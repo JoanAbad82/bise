@@ -52,6 +52,7 @@ pub const METHODS: &[MethodRow] = &[
     m("thread/subscribe", "subscribe", Some("thread")),
     m("thread/unsubscribe", "unsubscribe", None),
     m("thread/page", "page", Some("thread")),
+    m("thread/find", "find", Some("thread_hits")),
     m("turn/send", "send", None),
     m("turn/interrupt", "stop", None),
     m("card/answer", "answer", None),

@@ -86,6 +86,12 @@ pub enum HubEv {
     /// one page of a thread, newest last: the answer to `subscribe` and
     /// `page`; `before` the oldest entry's pos when there is more
     Thread { project: Project, agent: String, entries: Vec<Entry>, before: Option<Pos>, more: bool },
+    /// the answer to `find` (`thread/find`): every entry of the thread up
+    /// to the line `upto` that holds `needle` (`thread::find`'s rule),
+    /// oldest first, at most `thread::find::MAX_HITS` (the newest kept);
+    /// `rid` the find's own. Entries after `upto` the client matches itself
+    /// as they come.
+    ThreadHits { project: Project, agent: String, rid: u64, needle: String, hits: Vec<crate::thread::find::FindHit>, upto: Pos },
     /// a subscribed thread's entry, live: a new pos appends, a known pos
     /// replaces (a tools entry growing, a card answered)
     Entry { project: Project, agent: String, entry: Box<Entry> },
@@ -424,7 +430,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "paused", "switch", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "paused", "switch", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -525,6 +531,10 @@ pub enum HubCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         limit: Option<u32>,
     },
+    /// ⌘F over a whole thread (`thread/find`): the hub reads its
+    /// transcript off its loop and answers `thread_hits`; a newer find of the
+    /// same connection and agent stops an older one still running
+    Find { project: Project, agent: String, needle: String, rid: u64 },
     /// his words to an agent (main included), as the TUI sends them, with
     /// how they go ([`SendOpts`]: mode, context, files, voice, via)
     Send {
@@ -827,7 +837,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -854,6 +864,7 @@ impl HubCmd {
             HubCmd::Subscribe { project, .. }
             | HubCmd::Unsubscribe { project, .. }
             | HubCmd::Page { project, .. }
+            | HubCmd::Find { project, .. }
             | HubCmd::Send { project, .. }
             | HubCmd::Answer { project, .. }
             | HubCmd::Close { project, .. }

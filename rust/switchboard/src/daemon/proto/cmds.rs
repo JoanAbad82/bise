@@ -73,7 +73,7 @@ impl Shell {
             HubCmd::Subscribe { agent, limit, .. } => {
                 let Some(dir) = self.dir_of(&agent) else { return self.proto_error(id, &tag, &format!("no agent {agent}")) };
                 let path = self.transcript(&dir);
-                let lines = lines_of(transcript_page(&path, transcript_len(&path) + 1, LINES));
+                let lines = lines_of(self.page_lines(&path, None, LINES));
                 let facts = self.facts();
                 self.setup();
                 let setup = &self.setup;
@@ -100,9 +100,9 @@ impl Shell {
             HubCmd::Page { agent, before, limit, .. } => {
                 let Some(dir) = self.dir_of(&agent) else { return self.proto_error(id, &tag, &format!("no agent {agent}")) };
                 let path = self.transcript(&dir);
-                let lines = lines_of(transcript_page(&path, before as usize, LINES));
+                let lines = lines_of(self.page_lines(&path, Some(before as usize), LINES));
                 // its last turn's steered receipts may sit after it
-                let ahead = lines_of(transcript_ahead(&path, before as usize, LINES));
+                let ahead = lines_of(self.ahead_lines(&path, before as usize, LINES));
                 let facts = self.facts();
                 self.setup();
                 let setup = &self.setup;
@@ -110,6 +110,7 @@ impl Shell {
                 let (entries, before, more) = pthread::page(&lines, &ahead, &ctx, limit.map_or(LIMIT, |l| (l as usize).clamp(1, MAX_LIMIT)));
                 self.proto_send(id, &HubEv::Thread { project, agent, entries, before, more });
             }
+            HubCmd::Find { agent, needle, rid, .. } => self.proto_find(id, &tag, project, agent, needle, rid),
             HubCmd::Send { agent, text, opts, cid, parts, .. } if parts.is_empty() => self.proto_input(id, &tag, agent, text, opts, cid, String::new()),
             // msg-parts: the model's text from his parts, the parts kept
             // on his message (a part this hub doesn't know: refused)

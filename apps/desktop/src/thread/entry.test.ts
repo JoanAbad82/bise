@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolSource, jsonStrField, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatedReport, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
-import { search } from './find';
+import { hitsIn } from './find';
+import FIND_TEXT from '../../../../rust/proto/fixtures/find_text.json';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
 
@@ -27,11 +28,15 @@ describe('thread rows', () => {
 
   it("⌘F finds a tools entry's steps in the fixture's thread", () => {
     const entries = hub_ev.flatMap((ev) => (ev.ev === 'thread' ? ev.entries : ev.ev === 'entry' ? [ev.entry] : []));
-    const found = search(
+    const found = hitsIn(
       entries.map((x) => ({ pos: x.pos, text: findText(x) })),
       'slow',
     );
-    expect(found.matches.length).toBeGreaterThan(0);
+    expect(found.length).toBeGreaterThan(0);
+  });
+
+  it("findText is the hub's find_text (rust/proto/fixtures/find_text.json, bise_proto::thread::find)", () => {
+    for (const c of FIND_TEXT) expect(findText(c.entry as unknown as Entry), c.name).toBe(c.text);
   });
 });
 

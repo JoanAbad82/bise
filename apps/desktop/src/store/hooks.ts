@@ -11,7 +11,7 @@ import type { AnsweredFrom } from './answered';
 import type { AnswerJump } from './store';
 import type { Acted } from './acted';
 import { refusedOf, type Refused } from './refused';
-import { diffKey, toolOutKey, Store, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState, type TalkShot } from './store';
+import { diffKey, toolOutKey, Store, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadHits, type ThreadOrder, type VoiceModeState, type TalkShot } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -193,6 +193,8 @@ export function usePeek(key: string | null, opts: { on?: boolean; maxWidth?: num
 
 /** A thread's order, before and more (key: threadKey(project, agent)). */
 export const useThreadOrder = (key: string): ThreadOrder => useSlice(`order:${key}`, (s) => s.threadOrder(key));
+/** The hub's newest answer to ⌘F in a thread (store.findInThread); null before one. */
+export const useThreadHits = (key: string): ThreadHits | null => useSlice(`hits:${key}`, (s) => s.threadHits(key));
 /** One entry: re-renders only when that entry is replaced. */
 export const useEntry = (key: string, pos: number): Entry | undefined => useSlice(`entry:${key}:${String(pos)}`, (s) => s.entry(key, pos));
 export const useTyping = (key: string): string => useSlice(`typing:${key}`, (s) => s.typing(key));

@@ -576,6 +576,18 @@ export class Store extends StoreVoice {
     t.ask = plan.ask;
     this.command({ cmd: "page", project, agent, before: plan.ask.before, limit: plan.limit });
   }
+  /**
+   * ⌘F over a whole thread (`thread/find`, thread-perf): the hub searches its transcript and its
+   * `thread_hits` comes back as the thread's `hits:` slice (useThreadHits). Its rid: an answer for
+   * an older one is stale. A hub without the method refuses it: the slice says so (hits null).
+   */
+  findInThread(project: string, agent: string, needle: string): number {
+    this.rid += 1;
+    const rid = this.rid;
+    this.finding.set(project, { key: threadKey(project, agent), rid });
+    this.command({ cmd: "find", project, agent, needle, rid });
+    return rid;
+  }
   /** His answer to card `card`: its words, and the images he pasted or dropped (R41: absolute paths, as a send's files). */
   answer(
     project: string,
@@ -667,6 +679,7 @@ export type {
   InboxList,
   QueuedTake,
   TalkShot,
+  ThreadHits,
   ThreadOrder,
   ToolOut,
   VersionsList,

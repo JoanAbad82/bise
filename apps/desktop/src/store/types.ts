@@ -2,7 +2,7 @@
 // checked complete at compile time), the slices' list types, and the key and
 // compare helpers. Pure, no state. Split out of store.ts (pure move). Owner:
 // amb-core (the hub slices with amb-win).
-import type { AwayProject, CoreEv, HubEv, InboxRecord, Mode, Part, Pr, PickFile, PickFolder, BranchRow, Page, VersionItem } from '@/proto';
+import type { AwayProject, CoreEv, FindHit, HubEv, InboxRecord, Mode, Part, Pr, PickFile, PickFolder, BranchRow, Page, VersionItem } from '@/proto';
 export type Ev = HubEv | CoreEv;
 export type EvOf<T extends Ev['ev']> = Extract<Ev, { ev: T }>;
 
@@ -12,6 +12,7 @@ export const TAGS = {
   agents: true,
   cards: true,
   thread: true,
+  thread_hits: true,
   entry: true,
   typing: true,
   partial: true,
@@ -197,6 +198,17 @@ export interface Pending {
   /** A1: the message id the hub answered the send with (echo.ts); null: answered without one (an
    *  older hub); absent: not answered yet */
   readonly msgId?: number | null;
+}
+
+/**
+ * The hub's answer to ⌘F over a whole thread (`thread_hits`, store.findInThread): every entry with
+ * a match up to line `upto`, oldest first. `hits` null: this hub has no thread/find (older), the
+ * window searches what it has loaded.
+ */
+export interface ThreadHits {
+  readonly rid: number;
+  readonly hits: readonly FindHit[] | null;
+  readonly upto: number;
 }
 
 /** A thread's list, as the list draws it: replaced only when its order, before or more change. */

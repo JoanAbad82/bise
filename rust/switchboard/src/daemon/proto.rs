@@ -23,6 +23,7 @@
 
 mod cmds;
 mod emit;
+mod find;
 mod tool_out;
 mod log;
 

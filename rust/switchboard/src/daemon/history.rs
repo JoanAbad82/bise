@@ -43,6 +43,34 @@ pub(super) fn transcript_ahead(path: &Path, from: usize, count: usize) -> Vec<(u
 }
 
 impl Shell {
+    /// The lines of `path` at [before - count, before), `before` None: its
+    /// end (the newest page). Through the transcript's offset index
+    /// (tindex.rs): a page reads its own lines. A thread paged for the
+    /// first time has none yet: read the old way, once, while a worker
+    /// builds it.
+    pub(super) fn page_lines(&self, path: &Path, before: Option<usize>, count: usize) -> Vec<(usize, Option<u64>, String)> {
+        let at = |ix: &super::tindex::TIndex| {
+            let before = before.unwrap_or(ix.lines() + 1);
+            ix.read(path, before.saturating_sub(count), before)
+        };
+        if self.tix.ensure(path) {
+            if let Some(lines) = self.tix.with(path, at) {
+                return lines;
+            }
+        }
+        let before = before.unwrap_or_else(|| super::lines::transcript_len(path) + 1);
+        transcript_page(path, before, count)
+    }
+
+    /// The lines of `path` at [from, from + count), as [`Self::page_lines`]
+    /// (a page's last turn's steered receipts).
+    pub(super) fn ahead_lines(&self, path: &Path, from: usize, count: usize) -> Vec<(usize, Option<u64>, String)> {
+        if let Some(lines) = self.tix.with(path, |ix| ix.read(path, from, from + count)) {
+            return lines;
+        }
+        transcript_ahead(path, from, count)
+    }
+
     /// `sb inspect`: a bounded page of an agent's thread, with positions
     /// and cursors, or the origin of the caller (RFC 0001 §7.5).
     pub(super) fn inspect(&self, from: &str, v: &Value) -> Value {

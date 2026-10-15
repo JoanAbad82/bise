@@ -46,6 +46,7 @@ import {
   type TalkShot,
   takeKey,
   EMPTY_ORDER,
+  type ThreadHits,
   type ThreadOrder,
   type ToolOut,
   toolOutKey,
@@ -270,6 +271,10 @@ export class StoreReads extends StoreBase {
   }
   threadOrder(key: string): ThreadOrder {
     return this.threads.get(key)?.view ?? EMPTY_ORDER;
+  }
+  /** The hub's newest answer to ⌘F in thread `key` (findInThread); hits null: the hub can't search (older hub). */
+  threadHits(key: string): ThreadHits | null {
+    return this.slice<ThreadHits | null>(`hits:${key}`, null);
   }
   entry(key: string, pos: number): Entry | undefined {
     return this.threads.get(key)?.byPos.get(pos);

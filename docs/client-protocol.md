@@ -149,7 +149,16 @@ restarts.
 - An entry comes again when it changes (a tools entry growing, a card
   answered): the same `pos` replaces, a new `pos` appends.
 - `thread/page {agent, before, limit?}` answers the entries before
-  `before` (scrolling up).
+  `before` (scrolling up). The hub reads a page through the transcript's
+  offset index: its cost is the page's, not the thread's length.
+- `thread/find {agent, needle, rid}` answers `thread_hits {rid, needle,
+  hits: [{pos, n}], upto}`: every entry up to line `upto` that holds
+  `needle` (case-insensitive, without overlaps, on the entry's find text:
+  `bise_proto::thread::find`), oldest first, at most 5,000 (the newest).
+  The hub searches off its loop; a newer find of the same agent on the
+  same connection stops the older one, which then never answers. Match
+  the entries after `upto` yourself as they come. An older hub refuses it
+  (`hub_older`): search what you hold, and say the count is partial.
 - `thread/unsubscribe {agent}` stops them.
 - After a reconnection, subscribe again; the entries above the last
   `pos` you hold are new.

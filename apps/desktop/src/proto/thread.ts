@@ -414,3 +414,8 @@ export type Retry = { attempt: number, max: number, why: string, wait_ms: number
  * after it
  */
 end?: RetryEnd | null, };
+
+/**
+ * One entry's hits: its pos and how many matches it holds.
+ */
+export type FindHit = { pos: number, n: number, };

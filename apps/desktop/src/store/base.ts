@@ -65,6 +65,8 @@ export class StoreBase {
     { project: string; resolve: (a: FilesAnswer | null) => void }
   >();
   protected readonly newestRid = new Map<string, number>();
+  /** each project's newest ⌘F over a thread (findInThread): its thread and rid, for a refusal */
+  /** @internal for apply.ts */ readonly finding = new Map<string, { key: string; rid: number }>();
   /** commands asked from this core (said again when a core comes up) */
   protected commandsAsked = false;
   /** the last shown set sent (null: none yet); said again to a core that comes back up */

@@ -802,6 +802,7 @@ pub fn page(lines: &[Line], ahead: &[Line], ctx: &Ctx, limit: usize) -> (Vec<Ent
     (entries, before, more)
 }
 
+pub mod find;
 pub mod fold;
 pub mod legacy;
 pub mod lines;

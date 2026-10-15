@@ -14,6 +14,7 @@ import {
   type QueuedTake,
   takeKey,
   threadKey,
+  type ThreadHits,
   type ToolOut,
   toolOutKey,
   type VersionsList,
@@ -61,6 +62,9 @@ export function applyTyped(s: Store, ev: Ev): void {
       return;
     case "entry":
       s.entryEv(ev);
+      return;
+    case "thread_hits":
+      s.put(`hits:${threadKey(ev.project, ev.agent)}`, { rid: ev.rid, hits: ev.hits, upto: ev.upto } satisfies ThreadHits);
       return;
     case "typing": {
       const key = threadKey(ev.project, ev.agent);
@@ -260,6 +264,12 @@ export function applyTyped(s: Store, ev: Ev): void {
       // from where he answered and stayed after the hub took it late): the window that sent it gets
       // 'card_refused' for that very card and says so on the card (store.ts cardRefused, refused.ts)
       if (ev.cmd === "answer" || ev.cmd === "close") return;
+      // ⌘F over a whole thread on a hub without thread/find (older): find searches what is loaded
+      if (ev.cmd === "find" && ev.project != null) {
+        const f = s.finding.get(ev.project);
+        if (f !== undefined) s.put(`hits:${f.key}`, { rid: f.rid, hits: null, upto: -1 } satisfies ThreadHits);
+        return;
+      }
       // a slash the hub refused, or a queued message it couldn't send now (delivered, taken, the
       // agent down): its words on the line over the composer
       if ((ev.cmd === "slash" || ev.cmd === "queued_steer") && ev.project != null) {

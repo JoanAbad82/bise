@@ -53,13 +53,14 @@ mod loop_watch;
 mod merged;
 mod outbox;
 mod state_gate;
+mod tindex;
 mod usage;
 mod wakes;
 mod worktrees;
 mod xhub;
 mod xread;
 
-use history::{transcript_ahead, transcript_page};
+use history::transcript_page;
 use lines::transcript_len;
 use repl::{adopt, adoptable, busy_at, kill_pid, supervise};
 use skills::{skill_roots, skills_fingerprint};
@@ -334,6 +335,12 @@ struct Shell {
     /// Each agent's answer as it streams in (its `partial` lines, by
     /// name): memory only, never journaled (daemon/lines.rs).
     partials: BTreeMap<String, bise_proto::thread::lines::Partial>,
+    /// Each transcript's offset index (thread pages and `thread/find`,
+    /// daemon/tindex.rs): built by a worker the first time it is paged.
+    tix: tindex::Indexes,
+    /// Each connection's newest `thread/find` per agent: an older search
+    /// still running stops when it sees it moved (daemon/proto/find.rs).
+    finds: BTreeMap<(ClientId, String), std::sync::Arc<std::sync::atomic::AtomicU64>>,
     /// Versions being built (`/version <commit>`), by revision.
     building: BTreeSet<String>,
     /// The `/update` build in bise's source tree (dev-update): HEAD's
@@ -1978,6 +1985,8 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         switch_spawned: BTreeSet::new(),
         restored: BTreeSet::new(),
         partials: BTreeMap::new(),
+        tix: tindex::Indexes::default(),
+        finds: BTreeMap::new(),
         building: BTreeSet::new(),
         updating: None,
         release: None,

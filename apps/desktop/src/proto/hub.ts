@@ -9,7 +9,7 @@ import type { LogItem } from './log';
 import type { BranchRow, ReleaseEv, UpdateEv, VersionItem } from './ops';
 import type { Part } from './parts';
 import type { Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, FlowMode, Merged, Model, Page, Place, Pr, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
-import type { Entry } from './thread';
+import type { Entry, FindHit } from './thread';
 
 export type JobState = "running" | "done" | "failed";
 
@@ -37,7 +37,7 @@ cmds: Array<string>,
  * a hub newer than the app reads the app's update channel at once
  * (desktop-dist, architect m_25198)
  */
-built?: string | null, } | { "ev": "agents", project: string, agents: Array<Agent>, places?: Array<Place>, } | { "ev": "cards", project: string, cards: Array<Card>, others?: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "partial", project: string, agent: string, call: string, off: number, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, seen_ms?: number | null, } | { "ev": "scheduled", project: string, items: Array<ScheduledTask>, ended?: Array<ScheduledTask>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "tool_out", project: string, agent: string, pos: number, out: string, cut: boolean, 
+built?: string | null, } | { "ev": "agents", project: string, agents: Array<Agent>, places?: Array<Place>, } | { "ev": "cards", project: string, cards: Array<Card>, others?: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "thread_hits", project: string, agent: string, rid: number, needle: string, hits: Array<FindHit>, upto: number, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "partial", project: string, agent: string, call: string, off: number, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, seen_ms?: number | null, } | { "ev": "scheduled", project: string, items: Array<ScheduledTask>, ended?: Array<ScheduledTask>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "tool_out", project: string, agent: string, pos: number, out: string, cut: boolean, 
 /**
  * the whole output's size in bytes (the unit of the cap: '4 KB
  * of 18 KB shown'), when the session log answered; none for the
@@ -164,7 +164,7 @@ export type SendOpts = { mode?: Mode | null, context?: FnContext | null, files?:
 /**
  * What a client asks a hub.
  */
-export type HubCmd = { "cmd": "subscribe", project: string, agent: string, limit?: number | null, } | { "cmd": "unsubscribe", project: string, agent: string, } | { "cmd": "page", project: string, agent: string, before: number, limit?: number | null, } | { "cmd": "send", project: string, agent: string, text: string, 
+export type HubCmd = { "cmd": "subscribe", project: string, agent: string, limit?: number | null, } | { "cmd": "unsubscribe", project: string, agent: string, } | { "cmd": "page", project: string, agent: string, before: number, limit?: number | null, } | { "cmd": "find", project: string, agent: string, needle: string, rid: number, } | { "cmd": "send", project: string, agent: string, text: string, 
 /**
  * draft (G): the window's id for this send, echoed on its error
  * to this connection only (never journaled: view state)

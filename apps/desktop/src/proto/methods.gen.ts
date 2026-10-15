@@ -10,6 +10,7 @@ export const METHODS = {
   "thread/subscribe": { cmd: "subscribe", result: "thread" },
   "thread/unsubscribe": { cmd: "unsubscribe", result: null },
   "thread/page": { cmd: "page", result: "thread" },
+  "thread/find": { cmd: "find", result: "thread_hits" },
   "turn/send": { cmd: "send", result: null },
   "turn/interrupt": { cmd: "stop", result: null },
   "card/answer": { cmd: "answer", result: null },
