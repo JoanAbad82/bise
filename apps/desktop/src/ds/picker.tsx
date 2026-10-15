@@ -7,8 +7,11 @@
 // scroll past `maxHeight`, with 16 px fades at the clipped edges. The active row (hover or the
 // keyboard cursor, the last input wins) has the 6% tint; the current value its ✓, no tint.
 // Keys: `ownKeys` (mode, model): it takes the focus and ↑↓ (wrap) home end pgup pgdn ⏎ esc; else
-// (/ and @, the editor keeps the keys) `active` is the caller's. Placement is the caller's
-// (pickerPlace gives it: 8 px from the trigger, clamped in the window). css/picker.css.
+// (/ and @, the editor keeps the keys) `active` is the caller's; with its own keys a letter jumps to
+// the next row that starts with it (typeahead). Never taller than half the window (his m_26194: 50vh,
+// whatever `maxHeight` says); the list scrolls inside, the current row in view on open. Placement:
+// pickerPlace (8 px from the trigger, clamped in the window); a menu that opens from a trigger is
+// PickerPop or Dropdown (dropdown.tsx), never a Picker placed by a screen. css/picker.css.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { cx, sub } from "./cx";
 
@@ -27,6 +30,8 @@ export interface PickerRow {
   disabled?: boolean;
   /** the row's tip words (the ds tip layer) */
   tip?: string;
+  /** its words for the typeahead, when `name` isn't a string */
+  text?: string;
   testId?: string;
 }
 export interface PickerGroup {
@@ -34,6 +39,8 @@ export interface PickerGroup {
   /** its head, text-3 12, 28 px ('Anthropic') */
   head?: ReactNode;
   rows: readonly PickerRow[];
+  /** the group's own signed look (a class with its rule in the screen's css: the inbox's narrow-only rows) */
+  look?: string;
 }
 export interface PickerProps {
   /** the head line's title and key, text-3 12 ('mode', '⇧⇥') */
@@ -94,20 +101,45 @@ export function stepActive(ids: readonly string[], active: string | null, key: s
   }
 }
 
+/** The tallest a picker gets, as a part of the window's height (his m_26194: about 50vh). */
+export const PICKER_CAP = 0.5;
+/** The widest a picker gets (⌘K's 640 aside): picker.css's max-width. */
+const PICKER_W = 420;
+
 /**
- * A picker's place (designer m_24793, his m_25470): 8 px from its anchor (the composer's box),
- * aligned to its trigger's left edge, or its right edge when the trigger sits right, 8 px inside the
- * window. Above the anchor when the room there takes 240 px or is the larger; else below. Its whole
- * height fits that room (8 px from the anchor, 8 from the window's edge): the list scrolls inside,
- * the footer stays. Fixed coordinates. Pure.
+ * A picker's place (designer m_24793, his m_25470): 8 px from its anchor (the composer's box, else
+ * its trigger), aligned to its trigger's left edge, or its right edge when the trigger sits right
+ * ("auto": the left edge unless a 420 px picker would pass the window's right), 8 px inside the
+ * window. On its `side` (above: the composer's; below: a menu's) when the room there takes 240 px
+ * or is the larger; else the other side. Its whole height fits that room (8 px from the anchor, 8
+ * from the window's edge) and half the window: the list scrolls inside, the footer stays. Fixed
+ * coordinates. Pure.
  */
-export function pickerPlace(anchor: { top: number; bottom: number }, trigger: { left: number; right: number }, align: "start" | "end", win: { width: number; height: number }): { style: CSSProperties; maxHeight: number } {
+export function pickerPlace(
+  anchor: { top: number; bottom: number },
+  trigger: { left: number; right: number },
+  align: "start" | "end" | "auto",
+  win: { width: number; height: number },
+  side: "above" | "below" = "above",
+): { style: CSSProperties; maxHeight: number } {
   const above = anchor.top - 16;
   const below = win.height - anchor.bottom - 16;
-  const up = above >= 240 || above >= below;
-  const x: CSSProperties = align === "start" ? { left: Math.max(8, trigger.left) } : { right: Math.max(8, win.width - trigger.right) };
+  const up = side === "above" ? above >= 240 || above >= below : !(below >= 240 || below >= above);
+  const a = align === "auto" ? (trigger.left + PICKER_W + 8 <= win.width ? "start" : "end") : align;
+  const x: CSSProperties = a === "start" ? { left: Math.max(8, trigger.left) } : { right: Math.max(8, win.width - trigger.right) };
   const y: CSSProperties = up ? { bottom: win.height - anchor.top + 8 } : { top: anchor.bottom + 8 };
-  return { style: { position: "fixed", ...x, ...y }, maxHeight: Math.max(96, up ? above : below) };
+  return { style: { position: "fixed", ...x, ...y }, maxHeight: Math.min(Math.floor(win.height * PICKER_CAP), Math.max(96, up ? above : below)) };
+}
+
+/** The row a typed prefix jumps to: the first walkable row after `from` (or from the top when the
+ *  prefix is longer than one letter) whose words start with it; null: none. Pure. */
+export function typeahead(groups: readonly PickerGroup[], from: string | null, prefix: string): string | null {
+  const rows = groups.flatMap((g) => g.rows.filter((r) => r.disabled !== true));
+  const words = (r: PickerRow) => (r.text ?? (typeof r.name === "string" ? r.name : r.id)).toLowerCase();
+  const p = prefix.toLowerCase();
+  const i = from === null ? -1 : rows.findIndex((r) => r.id === from);
+  const order = p.length > 1 ? rows : [...rows.slice(i + 1), ...rows.slice(0, i + 1)];
+  return order.find((r) => words(r).startsWith(p))?.id ?? null;
 }
 
 /** The glyph column shows only when the list mixes kinds: every row with the same glyph (or none)
@@ -158,6 +190,7 @@ export function Picker({ title, titleKeys, groups, footer, keyline, empty, activ
   const [hover, setHover] = useState<{ id: string; at: string | null } | null>(null);
   const on = active === undefined ? own : hover !== null && hover.at === active ? hover.id : active;
   const [edges, setEdges] = useState({ top: false, bottom: false });
+  const typed = useRef({ s: "", at: 0 });
   // its own keys: the focus on open
   useEffect(() => {
     if (ownKeys) shell.current?.focus();
@@ -194,6 +227,16 @@ export function Picker({ title, titleKeys, groups, footer, keyline, empty, activ
       if (on !== null) onPick(on);
       return;
     }
+    if (e.key.length === 1 && e.key !== " " && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      // typeahead: the letters typed within 700 ms make one prefix
+      const now = Date.now();
+      typed.current = now - typed.current.at > 700 ? { s: e.key, at: now } : { s: typed.current.s + e.key, at: now };
+      const hit = typeahead(groups, on, typed.current.s);
+      e.preventDefault();
+      e.stopPropagation();
+      if (hit !== null) setOwn(hit);
+      return;
+    }
     const next = stepActive(ids, on, e.key);
     if (next === null) return;
     e.preventDefault();
@@ -203,7 +246,7 @@ export function Picker({ title, titleKeys, groups, footer, keyline, empty, activ
   const rows = groups.reduce((n, g) => n + g.rows.length, 0);
   const glyphs = glyphColumn(groups);
   return (
-    <div ref={shell} className={cx("b-picker", wide && "wide", inline && "inline")} role="menu" tabIndex={ownKeys ? -1 : undefined} style={maxHeight === undefined ? style : { ...style, maxHeight }} onKeyDown={onKeyDown}
+    <div ref={shell} className={cx("b-picker", wide && "wide", inline && "inline")} role="menu" tabIndex={ownKeys ? -1 : undefined} style={maxHeight === undefined ? style : { ...style, maxHeight: `min(${String(PICKER_CAP * 100)}vh, ${String(maxHeight)}px)` }} onKeyDown={onKeyDown}
       onMouseDown={(e) => { e.preventDefault(); }} data-testid={testId}>
       {title != null && (
         <div className="b-picker-head">
@@ -214,7 +257,7 @@ export function Picker({ title, titleKeys, groups, footer, keyline, empty, activ
       <div ref={list} className={cx("b-picker-list", edges.top && "fade-top", edges.bottom && "fade-bottom")} onScroll={onScroll}>
         {rows === 0 && empty != null && <div className="b-picker-row none">{empty}</div>}
         {groups.map((g) => (
-          <div key={g.id} className="b-picker-group" role="group">
+          <div key={g.id} className={cx("b-picker-group", g.look)} role="group">
             {g.head != null && <div className="b-picker-ghead">{g.head}</div>}
             {g.rows.map((r) => (
               <div key={r.id} data-row={r.id} role="menuitemradio" aria-checked={r.current === true} aria-disabled={r.disabled === true || undefined}

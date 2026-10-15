@@ -9,7 +9,7 @@ import { isImageSrc } from './zoom';
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { APP_FRAME_NAME } from './frameNote';
 import { useFrameNote } from './useFrameNote';
-import { Button, IconButton, Menu, MenuItem, Press } from '@/ds';
+import { Button, IconButton, PickerPop, PickerTrigger, Press } from '@/ds';
 import type { ArtifactLive } from '@/proto';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useStore } from '@/store';
@@ -192,6 +192,11 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
   // 'v' on a row of the list opens it with its versions shown
   const [menu, setMenu] = useState<'versions' | 'more' | null>(() => (takeVersions(`${project}/${id}`) ? 'versions' : null));
+  const closeMenu = useCallback(() => {
+    setMenu(null);
+  }, []);
+  const versionsAt = useRef<HTMLButtonElement>(null);
+  const moreAt = useRef<HTMLButtonElement>(null);
   const [at] = useState(() => takeAnchor(`${project}/${id}`));
   const [v, setV] = useState<number | null>(null);
   // the live line he moved away from (another version picked): it goes; a new line shows again
@@ -266,39 +271,41 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
         {lead}
         <span className="art-open-title" data-testid="artifact.title" title={a.title}>{a.title}</span>
         <span className="art-open-end">
-          <span className="art-drop">
-            <Button kind="ghost" size="sm" onClick={() => { setMenu(menu === 'versions' ? null : 'versions'); }} testId="artifact.version" title={shown === a.version ? 'the current version' : 'an older version'}>
-              {`${kindOf(a.kind)} · v${String(shown)} ⌄`}
-            </Button>
-            {menu === 'versions' && (
-              <Menu testId="artifact.versions">
-                {versions(a, now).map((r) => (
-                  <MenuItem key={r.v} on={r.v === shown} onClick={() => { setV(r.v); setMenu(null); setGoneLine(a.live?.line ?? null); }} testId={`artifact.versions.v${String(r.v)}`}>
-                    <span className="art-v">{`v${String(r.v)}`}</span>
-                    <span className="art-v-words">{r.words}</span>
-                    {r.when !== undefined && <span className="art-v-when">{r.when}</span>}
-                  </MenuItem>
-                ))}
-              </Menu>
-            )}
-          </span>
+          <PickerTrigger ref={versionsAt} open={menu === 'versions'} onClick={() => { setMenu(menu === 'versions' ? null : 'versions'); }} testId="artifact.version" tip={shown === a.version ? 'the current version' : 'an older version'}>
+            {`${kindOf(a.kind)} · v${String(shown)}`}
+          </PickerTrigger>
+          {menu === 'versions' && (
+            <PickerPop anchor={versionsAt} align="end" onClose={closeMenu} testId="artifact.versions"
+              groups={[{ id: 'versions', rows: versions(a, now).map((r) => ({
+                id: String(r.v),
+                text: `v${String(r.v)}`,
+                name: <><span className="art-v">{`v${String(r.v)}`}</span><span className="art-v-words">{r.words}</span></>,
+                trailing: r.when,
+                current: r.v === shown,
+                testId: `artifact.versions.v${String(r.v)}`,
+              })) }]}
+              onPick={(id) => { setV(Number(id)); setMenu(null); setGoneLine(a.live?.line ?? null); }} />
+          )}
           {out !== null && (
             <Button kind="ghost" size="sm" onClick={() => { void bise?.openExternal?.(out); }} testId="artifact.browser" title="open in browser">
               ↗ browser
             </Button>
           )}
-          <span className="art-drop">
-            <IconButton label="more" size="bar" pressed={menu === 'more'} onClick={() => { setMenu(menu === 'more' ? null : 'more'); }} testId="artifact.more">⋯</IconButton>
-            {menu === 'more' && (
-              <Menu testId="artifact.more.menu">
-                {finder !== undefined && path !== null && (
-                  <MenuItem onClick={() => { void finder(path); setMenu(null); }} testId="artifact.finder">show in Finder</MenuItem>
-                )}
-                <MenuItem onClick={() => { void bise?.copy?.(url); setMenu(null); }} testId="artifact.copy">copy link</MenuItem>
-                <MenuItem onClick={() => { setMenu(null); put(project, a); }} testId="artifact.put">put it in a message</MenuItem>
-              </Menu>
-            )}
-          </span>
+          <IconButton ref={moreAt} label="more" size="bar" pressed={menu === 'more'} onClick={() => { setMenu(menu === 'more' ? null : 'more'); }} testId="artifact.more">⋯</IconButton>
+          {menu === 'more' && (
+            <PickerPop anchor={moreAt} align="end" onClose={closeMenu} testId="artifact.more.menu"
+              groups={[{ id: 'more', rows: [
+                ...(finder !== undefined && path !== null ? [{ id: 'finder', name: 'show in Finder', testId: 'artifact.finder' }] : []),
+                { id: 'copy', name: 'copy link', testId: 'artifact.copy' },
+                { id: 'put', name: 'put it in a message', testId: 'artifact.put' },
+              ] }]}
+              onPick={(id) => {
+                setMenu(null);
+                if (id === 'finder' && finder !== undefined && path !== null) void finder(path);
+                else if (id === 'copy') void bise?.copy?.(url);
+                else if (id === 'put') put(project, a);
+              }} />
+          )}
           {x}
         </span>
       </div>

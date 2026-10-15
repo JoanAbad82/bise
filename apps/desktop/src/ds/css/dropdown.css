@@ -1,0 +1,53 @@
+/* bise desktop window · a menu's trigger and its floating Picker (ds/dropdown.tsx, his m_26194).
+   The trigger: its words then the 8x5 caret, 8 px after them, both centered on the trigger's height
+   (inline-flex, align-items center: the caret is an svg box, never a glyph on the baseline). The
+   chip: the composer's tool chip (designer m_24786), 28 px, padding 0 8, r 8, text-2 13, the 6% tint
+   on hover and while its menu shows, the caret text-3. The field look is controls.css's Select. */
+.b-ptrig {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  box-sizing: border-box;
+  height: var(--h-control-sm);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-2);
+  background: none;
+  font: var(--t-13) / 1 var(--font-ui);
+  color: var(--c-text-2);
+  white-space: nowrap;
+  cursor: default;
+  transition:
+    background var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out);
+}
+.b-ptrig.chip:hover,
+.b-ptrig.chip[aria-expanded="true"] {
+  background: var(--c-hover);
+  color: var(--c-text);
+}
+.b-ptrig:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--c-focus);
+}
+.b-ptrig:disabled {
+  opacity: 0.4;
+}
+.b-ptrig .w {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+.b-ptrig .v {
+  flex: none;
+  display: block;
+  color: var(--c-text-3);
+}
+/* the floating picker's layer: over the screens, under a Sheet's scrim */
+.b-picker-pop .b-picker {
+  z-index: 45;
+}

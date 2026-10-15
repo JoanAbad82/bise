@@ -6,9 +6,9 @@
 // listbox: focus trap, esc, typeahead and the a11y wiring are theirs, the look is the ds's.
 // Pure renders of their props, like every ds component (index.ts's rules); css/controls.css.
 import * as Dialog from "@radix-ui/react-dialog";
-import * as RSelect from "@radix-ui/react-select";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, MouseEventHandler, ReactNode, Ref, TextareaHTMLAttributes } from "react";
 import { cx, st, type UiState } from "./cx";
+import { Dropdown } from "./dropdown";
 import { tipAttrs } from "./tip";
 
 export interface PressProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "type"> {
@@ -192,33 +192,16 @@ export interface SelectProps {
   testId?: string;
 }
 /**
- * the settings picker: a Field with '⌄' that opens a ds Picker under it (its shell, rows, inline
- * hint and ✓, picker.css; designer m_24793); typeahead, ↑↓ ⏎ esc (Radix Select). Each option's test id is `<testId>.opt.<value>`.
+ * the settings picker: a Field with the ds caret that opens a ds Picker under it, at least the
+ * Field's width (dropdown.tsx's Dropdown, look "field"; designer m_24793): its inline hint and ✓,
+ * typeahead, ↑↓ ⏎ esc. Each option's test id is `<testId>.opt.<value>`.
  */
 export function Select({ value, options, onChange, label, placeholder, state, testId }: SelectProps) {
+  const cur = options.find((o) => o.value === value);
   return (
-    <RSelect.Root value={value} onValueChange={onChange} disabled={state === "disabled"}>
-      <RSelect.Trigger className={cx("b-field", "b-select", st(state))} aria-label={label} data-testid={testId}>
-        <RSelect.Value placeholder={placeholder} />
-        <RSelect.Icon className="chev">
-          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </RSelect.Icon>
-      </RSelect.Trigger>
-      <RSelect.Portal>
-        <RSelect.Content className="b-picker inline b-select-menu" position="popper" sideOffset={8}>
-          <RSelect.Viewport className="b-picker-list">
-            {options.map((o) => (
-              <RSelect.Item key={o.value} value={o.value} className="b-picker-row" data-testid={testId === undefined ? undefined : `${testId}.opt.${o.value}`}>
-                <span className="t">
-                  <span className="n"><RSelect.ItemText>{o.label}</RSelect.ItemText></span>
-                  {o.hint != null && <span className="s">{o.hint}</span>}
-                </span>
-                <RSelect.ItemIndicator className="ok" aria-hidden="true">✓</RSelect.ItemIndicator>
-              </RSelect.Item>
-            ))}
-          </RSelect.Viewport>
-        </RSelect.Content>
-      </RSelect.Portal>
-    </RSelect.Root>
+    <Dropdown look="field" extra={st(state) || undefined} name={label} disabled={state === "disabled"} placeholder={cur === undefined}
+      label={cur?.label ?? placeholder ?? ""} align="start" inline
+      groups={[{ id: "opts", rows: options.map((o) => ({ id: o.value, name: o.label, secondary: o.hint ?? undefined, current: o.value === value, testId: testId === undefined ? undefined : `${testId}.opt.${o.value}` })) }]}
+      onPick={(v) => { if (v !== value) onChange(v); }} testId={testId} />
   );
 }

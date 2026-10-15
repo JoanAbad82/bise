@@ -393,8 +393,8 @@
   font-weight: 600;
 }
 /* the box's row (designer's composer-strip A, thread/ComposerTools.tsx): '+' 28 px and the menus
-   28 px high, text-2, the 6% hover; the model in ink 500; their pickers (ds Picker) open above the
-   box, placed by the screen. Short (the box under 440 px), the effort leaves the model's button: it stays in
+   28 px high, text-2, the 6% hover; the model in ink 500; their pickers (ds PickerPop) open above the
+   box. Short (the box under 440 px), the effort leaves the model's button: it stays in
    its menu; the mode never drops */
 .b-composer .box {
   container: cmp-box / inline-size;
@@ -428,23 +428,11 @@
   padding: 0;
   font-size: var(--t-17);
 }
+/* the mode and model chips are the ds PickerTrigger (ds/dropdown.tsx: the same 28 px chip, the
+   caret centered 8 px after the words); here only the model's ink */
 .b-composer .cmp-menu b {
   font-weight: 500;
   color: var(--c-text);
-}
-.b-composer .cmp-menu {
-  gap: var(--s-2);
-}
-.b-composer .cmp-menu .w {
-  display: inline-flex;
-  align-items: baseline;
-  white-space: pre;
-}
-/* the caret: an 8x5 chevron, text-3, centered on the words' line box, 8 px after them (m_24786) */
-.b-composer .cmp-menu .v {
-  flex: none;
-  display: block;
-  color: var(--c-text-3);
 }
 @container cmp-box (max-width: 440px) {
   .b-composer .cmp-menu .eff {

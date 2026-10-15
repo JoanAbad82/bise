@@ -139,7 +139,7 @@ test('artifacts/script-page: a page its script builds shows whole in the panel, 
 
     // v2 lands while it is open: the panel follows it
     await core.send({ ev: 'artifacts', project: P, items: [row(pages.url, 2)] } as never);
-    await expect(page.getByTestId('artifact.version')).toHaveText('page · v2 ⌄', { timeout: 10_000 });
+    await expect(page.getByTestId('artifact.version')).toHaveText('page · v2', { timeout: 10_000 });
     await expect.poll(cards, { timeout: 10_000, message: "v2's 30 cards, live" }).toBe(30);
     await page.screenshot({ path: test.info().outputPath('script-v2.png') });
 

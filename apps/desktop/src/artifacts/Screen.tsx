@@ -7,7 +7,7 @@
 // search then leaves the archived ones. Owner: amb-mac (amb-kit's before).
 import { useState, type KeyboardEvent } from 'react';
 import { useListKeys } from '@/app/listkeys';
-import { Button, Field, Menu, MenuItem, Press } from '@/ds';
+import { Dropdown, Field, Press } from '@/ds';
 import { useProjects } from '@/store';
 import { useKeptScroll } from '@/app/keep';
 import { useAllArtifacts } from './hooks';
@@ -24,7 +24,6 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   // back from an open artifact (esc, ‹): the list where he left it (designer's desktop-history)
   useKeptScroll(`artifacts:${project}`, () => document.querySelector<HTMLElement>('[data-testid="artifacts.list"]'));
   const [f, setF] = useState<Filter>({ ...ALL, project });
-  const [menu, setMenu] = useState<'project' | 'agent' | null>(null);
   const [now] = useState(() => Date.now());
   // the archived ones leave the list behind a faint 'N archived' row; a (or a click) shows them
   // alone, esc goes back (the TUI's artifacts screen)
@@ -105,34 +104,18 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
         <div className="art-h2">{archivedOn ? 'what you or your agents put away' : 'what your agents made'}</div>
       </header>
       <div className="art-filters">
-        <span className="art-drop">
-          <Button kind="ghost" onClick={() => { setMenu(menu === 'project' ? null : 'project'); }} testId="artifacts.projects">
-            {f.project === '' ? 'all projects ⌄' : `${projectName} ⌄`}
-          </Button>
-          {menu === 'project' && (
-            <Menu testId="artifacts.projects.menu">
-              <MenuItem on={f.project === ''} onClick={() => { setF({ ...f, project: '' }); setMenu(null); }} testId="artifacts.projects.all">all projects</MenuItem>
-              {projects.map((p) => (
-                <MenuItem key={p.project} on={f.project === p.project} onClick={() => { setF({ ...f, project: p.project }); setMenu(null); }} testId={`artifacts.projects.${p.project}`}>
-                  {p.name !== '' ? p.name : p.project}
-                </MenuItem>
-              ))}
-            </Menu>
-          )}
-        </span>
-        <span className="art-drop">
-          <Button kind="ghost" onClick={() => { setMenu(menu === 'agent' ? null : 'agent'); }} testId="artifacts.agents">
-            {f.agent === '' ? 'all agents ⌄' : `${f.agent} ⌄`}
-          </Button>
-          {menu === 'agent' && (
-            <Menu testId="artifacts.agents.menu">
-              <MenuItem on={f.agent === ''} onClick={() => { setF({ ...f, agent: '' }); setMenu(null); }} testId="artifacts.agents.all">all agents</MenuItem>
-              {agentsOf(all).map((a) => (
-                <MenuItem key={a} on={f.agent === a} onClick={() => { setF({ ...f, agent: a }); setMenu(null); }} testId={`artifacts.agents.${a}`}>{a}</MenuItem>
-              ))}
-            </Menu>
-          )}
-        </span>
+        <Dropdown label={f.project === '' ? 'all projects' : projectName} testId="artifacts.projects"
+          groups={[{ id: 'projects', rows: [
+            { id: 'p:', name: 'all projects', current: f.project === '', testId: 'artifacts.projects.all' },
+            ...projects.map((p) => ({ id: `p:${p.project}`, name: p.name !== '' ? p.name : p.project, current: f.project === p.project, testId: `artifacts.projects.${p.project}` })),
+          ] }]}
+          onPick={(id) => { setF({ ...f, project: id.slice(2) }); }} />
+        <Dropdown label={f.agent === '' ? 'all agents' : f.agent} testId="artifacts.agents"
+          groups={[{ id: 'agents', rows: [
+            { id: 'a:', name: 'all agents', current: f.agent === '', testId: 'artifacts.agents.all' },
+            ...agentsOf(all).map((a) => ({ id: `a:${a}`, name: a, current: f.agent === a, testId: `artifacts.agents.${a}` })),
+          ] }]}
+          onPick={(id) => { setF({ ...f, agent: id.slice(2) }); }} />
         <span className="art-kinds">
           {KIND_FILTERS.map((k) => (
             <Press key={k.id} look={`art-kind${f.kinds.includes(k.id) ? ' on' : ''}`} aria-pressed={f.kinds.includes(k.id)}

@@ -23,6 +23,7 @@ export * from "./controls";
 export * from "./mark";
 export * from "./tip";
 export * from "./picker";
+export * from "./dropdown";
 export * from "./gust";
 export * from "./slide";
 export { textWidth } from "./hooks";

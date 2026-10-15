@@ -8,8 +8,8 @@ import { Markdown } from "@/thread/Markdown";
 // the thread's layout around the markdown (its code block's head, its pre), as the window draws it
 import "@/thread/thread.css";
 import {
-  Act, Answered, Art, ArtName, Bar, BiseMark, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
-  Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Picker, PickerSeg, Quote, Route, Row,
+  Act, Answered, Art, ArtName, Bar, BiseMark, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Dropdown, Empty, Err,
+  Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Picker, PickerSeg, PickerTrigger, Quote, Route, Row,
   SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
 } from "../index";
@@ -290,6 +290,11 @@ export const SECTIONS: Record<string, () => ReactNode> = {
   ),
   menus: () => (
     <div className="g-row g-top">
+      <Dropdown label="all agents" testId="ds.dropdown" onPick={() => undefined} groups={[{ id: "a", rows: [
+        { id: "", name: "all agents", current: true },
+        ...Array.from({ length: 40 }, (_, i) => ({ id: `agent-${String(i)}`, name: `agent-${String(i)}` })),
+      ] }]} />
+      <PickerTrigger open>opus 5.5 high</PickerTrigger>
       <Menu testId="ds.menu">
         <MenuItem hotkey="⌘C">copy</MenuItem>
         <MenuItem hotkey="⌘⇧C" on>copy as markdown</MenuItem>

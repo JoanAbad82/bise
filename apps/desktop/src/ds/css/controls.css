@@ -39,19 +39,12 @@
 .b-field.b-area textarea{flex:1;width:100%;min-width:0;min-height:calc(1.45em * 2);max-height:40vh;field-sizing:content;resize:none;overflow:auto;padding:0;border:0;outline:0;background:none;color:inherit;font:inherit;line-height:1.45}
 .b-field.b-area textarea::placeholder{color:var(--c-text-3)}
 
-/* Select: a Field with its chevron (12 px, text-2, centred) that opens the ds menu under it */
+/* Select: a Field with the ds caret (text-2, centred) that opens the ds Picker under it (dropdown.tsx's PickerTrigger look "field") */
 .b-field.b-select{justify-content:space-between;width:100%;border:0;font-family:var(--font-ui);cursor:default;text-align:left}
 .b-field.b-select:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--c-focus),0 0 0 3px color-mix(in srgb,var(--c-focus) 25%,transparent)}
-.b-field.b-select[data-placeholder]{color:var(--c-text-3)}
-.b-field.b-select .chev{display:inline-flex;align-items:center;width:12px;height:12px;color:var(--c-text-2)}
-.b-field.b-select .chev svg{display:block}
-.b-field.b-select.is-disabled,.b-field.b-select[data-disabled]{opacity:.4}
-.b-select-menu{z-index:60;min-width:max(240px,var(--radix-select-trigger-width));max-height:min(var(--radix-select-content-available-height),420px)}
-.b-select-menu .b-picker-list{max-height:calc(var(--radix-select-content-available-height) - var(--s-4))}
-/* the ds Picker's states (designer m_24793): the highlighted item the 6% tint, never a ring (the
-   ring is the trigger's only); the current value its ✓ text-2 at the right, no weight */
-.b-select-menu .b-picker-row{outline:0}
-.b-select-menu .b-picker-row[data-highlighted]{background:var(--c-hover)}
+.b-field.b-select.ph{color:var(--c-text-3)}
+.b-field.b-select .v{color:var(--c-text-2)}
+.b-field.b-select.is-disabled,.b-field.b-select:disabled{opacity:.4}
 
 /* Sheet: a modal over the dimmed window (40% scrim), raised, r-4, e-3, 560 wide (90% under 700) */
 .b-scrim{position:fixed;inset:0;z-index:50;background:var(--c-scrim)}

@@ -10,10 +10,10 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import type { Card } from '@/proto';
 import { useListKeys } from '@/app/listkeys';
-import { Button, Field, Menu, MenuItem, Press } from '@/ds';
+import { Dropdown, Field, Press } from '@/ds';
 import { shownName } from '@/agents/model';
 import { timeOf } from '@/artifacts/model';
-import { ALL, askersOf, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
+import { ALL, askersOf, closedMs, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
 import './past.css';
 
 export interface InboxPorts {
@@ -47,7 +47,6 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [f, setF] = useState<Filter>(ALL);
-  const [menu, setMenu] = useState<'project' | 'agent' | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const lists = listsOf(cards, records, names, f, now);
   const pastBy = new Map(lists.days.flatMap((d) => d.rows.map((r) => [r.key, r] as const)));
@@ -103,8 +102,8 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
   };
   const set = (g: Partial<Filter>) => {
     setF({ ...f, ...g });
-    setMenu(null);
   };
+  const askers = askersOf(cards, records);
   const empty = cards.length === 0 && records.length === 0;
   const none = lists.order.length === 0;
   return (
@@ -115,42 +114,30 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
       </header>
       {!cur && (
         <div className="ip-filters">
-          <span className="ip-drop">
-            <Button kind="ghost" onClick={() => { setMenu(menu === 'project' ? null : 'project'); }} testId="inbox.projects">
-              {f.project === '' ? 'all projects ⌄' : `${names[f.project] ?? f.project} ⌄`}
-            </Button>
-            {menu === 'project' && (
-              <Menu testId="inbox.projects.menu">
-                <MenuItem on={f.project === ''} onClick={() => { set({ project: '' }); }} testId="inbox.projects.all">all projects</MenuItem>
-                {projects.map((p) => (
-                  <MenuItem key={p.project} on={f.project === p.project} onClick={() => { set({ project: p.project }); }} testId={`inbox.projects.${p.project}`}>
-                    {p.name !== '' ? p.name : p.project}
-                  </MenuItem>
-                ))}
-                {/* 800: the agents and 'withdrawn' come in here (past.css shows them only narrow) */}
-                <div className="ip-narrow-only">
-                  <MenuItem on={f.agent === ''} onClick={() => { set({ agent: '' }); }} testId="inbox.projects.agents.all">all agents</MenuItem>
-                  {askersOf(cards, records).map((a) => (
-                    <MenuItem key={a} on={f.agent === a} onClick={() => { set({ agent: a }); }} testId={`inbox.projects.agent.${a}`}>{shownName(a)}</MenuItem>
-                  ))}
-                  <MenuItem on={f.state === 'withdrawn'} onClick={() => { set({ state: f.state === 'withdrawn' ? 'all' : 'withdrawn' }); }} testId="inbox.projects.withdrawn">withdrawn</MenuItem>
-                </div>
-              </Menu>
-            )}
-          </span>
-          <span className="ip-drop ip-wide-only">
-            <Button kind="ghost" onClick={() => { setMenu(menu === 'agent' ? null : 'agent'); }} testId="inbox.agents">
-              {f.agent === '' ? 'all agents ⌄' : `${shownName(f.agent)} ⌄`}
-            </Button>
-            {menu === 'agent' && (
-              <Menu testId="inbox.agents.menu">
-                <MenuItem on={f.agent === ''} onClick={() => { set({ agent: '' }); }} testId="inbox.agents.all">all agents</MenuItem>
-                {askersOf(cards, records).map((a) => (
-                  <MenuItem key={a} on={f.agent === a} onClick={() => { set({ agent: a }); }} testId={`inbox.agents.${a}`}>{shownName(a)}</MenuItem>
-                ))}
-              </Menu>
-            )}
-          </span>
+          <Dropdown label={f.project === '' ? 'all projects' : (names[f.project] ?? f.project)} testId="inbox.projects"
+            groups={[
+              { id: 'projects', rows: [
+                { id: 'p:', name: 'all projects', current: f.project === '', testId: 'inbox.projects.all' },
+                ...projects.map((p) => ({ id: `p:${p.project}`, name: p.name !== '' ? p.name : p.project, current: f.project === p.project, testId: `inbox.projects.${p.project}` })),
+              ] },
+              // 800: the agents and 'withdrawn' come in here (past.css shows them only narrow)
+              { id: 'agents', look: 'ip-narrow-only', rows: [
+                { id: 'a:', name: 'all agents', current: f.agent === '', testId: 'inbox.projects.agents.all' },
+                ...askers.map((a) => ({ id: `a:${a}`, name: shownName(a), current: f.agent === a, testId: `inbox.projects.agent.${a}` })),
+                { id: 'withdrawn', name: 'withdrawn', current: f.state === 'withdrawn', testId: 'inbox.projects.withdrawn' },
+              ] },
+            ]}
+            onPick={(id) => {
+              if (id === 'withdrawn') set({ state: f.state === 'withdrawn' ? 'all' : 'withdrawn' });
+              else if (id.startsWith('a:')) set({ agent: id.slice(2) });
+              else set({ project: id.slice(2) });
+            }} />
+          <Dropdown extra="ip-wide-only" label={f.agent === '' ? 'all agents' : shownName(f.agent)} testId="inbox.agents"
+            groups={[{ id: 'agents', rows: [
+              { id: 'a:', name: 'all agents', current: f.agent === '', testId: 'inbox.agents.all' },
+              ...askers.map((a) => ({ id: `a:${a}`, name: shownName(a), current: f.agent === a, testId: `inbox.agents.${a}` })),
+            ] }]}
+            onPick={(id) => { set({ agent: id.slice(2) }); }} />
           <span className="ip-states">
             {STATES.map((s) => (
               <Press key={s} look={`ip-state${f.state === s ? ' on' : ''}${s === 'withdrawn' ? ' ip-wide-only' : ''}`} aria-pressed={f.state === s}
@@ -217,7 +204,7 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
   );
 }
 
-const whenShort = (r: InboxRecord, now: number): string => whenWhere(r, now).split(' · ').pop() ?? timeOf(r.at_ms);
+const whenShort = (r: InboxRecord, now: number): string => whenWhere(r, now).split(' · ').pop() ?? '';
 
 function WaitLine({ w, on, end, narrowEnd, onClick }: { w: WaitRow; on: boolean; end: string; narrowEnd: string; onClick: () => void }) {
   return (
@@ -243,7 +230,7 @@ function PastLine({ p, on, project, onClick }: { p: PastRow; on: boolean; projec
         <span className="ip-who">{shownName(r.asker)}</span>
         <span className="ip-q">{r.question}</span>
       </span>
-      <span className="ip-end"><span className="ip-proj">{`${project} · `}</span>{timeOf(r.at_ms)}</span>
+      <span className="ip-end"><span className="ip-proj">{`${project} · `}</span>{closedMs(r) > 0 ? timeOf(closedMs(r)) : ''}</span>
       <span className="ip-two" data-testid={`inbox.row.${p.key}.said`}>
         {/* the 'where' in its own span, which 800 drops whole (past.css) */}
         {short}{short !== r.line2 && <span className="ip-where">{r.line2.slice(short.length)}</span>}

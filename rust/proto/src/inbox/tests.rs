@@ -67,6 +67,23 @@ fn a_close_without_his_answer_is_withdrawn_with_its_reason() {
 }
 
 #[test]
+fn a_close_without_ts_takes_the_journals_last_time_never_0() {
+    // sb-core writes card_closed with no time (the 'jan 1 1970' group in his inbox shot)
+    let mut x = Index::new("harness-1".into());
+    x.read_all(&[
+        json!({"type": "card_opened", "card": {"id": 7, "kind": "question", "agent": "shots", "text": "go?", "for_msg": null, "created_ms": 1_000}}),
+        json!({"type": "wake_end", "id": 1, "why": "hit", "at": 5_000}),
+        json!({"type": "reported", "name": "shots", "report": {"at_ms": 6_000, "kind": "turn"}}),
+        json!({"type": "card_closed", "id": 7, "resolution": "withdrawn by main: not needed"}),
+        json!({"type": "card_opened", "card": {"id": 8, "kind": "question", "agent": "shots", "text": "and now?", "for_msg": null, "created_ms": 9_000}}),
+        json!({"type": "card_closed", "id": 8, "resolution": "withdrawn by main"}),
+    ]);
+    assert_eq!(x.get(7).map(|r| (r.asked_ms, r.at_ms)), Some((1_000, 6_000)));
+    // nothing timed after it opened: its close is when it opened
+    assert_eq!(x.get(8).map(|r| r.at_ms), Some(9_000));
+}
+
+#[test]
 fn an_open_card_has_no_record() {
     assert!(index().get(4).is_none());
     assert_eq!(index().len(), 3);

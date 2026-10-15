@@ -136,12 +136,13 @@ describe('artifacts screens', () => {
   it('one artifact open: its head, the version menu points the page at an older version, ✕ back to the list', () => {
     const router = mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
     expect(screen.getByTestId('artifact.title').textContent).toBe('product page, before / after');
-    expect(screen.getByTestId('artifact.version').textContent).toBe('page · v2 ⌄');
+    expect(screen.getByTestId('artifact.version').textContent).toBe('page · v2');
+    expect(screen.getByTestId('artifact.version').querySelector('svg.v')).not.toBeNull();
     expect(screen.getByTestId('artifact.browser').textContent).toBe('↗ browser');
     fireEvent.click(screen.getByTestId('artifact.version'));
     fireEvent.click(screen.getByTestId('artifact.versions.v1'));
     expect(screen.getByTestId('artifact.page').getAttribute('src')).toBe('http://127.0.0.1:47123/p/notes/v/1');
-    expect(screen.getByTestId('artifact.version').textContent).toBe('page · v1 ⌄');
+    expect(screen.getByTestId('artifact.version').textContent).toBe('page · v1');
     fireEvent.click(screen.getByTestId('artifact.close'));
     expect(router.get()).toEqual({ screen: 'artifacts', project: '' });
   });

@@ -18,6 +18,8 @@ export const LAND = [
   'checks/app/core-line.spec.ts',
   // every list page walks with the TUI's list keys (ambient-lead m_22338)
   'checks/app/list-walk.spec.ts',
+  // every menu is the ds Picker: ≤ 50vh, inside the window, its caret centered (menus-ds, his m_26194)
+  'checks/app/menus.spec.ts',
   // answering (inbox-fix, architect m_23524): a refused answer or close shows that card again with
   // the words, a taken one stays out across a reload and a switch, '✓ you answered' where he is
   'checks/inbox/answer-refused.spec.ts',

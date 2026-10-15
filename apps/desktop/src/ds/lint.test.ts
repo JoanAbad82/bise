@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { classesOf, cssClasses, looseSpacing, rawControls } from './lint';
+import { classesOf, cssClasses, looseSpacing, menuDrawn, rawControls } from './lint';
 import { PENDING_CLASSES, PENDING_RAW } from './lint.pending';
 import { PENDING_SPACING } from './spacing.pending';
 
@@ -40,6 +40,31 @@ describe('the ds laws (designer m_18343)', () => {
     expect(grown, 'a bare control outside src/ds: use the ds component (raw-controls.md)').toEqual([]);
     const done = Object.entries(PENDING_RAW).filter(([f, n]) => (now[f] ?? 0) < n).map(([f, n]) => `${f}: ${String(now[f] ?? 0)} now, pending says ${String(n)}`);
     expect(done, 'lint.pending.ts lists more than is left: lower it').toEqual([]);
+  });
+
+  it('reads a menu drawn outside the ds Dropdown/PickerPop', () => {
+    expect(menuDrawn(`import { Button, Menu, type Picker as P } from '@/ds';\n// all agents ⌄\n<div role="menu" className="b-picker-row b-mi x">all ⌄</div>`)).toEqual([
+      'imports Menu',
+      'imports Picker',
+      'role="menu"',
+      'class b-picker-row',
+      'class b-mi',
+      "a '⌄' caret (the ds trigger draws its caret)",
+    ]);
+    expect(menuDrawn(`import { Dropdown, PickerPop } from '@/ds';\n/* 'yolo ⌄' */\n<Dropdown label="all agents" />`)).toEqual([]);
+  });
+
+  it('every menu is the ds Dropdown or PickerPop: the Picker with its trigger and its 50vh cap (his m_26194)', () => {
+    // the composer's / @ $ list rides the editor's keys inside the box (a Picker, the same cap); the
+    // capsule's tray menu is its own window, drawn in the Picker's still shell (Menu)
+    const may: Record<string, readonly string[]> = {
+      'composer/Picker.tsx': ['imports Picker', 'class b-picker-path'],
+      'capsule/Capsule.tsx': ['imports Menu', 'imports MenuItem', 'imports MenuSep'],
+    };
+    const drawn = screens
+      .filter((p) => !rel(p).startsWith('ds/'))
+      .flatMap((p) => menuDrawn(readFileSync(p, 'utf8')).filter((w) => !(may[rel(p)] ?? []).includes(w)).map((w) => `${rel(p)}: ${w}`));
+    expect(drawn, 'a menu drawn by a screen: use the ds Dropdown (a trigger and its menu) or PickerPop (a menu from your own anchor)').toEqual([]);
   });
 
   it('every class a .tsx names has a CSS rule (the pending list only shrinks)', () => {

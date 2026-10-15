@@ -229,6 +229,20 @@ pub struct Index {
     project: Project,
     open: BTreeMap<u64, Open>,
     done: BTreeMap<u64, InboxRecord>,
+    /// the latest time a line read so far carried (ms): a close without `ts` is then
+    last_ms: u64,
+}
+
+/// The time a journal line carries, in ms; 0: none. Its own `ts`, `at` or
+/// `at_ms`, else its card's `created_ms` or its report's `at_ms`. Pure.
+fn line_ms(line: &Value) -> u64 {
+    let ms = |v: Option<&Value>, k: &str| v.and_then(|v| v.get(k)).and_then(Value::as_u64);
+    ms(Some(line), "ts")
+        .or_else(|| ms(Some(line), "at_ms"))
+        .or_else(|| ms(Some(line), "at"))
+        .or_else(|| ms(line.get("card"), "created_ms"))
+        .or_else(|| ms(line.get("report"), "at_ms"))
+        .unwrap_or(0)
 }
 
 impl Index {
@@ -236,10 +250,15 @@ impl Index {
         Index { project, ..Index::default() }
     }
 
-    /// One journal line (its `ts`, stamped by the hub, is the close's
-    /// time). The card whose record it made or changed, if any.
+    /// One journal line. A close's time is its line's `ts` when the hub
+    /// stamped one; sb-core writes `card_closed` without any time, so
+    /// else the journal's latest time before it (any line's `ts`, `at`,
+    /// `at_ms`, a card's `created_ms`, a report's `at_ms`), never before
+    /// the card opened: never 0, which read as jan 1 1970. The card
+    /// whose record it made or changed, if any.
     pub fn read(&mut self, line: &Value) -> Option<u64> {
-        let ts = line.get("ts").and_then(Value::as_u64).unwrap_or(0);
+        let ts = line.get("ts").and_then(Value::as_u64);
+        self.last_ms = self.last_ms.max(line_ms(line));
         match journal::CardLine::of(line)? {
             journal::CardLine::Opened(o) => {
                 let c = o.card;
@@ -248,7 +267,8 @@ impl Index {
             }
             journal::CardLine::Closed(c) => {
                 let o = self.open.remove(&c.id)?;
-                let r = record(&self.project, c, o, ts);
+                let at = ts.unwrap_or(self.last_ms).max(o.created_ms);
+                let r = record(&self.project, c, o, at);
                 let id = r.card;
                 self.done.insert(id, r);
                 Some(id)

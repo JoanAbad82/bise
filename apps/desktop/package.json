@@ -24,7 +24,6 @@
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.2.0",
-    "@radix-ui/react-select": "^2.3.8",
     "@tanstack/react-virtual": "3.14.13",
     "@tiptap/core": "3.31.4",
     "@tiptap/extensions": "3.31.4",

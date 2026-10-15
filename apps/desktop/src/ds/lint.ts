@@ -11,6 +11,29 @@
 //      looseSpacing lists the lengths written by hand instead (a ratchet: spacing.pending.ts).
 // Pure: the test reads the files and hands their text here.
 
+/**
+ * The menu law (his m_26194, « de manière systémique »): a menu that opens from something is the
+ * ds Dropdown or PickerPop (ds/dropdown.tsx), so it is the Picker, capped at half the window, with
+ * the one trigger and its centered caret. What a screen writes that draws a menu itself, one entry
+ * each: an import of Picker, Menu, MenuItem or MenuSep from the ds; a role="menu" or "menuitem"; a
+ * class of the picker's or the old menu's (b-picker*, b-menu, b-mi); a '⌄' glyph for a caret
+ * (comments aside). Pure.
+ */
+export function menuDrawn(src: string): string[] {
+  const out: string[] = [];
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
+  for (const m of code.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]@\/ds['"]/g)) {
+    for (const part of (m[1] ?? "").split(",")) {
+      const name = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0] ?? "";
+      if (["Picker", "Menu", "MenuItem", "MenuSep"].includes(name)) out.push(`imports ${name}`);
+    }
+  }
+  for (const m of code.matchAll(/role=\{?["'](menu|menuitem)["']/g)) out.push(`role="${m[1] ?? ""}"`);
+  for (const c of classesOf(code)) if (/^b-(picker|menu$|mi$)/.test(c)) out.push(`class ${c}`);
+  if (code.includes("⌄")) out.push("a '⌄' caret (the ds trigger draws its caret)");
+  return out;
+}
+
 /** The bare controls a source writes: one per JSX tag. */
 export function rawControls(src: string): number {
   return (src.match(/<(button|input|select|textarea)\b/g) ?? []).length;

@@ -69,6 +69,13 @@ it('heads a day as words::day_head', () => {
   expect(dayHead(at(1, 9, 0), NOW)).toBe('yesterday');
   expect(dayHead(at(2, 9, 0), NOW)).toBe('oct 12');
   expect(dayHead(new Date(2024, 11, 30, 9, 0).getTime(), NOW)).toBe('dec 30 2024');
+  // a time never known reads 'earlier', never 'jan 1 1970' (his inbox shot)
+  expect(dayHead(0, NOW)).toBe('earlier');
+});
+
+it('a record without a close time sits on the day it was asked; none known: earlier, never 1970', () => {
+  const l = listsOf([], [rec(1, { at_ms: 0, asked_ms: at(1, 9, 0) }), rec(2, { at_ms: 0, asked_ms: 0 })], NAMES, ALL, NOW);
+  expect(l.days.map((d) => d.title)).toEqual(['yesterday', 'earlier']);
 });
 
 describe('jumpOf: where a past row goes', () => {

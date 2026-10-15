@@ -94,14 +94,15 @@ export function listsOf(cards: readonly Card[], records: readonly InboxRecord[],
     .filter((r) => (f.project === '' || r.project === f.project) && (f.agent === '' || r.asker === f.agent))
     .filter((r) => ws.length === 0 || hasAll(`${r.question} ${shownName(r.asker)} ${r.asker} ${pname(r.project)} ${r.said ?? ''} ${r.reason ?? ''}`, ws))
     .slice()
-    .sort((a, b) => b.at_ms - a.at_ms || b.card - a.card);
+    .sort((a, b) => closedMs(b) - closedMs(a) || b.card - a.card);
   const days: Day[] = [];
   for (const r of past) {
-    const d = dayOf(r.at_ms);
+    const ms = closedMs(r);
+    const d = ms > 0 ? dayOf(ms) : 'earlier';
     const row: PastRow = { key: pastKey(r), r, glyph: r.state === 'answered' ? '✓' : '–' };
     const last = days[days.length - 1];
     if (last !== undefined && last.day === d) (last.rows as PastRow[]).push(row);
-    else days.push({ day: d, title: dayHead(r.at_ms, now), rows: [row] });
+    else days.push({ day: d, title: dayHead(ms, now), rows: [row] });
   }
   return { waiting, days, order: [...waiting.map((w) => w.key), ...days.flatMap((d) => d.rows.map((r) => r.key))] };
 }
@@ -118,10 +119,17 @@ export function whereWords(w: Where): string {
   }
 }
 
+/** When it closed: its at_ms, else when it was asked (an older hub's record without a close time);
+ *  0: neither known (its day reads 'earlier', never jan 1 1970). Pure. */
+export function closedMs(r: InboxRecord): number {
+  return r.at_ms > 0 ? r.at_ms : r.asked_ms > 0 ? r.asked_ms : 0;
+}
+
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 /** A day's head (words::day_head): 'today', 'yesterday', 'oct 12', 'dec 30 2024'. Pure (local time). */
 export function dayHead(ms: number, now: number): string {
+  if (ms <= 0) return 'earlier';
   if (dayOf(ms) === dayOf(now)) return 'today';
   if (dayOf(ms) === dayOf(now - 86_400_000)) return 'yesterday';
   const d = new Date(ms);
@@ -190,8 +198,9 @@ export function jumpWords(j: Jump): string {
 
 /** The detail's 'where and when': 'you answered in the inbox · 14:02', 'withdrawn · yesterday 18:30'. Pure. */
 export function whenWhere(r: InboxRecord, now: number): string {
-  const day = dayHead(r.at_ms, now);
-  const when = day === 'today' ? timeOf(r.at_ms) : `${day} ${timeOf(r.at_ms)}`;
+  const ms = closedMs(r);
+  const day = dayHead(ms, now);
+  const when = ms <= 0 ? day : day === 'today' ? timeOf(ms) : `${day} ${timeOf(ms)}`;
   if (r.state !== 'answered') return `withdrawn · ${when}`;
   return r.where == null ? `you answered · ${when}` : `you answered ${whereWords(r.where)} · ${when}`;
 }
@@ -200,5 +209,5 @@ export function whenWhere(r: InboxRecord, now: number): string {
 export function mergeRecords(lists: readonly (readonly InboxRecord[])[]): InboxRecord[] {
   const by = new Map<string, InboxRecord>();
   for (const l of lists) for (const r of l) by.set(pastKey(r), r);
-  return [...by.values()].sort((a, b) => b.at_ms - a.at_ms || b.card - a.card);
+  return [...by.values()].sort((a, b) => closedMs(b) - closedMs(a) || b.card - a.card);
 }

@@ -18,10 +18,10 @@ import { notifyRow } from './pages';
 import { checks } from './check';
 import { FALLBACK } from './roles';
 
-/** a role's model picker (the ds Select): open it from the keyboard, then pick that option */
+/** a role's model picker (the ds Select): open it, then pick that option */
 function pickRole(role: string, value: string): void {
   const id = `settings.role.${role}.model`;
-  fireEvent.keyDown(screen.getByTestId(id), { key: 'Enter' });
+  fireEvent.click(screen.getByTestId(id));
   fireEvent.click(screen.getByTestId(`${id}.opt.${value}`));
 }
 

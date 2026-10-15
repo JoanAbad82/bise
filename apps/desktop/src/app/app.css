@@ -374,11 +374,6 @@ body:has(.app-shell) {
 .app-more:focus-within {
   opacity: 1;
 }
-.app-menu {
-  position: relative;
-  z-index: 5;
-  margin: 0 0 var(--s-1) var(--s-6);
-}
 /* the foot: '+ add a project ⌘N', '⚙ settings ⌘,', on top of the scrolled rows, hit at their
    centre and changing on hover (qa-flows' O.6 clicks audit) */
 [data-testid='app.sidebar'] {
@@ -549,16 +544,6 @@ body:has(.app-shell) {
   opacity: 0.45;
   background: none;
   color: var(--c-text-3);
-}
-.app-hist-menu {
-  position: absolute;
-  top: calc(100% + var(--s-1));
-  left: 0;
-  z-index: 40;
-  -webkit-app-region: no-drag;
-}
-.app-hist-menu .b-mi {
-  min-height: var(--h-row-tight);
 }
 /* the right panel, option A: 320 px, docked in the frame's third column or sliding over */
 .app-panel {

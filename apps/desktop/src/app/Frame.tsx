@@ -6,13 +6,14 @@
 // sidebar button (⌘\) and 'n waiting' in the accent), and which of the
 // sidebar and the right panel show. Owner: amb-win.
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { Chip, IconButton, Kbd, Menu, MenuItem, Pearl } from "@/ds";
+import { Chip, IconButton, Kbd, Pearl, PickerPop } from "@/ds";
 import { useModHeld } from "./held";
 import { useProjects } from "@/store";
 import { keep } from "./keep";
@@ -265,26 +266,11 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
   const cmd = useModHeld("Meta");
   const press = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const long = useRef(false);
-  useEffect(() => {
-    if (menu === null) return;
-    const away = (e: MouseEvent | KeyboardEvent) => {
-      if (
-        e instanceof KeyboardEvent
-          ? e.key !== "Escape"
-          : e.target instanceof Element &&
-            e.target.closest(".app-hist-menu") !== null
-      )
-        return;
-      if (e instanceof KeyboardEvent) e.preventDefault();
-      setMenu(null);
-    };
-    window.addEventListener("mousedown", away, true);
-    window.addEventListener("keydown", away, true);
-    return () => {
-      window.removeEventListener("mousedown", away, true);
-      window.removeEventListener("keydown", away, true);
-    };
-  }, [menu]);
+  const backAt = useRef<HTMLSpanElement>(null);
+  const forwardAt = useRef<HTMLSpanElement>(null);
+  const closeMenu = useCallback(() => {
+    setMenu(null);
+  }, []);
   const arrow = (side: Side) => {
     const can = side === "back" ? router.canBack() : router.canForward();
     const label = side === "back" ? "back" : "forward";
@@ -293,6 +279,7 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
     };
     return (
       <span
+        ref={side === "back" ? backAt : forwardAt}
         className="app-hist-arrow"
         // a mouse press never takes focus (designer m_19953): the ring is for the keyboard, and a
         // later key (the menu's esc) would light it on the pressed arrow; Tab still reaches them
@@ -338,22 +325,26 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
           </span>
         )}
         {menu === side && (
-          <div className="app-hist-menu">
-            <Menu testId={`app.title.${label}.menu`}>
-              {router.places(side, MENU_PLACES).map((r, i) => (
-                <MenuItem
-                  key={`${String(i)} ${formatRoute(r)}`}
-                  onClick={() => {
-                    setMenu(null);
-                    router.jump(side, i + 1);
-                  }}
-                  testId={`app.title.${label}.place`}
-                >
-                  {crumbOf(r, name).join(" › ")}
-                </MenuItem>
-              ))}
-            </Menu>
-          </div>
+          <PickerPop
+            anchor={side === "back" ? backAt : forwardAt}
+            align="start"
+            groups={[
+              {
+                id: "places",
+                rows: router.places(side, MENU_PLACES).map((r, i) => ({
+                  id: String(i + 1),
+                  name: crumbOf(r, name).join(" › "),
+                  testId: `app.title.${label}.place`,
+                })),
+              },
+            ]}
+            onPick={(id) => {
+              setMenu(null);
+              router.jump(side, Number(id));
+            }}
+            onClose={closeMenu}
+            testId={`app.title.${label}.menu`}
+          />
         )}
       </span>
     );

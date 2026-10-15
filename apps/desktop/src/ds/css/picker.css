@@ -13,6 +13,8 @@
   width: max-content;
   min-width: 240px;
   max-width: min(420px, calc(100vw - var(--s-4)));
+  /* never taller than half the window (his m_26194); a placed picker gets less (pickerPlace) */
+  max-height: 50vh;
   padding: var(--s-1);
   border-radius: var(--r-3);
   background: var(--c-solid);
@@ -22,6 +24,10 @@
   outline: none;
   overflow: hidden;
   animation: b-picker-in 120ms var(--ease-out);
+}
+/* the capsule's tray menu (Menu, its own window sized to it): never capped by its own window */
+.b-picker.b-menu {
+  max-height: none;
 }
 .b-picker.wide {
   width: min(640px, calc(100vw - var(--s-4)));

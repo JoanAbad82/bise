@@ -9,8 +9,8 @@
 //
 // It reads only projects, the route and counts (numbers, so a snapshot never
 // changes for nothing): a thread's entries never re-render it.
-import { memo, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { IconButton, Kbd, Menu, MenuItem, MenuSep, SearchButton, SectionHead, Side, tipAttrs } from '@/ds';
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
+import { IconButton, Kbd, PickerPop, SearchButton, SectionHead, Side, tipAttrs } from '@/ds';
 import type { ProjectRow } from '@/proto';
 import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
@@ -255,6 +255,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
   const side = projectSide(p, refused);
   const who = whoOf(useAgents(p.project));
   const [menu, setMenu] = useState(false);
+  const more = useRef<HTMLButtonElement>(null);
   return (
     <>
       <SRow
@@ -274,6 +275,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
         {/* ⋯, the ds's row IconButton: on hover or focus */}
         <span className={menu ? 'app-more on' : 'app-more'}>
           <IconButton
+            ref={more}
             size="row"
             label={`${p.name}: more`}
             pressed={menu}
@@ -287,50 +289,39 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
           </IconButton>
         </span>
       </SRow>
-      {menu && <ProjectMenu p={p} onClose={() => { setMenu(false); }} />}
+      {menu && <ProjectMenu p={p} anchor={more} onClose={() => { setMenu(false); }} />}
       {/* its hub refused this core: the hub's words and a retry, open or closed (lead m_11347) */}
       <RefusedLine project={p.project} name={p.name} className="app-refused" testId={`app.sidebar.project.${p.project}.refused`} />
     </>
   );
 });
 
-/** A project's ⋯ menu: its agents list, then its archived agents (each opens its thread). */
-function ProjectMenu({ p, onClose }: { p: ProjectRow; onClose: () => void }) {
+/** A project's ⋯ menu (the ds PickerPop from its ⋯): its agents list, then its archived agents
+ *  under their head (each opens its thread). */
+function ProjectMenu({ p, anchor, onClose }: { p: ProjectRow; anchor: RefObject<HTMLButtonElement | null>; onClose: () => void }) {
   const router = useRouter();
   const archived = archivedOf(useAgents(p.project));
-  useEffect(() => {
-    const away = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !(e.target instanceof Element && e.target.closest('.app-menu, .app-more') !== null)) onClose();
-    };
-    window.addEventListener('mousedown', away, true);
-    window.addEventListener('keydown', away, true);
-    return () => {
-      window.removeEventListener('mousedown', away, true);
-      window.removeEventListener('keydown', away, true);
-    };
-  }, [onClose]);
-  const go = (r: Route) => {
-    onClose();
-    router.go(r);
-  };
+  const id = `app.sidebar.project.${p.project}.menu`;
   return (
-    <div className="app-menu">
-      <Menu testId={`app.sidebar.project.${p.project}.menu.list`}>
-        <MenuItem onClick={() => { go({ screen: 'agents', project: p.project }); }} testId={`app.sidebar.project.${p.project}.menu.agents`}>
-          all agents
-        </MenuItem>
-        <MenuSep />
-        {archived.length === 0 ? (
-          <MenuItem disabled>no archived agent</MenuItem>
-        ) : (
-          archived.map((a) => (
-            <MenuItem key={a.name} hotkey="archived" onClick={() => { go({ screen: 'thread', project: p.project, agent: a.name }); }}
-              testId={`app.sidebar.project.${p.project}.menu.archived.${a.name}`}>
-              – {a.name}
-            </MenuItem>
-          ))
-        )}
-      </Menu>
-    </div>
+    <PickerPop
+      anchor={anchor}
+      align="start"
+      groups={[
+        { id: 'all', rows: [{ id: 'agents', name: 'all agents', testId: `${id}.agents` }] },
+        {
+          id: 'archived',
+          head: 'archived',
+          rows: archived.length === 0
+            ? [{ id: 'none', name: 'no archived agent', disabled: true }]
+            : archived.map((a) => ({ id: `a:${a.name}`, name: a.name, testId: `${id}.archived.${a.name}` })),
+        },
+      ]}
+      onPick={(pick) => {
+        onClose();
+        router.go(pick === 'agents' ? { screen: 'agents', project: p.project } : { screen: 'thread', project: p.project, agent: pick.slice(2) });
+      }}
+      onClose={onClose}
+      testId={`${id}.list`}
+    />
   );
 }

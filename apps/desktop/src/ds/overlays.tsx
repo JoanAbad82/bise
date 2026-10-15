@@ -142,7 +142,9 @@ export function MenuSep() {
   return <div className="b-picker-sep" role="separator" />;
 }
 
-/** a menu (the ⋯ menus): MenuItem and MenuSep children in the ds Picker's shell (picker.css) */
+/** a still menu in the ds Picker's shell (picker.css): MenuItem and MenuSep children. Only the
+ *  capsule's tray menu, a window of its own; a menu that opens from something in the window is
+ *  Dropdown or PickerPop (dropdown.tsx; the menu law in lint.ts refuses this one elsewhere) */
 export function Menu({ children, testId }: { children: ReactNode; testId?: string }) {
   return <div className="b-picker b-menu" role="menu" data-testid={testId}>{children}</div>;
 }
