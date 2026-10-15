@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ambient · the wind</title>
+<link rel="stylesheet" href="amb.css">
+<style>
+/* D · the wind: bise is a north wind. the face is made of wind: grains of air that settle into :) at rest, stream while you talk, swirl while main thinks */
+.wall-d{background:linear-gradient(180deg,#9fb5c9 0%,#d9c3c4 40%,#f2d7c4 70%,#efe2cf 100%)}
+.wall-d::after{content:"";position:absolute;left:-10%;right:-10%;bottom:-20%;height:55%;background:radial-gradient(60% 60% at 30% 100%,#c9a99d 0%,transparent 70%),radial-gradient(50% 60% at 80% 100%,#b89a95 0%,transparent 70%);opacity:.8}
+.wall-d .menubar{color:#1d1a17;background:#ffffff30}
+:root{--acc:#f4a6b0;--cream:#ece6da}
+.sky{position:absolute;right:20px;top:40px;color:var(--cream);border-radius:34px;overflow:hidden;
+  background:radial-gradient(120% 120% at 70% 0%,#2a2023e6,#141011f0);backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);box-shadow:0 30px 80px -30px #1d1015cc}
+.sky.grow{animation:grow .7s cubic-bezier(.16,1,.3,1)}
+@keyframes grow{from{clip-path:circle(8% at 88% 12%)}to{clip-path:circle(150% at 88% 12%)}}
+canvas.wind{display:block}
+.serif{font-family:Newsreader,serif}
+.m{font-family:"JetBrains Mono",monospace}
+.acc{color:var(--acc)}.dim{color:#ece6da9a}
+.tiny{display:flex;align-items:center;gap:10px;padding:6px 18px 6px 8px;font:500 14px Newsreader,serif}
+.tiny .s{font-size:16px}
+.wide{width:500px;padding:10px 26px 22px}
+.wide .top{display:flex;align-items:center;gap:6px}
+.wide .top .l{font:12px "JetBrains Mono",monospace;color:#ece6da90}
+/* words blown in by the wind */
+.kin{font:600 30px/1.22 Newsreader,serif;letter-spacing:-.015em;margin-top:6px}
+.kin .w{display:inline-block;opacity:0;transform:translateX(60px) skewX(-12deg);filter:blur(6px);transition:opacity .5s,transform .7s cubic-bezier(.16,1,.3,1),filter .5s}
+.kin .w.on{opacity:1;transform:none;filter:none}
+.kin .w.cur{color:var(--acc)}
+.kin.small{font-size:22px}
+.seen{font:12px "JetBrains Mono",monospace;color:#ece6da80;margin-top:14px;display:flex;align-items:center;gap:8px}
+.seen i{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--acc)}
+.you{font:italic 16px/1.4 Newsreader,serif;color:#ece6da90;margin-top:8px}
+.gusts{display:flex;gap:10px;margin-top:14px}
+.gch{font:13px "JetBrains Mono",monospace;padding:5px 12px;border-radius:99px;background:#f4a6b01f;color:var(--cream)}
+.gch b{color:var(--acc);font-weight:400;margin-right:4px}
+/* streamlines */
+.sl{display:grid;grid-template-columns:100px 1fr 200px;gap:12px;align-items:center;padding:8px 0;font-size:13px}
+.sl .n{font-family:"JetBrains Mono",monospace}
+.sl .w2{font:15px Newsreader,serif;color:#ece6dab0;text-align:right;white-space:nowrap}
+.flow{height:12px;position:relative;overflow:hidden;border-radius:6px}
+.flow::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,var(--c,#ece6da) 1.3px,transparent 1.8px);background-size:var(--g,14px) 12px;animation:flow var(--sp,1s) linear infinite;
+  -webkit-mask:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent)}
+@keyframes flow{to{background-position:var(--g,14px) 0}}
+.flow.done::before{animation:none;background-image:linear-gradient(var(--acc),var(--acc));background-size:100% 2px;background-repeat:no-repeat;background-position:0 50%;-webkit-mask:none}
+.flow.wait::before{--c:#ece6da60;--sp:5s}
+.flow.work::before{--c:#ece6dac0;--sp:.9s}
+.flow.need::before{--c:var(--acc);--sp:2.4s}
+.outs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.oc{border-radius:16px;background:#ffffff0d;padding:10px 12px;font:15px/1.25 Newsreader,serif}
+.oc .k{font:11px "JetBrains Mono",monospace;color:var(--acc);margin-bottom:4px}
+.oc .u{font:11px "JetBrains Mono",monospace;color:#ece6da70;margin-top:4px}
+/* needs you */
+.ask{width:440px;padding:12px 26px 22px}
+.ask .q{font:600 26px/1.2 Newsreader,serif;margin-top:4px}
+.ask .who{font:12px "JetBrains Mono",monospace;color:var(--acc)}
+.ask .opts{display:flex;gap:10px;margin-top:16px}
+.ask .opts span{flex:1;text-align:center;border-radius:99px;padding:9px;font:600 17px Newsreader,serif;background:#ffffff14}
+.ask .opts span b{font:12px "JetBrains Mono",monospace;color:#ece6da80;margin-right:6px}
+.ask .opts span.k{background:var(--acc);color:#141011}.ask .opts span.k b{color:#14101190}
+.ask .hint{font:12px "JetBrains Mono",monospace;color:#ece6da70;margin-top:12px;text-align:center}
+/* the image viewer */
+.iv{position:absolute;left:40px;top:50px;width:1080px;height:820px;border-radius:14px;overflow:hidden;background:#1b1718;box-shadow:0 30px 80px -24px #1d1015cc}
+.iv .wt{height:34px;background:#262122;display:flex;align-items:center;gap:8px;padding:0 12px;color:#aaa;font:12.5px -apple-system,sans-serif}
+.iv .wt i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.iv .wt i+i{background:#febc2e}.iv .wt i+i+i{background:#28c840}
+.iv .wt .url{margin-left:40px;background:#161213;border-radius:7px;padding:3px 14px;min-width:400px;color:#ddd}
+.iv h2{font:600 30px Newsreader,serif;color:var(--cream);padding:22px 34px 4px}
+.iv .sub{font:13px "JetBrains Mono",monospace;color:#ece6da80;padding:0 34px}
+.grays{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;padding:24px 34px;position:relative}
+.gy{border-radius:12px;overflow:hidden;box-shadow:0 0 0 1px #ffffff14;transition:transform .5s,box-shadow .5s}
+.gy .shot{height:400px;padding:16px;font:12px -apple-system,sans-serif;color:#ccc}
+.gy .shot .b{height:10px;border-radius:5px;margin:12px 0;background:#ffffff18}
+.gy .shot .sw{display:flex;gap:6px;margin:16px 0}.gy .shot .sw i{width:40px;height:24px;border-radius:6px;background:#ffffff14}
+.gy .shot .c{height:70px;border-radius:10px;margin-top:20px}
+.gy .cap{display:flex;justify-content:space-between;padding:10px 14px;background:#0003;font:13px "JetBrains Mono",monospace;color:var(--cream)}
+.gy .cap span{color:#ece6da80}
+.gy.pick.in{transform:translateY(-8px);box-shadow:0 0 0 2px var(--acc),0 20px 40px -10px #000c}
+.ann svg{position:absolute;overflow:visible;pointer-events:none}
+.ann path{fill:none;stroke:#c8264a;stroke-width:4;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset 1s cubic-bezier(.65,0,.35,1)}
+.ann .in path,.ann svg.in path{stroke-dashoffset:0}
+.vn{position:absolute;width:300px;border-radius:18px;background:#141011ee;padding:12px 16px;color:var(--cream);font:600 19px/1.3 Newsreader,serif;box-shadow:0 0 0 1px #c8264a66,0 16px 40px -12px #000c}
+.vn .k{font:11px "JetBrains Mono",monospace;color:#ff8fa6;margin-bottom:4px}
+.ivbar{position:absolute;left:34px;right:34px;bottom:22px;display:flex;align-items:center;gap:14px;font:13px "JetBrains Mono",monospace;color:#ece6da80}
+.ivbar b{margin-left:auto;background:var(--acc);color:#141011;border-radius:99px;padding:8px 18px;font:600 16px Newsreader,serif}
+/* spotlight */
+.spot{position:absolute;left:50%;top:180px;width:760px;margin-left:-380px;border-radius:40px;padding:0 0 18px}
+.spot .ln{display:flex;align-items:center;gap:8px;padding:6px 30px 0 12px}
+.spot .ln .kin{font-size:34px;margin:0}
+.spot .rs{padding:4px 34px}
+.spot .it{display:flex;gap:14px;align-items:baseline;padding:8px 0;font:18px Newsreader,serif;border-top:1px solid #ffffff10}
+.spot .it .g{font:13px "JetBrains Mono",monospace;color:var(--acc);width:24px}
+.spot .it .k{margin-left:auto;font:11px "JetBrains Mono",monospace;color:#ece6da70}
+/* sheet */
+.sheet{position:absolute;inset:30px 0 0 0;padding:34px 40px}
+.sheet h3{font:600 22px Newsreader,serif;color:#1d1a17;margin-bottom:12px}.sheet h3 span{color:#5a5349;font-weight:400;font-style:italic;font-size:17px}
+.cols{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:22px}
+.cols .lab{font:12px "JetBrains Mono",monospace;color:#3a332d;margin-bottom:6px}
+.cols .sky{position:relative;right:auto;top:auto;border-radius:26px;padding:8px 16px 16px;min-height:200px}
+.cols .sky .tx{font:600 16px/1.3 Newsreader,serif}.cols .sky small{display:block;font-weight:400;color:#ece6da99;margin-top:4px;font-size:14px}
+</style></head>
+<body>
+<script src="amb.js"></script>
+<script>
+const { W, AGENTS } = AMB;
+// a wind face: a canvas of grains that follow the kiss face's dots (same poses, same timing)
+const wind = (pose, cell = 6, extra = "") => `<canvas class="wind" data-wind="${pose}" data-cell="${cell}" ${extra}></canvas>`;
+function poseAt(spec, t) {
+  if (!spec.startsWith("seq:")) return { p: spec, s: t };
+  let cur = { p: "rest", s: t };
+  for (const part of spec.slice(4).split(",")) { const [p, at] = part.split("@"); if (t >= +at) cur = { p, s: t - +at }; }
+  return cur;
+}
+function rnd(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+function windFrame(cv, t) {
+  const cell = +cv.dataset.cell, padX = cell * 6, padY = cell * 3, w = 41 * cell + padX * 2, h = 18 * cell + padY * 2, dpr = 2;
+  if (cv.width !== w * dpr) { cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + "px"; cv.style.height = h + "px"; }
+  const still = cv.dataset.still != null;
+  let { p, s } = poseAt(cv.dataset.wind, t);
+  let lvl = p === "speak" ? AMB.voice(s, 2) : 0;
+  if (still) { s = 1.3; lvl = 0.45; if (p === "kiss") p = "rest"; }
+  const P = AMB.face(p, s, lvl), T = [];
+  for (let y = 0; y < 18; y++) for (let x = 0; x < 41; x++) if (P[y][x]) T.push([padX + x * cell + cell / 2, padY + y * cell + cell / 2]);
+  const N = cv._N || (cv._N = Math.round(150 + 41 * 18 * 0.2));
+  if (!cv._p) { cv._p = []; for (let i = 0; i < N; i++) cv._p.push({ x: rnd(i) * w, y: rnd(i + 99) * h, vx: 0, vy: 0, px: 0, py: 0 }); }
+  const talk = cv.dataset.k ? (() => { for (const part of cv.dataset.k.split(",")) { const m = part.match(/(\w+)@([\d.]+)-([\d.]+)/); if (m && t >= +m[2] && t <= +m[3]) return AMB.voice(t - m[2], 0); } return 0; })() : 0;
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const cx = padX + 23 * cell, cy = padY + 8.5 * cell;
+  cv._p.forEach((q, i) => {
+    const tg = T[(i * 7) % T.length] || [cx, cy];
+    q.px = q.x; q.py = q.y;
+    if (still) { q.x = tg[0]; q.y = tg[1]; }
+    else {
+      // spring to the dot, plus a breeze: a slow drift at rest, a gust with your voice, a swirl when thinking
+      const k = p === "think" ? 0.05 : 0.09;
+      q.vx += (tg[0] - q.x) * k; q.vy += (tg[1] - q.y) * k;
+      const n = Math.sin(t * 1.3 + i * 0.7) * 0.25, n2 = Math.cos(t * 1.1 + i * 1.3) * 0.25;
+      q.vx += n + talk * (2.5 + rnd(i) * 3); q.vy += n2 + talk * Math.sin(t * 8 + i) * 1.2;
+      if (p === "think") { const dx = q.x - cx, dy = q.y - cy; q.vx += -dy * 0.03; q.vy += dx * 0.03; }
+      q.vx *= 0.72; q.vy *= 0.72; q.x += q.vx; q.y += q.vy;
+      if (q.x > w + 4) { q.x = -4; q.px = q.x; }
+    }
+    const fast = Math.min(1, Math.hypot(q.x - q.px, q.y - q.py) / 6);
+    g.strokeStyle = g.fillStyle = i % 5 === 0 ? "#ece6da" : "#f4a6b0";
+    g.globalAlpha = 0.55 + 0.45 * (1 - fast);
+    if (fast > 0.15) { g.lineWidth = cell * 0.5; g.lineCap = "round"; g.beginPath(); g.moveTo(q.px - (q.x - q.px) * 1.5, q.py - (q.y - q.py) * 1.5); g.lineTo(q.x, q.y); g.stroke(); }
+    else { g.beginPath(); g.arc(q.x, q.y, cell * 0.42, 0, 7); g.fill(); }
+  });
+  g.globalAlpha = 1;
+}
+AMB.mount({
+  id: "d", letter: "D", name: "the wind", tray: ":*",
+  pitch: "bise is a north wind, so the face is made of wind: a few hundred grains of air that settle into the :) at rest, stream sideways while you talk, swirl into the * while main thinks, puff out with its voice. your words blow in from the right and land. the most graphic of the four, and the least like a window.",
+  wall: "wall-d",
+  tick(key, t, root) { root.querySelectorAll("canvas[data-wind]").forEach(cv => windFrame(cv, t)); },
+  screens: {
+    idle: () => `<div class="sky tiny grow">${wind("rest", 2)}<span class="s">${W.idle}</span></div>`,
+    listen: () => `<div class="vf" data-at="0.05" style="left:330px;top:300px;width:720px;height:520px"><i></i><i></i><i></i><i></i></div>
+      <div class="sky wide grow"><div class="top">${wind("seq:listen@0,talk@0.35", 5, 'data-k="you@0.35-6.2"')}<span class="l">listening<br>let go of fn to send</span></div>
+      <div class="kin" data-type="0.4" data-per="0.24">${W.said}</div>
+      <div class="seen fade" data-at="0.5"><i></i>main sees ${W.sees}</div></div>`,
+    talk: () => `<div class="sky wide"><div class="top">${wind("seq:rest@0,think@0.9,speak@2.1,kiss@6.6,rest@7.6", 5)}<span class="l"><span class="fade" data-at="0" data-out="0.9" style="position:absolute">${W.got}</span><span class="fade" data-at="0.9">${W.on}</span></span></div>
+      <div class="you">“${W.said}”</div>
+      <div class="kin small" data-type="2.1" data-per="0.3">${W.answer}</div>
+      <div class="gusts"><span class="gch pop" data-at="5.1"><b>∿</b>dark-mode</span><span class="gch pop" data-at="5.5"><b>∿</b>cookies</span></div></div>`,
+    agents: () => `<div class="sky wide grow" style="width:560px"><div class="top">${wind("rest", 3)}<span class="serif" style="font-size:19px;font-weight:600">${W.idle}</span></div>
+      ${AGENTS.map(([g, n, w, k], i) => `<div class="sl rise" data-at="${0.2 + i * 0.1}"><span class="n">${k === "done" ? `<span class="acc">✓</span> ` : ""}${n}</span><span class="flow ${k}"></span><span class="w2">${k === "done" ? "4.1 s → 0.9 s" : w}</span></div>`).join("")}
+      <div class="outs">${[["page", "settings, dark", "localhost:4801"], ["PR #482", "half-size banner", "cookies · CI ✓"], ["image", "which gray wins?", "localhost:4803"]].map(([k, t, u], i) => `<div class="oc rise" data-at="${1 + i * 0.12}"><div class="k">${k}</div>${t}<div class="u">${u}</div></div>`).join("")}</div></div>`,
+    needs: () => `<div class="sky tiny">${wind("rest", 2)}<span class="s"><span class="m acc">?</span> cookies needs you</span></div>
+      <div class="sky ask rise" data-at="0.5" style="top:100px"><div class="top">${wind("seq:rest@0,listen@3.4,talk@3.6,kiss@5.6,rest@6.6", 3, 'data-k="you@3.6-5.4"')}<span class="who">? cookies needs you</span></div>
+        <div class="q">keep the banner on mobile?</div>
+        <div class="opts"><span class="k"><b>1</b>yes</span><span><b>2</b>no</span></div>
+        <div class="kin small fade" data-at="3.6" style="margin-top:14px" data-type="3.7" data-per="0.26">yes, keep it. half the size, under the buy button</div>
+        <div class="hint"><span data-at="0" data-out="3.6">or hold fn and say it</span><span class="fade" data-at="5.8" style="color:#f4a6b0">✓ cookies has it</span></div></div>`,
+    viewer: () => `<div class="iv"><div class="wt"><i></i><i></i><i></i><span class="url">localhost:4803/grays · dark-mode asks you to pick</span></div>
+      <h2>which gray wins?</h2><div class="sub">three grays for the dark settings page · dark-mode · say a number, or draw</div>
+      <div class="grays">${[["#1c1c1f", "a · #1c1c1f", "cool"], ["#201d1b", "b · #201d1b", "tokens.css"], ["#262626", "c · #262626", "neutral"]].map(([c, a, b], i) => `<div class="gy ${i === 1 ? "pick" : ""}" ${i === 1 ? 'data-at="1.4"' : ""} style="${i === 1 ? "" : ""}"><div class="shot" style="background:${c}"><b style="color:#eee">settings</b><div class="b" style="width:70%"></div><div class="sw"><i></i><i style="background:#ffffff40"></i><i></i></div><div class="b"></div><div class="b" style="width:50%"></div><div class="c" style="background:#ffffff0c"></div></div><div class="cap">${a}<span>${b}</span></div></div>`).join("")}
+        <div class="ann"><svg data-at="1" style="left:385px;top:10px" width="320" height="480" viewBox="0 0 320 480"><path pathLength="1" d="M40 30 C 120 -6, 300 10, 300 120 C 310 300, 300 440, 160 470 C 30 480, 10 360, 14 200 C 16 90, 30 50, 90 26"/></svg>
+        <svg data-at="4.6" style="left:110px;top:160px" width="120" height="120" viewBox="0 0 120 120"><path pathLength="1" d="M10 10 L 110 110 M110 10 L 10 110"/></svg></div>
+        <div class="vn rise" data-at="1.8" style="left:720px;top:300px"><div class="k">you · voice · 0:03</div><span data-type="1.9" data-per="0.24">this one. a touch warmer for the cards</span></div>
+        <div class="vn rise" data-at="4.8" style="left:150px;top:300px;width:250px"><div class="k">you · voice · 0:01</div><span data-type="4.9" data-per="0.24">not this one, too blue</span></div></div>
+      <div class="ivbar"><span>fn talk · ✎ draw · 1-3 pick</span><b class="rise" data-at="6.4">send to dark-mode</b></div></div>
+      <div class="sky tiny">${wind("seq:listen@0,talk@1.8,listen@3.6,talk@4.8,listen@6,kiss@7.2,rest@8.2", 2, 'data-k="you@1.8-3.6,you@4.8-6"')}<span class="s">notes on <span class="m acc">grays</span></span></div>
+      <div class="sky tiny rise" data-at="7.2" style="top:94px">${wind("rest", 2)}<span class="s">b it is. dark-mode is on it.</span></div>`,
+    spotlight: () => `<div style="position:absolute;inset:0;background:#2a202320"></div>
+      <div class="sky spot grow"><div class="ln">${wind("seq:rest@0,think@2.4,speak@3,kiss@5,rest@6", 2.4)}<span class="kin" data-type="0.3" data-per="0.2">open the gray picker</span></div>
+        <div class="rs"><div class="it rise" data-at="1.4"><span class="g">▣</span>which gray wins? · dark-mode<span class="k">⏎ open · localhost:4803</span></div>
+        <div class="it rise" data-at="1.55"><span class="g">◰</span>settings, dark · dark-mode<span class="k">localhost:4801</span></div>
+        <div class="it rise" data-at="1.7"><span class="g">@</span>ask main about the grays<span class="k">⌘⏎</span></div>
+        <div class="it rise" data-at="3"><span class="g acc">:*</span><span class="kin small" style="margin:0;font-size:18px" data-type="3" data-per="0.2">opening it. dark-mode likes b, it's the one in tokens.css.</span></div></div></div>`,
+    sheet: () => `<div class="sheet"><h3>D · the wind <span>the same words in every direction</span></h3>
+      <div class="cols">${[["idle", "rest", W.idle, ""], ["listening", "seq:listen@0,talk@0.6", "dark mode for the settings page", "let go of fn to send"], ["thinking", "think", W.got, W.on], ["needs you", "rest", W.needs, "1 yes · 2 no"], ["done", "seq:kiss@0,rest@1.2", W.done, W.doneTouch]]
+        .map(([l, p, a, b]) => `<div><div class="lab">${l}</div><div class="sky">${wind(p, 3, l === "listening" ? 'data-k="you@0-99"' : "")}<div class="tx">${l === "needs you" ? `<span class="acc m">?</span> ` : ""}${a}<small>${b}</small></div></div></div>`).join("")}</div>
+      <h3>reduced motion <span>the grains sit on the face's dots and stay there</span></h3>
+      <div class="cols">${[["idle", "rest", W.idle], ["listening", "talk", "dark mode for the settings page"], ["thinking", "think", W.on], ["needs you", "rest", W.needs], ["failed", "rest", W.fail]]
+        .map(([l, p, a]) => `<div><div class="lab">${l}</div><div class="sky" style="min-height:160px">${wind(p, 3, "data-still")}<div class="tx">${l === "failed" ? `<span class="m" style="color:#ff8a84">▲</span> ` : ""}${a}</div></div></div>`).join("")}</div></div>`,
+  },
+  notes: {
+    idle: "<b>idle.</b> a small dark pebble top right. the grains of wind sit in the :) and drift a little, like dust in a sunbeam.",
+    listen: "<b>hold fn.</b> the pebble opens; the grains stream sideways with your voice and come back to the face; your words blow in from the right and land, big. the screenshot shows only as the pink corners and <em>main sees …</em>.",
+    talk: "<b>let go.</b> the grains swirl into the * while main thinks, puff out with its voice, then the kiss. the new agents arrive as gusts.",
+    agents: "<b>agents.</b> one streamline per agent: fast grains while it works, slow while it waits, a still pink line when it's done. outputs under it.",
+    needs: "<b>needs you.</b> a second pebble with the question in big serif. a key, a click, or say it.",
+    viewer: "<b>an image, with notes.</b> dark-mode asks you to pick a gray: three versions side by side on localhost. draw a ring, cross one out, say why; “send” gives the pick and the notes to dark-mode.",
+    spotlight: "<b>spotlight.</b> one wide line, in serif. results are agents and outputs; main answers in the same line.",
+    sheet: "<b>state sheet.</b> the same words as the other directions. reduced motion: the grains sit on the dots, so it's the pixel face again.",
+  },
+});
+</script>
+</body></html>

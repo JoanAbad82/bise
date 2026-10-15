@@ -167,7 +167,6 @@ mod tests {
             usage: None,
             waiting_on: None,
             watching: vec![],
-            shared_wip: 0,
             mode: None,
             path: String::new(),
             objective: String::new(),

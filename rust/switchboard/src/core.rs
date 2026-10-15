@@ -55,7 +55,7 @@ pub trait Env {
     /// The workspace is a git work tree (may be remembered a few seconds).
     fn is_git(&mut self) -> bool;
     /// RFC 0002 §4.1: a worktree on `sb/<name>` for this task.
-    fn worktree_create(&mut self, name: &str, what: &crate::carry::Carry) -> Result<Workspace, String>;
+    fn worktree_create(&mut self, name: &str, with_changes: bool) -> Result<Workspace, String>;
     fn worktree_loss(&mut self, ws: &Workspace) -> Loss;
     /// RFC 0002 §5.2-5.3: save if needed, then remove. Answers the ref.
     fn worktree_drop(
@@ -188,7 +188,6 @@ pub enum AgentReq {
     Move {
         agent: String,
         place: String,
-        with_changes: bool, // `--with-changes` (place `new`): its claimed files go too
     },
     /// `sb land [--here] [--add <path>]... "<message>"` (dev-flow §5):
     /// run by the daemon, off the hub's loop (`Effect::Land`).
@@ -415,7 +414,6 @@ impl AgentReq {
             "move" => AgentReq::Move {
                 agent: jstr(v, "agent"),
                 place: jstr(v, "place"),
-                with_changes: v.get("with_changes").and_then(|x| x.as_bool()).unwrap_or(false),
             },
             "land" => AgentReq::Land {
                 here: v.get("here").and_then(|x| x.as_bool()).unwrap_or(false),
@@ -607,8 +605,6 @@ pub enum Input {
     ConfirmClose { card: u64, res: String },
     /// A page question's card answered on its page: sb-core's page_answered (its asker told unless it is `agent`).
     PageAnswered { card: u64, agent: String, page: String, text: String, block: String },
-    /// shared-guard: the shared folder's uncommitted paths (core_wip.rs).
-    SharedStatus { dirty: BTreeSet<String>, now: u64 },
     /// inbox-record: his answer's route line went into `agent`'s transcript at `pos` (daemon/answers.rs).
     AnswerPos { card: u64, agent: String, pos: u64 },
     /// The end of a role-line call (BISE-126) for the task in `dir`,
@@ -1214,8 +1210,6 @@ pub struct Hub {
     /// The spawns that asked for a model, by request token: their answer
     /// waits for the daemon's pick (`Effect::SpawnModel`).
     spawn_asks: BTreeMap<Token, bise_catalog::spawn::Ask>,
-    /// shared-guard: each task's uncommitted files in the shared folder.
-    pub shared_wip: crate::shared_wip::SharedWip,
 }
 
 /// What the hub needs to restart a dead sb-core (BISE-292): the journal
@@ -1352,7 +1346,6 @@ impl Hub {
             pr_late: None,
             pr_done: BTreeSet::new(),
             pr_news: Default::default(),
-            shared_wip: Default::default(),
             pr_bots: Vec::new(),
             merges: merge::Merges::default(),
             updates: update_card::Updates::default(),
@@ -1522,6 +1515,36 @@ impl Hub {
             a.waiting = on;
             a.waiting_on = on.then(|| "you".to_string());
         }
+    }
+
+    /// BISE-136: the private worktree `a` works in (None: its own
+    /// workspace, shared checkout or hub worktree).
+    /// `sb move <agent> <place>`: the target's ws (None: a new worktree,
+    /// /isolate's path). An agent alone in its worktree does not leave
+    /// it: the folder would be left behind with no one (drop it instead).
+    fn move_target(&self, agent: &str, place: &str) -> Result<Option<Workspace>, String> {
+        let name = self.st.resolve(agent).ok_or_else(|| format!("no agent named {}", agent))?;
+        let a = &self.st.agents[&name];
+        let target = match place {
+            "new" => None,
+            crate::place::SHARED => self.st.agents.get(MAIN).map(|m| m.ws.clone()),
+            p => Some(crate::place::find_worktree(&self.st, p)?),
+        };
+        if a.ws.mode == Mode::Worktree && !a.ws.dropped {
+            let id = a.ws.place_id(&a.dir);
+            let others = crate::place::places(&self.st, &BTreeMap::new())
+                .into_iter()
+                .find(|p| p.id == id)
+                .is_some_and(|p| p.agents.iter().any(|n| *n != name));
+            let same = target.as_ref().is_some_and(|w| w.place_id(&a.dir) == id);
+            if !others && !same {
+                return Err(format!(
+                    "@{} is alone in its worktree: moving it would leave the folder behind; drop it instead",
+                    name
+                ));
+            }
+        }
+        Ok(target)
     }
 
     /// `sb land` (dev-flow §5): what the land needs from the state. The
@@ -2177,7 +2200,6 @@ impl Hub {
             Input::ConfirmClose { card, res } => self.core(&mut fx, env, None, In::ConfirmClose(ci::ConfirmClose { card, res })),
             Input::PageAnswered { card, agent, page, text, block } => self.core(&mut fx, env, None, In::PageAnswered(ci::PageAnswered { card, agent, page, text, block })),
             Input::AnswerPos { card, agent, pos } => self.core(&mut fx, env, None, In::AnswerPos(ci::AnswerPos { card, agent, pos })),
-            Input::SharedStatus { dirty, now } => self.shared_status(&mut fx, env, dirty, now),
             Input::Merged { card, place, number, res } => self.merged(&mut fx, env, card, &place, number, res),
             Input::Release(c) => self.release_in(&mut fx, env, c),
             Input::SignedIn => self.signed_in(&mut fx, env),
@@ -2515,8 +2537,6 @@ impl Hub {
                 match join.and_then(|j| new_task(name, &brief, &parts, worktree || place == "new", with_changes).map(|v| (j, json!(v)))) {
                     Ok((join, mut v)) => {
                         v["cmd"] = json!("spawn");
-                        // shared-guard: no place named = sb-core's spawn_wt decides with the git fact
-                        v["place_auto"] = json!(place.is_empty() && feature.is_empty() && !worktree);
                         if !parts.is_empty() {
                             v["brief_parts"] = json!(parts);
                         }
@@ -2529,8 +2549,8 @@ impl Hub {
                     Err(e) => json!({"cmd": "spawn", "pre_err": e}),
                 }
             }
-            AgentReq::Move { agent, place, with_changes } => match self.move_target(&agent, &place).and_then(|ws| crate::shared_wip::carry_ok(&self.st, &agent, &place, with_changes).map(|_| ws)) {
-                Ok(ws) => json!({"cmd": "move", "agent": agent, "ws": ws, "with_changes": with_changes}),
+            AgentReq::Move { agent, place } => match self.move_target(&agent, &place) {
+                Ok(ws) => json!({"cmd": "move", "agent": agent, "ws": ws}),
                 Err(e) => json!({"cmd": "move", "agent": agent, "pre_err": e}),
             },
             AgentReq::Land { here, message, add } => {
@@ -2712,9 +2732,6 @@ mod view;
 mod user;
 use user::new_task;
 pub use user::HELP;
-
-#[path = "core_wip.rs"]
-mod wip;
 
 #[path = "core_wake.rs"]
 mod wake_link;

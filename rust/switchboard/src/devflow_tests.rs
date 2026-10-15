@@ -199,9 +199,8 @@ fn mains_flow_section_by_flow() {
     // both: the placement hints replace "--worktree ONLY when the user asks"
     for f in [None, Some(flow(FlowMode::Pr, Source::Saved)), Some(flow(FlowMode::Trunk, Source::Saved))] {
         let s = main_section(f.as_ref(), None);
-        assert!(s.starts_with("## Flow\n\n- Places: `sb spawn <name>` gives a task its own new worktree by default"));
-        // shared-guard: shared only for read-only work; a sitting task moves with its files
-        assert!(s.contains("`--place shared` only for read-only work") && s.contains("`sb move <task> new --with-changes`"));
+        assert!(s.starts_with("## Flow\n\n- Places: you decide where each task works"));
+        assert!(s.contains("`sb spawn <name> --place new|<agent>`"));
         assert!(s.contains("`dark-mode takes a worktree; i18n joins it`"));
         assert!(s.contains("\"open a PR\", \"just commit it\""));
         assert!(!s.contains("ONLY when the user"));

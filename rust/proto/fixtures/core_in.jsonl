@@ -30,7 +30,6 @@
 {"ans": [], "git": true, "now": 1000000, "t": "forge", "text": "#412 (sb/dark): e2e failed again on h3 after 2 tries. The user is asked (inbox): don't push for it until the answer comes.\nhttps://github.com/o/r/pull/412", "to": "dark"}
 {"agent": "dark", "ans": [], "git": true, "now": 1000000, "t": "forge_card", "text": "#412 (sb/dark): e2e still fails after 2 fixes by dark. what should it do? (keep trying, skip it, or you look)"}
 {"ans": [], "git": true, "now": 1000000, "t": "hub_msg", "text": "your ChatGPT sign-in is back. go on where your turn stopped.", "to": "t1"}
-{"age_min": 21, "agent": "t1", "ans": [], "git": true, "n": 9, "note": "shared folder: @t1 has 9 uncommitted files there (a.rs, b.rs, c.rs, …), the oldest for 21 minutes; i asked it to land them or move to a worktree.", "now": 1000000, "t": "shared_wip", "text": "[bise] You have 9 uncommitted files in the shared folder (a.rs, b.rs, c.rs, …), the oldest for 21 minutes."}
 {"agent": "architect", "ans": [], "card": 3, "git": true, "now": 1000000, "page": "architecture", "t": "page_answered", "text": "D10"}
 {"agent": "perf", "ans": [], "card": 3, "git": true, "now": 1000000, "pos": 42, "t": "answer_pos"}
 {"agent": "a", "ans": [], "git": true, "held": false, "leftover": false, "now": 1000000, "t": "idle"}

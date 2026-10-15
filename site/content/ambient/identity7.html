@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bise · round 7 · the marble, out of the way</title>
+<link rel="stylesheet" href="amb.css">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{background:#1a1613;color:#ece6da;font:14px/1.6 "JetBrains Mono",monospace}
+a{color:#f0c9a0;text-decoration:none}
+.wrap{max-width:1500px;margin:0 auto;padding:30px 32px 140px}
+.top{display:flex;gap:16px;font-size:13px}.top .sp{flex:1}.top a{color:#a39c90}
+h1{font:400 66px/1 "Instrument Serif",serif;margin-top:26px}h1 em{color:#f0d29a}
+h2{font:400 46px/1.05 "Instrument Serif",serif;margin:0 0 6px}h2 em{color:#f0d29a}
+.lede{font:20px/1.5 Newsreader,serif;color:#d6cfc2;max-width:86ch;margin:14px 0 10px}.lede b{color:#ece6da;font-weight:600}
+.brief{font:italic 18px/1.5 Newsreader,serif;color:#a39c90;max-width:86ch;border-left:2px solid #f0d29a;padding-left:16px;margin:12px 0}
+section{margin:56px 0 0}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:16px 0 18px;font-size:12.5px;color:#857d72}.bar>span{margin-right:6px}
+.bar button{font:12.5px "JetBrains Mono",monospace;background:#231e1a;color:#cfc7b9;border:0;border-radius:8px;padding:5px 10px;cursor:pointer}.bar button.on{background:#f0d29a;color:#1a1613}
+/* ---- the marble variations */
+.vars{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.var{border-radius:16px;padding:14px;background:radial-gradient(ellipse at 50% 38%,#3a2c22,#1f1915 70%);box-shadow:0 0 0 1px #2c2724;cursor:pointer}
+.var.on{box-shadow:0 0 0 2px #f0d29a}
+.var .big{display:block;width:100%;aspect-ratio:1;max-width:240px;margin:0 auto}
+.var h3{font:400 25px/1.1 "Instrument Serif",serif;margin:8px 0 2px}.var h3 span{font:11px "JetBrains Mono",monospace;color:#f0d29a;margin-left:6px}
+.var p{font:14.5px/1.42 Newsreader,serif;color:#cfc7b9;min-height:6.2em}
+.sizes{display:flex;align-items:center;gap:12px;margin-top:10px}
+.sizes canvas{display:block}
+.strip{display:flex;align-items:center;gap:14px;height:26px;padding:0 10px;border-radius:7px;font:13px -apple-system,"Inter Tight",sans-serif}
+.strip.dark{background:linear-gradient(90deg,#3d2f3c,#5a3a3a);color:#fff}.strip.light{background:linear-gradient(90deg,#ece3d6,#e6d8c8);color:#1d1d1f}
+.strip .mi{opacity:.85}
+/* ---- the menu bar icon: the marble, plus a count when something waits for you */
+.mbi{display:inline-flex;align-items:center;gap:4px;vertical-align:middle}
+.mbi canvas{display:block}
+.cnt{display:none;align-items:center;justify-content:center;min-width:1.25em;height:1.2em;padding:0 .32em;border-radius:.62em;background:#c94a70;color:#fff6ee;font:700 .78em/1 "Inter Tight",sans-serif;box-shadow:inset 0 0 0 .08em #ffffff30,0 0 .5em #c94a7066}
+.cnt.on{display:inline-flex}
+.tri{display:none;color:#ff8f7a;font-size:.75em}.tri.on{display:inline}
+.moon{display:none;font-size:.8em;opacity:.8}.moon.on{display:inline}
+.menubar .tray{padding:1px 6px;font-family:-apple-system,"Inter Tight",sans-serif;font-size:13px}
+/* ---- icon states */
+.states{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.st{background:#231e1a;border-radius:14px;padding:12px 14px}
+.st .zoom{height:96px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:radial-gradient(ellipse at 50% 50%,#3a2c22,#1f1915 75%);margin-bottom:10px}
+.st .strip{margin:6px 0 0}
+.st h3{font:400 23px/1.1 "Instrument Serif",serif;margin:10px 0 2px}
+.st p{font:14.5px/1.42 Newsreader,serif;color:#cfc7b9}
+/* ---- the live film */
+.hstage{position:relative;height:540px;border-radius:14px;overflow:hidden;box-shadow:0 0 0 1px #2c2724,0 30px 70px -36px #000}
+.hstage .stage{position:absolute;left:0;top:0;background:url(walls/lamps.png) center/cover}
+.player{display:flex;align-items:center;gap:14px;margin-top:12px;font:12.5px "JetBrains Mono",monospace;color:#a39c90}
+.player button{font:12.5px "JetBrains Mono",monospace;background:#f0d29a;color:#1a1613;border:0;border-radius:8px;padding:5px 12px;cursor:pointer;min-width:64px}
+.tl{position:relative;flex:1;height:30px;cursor:pointer}
+.tl::before{content:"";position:absolute;left:0;right:0;top:14px;height:2px;background:#3a332c;border-radius:2px}
+.tl b{position:absolute;top:0;font:400 11px "JetBrains Mono",monospace;color:#857d72;white-space:nowrap;transform:translateX(2px)}
+.tl b::before{content:"";position:absolute;left:-2px;top:11px;width:2px;height:8px;background:#5a5048}
+.tl b.on{color:#f0d29a}
+.tl i{position:absolute;top:8px;width:2px;height:14px;background:#f0d29a;border-radius:2px}
+.hcap{font:italic 18px/1.4 Newsreader,serif;color:#cfc7b9;margin-top:6px;min-height:1.4em}
+/* the capsule (round 6's surface: no edge, light from inside), and it comes out of the menu-bar marble */
+:root{--ink:#33261b;--dim:#6b5844;--faint:#8a7660;--rose:#b8416b}
+.cap{position:absolute;top:44px;right:96px;z-index:40;color:var(--ink);font:15px/1.4 "Inter Tight",sans-serif;
+  transition:opacity .5s cubic-bezier(.16,1,.3,1),transform .75s cubic-bezier(.16,1,.3,1),width .7s cubic-bezier(.16,1,.3,1)}
+.cap.gone{opacity:0;transform:scale(.12);pointer-events:none;transition:opacity .45s cubic-bezier(.7,0,.84,0) .1s,transform .6s cubic-bezier(.7,0,.84,0),width .7s}
+.cap::before{content:"";position:absolute;inset:-18px;z-index:-1;border-radius:44px;-webkit-backdrop-filter:blur(22px) saturate(1.3) brightness(1.06);backdrop-filter:blur(22px) saturate(1.3) brightness(1.06);
+  background:radial-gradient(ellipse 72% 78% at 50% 42%,rgba(255,243,214,.9),rgba(255,240,208,.78) 55%,rgba(255,236,200,0) 100%);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent),linear-gradient(transparent,#000 24px,#000 calc(100% - 24px),transparent);-webkit-mask-composite:source-in;
+  mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent),linear-gradient(transparent,#000 24px,#000 calc(100% - 24px),transparent);mask-composite:intersect}
+.cap::after{content:"";position:absolute;left:10%;right:10%;bottom:-30px;height:40px;z-index:-2;background:radial-gradient(ellipse at 50% 0,#1c0e0640,transparent 70%);pointer-events:none}
+.cap .in{display:flex;gap:12px;align-items:flex-start;padding:12px 18px 14px 12px}
+.cap .in.swap{animation:swap .55s cubic-bezier(.16,1,.3,1)}
+@keyframes swap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.cap .ent{width:46px;height:46px;flex:none;margin-top:-2px}
+.cap .lab{font:600 10.5px "Inter Tight",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:3px}.cap .lab .r{color:var(--rose)}
+.cap .big{font:400 24px/1.2 "Instrument Serif",serif}
+.cap .sees{font:12px "Inter Tight";color:var(--dim);margin-top:6px}
+.cap .chips{display:flex;gap:8px;margin-top:8px}.cap .chip{font:500 12.5px "JetBrains Mono",monospace;padding:2px 10px;border-radius:99px;background:#33261b10}
+.cap .opts{display:flex;gap:8px;margin-top:8px}.cap .opt{font:500 14px "Inter Tight";padding:4px 13px;border-radius:9px;background:#fffaf0c0;box-shadow:0 0 0 1px #33261b18}.cap .opt.k{background:var(--rose);color:#fff7ef}.cap .opt b{font:600 11.5px "JetBrains Mono";margin-right:6px;color:var(--rose)}.cap .opt.k b{color:#fff7ef}
+.cap .hint{font:12.5px "Inter Tight";color:var(--faint);margin-top:6px}
+.cap .row{display:grid;grid-template-columns:10px 92px 1fr;gap:8px;align-items:center;padding:4px 0;border-top:1px solid #33261b14;font-size:14px}.cap .row .n{font:500 12.5px "JetBrains Mono"}.cap .row .w{color:var(--dim)}
+.cap .row i{width:8px;height:8px;border-radius:50%;background:#c9954a}.cap .row i.need{background:var(--rose)}.cap .row i.done{background:#8d9a55}
+/* ---- rules */
+.rules{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 18px;margin-top:16px}
+.rules div{background:#231e1a;border-radius:14px;padding:12px 16px;font:16px/1.45 Newsreader,serif;color:#cfc7b9}
+.rules b{display:block;font:500 11px "JetBrains Mono",monospace;color:#f0d29a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.rules q{font:italic 17px "Instrument Serif",serif;color:#ece6da}
+</style></head>
+<body><div class="wrap">
+<div class="top"><a href="identity6.html">← round 6 · lamplight, alive</a><a href="index.html">all directions</a><span class="sp"></span><span style="color:#857d72">identity · round 7 · the marble, out of the way</span></div>
+<h1>the marble, <em>out of the way</em></h1>
+<p class="lede">two of your notes, one answer. <b>bise is a marble</b>: a small floating ball of warm painted smoke, lit from inside. it's bise's body everywhere: <b>in the menu bar, at 18 px, it's all you see</b> when nothing needs you. when bise has something to say, or you talk to it, the light comes out of the marble and opens under it (round 6's surface), then goes back in. at rest, <b>nothing on your screen</b>.</p>
+<p class="brief">your notes: “at rest, la ui devrait carrément disparaître … une menubar icon qui nous indique s'il y a du travail en background ou pas, le nombre d'inbox messages … même quand ça travaille, il faudrait qu'on puisse cacher la UI” and “the marble … pourrait être assez compatible avec une entité de peinture un peu flottante.”</p>
+
+<section id="marble">
+  <h2>the entity: <em>five marbles</em></h2>
+  <p class="lede">all five are the same character: lamplight smoke that moves with bise's mood (slow at rest, faster with your voice, a whirlpool while it works, rose when it needs you, olive when something's done, an ember when you're away). they differ in how painted, misty or pointillist they are. <b>pick one</b> (a click): the film and the menu-bar icons below use it. each one is shown big, then at 64 and 32 px, and at 18 px in a dark and a light menu bar.</p>
+  <div class="bar" id="moodbar"><span>mood</span></div>
+  <div class="vars" id="vars"></div>
+</section>
+
+<section id="live">
+  <h2>out of the way, <em>live</em></h2>
+  <p class="lede">a 46 s film at real size. watch the menu bar: <b>the marble is the only thing that stays</b>. play/pause, click the timeline, ← →.</p>
+  <div class="hstage" id="hstage"></div>
+  <div class="player"><button id="hplay">pause</button><div class="tl" id="htl"><i id="hhead"></i></div><span id="htime">0.0 s</span></div>
+  <p class="hcap" id="hcap"></p>
+</section>
+
+<section id="icon">
+  <h2>the marble in the menu bar: <em>its states</em></h2>
+  <p class="lede">at a glance: <b>is anything running</b> (the smoke moves, or it's still), <b>how many things wait for you</b> (a rose count), and news for a moment. nothing blinks; the only color that asks for you is rose.</p>
+  <div class="states" id="states"></div>
+</section>
+
+<section id="rules">
+  <h2>when the light comes out, <em>and when it goes back</em></h2>
+  <div class="rules">
+    <div><b>at rest</b>nothing on screen. the marble in the menu bar, still.</div>
+    <div><b>you hold fn (or fn space)</b>the light comes out of the marble and opens under it while you talk. it stays while bise answers, then goes back in 4 s after the answer ends. your pointer on it keeps it open.</div>
+    <div><b>something needs you</b>it taps your shoulder once: the question opens under the marble for 8 s, then goes back in and leaves the count. answer any time: <q>fn 1</q> / <q>fn 2</q>, a click on the marble, or hold fn and say it.</div>
+    <div><b>while agents work</b>nothing on screen. the smoke in the marble turns slowly: that's the sign. a click on it (or fn 0) opens what's going on and what waits for you.</div>
+    <div><b>done, failed, a page ready</b>never the capsule. an olive glint (done, ready) or a small ▲ (failed) on the marble for 8 s. a page is also in the marble's menu, under “for you”.</div>
+    <div><b>hide it, any time</b>esc, a click anywhere else, or fn . : it goes back in at once. bise finishes saying the answer unless you hold fn again. hidden means hidden: it comes out again only when you call it, or for the next question.</div>
+    <div><b>meetings, calls, full screen</b>the light never comes out by itself, and bise doesn't speak. the marble dims to an ember; questions wait in the count.</div>
+    <div><b>the menu (a click on the marble)</b>the capsule opens with the agents and what waits for you. a right click: <q>type to main  fn space</q>, <q>hide bise  fn .</q>, <q>quit bise ambient</q>, plus “needs you” and “for you”.</div>
+  </div>
+  <p class="lede" style="margin-top:22px">when the light is out, it looks like round 6 (<a href="identity6.html">every feature there</a>): those screens still hold, except “idle” and “done”, which now live only in the marble.</p>
+</section>
+</div>
+<script src="amb.js"></script>
+<script src="marble.js"></script>
+<script>
+const { W } = AMB;
+const Q = new URLSearchParams(location.search), FROZEN = Q.has("t") ? +Q.get("t") : null;
+let VAR = +(Q.get("v") || 0), MOOD = "auto";
+const MOODS = ["auto", "rest", "listen", "speak", "work", "need", "done", "fail", "away", "still"];
+const AUTO = ["rest", "listen", "speak", "work", "need", "done", "away"];
+const DESC = [
+  "<b>clear glass, warm smoke inside,</b> a soft rim and one highlight. the closest to the marble you liked; the most object-like.",
+  "<b>no rim at all:</b> a ball of lamplit mist whose edge thins into the air and breaks into dots of light. the most ambient.",
+  "<b>the smoke laid down in strokes,</b> like a palette knife, the edge a little uneven. the most painted, the most artsy.",
+  "<b>a flame inside the smoke:</b> a bright warm core, light seeping out through the glass. the most “someone's home”.",
+  "<b>the marble made of dots of paint,</b> bigger where it's brighter, a few sparks around it. the most pointillist; it reads like a sign at small sizes.",
+];
+const LIVE = []; // { cv, v: () => variant, m: t => mood }
+const autoMood = t => AUTO[Math.floor(t / 3.2) % AUTO.length];
+const sectionMood = t => MOOD === "auto" ? autoMood(t) : MOOD;
+const strip = (cls, inner) => `<div class="strip ${cls}"><span class="mi">◔</span>${inner}<span class="mi">⌕</span><span>Fri 10:41</span></div>`;
+function icon(size, key) { // the menu-bar icon: marble + count / ▲ / moon, sized in px
+  return `<span class="mbi" data-k="${key}" style="font-size:${size * .72}px"><canvas class="m" style="width:${size}px;height:${size}px"></canvas><span class="cnt"></span><span class="tri">▲</span><span class="moon">☾</span></span>`;
+}
+
+// ---------- the five marbles
+document.getElementById("moodbar").insertAdjacentHTML("beforeend", MOODS.map(m => `<button data-m="${m}" class="${m === MOOD ? "on" : ""}">${m === "speak" ? "answers" : m === "need" ? "needs you" : m === "work" ? "working" : m}</button>`).join(""));
+document.getElementById("moodbar").onclick = e => { const b = e.target.closest("button"); if (!b) return; MOOD = b.dataset.m; document.querySelectorAll("#moodbar button").forEach(x => x.classList.toggle("on", x === b)); };
+document.getElementById("vars").innerHTML = MARBLE.NAMES.map((n, i) => `<div class="var${i === VAR ? " on" : ""}" data-v="${i}">
+  <canvas class="big" data-v="${i}"></canvas><h3>${n}<span>${String.fromCharCode(97 + i)}</span></h3><p>${DESC[i]}</p>
+  <div class="sizes"><canvas data-v="${i}" style="width:64px;height:64px"></canvas><canvas data-v="${i}" style="width:32px;height:32px"></canvas></div>
+  <div class="sizes">${strip("dark", icon(18, "v" + i))}</div><div class="sizes">${strip("light", icon(18, "v" + i))}</div></div>`).join("");
+document.querySelectorAll("#vars canvas[data-v]").forEach(cv => LIVE.push({ cv, v: () => +cv.dataset.v, m: t => sectionMood(t) }));
+document.querySelectorAll("#vars .mbi").forEach(el => { const v = +el.dataset.k.slice(1); LIVE.push({ cv: el.querySelector("canvas"), v: () => v, m: t => sectionMood(t) }); });
+document.getElementById("vars").addEventListener("click", e => { const c = e.target.closest(".var"); if (!c) return; VAR = +c.dataset.v; document.querySelectorAll(".var").forEach(x => x.classList.toggle("on", x === c)); });
+
+// ---------- the icon states
+const STATES = [
+  { k: "still", n: 0, name: "nothing going on", p: "nothing running, nothing waiting: the marble is still, a little dim." },
+  { k: "work", n: 0, name: "working", p: "agents are working: the smoke turns slowly, like a whirlpool. that's the whole sign." },
+  { k: "need", n: 2, name: "2 wait for you", p: "a rose count of what waits for you: questions, approvals, notes to answer. it never blinks." },
+  { k: "work", n: 1, name: "working, 1 waits", p: "both at once: the smoke turns, and the count says what's yours." },
+  { k: "done", n: 0, name: "done, or a page ready", p: "an olive glint in the smoke for 8 s, then back. no capsule, no sound." },
+  { k: "fail", n: 0, tri: 1, name: "failed", p: "the smoke stops, a small ▲ for 8 s. main is on it; if it needs you, it becomes a count." },
+  { k: "listen", n: 0, name: "listening", p: "you hold fn: the smoke brightens and speeds up with your voice, even with the light hidden." },
+  { k: "away", n: 1, moon: 1, name: "quiet: a meeting, a call", p: "an ember and a small moon: bise won't speak or come out. questions wait in the count." },
+];
+document.getElementById("states").innerHTML = STATES.map((s, i) => `<div class="st"><div class="zoom">${icon(72, "s" + i)}</div>${strip("dark", icon(18, "s" + i))}${strip("light", icon(18, "s" + i))}<h3>${s.name}</h3><p>${s.p}</p></div>`).join("");
+document.querySelectorAll("#states .mbi").forEach(el => {
+  const s = STATES[+el.dataset.k.slice(1)];
+  const c = el.querySelector(".cnt"); if (s.n) { c.textContent = s.n; c.classList.add("on"); }
+  if (s.tri) el.querySelector(".tri").classList.add("on"); if (s.moon) el.querySelector(".moon").classList.add("on");
+  LIVE.push({ cv: el.querySelector("canvas"), v: () => VAR, m: () => s.k });
+});
+
+// ---------- the film
+const HS = [
+  { t: 0,  show: 0, ic: "still", n: 0, cap: "at rest: nothing on your screen. only the marble in the menu bar, still." },
+  { t: 4,  show: 1, ic: "listen", n: 0, w: 430, cap: "you hold fn: the light comes out of the marble and opens under it. the smoke follows your voice.", html: lt => { const ws = W.said.replace(/<[^>]+>/g, "").split(" "), n = Math.max(1, Math.min(ws.length, Math.floor((lt - .5) / .24) + 1)); return `<div><div class="lab"><span class="r">listening</span> · let go of fn to send</div><div class="big">${ws.slice(0, n).join(" ")}</div><div class="sees">bise sees Chrome · localhost:4801/settings</div></div>`; } },
+  { t: 10, show: 1, ic: "speak", n: 0, w: 430, cap: "you let go: bise answers, said and written. the agents it starts appear.", html: lt => `<div><div class="lab">bise</div><div class="big">${W.answer}</div>${lt > 1.4 ? `<div class="chips"><span class="chip">dark-mode</span><span class="chip">cookies</span></div>` : ""}</div>` },
+  { t: 14.5, show: 0, ic: "work", n: 0, cap: "4 s after the answer, the light goes back into the marble. agents are working: the smoke turns. nothing else on screen." },
+  { t: 19, show: 1, ic: "need", n: 1, w: 400, cap: "a question: it taps your shoulder once. the question opens under the marble for 8 s.", html: () => `<div><div class="lab"><span class="r">? cookies needs you</span> · now</div><div class="big">keep the banner on mobile?</div><div class="opts"><span class="opt k"><b>1</b>yes</span><span class="opt"><b>2</b>no</span></div><div class="hint">or hold fn and say it</div></div>` },
+  { t: 26, show: 0, ic: "work", n: 1, cap: "you didn't answer: it goes back in and leaves a rose 1. no blinking, no reminder." },
+  { t: 29.5, show: 0, ic: "done", n: 1, cap: "perf is done: an olive glint in the marble, a few seconds. no capsule." },
+  { t: 33, show: 1, ic: "work", n: 1, w: 400, cap: "you click the marble (or fn 0): what's going on, and what waits for you.", html: () => `<div style="flex:1"><div class="lab">3 agents · 1 waits for you</div>
+      <div class="row"><i class="need"></i><span class="n">cookies</span><span class="w">keep the banner on mobile?</span></div>
+      <div class="row"><i></i><span class="n">dark-mode</span><span class="w">settings page first</span></div>
+      <div class="row"><i></i><span class="n">emoji-csv</span><span class="w">it's always unicode</span></div>
+      <div class="row"><i class="done"></i><span class="n">perf</span><span class="w">done · 4.1 s → 0.9 s</span></div></div>` },
+  { t: 38.5, show: 0, ic: "work", n: 1, cap: "esc, or a click anywhere: back into the marble." },
+  { t: 42, show: 0, ic: "still", n: 0, cap: "all done, nothing waits: the marble goes still." },
+];
+const HDUR = 46;
+let hT = FROZEN ?? 0, hPlay = FROZEN == null, hSeg = -1, hKey = "", CAP, TRAY;
+const segIc = () => HS[Math.max(0, hSeg)].ic;
+function buildHero() {
+  const box = document.getElementById("hstage");
+  box.innerHTML = `<div class="stage">${AMB.desktop("wall-none")}<div class="cap gone" id="cap"><div class="in"><canvas class="ent"></canvas><div class="txt"></div></div></div></div>`;
+  box.firstChild.style.transform = `translateX(${Math.min(0, box.clientWidth - 1440)}px)`;
+  TRAY = box.querySelector("#tray"); TRAY.innerHTML = icon(18, "hero");
+  LIVE.push({ cv: TRAY.querySelector("canvas"), v: () => VAR, m: segIc, always: 1 });
+  CAP = document.getElementById("cap");
+  LIVE.push({ cv: CAP.querySelector(".ent"), v: () => VAR, m: () => segIc() === "still" ? "rest" : segIc(), always: 1 });
+  const tl = document.getElementById("htl");
+  const lab = s => s.show ? (s.ic === "listen" ? "hold fn" : s.ic === "speak" ? "answer" : s.ic === "need" ? "needs you" : "click") : (s.ic === "still" ? "rest" : s.ic === "done" ? "done" : "back in");
+  tl.insertAdjacentHTML("beforeend", HS.map((s, i) => `<b data-i="${i}" style="left:${s.t / HDUR * 100}%">${lab(s)}</b>`).join(""));
+  tl.onclick = e => { const r = tl.getBoundingClientRect(); hT = (e.clientX - r.left) / r.width * HDUR; hSeg = -1; };
+  const btn = document.getElementById("hplay"); btn.onclick = () => { hPlay = !hPlay; btn.textContent = hPlay ? "pause" : "play"; }; btn.textContent = hPlay ? "pause" : "play";
+  addEventListener("keydown", e => { if (e.key === " " && e.target === document.body) { e.preventDefault(); btn.onclick(); } if (e.key === "ArrowRight") { hT = (hT + 2) % HDUR; hSeg = -1; } if (e.key === "ArrowLeft") { hT = (hT - 2 + HDUR) % HDUR; hSeg = -1; } });
+}
+function heroAt(t) {
+  let i = HS.length - 1; while (HS[i].t > t) i--;
+  const s = HS[i], lt = t - s.t, inn = CAP.querySelector(".in"), txt = CAP.querySelector(".txt");
+  if (i !== hSeg) {
+    hSeg = i;
+    if (s.show) {
+      txt.innerHTML = hKey = s.html(lt);
+      inn.classList.remove("swap"); void inn.offsetWidth; inn.classList.add("swap");
+      CAP.style.width = s.w + "px";
+    }
+    // the origin of the capsule's motion is the marble in the menu bar: it grows out of it and goes back into it
+    const ox = TRAY.offsetLeft + TRAY.offsetWidth / 2 + TRAY.offsetParent.offsetLeft - CAP.offsetLeft, oy = TRAY.offsetTop + TRAY.offsetHeight / 2 - CAP.offsetTop;
+    CAP.style.transformOrigin = `${ox}px ${oy}px`;
+    CAP.classList.toggle("gone", !s.show);
+    const c = TRAY.querySelector(".cnt"); c.textContent = s.n; c.classList.toggle("on", !!s.n);
+    document.getElementById("hcap").textContent = s.cap;
+    document.querySelectorAll("#htl b").forEach(b => b.classList.toggle("on", +b.dataset.i === i));
+  } else if (s.show) { const h = s.html(lt); if (h !== hKey) { hKey = h; txt.innerHTML = h; } }
+  document.getElementById("hhead").style.left = t / HDUR * 100 + "%";
+  document.getElementById("htime").textContent = t.toFixed(1) + " s";
+}
+
+// ---------- the loop: only what's on screen moves
+const vis = new WeakMap(), seen = new WeakSet();
+const io = new IntersectionObserver(es => es.forEach(e => vis.set(e.target, e.isIntersecting)), { rootMargin: "100px" });
+let last = performance.now() / 1000;
+function loop() {
+  const now = performance.now() / 1000, dt = Math.min(.1, now - last); last = now;
+  if (hPlay) hT = (hT + dt) % HDUR;
+  heroAt(hT);
+  const t = FROZEN ?? now;
+  for (const L of LIVE) {
+    if (!seen.has(L.cv)) { seen.add(L.cv); io.observe(L.cv); }
+    if (!vis.get(L.cv) && !(L.always && vis.get(document.getElementById("hstage")))) continue;
+    MARBLE.draw(L.cv, L.v(), L.m(t), t, FROZEN != null ? 9 : dt);
+  }
+  requestAnimationFrame(loop);
+}
+io.observe(document.getElementById("hstage"));
+document.fonts.ready.then(() => { buildHero(); loop(); });
+</script>
+</body></html>

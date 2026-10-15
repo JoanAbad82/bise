@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bise · round 10 · your agents, from the bar</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{--acc:#f4a6b0;--on-acc:#2a141b;--ink:#fff;--dim:#ffffffa6;--faint:#ffffff6e;--line:#ffffff14;--ok:#cfe8c0;--risk:#ff9a8a;
+  --ease-out:cubic-bezier(.16,1,.3,1);--ease-in:cubic-bezier(.7,0,.84,0)}
+*{box-sizing:border-box}
+body{margin:0;background:#141011;color:#ece6da;font:14px/1.6 "JetBrains Mono",ui-monospace,monospace}
+a{color:var(--acc);text-decoration:none}
+.wrap{max-width:1500px;margin:0 auto;padding:30px 32px 140px}
+.top{display:flex;gap:16px;font-size:13px}.top .sp{flex:1}.top a{color:#a39c90}
+h1{font:400 64px/1 "Instrument Serif",serif;margin:24px 0 0}h1 em,h2 em{color:var(--acc)}
+h2{font:400 42px/1.05 "Instrument Serif",serif;margin:0 0 6px}
+/* type (the user, main m_7003: no serif for reading). reading text is the system sans; the serif stays only for the big display titles */
+.lede{font:17px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;color:#d6cfc2;max-width:68ch;margin:12px 0}.lede b{color:#fff;font-weight:600}
+.brief{font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;color:#a39c90;max-width:76ch;border-left:2px solid var(--acc);padding-left:16px;margin:12px 0}
+section{margin:54px 0 0}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:18px 0 12px;font-size:12.5px;color:#857d72}.ctl>span{margin:0 6px 0 10px}.ctl>span:first-child{margin-left:0}
+.ctl button{font:12.5px "JetBrains Mono",monospace;background:#241c1e;color:#cfc7b9;border:0;border-radius:8px;padding:5px 10px;cursor:pointer}.ctl button.on{background:var(--acc);color:var(--on-acc)}
+.howto{font-size:12.5px;color:#a39c90;margin:0 0 12px;max-width:150ch}.howto kbd,.km kbd{font:600 11.5px -apple-system,sans-serif;color:#fff;background:#2a2326;border-radius:5px;padding:1px 6px;box-shadow:inset 0 -1px 0 #0006,0 0 0 1px #ffffff1a}
+.screen{position:relative;width:100%;aspect-ratio:1440/860;border-radius:14px;overflow:hidden;background:url(walls/lamps.png) center/cover;box-shadow:0 0 0 1px #2a2124,0 30px 70px -36px #000;outline:none}
+.screen:focus-visible{box-shadow:0 0 0 2px var(--acc)}
+.desk{position:absolute;left:0;top:0;width:1440px;height:860px;transform-origin:0 0;font:15px/1.35 -apple-system,"SF Pro Text",sans-serif;color:var(--ink)}
+.mb{position:absolute;left:0;right:0;top:0;height:30px;display:flex;align-items:center;gap:20px;padding:0 16px;font:13.5px -apple-system,sans-serif;color:#fff;background:#0000002e;-webkit-backdrop-filter:blur(30px) saturate(1.6);backdrop-filter:blur(30px) saturate(1.6);z-index:5}
+.mb .sp{flex:1}.mb .pi{display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 6px;border-radius:6px}.mb .pi:hover{background:#ffffff1f}.mb .pi canvas{width:18px;height:18px}
+.mb .cnt{min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:var(--acc);color:var(--on-acc);font:700 10.5px/15px -apple-system;text-align:center}
+.win{position:absolute;border-radius:12px;background:#1e1b1ccc;box-shadow:0 20px 60px -20px #000a,0 0 0 .5px #0008}
+.win .tb{height:28px;border-bottom:1px solid #ffffff10;display:flex;gap:7px;align-items:center;padding:0 10px}.win .tb i{width:11px;height:11px;border-radius:50%;background:#ff5f57}.win .tb i+i{background:#febc2e}.win .tb i+i+i{background:#28c840}
+/* glass, round 9 */
+.glass{position:relative;border-radius:26px;overflow:hidden;background:linear-gradient(180deg,rgba(40,33,36,.58),rgba(24,20,22,.74));-webkit-backdrop-filter:blur(40px) saturate(1.8);backdrop-filter:blur(40px) saturate(1.8);box-shadow:inset 0 0 0 1px #ffffff1f,inset 0 1px 0 #ffffff33,0 30px 80px -24px #000c}
+.appear{opacity:0;transform:translateY(-4px);pointer-events:none;transition:opacity .12s var(--ease-in),transform .12s var(--ease-in)}
+.appear.on{opacity:1;transform:none;pointer-events:auto;transition:opacity .16s var(--ease-out),transform .2s var(--ease-out)}
+kbd.k{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:6px;font:600 11.5px/1 -apple-system,sans-serif;color:#ffffffd9;background:#ffffff14;box-shadow:inset 0 -1px 0 #0005,inset 0 0 0 1px #ffffff1a}
+.lab{font:600 11px -apple-system;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding:8px 12px 4px}.lab .a{color:var(--acc)}
+.foot{display:flex;gap:16px;align-items:center;height:36px;padding:0 20px;border-top:1px solid var(--line);font:12px -apple-system;color:var(--faint);background:#0000001a;flex:none}
+.foot span{display:flex;gap:6px;align-items:center}.foot .sp{flex:1}.foot .act{cursor:pointer;border-radius:6px;padding:2px 4px;margin:0 -4px}.foot .act:hover{background:#ffffff12;color:var(--dim)}
+/* the bar */
+.bar{position:absolute;left:50%;top:170px;z-index:20}
+.bar .pearl{position:absolute;left:-76px;top:2px;width:64px;height:64px;pointer-events:none}
+.inrow{display:flex;align-items:center;gap:12px;height:68px;padding:0 20px 0 24px;border-bottom:1px solid var(--line)}
+.q{flex:1;min-width:0;font:400 23px/1.25 -apple-system,"SF Pro Display",sans-serif;letter-spacing:-.01em;color:#fff;white-space:nowrap;overflow:hidden}
+.q.ph{color:#ffffff59}.q .caret{display:inline-block;width:2px;height:24px;background:var(--acc);vertical-align:-4px;margin-left:1px;animation:caret 1.1s steps(1) infinite}@keyframes caret{50%{opacity:0}}
+.rk{display:flex;gap:6px;align-items:center;font:12px -apple-system;color:var(--faint);white-space:nowrap}
+.split{display:grid;height:420px}
+.list{overflow:auto;padding:6px 8px 8px;scrollbar-width:none}
+.row{display:grid;grid-template-columns:24px 1fr auto;gap:12px;align-items:center;height:44px;padding:0 12px;border-radius:12px;cursor:pointer}
+.row .g{font:600 14px -apple-system;color:var(--faint);text-align:center}.g.a{color:var(--acc)}.g.ok{color:var(--ok)}.g.risk{color:var(--risk)}.g.work{color:#ffffffc8}
+.row .t{min-width:0;display:flex;flex-direction:column;line-height:1.2}.row .t b{font-weight:500;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row .t small{font-size:12.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.row .s{display:flex;gap:4px;align-items:center;font:12px -apple-system;color:var(--faint)}
+.row.sel{background:#ffffff14}.row:hover:not(.sel){background:#ffffff0a}
+.row .wait{color:var(--acc);font-weight:600}
+mark{background:#f4a6b040;color:#fff;border-radius:3px;padding:0 1px}
+/* the preview, inside the bar (A) or the peek panel (B) */
+.pv{border-left:1px solid var(--line);padding:16px 20px;overflow:auto;scrollbar-width:none;animation:pvin .18s var(--ease-out)}
+@keyframes pvin{from{opacity:.4}to{opacity:1}}
+.pv h3{margin:0;font:600 19px/1.25 -apple-system,"SF Pro Display",sans-serif;letter-spacing:-.005em;display:flex;align-items:center;gap:8px}
+.chip{font:500 12px -apple-system;padding:2px 9px;border-radius:99px;background:#ffffff14;color:var(--dim);white-space:nowrap}.chip.a{background:#f4a6b026;color:var(--acc)}.chip.ok{background:#cfe8c01f;color:var(--ok)}.chip.risk{background:#ff9a8a1f;color:var(--risk)}
+.pv .now{font:15px/1.42 -apple-system;color:#ffffffe6;margin:8px 0 2px}
+.pv .sect{font:600 11px -apple-system;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:16px 0 6px}
+.act-l{display:grid;grid-template-columns:44px 1fr;gap:8px;font:13.5px/1.45 -apple-system;color:var(--dim);padding:3px 0}.act-l i{font-style:normal;color:var(--faint);font-size:12px}
+.wcard{border-radius:14px;background:#f4a6b014;box-shadow:inset 0 0 0 1px #f4a6b033;padding:10px 12px;font:14px/1.4 -apple-system;color:#fff;cursor:pointer}.wcard:hover{background:#f4a6b01f}
+.wcard .l{font:600 11px -apple-system;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);margin-bottom:3px}
+.rep{font:13.5px/1.45 -apple-system;color:var(--dim)}
+.pv .open{margin-top:16px;display:flex;gap:16px;font:12px -apple-system;color:var(--faint)}.pv .open span{display:flex;gap:6px;align-items:center;cursor:pointer}.pv .open span:hover{color:var(--dim)}
+/* the side panel */
+.side{position:absolute;right:8px;top:38px;bottom:8px;width:440px;z-index:22;display:flex;flex-direction:column}
+.side .glass{flex:1;display:flex;flex-direction:column;min-height:0}
+.side .pearl{position:absolute;left:-52px;top:14px;width:40px;height:40px;pointer-events:none}
+.side.peek .glass{opacity:.94}
+.sh{padding:16px 16px 12px 20px;border-bottom:1px solid var(--line);flex:none}
+.sh .t1{display:flex;align-items:center;gap:8px}.sh h3{margin:0;font:600 19px/1.2 -apple-system,"SF Pro Display",sans-serif;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh .tl{font:13.5px/1.4 -apple-system;color:var(--dim);margin-top:4px}
+.tools{display:flex;gap:4px;margin-top:10px}
+.tb2{display:flex;align-items:center;gap:6px;font:12.5px -apple-system;color:var(--dim);padding:4px 8px;border-radius:8px;cursor:pointer;border:0;background:#ffffff0c}.tb2:hover{background:#ffffff1a;color:#fff}.tb2.on{background:#f4a6b026;color:var(--acc)}
+.tb2 kbd.k{height:18px;min-width:18px;font-size:10.5px}
+.tb2.stop:hover{background:#ff9a8a26;color:var(--risk)}
+.sh{position:relative}
+.conf{display:flex;align-items:center;gap:12px;margin-top:10px;padding:8px 10px;border-radius:12px;background:#ff9a8a14;box-shadow:inset 0 0 0 1px #ff9a8a33;font:13.5px/1.35 -apple-system;color:#fff}.conf .sp{flex:1}.conf .act{display:flex;gap:5px;align-items:center;font-size:12px;color:var(--dim);cursor:pointer;white-space:nowrap}.conf .act:hover{color:#fff}
+.menu{position:absolute;right:12px;top:48px;z-index:5;width:250px;padding:6px;border-radius:14px;background:rgba(36,30,32,.92);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);box-shadow:inset 0 0 0 1px #ffffff1f,0 20px 50px -16px #000c}
+.menu .mi{display:flex;justify-content:space-between;align-items:center;height:30px;padding:0 10px;border-radius:8px;font:13.5px -apple-system;color:#fff;cursor:pointer}.menu .mi:hover{background:#ffffff14}.menu hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+.ix{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--faint);cursor:pointer;font:15px -apple-system}.ix:hover{background:#ffffff14;color:#fff}
+.hist{flex:1;overflow:auto;padding:10px 12px 12px;scrollbar-width:thin;scrollbar-color:#ffffff22 transparent;min-height:0}
+.ev{padding:6px 8px;border-radius:10px;margin:2px 0;font:14px/1.45 -apple-system;color:#ffffffe0;position:relative}
+.ev:hover{background:#ffffff08}
+.ev .who{font:600 11px -apple-system;letter-spacing:.04em;color:var(--faint);display:flex;gap:8px;margin-bottom:2px}.ev .who i{font-style:normal;font-weight:400;letter-spacing:0}
+.ev .copy{position:absolute;right:6px;top:4px;opacity:0;font:11.5px -apple-system;color:var(--faint);cursor:pointer;padding:2px 6px;border-radius:6px}.ev:hover .copy{opacity:1}.ev .copy:hover{background:#ffffff14;color:#fff}
+.ev.you{background:#ffffff0d;margin-left:40px}.ev.you:hover{background:#ffffff14}
+.ev.tool{font:12.5px/1.4 "JetBrains Mono",monospace;color:var(--faint);cursor:pointer;padding:4px 8px}.ev.tool:hover{color:var(--dim)}
+.ev.tool .more{display:none;margin:4px 0 0 14px;color:var(--faint)}.ev.tool.open .more{display:block}
+.ev.page{display:flex;align-items:center;gap:10px;cursor:pointer;background:#ffffff08}.ev.page:hover{background:#ffffff12}.ev.page .s{margin-left:auto;display:flex;gap:4px;font:12px -apple-system;color:var(--faint)}
+.ev.card{background:#f4a6b012;box-shadow:inset 0 0 0 1px #f4a6b030;padding:10px 10px 6px}
+.ev.card .l{font:600 11px -apple-system;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);margin-bottom:4px}
+.opt{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;height:36px;padding:0 8px;border-radius:10px;cursor:pointer;font-size:14px}.opt:hover{background:#ffffff12}.opt.sel{background:#ffffff1a}
+.ev.done{color:var(--ok)}.ev.done .rep2{color:var(--dim)}
+.ev.hit{box-shadow:inset 0 0 0 1px #f4a6b066}
+.live{display:flex;align-items:center;gap:8px;padding:8px 12px;font:12.5px -apple-system;color:var(--faint);flex:none}
+.dots i{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--dim);margin-right:3px;animation:dot 1.2s infinite}.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}@keyframes dot{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.comp{margin:0 10px 10px;border-radius:16px;background:#ffffff0d;box-shadow:inset 0 0 0 1px #ffffff14;padding:10px 12px 6px;flex:none;cursor:text}
+.comp.focus{box-shadow:inset 0 0 0 1px #ffffff40}
+.comp .in{font:15px/1.4 -apple-system;color:#fff;min-height:21px;white-space:pre-wrap;word-break:break-word}.comp .in.ph{color:#ffffff59}
+.comp .ch{display:flex;gap:14px;align-items:center;font:12px -apple-system;color:var(--faint);margin-top:6px}.comp .ch .sp{flex:1}.comp .ch span{display:flex;gap:5px;align-items:center}.comp .ch .act{cursor:pointer}.comp .ch .act:hover{color:var(--dim)}
+.find{display:none;margin:8px 12px 0;padding:6px 10px;border-radius:10px;background:#ffffff10;font:13.5px -apple-system;color:#fff;align-items:center;gap:8px;flex:none}.find.on{display:flex}.find .n{margin-left:auto;color:var(--faint);font-size:12px}
+.tip{position:absolute;z-index:40;pointer-events:none;font:12px -apple-system;color:#fff;background:#2a2326f0;padding:4px 8px;border-radius:7px;box-shadow:0 6px 20px -6px #000a;opacity:0;transition:opacity .12s;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.toast{position:absolute;left:50%;top:120px;transform:translateX(-50%);z-index:45;display:flex;gap:8px;align-items:center;padding:8px 14px;border-radius:14px;background:rgba(30,26,28,.78);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);box-shadow:inset 0 0 0 1px #ffffff1a;color:#fff;font:13.5px -apple-system;opacity:0;transition:opacity .2s}
+.quit{position:absolute;inset:0;z-index:50;display:none;place-items:center;font:15px -apple-system;color:#fff}.quit.on{display:grid}.quit div{background:#000a;padding:14px 18px;border-radius:14px;text-align:center}
+/* reference */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.cards div{background:#1e1719;border-radius:14px;padding:12px 16px;font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;color:#cfc7b9}
+.cards b{display:block;font:500 11px "JetBrains Mono";color:var(--acc);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+table.km{border-collapse:collapse;margin-top:12px;font:14px -apple-system;color:#e8e2d8;width:100%}
+.km td,.km th{padding:8px 10px;border-bottom:1px solid #2a2326;text-align:left;vertical-align:top}.km th{font:500 11px "JetBrains Mono";color:#857d72;text-transform:uppercase}
+.km code{font:12.5px "JetBrains Mono";color:#e8c9ce}
+.new{color:var(--acc);font:600 10px "JetBrains Mono";margin-left:6px;vertical-align:2px}
+</style></head>
+<body><div class="wrap">
+<div class="top"><a href="identity9.html">← round 9 · like Spotlight</a><a href="index.html">all directions</a><span class="sp"></span><span style="color:#857d72">identity · round 10 · your agents, from the bar</span></div>
+<h1>your agents, <em>from the bar</em></h1>
+<p class="lede">round 9's bar, now with your agents in it. <b>type to find one</b>, or <b>fn a</b> for all of them. arrow onto one and its <b>preview</b> shows on the right: what it does now, its last actions, what waits on you, its last report. <b>⏎ or a click</b> opens its <b>side panel</b> on the right edge of the screen: its whole history, live, where you can answer it, write to it, follow it or open it in the terminal. everything you see reacts to a click, and the usual Mac keys work (⌘Q, ⌘W, ⌘F, ⌘C, ⌘,).</p>
+<p class="brief">your words: “dans le menu Spotlight, je puisse sélectionner un agent et quand je descends dessus, je vois sur la droite … ses dernières actions, un petit résumé de ce qu'il est en train de faire … et quand je clique, ça m'ouvre un side panel sur la droite qui soit interactif avec l'historique … une vraie UI. il manque beaucoup de click events … il n'y a pas de commande Q pour quitter.”</p>
+
+<section id="demo">
+  <h2>try it, <em>live</em></h2>
+  <p class="howto">click the screen, then: <kbd>a</kbd> = fn a (all agents) · <kbd>/</kbd> = fn space, then type (try <b>perf</b> or <b>cook</b>) · <kbd>↑</kbd><kbd>↓</kbd> move, the preview follows · <kbd>⏎</kbd> open the side panel · in the panel: type to write, <kbd>⏎</kbd> send now, <kbd>tab</kbd> when it's free, <kbd>1</kbd><kbd>2</kbd> answer its card, <kbd>⌘</kbd><kbd>↑</kbd><kbd>↓</kbd> the agent above / below, <kbd>⌘</kbd><kbd>F</kbd> find, <kbd>⌘</kbd><kbd>D</kbd> follow, <kbd>⌘</kbd><kbd>O</kbd> terminal, <kbd>esc</kbd> or <kbd>⌘</kbd><kbd>W</kbd> close · <kbd>⌘</kbd><kbd>Q</kbd> quit bise ambient. (in this page ⌘ is also ctrl.) the mouse does all of it too.</p>
+  <div class="ctl" id="ctl"><span>preview</span><button data-v="A" class="on">A · inside the bar</button><button data-v="B">B · the side panel peeks</button>
+    <span>show</span><button data-go="agents">fn a</button><button data-go="type">fn space + "perf"</button><button data-go="panel">perf's panel</button><button data-go="closed">closed</button></div>
+  <div class="screen" id="screen" tabindex="0"><div class="desk" id="desk">
+    <div class="mb"><b>Chrome</b><span>File</span><span>Edit</span><span>View</span><span>Window</span><span class="sp"></span><span class="pi" id="mbpi" data-tip="what's going on|fn 0"><canvas id="mbp"></canvas><span class="cnt" id="cnt">2</span></span><span>◔</span><span>⌕</span><span>Sat 10:41</span></div>
+    <div class="win" style="left:70px;top:70px;width:760px;height:520px"><div class="tb"><i></i><i></i><i></i></div></div>
+    <div class="win" style="left:540px;top:250px;width:720px;height:520px"><div class="tb"><i></i><i></i><i></i></div></div>
+    <div class="bar appear" id="bar"><canvas class="pearl" id="pearl"></canvas><div class="glass" id="bglass"></div></div>
+    <div class="side appear" id="side"><canvas class="pearl" id="spearl"></canvas><div class="glass" id="sglass"></div></div>
+    <div class="tip" id="tip"></div><div class="toast" id="toast"></div>
+    <div class="quit" id="quit"><div>bise ambient quit.<br><span style="color:var(--faint);font-size:13px">fn does nothing now. open it again from Spotlight or at login. (click to bring it back)</span></div></div>
+  </div></div>
+</section>
+
+<section id="pick">
+  <h2>the choices, <em>and my pick</em></h2>
+  <div class="cards">
+    <div><b>A · preview inside the bar (my pick)</b>the bar widens to 860 for lists (it opens at that width, it never grows while shown): the list on the left, 360; the preview on the right, 500. one glass, one place, like Raycast. ⏎ then opens the side panel and the bar goes.</div>
+    <div><b>B · the side panel peeks</b>the bar stays 700; the selected agent's side panel shows read-only on the right edge as you arrow, and ⏎ makes it live. one place for an agent's details, but two glasses on screen at once, and the panel flickers as you arrow fast.</div>
+    <div><b>why A</b>you look at one spot while you browse; nothing moves at the edge of your eye; the panel only comes when you ask for it. B is the fallback if 860 feels too big on a 13" screen.</div>
+    <div><b>the side panel</b>docked to the right edge, full height under the menu bar, 440 wide, the same glass; the pearl floats to its left. it stays until esc / ⌘W, and you can keep working in your apps meanwhile: it takes the keys only when you click in it or open it.</div>
+    <div><b>clicks everywhere</b>every row, chip, keycap hint, tool row, page, card option and button reacts to the pointer (hover tint, a tooltip with its key) and to a click (= its key). the audit is below.</div>
+    <div><b>⌘Q and the Mac keys</b>⌘Q quits bise ambient only when bise has the keys (the bar or the panel is in front), never your front app. ⌘W closes the panel, ⌘F finds in it, ⌘C copies, ⌘, settings.</div>
+  </div>
+</section>
+
+<section id="keys">
+  <h2>the keys, <em>new in round 10</em></h2>
+  <p class="howto">round 9's keymap stays frozen; these are added. <b style="color:#fff">fn a</b> is the only new fn key.</p>
+  <table class="km">
+    <tr><th>key</th><th>where</th><th>does</th></tr>
+    <tr><td><kbd>fn</kbd><kbd>a</kbd><span class="new">new</span></td><td>anywhere</td><td>your agents: the bar with every agent, those waiting on you first, then working, then idle and done.</td></tr>
+    <tr><td>type</td><td>fn space, fn a</td><td>filters agents (name, title line, what it's for) and pages; matches are marked.</td></tr>
+    <tr><td><kbd>↑</kbd><kbd>↓</kbd></td><td>a list</td><td>move; the preview follows the selected row.</td></tr>
+    <tr><td><kbd>⏎</kbd> · click</td><td>an agent row</td><td>open its side panel (the bar goes, the panel takes the keys).</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>O</kbd></td><td>an agent row, the panel</td><td>open the agent in the terminal (bise's TUI on that agent).</td></tr>
+    <tr><td><kbd>⏎</kbd> · <kbd>tab</kbd></td><td>panel composer</td><td>send now (it reads it at once) · send when it's free (queued), like the TUI. <kbd>⇧</kbd><kbd>⏎</kbd> a new line.</td></tr>
+    <tr><td><kbd>1</kbd>-<kbd>9</kbd></td><td>panel, a card waits</td><td>answer the agent's open card (empty composer only).</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>↑</kbd> <kbd>⌘</kbd><kbd>↓</kbd></td><td>the panel</td><td>the agent above / below in the list, without closing.</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>F</kbd></td><td>the panel</td><td>find in its history; ⏎ next, esc done.</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>D</kbd></td><td>an agent row, the panel</td><td>follow: its reports and questions reach you as a line on the glass (and a notification when the screen is locked); again to stop.</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>.</kbd><span class="new">new</span></td><td>an agent row, the panel</td><td>stop it (working, waiting or blocked). asks once on the panel: “stop perf? it drops what it's doing now; its history and its work stay.” <kbd>⏎</kbd> stop, <kbd>esc</kbd> keep it. (⌘. is the Mac's cancel.)</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>⌫</kbd><span class="new">new</span></td><td>an agent row, the panel</td><td>archive: out of your list, still in search and history. idle or done: at once, with “archived perf · ⌘Z undo”. still working: asks “stop it and archive it?” first.</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>Z</kbd></td><td>after an archive</td><td>undo it: the agent is back in your list.</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>C</kbd></td><td>a row, a message</td><td>copy the selected text, else the selected message, else the agent's title line.</td></tr>
+    <tr><td><kbd>esc</kbd> · <kbd>⌘</kbd><kbd>W</kbd></td><td>the panel</td><td>close it (esc first leaves find, then the composer, then closes).</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>,</kbd></td><td>bise has the keys</td><td>settings (same as fn ,).</td></tr>
+    <tr><td><kbd>⌘</kbd><kbd>Q</kbd></td><td>bise has the keys</td><td>quit bise ambient. no confirm (a Mac app quits on ⌘Q); fn stops working until you open it again. never sent to your front app.</td></tr>
+  </table>
+</section>
+
+<section id="clicks">
+  <h2>what reacts, <em>the click audit</em></h2>
+  <p class="howto">the user: “il manque beaucoup de click events”. every element below has a hover state (tint #ffffff0a-1a, pointer cursor, a tooltip with its key after 600 ms) and a click that does exactly what its key does. nothing that looks like a button is inert; nothing inert looks like a button.</p>
+  <table class="km">
+    <tr><th>element</th><th>hover</th><th>click</th></tr>
+    <tr><td>the menu-bar pearl</td><td>tint, tooltip “what's going on · fn 0”</td><td>fn 0. right click: the menu.</td></tr>
+    <tr><td>the pink count next to it</td><td>tooltip “2 waiting for you · fn i”</td><td>fn i.</td></tr>
+    <tr><td>the bar's field</td><td>text cursor</td><td>focus the field (fn space).</td></tr>
+    <tr><td>every row (agent, page, card, setting)</td><td>tint</td><td>⏎ on it (agent → panel, page → browser, card → its card, setting → switch).</td></tr>
+    <tr><td>key hints in footers</td><td>tint (only hints that are keys)</td><td>the key. info hints (↑↓ move) stay plain text.</td></tr>
+    <tr><td>preview: “waits on you” card</td><td>pink tint</td><td>opens the panel at that card.</td></tr>
+    <tr><td>preview: a page line, a report</td><td>tint</td><td>the page in the browser · the panel at the report.</td></tr>
+    <tr><td>panel: follow, terminal, find, stop, archive, close, ⋯</td><td>tint + tooltip with the key (stop tints red)</td><td>⌘D, ⌘O, ⌘F, ⌘. (asks once), ⌘⌫, ⌘W; ⋯ opens a menu with all of them plus copy its name, open its folder in Finder and quit bise ambient ⌘Q.</td></tr>
+    <tr><td>panel: the stop / archive question</td><td>tint on its two answers</td><td>⏎ stop (or stop and archive) · esc keep it.</td></tr>
+    <tr><td>panel: the status chip</td><td>tooltip “working since 10:35”</td><td>jumps to the latest line.</td></tr>
+    <tr><td>panel: a message</td><td>tint, “copy” on the right</td><td>select; “copy” copies it (⌘C).</td></tr>
+    <tr><td>panel: a folded tool row</td><td>brighter</td><td>unfolds the commands and files; again to fold.</td></tr>
+    <tr><td>panel: a card option</td><td>tint</td><td>answers with it (its digit).</td></tr>
+    <tr><td>panel: a page row</td><td>tint, ⌘⏎ shown</td><td>the page in the browser.</td></tr>
+    <tr><td>panel: links, file paths, commit SHAs in text</td><td>underline</td><td>a link: the browser · a path: Finder (⌘ click: the editor) · a SHA: the commit on GitHub.</td></tr>
+    <tr><td>panel: composer, send, “when it's free”</td><td>text cursor · tint</td><td>focus · ⏎ · tab.</td></tr>
+    <tr><td>the pearl next to the bar / panel</td><td>none (it's bise, not a button)</td><td>click-through to the app below.</td></tr>
+  </table>
+</section>
+
+<section id="data">
+  <h2>the data, <em>for amb-core</em></h2>
+  <p class="howto">what each view needs, by field. names are suggestions; the shapes are what the UI draws. everything live comes as hub events on the capsule's stream (no polling).</p>
+  <table class="km">
+    <tr><th>view</th><th>fields</th><th>notes</th></tr>
+    <tr><td>agent row (fn a, search)</td><td><code>name</code> · <code>status</code> (working · idle · waiting · blocked · done · failed) · <code>title</code> (the TUI title line: what it does now) · <code>purpose</code> (one line, for search) · <code>since</code> (status changed at) · <code>waits</code> (count of his cards on it) · <code>followed</code> · <code>order</code> hint</td><td>sorted: waits &gt; 0 first, then working by since, then idle, done, failed. search matches name, title, purpose; returns match ranges for &lt;mark&gt;.</td></tr>
+    <tr><td>preview</td><td>row + <code>now</code> (title, as a sentence, ≤ 140 chars) · <code>actions[3..5]</code> {<code>at</code>, <code>text</code> one line, <code>kind</code>: tool · message · report · page · land} · <code>waiting[]</code> {<code>card_id</code>, <code>question</code>} · <code>last_report</code> {<code>kind</code>: progress · done · failed · blocked, <code>text</code> first sentence, <code>at</code>} · <code>pages[]</code> {<code>id</code>, <code>title</code>, <code>v</code>}</td><td>one request per selection, debounced 80 ms; cached; refreshed by its events while shown. action texts are summaries (“ran the e2e tests · 3 failed”), never raw tool output.</td></tr>
+    <tr><td>side panel history</td><td><code>entries[]</code> {<code>pos</code>, <code>at</code>, <code>kind</code>: you · agent · tools · card · page · report · from-agent, <code>text</code> (markdown), <code>tools</code> {<code>count</code>, <code>summary</code>, <code>items[]</code>}, <code>card</code> {<code>id</code>, <code>question</code>, <code>options[]</code>, <code>answered</code>}, <code>page</code> {<code>id</code>, <code>title</code>, <code>v</code>, <code>url</code>}} · <code>before</code> cursor for older pages</td><td>the last 60 entries first, older on scroll up (sb inspect's paging). consecutive tool calls fold into one entry. live: <code>entry</code> appended / updated, <code>status</code> changed, <code>typing</code> (it's working: its current step).</td></tr>
+    <tr><td>actions from the panel</td><td><code>send</code> {<code>agent</code>, <code>text</code>, <code>mode</code>: now · queued} · <code>answer</code> {<code>card_id</code>, <code>option</code> | <code>text</code>} · <code>follow</code> {<code>agent</code>, <code>on</code>} · <code>open_terminal</code> {<code>agent</code>} · <code>stop</code> {<code>agent</code>} · <code>archive</code> {<code>agent</code>, <code>stop_first</code>} · <code>unarchive</code> {<code>agent</code>} (⌘Z, while the toast shows or from search) · <code>find</code> is local (the loaded entries, then older on ⏎ past the end)</td><td>send = the hub's input to that agent from the user, as the TUI does (now = steer, queued = after its turn). an answer goes through the same /answer as the inbox, so it can't be answered twice.</td></tr>
+  </table>
+</section>
+<p class="howto" style="margin-top:40px">design only, local mock · ~/acme is the example world · ambient, round 10</p>
+</div>
+
+<script src="marble.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const screen = $("#screen"), desk = $("#desk"), bar = $("#bar"), bg = $("#bglass"), side = $("#side"), sg = $("#sglass");
+const k = s => s.split(" ").map(x => `<kbd class="k">${x}</kbd>`).join("");
+const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+
+// ---- the example world
+const AG = [
+  { name: "cookies", st: "waiting", g: "?", gc: "a", title: "the banner, half the size on mobile", purpose: "cookie banner on mobile", since: "4m", waits: 1,
+    now: "the banner is half the size on mobile; it asks you whether to keep it on small screens at all.",
+    acts: [["10:37", "built the banner at 50% height under 480 px"], ["10:38", "ran the visual tests · 2 snapshots changed"], ["10:39", "asked you: keep the banner on mobile?"]],
+    wait: "keep the banner on mobile, or only a link in the footer?", opts: ["keep it, half the size", "only a link in the footer"], rep: ["progress", "banner at 50% on mobile, snapshots updated."] },
+  { name: "perf", st: "working", g: "∿", gc: "work", title: "signup is 4.1 s → 0.9 s; checking the e2e tests", purpose: "make signup fast", since: "12m",
+    now: "signup went from 4.1 s to 0.9 s by caching the plan lookup; it's running the e2e tests before it lands.",
+    acts: [["10:29", "profiled signup · 3.2 s in the plan lookup"], ["10:33", "cached the plan lookup per request"], ["10:36", "signup 4.1 s → 0.9 s on the bench"], ["10:40", "running the e2e tests · 41 of 58"]],
+    rep: ["progress", "the plan lookup was 3.2 s of 4.1 s; cached, signup is 0.9 s."], page: "signup perf · v2" },
+  { name: "dark-mode", st: "working", g: "∿", gc: "work", title: "the settings page first, then the rest", purpose: "dark mode for the app", since: "6m",
+    now: "the settings page is dark; it's moving the colors of the other pages to the theme tokens.",
+    acts: [["10:31", "added theme tokens for 14 colors"], ["10:35", "settings page done in dark"], ["10:39", "editing billing.tsx and team.tsx"]], rep: ["progress", "settings is dark; 2 pages to go."] },
+  { name: "emoji-csv", st: "blocked", g: "▲", gc: "risk", title: "the export breaks on emoji in names", purpose: "fix the CSV export with emoji", since: "18m",
+    now: "it found the bug (the CSV writer counts bytes, not characters) and waits for main to say which branch to use.",
+    acts: [["10:20", "reproduced with a name “Zoé 🎉”"], ["10:23", "found the byte count in csv.ts"]], rep: ["blocked", "needs to know: fix on main or on release-2.5?"] },
+  { name: "release", st: "done", g: "✓", gc: "ok", title: "2.5.0 is published", purpose: "release 2.5.0", since: "1h",
+    now: "it published 2.5.0 to npm and wrote the release notes.", acts: [["09:30", "ran the full gate · green"], ["09:41", "published acme@2.5.0"], ["09:42", "release notes on GitHub"]], rep: ["done", "2.5.0 is out, notes on GitHub."], page: "release notes · v1" },
+  { name: "weekly-update", st: "idle", g: "◌", gc: "", title: "your weekly update, draft 2", purpose: "weekly update from Slack and Linear", since: "2h",
+    now: "the draft is on its page; it waits for your notes.", acts: [["08:50", "read #team and 5 Linear issues"], ["08:58", "draft 2 on its page"]], rep: ["done", "draft 2 is on the page."], page: "weekly update · v2" },
+];
+const STLAB = { waiting: ["needs you", "a"], working: ["working", ""], blocked: ["blocked", "risk"], done: ["done", "ok"], idle: ["idle", ""], failed: ["failed", "risk"] };
+const HIST = {
+  perf: [
+    { k: "you", at: "10:24", t: "signup feels slow, 4 seconds on my machine. find why and fix it." },
+    { k: "agent", at: "10:25", t: "on it. i'll profile signup first, then fix the slowest step." },
+    { k: "tools", at: "10:29", t: "ran 4 commands · read 6 files", more: ["$ pnpm bench signup", "$ node --cpu-prof scripts/signup.mjs", "read src/plans/lookup.ts", "read src/signup/route.ts"] },
+    { k: "agent", at: "10:30", t: "3.2 s of the 4.1 s is the plan lookup: it fetches every plan on each request. i'll cache it per request." },
+    { k: "tools", at: "10:34", t: "edited 2 files · ran the bench", more: ["edit src/plans/lookup.ts", "edit src/signup/route.ts", "$ pnpm bench signup  → 0.9 s"] },
+    { k: "page", at: "10:36", t: "signup perf", v: "v2" },
+    { k: "agent", at: "10:36", t: "signup is 0.9 s now (was 4.1 s). running the e2e tests before i land it." },
+    { k: "tools", at: "10:40", t: "running the e2e tests · 41 of 58", more: ["$ pnpm e2e"] },
+  ],
+  cookies: [
+    { k: "you", at: "10:30", t: "the cookie banner takes half the screen on mobile. make it smaller." },
+    { k: "tools", at: "10:37", t: "edited 1 file · ran the visual tests", more: ["edit src/ui/CookieBanner.tsx", "$ pnpm test:visual  → 2 snapshots changed"] },
+    { k: "agent", at: "10:38", t: "the banner is 50% of its height under 480 px now." },
+    { k: "card", at: "10:39", t: "keep the banner on mobile, or only a link in the footer?", opts: ["keep it, half the size", "only a link in the footer"] },
+  ],
+};
+function histOf(a) { return HIST[a.name] || [{ k: "agent", at: a.acts[0][0], t: a.now }, ...a.acts.map(([at, t]) => ({ k: "tools", at, t, more: [] }))]; }
+
+// ---- state
+let S = { st: "agents", v: "A", q: "", sel: 0, cur: null, comp: "", focus: "list", find: "", fol: {}, quit: false };
+function rowsFor(q) {
+  const order = { waiting: 0, blocked: 1, working: 2, idle: 3, done: 4, failed: 5 };
+  let l = AG.slice().sort((a, b) => order[a.st] - order[b.st]);
+  if (q) l = l.filter(a => (a.name + " " + a.title + " " + a.purpose).toLowerCase().includes(q.toLowerCase()));
+  return l;
+}
+function hl(s, q) { if (!q) return esc(s); const i = s.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(s) : esc(s.slice(0, i)) + "<mark>" + esc(s.slice(i, i + q.length)) + "</mark>" + esc(s.slice(i + q.length)); }
+
+function preview(a) {
+  if (!a) return `<div class="pv" style="color:var(--faint)">no agent matches. ⏎ asks main instead.</div>`;
+  const [sl, sc] = STLAB[a.st];
+  return `<div class="pv" data-pv="${a.name}"><h3>${a.name}<span class="chip ${sc}">${sl} · ${a.since}</span></h3>
+    <div class="now">${esc(a.now)}</div>
+    ${a.wait ? `<div class="sect">waits on you</div><div class="wcard" data-act="card"><div class="l">? ${a.name} needs you</div>${esc(a.wait)}</div>` : ""}
+    <div class="sect">last actions</div>${a.acts.slice(-5).map(([t, x]) => `<div class="act-l"><i>${t}</i><span>${esc(x)}</span></div>`).join("")}
+    <div class="sect">last report</div><div class="rep">${a.rep[0] === "done" ? "✓ " : a.rep[0] === "blocked" ? "▲ " : ""}${esc(a.rep[1])}</div>
+    ${a.page ? `<div class="sect">its page</div><div class="row" data-act="page" style="height:36px;margin:0 -12px"><span class="g">◰</span><span class="t"><b style="font-size:14px">${esc(a.page)}</b></span><span class="s">${k("⌘ ⏎")}</span></div>` : ""}
+    <div class="open"><span data-act="open">${k("⏎")} open its history</span><span data-act="term">${k("⌘ O")} terminal</span><span data-act="follow">${k("⌘ D")} ${S.fol[a.name] ? "following" : "follow"}</span></div></div>`;
+}
+function renderBar() {
+  const show = S.st === "agents" || S.st === "type";
+  bar.classList.toggle("on", show);
+  if (!show) return;
+  const l = rowsFor(S.q), A = S.v === "A", w = A ? 860 : 700;
+  S.sel = Math.min(S.sel, Math.max(0, l.length - 1));
+  bar.style.width = w + "px"; bar.style.marginLeft = -w / 2 + "px";
+  const typing = S.st === "type";
+  const head = `<div class="inrow"><div class="q${S.q ? "" : " ph"}">${S.q ? esc(S.q) : typing ? "ask bise, find an agent or a page" : "find an agent"}<span class="caret"></span></div><div class="rk">${typing ? "fn space" : "fn a"}</div></div>`;
+  const list = `<div class="list">${typing && S.q ? `<div class="lab">agents</div>` : `<div class="lab">${l.filter(a => a.waits).length ? "your agents · <span class='a'>" + l.filter(a => a.waits).length + " waiting on you</span>" : "your agents"}</div>`}
+    ${l.map((a, i) => `<div class="row${i === S.sel ? " sel" : ""}" data-i="${i}"><span class="g ${a.gc}">${a.g}</span><span class="t"><b>${hl(a.name, S.q)}</b><small>${hl(a.title, S.q)}</small></span><span class="s">${a.waits ? `<span class="wait">${a.waits}</span>` : a.since}${i === S.sel ? k("⏎") : ""}</span></div>`).join("")}
+    ${typing && S.q ? `<div class="lab">ask</div><div class="row" data-act="ask"><span class="g">@</span><span class="t"><b>ask main: ${esc(S.q)}</b></span><span class="s">${k("⌘ ⏎")}</span></div>` : ""}</div>`;
+  const body = A ? `<div class="split" style="grid-template-columns:360px 1fr">${list}${preview(l[S.sel])}</div>` : `<div class="split" style="grid-template-columns:1fr;height:auto;max-height:420px">${list}</div>`;
+  bg.innerHTML = head + body + `<div class="foot"><span>${k("↑")}${k("↓")} move</span><span class="act" data-act="open">${k("⏎")} open</span><span class="act" data-act="term">${k("⌘ O")} terminal</span><span class="act" data-act="follow">${k("⌘ D")} follow</span><span class="sp"></span><span class="act" data-act="close">${k("esc")} close</span></div>`;
+  if (!A) { S.cur = l[S.sel] || null; renderSide(true); }
+}
+function chipOf(a) { const [sl, sc] = STLAB[a.st]; return `<span class="chip ${sc}" data-act="latest" data-tip="${sl} since ${a.since} ago|jump to the latest">${a.g} ${sl} · ${a.since}</span>`; }
+function renderSide(peek) {
+  const a = S.cur, show = !!a && (S.st === "panel" || (peek && S.v === "B" && (S.st === "agents" || S.st === "type")));
+  side.classList.toggle("on", show); side.classList.toggle("peek", !!peek && S.st !== "panel");
+  if (!show) return;
+  const H = histOf(a), live = S.st === "panel";
+  const ev = e => {
+    const hit = S.find && e.t.toLowerCase().includes(S.find.toLowerCase()) ? " hit" : "";
+    if (e.k === "you") return `<div class="ev you${hit}"><div class="who">you <i>${e.at}</i></div>${hl(e.t, S.find)}<span class="copy" data-act="copy">copy</span></div>`;
+    if (e.k === "agent") return `<div class="ev${hit}"><div class="who">${a.name} <i>${e.at}</i></div>${hl(e.t, S.find)}<span class="copy" data-act="copy">copy</span></div>`;
+    if (e.k === "tools") return `<div class="ev tool${hit}" data-act="fold">› ${hl(e.t, S.find)} <span style="opacity:.7">· ${e.at}</span><div class="more">${(e.more || []).map(esc).join("<br>") || "—"}</div></div>`;
+    if (e.k === "page") return `<div class="ev page" data-act="page"><span class="g">◰</span><span>${esc(e.t)} <span style="color:var(--faint)">· ${e.v}</span></span><span class="s">${k("⌘ ⏎")}</span></div>`;
+    if (e.k === "card") return e.ans ? `<div class="ev"><div class="who">you <i>${e.at}</i></div>${esc(e.ans)} <span style="color:var(--faint)">(answer to: ${esc(e.t)})</span></div>`
+      : `<div class="ev card"><div class="l">? ${a.name} needs you · ${e.at}</div>${esc(e.t)}<div style="margin-top:6px">${e.opts.map((o, i) => `<div class="opt" data-opt="${i}"><span>${k(String(i + 1))}</span><span>${esc(o)}</span><span></span></div>`).join("")}</div></div>`;
+    return "";
+  };
+  const nHits = S.find ? H.filter(e => e.t.toLowerCase().includes(S.find.toLowerCase())).length : 0;
+  sg.innerHTML = `<div class="sh"><div class="t1"><h3>${a.name}</h3>${chipOf(a)}<span class="ix" data-act="more" data-tip="more|⋯">⋯</span><span class="ix" data-act="close" data-tip="close|esc">✕</span></div>
+      <div class="tl">${esc(a.title)}</div>
+      <div class="tools"><button class="tb2${S.fol[a.name] ? " on" : ""}" data-act="follow" data-tip="your line when it reports or asks|⌘ D">${S.fol[a.name] ? "✓ following" : "follow"} ${k("⌘ D")}</button><button class="tb2" data-act="term" data-tip="bise's TUI on ${a.name}|⌘ O">terminal ${k("⌘ O")}</button><span style="flex:1"></span>${a.st === "working" || a.st === "waiting" || a.st === "blocked" ? `<button class="tb2 stop" data-act="stop" data-tip="stop it now; its history stays|⌘ .">stop ${k("⌘ .")}</button>` : ""}<button class="tb2" data-act="archive" data-tip="out of your list; still in search|⌘ ⌫">archive ${k("⌘ ⌫")}</button></div>
+      ${S.confirm ? `<div class="conf"><span>${S.confirm === "stop" ? `stop ${a.name}? it drops what it's doing now; its history and its work stay.` : `${a.name} is still working. stop it and archive it?`}</span><span class="sp"></span><span class="act" data-act="yes">${k("⏎")} ${S.confirm === "stop" ? "stop" : "stop and archive"}</span><span class="act" data-act="no">${k("esc")} keep it</span></div>` : ""}
+      ${S.menu ? `<div class="menu">${[["follow", "⌘ D", "follow"], ["term", "⌘ O", "open in the terminal"], ["findo", "⌘ F", "find in its history"], ["copyname", "", "copy its name"], ["finder", "", "open its folder in Finder"], ["-"], ["stop", "⌘ .", "stop"], ["archive", "⌘ ⌫", "archive"], ["-"], ["quit", "⌘ Q", "quit bise ambient"]].map(([a2, kk, w]) => a2 === "-" ? `<hr>` : `<div class="mi" data-act="${a2}"><span>${w}</span><span>${kk ? k(kk) : ""}</span></div>`).join("")}</div>` : ""}</div>
+    <div class="find${S.focus === "find" ? " on" : ""}">⌕ <span>${esc(S.find) || '<span style="color:#ffffff59">find in history</span>'}</span><span class="n">${S.find ? nHits + " found" : ""}</span></div>
+    <div class="hist" id="hist">${H.map(ev).join("")}</div>
+    ${a.st === "working" ? `<div class="live"><span class="dots"><i></i><i></i><i></i></span>${esc(a.acts[a.acts.length - 1][1])}</div>` : ""}
+    ${live ? `<div class="comp${S.focus === "comp" ? " focus" : ""}" data-act="compfocus"><div class="in${S.comp ? "" : " ph"}">${S.comp ? esc(S.comp) : "write to " + a.name}${S.focus === "comp" ? '<span class="q" style="display:inline"><span class="caret" style="height:18px;vertical-align:-3px"></span></span>' : ""}</div>
+      <div class="ch"><span class="act" data-act="send">${k("⏎")} send now</span><span class="act" data-act="queue">${k("tab")} when it's free</span>${H.some(e => e.k === "card" && !e.ans) && !S.comp ? `<span>${k("1")}–${k("2")} answer</span>` : ""}<span class="sp"></span><span class="act" data-act="close">${k("esc")} close</span></div></div>`
+      : `<div class="live" style="justify-content:center">${k("⏎")} open it to write and answer</div>`}`;
+  const h = $("#hist"); if (h) h.scrollTop = h.scrollHeight;
+}
+function render() {
+  renderBar(); if (S.st === "panel" || S.st === "closed") renderSide(false);
+  if (S.st !== "panel" && !(S.v === "B" && (S.st === "agents" || S.st === "type"))) side.classList.remove("on");
+  $("#cnt").textContent = AG.reduce((n, a) => n + (a.waits || 0), 0) + 1;
+  document.querySelectorAll("#ctl [data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === S.v));
+}
+function go(st, extra = {}) { Object.assign(S, { st, sel: 0, find: "", focus: st === "panel" ? "comp" : "list" }, extra); if (st !== "type" && !extra.q) S.q = ""; render(); }
+function toast(h) { const t = $("#toast"); t.innerHTML = h; t.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.opacity = 0, 2200); }
+function openCur() { const l = rowsFor(S.q); const a = S.st === "panel" ? S.cur : l[S.sel]; if (!a) { toast("asked main"); return go("closed"); } S.cur = a; go("panel"); }
+function step(d) { const l = rowsFor(""); let i = l.indexOf(S.cur); i = (i + d + l.length) % l.length; S.cur = l[i]; S.find = ""; render(); }
+function follow() { const a = S.st === "panel" ? S.cur : rowsFor(S.q)[S.sel]; if (!a) return; S.fol[a.name] = !S.fol[a.name]; toast(S.fol[a.name] ? `following ${a.name}: its reports and questions reach you` : `stopped following ${a.name}`); render(); }
+function term() { const a = S.st === "panel" ? S.cur : rowsFor(S.q)[S.sel]; if (a) toast(`Terminal: bise, on ${a.name}`); }
+function send(mode) {
+  if (!S.comp.trim()) return; const a = S.cur, H = HIST[a.name] || (HIST[a.name] = histOf(a));
+  H.push({ k: "you", at: "10:41", t: S.comp + (mode === "queued" ? "  · when it's free" : "") }); S.comp = ""; render();
+  setTimeout(() => { if (S.cur !== a) return; H.push({ k: "agent", at: "10:41", t: mode === "queued" ? "noted, i'll do it right after the tests." : "ok, on it." }); render(); }, 1100);
+}
+function answer(i) { const a = S.cur, H = histOf(a), c = H.find(e => e.k === "card" && !e.ans); if (!c) return; c.ans = c.opts[i]; a.waits = 0; a.st = "working"; a.g = "∿"; a.gc = "work"; toast(`<span style="color:var(--ok)">✓</span> ${a.name} has it: ${esc(c.opts[i])}`); render(); }
+
+// ---- stop (asks once) and archive (asks only if it's still working; ⌘Z undoes)
+const ARCH = [];
+function target() { return S.st === "panel" ? S.cur : rowsFor(S.q)[S.sel]; }
+function askStop() { const a = target(); if (!a || !["working", "waiting", "blocked"].includes(a.st)) return; if (S.st !== "panel") { S.cur = a; go("panel"); } S.menu = false; S.confirm = "stop"; render(); }
+function askArchive() { const a = target(); if (!a) return; if (S.st !== "panel") S.cur = a; S.menu = false; if (["working", "waiting", "blocked"].includes(a.st)) { if (S.st !== "panel") go("panel"); S.confirm = "archive"; return render(); } archive(a); }
+function stopIt(a) { a.st = "idle"; a.g = "◌"; a.gc = ""; a.waits = 0; a.title = "stopped by you · " + a.title; (HIST[a.name] || (HIST[a.name] = histOf(a))).push({ k: "agent", at: "10:41", t: "stopped. what i had done is kept; say the word to pick it up again." }); toast(`stopped ${a.name}`); }
+function archive(a) { const i = AG.indexOf(a); if (i < 0) return; AG.splice(i, 1); ARCH.push([a, i]); toast(`archived ${a.name} · ${k("⌘ Z")} undo`); if (S.st === "panel") { S.cur = rowsFor("")[0] || null; if (!S.cur) go("closed"); } render(); }
+function confirmYes() { const a = S.cur, c = S.confirm; S.confirm = null; if (!a) return; stopIt(a); if (c === "archive") archive(a); render(); }
+function undo() { const x = ARCH.pop(); if (!x) return; AG.splice(x[1], 0, x[0]); toast(`${x[0].name} is back in your list`); render(); }
+function quit() { S.menu = false; S.quit = true; go("closed"); $("#quit").classList.add("on"); }
+
+// ---- clicks: a click = its key
+desk.addEventListener("click", e => {
+  if (S.quit) { S.quit = false; $("#quit").classList.remove("on"); return; }
+  const t = e.target.closest("[data-act],[data-i],[data-opt]"); if (!t) { if (!e.target.closest(".glass")) { if (S.st !== "closed" && S.st !== "panel") go("closed"); } return; }
+  if (t.dataset.i !== undefined) { S.sel = +t.dataset.i; if (e.detail > 1 || t.classList.contains("sel")) openCur(); else render(); return; }
+  if (t.dataset.opt !== undefined) return answer(+t.dataset.opt);
+  const act = t.dataset.act;
+  ({ open: openCur, term, follow, close: () => go("closed"), page: () => toast("opened in your browser"), card: openCur, ask: () => { toast("asked main"); go("closed"); },
+     copy: () => toast("copied"), fold: () => t.classList.toggle("open"), up: () => step(-1), down: () => step(1), latest: () => { const h = $("#hist"); if (h) h.scrollTop = 1e6; },
+     findo: () => { S.focus = "find"; render(); }, compfocus: () => { S.focus = "comp"; render(); }, send: () => send("now"), queue: () => send("queued"),
+     more: () => { S.menu = !S.menu; render(); }, stop: () => askStop(), archive: () => askArchive(), yes: () => confirmYes(), no: () => { S.confirm = null; render(); },
+     copyname: () => { S.menu = false; toast("copied " + S.cur.name); render(); }, finder: () => { S.menu = false; toast("Finder: ~/acme/.worktrees/" + S.cur.name); render(); }, quit: () => quit() })[act]?.();
+  if (S.menu && act !== "more") { S.menu = false; render(); }
+});
+$("#mbpi").addEventListener("click", e => { e.stopPropagation(); go("agents"); });
+// tooltips after 600 ms
+let tipT; desk.addEventListener("mouseover", e => { const t = e.target.closest("[data-tip]"); clearTimeout(tipT); $("#tip").style.opacity = 0; if (!t) return;
+  tipT = setTimeout(() => { const [w, key] = t.dataset.tip.split("|"); const r = t.getBoundingClientRect(), d = desk.getBoundingClientRect(), s = d.width / 1440; const tip = $("#tip");
+    tip.innerHTML = esc(w) + (key ? " " + k(key) : ""); tip.style.left = Math.min(1300, (r.left - d.left) / s) + "px"; tip.style.top = ((r.bottom - d.top) / s + 6) + "px"; tip.style.opacity = 1; }, 600); });
+
+// ---- keys (⌘ = meta or ctrl in this page)
+screen.addEventListener("keydown", e => {
+  const cmd = e.metaKey || e.ctrlKey, key = e.key;
+  if (S.quit) return;
+  if (cmd && key.toLowerCase() === "q") { e.preventDefault(); if (S.st === "closed") return; return quit(); }
+  if (cmd && key === ",") { e.preventDefault(); return toast("settings (fn ,)"); }
+  if (cmd && key.toLowerCase() === "z") { e.preventDefault(); return undo(); }
+  if (S.confirm) { if (key === "Enter") { e.preventDefault(); return confirmYes(); } if (key === "Escape") { e.preventDefault(); S.confirm = null; return render(); } return; }
+  if (S.st !== "closed" && cmd && key === ".") { e.preventDefault(); return askStop(); }
+  if (S.st !== "closed" && cmd && key === "Backspace") { e.preventDefault(); return askArchive(); }
+  if (S.st === "closed") {
+    if (key === "a") return go("agents");
+    if (key === "/") { e.preventDefault(); return go("type"); }
+    return;
+  }
+  if (S.st === "panel") {
+    if (cmd && key.toLowerCase() === "w") { e.preventDefault(); return go("closed"); }
+    if (cmd && key === "ArrowUp") { e.preventDefault(); return step(-1); }
+    if (cmd && key === "ArrowDown") { e.preventDefault(); return step(1); }
+    if (cmd && key.toLowerCase() === "f") { e.preventDefault(); S.focus = "find"; return render(); }
+    if (cmd && key.toLowerCase() === "d") { e.preventDefault(); return follow(); }
+    if (cmd && key.toLowerCase() === "o") { e.preventDefault(); return term(); }
+    if (cmd && key.toLowerCase() === "c") { e.preventDefault(); return toast("copied " + S.cur.name + "'s last message"); }
+    if (key === "Escape") { e.preventDefault(); if (S.focus === "find") { S.focus = "comp"; S.find = ""; return render(); } return go("closed"); }
+    if (S.focus === "find") { if (key === "Backspace") S.find = S.find.slice(0, -1); else if (key.length === 1) S.find += key; e.preventDefault(); return render(); }
+    if (/^[1-9]$/.test(key) && !S.comp) { e.preventDefault(); return answer(+key - 1); }
+    if (key === "Enter" && !e.shiftKey) { e.preventDefault(); return send("now"); }
+    if (key === "Tab") { e.preventDefault(); return send("queued"); }
+    if (key === "Backspace") { S.comp = S.comp.slice(0, -1); return render(); }
+    if (key.length === 1 && !cmd) { e.preventDefault(); S.focus = "comp"; S.comp += key; return render(); }
+    return;
+  }
+  // the bar
+  const l = rowsFor(S.q);
+  if (key === "Escape") { e.preventDefault(); return go("closed"); }
+  if (key === "ArrowDown") { e.preventDefault(); S.sel = Math.min(l.length - 1, S.sel + 1); return render(); }
+  if (key === "ArrowUp") { e.preventDefault(); S.sel = Math.max(0, S.sel - 1); return render(); }
+  if (key === "Enter" && cmd) { e.preventDefault(); toast("asked main"); return go("closed"); }
+  if (key === "Enter") { e.preventDefault(); return openCur(); }
+  if (cmd && key.toLowerCase() === "o") { e.preventDefault(); return term(); }
+  if (cmd && key.toLowerCase() === "d") { e.preventDefault(); return follow(); }
+  if (key === "Backspace") { S.q = S.q.slice(0, -1); S.sel = 0; return render(); }
+  if (key.length === 1 && !cmd) { e.preventDefault(); S.q += key; S.sel = 0; return render(); }
+});
+
+// ---- controls
+$("#ctl").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.v) { S.v = b.dataset.v; render(); }
+  if (b.dataset.go === "agents") go("agents");
+  if (b.dataset.go === "type") go("type", { q: "perf" });
+  if (b.dataset.go === "panel") { S.cur = AG[1]; go("panel"); }
+  if (b.dataset.go === "closed") go("closed");
+  screen.focus(); });
+
+function fit() { desk.style.transform = `scale(${screen.clientWidth / 1440})`; }
+addEventListener("resize", fit); fit();
+let last = performance.now() / 1000;
+function loop() {
+  const now = performance.now() / 1000, dt = Math.min(.1, now - last); last = now;
+  const sel = S.st === "panel" ? S.cur : rowsFor(S.q)[S.sel];
+  const mood = a => !a ? "rest" : a.st === "waiting" ? "need" : a.st === "working" ? "work" : a.st === "done" ? "done" : a.st === "blocked" ? "fail" : "rest";
+  if (bar.classList.contains("on")) MARBLE.draw($("#pearl"), 1, mood(sel), now, dt, "pink");
+  if (side.classList.contains("on")) MARBLE.draw($("#spearl"), 1, mood(S.cur), now, dt, "pink");
+  MARBLE.draw($("#mbp"), 1, "work", now, dt, "pink");
+  requestAnimationFrame(loop);
+}
+go("agents"); loop();
+</script>
+</body></html>

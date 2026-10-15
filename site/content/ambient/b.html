@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ambient · paper</title>
+<link rel="stylesheet" href="amb.css">
+<style>
+/* B · paper: the site's world on the desktop. a slip of warm paper with tape, Newsreader, the pixel face in raspberry; pen red only for notes */
+.wall-b{background:radial-gradient(120% 90% at 50% 40%,#f2ede2 55%,#e2dacb 100%)}
+.wall-b::before{content:"";position:absolute;inset:0;opacity:.1;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.wall-b .menubar{color:#1d1a17;background:#f2ede2b0}
+.wall-b .win{box-shadow:0 0 0 2px #1d1a17,10px 12px 0 #1d1a1722;border-radius:10px}
+:root{--ink:#1d1a17;--dim:#5a5349;--kick:#8a8174;--acc:#b8416b;--pen:#c8264a;--paper:#faf7f0}
+.slip{position:absolute;right:26px;top:48px;background:var(--paper);color:var(--ink);font-family:Newsreader,serif;border-radius:3px;
+  box-shadow:0 1px 0 #0000000d,0 14px 28px -12px #3a2a1a55,0 3px 8px -3px #3a2a1a33;transform-origin:top right}
+.slip::before{content:"";position:absolute;left:50%;top:-11px;width:96px;height:22px;margin-left:-48px;background:#e9dfc9b8;transform:rotate(-2deg);box-shadow:0 1px 2px #0001}
+.slip.tilt{transform:rotate(.6deg)}
+.slip.land{animation:land .7s cubic-bezier(.34,1.4,.5,1)}
+@keyframes land{from{transform:translateY(-40px) rotate(-4deg);opacity:0}to{transform:rotate(.6deg);opacity:1}}
+canvas.fc{color:#b8416b;display:block}
+.m{font-family:"JetBrains Mono",monospace}
+.acc{color:var(--acc)}.dim{color:var(--dim)}.kick{color:var(--kick)}
+.cav{font-family:Caveat,cursive;font-weight:600}
+.small{padding:12px 20px 12px 14px;display:flex;align-items:center;gap:12px;font-size:17px;font-weight:600}
+.small .gust{font:14px "JetBrains Mono",monospace;color:var(--kick)}
+.big{width:450px;padding:24px 28px 22px}
+.big .hd{display:flex;align-items:center;gap:16px}
+.big .hd .t{font-size:15px;color:var(--dim)}.big .hd .t b{display:block;font-size:19px;color:var(--ink);font-weight:600}
+.said{font-size:27px;line-height:1.3;font-weight:600;margin-top:16px;letter-spacing:-.015em}
+.said .w.cur{background:linear-gradient(#f4a6b099,#f4a6b099) 0 85%/100% 30% no-repeat}
+.wave{color:#6b645a;height:46px;margin-top:12px}.wave i{width:3px;border-radius:2px;transform:rotate(4deg)}
+.seen{font-family:Caveat,cursive;font-size:20px;color:var(--dim);margin-top:10px;display:flex;align-items:center;gap:6px}
+.seen svg path{fill:none;stroke:#6b645a;stroke-width:1.8;stroke-linecap:round}
+.quote{border-left:3px solid var(--acc);padding:2px 0 2px 14px;margin-top:16px;font-size:17px;color:var(--dim);line-height:1.4}
+.ans{font-size:22px;line-height:1.35;margin-top:14px;font-weight:600}
+.ul{position:relative;display:inline-block}
+.ul svg{position:absolute;left:-2%;bottom:-8px;width:104%;height:12px;overflow:visible}
+.ul path{fill:none;stroke:var(--acc);stroke-width:3;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .7s cubic-bezier(.65,0,.35,1)}
+.ul.in path{stroke-dashoffset:0}
+.tags{display:flex;gap:10px;margin-top:16px}
+.tag{font:13px "JetBrains Mono",monospace;background:#f1eadb;padding:6px 12px;border-radius:2px;box-shadow:2px 3px 0 #1d1a1714;transform:rotate(-1.5deg)}
+.tag+.tag{transform:rotate(1.2deg)}.tag b{color:var(--acc);font-weight:400;margin-right:5px}
+.tag.in{animation:pk 1s}
+@keyframes pk{0%{background:#f4a6b0}100%{background:#f1eadb}}
+.rows{margin-top:12px}
+.r{display:grid;grid-template-columns:20px 100px 1fr auto;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px dashed #cfc8bd;font-size:17px}
+.r .g{font:14px "JetBrains Mono",monospace;color:var(--kick);text-align:center}.r.done .g{color:var(--acc)}
+.r .n{font:14px "JetBrains Mono",monospace}.r .a{font:12px "JetBrains Mono",monospace;color:var(--kick)}
+.fy{font-family:Caveat,cursive;font-size:24px;color:var(--dim);margin:14px 0 4px}
+.figs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.fig{font-size:13.5px;line-height:1.3}
+.fig .th{height:70px;border-radius:4px;background:#1f1c19;box-shadow:0 0 0 2px #1d1a17,4px 5px 0 #1d1a1718;margin-bottom:6px;position:relative;overflow:hidden}
+.fig .th.l{background:#fff}.fig .th.p{background:#faf7f0}
+.fig .th::after{content:"";position:absolute;left:10px;right:22px;top:14px;height:5px;background:#ffffff30;box-shadow:0 12px 0 #ffffff20,0 24px 0 #ffffff20,0 36px 0 #ffffff14}
+.fig .th.l::after,.fig .th.p::after{background:#0002;box-shadow:0 12px 0 #0001,0 24px 0 #0001,0 36px 0 #00000014}
+.fig i{font-style:italic;color:var(--kick)}
+/* needs you: a slip that drops in */
+.nslip{width:400px;padding:20px 24px 18px}
+.nslip .from{font:12px "JetBrains Mono",monospace;color:var(--kick);display:flex;justify-content:space-between}
+.nslip h3{font-size:24px;line-height:1.25;margin-top:6px;font-weight:600}
+.nslip h3 .q{color:var(--acc);font-family:"JetBrains Mono",monospace;margin-right:6px}
+.stamps{display:flex;gap:12px;margin-top:14px}
+.stamp{flex:1;text-align:center;border:2px solid var(--ink);border-radius:4px;padding:6px;font-size:18px;font-weight:600;box-shadow:3px 3px 0 #1d1a17}
+.stamp.k{background:var(--ink);color:var(--paper)}
+.stamp b{font:500 13px "JetBrains Mono",monospace;margin-right:6px;opacity:.7}
+.nslip .or{font-family:Caveat,cursive;font-size:19px;color:var(--dim);text-align:center;margin-top:10px}
+.stamped{position:absolute;right:16px;top:-6px;font:700 30px Caveat,cursive;color:var(--acc);border:3px solid var(--acc);border-radius:8px;padding:0 14px;transform:rotate(-9deg)}
+.stamped.pop[data-at]:not(.in){transform:rotate(-9deg) scale(2.2)}
+/* the doc viewer */
+.doc{position:absolute;left:54px;top:52px;width:1060px;height:820px;border-radius:10px;overflow:hidden;background:#ecebe8;box-shadow:0 0 0 2px #1d1a17,12px 14px 0 #1d1a1722}
+.doc .wt{height:34px;background:#e3e1dc;display:flex;align-items:center;gap:8px;padding:0 12px;font:12.5px -apple-system,sans-serif;color:#555}
+.doc .wt i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.doc .wt i+i{background:#febc2e}.doc .wt i+i+i{background:#28c840}
+.doc .wt .url{margin-left:40px;background:#fff;border-radius:7px;padding:3px 14px;min-width:380px}
+.ed{position:absolute;inset:34px 0 0 0;background:#f2ede2;color:var(--ink);display:grid;grid-template-columns:1fr 260px;grid-template-rows:46px 1fr}
+.ed .bar{grid-column:1/-1;height:46px;display:flex;align-items:center;gap:6px;padding:0 22px;border-bottom:1px solid #cfc8bd;font:13px "JetBrains Mono",monospace;color:var(--dim)}
+.ed .bar span{padding:5px 10px;border-radius:4px}.ed .bar span.on{background:var(--ink);color:var(--paper)}
+.ed .bar .sp{flex:1}.ed .bar em{font-style:normal;color:var(--kick)}
+.pg{padding:34px 60px 30px 90px;font-family:Newsreader,serif;color:var(--ink);position:relative}
+.pg h1{font-size:38px;font-weight:600;letter-spacing:-.02em}
+.pg .sub{font-style:italic;color:var(--kick);font-size:17px;margin-bottom:18px}
+.pg ul{max-width:470px}.pg li{font-size:20px;line-height:1.5;margin:0 0 14px 20px}
+.hl{background:linear-gradient(#f4a6b000,#f4a6b000);transition:background .6s}
+.hl.in{background:linear-gradient(#f4a6b099,#f4a6b099) 0 70%/100% 55% no-repeat}
+.st{position:relative}
+.st svg{position:absolute;left:-3%;top:45%;width:106%;height:10px;overflow:visible}
+.st path{fill:none;stroke:var(--pen);stroke-width:2.6;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .5s}
+.st.in path{stroke-dashoffset:0}
+.mg{position:absolute;font:600 22px/1.15 Caveat,cursive;color:var(--pen);width:200px}
+.mg svg{display:block;overflow:visible}.mg svg path{fill:none;stroke:var(--pen);stroke-width:2;stroke-linecap:round}
+.side{border-left:1px solid #cfc8bd;padding:18px 18px;background:#ebe5d8;font-family:Newsreader,serif}
+.side h5{font:13px "JetBrains Mono",monospace;color:var(--dim);font-weight:400;margin-bottom:10px}
+.nt{background:var(--paper);padding:10px 12px;margin-bottom:10px;border-radius:2px;box-shadow:0 6px 14px -8px #3a2a1a66;font-size:15px;line-height:1.35}
+.nt .k{font:11px "JetBrains Mono",monospace;color:var(--pen);display:flex;justify-content:space-between}
+.nt .k i{font-style:normal;color:var(--kick)}
+.nt .voice{display:flex;align-items:center;gap:8px;margin-top:6px;color:#6b645a}
+.nt .voice .wv{height:20px}.nt .voice .wv i{width:2px}
+.sendb{position:absolute;right:18px;bottom:18px;left:18px;border:2px solid var(--ink);border-radius:4px;text-align:center;padding:10px;font-size:18px;font-weight:600;background:var(--ink);color:var(--paper);box-shadow:3px 3px 0 #b8416b}
+/* spotlight: an index card */
+.card-i{position:absolute;left:50%;top:200px;width:660px;margin-left:-330px;background:var(--paper);font-family:Newsreader,serif;color:var(--ink);border-radius:3px;
+  box-shadow:0 30px 60px -24px #3a2a1a88,0 4px 10px -4px #3a2a1a44;}
+.card-i .ln{border-bottom:1.5px solid #e2b3bd}
+.card-i .ln{display:flex;align-items:center;gap:14px;padding:6px 26px;height:48px;font-size:25px;font-weight:600}
+.card-i .ln .w.cur::after{content:"";display:inline-block;width:2px;height:.85em;background:var(--acc);margin-left:3px;vertical-align:-2px;animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+.card-i .bd{padding:14px 26px 22px;font-size:18px;line-height:34px}
+.card-i .opt{display:flex;gap:12px;align-items:baseline}
+.card-i .opt .g{font:14px "JetBrains Mono",monospace;color:var(--acc);width:18px}
+.card-i .opt .k{margin-left:auto;font:12px "JetBrains Mono",monospace;color:var(--kick)}
+.card-i .opt.sel{background:#f4a6b040;margin:0 -12px;padding:0 12px}
+/* sheet */
+.sheet{position:absolute;inset:30px 0 0 0;padding:36px 46px}
+.sheet h3{font:600 22px Newsreader,serif;color:var(--ink);margin-bottom:14px}.sheet h3 span{color:var(--kick);font-weight:400;font-style:italic;font-size:18px}
+.cols{display:grid;grid-template-columns:repeat(5,1fr);gap:22px;margin-bottom:24px}
+.cols .lab{font:26px Caveat,cursive;color:var(--dim);margin-bottom:6px}
+.cols .slip{position:relative;right:auto;top:auto;padding:14px 16px;min-height:150px;font-size:16.5px;line-height:1.3;font-weight:600}
+.cols .slip .tx{margin-top:8px}.cols .slip small{display:block;font-weight:400;color:var(--dim);margin-top:4px;font-size:14.5px}
+.cloud{width:120px;display:block;overflow:visible}
+.cloud.bob{animation:bob 5s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-5px) rotate(-1deg)}}
+.cloud.inhale .body{animation:inh 1.2s ease-in-out infinite;transform-origin:50% 60%}
+@keyframes inh{50%{transform:scale(1.06)}}
+.cloud .gst path{stroke-dasharray:1;stroke-dashoffset:1;animation:gs 1.6s ease-out infinite}
+.cloud .gst path:nth-child(2){animation-delay:.25s}.cloud .gst path:nth-child(3){animation-delay:.5s}
+@keyframes gs{0%{stroke-dashoffset:1;opacity:1}70%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.cloud .thk{animation:spin 1.8s linear infinite;transform-origin:150px 40px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<filter id="pencil" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" result="d"/><feTurbulence type="fractalNoise" baseFrequency="1.8" seed="9" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.1 1.3" result="m"/><feComposite in="d" in2="m" operator="in"/></filter>
+<pattern id="hatchB" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)"><line x1="0" y1="0" x2="0" y2="5" stroke="#8a8174" stroke-width="1.5" opacity=".7"/></pattern>
+</defs></svg>
+<script src="amb.js"></script>
+<script>
+const { W, AGENTS } = AMB;
+const fc = (pose, cell = 4, extra = "") => `<canvas class="fc" data-face="${pose}" data-cell="${cell}" data-gap="${cell > 2.5 ? .6 : .2}" ${extra}></canvas>`;
+const vf = (x, y, w, h) => `<div class="vf" data-at="0.05" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"><i></i><i></i><i></i><i></i></div>`;
+const ul = (txt, at) => `<span class="ul" data-at="${at}">${txt}<svg viewBox="0 0 100 10" preserveAspectRatio="none"><path pathLength="1" d="M2 6 C 30 2, 60 9, 98 4"/></svg></span>`;
+// the site's pencil cloud, as a variant beside the face (designer: not instead of it)
+const cloud = (mode = "") => `<svg class="cloud ${mode}" viewBox="0 0 220 120"><g filter="url(#pencil)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <g class="body"><path d="M40 92 C16 92,10 66,32 60 C26 36,56 26,70 42 C78 18,118 16,126 40 C142 26,170 36,164 58 C188 60,188 92,164 94 Z" fill="url(#hatchB)" stroke="#6b645a" stroke-width="2.8"/>
+  <g stroke="#1d1a17" stroke-width="2">${mode.includes("sleep") ? `<path d="M70 66 q6 5 12 0"/><path d="M104 66 q6 5 12 0"/>` : `<circle cx="76" cy="64" r="2.5" fill="#1d1a17"/><circle cx="110" cy="64" r="2.5" fill="#1d1a17"/>`}
+  ${mode.includes("blow") ? `<circle cx="94" cy="80" r="4"/>` : mode.includes("think") ? `<path d="M86 80 h14"/>` : `<path d="M84 76 q9 8 18 0"/>`}</g>
+  <circle cx="66" cy="78" r="6" fill="#ef9aae" opacity=".55" stroke="none"/><circle cx="122" cy="78" r="6" fill="#ef9aae" opacity=".55" stroke="none"/></g>
+  ${mode.includes("blow") ? `<g class="gst" stroke="#8a8174" stroke-width="2.2"><path pathLength="1" d="M180 70 q20 -6 34 2"/><path pathLength="1" d="M182 82 q24 -2 40 8"/><path pathLength="1" d="M178 58 q16 -10 30 -6"/></g>` : ""}
+  ${mode.includes("think") ? `<g class="thk" stroke="#b8416b" stroke-width="2.4"><path d="M150 30 v20 M141 35 l18 10 M141 45 l18 -10"/></g>` : ""}
+  ${mode.includes("ask") ? `<text x="160" y="40" font-family="JetBrains Mono" font-size="28" fill="#b8416b" stroke="none">?</text>` : ""}
+  ${mode.includes("sleep") ? `<path d="M150 46 l8 0 l-8 8 l8 0" stroke="#6b645a" stroke-width="1.8"/>` : ""}</g></svg>`;
+AMB.mount({
+  id: "b", letter: "B", name: "paper", tray: ":*",
+  pitch: "bise.dev on your desktop. the panel is a slip of warm paper taped under the menu bar; words in Newsreader, glyphs in mono, the pixel face in raspberry. outputs open in a paper editor, and your notes are the pen: red, in the margin, in Caveat. the pencil cloud from the site sits beside the face as a variant.",
+  wall: "wall-b",
+  screens: {
+    idle: () => `<div class="slip small tilt land">${fc("rest", 2)}<span>${W.idle}</span><span class="gust" data-gust="4"></span></div>`,
+    listen: () => `${vf(330, 300, 720, 520)}<div class="slip big tilt land">
+        <div class="hd">${fc("seq:listen@0,talk@0.35", 4)}<div class="t"><b>listening</b>let go of fn to send</div></div>
+        <div class="said" data-type="0.4" data-per="0.24">${W.said}</div>
+        <div class="wave" data-wave="you@0.35-6.2" data-n="60"></div>
+        <div class="seen" data-at="0.5"><svg width="34" height="18"><path d="M2 12 C 10 2, 22 2, 32 8 M26 3 l6 5 -7 3"/></svg>main sees ${W.sees}</div></div>`,
+    talk: () => `<div class="slip big tilt">
+        <div class="hd">${fc("seq:rest@0,think@0.9,speak@2.1,kiss@6.6,rest@7.6", 4)}<div class="t"><b class="acc">main</b><span data-at="0" data-out="0.9" style="position:absolute">${W.got}</span><span data-at="0.9">on it.</span></div></div>
+        <div class="quote">${W.said}</div>
+        <div class="ans" data-type="2.1" data-per="0.3">${W.answer}</div>
+        <div class="tags"><span class="tag pop" data-at="5.1"><b>∿</b>dark-mode</span><span class="tag pop" data-at="5.5"><b>∿</b>cookies</span></div></div>`,
+    agents: () => `<div class="slip big tilt land" style="width:500px">
+        <div class="hd">${fc("rest", 2.4)}<div class="t"><b>${W.idle}</b><span class="m" style="font-size:12px">~/acme</span></div></div>
+        <div class="rows">${AGENTS.map(([g, n, w, k], i) => `<div class="r ${k} rise" data-at="${0.25 + i * 0.1}"><span class="g">${k === "work" ? `<span data-gust="1"></span>` : g}</span><span class="n">${n}</span><span>${n === "perf" ? `is done · ${ul("4.1 s → 0.9 s", 1.1)}` : w}</span><span class="a">${["2m", "6m", "4m", "9m", "1m"][i]}</span></div>`).join("")}</div>
+        <div class="fy" data-at="1">for you</div>
+        <div class="figs">
+          <div class="fig rise" data-at="1.1"><div class="th"></div>settings, dark<br><i>a page · dark-mode</i></div>
+          <div class="fig rise" data-at="1.2"><div class="th p"></div>release notes, draft 2<br><i>a doc · release</i></div>
+          <div class="fig rise" data-at="1.3"><div class="th l"></div>PR #482<br><i>a pull request · cookies</i></div></div></div>`,
+    needs: () => `<div class="slip small tilt">${fc("rest", 2)}<span><span class="m acc">?</span> cookies needs you</span></div>
+      <div class="slip nslip land" data-at="0.4" style="top:120px">
+        <div class="from"><span>cookies · now</span><span>esc later</span></div>
+        <h3><span class="q">?</span>keep the banner on mobile?</h3>
+        <div class="stamps"><span class="stamp k"><b>1</b>yes</span><span class="stamp"><b>2</b>no</span></div>
+        <div class="or">or hold fn and say it</div>
+        <div class="stamped pop" data-at="3.6">yes · sent</div></div>
+      <div class="slip small rise" data-at="4.4" style="top:330px">${fc("seq:kiss@4.4,rest@5.4", 2)}<span>cookies has it. the banner stays, half the size.</span></div>`,
+    viewer: () => `<div class="doc"><div class="wt"><i></i><i></i><i></i><span class="url">localhost:4802/notes · release's draft</span></div>
+      <div class="ed"><div class="bar"><span class="on">✎ pen</span><span>▬ highlight</span><span>— strike</span><span>¶ type</span><span>● talk (fn)</span><span class="sp"></span><em>draft 2 · release</em></div>
+        <div class="pg"><h1>acme 2.5</h1><div class="sub">release notes · draft 2, written by release</div><ul>
+          <li>signup is <span class="st" data-at="1"><span>4× faster</span><svg viewBox="0 0 100 10" preserveAspectRatio="none"><path pathLength="1" d="M0 5 C 30 3, 70 7, 100 4"/></svg></span>: 4.1 s → 0.9 s on a mid-range phone.</li>
+          <li>dark mode, <span class="hl" data-at="3.6">everywhere</span>, starting with settings.</li>
+          <li>the cookie banner is half the size on mobile, and never covers the buy button.</li>
+          <li>csv export keeps your emoji. it's always unicode.</li></ul>
+          <div class="mg rise" data-at="1.5" style="left:590px;top:150px;width:180px"><svg width="60" height="30" style="margin-left:-40px"><path d="M56 26 C 40 6, 20 4, 4 12 M12 4 l-8 8 9 3"/></svg>say the seconds, not 4×</div>
+          <div class="mg rise" data-at="4.4" style="left:590px;top:215px;width:180px">not yet: settings only. say “settings first”</div></div>
+        <div class="side"><h5>notes for release · 2</h5>
+          <div class="nt rise" data-at="1.5"><div class="k">pen · line 1<i>0:03</i></div>say the seconds, not 4×</div>
+          <div class="nt rise" data-at="3.8" data-k="you@3.8-6"><div class="k">voice · line 2<i>0:04</i></div><span data-type="4" data-per="0.24">not yet: settings only. say “settings first”</span>
+            <div class="voice"><span class="wv" data-wave="you@3.8-6" data-n="26"></span></div></div>
+          <div class="sendb rise" data-at="6.5">send 2 notes to release</div></div></div></div>
+      <div class="slip small tilt">${fc("seq:listen@0,talk@3.8,listen@6,kiss@7.2,rest@8.2", 2)}<span>notes on <span class="m">acme 2.5</span></span></div>
+      <div class="slip small rise" data-at="7.2" style="top:120px">${fc("rest", 2)}<span>sent. release is on it.</span></div>`,
+    spotlight: () => `<div style="position:absolute;inset:0;background:#f2ede266"></div>
+      <div class="card-i land"><div class="ln">${fc("seq:rest@0,think@2.6,kiss@3.6,rest@4.6", 1.4)}<span data-type="0.3" data-per="0.16">start an agent: the csv export eats emoji</span></div>
+        <div class="bd">
+          <div class="opt sel rise" data-at="1.2"><span class="g">+</span>start <b class="m" style="font-size:15px;margin-right:-6px">emoji-csv</b>: the csv export eats emoji<span class="k">⏎</span></div>
+          <div class="opt rise" data-at="1.3"><span class="g">@</span>tell main instead<span class="k">⌘⏎</span></div>
+          <div class="opt rise" data-at="1.4"><span class="g">∿</span>emoji-csv is already on it?<span class="k">tab</span></div>
+          <div class="rise" data-at="3.4" style="margin-top:10px;font-size:20px;font-weight:600"><span class="acc m">:*</span> emoji-csv is on it. it's always unicode.</div></div></div>`,
+    sheet: () => `<div class="sheet"><h3>B · paper <span>the same words in every direction</span></h3>
+      <div class="cols">${[["idle", "rest", W.idle, ""], ["listening", "seq:listen@0,talk@0.6", "dark mode for the settings page", "let go of fn to send"], ["thinking", "think", W.got, W.on], ["needs you", "rest", W.needs, "1 yes · 2 no"], ["done", "seq:kiss@0,rest@1", W.done, W.doneTouch]]
+        .map(([l, p, a, b]) => `<div><div class="lab">${l}</div><div class="slip">${fc(p, 2.6)}<div class="tx">${l === "needs you" ? `<span class="acc m">?</span> ` : ""}${a}<small>${b}</small></div></div></div>`).join("")}</div>
+      <h3>variant: the pencil cloud <span>the north wind from bise.dev, beside the face, not instead of it</span></h3>
+      <div class="cols">${[["idle", "bob"], ["listening", "bob inhale"], ["thinking", "think"], ["needs you", "ask"], ["done", "blow"]].map(([l, m]) => `<div><div class="lab">${l}</div><div class="slip" style="min-height:0;display:flex;align-items:center;gap:6px">${cloud(m)}${fc(l === "thinking" ? "think" : l === "done" ? "seq:kiss@0,rest@1" : l === "listening" ? "listen" : "rest", 1.4)}</div></div>`).join("")}</div>
+      <h3>reduced motion <span>one still frame per state; the slip appears, it doesn't drop</span></h3>
+      <div class="cols">${[["idle", "rest", W.idle], ["listening", "talk", "dark mode for the settings page"], ["thinking", "think", W.on], ["needs you", "rest", W.needs], ["failed", "rest", W.fail]]
+        .map(([l, p, a]) => `<div><div class="lab">${l}</div><div class="slip" style="min-height:110px">${fc(p, 2, "data-still")}<div class="tx">${l === "failed" ? `<span class="m" style="color:#b3261e">▲</span> ` : ""}${a}</div></div></div>`).join("")}</div></div>`,
+  },
+  notes: {
+    idle: "<b>idle.</b> a paper slip taped under the menu bar, a little crooked. the face at rest in raspberry, the status in Newsreader, the breeze in mono.",
+    listen: "<b>hold fn.</b> the slip grows; your words land in big serif, the word being said gets the highlighter. a pencil arrow says <em>main sees Chrome · …</em>: one screenshot of the front window on fn down, never shown.",
+    talk: "<b>let go.</b> your words as a quote with the pink bar (like the terminal), main's answer under it, the new agents stuck on as tags.",
+    agents: "<b>agents.</b> a page from a notebook: one row per agent, the result underlined by hand. under “for you”, the outputs as small figures, like on bise.dev.",
+    needs: "<b>needs you.</b> a second slip drops in with two stamps. 1 / 2, a click, or hold fn and say it; the answer is stamped and the slip leaves.",
+    viewer: "<b>a doc, with notes.</b> release's draft opens in a paper editor on localhost. the pen strikes and writes in the margin; a voice note becomes a margin note with its words. the side lists every note; “send” gives them all to release.",
+    spotlight: "<b>spotlight.</b> an index card. typing “start an agent: …” offers the action; ⏎ starts it and main answers on the card.",
+    sheet: "<b>state sheet.</b> the five states, the same words as the other directions; the pencil cloud as a variant beside the face; the reduced-motion stills.",
+  },
+});
+</script>
+</body></html>

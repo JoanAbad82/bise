@@ -85,10 +85,6 @@ core_kinds! {
         CardClose = "card_close" => IConfirmClose { card: Nat, res: Str },
         /// a message of the hub itself (from `bise`) to an agent
         HubMsg = "hub_msg" => IHubMsg { to: Str, text: Str },
-        /// shared-guard: a task's claimed files still uncommitted in the
-        /// shared folder (`n`) and the oldest one's age (minutes); `text`
-        /// its nudge, `note` main's line (sb-core decides whether they go)
-        SharedWip = "shared_wip" => ISharedWip { agent: Str, n: Nat, age_min: Nat, text: Str, note: Str },
         /// a page question's card answered on its page (wake-deliver): the
         /// card closes `answered`; its asker hears it when that is not
         /// `agent`, the agent the pick went to (reach.bend)

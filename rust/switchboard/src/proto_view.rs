@@ -127,8 +127,6 @@ pub fn agents(
             waiting_on: bise_proto::rows::WaitingOn::of_word(&s(&a, "waiting_on")),
             // event-wake: what it waits for (wake.rs `Wakes::watching`)
             watching: a.get("watching").cloned().and_then(|w| serde_json::from_value(w).ok()).unwrap_or_default(),
-            // shared-guard: its uncommitted files in the shared folder
-            shared_wip: a.get("shared_wip").and_then(Value::as_u64).unwrap_or(0) as u32,
             // P4b: the terminal's facts, each the snapshot's own field
             mode,
             path: s(&a, "path"),

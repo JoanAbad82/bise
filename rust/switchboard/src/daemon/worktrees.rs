@@ -16,30 +16,6 @@ use bise_proto::hub::HubEv;
 use bise_proto::rows::Worktree;
 
 impl Shell {
-    /// shared-guard (`crate::shared_wip`): on the tick, about once a
-    /// minute, when a task works in the shared folder (or one had files
-    /// there): one `git status` of it in a thread, back as
-    /// `Input::SharedStatus`; the hub counts, sb-core decides the nudge.
-    pub(super) fn shared_wip_check(&mut self) {
-        let now = now_ms();
-        if !self.hub.shared_wip.due(now) {
-            return;
-        }
-        let ws = PathBuf::from(&self.hub.workspace);
-        let some = crate::shared_wip::claims(&self.hub.st, &ws).iter().any(|(_, fs)| !fs.is_empty());
-        if !some && self.hub.shared_wip.idle() {
-            return;
-        }
-        self.hub.shared_wip.start(now);
-        let tx = self.tx.clone();
-        std::thread::spawn(move || {
-            let st = crate::worktree::is_git_dir(&ws).then(|| crate::worktree::git(&ws, &["status", "--porcelain=v1", "-z", "--untracked-files=all"]));
-            if let Some(Ok(z)) = st {
-                let _ = tx.send(Msg::In(Input::SharedStatus { dirty: crate::shared_wip::parse_status(&z), now: now_ms() }));
-            }
-        });
-    }
-
     /// What makes the worktrees change: each agent's status and folder.
     pub(super) fn worktrees_key(&self) -> String {
         let st = &self.hub.st;

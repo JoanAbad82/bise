@@ -525,8 +525,7 @@ def seed_tasks(state, ws, names):
 
 def t_spawn_and_auto_reply(E, c):
     c.wait_status("main", "idle", 60)
-    # --place shared: a spawn with no place gets its own worktree (shared-guard)
-    c.say('crée une tâche [[bash: sb spawn t1 --place shared --objective "écris le fichier {{bash: echo hello-from-t1 > t1.txt && echo wrote}}"]]')
+    c.say('crée une tâche [[bash: sb spawn t1 --objective "écris le fichier {{bash: echo hello-from-t1 > t1.txt && echo wrote}}"]]')
     c.wait(lambda: c.agent("t1") is not None, 60, "t1 exists")
     c.wait_line("main", "new agent @t1")
     c.wait(lambda: os.path.exists(os.path.join(E.ws, "t1.txt")), 90, "t1.txt written in the workspace")
@@ -901,13 +900,13 @@ def t_origin_and_cursors(E, c):
     # a task reads the user message that led to its spawn, then searches
     # main's thread and gets positions
     c.wait_idle("main", "t1")
-    c.say('zorglub-origine [[bash: sb spawn orig --place shared --objective "{{bash: sb inspect main --origin > o.txt; sb inspect main --query zorglub-origine --limit 3 >> o.txt; sb history zorglub-origine --role user >> o.txt; echo done}}"]]')
+    c.say('zorglub-origine [[bash: sb spawn orig --objective "{{bash: sb inspect main --origin > o.txt; sb inspect main --query zorglub-origine --limit 3 >> o.txt; sb history zorglub-origine --role user >> o.txt; echo done}}"]]')
     c.wait_line("main", "new agent @orig")
     path = os.path.join(E.ws, "o.txt")
     c.wait(lambda: os.path.exists(path) and "open a hit" in open(path).read(), 90, "orig wrote o.txt")
     out = open(path).read()
     check("origin of `orig` in main's thread" in out, "the origin header: " + out)
-    check("user: zorglub-origine [[bash: sb spawn orig --place shared" in out, "the user message verbatim: " + out)
+    check("user: zorglub-origine [[bash: sb spawn orig" in out, "the user message verbatim: " + out)
     check("new agent @orig" in out, "main's turn up to the spawn: " + out)
     check(re.search(r"^#\d+ \(", out, re.M) is not None, "entries carry positions: " + out)
     # sb history finds it across the threads (BISE-233)

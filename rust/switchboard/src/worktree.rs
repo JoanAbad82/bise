@@ -4,7 +4,6 @@
 //! (`trunk::start_ref`, issue #8), never the shared folder's HEAD;
 //! `--with-changes` adds the shared folder's edits on top.
 
-use crate::carry::Carry;
 use crate::core::{Env, Loss};
 use crate::model::{Mode, Workspace};
 use crate::paths::Paths;
@@ -301,7 +300,7 @@ impl Env for GitEnv {
         }
     }
 
-    fn worktree_create(&mut self, name: &str, what: &Carry) -> Result<Workspace, String> {
+    fn worktree_create(&mut self, name: &str, with_changes: bool) -> Result<Workspace, String> {
         self.git_memo = None;
         // issue #8: main's tip, never the shared folder's HEAD (it may be
         // on another agent's branch); PR flow: the PR's base, origin's copy
@@ -324,13 +323,12 @@ impl Env for GitEnv {
         )?;
         self.own(&path, name);
         let result = (|| {
-            // a moved agent's files, relative to the shared folder
-            let what = match what {
-                Carry::Moved(fs) => Carry::Moved(fs.iter().filter_map(|f| crate::land::relative(self.ws(), f)).collect()),
-                w => w.clone(),
-            };
-            let save = crate::carry::patch_path(&self.paths.state, name, self.now());
-            crate::carry::carry(self.ws(), &path, &what, &save)?;
+            if with_changes {
+                let stash = git(self.ws(), &["stash", "create"])?;
+                if !stash.is_empty() {
+                    git(&path, &["stash", "apply", "-q", &stash])?;
+                }
+            }
             self.prepare(&path)
         })();
         if let Err(e) = result {
@@ -593,7 +591,7 @@ mod tests {
     fn create_measure_drop_restore() {
         let (root, mut env) = repo("cycle");
         assert!(env.is_git());
-        let ws = env.worktree_create("fix", &Carry::Nothing).unwrap();
+        let ws = env.worktree_create("fix", false).unwrap();
         let p = PathBuf::from(&ws.path);
         assert_eq!(ws.branch.as_deref(), Some("sb/fix"));
         // BISE-230: <worktrees>/<task>/<repo>, the task named in its folder
@@ -606,7 +604,7 @@ mod tests {
             "copied and setup files are ignored"
         );
         // a second task with the same name gets the next branch
-        let ws2 = env.worktree_create("fix", &Carry::Nothing).unwrap();
+        let ws2 = env.worktree_create("fix", false).unwrap();
         assert_eq!(ws2.branch.as_deref(), Some("sb/fix-2"));
         assert_eq!(PathBuf::from(&ws2.path), env.paths.worktrees.join("fix-2/repo"));
         assert_eq!(crate::sweep::owner_of(&env.paths.worktrees.join("fix-2")), "fix");
@@ -656,7 +654,7 @@ mod tests {
     fn with_changes_carries_the_user_edits() {
         let (root, mut env) = repo("changes");
         sh(&env.paths.workspace, "echo mine >> f");
-        let ws = env.worktree_create("t", &Carry::All).unwrap();
+        let ws = env.worktree_create("t", true).unwrap();
         assert_eq!(
             std::fs::read_to_string(Path::new(&ws.path).join("f")).unwrap(),
             "a\nmine\n"
@@ -684,21 +682,21 @@ mod tests {
     fn a_new_worktree_starts_from_main_tip_not_the_shared_head() {
         let (root, mut env) = repo("base");
         let main = on_another_branch(&env);
-        let ws = env.worktree_create("t", &Carry::Nothing).unwrap();
+        let ws = env.worktree_create("t", false).unwrap();
         let p = Path::new(&ws.path);
         assert_eq!(ws.base_commit.as_deref(), Some(main.as_str()));
         assert_eq!(git(p, &["rev-parse", "HEAD"]).unwrap(), main);
         assert!(!p.join("o").exists(), "no commit of sb/other");
         assert_eq!(std::fs::read_to_string(p.join("f")).unwrap(), "a\n", "clean");
         // --with-changes: main's tip, with the shared folder's edits
-        let wc = env.worktree_create("u", &Carry::All).unwrap();
+        let wc = env.worktree_create("u", true).unwrap();
         let q = Path::new(&wc.path);
         assert_eq!(git(q, &["rev-parse", "HEAD"]).unwrap(), main);
         assert_eq!(std::fs::read_to_string(q.join("f")).unwrap(), "a\ndirty\n");
         // `[worktree] base` set: it wins
         env.config.base = Some("sb/other".into());
         let other = git(&env.paths.workspace, &["rev-parse", "sb/other"]).unwrap();
-        let ob = env.worktree_create("v", &Carry::Nothing).unwrap();
+        let ob = env.worktree_create("v", false).unwrap();
         assert_eq!(ob.base_commit.as_deref(), Some(other.as_str()));
         let _ = std::fs::remove_dir_all(root);
     }
@@ -707,7 +705,7 @@ mod tests {
     fn a_failed_setup_removes_the_worktree() {
         let (root, mut env) = repo("setup");
         env.config.setup = "exit 3".into();
-        let e = env.worktree_create("t", &Carry::Nothing).unwrap_err();
+        let e = env.worktree_create("t", false).unwrap_err();
         assert!(e.contains("setup"), "{}", e);
         assert!(!env.paths.worktrees.join("t").exists(), "its folder too");
         assert!(git(

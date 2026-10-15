@@ -75,7 +75,6 @@ impl Agent {
             changes: a.changes.map(|c| (c.files, c.add, c.del)),
             usage: a.usage.clone(),
             watching: a.watching.clone(),
-            shared_wip: a.shared_wip,
         }
     }
 }

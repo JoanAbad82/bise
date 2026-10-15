@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bise · round 4 · lamplight, every feature</title>
+<link rel="stylesheet" href="amb.css">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{background:#1a1613;color:#ece6da;font:14px/1.6 "JetBrains Mono",monospace}
+a{color:#f0c9a0;text-decoration:none}
+.wrap{max-width:1500px;margin:0 auto;padding:30px 32px 140px}
+.top{display:flex;gap:16px;font-size:13px}.top .sp{flex:1}.top a{color:#a39c90}
+h1{font:400 66px/1 "Instrument Serif",serif;margin-top:26px}h1 em{color:#f0d29a}
+.lede{font:20px/1.5 Newsreader,serif;color:#d6cfc2;max-width:84ch;margin:16px 0 10px}.lede b{color:#ece6da;font-weight:600}
+.brief{font:italic 18px/1.5 Newsreader,serif;color:#a39c90;max-width:84ch;border-left:2px solid #f0d29a;padding-left:16px;margin:14px 0 30px}
+.rules{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 54px}
+.rules div{background:#231e1a;border-radius:14px;padding:12px 14px;font:15px/1.45 Newsreader,serif;color:#cfc7b9}
+.rules b{display:block;font:500 11px "JetBrains Mono",monospace;color:#f0d29a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.toc{display:flex;flex-wrap:wrap;gap:6px 16px;margin:-30px 0 50px;font-size:12.5px}.toc a{color:#a39c90}
+.feat{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:26px;margin:0 0 60px;align-items:start}
+.crop{position:relative;overflow:hidden;border-radius:12px;box-shadow:0 0 0 1px #2c2724,0 26px 60px -30px #000}
+.crop .stage,.thumb .stage{position:absolute;left:0;top:0;box-shadow:none;border-radius:0;transform-origin:0 0}
+.side h2{font:400 34px/1.05 "Instrument Serif",serif}.side h2 span{font:12px "JetBrains Mono",monospace;color:#f0d29a;margin-left:8px;vertical-align:middle}
+.side p{font:16px/1.5 Newsreader,serif;color:#cfc7b9;margin:8px 0}.side p b{color:#ece6da}
+.thumb{position:relative;width:330px;height:206px;overflow:hidden;border-radius:8px;box-shadow:0 0 0 1px #2c2724;margin-top:12px}
+.thumb .lab{position:absolute;left:8px;bottom:6px;z-index:40;font:10.5px "JetBrains Mono",monospace;color:#fff;background:#0008;padding:1px 6px;border-radius:4px}
+.end{font:18px/1.55 Newsreader,serif;color:#cfc7b9;max-width:92ch;border-top:1px solid #2c2724;padding-top:30px}.end b{color:#ece6da}.end li{margin:0 0 8px 20px}
+
+/* ---- the desktop */
+.stage{background-size:cover}
+.wall-none{background:none!important}.wall-none .menubar{background:#00000033}
+.menubar .tray{color:#f0d29a}
+
+/* ---- lamplight: the bise surface. painted light behind, calm in the middle, paint at the edges */
+:root{--ink:#33261b;--dim:#6b5844;--faint:#8a7660;--rose:#b8416b;--ochre:#a8772f;--cream:#f4e6c4}
+/* round 5: the surface is misted glass. you see the desktop through it, blurred; a mist of light dots gathers at its edge and dissolves it */
+:root{--glass:rgba(250,239,214,.7);--glass-hi:rgba(255,248,232,.55);--line:#33261b16;--well:#33261b0d;--opt:#fffaf0c9;--blur:blur(22px) saturate(1.35) brightness(1.08)}
+body.dusk{--ink:#f6e9cc;--dim:#d8c5a4;--faint:#b5a185;--glass:rgba(40,29,20,.62);--glass-hi:rgba(255,226,170,.16);--line:#f6e9cc1c;--well:#f6e9cc12;--opt:#f6e9cc14;--blur:blur(22px) saturate(1.25) brightness(.82);--rose:#e0789a}
+/* round 6: no edge, light from inside, mist at three depths, live */
+.lamp{position:absolute;right:20px;top:40px;z-index:30;color:var(--ink);font:15px/1.4 "Inter Tight",sans-serif}
+.lamp>.in{z-index:1}
+.lamp>canvas{position:absolute;pointer-events:none}
+.lamp>canvas.back{z-index:-2}.lamp>canvas.front{z-index:2}
+/* the glass: blurred desktop + a thin warm veil, fading out over its last 26 px on every side, so there is no edge */
+.lamp>.glass,.pframe>.glass,.pnotes>.glass{position:absolute;inset:-14px;z-index:-1;border-radius:40px;background:var(--veil);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 26px,#000 calc(100% - 26px),transparent),linear-gradient(transparent,#000 22px,#000 calc(100% - 22px),transparent);-webkit-mask-composite:source-in;
+  mask-image:linear-gradient(90deg,transparent,#000 26px,#000 calc(100% - 26px),transparent),linear-gradient(transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-composite:intersect}
+:root{--veil:rgba(250,238,212,.34)}body.dusk{--veil:rgba(36,26,18,.42)}
+.hero{margin:0 0 70px}
+.hstage{position:relative;height:560px;border-radius:14px;overflow:hidden;box-shadow:0 0 0 1px #2c2724,0 30px 70px -36px #000}
+.hstage .stage{position:absolute;left:0;top:0;transform-origin:0 0}
+.player{display:flex;align-items:center;gap:14px;margin-top:12px;font:12.5px "JetBrains Mono",monospace;color:#a39c90}
+.player button{font:12.5px "JetBrains Mono",monospace;background:#f0d29a;color:#1a1613;border:0;border-radius:8px;padding:5px 12px;cursor:pointer;min-width:64px}
+.tl{position:relative;flex:1;height:30px;cursor:pointer}
+.tl::before{content:"";position:absolute;left:0;right:0;top:14px;height:2px;background:#3a332c;border-radius:2px}
+.tl b{position:absolute;top:0;font:400 11px "JetBrains Mono",monospace;color:#857d72;white-space:nowrap;transform:translateX(2px)}
+.tl b::before{content:"";position:absolute;left:-2px;top:11px;width:2px;height:8px;background:#5a5048}
+.tl b.on{color:#f0d29a}
+.tl i{position:absolute;top:8px;width:2px;height:14px;background:#f0d29a;border-radius:2px}
+.hcap{font:italic 18px/1.4 Newsreader,serif;color:#cfc7b9;margin-top:6px;min-height:1.4em}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;margin:0 0 40px;font-size:12.5px;color:#857d72}
+.ctl .g{display:flex;gap:4px;align-items:center}.ctl .g>span{margin-right:6px}
+.ctl button{font:12.5px "JetBrains Mono",monospace;background:#231e1a;color:#cfc7b9;border:0;border-radius:8px;padding:5px 10px;cursor:pointer}.ctl button.on{background:#f0d29a;color:#1a1613}
+.stage,.mood .tile{background-image:var(--wall)!important;background-size:cover!important;background-position:center!important}
+.lamp .in{position:relative;padding:14px 20px 16px}
+.lamp.pill .in{display:flex;align-items:center;gap:12px;padding:9px 18px 9px 12px}
+.mark{width:40px;height:26px;flex:none;background-size:contain;background-repeat:no-repeat}
+.lab{font:600 10.5px "Inter Tight",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+.lab .r{color:var(--rose)}
+.big{font:400 25px/1.2 "Instrument Serif",serif;color:var(--ink);letter-spacing:-.005em}
+.big i{font-style:italic}
+.dim{color:var(--dim)}.faint{color:var(--faint)}.rose{color:var(--rose)}
+.quote{font:italic 16px/1.35 "Instrument Serif",serif;color:var(--dim);border-left:2px solid var(--rose);padding-left:10px;margin:8px 0}
+.voice{height:18px;margin:8px 0 4px;background-size:100% 100%;background-repeat:no-repeat}
+.sees{font:12px "Inter Tight",sans-serif;color:var(--dim);display:flex;align-items:center;gap:6px;margin-top:8px}
+.sees::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--rose)}
+.chips{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:6px;font:500 12.5px "JetBrains Mono",monospace;color:var(--ink);padding:2px 10px 2px 4px;border-radius:99px;background:var(--well)}
+.dab{width:16px;height:16px;flex:none;background-size:contain;background-repeat:no-repeat}
+.rows{margin-top:6px}
+.row{display:grid;grid-template-columns:18px 92px 1fr auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+.row .n{font:500 12.5px "JetBrains Mono",monospace}.row .w{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row .a{font:11px "JetBrains Mono",monospace;color:var(--faint)}
+.sec{font:600 10.5px "Inter Tight",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:12px 0 2px}
+.out{display:flex;gap:10px;align-items:center;padding:5px 0}.out .ic{width:28px;height:28px;border-radius:7px;background:var(--well);display:grid;place-items:center;font:600 11px "JetBrains Mono",monospace;color:var(--ochre)}
+.out .t{font-size:14px}.out .u{font:11px "JetBrains Mono",monospace;color:var(--faint)}
+.opts{display:flex;gap:8px;margin-top:10px}
+.opt{font:500 14px "Inter Tight",sans-serif;padding:5px 14px;border-radius:9px;background:var(--opt);box-shadow:0 0 0 1px var(--line)}
+.opt b{font:600 11.5px "JetBrains Mono",monospace;color:var(--rose);margin-right:6px}
+.opt.k{background:var(--rose);color:#fff7ef;box-shadow:2px 2px 0 #33261b22}.opt.k b{color:#fff7ef}
+.hint{font:12.5px "Inter Tight",sans-serif;color:var(--faint);margin-top:8px}
+.keys{font:12px "Inter Tight",sans-serif;color:var(--faint);margin-top:10px;word-spacing:2px}.keys b{color:var(--ink);font:600 11.5px "JetBrains Mono",monospace;margin-right:4px}
+.vf{position:absolute;pointer-events:none;z-index:25}
+.vf i{position:absolute;width:26px;height:26px;border:2.5px solid #e8b06a}
+.vf i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0;border-top-left-radius:8px}.vf i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0;border-top-right-radius:8px}
+.vf i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0;border-bottom-left-radius:8px}.vf i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0;border-bottom-right-radius:8px}
+/* the macOS notification, kept system, with the painted icon */
+.mnote{position:absolute;right:16px;top:40px;width:360px;z-index:30;border-radius:18px;padding:12px 14px;background:#ececec;color:#1d1d1f;font:13px/1.35 -apple-system,sans-serif;box-shadow:0 12px 40px -10px #0007}
+.mnote .h{display:flex;gap:8px;align-items:center;color:#6e6e73;font-size:12px}.mnote .ico{width:22px;height:22px;border-radius:6px;background-size:cover}
+.mnote b{display:block;margin-top:6px;font-size:13.5px}.mnote .bt{display:flex;gap:6px;margin-top:10px}.mnote .bt span{flex:1;text-align:center;background:#dcdcdc;border-radius:8px;padding:4px}
+/* the menu bar menu */
+.menu{position:absolute;right:250px;top:30px;width:250px;z-index:35;background:#f4ecdcf2;backdrop-filter:blur(20px);border-radius:10px;padding:5px;box-shadow:0 14px 40px -10px #0008,0 0 0 .5px #0003;color:var(--ink);font:13.5px "Inter Tight",sans-serif}
+.menu div{display:flex;justify-content:space-between;padding:5px 10px;border-radius:6px}.menu div.on{background:#b8416b;color:#fff}.menu div span{color:var(--faint);font:12px "JetBrains Mono",monospace}.menu div.on span{color:#fff}
+.menu hr{border:0;border-top:1px solid #33261b22;margin:4px 6px}
+/* the page (what agents make), in lamplight */
+.br{position:absolute;left:40px;top:44px;width:1100px;height:830px;border-radius:12px;overflow:hidden;background:#efe4cf;box-shadow:0 26px 70px -20px #000a,0 0 0 .5px #0006;z-index:12}
+.br .wt{height:34px;background:#e2d6be;display:flex;align-items:center;gap:8px;padding:0 12px;font:12.5px -apple-system,sans-serif;color:#5d5040}
+.br .wt i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.br .wt i+i{background:#febc2e}.br .wt i+i+i{background:#28c840}
+.br .wt .url{margin-left:30px;background:#f6efe0;border-radius:7px;padding:3px 14px;min-width:380px}
+.pframe{position:relative;margin:10px 12px 0;height:48px;display:flex;align-items:center;gap:12px;padding:0 16px;z-index:2;font:13px "Inter Tight",sans-serif;color:var(--ink)}
+.pframe>canvas,.pnotes>canvas{position:absolute;pointer-events:none}.pframe>canvas.back,.pnotes>canvas.back{z-index:-2}.pframe>canvas.front,.pnotes>canvas.front{z-index:2}
+.pframe>*:not(canvas):not(.glass),.pnotes>*:not(canvas):not(.glass){position:relative;z-index:1}
+.pframe .t{font:400 21px "Instrument Serif",serif}.pframe .m{font:12px "JetBrains Mono",monospace;color:var(--faint)}.pframe .sp{flex:1}
+.pframe button{font:500 12.5px "Inter Tight";border:0;border-radius:8px;padding:5px 11px;background:var(--well);color:var(--ink)}.pframe button.k{background:var(--rose);color:#fff7ef}
+.pbody{display:grid;grid-template-columns:1fr 290px;gap:34px;padding:30px 40px 0 76px}
+.pbody h1{font:400 50px/1.05 "Instrument Serif",serif;color:#2b2018;margin:4px 0 16px}
+.pbody .meta{font:italic 16px Newsreader,serif;color:var(--faint)}
+.pbody p{font:19px/1.6 Newsreader,serif;color:#2b2018;margin:0 0 14px}
+.pbody .num{font:15px "JetBrains Mono",monospace}
+.pbody sup{font:600 11px "JetBrains Mono";color:var(--rose)}
+.pbody h3{font:400 28px "Instrument Serif",serif;margin:26px 0 8px;color:#2b2018}
+.pbody table{width:100%;border-collapse:collapse;font:16px Newsreader,serif}.pbody th{font:11px "JetBrains Mono";color:var(--faint);text-align:left;font-weight:400;border-bottom:1.5px solid #2b2018;padding:5px 8px}.pbody td{padding:8px;border-bottom:1px solid #33261b1c}.pbody td.r{text-align:right;font:14px "JetBrains Mono"}
+.pin{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50% 50% 50% 0;transform:rotate(-45deg) translateY(-4px);background:#c8264a;color:#fff;font:700 10.5px -apple-system;margin:0 2px;vertical-align:middle}.pin b{transform:rotate(45deg)}
+.pnotes{position:relative;padding:14px 16px;align-self:start;color:var(--ink)}
+.nt{background:var(--opt);border-radius:10px;padding:8px 10px;margin:8px 0;font:14px/1.35 "Inter Tight";box-shadow:0 0 0 1px #33261b14}
+.nt .k{font:10.5px "JetBrains Mono";color:#c8264a;display:flex;justify-content:space-between}.nt .k i{font-style:normal;color:var(--faint)}
+.nt .a{font-size:12.5px;color:var(--dim);margin-top:4px}.nt.done{opacity:.6}
+.hl{background:linear-gradient(#f0c97a66,#f0c97a66) 0 70%/100% 55% no-repeat}
+/* ---- who bise is */
+.who{margin:0 0 70px}
+.who h2{font:400 46px/1.05 "Instrument Serif",serif}.who h2 em{color:#f0d29a}
+.who .lede{margin-top:10px}
+.trait{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0 34px}
+.trait div{background:#231e1a;border-radius:14px;padding:12px 14px;font:15px/1.45 Newsreader,serif;color:#cfc7b9}
+.trait b{display:block;font:400 22px "Instrument Serif",serif;color:#f0d29a;margin-bottom:2px}
+.moods{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 18px}
+.mood{display:flex;flex-direction:column;gap:10px}
+.mood .tile{position:relative;height:150px;border-radius:12px;overflow:hidden;background:#5d544a center/cover;box-shadow:0 0 0 1px #2c2724}
+.mood .tile .lamp{right:auto;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;font-size:14px}
+.mood h3{font:400 26px/1 "Instrument Serif",serif;color:#ece6da}.mood h3 span{font:12px "JetBrains Mono",monospace;color:#f0d29a;margin-left:6px}
+.mood p{font:15px/1.45 Newsreader,serif;color:#cfc7b9}.mood p i{color:#a39c90}
+/* how each mood moves (the motion is the character; reduced motion keeps only the color) */
+.in.swap{animation:swap .55s cubic-bezier(.16,1,.3,1)}
+@keyframes swap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.mood .tile{height:170px}
+.say{display:grid;grid-template-columns:1fr 1fr;gap:12px 26px;margin-top:34px}
+.say div{font:15px/1.45 Newsreader,serif;color:#cfc7b9;padding:10px 14px;border-radius:12px;background:#231e1a}
+.say .y b{color:#c9d39a}.say .n b{color:#e59a9a}.say b{display:block;font:500 11px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.say q{font:italic 17px "Instrument Serif",serif;color:#ece6da;quotes:"“" "”"}
+</style></head>
+<body><div class="wrap">
+<div class="top"><a href="identity4.html">← round 4 · lamplight, solid</a><a href="index.html">all directions</a><span class="sp"></span><span style="color:#857d72">identity · round 5 · lamplight in the mist</span></div>
+<h1>lamplight, <em>alive</em></h1>
+<p class="lede">no border and no flat fill anymore. bise is <b>a light in the mist</b>: the glass has no edge, it fades into your desktop; <b>the light comes from inside it</b>, warm in the middle where you read, and goes out toward the edges. around it, <b>three depths of mist and dots of light</b>: far ones, seen through the blur; near ones, floating in front, softer and larger. move your mouse: they slide at their own depth. and it all <b>moves</b>, slowly, and each mood moves its own way. watch it live first, then every feature.</p>
+<p class="brief">your note: “on voit encore un poil trop les borders et le background, ça fait un peu aplat. ce serait aussi intéressant de l'avoir en mouvement, un vrai motion design. … la sensation de volume aussi, de profondeur.”</p>
+<div class="rules">
+  <div><b>no edge</b>the glass fades out over its last 26 px: no line, no corner, no box. what you see is light, not a panel.</div>
+  <div><b>volume</b>light from inside (brighter in the middle, warmer at the top), a soft dusk under it instead of a shadow, and mist on three planes that the glass blurs or doesn't.</div>
+  <div><b>readable</b>the text sits where the inner light is strongest: ink on light at 7:1 or more over the darkest painting. the motion never passes under a word.</div>
+  <div><b>motion</b>slow by default (a 7 s breath). each mood has its own movement, and the change between two moods takes 0.9 s, never a cut.</div>
+</div>
+<section class="hero" id="live">
+  <div class="hstage" id="hstage"></div>
+  <div class="player"><button id="hplay">pause</button><div class="tl" id="htl"><i id="hhead"></i></div><span id="htime">0.0 s</span></div>
+  <p class="hcap" id="hcap"></p>
+</section>
+<div class="ctl"><div class="g"><span>glass</span><button data-glass="light" onclick="setGlass('light')">light mist</button><button data-glass="dusk" onclick="setGlass('dusk')">dusk mist</button></div>
+  <div class="g"><span>behind it</span><button data-wall="lamps" onclick="setWall('lamps')">the lamps come on</button><button data-wall="reading" onclick="setWall('reading')">woman reading</button><button data-wall="cherries" onclick="setWall('cherries')">cherries at noon</button><button data-wall="plain" onclick="setWall('plain')">plain</button></div>
+  <span>the wallpapers are paintings from ~/lab/paint-canvas.</span></div>
+<div class="toc" id="toc"><a href="#who">who bise is</a></div>
+<section class="who" id="who">
+  <h2>who bise is: <em>the lamp left on</em></h2>
+  <p class="lede">bise is the lamp someone leaves on in the next room. you don't look at it, but you know someone's home, and you can call out to it. it's a <b>presence, not a performer</b>: it keeps watch while agents work, leans in when you talk, taps your shoulder once when it needs you, and goes back to its corner. the mist is its body: <b>how its dots of light breathe, warm and settle is how bise feels</b>, so you read its mood from the corner of your eye, before any word.</p>
+  <div class="trait">
+    <div><b>calm</b>it never hurries you. the light moves slowly, the words are few. nothing blinks, nothing bounces.</div>
+    <div><b>attentive</b>when you talk, it turns toward you: the light opens and brightens. it says back what it heard before it acts.</div>
+    <div><b>discreet</b>it speaks when something needs you, and once. news is said in one line, then it fades back to the status.</div>
+    <div><b>warm, dry</b>a little humor when things go well, never on a failure. it says "i", calls you "you". the agents are its hands: it names them, but it's always bise who talks to you.</div>
+  </div>
+  <div class="moods" id="moods"></div>
+  <div class="say">
+    <div class="y"><b>how bise talks</b>lowercase, short, the result first. <q>perf is done: signup 4.1 s → 0.9 s.</q> <q>got it. dark mode first, then the banner.</q> <q>cookies asks: keep the banner on mobile?</q></div>
+    <div class="n"><b>how it never talks</b>no exclamation marks, no "great question", no "i'd be happy to", no emoji, no fake feelings. never <q>oops! something went wrong 😅</q>, but <q>release failed: npm said 403. i'm on it.</q></div>
+    <div class="y"><b>a light touch, when things go well</b><q>3 done, 0 waiting. the house is quiet.</q> <q>back already? nothing needs you.</q> at most one per day's worth of news, so it stays a smile, not a tic.</div>
+    <div class="n"><b>never a ghost</b>it doesn't appear from nowhere, flicker in the dark, or whisper. it fades in where you left it, always the same place, the same warm color. at night it lowers to an ember, it never goes cold.</div>
+  </div>
+</section>
+<div id="feats"></div>
+<div class="end"><ul>
+  <li><b>same everywhere:</b> one surface (misted lamplight glass), one mark (the painted :*: two umber dabs and a rose star), the same words as the app today.</li>
+  <li><b>pages:</b> the pages agents make keep their warm paper; their bar and your notes are the same misted glass, floating over it. so the app and the pages feel like one thing.</li>
+  <li><b>buildable:</b> the glass is the native blur the app already has (NSVisualEffectView) with a warm tint; the mist is one image per size and mood, drawn once, so it costs nothing while you work.</li>
+  <li><b>next, if this is it:</b> designer-level polish of the mark, then amb-web and amb-kit swap their tokens and the orb for this surface. the app's code keeps its shape.</li>
+</ul></div>
+</div>
+<script src="amb.js"></script>
+<script src="brush.js"></script>
+<script>
+const B = BRUSH, { W } = AMB;
+const mk = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+const CACHE = {};
+// the painted light: solid calm cream in the middle, brushed edges, a warm glow
+function lightURL(w, h, o = {}) {
+  const key = `${w}x${h}${o.edge || ""}${o.tone || ""}`; if (CACHE[key]) return CACHE[key];
+  const pad = 26, s = 2, W2 = w + pad * 2, H2 = h + pad * 2, c = mk(W2 * s, H2 * s), g = c.getContext("2d"); g.scale(s, s);
+  const base = o.tone || "#f4e6c4", R = B.rng(w * 3 + h);
+  // the glow
+  // an elliptical glow that reaches zero before the canvas edge (no visible rectangle)
+  g.save(); g.translate(W2 / 2, H2 / 2); g.scale(W2 / H2, 1);
+  const gr = g.createRadialGradient(0, 0, H2 * .2, 0, 0, H2 / 2); gr.addColorStop(0, "#ffe9b855"); gr.addColorStop(1, "#ffe9b800"); g.fillStyle = gr; g.fillRect(-H2 / 2, -H2 / 2, H2, H2); g.restore();
+  // brushed edge: vertical strokes along the border, fading outward
+  const EDGES = { rose: ["#efc9c4", "#e7b0b6", "#f4e0c9"], ochre: ["#ecc98a", "#e3b56c", "#f3dcaa"], olive: ["#d9dcb0", "#c9cf98", "#eee6c2"], umber: ["#d8c7ad", "#c9b598", "#e6d8bf"], ember: ["#e9b98a", "#d99a6c", "#f0cfa4"], open: ["#fbf0d4", "#f6dfa8", "#fff6e0", "#f1d593"] };
+  const edgeCols = EDGES[o.edge] || ["#f3e2bb", "#ead39f", "#f8ecd0", "#e9cf98"];
+  for (let i = 0; i < (w + h) * 0.9; i++) {
+    const side = R(); let x, y;
+    if (side < .5) { x = pad + R() * w; y = R() < .5 ? pad + R() * 8 - 4 : pad + h - R() * 8 + 4; } else { x = R() < .5 ? pad + R() * 8 - 4 : pad + w - R() * 8 + 4; y = pad + R() * h; }
+    const len = 14 + R() * 26, a = (-84 + (R() - .5) * 14) * Math.PI / 180;
+    B.stroke(g, [[x - Math.cos(a) * len / 2, y - Math.sin(a) * len / 2], [x, y], [x + Math.cos(a) * len / 2, y + Math.sin(a) * len / 2]], { w: 10 + R() * 8, color: edgeCols[i % edgeCols.length], alpha: .55, load: .6, taper: .35, seed: i + w, n: 6, vary: .12 });
+  }
+  // the calm middle (solid, readable), then a faint brush texture inside it
+  g.fillStyle = base; g.beginPath(); g.roundRect(pad + 4, pad + 4, w - 8, h - 8, Math.min(18, h / 2 - 4)); g.fill();
+  g.save(); g.clip();
+  for (let i = 0; i < w * h / 260; i++) { const x = pad + R() * w, y = pad + R() * h, len = 20 + R() * 30; B.stroke(g, [[x, y - len / 2], [x + (R() - .5) * 3, y], [x, y + len / 2]], { w: 7 + R() * 6, color: R() < .5 ? "#fbf1da" : "#ecd8ad", alpha: .12, load: .7, taper: .4, seed: i * 7 + h, n: 4, vary: .05 }); }
+  g.restore();
+  return (CACHE[key] = c.toDataURL());
+}
+// round 5: the mist. a halo of light dots that gathers at the glass edge and dissolves it.
+// dense right at the edge, thinning outward into a soft glow, and a few faint dots just inside: the middle stays clear glass.
+const MIST = { "": ["#fff3d6", "#f6dca0", "#ffe7b8", "#f2c98a"], open: ["#fff8e6", "#ffeec4", "#ffe2a0", "#ffffff"], ochre: ["#f2c27a", "#e8ab5c", "#ffe0a8"], rose: ["#f3b3c3", "#e98aa4", "#ffd9d0", "#d9607f"],
+  olive: ["#dfe3a8", "#c7d08a", "#f2ecc4"], umber: ["#d6c4a8", "#bfa98a", "#e8dcc6"], ember: ["#f0b27c", "#e08f5c", "#ffd0a0"] };
+function mistURL(w, h, o = {}) {
+  const key = `mist${w}x${h}${o.edge || ""}${o.dense || ""}`; if (CACHE[key]) return CACHE[key];
+  const pad = 30, s = 2, W2 = w + pad * 2, H2 = h + pad * 2, c = mk(W2 * s, H2 * s), g = c.getContext("2d"); g.scale(s, s);
+  const cols = MIST[o.edge || ""] || MIST[""], R = B.rng(w * 7 + h * 3 + (o.edge || "").length), r = Math.min(22, h / 2);
+  // the glow: an elliptical haze around the glass, zero at the canvas edge
+  g.save(); g.translate(W2 / 2, H2 / 2); g.scale(W2 / H2, 1);
+  const gr = g.createRadialGradient(0, 0, H2 * .3, 0, 0, H2 / 2); gr.addColorStop(0, cols[0] + "59"); gr.addColorStop(1, cols[0] + "00"); g.fillStyle = gr; g.fillRect(-H2 / 2, -H2 / 2, H2, H2); g.restore();
+  // a point on the rounded edge and its outward normal, by perimeter position
+  const per = 2 * (w + h);
+  const edgeAt = t => { let d = t * per; if (d < w) return [pad + d, pad, 0, -1]; d -= w; if (d < h) return [pad + w, pad + d, 1, 0]; d -= h; if (d < w) return [pad + w - d, pad + h, 0, 1]; d -= w; return [pad, pad + h - d, -1, 0]; };
+  const n = Math.round(per * (o.dense || 1.1));
+  for (let i = 0; i < n; i++) {
+    let [x, y, nx, ny] = edgeAt(R());
+    // pull corner points onto the radius so the halo follows the rounded shape
+    const cx = Math.min(Math.max(x, pad + r), pad + w - r), cy = Math.min(Math.max(y, pad + r), pad + h - r);
+    if (cx !== x && cy !== y) { const a = Math.atan2(y - cy, x - cx); x = cx + Math.cos(a) * r; y = cy + Math.sin(a) * r; nx = Math.cos(a); ny = Math.sin(a); }
+    // distance from the edge: mostly near 0, a long tail outward, a short one inward
+    const u = R(), d = u < .78 ? (R() - .35) * 12 : 6 + Math.pow(R(), 1.6) * 26;
+    const px = x + nx * d + (R() - .5) * 3, py = y + ny * d + (R() - .5) * 3;
+    const fade = d < 0 ? 1 + d / 9 : Math.max(0, 1 - d / 30);
+    const rad = (d > 8 ? .7 + R() * 1.6 : 1 + R() * 2.4);
+    g.globalAlpha = Math.max(0, (.25 + R() * .5) * fade);
+    g.fillStyle = cols[(R() * cols.length) | 0];
+    g.beginPath(); g.arc(px, py, rad, 0, Math.PI * 2); g.fill();
+    // now and then a dab: two overlapping dots, a touch of paint
+    if (R() < .12) { g.globalAlpha *= .7; g.beginPath(); g.ellipse(px + 1.4, py - .8, rad * 1.3, rad * .8, R() * 3, 0, Math.PI * 2); g.fill(); }
+  }
+  // a few sparks further out: the light scattering into the room
+  for (let i = 0; i < per / 40; i++) { const [x, y, nx, ny] = edgeAt(R()), d = 16 + R() * 12; g.globalAlpha = .25 + R() * .3; g.fillStyle = cols[0]; g.beginPath(); g.arc(x + nx * d, y + ny * d, .6 + R() * .9, 0, Math.PI * 2); g.fill(); }
+  g.globalAlpha = 1;
+  return (CACHE[key] = c.toDataURL());
+}
+const PAINTINGS = { lamps: "walls/lamps.png", reading: "walls/reading.png", cherries: "walls/cherries.png" };
+function setWall(k) { document.documentElement.style.setProperty("--wall", `url(${k === "plain" ? wallURL() : PAINTINGS[k]})`); document.querySelectorAll("[data-wall]").forEach(b => b.classList.toggle("on", b.dataset.wall === k)); }
+function setGlass(k) { document.body.classList.toggle("dusk", k === "dusk"); document.querySelectorAll("[data-glass]").forEach(b => b.classList.toggle("on", b.dataset.glass === k)); }
+function dabURL(col, seed = 1) { const key = "d" + col + seed; if (CACHE[key]) return CACHE[key]; const c = mk(48, 48), g = c.getContext("2d"); B.dab(g, 24, 24, 22, col, { seed, n: 8, light: "#ffffff" }); return (CACHE[key] = c.toDataURL()); }
+function markURL(eye = "#3b2c20", star = "#b8416b") { const key = "m" + eye + star; if (CACHE[key]) return CACHE[key]; const c = mk(160, 104), g = c.getContext("2d"), s = 60;
+  B.dab(g, 30, 30, 22, eye, { angle: -15, seed: 11, n: 8 }); B.dab(g, 32, 74, 22, eye, { angle: -25, seed: 12, n: 8 });
+  const cx = 104, cy = 52; [[0, -1, 0, 1], [-.9, -.5, .9, .5], [-.9, .5, .9, -.5]].forEach(([a, b, cc, d], i) => B.stroke(g, [[cx + a * 28, cy + b * 34], [cx, cy], [cx + cc * 28, cy + d * 34]], { w: 10, color: star, alpha: .95, load: .9, taper: .3, seed: 40 + i, n: 7 }));
+  return (CACHE[key] = c.toDataURL()); }
+function voiceURL(w, col, seed) { const key = "v" + w + col + seed; if (CACHE[key]) return CACHE[key]; const c = mk(w * 2, 36), g = c.getContext("2d"), R = B.rng(seed), pts = []; for (let x = w * 2 - 4; x > 4; x -= 6) pts.push([x, 18 + Math.sin(x / 30) * 2]); B.stroke(g, pts, { w: 22, color: col, alpha: .95, load: .8, taper: .08, seed, n: 14, press: t => .35 + .65 * Math.abs(Math.sin(t * 9 + seed)) * (0.6 + 0.4 * Math.sin(t * 3)) }); return (CACHE[key] = c.toDataURL()); }
+function wallURL() { if (CACHE.wall) return CACHE.wall; const c = mk(1440, 900), g = c.getContext("2d"); B.ground(g, 1440, 900, "#6f655a", { angle: 88, vary: .16, count: 1440 * 900 / 520 }); B.scumble(g, 420, 640, 700, 360, { colors: ["#5f564c", "#7a6f62", "#665c50"], angle: 92, spread: 14, len: 160, w: 30, alpha: .45, count: 160, seed: 3 }); return (CACHE.wall = c.toDataURL("image/jpeg", .85)); }
+
+// a status dab per agent
+const DAB = { work: "#c9954a", done: "#7f8a4e", wait: "#9b8d7c", need: "#b8416b" };
+const dab = k => `<span class="dab" style="background-image:url(${dabURL(DAB[k], k.length)})"></span>`;
+const mark = `<span class="mark" style="background-image:url(${markURL()})"></span>`;
+const AG = [["perf", "done", "is done · 4.1 s → 0.9 s", "2m"], ["dark-mode", "work", "settings page first", "6m"], ["cookies", "work", "the banner, half the size", "4m"], ["emoji-csv", "work", "it's always unicode", "9m"], ["release", "wait", "waits for the others", "1m"]];
+
+// ---------- every feature
+const F = [
+ { id: "idle", name: "idle", tag: "at rest", crop: [880, 0, 560, 170],
+   say: "<b>always there, small.</b> the painted :*, one line of status, a dab per agent. it's warm, but it doesn't ask for your eyes.",
+   html: () => `<div class="lamp pill">${mark}<span>${W.idle}</span><span style="display:flex;gap:2px;margin-left:4px">${["work", "work", "work"].map(dab).join("")}</span></div>` },
+ { id: "listen", name: "hold fn", tag: "talking", crop: [700, 0, 740, 420],
+   say: "<b>hold fn and talk.</b> the light opens, your words land in serif as you say them, your voice is a rose brushstroke. the pink corners show the window bise sees, for a blink.",
+   html: () => `<div class="vf" style="left:330px;top:300px;width:720px;height:520px"><i></i><i></i><i></i><i></i></div>
+     <div class="lamp" style="width:420px"><div class="in"><div class="lab"><span class="r">listening</span> · let go of fn to send</div>
+     <div class="big">${W.said}</div><div class="voice" style="background-image:url(${voiceURL(380, "#b8416b", 4)})"></div>
+     <div class="sees">bise sees Chrome · localhost:4801/settings</div></div></div>` },
+ { id: "answer", name: "bise answers", tag: "talking", crop: [700, 0, 740, 440],
+   say: "<b>let go.</b> “got it.”, then bise answers, said and written; its voice is an ochre stroke. the agents it starts (its hands) appear as chips. on these surfaces the speaker is bise; “main” stays the thread's name in the terminal.",
+   html: () => `<div class="lamp" style="width:420px"><div class="in"><div class="lab">bise</div><div class="quote">${W.said}</div>
+     <div class="big">${W.answer}</div><div class="voice" style="background-image:url(${voiceURL(300, "#c9954a", 9)});width:300px"></div>
+     <div class="chips"><span class="chip">${dab("work")}dark-mode</span><span class="chip">${dab("work")}cookies</span></div></div></div>` },
+ { id: "agents", name: "agents", tag: "fn + 0 or a click", crop: [700, 0, 740, 520],
+   say: "<b>who's doing what.</b> a dab per agent: ochre while it works, olive when done, gray while it waits, rose when it needs you. then what's ready for you.",
+   html: () => `<div class="lamp" style="width:420px"><div class="in"><div class="lab">5 agents · ~/acme</div>
+     <div class="rows">${AG.map(([n, k, w, a]) => `<div class="row">${dab(k)}<span class="n">${n}</span><span class="w">${w}</span><span class="a">${a}</span></div>`).join("")}</div>
+     <div class="sec">for you</div>
+     <div class="out"><span class="ic">◰</span><div><div class="t">weekly update, draft 2</div><div class="u">a page · weekly update</div></div></div>
+     <div class="out"><span class="ic">PR</span><div><div class="t">PR #482 · half-size banner on mobile</div><div class="u">cookies · CI ✓</div></div></div></div></div>` },
+ { id: "needs", name: "needs you", tag: "a question", crop: [700, 0, 740, 330],
+   say: "<b>a question for you.</b> the light's edge turns rose. answer with fn + 1 / 2 from anywhere, a click, or hold fn and say it.",
+   html: () => `<div class="lamp" style="width:400px" data-edge="rose"><div class="in"><div class="lab"><span class="r">? cookies needs you</span> · 2m</div>
+     <div class="big">keep the banner on mobile?</div>
+     <div class="opts"><span class="opt k"><b>1</b>yes</span><span class="opt"><b>2</b>no</span></div>
+     <div class="hint">or hold fn and say it</div></div></div>` },
+ { id: "inbox", name: "the inbox", tag: "fn + i", crop: [700, 0, 740, 470],
+   say: "<b>everything waiting for you, in one place,</b> the most blocking first. an approval shows exactly what will run.",
+   html: () => `<div class="lamp" style="width:420px" data-edge="rose"><div class="in"><div class="lab">inbox · 3 waiting for you</div>
+     <div class="rows">
+       <div class="row" style="grid-template-columns:18px 1fr auto">${dab("need")}<span><b style="font-weight:600">release</b> wants to run<br><span class="n" style="color:#b8416b">$ npm publish --access public</span></span><span class="a">1m</span></div>
+       <div class="row" style="grid-template-columns:18px 1fr auto">${dab("need")}<span><b style="font-weight:600">cookies</b> · keep the banner on mobile?</span><span class="a">2m</span></div>
+       <div class="row" style="grid-template-columns:18px 1fr auto">${dab("need")}<span><b style="font-weight:600">weekly update</b> · post now or wait for Marc?</span><span class="a">8m</span></div></div>
+     <div class="keys"><b>↑↓</b>choose &nbsp; <b>1-9</b>answer &nbsp; <b>⏎</b>open &nbsp; <b>l</b>later &nbsp; <b>esc</b>close</div></div></div>` },
+ { id: "done", name: "done, failed", tag: "status", crop: [880, 0, 560, 230],
+   say: "<b>news, briefly.</b> an agent done or failed shows for 8 seconds in the status line, then the count comes back. a failure is said plainly, never a joke.",
+   html: () => `<div class="lamp pill">${mark}<span>${dab("done")}</span><span><b style="font-weight:600">perf</b> is done: signup 4.1 s → 0.9 s.</span></div>
+     <div class="lamp pill" style="top:118px">${mark}<span style="font:600 14px 'JetBrains Mono';color:#9b3a2e">▲</span><span><b style="font-weight:600">release</b> failed. i'm on it.</span></div>` },
+ { id: "spot", name: "spotlight", tag: "fn + space", crop: [380, 120, 700, 420],
+   say: "<b>when you can't talk out loud.</b> type to main, start an agent, open something. the same light, in the middle of the screen.",
+   html: () => `<div class="lamp" style="width:640px;right:400px;top:200px"><div class="in" style="padding:18px 24px 18px">
+     <div style="display:flex;align-items:center;gap:12px">${mark}<span class="big">start an agent: the csv export eats emoji<span style="display:inline-block;width:2px;height:22px;background:#b8416b;vertical-align:-3px;margin-left:2px"></span></span></div>
+     <div class="rows" style="margin-top:12px">
+       <div class="row" style="grid-template-columns:20px 1fr auto;background:#b8416b14;border-radius:8px;padding:7px 8px"><span class="rose" style="font:600 14px 'JetBrains Mono'">+</span><span>start <span class="n">emoji-csv</span>: the csv export eats emoji</span><span class="a">⏎</span></div>
+       <div class="row" style="grid-template-columns:20px 1fr auto;padding:7px 8px"><span class="faint" style="font:600 13px 'JetBrains Mono'">@</span><span>tell main instead</span><span class="a">⌘⏎</span></div>
+       <div class="row" style="grid-template-columns:20px 1fr auto;padding:7px 8px">${dab("work")}<span><span class="n">emoji-csv</span> is already on it?</span><span class="a">tab</span></div></div>
+     <div class="keys"><b>⏎</b>send to main &nbsp; <b>tab</b>start an agent &nbsp; <b>esc</b>close</div></div></div>` },
+ { id: "ready", name: "a page is ready", tag: "for you", crop: [880, 0, 560, 170],
+   say: "<b>what an agent made for you</b> is announced, never pushed in your face: fn + o opens it in your browser.",
+   html: () => `<div class="lamp pill">${mark}<span>your weekly update is ready · <b style="font:600 12px 'JetBrains Mono'">fn o</b></span></div>` },
+ { id: "page", name: "a page, with your notes", tag: "in your browser", crop: [40, 44, 1100, 640], scale: .66,
+   say: "<b>what agents make is a page</b> on warm paper. its bar and your notes are the same painted light as bise; your notes are pen red. send, and the next version comes back in the same tab.",
+   html: () => `<div class="br"><div class="wt"><i></i><i></i><i></i><span class="url">localhost:4801/weekly-update</span></div>
+     <div class="pframe" data-paint="1068x48">${mark}<span class="t">weekly update</span><span class="m">v2 · 3 min ago</span><span class="sp"></span><button>what changed</button><span class="m">3 notes</span><button class="k">send</button></div>
+     <div class="pbody"><div><div class="meta">week 41 · for #team · draft 2</div><h1>the week, in three lines</h1>
+       <p><span class="hl">signup is faster: <span class="num">4.1 s → 0.9 s</span></span> on a mid-range phone<sup>1</sup>. dark mode ships on the settings page monday<sup>2</sup>. the cookie banner is half the size on mobile<sup>3</sup>.<span class="pin"><b>1</b></span></p>
+       <h3>numbers</h3><table><tr><th>metric</th><th style="text-align:right">last week</th><th style="text-align:right">this week</th></tr><tr><td>signups</td><td class="r">412</td><td class="r">468</td></tr><tr><td>signup time</td><td class="r">4.1 s</td><td class="r">0.9 s</td></tr></table></div>
+     <div class="pnotes" data-paint="290x330"><div class="lab">notes for weekly update · 3</div>
+       <div class="nt done"><div class="k">✓ done · line 1<i>v1</i></div>say the seconds, not “4× faster”.</div>
+       <div class="nt"><div class="k">voice<i>0:04</i></div>add Léa's tests, she did them saturday</div>
+       <div class="nt"><div class="k">you changed<i>now</i></div>“and its tests”</div>
+       <div class="hint">2 notes for weekly update · or just say “send”</div></div></div></div>` },
+ { id: "first", name: "first launch", tag: "permissions", crop: [700, 0, 740, 320],
+   say: "<b>one permission at a time,</b> asked when it's first needed, in one honest sentence.",
+   html: () => `<div class="lamp" style="width:420px"><div class="in"><div style="display:flex;gap:12px;align-items:flex-start">${mark}<div>
+     <div class="big" style="font-size:22px">to hear fn in every app, bise needs Accessibility. it only uses fn and the keys you press with it.</div>
+     <div class="opts"><span class="opt k">continue</span><span class="hint" style="margin:6px 0 0 6px">not now</span></div></div></div></div></div>` },
+ { id: "locked", name: "when bise is hidden", tag: "macOS notification", crop: [880, 0, 560, 240],
+   say: "<b>hidden (fn + .) or screen locked,</b> a question still reaches you, as a macOS notification with the painted icon. the menu bar's :* turns rose.",
+   html: () => `<div class="mnote"><div class="h"><span class="ico" style="background-image:url(${lightIcon()})"></span>bise ambient<span style="margin-left:auto">now</span></div><b>cookies needs you</b>keep the banner on mobile?<div class="bt"><span>yes</span><span>no</span></div></div>`, tray: "rose" },
+ { id: "menu", name: "the menu bar", tag: "a click on :*", crop: [880, 0, 560, 260],
+   say: "<b>the :* in the menu bar</b> is always there. a click shows the agents; this is its right-click menu.",
+   html: () => `<div class="menu"><div class="on">type to main <span>fn space</span></div><div>hide bise <span>fn .</span></div><hr><div>quit bise ambient <span></span></div></div>
+     <div class="lamp pill" style="top:40px">${mark}<span>${W.idle}</span></div>` },
+];
+function lightIcon() { if (CACHE.icon) return CACHE.icon; const c = mk(88, 88), g = c.getContext("2d"); g.fillStyle = "#4a4038"; g.beginPath(); g.roundRect(0, 0, 88, 88, 20); g.fill(); g.save(); g.clip(); B.scumble(g, 44, 44, 40, 40, { colors: ["#f4e6c4", "#ead39f", "#fbf1da"], angle: -84, spread: 12, len: 40, w: 12, alpha: .8, count: 60, seed: 5 }); g.restore(); const m = new Image(); return (CACHE.icon = c.toDataURL()); }
+
+// ---------- who bise is: its moods, each a painted light and one line
+const MOODS = [
+  { k: "idle", name: "at rest", tag: "idle", edge: "", star: "#b8416b", line: W.idle,
+    p: "<b>the lamp in the next room.</b> low, warm, it breathes very slowly (7 s). <i>you forget it's there, and you know it is.</i>" },
+  { k: "listen", name: "leans in", tag: "hold fn", edge: "open", star: "#b8416b", line: "listening…",
+    p: "<b>turns toward you.</b> the mist brightens and gathers, its dots pulse with your voice. it writes your words as you say them." },
+  { k: "work", name: "keeps busy", tag: "working", edge: "ochre", star: "#a8772f", line: "on it. 3 agents working.",
+    p: "<b>quietly at work.</b> ochre, a candle's flicker at the edge. it doesn't narrate, the rows say who does what." },
+  { k: "need", name: "taps your shoulder", tag: "needs you", edge: "rose", star: "#b8416b", line: "cookies needs you.",
+    p: "<b>once, then waits.</b> the edge warms to rose, one small nudge, then it holds still. no badge counting up, no repeat." },
+  { k: "done", name: "a small nod", tag: "done", edge: "olive", star: "#7f8a4e", line: "perf is done: 4.1 s → 0.9 s.",
+    p: "<b>good news, briefly.</b> an olive dab, a nod, 8 s, then back to rest. a light touch is allowed here." },
+  { k: "fail", name: "says it straight", tag: "failed", edge: "umber", star: "#6b5844", line: "release failed. i'm on it.",
+    p: "<b>still and plain.</b> the light stops moving, the color goes earthy. it says what broke and who's on it. no joke, no drama." },
+  { k: "away", name: "keeps watch", tag: "you're away", edge: "ember", star: "#a8772f", line: "while you were out: 2 done, 1 asks.",
+    p: "<b>an ember, never cold.</b> screen locked or late: the light lowers, the news waits in one line for when you're back." },
+  { k: "hello", name: "says hello, once", tag: "first launch", edge: "open", star: "#b8416b", line: "hi. i'm bise. hold fn and talk to me.",
+    p: "<b>introduces itself once,</b> then never again. the first thing it asks for is the one permission it needs, in one sentence." },
+];
+document.getElementById("moods").innerHTML = MOODS.map(m => `<div class="mood m-${m.k}"><div class="tile" style="background-image:url(${wallURL()})">
+  <div class="lamp pill" data-edge="${m.edge}"><span class="mark" style="background-image:url(${markURL("#3b2c20", m.star)})"></span><span>${m.line}</span></div></div>
+  <h3>${m.name}<span>${m.tag}</span></h3><p>${m.p}</p></div>`).join("");
+
+const stageHTML = f => `<div class="stage" style="background-image:url(${wallURL()})">${AMB.desktop("wall-none")}${f.html()}</div>`;
+document.getElementById("toc").innerHTML = F.map(f => `<a href="#f-${f.id}">${f.name}</a>`).join("");
+document.getElementById("feats").innerHTML = F.map((f, i) => {
+  const [cx, cy, cw, ch] = f.crop, sc = f.scale || 1;
+  return `<div class="feat" id="f-${f.id}"><div class="crop" style="width:${cw * sc}px;height:${ch * sc}px;max-width:100%">${stageHTML(f).replace('class="stage"', `class="stage" style="transform:scale(${sc}) translate(${-cx}px,${-cy}px)"`)}</div>
+    <div class="side"><h2>${f.name}<span>${i + 1} · ${f.tag}</span></h2><p>${f.say}</p><div class="thumb">${stageHTML(f).replace('class="stage"', 'class="stage" style="transform:scale(.2292)"')}<span class="lab">the whole screen</span></div></div></div>`;
+}).join("");
+// the stage background style attr got doubled by the replace: merge them
+document.querySelectorAll(".stage").forEach(s => { s.style.backgroundImage = `url(${wallURL()})`; });
+// =====================================================================
+// the presence: light from inside, mist at three depths, dots of light. live.
+// every frame is a pure function of (time, mood, size, pointer), so ?t=12 freezes any moment.
+// =====================================================================
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const PAL = {
+  rest: ["#fff1cf", "#f6d89a", "#ffe6b0", "#efc27e"], listen: ["#fff8ea", "#ffefc6", "#ffe0a0", "#ffffff"],
+  speak: ["#ffe9b8", "#f2c27a", "#ffd896", "#fff1cf"], work: ["#f6cf8c", "#e8ab5c", "#ffe0a8", "#f2bb6a"],
+  need: ["#f8c4cf", "#ec8fa8", "#ffd9d0", "#de6787"], done: ["#eef0c4", "#c9d38a", "#f4edc6", "#d6dd9c"],
+  fail: ["#e2d3bb", "#c2ad8e", "#e9ddc8", "#b8a283"], away: ["#f3c08e", "#e08f5c", "#ffd0a0", "#c97a4e"],
+  hello: ["#fff8ea", "#ffeec4", "#ffe2a0", "#fff3d6"] };
+for (const k in PAL) PAL[k] = PAL[k].map(hex);
+// I: how much light, v: how fast the dots circle, T: breath period (s), amp: breath (px), lean: gathers in,
+// frac: how many dots, glow: inner light, voice/pulse/rise/coalesce/flick: the mood's own movement
+const MP = {
+  rest:   { I: .8,  v: .004, T: 7,  amp: 3,   lean: 0,  frac: .8,  glow: .55, voice: 0, pulse: 0, rise: 0, coalesce: 0, flick: 0 },
+  listen: { I: 1,   v: .010, T: 1.7, amp: 2,  lean: 1,  frac: 1,   glow: .95, voice: 1, pulse: 0, rise: 0, coalesce: 0, flick: 0 },
+  speak:  { I: .92, v: .008, T: 2.4, amp: 2,  lean: .5, frac: .95, glow: .8,  voice: .55, pulse: 0, rise: 0, coalesce: 0, flick: 0 },
+  work:   { I: .88, v: .030, T: 3,  amp: 1.5, lean: 0,  frac: .9,  glow: .62, voice: 0, pulse: 0, rise: 0, coalesce: 0, flick: 1 },
+  need:   { I: 1,   v: .003, T: 6,  amp: 1.5, lean: .4, frac: 1,   glow: .85, voice: 0, pulse: 1, rise: 0, coalesce: 0, flick: 0 },
+  done:   { I: .92, v: .005, T: 4,  amp: 2,   lean: 0,  frac: .9,  glow: .72, voice: 0, pulse: 0, rise: 1, coalesce: 0, flick: 0 },
+  fail:   { I: .55, v: 0,    T: 30, amp: 0,   lean: 0,  frac: .7,  glow: .42, voice: 0, pulse: 0, rise: 0, coalesce: 0, flick: 0 },
+  away:   { I: .45, v: .002, T: 9,  amp: 3,   lean: 0,  frac: .45, glow: .32, voice: 0, pulse: 0, rise: 0, coalesce: 0, flick: 0 },
+  hello:  { I: 1,   v: .006, T: 5,  amp: 2,   lean: .3, frac: 1,   glow: .85, voice: 0, pulse: 0, rise: 0, coalesce: 1, flick: 0 } };
+const Q = new URLSearchParams(location.search), FROZEN = Q.has("t") ? +Q.get("t") : null;
+const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const POINTER = { x: 0, y: 0, tx: 0, ty: 0 };
+addEventListener("pointermove", e => { POINTER.tx = e.clientX / innerWidth * 2 - 1; POINTER.ty = e.clientY / innerHeight * 2 - 1; });
+const voiceLevel = t => Math.min(1, .3 + .55 * Math.abs(Math.sin(t * 7.3)) * (.55 + .45 * Math.sin(t * 2.1)) + .15 * Math.abs(Math.sin(t * 17.9)));
+const M = 70, DPR = 2, ALL = [];
+
+function Presence(el, mood, o = {}) {
+  const P = { el, mood, t0: 0, soft: o.soft || 1, still: !!o.still, vis: false, cur: { ...MP[mood] }, pal: PAL[mood].map(c => c.slice()), w: 0, h: 0 };
+  const glass = document.createElement("div"); glass.className = "glass";
+  P.back = document.createElement("canvas"); P.back.className = "back";
+  P.front = document.createElement("canvas"); P.front.className = "front";
+  el.prepend(glass); el.prepend(P.back); el.append(P.front);
+  // the dots: a perimeter position, a distance from the edge, a depth, a size, a color, a phase
+  const R = B.rng(el.textContent.length * 13 + 7), N = 1800;
+  P.dots = Array.from({ length: N }, () => {
+    const near = R() < .74;
+    return { u: R(), d: near ? (R() - .4) * 10 : 5 + Math.pow(R(), 1.5) * 38, z: R(), s: R(), c: (R() * 4) | 0, ph: R(), a: .3 + R() * .6 };
+  });
+  P.blobs = Array.from({ length: 7 }, (_, i) => ({ u: i / 7 + R() * .08, ph: R() * 6.28, T: 11 + R() * 9, r: .7 + R() * .6, c: i % 4 }));
+  P.setMood = (m, t) => { if (m !== P.mood) { P.mood = m; P.t0 = t; } };
+  ALL.push(P); return P;
+}
+
+function edgePoint(w, h, r, u) {
+  const per = 2 * (w + h); let d = ((u % 1) + 1) % 1 * per, x, y, nx, ny;
+  if (d < w) { x = d; y = 0; nx = 0; ny = -1; } else if ((d -= w) < h) { x = w; y = d; nx = 1; ny = 0; } else if ((d -= h) < w) { x = w - d; y = h; nx = 0; ny = 1; } else { d -= w; x = 0; y = h - d; nx = -1; ny = 0; }
+  const cx = Math.min(Math.max(x, r), w - r), cy = Math.min(Math.max(y, r), h - r);
+  if (cx !== x && cy !== y) { const a = Math.atan2(y - cy, x - cx); x = cx + Math.cos(a) * r; y = cy + Math.sin(a) * r; nx = Math.cos(a); ny = Math.sin(a); }
+  return [x, y, nx, ny];
+}
+const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+function glowEllipse(g, x, y, rx, ry, stops) { g.save(); g.translate(x, y); g.scale(rx / ry, 1); const gr = g.createRadialGradient(0, 0, 0, 0, 0, ry); stops.forEach(([o, c]) => gr.addColorStop(o, c)); g.fillStyle = gr; g.fillRect(-ry, -ry, ry * 2, ry * 2); g.restore(); }
+
+function drawPresence(P, t, dt) {
+  const el = P.el, w = el.offsetWidth, h = el.offsetHeight; if (!w || !h) return;
+  if (w !== P.w || h !== P.h) {
+    P.w = w; P.h = h;
+    for (const c of [P.back, P.front]) { c.width = (w + 2 * M) * DPR; c.height = (h + 2 * M) * DPR; c.style.left = c.style.top = -M + "px"; c.style.width = w + 2 * M + "px"; c.style.height = h + 2 * M + "px"; }
+  }
+  // ease every parameter and color toward the mood: a change takes ~0.9 s, never a cut
+  const tg = MP[P.mood], k = dt > 1 ? 1 : 1 - Math.exp(-dt / .3);
+  for (const key in tg) P.cur[key] += (tg[key] - P.cur[key]) * k;
+  PAL[P.mood].forEach((c, i) => { for (let j = 0; j < 3; j++) P.pal[i][j] += (c[j] - P.pal[i][j]) * k; });
+  const C = P.cur, pal = P.pal, lt = t - P.t0, dusk = document.body.classList.contains("dusk");
+  const breath = Math.sin(t * 2 * Math.PI / C.T), lvl = C.voice * voiceLevel(t);
+  const pulse = C.pulse * Math.exp(-Math.pow((lt % 6) - .6, 2) / .09);
+  const coal = (() => { const c = Math.max(0, 1 - (lt % 9) / 2.6); return C.coalesce * c * c * (3 - 2 * c); })();
+  const I = C.I * P.soft * (1 + .25 * pulse) * (1 - .5 * coal), px = POINTER.x, py = POINTER.y, r = Math.min(26, h / 2);
+  const gb = P.back.getContext("2d"), gf = P.front.getContext("2d");
+  for (const g of [gb, gf]) { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, g.canvas.width, g.canvas.height); g.setTransform(DPR, 0, 0, DPR, M * DPR, M * DPR); }
+  // 1. a soft dusk under it: depth without a drop shadow
+  glowEllipse(gb, w / 2 + px * 3, h + 6 + py * 2, w * .58, h * .35 + 22, [[0, `rgba(28,14,6,${.26 * P.soft})`], [1, "rgba(28,14,6,0)"]]);
+  // 2. mist: big slow blobs of light around it, the far plane (the glass blurs the part under it)
+  P.blobs.forEach(b => {
+    const [x, y, nx, ny] = edgePoint(w, h, r, b.u + Math.sin(t / b.T + b.ph) * .015), out = 8 + 6 * Math.sin(t / (b.T * .7) + b.ph) + C.amp * breath;
+    const rad = (34 + Math.min(w, h) * .32) * b.r * (1 + .12 * pulse);
+    glowEllipse(gb, x + nx * out + px * -4, y + ny * out + py * -3, rad * 1.25, rad, [[0, rgba(pal[b.c], (.2 + .12 * C.glow) * I)], [1, rgba(pal[b.c], 0)]]);
+  });
+  // 3. the light from inside: strongest behind the words, warmer at the top, fading before the edge
+  const a = .66 + .24 * C.glow + .12 * pulse;
+  if (!dusk) {
+    glowEllipse(gb, w / 2, h * .44, w * .72, h * .72 + 14, [[0, rgba(pal[0], a)], [.55, rgba(pal[0], a * .86)], [1, rgba(pal[0], 0)]]);
+    glowEllipse(gb, w / 2, h * .3, w * .45, h * .4 + 8, [[0, `rgba(255,252,240,${.28 + .2 * C.glow})`], [1, "rgba(255,252,240,0)"]]);
+  } else {
+    glowEllipse(gb, w / 2, h * .46, w * .72, h * .72 + 14, [[0, `rgba(30,20,12,${.72})`], [.6, `rgba(30,20,12,${.6})`], [1, "rgba(30,20,12,0)"]]);
+    glowEllipse(gb, w / 2, h * .1, w * .5, h * .35 + 8, [[0, rgba(pal[1], .22 * C.glow * I)], [1, rgba(pal[1], 0)]]);
+  }
+  // 4. dots of light at three depths. far: small, dim, behind the glass. near: larger, soft, in front, only outside the words.
+  const per = 2 * (w + h), n = Math.min(P.dots.length, Math.round(per * .8 * C.frac));
+  for (let i = 0; i < n; i++) {
+    const p = P.dots[i], z = p.z;
+    let [x, y, nx, ny] = edgePoint(w, h, r, p.u + C.v * t * (.4 + z) * (p.ph < .5 ? 1 : .8));
+    let d = p.d * (1 + .12 * breath) + C.amp * breath - 3 * C.lean + lvl * (p.d > 0 ? 7 : 2) * (.4 + z) + 8 * pulse * (p.d > 0 ? 1 : 0) + coal * (50 + 110 * p.ph);
+    x += nx * d + px * (z - .5) * 18; y += ny * d + py * (z - .5) * 12;
+    let al = p.a * I * (d < 0 ? Math.max(0, 1 + d / 8) : Math.max(0, 1 - d / 46));
+    if (C.rise > .01 && p.ph < .4) { const q = (t * .22 + p.ph * 2.5) % 1; y -= C.rise * q * 26; al *= 1 - C.rise * q; }
+    if (C.flick > .01) al *= 1 - C.flick * .25 * (.5 + .5 * Math.sin(t * 6 + p.ph * 40));
+    if (al < .02) continue;
+    const col = pal[p.c];
+    if (z < .88) { gb.fillStyle = rgba(col, al * (.35 + .5 * z)); gb.beginPath(); gb.arc(x, y, .5 + p.s * 1.2 + z * .8, 0, 6.283); gb.fill(); }
+    else if (d > 4) { const rr = 1.4 + p.s * 2.2; gf.fillStyle = rgba(col, al * .14); gf.beginPath(); gf.arc(x, y, rr * 2, 0, 6.283); gf.fill(); gf.fillStyle = rgba(col, al * .32); gf.beginPath(); gf.arc(x, y, rr, 0, 6.283); gf.fill(); }
+  }
+}
+
+// ---------- attach a presence to every surface
+const FEAT_MOOD = { idle: "rest", listen: "listen", answer: "speak", agents: "work", needs: "need", inbox: "need", done: "done", spot: "listen", ready: "done", page: "rest", first: "hello", locked: "rest", menu: "rest" };
+const TILE_MOOD = { idle: "rest", listen: "listen", work: "work", need: "need", done: "done", fail: "fail", away: "away", hello: "hello" };
+function attach() {
+  document.querySelectorAll(".lamp, .pframe, .pnotes").forEach(el => {
+    if (el._pr) return;
+    const feat = el.closest(".feat"), tile = el.closest(".mood"), still = !!el.closest(".thumb");
+    let mood = feat ? FEAT_MOOD[feat.id.slice(2)] : tile ? TILE_MOOD[[...tile.classList].find(c => c.startsWith("m-")).slice(2)] : "rest";
+    if (el.textContent.includes("▲")) mood = "fail";
+    if (el.id === "hl") return;
+    el._pr = Presence(el, mood || "rest", { still, soft: el.matches(".pframe,.pnotes") ? .6 : 1 });
+  });
+  document.querySelectorAll(".tray").forEach(t => t.textContent = ":*");
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.target._pr) e.target._pr.vis = e.isIntersecting; }), { rootMargin: "200px" });
+  ALL.forEach(P => io.observe(P.el));
+}
+
+// ---------- the live film at the top: one bise, its moods in a row, at real size
+const HS = [
+  { t: 0,    mood: "rest",   pill: 1, cap: "at rest. the lamp in the next room: a 7 s breath, the dots barely drift.", html: () => `${mark}<span>${W.idle}</span>` },
+  { t: 4,    mood: "listen", w: 420,  cap: "you hold fn: it leans in. the light gathers, brightens, and its dots pulse with your voice.", html: lt => { const ws = W.said.replace(/<[^>]+>/g, "").split(" "), n = Math.max(1, Math.min(ws.length, Math.floor((lt - .4) / .24) + 1)); return `<div class="lab"><span class="r">listening</span> · let go of fn to send</div><div class="big">${ws.slice(0, n).join(" ")}</div><div class="sees">bise sees Chrome · localhost:4801/settings</div>`; } },
+  { t: 10,   mood: "speak",  w: 420,  cap: "you let go: it answers, said and written. the agents it starts, its hands, appear.", html: lt => `<div class="lab">bise</div><div class="big">${W.answer}</div>${lt > 1.4 ? `<div class="chips"><span class="chip">${dab("work")}dark-mode</span><span class="chip">${dab("work")}cookies</span></div>` : ""}` },
+  { t: 15,   mood: "work",   pill: 1, cap: "it keeps busy: ochre light circling slowly, a candle's flicker. it doesn't narrate.", html: () => `${mark}<span>on it. 3 agents working.</span><span style="display:flex;gap:2px">${["work", "work", "work"].map(dab).join("")}</span>` },
+  { t: 19.5, mood: "need",   w: 400,  cap: "it needs you: rose wells up from inside, once. then it holds still and waits.", html: () => `<div class="lab"><span class="r">? cookies needs you</span> · now</div><div class="big">keep the banner on mobile?</div><div class="opts"><span class="opt k"><b>1</b>yes</span><span class="opt"><b>2</b>no</span></div><div class="hint">or hold fn and say it</div>` },
+  { t: 25.5, mood: "done",   pill: 1, cap: "news, briefly: an olive light rises off it, a small nod, then it settles.", html: () => `${mark}<span><b style="font-weight:600">perf</b> is done: signup 4.1 s → 0.9 s.</span>` },
+  { t: 30,   mood: "rest",   pill: 1, cap: "back to rest.", html: () => `${mark}<span>${W.idle}</span>` },
+  { t: 33,   mood: "away",   pill: 1, cap: "you're away: it lowers to an ember. never cold, never gone.", html: () => `${mark}<span>while you were out: 2 done, 1 asks.</span>` },
+  { t: 37,   mood: "hello",  pill: 1, cap: "and the very first time, it gathers out of the mist and says hello. once.", html: () => `${mark}<span>hi. i'm bise. hold fn and talk to me.</span>` },
+];
+const HDUR = 43;
+let hT = FROZEN ?? 0, hPlay = FROZEN == null, hSeg = -1, hKey = "", HL, HP;
+function buildHero() {
+  const box = document.getElementById("hstage");
+  box.innerHTML = `<div class="stage">${AMB.desktop("wall-none")}<div class="lamp" id="hl"><div class="in"></div></div></div>`;
+  const st = box.firstChild; st.style.transform = `translateX(${Math.min(0, box.clientWidth - 1440)}px)`;
+  HL = document.getElementById("hl"); HP = Presence(HL, "rest"); HL._pr = HP;
+  new IntersectionObserver(es => es.forEach(e => HP.vis = e.isIntersecting), { rootMargin: "200px" }).observe(HL);
+  const tl = document.getElementById("htl");
+  tl.insertAdjacentHTML("beforeend", HS.map((s, i) => `<b data-i="${i}" style="left:${s.t / HDUR * 100}%">${s.mood === "speak" ? "answers" : s.mood}</b>`).join(""));
+  tl.onclick = e => { const r = tl.getBoundingClientRect(); hT = (e.clientX - r.left) / r.width * HDUR; hSeg = -1; };
+  const btn = document.getElementById("hplay"); btn.onclick = () => { hPlay = !hPlay; btn.textContent = hPlay ? "pause" : "play"; };
+  btn.textContent = hPlay ? "pause" : "play";
+  addEventListener("keydown", e => { if (e.key === " " && e.target === document.body) { e.preventDefault(); btn.onclick(); } if (e.key === "ArrowRight") { hT = (hT + 2) % HDUR; hSeg = -1; } if (e.key === "ArrowLeft") { hT = (hT - 2 + HDUR) % HDUR; hSeg = -1; } });
+}
+function heroAt(t) {
+  let i = HS.length - 1; while (HS[i].t > t) i--;
+  const s = HS[i], lt = t - s.t, inn = HL.querySelector(".in"), html = s.html(lt);
+  if (i !== hSeg) {
+    const w0 = HL.offsetWidth; hSeg = i; HP.setMood(s.mood, t);
+    HL.classList.toggle("pill", !!s.pill); inn.innerHTML = html; hKey = html;
+    inn.classList.remove("swap"); void inn.offsetWidth; inn.classList.add("swap");
+    HL.style.transition = "none"; HL.style.width = s.w ? s.w + "px" : "auto"; const w1 = HL.offsetWidth;
+    if (w0 && FROZEN == null) { HL.style.width = w0 + "px"; void HL.offsetWidth; HL.style.transition = "width .8s cubic-bezier(.16,1,.3,1)"; }
+    HL.style.width = w1 + "px";
+    document.getElementById("hcap").textContent = s.cap;
+    document.querySelectorAll("#htl b").forEach(b => b.classList.toggle("on", +b.dataset.i === i));
+  } else if (html !== hKey) { inn.innerHTML = html; hKey = html; }
+  document.getElementById("hhead").style.left = t / HDUR * 100 + "%";
+  document.getElementById("htime").textContent = t.toFixed(1) + " s";
+}
+
+// ---------- the loop
+let last = performance.now() / 1000;
+function loop() {
+  const now = performance.now() / 1000, dt = Math.min(.1, now - last); last = now;
+  POINTER.x += (POINTER.tx - POINTER.x) * .06; POINTER.y += (POINTER.ty - POINTER.y) * .06;
+  if (hPlay) hT = (hT + dt) % HDUR;
+  heroAt(hT);
+  const t = FROZEN ?? (REDUCE ? 3 : now);
+  for (const P of ALL) {
+    if (P === HP) { if (P.vis) drawPresence(P, FROZEN ?? (REDUCE ? 3 : hT), FROZEN != null ? 9 : dt); continue; }
+    if (P.still) { if (!P.drawn && P.el.offsetWidth) { drawPresence(P, 3, 9); P.drawn = 1; } continue; }
+    if (!P.vis) continue;
+    if (REDUCE && P.drawn) continue;
+    drawPresence(P, t, FROZEN != null || REDUCE ? 9 : dt); P.drawn = 1;
+  }
+  requestAnimationFrame(loop);
+}
+setWall(Q.get("wall") || "lamps"); setGlass(Q.get("glass") || "light");
+document.fonts.ready.then(() => { attach(); buildHero(); if (FROZEN != null) { hSeg = -1; } loop(); });
+</script>
+</body></html>

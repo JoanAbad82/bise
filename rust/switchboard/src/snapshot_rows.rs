@@ -38,9 +38,6 @@ pub struct RowIn<'a> {
     /// How long its turn has run (None: no turn).
     pub turn_ms: Option<u64>,
     pub watching: Vec<AgentWatch>,
-    /// shared-guard: its uncommitted files in the shared folder
-    /// (`crate::shared_wip`; 0 from [`Rows::input`], the caller sets it).
-    pub shared_wip: u32,
 }
 
 /// A kept row and the inputs it was built from.
@@ -53,7 +50,6 @@ struct Kept {
     inbox: usize,
     turn_ms: Option<u64>,
     watching: Vec<AgentWatch>,
-    shared_wip: u32,
     row: Value,
 }
 
@@ -65,7 +61,6 @@ impl Kept {
             && self.role.as_deref() == i.role
             && self.queued_inputs == i.queued_inputs
             && self.watching == i.watching
-            && self.shared_wip == i.shared_wip
             && self.agent == *i.agent
     }
 }
@@ -120,7 +115,6 @@ impl Rows {
             inbox: if a.is_main { self.mail.unanswered.get(&a.name).copied().unwrap_or(0) } else { 0 },
             turn_ms: a.turn_started_ms.map(|t| now.saturating_sub(t)),
             watching,
-            shared_wip: 0,
         }
     }
 
@@ -140,7 +134,6 @@ impl Rows {
             inbox: i.inbox,
             turn_ms: i.turn_ms,
             watching: i.watching,
-            shared_wip: i.shared_wip,
             row: row.clone(),
         };
         self.kept.insert(k.agent.name.clone(), k);
@@ -217,8 +210,6 @@ pub fn build(i: &RowIn) -> Value {
         // event-wake: the events it waits for (the agents
         // row's `watching`, wake-ui)
         "watching": i.watching,
-        // shared-guard: its uncommitted files in the shared folder
-        "shared_wip": i.shared_wip,
     })
 }
 

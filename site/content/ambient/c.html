@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ambient · terminal brut</title>
+<link rel="stylesheet" href="amb.css">
+<style>
+/* C · terminal brut: a tiny floating bise. one font, the real glyphs, the half-block face; it is the TUI, unbolted from the terminal */
+.wall-c{background:radial-gradient(90% 70% at 70% 20%,#2a2422,#0e0d0c 70%)}
+.wall-c::before{content:"";position:absolute;inset:0;background-image:radial-gradient(#ffffff10 1px,transparent 1px);background-size:22px 22px}
+:root{--bg:#141211;--text:#ece6da;--dim:#a39c90;--faint:#857d72;--rule:#4a4540;--acc:#f4a6b0;--raised:#1f1c1a;--item:#26221f;--err:#ff5a52}
+.t{position:absolute;right:22px;top:44px;background:var(--bg);color:var(--text);font:14px/1.55 "JetBrains Mono",monospace;border:1px solid var(--rule);border-radius:10px;
+  box-shadow:0 26px 60px -20px #000e;white-space:normal;overflow:hidden;transform-origin:top right}
+.t.open{animation:open .35s steps(6)}
+@keyframes open{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+.a{color:var(--acc)}.d{color:var(--dim)}.f{color:var(--faint)}.r{color:var(--rule)}.e{color:var(--err)}
+.ttl{display:flex;justify-content:space-between;padding:6px 14px;border-bottom:1px solid var(--rule);color:var(--faint);font-size:12.5px}
+.bd{padding:12px 16px}
+.mini{padding:7px 14px;white-space:pre}
+.item{white-space:pre}
+.face{color:var(--acc);font:13px/1 "JetBrains Mono",monospace;letter-spacing:0;margin:2px 0 10px}
+.cur{background:var(--acc);color:var(--bg);animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{background:transparent}}
+.said .w.cur::after{content:"▌";color:var(--acc);animation:bl2 1s steps(1) infinite}
+@keyframes bl2{50%{opacity:0}}
+.said{white-space:normal;width:52ch}
+.ln{white-space:pre}
+.comp{background:var(--raised);margin:10px -16px -12px;padding:10px 16px 12px;border-top:1px solid var(--rule)}
+.keys{color:var(--faint);font-size:12.5px}.keys b{color:var(--text);font-weight:400}
+.bw{color:var(--acc);letter-spacing:0}
+.new.in{animation:nw .8s}
+@keyframes nw{0%{background:#f4a6b055}100%{background:transparent}}
+.row{display:grid;grid-template-columns:3ch 2ch 12ch 1fr 4ch;gap:0 1ch}
+.row.sel{background:#33292c}
+.box{border:1px solid var(--rule);border-radius:8px;margin:8px 0;padding:0}
+.box .h{color:var(--faint);padding:0 10px;margin-top:-11px;background:var(--bg);display:inline-block;margin-left:10px}
+.item{background:var(--item);border-left:2px solid var(--acc);padding:6px 12px;margin:6px 8px 8px}
+/* the PR review */
+.rv{position:absolute;left:46px;top:50px;width:1060px;height:820px;background:var(--bg);color:var(--text);font:13.5px/1.6 "JetBrains Mono",monospace;border:1px solid var(--rule);border-radius:10px;overflow:hidden;box-shadow:0 30px 80px -20px #000e}
+.rv .wt{height:32px;background:#1f1c1a;display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--faint);font-size:12px;border-bottom:1px solid var(--rule)}
+.rv .wt i{width:11px;height:11px;border-radius:50%;background:#4a4540}
+.rv .wt .url{margin-left:30px;color:var(--dim)}
+.rv .hd{padding:14px 22px;border-bottom:1px solid var(--rule)}
+.rv .hd b{font-weight:700}
+.rv .cols{display:grid;grid-template-columns:1fr 360px;height:calc(100% - 32px - 76px)}
+.diff{padding:10px 0;white-space:normal;overflow:hidden;border-right:1px solid var(--rule)}
+.diff .l{padding:0 22px;white-space:pre}.diff .add{background:#b9d99a14;color:#b9d99a}.diff .del{background:#ff5a5214;color:#ff9a94}.diff .n{color:var(--faint);display:inline-block;width:4ch}
+.diff .cm{margin:4px 22px 8px 60px;white-space:normal;background:var(--item);border-left:2px solid #c8264a;padding:8px 12px;color:var(--text)}
+.diff .cm .k{color:#ff8fa6;font-size:12px}
+.shots{padding:14px 18px}
+.shots .lab{color:var(--faint);font-size:12px;margin-bottom:6px;display:flex;justify-content:space-between}
+.ph{display:flex;gap:14px}
+.phone{width:150px;height:300px;border:1px solid var(--rule);border-radius:18px;padding:10px 8px;position:relative;background:#fff;overflow:hidden}
+.phone .bar{height:8px;background:#e7e2da;border-radius:4px;margin:8px 4px}
+.phone .buy{position:absolute;left:14px;right:14px;bottom:62px;height:28px;border-radius:6px;background:#2a2a2e;color:#fff;font:600 11px -apple-system,sans-serif;display:grid;place-items:center}
+.phone .ban{position:absolute;left:0;right:0;bottom:0;background:#f3efe8;border-top:1px solid #ddd;padding:8px;font:10px -apple-system,sans-serif;color:#444}
+.phone.before .ban{height:120px}.phone.after .ban{height:44px}
+.ring{position:absolute;overflow:visible;pointer-events:none}
+.ring path{fill:none;stroke:#c8264a;stroke-width:3;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .9s}
+.ring.in path{stroke-dashoffset:0}
+.pin{position:absolute;width:22px;height:22px;border-radius:50%;background:#c8264a;color:#fff;font:700 12px "JetBrains Mono",monospace;display:grid;place-items:center}
+.rv .act{position:absolute;left:0;right:0;bottom:0;background:var(--raised);border-top:1px solid var(--rule);padding:10px 22px;display:flex;gap:24px;color:var(--faint)}
+.rv .act b{color:var(--text);font-weight:400}.rv .act .a{color:var(--acc)}
+/* spotlight */
+.spot{position:absolute;left:50%;top:210px;width:720px;margin-left:-360px}
+.spot.t{right:auto}
+/* sheet */
+.sheet{position:absolute;inset:30px 0 0 0;padding:36px 40px}
+.sheet h3{font:700 14px "JetBrains Mono",monospace;color:var(--text);margin-bottom:12px}.sheet h3 span{color:var(--faint);font-weight:400}
+.cols5{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:26px}
+.cols5 .t{position:relative;right:auto;top:auto;white-space:normal;padding:12px 14px;min-height:190px;font-size:13px}
+.cols5 .lab{font:12px "JetBrains Mono",monospace;color:var(--faint);margin-bottom:6px}
+.cols5 .face{font-size:6.5px;line-height:1}
+</style></head>
+<body>
+<script src="amb.js"></script>
+<script>
+const { W, AGENTS } = AMB;
+const face = (pose, size = 13, extra = "") => `<pre class="face" data-face="${pose}" style="font-size:${size}px" ${extra}></pre>`;
+const bw = (spec, n = 40) => `<span class="bw" data-bw="${spec}" data-n="${n}"></span>`;
+const vf = (x, y, w, h) => `<div class="vf" data-at="0.05" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"><i></i><i></i><i></i><i></i></div>`;
+const ages = ["2m", "6m", "4m", "9m", "1m"];
+AMB.mount({
+  id: "c", letter: "C", name: "terminal brut", tray: ":*",
+  pitch: "the TUI, unbolted from the terminal: one small dark window that floats top right, one font, the real glyphs (:*, ∿, ?, ✓, ▲), the half-block face from voice mode. nothing invented: if you know bise in the terminal, you already know this one.",
+  wall: "wall-c",
+  tick(key, t, root) {
+    const B = "▁▂▃▄▅▆▇█";
+    root.querySelectorAll("[data-bw]").forEach(n => {
+      const N = +n.dataset.n, spec = n.dataset.bw; let s = "";
+      for (let i = 0; i < N; i++) {
+        let v = 0;
+        for (const part of spec.split(",")) { const m = part.match(/(\w+)@([\d.]+)-([\d.]+)/); if (m && t >= +m[2] && t <= +m[3]) v = AMB.voice(t - m[2] - (N - i) * 0.05, m[1] === "main" ? 2 : 0); }
+        s += B[Math.max(0, Math.min(7, Math.floor(v * 8)))];
+      }
+      n.textContent = s;
+    });
+  },
+  screens: {
+    idle: () => `<div class="t mini"><span class="a">:*</span> ${W.idle}  <span class="d" data-gust="4"></span></div>`,
+    listen: () => `${vf(330, 300, 720, 520)}<div class="t open"><div class="ttl"><span>bise · voice</span><span>~/acme</span></div><div class="bd">${face("seq:listen@0,talk@0.35")}<div class="said" data-type="0.4" data-per="0.24"><span class="a">›</span> ${W.said}</div>
+<div class="ln" style="margin-top:8px">${bw("you@0.35-6.2", 52)}</div>
+<div class="ln f fade" data-at="0.5">◉ main sees ${W.sees}</div>
+<div class="comp keys">fn <b>let go to send</b>  ·  esc <b>cancel</b>  ·  ⇧ <b>keep listening</b></div></div></div>`,
+    talk: () => `<div class="t"><div class="ttl"><span>bise · main</span><span>~/acme</span></div><div class="bd">${face("seq:rest@0,think@0.9,speak@2.1,kiss@6.6,rest@7.6")}<div class="said d"><span class="a">│</span> ${W.said} <span class="a">✓✓</span></div>
+<div class="ln" style="margin-top:8px"><span data-at="0" data-out="0.9" style="position:absolute">${W.got}</span><span class="d fade" data-at="0.9">∴ ${W.on}</span></div>
+<div class="said" style="margin-top:4px"><span class="a">:*</span> <span data-type="2.1" data-per="0.3">${W.answer}</span></div>
+<div class="ln" style="margin-top:8px"><span class="new pop" data-at="5.1"><span class="d">◇</span> dark-mode</span>   <span class="new pop" data-at="5.5"><span class="d">◇</span> cookies</span></div>
+<div class="ln">${bw("main@2.1-6.6", 52)}</div></div></div>`,
+    agents: () => `<div class="t open"><div class="ttl"><span>bise · agents</span><span>⌥0-5 go</span></div><div class="bd"><div class="row"><span class="f"> 0</span><span class="a" data-gust="1"></span><span>main <span class="a">:*</span></span><span class="d">${W.idle}</span><span></span></div>
+${AGENTS.map(([g, n, w, k], i) => `<div class="row rise" data-at="${0.15 + i * 0.08}"><span class="f"> ${i + 1}</span><span class="${k === "done" ? "a" : "d"}">${k === "work" ? `<span data-gust="1"></span>` : g}</span><span>${n}</span><span class="d">${w}</span><span class="f">${ages[i]}</span></div>`).join("")}
+<div class="box rise" data-at="0.9" style="margin-top:16px"><span class="h">for you · 3</span>
+<div class="row" style="padding:2px 6px"><span class="f">⌘1</span><span class="a">◰</span><span>settings</span><span class="d">localhost:4801 · dark-mode</span><span class="f">new</span></div>
+<div class="row" style="padding:2px 6px"><span class="f">⌘2</span><span class="a">±</span><span>PR #482</span><span class="d">cookies · +42 −7 · CI ✓</span><span class="f">3m</span></div>
+<div class="row" style="padding:2px 6px 6px"><span class="f">⌘3</span><span class="a">≡</span><span>notes</span><span class="d">release notes · draft 2</span><span class="f">8m</span></div></div>
+<div class="comp keys">fn <b>talk</b>  ·  / <b>type</b>  ·  ⌘1-3 <b>open</b>  ·  esc <b>hide</b></div></div></div>`,
+    needs: () => `<div class="t mini"><span class="a">:*</span> <span class="a">?</span> cookies needs you</div>
+<div class="t rise" data-at="0.4" style="top:92px"><div class="bd" style="padding:10px 12px"><div class="box"><span class="h">inbox · 1 waiting for you ── 1-2 answer</span>
+<div class="item"><span class="a">?</span> <b>cookies needs you</b>                 <span class="f">now</span>
+keep the banner on mobile?
+
+<span class="a">1</span> yes    <span class="a">2</span> no    <span class="f">fn  say it</span>
+<span class="f">cookies is on the banner · its last step: ✓ npm test · 12s</span></div></div>
+<div class="ln fade" data-at="3.4">${face("seq:listen@0,talk@3.6,kiss@5.4,rest@6.4", 6)}</div><div class="ln said fade" data-at="3.6"><span class="a">›</span> <span data-type="3.7" data-per="0.26">yes, keep it. half the size, under the buy button</span></div>
+<div class="ln fade" data-at="5.4"><span class="a">✓</span> cookies has it.</div></div></div>`,
+    viewer: () => `<div class="rv"><div class="wt"><i></i><i></i><i></i><span class="url">localhost:4810/review/482 · bise review</span></div>
+<div class="hd"><b>PR #482</b>  cookies: half-size banner on mobile  <span class="d">· cookies · +42 −7 · CI</span> <span class="a">✓</span><br><span class="f">github.com/acme/web/pull/482  ·  2 files</span></div>
+<div class="cols"><div class="diff"><div class="l f">src/consent/Banner.tsx</div>
+<div class="l"><span class="n">12</span>  export function Banner() {</div>
+<div class="l del"><span class="n">13</span>- const height = 120</div>
+<div class="l add"><span class="n">13</span>+ const height = isMobile ? 44 : 120</div>
+<div class="l"><span class="n">14</span>  return (</div>
+<div class="l del"><span class="n">15</span>-   &lt;div className="banner" style={{ height }}&gt;</div>
+<div class="l add"><span class="n">15</span>+   &lt;div className="banner compact" style={{ height }}&gt;</div>
+<div class="cm rise" data-at="5.6"><div class="k">you · voice · line 15 · 0:03</div><span data-type="5.7" data-per="0.22">compact also on tablets in portrait, please</span></div>
+<div class="l"><span class="n">16</span>      &lt;p&gt;{t("consent.short")}&lt;/p&gt;</div>
+<div class="l add"><span class="n">17</span>+     &lt;Button size="sm"&gt;{t("ok")}&lt;/Button&gt;</div>
+<div class="l"><span class="n">18</span>    &lt;/div&gt;</div>
+<div class="l f" style="margin-top:14px">src/consent/consent.css</div>
+<div class="l add"><span class="n">41</span>+ .banner.compact { padding: 6px 12px; }</div>
+<div class="l add"><span class="n">42</span>+ .banner.compact p { font-size: 12px; }</div></div>
+<div class="shots"><div class="lab"><span>before</span><span>after · iPhone 13</span></div><div class="ph" style="position:relative">
+<div class="phone before"><div class="bar"></div><div class="bar" style="width:60%"></div><div class="bar"></div><div class="buy">buy</div><div class="ban">we use cookies to make acme better. by continuing you agree to… [ok] [settings]</div></div>
+<div class="phone after"><div class="bar"></div><div class="bar" style="width:60%"></div><div class="bar"></div><div class="buy">buy</div><div class="ban">cookies? <b>ok</b> · settings</div></div>
+<svg class="ring" data-at="1.2" style="left:168px;top:200px" width="130" height="70" viewBox="0 0 130 70"><path pathLength="1" d="M10 36 C 4 8, 120 4, 124 32 C 128 62, 20 68, 12 44"/></svg>
+<div class="pin pop" data-at="1.8" style="left:290px;top:190px">1</div></div>
+<div class="cm rise" data-at="2.2" style="margin:14px 0 0;background:var(--item);border-left:2px solid #c8264a;padding:8px 12px;white-space:normal"><div style="color:#ff8fa6;font-size:12px">you · voice · on the screenshot · 0:04</div><span data-type="2.3" data-per="0.22">the ok button is too small to tap. 44 px at least</span></div></div></div>
+<div class="act"><span><b>fn</b> note</span><span><b>c</b> comment</span><span><b>a</b> approve + merge</span><span><b>s</b> <span class="a">send 2 notes to cookies</span></span><span style="margin-left:auto" class="fade" data-at="8"><span class="a">✓</span> sent. cookies is on it.</span></div></div>
+<div class="t mini"><span class="a">:*</span> <span class="d">notes on</span> PR #482  ${bw("you@2.2-4.4,you@5.6-7.4", 8)}</div>`,
+    spotlight: () => `<div style="position:absolute;inset:0;background:#0006"></div><div class="t spot open"><div class="bd"><div class="said" style="width:auto"><span class="a">›</span> <span data-type="0.3" data-per="0.18">ship release when the others are done</span></div>
+<div class="ln f fade" data-at="1.6" style="margin-top:10px">─ agents ───────────────────────────────────────────</div>
+<div class="row rise" data-at="1.7"><span></span><span class="d">…</span><span>release</span><span class="d">waits for the others</span><span class="f">1m</span></div>
+<div class="row rise" data-at="1.8"><span></span><span class="d" data-gust="1"></span><span>dark-mode</span><span class="d">settings page first</span><span class="f">6m</span></div>
+<div class="row rise" data-at="1.9"><span></span><span class="d" data-gust="1"></span><span>cookies</span><span class="d">the banner, half the size</span><span class="f">4m</span></div>
+<div class="ln f fade" data-at="2.1" style="margin-top:6px">─ main ─────────────────────────────────────────────</div>
+<div class="said rise" data-at="2.6" style="width:auto">${face("seq:think@0,speak@3,kiss@5.6,rest@6.6", 5)}<span class="a">:*</span> <span data-type="3" data-per="0.2">release waits for dark-mode and cookies, then publishes. you'll hear from me once.</span></div>
+<div class="comp keys">⏎ <b>send to main</b>  ·  tab <b>start an agent</b>  ·  ⌘⏎ <b>open</b>  ·  esc</div></div></div>`,
+    sheet: () => `<div class="sheet"><h3>C · terminal brut <span>· the same words in every direction</span></h3>
+<div class="cols5">${[["idle", "rest", `<span class="a">:*</span> ${W.idle}`], ["listening", "seq:listen@0,talk@0.6", `<span class="a">›</span> dark mode for the settings page<br><span class="f">let go of fn to send</span>`], ["thinking", "think", `${W.got}<br><span class="d">∴ ${W.on}</span>`], ["needs you", "rest", `<span class="a">?</span> ${W.needs}<br><span class="a">1</span> yes  <span class="a">2</span> no`], ["done", "seq:kiss@0,rest@1", `<span class="a">✓</span> ${W.done}<br><span class="d">${W.doneTouch}</span>`]]
+  .map(([l, p, a]) => `<div><div class="lab">${l}</div><div class="t">${face(p, 6.5)}${a}</div></div>`).join("")}</div>
+<h3>reduced motion <span>· BISE_REDUCE_MOTION: one still frame per state, the gust is a still ∿</span></h3>
+<div class="cols5">${[["idle", "rest", `<span class="a">:*</span> ${W.idle} <span class="d">∿</span>`], ["listening", "talk", `<span class="a">›</span> dark mode for the settings page`], ["thinking", "think", `<span class="d">∴</span> ${W.on}`], ["needs you", "rest", `<span class="a">?</span> ${W.needs}`], ["failed", "rest", `<span class="e">▲</span> ${W.fail}`]]
+  .map(([l, p, a]) => `<div><div class="lab">${l}</div><div class="t" style="min-height:150px">${face(p, 6.5, "data-still")}${a}</div></div>`).join("")}</div></div>`,
+  },
+  notes: {
+    idle: "<b>idle.</b> one line, top right, in the terminal's own colors: main's :* and the status, the gust breathing while agents work.",
+    listen: "<b>hold fn.</b> the line opens into a small bise: the half-block face, your words after a ›, a block meter under them. <em>◉ main sees …</em> is the only sign of the screenshot taken on fn down.",
+    talk: "<b>let go.</b> your line gets its ✓✓, “:* got it.”, ∴ while main thinks, its answer, then the ◇ of each new agent. the face does the end-of-turn kiss.",
+    agents: "<b>agents.</b> the TUI's panel, as is: numbers, glyphs, names, what each does. under it the outputs for you, ⌘1-3 to open.",
+    needs: "<b>needs you.</b> the inbox box from the terminal (`? cookies asks`, `1 yes 2 no`), floating. answer with a digit or with fn.",
+    viewer: "<b>a PR, with notes.</b> bise review on localhost: the diff, the before/after screenshots the agent took, a pen ring and a voice pin on the screenshot, a voice comment on a line. s sends every note to cookies; a approves and merges.",
+    spotlight: "<b>spotlight.</b> a command line: what you type shows the agents it touches, ⏎ sends it to main, tab starts an agent with it.",
+    sheet: "<b>state sheet.</b> the same words as the other directions; the reduced-motion stills are BISE_REDUCE_MOTION's frames.",
+  },
+});
+</script>
+</body></html>

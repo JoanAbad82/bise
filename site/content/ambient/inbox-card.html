@@ -1,0 +1,79 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>bise · the docked card (inbox card v2)</title>
+<style>
+.dark  { --p-bg:#141211; --p-text:#ece6da; --p-dim:#a39c90; --p-faint:#857d72; --p-rule:#4a4540; --p-accent:#f4a6b0; --p-raised:#1f1c1a; --p-chip:#231f1d; --p-shadow:#000; }
+.light { --p-bg:#fdfbf7; --p-text:#1b1917; --p-dim:#6b645a; --p-faint:#7d766c; --p-rule:#cfc8bd; --p-accent:#b8416b; --p-raised:#f4f0e8; --p-chip:#efe9df; --p-shadow:#5a4a3a; }
+.dark, .light {
+  --c-solid:var(--p-bg); --c-text:var(--p-text); --c-text-2:var(--p-dim); --c-text-3:var(--p-faint);
+  --c-line:color-mix(in srgb,var(--p-text) 10%,transparent); --c-line-strong:var(--p-rule);
+  --c-hover:color-mix(in srgb,var(--p-text) 6%,transparent); --c-accent:var(--p-accent); --c-ink:var(--p-text); --c-on-ink:var(--p-bg);
+  --c-card:color-mix(in srgb,var(--p-raised) 100%,var(--p-bg)); --c-row:var(--p-bg);
+  --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif; --font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+body { margin:0; background:#777; font-family:-apple-system,sans-serif; }
+.sheet { display:grid; grid-template-columns:repeat(3,auto); gap:12px; padding:12px; align-items:start; }
+.label { font:11px ui-monospace,monospace; color:#eee; margin:0 0 4px; }
+
+/* the thread column: the card docks between the thread and the composer, in the flow */
+.col { box-sizing:border-box; display:flex; flex-direction:column; height:640px; background:var(--c-solid); color:var(--c-text); font:13px/1.45 var(--font-ui); border-radius:10px; overflow:hidden; }
+.thread { flex:1; min-height:0; overflow:hidden; padding:16px 20px 8px; display:flex; flex-direction:column; justify-content:flex-end; gap:10px; }
+.msg b { font-weight:600; } .msg .t { color:var(--c-text-3); font-size:12px; margin-left:6px; }
+.msg p { margin:2px 0 0; font-size:14px; }
+
+/* THE CARD */
+.dock { margin:0 16px 10px; }
+.card { background:var(--c-card); border-radius:14px; box-shadow:0 0 0 1px var(--c-line), 0 6px 18px color-mix(in srgb,var(--p-shadow) 14%,transparent);
+  padding:12px 14px 10px; max-height:55vh; display:flex; flex-direction:column; }
+.card .h { display:flex; align-items:baseline; gap:8px; font-size:12px; color:var(--c-text-2); min-width:0; }
+.card .h .g { font:600 12px var(--font-mono); color:var(--c-accent); flex:none; }
+.card .h b { color:var(--c-text); font-weight:600; flex:none; }
+.card .h .p { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.card .h .k { margin-left:auto; color:var(--c-text-3); flex:none; }
+.card .q { margin:6px 0 10px; font-size:15px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere; overflow-y:auto; min-height:0; }
+.opts { display:flex; flex-direction:column; gap:4px; flex:none; }
+.opt { display:grid; grid-template-columns:22px 1fr; align-items:baseline; gap:6px; padding:7px 12px 7px 10px; border-radius:9px; background:var(--c-row);
+  box-shadow:inset 0 0 0 1px var(--c-line); font-size:13.5px; line-height:1.4; text-align:left; overflow-wrap:anywhere; cursor:default; }
+.opt .n { font:600 12px var(--font-mono); color:var(--c-accent); text-align:center; }
+.opt:hover, .opt.hover { background:var(--c-hover); }
+.opt.on { box-shadow:inset 0 0 0 1.5px var(--c-ink); }
+.foot { display:flex; flex-wrap:wrap; gap:2px 18px; margin-top:10px; padding-top:8px; border-top:1px solid var(--c-line); font:11.5px var(--font-ui); color:var(--c-text-3); flex:none; }
+.foot span { white-space:nowrap; } .foot kbd { font:600 11px var(--font-mono); color:var(--c-text-2); margin-right:5px; }
+.foot .end { margin-left:auto; }
+
+.comp { margin:0 16px 14px; border-radius:12px; box-shadow:0 0 0 1px var(--c-line-strong); padding:11px 14px; color:var(--c-text-3); font-size:14px; }
+.comp .lab { font:11px var(--font-mono); color:var(--c-text-3); margin:0 16px 4px; }
+</style>
+<body>
+<div class="sheet" id="s"></div>
+<script>
+const Q = "Tu veux que je relance la migration des comptes maintenant, ou on attend la fenêtre de maintenance de ce soir ?";
+const OPTS = [
+  "relance-la maintenant sur les comptes de test d’abord, puis sur la production si tout passe sans erreur",
+  "attends la fenêtre de maintenance de ce soir à 22 h",
+  "laisse tomber pour cette semaine : on en reparle lundi avec l’équipe data et on garde l’ancien schéma en attendant",
+];
+const card = (approval) => `
+<div class="dock"><div class="card">
+  <div class="h"><span class="g">${approval ? '!' : '?'}</span><b>bise asks</b><span class="p">· acme-storefront-checkout</span><span class="k">2 min</span></div>
+  <div class="q">${approval ? 'merge sb/streaming into main?' : Q}</div>
+  <div class="opts">${(approval ? ['merge into main', 'not now'] : OPTS).map((o, i) => `<div class="opt${i === 0 ? ' on' : ''}"><span class="n">${i + 1}</span><span>${o}</span></div>`).join('')}</div>
+  <div class="foot">${approval
+    ? '<span><kbd>1 2</kbd>pick</span><span><kbd>⌘⌫</kbd>close</span><span class="end"><kbd>esc</kbd>later</span>'
+    : '<span><kbd>1–3</kbd>pick</span><span>or type your answer below</span><span><kbd>⌘⌫</kbd>close</span><span class="end"><kbd>esc</kbd>later</span>'}</div>
+</div></div>`;
+const col = (theme, w, approval) => `<div><p class="label">${theme} · ${w} px${approval ? ' · approval' : ''}</p>
+<div class="col ${theme}" style="width:${w}px">
+  <div class="thread">
+    <div class="msg"><b>you</b><span class="t">13:30</span><p>la migration des comptes, on en est où ?</p></div>
+    <div class="msg"><b>bise</b><span class="t">13:36</span><p>les scripts sont prêts et testés sur une copie. il me faut ton feu vert pour la lancer, une question ci-dessous.</p></div>
+  </div>
+  ${card(approval)}
+  <p class="lab">${approval ? 'you → bise' : 'answering bise · la migration des comptes'}</p>
+  <div class="comp">${approval ? 'write to bise' : 'your answer, then ⏎'}</div>
+</div></div>`;
+document.getElementById('s').innerHTML =
+  col('light', 720, false) + col('light', 520, false) + col('light', 380, false) +
+  col('dark', 720, false) + col('dark', 520, true) + col('dark', 380, false);
+</script>
+</body>

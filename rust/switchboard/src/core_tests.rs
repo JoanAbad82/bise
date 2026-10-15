@@ -35,7 +35,7 @@ impl Env for FakeEnv {
     fn is_git(&mut self) -> bool {
         self.git
     }
-    fn worktree_create(&mut self, name: &str, _what: &crate::carry::Carry) -> Result<Workspace, String> {
+    fn worktree_create(&mut self, name: &str, _with_changes: bool) -> Result<Workspace, String> {
         Ok(Workspace {
             mode: Mode::Worktree,
             path: format!("/state/worktrees/{}", name),
@@ -181,7 +181,7 @@ impl T {
                 },
                 worktree: false,
                 with_changes: false,
-                place: "shared".into(),
+                place: String::new(),
                 feature: String::new(),
                 ask: Default::default(), parts: String::new(),
             },
@@ -313,7 +313,7 @@ fn the_board_of_main_follows_the_tasks() {
             },
             worktree: false,
             with_changes: false,
-            place: "shared".into(),
+            place: String::new(),
             feature: String::new(),
             ask: Default::default(), parts: String::new(),
         },
@@ -1053,7 +1053,7 @@ fn journal_replay_rebuilds_the_same_state() {
             },
             worktree: false,
             with_changes: false,
-            place: "shared".into(),
+            place: String::new(),
             feature: String::new(),
             ask: Default::default(), parts: String::new(),
         },
@@ -2029,7 +2029,7 @@ fn sb_move_between_places() {
     for n in ["a", "s", "busy"] {
         t.go(Input::ReplIdle { agent: n.into(), leftover: false });
     }
-    let mv = |t: &mut T, from: &str, who: &str, to: &str| t.req(from, AgentReq::Move { agent: who.into(), place: to.into(), with_changes: false });
+    let mv = |t: &mut T, from: &str, who: &str, to: &str| t.req(from, AgentReq::Move { agent: who.into(), place: to.into() });
     let (tok, fx) = mv(&mut t, "s", "s", "a");
     assert!(err_of(&fx, tok).contains("reserved for main"), "{:?}", fx);
     // a is alone in its worktree: it does not leave it
@@ -2147,7 +2147,7 @@ fn a_spawn_with_a_model_is_answered_by_the_daemons_pick() {
         brief: Brief { objective: "o".into(), ..Brief::default() },
         worktree: false,
         with_changes: false,
-        place: "shared".into(),
+        place: String::new(),
         feature: String::new(),
         ask: bise_catalog::spawn::Ask { model: model.into(), ..Default::default() }, parts: String::new(),
     };
@@ -2938,7 +2938,7 @@ mod prs {
                 brief: Brief { objective: format!("objective of {}", name), ..Brief::default() },
                 worktree: true,
                 with_changes: false,
-                place: "shared".into(),
+                place: String::new(),
                 feature: String::new(),
                 ask: Default::default(), parts: String::new(),
             },
@@ -3589,7 +3589,7 @@ mod prs {
                 brief: Brief { objective: "x".into(), ..Brief::default() },
                 worktree: false,
                 with_changes: false,
-                place: "shared".into(),
+                place: String::new(),
                 feature: String::new(),
                 ask: Default::default(), parts: String::new(),
             },

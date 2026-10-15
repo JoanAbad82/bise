@@ -98,7 +98,6 @@ impl Shell {
                     self.announce_update();
                     self.release_check(None);
                     self.plan_prs();
-                    self.shared_wip_check();
                     self.idle_check();
                     // computer use (design §7.3): each stop, one line in main's feed
                     for l in self.cu.poll() {

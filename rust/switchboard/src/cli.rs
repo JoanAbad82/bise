@@ -657,10 +657,10 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             req.insert("with_changes".into(), json!(o.contains_key("with-changes")));
         }
         "move" => {
-            let (pos, o) = parse_args(rest, &[], &["with-changes"])?;
-            let usage = "usage: sb move <agent> new|shared|<agent>|<branch> [--with-changes]";
-            req.insert("with_changes".into(), json!(o.contains_key("with-changes")));
-            req.extend([("agent".into(), json!(agent_arg(&pos, usage)?)), ("place".into(), json!(pos.get(1).ok_or(usage)?))]);
+            let (pos, _) = parse_args(rest, &[], &[])?;
+            let usage = "usage: sb move <agent> new|shared|<agent>|<branch>";
+            req.insert("agent".into(), json!(agent_arg(&pos, usage)?));
+            req.insert("place".into(), json!(pos.get(1).ok_or(usage)?));
         }
         "feature" => {
             // dev-flow §5.1: sb feature [new|sync|ready|merge|drop|retire|list] <name>
