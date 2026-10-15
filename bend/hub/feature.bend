@@ -9,7 +9,7 @@
 # The hub (daemon/features.rs) checked the tip first, under the feature's
 # land turn; it renames the branch to `kept` after this step. core.bend's
 # feature_retire runs these decisions (it holds emit and send). Laws in
-# bend/laws/hub.bend: feature_retire_clears, feature_retire_keeps_ws,
+# bend/laws/feature.bend: feature_retire_clears, feature_retire_keeps_ws,
 # feature_retire_archives_none, feature_retire_stops_nothing,
 # feature_retire_tells_once.
 import Base
