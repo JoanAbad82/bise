@@ -133,6 +133,7 @@ export const hub_cmd: readonly HubCmd[] = [
   {"agent":"perf","cmd":"diff","project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"tool_out","pos":4,"project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"queued_take","id":3,"project":"acme-1a2b3c4d"},
+  {"agent":"perf","cmd":"queued_steer","id":3,"project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"diff","commit":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e","project":"acme-1a2b3c4d"},
   {"cmd":"worktrees","project":"acme-1a2b3c4d"},
   {"cmd":"dev_servers","project":"acme-1a2b3c4d"},

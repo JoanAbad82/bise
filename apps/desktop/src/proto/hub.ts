@@ -29,7 +29,15 @@ export type HubEv = { "ev": "welcome", project: string, proto: number, workspace
  * `HubCmd::TAGS` (one owner). Empty: a hub older than the list;
  * the core then compares `proto` with its own.
  */
-cmds: Array<string>, } | { "ev": "agents", project: string, agents: Array<Agent>, places?: Array<Place>, } | { "ev": "cards", project: string, cards: Array<Card>, others?: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "partial", project: string, agent: string, call: string, off: number, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, seen_ms?: number | null, } | { "ev": "scheduled", project: string, items: Array<ScheduledTask>, ended?: Array<ScheduledTask>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "tool_out", project: string, agent: string, pos: number, out: string, cut: boolean, 
+cmds: Array<string>, 
+/**
+ * when this hub's bise was built (its VERSION `built=`, from
+ * `initialize`'s version); none: a dev build or an older hub. The
+ * core compares it with its own (bise_home::release::built_after):
+ * a hub newer than the app reads the app's update channel at once
+ * (desktop-dist, architect m_25198)
+ */
+built?: string | null, } | { "ev": "agents", project: string, agents: Array<Agent>, places?: Array<Place>, } | { "ev": "cards", project: string, cards: Array<Card>, others?: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "partial", project: string, agent: string, call: string, off: number, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, seen_ms?: number | null, } | { "ev": "scheduled", project: string, items: Array<ScheduledTask>, ended?: Array<ScheduledTask>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "tool_out", project: string, agent: string, pos: number, out: string, cut: boolean, 
 /**
  * the whole output's size in bytes (the unit of the cap: '4 KB
  * of 18 KB shown'), when the session log answered; none for the
