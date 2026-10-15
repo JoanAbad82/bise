@@ -56,7 +56,6 @@ import os
 import shlex
 import shutil
 import signal
-import socket
 import subprocess
 import sys
 import time
@@ -65,6 +64,7 @@ from desktop_try_env import (GATE, SELF_CONTAINED, TryError, clone_names, config
                              his_bise, his_repos, homes, keep_old_root, live_build, not_swapped, self_contained, try_env,
                              under)  # split for its size
 from heavy_slot import HEAVY_RUN, heavy_argv, under_heavy_slot  # noqa: F401  (desktop_dmg, the tests read them here)
+from try_procs import hub_socks, stop_hub, try_pids  # split for its size
 
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DESKTOP = os.path.join(REPO, "apps", "desktop")
@@ -866,36 +866,6 @@ def quit_app(app, tryh, timeout=10):
     if pid_alive(pid):
         os.kill(pid, signal.SIGKILL)
     return pid
-
-
-def hub_socks(tryh):
-    hubs = os.path.join(tryh, "hubs")
-    return [os.path.join(hubs, d, "hub.sock") for d in sorted(os.listdir(hubs))] if os.path.isdir(hubs) else []
-
-
-def stop_hub(sock, timeout=2.0):
-    try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(timeout)
-        s.connect(sock)
-        s.sendall(b'{"op":"hello"}\n{"op":"stop_hub"}\n')
-        s.close()
-        return True
-    except OSError:
-        return False
-
-
-def try_pids(tryh):
-    """Every process of the try home: its args name a path under it (its hubs' sbd --workspace,
-    the app's core), found by pid, never by name."""
-    out = subprocess.run(["ps", "-axww", "-o", "pid=,args="], capture_output=True, text=True).stdout
-    me = os.getpid()
-    pids = []
-    for l in out.splitlines():
-        pid, _, args = l.strip().partition(" ")
-        if pid.isdigit() and int(pid) != me and (tryh + "/") in args and "desktop_try" not in args:
-            pids.append(int(pid))
-    return pids
 
 
 def stop(real, tryh, app=None):

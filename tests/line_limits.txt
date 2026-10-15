@@ -16,7 +16,6 @@
 1236 rust/harness/src/main.rs
 1052 rust/plugins/src/resolve.rs
 1163 rust/proto/src/thread/fold_tests.rs
-1108 rust/proto/src/thread/lines.rs
 1655 rust/switchboard/src/approvals/tiers.rs
 1038 rust/switchboard/src/cli.rs
 2757 rust/switchboard/src/core.rs
@@ -35,11 +34,11 @@
 2166 rust/tui/src/render.rs
 1018 rust/tui/src/run.rs
 1714 rust/tui/src/sb.rs
-1411 rust/tui/src/sb/cards.rs
-2836 rust/tui/src/sb/panel.rs
+1410 rust/tui/src/sb/cards.rs
+2682 rust/tui/src/sb/panel.rs
 1036 rust/tui/src/term.rs
-1114 rust/tui/src/ui.rs
+1031 rust/tui/src/ui.rs
 1154 rust/tui/src/voicemode/speak.rs
 1232 rust/tui/src/voicemode/turn.rs
-1028 scripts/desktop_try.py
+1001 scripts/desktop_try.py
 1787 tests/fake_provider.py
