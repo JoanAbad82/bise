@@ -31,6 +31,8 @@ export interface BiseApi {
     readonly install: (route?: string) => Promise<boolean>;
     /** his click on 'go back' (went_bad): the previous app again */
     readonly revert: () => Promise<boolean>;
+    /** his click on 'move to Applications' (updates are off here): the app moves there and opens again; false when it didn't */
+    readonly move: () => Promise<boolean>;
     /** this app's version and the last quiet install (the settings' update group) */
     readonly info: () => Promise<UpdateInfo>;
     /** the window answers main before a quiet moment's install (its route, a send in flight); the returned function stops answering */
@@ -408,6 +410,7 @@ export const IPC = {
   updateNow: 'bise:update-now',
   updateInstall: 'bise:update-install',
   updateRevert: 'bise:update-revert',
+  updateMove: 'bise:update-move',
   updateAsk: 'bise:update-ask',
   updateInfo: 'bise:update-info',
   updateAnswer: 'bise:update-answer',
@@ -425,7 +428,7 @@ export const IPC = {
  * swapped-in app was started and never said it ran fine, so 'go back'.
  */
 export type UpdateState =
-  | { readonly state: 'none'; readonly cant?: UpdateCant }
+  | { readonly state: 'none'; readonly cant?: UpdateCant; readonly move?: UpdateMove }
   | { readonly state: 'downloading'; readonly version: string }
   | { readonly state: 'ready'; readonly version: string }
   | { readonly state: 'failed'; readonly version: string; readonly why: string; readonly reason?: UpdateFail }
@@ -434,9 +437,12 @@ export type UpdateState =
 /**
  * Why this app can't replace itself where it runs (desktop-dist, architect m_25198 Q3): from a
  * disk image, from a copy macOS translocated (opened from Downloads), or a folder it can't write.
- * Nothing is downloaded; 'Move to Applications' is a follow-up.
+ * Nothing is downloaded; main/update/move.ts offers to move it to Applications.
  */
 export type UpdateCant = 'disk_image' | 'translocated' | 'read_only';
+
+/** With a cant: 'can', moving to Applications fixes it (window.bise.update.move); 'failed', his last move failed (his cancel is none). */
+export type UpdateMove = 'can' | 'failed';
 
 /**
  * What failed: the download (or its sha256), the signature, a self-signed build meeting its first
@@ -508,6 +514,10 @@ export const TEST_DIST_UPDATE_ENV = 'BISE_DESKTOP_TEST_DIST_UPDATE';
 
 /** Test mode: the fake .app (inside the test HOME) the updater swaps; never his bundle. */
 export const UPDATE_TARGET_ENV = 'BISE_DESKTOP_UPDATE_TARGET';
+/** Test mode: the answer to 'Move bise to Applications?' ('move'; anything else is 'Not now'), never an alert. */
+export const TEST_MOVE_ENV = 'BISE_DESKTOP_TEST_MOVE';
+/** Test mode: the move's steps, never done: `MOVE_LINE ask {words}` (the alert), `MOVE_LINE moved <target>` (app.moveToApplicationsFolder). */
+export const MOVE_LINE = 'bise-desktop: move';
 
 /** The preload's argument naming its window: `--bise-surface=window|capsule`. */
 export const SURFACE_ARG = '--bise-surface=';

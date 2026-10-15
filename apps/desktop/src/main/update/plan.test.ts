@@ -93,9 +93,11 @@ describe('the signature rule (architect m_25198 Q2: the running signature decide
   });
 });
 
-describe('cantSwapAt (Q3: said now, moved later)', () => {
+describe('cantSwapAt (Q3: said, then move.ts offers the move)', () => {
   it('a disk image or a translocated copy cannot replace itself; Applications or a home folder can', () => {
     expect(cantSwapAt('/Volumes/bise/bise.app')).toBe('disk_image');
+    expect(cantSwapAt('/h/Volumes/bise/bise.app', '/h/Volumes/')).toBe('disk_image');
+    expect(cantSwapAt('/h/Volumes/bise/bise.app')).toBeNull();
     expect(cantSwapAt('/private/var/folders/xy/T/AppTranslocation/1234-ABCD/d/bise.app')).toBe('translocated');
     expect(cantSwapAt('/Applications/bise.app')).toBeNull();
     expect(cantSwapAt('/Users/g/Applications/bise.app')).toBeNull();

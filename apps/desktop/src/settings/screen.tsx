@@ -215,6 +215,7 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
                 // back on this page once the new app opens
                 install: () => void updateApi.install(formatRoute({ screen: 'settings', page: 'general' })),
                 revert: () => void updateApi.revert(),
+                move: () => void updateApi.move(),
                 open: (url: string) => void bise.openExternal(url),
               },
             }

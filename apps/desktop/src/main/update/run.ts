@@ -17,7 +17,9 @@
 // <name>.app.old, the new one in place, rolled back on any error). .old stays until the new app
 // ran and said so (plan.ts startup); a new app that never did is offered a way back, on his click.
 // An app on a disk image, translocated, or in a folder it can't write downloads nothing: state
-// 'none' with why (plan.ts cantSwapAt; 'Move to Applications' is a follow-up).
+// 'none' with why (plan.ts cantSwapAt). Where moving fixes it (move.ts movable), its first start
+// asks once per build to move it to /Applications (offerMove: one alert, 'Move' / 'Not now', kept
+// in move.json), and the settings' 'off here' row keeps the act (move, on his click).
 //
 // The folder next to the bundle is the updater's alone: `<name>.app.old` is its own only when
 // swap.json names it; any other .old (a launcher's copy) is 'stray': left on disk, never offered,
@@ -26,20 +28,24 @@
 // Test mode: never his bundle or a real feed. BISE_DESKTOP_UPDATE_TARGET names a fake .app inside
 // the test HOME, only a local feed (file://, http://127.0.0.1) is read, the idle seconds are
 // BISE_DESKTOP_TEST_IDLE_FILE's (never powerMonitor's), the relaunch is a stdout line, never done,
-// and so are a tick's moment and the swap at quit (MOMENT_LINE, QUIT_SWAP_LINE).
+// and so are a tick's moment and the swap at quit (MOMENT_LINE, QUIT_SWAP_LINE). The disk images
+// are the test HOME's Volumes/; the move alert is never shown (MOVE_LINE ask, answered by
+// BISE_DESKTOP_TEST_MOVE) and app.moveToApplicationsFolder never called: the bundle is copied into
+// the test HOME's Applications (MOVE_LINE moved), the app never quits.
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream, existsSync, readFileSync } from 'node:fs';
-import { access, constants, mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { access, constants, cp, mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { app, ipcMain, net, powerMonitor, type BrowserWindow, type IpcMainEvent } from 'electron';
-import { IPC, MOMENT_LINE, QUIT_SWAP_LINE, RELAUNCH_LINE, UPDATE_LINE, UPDATE_TARGET_ENV, type UpdateAsk, type UpdateFail, type UpdateInfo, type UpdateState } from '../../shared/api';
+import { app, dialog, ipcMain, net, powerMonitor, type BrowserWindow, type IpcMainEvent } from 'electron';
+import { IPC, MOMENT_LINE, MOVE_LINE, QUIT_SWAP_LINE, RELAUNCH_LINE, UPDATE_LINE, UPDATE_TARGET_ENV, type UpdateAsk, type UpdateCant, type UpdateFail, type UpdateInfo, type UpdateState } from '../../shared/api';
 import { inside } from '../testhome';
 import { notQuiet, idleOfText, TICK_MS, type Busy, type MomentFacts } from './moment';
 export { bounded } from './moment';
 import { bundleOf, cantSwapAt, designated, developerId, leftovers, localFeed, readAfter, readSwap, readTrace, readVersion, signerChange, startup, zipName, type After, type AppBuild, type SwapRecord } from './plan';
+import { asksMove, declinedText, movable, MOVE_ASK, readDeclined, testAnswer } from './move';
 import { swapIn, writeRecord } from './swap';
 
 const run = promisify(execFile);
@@ -58,6 +64,12 @@ export interface UpdateDeps {
   readonly ask: () => Promise<UpdateAsk | null>;
   /** the main window is on screen (a quiet install reopens it without focus; else hidden) */
   readonly shown: () => boolean;
+  /** his home (the test HOME under test): <home>/Applications is an Applications folder */
+  readonly home: string;
+  /** where disk images mount (/Volumes/; the test HOME's Volumes/ under test) */
+  readonly volumes: string;
+  /** test mode: the move alert's answer (BISE_DESKTOP_TEST_MOVE) */
+  readonly testMove?: string;
 }
 
 /** An Error carrying what failed (UpdateState's reason). */
@@ -118,7 +130,9 @@ export class Updates {
   private said: Busy | 'now' | null = null;
   private readonly build: AppBuild | null;
   /** this app can't replace itself where it runs: offers are left alone */
-  private cant = false;
+  private cant: UpdateCant | null = null;
+  /** moving it to Applications fixes that (move.ts movable) */
+  private canMove = false;
 
   constructor(
     private readonly target: string,
@@ -141,10 +155,11 @@ export class Updates {
   /** At start: the leftovers of a cut download go, then the last swap's follow-up; an app that can't swap itself says why. */
   async start(): Promise<void> {
     await mkdir(this.dir, { recursive: true });
-    const cant = cantSwapAt(this.target) ?? (await access(dirname(this.target), constants.W_OK).then(() => null, () => 'read_only' as const));
+    const cant = cantSwapAt(this.target, this.d.volumes) ?? (await access(dirname(this.target), constants.W_OK).then(() => null, () => 'read_only' as const));
     if (cant !== null) {
-      this.cant = true;
-      this.set({ state: 'none', cant });
+      this.cant = cant;
+      this.canMove = movable(cant, this.target, this.d.home);
+      this.set({ state: 'none', cant, ...(this.canMove ? { move: 'can' as const } : {}) });
     }
     for (const n of leftovers(await readdir(this.dir))) await rm(join(this.dir, n), { recursive: true, force: true });
     const recFile = join(this.dir, 'swap.json');
@@ -204,10 +219,68 @@ export class Updates {
       this.askCore();
       return;
     }
-    if (ev['ev'] !== 'app_update' || this.cant) return;
+    if (ev['ev'] !== 'app_update' || this.cant !== null) return;
     const { version, url, sha256 } = ev as { version?: unknown; url?: unknown; sha256?: unknown };
     if (typeof version !== 'string' || typeof url !== 'string' || typeof sha256 !== 'string') return;
     void this.fetch(version, url, sha256);
+  }
+
+  /**
+   * After start, before the window opens: where moving fixes 'off here' and he didn't say 'Not now'
+   * to this build, one alert asks. 'Not now' is kept (move.json); 'Move' moves. True: the app is on
+   * its way out (moved, it opens again from /Applications); never in test mode.
+   */
+  async offerMove(): Promise<boolean> {
+    const file = join(this.dir, 'move.json');
+    const declined = existsSync(file) ? readDeclined(readFileSync(file, 'utf8')) : null;
+    const build = this.build?.id ?? null;
+    if (!asksMove(this.canMove, build, declined)) return false;
+    let answer: 'move' | 'not_now';
+    if (this.d.testMode) {
+      process.stdout.write(`${MOVE_LINE} ask ${JSON.stringify(MOVE_ASK)}\n`);
+      answer = testAnswer(this.d.testMove);
+    } else {
+      const r = await dialog.showMessageBox({ type: 'question', message: MOVE_ASK.message, detail: MOVE_ASK.detail, buttons: [...MOVE_ASK.buttons], defaultId: 0, cancelId: 1 });
+      answer = r.response === 0 ? 'move' : 'not_now';
+    }
+    if (answer === 'not_now') {
+      if (build !== null) await writeFile(file, declinedText(build));
+      return false;
+    }
+    return this.move();
+  }
+
+  /**
+   * The move to /Applications (the alert's 'Move', or his click in the settings): Electron moves the
+   * bundle (asking for his password when it must, replacing an older bise there), quits and opens
+   * it again; the hubs never stop. False: it didn't move; a failure (not his cancel) the row says.
+   */
+  move(): Promise<boolean> {
+    if (!this.canMove || this.cant === null || this.installing) return Promise.resolve(false);
+    if (this.d.testMode) return this.testMove();
+    // Electron: false when he cancelled (the admin password, the conflict): no failure, the row
+    // stays as it was (designer m_26871); it throws when anything else stopped the move
+    let moved = false;
+    try {
+      moved = app.moveToApplicationsFolder();
+    } catch (e) {
+      console.log(`update: the move to Applications failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.set({ state: 'none', cant: this.cant, move: 'failed' });
+    }
+    if (moved) this.installing = true;
+    return Promise.resolve(moved);
+  }
+
+  /**
+   * Test mode's app.moveToApplicationsFolder: a copy into the test HOME's Applications (seen on
+   * disk), a stdout line, never a quit; false, so the window opens as after a refused move.
+   */
+  private async testMove(): Promise<boolean> {
+    const to = join(this.d.home, 'Applications', basename(this.target));
+    await mkdir(dirname(to), { recursive: true });
+    await cp(this.target, to, { recursive: true, verbatimSymlinks: true, force: true });
+    process.stdout.write(`${MOVE_LINE} moved ${this.target} ${to}\n`);
+    return false;
   }
 
   /** The window asks again (a reload): the core reads the channel again. */

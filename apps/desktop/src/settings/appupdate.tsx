@@ -1,8 +1,9 @@
 // Settings › general's 'update' group for a distributed app (desktop-dist v7; designer m_25362's
 // words): the app from the DMG updates itself (main's src/main/update/run.ts) at quit, at a quiet
 // moment or on 'restart to update'. Its states: up to date, getting <new>, ready, updates off here
-// (a disk image, not in Applications: no ▲, not a failure), update failed (grey: nothing broke,
-// nothing waits on him), went_bad (▲ and 'go back'); then the 'beta builds' toggle (his pref
+// (a disk image, not in Applications: no ▲, not a failure; the reason is the row's sub and
+// 'move to Applications' its act when moving fixes it, main's update/move.ts; a move that didn't
+// happen: ▲ and why, designer m_26934), update failed (grey: nothing broke, nothing waits on him), went_bad (▲ and 'go back'); then the 'beta builds' toggle (his pref
 // desktop_channel) and, for 7 days after a quiet install, 'updated to <version> · <when>'. His try
 // app keeps app-swap v2's group (update.tsx) instead. distRow is the pure part. Owner: dist-updater.
 import type { ReactNode } from 'react';
@@ -21,10 +22,12 @@ export interface DistRow {
   readonly kind: 'current' | 'getting' | 'ready' | 'off' | 'failed' | 'went_bad';
   readonly label: string;
   readonly sub?: string;
+  /** the sub starts with a red ▲ (a move that didn't happen, designer m_26934) */
+  readonly err?: true;
   readonly help?: string;
   /** the help's words that are a link to DOWNLOAD_URL */
   readonly link?: string;
-  readonly act?: 'restart' | 'back';
+  readonly act?: 'restart' | 'back' | 'move';
 }
 
 /** The row for `s` on this app (`version`: its own), or null (no updater in this app). Pure. */
@@ -35,10 +38,13 @@ export function distRow(s: UpdateState, version: string | null): DistRow | null 
   switch (s.state) {
     case 'none':
       if (s.cant === undefined) return { kind: 'current', label: me, sub: 'up to date' };
+      // the reason is the row's sub, beside its act (designer m_26934)
+      if (s.move === 'failed') return { kind: 'off', label: 'updates are off here', sub: "bise couldn't move itself. drag it to Applications to get updates.", err: true, act: 'move' };
       return {
         kind: 'off',
         label: 'updates are off here',
-        help: s.cant === 'disk_image' ? 'bise runs from the disk image. drag it to Applications to get updates.' : "bise isn't in Applications, so it can't replace itself.",
+        sub: s.cant === 'disk_image' ? "bise runs from the disk image, so it can't update itself." : "bise isn't in Applications, so it can't replace itself.",
+        ...(s.move === 'can' ? { act: 'move' as const } : {}),
       };
     case 'downloading':
       return { kind: 'getting', label: me, sub: `getting ${shortVersion(s.version)}` };
@@ -75,6 +81,8 @@ export interface DistPorts {
   readonly install: () => void;
   /** 'go back' (window.bise.update.revert) */
   readonly revert: () => void;
+  /** 'move to Applications' (window.bise.update.move: the app moves there and opens again) */
+  readonly move: () => void;
   /** a link in his browser (bise.dev/download) */
   readonly open: (url: string) => void;
 }
@@ -115,6 +123,10 @@ export function DistUpdateGroup({
       <Button onClick={() => ports?.revert()} testId="settings.dist.back">
         go back
       </Button>
+    ) : row.act === 'move' ? (
+      <Button onClick={() => ports?.move()} testId="settings.dist.move">
+        move to Applications
+      </Button>
     ) : undefined;
   const trace = row.kind === 'current' ? traceLine(info, now) : null;
   const items: GroupItem[] = [
@@ -125,7 +137,18 @@ export function DistUpdateGroup({
           {label}
         </span>
       ),
-      ...(row.sub !== undefined ? { sub: row.sub } : {}),
+      ...(row.sub !== undefined
+        ? {
+            sub:
+              row.err === true ? (
+                <span data-testid="settings.dist.sub">
+                  <span className="settings-update-err">▲</span> {row.sub}
+                </span>
+              ) : (
+                <span data-testid="settings.dist.sub">{row.sub}</span>
+              ),
+          }
+        : {}),
       ...(control !== undefined ? { control } : {}),
     },
     {

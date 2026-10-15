@@ -76,6 +76,7 @@ const api: BiseApi = {
     onState: (listener) => listen(IPC.updateState, listener),
     install: async (route) => (await ipcRenderer.invoke(IPC.updateInstall, route)) === true,
     revert: async () => (await ipcRenderer.invoke(IPC.updateRevert)) === true,
+    move: async () => (await ipcRenderer.invoke(IPC.updateMove)) === true,
     info: () => ipcRenderer.invoke(IPC.updateInfo) as Promise<UpdateInfo>,
     onAsk: (answer) => {
       const h = (_e: unknown, id: unknown): void => {

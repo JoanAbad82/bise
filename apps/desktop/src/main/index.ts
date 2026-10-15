@@ -14,7 +14,7 @@ import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, ipcMain, Menu, nativeTheme, session } from 'electron';
-import { BADGE_LINE, CORE_IPC, IPC, TEST_DIST_UPDATE_ENV, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+import { BADGE_LINE, CORE_IPC, IPC, TEST_DIST_UPDATE_ENV, TEST_ENV, TEST_MOVE_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { capsuleFramesDir } from './capsuleframe';
 import { badgeOf, CountKeeper, titleOf, type Counts } from './counts';
@@ -291,6 +291,10 @@ void app.whenReady().then(() => {
             const w = main.window;
             return w !== null && !w.isDestroyed() && w.isVisible() && !w.isMinimized();
           },
+          // under test, his home and its disk images are the test HOME's (never his /Volumes)
+          home: testMode ? (process.env['HOME'] ?? '') : userInfo().homedir,
+          volumes: testMode ? `${join(process.env['HOME'] ?? '/nonexistent', 'Volumes')}/` : '/Volumes/',
+          ...(testMode ? { testMove: process.env[TEST_MOVE_ENV] ?? '' } : {}),
         });
   // his quit with an update ready: the swap first, bounded (a quit never hangs on an update)
   let swappedAtQuit = false;
@@ -307,19 +311,35 @@ void app.whenReady().then(() => {
   ipcMain.handle(IPC.updateNow, () => fakeDist?.state ?? updates?.now() ?? { state: 'none' });
   ipcMain.handle(IPC.updateInstall, (_e, route: unknown) => updates?.install(typeof route === 'string' ? route : null) ?? false);
   ipcMain.handle(IPC.updateRevert, () => updates?.revert() ?? false);
+  ipcMain.handle(IPC.updateMove, () => updates?.move() ?? false);
   ipcMain.handle(IPC.updateInfo, () => fakeDist?.info ?? updates?.info() ?? { version: null, updated: null });
   // his try's swap to the staged gated build, from inside (update/tryrun.ts)
   installTrySwapIpc({ testMode, env: process.env, execPath: process.execPath, packaged: app.isPackaged, realHome: userInfo().homedir, updatesDir });
-  if (updates !== null) {
-    void updates.start().then(() => {
-      onCoreEvent((ev) => {
-        updates.onCoreEvent(ev);
-      });
-    });
-  }
   // after a swap, the screen he was on (written before it); a quiet moment's reopens without focus
-  const after = target === null ? null : takeAfter(updatesDir);
-  main.create(after?.route, after?.quiet === true ? (after.shown ? 'inactive' : 'hidden') : 'front');
+  const open = (): void => {
+    const after = target === null ? null : takeAfter(updatesDir);
+    main.create(after?.route, after?.quiet === true ? (after.shown ? 'inactive' : 'hidden') : 'front');
+  };
+  if (updates === null) open();
+  else {
+    // an app from the disk image or Downloads first asks to move to Applications (update/move.ts),
+    // before its window: 'Move' quits it and it opens again from there; else the window opens
+    void updates
+      .start()
+      .then(async () => {
+        onCoreEvent((ev) => {
+          updates.onCoreEvent(ev);
+        });
+        return updates.offerMove();
+      })
+      .catch((e: unknown) => {
+        console.log(`update: start: ${e instanceof Error ? e.message : String(e)}`);
+        return false;
+      })
+      .then((moving) => {
+        if (!moving) open();
+      });
+  }
   app.on('activate', () => {
     main.open();
   });

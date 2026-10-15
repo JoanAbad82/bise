@@ -14,9 +14,17 @@ describe("settings' update group for a distributed app (designer m_25362)", () =
   });
 
   it("says why updates are off here, never as a failure", () => {
-    expect(distRow({ state: 'none', cant: 'disk_image' }, 'v1')).toMatchObject({ kind: 'off', label: 'updates are off here', help: 'bise runs from the disk image. drag it to Applications to get updates.' });
-    expect(distRow({ state: 'none', cant: 'translocated' }, 'v1')?.help).toBe("bise isn't in Applications, so it can't replace itself.");
-    expect(distRow({ state: 'none', cant: 'read_only' }, 'v1')?.help).toBe("bise isn't in Applications, so it can't replace itself.");
+    // the reason is the row's sub (designer m_26934), no help line under the group
+    expect(distRow({ state: 'none', cant: 'disk_image' }, 'v1')).toEqual({ kind: 'off', label: 'updates are off here', sub: "bise runs from the disk image, so it can't update itself." });
+    expect(distRow({ state: 'none', cant: 'translocated' }, 'v1')?.sub).toBe("bise isn't in Applications, so it can't replace itself.");
+    expect(distRow({ state: 'none', cant: 'read_only' }, 'v1')?.sub).toBe("bise isn't in Applications, so it can't replace itself.");
+  });
+
+  it("offers 'move to Applications' where moving fixes it, and says when a move didn't happen", () => {
+    expect(distRow({ state: 'none', cant: 'disk_image', move: 'can' }, 'v1')).toEqual({ kind: 'off', label: 'updates are off here', sub: "bise runs from the disk image, so it can't update itself.", act: 'move' });
+    expect(distRow({ state: 'none', cant: 'translocated', move: 'can' }, 'v1')).toMatchObject({ sub: "bise isn't in Applications, so it can't replace itself.", act: 'move' });
+    expect(distRow({ state: 'none', cant: 'disk_image', move: 'failed' }, 'v1')).toEqual({ kind: 'off', label: 'updates are off here', sub: "bise couldn't move itself. drag it to Applications to get updates.", err: true, act: 'move' });
+    expect(distRow({ state: 'none', cant: 'read_only' }, 'v1')?.act).toBeUndefined();
   });
 
   it('a failure is grey: the download tries again, a refused signature keeps this version', () => {

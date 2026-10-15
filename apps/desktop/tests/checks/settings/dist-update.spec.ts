@@ -13,11 +13,15 @@ const N = 'desktop-v2026.10.2';
 const v = '2026.10.1';
 const n = '2026.10.2';
 const info = { version: V, updated: null };
-const CASES: Record<string, { state: unknown; info: unknown; label: string; row: string; why?: string }> = {
+const CASES: Record<string, { state: unknown; info: unknown; label: string; row: string; why?: string; sub?: string }> = {
   current: { state: { state: 'none' }, info, label: `bise ${v}`, row: 'up to date' },
   getting: { state: { state: 'downloading', version: N }, info, label: `bise ${v}`, row: `getting ${n}` },
   ready: { state: { state: 'ready', version: N }, info, label: `${n} is ready`, row: 'restart to update', why: 'it installs by itself when you quit or step away. your agents keep running.' },
-  off: { state: { state: 'none', cant: 'disk_image' }, info, label: 'updates are off here', row: '', why: 'bise runs from the disk image. drag it to Applications to get updates.' },
+  // off here: the reason is the row's sub (designer m_26934); where moving fixes it, the row's act
+  // (apple-signing ag-move: his click calls window.bise.update.move); a move that didn't happen: ▲
+  off: { state: { state: 'none', cant: 'read_only' }, info, label: 'updates are off here', row: '', sub: "bise isn't in Applications, so it can't replace itself." },
+  off_move: { state: { state: 'none', cant: 'disk_image', move: 'can' }, info, label: 'updates are off here', row: 'move to Applications', sub: "bise runs from the disk image, so it can't update itself." },
+  off_moved_failed: { state: { state: 'none', cant: 'translocated', move: 'failed' }, info, label: 'updates are off here', row: 'move to Applications', sub: "▲ bise couldn't move itself. drag it to Applications to get updates." },
   failed: { state: { state: 'failed', version: N, why: 'x', reason: 'signature' }, info, label: `bise ${v}`, row: 'update failed', why: `${n} was refused: its signature didn't check out. bise keeps ${v}.` },
   failed_swap: { state: { state: 'failed', version: N, why: 'x', reason: 'swap' }, info, label: `bise ${v}`, row: 'update failed', why: `${n} couldn't be installed. bise tries again later.` },
   failed_signer: {
@@ -42,6 +46,8 @@ async function shoot(page: Page, name: string): Promise<void> {
     }, theme);
     await sleep(250);
     await page.screenshot({ path: test.info().outputPath(`${name}-${theme}.png`) });
+    // the off-here rows: the UPDATE group alone too (designer m_26934)
+    if (name.startsWith('dist-update-off')) await page.getByTestId('settings.dist').screenshot({ path: test.info().outputPath(`${name}-group-${theme}.png`) });
   }
 }
 
@@ -56,6 +62,10 @@ for (const [name, c] of Object.entries(CASES)) {
       const group = page.getByTestId('settings.dist');
       if (c.row !== '') expect(flat(await group.textContent())).toContain(c.row);
       if (c.why !== undefined) expect(flat(await page.getByTestId('settings.dist.why').textContent())).toContain(c.why);
+      if (c.sub !== undefined) {
+        expect(flat(await page.getByTestId('settings.dist.sub').textContent())).toBe(c.sub);
+        await expect(page.getByTestId('settings.dist.why'), 'no help line under the group').toHaveCount(0);
+      }
       await expect(page.getByTestId('settings.pref.desktop_channel'), 'the beta toggle').toBeVisible();
       if (name === 'ready') {
         // the pill: the version, never cut inside a word; when it installs is the popover's

@@ -146,13 +146,14 @@ export function signerChange(running: string, next: string | null): 'new_signer'
 }
 
 /**
- * Where the running app can't replace itself (architect m_25198 Q3: said, not moved yet): a
- * mounted disk image (/Volumes/...), or a copy macOS runs from a random read-only path (App
- * Translocation: an app opened from Downloads with its quarantine). Null: it may.
+ * Where the running app can't replace itself (architect m_25198 Q3; move.ts offers the move): a
+ * mounted disk image (`volumes`: /Volumes/, a test home's own under test), or a copy macOS runs
+ * from a random read-only path (App Translocation: an app opened from Downloads with its
+ * quarantine). Null: it may.
  */
-export function cantSwapAt(target: string): 'disk_image' | 'translocated' | null {
+export function cantSwapAt(target: string, volumes = '/Volumes/'): 'disk_image' | 'translocated' | null {
   if (/\/AppTranslocation\//.test(target)) return 'translocated';
-  if (target.startsWith('/Volumes/')) return 'disk_image';
+  if (target.startsWith(volumes)) return 'disk_image';
   return null;
 }
 
