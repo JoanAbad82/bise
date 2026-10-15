@@ -152,6 +152,39 @@ def test_signs_a_fake_bundle():
         check("allow-jit" in e, "the app carries its entitlements")
 
 
+def wire(states, version=1):
+    """Electron Framework-shaped bytes: some code, the sentinel, a fuse wire, more code."""
+    return b"\xcf\xfa\xed\xfe junk" + R.FUSE_SENTINEL + bytes([version, len(states)]) + states + b"\x00 more"
+
+
+def test_the_fuse_wire():
+    default = b"1011001r"  # Electron 44's defaults, read in the audit's bise.app
+    locked = b"0000111r"
+    w = R.fuse_wires(wire(default))
+    check(len(w) == 1 and w[0]["RunAsNode"] is True and w[0]["EnableCookieEncryption"] is False, w)
+    check(w[0]["GrantFileProtocolExtraPrivileges"] is None, "'r' is a removed fuse: %s" % w)
+    bad = R.fuses_wrong(w)
+    check(len(bad) == 5 and any("RunAsNode is True" in b for b in bad), "every one of the 5 is wrong by default: %s" % bad)
+    check(R.fuses_wrong(R.fuse_wires(wire(locked))) == [], "the locked wire passes")
+    check(R.fuses_wrong(R.fuse_wires(wire(locked) + wire(default)))[0].startswith("fuse "), "a universal binary: both slices")
+    check(R.fuses_wrong(R.fuse_wires(b"no sentinel")) == ["no fuse wire in Electron Framework"], "no wire is refused")
+    check(len(R.fuses_wrong(R.fuse_wires(wire(b"000")))) == 3, "a short wire lacks --inspect's and the asar fuses")
+    check(raises(R.ReleaseError, R.fuse_wires, wire(locked, version=2)), "an unknown wire version stops")
+    if shutil.which("node"):
+        # electron-builder.mjs flips what the gates read back, nothing more, nothing less
+        with tempfile.TemporaryDirectory() as t:
+            for f in ("bise", "helper", "VERSION", "repl-live", "sb-core"):
+                open(os.path.join(t, f), "w").close()
+            js = "import(process.argv[1]).then(m => console.log(JSON.stringify(m.FUSES)))"
+            r = subprocess.run(["node", "-e", js, "file://" + os.path.join(R.DESKTOP, "electron-builder.mjs")],
+                               capture_output=True, text=True,
+                               env=dict(R.pack_env({"PATH": os.environ.get("PATH", "")}, R.paths(t), t),
+                                        BISE_PACK_BISE=os.path.join(t, "bise"), BISE_PACK_HELPER=os.path.join(t, "helper"),
+                                        BISE_PACK_VERSION=os.path.join(t, "VERSION")))
+            check(r.returncode == 0, r.stderr)
+            check(json.loads(r.stdout) == R.LOCKED, "electron-builder.mjs FUSES == desktop_release LOCKED: %s" % r.stdout)
+
+
 def version(tag="desktop-v2026.10.1", built="2026-10-12T08:40:00Z"):
     return F.version_text(F.app_id(tag), built, "c" * 40, "8c13fd8")
 

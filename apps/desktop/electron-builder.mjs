@@ -76,15 +76,39 @@ function signStable(appPath) {
   execFileSync('codesign', ['--verify', '--deep', '--strict', appPath]);
 }
 
+// Electron's fuses (apple-audit item 2): left at their defaults, any local program runs its own
+// code as bise (ELECTRON_RUN_AS_NODE=1, NODE_OPTIONS, --inspect) and inherits his grants (micro,
+// Apple Events, Accessibility). The app uses none of the three. Flipped in afterPack, before any
+// signature (signStable here, electron-builder's own after afterPack, desktop_sign.py's for a
+// release): a flip breaks the seal. electron-builder's `electronFuses` runs after afterPack, so
+// after signStable: not used. Kept on: GrantFileProtocolExtraPrivileges (the renderer loads from
+// file://); off for now: EnableCookieEncryption (needs a migration of his cookies).
+// scripts/desktop_release.py's gates read them back in the packed app (its `fuses`).
+export const FUSES = {
+  RunAsNode: false,
+  EnableNodeOptionsEnvironmentVariable: false,
+  EnableNodeCliInspectArguments: false,
+  EnableEmbeddedAsarIntegrityValidation: true,
+  OnlyLoadAppFromAsar: true,
+};
+
+async function lockFuses(appPath) {
+  const { flipFuses, FuseVersion, FuseV1Options } = await import('@electron/fuses');
+  const wire = { version: FuseVersion.V1 };
+  for (const [name, on] of Object.entries(FUSES)) wire[FuseV1Options[name]] = on;
+  await flipFuses(appPath, wire);
+}
+
 const appId = process.env['BISE_PACK_APP_ID'] || 'dev.bise.desktop';
 const productName = process.env['BISE_PACK_NAME'] || 'bise';
 
 export default {
   appId,
-  afterPack: (ctx) => {
-    if (signDir !== undefined && ctx.electronPlatformName === 'darwin') {
-      signStable(join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`));
-    }
+  afterPack: async (ctx) => {
+    if (ctx.electronPlatformName !== 'darwin') return;
+    const app = join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`);
+    await lockFuses(app);
+    if (signDir !== undefined) signStable(app);
   },
   productName,
   // BISE_PACK_OUT: another output dir (the try's staging, while his try runs from dist: amb-tools)

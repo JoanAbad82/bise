@@ -264,6 +264,45 @@ def hardened(codesign_dv):
     return re.search(r"flags=0x[0-9a-f]+\([^)]*\bruntime\b", codesign_dv) is not None
 
 
+# Electron's fuse wire (@electron/fuses): this sentinel in Electron Framework, then the wire's
+# version (1), its length, and one byte per fuse in this order: '0' off, '1' on, 'r' removed.
+FUSE_SENTINEL = b"dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX"
+FUSE_NAMES = ("RunAsNode", "EnableCookieEncryption", "EnableNodeOptionsEnvironmentVariable",
+              "EnableNodeCliInspectArguments", "EnableEmbeddedAsarIntegrityValidation", "OnlyLoadAppFromAsar",
+              "LoadBrowserProcessSpecificV8Snapshot", "GrantFileProtocolExtraPrivileges")
+# what electron-builder.mjs's FUSES flips (apple-audit item 2; tests/desktop_release_test.py keeps
+# the two the same): the gates refuse an app whose wire says otherwise
+LOCKED = {"RunAsNode": False, "EnableNodeOptionsEnvironmentVariable": False, "EnableNodeCliInspectArguments": False,
+          "EnableEmbeddedAsarIntegrityValidation": True, "OnlyLoadAppFromAsar": True}
+
+
+def framework_binary(app):
+    return os.path.join(app, "Contents", "Frameworks", "Electron Framework.framework", "Electron Framework")
+
+
+def fuse_wires(data):
+    """Every fuse wire in an Electron Framework's bytes (two in a universal binary), each a dict
+    name → True/False/None (None: removed, or a byte this reader doesn't know). Pure."""
+    wires = []
+    i = data.find(FUSE_SENTINEL)
+    while i != -1:
+        at = i + len(FUSE_SENTINEL)
+        if data[at] != 1:
+            raise ReleaseError("fuse wire version %d, this reader knows 1" % data[at])
+        raw = data[at + 2:at + 2 + data[at + 1]]
+        wires.append({n: {ord("0"): False, ord("1"): True}.get(b) for n, b in zip(FUSE_NAMES, raw)})
+        i = data.find(FUSE_SENTINEL, at)
+    return wires
+
+
+def fuses_wrong(wires, want=None):
+    """What differs from the locked fuses (LOCKED), one line each; no wire is wrong too. Pure."""
+    want = LOCKED if want is None else want
+    if not wires:
+        return ["no fuse wire in Electron Framework"]
+    return ["fuse %s is %s, want %s" % (n, w.get(n), on) for w in wires for n, on in sorted(want.items()) if w.get(n) is not on]
+
+
 def check(p, signed):
     """The gates: the app's signature deep and strict, hardened, with its entitlements; mounted, the
     DMG holds bise.app and the Applications link; signed with a real identity, Gatekeeper's own
@@ -278,6 +317,8 @@ def check(p, signed):
         bad.append("bise.app has no hardened runtime")
     if "com.apple.security.cs.allow-jit" not in d.stdout:
         bad.append("bise.app has no JIT entitlement")
+    with open(framework_binary(app), "rb") as f:
+        bad += fuses_wrong(fuse_wires(f.read()))
     for b in ("bise", "sb-core", "repl-live", "bend-jsrt"):
         f = os.path.join(app, "Contents", "Resources", "bin", b)
         if os.path.exists(f) and not hardened(subprocess.run(["codesign", "-dv", f], capture_output=True, text=True).stderr):
