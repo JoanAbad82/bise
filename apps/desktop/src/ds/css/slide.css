@@ -1,7 +1,9 @@
 /* Slide (slide.tsx): a line cut with '…' at rest that slides to show the rest on its row's hover or
-   keyboard focus. Vibe Work's AuraTextHoverScroll: 44 px/s (the time is set per line), 80 ms before
-   it moves, ease-in-out, back at the same pace with no delay; the line stays whole on the way back.
-   Under reduced motion nothing moves and the '…' stays. */
+   keyboard focus. Vibe Work's AuraTextHoverScroll's pace: 44 px/s (the time is set per line), linear
+   (slide-fix: an ease-in-out over a line's 8 s barely moved while hovered, then its long way back
+   was the motion he saw after leaving), 250 ms before it moves (designer m_26921), held at the end;
+   back home in --d-fast, eased out, the line whole on the way. Under reduced motion nothing moves
+   and the '…' stays. */
 .b-slide {
   display: block;
   min-width: 0;
@@ -18,7 +20,8 @@
   text-overflow: ellipsis;
   vertical-align: top;
   transform: translateX(0);
-  transition: transform var(--slide-ms, 1.1s) ease-in-out;
+  /* the way home: quick, whatever the line's length */
+  transition: transform var(--d-fast, 140ms) var(--ease-out, ease-out);
 }
 .b-slide[data-back] > .b-slide-in,
 .b-slide[data-over]:hover > .b-slide-in,
@@ -28,7 +31,8 @@
 .b-slide[data-over]:hover > .b-slide-in,
 [data-slide-row]:is(:hover, :focus-visible, :has(:focus-visible)) .b-slide[data-over] > .b-slide-in {
   transform: translateX(min(0px, calc(100cqw - 100%)));
-  transition-delay: var(--slide-delay, 80ms);
+  /* the way out: 44 px a second from the first frame, so it reads as moving at once */
+  transition: transform var(--slide-ms, 1.1s) linear var(--slide-delay, 250ms);
 }
 @media (prefers-reduced-motion: reduce) {
   .b-slide > .b-slide-in {

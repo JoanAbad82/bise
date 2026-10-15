@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// src/ds Slide: Vibe Work's pace (44 px/s, 80 ms delay), the words whole in the DOM, and the row's
+// src/ds Slide: Vibe Work's pace (44 px/s; a 250 ms delay, designer m_26921), the words whole in the DOM, and the row's
 // mark ([data-slide-row]) the hover listens on. The pixels and the slide itself: the harness checks.
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -8,9 +8,9 @@ import { Slide, SLIDE_DELAY_MS, SLIDE_PX_PER_S, slideMs, wholeWords } from "./in
 afterEach(cleanup);
 
 describe("ds Slide", () => {
-  it("slides at Vibe Work's pace: 44 px a second, after 80 ms", () => {
+  it("slides at Vibe Work's pace: 44 px a second, after 250 ms", () => {
     expect(SLIDE_PX_PER_S).toBe(44);
-    expect(SLIDE_DELAY_MS).toBe(80);
+    expect(SLIDE_DELAY_MS).toBe(250);
     expect(slideMs(0)).toBe(0);
     expect(slideMs(-3)).toBe(0);
     expect(slideMs(44)).toBe(1000);
@@ -35,6 +35,6 @@ describe("ds Slide", () => {
     const el = getByTestId("r.role");
     expect(el.textContent).toBe(words);
     expect(el.className).toBe("b-slide role");
-    expect(el.style.getPropertyValue("--slide-delay")).toBe("80ms");
+    expect(el.style.getPropertyValue("--slide-delay")).toBe("250ms");
   });
 });

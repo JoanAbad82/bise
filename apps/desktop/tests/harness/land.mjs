@@ -30,6 +30,9 @@ export const LAND = [
   'checks/app/proj-menu.spec.ts',
   // what slid over at 800 goes when the window grows past 1000: one bar, no scrim (try-gate dc4770c1)
   'checks/app/bar-slide.spec.ts',
+  // a hovered row's now line slides left at once, is home within 200 ms of the leave, still under
+  // reduced motion (slide-fix, his ask)
+  'checks/app/row-slide.spec.ts',
   // answering (inbox-fix, architect m_23524): a refused answer or close shows that card again with
   // the words, a taken one stays out across a reload and a switch, '✓ you answered' where he is
   'checks/inbox/answer-refused.spec.ts',

@@ -2,8 +2,10 @@
 // m_23711, kept in m_26248), and slides to show the rest
 // while its row is hovered or keyboard-focused (Gabriel: "slider au hover pour défiler et afficher le
 // reste"). Ported from Vibe Work's ds AuraTextHoverScroll (~/mistral/dashboard, ts/packages/ui
-// text-hover-scroll): 44 px a second, 80 ms before it starts, ease-in-out, back at the same pace when
-// the pointer leaves. The row is the nearest `[data-slide-row]` (the whole row's hover moves it), else
+// text-hover-scroll): 44 px a second, linear (slide-fix: eased over a long line it barely moved while
+// hovered), 250 ms before it starts (designer m_26921: at Vibe Work's 80 ms a pointer crossing the
+// bar set every row sliding); it holds at the end; home in --d-fast when the pointer leaves, never
+// sliding after. The row is the nearest `[data-slide-row]` (the whole row's hover moves it), else
 // the line itself. Under reduced motion nothing moves: the '…' stays and the whole words go in the
 // line's title. Its measure and its way back: hooks.ts. Owner: amb-kit.
 import { useRef, type CSSProperties } from "react";
@@ -12,8 +14,8 @@ import { reducedMotion, textWidth, useRoom, useSlideHold } from "./hooks";
 
 /** Vibe Work's pace: pixels a second. */
 export const SLIDE_PX_PER_S = 44;
-/** What the hover waits before the words move, ms (Vibe Work's). */
-export const SLIDE_DELAY_MS = 80;
+/** What the hover waits before the words move, ms: a pointer crossing the bar moves none (designer m_26921). */
+export const SLIDE_DELAY_MS = 250;
 
 /** How long the slide over `over` hidden pixels takes, ms. Pure. */
 export function slideMs(over: number): number {

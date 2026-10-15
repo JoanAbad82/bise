@@ -224,7 +224,7 @@ for (const theme of ['light', 'dark']) {
         expect(r.shown === '' || (r.shown.endsWith('…') && `${r.full} `.startsWith(`${r.shown.slice(0, -1)} `)), `'${r.shown}' of '${r.full}'`).toBe(true);
       }
       expect(roles.some((r) => r.shown !== r.full), 'a cut one in the list').toBe(true);
-      // the row's hover shows the whole words and slides them, after 80 ms, until the last one shows
+      // the row's hover shows the whole words and slides them, after 250 ms, until the last one shows
       // at the box's right edge; it goes home, cut again, when the pointer leaves
       const longRole = page.getByTestId(`app.right.agent.${LONG}.role`);
       await expect(longRole).toHaveAttribute('aria-label', 'the copy of every page, one by one');
