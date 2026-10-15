@@ -4,3 +4,4 @@
 history-perf	12c3d88dc	land-reds	test:land: a ⌘F reveal is pulled back to the end by followOutput while lines append (fix ready), and the oldest hit shown 1 in 4 at load 20
 picker-steady	a3d52808f	land-reds	test:land under load only: 5 frames seen, wants more than 5 (the off-screen rAF window); fix: wait for 6 frames
 inbox-open	1da997a46	land-reds	test:land: 1 red at load 38, green alone; not explained yet
+wake_deliver_e2e	3f4c38292	main (to assign)	full gate: a page question card is the asker t1's, the test wants main ("the hub asks as main"); red on 3f4c38292 without the land check (land-check ran it alone)
