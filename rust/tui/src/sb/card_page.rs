@@ -66,12 +66,26 @@ pub(in crate::sb) fn page_link_line(c: &Card, w: usize) -> Option<Drawn> {
     Some(Drawn { line: Line::from(spans), hits: vec![(0, wd, CardHit::Page(c.id))], item: false })
 }
 
+/// The title of a card of any other kind: a plan an agent proposes is
+/// that agent's (plan-ok, `lean-install proposes a plan`); the rest ask.
+pub(in crate::sb) fn other_title(kind: &str, agent: &str) -> String {
+    if kind == "plan" {
+        return format!("{agent} proposes a plan");
+    }
+    format!("{agent} asks")
+}
+
 /// A linked card's hint under its options: who reads typed words (`or
-/// type: designer reads it`); none for any other card.
+/// type: designer reads it`; a plan's: `or type what to change:
+/// lean-install reads it`, plan-ok); none for any other card.
 pub(in crate::sb) fn page_hint(c: &Card, s: &Shape) -> Option<String> {
-    if c.page.is_none() || s.enter != Enter::Answer || !s.words {
+    if s.enter != Enter::Answer || !s.words {
         return None;
     }
+    if c.kind == "plan" {
+        return Some(format!("or type what to change: {} reads it", c.agent));
+    }
+    c.page.as_ref()?;
     // the terminal calls main main (designer m_26776)
     Some(format!("{}type: {} reads it", if s.options.is_empty() { "" } else { "or " }, c.agent))
 }
@@ -160,5 +174,15 @@ mod tests {
         assert_eq!(linked.get(&7).map(String::as_str), Some("where does my answer go"));
         let plain = Card { page: None, ..c };
         assert!(page_link_line(&plain, 76).is_none() && page_mine(&plain, &s).is_empty() && page_hint(&plain, &s).is_none() && picked_fold(&plain, "B · frame").is_none());
+    }
+
+    /// plan-ok: a plan's card is its agent's, and typing changes the plan.
+    #[test]
+    fn a_plan_is_proposed_and_typing_changes_it() {
+        let c = Card { kind: "plan".into(), agent: "lean-install".into(), ..linked(Some("lean installs")) };
+        assert_eq!(other_title("plan", "lean-install"), "lean-install proposes a plan");
+        assert_eq!(other_title("merge", "lean-install"), "lean-install asks");
+        let s = super::super::shape(&c);
+        assert_eq!(page_hint(&c, &s).as_deref(), Some("or type what to change: lean-install reads it"));
     }
 }

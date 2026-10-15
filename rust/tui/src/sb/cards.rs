@@ -712,9 +712,9 @@ fn kind_title(kind: &str, agent: &str) -> String {
         "drop" => format!("drop {agent}?"),
         "overlap" => "overlap".into(),
         "done" => format!("{agent} is done"),
-        // never a card's kind id (designer m_15412): any other kind asks
-        // like a question; its text says what it asks
-        _ => format!("{agent} asks"),
+        // never a card's kind id (designer m_15412): a plan proposes, any
+        // other kind asks like a question (card_page.rs)
+        k => card_page::other_title(k, agent),
     }
 }
 
