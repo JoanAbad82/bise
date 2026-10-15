@@ -2420,7 +2420,9 @@ async function rowsF2A7(harness, say) {
       back = await until(async () => {
         return (await present(`${R}a`)) && (await present(`${R}b`)) ? { at_ms: Date.now() - t0 } : null;
       }, 50000, 1000);
-      words = await bodyHas(/its hub (didn't answer|went away)[^.]*\.( try again in a moment\.)?/);
+      // since the inbox stack (dfbd39d64) a refused item's row says 'not sent' in red (RefusedMark);
+      // the old words stay for an open item
+      words = await bodyHas(/its hub (didn't answer|went away)[^.]*\.( try again in a moment\.)?|\bnot sent\b/);
       await page.mouse.move(1, 300);
       await shot('f2a7-refusal-back');
     } finally { signal(pids, 'SIGCONT'); }
@@ -2566,6 +2568,12 @@ async function rows233B(harness, say) {
   });
   // a css variable's computed color, as the page draws it
   const color = (v) => page.evaluate((x) => { const d = document.createElement('i'); d.style.color = `var(${x})`; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; }, v).catch(() => null);
+  // Chromium gives some colors as 'color(srgb r g b)' (0..1) and others as 'rgb(R, G, B)': one form
+  // to compare (as agents-bar.spec's normColor; cand-3ce7q's marks and ARTIFACTS rows)
+  const rgbOf = (c) => {
+    const m = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)\)$/.exec(c ?? '');
+    return m ? `rgb(${[m[1], m[2], m[3]].map((v) => String(Math.round(Number(v) * 255))).join(', ')})` : c;
+  };
   const project = async () => page.evaluate(() => {
     const e = document.querySelector('[data-testid^="app.right.artifact."]');
     return e ? (e.getAttribute('data-testid') ?? '').split('.')[3] ?? null : null;
@@ -2707,13 +2715,18 @@ async function rows233B(harness, say) {
     const by = (n) => b0?.rows.find((r) => r.id === `app.right.agent.${n}`) ?? null;
     // zqwait reported blocked to main: it waits on another agent ('…'); '?' needs a card of its own
     // for him (proto_view waits: a card whose agent is it), which only main's hub makes here
-    step("the bar's signs: ✓ pink done (zqfin), ▲ red failed (zqbad), '…' waits on main (zqwait, blocked); no state word in the rows",
-      by('zqfin')?.g === '✓' && by('zqfin')?.gc === acc && by('zqbad')?.g === '▲' && by('zqbad')?.gc === err && ['…', '?'].includes(by('zqwait')?.g ?? '')
+    // a failed agent's sign is '✗' red since 88801bb6d ('▲' is a cut turn)
+    step("the bar's signs: ✓ pink done (zqfin), ✗ red failed (zqbad), '…' waits on main (zqwait, blocked); no state word in the rows",
+      by('zqfin')?.g === '✓' && rgbOf(by('zqfin')?.gc) === rgbOf(acc) && by('zqbad')?.g === '✗' && rgbOf(by('zqbad')?.gc) === rgbOf(err) && ['…', '?'].includes(by('zqwait')?.g ?? '')
         && !/\b(done|idle|now|waits|failed|working|blocked)\b/.test(b0?.words ?? ''),
       { zqfin: by('zqfin'), zqbad: by('zqbad'), zqwait: by('zqwait'), words: (b0?.words ?? '').slice(0, 600), acc, err });
     const plain = (b0?.rows ?? []).filter((r) => !r.head && !r.orphan);
-    step("columns: time and % right edges line up on every agent row (40 / 32 px), the mark's right edge the same on every row",
-      plain.length > 0 && new Set(plain.map((r) => r.time)).size === 1 && new Set(plain.map((r) => r.pct)).size === 1 && new Set((b0?.rows ?? []).map((r) => r.markR)).size === 1 && plain[0].tw === 40 && plain[0].pw === 32,
+    // since 018208a0e an empty time or % column gives its room to the now line: only the filled ones
+    // line up (time 40; the % 40 with its ring, as agents-bar.spec)
+    const timed = plain.filter((r) => r.tw > 0);
+    const pcted = plain.filter((r) => r.pw > 0);
+    step("columns: the filled time and % columns line up (time 40 px, % 40 px), empty ones give their room; the mark's right edge the same on every row",
+      plain.length > 0 && new Set(timed.map((r) => r.time)).size <= 1 && new Set(pcted.map((r) => r.pct)).size <= 1 && new Set((b0?.rows ?? []).map((r) => r.markR)).size === 1 && timed.every((r) => r.tw === 40) && pcted.every((r) => r.pw === 40),
       { cols: (b0?.rows ?? []).map((r) => ({ id: r.id, time: r.time, pct: r.pct, mark: r.markR, tw: r.tw, pw: r.pw })) });
     // the drop order on a real row: narrowed step by step, the role goes first, then the %, then the time; the mark stays
     const drops = await page.locator('[data-testid="app.right.agent.zqsolo"]').first().evaluate((e) => {
@@ -2729,7 +2742,9 @@ async function rows233B(harness, say) {
       return out;
     }).catch((x) => String(x).slice(0, 200));
     const first = (f) => (Array.isArray(drops) ? drops.findIndex(f) : -1);
-    const [roleGone, pctGone, timeGone] = [first((x) => x.role === 0), first((x) => !x.pct), first((x) => !x.time)];
+    // a column empty at full width (018208a0e: no time or % yet) never 'goes': -1
+    const full0 = Array.isArray(drops) ? drops[0] : null;
+    const [roleGone, pctGone, timeGone] = [first((x) => x.role === 0), full0?.pct ? first((x) => !x.pct) : -1, full0?.time ? first((x) => !x.time) : -1];
     step('a row short on room: the role goes first, then the %, then the time; the 16 px mark never goes (zqsolo narrowed)',
       Array.isArray(drops) && roleGone >= 0 && (pctGone === -1 || pctGone >= roleGone) && (timeGone === -1 || timeGone >= Math.max(pctGone, roleGone)) && drops.every((x) => x.mark === 16),
       { roleGone: drops[roleGone]?.w ?? null, pctGone: drops[pctGone]?.w ?? null, timeGone: drops[timeGone]?.w ?? null, full: Array.isArray(drops) ? drops[0] : drops });
@@ -2746,7 +2761,7 @@ async function rows233B(harness, say) {
     const headR = by1('app.right.group.sb/zqg1');
     const orphan = b1?.rows.find((r) => r.orphan) ?? null;
     step("marks: ψ text-2 on a worktree with no PR (zqsolo), ↑ red on #501 (checks fail); the group 'ψ sb/zqg1' head 28 px with '↑ #503', its rows no mark; the orphan PR #502's row: no sign, its ↑",
-      by1('app.right.agent.zqsolo')?.mark === 'ψ' && by1('app.right.agent.zqsolo')?.mc === t2 && by1('app.right.agent.zqfails')?.mark === '↑' && by1('app.right.agent.zqfails')?.mc === err
+      by1('app.right.agent.zqsolo')?.mark === 'ψ' && rgbOf(by1('app.right.agent.zqsolo')?.mc) === rgbOf(t2) && by1('app.right.agent.zqfails')?.mark === '↑' && rgbOf(by1('app.right.agent.zqfails')?.mc) === rgbOf(err)
         && !!headR && headR.h === 28 && headR.g === 'ψ' && /↑ #503/.test(headR.mark ?? '') && !by1('app.right.agent.zqg1')?.mark && !by1('app.right.agent.zqg2')?.mark
         && (orphan ? (orphan.g ?? '') === '' && /↑/.test(orphan.mark ?? '') : !tips?.[1]) && (true),
       { zqsolo: by1('app.right.agent.zqsolo'), zqfails: by1('app.right.agent.zqfails'), head: headR, g1: by1('app.right.agent.zqg1'), g2: by1('app.right.agent.zqg2'), orphan, more: b1?.more, t2, t3 });
@@ -2781,7 +2796,7 @@ async function rows233B(harness, say) {
       return { chip: c ? { t: c.textContent, c: getComputedStyle(c).color, bg: getComputedStyle(c).backgroundColor, h: Math.round(c.getBoundingClientRect().height) } : null, new: nw ? { t: nw.textContent, c: getComputedStyle(nw).color } : null };
     }).catch(() => null);
     const ink = await color('--c-text');
-    step("ARTIFACTS: the title in the pink chip (accent, 24 px), 'new' stays ink", !!art?.chip && art.chip.c === acc && art.chip.h === 24 && (!art.new || art.new.c === ink), { ...art, acc, ink });
+    step("ARTIFACTS: the title in the pink chip (accent, 24 px), 'new' stays ink", !!art?.chip && rgbOf(art.chip.c) === rgbOf(acc) && art.chip.h === 24 && (!art.new || rgbOf(art.new.c) === rgbOf(ink)), { ...art, acc, ink });
     // the shots: 1400, 1100, 800 (slid over), light and dark
     const sizes = [];
     for (const scheme of ['light', 'dark']) {
