@@ -83,27 +83,45 @@ impl Churn {
     }
 }
 
-/// How long after his last line to main its REPL is left alone.
-pub const TALK_MS: u64 = 120_000;
-
-/// He is talking to main (hub-stall, @bise m_25297: main was recycled
-/// as he wrote to it and was down 4.5 min): a message queued for it, or
-/// one of his to it in the last [`TALK_MS`]. Main is then neither
-/// recycled nor switched; it is, once he is quiet.
-pub fn talking(queued: usize, last_user_ms: Option<u64>, now_ms: u64) -> bool {
-    queued > 0 || last_user_ms.is_some_and(|t| now_ms.saturating_sub(t) < TALK_MS)
+/// Main's idle REPL is not restarted now (hub-stall, @bise m_25297: main
+/// was recycled as he wrote to it). Only the hub's own recycle holds
+/// (`explicit` false), and only while a message is queued for main
+/// (`queued`): it goes once that message is delivered and main is idle
+/// again. An explicit relaunch (/reload's switch to another binary, a
+/// plugin, skill or key change) goes at main's next idle like any
+/// agent's. The 4.5 min main was down then was its wait for a start
+/// slot, which `repl_start::admit` removed (main never waits for one).
+pub fn main_holds(explicit: bool, queued: usize) -> bool {
+    !explicit && queued > 0
 }
 
 #[cfg(test)]
-mod talking_tests {
+mod main_holds_tests {
     use super::*;
 
+    /// relaunch-fix: a8aaddeed held main 2 min after any line of his,
+    /// for every relaunch, so /reload and a plugin change never
+    /// relaunched it while he talked to it.
     #[test]
-    fn main_waits_while_he_talks_and_restarts_once_he_is_quiet() {
-        assert!(talking(1, None, 0));
-        assert!(talking(0, Some(1_000), 1_000 + TALK_MS - 1));
-        assert!(!talking(0, Some(1_000), 1_000 + TALK_MS));
-        assert!(!talking(0, None, 5));
+    fn only_the_hubs_own_recycle_waits_and_only_for_a_queued_message() {
+        assert!(!main_holds(true, 0));
+        assert!(!main_holds(true, 1));
+        assert!(!main_holds(false, 0));
+        assert!(main_holds(false, 1));
+    }
+
+    /// A due recycle with a message queued for main waits; the message
+    /// is delivered (queued 0), and the recycle goes at the next idle.
+    #[test]
+    fn a_held_recycle_goes_once_the_queued_message_is_delivered() {
+        let mut c = Churn::default();
+        c.started("main");
+        c.line("main", "  obs: usage: model=fake/claude-x in=3000000 out=10 cache_read=0 cache_write=0");
+        assert!(c.idle("main", 1_000_000));
+        let due = c.is_due("main");
+        assert!(due && main_holds(false, 1));
+        assert!(c.is_due("main"), "still due while it waits");
+        assert!(!main_holds(false, 0));
     }
 }
 

@@ -1522,7 +1522,9 @@ impl Shell {
     /// a reload (BISE-131), is asked to reload (a turn boundary: it
     /// checkpoints and exits); the hub then restarts it on its own
     /// binary, same port, same session. Busy ones wait for the end of
-    /// their turn: an agent never loses a turn.
+    /// their turn: an agent never loses a turn. Main's own recycle waits
+    /// while a message is queued for it (`recycle::main_holds`); its
+    /// explicit relaunches (/reload, plugins, skills, keys) do not.
     fn switch_idle_repls(&mut self) {
         let stale: Vec<(String, String)> = self
             .hub
@@ -1531,14 +1533,15 @@ impl Shell {
             .values()
             .filter(|a| a.run == crate::model::Run::Idle)
             .filter(|a| !self.switching.contains_key(&a.dir) && self.repls.contains_key(&a.dir))
-            .filter(|a| !(a.is_main && self.main_talking()))
             .filter(|a| {
-                self.reload_repls.contains(&a.dir)
-                    || self.recycle.is_due(&a.dir)
+                let explicit = self.reload_repls.contains(&a.dir)
                     || self
                         .bins
                         .get(&a.dir)
-                        .is_some_and(|b| !Self::same_bin(b, &self.opts.repl_bin))
+                        .is_some_and(|b| !Self::same_bin(b, &self.opts.repl_bin));
+                let due = explicit || self.recycle.is_due(&a.dir);
+                // main's own recycle waits for a message queued for it
+                due && !(a.is_main && self.main_holds(explicit))
             })
             .map(|a| (a.name.clone(), a.dir.clone()))
             .collect();
