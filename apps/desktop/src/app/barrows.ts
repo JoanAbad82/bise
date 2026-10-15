@@ -363,12 +363,33 @@ export function watchRows(agents: readonly ProjAgent[], now: number, all: boolea
     );
 }
 
+/** How many rows one click on 'show 50 more' adds (his m_26894: hundreds of artifacts). */
+export const PAGE = 50;
+
+/** A section's rows under its cap and the pages he opened past it, and its last row's words. */
+export interface Paged {
+  readonly shown: BarRow[];
+  /** the rows still folded */
+  readonly hidden: number;
+  /** the pages open past the cap, clamped to what the list has (a list that shrank) */
+  readonly pages: number;
+  /** the row that shows the next page, the cap's too: 'show 50 more · 365 left', 'show 15 more' under 50 ('' none): it says what a click does (designer m_27020) */
+  readonly more: string;
+  /** 'show less' is there: some page is open past the cap */
+  readonly less: boolean;
+}
+
 /**
- * The rows a section shows under its cap (8 for AGENTS, 5 for the others) and how many '+ N more'
- * counts: a row that waits on him is never hidden, it shows in its place past the cap and the count
- * leaves it out (designer v5, ambient-lead m_20091). Pure.
+ * The rows a section shows: its cap (8 for AGENTS, 5 for the others), then PAGE more for each page
+ * he opened. A row that waits on him is never hidden, it shows in its place past the limit and the
+ * count leaves it out (designer v5, ambient-lead m_20091). Pure.
  */
-export function capRows(rows: readonly BarRow[], cap: number): { shown: BarRow[]; hidden: number } {
-  const shown = rows.filter((r, i) => i < cap || r.waits);
-  return { shown, hidden: rows.length - shown.length };
+export function pageRows(rows: readonly BarRow[], cap: number, pages = 0): Paged {
+  const over = rows.filter((r, i) => i >= cap && !r.waits).length;
+  const p = Math.min(Math.max(0, Math.floor(pages)), Math.ceil(over / PAGE));
+  const limit = cap + p * PAGE;
+  const shown = rows.filter((r, i) => i < limit || r.waits);
+  const hidden = rows.length - shown.length;
+  const more = hidden === 0 ? '' : hidden > PAGE ? `show ${String(PAGE)} more · ${String(hidden)} left` : `show ${String(hidden)} more`;
+  return { shown, hidden, pages: p, more, less: p > 0 };
 }

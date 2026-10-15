@@ -3,7 +3,7 @@
 // px on perf's thread: the sidebar is 240 px with 'search or jump ⌘K', bise, '? inbox' with his pink count,
 // '↗ artifacts 1 new', '◷ scheduled 1', 'projects', storefront's row its '?' mark + 1 (desktop-delight v2), places only: no
 // agent row in the sidebar (designer's desktop-right-bar v5: the agents are in the right bar, each
-// with its sign ∿ ? ✗ ◷ ✓, never a 'main' row, 8 then '+ 1 more'), the titlebar 'storefront › perf' and '↗ artifacts · 1
+// with its sign ∿ ? ✗ ◷ ✓, never a 'main' row, 8 then 'show 1 more'), the titlebar 'storefront › perf' and '↗ artifacts · 1
 // ⌥⌘0' tinted with the panel open (artifacts · storefront, all ›), ⌥⌘0 hides it and is kept, ⌘\
 // hides the sidebar; at 800 px the sidebar and panel are away, the titlebar shows the sidebar
 // button and '2 waiting', ⌘\ slides the sidebar over a scrim and esc closes it. Shots light and
@@ -119,9 +119,9 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.right.agent.deploy-watch')).toHaveAttribute('aria-label', /^wakes at /u);
     await expect(sign('size-filter')).toHaveText('✓');
     await expect(page.getByTestId('app.right.agent.perf')).toContainText('14 min');
-    // 9 live agents: 8 then '+ 1 more'
+    // 9 live agents: 8 then 'show 1 more'
     const more = page.getByTestId('app.right.agents.more');
-    await expect(more).toHaveText('+ 1 more');
+    await expect(more).toHaveText('show 1 more');
     await expect(page.getByTestId('app.right.agent.old-ui')).toHaveCount(0);
     // the titlebar and panel A
     await expect(page.getByTestId('app.title.crumb')).toHaveText('storefront›perf');

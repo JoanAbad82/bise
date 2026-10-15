@@ -6,7 +6,9 @@
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
 // ARTIFACTS and SCHEDULED & WATCHING follow the thread in view (barscope.ts): a sub-agent's shows
 // only its own, its name on a line under the head ('for perf'). A head's parts never meet: the
-// label gives way ('…') under '+ add' and 'all ›' (app/bar-heads).
+// label gives way ('…') under '+ add' and 'all ›' (app/bar-heads). A long section opens 50 rows
+// at a time past its cap ('show 50 more · N left', then 'show less' beside it), kept per
+// section and per scope (his m_26894, barrows.ts pageRows).
 // Owner: amb-win. The rows' words are pure (barrows.ts).
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Act, Dot, Press, Ring, Slide, tipAttrs } from '@/ds';
@@ -27,7 +29,7 @@ import { useNowFor } from './clock';
 import { pauseInSeconds } from '@/thread/wake';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
-import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
+import { agentRows, archivedRows, artifactRows, pageRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
@@ -82,6 +84,19 @@ function useFolded(key: string, byDefault: boolean): readonly [boolean, () => vo
   ];
 }
 
+/** The pages a section opened past its cap (pageRows), kept per window under `key` until 'show less'. */
+function usePages(key: string): readonly [number, (n: number) => void] {
+  const [, bump] = useState(0);
+  const kept = keep.view(key);
+  return [
+    typeof kept === 'number' && kept > 0 ? kept : 0,
+    (n) => {
+      keep.setView(key, n > 0 ? n : undefined);
+      bump((x) => x + 1);
+    },
+  ];
+}
+
 type SectionId = 'agents' | 'archived' | 'artifacts' | 'scheduled';
 
 function Section({
@@ -93,6 +108,7 @@ function Section({
   noFold = false,
   count,
   scope = null,
+  pageScope,
   full,
   onAll,
   act,
@@ -108,6 +124,8 @@ function Section({
   noFold?: boolean;
   /** its scope's words on a line under the head ('by perf': a sub-agent's thread, barscope.ts), their tip, its line at 0 */
   scope?: ScopeWords | null;
+  /** whose list it shows ('<project>' or '<project>/<agent>', '' bise's thread): the pages he opened are kept per section and per scope */
+  pageScope: string;
   /** the rows of its full list, when it shows a part ('all ›' stays while the full list has some) */
   full?: number;
   onAll: () => void;
@@ -116,11 +134,10 @@ function Section({
   children: (r: BarRow) => ReactNode;
 }) {
   const [folded, toggle] = useFolded(id, id === 'archived');
-  const [more, setMore] = useState(false);
+  const [kept, setPages] = usePages(`frame.rb.more.${id}.${pageScope}`);
   const head = useRef<HTMLDivElement>(null);
   const shut = folded && !noFold;
-  const { shown, hidden } = capRows(rows, more ? Number.POSITIVE_INFINITY : cap);
-  const capped = capRows(rows, cap).hidden > 0;
+  const { shown, pages, more, less } = pageRows(rows, cap, kept);
   // a head that folds is a row: pointer, the rows' hover tint, a chevron ('▾' on hover while open,
   // '▸' always while folded); one that can't fold looks like a plain title (designer m_21633)
   return (
@@ -163,31 +180,36 @@ function Section({
       {!shut && rows.length > 0 && (
         <div className="app-rb-rows">
           {shown.map(children)}
-          {hidden > 0 && (
-            <Press
-              look="app-rb-row app-rb-more"
-              onClick={() => {
-                setMore(true);
-              }}
-              data-testid={`app.right.${id}.more`}
-            >
-              + {String(hidden)} more
-            </Press>
-          )}
-          {/* opened: 'show less' in the very row '+ N more' used, back to the cap, the head in view */}
-          {more && capped && (
-            <Press
-              look="app-rb-row app-rb-more"
-              onClick={() => {
-                setMore(false);
-                requestAnimationFrame(() => {
-                  head.current?.scrollIntoView({ block: 'nearest' });
-                });
-              }}
-              data-testid={`app.right.${id}.less`}
-            >
-              show less
-            </Press>
+          {/* 'show 50 more · N left' opens the next 50, not all (his m_26894, designer m_27020); past the
+              cap 'show less' joins it at the right of the same row: back to the cap, the head in view */}
+          {(more !== '' || less) && (
+            <div className="app-rb-pager">
+              {more !== '' && (
+                <Press
+                  look="app-rb-row app-rb-more"
+                  onClick={() => {
+                    setPages(pages + 1);
+                  }}
+                  data-testid={`app.right.${id}.more`}
+                >
+                  {more}
+                </Press>
+              )}
+              {less && (
+                <Press
+                  look="app-rb-row app-rb-more app-rb-less"
+                  onClick={() => {
+                    setPages(0);
+                    requestAnimationFrame(() => {
+                      head.current?.scrollIntoView({ block: 'nearest' });
+                    });
+                  }}
+                  data-testid={`app.right.${id}.less`}
+                >
+                  show less
+                </Press>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -423,6 +445,8 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   const archived = archivedRows(agents, now, all);
   // ARTIFACTS and SCHEDULED & WATCHING follow the thread in view: a sub-agent's, only its own (barscope.ts)
   const scope = barScope(route, project);
+  // whose list ARTIFACTS and SCHEDULED show: the pages he opened past a cap are kept per scope
+  const inView = scope.level === 'agent' ? `${project}/${scope.agent}` : project;
   const allMade = artifactRows(artifacts, now);
   const allLater = [...scheduledRows(tasks, now), ...watchRows(agents, now, all)];
   const made = scope.level === 'agent' ? artifactRows(artifacts.filter((it) => inScope(scope, it.a.agent)), now) : allMade;
@@ -455,6 +479,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
           rows={live}
           count={agentCount}
           cap={8}
+          pageScope={project}
           summary={live.length === 0 ? '' : `${String(working)} working`}
           noFold={waits}
           onAll={() => {
@@ -486,6 +511,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
           title="ARCHIVED"
           rows={archived}
           cap={5}
+          pageScope={project}
           summary={archived[0] === undefined ? '' : `${archived[0].glyph} ${archived[0].name}`}
           onAll={() => {
             if (!all) router.go({ screen: 'agents', project, archived: true });
@@ -502,6 +528,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
             full={allMade.length}
             scope={scopeWords(scope, 'artifacts', name)}
             cap={5}
+            pageScope={inView}
             summary={made.some((r) => r.end === 'new') ? `${String(made.filter((r) => r.end === 'new').length)} new` : ''}
             onAll={() => {
               router.go({ screen: 'artifacts', project });
@@ -518,6 +545,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
           full={allLater.length}
           scope={scopeWords(scope, 'scheduled', name)}
           cap={5}
+            pageScope={inView}
           summary={later[0] === undefined ? '' : `${later[0].glyph} ${later[0].end}`}
           onAll={() => {
             router.go({ screen: 'scheduled' });

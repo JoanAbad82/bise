@@ -768,6 +768,21 @@ body:has(.app-shell) {
   color: var(--c-text-3);
   font-size: var(--t-12);
 }
+/* the last row of a long section: 'show 50 more · N left' and, at its right, 'show less' (his
+   m_26894); each its own hover tint */
+.app-rb-pager {
+  display: flex;
+  align-items: center;
+}
+.app-rb-pager > .app-rb-more {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.app-rb-pager > .app-rb-less {
+  flex: none;
+  margin-left: auto;
+}
 .app-rb-g {
   flex: none;
   width: 2.2ch;

@@ -3,7 +3,7 @@
 // archived, 2 artifacts, a scheduled task and bench's alarm (agent-waiting-states A). Passes when:
 //   - the column is 320 px with its head 'storefront · N working ⌥⌘0' and four sections in his
 //     order, each head 'NAME · count' with 'all ›';
-//   - AGENTS keeps start order, shows 8 rows plus the waiting 10th in its place, '+ 4 more' unfolds
+//   - AGENTS keeps start order, shows 8 rows plus the waiting 10th in its place, 'show 4 more' unfolds
 //     the rest; it never folds while one waits; the waiting row's sign is '?' (desktop-agents-bar: no state words);
 //   - ARCHIVED folds to its head and a summary on the same line, kept after a reload;
 //   - ⌥ held shows ⌥1-⌥9 on the agents; a click opens the agent full in the centre;
@@ -74,11 +74,11 @@ for (const theme of ['light', 'dark']) {
       // (the labels: ARCHIVED starts folded, its summary beside its label)
       const heads = await page.locator('[data-testid^="app.right."][data-testid$=".head"] .app-rb-label').allTextContents();
       expect(heads).toEqual(['AGENTS · 13', 'ARCHIVED · 2', 'ARTIFACTS · 2', 'SCHEDULED & WATCHING · 2']);
-      // AGENTS: start order, 8 rows + the waiting 10th in its place, '+ 4 more'
+      // AGENTS: start order, 8 rows + the waiting 10th in its place, 'show 4 more'
       const names = async () => page.locator('[data-testid="app.right.agents"] .app-rb-row[data-testid^="app.right.agent."]').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')?.replace('app.right.agent.', '')));
       expect(await names()).toEqual([...NAMES.slice(0, 8), 'search']);
       await expect(page.getByTestId('app.right.agent.search').locator('.app-rb-g')).toHaveText('?');
-      await expect(page.getByTestId('app.right.agents.more')).toHaveText('+ 4 more');
+      await expect(page.getByTestId('app.right.agents.more')).toHaveText('show 4 more');
       // it never folds while one waits
       await page.getByTestId('app.right.agents.head').click();
       await expect(page.getByTestId('app.right.agent.perf')).toBeVisible();
@@ -86,7 +86,7 @@ for (const theme of ['light', 'dark']) {
       await page.screenshot({ path: test.info().outputPath(`right-bar-${theme}-1400.png`) });
       await page.getByTestId('app.right.agents.more').click();
       expect(await names()).toEqual([...NAMES, 'bench']);
-      // ARCHIVED starts folded (his ask, main m_23467): its head and a summary, no rows, no '+ N more'
+      // ARCHIVED starts folded (his ask, main m_23467): its head and a summary, no rows, no 'show N more'
       await expect(page.getByTestId('app.right.archived.summary')).toHaveText('✓ hero-img');
       await expect(page.getByTestId('app.right.archived.hero-img')).toHaveCount(0);
       await expect(page.getByTestId('app.right.archived.more')).toHaveCount(0);
@@ -145,7 +145,7 @@ for (const theme of ['light', 'dark']) {
   });
 
   // his right-bar feedback (main m_21628), designer m_21633: a head that folds looks clickable, and
-  // what '+ N more' opened, 'show less' folds back, in the same row
+  // what 'show N more' opened, 'show less' folds back, in the same row
   test(`app/right-bar: a head that folds is a row (pointer, tint, chevron), 'show less' folds back to the cap (${theme})`, async () => {
     const core = new FakeCore(world(theme) as unknown as ConstructorParameters<typeof FakeCore>[0]);
     const s = await launchDesktop({ core, route: `project/${P}`, size: '1100x900' });
@@ -201,24 +201,24 @@ for (const theme of ['light', 'dark']) {
       await page.getByTestId('app.right.archived.head').focus();
       await page.keyboard.press('Space');
       await expect(page.getByTestId('app.right.archived.hero-img')).toBeVisible();
-      // '+ 4 more' -> every agent, 'show less' in the same row -> back at the cap
+      // 'show 4 more' -> every agent, 'show less' in the same row -> back at the cap
       const names = async () => page.locator('[data-testid="app.right.agents"] .app-rb-row[data-testid^="app.right.agent."]').count();
       const more = page.getByTestId('app.right.agents.more');
-      await expect(more).toHaveText('+ 4 more');
+      await expect(more).toHaveText('show 4 more');
       const at = await more.boundingBox();
       await more.click();
       expect(await names()).toBe(13);
       await expect(more).toHaveCount(0);
       const less = page.getByTestId('app.right.agents.less');
       await expect(less).toHaveText('show less');
-      expect(Math.round((await less.boundingBox())?.height ?? 0), "'show less' is 28 px, as '+ N more'").toBe(Math.round(at?.height ?? 0));
+      expect(Math.round((await less.boundingBox())?.height ?? 0), "'show less' is 28 px, as 'show N more'").toBe(Math.round(at?.height ?? 0));
       await less.hover();
       await page.screenshot({ path: test.info().outputPath(`heads-${theme}-less.png`) });
       // scrolled down to it, 'show less' brings the list back to its cap with the head in view
       await bar.locator('.app-rb-body').evaluate((el) => { el.scrollTop = el.scrollHeight; });
       await less.click();
       expect(await names()).toBe(9);
-      await expect(more).toHaveText('+ 4 more');
+      await expect(more).toHaveText('show 4 more');
       await expect(less).toHaveCount(0);
       await expect(page.getByTestId('app.right.agents.head')).toBeInViewport();
       // a section under its cap has neither

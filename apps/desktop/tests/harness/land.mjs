@@ -28,6 +28,8 @@ export const LAND = [
   'checks/app/bar-overflow.spec.ts',
   // the context dial after Codex's: 2 px track and arc, round caps inside 0..pct, ink from 70 %, no hue (ring-look)
   'checks/app/ring-look.spec.ts',
+  // 'show 50 more' opens 50 at a time, 'show less' back to the cap, kept per section and scope (bar-more, his m_26894)
+  'checks/app/bar-more.spec.ts',
   // a project's ⋯ menu by priority: active (needs him, then at work), quiet, archived capped (his m_26450)
   'checks/app/proj-menu.spec.ts',
   // what slid over at 800 goes when the window grows past 1000: one bar, no scrim (try-gate dc4770c1)

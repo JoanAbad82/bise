@@ -1,7 +1,7 @@
 // app/archived-fold · his ask (main m_23467): « la section Archived soit complètement collapsed par
 // défaut ». Storefront on FakeCore, 7 archived agents (over the cap of 5). Passes when:
 //   - on a fresh userData, ARCHIVED is its head only ('ARCHIVED · 7', '▸', the summary): no rows, no
-//     '+ N more', in the project and on bise's thread;
+//     'show N more', in the project and on bise's thread;
 //   - a click opens it, a reload keeps it open; a click folds it, a relaunch on the same userData
 //     keeps it folded; the other sections stay open.
 // Shots: archived-fold-<theme>.png (folded, the designer's sign). Owner: amb-win.
@@ -46,20 +46,20 @@ const world = (theme: string) => [
   { ev: 'thread', project: HOME, agent: 'main', entries: [{ pos: 1, at_ms: NOW - 3 * MIN, kind: 'agent', text: 'storefront works.' }], before: null, more: false },
 ];
 
-/** ARCHIVED shut: its head and summary, no row and no '+ N more'; AGENTS still open. */
+/** ARCHIVED shut: its head and summary, no row and no 'show N more'; AGENTS still open. */
 async function folded(page: Page, what: string): Promise<void> {
   await expect(page.getByTestId('app.right.archived.head'), what).toHaveAttribute('aria-expanded', 'false', { timeout: 10_000 });
   await expect(page.getByTestId('app.right.archived.head'), what).toContainText(`ARCHIVED · ${String(OLD.length)}`);
   await expect(page.getByTestId('app.right.archived.summary'), what).toHaveText('✓ hero-img');
   await expect(page.locator('[data-testid="app.right.archived"] .app-rb-row'), `${what}: no row`).toHaveCount(0);
-  await expect(page.getByTestId('app.right.archived.more'), `${what}: no '+ N more'`).toHaveCount(0);
+  await expect(page.getByTestId('app.right.archived.more'), `${what}: no 'show N more'`).toHaveCount(0);
   await expect(page.getByTestId('app.right.agents.head'), `${what}: AGENTS open`).toHaveAttribute('aria-expanded', 'true');
 }
 
 async function opened(page: Page, what: string): Promise<void> {
   await expect(page.getByTestId('app.right.archived.head'), what).toHaveAttribute('aria-expanded', 'true', { timeout: 10_000 });
   await expect(page.getByTestId('app.right.archived.hero-img'), what).toBeVisible();
-  await expect(page.getByTestId('app.right.archived.more'), `${what}: the cap`).toHaveText('+ 2 more');
+  await expect(page.getByTestId('app.right.archived.more'), `${what}: the cap`).toHaveText('show 2 more');
 }
 
 for (const theme of ['light', 'dark']) {

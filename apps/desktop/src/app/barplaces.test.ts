@@ -1,7 +1,7 @@
 // desktop-agents-bar §2-§4: the AGENTS rows' signs, columns, marks, groups and order, one test per rule.
 import { describe, expect, it } from 'vitest';
 import type { Agent, Card, Place, Pr } from '@/proto';
-import { agentRows, capRows, type ProjAgent } from './barrows';
+import { agentRows, pageRows, type ProjAgent } from './barrows';
 import { asksMerge, markOf, tilde, tipWords, waitsToLand, worktreeParts } from './barplaces';
 
 const NOW = 1_791_100_000_000;
@@ -144,7 +144,7 @@ describe('groups, orphan PRs and order (§4)', () => {
     const many = Array.from({ length: 9 }, (_, i) => ag(`a${String(i + 1)}`));
     const list = [...many, ag('g1'), ag('g2', { waits: 1 })];
     const r = agentRows(list, NOW, false, false, { places: [place('sb/g', ['g1', 'g2'])], numbers: nums(...list.map((x) => x.a.name)) });
-    const { shown } = capRows(r, 8);
+    const { shown } = pageRows(r, 8);
     expect(shown.map((x) => x.name)).toEqual(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'sb/g', 'g2']);
   });
 });

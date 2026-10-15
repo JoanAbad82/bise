@@ -102,13 +102,13 @@ for (const theme of ['light', 'dark']) {
       const { page } = s;
       const row = (id: string) => page.getByTestId(`app.right.agent.${id}`);
       await expect(row('perf')).toBeVisible({ timeout: 10_000 });
-      // the TUI's order, the cap: 8 rows, then the group's head and pricing (waits) past it; stock under '+ 1 more'
+      // the TUI's order, the cap: 8 rows, then the group's head and pricing (waits) past it; stock under 'show 2 more'
       const order = await page.locator('[data-testid="app.right.agents"] .app-rb-arow').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')));
       expect(order).toEqual([
         'app.right.agent.perf', 'app.right.agent.search', 'app.right.agent.pay', 'app.right.agent.docs', 'app.right.agent.launch',
         `app.right.agent.${LONG}`, 'app.right.agent.broken', 'app.right.agent.bench', 'app.right.group.sb/flash-sale', 'app.right.agent.pricing',
       ]);
-      await expect(page.getByTestId('app.right.agents.more')).toHaveText('+ 2 more');
+      await expect(page.getByTestId('app.right.agents.more')).toHaveText('show 2 more');
       await expect(page.getByTestId('app.right.agents.head').locator('.app-rb-label')).toHaveText('AGENTS · 10');
       await page.getByTestId('app.right.agents.more').click();
       await expect(page.getByTestId('app.right.pr.420')).toBeVisible();
@@ -320,8 +320,8 @@ for (const theme of ['light', 'dark']) {
       }
       // a click on the orphan opens its branch; on a mark, the PR in the review screen
       await page.setViewportSize({ width: 1400, height: 900 });
-      // docked again: a new bar at its cap, the orphan under '+ 2 more'
-      await page.getByTestId('app.right.agents.more').click();
+      // docked again: a new bar keeps what he opened past the cap (bar-more, his m_26894), the orphan in view
+      await expect(page.getByTestId('app.right.agents.less')).toBeVisible();
       await page.getByTestId('app.right.pr.420').click();
       await expect(page.getByTestId('branch.screen')).toHaveAttribute('data-branch', 'sb/palette');
       await mark('app.right.agent.pay').click();

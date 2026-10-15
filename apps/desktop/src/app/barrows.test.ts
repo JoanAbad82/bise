@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
-import { agentRows, archivedRows, capRows, roleWords, watchRows, type ProjAgent } from './barrows';
+import { agentRows, archivedRows, pageRows, PAGE, roleWords, watchRows, type ProjAgent } from './barrows';
 
 const NOW = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): ProjAgent => ({
@@ -57,9 +57,23 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
   });
   it('the cap never hides what waits on him: 12 agents, the 10th waits', () => {
     const list = Array.from({ length: 12 }, (_, i) => ag(`a${String(i + 1)}`, i === 9 ? { waits: 1 } : {}));
-    const { shown, hidden } = capRows(agentRows(list, NOW, false), 8);
+    const { shown, hidden } = pageRows(agentRows(list, NOW, false), 8);
     expect(shown.map((r) => r.name)).toEqual(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a10']);
     expect(hidden).toBe(3);
+  });
+  it("'show 50 more' opens 50 at a time, 'show less' goes back to the cap (his m_26894): 370 rows, cap 5", () => {
+    const rows = agentRows(Array.from({ length: 370 }, (_, i) => ag(`a${String(i + 1)}`, i === 300 ? { waits: 1 } : {})), NOW, false);
+    const at = (p: number) => pageRows(rows, 5, p);
+    expect(PAGE).toBe(50);
+    expect([at(0).shown.length, at(0).hidden, at(0).more, at(0).less]).toEqual([6, 364, 'show 50 more · 364 left', false]);
+    expect([at(1).shown.length, at(1).hidden, at(1).more, at(1).less]).toEqual([56, 314, 'show 50 more · 314 left', true]);
+    expect(at(1).shown.at(-1)?.name).toBe('a301');
+    expect([at(7).shown.length, at(7).hidden, at(7).more]).toEqual([355, 15, 'show 15 more']);
+    expect([at(8).shown.length, at(8).hidden, at(8).more, at(8).less]).toEqual([370, 0, '', true]);
+    // more pages than the list has (it shrank): clamped, 'show less' still there
+    expect([at(40).pages, at(40).hidden]).toEqual([8, 0]);
+    // under the cap: no row at all, whatever was kept
+    expect(pageRows(rows.slice(0, 4), 5, 3)).toMatchObject({ pages: 0, hidden: 0, more: '', less: false });
   });
   it("never draws a raw tag as an agent's role: '<think>' reads 'thinking' (main m_22156)", () => {
     expect(roleWords('<think>')).toBe('thinking');
