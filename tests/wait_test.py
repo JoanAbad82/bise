@@ -79,12 +79,17 @@ def main():
     finally:
         restore()
 
+    # its wait is 0.2 s times load_factor() (up to x4: "timeout after 1 s"
+    # on a loaded machine, the full suite's): it fires, and near that end
+    t0 = wait.now()
     try:
         wait.until(lambda: False, 0.2, "a state that never comes", poll=0.05)
         got = "returned"
     except AssertionError as e:
         got = str(e)
-    check(got.startswith("timeout after 0 s"), "a real timeout still fires: %r" % got)
+    spent = wait.now() - t0
+    check(got.startswith("timeout after ") and "waiting for a state that never comes" in got
+          and spent < 0.2 * wait.load_factor() + 2, "a real timeout still fires: %r after %.1f s" % (got, spent))
 
     if FAILS:
         sys.exit("wait_test: %d failed" % len(FAILS))
