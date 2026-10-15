@@ -792,12 +792,40 @@
   // behaviours; no stream, no notes, no send (nothing here talks to a hub).
   function startStatic(main) {
     const d = main.dataset;
-    const f = frame(d.title || d.page || "");
+    const { f, info } = frame(d.title || d.page || "");
     f.setAttribute("data-static", "");
     const at = parseInt(d.at, 10);
     const words = [d.agent ? W.by(d.agent) : null, d.version ? "v" + d.version : null, at ? ago(at, Date.now()) : null].filter(Boolean);
-    f.append(el("span", { class: "m" }, words.join(" · ")));
+    info.append(el("span", { class: "m" }, words.join(" · ")));
     decorate(Array.from(main.querySelectorAll(":scope > [data-kit][data-id]")), d.agent || "", doc);
+  }
+
+  // The words that don't fit their room lose a part, least useful first: the taste rules, the age,
+  // then whose (data-fit on the frame, kit.css hides them); the title ends in '…'. Each word
+  // part clips its own text, so its scrollWidth is the room it would want.
+  function fitFrame(f, info, title) {
+    const t = info.querySelector(".t");
+    if (t) t.textContent = title;
+    const want = () => {
+      const kids = Array.from(info.children).filter((c) => c.getClientRects().length);
+      const gap = parseFloat(root.getComputedStyle(info).columnGap) || 0;
+      return kids.reduce((s, c) => s + c.scrollWidth, 0) + gap * Math.max(0, kids.length - 1);
+    };
+    const room = info.clientWidth;
+    // last, 'by <agent>' itself: the title's '…' reads better than a lone 'b'
+    for (const fit of [null, "taste", "age", "by"]) {
+      if (fit) f.setAttribute("data-fit", fit); else f.removeAttribute("data-fit");
+      if (want() <= room + 0.5) return;
+    }
+    // the title alone doesn't fit: cut it after the last whole word that does, its '…' glued to
+    // it ('mail pour frédéric…', designer m_26581); one long word keeps the CSS '…'
+    if (!t) return;
+    const words = String(title).split(/\s+/).filter(Boolean);
+    for (let k = words.length - 1; k >= 1; k--) {
+      t.textContent = `${words.slice(0, k).join(" ").replace(/[\s,;:·–—-]+$/, "")}…`;
+      if (t.scrollWidth <= t.clientWidth + 0.5) return;
+    }
+    t.textContent = title;
   }
 
   function el(tag, attrs, text) {
@@ -807,13 +835,30 @@
     return e;
   }
 
+  // The frame: the pearl, then two groups (page-head, his m_26492). `.i` the words (title, whose,
+  // age, taste, state) give way: they end in '…', and fitFrame drops the taste rules, then the age;
+  // `.a` the controls never shrink: past the words' least width they go to a second row, whole.
   function frame(title) {
     const f = el("header", { class: "bise-frame", role: "banner" });
     // the pearl at 36 px (SPEC §1, round 8): amb-web draws its shader into [data-bise-pearl]; the
     // ':*' stays as the fallback until it does
-    f.append(el("span", { class: "k", "aria-hidden": "true", "data-bise-pearl": "36" }, ":*"), el("span", { class: "t" }, title));
+    const info = el("span", { class: "i" });
+    info.append(el("span", { class: "t" }, title));
+    const acts = el("span", { class: "a" });
+    f.append(el("span", { class: "k", "aria-hidden": "true", "data-bise-pearl": "36" }, ":*"), info, acts);
     doc.body.prepend(f);
-    return f;
+    // fit again when the words' room changes (the window, the buttons going to a second row), when
+    // the words change (drawMeta) and once the fonts are in
+    const fit = () => { if (typeof root.getComputedStyle === "function") fitFrame(f, info, title); };
+    if (typeof root.ResizeObserver !== "undefined") {
+      let lastW = -1;
+      new root.ResizeObserver(() => {
+        const w = Math.round(info.clientWidth);
+        if (w !== lastW) { lastW = w; fit(); }
+      }).observe(f);
+    }
+    if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(fit);
+    return { f, info, acts, fit };
   }
 
   function startPage(main) {
@@ -826,9 +871,12 @@
     const follow = shown === latestAtLoad; // an older version stays put
     let meta = null;
 
-    const f = frame(title);
+    const { f, info, acts, fit } = frame(title);
     f.setAttribute("data-state", d.state || "ready");
+    // 'by <agent>' and ' · 19 h ago' (or ' · writing · 12 s'): the age goes first when room is short
+    const mBy = el("span", { class: "by" }), mAge = el("span", { class: "age" });
     const m = el("span", { class: "m" });
+    m.append(mBy, mAge);
     // to the page of what bise keeps about him (about-you), where he edits the rules
     const tasteLink = el("a", { class: "taste", href: "/p/about-you", hidden: "" });
     const publicChip = el("span", { class: "pub", title: "published with --public: copied to your public mirror", hidden: main.hasAttribute("data-public") ? null : "" }, "public");
@@ -859,7 +907,6 @@
       phFail.textContent = W.failed(failure);
     }
     const startedMs = num(d.started, Date.now());
-    const sp = el("span", { class: "sp" });
     const wc = el("button", { type: "button", disabled: "" }, W.changed);
     // the version: "v3 ▾" opens the list of versions (ambient m_4918), older ones read-only
     const vbox = el("span", { class: "v" });
@@ -886,7 +933,8 @@
       wStop.disabled = true;
       doc.dispatchEvent(new root.CustomEvent("bise:stop", { detail: { page: id, timer: watch.timer == null ? null : watch.timer } }));
     });
-    f.append(m, tasteLink, publicChip, st, wbox, sp, wc, vbox, latest, n, send);
+    info.append(m, tasteLink, publicChip, st);
+    acts.append(wbox, wc, vbox, latest, n, send);
     // the version menu (amb-web m_5684): ↓ ⏎ space on the button open it on the shown version;
     // ↑ ↓ Home End move, ⏎ space pick, esc closes back on the button, tab closes
     const menuItems = () => Array.from(menu.querySelectorAll('[role="menuitemradio"]'));
@@ -927,13 +975,14 @@
     function drawMeta() {
       const v = versionOf(meta, shown);
       const latestN = meta && meta.versions.length ? Math.max(...meta.versions.map((x) => x.n)) : latestAtLoad;
-      const parts = [W.by(agent)];
+      const parts = [];
       if (main.dataset.state === "writing") {
         // "by launch recap · writing · 12 s", counting up
         const t0 = meta && meta.created_ms ? meta.created_ms : startedMs;
         parts.push(W.writingFrame, since(t0, Date.now()));
       } else if (v && v.at_ms) parts.push(ago(v.at_ms, Date.now()));
-      m.textContent = parts.join(" · ");
+      mBy.textContent = W.by(agent);
+      mAge.textContent = parts.map((x) => ` · ${x}`).join("");
       // the agent read his taste file (sb page publish --taste): 'following your taste · 4 rules'
       const tw = tasteWords(meta && meta.taste);
       tasteLink.hidden = !tw || main.dataset.state === "writing";
@@ -954,6 +1003,7 @@
         if (x.n === shown) a.setAttribute("aria-current", "page");
         return a;
       }));
+      fit();
     }
     function markChanged(ids) {
       const set = new Set(ids);
@@ -1030,6 +1080,7 @@
       stProgress.textContent = ` · ${text}`;
       if (intents[intents.length - 1] !== text) intents.push(text);
       drawIntents();
+      fit();
     }
     if (blocks().length === 0) setState(d.state || "writing");
 

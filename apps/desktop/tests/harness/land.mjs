@@ -52,6 +52,9 @@ export const LAND = [
   // save a copy… (⤓, ⋯, ⌘S) and show in Finder: a file, an office file's older version, an archived
   // agent's gone file through bise's copy; the panel stubbed (art-save)
   'checks/artifacts/save-copy.spec.ts',
+  // a bise page's frame keeps every control whole from 1400 to 320 px, the words give way first
+  // (page-head, his m_26492)
+  'checks/artifacts/page-head.spec.ts',
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));

@@ -62,6 +62,12 @@ html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
 /* narrow (the desktop side panel too): folded, the pill sits in the page's 46 px top padding, under
    the frame, its right edge on the frame's padding: the title stays clear */
 @media (max-width: 1080px) { .bn-list.bn-folded { top: 65px; } }
+/* the frame can take two rows at a narrow window (kit.css, page-head): the box hangs from its
+   bottom (kit.css's anchor-name), the same 16 / 9 px under it */
+@supports (top: anchor(bottom)) {
+  .bn-list { top: calc(anchor(--bise-frame bottom, 56px) + 16px); }
+  @media (max-width: 1080px) { .bn-list.bn-folded { top: calc(anchor(--bise-frame bottom, 56px) + 9px); } }
+}
 .bn-items { list-style: none; margin: 0; padding: 0 8px; overflow-y: auto; flex: 0 1 auto; min-height: 0; }
 .bn-item { position: relative; padding: 9px 30px 9px 10px; border-radius: var(--radius-small, 10px); cursor: pointer; }
 .bn-item:hover { background: color-mix(in srgb, var(--talk-ink, #fff) 7%, transparent); }

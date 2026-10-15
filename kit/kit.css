@@ -20,17 +20,31 @@ body {
 
 /* ---- the frame (surface-talk): whose page, version and age, state, what changed, notes, send */
 .bise-frame {
-  grid-area: frame; position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; gap: 12px;
-  height: 46px; margin: 10px 12px 0; padding: 0 10px 0 6px; border-radius: 14px;
+  grid-area: frame; position: sticky; top: 0; z-index: 20; anchor-name: --bise-frame;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px;
+  min-height: 46px; margin: 10px 12px 0; padding: 5px 10px 5px 6px; border-radius: 14px;
   background: var(--surface-talk); -webkit-backdrop-filter: var(--talk-blur); backdrop-filter: var(--talk-blur);
   box-shadow: var(--talk-stroke);
   color: var(--talk-ink); font: var(--text-ui)/1.2 var(--font-ui); white-space: nowrap;
 }
 /* the pearl at 36 px (amb-web's pearl.js draws into it); ':*' in the accent until it does */
 .bise-frame .k { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; font: 700 14px var(--font-mono); color: var(--talk-accent); }
-.bise-frame .t { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.bise-frame .m { color: var(--talk-meta); font: 12px var(--font-mono); }
+/* two groups (page-head, his m_26492): the words give way, the controls never do. The words take
+   what is left (basis 0) and keep at least 8rem: under that, the controls go to a second row, at
+   its right, and wrap again among themselves at the narrowest; a button is never cut. When the
+   words don't fit, kit.js drops the taste rules, then the age, then whose (data-fit); the title
+   ends in '…'. */
+.bise-frame .i { flex: 1 1 0; min-width: 8rem; display: flex; align-items: center; gap: 12px; overflow: hidden; }
+.bise-frame .i > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bise-frame .a { flex: 0 1 auto; max-width: 100%; margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px 12px; }
+.bise-frame .a > * { flex: none; }
+.bise-frame .t { font-size: 15px; font-weight: 600; flex: 0 1 auto; }
+.bise-frame .m { color: var(--talk-meta); font: 12px var(--font-mono); flex: 0 4 auto; }
+.bise-frame a.taste { flex: 0 8 auto; }
+.bise-frame:is([data-fit="taste"], [data-fit="age"], [data-fit="by"]) a.taste, .bise-frame[data-fit="age"] .m .age { display: none; }
+/* whose goes last, unless the page is being written: its working dot stays (on .m) */
+.bise-frame[data-fit="by"]:not([data-state="writing"]) .m { display: none; }
+.bise-frame[data-fit="by"][data-state="writing"] .m .by { display: none; }
 .bise-frame .st { display: none; align-items: center; gap: var(--space-2); color: var(--talk-dim); font-size: 12.5px; }
 .bise-frame .st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--talk-working); animation: bise-pulse 1.4s ease-in-out infinite; }
 .bise-frame[data-state="updating"] .st { display: flex; }
@@ -56,7 +70,6 @@ body {
 #bise-page > .bise-writing .fail::first-letter { color: var(--risk); }
 @media (prefers-reduced-motion: reduce) { .bise-frame .m::after, #bise-page > .bise-writing .intents li::before, .bise-frame .st::before { animation: none; } }
 @keyframes bise-pulse { 50% { opacity: .3; } }
-.bise-frame .sp { flex: 1; }
 .bise-frame button, .bise-frame a.b {
   font: 500 12.5px var(--font-ui); color: var(--talk-ink); background: var(--talk-raised); border: 0; border-radius: 8px;
   padding: 5px 11px; cursor: pointer; text-decoration: none;
@@ -65,8 +78,9 @@ body {
 .bise-frame button[disabled] { opacity: .4; cursor: default; background: var(--talk-raised); }
 .bise-frame [hidden] { display: none; }
 /* a watching page (roadmap B): 'watching · checked 3 min ago · until tomorrow 18:00' and 'stop' */
-.bise-frame .w { display: flex; align-items: center; gap: 8px; min-width: 0; font: 12px var(--font-mono); color: var(--talk-meta); overflow: hidden; }
-.bise-frame .w > span { overflow: hidden; text-overflow: ellipsis; }
+.bise-frame .w { display: flex; align-items: center; gap: 8px; max-width: 100%; font: 12px var(--font-mono); color: var(--talk-meta); }
+.bise-frame .w > span { overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 32ch; }
+.bise-frame .w > button { flex: none; }
 .bise-frame .w[hidden] { display: none; }
 /* the agent followed his taste file (roadmap §3, 4): a quiet link to the rules (about-you) */
 .bise-frame a.taste { font: 12px var(--font-mono); color: var(--talk-meta); text-decoration: none; }
@@ -92,7 +106,7 @@ body {
 .bise-frame .n:empty { display: none; }
 .bise-frame button.send { background: var(--talk-accent); color: var(--talk-on-accent); font-weight: 600; }
 .bise-frame button.send[disabled] { background: var(--talk-raised); color: var(--talk-dim); opacity: 1; }
-@media (max-width: 720px) { .bise-frame .m, .bise-frame .n { display: none; } }
+@media (max-width: 720px) { .bise-frame .n { display: none; } }
 
 /* ---- the page (surface-made): the agent's blocks */
 #bise-page, #bise-home { grid-area: page; padding: var(--space-6) 0 120px; min-width: 0; }
