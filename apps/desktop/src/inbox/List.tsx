@@ -44,13 +44,13 @@ export interface InboxViewProps {
   readonly nextOf?: (r: InboxRecord) => string | undefined;
   /** the record the pane shows (none: closed): the screen reads its thread meanwhile */
   readonly onDetail?: (r: InboxRecord | null) => void;
-  /** a page's title, for the pane's chip (none: the page's id) */
-  readonly pageTitle?: (project: string, page: string) => string | undefined;
+  /** a page's title and version, for the pane's chip ('↗ <title> · page · v3'; none: its id) */
+  readonly pageOf?: (project: string, page: string) => PageMeta | undefined;
   /** now (a test or a shot pins it) */
   readonly now?: number;
 }
 
-export function InboxView({ cards, records, answered, onEnd, names, projects, ports, nextOf, onDetail, pageTitle, now: pinned }: InboxViewProps) {
+export function InboxView({ cards, records, answered, onEnd, names, projects, ports, nextOf, onDetail, pageOf, now: pinned }: InboxViewProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [f, setF] = useState<Filter>(ALL);
@@ -192,7 +192,7 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
         </div>
       )}
       {cur && (
-        <Pane row={cur} now={now} names={names} next={nextOf?.(cur.r)} title={pageTitle}
+        <Pane row={cur} now={now} names={names} next={nextOf?.(cur.r)} meta={pageOf}
           onJump={() => { ports.jump(jumpOf(cur.r)); }}
           onClose={() => { setPaned(false); ref.current?.focus({ preventScroll: true }); }}
           {...(ports.openPage === undefined ? {} : { onPage: ports.openPage })} />
@@ -265,9 +265,19 @@ function PastLine({ p, on, open, project, onClick }: { p: PastRow; on: boolean; 
  * bubble), where and when he answered, the page he answered on, what the agent did next, and the
  * way to his answer (⌘⏎).
  */
-function Pane({ row, now, names, next, title, onJump, onClose, onPage }: {
+export interface PageMeta {
+  readonly title: string;
+  readonly version: number;
+}
+
+/** The pane's page chip: '↗ size chips · page · v3' (notif-artifact's chip), its id when unknown. Pure. */
+export function pageChip(page: string, meta: PageMeta | undefined): string {
+  return meta === undefined ? `↗ ${page} · page` : `↗ ${meta.title !== '' ? meta.title : page} · page · v${String(meta.version)}`;
+}
+
+function Pane({ row, now, names, next, meta, onJump, onClose, onPage }: {
   row: PastRow; now: number; names: Readonly<Record<string, string>>; next: string | undefined;
-  title: ((project: string, page: string) => string | undefined) | undefined;
+  meta: ((project: string, page: string) => PageMeta | undefined) | undefined;
   onJump: () => void; onClose: () => void; onPage?: (project: string, page: string, block?: string) => void;
 }) {
   const r = row.r;
@@ -299,7 +309,7 @@ function Pane({ row, now, names, next, title, onJump, onClose, onPage }: {
         <div className="ip-d-k" data-testid="inbox.detail.where">{whenWhere(r, now)}</div>
         {page !== null && (
           <Press look="ip-d-chip" onClick={() => { onPage?.(r.project, page.page, page.block); }} data-testid="inbox.detail.page">
-            {`↗ ${title?.(r.project, page.page) ?? page.page} · page`}
+            {pageChip(page.page, meta?.(r.project, page.page))}
           </Press>
         )}
         {next !== undefined && next !== '' && <div className="ip-d-next">{`${shownName(j.kind === 'thread' ? j.agent : r.asker)} went on: ${next}`}</div>}

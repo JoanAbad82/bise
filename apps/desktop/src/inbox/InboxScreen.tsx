@@ -63,7 +63,10 @@ export function InboxScreen() {
       projects={projects}
       nextOf={(r) => nextLine(store, r)}
       onDetail={setLooked}
-      pageTitle={(project, page) => store.artifacts(project).find((a) => a.id === page)?.title}
+      pageOf={(project, page) => {
+        const a = store.artifacts(project).find((x) => x.id === page);
+        return a === undefined ? undefined : { title: a.title, version: a.version };
+      }}
       ports={{
         answer: (project, card) => {
           openInbox({ project, card });

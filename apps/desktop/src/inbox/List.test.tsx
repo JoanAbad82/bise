@@ -24,6 +24,7 @@ function mount() {
   const jumps: Jump[] = [];
   render(<InboxView cards={CARDS} records={RECORDS} names={NAMES} projects={PROJECTS} now={NOW}
     nextOf={(r) => (r.card === 1 ? 'kept a webp fallback for Safari 16' : undefined)}
+    pageOf={(_, page) => (page === 'wait-line' ? { title: 'the wait line', version: 3 } : undefined)}
     ports={{ answer: (p, c) => answered.push(`${p}#${String(c)}`), jump: (j) => jumps.push(j) }} />);
   return { answered, jumps, root: screen.getByTestId('inbox.screen') };
 }
@@ -94,7 +95,7 @@ describe('the inbox screen', () => {
     expect(screen.getByTestId('inbox.detail.option.1').textContent).toBe('✓A');
     expect(screen.getByTestId('inbox.detail.option.2').textContent).toBe('2B');
     expect(screen.queryByTestId('inbox.detail.said')).toBeNull();
-    expect(screen.getByTestId('inbox.detail.page').textContent).toBe('↗ wait-line · page');
+    expect(screen.getByTestId('inbox.detail.page').textContent).toBe('↗ the wait line · page · v3');
     fireEvent.keyDown(root, { key: 'o' });
     expect(jumps).toEqual([{ kind: 'page', project: 'bise', page: 'wait-line', block: 'q1' }]);
     fireEvent.keyDown(root, { key: 'ArrowDown' });
