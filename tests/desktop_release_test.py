@@ -104,6 +104,8 @@ def test_entitlements_file():
               "com.apple.security.device.audio-input", "com.apple.security.automation.apple-events"):
         check(e.get(k) is True, "entitlements: %s" % k)
     check(not any("get-task-allow" in k or "disable-library-validation" in k for k in e), "nothing notarization refuses or needs not")
+    # the calendar is never read (Apple audit #554): no calendar entitlement
+    check(not any("calendars" in k or "personal-information" in k for k in e), "no calendar entitlement: %s" % list(e))
 
 
 def fake_app(root):
@@ -272,6 +274,9 @@ def test_pack_and_dmg_settings():
             check(r.returncode == 0, r.stderr)
             mac = json.loads(r.stdout)
             check(mac.get("notarize") is False, "electron-builder's config says notarize: false: %s" % mac)
+            # the calendar is never read (Apple audit #554): no calendar usage string in Info.plist
+            info = mac.get("extendInfo", {})
+            check(not [k for k in info if "Calendar" in k], "no calendar usage string: %s" % list(info))
     na = R.notary_argv("/x.zip")
     check("--wait" in na and "${APPLE_API_KEY_PATH}" in na, "notarytool waits, the key is a path from the env")
     check(R.dmgbuild_argv("s.py", "bise", "o.dmg")[-4:] == ["-s", "s.py", "bise", "o.dmg"], "dmgbuild's argv")

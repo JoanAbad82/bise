@@ -218,9 +218,9 @@ owns the look and the words):
   The voice, the capsule's words and the frame's words on pages are the same someone.
 - **Quiet by default.** It speaks first only for: a decision that's yours, something you asked it
   to watch, the morning. Never to fill silence, never "anything else?".
-- **It knows when not to talk.** No voice while the mic is used by a call or during a calendar
-  meeting; text only, and cards wait unless urgent. (The calendar and the mic state are already on
-  the Mac.)
+- **It knows when not to talk.** No voice while the mic or a camera is used by a call, the screen
+  is shared or the front app is full screen; text only, and cards wait unless urgent. (All read on
+  the Mac with no permission; the calendar is not read: Apple audit #554.)
 - **Reassuring.** It says what it did and what it didn't, in one line; a failure is plain, never
   joked about, and comes with what it does next.
 - **It remembers.** Your taste (§3.4), who people are (`Lélio · your manager`), what you asked it

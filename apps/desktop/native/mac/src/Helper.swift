@@ -8,7 +8,6 @@
 // a prompt unless asked. stdin closed = Electron is gone: it exits.
 
 import AppKit
-import EventKit
 
 @MainActor
 final class Helper {
@@ -18,8 +17,6 @@ final class Helper {
     private let keys = Keys()
     private var skip = SkipList.builtIn
     private var quiet = QuietMachine()
-    private var meetings = false
-    private let calendar = EKEventStore()
     private var permsSaid: [String: String] = [:]
     private var timers: [Timer] = []
     private var buffer = Data()
@@ -34,15 +31,12 @@ final class Helper {
         if AXIsProcessTrusted() { keys.start() }
         readStdin()
         // the permissions every 2 s (cheap reads: he may grant one in System
-        // Settings at any time), the quiet probes every 1 s, the calendar every 30 s
+        // Settings at any time), the quiet probes every 1 s
         timers.append(Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
             MainActor.assumeIsolated { [weak self] in self?.sayPerms() }
         })
         timers.append(Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             MainActor.assumeIsolated { [weak self] in self?.sampleQuiet() }
-        })
-        timers.append(Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
-            MainActor.assumeIsolated { [weak self] in self?.lookMeetings() }
         })
         let ws = NSWorkspace.shared.notificationCenter
         ws.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { n in
@@ -89,11 +83,9 @@ final class Helper {
 
     private func run(_ c: HelperCmd) {
         switch c {
-        case .config(let ex, let ro, let mt):
+        case .config(let ex, let ro):
             skip = SkipList.with(ex)
             keys.rightOption = ro
-            meetings = mt
-            lookMeetings()
         case .route(let open):
             keys.routeOpen = open
         case .ownMic(let open):
@@ -101,7 +93,7 @@ final class Helper {
         case .readContext(let id):
             readFront(id: id)
         case .perm(let p, let ask):
-            if ask { Perms.ask(p, store: calendar) { [weak self] in self?.sayPerms() } } else { Perms.open(p) }
+            if ask { Perms.ask(p) { [weak self] in self?.sayPerms() } } else { Perms.open(p) }
         case .shot(let id, let dir):
             let skip = self.skip
             Task { @MainActor [weak self] in
@@ -201,24 +193,6 @@ final class Helper {
         if let m = MicProbe.running() { quiet.mic(running: m, at: t) }
         if let c = CameraProbe.running() { quiet.camera(running: c, at: t) }
         if let s = SharingProbe.present() { quiet.sharing(s) }
-        sayQuiet()
-    }
-
-    private func lookMeetings() {
-        guard meetings, EKEventStore.authorizationStatus(for: .event) == .fullAccess else {
-            quiet.meeting(false)
-            sayQuiet()
-            return
-        }
-        let now = Date()
-        let pred = calendar.predicateForEvents(withStart: now.addingTimeInterval(-3600), end: now.addingTimeInterval(3600), calendars: nil)
-        let evs = calendar.events(matching: pred).map { e in
-            let mine = e.attendees?.first { $0.isCurrentUser }
-            return CalendarEvent(start: e.startDate, end: e.endDate, allDay: e.isAllDay, busy: e.availability != .free,
-                                 declined: mine?.participantStatus == .declined,
-                                 attendees: (e.attendees ?? []).filter { !$0.isCurrentUser }.count)
-        }
-        quiet.meeting(CalendarEvent.meetingNow(evs, now: now))
         sayQuiet()
     }
 

@@ -58,7 +58,7 @@ test('setup/sign-in (S.2): a subscription signs in on his click; a key is sent o
 test('setup/check-again (S.8): each missing thing offers its fix, check again reads them fresh, all set after', async () => {
   await onWorld(async ({ s, core, helper, out }) => {
     const { page } = s;
-    await helper.send({ ev: 'perms', accessibility: 'ask', mic: 'denied', screen: 'allowed', calendar: 'ask' });
+    await helper.send({ ev: 'perms', accessibility: 'ask', mic: 'denied', screen: 'allowed' });
     const check = page.getByTestId('settings.check');
     await expect(check, 'the setup page').toBeVisible();
     await expect(check, 'a refused mic says what it costs').toContainText(/denied/);
@@ -69,7 +69,7 @@ test('setup/check-again (S.8): each missing thing offers its fix, check again re
     await expect(check, 'no model signed in: it says agents can’t answer').toContainText(/no subscription or key/);
     await page.getByTestId('settings.check.again').click();
     await core.waitCmd((c) => c.cmd === 'setup_check', 1000);
-    await helper.send({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen: 'allowed', calendar: 'ask' });
+    await helper.send({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen: 'allowed' });
     await core.send(accountsEv([{ ...SIGNED_OUT[0], state: 'signed_in', who: 'camille@example.com' } as Account, SIGNED_OUT[1] as Account]));
     await expect(page.getByText('all set.'), 'everything granted: all set').toBeVisible();
     await page.getByTestId('settings.check.model.fix').waitFor({ state: 'detached', timeout: 1000 }).catch(() => undefined);

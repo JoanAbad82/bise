@@ -379,11 +379,10 @@ export const helper_ev: readonly HelperEv[] = [
   {"app":"Safari","bundle":"com.apple.Safari","ev":"front","title":"checkout: fix the card field on Safari #42","url":"https://github.com/acme/checkout/pull/42"},
   {"app":"Code","bundle":"com.microsoft.VSCode","ev":"front","path":"/Users/u/w/telemetry/src/main.rs","title":"main.rs — telemetry"},
   {"app":null,"ev":"front"},
-  {"accessibility":"allowed","calendar":"ask","ev":"perms","mic":"ask","screen":"ask"},
-  {"accessibility":"ask","calendar":"denied","ev":"perms","mic":"denied","screen":"allowed"},
+  {"accessibility":"allowed","ev":"perms","mic":"ask","screen":"ask"},
+  {"accessibility":"ask","ev":"perms","mic":"denied","screen":"allowed"},
   {"ev":"quiet","on":true,"why":"call"},
   {"ev":"quiet","on":true,"why":"sharing"},
-  {"ev":"quiet","on":true,"why":"meeting"},
   {"ev":"quiet","on":true,"why":"full_screen"},
   {"ev":"quiet","on":false,"why":""},
   {"app":"Safari","ev":"shot","id":"s1","path":"/Users/u/.bise/run/shots/fn-1791100400000.png","title":"checkout: fix the card field on Safari #42"},
@@ -395,8 +394,8 @@ export const helper_ev: readonly HelperEv[] = [
 
 /** rust/proto/fixtures/helper_cmd.jsonl */
 export const helper_cmd: readonly HelperCmd[] = [
-  {"cmd":"config","exclude":["com.agilebits.onepassword7"],"meetings":false,"right_option":true},
-  {"cmd":"config","exclude":[],"meetings":true,"right_option":false},
+  {"cmd":"config","exclude":["com.agilebits.onepassword7"],"right_option":true},
+  {"cmd":"config","exclude":[],"right_option":false},
   {"cmd":"route","open":true},
   {"cmd":"route","open":false},
   {"cmd":"own_mic","open":true},
@@ -404,7 +403,6 @@ export const helper_cmd: readonly HelperCmd[] = [
   {"action":"ask","cmd":"perm","perm":"accessibility"},
   {"action":"open","cmd":"perm","perm":"mic"},
   {"action":"ask","cmd":"perm","perm":"screen"},
-  {"action":"ask","cmd":"perm","perm":"calendar"},
   {"cmd":"shot","dir":"/Users/u/.bise/run/shots","id":"s1"},
   {"cmd":"quit"},
 ];

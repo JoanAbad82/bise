@@ -49,7 +49,7 @@ DESKTOP = os.path.join(REPO, "apps", "desktop")
 DMG_DIR = os.path.join(DESKTOP, "resources", "dmg")
 NAME = "bise"
 APP_ID = "dev.bise.desktop"
-# the native helper's floor (apps/desktop/native/mac/build.sh: ScreenCaptureKit, EventKit)
+# the native helper's floor (apps/desktop/native/mac/build.sh: ScreenCaptureKit)
 MACOS_TARGET = "14.0"
 DMGBUILD = "dmgbuild==1.6.7"
 # what a desktop app needs from its runtime's core: unchanged between the two commits

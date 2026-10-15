@@ -11,7 +11,7 @@
 #                           the EDR deletes fresh unsigned binaries)
 #
 # MACOSX_DEPLOYMENT_TARGET: from the caller, 14.0 at least (ScreenCaptureKit
-# screenshots, EventKit full access). HELPER_SIGN_ID: a codesigning identity
+# screenshots). HELPER_SIGN_ID: a codesigning identity
 # (the app's); without it, ad hoc.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -22,7 +22,7 @@ SDK="$(xcrun --show-sdk-path)"
 SOURCES=("$HERE"/src/*.swift)
 FLAGS=(-swift-version 5 -target "$ARCH-apple-macos$TARGET" -sdk "$SDK"
        -framework AppKit -framework ScreenCaptureKit -framework AVFoundation
-       -framework ApplicationServices -framework CoreAudio -framework CoreMediaIO -framework EventKit)
+       -framework ApplicationServices -framework CoreAudio -framework CoreMediaIO)
 
 case "${1:-}" in
   --check)

@@ -28,7 +28,7 @@ const prefs = (theme: 'light' | 'dark', shot: boolean | undefined) => ({
     shots_keep_days: 7,
   },
 });
-const perms = (screen: 'allowed' | 'ask' | 'denied') => ({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen, calendar: 'allowed' });
+const perms = (screen: 'allowed' | 'ask' | 'denied') => ({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen });
 
 /** waits for one more capsule line matching `pred` than there was before `act` */
 async function next(w: World, pred: (l: string) => boolean, act: () => Promise<void>, ms = 3000): Promise<void> {

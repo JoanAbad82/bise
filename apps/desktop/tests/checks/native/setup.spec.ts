@@ -25,7 +25,7 @@ const QUIET_DOWN_MS = 2000;
 test('setup/perms: none granted: allow asks the helper, a refusal says how, a grant shows, continue for now', async () => {
   await onWorld(async ({ s, helper }) => {
     const { page } = s;
-    await helper.send({ ev: 'perms', accessibility: 'ask', mic: 'ask', screen: 'ask', calendar: 'ask' });
+    await helper.send({ ev: 'perms', accessibility: 'ask', mic: 'ask', screen: 'ask' });
     await page.getByTestId('setup.next').click(); // hello -> permissions
     await expect(page.getByTestId('setup.perms'), 'the permissions step').toBeVisible();
     for (const p of PERMS) await expect.soft(page.getByTestId(`setup.perm.${p}`), `${p}: allow`).toBeVisible();
@@ -33,7 +33,7 @@ test('setup/perms: none granted: allow asks the helper, a refusal says how, a gr
 
     await page.getByTestId('setup.perm.mic').click();
     await helper.waitCmd((c) => c.cmd === 'perm' && c.perm === 'mic' && c.action === 'ask', 1000);
-    await helper.send({ ev: 'perms', accessibility: 'ask', mic: 'denied', screen: 'ask', calendar: 'ask' });
+    await helper.send({ ev: 'perms', accessibility: 'ask', mic: 'denied', screen: 'ask' });
     const open = page.getByTestId('setup.perm.mic.open');
     await expect(open, 'a refused mic offers System Settings').toBeVisible();
     await expect.soft(page.getByTestId('setup.perms'), 'and says what is lost or how to grant it').toContainText(/settings|later|without/i);
@@ -42,7 +42,7 @@ test('setup/perms: none granted: allow asks the helper, a refusal says how, a gr
 
     await page.getByTestId('setup.perm.accessibility').click();
     await helper.waitCmd((c) => c.cmd === 'perm' && c.perm === 'accessibility' && c.action === 'ask', 1000);
-    await helper.send({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen: 'allowed', calendar: 'ask' });
+    await helper.send({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen: 'allowed' });
     for (const p of PERMS) await expect.soft(page.getByTestId(`setup.perm.${p}`), `${p}: no allow once granted`).toBeHidden();
     await expect(page.getByTestId('setup.next'), 'all granted: continue').toHaveText(/^continue$/);
     await page.getByTestId('setup.next').click();

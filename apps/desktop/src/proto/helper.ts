@@ -22,7 +22,7 @@ by?: TalkKey | null,
  * the bise key after fn (`space`, `1`..`0`, `i`, `enter`, `tab`...),
  * act `key` only
  */
-key?: string | null, } | { "ev": "context", id?: string | null, context: FnContext, bundle?: string | null, excluded?: boolean, } | { "ev": "front", app: string | null, bundle?: string | null, title?: string | null, url?: string | null, path?: string | null, } | { "ev": "perms", accessibility: Grant, mic: Grant, screen: Grant, calendar: Grant, } | { "ev": "quiet", on: boolean, why: QuietWhy, } | { "ev": "shot", id: string, 
+key?: string | null, } | { "ev": "context", id?: string | null, context: FnContext, bundle?: string | null, excluded?: boolean, } | { "ev": "front", app: string | null, bundle?: string | null, title?: string | null, url?: string | null, path?: string | null, } | { "ev": "perms", accessibility: Grant, mic: Grant, screen: Grant, } | { "ev": "quiet", on: boolean, why: QuietWhy, } | { "ev": "shot", id: string, 
 /**
  * none: no front window, no screen permission, or skipped
  */
@@ -45,13 +45,13 @@ export type TalkKey = "fn" | "right_option";
  */
 export type Grant = "allowed" | "denied" | "ask";
 
-export type QuietWhy = "call" | "sharing" | "meeting" | "full_screen" | "";
+export type QuietWhy = "call" | "sharing" | "full_screen" | "";
 
-export type Perm = "accessibility" | "mic" | "screen" | "calendar";
+export type Perm = "accessibility" | "mic" | "screen";
 
 export type PermAction = "ask" | "open";
 
 /**
  * What Electron's main asks the helper.
  */
-export type HelperCmd = { "cmd": "config", exclude: Array<string>, right_option: boolean, meetings: boolean, } | { "cmd": "route", open: boolean, } | { "cmd": "own_mic", open: boolean, } | { "cmd": "read_context", id: string, } | { "cmd": "perm", perm: Perm, action: PermAction, } | { "cmd": "shot", id: string, dir: string, } | { "cmd": "quit" };
+export type HelperCmd = { "cmd": "config", exclude: Array<string>, right_option: boolean, } | { "cmd": "route", open: boolean, } | { "cmd": "own_mic", open: boolean, } | { "cmd": "read_context", id: string, } | { "cmd": "perm", perm: Perm, action: PermAction, } | { "cmd": "shot", id: string, dir: string, } | { "cmd": "quit" };

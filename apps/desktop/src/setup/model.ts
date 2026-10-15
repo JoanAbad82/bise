@@ -15,7 +15,7 @@ import type { AppCmd, Found, Grant, Perm } from '@/proto';
 export const STEPS = ['hello', 'permissions', 'model', 'projects', 'fn'] as const;
 export type Step = (typeof STEPS)[number];
 
-/** The three permissions the first launch asks (calendar is quiet moments', later). */
+/** The three permissions the first launch asks: all the helper has. */
 export const PERMS: readonly Perm[] = ['mic', 'accessibility', 'screen'];
 
 export type Perms = Readonly<Partial<Record<Perm, Grant>>>;

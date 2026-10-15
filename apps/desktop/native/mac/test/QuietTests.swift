@@ -1,6 +1,5 @@
-// The laws of QuietMachine and CalendarEvent.meetingNow, run by build.sh
-// --test through the swift interpreter (cat'ed after src/Quiet.swift).
-// Never reads a real mic or calendar.
+// The laws of QuietMachine, run by build.sh --test through the swift
+// interpreter (cat'ed after src/Quiet.swift). Never reads a real mic.
 
 import Foundation
 
@@ -40,41 +39,18 @@ _ = samples(&frozen, true, 0, 3)
 frozen.own(open: true, at: 4)
 law("a call stays a call while bise's mic is open (frozen)", samples(&frozen, false, 4, 12) == [] && frozen.call)
 
-var mt = QuietMachine()
-mt.meeting(true)
-law("a meeting is quiet, why meeting", mt.change().map { "\($0.on):\($0.why)" } == "true:meeting")
-_ = samples(&mt, true, 0, 3)
-law("a call during a meeting: why call", mt.why == "call")
-_ = samples(&mt, false, 4, 8)
-law("the call ends, the meeting goes on: why meeting again", mt.on && mt.why == "meeting")
-mt.meeting(false)
-law("the meeting ends: off", mt.change().map { "\($0.on):\($0.why)" } == "false:")
-
 var fs = QuietMachine()
 fs.fullScreen(true)
 law("full screen is quiet, why full_screen", fs.change().map { "\($0.on):\($0.why)" } == "true:full_screen")
-fs.meeting(true)
-law("a meeting outranks full screen", fs.change().map { $0.why } == "meeting")
+_ = samples(&fs, true, 0, 3)
+law("a call outranks full screen", fs.why == "call")
+_ = samples(&fs, false, 4, 8)
+law("the call ends, full screen goes on: why full_screen again", fs.on && fs.why == "full_screen")
+fs.fullScreen(false)
+law("full screen ends: off", fs.change().map { "\($0.on):\($0.why)" } == "false:")
 
 var start = QuietMachine()
 law("nothing to say at start when it's not quiet", start.change() == nil)
-
-let now = Date(timeIntervalSince1970: 1_800_000_000)
-func ev(_ s: Double, _ e: Double, allDay: Bool = false, busy: Bool = true, declined: Bool = false, people: Int = 2) -> CalendarEvent {
-    CalendarEvent(start: now.addingTimeInterval(s), end: now.addingTimeInterval(e), allDay: allDay, busy: busy, declined: declined, attendees: people)
-}
-law("a meeting around now", CalendarEvent.meetingNow([ev(-600, 600)], now: now))
-law("not before it starts, not at its end",
-    !CalendarEvent.meetingNow([ev(60, 600)], now: now) && !CalendarEvent.meetingNow([ev(-600, 0)], now: now))
-law("all-day, free, declined or alone: not a meeting",
-    !CalendarEvent.meetingNow([ev(-600, 600, allDay: true), ev(-600, 600, busy: false), ev(-600, 600, declined: true), ev(-600, 600, people: 0)], now: now))
-
-// the tray's quiet hour is Electron's: the machine knows only what it samples
-var qp = QuietMachine()
-qp.meeting(true)
-law("meeting: on, why meeting", qp.on && qp.why == "meeting" && qp.change()! == (true, "meeting"))
-qp.meeting(false)
-law("meeting: its end ends the quiet", !qp.on && qp.change()! == (false, ""))
 
 // S9: a camera in use is a call; a shared screen is quiet (lead m_9025)
 func cams(_ m: inout QuietMachine, _ running: Bool, _ t0: Double, _ t1: Double) -> [String] {
@@ -99,11 +75,11 @@ law("camera: bise's own talk doesn't freeze the camera (bise never opens one)", 
 var sh = QuietMachine()
 sh.sharing(true)
 law("sharing: a shared screen is quiet, why sharing", sh.change().map { "\($0.on):\($0.why)" } == "true:sharing")
-sh.meeting(true)
-law("sharing: outranks a meeting (the screen is seen)", sh.why == "sharing")
+sh.fullScreen(true)
+law("sharing: outranks full screen (the screen is seen)", sh.why == "sharing")
 _ = samples(&sh, true, 0, 3)
 law("sharing: a call during a share names the call", sh.why == "call")
-sh.sharing(false); sh.meeting(false)
+sh.sharing(false); sh.fullScreen(false)
 law("sharing: all over: off once the call ends", samples(&sh, false, 4, 8) == ["off:"] && !sh.on)
 
 if failures > 0 { print("\(failures) failed"); exit(1) }

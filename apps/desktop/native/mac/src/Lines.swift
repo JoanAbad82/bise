@@ -11,11 +11,11 @@ import Foundation
 
 // what Electron asks (HelperCmd)
 enum HelperCmd: Equatable {
-    case config(exclude: [String], rightOption: Bool, meetings: Bool)
+    case config(exclude: [String], rightOption: Bool)
     case route(open: Bool)
     case ownMic(open: Bool)
     case readContext(id: String)
-    case perm(String, ask: Bool)           // accessibility | mic | screen | calendar; ask, else open
+    case perm(String, ask: Bool)           // accessibility | mic | screen; ask, else open
     case shot(id: String, dir: String)
     case quit
     case unknown(String)                   // a newer app's command: said back as an error, never fatal
@@ -26,7 +26,7 @@ struct LineError: Error, Equatable { let why: String }
 
 enum Lines {
     static let proto = 1
-    static let perms: Set<String> = ["accessibility", "mic", "screen", "calendar"]
+    static let perms: Set<String> = ["accessibility", "mic", "screen"]
 
     // one line in -> a command, or why it isn't one (a bug of the sender)
     static func decode(_ line: String) -> Result<HelperCmd, LineError> {
@@ -41,8 +41,7 @@ enum Lines {
         case "config":
             guard let ex = o["exclude"] as? [Any], ex.allSatisfy({ $0 is String }) else { return bad("exclude") }
             guard let ro = bool("right_option") else { return bad("right_option") }
-            guard let mt = bool("meetings") else { return bad("meetings") }
-            return .success(.config(exclude: ex as! [String], rightOption: ro, meetings: mt))
+            return .success(.config(exclude: ex as! [String], rightOption: ro))
         case "route":
             guard let v = bool("open") else { return bad("open") }
             return .success(.route(open: v))
@@ -106,8 +105,8 @@ enum Lines {
     }
 
     // each 'allowed' | 'denied' | 'ask'
-    static func perms(accessibility: String, mic: String, screen: String, calendar: String) -> [String: Any] {
-        ["ev": "perms", "accessibility": accessibility, "mic": mic, "screen": screen, "calendar": calendar]
+    static func perms(accessibility: String, mic: String, screen: String) -> [String: Any] {
+        ["ev": "perms", "accessibility": accessibility, "mic": mic, "screen": screen]
     }
 
     static func quiet(on: Bool, why: String) -> [String: Any] { ["ev": "quiet", "on": on, "why": why] }

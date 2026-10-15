@@ -22,7 +22,7 @@ function rig(coreUp = true) {
   return { s, ev, helper, core, dropped };
 }
 
-const PERMS = (screen: 'allowed' | 'denied' | 'ask'): HelperEv => ({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen, calendar: 'ask' });
+const PERMS = (screen: 'allowed' | 'denied' | 'ask'): HelperEv => ({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen });
 const SHOT: HelperEv = { ev: 'shot', id: 'fn-1', path: '/u/shots/a.png', app: 'Safari', title: 'Stripe pricing' };
 
 describe('the fn talk still', () => {

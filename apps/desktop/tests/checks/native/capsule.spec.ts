@@ -7,7 +7,7 @@
 //     window's inbox block or the native notification shows it); it waits in the spotlight's
 //     'waiting for you' rows, ⏎ answers it in place, esc goes back; a quiet moment never holds his
 //     own fn space;
-//   - the helper is told his prefs at start (config: the apps fn never reads, right option, meetings).
+//   - the helper is told his prefs at start (config: the apps fn never reads, right option).
 // In test mode the display is place.ts's OFF_DISPLAY (1920x1200 at -30000,-30000, no menu bar, no
 // Dock), never one of his. The glass over a full-screen app and his app staying active are the VM pass's.
 import type { Page } from '@playwright/test';
@@ -114,7 +114,7 @@ test('native/capsule b3: a new card never pops the capsule; it waits in the spot
   }, { core: new FakeCore(start) });
 });
 
-test('native/capsule: the helper gets his prefs at start (config: excluded apps, right option, meetings)', async () => {
+test('native/capsule: the helper gets his prefs at start (config: excluded apps, right option)', async () => {
   await onWorld(async ({ helper }) => {
     const config = await helper.waitCmd((c) => c.cmd === 'config', 3000).catch(() => null);
     expect(config, `the helper was configured at start (it got ${JSON.stringify(helper.cmds())})`).not.toBeNull();

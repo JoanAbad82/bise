@@ -19,10 +19,10 @@ func json(_ l: String) -> NSDictionary { (try? JSONSerialization.jsonObject(with
 
 // every command line decodes to a known command, as Rust's HelperCmd
 let want: [HelperCmd] = [
-    .config(exclude: ["com.agilebits.onepassword7"], rightOption: true, meetings: false),
-    .config(exclude: [], rightOption: false, meetings: true),
+    .config(exclude: ["com.agilebits.onepassword7"], rightOption: true),
+    .config(exclude: [], rightOption: false),
     .route(open: true), .route(open: false), .ownMic(open: true), .readContext(id: "c7"),
-    .perm("accessibility", ask: true), .perm("mic", ask: false), .perm("screen", ask: true), .perm("calendar", ask: true),
+    .perm("accessibility", ask: true), .perm("mic", ask: false), .perm("screen", ask: true),
     .shot(id: "s1", dir: "/Users/u/.bise/run/shots"), .quit,
 ]
 let cmds = lines("helper_cmd.jsonl")
@@ -47,9 +47,9 @@ let built: [[String: Any]] = [
     Lines.context(FrontRules.build(FrontRaw(app: "1Password", bundle: "com.1password.1password", title: "Vault"), skip: SkipList.builtIn),
                   id: "c8", bundle: "com.1password.1password"),
     safari.front, code.front, FnCtx().front,
-    Lines.perms(accessibility: "allowed", mic: "ask", screen: "ask", calendar: "ask"),
-    Lines.perms(accessibility: "ask", mic: "denied", screen: "allowed", calendar: "denied"),
-    Lines.quiet(on: true, why: "call"), Lines.quiet(on: true, why: "sharing"), Lines.quiet(on: true, why: "meeting"),
+    Lines.perms(accessibility: "allowed", mic: "ask", screen: "ask"),
+    Lines.perms(accessibility: "ask", mic: "denied", screen: "allowed"),
+    Lines.quiet(on: true, why: "call"), Lines.quiet(on: true, why: "sharing"),
     Lines.quiet(on: true, why: "full_screen"), Lines.quiet(on: false, why: ""),
     Lines.shot(id: "s1", path: "/Users/u/.bise/run/shots/fn-1791100400000.png", app: "Safari",
                title: "checkout: fix the card field on Safari #42", skipped: false),
@@ -67,7 +67,7 @@ for (l, b) in zip(evs, built) {
 
 // the quiet machine's words are QuietWhy's, the key names the fixtures'
 let whys = Set(evs.map(json).filter { $0["ev"] as? String == "quiet" }.compactMap { $0["why"] as? String })
-law("quiet: the fixtures name every why the machine says", whys == ["call", "sharing", "meeting", "full_screen", ""])
+law("quiet: the fixtures name every why the machine says", whys == ["call", "sharing", "full_screen", ""])
 
 // bad lines: an error, never a crash; a newer app's command: unknown
 law("bad: not JSON", (try? Lines.decode("hello").get()) == nil)

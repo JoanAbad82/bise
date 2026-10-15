@@ -119,7 +119,6 @@ export default {
     extraFiles: [{ from: helper, to: 'MacOS/bise-mac-helper' }],
     extendInfo: {
       NSMicrophoneUsageDescription: 'bise listens while you hold fn, to hear what you ask.',
-      NSCalendarsFullAccessUsageDescription: 'bise stays quiet during your meetings, when you turn that on.',
       NSAppleEventsUsageDescription: 'bise reads the address of the tab in front when you hold fn.',
     },
   },

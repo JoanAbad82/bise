@@ -15,7 +15,7 @@ export function useHelper(): { perms: Perms; fn: { act: string; n: number } | nu
     const bise = typeof window === 'undefined' ? undefined : window.bise;
     if (bise === undefined) return;
     const on = (ev: HelperEv) => {
-      if (ev.ev === 'perms') setPerms({ mic: ev.mic, accessibility: ev.accessibility, screen: ev.screen, calendar: ev.calendar });
+      if (ev.ev === 'perms') setPerms({ mic: ev.mic, accessibility: ev.accessibility, screen: ev.screen });
       else if (ev.ev === 'fn') setFn((f) => ({ act: ev.act, n: (f?.n ?? 0) + 1 }));
     };
     let live = true;

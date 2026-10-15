@@ -76,7 +76,7 @@ pub enum HelperEv {
         path: Option<String>,
     },
     /// the permissions, at start and whenever one changes
-    Perms { accessibility: Grant, mic: Grant, screen: Grant, calendar: Grant },
+    Perms { accessibility: Grant, mic: Grant, screen: Grant },
     /// a quiet moment began or ended (his 'quiet for 1 h' is the tray's:
     /// Electron ORs it in)
     Quiet { on: bool, why: QuietWhy },
@@ -158,8 +158,6 @@ pub enum QuietWhy {
     Call,
     /// his screen is shared or recorded
     Sharing,
-    /// a meeting in his calendar (when `config.meetings`)
-    Meeting,
     /// the front window fills a screen
     FullScreen,
     /// not quiet
@@ -174,7 +172,6 @@ pub enum Perm {
     Accessibility,
     Mic,
     Screen,
-    Calendar,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -209,11 +206,10 @@ impl HelperEv {
 pub enum HelperCmd {
     /// at start and when his prefs change: the apps never read (bundle
     /// ids, on top of the helper's built-in list), right option as the fn
-    /// fallback, quiet during calendar meetings
+    /// fallback
     Config {
         exclude: Vec<String>,
         right_option: bool,
-        meetings: bool,
     },
     /// the spotlight's route line is up: a plain tab is bise's
     Route { open: bool },

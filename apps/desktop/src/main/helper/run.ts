@@ -155,7 +155,7 @@ function frontWindow(): BrowserWindow | null {
 
 /** Starts the helper when this run has one, and answers the windows' helper calls either way. */
 /** What the pages see in an off-screen run: every permission granted, none asked. */
-export const GRANTED: HelperEv = { ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen: 'allowed', calendar: 'allowed' };
+export const GRANTED: HelperEv = { ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen: 'allowed' };
 
 export function startHelper(testMode: boolean): Helper | null {
   // an off-screen run asks him nothing: no helper, so no fn tap and no TCC preflight (offscreen.ts)

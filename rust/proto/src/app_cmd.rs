@@ -246,7 +246,8 @@ pub enum AppCmd {
     Hush,
     /// he talks over main: its voice stops and his talk starts
     CutIn,
-    /// on a call or in a meeting (the app's read): text only, no voice
+    /// a quiet moment (the app's read: a call, a shared screen, full
+    /// screen): text only, no voice
     /// (docs/ambient-app.md §4)
     Quiet {
         #[serde(default)]
