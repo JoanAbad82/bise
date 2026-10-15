@@ -1,15 +1,16 @@
-/* Ring (ring.tsx): the context gauge, 12 px (designer's desktop-delight touch 4, m_25940): a filled
-   wedge in text-2 from 12 o'clock inside a 1 px text-3 circle; never a spinner. */
+/* Ring (ring.tsx): the context gauge, 12 px, a donut (his ask on agent-rows: the filled pie read
+   heavy): a 1.5 px arc in text-2 from 12 o'clock on a faint track of the same width; never a spinner. */
 .b-ring {
   display: block;
   flex: none;
 }
-.b-ring .track {
+.b-ring circle {
   fill: none;
-  stroke: var(--c-text-3);
-  stroke-width: 1;
+  stroke-width: 1.5;
+}
+.b-ring .track {
+  stroke: var(--c-line);
 }
 .b-ring .used {
-  fill: var(--c-text-2);
-  stroke: none;
+  stroke: var(--c-text-2);
 }

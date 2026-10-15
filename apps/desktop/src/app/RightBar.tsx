@@ -438,7 +438,8 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   };
   const here = (p: string, agent: string) => route.screen === 'thread' && route.project === p && route.agent === agent;
   return (
-    <aside className={over === true ? 'app-panel app-rb over' : 'app-panel app-rb'} data-testid="app.panel" aria-label={`what happens in ${name}`}>
+    // ⌥ held: every agent row shows its context ring (and its %), else only the hovered one (app.css)
+    <aside className={over === true ? 'app-panel app-rb over' : 'app-panel app-rb'} data-testid="app.panel" data-held={alt ? 'alt' : undefined} aria-label={`what happens in ${name}`}>
       <div className="app-rb-top" data-testid="app.right.top">
         <b>{name}</b>
         {working > 0 && <span className="app-rb-dim">{String(working)} working</span>}

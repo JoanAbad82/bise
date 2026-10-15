@@ -143,11 +143,35 @@ for (const theme of ['light', 'dark']) {
       const brokenCols = cols.find((c) => c.id === 'app.right.agent.broken');
       expect([brokenCols?.tw, brokenCols?.pw], 'no time and no usage: no columns').toEqual([0, 0]);
       expect(cols.find((c) => c.id === 'app.right.agent.launch')?.tw, 'no time: no time column').toBe(0);
-      // every row with usage shows its context ring (his m_26205), the composer's 12 px ds Ring, its words in the tip
-      await expect(page.getByTestId('app.right.agent.launch.ring')).toBeVisible();
+      // every row with usage has its context ring (his m_26205), the composer's 12 px ds Ring, its words in the tip
       expect(Math.round((await page.getByTestId('app.right.agent.launch.ring').boundingBox())?.width ?? 0)).toBe(12);
       await expect(page.getByTestId('app.right.agent.launch.pct')).toHaveAttribute('data-tip', /29% of launch's context used/u);
       await expect(page.getByTestId('app.right.agent.broken.ring')).toHaveCount(0);
+      // ...quiet at rest (his ask on agent-rows): the ring and its '71%' show on the row's hover, or on
+      // every row while ⌥ is held; the column keeps its room, so the now line never moves
+      const ring = (id: string) => page.getByTestId(`app.right.agent.${id}.ring`);
+      const roleRight = async (id: string) => Math.round((await page.getByTestId(`app.right.agent.${id}.role`).boundingBox())?.width ?? 0);
+      const restW = { perf: await roleRight('perf'), launch: await roleRight('launch') };
+      await page.mouse.move(1, 400);
+      await expect(ring('launch'), 'no ring at rest').toBeHidden();
+      await expect(ring('perf')).toBeHidden();
+      await expect(page.getByTestId('app.right.agent.perf.pct'), "no '71%' at rest").toBeHidden();
+      await row('launch').hover();
+      await expect(ring('launch'), "the hovered row's ring shows").toBeVisible();
+      await expect(ring('perf'), 'the others stay quiet').toBeHidden();
+      expect(await roleRight('launch'), 'its now line keeps its width').toBe(restW.launch);
+      await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-ring-hover.png`) });
+      await row('perf').hover();
+      await expect(page.getByTestId('app.right.agent.perf.pct'), "hovered, the '71%' with its ring").toBeVisible();
+      await expect(ring('launch')).toBeHidden();
+      await page.mouse.move(1, 400);
+      await page.keyboard.down('Alt');
+      for (const id of ['perf', 'launch', 'search', 'pay']) await expect(ring(id), `⌥ held: ${id}'s ring`).toBeVisible();
+      await expect(page.getByTestId('app.right.agent.perf.pct')).toBeVisible();
+      expect([await roleRight('perf'), await roleRight('launch')], 'the now lines keep their width').toEqual([restW.perf, restW.launch]);
+      await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-ring-alt.png`) });
+      await page.keyboard.up('Alt');
+      await expect(ring('launch'), 'let go of ⌥: quiet again').toBeHidden();
       // the now line fills its row (his m_26200): its right edge 8 px (the gap) before the first filled
       // column, else before the mark (or the row's padding when it has none)
       const fills = await page.locator('[data-testid="app.right.agents"] .app-rb-arow:not(.app-rb-ghead):not(.app-rb-orphan)').evaluateAll((es) =>

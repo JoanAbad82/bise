@@ -1111,9 +1111,8 @@
   margin-left: auto;
   color: var(--c-text-3);
 }
-/* the context gauge (designer's desktop-delight touch 4, m_25940): 12 px, a filled wedge in text-2 from
-   12 o'clock inside a 1 px text-3 circle (never a spinner); past 80% its numbers in clear beside it,
-   sans with tabular figures */
+/* the context gauge (designer's desktop-delight touch 4, m_25940): the ds Ring, a 12 px donut, always
+   shown here (never a spinner); past 80% its numbers in clear beside it, sans with tabular figures */
 .b-composer .tab .ctx {
   display: inline-flex;
   align-items: center;

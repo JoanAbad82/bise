@@ -839,7 +839,18 @@ body:has(.app-shell) {
 }
 /* the bar's rings in text-3 so a list of them stays quiet (designer m_26248) */
 .app-rb-pct .b-ring .used {
-  fill: var(--c-text-3);
+  stroke: var(--c-text-3);
+}
+/* quiet at rest (his ask on agent-rows: the list of rings read heavy): the ring and its % show on
+   the row's hover or focus, or on every row while ⌥ is held (held.ts, RightBar's data-held); the
+   column keeps its room, so the now line never moves when they show */
+.app-rb-pct {
+  visibility: hidden;
+}
+.app-rb-arow:hover .app-rb-pct,
+.app-rb-arow:focus-visible .app-rb-pct,
+.app-rb[data-held='alt'] .app-rb-pct {
+  visibility: visible;
 }
 /* no time before it: no space either, the now line comes up to the ring */
 .app-rb-time:empty + .app-rb-pct {
