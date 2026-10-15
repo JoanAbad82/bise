@@ -13,6 +13,9 @@ catalog's (tests/words/*.gen.json, generated from rust/proto/src/words/):
     left, more) is digits, a name (agent, from, to, who, asker, maker, by) one token with no
     space, any other arg any text (words-inbox m_27144: '{n} agents {head}' is not 'main and
     your agents use …').
+The cost (architect m_27149): a one-word label with no space or mark ("approve", "search") is
+not linted, so a test that waits on one still breaks when it changes: move such waits onto w()
+where you see them.
 Python files are read with ast (every str constant but docstrings), the desktop's .ts/.tsx/.js/
 .mjs/.mts with a small tokenizer ('…', "…", `…` without ${}, comments skipped).
 
