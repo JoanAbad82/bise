@@ -1,7 +1,8 @@
 // The field's paste, drop and clipboard, out of PmField.tsx: images as chips (pasted, dropped on
 // the field or anywhere in the window), any other file on disk as a file chip by its path
 // (file-chips), a long text as a chip after it lands inline (⌘Z puts it
-// back inline), any other text as plain text; a copy reads chips as their labels.
+// back inline), a URL over selected words as a link with those words (linkpaste.ts), any other
+// text as plain text; a copy reads chips as their labels.
 import { useEffect, useEffectEvent } from "react";
 import { closeHistory } from "@tiptap/pm/history";
 import {
@@ -14,6 +15,7 @@ import type { Slice } from "@tiptap/pm/model";
 import { chipLabel, isLongPaste, nextChipNumber, type Chip } from "../message";
 import { isImagePath, type ComposerSources } from "../sources";
 import { fileIconOf, filePathOf, imageDims, isImageFile, thumbnail } from "../attach";
+import { linkPaste } from "../linkpaste";
 import { insertChip, insertText, nodeType, segmentsOf } from "./pmtext";
 
 /** What paste and drop need of the field: read at each use (the editor and props live in refs). */
@@ -144,6 +146,23 @@ const longPaste = (c: PasteCtx, raw: string): void => {
   c.dispatch(closeHistory(tr));
 };
 
+/** A URL pasted over selected words: `[words](url)`, the caret after it, one undo step that
+ *  gives the selection back (linkpaste.ts). False: a chip, a newline or the dictation in the
+ *  selection, or not one URL; the paste goes on as before. */
+const linkOverSelection = (c: PasteCtx, text: string): boolean => {
+  const st = c.state();
+  if (st === null || st.selection.empty) return false;
+  const { from, to } = st.selection;
+  const selected = st.doc.textBetween(from, to, "\n", "\uFFFC");
+  if (selected.includes("\uFFFC")) return false;
+  const link = linkPaste(selected, text);
+  if (link === null) return false;
+  const tr = insertText(st, link.text);
+  tr.setSelection(TextSelection.create(tr.doc, from + link.caret));
+  c.dispatch(closeHistory(tr.setMeta("paste", true)));
+  return true;
+};
+
 /** A paste in the field (or anywhere, through grab.ts): true, it was handled. */
 export function pasteInto(c: PasteCtx, e: ClipboardEvent): boolean {
   const data = e.clipboardData;
@@ -159,6 +178,7 @@ export function pasteInto(c: PasteCtx, e: ClipboardEvent): boolean {
   }
   const text = data.getData("text/plain");
   e.preventDefault();
+  if (linkOverSelection(c, text)) return true;
   if (isLongPaste(text)) {
     longPaste(c, text);
     return true;

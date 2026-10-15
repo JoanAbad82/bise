@@ -95,6 +95,7 @@ mod attach_file;
 mod open_file;
 mod quote;
 mod pasted;
+mod paste_link;
 mod usage;
 mod models;
 mod term;

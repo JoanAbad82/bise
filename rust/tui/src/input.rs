@@ -557,6 +557,10 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
     // normalize CRLF/CR so a terminal paste behaves like the
     // typed newline, then insert at the cursor
     let text = text.replace("\r\n", "\n").replace('\r', "\n");
+    if link_over_selection(app, &text) {
+        app.popup_sel = 0;
+        return;
+    }
     // a paste that is only image paths (a file dragged into the
     // terminal, iTerm2's "Save to Temp File and Paste Path" on an image)
     // attaches the images; an empty or blank paste (Cmd+V on an image in
@@ -586,6 +590,21 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
         None => app.ed.paste(&text),
     }
     app.popup_sel = 0;
+}
+
+/// A URL pasted over selected words: `[words](url)`, the cursor after
+/// it, one undo step that gives the selection back (paste_link.rs).
+/// False: a chip in the selection, or not one URL over words.
+fn link_over_selection(app: &mut App, text: &str) -> bool {
+    let Some((a, b)) = app.ed.selection() else { return false };
+    let Some(selected) = app.ed.selected_text() else { return false };
+    if crate::attach::chips(&app.ed.text).iter().any(|&(s, e, _)| s < b && a < e) {
+        return false;
+    }
+    let Some(link) = crate::paste_link::link_paste(&selected, text) else { return false };
+    app.ed.paste(&link.text);
+    app.ed.cursor = a + link.caret;
+    true
 }
 
 /// A newline in the composer (BISE-276, mdlive.rs): it continues or
