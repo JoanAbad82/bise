@@ -135,7 +135,7 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u, k):
       Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.msgs(HX.d(o, wg)), HM.St.msgs(HX.d(o, tg)),
         PL1.hub_msgs_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
         PL1.hub_msgs_wakes(o, life, tg, n)),
-      PL2.hub_msgs_gone(o, HC.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
+      PL2.hub_msgs_gone(o, HR.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
     Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, g)), HM.St.msgs(HX.d(o, cx6)), PL1.hub_rej(ids, m5),
       PL2.hub_msgs_close_ids(o, HC.card_ids(HM.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
       PL1.hub_msgs_reject(o, ids, cx5)))
@@ -147,7 +147,7 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u, k):
         Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, wg)), HM.St.agents(HX.d(o, tg)),
           PL2.hub_agents_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
           PL1.hub_agents_wakes(o, life, tg, n)),
-        PL2.hub_agents_gone(o, HC.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
+        PL2.hub_agents_gone(o, HR.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
       Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, g)), HM.St.agents(HX.d(o, cx6)), HM.St.agents(HX.d(o, cx5)),
         PL2.hub_agents_close_ids(o, HC.card_ids(HM.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
         PL2.hub_agents_reject(o, ids, cx5))))
@@ -192,7 +192,7 @@ def Laws.stop_leaves_no_card(o, cx, n, life, why, u):
       Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.cards(HX.d(o, wg)), HM.St.cards(HX.d(o, tg)),
         PL2.hub_cards_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
         PL2.hub_cards_wakes(o, life, tg, n)),
-      PL2.hub_cards_gone(o, HC.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
+      PL2.hub_cards_gone(o, HR.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
     PL2.hub_cards_close_ids(o, HC.card_ids(c6, n, Nil{}), cx6, "agent stopped"))
   PL2.hub_cids_tr(HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL2.hub_dropc(HC.card_ids(c6, n, Nil{}), c6), n, ef,
     PL2.hub_KC(c6, n, PL1.hub_distinct_tr(HI.card_ids(c6), HI.card_ids(HM.St.cards(HX.d(o, cx))),
@@ -350,6 +350,23 @@ def Laws.page_answer_tells_asker(o, cx, c, to, page, text):
   {==}
 
 def Laws.page_answer_quiet(o, cx, c, to, page, text):
+  {==}
+
+def Laws.page_card_asker_main(s):
+  {==}
+
+def Laws.page_card_asker_first(s, h, t, q):
+  %Equal.sym(Bool, HR.agent_active(s, h), True{}, q) : {HR.page_asker.pick(_, h, HR.page_asker(s, t)) == h : String}
+  {==}
+
+def Laws.page_card_asker_next(s, h, t, q):
+  %Equal.sym(Bool, HR.agent_active(s, h), False{}, q) : {HR.page_asker.pick(_, h, HR.page_asker(s, t)) == HR.page_asker(s, t) : String}
+  {==}
+
+def Laws.page_card_opens(o, cx, agents, text):
+  {==}
+
+def Laws.page_card_other_kind(o, cx, agents, text):
   {==}
 
 def Laws.page_asker_other(x, y, q):

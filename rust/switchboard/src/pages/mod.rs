@@ -15,6 +15,7 @@ pub mod lint;
 pub mod artifact;
 pub mod mirror;
 pub mod notelines;
+pub mod plan;
 pub mod questions;
 pub mod server;
 pub mod site;

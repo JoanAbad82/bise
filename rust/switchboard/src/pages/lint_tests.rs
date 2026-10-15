@@ -405,7 +405,7 @@ fn a_write_his_word_triggers_is_an_action_block() {
     );
     has(
         &errs(r#"<section data-kit="prose" data-id="p" data-do="close OPS-12"><p>x</p></section>"#),
-        "p: data-do is not a kit attribute here: only an action block takes it",
+        "p: data-do is not a kit attribute here: only an action or a plan block takes it",
     );
     // code work is never an action (pm's C, lead m_6217)
     let act = |d: &str| format!(r#"<section data-kit="action" data-id="a1" data-do="{d}"><p>x</p></section>"#);
@@ -636,4 +636,29 @@ fn an_item_names_the_agent_working_on_it() {
         ),
         "c: data-agent is not a kit attribute",
     );
+}
+
+/// plan-ok: a plan an agent proposes is one plan block (a name, a gist,
+/// its parts, who runs it, its verb) and its other ways a compare with
+/// data-for; one plan a page; each other way says its verb.
+#[test]
+fn a_plan_is_one_block_and_its_other_ways() {
+    let plan = include_str!("../../../../kit/examples/lean-plan.html");
+    let kits: Vec<String> = ok(plan).into_iter().map(|b| b.kit).collect();
+    assert!(kits.contains(&"plan".to_string()) && kits.contains(&"compare".to_string()));
+    // started: data-started on the plan or on one of its other ways
+    ok(&plan.replace("data-do=\"start the plan\">", "data-do=\"start the plan\" data-started=\"11:42\">"));
+    ok(&plan.replace("data-id=\"arm64\"", "data-id=\"arm64\" data-started=\"11:50\""));
+    has(&errs(&plan.replace(" data-agent=\"lean-install\"", "")), "plan: a plan block needs data-agent");
+    has(&errs(&plan.replace(" data-agent=\"lean-install\"", " data-agent=\"Lean Install\"")), "is not an agent name");
+    has(&errs(&plan.replace(" data-do=\"start the plan\"", "")), "plan: a plan block needs data-do");
+    has(&errs(&plan.replace("<h3>make installs lean by default</h3>", "")), "plan: a plan block needs its name as <h3>");
+    has(&errs(&plan.replace("data-id=\"p2\"", "")), "a plan item without data-id");
+    has(&errs(&plan.replace(" data-do=\"start it, but keep win32\"", "")), "an other way of a plan needs data-do");
+    has(&errs(&plan.replace("data-for=\"plan\"", "data-for=\"nope\"")), "others: data-for=\"nope\" names no plan block");
+    has(&errs(&plan.replace("data-id=\"others\" data-for=\"plan\"", "data-id=\"others\"")), "others: data-do is not a kit attribute");
+    let second = plan.replace("data-id=\"plan\"", "data-id=\"plan2\"").replace("data-id=\"title\"", "data-id=\"t2\"").replace("data-id=\"others\"", "data-id=\"o2\"").replace("data-id=\"measures\"", "data-id=\"m2\"");
+    has(&errs(&format!("{plan}{second}")), "plan2: a second plan block");
+    has(&errs("<section data-kit=\"prose\" data-id=\"p\" data-agent=\"x\"><p>a</p></section>"), "data-agent is not a kit attribute here");
+    has(&errs("<section data-kit=\"compare\" data-id=\"c\" data-for=\"plan\" data-started=\"1\"><ol><li data-id=\"a\" data-do=\"x\">a</li></ol></section>"), "data-started is not a kit attribute here");
 }

@@ -352,6 +352,44 @@ law page_answer_quiet:
   for +text: String
   {HC.page_answered.tell(o, False{}, cx, c, to, page, text) == cx : HX.Cx<o>}
 
+# LAW (plan-ok, architect m_26549, m_26571): a page's own card is asked
+# by the first live agent of its chain (a plan's agent, then the page's),
+# else main. Live: registered and active (not stopped, failed or
+# archived).
+law page_card_asker_main:
+  for +s: HM.St
+  {HR.page_asker(s, []) == HM.MAIN() : String}
+
+law page_card_asker_first:
+  for +s: HM.St
+  for +h: String
+  for +t: List<&2, String>
+  for q: {HR.agent_active(s, h) == True{} : Bool}
+  {HR.page_asker(s, h <> t) == h : String}
+
+law page_card_asker_next:
+  for +s: HM.St
+  for +h: String
+  for +t: List<&2, String>
+  for q: {HR.agent_active(s, h) == False{} : Bool}
+  {HR.page_asker(s, h <> t) == HR.page_asker(s, t) : String}
+
+# LAW: a plan card opens one card, asked by that chain's agent; a kind
+# that is no page card's opens nothing.
+law page_card_opens:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agents: List<&2, String>
+  for +text: String
+  {HC.page_card(o, cx, agents, "plan", text) == HC.page_card.open(o, cx, "plan", HR.page_asker(HX.d(o, cx), agents), text) : HX.Cx<o>}
+
+law page_card_other_kind:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agents: List<&2, String>
+  for +text: String
+  {HC.page_card(o, cx, agents, "merge", text) == HC.notice(o, cx, "not a page card: merge") : HX.Cx<o>}
+
 # LAW: who is told: the asker when it is another agent than the one the
 # pick went to; never the same agent twice, never an unknown asker.
 law page_asker_other:

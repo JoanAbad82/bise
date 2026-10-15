@@ -141,7 +141,7 @@ pub fn with_title(title: &str, text: &str) -> String {
 
 /// The value of attribute `k` in an open tag (`<li data-id="t1" …>`);
 /// Some("") for a bare one (`data-done`).
-fn attr(head: &str, k: &str) -> Option<String> {
+pub(crate) fn attr(head: &str, k: &str) -> Option<String> {
     let mut rest = head;
     while let Some(i) = rest.find(k) {
         let before = rest[..i].chars().last();

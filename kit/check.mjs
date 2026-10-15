@@ -661,7 +661,7 @@ law("the fonts tokens.css names are in the kit (the CSP loads nothing from outsi
 });
 
 law("every example page is a fragment of known blocks with unique ids", () => {
-  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email", "message", "compare", "checklist", "ui"]);
+  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email", "message", "compare", "checklist", "plan", "ui"]);
   for (const f of readdirSync(join(here, "examples"))) {
     const main = parse(readFileSync(join(here, "examples", f), "utf8"));
     assert.ok(main.children.length > 0 && main.children.every((c) => c.tagName === "SECTION" && kinds.has(c.getAttribute("data-kit"))), f);

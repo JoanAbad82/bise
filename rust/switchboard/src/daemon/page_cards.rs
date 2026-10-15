@@ -559,7 +559,7 @@ impl Shell {
         let closed = || format!("that notification is closed: nothing waits on {} now.", meta.title);
         let changed = |s: &crate::pages::checklist::Step| format!("that notification changed: {}", s.text.lines().next().unwrap_or_default());
         let say = match (now, crate::pages::drafts::is_send_all(reply)) {
-            (Some(s), true) => match s.batch_choices().into_iter().find(|c| c.label.starts_with("send ")) {
+            (Some(s), true) => match s.batch_choices().into_iter().find(|c| crate::pages::drafts::is_all_label(&c.label)) {
                 Some(c) => {
                     self.page_drafts_answer(client, &id, s.card, &c.label);
                     None

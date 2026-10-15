@@ -15,6 +15,8 @@ use serde::{Deserialize, Serialize};
 
 #[path = "lint_tokens.rs"]
 mod tokens;
+#[path = "lint_plan.rs"]
+mod plan;
 use tokens::{decode, parse_tag, Tag};
 
 /// One block of a page: its `data-id`, its kind (`data-kit`) and a hash of its
@@ -42,12 +44,14 @@ pub const KINDS: &[&str] = &[
     "compare",
     "checklist",
     "action",
+    // a plan an agent proposes (plan-ok): one start, its other ways a compare data-for
+    "plan",
     // pages-ui: custom UI in bise's look (ui.rs)
     "ui",
 ];
 
 /// The kinds whose list items are things the user reacts to, each with its own data-id.
-pub const ITEM_KINDS: &[&str] = &["review", "compare", "checklist"];
+pub const ITEM_KINDS: &[&str] = &["review", "compare", "checklist", "plan"];
 
 /// `data-field` of an email's header lines.
 /// An email block's fields; `preview` is a newsletter's preview text (Kit).
@@ -172,6 +176,8 @@ fn lint_full(html: &str) -> Result<(Vec<Block>, Vec<String>), Vec<String>> {
         unsendable: Vec::new(),
         drafted_rows: Vec::new(),
         carded: Vec::new(),
+        plans: Vec::new(),
+        plan_for: Vec::new(),
         raw: None,
     };
     l.run();
@@ -182,6 +188,7 @@ fn lint_full(html: &str) -> Result<(Vec<Block>, Vec<String>), Vec<String>> {
             l.err(&at, format!("item {item}: its draft {draft} can't leave yet (no address in its To): say what you need from him as a question (a question block, and data-question=\"<its id>\" on the row)"));
         }
     }
+    l.plan_end();
     if l.open.is_some() {
         let b = l.open.take().unwrap();
         l.err(
@@ -218,6 +225,8 @@ struct Open {
     list_depth: usize,
     /// a ui block's <style> elements (one at most)
     styles: usize,
+    /// a compare of a plan's other ways (data-for)
+    plan_for: bool,
 }
 
 impl Open {
@@ -240,6 +249,10 @@ struct Linter<'a> {
     drafted_rows: Vec<(String, String, String)>,
     /// question blocks that make a notification (no data-notify="none")
     carded: Vec<String>,
+    /// plan blocks (plan-ok): at most one a page
+    plans: Vec<String>,
+    /// compare blocks of a plan's other ways: (block, the plan it names)
+    plan_for: Vec<(String, String)>,
     /// the text of the raw element just read (a ui block's <style>)
     raw: Option<String>,
 }
@@ -431,8 +444,15 @@ impl<'a> Linter<'a> {
                 // data-question: a step that is a decision is that question (pm's 35)
                 "checklist" => &["data-id", "data-done", "data-who", "data-due", "data-agent", "data-did", "data-draft", "data-question"],
                 "review" => &["data-id", "data-reply", "data-agent"],
+                // a plan's part: optional, done as the agent goes (plan-ok)
+                "plan" => &["data-id", "data-optional", "data-done"],
+                // a plan's other way: its verb, started
+                "compare" if self.open.as_ref().is_some_and(|b| b.plan_for) => &["data-id", "data-do", "data-started"],
                 _ => &["data-id"],
             };
+            if kit == "compare" && self.open.as_ref().is_some_and(|b| b.plan_for) {
+                self.plan_way(&at, get("data-do"));
+            }
             // a reply item's thread (slice B): an https link the user opens to answer there
             if let Some(u) = get("data-reply") {
                 let low = u.trim().to_ascii_lowercase();
@@ -587,9 +607,11 @@ impl<'a> Linter<'a> {
                 Some(d) if is_code_work(d) => self.err(&at, format!("data-do=\"{d}\" is code work: an action is one write in his accounts (close OPS-12, label a mail); a code change is a review item with data-verb=\"start\" (start an agent)")),
                 _ => {}
             }
-        } else if what.is_some() {
-            self.err(&at, "data-do is not a kit attribute here: only an action block takes it".into());
+        } else if kit.as_deref() != Some("plan") && what.is_some() {
+            self.err(&at, "data-do is not a kit attribute here: only an action or a plan block takes it".into());
         }
+        // a plan (plan-ok, lint_plan.rs): its verb, who runs it, its other ways
+        let plan_for = self.plan_block(&at, kit.as_deref(), what, get("data-agent"), get("data-started"), get("data-for"));
         // an email may say where it goes too (data-to="Gmail · reply to Camille Roux")
         if get("data-to").is_some() && !matches!(kit.as_deref(), Some("message" | "email")) {
             self.err(
@@ -671,6 +693,7 @@ impl<'a> Linter<'a> {
             bare_items: false,
             list_depth: 0,
             styles: 0,
+            plan_for: plan_for.is_some(),
         });
     }
 
@@ -700,6 +723,11 @@ impl<'a> Linter<'a> {
                 "a question block needs its options as <ol><li>…</li></ol>",
             )],
             "action" => &[("p", "an action block needs a <p> saying what it does and why (close OPS-12 · fixed in 0.4.2)")],
+            "plan" => &[
+                ("h3", "a plan block needs its name as <h3> (make installs lean by default)"),
+                ("p", "a plan block needs a <p>: what it does and gains, one or two whole sentences (the notification says it as is)"),
+                ("li", "a plan block needs its parts in order as <ol><li data-id=\"p1\">…</li></ol>"),
+            ],
             "review" => &[(
                 "li",
                 "a review block needs its items as <ol><li data-id=\"m1\">…</li></ol>",
@@ -713,7 +741,9 @@ impl<'a> Linter<'a> {
         if ITEM_KINDS.contains(&kit.as_str()) && b.bare_items {
             self.err(&at, format!("a {kit} item without data-id: give each <li> of its list its own (m1, m2) so reactions know which"));
         }
-        if kit == "compare" && !(2..=4).contains(&b.items.len()) {
+        if kit == "compare" && b.plan_for && !(1..=3).contains(&b.items.len()) {
+            self.err(&at, format!("a plan's other ways are 1 to 3, as <ol><li data-id=\"o1\" data-do=\"…\">…</li></ol>, not {}", b.items.len()));
+        } else if kit == "compare" && !b.plan_for && !(2..=4).contains(&b.items.len()) {
             self.err(&at, format!("a compare block has 2 to 4 variants as <ol><li data-id=\"v1\">…</li></ol>, not {}", b.items.len()));
         }
         if kit == "email" {
@@ -818,13 +848,16 @@ impl<'a> Linter<'a> {
                             | "data-notify"
                             | "data-card"
                             | "data-do"
+                            | "data-agent"
+                            | "data-started"
+                            | "data-for"
                     )
                 } else {
                     false
                 };
                 if !ok {
                     let hint = if block {
-                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review), data-plan (checklist), data-notify=\"none\" (question), data-do (action)"
+                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review), data-plan (checklist), data-notify=\"none\" (question), data-do (action, plan), data-agent and data-started (plan), data-for (a compare of a plan's other ways)"
                     } else {
                         "inside a block only a review's <li data-id> and an email's <p data-field> take one"
                     };

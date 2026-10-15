@@ -23,8 +23,10 @@ pub struct Draft {
     pub text: String,
     /// a drafted plan step: its row (the page anchor)
     pub step: Option<String>,
-    /// what it is: reply (a review item) | email | message | step (a
-    /// drafted step with no draft block)
+    /// what it is: reply (a review item that leaves: data-verb send or
+    /// reply, a message in a thread) | item (a review item with no verb:
+    /// he approves it, nothing leaves) | email | message | step (a
+    /// drafted step with no draft block) | action
     pub kind: &'static str,
     /// who it goes to, when the page says: an email's To (its name, or
     /// the address before the @), a message's channel
@@ -99,16 +101,20 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question], went: &[Strin
     // a review's verb says what its items are: start (feedback an agent
     // can fix: his pick goes to main), keep (what bise keeps), open-reply
     // (read-only places: copy + open) are nothing bise sends (pm's C
-    // fail 42)
-    let sends = |b: &str| {
-        let verb = head_of(html, b).and_then(|(h, _)| h.split("data-verb=\"").nth(1).and_then(|r| r.split('"').next()).map(String::from));
-        !matches!(verb.as_deref(), Some("start" | "keep" | "open-reply"))
-    };
+    // fail 42); send and reply (mentions) are replies that leave; none:
+    // items he approves, never 'replies' (plan-ok: a plan written as a
+    // review read 'send these 3 replies?')
+    let verb_of = |b: &str| head_of(html, b).and_then(|(h, _)| h.split("data-verb=\"").nth(1).and_then(|r| r.split('"').next()).map(String::from));
     for r in items_of(html, "review") {
-        if !r.done && !verdict(&r.block, Some(&r.item)) && sends(&r.block) {
-            let to = reply_to(&r.text);
-            out.push(Draft { block: r.block.clone(), item: Some(r.item.clone()), text: r.text.clone(), step: None, kind: "reply", to, topic: None, detail: None, rank: None });
+        let verb = verb_of(&r.block);
+        if r.done || verdict(&r.block, Some(&r.item)) || matches!(verb.as_deref(), Some("start" | "keep" | "open-reply")) {
+            continue;
         }
+        let (kind, to) = match verb.as_deref() {
+            Some("send" | "reply") => ("reply", reply_to(&r.text)),
+            _ => ("item", None),
+        };
+        out.push(Draft { block: r.block.clone(), item: Some(r.item.clone()), text: r.text.clone(), step: None, kind, to, topic: None, detail: None, rank: None });
     }
     // what left already: a --went block, the message an approved action posts
     let approved = |a: &str| notes.iter().any(|n| n.block == a && note_item(n).is_none() && (n.kind == "approve" || is_go_word(n)));
@@ -315,7 +321,8 @@ fn reply_to(text: &str) -> Option<String> {
 }
 
 /// What a batch holds, in ambient's words: replies, emails, messages,
-/// steps, or drafts when they differ.
+/// steps, items (nothing that leaves: never 'replies'), or drafts when
+/// they differ.
 pub fn what(drafts: &[Draft]) -> &'static str {
     // account changes are counted apart (action_words); only them: actions
     let sends: Vec<&Draft> = drafts.iter().filter(|d| d.kind != "action").collect();
@@ -328,6 +335,7 @@ pub fn what(drafts: &[Draft]) -> &'static str {
     }
     match first {
         "reply" => "replies",
+        "item" => "items",
         "email" => "emails",
         "message" => "messages",
         _ => "steps",
@@ -433,6 +441,9 @@ pub fn batch_text(drafts: &[Draft], title: &str) -> String {
         let w = what(&sends.iter().map(|d| (*d).clone()).collect::<Vec<_>>());
         let w = if w == "steps" { "drafts" } else { w };
         out.push(page(match (sends.len(), w) {
+            // items leave nothing: he approves them (plan-ok)
+            (1, "items") => "approve this item?".to_string(),
+            (n, "items") => format!("approve these {n} items?"),
             (1, "replies") => "send this reply?".to_string(),
             (1, w) => format!("send this {}?", w.trim_end_matches('s')),
             (n, w) => format!("send these {n} {w}?"),
@@ -497,7 +508,9 @@ pub fn choices(drafts: &[Draft]) -> Vec<Choice> {
     // one decision per notification (designer m_25451): the sends first,
     // then each change alone
     if !sends.is_empty() {
-        return vec![Choice { label: send_label(sends.len()), keys: sends }];
+        let items = drafts.iter().filter(|d| d.kind != "action").all(|d| d.kind == "item");
+        let label = if items { approve_label(sends.len()) } else { send_label(sends.len()) };
+        return vec![Choice { label, keys: sends }];
     }
     drafts.iter().find(|d| d.kind == "action").map(|a| Choice { label: a.text.clone(), keys: vec![a.key()] }).into_iter().collect()
 }
@@ -510,6 +523,18 @@ pub fn send_label(n: usize) -> String {
         2 => "send both".into(),
         n => format!("send all {n}"),
     }
+}
+
+/// A batch of items' option (nothing leaves, plan-ok): 'approve it',
+/// 'approve both', 'approve all <n>'.
+pub fn approve_label(n: usize) -> String {
+    send_label(n).replacen("send", "approve", 1)
+}
+
+/// The option that lets a batch's drafts go together (send or approve
+/// all), never an account change.
+pub fn is_all_label(label: &str) -> bool {
+    label.starts_with("send ") || label.starts_with("approve ")
 }
 
 /// `t` cut to about `n` chars after a whole word, '…' glued to it
@@ -588,7 +613,7 @@ pub fn batch_answer<'a>(reply: &'a str, choices: &[Choice]) -> BatchAnswer<'a> {
         BatchAnswer::Choice(i - 2)
     } else if let Some(i) = choices.iter().position(label) {
         BatchAnswer::Choice(i)
-    } else if let Some(i) = choices.iter().position(|c| c.label.starts_with("send ")).filter(|_| is_send_word(&w)) {
+    } else if let Some(i) = choices.iter().position(|c| is_all_label(&c.label)).filter(|_| is_send_word(&w)) {
         BatchAnswer::Choice(i)
     } else if choices.len() == 1 && matches!(w.as_str(), "yes" | "oui" | "go" | "ok" | "vas-y" | "vas y") {
         BatchAnswer::Choice(0)
@@ -604,7 +629,7 @@ fn is_send_word(w: &str) -> bool {
         Some((head, n)) if n.chars().all(|c| c.is_ascii_digit()) => head,
         _ => w,
     };
-    matches!(w, "send all" | "send both" | "send" | "send it" | "send them" | "envoie" | "envoie tout" | "envoie les" | "envoie-le")
+    matches!(w, "send all" | "send both" | "send" | "send it" | "send them" | "envoie" | "envoie tout" | "envoie les" | "envoie-le" | "approve all" | "approve both" | "approve" | "approve it")
 }
 
 /// Words on an old batch notification (replaced or closed) that still
@@ -653,7 +678,7 @@ mod tests {
     /// a mail with no address is not ready.
     #[test]
     fn review_items_and_mails_are_drafts_too() {
-        let html = r#"<section data-kit="review" data-id="replies"><ol><li data-id="r1">reply to Nina</li><li data-id="r2">reply to Marc</li></ol></section>
+        let html = r#"<section data-kit="review" data-id="replies" data-verb="send"><ol><li data-id="r1">reply to Nina</li><li data-id="r2">reply to Marc</li></ol></section>
 <section data-kit="message" data-id="slack-1" data-to="Slack · #lyon"><p>bonjour</p></section>
 <section data-kit="email" data-id="mail-x"><p data-field="to">legal: address missing</p><p data-field="subject">s</p><p>x</p></section>"#;
         let skip = [note(json!({"id": "n1", "block": "replies", "item": "r2", "kind": "skip", "status": "sent"}))];
@@ -661,6 +686,27 @@ mod tests {
         assert_eq!(p.iter().map(Draft::key).collect::<Vec<_>>(), vec!["replies/r1", "slack-1"]);
         assert_eq!(what(&p), "drafts", "a reply and a message: mixed");
         assert_eq!(names(&p), vec!["Nina".to_string(), "#lyon".to_string()]);
+    }
+
+    /// Law (plan-ok, Benjamin's 'send these 3 replies?' on a plan): a
+    /// review with no verb holds items he approves, never replies: the
+    /// card asks 'approve these 3 items?' and offers 'approve all 3';
+    /// 'send' and 'replies' stay for a review of data-verb="send".
+    #[test]
+    fn a_review_with_no_verb_is_items_never_replies() {
+        let review = |verb: &str| {
+            format!(r#"<section data-kit="review" data-id="prs"{verb}><ol><li data-id="p1"><p>PR 1 · lean install</p></li><li data-id="p2"><p>PR 2 · AGENTS.md</p></li><li data-id="p3"><p>PR 3 · win32</p></li></ol></section>"#)
+        };
+        let p = pending(&review(""), &[], &[], &[]);
+        assert_eq!(p.iter().map(|d| d.kind).collect::<Vec<_>>(), vec!["item"; 3]);
+        assert_eq!(what(&p), "items");
+        assert!(batch_text(&p, "lean installs").starts_with("lean installs: approve these 3 items?\n- "), "{}", batch_text(&p, "lean installs"));
+        assert_eq!(choices(&p)[0].label, "approve all 3");
+        assert_eq!(batch_answer("approve all 3", &choices(&p)), BatchAnswer::Choice(0));
+        assert_eq!(batch_answer("approve all", &choices(&p)), BatchAnswer::Choice(0));
+        let sends = pending(&review(r#" data-verb="send""#), &[], &[], &[]);
+        assert_eq!((what(&sends), choices(&sends)[0].label.as_str()), ("replies", "send all 3"));
+        assert!(batch_text(&sends, "t").starts_with("t: send these 3 replies?"));
     }
 
     /// Law (pm's C fail 42): a feedback page's Slack replies (message

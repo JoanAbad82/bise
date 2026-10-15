@@ -71,3 +71,4 @@
 {"ans": [], "git": true, "name": "shop", "now": 1066100, "t": "x_reply", "text": "again", "xid": 1}
 {"ans": [], "git": true, "now": 1000000, "t": "pause"}
 {"ans": [], "git": true, "now": 1000500, "t": "resume"}
+{"agents": ["lean-install", "main"], "ans": [], "git": true, "key": "plan:plan", "kind": "plan", "now": 1000000, "t": "page_card", "text": "lean installs: start the plan lean-install recommends?\n1. start the plan\n2. open the plan"}

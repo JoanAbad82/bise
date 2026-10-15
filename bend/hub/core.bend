@@ -1028,13 +1028,6 @@ def live(-o: M.St, +cx: X.Cx<o>) -> List<&2, TM.Timer>:
 def bise_queued(+s: M.St, +n: String) -> Bool:
   R.from_bise(M.queued_for(s, n))
 
-def life_gone(l: M.Life) -> Bool:
-  match l:
-    case M.LArchived{}:
-      True{}
-    case _:
-      False{}
-
 def ready.go(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>) -> Bool:
   match m:
     case None{}:
@@ -1046,17 +1039,6 @@ def ready.go(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>) -> Bool:
 # turn: law timer_reaches_busy); starting or down: it waits
 def timer_ready(-o: M.St, +cx: X.Cx<o>, +n: String) -> Bool:
   ready.go(o, R.agent_of(st(o, cx), n), cx)
-
-def gone.go(m: Maybe<&2, M.Agent>) -> Bool:
-  match m:
-    case None{}:
-      True{}
-    case Some{+a}:
-      life_gone(M.Agent.life(a))
-
-# unknown or archived: its timers end
-def timer_gone(+s: M.St, +n: String) -> Bool:
-  gone.go(R.agent_of(s, n))
 
 # a paused project fires no timer (law timer_held_while_paused): a due
 # one fires at the first tick after /resume
@@ -1200,7 +1182,7 @@ def timers_gone.if(-o: M.St, archived: Bool, +cx: X.Cx<o>, +n: String, +ns: List
 # an archived (dropped) agent's timers end with it, in the same step (law
 # stop_leaves_no_timer); a stopped one's wait for it, as before
 def timers_gone(-o: M.St, +life: M.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
-  timers_gone.if(o, life_gone(life), cx, n, M.names_of(st(o, cx), n))
+  timers_gone.if(o, R.life_gone(life), cx, n, M.names_of(st(o, cx), n))
 
 # ---- the timers at a tick ----
 
@@ -1221,7 +1203,7 @@ def wake_qs(-o: M.St, ts: List<&2, TM.Timer>, +cx: X.Cx<o>) -> List<&2, J.Json>:
     case Nil{}:
       Nil{}
     case Con{+t, +rest}:
-      +ok = Maybe.is_none(&2, String, TM.end_why(t, timer_gone(st(o, cx), TM.Timer.agent(t)), now(o, cx))) && timer_may(o, cx, t, True{})
+      +ok = Maybe.is_none(&2, String, TM.end_why(t, R.asked_gone(st(o, cx), TM.Timer.agent(t)), now(o, cx))) && timer_may(o, cx, t, True{})
       List.append(&2, J.Json, wake_q.go(ok, t, now(o, cx)), wake_qs(o, rest, cx))
 
 def wake_ans(xs: List<&2, J.Json>, +id: Nat) -> Maybe<&2, J.Json>:
@@ -1251,7 +1233,7 @@ def timers_tick.each(-o: M.St, ts: List<&2, TM.Timer>, +cx: X.Cx<o>, +ans: List<
     case Nil{}:
       cx
     case Con{+t, +rest}:
-      +cx2 = timers_tick.end(o, TM.end_why(t, timer_gone(st(o, cx), TM.Timer.agent(t)), now(o, cx)), cx, t, ans)
+      +cx2 = timers_tick.end(o, TM.end_why(t, R.asked_gone(st(o, cx), TM.Timer.agent(t)), now(o, cx)), cx, t, ans)
       timers_tick.each(o, rest, cx2, ans)
 
 def json_arr(m: Maybe<&2, J.Json>) -> List<&2, J.Json>:
@@ -1403,7 +1385,7 @@ def replies_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
 # (law wake_drop_ends); a stopped one's wait, as its timers do. The reply
 # watches waiting on it end at the next tick (replies_tick)
 def wakes_gone(-o: M.St, +life: M.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
-  pick_lazy(X.Cx<o>, life_gone(life),
+  pick_lazy(X.Cx<o>, R.life_gone(life),
     u => wakes_gone.each(o, WK.ids_of(WK.Wakes.live(wks(o, cx)), M.names_of(st(o, cx), n)), cx),
     u => cx)
 
@@ -3619,6 +3601,17 @@ def page_answered(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +to: String, +pa
       +cx2 = close_card_ans(o, cx, M.Card.id(c), "answered", A.page_ans(text, page, block))
       page_answered.tell(o, R.tells_asker(M.resolve(st(o, cx2), M.Card.agent(c)), M.resolve(st(o, cx2), to)), cx2, c, to, page, text)
 
+# {"t":"page_card"}: a page's own card (plan-ok): asked by the first live
+# agent of `agents`, else main (reach.bend page_asker), in its feed too;
+# a kind that is no page card's opens nothing. `key` is the hub's record.
+def page_card.open(-o: M.St, +cx: X.Cx<o>, +kind: String, +who: String, +text: String) -> X.Cx<o>:
+  card_to_asker(o, open_card(o, cx, kind, who, text, None{}), M.St.next_card(st(o, cx)), who, text)
+
+def page_card(-o: M.St, +cx: X.Cx<o>, +agents: List<&2, String>, +kind: String, +text: String) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, M.page_kind(kind),
+    u => page_card.open(o, cx, kind, R.page_asker(st(o, cx), agents), text),
+    u => notice(o, cx, String.append("not a page card: ", kind)))
+
 def force_run_of(+r: String) -> M.Run:
   Bool.pick(M.Run, String.eq(r, "starting"), M.RStarting{},
     Bool.pick(M.Run, String.eq(r, "idle"), M.RIdle{},
@@ -3699,6 +3692,8 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       page_answered(o, M.card_of(M.St.cards(st(o, cx)), card), cx, agent, page, text, block)
     case GI.IForge{+to, +text}:
       fst(o, send(o, cx, msg(M.GITHUB(), to, text, False{}, None{}, False{}, False{})))
+    case GI.IPageCard{+agents, +kind, +text, +key}:
+      page_card(o, cx, agents, kind, text)
     case GI.IForgeCard{+agent, +text}:
       open_card(o, cx, "question", agent, text, None{})
     case GI.ICardOpen{+kind, +agent, +text, +place, +pr}:

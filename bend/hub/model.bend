@@ -526,6 +526,11 @@ def put_card(xs: List<&2, Card>, +c: Card) -> List<&2, Card>:
 def choice_kind(+k: String) -> Bool:
   String.eq(k, "merge") || String.eq(k, "feature_try") || String.eq(k, "feature_merge") || String.eq(k, "update") || String.eq(k, "signin")
 
+# a page's own card (plan-ok): a plan an agent proposes, asked by that
+# agent (core.bend page_card); his answer is the hub's page path
+def page_kind(+k: String) -> Bool:
+  String.eq(k, "plan")
+
 # BISE-299: the user's inbox holds only what needs the user, by kind, set
 # at the card's creation: main's escalations (`question`: `sb card`,
 # `drop`: main's drop of a task with attention) and, later, tool-call
@@ -535,7 +540,7 @@ def choice_kind(+k: String) -> Bool:
 # main's, never a card: an older journal's cards of other kinds close at
 # boot.
 def user_kind(+k: String) -> Bool:
-  String.eq(k, "question") || String.eq(k, "drop") || String.eq(k, "confirm") || choice_kind(k)
+  String.eq(k, "question") || String.eq(k, "drop") || String.eq(k, "confirm") || choice_kind(k) || page_kind(k)
 
 # the ids of the open cards that are not the user's (an older journal's)
 def legacy_cards(xs: List<&2, Card>) -> List<&2, Nat>:

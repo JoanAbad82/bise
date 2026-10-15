@@ -16,6 +16,7 @@
 //! timer, and the mirror `st.timers` from the view.
 
 use crate::board;
+use crate::core_turn::{failed_turn_report, model_refusal};
 use crate::model::*;
 use crate::prompts;
 use crate::role;
@@ -605,6 +606,10 @@ pub enum Input {
     ConfirmClose { card: u64, res: String },
     /// A page question's card answered on its page: sb-core's page_answered (its asker told unless it is `agent`).
     PageAnswered { card: u64, agent: String, page: String, text: String, block: String },
+    /// A page's own card (plan-ok): sb-core's page_card opens a `kind`
+    /// card asked by the first live agent of `agents`, else main; `key`:
+    /// what it asks on its page, for the record.
+    PageCard { agents: Vec<String>, kind: String, text: String, key: String },
     /// inbox-record: his answer's route line went into `agent`'s transcript at `pos` (daemon/answers.rs).
     AnswerPos { card: u64, agent: String, pos: u64 },
     /// The end of a role-line call (BISE-126) for the task in `dir`,
@@ -2199,6 +2204,7 @@ impl Hub {
             Input::ConfirmOpen { agent, text } => self.core(&mut fx, env, None, In::ConfirmOpen(ci::ConfirmOpen { agent, text })),
             Input::ConfirmClose { card, res } => self.core(&mut fx, env, None, In::ConfirmClose(ci::ConfirmClose { card, res })),
             Input::PageAnswered { card, agent, page, text, block } => self.core(&mut fx, env, None, In::PageAnswered(ci::PageAnswered { card, agent, page, text, block })),
+            Input::PageCard { agents, kind, text, key } => self.core(&mut fx, env, None, In::PageCard(ci::PageCard { agents, kind, text, key })),
             Input::AnswerPos { card, agent, pos } => self.core(&mut fx, env, None, In::AnswerPos(ci::AnswerPos { card, agent, pos })),
             Input::Merged { card, place, number, res } => self.merged(&mut fx, env, card, &place, number, res),
             Input::Release(c) => self.release_in(&mut fx, env, c),
@@ -2640,45 +2646,6 @@ fn direct_exchange(task: &str, sent: &[String], reply: &str) -> (String, String)
         clip_tail(&one_line(reply), 2000)
     );
     (note, format!("You talked to @{} ({} message{})", task, n, s))
-}
-
-/// Issue #4: a failed turn's line that says the provider refused the
-/// model or its key (a 400, 401, 403, 404 or 422, not for the request's
-/// size): the status's words, `the provider refused it (404)`; None for
-/// any other failure (network, rate limit, server error, a stop).
-fn model_refusal(turn_done: &str) -> Option<String> {
-    let why = turn_done.strip_prefix("failed: ")?;
-    // the size's own refusal compacts (core/wire.bend too_large_mark)
-    if why.contains("the request is too large") {
-        return None;
-    }
-    let at = why.find(" refused the ")?;
-    let rest = &why[at..];
-    let open = rest.find('(')?;
-    let status: u16 = rest[open + 1..].split(')').next()?.trim().parse().ok()?;
-    [400, 401, 403, 404, 422]
-        .contains(&status)
-        .then(|| format!("the provider refused it ({})", status))
-}
-
-/// BR-007: the report a failed turn of a task sends to its parent, or
-/// None when there is nothing to report: a completed or interrupted
-/// turn, main (its own view shows the failure), or a retry loop someone
-/// stopped on purpose. A call an interrupt stopped mid-answer says who
-/// asked (the runtime's "interrupted by main" / "by the user") and is a
-/// stop, not a failure.
-fn failed_turn_report(agent: &str, turn_done: &str) -> Option<String> {
-    let why = turn_done.strip_prefix("failed: ")?;
-    if agent == "main" || why.starts_with("stopped retrying (interrupted by ") {
-        return None;
-    }
-    if why.starts_with("interrupted by ") {
-        return Some(format!("my turn stopped: {} — a new message continues it", why));
-    }
-    Some(format!(
-        "my turn failed: {} — a new message retries it",
-        why
-    ))
 }
 
 /// The checks and texts of a new task the daemon prepares for sb-core

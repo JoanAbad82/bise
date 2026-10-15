@@ -213,7 +213,8 @@ pub struct CardBatch {
 pub fn card_rank(kind: &str) -> u8 {
     match kind {
         "approval" | "confirm" => 0,
-        "question" | "merge" | "feature_try" | "feature_merge" | "signin" => 1,
+        // a plan an agent proposes (plan-ok): a question of that agent's
+        "question" | "plan" | "merge" | "feature_try" | "feature_merge" | "signin" => 1,
         "blocked" => 2,
         "failed" | "restart" => 3,
         "drop" => 4,
@@ -233,7 +234,7 @@ impl Card {
     /// typed). sb-core's refusal of words says the same (amb-hub's
     /// agreement test, architect m_8848).
     pub fn approval_kind(kind: &str) -> bool {
-        !matches!(kind, "question" | "drop")
+        !matches!(kind, "question" | "plan" | "drop")
     }
 }
 

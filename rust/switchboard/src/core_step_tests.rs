@@ -162,3 +162,25 @@ mod core_attach_tests;
 /// queued_steer's tests, out of core_tests.rs too.
 #[path = "core_queue_tests.rs"]
 mod core_queue_tests;
+
+/// plan-ok (architect m_26549, m_26571): a page's own card is asked by
+/// the first live agent of its chain, else main; it shows in that
+/// asker's feed too; a kind that is no page card's opens nothing.
+#[test]
+fn a_page_card_is_asked_by_the_first_live_agent() {
+    let mut t = T::new();
+    t.spawn_task("lean-install");
+    let card = |t: &mut T, agents: &[&str], kind: &str| {
+        let before: Vec<u64> = t.hub.st.open_cards().map(|c| c.id).collect();
+        let fx = t.go(Input::PageCard { agents: agents.iter().map(|a| a.to_string()).collect(), kind: kind.into(), text: "lean installs: start the plan lean-install recommends?\n1. start the plan\n2. open the plan".into(), key: "plan:plan".into() });
+        let new = t.hub.st.open_cards().find(|c| !before.contains(&c.id)).map(|c| (c.kind.clone(), c.agent.clone()));
+        (new, fx)
+    };
+    let (got, fx) = card(&mut t, &["ghost", "lean-install"], "plan");
+    assert_eq!(got, Some(("plan".to_string(), "lean-install".to_string())), "the first live one asks");
+    assert!(recs(&fx, "lean-install").iter().any(|r| r["sb"] == "card"), "in its own feed: {fx:?}");
+    let (got, _) = card(&mut t, &["ghost"], "plan");
+    assert_eq!(got, Some(("plan".to_string(), MAIN.to_string())), "none live: main");
+    let (got, _) = card(&mut t, &["lean-install"], "merge");
+    assert_eq!(got, None, "no page card's kind");
+}

@@ -8,6 +8,7 @@
 # - `reachable`: a run a wake reaches NOW. Idle: it starts a turn. Busy: it
 #   is steered into the turn (pump's steer, like `sb send`'s default
 #   --mode steer). Starting or down: it stays queued until the REPL is up.
+# - a page's own card (`page_card`, plan-ok): who asks it;
 # - a page question answered (`page_answered`): the card's asker (main, who
 #   opened the page's card) hears it too when the page's agent is another
 #   agent, in one message from bise with his answer.
@@ -16,7 +17,7 @@
 # project delivers and steers nothing, laws paused_delivers_nothing and
 # timer_held_while_paused). Laws in bend/laws/hub.bend: wake_steers_busy,
 # busy_steers_now, timer_fires_busy, timer_reaches_busy,
-# page_answer_tells_asker.
+# page_answer_tells_asker, page_card_asker_*.
 import Base
 
 import ./model.bend as M
@@ -59,6 +60,23 @@ def agent_active.go(m: Maybe<&2, M.Agent>) -> Bool:
 # known (by its name or an old one) and active
 def agent_active(+s: M.St, +n: String) -> Bool:
   agent_active.go(agent_of(s, n))
+
+# a page's own card (plan-ok, architect m_26549, m_26571): its asker is
+# the first agent of its chain (a plan's, then the page's) known and
+# active, else main (laws page_card_asker_*)
+def page_asker.pick(first: Bool, +h: String, +rest: String) -> String:
+  match first:
+    case True{}:
+      h
+    case False{}:
+      rest
+
+def page_asker(+s: M.St, agents: List<&2, String>) -> String:
+  match agents:
+    case Nil{}:
+      M.MAIN()
+    case Con{+h, +t}:
+      page_asker.pick(agent_active(s, h), h, page_asker(s, t))
 
 # a wake reaches this run now: idle (a turn starts) or busy (steered in)
 def reachable(r: M.Run) -> Bool:

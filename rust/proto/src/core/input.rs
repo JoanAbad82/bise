@@ -90,6 +90,13 @@ core_kinds! {
         /// `agent`, the agent the pick went to (reach.bend)
         /// `block`: the page's question block (the inbox's record)
         PageAnswered = "page_answered" => IPageAnswered { card: Nat, agent: Str, page: Str, text: Str, block: StrOmit },
+        /// a page's own card (plan-ok, architect m_26549, m_26571): a plan
+        /// an agent proposes (kind "plan"). Its asker is the first live
+        /// agent of `agents` (a plan's data-agent, then the page's agent),
+        /// else main (laws page_card_asker_*); its answer is the hub's
+        /// page path. `key`: what it asks on its page ('plan:<block>'),
+        /// for the record
+        PageCard = "page_card" => IPageCard { agents: Strs, kind: Str, text: Str, key: Str },
         /// the shell appended card `card`'s route line (his answer) to
         /// `agent`'s transcript at `pos`: journaled once per card closed
         /// with his answer (law answer_pos_once)

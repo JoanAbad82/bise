@@ -231,6 +231,12 @@ law in_page_answered_bare:
 def in_page_answered_bare():
   {==}
 
+law in_page_card_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"page_card"})])) == IN.IPageCard{Nil{}, "", "", ""} : IN.In}
+
+def in_page_card_bare():
+  {==}
+
 law in_answer_pos_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"answer_pos"})])) == IN.IAnswerPos{0n, "", 0n} : IN.In}
 
@@ -665,6 +671,17 @@ def in_IPageAnswered_round(card, agent, page, text, block):
       {==}
     case SCon{h_block, t_block}:
       {==}
+
+law in_IPageCard_round:
+  for agents: List<&2, String>
+  for kind: String
+  for text: String
+  for key: String
+  {IN.of(IN.json(IN.IPageCard{agents, kind, text, key})) == IN.IPageCard{agents, kind, text, key} : IN.In}
+
+def in_IPageCard_round(agents, kind, text, key):
+  %K.strs_round(agents) : {IN.of(IN.json(IN.IPageCard{agents, kind, text, key})) == IN.IPageCard{_, kind, text, key} : IN.In}
+  {==}
 
 law in_IAnswerPos_round:
   for card: Nat

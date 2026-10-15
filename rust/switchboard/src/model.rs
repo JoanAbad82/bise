@@ -322,7 +322,7 @@ pub struct Card {
 /// confirmations and the hub's own items ([`choice_kind`]). The agents'
 /// traffic is main's, never a card.
 pub fn user_kind(kind: &str) -> bool {
-    matches!(kind, "question" | "drop" | "confirm") || choice_kind(kind)
+    matches!(kind, "question" | "plan" | "drop" | "confirm") || choice_kind(kind)
 }
 
 /// The hub's items with numbered options, about a place (hub/model.bend

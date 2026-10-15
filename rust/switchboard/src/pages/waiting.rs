@@ -143,7 +143,7 @@ mod tests {
     // a plan (data-plan): its drafts are one card, so one line
     const PAGE: &str = r#"<section data-kit="checklist" data-id="steps" data-plan><ol>
 <li data-id="t1" data-done>check the name</li><li data-id="t2" data-who="yours">pay the domain on Gandi</li><li data-id="t3">point the DNS</li></ol></section>
-<section data-kit="review" data-id="replies"><ol><li data-id="m1">reply to Nina: yes, Friday</li><li data-id="m2">reply to Marc: no</li></ol></section>
+<section data-kit="review" data-id="replies" data-verb="send"><ol><li data-id="m1">reply to Nina: yes, Friday</li><li data-id="m2">reply to Marc: no</li></ol></section>
 <section data-kit="email" data-id="mail"><p data-field="to">team@acme.test</p><p>Subject: the offsite</p><p>Hi all, …</p></section>
 <section data-kit="question" data-id="q1"><p>post it now?</p><ol><li>yes</li><li>no</li></ol></section>
 <section data-kit="question" data-id="q2" data-answer="1"><p>done one?</p><ol><li>yes</li></ol></section>"#;
