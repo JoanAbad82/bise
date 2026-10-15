@@ -4022,7 +4022,12 @@ async function rowsDC47(harness, say) {
     await frameEl.waitFor({ timeout: 10000 });
     const fr = page.frameLocator('[data-testid="artifact.page"]').first();
     // the viewer frames a site inside its own frame: find the anchor in any nested frame
-    const anchorFrame = await until(async () => page.frames().find((f) => f.url().includes('dc-links') || f.url().includes('/framed/')) ?? null, 15000, 500);
+    // the viewer (/a/<id>/view) frames the copy in a frame of its own: the one that holds #jump
+    // (cand-dc47s read the viewer's frame: no anchor there)
+    const anchorFrame = await until(async () => {
+      for (const f of page.frames()) if (await f.evaluate(() => !!document.getElementById('jump')).catch(() => false)) return f;
+      return null;
+    }, 15000, 500);
     let jumped = null;
     if (anchorFrame) {
       await anchorFrame.evaluate(() => document.getElementById('jump')?.click()).catch(() => {});
@@ -4046,6 +4051,20 @@ async function rowsDC47(harness, say) {
     await clear();
     await page.keyboard.type('read the docs', { delay: 20 });
     await page.keyboard.press('Alt+Shift+ArrowLeft');
+    // ⇧⌥← over CDP left the caret collapsed (cand-dc47s: the URL landed after 'docs'): select the
+    // word through the DOM when the key didn't
+    const sel = await page.evaluate(() => {
+      const s = window.getSelection();
+      if (s && s.toString() === 'docs') return 'key';
+      const root = document.activeElement;
+      const walk = root ? document.createTreeWalker(root, NodeFilter.SHOW_TEXT) : null;
+      for (let n = walk?.nextNode(); n; n = walk.nextNode()) {
+        const i = (n.textContent ?? '').lastIndexOf('docs');
+        if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 4); s.removeAllRanges(); s.addRange(r); return s.toString() === 'docs' ? 'dom' : null; }
+      }
+      return null;
+    });
+    await page.waitForTimeout(150);
     await page.evaluate(() => {
       const el = document.activeElement;
       const dt = new DataTransfer();
@@ -4055,8 +4074,35 @@ async function rowsDC47(harness, say) {
     await page.waitForTimeout(400);
     const got = await fieldText();
     await shot('dc47-paste-link');
-    step("a URL pasted over the selected word 'docs' gives 'read the [docs](https://bise.dev/docs)'", got === 'read the [docs](https://bise.dev/docs)', { got });
+    step("a URL pasted over the selected word 'docs' gives 'read the [docs](https://bise.dev/docs)'", got === 'read the [docs](https://bise.dev/docs)', { got, selectedBy: sel });
     await clear();
+  });
+
+  // the bar slid over at 800 (⌘⌥0), then the window grows to 1400: one bar, no scrim left over the
+  // window (cand-dc47r's shot: two 'harness ⌥⌘0' heads and a dimmed window that took every click)
+  await row('bar widen', async () => {
+    await harness();
+    await resizeWin(800, 900);
+    await page.waitForTimeout(700);
+    await page.keyboard.press('Meta+Alt+0');
+    await page.waitForTimeout(700);
+    const narrow = await page.evaluate(() => [...document.querySelectorAll('[data-testid="app.right.top"]')].filter((e) => e.getBoundingClientRect().width > 0).length);
+    await resizeWin(1400, 900);
+    await page.waitForTimeout(1000);
+    const wide = await page.evaluate(() => {
+      const tops = [...document.querySelectorAll('[data-testid="app.right.top"]')].filter((e) => e.getBoundingClientRect().width > 0).length;
+      const side = document.querySelector('[data-testid="app.sidebar.scheduled"]');
+      const b = side?.getBoundingClientRect();
+      const at = b ? document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2) : null;
+      return { tops, sidebarReachable: !!at && !!side && side.contains(at), covers: at && side && !side.contains(at) ? `${at.tagName}.${String(at.className).slice(0, 60)}` : null };
+    });
+    await shot('dc47-bar-widen');
+    step("the bar slid over at 800, then the window at 1400: one bar, nothing left over the window (the sidebar takes a click)",
+      wide.tops === 1 && wide.sidebarReachable, { narrow, ...wide });
+    // leave it as it was: whatever is open closes
+    if (!wide.sidebarReachable || wide.tops > 1) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
+    if (await page.evaluate(() => [...document.querySelectorAll('[data-testid="app.right.top"]')].filter((e) => e.getBoundingClientRect().width > 0).length > 1)) await page.keyboard.press('Meta+Alt+0');
+    await page.mouse.click(5, 450).catch(() => {});
   });
 
   // 7. sb-words: no line he reads names an sb command (the scheduled screen, its empty list)
