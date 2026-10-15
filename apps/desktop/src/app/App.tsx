@@ -35,7 +35,8 @@ import { PrsScreen } from '@/review/PrsScreen';
 import { EnvironmentsScreen } from '@/review/EnvironmentsScreen';
 import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
-import { Sidebar } from './Sidebar';
+import { Sidebar, useWaitingTotal } from './Sidebar';
+import { useZen, useZenWatch } from './zen';
 import { RAIL_PX, SideRail } from './SideRail';
 import { Over, Titlebar, useFrame } from './Frame';
 import { ART_FOLD_PX, ArtifactCentre, ArtifactColumn, artOf, artWidth, useArtPct, useInnerWidth } from './ArtifactView';
@@ -61,6 +62,7 @@ import { ScheduledScreen } from '@/scheduled';
 import { InboxScreen } from '@/inbox/InboxScreen';
 import '@/ds/index.css';
 import './app.css';
+import './zen.css';
 import { useKissWatch } from './Marks';
 
 export function App() {
@@ -223,6 +225,9 @@ function Shell() {
   // his theme pref on <html data-theme> (amb-web's src/theme)
   useTheme();
   useShown();
+  // zen while he types (zen.ts, the TUI's zen.rs): a change of what waits on him leaves it
+  useZenWatch(useWaitingTotal());
+  const zen = useZen();
   // an artifact open (designer's artifact-open page): it takes the right column, widened to its share
   // of the window; under 1200 px the left bar folds; under 1000 px it takes the centre (ArtifactCentre)
   const winW = useInnerWidth();
@@ -254,6 +259,7 @@ function Shell() {
       className={`app-shell b-ui w-${frame.width}${side ? '' : rail ? ' rail' : ' no-side'}`}
       style={{ '--side-w': `${String(rail ? RAIL_PX : frame.sideW)}px`, '--side-full': `${String(frame.sideW)}px`, '--panel-w': `${String(artDocked ? artW : frame.panelW)}px` } as CSSProperties}
       data-testid="app.root"
+      data-zen={zen || undefined}
     >
       {/* setup is the window itself, never a window drawn inside it (his try round 3) */}
       {route.screen === 'onboarding' ? (

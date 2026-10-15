@@ -58,7 +58,8 @@ test('thread/esc-order: esc closes an open list first and never stops the turn, 
       await expect(page.locator(T.thread), 'perf still works').toHaveAttribute('data-agent', 'perf');
       await page.locator(T.field).click();
       await page.keyboard.type('garde');
-      await expect(page.getByTestId('composer.keys'), "the key line says it: 'ctrl+c stop'").toContainText('ctrl+c stop');
+      // ctrl as the Mac's ⌃ (designer m_26044)
+      await expect(page.getByTestId('composer.keys'), "the key line says it: '⌃C stop'").toContainText('⌃C stop');
       await page.screenshot({ path: test.info().outputPath('keyline-working-light.png') });
       await page.keyboard.press('Control+c');
       await core.waitCmd((c) => c.cmd === 'stop' && 'project' in c && c.project === ACME && c.agent === 'perf', 1000);

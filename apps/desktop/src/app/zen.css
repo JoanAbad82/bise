@@ -1,0 +1,30 @@
+/* zen while he types (zen.ts; the TUI's rust/tui/src/zen.rs): the root's data-zen moves --zen
+   from 0 to 45% (zen.rs DEPTH) over 250 ms (FADE), and back. In the chrome the text and line
+   tokens are mixed that far toward transparent, i.e. toward their own ground. The accent and err
+   tokens are never remapped: what needs him keeps its ink. Kept as they are: the thread, the
+   composer's text, caret and tab label, the inbox block. */
+@property --zen {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+.app-shell {
+  --zen: 0%;
+  transition: --zen 250ms var(--ease-io);
+}
+.app-shell[data-zen] {
+  --zen: 45%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell {
+    transition: none;
+  }
+}
+.app-shell :is(.app-title, .b-side, .app-rb, .b-composer .keys, .b-composer .row) {
+  --c-text: color-mix(in srgb, var(--p-text), transparent var(--zen));
+  --c-ink: color-mix(in srgb, var(--p-text), transparent var(--zen));
+  --c-text-2: color-mix(in srgb, var(--p-dim), transparent var(--zen));
+  --c-text-3: color-mix(in srgb, var(--p-faint), transparent var(--zen));
+  --c-line: color-mix(in srgb, color-mix(in srgb, var(--p-text) 10%, transparent), transparent var(--zen));
+  --c-line-strong: color-mix(in srgb, var(--p-rule), transparent var(--zen));
+}

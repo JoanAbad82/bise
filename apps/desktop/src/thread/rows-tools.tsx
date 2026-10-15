@@ -6,6 +6,7 @@ import type { Entry } from '@/proto';
 import { useStore, useToolOut } from '@/store';
 import { liveTime, useLiveStep, useSecondsSince } from './live-step';
 import { useFold } from './folds';
+import { useFoldHint } from './foldHint';
 import { thinkingWords } from './thinking';
 import { toolLines, type ToolLine } from './entry';
 import { Code, known } from './Code';
@@ -34,12 +35,13 @@ export function thoughtFor(ms: number): string {
 export function ThinkingLine({ pos, head, body: raw }: { pos: number; head: string; body: string }) {
   const body = thinkingWords(raw);
   const [open, setOpen] = useFold(false, pos);
+  const hint = useFoldHint();
   const toggle = () => {
     setOpen((o) => !o);
   };
   return (
     <div className="th-think" data-testid={`thread.think.${pos}`}>
-      <Fold open={open} onToggle={body === '' ? undefined : toggle} testId={`thread.think.${pos}.head`}>
+      <Fold open={open} onToggle={body === '' ? undefined : toggle} hint={body === '' ? undefined : hint} testId={`thread.think.${pos}.head`}>
         {head}
       </Fold>
       {open && body !== '' && <div className="th-think-body">{body}</div>}

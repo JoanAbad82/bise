@@ -23,6 +23,7 @@ import { ComposerTab } from './ComposerTab';
 import { useThreadQueue } from './ThreadQueue';
 import { AttachTool, ModelTool, ModeTool } from './ComposerTools';
 import type { TabWords } from './tab';
+import { useComposerHeld } from './foldHint';
 
 /**
  * The thread's composer, also mounted under an open artifact (amb-kit's src/artifacts/Open.tsx,
@@ -296,7 +297,9 @@ export const ThreadComposer = memo(function ThreadComposer({
   // context come back with a plain message (designer m_24517)
   const tabWords = useMemo(() => (answering ? { label: tab.label } : tab), [answering, tab]);
   const tabEl = <ComposerTab words={tabWords} mark={mark} end={end ?? undefined} testId="composer.tab" />;
-  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} tabAccent={answering} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
+  // a modifier held alone: the key line lists its keys (the TUI's ctrlhint.rs key bar)
+  const held = useComposerHeld();
+  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} tabAccent={answering} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
   if (note === null) return field;
   return (
     <>

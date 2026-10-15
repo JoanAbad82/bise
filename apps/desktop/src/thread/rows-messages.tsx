@@ -9,6 +9,7 @@ import { useAgents, useArtifacts, useCoreState, useHubRefused, usePending, usePr
 import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
+import { useFoldHint } from './foldHint';
 import { Markdown } from './Markdown';
 import { chipOf, clock, deliveryMark, lastOfRun, stripContext } from './entry';
 import { shownName } from '@/agents/model';
@@ -111,6 +112,7 @@ function QuoteLine({ source, about, text, n, testId }: { source: string; about: 
 
 export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefined }) {
   const [open, setOpen] = useFold(false, e.pos);
+  const hint = useFoldHint();
   // the fn context block the hub appended never shows: a chip from the typed context instead;
   // the quotes he sent in front of his words show first in his bubble, with their rail and source
   // msg-parts: his message comes from its typed parts, never from Entry.text (the model's templated
@@ -214,7 +216,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
       ))}
       {text !== '' && <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} breaks />}
       {fold !== undefined && (
-        <Fold open={open} onToggle={toggle} testId={`thread.fold.${e.pos}`}>
+        <Fold open={open} onToggle={toggle} hint={hint} testId={`thread.fold.${e.pos}`}>
           {open ? 'fold it' : `show all · ${String(fold.lines)} lines`}
         </Fold>
       )}

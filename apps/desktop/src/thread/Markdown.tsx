@@ -17,7 +17,8 @@ import { pathOf } from './paths';
 import { Code, PlainCode, known } from './Code';
 import { fade, type FadeOpts } from './fade';
 import { streamView } from './stream';
-import { ArtName, Press } from '@/ds';
+import { ArtName, Kbd, Press } from '@/ds';
+import { useModHeld } from '@/app/held';
 
 /** A link he may open from an answer: http, https or mailto. */
 export function openable(href: string | undefined): href is string {
@@ -163,15 +164,7 @@ export const Markdown = memo(function Markdown({
         <div className={boxIn ? 'th-code th-in' : 'th-code'}>
           <div className="th-code-head">
             <span className="th-code-lang b-md-lang">{lang ?? ''}</span>
-            <Press
-              look="th-code-copy"
-              onClick={() => {
-                void (window as Partial<Window>).bise?.copy(text);
-              }}
-              data-testid="thread.code.copy"
-            >
-              copy
-            </Press>
+            <CodeCopy text={text} />
           </div>
           <pre className="th-pre">{known(lang) ? <Code text={text} lang={lang} from={fresh} /> : fresh !== undefined ? <PlainCode text={text} from={fresh} /> : children}</pre>
         </div>
@@ -200,6 +193,28 @@ export const Markdown = memo(function Markdown({
 });
 
 /** Each Answer's rendered length after its last pass (its next update fades from there). */
+/** A code block's copy, on hover; ctrl held, '⌃Y copy' (ctrl+y copies the block under the mouse,
+ *  ThreadScreen codeToCopy; the TUI's ctrlhint.rs key bar 'ctrl+y copy code'). */
+function CodeCopy({ text }: { text: string }) {
+  const ctrl = useModHeld('Control');
+  return (
+    <Press
+      look="th-code-copy"
+      onClick={() => {
+        void (window as Partial<Window>).bise?.copy(text);
+      }}
+      data-testid="thread.code.copy"
+    >
+      {ctrl && (
+        <span className="app-keyhint" data-testid="thread.code.hint">
+          <Kbd>⌃Y</Kbd>
+        </span>
+      )}{' '}
+      copy
+    </Press>
+  );
+}
+
 const totals = new WeakMap<object, number>();
 
 /** How long the new words of one update take to fade in (300 ms of spread + 180 ms of fade, R40). */

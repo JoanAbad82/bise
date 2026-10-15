@@ -89,11 +89,71 @@ export function barPairs(mode: BarMode, typing: boolean): readonly Pair[] {
         ? [
             ['tab', 'queue'],
             ['⏎', 'steer'],
-            ['ctrl+c', 'stop'],
+            ['⌃C', 'stop'],
           ]
-        : [['ctrl+c', 'stop']];
+        : [['⌃C', 'stop']];
     case 'rest':
       return REST;
+  }
+}
+
+/** A modifier held alone (the app's held.ts): the bar lists its keys instead (the TUI's ctrlhint.rs). */
+export type HeldMod = 'Control' | 'Alt' | 'Meta';
+
+/** What the screen knows for the held keys (the composer adds its own: busy, typing, selected). */
+export interface HeldCtx {
+  /** ctrl+o's word: 'expand' (something folded), 'collapse' (all open), none: no fold */
+  readonly fold: 'expand' | 'collapse' | null;
+  /** the inbox block's items (ctrl+1-N) */
+  readonly inbox: number;
+  /** an inbox item is open (ctrl+n/p walk) */
+  readonly itemOpen: boolean;
+  /** a code block in the thread (ctrl+y) */
+  readonly code: boolean;
+  /** the agents ⌥1-9 reach */
+  readonly agents: number;
+}
+
+export interface HeldState extends HeldCtx {
+  readonly busy: boolean;
+  readonly typing: boolean;
+  readonly selected: boolean;
+}
+
+/** `⌃1`, `⌃1–2` … `⌃1–9` (ctrlhint.rs open_keys; ctrl as the Mac's ⌃, designer m_26044). Pure. */
+export const openKeys = (n: number): string => (n <= 1 ? '⌃1' : `⌃1–${String(Math.min(n, 9))}`);
+
+/** Every key of the held modifier that does something now, in the TUI's order (ctrlhint.rs
+ *  ctrl_pairs, alt_pairs, cmd_pairs), for the keys the window has. ctrl+r and ctrl+r twice are on
+ *  the mic and voice buttons beside the bar, never twice. Pure. */
+export function heldPairs(mod: HeldMod, s: HeldState): readonly Pair[] {
+  const p: Pair[] = [];
+  switch (mod) {
+    case 'Control':
+      if (s.busy) p.push(['⌃C', 'stop']);
+      if (s.fold !== null) p.push(['⌃O', s.fold]);
+      if (s.inbox > 0) {
+        p.push([openKeys(s.inbox), 'open an inbox item']);
+        if (s.itemOpen && s.inbox > 1) p.push(['⌃N/⌃P', 'next item']);
+      }
+      if (s.code) p.push(['⌃Y', 'copy code']);
+      p.push(['⌃`', 'terminal']);
+      return p;
+    case 'Alt':
+      if (s.agents > 0) {
+        p.push(['⌥0-9', 'go to an agent']);
+        if (!s.typing) p.push(['⌥↑↓', 'select an agent']);
+      }
+      if (s.typing) p.push(['⌥←→', 'word'], ['⌥⌫', 'delete a word']);
+      p.push(['⌥⏎', 'newline']);
+      return p;
+    case 'Meta':
+      p.push(['⌘K', 'find agent'], ['⌘F', 'find']);
+      if (s.busy) p.push(['⌘.', 'stop']);
+      if (s.selected) p.push(['⌘C', 'copy'], ['⌘X', 'cut']);
+      if (s.typing) p.push(['⌘A', 'select all'], ['⌘←→', 'line start/end'], ['⌘⌫', 'delete to line start']);
+      p.push(['⌘V', 'paste']);
+      return p;
   }
 }
 

@@ -9,6 +9,7 @@ import { useAgents, useArtifacts, useStore } from '@/store';
 import { leaves, LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { glyphOf } from '@/artifacts/model';
 import { useFold } from './folds';
+import { useFoldHint } from './foldHint';
 import { Markdown } from './Markdown';
 import { clock, handoffOf, repeatsReport, reportBody, schedHead } from './entry';
 import { wakeLine, wakeTail } from './wake';
@@ -180,12 +181,13 @@ export function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 
 export function CompactedRow({ e }: { e: Entry }) {
   const [open, setOpen] = useFold(false, e.pos);
+  const hint = useFoldHint();
   const toggle = () => {
     setOpen((o) => !o);
   };
   return (
     <div className="th-compact" data-testid={`thread.compacted.${e.pos}`}>
-      <Fold open={open} onToggle={e.text === '' ? undefined : toggle} testId={`thread.compacted.${e.pos}.head`}>
+      <Fold open={open} onToggle={e.text === '' ? undefined : toggle} hint={e.text === '' ? undefined : hint} testId={`thread.compacted.${e.pos}.head`}>
         context compacted
       </Fold>
       {open && e.text !== '' && <div className="th-think-body">{e.text}</div>}
@@ -200,6 +202,7 @@ export function CompactedRow({ e }: { e: Entry }) {
  */
 export function WakeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const [open, setOpen] = useFold(false, e.pos);
+  const hint = useFoldHint();
   const line = wakeLine(e);
   // another agent's wake, main's copy of it (amb-feed 11e5fbbc wake.agent): tier 4, dim, never red,
   // named for whom (designer m_19383: nothing addressed to another agent in ink)
@@ -227,6 +230,7 @@ export function WakeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
             onToggle={() => {
               setOpen((o) => !o);
             }}
+            hint={hint}
             testId={`thread.wake.${String(e.pos)}.fold`}
           >
             {words}

@@ -29,6 +29,8 @@
 .strip-count { color: var(--c-text-3); }
 .strip-keys { margin-left: auto; color: var(--c-text-3); }
 .strip-n { min-width: 1ch; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+/* ctrl held (app/held.ts, the TUI's card_draw.rs number_style): the numbers ctrl+N opens, in accent */
+.inbox-block[data-ctrl] .strip-n { color: var(--c-accent); }
 .strip-who { flex: none; }
 .strip-what { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--c-text-2); }
 .strip-more { color: var(--c-text-3); font-size: var(--t-12); }

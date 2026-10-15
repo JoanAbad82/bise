@@ -27,6 +27,9 @@ export type QueueSlot = Omit<QueueDrawerProps, "fieldEmpty" | "testId">;
 import {
   barMode,
   barPairs,
+  heldPairs,
+  type HeldCtx,
+  type HeldMod,
   startTip,
   tickTip,
   tipShown,
@@ -86,6 +89,9 @@ export interface ComposerProps {
   readonly onReady?: (a: ComposerActions) => void;
   /** in the box at its left, before the field (voice mode's grey pearl while he types) */
   readonly lead?: ReactNode;
+  /** a modifier held alone (app/held.ts) and the screen's facts: the bar lists that modifier's
+   *  keys (keybar.ts heldPairs, the TUI's ctrlhint.rs); ⌘ or ⌥ held, the ⌃R mic and voice step out */
+  readonly held?: { readonly mod: HeldMod; readonly ctx: HeldCtx } | null;
   readonly testId?: string;
 }
 
@@ -141,6 +147,11 @@ export const Composer = memo(function Composer(
   });
   const dictating = field.dictating;
   const mode = barMode({ ...field, voice: voice ?? dictating, quoting, busy });
+  // a held modifier lists its keys in the default, steer, selection, image and quote modes (the
+  // TUI's keybar.rs keys_line); a take or the @ list keep theirs
+  const held = props.held != null && mode !== "recording" && mode !== "transcribing" && mode !== "file" ? props.held : null;
+  // ⌘ or ⌥ held: the line shows only that modifier's keys (designer m_25695), the ⌃R mic and voice step out
+  const otherMod = held !== null && held.mod !== "Control";
 
   // the tip: the one after the last session's, the next every 5 minutes, never while he types
   const [tip, setTip] = useState<TipClock | null>(null);
@@ -200,7 +211,7 @@ export const Composer = memo(function Composer(
       lead={lead}
       keys={
         <>
-          {sources.dictate !== undefined && (
+          {sources.dictate !== undefined && !otherMod && (
             <Mic
               state={dictating}
               onClick={() => {
@@ -210,7 +221,7 @@ export const Composer = memo(function Composer(
               testId={testId}
             />
           )}
-          {sources.voice !== undefined && keys === undefined && (
+          {sources.voice !== undefined && keys === undefined && !otherMod && (
             // voice mode with the agent in view (designer's voice-window page (1)): ∿, or ctrl+r twice
             <Press
               look="mic voice"
@@ -230,10 +241,10 @@ export const Composer = memo(function Composer(
           <span
             className="pairs"
             data-testid={`${testId}.keys`}
-            data-mode={keys === undefined ? mode : "fixed"}
+            data-mode={keys === undefined ? (held !== null ? `held-${held.mod}` : mode) : "fixed"}
           >
             {keys ??
-              barPairs(mode, field.typing).map(([k, l]) => (
+              (held !== null ? heldPairs(held.mod, { ...held.ctx, busy, typing: field.typing, selected: field.selected }) : barPairs(mode, field.typing)).map(([k, l]) => (
                 <span key={k + l} className="pair">
                   {k !== "" && <span className="kk">{k}</span>} {l}
                 </span>

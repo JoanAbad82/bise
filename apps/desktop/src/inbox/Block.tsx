@@ -280,6 +280,8 @@ function typing(t: EventTarget | null): boolean {
 // one-line form while he read up the thread (m_19835) is gone: the layout jumped under him.
 export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlockProps) {
   const cmd = useModHeld('Meta');
+  // ctrl held (the TUI's card_draw.rs number_style): each row's number in accent, ctrl+N opens it
+  const ctrl = useModHeld('Control');
   const rows = useProjects();
   const store = useStore();
   const doAct = useOptAct();
@@ -579,7 +581,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   const next = list.find((_, i) => i >= BLOCK_ROWS && i > openAt) ?? list.find((_, i) => i >= BLOCK_ROWS && i !== openAt);
   const keys = list.length > 1 ? `⌃1–${String(Math.min(list.length, STRIP_KEYS))}` : '⌃1';
   return (
-    <section className="inbox-strip inbox-block" aria-label="inbox" data-testid="inbox.block" data-open={openCard !== undefined || undefined}>
+    <section className="inbox-strip inbox-block" aria-label="inbox" data-testid="inbox.block" data-open={openCard !== undefined || undefined} data-count={list.length} data-ctrl={ctrl || undefined}>
       <div className="strip-title">
         inbox <span className="strip-count">{headWords(list)}</span>
         {more > 0 && next !== undefined && (

@@ -94,6 +94,13 @@
   font-size: 11px;
 }
 
+/* ctrl held (foldHint.tsx): '⌃O expand' after a fold's words */
+.th-fold-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
 .th-code-copy {
   visibility: hidden;
   border: 0;
