@@ -435,11 +435,15 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   const isClosed = openCard !== undefined && openCard === closed;
   const told = openCard === undefined ? null : (isClosed ? closedAnswering : answeringOf)(openCard, { project: hp, agent: ha }, projectWord(names.get(openCard.project), openCard.project));
   const tellKey = told === null ? '' : `${told.project}/${String(told.card)}/${told.label}/${told.end ?? ''}/${String(told.answer)}/${String(told.closed === true)}`;
+  // told in the layout phase (ghost-badge): an item he opens swaps the composer to its draft in the
+  // same task as his click (an update from a layout effect is sync, so is the field's swap after
+  // it); told from a passive effect, the swap came a render later, and a key typed in between went
+  // to the thread's draft and left the field (bisected to e2428cd09, which only made it slower)
   const tell = useRef(onAnswer);
-  useEffect(() => {
+  useLayoutEffect(() => {
     tell.current = onAnswer;
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
     tell.current(told);
     // told is derived from tellKey: it changes exactly when tellKey does
     // eslint-disable-next-line react-hooks/exhaustive-deps
