@@ -482,26 +482,30 @@ fn pane_rows_queued(height: u16, images: usize, queued: &[&str]) -> Vec<String> 
 #[test]
 fn the_queued_messages_have_a_blank_row_above_them() {
     // BISE-224 (user request): from 20 rows, divider · blank row · the
-    // queued lines and their hint · the body's blank bar row · text; with
-    // the box: queue · its blank row · the box · text; 16-19 rows, no pad
+    // queue drawer (designer m_25146) · the body's blank bar row · text;
+    // with the box: drawer · its blank row · the box · text; 16-19 rows,
+    // no pad
     let rows = pane_rows_queued(40, 0, &["ouvre les screens"]);
     assert_eq!(rows[1], "│", "{rows:#?}");
-    assert!(rows[2].starts_with("│  › ouvre les screens"), "{rows:#?}");
-    assert!(rows[3].starts_with("│    queued"), "{rows:#?}");
-    assert_eq!(rows[4], "│  │", "{rows:#?}");
-    assert!(rows[5].starts_with("│  │     what's on your mind?"), "{rows:#?}");
+    assert!(rows[2].starts_with("│  ╭─ queued · sent when main's turn ends ─"), "{rows:#?}");
+    assert!(rows[3].starts_with("│  │ › ouvre les screens"), "{rows:#?}");
+    assert!(rows[4].starts_with("│  ╰─"), "{rows:#?}");
+    assert_eq!(rows[5], "│  │", "{rows:#?}");
+    assert!(rows[6].starts_with("│  │     what's on your mind?"), "{rows:#?}");
     let boxed = pane_rows_queued(40, 1, &["ouvre les screens"]);
     assert_eq!(boxed[1], "│", "{boxed:#?}");
-    assert!(boxed[2].starts_with("│  › ouvre les screens"), "{boxed:#?}");
-    assert!(boxed[3].starts_with("│    queued"), "{boxed:#?}");
-    assert_eq!(boxed[4], "│", "{boxed:#?}");
-    assert!(boxed[5].starts_with("│      ╭─ attached"), "{boxed:#?}");
-    assert!(boxed[6].starts_with("│      │   ▣ 1  Screenshot 1.png"), "{boxed:#?}");
-    assert!(boxed[8].starts_with("│  │    ▣ 1  hi"), "{boxed:#?}");
+    assert!(boxed[2].starts_with("│  ╭─ queued"), "{boxed:#?}");
+    assert!(boxed[3].starts_with("│  │ › ouvre les screens"), "{boxed:#?}");
+    assert!(boxed[4].starts_with("│  ╰─"), "{boxed:#?}");
+    assert_eq!(boxed[5], "│", "{boxed:#?}");
+    assert!(boxed[6].starts_with("│      ╭─ attached"), "{boxed:#?}");
+    assert!(boxed[7].starts_with("│      │   ▣ 1  Screenshot 1.png"), "{boxed:#?}");
+    assert!(boxed[9].starts_with("│  │    ▣ 1  hi"), "{boxed:#?}");
     let small = pane_rows_queued(18, 0, &["ouvre les screens"]);
-    assert!(small[1].starts_with("│  › ouvre les screens"), "{small:#?}");
-    assert!(small[2].starts_with("│    queued"), "{small:#?}");
-    assert!(small[3].starts_with("│  │     what's on your mind?"), "{small:#?}");
+    assert!(small[1].starts_with("│  ╭─ queued"), "{small:#?}");
+    assert!(small[2].starts_with("│  │ › ouvre les screens"), "{small:#?}");
+    assert!(small[3].starts_with("│  ╰─"), "{small:#?}");
+    assert!(small[4].starts_with("│  │     what's on your mind?"), "{small:#?}");
 }
 
 #[test]

@@ -693,6 +693,11 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
     let matches = popup_items(app);
     let popup_open = !matches.is_empty();
     let sel = matches.get(app.popup_sel.min(matches.len().saturating_sub(1)));
+    // the queue drawer (designer m_25146): ↑ in an empty composer moves
+    // into it; there it has the keys (sb/queued.rs)
+    if !popup_open && crate::sb::queued::key(app, k) {
+        return false;
+    }
     if sb::key(app, k, popup_open) {
         return false;
     }
@@ -857,13 +862,6 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
                     handle_input(app, &line);
                 }
             }
-        }
-        // BISE-89: ↑ in an empty composer edits the newest queued
-        // message, taken back from the hub (the history comes after the
-        // queue)
-        (KeyCode::Up, KeyModifiers::NONE) if !popup_open && app.ed.text.is_empty() && !app.sb.queued_for(&app.sb.focus).is_empty() => {
-            crate::sb::queued::take_newest(app);
-            app.key_in_composer = true;
         }
         // the popup takes the plain arrows
         (KeyCode::Up | KeyCode::Down, KeyModifiers::NONE) if popup_open => {

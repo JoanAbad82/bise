@@ -51,8 +51,12 @@ const REST: readonly Pair[] = [
   ['/', 'commands'],
 ];
 
-/** The pairs of a mode; `typing` hides `tab queue` and `⏎ steer` on an empty field (designer). */
-export function barPairs(mode: BarMode, typing: boolean): readonly Pair[] {
+/**
+ * The pairs of a mode; `typing` hides `tab queue` and `⏎ steer` on an empty field (designer).
+ * `queued`: his messages wait in the drawer: on an empty field ↑ edits the newest (designer
+ * m_25146 'tab queue   ⏎ steer   ↑ edit queued'; with a draft ↑ moves in it).
+ */
+export function barPairs(mode: BarMode, typing: boolean, queued = false): readonly Pair[] {
   switch (mode) {
     case 'recording':
       return [
@@ -91,7 +95,12 @@ export function barPairs(mode: BarMode, typing: boolean): readonly Pair[] {
             ['⏎', 'steer'],
             ['⌃C', 'stop'],
           ]
-        : [['⌃C', 'stop']];
+        : queued
+          ? [
+              ['↑', 'edit queued'],
+              ['⌃C', 'stop'],
+            ]
+          : [['⌃C', 'stop']];
     case 'rest':
       return REST;
   }

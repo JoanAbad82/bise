@@ -312,12 +312,13 @@ fn draw_bise(app: &mut App, frame: &mut Frame, area: Rect, cols: crate::layout::
     if let Some(r) = app.bottom_bar_rect {
         crate::pointer::region(r, crate::pointer::Shape::Pointer);
     }
-    // the queued messages: ` › text`, the `›` under the composer's bar
+    // the queue drawer (designer m_25146): its left edge on the
+    // composer's bar column (m_26076), to the pane's right margin
     let queue = pane(chunks[7]);
     if queue.height > 0 {
-        let r = Rect { x: queue.x.saturating_sub(1), width: queue.width + 1, ..queue }.intersection(area);
+        let r = queue.intersection(area);
         frame.render_widget(Paragraph::new(crate::queue::lines(app, r.width as usize)), r);
-        crate::textlayer::text(r); // BISE-290
+        crate::queue::placed(app, r); // BISE-290's text, the undo's click
     }
     // the attachments box: from the bar's column (from 60 columns, the
     // composer's text column), at most the composer's width; no bar:

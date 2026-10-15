@@ -41,6 +41,8 @@ pub(crate) enum Mode {
     Find,
     /// cmd+k / ctrl+s: the agent palette (BISE-265)
     Palette,
+    /// a row of the queue drawer has the keys (sb/queued.rs)
+    Queued,
     /// an agent is selected in the panel
     Selected,
     /// in an archived agent
@@ -57,6 +59,10 @@ type Pair = (&'static str, &'static str);
 /// The way home from an agent's view (book §13, BISE-103): the first
 /// pair there, never dropped.
 const BACK: Pair = ("esc", "back to main");
+
+/// An empty composer's `↑` with his messages queued (designer m_25146:
+/// the window's words, one phrase in both apps).
+const EDIT_QUEUED: Pair = ("↑", "edit queued");
 
 /// The inbox from the thread while it holds something (book §12): last
 /// at rest, right after `⏎ steer` while the agent works; `ctrl+1 inbox`,
@@ -105,6 +111,7 @@ impl Mode {
             Mode::Confirm => &[("y", "yes"), ("n", "no"), ("esc", "cancel")],
             Mode::Find => &[("⏎", "older"), ("shift+⏎", "newer"), ("esc", "close")],
             Mode::Palette => &[("↑↓", "choose"), ("⏎", "open"), ("esc", "close")],
+            Mode::Queued => &[("⏎", "send now"), ("e", "edit"), ("d", "delete"), ("esc", "back")],
             // the view's own keys come from `sb::card_key_pairs` (`1-2 pick`…)
             Mode::Card => &[("⏎", "answer"), ("ctrl+x", "close"), ("esc", "back")],
             Mode::Selected => &[("⏎", "enter"), ("space", "preview"), ("D", "archive"), ("esc", "close")],
@@ -140,6 +147,8 @@ pub(crate) fn mode(app: &App) -> Mode {
         Mode::Palette
     } else if app.find.is_some() {
         Mode::Find
+    } else if app.sb.queue_focus().is_some() {
+        Mode::Queued
     } else if commands::popup_open(app) && files::token(&app.ed.text, app.ed.cursor).is_some() {
         Mode::FilePopup
     } else if (app.feed_sel.is_some() && app.mouse.drag.is_none()) || crate::diffquote::selected(app) {
@@ -251,7 +260,8 @@ fn keys_line(app: &App, width: u16) -> Line<'static> {
         pairs.extend(inbox);
         return pairs_line(&pairs, usize::from(width)).0;
     }
-    let bar = Bar { typing, agent, inbox };
+    let queued = !app.sb.queued_for(&app.sb.focus).is_empty();
+    let bar = Bar { typing, agent, inbox, queued };
     // the diff panel open, the composer with the keys: its bar, then
     // `ctrl+g close` (designer m_7291), no tip
     if app.diff.is_some() {
@@ -396,6 +406,9 @@ struct Bar {
     /// the inbox holds something: its pair (`ctrl+1 inbox`, `/inbox`),
     /// last at rest, after `⏎ steer` while the agent works
     inbox: Option<Pair>,
+    /// his messages wait in the queue drawer: an empty composer's `↑`
+    /// moves into it (designer m_25146, the window's words)
+    queued: bool,
 }
 
 /// The key bar for `mode` in a row `width` columns wide. Pairs that don't
@@ -411,7 +424,7 @@ pub(crate) fn render(mode: Mode, width: u16, typing: bool, agent: bool, tip: Opt
 
 /// [`render`], with the inbox pair ([`Bar`]).
 fn render_with(mode: Mode, width: u16, tip: Option<&str>, bar: Bar) -> Line<'static> {
-    let Bar { typing, agent, inbox } = bar;
+    let Bar { typing, agent, inbox, queued } = bar;
     let width = usize::from(width);
     let dim = Style::default().fg(theme::dim());
     let mut pairs = if agent { mode.agent_pairs() } else { mode.pairs().to_vec() };
@@ -423,6 +436,10 @@ fn render_with(mode: Mode, width: u16, tip: Option<&str>, bar: Bar) -> Line<'sta
     // steer (both do nothing on an empty composer)
     if mode == Mode::Steer && !typing {
         pairs.retain(|p| p.0 != "tab" && p.0 != "⏎");
+        if queued {
+            let at = pairs.iter().position(|p| p.0 == "ctrl+c").unwrap_or(pairs.len());
+            pairs.insert(at, EDIT_QUEUED);
+        }
     }
     let pairs = fit(pairs, width, agent);
     let (Line { mut spans, .. }, used) = pairs_line(&pairs, width);
@@ -569,6 +586,10 @@ mod tests {
         // main's view and an agent's
         assert_eq!(text(&render(Mode::Steer, 120, true, false, None)), "tab queue   ⏎ steer   ctrl+c interrupt");
         assert_eq!(text(&render(Mode::Steer, 120, false, false, None)), "ctrl+c interrupt");
+        let queued = |typing| text(&render_with(Mode::Steer, 120, None, Bar { typing, queued: true, ..Bar::default() }));
+        assert_eq!(queued(false), "↑ edit queued   ctrl+c interrupt");
+        assert_eq!(queued(true), "tab queue   ⏎ steer   ctrl+c interrupt", "a draft: ↑ moves in it");
+        assert_eq!(text(&render(Mode::Queued, 120, false, false, None)), "⏎ send now   e edit   d delete   esc back");
         assert!(!text(&render(Mode::Default, 100, true, false, Some(TIP))).contains("tip"));
         assert!(!text(&render(Mode::Steer, 100, false, false, Some(TIP))).contains("tip"));
     }

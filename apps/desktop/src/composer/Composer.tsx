@@ -244,7 +244,7 @@ export const Composer = memo(function Composer(
             data-mode={keys === undefined ? (held !== null ? `held-${held.mod}` : mode) : "fixed"}
           >
             {keys ??
-              (held !== null ? heldPairs(held.mod, { ...held.ctx, busy, typing: field.typing, selected: field.selected }) : barPairs(mode, field.typing)).map(([k, l]) => (
+              (held !== null ? heldPairs(held.mod, { ...held.ctx, busy, typing: field.typing, selected: field.selected }) : barPairs(mode, field.typing, (props.queue?.rows.length ?? 0) > 0)).map(([k, l]) => (
                 <span key={k + l} className="pair">
                   {k !== "" && <span className="kk">{k}</span>} {l}
                 </span>

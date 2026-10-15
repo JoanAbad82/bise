@@ -419,6 +419,9 @@ describe('the key bar (keybar.rs, W9)', () => {
     expect(barMode({ ...st, busy: true, images: true })).toBe('steer');
     expect(line('steer', true)).toBe('tab queue   ⏎ steer   ⌃C stop');
     expect(line('steer', false)).toBe('⌃C stop');
+    // designer m_25146: his queued messages wait: on an empty field ↑ edits the newest
+    expect(barPairs('steer', false, true).map(([k, l]) => `${k} ${l}`).join('   ')).toBe('↑ edit queued   ⌃C stop');
+    expect(barPairs('steer', true, true).map(([k, l]) => `${k} ${l}`).join('   ')).toBe('tab queue   ⏎ steer   ⌃C stop');
     expect(line(barMode({ ...st, images: true }))).toBe('⌘V paste image   @ file   $ skills   / commands');
   });
   it('a tip every 5 minutes, never while he types, only at rest', () => {

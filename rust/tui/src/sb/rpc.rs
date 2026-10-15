@@ -53,9 +53,10 @@ pub(crate) enum Then {
     /// hub's words (its refusal, or a CommandRunResult's notice) show
     /// as its notice did
     Line,
-    /// `turn/unqueue` for his queued message `id` (↑, issue 23): its
-    /// words back in the composer, or the hub's refusal (sb/queued.rs)
-    Taken(u64),
+    /// `turn/unqueue` for his queued message `id` (the drawer's `e` or
+    /// `d`, issue 23): its words back in the composer, or kept for the
+    /// undo, or the hub's refusal (sb/queued.rs)
+    Taken(u64, super::queued::Take),
     /// `thread/subscribe` (None: the first page, it replaces the feed)
     /// or `thread/page` (the `before` asked) for this agent: entries
     /// placed by pos (sb/feed_entries.rs)
@@ -162,7 +163,7 @@ fn run(app: &mut App, then: Then, r: Response) {
             None => feed_entries::first_page_in(app, &agent),
             Some(_) => with_feed(app, &agent, |app| app.win.loading = false),
         },
-        (Then::Taken(id), answer) => super::queued::taken(app, id, answer),
+        (Then::Taken(id, why), answer) => super::queued::taken(app, id, why, answer),
         (Then::Line, Err(e)) => {
             match undelivered.then(|| above_undelivered(app)).flatten() {
                 Some(at) => {

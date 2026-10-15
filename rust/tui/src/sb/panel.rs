@@ -1109,7 +1109,7 @@ pub(crate) fn panel_mouse(app: &mut App, m: &crossterm::event::MouseEvent) -> bo
         return false;
     }
     // no panel: the composer rule's `◌ 1 watching` stands for it
-    if crate::scheduled_watch::click(app, m) {
+    if crate::scheduled_watch::click(app, m) || crate::sb::queued::click(app, m) {
         return true;
     }
     let sb = &app.sb;

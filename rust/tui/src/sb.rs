@@ -265,10 +265,9 @@ pub(super) struct Sb {
     /// Each agent's last row as the turn edges read it: its turn runs,
     /// its ended turns (feed_entries::agent_row).
     turns_seen: HashMap<String, (bool, u64)>,
-    /// issue 23: his queued messages ↑ asked back (`turn/unqueue`) whose
-    /// answer has not come: view state, so a second ↑ takes the next one
-    /// and the queue no longer draws them (queue.rs).
-    pub(crate) taking: std::collections::BTreeSet<u64>,
+    /// issue 23: the queue drawer's view state (sb/queued.rs): the rows
+    /// asked back, the focused row, the last delete for its undo.
+    pub(crate) queue: queued::Drawer,
     /// The agent whose first page `ready` waits for (the focus at the
     /// connection, sb/feed_entries.rs `on_ready`): none, it came.
     ready_page: Option<String>,
