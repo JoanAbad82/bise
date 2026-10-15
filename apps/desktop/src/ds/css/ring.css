@@ -1,19 +1,21 @@
-/* Ring (ring.tsx): the context gauge, 12 px, a donut that reads as a dial (his ask on agent-rows: the
-   filled pie read heavy; designer m_26307: a thin arc alone read as a spinner): the track a full 1 px
-   circle in text-3, always seen, the arc 2 px in text-2 on it from 12 o'clock, butt caps. */
+/* Ring (ring.tsx): the context gauge, 12 px, after Codex's (his ask on ring-look; designer m_26952):
+   a full 2 px track in text at 18 % (a groove you still see at 0 % in dark), the arc as wide on it from
+   12 o'clock, round caps, text-2 at rest and ink from 70 % (data-warn), no hue at any percent. */
 .b-ring {
   display: block;
   flex: none;
 }
 .b-ring circle {
   fill: none;
+  stroke-width: 2;
 }
 .b-ring .track {
-  stroke: var(--c-text-3);
-  stroke-width: 1;
+  stroke: color-mix(in srgb, var(--c-text) 18%, transparent);
 }
 .b-ring .used {
   stroke: var(--c-text-2);
-  stroke-width: 2;
-  stroke-linecap: butt;
+  stroke-linecap: round;
+}
+.b-ring[data-warn] .used {
+  stroke: var(--c-text);
 }

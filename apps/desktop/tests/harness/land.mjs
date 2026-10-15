@@ -26,6 +26,8 @@ export const LAND = [
   'checks/app/bar-heads.spec.ts',
   // the right bar never scrolls sideways: focused, hovered, ⌥ held, scoped at 0 rows (bar-overflow, his m_26733)
   'checks/app/bar-overflow.spec.ts',
+  // the context dial after Codex's: 2 px track and arc, round caps inside 0..pct, ink from 70 %, no hue (ring-look)
+  'checks/app/ring-look.spec.ts',
   // a project's ⋯ menu by priority: active (needs him, then at work), quiet, archived capped (his m_26450)
   'checks/app/proj-menu.spec.ts',
   // what slid over at 800 goes when the window grows past 1000: one bar, no scrim (try-gate dc4770c1)

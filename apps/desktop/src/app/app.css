@@ -880,12 +880,16 @@ body:has(.app-shell) {
   color: var(--c-text-3);
 }
 /* the context ring (his ask m_26205), the composer's ds Ring; from 70 % its number before it, and
-   the column 40 px on every row of the list so the times stay aligned */
+   the column 44 px on every row of the list so the times stay aligned: '95%' (26.2 px), the gap
+   and the ring are 42.2, so at 40 the clipping cols cut the 9 ('ɔ5%', designer m_26968); '100%'
+   grows its own row past it rather than lose its 1 */
 .app-rb-rows:has(.app-rb-pct[data-loud]) .app-rb-pct {
-  width: 40px;
+  width: auto;
+  min-width: 44px;
 }
-/* the bar's rings in text-3 so a list of them stays quiet (designer m_26248) */
-.app-rb-pct .b-ring .used {
+/* the bar's rings in text-3 at rest so a list of them stays quiet (designer m_26248); from 70 % the
+   ds's ink, as its percent shows (designer m_26952) */
+.app-rb-pct .b-ring:not([data-warn]) .used {
   stroke: var(--c-text-3);
 }
 /* quiet at rest (his ask on agent-rows: the list of rings read heavy): the ring and its % show on
