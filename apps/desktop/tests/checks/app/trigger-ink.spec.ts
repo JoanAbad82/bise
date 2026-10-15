@@ -58,7 +58,7 @@ async function inks(page: Page): Promise<Ink[]> {
     els
       .filter((el) => (el as HTMLElement).offsetParent !== null)
       .map((el) => {
-        const w = el.querySelector('.w') as HTMLElement | null;
+        const w = el.querySelector<HTMLElement>('.w');
         const v = el.querySelector('svg.v')?.getBoundingClientRect();
         const t = el.getBoundingClientRect();
         const box = w?.getBoundingClientRect();
@@ -81,7 +81,7 @@ async function inks(page: Page): Promise<Ink[]> {
             probe.remove();
             const cs = getComputedStyle(host);
             ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-            const m = ctx.measureText(n.textContent ?? '');
+            const m = ctx.measureText(n.textContent);
             inkTop = Math.min(inkTop, baseline - m.actualBoundingBoxAscent);
             inkBottom = Math.max(inkBottom, baseline + m.actualBoundingBoxDescent);
           }
