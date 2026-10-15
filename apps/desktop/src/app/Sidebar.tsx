@@ -135,9 +135,8 @@ function SRow({ kind, lead, name, end, endErr, endTip, count, countTip, hint, on
       <span className="nm">{name}</span>
       {children}
       {children != null ? (
-        // a row with buttons (a project's folder, ⋯): its end words in a box of a kept width, so
-        // the buttons never move when they change ('∿ 1' going away moved them under the
-        // pointer: app/clicks)
+        // a row with a ⋯ (a project's): its end words in a box of a kept width at the row's end;
+        // the ⋯ shows over it, flush right, and the words give way (app.css .app-more)
         <span className="app-tail">{tail}</span>
       ) : (
         tail
@@ -272,7 +271,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
         onClick={() => { router.go({ screen: 'thread', project: p.project, agent: MAIN }); }}
         testId={`app.sidebar.project.${p.project}`}
       >
-        {/* ⋯, the ds's row IconButton: on hover or focus */}
+        {/* ⋯, the ds's row IconButton: on hover or focus, flush at the row's right end */}
         <span className={menu ? 'app-more on' : 'app-more'}>
           <IconButton
             ref={more}

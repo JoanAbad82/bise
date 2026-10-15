@@ -51,7 +51,8 @@ test("app/working-count: a project's row ends with how many agents work in it, w
       const row = (el.closest('.app-r') as HTMLElement).getBoundingClientRect();
       const probe = document.createElement('span');
       probe.style.color = 'var(--c-text-3)';
-      document.body.append(probe);
+      // in the row: the same scope as the end words, so both colors read in the same form
+      el.closest('.app-r')?.append(probe);
       const dim = getComputedStyle(probe).color;
       probe.remove();
       return { color: getComputedStyle(el).color, dim, fromRight: row.right - r.right };
@@ -87,8 +88,6 @@ test("app/working-count: a project's row ends with how many agents work in it, w
     }
     expect(new Set(phase.map(([x]) => x)).size, 'and it moves').toBeGreaterThan(1);
 
-    await page.getByTestId(`app.sidebar.project.${P}.end`).hover();
-    await expect(page.getByTestId('tip')).toHaveText('3 agents working');
     const side = await page.getByTestId('app.sidebar').boundingBox();
     const clip = side ? { x: side.x, y: side.y, width: side.width, height: Math.min(side.height, 360) } : undefined;
     await page.screenshot({ path: test.info().outputPath('count-light.png'), clip });

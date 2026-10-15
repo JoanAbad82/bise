@@ -1,7 +1,9 @@
 // app/hover-tips · designer's tip rule (m_24359, his 'every compact mark explains itself'): one ds tip
 // for the window, never interactive. Storefront on FakeCore at 1400 px, light and dark. Passes when:
-//   - hovering a mark shows its words after the delay: the sidebar's working count '2' ('2 agents
-//     working'), the pink count (a quiet project has no end words), '1 new', 'scheduled 1'; the right bar's sign, time, %, '↑';
+//   - hovering a mark shows its words after the delay: '1 new', 'scheduled 1', the inbox's pink
+//     count; the right bar's sign, time, %, '↑'. A project row's working count '2' and pink count
+//     carry their words ('2 agents working') but give way under the row's ⋯ on hover (a quiet
+//     project has no end words);
 //   - the tip never takes the pointer: pointer-events none, and elementFromPoint under it is the
 //     page under it (a row, the screen), never the tip; it sits 8 px above or below its mark, never
 //     over it, inside the window;
@@ -128,16 +130,18 @@ for (const theme of ['light', 'dark']) {
 
       // cold: the delay, then the tip; leave: gone
       await page.mouse.move(700, 500);
-      await page.getByTestId(`app.sidebar.project.${P}.end`).hover();
+      await page.getByTestId('app.sidebar.scheduled.end').hover();
       await page.waitForTimeout(150);
       await expect(tip, 'not before the delay').toHaveCount(0);
-      await expect(tip).toHaveText('2 agents working');
+      await expect(tip).toHaveText('1 scheduled task, in all your projects');
       await page.mouse.move(700, 500);
       await expect(tip, 'gone when the pointer leaves').toHaveCount(0);
 
-      // the sidebar's marks
-      await hover(`app.sidebar.project.${P}.end`, '2 agents working', 'sidebar-working');
-      await hover(`app.sidebar.project.${P}.count`, '1 waiting for you', 'sidebar-count');
+      // the sidebar's marks. A project row's end words give way under its ⋯ on hover (Benjamin's
+      // ⋯ flush right, designer m_26343: the mark's tip says who works and who waits): their tips
+      // stay on them, read as attributes
+      await expect(page.getByTestId(`app.sidebar.project.${P}.end`)).toHaveAttribute('data-tip', '2 agents working');
+      await expect(page.getByTestId(`app.sidebar.project.${P}.count`)).toHaveAttribute('data-tip', '1 waiting for you');
       await expect(page.getByTestId('app.sidebar.project.docs-cff418c0.end'), 'quiet: no end words (its mark says it)').toHaveCount(0);
       // the pink count is the inbox row's (inbox-history pick A)
       await hover('app.sidebar.inbox.count', '2 waiting for you, in all your projects', 'sidebar-inbox');

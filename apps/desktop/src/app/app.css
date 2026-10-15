@@ -363,16 +363,33 @@ body:has(.app-shell) {
   letter-spacing: 0.01em;
   text-transform: none;
 }
-/* a project's ⋯ button: on hover or focus */
+/* a project's ⋯ button: on hover or focus, flush at the row's right end (Benjamin, his 👍), over
+   the end box, out of the flow: nothing moves when it shows. The end words and the count give way
+   under it, like the ⌘ digit; the ⌘ digit wins while ⌘ is held */
 .app-more {
-  flex: none;
+  position: absolute;
+  top: 50%;
+  right: var(--pad-row-x);
   display: inline-flex;
   opacity: 0;
+  transform: translateY(-50%);
 }
 .app-r:hover .app-more,
 .app-more.on,
 .app-more:focus-within {
   opacity: 1;
+}
+.app-r:hover:has(.app-more) .app-tail,
+.app-r:has(.app-more.on) .app-tail,
+.app-r:has(.app-more:focus-within) .app-tail {
+  visibility: hidden;
+}
+.app-r:has(.app-keyhint) .app-tail {
+  visibility: visible;
+}
+.app-r:has(.app-keyhint) .app-more:not(.on) {
+  opacity: 0;
+  pointer-events: none;
 }
 /* the foot: '+ add a project ⌘N', '⚙ settings ⌘,', on top of the scrolled rows, hit at their
    centre and changing on hover (qa-flows' O.6 clicks audit) */
