@@ -67,13 +67,14 @@
   overscroll-behavior: contain;
 }
 .b-picker-list.fade-top {
-  mask-image: linear-gradient(to bottom, transparent, #000 16px);
+  /* a mask reads only the alpha: black is opaque, never a color drawn */
+  mask-image: linear-gradient(to bottom, transparent, black 16px);
 }
 .b-picker-list.fade-bottom {
-  mask-image: linear-gradient(to top, transparent, #000 16px);
+  mask-image: linear-gradient(to top, transparent, black 16px);
 }
 .b-picker-list.fade-top.fade-bottom {
-  mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent);
 }
 .b-picker-group + .b-picker-group {
   margin-top: var(--s-2);

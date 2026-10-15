@@ -56,6 +56,8 @@
 :root {
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
   --s-10: 40px; --s-12: 48px; --s-16: 64px;
+  /* the dim behind a Sheet: 40% black in both themes (controls.css reads the role, never a color) */
+  --c-scrim: rgb(0 0 0 / 0.4);
   /* between things */
   --gap-tight: var(--s-1);    /* a label over its control; a section head and its first row */
   --gap-inline: var(--s-2);   /* an icon and its text, a name and its meta, two buttons or chips side by side */

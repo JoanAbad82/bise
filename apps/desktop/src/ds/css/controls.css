@@ -54,7 +54,7 @@
 .b-select-menu .b-picker-row[data-highlighted]{background:var(--c-hover)}
 
 /* Sheet: a modal over the dimmed window (40% scrim), raised, r-4, e-3, 560 wide (90% under 700) */
-.b-scrim{position:fixed;inset:0;z-index:50;background:rgb(0 0 0 / .4)}
+.b-scrim{position:fixed;inset:0;z-index:50;background:var(--c-scrim)}
 .b-sheet{position:fixed;z-index:51;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;width:min(560px,90vw);max-height:86vh;border-radius:var(--r-4);background:linear-gradient(var(--c-raised),var(--c-raised)),var(--c-solid);box-shadow:var(--e-3);color:var(--c-text);outline:0}
 /* a Sheet is opaque (designer m_18975): the raised role laid on the solid one, so nothing behind shows
    through (the roles are translucent for the window's glass); no backdrop blur on the panel */
