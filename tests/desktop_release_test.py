@@ -239,8 +239,13 @@ def test_runtime_rules():
 
 def test_pack_and_dmg_settings():
     p = R.paths("/o")
-    env = R.pack_env({"PATH": "/bin", "BISE_PACK_SIGN_DIR": "/s", "CSC_LINK": "x"}, p, "/rt")
-    check("BISE_PACK_SIGN_DIR" not in env and "CSC_LINK" not in env, "no other signing reaches electron-builder")
+    apple = {"APPLE_API_KEY_PATH": "/k.p8", "APPLE_API_KEY_ID": "K", "APPLE_API_ISSUER": "I", "APPLE_ID": "a@b",
+             "APPLE_APP_SPECIFIC_PASSWORD": "p", "APPLE_TEAM_ID": "T", "APPLE_KEYCHAIN_PROFILE": "bise-notary"}
+    env = R.pack_env({"PATH": "/bin", "BISE_PACK_SIGN_DIR": "/s", "CSC_LINK": "x", "CSC_KEY_PASSWORD": "y", **apple}, p, "/rt")
+    check("BISE_PACK_SIGN_DIR" not in env and "CSC_LINK" not in env and "CSC_KEY_PASSWORD" not in env,
+          "no other signing reaches electron-builder")
+    check(not [k for k in env if k.startswith("APPLE_")], "no notary key reaches electron-builder (it would notarize)")
+    check(env["PATH"] == "/bin" and env["CSC_IDENTITY_AUTO_DISCOVERY"] == "false" and env["BISE_PACK_IDENTITY"] == "-", env)
     check(env["BISE_PACK_APP_ID"] == "dev.bise.desktop" and env["BISE_PACK_NAME"] == "bise", env)
     check(env["BISE_PACK_BISE"] == "/rt/bise" and env["BISE_PACK_ROOT"] == "/rt" and env["BISE_PACK_VERSION"] == "/o/VERSION", env)
     check(p["dmg"].endswith("/release/bise-mac-arm64.dmg") and p["zip"].endswith("/release/bise-mac-arm64.zip"), p)
@@ -253,6 +258,20 @@ def test_pack_and_dmg_settings():
     base, ext = os.path.splitext(s["background"])
     check(os.path.isfile(base + "@2x" + ext), "its @2x next to it (one HiDPI tiff)")
     check(not s["show_toolbar"] and not s["show_sidebar"], "a bare window")
+    if shutil.which("node"):
+        # electron-builder.mjs itself, with the notary keys in the env: it never notarizes
+        with tempfile.TemporaryDirectory() as t:
+            for f in ("bise", "helper", "VERSION", "repl-live", "sb-core"):
+                open(os.path.join(t, f), "w").close()
+            js = "import(process.argv[1]).then(m => console.log(JSON.stringify(m.default.mac)))"
+            r = subprocess.run(["node", "-e", js, "file://" + os.path.join(R.DESKTOP, "electron-builder.mjs")],
+                               capture_output=True, text=True,
+                               env=dict(R.pack_env({"PATH": os.environ.get("PATH", ""), **apple}, R.paths(t), t),
+                                        BISE_PACK_BISE=os.path.join(t, "bise"), BISE_PACK_HELPER=os.path.join(t, "helper"),
+                                        BISE_PACK_VERSION=os.path.join(t, "VERSION"), **apple))
+            check(r.returncode == 0, r.stderr)
+            mac = json.loads(r.stdout)
+            check(mac.get("notarize") is False, "electron-builder's config says notarize: false: %s" % mac)
     na = R.notary_argv("/x.zip")
     check("--wait" in na and "${APPLE_API_KEY_PATH}" in na, "notarytool waits, the key is a path from the env")
     check(R.dmgbuild_argv("s.py", "bise", "o.dmg")[-4:] == ["-s", "s.py", "bise", "o.dmg"], "dmgbuild's argv")

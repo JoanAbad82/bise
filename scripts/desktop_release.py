@@ -165,8 +165,11 @@ def paths(out_dir):
 
 def pack_env(base, p, runtime_root):
     """electron-builder's inputs (electron-builder.mjs): the shipping bundle 'bise', the runtime's
-    bise, the helper, the runtime, the app's VERSION; ad hoc here, signed after by desktop_sign. Pure."""
-    env = {k: v for k, v in base.items() if not k.startswith("BISE_PACK_") and k not in ("CSC_LINK", "CSC_NAME")}
+    bise, the helper, the runtime, the app's VERSION; ad hoc here, signed after by desktop_sign and
+    notarized after by notarize: no CSC_* (its signing) and no APPLE_* (its notarization, which
+    electron-builder 26 starts on its own when it sees them; its config also says notarize: false)
+    reach it. Pure."""
+    env = {k: v for k, v in base.items() if not k.startswith(("BISE_PACK_", "CSC_", "APPLE_"))}
     env.update({"BISE_PACK_NAME": NAME, "BISE_PACK_APP_ID": APP_ID, "BISE_PACK_BISE": os.path.join(runtime_root, "bise"),
                 "BISE_PACK_HELPER": p["helper"], "BISE_PACK_ROOT": runtime_root, "BISE_PACK_VERSION": p["version"],
                 "BISE_PACK_IDENTITY": "-", "BISE_PACK_OUT": p["dist"], "CSC_IDENTITY_AUTO_DISCOVERY": "false"})

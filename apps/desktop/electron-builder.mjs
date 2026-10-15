@@ -106,11 +106,16 @@ export default {
     // bise, which breaks Electron's own seal, so a dir build is re-signed
     // deep: with BISE_PACK_SIGN_DIR by signStable (above), else
     // BISE_PACK_IDENTITY names a codesigning identity (CSC_KEYCHAIN: its
-    // keychain), else ad hoc ('-'). Notarizing
-    // and the Developer ID come with the release work. No hardened runtime
-    // until the entitlements exist.
+    // keychain), else ad hoc ('-'). No hardened runtime here: a release
+    // re-signs it with the Developer ID and its entitlements after
+    // (scripts/desktop_sign.py).
     identity: signDir === undefined ? (process.env['BISE_PACK_IDENTITY'] ?? '-') : null,
     hardenedRuntime: false,
+    // never notarize here: electron-builder 26 starts its own notarization as
+    // soon as APPLE_API_KEY_ID/APPLE_API_ISSUER (or APPLE_ID...) are in the env,
+    // on the ad hoc app; a release notarizes the signed app and DMG itself with
+    // notarytool (scripts/desktop_release.py notarize)
+    notarize: false,
     extraFiles: [{ from: helper, to: 'MacOS/bise-mac-helper' }],
     extendInfo: {
       NSMicrophoneUsageDescription: 'bise listens while you hold fn, to hear what you ask.',
