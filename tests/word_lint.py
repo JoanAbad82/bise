@@ -9,11 +9,15 @@ catalog's (tests/words/*.gen.json, generated from rust/proto/src/words/):
     characters or more ("search", "today", "withdrawn" are agent names, states and kinds in test
     data too; "esc to main", "✓ sent" count);
   - or it fills a template whole, a template with 6 fixed characters or more ("you: {said}"
-    would match any test message), each {arg} typed by its name: a count (n, pos, count, total,
-    left, more) is digits, a name (agent, from, to, who, asker, maker, by) one token with no
-    space, a time (len, age, at, when, time, since, ago: '3m', '2 h', 'fri 08:07') and a revision
-    (rev, sha, version) hold a digit (words-panel m_27163), any other arg any text (words-inbox m_27144: '{n} agents {head}' is not 'main and
-    your agents use …').
+    would match any test message), each {arg} typed by its name (HOLE_KINDS, one line per kind;
+    words-inbox m_27144, words-panel m_27163):
+      count  n, pos, count, total, left, more        digits ('12', '1.2k')
+      name   agent, from, to, who, asker, maker, by   one token, no space
+      time   len, age, at, when, time, since, ago     a digit in it ('3m', '2 h', 'fri 08:07')
+      rev    rev, sha, version                        a digit in it ('a1b2c3d')
+      any other name                                 any text
+    so '{n} agents {head}' is not 'main and your agents use …', 'waiting for {len}' not
+    'waiting for you'.
 The cost (architect m_27149): a one-word label with no space or mark ("approve", "search") is
 not linted, so a test that waits on one still breaks when it changes: move such waits onto w()
 where you see them.
@@ -52,26 +56,22 @@ CATALOG_PREFIXES = ("tests/words/", "rust/proto/src/words/")
 JS_EXTS = (".ts", ".tsx", ".js", ".mjs", ".mts")
 MIN_PLAIN = 4
 MIN_FIXED = 6
-# a hole by its name: a count is digits, a name one token, any other any text
-COUNT_ARGS = {"n", "pos", "count", "total", "left", "more"}
-NAME_ARGS = {"agent", "from", "to", "who", "asker", "maker", "by"}
-# a time or a length ('3m', '2 h', '14:20', 'fri 08:07'), a revision ('a1b2c3d'): a digit in it
-TIME_ARGS = {"len", "age", "at", "when", "time", "since", "ago"}
-REV_ARGS = {"rev", "sha", "version"}
+# A hole's kind by its name, one line per kind (architect m_27166: a new kind is a line here,
+# never a branch; a fourth narrowing makes the words! macro carry a kind per arg instead):
+#   kind     names                                        pattern
+HOLE_KINDS = [
+    ("count", {"n", "pos", "count", "total", "left", "more"}, r"\d[\d.,]*[kKM%]?"),
+    ("name", {"agent", "from", "to", "who", "asker", "maker", "by"}, r"\S+?"),
+    ("time", {"len", "age", "at", "when", "time", "since", "ago"}, r"(?:[a-z]+ ){0,2}\d[\d:.,]*(?: ?[a-z]{1,4})?"),
+    ("rev", {"rev", "sha", "version"}, r"\S*\d\S*"),
+]
+ANY = r".+?"
 HOLE = r"\{([a-z_][a-z0-9_]*)\}"
 
 
 def hole_re(name):
-    """The regex of a hole, by its name. Pure."""
-    if name in COUNT_ARGS:
-        return r"\d[\d.,]*[kKM%]?"
-    if name in NAME_ARGS:
-        return r"\S+?"
-    if name in TIME_ARGS:
-        return r"(?:[a-z]+ ){0,2}\d[\d:.,]*(?: ?[a-z]{1,4})?"
-    if name in REV_ARGS:
-        return r"\S*\d\S*"
-    return r".+?"
+    """The regex of a hole, by its name's kind (any text when no kind has it). Pure."""
+    return next((rx for _, names, rx in HOLE_KINDS if name in names), ANY)
 
 
 def one_bare_word(form):
