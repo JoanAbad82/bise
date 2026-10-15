@@ -11,7 +11,8 @@ catalog's (tests/words/*.gen.json, generated from rust/proto/src/words/):
   - or it fills a template whole, a template with 6 fixed characters or more ("you: {said}"
     would match any test message), each {arg} typed by its name: a count (n, pos, count, total,
     left, more) is digits, a name (agent, from, to, who, asker, maker, by) one token with no
-    space, any other arg any text (words-inbox m_27144: '{n} agents {head}' is not 'main and
+    space, a time (len, age, at, when, time, since, ago: '3m', '2 h', 'fri 08:07') and a revision
+    (rev, sha, version) hold a digit (words-panel m_27163), any other arg any text (words-inbox m_27144: '{n} agents {head}' is not 'main and
     your agents use …').
 The cost (architect m_27149): a one-word label with no space or mark ("approve", "search") is
 not linted, so a test that waits on one still breaks when it changes: move such waits onto w()
@@ -54,6 +55,9 @@ MIN_FIXED = 6
 # a hole by its name: a count is digits, a name one token, any other any text
 COUNT_ARGS = {"n", "pos", "count", "total", "left", "more"}
 NAME_ARGS = {"agent", "from", "to", "who", "asker", "maker", "by"}
+# a time or a length ('3m', '2 h', '14:20', 'fri 08:07'), a revision ('a1b2c3d'): a digit in it
+TIME_ARGS = {"len", "age", "at", "when", "time", "since", "ago"}
+REV_ARGS = {"rev", "sha", "version"}
 HOLE = r"\{([a-z_][a-z0-9_]*)\}"
 
 
@@ -63,6 +67,10 @@ def hole_re(name):
         return r"\d[\d.,]*[kKM%]?"
     if name in NAME_ARGS:
         return r"\S+?"
+    if name in TIME_ARGS:
+        return r"(?:[a-z]+ ){0,2}\d[\d:.,]*(?: ?[a-z]{1,4})?"
+    if name in REV_ARGS:
+        return r"\S*\d\S*"
     return r".+?"
 
 
@@ -390,6 +398,19 @@ def self_test():
     want("a count is not text", word_of("main and your agents use it", ms2), None)
     want("a name is one token", word_of("perf failed", ms2), "b.failed")
     want("a name has no space", word_of("build of tree failed", ms2), None)
+    cat3 = {
+        "c.wait": {"text": "waiting for {len}", "args": ["len"], "one": None},
+        "c.until": {"text": "until {at}", "args": ["at"], "one": None},
+        "c.build": {"text": "building {rev}", "args": ["rev"], "one": None},
+    }
+    ms3 = matchers(cat3)
+    want("a time has a digit", word_of("waiting for you", ms3), None)
+    want("a short time", word_of("waiting for 3m", ms3), "c.wait")
+    want("a long time", word_of("waiting for 2 h", ms3), "c.wait")
+    want("a day and a time", word_of("until fri 08:07", ms3), "c.until")
+    want("not a time", word_of("until the whole", ms3), None)
+    want("a revision", word_of("building a1b2c3d", ms3), "c.build")
+    want("not a revision", word_of("building the latest commit, %s…", ms3), None)
     want("scope tmux", in_scope("tests/tui_cards_tmux.py"), True)
     want("scope e2e", in_scope("tests/approvals_e2e.py"), False)
     want("scope desktop", in_scope("apps/desktop/tests/checks/inbox/a.spec.ts"), True)
