@@ -276,7 +276,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
           <IconButton
             ref={more}
             size="row"
-            label={`${p.name}: more`}
+            label={`${p.name}: all agents, archived agents`}
             pressed={menu}
             onClick={(e) => {
               e.stopPropagation();
