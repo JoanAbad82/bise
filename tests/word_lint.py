@@ -15,9 +15,10 @@ tests/word_literals.txt ("<count> <path>", sorted by path) holds the words left 
 ratchet like tests/line_limits.txt:
   - a file's count never goes past its line, and a drop lowers its line in the same commit (the
     line goes at 0, or when the file is gone);
-  - vs the base (GATE_BASE, default HEAD) a count goes up, or a path comes in, only by literals
-    of keys the change adds to the catalog: the chunk that moves a word may leave another
-    area's tests to that area's chunk, counted here. A rename keeps its count.
+  - vs the base (GATE_BASE, default HEAD) a count goes up, or a path comes in, only by the
+    literals of keys the change adds to the catalog that the file already had at the base: the
+    chunk that moves a word may leave another area's old literals to that area's chunk, counted
+    here; a literal written in the change is red. A rename keeps its count.
 
   python3 tests/word_lint.py <changed path>...   the changed test files (gate.sh quick); every
                                                  file when the catalog changed
@@ -242,8 +243,8 @@ def check_files(found, caps):
 
 
 def check_list(caps, base, new_keys_hits):
-    """The list only shrinks vs base, except by hits on keys new in this change
-    (new_keys_hits: {path: count}). Pure."""
+    """The list only shrinks vs base, except by the literals of keys new in this change that
+    each file had at the base (new_keys_hits: {path: count}). Pure."""
     if base is None:
         return []
     out = []
@@ -282,27 +283,46 @@ def tracked_tests():
     return [p for p in files if in_scope(p)]
 
 
+def base_read(path):
+    """A file's text at GATE_BASE (default HEAD), None when it has none."""
+    r = subprocess.run(["git", "-C", ROOT, "show", "%s:%s" % (os.environ.get("GATE_BASE", "HEAD"), path)], capture_output=True)
+    if r.returncode != 0:
+        return None
+    try:
+        return r.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def judge(todo, read_now, read_base, caps, base_caps, catalog, base_cat):
+    """Every problem of these files and of the list. read_now/read_base(path) -> text or None
+    (at the tree, at GATE_BASE). A count may rise only by literals of keys new in this change
+    that the file already had at the base (an old literal the new key makes a word, for its
+    area's chunk); a literal written in this change is red like any other (architect
+    m_27092). Pure."""
+    ms = matchers(catalog)
+    new_ms = matchers({k: v for k, v in catalog.items() if k not in base_cat})
+    found, old = {}, {}
+    for path in sorted(todo):
+        src = read_now(path)
+        found[path] = None if src is None else hits(path, src, ms)
+        if new_ms:
+            was = read_base(path)
+            old[path] = 0 if was is None else len(hits(path, was, new_ms))
+    return check_files(found, caps) + check_list(caps, base_caps, old)
+
+
 def check(paths, audit=False):
     try:
         with open(os.path.join(ROOT, LIST)) as f:
             caps, bad = parse(f.read())
     except FileNotFoundError:
         caps, bad = {}, ["%s: missing" % LIST]
-    catalog = tree_catalog()
-    base_cat = base_catalog()
-    ms = matchers(catalog)
-    new_ms = matchers({k: v for k, v in catalog.items() if k not in base_cat})
     catalog_changed = any(p.startswith(CATALOG_PREFIXES) for p in paths)
     todo = set(p for p in paths if in_scope(p))
     if audit or catalog_changed or LIST in paths:
         todo |= set(tracked_tests()) | set(caps)
-    found, fresh = {}, {}
-    for path in todo:
-        src = read(path)
-        found[path] = None if src is None else hits(path, src, ms)
-        if src is not None and new_ms:
-            fresh[path] = len(hits(path, src, new_ms))
-    return bad + check_files(found, caps) + check_list(caps, base_list(), fresh)
+    return bad + judge(todo, read, base_read, caps, base_list(), tree_catalog(), base_catalog())
 
 
 def self_test():
@@ -359,6 +379,18 @@ def self_test():
     want("list rename", check_list({"a2": 3, "b": 2}, base, {}), [])
     want("list rename bigger", len(check_list({"a2": 4, "b": 2}, base, {})), 1)
     want("list no base", check_list({"x": 9}, None, {}), [])
+    # the allowance counts the base's files, never the change's (architect m_27092)
+    base_cat = {k: v for k, v in cat.items() if k != "a.inbox"}
+    t = "tests/t_tmux.py"
+    was = 'x = "in the inbox"\n'
+    now_old = was
+    now_new = was + 'y = "in the inbox"\n'
+    def run(now, listed):
+        return judge([t], {t: now}.get, {t: was}.get, {t: listed}, {}, cat, base_cat)
+    want("old literal newly matched", run(now_old, 1), [])
+    want("new literal of a new key", len(run(now_new, 2)), 1)
+    want("new literal unlisted", len(run(now_new, 1)), 1)
+    want("new file, new key", len(judge([t], {t: now_old}.get, {}.get, {t: 1}, {}, cat, base_cat)), 1)
     if wrong:
         raise SystemExit("word-lint self-test failed:\n  " + "\n  ".join(wrong))
 
