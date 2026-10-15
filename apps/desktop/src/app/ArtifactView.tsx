@@ -147,7 +147,7 @@ export function ArtifactThread({ project, id }: { project: string; id: string })
       project={project}
       agent={maker}
       {...(name === undefined ? {} : { projectName: name })}
-      artifact={{ id, title: it.a.title, url: it.a.url, to: words.to, placeholder: words.placeholder, agent: words.agent }}
+      artifact={{ id, title: it.a.title, url: it.a.url, to: words.to, placeholder: words.placeholder, agent: words.agent, ...(words.pink === undefined ? {} : { pink: words.pink.tip }), ...(words.end === undefined ? {} : { end: words.end }) }}
     />
   );
 }

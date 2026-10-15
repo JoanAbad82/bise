@@ -165,3 +165,8 @@ export function updatedTip(): string {
 export function answerTip(who: string, escTo: string): string {
   return `your words answer ${who}'s question · esc writes to ${escTo}`;
 }
+
+/** The pink border's tip while an open artifact's words go to its maker (art-target): 'your words go to perf, not bise · esc writes to bise'; no thread to go back to: 'esc closes it'. */
+export function aboutTip(who: string, escTo: string | undefined): string {
+  return `your words go to ${who}, not bise · ${escTo === undefined ? 'esc closes it' : `esc writes to ${escTo}`}`;
+}

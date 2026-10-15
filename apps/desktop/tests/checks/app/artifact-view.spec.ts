@@ -109,7 +109,8 @@ for (const theme of ['light', 'dark']) {
       // the centre: perf's thread, its artifact row marked 'open', the one composer is perf's, about it
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf');
       await expect(page.getByTestId('thread.artifact.3')).toHaveAttribute('data-open', 'true');
-      await expect(page.getByTestId('composer.tab.to')).toContainText('about');
+      // (its '· about “…”' whole or gone in the thread's column: art-target, designer m_27021)
+      await expect(page.getByTestId('composer.tab.to')).toHaveText(/^↳ to perf(?: · about “product page, before \/ after”)?$/u);
       await expect(page.locator('[data-testid="composer.field"]'), 'one composer on the screen').toHaveCount(1);
       // the page itself, drawn by the pages server
       await expect(page.frameLocator('[data-testid="artifact.page"]').locator('h1'), 'the page is drawn').toHaveText('product page, before / after', { timeout: 10_000 });
@@ -222,7 +223,7 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByTestId('thread.head.changes')).toHaveCount(0);
       expect(await widthOf(page, '[data-testid="thread.head"]') > 0 && Math.round((await page.getByTestId('thread.head').boundingBox())?.height ?? 0), 'one line, 44 px').toBe(44);
       await expect(page.getByTestId('thread.archived'), 'no history foot: the one composer is there').toHaveCount(0);
-      await expect(page.getByTestId('composer.tab.to'), 'the composer goes to the project\'s main').toContainText('to main · about');
+      await expect(page.getByTestId('composer.tab.to'), 'the composer goes to the project\'s main').toContainText('to bise · about');
       await expect(page.locator('.b-head, .ah').first(), 'never a workspace id in a head').not.toContainText(P);
       await expect(page.getByTestId('inbox.block'), "no other agent's question here").toHaveCount(0);
       await page.mouse.move(1, 400);

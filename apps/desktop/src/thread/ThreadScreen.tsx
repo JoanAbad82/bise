@@ -76,6 +76,10 @@ export interface ThreadScreenProps {
      * in its head; only the composer goes to main)
      */
     agent?: string;
+    /** its words go to a live sub-agent (art-target): the composer's pink with this tip, none: plain */
+    pink?: string;
+    /** the tab's right while pink: 'esc to bise instead' */
+    end?: string;
   };
 }
 
@@ -469,13 +473,14 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             // 'to bise · the merge waits for 1 or 2' where his words stay a plain message, ambient m_8773);
             // voice mode while he types: 'to perf · voice paused', 'tab back to voice' (designer's voice-window (1))
             tab={tab}
-            tabEnd={voice === 'typing' ? TYPING_END : answering?.end}
+            tabEnd={voice === 'typing' ? TYPING_END : answering !== null ? answering.end : artifact?.end}
             me={addr}
             keys={voice === 'typing' ? VOICE_TYPING_KEYS : undefined}
             lead={voice === 'typing' ? <VoiceTypePearl /> : undefined}
             mark={labelMark}
             placeholder={answering?.placeholder ?? (artifact !== undefined ? artifact.placeholder : composerWords(title).placeholder)}
             {...(artifact === undefined ? {} : { about: { id: artifact.id, title: artifact.title, url: artifact.url } })}
+            aboutPink={voice === 'typing' ? undefined : artifact?.pink}
             answer={answerOf(answering)}
             onStop={stop}
             onEscape={escape}

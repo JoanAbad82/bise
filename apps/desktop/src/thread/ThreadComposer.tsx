@@ -44,6 +44,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   onReady,
   onSent,
   about,
+  aboutPink,
   keys,
   lead,
   mark,
@@ -72,6 +73,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   onSent: () => void;
   /** the artifact his words are about (an open artifact's composer): sent as `about [title](url): …` */
   about?: { id: string; title: string; url: string };
+  /** the open artifact's words go to a live sub-agent (art-target): the pink, with this tip, while no item is open */
+  aboutPink?: string | undefined;
   /** a fixed key line (voice mode while he types: '⏎ send   tab back to voice   esc leave') */
   keys?: string | undefined;
   /** in the box at its left (voice mode's grey pearl while he types) */
@@ -283,8 +286,11 @@ export const ThreadComposer = memo(function ThreadComposer({
   }, [closedKey, answer?.asker]);
   // the box's row: '+' always; the mode and the model only for a message (an answer has neither)
   const answering = answer !== null;
-  // pink only while his words answer a question (composer-target A): a closed one takes them as a message
-  const pink = answering && answer.closed !== true && answer.message !== true;
+  // pink only while his words answer a question (composer-target A): a closed one takes them as a
+  // message; with no item open, an open artifact's words to a live sub-agent are pink too (art-target);
+  // an item open beside the artifact: its state wins (an approval's plain line)
+  const pink = answering ? answer.closed !== true && answer.message !== true : aboutPink !== undefined;
+  const pinkTip = answering ? answer.tip : aboutPink;
   const attach = useCallback((paths: readonly string[]) => {
     actions.current?.attach(paths);
   }, []);
@@ -300,11 +306,15 @@ export const ThreadComposer = memo(function ThreadComposer({
   const toolsEnd = answering || me === undefined ? undefined : <ModelTool project={project} a={me} />;
   // answering, the tab holds only 'answering <agent> · <question>' and the way back: its place and
   // context come back with a plain message (designer m_24517)
-  const tabWords = useMemo(() => (answering ? { label: tab.label } : tab), [answering, tab]);
+  // (the pink artifact's tab the same: '↳ to perf · about “…”' and 'esc to bise instead')
+  // (its '· about “…”' shows whole or not at all, designer m_27021)
+  const bare = answering || pink;
+  const whole = !answering && pink;
+  const tabWords = useMemo(() => (bare ? { label: tab.label, ...(whole ? { whole } : {}) } : tab), [bare, whole, tab]);
   const tabEl = <ComposerTab words={tabWords} mark={mark} end={end ?? undefined} testId="composer.tab" />;
   // a modifier held alone: the key line lists its keys (the TUI's ctrlhint.rs key bar)
   const held = useComposerHeld();
-  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={answer?.tip} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
+  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
   if (note === null) return field;
   return (
     <>

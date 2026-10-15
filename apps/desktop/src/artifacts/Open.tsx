@@ -439,8 +439,9 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
             busy={busy}
             // the crumb names the project here: the tab says who and where (designer's composer-strip A)
             tab={{ label: answering?.label ?? words.to, place: makerPlace, context: usageLine(maker?.usage?.words), who: words.agent }}
-            tabEnd={answering?.end}
+            tabEnd={answering !== null ? answering.end : words.end}
             me={maker}
+            aboutPink={words.pink?.tip}
             placeholder={answering?.placeholder ?? words.placeholder}
             answer={answerOf(answering)}
             onStop={onStop}

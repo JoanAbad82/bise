@@ -172,10 +172,23 @@ describe('artifacts screens', () => {
   });
 
   it("the maker's words: its own, or the project's main when it is archived", () => {
-    expect(aboutWords('perf', 'speed', { archived: false })).toEqual({ agent: 'perf', archived: false, to: 'to perf · about “speed”', placeholder: 'ask perf about it, then ⏎' });
-    expect(aboutWords('perf', 'speed', { archived: true })).toEqual({ agent: 'main', archived: true, to: 'to main · about “speed”', placeholder: 'ask main about it, then ⏎' });
-    // not listed yet (the agents event may come later): its own name
-    expect(aboutWords('perf', 'speed', undefined).agent).toBe('perf');
+    expect(aboutWords('perf', 'speed', { archived: false })).toEqual({ agent: 'perf', archived: false, to: '↳ to perf · about “speed”', placeholder: 'ask perf about it, then ⏎', pink: { tip: 'your words go to perf, not bise · esc closes it' } });
+    expect(aboutWords('perf', 'speed', { archived: true })).toEqual({ agent: 'main', archived: true, to: 'to bise · about “speed”', placeholder: 'ask bise about it, then ⏎' });
+    // not listed yet (the agents event may come later): its own name, plain
+    expect(aboutWords('perf', 'speed', undefined)).toEqual({ agent: 'perf', archived: false, to: 'to perf · about “speed”', placeholder: 'ask perf about it, then ⏎' });
+  });
+
+  it("art-target: pink only for a live sub-agent's artifact, the end names the thread esc goes back to", () => {
+    // from main's thread: 'esc to bise instead'
+    expect(aboutWords('perf', 'speed', { archived: false }, 'main')).toMatchObject({ to: '↳ to perf · about “speed”', end: 'esc to bise instead', pink: { tip: 'your words go to perf, not bise · esc writes to bise' } });
+    // from perf's own thread: esc lands on perf, no end
+    const own = aboutWords('perf', 'speed', { archived: false }, 'perf');
+    expect(own.end).toBeUndefined();
+    expect(own.pink?.tip).toBe('your words go to perf, not bise · esc closes it');
+    // main's own artifact: plain, whatever is behind
+    expect(aboutWords('main', 'speed', { archived: false }, 'perf')).toEqual({ agent: 'main', archived: false, to: 'to bise · about “speed”', placeholder: 'ask bise about it, then ⏎' });
+    // an archived maker (the words go to main): plain
+    expect(aboutWords('perf', 'speed', { archived: true }, 'main').pink).toBeUndefined();
   });
 
   it("⋯ puts it in a message: a chip at the end of perf's draft, then perf's thread; show in Finder only with a file and the bridge", () => {

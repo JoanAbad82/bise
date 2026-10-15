@@ -1,7 +1,7 @@
 // artifacts/open-cases · designer's artifact-open v2 (ambient-lead m_20431): the two cases of the
 // artifact view that amb-win's app/artifact-view doesn't shoot, for designer's sign-off of
 // task-panel's ArtifactOpen: (1) the maker archived: the one composer goes to the project's main
-// ('to main · about “…”'), the maker's thread stays readable; (2) a question from the maker, docked
+// ('to bise · about “…”'), the maker's thread stays readable; (2) a question from the maker, docked
 // over the composer under the page at 800 ('answering perf · …' once opened). Each
 // at 1400 and 800 (the artifact alone, the composer under the page), light and dark. FakeCore, fake
 // data. Owner: task-panel.
@@ -89,7 +89,7 @@ for (const c of ['archived', 'question'] as const) {
         await page.setViewportSize({ width: 1400, height: 900 });
         await expect(page.getByTestId('artifact.title')).toHaveText('product page, before / after', { timeout: 10_000 });
         await expect(page.locator('[data-testid="composer.field"]'), 'one composer').toHaveCount(1);
-        if (c === 'archived') await expect(page.getByTestId('composer.tab.to').first()).toContainText('to main · about');
+        if (c === 'archived') await expect(page.getByTestId('composer.tab.to').first()).toContainText('to bise · about');
         await page.mouse.move(1, 400);
         await expect(page.frameLocator('[data-testid="artifact.page"]').locator('h1')).toHaveText('product page, before / after', { timeout: 10_000 });
         await settle(page);
@@ -102,7 +102,7 @@ for (const c of ['archived', 'question'] as const) {
         expect(pageBox?.height ?? 0, 'the page keeps its height at 800').toBeGreaterThan(300);
         const cBox = await page.getByTestId('artifact.composer').boundingBox();
         expect(Math.round(900 - ((cBox?.y ?? 0) + (cBox?.height ?? 0))), 'the composer at the bottom').toBeLessThanOrEqual(1);
-        if (c === 'archived') await expect(page.getByTestId('artifact.composer')).toContainText('to main · about');
+        if (c === 'archived') await expect(page.getByTestId('artifact.composer')).toContainText('to bise · about');
         if (c === 'question') {
           // the maker's own question docks over the composer under the page (designer m_20452), only its
           const dock = page.getByTestId('artifact.composer').getByTestId('inbox.block');

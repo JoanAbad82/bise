@@ -41,6 +41,22 @@ function widthIn(font: string): ((s: string) => number) | null {
   return (s) => Math.ceil(ctx.measureText(s).width);
 }
 
+/**
+ * A label's width as MarkedLabel draws it: its first part in the `.who` span's font (bold in the
+ * accent tab), the rest in the label's. Measured all in the label's font, a bold head came out
+ * short and the css clip cut the question mid-word (designer m_27021: 'next to th…').
+ */
+function labelWidth(lbl: HTMLElement): ((s: string) => number) | null {
+  const reg = widthIn(getComputedStyle(lbl).font);
+  if (reg === null) return null;
+  const who = lbl.querySelector<HTMLElement>('.who');
+  const head = (who === null ? null : widthIn(getComputedStyle(who).font)) ?? reg;
+  return (s) => {
+    const i = s.indexOf(' · ');
+    return i < 0 ? head(s) : head(s.slice(0, i)) + reg(s.slice(i));
+  };
+}
+
 /** The label with its mark after the first part: 'to bise' ∿, '↳ answering perf' ∿ ' · the question';
  *  the first part is its own span (answering, it is bold: '↳ answering perf'). */
 function MarkedLabel({ label, mark }: { label: string; mark: ReactNode }) {
@@ -85,10 +101,11 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
       const lbl = q(':scope > .lbl');
       const markEl = lbl?.querySelector<HTMLElement>('[data-testid="thread.mark"]') ?? null;
       const markW = markEl === null ? 0 : Math.ceil(markEl.getBoundingClientRect().width + (parseFloat(getComputedStyle(markEl).marginLeft) || 0));
-      const width = lbl === null ? null : widthIn(getComputedStyle(lbl).font);
+      const width = lbl === null ? null : labelWidth(lbl);
       if (answering && width !== null) {
-        // the question first, then the end; '↳ answering search' never goes
-        const f = answerFit(words.label, inner - markW, endW, width);
+        // the question first, then the end; '↳ answering search' never goes; an open artifact's
+        // '· about “…”' whole or gone (designer m_27021)
+        const f = answerFit(words.label, inner - markW, endW, width, words.whole === true);
         const nextCut = f.label === words.label ? null : f.label;
         setCut((c) => (c === nextCut ? c : nextCut));
         setEndIn(f.end);
@@ -112,7 +129,7 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
     return () => {
       ro.disconnect();
     };
-  }, [key, words.label, answering]);
+  }, [key, words.label, words.whole, answering]);
   return (
     <>
       <span ref={ref} className="lbl" data-testid={`${testId}.to`}>

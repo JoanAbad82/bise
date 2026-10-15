@@ -67,6 +67,13 @@ describe("the answering tab at a narrow width (composer-target A, designer m_265
     expect(answerFit(label, 190, end, w)).toEqual({ label: '↳ answering search…', end: false });
     expect(answerFit(label, 60, end, w)).toEqual({ label: '↳ answering search', end: false });
   });
+  it("an open artifact's '· about “…”' shows whole or goes whole, never 'about…'; then the end (designer m_27021)", () => {
+    const about = '↳ to perf · about “product page”'; // 32 chars, head 9
+    expect(answerFit(about, 320 + end, end, w, true)).toEqual({ label: about, end: true });
+    expect(answerFit(about, 310 + end, end, w, true)).toEqual({ label: '↳ to perf', end: true });
+    expect(answerFit(about, 90 + end, end, w, true)).toEqual({ label: '↳ to perf', end: true });
+    expect(answerFit(about, 89 + end, end, w, true)).toEqual({ label: '↳ to perf', end: false });
+  });
 });
 
 describe("the tab's context ring (designer m_24404 touch 4)", () => {

@@ -27,6 +27,8 @@ export interface TabWords {
   readonly context?: string | undefined;
   /** whose context it is, as the ring's tip names it ('perf', 'bise') */
   readonly who?: string | undefined;
+  /** the label's part after its head shows whole or not at all (an open artifact's pink '↳ to perf · about “…”') */
+  readonly whole?: boolean | undefined;
 }
 
 /** A folder's own name: the last part of its path. Pure. */
@@ -117,8 +119,14 @@ export function answerHead(label: string): string {
  * (cut after a whole word, down to '↳ answering search…'), then the end; the head itself never goes
  * (past that, the tab's own clip). Pure.
  */
-export function answerFit(label: string, room: number, endW: number, width: (s: string) => number): { label: string; end: boolean } {
+export function answerFit(label: string, room: number, endW: number, width: (s: string) => number, whole = false): { label: string; end: boolean } {
   const head = answerHead(label);
+  // `whole` (an open artifact's '↳ to perf · about “…”', designer m_27021): the part after the head
+  // shows whole or drops whole, never 'about…'; the end goes only once the head alone needs its room
+  if (whole) {
+    if (width(label) <= room - endW) return { label, end: true };
+    return { label: head, end: width(head) <= room - endW };
+  }
   const keeps = (cut: string) => cut === label || (cut.startsWith(head) && Array.from(cut).length > Array.from(head).length);
   const withEnd = wordCut(label, room - endW, width);
   if (keeps(withEnd) && width(withEnd) <= room - endW) return { label: withEnd, end: true };
