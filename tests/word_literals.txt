@@ -7,7 +7,3 @@
 1 apps/desktop/tests/checks/app/trigger-ink.spec.ts
 3 apps/desktop/tests/checks/inbox/inbox-open.spec.ts
 6 apps/desktop/tests/checks/inbox/inbox-screen.spec.ts
-1 apps/desktop/tests/checks/thread/hover-time.spec.ts
-2 apps/desktop/tests/checks/thread/reading.spec.ts
-1 tests/tui_artifacts_tmux.py
-1 tests/tui_pause_tmux.py

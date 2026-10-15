@@ -5,9 +5,14 @@ never as a literal, so a word designer changes moves every test with it.
 
 A literal string in tests/*_tmux.py or apps/desktop/tests/** is a word when it is one of the
 catalog's (tests/words/*.gen.json, generated from rust/proto/src/words/):
-  - it equals a word with no arg (of 4 characters or more: "ok", "✓", "send" are test data too);
-  - or it fills a template whole, each {arg} as any text (a template with 6 fixed characters or
-    more: "you: {said}" would match any test message).
+  - it equals a word with no arg that is more than one bare word: a space or a mark in it, 4
+    characters or more ("search", "today", "withdrawn" are agent names, states and kinds in test
+    data too; "esc to main", "✓ sent" count);
+  - or it fills a template whole, a template with 6 fixed characters or more ("you: {said}"
+    would match any test message), each {arg} typed by its name: a count (n, pos, count, total,
+    left, more) is digits, a name (agent, from, to, who, asker, maker, by) one token with no
+    space, any other arg any text (words-inbox m_27144: '{n} agents {head}' is not 'main and
+    your agents use …').
 Python files are read with ast (every str constant but docstrings), the desktop's .ts/.tsx/.js/
 .mjs/.mts with a small tokenizer ('…', "…", `…` without ${}, comments skipped).
 
@@ -43,6 +48,24 @@ CATALOG_PREFIXES = ("tests/words/", "rust/proto/src/words/")
 JS_EXTS = (".ts", ".tsx", ".js", ".mjs", ".mts")
 MIN_PLAIN = 4
 MIN_FIXED = 6
+# a hole by its name: a count is digits, a name one token, any other any text
+COUNT_ARGS = {"n", "pos", "count", "total", "left", "more"}
+NAME_ARGS = {"agent", "from", "to", "who", "asker", "maker", "by"}
+HOLE = r"\{([a-z_][a-z0-9_]*)\}"
+
+
+def hole_re(name):
+    """The regex of a hole, by its name. Pure."""
+    if name in COUNT_ARGS:
+        return r"\d[\d.,]*[kKM%]?"
+    if name in NAME_ARGS:
+        return r"\S+?"
+    return r".+?"
+
+
+def one_bare_word(form):
+    """A word with no space and no mark ('search', "don't"): test data too. Pure."""
+    return re.fullmatch(r"[A-Za-z']+", form) is not None
 RULE = "read it by its key: tests/words.py's w()/w_re(), or the desktop's words_<area>.gen.ts"
 
 
@@ -60,12 +83,14 @@ def matchers(catalog):
     out = []
     for key, e in sorted(catalog.items()):
         for form in [e["text"]] + ([e["one"]] if e.get("one") else []):
-            pieces = re.split(r"\{[a-z_][a-z0-9_]*\}", form)
-            if len(pieces) == 1:
-                if len(form) >= MIN_PLAIN:
+            parts = re.split(HOLE, form)
+            pieces, names = parts[0::2], parts[1::2]
+            if not names:
+                if len(form) >= MIN_PLAIN and not one_bare_word(form):
                     out.append((key, form, None))
             elif len("".join(pieces)) >= MIN_FIXED:
-                out.append((key, None, re.compile("(?s)" + ".+?".join(re.escape(p) for p in pieces))))
+                rx = re.escape(pieces[0]) + "".join(hole_re(h) + re.escape(p) for h, p in zip(names, pieces[1:]))
+                out.append((key, None, re.compile("(?s)" + rx)))
     return out
 
 
@@ -347,6 +372,21 @@ def self_test():
     want("short template", word_of("you: ship it", ms), None)
     want("plural one", word_of("1 row left", ms), "a.left")
     want("plural other", word_of("12 rows left", ms), "a.left")
+    cat2 = {
+        "b.search": {"text": "search", "args": [], "one": None},
+        "b.esc": {"text": "esc to main", "args": [], "one": None},
+        "b.sent": {"text": "✓ sent", "args": [], "one": None},
+        "b.agents": {"text": "{n} agents {head}", "args": ["n", "head"], "one": None},
+        "b.failed": {"text": "{agent} failed", "args": ["agent"], "one": None},
+    }
+    ms2 = matchers(cat2)
+    want("one bare word is data", word_of("search", ms2), None)
+    want("words with a space", word_of("esc to main", ms2), "b.esc")
+    want("a word with a mark", word_of("✓ sent", ms2), "b.sent")
+    want("a count is digits", word_of("12 agents working", ms2), "b.agents")
+    want("a count is not text", word_of("main and your agents use it", ms2), None)
+    want("a name is one token", word_of("perf failed", ms2), "b.failed")
+    want("a name has no space", word_of("build of tree failed", ms2), None)
     want("scope tmux", in_scope("tests/tui_cards_tmux.py"), True)
     want("scope e2e", in_scope("tests/approvals_e2e.py"), False)
     want("scope desktop", in_scope("apps/desktop/tests/checks/inbox/a.spec.ts"), True)
