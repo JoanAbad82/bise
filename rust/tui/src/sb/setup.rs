@@ -371,7 +371,7 @@ pub(crate) fn arm(app: &mut App) {
 pub(crate) fn pump(app: &mut App) {
     if app.sb.ready {
         if let Some(v) = app.sb.setup.launch.take() {
-            let root = tune::repo_root(&workspace_dir(app), Duration::from_millis(1500));
+            let root = tune::repo_root(&workspace_dir(app), tune::GIT_WAIT);
             if let Some(scope) = due(&v, root.as_deref()) {
                 app.sb.setup.vars = Some(v);
                 app.sb.setup.add(What::Ask(scope));
@@ -496,7 +496,7 @@ pub(crate) fn start(app: &mut App, scope: Scope) {
 /// `/setup`.
 pub(crate) fn command(app: &mut App) {
     let v = app.sb.setup.vars();
-    let root = tune::repo_root(&workspace_dir(app), Duration::from_millis(1500));
+    let root = tune::repo_root(&workspace_dir(app), tune::GIT_WAIT);
     remember(&v, root.as_deref());
     start(app, Scope::All);
 }
@@ -529,7 +529,7 @@ pub(super) fn answer(app: &mut App, id: u64, reply: &str) {
     let v = app.sb.setup.vars();
     match w {
         What::Ask(scope) => {
-            let root = tune::repo_root(&workspace_dir(app), Duration::from_millis(1500));
+            let root = tune::repo_root(&workspace_dir(app), tune::GIT_WAIT);
             remember(&v, root.as_deref());
             if yes {
                 start(app, scope);

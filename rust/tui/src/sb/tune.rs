@@ -128,6 +128,13 @@ impl Found {
 
 // ---- running things with a timeout ----
 
+/// How long one git command of a check may take: the checks run at
+/// launch, a slower one counts as a note. The tests get load slack: under
+/// the full suite a `git init` or `git rev-parse` took over 5 s (loop
+/// audit, 2026-10-14) and the repo checks came out as "not a repo"; a
+/// hung command still ends.
+pub(crate) const GIT_WAIT: Duration = if cfg!(test) { Duration::from_secs(30) } else { Duration::from_millis(1500) };
+
 /// Run `cmd` for at most `t`: its success and its output (stdout, then
 /// stderr); None when it can't start or takes longer (it is killed).
 pub(crate) fn output(mut cmd: Command, t: Duration) -> Option<(bool, String)> {
@@ -361,13 +368,13 @@ fn check_git(ctx: &Ctx) -> Check {
             c.arg("--version");
             c
         },
-        Duration::from_millis(1500),
+        GIT_WAIT,
     );
     let Some((true, v)) = v else {
         return Check { mark: Mark::Note, text: "no git: your agents can't use worktrees".into() };
     };
     let v = v.trim().trim_start_matches("git version ").split(' ').next().unwrap_or("").to_string();
-    match repo_root(&ctx.dir, Duration::from_millis(1500)) {
+    match repo_root(&ctx.dir, GIT_WAIT) {
         Some(_) => Check { mark: Mark::Fine, text: format!("git {v} · a repo here") },
         None => Check { mark: Mark::Note, text: format!("git {v} · not a repo here: no worktrees") },
     }
@@ -376,7 +383,7 @@ fn check_git(ctx: &Ctx) -> Check {
 /// AGENTS.md at the repo's root (BISE-232 reads it into every agent's
 /// prompt); none: a starter is offered. Not a repo: no check.
 fn check_agents(ctx: &Ctx) -> Option<(Check, Option<Offer>)> {
-    let root = repo_root(&ctx.dir, Duration::from_millis(1500))?;
+    let root = repo_root(&ctx.dir, GIT_WAIT)?;
     let file = root.join("AGENTS.md");
     Some(if file.exists() {
         (Check { mark: Mark::Fine, text: "AGENTS.md found".into() }, None)
@@ -631,7 +638,7 @@ pub(crate) fn facts(root: &Path) -> Facts {
     }
     let mut c = Command::new("git");
     c.arg("-C").arg(root).args(["log", "-12", "--format=%s"]);
-    if let Some((true, out)) = output(c, Duration::from_millis(1500)) {
+    if let Some((true, out)) = output(c, GIT_WAIT) {
         f.commits = out.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect();
     }
     f
