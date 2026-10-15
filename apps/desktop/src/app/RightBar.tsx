@@ -155,7 +155,7 @@ function Section({
       {/* a scoped head at 0 rows: one text-3 line ('perf made nothing yet', designer m_25031) */}
       {!shut && rows.length === 0 && scope !== null && (
         <div className="app-rb-rows">
-          <div className="app-rb-row app-rb-more app-rb-none" data-testid={`app.right.${id}.none`}>
+          <div className="app-rb-row app-rb-more app-rb-none" {...tipAttrs(scope.empty)} data-testid={`app.right.${id}.none`}>
             {scope.empty}
           </div>
         </div>

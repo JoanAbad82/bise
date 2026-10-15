@@ -712,6 +712,15 @@ body:has(.app-shell) {
   cursor: default;
   background: none;
 }
+/* its words one line in the row's room: a long name ends in '…' (it ran past the bar: his bug, main
+   m_26733); a block, so the ellipsis draws (a flex row's bare text can't take one); never a control,
+   so no ring to clip; .app-rb-row's flex comes later in this file, hence the two classes */
+.app-rb-row.app-rb-none {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: var(--h-row-tight);
+}
 .app-rb-sum {
   min-width: 0;
   line-height: var(--h-row-tight);
@@ -734,7 +743,11 @@ body:has(.app-shell) {
   display: flex;
   flex-direction: column;
 }
+/* every row is the body's width, its padding inside it: a <div> row (a scoped head's 'nothing wakes
+   perf') is content-box, and its 16 px of padding pushed the body to scroll sideways (his bug, main
+   m_26733) */
 .app-rb-row {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
