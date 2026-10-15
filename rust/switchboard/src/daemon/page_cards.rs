@@ -82,6 +82,11 @@ impl Shell {
                             c["opens"] = crate::card_link::opens_json(&[(n, bise_proto::rows::OptAct::artifact(id, Some(b), Some(&url)))]);
                         }
                         c["page"] = json!({"id": id, "block": b, "url": url});
+                        // its chip, '↗ lean installs · page · v1' (designer m_26845)
+                        if let Some(meta) = p.store.meta(id) {
+                            c["page"]["title"] = json!(meta.title);
+                            c["page"]["v"] = json!(meta.version());
+                        }
                         continue;
                     }
                     // a step of his: its row (roadmap D)

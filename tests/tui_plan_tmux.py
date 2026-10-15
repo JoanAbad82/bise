@@ -37,7 +37,8 @@ def main():
             assert words in sc.replace("\n", " ") or words in sc, (words, sc)
         assert "bise asks" not in sc and "send these" not in sc, sc
         # the thread's line says the same as the box (designer m_26765)
-        assert "? lean-install proposes a plan" in sc and "lean-install asks" not in sc, sc
+        assert "? lean-install proposes a plan: lean installs ↗" in sc and "lean-install asks" not in sc, sc
+        assert "↗ lean installs · page · v1   ctrl+t open in your browser" in sc, sc
         assert "{{bash" not in sc.split("inbox ·")[1], sc
         if os.environ.get("SHOT_OUT"):
             open(os.environ["SHOT_OUT"], "w").write(sc)
