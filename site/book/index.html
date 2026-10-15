@@ -179,7 +179,7 @@
   <a href="#levels">three levels</a>
   <a href="#history">the history</a>
   <a href="#reading">reading</a>
-  <a href="#cards">cards</a>
+  <a href="#cards">notifications</a>
   <a href="#talking">talking to agents</a>
   <a href="#images">images</a>
   <a href="#onboarding">onboarding</a>
@@ -284,7 +284,7 @@
   <h3>who speaks</h3>
   <p>inside the product, bise says <b>"i"</b>, and <b>"you"</b> is always the user. on the site, we talk to the reader as "you".</p>
   <h3>four words, no more</h3>
-  <p>the user meets <b>you, main, agents, cards</b>. never "task", "sub-agent", "orchestrator", "hub" or "hands" in the UI.</p>
+  <p>the user meets <b>you, main, agents, the inbox</b>; what waits in the inbox is a <b>notification</b>. never "task", "sub-agent", "orchestrator", "hub", "hands" or "card" in the UI.</p>
   <h3>do / don't</h3>
   <div class="dodont">
     <div class="do"><div class="lbl">do</div><p>say it and keep talking. the work runs in the background, i'm always here.</p><p>docs asked v1 or v2; the brief says v2, so i answered.</p><p>glm-5 can't read images. pick a model that can, or describe the screen in words.</p></div>
@@ -471,7 +471,7 @@
 <section id="history">
   <h1>10 · the history</h1>
   <h2>it only grows. in order.</h2>
-  <p>the history is append-only, in arrival order. nothing is grouped by agent, nothing moves later. what changes over time (status, age, open cards) lives outside it: the panel, the header, the card box.</p>
+  <p>the history is append-only, in arrival order. nothing is grouped by agent, nothing moves later. what changes over time (status, age, open notifications) lives outside it: the panel, the header, the card box.</p>
   <ul class="list">
     <li><b>content is frozen; small marks are not.</b> the only change on an existing line is its status mark, like <span class="faint">✓</span> becoming <span class="acc">✓✓</span>.</li>
     <li><b>only the tail can grow.</b> more than 3 messages between agents fold into one dim line. only the last run, at the bottom, still grows; a line for you closes it forever.</li>
@@ -528,9 +528,9 @@ added secure: true; the webkit test passes now.</div></div>
 
 <!-- cards -->
 <section id="cards">
-  <h1>12 · cards</h1>
+  <h1>12 · notifications</h1>
   <h2>only the decisions that are yours.</h2>
-  <p>main answers the obvious questions itself. what's left arrives as a card: a pink bar, who needs you, the question, the choices.</p>
+  <p>main answers the obvious questions itself. what's left arrives as a notification: a pink bar, who needs you, the question, the choices.</p>
   <div class="term"><div class="l1"><div class="t">? docs needs you <span class="dim" style="font-weight:400">· 1 of 3 · 2m</span></div><div>the brief says "keep old clients working", but v2 removes /users. do we document v1 or v2?</div><div class="b"><span class="acc">1</span> v1   <span class="acc">2</span> v2   <span class="dim"><span class="acc">alt+r</span> answer with text · <span class="acc">ctrl+x</span> later · <span class="acc">ctrl+f</span> full screen</span></div></div></div>
   <table>
     <tr><td class="g acc">?</td><td>a question, or an agent blocked</td></tr>
@@ -540,7 +540,7 @@ added secure: true; the webkit test passes now.</div></div>
     <tr><td class="g">⇄</td><td>two agents changed the same file</td></tr>
     <tr><td class="g acc">✓</td><td>done</td></tr>
   </table>
-  <p><code>ctrl+f</code> opens a long card full screen, <code>pgup</code> / <code>pgdn</code> scroll it.</p>
+  <p><code>ctrl+f</code> opens a long notification full screen, <code>pgup</code> / <code>pgdn</code> scroll it.</p>
 </section>
 
 <!-- talking -->

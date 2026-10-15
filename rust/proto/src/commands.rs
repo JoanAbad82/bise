@@ -150,7 +150,7 @@ pub const COMMANDS: &[Cmd] = &[
         args: &[Arg::Branch],
         client: true,
     },
-    Cmd { name: "/inbox", desc: "open what waits for you, the most blocking first (also /cards)", args: &[], client: true },
+    Cmd { name: "/inbox", desc: "open what waits for you, the most blocking first", args: &[], client: true },
     Cmd { name: "/agents", desc: "list the agents and what they do", args: &[], client: true },
     Cmd {
         name: "/switch",

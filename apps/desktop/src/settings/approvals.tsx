@@ -1,6 +1,6 @@
 // settings · approvals (bar V8 / W21, the TUI's /approvals, approvals_screen.rs): what runs without
-// asking him in this repo: the mode (auto: the checker decides, else a card; yolo: everything
-// runs), the checker, and the saved rules ("always allow" on a card adds one). Removing a rule
+// asking him in this repo: the mode (auto: the checker decides, else a notification; yolo: everything
+// runs), the checker, and the saved rules ("always allow" on a notification adds one). Removing a rule
 // asks inline first ("remove it? yes · keep it"), then the hub drops it from approvals.toml and
 // every TUI hears the new list. Pure: draws the hub's typed approvals event (HubEv approvals,
 // the store's useApprovals) and says what he changes (HubCmd approvals / remove_rule; a refusal
@@ -103,7 +103,7 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
     {
       id: 'mode',
       label: 'mode',
-      sub: a.mode === 'yolo' ? 'everything runs, no card' : 'the checker decides; else a card asks you',
+      sub: a.mode === 'yolo' ? 'everything runs, no notification' : 'the checker decides; else a notification asks you',
       control: a.env ? (
         <span className="v">{`${a.mode} · this session (BISE_APPROVALS)`}</span>
       ) : (
@@ -162,7 +162,7 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
           items={rules.map((it) => ({ ...it, sel: it.id === sel, onPick: () => { setSel(it.id); } }))}
         />
       ) : (
-        <Help testId="settings.approvals.empty">nothing yet: a card's “always allow” adds a rule here.</Help>
+        <Help testId="settings.approvals.empty">nothing yet: a notification's “always allow” adds a rule here.</Help>
       )}
       {error != null && error !== '' && (
         <Help err testId="settings.approvals.error">

@@ -75,7 +75,7 @@ Rules: the position separates look-alikes (✓ at the start of a row = done, at 
 - **never block**: items wait in the inbox, never auto-open while the draft has text, and open in place with the thread visible. no modal eats keys.
 
 ## words
-- bise says "i", the user is "you". four nouns: you, main (team lead), agents, the inbox. never task, hub, sub-agent, orchestrator, cards.
+- bise says "i", the user is "you". four nouns: you, main (team lead), agents, the inbox; what waits in the inbox is a notification (#12 in a tight row, never "notif"), and the macOS one is a banner. never task, hub, sub-agent, orchestrator, cards.
 - state words, the same everywhere: working, idle, done, waiting, asks you, failed, starting, stopped.
 - picker titles are questions, flashes are `✓ state`, keys are verbs. no period on titles or labels. numbers before units: `58k · 22%`, `3m`.
 - templates: error `✗ X. /cmd fixes it.` · tip `fact. key does what.` · mode `auto · safe calls run, risky ones ask you` · answered `✓ you allowed t3: …` · hard rule `it rewrites main. this one always asks.`

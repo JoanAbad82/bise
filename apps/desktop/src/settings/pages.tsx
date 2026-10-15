@@ -28,7 +28,7 @@ export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'setup', title: 'setup', sub: 'what bise needs, checked again. /setup in the terminal.' },
   { id: 'voice', title: 'voice and fn', sub: 'how you talk to bise.' },
   { id: 'privacy', title: 'context and privacy', sub: 'what fn adds to your question. nothing is read unless you hold fn.' },
-  { id: 'quiet', title: 'quiet moments', sub: 'when cards wait, and how they come back.' },
+  { id: 'quiet', title: 'quiet moments', sub: 'when notifications wait, and how they come back.' },
   { id: 'models', title: 'models', sub: 'your subscription is enough; an API key works too. /models and /provider in the terminal.' },
   { id: 'approvals', title: 'approvals', sub: 'what runs without asking you. /approvals in the terminal.' },
   { id: 'projects', title: 'projects', sub: "one main per project; yours, bise, coordinates them. the order is ⌘1 … ⌘9's." },
@@ -173,11 +173,11 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       return (
         <>
           <Group
-            title="cards wait"
+            title="notifications wait"
             testId="settings.quiet"
             items={[
               tg('quiet.call', 'during a call', 'Zoom, Meet, FaceTime: the pearl blushes, nothing shows'),
-              tg('quiet.share', 'while you share your screen', 'never a card during a share'),
+              tg('quiet.share', 'while you share your screen', 'never a notification during a share'),
               tg('quiet.fullscreen', 'in full screen', 'Keynote, a game, a video'),
               tg('quiet.focus', 'in focus mode', 'follows macOS focus'),
             ]}
@@ -202,7 +202,7 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
                   />
                 ),
               },
-              tg('quiet.away_card', 'while you were away', 'one card when you open your Mac again'),
+              tg('quiet.away_card', 'while you were away', 'one notification when you open your Mac again'),
             ]}
           />
         </>

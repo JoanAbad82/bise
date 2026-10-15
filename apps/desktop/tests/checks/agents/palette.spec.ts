@@ -222,7 +222,7 @@ test('agents/palette: pages by name, after the agents; ⏎ opens one like its ke
     await page.keyboard.press('Enter');
     await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
     await expect(page.getByTestId('settings.root'), 'the settings page opened').toBeVisible({ timeout: 3000 });
-    await expect(page.getByTestId('settings.root')).toContainText('when cards wait');
+    await expect(page.getByTestId('settings.root')).toContainText('when notifications wait');
 
     // ⏎ on help opens the key list over the screen, as ⌘/ does
     await openK(page);

@@ -246,7 +246,7 @@ pub(crate) fn lines(a: &Approvals, sc: &Screen, days: &[Option<i64>], w: usize, 
     let n = a.rules.len();
     if n == 0 {
         v.push(Line::from(s(
-            cut("  nothing yet: a card's \"always allow\" adds a rule here.", w),
+            cut("  nothing yet: a notification's \"always allow\" adds a rule here.", w),
             theme::dim(),
         )));
     }
@@ -412,7 +412,7 @@ what runs without asking you in /w/acme.
         let mut a = state();
         a.rules.clear();
         let t = text(&lines(&a, &Screen::default(), &[], 80, 40));
-        assert!(t.contains("nothing yet: a card's \"always allow\" adds a rule here."), "{t}");
+        assert!(t.contains("nothing yet: a notification's \"always allow\" adds a rule here."), "{t}");
         assert!(t.ends_with("⇧⇥ switches · esc back"), "{t}");
         // many rules on few rows: the cursor's row shows, the rest is counted
         let mut a = state();

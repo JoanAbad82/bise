@@ -912,6 +912,7 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
         "/switch" => palette::open(app, typed.strip_prefix("/switch").unwrap_or("")),
         // the inbox: what waits, then his past answers (inbox_screen.rs;
         // `/cards`: its old name)
+        // TODO(notif-rename): /cards, the old word, goes one release after (docs/issues/27)
         "/inbox" | "/cards" => crate::inbox_screen::open(app),
         "/theme" => out.push(theme_command(typed.split_whitespace().nth(1), crate::theme_detect::choose)),
         "/keychain" => out.extend(crate::keychain::command(&typed)),

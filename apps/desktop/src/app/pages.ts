@@ -55,7 +55,7 @@ export const SCREENS: Record<Screen, readonly Rule[]> = {
 
 /** The pages that are not routes: opened in place, over the screen he is on. */
 export const ASKS: readonly SearchPage[] = [
-  { id: 'inbox', name: 'inbox', words: ['questions', 'cards', 'waiting'], glyph: '#', key: '⌘I', go: { inbox: true } },
+  { id: 'inbox', name: 'inbox', words: ['questions', 'notifications', 'cards', 'waiting'], glyph: '#', key: '⌘I', go: { inbox: true } },
   { id: 'help', name: 'help', words: ['keys', 'shortcuts'], glyph: '·', key: '⌘/', go: { help: true } },
 ];
 

@@ -426,7 +426,7 @@ pub(crate) const LEGEND: &[Symbol] = &[
     sym(AGENTS, G_STARTING, Tone::Dim, "starting"),
     sym(AGENTS, G_WAITING, Tone::Text, "waiting on another agent, or paused until a command ends"),
     sym(AGENTS, G_WATCHING, Tone::Faint, "watching: bise wakes the agent if something happens (/scheduled)"),
-    sym(AGENTS, G_NEEDS_YOU, Tone::Accent, "needs you: a card in your inbox (dim: a blocked task, main's to handle)"),
+    sym(AGENTS, G_NEEDS_YOU, Tone::Accent, "needs you: a notification in your inbox (dim: a blocked task, main's to handle)"),
     Symbol { group: AGENTS, glyph: G_DONE, tone: Tone::Accent, ascii: "*", meaning: "done" },
     sym(AGENTS, G_FAILED, Tone::Error, "failed"),
     sym(AGENTS, G_IDLE, Tone::Dim, "idle"),
