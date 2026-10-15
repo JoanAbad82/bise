@@ -26,6 +26,8 @@ export const LAND = [
   'checks/app/bar-overflow.spec.ts',
   // a project's ⋯ menu by priority: active (needs him, then at work), quiet, archived capped (his m_26450)
   'checks/app/proj-menu.spec.ts',
+  // what slid over at 800 goes when the window grows past 1000: one bar, no scrim (try-gate dc4770c1)
+  'checks/app/bar-slide.spec.ts',
   // answering (inbox-fix, architect m_23524): a refused answer or close shows that card again with
   // the words, a taken one stays out across a reload and a switch, '✓ you answered' where he is
   'checks/inbox/answer-refused.spec.ts',
