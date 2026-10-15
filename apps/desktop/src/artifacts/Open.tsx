@@ -7,7 +7,7 @@
 // words come from maker.ts. Owner: amb-kit (the list, the model); task-panel (the open view).
 import { ImageView } from './ImageView';
 import { isImageSrc } from './zoom';
-import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { APP_FRAME_NAME } from './frameNote';
 import { useFrameNote } from './useFrameNote';
 import { Button, IconButton, PickerPop, PickerTrigger, Press } from '@/ds';
@@ -20,7 +20,10 @@ import { useTabPlace } from '@/thread/ComposerTab';
 import { usageLine } from '@/thread/head';
 import { InboxBlock, type Answering } from '@/inbox';
 import { useAllArtifacts } from './hooks';
-import { kindOf, pathOf, versions } from './model';
+import { kindOf, revealPathOf, saveOf, versions } from './model';
+import { useMenuAction } from '@/app/menu';
+import { tilde } from '@/app/barplaces';
+import type { SaveResult } from '@/shared/api';
 import { putInDraft } from './put';
 import { useAboutWords } from './maker';
 import { takeVersion, useArtifactLinks } from './links';
@@ -32,6 +35,8 @@ export interface ArtBridge {
   copy?: (t: string) => unknown;
   quickLook?: (path: string) => Promise<boolean>;
   showInFinder?: (path: string) => Promise<boolean>;
+  saveCopy?: (path: string, name: string) => Promise<SaveResult>;
+  home?: string;
 }
 export const bridge = (): ArtBridge | undefined => (globalThis as { bise?: ArtBridge }).bise;
 
@@ -139,6 +144,79 @@ export function browserUrl(
   return /^https?:\/\//i.test(a.url) ? versionUrl(a.url, a.version, shown) : null;
 }
 
+/** The save line icon (designer m_26482): an arrow down onto a short line, 16 px, stroke 1.5. */
+function SaveIcon() {
+  return (
+    <svg className="art-save-ico" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 2.5v8M4.75 7.25 8 10.5l3.25-3.25M3 13.25h10" />
+    </svg>
+  );
+}
+
+/** A path's folder part with its last '/' ('~/Downloads/'), and its name ('deck.pptx'). Pure. */
+export const folderOf = (p: string): string => p.slice(0, p.lastIndexOf('/') + 1);
+export const nameOf = (p: string): string => p.slice(p.lastIndexOf('/') + 1);
+
+/** A folder with its first `drop` folders cut at a slash: ('~/a/b/c/', 2) is '…/b/c/'. Pure. */
+export function cutFolder(folder: string, drop: number): string {
+  if (drop <= 0) return folder;
+  const parts = folder.split('/');
+  // the last part is '' (the folder ends with '/'): one folder always stays
+  const keep = parts.slice(Math.min(drop, Math.max(parts.length - 2, 0)));
+  return `…/${keep.join('/')}`;
+}
+
+/** The saved folder, cut at a slash from the left until it fits its box (designer m_26488). */
+function FolderFit({ folder }: { folder: string }) {
+  const at = useRef<HTMLSpanElement>(null);
+  const [drop, setDrop] = useState(0);
+  const most = Math.max(folder.split('/').length - 2, 0);
+  // a new width: start whole again (a new folder mounts a new FolderFit: its key)
+  useEffect(() => {
+    const el = at.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => { setDrop(0); });
+    ro.observe(el.parentElement ?? el);
+    return () => { ro.disconnect(); };
+  }, [folder]);
+  useLayoutEffect(() => {
+    const el = at.current;
+    if (el !== null && el.scrollWidth > el.clientWidth && drop < most) setDrop(drop + 1);
+  }, [drop, most, folder]);
+  return <span ref={at} className="art-saved-dir">{cutFolder(folder, drop)}</span>;
+}
+
+/**
+ * After 'save a copy…' (art-save): 'saved to ~/Downloads/deck.pptx' with 'show in Finder', or
+ * '▲ couldn't save: <why>' (▲ red); a long folder is cut from the left, the name stays whole
+ * (designer m_26482), in the live strip's place; it goes when he saves again or moves.
+ */
+export function SavedStrip({ saved, home, onReveal }: { saved: SaveResult; home: string | undefined; onReveal?: ((to: string) => void) | undefined }) {
+  if (saved === null) return null;
+  if ('error' in saved) {
+    return (
+      <div className="art-live" data-testid="artifact.saved" data-state="error">
+        <span className="art-saved-err">▲</span>
+        <span className="art-saved-to">{`couldn't save: ${saved.error}`}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="art-live" data-testid="artifact.saved" data-state="saved">
+      <span className="art-saved-to" title={saved.to}>
+        <span>saved to </span>
+        <FolderFit key={saved.to} folder={folderOf(tilde(saved.to, home))} />
+        <span className="art-saved-name">{nameOf(saved.to)}</span>
+      </span>
+      {onReveal !== undefined && (
+        <Press look="art-live-back" onClick={() => { onReveal(saved.to); }} data-testid="artifact.saved.finder">
+          show in Finder
+        </Press>
+      )}
+    </div>
+  );
+}
+
 /**
  * The hub's live words under the head (art-live, designer m_23868, the 28 px strip): '∿ deck is
  * updating · slide 2' while the maker's turn runs, then 'v3 · 2 slides changed' with '← v2' 16 px
@@ -183,8 +261,8 @@ export interface ArtifactOpenProps {
 /**
  * One artifact open (designer's artifact-open v2, amb-win's seam m_19613): it fills the box the
  * frame gives it (the right column at 55%, or the whole width under 1000 px) and reads no route.
- * Its head, 44 high: the title, 'page · v2 ⌄', '↗ browser', ⋯ (Finder, copy link, put it in a
- * message), ✕; esc closes a menu first, then the artifact, unless a field inside has his caret.
+ * Its head, 44 high: the title, 'page · v2 ⌄', '↗ browser', ⤓ save a copy (⌘S, a file's only),
+ * ⋯ (save a copy, Finder, copy link, put it in a message), ✕; esc closes a menu first, then the artifact, unless a field inside has his caret.
  * The page sits 16 px in on a 3% backdrop, r 12. The screen's ONE composer is the maker's
  * (maker.ts: the project's main when the maker is archived); the frame draws it under the
  * maker's thread, so here only with `composer`.
@@ -205,6 +283,8 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   useArtifactLinks(project);
   // the live line he moved away from (another version picked): it goes; a new line shows again
   const [goneLine, setGoneLine] = useState<string | null>(null);
+  // what the last 'save a copy…' did (SavedStrip); null: nothing to say
+  const [saved, setSaved] = useState<SaveResult>(null);
   const [now] = useState(() => Date.now());
   const theme = themeOf(usePrefs());
   const bise = bridge();
@@ -225,6 +305,17 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   // the frame's src, from the hub's row (hooks before the early return), at the block an inbox
   // option opened it at, on its current version only
   const src = it === undefined ? null : anchoredSrc(frameSrc(it.a, v ?? it.a.version, theme), (v ?? it.a.version) === it.a.version ? at : null);
+  // ⌘S (File › Save a Copy…): the version shown, when it has bytes to save
+  const toSave = it === undefined ? null : saveOf(it.a, v ?? it.a.version);
+  const save = () => {
+    const doSave = bise?.saveCopy;
+    if (toSave === null || doSave === undefined) return;
+    setMenu(null);
+    void doSave(toSave.path, toSave.name).then((r) => {
+      if (r !== null) setSaved(r);
+    });
+  };
+  useMenuAction('save', save);
   const frame = useRef<HTMLIFrameElement>(null);
   useFrameNote(frame, src, project, id, it?.a.title ?? '');
   const close = () => {
@@ -267,8 +358,10 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   const url = versionUrl(a.url, a.version, shown);
   // '↗ browser': what the panel frames, else an http(s) url; none: no button
   const out = browserUrl(a, shown);
-  const path = pathOf(a);
-  const finder = path !== null && bise?.showInFinder !== undefined ? bise.showInFinder : undefined;
+  // show in Finder: the file, else bise's copy when the file is gone (an archived agent's temp folder)
+  const path = revealPathOf(a, shown);
+  const finder = bise?.showInFinder;
+  const canSave = toSave !== null && bise?.saveCopy !== undefined;
   return (
     <section className="art-open" data-testid="artifact.open" data-agent={a.agent} onKeyDown={onKeyDown}>
       <div className="art-open-head" data-testid="artifact.head">
@@ -288,24 +381,29 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
                 current: r.v === shown,
                 testId: `artifact.versions.v${String(r.v)}`,
               })) }]}
-              onPick={(id) => { setV(Number(id)); setMenu(null); setGoneLine(a.live?.line ?? null); }} />
+              onPick={(id) => { setV(Number(id)); setMenu(null); setGoneLine(a.live?.line ?? null); setSaved(null); }} />
           )}
           {out !== null && (
             <Button kind="ghost" size="sm" onClick={() => { void bise?.openExternal?.(out); }} testId="artifact.browser" title="open in browser">
               ↗ browser
             </Button>
           )}
+          {canSave && (
+            <IconButton label="save a copy…" keys="⌘S" size="bar" onClick={save} testId="artifact.save"><SaveIcon /></IconButton>
+          )}
           <IconButton ref={moreAt} label="more" size="bar" pressed={menu === 'more'} onClick={() => { setMenu(menu === 'more' ? null : 'more'); }} testId="artifact.more">⋯</IconButton>
           {menu === 'more' && (
             <PickerPop anchor={moreAt} align="end" onClose={closeMenu} testId="artifact.more.menu"
               groups={[{ id: 'more', rows: [
+                ...(canSave ? [{ id: 'save', name: 'save a copy…', trailing: '⌘S', testId: 'artifact.save.menu' }] : []),
                 ...(finder !== undefined && path !== null ? [{ id: 'finder', name: 'show in Finder', testId: 'artifact.finder' }] : []),
                 { id: 'copy', name: 'copy link', testId: 'artifact.copy' },
                 { id: 'put', name: 'put it in a message', testId: 'artifact.put' },
               ] }]}
               onPick={(id) => {
                 setMenu(null);
-                if (id === 'finder' && finder !== undefined && path !== null) void finder(path);
+                if (id === 'save') save();
+                else if (id === 'finder' && finder !== undefined && path !== null) void finder(path);
                 else if (id === 'copy') void bise?.copy?.(url);
                 else if (id === 'put') put(project, a);
               }} />
@@ -313,7 +411,8 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
           {x}
         </span>
       </div>
-      <LiveStrip live={a.live ?? null} gone={goneLine} onBack={(back, line) => { setV(back); setGoneLine(line); }} />
+      <LiveStrip live={a.live ?? null} gone={goneLine} onBack={(back, line) => { setV(back); setGoneLine(line); setSaved(null); }} />
+      <SavedStrip saved={saved} home={bise?.home} onReveal={finder === undefined ? undefined : (to) => { void finder(to); }} />
       <div className="art-open-body">
         {/* the page follows his theme: opened with ?theme=<his pref>, the kit wears it (kit.js puts
             it on <html data-theme>); with no pref, the system's. A browser-only kind never gets

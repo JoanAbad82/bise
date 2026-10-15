@@ -37,15 +37,15 @@ describe('the application menu (bar ⛔2)', () => {
     for (const want of ['hide', 'hideOthers', 'quit', 'close', 'windowMenu', 'about']) expect(r).toContain(want);
   });
 
-  it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal", () => {
+  it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal, ⌘S save", () => {
     const { items, sent } = build('darwin');
     const keys = new Map(items.filter((i) => i.click !== undefined).map((i) => [i.accelerator, i]));
-    expect([...keys.keys()].sort()).toEqual(['CmdOrCtrl+,', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'Ctrl+`']);
-    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`']) {
+    expect([...keys.keys()].sort()).toEqual(['CmdOrCtrl+,', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'CmdOrCtrl+S', 'Ctrl+`']);
+    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`', 'CmdOrCtrl+S']) {
       const click = keys.get(k)?.click as (() => void) | undefined;
       click?.();
     }
-    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal']);
+    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal', 'save']);
   });
 
   it('settings once per platform, never twice', () => {
@@ -95,6 +95,12 @@ describe('menuTarget (qa-native m_9724)', () => {
   it('the main window with the keys gets them itself; find always goes to the focused page', () => {
     expect(menuTarget('settings', true)).toEqual({ send: 'focused' });
     expect(menuTarget('find', false)).toEqual({ send: 'focused' });
+  });
+
+  it('⌘S (art-save) goes to the focused page, never opens a route', () => {
+    expect(menuTarget('save', false)).toEqual({ send: 'focused' });
+    const { items } = build('darwin');
+    expect(items.find((i) => i.accelerator === 'CmdOrCtrl+S')?.label).toBe('Save a Copy…');
   });
 });
 

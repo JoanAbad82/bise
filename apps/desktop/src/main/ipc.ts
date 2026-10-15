@@ -6,7 +6,8 @@ import { appendFile, existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, extname, isAbsolute, join } from 'node:path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell, type OpenDialogOptions } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
+import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, SAVE_COPY_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, TEST_SAVE_TO_ENV, type MenuAction, type SaveResult } from '../shared/api';
+import { saveCopy } from './savecopy';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
@@ -136,6 +137,21 @@ export function installIpc(testMode: boolean): void {
   ipcMain.handle(IPC.openPath, (_e, raw: unknown, opts: unknown): Promise<boolean> => openFile(raw, opts, testMode));
   ipcMain.handle(IPC.quickLook, (e, raw: unknown): boolean => quickLook(BrowserWindow.fromWebContents(e.sender), raw, testMode));
   ipcMain.handle(IPC.showInFinder, (_e, raw: unknown): boolean => showInFinder(raw, testMode));
+  // art-save: an artifact's file copied where he says (savecopy.ts), behind the same fence
+  ipcMain.handle(IPC.saveCopy, (e, raw: unknown, name: unknown): Promise<SaveResult> => {
+    const p = lookable(raw);
+    if (p === null) return Promise.resolve(null);
+    return saveCopy(BrowserWindow.fromWebContents(e.sender), p, name, {
+      testMode,
+      testTo: process.env[TEST_SAVE_TO_ENV],
+      downloads: () => app.getPath('downloads'),
+      panel: (win, opts) => panelOpen(() => (win === null ? dialog.showSaveDialog(opts) : dialog.showSaveDialog(win, opts))),
+      line: (rec) => {
+        process.stdout.write(`${SAVE_COPY_LINE} ${JSON.stringify(rec)}
+`);
+      },
+    });
+  });
   ipcMain.handle(IPC.fileIcon, (_e, raw: unknown): Promise<string | null> => fileIcon(raw, testMode));
   // a window's full screen now (window.bise.onFullScreen's first call)
   ipcMain.handle(IPC.fullScreen, (e): boolean => BrowserWindow.fromWebContents(e.sender)?.isFullScreen() ?? false);

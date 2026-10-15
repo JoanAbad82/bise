@@ -6,10 +6,11 @@ import { Store, StoreProvider } from '@/store';
 import { RouterContext, createRouter } from '@/app/router';
 import type { Route } from '@/app/route';
 import { formatRoute, parseRoute } from '@/app/route';
-import { byDay, dayWords, filterItems, glyphOf, inApp, kindWords, leaves, ALL, splitArchived, timeOf, versions, whenWords, type Item } from './model';
+import { byDay, dayWords, filterItems, glyphOf, inApp, kindWords, leaves, ALL, revealPathOf, saveOf, splitArchived, timeOf, versions, whenWords, type Item } from './model';
+import { emitAction } from '@/app/menu';
 import { aboutWords, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
-import { browserUrl, frameSrc, themedUrl } from './Open';
+import { browserUrl, cutFolder, frameSrc, themedUrl } from './Open';
 import { aboutText } from '@/thread/ThreadComposer';
 import { load } from '@/composer/drafts';
 import { entryOf, entrySegments } from '@/composer/entry';
@@ -200,6 +201,43 @@ describe('artifacts screens', () => {
       fireEvent.click(screen.getByTestId('artifact.more'));
       fireEvent.click(screen.getByTestId('artifact.finder'));
       expect(shown).toEqual(['/x/shop/bench.csv']);
+    } finally {
+      delete g.bise;
+    }
+  });
+
+  it("art-save: ⤓, the ⋯ row and ⌘S save the version shown under its file's name; the strip says where", async () => {
+    const calls: [string, string][] = [];
+    const shown: string[] = [];
+    const g = globalThis as { bise?: unknown };
+    g.bise = {
+      home: '/h',
+      showInFinder: (p: string) => { shown.push(p); return Promise.resolve(true); },
+      saveCopy: (p: string, n: string) => { calls.push([p, n]); return Promise.resolve(calls.length === 3 ? { error: 'disk full' } : { to: '/h/Downloads/bench.csv' }); },
+    };
+    try {
+      mount(<ArtifactOpen project="shop-1" id="bench" />, { screen: 'artifacts', project: 'shop-1', id: 'bench' });
+      fireEvent.click(screen.getByTestId('artifact.save'));
+      await Promise.resolve();
+      expect(await screen.findByTestId('artifact.saved')).toHaveProperty('textContent', 'saved to ~/Downloads/bench.csvshow in Finder');
+      fireEvent.click(screen.getByTestId('artifact.saved.finder'));
+      expect(shown).toEqual(['/h/Downloads/bench.csv']);
+      fireEvent.click(screen.getByTestId('artifact.more'));
+      fireEvent.click(screen.getByTestId('artifact.save.menu'));
+      emitAction('save');
+      await Promise.resolve();
+      expect(calls).toEqual([['/x/shop/bench.csv', 'bench.csv'], ['/x/shop/bench.csv', 'bench.csv'], ['/x/shop/bench.csv', 'bench.csv']]);
+      await screen.findByText("couldn't save: disk full");
+      expect(screen.getByTestId('artifact.saved').dataset['state']).toBe('error');
+      expect(screen.getByTestId('artifact.saved').textContent).toBe("▲couldn't save: disk full");
+      cleanup();
+      // a bise page: no save (its html needs the pages server; his browser saves it), ⌘S does nothing
+      mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
+      expect(screen.queryByTestId('artifact.save')).toBeNull();
+      fireEvent.click(screen.getByTestId('artifact.more'));
+      expect(screen.queryByTestId('artifact.save.menu')).toBeNull();
+      emitAction('save');
+      expect(calls).toHaveLength(3);
     } finally {
       delete g.bise;
     }
@@ -403,5 +441,36 @@ describe('put it in a message', () => {
   it("the versions menu says each version's note and time when the hub sends them", () => {
     const a = { ...art('a', 'page', { version: 2, at_ms: at(0, 14, 2) }), versions: [{ v: 2, at_ms: at(0, 14, 2) }, { v: 1, at_ms: at(0, 13, 20), note: 'before the fix' }] };
     expect(versions(a, NOW)).toEqual([{ v: 2, words: 'the current one', when: '14:02' }, { v: 1, words: 'before the fix', when: '13:20' }]);
+  });
+
+  it("art-save: save and show in Finder for a file, an office file's older version, an archived agent's gone file, a page, a link", () => {
+    const deck = art('deck', 'file', {
+      version: 2, path: '/w/out/deck.pptx', target: '/w/out/deck.pptx', copy: '/s/artifacts/deck/v2/deck.pptx',
+      versions: [{ v: 1, at_ms: 1, target: '/w/out/deck-old.pptx', copy: '/s/artifacts/deck/v1/deck-old.pptx' }, { v: 2, at_ms: 2, target: '/w/out/deck.pptx', copy: '/s/artifacts/deck/v2/deck.pptx' }],
+    });
+    // the version's own bytes (bise's copy, what the panel frames), named as the agent named it
+    expect(saveOf(deck)).toEqual({ path: '/s/artifacts/deck/v2/deck.pptx', name: 'deck.pptx' });
+    expect(saveOf(deck, 1)).toEqual({ path: '/s/artifacts/deck/v1/deck-old.pptx', name: 'deck-old.pptx' });
+    expect(revealPathOf(deck)).toBe('/w/out/deck.pptx');
+    // no copy kept (over 50 MB): the file itself, while it is there
+    const big = art('film', 'file', { path: '/w/film.mov', target: '/w/film.mov' });
+    expect(saveOf(big)).toEqual({ path: '/w/film.mov', name: 'film.mov' });
+    expect(saveOf({ ...big, gone: true })).toBeNull();
+    expect(revealPathOf({ ...big, gone: true })).toBeNull();
+    // an archived agent's file, gone from its temp folder: bise's copy, older versions not kept
+    const gone = { ...deck, archived: true, gone: true, versions: [{ v: 1, at_ms: 1, target: '/w/out/deck-old.pptx', copy: null }, { v: 2, at_ms: 2, target: '/w/out/deck.pptx', copy: '/s/artifacts/deck/v2/deck.pptx' }] };
+    expect(revealPathOf(gone)).toBe('/s/artifacts/deck/v2/deck.pptx');
+    expect(revealPathOf(gone, 1)).toBe('/s/artifacts/deck/v2/deck.pptx');
+    expect(saveOf(gone)).toEqual({ path: '/s/artifacts/deck/v2/deck.pptx', name: 'deck.pptx' });
+    expect(saveOf(gone, 1)).toBeNull();
+    // a folder (a site): saved whole, under its own name
+    expect(saveOf(art('site', 'site', { path: '/w/site/', target: '/w/site/', copy: '/s/artifacts/site/v1/site' }))).toEqual({ path: '/s/artifacts/site/v1/site', name: 'site' });
+    // a bise page and a link: neither (the hub sends no path)
+    expect(saveOf(art('notes', 'page', { copy: '/s/artifacts/notes/v1/notes.html' }))).toBeNull();
+    expect(revealPathOf(art('pr', 'pr', { target: 'https://github.com/a/b/pull/1' }))).toBeNull();
+    // the strip's folder, cut at a slash, one folder always kept (designer m_26488)
+    expect(cutFolder('~/a/b/c/', 0)).toBe('~/a/b/c/');
+    expect(cutFolder('~/a/b/c/', 2)).toBe('…/b/c/');
+    expect(cutFolder('~/a/b/c/', 9)).toBe('…/c/');
   });
 });

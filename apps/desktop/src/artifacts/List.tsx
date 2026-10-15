@@ -5,7 +5,7 @@
 // @). Owner: amb-mac (amb-kit's before).
 import { memo, useState, type KeyboardEvent, type Ref } from 'react';
 import { useListKeys } from '@/app/listkeys';
-import { byDay, glyphOf, keyOf, kindWords, madeBy, pathOf, splitArchived, timeOf, type Item } from './model';
+import { byDay, glyphOf, keyOf, kindWords, madeBy, revealPathOf, splitArchived, timeOf, type Item } from './model';
 import { useAllArtifacts } from './hooks';
 import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
 import { leaves, LEAVES, useGoArtifact } from './leave';
@@ -58,7 +58,8 @@ export function rowKey(e: KeyboardEvent, cur: Item | undefined, p: Pick<RowsProp
       return true;
     case 'r':
     case 'o': {
-      const path = pathOf(cur.a);
+      // the file, else bise's copy when it is gone (art-save)
+      const path = revealPathOf(cur.a);
       const finder = bridge()?.showInFinder;
       if (path !== null && finder !== undefined) void finder(path);
       else if (leaves(cur.a)) p.onOpen(cur);
@@ -75,7 +76,7 @@ export function rowKey(e: KeyboardEvent, cur: Item | undefined, p: Pick<RowsProp
  */
 export function useLook(open: (it: Item) => void): (it: Item) => void {
   return (it) => {
-    const path = pathOf(it.a);
+    const path = revealPathOf(it.a);
     const look = bridge()?.quickLook;
     if (path === null || look === undefined) {
       open(it);

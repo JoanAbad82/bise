@@ -87,6 +87,14 @@ export interface BiseApi {
   /** The file selected in a Finder window; same fence; test mode prints REVEAL_LINE <path>. */
   readonly showInFinder: (path: string) => Promise<boolean>;
   /**
+   * 'save a copy…' (art-save): macOS's save panel, attached to the asking window, named `name`
+   * in the folder he last saved to (else Downloads); the file or folder at `path` (same fence)
+   * copied where he says. `{to}` once copied, `{error}` when the copy failed, null when he
+   * cancels or the path is refused. Test mode never opens a panel: SAVE_COPY_LINE
+   * `{from, name, to}` on stdout, and BISE_DESKTOP_TEST_SAVE_TO (an absolute path) is his answer.
+   */
+  readonly saveCopy: (path: string, name: string) => Promise<SaveResult>;
+  /**
    * A file's 16 px system icon as a data URL (a file chip, designer m_21765); same fence; null
    * when there is none, and always in test mode (the chip's ▯ glyph instead).
    */
@@ -339,7 +347,10 @@ export interface CapsuleApi {
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
-export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal';
+export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save';
+
+/** window.bise.saveCopy's answer: where the copy went, why it failed, or null (he cancelled, or refused). */
+export type SaveResult = { readonly to: string } | { readonly error: string } | null;
 
 /** The IPC channels between the preload and main (owner: amb-mac). */
 export const IPC = {
@@ -349,6 +360,7 @@ export const IPC = {
   pickFiles: 'bise:pick-files',
   quickLook: 'bise:quick-look',
   showInFinder: 'bise:show-in-finder',
+  saveCopy: 'bise:save-copy',
   fileIcon: 'bise:file-icon',
   saveImage: 'bise:save-image',
   copy: 'bise:copy',
@@ -484,6 +496,10 @@ export const APP_SWAP_LINE = 'bise-desktop: app swap';
 
 /** Test mode: the folder window.bise.pickFolder answers (an absolute path), never a panel. */
 export const TEST_PICK_FOLDER_ENV = 'BISE_DESKTOP_TEST_PICK_FOLDER';
+/** Test mode: where window.bise.saveCopy's panel 'saves' (an absolute file path; unset: a cancel), never a panel. */
+export const TEST_SAVE_TO_ENV = 'BISE_DESKTOP_TEST_SAVE_TO';
+/** Test mode: window.bise.saveCopy's line on stdout, `SAVE_COPY_LINE {from, name, to}` (to: null on a cancel). */
+export const SAVE_COPY_LINE = 'bise-desktop: save-copy';
 /** Test mode: the files window.bise.pickFiles answers (absolute paths, one per line), never a panel. */
 export const TEST_PICK_FILES_ENV = 'BISE_DESKTOP_TEST_PICK_FILES';
 

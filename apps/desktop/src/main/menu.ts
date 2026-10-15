@@ -3,7 +3,7 @@
 // Electron roles, so each does exactly what the OS does (undo, redo, cut,
 // copy, paste, select all in the focused field; hide, quit, close, minimize)
 // and shows in the menu bar with its key. bise's own items (settings ⌘,,
-// inbox ⌘I, find ⌘F, terminal ⌃`) only send a MenuAction to the focused window's
+// inbox ⌘I, find ⌘F, terminal ⌃`, File › save a copy ⌘S) only send a MenuAction to the focused window's
 // renderer, which decides what it means (src/shared/api.ts onMenu).
 import type { MenuItemConstructorOptions } from 'electron';
 import type { MenuAction } from '../shared/api';
@@ -78,7 +78,10 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
 
   const file: MenuItemConstructorOptions = {
     label: 'File',
-    submenu: mac ? [{ role: 'close' }] : [settings, { type: 'separator' }, { role: 'close' }, { role: 'quit' }],
+    // art-save: the open artifact's 'save a copy…' (no artifact open: the window does nothing)
+    submenu: mac
+      ? [item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' }, { role: 'close' }]
+      : [item('Save a Copy…', 'CmdOrCtrl+S', 'save'), { type: 'separator' }, settings, { type: 'separator' }, { role: 'close' }, { role: 'quit' }],
   };
 
   const edit: MenuItemConstructorOptions = {
@@ -142,6 +145,6 @@ export type MenuTarget = { readonly send: 'focused' } | { readonly open: string 
  * included), else the main window's (qa-flows m_9739: never dropped).
  */
 export function menuTarget(action: MenuAction, mainFocused: boolean): MenuTarget {
-  if (action === 'find' || mainFocused) return { send: 'focused' };
+  if (action === 'find' || action === 'save' || mainFocused) return { send: 'focused' };
   return { open: action };
 }

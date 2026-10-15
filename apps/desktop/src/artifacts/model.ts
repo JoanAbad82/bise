@@ -164,6 +164,41 @@ export function pathOf(a: Artifact): string | null {
 }
 
 /**
+ * What 'show in Finder' selects (art-save): the file itself while it is there, else bise's copy
+ * of the version shown (the current one's when that version kept none), else null (no item).
+ * Never a bise page's or a link's. Pure.
+ */
+export function revealPathOf(a: Artifact, shown = a.version): string | null {
+  const path = pathOf(a);
+  if (path === null) return null;
+  if (a.gone !== true) return path;
+  const copy = a.versions?.find((x) => x.v === shown)?.copy ?? a.copy;
+  return copy ?? null;
+}
+
+/** The last part of a path, its trailing slashes left out. Pure. */
+const fileName = (p: string): string => p.replace(/\/+$/u, '').split('/').pop() ?? '';
+
+/**
+ * What 'save a copy…' copies (art-save): the bytes of version `shown`, bise's copy of it first
+ * (what the panel frames), else the file itself when `shown` is the current version and it is
+ * still there; named after the file the agent made. null: no item (a bise page: its html needs
+ * the pages server, his browser saves it; a link; an older version bise didn't keep). Pure.
+ */
+export function saveOf(a: Artifact, shown = a.version): { path: string; name: string } | null {
+  const path = pathOf(a);
+  if (path === null) return null;
+  const ver = a.versions?.find((x) => x.v === shown);
+  const current = shown === a.version;
+  const copy = ver?.copy ?? (current ? a.copy : null) ?? null;
+  const src = copy ?? (current && a.gone !== true ? path : null);
+  if (src === null) return null;
+  const target = ver?.target ?? (current ? path : '');
+  const name = fileName(target) || fileName(src);
+  return { path: src, name };
+}
+
+/**
  * The versions popover's rows, newest first: 'v2  the current one  14:02', 'v1  <its note>  13:20'
  * (the hub's versions, oldest first, note = the TUI's words, left out when empty; from the live
  * artifacts event, never the ⌘K index).

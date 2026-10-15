@@ -156,3 +156,12 @@
 .art-live-back { border: 0; padding: 0; background: none; font: inherit; color: var(--c-text-2); cursor: pointer; }
 .art-live-back:hover { text-decoration: underline; text-underline-offset: 3px; }
 .art-live-back:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; border-radius: 3px; }
+/* after 'save a copy…' (art-save): a long folder ellipsizes, 'show in Finder' stays */
+.art-saved-to { display: flex; min-width: 0; overflow: hidden; white-space: pre; text-overflow: ellipsis; }
+/* the folder cut at a slash from the left ('…/tmp/', FolderFit), the name whole (designer m_26482, m_26488) */
+.art-saved-dir { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.art-saved-name { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+.art-saved-err { flex: none; color: var(--c-err); }
+.art-save-ico { display: block; color: var(--c-text-3); }
+.b-ibtn:hover > .art-save-ico, .b-ibtn:focus-visible > .art-save-ico { color: var(--c-ink); }
+.art-live > .art-live-back { flex: none; }

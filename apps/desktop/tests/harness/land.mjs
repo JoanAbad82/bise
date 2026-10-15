@@ -47,6 +47,9 @@ export const LAND = [
   // a link in the panel's artifact (html, bise page, office viewer): his browser, another artifact
   // in the panel, an anchor scrolls; the frame never leaves its artifact (art-links, architect m_26370)
   'checks/artifacts/links.spec.ts',
+  // save a copy… (⤓, ⋯, ⌘S) and show in Finder: a file, an office file's older version, an archived
+  // agent's gone file through bise's copy; the panel stubbed (art-save)
+  'checks/artifacts/save-copy.spec.ts',
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));

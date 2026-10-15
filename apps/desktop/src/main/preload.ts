@@ -5,7 +5,7 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppSwapResult, type AppUpdate, type ArtifactLink, type BiseApi, type CrashReport, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppSwapResult, type AppUpdate, type ArtifactLink, type BiseApi, type CrashReport, type CapsuleState, type MenuAction, type NotifyAuth, type SaveResult, type Surface, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
 import { argValue } from './args';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
@@ -28,6 +28,14 @@ interface Pushed {
   [IPC.termData]: { id: string; bytes: Uint8Array };
   [IPC.termExit]: { id: string; code: number | null };
   [IPC.updateState]: UpdateState;
+}
+
+// window.bise.saveCopy's answer as main gives it: {to}, {error}, or null
+function saved(v: unknown): SaveResult {
+  if (typeof v !== 'object' || v === null) return null;
+  const r = v as Record<string, unknown>;
+  if (typeof r['to'] === 'string') return { to: r['to'] };
+  return typeof r['error'] === 'string' ? { error: r['error'] } : null;
 }
 
 // one listener on a channel, its unsubscribe
@@ -88,6 +96,7 @@ const api: BiseApi = {
   openPath: async (path, opts) => (await ipcRenderer.invoke(IPC.openPath, path, opts)) === true,
   quickLook: async (path) => (await ipcRenderer.invoke(IPC.quickLook, path)) === true,
   showInFinder: async (path) => (await ipcRenderer.invoke(IPC.showInFinder, path)) === true,
+  saveCopy: async (path, name) => saved(await ipcRenderer.invoke(IPC.saveCopy, path, name)),
   fileIcon: async (path) => {
     const u: unknown = await ipcRenderer.invoke(IPC.fileIcon, path);
     return typeof u === 'string' ? u : null;
