@@ -79,6 +79,10 @@ def main():
     home = os.path.join(E.tmp, "home")
     os.makedirs(home)
     E.env.update(HOME=home, XDG_STATE_HOME=os.path.join(home, "state"))
+    # bise office's engine: a fresh worktree has no rust/jsrt build
+    # ("no bend-jsrt in <tree>" in every gate tree)
+    import scripted_ts
+    E.env.update(scripted_ts.jsrt_env())
     ok = False
     sock = os.path.join(E.state, "agent.sock")
 

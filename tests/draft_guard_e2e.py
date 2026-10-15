@@ -15,7 +15,6 @@ Run: python3 -u tests/draft_guard_e2e.py
 import http.client
 import json
 import os
-import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -84,12 +83,9 @@ def main():
     # run_typescript needs the V8 engine: a dev tree has none at its root,
     # so a run from a shell without BEND_JSRT_BIN (a launchd job, a scratch
     # worktree) failed every draft with 'program error (exit 127)' and no
-    # card; take the built one bins.sh names
-    if not os.path.exists(E.env.get("BEND_JSRT_BIN", "")):
-        out = subprocess.run([os.path.join(e2e.ROOT, "scripts", "bins.sh"), "path", "bend-jsrt"],
-                             capture_output=True, text=True).stdout.strip().splitlines()
-        if out and os.path.exists(out[-1]):
-            E.env["BEND_JSRT_BIN"] = out[-1]
+    # card; take this tree's
+    import scripted_ts
+    E.env.update(scripted_ts.jsrt_env())
     install_fake_gmail(E.ws)
     ok = True
     c = None

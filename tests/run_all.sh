@@ -45,6 +45,10 @@ echo "== Rust: build, unit and scenario tests, clippy"
 # the Bend binaries the e2e/tmux tests run (./repl-live, ./repl-scripted,
 # ./sb-core; not in git): from bins.sh's cache, compiled on a miss
 scripts/bins.sh repl-live repl-scripted sb-core || exit 1
+# and the V8 engine of these sources in the cache, once, before the tests
+# that run it ask for it in parallel (scripted_ts.jsrt_env: a fresh
+# worktree has no rust/jsrt build; on a miss each would compile its own)
+scripts/bins.sh path bend-jsrt >/dev/null || exit 1
 log="$(mktemp -t sb-run-all)"
 (cd rust && cargo build --offline -q) || exit 1
 # every test binary's summary; a failure stops here with cargo's report
