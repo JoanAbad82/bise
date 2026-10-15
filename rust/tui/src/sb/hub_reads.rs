@@ -272,8 +272,8 @@ fn cards(app: &mut App, his: &[bise_proto::rows::Card], others: &[bise_proto::ro
     // the setup cards are the TUI's own: not in the hub's rows
     super::setup::put_back(sb);
     // a card linked to a page: its thread line is one line (render.rs)
-    if super::cards::remember_pages(&sb.cards) {
-        app.cache.iter_mut().for_each(|c| *c = None);
+    if super::cards::remember_pages(&mut sb.card.linked, &sb.cards) {
+        super::cards::link_feed(app);
     }
     let sb = &mut app.sb;
     // zen (BISE-121): a card that was not there

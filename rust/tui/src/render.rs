@@ -896,7 +896,7 @@ fn card_lines(card: &crate::wire::CardParts, closed: &str, width: usize) -> Vec<
         }
         _ => {}
     }
-    let page = card.id.and_then(crate::sb::linked_page).map(|p| format!("{name} asks: {} ↗ {p}", card.question.lines().next().unwrap_or("")));
+    let page = card.page.as_ref().map(|p| format!("{name} asks: {} ↗ {p}", card.question.lines().next().unwrap_or("")));
     let mut title = page.clone().unwrap_or_else(|| if name.is_empty() { "needs you".to_string() } else { format!("{} needs you", name) });
     let (bar_st, title_st, body_st) = if closed.is_empty() {
         let accent_st = Style::default().fg(accent()).add_modifier(Modifier::BOLD);

@@ -190,6 +190,7 @@ fn card(c: &pthread::EntryCard) -> Ev {
         agent: c.agent.clone().unwrap_or_default(),
         question: c.question.clone(),
         options: c.options.iter().map(|o| o.label.clone()).collect(),
+        page: None,
     };
     // faded with the hub's closing word, as the line path's card-closed
     Ev::Card { card, closed: c.closed.clone().unwrap_or_default() }

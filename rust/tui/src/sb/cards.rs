@@ -195,6 +195,7 @@ pub(super) struct CardView {
     pub(super) drafts: HashMap<u64, Editor>,
     /// The thread's draft while the view is open.
     pub(super) thread: Option<Editor>,
+    pub(super) linked: card_page::PageTitles,
     /// The card in view the hub closed (withdrawn, answered via main,
     /// its agent stopped) while your words were typed: it stays in view,
     /// `· closed`, until you send them as a message or leave it.
@@ -1365,8 +1366,7 @@ fn split_inline(text: &str) -> Option<(String, Vec<String>)> {
 
 #[path = "card_page.rs"]
 mod card_page;
-pub(crate) use card_page::linked_page;
-pub(super) use card_page::{open_page, page_hint, page_link_line, page_mine, picked_fold, remember_pages, PageLink};
+pub(super) use card_page::{link_feed, open_page, page_hint, page_link_line, page_mine, picked_fold, remember_pages, PageLink};
 #[path = "card_choices.rs"]
 mod card_choices;
 pub(crate) use card_choices::card_choices;

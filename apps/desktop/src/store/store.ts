@@ -246,6 +246,17 @@ export class Store extends StoreVoice {
     this.put("acted", list);
     this.asideKeep?.write("acted", list);
   }
+  /**
+   * A page's item kept open across the views (notif-artifact, designer m_26776): the inbox block that
+   * opens the page beside, or unmounts with that item open, sets it; the block that mounts reads it
+   * and clears it once its list holds the item. A view slice: the window's own, never the hub's.
+   */
+  keepOpen(at: { readonly project: string; readonly card: number } | undefined): void {
+    this.slices.set("reopen", at);
+  }
+  keptOpen(): { readonly project: string; readonly card: number } | undefined {
+    return this.slice<{ readonly project: string; readonly card: number } | undefined>("reopen", undefined);
+  }
   /** @internal for apply.ts: a projects event; the cards its rows no longer list leave the set */
   rowsCame(rows: readonly ProjectRow[]): void {
     this.putActed(actedPrune(this.acted(), rows, this.now()));

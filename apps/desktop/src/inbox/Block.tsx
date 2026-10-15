@@ -92,13 +92,6 @@ export function openInbox(at?: { project: string; card: number }): boolean {
   return opened;
 }
 
-/** A page-linked item opened beside (notif-artifact, designer m_26776): the block that mounts with
- * the artifact view opens it again, so he decides while he reads the page. Taken once. */
-let reopen: OpenAt = undefined;
-export function keepOpenBeside(at: { project: string; card: number }): void {
-  reopen = at;
-}
-
 /** Hear openInbox (the block itself, a test): returns the unsubscribe. */
 export function onOpenInbox(f: (at: OpenAt) => boolean): () => void {
   openers.add(f);
@@ -448,10 +441,10 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   };
   // the item he opened beside its page stays open in the block the artifact view mounts
   useEffect(() => {
-    const at = reopen;
+    const at = store.keptOpen();
     const c = at === undefined ? undefined : list.find((x) => x.project === at.project && x.id === at.card);
     if (c === undefined) return;
-    reopen = undefined;
+    store.keepOpen(undefined);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- set by the view that unmounted in this commit: known only after it
     openTo(cardKey(c));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- openTo is this render's; the list is the trigger
@@ -464,9 +457,9 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   useEffect(
     () => () => {
       const c = openNow.current;
-      if (c?.page != null) keepOpenBeside({ project: c.project, card: c.id });
+      if (c?.page != null) store.keepOpen({ project: c.project, card: c.id });
     },
-    [],
+    [store],
   );
 
   // ⌘I, '/inbox' and a notification click: that card, else the first item; one the filter leaves
@@ -539,7 +532,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   const openPage = (c: Card) => {
     const p = c.page;
     if (p == null) return;
-    keepOpenBeside({ project: c.project, card: c.id });
+    store.keepOpen({ project: c.project, card: c.id });
     doAct(c.project, { act: 'open', artifact: p.id, at: p.item ?? p.block ?? null, url: p.url });
   };
   const pick = (c: Card, n: number) => {

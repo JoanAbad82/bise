@@ -527,6 +527,9 @@ pub(crate) struct CardParts {
     pub(crate) agent: String,
     pub(crate) question: String,
     pub(crate) options: Vec<String>,
+    /// the title of the page it is linked to (notif-artifact): the Sb's
+    /// view state fills it (cards::link_feed), the thread draws one line
+    pub(crate) page: Option<String>,
 }
 
 impl CardParts {
@@ -536,7 +539,7 @@ impl CardParts {
     pub(crate) fn of_line(t: &str) -> CardParts {
         let id = t.strip_prefix('#').and_then(|r| r.split(' ').next()).and_then(|n| n.parse().ok());
         match crate::render::card_parts(t) {
-            Some((kind, agent, body)) => CardParts { id, kind: kind.into(), agent: agent.into(), question: body.into(), options: Vec::new() },
+            Some((kind, agent, body)) => CardParts { id, kind: kind.into(), agent: agent.into(), question: body.into(), ..CardParts::default() },
             None => CardParts { id, kind: "question".into(), question: t.into(), ..CardParts::default() },
         }
     }

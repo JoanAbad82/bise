@@ -88,6 +88,7 @@ pub(super) fn page(app: &mut App, agent: &str, older: Option<usize>, entries: Ve
     if older.is_none() {
         first_page_in(app, agent);
     }
+    super::cards::link_feed(app);
     super::inbox::reveal(app);
 }
 
@@ -170,6 +171,7 @@ pub(super) fn entry(app: &mut App, agent: &str, e: &Entry) {
         }
         trim_window(app);
     });
+    super::cards::link_feed(app);
     reads(app, agent, e, true);
 }
 

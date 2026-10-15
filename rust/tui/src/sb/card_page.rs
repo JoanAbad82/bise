@@ -92,32 +92,44 @@ pub(in crate::sb) fn open_page(app: &mut App, id: u64) -> bool {
     true
 }
 
-thread_local! {
-    /// The page titles of the cards linked to one (card id → title), kept
-    /// once the card closes: its line in the thread stays one line.
-    static LINKED: std::cell::RefCell<std::collections::HashMap<u64, String>> = Default::default();
+/// The page title of each card linked to one, by card id (the cards'
+/// view state, CardView), kept once it closes: its thread line stays one
+/// line. Filled from the hub's state; after a TUI restart a card closed
+/// before it is not there, and its line draws whole (the fix: the
+/// thread's entry carrying its page).
+pub(in crate::sb) type PageTitles = std::collections::HashMap<u64, String>;
+
+/// Keeps in `linked` the page title of each card linked to one; true
+/// when one is new or changed.
+pub(in crate::sb) fn remember_pages(linked: &mut PageTitles, cards: &[Card]) -> bool {
+    let mut new = false;
+    for c in cards {
+        if let Some(l) = &c.page {
+            let t = l.page.title.clone().unwrap_or_else(|| l.page.id.clone());
+            new |= linked.insert(c.id, t.clone()).as_ref() != Some(&t);
+        }
+    }
+    new
 }
 
-/// Keeps the page of each card linked to one; true when one is new (the
-/// feed's cached rows draw again).
-pub(crate) fn remember_pages(cards: &[Card]) -> bool {
-    LINKED.with(|m| {
-        let mut m = m.borrow_mut();
-        let mut new = false;
-        for c in cards {
-            if let Some(l) = &c.page {
-                let t = l.page.title.clone().unwrap_or_else(|| l.page.id.clone());
-                new |= m.insert(c.id, t.clone()).as_ref() != Some(&t);
+/// The feed's cards learn their page from `linked`: the thread draws one
+/// linked to a page as one line, `? main asks: <question> ↗ <title>`
+/// (render.rs card_lines, designer m_26776); the rows of a card that
+/// changed draw again.
+pub(in crate::sb) fn link_feed(app: &mut App) {
+    if app.sb.card.linked.is_empty() {
+        return;
+    }
+    for (i, ev) in app.events.iter_mut().enumerate() {
+        let crate::wire::Ev::Card { card, .. } = ev else { continue };
+        let page = card.id.and_then(|id| app.sb.card.linked.get(&id)).cloned();
+        if page.is_some() && card.page != page {
+            card.page = page;
+            if let Some(c) = app.cache.get_mut(i) {
+                *c = None;
             }
         }
-        new
-    })
-}
-
-/// Card `id`'s page title when it is linked to one: its line in the
-/// thread reads `? main asks: <question> ↗ <title>` (designer m_26776).
-pub(crate) fn linked_page(id: u64) -> Option<String> {
-    LINKED.with(|m| m.borrow().get(&id).cloned())
+    }
 }
 
 #[cfg(test)]
@@ -143,8 +155,9 @@ mod tests {
         assert_eq!(page_hint(&c, &s).as_deref(), Some("or type: designer reads it"));
         assert_eq!(picked_fold(&c, "B · frame").as_deref(), Some("you picked B"));
         assert_eq!(picked_fold(&c, "post now"), None);
-        assert!(remember_pages(std::slice::from_ref(&c)) && !remember_pages(std::slice::from_ref(&c)));
-        assert_eq!(linked_page(7).as_deref(), Some("where does my answer go"));
+        let mut linked = std::collections::HashMap::new();
+        assert!(remember_pages(&mut linked, std::slice::from_ref(&c)) && !remember_pages(&mut linked, std::slice::from_ref(&c)));
+        assert_eq!(linked.get(&7).map(String::as_str), Some("where does my answer go"));
         let plain = Card { page: None, ..c };
         assert!(page_link_line(&plain, 76).is_none() && page_mine(&plain, &s).is_empty() && page_hint(&plain, &s).is_none() && picked_fold(&plain, "B · frame").is_none());
     }
