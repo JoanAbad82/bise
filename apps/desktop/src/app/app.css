@@ -306,6 +306,14 @@ body:has(.app-shell) {
 .app-sign.dim {
   color: var(--c-text-2);
 }
+/* a project ⋯ menu row's end: words he reads, sans text-3 12 (designer m_26470), 'waits' in the accent */
+.app-pm-end {
+  font: var(--t-12) var(--font-ui);
+  color: var(--c-text-3);
+}
+.app-pm-end.acc {
+  color: var(--c-accent);
+}
 .app-m {
   flex: none;
   color: var(--c-text-3);

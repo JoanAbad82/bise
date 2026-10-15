@@ -22,6 +22,8 @@ export const LAND = [
   'checks/app/menus.spec.ts',
   // the right bar's heads: no part meets another, the scope words on their own line (bar-heads, his m_26417)
   'checks/app/bar-heads.spec.ts',
+  // a project's ⋯ menu by priority: active (needs him, then at work), quiet, archived capped (his m_26450)
+  'checks/app/proj-menu.spec.ts',
   // answering (inbox-fix, architect m_23524): a refused answer or close shows that card again with
   // the words, a taken one stays out across a reload and a switch, '✓ you answered' where he is
   'checks/inbox/answer-refused.spec.ts',

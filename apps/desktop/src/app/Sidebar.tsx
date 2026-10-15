@@ -2,8 +2,8 @@
 // ⌘K', bise, '? inbox' (the pink waiting count), '↗ artifacts' and '◷ scheduled' for every project at once,
 // then his projects, each with its mark (desktop-delight v2: the '∿' gust at
 // work, '?' when it asks him, '·' quiet; a click opens 'bise · storefront')
-// and his pink count; bise's row leads with its ':*' (Marks.tsx); the archived agents
-// are in the project's ⋯ menu; '+ add a project' and settings at the foot.
+// and his pink count; bise's row leads with its ':*' (Marks.tsx); the project's ⋯ menu
+// lists its agents by priority (active, quiet, archived: projmenu.ts); '+ add a project' and settings at the foot.
 // Places only (designer's desktop-right-bar v5, ambient-lead m_20087): the
 // agents of the place shown are in the right bar (RightBar.tsx). Owner: amb-win.
 //
@@ -15,7 +15,8 @@ import type { ProjectRow } from '@/proto';
 import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
 import { useWaitingCount } from '@/inbox/waiting';
-import { archivedOf } from '@/agents/model';
+import { useNow } from './clock';
+import { menuGroupsOf } from './projmenu';
 import { MAIN, projectOf, type Route } from './route';
 import { addProject } from './addProject';
 import { useRoute, useRouter } from './router';
@@ -276,7 +277,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
           <IconButton
             ref={more}
             size="row"
-            label={`${p.name}: all agents, archived agents`}
+            label={`${p.name}: its agents, what needs you first`}
             pressed={menu}
             onClick={(e) => {
               e.stopPropagation();
@@ -295,11 +296,13 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
   );
 });
 
-/** A project's ⋯ menu (the ds PickerPop from its ⋯): its agents list, then its archived agents
- *  under their head (each opens its thread). */
+/** A project's ⋯ menu (the ds PickerPop from its ⋯), by priority (projmenu.ts): 'all agents',
+ *  then 'active', 'quiet', 'archived' (the newest 5, '+ N more' to /archived); each row wears the
+ *  right bar's mark, its end in sans words ('waits' in the accent); a row opens its thread. */
 function ProjectMenu({ p, anchor, onClose }: { p: ProjectRow; anchor: RefObject<HTMLButtonElement | null>; onClose: () => void }) {
   const router = useRouter();
-  const archived = archivedOf(useAgents(p.project));
+  const now = useNow();
+  const groups = menuGroupsOf(useAgents(p.project), now);
   const id = `app.sidebar.project.${p.project}.menu`;
   return (
     <PickerPop
@@ -307,17 +310,29 @@ function ProjectMenu({ p, anchor, onClose }: { p: ProjectRow; anchor: RefObject<
       align="start"
       groups={[
         { id: 'all', rows: [{ id: 'agents', name: 'all agents', testId: `${id}.agents` }] },
-        {
-          id: 'archived',
-          head: 'archived',
-          rows: archived.length === 0
-            ? [{ id: 'none', name: 'no archived agent', disabled: true }]
-            : archived.map((a) => ({ id: `a:${a.name}`, name: a.name, testId: `${id}.archived.${a.name}` })),
-        },
+        ...groups.map((g) => ({
+          id: g.head,
+          head: g.head,
+          rows: [
+            ...g.rows.map((r) => ({
+              id: `a:${r.agent.name}`,
+              name: r.agent.name,
+              text: r.agent.name,
+              glyph: <span className={`app-sign ${r.tone}`} data-testid={`${id}.${g.head}.${r.agent.name}.mark`}>{r.glyph}</span>,
+              trailing: <span className={r.acc ? 'app-pm-end acc' : 'app-pm-end'}>{r.end}</span>,
+              testId: `${id}.${g.head}.${r.agent.name}`,
+            })),
+            ...(g.more > 0 ? [{ id: 'more', name: `+ ${String(g.more)} more`, testId: `${id}.archived.more` }] : []),
+          ],
+        })),
       ]}
       onPick={(pick) => {
         onClose();
-        router.go(pick === 'agents' ? { screen: 'agents', project: p.project } : { screen: 'thread', project: p.project, agent: pick.slice(2) });
+        router.go(
+          pick === 'agents' ? { screen: 'agents', project: p.project }
+          : pick === 'more' ? { screen: 'agents', project: p.project, archived: true }
+          : { screen: 'thread', project: p.project, agent: pick.slice(2) },
+        );
       }}
       onClose={onClose}
       testId={`${id}.list`}
