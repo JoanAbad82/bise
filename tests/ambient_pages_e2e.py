@@ -492,7 +492,10 @@ def main():
         c.say("/answer %d 2" % tq["id"])
         c.wait(lambda: tps.seen("answered", lambda d: d == {"block": "q1", "reply": "wait for Marc"}), 30, "the task page's answer on the page")
         # t4's turn ended with a plain answer (no sb report): his tick on
-        # its page still wakes it (pm's D fail 37)
+        # its page still wakes it (pm's D fail 37). That first turn's end
+        # first: on a loaded machine t4 was still in its sb page publish,
+        # the tick went into that turn and no new one started
+        c.wait(lambda: any(l.startswith("  obs: turn_done") for l in c.lines("t4")), 120, "t4's first turn done")
         n4 = len(c.lines("t4"))
         c.say("/answer %d done" % step_card("s1")["id"])
         c.wait(lambda: tps.seen("ticked", lambda d: d == {"block": "steps", "item": "s1"}), 30, "the task page's step ticked")
