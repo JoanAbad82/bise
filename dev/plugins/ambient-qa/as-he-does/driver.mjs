@@ -1211,12 +1211,14 @@ if (mode === 'quick') {
     await rowsF2A7(harness, say);
     await rows233B(harness, say);
     await rowsC2BA(harness, say);
+    await rowsDC47(harness, say);
   } else {
     // first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the time the others take
     await rowsE812(harness, say);
     await rowsF2A7(harness, say);
     await rows233B(harness, say);
     await rowsC2BA(harness, say);
+    await rowsDC47(harness, say);
     await quickRows(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
@@ -3854,6 +3856,263 @@ async function rowsC2BA(harness, say) {
       !!got.answering && /^zqk$/.test(got.inAnswer ?? '') && !/zqk/.test(got.draft ?? ''), got);
     await answerWith(F1, 1);
     for (let i = 1; i <= 4; i += 1) await answerWith(`${S}${String(i)}`, 1);
+  });
+}
+
+// dc4770c14's cut (desk-cut-4 m_26522): one row per new item since 3ce74eb9a. Nothing here reaches
+// his machine: no native save panel (the ⤓ / ⋯ items read, never clicked), no 'show in Finder',
+// no web link clicked (main's openLink would open his browser; links.spec has the stub), the paste a
+// synthetic ClipboardEvent (his pasteboard untouched), no 'add a project' (the folder picker)
+async function rowsDC47(harness, say) {
+  const row = async (name, fn) => {
+    if (!wanted(name)) return;
+    try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const flat = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const fieldText = async () => flat(await field.innerText({ timeout: 2000 }).catch(() => ''));
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  const T = String(Date.now()).slice(-5);
+  const unfold = async () => {
+    const more = page.locator('[data-testid="app.right.agents.more"]').first();
+    if (/^\+ \d+ more$/.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
+  };
+  // the harness project's sidebar row (its id carries a hash)
+  const projId = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
+    .find((e) => /^app\.sidebar\.project\.[^.]+$/.test(e.getAttribute('data-testid') ?? '') && /\bharness\b/.test(e.textContent ?? ''))?.getAttribute('data-testid') ?? null).catch(() => null);
+
+  // 1. at-steady: the @ list never leaves for a frame while he types a file name
+  await row('at steady', async () => {
+    await harness();
+    await clear();
+    await page.keyboard.type('@', { delay: 20 });
+    const open = await page.locator('[data-testid="composer.pick"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
+    await page.evaluate(() => {
+      const first = document.querySelector('[data-testid="composer.pick"]');
+      const w = { frames: [], removed: 0, on: true };
+      window.__qaSteady = w;
+      const tick = () => {
+        if (!w.on) return;
+        const el = document.querySelector('[data-testid="composer.pick"]');
+        w.frames.push({ present: !!el && el.isConnected, same: el === first, h: Math.round(el?.getBoundingClientRect().height ?? 0) });
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      new MutationObserver((rs) => { for (const r of rs) for (const n of r.removedNodes) if (n === first || (n instanceof Element && first && n.contains(first))) w.removed += 1; }).observe(document.body, { childList: true, subtree: true });
+    });
+    await page.keyboard.type('READM', { delay: 40 });
+    await page.waitForTimeout(600);
+    await shot('dc47-at-steady');
+    const w = await page.evaluate(() => { const x = window.__qaSteady; x.on = false; return { n: x.frames.length, gone: x.frames.filter((f) => !f.present || !f.same || f.h === 0).length, removed: x.removed }; });
+    step("@ then 5 keys of a file name (READM): the @ list is the same node, drawn, on every frame", open && w.n > 10 && w.gone === 0 && w.removed === 0, { open, ...w, field: await fieldText() });
+    await page.keyboard.press('Escape');
+    await clear();
+  });
+
+  // 2. art-save: the ⤓ button and the ⋯ menu's 'save a copy…' and 'show in Finder' are there and
+  // enabled (read only: a click opens macOS's save panel or reveals in his Finder)
+  await row('art save', async () => {
+    await harness();
+    await unfold();
+    const chip = page.locator('[data-testid^="app.right.artifact."][data-testid$=".chip"]').first();
+    await chip.click({ timeout: 5000 });
+    await page.locator('[data-testid="artifact.open"]').first().waitFor({ timeout: 10000 });
+    const save = await page.evaluate(() => {
+      const b = document.querySelector('[data-testid="artifact.save"]');
+      return b ? { there: true, enabled: !b.disabled && b.getAttribute('aria-disabled') !== 'true', tip: b.getAttribute('aria-label') ?? b.getAttribute('data-tip') ?? b.getAttribute('title') } : { there: false };
+    });
+    await page.locator('[data-testid="artifact.more"]').first().click({ timeout: 3000 });
+    await page.locator('[data-testid="artifact.more.menu"]').first().waitFor({ timeout: 3000 }).catch(() => {});
+    const menu = await page.evaluate(() => [...document.querySelectorAll('[data-testid="artifact.more.menu"] [data-testid]')]
+      .map((e) => ({ id: e.getAttribute('data-testid'), t: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), off: e.getAttribute('aria-disabled') === 'true' || e.hasAttribute('disabled') })));
+    await shot('dc47-art-save-menu');
+    await page.keyboard.press('Escape');
+    const saveItem = menu.find((m) => /save a copy/.test(m.t));
+    const finder = menu.find((m) => /show in Finder/i.test(m.t));
+    step("an artifact's ⤓ and its ⋯ 'save a copy…' and 'show in Finder' are there and enabled (not clicked: his save panel, his Finder)",
+      save.there && save.enabled && !!saveItem && !saveItem.off && !!finder && !finder.off, { save, menu });
+    await closeArtifact();
+  });
+
+  // 3. proj-menu: a project's ⋯ lists 'all agents', then 'active', 'quiet', 'archived', each row the
+  // bar's mark; main left out
+  await row('proj menu', async () => {
+    await harness();
+    const P = await projId();
+    if (!P) { step("a project's ⋯ menu: its agents by priority", false, { why: 'no harness row in the sidebar' }); return; }
+    const M = `${P}.menu`;
+    await page.locator(`[data-testid="${P}"]`).first().hover();
+    await page.locator(`[data-testid="${M}"]`).first().click({ timeout: 3000 });
+    await page.locator(`[data-testid="${M}.list"]`).first().waitFor({ timeout: 5000 });
+    const got = await page.evaluate((m) => {
+      const list = document.querySelector(`[data-testid="${m}.list"]`);
+      const rows = [...list.querySelectorAll(`[data-testid^="${m}."]`)].map((e) => e.getAttribute('data-testid')).filter((t) => !/\.(mark|end|list)$/.test(t));
+      const marks = rows.map((r) => { const k = r.split('.').at(-1); const mk = document.querySelector(`[data-testid="${r}.mark"]`); const bar = document.querySelector(`[data-testid="app.right.agent.${k}.sign"]`); return { k, mark: (mk?.textContent ?? '').trim(), bar: bar ? (bar.textContent ?? '').trim() : null }; });
+      return { rows, heads: ['active', 'quiet', 'archived'].filter((h) => [...list.querySelectorAll('*')].some((e) => e.children.length === 0 && (e.textContent ?? '').trim() === h)), marks, text: (list.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 400) };
+    }, M);
+    await shot('dc47-proj-menu');
+    await page.keyboard.press('Escape');
+    const live = got.marks.filter((x) => x.bar !== null && x.bar !== '' && x.mark !== '');
+    step("a project's ⋯: 'all agents' first, then 'active' / 'quiet' / 'archived' heads, each live row the bar's mark, main left out",
+      got.rows[0] === `${M}.agents` && got.heads.includes('archived') && got.heads.length >= 2 && !got.rows.some((r) => /\.main$/.test(r)) && live.every((x) => x.mark === x.bar),
+      { rows: got.rows, heads: got.heads, differ: live.filter((x) => x.mark !== x.bar), text: got.text });
+  });
+
+  // 4. bar-heads: a head's scope words on a line of their own; '+ add' / 'all ›' never over them
+  await row('bar heads', async () => {
+    await harness();
+    await unfold();
+    await page.locator('[data-testid="app.right.agent.zcwt"], [data-testid="app.right.agent.zqsolo"]').first().click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const out = [];
+    for (const w of [1400, 800]) {
+      await resizeWin(w, 900);
+      await page.waitForTimeout(700);
+      if (!(await page.locator('[data-testid="app.panel"]').first().isVisible().catch(() => false))) { await page.keyboard.press('Meta+Alt+0'); await page.waitForTimeout(600); }
+      const r = await page.evaluate(() => {
+        const box = (s) => { const e = document.querySelector(`[data-testid="${s}"]`); if (!e) return null; const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 ? { l: b.left, t: b.top, r: b.right, b: b.bottom, words: (e.textContent ?? '').trim().slice(0, 40) } : null; };
+        const hit = (a, b) => a && b && a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+        return ['agents', 'archived', 'artifacts', 'scheduled'].map((id) => {
+          const parts = { label: box(`app.right.${id}.head`), sum: box(`app.right.${id}.summary`), add: box(`app.right.${id}.add`), all: box(`app.right.${id}.all`), scope: box(`app.right.${id}.scope`) };
+          const ks = Object.keys(parts).filter((k) => parts[k]);
+          const over = [];
+          for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++) if (hit(parts[ks[i]], parts[ks[j]])) over.push(`${ks[i]}×${ks[j]}`);
+          return { id, scope: parts.scope?.words ?? null, own: parts.scope && parts.label ? parts.scope.t >= parts.label.b - 1 : null, over };
+        });
+      });
+      await shot(`dc47-bar-heads-${String(w)}`);
+      out.push({ w, heads: r });
+    }
+    await resizeWin(1400, 900);
+    const scoped = out.flatMap((x) => x.heads).filter((h) => h.scope !== null);
+    step("the right bar's heads at 1400 and 800: no two parts overlap; a scope line ('for <agent>') sits under its head",
+      out.every((x) => x.heads.every((h) => h.over.length === 0)) && scoped.every((h) => h.own), { out, scoped: scoped.length });
+  });
+
+  // 5. art-links: an html artifact's in-page link keeps the panel on the artifact (no blank panel);
+  // the window's CSP lets a frame ask for http(s) so the guard decides. The web link itself is not
+  // clicked: main's openLink would open his browser
+  await row('art links', async () => {
+    const D = FX;
+    fs.mkdirSync(D, { recursive: true });
+    const html = `<!doctype html><title>dc links ${T}</title><p><a id="jump" href="#end">jump</a> <a id="web" href="https://example.com/">web</a></p><div style="height:3000px"></div><p id="end">the end ${T}</p>`;
+    fs.writeFileSync(path.join(D, `dc-links-${T}.html`), html);
+    await harness();
+    await say(`[[bash: sb artifact add ${D}/dc-links-${T}.html --title dc-links-${T}]] dc links`);
+    await unfold();
+    const chip = page.locator('[data-testid^="app.right.artifact."][data-testid$=".chip"]').filter({ hasText: `dc-links-${T}` }).first();
+    const seen = await until(async () => ((await chip.count()) ? true : null), 60000, 1000);
+    if (!seen) { step('an html artifact\'s link keeps the panel on it', false, { why: 'the artifact never showed in ARTIFACTS' }); return; }
+    await chip.click({ timeout: 5000 });
+    const frameEl = page.locator('[data-testid="artifact.page"]').first();
+    await frameEl.waitFor({ timeout: 10000 });
+    const fr = page.frameLocator('[data-testid="artifact.page"]').first();
+    // the viewer frames a site inside its own frame: find the anchor in any nested frame
+    const anchorFrame = await until(async () => page.frames().find((f) => f.url().includes('dc-links') || f.url().includes('/framed/')) ?? null, 15000, 500);
+    let jumped = null;
+    if (anchorFrame) {
+      await anchorFrame.evaluate(() => document.getElementById('jump')?.click()).catch(() => {});
+      await page.waitForTimeout(800);
+      jumped = await anchorFrame.evaluate(() => ({ y: Math.round(window.scrollY), hash: location.hash, end: !!document.getElementById('end') })).catch(() => null);
+    }
+    await shot('dc47-art-links');
+    const stays = await page.evaluate(() => ({ page: !!document.querySelector('[data-testid="artifact.page"]'), title: (document.querySelector('[data-testid="artifact.title"]')?.textContent ?? '').trim() }));
+    const csp = await page.evaluate(() => document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') ?? '');
+    const frameSrc = /frame-src[^;]*/.exec(csp)?.[0] ?? '';
+    void fr;
+    step("an html artifact's in-page link scrolls inside it, the panel stays on the artifact; the window's frame-src lets a frame ask for https (the guard decides; the web click not run: his browser)",
+      !!jumped && jumped.end && jumped.y > 0 && stays.page && /dc-links/.test(stays.title) && /https:/.test(frameSrc), { jumped, stays, frameSrc, frame: anchorFrame?.url() ?? null });
+    await closeArtifact();
+  });
+
+  // 6. paste-link-label: a URL pasted over selected words becomes [words](url). A synthetic paste
+  // event: his pasteboard is never read nor written
+  await row('paste link', async () => {
+    await harness();
+    await clear();
+    await page.keyboard.type('read the docs', { delay: 20 });
+    await page.keyboard.press('Alt+Shift+ArrowLeft');
+    await page.evaluate(() => {
+      const el = document.activeElement;
+      const dt = new DataTransfer();
+      dt.setData('text/plain', 'https://bise.dev/docs');
+      el?.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    await page.waitForTimeout(400);
+    const got = await fieldText();
+    await shot('dc47-paste-link');
+    step("a URL pasted over the selected word 'docs' gives 'read the [docs](https://bise.dev/docs)'", got === 'read the [docs](https://bise.dev/docs)', { got });
+    await clear();
+  });
+
+  // 7. sb-words: no line he reads names an sb command (the scheduled screen, its empty list)
+  await row('sb words', async () => {
+    await click('scheduled', page.locator('[data-testid="app.sidebar.scheduled"]').first());
+    await page.waitForTimeout(1200);
+    const words = flat(await text('[data-testid="app.main"]'));
+    await shot('dc47-sb-words-scheduled');
+    const hit = /\bsb (card|send|ask|every|wake|land|artifact|page|report|status|list|tasks)\b/.exec(words)?.[0] ?? null;
+    step("no 'sb <command>' on the scheduled screen (its empty list asks an agent instead)", words !== '' && hit === null, { hit, words: words.slice(0, 400) });
+    await harness();
+  });
+
+  // 8. sidebar-more-right: a project row's ⋯ flush right on hover, nothing else moves
+  await row('sidebar more', async () => {
+    await harness();
+    const P = await projId();
+    if (!P) { step("a project row's ⋯ flush right on hover", false, { why: 'no harness row' }); return; }
+    const read = () => page.evaluate((p) => {
+      const r = document.querySelector(`[data-testid="${p}"]`);
+      const m = document.querySelector(`[data-testid="${p}.menu"]`);
+      const n = [...r.querySelectorAll('*')].find((e) => e.children.length === 0 && /harness/.test(e.textContent ?? ''));
+      const rb = r.getBoundingClientRect();
+      const mb = m?.getBoundingClientRect();
+      return { name: n ? Math.round(n.getBoundingClientRect().left) : null, nameTop: n ? Math.round(n.getBoundingClientRect().top) : null, rowH: Math.round(rb.height), more: mb && mb.width > 0 && getComputedStyle(m).visibility !== 'hidden' && getComputedStyle(m).opacity !== '0' ? { right: Math.round(rb.right - mb.right), pad: Math.round(parseFloat(getComputedStyle(r).paddingRight)) } : null };
+    }, P);
+    await page.mouse.move(1, 500);
+    await page.waitForTimeout(300);
+    const rest = await read();
+    await page.locator(`[data-testid="${P}"]`).first().hover();
+    await page.waitForTimeout(400);
+    const on = await read();
+    await shot('dc47-sidebar-more');
+    await page.mouse.move(1, 500);
+    step("a project row's ⋯ shows flush right on hover (its right edge on the row's padding), the name and the row don't move",
+      !!on.more && on.more.right <= Math.max(on.more.pad, 0) + 2 && on.name === rest.name && on.nameTop === rest.nameTop && on.rowH === rest.rowH, { rest, on });
+  });
+
+  // 9. ring-quiet: the ring is a dial (a 1 px track, a 2 px arc); the composer's tab shows it always,
+  // the bar's rows on hover / focus / ⌥ (the fake provider's [[usage: N]] gives main a context)
+  await row('ring quiet', async () => {
+    await harness();
+    await say(`[[usage: 70000]] ring ${T}`);
+    const ring = await until(async () => page.evaluate(() => {
+      const r = document.querySelector('[data-testid="composer.tab"] .b-ring');
+      if (!r || r.getBoundingClientRect().width === 0) return null;
+      const tr = r.querySelector('.track');
+      const used = r.querySelector('.used');
+      const sw = (e) => (e ? getComputedStyle(e).strokeWidth : null);
+      return { w: Math.round(r.getBoundingClientRect().width), track: sw(tr), used: sw(used), usedTag: used?.tagName ?? null, tab: (document.querySelector('[data-testid="composer.tab"]')?.textContent ?? '').replace(/\s+/g, ' ').trim() };
+    }), 60000, 1000);
+    await shot('dc47-ring-composer');
+    step("the composer tab's context ring is a dial: a 1 px track and a 2 px arc, 12 px", !!ring && ring.w === 12 && /^1(px)?$/.test(ring.track ?? '') && /^2(px)?$/.test(ring.used ?? ''), ring ?? { why: 'no ring on the tab after [[usage: 70000]]' });
+    // the bar: rings at rest hidden, shown on a row's hover (only agents with a context have one)
+    await unfold();
+    const bar = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.right.agent."][data-testid$=".ring"]')].map((e) => ({ id: e.getAttribute('data-testid'), op: getComputedStyle(e.closest('.app-rb-pct') ?? e).opacity, vis: getComputedStyle(e.closest('.app-rb-pct') ?? e).visibility })));
+    let hover = null;
+    if (bar.length) {
+      const rowId = bar[0].id.replace(/\.ring$/, '');
+      await page.locator(`[data-testid="${rowId}"]`).first().hover();
+      await page.waitForTimeout(400);
+      hover = await page.evaluate((id) => { const e = document.querySelector(`[data-testid="${id}"]`); const c = e.closest('.app-rb-pct') ?? e; return { op: getComputedStyle(c).opacity, vis: getComputedStyle(c).visibility }; }, bar[0].id);
+      await page.mouse.move(1, 500);
+    }
+    step("the bar's rings are quiet at rest and show on the row's hover", bar.length === 0 ? true : bar.every((b) => b.op === '0' || b.vis === 'hidden') && hover?.op !== '0' && hover?.vis !== 'hidden',
+      bar.length === 0 ? { note: 'no agent with a context in this world: nothing to ring in the bar' } : { bar, hover });
   });
 }
 
