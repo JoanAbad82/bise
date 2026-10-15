@@ -64,12 +64,12 @@ def main():
         assert "you → ? main" not in t.screen(), t.screen()
         # ctrl+2: the second row opens in place, the draft steps aside
         t.typed(CTRL % ord("2"))
-        sc = t.wait("you → ? main · your answer")
+        sc = t.wait("↳ answering main · second: say something")
         assert "┃ ? main asks" in sc and "hello main 1" not in sc, sc
         assert "│ 1 ? main · first: pick one" in sc, "the other rows stay: " + sc
         # ctrl+1 on an item: the first item, nothing highlighted
         t.typed(CTRL % ord("1"))
-        sc = t.wait("1-2 answer   ←→ choose   ↑↓ other items")
+        sc = t.wait("1-2 answer   ⏎ send the answer   ←→ choose   ↑↓ other items   ctrl+o full screen   esc to main")
         t.wait("┃ 1 alpha   2 beta")
         # a reflex ⏎ does nothing; → ⏎ picks option 1
         t.keys("Enter")
@@ -93,7 +93,7 @@ def main():
         t.wait("ctrl+o full screen")
         # typing answers: ⏎ sends the text
         t.typed("draft for two")
-        t.wait("⏎ sends your answer")
+        t.wait("⏎ send the answer   ctrl+o full screen   esc to main")
         t.keys("Enter")
         t.wait("│ ✓ you answered main: draft for two")
         t.wait("┃ third: never mind")
@@ -115,7 +115,7 @@ def main():
         assert "ctrl+1" not in sc, sc
         t.wait("/ commands   /inbox")
         click(t, "1 ? main · only")
-        t.wait("you → ? main · your answer")
+        t.wait("↳ answering main · only: yes or no?")
         t.keys("Escape")
         t.wait_re(in_view("main"))
     print("PASS tui cards")

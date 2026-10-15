@@ -302,7 +302,7 @@ fn draw_bise(app: &mut App, frame: &mut Frame, area: Rect, cols: crate::layout::
     // voice mode: `you ⇄ main · voice mode · headphones`
     let voice_label = voice.as_ref().map(|(v, _)| crate::voicemode::pane::divider(v));
     let (state_rect, label_rect) = match card_label.or_else(|| sb::palette::divider_label(app)).or(voice_label) {
-        Some(label) => chrome::draw_divider_label(frame.buffer_mut(), area, cols, divider_y, label, |room| sb::answer_target::divider(app, room)),
+        Some(label) => chrome::draw_divider_label(frame.buffer_mut(), area, cols, divider_y, label, |room| sb::answer_target::divider(app, room, fresh_note(&app.flash))),
         None => chrome::draw_divider(frame.buffer_mut(), area, cols, divider_y, &name, &who, working.as_ref(), state),
     };
     // BISE-290: the divider's words (who, the notes) select and copy

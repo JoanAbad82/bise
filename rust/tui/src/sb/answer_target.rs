@@ -59,13 +59,24 @@ pub(crate) fn placeholder(app: &App) -> Option<String> {
 /// The divider's two sides while his words answer, in `room` columns
 /// (from the label's start to the right side's end): the label
 /// ` ↳ answering search · which size… ` in the accent, the end
-/// ` esc to main instead ` dim. None: the plain divider.
-pub(crate) fn divider(app: &App, room: usize) -> Option<(Vec<Span<'static>>, Vec<Span<'static>>)> {
+/// ` esc to main instead ` dim; a fresh `note` (a drag's `copied 9
+/// chars`, 2 s) takes the end's place as ` ✓ copied 9 chars `, then the
+/// end comes back. None: the plain divider.
+pub(crate) fn divider(app: &App, room: usize, note: Option<String>) -> Option<(Vec<Span<'static>>, Vec<Span<'static>>)> {
     let a = answering(app)?;
-    let (label, end) = fit(&a, room);
+    let tick = if theme::ascii_mode() { "v" } else { "✓" };
+    let end = match &note {
+        Some(n) => format!("{} {}", tick, n),
+        None => format!("esc to {} instead", a.esc_to),
+    };
+    let (label, end) = fit(&a, &end, room);
     let acc = Style::default().fg(theme::accent());
     let left = vec![Span::styled(format!(" {} ", label), acc)];
-    let right = end.map(|e| vec![Span::styled(format!(" {} ", e), Style::default().fg(theme::dim()))]).unwrap_or_default();
+    let right = match (end, note) {
+        (Some(_), Some(n)) => vec![Span::styled(format!(" {} ", tick), acc), Span::styled(n, Style::default().fg(theme::text())), Span::raw(" ")],
+        (Some(e), None) => vec![Span::styled(format!(" {} ", e), Style::default().fg(theme::dim()))],
+        (None, _) => Vec::new(),
+    };
     Some((left, right))
 }
 
@@ -102,11 +113,12 @@ pub(crate) fn question_cut(s: &str, max: usize) -> String {
 /// The label and the end in `room` columns (the label's blank on each
 /// side, the end's too, 3 rule cells between them at least): both whole
 /// when they fit; short, the question goes first, word by word down to
-/// `↳ answering search…`, then the end; the head never goes. Pure.
-pub(crate) fn fit(a: &Answering, room: usize) -> (String, Option<String>) {
+/// `↳ answering search…`, then the end; the head never goes. `end`:
+/// `esc to main instead`, or a fresh note. Pure.
+pub(crate) fn fit(a: &Answering, end: &str, room: usize) -> (String, Option<String>) {
     let head = head(&a.who);
     let full = if a.question.is_empty() { head.clone() } else { format!("{} · {}", head, a.question) };
-    let end = format!("esc to {} instead", a.esc_to);
+    let end = end.to_string();
     let ell = theme::ellipsis();
     // the label's words, longest first: the whole, then cut after each word, then the head alone
     let mut tries = vec![full.clone()];
@@ -147,7 +159,7 @@ mod tests {
 
     #[test]
     fn both_whole_when_they_fit() {
-        let (l, e) = fit(&a(), 120);
+        let (l, e) = fit(&a(), END, 120);
         assert_eq!(l, "↳ answering search · which size system should the filter…");
         assert_eq!(e.as_deref(), Some("esc to main instead"));
     }
@@ -155,15 +167,24 @@ mod tests {
     #[test]
     fn the_question_goes_first_then_the_end_never_the_head() {
         // 80 columns framed: the label's room is about 74
-        let (l, e) = fit(&a(), 74);
+        let (l, e) = fit(&a(), END, 74);
         assert_eq!(e.as_deref(), Some("esc to main instead"), "{l}");
         assert!(l.starts_with("↳ answering search · which size system"), "{l}");
         assert!(l.ends_with('…'));
-        let (l, e) = fit(&a(), 46);
+        let (l, e) = fit(&a(), END, 46);
         assert_eq!((l.as_str(), e.as_deref()), ("↳ answering search…", Some("esc to main instead")));
-        let (l, e) = fit(&a(), 40);
+        let (l, e) = fit(&a(), END, 40);
         assert_eq!((l.as_str(), e), ("↳ answering search · which size…", None));
-        let (l, e) = fit(&a(), 12);
+        let (l, e) = fit(&a(), END, 12);
         assert_eq!((l.as_str(), e), ("↳ answering search", None));
     }
+
+    #[test]
+    fn a_fresh_note_takes_the_ends_place() {
+        let (l, e) = fit(&a(), "✓ copied 9 chars", 74);
+        assert_eq!(e.as_deref(), Some("✓ copied 9 chars"), "{l}");
+        assert!(l.starts_with("↳ answering search · which size system"), "{l}");
+    }
+
+    const END: &str = "esc to main instead";
 }
