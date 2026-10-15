@@ -227,12 +227,6 @@ function Footer({ card, acts, on, id, pick }: { card: CardRow; acts: InboxCardAc
   );
 }
 
-/** What typed words do: a page's card says who reads them ('or type: designer reads it'). */
-export function typeWords(card: CardRow, n: number): string {
-  if (card.page?.title != null) return `${n > 0 ? 'or type' : 'type'}: ${shownAgent(card.agent)} reads it`;
-  return n > 0 ? 'or type your answer below' : 'type your answer below';
-}
-
 /** main's card is bise's (ambient m_11273). */
 function shownAgent(agent: string): string {
   return agent === 'main' ? 'bise' : agent;
@@ -311,9 +305,11 @@ export function planParts(text: string): [string, string] {
   return at < 0 ? [text, ''] : [text.slice(0, at), text.slice(at + 1).trim()];
 }
 
-/** What typing does (a plan's card: what he types changes it, its agent reads it; plan-ok). */
-export function typeWords(c: Pick<CardRow, 'kind' | 'agent'>, n: number): string {
-  if (c.kind === 'plan') return `or type what to change: ${c.agent === 'main' ? 'bise' : c.agent} reads it`;
+/** What typing does: a plan's card says what he types changes it and who reads it (plan-ok); a
+ * page's card says who reads them ('or type: designer reads it'). */
+export function typeWords(c: Pick<CardRow, 'kind' | 'agent' | 'page'>, n: number): string {
+  if (c.kind === 'plan') return `or type what to change: ${shownAgent(c.agent)} reads it`;
+  if (c.page?.title != null) return `${n > 0 ? 'or type' : 'type'}: ${shownAgent(c.agent)} reads it`;
   return n > 0 ? 'or type your answer below' : 'type your answer below';
 }
 
