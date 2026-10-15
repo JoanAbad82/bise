@@ -14,6 +14,9 @@ export interface AnswerAt {
   readonly project: string;
   readonly agent: string;
   readonly card: number;
+  /** where his answer sits in that thread (the inbox's record knows it): the thread reads the
+   *  page around it, however old (the store's window); none: it looks for the card's answer */
+  readonly pos?: number;
 }
 
 /** How many older pages the thread loads looking for the answer before it says it is further up (designer m_24211). */

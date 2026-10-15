@@ -43,7 +43,7 @@ export function InboxScreen() {
   const jump = useCallback(
     (j: Jump) => {
       if (j.kind === 'thread') {
-        openAnswer(router, { project: j.project, agent: j.agent, card: j.card });
+        openAnswer(router, { project: j.project, agent: j.agent, card: j.card, ...(j.pos === undefined ? {} : { pos: j.pos }) });
         return;
       }
       // a page answer: the page in the window beside the thread, at the block he answered (notif-open's useOptAct)

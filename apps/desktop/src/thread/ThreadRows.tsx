@@ -16,6 +16,7 @@ import { landedEchoes, retryRuns } from './tiers';
 import { foldedRuns, runKey, runWords, withRuns } from './runs';
 import { absolute } from './paths';
 import { FoldsContext } from './folds';
+import { GapRow, isGapKey, withGap } from './gap';
 import { useGoArtifact } from '@/artifacts/leave';
 
 /** The agent's folder: its worktree, else its project's checkout; none until the rows come. */
@@ -107,7 +108,10 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   const runs = useMemo(() => foldedRuns(shown, (pos) => store.entry(tkey, pos), agent), [shown, store, tkey, agent]);
   // a press since the last render: every run listed now opens, or every one folds
   if (runsOpen.v !== foldAll.v) setRunsOpen({ open: foldAll.open ? new Set(runs.map((r) => r.start)) : new Set(), v: foldAll.v });
-  const listed = useMemo(() => withRuns(shown, runs, openRuns, entryKey), [shown, runs, openRuns]);
+  // a window around a far entry (his answer weeks back, store/window.ts): the gap row between it
+  // and the latest, under the window's last row
+  const gap = view.gap;
+  const listed = useMemo(() => withGap(withRuns(shown, runs, openRuns, entryKey), gap?.hi), [shown, runs, openRuns, gap?.hi]);
   // the reply being written (streaming): a live row at the end, drawn as the entry it becomes,
   // which takes its place with the same key (live.ts, text-appearing v2)
   const partial = usePartialText(project, agent);
@@ -200,11 +204,12 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
           </Press>
         );
       }
+      if (isGapKey(key)) return <GapRow project={project} agent={agent} onLatest={() => listRef.current?.scrollToEnd()} />;
       if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} carry={heads.carry} />;
       const pos = posOfKey(key);
       return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} named={heads.named.has(pos)} afterFold={afterFold.has(pos)} underFold={underFold.has(pos)} retries={retries.runs.get(pos)} />;
     },
-    [ctx, prevOf, nextOf, runs, openRuns, setOpenRuns, live.entry, lastPos, still, heads, afterFold, underFold, foldGap, retries],
+    [ctx, prevOf, nextOf, runs, openRuns, setOpenRuns, live.entry, lastPos, still, heads, afterFold, underFold, foldGap, retries, project, agent, listRef],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);

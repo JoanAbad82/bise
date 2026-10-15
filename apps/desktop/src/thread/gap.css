@@ -1,0 +1,7 @@
+/* src/thread (inbox-open): the gap row between a window around a far entry and the latest
+   messages (gap.tsx). The marker centred, 'back to the latest ↓' quiet on its right. */
+.th-gap { position: relative; display: flex; align-items: center; justify-content: center; min-height: var(--h-row); margin: var(--s-3) 0; }
+.th-gap .b-marker { color: var(--c-text-3); }
+.th-gap-latest { position: absolute; right: 0; padding: 0 var(--pad-control-x-sm); height: var(--h-control-sm); border: 0; border-radius: var(--r-2); background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); cursor: pointer; }
+.th-gap-latest:hover { color: var(--c-text); background: var(--c-hover); }
+.th-gap-latest:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }

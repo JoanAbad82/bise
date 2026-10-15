@@ -206,6 +206,12 @@ export interface ThreadOrder {
   readonly more: boolean;
   /** a first page arrived */
   readonly loaded: boolean;
+  /**
+   * A detached window around a far entry is held (window.ts): the positions between `lo` (its
+   * newest) and `hi` (the tail's oldest) are not; the list draws its gap row there, and pages
+   * newer from `from` until it meets the tail. Absent: one run.
+   */
+  readonly gap?: { readonly lo: number; readonly hi: number; readonly from: number };
 }
 
 /** A thread not loaded yet. */

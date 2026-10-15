@@ -1,6 +1,8 @@
 // answered-link: the thread screen's side of openAnswer (answerlink.ts). When the pending jump names
-// this thread, it finds his answer among the loaded entries (the approval for that card), loads
-// older pages for it up to ANSWER_PAGES (the thread's own 'loading earlier…' line), brings it into
+// this thread and knows where his answer sits (its pos, the inbox's record), the store reads the
+// page around it however old (store.jumpTo, its window: inbox-open); else it finds his answer among
+// the loaded entries (the approval for that card), loads older pages for it up to ANSWER_PAGES (the
+// thread's own 'loading earlier…' line). Either way it brings it into
 // view only when it is outside it, and flashes it once; not found, the miss line for MISS_MS
 // (designer m_24211). Owner: amb-win.
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
@@ -32,8 +34,12 @@ export function useAnswerReveal(store: Store, project: string, agent: string, li
     if (want === null) return;
     if (asked.current.at !== want) asked.current = { at: want, n: 0, before: null };
     const a = asked.current;
+    // where it sits is known (the inbox's record): the store reads the page around it, however
+    // old (its window, a gap row to the latest); else look for the card's answer page by page
+    const at = want.pos === undefined ? null : store.jumpTo(project, agent, want.pos);
+    if (at !== null && at.kind !== 'held') return;
     const waiting = a.before !== null && view.before === a.before && view.more;
-    const found = answerPos(view.order, (p) => store.entry(tkey, p), want.card);
+    const found = at !== null ? at.pos : answerPos(view.order, (p) => store.entry(tkey, p), want.card);
     const step = revealStep({ loaded: view.loaded, found, more: view.more, asked: a.n, waiting });
     switch (step.kind) {
       case 'wait':

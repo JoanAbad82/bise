@@ -4,6 +4,7 @@
 import type { Entry } from "@/proto";
 import type { CoreCmd, CorePort, CoreState } from "@/shared/api";
 import type { Ev, FilesAnswer, Pending, ThreadOrder } from "./types";
+import type { Ask } from "./window";
 
 export const EMPTY: readonly never[] = [];
 
@@ -13,6 +14,7 @@ export interface Thread {
   typing: string;
   pending: readonly Pending[];
   landedIds?: readonly number[]; // A1: his ids that landed before their send's answer (echo.ts)
+  ask?: Ask; // the window's page on its way (window.ts)
 }
 
 export type Listener = () => void;

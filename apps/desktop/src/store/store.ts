@@ -32,6 +32,7 @@ import {
   type EvOf,
   type FilesAnswer,
   type Pending,
+  type ThreadOrder,
   sameJson,
   sameOrder,
   sameStrings,
@@ -40,6 +41,7 @@ import {
   typed,
 } from "./types";
 import { applyTyped } from "./apply";
+import { answers, listsLive, merged, planJump, planNewer } from "./window";
 import { answered, echoOf, keepLanded, sentOf, ECHO_SLACK_MS, type Sent } from "./echo";
 import { EMPTY, type Thread } from "./base";
 import { answeredFromOf, answersOf, cardAnsweredOf, cardKeyOf, jumpOf, keptAnswers, type AnswerAt, type AnswerFrom, type AnsweredFrom, type CardAnswered } from "./answered";
@@ -117,6 +119,8 @@ export class Store extends StoreVoice {
       this.askCommands();
     }
     for (const s of this.subs.values()) {
+      // a window's page asked of the old core never comes
+      delete this.thread(threadKey(s.project, s.agent)).ask;
       this.command({
         cmd: "subscribe",
         project: s.project,
@@ -135,25 +139,6 @@ export class Store extends StoreVoice {
     return t;
   }
 
-  private setOrder(
-    key: string,
-    t: Thread,
-    order: readonly number[],
-    before: number | null,
-    more: boolean,
-  ): void {
-    const v = t.view;
-    if (
-      v.loaded &&
-      v.before === before &&
-      v.more === more &&
-      sameOrder(v.order, order)
-    )
-      return;
-    t.view = { order, before, more, loaded: true };
-    this.emit(`order:${key}`);
-  }
-
   /** @internal for apply.ts */ page(ev: EvOf<"thread">): void {
     const key = threadKey(ev.project, ev.agent);
     const t = this.thread(key);
@@ -163,18 +148,20 @@ export class Store extends StoreVoice {
     // goes the same way (ambient-lead m_20138: it stayed 'sending…' after main answered)
     if (t.pending.length > 0)
       for (const e of ev.entries) if (e.kind === "you") this.landed(key, t, e);
-    const all = new Set(t.view.order);
-    for (const e of ev.entries) all.add(e.pos);
-    const order = [...all].sort((a, b) => a - b);
-    // a page of older entries keeps the newer ones; its before/more are the oldest page's
-    const oldest =
-      ev.entries.length === 0 ||
-      (t.view.order.length > 0 &&
-        (ev.entries[0]?.pos ?? 0) < (t.view.order[0] ?? 0));
-    const fresh = !t.view.loaded;
-    const before = fresh || oldest ? ev.before : t.view.before;
-    const more = fresh || oldest ? ev.more : t.view.more;
-    this.setOrder(key, t, order, before, more);
+    // a page of older entries keeps the newer ones; its before/more are the oldest page's; the
+    // window's page (a jump's, a newer one's) moves the gap (window.ts)
+    const pos = ev.entries.map((e) => e.pos);
+    const ask = t.ask !== undefined && answers(t.ask, t.view, pos) ? t.ask : null;
+    if (ask !== null) delete t.ask;
+    this.setView(key, t, merged(t.view, pos, ev.before, ev.more, ask));
+  }
+
+  private setView(key: string, t: Thread, v: ThreadOrder): void {
+    const o = t.view;
+    const g = (x: ThreadOrder) => (x.gap === undefined ? "" : `${String(x.gap.lo)}/${String(x.gap.hi)}/${String(x.gap.from)}`);
+    if (o.loaded && o.before === v.before && o.more === v.more && g(o) === g(v) && sameOrder(o.order, v.order)) return;
+    t.view = v;
+    this.emit(`order:${key}`);
   }
 
   /** @internal for apply.ts */ entryEv(ev: EvOf<"entry">): void {
@@ -182,9 +169,10 @@ export class Store extends StoreVoice {
     const t = this.thread(key);
     const known = t.byPos.has(ev.entry.pos);
     this.putEntry(key, t, ev.entry);
-    if (!known) {
+    // a live entry lands in the tail; one that falls in the window's gap waits for its page
+    if (!known && listsLive(t.view, ev.entry.pos)) {
       const order = [...t.view.order, ev.entry.pos].sort((a, b) => a - b);
-      this.setOrder(key, t, order, t.view.before, t.view.more);
+      this.setView(key, t, { ...t.view, order, loaded: true });
     }
     if (ev.entry.kind === "you") this.landed(key, t, ev.entry);
   }
@@ -559,6 +547,32 @@ export class Store extends StoreVoice {
       before: v.before,
       ...(limit === undefined ? {} : { limit }),
     });
+  }
+  /**
+   * Bring the entry at `pos` into the view (his answer weeks back, a find's hit): 'held' with the
+   * row's pos when the view has it; 'asked' when its page is on its way (the view's window, with a
+   * gap row to the tail, window.ts); 'wait' while the thread isn't loaded. Again with the page
+   * there: 'held'.
+   */
+  jumpTo(project: string, agent: string, pos: number): { kind: "held"; pos: number } | { kind: "asked" | "wait" } {
+    const key = threadKey(project, agent);
+    const t = this.thread(key);
+    const plan = planJump(t.view, pos);
+    if (plan.kind !== "ask") return plan;
+    if (t.ask?.kind === "jump" && t.ask.pos === pos) return { kind: "asked" };
+    t.ask = plan.ask;
+    this.setView(key, t, plan.view);
+    this.command({ cmd: "page", project, agent, before: plan.ask.before, limit: plan.limit });
+    return { kind: "asked" };
+  }
+  /** The window's next newer page, toward the tail (its gap row came into view); one at a time. */
+  newerPage(project: string, agent: string): void {
+    const t = this.thread(threadKey(project, agent));
+    if (t.ask !== undefined) return;
+    const plan = planNewer(t.view);
+    if (plan === null) return;
+    t.ask = plan.ask;
+    this.command({ cmd: "page", project, agent, before: plan.ask.before, limit: plan.limit });
   }
   /** His answer to card `card`: its words, and the images he pasted or dropped (R41: absolute paths, as a send's files). */
   answer(
