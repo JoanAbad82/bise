@@ -7,12 +7,12 @@
 //     past by day (today, yesterday), two lines each ('you: <his words> · in the inbox'), the withdrawn
 //     one dim with its reason;
 //   - ⏎ on a waiting item opens it above this screen's composer ('answering perf · which bench?'), as ⌘I;
-//   - ⏎ on a past one goes to perf's thread at his answer, flashed once (answered-link's openAnswer; a
-//     history step: ⌘[ comes back to the inbox);
+//   - a click on a past one opens it whole in the pane beside the list; ⌘⏎ goes to perf's thread at
+//     his answer, flashed once (answered-link's openAnswer; a history step: ⌘[ comes back to the inbox);
 //   - the history is asked of each project's hub (inbox_history) when the screen opens;
-//   - space opens the read-only detail, esc back; '/' searches;
+//   - space opens the pane, esc closes it; '/' searches;
 //   - no folded block above the composer at rest (the list is the inbox), only the item he opens; the key
-//     line says '⏎ answer' on a waiting row, '⏎ go to it' on a past one (designer m_25639);
+//     line says '⏎ answer' on a waiting row, '⏎ open' and '⌘⏎ go to your answer' on a past one;
 //   - 1400 / 1100 / 800 x 820: at 800 the agents filter and 'withdrawn' leave the head row, the rows drop
 //     the project and the 'where' whole; no text clipped.
 // Shots (for designer): the list at 1400/1100/800, the detail, the jump, each light + dark.
@@ -144,14 +144,15 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
       await page.getByTestId('inbox.screen').focus();
       await page.keyboard.press('Home');
       for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
-      await expect(page.getByTestId('inbox.keys.enter')).toHaveText('⏎ go to it');
+      await expect(page.getByTestId('inbox.keys.enter')).toHaveText('⏎ open');
       await page.keyboard.press(' ');
       await expect(page.getByTestId('inbox.detail.question')).toHaveText('keep the webp next to the avif?');
-      await expect(page.getByTestId('inbox.keys')).toContainText('o open in its thread');
+      await expect(page.getByTestId('inbox.keys')).toContainText('⌘⏎ go to your answer');
       await expect(page.getByTestId('inbox.detail')).toContainText('perf went on: kept a webp fallback for Safari 16');
       await shoot(page, core, 'detail-1400');
       await page.keyboard.press('Escape');
       await expect(page.getByTestId('inbox.list')).toBeVisible();
+      await expect(page.getByTestId('inbox.detail')).toHaveCount(0);
     });
 
     await test.step('⏎ on a waiting item opens it above the composer, as ⌘I', async () => {
@@ -168,8 +169,12 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
       await page.keyboard.press('Escape');
     });
 
-    await test.step("⏎ on a past one goes to his answer in perf's thread; ⌘[ back to the inbox", async () => {
+    await test.step("a click on a past one opens the pane; ⌘⏎ goes to his answer in perf's thread; ⌘[ back to the inbox", async () => {
       await page.getByTestId(`inbox.row.p:${P}/7`).click();
+      await expect(page.getByTestId('inbox.detail.question')).toHaveText('keep the webp next to the avif?');
+      await expect(page.getByTestId('inbox.screen')).toBeVisible();
+      await page.getByTestId('inbox.screen').focus();
+      await page.keyboard.press('Meta+Enter');
       await expect(page.getByTestId('inbox.screen')).toHaveCount(0);
       await expect(page.getByText('only for Safari 16').first()).toBeVisible({ timeout: 5000 });
       // his answer flashed once (answered-link's openAnswer, the one jump)

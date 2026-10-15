@@ -44,10 +44,26 @@ const start = again ? all.filter((l) => !ONCE.has(JSON.parse(l).ev)) : all;
 // a window that loads later (amb-core 162ec18b). A thread's lines aren't state: like the real core,
 // the stub sends them when the window asks (subscribe, page) and answers the per-project asks
 // (diff, worktrees, dev_servers, merged, inbox_history) from the same world.
-const evs = start.map((l) => JSON.parse(l));
+const evs = start.map((l) => JSON.parse(l)).filter((ev) => ev.ev !== 'transcript');
+// A world may give an agent's whole thread as one `{ev: 'transcript', project, agent, entries}` (the
+// harness's own line, never sent to the app): then subscribe and page answer as the hub does,
+// paged by pos (thread/subscribe: the newest `limit`, 40; thread/page: the newest `limit` before
+// `before`), so a test can reach an entry pages back (inbox-open: the window around his answer).
+const transcripts = start.map((l) => JSON.parse(l)).filter((ev) => ev.ev === 'transcript');
+function paged(cmd) {
+  const t = transcripts.find((ev) => same(ev, cmd));
+  if (t === undefined) return null;
+  const under = t.entries.filter((e) => cmd.before === undefined || cmd.before === null || e.pos < cmd.before);
+  const n = Math.max(1, Math.min(200, cmd.limit ?? 40));
+  const entries = under.slice(-n);
+  const more = under.length > entries.length;
+  return [{ ev: 'thread', project: cmd.project, agent: cmd.agent, entries, before: more ? (entries[0]?.pos ?? null) : null, more }];
+}
 const same = (ev, cmd) => ev.project === cmd.project && (cmd.agent === undefined || ev.agent === undefined || ev.agent === cmd.agent);
 function answer(cmd) {
   const of = (kinds, more = () => true) => evs.filter((ev) => kinds.includes(ev.ev) && same(ev, cmd) && more(ev));
+  const t = cmd.cmd === 'subscribe' || cmd.cmd === 'page' ? paged(cmd) : null;
+  if (t !== null) return t;
   switch (cmd.cmd) {
     case 'subscribe': return of(['thread', 'entry', 'typing'], (ev) => ev.ev !== 'thread' || ev.before === null || ev.before === undefined);
     case 'page': return of(['thread'], (ev) => ev.before !== null && ev.before !== undefined);
@@ -65,4 +81,4 @@ function answer(cmd) {
 const NAMES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'src', 'proto', 'app_methods.gen.ts');
 const notes = JSON.parse(/export const NOTIFICATIONS = (\[.*\]) as const;/.exec(readFileSync(NAMES, 'utf8'))[1]);
 const hubEvs = notes.filter((n) => n.startsWith('hub/')).map((n) => n.slice(4));
-runStub({ start, sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG, answer, rpc: { hubEvs } });
+runStub({ start: start.filter((l) => JSON.parse(l).ev !== 'transcript'), sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG, answer, rpc: { hubEvs } });

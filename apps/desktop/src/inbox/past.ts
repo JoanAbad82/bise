@@ -191,9 +191,11 @@ export function jumpOf(r: InboxRecord): Jump {
   return { kind: 'thread', project: r.project, agent, card: r.card, ...(r.thread == null ? {} : { pos: r.thread.pos }) };
 }
 
-/** The jump's words, for the detail's link: "open it in perf's thread", 'open the page'. Pure. */
-export function jumpWords(j: Jump): string {
-  return j.kind === 'page' ? 'open the page at your answer' : `open it in ${shownName(j.agent)}'s thread`;
+/** The jump's words, for the pane's button (⌘⏎): "go to your answer in perf's thread", 'open the
+ *  page at your answer'; withdrawn (no answer): "open perf's thread". Pure. */
+export function jumpWords(j: Jump, answered = true): string {
+  if (j.kind === 'page') return 'open the page at your answer';
+  return answered ? `go to your answer in ${shownName(j.agent)}'s thread` : `open ${shownName(j.agent)}'s thread`;
 }
 
 /** The detail's 'where and when': 'you answered in the inbox · 14:02', 'withdrawn · yesterday 18:30'. Pure. */

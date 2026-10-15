@@ -1,10 +1,11 @@
 // The gap row (inbox-open): when the thread holds a window around a far entry (his answer weeks
 // back, store/window.ts), the row between that window and the latest messages. While it shows, the
 // window pages newer (store.newerPage, one page at a time) until it meets the latest, then the row
-// goes; 'back to the latest ↓' takes him to the end. Its key never equals an entry's (thread-perf's
-// anchor skips it). Owner: inbox-open.
+// goes: the 'older messages…' line's twin, scrolled into, it loads; the thread's own '↓ back to the
+// bottom' takes him to the latest. Its key never equals an entry's (thread-perf's anchor skips it).
+// Owner: inbox-open.
 import { useEffect } from 'react';
-import { Marker, Press } from '@/ds';
+import { Marker } from '@/ds';
 import { threadKey, useStore, useThreadOrder } from '@/store';
 import './gap.css';
 
@@ -28,7 +29,7 @@ export function withGap(keys: readonly string[], hi: number | undefined): readon
   return [...keys.slice(0, i), gapKey(hi), ...keys.slice(i)];
 }
 
-export function GapRow({ project, agent, onLatest }: { project: string; agent: string; onLatest: () => void }) {
+export function GapRow({ project, agent }: { project: string; agent: string }) {
   const store = useStore();
   const view = useThreadOrder(threadKey(project, agent));
   const from = view.gap?.from;
@@ -39,9 +40,6 @@ export function GapRow({ project, agent, onLatest }: { project: string; agent: s
   return (
     <div className="th-gap" data-testid="thread.gap">
       <Marker>newer messages…</Marker>
-      <Press look="th-gap-latest" onClick={onLatest} data-testid="thread.gap.latest">
-        back to the latest ↓
-      </Press>
     </div>
   );
 }

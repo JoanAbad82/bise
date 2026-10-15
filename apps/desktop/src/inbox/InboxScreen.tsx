@@ -1,9 +1,11 @@
 // The inbox screen as the shell mounts it (route inbox/all, the sidebar's '? inbox' row): every
 // project's open cards (the same list the block above the composer shows, blockList) and the
 // hub's records of what he answered or what was withdrawn (useInboxRecords), into InboxView
-// (List.tsx). ⏎ on a waiting item opens it above this screen's composer (openInbox, as ⌘I); a past
-// one goes to his answer: the thread at it with one th-flash, a history step (answered-link's
-// openAnswer, the one jump), or the page in the window at its block (notif-open's useOptAct). Owner: inbox-screen.
+// (List.tsx). ⏎ on a waiting item opens it above this screen's composer (openInbox, as ⌘I); on a
+// past one, the item whole in the pane beside the list; ⌘⏎ goes to his answer: the thread at that
+// very entry (its record's pos: the store reads the page around it, however old) with one
+// th-flash, a history step (answered-link's openAnswer, the one jump), or the page in the window
+// at its block (notif-open's useOptAct). Owner: inbox-screen.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProjects, useStore, useThreadOrder } from '@/store';
 import { useRouter } from '@/app/router';
@@ -61,11 +63,15 @@ export function InboxScreen() {
       projects={projects}
       nextOf={(r) => nextLine(store, r)}
       onDetail={setLooked}
+      pageTitle={(project, page) => store.artifacts(project).find((a) => a.id === page)?.title}
       ports={{
         answer: (project, card) => {
           openInbox({ project, card });
         },
         jump,
+        openPage: (project, page, block) => {
+          optAct(project, { act: 'open', artifact: page, at: block ?? null });
+        },
       }}
     />
   );
@@ -80,8 +86,14 @@ function nextLine(store: Store, r: InboxRecord): string | undefined {
   const at = r.thread;
   if (at == null) return undefined;
   const key = threadKey(r.project, at.agent);
-  for (const pos of store.threadOrder(key).order) {
+  const view = store.threadOrder(key);
+  // his answer's part of the thread isn't held yet: what came after it isn't known
+  const first = view.order[0];
+  if (first === undefined || at.pos < first) return undefined;
+  for (const pos of view.order) {
     if (pos <= at.pos) continue;
+    // past the window's gap: not what came next (store/window.ts)
+    if (view.gap !== undefined && at.pos <= view.gap.lo && pos >= view.gap.hi) return undefined;
     const e = store.entry(key, pos);
     if (e?.kind === 'agent' && e.text.trim() !== '') return e.text.trim().split('\n')[0];
   }

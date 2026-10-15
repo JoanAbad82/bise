@@ -204,12 +204,12 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
           </Press>
         );
       }
-      if (isGapKey(key)) return <GapRow project={project} agent={agent} onLatest={() => listRef.current?.scrollToEnd()} />;
+      if (isGapKey(key)) return <GapRow project={project} agent={agent} />;
       if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} carry={heads.carry} />;
       const pos = posOfKey(key);
       return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} named={heads.named.has(pos)} afterFold={afterFold.has(pos)} underFold={underFold.has(pos)} retries={retries.runs.get(pos)} />;
     },
-    [ctx, prevOf, nextOf, runs, openRuns, setOpenRuns, live.entry, lastPos, still, heads, afterFold, underFold, foldGap, retries, project, agent, listRef],
+    [ctx, prevOf, nextOf, runs, openRuns, setOpenRuns, live.entry, lastPos, still, heads, afterFold, underFold, foldGap, retries, project, agent],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);

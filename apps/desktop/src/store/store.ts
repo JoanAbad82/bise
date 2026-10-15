@@ -7,7 +7,9 @@
 // replaced only when that slice changed, so useSyncExternalStore sees the
 // same reference otherwise. A thread is a key `${project}/${agent}`: its
 // order (positions), its entries by position (a `thread` page merges, an
-// `entry` replaces only that entry), typing, and his pending sends.
+// `entry` replaces only that entry), typing, and his pending sends. Its order
+// may hold one detached window around a far entry (jumpTo / newerPage, the gap
+// to the tail: window.ts).
 //
 // The hub's yes/no questions (`confirm`, bar I9) belong to the connection
 // that asked: a new `welcome` for that project (the core reconnected, so the

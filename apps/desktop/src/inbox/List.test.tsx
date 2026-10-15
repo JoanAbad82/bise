@@ -48,30 +48,58 @@ describe('the inbox screen', () => {
     expect(screen.getByTestId('inbox.row.p:shop/5.said').textContent).toBe('withdrawn: checkout answered itself');
   });
 
-  it('⏎ on a waiting item opens it above the composer; on a past one goes to his answer', () => {
+  it('⏎ on a waiting item opens it above the composer; on a past one opens it whole in the pane; ⌘⏎ goes to his answer', () => {
     const { answered, jumps, root } = mount();
     fireEvent.keyDown(root, { key: 'Enter' });
     expect(answered).toEqual(['shop#3']);
+    expect(screen.queryByTestId('inbox.detail')).toBeNull();
     fireEvent.keyDown(root, { key: 'ArrowDown' });
+    expect(screen.getByTestId('inbox.keys.enter').textContent).toBe('⏎ open');
     fireEvent.keyDown(root, { key: 'Enter' });
+    // the first action: the item whole beside the list, nothing jumped
+    expect(jumps).toEqual([]);
+    expect(screen.getByTestId('inbox.list')).toBeTruthy();
+    expect(screen.getByTestId('inbox.detail.question').textContent).toBe('keep the webp next to the avif?');
+    // the second: his answer in its thread, at that entry
+    fireEvent.keyDown(root, { key: 'Enter', metaKey: true });
     expect(jumps).toEqual([{ kind: 'thread', project: 'shop', agent: 'perf', card: 1, pos: 40 }]);
-    // a page answer: the page at its block
+    // a click on a page answer opens it in the pane; its button opens the page at its block
     fireEvent.click(screen.getByTestId('inbox.row.p:bise/2'));
+    expect(jumps).toHaveLength(1);
+    expect(screen.getByTestId('inbox.detail.go').textContent).toBe('open the page at your answer⌘⏎');
+    fireEvent.click(screen.getByTestId('inbox.detail.go'));
     expect(jumps[1]).toEqual({ kind: 'page', project: 'bise', page: 'wait-line', block: 'q1' });
+    // ⌘⏎ from the list, the pane closed
+    fireEvent.keyDown(root, { key: 'Escape' });
+    expect(screen.queryByTestId('inbox.detail')).toBeNull();
+    fireEvent.keyDown(root, { key: 'ArrowUp' });
+    fireEvent.keyDown(root, { key: 'Enter', metaKey: true });
+    expect(jumps[2]).toEqual({ kind: 'thread', project: 'shop', agent: 'perf', card: 1, pos: 40 });
   });
 
-  it('space opens the read-only detail; ↓ the next; o goes; esc back', () => {
+  it('the pane: every option with his pick marked, or his words; where and when; the page; it follows ↑↓; esc closes', () => {
     const { jumps, root } = mount();
     fireEvent.keyDown(root, { key: 'ArrowDown' });
     fireEvent.keyDown(root, { key: ' ' });
-    expect(screen.getByTestId('inbox.detail.question').textContent).toBe('keep the webp next to the avif?');
+    // his own words: no option marked, his bubble
     expect(screen.getByTestId('inbox.detail.said').textContent).toBe('only for Safari 16');
+    expect(screen.getByTestId('inbox.detail.options').querySelector('[aria-current]')).toBeNull();
+    expect(screen.getByTestId('inbox.detail.where').textContent).toBe('you answered in the inbox · 14:02');
     expect(screen.getByTestId('inbox.detail').textContent).toContain('perf went on: kept a webp fallback for Safari 16');
-    expect(screen.getByTestId('inbox.detail.go').textContent).toBe("open it in perf's thread");
+    expect(screen.getByTestId('inbox.detail.go').textContent).toBe("go to your answer in perf's thread⌘⏎");
     fireEvent.keyDown(root, { key: 'ArrowDown' });
+    // a pick: its option marked ✓, no bubble; the page he answered on as a chip
     expect(screen.getByTestId('inbox.detail.question').textContent).toBe('la ligne d’attente?');
+    expect(screen.getByTestId('inbox.detail.option.1').getAttribute('aria-current')).toBe('true');
+    expect(screen.getByTestId('inbox.detail.option.1').textContent).toBe('✓A');
+    expect(screen.getByTestId('inbox.detail.option.2').textContent).toBe('2B');
+    expect(screen.queryByTestId('inbox.detail.said')).toBeNull();
+    expect(screen.getByTestId('inbox.detail.page').textContent).toBe('↗ wait-line · page');
     fireEvent.keyDown(root, { key: 'o' });
     expect(jumps).toEqual([{ kind: 'page', project: 'bise', page: 'wait-line', block: 'q1' }]);
+    fireEvent.keyDown(root, { key: 'ArrowDown' });
+    expect(screen.getByTestId('inbox.detail').textContent).toContain('withdrawn: checkout answered itself');
+    expect(screen.getByTestId('inbox.detail.go').textContent).toBe("open checkout's thread⌘⏎");
     fireEvent.keyDown(root, { key: 'Escape' });
     expect(screen.queryByTestId('inbox.detail')).toBeNull();
     expect(screen.getByTestId('inbox.list')).toBeTruthy();

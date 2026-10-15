@@ -31,6 +31,9 @@ export const LAND = [
   // ghost-badge: a card the hub keeps after his answer is back in the block, the sidebar's count is
   // the block's; '/inbox' opens the item, or says nothing waits
   'checks/inbox/ghost-badge.spec.ts',
+  // inbox-open (his ask): ⏎ opens a past item whole in the pane beside the list, ⌘⏎ lands on his
+  // answer 23 pages back in its thread (the store's window around it, the gap row loads newer)
+  'checks/inbox/inbox-open.spec.ts',
   'checks/thread/reading.spec.ts',
   'checks/thread/streaming.spec.ts',
   'checks/thread/esc-order.spec.ts',

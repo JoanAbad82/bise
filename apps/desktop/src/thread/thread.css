@@ -1463,8 +1463,9 @@
 .th-you-mark {
   margin-right: var(--s-1);
 }
+/* his '✓ you answered …': text-3 like its words; green is only a diff's + (designer m_26718) */
 .th-you-mark.ok {
-  color: var(--c-ok, var(--c-text-2));
+  color: var(--c-text-3);
 }
 .th-bubble {
   box-sizing: border-box;

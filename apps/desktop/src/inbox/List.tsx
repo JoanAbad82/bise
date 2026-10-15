@@ -1,11 +1,14 @@
 // The inbox screen's view (designer's inbox-history pick A, m_24212 (2)-(6); route inbox/all,
 // sidebar row '? inbox'): the head ('inbox', '3 waiting · 41 answered'), the filters (projects,
 // agents, all / waiting / answered / withdrawn, '/' search), 'waiting for you · N' first (⏎ opens
-// the item above this screen's composer, as ⌘I), then the past by day, two lines each, read-only:
-// ⏎ or a click goes to his answer (the thread at it, or the page at its block), space opens the
-// read-only detail (↑↓ the next one, o goes, esc back). The list keys are app/listkeys.ts's. At
-// 800 the agents go into the projects menu, 'withdrawn' too, and the rows drop the project and
-// the 'where', whole (past.css). From props: the store's wiring is InboxScreen
+// the item above this screen's composer, as ⌘I), then the past by day, two lines each, read-only.
+// A past row's first action (his ask, inbox-open): ⏎, space or a click opens the whole item in the
+// pane beside the list (Pane: the question, every option with his pick marked or his words, where
+// and when, the page he answered on); the pane follows the selection (↑↓), esc closes it. The
+// second: ⌘⏎ (or the pane's button, or o) goes to his answer: the thread at that very entry,
+// however old, or the page at its block. The list keys are app/listkeys.ts's. At 800 the agents go
+// into the projects menu, 'withdrawn' too, the rows drop the project and the 'where', whole, and
+// the pane takes the list's place (past.css). From props: the store's wiring is InboxScreen
 // (InboxScreen.tsx). Owner: inbox-screen.
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import type { Card } from '@/proto';
@@ -13,7 +16,7 @@ import { useListKeys } from '@/app/listkeys';
 import { Dropdown, Field, Press } from '@/ds';
 import { shownName } from '@/agents/model';
 import { timeOf } from '@/artifacts/model';
-import { ALL, askersOf, closedMs, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
+import { ALL, askersOf, closedMs, dayHead, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
 import './past.css';
 
 export interface InboxPorts {
@@ -21,6 +24,8 @@ export interface InboxPorts {
   readonly answer: (project: string, card: number) => void;
   /** a past item: his answer in its thread (th-flash, a history step), or the page at its block */
   readonly jump: (j: Jump) => void;
+  /** the page he answered on, beside (notif-artifact's open act) */
+  readonly openPage?: (project: string, page: string, block?: string) => void;
 }
 
 export interface InboxViewProps {
@@ -37,54 +42,57 @@ export interface InboxViewProps {
   readonly ports: InboxPorts;
   /** the asker's first line after his answer, when its thread holds it (the detail's 'went on') */
   readonly nextOf?: (r: InboxRecord) => string | undefined;
-  /** the record the detail shows (none: the list): the screen reads its thread meanwhile */
+  /** the record the pane shows (none: closed): the screen reads its thread meanwhile */
   readonly onDetail?: (r: InboxRecord | null) => void;
+  /** a page's title, for the pane's chip (none: the page's id) */
+  readonly pageTitle?: (project: string, page: string) => string | undefined;
   /** now (a test or a shot pins it) */
   readonly now?: number;
 }
 
-export function InboxView({ cards, records, answered, onEnd, names, projects, ports, nextOf, onDetail, now: pinned }: InboxViewProps) {
+export function InboxView({ cards, records, answered, onEnd, names, projects, ports, nextOf, onDetail, pageTitle, now: pinned }: InboxViewProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [f, setF] = useState<Filter>(ALL);
-  const [detail, setDetail] = useState<string | null>(null);
+  // the pane is open: it shows the selected row while that is a past one (it follows ↑↓)
+  const [paned, setPaned] = useState(false);
   const lists = listsOf(cards, records, names, f, now);
   const pastBy = new Map(lists.days.flatMap((d) => d.rows.map((r) => [r.key, r] as const)));
   const waitBy = new Map(lists.waiting.map((w) => [w.key, w] as const));
+  // ⏎ (the first action): a waiting item opens above the composer; a past one, whole, in the pane
   const open = (key: string) => {
     const w = waitBy.get(key);
     if (w) ports.answer(w.card.project, w.card.id);
-    const p = pastBy.get(key);
-    if (p) ports.jump(jumpOf(p.r));
+    if (pastBy.has(key)) setPaned(true);
   };
-  const cur = detail === null ? undefined : pastBy.get(detail);
-  const looked = cur?.r ?? null;
-  useEffect(() => {
-    onDetail?.(looked);
-  }, [onDetail, looked]);
+  // ⌘⏎ (the second): to his answer, in its thread at that entry or on its page
+  const go = (key: string | null) => {
+    const p = key === null ? undefined : pastBy.get(key);
+    if (p) ports.jump(jumpOf(p.r));
+    return p !== undefined;
+  };
   const screenKey = (e: KeyboardEvent, k: string | null): boolean => {
+    if (e.key === 'Enter' && e.metaKey && !e.ctrlKey && !e.altKey) return go(k);
     if (e.metaKey || e.ctrlKey || e.altKey) return false;
     if (cur) {
-      if (e.key === 'Escape') setDetail(null);
-      else if (e.key === 'o' || e.key === 'Enter') ports.jump(jumpOf(cur.r));
-      else if (e.key === 'ArrowDown' || e.key === 'j' || e.key === 'ArrowUp' || e.key === 'k') {
-        const past = lists.order.filter((x) => pastBy.has(x));
-        const i = past.indexOf(cur.key) + (e.key === 'ArrowDown' || e.key === 'j' ? 1 : -1);
-        const next = past[Math.max(0, Math.min(past.length - 1, i))];
-        if (next !== undefined) {
-          setDetail(next);
-          setSel(next);
-        }
-      } else return false;
+      if (e.key === 'Escape') setPaned(false);
+      else if (e.key === 'o') go(cur.key);
+      else if (e.key === ' ') setPaned(false);
+      else return false;
       return true;
     }
-    if (e.key === ' ' && k !== null && pastBy.has(k)) setDetail(k);
+    if (e.key === ' ' && k !== null && pastBy.has(k)) setPaned(true);
     else if (e.key === '/') document.querySelector<HTMLInputElement>('[data-testid="inbox.search"]')?.focus();
     else if (e.key === 'Escape' && f.q !== '') setF({ ...f, q: '' });
     else return false;
     return true;
   };
-  const { sel, setSel, ref, onKeyDown, move } = useListKeys({ order: lists.order, keepAs: 'inbox.sel', still: cur !== undefined, onOpen: open, onKey: screenKey });
+  const { sel, setSel, ref, onKeyDown, move } = useListKeys({ order: lists.order, keepAs: 'inbox.sel', onOpen: open, onKey: screenKey });
+  const cur = !paned || sel === null ? undefined : pastBy.get(sel);
+  const looked = cur?.r ?? null;
+  useEffect(() => {
+    onDetail?.(looked);
+  }, [onDetail, looked]);
   // the search has the keys: ⏎ gives them back, ↑↓ give them back and move, esc clears
   const searchKey = (e: KeyboardEvent<HTMLInputElement>) => {
     const back = () => {
@@ -109,10 +117,10 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
   return (
     <section ref={ref} tabIndex={-1} className="ip-screen" data-testid="inbox.screen" onKeyDown={onKeyDown}>
       <header className="ip-head">
-        <div className="ip-h1">{cur ? <><Press look="ip-crumb" onClick={() => { setDetail(null); }} data-testid="inbox.detail.back">inbox</Press>{` › ${shownName(cur.r.asker)} · ${whenShort(cur.r, now)}`}</> : 'inbox'}</div>
-        {!cur && <div className="ip-h2" data-testid="inbox.counts">{headWords(cards, records, answered)}</div>}
+        <div className="ip-h1">inbox</div>
+        <div className="ip-h2" data-testid="inbox.counts">{headWords(cards, records, answered)}</div>
       </header>
-      {!cur && (
+      {(
         <div className="ip-filters">
           <Dropdown label={f.project === '' ? 'all projects' : (names[f.project] ?? f.project)} testId="inbox.projects"
             groups={[
@@ -152,9 +160,8 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
           </span>
         </div>
       )}
-      {cur ? (
-        <Detail row={cur} now={now} names={names} next={nextOf?.(cur.r)} onJump={() => { ports.jump(jumpOf(cur.r)); }} />
-      ) : empty ? (
+      <div className={`ip-body${cur ? ' paned' : ''}`}>
+      {empty ? (
         <div className="ip-empty" data-testid="inbox.empty">nothing yet. what your agents ask you waits here, and stays once you answer.</div>
       ) : none ? (
         <div className="ip-empty" data-testid="inbox.none">nothing matches. esc clears the search.</div>
@@ -177,25 +184,38 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
             <div key={d.day} role="group" aria-label={d.title}>
               <div className="ip-day-h" data-testid={`inbox.day.${d.day}`}>{d.title}</div>
               {d.rows.map((p) => (
-                <PastLine key={p.key} p={p} on={p.key === sel} project={names[p.r.project] ?? p.r.project}
-                  onClick={() => { setSel(p.key); ports.jump(jumpOf(p.r)); }} />
+                <PastLine key={p.key} p={p} on={p.key === sel} open={p.key === cur?.key} project={names[p.r.project] ?? p.r.project}
+                  onClick={() => { setSel(p.key); setPaned(true); }} />
               ))}
             </div>
           ))}
         </div>
       )}
+      {cur && (
+        <Pane row={cur} now={now} names={names} next={nextOf?.(cur.r)} title={pageTitle}
+          onJump={() => { ports.jump(jumpOf(cur.r)); }}
+          onClose={() => { setPaned(false); ref.current?.focus({ preventScroll: true }); }}
+          {...(ports.openPage === undefined ? {} : { onPage: ports.openPage })} />
+      )}
+      </div>
       <div className="ip-keys" data-testid="inbox.keys">
         {cur ? (
           <>
             <span><b>↑↓</b> previous / next</span>
-            <span><b>o</b> open in its thread</span>
-            <span><b>esc</b> back to the list</span>
+            <span data-testid="inbox.keys.go"><b>⌘⏎</b> go to your answer</span>
+            <span><b>esc</b> close</span>
+          </>
+        ) : sel !== null && pastBy.has(sel) ? (
+          <>
+            {/* what ⏎ and ⌘⏎ do on the selected row (designer m_25639; inbox-open) */}
+            <span data-testid="inbox.keys.enter"><b>⏎</b> open</span>
+            <span data-testid="inbox.keys.go"><b>⌘⏎</b> go to your answer</span>
+            <span><b>/</b> search</span>
+            <span><b>esc</b> back</span>
           </>
         ) : (
           <>
-            {/* the one ⏎ does on the selected row (designer m_25639) */}
-            <span data-testid="inbox.keys.enter"><b>⏎</b>{sel !== null && pastBy.has(sel) ? ' go to it' : ' answer'}</span>
-            <span className="ip-wide-only"><b>space</b> details</span>
+            <span data-testid="inbox.keys.enter"><b>⏎</b> answer</span>
             <span><b>/</b> search</span>
             <span><b>esc</b> back</span>
           </>
@@ -205,7 +225,6 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
   );
 }
 
-const whenShort = (r: InboxRecord, now: number): string => whenWhere(r, now).split(' · ').pop() ?? '';
 
 function WaitLine({ w, on, end, narrowEnd, onClick }: { w: WaitRow; on: boolean; end: string; narrowEnd: string; onClick: () => void }) {
   return (
@@ -220,11 +239,11 @@ function WaitLine({ w, on, end, narrowEnd, onClick }: { w: WaitRow; on: boolean;
   );
 }
 
-function PastLine({ p, on, project, onClick }: { p: PastRow; on: boolean; project: string; onClick: () => void }) {
+function PastLine({ p, on, open, project, onClick }: { p: PastRow; on: boolean; open: boolean; project: string; onClick: () => void }) {
   const r = p.r;
   const short = lineTwo(r, true);
   return (
-    <div className={`ip-row ip-past${on ? ' on' : ''}${r.state !== 'answered' ? ' gone' : ''}`} role="option" aria-selected={on} data-row={p.key}
+    <div className={`ip-row ip-past${on ? ' on' : ''}${open ? ' open' : ''}${r.state !== 'answered' ? ' gone' : ''}`} role="option" aria-selected={on} data-row={p.key}
       data-testid={`inbox.row.${p.key}`} onClick={onClick}>
       <span className="ip-g">{p.glyph}</span>
       <span className="ip-one">
@@ -240,26 +259,67 @@ function PastLine({ p, on, project, onClick }: { p: PastRow; on: boolean; projec
   );
 }
 
-/** One past item, read-only (space): the question whole and its options, his answer as his bubble, where and when, what the agent did next, the way to it. */
-function Detail({ row, now, names, next, onJump }: { row: PastRow; now: number; names: Readonly<Record<string, string>>; next: string | undefined; onJump: () => void }) {
+/**
+ * One past item, whole, in the pane beside the list (his ask, inbox-open): who asked where and
+ * when, the question whole, every option with the one he picked marked (or his words as his
+ * bubble), where and when he answered, the page he answered on, what the agent did next, and the
+ * way to his answer (⌘⏎).
+ */
+function Pane({ row, now, names, next, title, onJump, onClose, onPage }: {
+  row: PastRow; now: number; names: Readonly<Record<string, string>>; next: string | undefined;
+  title: ((project: string, page: string) => string | undefined) | undefined;
+  onJump: () => void; onClose: () => void; onPage?: (project: string, page: string, block?: string) => void;
+}) {
   const r = row.r;
   const j = jumpOf(r);
   const said = saidWords(r);
+  const picked = pickedOf(r);
+  const page = r.where?.kind === 'page' ? r.where : null;
   return (
-    <div className="ip-detail" data-testid="inbox.detail">
-      <div className="ip-d-k">{`${shownName(r.asker)} asked in ${names[r.project] ?? r.project} · ${timeOf(r.asked_ms)}`}</div>
-      <div className="ip-d-q" data-testid="inbox.detail.question">{r.question}</div>
-      {r.options.length > 0 && (
-        <ol className="ip-d-opts">
-          {r.options.map((o, i) => (
-            <li key={o} className={o === said || r.pick_n === i + 1 ? 'on' : undefined}><span className="ip-d-n">{i + 1}</span>{o}</li>
-          ))}
-        </ol>
-      )}
-      {r.state === 'answered' ? <div className="ip-d-said" data-testid="inbox.detail.said">{said}</div> : <div className="ip-d-gone">{r.line2}</div>}
-      <div className="ip-d-k" data-testid="inbox.detail.where">{whenWhere(r, now)}</div>
-      {next !== undefined && next !== '' && <div className="ip-d-next">{`${shownName(j.kind === 'thread' ? j.agent : r.asker)} went on: ${next}`}</div>}
-      <Press look="ip-d-go" onClick={onJump} data-testid="inbox.detail.go">{jumpWords(j)}</Press>
-    </div>
+    <aside className="ip-pane" aria-label={`${shownName(r.asker)}'s question`} data-testid="inbox.detail">
+      <div className="ip-p-head">
+        <Press look="ip-crumb" onClick={onClose} data-testid="inbox.detail.back">‹ inbox</Press>
+        <span className="ip-d-k">{`${shownName(r.asker)} asked in ${names[r.project] ?? r.project} · ${whenOf(r.asked_ms, now)}`}</span>
+        <Press look="ip-p-close" onClick={onClose} aria-label="close (esc)" title="close · esc" data-testid="inbox.detail.close">×</Press>
+      </div>
+      <div className="ip-p-body">
+        <div className="ip-d-q" data-testid="inbox.detail.question">{r.question}</div>
+        {r.options.length > 0 && (
+          <ol className="ip-d-opts" data-testid="inbox.detail.options">
+            {r.options.map((o, i) => (
+              <li key={`${String(i)}:${o}`} className={picked === i ? 'on' : undefined} data-testid={`inbox.detail.option.${String(i + 1)}`} aria-current={picked === i ? 'true' : undefined}>
+                <span className="ip-d-n">{picked === i ? '✓' : i + 1}</span>{o}
+              </li>
+            ))}
+          </ol>
+        )}
+        {r.state === 'answered'
+          ? picked === null && said !== '' && <div className="ip-d-said" data-testid="inbox.detail.said">{said}</div>
+          : <div className="ip-d-gone">{r.line2}</div>}
+        <div className="ip-d-k" data-testid="inbox.detail.where">{whenWhere(r, now)}</div>
+        {page !== null && (
+          <Press look="ip-d-chip" onClick={() => { onPage?.(r.project, page.page, page.block); }} data-testid="inbox.detail.page">
+            {`↗ ${title?.(r.project, page.page) ?? page.page} · page`}
+          </Press>
+        )}
+        {next !== undefined && next !== '' && <div className="ip-d-next">{`${shownName(j.kind === 'thread' ? j.agent : r.asker)} went on: ${next}`}</div>}
+        <Press look="ip-d-go" onClick={onJump} data-testid="inbox.detail.go">{jumpWords(j, r.state === 'answered')}<kbd>⌘⏎</kbd></Press>
+      </div>
+    </aside>
   );
+}
+
+/** The option he picked: its number, else the option his words are; null for his own words. Pure. */
+export function pickedOf(r: InboxRecord): number | null {
+  if (r.state !== 'answered') return null;
+  if (r.pick_n != null && r.pick_n >= 1 && r.pick_n <= r.options.length) return r.pick_n - 1;
+  const said = saidWords(r);
+  const i = r.options.indexOf(said);
+  return i < 0 ? null : i;
+}
+
+/** 'today 14:02' → '14:02', else 'oct 12 14:02'. */
+function whenOf(ms: number, now: number): string {
+  const day = dayHead(ms, now);
+  return ms <= 0 ? day : day === 'today' ? timeOf(ms) : `${day} ${timeOf(ms)}`;
 }
