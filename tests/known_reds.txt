@@ -1,5 +1,5 @@
 # The tests red on main now, each with who fixes it (issue 28; tests/known_reds.py reads it).
 # One per line, tab-separated: <test>	<since>	<owner>	<why>. A red here is known: the full gate
 # and test:land say so; any other red is NEW. Remove the line in the commit that fixes it.
-history-perf	12c3d88dc	land-reds	test:land at load 15+ only: '⏎ to the oldest hit' (entry 500 never drawn after 49 ⏎) about 1 run in 4; the follow-back, the stale settle, the 1.5 s settle deadline and the stub's half-read cmds line are fixed, this one is not explained yet
-inbox-open	1da997a46	land-reds	test:land at load 10-38 only, 2 in 12 runs: once entry 50 not drawn in 5 s, once its gap row 'newer messages…' missing; green alone; its flash (a fixed 120 ms) is fixed
+history-perf	12c3d88dc	land-reds	test:land at load 30+ only: the 'zanzibar' jump (entry 1200) never drawn in 60 s, once in 10 runs; not explained yet, a red run now writes jump.json (what the list draws, the finds and pages asked). The walk to the oldest hit (a reveal's settle on a stale index after the older page came) is fixed, 5/5 at load 13-33
+inbox-open	1da997a46	land-reds	test:land at load 10-38 only, 2 in 12 runs before the reveal fixes (entry 50 not drawn in 5 s; its gap row missing); 5/5 green since at load 13-33, kept here until test:land shows it

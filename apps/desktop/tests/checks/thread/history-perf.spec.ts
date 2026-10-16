@@ -286,6 +286,8 @@ test('thread/history-perf: 50k entries, lines appending, scroll up and ⌘F stay
     const jumped = await expect(page.getByTestId('thread.entry.1200')).toBeInViewport({ timeout: CAP }).then(() => true, () => false);
     out.jumpMs = Date.now() - t1;
     out.jumpDone = jumped ? 1 : 0;
+    // a red run's cause: what the list draws and the finds and pages it asked (land-reds: once in 10 at load 33)
+    if (!jumped) writeFileSync(test.info().outputPath('jump.json'), JSON.stringify({ drawn: await drawn(page), cmds: (core.cmds() as unknown as Cmd[]).filter((c) => c.agent === 'perf').slice(-16) }, null, 2));
 
     // 6. architect m_26633: back to the 50 hits, ⏎ to the oldest one (each hit a page read around
     // it), then he scrolls newer through the window with find open: the counter and the current
@@ -299,7 +301,14 @@ test('thread/history-perf: 50k entries, lines appending, scroll up and ⌘F stay
         await page.keyboard.press('Enter');
         await expect(count).toHaveText(`${String(i + 1)}/${String(n)}`, { timeout: 5000 });
       }
-      await expect(page.getByTestId('thread.entry.500'), 'the oldest hit, shown').toBeInViewport({ timeout: 10_000 });
+      await expect(page.getByTestId('thread.entry.500'), 'the oldest hit, shown')
+        .toBeInViewport({ timeout: 10_000 })
+        .catch(async (e: unknown) => {
+          // a red run's cause: what the list draws and the pages it asked (land-reds: 1 in 4 at load 15+)
+          const cmds = (core.cmds() as unknown as Cmd[]).filter((c) => c.agent === 'perf').slice(-16);
+          writeFileSync(test.info().outputPath('walk.json'), JSON.stringify({ drawn: await drawn(page), cmds }, null, 2));
+          throw e;
+        });
     });
     out.walkMs = Date.now() - t2;
     out.walkTaskMax = wt.taskMax;
