@@ -108,6 +108,11 @@
     "one": null,
     "text": "{n} days ago"
   },
+  "settings.age_month": {
+    "args": [],
+    "one": null,
+    "text": "a month ago"
+  },
   "settings.age_months": {
     "args": [
       "n"
@@ -912,6 +917,197 @@
     "one": null,
     "text": "turn on"
   },
+  "settings.onb_accessibility_lost": {
+    "args": [],
+    "one": null,
+    "text": "without it, fn works only in bise's own windows"
+  },
+  "settings.onb_accessibility_sub": {
+    "args": [],
+    "one": null,
+    "text": "for fn everywhere, and to read the app in front (URL, file, selection)"
+  },
+  "settings.onb_add_projects": {
+    "args": [
+      "n"
+    ],
+    "one": "add {n} project",
+    "text": "add {n} projects"
+  },
+  "settings.onb_allowed": {
+    "args": [],
+    "one": null,
+    "text": "✓ allowed"
+  },
+  "settings.onb_back": {
+    "args": [],
+    "one": null,
+    "text": "← back"
+  },
+  "settings.onb_choose": {
+    "args": [],
+    "one": null,
+    "text": "choose a folder…"
+  },
+  "settings.onb_chosen": {
+    "args": [],
+    "one": null,
+    "text": "chosen"
+  },
+  "settings.onb_continue": {
+    "args": [],
+    "one": null,
+    "text": "continue"
+  },
+  "settings.onb_continue_for_now": {
+    "args": [],
+    "one": null,
+    "text": "continue for now"
+  },
+  "settings.onb_denied": {
+    "args": [],
+    "one": null,
+    "text": "denied"
+  },
+  "settings.onb_filter": {
+    "args": [],
+    "one": null,
+    "text": "filter: type a name or a path"
+  },
+  "settings.onb_fn_done": {
+    "args": [],
+    "one": null,
+    "text": "✓ that's it: bise answers in the capsule, at the bottom of the screen."
+  },
+  "settings.onb_fn_help": {
+    "args": [],
+    "one": null,
+    "text": "fn space opens the spotlight · fn fn talks without holding"
+  },
+  "settings.onb_fn_sub": {
+    "args": [],
+    "one": null,
+    "text": "and say, for example, “what moved in storefront this week?”"
+  },
+  "settings.onb_fn_title": {
+    "args": [],
+    "one": null,
+    "text": "try it: hold fn"
+  },
+  "settings.onb_git": {
+    "args": [
+      "when"
+    ],
+    "one": null,
+    "text": "git · {when}"
+  },
+  "settings.onb_hello_sub": {
+    "args": [],
+    "one": null,
+    "text": "hold fn and talk to me, from any app. i look after your projects with a team of agents, and i only ask you what needs you."
+  },
+  "settings.onb_hello_title": {
+    "args": [],
+    "one": null,
+    "text": "hi. i'm bise."
+  },
+  "settings.onb_mic_lost": {
+    "args": [],
+    "one": null,
+    "text": "without it, fn can't hear you: you type in the spotlight instead"
+  },
+  "settings.onb_mic_sub": {
+    "args": [],
+    "one": null,
+    "text": "to talk while you hold fn"
+  },
+  "settings.onb_model_help": {
+    "args": [],
+    "one": null,
+    "text": "sign in to one of them to go on"
+  },
+  "settings.onb_model_sub": {
+    "args": [],
+    "one": null,
+    "text": "your subscription is enough. you can change it per project."
+  },
+  "settings.onb_model_title": {
+    "args": [],
+    "one": null,
+    "text": "which model?"
+  },
+  "settings.onb_no_match": {
+    "args": [
+      "q"
+    ],
+    "one": null,
+    "text": "no repo matches “{q}”. choose a folder…, or clear the filter."
+  },
+  "settings.onb_no_project": {
+    "args": [],
+    "one": null,
+    "text": "continue without a project"
+  },
+  "settings.onb_no_repos": {
+    "args": [],
+    "one": null,
+    "text": "no repos in this folder. choose a folder…, or continue without one."
+  },
+  "settings.onb_open": {
+    "args": [],
+    "one": null,
+    "text": "open bise"
+  },
+  "settings.onb_open_untried": {
+    "args": [],
+    "one": null,
+    "text": "open bise without trying"
+  },
+  "settings.onb_perms_sub": {
+    "args": [],
+    "one": null,
+    "text": "nothing leaves unless you hold fn. you choose what i read in settings · privacy."
+  },
+  "settings.onb_perms_title": {
+    "args": [],
+    "one": null,
+    "text": "three permissions"
+  },
+  "settings.onb_projects_found": {
+    "args": [],
+    "one": null,
+    "text": "i found these repos in your folder. tick the ones bise should work in."
+  },
+  "settings.onb_projects_none": {
+    "args": [],
+    "one": null,
+    "text": "bise works in your repos. choose the folder that has them."
+  },
+  "settings.onb_projects_title": {
+    "args": [],
+    "one": null,
+    "text": "your projects"
+  },
+  "settings.onb_screen_lost": {
+    "args": [],
+    "one": null,
+    "text": "fn will send your words without a capture"
+  },
+  "settings.onb_screen_sub": {
+    "args": [],
+    "one": null,
+    "text": "for the capture fn adds to your question"
+  },
+  "settings.onb_skip": {
+    "args": [],
+    "one": null,
+    "text": "skip for now"
+  },
+  "settings.onb_start": {
+    "args": [],
+    "one": null,
+    "text": "start"
+  },
   "settings.open_system_settings": {
     "args": [],
     "one": null,
@@ -1471,6 +1667,109 @@
     "args": [],
     "one": null,
     "text": "system"
+  },
+  "settings.tour_card": {
+    "args": [
+      "who",
+      "key",
+      "one",
+      "two"
+    ],
+    "one": null,
+    "text": "{who} needs you. {key} opens the question, {one} or {two} answers. ↓"
+  },
+  "settings.tour_card_click": {
+    "args": [
+      "who",
+      "click",
+      "one",
+      "two"
+    ],
+    "one": null,
+    "text": "{who} needs you. {click} the question, {one} or {two} answers. ↓"
+  },
+  "settings.tour_end": {
+    "args": [
+      "gone",
+      "key",
+      "rest"
+    ],
+    "one": null,
+    "text": "that's it. {gone} is archived: {key} finds it.{rest}"
+  },
+  "settings.tour_end_more": {
+    "args": [
+      "keys"
+    ],
+    "one": null,
+    "text": " {keys} open the others."
+  },
+  "settings.tour_end_one": {
+    "args": [
+      "keys",
+      "name"
+    ],
+    "one": null,
+    "text": " {keys} opens {name}."
+  },
+  "settings.tour_end_two": {
+    "args": [
+      "keys"
+    ],
+    "one": null,
+    "text": " {keys} open the other two."
+  },
+  "settings.tour_inside": {
+    "args": [
+      "name",
+      "others",
+      "esc"
+    ],
+    "one": null,
+    "text": "this is {name}'s own thread, live. {others}{esc} back to main."
+  },
+  "settings.tour_it": {
+    "args": [],
+    "one": null,
+    "text": "it"
+  },
+  "settings.tour_others": {
+    "args": [
+      "keys"
+    ],
+    "one": null,
+    "text": "{keys} the others · "
+  },
+  "settings.tour_start": {
+    "args": [
+      "key",
+      "name"
+    ],
+    "one": null,
+    "text": "your team just started. they work on their own. {key} looks inside {name}. →"
+  },
+  "settings.tour_steer": {
+    "args": [
+      "name",
+      "how",
+      "enter",
+      "got",
+      "read"
+    ],
+    "one": null,
+    "text": "{name} waits for a word from you: {how}type, {enter}. {got} it got it, {read} it read it."
+  },
+  "settings.tour_steer_how": {
+    "args": [
+      "key"
+    ],
+    "one": null,
+    "text": "{key}, "
+  },
+  "settings.tour_your_team": {
+    "args": [],
+    "one": null,
+    "text": "your team"
   },
   "settings.update_again": {
     "args": [],

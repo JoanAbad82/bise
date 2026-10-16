@@ -185,12 +185,12 @@ fn choices(app: &App, arg: Arg, q: &str) -> Vec<Choice> {
 fn version_word(q: &str) -> Option<Choice> {
     use bise_proto::slash::{version, Version};
     match q.trim().to_lowercase().as_str() {
-        "restart" => Some(Choice::word("/restart", "reload bise, nothing lost")),
-        "update" => Some(Choice::word("/update", "look for a new bise release now")),
+        "restart" => Some(Choice::word("/restart", bise_proto::words::settings::version_restart)),
+        "update" => Some(Choice::word("/update", bise_proto::words::settings::version_update)),
         "" => None, // the bare '/version ': every version is offered
         w => match version(&format!("/version {w}"))? {
-            Version::List => Some(Choice::word(w, "the installed versions")),
-            Version::Rollback => Some(Choice::word(w, "back to the version before")),
+            Version::List => Some(Choice::word(w, bise_proto::words::settings::version_list)),
+            Version::Rollback => Some(Choice::word(w, bise_proto::words::settings::version_rollback)),
             _ => None,
         },
     }

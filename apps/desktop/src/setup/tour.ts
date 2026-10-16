@@ -14,6 +14,8 @@
 //             (the palette) or another demo agent.
 // Any tip goes when he sends a message (its step counts as done).
 
+import { settings } from '@/proto/words.gen';
+
 /** How a demo agent's objective starts (the bise-demo skill's spawns). */
 export const MARK = 'bise demo';
 
@@ -146,8 +148,24 @@ export function sent(t0: Tour, all: Snap): Tour {
 /** A part of a tip's words: plain text, or a key to draw as a key. */
 export type TipPart = string | { key: string };
 
-const keyOf = (m: Member): TipPart[] => (m.number != null ? [{ key: `⌥${String(m.number)}` }] : []);
-const keysOf = (ms: readonly Member[]): TipPart[] => ms.flatMap((m, i) => (i > 0 && m.number != null ? [' ', ...keyOf(m)] : keyOf(m)));
+// The words are bise_proto's (words::settings tour_*, the TUI's tour.rs reads them too): a key is a
+// marked hole (KEY…KEY, drawn as a key), and a hole holding a sub-template (how, rest) is its own
+// parts (PART on both sides). tipParts cuts the filled words there and drops the empty pieces.
+const KEY = '\uE000';
+const PART = '\uE001';
+const mark = (key: string): string => `${KEY}${key}${KEY}`;
+const part = (words: string): string => `${PART}${words}${PART}`;
+
+/** Filled words -> their parts: the text between the marks, the marked keys as keys. Pure. */
+export function tipParts(words: string): TipPart[] {
+  return words
+    .split(PART)
+    .flatMap((piece) => piece.split(KEY).map((p, i): TipPart | null => (i % 2 === 1 ? { key: p } : p === '' ? null : p)))
+    .filter((p): p is TipPart => p !== null);
+}
+
+const keyOf = (m: Member): string => (m.number != null ? mark(`⌥${String(m.number)}`) : '');
+const keysOf = (ms: readonly Member[]): string => ms.map((m, i) => (i > 0 && m.number != null ? ` ${keyOf(m)}` : keyOf(m))).join('');
 
 /** The words of a tip, the TUI's, with ⌘ for the Mac where the TUI says ctrl. */
 export function tipText(t: Tip, all: Snap): TipPart[] {
@@ -158,31 +176,34 @@ export function tipText(t: Tip, all: Snap): TipPart[] {
       const m = liveM[0];
       if (m === undefined) return [];
       const k = keyOf(m);
-      return ['your team just started. they work on their own. ', ...(k.length > 0 ? k : [{ key: '⌘K' }]), ` looks inside ${m.name}. →`];
+      return tipParts(settings.tour_start({ key: k !== '' ? k : mark('⌘K'), name: m.name }));
     }
     case 'inside': {
       const others = keysOf(liveM.filter((m) => m.name !== s.focus));
-      return [`this is ${s.focus}'s own thread, live. `, ...(others.length > 0 ? [...others, ' the others · '] : []), { key: 'esc' }, ' back to main.'];
+      return tipParts(settings.tour_inside({ name: s.focus, others: others !== '' ? settings.tour_others({ keys: others }) : '', esc: mark('esc') }));
     }
     case 'card': {
-      const who = s.card !== null && liveM.some((m) => m.name === s.card) ? s.card : 'your team';
-      return [`${who} needs you. `, { key: '⌘I' }, ' opens the question, ', { key: '1' }, ' or ', { key: '2' }, ' answers. ↓'];
+      const who = s.card !== null && liveM.some((m) => m.name === s.card) ? s.card : settings.tour_your_team;
+      return tipParts(settings.tour_card({ who, key: mark('⌘I'), one: mark('1'), two: mark('2') }));
     }
     case 'steer': {
       const m = target(s);
       if (m === undefined) return [];
-      const how = s.focus === m.name ? [] : [...keyOf(m), ...(keyOf(m).length > 0 ? [', '] : [])];
-      return [`${m.name} waits for a word from you: `, ...how, 'type, ', { key: '⏎' }, '. ✓ it got it, ✓✓ it read it.'];
+      const how = s.focus === m.name || keyOf(m) === '' ? '' : settings.tour_steer_how({ key: keyOf(m) });
+      return tipParts(settings.tour_steer({ name: m.name, how: part(how), enter: mark('⏎'), got: '✓', read: '✓✓' }));
     }
     case 'end': {
-      const gone = s.members.find((m) => m.archived)?.name ?? 'it';
-      const rest: TipPart[] =
+      const gone = s.members.find((m) => m.archived)?.name ?? settings.tour_it;
+      const keys = keysOf(liveM);
+      const rest =
         liveM.length === 0
-          ? []
+          ? ''
           : liveM.length === 1
-            ? [' ', ...keysOf(liveM), ` opens ${liveM[0]?.name ?? ''}.`]
-            : [' ', ...keysOf(liveM), liveM.length === 2 ? ' open the other two.' : ' open the others.'];
-      return [`that's it. ${gone} is archived: `, { key: '⌘K' }, ' finds it.', ...rest];
+            ? settings.tour_end_one({ keys, name: liveM[0]?.name ?? '' })
+            : liveM.length === 2
+              ? settings.tour_end_two({ keys })
+              : settings.tour_end_more({ keys });
+      return tipParts(settings.tour_end({ gone, key: mark('⌘K'), rest: part(rest) }));
     }
   }
 }

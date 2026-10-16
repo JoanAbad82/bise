@@ -12,6 +12,7 @@
 
 use super::*;
 use bise_catalog::auth_cli::Paths;
+use bise_proto::words::settings;
 use std::path::Path;
 
 /// Which sign-in.
@@ -233,19 +234,19 @@ pub(crate) fn plan_words(a: &Account) -> String {
 // ---- the designer's lines (docs/subscriptions-design.md, final words) ----
 
 /// esc, or 5 minutes without an answer.
-pub(crate) const UNFINISHED: &str = "▲ the sign-in wasn't finished. try again, or pick another way.";
+pub(crate) const UNFINISHED: &str = settings::signin_unfinished;
 /// Signed in, plan use refused (or no plan scope).
-pub(crate) const DENIED: &str = "▲ ChatGPT signed you in but didn't let bise use your plan. try again and allow it, or pick another way.";
+pub(crate) const DENIED: &str = settings::signin_denied;
 /// The plan's refusals, the turn errors' own lines (design, item 5; the
 /// runtime says them in a turn, the key step's check says them here).
-pub(crate) const LIMIT: &str = "▲ your ChatGPT plan's limit for bise is reached. your usage is at chatgpt.com/settings/usage, or switch model with /model.";
+pub(crate) const LIMIT: &str = settings::signin_limit;
 /// The limit line's words that link to [`PLAN_USAGE_URL`].
-pub(crate) const LIMIT_LINK: &str = "chatgpt.com/settings/usage";
-pub(crate) const PLAN_OFF: &str = "▲ ChatGPT plan use is off for bise. turn it on in your ChatGPT settings, or pick another provider in /provider.";
-pub(crate) const UNCHECKED: &str = "▲ ChatGPT couldn't check your plan's usage. try again in a moment, or switch model with /model.";
-pub(crate) const EXPIRED: &str = "▲ your ChatGPT sign-in expired. sign in again in /provider, or run bise login chatgpt.";
+pub(crate) const LIMIT_LINK: &str = settings::signin_limit_link;
+pub(crate) const PLAN_OFF: &str = settings::signin_plan_off;
+pub(crate) const UNCHECKED: &str = settings::signin_unchecked;
+pub(crate) const EXPIRED: &str = settings::signin_expired;
 /// OpenRouter came back without a key.
-pub(crate) const OR_DENIED: &str = "▲ OpenRouter didn't give bise a key. try again, or pick another way.";
+pub(crate) const OR_DENIED: &str = settings::signin_or_denied;
 
 impl Onb {
     /// Start a sign-in: the browser opens on its link, the screen waits.
@@ -317,7 +318,7 @@ impl Onb {
                     }
                     None => Sub::Model(p, 0, String::new()),
                 },
-                None => self.sign_in_note("▲ this bise has no ChatGPT provider yet.".into()),
+                None => self.sign_in_note(settings::signin_no_chatgpt.into()),
             },
             // the key is in auth.json: its model, then the check
             (Poll::Done(_), Kind::OpenRouter) => match self.openrouter() {
@@ -362,14 +363,14 @@ impl Onb {
         let answer = match rx.try_recv() {
             Ok(a) => a,
             Err(std::sync::mpsc::TryRecvError::Empty) => return,
-            Err(_) => Err("it stopped".into()),
+            Err(_) => Err(settings::signin_stopped.into()),
         };
         self.signing_out = None;
         self.refresh_keys(env);
         let t = match answer {
-            Ok(true) => "✓ signed out of ChatGPT.".to_string(),
-            Ok(false) => "✓ signed out here. ChatGPT didn't confirm: to be sure, remove bise in your ChatGPT settings.".to_string(),
-            Err(e) => format!("▲ couldn't sign out: {}", e.trim_end_matches('.')),
+            Ok(true) => settings::signin_signed_out.to_string(),
+            Ok(false) => settings::signin_signed_out_here.to_string(),
+            Err(e) => settings::signin_sign_out_failed(e.trim_end_matches('.')),
         };
         if let Some(pn) = &mut self.panel {
             pn.said = Some(t);

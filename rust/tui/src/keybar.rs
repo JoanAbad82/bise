@@ -249,7 +249,8 @@ fn keys_line(app: &App, width: u16) -> Line<'static> {
     // run's words, designer m_7456)
     if let Some(r) = app.resign.as_ref() {
         let copy = if r.just_copied() { ("c", composer::bar_copied) } else { ("c", composer::bar_copy_link) };
-        let pairs = [("", crate::resign::WAITING), copy, ("esc", composer::bar_cancel)];
+        let waiting = crate::resign::waiting();
+        let pairs = [("", waiting.as_str()), copy, ("esc", composer::bar_cancel)];
         return pairs_line(&pairs, usize::from(width)).0;
     }
     // expired-ux: the agent in view stopped on the expired ChatGPT

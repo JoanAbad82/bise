@@ -26,6 +26,7 @@
 
 use crate::hints;
 use crate::App;
+use bise_proto::words::settings;
 use ratatui::layout::Rect;
 use ratatui::Frame;
 use std::cell::RefCell;
@@ -240,41 +241,37 @@ fn keys<'a>(ms: impl Iterator<Item = &'a Member>) -> String {
 pub(crate) fn text(t: Tip, s: &Snap) -> String {
     match t {
         Tip::Start => match s.live().next() {
-            Some(m) => format!(
-                "your team just started. they work on their own. {} looks inside {}. →",
-                key(m).unwrap_or_else(|| "{ctrl+s}".into()),
-                m.name
-            ),
+            Some(m) => settings::tour_start(key(m).unwrap_or_else(|| "{ctrl+s}".into()), &m.name),
             None => String::new(),
         },
         Tip::Inside => {
             let others = keys(s.live().filter(|m| m.name != s.focus));
-            let others = if others.is_empty() { String::new() } else { format!("{others} the others · ") };
-            format!("this is {}'s own thread, live. {others}{{esc}} back to main.", s.focus)
+            let others = if others.is_empty() { String::new() } else { settings::tour_others(others) };
+            settings::tour_inside(&s.focus, others, "{esc}")
         }
         Tip::Card => {
-            let who = s.card.as_deref().filter(|w| s.live().any(|m| m.name == *w)).unwrap_or("your team");
+            let who = s.card.as_deref().filter(|w| s.live().any(|m| m.name == *w)).unwrap_or(settings::tour_your_team);
             if s.no_ctrl_digits {
-                format!("{who} needs you. {{click}} the question, {{1}} or {{2}} answers. ↓")
+                settings::tour_card_click(who, "{click}", "{1}", "{2}")
             } else {
-                format!("{who} needs you. {{ctrl+1}} opens the question, {{1}} or {{2}} answers. ↓")
+                settings::tour_card(who, "{ctrl+1}", "{1}", "{2}")
             }
         }
         Tip::Steer => {
             let Some(m) = s.target() else { return String::new() };
-            let how = if s.focus == m.name { String::new() } else { key(m).map(|k| format!("{k}, ")).unwrap_or_default() };
-            format!("{} waits for a word from you: {how}type, {{⏎}}. [✓] it got it, [✓✓] it read it.", m.name)
+            let how = if s.focus == m.name { String::new() } else { key(m).map(settings::tour_steer_how).unwrap_or_default() };
+            settings::tour_steer(&m.name, how, "{⏎}", "[✓]", "[✓✓]")
         }
         Tip::End => {
-            let gone = s.members.iter().find(|m| m.archived).map(|m| m.name.as_str()).unwrap_or("it");
+            let gone = s.members.iter().find(|m| m.archived).map(|m| m.name.as_str()).unwrap_or(settings::tour_it);
             let live: Vec<&Member> = s.live().collect();
             let rest = match live.len() {
                 0 => String::new(),
-                1 => format!(" {} opens {}.", keys(live.into_iter()), s.live().next().map_or("", |m| m.name.as_str())),
-                2 => format!(" {} open the other two.", keys(live.into_iter())),
-                _ => format!(" {} open the others.", keys(live.into_iter())),
+                1 => settings::tour_end_one(keys(live.into_iter()), s.live().next().map_or("", |m| m.name.as_str())),
+                2 => settings::tour_end_two(keys(live.into_iter())),
+                _ => settings::tour_end_more(keys(live.into_iter())),
             };
-            format!("that's it. {gone} is archived: {{ctrl+s}} finds it.{rest}")
+            settings::tour_end(gone, "{ctrl+s}", rest)
         }
     }
 }

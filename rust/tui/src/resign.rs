@@ -20,7 +20,9 @@ use std::time::{Duration, Instant};
 const COPIED_FOR: Duration = Duration::from_secs(2);
 
 /// The waiting words (the first run's, onboarding.rs).
-pub(crate) const WAITING: &str = "waiting for you to sign in to ChatGPT in your browser…";
+pub(crate) fn waiting() -> String {
+    bise_proto::words::common::signing_wait("ChatGPT")
+}
 
 /// A sign-in under way from the thread.
 pub(crate) struct ReSignIn {

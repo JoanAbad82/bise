@@ -12,6 +12,7 @@ import {
   allAllowed, back, choose as choose_, chosenTicked, filterFound, finish, fnAct, next, pick, pickChosen, PERMS, START, stepOf, STEPS, ticked,
   type OnbState, type Perms,
 } from './model';
+import { settings } from '@/proto/words.gen';
 import './setup.css';
 
 export interface OnboardingPorts {
@@ -39,9 +40,9 @@ export interface OnboardingProps {
 }
 
 const PERM_WORDS: Record<string, { label: string; sub: string; lost: string }> = {
-  mic: { label: 'microphone', sub: 'to talk while you hold fn', lost: "without it, fn can't hear you: you type in the spotlight instead" },
-  accessibility: { label: 'accessibility', sub: 'for fn everywhere, and to read the app in front (URL, file, selection)', lost: "without it, fn works only in bise's own windows" },
-  screen: { label: 'screen recording', sub: 'for the capture fn adds to your question', lost: 'fn will send your words without a capture' },
+  mic: { label: settings.perm_mic, sub: settings.onb_mic_sub, lost: settings.onb_mic_lost },
+  accessibility: { label: settings.perm_accessibility, sub: settings.onb_accessibility_sub, lost: settings.onb_accessibility_lost },
+  screen: { label: settings.perm_screen, sub: settings.onb_screen_sub, lost: settings.onb_screen_lost },
 };
 
 export function Onboarding({ accounts, found, perms, fn = null, keyError = null, ports, now: pinned, home = '' }: OnboardingProps) {
@@ -80,9 +81,9 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
         <Onb
           {...frame}
           pearl
-          title="hi. i'm bise."
-          sub="hold fn and talk to me, from any app. i look after your projects with a team of agents, and i only ask you what needs you."
-          cta={{ text: 'start', onClick: go, testId: 'setup.next' }}
+          title={settings.onb_hello_title}
+          sub={settings.onb_hello_sub}
+          cta={{ text: settings.onb_start, onClick: go, testId: 'setup.next' }}
         />
       );
       break;
@@ -90,9 +91,9 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
       body = (
         <Onb
           {...frame}
-          title="three permissions"
-          sub="nothing leaves unless you hold fn. you choose what i read in settings · privacy."
-          cta={{ text: allAllowed(perms) ? 'continue' : 'continue for now', onClick: go, testId: 'setup.next' }}
+          title={settings.onb_perms_title}
+          sub={settings.onb_perms_sub}
+          cta={{ text: allAllowed(perms) ? settings.onb_continue : settings.onb_continue_for_now, onClick: go, testId: 'setup.next' }}
         >
           <Group
             testId="setup.perms"
@@ -105,17 +106,17 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
                 sub: g === 'denied' ? w.lost : w.sub,
                 control:
                   g === 'allowed' ? (
-                    <Chip tone="ok">✓ allowed</Chip>
+                    <Chip tone="ok">{settings.onb_allowed}</Chip>
                   ) : g === 'denied' ? (
                     <span className="setup-acts">
-                      <Chip tone="err">denied</Chip>
+                      <Chip tone="err">{settings.onb_denied}</Chip>
                       <Button onClick={() => { ports.perm(p, 'open'); }} testId={`setup.perm.${p}.open`}>
-                        open System Settings
+                        {settings.open_system_settings}
                       </Button>
                     </span>
                   ) : (
                     <Button onClick={() => { ports.perm(p, 'ask'); }} testId={`setup.perm.${p}`}>
-                      allow
+                      {settings.perm_allow}
                     </Button>
                   ),
               };
@@ -128,12 +129,12 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
       body = (
         <Onb
           {...frame}
-          title="which model?"
-          sub="your subscription is enough. you can change it per project."
-          cta={{ text: 'continue', onClick: go, state: ok ? undefined : 'disabled', testId: 'setup.next' }}
+          title={settings.onb_model_title}
+          sub={settings.onb_model_sub}
+          cta={{ text: settings.onb_continue, onClick: go, state: ok ? undefined : 'disabled', testId: 'setup.next' }}
         >
           <Accounts accounts={accounts} send={ports.send} keyError={keyError} />
-          {!ok && <Help>sign in to one of them to go on</Help>}
+          {!ok && <Help>{settings.onb_model_help}</Help>}
         </Onb>
       );
       break;
@@ -158,7 +159,7 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
               testId={`setup.chosen.${baseName(p)}`}
             />
           ),
-          value: 'chosen',
+          value: settings.onb_chosen,
         })),
         ...shown.map((f) => ({
           id: f.path,
@@ -174,21 +175,21 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
               testId={`setup.found.${f.name}`}
             />
           ),
-          value: `git · ${ago(now - f.last_ms)}`,
+          value: settings.onb_git({ when: ago(now - f.last_ms) }),
         })),
       ];
       body = (
         <Onb
           {...frame}
-          title="your projects"
-          sub={items.length > 0 ? 'i found these repos in your folder. tick the ones bise should work in.' : 'bise works in your repos. choose the folder that has them.'}
-          cta={{ text: n > 0 ? `add ${String(n)} ${n === 1 ? 'project' : 'projects'}` : 'continue without a project', onClick: go, testId: 'setup.next' }}
+          title={settings.onb_projects_title}
+          sub={items.length > 0 ? settings.onb_projects_found : settings.onb_projects_none}
+          cta={{ text: n > 0 ? settings.onb_add_projects({ n }) : settings.onb_no_project, onClick: go, testId: 'setup.next' }}
         >
           {/* no repo to filter: 'choose a folder…' alone, centred (designer N5) */}
           <div className={items.length > 0 ? 'setup-pick' : 'setup-pick alone'}>
             {items.length > 0 && (
               <Field
-                placeholder="filter: type a name or a path"
+                placeholder={settings.onb_filter}
                 value={q}
                 onChange={(e) => {
                   setQ(e.currentTarget.value);
@@ -205,12 +206,12 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
                 }}
                 testId="setup.choose"
               >
-                choose a folder…
+                {settings.onb_choose}
               </Button>
             )}
           </div>
           {found.length === 0 && s.chosen.length === 0 ? (
-            <Help>looking in your folders…</Help>
+            <Help>{settings.scan_looking}</Help>
           ) : rows.length === 0 ? (
             <Help testId="setup.filter.none">{noRepoWords(q)}</Help>
           ) : (
@@ -228,11 +229,11 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
           {...frame}
           pearl={{ mood: s.fn === 'down' ? 'listen' : s.tried ? 'done' : 'rest' }}
           fn={s.fn}
-          title="try it: hold fn"
-          sub="and say, for example, “what moved in storefront this week?”"
-          cta={{ text: s.tried ? 'open bise' : 'open bise without trying', onClick: go, testId: 'setup.next' }}
+          title={settings.onb_fn_title}
+          sub={settings.onb_fn_sub}
+          cta={{ text: s.tried ? settings.onb_open : settings.onb_open_untried, onClick: go, testId: 'setup.next' }}
         >
-          <Help>{s.tried ? "✓ that's it: bise answers in the capsule, at the bottom of the screen." : 'fn space opens the spotlight · fn fn talks without holding'}</Help>
+          <Help>{s.tried ? settings.onb_fn_done : settings.onb_fn_help}</Help>
         </Onb>
       );
       break;
@@ -258,12 +259,12 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
         {s.at > 0 && (
           // designer m_18736: back and skip are Acts; only the step's own action is a Button (pri)
           <Act onClick={() => { setSt(back(s)); }} testId="setup.back">
-            ← back
+            {settings.onb_back}
           </Act>
         )}
         {at !== 'fn' && (
           <Act onClick={() => { run(finish(s)); }} testId="setup.skip">
-            skip for now
+            {settings.onb_skip}
           </Act>
         )}
       </div>
@@ -276,7 +277,7 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
  * no repo here (never 'matches ""' or 'clear the filter'; ambient-lead m_12999, designer's N5 words). Pure.
  */
 export function noRepoWords(q: string): string {
-  return q.trim() === '' ? 'no repos in this folder. choose a folder…, or continue without one.' : `no repo matches “${q.trim()}”. choose a folder…, or clear the filter.`;
+  return q.trim() === '' ? settings.onb_no_repos : settings.onb_no_match({ q: q.trim() });
 }
 
 /**
@@ -302,9 +303,9 @@ export function baseName(p: string): string {
 
 function ago(ms: number): string {
   const d = Math.floor(ms / 86_400_000);
-  if (d < 1) return 'today';
-  if (d < 2) return 'yesterday';
-  if (d < 30) return `${String(d)} days ago`;
-  if (d < 60) return 'a month ago';
-  return `${String(Math.floor(d / 30))} months ago`;
+  if (d < 1) return settings.age_today;
+  if (d < 2) return settings.age_yesterday;
+  if (d < 30) return settings.age_days({ n: d });
+  if (d < 60) return settings.age_month;
+  return settings.age_months({ n: Math.floor(d / 30) });
 }

@@ -21,6 +21,7 @@
 use super::signin::Kind;
 use super::*;
 use bise_catalog::roles::{self as r, Source};
+use bise_proto::words::settings;
 use std::sync::Mutex;
 
 /// Which of the panel's screens shows.
@@ -102,20 +103,20 @@ pub(crate) fn shown() -> Vec<&'static r::Role> {
 /// A role as the steps' sentences say it: `for the agents.`
 pub(super) fn who(id: &str) -> &'static str {
     match id {
-        r::MAIN => "main",
-        r::AGENTS => "the agents",
-        r::SMALL => "small jobs",
-        r::CLASSIFY => "the checker",
-        _ => "voice",
+        r::MAIN => settings::role_who_main,
+        r::AGENTS => settings::role_who_agents,
+        r::SMALL => settings::role_who_small,
+        r::CLASSIFY => settings::role_who_checker,
+        _ => settings::role_who_voice,
     }
 }
 
 /// The fallback row's word: `same as main` (agents), `auto` (small jobs).
 fn fallback_word(id: &str) -> &'static str {
     if id == r::AGENTS {
-        "same as main"
+        settings::role_same_as_main
     } else {
-        "auto"
+        settings::role_auto
     }
 }
 
@@ -683,7 +684,7 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
     let dim = |t: String| Line::from(s(t, theme::dim()));
     match (&pn.screen, &o.sub) {
         (Screen::Roles, Sub::List) => {
-            let mut v = vec![title("which model does what?"), dim("each role picks a provider, then a model. one provider can serve several.".into())];
+            let mut v = vec![title(settings::roles_screen_title), dim(settings::roles_screen_sub.into())];
             blanks(&mut v, gap);
             // the providers in one column (designer)
             let pw = shown()
@@ -706,24 +707,24 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
             }
             said(&mut v);
             blanks(&mut v, gap);
-            v.push(keybar("↑↓ choose   ⏎ change   esc back"));
+            v.push(keybar(settings::bar_choose_change));
             Some(v)
         }
         (Screen::Pick(id, _), Sub::List) => Some(provider_lines(o, id, w, gap, &said)),
         (Screen::Pick(id, _), Sub::Model(p, i, f)) => Some(model_lines(o, id, p, *i, f, w, gap, &said)),
         (Screen::Pick(id, _), Sub::Effort(m, i)) => {
-            let mut v = vec![title("how hard should it think?"), dim(format!("{} for {}", short_model(m), who(id)))];
+            let mut v = vec![title(settings::roles_effort_title), dim(settings::roles_effort_for(short_model(m), who(id)))];
             blanks(&mut v, gap);
             let (efforts, default) = o.efforts_of(m);
             for (k, e) in efforts.iter().enumerate() {
                 let mut name = vec![s(pad(e, 10), theme::text()), s(crate::commands::effort_hint(e), theme::dim())];
                 if *e == default {
-                    name.push(s(format!(" {} default", dot()), theme::dim()));
+                    name.push(s(settings::roles_default(dot()), theme::dim()));
                 }
                 option(&mut v, k == *i, name, "", w);
             }
             blanks(&mut v, gap);
-            v.push(keybar("↑↓ choose   ⏎ ok   esc back"));
+            v.push(keybar(settings::bar_choose_ok));
             Some(v)
         }
         _ => None,
@@ -733,12 +734,8 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
 /// `1 agent uses its own model: perf · openai/gpt-6-sol`.
 fn overrides_words(o: &[(String, String)]) -> String {
     match o {
-        [(a, m)] => format!("1 agent uses its own model: {} {} {}", a, dot(), m),
-        _ => format!(
-            "{} agents use their own model: {}",
-            o.len(),
-            o.iter().map(|(a, m)| format!("{} {} {}", a, dot(), m)).collect::<Vec<_>>().join(", ")
-        ),
+        [(a, m)] => settings::roles_override_one(a, dot(), m),
+        _ => settings::roles_override_more(o.len(), o.iter().map(|(a, m)| format!("{} {} {}", a, dot(), m)).collect::<Vec<_>>().join(", ")),
     }
 }
 
@@ -747,10 +744,10 @@ fn overrides_words(o: &[(String, String)]) -> String {
 fn role_extra(o: &Onb, id: &str) -> String {
     let (m, src) = o.role_model(id);
     if let Source::Env(n) = src {
-        return format!("from {}", n);
+        return settings::roles_from(n);
     }
     if id == r::VOICE && !o.voice_enabled() && src == Source::Picked {
-        return "off".into();
+        return settings::roles_off.into();
     }
     if (id == r::MAIN || id == r::AGENTS) && matches!(src, Source::Picked | Source::SameAs(_)) {
         let e = o.setup.role_effort(if src == Source::Picked { id } else { r::MAIN });
@@ -789,15 +786,15 @@ fn role_row(o: &Onb, role: &r::Role, selected: bool, flash: bool, w: usize, pw: 
         // the thing that runs stays on screen (designer)
         what(&mut pieces);
         pieces.push(s(format!("  {} ", theme::glyph(theme::G_FAILED)), theme::error()));
-        pieces.push(s(format!("no key {} enter fixes it", d), theme::dim()));
+        pieces.push(s(settings::roles_no_key(d), theme::dim()));
     } else {
         match src {
             // one key, every role: a key that can't listen says so here
             // (voice follows the keys; none of them transcribes)
-            _ if voice_none => pieces.push(s(format!("off {} none of your keys listens {} enter sets it up", d, d), theme::dim())),
-            _ if voice_off && src != Source::Picked => pieces.push(s(format!("off {} enter sets it up", d), theme::dim())),
-            _ if checker_off => pieces.push(s(format!("off {} every command asks you", d), theme::dim())),
-            Source::None => pieces.push(s(format!("none yet {} enter picks one", d), theme::dim())),
+            _ if voice_none => pieces.push(s(settings::roles_voice_none(d), theme::dim())),
+            _ if voice_off && src != Source::Picked => pieces.push(s(settings::roles_voice_off(d), theme::dim())),
+            _ if checker_off => pieces.push(s(settings::roles_checker_off(d), theme::dim())),
+            Source::None => pieces.push(s(settings::roles_none_yet(d), theme::dim())),
             Source::Picked | Source::Env(_) => {
                 what(&mut pieces);
                 let used: usize = pieces.iter().map(|x| x.content.width()).sum();
@@ -807,8 +804,8 @@ fn role_row(o: &Onb, role: &r::Role, selected: bool, flash: bool, w: usize, pw: 
             }
             Source::SameAs(_) | Source::Auto => {
                 let rule = match src {
-                    Source::SameAs(of) => format!("same as {}", r::role(of).map_or(of, |x| x.name)),
-                    _ => "auto".into(),
+                    Source::SameAs(of) => settings::roles_same_as(r::role(of).map_or(of, |x| x.name)),
+                    _ => settings::role_auto.into(),
                 };
                 let full = format!("{} {} {} {} {}{}", rule, d, pname, d, short, extra);
                 let no_id = format!("{} {} {}{}", rule, d, pname, extra);
@@ -836,11 +833,11 @@ fn role_row(o: &Onb, role: &r::Role, selected: bool, flash: bool, w: usize, pw: 
 /// cursor.
 fn role_hint(id: &str) -> &'static str {
     match id {
-        r::MAIN => "talks with you and starts the agents.",
-        r::AGENTS => "the ones main starts, for the work it hands out.",
-        r::SMALL => "titles and summaries. a small fast model is enough.",
-        r::CLASSIFY => "in auto, decides which commands run and which ask you.",
-        _ => "writes down what you say. enter opens /voice.",
+        r::MAIN => settings::roles_hint_main,
+        r::AGENTS => settings::roles_hint_agents,
+        r::SMALL => settings::roles_hint_small,
+        r::CLASSIFY => settings::roles_hint_checker,
+        _ => settings::roles_hint_voice,
     }
 }
 
@@ -862,26 +859,26 @@ fn auto_mode(o: &Onb) -> bool {
 
 /// What leaves the machine with the checker (design §4.7, the tip's
 /// words).
-const CHECKER_SEES: &str = "the checker sees the command, the script it runs, and your request.";
+const CHECKER_SEES: &str = settings::roles_checker_sees;
 
 /// The dim line under `which provider?`: what the role runs now
 /// (`now: OpenAI · gpt-6-luna · medium`); voice: what the list holds.
 fn now_words(o: &Onb, id: &str) -> String {
     if id == r::VOICE {
-        return "only the providers that can listen. ctrl+r starts, any key stops.".into();
+        return settings::roles_voice_list.into();
     }
     let (m, src) = o.role_model(id);
     let d = dot();
     if id == r::CLASSIFY && m == r::CHECKER_OFF {
-        return format!("now: off {} every command asks you", d);
+        return settings::roles_now_off(d);
     }
     let extra = role_extra(o, id);
     let extra = if extra.is_empty() { extra } else { format!(" {} {}", d, extra) };
     let what = if o.provider_name(&m).is_empty() { m.clone() } else { format!("{} {} {}", o.provider_name(&m), d, short_model(&m)) };
     match src {
-        Source::None => "nothing picked yet.".into(),
-        Source::SameAs(_) | Source::Auto => format!("now: {} {} {}{}", fallback_word(id), d, what, extra),
-        _ => format!("now: {}{}", what, extra),
+        Source::None => settings::roles_nothing.into(),
+        Source::SameAs(_) | Source::Auto => settings::roles_now_rule(fallback_word(id), d, what, extra),
+        _ => settings::roles_now(what, extra),
     }
 }
 
@@ -892,7 +889,7 @@ const LIST_ROWS: usize = 12;
 fn provider_lines(o: &Onb, id: &'static str, w: u16, gap: usize, said: &dyn Fn(&mut Vec<Line<'static>>)) -> Vec<Line<'static>> {
     let pn = o.panel.as_ref().expect("panel");
     let role = r::role(id).expect("role");
-    let mut v = vec![title(format!("{}: which provider?", role.name)), Line::from(s(now_words(o, id), theme::dim()))];
+    let mut v = vec![title(settings::roles_which_provider(role.name)), Line::from(s(now_words(o, id), theme::dim()))];
     if id == r::CLASSIFY {
         v.push(Line::from(s(CHECKER_SEES, theme::dim())));
     }
@@ -904,7 +901,7 @@ fn provider_lines(o: &Onb, id: &'static str, w: u16, gap: usize, said: &dyn Fn(&
         .map(|x| match x {
             PRow::Fallback(_) => fallback_word(id).width(),
             PRow::Provider(p) | PRow::Jev(p, _) => p.name.width(),
-            PRow::More(_) => "more providers…".width(),
+            PRow::More(_) => settings::prov_more.width(),
             PRow::Sep | PRow::Off => 0,
         })
         .max()
@@ -918,21 +915,21 @@ fn provider_lines(o: &Onb, id: &'static str, w: u16, gap: usize, said: &dyn Fn(&
     let now_pid = if o.own(id) { bise_catalog::split_name(&current).map(|(p, _)| p.to_string()) } else { None };
     let from = o.sel.saturating_sub(LIST_ROWS / 2).min(rows.len().saturating_sub(LIST_ROWS));
     if from > 0 {
-        v.push(Line::from(s(format!("  ↑ {} more", from), theme::dim())));
+        v.push(Line::from(s(settings::first_more_up(from), theme::dim())));
     }
     for (k, row) in rows.iter().enumerate().skip(from).take(LIST_ROWS) {
         let mut name: Vec<Span<'static>> = Vec::new();
         match row {
             // a divider, not a row (designer)
             PRow::Sep => {
-                v.push(Line::from(s("  ── or a chat model checks ──", theme::faint())));
+                v.push(Line::from(s(settings::roles_or_chat, theme::faint())));
                 continue;
             }
             PRow::Off => {
-                name.push(s("off", theme::text()));
-                let mut t = format!(" {} every command asks you", d);
+                name.push(s(settings::roles_off, theme::text()));
+                let mut t = settings::roles_every_asks(d);
                 if o.own(id) && current == r::CHECKER_OFF {
-                    t.push_str(&format!(" {} now", d));
+                    t.push_str(&settings::roles_now_mark(d));
                 }
                 name.push(s(t, theme::dim()));
             }
@@ -940,17 +937,17 @@ fn provider_lines(o: &Onb, id: &'static str, w: u16, gap: usize, said: &dyn Fn(&
                 name.push(s(pad(&p.name, nw), theme::text()));
                 if o.ready(p) {
                     name.push(s("✓ ", theme::accent()));
-                    name.push(s("ready", theme::text()));
+                    name.push(s(settings::roles_ready, theme::text()));
                 } else {
-                    name.push(s("not set up", theme::dim()));
+                    name.push(s(settings::prov_not_set_up, theme::dim()));
                 }
                 if o.own(id) && current == *m {
-                    name.push(s(format!(" {} now", d), theme::dim()));
+                    name.push(s(settings::roles_now_mark(d), theme::dim()));
                 }
                 // designer: OpenRouter says it serves Jev; TypeSafe, no tag
                 // (auto is the default and says what it uses)
                 if p.id != "typesafe" {
-                    name.push(s(format!(" {} jev through {}", d, p.name), theme::dim()));
+                    name.push(s(settings::roles_jev_through(d, &p.name), theme::dim()));
                 }
             }
             PRow::Fallback(m) => {
@@ -958,7 +955,7 @@ fn provider_lines(o: &Onb, id: &'static str, w: u16, gap: usize, said: &dyn Fn(&
                 let mut t = format!("{} {} {}", o.provider_name(m), d, short_model(m));
                 // unset: the fallback runs (the checker off is its own row)
                 if !o.own(id) {
-                    t.push_str(&format!(" {} now", d));
+                    t.push_str(&settings::roles_now_mark(d));
                 }
                 name.push(s(t, theme::dim()));
             }
@@ -966,32 +963,32 @@ fn provider_lines(o: &Onb, id: &'static str, w: u16, gap: usize, said: &dyn Fn(&
                 name.push(s(pad(&p.name, nw), theme::text()));
                 let mut notes: Vec<String> = Vec::new();
                 if now_pid.as_deref() == Some(p.id.as_str()) {
-                    notes.push("now".into());
+                    notes.push(settings::roles_note_now.into());
                 }
                 if id == r::VOICE && !o.chats(p) {
-                    notes.push("voice only".into());
+                    notes.push(settings::roles_voice_only.into());
                 }
                 // the other roles on it: one provider, several roles
                 let others: Vec<&str> = o.roles_of(&p.id).iter().filter(|x| x.id != id).map(|x| x.name).collect();
                 let uses = match others.as_slice() {
                     [] => String::new(),
-                    [one] => format!("{} uses it", one),
-                    many => format!("{} use it", many.join(", ")),
+                    [one] => settings::roles_uses(one),
+                    many => settings::roles_use(many.join(", ")),
                 };
                 if p.plan {
                     name.extend(provider::plan_spans(o));
                 } else if p.key_env.is_empty() {
                     // a local server: nothing checked it runs (designer)
-                    name.push(s("no key needed", theme::dim()));
+                    name.push(s(settings::prov_no_key, theme::dim()));
                 } else if o.ready(p) {
                     name.push(s("✓ ", theme::accent()));
-                    name.push(s("ready", theme::text()));
+                    name.push(s(settings::roles_ready, theme::text()));
                 } else {
-                    name.push(s("not set up", theme::dim()));
+                    name.push(s(settings::prov_not_set_up, theme::dim()));
                     // none ready: why this one is preselected (designer)
                     if Some(p.id.as_str()) == rec_voice.as_deref() {
                         name.push(s(format!(" {} ", d), theme::dim()));
-                        name.push(s("recommended", theme::accent()));
+                        name.push(s(settings::roles_recommended, theme::accent()));
                     }
                 }
                 let used: usize = 2 + name.iter().map(|x| x.content.width()).sum::<usize>();
@@ -1002,22 +999,22 @@ fn provider_lines(o: &Onb, id: &'static str, w: u16, gap: usize, said: &dyn Fn(&
                 name.push(s(tail, theme::dim()));
             }
             PRow::More(names) => {
-                name.push(s(pad("more providers…", nw), theme::text()));
+                name.push(s(pad(settings::prov_more, nw), theme::text()));
                 name.push(s(provider::more_words(names), theme::dim()));
             }
         }
         option(&mut v, k == o.sel, name, "", w);
     }
     if from + LIST_ROWS < rows.len() {
-        v.push(Line::from(s(format!("  ↓ {} more", rows.len() - from - LIST_ROWS), theme::dim())));
+        v.push(Line::from(s(settings::first_more_down(rows.len() - from - LIST_ROWS), theme::dim())));
     }
     said(&mut v);
     blanks(&mut v, gap);
     let esc = match &pn.screen {
-        Screen::Pick(_, Back::Close) if id == r::VOICE => "not now",
-        _ => "back",
+        Screen::Pick(_, Back::Close) if id == r::VOICE => settings::roles_not_now,
+        _ => settings::roles_back,
     };
-    v.push(keybar(&format!("↑↓ choose   ⏎ ok   esc {}", esc)));
+    v.push(keybar(&settings::bar_choose_esc(esc)));
     v
 }
 
@@ -1034,13 +1031,13 @@ fn model_lines(
     said: &dyn Fn(&mut Vec<Line<'static>>),
 ) -> Vec<Line<'static>> {
     let role = r::role(id).expect("role");
-    let sub = if id == r::VOICE { "you talk, it types in the composer." } else { "type to filter, or a model id that isn't listed." };
-    let mut v = vec![title(format!("{} {} {}: which model?", role.name, dot(), p.name)), Line::from(s(sub, theme::dim()))];
+    let sub = if id == r::VOICE { settings::roles_voice_sub } else { settings::roles_models_sub };
+    let mut v = vec![title(settings::roles_which_model(role.name, dot(), &p.name)), Line::from(s(sub, theme::dim()))];
     blanks(&mut v, gap);
     // the filter line (designer: like the ctrl+s palette)
     let mut line = vec![s(format!("{} ", theme::glyph(theme::G_YOU)), theme::accent())];
     if f.is_empty() {
-        line.push(s("type to filter", theme::faint()));
+        line.push(s(settings::prov_filter, theme::faint()));
     } else {
         line.push(s(format!("{}▏", f), theme::text()));
     }
@@ -1048,7 +1045,7 @@ fn model_lines(
     blanks(&mut v, 1);
     let rows = o.model_rows(p, f);
     if !f.is_empty() && !rows.iter().any(|x| matches!(x, ModelRow::Listed(_))) && !rows.is_empty() {
-        v.push(Line::from(s("  no listed model matches.", theme::dim())));
+        v.push(Line::from(s(settings::first_model_none, theme::dim())));
     }
     let mw = rows
         .iter()
@@ -1064,17 +1061,17 @@ fn model_lines(
     let own = o.own(id);
     let from = i.saturating_sub(LIST_ROWS / 2).min(rows.len().saturating_sub(LIST_ROWS));
     if from > 0 {
-        v.push(Line::from(s(format!("  ↑ {} more", from), theme::dim())));
+        v.push(Line::from(s(settings::first_more_up(from), theme::dim())));
     }
     for (k, row) in rows.iter().enumerate().skip(from).take(LIST_ROWS) {
         let name = match row {
             ModelRow::Listed(m) => {
                 let mut tags: Vec<String> = Vec::new();
                 if own && *m == current {
-                    tags.push(format!("{} now", theme::glyph(theme::G_DONE)));
+                    tags.push(settings::roles_now_glyph(theme::glyph(theme::G_DONE)));
                 }
                 if rec.as_deref() == Some(m.as_str()) {
-                    tags.push("recommended".into());
+                    tags.push(settings::roles_recommended.into());
                 }
                 let mut n = if tags.is_empty() {
                     vec![s(short_model(m), theme::text())]
@@ -1084,7 +1081,7 @@ fn model_lines(
                 // what pays (designer): the plan, dim, in the right column
                 if p.plan {
                     let used: usize = 2 + n.iter().map(|x| x.content.width()).sum::<usize>();
-                    let pays = "your ChatGPT plan";
+                    let pays = settings::roles_your_plan;
                     let at = (2 + mw + 14).max(used + 3);
                     if at + pays.width() <= w as usize {
                         n.push(s(format!("{}{}", " ".repeat(at - used), pays), theme::dim()));
@@ -1094,9 +1091,11 @@ fn model_lines(
             }
             // designer (BISE-289): '+' accent, the tail when it fits
             ModelRow::Typed(m) => {
-                let mut n = vec![s("+ ", theme::accent()), s(format!("use {}", m), theme::text())];
-                let tail = "   not in my list: i'll try it with one tiny call";
-                if 4 + format!("use {}", m).width() + tail.width() <= w as usize {
+                let used = settings::first_use(m);
+                let tail = settings::first_not_listed;
+                let fits = 4 + used.width() + tail.width() <= w as usize;
+                let mut n = vec![s("+ ", theme::accent()), s(used, theme::text())];
+                if fits {
                     n.push(s(tail, theme::dim()));
                 }
                 n
@@ -1105,13 +1104,13 @@ fn model_lines(
         option(&mut v, k == i, name, "", w);
     }
     if from + LIST_ROWS < rows.len() {
-        v.push(Line::from(s(format!("  ↓ {} more", rows.len() - from - LIST_ROWS), theme::dim())));
+        v.push(Line::from(s(settings::first_more_down(rows.len() - from - LIST_ROWS), theme::dim())));
     }
     if rows.is_empty() {
-        v.push(Line::from(s(format!("  {} has no model listed: type its id.", p.name), theme::dim())));
+        v.push(Line::from(s(settings::roles_no_model(&p.name), theme::dim())));
     }
     said(&mut v);
     blanks(&mut v, gap);
-    v.push(keybar("↑↓ choose   ⏎ ok   esc back"));
+    v.push(keybar(settings::bar_choose_ok));
     v
 }

@@ -348,16 +348,16 @@ impl Onb {
         self.refresh_keys(env);
         match r {
             Err(e) => {
-                self.say(format!("{} couldn't remove it: {}", theme::glyph(theme::G_FAILED), e));
+                self.say(settings::prov_remove_failed(theme::glyph(theme::G_FAILED), e));
                 Sub::Menu(p.clone(), 0)
             }
             Ok(_) => match self.key_state(&p.id).and_then(|k| k.other.clone()) {
                 Some(w) => {
-                    self.say(format!("✓ removed. {} still gives me a key.", w));
+                    self.say(settings::prov_removed_other(w));
                     Sub::Menu(p.clone(), 0)
                 }
                 None => {
-                    self.say(format!("✓ removed the {} key.", p.name));
+                    self.say(settings::prov_removed(&p.name));
                     Sub::List
                 }
             },
@@ -452,7 +452,7 @@ impl Onb {
                             Sub::Works(p, m)
                         }
                         Err(e) => {
-                            self.say(format!("{} couldn't write config.toml: {}", theme::glyph(theme::G_FAILED), e));
+                            self.say(settings::prov_write_failed(theme::glyph(theme::G_FAILED), e));
                             Sub::Model(p, i, f)
                         }
                     },
@@ -486,19 +486,19 @@ impl Onb {
             Some(Item::Paste) => self.paste_for(p, None),
             Some(Item::SignIn) => self.sign_in(Kind::ChatGpt),
             Some(Item::SignOut) => {
-                self.say("signing out…".into());
+                self.say(settings::prov_signing_out.into());
                 self.sign_out();
                 Sub::Menu(p, i)
             }
             Some(Item::Usage) => {
                 let open = self.panel.as_ref().map_or(crate::links::open as fn(&str) -> bool, |pn| pn.opener);
-                self.say(if open(PLAN_USAGE_URL) { format!("opening {}", PLAN_USAGE_URL) } else { format!("could not open {}", PLAN_USAGE_URL) });
+                self.say(if open(PLAN_USAGE_URL) { settings::first_opening(PLAN_USAGE_URL) } else { settings::first_open_failed(PLAN_USAGE_URL) });
                 Sub::Menu(p, i)
             }
             Some(Item::Keys) | Some(Item::Billing) => {
                 let url = if self.items(&p)[i] == Item::Keys { p.keys_url.clone() } else { p.billing_url.clone() };
                 let open = self.panel.as_ref().map_or(crate::links::open as fn(&str) -> bool, |pn| pn.opener);
-                self.say(if open(&url) { format!("opening {}", url) } else { format!("could not open {}", url) });
+                self.say(if open(&url) { settings::first_opening(&url) } else { settings::first_open_failed(&url) });
                 Sub::Menu(p, i)
             }
             Some(Item::Remove) => Sub::Remove(p),
@@ -533,9 +533,9 @@ const NAME_W: usize = 18;
 /// OPENAI_API_KEY", "from ~/.vibe/.env".
 fn from_words(o: &Onb, f: &From) -> String {
     match f {
-        From::AuthFile => "saved in bise".into(),
-        From::Env(n) => format!("from {}", n),
-        From::EnvFile(path, _) => format!("from {}", bise_catalog::auth::tilde(path, Some(o.home.user_home()))),
+        From::AuthFile => settings::prov_saved.into(),
+        From::Env(n) => settings::prov_from(n),
+        From::EnvFile(path, _) => settings::prov_from(bise_catalog::auth::tilde(path, Some(o.home.user_home()))),
     }
 }
 
@@ -547,10 +547,10 @@ fn state_spans(o: &Onb, p: &Provider) -> Vec<Span<'static>> {
     }
     let v = match o.key_state(&p.id).and_then(|k| k.from.clone()) {
         _ if o.setup.catalog.provider(&p.id).is_some_and(|p| !p.key_command().is_empty()) => vec![s(bise_catalog::KEY_COMMAND_STATE, theme::text())],
-        _ if p.key_env.is_empty() => vec![s("✓ ", theme::accent()), s("no key needed", theme::text())],
+        _ if p.key_env.is_empty() => vec![s("✓ ", theme::accent()), s(settings::prov_no_key, theme::text())],
         // the ✓ says ready (designer, BISE-298)
         Some(f) => vec![s("✓ ", theme::accent()), s(from_words(o, &f), theme::text())],
-        None => vec![s("not set up", theme::dim())],
+        None => vec![s(settings::prov_not_set_up, theme::dim())],
     };
     v
 }
@@ -560,7 +560,7 @@ fn state_spans(o: &Onb, p: &Provider) -> Vec<Span<'static>> {
 pub(super) fn plan_spans(o: &Onb) -> Vec<Span<'static>> {
     match &o.plan {
         PlanState::SignedIn(a) => {
-            let mut t = "signed in".to_string();
+            let mut t = settings::prov_signed_in.to_string();
             if !a.email.is_empty() {
                 t.push_str(&format!(" · {}", a.email));
             }
@@ -569,10 +569,10 @@ pub(super) fn plan_spans(o: &Onb) -> Vec<Span<'static>> {
             }
             vec![s("✓ ", theme::accent()), s(t, theme::text())]
         }
-        PlanState::SignedOut => vec![s("signed out", theme::dim())],
-        PlanState::NotSetUp => vec![s("not set up", theme::dim())],
+        PlanState::SignedOut => vec![s(settings::prov_signed_out, theme::dim())],
+        PlanState::NotSetUp => vec![s(settings::prov_not_set_up, theme::dim())],
         // designer: a failure is ▲, never ✗
-        PlanState::Expired => vec![s("▲ ", theme::error()), s("sign-in expired · ⏎ sign in again", theme::text())],
+        PlanState::Expired => vec![s("▲ ", theme::error()), s(settings::prov_expired, theme::text())],
     }
 }
 
@@ -588,9 +588,9 @@ fn role_tags(o: &Onb, p: &Provider) -> String {
 fn roles_line(o: &Onb, p: &Provider) -> String {
     let names: Vec<&str> = o.roles_of(&p.id).iter().map(|r| r.name).collect();
     match names.as_slice() {
-        [] => "no role uses it yet. /models picks one.".into(),
-        [one] => format!("{} uses it. /models changes that.", one),
-        [rest @ .., last] => format!("{} and {} use it. /models changes that.", rest.join(", "), last),
+        [] => settings::prov_no_role.into(),
+        [one] => settings::prov_role_one(one),
+        [rest @ .., last] => settings::prov_role_more(rest.join(", "), last),
     }
 }
 
@@ -607,7 +607,7 @@ fn pad(t: &str, w: usize) -> String {
 pub(super) fn more_words(names: &[String]) -> String {
     match names.len() {
         0..=3 => names.join(", "),
-        n => format!("{} and {} more", names[..3].join(", "), n - 3),
+        n => settings::prov_more_names(names[..3].join(", "), n - 3),
     }
 }
 
@@ -622,17 +622,19 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
     let said = |v: &mut Vec<Line<'static>>| {
         if let Some(t) = &pn.said {
             v.push(Line::raw(""));
-            let c = if t.starts_with('✓') || t.starts_with("opening") || t.starts_with("signing") { theme::text() } else { theme::error() };
+            // a done or under-way line is text, the rest an error (its ▲ or ✗ words)
+            let opening = settings::first_opening("");
+            let c = if t.starts_with('✓') || t.starts_with(opening.trim_end()) || *t == settings::prov_signing_out { theme::text() } else { theme::error() };
             v.push(Line::from(s(t.clone(), c)));
         }
     };
     Some(match &o.sub {
         Sub::List => {
-            let mut v = vec![title("providers"), dim("the keys i can use. enter sets one up or changes it.".into())];
+            let mut v = vec![title(settings::prov_title), dim(settings::prov_sub.into())];
             blanks(&mut v, gap);
             let mut line = vec![s("› ", theme::accent())];
             if pn.filter.is_empty() {
-                line.push(s("type to filter", theme::faint()));
+                line.push(s(settings::prov_filter, theme::faint()));
             } else {
                 line.push(s(format!("{}▏", pn.filter), theme::text()));
             }
@@ -640,11 +642,11 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
             blanks(&mut v, 1);
             let rows = o.rows();
             if rows.is_empty() {
-                v.push(dim("  no provider matches.".into()));
+                v.push(dim(settings::prov_none.into()));
             }
             let from = o.sel.saturating_sub(LIST_ROWS / 2).min(rows.len().saturating_sub(LIST_ROWS));
             if from > 0 {
-                v.push(dim(format!("  ↑ {} more", from)));
+                v.push(dim(settings::first_more_up(from)));
             }
             // the roles in one column, after the widest state (designer)
             let sw = rows
@@ -669,7 +671,7 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
             for (k, r) in rows.iter().enumerate().skip(from).take(LIST_ROWS) {
                 let mut name = match r {
                     Row::P(p) => vec![s(pad(&p.name, NAME_W), theme::text())],
-                    Row::More(_) => vec![s(pad("more providers…", NAME_W), theme::text())],
+                    Row::More(_) => vec![s(pad(settings::prov_more, NAME_W), theme::text())],
                 };
                 let mut under = String::new();
                 match r {
@@ -698,17 +700,17 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
                 }
             }
             if from + LIST_ROWS < rows.len() {
-                v.push(dim(format!("  ↓ {} more", rows.len() - from - LIST_ROWS)));
+                v.push(dim(settings::first_more_down(rows.len() - from - LIST_ROWS)));
             }
             said(&mut v);
             // designer m_13193: where the keys are, and the one step to the
             // keychain (macOS, while they are in files)
             if cfg!(target_os = "macos") && crate::keychain::now() == bise_secrets::Store::File {
                 blanks(&mut v, 1);
-                v.push(dim("keys are kept in files in ~/.bise · /keychain keeps them in the macOS keychain".into()));
+                v.push(dim(settings::prov_keychain.into()));
             }
             blanks(&mut v, gap);
-            v.push(keybar("↑↓ choose   ⏎ open   esc back"));
+            v.push(keybar(settings::bar_choose_open));
             v
         }
         Sub::Menu(p, i) => {
@@ -717,16 +719,16 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
             let head = match ks.and_then(|k| k.from.clone()) {
                 _ if p.plan => plan_spans(o).iter().map(|x| x.content.to_string()).collect(),
                 _ if o.setup.catalog.provider(&p.id).is_some_and(|p| !p.key_command().is_empty()) => bise_catalog::KEY_COMMAND_STATE.to_string(),
-                _ if p.key_env.is_empty() => "✓ no key needed".to_string(),
-                Some(f) => format!("✓ ready · {}", from_words(o, &f)),
-                None => "not set up".to_string(),
+                _ if p.key_env.is_empty() => settings::prov_no_key_mark.to_string(),
+                Some(f) => settings::prov_ready(from_words(o, &f)),
+                None => settings::prov_not_set_up.to_string(),
             };
             v.push(dim(head));
             if let Some(k) = ks.filter(|k| !k.saved && k.from.is_some()) {
                 if let Some(n) = &k.other {
                     // the origin is on the line above (designer)
                     let _ = n;
-                    v.push(dim("change it where you set it, or paste one here.".into()));
+                    v.push(dim(settings::prov_change_there.into()));
                 }
             }
             // BISE-301: who uses it; the roles are picked on /models
@@ -740,13 +742,13 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
                         "{} · {}",
                         n,
                         match it {
-                            Item::Paste => "paste a new key",
-                            Item::Keys => "open the keys page",
-                            Item::Billing => "open billing",
-                            Item::Remove => "remove the key",
-                            Item::SignIn => "sign in again or switch account",
-                            Item::SignOut => "sign out",
-                            Item::Usage => "your plan's usage on chatgpt.com ↗",
+                            Item::Paste => settings::prov_item_paste,
+                            Item::Keys => settings::prov_item_keys,
+                            Item::Billing => settings::prov_item_billing,
+                            Item::Remove => settings::prov_item_remove,
+                            Item::SignIn => settings::prov_item_sign_in,
+                            Item::SignOut => settings::prov_item_sign_out,
+                            Item::Usage => settings::prov_item_usage,
                         }
                     ),
                     theme::text(),
@@ -755,50 +757,50 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
             }
             said(&mut v);
             blanks(&mut v, gap);
-            v.push(keybar(if items.is_empty() { "esc back" } else { "↑↓ choose   ⏎ ok   esc back" }));
+            v.push(keybar(if items.is_empty() { settings::bar_back } else { settings::bar_choose_ok }));
             v
         }
         Sub::Remove(p) => {
             // BISE-298: the roles that stop without it, by name
             let roles: Vec<&str> = o.roles_of(&p.id).iter().map(|r| r.name).collect();
             let stop = match roles.as_slice() {
-                [] => format!("agents on {} models stop until you add one again.", p.name),
-                [one] => format!("{} uses {}. without the key it stops.", one, p.name),
-                [rest @ .., last] => format!("{} and {} use {}. without the key they stop.", rest.join(", "), last, p.name),
+                [] => settings::prov_stop_none(&p.name),
+                [one] => settings::prov_stop_one(one, &p.name),
+                [rest @ .., last] => settings::prov_stop_more(rest.join(", "), last, &p.name),
             };
-            let mut v = vec![title(format!("remove the {} key saved in bise?", p.name)), dim(stop)];
+            let mut v = vec![title(settings::prov_remove_ask(&p.name)), dim(stop)];
             if let Some(n) = o.key_state(&p.id).and_then(|k| k.other.clone()) {
-                v.push(dim(format!("{} still gives me a key.", n)));
+                v.push(dim(settings::prov_still_gives(n)));
             }
             blanks(&mut v, gap);
-            v.push(keybar("⏎ remove   esc keep it"));
+            v.push(keybar(settings::bar_remove));
             v
         }
         // the plan signed in from here: who, and where its roles are picked
         Sub::Works(p, _) if p.plan => {
             let mut v = match &o.plan {
                 PlanState::SignedIn(a) => super::signed_in(a),
-                _ => vec![title("ChatGPT answered.")],
+                _ => vec![title(settings::prov_chatgpt_answered)],
             };
-            v.push(dim("your ChatGPT plan is ready. /models picks the roles it runs.".into()));
+            v.push(dim(settings::prov_plan_ready.into()));
             blanks(&mut v, gap);
-            v.push(super::keybar("⏎ ok"));
+            v.push(super::keybar(settings::bar_ok));
             v
         }
         Sub::Works(p, m) => {
-            let mut v = vec![title(format!("it works: {} answered.", short_model(m)))];
+            let mut v = vec![title(settings::first_works(short_model(m)))];
             if pn.wanted.as_ref().is_some_and(|(w, _)| w == m) {
-                v.push(dim(format!("{} is ready. enter switches to {}.", p.name, short_model(m))));
+                v.push(dim(settings::prov_switches(&p.name, short_model(m))));
             } else if pn.save_model || p.key_env.is_empty() {
-                v.push(dim(format!("main's default model is now {}.", m)));
+                v.push(dim(settings::prov_default_now(m)));
             } else {
-                v.push(dim(format!("{} is ready. agents use the key from their next message.", p.name)));
+                v.push(dim(settings::prov_key_ready(&p.name)));
             }
             if let Some(n) = &o.shadows {
-                v.push(dim(format!("{} in your environment holds another key: i use this one.", n)));
+                v.push(dim(settings::first_shadows(n)));
             }
             blanks(&mut v, gap);
-            v.push(keybar("⏎ ok"));
+            v.push(keybar(settings::bar_ok));
             v
         }
         _ => return None,

@@ -10,6 +10,7 @@
 //! - [`pump`] also says once per server and per TUI run, when a session
 //!   found that one needs a login: `linear needs a login: /plugins login`.
 
+use bise_proto::words::settings;
 use std::path::Path;
 
 /// The plugins of `workspace` as rows (the desktop's `plugins` event, P.1):
@@ -157,11 +158,11 @@ fn login(workspace: &Path, name: &str) -> String {
     {
         let mut r = RUNNING.lock().unwrap_or_else(|e| e.into_inner());
         if r.contains(&t.name) {
-            return format!("the login to {} is still open in your browser", t.name);
+            return settings::plugins_login_open(&t.name);
         }
         r.push(t.name.clone());
     }
-    let first = format!("opening your browser to log in to {}…", t.name);
+    let first = settings::plugins_login_opening(&t.name);
     std::thread::spawn(move || {
         let (secrets, sd) = (bend_plugins::oauth::store_dir(), bend_plugins::status::dir());
         let name = t.name.clone();
@@ -212,7 +213,7 @@ pub(crate) fn pending_lines(workspace: &Path) -> Vec<String> {
         let needs = bend_plugins::status::read(&sd, &t.plugin, &t.server.id).is_some_and(|s| s.login);
         if needs && !w.said.contains(&t.name) && !running.contains(&t.name) {
             w.said.push(t.name.clone());
-            out.push(format!("{} needs a login: /plugins login", t.name));
+            out.push(settings::plugins_needs_login(&t.name));
         } else if !needs {
             // logged in since: a later 401 is said again
             w.said.retain(|n| *n != t.name);
@@ -244,21 +245,20 @@ pub(crate) fn command(typed: &str, workspace: &Path) -> String {
             let (secrets, sd) = (bend_plugins::oauth::store_dir(), bend_plugins::status::dir());
             let ts = bend_plugins::login::targets(workspace);
             if ts.is_empty() {
-                return "no remote MCP server that logs in (one without an Authorization header in its mcp.json)".into();
+                return settings::plugins_no_login.into();
             }
             let rows: Vec<String> = ts.iter().map(|t| format!("  {}   {}", t.name, bend_plugins::login::state(t, &secrets, &sd))).collect();
             format!("/plugins {} NAME:\n{}", sub, rows.join("\n"))
         }
         (Some("logout"), Some(name)) => match logout(workspace, name) {
-            Ok(n) => format!("logged out of {n}."),
+            Ok(n) => settings::plugins_logged_out(n),
             Err(e) => e,
         },
         (Some(sub @ ("enable" | "disable")), Some(name)) => match set(name, sub == "enable") {
-            Ok(changed) => format!(
-                "{} {}{} — applies at the next /reload",
+            Ok(changed) => settings::plugins_set(
                 name,
-                if sub == "enable" { "enabled" } else { "disabled" },
-                if changed { "" } else { " (unchanged)" }
+                if sub == "enable" { settings::plugins_enabled } else { settings::plugins_disabled },
+                if changed { "" } else { settings::plugins_unchanged },
             ),
             Err(e) => e,
         },
@@ -266,7 +266,7 @@ pub(crate) fn command(typed: &str, workspace: &Path) -> String {
             let text = bend_plugins::cli::listing(workspace);
             format!("plugins ({})\n{}", workspace.display(), text.trim_end())
         }
-        _ => "usage: /plugins [list] | /plugins enable NAME | /plugins disable NAME | /plugins login [NAME] | /plugins logout NAME".into(),
+        _ => settings::plugins_usage.into(),
     }
 }
 
