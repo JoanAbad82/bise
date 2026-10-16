@@ -38,8 +38,11 @@ FULL = open(os.path.join(ROOT, "prompts", "tool-desc-run-typescript.txt")).read(
 # docs rows, measured from their plugin.json: +546 for each. Then
 # notif-rename (architect m_24654: raise by the measured delta): 'card'
 # became 'notification' in the words every agent reads, +8 for a task (the
-# sb page row) and +154 for main, measured on main_role_desktop.txt
-TASK_BUDGET = 27000 + 2044 + 546 + 8
+# sb page row) and +154 for main, measured on main_role_desktop.txt.
+# Then card-links (5bf91107c, sb notify --artifact): the bise-pages skill
+# and blocks.md lines a task reads, +119 for a task (29717, measured on
+# 645685421), rounded to +120; main stays under its budget
+TASK_BUDGET = 27000 + 2044 + 546 + 8 + 120
 MAIN_BUDGET = 38500 + 2184 + 229 + 34 + 216 + 548 + 327 + 154 + 546 + 154
 fails = []
 
