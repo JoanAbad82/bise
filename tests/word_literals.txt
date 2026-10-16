@@ -60,7 +60,6 @@
 1 tests/tui_file_links_tmux.py
 1 tests/tui_inbox_split_tmux.py
 1 tests/tui_links_tmux.py
-2 tests/tui_notif_open_tmux.py
 4 tests/tui_onboarding_tmux.py
 1 tests/tui_openai_responses_tmux.py
 1 tests/tui_page_answer_tmux.py

@@ -14,6 +14,7 @@
 // and tests/tmux/card_draft_keep.sh. Owner: amb-home.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common } from '../../../src/proto/words_common.gen';
 import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
@@ -86,7 +87,7 @@ test('inbox/new-card-mid-answer: a new card never takes the card he answers nor 
       // 4 wait: card 9 open, the rows that fit (fitRows: 1 or 2 more at 760, as the composer and
       // head measure) and '+ N more' for the rest, never one lost or counted twice (land-reds:
       // '+ 2 more' was one fit)
-      await expect(page.getByTestId('inbox.block')).toContainText('4 waiting');
+      await expect(page.getByTestId('inbox.block')).toContainText(common.count_waiting({ n: 4 }));
       await expect
         .poll(async () => {
           const shown = await page.locator('[data-testid^="inbox.block.row."]').count();
