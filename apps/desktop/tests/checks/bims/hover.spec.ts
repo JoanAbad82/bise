@@ -12,6 +12,8 @@
 import { test, expect } from '../../harness';
 import type { Session } from '../../harness';
 import { office } from '../../../src/bims/fixtures';
+import { bims } from '../../../src/proto/words_bims.gen';
+import { thread } from '../../../src/proto/words_thread.gen';
 import { Recorder, type Box } from '../../harness';
 import { PNG } from 'pngjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -71,7 +73,7 @@ test('(a) closed by default; the title icon opens and closes the office, the ope
     await expect(s.page.getByTestId('app.right.bims')).toHaveCount(0);
     const icon = s.page.getByTestId('app.title.bims');
     await expect(icon).toHaveAttribute('aria-pressed', 'false');
-    await expect(icon).toHaveAttribute('aria-label', 'bims: your agents in their office');
+    await expect(icon).toHaveAttribute('aria-label', bims.title_bims_tip);
     await shot(s, 'hover-a-closed.png', 'a fresh window: the office closed', "the title bar's bims icon (the little house) beside the right bar's toggle, not pressed; AGENTS shows its rows", 'app.title');
     // the chunk once, so the timing below is the open's own (the first open loads three)
     await icon.click();
@@ -161,7 +163,7 @@ test('(c) an agent opened: the office follows its bim; a pill out of frame stays
     await s.page.getByTestId('app.title.back').click();
     await expect.poll(() => zoomed(s), { timeout: 3000 }).toBe(false);
     await settle(s, 800, 6000);
-    await shot(s, 'hover-c-main.png', "main's thread", 'the whole office again');
+    await shot(s, 'hover-c-main.png', thread.from_thread({ name: 'main' }), 'the whole office again');
   } finally {
     await s.close();
   }
@@ -212,7 +214,7 @@ for (const theme of ['light', 'dark'] as const) {
         await shot(s, `hover-e-open-${tag}.png`, `the icon open, ${theme}, ${String(width)} px`, 'pressed in ink like the right bar toggle (never pink); the office above the rows', 'app.title');
         await icon.hover();
         await sleep(700);
-        await shot(s, `hover-e-hover-${tag}.png`, `the icon hovered, ${theme}, ${String(width)} px`, "ink, and its tip 'bims: your agents in their office'", 'app.title');
+        await shot(s, `hover-e-hover-${tag}.png`, `the icon hovered, ${theme}, ${String(width)} px`, `ink, and its tip '${bims.title_bims_tip}'`, 'app.title');
       } finally {
         await s.close();
       }
