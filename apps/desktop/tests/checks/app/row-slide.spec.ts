@@ -112,8 +112,10 @@ test('app/row-slide: the hovered row slides its now line left over time; on leav
     expect(mid?.x ?? 0, `moved left by 600 ms: ${say}`).toBeLessThan(-6);
     expect(end, `further left by the end: ${say}`).toBeLessThan((mid?.x ?? 0) - 4);
     expect(hovered.every((f, i) => f.x <= (hovered[i - 1]?.x ?? 0) + 0.01), `never right while hovered: ${say}`).toBe(true);
-    // left: never further left than where it was, at 0 within 200 ms, still after
-    expect(left.every((f) => f.x >= end - 0.01), `never further left after the leave: ${say}`).toBe(true);
+    // left: from the leave on, never a frame further left than the one before, at 0 within 200 ms,
+    // still after. Not 'never left of the last hovered frame read': the line slides on between that
+    // read and the leave (longer under load: one frame 'further left' red in test:land, land-reds)
+    expect(left.every((f, i) => f.x >= (left[i - 1]?.x ?? -Infinity) - 0.01), `never further left after the leave: ${say}`).toBe(true);
     const home = left.filter((f) => f.t >= 200);
     expect(home.length, 'frames after 200 ms').toBeGreaterThan(5);
     expect(home.every((f) => Math.abs(f.x) < 0.5), `home within 200 ms and still: ${say}`).toBe(true);
