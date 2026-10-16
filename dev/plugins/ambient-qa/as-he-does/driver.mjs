@@ -1207,6 +1207,7 @@ if (mode === 'quick') {
     // main's next request, the quote's included); the bims office first: it seeds nothing, and the
     // seeds below can take the 600 s watchdog before a late row (desk-cut-8's cand-d3d8b)
     await rowsD3D8(harness, say);
+    await rows42D1(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
     await rowsE812(harness, say);
@@ -1222,6 +1223,7 @@ if (mode === 'quick') {
     await rowsC2BA(harness, say);
     await rowsDC47(harness, say);
     await rowsD3D8(harness, say);
+    await rows42D1(harness, say);
     await quickRows(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
@@ -3875,7 +3877,10 @@ async function rowsD3D8(harness, say) {
   if (!wanted(name)) return;
   try {
     await harness();
-    const view = page.locator('[data-testid="app.right.agents.view.bims"]').first();
+    // the office's toggle: the head's 'bims' pill until 42d13ed57, the title bar's cube icon after it
+    // (closed by default; desk-cut-9 m_28268)
+    const pill = page.locator('[data-testid="app.right.agents.view.bims"]').first();
+    const view = (await pill.count()) > 0 ? pill : page.locator('[data-testid="app.title.bims"]').first();
     const was = await view.getAttribute('aria-pressed', { timeout: 5000 }).catch(() => null);
     if (was !== 'true' && !(await click('bims on', view))) return;
     const tipNow = () => page.locator('[data-testid="app.right.bims.level"]').first().getAttribute('data-tip', { timeout: 1000 }).catch(() => null);
@@ -3909,6 +3914,56 @@ async function rowsD3D8(harness, say) {
       drawn && lost === 0 && level !== null && stage !== null && level >= stage && level > 0,
       { seeded, drawn, lost, tip, level, jobs, stage, w: Math.round(box?.width ?? 0), h: Math.round(box?.height ?? 0) });
   } catch (e) { step(name, false, String(e).slice(0, 300)); }
+}
+
+// 42d13ed57's cut (desk-cut-9, main m_28268): the office opens and closes from the title bar's cube
+// icon (pressed while it shows), and the composer is pink on a sub-agent's thread, plain on main's
+// (fe7455e29). Runs after rowsD3D8 (its seeded agents give harness AGENTS rows); the office is put
+// back as it was.
+async function rows42D1(harness, say) {
+  const row = async (name, fn) => {
+    if (!wanted(name)) return;
+    try { await fn(name); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const shownOf = () => page.locator('[data-testid="app.right.bims"]').first().getAttribute('data-shown', { timeout: 1000 }).catch(() => null);
+  await row('bims title icon', async (name) => {
+    await harness();
+    const icon = page.locator('[data-testid="app.title.bims"]').first();
+    // rowsD3D8 just closed it: the office stays mounted (data-shown) through its fade, under 800 ms
+    // (Fold.tsx; cand-42d1b read 'pressed false, shown true' mid-close)
+    await page.waitForTimeout(1500);
+    const was = await icon.getAttribute('aria-pressed', { timeout: 5000 }).catch(() => null);
+    const states = [{ pressed: was, shown: await shownOf() }];
+    for (let i = 0; i < 2; i++) {
+      if (!(await click(`bims icon ${i}`, icon))) return;
+      await page.waitForTimeout(1200);
+      states.push({ pressed: await icon.getAttribute('aria-pressed').catch(() => null), shown: await shownOf() });
+      if (i === 0) await shot('42d1-bims-icon-toggled');
+    }
+    const on = (s) => s.pressed === 'true' && s.shown === 'true';
+    const off = (s) => s.pressed !== 'true' && s.shown !== 'true';
+    const flips = states.every((s) => on(s) || off(s)) && on(states[1]) !== on(states[0]) && on(states[2]) === on(states[0]);
+    step(`${name}: the title bar's cube opens and closes the office, pressed while it shows, and twice puts it back`, flips, states);
+  });
+  await row('composer pink to a sub-agent', async (name) => {
+    await harness();
+    const box = page.locator('[data-testid="composer.box"]:visible').first();
+    const pinkNow = async () => (await box.getAttribute('data-answering', { timeout: 3000 }).catch(() => null)) === 'true';
+    const mainPink = await pinkNow();
+    const more = page.locator('[data-testid="app.right.agents.more"]').first();
+    if (/^\+ \d+ more$/.test(((await more.textContent({ timeout: 500 }).catch(() => '')) ?? '').trim())) await more.click({ timeout: 2000 }).catch(() => {});
+    const id = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.right.agent."]')]
+      .map((e) => e.getAttribute('data-testid') ?? '').find((t) => /^app\.right\.agent\.[^.]+$/.test(t) && t !== 'app.right.agent.main') ?? null).catch(() => null);
+    if (id === null) { step(name, false, 'no sub-agent row in harness'); return; }
+    if (!(await click(`open ${id}`, page.locator(`[data-testid="${id}"]`).first()))) return;
+    const subPink = await until(async () => ((await pinkNow()) ? true : null), 8000, 500) === true;
+    const tip = await page.locator('[data-testid="composer.tab"]:visible').first().getAttribute('data-tip', { timeout: 1000 }).catch(() => null);
+    await shot('42d1-composer-pink');
+    await harness();
+    await page.waitForTimeout(1500);
+    const backPlain = !(await pinkNow());
+    step(`${name}: main's composer plain, a sub-agent's thread pink with its tip, main's plain again`, !mainPink && subPink && backPlain, { id, mainPink, subPink, tip, backPlain });
+  });
 }
 
 // dc4770c14's cut (desk-cut-4 m_26522): one row per new item since 3ce74eb9a. Nothing here reaches
