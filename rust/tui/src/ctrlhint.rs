@@ -224,10 +224,10 @@ pub(crate) fn pairs(app: &App) -> Vec<Pair> {
 /// The ctrl keys (ctrl+f, ctrl+s: cmd+f, cmd+k are cmd's hints).
 fn ctrl_pairs(app: &App) -> Vec<Pair> {
     let mut p: Vec<Pair> = Vec::new();
-    p.push(if app.pending && !app.interrupt_requested { ("ctrl+c", "interrupt") } else { ("ctrl+c", "quit") });
+    p.push(if app.pending && !app.interrupt_requested { ("ctrl+c", bise_proto::words::composer::bar_interrupt) } else { ("ctrl+c", bise_proto::words::composer::bar_quit) });
     // BISE-297: the find box has the keys (find.rs `on_key`)
     if app.find.is_some() {
-        p.extend([("ctrl+f", "older"), ("ctrl+w", "delete a word"), ("ctrl+u", "clear")]);
+        p.extend([("ctrl+f", bise_proto::words::composer::bar_older), ("ctrl+w", bise_proto::words::composer::bar_delete_word), ("ctrl+u", bise_proto::words::composer::bar_clear)]);
         return p;
     }
     if let Some(w) = fold_word(app) {
@@ -235,41 +235,41 @@ fn ctrl_pairs(app: &App) -> Vec<Pair> {
     }
     // BISE-237: find in the history
     if !app.events.is_empty() {
-        p.push(("ctrl+f", "find"));
+        p.push(("ctrl+f", bise_proto::words::composer::bar_find));
     }
     let v = crate::sb::ctrl_view(app);
     if v.cards > 0 {
         // BISE-302: ctrl+N opens inbox row N (from the thread and the
         // card view); the rest in the card view
         if app.ctrl_digits {
-            p.push((open_keys(crate::sb::strip_rows(app)), "open an inbox item"));
+            p.push((open_keys(crate::sb::strip_rows(app)), bise_proto::words::composer::bar_open_item));
         }
         if v.card_open {
             if v.cards > 1 {
-                p.push(("ctrl+n/p", "next item"));
+                p.push(("ctrl+n/p", bise_proto::words::composer::bar_next_item));
             }
-            p.push(("ctrl+x", "close without answering"));
+            p.push(("ctrl+x", bise_proto::words::composer::bar_close_unanswered));
         }
     }
     // BISE-265: the agent palette
     if crate::sb::palette::has_agents(app) {
-        p.push(("ctrl+s", "find agent"));
+        p.push(("ctrl+s", bise_proto::words::composer::bar_find_agent));
     }
     // voice (designer): dictation when it is on; voice mode always (two
     // ctrl+r open it with dictation off too). Before the generic keys
     // below: a full line drops those first
     if app.voice.enabled {
-        p.push(("ctrl+r", "dictate"));
+        p.push(("ctrl+r", bise_proto::words::composer::bar_dictate));
     }
-    p.push(("ctrl+r twice", "voice mode"));
+    p.push(("ctrl+r twice", bise_proto::words::composer::bar_voice_mode));
     // a code block on screen: ctrl+y copies it (codeblock.rs)
     if crate::codeblock::any_on_screen(app) {
-        p.push(("ctrl+y", "copy code"));
+        p.push(("ctrl+y", bise_proto::words::composer::bar_copy_code));
     }
-    p.push(("ctrl+v", "paste image"));
-    p.push(("ctrl+j", "newline"));
-    p.push(("ctrl+`", "terminal"));
-    p.push(("ctrl+l", "clear"));
+    p.push(("ctrl+v", bise_proto::words::composer::bar_paste_image));
+    p.push(("ctrl+j", bise_proto::words::composer::bar_newline));
+    p.push(("ctrl+`", bise_proto::words::composer::bar_terminal));
+    p.push(("ctrl+l", bise_proto::words::composer::bar_clear));
     p
 }
 
@@ -283,22 +283,22 @@ pub(crate) fn open_keys(rows: usize) -> &'static str {
 fn alt_pairs(app: &App) -> Vec<Pair> {
     let mut p: Vec<Pair> = Vec::new();
     if app.find.is_some() {
-        p.push(("⌥⌫", "delete a word"));
+        p.push(("⌥⌫", bise_proto::words::composer::bar_delete_word));
         return p;
     }
     let v = crate::sb::ctrl_view(app);
     let empty = app.ed.text.is_empty();
     if v.agents > 1 {
-        p.push(("⌥0-9", "go to an agent"));
+        p.push(("⌥0-9", bise_proto::words::composer::bar_go_to_agent));
         if empty {
-            p.push(("⌥↑↓", "select an agent"));
+            p.push(("⌥↑↓", bise_proto::words::composer::bar_select_agent));
         }
     }
     if !empty {
-        p.push(("⌥←→", "word"));
-        p.push(("⌥⌫", "delete a word"));
+        p.push(("⌥←→", bise_proto::words::composer::bar_word));
+        p.push(("⌥⌫", bise_proto::words::composer::bar_delete_word));
     }
-    p.push(("⌥⏎", "newline"));
+    p.push(("⌥⏎", bise_proto::words::composer::bar_newline));
     p
 }
 
@@ -307,37 +307,37 @@ fn alt_pairs(app: &App) -> Vec<Pair> {
 fn cmd_pairs(app: &App) -> Vec<Pair> {
     let mut p: Vec<Pair> = Vec::new();
     if app.find.is_some() {
-        p.push(("cmd+f", "older"));
+        p.push(("cmd+f", bise_proto::words::composer::bar_older));
         return p;
     }
     let empty = app.ed.text.is_empty();
     if crate::sb::palette::has_agents(app) {
-        p.push(("cmd+k", "find agent"));
+        p.push(("cmd+k", bise_proto::words::composer::bar_find_agent));
     }
     if !app.events.is_empty() {
-        p.push(("cmd+f", "find"));
+        p.push(("cmd+f", bise_proto::words::composer::bar_find));
     }
     if app.ed.anchor.is_some() && app.ed.selected_text().is_some() {
-        p.push(("cmd+c", "copy"));
-        p.push(("cmd+x", "cut"));
+        p.push(("cmd+c", bise_proto::words::composer::bar_copy));
+        p.push(("cmd+x", bise_proto::words::composer::bar_cut));
     } else if app.feed_sel.is_some() {
-        p.push(("cmd+c", "copy"));
+        p.push(("cmd+c", bise_proto::words::composer::bar_copy));
     }
     if !empty {
-        p.push(("cmd+a", "select all"));
-        p.push(("cmd+←→", "line start/end"));
-        p.push(("cmd+⌫", "delete to line start"));
+        p.push(("cmd+a", bise_proto::words::composer::bar_select_all));
+        p.push(("cmd+←→", bise_proto::words::composer::bar_line_ends));
+        p.push(("cmd+⌫", bise_proto::words::composer::bar_delete_to_start));
     }
-    p.push(("cmd+v", "paste"));
+    p.push(("cmd+v", bise_proto::words::composer::bar_paste));
     p
 }
 
 /// What ctrl+o does now: open everything closed, else close what is open.
 fn fold_word(app: &App) -> Option<&'static str> {
     if crate::feed::anything_closed(&app.events) {
-        Some("expand")
+        Some(bise_proto::words::composer::bar_expand)
     } else if (0..app.events.len()).any(|i| crate::feed::is_open_at(&app.events, i)) {
-        Some("collapse")
+        Some(bise_proto::words::composer::bar_collapse)
     } else {
         None
     }
@@ -403,8 +403,8 @@ pub(crate) fn draw(app: &App, buf: &mut Buffer) {
     match held(app) {
         Some(Held::Ctrl) if app.find.is_some() => {}
         Some(Held::Ctrl) => folds(app, buf),
-        Some(Held::Alt) if empty => panel(app, buf, ("⌥↑↓", "select")),
-        Some(Held::Cmd) => panel(app, buf, ("cmd+k", "find")),
+        Some(Held::Alt) if empty => panel(app, buf, ("⌥↑↓", bise_proto::words::composer::bar_select)),
+        Some(Held::Cmd) => panel(app, buf, ("cmd+k", bise_proto::words::composer::bar_find)),
         _ => {}
     }
 }
@@ -413,7 +413,7 @@ pub(crate) fn draw(app: &App, buf: &mut Buffer) {
 /// mark gets the hint in the blank cells after its row's text.
 fn folds(app: &App, buf: &mut Buffer) {
     let Some(word) = fold_word(app) else { return };
-    let (mark, want_open) = if word == "expand" { (theme::G_CLOSED, false) } else { (theme::G_OPEN, true) };
+    let (mark, want_open) = if word == bise_proto::words::composer::bar_expand { (theme::G_CLOSED, false) } else { (theme::G_OPEN, true) };
     let x0 = app.feed_x;
     let x1 = (x0 as usize + app.area_w).min(buf.area.right() as usize) as u16;
     let mut last: Option<usize> = None;

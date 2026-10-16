@@ -11,6 +11,7 @@
 //! accent anywhere. It sends nothing and decides nothing.
 
 use crate::app::App;
+use bise_proto::words::composer;
 use crate::theme::{chip_bg, dim, faint, glyph, rule, text, G_YOU};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -71,7 +72,7 @@ pub(crate) fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
 /// head's `u undo` takes a click (sb/queued.rs `click`) with the hand.
 pub(crate) fn placed(app: &mut App, r: ratatui::layout::Rect) {
     crate::textlayer::text(r);
-    let at = app.sb.undo_shown().then(|| ratatui::layout::Rect { x: r.x + UNDO_X, y: r.y, width: UNDO.width() as u16, height: 1 }.intersection(r));
+    let at = app.sb.undo_shown().then(|| ratatui::layout::Rect { x: r.x + UNDO_X, y: r.y, width: undo_words().width() as u16, height: 1 }.intersection(r));
     app.sb.queue.undo_at = at;
     if let Some(u) = at {
         crate::pointer::region(u, crate::pointer::Shape::Pointer);
@@ -80,7 +81,9 @@ pub(crate) fn placed(app: &mut App, r: ratatui::layout::Rect) {
 
 /// The head's undo words, and their column in the drawer: after
 /// `╭─ deleted · `.
-const UNDO: &str = "u undo";
+fn undo_words() -> String {
+    format!("u {}", composer::queue_undo)
+}
 const UNDO_X: u16 = 13;
 
 /// The head's words: 'queued · sent when perf's turn ends' ('2 queued ·
@@ -88,14 +91,14 @@ const UNDO_X: u16 = 13;
 /// (designer: no second phrasing); 'deleted · u undo' for 4 s.
 fn head(v: &View, room: usize) -> String {
     if v.deleted {
-        return format!("deleted · {UNDO}");
+        return format!("{} · {}", composer::queue_deleted, undo_words());
     }
     let n = v.rows.len();
-    let count = if n > 1 { format!("{n} queued") } else { "queued".into() };
-    [format!("{count} · sent when {}'s turn ends", v.who), count]
+    let count = if n > 1 { composer::queue_count(n) } else { composer::queue_queued.into() };
+    [composer::queue_when(&count, &v.who), count]
         .into_iter()
         .find(|h| h.width() <= room)
-        .unwrap_or_else(|| cut(&format!("{n} queued"), room))
+        .unwrap_or_else(|| cut(&composer::queue_count(n), room))
 }
 
 /// The first row shown: the oldest, or so the focused row shows.

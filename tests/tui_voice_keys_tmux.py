@@ -13,10 +13,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, tmux, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 CTRL_DOWN = "\x1b[57442;5u"
 CTRL_UP = "\x1b[57442;1:3u"
-HINT = "ctrl+c quit"
+HINT = "ctrl+c " + w("composer.bar_quit")
+QUEUE = "tab %s   ⏎ %s" % (w("composer.bar_queue"), w("composer.bar_steer"))
+INTERRUPT = "ctrl+c " + w("composer.bar_interrupt")
+BACK = "esc " + w("composer.bar_back_to_main")
 
 
 def raw(t, s):
@@ -52,8 +56,8 @@ def check(cols, rows, dictation):
         t.wait_re(MAIN_IDLE)
         bar = ctrl_held(t, cols, dictation)
         if cols >= 150:
-            assert "ctrl+r twice voice mode" in bar, bar
-            assert ("ctrl+r dictate" in bar) == bool(dictation), bar
+            assert "ctrl+r twice " + w("composer.bar_voice_mode") in bar, bar
+            assert ("ctrl+r " + w("composer.bar_dictate") in bar) == bool(dictation), bar
         voice_screen(t, cols)
         if cols >= 150 and dictation:
             t.typed("/help")
@@ -80,22 +84,22 @@ def steer_bar():
         t.wait_re(MAIN_IDLE)
         t.typed('[[bash: sb spawn t1 --objective "wait {{bash: sleep 40}}"]] [[bash: sleep 25]]')
         t.keys("Enter")
-        sc = t.wait("ctrl+c interrupt", 20)
+        sc = t.wait(INTERRUPT, 20)
         bar = bar_of(sc)
-        assert "tab queue" not in bar and "steer" not in bar, bar
+        assert "tab " + w("composer.bar_queue") not in bar and w("composer.bar_steer") not in bar, bar
         print("---- main works, empty composer ----\n%s" % sc)
         t.typed("later")
-        sc = t.wait("tab queue   ⏎ steer   ctrl+c interrupt", 5)
+        sc = t.wait(QUEUE + "   " + INTERRUPT, 5)
         print("---- main works, text in the composer ----\n%s" % sc)
         t.keys("Tab")
         t.wait(" › later", 5)
         # t1's view, t1 working
         t.wait_re(r"\b1 \S+ t1\b", 20)
         t.keys("M-1")
-        sc = t.wait("esc back to main   ctrl+c interrupt", 20)
+        sc = t.wait(BACK + "   " + INTERRUPT, 20)
         print("---- t1 works, empty composer ----\n%s" % sc)
         t.typed("later")
-        sc = t.wait("esc back to main   tab queue   ⏎ steer   ctrl+c interrupt", 5)
+        sc = t.wait(BACK + "   " + QUEUE + "   " + INTERRUPT, 5)
         print("---- t1 works, text in the composer ----\n%s" % sc)
 
 

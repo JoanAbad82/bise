@@ -13,6 +13,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, tmux, wait_until, MAIN_IDLE  # noqa: E402
 from tui_composer_tmux import composer, wait_composer  # noqa: E402
+from words import w  # noqa: E402
 
 N = 300
 TEXT = "".join("pasted line %03d of the log\n" % i for i in range(1, N + 1))
@@ -32,9 +33,9 @@ def main():
         paste(t, TEXT)
         # one chip, not 300 lines; the flash names it
         wait_composer(t, "sum up  ▤ 1")
-        sc = t.wait("╭─ attached ─")
+        sc = t.wait("╭─ %s ─" % w("composer.box_title"))
         assert "pasted line 002" not in composer(t, sc), sc
-        t.wait("300 lines · 8 kB")
+        t.wait(w("composer.paste_about", n=300, size="8 kB"))
         t.wait("▤ 1  “pasted line 001 of the log pasted line 00")
         # a short paste stays text
         paste(t, "please")
@@ -54,7 +55,7 @@ def main():
         # the history: the chip in your line, one dim row under it
         sc = t.wait("sum up ▤ 1 please")
         t.wait("▤ 1 “pasted line 001 of the log")
-        t.wait("· 300 lines")
+        t.wait("· " + w("composer.lines", n=300))
         # the answer streams in (live rows) before its entry: wait for the
         # turn's end, so the entry doesn't land under the opened message
         t.wait("ack: sum up")
@@ -63,7 +64,7 @@ def main():
         # (the fake's `ack:` echoes the tag: that is the model's text)
         assert "pasted line 150" not in sc, sc
         assert not any("<pasted" in l for l in sc.splitlines() if "sum up" in l and "ack:" not in l), sc
-        assert "╭─ attached" not in sc, sc
+        assert "╭─ " + w("composer.box_title") not in sc, sc
         # ctrl+o opens your message: the full paste under it (300 rows:
         # its head `▤ 1 · 300 lines` scrolls off; the model's `ack:` only
         # echoes the first lines)

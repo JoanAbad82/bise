@@ -24,6 +24,7 @@ import { useThreadQueue } from './ThreadQueue';
 import { AttachTool, ModelTool, ModeTool } from './ComposerTools';
 import type { TabWords } from './tab';
 import { useComposerHeld } from './foldHint';
+import { composer } from '../proto/words.gen';
 
 /**
  * The thread's composer, also mounted under an open artifact (amb-kit's src/artifacts/Open.tsx,
@@ -174,7 +175,7 @@ export const ThreadComposer = memo(function ThreadComposer({
         if ('go' in w) router.go(w.go);
         // nothing waits anywhere: say so where he typed it, never a silent nothing (ghost-badge)
         else if ('inbox' in w) {
-          if (!openInbox()) setNote({ level: 'info', text: 'nothing waits for you.' });
+          if (!openInbox()) setNote({ level: 'info', text: composer.nothing_waits });
         }
         else if ('app' in w) store.command(w.app);
         else if ('quit' in w) window.bise.quit();
@@ -282,7 +283,7 @@ export const ThreadComposer = memo(function ThreadComposer({
     const entry = load(keptStorage, was.key).draft;
     if (entry === null) return;
     save(keptStorage, was.key, { draft: null, history: [] });
-    if (actions.current?.putBack(entry) === 'history') setNote({ level: 'info', text: `your words to ${shownName(was.asker)}'s closed question: ↑ brings them back` });
+    if (actions.current?.putBack(entry) === 'history') setNote({ level: 'info', text: composer.closed_question({ agent: shownName(was.asker) }) });
   }, [closedKey, answer?.asker]);
   // the box's row: '+' always; the mode and the model only for a message (an answer has neither)
   const answering = answer !== null;

@@ -3,15 +3,42 @@
 # (tests/words.py's w(), the desktop's words_<area>.gen.ts); a count never goes up, a drop lowers it
 # in the same commit, at 0 its line goes. Only a change that adds keys to the catalog may raise a
 # count, by literals of those keys (another area's chunk moves them). Checked by tests/word_lint.py.
+1 apps/desktop/tests/checks/app/add-sheet.spec.ts
+1 apps/desktop/tests/checks/app/agents-bar.spec.ts
+1 apps/desktop/tests/checks/app/artifact-view.spec.ts
 2 apps/desktop/tests/checks/app/hover-tips.spec.ts
 1 apps/desktop/tests/checks/app/menus.spec.ts
+2 apps/desktop/tests/checks/app/sidebar-v6.spec.ts
 1 apps/desktop/tests/checks/app/trigger-ink.spec.ts
+1 apps/desktop/tests/checks/gate/right.spec.ts
+2 apps/desktop/tests/checks/inbox/block-views.spec.ts
+1 apps/desktop/tests/checks/inbox/ghost-badge.spec.ts
 3 apps/desktop/tests/checks/inbox/inbox-open.spec.ts
 6 apps/desktop/tests/checks/inbox/inbox-screen.spec.ts
-5 apps/desktop/tests/checks/thread/hierarchy.spec.ts
+1 apps/desktop/tests/checks/native/fn.spec.ts
+1 apps/desktop/tests/checks/review/quote-lines.spec.ts
+1 apps/desktop/tests/checks/settings/keys.spec.ts
+1 apps/desktop/tests/checks/settings/sign-in-expired.spec.ts
+2 apps/desktop/tests/checks/thread/agent-head.spec.ts
+1 apps/desktop/tests/checks/thread/composer-sources.spec.ts
+1 apps/desktop/tests/checks/thread/find-bar.spec.ts
+3 apps/desktop/tests/checks/thread/first-run.spec.ts
+6 apps/desktop/tests/checks/thread/hierarchy.spec.ts
+3 apps/desktop/tests/checks/thread/keys-real.spec.ts
 2 apps/desktop/tests/checks/thread/news-rows.spec.ts
+2 apps/desktop/tests/checks/thread/parts.spec.ts
+2 apps/desktop/tests/checks/thread/rows.spec.ts
 1 apps/desktop/tests/checks/thread/tiers.spec.ts
 1 apps/desktop/tests/checks/thread/waiting-states.spec.ts
 3 apps/desktop/tests/checks/thread/wake.spec.ts
+1 tests/tui_approvals_tmux.py
+2 tests/tui_archived_tmux.py
+1 tests/tui_artifacts_tmux.py
+4 tests/tui_onboarding_tmux.py
+1 tests/tui_openai_responses_tmux.py
+2 tests/tui_palette_tmux.py
+1 tests/tui_psi_hover_tmux.py
+7 tests/tui_roles_tmux.py
 2 tests/tui_scheduled_tmux.py
+1 tests/tui_tool_names_tmux.py
 3 tests/tui_wake_tmux.py

@@ -4,6 +4,7 @@
 import type { Agent, EntryKind } from '@/proto';
 import { ago } from '@/agents/model';
 import { paused, pauseLine } from './wake';
+import { composer } from '../proto/words.gen';
 
 /** The state chip: '<breath> working · 14 min', 'starting', '? waiting for you' (accent). */
 export interface StateChip {
@@ -91,7 +92,7 @@ export function workingRowShows(a: Agent | undefined): boolean {
 }
 
 export function composerWords(name: string): { label: string; placeholder: string } {
-  return { label: `to ${name}`, placeholder: `write to ${name}, then ⏎` };
+  return { label: composer.tab_to({ agent: name }), placeholder: composer.placeholder_to({ agent: name }) };
 }
 
 /** K2, ⏎ on an empty composer (the TUI's sb/keys.rs + input.rs): never an empty send. A sign-in

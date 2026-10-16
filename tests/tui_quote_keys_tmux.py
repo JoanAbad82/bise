@@ -12,9 +12,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, wait_until, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 COLS, ROWS = 120, 36
-HINT = " type to ask about it · tab quote · cmd+c copy "
+HINT = " type %s · tab %s · cmd+c %s " % (w("composer.bar_ask"), w("composer.bar_quote"), w("composer.bar_copy"))
 
 
 def chips(n):

@@ -4,6 +4,7 @@
 
 use super::*;
 use unicode_width::UnicodeWidthStr;
+use bise_proto::words::composer;
 
 /// The status glyph of an agent and its color (book §6): the gust
 /// breathes in its cell while it works (BISE-107), `·` pulses while it
@@ -1321,7 +1322,7 @@ pub(crate) fn status_text(app: &App) -> String {
 
 /// What `D` asks in the status row (book §16, BISE-43).
 pub(crate) fn drop_question(name: &str) -> String {
-    format!("archive {}? /restore brings it back. y / n", name)
+    composer::drop_question(name)
 }
 
 /// The key bar's mode once no overlay or popup has it (BISE-99,
@@ -1355,18 +1356,18 @@ pub(crate) fn key_mode(app: &App) -> crate::keybar::Mode {
 pub(crate) fn placeholder(app: &App) -> Option<String> {
     let sb = &app.sb;
     Some(if sb.focus_archived() {
-        format!("{} is archived · /restore to talk to it", sb.focus)
+        composer::placeholder_archived(&sb.focus)
     } else if sb.is_main_focus() {
         PLACEHOLDER_MAIN.to_string()
     } else {
-        format!("talk to {} directly", sb.focus)
+        composer::placeholder_agent(&sb.focus)
     })
 }
 
 /// The line an archived agent's view says when ⏎ would send it a plain
 /// message (designer's words): it is not sent.
 pub(crate) fn archived_warn(name: &str) -> String {
-    format!("{name} is archived. /restore brings it back · esc → main")
+    composer::archived_warn(name)
 }
 
 /// ⏎ on `text` in the view in focus: an archived agent reads nothing,
@@ -1378,23 +1379,19 @@ pub(crate) fn archived_refusal(app: &App, text: &str) -> Option<String> {
 }
 
 /// The empty composer's question, to main (copy deck §17).
-pub(crate) const PLACEHOLDER_MAIN: &str = "what's on your mind?";
+pub(crate) const PLACEHOLDER_MAIN: &str = composer::placeholder_main;
 
 /// The first-run text (book §8, §17): shown dim in main's empty feed
 /// while there are no agents yet.
-pub(crate) const FIRST_RUN: [&str; 3] = [
-    "what's on your mind?",
-    "say it and keep talking. the work runs in the background, i'm always here.",
-    "try: \"show me what you can do\"",
-];
+pub(crate) const FIRST_RUN: [&str; 3] = [composer::placeholder_main, composer::first_run_say, composer::first_run_try];
 
 /// The first-run text's suggestion (BISE-284): a click on it fills the
 /// composer, and the first open after the onboarding starts with it.
-pub(crate) const DEMO: &str = "show me what you can do";
+pub(crate) const DEMO: &str = composer::demo;
 
 /// What the first-run text's last line says while the composer holds
 /// [`DEMO`] (designer, BISE-284): the key, then the words.
-pub(crate) const DEMO_READY: (&str, &str) = ("⏎", " try it · or just type your own");
+pub(crate) const DEMO_READY: (&str, &str) = ("⏎", composer::demo_ready);
 
 /// The composer holds `show me what you can do`, selected: typing
 /// replaces it, enter sends it, an arrow or esc keeps it (BISE-284).
@@ -1436,16 +1433,16 @@ impl Sb {
         if self.preview {
             let name = self.selected_agent().map(|a| a.name.clone()).filter(|n| *n != self.focus)?;
             return Some(Line::from(vec![
-                Span::styled("preview · ", dim),
+                Span::styled(format!("{} · ", composer::preview_head), dim),
                 Span::styled(name, Style::default().fg(text())),
-                Span::styled(" · ⏎ enter · esc close", dim),
+                Span::styled(format!(" · ⏎ {} · esc {}", composer::bar_enter, composer::bar_close), dim),
             ]));
         }
         if self.focus == "main" || self.focus_archived() || self.agent(&self.focus).is_none() {
             return None;
         }
         Some(Line::from(Span::styled(
-            format!("you're talking to {} directly. main isn't in the loop. esc back to main.", self.focus),
+            composer::talking_directly(&self.focus),
             dim,
         )))
     }

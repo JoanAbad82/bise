@@ -20,10 +20,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import Tui, tui_session, run, in_view, pane_rows, start_tui, tmux, wait_until  # noqa: E402
+from words import w  # noqa: E402
 
 COLS, ROWS = 150, 42
-HEAD2 = "╭─ 2 queued · sent when main's turn ends ─"
-KEYS = "⏎ send now   e edit   d delete   esc back"
+HEAD2 = "╭─ %s ─" % w("composer.queue_when", count=w("composer.queue_count", n=2), who="main")
+DELETED = "%s · u %s" % (w("composer.queue_deleted"), w("composer.queue_undo"))
+KEYS = "⏎ %s   e %s   d %s   esc %s" % tuple(w("composer.bar_" + k) for k in ("send_now", "edit", "delete", "back"))
 
 
 def sent(E):
@@ -46,7 +48,7 @@ def composer_row(t):
 def drawer(sc):
     """The drawer's rows, from its top edge to its bottom one."""
     rows = sc.splitlines()
-    top = next(i for i, r in enumerate(rows) if "╭─ " in r and ("queued" in r or "deleted" in r))
+    top = next(i for i, r in enumerate(rows) if "╭─ " in r and (w("composer.queue_queued") in r or w("composer.queue_deleted") in r))
     col = rows[top].index("╭─ ")
     end = rows[top].index("╮", col) + 1
     bottom = next(i for i in range(top, len(rows)) if rows[i][col:col + 1] == "╰")
@@ -108,7 +110,7 @@ def scenario(theme):
             # tab queues on the hub: the model gets nothing yet; the key
             # bar offers it only once the composer has text (5e3873d)
             t.typed("queued-one")
-            t.wait("tab queue   ⏎ steer", 20)
+            t.wait("tab %s   ⏎ %s" % (w("composer.bar_queue"), w("composer.bar_steer")), 20)
             t.keys("Tab")
             t.wait("│ › queued-one", 10)
             queue(t, "queued-two")
@@ -117,11 +119,11 @@ def scenario(theme):
             assert len(d) == 4 and "queued-one" in d[1] and "queued-two" in d[2] and d[3].startswith("╰"), d
             assert not any("queued-" in m for m in sent(t.E)), sent(t.E)
             # an empty composer: ↑ edits them (the window's words)
-            t.wait("↑ edit queued   ctrl+c interrupt", 5)
+            t.wait("↑ %s   ctrl+c %s" % (w("composer.bar_edit_queued"), w("composer.bar_interrupt")), 5)
             # the second terminal shows the same drawer (the hub's row)
             sc = u.wait_all([HEAD2, "│ › queued-one", "│ › queued-two"], 10)
             assert sc.index("queued-one") < sc.index("queued-two"), sc
-            shot(t, theme, "2-queued", "╭─ 2 queued")
+            shot(t, theme, "2-queued", "╭─ " + w("composer.queue_count", n=2))
             # 5: 3 rows, then it scrolls
             for x in ("three", "four", "five"):
                 queue(t, "queued-" + x) if x == "three" else (t.typed("queued-" + x), t.keys("Tab"))
@@ -135,13 +137,13 @@ def scenario(theme):
             shot(t, theme, "focused", "│ › queued-five")
             # d: gone from both terminals, 'deleted · u undo'; u: back
             t.keys("d")
-            sc = t.wait("╭─ deleted · u undo", 10)
+            sc = t.wait("╭─ " + DELETED, 10)
             assert "queued-five" not in sc, sc
             u.wait("↓ 1 more", 10)   # the other terminal shows the oldest 3
-            shot(t, theme, "deleted", "╭─ deleted · u undo")
+            shot(t, theme, "deleted", "╭─ " + DELETED)
             t.keys("u")
             t.wait("│ › queued-five", 10)
-            t.wait_gone("deleted · u undo", 5)
+            t.wait_gone(DELETED, 5)
             u.wait("↓ 2 more", 10)
             # e on the newest: back into the composer; tab queues it again
             t.keys("Escape")
@@ -154,7 +156,7 @@ def scenario(theme):
             u.wait("↓ 1 more", 10)
             t.typed(" edited")
             t.keys("Tab")
-            t.wait("╭─ 5 queued", 10)   # at the end, under '↓ 2 more' 
+            t.wait("╭─ " + w("composer.queue_count", n=5), 10)   # at the end, under '↓ 2 more' 
             assert "queued" not in composer_row(t), t.screen()
             # ⏎ on the oldest: said now, mid-turn, alone
             t.keys("Up")

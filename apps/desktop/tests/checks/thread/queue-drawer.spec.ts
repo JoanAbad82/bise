@@ -16,6 +16,7 @@
 // The hub's own side (queued_steer delivers once with its id, a take after it refused) is
 // tests/proto_e2e_threads.py's queued_round, on a real hub. Owner: queue-drawer.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { composer } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -93,7 +94,7 @@ test('thread/queue-drawer: 2 queued as drawer rows; send now steers, edit puts i
     });
 
     await test.step('the three icons explain themselves on hover and on focus', async () => {
-      const words = { steer: 'send now: bise reads it mid-turn', edit: 'edit: back into the composer', delete: 'delete it' } as const;
+      const words = { steer: composer.queue_send_now({ who: 'bise' }), edit: composer.queue_edit, delete: composer.queue_delete } as const;
       for (const [k, w] of Object.entries(words)) {
         await page.getByTestId(`composer.queue.1.${k}`).hover();
         await expect(tip, `${k}: its tip on hover`).toBeVisible();
@@ -144,7 +145,7 @@ test('thread/queue-drawer: 2 queued as drawer rows; send now steers, edit puts i
       });
       await page.getByTestId('composer.queue.fold').click();
       await expect(rows).toHaveCount(0);
-      await expect(page.getByTestId('composer.queue.head')).toContainText('5 queued');
+      await expect(page.getByTestId('composer.queue.head')).toContainText(composer.queue_count({ n: 5 }));
       await shot('folded-dark-1100');
       await page.getByTestId('composer.queue.fold').click();
       await core.send(prefs('light') as never);
@@ -166,7 +167,7 @@ test('thread/queue-drawer: 2 queued as drawer rows; send now steers, edit puts i
       await page.keyboard.type('a draft');
       await expect(page.getByTestId('composer.queue.1.edit')).toBeDisabled();
       await page.getByTestId('composer.queue.1.edit').locator('..').hover();
-      await expect(page.getByTestId('tip.words')).toHaveText('empty the composer to edit it');
+      await expect(page.getByTestId('tip.words')).toHaveText(composer.queue_edit_wait);
       await field.click();
       await page.keyboard.press('Meta+a');
       await page.keyboard.press('Backspace');

@@ -12,9 +12,9 @@ import {
   outdentAtStart,
   subwordLeft,
   subwordRight,
-  NO_UNDO,
   type Op,
 } from "../mdlive";
+import { composer } from "../../proto/words.gen";
 import { historyAt, type Saved } from "../drafts";
 import { completion, enterSends, move, type Pick, type Row } from "../pick";
 import type { Trigger } from "../tokens";
@@ -148,7 +148,7 @@ export function fieldKey(c: KeyCtx, e: KeyboardEvent): boolean {
   ) {
     e.preventDefault();
     if (undoDepth(st) > 0) undo(st, v.dispatch);
-    else c.say(NO_UNDO);
+    else c.say(composer.no_undo);
     return true;
   }
   if (

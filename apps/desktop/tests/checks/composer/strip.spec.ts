@@ -18,6 +18,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { composer } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'storefront-1a2b3c4d';
@@ -117,7 +118,7 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     // percent in clear under 80% (desktop-delight touch 4)
     const ctx = page.getByTestId('composer.tab.context');
     await expect(ctx).toHaveAttribute('data-pct', '17');
-    await expect(ctx).toHaveAttribute('data-tip', "17% of perf's context used · 42k tokens · compacts at 90%");
+    await expect(ctx).toHaveAttribute('data-tip', composer.ring_tip({ pct: 17, agent: 'perf', tokens: '42k' }));
     await expect(ctx).toHaveText('42k');
     expect(await ctx.evaluate((e) => (e.querySelector('.num')?.getBoundingClientRect().right ?? 0) <= (e.querySelector('svg.b-ring')?.getBoundingClientRect().left ?? 0)), 'the tokens left of the ring').toBe(true);
     // a gauge, never a spinner (designer m_25940, m_26307): 12 px, a dial (his ask on agent-rows): a
@@ -291,7 +292,7 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     await go('docs');
     // ψ is a worktree's sign: his own checkout reads its folder's name alone (his m_24782, designer m_24790)
     await expect(page.getByTestId('composer.tab.place')).toHaveText('storefront');
-    await expect(page.getByTestId('composer.tab.place')).toHaveAttribute('data-tip', 'your own folder: /nowhere/storefront');
+    await expect(page.getByTestId('composer.tab.place')).toHaveAttribute('data-tip', composer.tab_own_folder({ path: '/nowhere/storefront' }));
 
     // (3) answering: the accent tab, the way back on its right, '+' and send only
     await go('search');
@@ -299,7 +300,7 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true');
     await expect(tab).toHaveClass(/\bacc\b/u);
     await expect(page.getByTestId('composer.tab.to')).toHaveText(/^↳ answering search · which size/u);
-    await expect(page.getByTestId('composer.tab.end')).toHaveText('esc to search instead');
+    await expect(page.getByTestId('composer.tab.end')).toHaveText(composer.tab_esc_instead({ agent: 'search' }));
     // answering, the tab holds only the question and the way back (designer m_24517)
     await expect(page.getByTestId('composer.tab.place')).toHaveCount(0);
     await expect(page.getByTestId('composer.tab.context')).toHaveCount(0);
@@ -397,7 +398,7 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
         await page.waitForTimeout(300);
         await shot(t, w, 'scrolled under the fade');
         await at('ui');
-        await shot(t, w, '2 attachments');
+        await shot(t, w, composer.queue_attachments({ n: 2 }));
         await at('search');
         if (!(await page.getByTestId('inbox.block.open.1').isVisible())) await page.getByTestId('inbox.block.row.1').click();
         await expect(tab).toHaveClass(/\bacc\b/u);

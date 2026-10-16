@@ -2,6 +2,7 @@
 //! the composer editor keys, voice keys, and the feed selection copy.
 
 use crate::*;
+use bise_proto::words::composer;
 use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
 use ratatui::text::Line;
 use unicode_width::UnicodeWidthStr;
@@ -192,7 +193,7 @@ pub(crate) fn toggle_voice(app: &mut App, job: impl FnOnce() -> Result<voice::Vo
     match job() {
         Ok(j) => {
             app.voice.enabled = true;
-            Some(saved(voice::save_voice_enabled(true), format!("{}{}", voice::ENABLED_MESSAGE, j.name)))
+            Some(saved(voice::save_voice_enabled(true), composer::voice_enabled(&j.name)))
         }
         Err(_) => {
             open_voice_setup(app, true);
@@ -204,7 +205,7 @@ pub(crate) fn toggle_voice(app: &mut App, job: impl FnOnce() -> Result<voice::Vo
 fn saved(r: Result<(), String>, line: String) -> Ev {
     match r {
         Ok(()) => Ev::Info(line),
-        Err(e) => Ev::Warn(format!("{} (not saved: {})", line, e)),
+        Err(e) => Ev::Warn(composer::not_saved(line, e)),
     }
 }
 
@@ -224,10 +225,10 @@ pub(crate) fn voice_out(app: &mut App, out: crate::onboarding::VoiceOut) {
     match out {
         crate::onboarding::VoiceOut::On(m) => {
             app.voice.enabled = true;
-            let head = format!("voice is on: {}.", m);
+            let head = composer::voice_on(m);
             let ev = match voice::save_voice_enabled(true) {
                 Ok(()) => Ev::Said { glyph: "✓", head, dim: vec![voice::ON_HOW.into()] },
-                Err(e) => Ev::Warn(format!("{} (not saved: {})", head, e)),
+                Err(e) => Ev::Warn(composer::not_saved(head, e)),
             };
             push_event(&mut app.events, &mut app.cache, ev);
         }
@@ -575,9 +576,9 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
         crate::attach_file::on_paste(app, &text)
     };
     match attached {
-        Some(Ok(labels)) => flash(app, format!("attached {}", labels.join(" "))),
+        Some(Ok(labels)) => flash(app, composer::attached(labels.join(" "))),
         Some(Err(e)) if !text.trim().is_empty() => {
-            flash(app, format!("image not attached: {e}"));
+            flash(app, composer::image_not_attached(e));
             app.ed.paste(&text);
         }
         Some(Err(_)) => {}
@@ -585,7 +586,7 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
         // (BISE-240, pasted.rs)
         None if crate::pasted::is_long(&text) => {
             let chip = crate::pasted::add(app, &text);
-            flash(app, format!("attached {chip}"));
+            flash(app, composer::attached(chip));
         }
         None => app.ed.paste(&text),
     }
@@ -814,7 +815,7 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
         // (Ghostty `keybind = performable:super+v=paste_from_clipboard`
         // passes it through on an image-only clipboard)
         (KeyCode::Char('v'), KeyModifiers::CONTROL) | (KeyCode::Char('v'), KeyModifiers::SUPER) => match crate::attach::attach_clipboard(app) {
-            Ok(l) => flash(app, format!("attached {l}")),
+            Ok(l) => flash(app, composer::attached(l)),
             Err(e) => flash(app, e),
         },
         (KeyCode::Enter, KeyModifiers::SHIFT)
@@ -957,11 +958,11 @@ fn pick(app: &mut App, c: &PopItem) {
         // (parts::pick_kind: code stays `@path`)
         match crate::attach_file::pick(app, p) {
             Some(Ok(l)) => {
-                flash(app, format!("attached {l} {}", crate::attach::file_name(p)));
+                flash(app, composer::attached(format!("{l} {}", crate::attach::file_name(p))));
                 app.popup_sel = 0;
                 return;
             }
-            Some(Err(e)) => flash(app, format!("image not attached: {e}")),
+            Some(Err(e)) => flash(app, composer::image_not_attached(e)),
             None => {}
         }
     }

@@ -14,6 +14,7 @@ import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bise_env  # noqa: E402
+from words import w, w_re  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
 
@@ -215,7 +216,7 @@ def in_view(name):
 MAIN_IDLE = r"\b0 ○ main\b|you → main(?: · [\w.\-]+(?:[ ·][\w.\-]+)*)* ─"
 
 
-PLACEHOLDER = re.compile(r"^(what's on your mind\?|talk to \S+ directly)$")
+PLACEHOLDER = re.compile(r"^(%s|%s)$" % (re.escape(w("composer.placeholder_main")), w_re("composer.placeholder_agent")))
 
 
 def pane_rows(rows):
@@ -315,7 +316,7 @@ def main():
         sc = t.wait("⏎ enter   space preview")
         t.keys("Enter")
         sc = t.wait_re(in_view("t1"))
-        assert "you're talking to t1 directly. main isn't in the loop. esc back to main." in sc, sc
+        assert w("composer.talking_directly", agent="t1") in sc, sc
         # its brief, folded (BISE-12)
         assert "brief" in sc, sc
         t.wait("done: tool bash ok: hi-t1")
@@ -350,7 +351,7 @@ def main():
         t.keys("M-Down")
         t.keys("M-Down")
         t.typed("D")
-        t.wait("archive t1? /restore brings it back. y / n")
+        t.wait(w("composer.drop_question", agent="t1"))
         t.typed("y")
         t.wait("@t1 archived", 20)
         t.wait("1 archived")

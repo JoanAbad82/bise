@@ -220,5 +220,3 @@ export function subwordRight(text: string, cursor: number): number {
   return i < cps.length ? (offs[i] ?? text.length) : text.length;
 }
 
-/** What ctrl+z says when the field has nothing left to undo (sb.rs NO_UNDO). */
-export const NO_UNDO = 'no undo: an agent may already have acted. say the change to main instead ("no, v1 for docs").';

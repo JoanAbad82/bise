@@ -5,7 +5,7 @@
 // without a project too. Owner: amb-win.
 import { Button, Pearl, Press } from '@/ds';
 import { useProjects } from '@/store';
-import { DEMO } from '@/setup';
+import { composer } from '../proto/words.gen';
 import { useRouter } from '@/app/router';
 
 export function NoProject({ onDemo }: { onDemo: (text: string) => void }) {
@@ -26,10 +26,10 @@ export function NoProject({ onDemo }: { onDemo: (text: string) => void }) {
           look="th-noproj-demo"
           // keep the composer's focus and selection: the click must not blur it first
           onMouseDown={(e) => { e.preventDefault(); }}
-          onClick={() => { onDemo(DEMO); }}
+          onClick={() => { onDemo(composer.demo); }}
           data-testid="thread.noproject.demo"
         >
-          {DEMO}
+          {composer.demo}
         </Press>
       </div>
     </div>

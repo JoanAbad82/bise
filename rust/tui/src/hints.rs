@@ -19,6 +19,7 @@
 //! of the other tracks stays as it is.
 
 use crate::theme;
+use bise_proto::words::composer;
 use crate::App;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -64,15 +65,15 @@ pub(crate) fn set_auto_text(checker: &str, who: &str) {
 /// machine (Ollama, LM Studio).
 fn auto_text(checker: &str, who: &str, catalog: &bise_catalog::Catalog) -> String {
     if checker == "jev" {
-        return format!("auto sends commands to Jev ({who}) to check them. /models changes it.");
+        return composer::hint_auto_jev(who);
     }
     let Some((pid, model)) = bise_catalog::split_name(who) else {
-        return format!("auto sends commands to {who} to check them. /models changes it.");
+        return composer::hint_auto_to(who);
     };
     match catalog.provider(pid) {
-        Some(p) if p.key_env.is_empty() => format!("auto checks commands with {model}, on this machine. /models changes it."),
-        Some(p) => format!("auto sends commands to {} ({model}) to check them. /models changes it.", p.name),
-        None => format!("auto sends commands to {pid} ({model}) to check them. /models changes it."),
+        Some(p) if p.key_env.is_empty() => composer::hint_auto_local(model),
+        Some(p) => composer::hint_auto_provider(&p.name, model),
+        None => composer::hint_auto_provider(pid, model),
     }
 }
 
@@ -89,17 +90,15 @@ impl Hint {
         }
     }
 
-    /// The text (book §15); `{…}` is a key, in accent.
-    pub(crate) fn text(self) -> &'static str {
+    /// The text (book §15); `{…}` is a key, in accent (the words' args).
+    pub(crate) fn text(self) -> String {
         match self {
-            Hint::FirstAgent => {
-                "new: your agents. they work in the background. {⌥ 1} to look inside, {esc} to come back. →"
-            }
-            Hint::FirstLevel3 => "agents talk to each other. it stays dim: you can ignore it, or {▸} to read.",
-            Hint::FirstCard => "[?] <this is your inbox.> when an agent needs you, it waits here instead of interrupting you. {ctrl+1} opens it, or click it. ↓",
-            Hint::FirstSteer => "{✓} the agent got it · {✓✓} it read it.",
-            Hint::FirstYolo => "you're in yolo: agents run commands without asking. {⇧⇥} changes it.",
-            Hint::FirstAuto => AUTO_TEXT.with(|c| c.get()),
+            Hint::FirstAgent => composer::hint_first_agent("{⌥ 1}", "{esc}"),
+            Hint::FirstLevel3 => composer::hint_first_level3("{▸}"),
+            Hint::FirstCard => composer::hint_first_card("{ctrl+1}"),
+            Hint::FirstSteer => composer::hint_first_steer("{✓}", "{✓✓}"),
+            Hint::FirstYolo => composer::hint_first_yolo("{⇧⇥}"),
+            Hint::FirstAuto => AUTO_TEXT.with(|c| c.get()).to_string(),
         }
     }
 }
@@ -305,17 +304,19 @@ fn wrap_in(text: &str, w: usize, plain: Style, key: Style) -> Vec<Line<'static>>
 
 /// The first item's hint where the terminal sends no ctrl+1-9 (BISE-302,
 /// reach.rs).
-const FIRST_CARD_CLICK: &str = "[?] <this is your inbox.> when an agent needs you, it waits here instead of interrupting you. click it, or type {/inbox}. ↓";
+fn first_card_click() -> String {
+    composer::hint_first_card_click("{/inbox}")
+}
 
 /// Hint `h`'s lines at `w` columns, in its styles; `digits`: the
 /// terminal sends ctrl+1-9.
 fn hint_lines(h: Hint, w: usize, digits: bool) -> Vec<Line<'static>> {
     match h {
         Hint::FirstCard => {
-            let t = if digits { h.text() } else { FIRST_CARD_CLICK };
-            wrap_in(t, w, Style::default().fg(theme::dim()), Style::default().fg(theme::text()))
+            let t = if digits { h.text() } else { first_card_click() };
+            wrap_in(&t, w, Style::default().fg(theme::dim()), Style::default().fg(theme::text()))
         }
-        _ => wrap(h.text(), w),
+        _ => wrap(&h.text(), w),
     }
 }
 
@@ -615,7 +616,7 @@ mod tests {
 
     #[test]
     fn keys_are_accent_and_lines_fit() {
-        let ls = wrap(Hint::FirstAgent.text(), TEXT_W);
+        let ls = wrap(&Hint::FirstAgent.text(), TEXT_W);
         let all: Vec<String> = ls.iter().map(text_of).collect();
         assert_eq!(
             all.join(" "),
@@ -629,7 +630,7 @@ mod tests {
             .map(|s| s.content.as_ref())
             .collect();
         assert_eq!(accent, vec!["⌥ 1", "esc"]);
-        let l3: Vec<String> = wrap(Hint::FirstLevel3.text(), TEXT_W).iter().map(text_of).collect();
+        let l3: Vec<String> = wrap(&Hint::FirstLevel3.text(), TEXT_W).iter().map(text_of).collect();
         assert_eq!(l3.join(" "), "agents talk to each other. it stays dim: you can ignore it, or ▸ to read.");
         let card = hint_lines(Hint::FirstCard, TEXT_W, true);
         let words: Vec<String> = card.iter().map(text_of).collect();

@@ -4,6 +4,7 @@
 // marks a switch with `flash: true` on its `approvals` event.
 import { useEffect, useRef, useState } from 'react';
 import type { HubEv } from '@/proto';
+import { composer } from '../proto/words.gen';
 
 export type ApprovalsEv = Extract<HubEv, { ev: 'approvals' }>;
 
@@ -13,8 +14,8 @@ export const FLASH_MS = 3000;
 /** The flash of a switch (keybar.rs flash_words): the mode word, then its sentence. Pure. */
 export function flashWords(mode: string, checker: string, env: boolean): { word: string; rest: string } {
   const word = mode === '' ? 'yolo' : mode;
-  const what = word === 'auto' ? (checker === 'off' ? 'edits run, commands ask you' : 'safe calls run, risky ones ask you') : 'everything runs, nothing asks';
-  return { word, rest: ` · ${what}${env ? ' (this session only: BISE_APPROVALS)' : ''}` };
+  const what = word === 'auto' ? (checker === 'off' ? composer.approvals_auto_off : composer.approvals_auto) : composer.approvals_yolo;
+  return { word, rest: env ? composer.approvals_flash_env({ what }) : composer.approvals_flash({ what }) };
 }
 
 /**

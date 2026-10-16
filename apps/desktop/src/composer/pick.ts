@@ -3,6 +3,7 @@
 import { filterEmoji } from './emoji';
 import type { ComposerSources, PickAgent, PickArtifact, PickCommand, PickFile, PickSkill } from './sources';
 import { agentPick, filePick, prefixFirst, skillPick, type Trigger } from './tokens';
+import { composer } from '../proto/words.gen';
 
 export interface Row {
   /** Stable per row, for React keys and the test id `composer.pick.<id>`. */
@@ -114,7 +115,7 @@ export function commandRows(t: Trigger, commands: readonly PickCommand[]): Row[]
       return {
         id: `cmd.${name.slice(1)}`,
         label: name,
-        desc: c.ready ? c.desc : `${c.desc} · not yet`,
+        desc: c.ready ? c.desc : composer.cmd_not_yet({ desc: c.desc }),
         tag: 'cmd',
         off: !c.ready,
         pick: c.args ? { kind: 'insert', text: `${name} `, browse: false } : { kind: 'run', name },

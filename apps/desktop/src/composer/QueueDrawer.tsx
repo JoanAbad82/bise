@@ -9,6 +9,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent } from "react";
 import { Act, cx, IconButton, tipAttrs } from "@/ds";
 import "./queue-drawer.css";
+import { composer } from "../proto/words.gen";
 
 /** One queued message as the drawer shows it. */
 export interface QueueRow {
@@ -36,14 +37,14 @@ export interface QueueDrawerProps {
 
 /** The head's words: 'queued · sent when perf's turn ends', '2 queued · …' for 2 and more. Pure. */
 export function queueHead(n: number, who: string): string {
-  return `${n > 1 ? `${String(n)} queued` : "queued"} · sent when ${who}'s turn ends`;
+  return composer.queue_when({ count: n > 1 ? composer.queue_count({ n }) : composer.queue_queued, who });
 }
 
 /** What goes with his words: ' · 1 image', ' · 2 images, 1 file'; '' for none. Pure. */
 export function rowExtra(images: number, others: number): string {
   const bits: string[] = [];
-  if (images > 0) bits.push(`${String(images)} ${images > 1 ? "images" : "image"}`);
-  if (others > 0) bits.push(`${String(others)} ${others > 1 ? "attachments" : "attachment"}`);
+  if (images > 0) bits.push(composer.queue_images({ n: images }));
+  if (others > 0) bits.push(composer.queue_attachments({ n: others }));
   return bits.length === 0 ? "" : ` · ${bits.join(", ")}`;
 }
 
@@ -122,16 +123,16 @@ function Row({ row, who, fieldEmpty, onSteer, onEdit, onDelete, testId }: { row:
         {row.extra !== "" && <span className="x">{row.extra}</span>}
       </span>
       <span className="acts">
-        <IconButton size="bar" label={`send now: ${who} reads it mid-turn`} keys="⏎" onClick={onSteer} testId={`${testId}.steer`}>
+        <IconButton size="bar" label={composer.queue_send_now({ who })} keys="⏎" onClick={onSteer} testId={`${testId}.steer`}>
           <Icon d={ICONS.steer} />
         </IconButton>
         {/* a draft in the field: edit waits; the tip on its wrapper says why (a disabled button gets no hover) */}
-        <span className={cx("hold", !fieldEmpty && "off")} {...tipAttrs(fieldEmpty ? undefined : "empty the composer to edit it")}>
-          <IconButton size="bar" label="edit: back into the composer" keys="↑" disabled={!fieldEmpty} onClick={onEdit} testId={`${testId}.edit`}>
+        <span className={cx("hold", !fieldEmpty && "off")} {...tipAttrs(fieldEmpty ? undefined : composer.queue_edit_wait)}>
+          <IconButton size="bar" label={composer.queue_edit} keys="↑" disabled={!fieldEmpty} onClick={onEdit} testId={`${testId}.edit`}>
             <Icon d={ICONS.edit} />
           </IconButton>
         </span>
-        <IconButton size="bar" label="delete it" keys="⌫" onClick={onDelete} testId={`${testId}.delete`}>
+        <IconButton size="bar" label={composer.queue_delete} keys="⌫" onClick={onDelete} testId={`${testId}.delete`}>
           <Icon d={ICONS.delete} />
         </IconButton>
       </span>
@@ -175,16 +176,16 @@ export function QueueDrawer({ rows, who, fieldEmpty, deleted, onSteer, onEdit, o
       <div className="h" data-testid={`${testId}.head`}>
         {deleted ? (
           <span className="hw" role="status">
-            deleted ·{" "}
+            {composer.queue_deleted} ·{" "}
             <Act onClick={onUndo} testId={`${testId}.undo`}>
-              undo
+              {composer.queue_undo}
             </Act>
           </span>
         ) : (
           <span className="hw">{queueHead(rows.length, who)}</span>
         )}
         {rows.length > 0 && (
-          <IconButton size="bar" label={folded ? "show the queued messages" : "fold the queued messages"} pressed={!folded} onClick={() => {
+          <IconButton size="bar" label={folded ? composer.queue_show : composer.queue_fold} pressed={!folded} onClick={() => {
               setFolded((f) => !f);
             }} testId={`${testId}.fold`}>
             {/* the composer's 8x5 chevron: down while open, right while folded */}

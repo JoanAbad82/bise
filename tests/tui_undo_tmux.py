@@ -13,6 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, tmux, wait_until, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 
 def composer(t):
@@ -58,10 +59,10 @@ def main():
         # redo once (ctrl+y: tmux cannot tell ctrl+shift+z apart)
         t.keys("C-y")
         step(t, "fix the login bug", 14)
-        assert "no undo" not in t.screen(), t.screen()
+        assert w("composer.no_undo") not in t.screen(), t.screen()
         for _ in range(5):
             t.keys("C-z")
-        t.wait("no undo: an agent may already have acted")
+        t.wait(w("composer.no_undo"))
         print("PASS tui undo")
 
 

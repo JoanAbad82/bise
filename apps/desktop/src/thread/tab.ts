@@ -5,6 +5,7 @@
 // Answering a card: '↳ answering search · <question>' and 'esc to bise instead' on the right; short,
 // the question goes first, then that end; '↳ answering search' never goes (answerFit).
 // Pure: ComposerTab.tsx draws and measures it. Owner: amb-win.
+import { composer } from '../proto/words.gen';
 
 /** Where its words go, as the tab names it (designer m_24790): his checkout by its folder's name,
  *  a worktree by its own folder's name after the ψ; the tip says what it is. */
@@ -57,10 +58,10 @@ export function tabPlace(
 ): TabPlace | undefined {
   if (a === undefined || home) return undefined;
   if (wt !== undefined && wt.path != null && wt.path !== '') return { name: worktreeName(wt.path), worktree: true, tip: wt.tip };
-  if (a.worktree != null && a.worktree !== '') return { name: worktreeName(a.worktree), worktree: true, tip: wt?.tip ?? `ψ worktree: ${tilde(a.worktree)}` };
-  if (a.branch != null && a.branch !== '') return { name: a.branch, worktree: true, tip: wt?.tip ?? `ψ worktree, on ${a.branch}` };
+  if (a.worktree != null && a.worktree !== '') return { name: worktreeName(a.worktree), worktree: true, tip: wt?.tip ?? composer.tab_worktree_at({ path: tilde(a.worktree) }) };
+  if (a.branch != null && a.branch !== '') return { name: a.branch, worktree: true, tip: wt?.tip ?? composer.tab_worktree_on({ branch: a.branch }) };
   if (project === undefined || project === '') return undefined;
-  return { name: folderName(project), worktree: false, tip: `your own folder: ${tilde(project)}` };
+  return { name: folderName(project), worktree: false, tip: composer.tab_own_folder({ path: tilde(project) }) };
 }
 
 /** Which optional items fit beside the label. */
@@ -148,5 +149,5 @@ export const RING_CLEAR_PCT = 80;
 
 /** The ring's tip: '17% of perf's context used · 42k tokens · compacts at 90%'. Pure. */
 export function ringTip(who: string, c: { tokens: string; pct: number }): string {
-  return `${String(Math.round(c.pct))}% of ${who}'s context used · ${c.tokens} tokens · compacts at 90%`;
+  return composer.ring_tip({ pct: Math.round(c.pct), agent: who, tokens: c.tokens });
 }

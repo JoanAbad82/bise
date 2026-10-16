@@ -30,6 +30,7 @@
 //! box).
 
 use crate::app::App;
+use bise_proto::words::composer;
 use crate::attach::Attachment;
 
 /// A paste of at least this many lines becomes a chip.
@@ -123,7 +124,7 @@ pub(crate) fn rows(pastes: &[Pasted], open: bool, width: usize) -> Vec<ratatui::
     let mut out = Vec::new();
     for p in pastes {
         let n = crate::quote::line_count(&p.text);
-        let count = format!("{n} line{}", if n == 1 { "" } else { "s" });
+        let count = composer::lines(n);
         if open {
             out.push(Line::from(Span::styled(format!("{g} {} · {count}", p.n), d)));
             let t = Style::default().fg(crate::theme::text());
@@ -141,9 +142,7 @@ pub(crate) fn rows(pastes: &[Pasted], open: bool, width: usize) -> Vec<ratatui::
 
 /// What the box and the history say about a paste: `240 lines · 9.8 kB`.
 pub(crate) fn about(text: &str) -> String {
-    let n = crate::quote::line_count(text);
-    let s = if n == 1 { "" } else { "s" };
-    format!("{n} line{s} · {}", crate::attach::size_text(text.len() as u64))
+    composer::paste_about(crate::quote::line_count(text), crate::attach::size_text(text.len() as u64))
 }
 
 /// The paste an attachment holds (its marker is its tag).

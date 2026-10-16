@@ -13,6 +13,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, wait_until, pane_rows, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 
 def composer(sc):
@@ -63,7 +64,7 @@ def main():
         t.wait_re(MAIN_IDLE)
         t.start(150, 40, env)
         t.wait_re(MAIN_IDLE)
-        t.wait("what's on your mind?")
+        t.wait(w("composer.placeholder_main"))
         # the sent prompts come back with Up, newest first
         t.keys("Up")
         t.wait_any([lambda s: "half a thought" in composer(s)])

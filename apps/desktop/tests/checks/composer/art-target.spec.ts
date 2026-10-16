@@ -15,6 +15,7 @@ import type { Page } from '@playwright/test';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { composer } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -143,14 +144,14 @@ for (const theme of ['light', 'dark'] as const) {
       // the thread's 390 px column: '· about “…”' whole or gone, never 'about…' (designer m_27021)
       await expect(to).toHaveText(PINK);
       await expect(page.locator('[data-testid="composer.tab.to"] .who')).toHaveText('↳ to perf');
-      await expect(end).toHaveText('esc to bise instead');
-      await expect(field).toHaveAttribute('aria-placeholder', 'ask perf about it, then ⏎');
+      await expect(end).toHaveText(composer.tab_esc_instead({ agent: 'bise' }));
+      await expect(field).toHaveAttribute('aria-placeholder', composer.placeholder_about({ agent: 'perf' }));
       await page.waitForTimeout(220);
       const a = await look(page);
       expect(a.boxShadow, 'a 1.5 px accent border').toContain(`${a.accent} 0px 0px 0px 1.5px`);
       expect(a.tabAcc).toBe(true);
       expect(a.tabColor, 'the tab in the accent').toBe(a.accent);
-      expect(a.tabTip).toBe('your words go to perf, not bise · esc writes to bise');
+      expect(a.tabTip).toBe(composer.about_tip({ agent: 'perf', esc: composer.esc_writes_to({ agent: 'bise' }) }));
       expect(a.sendBg, 'the send filled accent').toBe(a.accent);
       await expect(page.getByTestId('composer.tab'), 'the pink tab holds no place nor context').not.toContainText('context');
       await shot('pink');
@@ -181,7 +182,7 @@ for (const theme of ['light', 'dark'] as const) {
 
       // (4) main's own artifact: plain
       await openArt('weekly');
-      await expect(to).toHaveText('to bise · about “weekly update”');
+      await expect(to).toHaveText(composer.tab_about({ agent: 'bise', title: 'weekly update' }));
       await expect(end).toHaveCount(0);
       await page.waitForTimeout(220);
       await plain("main's artifact");
@@ -198,7 +199,7 @@ for (const theme of ['light', 'dark'] as const) {
       // cut after a whole word by the tab, never by the css clip (designer m_27021: 'next to th…')
       await expect.poll(() => to.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), { timeout: 2000 }).toBe(true);
       await page.waitForTimeout(220);
-      expect((await look(page)).tabTip).toMatch(/^your words answer perf's question/u);
+      expect(((await look(page)).tabTip ?? '').startsWith(composer.answer_tip({ agent: 'perf', esc_to: '' }).replace(/ · .*$/u, ''))).toBe(true);
       await shot('question');
       await page.getByTestId('inbox.block.row.2').click();
       await expect(page.getByTestId('inbox.block.open.2')).toBeVisible({ timeout: 3000 });

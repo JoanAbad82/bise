@@ -14,6 +14,7 @@ import type { Part } from '@/proto';
 import { NO_SPACE_BEFORE } from '@/proto/chips.gen';
 import type { Anchor } from '@/proto/anchor';
 import { anchorLabel, anchorWhere } from './anchor';
+import { composer } from '../proto/words.gen';
 
 export type Chip =
   | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string; readonly w?: number; readonly h?: number; readonly bytes?: number }
@@ -34,12 +35,11 @@ export interface QuoteAt {
 /** A quote's place in words (quote.rs about): 'src/a.rs:12-14 · 3 lines', 'src/a.rs:11-12 · 2 removed lines', else 'main · 3 lines'. */
 export function quoteAbout(from: string, text: string, at?: QuoteAt): string {
   const n = lineCount(text);
-  const s = n === 1 ? '' : 's';
   // the author as the thread draws it: a project's main is 'bise' (designer m_21425; the part keeps 'main')
-  if (at === undefined || at.file === '') return `${from === 'main' ? 'bise' : from} · ${n} line${s}`;
-  if (at.new !== '') return `${at.file}:${at.new} · ${n} line${s}`;
-  if (at.old !== '') return `${at.file}:${at.old} · ${n} removed line${s}`;
-  return `${at.file} · ${n} line${s}`;
+  if (at === undefined || at.file === '') return composer.quote_about({ place: from === 'main' ? 'bise' : from, n });
+  if (at.new !== '') return composer.quote_about({ place: `${at.file}:${at.new}`, n });
+  if (at.old !== '') return composer.quote_about_removed({ place: `${at.file}:${at.old}`, n });
+  return composer.quote_about({ place: at.file, n });
 }
 
 export type Segment = { readonly kind: 'text'; readonly text: string } | { readonly kind: 'chip'; readonly chip: Chip };
@@ -115,7 +115,7 @@ export function chipStrip(c: Chip): string {
       return `${chipLabel(c)} ${c.name}`;
     case 'paste': {
       const kb = new TextEncoder().encode(c.text).length / 1000;
-      return `${chipLabel(c)} “${preview(c.text, 32)}”   ${lineCount(c.text)} lines · ${kb.toFixed(1)} kB`;
+      return `${chipLabel(c)} “${preview(c.text, 32)}”   ${composer.paste_lines_kb({ n: lineCount(c.text), kb: kb.toFixed(1) })}`;
     }
     case 'quote':
       return `${chipLabel(c)} “${preview(c.text, 32)}”  ${quoteAbout(c.from, c.text, c.at)}`;
@@ -137,7 +137,7 @@ export function attachRow(c: Chip, home = ''): { readonly name: string; readonly
       return { name: `“${preview(c.text, 60)}”`, info: quoteAbout(c.from, c.text, c.at) };
     case 'paste': {
       const kb = new TextEncoder().encode(c.text).length / 1000;
-      return { name: `“${preview(c.text, 60)}”`, info: `${String(lineCount(c.text))} lines · ${kb.toFixed(1)} kB` };
+      return { name: `“${preview(c.text, 60)}”`, info: composer.paste_lines_kb({ n: lineCount(c.text), kb: kb.toFixed(1) }) };
     }
     case 'image': {
       // its pixels and its size, text-3, like a file's (designer m_22673): '1200×630 · 84 kB'

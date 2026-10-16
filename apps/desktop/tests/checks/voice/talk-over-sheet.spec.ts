@@ -10,6 +10,7 @@ import { writeFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../harness';
 import { CAPSULE, capsulePage, onWorld, sleep, type World } from '../native/world';
+import { composer } from '../../../src/proto/words.gen';
 
 const P = 'acme-1a2b3c4d';
 const prefs = (theme: 'light' | 'dark') => ({
@@ -27,7 +28,7 @@ const prefs = (theme: 'light' | 'dark') => ({
 const STOP = "bise stopped 3 times in 2 minutes (the hub exited: journal.jsonl line 812 isn't json). your next fn talk starts it again.";
 const STATES: readonly { name: string; ev: Record<string, unknown>; says: string }[] = [
   { name: 'nothing heard', ev: { ev: 'heard', text: '', final: true }, says: "i didn't hear anything. hold fn and talk." },
-  { name: 'no voice key', ev: { ev: 'error', cmd: 'talk_start', text: 'voice needs a key. /voice picks one.' }, says: 'bise needs a voice key to hear you. settings › voice' },
+  { name: 'no voice key', ev: { ev: 'error', cmd: 'talk_start', text: composer.voice_needs_key }, says: 'bise needs a voice key to hear you. settings › voice' },
   { name: 'the stop line', ev: { ev: 'error', text: STOP }, says: STOP },
   { name: 'answered', ev: { ev: 'voice_answer', project: P, card: 9, n: 1, line: 'heard "the first one" → 1 cold', ms: 1500 }, says: '✓ answered acme' },
 ];

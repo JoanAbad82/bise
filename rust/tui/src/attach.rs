@@ -12,6 +12,7 @@
 //! here panics on any input.
 
 use crate::app::App;
+use bise_proto::words::composer;
 use crate::theme::{accent, dim, error, glyph, text, G_FAILED, G_FILE, G_IMAGE, G_PASTE, G_QUOTE};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -641,17 +642,14 @@ pub(crate) fn no_vision(err: &str) -> Option<Vec<Span<'static>>> {
         return None;
     }
     let model = MODEL.with(|m| m.borrow().clone());
-    Some(no_vision_spans(if model.is_empty() { "this model" } else { &model }))
+    Some(no_vision_spans(if model.is_empty() { composer::this_model } else { &model }))
 }
 
 fn no_vision_spans(model: &str) -> Vec<Span<'static>> {
     vec![
         Span::styled(format!("  {G_FAILED} "), Style::default().fg(error())),
-        Span::styled(format!("{model} can't read images."), Style::default().fg(error())),
-        Span::styled(
-            " pick a model that can (/model), or describe the screen in words.".to_string(),
-            Style::default().fg(dim()),
-        ),
+        Span::styled(composer::no_vision(model), Style::default().fg(error())),
+        Span::styled(format!(" {}", composer::no_vision_how), Style::default().fg(dim())),
     ]
 }
 
@@ -675,15 +673,15 @@ pub(crate) fn strip_row(n: usize, info: &Info) -> (String, String) {
     let left = format!("{G_IMAGE} {n} {}", file_name(&info.source));
     let mut right = format!("{} · {}", wxh((info.width, info.height)), size_text(info.bytes));
     if info.resized {
-        right.push_str(&format!(" → resized to fit {}", bend_images::MAX_DIMENSION));
+        right.push_str(&format!(" {}", composer::image_resized(bend_images::MAX_DIMENSION)));
     }
     (left, right)
 }
 
 /// The box's title, in its top border (book §13 "The attachments box").
-pub(crate) const BOX_TITLE: &str = "attached";
+pub(crate) const BOX_TITLE: &str = composer::box_title;
 /// The box's tip, in its bottom border on the right.
-pub(crate) const BOX_TIP: &str = "backspace on a chip removes it";
+pub(crate) const BOX_TIP: &str = composer::box_tip;
 /// The box's width bounds: as wide as its longest row, at least 44
 /// columns, at most the reading width (full width when narrower).
 const BOX_MIN: usize = 44;

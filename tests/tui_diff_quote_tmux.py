@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, wait_until, in_view, MAIN_IDLE  # noqa: E402
 from tui_artifacts_tmux import sb, command  # noqa: E402
+from words import w  # noqa: E402
 
 SHOTS = os.environ.get("DQ_SHOTS")
 LIGHT = os.environ.get("DQ_LIGHT") == "1"
@@ -116,7 +117,7 @@ def wide(t):
     t.typed("why these three?")
     sc = t.wait("❝ 1")
     t.wait_gone(hint)
-    sc = t.wait("src/pricing.tsx:6-8 · 3 lines")
+    sc = t.wait(w("composer.quote_about", place="src/pricing.tsx:6-8", n=3))
     shot(t, "150-composer")
     t.keys("Enter")
     r = sent_to(E, "t1", 'new=\\"6-8\\"')
@@ -124,7 +125,7 @@ def wide(t):
     # the quote's tag where its chip was, with its number (his m_22231)
     assert 'from=\\"t1 vs main\\" n=\\"1\\" file=\\"src/pricing.tsx\\" new=\\"6-8\\"' in blob, blob
     assert "+line 5\\n+line 6\\n+line 7" in blob and "why these three?" in blob, blob
-    sc = t.wait_re(r"❝ line 5 line 6 line 7 · src/pricing.tsx:6-8 · 3 lines")
+    sc = t.wait_re(re.escape("❝ line 5 line 6 line 7 · " + w("composer.quote_about", place="src/pricing.tsx:6-8", n=3)))
     shot(t, "150-thread")
 
     # t1's turn runs meanwhile: give the close the time of a busy frame.
@@ -159,9 +160,9 @@ def removed(t):
     sc = t.wait("− b")
     px = row_of(sc, "− b")[0] - 10
     drag_rows(t, "− b", "− c", px)
-    t.wait(" type to ask main about it")
+    t.wait(" type " + w("composer.bar_ask_who", who="main"))
     t.typed("x")
-    t.wait("gone.txt:2-3 · 2 removed lines")
+    t.wait(w("composer.quote_about_removed", place="gone.txt:2-3", n=2))
     shot(t, "150-removed")
     t.keys("C-u")
 
@@ -184,11 +185,11 @@ def narrow(t):
     else:
         raise AssertionError("the cursor never reached −b:\n" + sc)
     t.keys("S-Down")
-    sc = t.wait(" type to ask main about it")
+    sc = t.wait(" type " + w("composer.bar_ask_who", who="main"))
     shot(t, "80-selected")
     t.typed("fix")
     sc = t.wait("❝ 1")
-    assert "gone.txt:2-3 · 2 removed lines" in sc, sc
+    assert w("composer.quote_about_removed", place="gone.txt:2-3", n=2) in sc, sc
     shot(t, "80-composer")
 
 

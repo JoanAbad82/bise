@@ -138,7 +138,7 @@ fn steer(app: &mut App, at: usize) {
 /// 'empty the composer to edit it'); the composer has the keys again.
 fn edit(app: &mut App, at: usize) {
     if !app.ed.text.is_empty() {
-        crate::input::flash(app, "empty the composer to edit it".into());
+        crate::input::flash(app, bise_proto::words::composer::queue_edit_wait.into());
         return;
     }
     take(app, at, Take::Edit);

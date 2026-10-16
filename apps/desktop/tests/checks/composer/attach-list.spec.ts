@@ -18,6 +18,7 @@ import type { Page } from '@playwright/test';
 import { FakeCore, test, expect } from '../../harness';
 import { dropFiles } from '../../harness/inputs';
 import { onWorld } from '../native/world';
+import { composer } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const ROOT = mkdtempSync(path.join(tmpdir(), 'attach-list-'));
@@ -99,7 +100,7 @@ for (const size of ['1100x720', '800x720']) {
         await quoteAnswer(page);
         await expect(rows(page), 'one row').toHaveCount(1);
         await expect(page.getByTestId('composer.attach.1')).toContainText('“Contacte le service crédit immobilier');
-        await expect(page.getByTestId('composer.attach.1')).toContainText('bise · 1 line');
+        await expect(page.getByTestId('composer.attach.1')).toContainText(composer.quote_about({ place: 'bise', n: 1 }));
         await shot(page, core, `one-${w}`);
 
         await field.click();
@@ -113,7 +114,7 @@ for (const size of ['1100x720', '800x720']) {
         await expect(page.getByTestId('composer.attach.3')).toContainText('deck.pptx');
         await expect(page.getByTestId('composer.attach.2').locator('.in3'), "an image row's facts: its pixels and size").toHaveText(/^\d+×\d+ · \d+ (B|kB)$/u);
         await expect(page.locator('[data-testid^="composer.strip."]'), "no strip line above 'to bise'").toHaveCount(0);
-        await expect(page.getByTestId('composer.tip')).toHaveText('backspace on a chip removes it');
+        await expect(page.getByTestId('composer.tip')).toHaveText(composer.box_tip);
 
         // inside the box, 28 px each, above his words
         const geo = await page.evaluate(() => {

@@ -32,6 +32,7 @@
 //! and the per-view drafts keep it like an image, with no new state.
 
 use crate::app::App;
+use bise_proto::words::composer;
 use crate::attach::Attachment;
 
 /// Quotes in one message, at most.
@@ -125,12 +126,11 @@ pub(crate) fn words(q: &Quote) -> String {
 /// `src/quote.rs:192-194 · 3 lines`, `src/a.rs:40-41 · 2 removed lines`.
 pub(crate) fn about(q: &Quote) -> String {
     let n = line_count(&q.text);
-    let s = if n == 1 { "" } else { "s" };
     match (&q.at.file, &q.at.new, &q.at.old) {
-        (f, _, _) if f.is_empty() => format!("{} · {} line{}", q.from, n, s),
-        (f, new, _) if !new.is_empty() => format!("{}:{} · {} line{}", f, new, n, s),
-        (f, _, old) if !old.is_empty() => format!("{}:{} · {} removed line{}", f, old, n, s),
-        (f, _, _) => format!("{} · {} line{}", f, n, s),
+        (f, _, _) if f.is_empty() => composer::quote_about(&q.from, n),
+        (f, new, _) if !new.is_empty() => composer::quote_about(format!("{f}:{new}"), n),
+        (f, _, old) if !old.is_empty() => composer::quote_about_removed(format!("{f}:{old}"), n),
+        (f, _, _) => composer::quote_about(f, n),
     }
 }
 
@@ -172,10 +172,10 @@ pub(crate) fn add(app: &mut App, from: &str, text: &str) -> Result<String, Strin
 pub(crate) fn add_at(app: &mut App, from: &str, at: &Where, text: &str) -> Result<String, String> {
     let text = text.trim_matches('\n').trim_end();
     if text.trim().is_empty() {
-        return Err("nothing selected".into());
+        return Err(composer::nothing_selected.into());
     }
     if chips(&app.ed.text).len() >= MAX {
-        return Err(format!("{MAX} quotes at most: backspace on one to make room"));
+        return Err(composer::quotes_at_most(MAX));
     }
     let text: String = match text.char_indices().nth(MAX_CHARS) {
         Some((b, _)) => format!("{}…", &text[..b]),
@@ -253,11 +253,11 @@ pub(crate) fn take_selection(app: &mut App) -> Option<Result<String, String>> {
 /// not fit; empty: none (the thread's).
 pub(crate) fn hint_line(width: usize, no_color: bool, who: &str) -> Option<ratatui::text::Line<'static>> {
     if !who.is_empty() {
-        if let Some(l) = hint_words(width, no_color, &format!(" to ask {who} about it")) {
+        if let Some(l) = hint_words(width, no_color, &format!(" {}", composer::bar_ask_who(who))) {
             return Some(l);
         }
     }
-    hint_words(width, no_color, " to ask about it")
+    hint_words(width, no_color, &format!(" {}", composer::bar_ask))
 }
 
 fn hint_words(width: usize, no_color: bool, words: &str) -> Option<ratatui::text::Line<'static>> {
@@ -275,8 +275,8 @@ fn hint_words(width: usize, no_color: bool, words: &str) -> Option<ratatui::text
     };
     let (open, close) = if no_color { ("[ ", " ]") } else { (" ", " ") };
     let ask_pair = [Span::styled(open, bg), Span::styled("type", key), Span::styled(words.to_string(), ask)];
-    let tab_pair = [Span::styled(" · ", sep), Span::styled(TAB_KEY, copy_key), Span::styled(" quote", copy)];
-    let copy_pair = [Span::styled(" · ", sep), Span::styled(COPY_KEY, copy_key), Span::styled(" copy", copy)];
+    let tab_pair = [Span::styled(" · ", sep), Span::styled(TAB_KEY, copy_key), Span::styled(format!(" {}", composer::bar_quote), copy)];
+    let copy_pair = [Span::styled(" · ", sep), Span::styled(COPY_KEY, copy_key), Span::styled(format!(" {}", composer::bar_copy), copy)];
     let end = [Span::styled(close, bg)];
     // designer m_11973: narrower, `cmd+c copy` goes first, then `tab quote`
     let long: Vec<Span<'static>> = ask_pair.iter().chain(&tab_pair).chain(&copy_pair).chain(&end).cloned().collect();
@@ -305,7 +305,7 @@ pub(crate) fn hint_part(line: &ratatui::text::Line<'_>, x: u16) -> HintPart {
     for (i, s) in line.spans.iter().enumerate() {
         let w = s.width();
         if (x as usize) < at + w {
-            let copy = s.content == COPY_KEY || s.content == " copy" || line.spans.get(i + 1).is_some_and(|n| n.content == COPY_KEY);
+            let copy = s.content == COPY_KEY || s.content.strip_prefix(' ') == Some(composer::bar_copy) || line.spans.get(i + 1).is_some_and(|n| n.content == COPY_KEY);
             return if copy { HintPart::Copy } else { HintPart::Quote };
         }
         at += w;
@@ -372,7 +372,7 @@ pub(crate) fn hint_click(app: &App, col: u16, row: u16) -> Option<HintPart> {
 /// the composer's cursor, the flash says it. False: no selection.
 pub(crate) fn quote_now(app: &mut App) -> bool {
     match take_selection(app) {
-        Some(Ok(chip)) => crate::input::flash(app, format!("quoted {chip} · backspace on it removes it")),
+        Some(Ok(chip)) => crate::input::flash(app, composer::quoted(chip)),
         Some(Err(e)) => crate::input::flash(app, e),
         None => return false,
     }

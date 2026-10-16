@@ -5,6 +5,7 @@
 //! their own (the theme ground stays, BISE-92).
 
 use crate::gust;
+use bise_proto::words::composer;
 use crate::layout::Cols;
 use crate::theme::{self, accent, dim, faint};
 use ratatui::buffer::Buffer;
@@ -359,7 +360,7 @@ fn label(name: &str, tail: &[Span<'static>], working: Option<(&Working, Step)>) 
     };
     let mut out = vec![
         Span::raw(" "),
-        Span::styled(format!("you {} ", arrow), Style::default().fg(dim())),
+        Span::styled(format!("{} ", composer::divider_you(arrow)), Style::default().fg(dim())),
         Span::styled(name, Style::default().fg(accent())),
     ];
     out.extend(tail.iter().cloned());
@@ -368,8 +369,8 @@ fn label(name: &str, tail: &[Span<'static>], working: Option<(&Working, Step)>) 
         out.extend(gust::mark(w.motion, step.size));
         if step.words && w.words {
             let words = match &w.age {
-                Some(age) => format!(" working · {}", age),
-                None => " working".to_string(),
+                Some(age) => format!(" {}", composer::divider_working_for(age)),
+                None => format!(" {}", composer::divider_working),
             };
             out.push(Span::styled(words, Style::default().fg(dim())));
         }

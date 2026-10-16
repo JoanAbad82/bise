@@ -7,6 +7,7 @@
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { expectShown } from './shown';
+import { composer } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const ANSWER = 'the p99 climbs when the 14:00 compaction runs. alerts suggests moving it to 03:00.';
@@ -134,7 +135,7 @@ test('review/quote-pop: a click on the pop asks about the picked lines, the thre
     await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), "perf's thread").toBeVisible({ timeout: 5000 });
     const chip = page.locator('[data-testid="composer.chip.1"][data-kind="quote"]');
     await expect(chip, 'a quote chip').toBeVisible({ timeout: 3000 });
-    await expect(page.getByText('src/query.rs:10-11 · 3 lines')).toBeVisible();
+    await expect(page.getByText(composer.quote_about({ place: 'src/query.rs:10-11', n: 3 }))).toBeVisible();
     expect(await fieldText(page), 'nothing typed after it').toMatch(/^❝ 1 ?$/u);
   } finally {
     await s.close();
@@ -160,7 +161,7 @@ test('review/quote-pop: tab asks about the picked lines, the thread opens with t
     await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), "perf's thread").toBeVisible({ timeout: 5000 });
     const chip = page.locator('[data-testid="composer.chip.1"][data-kind="quote"]');
     await expect(chip, 'a quote chip').toBeVisible({ timeout: 3000 });
-    await expect(page.getByText('src/query.rs:10-11 · 3 lines')).toBeVisible();
+    await expect(page.getByText(composer.quote_about({ place: 'src/query.rs:10-11', n: 3 }))).toBeVisible();
     expect(await fieldText(page), 'nothing typed after it').toMatch(/^❝ 1 ?$/u);
   } finally {
     await s.close();

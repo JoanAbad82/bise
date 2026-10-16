@@ -10,6 +10,7 @@ import { shortAge } from '@/agents/model';
 import { pauseLine, shownPause, waitLen } from '@/thread/wake';
 import { tilde, type Mark } from './barplaces';
 import { projectMark } from './markstates';
+import { composer } from '../proto/words.gen';
 
 const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
 
@@ -163,10 +164,10 @@ export function updatedTip(): string {
 
 /** The pink border's tip while his words answer `who`'s question: 'your words answer search's question · esc writes to bise'. */
 export function answerTip(who: string, escTo: string): string {
-  return `your words answer ${who}'s question · esc writes to ${escTo}`;
+  return composer.answer_tip({ agent: who, esc_to: escTo });
 }
 
 /** The pink border's tip while an open artifact's words go to its maker (art-target): 'your words go to perf, not bise · esc writes to bise'; no thread to go back to: 'esc closes it'. */
 export function aboutTip(who: string, escTo: string | undefined): string {
-  return `your words go to ${who}, not bise · ${escTo === undefined ? 'esc closes it' : `esc writes to ${escTo}`}`;
+  return composer.about_tip({ agent: who, esc: escTo === undefined ? composer.esc_closes : composer.esc_writes_to({ agent: escTo }) });
 }

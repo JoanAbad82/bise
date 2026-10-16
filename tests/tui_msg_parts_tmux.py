@@ -29,9 +29,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, tmux, wait_until, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 COLS, ROWS = 140, 50
-HINT = "tab quote"
+HINT = "tab " + w("composer.bar_quote")
 TAGS = ("<selection", "</selection>", "<pasted", "</pasted>", "<image name=")
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
@@ -113,9 +114,9 @@ def main():
         shot("quote-paste-image")
         rows = mine(sc)
         no_tag(rows, "his message")
-        expect(any("❝ login" in r and "main · 1 line" in r for r in rows), "the quote line: %r" % rows)
+        expect(any("❝ login" in r and w("composer.quote_about", place="main", n=1) in r for r in rows), "the quote line: %r" % rows)
         expect(any("why does" in r and "▤" in r for r in rows), "the paste's chip in his words: %r" % rows)
-        expect(any("14 lines" in r for r in rows), "the paste's row: %r" % rows)
+        expect(any(w("composer.lines", n=14) in r for r in rows), "the paste's row: %r" % rows)
         expect(any("▣ clipboard" in r for r in rows), "the image's chip: %r" % rows)
         print("ok: a quote, a paste and an image draw as chips")
 
@@ -146,7 +147,7 @@ def main():
         no_tag(rows, "queued and steered")
         for w in ("queued words", "steered words"):
             expect(any(w in r and "▤" in r for r in rows), "%s with its chip: %r" % (w, rows))
-        expect(sum("14 lines" in r for r in rows) >= 2, "a paste row each: %r" % rows)
+        expect(sum(w("composer.lines", n=14) in r for r in rows) >= 2, "a paste row each: %r" % rows)
         print("ok: queued and steered messages draw their chips")
 
         # 3. a message to another agent
@@ -198,7 +199,7 @@ def main():
             i = max(k for k, row in enumerate(rows) if "you answered t3" in row)
             block = [rows[i]] + mine("\n".join(rows[i + 1:i + 6]))
             expect(not any(tg in row for row in block for tg in TAGS), "the answer's rows (%s): %r" % (how, block))
-            expect(any("❝ le process" in row and "main · 1 line" in row for row in block), "its quote line (%s): %r" % (how, block))
+            expect(any("❝ le process" in row and w("composer.quote_about", place="main", n=1) in row for row in block), "its quote line (%s): %r" % (how, block))
             expect(any(words in row for row in block), "his words (%s): %r" % (how, block))
         print("ok: a card answer with a quote draws the quote line and his words")
     print("PASS tui msg parts")

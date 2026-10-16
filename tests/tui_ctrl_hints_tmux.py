@@ -16,16 +16,17 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import wait  # noqa: E402
 from tui_tmux import tui_session, run, tmux, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 CTRL_DOWN = "\x1b[57442;5u"
 CTRL_UP = "\x1b[57442;1:3u"
-HINT = "ctrl+c quit"
+HINT = "ctrl+c " + w("composer.bar_quit")
 ALT_DOWN = "\x1b[57443;3u"
 ALT_UP = "\x1b[57443;1:3u"
-ALT_HINT = "\u2325\u23ce newline"
+ALT_HINT = "\u2325\u23ce " + w("composer.bar_newline")
 CMD_DOWN = "\x1b[57444;9u"
 CMD_UP = "\x1b[57444;1:3u"
-CMD_HINT = "cmd+v paste"
+CMD_HINT = "cmd+v " + w("composer.bar_paste")
 
 
 def raw(t, s):
@@ -41,7 +42,7 @@ def check(cols, rows):
         # held alone: the hints come, the frame's rows stay where they are
         raw(t, CTRL_DOWN)
         sc = t.wait(HINT, timeout=5)
-        assert "ctrl+v paste image" in sc, sc
+        assert "ctrl+v " + w("composer.bar_paste_image") in sc, sc
         assert len(sc.splitlines()) == len(before.splitlines()), sc
         print("---- ctrl held at %d columns ----\n%s" % (cols, sc))
         raw(t, CTRL_UP)
@@ -73,7 +74,7 @@ def check(cols, rows):
         raw(t, CMD_UP + CMD_DOWN + "\x1b[99;9u" + "\x1b[99;9:3u" + CMD_UP)
         raw(t, CMD_DOWN)
         sc = t.wait(CMD_HINT, timeout=5)
-        assert "cmd+a select all" in sc, sc
+        assert "cmd+a " + w("composer.bar_select_all") in sc, sc
         print("---- cmd held ----\n%s" % sc)
         raw(t, CMD_UP)
         t.wait_gone(CMD_HINT, timeout=2)

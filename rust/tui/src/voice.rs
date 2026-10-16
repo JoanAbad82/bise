@@ -23,6 +23,7 @@
 // meter and the resampler are only used by the tests there
 #![cfg_attr(all(target_os = "linux", not(test)), allow(dead_code))]
 
+use bise_proto::words::composer;
 use crossterm::event::{KeyCode, KeyModifiers};
 use serde_json::Value;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -71,9 +72,9 @@ pub fn loudness(peak: f32) -> f32 {
 
 fn mic_access_hint() -> &'static str {
     if cfg!(target_os = "macos") {
-        " grant access in System Settings → Privacy & Security → Microphone."
+        composer::voice_mic_access_mac
     } else if cfg!(target_os = "windows") {
-        " grant access in Settings → Privacy & security → Microphone."
+        composer::voice_mic_access_windows
     } else {
         ""
     }
@@ -83,8 +84,8 @@ fn mic_access_hint() -> &'static str {
 /// voice mode).
 pub(crate) fn start_error_line(e: StartError) -> String {
     match e {
-        StartError::NoInputDevice => format!("no audio input device found.{}", mic_access_hint()),
-        StartError::Backend(m) => format!("audio backend is unavailable: {}", m),
+        StartError::NoInputDevice => composer::voice_no_device(mic_access_hint()),
+        StartError::Backend(m) => composer::voice_backend(m),
     }
 }
 
@@ -92,24 +93,22 @@ pub(crate) fn start_error_line(e: StartError) -> String {
 /// terminal may not use it).
 fn no_audio_detected_message() -> String {
     if cfg!(target_os = "macos") {
-        "i can't hear you. allow the microphone for your terminal: System Settings › Privacy & Security › Microphone.".into()
+        composer::voice_cant_hear_mac.into()
     } else {
-        format!("i can't hear you. check your terminal may use the microphone.{}", mic_access_hint())
+        composer::voice_cant_hear(mic_access_hint())
     }
 }
 
 /// The voice model has no key (BISE-298: replaces "voice transcription
 /// needs an API key: …").
-pub const NEEDS_KEY: &str = "voice needs a key. /voice picks one.";
+pub const NEEDS_KEY: &str = composer::voice_needs_key;
 
-/// `/voice` with a setup that works (BISE-298): `voice is on: <model>`
-pub const ENABLED_MESSAGE: &str = "voice is on: ";
-pub const DISABLED_MESSAGE: &str = "voice is off. /voice turns it back on.";
-pub const OFF_HINT: &str = "voice is off: /voice turns it on";
+pub const DISABLED_MESSAGE: &str = composer::voice_disabled;
+pub const OFF_HINT: &str = composer::voice_off_hint;
 /// under `✓ voice is on: <model>.` once the voice picker checked it
-pub const ON_HOW: &str = "press ctrl+r and talk, any key stops. /voice turns it off.";
+pub const ON_HOW: &str = composer::voice_on_how;
 /// esc on the voice picker while turning voice on
-pub const STAYS_OFF: &str = "voice is off. /voice when you want it.";
+pub const STAYS_OFF: &str = composer::voice_stays_off;
 
 // ---- keys ----
 
@@ -329,19 +328,19 @@ pub struct FailLines {
 
 pub fn fail_lines(f: &Failure, provider: &str, model: &str, billing_url: &str, kept: bool) -> FailLines {
     let (glyph, head) = match f.kind {
-        FailKind::WrongKey => ("✗", format!("{} says the voice key is wrong. /provider fixes it.", provider)),
-        FailKind::NoCredit if billing_url.is_empty() => ("?", format!("your {} account has no credit yet.", provider)),
-        FailKind::NoCredit => ("?", format!("your {} account has no credit yet. add some here: {}", provider, billing_url)),
-        FailKind::Model => ("✗", format!("{} can't transcribe with {}. /voice picks another model.", provider, model)),
-        FailKind::Down => ("✗", format!("i couldn't reach {} to transcribe. try again, or /voice for another provider.", provider)),
-        FailKind::Other => ("✗", format!("{} answered something i can't read. try again, or /voice for another provider.", provider)),
+        FailKind::WrongKey => ("✗", composer::voice_wrong_key(provider)),
+        FailKind::NoCredit if billing_url.is_empty() => ("?", composer::voice_no_credit(provider)),
+        FailKind::NoCredit => ("?", composer::voice_no_credit_url(provider, billing_url)),
+        FailKind::Model => ("✗", composer::voice_bad_model(provider, model)),
+        FailKind::Down => ("✗", composer::voice_down(provider)),
+        FailKind::Other => ("✗", composer::voice_unreadable(provider)),
     };
     let mut dim = Vec::new();
     if !f.said.is_empty() {
         dim.push(f.said.clone());
     }
     if kept {
-        dim.push("your recording is kept: ctrl+r retry".into());
+        dim.push(composer::voice_kept.into());
     }
     FailLines { glyph, head, dim }
 }
@@ -634,7 +633,7 @@ impl Voice {
             {
                 self.cancel();
                 out.push(VoiceOutput::Error(
-                    "voice transcription failed: the transcription timed out".into(),
+                    composer::voice_failed(composer::voice_timed_out),
                 ));
             }
             _ => {}
@@ -651,12 +650,9 @@ impl Voice {
         if run.text_len > 0 {
             vec![VoiceOutput::Utterance]
         } else if !run.has_signal && duration >= MIN_SIGNAL_DURATION {
-            vec![VoiceOutput::Error(format!(
-                "voice transcription failed: {}",
-                no_audio_detected_message()
-            ))]
+            vec![VoiceOutput::Error(composer::voice_failed(no_audio_detected_message()))]
         } else {
-            vec![VoiceOutput::Notice("no speech detected".into())]
+            vec![VoiceOutput::Notice(composer::voice_no_speech.into())]
         }
     }
 }
@@ -771,7 +767,7 @@ pub struct MicRecorder;
 #[cfg(target_os = "linux")]
 impl Recorder for MicRecorder {
     fn start(&mut self, _sample_rate: u32, _audio: Sender<AudioMsg>) -> Result<Box<dyn Capture>, StartError> {
-        Err(StartError::Backend("voice input is not available on Linux yet".into()))
+        Err(StartError::Backend(composer::voice_no_linux.into()))
     }
 }
 

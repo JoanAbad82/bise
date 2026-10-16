@@ -22,6 +22,7 @@ import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run, tmux, wait_until, MAIN_IDLE  # noqa: E402
 from tui_composer_tmux import composer  # noqa: E402
+from words import w  # noqa: E402
 
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
@@ -93,7 +94,7 @@ def main():
         t.typed("dans la presentation powerpoint ")
         paste(t, paths["deck.pptx"].replace(" ", "\\ "))
         wait_until(lambda: "▯ 2" in composer(t), 10, lambda: "no file chip: %r" % composer(t))
-        t.wait("╭─ attached ─")
+        t.wait("╭─ %s ─" % w("composer.box_title"))
         # the row whole, its size with it: a wait on the name alone took a
         # screen captured while the row was drawn, name before size (issue 26)
         sc = t.wait_re(r"▯ 2  deck\.pptx +2 kB")
@@ -130,8 +131,8 @@ def main():
         y = next(i for i, r in enumerate(rows) if "▯ deck.pptx" in r)
         x = rows[y].find("▯ deck.pptx") + 3
         hover(t, x, y)
-        t.wait("click preview")
-        t.wait("⌥ click show in Finder")
+        t.wait("click " + w("composer.bar_preview"))
+        t.wait("⌥ click " + w("composer.bar_show_in_finder"))
         click(t, x, y)
         wait_until(lambda: ("preview " + paths["deck.pptx"]) in recorded(rec), 10, lambda: "no preview: %r" % recorded(rec))
         # past the double-click's time (a second click there selects a word):

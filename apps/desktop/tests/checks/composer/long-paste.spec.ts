@@ -9,6 +9,7 @@
 import { test, expect } from '../../harness';
 import { T, fieldText, onTarget } from './target';
 import { pasteboardCount } from './pasteboard';
+import { composer } from '../../../src/proto/words.gen';
 
 test('composer/long-paste: 200 lines -> a chip, 200 lines in its strip, ⌘Z makes it inline', async () => {
   const before = pasteboardCount();
@@ -19,7 +20,7 @@ test('composer/long-paste: 200 lines -> a chip, 200 lines in its strip, ⌘Z mak
     await page.keyboard.press('Meta+v');
     const chip = page.locator(T.chipPaste);
     await expect(chip, 'a paste chip').toBeVisible({ timeout: 1500 });
-    await expect(page.locator(T.strip), "the strip gives the paste's line count").toContainText('200 lines');
+    await expect(page.locator(T.strip), "the strip gives the paste's line count").toContainText(composer.lines({ n: 200 }));
     expect(await field.evaluate(fieldText), 'no pasted line shows as text').not.toContain('ligne 17 de 200');
     await page.keyboard.press('Meta+z');
     await expect(chip, '⌘Z turns the chip into text').toHaveCount(0);

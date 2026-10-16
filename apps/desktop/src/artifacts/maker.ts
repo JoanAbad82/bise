@@ -11,6 +11,7 @@ import { useRouter } from '@/app/router';
 import { aboutTip } from '@/app/tipwords';
 import { shownName } from '@/agents/model';
 import { useAllArtifacts } from './hooks';
+import { composer } from '../proto/words.gen';
 
 /** The composer's words on an open artifact: whom they go to, the label and the empty field's words. Pure. */
 export interface AboutWords {
@@ -42,10 +43,10 @@ export function aboutWords(maker: string, title: string, row: Pick<Agent, 'archi
   const agent = archived ? MAIN : maker;
   // the project's main is 'bise' here as in every other composer (designer m_27021); `agent` routes
   const name = shownName(agent);
-  const plain = { agent, archived, to: `to ${name} · about “${title}”`, placeholder: `ask ${name} about it, then ⏎` };
+  const plain = { agent, archived, to: composer.tab_about({ agent: name, title }), placeholder: composer.placeholder_about({ agent: name }) };
   if (row === undefined || archived || agent === MAIN) return plain;
   const escTo = back === undefined || back === agent ? undefined : shownName(back);
-  return { ...plain, to: `${ABOUT_HEAD}${plain.to}`, pink: { tip: aboutTip(agent, escTo) }, ...(escTo === undefined ? {} : { end: `esc to ${escTo} instead` }) };
+  return { ...plain, to: `${ABOUT_HEAD}${plain.to}`, pink: { tip: aboutTip(agent, escTo) }, ...(escTo === undefined ? {} : { end: composer.tab_esc_instead({ agent: escTo }) }) };
 }
 
 /** The pink tab's head (the answering state's '↳', composer-target A): the tab keeps 'to perf' whole. */

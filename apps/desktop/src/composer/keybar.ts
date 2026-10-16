@@ -1,7 +1,9 @@
 // The key bar under the composer (W9, the TUI's keybar.rs): the keys of the current mode, the key
 // in the text color and what it does dim, and at rest a dim tip on the right that changes every 5
 // minutes, never while he types. Pure: the composer reports its state on transitions (a list
-// opens, text is selected, a chip comes, a turn starts), never per keystroke.
+// opens, text is selected, a chip comes, a turn starts), never per keystroke. The
+// labels and the tips are the catalog's (words_composer.gen.ts); the keys are this app's.
+import { composer } from '../proto/words.gen';
 
 /** A key and what it does; an empty key is a plain dim label. */
 export type Pair = readonly [key: string, label: string];
@@ -46,9 +48,9 @@ export function barMode(s: BarState): BarMode {
 
 /** At rest: the three characters that start something (BISE-303). */
 const REST: readonly Pair[] = [
-  ['@', 'file'],
-  ['$', 'skills'],
-  ['/', 'commands'],
+  ['@', composer.bar_file],
+  ['$', composer.bar_skills],
+  ['/', composer.bar_commands],
 ];
 
 /**
@@ -60,47 +62,47 @@ export function barPairs(mode: BarMode, typing: boolean, queued = false): readon
   switch (mode) {
     case 'recording':
       return [
-        ['any key', 'stop'],
-        ['esc', 'cancel'],
+        ['any key', composer.bar_stop],
+        ['esc', composer.bar_cancel],
       ];
     case 'transcribing':
-      return [['esc', 'cancel']];
+      return [['esc', composer.bar_cancel]];
     case 'file':
       return [
-        ['⏎/tab', 'insert'],
-        ['→', 'open a folder'],
-        ['←', 'up'],
-        ['↑↓', 'select'],
-        ['esc', 'close'],
+        ['⏎/tab', composer.bar_insert],
+        ['→', composer.bar_open_folder],
+        ['←', composer.bar_up],
+        ['↑↓', composer.bar_select],
+        ['esc', composer.bar_close],
       ];
     case 'quote':
       return [
-        ['type', 'to ask about it'],
-        ['tab', 'quote'],
-        ['⌘C', 'copy'],
-        ['esc', 'drop'],
+        ['type', composer.bar_ask],
+        ['tab', composer.bar_quote],
+        ['⌘C', composer.bar_copy],
+        ['esc', composer.bar_drop],
       ];
     case 'selection':
       return [
-        ['type', 'to replace it'],
-        ['⌘C', 'copy'],
-        ['⌘X', 'cut'],
+        ['type', composer.bar_replace],
+        ['⌘C', composer.bar_copy],
+        ['⌘X', composer.bar_cut],
       ];
     case 'images':
-      return [['⌘V', 'paste image'], ...REST];
+      return [['⌘V', composer.bar_paste_image], ...REST];
     case 'steer':
       return typing
         ? [
-            ['tab', 'queue'],
-            ['⏎', 'steer'],
-            ['⌃C', 'stop'],
+            ['tab', composer.bar_queue],
+            ['⏎', composer.bar_steer],
+            ['⌃C', composer.bar_stop],
           ]
         : queued
           ? [
-              ['↑', 'edit queued'],
-              ['⌃C', 'stop'],
+              ['↑', composer.bar_edit_queued],
+              ['⌃C', composer.bar_stop],
             ]
-          : [['⌃C', 'stop']];
+          : [['⌃C', composer.bar_stop]];
     case 'rest':
       return REST;
   }
@@ -139,43 +141,43 @@ export function heldPairs(mod: HeldMod, s: HeldState): readonly Pair[] {
   const p: Pair[] = [];
   switch (mod) {
     case 'Control':
-      if (s.busy) p.push(['⌃C', 'stop']);
-      if (s.fold !== null) p.push(['⌃O', s.fold]);
+      if (s.busy) p.push(['⌃C', composer.bar_stop]);
+      if (s.fold !== null) p.push(['⌃O', s.fold === 'expand' ? composer.bar_expand : composer.bar_collapse]);
       if (s.inbox > 0) {
-        p.push([openKeys(s.inbox), 'open an inbox item']);
-        if (s.itemOpen && s.inbox > 1) p.push(['⌃N/⌃P', 'next item']);
+        p.push([openKeys(s.inbox), composer.bar_open_item]);
+        if (s.itemOpen && s.inbox > 1) p.push(['⌃N/⌃P', composer.bar_next_item]);
       }
-      if (s.code) p.push(['⌃Y', 'copy code']);
-      p.push(['⌃`', 'terminal']);
+      if (s.code) p.push(['⌃Y', composer.bar_copy_code]);
+      p.push(['⌃`', composer.bar_terminal]);
       return p;
     case 'Alt':
       if (s.agents > 0) {
-        p.push(['⌥0-9', 'go to an agent']);
-        if (!s.typing) p.push(['⌥↑↓', 'select an agent']);
+        p.push(['⌥0-9', composer.bar_go_to_agent]);
+        if (!s.typing) p.push(['⌥↑↓', composer.bar_select_agent]);
       }
-      if (s.typing) p.push(['⌥←→', 'word'], ['⌥⌫', 'delete a word']);
-      p.push(['⌥⏎', 'newline']);
+      if (s.typing) p.push(['⌥←→', composer.bar_word], ['⌥⌫', composer.bar_delete_word]);
+      p.push(['⌥⏎', composer.bar_newline]);
       return p;
     case 'Meta':
-      p.push(['⌘K', 'find agent'], ['⌘F', 'find']);
-      if (s.busy) p.push(['⌘.', 'stop']);
-      if (s.selected) p.push(['⌘C', 'copy'], ['⌘X', 'cut']);
-      if (s.typing) p.push(['⌘A', 'select all'], ['⌘←→', 'line start/end'], ['⌘⌫', 'delete to line start']);
-      p.push(['⌘V', 'paste']);
+      p.push(['⌘K', composer.bar_find_agent], ['⌘F', composer.bar_find]);
+      if (s.busy) p.push(['⌘.', composer.bar_stop]);
+      if (s.selected) p.push(['⌘C', composer.bar_copy], ['⌘X', composer.bar_cut]);
+      if (s.typing) p.push(['⌘A', composer.bar_select_all], ['⌘←→', composer.bar_line_ends], ['⌘⌫', composer.bar_delete_to_start]);
+      p.push(['⌘V', composer.bar_paste]);
       return p;
   }
 }
 
 /** The desktop's tips (help.rs TIPS, the keys that work here), shown in order. */
 export const TIPS: readonly string[] = [
-  '$ calls a skill, tab completes',
-  'esc puts your draft away, ↑ brings it back',
-  '⇧⏎ adds a new line',
-  'tab queues a message while the agent works',
-  ':tada: puts 🎉, a : and two letters list them',
-  '→ opens a folder in the @ list, ← goes up',
-  'a ``` block keeps ⏎ for new lines until you close it',
-  '/theme switches between light and dark',
+  composer.tip_skill,
+  composer.tip_draft,
+  composer.tip_newline_mac,
+  composer.tip_queue,
+  composer.tip_emoji,
+  composer.tip_folder,
+  composer.tip_fence,
+  composer.tip_theme,
 ];
 
 /** How long a tip stays. */

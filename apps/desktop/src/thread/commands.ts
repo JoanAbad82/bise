@@ -11,16 +11,17 @@
 import type { ArgKind, PickCommand } from '@/composer';
 import type { AppCmd, HubCmd, PickArg, PickCommand as CoreCommand } from '@/proto';
 import { MAIN, type Route } from '@/app/route';
+import { composer } from '../proto/words.gen';
 
 /** The window's own commands the TUI has no row for, after the core's. */
 export const windowCommands: readonly PickCommand[] = [
-  { name: 'agents', desc: 'the agents of this project', args: false, ready: true },
-  { name: 'archived', desc: 'its archived agents', args: false, ready: true },
-  { name: 'switch', desc: 'go to an agent', args: true, argKinds: ['agent'], ready: true },
-  { name: 'diff', desc: "an agent's or a branch's changes, or the project's", args: true, argKinds: ['agent'], ready: true },
-  { name: 'prs', desc: 'its open pull requests', args: false, ready: true },
-  { name: 'artifacts', desc: 'what its agents made', args: false, ready: true },
-  { name: 'scheduled', desc: 'its timers', args: false, ready: true },
+  { name: 'agents', desc: composer.cmd_agents, args: false, ready: true },
+  { name: 'archived', desc: composer.cmd_archived, args: false, ready: true },
+  { name: 'switch', desc: composer.cmd_switch, args: true, argKinds: ['agent'], ready: true },
+  { name: 'diff', desc: composer.cmd_diff, args: true, argKinds: ['agent'], ready: true },
+  { name: 'prs', desc: composer.cmd_prs, args: false, ready: true },
+  { name: 'artifacts', desc: composer.cmd_artifacts, args: false, ready: true },
+  { name: 'scheduled', desc: composer.cmd_scheduled, args: false, ready: true },
 ];
 
 /**

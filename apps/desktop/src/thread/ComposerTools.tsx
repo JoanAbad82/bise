@@ -13,6 +13,7 @@ import { useRouter } from '@/app/router';
 import { modelOrSetup } from '@/settings';
 import { effortsFor, modelGroups, modelOf, setEffort } from '@/agents/actions';
 import { modeSentence, modeWords, modelWords } from './tools';
+import { composer } from '../proto/words.gen';
 
 /** A chip's open state: `toggle` opens and closes it, `close` closes it. */
 function useOpen(): { open: boolean; toggle: () => void; close: () => void } {
@@ -37,8 +38,8 @@ export function AttachTool({ onPick }: { onPick: (paths: readonly string[]) => v
           onPick(paths);
         });
       }}
-      aria-label="attach files"
-      data-tip="attach files"
+      aria-label={composer.attach_files}
+      data-tip={composer.attach_files}
       data-testid="composer.attach"
     >
       +

@@ -16,6 +16,7 @@
 // Writes shots for designer (light + dark at 1100 and 800: answering, typed, approval, after esc).
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { composer } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -121,13 +122,13 @@ test('composer/answer-target: pink while his words answer a question, never for 
       // (1) answering
       await openRow(1);
       await expect(to).toHaveText(/^↳ answering search · which size system\b.*…$/u);
-      await expect(end).toHaveText('esc to bise instead');
+      await expect(end).toHaveText(composer.tab_esc_instead({ agent: 'bise' }));
       await expect(field).toHaveAttribute('aria-placeholder', 'your answer to search, then ⏎');
       await expect(page.locator('.inbox-block-open')).toHaveAttribute('data-answering', 'true');
       await page.waitForTimeout(200);
       const a = await look(page);
       expect(a.boxShadow, 'a 1.5 px accent border').toContain(`${a.accent} 0px 0px 0px 1.5px`);
-      expect(a.tabTip, "the tab's tip, never over the label").toBe("your words answer search's question · esc writes to bise");
+      expect(a.tabTip, "the tab's tip, never over the label").toBe(composer.answer_tip({ agent: 'search', esc_to: 'bise' }));
       expect(a.boxTip, 'the box has no tip of its own').toBeNull();
       expect(a.tabAcc).toBe(true);
       expect(a.tabColor, 'the tab in the accent').toBe(a.accent);
@@ -176,8 +177,8 @@ test('composer/answer-target: pink while his words answer a question, never for 
       // (3) an approval: words never approve, nothing pink
       await openRow(2);
       await expect(to).toHaveText('to perf · the merge waits for 1 or 2');
-      await expect(end).toHaveText('esc to bise instead');
-      await expect(field).toHaveAttribute('aria-placeholder', 'write to perf, then ⏎');
+      await expect(end).toHaveText(composer.tab_esc_instead({ agent: 'bise' }));
+      await expect(field).toHaveAttribute('aria-placeholder', composer.placeholder_to({ agent: 'perf' }));
       await page.waitForTimeout(200);
       const p = await look(page);
       expect(p.boxShadow).not.toContain(p.accent);

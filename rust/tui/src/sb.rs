@@ -567,8 +567,7 @@ impl Sb {
 }
 
 /// What `ctrl+z` and a typed `/cancel` say (book §13, §17).
-pub(super) const NO_UNDO: &str =
-    "no undo: an agent may already have acted. say the change to main instead (\"no, v1 for docs\").";
+pub(super) const NO_UNDO: &str = bise_proto::words::composer::no_undo;
 
 /// `/theme [auto|light|dark]`: switch the palette now and keep it for
 /// the next launches (`choose`: `theme_detect::choose`, a fake in tests

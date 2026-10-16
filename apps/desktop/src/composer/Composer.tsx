@@ -18,6 +18,7 @@ import {
 } from "react";
 import { ComposerFrame, Press } from "@/ds";
 import "./composer.css";
+import { composer } from "../proto/words.gen";
 import type { ComposerActions, FieldBar } from "./actions";
 import { PmField } from "./pm/PmField";
 import { QueueDrawer, type QueueDrawerProps } from "./QueueDrawer";
@@ -119,7 +120,7 @@ export const Composer = memo(function Composer(
     answerTip,
     tools,
     toolsEnd,
-    placeholder = "write to bise",
+    placeholder = composer.placeholder_bise,
     keys,
     voice = null,
     quoting = false,
@@ -232,13 +233,13 @@ export const Composer = memo(function Composer(
                 e.preventDefault(); // the field keeps the caret
               }}
               onClick={sources.voice}
-              aria-label="voice mode"
-              title="voice mode · ⌃R ⌃R"
+              aria-label={composer.bar_voice_mode}
+              title={`${composer.bar_voice_mode} · ⌃R ⌃R`}
               // while a take runs the key line is only its keys (designer m_22785)
               hidden={dictating !== null}
               data-testid={`${testId}.voice`}
             >
-              <span className="kk">⌃R⌃R</span> voice
+              <span className="kk">⌃R⌃R</span> {composer.voice_button}
             </Press>
           )}
           <span
@@ -256,13 +257,13 @@ export const Composer = memo(function Composer(
           {keys === undefined && field.chips === true ? (
             // the attachment list's one key (designer's composer-attachments A)
             <span className="tip" data-testid={`${testId}.tip`}>
-              backspace on a chip removes it
+              {composer.box_tip}
             </span>
           ) : (
             keys === undefined &&
             tipText !== undefined && (
               <span className="tip rest-tip" data-testid={`${testId}.tip`}>
-                tip: {tipText}
+                {composer.tip_ascii({ words: tipText })}
               </span>
             )
           )}
