@@ -49,11 +49,18 @@ export interface OfficeEggs {
   readonly cake: boolean;
   /** s3: april fools, hats shuffled and one bim in main's hoodie */
   readonly april: boolean;
-  /** o4: a game on the whiteboard instead of equations (1 drawing in 10) */
+  /** o4: a game on the whiteboard instead of equations (1 drawing in 10); only once the office has its whiteboard (stage 4) */
   readonly doodle: boolean;
+  /** the boombox plays, notes over it (bims-grow): o3, 5+ agents working; t1, friday after 17:00. Only once it has one (stage 5) */
+  readonly music: boolean;
 }
 
-export const NO_OFFICE: OfficeEggs = { eclipse: false, ghost: null, tree: false, cake: false, april: false, doodle: false };
+export const NO_OFFICE: OfficeEggs = { eclipse: false, ghost: null, tree: false, cake: false, april: false, doodle: false, music: false };
+/** the growth stages (growth.ts) that bring the whiteboard and the boombox */
+export const BOARD_STAGE = 4;
+export const BOOMBOX_STAGE = 5;
+/** o3: this many agents working and the boombox plays */
+export const MUSIC_WORKING = 5;
 
 /** the local date and time, as the office's clock reads it (Office.tsx: localOf(new Date())) */
 export interface Local {
@@ -98,6 +105,8 @@ export interface EggIn {
   readonly lands: readonly Land[];
   /** when he typed the konami code (m1), null never */
   readonly konami: number | null;
+  /** the office's growth stage (growth.ts): the whiteboard's and the boombox's eggs wait for them */
+  readonly stage?: number;
 }
 
 export interface Eggs {
@@ -160,7 +169,7 @@ export function konamiDone(keys: readonly string[]): boolean {
 }
 
 /** The office's own eggs at this local time (pure): the eclipse, the ghost, the dates. */
-export function officeEggs(i: Pick<EggIn, 'local' | 'night' | 'agents'>, doodle: boolean): OfficeEggs {
+export function officeEggs(i: Pick<EggIn, 'local' | 'night' | 'agents'> & { readonly stage?: number }, doodle: boolean): OfficeEggs {
   const { local: l } = i;
   const day = dayKey(l);
   const at = 10 * 3600 + (hash(`eclipse-at|${day}`) % (8 * 3600));
@@ -169,7 +178,11 @@ export function officeEggs(i: Pick<EggIn, 'local' | 'night' | 'agents'>, doodle:
   const first = i.agents.reduce<number | null>((m, a) => (a.created_ms === undefined || a.created_ms === null ? m : m === null ? a.created_ms : Math.min(m, a.created_ms)), null);
   const born = first === null ? null : new Date(first);
   const cake = born !== null && born.getMonth() + 1 === l.mo && born.getDate() === l.d && born.getFullYear() < l.y;
-  return { eclipse, ghost, tree: l.mo === 12 && (l.d === 24 || l.d === 25), cake, april: l.mo === 4 && l.d === 1, doodle };
+  const stage = i.stage ?? 0;
+  const working = i.agents.filter((a) => !a.archived && a.status === 'working').length;
+  const friday = l.dow === 5 && l.s >= 17 * 3600;
+  const music = stage >= BOOMBOX_STAGE && (working >= MUSIC_WORKING || friday);
+  return { eclipse, ghost, tree: l.mo === 12 && (l.d === 24 || l.d === 25), cake, april: l.mo === 4 && l.d === 1, doodle: doodle && stage >= BOARD_STAGE, music };
 }
 
 /** Each bim's egg candidate now, by its own pose and rows (before the caps). Pure. */

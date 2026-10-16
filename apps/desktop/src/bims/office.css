@@ -66,6 +66,25 @@
 .bims-more:empty {
   display: none;
 }
+/* 320 with a garden past the building (growth.ts): it is cropped, a soft fade at the sides says so */
+.bims-canvas.bims-fade {
+  mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+}
+/* the ground's corner: hover gives the level tip (growth.ts tipOf); nothing drawn */
+.bims-level {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--h-control);
+  height: var(--h-control);
+  pointer-events: auto;
+}
+/* the unlock moment's 'new: <thing>' over the piece (3 s), centred above it */
+.bims-label.bims-new {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  white-space: nowrap;
+}
 /* a label moved off its bim (tags.ts placeTags): a 1 px leader back to its head */
 .bims-leaders {
   position: absolute;

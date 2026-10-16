@@ -1,12 +1,14 @@
 // The office's own easter eggs in three (eggs.ts OfficeEggs says which show): t3's little ghost
 // crossing at midnight (night theme), s2's christmas tree in the lounge, s4's cake on the island,
-// o4's game on the whiteboard (a noughts and crosses grid over the equations). Built once per
-// office, hidden until an egg shows them; nothing here decides. The eclipse is index.ts's sky.
+// o4's game on the whiteboard (a noughts and crosses grid over the equations), o3/t1's notes over
+// the boombox (bims-grow). Built once per office and growth, hidden until an egg shows them;
+// nothing here decides. The eclipse is index.ts's sky.
 // Colours: the palette's (never the app's pink or red). Owner: bims-follow.
 import { Group, Mesh, type BufferGeometry, type Material, type Object3D } from 'three';
 import type { Office } from '../model';
 import type { OfficeEggs } from '../eggs';
 import { WORLD } from './palette';
+import { islandLen } from './stages';
 import type { Style } from './style';
 
 export interface EggDecor {
@@ -16,7 +18,7 @@ export interface EggDecor {
   dispose(): void;
 }
 
-export function makeEggDecor(o: Office, style: Style): EggDecor {
+export function makeEggDecor(o: Office, style: Style, stage = 0): EggDecor {
   const root = new Group();
   const mats: Material[] = [];
   const mat = (c: string, glow = 0): Material => {
@@ -81,6 +83,22 @@ export function makeEggDecor(o: Office, style: Style): EggDecor {
   board.visible = false;
   root.add(board);
 
+  // o3 / t1 (bims-grow): the boombox plays, three notes over it (stages.ts puts it at the island's
+  // far end from stage 5). Still notes: a playing boombox never keeps the loop running
+  const notes = new Group();
+  const noteInk = mat(WORLD.ink);
+  for (const [i, [dx, dy]] of [[-0.22, 0.25], [0.02, 0.42], [0.26, 0.3]].entries()) {
+    const n = new Group();
+    n.position.set(dx ?? 0, dy ?? 0, 0);
+    n.rotation.z = (i - 1) * 0.25;
+    add(style.ball(0.055), noteInk, n, 0, 0, 0).scale.set(1.25, 0.9, 0.6);
+    add(style.box(0.022, 0.2, 0.022), noteInk, n, 0.05, 0.1, 0);
+    notes.add(n);
+  }
+  notes.position.set(0, 0.95, o.island.z0 + islandLen(o, stage) - 0.6);
+  notes.visible = false;
+  root.add(notes);
+
   const x0 = o.x0 - 0.5;
   const x1 = o.x0 + o.W + 0.5;
   const gz = (o.island.z0 + o.island.z1) / 2;
@@ -93,6 +111,7 @@ export function makeEggDecor(o: Office, style: Style): EggDecor {
       tree.visible = e?.tree === true;
       cake.visible = e?.cake === true;
       board.visible = e?.doodle === true;
+      notes.visible = e?.music === true;
       return g !== null;
     },
     dispose() {

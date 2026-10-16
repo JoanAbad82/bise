@@ -1,8 +1,10 @@
 // The room (three): the floating grass block, the floor, the back and left walls (the near ones are
-// cut away so the camera sees in), the lounge, the whiteboard, main's desk and its neon, the kitchen
-// island, one desk per agent from the Office, the door and the terrace. Built once per office and
-// theme; what changes per frame (a desk's screen and lamp) is handed back as handles. No text, no
-// texture but the floor tile, never the accent pink or the error red (palette.ts).
+// cut away so the camera sees in), main's desk and its neon, the kitchen island (a coffee counter
+// first), one desk per agent from the Office, the door. What the project's growth adds (the lounge,
+// the whiteboard, the terrace's things, the garden, the late pieces, the frames, the cones) is
+// stages.ts's. Built once per office, theme and growth; what changes per frame (a desk's screen
+// and lamp) is handed back as handles. No text, no texture but the floor tile, never the accent
+// pink or the error red (palette.ts).
 import {
   type BufferGeometry,
   Group,
@@ -16,9 +18,12 @@ import {
 } from 'three';
 import { type Box, furniture } from '../layout';
 import type { Office, Pt, Spot } from '../model';
-import { siteOf } from './camera';
-import { type Decor, type Foot, decorOf } from './decor';
-import { type Palette, WORLD, hash, rng, HOODIE } from './palette';
+import { NO_GROW, type Grow } from '../growth';
+import { groundOf } from './camera';
+import { decorOf } from './decor';
+import { type Kit, boxOf, glyph, kitOf, onFloor } from './kit';
+import { type Palette, WORLD, hash, HOODIE } from './palette';
+import { type Pieces, buildStages, islandLen } from './stages';
 import type { Style } from './style';
 
 /** a desk's parts the frame drives */
@@ -35,34 +40,9 @@ export interface World {
   readonly desks: ReadonlyMap<string, DeskHandles>;
   readonly mainDesk: DeskHandles;
   readonly pal: Palette;
+  /** each stage's pieces (stages.ts): the unlock moment hides the newest until it is brought in */
+  readonly pieces: Pieces;
   dispose(): void;
-}
-
-interface Kit {
-  readonly style: Style;
-  readonly pal: Palette;
-  /** a shared material per colour (bims have their own: they fade and go grey) */
-  mat(color: string): Material;
-  add(geo: BufferGeometry, mat: Material, parent: Object3D, x: number, y: number, z: number): Mesh;
-}
-
-function kitOf(style: Style, pal: Palette): Kit {
-  const cache = new Map<string, Material>();
-  return {
-    style,
-    pal,
-    mat(color) {
-      let m = cache.get(color);
-      if (!m) { m = style.material(color); cache.set(color, m); }
-      return m;
-    },
-    add(geo, mat, parent, x, y, z) {
-      const m = new Mesh(geo, mat);
-      m.position.set(x, y, z);
-      parent.add(m);
-      return m;
-    },
-  };
 }
 
 const LAMP_ON_EI = (pal: Palette): number => (pal.pendants ? 1.1 : 0.55);
@@ -141,105 +121,6 @@ function desk(k: Kit, parent: Object3D, b: Box, d: Spot, name: string): DeskHand
   return { screen, lamp, top: { x: cx, y: 0.55, z: cz } };
 }
 
-function tree(k: Kit, parent: Object3D, x: number, z: number): void {
-  const { style } = k;
-  if (style.name === 'clay') {
-    // clay: a trunk and three soft spheres (bims m_27814)
-    k.add(style.cylinder(0.14, 1.3), k.mat(WORLD.trunk), parent, x, 0.65, z);
-    const balls: readonly [number, number, number, number][] = [[0, 1.75, 0, 0.62], [0.42, 1.45, 0.1, 0.45], [-0.38, 1.5, -0.1, 0.48]];
-    balls.forEach(([dx, y, dz, r], i) => k.add(style.ball(r), k.mat(WORLD.leaf[i % 2] ?? WORLD.trunk), parent, x + dx, y, z + dz));
-    return;
-  }
-  k.add(style.box(0.36, 1.4, 0.36), k.mat(WORLD.trunk), parent, x, 0.7, z);
-  const leaves: readonly [number, number, number][] = [[0, 1.6, 0], [0.45, 1.5, 0], [-0.45, 1.5, 0], [0, 2.05, 0], [0, 1.6, 0.45]];
-  leaves.forEach(([dx, y, dz], i) => k.add(style.box(0.75, 0.75, 0.75), k.mat(WORLD.leaf[i % 2] ?? WORLD.trunk), parent, x + dx, y, z + dz));
-}
-
-function bigPlant(k: Kit, parent: Object3D, x: number, z: number): void {
-  k.add(k.style.cylinder(0.2, 0.36), k.mat(WORLD.pot), parent, x, 0.18, z);
-  for (let i = 0; i < 3; i++) {
-    const l = k.add(k.style.ball(0.26 - i * 0.04), k.mat(i % 2 ? WORLD.leaf[0] : k.pal.plant), parent, x + (i - 1) * 0.12, 0.55 + i * 0.22, z + (i % 2) * 0.08);
-    l.scale.y = 1.2;
-  }
-}
-
-function pineapple(k: Kit, parent: Object3D, x: number, y: number, z: number): void {
-  const b = k.add(k.style.ball(0.11), k.mat(WORLD.pineapple), parent, x, y + 0.1, z);
-  b.scale.y = 1.45;
-  k.add(k.style.box(0.08, 0.16, 0.08), k.mat(WORLD.pineLeaf), parent, x, y + 0.3, z);
-}
-
-function fruitBowl(k: Kit, parent: Object3D, x: number, z: number): void {
-  k.add(k.style.box(0.5, 0.12, 0.5), k.mat(WORLD.paper), parent, x, 0.76, z);
-  const fr = [WORLD.orange, WORLD.orange, WORLD.banana, WORLD.leaf[0]];
-  fr.forEach((c, i) => k.add(k.style.ball(0.09), k.mat(c), parent, x + Math.cos(i * 1.7) * 0.13, 0.86, z + Math.sin(i * 1.7) * 0.12));
-  pineapple(k, parent, x + 0.05, 0.84, z - 0.02);
-}
-
-/** the whiteboard: coloured strokes for the equations (no text) */
-function whiteboard(k: Kit, parent: Object3D, x: number): void {
-  const { style } = k;
-  const pz = style.pictureZ;
-  k.add(style.box(1.8, 0.95, 0.05), k.mat('#d8d2c6'), parent, x, 1.05, 0.02 + pz);
-  k.add(style.box(1.7, 0.85, 0.02), k.mat(WORLD.paper), parent, x, 1.05, 0.05 + pz);
-  const r = rng(hash('board'));
-  for (let i = 0; i < 5; i++) {
-    const w = 0.5 + r() * 0.7;
-    const c = WORLD.board[i % WORLD.board.length] ?? WORLD.marker;
-    k.add(style.box(w, 0.045, 0.01), k.mat(c), parent, x - 0.78 + w / 2 + (i % 2) * 0.08, 1.37 - i * 0.15, 0.065 + pz);
-  }
-  // a little rising chart in the corner
-  const pts = [[0.45, 0.72], [0.55, 0.88], [0.65, 0.8], [0.75, 1.02]];
-  for (const [px, py] of pts) k.add(style.box(0.06, 0.06, 0.01), k.mat(WORLD.mat), parent, x + (px ?? 0), py ?? 0, 0.065 + pz);
-}
-
-/** the mural over the lounge: colour blobs and an ink :* in blocks */
-function mural(k: Kit, parent: Object3D, x0: number, x1: number): void {
-  const { style } = k;
-  const w = x1 - x0;
-  WORLD.mural.forEach((c, i) => {
-    const bw = w / 4;
-    k.add(style.box(bw, 0.45 + (i % 2) * 0.12, 0.02), k.mat(c), parent, x0 + bw / 2 + (i * (w - bw)) / 4, 1.15 + (i % 2 ? -0.06 : 0.08), 0.01 + style.pictureZ);
-  });
-  glyph(k, parent, (x0 + x1) / 2, 1.18, 0.035 + style.pictureZ, k.pal.ink, 0.07);
-}
-
-/** the :* in blocks: two dots and a three-bar star */
-function glyph(k: Kit, parent: Object3D, x: number, y: number, z: number, color: string, u: number, m?: Material): void {
-  const mat = m ?? k.mat(color);
-  k.add(k.style.box(u, u, 0.02), mat, parent, x - 2.2 * u, y + 1.1 * u, z);
-  k.add(k.style.box(u, u, 0.02), mat, parent, x - 2.2 * u, y - 1.1 * u, z);
-  for (let i = 0; i < 3; i++) {
-    const bar = k.add(k.style.box(3.4 * u, 0.8 * u, 0.02), mat, parent, x + 1.2 * u, y, z);
-    bar.rotation.z = (i * Math.PI) / 3 + Math.PI / 2;
-  }
-}
-
-/** a box on the floor from a footprint or a furniture box */
-function onFloor(k: Kit, parent: Object3D, b: Box, h: number, y: number, color: string): Mesh {
-  return k.add(k.style.box(b.x1 - b.x0, h, b.z1 - b.z0), k.mat(color), parent, (b.x0 + b.x1) / 2, y, (b.z0 + b.z1) / 2);
-}
-const boxOf = (f: Foot): Box => ({ x0: f.x - f.hw, x1: f.x + f.hw, z0: f.z - f.hd, z1: f.z + f.hd });
-
-function terrace(k: Kit, parent: Object3D, o: Office, d: Decor, boxes: readonly Box[]): void {
-  const { style, pal } = k;
-  onFloor(k, parent, boxOf(d.terrace), 0.08, 0, pal.terrace);
-  const p = d.parasol;
-  k.add(style.cylinder(0.03, 1.8), k.mat(pal.ink), parent, p.x, 0.9, p.z);
-  k.add(style.box(1.4, 0.3, 1.4), k.mat(WORLD.parasol), parent, p.x, 1.85, p.z);
-  // a deck chair per terrace spot (layout.ts furniture)
-  const isChair = (b: Box): boolean => b.of !== undefined && o.terrace.some((t) => t.x === b.of?.x && t.z === b.of.z);
-  boxes.filter(isChair).forEach((b, i) => onFloor(k, parent, b, 0.08, 0.2, WORLD.chair[i % 2] ?? WORLD.paper));
-  // the palm and the mini ramp
-  const pm = d.palm;
-  k.add(style.box(0.16, 1.6, 0.16), k.mat(WORLD.palmTrunk), parent, pm.x, 0.8, pm.z);
-  for (let i = 0; i < 4; i++) {
-    const f = k.add(style.box(0.9, 0.04, 0.22), k.mat(WORLD.leaf[0]), parent, pm.x, 1.62, pm.z);
-    f.rotation.y = (i * Math.PI) / 2 + 0.4;
-  }
-  onFloor(k, parent, boxOf(d.ramp), 0.3, 0.15, WORLD.ramp);
-}
-
 /** every mesh under `root` casts and takes the sun's shadow (a style with shadows: clay) */
 export function castShadows(root: Object3D): void {
   root.traverse((obj) => {
@@ -250,7 +131,7 @@ export function castShadows(root: Object3D): void {
   });
 }
 
-export function buildWorld(o: Office, mainName: string, style: Style, pal: Palette): World {
+export function buildWorld(o: Office, mainName: string, style: Style, pal: Palette, grow: Grow = NO_GROW): World {
   const k = kitOf(style, pal);
   const root = new Group();
   const { x0, W, D } = o;
@@ -278,29 +159,26 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
   }
   root.add(sun, sun.target);
 
-  // the floating grass block, its trees on the far sides (left and back) so nothing hides the office
-  const site = siteOf(o);
+  // the floating grass block, as wide as the garden has grown (camera.ts groundOf); its trees and
+  // everything else the project's growth brings: stages.ts
+  const site = groundOf(o, grow);
   const gw = site.x1 - site.x0;
   const gd = site.z1 - site.z0;
+  const gx = (site.x0 + site.x1) / 2;
   const gz = (site.z0 + site.z1) / 2;
-  k.add(style.box(gw, 1.2, gd, 0.45), k.mat(pal.dirt), root, cx, -0.75, gz);
-  k.add(style.box(gw, 0.16, gd), k.mat(pal.grass), root, cx, -0.1, gz);
+  k.add(style.box(gw, 1.2, gd, 0.45), k.mat(pal.dirt), root, gx, -0.75, gz);
+  k.add(style.box(gw, 0.16, gd), k.mat(pal.grass), root, gx, -0.1, gz);
   const decor = decorOf(o);
   const boxes = furniture(o);
-  const r = rng(hash(`trees${W}`));
-  for (const t of decor.trees) tree(k, root, t.x, t.z);
-  for (let i = 0; i < 10; i++) {
-    const fx = r() < 0.5 ? x0 - 0.35 - r() * 0.6 : x0 + W + 0.35 + r() * 0.6;
-    k.add(style.box(0.16, 0.16, 0.16), k.mat(WORLD.flowers[i % 4] ?? WORLD.paper), root, fx, 0.06, r() * (D + 3));
-  }
+  const pieces = buildStages(k, root, o, grow, boxes);
 
-  terrace(k, root, o, decor, boxes);
   const floor = new Mesh(style.box(W, 0.14, D), style.floor(pal.floor, W, D));
   floor.position.set(cx, -0.05, D / 2);
   root.add(floor);
   // the rug under the island
   const isl = o.island;
-  k.add(style.box(isl.w + 1.6, 0.02, isl.z1 - isl.z0 + 1.2), k.mat(pal.islandRug), root, 0, 0.03, (isl.z0 + isl.z1) / 2);
+  const il = islandLen(o, grow.stage);
+  k.add(style.box(isl.w + 1.6, 0.02, il + 1.2), k.mat(pal.islandRug), root, 0, 0.03, isl.z0 + il / 2);
 
   // walls: back (tall: the mural, the whiteboard, the neon) and left (low, windows); the near ones cut away
   const wallH = 1.7;
@@ -310,27 +188,6 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
   for (let z = (o.desks.size > 0 ? Math.min(...[...o.desks.values()].map((d) => d.z)) : 4.3) + 0.1; z < D - 1; z += 2.3) {
     k.add(style.box(0.05, 0.45, 1.2), glass, root, x0, 0.62, z + 0.6);
   }
-
-  // the lounge: its rug, the bean bags, a plant at each end of the back wall
-  const lx = o.lounge.map((s) => s.x);
-  const lz = o.lounge.map((s) => s.z);
-  const l0 = lx.length ? Math.min(...lx) - 0.55 : x0 + 0.1;
-  const l1 = lx.length ? Math.max(...lx) + 0.55 : x0 + W * 0.4;
-  if (lx.length) {
-    k.add(style.box(l1 - l0, 0.02, Math.max(...lz) - Math.min(...lz) + 1.1), k.mat(pal.rug), root, (l0 + l1) / 2, 0.035, (Math.min(...lz) + Math.max(...lz)) / 2);
-  }
-  // a bean bag per lounge spot (layout.ts furniture)
-  const isBean = (b: Box): boolean => b.of !== undefined && o.lounge.some((l) => l.x === b.of?.x && l.z === b.of.z);
-  boxes.filter(isBean).forEach((b, i) => {
-    const bag = k.add(style.ball((b.x1 - b.x0) / 2 / 1.05 / 0.92), k.mat(WORLD.bean[i % WORLD.bean.length] ?? pal.rug), root, (b.x0 + b.x1) / 2, 0.2, (b.z0 + b.z1) / 2);
-    bag.scale.set(1.05, 0.62, 1.05);
-  });
-  mural(k, root, l0 + 0.15, l1 - 0.15);
-  for (const p of decor.plants) bigPlant(k, root, p.x, p.z);
-
-  // the whiteboard, centred on its spots
-  const bx = o.boardSpots.length ? o.boardSpots.reduce((s, p) => s + p.x, 0) / o.boardSpots.length : cx;
-  whiteboard(k, root, bx);
 
   // main's desk: bigger, a tray, the neon :* behind it
   const md = o.mainDesk;
@@ -352,22 +209,17 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
   const neon = style.material(pal.neon, { flat: true });
   glyph(k, root, md.x, 1.25, 0.02 + style.pictureZ, pal.neon, 0.06, neon);
 
-  // the kitchen island: its base, its top, a coffee machine, fruit, a boombox
+  // the kitchen island: a small coffee counter in a new office, as long as the stage makes it
+  // (stages.ts islandLen); its base, its top, the coffee machine. Its fruit and boombox: stages.ts
   const iz = (isl.z0 + isl.z1) / 2;
-  const il = isl.z1 - isl.z0;
-  const top = boxes.find((b) => !b.of && b.x0 < 0 && b.x1 > 0 && b.z0 < iz && b.z1 > iz) ?? { x0: -isl.w / 2, x1: isl.w / 2, z0: isl.z0, z1: isl.z1 };
-  k.add(style.box(top.x1 - top.x0 - 0.2, 0.62, top.z1 - top.z0 - 0.15, 0.2), k.mat(pal.island), root, 0, 0.31, iz);
+  const full = boxes.find((b) => !b.of && b.x0 < 0 && b.x1 > 0 && b.z0 < iz && b.z1 > iz) ?? { x0: -isl.w / 2, x1: isl.w / 2, z0: isl.z0, z1: isl.z1 };
+  const top = { ...full, z1: Math.min(full.z1, full.z0 + islandLen(o, grow.stage) + 0.15) };
+  k.add(style.box(top.x1 - top.x0 - 0.2, 0.62, top.z1 - top.z0 - 0.15, 0.2), k.mat(pal.island), root, 0, 0.31, (top.z0 + top.z1) / 2);
   onFloor(k, root, top, 0.07, 0.66, pal.islandTop);
   k.add(style.box(0.5, 0.5, 0.42), k.mat(WORLD.coffee), root, 0, 0.95, isl.z0 + 0.35);
   k.add(style.box(0.18, 0.06, 0.04), style.material(WORLD.coffeeLed, { emissive: WORLD.coffeeLed, ei: 0.5 }), root, 0, 1.07, isl.z0 + 0.57);
-  fruitBowl(k, root, 0, isl.z0 + 1.3);
-  if (il > 3) fruitBowl(k, root, 0, isl.z0 + 2.9);
-  if (il > 4.5) {
-    k.add(style.box(0.55, 0.28, 0.2), k.mat(WORLD.dark), root, 0, 0.84, isl.z1 - 0.6);
-    for (const dx of [-0.15, 0.15]) k.add(style.box(0.14, 0.14, 0.02), k.mat(WORLD.wheel), root, dx, 0.84, isl.z1 - 0.49);
-  }
   if (pal.pendants) {
-    for (let z = isl.z0 + 0.9; z < isl.z1; z += 1.8) {
+    for (let z = isl.z0 + 0.9; z < top.z1; z += 1.8) {
       const l = new PointLight('#ffcf8a', 3.2, 4.5, 1.6);
       l.position.set(0, 1.5, z);
       root.add(l);
@@ -392,6 +244,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
     desks,
     mainDesk,
     pal,
+    pieces,
     dispose() {
       root.traverse((obj) => {
         if (obj instanceof Mesh) {

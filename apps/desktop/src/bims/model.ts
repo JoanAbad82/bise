@@ -9,6 +9,7 @@
 import type { Agent, Card, Place } from '@/proto';
 import type { Cam } from './zoom';
 import type { BimEgg, OfficeEggs } from './eggs';
+import type { Grow } from './growth';
 
 /** What the office reads at one moment: the bar's rows for one project, nothing else. */
 export interface Snapshot {
@@ -221,6 +222,10 @@ export interface Look {
   readonly reduced: boolean;
   /** the office's own easter eggs now (eggs.ts): the eclipse, the ghost, the tree...; absent: none */
   readonly eggs?: OfficeEggs;
+  /** what the project's growth draws (growth.ts, the client's high-water mark); absent: a bare room */
+  readonly grow?: Grow;
+  /** the unlock moment (growth.ts unlockOf): the stage whose piece two bims bring in, and when it began (t) */
+  readonly unlock?: { readonly stage: number; readonly at: number };
 }
 
 /**
@@ -238,6 +243,8 @@ export interface OfficeRenderer {
   frame(t: number, bims: readonly BimFrame[], look: Look): Motion;
   /** a bim's head on the canvas, css px from its top left (labels and pills go there), and its feet's y (the hover card flips under them); null off view */
   headOf(name: string): { readonly x: number; readonly y: number; readonly feet: number } | null;
+  /** where a stage's piece stands on the canvas, css px (the unlock moment's label); null off view */
+  pieceOf(stage: number): { readonly x: number; readonly y: number } | null;
   /** the bim (or its desk) under a canvas point, css px; null on nothing */
   pick(x: number, y: number): string | null;
   /** WebGL lost: the shell falls back to the list with one line */

@@ -23,6 +23,9 @@ import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
 import { atFit, DRAG_PX, FIT, panBy, pinchFactor, sameCam, zoomAt, type Cam } from './zoom';
 import { clockSig, eggLabels, eggsAt, konamiDone, localOf, NO_EGGS, noteLands, withForced, type Forced, type Land } from './eggs';
+import { growOf, tipOf, UNLOCK_LABEL, UNLOCK_WALK, unlockLabel, unlockOf, type Grow } from './growth';
+import { growHigh } from './grow-keep';
+import type { Growth } from '@/proto';
 import './office.css';
 
 /** The pure modules and the renderer's loader: feed.ts's, or fakes in a test. */
@@ -91,6 +94,8 @@ const CARD_LINES = 3;
 const CARD_GAP = 4;
 /** after a card closes, the next one shows at once for this long (the ds tips' warmth) */
 const WARM_MS = 1000;
+/** under this width the camera fits the building only (render/index.ts): a grown garden fades at the sides */
+const WHOLE_GROUND_PX = 480;
 
 /** The labels' font for measuring a cut: the ds's sans at 12 px (office.css .bims-label). */
 function labelFont(weight = ''): string {
@@ -132,6 +137,7 @@ export function Office({
   agents,
   cards,
   places,
+  growth = null,
   parts,
   onOpen,
 }: {
@@ -140,6 +146,8 @@ export function Office({
   agents: readonly Agent[];
   cards: readonly Card[];
   places: readonly Place[];
+  /** how much the project has done (hub/growth); the office draws its high-water mark (growth.ts) */
+  growth?: Growth | null;
   parts: Parts;
   /** a click on a bim: open that agent, as its row's click */
   onOpen: (agent: string) => void;
@@ -177,6 +185,25 @@ export function Office({
     applyCam.current(c);
   }, []);
   const live = useRef<Live>({ snap: { agents, cards, places }, agents, fresh: true, events: [], hover: null, held });
+  // the office grows (growth.ts): its high-water mark, the last growth drawn (an unlock is a stage
+  // past it), the unlock moment, its label over the piece and the ground corner's tip
+  // in test mode no kept mark: the fixture's growth, or a check's own (window.__biseGrow, read when
+  // the `growth` prop changes) so a check can go back to a lower stage
+  const high = useMemo(() => (testMode() ? ((window as { __biseGrow?: Growth }).__biseGrow ?? growth) : growHigh(project, growth)), [project, growth]);
+  const growNow = useMemo(() => growOf(high), [high]);
+  const grow = useRef<Grow>(growNow);
+  const seen = useRef<Grow | null>(null);
+  const unlockAt = useRef<{ stage: number; at: number } | undefined>(undefined);
+  const [newTag, setNewTag] = useState<{ text: string; x: number; y: number } | null>(null);
+  useEffect(() => {
+    grow.current = growNow;
+    if (high === null) return;
+    // the first growth drawn is no moment; a stage past the last drawn one is
+    const u = unlockOf(seen.current, growNow);
+    if (u !== null) unlockAt.current = { stage: u, at: Date.now() / 1000 };
+    seen.current = growNow;
+    kickRef.current();
+  }, [high, growNow]);
 
   // a fresh snapshot (the store gives new arrays only on a change): the timeline hears of it
   useEffect(() => {
@@ -251,6 +278,7 @@ export function Office({
     let raf = 0;
     let tick: ReturnType<typeof setTimeout> | undefined;
     let lastLabels = '';
+    let lastNew = 'null';
     let lastActs = '';
     let lastEggs = '';
     let reduced = reducedMotion();
@@ -310,14 +338,24 @@ export function Office({
       const forced = testMode() ? (window as { __biseEggs?: Forced }).__biseEggs : undefined;
       const eg = testMode()
         ? withForced(NO_EGGS, forced)
-        : eggsAt({ t, frames, agents: L.agents, cards: L.snap.cards.length, local, night, reduced, lands: lands.current.lands, konami: konamiAt.current });
+        : eggsAt({ t, frames, agents: L.agents, cards: L.snap.cards.length, local, night, reduced, lands: lands.current.lands, konami: konamiAt.current, stage: grow.current.stage });
       lastEggs = clockSig(local, night, L.agents);
       const played = frames.map((f) => {
         const e = eg.bims.get(f.name);
         return e === undefined ? f : { ...f, egg: e };
       });
-      const look: Look = { night, reduced, eggs: eg.office };
+      // the office grows: what it draws, and the unlock moment while it lasts
+      const u = unlockAt.current;
+      const look: Look = { night, reduced, eggs: eg.office, grow: grow.current, ...(u ? { unlock: u } : {}) };
       const motion = r.frame(t, played, look);
+      const said = unlockLabel(u, t, reduced);
+      const at = said !== null && u ? r.pieceOf(u.stage) : null;
+      const tag = said !== null && at !== null ? { text: said, x: Math.round(at.x), y: Math.round(at.y) } : null;
+      if (JSON.stringify(tag) !== lastNew) {
+        lastNew = JSON.stringify(tag);
+        setNewTag(tag);
+      }
+      if (u && t - u.at > UNLOCK_WALK + UNLOCK_LABEL) unlockAt.current = undefined;
       const shown = parts.labelsOf(played, { t, hover: L.hover, held: L.held, agents: L.agents, eggs: eggLabels(eg) });
       ranks.current = new Map(frames.map((f) => [f.name, tagRank(f.pose.seg.act.k)]));
       heads.current = new Map();
@@ -562,10 +600,22 @@ export function Office({
         if (name !== null) onOpen(name);
       }}
     >
-      <canvas ref={canvas} className="bims-canvas" data-testid="app.right.bims.canvas" />
+      <canvas
+        ref={canvas}
+        // 320: the garden past the building is cropped; a soft fade at the sides says there is more
+        className={`bims-canvas${boxW > 0 && boxW < WHOLE_GROUND_PX && (growNow.garden > 0 || growNow.stage >= 10) ? ' bims-fade' : ''}`}
+        data-testid="app.right.bims.canvas"
+      />
       <div className="bims-overlay">
         <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
         <div ref={moreRef} className="bims-more" data-testid="app.right.bims.more" />
+        {/* the ground's corner: hover says the level, the jobs done, the next piece */}
+        <span className="bims-level" data-testid="app.right.bims.level" {...tipAttrs(tipOf(growNow))} />
+        {newTag !== null && (
+          <div className="bims-label bims-new" data-mode="event" style={{ left: `${String(newTag.x)}px`, top: `${String(newTag.y)}px` }} data-testid="app.right.bims.new">
+            {newTag.text}
+          </div>
+        )}
         {!fitted && (
           <Press
             look="bims-fit"

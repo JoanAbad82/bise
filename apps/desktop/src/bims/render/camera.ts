@@ -24,8 +24,21 @@ export interface Site {
   readonly yHigh: number;
 }
 
+/** the building's site: what the camera fits at 320 (the garden past it is cropped, a soft fade) */
 export function siteOf(o: Office): Site {
   return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.8, yLow: -1.35, yHigh: 2.5 };
+}
+
+/** what the ground grows by with the garden's level (growth.ts: the days used), each side */
+const GARDEN_M = [0, 0.15, 0.3, 0.45, 0.6, 0.8, 1.0, 1.2, 1.4] as const;
+/** stage 10's bigger ground (the fountain, then the pond and the statue, on the left) */
+const BIG_GROUND = 1.7;
+
+/** The whole ground for this growth: the grass block world.ts builds, what the camera fits wide. */
+export function groundOf(o: Office, g: { readonly stage: number; readonly garden: number }): Site {
+  const s = siteOf(o);
+  const m = (GARDEN_M[Math.min(g.garden, GARDEN_M.length - 1)] ?? 0) + (g.stage >= 10 ? BIG_GROUND : 0);
+  return { x0: s.x0 - m, x1: s.x1 + m, z0: s.z0 - m / 2, z1: s.z1 + m / 2, yLow: s.yLow, yHigh: g.stage >= 13 ? 3.0 : s.yHigh };
 }
 
 export interface V3 {

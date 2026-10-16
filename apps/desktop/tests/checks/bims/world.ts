@@ -44,6 +44,9 @@ export function world(snap: Snapshot, theme: 'light' | 'dark' = 'light'): Record
     },
     { ev: 'welcome', project: P, proto: 1, workspace: '/nowhere/office', name: 'office' },
     rowsOf(snap),
+    // a grown office (growth.ts stage 9: the lounge, the whiteboard, the terrace, the ramp), as
+    // these checks drew it before the office grew; grow.spec.ts walks the stages
+    { ev: 'growth', project: P, growth: { jobs_done: 100, days_used: 14, artifacts_made: 120 } },
     { ev: 'agents', project: HOME, agents: [{ name: 'main', main: true, status: 'idle', archived: false, title: '', purpose: '', since_ms: now, waits: 0, watching: [], dir: 'main' }] },
     cardsOf(snap),
     { ev: 'thread', project: P, agent: 'main', entries: [{ pos: 1, at_ms: now - MIN, kind: 'agent', text: 'the office is open.' }], before: null, more: false },

@@ -84,4 +84,41 @@ crate::words! { bims:
     // ---- ctrl held: every name that has room near its bim (designer m_27799)
     /// the office's bottom-right corner when names had no room, so 'every name' never quietly lies
     held_left_out(n) = one "+{n} name · hover a bim" | "+{n} names · hover a bim";
+
+    // ---- the office grows with the project (page bims-office v14 "un bureau qui grandit"): what
+    // each building stage brings (growth.ts's table: stage 1 at 1 job done ... stage 14 at 1000)
+    /// stage 1: a plant, and a first deck chair outside
+    stage_1 = "a plant and a deck chair";
+    /// stage 2: the short island with a fruit bowl, a first tree
+    stage_2 = "the kitchen island";
+    /// stage 3: a rug and two bean bags
+    stage_3 = "the lounge";
+    /// stage 4: the whiteboard, a 2nd plant, a 2nd deck chair
+    stage_4 = "the whiteboard";
+    /// stage 5: the "bise :*" mural, the boombox, 4 bean bags
+    stage_5 = "the mural and the boombox";
+    /// stage 6: the island grows, a 2nd fruit bowl, flowers
+    stage_6 = "a longer island";
+    /// stage 7: the parasol, the palm, 4 deck chairs
+    stage_7 = "the terrace";
+    /// stage 8: trees all round, 8 bean bags
+    stage_8 = "trees all round";
+    /// stage 9
+    stage_9 = "the skate ramp";
+    /// stage 10: a bigger ground, the fountain, 8 deck chairs
+    stage_10 = "the fountain";
+    /// stage 11: in the lounge
+    stage_11 = "the arcade cabinet";
+    /// stage 12: a pond with a little dock
+    stage_12 = "the pond";
+    /// stage 13: floating by the office
+    stage_13 = "the balloon";
+    /// stage 14: the last one, in the garden
+    stage_14 = "main's golden statue";
+    /// the event label 3 s over the new piece as two bims carry it in
+    grow_new(thing) = "new: {thing}";
+    /// the tip on the ground's corner: the level, the jobs done, the next piece and when
+    grow_tip(n, level, thing, at) = one "level {level} · {n} job done · next: {thing} at {at}" | "level {level} · {n} jobs done · next: {thing} at {at}";
+    /// the same at the last level
+    grow_tip_top(n, level) = one "level {level} · {n} job done" | "level {level} · {n} jobs done";
 }

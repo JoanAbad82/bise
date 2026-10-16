@@ -107,6 +107,18 @@ describe('the easter eggs scheduler (eggs.ts)', () => {
     expect(eggsAt(base([frame('a', work)], { local: fri })).bims.get('a')).toBeUndefined();
   });
 
+  it('the boombox plays (o3: 5+ working, t1: friday 17:00) and the board games (o4) only once the office has them', () => {
+    const busy = ['a', 'b', 'c', 'd', 'e'].map((n) => agent(n, { status: 'working' }));
+    expect(officeEggs({ local: TUE, night: false, agents: busy, stage: 5 }, false).music).toBe(true);
+    expect(officeEggs({ local: TUE, night: false, agents: busy, stage: 4 }, false).music).toBe(false);
+    expect(officeEggs({ local: TUE, night: false, agents: busy.slice(1), stage: 9 }, false).music).toBe(false);
+    const fri = { ...TUE, dow: 5, s: 17 * 3600 + 60 };
+    expect(officeEggs({ local: fri, night: false, agents: [], stage: 5 }, false).music).toBe(true);
+    expect(officeEggs({ local: fri, night: false, agents: [], stage: 2 }, false).music).toBe(false);
+    expect(officeEggs({ local: TUE, night: false, agents: [], stage: 3 }, true).doodle).toBe(false);
+    expect(officeEggs({ local: TUE, night: false, agents: [], stage: 4 }, true).doodle).toBe(true);
+  });
+
   it("a check's forced eggs replace the rolls, with their words", () => {
     const e = withForced(NO_EGGS, { bims: { a: { kind: 'speedrun', since: 1 }, b: { kind: 'salto', since: 0.4 } }, office: { eclipse: true } });
     expect(e.bims.get('a')).toMatchObject({ kind: 'speedrun', label: '1:47' });

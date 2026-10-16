@@ -4,7 +4,7 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, FlowMode, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
+import type { Account, Agent, FlowMode, Growth, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import { keep } from '@/app/keep';
 import type { AnsweredFrom } from './answered';
@@ -108,6 +108,8 @@ export const usePages = (project: string): PagesList | null => useSlice(`pages:$
 export const useHubUpdate = (project: string): UpdateEv | null => useSlice(`update:${project}`, (s) => s.hubUpdate(project));
 /** the hub's newest version switch (/reload, /restart, /version): null before the hub said one */
 export const useHubSwitch = (project: string): SwitchRow | null => useSlice(`switch:${project}`, (s) => s.switchRow(project));
+/** les bims: how much the project has done (hub/growth): null before the hub said */
+export const useGrowth = (project: string): Growth | null => useSlice(`growth:${project}`, (s) => s.growth(project));
 export const useRelease = (project: string): ReleaseEv | null => useSlice(`release:${project}`, (s) => s.release(project));
 export const usePrs = (project: string): PrsList | null => useSlice(`prs:${project}`, (s) => s.prs(project));
 export const useModels = (project: string): readonly Model[] => useSlice(`models:${project}`, (s) => s.models(project));

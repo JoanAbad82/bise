@@ -62,6 +62,31 @@
     "one": null,
     "text": "back to the whole office"
   },
+  "bims.grow_new": {
+    "args": [
+      "thing"
+    ],
+    "one": null,
+    "text": "new: {thing}"
+  },
+  "bims.grow_tip": {
+    "args": [
+      "n",
+      "level",
+      "thing",
+      "at"
+    ],
+    "one": "level {level} · {n} job done · next: {thing} at {at}",
+    "text": "level {level} · {n} jobs done · next: {thing} at {at}"
+  },
+  "bims.grow_tip_top": {
+    "args": [
+      "n",
+      "level"
+    ],
+    "one": "level {level} · {n} job done",
+    "text": "level {level} · {n} jobs done"
+  },
   "bims.held_left_out": {
     "args": [
       "n"
@@ -97,6 +122,76 @@
     ],
     "one": null,
     "text": "{agent} failed. click opens it"
+  },
+  "bims.stage_1": {
+    "args": [],
+    "one": null,
+    "text": "a plant and a deck chair"
+  },
+  "bims.stage_10": {
+    "args": [],
+    "one": null,
+    "text": "the fountain"
+  },
+  "bims.stage_11": {
+    "args": [],
+    "one": null,
+    "text": "the arcade cabinet"
+  },
+  "bims.stage_12": {
+    "args": [],
+    "one": null,
+    "text": "the pond"
+  },
+  "bims.stage_13": {
+    "args": [],
+    "one": null,
+    "text": "the balloon"
+  },
+  "bims.stage_14": {
+    "args": [],
+    "one": null,
+    "text": "main's golden statue"
+  },
+  "bims.stage_2": {
+    "args": [],
+    "one": null,
+    "text": "the kitchen island"
+  },
+  "bims.stage_3": {
+    "args": [],
+    "one": null,
+    "text": "the lounge"
+  },
+  "bims.stage_4": {
+    "args": [],
+    "one": null,
+    "text": "the whiteboard"
+  },
+  "bims.stage_5": {
+    "args": [],
+    "one": null,
+    "text": "the mural and the boombox"
+  },
+  "bims.stage_6": {
+    "args": [],
+    "one": null,
+    "text": "a longer island"
+  },
+  "bims.stage_7": {
+    "args": [],
+    "one": null,
+    "text": "the terrace"
+  },
+  "bims.stage_8": {
+    "args": [],
+    "one": null,
+    "text": "trees all round"
+  },
+  "bims.stage_9": {
+    "args": [],
+    "one": null,
+    "text": "the skate ramp"
   },
   "bims.state_hot": {
     "args": [],

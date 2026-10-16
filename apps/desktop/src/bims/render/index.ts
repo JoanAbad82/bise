@@ -21,6 +21,13 @@ import { eggRig } from './egg';
 import { makeEggDecor, type EggDecor } from './eggdecor';
 import { MAIN_HOODIE, WORLD, outfitOf, type Outfit } from './palette';
 import { buildWorld, castShadows, lightDesk, type World } from './world';
+import { NO_GROW, growSig, type Grow } from '../growth';
+import { groundOf } from './camera';
+import { pieceAt } from './stages';
+import { makeUnlock } from './unlock';
+
+/** from this width (css px) the camera fits the whole ground (the garden too); under it the building */
+const WHOLE_GROUND_PX = 480;
 
 /** what the headless check reads (test mode only) */
 interface Probe {
@@ -53,6 +60,10 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   let eclipsed = false;
   let eggDecor: EggDecor | null = null;
   let april = false;
+  // the project's growth as drawn now (growth.ts), and the unlock moment's crew
+  let grow: Grow = NO_GROW;
+  let growKey = growSig(NO_GROW);
+  const unlock = makeUnlock(scene, STYLE);
   /** the whole site fitted to the canvas, and what shows through his camera (fit = base at FIT) */
   let base: Fit | null = null;
   let fit: Fit | null = null;
@@ -88,10 +99,10 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     const pal = paletteOf(isNight);
     renderer.setClearColor(pal.bg);
     eclipsed = false;
-    world = buildWorld(office, mainName(), STYLE, pal);
+    world = buildWorld(office, mainName(), STYLE, pal, grow);
     scene.add(world.root);
     if (eggDecor) { scene.remove(eggDecor.root); eggDecor.dispose(); }
-    eggDecor = makeEggDecor(office, STYLE);
+    eggDecor = makeEggDecor(office, STYLE, grow.stage);
     scene.add(eggDecor.root);
   }
 
@@ -132,7 +143,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
 
   function applyFit(): void {
     if (!office || size.w <= 0) return;
-    base = fitSite(siteOf(office), size.w, size.maxH);
+    // 320: the building, the garden past it cropped (Office.tsx's soft fade); wide: the whole ground
+    base = fitSite(size.w >= WHOLE_GROUND_PX ? groundOf(office, grow) : siteOf(office), size.w, size.maxH);
     applyView();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, STYLE.maxPixelRatio));
     renderer.setSize(base.widthPx, base.heightPx, false);
@@ -205,7 +217,14 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     },
     frame(t, frames, look: Look): Motion {
       if (lost || !office) return 'still';
-      if (night !== look.night) rebuildWorld(look.night);
+      // the growth moved (a new stage, garden, frames, cones): the world again, the ground may be wider
+      const g = look.grow ?? NO_GROW;
+      if (growSig(g) !== growKey) {
+        grow = g;
+        growKey = growSig(g);
+        rebuildWorld(look.night);
+        applyFit();
+      } else if (night !== look.night) rebuildWorld(look.night);
       // t4: the eclipse turns the sky behind the office violet
       const eclipse = look.eggs?.eclipse === true;
       if (eclipse !== eclipsed && world) {
@@ -241,11 +260,18 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       if (!look.reduced && drawPlanes(frames)) motion = 'walk';
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
       if (eggDecor?.update(look.eggs) === true) motion = 'walk';
+      // the unlock moment: two bims bring the new piece in from the door
+      if (unlock.update(t, office, look.unlock, look.unlock ? world.pieces.get(look.unlock.stage) : undefined, look.reduced)) motion = 'walk';
       renderer.render(scene, camera);
       if (probe) probe.frames++;
       return motion;
     },
     headOf,
+    pieceOf(stage) {
+      if (!fit || !office) return null;
+      const p = toScreen(fit, { ...pieceAt(office, stage), y: 1.2 });
+      return p.x < 0 || p.y < 0 || p.x > fit.widthPx || p.y > fit.heightPx ? null : p;
+    },
     pick(x, y) {
       if (!fit || !world) return null;
       const f = fit;
@@ -270,6 +296,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       canvas.removeEventListener('webglcontextlost', onLost);
       if (world) { scene.remove(world.root); world.dispose(); world = null; }
       if (eggDecor) { eggDecor.dispose(); eggDecor = null; }
+      unlock.dispose();
       for (const b of bims.values()) b.dispose();
       bims.clear();
       for (const p of planes.values()) p.dispose();

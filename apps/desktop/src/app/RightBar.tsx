@@ -21,7 +21,7 @@ import { LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { AddButton, AddDrop, useAddPlace } from '@/artifacts/Drops';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
-import { useCards, useComputerLive, usePlaces, useStore, type Store } from '@/store';
+import { useCards, useComputerLive, useGrowth, usePlaces, useStore, type Store } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
@@ -440,6 +440,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   const tasks = useAllScheduled(all ? undefined : project);
   const places = usePlaces(project);
   const cards = useCards(project);
+  const growth = useGrowth(project);
   const computer = useComputerLive();
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
   // the TUI's ⌥ numbers: the rows' order and ⌥N (a project's only; bise's thread keeps start order)
@@ -512,6 +513,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
                 agents={officeAgents}
                 cards={cards}
                 places={places}
+                growth={growth}
                 parts={bimsParts}
                 onOpen={(agent) => {
                   openAgent(project, agent);

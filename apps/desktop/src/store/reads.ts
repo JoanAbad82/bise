@@ -3,6 +3,7 @@
 import type {
   Account,
   SwitchRow,
+  Growth,
   Card,
   ComputerAgent,
   Agent,
@@ -188,6 +189,10 @@ export class StoreReads extends StoreBase {
   /** the hub's newest version switch (its phase, to/from, why it rolled back, at_ms); null: none said */
   switchRow(project: string): SwitchRow | null {
     return this.slice<SwitchRow | null>(`switch:${project}`, null);
+  }
+  /** les bims: how much the project has done (hub/growth); null before the hub said */
+  growth(project: string): Growth | null {
+    return this.slice<Growth | null>(`growth:${project}`, null);
   }
   /** his pages and the late promises' count; null before the hub said */
   pages(project: string): PagesList | null {
