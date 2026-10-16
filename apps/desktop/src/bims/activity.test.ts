@@ -20,6 +20,18 @@ describe("the rows -> bims mapping (spec §4, [a] lines)", () => {
   it('working: at its desk, typing', () => {
     expect(one(agent('a', { status: 'working', turn_ms: 60_000 }))).toEqual({ k: 'work', at: 'desk' });
   });
+  it("what the turn does (the hub's Agent.doing): a working bim's pose; think goes to the whiteboard", () => {
+    const d = (kind: 'think' | 'search' | 'build', status: 'working' | 'waiting' = 'working') =>
+      agent('a', { status, turn_ms: 60_000, doing: { kind, since_ms: 0 } });
+    expect(one(d('search'))).toEqual({ k: 'work', at: 'desk', doing: 'search' });
+    expect(one(d('think'))).toEqual({ k: 'work', at: 'board', doing: 'think' });
+    expect(one(agent('a', { status: 'working', turn_ms: HOT_MS + 1, doing: { kind: 'search', since_ms: 0 } }))).toEqual({ k: 'hot', at: 'desk', doing: 'search' });
+    expect(one(mainAgent({ status: 'working', doing: { kind: 'think', since_ms: 0 } }))).toEqual({ k: 'main', at: 'main', doing: 'think' });
+    // paused on a backgrounded build: arms crossed under a progress bar, not asleep
+    expect(one(d('build', 'waiting'))).toEqual({ k: 'work', at: 'desk', doing: 'build' });
+    // a bim that asks you or failed shows that, whatever its turn does
+    expect(one(agent('a', { status: 'failed', doing: { kind: 'tool', since_ms: 0 } })).k).toBe('failed');
+  });
   it('working, a long turn: hot past HOT_MS, not at it', () => {
     expect(one(agent('a', { status: 'working', turn_ms: HOT_MS + 1 })).k).toBe('hot');
     expect(one(agent('a', { status: 'working', turn_ms: HOT_MS })).k).toBe('work');

@@ -1,9 +1,10 @@
-// les bims: one agent row -> where its bim is and what it does (the spec's §4, [a] lines only:
+// les bims: one agent row -> where its bim is and what it does (the spec's §4, the [a] lines and Agent.doing:
 // rows.ts fields, never a thread's words). Pure: the same row, snapshot and t give the same
 // activity, so a timeline computed ahead replays. Rule 1 (the map never lies): only an idle bim
-// goes for office life (nap / snack); a busy one stays at its desk. `doing` stays unset in v1
-// (q-data, model.ts). An archived agent has no bim: the caller leaves it out.
-import type { Agent } from '@/proto';
+// goes for office life (nap / snack); a busy one stays at its desk. `doing` is the hub's
+// Agent.doing (bims-facts, typed): a working bim's pose, the whiteboard for think. An archived agent
+// has no bim: the caller leaves it out.
+import type { Agent, DoingKind } from '@/proto';
 import type { Activity, Snapshot } from './model';
 
 /** a turn longer than this runs hot (sweat, steam): the spec's 10 min, to tune */
@@ -52,12 +53,24 @@ export function activity(a: Agent, s: Snapshot, t: number): Activity {
     if (rank != null && rank > 0) return { k: 'landing', at: 'queue', rank };
   }
   if (a.phase === 'starting') return { k: 'starting', at: a.main ? 'main' : 'door' };
-  if (a.main) return a.status === 'working' ? { k: 'main', at: 'main' } : { k: 'mainidle', at: 'main' };
-  if (a.status === 'working') return (a.turn_ms ?? 0) > HOT_MS ? { k: 'hot', at: 'desk' } : { k: 'work', at: 'desk' };
+  const doing = a.doing?.kind;
+  if (a.main) return a.status === 'working' ? withDoing({ k: 'main', at: 'main' }, doing, false) : { k: 'mainidle', at: 'main' };
+  if (a.status === 'working') return withDoing((a.turn_ms ?? 0) > HOT_MS ? { k: 'hot', at: 'desk' } : { k: 'work', at: 'desk' }, doing, true);
   if (a.status === 'blocked') return { k: 'blocked', at: 'desk' };
   if (a.waiting_on?.who === 'agent') return { k: 'waitagent', at: 'desk', on: a.waiting_on.name };
+  // paused on a backgrounded command that still runs: the hub says build (arms crossed, a progress bar), not asleep
+  if (doing === 'build') return { k: 'work', at: 'desk', doing };
   if (a.status === 'waiting' || a.watching.length > 0) return { k: 'sleep', at: 'desk' };
   return idleLife(a.name, t);
+}
+
+/**
+ * A working bim's activity with what its turn does (the hub's Agent.doing, spec §4 [t]): the
+ * renderer poses it; thinking goes to the whiteboard (`board`), except main, who stays at his desk.
+ */
+function withDoing(act: Activity, doing: DoingKind | undefined, board: boolean): Activity {
+  if (doing === undefined) return act;
+  return { ...act, doing, ...(doing === 'think' && board ? { at: 'board' as const } : {}) };
 }
 
 /** every live agent's activity at t, by name (archived agents have no bim) */
