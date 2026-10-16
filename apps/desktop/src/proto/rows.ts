@@ -1107,7 +1107,8 @@ export type Doing = { kind: DoingKind, since_ms: number, };
  */
 export type Growth = { 
 /**
- * tasks whose last report is a done, live or archived
+ * agents in the done state now, live or archived (a done agent
+ * that resumes leaves it)
  */
 jobs_done: number, 
 /**
