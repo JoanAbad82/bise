@@ -17,7 +17,7 @@
 1052 rust/plugins/src/resolve.rs
 1163 rust/proto/src/thread/fold_tests.rs
 1655 rust/switchboard/src/approvals/tiers.rs
-1038 rust/switchboard/src/cli.rs
+1013 rust/switchboard/src/cli.rs
 2724 rust/switchboard/src/core.rs
 4612 rust/switchboard/src/core_tests.rs
 2279 rust/switchboard/src/daemon.rs
@@ -27,11 +27,11 @@
 1029 rust/tui/src/ctrlhint.rs
 1191 rust/tui/src/diffview.rs
 1597 rust/tui/src/editor.rs
-1791 rust/tui/src/feed.rs
+1625 rust/tui/src/feed.rs
 1204 rust/tui/src/logview.rs
 2995 rust/tui/src/onboarding.rs
 1116 rust/tui/src/onboarding/roles.rs
-2166 rust/tui/src/render.rs
+2163 rust/tui/src/render.rs
 1018 rust/tui/src/run.rs
 1713 rust/tui/src/sb.rs
 1383 rust/tui/src/sb/cards.rs
