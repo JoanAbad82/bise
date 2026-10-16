@@ -23,7 +23,7 @@ import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
 import { atFit, DRAG_PX, FIT, panBy, pinchFactor, sameCam, zoomAt, type Cam } from './zoom';
 import { clockSig, eggLabels, eggsAt, konamiDone, localOf, NO_EGGS, noteLands, withForced, type Forced, type Land } from './eggs';
-import { growOf, tipOf, UNLOCK_LABEL, UNLOCK_WALK, unlockLabel, unlockOf, type Grow } from './growth';
+import { cropped, growOf, tipOf, UNLOCK_LABEL, UNLOCK_WALK, unlockLabel, unlockOf, type Grow } from './growth';
 import { growHigh } from './grow-keep';
 import type { Growth } from '@/proto';
 import './office.css';
@@ -94,8 +94,8 @@ const CARD_LINES = 3;
 const CARD_GAP = 4;
 /** after a card closes, the next one shows at once for this long (the ds tips' warmth) */
 const WARM_MS = 1000;
-/** under this width the camera fits the building only (render/index.ts): a grown garden fades at the sides */
-const WHOLE_GROUND_PX = 480;
+/** from this width the camera fits a little ground past the building (render/index.ts), under it the building only */
+const WIDE_FIT_PX = 480;
 
 /** The labels' font for measuring a cut: the ds's sans at 12 px (office.css .bims-label). */
 function labelFont(weight = ''): string {
@@ -602,8 +602,8 @@ export function Office({
     >
       <canvas
         ref={canvas}
-        // 320: the garden past the building is cropped; a soft fade at the sides says there is more
-        className={`bims-canvas${boxW > 0 && boxW < WHOLE_GROUND_PX && (growNow.garden > 0 || growNow.stage >= 10) ? ' bims-fade' : ''}`}
+        // the garden past what the camera fits is cropped; a soft fade at the sides says there is more
+        className={`bims-canvas${boxW > 0 && cropped(growNow, boxW >= WIDE_FIT_PX) ? ' bims-fade' : ''}`}
         data-testid="app.right.bims.canvas"
       />
       <div className="bims-overlay">

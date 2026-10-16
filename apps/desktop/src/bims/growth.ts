@@ -130,6 +130,23 @@ export function tipOf(g: Grow): string {
   return bims.grow_tip({ n: g.jobs, level: g.stage, thing: thingOf(g.stage + 1), at: next });
 }
 
+/** what the ground grows by with the garden's level (the days used), each side, world units */
+const GARDEN_M = [0, 0.15, 0.3, 0.45, 0.6, 0.8, 1.0, 1.2, 1.4] as const;
+/** stage 10's bigger ground (the fountain, then the pond and the statue, on the left) */
+const BIG_GROUND = 1.7;
+/** the ground the camera shows wide past the building, each side (render/camera.ts wideSiteOf) */
+export const WIDE_GARDEN = 1.5;
+
+/** How far the grass reaches past the building's site, each side. */
+export function groundMargin(g: { readonly stage: number; readonly garden: number }): number {
+  return (GARDEN_M[Math.min(g.garden, GARDEN_M.length - 1)] ?? 0) + (g.stage >= 10 ? BIG_GROUND : 0);
+}
+
+/** The garden reaches past what the camera fits (320: the building; wide: WIDE_GARDEN more): a soft side fade says so. */
+export function cropped(g: Grow, wide: boolean): boolean {
+  return groundMargin(g) > (wide ? WIDE_GARDEN : 0);
+}
+
 /** What makes the world rebuild: everything it draws from the counters. */
 export function growSig(g: Grow): string {
   return `${g.stage}/${g.garden}/${g.frames}/${g.golden ? 1 : 0}/${g.building ? 1 : 0}`;

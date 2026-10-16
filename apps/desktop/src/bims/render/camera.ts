@@ -5,6 +5,7 @@
 // His pinch and pan (zoom.ts Cam) are a view inside the fit (viewFit), the canvas's size unchanged.
 import type { Office, Pt } from '../model';
 import type { Cam } from '../zoom';
+import { WIDE_GARDEN, groundMargin } from '../growth';
 
 export const AZ = Math.PI / 4;
 export const EL = Math.PI / 6;
@@ -29,16 +30,21 @@ export function siteOf(o: Office): Site {
   return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.8, yLow: -1.35, yHigh: 2.5 };
 }
 
-/** what the ground grows by with the garden's level (growth.ts: the days used), each side */
-const GARDEN_M = [0, 0.15, 0.3, 0.45, 0.6, 0.8, 1.0, 1.2, 1.4] as const;
-/** stage 10's bigger ground (the fountain, then the pond and the statue, on the left) */
-const BIG_GROUND = 1.7;
-
-/** The whole ground for this growth: the grass block world.ts builds, what the camera fits wide. */
+/** The whole ground for this growth: the grass block world.ts builds (growth.ts groundMargin). */
 export function groundOf(o: Office, g: { readonly stage: number; readonly garden: number }): Site {
   const s = siteOf(o);
-  const m = (GARDEN_M[Math.min(g.garden, GARDEN_M.length - 1)] ?? 0) + (g.stage >= 10 ? BIG_GROUND : 0);
+  const m = groundMargin(g);
   return { x0: s.x0 - m, x1: s.x1 + m, z0: s.z0 - m / 2, z1: s.z1 + m / 2, yLow: s.yLow, yHigh: g.stage >= 13 ? 3.0 : s.yHigh };
+}
+
+/**
+ * What the camera fits wide: the building and WIDE_GARDEN of ground each side, whatever the growth
+ * (bims m_28178: the office never gets smaller as the project grows; the garden past it is cropped
+ * with the same soft fade as 320's).
+ */
+export function wideSiteOf(o: Office): Site {
+  const s = siteOf(o);
+  return { ...s, x0: s.x0 - WIDE_GARDEN, x1: s.x1 + WIDE_GARDEN, z0: s.z0 - WIDE_GARDEN / 2, z1: s.z1 + WIDE_GARDEN / 2 };
 }
 
 export interface V3 {

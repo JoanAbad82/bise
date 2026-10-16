@@ -152,8 +152,10 @@ export function buildStages(k: Kit, root: Object3D, o: Office, g: Grow, boxes: r
   const s0 = s(0);
   if (!s0) return pieces;
 
-  // the terrace slab is every office's (a done bim walks out there); its deck chairs come with the stages
-  onFloor(k, s0, boxOf(d.terrace), 0.08, 0, pal.terrace);
+  // the terrace: grass in a new office; the first done bim makes it, with its first deck chair
+  // (bims m_28178). Its deck chairs come with the stages
+  const s1t = s(1);
+  if (s1t) onFloor(k, s1t, boxOf(d.terrace), 0.08, 0, pal.terrace);
   const isChair = (b: Box): boolean => b.of !== undefined && o.terrace.some((t) => t.x === b.of?.x && t.z === b.of.z);
   const chairs = boxes.filter(isChair);
   const nChairs = at(CHAIRS, g.stage);

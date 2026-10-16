@@ -22,12 +22,12 @@ import { makeEggDecor, type EggDecor } from './eggdecor';
 import { MAIN_HOODIE, WORLD, outfitOf, type Outfit } from './palette';
 import { buildWorld, castShadows, lightDesk, type World } from './world';
 import { NO_GROW, growSig, type Grow } from '../growth';
-import { groundOf } from './camera';
+import { wideSiteOf } from './camera';
 import { pieceAt } from './stages';
 import { makeUnlock } from './unlock';
 
-/** from this width (css px) the camera fits the whole ground (the garden too); under it the building */
-const WHOLE_GROUND_PX = 480;
+/** from this width (css px) the camera fits the building and a little ground (wideSiteOf); under it the building */
+const WIDE_FIT_PX = 480;
 
 /** what the headless check reads (test mode only) */
 interface Probe {
@@ -143,8 +143,9 @@ export const makeRenderer: MakeRenderer = (canvas) => {
 
   function applyFit(): void {
     if (!office || size.w <= 0) return;
-    // 320: the building, the garden past it cropped (Office.tsx's soft fade); wide: the whole ground
-    base = fitSite(size.w >= WHOLE_GROUND_PX ? groundOf(office, grow) : siteOf(office), size.w, size.maxH);
+    // 320: the building; wide: a little ground past it. The garden past that is cropped (Office.tsx's
+    // soft fade), so the office never gets smaller as the project grows (bims m_28178)
+    base = fitSite(size.w >= WIDE_FIT_PX ? wideSiteOf(office) : siteOf(office), size.w, size.maxH);
     applyView();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, STYLE.maxPixelRatio));
     renderer.setSize(base.widthPx, base.heightPx, false);
@@ -269,8 +270,10 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     headOf,
     pieceOf(stage) {
       if (!fit || !office) return null;
+      // a piece out of the frame (the garden cropped at 320): the frame's edge nearest it (bims m_28178)
       const p = toScreen(fit, { ...pieceAt(office, stage), y: 1.2 });
-      return p.x < 0 || p.y < 0 || p.x > fit.widthPx || p.y > fit.heightPx ? null : p;
+      const m = 12;
+      return { x: Math.min(fit.widthPx - m, Math.max(m, p.x)), y: Math.min(fit.heightPx - m, Math.max(m * 2, p.y)) };
     },
     pick(x, y) {
       if (!fit || !world) return null;
