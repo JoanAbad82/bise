@@ -1,0 +1,132 @@
+/* The office in the right bar (page bims-office v7, spec §2): the canvas at the AGENTS section's
+   top at its natural height, the label overlay over it. Colour is attention: the accent only for
+   the '?' pill (asks you), the error red only for '✗' (failed). Tokens only. Owner: bims-wire. */
+.bims-office {
+  position: relative;
+  /* the renderer sets the height it needs at this width (Office.tsx resize); the bar's whole
+     width, out of the body's padding (.app-rb-body, --s-2 each side) */
+  margin: var(--gap-tight) calc(-1 * var(--s-2));
+  overflow: hidden;
+}
+.bims-office[data-state='loading'] {
+  height: 0;
+}
+.bims-office[data-pointer] {
+  cursor: pointer;
+}
+.bims-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* nothing takes the pointer but the pills (spec §1 rule 6): hover and click go to the canvas */
+.bims-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bims-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-tight);
+  padding-bottom: var(--s-1);
+  white-space: nowrap;
+  will-change: transform;
+}
+.bims-label {
+  padding: 0 var(--s-1);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
+  color: var(--c-text);
+  font: var(--t-11) / 1.5 var(--font-mono);
+  animation: bims-in var(--d-base) var(--ease-out, ease-out);
+}
+/* a walking bim's name: small and dim (spec §2) */
+.bims-label[data-mode='name'] {
+  color: var(--c-text-3);
+}
+.bims-pill {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--s-4);
+  height: var(--s-4);
+  border-radius: var(--r-pill);
+  font: 600 var(--t-11) / 1 var(--font-mono);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bims-pill.asks {
+  background: var(--c-accent);
+  color: var(--c-on-ink);
+}
+.bims-pill.failed {
+  background: var(--c-err);
+  color: var(--c-on-ink);
+}
+/* WebGL lost: one line, then the list (never a blank section) */
+.bims-lost {
+  padding: var(--s-1) var(--pad-row-x);
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+@keyframes bims-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-label {
+    animation: none;
+  }
+}
+
+/* the bar wide while the office shows (bims m_27494): 640 px. The frame's column (--panel-w) is
+   640 when the window has room (view.ts panelColumn): data-wide='docked'. Short of room the column
+   keeps his width, fixed, and the bar, 640 at the column's end, slides over the thread on its left
+   (data-wide='over'); under 1000 px it already slides over in its own layer (.over) */
+.app-panel.app-rb[data-wide] {
+  width: max(var(--panel-w, 320px), 640px);
+}
+.app-shell:has(.app-panel.app-rb[data-wide='over']:not(.over)) .b-win > .cols {
+  grid-template-columns: var(--side-w, 240px) minmax(0, 1fr) var(--panel-w, 320px);
+}
+.app-shell.no-side:has(.app-panel.app-rb[data-wide='over']:not(.over)) .b-win > .cols {
+  grid-template-columns: minmax(0, 1fr) var(--panel-w, 320px);
+}
+.app-panel.app-rb[data-wide='over']:not(.over) {
+  justify-self: end;
+  position: relative;
+  z-index: 3;
+  box-shadow: var(--e-3);
+}
+/* the AGENTS head's two small toggles: 'list | bims', '320 | wide' */
+.bims-switch {
+  display: inline-flex;
+  flex: none;
+  gap: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-11);
+}
+.bims-switch > .bims-opt {
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--r-1);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.bims-switch > .bims-opt:hover {
+  background: var(--c-hover);
+  color: var(--c-text-2);
+}
+.bims-switch > .bims-opt[aria-pressed='true'] {
+  color: var(--c-text);
+}
+.bims-switch > .bims-opt:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}

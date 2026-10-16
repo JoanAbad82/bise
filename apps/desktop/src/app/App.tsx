@@ -276,7 +276,7 @@ function Shell() {
               artDocked ? (
                 <ArtifactColumn project={art.project} id={art.id} />
               ) : frame.panel?.docked === true ? (
-                <RightBar project={frame.panel.project} name={frame.panel.name} />
+                <RightBar project={frame.panel.project} name={frame.panel.name} column={frame.panelW} />
               ) : undefined
             }
           />

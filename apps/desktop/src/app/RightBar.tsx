@@ -35,6 +35,9 @@ import { agentRows, archivedRows, artifactRows, pageRows, scheduledRows, watchRo
 import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
+import { BimsSwitch, Office } from '@/bims/Office';
+import { parts as bimsParts } from '@/bims/feed';
+import { showsWide, useBimsView, wideMode } from '@/bims/view';
 
 const lastAgents = new Map<string, { from: readonly (readonly Agent[])[]; items: readonly ProjAgent[] }>();
 
@@ -114,6 +117,7 @@ function Section({
   full,
   onAll,
   act,
+  office,
   children,
 }: {
   id: SectionId;
@@ -133,6 +137,8 @@ function Section({
   onAll: () => void;
   /** a control in the head before 'all ›' (ARTIFACTS' '+ add') */
   act?: ReactNode;
+  /** AGENTS with bims on: the office in place of the rows, the rows its fallback (while it loads, WebGL lost) */
+  office?: ((list: ReactNode) => ReactNode) | undefined;
   children: (r: BarRow) => ReactNode;
 }) {
   const [folded, toggle] = useFolded(id, id === 'archived');
@@ -179,7 +185,7 @@ function Section({
           </div>
         </div>
       )}
-      {!shut && rows.length > 0 && (
+      {!shut && rows.length > 0 && (office ?? ((list: ReactNode) => list))(
         <div className="app-rb-rows">
           {shown.map(children)}
           {/* 'show 50 more · N left' opens the next 50, not all (his m_26894, designer m_27020); past the
@@ -213,7 +219,7 @@ function Section({
               )}
             </div>
           )}
-        </div>
+        </div>,
       )}
     </section>
   );
@@ -414,7 +420,7 @@ function useAgentTip(project: string, rows: readonly BarRow[], route: ReturnType
   };
 }
 
-export function RightBar({ project, name, over }: { project: string; name: string; over?: boolean }) {
+export function RightBar({ project, name, over, column }: { project: string; name: string; over?: boolean; column?: number }) {
   const router = useRouter();
   // a browser-only artifact (a PR, a link) opens his browser, the bar stays (leave.ts)
   const goArtifact = useGoArtifact();
@@ -466,9 +472,19 @@ export function RightBar({ project, name, over }: { project: string; name: strin
     router.go({ screen: 'thread', project: p, agent });
   };
   const here = (p: string, agent: string) => route.screen === 'thread' && route.project === p && route.agent === agent;
+  // the AGENTS section as the office (les bims): a project's bar only, bise's thread keeps the list in v1
+  const bims = useBimsView();
+  const office = !all && bims.view === 'bims';
+  const officeAgents = useMemo(() => agents.filter((x) => !x.a.archived).map((x) => x.a), [agents]);
   return (
     // ⌥ held: every agent row shows its context ring (and its %), else only the hovered one (app.css)
-    <aside className={over === true ? 'app-panel app-rb over' : 'app-panel app-rb'} data-testid="app.panel" data-held={alt ? 'alt' : undefined} aria-label={panel.bar_label({ name })}>
+    <aside
+      className={over === true ? 'app-panel app-rb over' : 'app-panel app-rb'}
+      data-testid="app.panel"
+      data-held={alt ? 'alt' : undefined}
+      data-wide={showsWide(bims, project) ? wideMode(over === true, column) : undefined}
+      aria-label={panel.bar_label({ name })}
+    >
       <div className="app-rb-top" data-testid="app.right.top">
         <b>{name}</b>
         {working > 0 && <span className="app-rb-dim">{panel.count_working({ n: working })}</span>}
@@ -487,6 +503,24 @@ export function RightBar({ project, name, over }: { project: string; name: strin
           onAll={() => {
             router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
           }}
+          act={all ? undefined : <BimsSwitch view={bims} />}
+          office={
+            office
+              ? (list) => (
+                  <Office
+                    project={project}
+                    agents={officeAgents}
+                    cards={cards}
+                    places={places}
+                    parts={bimsParts}
+                    onOpen={(agent) => {
+                      openAgent(project, agent);
+                    }}
+                    fallback={list}
+                  />
+                )
+              : undefined
+          }
         >
           {(r) =>
             r.kind === 'group' || r.kind === 'orphan' ? (

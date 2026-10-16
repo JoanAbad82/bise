@@ -36,6 +36,7 @@ import {
   panelProject,
 } from "./side";
 import { useWaitingTotal } from "./Sidebar";
+import { usePanelColumn } from "@/bims/view";
 
 export type Width = "narrow" | "mid" | "wide";
 
@@ -162,6 +163,8 @@ export function useFrame(): FrameState {
     4000,
     PANEL.def,
   );
+  // the office wide: the column is 640 when the window has room for it (bims/view.ts)
+  const column = usePanelColumn(panelW, side ? sideW : 0, project);
   const panel =
     project === undefined
       ? undefined
@@ -189,11 +192,11 @@ export function useFrame(): FrameState {
       setSlid(null);
     },
     sideW,
-    panelW,
+    panelW: column,
     resize: (what, want) => {
       const win = window.innerWidth;
       const shownPanel =
-        at.docked && at.open && project !== undefined ? panelW : 0;
+        at.docked && at.open && project !== undefined ? column : 0;
       if (what === "side") {
         // folded (⌘\ or a drag under 160): a drag out of the fold opens it at 200
         if (!side) {
