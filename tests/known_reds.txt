@@ -3,3 +3,7 @@
 # and test:land say so; any other red is NEW. Remove the line in the commit that fixes it.
 history-perf	12c3d88dc	land-reds	test:land at load 30+ only: the 'zanzibar' jump (entry 1200) never drawn in 60 s, once in 10 runs; not explained yet, a red run now writes jump.json (what the list draws, the finds and pages asked). The walk to the oldest hit (a reveal's settle on a stale index after the older page came) is fixed, 5/5 at load 13-33
 inbox-open	1da997a46	land-reds	test:land at load 10-38 only, 2 in 12 runs before the reveal fixes (entry 50 not drawn in 5 s; its gap row missing); 5/5 green since at load 13-33, kept here until test:land shows it
+agents-bar	f6b33024d	land-reds	the % column is 44 px where it wants 40 ("time 40, the % column 40", a row's 71%), light and dark; red on main f6b33024d alone (words-panel m_27360)
+delight-marks	f6b33024d	land-reds	its first test reads text-2 as color(srgb 0.42 0.39 0.35), it wants rgb(107, 100, 90); red on main f6b33024d alone (words-panel)
+archived	f6b33024d	land-reds	artifacts/archived.spec: the right bar shows 3 artifacts where it wants 1 after a project click; red on main f6b33024d alone (words-panel)
+tui_artifacts_new_tmux	f6b33024d	land-reds	its NEW_ROW regex wants 1-2 spaces before 'new' and /artifacts now pads the title column (9b029a4ce?); red on main f6b33024d alone (words-panel)
