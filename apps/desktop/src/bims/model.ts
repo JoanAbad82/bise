@@ -135,6 +135,33 @@ export interface Pose extends Pt {
   readonly seg: Segment;
 }
 
+// ---- the pure modules' entry points (each module exports a function of this type under that name)
+
+/** activity.ts `activities`: every live agent's activity at t (archived rows absent). */
+export type ActivitiesFn = (snap: Snapshot, t: number) => ReadonlyMap<string, Activity>;
+
+/** layout.ts `layoutOf`: the office for these agents (main and the others, start order). */
+export type LayoutFn = (agents: readonly Agent[]) => Office;
+
+/** timeline.ts `newTimeline`: one per mounted office, fed at each snapshot change and each frame. */
+export interface Timeline {
+  /** a new snapshot's activities (or the same ones at a later t): new segments for what changed */
+  update(acts: ReadonlyMap<string, Activity>, office: Office, t: number, events: readonly BimEvent[]): void;
+  /** where a bim is at t; null for one the timeline doesn't know (or that has left) */
+  poseAt(name: string, t: number): Pose | null;
+  /** the bims on the map at t, a leaving one until it's out */
+  names(t: number): readonly string[];
+  /** whether anything moves at t (a walk, a transition, a plane): the loop stops when false */
+  moving(t: number): boolean;
+}
+export type NewTimelineFn = () => Timeline;
+
+/** labels.ts `labelsOf`: what the overlay shows at t; events are read from the poses' segments (seg.from, seg.t). */
+export type LabelsFn = (
+  bims: readonly BimFrame[],
+  o: { readonly t: number; readonly hover: string | null; readonly held: boolean; readonly agents: readonly Agent[] },
+) => ReadonlyMap<string, Label>;
+
 /** One bim's input to the renderer for a frame. */
 export interface BimFrame {
   readonly name: string;
