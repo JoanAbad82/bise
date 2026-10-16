@@ -148,9 +148,17 @@ impl Shell {
     pub(super) fn feature(&mut self, token: Option<Token>, op: String, name: String, agents: Vec<(String, String)>) {
         let mut stream = token.and_then(|t| self.replies.remove(&t));
         let flow = FlowConfig::load(&self.opts.paths);
-        let refuse = |stream: &mut Option<std::os::unix::net::UnixStream>, e: String| {
-            if let Some(s) = stream.as_mut() {
+        // an agent's refusal is its answer; the user's (an item's number)
+        // goes on the item, with why
+        let tx = self.tx.clone();
+        let (op_, name_) = (op.clone(), name.clone());
+        let refuse = |stream: &mut Option<std::os::unix::net::UnixStream>, e: String| match stream.as_mut() {
+            Some(s) => {
                 write_json(s, &json!({"ok": false, "error": e}));
+            }
+            None => {
+                let refused = Some(feature::refused_line(&op_, &e));
+                let _ = tx.send(Msg::In(Input::Feature(FeatureDone { name: name_.clone(), refused, ..FeatureDone::default() })));
             }
         };
         if op == "list" || (op.is_empty() && name.is_empty()) {
@@ -226,7 +234,8 @@ impl Shell {
                     }
                     // the user's answer failed: main hears it, the item waits
                     let line = (!job.asked).then(|| Feed::warn(format!("{}: {} did not go through: {}", job.name, job.op, e)));
-                    FeatureDone { name: job.name.clone(), line, ..FeatureDone::default() }
+                    let refused = (!job.asked).then(|| feature::refused_line(&job.op, &e));
+                    FeatureDone { name: job.name.clone(), line, refused, ..FeatureDone::default() }
                 }
             };
             let _ = job.tx.send(Msg::In(Input::Feature(done)));

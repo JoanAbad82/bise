@@ -493,6 +493,28 @@ pub fn try_text(name: &str, f: &Facts, main: &str, checked: bool) -> String {
     )
 }
 
+/// What a refused or failed answer says on its item.
+const REFUSED: &str = " didn't go through: ";
+
+/// The line an item gets when the user's answer did not go through:
+/// `try didn't go through: <why>` (one line, clipped).
+pub fn refused_line(op: &str, why: &str) -> String {
+    let why: String = why.split_whitespace().collect::<Vec<_>>().join(" ");
+    let why = if why.chars().count() > 200 { format!("{}…", why.chars().take(199).collect::<String>()) } else { why };
+    format!("{}{}{}", op, REFUSED, why)
+}
+
+/// The item's text again, with `line` (a [`refused_line`]) as the last
+/// line of its body, before its options; an earlier one goes.
+pub fn with_refusal(text: &str, line: &str) -> String {
+    let (body, opts) = match text.find("\u{a}\u{a}1. ") {
+        Some(i) => text.split_at(i),
+        None => (text, ""),
+    };
+    let kept: Vec<&str> = body.lines().filter(|l| !l.contains(REFUSED)).collect();
+    format!("{}\u{a}{}{}", kept.join("\u{a}"), line, opts)
+}
+
 /// The options as pr-merge's choice cards write them (tui cards.rs
 /// `split_choices`): a blank line, then `1. try it`, `2. …`.
 fn options(xs: &[&str]) -> String {

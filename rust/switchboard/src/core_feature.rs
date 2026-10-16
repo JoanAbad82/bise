@@ -1,7 +1,8 @@
 //! Feature branches, the hub's side (dev-flow §5.1): a step's end
 //! (`feature_done`: its items, the agents a merge or a drop archives, the
 //! agents a retire moves to the trunk through sb-core's `feature_retire`),
-//! the user's numbers on a feature item, the live agents of a feature,
+//! the user's numbers on a feature item (refused or failed: the item
+//! opens again with why on it), the live agents of a feature,
 //! the worktree of `sb spawn --feature`, and where an agent lands
 //! ([`onto`]: the land job's target, read again by a land that waited
 //! behind a retire). Git runs in daemon/features.rs, never here.
@@ -44,6 +45,20 @@ impl Hub {
             let res = d.close.clone().unwrap_or_else(|| "replaced".into());
             for id in open {
                 self.close_card(fx, env, id, &res);
+            }
+        }
+        // his answer did not go through: the item says why, as a new item
+        // (its number changes: both apps show it again)
+        if let Some(why) = &d.refused {
+            let open: Vec<(u64, String, String)> = self
+                .st
+                .open_cards()
+                .filter(|c| c.place.as_deref() == Some(place.as_str()))
+                .map(|c| (c.id, c.kind.clone(), crate::feature::with_refusal(&c.text, why)))
+                .collect();
+            for (id, kind, text) in open {
+                self.close_card(fx, env, id, why);
+                self.open_card(fx, env, merge::HubItem { kind: &kind, agent: MAIN, text: &text, place: &place, pr: None });
             }
         }
         if let Some((kind, text)) = &d.open {

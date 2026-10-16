@@ -59,3 +59,25 @@ fn an_agent_says_where_it_works() {
     assert!(fx.iter().any(|e| matches!(e, Effect::Reply { token, body } if *token == tok && body["ok"] == false)), "{:?}", fx);
     let _ = std::fs::remove_dir_all(&wt);
 }
+
+/// A feature's try that did not go through (the rebase conflicts, the
+/// feature is busy): the item opens again with why on it, under a new
+/// number (both apps show it again), and the old one closes with that line.
+#[test]
+fn a_refused_feature_answer_says_why_on_its_item() {
+    let mut t = T::new();
+    let place = crate::feature::place_id("bims");
+    let text = "bims is ready to try\n24 commits on bims\n\n1. try it\n2. show the diff\n3. not yet";
+    let open = ci::CardOpen { kind: "feature_try".into(), agent: MAIN.into(), text: text.into(), place: Some(place.clone()), pr: None };
+    let mut fx = Vec::new();
+    t.hub.core(&mut fx, &mut t.env, None, In::CardOpen(open));
+    let id = *t.hub.st.cards.keys().max().unwrap();
+    let why = crate::feature::refused_line("try", "a.txt changed on main too: the rebase of bims conflicts");
+    t.go(Input::Feature(FeatureDone { name: "bims".into(), refused: Some(why.clone()), ..FeatureDone::default() }));
+    assert!(!t.hub.st.cards.contains_key(&id), "the old item closed");
+    let open: Vec<_> = t.hub.st.open_cards().collect();
+    assert_eq!(open.len(), 1, "{open:?}");
+    let c = open[0];
+    assert_eq!((c.kind.as_str(), c.place.as_deref()), ("feature_try", Some(place.as_str())));
+    assert!(c.id > id && c.text.contains(&why) && c.text.ends_with("3. not yet"), "{}", c.text);
+}

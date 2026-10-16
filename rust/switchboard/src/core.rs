@@ -977,19 +977,19 @@ pub enum Effect {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FeatureDone {
     pub name: String,
-    /// (kind, text): open this item (place `feature:<name>`), closing the
-    /// feature's other open items first.
+    /// (kind, text): open this item (place `feature:<name>`), its others closed first.
     pub open: Option<(String, String)>,
     /// Close the feature's open items (with this result).
     pub close: Option<String>,
     pub archive: Vec<String>,
-    /// A retire (`sb feature retire`): (the branch's new name, the
-    /// trunk's short name); sb-core moves the feature's agents to the trunk.
+    /// `sb feature retire`: (branch's new name, trunk); sb-core moves its agents to the trunk.
     pub retire: Option<(String, String)>,
     /// Told once the hub ran this step (the retire's thread waits for it).
     pub ack: Option<feature::Ack>,
     /// a record for main's feed (`info`, `warn`).
     pub line: Option<Feed>,
+    /// His answer didn't go through: its open items open again with this line on them.
+    pub refused: Option<String>,
 }
 
 /// The sb-core executable when the app root has none: `sb-core` next to

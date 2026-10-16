@@ -285,3 +285,22 @@ fn a_land_queued_behind_a_retire_goes_to_main() {
     assert_eq!(o.target, "cv");
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }
+
+// a try that failed (a rebase conflict) says why on its item, before its
+// options; a second failure replaces the first line
+#[test]
+fn a_refused_answer_says_why_on_the_item() {
+    let text = "bims is ready to try\n24 commits on bims\nnone of it is on main yet.\n\n1. try it\n2. show the diff\n3. not yet";
+    let line = refused_line("try", "tests/a.txt changed on main too:\n the rebase of bims conflicts");
+    assert_eq!(line, "try didn't go through: tests/a.txt changed on main too: the rebase of bims conflicts");
+    let once = with_refusal(text, &line);
+    assert_eq!(
+        once,
+        "bims is ready to try\n24 commits on bims\nnone of it is on main yet.\ntry didn't go through: tests/a.txt changed on main too: the rebase of bims conflicts\n\n1. try it\n2. show the diff\n3. not yet"
+    );
+    let (_, opts) = bise_proto::rows::split_choices(&once);
+    assert_eq!(opts.len(), 3, "the options stay: {opts:?}");
+    let twice = with_refusal(&once, &refused_line("try", "bims is busy"));
+    assert!(twice.contains("try didn't go through: bims is busy") && !twice.contains("conflicts"), "{twice}");
+    assert!(refused_line("try", &"x".repeat(500)).chars().count() < 230);
+}
