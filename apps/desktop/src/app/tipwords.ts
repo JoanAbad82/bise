@@ -171,6 +171,11 @@ export function answerTip(who: string, escTo: string): string {
   return composer.answer_tip({ agent: who, esc_to: escTo });
 }
 
+/** The pink border's tip while his words go to an agent that is not main (agent-target): 'your words go to perf, not bise'. */
+export function otherTip(who: string): string {
+  return `your words go to ${who}, not bise`;
+}
+
 /** The pink border's tip while an open artifact's words go to its maker (art-target): 'your words go to perf, not bise · esc writes to bise'; no thread to go back to: 'esc closes it'. */
 export function aboutTip(who: string, escTo: string | undefined): string {
   return composer.about_tip({ agent: who, esc: escTo === undefined ? composer.esc_closes : composer.esc_writes_to({ agent: escTo }) });

@@ -60,6 +60,8 @@ export interface ComposerProps {
   /** his words answer a question: the frame's accent (tab, border, send) and the border's tip */
   readonly answering?: boolean;
   readonly answerTip?: string | undefined;
+  /** with `answering`: lines only, no fill (an agent that is not main, agent-target) */
+  readonly quiet?: boolean;
   /** the box's bottom row, left ('+', the mode menu), and right before send (the model menu) */
   readonly tools?: ReactNode;
   readonly toolsEnd?: ReactNode;
@@ -118,6 +120,7 @@ export const Composer = memo(function Composer(
     tab,
     answering,
     answerTip,
+    quiet,
     tools,
     toolsEnd,
     placeholder = composer.placeholder_bise,
@@ -205,6 +208,7 @@ export const Composer = memo(function Composer(
       tab={tab}
       answering={answering}
       answerTip={answerTip}
+      {...(quiet === true ? { quiet } : {})}
       tools={tools}
       toolsEnd={toolsEnd}
       sent={sent}

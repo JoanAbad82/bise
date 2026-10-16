@@ -3,9 +3,11 @@
 // the project where the crumb doesn't name it, and on the right 'context 42k · 17%'. Short, it
 // drops whole items: the project, then the context, then the place; the label always stays.
 // Answering a card: '↳ answering search · <question>' and 'esc to bise instead' on the right; short,
-// the question goes first, then that end; '↳ answering search' never goes (answerFit).
+// the question goes first, then that end; '↳ answering search' never goes (answerFit). Which of
+// these states makes it pink (an item, an open artifact, an agent that is not main): pinkState.
 // Pure: ComposerTab.tsx draws and measures it. Owner: amb-win.
 import { composer } from '../proto/words.gen';
+import { MAIN } from '../app/route';
 
 /** Where its words go, as the tab names it (designer m_24790): his checkout by its folder's name,
  *  a worktree by its own folder's name after the ψ; the tip says what it is. */
@@ -133,6 +135,44 @@ export function answerFit(label: string, room: number, endW: number, width: (s: 
   if (keeps(withEnd) && width(withEnd) <= room - endW) return { label: withEnd, end: true };
   const alone = wordCut(label, room, width);
   return { label: keeps(alone) ? alone : head, end: false };
+}
+
+/** What makes the composer pink, and its border's tip; `tip` undefined: plain. */
+export interface PinkState {
+  readonly pink: boolean;
+  readonly tip: string | undefined;
+  /** the tab holds only its label (an open item, the pink artifact): no place, no context */
+  readonly bare: boolean;
+  /** the label's part after its head whole or gone (the pink artifact's '· about “…”') */
+  readonly whole: boolean;
+  /** lines only, the tab on its plain fill (an agent that is not main, designer m_28208) */
+  readonly quiet: boolean;
+}
+
+/**
+ * The composer's one pink state (composer-target A's accent tab, 1.5 px border and send), whoever
+ * sets it. An open item wins: a question pink with its tip, a closed one or an approval plain.
+ * Then an open artifact: its maker's pink (`aboutPink`, art-target), main's or an archived maker's
+ * plain. Then a thread or a bottom block whose words go to an agent that is not main (agent-target,
+ * his ask: he wrote to the wrong agent without seeing it): pink in lines only (`quiet`: no fill,
+ * designer m_28208), its place and context kept. Voice
+ * typing stays plain, as art-target. Pure.
+ */
+export function pinkState(o: {
+  answer: { closed?: boolean; message?: boolean; tip?: string } | null;
+  aboutPink: string | undefined;
+  about: boolean;
+  agent: string;
+  voiceTyping: boolean;
+  otherTip: (agent: string) => string;
+}): PinkState {
+  if (o.answer !== null) {
+    const pink = o.answer.closed !== true && o.answer.message !== true;
+    return { pink, tip: o.answer.tip, bare: true, whole: false, quiet: false };
+  }
+  if (o.aboutPink !== undefined) return { pink: true, tip: o.aboutPink, bare: true, whole: true, quiet: false };
+  if (o.about || o.voiceTyping || o.agent === MAIN) return { pink: false, tip: undefined, bare: false, whole: false, quiet: false };
+  return { pink: true, tip: o.otherTip(o.agent), bare: false, whole: false, quiet: true };
 }
 
 /** The context as the hub says it ('42k · 17%', or named 'context 42k · 17%'): its tokens and its

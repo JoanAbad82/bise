@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { answerFit, answerHead, contextOf, folderName, ringTip, tabFit, tabPlace, wordCut, worktreeName } from './tab';
+import { answerFit, answerHead, contextOf, folderName, pinkState, ringTip, tabFit, tabPlace, wordCut, worktreeName } from './tab';
+
+describe("the composer's one pink state (composer-target A, art-target, agent-target)", () => {
+  const base = { answer: null, aboutPink: undefined, about: false, agent: 'perf', voiceTyping: false, otherTip: (a: string) => `to ${a}, not bise` };
+  it('is pink, with its place and context, when his words go to an agent that is not main', () => {
+    expect(pinkState(base)).toEqual({ pink: true, tip: 'to perf, not bise', bare: false, whole: false, quiet: true });
+  });
+  it("main stays plain, and voice typing (as art-target)", () => {
+    expect(pinkState({ ...base, agent: 'main' }).pink).toBe(false);
+    expect(pinkState({ ...base, voiceTyping: true }).pink).toBe(false);
+  });
+  it("an open artifact decides by its maker alone: its pink bare and whole, else plain (one not listed yet, main's)", () => {
+    expect(pinkState({ ...base, about: true, aboutPink: 'tip' })).toEqual({ pink: true, tip: 'tip', bare: true, whole: true, quiet: false });
+    expect(pinkState({ ...base, about: true })).toEqual({ pink: false, tip: undefined, bare: false, whole: false, quiet: false });
+  });
+  it("an open item wins: a question pink with its tip, a closed one or an approval plain, the tab bare", () => {
+    expect(pinkState({ ...base, answer: { tip: 'q' }, aboutPink: 'tip' })).toEqual({ pink: true, tip: 'q', bare: true, whole: false, quiet: false });
+    expect(pinkState({ ...base, answer: { message: true } })).toMatchObject({ pink: false, bare: true });
+    expect(pinkState({ ...base, answer: { closed: true }, agent: 'main' })).toMatchObject({ pink: false, bare: true });
+  });
+});
 
 describe("the composer's tab (designer's composer-strip A)", () => {
   const w = { gap: 16, label: 60, branch: 80, project: 90, context: 120 };

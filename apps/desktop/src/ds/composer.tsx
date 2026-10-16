@@ -118,6 +118,9 @@ export interface ComposerFrameProps {
    *  the send filled accent; off in 120 ms (esc). An approval never sets it: words never approve */
   answering?: boolean;
   answerTip?: string | undefined;
+  /** with `answering`: lines only, the tab on its plain fill (his words go to an agent that is not
+   *  main, agent-target, designer m_28208: it must not shout on every sub-agent screen) */
+  quiet?: boolean;
   /** the box's bottom row, left: what he changes ('+', the mode menu) */
   tools?: ReactNode;
   /** the box's bottom row, right, before send: the model and effort menu */
@@ -154,7 +157,7 @@ export function boxPress(target: EventTarget | null): boolean {
 }
 /** the composer's frame: tabs, dock, quote, the tab glued to the box, the box (the editor, then its
  *  32 px row: tools left, tools and send right), the keys */
-export function ComposerFrame({ children, tab, answering, answerTip, tools, toolsEnd, sent = 0, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
+export function ComposerFrame({ children, tab, answering, answerTip, quiet, tools, toolsEnd, sent = 0, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
   return (
     <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId}
       onMouseDown={onBoxDown && ((e) => {
@@ -167,7 +170,7 @@ export function ComposerFrame({ children, tab, answering, answerTip, tools, tool
       {dock}
       {quote}
       {/* answering, the tab is the pink border's label: its tip says where his words go (designer m_26683) */}
-      {tab != null && <div className={cx("tab", answering && "acc")} data-testid={sub(testId, "tab")} {...(answering ? tipAttrs(answerTip) : {})}>{tab}</div>}
+      {tab != null && <div className={cx("tab", answering && "acc", answering && quiet && "quiet")} data-testid={sub(testId, "tab")} {...(answering ? tipAttrs(answerTip) : {})}>{tab}</div>}
       <div className={cx("box", focus && "is-focus", answering && "ans")} data-testid={sub(testId, "box")} data-answering={answering || undefined}>
         <div className="line">
           {lead}
