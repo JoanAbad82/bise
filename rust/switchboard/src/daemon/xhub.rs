@@ -108,7 +108,7 @@ impl Shell {
                     Input::XFail { xid }
                 }
             };
-            let _ = tx.send(Msg::In(input));
+            let _ = tx.send(Msg::input(input));
         });
     }
 

@@ -121,7 +121,9 @@ pub struct Opts {
 pub type SpawnEnv = fn() -> Vec<(String, Option<String>)>;
 
 enum Msg {
-    In(Input),
+    /// Boxed: an Input is far bigger than every other message (clippy's
+    /// large_enum_variant); `Msg::input` builds it.
+    In(Box<Input>),
     ReplConnected {
         dir: String,
         gen: u64,
@@ -259,6 +261,11 @@ enum Msg {
 }
 
 impl Msg {
+    /// An input for the loop, boxed.
+    fn input(i: Input) -> Msg {
+        Msg::In(Box::new(i))
+    }
+
     /// The inbox's urgent lane (daemon/inbox.rs): a client's own message
     /// (its hello or `initialize`, a line, its end, a thread's typed answer
     /// to its request), one lane so its order holds (architect m_14659);
@@ -1215,7 +1222,7 @@ impl Shell {
                 &log_paths,
                 &format!("PR #{} merge ({:?}): {}", number, method, res.as_ref().map_or_else(|e| e.as_str(), |_| "merged")),
             );
-            let _ = tx.send(Msg::In(Input::Merged { card, place, number, res }));
+            let _ = tx.send(Msg::input(Input::Merged { card, place, number, res }));
         });
     }
 
@@ -1244,7 +1251,7 @@ impl Shell {
             Some(crate::forge::poll::Watcher::new(repo, forge, Box::new(crate::forge::poll::RepoGit { workspace: ws })))
         });
         let sink = Box::new(move |r| {
-            let _ = tx.send(Msg::In(Input::Prs(r)));
+            let _ = tx.send(Msg::input(Input::Prs(r)));
         });
         self.prs = Some(crate::forge::poll::Poller::start(setup, sink));
     }
@@ -2070,7 +2077,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
             if !queued.take() {
                 continue;
             }
-            if tx.send(Msg::In(Input::Tick)).is_err() {
+            if tx.send(Msg::input(Input::Tick)).is_err() {
                 break;
             }
         });
@@ -2091,7 +2098,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
                     let store = bise_catalog::auth::Store::read(&path).unwrap_or_default();
                     matches!(bise_catalog::chatgpt::state(&store), bise_catalog::chatgpt::State::SignedIn { .. })
                 });
-                if back && tx.send(Msg::In(Input::SignedIn)).is_err() {
+                if back && tx.send(Msg::input(Input::SignedIn)).is_err() {
                     break;
                 }
             }

@@ -11,7 +11,7 @@ fn a_clients_own_messages_take_the_urgent_lane() {
     assert!(Msg::is_urgent(&Msg::RpcNew { id: 1, stream: a, v: Value::Null, peer: String::new() }));
     assert!(Msg::is_urgent(&Msg::Typed { to: rpc::Typed::Answer(1), v: Value::Null }));
     assert!(Msg::is_urgent(&Msg::ClientGone { id: 1 }));
-    assert!(!Msg::is_urgent(&Msg::In(Input::Tick)));
+    assert!(!Msg::is_urgent(&Msg::input(Input::Tick)));
 }
 
 /// 2026-10-11, his hub: `bise switchboard --stop` at 22:18:16, its

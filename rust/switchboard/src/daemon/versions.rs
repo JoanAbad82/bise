@@ -809,7 +809,7 @@ impl Shell {
                 names.insert(n.id.clone(), json!(n.version));
                 let _ = std::fs::write(&names_path, Value::Object(names).to_string());
             }
-            let _ = tx.send(Msg::In(Input::Release(crate::core::update_card::ReleaseCheck { news, asked, error })));
+            let _ = tx.send(Msg::input(Input::Release(crate::core::update_card::ReleaseCheck { news, asked, error })));
         });
     }
 
@@ -960,7 +960,7 @@ impl Shell {
                 spawn_switcher(&paths, &exe, &dir, Switcher::Switch);
                 Ok(())
             })();
-            let _ = tx.send(Msg::In(Input::Updated { card, version, res }));
+            let _ = tx.send(Msg::input(Input::Updated { card, version, res }));
         });
     }
 

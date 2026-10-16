@@ -79,6 +79,7 @@ impl Shell {
     pub(super) fn dispatch(&mut self, m: Msg, tick_queued: &TickFlag) -> Flow {
         match m {
             Msg::In(i) => {
+                let i = *i;
                 let tick = matches!(i, Input::Tick);
                 if tick {
                     tick_queued.queued.store(false, Ordering::Release);

@@ -158,7 +158,7 @@ impl Shell {
             }
             None => {
                 let refused = Some(feature::refused_line(&op_, &e));
-                let _ = tx.send(Msg::In(Input::Feature(FeatureDone { name: name_.clone(), refused, ..FeatureDone::default() })));
+                let _ = tx.send(Msg::input(Input::Feature(FeatureDone { name: name_.clone(), refused, ..FeatureDone::default() })));
             }
         };
         if op == "list" || (op.is_empty() && name.is_empty()) {
@@ -238,7 +238,7 @@ impl Shell {
                     FeatureDone { name: job.name.clone(), line, refused, ..FeatureDone::default() }
                 }
             };
-            let _ = job.tx.send(Msg::In(Input::Feature(done)));
+            let _ = job.tx.send(Msg::input(Input::Feature(done)));
         });
     }
 
@@ -508,7 +508,7 @@ fn retire(job: &Job, feature_ref: &str, place: &str, main: &str) -> Out {
             ack: Some(crate::core::feature::Ack(tx)),
             ..FeatureDone::default()
         };
-        if job.tx.send(Msg::In(Input::Feature(step))).is_err() || rx.recv().is_err() {
+        if job.tx.send(Msg::input(Input::Feature(step))).is_err() || rx.recv().is_err() {
             return Err("the hub stopped before the retire: nothing changed; run it again".into());
         }
         did.push(match job.agents.len() {
@@ -537,7 +537,7 @@ pub(super) fn onto_now(tx: &std::sync::mpsc::Sender<Msg>, agent: &str, was: Opti
     let (tx, agent) = (tx.clone(), agent.to_string());
     move || {
         let (reply, rx) = std::sync::mpsc::channel();
-        let _ = tx.send(Msg::In(Input::Onto { agent: agent.clone(), reply }));
+        let _ = tx.send(Msg::input(Input::Onto { agent: agent.clone(), reply }));
         rx.recv().unwrap_or_else(|_| was.clone())
     }
 }
