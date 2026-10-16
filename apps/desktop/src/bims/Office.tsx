@@ -341,7 +341,9 @@ export function Office({
   if (state === 'lost')
     return (
       <>
-        <div className="bims-lost" data-testid="app.right.bims.lost">
+        {/* its own element: React would reuse the holder's div here, the height resize() set on it
+            by hand included (a 212 px line, bims-qa m_27786) */}
+        <div key="lost" className="bims-lost" data-testid="app.right.bims.lost">
           {bims.lost}
         </div>
         {fallback}
@@ -350,6 +352,7 @@ export function Office({
   return (
     <>
       <div
+        key="office"
         className="bims-office"
         ref={holder}
         data-testid="app.right.bims"
