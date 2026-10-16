@@ -85,11 +85,12 @@ def main():
             t.typed("the thread draft")
             t.wait("the thread draft")
             t.typed(CTRL % ord("1"))
-            t.wait("you → ? main · your answer")
+            # his words answer it: the divider says so (b2a3b9160)
+            t.wait("↳ answering main")
             t.typed("half an answer")
             t.wait("half an answer")
             reload(t)
-            sc = t.wait("you → ? main", 30)
+            sc = t.wait("↳ answering main", 30)
             sc = t.wait("half an answer")
             assert "half an answer" in composer(sc), sc
             # esc: back to the thread, its draft is there

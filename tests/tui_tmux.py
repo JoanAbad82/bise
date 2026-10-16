@@ -221,17 +221,22 @@ PLACEHOLDER = re.compile(r"^(%s|%s)$" % (re.escape(w("composer.placeholder_main"
 
 def pane_rows(rows):
     """The composer's rows (BISE-98): from the bottom, the first run of
-    rows whose text, inside the frame's edges, starts with the bar `│`
-    (the key bar and the frame's bottom edge are skipped; a popup may
-    hide the divider); each row's text after the bar."""
+    rows whose text, inside the frame's edges, starts with the bar `│`,
+    or `┃` while his words answer an open item (sb/answer_target.rs),
+    the same bar all the run long: a popup's `┃` edge over the composer
+    ends it (the key bar and the frame's bottom edge are skipped; a
+    popup may hide the divider); each row's text after the bar."""
     out = []
+    bar = None
     for r in reversed(rows):
         r = r.rstrip()
         if r.startswith("│"):
             r = r[1:].rstrip()
             if r.endswith("│"):
                 r = r[:-1]
-        if r.lstrip().startswith("│"):
+        mark = r.lstrip()[:1]
+        if mark in ("│", "┃") and mark == (bar or mark):
+            bar = mark
             text = r.lstrip()[1:].strip()
             # the empty composer's dim placeholder is not text
             out.append("" if PLACEHOLDER.match(text) else text)

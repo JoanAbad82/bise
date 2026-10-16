@@ -59,9 +59,9 @@ def main():
         assert "ia asks main" not in box and "? ia ·" not in box, box
         # only the user answers it: open it, type, ⏎; it leaves the strip
         t.typed("\x1b[49;5u")             # ctrl+1, the kitty form (BISE-302)
-        t.wait("your answer")
+        t.wait("↳ answering main")
         t.typed("yes friday")
-        t.wait("⏎ sends your answer")
+        t.wait("⏎ send the answer")
         t.keys("Enter")
         t.wait_gone("waiting for you", 20)
         t.wait("✓ you answered main: yes friday")
