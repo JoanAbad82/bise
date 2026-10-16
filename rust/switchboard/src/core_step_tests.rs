@@ -159,6 +159,10 @@ mod core_ask_tests;
 #[path = "core_attach_tests.rs"]
 mod core_attach_tests;
 
+/// les bims' tests (doing, activity), out of core_tests.rs too.
+#[path = "core_doing_tests.rs"]
+mod core_doing_tests;
+
 /// queued_steer's tests, out of core_tests.rs too.
 #[path = "core_queue_tests.rs"]
 mod core_queue_tests;

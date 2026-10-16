@@ -67,6 +67,7 @@ use skills::{skill_roots, skills_fingerprint};
 use versions::version_allowed;
 use crate::core::{AgentReq, ClientId, Effect, Hub, Input, Token};
 use bise_proto::core::Feed;
+use bise_proto::hub::HubEv;
 use crate::devflow;
 use crate::model::{Agent, Lifecycle, MAIN};
 use crate::paths::Paths;
@@ -1183,17 +1184,12 @@ impl Shell {
             Effect::UpdateLater { id } => versions::update_later(&id),
             Effect::XDeliver { xid, project, kind, text, context, parts } => self.xdeliver(xid, project, kind, text, context, parts),
             Effect::XReply { hub, xid, text } => self.xreply_back(hub, xid, text),
-            Effect::Route { rid, to, name, text, due_ms, why } => {
-                let project = self.project();
-                self.proto_route(bise_proto::hub::HubEv::Route { project, rid, to, name, text, correct_until_ms: due_ms, why })
-            }
+            Effect::Route { rid, to, name, text, due_ms, why } => self.proto_route(HubEv::Route { project: self.project(), rid, to, name, text, correct_until_ms: due_ms, why }),
             Effect::JobEnd { agent, state, label, summary, key } => self.job_end(agent, &state, label, summary, key),
             Effect::FollowedEnd { project, agent, key, state, label, summary } => self.followed_end(project, agent, key, &state, label, summary),
             Effect::MergedChanged => self.merged_all(),
-            Effect::RouteDone { rid, state, to, xid, msg } => {
-                let project = self.project();
-                self.proto_route(bise_proto::hub::HubEv::RouteDone { project, rid, state, to, xid, msg })
-            }
+            Effect::Activity(item) => self.proto_route(HubEv::Activity { project: self.project(), item }),
+            Effect::RouteDone { rid, state, to, xid, msg } => self.proto_route(HubEv::RouteDone { project: self.project(), rid, state, to, xid, msg }),
         }
     }
 

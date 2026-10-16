@@ -205,6 +205,8 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("hub/switch", "switch", Scope::Hub),
     n("job/end", "job_end", Scope::Hub),
     n("job/followedEnd", "followed_end", Scope::Hub),
+    // les bims: a message sent, a report made (no body, no text)
+    n("hub/activity", "activity", Scope::Hub),
     n("thread/entry", "entry", Scope::Thread),
     n("thread/typing", "typing", Scope::Thread),
     // the answer as it streams in (whole text; "" when it ended)

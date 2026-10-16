@@ -127,6 +127,8 @@ pub fn agents(
             waiting_on: bise_proto::rows::WaitingOn::of_word(&s(&a, "waiting_on")),
             // event-wake: what it waits for (wake.rs `Wakes::watching`)
             watching: a.get("watching").cloned().and_then(|w| serde_json::from_value(w).ok()).unwrap_or_default(),
+            // les bims: what it is doing now (snapshot_rows, crate::doing::row)
+            doing: a.get("doing").cloned().and_then(|d| serde_json::from_value(d).ok()),
             // P4b: the terminal's facts, each the snapshot's own field
             mode,
             path: s(&a, "path"),

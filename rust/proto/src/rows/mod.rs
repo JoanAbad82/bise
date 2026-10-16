@@ -5,6 +5,7 @@
 
 mod agents;
 mod approvals;
+mod doing;
 mod artifacts;
 mod cards;
 mod models;
@@ -16,6 +17,7 @@ mod usage;
 
 pub use agents::*;
 pub use approvals::*;
+pub use doing::*;
 pub use artifacts::*;
 pub use cards::*;
 pub use models::*;

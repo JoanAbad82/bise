@@ -26,6 +26,13 @@ pub enum Wire {
     /// `bg_handoff : {"slot", "cmd"}` (event-wake): the bash tool handed a
     /// command off to the background; the JSON, as written.
     BgHandoff(String),
+    /// `tool_result #<id> ok|fail : …`: a tool call ended (les bims:
+    /// the agent thinks again).
+    ToolResult,
+    /// `obs: compaction_started #<n> (auto|manual)`.
+    CompactionStarted,
+    /// `obs: compaction_done: …` or `obs: context_compaction_failed: …`.
+    CompactionEnded,
     /// A line replayed from a restored session.
     History,
     Other,
@@ -53,6 +60,15 @@ pub fn parse(line: &str) -> Wire {
     }
     if let Some(rest) = t.strip_prefix("obs: turn_done: ") {
         return Wire::TurnDone(rest.trim().to_string());
+    }
+    if t.starts_with("obs: compaction_started #") {
+        return Wire::CompactionStarted;
+    }
+    if t.starts_with("obs: compaction_done:") || t.starts_with("obs: context_compaction_failed:") {
+        return Wire::CompactionEnded;
+    }
+    if line.starts_with("tool_result #") {
+        return Wire::ToolResult;
     }
     if let Some(rest) = line.strip_prefix("bg_handoff : ") {
         return Wire::BgHandoff(rest.trim().to_string());
@@ -158,6 +174,16 @@ mod tests {
         let l = "bg_handoff : {\"slot\":\"/t/bg/3\",\"cmd\":\"cargo test\"}";
         assert_eq!(parse(l), Wire::BgHandoff("{\"slot\":\"/t/bg/3\",\"cmd\":\"cargo test\"}".into()));
         assert_eq!(parse(&format!("history {}", l)), Wire::History);
+    }
+
+    #[test]
+    fn tool_results_and_compactions() {
+        assert_eq!(parse("tool_result #3 ok : done"), Wire::ToolResult);
+        assert_eq!(parse("tool_result #4 fail : exit 1"), Wire::ToolResult);
+        assert_eq!(parse("  obs: compaction_started #750 (auto)"), Wire::CompactionStarted);
+        assert_eq!(parse("  obs: compaction_done: ## Who I am"), Wire::CompactionEnded);
+        assert_eq!(parse("  obs: context_compaction_failed: too big"), Wire::CompactionEnded);
+        assert_eq!(parse("history tool_result #3 ok : done"), Wire::History);
     }
 
     #[test]

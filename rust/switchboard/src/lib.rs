@@ -18,6 +18,9 @@
 //!   (send-parts), the pure half of `daemon/attach.rs`;
 //! - `daemon`: the imperative shell (sockets, journal, feeds), with
 //!   `daemon/repl` (REPL processes) and `daemon/versions` (`/version`);
+//! - `doing`, `activity`: les bims' facts, pure: an agent's `doing` from
+//!   its REPL lines, `hub/activity` from sb-core's journal effects (their
+//!   hub side: `core_doing.rs`);
 //! - `transcript`: reading a thread (positions, cursors, origin);
 //! - `cli`: the `sb` command the agents call through their bash tool;
 //! - `client`: how a client (TUI, headless test) reaches the hub.
@@ -37,6 +40,7 @@ pub mod boot;
 pub mod card_link;
 pub mod cli;
 pub mod client;
+pub mod activity;
 pub mod computer_use;
 pub mod contexts;
 pub mod core;
@@ -46,6 +50,7 @@ mod core_turn;
 pub mod core_num;
 pub mod daemon;
 pub mod devflow;
+pub mod doing;
 pub mod diff;
 pub mod every;
 pub mod every_name;

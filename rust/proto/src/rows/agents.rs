@@ -222,6 +222,11 @@ pub struct Agent {
     /// hub (none)
     #[serde(default)]
     pub watching: Vec<AgentWatch>,
+    /// les bims (architect m_27581): what it is doing now and since when
+    /// (think, a tool, an edit, a build...), from its live lines; only
+    /// while its turn runs, none otherwise
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doing: Option<super::Doing>,
 }
 
 /// What a watch looks at (event-wake).

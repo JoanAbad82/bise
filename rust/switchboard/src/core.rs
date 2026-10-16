@@ -21,7 +21,7 @@ use crate::model::*;
 use crate::prompts;
 use crate::role;
 use crate::router::{self, UserCmd};
-use crate::util::{clip, clip_tail, one_line};
+use crate::util::{clip, one_line};
 use crate::wire::{self, Wire};
 use bise_proto::core::{input as ci, link as cl, In, Link, View};
 use bise_proto::core::feed as feed_rec;
@@ -947,6 +947,9 @@ pub enum Effect {
     /// list goes again to the typed connections, as after a land (a
     /// feature merge writes no `landed` line).
     MergedChanged,
+    /// les bims: a message sent or a report made (crate::activity), to
+    /// every typed connection.
+    Activity(bise_proto::activity::ActivityEv),
     /// S10: a followed task ended (done or failed), once: his notification.
     /// `key`: the job's (its end's time here), the same in what goes back
     /// to a hub that asked (J), so a window hearing both shows one line.
@@ -1138,6 +1141,9 @@ pub struct Hub {
     rows: crate::snapshot_rows::Rows,
     /// The last thing each agent did (from its REPL lines, for the views).
     activity: BTreeMap<String, (u64, String)>,
+    /// les bims: what each agent is doing now (doing.rs, core_doing.rs);
+    /// runtime only, like `activity`.
+    doing: BTreeMap<String, bise_proto::rows::Doing>,
     /// The role line of each task, by dir (BISE-126).
     roles: BTreeMap<String, Role>,
     /// The timers' name calls (every_name.rs); runtime only.
@@ -1335,6 +1341,7 @@ impl Hub {
             contexts: Default::default(),
             rows: Default::default(),
             activity: BTreeMap::new(),
+            doing: BTreeMap::new(),
             roles: BTreeMap::new(),
             timer_names: Default::default(),
             places: BTreeMap::new(),
@@ -1993,7 +2000,7 @@ impl Hub {
         let mut agents: Vec<Value> = Vec::with_capacity(self.st.order.len());
         for a in self.st.order.iter().filter_map(|n| self.st.agents.get(n)) {
             let role = self.roles.get(&a.dir).and_then(|r| r.line.as_deref());
-            let i = self.rows.input(a, role, now, self.st.wakes.watching(&a.name));
+            let i = self.rows.input(a, role, now, self.st.wakes.watching(&a.name), self.doing.get(&a.name).copied());
             agents.push(self.rows.row(i));
         }
         self.rows.keep_only(self.st.agents.keys());
@@ -2136,6 +2143,7 @@ impl Hub {
             Input::ReplReady { agent } => self.core(&mut fx, env, None, In::Ready(ci::Ready { agent })),
             Input::ReplLine { agent, line } => self.repl_line(&mut fx, env, &agent, &line),
             Input::ReplIdle { agent, leftover } => {
+                self.doing_line(&agent, &Wire::Idle, env.now());
                 // expired-ux: a turn that stopped on the expired ChatGPT
                 // sign-in is held, not over: no automatic reply (`(no
                 // written reply…)` woke its parent, on the same plan, into
@@ -2237,7 +2245,9 @@ impl Hub {
     fn repl_line(&mut self, fx: &mut Fx, env: &mut dyn Env, agent: &str, raw: &str) {
         let now = env.now();
         let agent_s = agent.to_string();
-        match wire::parse(raw) {
+        let line = wire::parse(raw);
+        self.doing_line(agent, &line, now);
+        match line {
             Wire::TurnStarted => self.core(fx, env, None, In::TurnStarted(ci::TurnStarted { agent: agent_s })),
             Wire::SteeringReceived => self.core(fx, env, None, In::SteerRx(ci::SteerRx { agent: agent_s })),
             Wire::Steered => self.core(fx, env, None, In::Steered(ci::Steered { agent: agent_s })),
@@ -2629,62 +2639,10 @@ impl Hub {
     }
 }
 
-/// RFC 0001 §7.4: what main (`note`) and the user's own feed (`direct`)
-/// read after the user talked directly to `task`: the messages sent,
-/// and the end of the task's reply since.
-fn direct_exchange(task: &str, sent: &[String], reply: &str) -> (String, String) {
-    let quoted: Vec<String> = sent.iter().map(|m| format!("\"{}\"", one_line(m))).collect();
-    let n = sent.len();
-    let s = if n > 1 { "s" } else { "" };
-    let note = format!(
-        "The user talked directly to @{} ({} message{}): {}. Last reply of @{}: \"{}\"",
-        task,
-        n,
-        s,
-        quoted.join(", "),
-        task,
-        clip_tail(&one_line(reply), 2000)
-    );
-    (note, format!("You talked to @{} ({} message{})", task, n, s))
-}
-
-/// The checks and texts of a new task the daemon prepares for sb-core
-/// (RFC 0001 §7.1): a valid name or the slug of the objective, the brief
-/// as the task reads it (sb-core adds the `# Task` header with the final
-/// name).
-/// The name sb-core gives a new task of base name `base` (hub/core.bend
-/// `unique_name`): `base` when free, else `base-2`, `base-3`… cut to 24
-/// characters, trailing dashes off before the suffix.
-fn unique_name(st: &State, base: &str) -> String {
-    let taken = |n: &str| n == MAIN || n == "user" || n == "hub" || st.resolve(n).is_some();
-    if !taken(base) {
-        return base.to_string();
-    }
-    (2..1002)
-        .map(|i| {
-            let suffix = format!("-{}", i);
-            let head: String = base.chars().take(24usize.saturating_sub(suffix.len())).collect();
-            format!("{}{}", head.trim_end_matches('-'), suffix)
-        })
-        .find(|c| !taken(c))
-        .unwrap_or_else(|| base.to_string())
-}
-
-/// The `sb` commands that need git: off in a workspace without it (the
-/// home workspace, docs/ambient-pages.md §5.1). Their name, else None.
-fn git_only(req: &AgentReq) -> Option<&'static str> {
-    match req {
-        AgentReq::Land { .. } => Some("land"),
-        AgentReq::Feature { .. } => Some("feature"),
-        AgentReq::Flow { .. } => Some("flow"),
-        _ => None,
-    }
-}
-
-/// The one line `sb <cmd>` answers in a workspace without git.
-pub(crate) fn not_in_a_repo(cmd: &str) -> String {
-    format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)
-}
+#[path = "core_pure.rs"]
+mod pure;
+pub(crate) use pure::not_in_a_repo;
+use pure::{direct_exchange, git_only, unique_name};
 
 #[path = "core_link.rs"]
 mod link;
@@ -2702,6 +2660,9 @@ pub use user::HELP;
 
 #[path = "core_wake.rs"]
 mod wake_link;
+
+#[path = "core_doing.rs"]
+mod doing_link;
 
 #[path = "core_feature.rs"]
 pub mod feature;

@@ -8,7 +8,7 @@ import type { InboxRecord, StateFilter } from './inbox';
 import type { LogItem } from './log';
 import type { BranchRow, ReleaseEv, UpdateEv, VersionItem } from './ops';
 import type { Part } from './parts';
-import type { Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, FlowMode, Merged, Model, Page, Place, Pr, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
+import type { Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, FlowMode, Merged, Model, Page, Place, Pr, ReportKind, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
 import type { Entry, FindHit } from './thread';
 
 export type JobState = "running" | "done" | "failed";
@@ -19,6 +19,23 @@ export type JobState = "running" | "done" | "failed";
  * --step n/m`), since when it is at this step.
  */
 export type Job = { agent: string, label: string, step?: number | null, of?: number | null, state: JobState, since_ms: number, };
+
+/**
+ * One end of a message: the user, an agent, or one of the hub's pseudo
+ * senders. Typed, so no client compares a name with "you" (a client
+ * says "you" from its words catalog).
+ */
+export type Party = { "who": "you" } | { "who": "agent", name: string, } | { "who": "bise" } | { "who": "github" } | { "who": "unknown" };
+
+/**
+ * How a message was sent (`sb send --mode`).
+ */
+export type MsgMode = "steer" | "queued" | "unknown";
+
+/**
+ * One activity event.
+ */
+export type ActivityEv = { "kind": "message", id: number, from: Party, to: Party, mode: MsgMode, expects_reply: boolean, at_ms: number, } | { "kind": "report", agent: string, report: ReportKind, at_ms: number, } | { "kind": "unknown" };
 
 /**
  * What a hub sends a client that said `hello {proto: 1}`.
@@ -68,7 +85,7 @@ note?: string | null, title?: string | null, req?: number | null, commits?: numb
  * as in bise's followed_end of it: a window shows one line per
  * (project, agent, key)
  */
-key?: number | null, } | { "ev": "followed_end", project: string, agent: string, key: number, state: JobState, label: string, summary: string, } | { "ev": "confirm", project: string, id: number, text: string, } | { "ev": "flow", project: string, flow?: FlowMode | null, } | { "ev": "paused", project: string, paused: boolean, since_ms?: number | null, 
+key?: number | null, } | { "ev": "followed_end", project: string, agent: string, key: number, state: JobState, label: string, summary: string, } | { "ev": "activity", project: string, item: ActivityEv, } | { "ev": "confirm", project: string, id: number, text: string, } | { "ev": "flow", project: string, flow?: FlowMode | null, } | { "ev": "paused", project: string, paused: boolean, since_ms?: number | null, 
 /**
  * the messages held so far (queued for an agent, not delivered)
  */

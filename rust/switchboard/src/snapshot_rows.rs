@@ -18,7 +18,7 @@
 use crate::board::Waiting;
 use crate::model::{Agent, Mode, State};
 use crate::util::{clip, one_line};
-use bise_proto::rows::AgentWatch;
+use bise_proto::rows::{AgentWatch, Doing};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
@@ -38,6 +38,9 @@ pub struct RowIn<'a> {
     /// How long its turn has run (None: no turn).
     pub turn_ms: Option<u64>,
     pub watching: Vec<AgentWatch>,
+    /// les bims: what it is doing now, from `Hub.doing` (its one owner,
+    /// core_doing.rs); the row says it through `crate::doing::row`
+    pub doing: Option<Doing>,
 }
 
 /// A kept row and the inputs it was built from.
@@ -50,6 +53,7 @@ struct Kept {
     inbox: usize,
     turn_ms: Option<u64>,
     watching: Vec<AgentWatch>,
+    doing: Option<Doing>,
     row: Value,
 }
 
@@ -61,6 +65,7 @@ impl Kept {
             && self.role.as_deref() == i.role
             && self.queued_inputs == i.queued_inputs
             && self.watching == i.watching
+            && self.doing == i.doing
             && self.agent == *i.agent
     }
 }
@@ -106,7 +111,7 @@ impl Rows {
     }
 
     /// `a`'s row inputs, its messages' part from the last [`Rows::mail`].
-    pub fn input<'a>(&self, a: &'a Agent, role: Option<&'a str>, now: u64, watching: Vec<AgentWatch>) -> RowIn<'a> {
+    pub fn input<'a>(&self, a: &'a Agent, role: Option<&'a str>, now: u64, watching: Vec<AgentWatch>, doing: Option<Doing>) -> RowIn<'a> {
         RowIn {
             agent: a,
             role,
@@ -115,6 +120,7 @@ impl Rows {
             inbox: if a.is_main { self.mail.unanswered.get(&a.name).copied().unwrap_or(0) } else { 0 },
             turn_ms: a.turn_started_ms.map(|t| now.saturating_sub(t)),
             watching,
+            doing,
         }
     }
 
@@ -134,6 +140,7 @@ impl Rows {
             inbox: i.inbox,
             turn_ms: i.turn_ms,
             watching: i.watching,
+            doing: i.doing,
             row: row.clone(),
         };
         self.kept.insert(k.agent.name.clone(), k);
@@ -210,6 +217,9 @@ pub fn build(i: &RowIn) -> Value {
         // event-wake: the events it waits for (the agents
         // row's `watching`, wake-ui)
         "watching": i.watching,
+        // les bims: what it is doing now, only while its turn runs (or
+        // paused on a backgrounded command: a build)
+        "doing": crate::doing::row(a.run == crate::model::Run::Busy, i.doing, &i.watching),
     })
 }
 

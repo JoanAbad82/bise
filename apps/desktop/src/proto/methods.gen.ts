@@ -81,6 +81,7 @@ export const NOTIFICATIONS = {
   "hub/switch": { ev: "switch", scope: "hub" },
   "job/end": { ev: "job_end", scope: "hub" },
   "job/followedEnd": { ev: "followed_end", scope: "hub" },
+  "hub/activity": { ev: "activity", scope: "hub" },
   "thread/entry": { ev: "entry", scope: "thread" },
   "thread/typing": { ev: "typing", scope: "thread" },
   "thread/partial": { ev: "partial", scope: "thread" },

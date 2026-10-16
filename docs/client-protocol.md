@@ -119,6 +119,16 @@ fields are its params, and its scope). Three scopes:
 A notification method this client doesn't know (a newer hub) is ignored:
 `rpc::ev` decodes it as `HubEv::Unknown`, never an error.
 
+### What each agent does, who messages whom (les bims)
+
+Two hub-wide facts, for every agent without subscribing its thread. Kinds,
+names, ids and times only: no message body, no report text, no tool args.
+
+| where | what |
+|---|---|
+| `hub/agents`, an agent's `doing` | `{kind, since_ms}`: `think`, `tool`, `edit`, `search`, `computer`, `image`, `publish`, `compact`, `build` (a newer kind: `unknown`). Set only while its turn runs, or while it is paused on a backgrounded command (`build`); absent otherwise. A tool call's kind is `bise_proto::rows::DoingKind::of_call` (one table, `RULES`). "Long" is the client's, from `since_ms`. It goes with the rows (the 100 ms state gate). |
+| `hub/activity {project, item}` | `item` (`bise_proto::activity::ActivityEv`, tag `kind`): `message {id, from, to, mode: steer\|queued, expects_reply, at_ms}` (`from`/`to`: `{who: you}`, `{who: agent, name}`, `{who: bise}`, `{who: github}`), `report {agent, report: progress\|done\|failed\|blocked, at_ms}`, or `unknown`. Sent as sb-core journals the message or the report; a hub start replays none, so a client gets only what happens after its `initialize`. Numbered like every hub-wide notification: a gap is a loss, and nothing replays it (the rows stay true). |
+
 ### The watermark and resync
 
 The hub-wide notifications are numbered by one counter per hub run:

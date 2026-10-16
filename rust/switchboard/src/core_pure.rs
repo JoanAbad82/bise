@@ -1,0 +1,61 @@
+//! Small pure helpers of core.rs's handlers (moved out of core.rs to keep
+//! it under its line ratchet, architect m_27675): the direct-exchange
+//! note, a new task's free name, the `sb` commands that need git. No hub
+//! state: arguments in, words or a name out.
+
+use super::AgentReq;
+use crate::model::{State, MAIN};
+use crate::util::{clip_tail, one_line};
+
+/// RFC 0001 §7.4: what main (`note`) and the user's own feed (`direct`)
+/// read after the user talked directly to `task`: the messages sent,
+/// and the end of the task's reply since.
+pub(super) fn direct_exchange(task: &str, sent: &[String], reply: &str) -> (String, String) {
+    let quoted: Vec<String> = sent.iter().map(|m| format!("\"{}\"", one_line(m))).collect();
+    let n = sent.len();
+    let s = if n > 1 { "s" } else { "" };
+    let note = format!(
+        "The user talked directly to @{} ({} message{}): {}. Last reply of @{}: \"{}\"",
+        task,
+        n,
+        s,
+        quoted.join(", "),
+        task,
+        clip_tail(&one_line(reply), 2000)
+    );
+    (note, format!("You talked to @{} ({} message{})", task, n, s))
+}
+
+/// The name sb-core gives a new task of base name `base` (hub/core.bend
+/// `unique_name`): `base` when free, else `base-2`, `base-3`… cut to 24
+/// characters, trailing dashes off before the suffix.
+pub(super) fn unique_name(st: &State, base: &str) -> String {
+    let taken = |n: &str| n == MAIN || n == "user" || n == "hub" || st.resolve(n).is_some();
+    if !taken(base) {
+        return base.to_string();
+    }
+    (2..1002)
+        .map(|i| {
+            let suffix = format!("-{}", i);
+            let head: String = base.chars().take(24usize.saturating_sub(suffix.len())).collect();
+            format!("{}{}", head.trim_end_matches('-'), suffix)
+        })
+        .find(|c| !taken(c))
+        .unwrap_or_else(|| base.to_string())
+}
+
+/// The `sb` commands that need git: off in a workspace without it (the
+/// home workspace, docs/ambient-pages.md §5.1). Their name, else None.
+pub(super) fn git_only(req: &AgentReq) -> Option<&'static str> {
+    match req {
+        AgentReq::Land { .. } => Some("land"),
+        AgentReq::Feature { .. } => Some("feature"),
+        AgentReq::Flow { .. } => Some("flow"),
+        _ => None,
+    }
+}
+
+/// The one line `sb <cmd>` answers in a workspace without git.
+pub(crate) fn not_in_a_repo(cmd: &str) -> String {
+    format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)
+}

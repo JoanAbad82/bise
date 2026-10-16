@@ -181,7 +181,13 @@ turns?: number,
  * empty included, so a client tells "no watch now" from an older
  * hub (none)
  */
-watching: Array<AgentWatch>, };
+watching: Array<AgentWatch>, 
+/**
+ * les bims (architect m_27581): what it is doing now and since when
+ * (think, a tool, an edit, a build...), from its live lines; only
+ * while its turn runs, none otherwise
+ */
+doing?: Doing | null, };
 
 /**
  * An option a client does itself (card-state, architect m_23450): the
@@ -1084,3 +1090,13 @@ to: string, from?: string,
  * rolled_back: why the new version failed
  */
 reason?: string, at_ms: number, };
+
+/**
+ * The kind of an agent's current step.
+ */
+export type DoingKind = "think" | "tool" | "edit" | "search" | "computer" | "image" | "publish" | "compact" | "build" | "unknown";
+
+/**
+ * What an agent is doing now and since when (ms).
+ */
+export type Doing = { kind: DoingKind, since_ms: number, };

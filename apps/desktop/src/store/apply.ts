@@ -371,6 +371,7 @@ export function applyTyped(s: Store, ev: Ev): void {
     case "route_done":
     case "job_end":
     case "followed_end":
+    case "activity":
     case "open":
     case "page_changed":
     case "card_open":

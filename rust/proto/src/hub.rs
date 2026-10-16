@@ -282,6 +282,9 @@ pub enum HubEv {
     /// (project, agent, key), whichever of this and that project's own
     /// job_end comes first
     FollowedEnd { project: Project, agent: String, key: u64, state: JobState, label: String, summary: String },
+    /// les bims: a message sent or a report made, hub-wide, as it
+    /// happens (crate::activity: no body, no text)
+    Activity { project: Project, item: crate::activity::ActivityEv },
     /// a yes/no question from the hub to the window that asked (bar
     /// I9: archive a working agent...), answered by `confirm` with its
     /// `id`; only that connection gets it. Left unanswered it holds
@@ -430,7 +433,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "paused", "switch", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)

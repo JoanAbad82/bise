@@ -36,6 +36,7 @@ export const TAGS = {
   jobs: true,
   job_end: true,
   followed_end: true,
+  activity: true,
   confirm: true,
   approvals: true,
   notice: true,

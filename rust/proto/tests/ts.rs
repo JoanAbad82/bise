@@ -24,7 +24,7 @@
 #[path = "ts/words.rs"]
 mod words;
 
-use bise_proto::{anchor, app_cmd, app_rows, app_rpc, commands, core_ev, context, diff, draft, helper, hub, inbox, log, ops, parts, pty, rows, rpc, thread};
+use bise_proto::{activity, anchor, app_cmd, app_rows, app_rpc, commands, core_ev, context, diff, draft, helper, hub, inbox, log, ops, parts, pty, rows, rpc, thread};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -69,12 +69,12 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
         module!(cfg, "anchor": anchor::Rect, anchor::Anchor),
         module!(cfg, "parts": parts::PageNote, parts::HintKind, parts::Part),
         module!(cfg, "diff": diff::LineKind, diff::DiffLine, diff::Hunk, diff::DiffFile, diff::DiffResult, diff::Series, diff::DiffView),
-        module!(cfg, "rows": rows::Status, rows::Phase, rows::ReportKind, rows::Report, rows::Agent, rows::OptAct, rows::Opt, rows::CardPage, rows::ArtLink, rows::Card, rows::CardBatch, rows::Merged, rows::DevServer, rows::Worktree, rows::FeatureTry, rows::Feature, rows::PrState, rows::PrChecks, rows::PrReview, rows::Pr, rows::Page, rows::Place, rows::ModelRole, rows::Model, rows::Artifact, rows::ArtifactPr, rows::ArtifactVersion, rows::ArtifactLive, rows::ArtifactBack, rows::ScheduledTask, rows::ScheduledEnd, rows::AgentUsage, rows::WaitingOn, rows::AgentMode, rows::Changes, rows::FlowMode, rows::ApprovalMode, rows::CheckerKind, rows::ApprovalRule, rows::WatchKind, rows::AgentWatch, rows::UsageSum, rows::UsageRow, rows::SwitchPhase, rows::SwitchRow),
+        module!(cfg, "rows": rows::Status, rows::Phase, rows::ReportKind, rows::Report, rows::Agent, rows::OptAct, rows::Opt, rows::CardPage, rows::ArtLink, rows::Card, rows::CardBatch, rows::Merged, rows::DevServer, rows::Worktree, rows::FeatureTry, rows::Feature, rows::PrState, rows::PrChecks, rows::PrReview, rows::Pr, rows::Page, rows::Place, rows::ModelRole, rows::Model, rows::Artifact, rows::ArtifactPr, rows::ArtifactVersion, rows::ArtifactLive, rows::ArtifactBack, rows::ScheduledTask, rows::ScheduledEnd, rows::AgentUsage, rows::WaitingOn, rows::AgentMode, rows::Changes, rows::FlowMode, rows::ApprovalMode, rows::CheckerKind, rows::ApprovalRule, rows::WatchKind, rows::AgentWatch, rows::UsageSum, rows::UsageRow, rows::SwitchPhase, rows::SwitchRow, rows::DoingKind, rows::Doing),
         module!(cfg, "thread": thread::EntryKind, thread::ToolKind, thread::ToolState, thread::GateWait, thread::ToolGate, thread::FileCount, thread::ToolItem, thread::Tools, thread::EntryCard, thread::PageRef, thread::ReportRef, thread::Thinking, thread::Delivery, thread::NoticeLevel, thread::Notice, thread::NotDelivered, thread::Landed, thread::PrNewsState, thread::PrNews, thread::Made, thread::ImageRef, thread::Answered, thread::ApprovalFold, thread::Scheduled, thread::TurnFailed, thread::WakeEv, thread::WakeFold, thread::Went, thread::Entry, thread::RetryEnd, thread::Retry, thread::find::FindHit),
         module!(cfg, "log": log::LogRole, log::LogBodyKind, log::LogBody, log::LogItem),
         module!(cfg, "ops": ops::BranchRow, ops::VersionItem, ops::ReleaseEv, ops::UpdateEv),
         module!(cfg, "inbox": inbox::InboxState, inbox::InboxKind, inbox::Where, inbox::AnswerAt, inbox::InboxRecord, inbox::StateFilter, inbox::HistoryParams, inbox::InboxPage),
-        module!(cfg, "hub": hub::JobState, hub::Job, hub::HubEv, hub::Mode, hub::SendOpts, hub::HubCmd, hub::ErrorKind),
+        module!(cfg, "hub": hub::JobState, hub::Job, activity::Party, activity::MsgMode, activity::ActivityEv, hub::HubEv, hub::Mode, hub::SendOpts, hub::HubCmd, hub::ErrorKind),
         module!(cfg, "rpc": rpc::Id, rpc::Request, rpc::Notification, rpc::Response, rpc::ErrorData, rpc::RpcError, rpc::Watermark, rpc::ClientInfo, rpc::InitializeParams, rpc::HubState, rpc::InitializeResult, rpc::CommandsList, rpc::CommandRunResult, rpc::SendResult, rpc::CardAnswer, rpc::AnswerResult),
         module!(cfg, "commands": commands::WordRow, commands::ArgRow, commands::CommandRow),
         module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectView),

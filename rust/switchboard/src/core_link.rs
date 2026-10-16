@@ -151,6 +151,8 @@ impl Hub {
                 fx.push(Effect::Journal(j.ev.clone()));
                 // a timer set or ended (sb every): its ◷ lines
                 self.timer_journal_lines(fx, &j.ev);
+                // les bims: a message sent, a report made (core_doing.rs)
+                Self::activity_of_journal(fx, &j.ev);
             }
             CoreFx::Interrupt(i) => {
                 let by = self.interrupt_by.clone().unwrap_or_else(|| "bise".into());
