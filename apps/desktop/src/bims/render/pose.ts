@@ -176,6 +176,13 @@ function rest(k: ActivityKind, lt: number, ph: number, urgent: boolean, fruit: n
     case 'mainidle':
       // reads the paper
       return { ...STAND, ...SEATED, armL: [-1.3, 0, 0.35], armR: [-1.3, 0, -0.35], head: [0.25, 0, 0], props: { ...NO_PROPS, sheet: true } };
+    // the hub's events (bims-facts): a coffee at the island, a visit to a busy bim's desk, a report to main
+    case 'coffee':
+      return { ...STAND, armR: [-1.5, 0, 0], head: [-0.1, 0, 0.06], mouth: 'laugh', eyes: 0.3, props: { ...NO_PROPS, mug: true } };
+    case 'visit':
+      return { ...STAND, armR: [-1.2, 0, -0.3], head: [0.1, 0, 0] };
+    case 'report':
+      return { ...STAND, armL: [-1.3, 0, 0], armR: [-1.3, 0, 0], props: { ...NO_PROPS, sheet: true } };
   }
 }
 
