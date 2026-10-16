@@ -18,12 +18,16 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
     // restart loop): no runtime, the core still answers, says why
     // (`broken`) and every hub's row says it too. Its hubs run from the
     // installed runtime, never from inside the app (update::hub_exe)
-    let hub = crate::approot::locate("repl-live").map(|(r, _)| r).and_then(|r| crate::update::hub_of(&r));
+    let hub = crate::approot::locate("repl-live").map(|(r, _)| r).and_then(|app| crate::update::hub_of(&app).map(|(exe, root)| (app, exe, root)));
+    // its runtime is leased while this core runs: `bise update` never
+    // prunes it (no ps line names it, the core runs from the .app)
+    let _lease = hub.as_ref().ok().and_then(|(_, _, root)| bise_home::release::lease(root));
     let (projects, home_move, connect, broken) = match hub {
-        Ok((exe, root)) => {
-            let projects = ambient_projects(Connector::Hub(exe.clone(), root.clone()));
-            let home_move = home_move(paths.clone(), root.clone());
-            (projects, Some(home_move), ambient_connector(paths, Connector::Hub(exe, root), true), None)
+        Ok((app, exe, root)) => {
+            let how = Connector::Hub { app, exe, root: root.clone() };
+            let projects = ambient_projects(how.clone());
+            let home_move = home_move(paths.clone(), root);
+            (projects, Some(home_move), ambient_connector(paths, how, true), None)
         }
         Err(why) => {
             eprintln!("ambient-core: {why}");
@@ -41,8 +45,29 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
 /// and its app root, or never (no runtime: each attempt fails with why).
 #[derive(Clone)]
 enum Connector {
-    Hub(std::path::PathBuf, std::path::PathBuf),
+    /// `app`: the root this core was found in (a bundle's); `exe`,
+    /// `root`: the hub's, from `update::hub_of(app)` at boot
+    Hub { app: std::path::PathBuf, exe: std::path::PathBuf, root: std::path::PathBuf },
     Broken(String),
+}
+
+impl Connector {
+    /// The hub's executable and app root for a start. Its runtime gone
+    /// since boot (deleted by hand, or by a prune from before the lease:
+    /// his app-form hub that never started): installed again from the
+    /// app, the one way (`hub_of`), and leased for this core's life.
+    fn hub(&self) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+        match self {
+            Connector::Broken(why) => Err(why.clone()),
+            Connector::Hub { exe, root, .. } if exe.exists() => Ok((exe.clone(), root.clone())),
+            Connector::Hub { app, exe, .. } => {
+                eprintln!("ambient-core: {} is gone, installing its runtime again", exe.display());
+                let (exe, root) = crate::update::hub_of(app)?;
+                std::mem::forget(bise_home::release::lease(&root));
+                Ok((exe, root))
+            }
+        }
+    }
 }
 
 /// The core's move of an older home hub to its own version (architect
@@ -127,13 +152,13 @@ fn ambient_connector(paths: switchboard::paths::Paths, how: Connector, home: boo
     let mut talks = bend_tui::ambient::talks();
     let mut last_err: Option<String> = None;
     Box::new(move || {
-        let (exe, root) = match &how {
-            Connector::Hub(exe, root) => (exe, root),
-            Connector::Broken(why) => return Err(std::io::Error::other(why.clone())),
-        };
+        if let Connector::Broken(why) = &how {
+            return Err(std::io::Error::other(why.clone()));
+        }
         if !home {
             return if std::mem::take(&mut first) {
-                switchboard::client::open(&paths, exe, root).map_err(|e| std::io::Error::other(e.to_string()))
+                let (exe, root) = how.hub().map_err(std::io::Error::other)?;
+                switchboard::client::open(&paths, &exe, &root).map_err(|e| std::io::Error::other(e.to_string()))
             } else {
                 std::os::unix::net::UnixStream::connect(paths.socket())
             };
@@ -163,7 +188,11 @@ fn ambient_connector(paths: switchboard::paths::Paths, how: Connector, home: boo
         } else {
             eprintln!("ambient-core: home hub lost ({}), starting it again ({}/{HOME_STARTS} in {} s)", clip(&cause, 300), starts.len(), HOME_SPELL.as_secs());
         }
-        switchboard::client::open(&paths, exe, root).map_err(|e| {
+        let (exe, root) = how.hub().map_err(|e| {
+            last_err = Some(e.clone());
+            std::io::Error::other(e)
+        })?;
+        switchboard::client::open(&paths, &exe, &root).map_err(|e| {
             last_err = Some(e.to_string());
             std::io::Error::other(e.to_string())
         })

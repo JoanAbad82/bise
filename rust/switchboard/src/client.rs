@@ -1,5 +1,6 @@
 //! How a client reaches the hub of a workspace: connect to `hub.sock`,
-//! starting the hub first when none runs.
+//! starting the hub first when none runs. The hub's own side of a start
+//! too ([`run_from`]: its `hub.root`, and the lease on its app root).
 
 use crate::paths::Paths;
 use serde_json::Value;
@@ -33,9 +34,19 @@ pub fn start_hub(paths: &Paths, exe: &Path, app_root: &Path) -> std::io::Result<
         .stdout(Stdio::null())
         .stderr(Stdio::from(err))
         .process_group(0)
-        .spawn()?;
+        .spawn()
+        // a bare 'No such file or directory' named nothing (his pruned runtime)
+        .map_err(|e| std::io::Error::other(format!("can't run {}: {}", exe.display(), e)))?;
     reap(child);
     Ok(())
+}
+
+/// A hub's start, its own side: `hub.root` says where it runs from (the
+/// switcher reads it: `switch::running_root`), and that root is leased
+/// while the hub runs (`release::lease`: `bise update` never prunes it).
+pub fn run_from(paths: &Paths, app_root: &Path) -> Option<bise_home::release::Lease> {
+    let _ = std::fs::write(paths.state.join("hub.root"), app_root.to_string_lossy().as_bytes());
+    bise_home::release::lease(app_root)
 }
 
 /// A hub this process started is its child until it exits: waited for

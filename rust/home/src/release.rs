@@ -3,6 +3,10 @@
 //! (`latest.json`). Shared by `bise update` (the harness) and the hub
 //! (`/version`, `/restart latest`, the "update ready" notice).
 //!
+//! A `versions/<id>` dir in use is leased ([`lease`]: a shared flock on
+//! its `.in-use`, by the desktop core and each hub that runs from it);
+//! `bise update`'s prune never deletes a leased dir ([`in_use`]).
+//!
 //! An install (install.sh):
 //!   <prefix>/versions/<id>/   immutable app roots (VERSION has no `repo=`)
 //!   <prefix>/current -> versions/<id>
@@ -153,6 +157,43 @@ impl Install {
     pub fn find(&self, id: &str) -> Option<Installed> {
         self.installed().into_iter().find(|i| i.id == id)
     }
+}
+
+/// The lease file of a version dir: a shared flock on it says "a process
+/// runs from this dir" (architect m_27423).
+pub const IN_USE: &str = ".in-use";
+
+/// A held lease on a version dir: released when dropped (or by the
+/// kernel when its holder dies).
+pub struct Lease(#[allow(dead_code)] std::fs::File);
+
+/// A shared lease on `root` for whoever runs from it or holds it (the
+/// desktop core for its lifetime, each hub): `bise update`'s prune never
+/// deletes a leased dir ([`in_use`]). Only a `versions/<id>` dir is
+/// leased (never a dev tree, never a dir inside an app bundle: its
+/// signature covers its files); None for any other root or an error.
+pub fn lease(root: &Path) -> Option<Lease> {
+    use std::os::unix::io::AsRawFd;
+    let in_versions = root.parent().and_then(Path::file_name).is_some_and(|n| n == "versions");
+    if !in_versions || root.to_string_lossy().contains(".app/Contents/") {
+        return None;
+    }
+    let f = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(root.join(IN_USE)).ok()?;
+    // SAFETY: flock on a descriptor this function owns; never blocks long
+    // (an exclusive holder is a prune's check, released at once)
+    (unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_SH) } == 0).then_some(Lease(f))
+}
+
+/// Whether a process holds a [`lease`] on `dir` now: its lease file is
+/// there and an exclusive flock on it would block.
+pub fn in_use(dir: &Path) -> bool {
+    use std::os::unix::io::AsRawFd;
+    let Ok(f) = std::fs::File::open(dir.join(IN_USE)) else { return false };
+    // SAFETY: flock on a descriptor this function owns; LOCK_NB never blocks
+    if unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+        return false;
+    }
+    std::io::Error::last_os_error().kind() == std::io::ErrorKind::WouldBlock
 }
 
 /// What kind of app root a bise runs from: the one answer to "who

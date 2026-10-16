@@ -195,6 +195,20 @@ pub const HUB_LACKS: &str = "this project's hub is older: update bise";
 /// hub-skew: a hub that listed its commands (`welcome.cmds`) and lacks
 /// `tag`, the typed command's own tag (never its text: architect
 /// m_11487). An empty list (not welcomed yet) lacks nothing we can know.
+/// A command's error when its hub never welcomed it: the start's cause
+/// when the connector said one (`HubIn::Down`: client::open's 'the hub
+/// did not start: <why> (its log: ..)', a missing runtime), never a bare
+/// 'try again' that a retry wouldn't fix.
+pub fn not_started(down: Option<&str>) -> String {
+    match down.map(str::trim).filter(|d| !d.is_empty()) {
+        Some(d) => {
+            let why = d.strip_prefix("the hub did not start: ").or_else(|| d.strip_prefix("the hub ")).unwrap_or(d);
+            format!("its hub didn't start: {}. nothing sent.", why.trim_end_matches('.'))
+        }
+        None => format!("its hub didn't start in {} s: nothing sent.", START.as_secs()),
+    }
+}
+
 pub fn lacks(cmds: &[String], tag: &str) -> bool {
     !cmds.is_empty() && !cmds.iter().any(|c| c == tag)
 }
@@ -468,16 +482,26 @@ impl Core {
     /// Commands past their deadline get their error; the hubs held for a
     /// command only go once it went.
     pub(super) fn tick_projects(&mut self, now: Instant) {
-        let mut late: Vec<(String, String, Option<u64>, Option<Id>)> = Vec::new();
+        // (project, cmd, cid, the app's request, its words)
+        type Late = (String, String, Option<u64>, Option<Id>, String);
+        let mut late: Vec<Late> = Vec::new();
         let mut close = false;
+        // hubs that failed to start: their connection goes, so the next
+        // command starts them again (a project connection starts its hub
+        // at its first attempt only)
+        let mut failed: Vec<String> = Vec::new();
         for (id, c) in self.hubs.conns.iter_mut() {
+            let words = not_started(c.down.as_deref());
             c.pending.retain(|(v, deadline, app)| {
                 let ok = *deadline > now;
                 if !ok {
-                    late.push((id.clone(), v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string(), v.get("cid").and_then(Value::as_u64), app.clone()));
+                    late.push((id.clone(), v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string(), v.get("cid").and_then(Value::as_u64), app.clone(), words.clone()));
                 }
                 ok
             });
+            if c.down.is_some() && !c.welcomed && late.iter().any(|l| &l.0 == id) {
+                failed.push(id.clone());
+            }
             // an app request its hub never answered gets the core's words
             if let Some(before) = now.checked_sub(super::hub_rpc::ASK_LATE) {
                 c.rpc.late(before, super::hub_rpc::LATE);
@@ -485,8 +509,16 @@ impl Core {
             close |= c.until.is_some_and(|u| u <= now) && c.pending.is_empty();
         }
         self.take_rpc_replies();
-        for (id, cmd, cid, app) in late {
-            self.project_error(&id, &cmd, "its hub didn't start: nothing sent. try again in a moment.", cid, None, app);
+        for (id, cmd, cid, app, words) in late {
+            self.project_error(&id, &cmd, &words, cid, None, app);
+        }
+        for id in failed {
+            if let Some(mut c) = self.hubs.conns.remove(&id) {
+                c.hub.close();
+                c.rpc.lost(super::hub_rpc::GONE);
+                self.replies.extend(c.rpc.take_replies());
+            }
+            close = true;
         }
         if close {
             self.hold_at(now);

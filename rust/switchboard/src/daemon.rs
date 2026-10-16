@@ -1868,8 +1868,8 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     if let Err(e) = crate::tools_env::write_mktemp_shim(&paths.bin_dir()) {
         log_line(&paths, &format!("mktemp shim not written: {}", e));
     }
-    // the switcher reads where this hub runs from (to come back to it)
-    let _ = std::fs::write(paths.state.join("hub.root"), opts.app_root.to_string_lossy().as_bytes());
+    // where this hub runs from: said (the switcher comes back to it), leased
+    let _lease = crate::client::run_from(&paths, &opts.app_root);
     log_line(&paths, &format!("hub start pid={} workspace={}", std::process::id(), paths.workspace.display()));
     // no boot hangs silently: its steps and the replay's batches are its progress
     let boot = boot::Boot::start(&paths, "hub start (sb-core starting)");

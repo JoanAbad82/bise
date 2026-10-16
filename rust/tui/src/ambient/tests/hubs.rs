@@ -626,6 +626,46 @@ fn a_send_to_a_hub_that_went_away_waits_for_it_then_says_so() {
     assert!(e["text"].as_str().unwrap().contains("nothing sent"), "{e}");
 }
 
+/// His app-form send (new-project): a hub whose start failed says the
+/// start's cause, never 'try again in a moment', and the next command
+/// starts it again (a project connection starts its hub once only).
+#[test]
+fn a_hub_that_did_not_start_says_why_and_the_next_send_starts_it_again() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.opened(&mut t, &["home"]);
+    let send = json!({"cmd": "send", "project": "mail", "agent": "main", "text": "a Typeform-like app", "mode": "now"});
+    typed(&mut t, send.clone());
+    w.opened(&mut t, &["mail"]);
+    // its initialize read: the core saw it up
+    let mut l = String::new();
+    w.end("mail").r.read_line(&mut l).unwrap();
+    w.open.remove("mail");
+    // client::open's cause for a start that failed
+    let cause = "the hub did not start: can't run /v/root-x/bise: No such file or directory (os error 2) (its log: /h/hub.err)";
+    t.core.project_hub("mail", HubIn::Down(Some(cause.into())));
+    t.core.tick(Instant::now() + START + Duration::from_secs(1));
+    t.out.extend(t.core.take_out());
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("its error at the deadline");
+    assert_eq!(
+        e["text"],
+        "its hub didn't start: can't run /v/root-x/bise: No such file or directory (os error 2) (its log: /h/hub.err). nothing sent."
+    );
+    // he sends again: a new connection, its hub started again, delivered
+    typed(&mut t, send.clone());
+    w.opened(&mut t, &["mail"]);
+    w.welcome(&mut t, "mail");
+    assert_eq!(w.end("mail").next(), send);
+}
+
+#[test]
+fn a_late_command_without_a_cause_says_how_long_it_waited() {
+    assert_eq!(crate::ambient::core::not_started(None), format!("its hub didn't start in {} s: nothing sent.", START.as_secs()));
+    assert_eq!(crate::ambient::core::not_started(Some("bise couldn't install its runtime: no /v/x/bise. reinstall bise")), "its hub didn't start: bise couldn't install its runtime: no /v/x/bise. reinstall bise. nothing sent.");
+}
+
 /// Law (bar N14/L8, architect m_10930): fn's words answer the card in view
 /// exactly as the TUI's answer_by_voice decides (voicemode/answers.rs
 /// `decide`, one table): a match sends `voice_answer` and nothing to

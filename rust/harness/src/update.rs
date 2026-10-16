@@ -403,14 +403,17 @@ fn flip(inst: &Install, id: &str) -> Result<(), String> {
     std::fs::rename(&tmp, inst.current_link()).map_err(|e| e.to_string())
 }
 
-/// The versions to delete: past the newest `keep`, never `current` nor
-/// one a process runs (a hub, an agent's REPL: `ps` names its folder).
-fn to_prune(installed: &[release::Installed], keep: usize, current: Option<&Path>, ps: &str) -> Vec<PathBuf> {
+/// The versions to delete: past the newest `keep`, never `current`, nor
+/// one a process runs (a hub, an agent's REPL: `ps` names its folder),
+/// nor one `leased` (`release::in_use`: the desktop core runs from its
+/// .app but its hubs start from that dir; a ps line never names it).
+fn to_prune(installed: &[release::Installed], keep: usize, current: Option<&Path>, ps: &str, leased: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
     installed
         .iter()
         .skip(keep)
         .filter(|i| Some(i.dir.as_path()) != current)
         .filter(|i| !ps.contains(&format!("{}/", i.dir.display())))
+        .filter(|i| !leased(&i.dir))
         .map(|i| i.dir.clone())
         .collect()
 }
@@ -422,7 +425,7 @@ fn prune(inst: &Install) {
         .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
         .unwrap_or_default();
     let current = inst.current();
-    for d in to_prune(&inst.installed(), KEEP, current.as_deref(), &ps) {
+    for d in to_prune(&inst.installed(), KEEP, current.as_deref(), &ps, &release::in_use) {
         let _ = std::fs::remove_dir_all(d);
     }
 }
@@ -745,16 +748,24 @@ mod tests {
         let dirs: Vec<PathBuf> = all.iter().map(|i| i.dir.clone()).collect();
         assert!(dirs.contains(&versions.join("root-8b00ed2b0123")) && dirs.contains(&versions.join("root")), "{dirs:?}");
         // past KEEP=2: both roots go
-        let gone = to_prune(&all, 2, Some(&versions.join("v4")), "");
+        let gone = to_prune(&all, 2, Some(&versions.join("v4")), "", &release::in_use);
         assert_eq!(gone.len(), 2, "{gone:?}");
         assert!(gone.contains(&versions.join("root-8b00ed2b0123")) && gone.contains(&versions.join("root")), "{gone:?}");
         // a hub runs from it: kept
         let ps = format!("{}/bise sbd --workspace /w{}", versions.join("root-8b00ed2b0123").display(), char::from(10u8));
-        let gone = to_prune(&all, 2, Some(&versions.join("v4")), &ps);
+        let gone = to_prune(&all, 2, Some(&versions.join("v4")), &ps, &release::in_use);
         assert_eq!(gone, [versions.join("root")]);
         // current: kept
-        let gone = to_prune(&all, 2, Some(&versions.join("root-8b00ed2b0123")), "");
+        let gone = to_prune(&all, 2, Some(&versions.join("root-8b00ed2b0123")), "", &release::in_use);
         assert_eq!(gone, [versions.join("root")]);
+        // leased (a desktop core's runtime, no ps line names it): kept
+        // while held, gone once released (his pruned app-form runtime)
+        let lease = release::lease(&versions.join("root-8b00ed2b0123")).expect("a versions dir is leased");
+        let gone = to_prune(&all, 2, Some(&versions.join("v4")), "", &release::in_use);
+        assert_eq!(gone, [versions.join("root")]);
+        drop(lease);
+        let gone = to_prune(&all, 2, Some(&versions.join("v4")), "", &release::in_use);
+        assert_eq!(gone.len(), 2, "{gone:?}");
         let _ = std::fs::remove_dir_all(&t);
     }
 
@@ -847,9 +858,9 @@ mod tests {
         };
         let all = [v("e"), v("d"), v("c"), v("b"), v("a")];
         let ps = "/p/versions/b/bise sbd --workspace /w\n";
-        let gone = to_prune(&all, 3, Some(Path::new("/p/versions/a")), ps);
+        let gone = to_prune(&all, 3, Some(Path::new("/p/versions/a")), ps, &|_| false);
         assert_eq!(gone, Vec::<PathBuf>::new());
-        let gone = to_prune(&all, 2, None, ps);
+        let gone = to_prune(&all, 2, None, ps, &|_| false);
         assert_eq!(gone, [PathBuf::from("/p/versions/c"), PathBuf::from("/p/versions/a")]);
     }
 
