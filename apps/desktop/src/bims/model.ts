@@ -214,6 +214,8 @@ export interface BimFrame {
   readonly pose: Pose;
   /** the easter egg it plays now (eggs.ts), on top of its pose; absent: none */
   readonly egg?: BimEgg;
+  /** a soft halo on the floor under it (focus.ts): its row hovered, or the bim the office follows */
+  readonly lit?: boolean;
 }
 
 /** The look of the moment: the app's theme (day light, night dark), reduced motion (no loops, fades for walks). */
@@ -243,6 +245,8 @@ export interface OfficeRenderer {
   frame(t: number, bims: readonly BimFrame[], look: Look): Motion;
   /** a bim's head on the canvas, css px from its top left (labels and pills go there), and its feet's y (the hover card flips under them); null off view */
   headOf(name: string): { readonly x: number; readonly y: number; readonly feet: number } | null;
+  /** where a bim stands even off view (focus.ts): its head on the canvas (css px, maybe outside it) and its middle as fractions of the whole fit (the follow camera aims there); null: not drawn */
+  spotOf(name: string): { readonly x: number; readonly y: number; readonly u: number; readonly v: number } | null;
   /** where a stage's piece stands on the canvas, css px (the unlock moment's label); null off view */
   pieceOf(stage: number): { readonly x: number; readonly y: number } | null;
   /** the bim (or its desk) under a canvas point, css px; null on nothing */

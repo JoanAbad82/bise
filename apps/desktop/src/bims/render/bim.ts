@@ -23,6 +23,8 @@ export interface Bim {
 }
 
 const GREY = new Color(WORLD.grey);
+/** eyes this shut or more (pose.ts: 0.15 asleep, 0.3 laughing) draw as closed lines */
+const CLOSED = 0.25;
 
 /** `outfit`: another bim's (s3, april fools: hats shuffled, one in main's hoodie); its own by default */
 export function makeBim(name: string, main: boolean, style: Style, outfit?: Outfit): Bim {
@@ -58,6 +60,9 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   body.add(head);
   add(style.ball(0.22), mat(o.skin), head, 0, 0, 0);
   const eyes = [-0.075, 0.075].map((ex) => add(style.box(0.07, 0.08, 0.02), mat(EYE), head, ex, 0.03, 0.205));
+  // closed eyes (asleep, napping): two thin lines a little lower and apart, flush on the face; a
+  // squashed eye box read as one thick bar from above (Gabriel, via landing-shots m_28200)
+  const lids = [-0.08, 0.08].map((ex) => add(style.box(0.065, 0.014, 0.006), mat(EYE), head, ex, 0.01, 0.214));
   const smile = add(style.box(0.12, 0.03, 0.02), mat(EYE), head, 0, -0.05, 0.205);
   const laugh = add(style.box(0.12, 0.06, 0.02), mat(MOUTH), head, 0, -0.06, 0.207);
   const oh = add(style.box(0.06, 0.06, 0.02), mat(EYE), head, 0, -0.08, 0.205);
@@ -218,7 +223,13 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       setRot(armR, rig.armR);
       legL.rotation.set(rig.legL, 0, 0);
       legR.rotation.set(rig.legR, 0, 0);
-      for (const e of eyes) e.scale.y = rig.eyes;
+      // under CLOSED the eyes are shut: the lids' lines, no squashed box
+      const shut = rig.eyes < CLOSED;
+      for (const e of eyes) {
+        e.visible = !shut;
+        e.scale.y = rig.eyes;
+      }
+      for (const l of lids) l.visible = shut;
       smile.visible = rig.mouth === 'smile';
       laugh.visible = rig.mouth === 'laugh';
       oh.visible = rig.mouth === 'oh';

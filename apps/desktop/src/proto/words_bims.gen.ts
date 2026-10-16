@@ -50,10 +50,10 @@ export const bims = {
   pill_asks_tip: (a: { agent: string | number }): string => String(a.agent) + " asks you. click opens it",
   /** the '✗' pill's tip */
   pill_failed_tip: (a: { agent: string | number }): string => String(a.agent) + " failed. click opens it",
-  /** the toggle: the office above the rows (pressed) or the rows alone */
-  view_bims: "bims",
-  /** the toggle's tip */
+  /** the office's name for a screen reader: the agents in it, above the list */
   view_bims_tip: "the agents in their office, above the list",
+  /** the title bar's icon that opens or closes the office (pressed while it shows); its tip (designer m_28198) */
+  title_bims_tip: "bims: your agents in their office",
   /** the width switch: the bar at 320 px */
   width_narrow: "320",
   /** the width switch: the wide bar */

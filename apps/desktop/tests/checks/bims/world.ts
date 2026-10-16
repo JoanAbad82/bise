@@ -72,7 +72,7 @@ export async function open(snapshot: Snapshot, o: { theme?: 'light' | 'dark'; re
   const core = new FakeCore(world(snapshot, o.theme ?? 'light') as never);
   const s = await launchDesktop({ core, route: `project/${P}`, size: `${String(o.width ?? 1400)}x900` });
   if (o.reduced === true) await s.page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(s.page.getByTestId('app.right.agents.view.bims')).toBeVisible({ timeout: 20_000 });
+  await expect(s.page.getByTestId('app.title.bims')).toBeVisible({ timeout: 20_000 });
   return { s, core };
 }
 
@@ -86,7 +86,7 @@ export async function trackpad(cdp: CDPSession, x: number, y: number, o: { dx?: 
 
 /** The office on, its renderer loaded and drawing. */
 export async function showOffice(s: Session): Promise<void> {
-  await s.page.getByTestId('app.right.agents.view.bims').click();
+  await s.page.getByTestId('app.title.bims').click();
   await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-state', 'on', { timeout: 20_000 });
   await expect.poll(async () => (await probe(s.page))?.frames ?? 0, { timeout: 10_000 }).toBeGreaterThan(0);
 }

@@ -6,7 +6,7 @@
 // only when frame() is called and says how the loop must run next (Motion). The look is style.ts.
 // In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, head } for the
 // headless check (bims-qa).
-import { Color, OrthographicCamera, PCFShadowMap, Scene, Vector3, WebGLRenderer } from 'three';
+import { Color, Mesh, MeshBasicMaterial, OrthographicCamera, PCFShadowMap, RingGeometry, Scene, Vector3, WebGLRenderer } from 'three';
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, MakeRenderer, Motion, Office, OfficeRenderer } from '../model';
 import { makeBim, type Bim } from './bim';
@@ -42,6 +42,8 @@ const PLANE_MIN_PX = 12;
 const PLANE_FORESHORTEN = 1.25;
 /** how much of the eclipse's violet goes into the backdrop */
 const ECLIPSE_MIX = 0.45;
+/** the lit bim's halo on the floor (focus.ts; bims m_28199): the text's colour at low alpha, never the accent */
+const HALO = { inner: 0.34, outer: 0.5, alpha: 0.28, day: '#1d1a17', night: '#f3ede4' } as const;
 
 const testMode = (): boolean => (window as Partial<Window> & { bise?: { test?: boolean } }).bise?.test === true;
 
@@ -75,6 +77,11 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   let lost = false;
   const lostCbs: (() => void)[] = [];
   const v = new Vector3();
+  // the halo under a lit bim (focus.ts): one ring, flat on the floor, shown under each lit bim's feet
+  const haloGeo = new RingGeometry(HALO.inner, HALO.outer, 40);
+  haloGeo.rotateX(-Math.PI / 2);
+  const haloMat = new MeshBasicMaterial({ color: HALO.day, transparent: true, opacity: HALO.alpha, depthWrite: false });
+  const halos = new Map<string, Mesh>();
 
   const probe: Probe | null = testMode()
     ? { frames: 0, trace: [], head: (name) => headOf(name) }
@@ -199,6 +206,23 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     return flying.size > 0;
   }
 
+  function drawHalos(frames: readonly BimFrame[], isNight: boolean): void {
+    haloMat.color.set(isNight ? HALO.night : HALO.day);
+    const lit = new Set<string>();
+    for (const f of frames) {
+      const rig = rigs.get(f.name);
+      if (f.lit !== true || !rig) continue;
+      lit.add(f.name);
+      let h = halos.get(f.name);
+      if (!h) { h = new Mesh(haloGeo, haloMat); h.renderOrder = 1; halos.set(f.name, h); scene.add(h); }
+      h.position.set(rig.x, 0.02, rig.z);
+      h.visible = rig.opacity > 0.05;
+    }
+    for (const [name, h] of halos) {
+      if (!lit.has(name)) { scene.remove(h); halos.delete(name); }
+    }
+  }
+
   const api: OfficeRenderer = {
     setOffice(o, as) {
       office = o;
@@ -254,6 +278,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
         }
       }
       for (const [name, b] of bims) if (!shown.has(name)) b.group.visible = false;
+      drawHalos(frames, look.night);
       for (const [name, d] of world.desks) {
         const rig = rigs.get(name);
         lightDesk(d, pal, rig?.screen ?? 0, rig ? rig.lamp : name !== mainName());
@@ -268,6 +293,14 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       return motion;
     },
     headOf,
+    spotOf(name) {
+      const b = bims.get(name);
+      if (!b || !fit || !base || !b.group.visible) return null;
+      const head = toScreen(fit, b.headTop(v));
+      const feet = b.feet(v);
+      const mid = toScreen(base, { x: feet.x, y: 0.5, z: feet.z });
+      return { x: head.x, y: head.y, u: mid.x / base.widthPx, v: mid.y / base.heightPx };
+    },
     pieceOf(stage) {
       if (!fit || !office) return null;
       // a piece out of the frame (the garden cropped at 320): the frame's edge nearest it (bims m_28178)
@@ -304,6 +337,10 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       bims.clear();
       for (const p of planes.values()) p.dispose();
       planes.clear();
+      for (const h of halos.values()) scene.remove(h);
+      halos.clear();
+      haloGeo.dispose();
+      haloMat.dispose();
       renderer.dispose();
       if (probe) delete (window as unknown as { __biseBims?: Probe }).__biseBims;
     },

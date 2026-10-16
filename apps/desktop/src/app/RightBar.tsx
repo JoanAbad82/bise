@@ -37,7 +37,9 @@ import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
 import { BimsSwitch, Office } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
+import { BimsFold } from '@/bims/Fold';
 import { showsWide, useBimsView, wideMode } from '@/bims/view';
+import { bimsLit, followOf, useBimsLit } from '@/bims/focus';
 
 const lastAgents = new Map<string, { from: readonly (readonly Agent[])[]; items: readonly ProjAgent[] }>();
 
@@ -259,7 +261,16 @@ function MarkCell({ r, onOpenPr, head = false }: { r: BarRow; onOpenPr: OpenPr; 
   );
 }
 
-function Row({ r, onOpen, on, onOpenPr }: { r: BarRow; onOpen: () => void; on?: boolean; onOpenPr?: OpenPr }) {
+function Row({ r, onOpen, on, onOpenPr, lit, onLit }: {
+  r: BarRow;
+  onOpen: () => void;
+  on?: boolean;
+  onOpenPr?: OpenPr;
+  /** its bim hovered in the office (bims/focus.ts): the rows' hover tint */
+  lit?: boolean;
+  /** the pointer on it (true) or off it: its bim lights in the office */
+  onLit?: (on: boolean) => void;
+}) {
   const openPr = onOpenPr ?? (() => undefined);
   // an agent's row, an orphan PR, a worktree's head: the TUI's columns (desktop-agents-bar §2-§4)
   if (r.kind !== undefined) {
@@ -270,8 +281,11 @@ function Row({ r, onOpen, on, onOpenPr }: { r: BarRow; onOpen: () => void; on?: 
         aria-current={on === true || undefined}
         aria-label={r.title}
         onClick={onOpen}
+        onPointerEnter={onLit && (() => { onLit(true); })}
+        onPointerLeave={onLit && (() => { onLit(false); })}
         data-testid={r.testId}
         data-group={r.group}
+        data-lit={lit === true || undefined}
         data-slide-row
       >
         {/* each mark says itself in the ds tip (tipwords.ts); the row has none, its words are there */}
@@ -478,6 +492,11 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   const bims = useBimsView();
   const office = !all && bims.view === 'bims';
   const officeAgents = useMemo(() => agents.filter((x) => !x.a.archived).map((x) => x.a), [agents]);
+  // the row <-> bim link (bims/focus.ts): a row hovered lights its bim, a bim hovered its row
+  const lit = useBimsLit();
+  const litBim = office && lit?.from === 'bim' ? lit.name : null;
+  useEffect(() => () => { bimsLit.set(null, 'row'); }, []);
+  const follow = office ? followOf(route, project, agents.map((x) => x.a)) : null;
   return (
     // ⌥ held: every agent row shows its context ring (and its %), else only the hovered one (app.css)
     <aside
@@ -507,7 +526,8 @@ export function RightBar({ project, name, over, column }: { project: string; nam
           }}
           act={all ? undefined : <BimsSwitch view={bims} />}
           office={
-            office ? (
+            all ? undefined : (
+              <BimsFold open={office}>
               <Office
                 project={project}
                 agents={officeAgents}
@@ -515,11 +535,13 @@ export function RightBar({ project, name, over, column }: { project: string; nam
                 places={places}
                 growth={growth}
                 parts={bimsParts}
+                follow={follow}
                 onOpen={(agent) => {
                   openAgent(project, agent);
                 }}
               />
-            ) : undefined
+              </BimsFold>
+            )
           }
         >
           {(r) =>
@@ -536,7 +558,14 @@ export function RightBar({ project, name, over, column }: { project: string; nam
               />
             ) : (
               <Fragment key={r.key}>
-                <Row r={r} on={here(r.project, r.agent ?? '')} onOpenPr={openPr} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />
+                <Row
+                  r={r}
+                  on={here(r.project, r.agent ?? '')}
+                  onOpenPr={openPr}
+                  onOpen={() => { openAgent(r.project, r.agent ?? ''); }}
+                  lit={r.agent !== undefined && r.agent === litBim}
+                  onLit={office && r.agent !== undefined ? (on) => { bimsLit.set(on ? { name: r.agent ?? '', from: 'row' } : null, 'row'); } : undefined}
+                />
                 {tipOf(r.agent ?? '')}
               </Fragment>
             )

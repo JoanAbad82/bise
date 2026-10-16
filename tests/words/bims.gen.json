@@ -234,10 +234,10 @@
     "one": null,
     "text": "waiting on {agent}"
   },
-  "bims.view_bims": {
+  "bims.title_bims_tip": {
     "args": [],
     "one": null,
-    "text": "bims"
+    "text": "bims: your agents in their office"
   },
   "bims.view_bims_tip": {
     "args": [],

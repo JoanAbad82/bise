@@ -1,9 +1,10 @@
-// How the right bar shows its agents (page bims-office v7, bims m_27494): 'list' (the rows alone)
-// or 'bims' (the office above the rows: he keeps the list while the bims are open), and with bims
+// How the right bar shows its agents (page bims-office v7, bims m_27494): 'list' (the rows alone,
+// the default: the office is an easter egg he opens with the title bar's icon, Frame.tsx) or 'bims'
+// (the office above the rows: he keeps the list while the bims are open), and with bims
 // on, the bar at 320 or 'wide' (640 px while the office shows: docked when the window has room for
 // it and the thread's 520, sliding over the thread otherwise).
 // Both kept per window (keep.ts, like the sections' folds), one store for the window so the frame
-// (its column's width) and the bar (its head's toggles) read the same. Owner: bims-wire.
+// (its column's width and the title bar's icon) and the bar (its head's 320 | wide) read the same. Owner: bims-wire.
 import { useSyncExternalStore } from 'react';
 import { keep } from '@/app/keep';
 import { MAIN_MIN } from '@/app/resize';

@@ -59,11 +59,11 @@ crate::words! { bims:
     /// the '✗' pill's tip
     pill_failed_tip(agent) = "{agent} failed. click opens it";
 
-    // ---- the bar's AGENTS head: the office on or off over the rows, and its width
-    /// the toggle: the office above the rows (pressed) or the rows alone
-    view_bims = "bims";
-    /// the toggle's tip
+    // ---- the office on or off over the AGENTS rows (the title bar's icon), and its width (the AGENTS head)
+    /// the office's name for a screen reader: the agents in it, above the list
     view_bims_tip = "the agents in their office, above the list";
+    /// the title bar's icon that opens or closes the office (pressed while it shows); its tip (designer m_28198)
+    title_bims_tip = "bims: your agents in their office";
     /// the width switch: the bar at 320 px
     width_narrow = "320";
     /// the width switch: the wide bar

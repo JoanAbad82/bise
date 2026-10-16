@@ -4,7 +4,8 @@
 //   (1) the list view never loads the three chunk (CDP scriptParsed against the built chunk that
 //       holds three's REVISION); the office loads it (the control); back on list, the list shows;
 //   (3) a world of still poses (asleep, failed, blocked, done, stopped, main reading) draws 0 frames
-//       once arrived; a typing bim loops at ~8 fps, never the display's rate; hidden draws 0;
+//       once arrived (the sleepers' z's, a CSS loop, at 7.5 fps at most); a typing bim loops at ~8
+//       fps, never the display's rate; hidden draws 0, z's included;
 //   (4) a lost WebGL context shows the list right under its one line (no office-high hole).
 // The sizes, labels, night, planes and reduced motion: office.spec.ts. Owner: bims-qa.
 import { test, expect } from '../../harness';
@@ -25,8 +26,8 @@ test('(1) the list view never loads the three chunk', async () => {
     await showOffice(s);
     expect(parsed().filter((f) => chunks.includes(f)), 'the office loads three (the control)').toHaveLength(1);
     // the toggle again: the rows alone
-    await s.page.getByTestId('app.right.agents.view.bims').click();
-    await expect(s.page.getByTestId('app.right.bims')).toHaveCount(0);
+    await s.page.getByTestId('app.title.bims').click();
+    await expect(s.page.getByTestId('app.right.bims')).toHaveCount(0, { timeout: 2000 });
     await expect(s.page.getByTestId(`app.right.agent.${NAMES[1] ?? ''}`)).toBeVisible();
   } finally {
     await s.close();
@@ -48,8 +49,10 @@ test('(3) no frame while every bim is still or the window hidden; ~8 fps for a l
   try {
     await showOffice(s);
     await settle(s);
+    // asleep (login-test): its 'z z Z' are a CSS loop at 7.5 fps, never WebGL (architect m_28263)
     const still = await drawnIn(s, 3000);
-    expect(still, 'a still office draws nothing').toEqual({ frames: 0, shown: 0 });
+    expect(still.frames, 'a still office draws nothing').toBe(0);
+    expect(still.shown, "the sleepers' z's: 7.5 fps at most, never the display rate").toBeLessThanOrEqual(30);
 
     // one bim types: the loop's rate, never the display's
     await core.send(rowsOf(withRows(STILL, { 'cookie-banner': { status: 'working', turn_ms: 1000 } })) as never);
@@ -59,7 +62,7 @@ test('(3) no frame while every bim is still or the window hidden; ~8 fps for a l
     expect(loop.frames / 3, 'a typing bim: ~8 fps').toBeGreaterThan(4);
     expect(loop.frames / 3, 'never the display rate').toBeLessThan(12);
 
-    // hidden: nothing, whatever the world
+    // hidden: nothing, whatever the world, the sleepers' z's included (blur shares the flag: loop.ts away)
     await setHidden(s.page, true);
     await sleep(300);
     expect(await drawnIn(s, 2000), 'hidden draws nothing').toEqual({ frames: 0, shown: 0 });

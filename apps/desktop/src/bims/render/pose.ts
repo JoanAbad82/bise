@@ -245,9 +245,10 @@ function rest(act: Activity, lt: number, ph: number): Body {
     case 'landing':
       return { ...STAND, armL: [-1.3, 0, 0], armR: [-1.3, 0, 0], props: { ...NO_PROPS, crate: true } };
     case 'done':
-      // on a deck chair, sunglasses
+      // on a deck chair (stages.ts deckChair), sunglasses: its seat under it, its back on the
+      // backrest's tilt (DECK.tilt), its legs down along the seat
       return {
-        ...STAND, y: 0.25, dz: 0.1, body: [-1.0, 0, 0], legL: -0.6, legR: -0.6, armL: [0, 0, -2.6], armR: [0, 0, 2.6],
+        ...STAND, y: 0.26, dz: 0.33, body: [-1.0, 0, 0], legL: -0.2, legR: -0.2, armL: [0, 0, -2.6], armR: [0, 0, 2.6],
         props: { ...NO_PROPS, glasses: true },
       };
     case 'stopped':

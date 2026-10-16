@@ -100,27 +100,20 @@ afterEach(() => {
 });
 
 describe('the toggle', () => {
-  it("one 'bims' toggle (the office above the rows); 320 | wide only with it on; kept", () => {
+  it("no 'bims' pill in the head (the title bar's icon); 320 | wide only with the office on; kept", () => {
     const { rerender } = render(<BimsSwitch view={bimsView.get()} />);
-    expect(screen.queryByTestId('app.right.agents.view.list')).toBeNull();
-    expect(screen.getByTestId('app.right.agents.view.bims').getAttribute('aria-pressed')).toBe('false');
+    expect(screen.queryByTestId('app.right.agents.view.bims')).toBeNull();
     expect(screen.queryByTestId('app.right.agents.width.wide')).toBeNull();
-    fireEvent.click(screen.getByTestId('app.right.agents.view.bims'));
-    expect(bimsView.get().view).toBe('bims');
+    bimsView.setView('bims');
     rerender(<BimsSwitch view={bimsView.get()} />);
-    expect(screen.getByTestId('app.right.agents.view.bims').getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByTestId('app.right.agents.width.wide'));
     expect(bimsView.get()).toEqual({ view: 'bims', wide: true });
     bimsView.reset();
     expect(bimsView.get()).toEqual({ view: 'bims', wide: true });
-    // pressed again: the rows alone
-    rerender(<BimsSwitch view={bimsView.get()} />);
-    fireEvent.click(screen.getByTestId('app.right.agents.view.bims'));
-    expect(bimsView.get().view).toBe('list');
   });
   it('each choice says itself on hover (taste 15)', () => {
     render(<BimsSwitch view={{ view: 'bims', wide: false }} />);
-    for (const id of ['view.bims', 'width.narrow', 'width.wide']) expect(screen.getByTestId(`app.right.agents.${id}`).dataset.tip).not.toBe('');
+    for (const id of ['width.narrow', 'width.wide']) expect(screen.getByTestId(`app.right.agents.${id}`).dataset.tip).not.toBe('');
   });
 });
 

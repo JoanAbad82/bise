@@ -10,7 +10,7 @@
 // line over the rows, never a blank section. Hover: the bim under the pointer (renderer.pick) shows
 // its card after the tip's 400 ms (at once for 1 s after one closed, the ds tips' warmth); a click
 // opens it as its row's click does. Owner: bims-wire.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Press, tipAttrs } from '@/ds';
 import { reducedMotion, textWidth } from '@/ds/hooks';
 import type { Agent, Card, Place } from '@/proto';
@@ -25,6 +25,9 @@ import { atFit, DRAG_PX, FIT, panBy, pinchFactor, sameCam, zoomAt, type Cam } fr
 import { clockSig, eggLabels, eggsAt, konamiDone, localOf, NO_EGGS, noteLands, withForced, type Forced, type Land } from './eggs';
 import { cropped, growOf, tipOf, UNLOCK_LABEL, UNLOCK_WALK, unlockLabel, unlockOf, type Grow } from './growth';
 import { growHigh } from './grow-keep';
+import { FOLD_MS } from './Fold';
+import { placeZzz, sleepers } from './zzz';
+import { aimAt, bimsLit, easeCam, edgeOf, useBimsLit } from './focus';
 import type { Growth } from '@/proto';
 import './office.css';
 
@@ -39,7 +42,10 @@ export interface Parts {
 
 export type OfficeState = 'loading' | 'on' | 'lost';
 
-/** The AGENTS head's toggles: 'bims' (the office above the rows), and with it on '320 | wide' (view.ts keeps them per window). */
+/** the office's last width / height in this window: the fold grows to it before the renderer has loaded (Fold.tsx) */
+let lastRatio = 1.4;
+
+/** The AGENTS head's '320 | wide' while the office shows (view.ts keeps it per window); the title bar's icon opens and closes the office (Frame.tsx). */
 export function BimsSwitch({ view }: { view: BimsView }) {
   const opt = (id: string, label: string, tip: string, on: boolean, pick: () => void) => (
     <Press look="bims-opt" aria-pressed={on} {...tipAttrs(tip)} onClick={pick} data-testid={`app.right.agents.${id}`}>
@@ -58,11 +64,6 @@ export function BimsSwitch({ view }: { view: BimsView }) {
           })}
         </span>
       )}
-      <span className="bims-switch" data-testid="app.right.agents.view">
-        {opt('view.bims', bims.view_bims, bims.view_bims_tip, view.view === 'bims', () => {
-          bimsView.setView(view.view === 'bims' ? 'list' : 'bims');
-        })}
-      </span>
     </>
   );
 }
@@ -127,6 +128,14 @@ interface Live {
   events: BimEvent[];
   hover: string | null;
   held: boolean;
+  /** the agent whose row the pointer is on (focus.ts): a halo under its bim */
+  lit: string | null;
+}
+
+/** The follow camera (focus.ts): the bim it aims at ('fit': back to the whole office, then null), and its last step's time. */
+interface Follow {
+  target: { readonly name: string } | 'fit' | null;
+  at: number;
 }
 
 /** The office's agents in a stable shape: the live rows (archived ones have left). */
@@ -139,6 +148,7 @@ export function Office({
   places,
   growth = null,
   parts,
+  follow = null,
   onOpen,
 }: {
   project: string;
@@ -149,23 +159,38 @@ export function Office({
   /** how much the project has done (hub/growth); the office draws its high-water mark (growth.ts) */
   growth?: Growth | null;
   parts: Parts;
+  /** the agent whose thread is open (focus.ts followOf): the office zooms on its bim and follows it */
+  follow?: string | null;
   /** a click on a bim: open that agent, as its row's click */
   onOpen: (agent: string) => void;
 }) {
   const [state, setState] = useState<OfficeState>('loading');
+  // the scene fades in once its first frame is drawn and the fold has grown (Fold.tsx)
+  const [drawn, setDrawn] = useState(false);
+  const [grown, setGrown] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setGrown(true);
+    }, reducedMotion() ? 0 : FOLD_MS - 40);
+    return () => {
+      clearTimeout(t);
+    };
+  }, []);
   const [labels, setLabels] = useState<ReadonlyMap<string, Label>>(new Map());
   const holder = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const tags = useRef(new Map<string, HTMLDivElement>());
   const leaders = useRef<SVGSVGElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
+  // the sleepers' z's (zzz.ts): placed by hand at each draw, a CSS loop between draws
+  const zzzRef = useRef<HTMLDivElement>(null);
   // each bim's place in line for a label's room this frame (tagRank)
   const ranks = useRef(new Map<string, number>());
   // the office's width, for the cut of a long line (whole words, a glued '…')
   const [boxW, setBoxW] = useState(0);
   const measure = useMemo(() => textWidth(labelFont()), []);
   const measureBold = useMemo(() => textWidth(labelFont('600 ')), []);
-  const heads = useRef(new Map<string, { x: number; y: number; feet: number }>());
+  const heads = useRef(new Map<string, { x: number; y: number; feet: number; edge?: 'left' | 'right' | 'up' | 'down' }>());
   const kickRef = useRef<() => void>(() => undefined);
   // the bim under a point of the canvas, css px: the renderer's once loaded
   const pick = useRef<(x: number, y: number) => string | null>(() => null);
@@ -178,13 +203,23 @@ export function Office({
   const camRef = useRef<Cam>(FIT);
   const [fitted, setFitted] = useState(true);
   const applyCam = useRef<(c: Cam) => void>(() => undefined);
+  // the follow camera: his own pinch, drag, esc or '⤢ fit' (moveCam) stops it until he opens another agent
+  const followRef = useRef<Follow>({ target: follow === null ? null : { name: follow }, at: 0 });
   const moveCam = useCallback((c: Cam) => {
+    followRef.current = { target: null, at: 0 };
     if (sameCam(c, camRef.current)) return;
     camRef.current = c;
     setFitted(atFit(c));
     applyCam.current(c);
   }, []);
-  const live = useRef<Live>({ snap: { agents, cards, places }, agents, fresh: true, events: [], hover: null, held });
+  const live = useRef<Live>({ snap: { agents, cards, places }, agents, fresh: true, events: [], hover: null, held, lit: null });
+  useEffect(() => {
+    const was = followRef.current.target;
+    if (follow === (was === null || was === 'fit' ? null : was.name)) return;
+    // another agent's thread: follow it; none (main's, bise's, a screen): back to the whole office if it followed one
+    followRef.current = { target: follow !== null ? { name: follow } : was === null ? null : 'fit', at: 0 };
+    kickRef.current();
+  }, [follow]);
   // the office grows (growth.ts): its high-water mark, the last growth drawn (an unlock is a stage
   // past it), the unlock moment, its label over the piece and the ground corner's tip
   // in test mode no kept mark: the fixture's growth, or a check's own (window.__biseGrow, read when
@@ -234,6 +269,10 @@ export function Office({
       const h = heads.current.get(name);
       el.style.visibility = h === undefined ? 'hidden' : '';
       if (h === undefined) continue;
+      if ((el.dataset.edge ?? '') !== (h.edge ?? '')) {
+        if (h.edge === undefined) delete el.dataset.edge;
+        else el.dataset.edge = h.edge;
+      }
       const w = el.offsetWidth;
       const th = el.offsetHeight;
       if (el.dataset.mode === 'hover') {
@@ -282,6 +321,7 @@ export function Office({
     let lastActs = '';
     let lastEggs = '';
     let reduced = reducedMotion();
+    let firstDrawn = false;
 
     const cancel = () => {
       if (raf !== 0) cancelAnimationFrame(raf);
@@ -301,6 +341,7 @@ export function Office({
       if (w <= 0) return;
       const h = r.setSize(w, 4000);
       box.style.height = `${String(Math.round(h))}px`;
+      if (h > 0) lastRatio = w / h;
       setBoxW(w);
     };
     const draw = () => {
@@ -340,14 +381,23 @@ export function Office({
         ? withForced(NO_EGGS, forced)
         : eggsAt({ t, frames, agents: L.agents, cards: L.snap.cards.length, local, night, reduced, lands: lands.current.lands, konami: konamiAt.current, stage: grow.current.stage });
       lastEggs = clockSig(local, night, L.agents);
+      const ft = followRef.current.target;
+      const fol = ft === null || ft === 'fit' ? null : ft.name;
       const played = frames.map((f) => {
         const e = eg.bims.get(f.name);
-        return e === undefined ? f : { ...f, egg: e };
+        const lit = f.name === L.lit || f.name === fol;
+        return e === undefined ? (lit ? { ...f, lit } : f) : { ...f, egg: e, ...(lit ? { lit } : {}) };
       });
       // the office grows: what it draws, and the unlock moment while it lasts
       const u = unlockAt.current;
       const look: Look = { night, reduced, eggs: eg.office, grow: grow.current, ...(u ? { unlock: u } : {}) };
       const motion = r.frame(t, played, look);
+      if (!firstDrawn) {
+        firstDrawn = true;
+        setDrawn(true);
+      }
+      // the follow camera, from where the bims stand now: the next frame draws the new view
+      const chasing = chase(r, t, reduced);
       const said = unlockLabel(u, t, reduced);
       const at = said !== null && u ? r.pieceOf(u.stage) : null;
       const tag = said !== null && at !== null ? { text: said, x: Math.round(at.x), y: Math.round(at.y) } : null;
@@ -359,19 +409,55 @@ export function Office({
       const shown = parts.labelsOf(played, { t, hover: L.hover, held: L.held, agents: L.agents, eggs: eggLabels(eg) });
       ranks.current = new Map(frames.map((f) => [f.name, tagRank(f.pose.seg.act.k)]));
       heads.current = new Map();
-      for (const name of shown.keys()) {
+      const box = holder.current;
+      for (const [name, l] of shown) {
         const h = r.headOf(name);
         if (h !== null) heads.current.set(name, h);
+        else if (l.pill !== null && box !== null) {
+          // a '?' / '✗' whose bim is out of the frame stays at its nearest edge, an arrow towards it (bims m_28199)
+          const s = r.spotOf(name);
+          if (s === null) continue;
+          const e = edgeOf(s.x, s.y, box.clientWidth, box.clientHeight, TAG_INSET);
+          heads.current.set(name, { x: e.x, y: e.y, feet: e.y, ...(e.side === null ? {} : { edge: e.side }) });
+        }
       }
       layoutTags();
+      if (zzzRef.current !== null) {
+        const zs = new Map<string, { x: number; y: number }>();
+        for (const name of sleepers(frames)) {
+          const h = r.headOf(name);
+          if (h !== null) zs.set(name, h);
+        }
+        placeZzz(zzzRef.current, zs);
+      }
       const sig = labelsSig(shown);
       if (sig !== lastLabels) {
         lastLabels = sig;
         setLabels(shown);
       }
-      const next = nextAfter({ motion, moving: timeline.moving(t), labels: shown, away: awayNow(), lost });
+      const next = chasing && !awayNow() ? 'raf' : nextAfter({ motion, moving: timeline.moving(t), labels: shown, away: awayNow(), lost });
       if (next === 'raf') raf = requestAnimationFrame(draw);
       else if (next === 'tick') tick = setTimeout(draw, TICK_MS);
+    };
+    // one step of the follow camera (focus.ts): ease towards its bim (or back to the fit); true while it moves
+    const chase = (rr: OfficeRenderer, t: number, still: boolean): boolean => {
+      const F = followRef.current;
+      if (F.target === null) return false;
+      let to: Cam | null = FIT;
+      if (F.target !== 'fit') {
+        const s = rr.spotOf(F.target.name);
+        to = s === null ? null : aimAt(s.u, s.v);
+      }
+      if (to === null) return false;
+      const dt = F.at === 0 ? 1 / 60 : Math.min(0.1, t - F.at);
+      F.at = t;
+      const c = easeCam(camRef.current, to, dt, still);
+      if (F.target === 'fit' && sameCam(c, FIT)) followRef.current = { target: null, at: 0 };
+      if (sameCam(c, camRef.current)) return false;
+      camRef.current = c;
+      rr.setCam(c);
+      setFitted(atFit(c));
+      return true;
     };
     const kick = () => {
       if (r === null || lost || gone || awayNow()) return;
@@ -403,10 +489,14 @@ export function Office({
     box.addEventListener('wheel', onWheel, { passive: false });
 
     // the window away: nothing runs; back: one frame, and the loop if it moves
+    // the z's' CSS loop (zzz.ts) pauses on the same flag (architect m_28263)
     const onWindow = () => {
-      if (awayNow()) cancel();
+      const isAway = awayNow();
+      box.toggleAttribute('data-away', isAway);
+      if (isAway) cancel();
       else kick();
     };
+    box.toggleAttribute('data-away', awayNow());
     document.addEventListener('visibilitychange', onWindow);
     window.addEventListener('focus', onWindow);
     window.addEventListener('blur', onWindow);
@@ -495,6 +585,25 @@ export function Office({
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
   const dragged = useRef(false);
   const [dragging, setDragging] = useState(false);
+  // his pointer on an AGENTS row (focus.ts): the halo under its bim at once, its card after the
+  // tip's delay (warm after one closed), so a sweep down the list never flashes a card per row
+  const lit = useBimsLit();
+  const rowLit = lit?.from === 'row' ? lit.name : null;
+  useEffect(() => {
+    live.current.lit = rowLit;
+    kickRef.current();
+    clearTimeout(hoverTimer.current);
+    pending.current = rowLit;
+    if (rowLit === null) {
+      setHover(null);
+      return;
+    }
+    if (Date.now() < warmUntil.current) setHover(rowLit);
+    else
+      hoverTimer.current = setTimeout(() => {
+        setHover(rowLit);
+      }, HOVER_MS);
+  }, [rowLit]);
   const pickEvent = (e: { clientX: number; clientY: number }): string | null => {
     const box = holder.current;
     if (box === null) return null;
@@ -521,6 +630,8 @@ export function Office({
       aria-label={bims.view_bims_tip}
       data-testid="app.right.bims"
       data-state={state}
+      data-shown={(drawn && grown) || undefined}
+      style={state === 'loading' ? ({ '--bims-ratio': String(lastRatio) } as CSSProperties) : undefined}
       data-pointer={pointer || undefined}
       data-zoomed={!fitted || undefined}
       data-drag={dragging || undefined}
@@ -578,6 +689,7 @@ export function Office({
         if (name === pending.current) return;
         pending.current = name;
         clearTimeout(hoverTimer.current);
+        bimsLit.set(name === null ? null : { name, from: 'bim' }, 'bim');
         if (name === null) setHover(null);
         else if (Date.now() < warmUntil.current) setHover(name);
         else
@@ -586,6 +698,7 @@ export function Office({
           }, HOVER_MS);
       }}
       onPointerLeave={() => {
+        bimsLit.set(null, 'bim');
         pending.current = null;
         clearTimeout(hoverTimer.current);
         setPointer(false);
@@ -608,6 +721,7 @@ export function Office({
       />
       <div className="bims-overlay">
         <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
+        <div ref={zzzRef} className="bims-zzzs" data-testid="app.right.bims.zzzs" />
         <div ref={moreRef} className="bims-more" data-testid="app.right.bims.more" />
         {/* the ground's corner: hover says the level, the jobs done, the next piece */}
         <span className="bims-level" data-testid="app.right.bims.level" {...tipAttrs(tipOf(growNow))} />

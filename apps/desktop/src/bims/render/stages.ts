@@ -162,8 +162,7 @@ export function buildStages(k: Kit, root: Object3D, o: Office, g: Grow, boxes: r
   chairs.forEach((b, i) => {
     if (i >= nChairs) return;
     const st = ([1, 4, 7, 7, 10, 10, 10, 10] as const)[i] ?? 0;
-    const p = s(st) ?? s0;
-    onFloor(k, p, b, 0.08, 0.2, WORLD.chair[i % 2] ?? WORLD.paper);
+    deckChair(k, s(st) ?? s0, b, WORLD.chair[i % 2] ?? WORLD.paper);
   });
 
   // the lounge: its rug from stage 3, a bean bag per stage count, or per bim that may nap there
@@ -324,4 +323,39 @@ function cones(k: Kit, parent: Object3D, p: Pt): void {
   }
   for (let i = 0; i < 4; i++) k.add(style.box(0.26, 0.12, 0.05), k.mat(i % 2 ? WORLD.paper : WORLD.parasol), parent, p.x - 0.39 + i * 0.26, 0.32, p.z + 0.45);
   for (const dx of [-0.5, 0.5]) k.add(style.box(0.04, 0.32, 0.04), k.mat(WORLD.ink), parent, p.x + dx, 0.16, p.z + 0.45);
+}
+
+/** a deck chair's sizes (office units): its seat's top, its backrest's tilt (the done bim's back, pose.ts) and length */
+export const DECK = { seat: 0.24, tilt: 0.6, back: 0.54, cloth: 0.05, rail: 0.04 } as const;
+
+/**
+ * A deck chair in its floor box (Gabriel: the slabs didn't read as deck chairs, the bims hovered
+ * over them): a wooden frame on four legs, the cloth seat towards the front (+z) and the backrest
+ * rising to the back at the done bim's tilt, a prop under it. The done pose (pose.ts) lies on it.
+ */
+function deckChair(k: Kit, parent: Object3D, b: Box, cloth: string): void {
+  const { style, pal } = k;
+  const x = (b.x0 + b.x1) / 2;
+  const w = b.x1 - b.x0 - 0.04;
+  const wood = k.mat(pal.desk);
+  const fab = k.mat(cloth);
+  // the seat ends where the backrest starts: a little behind the box's middle
+  const hinge = b.z0 + 0.42;
+  const seatD = b.z1 - hinge;
+  k.add(style.box(w, DECK.cloth, seatD), fab, parent, x, DECK.seat - DECK.cloth / 2, hinge + seatD / 2);
+  const back = k.add(style.box(w, DECK.cloth, DECK.back), fab, parent, x, 0, 0);
+  const c = Math.cos(DECK.tilt);
+  const sn = Math.sin(DECK.tilt);
+  back.rotation.x = DECK.tilt;
+  back.position.set(x, DECK.seat - DECK.cloth / 2 + (DECK.back / 2) * sn, hinge - (DECK.back / 2) * c);
+  // the frame: a rail each side under the cloth, four legs, the prop under the backrest
+  const legH = DECK.seat - DECK.cloth;
+  for (const sx of [-1, 1]) {
+    const rx = x + sx * (w / 2 - DECK.rail / 2);
+    k.add(style.box(DECK.rail, DECK.rail, seatD), wood, parent, rx, legH - DECK.rail / 2, hinge + seatD / 2);
+    k.add(style.box(DECK.rail, legH, DECK.rail), wood, parent, rx, legH / 2, b.z1 - DECK.rail);
+    k.add(style.box(DECK.rail, legH, DECK.rail), wood, parent, rx, legH / 2, hinge);
+    const propH = DECK.seat + (DECK.back - 0.12) * sn - DECK.cloth;
+    k.add(style.box(DECK.rail, propH, DECK.rail), wood, parent, rx, propH / 2, hinge - (DECK.back - 0.12) * c);
+  }
 }

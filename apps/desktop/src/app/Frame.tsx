@@ -36,7 +36,8 @@ import {
   panelProject,
 } from "./side";
 import { useWaitingTotal } from "./Sidebar";
-import { usePanelColumn } from "@/bims/view";
+import { bimsView, useBimsView, usePanelColumn } from "@/bims/view";
+import { bims } from "@/proto/words_bims.gen";
 
 export type Width = "narrow" | "mid" | "wide";
 
@@ -410,6 +411,9 @@ export function Titlebar({ frame }: { frame: FrameState }) {
   const crumb = crumbOf(route, name);
   const panelOn =
     frame.panel !== undefined && (frame.panel.docked || frame.over === "panel");
+  // les bims' icon (Gabriel: the head's toggle wasn't clear): a project's bar only, like the office
+  const view = useBimsView();
+  const officeOn = panelOn && view.view === "bims";
   return (
     <div
       className={frame.side ? "app-title" : "app-title away"}
@@ -463,6 +467,25 @@ export function Titlebar({ frame }: { frame: FrameState }) {
       </StatusSlot>
       {/* the right bar's toggle (designer m_20274/m_20275): the left toggle's panel icon mirrored,
           pressed while the bar is open; the accent count of what waits on him in its place, none at 0 */}
+      {/* les bims' icon (designer m_28198): a 16 px cube in the line set, text-3, ink on hover;
+          open = pressed in ink like the right bar's toggle beside it, never the accent */}
+      {frame.panel !== undefined && frame.panel.project !== "" && view.lost !== true && (
+        <span className="app-btg">
+        <IconButton
+          label={bims.title_bims_tip}
+          size="bar"
+          pressed={officeOn}
+          onClick={() => {
+            // open: the office, and the bar if it was closed; close: the rows alone, the bar stays
+            bimsView.setView(officeOn ? "list" : "bims");
+            if (!officeOn && !panelOn) frame.toggle("panel");
+          }}
+          testId="app.title.bims"
+        >
+          <BimsGlyph />
+        </IconButton>
+        </span>
+      )}
       {frame.panel !== undefined && (
         <span className="app-rtg">
           <IconButton
@@ -487,5 +510,15 @@ export function Titlebar({ frame }: { frame: FrameState }) {
         </span>
       )}
     </div>
+  );
+}
+
+/** les bims' icon: an isometric cube outline (the office seen from above), 16 px, stroke 1.5, the button's colour. */
+function BimsGlyph() {
+  return (
+    <svg className="app-bims-glyph" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 1.75 13.75 5v6L8 14.25 2.25 11V5Z" />
+      <path d="M2.25 5 8 8.25 13.75 5M8 8.25v6" />
+    </svg>
   );
 }

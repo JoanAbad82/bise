@@ -8,8 +8,46 @@
   margin: var(--gap-tight) calc(-1 * var(--s-2));
   overflow: hidden;
 }
+/* not loaded yet: the office's last shape (Office.tsx lastRatio), empty, so the fold grows to it */
 .bims-office[data-state='loading'] {
-  height: 0;
+  aspect-ratio: var(--bims-ratio, 1.4);
+}
+/* the scene fades in once drawn and the fold grown (Fold.tsx); out with the fold closing */
+.bims-office > .bims-canvas,
+.bims-office > .bims-overlay {
+  opacity: 0;
+  transition: opacity 220ms var(--ease-out, ease-out);
+}
+.bims-office[data-shown] > .bims-canvas,
+.bims-office[data-shown] > .bims-overlay {
+  opacity: 1;
+}
+.bims-fold:not([data-open]) .bims-office > .bims-canvas,
+.bims-fold:not([data-open]) .bims-office > .bims-overlay {
+  opacity: 0;
+  transition-duration: 160ms;
+}
+/* the accordion (Fold.tsx): grid rows 0fr -> 1fr follow the office's own height */
+.bims-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms var(--ease-out, cubic-bezier(0.2, 0.8, 0.2, 1));
+}
+.bims-fold[data-open] {
+  grid-template-rows: 1fr;
+}
+.bims-fold-in {
+  min-height: 0;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-fold {
+    transition: none;
+  }
+  .bims-office > .bims-canvas,
+  .bims-office > .bims-overlay {
+    transition-duration: 120ms;
+  }
 }
 .bims-office:focus-visible {
   outline: 2px solid var(--c-focus);
@@ -243,4 +281,66 @@
 .bims-switch > .bims-opt:focus-visible {
   outline: 2px solid var(--c-focus);
   outline-offset: -2px;
+}
+
+/* a '?' / '✗' whose bim is out of the frame (the follow camera, his zoom): held at the frame's edge,
+   an arrow towards its bim (focus.ts edgeOf; bims m_28199) */
+.bims-tag[data-edge]::before {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--fg-2);
+}
+.bims-tag[data-edge='left']::before { content: '←'; }
+.bims-tag[data-edge='right'] { flex-direction: row-reverse; }
+.bims-tag[data-edge='right']::before { content: '→'; }
+.bims-tag[data-edge='up']::before { content: '↑'; }
+.bims-tag[data-edge='down']::before { content: '↓'; }
+
+/* a sleeping bim's 'z z Z' (zzz.ts): over its head, each rising and fading in turn, slowly; a CSS
+   loop, so a still office draws no frame. Reduced motion: one still 'z' */
+.bims-zzzs {
+  position: absolute;
+  inset: 0;
+}
+.bims-zzz {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.bims-zzz > span {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  color: var(--c-text-2);
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  /* 7.5 fps (27 steps over 3.6 s; the 1.2 s delays fall on the same steps): a typing bim's loop
+     rate, never the display's (architect m_28263) */
+  animation: bims-z 3.6s steps(27) infinite;
+  will-change: transform, opacity;
+}
+/* the window away (hidden, not in front): the z's hold still, as the renderer's loop stops */
+.bims-office[data-away] .bims-zzz > span {
+  animation-play-state: paused;
+}
+.bims-zzz > span:nth-child(2) {
+  font-size: 11px;
+  animation-delay: 1.2s;
+}
+.bims-zzz > span:nth-child(3) {
+  font-size: 13px;
+  animation-delay: 2.4s;
+}
+@keyframes bims-z {
+  0% { opacity: 0; transform: translate(0, 0); }
+  20% { opacity: 0.85; }
+  70% { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(12px, -26px); }
+}
+/* reduced motion: no z's at all (architect m_28263) */
+@media (prefers-reduced-motion: reduce) {
+  .bims-zzzs { display: none; }
 }
