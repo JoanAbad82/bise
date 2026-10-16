@@ -3,7 +3,7 @@ import { activities } from './activity';
 import { agent, crowd, mainAgent, office as officeSnap } from './fixtures';
 import { exitOf, layoutOf } from './layout';
 import type { Activity, BimEvent, Office, Pose } from './model';
-import { MAX_WALK_S, PLANE_S, SETTLE_S, SPEED, newTimeline } from './timeline';
+import { COFFEE_S, MAX_WALK_S, PLANE_S, SETTLE_S, SPEED, VISIT_S, newTimeline } from './timeline';
 
 /** a value the test knows is there */
 function must<T>(x: T | undefined): T {
@@ -199,5 +199,76 @@ describe('timeline', () => {
       }
     }
     expect(tl.names(120)).toHaveLength(officeSnap.agents.length);
+  });
+
+  describe("the hub's events (spec §6)", () => {
+    const msg = (from: string, to: string, t: number, mode: 'steer' | 'queued' = 'queued'): BimEvent => ({
+      kind: 'message', from: { who: 'agent', name: from }, to: { who: 'agent', name: to }, mode, expectsReply: false, t,
+    });
+    const run = (tl: ReturnType<typeof newTimeline>, a: Record<string, Activity>, o: Office, from: number, to: number, ev: BimEvent[] = []) => {
+      for (let t = from; t <= to; t += 0.5) tl.update(acts(a), o, t, t === from ? ev : []);
+    };
+
+    it('a message to an idle bim: both go to the island for a coffee, then back', () => {
+      const o = office();
+      const tl = newTimeline();
+      const rows = { main: MAIN, a1: WORK, a2: NAP };
+      tl.update(acts(rows), o, 0, []);
+      run(tl, rows, o, 1, 9, [msg('a1', 'a2', 1)]);
+      expect(tl.poseAt('a1', 9)?.seg.act).toMatchObject({ k: 'coffee', at: 'island', with: 'a2' });
+      expect(tl.poseAt('a2', 9)?.seg.act).toMatchObject({ k: 'coffee', with: 'a1' });
+      expect(tl.moving(9)).toBe(true);
+      run(tl, rows, o, 9.5, 9 + COFFEE_S + 2 * MAX_WALK_S);
+      const end = 9 + COFFEE_S + 2 * MAX_WALK_S;
+      expect(tl.poseAt('a1', end)?.seg.act.k).toBe('work');
+      expect(at(tl.poseAt('a1', end))).toEqual({ x: o.desks.get('a1')?.x, z: o.desks.get('a1')?.z });
+      expect(tl.poseAt('a2', end)?.seg.act.k).toBe('nap');
+      expect(tl.moving(end + SETTLE_S + 1)).toBe(false);
+    });
+
+    it('a message to a busy bim: the sender goes to its desk (post-it or tap) and comes back; the busy one stays', () => {
+      const o = office();
+      const tl = newTimeline();
+      const rows = { main: MAIN, a1: WORK, a2: WORK };
+      tl.update(acts(rows), o, 0, []);
+      run(tl, rows, o, 1, 2, [msg('a1', 'a2', 1, 'steer')]);
+      const seg = tl.poseAt('a1', 2)?.seg;
+      expect(seg?.act).toMatchObject({ k: 'visit', with: 'a2', mode: 'steer' });
+      expect(seg?.spot.x).toBe(o.desks.get('a2')?.x);
+      expect(tl.poseAt('a2', 2)?.seg.act.k).toBe('work');
+      const end = 2 + VISIT_S + 2 * MAX_WALK_S;
+      run(tl, rows, o, 2.5, end);
+      expect(tl.poseAt('a1', end)?.seg.act.k).toBe('work');
+      expect(at(tl.poseAt('a1', end))).toEqual({ x: o.desks.get('a1')?.x, z: o.desks.get('a1')?.z });
+    });
+
+    it('a report: the sender takes a sheet to main; one asking you or failed stays put; an event plays once', () => {
+      const o = office();
+      const tl = newTimeline();
+      const rows: Record<string, Activity> = { main: MAIN, a1: WORK, a2: { k: 'asks', at: 'desk' }, a3: { k: 'failed', at: 'desk' } };
+      tl.update(acts(rows), o, 0, []);
+      const ev: BimEvent[] = [
+        { kind: 'report', agent: 'a1', report: 'done', t: 1 },
+        { kind: 'report', agent: 'a2', report: 'progress', t: 1 },
+        msg('a3', 'a1', 1),
+      ];
+      tl.update(acts(rows), o, 1, ev);
+      expect(tl.poseAt('a1', 1)?.seg.act.k).toBe('report');
+      expect(tl.poseAt('a2', 1)?.seg.act.k).toBe('asks');
+      expect(tl.poseAt('a3', 1)?.seg.act.k).toBe('failed');
+      run(tl, rows, o, 1.5, 30);
+      expect(tl.poseAt('a1', 30)?.seg.act.k).toBe('work');
+      tl.update(acts(rows), o, 30.5, ev);
+      expect(tl.poseAt('a1', 30.5)?.seg.act.k).toBe('work');
+    });
+
+    it('a stale event (older than 10 s when it comes) is not played', () => {
+      const o = office();
+      const tl = newTimeline();
+      const rows = { main: MAIN, a1: WORK, a2: NAP };
+      tl.update(acts(rows), o, 0, []);
+      tl.update(acts(rows), o, 20, [msg('a1', 'a2', 5)]);
+      expect(tl.poseAt('a1', 20)?.seg.act.k).toBe('work');
+    });
   });
 });
