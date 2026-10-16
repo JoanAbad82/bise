@@ -213,6 +213,113 @@
     "one": null,
     "text": "everything runs, no notification"
   },
+  "settings.bar_back": {
+    "args": [],
+    "one": null,
+    "text": "esc back"
+  },
+  "settings.bar_check": {
+    "args": [],
+    "one": null,
+    "text": "⏎ check   esc back"
+  },
+  "settings.bar_check_it": {
+    "args": [],
+    "one": null,
+    "text": "⏎ check it   esc back to the providers"
+  },
+  "settings.bar_choose_change": {
+    "args": [],
+    "one": null,
+    "text": "↑↓ choose   ⏎ change   esc back"
+  },
+  "settings.bar_choose_esc": {
+    "args": [
+      "esc"
+    ],
+    "one": null,
+    "text": "↑↓ choose   ⏎ ok   esc {esc}"
+  },
+  "settings.bar_choose_go": {
+    "args": [],
+    "one": null,
+    "text": "↑↓ choose   ⏎ go   esc back"
+  },
+  "settings.bar_choose_ok": {
+    "args": [],
+    "one": null,
+    "text": "↑↓ choose   ⏎ ok   esc back"
+  },
+  "settings.bar_choose_open": {
+    "args": [],
+    "one": null,
+    "text": "↑↓ choose   ⏎ open   esc back"
+  },
+  "settings.bar_copied": {
+    "args": [],
+    "one": null,
+    "text": "c copied   esc cancel"
+  },
+  "settings.bar_copy_link": {
+    "args": [],
+    "one": null,
+    "text": "c copy the link   esc cancel"
+  },
+  "settings.bar_go_on": {
+    "args": [],
+    "one": null,
+    "text": "⏎ go on"
+  },
+  "settings.bar_key_again": {
+    "args": [],
+    "one": null,
+    "text": "⏎ try again   tab another provider   esc back"
+  },
+  "settings.bar_key_check": {
+    "args": [],
+    "one": null,
+    "text": "⏎ check again   tab another provider   esc back"
+  },
+  "settings.bar_key_model": {
+    "args": [],
+    "one": null,
+    "text": "⏎ pick another model   tab another provider   esc back"
+  },
+  "settings.bar_key_paste": {
+    "args": [],
+    "one": null,
+    "text": "⏎ paste another key   tab another provider   esc back"
+  },
+  "settings.bar_ok": {
+    "args": [],
+    "one": null,
+    "text": "⏎ ok"
+  },
+  "settings.bar_plan_again": {
+    "args": [],
+    "one": null,
+    "text": "⏎ try again   tab another way   esc back"
+  },
+  "settings.bar_plan_model": {
+    "args": [],
+    "one": null,
+    "text": "⏎ pick another model   tab another way   esc back"
+  },
+  "settings.bar_plan_sign_in": {
+    "args": [],
+    "one": null,
+    "text": "⏎ sign in again   tab another way   esc back"
+  },
+  "settings.bar_remove": {
+    "args": [],
+    "one": null,
+    "text": "⏎ remove   esc keep it"
+  },
+  "settings.bar_replace": {
+    "args": [],
+    "one": null,
+    "text": "⏎ replaces it   esc keeps the old one"
+  },
   "settings.cancel": {
     "args": [],
     "one": null,
@@ -490,6 +597,692 @@
     ],
     "one": null,
     "text": "your sign-in expired: {names} waits"
+  },
+  "settings.first_add_credit": {
+    "args": [],
+    "one": null,
+    "text": "add credit, then enter checks again."
+  },
+  "settings.first_add_here": {
+    "args": [],
+    "one": null,
+    "text": "add some here: "
+  },
+  "settings.first_add_on": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "add some on your {provider} account."
+  },
+  "settings.first_any_key": {
+    "args": [],
+    "one": null,
+    "text": "any key"
+  },
+  "settings.first_api_key_sub": {
+    "args": [],
+    "one": null,
+    "text": "Anthropic, OpenAI, Google, Mistral…"
+  },
+  "settings.first_chatgpt": {
+    "args": [],
+    "one": null,
+    "text": "Continue with ChatGPT"
+  },
+  "settings.first_chatgpt_codex": {
+    "args": [],
+    "one": null,
+    "text": "use your Plus or Pro plan · you use it in Codex already"
+  },
+  "settings.first_chatgpt_sub": {
+    "args": [],
+    "one": null,
+    "text": "use your Plus or Pro plan"
+  },
+  "settings.first_check_network": {
+    "args": [],
+    "one": null,
+    "text": "check your network, then enter."
+  },
+  "settings.first_check_stopped": {
+    "args": [],
+    "one": null,
+    "text": "the check stopped"
+  },
+  "settings.first_checking_key": {
+    "args": [],
+    "one": null,
+    "text": "checking your key with one tiny call…"
+  },
+  "settings.first_checking_plan": {
+    "args": [],
+    "one": null,
+    "text": "checking your plan…"
+  },
+  "settings.first_claude_plan": {
+    "args": [],
+    "one": null,
+    "text": "your Claude plan works only in Claude Code (Anthropic's terms). for Claude here, use an API key."
+  },
+  "settings.first_coding": {
+    "args": [],
+    "one": null,
+    "text": "a coding plan key"
+  },
+  "settings.first_coding_sub": {
+    "args": [],
+    "one": null,
+    "text": "GLM, Kimi or MiniMax"
+  },
+  "settings.first_copy_again": {
+    "args": [],
+    "one": null,
+    "text": "copy it again from "
+  },
+  "settings.first_dark": {
+    "args": [],
+    "one": null,
+    "text": "dark"
+  },
+  "settings.first_extra_tools": {
+    "args": [],
+    "one": null,
+    "text": "web search and other tools: a Mistral key · /setup"
+  },
+  "settings.first_extra_voice": {
+    "args": [],
+    "one": null,
+    "text": "voice (ctrl+r): a Mistral, OpenAI or ElevenLabs key · /voice"
+  },
+  "settings.first_for_role": {
+    "args": [
+      "role"
+    ],
+    "one": null,
+    "text": "for {role}. then you pick the model."
+  },
+  "settings.first_found": {
+    "args": [],
+    "one": null,
+    "text": "found"
+  },
+  "settings.first_found_wrong": {
+    "args": [
+      "key",
+      "provider"
+    ],
+    "one": null,
+    "text": "{key} doesn't work. {provider} says it's wrong."
+  },
+  "settings.first_get_one": {
+    "args": [],
+    "one": null,
+    "text": "get one: "
+  },
+  "settings.first_gloss": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": " /beez/ {dot} french, n."
+  },
+  "settings.first_goes_in": {
+    "args": [
+      "path"
+    ],
+    "one": null,
+    "text": "it goes in {path}, only you can read it."
+  },
+  "settings.first_goes_in_auth": {
+    "args": [],
+    "one": null,
+    "text": "it goes in bise's auth.json, only you can read it."
+  },
+  "settings.first_has_key": {
+    "args": [
+      "provider",
+      "path"
+    ],
+    "one": null,
+    "text": "{provider} has a key in {path} already."
+  },
+  "settings.first_hi": {
+    "args": [],
+    "one": null,
+    "text": "hi, i'm bise "
+  },
+  "settings.first_how": {
+    "args": [],
+    "one": null,
+    "text": "how it works"
+  },
+  "settings.first_how_1a": {
+    "args": [],
+    "one": null,
+    "text": "you talk to "
+  },
+  "settings.first_how_1b": {
+    "args": [],
+    "one": null,
+    "text": ": main, your team lead. any time, keep typing"
+  },
+  "settings.first_how_2": {
+    "args": [],
+    "one": null,
+    "text": " start an agent when a job needs one. they sync on their own"
+  },
+  "settings.first_how_3": {
+    "args": [],
+    "one": null,
+    "text": "only the real decisions reach you, in your inbox · ctrl+1"
+  },
+  "settings.first_how_3_click": {
+    "args": [],
+    "one": null,
+    "text": "only the real decisions reach you, in your inbox · click it"
+  },
+  "settings.first_how_foot": {
+    "args": [],
+    "one": null,
+    "text": "ctrl+o opens everything folded · ⌥0-9 talk to an agent"
+  },
+  "settings.first_how_i": {
+    "args": [],
+    "one": null,
+    "text": "i"
+  },
+  "settings.first_how_key": {
+    "args": [
+      "key"
+    ],
+    "one": null,
+    "text": "{key} ↵"
+  },
+  "settings.first_how_me": {
+    "args": [],
+    "one": null,
+    "text": "me"
+  },
+  "settings.first_key_model": {
+    "args": [
+      "provider",
+      "model"
+    ],
+    "one": null,
+    "text": "{provider} doesn't know {model}. pick another model."
+  },
+  "settings.first_key_wrong": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "{provider} says this key is wrong."
+  },
+  "settings.first_light": {
+    "args": [],
+    "one": null,
+    "text": "light"
+  },
+  "settings.first_main_uses": {
+    "args": [
+      "model"
+    ],
+    "one": null,
+    "text": "main uses {model}."
+  },
+  "settings.first_meaning_bise": {
+    "args": [],
+    "one": null,
+    "text": "a terminal where multi-agent coding is painless"
+  },
+  "settings.first_meaning_kiss": {
+    "args": [],
+    "one": null,
+    "text": "a quick kiss on the cheek :*"
+  },
+  "settings.first_meaning_wind": {
+    "args": [],
+    "one": null,
+    "text": "a brisk north wind"
+  },
+  "settings.first_model_filter": {
+    "args": [],
+    "one": null,
+    "text": "type to filter, or any model id"
+  },
+  "settings.first_model_none": {
+    "args": [],
+    "one": null,
+    "text": "  no listed model matches."
+  },
+  "settings.first_model_note": {
+    "args": [],
+    "one": null,
+    "text": "you can change it any time with /model."
+  },
+  "settings.first_model_on": {
+    "args": [
+      "model",
+      "provider"
+    ],
+    "one": null,
+    "text": "{model} on {provider}"
+  },
+  "settings.first_more_down": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "  ↓ {n} more"
+  },
+  "settings.first_more_up": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "  ↑ {n} more"
+  },
+  "settings.first_no_access": {
+    "args": [
+      "model"
+    ],
+    "one": null,
+    "text": "this key can't use {model}."
+  },
+  "settings.first_no_access_note": {
+    "args": [],
+    "one": null,
+    "text": "your account may not have access to this model yet. pick another one."
+  },
+  "settings.first_no_account": {
+    "args": [],
+    "one": null,
+    "text": "no account yet? "
+  },
+  "settings.first_no_credit": {
+    "args": [
+      "key",
+      "provider"
+    ],
+    "one": null,
+    "text": "{key} works, but your {provider} account has no credit yet."
+  },
+  "settings.first_no_model": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "{provider} has no model listed: type its id."
+  },
+  "settings.first_no_plan": {
+    "args": [],
+    "one": null,
+    "text": "  this bise has no coding plan provider yet."
+  },
+  "settings.first_no_url": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "{provider} has no URL yet: i didn't call it."
+  },
+  "settings.first_not_a_key": {
+    "args": [
+      "glyph"
+    ],
+    "one": null,
+    "text": "{glyph} that doesn't look like a key: no spaces inside."
+  },
+  "settings.first_not_listed": {
+    "args": [],
+    "one": null,
+    "text": "   not in my list: i'll try it with one tiny call"
+  },
+  "settings.first_open_failed": {
+    "args": [
+      "url"
+    ],
+    "one": null,
+    "text": "could not open {url}"
+  },
+  "settings.first_opening": {
+    "args": [
+      "url"
+    ],
+    "one": null,
+    "text": "opening {url}"
+  },
+  "settings.first_openrouter_sign_in": {
+    "args": [],
+    "one": null,
+    "text": "sign in with OpenRouter"
+  },
+  "settings.first_openrouter_sub": {
+    "args": [],
+    "one": null,
+    "text": "sign in with your browser, or paste its key."
+  },
+  "settings.first_openrouter_way": {
+    "args": [],
+    "one": null,
+    "text": "sign in, or paste its key"
+  },
+  "settings.first_optional": {
+    "args": [],
+    "one": null,
+    "text": "optional. add these any time:"
+  },
+  "settings.first_paste_a_key": {
+    "args": [],
+    "one": null,
+    "text": "paste a key"
+  },
+  "settings.first_paste_another": {
+    "args": [],
+    "one": null,
+    "text": "paste another one."
+  },
+  "settings.first_paste_another_get": {
+    "args": [],
+    "one": null,
+    "text": "paste another one, or get a new key: "
+  },
+  "settings.first_paste_key": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "paste your {provider} key"
+  },
+  "settings.first_pay": {
+    "args": [],
+    "one": null,
+    "text": "how do you want to pay for the models?"
+  },
+  "settings.first_pay_sub": {
+    "args": [],
+    "one": null,
+    "text": "a plan you already have, or a key. you can add more later in /provider."
+  },
+  "settings.first_plan_config": {
+    "args": [
+      "why"
+    ],
+    "one": null,
+    "text": "▲ {why}"
+  },
+  "settings.first_plan_model": {
+    "args": [
+      "model"
+    ],
+    "one": null,
+    "text": "▲ your plan doesn't run {model}. pick another model."
+  },
+  "settings.first_plan_no_url": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "▲ {provider} has no URL yet: i didn't call it."
+  },
+  "settings.first_plan_unreachable": {
+    "args": [
+      "provider",
+      "why"
+    ],
+    "one": null,
+    "text": "▲ i couldn't reach {provider}: {why}."
+  },
+  "settings.first_preview_done": {
+    "args": [],
+    "one": null,
+    "text": "auth-fix is done."
+  },
+  "settings.first_preview_main": {
+    "args": [],
+    "one": null,
+    "text": "on it: auth-fix takes it."
+  },
+  "settings.first_preview_msg": {
+    "args": [
+      "glyph"
+    ],
+    "one": null,
+    "text": "{glyph} auth-fix → main  found it"
+  },
+  "settings.first_preview_you": {
+    "args": [],
+    "one": null,
+    "text": "fix the flaky login test"
+  },
+  "settings.first_recommended": {
+    "args": [],
+    "one": null,
+    "text": "  recommended"
+  },
+  "settings.first_said": {
+    "args": [
+      "provider",
+      "said"
+    ],
+    "one": null,
+    "text": "{provider} said: \"{said}\""
+  },
+  "settings.first_save_failed": {
+    "args": [
+      "glyph",
+      "why"
+    ],
+    "one": null,
+    "text": "{glyph} couldn't save the key: {why}"
+  },
+  "settings.first_saved_add_credit": {
+    "args": [],
+    "one": null,
+    "text": "i saved the key. add credit, then enter checks again."
+  },
+  "settings.first_set_model": {
+    "args": [
+      "provider",
+      "path"
+    ],
+    "one": null,
+    "text": "{provider}. set model in {path}"
+  },
+  "settings.first_set_up": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "{provider}, already set up"
+  },
+  "settings.first_shadows": {
+    "args": [
+      "var"
+    ],
+    "one": null,
+    "text": "{var} in your environment holds another key: i use this one."
+  },
+  "settings.first_signed_in": {
+    "args": [
+      "email",
+      "plan"
+    ],
+    "one": null,
+    "text": "signed in as {email} · {plan}"
+  },
+  "settings.first_small": {
+    "args": [
+      "model"
+    ],
+    "one": null,
+    "text": "small jobs use {model}."
+  },
+  "settings.first_small_and": {
+    "args": [
+      "model",
+      "checker"
+    ],
+    "one": null,
+    "text": "small jobs use {model}. auto's checker: {checker}."
+  },
+  "settings.first_small_checker": {
+    "args": [
+      "model"
+    ],
+    "one": null,
+    "text": "small jobs and auto's checker use {model}."
+  },
+  "settings.first_small_jev": {
+    "args": [
+      "model",
+      "by"
+    ],
+    "one": null,
+    "text": "small jobs use {model}. auto's checker: Jev, by {by}."
+  },
+  "settings.first_tagline": {
+    "args": [],
+    "one": null,
+    "text": "ideas in. little kisses out. also pull requests."
+  },
+  "settings.first_the_key": {
+    "args": [],
+    "one": null,
+    "text": "the key"
+  },
+  "settings.first_the_key_in": {
+    "args": [
+      "var"
+    ],
+    "one": null,
+    "text": "the key in {var}"
+  },
+  "settings.first_the_rest": {
+    "args": [],
+    "one": null,
+    "text": "agents, voice and the rest: /models"
+  },
+  "settings.first_theme_env": {
+    "args": [
+      "var",
+      "name"
+    ],
+    "one": null,
+    "text": "{var} is set to {name}, so i picked it."
+  },
+  "settings.first_theme_keys": {
+    "args": [
+      "arrows",
+      "enter"
+    ],
+    "one": null,
+    "text": "{arrows} switch · {enter} keep"
+  },
+  "settings.first_theme_note": {
+    "args": [],
+    "one": null,
+    "text": "you can change it any time with /theme."
+  },
+  "settings.first_theme_saved": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "you picked {name} last time, so i kept it."
+  },
+  "settings.first_theme_terminal": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "your terminal looks {name}, so i picked {name}."
+  },
+  "settings.first_theme_unread": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "i couldn't read your terminal's background, so i picked {name}."
+  },
+  "settings.first_then_enter": {
+    "args": [
+      "fix"
+    ],
+    "one": null,
+    "text": "{fix}, then enter."
+  },
+  "settings.first_unknown_provider": {
+    "args": [
+      "id"
+    ],
+    "one": null,
+    "text": "unknown provider {id}"
+  },
+  "settings.first_unreachable": {
+    "args": [
+      "provider",
+      "why"
+    ],
+    "one": null,
+    "text": "i couldn't reach {provider}: {why}."
+  },
+  "settings.first_use": {
+    "args": [
+      "model"
+    ],
+    "one": null,
+    "text": "use {model}"
+  },
+  "settings.first_which_model": {
+    "args": [],
+    "one": null,
+    "text": "which model?"
+  },
+  "settings.first_which_plan": {
+    "args": [],
+    "one": null,
+    "text": "which coding plan?"
+  },
+  "settings.first_which_provider": {
+    "args": [],
+    "one": null,
+    "text": "which provider?"
+  },
+  "settings.first_will_use": {
+    "args": [
+      "provider",
+      "model"
+    ],
+    "one": null,
+    "text": "{provider}. i'll use {model}"
+  },
+  "settings.first_works": {
+    "args": [
+      "model"
+    ],
+    "one": null,
+    "text": "it works: {model} answered."
+  },
+  "settings.first_works_plan": {
+    "args": [
+      "model"
+    ],
+    "one": null,
+    "text": "main and your agents use {model} now, on your plan."
+  },
+  "settings.first_write_config": {
+    "args": [
+      "why"
+    ],
+    "one": null,
+    "text": "couldn't write config.toml: {why}"
+  },
+  "settings.first_your_plan": {
+    "args": [],
+    "one": null,
+    "text": "   your ChatGPT plan"
   },
   "settings.found_sub": {
     "args": [
@@ -1275,10 +2068,41 @@
     "one": null,
     "text": "fn sends your words without a capture without it"
   },
+  "settings.plugins_disabled": {
+    "args": [],
+    "one": null,
+    "text": "disabled"
+  },
+  "settings.plugins_enabled": {
+    "args": [],
+    "one": null,
+    "text": "enabled"
+  },
   "settings.plugins_help": {
     "args": [],
     "one": null,
     "text": "a change applies to the agents' next sessions."
+  },
+  "settings.plugins_logged_out": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "logged out of {name}."
+  },
+  "settings.plugins_login_open": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "the login to {name} is still open in your browser"
+  },
+  "settings.plugins_login_opening": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "opening your browser to log in to {name}…"
   },
   "settings.plugins_logins": {
     "args": [],
@@ -1290,10 +2114,41 @@
     "one": null,
     "text": "looking at your plugins…"
   },
+  "settings.plugins_needs_login": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "{name} needs a login: /plugins login"
+  },
+  "settings.plugins_no_login": {
+    "args": [],
+    "one": null,
+    "text": "no remote MCP server that logs in (one without an Authorization header in its mcp.json)"
+  },
   "settings.plugins_none": {
     "args": [],
     "one": null,
     "text": "no plugin yet: a plugin adds skills and tools to your agents (docs/plugins.md)."
+  },
+  "settings.plugins_set": {
+    "args": [
+      "name",
+      "state",
+      "unchanged"
+    ],
+    "one": null,
+    "text": "{name} {state}{unchanged} — applies at the next /reload"
+  },
+  "settings.plugins_unchanged": {
+    "args": [],
+    "one": null,
+    "text": " (unchanged)"
+  },
+  "settings.plugins_usage": {
+    "args": [],
+    "one": null,
+    "text": "usage: /plugins [list] | /plugins enable NAME | /plugins disable NAME | /plugins login [NAME] | /plugins logout NAME"
   },
   "settings.privacy_add": {
     "args": [],
@@ -1432,6 +2287,258 @@
     "one": null,
     "text": "move up"
   },
+  "settings.prov_change_there": {
+    "args": [],
+    "one": null,
+    "text": "change it where you set it, or paste one here."
+  },
+  "settings.prov_chatgpt_answered": {
+    "args": [],
+    "one": null,
+    "text": "ChatGPT answered."
+  },
+  "settings.prov_default_now": {
+    "args": [
+      "model"
+    ],
+    "one": null,
+    "text": "main's default model is now {model}."
+  },
+  "settings.prov_expired": {
+    "args": [],
+    "one": null,
+    "text": "sign-in expired · ⏎ sign in again"
+  },
+  "settings.prov_filter": {
+    "args": [],
+    "one": null,
+    "text": "type to filter"
+  },
+  "settings.prov_from": {
+    "args": [
+      "source"
+    ],
+    "one": null,
+    "text": "from {source}"
+  },
+  "settings.prov_item_billing": {
+    "args": [],
+    "one": null,
+    "text": "open billing"
+  },
+  "settings.prov_item_keys": {
+    "args": [],
+    "one": null,
+    "text": "open the keys page"
+  },
+  "settings.prov_item_paste": {
+    "args": [],
+    "one": null,
+    "text": "paste a new key"
+  },
+  "settings.prov_item_remove": {
+    "args": [],
+    "one": null,
+    "text": "remove the key"
+  },
+  "settings.prov_item_sign_in": {
+    "args": [],
+    "one": null,
+    "text": "sign in again or switch account"
+  },
+  "settings.prov_item_sign_out": {
+    "args": [],
+    "one": null,
+    "text": "sign out"
+  },
+  "settings.prov_item_usage": {
+    "args": [],
+    "one": null,
+    "text": "your plan's usage on chatgpt.com ↗"
+  },
+  "settings.prov_key_ready": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "{provider} is ready. agents use the key from their next message."
+  },
+  "settings.prov_keychain": {
+    "args": [],
+    "one": null,
+    "text": "keys are kept in files in ~/.bise · /keychain keeps them in the macOS keychain"
+  },
+  "settings.prov_more": {
+    "args": [],
+    "one": null,
+    "text": "more providers…"
+  },
+  "settings.prov_more_names": {
+    "args": [
+      "names",
+      "n"
+    ],
+    "one": null,
+    "text": "{names} and {n} more"
+  },
+  "settings.prov_no_key": {
+    "args": [],
+    "one": null,
+    "text": "no key needed"
+  },
+  "settings.prov_no_key_mark": {
+    "args": [],
+    "one": null,
+    "text": "✓ no key needed"
+  },
+  "settings.prov_no_role": {
+    "args": [],
+    "one": null,
+    "text": "no role uses it yet. /models picks one."
+  },
+  "settings.prov_none": {
+    "args": [],
+    "one": null,
+    "text": "  no provider matches."
+  },
+  "settings.prov_not_set_up": {
+    "args": [],
+    "one": null,
+    "text": "not set up"
+  },
+  "settings.prov_plan_ready": {
+    "args": [],
+    "one": null,
+    "text": "your ChatGPT plan is ready. /models picks the roles it runs."
+  },
+  "settings.prov_ready": {
+    "args": [
+      "from"
+    ],
+    "one": null,
+    "text": "✓ ready · {from}"
+  },
+  "settings.prov_remove_ask": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "remove the {provider} key saved in bise?"
+  },
+  "settings.prov_remove_failed": {
+    "args": [
+      "glyph",
+      "why"
+    ],
+    "one": null,
+    "text": "{glyph} couldn't remove it: {why}"
+  },
+  "settings.prov_removed": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "✓ removed the {provider} key."
+  },
+  "settings.prov_removed_other": {
+    "args": [
+      "from"
+    ],
+    "one": null,
+    "text": "✓ removed. {from} still gives me a key."
+  },
+  "settings.prov_role_more": {
+    "args": [
+      "roles",
+      "last"
+    ],
+    "one": null,
+    "text": "{roles} and {last} use it. /models changes that."
+  },
+  "settings.prov_role_one": {
+    "args": [
+      "role"
+    ],
+    "one": null,
+    "text": "{role} uses it. /models changes that."
+  },
+  "settings.prov_saved": {
+    "args": [],
+    "one": null,
+    "text": "saved in bise"
+  },
+  "settings.prov_signed_in": {
+    "args": [],
+    "one": null,
+    "text": "signed in"
+  },
+  "settings.prov_signed_out": {
+    "args": [],
+    "one": null,
+    "text": "signed out"
+  },
+  "settings.prov_signing_out": {
+    "args": [],
+    "one": null,
+    "text": "signing out…"
+  },
+  "settings.prov_still_gives": {
+    "args": [
+      "from"
+    ],
+    "one": null,
+    "text": "{from} still gives me a key."
+  },
+  "settings.prov_stop_more": {
+    "args": [
+      "roles",
+      "last",
+      "provider"
+    ],
+    "one": null,
+    "text": "{roles} and {last} use {provider}. without the key they stop."
+  },
+  "settings.prov_stop_none": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "agents on {provider} models stop until you add one again."
+  },
+  "settings.prov_stop_one": {
+    "args": [
+      "role",
+      "provider"
+    ],
+    "one": null,
+    "text": "{role} uses {provider}. without the key it stops."
+  },
+  "settings.prov_sub": {
+    "args": [],
+    "one": null,
+    "text": "the keys i can use. enter sets one up or changes it."
+  },
+  "settings.prov_switches": {
+    "args": [
+      "provider",
+      "model"
+    ],
+    "one": null,
+    "text": "{provider} is ready. enter switches to {model}."
+  },
+  "settings.prov_title": {
+    "args": [],
+    "one": null,
+    "text": "providers"
+  },
+  "settings.prov_write_failed": {
+    "args": [
+      "glyph",
+      "why"
+    ],
+    "one": null,
+    "text": "{glyph} couldn't write config.toml: {why}"
+  },
   "settings.quiet_away": {
     "args": [],
     "one": null,
@@ -1512,12 +2619,54 @@
     "one": null,
     "text": "notifications wait"
   },
+  "settings.release_dry": {
+    "args": [],
+    "one": null,
+    "text": " · dry run"
+  },
+  "settings.release_first": {
+    "args": [],
+    "one": null,
+    "text": "the first release"
+  },
+  "settings.release_head": {
+    "args": [],
+    "one": null,
+    "text": "release "
+  },
+  "settings.release_more": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "and {n} more"
+  },
+  "settings.release_more_lines": {
+    "args": [
+      "n"
+    ],
+    "one": "▸ {n} more line",
+    "text": "▸ {n} more lines"
+  },
+  "settings.release_since": {
+    "args": [
+      "n",
+      "since"
+    ],
+    "one": "{n} commit since {since}",
+    "text": "{n} commits since {since}"
+  },
   "settings.role_as": {
     "args": [
       "role"
     ],
     "one": null,
     "text": "as {role}"
+  },
+  "settings.role_auto": {
+    "args": [],
+    "one": null,
+    "text": "auto"
   },
   "settings.role_default": {
     "args": [],
@@ -1543,6 +2692,11 @@
     "one": null,
     "text": "{role}'s model"
   },
+  "settings.role_same_as_main": {
+    "args": [],
+    "one": null,
+    "text": "same as main"
+  },
   "settings.role_set_here": {
     "args": [],
     "one": null,
@@ -1555,15 +2709,322 @@
     "one": null,
     "text": "{provider}: set up first"
   },
+  "settings.role_who_agents": {
+    "args": [],
+    "one": null,
+    "text": "the agents"
+  },
+  "settings.role_who_checker": {
+    "args": [],
+    "one": null,
+    "text": "the checker"
+  },
+  "settings.role_who_main": {
+    "args": [],
+    "one": null,
+    "text": "main"
+  },
+  "settings.role_who_small": {
+    "args": [],
+    "one": null,
+    "text": "small jobs"
+  },
+  "settings.role_who_voice": {
+    "args": [],
+    "one": null,
+    "text": "voice"
+  },
+  "settings.roles_back": {
+    "args": [],
+    "one": null,
+    "text": "back"
+  },
+  "settings.roles_checker_off": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": "off {dot} every command asks you"
+  },
+  "settings.roles_checker_sees": {
+    "args": [],
+    "one": null,
+    "text": "the checker sees the command, the script it runs, and your request."
+  },
+  "settings.roles_default": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": " {dot} default"
+  },
+  "settings.roles_effort_for": {
+    "args": [
+      "model",
+      "role"
+    ],
+    "one": null,
+    "text": "{model} for {role}"
+  },
+  "settings.roles_effort_title": {
+    "args": [],
+    "one": null,
+    "text": "how hard should it think?"
+  },
+  "settings.roles_every_asks": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": " {dot} every command asks you"
+  },
+  "settings.roles_from": {
+    "args": [
+      "var"
+    ],
+    "one": null,
+    "text": "from {var}"
+  },
   "settings.roles_help": {
     "args": [],
     "one": null,
     "text": "the terminal's /models shows the same"
   },
+  "settings.roles_hint_agents": {
+    "args": [],
+    "one": null,
+    "text": "the ones main starts, for the work it hands out."
+  },
+  "settings.roles_hint_checker": {
+    "args": [],
+    "one": null,
+    "text": "in auto, decides which commands run and which ask you."
+  },
+  "settings.roles_hint_main": {
+    "args": [],
+    "one": null,
+    "text": "talks with you and starts the agents."
+  },
+  "settings.roles_hint_small": {
+    "args": [],
+    "one": null,
+    "text": "titles and summaries. a small fast model is enough."
+  },
+  "settings.roles_hint_voice": {
+    "args": [],
+    "one": null,
+    "text": "writes down what you say. enter opens /voice."
+  },
+  "settings.roles_jev_through": {
+    "args": [
+      "dot",
+      "provider"
+    ],
+    "one": null,
+    "text": " {dot} jev through {provider}"
+  },
+  "settings.roles_models_sub": {
+    "args": [],
+    "one": null,
+    "text": "type to filter, or a model id that isn't listed."
+  },
+  "settings.roles_no_key": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": "no key {dot} enter fixes it"
+  },
+  "settings.roles_no_model": {
+    "args": [
+      "provider"
+    ],
+    "one": null,
+    "text": "  {provider} has no model listed: type its id."
+  },
+  "settings.roles_none_yet": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": "none yet {dot} enter picks one"
+  },
+  "settings.roles_not_now": {
+    "args": [],
+    "one": null,
+    "text": "not now"
+  },
+  "settings.roles_note_now": {
+    "args": [],
+    "one": null,
+    "text": "now"
+  },
+  "settings.roles_nothing": {
+    "args": [],
+    "one": null,
+    "text": "nothing picked yet."
+  },
+  "settings.roles_now": {
+    "args": [
+      "what",
+      "extra"
+    ],
+    "one": null,
+    "text": "now: {what}{extra}"
+  },
+  "settings.roles_now_glyph": {
+    "args": [
+      "glyph"
+    ],
+    "one": null,
+    "text": "{glyph} now"
+  },
+  "settings.roles_now_mark": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": " {dot} now"
+  },
+  "settings.roles_now_off": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": "now: off {dot} every command asks you"
+  },
+  "settings.roles_now_rule": {
+    "args": [
+      "rule",
+      "dot",
+      "what",
+      "extra"
+    ],
+    "one": null,
+    "text": "now: {rule} {dot} {what}{extra}"
+  },
+  "settings.roles_off": {
+    "args": [],
+    "one": null,
+    "text": "off"
+  },
+  "settings.roles_or_chat": {
+    "args": [],
+    "one": null,
+    "text": "  ── or a chat model checks ──"
+  },
+  "settings.roles_override_more": {
+    "args": [
+      "n",
+      "list"
+    ],
+    "one": null,
+    "text": "{n} agents use their own model: {list}"
+  },
+  "settings.roles_override_one": {
+    "args": [
+      "agent",
+      "dot",
+      "model"
+    ],
+    "one": null,
+    "text": "1 agent uses its own model: {agent} {dot} {model}"
+  },
+  "settings.roles_ready": {
+    "args": [],
+    "one": null,
+    "text": "ready"
+  },
+  "settings.roles_recommended": {
+    "args": [],
+    "one": null,
+    "text": "recommended"
+  },
+  "settings.roles_same_as": {
+    "args": [
+      "role"
+    ],
+    "one": null,
+    "text": "same as {role}"
+  },
+  "settings.roles_screen_sub": {
+    "args": [],
+    "one": null,
+    "text": "each role picks a provider, then a model. one provider can serve several."
+  },
+  "settings.roles_screen_title": {
+    "args": [],
+    "one": null,
+    "text": "which model does what?"
+  },
   "settings.roles_title": {
     "args": [],
     "one": null,
     "text": "which model does what"
+  },
+  "settings.roles_use": {
+    "args": [
+      "roles"
+    ],
+    "one": null,
+    "text": "{roles} use it"
+  },
+  "settings.roles_uses": {
+    "args": [
+      "role"
+    ],
+    "one": null,
+    "text": "{role} uses it"
+  },
+  "settings.roles_voice_list": {
+    "args": [],
+    "one": null,
+    "text": "only the providers that can listen. ctrl+r starts, any key stops."
+  },
+  "settings.roles_voice_none": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": "off {dot} none of your keys listens {dot} enter sets it up"
+  },
+  "settings.roles_voice_off": {
+    "args": [
+      "dot"
+    ],
+    "one": null,
+    "text": "off {dot} enter sets it up"
+  },
+  "settings.roles_voice_only": {
+    "args": [],
+    "one": null,
+    "text": "voice only"
+  },
+  "settings.roles_voice_sub": {
+    "args": [],
+    "one": null,
+    "text": "you talk, it types in the composer."
+  },
+  "settings.roles_which_model": {
+    "args": [
+      "role",
+      "dot",
+      "provider"
+    ],
+    "one": null,
+    "text": "{role} {dot} {provider}: which model?"
+  },
+  "settings.roles_which_provider": {
+    "args": [
+      "role"
+    ],
+    "one": null,
+    "text": "{role}: which provider?"
+  },
+  "settings.roles_your_plan": {
+    "args": [],
+    "one": null,
+    "text": "your ChatGPT plan"
   },
   "settings.rule_keep": {
     "args": [],
@@ -1637,6 +3098,73 @@
     "args": [],
     "one": null,
     "text": "✓ signed in"
+  },
+  "settings.signin_denied": {
+    "args": [],
+    "one": null,
+    "text": "▲ ChatGPT signed you in but didn't let bise use your plan. try again and allow it, or pick another way."
+  },
+  "settings.signin_expired": {
+    "args": [],
+    "one": null,
+    "text": "▲ your ChatGPT sign-in expired. sign in again in /provider, or run bise login chatgpt."
+  },
+  "settings.signin_limit": {
+    "args": [],
+    "one": null,
+    "text": "▲ your ChatGPT plan's limit for bise is reached. your usage is at chatgpt.com/settings/usage, or switch model with /model."
+  },
+  "settings.signin_limit_link": {
+    "args": [],
+    "one": null,
+    "text": "chatgpt.com/settings/usage"
+  },
+  "settings.signin_no_chatgpt": {
+    "args": [],
+    "one": null,
+    "text": "▲ this bise has no ChatGPT provider yet."
+  },
+  "settings.signin_or_denied": {
+    "args": [],
+    "one": null,
+    "text": "▲ OpenRouter didn't give bise a key. try again, or pick another way."
+  },
+  "settings.signin_plan_off": {
+    "args": [],
+    "one": null,
+    "text": "▲ ChatGPT plan use is off for bise. turn it on in your ChatGPT settings, or pick another provider in /provider."
+  },
+  "settings.signin_sign_out_failed": {
+    "args": [
+      "why"
+    ],
+    "one": null,
+    "text": "▲ couldn't sign out: {why}"
+  },
+  "settings.signin_signed_out": {
+    "args": [],
+    "one": null,
+    "text": "✓ signed out of ChatGPT."
+  },
+  "settings.signin_signed_out_here": {
+    "args": [],
+    "one": null,
+    "text": "✓ signed out here. ChatGPT didn't confirm: to be sure, remove bise in your ChatGPT settings."
+  },
+  "settings.signin_stopped": {
+    "args": [],
+    "one": null,
+    "text": "it stopped"
+  },
+  "settings.signin_unchecked": {
+    "args": [],
+    "one": null,
+    "text": "▲ ChatGPT couldn't check your plan's usage. try again in a moment, or switch model with /model."
+  },
+  "settings.signin_unfinished": {
+    "args": [],
+    "one": null,
+    "text": "▲ the sign-in wasn't finished. try again, or pick another way."
   },
   "settings.signing_copy": {
     "args": [],
@@ -1880,6 +3408,26 @@
     ],
     "one": null,
     "text": "you run {live}"
+  },
+  "settings.version_list": {
+    "args": [],
+    "one": null,
+    "text": "the installed versions"
+  },
+  "settings.version_restart": {
+    "args": [],
+    "one": null,
+    "text": "reload bise, nothing lost"
+  },
+  "settings.version_rollback": {
+    "args": [],
+    "one": null,
+    "text": "back to the version before"
+  },
+  "settings.version_update": {
+    "args": [],
+    "one": null,
+    "text": "look for a new bise release now"
   },
   "settings.voice_fn_hold": {
     "args": [],

@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run, wait_until  # noqa: E402
+from words import w  # noqa: E402
 
 
 def key_envs():
@@ -60,12 +61,12 @@ def to_paste(t, name):
     t.keys("Down")
     t.wait("› OpenRouter")
     t.keys("Down")
-    t.wait("› an API key")
+    t.wait("› " + w("settings.api_key"))
     t.keys("Enter")
     t.wait("which provider?")
     t.press_until("Down", re.compile(r"› \d+ · %s " % re.escape(name)), sel=re.compile(r"› (\d+) · "))
     t.keys("Enter")
-    t.wait("which model?")
+    t.wait(w("settings.onb_model_title"))
     t.keys("Enter")
     return t.wait("paste your %s key" % name)
 

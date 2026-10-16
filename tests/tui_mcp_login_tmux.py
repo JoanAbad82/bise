@@ -37,6 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run  # noqa: E402
+from words import w_re  # noqa: E402
 
 COLS, ROWS = 120, 36
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -211,7 +212,7 @@ def login_here():
             sc = t.wait("mcp fake · %s · needs a login · /plugins login" % host)
             shot(t, "plugins-needs-login", sc)
             t.typed("/plugins login ")
-            sc = t.wait_re(r"fake\s+%s · needs a login" % host.replace(".", r"\."))
+            sc = t.wait_re(r"fake\s+" + w_re("settings.login_needs", host=host))
             shot(t, "popup-needs-login", sc)
             t.keys("Enter")
             sc = t.wait("logged in to fake: 3 tools, your agents have them now.")
@@ -220,7 +221,7 @@ def login_here():
             html = page(1)
             assert "bise <b>:*</b> is logged in to fake." in html, html
             t.typed("/plugins login ")
-            sc = t.wait_re(r"fake\s+%s · logged in · 3 tools" % host.replace(".", r"\."))
+            sc = t.wait_re(r"fake\s+" + w_re("settings.login_in_tools", host=host, n=3))
             shot(t, "popup-logged-in", sc)
             t.keys("Escape")
             t.keys("C-u")

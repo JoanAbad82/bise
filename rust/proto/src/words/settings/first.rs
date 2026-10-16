@@ -255,7 +255,7 @@ crate::words! { settings:
     /// how it works: the title
     first_how = "how it works";
     /// how it works: the key line
-    first_how_key = "{any key} ↵";
+    first_how_key(key) = "{key} ↵";
     /// the key check ended without an answer (why it couldn't reach)
     first_check_stopped = "the check stopped";
     /// the model not saved

@@ -35,11 +35,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run  # noqa: E402
+from words import w  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NORMAL = "   @ file   "
 PAY = "how do you want to pay for the models?"
-WAITING = "waiting for you to sign in to ChatGPT in your browser…"
+WAITING = w("common.signing_wait", label="ChatGPT")
 SIGNED = "✓ signed in as you@example.com · ChatGPT Plus"
 CODEX = "use your Plus or Pro plan · you use it in Codex already"
 CLAUDE = "your Claude plan works only in Claude Code (Anthropic's terms). for Claude here, use an API key."

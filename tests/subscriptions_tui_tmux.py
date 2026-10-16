@@ -40,6 +40,7 @@ import bise_env  # noqa: E402
 import e2e  # noqa: E402
 from tui_tmux import MAIN_IDLE, tui_session, run, wait_until  # noqa: E402
 from subscriptions_e2e import auth_log, control, snapshot_real  # noqa: E402
+from words import w  # noqa: E402
 
 NORMAL = "   @ file   "
 
@@ -140,7 +141,7 @@ def main():
             t.keys("Enter")
             sc = t.wait("how do you want to pay for the models?", 30)
             for s in ("a plan you already have, or a key. you can add more later in /provider.",
-                      "Continue with ChatGPT", "use your Plus or Pro plan", "OpenRouter", "an API key",
+                      "Continue with ChatGPT", "use your Plus or Pro plan", "OpenRouter", w("settings.api_key"),
                       "a coding plan key", "↑↓ choose   ⏎ go   esc back"):
                 assert s in sc, sc
             assert re.search(r"› Continue with ChatGPT", sc), sc
@@ -228,7 +229,7 @@ def main():
             # its key bar says so (the first run's words)
             open(opened + ".slow", "w").close()
             t.keys("Enter")
-            sc = t.wait("waiting for you to sign in to ChatGPT in your browser…   c copy the link   esc cancel", 10)
+            sc = t.wait(w("common.signing_wait", label="ChatGPT") + "   c copy the link   esc cancel", 10)
             assert "▲ your ChatGPT sign-in expired" in flat(sc), sc
             shot(t, "2-signing-in")
             os.remove(opened + ".slow")
@@ -237,7 +238,7 @@ def main():
             again = links()[-1]
             assert "client_id=" + a["client_id"] in again and "agent_name_hint" not in again, again
             # main's turn goes on from bise's message: nothing retyped
-            t.wait_gone("waiting for you to sign in to ChatGPT", 60)
+            t.wait_gone(w("common.signing_wait", label="ChatGPT"), 60)
             wait_until(lambda: plan_reqs("sign-in is back") and plan_reqs("sign-in is back")[-1]["status"] == 200, 90,
                        lambda: "main did not go on: %r" % plan_reqs("sign-in is back"))
             def went_on(s):

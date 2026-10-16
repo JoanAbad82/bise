@@ -698,4 +698,528 @@ export const settings = {
   tour_end_two: (a: { keys: string | number }): string => " " + String(a.keys) + " open the other two.",
   /** tour: the end, more agents left */
   tour_end_more: (a: { keys: string | number }): string => " " + String(a.keys) + " open the others.",
+  /** welcome: typed first */
+  first_hi: "hi, i'm bise ",
+  /** welcome: the tagline */
+  first_tagline: "ideas in. little kisses out. also pull requests.",
+  /** welcome: the hint, its key */
+  first_any_key: "any key",
+  /** the definition's head (after the bold name) */
+  first_gloss: (a: { dot: string | number }): string => " /beez/ " + String(a.dot) + " french, n.",
+  /** the definition's first meaning */
+  first_meaning_kiss: "a quick kiss on the cheek :*",
+  /** the definition's second meaning */
+  first_meaning_wind: "a brisk north wind",
+  /** the definition's third meaning */
+  first_meaning_bise: "a terminal where multi-agent coding is painless",
+  /** a theme: dark */
+  first_dark: "dark",
+  /** a theme: light */
+  first_light: "light",
+  /** theme step: forced by the environment */
+  first_theme_env: (a: { var: string | number; name: string | number }): string => String(a.var) + " is set to " + String(a.name) + ", so i picked it.",
+  /** theme step: picked last time */
+  first_theme_saved: (a: { name: string | number }): string => "you picked " + String(a.name) + " last time, so i kept it.",
+  /** theme step: read from the terminal */
+  first_theme_terminal: (a: { name: string | number }): string => "your terminal looks " + String(a.name) + ", so i picked " + String(a.name) + ".",
+  /** theme step: the terminal's background unread */
+  first_theme_unread: (a: { name: string | number }): string => "i couldn't read your terminal's background, so i picked " + String(a.name) + ".",
+  /** theme step: the note */
+  first_theme_note: "you can change it any time with /theme.",
+  /** theme preview: what he says */
+  first_preview_you: "fix the flaky login test",
+  /** theme preview: main's answer */
+  first_preview_main: "on it: auth-fix takes it.",
+  /** theme preview: a message between agents */
+  first_preview_msg: (a: { glyph: string | number }): string => String(a.glyph) + " auth-fix → main  found it",
+  /** theme preview: the agent done */
+  first_preview_done: "auth-fix is done.",
+  /** theme step: the key line (keys in keyline's `{key}` marks) */
+  first_theme_keys: (a: { arrows: string | number; enter: string | number }): string => String(a.arrows) + " switch · " + String(a.enter) + " keep",
+  /** key bar: a sign-in under way, just copied */
+  bar_copied: "c copied   esc cancel",
+  /** key bar: a sign-in under way */
+  bar_copy_link: "c copy the link   esc cancel",
+  /** key bar: a list, ⏎ goes */
+  bar_choose_go: "↑↓ choose   ⏎ go   esc back",
+  /** key bar: a list, ⏎ picks */
+  bar_choose_ok: "↑↓ choose   ⏎ ok   esc back",
+  /** key bar: the pasted key, a role's steps */
+  bar_check_it: "⏎ check it   esc back to the providers",
+  /** key bar: the pasted key */
+  bar_check: "⏎ check   esc back",
+  /** key bar: a key already there */
+  bar_replace: "⏎ replaces it   esc keeps the old one",
+  /** key bar: back */
+  bar_back: "esc back",
+  /** key bar: a plan that failed, sign in again */
+  bar_plan_sign_in: "⏎ sign in again   tab another way   esc back",
+  /** key bar: a plan that failed, another model */
+  bar_plan_model: "⏎ pick another model   tab another way   esc back",
+  /** key bar: a plan that failed */
+  bar_plan_again: "⏎ try again   tab another way   esc back",
+  /** key bar: a key that failed, another model */
+  bar_key_model: "⏎ pick another model   tab another provider   esc back",
+  /** key bar: a found key that failed */
+  bar_key_paste: "⏎ paste another key   tab another provider   esc back",
+  /** key bar: no credit */
+  bar_key_check: "⏎ check again   tab another provider   esc back",
+  /** key bar: a key that failed */
+  bar_key_again: "⏎ try again   tab another provider   esc back",
+  /** key bar: it works */
+  bar_go_on: "⏎ go on",
+  /** OpenRouter's line */
+  first_openrouter_sub: "sign in with your browser, or paste its key.",
+  /** OpenRouter: sign in */
+  first_openrouter_sign_in: "sign in with OpenRouter",
+  /** OpenRouter: paste a key */
+  first_paste_a_key: "paste a key",
+  /** the provider list, coding plans */
+  first_which_plan: "which coding plan?",
+  /** the provider list */
+  first_which_provider: "which provider?",
+  /** a list's rows above */
+  first_more_up: (a: { n: string | number }): string => "  ↑ " + String(a.n) + " more",
+  /** a list's rows below */
+  first_more_down: (a: { n: string | number }): string => "  ↓ " + String(a.n) + " more",
+  /** no coding plan provider */
+  first_no_plan: "  this bise has no coding plan provider yet.",
+  /** the model list's title */
+  first_which_model: "which model?",
+  /** the model list's line */
+  first_model_note: "you can change it any time with /model.",
+  /** the model list's filter, empty */
+  first_model_filter: "type to filter, or any model id",
+  /** the model list: no match */
+  first_model_none: "  no listed model matches.",
+  /** the model list: the pick */
+  first_recommended: "  recommended",
+  /** the model list: a ChatGPT plan's model */
+  first_your_plan: "   your ChatGPT plan",
+  /** the model list: a typed id */
+  first_use: (a: { model: string | number }): string => "use " + String(a.model),
+  /** the model list: a typed id's note */
+  first_not_listed: "   not in my list: i'll try it with one tiny call",
+  /** the model list: none listed */
+  first_no_model: (a: { provider: string | number }): string => String(a.provider) + " has no model listed: type its id.",
+  /** the pasted key's title */
+  first_paste_key: (a: { provider: string | number }): string => "paste your " + String(a.provider) + " key",
+  /** the pasted key: for a role */
+  first_for_role: (a: { role: string | number }): string => "for " + String(a.role) + ". then you pick the model.",
+  /** the pasted key: where to get one (before the link) */
+  first_get_one: "get one: ",
+  /** the pasted key: sign up (before the link) */
+  first_no_account: "no account yet? ",
+  /** the pasted key: spaces inside */
+  first_not_a_key: (a: { glyph: string | number }): string => String(a.glyph) + " that doesn't look like a key: no spaces inside.",
+  /** the pasted key: where it goes */
+  first_goes_in: (a: { path: string | number }): string => "it goes in " + String(a.path) + ", only you can read it.",
+  /** the pasted key: where it goes, the path too long */
+  first_goes_in_auth: "it goes in bise's auth.json, only you can read it.",
+  /** a key already there */
+  first_has_key: (a: { provider: string | number; path: string | number }): string => String(a.provider) + " has a key in " + String(a.path) + " already.",
+  /** checking the plan */
+  first_checking_plan: "checking your plan…",
+  /** checking the key */
+  first_checking_key: "checking your key with one tiny call…",
+  /** checking: which model on which provider */
+  first_model_on: (a: { model: string | number; provider: string | number }): string => String(a.model) + " on " + String(a.provider),
+  /** a plan that doesn't run the model */
+  first_plan_model: (a: { model: string | number }): string => "▲ your plan doesn't run " + String(a.model) + ". pick another model.",
+  /** a plan's provider unreachable */
+  first_plan_unreachable: (a: { provider: string | number; why: string | number }): string => "▲ i couldn't reach " + String(a.provider) + ": " + String(a.why) + ".",
+  /** a plan's provider with no URL */
+  first_plan_no_url: (a: { provider: string | number }): string => "▲ " + String(a.provider) + " has no URL yet: i didn't call it.",
+  /** a plan's configuration error */
+  first_plan_config: (a: { why: string | number }): string => "▲ " + String(a.why),
+  /** the provider's own words */
+  first_said: (a: { provider: string | number; said: string | number }): string => String(a.provider) + " said: \"" + String(a.said) + "\"",
+  /** the key tried: pasted */
+  first_the_key: "the key",
+  /** the key tried: found in a variable */
+  first_the_key_in: (a: { var: string | number }): string => "the key in " + String(a.var),
+  /** a found key refused */
+  first_found_wrong: (a: { key: string | number; provider: string | number }): string => String(a.key) + " doesn't work. " + String(a.provider) + " says it's wrong.",
+  /** a pasted key refused */
+  first_key_wrong: (a: { provider: string | number }): string => String(a.provider) + " says this key is wrong.",
+  /** no credit */
+  first_no_credit: (a: { key: string | number; provider: string | number }): string => String(a.key) + " works, but your " + String(a.provider) + " account has no credit yet.",
+  /** the provider doesn't know the model */
+  first_key_model: (a: { provider: string | number; model: string | number }): string => String(a.provider) + " doesn't know " + String(a.model) + ". pick another model.",
+  /** the key can't use the model */
+  first_no_access: (a: { model: string | number }): string => "this key can't use " + String(a.model) + ".",
+  /** the provider unreachable */
+  first_unreachable: (a: { provider: string | number; why: string | number }): string => "i couldn't reach " + String(a.provider) + ": " + String(a.why) + ".",
+  /** the provider has no URL */
+  first_no_url: (a: { provider: string | number }): string => String(a.provider) + " has no URL yet: i didn't call it.",
+  /** a pasted key refused: where to copy it (before the link) */
+  first_copy_again: "copy it again from ",
+  /** a found key refused: another (before the link) */
+  first_paste_another_get: "paste another one, or get a new key: ",
+  /** a found key refused, no keys page */
+  first_paste_another: "paste another one.",
+  /** no credit: where, no billing page */
+  first_add_on: (a: { provider: string | number }): string => "add some on your " + String(a.provider) + " account.",
+  /** no credit: where (before the link) */
+  first_add_here: "add some here: ",
+  /** no credit, the pasted key saved */
+  first_saved_add_credit: "i saved the key. add credit, then enter checks again.",
+  /** no credit */
+  first_add_credit: "add credit, then enter checks again.",
+  /** no access to the model */
+  first_no_access_note: "your account may not have access to this model yet. pick another one.",
+  /** unreachable */
+  first_check_network: "check your network, then enter.",
+  /** no URL: the fix */
+  first_then_enter: (a: { fix: string | number }): string => String(a.fix) + ", then enter.",
+  /** it works */
+  first_works: (a: { model: string | number }): string => "it works: " + String(a.model) + " answered.",
+  /** it works, a plan */
+  first_works_plan: (a: { model: string | number }): string => "main and your agents use " + String(a.model) + " now, on your plan.",
+  /** it works: main's model */
+  first_main_uses: (a: { model: string | number }): string => "main uses " + String(a.model) + ".",
+  /** it works: another key in the environment */
+  first_shadows: (a: { var: string | number }): string => String(a.var) + " in your environment holds another key: i use this one.",
+  /** it works: optional keys */
+  first_optional: "optional. add these any time:",
+  /** it works: the other roles */
+  first_the_rest: "agents, voice and the rest: /models",
+  /** small jobs, Jev checks */
+  first_small_jev: (a: { model: string | number; by: string | number }): string => "small jobs use " + String(a.model) + ". auto's checker: Jev, by " + String(a.by) + ".",
+  /** small jobs and the checker, one model */
+  first_small_checker: (a: { model: string | number }): string => "small jobs and auto's checker use " + String(a.model) + ".",
+  /** small jobs, no checker */
+  first_small: (a: { model: string | number }): string => "small jobs use " + String(a.model) + ".",
+  /** small jobs and the checker, two models */
+  first_small_and: (a: { model: string | number; checker: string | number }): string => "small jobs use " + String(a.model) + ". auto's checker: " + String(a.checker) + ".",
+  /** an optional key: tools */
+  first_extra_tools: "web search and other tools: a Mistral key · /setup",
+  /** an optional key: voice */
+  first_extra_voice: "voice (ctrl+r): a Mistral, OpenAI or ElevenLabs key · /voice",
+  /** the pay step's title */
+  first_pay: "how do you want to pay for the models?",
+  /** the pay step's line */
+  first_pay_sub: "a plan you already have, or a key. you can add more later in /provider.",
+  /** a found key: its provider set up */
+  first_set_up: (a: { provider: string | number }): string => String(a.provider) + ", already set up",
+  /** a found key: the model it takes */
+  first_will_use: (a: { provider: string | number; model: string | number }): string => String(a.provider) + ". i'll use " + String(a.model),
+  /** a found key: no model */
+  first_set_model: (a: { provider: string | number; path: string | number }): string => String(a.provider) + ". set model in " + String(a.path),
+  /** the ChatGPT way */
+  first_chatgpt: "Continue with ChatGPT",
+  /** the ChatGPT way's line, Codex seen */
+  first_chatgpt_codex: "use your Plus or Pro plan · you use it in Codex already",
+  /** the ChatGPT way's line */
+  first_chatgpt_sub: "use your Plus or Pro plan",
+  /** the OpenRouter way's line */
+  first_openrouter_way: "sign in, or paste its key",
+  /** the key way's line */
+  first_api_key_sub: "Anthropic, OpenAI, Google, Mistral…",
+  /** the coding plan way */
+  first_coding: "a coding plan key",
+  /** the coding plan way's line */
+  first_coding_sub: "GLM, Kimi or MiniMax",
+  /** a found key's mark */
+  first_found: "found",
+  /** Claude's plan, no key */
+  first_claude_plan: "your Claude plan works only in Claude Code (Anthropic's terms). for Claude here, use an API key.",
+  /** a key not saved */
+  first_save_failed: (a: { glyph: string | number; why: string | number }): string => String(a.glyph) + " couldn't save the key: " + String(a.why),
+  /** signed in to a plan */
+  first_signed_in: (a: { email: string | number; plan: string | number }): string => "signed in as " + String(a.email) + " · " + String(a.plan),
+  /** how it works: line 1 (before me) */
+  first_how_1a: "you talk to ",
+  /** how it works: me */
+  first_how_me: "me",
+  /** how it works: line 1 (after me) */
+  first_how_1b: ": main, your team lead. any time, keep typing",
+  /** how it works: I */
+  first_how_i: "i",
+  /** how it works: line 2 (after I) */
+  first_how_2: " start an agent when a job needs one. they sync on their own",
+  /** how it works: line 3 */
+  first_how_3: "only the real decisions reach you, in your inbox · ctrl+1",
+  /** how it works: line 3, no ctrl digits */
+  first_how_3_click: "only the real decisions reach you, in your inbox · click it",
+  /** how it works: the footer */
+  first_how_foot: "ctrl+o opens everything folded · ⌥0-9 talk to an agent",
+  /** how it works: the title */
+  first_how: "how it works",
+  /** how it works: the key line */
+  first_how_key: (a: { key: string | number }): string => String(a.key) + " ↵",
+  /** the key check ended without an answer (why it couldn't reach) */
+  first_check_stopped: "the check stopped",
+  /** the model not saved */
+  first_write_config: (a: { why: string | number }): string => "couldn't write config.toml: " + String(a.why),
+  /** a provider the catalog doesn't know */
+  first_unknown_provider: (a: { id: string | number }): string => "unknown provider " + String(a.id),
+  /** a link opened */
+  first_opening: (a: { url: string | number }): string => "opening " + String(a.url),
+  /** a link not opened */
+  first_open_failed: (a: { url: string | number }): string => "could not open " + String(a.url),
+  /** a key not removed */
+  prov_remove_failed: (a: { glyph: string | number; why: string | number }): string => String(a.glyph) + " couldn't remove it: " + String(a.why),
+  /** a key removed, another source still gives one */
+  prov_removed_other: (a: { from: string | number }): string => "✓ removed. " + String(a.from) + " still gives me a key.",
+  /** a key removed */
+  prov_removed: (a: { provider: string | number }): string => "✓ removed the " + String(a.provider) + " key.",
+  /** the model not saved */
+  prov_write_failed: (a: { glyph: string | number; why: string | number }): string => String(a.glyph) + " couldn't write config.toml: " + String(a.why),
+  /** signing out */
+  prov_signing_out: "signing out…",
+  /** a key's source: saved by bise */
+  prov_saved: "saved in bise",
+  /** a key's source: a variable or a file */
+  prov_from: (a: { source: string | number }): string => "from " + String(a.source),
+  /** a provider with no key to set */
+  prov_no_key: "no key needed",
+  /** a provider not set up */
+  prov_not_set_up: "not set up",
+  /** the plan signed in */
+  prov_signed_in: "signed in",
+  /** the plan signed out */
+  prov_signed_out: "signed out",
+  /** the plan's sign-in expired */
+  prov_expired: "sign-in expired · ⏎ sign in again",
+  /** the roles: none */
+  prov_no_role: "no role uses it yet. /models picks one.",
+  /** the roles: one */
+  prov_role_one: (a: { role: string | number }): string => String(a.role) + " uses it. /models changes that.",
+  /** the roles: more */
+  prov_role_more: (a: { roles: string | number; last: string | number }): string => String(a.roles) + " and " + String(a.last) + " use it. /models changes that.",
+  /** providers' names past three */
+  prov_more_names: (a: { names: string | number; n: string | number }): string => String(a.names) + " and " + String(a.n) + " more",
+  /** the list's title */
+  prov_title: "providers",
+  /** the list's line */
+  prov_sub: "the keys i can use. enter sets one up or changes it.",
+  /** the list's filter, empty */
+  prov_filter: "type to filter",
+  /** the list: no match */
+  prov_none: "  no provider matches.",
+  /** the list's last row */
+  prov_more: "more providers…",
+  /** the keys in files (macOS) */
+  prov_keychain: "keys are kept in files in ~/.bise · /keychain keeps them in the macOS keychain",
+  /** key bar: the list */
+  bar_choose_open: "↑↓ choose   ⏎ open   esc back",
+  /** a provider's menu: no key needed */
+  prov_no_key_mark: "✓ no key needed",
+  /** a provider's menu: ready */
+  prov_ready: (a: { from: string | number }): string => "✓ ready · " + String(a.from),
+  /** a provider's menu: a key set elsewhere */
+  prov_change_there: "change it where you set it, or paste one here.",
+  /** a menu item: paste */
+  prov_item_paste: "paste a new key",
+  /** a menu item: the keys page */
+  prov_item_keys: "open the keys page",
+  /** a menu item: billing */
+  prov_item_billing: "open billing",
+  /** a menu item: remove */
+  prov_item_remove: "remove the key",
+  /** a menu item: sign in */
+  prov_item_sign_in: "sign in again or switch account",
+  /** a menu item: sign out */
+  prov_item_sign_out: "sign out",
+  /** a menu item: the plan's usage */
+  prov_item_usage: "your plan's usage on chatgpt.com ↗",
+  /** remove: no role stops */
+  prov_stop_none: (a: { provider: string | number }): string => "agents on " + String(a.provider) + " models stop until you add one again.",
+  /** remove: one role stops */
+  prov_stop_one: (a: { role: string | number; provider: string | number }): string => String(a.role) + " uses " + String(a.provider) + ". without the key it stops.",
+  /** remove: roles stop */
+  prov_stop_more: (a: { roles: string | number; last: string | number; provider: string | number }): string => String(a.roles) + " and " + String(a.last) + " use " + String(a.provider) + ". without the key they stop.",
+  /** remove: the ask */
+  prov_remove_ask: (a: { provider: string | number }): string => "remove the " + String(a.provider) + " key saved in bise?",
+  /** remove: another source */
+  prov_still_gives: (a: { from: string | number }): string => String(a.from) + " still gives me a key.",
+  /** key bar: remove */
+  bar_remove: "⏎ remove   esc keep it",
+  /** the plan answered, no account known */
+  prov_chatgpt_answered: "ChatGPT answered.",
+  /** the plan ready */
+  prov_plan_ready: "your ChatGPT plan is ready. /models picks the roles it runs.",
+  /** key bar: ok */
+  bar_ok: "⏎ ok",
+  /** a model ready, the one he wanted */
+  prov_switches: (a: { provider: string | number; model: string | number }): string => String(a.provider) + " is ready. enter switches to " + String(a.model) + ".",
+  /** main's default model changed */
+  prov_default_now: (a: { model: string | number }): string => "main's default model is now " + String(a.model) + ".",
+  /** a key ready */
+  prov_key_ready: (a: { provider: string | number }): string => String(a.provider) + " is ready. agents use the key from their next message.",
+  /** sign-in: esc, or 5 minutes without an answer */
+  signin_unfinished: "▲ the sign-in wasn't finished. try again, or pick another way.",
+  /** sign-in: plan use refused */
+  signin_denied: "▲ ChatGPT signed you in but didn't let bise use your plan. try again and allow it, or pick another way.",
+  /** the plan's limit reached */
+  signin_limit: "▲ your ChatGPT plan's limit for bise is reached. your usage is at chatgpt.com/settings/usage, or switch model with /model.",
+  /** the limit line's words that link to the usage page */
+  signin_limit_link: "chatgpt.com/settings/usage",
+  /** plan use off */
+  signin_plan_off: "▲ ChatGPT plan use is off for bise. turn it on in your ChatGPT settings, or pick another provider in /provider.",
+  /** the plan's usage unchecked */
+  signin_unchecked: "▲ ChatGPT couldn't check your plan's usage. try again in a moment, or switch model with /model.",
+  /** the sign-in expired */
+  signin_expired: "▲ your ChatGPT sign-in expired. sign in again in /provider, or run bise login chatgpt.",
+  /** OpenRouter gave no key */
+  signin_or_denied: "▲ OpenRouter didn't give bise a key. try again, or pick another way.",
+  /** no ChatGPT provider */
+  signin_no_chatgpt: "▲ this bise has no ChatGPT provider yet.",
+  /** sign-out stopped */
+  signin_stopped: "it stopped",
+  /** signed out */
+  signin_signed_out: "✓ signed out of ChatGPT.",
+  /** signed out, not confirmed */
+  signin_signed_out_here: "✓ signed out here. ChatGPT didn't confirm: to be sure, remove bise in your ChatGPT settings.",
+  /** sign-out failed */
+  signin_sign_out_failed: (a: { why: string | number }): string => "▲ couldn't sign out: " + String(a.why),
+  /** a role in a sentence: main */
+  role_who_main: "main",
+  /** a role in a sentence: the agents */
+  role_who_agents: "the agents",
+  /** a role in a sentence: small jobs */
+  role_who_small: "small jobs",
+  /** a role in a sentence: the checker */
+  role_who_checker: "the checker",
+  /** a role in a sentence: voice */
+  role_who_voice: "voice",
+  /** a role's fallback: the agents follow main */
+  role_same_as_main: "same as main",
+  /** a role's fallback: picked for you */
+  role_auto: "auto",
+  /** the roles' title */
+  roles_screen_title: "which model does what?",
+  /** the roles' line */
+  roles_screen_sub: "each role picks a provider, then a model. one provider can serve several.",
+  /** key bar: the roles */
+  bar_choose_change: "↑↓ choose   ⏎ change   esc back",
+  /** the effort's title */
+  roles_effort_title: "how hard should it think?",
+  /** the effort's line */
+  roles_effort_for: (a: { model: string | number; role: string | number }): string => String(a.model) + " for " + String(a.role),
+  /** an effort: the model's default */
+  roles_default: (a: { dot: string | number }): string => " " + String(a.dot) + " default",
+  /** agents on their own model: one */
+  roles_override_one: (a: { agent: string | number; dot: string | number; model: string | number }): string => "1 agent uses its own model: " + String(a.agent) + " " + String(a.dot) + " " + String(a.model),
+  /** agents on their own model: more */
+  roles_override_more: (a: { n: string | number; list: string | number }): string => String(a.n) + " agents use their own model: " + String(a.list),
+  /** a role's model from the environment */
+  roles_from: (a: { var: string | number }): string => "from " + String(a.var),
+  /** voice off */
+  roles_off: "off",
+  /** a role with no key */
+  roles_no_key: (a: { dot: string | number }): string => "no key " + String(a.dot) + " enter fixes it",
+  /** voice: none of the keys listens */
+  roles_voice_none: (a: { dot: string | number }): string => "off " + String(a.dot) + " none of your keys listens " + String(a.dot) + " enter sets it up",
+  /** voice off */
+  roles_voice_off: (a: { dot: string | number }): string => "off " + String(a.dot) + " enter sets it up",
+  /** the checker off */
+  roles_checker_off: (a: { dot: string | number }): string => "off " + String(a.dot) + " every command asks you",
+  /** a role with nothing picked */
+  roles_none_yet: (a: { dot: string | number }): string => "none yet " + String(a.dot) + " enter picks one",
+  /** a role following another */
+  roles_same_as: (a: { role: string | number }): string => "same as " + String(a.role),
+  /** what main is for */
+  roles_hint_main: "talks with you and starts the agents.",
+  /** what the agents are for */
+  roles_hint_agents: "the ones main starts, for the work it hands out.",
+  /** what small jobs are for */
+  roles_hint_small: "titles and summaries. a small fast model is enough.",
+  /** what the checker is for */
+  roles_hint_checker: "in auto, decides which commands run and which ask you.",
+  /** what voice is for */
+  roles_hint_voice: "writes down what you say. enter opens /voice.",
+  /** what leaves the machine with the checker */
+  roles_checker_sees: "the checker sees the command, the script it runs, and your request.",
+  /** voice's providers */
+  roles_voice_list: "only the providers that can listen. ctrl+r starts, any key stops.",
+  /** the checker off, now */
+  roles_now_off: (a: { dot: string | number }): string => "now: off " + String(a.dot) + " every command asks you",
+  /** nothing picked */
+  roles_nothing: "nothing picked yet.",
+  /** what a role runs now, by its fallback */
+  roles_now_rule: (a: { rule: string | number; dot: string | number; what: string | number; extra: string | number }): string => "now: " + String(a.rule) + " " + String(a.dot) + " " + String(a.what) + String(a.extra),
+  /** what a role runs now */
+  roles_now: (a: { what: string | number; extra: string | number }): string => "now: " + String(a.what) + String(a.extra),
+  /** a role's providers */
+  roles_which_provider: (a: { role: string | number }): string => String(a.role) + ": which provider?",
+  /** the checker: the chat models */
+  roles_or_chat: "  ── or a chat model checks ──",
+  /** the checker off: its line */
+  roles_every_asks: (a: { dot: string | number }): string => " " + String(a.dot) + " every command asks you",
+  /** what runs now */
+  roles_now_mark: (a: { dot: string | number }): string => " " + String(a.dot) + " now",
+  /** a provider ready */
+  roles_ready: "ready",
+  /** jev through a provider */
+  roles_jev_through: (a: { dot: string | number; provider: string | number }): string => " " + String(a.dot) + " jev through " + String(a.provider),
+  /** a note: now */
+  roles_note_now: "now",
+  /** a note: voice only */
+  roles_voice_only: "voice only",
+  /** the roles a provider runs: one */
+  roles_uses: (a: { role: string | number }): string => String(a.role) + " uses it",
+  /** the roles a provider runs: more */
+  roles_use: (a: { roles: string | number }): string => String(a.roles) + " use it",
+  /** a model's mark: the pick */
+  roles_recommended: "recommended",
+  /** esc on voice's first pick */
+  roles_not_now: "not now",
+  /** esc */
+  roles_back: "back",
+  /** key bar: a role's providers (esc: back or not now) */
+  bar_choose_esc: (a: { esc: string | number }): string => "↑↓ choose   ⏎ ok   esc " + String(a.esc),
+  /** voice's models' line */
+  roles_voice_sub: "you talk, it types in the composer.",
+  /** a role's models' line */
+  roles_models_sub: "type to filter, or a model id that isn't listed.",
+  /** a role's models */
+  roles_which_model: (a: { role: string | number; dot: string | number; provider: string | number }): string => String(a.role) + " " + String(a.dot) + " " + String(a.provider) + ": which model?",
+  /** a model: what runs now */
+  roles_now_glyph: (a: { glyph: string | number }): string => String(a.glyph) + " now",
+  /** a model: his ChatGPT plan pays */
+  roles_your_plan: "your ChatGPT plan",
+  /** no model listed */
+  roles_no_model: (a: { provider: string | number }): string => "  " + String(a.provider) + " has no model listed: type its id.",
+  /** /plugins: a login already open */
+  plugins_login_open: (a: { name: string | number }): string => "the login to " + String(a.name) + " is still open in your browser",
+  /** /plugins: a login starts */
+  plugins_login_opening: (a: { name: string | number }): string => "opening your browser to log in to " + String(a.name) + "…",
+  /** /plugins: a server needs a login */
+  plugins_needs_login: (a: { name: string | number }): string => String(a.name) + " needs a login: /plugins login",
+  /** /plugins login: none to log in */
+  plugins_no_login: "no remote MCP server that logs in (one without an Authorization header in its mcp.json)",
+  /** /plugins logout: done */
+  plugins_logged_out: (a: { name: string | number }): string => "logged out of " + String(a.name) + ".",
+  /** /plugins enable|disable: done (state: enabled or disabled; unchanged: plugins_unchanged or nothing) */
+  plugins_set: (a: { name: string | number; state: string | number; unchanged: string | number }): string => String(a.name) + " " + String(a.state) + String(a.unchanged) + " — applies at the next /reload",
+  /** a plugin turned on */
+  plugins_enabled: "enabled",
+  /** a plugin turned off */
+  plugins_disabled: "disabled",
+  /** a plugin already in that state */
+  plugins_unchanged: " (unchanged)",
+  /** /plugins with a wrong argument */
+  plugins_usage: "usage: /plugins [list] | /plugins enable NAME | /plugins disable NAME | /plugins login [NAME] | /plugins logout NAME",
+  /** release row: the first release */
+  release_first: "the first release",
+  /** release row: commits since the last tag */
+  release_since: (a: { n: number; since: string | number }): string => a.n === 1 ? String(a.n) + " commit since " + String(a.since) : String(a.n) + " commits since " + String(a.since),
+  /** release row: its head (before the tag) */
+  release_head: "release ",
+  /** release row: a dry run */
+  release_dry: " · dry run",
+  /** release row: commits not listed */
+  release_more: (a: { n: string | number }): string => "and " + String(a.n) + " more",
+  /** release row: a step's folded lines */
+  release_more_lines: (a: { n: number }): string => a.n === 1 ? "▸ " + String(a.n) + " more line" : "▸ " + String(a.n) + " more lines",
+  /** /version restart */
+  version_restart: "reload bise, nothing lost",
+  /** /version update */
+  version_update: "look for a new bise release now",
+  /** /version list */
+  version_list: "the installed versions",
+  /** /version rollback */
+  version_rollback: "back to the version before",
 } as const;

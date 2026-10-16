@@ -1870,7 +1870,7 @@ fn how_lines(t: u64, gap: usize, w: u16, digits: bool) -> Vec<Line<'static>> {
     blanks(&mut v, 1);
     v.push(if shown(3) { Line::from(s(HOW_FOOT, theme::faint())) } else { Line::raw("") });
     blanks(&mut v, gap);
-    v.push(if shown(3) { keyline(settings::first_how_key) } else { Line::raw("") });
+    v.push(if shown(3) { keyline(&settings::first_how_key("{any key}")) } else { Line::raw("") });
     v
 }
 
