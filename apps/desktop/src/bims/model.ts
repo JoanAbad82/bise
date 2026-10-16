@@ -3,9 +3,9 @@
 // the pure parts (activity.ts, layout.ts, paths.ts, timeline.ts, labels.ts: no three, no DOM, unit
 // tests on fake rows) and the effectful ones (render/: three.js; Office.tsx: the canvas, the label
 // overlay, the loop). Time is real time in seconds (`t`), read by the shell and passed in.
-// v1 reads only the rows' existing fields (the spec's [a]); `BimEvent` and `Activity.doing` are
-// the seam for his open questions q-planes / q-data (thread reads, a hub fact for who writes to
-// whom): empty in v1, nothing downstream changes when they fill. Owner: bims-lead.
+// It reads the rows (the spec's [a]) and the hub's two facts for his q-planes / q-data answers
+// (bims-facts, architect m_27522): Agent.doing -> Activity.doing, hub/activity -> BimEvent, both
+// mapped in the feed only, never from thread text. Owner: bims-lead.
 import type { Agent, Card, Place } from '@/proto';
 
 /** What the office reads at one moment: the bar's rows for one project, nothing else. */
@@ -34,7 +34,11 @@ export type ActivityKind =
   | 'stopped' // stopped by you: grey at its desk, lamp off
   | 'starting' // came in by the door
   | 'main' // main working at the big desk
-  | 'mainidle'; // main idle: reads the paper
+  | 'mainidle' // main idle: reads the paper
+  // from events (timeline.ts makes them, a few seconds each, then the row's activity again)
+  | 'coffee' // a message to an idle bim: both at the island
+  | 'visit' // a message to a busy bim: the sender at its desk (post-it or tap, Activity.mode)
+  | 'report'; // a report: the sender at main's desk with a sheet
 
 export type SpotKind = 'desk' | 'main' | 'lounge' | 'island' | 'board' | 'queue' | 'door' | 'terrace';
 
@@ -51,17 +55,37 @@ export interface Activity {
   readonly fruit?: number;
   /** a card holds running work (asks, urgent: jumps faster, holds a sheet) */
   readonly urgent?: boolean;
-  /** seam (q-data): what the thread says it does ('think', 'tool', ...). Never set in v1. */
-  readonly doing?: string;
+  /** what its turn does now (q-data, the hub's Agent.doing, bims-facts): working poses follow it (spec §4 [t]) */
+  readonly doing?: Doing;
+  /** the other bim of a message ('coffee', 'visit') */
+  readonly with?: string;
+  /** how the message went ('visit': queued = a post-it on its desk, steer = a tap on the shoulder) */
+  readonly mode?: 'steer' | 'queued';
 }
 
+/** The hub's Agent.doing kinds (architect m_27522, bims-facts m_27638); absent = nothing running. */
+export type Doing = 'think' | 'tool' | 'edit' | 'search' | 'computer' | 'image' | 'publish' | 'compact' | 'build' | 'unknown';
+
+/** Who a message is from or to: typed, never a name compared with 'you'. */
+export type Party = { readonly who: 'you' } | { readonly who: 'agent'; readonly name: string };
+
 /**
- * Seam (q-planes / q-data): something that happened between two snapshots that the rows don't
- * carry (his message to an agent, A writes to B). The shell passes `[]` in v1.
+ * What happened between two snapshots that the rows don't carry, from the hub's hub/activity
+ * notification (bims-facts) mapped in one place (the feed). His message is a message from
+ * { who: 'you' }: the paper plane. A message to an idle bim = coffee at the island; queued = a
+ * post-it; steer = a tap; a report = a sheet to main's desk. The timeline turns them into short
+ * segments ('coffee', 'visit', 'report') and planes; it never invents one.
  */
 export type BimEvent =
-  | { readonly kind: 'message'; readonly from: string; readonly to: string; readonly t: number }
-  | { readonly kind: 'his'; readonly to: string; readonly t: number };
+  | {
+      readonly kind: 'message';
+      readonly from: Party;
+      readonly to: Party;
+      readonly mode: 'steer' | 'queued' | 'unknown';
+      readonly expectsReply: boolean;
+      readonly t: number;
+    }
+  | { readonly kind: 'report'; readonly agent: string; readonly report: 'progress' | 'done' | 'failed' | 'blocked'; readonly t: number };
 
 /** A point on the floor, in office units (1 = one floor tile); x right, z towards the viewer. */
 export interface Pt {
