@@ -7,11 +7,12 @@
 1 apps/desktop/tests/checks/agents/archived.spec.ts  # lint shape: 'n answers' is a test's words, not thread.event_answers
 1 apps/desktop/tests/checks/agents/settings.spec.ts  # lint shape: a test description, not settings.role_model
 1 apps/desktop/tests/checks/app/add-sheet.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
-1 apps/desktop/tests/checks/app/agents-bar.spec.ts  # lint shape: the worktree tip's other words, not composer.tab_worktree_at
+2 apps/desktop/tests/checks/app/agents-bar.spec.ts  # lint shape: the worktree tip's other words, not composer.tab_worktree_at; the bar's 'waits to land · 2nd', not bims.state_in_line
 1 apps/desktop/tests/checks/app/archived-fold.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
 2 apps/desktop/tests/checks/app/artifact-view.spec.ts  # a part of composer's '↳ to bise · about …' tab in toContainText: composer to move it whole
 1 apps/desktop/tests/checks/app/clicks.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
 1 apps/desktop/tests/checks/app/list-walk.spec.ts  # lint shape: a rule's note in the fixture, and 'remove it?' is settings': settings to check
+1 apps/desktop/tests/checks/app/proj-menu.spec.ts  # lint shape: the project menu's 'waiting on perf', not bims.state_waits_on
 1 apps/desktop/tests/checks/app/sidebar-lights.spec.ts  # lint shape: 'full screen' is the window's state here, not inbox.key_full
 1 apps/desktop/tests/checks/app/sidebar-v6.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
 2 apps/desktop/tests/checks/artifacts/open-cases.spec.ts  # a part of composer's '↳ to bise · about …' tab in toContainText: composer to move it whole
@@ -39,6 +40,7 @@
 2 apps/desktop/tests/checks/thread/news-rows.spec.ts  # scheduled rows' whole lines: scheduled to move them
 1 apps/desktop/tests/checks/thread/parts.spec.ts  # lint shape: a part chip's label, not composer.quote_about
 1 apps/desktop/tests/checks/thread/tiers.spec.ts  # a wake row's words (not scheduled.ended): thread to move it
+2 apps/desktop/tests/checks/thread/waiting-failed.spec.ts  # lint shape: the thread's 'waiting on bise' / 'waiting on you', not bims.state_waits_on
 3 apps/desktop/tests/checks/thread/wake.spec.ts  # wake rows' words (not scheduled.ended): thread to move them
 1 tests/tui_computer_use_tmux.py  # lint shape: 'for apps' is computer use's grant text, settings to check
 1 tests/tui_file_links_tmux.py  # lint shape: the file-link note, not settings.first_opening
