@@ -20,3 +20,4 @@ fake_provider.py | time.sleep(float(sc["slow"])) | a $FAKE_SCRIPTS script's "slo
 fake_provider.py | time.sleep(gap) | the fake model's [[drip: N S]] and [[split: S]] streams (issue 13): a stream that generates slowly, or pauses inside an event, is the input
 fake_repl_flood.py | time.sleep(0.02) | the flooding fake REPL's pace: a batch of lines every 20 ms (FLOOD_RATE per second) is the input of hub_flood_e2e
 hub_flood_e2e.py | time.sleep(STATE_WINDOW_S) | the window the state events are counted in: at most ~10 per second while the REPLs flood is the behavior under test
+tui_roles_tmux.py | time.sleep(0.5) | the dictation retry test: the next ctrl+r must come after voicemode::DOUBLE_CTRL_R (400 ms) or it reads as ctrl+r twice and opens voice mode; the gap between two key presses is the input under test (2b65c3580)
