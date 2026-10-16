@@ -212,8 +212,8 @@ export type MakeRenderer = (canvas: HTMLCanvasElement) => OfficeRenderer;
 /** What the overlay shows over one bim (labels.ts): nothing at rest, the spec's §2. */
 export interface Label {
   readonly name: string;
-  /** 'name' while walking or ctrl held, 'event' the 3 s after an event, 'hover' the tip line */
-  readonly mode: 'name' | 'event' | 'hover';
+  /** 'name' while walking or ctrl held, 'event' the 3 s after an event, 'hover' the tip line, 'pill' the '?' / '✗' alone (no name drawn, words '') */
+  readonly mode: 'name' | 'event' | 'hover' | 'pill';
   /** the words after the name ('done', '→ dark-mode'); '' for a name alone */
   readonly words: string;
   /** '?' pink (asks you) or '✗' red (failed): shown without a name, always */
