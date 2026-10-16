@@ -49,3 +49,18 @@ Done when every area is moved, a word changed in the catalog alone moves
 the TUI, the desktop and every test with no test edit (full gate green on
 a throwaway branch), and word_literals.txt is empty or each line left
 names its owner.
+
+## Follow-up: a nightly word mutation (architect m_27743)
+
+The end proof (one word changed in the catalog only) found 4 unit tests
+that hard-coded the word: the ratchet reads tests/*_tmux.py and
+apps/desktop/tests/** only. It stays so: in a Rust or vitest unit test a
+literal is often the expected output of formatting logic (clip, fit,
+plural), which a lint can't tell from a word that should be a key.
+
+Instead, make the proof repeatable: a nightly step that, in a scratch
+tree, rewrites every catalog text (a marker added to each, its holes
+kept), regenerates (BISE_PROTO_BLESS=1), and runs the Rust and vitest unit
+tests and the files word_lint reads. A test red there hard-codes a word:
+the report names it, and its fix builds the expected value from the key
+and its args. Owner: words-lead, or whoever main gives it.
