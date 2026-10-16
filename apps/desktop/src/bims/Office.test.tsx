@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Agent } from '@/proto';
 import type { Activity, Label, Motion, Office as OfficeMap, OfficeRenderer, Pose, Timeline } from './model';
-import { BimsSwitch, labelsSig, Office, tagLeft, tagOf, type Parts } from './Office';
+import { BimsSwitch, labelsSig, Office, tagOf, type Parts } from './Office';
 import { bimsView } from './view';
 
 // ---- a hand-driven rAF: a test runs the frames itself
@@ -244,15 +244,5 @@ describe('the overlay', () => {
     expect(onOpen).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByTestId('app.right.bims'), { clientX: 200, clientY: 10 });
     expect(onOpen).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('tagLeft', () => {
-  it('centres a tag on the head and holds it inside the office (bims-qa m_27780: the 320 hover line)', () => {
-    expect(tagLeft(160, 100, 320)).toBe(110);
-    expect(tagLeft(30, 325, 320)).toBe(4);
-    expect(tagLeft(20, 100, 320)).toBe(4);
-    expect(tagLeft(300, 100, 320)).toBe(216);
-    expect(tagLeft(160, 100, 0)).toBe(110);
   });
 });

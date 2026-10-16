@@ -35,18 +35,32 @@
   padding-bottom: var(--s-1);
   white-space: nowrap;
   will-change: transform;
-  /* never wider than the office (Office.tsx tagLeft keeps it inside): a longer line ends in '…' */
+  /* never wider than the office: Office.tsx cuts a long line on a whole word with a glued '…' (tags.ts cutWords) */
   max-width: calc(100% - 2 * var(--s-1));
+  z-index: 1;
+}
+/* a '?' / '✗' pill alone draws over every label (it is what needs him) */
+.bims-tag[data-mode='pill'] {
+  z-index: 2;
+}
+/* a label moved off its bim (tags.ts placeTags): a 1 px leader back to its head */
+.bims-leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  stroke: var(--c-text-3);
+  stroke-width: 1;
 }
 .bims-label {
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   padding: 0 var(--s-1);
   border-radius: var(--r-1);
   background: color-mix(in srgb, var(--c-solid) 85%, transparent);
   color: var(--c-text);
-  font: var(--t-11) / 1.5 var(--font-mono);
+  font: var(--t-12) / 1.5 var(--font-ui);
   animation: bims-in var(--d-base) var(--ease-out, ease-out);
 }
 /* a walking bim's name: small and dim (spec §2) */

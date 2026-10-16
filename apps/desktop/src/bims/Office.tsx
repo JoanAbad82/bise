@@ -7,9 +7,9 @@
 // none while the window is away. A lost WebGL context (or a renderer that fails to load) shows the
 // list with one line, never a blank section. Hover: the bim under the pointer (renderer.pick) shows
 // its line after the tip's 400 ms; a click opens it as its row's click does. Owner: bims-wire.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Press, tipAttrs } from '@/ds';
-import { reducedMotion } from '@/ds/hooks';
+import { reducedMotion, textWidth } from '@/ds/hooks';
 import type { Agent, Card, Place } from '@/proto';
 import { bims } from '@/proto/words_bims.gen';
 import { useModHeld } from '@/app/held';
@@ -17,6 +17,7 @@ import type { ActivitiesFn, BimEvent, BimFrame, Label, LabelsFn, LayoutFn, Look,
 import { away, CHECK_MS, HOVER_MS, nextAfter, TICK_MS } from './loop';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
+import { cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
 import './office.css';
 
 /** The pure modules and the renderer's loader: feed.ts's, or fakes in a test. */
@@ -39,7 +40,7 @@ export function BimsSwitch({ view }: { view: BimsView }) {
   );
   return (
     <>
-      {view.view === 'bims' && (
+      {view.view === 'bims' && !view.lost && (
         <span className="bims-switch" data-testid="app.right.agents.width">
           {opt('width.narrow', bims.width_narrow, bims.width_narrow_tip, !view.wide, () => {
             bimsView.setWide(false);
@@ -68,13 +69,15 @@ export function tagOf(l: Label): { readonly text: string | null; readonly pill: 
   return { text: l.words === '' ? l.name : `${l.name} · ${l.words}`, pill: l.pill };
 }
 
-/** A tag's left edge: centred on the head at x, held TAG_INSET px inside a box `box` px wide (a tag wider than it starts at the inset). Pure. */
-export function tagLeft(x: number, w: number, box: number): number {
-  const left = x - w / 2;
-  if (box <= 0) return left;
-  return Math.max(TAG_INSET, Math.min(left, box - TAG_INSET - w));
+/** px a label's chip adds to its words (its padding), and a pill beside it with its gap */
+const CHIP_PAD = 8;
+const PILL_ROOM = 20;
+
+/** The labels' font for measuring a cut: the ds's sans at 12 px (office.css .bims-label). */
+function labelFont(): string {
+  const ui = typeof document === 'undefined' ? '' : getComputedStyle(document.documentElement).getPropertyValue('--font-ui').trim();
+  return `12px ${ui === '' ? 'sans-serif' : ui}`;
 }
-const TAG_INSET = 4;
 
 /** The labels' content, to re-render the overlay only when it changes (not at each frame). Pure. */
 export function labelsSig(labels: ReadonlyMap<string, Label>): string {
@@ -130,6 +133,10 @@ export function Office({
   const holder = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const tags = useRef(new Map<string, HTMLDivElement>());
+  const leaders = useRef<SVGSVGElement>(null);
+  // the office's width, for the cut of a long line (whole words, a glued '…')
+  const [boxW, setBoxW] = useState(0);
+  const measure = useMemo(() => textWidth(labelFont()), []);
   const heads = useRef(new Map<string, { x: number; y: number }>());
   const kickRef = useRef<() => void>(() => undefined);
   // the bim under a point of the canvas, css px: the renderer's once loaded
@@ -154,13 +161,31 @@ export function Office({
     kickRef.current();
   });
 
-  const place = useCallback((el: HTMLDivElement, name: string) => {
-    const h = heads.current.get(name);
-    el.style.visibility = h === undefined ? 'hidden' : '';
-    if (h === undefined) return;
-    // centred over the head, held inside the office (a long hover line at 320 never leaves it, bims-qa m_27780)
-    const x = tagLeft(h.x, el.offsetWidth, holder.current?.clientWidth ?? 0);
-    el.style.transform = `translate(${x.toFixed(1)}px, ${h.y.toFixed(1)}px) translate(0, -100%)`;
+  // every tag over its bim, inside the office, none over another (tags.ts placeTags); a moved one
+  // gets its 1 px leader. The hovered one first, then the labels' own order (newest events first).
+  const layoutTags = useCallback(() => {
+    const box = holder.current;
+    if (box === null) return;
+    const ins: TagIn[] = [];
+    for (const [name, el] of tags.current) {
+      const h = heads.current.get(name);
+      el.style.visibility = h === undefined ? 'hidden' : '';
+      if (h !== undefined) ins.push({ name, x: h.x, y: h.y, w: el.offsetWidth, h: el.offsetHeight, pill: el.dataset.mode === 'pill' });
+    }
+    ins.sort((a, b) => Number(tags.current.get(b.name)?.dataset.mode === 'hover') - Number(tags.current.get(a.name)?.dataset.mode === 'hover'));
+    const { at } = placeTags(ins, box.clientWidth, box.clientHeight);
+    let lines = '';
+    for (const t of ins) {
+      const p = at.get(t.name);
+      const el = tags.current.get(t.name);
+      if (p === undefined || el === undefined) continue;
+      el.style.transform = `translate(${p.left.toFixed(1)}px, ${p.top.toFixed(1)}px)`;
+      if (!p.lead) continue;
+      const lx = Math.min(Math.max(t.x, p.left), p.left + t.w);
+      const ly = p.top + t.h <= t.y ? p.top + t.h : p.top;
+      lines += `<line x1="${lx.toFixed(1)}" y1="${ly.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}"/>`;
+    }
+    if (leaders.current !== null && leaders.current.innerHTML !== lines) leaders.current.innerHTML = lines;
   }, []);
 
   useEffect(() => {
@@ -189,6 +214,7 @@ export function Office({
       lost = true;
       cancel();
       if (!gone) setState('lost');
+      bimsView.setLost(true);
     };
     const resize = () => {
       if (r === null) return;
@@ -196,6 +222,7 @@ export function Office({
       if (w <= 0) return;
       const h = r.setSize(w, 4000);
       box.style.height = `${String(Math.round(h))}px`;
+      setBoxW(w);
     };
     const draw = () => {
       raf = 0;
@@ -232,7 +259,7 @@ export function Office({
         const h = r.headOf(name);
         if (h !== null) heads.current.set(name, h);
       }
-      for (const [name, el] of tags.current) place(el, name);
+      layoutTags();
       const sig = labelsSig(shown);
       if (sig !== lastLabels) {
         lastLabels = sig;
@@ -294,6 +321,7 @@ export function Office({
         timeline = parts.newTimeline();
         live.current.fresh = true;
         setState('on');
+        bimsView.setLost(false);
         resize();
         kick();
       })
@@ -314,7 +342,7 @@ export function Office({
       pick.current = () => null;
       r?.dispose();
     };
-  }, [parts, place]);
+  }, [parts, layoutTags]);
 
   // hover: the bim under the pointer, its line after the tip's delay; off it, at once
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -383,6 +411,7 @@ export function Office({
       >
         <canvas ref={canvas} className="bims-canvas" data-testid="app.right.bims.canvas" />
         <div className="bims-overlay">
+          <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
           {[...labels.values()].map((l) => {
             const tag = tagOf(l);
             return (
@@ -394,13 +423,13 @@ export function Office({
                   if (el === null) tags.current.delete(l.name);
                   else {
                     tags.current.set(l.name, el);
-                    place(el, l.name);
+                    layoutTags();
                   }
                 }}
               >
                 {tag.text !== null && (
                   <span className="bims-label" data-mode={l.mode} data-testid={`app.right.bims.label.${l.name}`}>
-                    {tag.text}
+                    {boxW > 0 ? cutWords(tag.text, boxW - 2 * TAG_INSET - CHIP_PAD - (tag.pill === null ? 0 : PILL_ROOM), measure) : tag.text}
                   </span>
                 )}
                 {tag.pill !== null && (

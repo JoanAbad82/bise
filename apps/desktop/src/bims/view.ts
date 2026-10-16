@@ -18,6 +18,8 @@ const WIDE_KEY = 'frame.rb.agents.wide';
 export interface BimsView {
   readonly view: AgentsView;
   readonly wide: boolean;
+  /** the office couldn't draw here (WebGL lost): the list shows, no width toggle, never wide. Not kept. */
+  readonly lost?: boolean;
 }
 
 /** A kept value read back: anything but 'bims' is the list (the default), anything but true is 320. Pure. */
@@ -48,6 +50,10 @@ export const bimsView = {
   setWide(wide: boolean): void {
     if (read().wide !== wide) write({ ...read(), wide });
   },
+  /** Office.tsx: the office lost its WebGL context (true) or draws again (false) */
+  setLost(lost: boolean): void {
+    if ((read().lost === true) !== lost) write({ ...read(), lost });
+  },
   /** tests: forget the cached value (keep.ts was reset under it) */
   reset(): void {
     current = null;
@@ -66,7 +72,7 @@ export function useBimsView(): BimsView {
 
 /** Whether the bar shows wide now: bims on, wide picked, and a project's bar (bise's thread keeps the list in v1). Pure. */
 export function showsWide(v: BimsView, project: string | undefined): boolean {
-  return v.view === 'bims' && v.wide && project !== undefined && project !== '';
+  return v.view === 'bims' && v.wide && v.lost !== true && project !== undefined && project !== '';
 }
 
 /**

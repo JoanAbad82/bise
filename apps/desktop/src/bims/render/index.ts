@@ -25,6 +25,10 @@ interface Probe {
   head(name: string): { x: number; y: number } | null;
 }
 const TRACE_MAX = 3000;
+/** his plane's length in office units (plane.ts's wings), its least length on screen, and the iso view's shortening of it */
+const PLANE_LEN = 0.42;
+const PLANE_MIN_PX = 12;
+const PLANE_FORESHORTEN = 1.25;
 
 const testMode = (): boolean => (window as Partial<Window> & { bise?: { test?: boolean } }).bise?.test === true;
 
@@ -129,6 +133,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       const hand = { x: rig.x, y: 1.0, z: rig.z };
       const fl = flightAt(hand, aboveTop(fit, hand), s);
       p.group.visible = true;
+      // never smaller than PLANE_MIN_PX on screen (designer via bims-qa m_27793: at 320 it was a speck)
+      p.group.scale.setScalar(Math.max(1, (PLANE_MIN_PX * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN));
       p.group.position.set(fl.p.x, fl.p.y, fl.p.z);
       p.group.lookAt(fl.p.x + fl.heading.x, fl.p.y + fl.heading.y, fl.p.z + fl.heading.z);
       p.group.rotateZ(fl.roll);
