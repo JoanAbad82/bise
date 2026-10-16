@@ -13,7 +13,7 @@ import { reducedMotion, textWidth } from '@/ds/hooks';
 import type { Agent, Card, Place } from '@/proto';
 import { bims } from '@/proto/words_bims.gen';
 import { useModHeld } from '@/app/held';
-import type { ActivitiesFn, BimEvent, BimFrame, Label, LabelsFn, LayoutFn, Look, MakeRenderer, NewTimelineFn, Office as OfficeMap, OfficeRenderer, Snapshot, Timeline } from './model';
+import type { ActivitiesFn, ActivityKind, BimEvent, BimFrame, Label, LabelsFn, LayoutFn, Look, MakeRenderer, NewTimelineFn, Office as OfficeMap, OfficeRenderer, Snapshot, Timeline } from './model';
 import { away, CHECK_MS, HOVER_MS, nextAfter, TICK_MS } from './loop';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
@@ -67,6 +67,13 @@ export function tagOf(l: Label): { readonly text: string | null; readonly pill: 
   // 'pill': the '?' / '✗' alone at rest, no name; hover, ctrl or an event give it its line
   if (l.mode === 'pill') return { text: null, pill: l.pill };
   return { text: l.words === '' ? l.name : `${l.name} · ${l.words}`, pill: l.pill };
+}
+
+/** A bim's place in line for a label's room (designer m_27799): with a pill first, then working, then quiet. Pure. */
+export function tagRank(k: ActivityKind): number {
+  if (k === 'asks' || k === 'failed') return 1;
+  if (k === 'work' || k === 'hot' || k === 'main' || k === 'starting' || k === 'landing' || k === 'visit' || k === 'report') return 2;
+  return 3;
 }
 
 /** px a label's chip adds to its words (its padding), and a pill beside it with its gap */
@@ -134,6 +141,9 @@ export function Office({
   const canvas = useRef<HTMLCanvasElement>(null);
   const tags = useRef(new Map<string, HTMLDivElement>());
   const leaders = useRef<SVGSVGElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+  // each bim's place in line for a label's room this frame (tagRank)
+  const ranks = useRef(new Map<string, number>());
   // the office's width, for the cut of a long line (whole words, a glued '…')
   const [boxW, setBoxW] = useState(0);
   const measure = useMemo(() => textWidth(labelFont()), []);
@@ -162,7 +172,9 @@ export function Office({
   });
 
   // every tag over its bim, inside the office, none over another (tags.ts placeTags); a moved one
-  // gets its 1 px leader. The hovered one first, then the labels' own order (newest events first).
+  // gets its 1 px leader, one with no room is left out and counted in the corner while ctrl is held
+  // (designer m_27799). Room goes first to the hovered one, then to bims with a pill, then to
+  // working ones, then to the quiet ones (tagRank), the labels' own order among equals.
   const layoutTags = useCallback(() => {
     const box = holder.current;
     if (box === null) return;
@@ -170,15 +182,20 @@ export function Office({
     for (const [name, el] of tags.current) {
       const h = heads.current.get(name);
       el.style.visibility = h === undefined ? 'hidden' : '';
-      if (h !== undefined) ins.push({ name, x: h.x, y: h.y, w: el.offsetWidth, h: el.offsetHeight, pill: el.dataset.mode === 'pill' });
+      if (h === undefined) continue;
+      const rank = el.dataset.mode === 'hover' ? 0 : (ranks.current.get(name) ?? 3);
+      ins.push({ name, x: h.x, y: h.y, w: el.offsetWidth, h: el.offsetHeight, pill: el.dataset.mode === 'pill', rank });
     }
-    ins.sort((a, b) => Number(tags.current.get(b.name)?.dataset.mode === 'hover') - Number(tags.current.get(a.name)?.dataset.mode === 'hover'));
-    const { at } = placeTags(ins, box.clientWidth, box.clientHeight);
+    const { at, left } = placeTags(ins, box.clientWidth, box.clientHeight);
+    const more = left > 0 && live.current.held ? bims.held_left_out({ n: left }) : '';
+    if (moreRef.current !== null && moreRef.current.textContent !== more) moreRef.current.textContent = more;
     let lines = '';
     for (const t of ins) {
       const p = at.get(t.name);
       const el = tags.current.get(t.name);
-      if (p === undefined || el === undefined) continue;
+      if (el === undefined) continue;
+      el.style.visibility = p === undefined ? 'hidden' : '';
+      if (p === undefined) continue;
       el.style.transform = `translate(${p.left.toFixed(1)}px, ${p.top.toFixed(1)}px)`;
       if (!p.lead) continue;
       const lx = Math.min(Math.max(t.x, p.left), p.left + t.w);
@@ -254,6 +271,7 @@ export function Office({
       const look: Look = { night: nightNow(), reduced };
       const motion = r.frame(t, frames, look);
       const shown = parts.labelsOf(frames, { t, hover: L.hover, held: L.held, agents: L.agents });
+      ranks.current = new Map(frames.map((f) => [f.name, tagRank(f.pose.seg.act.k)]));
       heads.current = new Map();
       for (const name of shown.keys()) {
         const h = r.headOf(name);
@@ -412,6 +430,7 @@ export function Office({
         <canvas ref={canvas} className="bims-canvas" data-testid="app.right.bims.canvas" />
         <div className="bims-overlay">
           <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
+          <div ref={moreRef} className="bims-more" data-testid="app.right.bims.more" />
           {[...labels.values()].map((l) => {
             const tag = tagOf(l);
             return (

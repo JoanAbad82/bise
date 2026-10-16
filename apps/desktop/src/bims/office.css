@@ -43,6 +43,18 @@
 .bims-tag[data-mode='pill'] {
   z-index: 2;
 }
+/* ctrl held and some names had no room: '+3 names · hover a bim', faint, bottom right (designer m_27799) */
+.bims-more {
+  position: absolute;
+  right: var(--s-1);
+  bottom: var(--s-1);
+  color: var(--c-text-3);
+  font: var(--t-12) / 1.5 var(--font-ui);
+  white-space: nowrap;
+}
+.bims-more:empty {
+  display: none;
+}
 /* a label moved off its bim (tags.ts placeTags): a 1 px leader back to its head */
 .bims-leaders {
   position: absolute;

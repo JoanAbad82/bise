@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cutWords, placeTags, tagLeft, type TagIn } from './tags';
 
-const tag = (name: string, x: number, y: number, w = 60, pill = false): TagIn => ({ name, x, y, w, h: 16, pill });
+const tag = (name: string, x: number, y: number, w = 60, pill = false, rank = 3): TagIn => ({ name, x, y, w, h: 16, pill, rank });
 const boxes = (at: ReturnType<typeof placeTags>['at'], tags: readonly TagIn[]) =>
   tags.map((t) => ({ ...must(at.get(t.name)), w: t.w, h: t.h }));
 function must<T>(x: T | undefined): T {
@@ -21,43 +21,54 @@ describe('tagLeft', () => {
   });
 });
 
-describe('placeTags (designer via bims-qa m_27793)', () => {
+describe('placeTags (designer m_27793, m_27799)', () => {
   it('a lone tag sits over its head, no leader', () => {
-    const { at, column } = placeTags([tag('a', 100, 80)], 320, 200);
+    const { at, left } = placeTags([tag('a', 100, 80)], 320, 200);
     expect(at.get('a')).toEqual({ left: 70, top: 64, lead: false });
-    expect(column).toBe(false);
+    expect(left).toBe(0);
   });
 
-  it('a pill never moves; a label on it moves up one label height, with a leader', () => {
+  it('a pill never moves off its bim; a label on it moves up one label height, with a leader', () => {
     const tags = [tag('lbl', 100, 80), tag('pil', 100, 80, 16, true)];
     const { at } = placeTags(tags, 320, 200);
     expect(at.get('pil')).toEqual({ left: 92, top: 64, lead: false });
     expect(at.get('lbl')).toEqual({ left: 70, top: 48, lead: true });
   });
 
-  it('then down when up is taken or out of the office', () => {
+  it('a pill stays inside the office (a head near its bottom edge)', () => {
+    const { at } = placeTags([tag('pil', 100, 300, 16, true)], 320, 200);
+    expect(at.get('pil')).toEqual({ left: 92, top: 180, lead: false });
+  });
+
+  it('then down when up is out of the office', () => {
     const tags = [tag('a', 100, 18), tag('b', 100, 18)];
     const { at } = placeTags(tags, 320, 200);
     expect(at.get('b')).toEqual({ left: 70, top: 18, lead: true });
   });
 
-  it('no two tags overlap, whatever the pile (ctrl held in main\'s corner)', () => {
-    const tags = [tag('p1', 280, 60, 16, true), tag('m', 280, 60), tag('x', 270, 64), tag('y', 290, 70, 80)];
-    const { at } = placeTags(tags, 320, 200);
-    const b = boxes(at, tags);
-    for (let i = 0; i < b.length; i++) for (let j = i + 1; j < b.length; j++) expect(overlap(must(b[i]), must(b[j])), `${String(i)} ${String(j)}`).toBe(false);
+  it('no two tags overlap and none leaves the office, whatever the pile (ctrl held, 16 names at 320)', () => {
+    const tags = Array.from({ length: 16 }, (_, i) => tag(`n${String(i)}`, 120 + (i % 4) * 24, 60 + Math.floor(i / 4) * 10, i % 5 === 0 ? 16 : 70, i % 5 === 0, i % 3));
+    const { at, left } = placeTags(tags, 320, 204);
+    const shown = tags.filter((t) => at.has(t.name));
+    expect(shown.length + left).toBe(16);
+    const b = boxes(at, shown);
+    for (const r of b) expect(r.top >= 0 && r.top + r.h <= 204 && r.left >= 4 && r.left + r.w <= 316).toBe(true);
+    // two pills never move, so only they may meet; a label never meets anything
+    for (let i = 0; i < b.length; i++)
+      for (let j = i + 1; j < b.length; j++)
+        if (!(must(shown[i]).pill && must(shown[j]).pill)) expect(overlap(must(b[i]), must(b[j])), `${String(i)} ${String(j)}`).toBe(false);
+    // every pill shows
+    for (const t of tags.filter((x) => x.pill)) expect(at.has(t.name)).toBe(true);
   });
 
-  it('no room after two moves: every tag in a column at the left edge, each with its leader', () => {
-    const tags = [tag('a', 100, 40), tag('b', 100, 40), tag('c', 100, 40), tag('d', 100, 40)];
-    const { at, column } = placeTags(tags, 320, 200);
-    expect(column).toBe(true);
-    expect([...at.values()].map((p) => [p.left, p.top, p.lead])).toEqual([
-      [4, 4, true],
-      [4, 22, true],
-      [4, 40, true],
-      [4, 58, true],
-    ]);
+  it('no room: the quiet one is left out and counted, never one that waits on him', () => {
+    const tags = [tag('quiet', 100, 40, 60, false, 3), tag('asks', 100, 40, 60, false, 1), tag('work', 100, 40, 60, false, 2)];
+    const box = { w: 320, h: 40 };
+    const { at, left } = placeTags(tags, box.w, box.h);
+    expect(at.has('asks')).toBe(true);
+    expect(at.has('work')).toBe(true);
+    expect(at.has('quiet')).toBe(false);
+    expect(left).toBe(1);
   });
 });
 

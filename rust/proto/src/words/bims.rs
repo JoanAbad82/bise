@@ -80,4 +80,8 @@ crate::words! { bims:
     width_wide_tip = "the bar at 640 px while the office shows";
     /// one line over the list when the office can't draw (WebGL lost)
     lost = "can't draw the office here: the list shows instead";
+
+    // ---- ctrl held: every name that has room near its bim (designer m_27799)
+    /// the office's bottom-right corner when names had no room, so 'every name' never quietly lies
+    held_left_out(n) = one "+{n} name · hover a bim" | "+{n} names · hover a bim";
 }

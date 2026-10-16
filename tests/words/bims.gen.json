@@ -52,6 +52,13 @@
     "one": null,
     "text": "failed"
   },
+  "bims.held_left_out": {
+    "args": [
+      "n"
+    ],
+    "one": "+{n} name · hover a bim",
+    "text": "+{n} names · hover a bim"
+  },
   "bims.idle": {
     "args": [],
     "one": null,
