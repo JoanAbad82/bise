@@ -35,8 +35,13 @@
   padding-bottom: var(--s-1);
   white-space: nowrap;
   will-change: transform;
+  /* never wider than the office (Office.tsx tagLeft keeps it inside): a longer line ends in '…' */
+  max-width: calc(100% - 2 * var(--s-1));
 }
 .bims-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0 var(--s-1);
   border-radius: var(--r-1);
   background: color-mix(in srgb, var(--c-solid) 85%, transparent);

@@ -68,6 +68,14 @@ export function tagOf(l: Label): { readonly text: string | null; readonly pill: 
   return { text: l.words === '' ? l.name : `${l.name} · ${l.words}`, pill: l.pill };
 }
 
+/** A tag's left edge: centred on the head at x, held TAG_INSET px inside a box `box` px wide (a tag wider than it starts at the inset). Pure. */
+export function tagLeft(x: number, w: number, box: number): number {
+  const left = x - w / 2;
+  if (box <= 0) return left;
+  return Math.max(TAG_INSET, Math.min(left, box - TAG_INSET - w));
+}
+const TAG_INSET = 4;
+
 /** The labels' content, to re-render the overlay only when it changes (not at each frame). Pure. */
 export function labelsSig(labels: ReadonlyMap<string, Label>): string {
   let s = '';
@@ -149,7 +157,10 @@ export function Office({
   const place = useCallback((el: HTMLDivElement, name: string) => {
     const h = heads.current.get(name);
     el.style.visibility = h === undefined ? 'hidden' : '';
-    if (h !== undefined) el.style.transform = `translate(${h.x.toFixed(1)}px, ${h.y.toFixed(1)}px) translate(-50%, -100%)`;
+    if (h === undefined) return;
+    // centred over the head, held inside the office (a long hover line at 320 never leaves it, bims-qa m_27780)
+    const x = tagLeft(h.x, el.offsetWidth, holder.current?.clientWidth ?? 0);
+    el.style.transform = `translate(${x.toFixed(1)}px, ${h.y.toFixed(1)}px) translate(0, -100%)`;
   }, []);
 
   useEffect(() => {
