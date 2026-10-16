@@ -133,7 +133,18 @@ export interface Pose extends Pt {
   /** seconds since its segment started (the renderer's loops and transitions) */
   readonly since: number;
   readonly seg: Segment;
+  /** his message flying to it (q-planes): seconds since the plane left the top edge (flight ~1.5 s, then the catch ~2 s) */
+  readonly plane?: { readonly since: number };
 }
+
+/**
+ * How the loop runs after a frame (battery, architect m_27495): 'walk' at the display's rate (a walk,
+ * a transition, a plane, a fade), 'loop' at LOOP_FPS (only ambient loops: typing, the '?' jumps),
+ * 'still' stopped until the next snapshot, hover, size or theme change. Asleep, napping, on the
+ * terrace, failed, blocked, stopped or in line are still poses: no breathing loop in v1.
+ */
+export type Motion = 'walk' | 'loop' | 'still';
+export const LOOP_FPS = 8;
 
 // ---- the pure modules' entry points (each module exports a function of this type under that name)
 
@@ -184,8 +195,8 @@ export interface OfficeRenderer {
   setOffice(office: Office, agents: readonly Agent[]): void;
   /** css px; the camera fits the office to the width (never cropped), returns the height it takes */
   setSize(widthPx: number, maxHeightPx: number): number;
-  /** draw time t; true while something still moves (the loop stops when every bim is still) */
-  frame(t: number, bims: readonly BimFrame[], look: Look): boolean;
+  /** draw time t; how the loop must run next (Motion). Reduced motion: never 'loop' */
+  frame(t: number, bims: readonly BimFrame[], look: Look): Motion;
   /** a bim's head on the canvas, css px from its top left (labels and pills go there); null off view */
   headOf(name: string): { readonly x: number; readonly y: number } | null;
   /** the bim (or its desk) under a canvas point, css px; null on nothing */
