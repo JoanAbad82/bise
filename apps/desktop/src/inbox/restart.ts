@@ -8,6 +8,7 @@
 // but for appBuild/appSwap, the two reads of window.bise. Owner: amb-home.
 
 import type { AppUpdate, BiseApi } from '@/shared/api';
+import { inbox } from '@/proto/words_inbox.gen';
 
 /** amb-mac's window.bise.app.update() (38a0bbe3). */
 export type AppBuild = AppUpdate;
@@ -34,7 +35,7 @@ export function restartTail(app: AppBuild | null, hub: string | null): RestartTa
 
 /** The tail's words (the act ⏎ restart to update is drawn apart). Pure. */
 export function tailWords(t: RestartTail): string {
-  return t.kind === 'staged' ? `this app is ${t.live}, a newer one is ready` : `this app is ${t.live} · it updates at the next try`;
+  return t.kind === 'staged' ? inbox.restart_staged({ live: t.live }) : inbox.restart_older({ live: t.live });
 }
 
 type AppApi = BiseApi['app'];
@@ -60,7 +61,7 @@ export async function appBuild(): Promise<AppBuild | null> {
  * started (the app quits ~50 ms later), else the refusal's why. */
 export async function appSwap(route: string | undefined): Promise<string | null> {
   const api = appApi();
-  if (api === null) return 'this app cannot restart itself';
+  if (api === null) return inbox.restart_cannot;
   try {
     const r = await api.swap(route);
     return r.ok ? null : r.why;

@@ -8,6 +8,8 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Card, Part } from '@/proto';
 import type { OptAct } from '@/proto/rows';
+import { inbox } from '@/proto/words_inbox.gen';
+import { common } from '@/proto/words_common.gen';
 import { Dot, Kbd, Row } from '@/ds';
 import { age, dotOf, InboxCard, RefusedMark, titleOf } from './InboxCard';
 import { cardKey } from './order';
@@ -185,11 +187,11 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
   return (
     <>
       {tip}
-      <section className="inbox-strip" aria-label="inbox" data-testid="strip">
+      <section className="inbox-strip" aria-label={inbox.head} data-testid="strip">
         <div className="strip-title">
-          inbox <span className="strip-count">{`${String(list.length)} waiting`}</span>
+          {inbox.head} <span className="strip-count">{common.count_waiting({ n: list.length })}</span>
           <span className="strip-keys">
-            <Kbd>{list.length > 1 ? `ctrl 1–${String(Math.min(list.length, STRIP_KEYS))}` : 'ctrl 1'}</Kbd> open
+            <Kbd>{list.length > 1 ? `ctrl 1–${String(Math.min(list.length, STRIP_KEYS))}` : 'ctrl 1'}</Kbd> {inbox.key_open}
           </span>
         </div>
         {view.rows.map(({ card: c, n }) => (

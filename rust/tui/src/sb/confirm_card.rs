@@ -3,6 +3,7 @@
 //! `always: `) into a `Shape`, and its option 2's words.
 
 use super::{Card, Enter, Part, Shape};
+use bise_proto::words::inbox;
 use crate::theme;
 use ratatui::style::Style;
 use ratatui::text::Span;
@@ -31,7 +32,7 @@ pub(super) fn confirm_shape(c: &Card) -> Shape {
     }
     let n = c.agent.split(", ").count();
     let title = if n > 1 {
-        format!("{} agents {}", n, head.replacen("wants", "want", 1))
+        inbox::agents_ask(n, head.replacen("wants", "want", 1))
     } else {
         format!("{} {}", c.agent, head)
     };
@@ -62,7 +63,7 @@ pub(super) fn confirm_shape(c: &Card) -> Shape {
         text.lines().map(|l| vec![Span::raw(l.to_string())]).collect()
     }));
     if more > 0 {
-        parts.push(Part::Reason(format!("{} {} more line{}", theme::glyph("▸"), more, if more == 1 { "" } else { "s" })));
+        parts.push(Part::Reason(format!("{} {}", theme::glyph("▸"), inbox::more_lines(more))));
     }
     if !reason.is_empty() {
         parts.push(Part::Reason(reason));
@@ -72,15 +73,15 @@ pub(super) fn confirm_shape(c: &Card) -> Shape {
         parts.push(Part::Note(c.note.clone()));
     }
     let first = body.first().map_or("", |l| l.trim());
-    let summary = if body.len() > 1 && bash { format!("{first} · {} lines", body.len()) } else { first.to_string() };
-    let mut options = vec![if rerun { "run it again without the sandbox" } else { "allow" }.to_string()];
-    let mut short = vec![if rerun { "run again" } else { "allow" }.to_string()];
+    let summary = if body.len() > 1 && bash { inbox::cmd_lines(first, body.len()) } else { first.to_string() };
+    let mut options = vec![if rerun { inbox::rerun } else { inbox::allow }.to_string()];
+    let mut short = vec![if rerun { inbox::rerun_short } else { inbox::allow }.to_string()];
     if !always.is_empty() {
         options.push(always_option(rerun, &always, &body));
         short.push("always".into());
     }
-    options.push("no".into());
-    short.push("no".into());
+    options.push(inbox::no.into());
+    short.push(inbox::no.into());
     let who = title.clone();
     let hard = always.is_empty();
     let mut s = Shape::plain(title, who, summary, parts, options, short, Enter::Deny);
@@ -99,10 +100,10 @@ pub(super) fn confirm_shape(c: &Card) -> Shape {
 fn always_option(rerun: bool, always: &[String], body: &[String]) -> String {
     let rules = always.join(", ");
     if !rerun {
-        format!("always allow {rules} here")
+        inbox::always_allow(rules)
     } else if rules == body.join("\n").trim() {
-        "always run it outside the sandbox here".to_string()
+        inbox::always_outside.to_string()
     } else {
-        format!("always run {rules} outside the sandbox here")
+        inbox::always_outside_rules(rules)
     }
 }

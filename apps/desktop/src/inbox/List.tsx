@@ -15,9 +15,13 @@ import type { Card } from '@/proto';
 import { useListKeys } from '@/app/listkeys';
 import { Dropdown, Field, Press } from '@/ds';
 import { shownName } from '@/agents/model';
+import { inbox } from '@/proto/words_inbox.gen';
 import { timeOf } from '@/artifacts/model';
-import { ALL, askersOf, closedMs, dayHead, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
+import { ALL, askersOf, closedMs, dayHead, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type StateFilter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
 import './past.css';
+
+/** A state filter's words. */
+const STATE_WORDS: Readonly<Record<StateFilter, string>> = { all: inbox.state_all, waiting: inbox.state_waiting, answered: inbox.state_answered, withdrawn: inbox.state_withdrawn };
 
 export interface InboxPorts {
   /** ⏎ on a waiting item: it opens above the composer, as ⌘I (openInbox) */
@@ -117,23 +121,23 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
   return (
     <section ref={ref} tabIndex={-1} className="ip-screen" data-testid="inbox.screen" onKeyDown={onKeyDown}>
       <header className="ip-head">
-        <div className="ip-h1">inbox</div>
+        <div className="ip-h1">{inbox.head}</div>
         <div className="ip-h2" data-testid="inbox.counts">{headWords(cards, records, answered)}</div>
       </header>
       {(
         <div className="ip-filters">
-          <Dropdown label={f.project === '' ? 'all projects' : (names[f.project] ?? f.project)} testId="inbox.projects"
+          <Dropdown label={f.project === '' ? inbox.all_projects : (names[f.project] ?? f.project)} testId="inbox.projects"
             groups={[
               // 800: each part under its head, two choices (designer m_26260); wide, no head
-              { id: 'projects', head: 'projects', look: 'ip-heads-narrow', rows: [
-                { id: 'p:', name: 'all projects', current: f.project === '', testId: 'inbox.projects.all' },
+              { id: 'projects', head: inbox.filter_projects, look: 'ip-heads-narrow', rows: [
+                { id: 'p:', name: inbox.all_projects, current: f.project === '', testId: 'inbox.projects.all' },
                 ...projects.map((p) => ({ id: `p:${p.project}`, name: p.name !== '' ? p.name : p.project, current: f.project === p.project, testId: `inbox.projects.${p.project}` })),
               ] },
               // 800: the agents and 'withdrawn' come in here (past.css shows them only narrow)
-              { id: 'agents', head: 'agents', look: 'ip-narrow-only', rows: [
-                { id: 'a:', name: 'all agents', current: f.agent === '', testId: 'inbox.projects.agents.all' },
+              { id: 'agents', head: inbox.filter_agents, look: 'ip-narrow-only', rows: [
+                { id: 'a:', name: inbox.all_agents, current: f.agent === '', testId: 'inbox.projects.agents.all' },
                 ...askers.map((a) => ({ id: `a:${a}`, name: shownName(a), current: f.agent === a, testId: `inbox.projects.agent.${a}` })),
-                { id: 'withdrawn', name: 'withdrawn', current: f.state === 'withdrawn', testId: 'inbox.projects.withdrawn' },
+                { id: 'withdrawn', name: inbox.state_withdrawn, current: f.state === 'withdrawn', testId: 'inbox.projects.withdrawn' },
               ] },
             ]}
             onPick={(id) => {
@@ -141,9 +145,9 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
               else if (id.startsWith('a:')) set({ agent: id.slice(2) });
               else set({ project: id.slice(2) });
             }} />
-          <Dropdown extra="ip-wide-only" label={f.agent === '' ? 'all agents' : shownName(f.agent)} testId="inbox.agents"
+          <Dropdown extra="ip-wide-only" label={f.agent === '' ? inbox.all_agents : shownName(f.agent)} testId="inbox.agents"
             groups={[{ id: 'agents', rows: [
-              { id: 'a:', name: 'all agents', current: f.agent === '', testId: 'inbox.agents.all' },
+              { id: 'a:', name: inbox.all_agents, current: f.agent === '', testId: 'inbox.agents.all' },
               ...askers.map((a) => ({ id: `a:${a}`, name: shownName(a), current: f.agent === a, testId: `inbox.agents.${a}` })),
             ] }]}
             onPick={(id) => { set({ agent: id.slice(2) }); }} />
@@ -151,20 +155,20 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
             {STATES.map((s) => (
               <Press key={s} look={`ip-state${f.state === s ? ' on' : ''}${s === 'withdrawn' ? ' ip-wide-only' : ''}`} aria-pressed={f.state === s}
                 onClick={() => { set({ state: s }); }} data-testid={`inbox.state.${s}`}>
-                {s}
+                {STATE_WORDS[s]}
               </Press>
             ))}
           </span>
           <span className="ip-search">
-            <Field slash placeholder="search" value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} onKeyDown={searchKey} testId="inbox.search" />
+            <Field slash placeholder={inbox.search} value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} onKeyDown={searchKey} testId="inbox.search" />
           </span>
         </div>
       )}
       <div className={`ip-body${cur ? ' paned' : ''}`}>
       {empty ? (
-        <div className="ip-empty" data-testid="inbox.empty">nothing yet. what your agents ask you waits here, and stays once you answer.</div>
+        <div className="ip-empty" data-testid="inbox.empty">{inbox.screen_empty}</div>
       ) : none ? (
-        <div className="ip-empty" data-testid="inbox.none">nothing matches. esc clears the search.</div>
+        <div className="ip-empty" data-testid="inbox.none">{inbox.screen_none}</div>
       ) : (
         <div className="ip-list" role="listbox" data-testid="inbox.list"
           onScroll={onEnd === undefined ? undefined : (e) => {
@@ -173,7 +177,7 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
           }}>
           {lists.waiting.length > 0 && (
             <>
-              <div className="ip-day-h ip-wait-h" data-testid="inbox.waiting.head">{`waiting for you · ${String(lists.waiting.length)}`}</div>
+              <div className="ip-day-h ip-wait-h" data-testid="inbox.waiting.head">{inbox.list_waiting({ n: lists.waiting.length })}</div>
               {lists.waiting.map((w) => (
                 <WaitLine key={w.key} w={w} on={w.key === sel} end={waitEnd(w, names, now, false)} narrowEnd={waitEnd(w, names, now, true)}
                   onClick={() => { setSel(w.key); ports.answer(w.card.project, w.card.id); }} />
@@ -201,23 +205,23 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
       <div className="ip-keys" data-testid="inbox.keys">
         {cur ? (
           <>
-            <span><b>↑↓</b> previous / next</span>
-            <span data-testid="inbox.keys.go"><b>⌘⏎</b> go to your answer</span>
-            <span><b>esc</b> close</span>
+            <span><b>↑↓</b> {inbox.key_prev_next}</span>
+            <span data-testid="inbox.keys.go"><b>⌘⏎</b> {inbox.key_go}</span>
+            <span><b>esc</b> {inbox.key_close}</span>
           </>
         ) : sel !== null && pastBy.has(sel) ? (
           <>
             {/* what ⏎ and ⌘⏎ do on the selected row (designer m_25639; inbox-open) */}
-            <span data-testid="inbox.keys.enter"><b>⏎</b> open</span>
-            <span data-testid="inbox.keys.go"><b>⌘⏎</b> go to your answer</span>
-            <span><b>/</b> search</span>
-            <span><b>esc</b> back</span>
+            <span data-testid="inbox.keys.enter"><b>⏎</b> {inbox.key_open}</span>
+            <span data-testid="inbox.keys.go"><b>⌘⏎</b> {inbox.key_go}</span>
+            <span><b>/</b> {inbox.search}</span>
+            <span><b>esc</b> {inbox.key_back}</span>
           </>
         ) : (
           <>
-            <span data-testid="inbox.keys.enter"><b>⏎</b> answer</span>
-            <span><b>/</b> search</span>
-            <span><b>esc</b> back</span>
+            <span data-testid="inbox.keys.enter"><b>⏎</b> {inbox.key_answer}</span>
+            <span><b>/</b> {inbox.search}</span>
+            <span><b>esc</b> {inbox.key_back}</span>
           </>
         )}
       </div>
@@ -272,7 +276,7 @@ export interface PageMeta {
 
 /** The pane's page chip: '↗ size chips · page · v3' (notif-artifact's chip), its id when unknown. Pure. */
 export function pageChip(page: string, meta: PageMeta | undefined): string {
-  return meta === undefined ? `↗ ${page} · page` : `↗ ${meta.title !== '' ? meta.title : page} · page · v${String(meta.version)}`;
+  return meta === undefined ? inbox.page_chip({ page }) : inbox.page_chip_v({ title: meta.title !== '' ? meta.title : page, v: meta.version });
 }
 
 function Pane({ row, now, names, next, meta, onJump, onClose, onPage }: {
@@ -286,11 +290,11 @@ function Pane({ row, now, names, next, meta, onJump, onClose, onPage }: {
   const picked = pickedOf(r);
   const page = r.where?.kind === 'page' ? r.where : null;
   return (
-    <aside className="ip-pane" aria-label={`${shownName(r.asker)}'s question`} data-testid="inbox.detail">
+    <aside className="ip-pane" aria-label={inbox.detail_label({ agent: shownName(r.asker) })} data-testid="inbox.detail">
       <div className="ip-p-head">
-        <Press look="ip-crumb" onClick={onClose} data-testid="inbox.detail.back">‹ inbox</Press>
-        <span className="ip-d-k">{`${shownName(r.asker)} asked in ${names[r.project] ?? r.project} · ${whenOf(r.asked_ms, now)}`}</span>
-        <Press look="ip-p-close" onClick={onClose} aria-label="close (esc)" title="close · esc" data-testid="inbox.detail.close">×</Press>
+        <Press look="ip-crumb" onClick={onClose} data-testid="inbox.detail.back">{`‹ ${inbox.head}`}</Press>
+        <span className="ip-d-k">{inbox.detail_asked({ agent: shownName(r.asker), project: names[r.project] ?? r.project, when: whenOf(r.asked_ms, now) })}</span>
+        <Press look="ip-p-close" onClick={onClose} aria-label={inbox.detail_close_label} title={inbox.detail_close_tip} data-testid="inbox.detail.close">×</Press>
       </div>
       <div className="ip-p-body">
         <div className="ip-d-q" data-testid="inbox.detail.question">{r.question}</div>
@@ -312,7 +316,7 @@ function Pane({ row, now, names, next, meta, onJump, onClose, onPage }: {
             {pageChip(page.page, meta?.(r.project, page.page))}
           </Press>
         )}
-        {next !== undefined && next !== '' && <div className="ip-d-next">{`${shownName(j.kind === 'thread' ? j.agent : r.asker)} went on: ${next}`}</div>}
+        {next !== undefined && next !== '' && <div className="ip-d-next">{inbox.detail_next({ agent: shownName(j.kind === 'thread' ? j.agent : r.asker), next })}</div>}
         <Press look="ip-d-go" onClick={onJump} data-testid="inbox.detail.go">{jumpWords(j, r.state === 'answered')}<kbd>⌘⏎</kbd></Press>
       </div>
     </aside>
@@ -331,5 +335,5 @@ export function pickedOf(r: InboxRecord): number | null {
 /** 'today 14:02' → '14:02', else 'oct 12 14:02'. */
 function whenOf(ms: number, now: number): string {
   const day = dayHead(ms, now);
-  return ms <= 0 ? day : day === 'today' ? timeOf(ms) : `${day} ${timeOf(ms)}`;
+  return ms <= 0 ? day : day === inbox.day_today ? timeOf(ms) : `${day} ${timeOf(ms)}`;
 }

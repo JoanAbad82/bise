@@ -11,6 +11,7 @@
 //   - '/inbox' with nothing waiting says so under the composer, never a silent nothing.
 // Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common } from '../../../src/proto/words_common.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'docs-1a2b3c4d';
@@ -68,7 +69,7 @@ test("inbox/ghost-badge: a card the hub keeps after his inbox answer is back in 
     });
     await w.reload();
     await expect(block).toBeVisible({ timeout: 10_000 });
-    await expect(block).toContainText('1 waiting');
+    await expect(block).toContainText(common.count_waiting({ n: 1 }));
     await expect(count).toHaveText('1');
 
     await test.step('answered on the page: the hub re-asks it as card 19 (16 replaced)', async () => {
@@ -87,7 +88,7 @@ test("inbox/ghost-badge: a card the hub keeps after his inbox answer is back in 
       // the step's rows (still #19) came before the answer: the card is his again
       await core.send(projects([drafts(19)]) as never);
       await expect(block).toBeVisible({ timeout: 3000 });
-      await expect(block).toContainText('1 waiting', { timeout: 3000 });
+      await expect(block).toContainText(common.count_waiting({ n: 1 }), { timeout: 3000 });
       await expect(block).toContainText('#19');
       await expect(count).toHaveText('1');
     });

@@ -15,6 +15,7 @@
 // until the core's next rows no longer have it (the TUI's `answered` set):
 // the hub's snapshot lags the act by a moment.
 import type { Card } from '@/proto';
+import { inbox } from '@/proto/words_inbox.gen';
 import { cardKey, sortCards } from './order';
 
 export interface InboxState {
@@ -68,7 +69,7 @@ export function takesWords(c: Pick<Card, 'approval' | 'kind'>): boolean {
 
 /** '1', '1 or 2', '1 to 3': the digits that answer n options, in words. Pure. */
 export function digitWords(n: number): string {
-  return n <= 1 ? '1' : n === 2 ? '1 or 2' : `1 to ${String(n)}`;
+  return n <= 1 ? '1' : n === 2 ? inbox.digits_two : inbox.digits_to({ n });
 }
 
 /** What a docked item that only its options decide waits for, for the composer's label ('the merge
@@ -76,8 +77,8 @@ export function digitWords(n: number): string {
 export function pickWaits(c: Pick<Card, 'approval' | 'kind' | 'options'>): string | null {
   if (takesWords(c) || c.options.length === 0) return null;
   // the item's own verb ('the merge'), else 'the approval' (designer m_26683)
-  const noun = c.kind === 'merge' || c.kind === 'feature_merge' ? 'merge' : c.kind === 'feature_try' ? 'try' : c.kind === 'signin' ? 'sign-in' : c.approval === true ? 'approval' : c.kind;
-  return `the ${noun} waits for ${digitWords(c.options.length)}`;
+  const noun = c.kind === 'merge' || c.kind === 'feature_merge' ? inbox.noun_merge : c.kind === 'feature_try' ? inbox.noun_try : c.kind === 'signin' ? inbox.noun_signin : c.approval === true ? inbox.noun_approval : c.kind;
+  return inbox.waits_for({ noun, digits: digitWords(c.options.length) });
 }
 
 /** ⏎ with nothing typed and no option answers it (done, overlap). */
@@ -163,11 +164,11 @@ export function withConfirmOptions(c: Card): Card {
   const body = lines.flatMap((l) => (l.startsWith('|') ? [l.replace(/^\| ?/, '')] : []));
   const rerun = head.endsWith('outside the sandbox');
   const rules = always.join(', ');
-  const alwaysLabel = !rerun ? `always allow ${rules} here` : rules === body.join('\n').trim() ? 'always run it outside the sandbox here' : `always run ${rules} outside the sandbox here`;
+  const alwaysLabel = !rerun ? inbox.always_allow({ rules }) : rules === body.join('\n').trim() ? inbox.always_outside : inbox.always_outside_rules({ rules });
   const options = [
-    { n: 1, label: rerun ? 'run it again without the sandbox' : 'allow' },
+    { n: 1, label: rerun ? inbox.rerun : inbox.allow },
     ...(always.length > 0 ? [{ n: 2, label: alwaysLabel }] : []),
-    { n: 3, label: 'no' },
+    { n: 3, label: inbox.no },
   ];
   return { ...c, options, approval: true };
 }

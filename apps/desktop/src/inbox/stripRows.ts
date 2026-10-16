@@ -9,6 +9,7 @@
 // where its row was. Not ported: approvals that came together sharing a
 // row (order.ts says why).
 import type { Card } from '@/proto';
+import { inbox } from '@/proto/words_inbox.gen';
 import { cardKey, sortCards } from './order';
 
 /** At most this many item rows in the box, then '+ n more' (card_draw.rs STRIP_ROWS). */
@@ -132,11 +133,11 @@ export function rowWords(c: Card): RowWords {
     const files = lines.filter((l) => l.startsWith('+++ ')).map((l) => l.slice(4).trim().replace(/^b\//u, ''));
     const plus = lines.filter((l) => l.startsWith('+') && !l.startsWith('+++')).length;
     const minus = lines.filter((l) => l.startsWith('-') && !l.startsWith('---')).length;
-    const more = files.length > 1 ? ` +${String(files.length - 1)} file${files.length > 2 ? 's' : ''} ·` : '';
-    return { who, cmd: false, what: `${files[0] ?? 'a file'}${more} +${String(plus)} −${String(minus)}`, note };
+    const more = files.length > 1 ? ` ${inbox.more_files({ n: files.length - 1 })} ·` : '';
+    return { who, cmd: false, what: `${files[0] ?? inbox.a_file}${more} +${String(plus)} −${String(minus)}`, note };
   }
   const first = (lines[0] ?? '').trim();
-  return { who, cmd: first !== '', what: lines.length > 1 ? `${first} · ${String(lines.length)} lines` : first, note };
+  return { who, cmd: first !== '', what: lines.length > 1 ? inbox.cmd_lines({ first, n: lines.length }) : first, note };
 }
 
 /** A row's words: who, then the question's first line (the TUI's `? t3 · npm publish`). */

@@ -4,6 +4,7 @@
 //! fit the width.
 
 use super::*;
+use bise_proto::words::inbox;
 
 /// The divider's label while an item is open: `you → ? t3 · your
 /// answer`.
@@ -18,17 +19,17 @@ pub(crate) fn divider_label(app: &App) -> Option<Vec<Span<'static>>> {
     if app.sb.closed_in_view().is_some() {
         return Some(vec![
             Span::raw(" "),
-            Span::styled(format!("you {} ", arrow), fg(theme::dim())),
+            Span::styled(format!("{} {} ", inbox::you, arrow), fg(theme::dim())),
             Span::styled(c.agent.clone(), fg(theme::text())),
-            Span::styled(" · the question is closed: ⏎ sends your words as a message", fg(theme::dim())),
+            Span::styled(format!(" · {}", inbox::question_closed), fg(theme::dim())),
             Span::raw(" "),
         ]);
     }
     Some(vec![
         Span::raw(" "),
-        Span::styled(format!("you {} ", arrow), fg(theme::dim())),
+        Span::styled(format!("{} {} ", inbox::you, arrow), fg(theme::dim())),
         Span::styled(format!("{} {}", kind_look(&c.kind).1, c.agent), fg(theme::accent())),
-        Span::styled(" · your answer", fg(theme::dim())),
+        Span::styled(format!(" · {}", inbox::your_answer), fg(theme::dim())),
         Span::raw(" "),
     ])
 }
@@ -54,9 +55,9 @@ pub(crate) fn key_pairs(app: &App) -> Vec<(&'static str, String)> {
         return s.keys.iter().map(|(k, l)| p(k, l)).collect();
     }
     let mut v = Vec::new();
-    let back = p("esc", "back to your message");
+    let back = p("esc", inbox::key_back_message);
     if sb.closed_in_view().is_some() {
-        v.push(p("⏎", "sends your words as a message"));
+        v.push(p("⏎", inbox::key_send_message));
         v.push(back);
         return v;
     }
@@ -68,58 +69,58 @@ pub(crate) fn key_pairs(app: &App) -> Vec<(&'static str, String)> {
             Some(i) => v.push(("⏎", cut(&s.options[i], 32))),
             None => {
                 if n > 0 && !typed {
-                    v.push(p(digits(n), if c.page.is_some() { "pick" } else { "answer" }));
+                    v.push(p(digits(n), if c.page.is_some() { inbox::key_pick } else { inbox::key_answer }));
                 }
                 // a page's card (notif-artifact): `1-2 pick   ctrl+t open`
                 if c.page.is_some() && !typed {
-                    v.push(p("ctrl+t", "open"));
+                    v.push(p("ctrl+t", inbox::key_open));
                 }
-                v.push(p("⏎", "send the answer"));
+                v.push(p("⏎", inbox::key_send_answer));
             }
         }
         if n > 0 && !full && !typed {
-            v.push(p("←→", "choose"));
+            v.push(p("←→", inbox::key_choose));
         }
         if more && !typed {
-            v.push(p("↑↓", "other items"));
+            v.push(p("↑↓", inbox::key_other_items));
         }
         if full {
-            v.push(p("pgup pgdn", "scroll"));
+            v.push(p("pgup pgdn", inbox::key_scroll));
         }
-        v.push(if full { p("ctrl+o", "back in place") } else { p("ctrl+o", "full screen") });
-        v.push(p("esc", &format!("to {}", a.esc_to)));
+        v.push(if full { p("ctrl+o", inbox::key_in_place) } else { p("ctrl+o", inbox::key_full) });
+        v.push(p("esc", &inbox::key_to(&a.esc_to)));
         return v;
     }
     if !app.ed.text.is_empty() {
-        v.push(p("⏎", if s.enter == Enter::Deny { "says no, with your note" } else { "sends your answer" }));
-        v.push(if full { p("ctrl+o", "back in place") } else { p("ctrl+o", "full screen") });
+        v.push(p("⏎", if s.enter == Enter::Deny { inbox::key_says_no } else { inbox::key_sends_answer }));
+        v.push(if full { p("ctrl+o", inbox::key_in_place) } else { p("ctrl+o", inbox::key_full) });
         v.push(back);
         return v;
     }
     match sb.card.opt.filter(|i| *i < n) {
         Some(i) => v.push(("⏎", cut(&s.options[i], 32))),
         // a hard rule's card: 1 allow, 3 no (designer)
-        None if n > 0 && s.nums == [1, 3] => v.push(p("1 3", "answer")),
+        None if n > 0 && s.nums == [1, 3] => v.push(p("1 3", inbox::key_answer)),
         // a page's card (notif-artifact): its options pick, ctrl+t opens the page
-        None if n > 0 && c.page.is_some() => v.push(p(digits(n), "pick")),
-        None if n > 0 => v.push(p(digits(n), "answer")),
-        None if s.enter == Enter::Ack => v.push(p("⏎", "got it")),
+        None if n > 0 && c.page.is_some() => v.push(p(digits(n), inbox::key_pick)),
+        None if n > 0 => v.push(p(digits(n), inbox::key_answer)),
+        None if s.enter == Enter::Ack => v.push(p("⏎", inbox::key_got_it)),
         None => {}
     }
     if c.page.is_some() {
-        v.push(p("ctrl+t", "open"));
+        v.push(p("ctrl+t", inbox::key_open));
     }
     if n > 0 && !full {
-        v.push(p("←→", "choose"));
+        v.push(p("←→", inbox::key_choose));
     }
     if more {
-        v.push(p("↑↓", "other items"));
+        v.push(p("↑↓", inbox::key_other_items));
     }
     if full {
-        v.push(p("pgup pgdn", "scroll"));
-        v.push(p("ctrl+o", "back in place"));
+        v.push(p("pgup pgdn", inbox::key_scroll));
+        v.push(p("ctrl+o", inbox::key_in_place));
     } else {
-        v.push(p("ctrl+o", "full screen"));
+        v.push(p("ctrl+o", inbox::key_full));
     }
     v.push(back);
     v
@@ -144,8 +145,8 @@ pub(crate) fn fit_pairs(mut v: Vec<(&'static str, String)>, width: usize) -> Vec
     if w(&v) > width || width < 100 {
         // `esc to main` (answering) keeps its words: it says where they go
         for (k, l) in v.iter_mut() {
-            if *k == "esc" && l == "back to your message" {
-                *l = "back".into();
+            if *k == "esc" && l == inbox::key_back_message {
+                *l = inbox::key_back.into();
             }
         }
     }

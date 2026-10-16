@@ -15,6 +15,8 @@ import type { NotifyAuth } from '@/shared/api';
 import { Dot, Kbd, Row } from '@/ds';
 import { actedKeys, useActed, useProjects, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
 import { shownName } from '@/agents/model';
+import { inbox } from '@/proto/words_inbox.gen';
+import { common } from '@/proto/words_common.gen';
 import { age, dotOf, folds, InboxCard, RefusedMark } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
 import { cardKey, sortCards } from './order';
@@ -151,10 +153,10 @@ export function notifyCard(home: string, since: number): Card {
     project: home,
     kind: 'question',
     agent: 'bise',
-    question: 'let questions reach you as macOS notifications?',
+    question: inbox.notify_question,
     options: [
-      { n: 1, label: 'turn on' },
-      { n: 2, label: 'not now' },
+      { n: 1, label: inbox.notify_on },
+      { n: 2, label: inbox.notify_not_now },
     ],
     urgent: false,
     since_ms: since,
@@ -212,7 +214,7 @@ const cut = (s: string, max: number): string => {
 };
 
 /** The composer's head while his words answer a question: '↳ answering' (never cut). */
-export const ANSWERING_HEAD = '↳ answering';
+export const ANSWERING_HEAD = '↳';
 
 /** A question on one line, cut after a whole word within `max` characters with one '…' (designer
  *  m_24325: never mid-word; a word longer than `max` alone: cut there). Pure. */
@@ -239,24 +241,24 @@ export function cutWords(s: string, max: number): string {
 export function answeringOf(c: Card, here: Here, pname?: string): Answering {
   const to = here.agent === null ? 'bise' : shownName(here.agent);
   // the permission ask is bise's own, never the hub's: only its two options answer it
-  if (isNotify(c)) return { project: c.project, card: c.id, label: `to ${to} · bise's ask waits for 1 or 2`, answer: null };
+  if (isNotify(c)) return { project: c.project, card: c.id, label: inbox.notify_waits({ to }), answer: null };
   const other = here.project !== null && here.project !== c.project ? `${shownName(c.agent)} · ${pname ?? c.project}` : null;
   if (takesWords(c)) {
     // composer-target A (designer m_26531): '↳ answering search · <question>' (the tab cuts it after
     // a whole word), 'esc to bise instead', the field names who gets his words, the border's tip
     // on the asker's own thread there is no esc end (designer m_26776, m_26818)
     const who = shownName(c.agent);
-    const label = `${ANSWERING_HEAD} ${other ?? who} · ${cutWords(c.question, 40)}`;
-    const end = other === null && who === to ? {} : { end: `esc to ${to} instead` };
-    return { project: c.project, card: c.id, label, ...end, answer: c.id, asker: c.agent, placeholder: `your answer to ${who}, then ⏎`, tip: answerTip(who, to) };
+    const label = `${ANSWERING_HEAD} ${inbox.answering({ who: other ?? who })} · ${cutWords(c.question, 40)}`;
+    const end = other === null && who === to ? {} : { end: inbox.esc_instead({ to }) };
+    return { project: c.project, card: c.id, label, ...end, answer: c.id, asker: c.agent, placeholder: inbox.answer_placeholder({ who, key: '⏎' }), tip: answerTip(who, to) };
   }
   // an approval or a choice never takes his words (designer m_26683): typed, they go to its asker as
   // a plain message, and the label says so ('to perf · the merge waits for 1 or 2'); esc names the
   // screen's own addressee when it is someone else
-  const waits = pickWaits(c) ?? 'it waits for its options';
+  const waits = pickWaits(c) ?? inbox.waits_options;
   const asker = shownName(c.agent);
   const same = other === null && asker === to;
-  return { project: c.project, card: c.id, label: `to ${other ?? asker} · ${waits}`, ...(same ? {} : { end: `esc to ${to} instead` }), answer: null, asker: c.agent, message: true, placeholder: `write to ${asker}, then ⏎` };
+  return { project: c.project, card: c.id, label: inbox.to_waits({ who: other ?? asker, waits }), ...(same ? {} : { end: inbox.esc_instead({ to }) }), answer: null, asker: c.agent, message: true, placeholder: inbox.message_placeholder({ who: asker }) };
 }
 
 /**
@@ -268,7 +270,7 @@ export function answeringOf(c: Card, here: Here, pname?: string): Answering {
 export function closedAnswering(c: Card, here: Here, pname?: string): Answering {
   const to = here.agent === null ? 'bise' : shownName(here.agent);
   const other = here.project !== null && here.project !== c.project ? `${shownName(c.agent)} · ${pname ?? c.project}` : shownName(c.agent);
-  return { project: c.project, card: c.id, label: `to ${other} · the question is closed`, end: `esc to ${to} instead`, answer: null, asker: c.agent, closed: true };
+  return { project: c.project, card: c.id, label: inbox.to_closed({ who: other }), end: inbox.esc_instead({ to }), answer: null, asker: c.agent, closed: true };
 }
 
 /**
@@ -297,7 +299,7 @@ export function projectWord(row: Pick<ProjectRow, 'name' | 'home'> | undefined, 
 /** The block's head: 'N waiting', ' · K projects' once more than one project waits. Pure. */
 export function headWords(list: readonly Pick<Card, 'project'>[]): string {
   const projects = new Set(list.map((c) => c.project)).size;
-  return `${String(list.length)} waiting${projects > 1 ? ` · ${String(projects)} projects` : ''}`;
+  return projects > 1 ? inbox.block_head_projects({ n: list.length, projects }) : common.count_waiting({ n: list.length });
 }
 
 /** An item's sign on its line: '?' a question, '!' what only its options decide, else its dot. */
@@ -311,7 +313,7 @@ export function moreWords(more: number, next: Card): string {
   const w = rowWords(next);
   const sign = signOf(next);
   const what = w.what === '' ? '' : ` · ${w.cmd ? '$ ' : ''}${w.what}`;
-  return `+ ${String(more)} more · ${sign === null ? '' : `${sign} `}${shownName(w.who)}${what}`;
+  return inbox.more_row({ n: more, first: `${sign === null ? '' : `${sign} `}${shownName(w.who)}${what}` });
 }
 
 /** A field he is typing in: its keys are his, not the block's. */
@@ -692,9 +694,9 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   const next = list.find((_, i) => i >= rowsFit && i > openAt) ?? list.find((_, i) => i >= rowsFit && i !== openAt);
   const keys = list.length > 1 ? `⌃1–${String(Math.min(list.length, STRIP_KEYS))}` : '⌃1';
   return (
-    <section ref={section} className="inbox-strip inbox-block" aria-label="inbox" data-testid="inbox.block" data-rows={rowsFit} data-open={openCard !== undefined || undefined} data-count={list.length} data-ctrl={ctrl || undefined}>
+    <section ref={section} className="inbox-strip inbox-block" aria-label={inbox.head} data-testid="inbox.block" data-rows={rowsFit} data-open={openCard !== undefined || undefined} data-count={list.length} data-ctrl={ctrl || undefined}>
       <div className="strip-title">
-        inbox <span className="strip-count">{headWords(list)}</span>
+        {inbox.head} <span className="strip-count">{headWords(list)}</span>
         <span className="strip-keys" data-testid="inbox.block.keys">
           {cmd ? (
             // ⌘ held: the inbox's own ⌘ key on its head (amb-win's held.ts, designer m_21510)
@@ -703,11 +705,11 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
             </span>
           ) : openCard !== undefined ? (
             <>
-              <Kbd>↑↓</Kbd> next <Kbd>esc</Kbd> fold
+              <Kbd>↑↓</Kbd> {inbox.key_next} <Kbd>esc</Kbd> {inbox.key_fold}
             </>
           ) : (
             <>
-              <Kbd>{keys}</Kbd> open
+              <Kbd>{keys}</Kbd> {inbox.key_open}
             </>
           )}
         </span>
@@ -729,7 +731,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
                   ? {
                       note: (
                         <span className="inbox-heard" data-testid="inbox.heard">
-                          {heard.line} · esc undoes
+                          {inbox.heard_undo({ line: heard.line })}
                         </span>
                       ),
                     }
@@ -752,7 +754,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
                       closed: true,
                       keys: (
                         <span data-testid="inbox.block.closed.keys">
-                          <Kbd>⏎</Kbd> sends your words as a message <Kbd>esc</Kbd> back
+                          <Kbd>⏎</Kbd> {inbox.key_send_message} <Kbd>esc</Kbd> {inbox.key_back}
                         </span>
                       ),
                     }

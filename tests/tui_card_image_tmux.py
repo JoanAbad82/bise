@@ -20,6 +20,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from words import w  # noqa: E402
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, tmux, wait_until, MAIN_IDLE  # noqa: E402
 
@@ -116,7 +117,7 @@ def main():
             c.wait_idle("main")
             t.wait("waiting for you", 30)
             t.typed(CTRL % ord("1"))
-            t.wait("your answer")
+            t.wait(w("inbox.your_answer"))
             t.typed("this one ")
             tmux("send-keys", "-t", t.name, "-l", "\x1b[200~\x1b[201~")
             t.wait_re(r"▣ 1\s+clipboard")

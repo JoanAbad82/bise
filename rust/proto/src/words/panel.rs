@@ -14,8 +14,6 @@ crate::words! { panel:
     // ---- the counts: the TUI header and the bar's top
     /// a count of agents at work (the TUI header, the right bar's top and AGENTS folded)
     count_working(n) = "{n} working";
-    /// the TUI header's count of agents waiting on an event or another agent
-    count_waiting(n) = "{n} waiting";
     /// the TUI header's count of agents that ask him something
     count_needs_you(n) = "{n} needs you";
     /// the TUI header's count of agents done
@@ -266,8 +264,6 @@ crate::words! { panel:
     tip_agents(n) = one "{n} agent" | "{n} agents";
     /// nothing goes on
     tip_quiet = "all quiet";
-    /// a pink count
-    tip_waiting_you(n) = "{n} waiting for you";
     /// bise's pink count
     tip_waiting_you_all(n) = "{n} waiting for you, in all your projects";
     /// a gone folder's tip, its path unknown

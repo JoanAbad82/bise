@@ -11,6 +11,7 @@
 
 use super::cards::{shape, Enter};
 use super::*;
+use bise_proto::words::inbox;
 use unicode_width::UnicodeWidthStr;
 
 /// The question in the label: cut after a whole word within this many
@@ -53,7 +54,7 @@ pub(crate) fn bar(app: &App, lead: u16) -> Option<Span<'static>> {
 /// `placeholder`, designer m_26765): `your answer to search, then ⏎`.
 /// None: the usual placeholder.
 pub(crate) fn placeholder(app: &App) -> Option<String> {
-    answering(app).map(|a| format!("your answer to {}, then {}", if a.who == "main" { "bise" } else { &a.who }, if theme::ascii_mode() { "enter" } else { "⏎" }))
+    answering(app).map(|a| inbox::answer_placeholder(if a.who == "main" { "bise" } else { &a.who }, if theme::ascii_mode() { "enter" } else { "⏎" }))
 }
 
 /// The divider's two sides while his words answer, in `room` columns
@@ -67,7 +68,7 @@ pub(crate) fn divider(app: &App, room: usize, note: Option<String>) -> Option<(V
     let tick = if theme::ascii_mode() { "v" } else { "✓" };
     let end = match &note {
         Some(n) => format!("{} {}", tick, n),
-        None => format!("esc to {} instead", a.esc_to),
+        None => inbox::esc_instead(&a.esc_to),
     };
     let (label, end) = fit(&a, &end, room);
     let acc = Style::default().fg(theme::accent());
@@ -82,7 +83,7 @@ pub(crate) fn divider(app: &App, room: usize, note: Option<String>) -> Option<(V
 
 /// `↳ answering search` (ASCII: `-> answering search`): never cut.
 pub(crate) fn head(who: &str) -> String {
-    format!("{} answering {}", if theme::ascii_mode() { "->" } else { "↳" }, who)
+    format!("{} {}", if theme::ascii_mode() { "->" } else { "↳" }, inbox::answering(who))
 }
 
 /// A question on one line, cut after a whole word within `max`

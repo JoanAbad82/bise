@@ -19,6 +19,8 @@
 // Owner: amb-home.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect, type Session } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
+import { common } from '../../../src/proto/words_common.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -101,7 +103,7 @@ test("inbox/block-views: on perf's thread the block folds 4 items, opens a quest
 
     // a fresh test home: macOS never asked, so bise's notifications ask is the 5th item (H10)
     await test.step("folded (inbox-stack, the TUI's box): the head, 3 lines, '+ 2 more · …' under them, the keys", async () => {
-      await expect(block).toContainText('5 waiting');
+      await expect(block).toContainText(common.count_waiting({ n: 5 }));
       for (const n of [1, 2, 3]) await expect(page.getByTestId(`inbox.block.row.${String(n)}`)).toBeVisible();
       await expect(page.getByTestId('inbox.block.row.4')).toHaveCount(0);
       await expect(page.getByTestId('inbox.block.row.1')).toContainText('which bench?');
@@ -118,7 +120,7 @@ test("inbox/block-views: on perf's thread the block folds 4 items, opens a quest
       await expect(page.getByTestId('inbox.block.open.1')).toBeVisible({ timeout: 3000 });
       await expect(page.getByTestId(`inbox.block.card.${P}-9`)).toContainText('cold');
       await expect(composer(page)).toContainText('↳ answering perf · which bench?');
-      await expect(composer(page)).not.toContainText('esc to perf instead');
+      await expect(composer(page)).not.toContainText(inbox.esc_instead({ to: 'perf' }));
       await shoot(page, core, 'question-open');
       await field(page).click();
       await page.keyboard.type('cold, on the m2');
@@ -130,10 +132,10 @@ test("inbox/block-views: on perf's thread the block folds 4 items, opens a quest
       await expect(page.getByTestId(`inbox.block.card.${P}-9`)).toHaveCount(0);
     });
 
-    await test.step("the merge opens: 'to perf · the merge waits for 1 or 2'; words go as a message; 2 picks it", async () => {
+    await test.step(`the merge opens: '${inbox.to_waits({ who: 'perf', waits: inbox.waits_for({ noun: inbox.noun_merge, digits: inbox.digits_two }) })}'; words go as a message; 2 picks it`, async () => {
       await page.getByTestId('inbox.block.row.1').click();
       await expect(page.getByTestId(`inbox.block.card.${P}-10`)).toBeVisible({ timeout: 3000 });
-      await expect(composer(page)).toContainText('to perf · the merge waits for 1 or 2');
+      await expect(composer(page)).toContainText(inbox.to_waits({ who: 'perf', waits: inbox.waits_for({ noun: inbox.noun_merge, digits: inbox.digits_two }) }));
       await shoot(page, core, 'merge-open');
       await field(page).click();
       await page.keyboard.type('wait for the bench first');
@@ -234,8 +236,8 @@ test("inbox/block-views: the permission row asks macOS once ('turn on'), then go
     await page.keyboard.press('Control+5');
     const row = page.getByTestId('inbox.block.notify');
     await expect(row).toBeVisible({ timeout: 3000 });
-    await expect(row).toContainText('let questions reach you as macOS notifications?');
-    await expect(page.getByTestId('inbox.block.notify.opt.1')).toContainText('turn on');
+    await expect(row).toContainText(inbox.notify_question);
+    await expect(page.getByTestId('inbox.block.notify.opt.1')).toContainText(inbox.notify_on);
     await page.getByTestId('inbox.block.notify.opt.1').click();
     await expect(row, "the test's answer is 'on': it goes").toHaveCount(0, { timeout: 5000 });
     await expect(page.getByTestId('inbox.block.more')).toContainText('+ 1 more');
@@ -366,7 +368,7 @@ test("inbox/block-views: one inbox, 3 projects: the row says its project, the he
     const block = page.getByTestId('inbox.block');
     await expect(block).toBeVisible({ timeout: 10_000 });
     await test.step("folded: 'inbox · 5 waiting · 3 projects', the first row ends 'telemetry · <age>'", async () => {
-      await expect(block).toContainText('5 waiting · 3 projects');
+      await expect(block).toContainText(inbox.block_head_projects({ n: 5, projects: 3 }));
       const row = page.getByTestId('inbox.block.row.1');
       await expect(row.locator('.strip-who')).toHaveText('p99');
       await expect(row.locator('.strip-what')).toContainText('which percentile');
@@ -378,7 +380,7 @@ test("inbox/block-views: one inbox, 3 projects: the row says its project, the he
       await expect(page.getByTestId(`inbox.block.card.${T}-21`)).toBeVisible({ timeout: 3000 });
       await expect(page.getByTestId(`inbox.block.card.${T}-21.project`)).toHaveText('· telemetry');
       await expect(composer(page)).toContainText('↳ answering p99 · telemetry · which percentile');
-      await expect(composer(page)).toContainText('esc to perf instead');
+      await expect(composer(page)).toContainText(inbox.esc_instead({ to: 'perf' }));
       await shoot(page, core, 'one-inbox-other');
       await field(page).click();
       await page.keyboard.type('p99, with p95 under it');

@@ -74,13 +74,13 @@ def main():
         # the list: waiting on top, then today's answers on two lines
         t.typed("/inbox")
         t.keys("Enter")
-        sc = t.wait_all(["waiting for you · 1", "› 1  main  third: ship the readme?", TODAY,
+        sc = t.wait_all([w("inbox.list_waiting", n=1), "› 1  main  third: ship the readme?", TODAY,
                          "✓ main  first: pick one", ALPHA,
                          "– main  second: never mind", MOOT])
         assert sc.index("waiting for you") < sc.index(TODAY) < sc.index("✓ main"), sc
         shot(t, "inbox-150")
         tmux("resize-window", "-t", t.name, "-x", "80")
-        t.wait_gone("╭─ inbox · 1 waiting")  # the frame redrawn narrow
+        t.wait_gone("╭─ " + w("inbox.head") + " · " + w("common.count_waiting", n=1))  # the frame redrawn narrow
         sc = t.wait_all(["› 1  main  third: ship the readme?", ALPHA])
         assert all(len(r.rstrip()) <= 80 for r in sc.splitlines()), sc
         shot(t, "inbox-80")
@@ -92,15 +92,15 @@ def main():
         t.keys("Down")
         t.wait("› ✓ main  first: pick one")
         t.keys("Enter")
-        t.wait_gone("waiting for you · 1")
+        t.wait_gone(w("inbox.list_waiting", n=1))
         sc = t.wait("✓ you answered main: alpha")
         t.wait_re(in_view("main"))
         shot(t, "jumped-150")
         # esc: the list as he left it, the same row selected
         t.keys("Escape")
-        t.wait_all(["› ✓ main  first: pick one", "waiting for you · 1"])
+        t.wait_all(["› ✓ main  first: pick one", w("inbox.list_waiting", n=1)])
         t.keys("Escape")
-        t.wait_gone("waiting for you · 1")
+        t.wait_gone(w("inbox.list_waiting", n=1))
         t.wait_re(in_view("main"))
     print("PASS tui inbox")
 

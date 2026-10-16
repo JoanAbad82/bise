@@ -4,6 +4,8 @@
 // bise_proto::words::inbox: rust/proto/src/words/inbox.rs, never a word typed here.
 
 export const inbox = {
+  /** the inbox's name: the screen's title, the box's and the block's head */
+  head: "inbox",
   /** a row's place: he answered it in the inbox */
   where_inbox: "in the inbox",
   /** a row's place: he answered it in an agent's thread */
@@ -28,4 +30,306 @@ export const inbox = {
   day_today: "today",
   /** the history's day head: yesterday */
   day_yesterday: "yesterday",
+  /** the history's day head: a record with no time known (the desktop) */
+  day_earlier: "earlier",
+  /** the head over the open items */
+  list_waiting: (a: { n: string | number }): string => "waiting for you · " + String(a.n),
+  /** the TUI's list: nothing answered yet */
+  list_empty: "nothing answered yet",
+  /** the TUI's list: older answers load at the end */
+  list_older: "older answers…",
+  /** the TUI's keys on a waiting item */
+  list_keys_card: "⏎ answer   ↑↓ move   esc back",
+  /** the TUI's keys on a past item */
+  list_keys_past: "⏎ go to it   ↑↓ move   esc back",
+  /** the TUI's keys with nothing selected */
+  list_keys_none: "esc back",
+  /** the desktop screen's counts */
+  screen_counts: (a: { waiting: string | number; answered: string | number }): string => String(a.waiting) + " waiting · " + String(a.answered) + " answered",
+  /** the desktop's project filter: every project */
+  all_projects: "all projects",
+  /** the desktop's agent filter: every agent */
+  all_agents: "all agents",
+  /** the desktop filter menu's head over the projects (800) */
+  filter_projects: "projects",
+  /** the desktop filter menu's head over the agents (800) */
+  filter_agents: "agents",
+  /** the desktop's state filter: all */
+  state_all: "all",
+  /** the desktop's state filter: waiting */
+  state_waiting: "waiting",
+  /** the desktop's state filter: answered */
+  state_answered: "answered",
+  /** the desktop's state filter: withdrawn */
+  state_withdrawn: "withdrawn",
+  /** the desktop's search field, and its `/` key */
+  search: "search",
+  /** the desktop screen with nothing at all */
+  screen_empty: "nothing yet. what your agents ask you waits here, and stays once you answer.",
+  /** the desktop screen when the filter keeps nothing */
+  screen_none: "nothing matches. esc clears the search.",
+  /** the desktop's detail pane, for a screen reader */
+  detail_label: (a: { agent: string | number }): string => String(a.agent) + "'s question",
+  /** the desktop's detail close button, for a screen reader */
+  detail_close_label: "close (esc)",
+  /** the desktop's detail close button's tip */
+  detail_close_tip: "close · esc",
+  /** the desktop's detail: who asked where and when */
+  detail_asked: (a: { agent: string | number; project: string | number; when: string | number }): string => String(a.agent) + " asked in " + String(a.project) + " · " + String(a.when),
+  /** the desktop's detail: what the agent did next */
+  detail_next: (a: { agent: string | number; next: string | number }): string => String(a.agent) + " went on: " + String(a.next),
+  /** the desktop's detail: the page he answered on, its title unknown */
+  page_chip: (a: { page: string | number }): string => "↗ " + String(a.page) + " · page",
+  /** the desktop's detail: the page he answered on */
+  page_chip_v: (a: { title: string | number; v: string | number }): string => "↗ " + String(a.title) + " · page · v" + String(a.v),
+  /** the detail's way to a page answer */
+  jump_page: "open the page at your answer",
+  /** the detail's way to an answer in a thread */
+  jump_thread: (a: { agent: string | number }): string => "go to your answer in " + String(a.agent) + "'s thread",
+  /** the detail's way to a withdrawn item's asker */
+  jump_asker: (a: { agent: string | number }): string => "open " + String(a.agent) + "'s thread",
+  /** the detail's where and when: withdrawn */
+  when_withdrawn: (a: { when: string | number }): string => "withdrawn · " + String(a.when),
+  /** the detail's where and when: answered, place unknown */
+  when_answered: (a: { when: string | number }): string => "you answered · " + String(a.when),
+  /** the detail's where and when: answered there */
+  when_answered_at: (a: { place: string | number; when: string | number }): string => "you answered " + String(a.place) + " · " + String(a.when),
+  /** a waiting page item's right column on the desktop */
+  wait_end_page: (a: { project: string | number; age: string | number }): string => String(a.project) + " · page · " + String(a.age),
+  /** a question's title (any other kind asks too) */
+  title_asks: (a: { agent: string | number }): string => String(a.agent) + " asks",
+  /** a plan's title */
+  title_plan: (a: { agent: string | number }): string => String(a.agent) + " proposes a plan",
+  /** a blocked agent's title */
+  title_blocked: (a: { agent: string | number }): string => String(a.agent) + " is blocked",
+  /** a failed agent's title */
+  title_failed: (a: { agent: string | number }): string => String(a.agent) + " failed",
+  /** a failed restart's title */
+  title_restart: "restart failed",
+  /** a drop's title */
+  title_drop: (a: { agent: string | number }): string => "drop " + String(a.agent) + "?",
+  /** an overlap's title */
+  title_overlap: "overlap",
+  /** a done agent's title */
+  title_done: (a: { agent: string | number }): string => String(a.agent) + " is done",
+  /** the desktop block's count, items of several projects */
+  block_head_projects: (a: { n: string | number; projects: string | number }): string => String(a.n) + " waiting · " + String(a.projects) + " projects",
+  /** the box's last row: more items under it */
+  more_row: (a: { n: string | number; first: string | number }): string => "+ " + String(a.n) + " more · " + String(a.first),
+  /** a key's words: open the item (the box's opener, the block's, the screen's ⏎) */
+  key_open: "open",
+  /** the box's opener: a click */
+  opener_click: "to open",
+  /** the box's opener: the command */
+  opener_command: "opens it",
+  /** a key's words: the next item (the desktop block) */
+  key_next: "next",
+  /** a key's words: fold the open item (the desktop block) */
+  key_fold: "fold",
+  /** a key's words: back */
+  key_back: "back",
+  /** a key's words: close */
+  key_close: "close",
+  /** a key's words: later (esc) */
+  key_later: "later",
+  /** a key's words: answer with a digit or ⏎ */
+  key_answer: "answer",
+  /** a key's words: pick an option */
+  key_pick: "pick",
+  /** a key's words: previous / next (the desktop's detail) */
+  key_prev_next: "previous / next",
+  /** a key's words: go to his answer (the desktop's ⌘⏎) */
+  key_go: "go to your answer",
+  /** a key's words: back to his message (the TUI's esc) */
+  key_back_message: "back to your message",
+  /** a key's words: a closed question's words go as a message */
+  key_send_message: "sends your words as a message",
+  /** a key's words: ⏎ sends the answer (answering) */
+  key_send_answer: "send the answer",
+  /** a key's words: ←→ choose an option */
+  key_choose: "choose",
+  /** a key's words: ↑↓ the other items */
+  key_other_items: "other items",
+  /** a key's words: pgup pgdn */
+  key_scroll: "scroll",
+  /** a key's words: ctrl+o, back from full screen */
+  key_in_place: "back in place",
+  /** a key's words: ctrl+o, full screen */
+  key_full: "full screen",
+  /** a key's words: esc gives his words to someone else */
+  key_to: (a: { who: string | number }): string => "to " + String(a.who),
+  /** a key's words: ⏎ says no with his note */
+  key_says_no: "says no, with your note",
+  /** a key's words: ⏎ sends his answer */
+  key_sends_answer: "sends your answer",
+  /** a key's words: ⏎ acknowledges */
+  key_got_it: "got it",
+  /** a key's words: the desktop card opens in the app */
+  key_open_in_bise: "open in bise",
+  /** a key's words: the desktop card's page opens beside */
+  key_open_beside: "open beside",
+  /** a key's words: the TUI card's page opens in the browser */
+  key_open_browser: "open in your browser",
+  /** a key's words: yes (the desktop's confirm bar) */
+  key_yes: "yes",
+  /** a key's words: no (the desktop's confirm bar), and a gate's no */
+  no: "no",
+  /** the TUI's divider: he writes */
+  you: "you",
+  /** the TUI's divider: his words answer the item */
+  your_answer: "your answer",
+  /** the TUI's divider: the question closed under his words */
+  question_closed: "the question is closed: ⏎ sends your words as a message",
+  /** how many lines are folded away */
+  more_lines: (a: { n: number }): string => a.n === 1 ? String(a.n) + " more line" : String(a.n) + " more lines",
+  /** the TUI's scroll mark: lines under the view */
+  scroll_more: (a: { n: number }): string => a.n === 1 ? String(a.n) + " more line · pgdn" : String(a.n) + " more lines · pgdn",
+  /** the TUI's scroll mark: at the end */
+  scroll_end: "end · pgup",
+  /** the TUI's position among the items */
+  pos_of: (a: { pos: string | number; n: string | number; age: string | number }): string => String(a.pos) + " of " + String(a.n) + " · " + String(a.age),
+  /** a closed card's age (the desktop) */
+  closed_age: (a: { age: string | number }): string => String(a.age) + " · closed",
+  /** the option he picked on a page (the TUI and the desktop) */
+  my_pick: "my pick",
+  /** the hint under a gate's options */
+  hint_why_not: "or type why not, ⏎ says no",
+  /** the TUI's hint under a question's options */
+  hint_or_answer: "or type your answer, ⏎ sends it",
+  /** the TUI's hint under a question without options */
+  hint_answer: "type your answer, ⏎ sends it",
+  /** the desktop's hint under a question's options */
+  type_or_below: "or type your answer below",
+  /** the desktop's hint under a question without options */
+  type_below: "type your answer below",
+  /** a plan's hint: his words change it */
+  type_plan: (a: { agent: string | number }): string => "or type what to change: " + String(a.agent) + " reads it",
+  /** a page's item without options: who reads his words */
+  type_reads: (a: { agent: string | number }): string => "type: " + String(a.agent) + " reads it",
+  /** a page's item with options: who reads his words */
+  or_type_reads: (a: { agent: string | number }): string => "or type: " + String(a.agent) + " reads it",
+  /** where the asker is: its role */
+  agent_is: (a: { agent: string | number; role: string | number }): string => String(a.agent) + " is " + String(a.role),
+  /** where the asker is: its last step */
+  last_step: (a: { agent: string | number; step: string | number }): string => String(a.agent) + "'s last step: " + String(a.step),
+  /** where the asker is: its role and its last step */
+  agent_is_step: (a: { agent: string | number; role: string | number; step: string | number }): string => String(a.agent) + " is " + String(a.role) + " · its last step: " + String(a.step),
+  /** a page item's chip */
+  page_noun: "page",
+  /** an option that opens an artifact: where it goes (the desktop's tip) */
+  opens_beside: (a: { title: string | number }): string => "opens " + String(a.title) + " beside the thread",
+  /** a heard answer, before it goes (the desktop) */
+  heard_undo: (a: { line: string | number }): string => String(a.line) + " · esc undoes",
+  /** the line in the desktop block's place when nothing waits */
+  zero: "nothing waits for you",
+  /** the desktop's mark on an item whose answer was refused */
+  not_sent: "not sent",
+  /** the desktop's way to send it again */
+  try_again: "try again",
+  /** an approval to edit a file */
+  wants_edit_file: (a: { agent: string | number; file: string | number }): string => String(a.agent) + " wants to edit " + String(a.file),
+  /** an approval to edit */
+  wants_edit: (a: { agent: string | number }): string => String(a.agent) + " wants to edit",
+  /** an approval to run a command */
+  wants_run: (a: { agent: string | number }): string => String(a.agent) + " wants to run",
+  /** a patch with no file name */
+  a_file: "a file",
+  /** a patch's other files */
+  more_files: (a: { n: number }): string => a.n === 1 ? "+" + String(a.n) + " file" : "+" + String(a.n) + " files",
+  /** a command of several lines */
+  cmd_lines: (a: { first: string | number; n: string | number }): string => String(a.first) + " · " + String(a.n) + " lines",
+  /** a gate's option: allow */
+  allow: "allow",
+  /** a gate's option outside the sandbox */
+  rerun: "run it again without the sandbox",
+  /** a gate's short option outside the sandbox (the TUI) */
+  rerun_short: "run again",
+  /** a gate's option: always allow these rules */
+  always_allow: (a: { rules: string | number }): string => "always allow " + String(a.rules) + " here",
+  /** a gate's option: always outside the sandbox */
+  always_outside: "always run it outside the sandbox here",
+  /** a gate's option: always these rules outside the sandbox */
+  always_outside_rules: (a: { rules: string | number }): string => "always run " + String(a.rules) + " outside the sandbox here",
+  /** a gate many agents ask at once (the TUI) */
+  agents_ask: (a: { n: string | number; what: string | number }): string => String(a.n) + " agents " + String(a.what),
+  /** a drop's last ask */
+  drop_ask: (a: { name: string | number; n: number }): string => a.n === 1 ? "drop " + String(a.name) + "? " + String(a.n) + " commit go." : "drop " + String(a.name) + "? " + String(a.n) + " commits go.",
+  /** a drop's last ask, its branch unnamed */
+  the_branch: "the branch",
+  /** a drop's option: drop */
+  drop_it: "drop it",
+  /** a drop's option: keep */
+  keep_it: "keep it",
+  /** the desktop: what an item only its options decide waits for */
+  waits_for: (a: { noun: string | number; digits: string | number }): string => "the " + String(a.noun) + " waits for " + String(a.digits),
+  /** the desktop: an item's options, its noun unknown */
+  waits_options: "it waits for its options",
+  /** the digits that answer two options */
+  digits_two: "1 or 2",
+  /** the digits that answer n options */
+  digits_to: (a: { n: string | number }): string => "1 to " + String(a.n),
+  /** the item's noun: a merge */
+  noun_merge: "merge",
+  /** the item's noun: a try */
+  noun_try: "try",
+  /** the item's noun: a sign-in */
+  noun_signin: "sign-in",
+  /** the item's noun: an approval */
+  noun_approval: "approval",
+  /** a picked option folded */
+  fold_answered: (a: { agent: string | number; pick: string | number }): string => "you answered " + String(a.agent) + ": " + String(a.pick),
+  /** a gate he said no to */
+  fold_no: (a: { agent: string | number; what: string | number }): string => "you said no to " + String(a.agent) + ": " + String(a.what),
+  /** a gate he let run outside the sandbox */
+  fold_outside: (a: { agent: string | number; what: string | number }): string => "you let " + String(a.agent) + " run it outside the sandbox: " + String(a.what),
+  /** a gate he allowed */
+  fold_allowed: (a: { agent: string | number; what: string | number }): string => "you allowed " + String(a.agent) + ": " + String(a.what),
+  /** a page's pick folded */
+  picked: (a: { name: string | number }): string => "you picked " + String(a.name),
+  /** the last item answered */
+  clear: "inbox clear",
+  /** his words to a closed question, kept */
+  closed_words: (a: { agent: string | number }): string => "your words to " + String(a.agent) + "'s closed question: ↑ brings them back",
+  /** his words answer this asker */
+  answering: (a: { who: string | number }): string => "answering " + String(a.who),
+  /** esc gives his words to the thread he is in instead */
+  esc_instead: (a: { to: string | number }): string => "esc to " + String(a.to) + " instead",
+  /** the empty composer while his words answer */
+  answer_placeholder: (a: { who: string | number; key: string | number }): string => "your answer to " + String(a.who) + ", then " + String(a.key),
+  /** an item only options decide: his words go to its asker as a message */
+  to_waits: (a: { who: string | number; waits: string | number }): string => "to " + String(a.who) + " · " + String(a.waits),
+  /** the empty composer then */
+  message_placeholder: (a: { who: string | number }): string => "write to " + String(a.who) + ", then ⏎",
+  /** the question closed under his words */
+  to_closed: (a: { who: string | number }): string => "to " + String(a.who) + " · the question is closed",
+  /** bise's own ask (notifications): only its options answer it */
+  notify_waits: (a: { to: string | number }): string => "to " + String(a.to) + " · bise's ask waits for 1 or 2",
+  /** bise's own ask */
+  notify_question: "let questions reach you as macOS notifications?",
+  /** bise's own ask: yes */
+  notify_on: "turn on",
+  /** bise's own ask: not now */
+  notify_not_now: "not now",
+  /** what the agent asked */
+  main_asked: (a: { agent: string | number; question: string | number }): string => String(a.agent) + " asked: " + String(a.question),
+  /** what main answered */
+  main_answered: (a: { answer: string | number }): string => "i answered: " + String(a.answer),
+  /** the open head: whom main answered */
+  main_answered_who: (a: { agent: string | number }): string => "i answered " + String(a.agent),
+  /** the open body's label: the question */
+  label_asked: "asked:",
+  /** the open body's label: the answer */
+  label_answered: "i answered:",
+  /** the open body's label: why */
+  label_why: "why:",
+  /** the fold mark: only the why is behind it */
+  why_mark: "why",
+  /** a newer app is staged */
+  restart_staged: (a: { live: string | number }): string => "this app is " + String(a.live) + ", a newer one is ready",
+  /** the hub is newer than the app */
+  restart_older: (a: { live: string | number }): string => "this app is " + String(a.live) + " · it updates at the next try",
+  /** the app has no swap */
+  restart_cannot: "this app cannot restart itself",
+  /** the act */
+  restart_update: "restart to update",
 } as const;

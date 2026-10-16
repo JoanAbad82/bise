@@ -12,6 +12,7 @@ use super::super::card_draw::{fg, Drawn};
 use super::{cut, Card, CardHit, Enter, Shape};
 use crate::theme;
 use crate::App;
+use bise_proto::words::inbox;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
@@ -40,18 +41,18 @@ pub(in crate::sb) fn page_mine(c: &Card, s: &Shape) -> Vec<usize> {
 
 /// Its page's chip in words: `↗ <title> · page · v4` (an older hub: the id).
 pub(crate) fn chip_words(p: &bise_proto::rows::CardPage) -> String {
-    let mut t = format!("↗ {} · page", p.title.as_deref().unwrap_or(&p.id));
-    if let Some(v) = p.v {
-        t.push_str(&format!(" · v{v}"));
+    let title = p.title.as_deref().unwrap_or(&p.id);
+    match p.v {
+        Some(v) => inbox::page_chip_v(title, v),
+        None => inbox::page_chip(title),
     }
-    t
 }
 
 /// The page's line under what it asks, `w` columns: the chip's words in
 /// text, `ctrl+t open in your browser` when it fits; the line opens it too.
 pub(in crate::sb) fn page_link_line(c: &Card, w: usize) -> Option<Drawn> {
     let p = &c.page.as_ref()?.page;
-    let key = "   ctrl+t open in your browser";
+    let key = format!("   ctrl+t {}", inbox::key_open_browser);
     // the key only beside the whole chip; narrower, the chip alone, cut
     let whole = chip_words(p);
     let fits = whole.width() + key.width() <= w;
@@ -60,7 +61,7 @@ pub(in crate::sb) fn page_link_line(c: &Card, w: usize) -> Option<Drawn> {
     if fits {
         spans.push(Span::styled("   ", Style::default()));
         spans.push(Span::styled("ctrl+t", fg(theme::text())));
-        spans.push(Span::styled(" open in your browser", fg(theme::dim())));
+        spans.push(Span::styled(format!(" {}", inbox::key_open_browser), fg(theme::dim())));
     }
     let wd = chip.width() + if fits { key.width() } else { 0 };
     Some(Drawn { line: Line::from(spans), hits: vec![(0, wd, CardHit::Page(c.id))], item: false })
@@ -70,9 +71,9 @@ pub(in crate::sb) fn page_link_line(c: &Card, w: usize) -> Option<Drawn> {
 /// that agent's (plan-ok, `lean-install proposes a plan`); the rest ask.
 pub(in crate::sb) fn other_title(kind: &str, agent: &str) -> String {
     if kind == "plan" {
-        return format!("{agent} proposes a plan");
+        return inbox::title_plan(agent);
     }
-    format!("{agent} asks")
+    inbox::title_asks(agent)
 }
 
 /// A linked card's hint under its options: who reads typed words (`or
@@ -83,11 +84,11 @@ pub(in crate::sb) fn page_hint(c: &Card, s: &Shape) -> Option<String> {
         return None;
     }
     if c.kind == "plan" {
-        return Some(format!("or type what to change: {} reads it", c.agent));
+        return Some(inbox::type_plan(&c.agent));
     }
     c.page.as_ref()?;
     // the terminal calls main main (designer m_26776)
-    Some(format!("{}type: {} reads it", if s.options.is_empty() { "" } else { "or " }, c.agent))
+    Some(if s.options.is_empty() { inbox::type_reads(&c.agent) } else { inbox::or_type_reads(&c.agent) })
 }
 
 /// The fold of his pick on a page's drawn pick (`B · one frame`): `you
@@ -96,7 +97,7 @@ pub(in crate::sb) fn page_hint(c: &Card, s: &Shape) -> Option<String> {
 pub(in crate::sb) fn picked_fold(c: &Card, reply: &str) -> Option<String> {
     c.page.as_ref()?;
     let name = reply.split_once(" · ").map(|(k, _)| k.trim()).filter(|k| !k.is_empty() && k.width() <= 12)?;
-    Some(format!("you picked {name}"))
+    Some(inbox::picked(name))
 }
 
 /// Card `id`'s page in the browser at its block; false: no linked page.

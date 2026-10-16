@@ -403,7 +403,7 @@ fn fit_counts(n: [usize; 6], short: bool, room: usize, gust: &[Span<'static>]) -
     // dim words (BISE-100)
     let parts: [CountPart; 6] = [
         (G_WORKING, words::panel::count_working, dim(), dim()),
-        (G_WAITING, words::panel::count_waiting, dim(), dim()),
+        (G_WAITING, words::common::count_waiting, dim(), dim()),
         (G_NEEDS_YOU, words::panel::count_needs_you, accent(), accent()),
         (crate::theme::done_glyph(), words::panel::count_done, accent(), dim()),
         (crate::theme::pr_glyph(), words::panel::count_prs, dim(), dim()),

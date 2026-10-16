@@ -6,6 +6,7 @@
 // Pure: Sidebar.tsx and RightBar.tsx spread them with the ds's tipAttrs. Owner: amb-win.
 import type { Agent, ProjectRow } from '@/proto';
 import { panel } from '@/proto/words_panel.gen';
+import { common } from '@/proto/words_common.gen';
 import { shortAge } from '@/agents/model';
 import { pauseLine, shownPause, waitLen } from '@/thread/wake';
 import { tilde, type Mark } from './barplaces';
@@ -56,7 +57,7 @@ export function workingTip(n: number): string {
 
 /** A pink count: '2 waiting for you'; bise's (every project's): '… in all your projects'. */
 export function waitsTip(n: number, everywhere = false): string {
-  return everywhere ? panel.tip_waiting_you_all({ n }) : panel.tip_waiting_you({ n });
+  return everywhere ? panel.tip_waiting_you_all({ n }) : common.waiting_for_you({ n });
 }
 
 /** A project's 'folder gone': where it was. */

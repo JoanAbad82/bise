@@ -11,6 +11,7 @@
 // for ambient's sign-off. The scripted core (FakeCore), fake data. Owner: amb-home.
 import { writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -20,7 +21,7 @@ const OPTS = [
   'attends la fenêtre de maintenance de ce soir à 22 h',
   'laisse tomber pour cette semaine : on en reparle lundi avec l’équipe data et on garde l’ancien schéma en attendant',
 ];
-const APPROVAL = { id: 7, project: P, kind: 'merge', rank: 0, approval: true, agent: 'main', question: 'merge sb/streaming into main?', options: [{ n: 1, label: 'merge into main' }, { n: 2, label: 'not now' }], urgent: false, since_ms: 1791100300000 };
+const APPROVAL = { id: 7, project: P, kind: 'merge', rank: 0, approval: true, agent: 'main', question: 'merge sb/streaming into main?', options: [{ n: 1, label: 'merge into main' }, { n: 2, label: inbox.notify_not_now }], urgent: false, since_ms: 1791100300000 };
 const QUESTION = { id: 9, project: P, kind: 'question', rank: 1, agent: 'main', question: Q, options: OPTS.map((label, i) => ({ n: i + 1, label })), urgent: false, since_ms: 1791100310000 };
 const agent = (name: string) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: 0 });
 const prefs = (theme: 'light' | 'dark' | 'system') => ({

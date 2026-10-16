@@ -7,6 +7,7 @@
 // Shots (for designer): the card open, light + dark. Owner: plan-ok.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -75,11 +76,11 @@ test("inbox/plan-card: lean-install's plan is its own card: 'lean-install propos
     const card = page.getByTestId(`inbox.block.card.${P}-21`);
     await expect(card).toBeVisible({ timeout: 3000 });
     await test.step("its head names the agent that proposes it, its gist is whole, its choices say what happens", async () => {
-      await expect(card).toContainText('lean-install proposes a plan');
+      await expect(card).toContainText(inbox.title_plan({ agent: 'lean-install' }));
       await expect(card).toContainText(Q);
       await expect(card).toContainText('win32 leaves the platform binaries (that one goes through CI).');
       for (const o of OPTIONS) await expect(card).toContainText(o);
-      await expect(card).toContainText('or type what to change: lean-install reads it');
+      await expect(card).toContainText(inbox.type_plan({ agent: 'lean-install' }));
       await expect(card).not.toContainText('bise asks');
       // its question reads first (ink), the plan under it in text-2 (designer m_26765)
       const gist = card.locator('.ic-qd');

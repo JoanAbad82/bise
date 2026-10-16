@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
 import type { CardPage } from '@/proto/rows';
+import { inbox } from '@/proto/words_inbox.gen';
 import { Act, ArtChip, Kbd, tipAttrs } from '@/ds';
 import { refusedLine, useRefused, useStore } from '@/store';
 import { cardKey } from './order';
@@ -120,7 +121,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
         </span>
         <b>{titleOf(card)}</b>
         {home !== true && <span className="ic-p" data-testid={`${id}.project`}>{`· ${where}`}</span>}
-        <span className="ic-k">{closed ? `${age(now - card.since_ms)} · closed` : age(now - card.since_ms)}</span>
+        <span className="ic-k">{closed ? inbox.closed_age({ age: age(now - card.since_ms) }) : age(now - card.since_ms)}</span>
       </div>
       <div className="ic-q" data-testid={`${id}.q`}>
         {full === false && card.kind !== 'plan' ? <Folded text={card.question} project={card.project} testId={`${id}.more`} q={`${id}.q`} /> : <Question card={card} id={id} />}
@@ -145,7 +146,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
                 {o.label}
                 {o.why != null && o.why !== '' && <span className="ic-why">{o.why}</span>}
               </span>
-              {o.mine === true && <span className="ic-mine">my pick</span>}
+              {o.mine === true && <span className="ic-mine">{inbox.my_pick}</span>}
             </div>
           ))}
         </div>
@@ -189,7 +190,7 @@ function RefusedNote({ card, id }: { card: CardRow; id: string }) {
             }}
             testId={`${id}.retry`}
           >
-            try again
+            {inbox.try_again}
           </Act>
         </>
       )}
@@ -200,7 +201,7 @@ function RefusedNote({ card, id }: { card: CardRow; id: string }) {
 /** A folded row's mark for a card whose answer or close was refused here: 'not sent', or nothing. */
 export function RefusedMark({ card }: { card: CardRow }) {
   const refused = useRefused(card.project, card.id);
-  return refused === null ? null : <span className="ic-refused-mark">not sent</span>;
+  return refused === null ? null : <span className="ic-refused-mark">{inbox.not_sent}</span>;
 }
 
 /** The footer's keys (ambient's six forms), each pair a button. */
@@ -218,11 +219,11 @@ function Footer({ card, acts, on, id, pick }: { card: CardRow; acts: InboxCardAc
   };
   return (
     <>
-      {n > 0 && pair(pickKeys(n), 'pick', 'pick', on !== null ? () => { pick(on); } : undefined)}
+      {n > 0 && pair(pickKeys(n), inbox.key_pick, 'pick', on !== null ? () => { pick(on); } : undefined)}
       {!outside && takesWords(card) && pair(null, typeWords(card, n), 'type', acts.type)}
-      {outside && pair('⏎', 'open in bise', 'open', acts.open)}
-      {!outside && acts.close && pair('⌘⌫', 'close', 'close', acts.close)}
-      {pair('esc', 'later', 'later', acts.later, true)}
+      {outside && pair('⏎', inbox.key_open_in_bise, 'open', acts.open)}
+      {!outside && acts.close && pair('⌘⌫', inbox.key_close, 'close', acts.close)}
+      {pair('esc', inbox.key_later, 'later', acts.later, true)}
     </>
   );
 }
@@ -234,7 +235,7 @@ function shownAgent(agent: string): string {
 
 /** The chip's words: '<title> · page · v4' (an older hub sends no title: the page's id). */
 export function pageChipWords(page: CardPage): { title: string; meta: string } {
-  return { title: page.title ?? page.id, meta: ['page', page.v == null ? '' : `v${String(page.v)}`].filter(Boolean).join(' · ') };
+  return { title: page.title ?? page.id, meta: [inbox.page_noun, page.v == null ? '' : `v${String(page.v)}`].filter(Boolean).join(' · ') };
 }
 
 /** The page under the question (designer m_26560, m_26776): the artifact chip, '⌘O open beside' at its right. */
@@ -246,7 +247,7 @@ function PageChip({ page, open, id }: { page: CardPage; open: (() => void) | und
       {open && (
         <Act onClick={open} testId={`${id}.page.open`}>
           <Kbd>⌘O</Kbd>
-          open beside
+          {inbox.key_open_beside}
         </Act>
       )}
     </div>
@@ -281,7 +282,7 @@ function Folded({ text, project, testId, q }: { text: string; project: string; t
     <>
       <ArtWords text={lines.slice(0, FOLD_SHOW).join('\n')} project={project} testId={q} />
       <span data-testid={testId}>
-        {`\n… ${String(more)} more lines `}
+        {`\n… ${inbox.more_lines({ n: more })} `}
         <Kbd>ctrl o</Kbd>
       </span>
     </>
@@ -308,9 +309,9 @@ export function planParts(text: string): [string, string] {
 /** What typing does: a plan's card says what he types changes it and who reads it (plan-ok); a
  * page's card says who reads them ('or type: designer reads it'). */
 export function typeWords(c: Pick<CardRow, 'kind' | 'agent' | 'page'>, n: number): string {
-  if (c.kind === 'plan') return `or type what to change: ${shownAgent(c.agent)} reads it`;
-  if (c.page?.title != null) return `${n > 0 ? 'or type' : 'type'}: ${shownAgent(c.agent)} reads it`;
-  return n > 0 ? 'or type your answer below' : 'type your answer below';
+  if (c.kind === 'plan') return inbox.type_plan({ agent: shownAgent(c.agent) });
+  if (c.page?.title != null) return n > 0 ? inbox.or_type_reads({ agent: shownAgent(c.agent) }) : inbox.type_reads({ agent: shownAgent(c.agent) });
+  return n > 0 ? inbox.type_or_below : inbox.type_below;
 }
 
 /** Words answer it (a question), not only its options. */
@@ -327,26 +328,26 @@ export function kindTitle(kind: string, agent0: string): string {
   const agent = agent0 === 'main' ? 'bise' : agent0;
   switch (kind) {
     case 'question':
-      return `${agent} asks`;
+      return inbox.title_asks({ agent });
     // a plan an agent proposes (plan-ok, Gabriel's pick A): its own card, its words reach it
     case 'plan':
-      return `${agent} proposes a plan`;
+      return inbox.title_plan({ agent });
     case 'blocked':
-      return `${agent} is blocked`;
+      return inbox.title_blocked({ agent });
     case 'failed':
-      return `${agent} failed`;
+      return inbox.title_failed({ agent });
     case 'restart':
-      return 'restart failed';
+      return inbox.title_restart;
     case 'drop':
-      return `drop ${agent}?`;
+      return inbox.title_drop({ agent });
     case 'overlap':
-      return 'overlap';
+      return inbox.title_overlap;
     case 'done':
-      return `${agent} is done`;
+      return inbox.title_done({ agent });
     default:
       // never a card's kind id (designer m_15412): any other kind asks like a question; its text
       // says what it asks ('merge sb/perf into main?')
-      return `${agent} asks`;
+      return inbox.title_asks({ agent });
   }
 }
 

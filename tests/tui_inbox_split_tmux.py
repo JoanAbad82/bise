@@ -10,6 +10,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from words import w  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run, in_view, MAIN_IDLE  # noqa: E402
 
@@ -59,9 +60,9 @@ def main():
         assert "ia asks main" not in box and "? ia ·" not in box, box
         # only the user answers it: open it, type, ⏎; it leaves the strip
         t.typed("\x1b[49;5u")             # ctrl+1, the kitty form (BISE-302)
-        t.wait("↳ answering main")
+        t.wait("↳ " + w("inbox.answering", who="main"))
         t.typed("yes friday")
-        t.wait("⏎ send the answer")
+        t.wait("⏎ " + w("inbox.key_send_answer"))
         t.keys("Enter")
         t.wait_gone("waiting for you", 20)
         t.wait("✓ you answered main: yes friday")

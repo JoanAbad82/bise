@@ -9,6 +9,7 @@
 import { writeFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, pngBytes, Recorder, test, expect } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -53,7 +54,7 @@ async function answerLast(page: Page, core: FakeCore): Promise<void> {
 async function noNotifyAsk(page: Page): Promise<void> {
   const rows = page.getByTestId('inbox.block');
   await expect(rows).toBeVisible({ timeout: 10_000 });
-  const ask = page.getByText('let questions reach you as macOS notifications?');
+  const ask = page.getByText(inbox.notify_question);
   if ((await ask.count()) === 0) return;
   await ask.first().click();
   await page.keyboard.press('2');

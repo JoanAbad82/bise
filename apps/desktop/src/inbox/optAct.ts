@@ -8,6 +8,7 @@ import { useGoArtifact } from '@/artifacts/leave';
 import { openAtAnchor } from '@/artifacts/Open';
 import { useStore } from '@/store';
 import type { OptAct } from '@/proto/rows';
+import { inbox } from '@/proto/words_inbox.gen';
 
 export type OptPlan =
   | { readonly t: 'artifact'; readonly id: string; readonly at: string | null }
@@ -34,7 +35,7 @@ export function optPlan(act: OptAct, listed: (id: string) => boolean): OptPlan {
  */
 export function optTip(act: OptAct | null | undefined, titleOf: (id: string) => string | undefined): string | null {
   if (act?.act !== 'open' || act.artifact == null) return null;
-  return `opens ${titleOf(act.artifact) ?? act.artifact} beside the thread`;
+  return inbox.opens_beside({ title: titleOf(act.artifact) ?? act.artifact });
 }
 
 /** Does an option's act for an item of `project`. */

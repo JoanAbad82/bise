@@ -13,6 +13,7 @@
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { panel } from '../../../src/proto/words_panel.gen';
+import { common } from '../../../src/proto/words_common.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -142,7 +143,7 @@ for (const theme of ['light', 'dark']) {
       // ⋯ flush right, designer m_26343: the mark's tip says who works and who waits): their tips
       // stay on them, read as attributes
       await expect(page.getByTestId(`app.sidebar.project.${P}.end`)).toHaveAttribute('data-tip', panel.tip_agents_working({ n: 2 }));
-      await expect(page.getByTestId(`app.sidebar.project.${P}.count`)).toHaveAttribute('data-tip', panel.tip_waiting_you({ n: 1 }));
+      await expect(page.getByTestId(`app.sidebar.project.${P}.count`)).toHaveAttribute('data-tip', common.waiting_for_you({ n: 1 }));
       await expect(page.getByTestId('app.sidebar.project.docs-cff418c0.end'), 'quiet: no end words (its mark says it)').toHaveCount(0);
       // the pink count is the inbox row's (inbox-history pick A)
       await hover('app.sidebar.inbox.count', panel.tip_waiting_you_all({ n: 2 }), 'sidebar-inbox');

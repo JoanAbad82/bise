@@ -17,6 +17,7 @@
 // Owner: inbox-open.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect, textProblems } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -33,14 +34,14 @@ const LEN = 1000;
 const ENTRIES = Array.from({ length: LEN }, (_, i) => {
   const pos = i + 1;
   const at_ms = NOW - 21 * DAY + i * (20 * DAY / LEN);
-  if (pos === ANSWER) return { pos, at_ms, kind: 'approval', text: 'you answered search: EU sizes, with a US hint', approval: { ok: true, text: 'you answered search: EU sizes, with a US hint', card: 21 } };
+  if (pos === ANSWER) return { pos, at_ms, kind: 'approval', text: inbox.fold_answered({ agent: 'search', pick: 'EU sizes, with a US hint' }), approval: { ok: true, text: inbox.fold_answered({ agent: 'search', pick: 'EU sizes, with a US hint' }), card: 21 } };
   return { pos, at_ms, kind: 'agent', text: `search note ${String(pos)}: checked the size filter on page ${String(pos)}` };
 });
 const asked = (d: number) => NOW - d * DAY;
 const RECORDS = [
-  { card: 21, project: P, asker: 'search', kind: 'question', question: 'which size system should the filter use?', options: ['EU', 'US', 'both, by locale'], state: 'answered', said: 'EU', pick_n: 1, where: { kind: 'inbox' }, asked_ms: (ENTRIES[ANSWER - 1]?.at_ms ?? asked(18)) - 600_000, at_ms: ENTRIES[ANSWER - 1]?.at_ms ?? asked(18), thread: { agent: 'search', pos: ANSWER }, line2: 'you: EU · in the inbox' },
-  { card: 22, project: P, asker: 'search', kind: 'question', question: 'keep the old size chart as a fallback?', options: [], state: 'answered', said: 'only for the kids range', where: { kind: 'inbox' }, asked_ms: asked(17) - 300_000, at_ms: asked(17), thread: { agent: 'search', pos: 60 }, line2: 'you: only for the kids range · in the inbox' },
-  { card: 23, project: P, asker: 'designer', kind: 'question', question: 'the size chips: which look?', options: ['A', 'B'], state: 'answered', said: 'B', pick_n: 2, where: { kind: 'page', page: 'size-chips', block: 'q1' }, asked_ms: asked(16) - 300_000, at_ms: asked(16), line2: 'you: B · on a page' },
+  { card: 21, project: P, asker: 'search', kind: 'question', question: 'which size system should the filter use?', options: ['EU', 'US', 'both, by locale'], state: 'answered', said: 'EU', pick_n: 1, where: { kind: 'inbox' }, asked_ms: (ENTRIES[ANSWER - 1]?.at_ms ?? asked(18)) - 600_000, at_ms: ENTRIES[ANSWER - 1]?.at_ms ?? asked(18), thread: { agent: 'search', pos: ANSWER }, line2: inbox.answered_at({ said: 'EU', place: inbox.where_inbox }) },
+  { card: 22, project: P, asker: 'search', kind: 'question', question: 'keep the old size chart as a fallback?', options: [], state: 'answered', said: 'only for the kids range', where: { kind: 'inbox' }, asked_ms: asked(17) - 300_000, at_ms: asked(17), thread: { agent: 'search', pos: 60 }, line2: inbox.answered_at({ said: 'only for the kids range', place: inbox.where_inbox }) },
+  { card: 23, project: P, asker: 'designer', kind: 'question', question: 'the size chips: which look?', options: ['A', 'B'], state: 'answered', said: 'B', pick_n: 2, where: { kind: 'page', page: 'size-chips', block: 'q1' }, asked_ms: asked(16) - 300_000, at_ms: asked(16), line2: inbox.answered_at({ said: 'B', place: inbox.where_page }) },
 ];
 const world = () => [
   prefs('light'),
@@ -113,7 +114,7 @@ test('inbox/inbox-open: ⏎ opens the item whole in the pane, ⌘⏎ lands on hi
       // ↑ a page answer: the page as a chip
       await page.keyboard.press('ArrowUp');
       await expect(page.getByTestId('inbox.detail.option.2')).toHaveText('✓B');
-      await expect(page.getByTestId('inbox.detail.page')).toHaveText('↗ size-chips · page');
+      await expect(page.getByTestId('inbox.detail.page')).toHaveText(inbox.page_chip({ page: 'size-chips' }));
       await page.keyboard.press('ArrowDown');
       await page.keyboard.press('ArrowDown');
       await expect(page.getByTestId('inbox.detail.question')).toHaveText('which size system should the filter use?');

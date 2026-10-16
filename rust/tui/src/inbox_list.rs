@@ -11,6 +11,7 @@
 //! `withdrawn: <why>`. The same at 80 and 150 columns: the question cuts.
 
 use bise_proto::inbox::{words, InboxRecord, InboxState};
+use bise_proto::words::inbox;
 use unicode_width::UnicodeWidthStr;
 
 /// One open card, as the strip numbers it.
@@ -115,7 +116,7 @@ pub(crate) fn step(rows: &[Row], cur: Option<Pick>, d: isize) -> Option<Pick> {
 /// A row's text in `width` columns: (left, right). The caller styles it.
 pub(crate) fn text(r: &Row, width: usize) -> (String, String) {
     match r {
-        Row::WaitHead(n) => (format!("waiting for you · {n}"), String::new()),
+        Row::WaitHead(n) => (inbox::list_waiting(n), String::new()),
         Row::Wait(w) => {
             let head = format!("{}  {}  ", w.n, w.agent);
             let room = width.saturating_sub(head.width() + w.age.width() + 2);
@@ -128,8 +129,8 @@ pub(crate) fn text(r: &Row, width: usize) -> (String, String) {
             (format!("{head}{}", cut(question, room)), time.clone())
         }
         Row::Said { text, .. } => (format!("  {}", cut(text, width.saturating_sub(2))), String::new()),
-        Row::Empty => ("nothing answered yet".into(), String::new()),
-        Row::More => ("older answers…".into(), String::new()),
+        Row::Empty => (inbox::list_empty.into(), String::new()),
+        Row::More => (inbox::list_older.into(), String::new()),
     }
 }
 
@@ -137,9 +138,9 @@ pub(crate) fn text(r: &Row, width: usize) -> (String, String) {
 /// m_25918, the desktop's rule).
 pub(crate) fn keys(sel: Option<Pick>) -> &'static str {
     match sel {
-        Some(Pick::Card(_)) => "⏎ answer   ↑↓ move   esc back",
-        Some(Pick::Past(_)) => "⏎ go to it   ↑↓ move   esc back",
-        None => "esc back",
+        Some(Pick::Card(_)) => inbox::list_keys_card,
+        Some(Pick::Past(_)) => inbox::list_keys_past,
+        None => inbox::list_keys_none,
     }
 }
 

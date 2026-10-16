@@ -13,6 +13,7 @@
 // Owner: menus-ds.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -25,7 +26,7 @@ const prefs = (theme: string) => ({
 const ag = (name: string, archived = false) => ({ name, main: name === 'main', status: 'idle', archived, title: '', purpose: `${name}'s job`, since_ms: NOW - 3_600_000, waits: 0 });
 const RECORDS = AGENTS.map((a, i) => ({
   card: i + 1, project: P, asker: a, kind: 'question', question: `does ${a} ship today?`, options: [], state: 'answered', said: 'yes',
-  where: { kind: 'inbox' }, asked_ms: NOW - (i + 2) * 600_000, at_ms: NOW - (i + 1) * 600_000, line2: 'you: yes · in the inbox',
+  where: { kind: 'inbox' }, asked_ms: NOW - (i + 2) * 600_000, at_ms: NOW - (i + 1) * 600_000, line2: inbox.answered_at({ said: 'yes', place: inbox.where_inbox }),
 }));
 const world = () => [
   prefs('light'),

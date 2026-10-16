@@ -21,6 +21,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from words import w  # noqa: E402
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, wait_until, MAIN_IDLE  # noqa: E402
 
@@ -54,9 +55,9 @@ def one(cols, rows, tmp):
         t.wait("ctrl+t open in your browser")
         sc = t.screen()
         print(sc)
-        assert "↗ where does my answer go · page · v1   ctrl+t open in your browser" in sc, "the page's line:\n" + sc
+        assert w("inbox.page_chip_v", title="where does my answer go", v=1) + "   ctrl+t " + w("inbox.key_open_browser") in sc, "the page's line:\n" + sc
         assert "A · a pink border   my pick" in sc, "the asker's pick:\n" + sc
-        assert "or type: main reads it" in sc, "who reads typed words:\n" + sc
+        assert w("inbox.or_type_reads", agent="main") in sc, "who reads typed words:\n" + sc
         assert "1-2 pick" in sc and "ctrl+t open" in sc, "the key bar:\n" + sc
         # ctrl+t: the page in the browser at its block, nothing sent
         t.keys("C-t")
@@ -70,7 +71,7 @@ def one(cols, rows, tmp):
         # 2: answered; the thread says what he picked
         t.keys("2")
         c.wait(lambda: not any((x.get("page") or {}).get("id") == "composer-look" for x in c.cards()), 20, "the item answered")
-        sc = t.wait("you picked B")
+        sc = t.wait(w("inbox.picked", name="B"))
         print(sc)
         print("PASS the page's line, ctrl+t opens %s, '2' answers at %d cols" % (opened[0], cols))
 

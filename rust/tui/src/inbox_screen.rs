@@ -147,7 +147,7 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
     if full.width < 30 || full.height < 10 {
         return;
     }
-    let area = crate::artifacts_screen::draw_frame(app, frame, full, "inbox");
+    let area = crate::artifacts_screen::draw_frame(app, frame, full, bise_proto::words::inbox::head);
     let rows = rows(app);
     let Some(sc) = app.inbox.as_mut() else { return };
     let out = lines(sc, &rows, area.width as usize, area.height as usize);

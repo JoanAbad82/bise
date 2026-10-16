@@ -25,6 +25,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from words import w  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run, in_view, MAIN_IDLE  # noqa: E402
@@ -144,7 +145,7 @@ def session(E, env, home, bise, shot):
         t.wait("type why not, ⏎ says no")
         shot(t, "card-checker-off", sc)
         t.keys("1")
-        sc = t.wait("you allowed t1: curl -s -m 1 http://127.0.0.1:9/")
+        sc = t.wait(w("inbox.fold_allowed", agent="t1", what="curl -s -m 1 http://127.0.0.1:9/"))
         shot(t, "fold-allowed", sc)
         # "always": its rule in /approvals, from t2, today; then removed
         t.keys("M-0")
@@ -156,7 +157,7 @@ def session(E, env, home, bise, shot):
         t.keys("2")
         # answered from main's view: t2's thread opens at the answer
         # (answer-in-thread A, 787e6ee82); the rest of this run is there
-        sc = t.wait("you allowed t2: curl -s -m 1 http://127.0.0.1:9/x")
+        sc = t.wait(w("inbox.fold_allowed", agent="t2", what="curl -s -m 1 http://127.0.0.1:9/x"))
         assert "you're talking to t2 directly" in sc, sc
         t.typed("/approvals")
         t.keys("Enter")
@@ -208,7 +209,7 @@ def session(E, env, home, bise, shot):
         shot(t, "card-sandbox", sc)
         t.keys("1")
         # the fold says the sandbox was off for it (designer)
-        sc = t.wait("you let t3 run it outside the sandbox: echo hi > ~/Desktop/x.txt")
+        sc = t.wait(w("inbox.fold_outside", agent="t3", what="echo hi > ~/Desktop/x.txt"))
         shot(t, "fold-sandbox-rerun", sc)
         out = os.path.join(home, "Desktop", "x.txt")
         wait.until(lambda: os.path.exists(out), 30, "the rerun's %s" % out)

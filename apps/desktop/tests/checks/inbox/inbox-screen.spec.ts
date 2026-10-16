@@ -19,6 +19,7 @@
 // Owner: inbox-screen.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect, textProblems } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -43,9 +44,9 @@ const CARDS = [
   { id: 11, project: P, kind: 'question', rank: 1, agent: 'search', question: 'which size system should the filter use?', options: two('EU', 'US'), urgent: false, since_ms: NOW - 9 * 3_600_000 },
 ];
 const RECORDS = [
-  { card: 7, project: P, asker: 'perf', kind: 'question', question: 'keep the webp next to the avif?', options: ['keep both', 'avif only'], state: 'answered', said: 'only for Safari 16', where: { kind: 'inbox' }, asked_ms: today(13, 58) - 240_000, at_ms: today(13, 58), thread: { agent: 'perf', pos: 2 }, line2: 'you: only for Safari 16 · in the inbox' },
-  { card: 5, project: P, asker: 'main', kind: 'question', question: 'merge #381 now or after the bench?', options: ['now', 'after the bench'], state: 'answered', said: 'after the bench', pick_n: 2, where: { kind: 'thread', agent: 'perf' }, asked_ms: today(11, 30), at_ms: today(11, 40), thread: { agent: 'perf', pos: 1 }, line2: "you: after the bench · in perf's thread" },
-  { card: 3, project: P, asker: 'checkout', kind: 'question', question: 'retry the failed payment test?', options: [], state: 'withdrawn', reason: 'checkout answered itself', asked_ms: yesterday(18, 0), at_ms: yesterday(18, 30), line2: 'withdrawn: checkout answered itself' },
+  { card: 7, project: P, asker: 'perf', kind: 'question', question: 'keep the webp next to the avif?', options: ['keep both', 'avif only'], state: 'answered', said: 'only for Safari 16', where: { kind: 'inbox' }, asked_ms: today(13, 58) - 240_000, at_ms: today(13, 58), thread: { agent: 'perf', pos: 2 }, line2: inbox.answered_at({ said: 'only for Safari 16', place: inbox.where_inbox }) },
+  { card: 5, project: P, asker: 'main', kind: 'question', question: 'merge #381 now or after the bench?', options: ['now', 'after the bench'], state: 'answered', said: 'after the bench', pick_n: 2, where: { kind: 'thread', agent: 'perf' }, asked_ms: today(11, 30), at_ms: today(11, 40), thread: { agent: 'perf', pos: 1 }, line2: inbox.answered_at({ said: 'after the bench', place: inbox.where_thread({ agent: 'perf' }) }) },
+  { card: 3, project: P, asker: 'checkout', kind: 'question', question: 'retry the failed payment test?', options: [], state: 'withdrawn', reason: 'checkout answered itself', asked_ms: yesterday(18, 0), at_ms: yesterday(18, 30), line2: inbox.withdrawn({ why: 'checkout answered itself' }) },
 ];
 const world = () => [
   prefs('light'),
@@ -64,8 +65,8 @@ const world = () => [
   {
     ev: 'thread', project: P, agent: 'perf', before: null, more: false,
     entries: [
-      { pos: 1, at_ms: today(11, 40), kind: 'approval', text: 'you answered perf: after the bench', approval: { ok: true, text: 'you answered perf: after the bench', card: 5 } },
-      { pos: 2, at_ms: today(13, 58), kind: 'approval', text: 'you answered perf: only for Safari 16', approval: { ok: true, text: 'you answered perf: only for Safari 16', card: 7 } },
+      { pos: 1, at_ms: today(11, 40), kind: 'approval', text: inbox.fold_answered({ agent: 'perf', pick: 'after the bench' }), approval: { ok: true, text: inbox.fold_answered({ agent: 'perf', pick: 'after the bench' }), card: 5 } },
+      { pos: 2, at_ms: today(13, 58), kind: 'approval', text: inbox.fold_answered({ agent: 'perf', pick: 'only for Safari 16' }), approval: { ok: true, text: inbox.fold_answered({ agent: 'perf', pick: 'only for Safari 16' }), card: 7 } },
       { pos: 3, at_ms: today(14, 0), kind: 'agent', text: 'kept a webp fallback for Safari 16' },
     ],
   },
@@ -105,13 +106,13 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
 
     await test.step('waiting first, then the past by day, two lines each', async () => {
       // a fresh test home: bise's notifications ask waits too, in the list and the count as in the block (one number)
-      await expect(page.getByTestId('inbox.counts')).toHaveText('3 waiting · 2 answered');
-      await expect(page.getByTestId('inbox.waiting.head')).toHaveText('waiting for you · 3');
+      await expect(page.getByTestId('inbox.counts')).toHaveText(inbox.screen_counts({ waiting: 3, answered: 2 }));
+      await expect(page.getByTestId('inbox.waiting.head')).toHaveText(inbox.list_waiting({ n: 3 }));
       await expect(rows(page)).toHaveCount(6);
-      await expect(page.getByTestId(`inbox.row.p:${P}/7.said`)).toHaveText('you: only for Safari 16 · in the inbox');
-      await expect(page.getByTestId(`inbox.row.p:${P}/5.said`)).toHaveText("you: after the bench · in perf's thread");
+      await expect(page.getByTestId(`inbox.row.p:${P}/7.said`)).toHaveText(inbox.answered_at({ said: 'only for Safari 16', place: inbox.where_inbox }));
+      await expect(page.getByTestId(`inbox.row.p:${P}/5.said`)).toHaveText(inbox.answered_at({ said: 'after the bench', place: inbox.where_thread({ agent: 'perf' }) }));
       await expect(page.getByTestId(`inbox.row.p:${P}/3`)).toHaveClass(/gone/);
-      await expect(page.getByTestId(`inbox.row.p:${P}/3.said`)).toHaveText('withdrawn: checkout answered itself');
+      await expect(page.getByTestId(`inbox.row.p:${P}/3.said`)).toHaveText(inbox.withdrawn({ why: 'checkout answered itself' }));
       const h = await page.getByTestId(`inbox.row.w:${P}/9`).evaluate((e) => e.getBoundingClientRect().height);
       expect(h, 'a waiting row is one 32 px line').toBe(32);
       expect(await textProblems(page, '[data-testid="inbox.screen"]', 11)).toEqual([]);
@@ -148,7 +149,7 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
       await page.keyboard.press(' ');
       await expect(page.getByTestId('inbox.detail.question')).toHaveText('keep the webp next to the avif?');
       await expect(page.getByTestId('inbox.keys')).toContainText('⌘⏎ go to your answer');
-      await expect(page.getByTestId('inbox.detail')).toContainText('perf went on: kept a webp fallback for Safari 16');
+      await expect(page.getByTestId('inbox.detail')).toContainText(inbox.detail_next({ agent: 'perf', next: 'kept a webp fallback for Safari 16' }));
       await shoot(page, core, 'detail-1400');
       await page.keyboard.press('Escape');
       await expect(page.getByTestId('inbox.list')).toBeVisible();
@@ -164,7 +165,7 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
       await page.keyboard.press('ArrowDown');
       await page.keyboard.press('Enter');
       await expect(page.getByTestId(`inbox.block.card.${P}-9`)).toBeVisible({ timeout: 3000 });
-      await expect(page.getByTestId('composer').first()).toContainText('answering perf');
+      await expect(page.getByTestId('composer').first()).toContainText(inbox.answering({ who: 'perf' }));
       await shoot(page, core, 'answer-1400');
       await page.keyboard.press('Escape');
     });

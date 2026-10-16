@@ -131,13 +131,6 @@
     "one": "{n} PR",
     "text": "{n} PRs"
   },
-  "panel.count_waiting": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "{n} waiting"
-  },
   "panel.count_working": {
     "args": [
       "n"
@@ -739,13 +732,6 @@
     ],
     "one": null,
     "text": "waiting for {len}"
-  },
-  "panel.tip_waiting_you": {
-    "args": [
-      "n"
-    ],
-    "one": null,
-    "text": "{n} waiting for you"
   },
   "panel.tip_waiting_you_all": {
     "args": [

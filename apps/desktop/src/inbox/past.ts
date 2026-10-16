@@ -6,6 +6,7 @@
 // agree (architect m_24257); the day heads are words::day_head's. Owner: inbox-screen.
 import type { Card } from '@/proto';
 import type { InboxRecord, Where } from '@/proto/inbox';
+import { inbox } from '@/proto/words_inbox.gen';
 import { shownName } from '@/agents/model';
 import { dayOf, timeOf } from '@/artifacts/model';
 import { age, titleOf } from './InboxCard';
@@ -75,7 +76,7 @@ export function askersOf(cards: readonly Card[], records: readonly InboxRecord[]
 /** The head's counts: '3 waiting · 41 answered' (the hubs' total when given; withdrawn ones are not 'answered'). Pure. */
 export function headWords(cards: readonly Card[], records: readonly InboxRecord[], total?: number): string {
   const answered = total ?? records.filter((r) => r.state === 'answered').length;
-  return `${String(cards.length)} waiting · ${String(answered)} answered`;
+  return inbox.screen_counts({ waiting: cards.length, answered });
 }
 
 /** The rows the filter keeps: what waits (in the hub's order, given), then the past by day, newest first. Pure. */
@@ -98,7 +99,7 @@ export function listsOf(cards: readonly Card[], records: readonly InboxRecord[],
   const days: Day[] = [];
   for (const r of past) {
     const ms = closedMs(r);
-    const d = ms > 0 ? dayOf(ms) : 'earlier';
+    const d = ms > 0 ? dayOf(ms) : inbox.day_earlier;
     const row: PastRow = { key: pastKey(r), r, glyph: r.state === 'answered' ? '✓' : '–' };
     const last = days[days.length - 1];
     if (last !== undefined && last.day === d) (last.rows as PastRow[]).push(row);
@@ -111,11 +112,11 @@ export function listsOf(cards: readonly Card[], records: readonly InboxRecord[],
 export function whereWords(w: Where): string {
   switch (w.kind) {
     case 'thread':
-      return `in ${w.agent}'s thread`;
+      return inbox.where_thread({ agent: w.agent });
     case 'page':
-      return 'on a page';
+      return inbox.where_page;
     default:
-      return 'in the inbox';
+      return inbox.where_inbox;
   }
 }
 
@@ -129,9 +130,9 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 
 /** A day's head (words::day_head): 'today', 'yesterday', 'oct 12', 'dec 30 2024'. Pure (local time). */
 export function dayHead(ms: number, now: number): string {
-  if (ms <= 0) return 'earlier';
-  if (dayOf(ms) === dayOf(now)) return 'today';
-  if (dayOf(ms) === dayOf(now - 86_400_000)) return 'yesterday';
+  if (ms <= 0) return inbox.day_earlier;
+  if (dayOf(ms) === dayOf(now)) return inbox.day_today;
+  if (dayOf(ms) === dayOf(now - 86_400_000)) return inbox.day_yesterday;
   const d = new Date(ms);
   const md = `${MONTHS[d.getMonth()] ?? ''} ${String(d.getDate())}`;
   return d.getFullYear() === new Date(now).getFullYear() ? md : `${md} ${String(d.getFullYear())}`;
@@ -167,7 +168,7 @@ export function waitEnd(w: WaitRow, names: Readonly<Record<string, string>>, now
   const a = age(now - w.card.since_ms);
   if (narrow) return a;
   const p = names[w.project] ?? w.project;
-  return w.glyph === '¶' ? `${p} · page · ${a}` : `${p} · ${a}`;
+  return w.glyph === '¶' ? inbox.wait_end_page({ project: p, age: a }) : `${p} · ${a}`;
 }
 
 /** A waiting row's words: the card's title ('perf asks', 'merge #381?') is the asker's, the question after. */
@@ -194,17 +195,17 @@ export function jumpOf(r: InboxRecord): Jump {
 /** The jump's words, for the pane's button (⌘⏎): "go to your answer in perf's thread", 'open the
  *  page at your answer'; withdrawn (no answer): "open perf's thread". Pure. */
 export function jumpWords(j: Jump, answered = true): string {
-  if (j.kind === 'page') return 'open the page at your answer';
-  return answered ? `go to your answer in ${shownName(j.agent)}'s thread` : `open ${shownName(j.agent)}'s thread`;
+  if (j.kind === 'page') return inbox.jump_page;
+  return answered ? inbox.jump_thread({ agent: shownName(j.agent) }) : inbox.jump_asker({ agent: shownName(j.agent) });
 }
 
 /** The detail's 'where and when': 'you answered in the inbox · 14:02', 'withdrawn · yesterday 18:30'. Pure. */
 export function whenWhere(r: InboxRecord, now: number): string {
   const ms = closedMs(r);
   const day = dayHead(ms, now);
-  const when = ms <= 0 ? day : day === 'today' ? timeOf(ms) : `${day} ${timeOf(ms)}`;
-  if (r.state !== 'answered') return `withdrawn · ${when}`;
-  return r.where == null ? `you answered · ${when}` : `you answered ${whereWords(r.where)} · ${when}`;
+  const when = ms <= 0 ? day : day === inbox.day_today ? timeOf(ms) : `${day} ${timeOf(ms)}`;
+  if (r.state !== 'answered') return inbox.when_withdrawn({ when });
+  return r.where == null ? inbox.when_answered({ when }) : inbox.when_answered_at({ place: whereWords(r.where), when });
 }
 
 /** Merge each project's records (each hub's own list), one per card, newest first. Pure. */

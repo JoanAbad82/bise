@@ -15,6 +15,7 @@
 // Owner: trigger-crop.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -28,7 +29,7 @@ const MODELS = [
 ];
 const RECORDS = AGENTS.map((a, i) => ({
   card: i + 1, project: P, asker: a, kind: 'question', question: `does ${a} ship today?`, options: [], state: 'answered', said: 'yes',
-  where: { kind: 'inbox' }, asked_ms: NOW - (i + 2) * 600_000, at_ms: NOW - (i + 1) * 600_000, line2: 'you: yes · in the inbox',
+  where: { kind: 'inbox' }, asked_ms: NOW - (i + 2) * 600_000, at_ms: NOW - (i + 1) * 600_000, line2: inbox.answered_at({ said: 'yes', place: inbox.where_inbox }),
 }));
 const world = () => [
   prefs,

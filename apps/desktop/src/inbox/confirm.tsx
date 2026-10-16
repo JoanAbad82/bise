@@ -12,6 +12,7 @@
 import { useContext, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { formatRoute } from '@/app/route';
 import { RouterContext } from '@/app/router';
+import { inbox } from '@/proto/words_inbox.gen';
 import { Act, Button, Kbd } from '@/ds';
 import { useConfirms, useNotice, useStore, useVersions } from '@/store';
 import { appBuild, appSwap, restartTail, tailWords, type AppBuild, type RestartTail } from './restart';
@@ -87,7 +88,7 @@ function SwapAct() {
     <>
       {' '}
       <Act onClick={swap} testId="confirm.notice.swap">
-        <Kbd>⏎</Kbd> restart to update
+        <Kbd>⏎</Kbd> {inbox.restart_update}
       </Act>
       {why !== null && <span className="th-hubnote-why"> · {why}</span>}
     </>
@@ -154,13 +155,13 @@ export function ConfirmBar({ project, plain = false }: { project: string; plain?
       {/* raw-controls (designer m_18343): the ds's Button and Act, never a bare button; no is the
           default (the TUI's [y/N], designer m_18733): the filled one, and ⏎ */}
       <Button size="sm" onClick={yes} testId="confirm.yes">
-        <Kbd>y</Kbd> yes
+        <Kbd>y</Kbd> {inbox.key_yes}
       </Button>
       <Button kind="pri" size="sm" onClick={no} testId="confirm.no">
-        <Kbd>n</Kbd> no
+        <Kbd>n</Kbd> {inbox.no}
       </Button>
       <Act onClick={later} testId="confirm.later">
-        <Kbd>esc</Kbd> later
+        <Kbd>esc</Kbd> {inbox.key_later}
       </Act>
     </div>
   );

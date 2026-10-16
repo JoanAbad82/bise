@@ -18,6 +18,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -156,7 +157,7 @@ for (const theme of ['light', 'dark']) {
       // the page's options, each with its why (text-2), the asker's 'my pick'
       const opt1 = page.getByTestId(`${id}.opt.1`);
       await expect(opt1.locator('.ic-why')).toHaveText('the field keeps its place; the label says who reads it');
-      await expect(opt1.locator('.ic-mine')).toHaveText('my pick');
+      await expect(opt1.locator('.ic-mine')).toHaveText(inbox.my_pick);
       await expect(page.getByTestId(`${id}.opt.2`).locator('.ic-why')).toHaveText('one box, but it moves the field');
       await expect(page.getByTestId(`${id}.opt.2`).locator('.ic-mine')).toHaveCount(0);
       // every option of the page's pick, in its order and words
@@ -169,7 +170,7 @@ for (const theme of ['light', 'dark']) {
       // the foot: who reads typed words; the old '⌘O open its page' is gone
       const keys = page.getByTestId(`${id}.keys`);
       await expect(keys).toContainText('pick');
-      await expect(keys).toContainText('or type: designer reads it');
+      await expect(keys).toContainText(inbox.or_type_reads({ agent: 'designer' }));
       await expect(keys).toContainText('later');
       await expect(keys).not.toContainText('open its page');
       for (const w of [1100, 800]) {

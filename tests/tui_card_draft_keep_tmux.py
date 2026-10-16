@@ -12,6 +12,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from words import w  # noqa: E402
 from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
 
 COLS, ROWS = 150, 42
@@ -39,15 +40,15 @@ def main():
                 "sb card \"$(printf 'and the p99 too?\\n1. yes\\n2. no')\"; sleep 8; "
                 "sb card --withdraw $a \"answered in chat\"; sb card \"which bench, cold or warm?\"]]")
         t.keys("Enter")
-        t.wait("inbox · 1 waiting for you")
+        t.wait(w("inbox.head") + " · " + w("common.waiting_for_you", n=1))
         # A opens in place; half an answer
         t.typed(CTRL % ord("1"))
-        t.wait("you → ? main · your answer")
+        t.wait("↳ " + w("inbox.answering", who="main"))
         t.wait("┃ which bench?")
         t.typed(HALF)
         t.wait(HALF)
         # B comes in: A stays, his words stay
-        sc = t.wait("2 waiting for you", 30)
+        sc = t.wait(w("inbox.head") + " · " + w("common.waiting_for_you", n=2), 30)
         assert HALF in sc, "his half answer is gone when B came in:\n" + sc
         b = box(sc)
         assert "┃ which bench?" in b, "A is no longer the open item:\n" + sc
@@ -57,17 +58,17 @@ def main():
         t.wait(HALF + " tonight")
         assert "┃ which bench?" in box(t.screen()), t.screen()
         # main withdraws A and asks C: A stays open, closed, his words stay
-        sc = t.wait("you → main · the question is closed: ⏎ sends your words as a message", 30)
+        sc = t.wait("you → main · " + w("inbox.question_closed"), 30)
         b = box(sc)
         assert "· closed" in b, sc
         assert HALF + " tonight" in sc, "his words are gone when A closed:\n" + sc
         assert "┃ which bench?" in b, "A left the view:\n" + sc
         assert "┃ which bench, cold or warm?" not in b, "C took the view:\n" + sc
-        t.wait("⏎ sends your words as a message")
+        t.wait("⏎ " + w("inbox.key_send_message"))
         # ⏎: his words go to main as a message; the view moves on
         t.keys("Enter")
         t.wait_gone("the question is closed", 10)
-        t.wait("you → ? main · your answer")
+        t.wait("↳ " + w("inbox.answering", who="main"))
         t.keys("Escape")
         t.wait(HALF + " tonight")
     print("PASS tui card draft keep")

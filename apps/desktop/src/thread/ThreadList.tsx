@@ -527,19 +527,15 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         };
         const settle = () => {
           if (revealGen.current !== gen) return;
-          // the row's index now: rows that came before it while it settles (the older page its
-          // top's startReached asks, a far one trimmed) move it, and the index it had then names
-          // another row (history-perf's walk drew the tail's rows, land-reds)
-          const j = lastKeys.current.indexOf(key);
           const box = scroller.current;
-          const r = j < 0 ? null : (box?.querySelector<HTMLElement>(`[data-item-index="${String(firstIndex.current + j)}"]`) ?? null);
+          const r = box?.querySelector<HTMLElement>(`[data-item-index="${String(firstIndex.current + i)}"]`) ?? null;
           frames += 1;
-          if (j < 0 || moved.current || frames > HOLD_FRAMES) {
+          if (moved.current || frames > HOLD_FRAMES) {
             settling.current = false;
             if (r !== null) tell();
             return;
           }
-          if (box === null || r === null) virtuoso.current?.scrollToIndex({ index: j, align: 'center' });
+          if (box === null || r === null) virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
           else {
             const b = r.getBoundingClientRect();
             const v = box.getBoundingClientRect();

@@ -14,6 +14,7 @@
 // and tests/tmux/card_draft_keep.sh. Owner: amb-home.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -106,7 +107,7 @@ test('inbox/new-card-mid-answer: a new card never takes the card he answers nor 
       await expect(nine(page), 'card 9 stays open').toHaveAttribute('data-closed', 'true', { timeout: 5000 });
       await expect(nine(page)).toContainText('· closed');
       await expect(field(page), 'his words stay').toHaveText(`${HALF} tonight`);
-      await expect(page.getByTestId('thread.screen')).toContainText('to perf · the question is closed');
+      await expect(page.getByTestId('thread.screen')).toContainText(inbox.to_closed({ who: 'perf' }));
       await page.screenshot({ path: test.info().outputPath('closed-mid-answer.png') });
     });
 

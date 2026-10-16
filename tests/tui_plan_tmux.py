@@ -11,6 +11,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from words import w  # noqa: E402
 from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
 
 COLS, ROWS = 80, 46
@@ -31,14 +32,14 @@ def main():
         t.keys("Enter")
         t.wait("1 waiting for you", 90)
         t.typed(CTRL % ord("1"))
-        sc = t.wait("lean-install proposes a plan")
-        sc = t.wait("or type what to change: lean-install reads it")
+        sc = t.wait(w("inbox.title_plan", agent="lean-install"))
+        sc = t.wait(w("inbox.type_plan", agent="lean-install"))
         for words in ("lean installs: start the plan lean-install recommends?", "1 start the plan", "open the plan"):
             assert words in sc.replace("\n", " ") or words in sc, (words, sc)
         assert "bise asks" not in sc and "send these" not in sc, sc
         # the thread's line says the same as the box (designer m_26765)
         assert "? lean-install proposes a plan: lean installs ↗" in sc and "lean-install asks" not in sc, sc
-        assert "↗ lean installs · page · v1   ctrl+t open in your browser" in sc, sc
+        assert w("inbox.page_chip_v", title="lean installs", v=1) + "   ctrl+t " + w("inbox.key_open_browser") in sc, sc
         assert "{{bash" not in sc.split("inbox ·")[1], sc
         if os.environ.get("SHOT_OUT"):
             open(os.environ["SHOT_OUT"], "w").write(sc)

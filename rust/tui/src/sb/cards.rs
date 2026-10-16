@@ -37,6 +37,7 @@
 //! opens them is not built yet.
 
 use super::*;
+use bise_proto::words::inbox;
 use crate::editor::Editor;
 use crate::theme;
 use std::cell::RefCell;
@@ -381,27 +382,24 @@ fn approval_shape(c: &Card) -> Shape {
             lines.iter().filter_map(|l| l.strip_prefix("+++ ")).map(|f| f.trim().trim_start_matches("b/")).collect();
         let plus = lines.iter().filter(|l| l.starts_with('+') && !l.starts_with("+++")).count();
         let minus = lines.iter().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
-        let first = files.first().copied().unwrap_or("a file");
-        let more = match files.len() {
-            0 | 1 => String::new(),
-            n => format!(" +{} file{} ·", n - 1, if n > 2 { "s" } else { "" }),
-        };
+        let first = files.first().copied().unwrap_or(inbox::a_file);
+        let more = if files.len() > 1 { format!(" {} ·", inbox::more_files(files.len() - 1)) } else { String::new() };
         let minus_sign = if theme::ascii_mode() { "-" } else { "−" };
         (
-            format!("{} wants to edit {}", c.agent, first),
-            format!("{} wants to edit", c.agent),
+            inbox::wants_edit_file(&c.agent, first),
+            inbox::wants_edit(&c.agent),
             format!("{first}{more} +{plus} {minus_sign}{minus}"),
             crate::code::highlight_patch(head),
         )
     } else {
         let first = lines.first().map_or("", |l| l.trim());
-        let summary = if lines.len() > 1 { format!("{first} · {} lines", lines.len()) } else { first.to_string() };
+        let summary = if lines.len() > 1 { inbox::cmd_lines(first, lines.len()) } else { first.to_string() };
         // the bash mark in accent before the command, like a gate's card
         let mut rows = crate::code::highlight_bash(head);
         if let Some(first) = rows.first_mut() {
             first.insert(0, Span::styled("$ ", Style::default().fg(theme::accent())));
         }
-        (format!("{} wants to run", c.agent), format!("{} wants to run", c.agent), summary, rows)
+        (inbox::wants_run(&c.agent), inbox::wants_run(&c.agent), summary, rows)
     };
     let mut parts = vec![Part::Code(code)];
     if !reason.is_empty() {
@@ -517,7 +515,7 @@ fn drop_ask_shape(c: &Card) -> Shape {
         .place
         .as_deref()
         .and_then(|p| p.strip_prefix("feature:"))
-        .unwrap_or("the branch")
+        .unwrap_or(inbox::the_branch)
         .to_string();
     let commits = c
         .text
@@ -528,8 +526,8 @@ fn drop_ask_shape(c: &Card) -> Shape {
             w.next().filter(|x| x.starts_with("commit")).map(|_| n)
         })
         .unwrap_or(0);
-    let head = format!("drop {}? {} commit{} go.", name, commits, if commits == 1 { "" } else { "s" });
-    let options = vec!["drop it".to_string(), "keep it".to_string()];
+    let head = inbox::drop_ask(&name, commits);
+    let options = vec![inbox::drop_it.to_string(), inbox::keep_it.to_string()];
     let short = short_labels(&options);
     Shape::plain(format!("{}: {}", c.agent, head), c.agent.clone(), head, Vec::new(), options, short, Enter::Answer)
 }
@@ -705,13 +703,13 @@ pub(super) fn glyph_color(kind: &str) -> Color {
 /// A card's title, after its glyph (copy deck §17: `{name} needs you`).
 fn kind_title(kind: &str, agent: &str) -> String {
     match kind {
-        "question" => format!("{agent} asks"),
-        "blocked" => format!("{agent} is blocked"),
-        "failed" => format!("{agent} failed"),
-        "restart" => "restart failed".into(),
-        "drop" => format!("drop {agent}?"),
-        "overlap" => "overlap".into(),
-        "done" => format!("{agent} is done"),
+        "question" => inbox::title_asks(agent),
+        "blocked" => inbox::title_blocked(agent),
+        "failed" => inbox::title_failed(agent),
+        "restart" => inbox::title_restart.into(),
+        "drop" => inbox::title_drop(agent),
+        "overlap" => inbox::title_overlap.into(),
+        "done" => inbox::title_done(agent),
         // never a card's kind id (designer m_15412): a plan proposes, any
         // other kind asks like a question (card_page.rs)
         k => card_page::other_title(k, agent),
@@ -763,7 +761,7 @@ fn park_draft(app: &mut App) {
         let d = std::mem::take(&mut app.ed);
         if !d.text.trim().is_empty() {
             app.history.insert(0, d.text);
-            let line = format!("your words to {}'s closed question: ↑ brings them back", g.agent);
+            let line = inbox::closed_words(&g.agent);
             push_event(&mut app.events, &mut app.cache, Ev::Info(line));
         }
         return;
@@ -863,7 +861,7 @@ fn answer_with(app: &mut App, id: u64, said: &crate::said::Said, picked: Option<
     if app.sb.card.open {
         app.sb.card.fold = Some((fold, std::time::Instant::now()));
     } else {
-        app.flash = Some(("inbox clear".into(), std::time::Instant::now()));
+        app.flash = Some((inbox::clear.into(), std::time::Instant::now()));
     }
 }
 
@@ -884,7 +882,7 @@ pub(super) fn fold_of(c: &Card, reply: &str, picked: Option<&str>) -> Fold {
     if !gate {
         // a picked option: its short label on the line (`both`)
         let (text, note) = match picked {
-            Some(p) => (picked_fold(c, reply).unwrap_or_else(|| format!("you answered {}: {}", c.agent, p)), String::new()),
+            Some(p) => (picked_fold(c, reply).unwrap_or_else(|| inbox::fold_answered(&c.agent, p)), String::new()),
             None => answered(&c.agent, reply),
         };
         return Fold { ok: true, text, note, asked: c.text.trim().to_string() };
@@ -893,13 +891,13 @@ pub(super) fn fold_of(c: &Card, reply: &str, picked: Option<&str>) -> Fold {
     let no = reply == "no" || reply == "deny" || reply.starts_with("deny: ");
     if no {
         let note = reply.strip_prefix("deny: ").unwrap_or("").trim().to_string();
-        return Fold { ok: false, text: format!("you said no to {}: {}", c.agent, what), note, asked: String::new() };
+        return Fold { ok: false, text: inbox::fold_no(&c.agent, &what), note, asked: String::new() };
     }
     let outside = c.text.lines().next().is_some_and(|h| h.ends_with("outside the sandbox"));
     let text = if outside {
-        format!("you let {} run it outside the sandbox: {}", c.agent, what)
+        inbox::fold_outside(&c.agent, &what)
     } else {
-        format!("you allowed {}: {}", c.agent, what)
+        inbox::fold_allowed(&c.agent, &what)
     };
     Fold { ok: true, text, note: String::new(), asked: String::new() }
 }

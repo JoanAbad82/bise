@@ -6,6 +6,7 @@
 // its look, so ':*' sits on the content edge, where the rows' text and the composer's label start
 // (designer m_24516). Owner: inbox-screen (in amb-home's block).
 import { useEffect, useState } from 'react';
+import { inbox } from '@/proto/words_inbox.gen';
 
 /** How long the line stays before it fades, and the fade. */
 export const ZERO_MS = 2000;
@@ -47,7 +48,7 @@ export function InboxZero() {
   return (
     <div className="inbox-strip inbox-zero" role="status" data-testid="inbox.zero">
       <span className="inbox-zero-mark" aria-hidden="true">:*</span>
-      <span className="inbox-zero-words">nothing waits for you</span>
+      <span className="inbox-zero-words">{inbox.zero}</span>
     </div>
   );
 }
