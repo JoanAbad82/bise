@@ -53,13 +53,15 @@ export function makeEggDecor(o: Office, style: Style): EggDecor {
   tree.visible = false;
   root.add(tree);
 
-  // s4: the cake on the island's top, near its back end
+  // s4: the cake on the island's top, near its back end: cream, two layers, one candle (bims
+  // m_28109: big enough to read at 640)
   const cake = new Group();
-  add(style.cylinder(0.26, 0.18), mat(WORLD.paper), cake, 0, 0.09, 0);
-  add(style.cylinder(0.27, 0.04), mat(WORLD.pineapple), cake, 0, 0.2, 0);
-  add(style.cylinder(0.015, 0.1), mat(WORLD.paper), cake, 0, 0.27, 0);
-  add(style.ball(0.025), mat(WORLD.gold, 0.8), cake, 0, 0.34, 0);
-  cake.position.set(0, 0.66, o.island.z1 - 0.5);
+  const cream = mat(WORLD.paper);
+  add(style.cylinder(0.4, 0.22), cream, cake, 0, 0.11, 0);
+  add(style.cylinder(0.3, 0.18), cream, cake, 0, 0.31, 0);
+  add(style.cylinder(0.03, 0.18), mat(WORLD.pineapple), cake, 0, 0.49, 0);
+  add(style.ball(0.045), mat(WORLD.gold, 0.9), cake, 0, 0.61, 0);
+  cake.position.set(0, 0.66, o.island.z1 - 0.6);
   cake.visible = false;
   root.add(cake);
 

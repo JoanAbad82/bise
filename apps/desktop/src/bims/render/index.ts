@@ -6,7 +6,7 @@
 // only when frame() is called and says how the loop must run next (Motion). The look is style.ts.
 // In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, head } for the
 // headless check (bims-qa).
-import { OrthographicCamera, PCFShadowMap, Scene, Vector3, WebGLRenderer } from 'three';
+import { Color, OrthographicCamera, PCFShadowMap, Scene, Vector3, WebGLRenderer } from 'three';
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, MakeRenderer, Motion, Office, OfficeRenderer } from '../model';
 import { makeBim, type Bim } from './bim';
@@ -33,6 +33,8 @@ const TRACE_MAX = 3000;
 const PLANE_LEN = 0.42;
 const PLANE_MIN_PX = 12;
 const PLANE_FORESHORTEN = 1.25;
+/** how much of the eclipse's violet goes into the backdrop */
+const ECLIPSE_MIX = 0.45;
 
 const testMode = (): boolean => (window as Partial<Window> & { bise?: { test?: boolean } }).bise?.test === true;
 
@@ -208,7 +210,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       const eclipse = look.eggs?.eclipse === true;
       if (eclipse !== eclipsed && world) {
         eclipsed = eclipse;
-        renderer.setClearColor(eclipse ? WORLD.eclipse : world.pal.bg);
+        // a sky event, not the bar changing colour (bims m_28109): the violet blended into the backdrop
+        renderer.setClearColor(eclipse ? new Color(world.pal.bg).lerp(new Color(WORLD.eclipse), ECLIPSE_MIX) : world.pal.bg);
       }
       const fool = look.eggs?.april === true;
       if (fool !== april) { april = fool; dropBims(); }
