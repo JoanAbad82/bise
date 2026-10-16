@@ -37,8 +37,9 @@ const START = 1_000_000_000;
 export interface ThreadListHandle {
   /** bring a row into view (⌘F's current match, a card's entry) */
   scrollTo(key: string): void;
-  /** bring a row into view only when it isn't whole in it already (answered-link: his answer) */
-  reveal(key: string): void;
+  /** bring a row into view only when it isn't whole in it already (answered-link: his answer);
+   * `shown` runs once the row is drawn and whole in it (his answer's flash) */
+  reveal(key: string, shown?: () => void): void;
   /** to the newest row */
   scrollToEnd(): void;
   /**
@@ -126,6 +127,8 @@ export function placeOf(v: unknown): { key: string; off: number } | undefined {
 
 /** How long after a prepend the anchor row is held (Virtuoso measures the new rows over a few frames). */
 const HOLD_MS = 1500;
+/** How many frames a reveal nudges its row toward the view's centre at most (~1.5 s at 60 fps). */
+const HOLD_FRAMES = 90;
 
 /** The part of a row held still: `sel` inside it when given and there, else the row. */
 function partOf(row: HTMLElement, sel: string | undefined): HTMLElement {
@@ -236,6 +239,14 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
   // that scrolls up unsticks it; at the end, or after his send, it sticks.
   const stick = useRef(true);
   const [stuck, setStuck] = useState(true);
+  // a reveal's settle runs (settling), and HOLD_MS after it began (revealUntil): Virtuoso's
+  // isAtBottom stays the end's until its scroll events catch up with the reveal's scroll, so a line
+  // that came meanwhile followed the output back to the end and the ⌘F hit was gone (history-perf's
+  // 'the current match stays put', land-reds). Ends early when he moves the list. revealGen: the
+  // newest reveal's, an older settle stops
+  const revealUntil = useRef(0);
+  const settling = useRef(false);
+  const revealGen = useRef(0);
   const setStick = useCallback((on: boolean) => {
     stick.current = on;
     setStuck(on);
@@ -477,7 +488,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         stopHold.current();
         virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
       },
-      reveal(key) {
+      reveal(key, shown) {
         const i = keys.indexOf(key);
         if (i < 0) return;
         // a jump of his (⌘F's match, his answer far back) wins over the row held still: the window
@@ -487,25 +498,53 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         // a row drawn and whole in the view stays where it is (his ask: only when it is outside)
         const el = scroller.current;
         const row = el?.querySelector<HTMLElement>(`[data-item-index="${String(next.index + i)}"]`) ?? null;
-        if (el !== null && row !== null && rowWhole(row.getBoundingClientRect(), el.getBoundingClientRect())) return;
+        if (el !== null && row !== null && rowWhole(row.getBoundingClientRect(), el.getBoundingClientRect())) {
+          shown?.();
+          return;
+        }
         // he reads up there now: no growth takes the list back to its end
         setStick(false);
         virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
         // Virtuoso lands on its estimated sizes (far off in a long thread of unmeasured rows): once
         // the row is drawn, its centre is nudged to the view's over the next frames, until it shows
-        // whole, he moves the list, or HOLD_MS
-        const until = Date.now() + HOLD_MS;
+        // whole, he moves the list, a newer reveal takes over, or HOLD_FRAMES. Frames, not ms: under
+        // load (or off-screen) frames come late, and a 1.5 s deadline gave up before the row was
+        // drawn, the list left at Virtuoso's estimate (history-perf's '⏎ to the oldest hit', land-reds);
+        // and an older reveal's settle went on beside the newer one, centring a row by its stale
+        // index. `shown` waits for the row drawn and whole: a fixed delay missed it under load
+        // (inbox-open's flash), the row not drawn yet
+        revealGen.current += 1;
+        const gen = revealGen.current;
+        let frames = 0;
         moved.current = false;
+        revealUntil.current = Date.now() + HOLD_MS;
+        settling.current = true;
+        let told = false;
+        const tell = (): void => {
+          if (told) return;
+          told = true;
+          shown?.();
+        };
         const settle = () => {
-          if (moved.current || Date.now() >= until) return;
+          if (revealGen.current !== gen) return;
           const box = scroller.current;
           const r = box?.querySelector<HTMLElement>(`[data-item-index="${String(firstIndex.current + i)}"]`) ?? null;
+          frames += 1;
+          if (moved.current || frames > HOLD_FRAMES) {
+            settling.current = false;
+            if (r !== null) tell();
+            return;
+          }
           if (box === null || r === null) virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
           else {
             const b = r.getBoundingClientRect();
             const v = box.getBoundingClientRect();
             const d = b.top + b.height / 2 - (v.top + v.height / 2);
-            if (rowWhole(b, v) && Math.abs(d) < 2) return;
+            if (rowWhole(b, v) && Math.abs(d) < 2) {
+              settling.current = false;
+              tell();
+              return;
+            }
             box.scrollTop += b.height > v.height ? b.top - v.top : d;
           }
           requestAnimationFrame(settle);
@@ -555,7 +594,8 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         computeItemKey={(_, key) => (reactKey === undefined ? key : reactKey(key))}
         itemContent={(_, key) => row(key)}
         // never back to the end while a row he opened is held
-        followOutput={(b) => (held.current?.click === true ? false : b || stick.current ? 'auto' : false)}
+        // nor while a reveal lands (revealUntil)
+        followOutput={(b) => (held.current?.click === true || (!moved.current && (settling.current || Date.now() < revealUntil.current)) ? false : b || stick.current ? 'auto' : false)}
         totalListHeightChanged={onGrow}
         rangeChanged={onRange}
         alignToBottom

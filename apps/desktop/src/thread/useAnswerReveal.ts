@@ -55,10 +55,10 @@ export function useAnswerReveal(store: Store, project: string, agent: string, li
         // the timer away before it fired
         const t = window.setTimeout(() => {
           answerDone(want);
-          list.current?.reveal(entryKey(step.pos));
-          window.setTimeout(() => {
+          // flashed once its row is drawn and whole (a fixed 120 ms found no row under load)
+          list.current?.reveal(entryKey(step.pos), () => {
             flashEntry(step.pos);
-          }, 120);
+          });
         }, 60);
         return () => {
           window.clearTimeout(t);

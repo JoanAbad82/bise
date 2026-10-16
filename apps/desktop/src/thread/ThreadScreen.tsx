@@ -381,7 +381,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         ) : agent === MAIN ? (
           <BiseHead project={project} name={projectName ?? project} more={more} />
         ) : (
-          <AgentHead project={project} a={me} more={more} note={voice !== 'off' ? 'voice mode' : undefined} starting={fresh} />
+          <AgentHead project={project} a={me} more={more} note={voice !== 'off' ? 'voice mode' : undefined} starting={fresh} named={artifact !== undefined} />
         )}
         {/* S29/L19 W1: it drives his computer: one line under the head, from computer_live only */}
         {!bise && <ComputerLine project={project} agent={agent} />}

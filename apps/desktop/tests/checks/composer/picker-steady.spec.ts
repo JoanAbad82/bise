@@ -80,7 +80,11 @@ for (const c of CASES) {
       await watch(page);
       await page.keyboard.type(c.more, { delay: 40 });
       await expect(picker.locator(T.pickerRow).first()).toContainText(c.last);
-      await page.waitForTimeout(200);
+      // at least 6 frames watched: off-screen, rAF is throttled, and under load 200 ms after the
+      // last key gave 5 (land-reds, test:land at load 11); the watch goes on until it has them
+      await expect
+        .poll(() => page.evaluate(() => (window as unknown as { __steady: { frames: Frame[] } }).__steady.frames.length), { timeout: 5000 })
+        .toBeGreaterThan(5);
       const { frames, removed } = await stop(page);
       expect(frames.length, 'frames were seen').toBeGreaterThan(5);
       expect(removed, 'no mutation removed the list').toBe(0);

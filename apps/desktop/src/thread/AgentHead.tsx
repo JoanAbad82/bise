@@ -89,8 +89,8 @@ function Restore({ icon, onRestore }: { icon: boolean; onRestore: () => void }) 
   );
 }
 
-/** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'). */
-export function AgentHead({ project, a, more, note, starting = false, restore }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean; restore?: () => void }) {
+/** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'); `named`: the crumb doesn't name it (beside its artifact), so the head does. */
+export function AgentHead({ project, a, more, note, starting = false, restore, named = false }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean; restore?: () => void; named?: boolean }) {
   // its chip's pause under a minute reads in seconds: the second clock
   const now = useNowFor((t) => pauseInSeconds(a, t));
   const router = useRouter();
@@ -108,9 +108,10 @@ export function AgentHead({ project, a, more, note, starting = false, restore }:
   return (
     <div className="ah" data-testid="thread.head" ref={headRef} data-arch={restore === undefined ? undefined : arch.stage}>
       <span className="ah-who">
-        {/* its name is the crumb's (desktop-delight v2): the head keeps its role; an archived maker
-            beside its artifact keeps it (that head stands for it there) */}
-        {restore !== undefined && (
+        {/* its name is the crumb's (desktop-delight v2): the head keeps its role; the head names it
+            wherever the crumb doesn't: a maker beside its artifact, live or archived, at 1400 and in
+            the 800 slide-over (crumb 'storefront › artifacts'; designer m_27230) */}
+        {(restore !== undefined || named) && (
           <b className="ah-name" data-testid="thread.head.name" title={a.name} style={{ minWidth: arch.nameMin }}>
             {a.name}
           </b>

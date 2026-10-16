@@ -42,10 +42,14 @@ class Stub<Ev, Cmd> {
     });
   }
 
-  /** Every command the app sent so far. */
+  /** Every command the app sent so far: its whole lines only. The stub appends a line while a test
+   * reads; a line read half written threw in JSON.parse and killed the test's own scripted hub
+   * loop (history-perf's pages never answered under load, land-reds). */
   cmds(): Cmd[] {
     if (!existsSync(this.log)) return [];
-    return readFileSync(this.log, 'utf8').split(NL).filter(Boolean).map((l) => JSON.parse(l) as Cmd);
+    const text = readFileSync(this.log, 'utf8');
+    const whole = text.slice(0, text.lastIndexOf(NL) + 1);
+    return whole.split(NL).filter(Boolean).map((l) => JSON.parse(l) as Cmd);
   }
 
   /** Waits for a command matching `pred` (reads the log every 50 ms). */
