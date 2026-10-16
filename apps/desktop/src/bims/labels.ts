@@ -149,6 +149,7 @@ export const labelsOf: LabelsFn = (frames, o) => {
       const row = rows.get(b.name);
       at('hover', stateWords(act, row?.watching[0]?.what ?? ''), row?.title ?? '');
     } else if (events.has(b.name)) at('event', eventWords(act, from));
+    else if (o.eggs?.has(b.name) === true) at('egg', o.eggs.get(b.name) ?? '');
     else if (o.held || (b.pose.moving && !b.main)) at('name', '');
     else if (pill) at('pill', '');
   }

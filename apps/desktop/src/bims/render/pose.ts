@@ -33,6 +33,10 @@ export interface Props {
   readonly shredder: number | null;
   /** build: the progress bar over its head, 0..1 */
   readonly progress: number | null;
+  /** the eggs' props (render/egg.ts): m2's coin rising over its head 0..1, o5's golden pineapple, m6's box held up */
+  readonly coin: number | null;
+  readonly golden: boolean;
+  readonly crateUp: boolean;
 }
 
 export interface Rig {
@@ -76,6 +80,7 @@ const NO_PROPS: Props = {
   crate: false, mug: false, orange: false, pine: false, sheet: false, plane: false,
   skate: false, glasses: false, cloud: 0, hot: null,
   marker: false, newspaper: false, bigScreen: false, magnifier: false, poster: false, shredder: null, progress: null,
+  coin: null, golden: false, crateUp: false,
 };
 
 const Z: Rot = [0, 0, 0];

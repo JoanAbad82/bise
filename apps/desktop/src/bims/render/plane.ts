@@ -7,8 +7,11 @@ import { WORLD } from './palette';
 import { PLANE_FLIGHT } from './pose';
 import type { Style } from './style';
 
-/** where the plane is s seconds into its flight: from `top` units above the hand, gliding in from the left */
-export function flightAt(hand: V3, top: number, s: number): { p: V3; heading: V3; roll: number } {
+/**
+ * where the plane is s seconds into its flight: from `top` units above the hand, gliding in from the
+ * left; `loop` (y1, 1 in 50): a looping in the middle of its way before it lands
+ */
+export function flightAt(hand: V3, top: number, s: number, loop = false): { p: V3; heading: V3; roll: number } {
   const f = Math.min(1, Math.max(0, s / PLANE_FLIGHT));
   // ease out: fast from the top, a soft landing in the hand
   const e = 1 - (1 - f) * (1 - f);
@@ -20,6 +23,16 @@ export function flightAt(hand: V3, top: number, s: number): { p: V3; heading: V3
     z: hand.z - RIGHT.z * side,
   };
   const heading = { x: RIGHT.x * 1.6 * 2 * (1 - f), y: -top * 2 * (1 - f) - 0.01, z: RIGHT.z * 1.6 * 2 * (1 - f) };
+  if (loop && f > 0.2 && f < 0.6) {
+    // a circle in the view's plane: up, over and back down on its way
+    const a = ((f - 0.2) / 0.4) * Math.PI * 2;
+    const r = 0.45;
+    return {
+      p: { x: p.x + RIGHT.x * Math.sin(a) * r, y: p.y + (1 - Math.cos(a)) * r, z: p.z + RIGHT.z * Math.sin(a) * r },
+      heading: { x: RIGHT.x * Math.cos(a), y: Math.sin(a), z: RIGHT.z * Math.cos(a) },
+      roll: 0,
+    };
+  }
   return { p, heading, roll: Math.sin(f * Math.PI * 2) * 0.35 };
 }
 

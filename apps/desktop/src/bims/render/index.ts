@@ -17,6 +17,8 @@ import { pickAt, type Target } from './pick';
 import { flightAt, makePlane, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { STYLE } from './style';
+import { eggRig } from './egg';
+import { WORLD } from './palette';
 import { buildWorld, castShadows, lightDesk, type World } from './world';
 
 /** what the headless check reads (test mode only) */
@@ -45,6 +47,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   let agents: readonly Agent[] = [];
   let world: World | null = null;
   let night: boolean | null = null;
+  let eclipsed = false;
   /** the whole site fitted to the canvas, and what shows through his camera (fit = base at FIT) */
   let base: Fit | null = null;
   let fit: Fit | null = null;
@@ -79,6 +82,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     if (!office) return;
     const pal = paletteOf(isNight);
     renderer.setClearColor(pal.bg);
+    eclipsed = false;
     world = buildWorld(office, mainName(), STYLE, pal);
     scene.add(world.root);
   }
@@ -145,7 +149,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       let p = planes.get(f.name);
       if (!p) { p = makePlane(STYLE); planes.set(f.name, p); scene.add(p.group); }
       const hand = { x: rig.x, y: 1.0, z: rig.z };
-      const fl = flightAt(hand, aboveTop(fit, hand), s);
+      const fl = flightAt(hand, aboveTop(fit, hand), s, f.egg?.kind === 'loop');
       p.group.visible = true;
       // never smaller than PLANE_MIN_PX on screen (designer via bims-qa m_27793: at 320 it was a speck)
       p.group.scale.setScalar(Math.max(1, (PLANE_MIN_PX * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN));
@@ -179,6 +183,12 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     frame(t, frames, look: Look): Motion {
       if (lost || !office) return 'still';
       if (night !== look.night) rebuildWorld(look.night);
+      // t4: the eclipse turns the sky behind the office violet
+      const eclipse = look.eggs?.eclipse === true;
+      if (eclipse !== eclipsed && world) {
+        eclipsed = eclipse;
+        renderer.setClearColor(eclipse ? WORLD.eclipse : world.pal.bg);
+      }
       if (!world || !fit) return 'still';
       const pal = world.pal;
       let motion: Motion = 'still';
@@ -186,7 +196,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       rigs.clear();
       for (const f of frames) {
         const b = ensureBim(f.name, f.main);
-        const rig = rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced });
+        // his easter egg on top of its pose (eggs.ts picks it, egg.ts plays it)
+        const rig = eggRig(rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced }), f.egg ?? null);
         b.apply(rig);
         rigs.set(f.name, rig);
         shown.add(f.name);

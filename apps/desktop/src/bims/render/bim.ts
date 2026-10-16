@@ -135,7 +135,14 @@ export function makeBim(name: string, main: boolean, style: Style): Bim {
   const orange = add(style.ball(0.08), mat(WORLD.orange), hand, 0, 0, 0.02);
   const pine = new Group();
   hand.add(pine);
-  add(style.ball(0.08), mat(WORLD.pineapple), pine, 0, 0, 0.03).scale.y = 1.4;
+  const fruit = add(style.ball(0.08), mat(WORLD.pineapple), pine, 0, 0, 0.03);
+  fruit.scale.y = 1.4;
+  // o5: the golden one, glowing (the palette's gold, never the accent)
+  const golden = mat(WORLD.gold, 0.6);
+  const plainPine = fruit.material;
+  // m2: the coin it picks up mid-hop, rising over its head
+  const coin = add(style.cylinder(0.09, 0.025), mat(WORLD.gold, 0.4), g, 0, 1.4, 0);
+  coin.rotation.x = Math.PI / 2;
   add(style.box(0.06, 0.12, 0.06), mat(WORLD.pineLeaf), pine, 0, 0.16, 0.03);
   const plane = new Group();
   hand.add(plane);
@@ -216,6 +223,11 @@ export function makeBim(name: string, main: boolean, style: Style): Bim {
       oh.visible = rig.mouth === 'oh';
       const p = rig.props;
       crate.visible = p.crate;
+      // m6: the box held up over its head, else in front of its belly
+      crate.position.set(0, p.crateUp ? 1.62 * s : 0.62, p.crateUp ? 0 : 0.3);
+      fruit.material = p.golden ? golden : plainPine;
+      coin.visible = p.coin !== null;
+      if (p.coin !== null) coin.position.y = 1.5 * s + rig.y + p.coin * 0.5;
       mug.visible = p.mug;
       orange.visible = p.orange;
       pine.visible = p.pine;

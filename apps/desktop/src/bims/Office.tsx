@@ -22,6 +22,7 @@ import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
 import { atFit, DRAG_PX, FIT, panBy, pinchFactor, sameCam, zoomAt, type Cam } from './zoom';
+import { clockSig, eggLabels, eggsAt, konamiDone, localOf, NO_EGGS, noteLands, withForced, type Forced, type Land } from './eggs';
 import './office.css';
 
 /** The pure modules and the renderer's loader: feed.ts's, or fakes in a test. */
@@ -68,6 +69,8 @@ export function tagOf(l: Label): { readonly text: string | null; readonly pill: 
   // 'pill': the '?' / '✗' alone at rest, no name; hover, ctrl or an event give it its line
   if (l.mode === 'pill') return { text: null, pill: l.pill };
   if (l.mode === 'hover') return { text: l.name, pill: l.pill };
+  // an easter egg's words stand alone ('1:47', 'combo ×2', '!'): the egg is the bim's, not news
+  if (l.mode === 'egg') return { text: l.words, pill: l.pill };
   return { text: l.words === '' ? l.name : `${l.name} · ${l.words}`, pill: l.pill };
 }
 
@@ -159,6 +162,10 @@ export function Office({
   // the bim under a point of the canvas, css px: the renderer's once loaded
   const pick = useRef<(x: number, y: number) => string | null>(() => null);
   const held = useModHeld('Control');
+  // the eggs' memory: today's lands (m6, m8) and when he typed the konami code (m1), with his last keys
+  const lands = useRef<{ day: string; lands: readonly Land[] }>({ day: '', lands: [] });
+  const konamiAt = useRef<number | null>(null);
+  const keys = useRef<string[]>([]);
   // his camera (zoom.ts): the view the renderer draws; `fitted` re-renders only for the '⤢ fit' button
   const camRef = useRef<Cam>(FIT);
   const [fitted, setFitted] = useState(true);
@@ -245,6 +252,7 @@ export function Office({
     let tick: ReturnType<typeof setTimeout> | undefined;
     let lastLabels = '';
     let lastActs = '';
+    let lastEggs = '';
     let reduced = reducedMotion();
 
     const cancel = () => {
@@ -294,9 +302,23 @@ export function Office({
         const pose = timeline.poseAt(name, t);
         if (pose !== null) frames.push({ name, main: main.has(name), pose });
       }
-      const look: Look = { night: nightNow(), reduced };
-      const motion = r.frame(t, frames, look);
-      const shown = parts.labelsOf(frames, { t, hover: L.hover, held: L.held, agents: L.agents });
+      // his easter eggs (eggs.ts): one pass between the poses and the labels. In test mode only a
+      // check's forced ones (window.__biseEggs), never a random roll
+      const night = nightNow();
+      const local = localOf(new Date());
+      lands.current = noteLands(lands.current, frames, local);
+      const forced = testMode() ? (window as { __biseEggs?: Forced }).__biseEggs : undefined;
+      const eg = testMode()
+        ? withForced(NO_EGGS, forced)
+        : eggsAt({ t, frames, agents: L.agents, cards: L.snap.cards.length, local, night, reduced, lands: lands.current.lands, konami: konamiAt.current });
+      lastEggs = clockSig(local, night, L.agents);
+      const played = frames.map((f) => {
+        const e = eg.bims.get(f.name);
+        return e === undefined ? f : { ...f, egg: e };
+      });
+      const look: Look = { night, reduced, eggs: eg.office };
+      const motion = r.frame(t, played, look);
+      const shown = parts.labelsOf(played, { t, hover: L.hover, held: L.held, agents: L.agents, eggs: eggLabels(eg) });
       ranks.current = new Map(frames.map((f) => [f.name, tagRank(f.pose.seg.act.k)]));
       heads.current = new Map();
       for (const name of shown.keys()) {
@@ -369,7 +391,9 @@ export function Office({
     // island): it draws only when an activity changed
     const check = setInterval(() => {
       if (r === null || timeline === null || awayNow() || lost) return;
-      if (JSON.stringify([...parts.activities(live.current.snap, Date.now() / 1000)]) === lastActs) return;
+      // the clock's eggs (the eclipse, friday 17:00, midnight) start and end without a row change
+      const clockNow = clockSig(localOf(new Date()), nightNow(), live.current.agents);
+      if (clockNow === lastEggs && JSON.stringify([...parts.activities(live.current.snap, Date.now() / 1000)]) === lastActs) return;
       live.current.fresh = true;
       kick();
     }, CHECK_MS);
@@ -463,6 +487,12 @@ export function Office({
       data-zoomed={!fitted || undefined}
       data-drag={dragging || undefined}
       onKeyDown={(e) => {
+        keys.current = [...keys.current.slice(-9), e.key];
+        if (konamiDone(keys.current)) {
+          keys.current = [];
+          konamiAt.current = Date.now() / 1000;
+          kickRef.current();
+        }
         if (e.key !== 'Escape' || fitted) return;
         e.stopPropagation();
         moveCam(FIT);

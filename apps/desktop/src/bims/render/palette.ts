@@ -88,6 +88,8 @@ export const WORLD = {
   coffee: '#2b2d42',
   coffeeLed: '#ffd166',
   gold: '#e9c46a',
+  /** t4: the sky behind the office during the eclipse (violet, never the accent) */
+  eclipse: '#4b3f7a',
   grey: '#9a958c',
   ink: '#1d1a17',
   glass: '#bfe1f2',

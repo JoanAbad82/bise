@@ -8,6 +8,7 @@
 // mapped in the feed only, never from thread text. Owner: bims-lead.
 import type { Agent, Card, Place } from '@/proto';
 import type { Cam } from './zoom';
+import type { BimEgg, OfficeEggs } from './eggs';
 
 /** What the office reads at one moment: the bar's rows for one project, nothing else. */
 export interface Snapshot {
@@ -195,7 +196,14 @@ export type NewTimelineFn = () => Timeline;
 /** labels.ts `labelsOf`: what the overlay shows at t; events are read from the poses' segments (seg.from, seg.t). */
 export type LabelsFn = (
   bims: readonly BimFrame[],
-  o: { readonly t: number; readonly hover: string | null; readonly held: boolean; readonly agents: readonly Agent[] },
+  o: {
+    readonly t: number;
+    readonly hover: string | null;
+    readonly held: boolean;
+    readonly agents: readonly Agent[];
+    /** the eggs' words by bim (eggs.ts eggLabels): shown where no hover or event label is */
+    readonly eggs?: ReadonlyMap<string, string>;
+  },
 ) => ReadonlyMap<string, Label>;
 
 /** One bim's input to the renderer for a frame. */
@@ -203,12 +211,16 @@ export interface BimFrame {
   readonly name: string;
   readonly main: boolean;
   readonly pose: Pose;
+  /** the easter egg it plays now (eggs.ts), on top of its pose; absent: none */
+  readonly egg?: BimEgg;
 }
 
 /** The look of the moment: the app's theme (day light, night dark), reduced motion (no loops, fades for walks). */
 export interface Look {
   readonly night: boolean;
   readonly reduced: boolean;
+  /** the office's own easter eggs now (eggs.ts): the eclipse, the ghost, the tree...; absent: none */
+  readonly eggs?: OfficeEggs;
 }
 
 /**
@@ -239,8 +251,8 @@ export type MakeRenderer = (canvas: HTMLCanvasElement) => OfficeRenderer;
 /** What the overlay shows over one bim (labels.ts): nothing at rest, the spec's §2. */
 export interface Label {
   readonly name: string;
-  /** 'name' while walking or ctrl held, 'event' the 3 s after an event, 'hover' the tip line, 'pill' the '?' / '✗' alone (no name drawn, words '') */
-  readonly mode: 'name' | 'event' | 'hover' | 'pill';
+  /** 'name' while walking or ctrl held, 'event' the 3 s after an event, 'hover' the tip line, 'pill' the '?' / '✗' alone (no name drawn, words ''), 'egg' an easter egg's words alone ('1:47', '!') */
+  readonly mode: 'name' | 'event' | 'hover' | 'pill' | 'egg';
   /** the words after the name ('done', '→ dark-mode'); the hover card's state line; '' for a name alone */
   readonly words: string;
   /** the hover card's title, under its state (its row's title); '' but on hover */
