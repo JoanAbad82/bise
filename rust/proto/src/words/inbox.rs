@@ -87,6 +87,10 @@ crate::words! { inbox:
     page_chip(page) = "↗ {page} · page";
     /// the desktop's detail: the page he answered on
     page_chip_v(title, v) = "↗ {title} · page · v{v}";
+    /// a notification's chip, what it is about: any artifact (card-links)
+    art_chip(title, kind) = "↗ {title} · {kind}";
+    /// a notification's chip with its version (card-links)
+    art_chip_v(title, kind, v) = "↗ {title} · {kind} · v{v}";
     /// the detail's way to a page answer
     jump_page = "open the page at your answer";
     /// the detail's way to an answer in a thread

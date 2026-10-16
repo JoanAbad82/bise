@@ -1,10 +1,14 @@
-//! `sb notify --page <id>[#<item>]` (pm's B m_6008): main's card linked to
-//! a page, in the shape of a step card's `page`, so the capsule's fn + o
-//! opens the page at the item. Cards are main's: a task (a watch) sends
-//! main the exact command for its page (amb-kit 78500b1b).
+//! `sb notify --artifact <id>[#<item>]` (card-links, architect m_27431):
+//! main's card linked to what it is about, one `artifact` link
+//! ([`bise_proto::rows::ArtLink`]) for any kind; a page link fills the
+//! card's older `page` too (pm's B m_6008, the shape of a step card's
+//! `page`), so an older client keeps its chip. `--page <id>[#<item>]` is
+//! the same link. A task asks on its page (a question block makes the
+//! linked card, notif-artifact); `sb notify` is main's (sb-core).
 //! `sb notify --open <n>=<artifact>[#<anchor>]` (notif-open, architect
 //! m_24679): its option n opens that artifact in the app, nothing sent.
-//! One link per card, `{page?, opens?}`, kept until the card closes.
+//! One link per card, `{page?, artifact?, opens?}`, kept until the card
+//! closes.
 
 use crate::pages::Pages;
 use bise_proto::rows::OptAct;
@@ -105,6 +109,55 @@ pub fn link(pages: &Pages, spec: &str) -> Result<Value, String> {
         Some(b) => Ok(json!({"id": id, "block": b, "item": item, "url": format!("{url}#{item}"), "title": title, "v": v})),
         None => Err(format!("page {id:?} has no block or item {item:?} in v{v}")),
     }
+}
+
+/// The `artifact` link of a card's `page` link (snapshot shape): kind
+/// `page`, its item or block as an [`Anchor::Block`]. None: not a page
+/// link (no id).
+///
+/// [`Anchor::Block`]: bise_proto::anchor::Anchor::Block
+pub fn art_of_page(page: &Value) -> Option<Value> {
+    let id = page.get("id").and_then(Value::as_str).filter(|i| !i.is_empty())?;
+    let s = |k: &str| page.get(k).and_then(Value::as_str).filter(|x| !x.is_empty());
+    let mut a = json!({"id": id, "kind": "page", "title": s("title").unwrap_or(id)});
+    if let Some(v) = page.get("v").and_then(Value::as_u64) {
+        a["v"] = json!(v);
+    }
+    if let Some(u) = s("url") {
+        a["url"] = json!(u);
+    }
+    if let Some(at) = s("item").or(s("block")) {
+        a["at"] = json!({"kind": "block", "block": at});
+    }
+    Some(a)
+}
+
+/// `--artifact <id>[#<item>]`: a page (its id) links like `--page`, its
+/// `page` and its `artifact`; any other artifact its `artifact` alone,
+/// `{id, kind, title, v, url?}` (`url` only for a link). Err: the line the
+/// agent reads (no such artifact, an item on an artifact that is no page).
+pub fn artifact(pages: Option<&Pages>, art: &dyn Fn(&str) -> Option<crate::artifacts::Meta>, spec: &str) -> Result<(Option<Value>, Value), String> {
+    let (id, item) = match spec.trim().split_once('#') {
+        Some((id, item)) => (id.trim(), Some(item.trim()).filter(|i| !i.is_empty())),
+        None => (spec.trim(), None),
+    };
+    if let Some(p) = pages.filter(|p| p.store.meta(id).is_some()) {
+        let page = link(p, spec)?;
+        let a = art_of_page(&page).unwrap_or(Value::Null);
+        return Ok((Some(page), a));
+    }
+    let m = art(id).ok_or_else(|| format!("no artifact {id:?} (sb artifact list)"))?;
+    if let Some(i) = item {
+        return Err(format!("{id:?} is a {}, not a page: no #{i} in it (sb notify --artifact {id})", m.kind));
+    }
+    let mut a = json!({"id": m.id, "kind": m.kind, "title": m.title});
+    if let Some(v) = m.current() {
+        a["v"] = json!(v.v);
+        if v.target.starts_with("http://") || v.target.starts_with("https://") {
+            a["url"] = json!(v.target);
+        }
+    }
+    Ok((None, a))
 }
 
 /// The block of `target` in a fragment: a block's own id (`<section
@@ -235,6 +288,42 @@ mod tests {
             assert!(parse_open(bad).unwrap_err().contains("--open expects <n>=<artifact>[#<anchor>]"), "{bad}");
         }
         assert_eq!(opens_json(&[(1, OptAct::artifact("w", Some("b"), None))]), json!({"1": {"act": "open", "artifact": "w", "at": "b"}}));
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// card-links (architect m_27431): `--artifact` links any artifact in
+    /// one `artifact` link; a page id is `--page`'s link plus its
+    /// `artifact`; an item only on a page; a missing one refused.
+    #[test]
+    fn a_card_links_any_artifact_a_page_too() {
+        let d = std::env::temp_dir().join(format!("sb-card-art-{}", std::process::id()));
+        let p = Pages::new(&d, 47125, &d.join("kit"));
+        let pb = Publish { agent: "bims".into(), id: Some("bims-office".into()), html: HTML.into(), ..Default::default() };
+        p.publish(&pb, 1, &|_| false).unwrap();
+        let u = "http://127.0.0.1:47125/p/bims-office";
+        let t = p.store.meta("bims-office").unwrap().title;
+        let meta = |t: &str| crate::artifacts::Meta {
+            id: "les-bims-prototype".into(), title: "les bims · prototype".into(), kind: "site".into(), agent: "bims".into(), by: "bims".into(), created_ms: 0, source: t.into(), cwd: String::new(),
+            versions: vec![crate::artifacts::Version { v: 2, at_ms: 0, target: t.into(), ..Default::default() }],
+        };
+        let file = |id: &str| (id == "les-bims-prototype").then(|| meta("/w/bims.html"));
+        let (page, a) = artifact(Some(&p), &file, "bims-office#hn-41").unwrap();
+        assert_eq!(page.unwrap(), link(&p, "bims-office#hn-41").unwrap(), "a page: --page's link");
+        assert_eq!(a, json!({"id": "bims-office", "kind": "page", "title": t, "v": 1, "url": format!("{u}#hn-41"), "at": {"kind": "block", "block": "hn-41"}}));
+        let al: bise_proto::rows::ArtLink = serde_json::from_value(a).unwrap();
+        assert_eq!(al.at, Some(bise_proto::anchor::Anchor::Block { block: "hn-41".into(), quote: String::new() }));
+        assert_eq!(
+            artifact(Some(&p), &file, "les-bims-prototype").unwrap(),
+            (None, json!({"id": "les-bims-prototype", "kind": "site", "title": "les bims · prototype", "v": 2}))
+        );
+        let link_ = |_: &str| Some(meta("https://bims.test/"));
+        assert_eq!(artifact(None, &link_, "les-bims-prototype").unwrap().1["url"], "https://bims.test/", "a link opens outside the app too");
+        assert!(artifact(Some(&p), &file, "les-bims-prototype#look").unwrap_err().contains("is a site, not a page"));
+        assert!(artifact(Some(&p), &file, "nope").unwrap_err().contains("no artifact \"nope\""));
+        assert!(artifact(Some(&p), &file, "bims-office#gone").unwrap_err().contains("no block or item \"gone\""));
+        // the snapshot's page links (a page question's card) get theirs
+        assert_eq!(art_of_page(&json!({"id": "w", "url": "http://h/p/w#q1", "block": "q1"})).unwrap(), json!({"id": "w", "kind": "page", "title": "w", "url": "http://h/p/w#q1", "at": {"kind": "block", "block": "q1"}}));
+        assert_eq!(art_of_page(&json!({"url": "x"})), None);
         let _ = std::fs::remove_dir_all(d);
     }
 }

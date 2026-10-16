@@ -181,6 +181,15 @@ fn a_card_can_link_its_page_and_item() {
 }
 
 #[test]
+fn a_notification_links_any_artifact() {
+    let r = build(&a(&["notify", "--artifact", "les-bims-prototype", "which look?"])).unwrap();
+    assert_eq!((r["artifact"].as_str(), r["text"].as_str()), (Some("les-bims-prototype"), Some("which look?")));
+    crate::core::AgentReq::from_json(&r).unwrap();
+    assert!(build(&a(&["notify", "--artifact", "#x", "q?"])).is_err(), "an item needs its artifact");
+    assert!(build(&a(&["notify", "--artifact", "a", "--page", "b", "q?"])).is_err(), "one link");
+}
+
+#[test]
 fn main_controls_parse() {
     let r = build(&a(&["close", "#3", "handled", "by", "docs"])).unwrap();
     assert_eq!(r["card"], 3);

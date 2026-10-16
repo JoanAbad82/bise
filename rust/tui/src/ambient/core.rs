@@ -198,6 +198,8 @@ struct CardInfo {
     text: String,
     /// a page question's card: {id, block, url} (docs/ambient-pages.md §4.2)
     page: Option<bise_proto::rows::CardPage>,
+    /// what it is about, any artifact, pages included (card-links)
+    artifact: Option<bise_proto::rows::ArtLink>,
     /// a batch of drafts' card: {count, title, what, names} (amb-web
     /// m_6061: the capsule's words)
     batch: Option<bise_proto::rows::CardBatch>,

@@ -192,6 +192,25 @@ describe('InboxStrip (W7/K24)', () => {
     expect(screen.getByTestId(id)).toBeTruthy();
   });
 
+  // card-links (architect m_27431): a notification about any artifact (here a site) carries
+  // the same chip, its kind instead of 'page'; the chip and ⌘O open it in the app, its link beside
+  it('an artifact-linked card: the chip names its kind and opens it', () => {
+    const { did, p, wrapper } = ports();
+    const linked: Card = {
+      ...card(1, 1),
+      agent: 'bims',
+      artifact: { id: 'les-bims-prototype', kind: 'site', title: 'les bims · prototype', v: 2, url: null, at: null },
+    };
+    render(<InboxStrip project="acme" cards={[linked]} ports={p} now={NOW} />, { wrapper });
+    fireEvent.keyDown(window, { code: 'Digit1', key: '1', ctrlKey: true });
+    const id = 'strip.card.acme-1';
+    expect(screen.getByTestId(`${id}.page.chip`).textContent).toBe('↗ les bims · prototypesite · v2');
+    const opened = `act acme {"act":"open","artifact":"les-bims-prototype","at":null,"url":null}`;
+    fireEvent.click(screen.getByTestId(`${id}.page.chip`));
+    fireEvent.keyDown(window, { key: 'o', metaKey: true });
+    expect(did).toEqual([opened, opened]);
+  });
+
   it('ctrl+N past the last row does nothing and leaves the key alone', () => {
     render(<InboxStrip project="acme" cards={[card(1, 0)]} ports={ports().p} now={NOW} />);
     const e = new KeyboardEvent('keydown', { code: 'Digit3', key: '3', ctrlKey: true, cancelable: true });

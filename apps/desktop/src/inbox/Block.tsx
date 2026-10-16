@@ -31,6 +31,7 @@ import { keep } from '@/app/keep';
 import { useModHeld } from '@/app/held';
 import { answerTip } from '@/app/tipwords';
 import './inbox.css';
+import { aboutOf, openAct } from './about';
 
 /** What the composer under the block does with his words while an item is open. */
 export interface Answering {
@@ -459,7 +460,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   useEffect(
     () => () => {
       const c = openNow.current;
-      if (c?.page != null) store.keepOpen({ project: c.project, card: c.id });
+      if (c != null && aboutOf(c) != null) store.keepOpen({ project: c.project, card: c.id });
     },
     [store],
   );
@@ -532,10 +533,10 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   // a card linked to a page (notif-artifact, designer m_26560): its chip or 'o' opens the page beside
   // the thread at its block, the act an option's --open takes (optAct.ts); nothing sent, it stays
   const openPage = (c: Card) => {
-    const p = c.page;
-    if (p == null) return;
+    const a = aboutOf(c);
+    if (a == null) return;
     store.keepOpen({ project: c.project, card: c.id });
-    doAct(c.project, { act: 'open', artifact: p.id, at: p.item ?? p.block ?? null, url: p.url });
+    doAct(c.project, openAct(a));
   };
   const pick = (c: Card, n: number) => {
     // a closed card picks nothing: its options are dim
@@ -746,7 +747,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
                   later: () => {
                     openTo(null);
                   },
-                  ...(c.page != null ? { openPage: () => { openPage(c); } } : {}),
+                  ...(aboutOf(c) != null ? { openPage: () => { openPage(c); } } : {}),
                 }}
                 testId={isNotify(c) ? 'inbox.block.notify' : `inbox.block.card.${cardKey(c)}`}
                 {...(c === closed

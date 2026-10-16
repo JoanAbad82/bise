@@ -142,6 +142,82 @@ pub struct CardPage {
     pub v: Option<u64>,
 }
 
+/// What a card is about, one link for any artifact (card-links,
+/// architect m_27431): a page (its id is its page id), a site, a file.
+/// The hub fills it for every linked card, pages included; a client draws
+/// one chip from it, `↗ <title> · <kind> · v<n>`, and opens it the way an
+/// artifact chip opens (the app's artifact view, else `url`). A page link
+/// still fills [`Card::page`] too, for an older client.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ArtLink {
+    pub id: String,
+    /// the artifact's kind (`page`, `site`, `doc`, …): an open set
+    pub kind: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v: Option<u64>,
+    /// where it opens outside the app (a page's url, a site's link)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// where in it (a page's block or item: an [`Anchor::Block`])
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<crate::anchor::Anchor>,
+}
+
+impl Card {
+    /// What it is about: its `artifact`, else its `page` as one (an older
+    /// hub sends the page alone). Pure.
+    pub fn about(&self) -> Option<ArtLink> {
+        self.artifact.clone().or_else(|| self.page.as_ref().map(CardPage::art_link))
+    }
+}
+
+impl CardPage {
+    /// The page as an artifact link: kind `page`, its item or block as
+    /// the anchor, its title (an older hub's: its id).
+    pub fn art_link(&self) -> ArtLink {
+        ArtLink {
+            id: self.id.clone(),
+            kind: "page".into(),
+            title: self.title.clone().unwrap_or_else(|| self.id.clone()),
+            v: self.v,
+            url: Some(self.url.clone()).filter(|u| !u.is_empty()),
+            at: self.item.clone().or_else(|| self.block.clone()).map(|block| crate::anchor::Anchor::Block { block, quote: String::new() }),
+        }
+    }
+}
+
+impl ArtLink {
+    /// Its kind as the chip says it, the artifacts list's words (designer
+    /// m_27435): `deck` for slides, `file` for none, `PR`, else the kind.
+    pub fn kind_word(&self) -> String {
+        match self.kind.as_str() {
+            "slides" => "deck".into(),
+            k => crate::thread::words::kind_word(k),
+        }
+    }
+
+    /// The version the chip shows: none for a link, which has none to him.
+    pub fn shown_v(&self) -> Option<u64> {
+        self.v.filter(|_| self.kind != "link")
+    }
+
+    /// What a browser opens (a page, a site, a link, an image): the
+    /// terminal's key says `open in your browser`, the rest `open`.
+    pub fn in_browser(&self) -> bool {
+        matches!(self.kind.as_str(), "page" | "site" | "link" | "image")
+    }
+
+    /// The block or item it opens at on a page; none for any other anchor.
+    pub fn block(&self) -> Option<&str> {
+        match &self.at {
+            Some(crate::anchor::Anchor::Block { block, .. }) => Some(block),
+            _ => None,
+        }
+    }
+}
+
 /// One open card: what waits on him.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -159,6 +235,10 @@ pub struct Card {
     pub since_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page: Option<CardPage>,
+    /// what it is about, any artifact, pages included (card-links): the
+    /// one chip new clients draw; none from an older hub
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact: Option<ArtLink>,
     /// it acts or leaves (a tool call's yes, a merge, a release...): only
     /// one of its options answers it, never typed words (the composer
     /// rule, lead m_8777); false: a question, words answer it
@@ -366,7 +446,7 @@ mod open_tests {
         // hub-given wins over opt_act's default; the others keep theirs
         let (question, options) = question("#384 is ready\n1. squash and merge\n2. open it on GitHub\n3. not yet");
         let card = Card {
-            id: 1, project: "p".into(), kind: "merge".into(), agent: "a".into(), question, options, urgent: false, since_ms: 0, page: None,
+            id: 1, project: "p".into(), kind: "merge".into(), agent: "a".into(), question, options, urgent: false, since_ms: 0, page: None, artifact: None,
             approval: false, rank: None, waiting: None, text: String::new(), note: None, place: None, pr: None, link: Some("https://x.test/pull/1".into()),
             for_msg: None, batch: None,
         };

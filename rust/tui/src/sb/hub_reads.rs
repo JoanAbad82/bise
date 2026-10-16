@@ -429,6 +429,7 @@ pub(crate) mod rows_for_tests {
             urgent: false,
             since_ms: crate::when::now_ms(),
             page: None,
+            artifact: None,
             approval: false,
             rank: None,
             waiting: None,

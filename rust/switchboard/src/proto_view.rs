@@ -274,6 +274,8 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 title: Some(s(p, "title")).filter(|t| !t.is_empty()),
                 v: n(p, "v"),
             });
+            // what it is about, any artifact (card-links); a bad one reads as none
+            let artifact = c.get("artifact").and_then(|a| serde_json::from_value::<bise_proto::rows::ArtLink>(a.clone()).ok());
             // a page's pick: each option's why, the agent's own (snapshot_pages)
             if let Some(p) = c.get("pick").and_then(|p| serde_json::from_value::<crate::pages::questions::Pick>(p.clone()).ok()) {
                 for o in &mut options {
@@ -293,6 +295,7 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 options,
                 since_ms: now.saturating_sub(n(c, "age_ms").unwrap_or(0)),
                 page,
+                artifact,
                 // V14: the signin card's stopped agents (core.rs signin_waiting)
                 waiting: c.get("waiting").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect()),
                 note: opt(c, "note"),

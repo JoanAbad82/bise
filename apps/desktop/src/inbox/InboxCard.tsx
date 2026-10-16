@@ -4,8 +4,8 @@
 // lines), the options as full-width numbered rows that wrap freely (never
 // pills: a 3-line French label grows its row), and one footer line of keys,
 // each pair a button ('1–3 pick', '⌘⌫ close', '⏎ open in bise', 'esc
-// later'). A card linked to a page (notif-artifact, designer m_26560) carries
-// the page as a chip under the question ('↗ <title> · page · v4', '⌘O open
+// later'). A card linked to what it is about (notif-artifact, designer m_26560;
+// card-links: any artifact) carries it as a chip under the question ('↗ <title> · page · v4', '⌘O open
 // beside' at its right), each option's one-line why and the asker's 'my
 // pick', and its foot says who reads typed words. Opaque and docked in the window (the strip's open item,
 // ⌘I's open item); the capsule's card keeps its glass (surface 'glass') with
@@ -13,7 +13,8 @@
 // row shows picked for PICKED_MS, then picks. Owner: amb-home.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
-import type { CardPage } from '@/proto/rows';
+import type { ArtLink } from '@/proto/rows';
+import { aboutOf, aboutWords } from './about';
 import { inbox } from '@/proto/words_inbox.gen';
 import { common } from '@/proto/words_common.gen';
 import { Act, ArtChip, Kbd, tipAttrs } from '@/ds';
@@ -33,7 +34,7 @@ export interface InboxCardActs {
   close?: () => void;
   /** open it in bise's window (a card outside the window: '⏎ open in bise') */
   open?: () => void;
-  /** it is linked to a page: open it beside the thread at its block (the chip, 'o') */
+  /** it is linked to a page or an artifact: open it beside the thread at its block (the chip, ⌘O) */
   openPage?: () => void;
   /** put it off ('esc later') */
   later?: () => void;
@@ -73,6 +74,7 @@ export interface InboxCardProps {
 
 export function InboxCard({ card, project, home, acts, on = null, now, keys, note, children, stacked, full, surface = 'dock', testId, closed = false }: InboxCardProps) {
   const id = testId ?? `inbox.card.${cardKey(card)}`;
+  const about = aboutOf(card);
   const [picked, setPicked] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -127,7 +129,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
       <div className="ic-q" data-testid={`${id}.q`}>
         {full === false && card.kind !== 'plan' ? <Folded text={card.question} project={card.project} testId={`${id}.more`} q={`${id}.q`} /> : <Question card={card} id={id} />}
       </div>
-      {card.page != null && <PageChip page={card.page} open={acts.openPage} id={id} />}
+      {about != null && <PageChip about={about} open={acts.openPage} id={id} />}
       {card.options.length > 0 && (
         <div className="ic-opts" role="listbox" data-testid={`${id}.opt`}>
           {card.options.map((o) => (
@@ -234,14 +236,10 @@ function shownAgent(agent: string): string {
   return agent === 'main' ? 'bise' : agent;
 }
 
-/** The chip's words: '<title> · page · v4' (an older hub sends no title: the page's id). */
-export function pageChipWords(page: CardPage): { title: string; meta: string } {
-  return { title: page.title ?? page.id, meta: [inbox.page_noun, page.v == null ? '' : `v${String(page.v)}`].filter(Boolean).join(' · ') };
-}
-
-/** The page under the question (designer m_26560, m_26776): the artifact chip, '⌘O open beside' at its right. */
-function PageChip({ page, open, id }: { page: CardPage; open: (() => void) | undefined; id: string }) {
-  const w = pageChipWords(page);
+/** What it is about under the question (designer m_26560, m_26776; card-links: any artifact): the
+ * artifact chip, '⌘O open beside' at its right. */
+function PageChip({ about, open, id }: { about: ArtLink; open: (() => void) | undefined; id: string }) {
+  const w = aboutWords(about);
   return (
     <div className="ic-page" data-testid={`${id}.page`}>
       <ArtChip title={w.title} meta={w.meta} {...(open ? { onClick: open } : {})} testId={`${id}.page.chip`} />

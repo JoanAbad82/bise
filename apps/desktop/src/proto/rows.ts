@@ -2,6 +2,7 @@
 // BISE_PROTO_BLESS=1 cargo test -p bise-proto --features ts --test ts
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
+import type { Anchor } from './anchor';
 import type { Queued } from './draft';
 
 /**
@@ -228,6 +229,28 @@ export type CardPage = { id: string, url: string, block?: string | null, item?: 
 title?: string | null, v?: number | null, };
 
 /**
+ * What a card is about, one link for any artifact (card-links,
+ * architect m_27431): a page (its id is its page id), a site, a file.
+ * The hub fills it for every linked card, pages included; a client draws
+ * one chip from it, `↗ <title> · <kind> · v<n>`, and opens it the way an
+ * artifact chip opens (the app's artifact view, else `url`). A page link
+ * still fills [`Card::page`] too, for an older client.
+ */
+export type ArtLink = { id: string, 
+/**
+ * the artifact's kind (`page`, `site`, `doc`, …): an open set
+ */
+kind: string, title: string, v?: number | null, 
+/**
+ * where it opens outside the app (a page's url, a site's link)
+ */
+url?: string | null, 
+/**
+ * where in it (a page's block or item: an [`Anchor::Block`])
+ */
+at?: Anchor | null, };
+
+/**
  * One open card: what waits on him.
  */
 export type Card = { id: number, project: string, 
@@ -243,6 +266,11 @@ question: string, options: Array<Opt>,
  * it holds running work now (a tool call waiting for a yes)
  */
 urgent: boolean, since_ms: number, page?: CardPage | null, 
+/**
+ * what it is about, any artifact, pages included (card-links): the
+ * one chip new clients draw; none from an older hub
+ */
+artifact?: ArtLink | null, 
 /**
  * it acts or leaves (a tool call's yes, a merge, a release...): only
  * one of its options answers it, never typed words (the composer

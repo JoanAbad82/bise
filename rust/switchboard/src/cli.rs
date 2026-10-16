@@ -743,7 +743,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
         "notify" | "card" => {
             // a notification is a card on the wire: the hub's command keeps its name
             req.insert("cmd".into(), json!("card"));
-            let (pos, o) = parse_args(rest, &["for", "page", "open"], &[])?;
+            let (pos, o) = parse_args(rest, &["for", "page", "artifact", "open"], &[])?;
             req.insert("text".into(), json!(text_of(&pos)?));
             // `--open <n>=<artifact>[#<anchor>]` (repeatable): option n
             // opens that artifact in his app, nothing sent (notif-open)
@@ -760,12 +760,20 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             if o.contains_key("for") { req.insert("for".into(), json!(str_of(&o, "for"))); }
             // `--page <id>[#<item>]`: the notification opens that page at the item
             // (fn + o in the capsule), pm's B m_6008
-            if o.contains_key("page") {
-                let page = str_of(&o, "page");
-                if page.trim().trim_start_matches('#').is_empty() || page.trim().starts_with('#') {
-                    return Err("usage: sb notify [--for <msg>] [--page <id>[#<item>]] [--open <n>=<artifact>[#<anchor>]]... \"<question>\"".into());
+            // `--artifact <id>[#<item>]` (card-links): what it is about,
+            // any artifact; `--page` is the same link
+            let usage = "usage: sb notify [--for <msg>] [--page|--artifact <id>[#<item>]] [--open <n>=<artifact>[#<anchor>]]... \"<question>\"";
+            if o.contains_key("page") && o.contains_key("artifact") {
+                return Err(format!("--page and --artifact are the same link: give one. {usage}"));
+            }
+            for k in ["page", "artifact"] {
+                if o.contains_key(k) {
+                    let spec = str_of(&o, k);
+                    if spec.trim().trim_start_matches('#').is_empty() || spec.trim().starts_with('#') {
+                        return Err(usage.into());
+                    }
+                    req.insert(k.into(), json!(spec.trim()));
                 }
-                req.insert("page".into(), json!(page.trim()));
             }
         }
         "inspect" => {

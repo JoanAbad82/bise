@@ -2,7 +2,7 @@
 //! [`crate::app_cmd::AppCmd`]): the sidebar's projects, accounts, plugins,
 //! computer use, roles, the composer's pick lists and ⌘K's index.
 
-use crate::rows::{Agent, Artifact, Card, CardBatch, CardPage, Opt, ReportKind, ScheduledTask};
+use crate::rows::{Agent, ArtLink, Artifact, Card, CardBatch, CardPage, Opt, ReportKind, ScheduledTask};
 use crate::{Pos, Project};
 use serde::{Deserialize, Serialize};
 
@@ -399,6 +399,9 @@ pub struct StateCard {
     pub label: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page: Option<CardPage>,
+    /// what it is about, any artifact, pages included (card-links)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact: Option<ArtLink>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub batch: Option<CardBatch>,
 }

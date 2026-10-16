@@ -2,7 +2,7 @@
 // BISE_PROTO_BLESS=1 cargo test -p bise-proto --features ts --test ts
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
-import type { Agent, Artifact, Card, CardBatch, CardPage, Opt, ReportKind, ScheduledTask } from './rows';
+import type { Agent, ArtLink, Artifact, Card, CardBatch, CardPage, Opt, ReportKind, ScheduledTask } from './rows';
 
 /**
  * One project in the window's sidebar.
@@ -306,7 +306,11 @@ export type StateAgent = { name: string, status: string, title: string, purpose:
  * `label` (main's own question), the page block it is about, the batch
  * of drafts it stands for.
  */
-export type StateCard = { id: number, kind: string, agent: string, text: string, options: Array<Opt>, urgent: boolean, label?: string | null, page?: CardPage | null, batch?: CardBatch | null, };
+export type StateCard = { id: number, kind: string, agent: string, text: string, options: Array<Opt>, urgent: boolean, label?: string | null, page?: CardPage | null, 
+/**
+ * what it is about, any artifact, pages included (card-links)
+ */
+artifact?: ArtLink | null, batch?: CardBatch | null, };
 
 /**
  * The page a note talk is about, as the capsule's `phase` says it.

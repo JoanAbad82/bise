@@ -88,6 +88,7 @@ fn card_info(c: &rows::Card) -> CardInfo {
         agent: c.agent.clone(),
         text: if c.text.is_empty() { c.question.clone() } else { c.text.clone() },
         page: c.page.clone(),
+        artifact: c.artifact.clone(),
         batch: c.batch.clone(),
     }
 }
@@ -503,6 +504,7 @@ fn card_ev(c: &CardInfo) -> StateCard {
         // main's own question (no page): its label (ambient m_6476)
         label: (c.agent == "main" && c.kind == "question" && c.page.is_none()).then(|| "? main needs you".to_string()),
         page: c.page.clone(),
+        artifact: c.artifact.clone(),
         batch: c.batch.clone(),
     }
 }

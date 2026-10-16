@@ -96,6 +96,7 @@ fn card(id: u64, kind: &str, text: &str) -> RowCard {
         urgent: false,
         since_ms: 1_000,
         page: None,
+        artifact: None,
         approval: false,
         rank: None,
         waiting: None,

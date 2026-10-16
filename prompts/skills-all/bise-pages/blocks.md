@@ -179,5 +179,7 @@ writing), `launch-post.html` (a Slack post), `offsite-plan.html` (venues to comp
 
 The notification and the page are one thing: it carries the page as a chip and the page's own
 options, `o` opens the page beside the thread, and one answer, in the inbox or on the page,
-closes both. A notification main opens by hand about a page links it with
-`sb notify --page <id>#<block>`.
+closes both. A question about something you made goes on its page as a `question` block: never
+a bare one he must go find the page for. A notification main opens by hand about a page or any
+artifact links it, so one click opens it: `sb notify --page <id>#<block> "…"` or
+`sb notify --artifact <id> "…"` (a site, a doc, a prototype).

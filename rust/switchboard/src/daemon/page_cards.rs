@@ -44,12 +44,15 @@ impl Shell {
                 self.save_card_links();
             }
             if let Some(cards) = snap["cards"].as_array_mut() {
-                for c in cards {
+                for c in &mut *cards {
                     // an agent's card linked with `sb notify --page`, its
                     // options' artifacts with `--open` (card_link.rs)
                     if let Some(link) = c["id"].as_u64().and_then(|n| self.pg.card_links.get(&n)) {
                         if let Some(page) = link.get("page") {
                             c["page"] = page.clone();
+                        }
+                        if let Some(a) = link.get("artifact") {
+                            c["artifact"] = a.clone();
                         }
                         if let Some(opens) = link.get("opens") {
                             c["opens"] = opens.clone();
@@ -109,27 +112,38 @@ impl Shell {
                         c["pick"] = json!(q.pick);
                     }
                 }
+                // every linked card says what it is about in one link,
+                // pages included (card-links, architect m_27431)
+                for c in cards.iter_mut().filter(|c| c.get("artifact").is_none()) {
+                    if let Some(a) = c.get("page").and_then(crate::card_link::art_of_page) {
+                        c["artifact"] = a;
+                    }
+                }
             }
         }
     }
 
-    /// `sb notify --page <id>[#<item>]` and `--open <n>=<artifact>[#<anchor>]`:
-    /// a page, an artifact or an anchor that isn't there is refused before
-    /// the card opens (pm's B m_6008). Ok(None): neither; Ok(Some): the
-    /// card's link `{page?, opens?}` (card_link.rs); Err: the refusal's words.
+    /// `sb notify --page|--artifact <id>[#<item>]` and `--open
+    /// <n>=<artifact>[#<anchor>]`: a page, an artifact or an anchor that
+    /// isn't there is refused before the card opens (pm's B m_6008).
+    /// Ok(None): no link; Ok(Some): the card's link `{page?, artifact?,
+    /// opens?}` (card_link.rs, card-links); Err: the refusal's words.
     pub(super) fn card_page_link(&self, cmd: &str, v: &Value) -> Result<Option<Value>, String> {
         if cmd != "card" {
             return Ok(None);
         }
+        let store = crate::artifacts::Store::new(&self.opts.paths.state);
+        let art = |id: &str| store.get(id);
         let mut link = serde_json::Map::new();
-        if let Some(spec) = v.get("page").and_then(Value::as_str) {
-            let pages = self.pg.pages.as_ref().ok_or("no pages on this hub")?;
-            link.insert("page".into(), crate::card_link::link(pages, spec)?);
+        if let Some(spec) = v.get("artifact").or(v.get("page")).and_then(Value::as_str) {
+            let (page, a) = crate::card_link::artifact(self.pg.pages.as_deref(), &art, spec)?;
+            if let Some(p) = page {
+                link.insert("page".into(), p);
+            }
+            link.insert("artifact".into(), a);
         }
         let specs: Vec<&str> = v.get("open").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
         if !specs.is_empty() {
-            let store = crate::artifacts::Store::new(&self.opts.paths.state);
-            let art = |id: &str| store.get(id);
             let opens = specs.iter().map(|s| crate::card_link::open_act(self.pg.pages.as_deref(), &art, s)).collect::<Result<Vec<_>, _>>()?;
             link.insert("opens".into(), crate::card_link::opens_json(&opens));
         }

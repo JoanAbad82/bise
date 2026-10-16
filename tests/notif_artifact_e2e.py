@@ -104,6 +104,23 @@ def main():
         c.wait(lambda: card("composer-look-3", "look3"), 60, "the hand-made notification, linked")
         k3 = card("composer-look-3", "look3")
         check((k3["page"].get("title"), k3["page"].get("v")) == ("a later look", 1), "its chip: %r" % k3["page"])
+        check(k3.get("artifact") == {"id": "composer-look-3", "kind": "page", "title": "a later look", "v": 1, "url": "%s/p/composer-look-3#look3" % origin, "at": {"kind": "block", "block": "look3"}},
+              "a page link is an artifact link too (card-links): %r" % k3.get("artifact"))
+
+        # 5. card-links (main m_27429, architect m_27431): main links any artifact, a site
+        # here, with --artifact: the card's one link, its kind; no page link beside it
+        proto = os.path.join(E.tmp, "proto.html")
+        open(proto, "w").write("<html><body>proto</body></html>\n")
+        settle(c)
+        c.say('[[bash: sb artifact add %s --title "t proto" --kind site && sb notify --artifact t-proto "the prototype ok?"]]' % proto)
+        site = lambda: next((x for x in c.cards() if (x.get("artifact") or {}).get("id") == "t-proto"), None)  # noqa: E731
+        c.wait(site, 60, "the notification linked to the site")
+        s5 = site()
+        check(s5.get("page") is None and (s5["artifact"]["kind"], s5["artifact"]["title"], s5["artifact"]["v"]) == ("site", "t proto", 1), "the site link: %r" % s5)
+        c.wait_idle("main")
+        c.say('[[bash: sb notify --artifact t-proto#look "x?" ; sb notify --artifact nope "y?"]]')
+        c.wait_line("main", 'is a site, not a page: no #look in it', 60)
+        c.wait_line("main", '(sb artifact list)', 60)
     except Exception as e:  # noqa: BLE001
         ok = False
         print("FAIL", e)
