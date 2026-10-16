@@ -25,7 +25,10 @@
 //! - a word goes in [`common`] only when two areas read it (the commit that
 //!   puts it there names the two);
 //! - every key is read by a client (Rust as `<area>::<name>`, the desktop
-//!   as `<area>.<name>`): deleting a word deletes its key (tests/words.rs).
+//!   as `<area>.<name>`): deleting a word deletes its key (tests/words.rs);
+//! - a key must not share a name with any arg of its area: the generated
+//!   fn param shadows the const, E0308 (a `title` word breaks every
+//!   `(title, …)` template of its area; tests.rs says which).
 
 use std::fmt::Display;
 

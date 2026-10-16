@@ -60,6 +60,38 @@ fn an_area_split_in_parts_is_one_list() {
     assert_eq!(ALL_DEMO[2].args, ["n"]);
 }
 
+/// A word with no arg is a `const`; a template's arg of the same name in
+/// its area is a fn param pattern that hits that const (E0308, words-
+/// scheduled's `title`). The build already fails then: this test is the
+/// clear message for a key added in a branch that also renames an arg.
+#[test]
+fn no_key_shares_a_name_with_an_arg_of_its_area() {
+    assert_eq!(clashes(&[("demo", DEMO_CLASH)]), vec!["demo.title is also an arg of demo.ended: a key must not share a name with any arg of its area (the generated fn param shadows the const, E0308)".to_string()]);
+    let found = clashes(ALL);
+    assert!(found.is_empty(), "{found:#?}");
+}
+
+const DEMO_CLASH: &[Word] = &[
+    Word { key: "demo.title", args: &[], one: None, text: "scheduled", doc: "the head
+" },
+    Word { key: "demo.ended", args: &["title", "why"], one: None, text: "{title} ended · {why}", doc: "a line
+" },
+];
+
+/// Each const key of an area that is also an arg of a template of that area.
+fn clashes(all: &[(&str, &[Word])]) -> Vec<String> {
+    let mut out = Vec::new();
+    for (_, ws) in all {
+        for k in ws.iter().filter(|w| w.args.is_empty()) {
+            let name = k.key.split_once('.').map_or(k.key, |(_, n)| n);
+            if let Some(t) = ws.iter().find(|w| w.args.contains(&name)) {
+                out.push(format!("{} is also an arg of {}: a key must not share a name with any arg of its area (the generated fn param shadows the const, E0308)", k.key, t.key));
+            }
+        }
+    }
+    out
+}
+
 #[test]
 fn a_template_fills_and_a_plural_picks() {
     assert_eq!(inbox::where_thread("old"), "in old's thread");
