@@ -64,15 +64,15 @@ def one(pid, name, model, keys_url, family):
     blank = " ".join("%s=" % k for k in key_envs())
     env = "BISE_HOME=%s HOME=%s SB_SETUP=off %s" % (root, home, blank)
     with tui_session(110, 34, env, E=E) as t:
-        t.wait("how do you want to pay for the models?", 40)
-        t.wait("↑↓ choose   ⏎ go   esc back")
+        t.wait(w("settings.first_pay"), 40)
+        t.wait(w("settings.bar_choose_go"))
         # subscriptions: a plan first, then `an API key` (two rows down)
         t.keys("Down")
         t.wait("› OpenRouter")
         t.keys("Down")
         t.wait("› an API key")
         t.keys("Enter")
-        t.wait("which provider?")
+        t.wait(w("settings.first_which_provider"))
         cur = re.compile(r"› (\d+) · ")
         for _ in range(20):
             sc = t.screen()
@@ -87,23 +87,23 @@ def one(pid, name, model, keys_url, family):
         else:
             raise AssertionError("no row for %s:\n%s" % (name, sc))
         t.keys("Enter")
-        sc = t.wait("which model?")
+        sc = t.wait(w("settings.first_which_model"))
         assert "%s/%s  recommended" % (pid, model) in sc, sc
         t.keys("Enter")
-        sc = t.wait("paste your %s key" % name)
-        assert "get one: " + keys_url in sc, sc
+        sc = t.wait(w("settings.first_paste_key", provider=name))
+        assert w("settings.first_get_one") + keys_url in sc, sc
         t.typed("bad-key-123")
         t.keys("Enter")
         sc = t.wait("says this key is wrong.")
-        assert "%s says this key is wrong." % name in sc and "⏎ try again" in sc, sc
+        assert w("settings.first_key_wrong", provider=name) in sc and "⏎ try again" in sc, sc
         # BISE-282: the provider's own words, dim, under bise's
-        assert '%s said: "invalid api key"' % name in sc, sc
+        assert w("settings.first_said", provider=name, said="invalid api key") in sc, sc
         assert not os.path.exists(os.path.join(root, "auth.json")), "nothing saved"
         t.keys("Enter")
-        t.wait("paste your %s key" % name)
+        t.wait(w("settings.first_paste_key", provider=name))
         t.typed("good-key-123")
         t.keys("Enter")
-        sc = t.wait("it works: %s answered." % model)
+        sc = t.wait(w("settings.first_works", model=model))
         cfg = open(os.path.join(root, "config.toml")).read()
         # BISE-298: main's role
         assert '[roles]\nmain = "%s/%s"' % (pid, model) in cfg and not cfg.startswith("model ="), cfg

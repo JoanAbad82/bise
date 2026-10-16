@@ -29,6 +29,10 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run  # noqa: E402
+from words import w  # noqa: E402
+
+PASTE = w("settings.first_paste_key", provider="Mistral")
+ROLES = w("settings.roles_screen_title")
 
 NORMAL = "   @ file   "
 
@@ -81,11 +85,11 @@ def main():
 
         # voice off, no voice key: ctrl+r opens voice's providers (BISE-301)
         t.keys("C-r")
-        t.wait("voice: which provider?")
+        t.wait(w("settings.roles_which_provider", role="voice"))
         # the providers' states drawn (a key check may land a frame later)
         sc = t.wait_re(r"› Mistral +not set up · recommended")
         cap("01-voice-providers-none-ready")
-        assert "only the providers that can listen. ctrl+r starts, any key stops." in sc, sc
+        assert w("settings.roles_voice_list") in sc, sc
         assert re.search(r"› Mistral +not set up · recommended", sc), sc
         assert re.search(r"ElevenLabs +not set up · voice only", sc), sc
         assert "Groq" not in sc and "Deepgram" not in sc and "Anthropic" not in sc, sc
@@ -99,22 +103,22 @@ def main():
         t.keys("Enter")
         t.wait("turn voice on (ctrl+r: you talk, it types)")
         t.keys("Enter")
-        t.wait("voice: which provider?")
+        t.wait(w("settings.roles_which_provider", role="voice"))
         # Mistral: its key first, then its voice models
         t.keys("Enter")
-        sc = t.wait("paste your Mistral key")
-        assert "for voice. then you pick the model." in sc and "esc back to the providers" in sc, sc
+        sc = t.wait(PASTE)
+        assert w("settings.first_for_role", role="voice") in sc and "esc back to the providers" in sc, sc
         assert "only you can read it." in sc and "/var/" not in sc and "/tmp" not in sc, sc
         cap("02-voice-key-step")
         # a wrong key: the provider's words, nothing saved
         t.typed("bad-key-1")
         t.keys("Enter")
-        sc = t.wait("Mistral says this key is wrong.", 30)
+        sc = t.wait(w("settings.first_key_wrong", provider="Mistral"), 30)
         cap("03-voice-wrong-key")
         assert "Invalid API Key" in sc, sc
         assert not os.path.exists(auth), "nothing saved"
         t.keys("Enter")
-        t.wait("paste your Mistral key")
+        t.wait(PASTE)
         # no credit: saved all the same; credit added, enter tries again
         t.typed("broke-key-1")
         t.keys("Enter")
@@ -123,7 +127,7 @@ def main():
         assert "broke-key-1" in open(auth).read(), "a normal provider key"
         open(credit, "w").close()
         t.keys("Enter")
-        sc = t.wait("voice · Mistral: which model?", 30)
+        sc = t.wait(w("settings.roles_which_model", role="voice", dot="·", provider="Mistral"), 30)
         cap("05-voice-models")
         assert "voxtral-transcribe-3" in sc and "mistral-large-4" not in sc, sc
         assert re.search(r"› voxtral-mini-latest +recommended", sc), sc
@@ -140,22 +144,22 @@ def main():
         # /models: provider then model, one column
         t.typed("/models")
         t.keys("Enter")
-        sc = t.wait("which model does what?")
+        sc = t.wait(ROLES)
         cap("06-models")
-        assert "each role picks a provider, then a model. one provider can serve several." in sc, sc
+        assert w("settings.roles_screen_sub") in sc, sc
         assert re.search(r"voice +Mistral +voxtral-mini-latest", sc), sc
         assert re.search(r"main +Anthropic +claude-opus-5-5", sc), sc
         assert re.search(r"agents +same as main · Anthropic · claude-opus-5-5", sc), sc
         # main on Mistral too: the key voice uses, ready
         t.keys("Enter")
-        sc = t.wait("main: which provider?")
+        sc = t.wait(w("settings.roles_which_provider", role="main"))
         cap("07-main-providers")
         assert re.search(r"› Anthropic +✓ ready · now", sc), sc
-        assert re.search(r"Mistral +✓ ready · voice uses it", sc), sc
+        assert re.search(r"Mistral +✓ ready · " + re.escape(w("settings.roles_uses", role="voice")), sc), sc
         t.keys("Down")
         t.wait("› Mistral")
         t.keys("Enter")
-        sc = t.wait("main · Mistral: which model?")
+        sc = t.wait(w("settings.roles_which_model", role="main", dot="·", provider="Mistral"))
         assert re.search(r"› mistral-large-4 +recommended", sc), sc
         # an id it doesn't list
         t.typed("mistral-nova-1")
@@ -166,7 +170,7 @@ def main():
         t.wait_gone("mistral-nova-1")
         cap("09-main-models")
         t.keys("Enter")
-        sc = t.wait("how hard should it think?")
+        sc = t.wait(w("settings.roles_effort_title"))
         cap("10-main-effort")
         assert "mistral-large-4 for main" in sc, sc
         t.keys("Enter")
@@ -179,13 +183,13 @@ def main():
         # agents: same as main first
         t.keys("Down")
         t.keys("Enter")
-        sc = t.wait("agents: which provider?")
+        sc = t.wait(w("settings.roles_which_provider", role="agents"))
         cap("12-agents-providers")
         assert re.search(r"› same as main +Mistral · mistral-large-4 · now", sc), sc
-        assert re.search(r"Mistral +✓ ready · main, small jobs, voice use it", sc), sc
-        assert re.search(r"OpenAI +not set up", sc) and "more providers…" in sc, sc
+        assert re.search(r"Mistral +✓ ready · " + re.escape(w("settings.roles_use", roles="main, small jobs, voice")), sc), sc
+        assert re.search(r"OpenAI +not set up", sc) and w("settings.prov_more") in sc, sc
         t.keys("Escape")
-        t.wait("which model does what?")
+        t.wait(ROLES)
         t.keys("Escape")
         t.wait(NORMAL)   # the esc handled alone: the next key is not alt+key
         t.typed("/model ")
@@ -215,14 +219,14 @@ def main():
         t.keys("Enter")
         sc = t.wait("1 · paste a new key")
         cap("15-provider-menu")
-        assert "main, agents, small jobs and voice use it. /models changes that." in sc, sc
-        assert "use it for" not in sc and "open billing" not in sc, sc
+        assert w("settings.prov_role_more", roles="main, agents, small jobs", last="voice") in sc, sc
+        assert "use it for" not in sc and w("settings.prov_item_billing") not in sc, sc
         rm = re.search(r"(\d) · remove the key", sc)
         assert rm, sc
         t.keys(rm.group(1))
-        sc = t.wait("remove the Mistral key saved in bise?")
+        sc = t.wait(w("settings.prov_remove_ask", provider="Mistral"))
         cap("16-provider-remove")
-        assert "main, agents, small jobs and voice use Mistral. without the key they stop." in " ".join(sc.split()), sc
+        assert w("settings.prov_stop_more", roles="main, agents, small jobs", last="voice", provider="Mistral") in " ".join(sc.split()), sc
         t.keys("Escape")
         t.wait("1 · paste a new key")
         t.keys("Escape")

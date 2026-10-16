@@ -23,6 +23,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run  # noqa: E402
+from words import w  # noqa: E402
+
+PASTE = w("settings.first_paste_key", provider="OpenRouter")
 
 NORMAL = "   @ file   "
 PICK = "openrouter/anthropic/claude-sonnet-5.5"
@@ -72,11 +75,11 @@ def main():
         # /provider: the list and its states
         t.typed("/provider")
         t.keys("Enter")
-        sc = t.wait("the keys i can use. enter sets one up or changes it.")
+        sc = t.wait(w("settings.prov_sub"))
         assert re.search(r"Anthropic +✓ from ANTHROPIC_API_KEY", sc), sc
         # BISE-298: the roles it runs, by name
         assert re.search(r"OpenRouter +not set up +main · agents · small jobs", sc), sc
-        assert "more providers…" in sc, sc
+        assert w("settings.prov_more") in sc, sc
         for _ in range(12):
             if re.search(r"› OpenRouter ", t.screen()):
                 break
@@ -88,17 +91,17 @@ def main():
         t.keys("Down")
         t.wait("› paste a key")
         t.keys("Enter")
-        sc = t.wait("paste your OpenRouter key")
+        sc = t.wait(PASTE)
         assert "get one: https://openrouter.ai/settings/keys" in sc, sc
         # a wrong key: its words, nothing saved
         t.typed("bad-key-123")
         t.keys("Enter")
-        sc = t.wait("OpenRouter says this key is wrong.")
-        assert 'OpenRouter said: "invalid api key"' in sc, sc
+        sc = t.wait(w("settings.first_key_wrong", provider="OpenRouter"))
+        assert w("settings.first_said", provider="OpenRouter", said="invalid api key") in sc, sc
         assert not os.path.exists(auth), "nothing saved"
         # no credit: saved all the same, the billing page linked
         t.keys("Enter")
-        t.wait("paste your OpenRouter key")
+        t.wait(PASTE)
         t.typed("broke-key-123")
         t.keys("Enter")
         sc = t.wait("account has no credit yet.")
@@ -107,14 +110,14 @@ def main():
         # esc: it has a key now, its menu; a new key that works
         t.keys("Escape")
         sc = t.wait("1 · paste a new key")
-        assert "✓ ready · saved in bise" in sc and "remove the key" in sc, sc
+        assert "✓ ready · saved in bise" in sc and w("settings.prov_item_remove") in sc, sc
         # BISE-301: keys and accounts only; the roles are picked on /models
-        assert "use it for" not in sc and "main, agents and small jobs use it. /models changes that." in sc, sc
+        assert "use it for" not in sc and w("settings.prov_role_more", roles="main, agents", last=w("settings.role_who_small")) in sc, sc
         t.keys("1")
-        t.wait("paste your OpenRouter key")
+        t.wait(PASTE)
         t.typed("good-key-123")
         t.keys("Enter")
-        sc = t.wait("OpenRouter is ready. agents use the key from their next message.")
+        sc = t.wait(w("settings.prov_key_ready", provider="OpenRouter"))
         assert "good-key-123" not in sc
         assert "good-key-123" in open(auth).read()
         cfg = open(os.path.join(root, "config.toml")).read()

@@ -22,6 +22,11 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run  # noqa: E402
+from words import w  # noqa: E402
+
+ROLES = w("settings.roles_screen_title")
+WHICH = w("settings.roles_which_provider", role="checker")
+USE = re.escape(w("settings.roles_use", roles="main, agents, small jobs"))
 
 NORMAL = "   @ file   "
 
@@ -63,7 +68,7 @@ def main():
 
         t.typed("/models")
         t.keys("Enter")
-        t.wait("which model does what?")
+        t.wait(ROLES)
         # the roles' states drawn (a key check may land a frame later)
         sc = t.wait_re(r"checker +auto · TypeSafe · jev-1.13")
         assert re.search(r"checker +auto · TypeSafe · jev-1.13", sc), sc
@@ -75,18 +80,18 @@ def main():
         assert "checker: in auto, decides which commands run and which ask you. " in flat and "only used" not in flat, sc
         # 1. which provider?
         t.keys("Enter")
-        t.wait("checker: which provider?")
+        t.wait(WHICH)
         # the providers' key checks drawn (they land a frame or two later)
-        ready = [re.compile(r"TypeSafe +✓ ready$", re.M), re.compile(r"Anthropic +✓ ready · main, agents, small jobs use it")]
+        ready = [re.compile(r"TypeSafe +✓ ready$", re.M), re.compile(r"Anthropic +✓ ready · " + USE)]
         sc = t.wait_any([lambda s: all(r.search(s) for r in ready)])[1]
         cap("02-checker-providers")
-        assert "now: auto · TypeSafe · jev-1.13" in sc, sc
-        assert "the checker sees the command, the script it runs, and your request." in sc, sc
+        assert w("settings.roles_now_rule", rule="auto", dot="·", what="TypeSafe · jev-1.13", extra="") in sc, sc
+        assert w("settings.roles_checker_sees") in sc, sc
         assert re.search(r"› auto +TypeSafe · jev-1.13 · now", sc), sc
         assert re.search(r"TypeSafe +✓ ready$", sc, re.M), sc
         assert re.search(r"OpenRouter +not set up · jev through OpenRouter", sc), sc
         assert re.search(r"^ +── or a chat model checks ──$", sc, re.M), sc
-        assert re.search(r"Anthropic +✓ ready · main, agents, small jobs use it", sc), sc
+        assert re.search(r"Anthropic +✓ ready · " + USE, sc), sc
         assert re.search(r"^ +off · every command asks you$", sc, re.M), sc
         assert len(re.findall(r"^\W*OpenRouter ", sc, re.M)) == 1, sc
         # the separator is stepped over: OpenRouter, then Anthropic
@@ -99,11 +104,11 @@ def main():
         cap("03-checker-on-a-chat-provider")
         # a chat provider: its models, the small one recommended, no effort
         t.keys("Enter")
-        sc = t.wait("checker · Anthropic: which model?")
+        sc = t.wait(w("settings.roles_which_model", role="checker", dot="·", provider="Anthropic"))
         cap("04-checker-chat-models")
         assert re.search(r"› claude-haiku-\S+ +recommended", sc), sc
         t.keys("Escape")
-        t.wait("checker: which provider?")
+        t.wait(WHICH)
         # TypeSafe: Jev at once
         t.keys("Up")
         t.wait("› OpenRouter")
@@ -115,7 +120,7 @@ def main():
         assert 'classify = "typesafe/jev-1.13"' in cfg(), cfg()
         # off: the last row
         t.keys("Enter")
-        sc = t.wait("checker: which provider?")
+        sc = t.wait(WHICH)
         assert re.search(r"› TypeSafe +✓ ready · now$", sc, re.M), sc
         t.keys("Up")
         t.wait("› auto")
@@ -127,11 +132,11 @@ def main():
         cap("07-models-checker-off")
         assert 'classify = "off"' in cfg(), cfg()
         t.keys("Enter")
-        sc = t.wait("now: off · every command asks you")
+        sc = t.wait(w("settings.roles_now_off", dot="·"))
         cap("08-checker-providers-now-off")
         assert "› off · every command asks you · now" in sc and sc.count("· now") == 1, sc
         t.keys("Escape")
-        t.wait("which model does what?")
+        t.wait(ROLES)
         t.keys("Escape")
         t.wait(NORMAL)
     print("ok")

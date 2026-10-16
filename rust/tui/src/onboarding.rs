@@ -1076,11 +1076,9 @@ pub(crate) fn typed(text: &str, start: u64, per: u64, t: u64) -> &str {
 // the welcome timeline (the mockup's): typing, the kiss, the tagline, the hint
 const HI: &str = settings::first_hi;
 const TAGLINE: &str = settings::first_tagline;
-/// `any key ↵`: the key's words, then the arrow
+/// `any key ↵`: the key's words, then the arrow (press_text: the hint whole)
 const PRESS_KEY: &str = settings::first_any_key;
 const PRESS_TAIL: &str = " ↵";
-
-/// The welcome's hint, whole.
 fn press_text() -> String {
     format!("{PRESS_KEY}{PRESS_TAIL}")
 }

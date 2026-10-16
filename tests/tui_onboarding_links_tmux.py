@@ -55,20 +55,20 @@ def at(sc, text):
 
 def to_paste(t, name):
     """From the key step to `paste your <name> key`."""
-    t.wait("how do you want to pay for the models?", 40)
-    t.wait("↑↓ choose   ⏎ go   esc back")
+    t.wait(w("settings.first_pay"), 40)
+    t.wait(w("settings.bar_choose_go"))
     # subscriptions: a plan first, then `an API key` (two rows down)
     t.keys("Down")
     t.wait("› OpenRouter")
     t.keys("Down")
     t.wait("› " + w("settings.api_key"))
     t.keys("Enter")
-    t.wait("which provider?")
+    t.wait(w("settings.first_which_provider"))
     t.press_until("Down", re.compile(r"› \d+ · %s " % re.escape(name)), sel=re.compile(r"› (\d+) · "))
     t.keys("Enter")
     t.wait(w("settings.onb_model_title"))
     t.keys("Enter")
-    return t.wait("paste your %s key" % name)
+    return t.wait(w("settings.first_paste_key", provider=name))
 
 
 def session(E, tag):
@@ -108,7 +108,7 @@ def anthropic():
     env, log, clip = session(E, "a")
     with tui_session(110, 34, env, E=E) as t:
         sc = to_paste(t, "Anthropic")
-        assert "get one: " + url in sc, sc
+        assert w("settings.first_get_one") + url in sc, sc
         # the link is an OSC 8 hyperlink (tmux keeps it)
         assert (";" + url + "\x1b\\") in t.screen(colors=True), "no OSC 8 for the keys page"
         # a plain click on it: the opener gets it, the note says so
@@ -132,7 +132,7 @@ def anthropic():
         # a key the provider refuses: the url under the error opens too
         t.typed("bad-key-123")
         t.keys("Enter")
-        sc = t.wait("copy it again from " + url, 30)
+        sc = t.wait(w("settings.first_copy_again") + url, 30)
         n = len(read(log).split())
         x, y = at(sc, url)
         click(t, x + 3, y)
@@ -148,7 +148,7 @@ def openai():
     env, log, _ = session(E, "o")
     with tui_session(110, 34, env, E=E) as t:
         sc = to_paste(t, "OpenAI")
-        assert "no account yet? " + signup in sc, sc
+        assert w("settings.first_no_account") + signup in sc, sc
         x, y = at(sc, signup)
         click(t, x + 2, y)
         wait_until(lambda: signup in read(log), 10, lambda: "the click opens the signup page: %r" % read(log))

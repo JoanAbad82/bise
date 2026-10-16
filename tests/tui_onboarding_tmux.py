@@ -26,6 +26,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run, wait_until  # noqa: E402
+from words import w  # noqa: E402
+
+THEME_KEYS = w("settings.first_theme_keys", arrows="←→", enter="enter")
 
 NORMAL = "   @ file   "  # the key bar (BISE-98/99; `ctrl+1 inbox` may come before it, BISE-248)
 
@@ -104,7 +107,7 @@ def main():
         # the fake env has MISTRAL_API_KEY: no key step, three dots
         welcome = ["hi, i'm bise :*", "bise /beez/ · french, n.", "1. a quick kiss on the cheek :*",
                    "2. a brisk north wind", "3. a terminal where multi-agent coding is painless",
-                   "ideas in. little kisses out. also pull requests.", "● ○ ○"]
+                   w("settings.first_tagline"), "● ○ ○"]
         # typed one letter at a time: the whole welcome drawn
         sc = t.wait_any([lambda s: all(w in flat(s) for w in welcome)], 10)[1]
         for s in welcome:
@@ -120,12 +123,12 @@ def main():
         # (rushed) and the screen says nothing of it: one more key then
         t.keys("Space")
         try:
-            sc = t.wait("←→ switch · enter keep", 3)
+            sc = t.wait(THEME_KEYS, 3)
         except AssertionError:
             t.keys("Space")
-            sc = t.wait("←→ switch · enter keep")
-        for s in ["so i picked dark.", "you can change it any time with /theme.", "fix the flaky login test",
-                  "on it: auth-fix takes it.", "auth-fix is done.", "○ ● ○"]:
+            sc = t.wait(THEME_KEYS)
+        for s in ["so i picked dark.", w("settings.first_theme_note"), w("settings.first_preview_you"),
+                  w("settings.first_preview_main"), w("settings.first_preview_done"), "○ ● ○"]:
             assert s in flat(sc), sc
         shot("2-theme", sc)
         dark = t.screen(colors=True)
@@ -136,7 +139,7 @@ def main():
         # no folder step)
         t.keys("Enter")
         sc = t.wait("any key ↵")
-        for s in ["how it works", "1  you talk to me: main, your team lead. any time, keep typing",
+        for s in [w("settings.first_how"), "1  you talk to me: main, your team lead. any time, keep typing",
                   "2  i start an agent when a job needs one. they sync on their own",
                   "3  only the real decisions reach you, in your inbox · ctrl+1",
                   "ctrl+o opens everything folded", "○ ○ ●"]:

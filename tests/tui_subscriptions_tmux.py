@@ -39,13 +39,15 @@ from words import w  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NORMAL = "   @ file   "
-PAY = "how do you want to pay for the models?"
+PAY = w("settings.first_pay")
 WAITING = w("common.signing_wait", label="ChatGPT")
 SIGNED = "✓ signed in as you@example.com · ChatGPT Plus"
-CODEX = "use your Plus or Pro plan · you use it in Codex already"
-CLAUDE = "your Claude plan works only in Claude Code (Anthropic's terms). for Claude here, use an API key."
-DENIED = "▲ ChatGPT signed you in but didn't let bise use your plan. try again and allow it, or pick another way."
-UNFINISHED = "▲ the sign-in wasn't finished. try again, or pick another way."
+CODEX = w("settings.first_chatgpt_codex")
+CLAUDE = w("settings.first_claude_plan")
+DENIED = w("settings.signin_denied")
+UNFINISHED = w("settings.signin_unfinished")
+CHOOSE = w("settings.bar_choose_go")
+COPIED = w("settings.bar_copied")
 
 
 def flat(sc):
@@ -142,7 +144,7 @@ def to_pay_step(t):
     t.keys("Enter")
     # the whole step drawn: its key bar is the last row
     t.wait(PAY)
-    return t.wait_all([PAY, "↑↓ choose   ⏎ go   esc back"])
+    return t.wait_all([PAY, CHOOSE])
 
 
 def main():
@@ -163,21 +165,21 @@ def main():
         root, clip, line = setup(E, auth, after=3)
         with tui_session(150, 40, line, E=E) as t:
             to_pay_step(t)
-            sc = wait_has(t, "a plan you already have, or a key. you can add more later in /provider.",
+            sc = wait_has(t, w("settings.first_pay_sub"),
                 "› Continue with ChatGPT      " + CODEX,
                 "  OpenRouter                 sign in, or paste its key",
                 "  an API key                 Anthropic, OpenAI, Google, Mistral…",
                 "  a coding plan key          GLM, Kimi or MiniMax",
-                CLAUDE, "↑↓ choose   ⏎ go   esc back")
+                CLAUDE, CHOOSE)
             shot("1-pay-150", sc)
             t.keys("Enter")
-            sc = wait_has(t, WAITING, "c copy the link   esc cancel", timeout=20)
+            sc = wait_has(t, WAITING, w("settings.bar_copy_link"), timeout=20)
             t.keys("c")
-            sc = t.wait("c copied   esc cancel")
+            sc = t.wait(COPIED)
             shot("2-waiting-150", sc)
             link = open(clip).read()
             assert link.startswith(auth + "/api/accounts/authorize?"), link
-            sc = wait_has(t, "main and your agents use", SIGNED, "now, on your plan.", "⏎ go on")
+            sc = wait_has(t, "main and your agents use", SIGNED, "now, on your plan.", w("settings.bar_go_on"))
             no_secret(sc)
             shot("3-signed-in-150", sc)
             # the sign-in is saved (never a token on screen), main runs on the plan
@@ -187,7 +189,7 @@ def main():
             cfg = open(os.path.join(root, "config.toml")).read()
             assert re.search(r'main = "chatgpt/', cfg), cfg
             t.keys("Enter")
-            t.wait("how it works")
+            t.wait(w("settings.first_how"))
             t.keys("x")
             sc = t.wait(NORMAL, 30)
             no_secret(sc)
@@ -197,7 +199,7 @@ def main():
         root, clip, line = setup(E, auth, after=1)
         with tui_session(80, 30, line, E=E) as t:
             to_pay_step(t)
-            sc = wait_has(t, "Continue with ChatGPT", "use your Plus or Pro plan", "you use it in Codex already", CLAUDE)
+            sc = wait_has(t, w("settings.first_chatgpt"), w("settings.first_chatgpt_sub"), "you use it in Codex already", CLAUDE)
             shot("4-pay-80", sc)
             control(auth, action="deny_next")
             t.keys("Enter")
@@ -210,7 +212,7 @@ def main():
             t.keys("Enter")
             t.wait(WAITING, 20)
             t.keys("c")
-            t.wait("c copied   esc cancel")
+            t.wait(COPIED)
             q = urllib.parse.parse_qs(urllib.parse.urlparse(open(clip).read()).query)
             port = int(urllib.parse.urlparse(q["redirect_uri"][0]).port)
             socket.create_connection(("127.0.0.1", port), timeout=2).close()   # listening

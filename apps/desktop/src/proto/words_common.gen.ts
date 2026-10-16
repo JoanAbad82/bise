@@ -6,4 +6,6 @@
 export const common = {
   /** stop an agent's alarm: /scheduled's key bar (scheduled) and the desktop right bar's alarm detail (panel) */
   stop_watching: "stop watching",
+  /** a sign-in under way in his browser: settings · models and the thread of an agent its expiry stopped (settings, thread) */
+  signing_wait: (a: { label: string | number }): string => "waiting for you to sign in to " + String(a.label) + " in your browser…",
 } as const;

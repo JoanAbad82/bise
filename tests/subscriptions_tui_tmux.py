@@ -137,12 +137,12 @@ def main():
             # 1. the first run: welcome, theme, then how to pay (no key)
             t.wait("any key ↵", 30)
             t.keys("Space")
-            t.wait("←→ switch · enter keep")
+            t.wait(w("settings.first_theme_keys", arrows="←→", enter="enter"))
             t.keys("Enter")
-            sc = t.wait("how do you want to pay for the models?", 30)
-            for s in ("a plan you already have, or a key. you can add more later in /provider.",
-                      "Continue with ChatGPT", "use your Plus or Pro plan", "OpenRouter", w("settings.api_key"),
-                      "a coding plan key", "↑↓ choose   ⏎ go   esc back"):
+            sc = t.wait(w("settings.first_pay"), 30)
+            for s in (w("settings.first_pay_sub"),
+                      w("settings.first_chatgpt"), w("settings.first_chatgpt_sub"), "OpenRouter", w("settings.api_key"),
+                      w("settings.first_coding"), w("settings.bar_choose_go")):
                 assert s in sc, sc
             assert re.search(r"› Continue with ChatGPT", sc), sc
             t.keys("Enter")
@@ -153,7 +153,7 @@ def main():
             link = [l for l in links() if "/api/accounts/authorize?" in l][0]
             assert link.startswith(A) and "client_id=dynamic_agent_client" in link and "agent_name_hint=bise" in link, link
             sc = t.wait("✓ signed in as you@example.com · ChatGPT Plus", 60)
-            sc = t.wait("main and your agents use gpt-6.1-sol now, on your plan.", 60)
+            sc = t.wait(w("settings.first_works_plan", model="gpt-6.1-sol"), 60)
             assert not [l for l in links() if l.startswith("error")], links()
             a = json.load(open(os.path.join(root, "auth.json")))["chatgpt"]
             assert a["type"] == "oauth" and a["client_id"].startswith("oaiapp_") and a["access"], sorted(a)
@@ -183,12 +183,13 @@ def main():
             t.wait("main", 30)
             t.keys("Enter")
             sc = t.wait("ChatGPT", 30)
-            t.press_until("Down", lambda s: "your ChatGPT plan" in s or re.search(r"› *ChatGPT", s),
+            plan = w("settings.roles_your_plan")
+            t.press_until("Down", lambda s: plan in s or re.search(r"› *ChatGPT", s),
                           sel=re.compile(r"› *\S+"), must=False)
-            if "your ChatGPT plan" not in t.screen():
+            if plan not in t.screen():
                 t.keys("Enter")
-            sc = t.wait("your ChatGPT plan", 30)
-            assert re.search(r"gpt-6\.1-sol.*your ChatGPT plan", sc), sc
+            sc = t.wait(plan, 30)
+            assert re.search(r"gpt-6\.1-sol.*" + re.escape(plan), sc), sc
             t.press_until("Escape", NORMAL, tries=3, must=False)
             t.wait(NORMAL)
             # 4. the sign-in expires: the refresh is refused

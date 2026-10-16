@@ -30,7 +30,7 @@
 1791 rust/tui/src/feed.rs
 1204 rust/tui/src/logview.rs
 2995 rust/tui/src/onboarding.rs
-1117 rust/tui/src/onboarding/roles.rs
+1116 rust/tui/src/onboarding/roles.rs
 2166 rust/tui/src/render.rs
 1018 rust/tui/src/run.rs
 1713 rust/tui/src/sb.rs

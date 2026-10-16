@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run  # noqa: E402
+from words import w  # noqa: E402
 
 NORMAL = "   @ file   "
 
@@ -57,27 +58,27 @@ def main():
     with tui_session(120, 34, env, E=E) as t:
         t.wait("any key ↵", 30)
         t.keys("Space")
-        t.wait("←→ switch · enter keep")
+        t.wait(w("settings.first_theme_keys", arrows="←→", enter="enter"))
         t.keys("Enter")
-        t.wait("how do you want to pay for the models?", 40)
-        t.wait("↑↓ choose   ⏎ go   esc back")
+        t.wait(w("settings.first_pay"), 40)
+        t.wait(w("settings.bar_choose_go"))
         # subscriptions: a plan first, then `an API key` (two rows down)
         t.keys("Down")
         t.wait("› OpenRouter")
         t.keys("Down")
         t.wait("› an API key")
         t.keys("Enter")
-        t.wait("which provider?")
+        t.wait(w("settings.first_which_provider"))
         t.press_until("Down", re.compile(r"› \d+ · OpenAI "), sel=re.compile(r"› (\d+) · "))
         t.keys("Enter")
-        t.wait("which model?")
+        t.wait(w("settings.first_which_model"))
         t.keys("Enter")
-        t.wait("paste your OpenAI key")
+        t.wait(w("settings.first_paste_key", provider="OpenAI"))
         # a new account: the key works, no credit yet
         t.typed("sk-broke-0123456789abcdef")
         t.keys("Enter")
         sc = t.wait("has no credit yet", 30)
-        assert "i saved the key. add credit, then enter checks again." in flat(sc), sc
+        assert w("settings.first_saved_add_credit") in flat(sc), sc
         # the user adds credit, enter checks again
         with open(credit, "w"):
             pass
