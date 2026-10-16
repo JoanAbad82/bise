@@ -3,7 +3,7 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
 import type { Part } from './parts';
-import type { Agent, Artifact, Card, ScheduledTask } from './rows';
+import type { Agent, Artifact, Card, Growth, ScheduledTask } from './rows';
 
 /**
  * Selected lines of a thread quoted in a message (❝).
@@ -48,4 +48,9 @@ artifacts?: Array<Artifact>, artifacts_total?: number,
  * ⌘K's index: its live scheduled tasks, as the typed `scheduled`
  * event gives them (the same builder, proto_view::scheduled)
  */
-scheduled?: Array<ScheduledTask>, };
+scheduled?: Array<ScheduledTask>, 
+/**
+ * les bims: how much it has done, the typed `growth` event's value
+ * (the same cached computation); none: a view written before it
+ */
+growth?: Growth | null, };

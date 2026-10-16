@@ -360,6 +360,10 @@ pub struct IndexRow {
     /// none: a `next_ms` in the past is not coming)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scheduled: Vec<ScheduledTask>,
+    /// les bims: how much it has done, as its `view.json` says (none: no
+    /// view, or one written before growth)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub growth: Option<crate::rows::Growth>,
 }
 
 /// An agent's row in the capsule's `state` (main aside): `status` the

@@ -88,6 +88,10 @@ pub struct ProjectView {
     /// event gives them (the same builder, proto_view::scheduled)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scheduled: Vec<ScheduledTask>,
+    /// les bims: how much it has done, the typed `growth` event's value
+    /// (the same cached computation); none: a view written before it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub growth: Option<crate::rows::Growth>,
 }
 
 /// How many artifacts a `view.json` keeps (it is rewritten on every

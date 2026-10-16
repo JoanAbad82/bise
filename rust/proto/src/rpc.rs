@@ -203,6 +203,8 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("hub/flow", "flow", Scope::Hub),
     n("hub/paused", "paused", Scope::Hub),
     n("hub/switch", "switch", Scope::Hub),
+    // les bims: how much the project has done (rows::growth)
+    n("hub/growth", "growth", Scope::Hub),
     n("job/end", "job_end", Scope::Hub),
     n("job/followedEnd", "followed_end", Scope::Hub),
     // les bims: a message sent, a report made (no body, no text)

@@ -283,7 +283,7 @@ fn inbox_cards(cards: Vec<Card>, others: Vec<Card>) -> Vec<Card> {
 
 /// A held hub's own rows as a view (the sidebar's counts).
 fn live_view(project: &str, agents: &[Agent], cards: &[Card]) -> ProjectView {
-    ProjectView { v: 1, project: project.into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: agents.to_vec(), cards: cards.to_vec(), artifacts: vec![], artifacts_total: 0, scheduled: vec![] }
+    ProjectView { v: 1, project: project.into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: agents.to_vec(), cards: cards.to_vec(), artifacts: vec![], artifacts_total: 0, scheduled: vec![], growth: None }
 }
 
 impl Core {

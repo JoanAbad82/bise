@@ -2,7 +2,7 @@
 // BISE_PROTO_BLESS=1 cargo test -p bise-proto --features ts --test ts
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
-import type { Agent, ArtLink, Artifact, Card, CardBatch, CardPage, Opt, ReportKind, ScheduledTask } from './rows';
+import type { Agent, ArtLink, Artifact, Card, CardBatch, CardPage, Growth, Opt, ReportKind, ScheduledTask } from './rows';
 
 /**
  * One project in the window's sidebar.
@@ -291,7 +291,12 @@ export type IndexRow = { project: string, up: boolean, written_ms?: number | nul
  * its live scheduled tasks as of `written_ms` (a stopped hub runs
  * none: a `next_ms` in the past is not coming)
  */
-scheduled?: Array<ScheduledTask>, };
+scheduled?: Array<ScheduledTask>, 
+/**
+ * les bims: how much it has done, as its `view.json` says (none: no
+ * view, or one written before growth)
+ */
+growth?: Growth | null, };
 
 /**
  * An agent's row in the capsule's `state` (main aside): `status` the

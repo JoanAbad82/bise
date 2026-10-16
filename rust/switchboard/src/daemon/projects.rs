@@ -72,14 +72,16 @@ impl Shell {
     fn view_write(&mut self, snap: &Value, stopped_ms: Option<u64>) {
         let now = now_ms();
         let project = crate::paths::workspace_id(&self.opts.paths.workspace);
+        // ⌘K's index: the same rows as the typed artifacts event
+        let arts = self.artifact_rows(&self.artifacts_ev());
+        // les bims: the same cached growth as the typed event
+        let growth = self.growth_of(Some(snap), Some(arts.len() as u32));
         self.setup();
         let cat = self.setup.as_ref().map(|(_, s)| &s.catalog);
         let vision = |m: &str| cat.and_then(|c| c.vision(m));
-        // ⌘K's index: the same rows as the typed artifacts event
-        let arts = self.artifact_rows(&self.artifacts_ev());
         // and the same rows as the typed scheduled event
         let sched = crate::proto_view::scheduled(self.hub.timers());
-        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since, &vision, arts, sched);
+        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since, &vision, arts, sched, growth);
         let paths = self.opts.paths.clone();
         let (tmp, file) = (paths.state.join("view.json.tmp"), paths.state.join(view::FILE));
         if write_logged(&paths, &tmp, &view::render(&v)) {

@@ -190,6 +190,8 @@ impl Shell {
                 if new.0 {
                     self.proto_note(&ids, &agents);
                 }
+                // les bims: the project's growth, when it changed
+                self.growth_changed(&ids, Some(v), None);
                 if new.1 {
                     self.proto_note(&ids, &cards);
                 }
@@ -296,6 +298,9 @@ impl Shell {
             Some("artifacts") => {
                 let arts = self.proto_artifacts(v);
                 self.proto_note(&ids, &arts);
+                if let HubEv::Artifacts { items, .. } = &arts {
+                    self.growth_changed(&ids, None, Some(items.len() as u32));
+                }
             }
             // the answer as it streams in: to the connections subscribed
             Some("partial") => {

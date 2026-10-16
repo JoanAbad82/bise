@@ -1100,3 +1100,21 @@ export type DoingKind = "think" | "tool" | "edit" | "search" | "computer" | "ima
  * What an agent is doing now and since when (ms).
  */
 export type Doing = { kind: DoingKind, since_ms: number, };
+
+/**
+ * The project's counters. `since_ms`: its first agent's `created_ms`
+ * (none: no row says when it was made).
+ */
+export type Growth = { 
+/**
+ * tasks whose last report is a done, live or archived
+ */
+jobs_done: number, 
+/**
+ * distinct local days on which an agent was created
+ */
+days_used: number, 
+/**
+ * every artifact made, archived ones included
+ */
+artifacts_made: number, since_ms?: number | null, };

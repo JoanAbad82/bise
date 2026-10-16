@@ -107,6 +107,10 @@ export function applyTyped(s: Store, ev: Ev): void {
       // where the hub's version switch is (/reload, /restart): at hello and when it moved; none = no switch yet
       s.put(`switch:${ev.project}`, ev.switch ?? null);
       return;
+    case "growth":
+      // les bims: how much the project has done (the office's stages read it), at hello and on change
+      s.put(`growth:${ev.project}`, ev.growth);
+      return;
     case "inbox_history": {
       // a page: the first one (no older held) replaces, an older one (its items older than the
       // held ones) goes after them; one record per card, newest first

@@ -91,6 +91,7 @@ export const TAGS = {
   // the hub's version switch (/reload, /restart; architect m_20576): one status line under the
   // title bar, words from Rust's switch_line (amb-home draws it)
   switch: true,
+  growth: true,
   // the core can't start any hub (its runtime is missing): Rust's words, drawn by CoreLine
   broken: true,
   // the core's capsule and agents-panel lines, typed in CoreEv (docs/issues/24): known, not

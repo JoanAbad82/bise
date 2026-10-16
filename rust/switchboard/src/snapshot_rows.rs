@@ -193,6 +193,10 @@ pub fn build(i: &RowIn) -> Value {
         "dir": a.dir,
         "aliases": a.aliases,
         "note": a.declared.as_ref().map(|(_, n)| n.clone()).unwrap_or_default(),
+        // the status it declared (done, blocked, working; null: none):
+        // les bims' growth counts the done ones, archived too (the
+        // archive keeps it; an auto turn report replaces report_kind)
+        "declared": a.declared.as_ref().map(|(d, _)| *d),
         "report": a.last_report.as_ref().map(|r| clip(&one_line(&r.summary), 200)),
         // when it last reported (an archived task: about when it stopped)
         "report_ms": a.last_report.as_ref().map(|r| r.at_ms),
