@@ -4,9 +4,11 @@ The user's rule: his message and his card answer always wake the agent at
 once, whatever it waits on (its watches and timers stay live and fire
 later); a watch or a timer that fires while the agent is mid-turn reaches
 it in that turn, steered, like `sb send`'s default --mode steer; a page
-question answered on its page reaches the page's agent (the pick) and
-the card's asker, main, in one message (main's card #513: he answered on
-the page, main never heard it).
+question answered on its page reaches the page's agent (the pick). Its
+card is the page's agent's own (1de5fc75f, notif-artifact: reach.bend
+page_asker), so no other agent hears it: the asker is told only when it
+is not the agent the pick went to (law page_answer_tells_asker; main's
+card #513 was main's card on t1's page, before 1de5fc75f).
 
 A real hub (bise sbd, scripted model), a throwaway home:
 1. t1 has a live file watch and a 10 min timer and asked main a question
@@ -16,8 +18,8 @@ A real hub (bise sbd, scripted model), a throwaway home:
 2. a watch that fires while t1 is mid-turn (a `sleep 8`): its wake is in
    that turn (steered, before its turn_done), not after it;
 3. a timer due while t1 is mid-turn: its fire is in that turn too;
-4. t1's page asks a question (the hub opens the card as main): his
-   answer goes to t1 as the pick, and main gets ONE message with it.
+4. t1's page asks a question (the card is t1's): his answer goes to t1
+   as the pick, once, and main gets no message about it.
 
 Run: python3 -u tests/wake_deliver_e2e.py
 """
@@ -135,24 +137,28 @@ def main():
         c.wait_idle("t1")
         in_turn(c, "t1", "TICK-MID", "sleep 9")
 
-        # 4. a page question answered: the pick to t1, one message to main
+        # 4. a page question answered: the pick to t1, its card's asker, and
+        # no word to main (the asker is told only when it is another agent)
         page = os.path.join(E.tmp, "page.html")
         open(page, "w").write(PAGE)
         c.say("[[bash: sb page publish %s --id t1-plan --title \"t1 plan\"]]" % page, focus="t1")
         c.wait(lambda: any((x.get("page") or {}).get("block") == "q1" for x in c.cards()), 60, "the page's question card")
         q1 = next(x for x in c.cards() if (x.get("page") or {}).get("block") == "q1")
-        check(q1["agent"] == "main", "the hub asks as main: %r" % q1)
+        check(q1["agent"] == "t1", "the page's agent asks: %r" % q1)
         c.wait_idle("t1", "main")
         nm = len(c.lines("main"))
         nt = len(c.lines("t1"))
         c.say("/answer %d 1" % q1["id"])
         c.wait(lambda: not any(x["id"] == q1["id"] for x in c.cards()), 30, "the card closed")
         c.wait(lambda: any("ship today" in l for l in c.lines("t1")[nt:]), AT_ONCE * 2, "t1 gets the pick")
-        told = "the user answered notification #%d on the page t1-plan" % q1["id"]
-        c.wait(lambda: any(l.startswith("sb msg-in") and told in l for l in c.lines("main")[nm:]), AT_ONCE * 2, "main told")
         c.wait_idle("t1", "main")
+        # the pick comes as his page note (`sb you`), like any page note
+        picks = [l for l in c.lines("t1")[nt:] if l.startswith("sb you ::") and "on q1: pick: ship today" in l]
+        check(len(picks) == 1, "t1 gets the pick once: %r" % picks)
+        told = "notification #%d" % q1["id"]
+        check(not any(told in l for l in c.lines("main")[nm:]), "main is not told: %r" % c.lines("main")[nm:])
         ms = [m for m in journal(E, "message_sent") if told in m["msg"]["text"]]
-        check(len(ms) == 1 and ms[0]["msg"]["to"] == "main" and "ship today" in ms[0]["msg"]["text"], "one message to main: %r" % ms)
+        check(not ms, "no message from bise about the answer: %r" % ms)
     except AssertionError as e:
         print("FAIL", e)
         if c:
