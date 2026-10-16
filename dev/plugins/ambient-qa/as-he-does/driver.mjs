@@ -1204,7 +1204,9 @@ if (mode === 'quick') {
   await closeArtifact();
   if (ONLY.length) {
     // the chosen rows alone; rows37's before rowsE812's seed (its spawns' task_status would ride on
-    // main's next request, the quote's included)
+    // main's next request, the quote's included); the bims office first: it seeds nothing, and the
+    // seeds below can take the 600 s watchdog before a late row (desk-cut-8's cand-d3d8b)
+    await rowsD3D8(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
     await rowsE812(harness, say);
@@ -1219,6 +1221,7 @@ if (mode === 'quick') {
     await rows233B(harness, say);
     await rowsC2BA(harness, say);
     await rowsDC47(harness, say);
+    await rowsD3D8(harness, say);
     await quickRows(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
@@ -3857,6 +3860,55 @@ async function rowsC2BA(harness, say) {
     await answerWith(F1, 1);
     for (let i = 1; i <= 4; i += 1) await answerWith(`${S}${String(i)}`, 1);
   });
+}
+
+// d3d8f234a's cut (desk-cut-8, main m_28186): les bims' office grows with the project (710f5c965 +
+// d3d8f234a). With bims on in harness' AGENTS, the ground corner's tip says 'level N · X jobs done',
+// N is at least growth.ts' stage for X (the client keeps a high-water mark, never less), the office
+// draws (no 'lost'), and a busy project stands past stage 0. 320 and wide shots to look at; the
+// view and the width are put back as they were.
+async function rowsD3D8(harness, say) {
+  // growth.ts' STAGE_AT, here (not a module const: the quick block runs this row before the line
+  // below it is reached, cand-d3d8d's TDZ)
+  const STAGE_AT_D3D8 = [0, 1, 3, 6, 10, 15, 25, 40, 60, 100, 150, 250, 400, 600, 1000];
+  const name = 'bims office grows';
+  if (!wanted(name)) return;
+  try {
+    await harness();
+    const view = page.locator('[data-testid="app.right.agents.view.bims"]').first();
+    const was = await view.getAttribute('aria-pressed', { timeout: 5000 }).catch(() => null);
+    if (was !== 'true' && !(await click('bims on', view))) return;
+    const tipNow = () => page.locator('[data-testid="app.right.bims.level"]').first().getAttribute('data-tip', { timeout: 1000 }).catch(() => null);
+    const jobsOf = (t) => Number(/ (\d+) jobs? done/.exec(t ?? '')?.[1] ?? 0);
+    // the office draws only over AGENTS rows: a fresh world's harness (its first row in a rows-only
+    // pass, cand-d3d8c) has none, so three done agents first (their briefs end in 'sb report done')
+    let seeded = false;
+    if (jobsOf(await until(tipNow, 5000, 500)) === 0) {
+      const seed = ['zqgrow1', 'zqgrow2', 'zqgrow3'].map((a) => `sb spawn ${a} --objective 'zq grow {{bash: sb report done ${a}-done}}'`);
+      seeded = await say(`[[bash: ${seed.join(' && ')}]] seeded d3d8`);
+      await until(async () => jobsOf(await tipNow()) >= 3, 120000, 1000);
+    }
+    const drawn = await page.locator('[data-testid="app.right.bims.canvas"]').first().waitFor({ timeout: 15000 }).then(() => true, () => false);
+    await page.waitForTimeout(4000);
+    const lost = await page.locator('[data-testid="app.right.bims.lost"]').count();
+    const tip = await tipNow();
+    const box = await page.locator('[data-testid="app.right.bims.canvas"]').first().boundingBox().catch(() => null);
+    await shot('d3d8-bims-320');
+    const wide = page.locator('[data-testid="app.right.agents.width.wide"]').first();
+    const wasWide = await wide.getAttribute('aria-pressed', { timeout: 3000 }).catch(() => null);
+    if (wasWide !== 'true') await click('bims wide', wide);
+    await page.waitForTimeout(3000);
+    await shot('d3d8-bims-wide');
+    if (wasWide !== 'true') await click('bims back to 320', page.locator('[data-testid="app.right.agents.width.narrow"]').first());
+    if (was !== 'true') await click('bims off', view);
+    const m = /^level (\d+) · (\d+) jobs? done/.exec(tip ?? '');
+    const level = m ? Number(m[1]) : null;
+    const jobs = m ? Number(m[2]) : null;
+    const stage = jobs === null ? null : STAGE_AT_D3D8.filter((a) => jobs >= a).length - 1;
+    step(`${name}: harness' office draws, its corner tip says the level and the jobs done, the level is at least the stage for those jobs and past 0`,
+      drawn && lost === 0 && level !== null && stage !== null && level >= stage && level > 0,
+      { seeded, drawn, lost, tip, level, jobs, stage, w: Math.round(box?.width ?? 0), h: Math.round(box?.height ?? 0) });
+  } catch (e) { step(name, false, String(e).slice(0, 300)); }
 }
 
 // dc4770c14's cut (desk-cut-4 m_26522): one row per new item since 3ce74eb9a. Nothing here reaches
