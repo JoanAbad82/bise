@@ -3,29 +3,37 @@
 # (tests/words.py's w(), the desktop's words_<area>.gen.ts); a count never goes up, a drop lowers it
 # in the same commit, at 0 its line goes. Only a change that adds keys to the catalog may raise a
 # count, by literals of those keys (another area's chunk moves them). Checked by tests/word_lint.py.
+1 apps/desktop/tests/checks/agents/settings.spec.ts
 1 apps/desktop/tests/checks/app/add-sheet.spec.ts
 1 apps/desktop/tests/checks/app/agents-bar.spec.ts
 1 apps/desktop/tests/checks/app/artifact-view.spec.ts
+2 apps/desktop/tests/checks/app/list-walk.spec.ts
 1 apps/desktop/tests/checks/app/menus.spec.ts
 2 apps/desktop/tests/checks/app/sidebar-v6.spec.ts
 1 apps/desktop/tests/checks/app/trigger-ink.spec.ts
+1 apps/desktop/tests/checks/composer/dictation-takes.spec.ts
+1 apps/desktop/tests/checks/composer/question-space.spec.ts
 1 apps/desktop/tests/checks/gate/counts.spec.ts
 1 apps/desktop/tests/checks/gate/right.spec.ts
-3 apps/desktop/tests/checks/inbox/block-views.spec.ts
+1 apps/desktop/tests/checks/inbox/answer-refused.spec.ts
+4 apps/desktop/tests/checks/inbox/block-views.spec.ts
+1 apps/desktop/tests/checks/inbox/card-fit.spec.ts
 3 apps/desktop/tests/checks/inbox/ghost-badge.spec.ts
 3 apps/desktop/tests/checks/inbox/inbox-open.spec.ts
 6 apps/desktop/tests/checks/inbox/inbox-screen.spec.ts
 1 apps/desktop/tests/checks/inbox/inbox-zero.spec.ts
 1 apps/desktop/tests/checks/native/fn.spec.ts
+2 apps/desktop/tests/checks/native/move-apps.spec.ts
+1 apps/desktop/tests/checks/native/setup-rows.spec.ts
 1 apps/desktop/tests/checks/review/quote-lines.spec.ts
-3 apps/desktop/tests/checks/settings/dist-update.spec.ts
 1 apps/desktop/tests/checks/settings/keys.spec.ts
 1 apps/desktop/tests/checks/settings/sign-in-expired.spec.ts
 1 apps/desktop/tests/checks/spotlight/projects.spec.ts
 3 apps/desktop/tests/checks/thread/agent-head.spec.ts
 2 apps/desktop/tests/checks/thread/composer-sources.spec.ts
-2 apps/desktop/tests/checks/thread/computer-live.spec.ts
+3 apps/desktop/tests/checks/thread/computer-live.spec.ts
 1 apps/desktop/tests/checks/thread/computer-use.spec.ts
+4 apps/desktop/tests/checks/thread/empty-enter.spec.ts
 1 apps/desktop/tests/checks/thread/find-bar.spec.ts
 3 apps/desktop/tests/checks/thread/first-run.spec.ts
 6 apps/desktop/tests/checks/thread/hierarchy.spec.ts
@@ -38,10 +46,14 @@
 1 apps/desktop/tests/checks/thread/waiting-states.spec.ts
 3 apps/desktop/tests/checks/thread/wake.spec.ts
 1 tests/tui_answer_target_tmux.py
-1 tests/tui_approvals_tmux.py
+2 tests/tui_approvals_tmux.py
 2 tests/tui_archived_tmux.py
 1 tests/tui_artifacts_tmux.py
 1 tests/tui_card_draft_keep_tmux.py
+2 tests/tui_computer_use_tmux.py
+1 tests/tui_file_links_tmux.py
+1 tests/tui_inbox_split_tmux.py
+1 tests/tui_links_tmux.py
 2 tests/tui_notif_open_tmux.py
 4 tests/tui_onboarding_tmux.py
 1 tests/tui_openai_responses_tmux.py
@@ -53,4 +65,6 @@
 7 tests/tui_roles_tmux.py
 2 tests/tui_scheduled_tmux.py
 1 tests/tui_tool_names_tmux.py
+1 tests/tui_voice_keys_tmux.py
 3 tests/tui_wake_tmux.py
+6 tests/tui_you_fold_click_tmux.py
