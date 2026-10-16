@@ -123,8 +123,9 @@ export function newTimeline(): Timeline {
       for (const [name, b] of bims) if (b.leaving && b.outAt < t) bims.delete(name);
 
       for (const e of events) {
-        if (e.kind !== 'his') continue;
-        const b = bims.get(e.to);
+        // his message (from { who: 'you' }) is a paper plane to its agent; agents' messages and reports: not drawn yet
+        if (e.kind !== 'message' || e.from.who !== 'you' || e.to.who !== 'agent') continue;
+        const b = bims.get(e.to.name);
         if (!b || b.planes.includes(e.t)) continue;
         b.planes.push(e.t);
         b.planes.sort((x, y) => x - y);

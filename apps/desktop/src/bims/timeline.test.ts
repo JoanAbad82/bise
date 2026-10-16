@@ -165,7 +165,7 @@ describe('timeline', () => {
   it('flies his paper plane to the agent he writes to', () => {
     const o = office();
     const tl = newTimeline();
-    const ev: BimEvent = { kind: 'his', to: 'a1', t: 4 };
+    const ev: BimEvent = { kind: 'message', from: { who: 'you' }, to: { who: 'agent', name: 'a1' }, mode: 'queued', expectsReply: false, t: 4 };
     tl.update(acts({ main: MAIN, a1: { k: 'sleep', at: 'desk' } }), o, 0, []);
     tl.update(acts({ main: MAIN, a1: { k: 'sleep', at: 'desk' } }), o, 4, [ev]);
     tl.update(acts({ main: MAIN, a1: { k: 'sleep', at: 'desk' } }), o, 4.5, [ev]);

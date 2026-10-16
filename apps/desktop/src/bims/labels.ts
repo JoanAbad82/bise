@@ -15,7 +15,8 @@ export const EVENT_S = 3;
 export const EVENT_SLOTS = 3;
 
 /** office life: never an event (rule 1: it's no news) */
-const DECOR: ReadonlySet<ActivityKind> = new Set(['nap', 'snack']);
+// office life, and the hub's message/report events: their shape is the event (spec §1 rule 4), no label
+const DECOR: ReadonlySet<ActivityKind> = new Set(['nap', 'snack', 'coffee', 'visit', 'report']);
 /** main's plain turns: no label at rest, so no event either */
 const MAIN_PLAIN: ReadonlySet<ActivityKind> = new Set(['main', 'mainidle']);
 
@@ -59,6 +60,9 @@ export function eventWords(act: Activity, from: ActivityKind | null): string {
       return bims.idle;
     case 'nap':
     case 'snack':
+    case 'coffee':
+    case 'visit':
+    case 'report':
       return '';
   }
 }
@@ -97,6 +101,11 @@ export function stateWords(act: Activity, watch = ''): string {
       return bims.state_stopped;
     case 'starting':
       return bims.state_starting;
+    // a message or a report in flight: the sender is in its turn, the receiver of a message wakes to it
+    case 'coffee':
+    case 'visit':
+    case 'report':
+      return bims.working;
   }
 }
 
