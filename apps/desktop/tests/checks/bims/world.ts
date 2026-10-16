@@ -69,8 +69,16 @@ export async function open(snapshot: Snapshot, o: { theme?: 'light' | 'dark'; re
   const core = new FakeCore(world(snapshot, o.theme ?? 'light') as never);
   const s = await launchDesktop({ core, route: `project/${P}`, size: `${String(o.width ?? 1400)}x900` });
   if (o.reduced === true) await s.page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(s.page.getByTestId('app.right.agents.view.list')).toBeVisible({ timeout: 20_000 });
+  await expect(s.page.getByTestId('app.right.agents.view.bims')).toBeVisible({ timeout: 20_000 });
   return { s, core };
+}
+
+/**
+ * A trackpad's wheel at a page point, as Chromium gets it: a pinch is a wheel with ctrl (modifiers 2),
+ * two fingers a plain one. Through CDP so it is the browser's own event, not a synthetic one.
+ */
+export async function trackpad(cdp: CDPSession, x: number, y: number, o: { dx?: number; dy?: number; pinch?: boolean }): Promise<void> {
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: o.dx ?? 0, deltaY: o.dy ?? 0, modifiers: o.pinch === true ? 2 : 0 });
 }
 
 /** The office on, its renderer loaded and drawing. */

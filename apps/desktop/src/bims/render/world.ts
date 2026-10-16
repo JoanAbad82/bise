@@ -81,13 +81,15 @@ function laptop(k: Kit, parent: Object3D, x: number, z: number): MeshLambertMate
   return screen;
 }
 
+// a small light lamp, in the wall's cream (bims m_27836: black ones read as ink glyphs at 640),
+// its bulb lit at night only (lightDesk)
 function deskLamp(k: Kit, parent: Object3D, x: number, z: number): MeshLambertMaterial {
   const { style, pal } = k;
-  k.add(style.box(0.16, 0.03, 0.16), k.mat(pal.ink), parent, x, 0.565, z);
-  k.add(style.box(0.03, 0.3, 0.03), k.mat(pal.ink), parent, x, 0.72, z);
-  k.add(style.box(0.16, 0.07, 0.12), k.mat(WORLD.dark), parent, x - 0.05, 0.88, z);
-  const bulb = style.material(pal.lampOn, { emissive: pal.lampOn, ei: LAMP_ON_EI(pal) }) as MeshLambertMaterial;
-  k.add(style.box(0.1, 0.025, 0.07), bulb, parent, x - 0.05, 0.84, z);
+  k.add(style.box(0.11, 0.025, 0.11), k.mat(pal.wallTop), parent, x, 0.56, z);
+  k.add(style.box(0.025, 0.2, 0.025), k.mat(pal.wallTop), parent, x, 0.67, z);
+  k.add(style.box(0.12, 0.06, 0.1), k.mat(pal.wall), parent, x - 0.03, 0.79, z);
+  const bulb = style.material(pal.wall, { emissive: pal.lampOn, ei: 0 }) as MeshLambertMaterial;
+  k.add(style.box(0.08, 0.02, 0.06), bulb, parent, x - 0.03, 0.755, z);
   return bulb;
 }
 
@@ -122,8 +124,9 @@ function desk(k: Kit, parent: Object3D, b: Box, d: Spot, name: string): DeskHand
   const g = new Group();
   g.position.set(cx, 0, cz);
   parent.add(g);
-  k.add(style.box(w - 0.1, 0.5, dd - 0.08), k.mat(pal.desk), g, 0, 0.25, 0);
-  k.add(style.box(w, 0.06, dd), k.mat(pal.deskTop), g, 0, 0.52, 0);
+  // clay: rounder desks than the default bevel, so the look reads at 640 (bims m_27836)
+  k.add(style.box(w - 0.1, 0.5, dd - 0.08, 0.12), k.mat(pal.desk), g, 0, 0.25, 0);
+  k.add(style.box(w, 0.06, dd, 0.03), k.mat(pal.deskTop), g, 0, 0.52, 0);
   // a small plate without text, in the colour of its bim's hoodie (spec §2)
   k.add(style.box(0.22, 0.08, 0.02), k.mat(HOODIE[h % HOODIE.length] ?? pal.desk), g, -w / 3, 0.4, dd / 2 - 0.03);
   const screen = laptop(k, g, d.x - cx, -0.03);
@@ -353,7 +356,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
   const iz = (isl.z0 + isl.z1) / 2;
   const il = isl.z1 - isl.z0;
   const top = boxes.find((b) => !b.of && b.x0 < 0 && b.x1 > 0 && b.z0 < iz && b.z1 > iz) ?? { x0: -isl.w / 2, x1: isl.w / 2, z0: isl.z0, z1: isl.z1 };
-  k.add(style.box(top.x1 - top.x0 - 0.2, 0.62, top.z1 - top.z0 - 0.15), k.mat(pal.island), root, 0, 0.31, iz);
+  k.add(style.box(top.x1 - top.x0 - 0.2, 0.62, top.z1 - top.z0 - 0.15, 0.2), k.mat(pal.island), root, 0, 0.31, iz);
   onFloor(k, root, top, 0.07, 0.66, pal.islandTop);
   k.add(style.box(0.5, 0.5, 0.42), k.mat(WORLD.coffee), root, 0, 0.95, isl.z0 + 0.35);
   k.add(style.box(0.18, 0.06, 0.04), style.material(WORLD.coffeeLed, { emissive: WORLD.coffeeLed, ei: 0.5 }), root, 0, 1.07, isl.z0 + 0.57);
@@ -409,6 +412,8 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
 export function lightDesk(h: DeskHandles, pal: Palette, screen: number, lamp: boolean): void {
   h.screen.emissiveIntensity = screen;
   h.screen.color.set(screen > 0.05 ? pal.screenOn : pal.screenOff);
-  h.lamp.emissiveIntensity = lamp ? LAMP_ON_EI(pal) : 0;
-  h.lamp.color.set(lamp ? pal.lampOn : WORLD.dark);
+  // a desk lamp lights at night only (bims m_27836); by day it is a cream shade
+  const lit = lamp && pal.pendants;
+  h.lamp.emissiveIntensity = lit ? LAMP_ON_EI(pal) : 0;
+  h.lamp.color.set(lit ? pal.lampOn : pal.wall);
 }

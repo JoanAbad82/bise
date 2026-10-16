@@ -4,7 +4,7 @@ import type { Label } from './model';
 import { away, nextAfter } from './loop';
 
 const none = new Map<string, Label>();
-const label = (mode: Label['mode'], pill: Label['pill'] = null): ReadonlyMap<string, Label> => new Map([['perf', { name: 'perf', mode, words: '', pill }]]);
+const label = (mode: Label['mode'], pill: Label['pill'] = null): ReadonlyMap<string, Label> => new Map([['perf', { name: 'perf', mode, words: '', title: '', pill }]]);
 const still = { motion: 'still', moving: false, labels: none, away: false, lost: false } as const;
 
 describe('the window away', () => {

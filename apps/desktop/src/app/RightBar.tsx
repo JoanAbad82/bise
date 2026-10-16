@@ -137,8 +137,8 @@ function Section({
   onAll: () => void;
   /** a control in the head before 'all ›' (ARTIFACTS' '+ add') */
   act?: ReactNode;
-  /** AGENTS with bims on: the office in place of the rows, the rows its fallback (while it loads, WebGL lost) */
-  office?: ((list: ReactNode) => ReactNode) | undefined;
+  /** AGENTS with bims on: the office, above the rows */
+  office?: ReactNode;
   children: (r: BarRow) => ReactNode;
 }) {
   const [folded, toggle] = useFolded(id, id === 'archived');
@@ -185,7 +185,8 @@ function Section({
           </div>
         </div>
       )}
-      {!shut && rows.length > 0 && (office ?? ((list: ReactNode) => list))(
+      {!shut && rows.length > 0 && office}
+      {!shut && rows.length > 0 && (
         <div className="app-rb-rows">
           {shown.map(children)}
           {/* 'show 50 more · N left' opens the next 50, not all (his m_26894, designer m_27020); past the
@@ -219,7 +220,7 @@ function Section({
               )}
             </div>
           )}
-        </div>,
+        </div>
       )}
     </section>
   );
@@ -472,7 +473,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
     router.go({ screen: 'thread', project: p, agent });
   };
   const here = (p: string, agent: string) => route.screen === 'thread' && route.project === p && route.agent === agent;
-  // the AGENTS section as the office (les bims): a project's bar only, bise's thread keeps the list in v1
+  // the office above the AGENTS rows (les bims): a project's bar only, bise's thread keeps the list in v1
   const bims = useBimsView();
   const office = !all && bims.view === 'bims';
   const officeAgents = useMemo(() => agents.filter((x) => !x.a.archived).map((x) => x.a), [agents]);
@@ -505,21 +506,18 @@ export function RightBar({ project, name, over, column }: { project: string; nam
           }}
           act={all ? undefined : <BimsSwitch view={bims} />}
           office={
-            office
-              ? (list) => (
-                  <Office
-                    project={project}
-                    agents={officeAgents}
-                    cards={cards}
-                    places={places}
-                    parts={bimsParts}
-                    onOpen={(agent) => {
-                      openAgent(project, agent);
-                    }}
-                    fallback={list}
-                  />
-                )
-              : undefined
+            office ? (
+              <Office
+                project={project}
+                agents={officeAgents}
+                cards={cards}
+                places={places}
+                parts={bimsParts}
+                onOpen={(agent) => {
+                  openAgent(project, agent);
+                }}
+              />
+            ) : undefined
           }
         >
           {(r) =>

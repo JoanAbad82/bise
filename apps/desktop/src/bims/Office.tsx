@@ -1,13 +1,16 @@
 // The office in the right bar's AGENTS section (page bims-office v7; spec les-bims-sc-narios-du-bureau
-// §1-§2): the canvas at the section's top at the office's natural height (the renderer fits it to
-// the width), a DOM overlay for the labels and the '?' / '✗' pills over the bims' heads, and the
-// loop. The renderer (three.js) comes with import('./render') only once the office shows: the list
+// §1-§2): the canvas above the section's rows at the office's natural height (the renderer fits it
+// to the width), a DOM overlay for the labels, the hover card and the '?' / '✗' pills over the
+// bims' heads, and the loop. His camera (zoom.ts): a pinch (a ctrl wheel in Chromium) zooms around
+// the pointer, two fingers or a drag move the view while zoomed, '⤢ fit', esc or a double-click on
+// the floor go back to the whole office; each move draws one frame. The renderer (three.js) comes with import('./render') only once the office shows: the list
 // never asks for it. The loop draws on demand (loop.ts): a kick (new rows, his message, a hover,
 // ctrl held, a size or theme change) draws one frame, the next comes only while something moves;
-// none while the window is away. A lost WebGL context (or a renderer that fails to load) shows the
-// list with one line, never a blank section. Hover: the bim under the pointer (renderer.pick) shows
-// its line after the tip's 400 ms; a click opens it as its row's click does. Owner: bims-wire.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+// none while the window is away. A lost WebGL context (or a renderer that fails to load) shows one
+// line over the rows, never a blank section. Hover: the bim under the pointer (renderer.pick) shows
+// its card after the tip's 400 ms (at once for 1 s after one closed, the ds tips' warmth); a click
+// opens it as its row's click does. Owner: bims-wire.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Press, tipAttrs } from '@/ds';
 import { reducedMotion, textWidth } from '@/ds/hooks';
 import type { Agent, Card, Place } from '@/proto';
@@ -17,7 +20,8 @@ import type { ActivitiesFn, ActivityKind, BimEvent, BimFrame, Label, LabelsFn, L
 import { away, CHECK_MS, HOVER_MS, nextAfter, TICK_MS } from './loop';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
-import { cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
+import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
+import { atFit, DRAG_PX, FIT, panBy, pinchFactor, sameCam, zoomAt, type Cam } from './zoom';
 import './office.css';
 
 /** The pure modules and the renderer's loader: feed.ts's, or fakes in a test. */
@@ -31,7 +35,7 @@ export interface Parts {
 
 export type OfficeState = 'loading' | 'on' | 'lost';
 
-/** The AGENTS head's toggles: 'list | bims', and with bims on '320 | wide' (view.ts keeps them per window). */
+/** The AGENTS head's toggles: 'bims' (the office above the rows), and with it on '320 | wide' (view.ts keeps them per window). */
 export function BimsSwitch({ view }: { view: BimsView }) {
   const opt = (id: string, label: string, tip: string, on: boolean, pick: () => void) => (
     <Press look="bims-opt" aria-pressed={on} {...tipAttrs(tip)} onClick={pick} data-testid={`app.right.agents.${id}`}>
@@ -51,21 +55,19 @@ export function BimsSwitch({ view }: { view: BimsView }) {
         </span>
       )}
       <span className="bims-switch" data-testid="app.right.agents.view">
-        {opt('view.list', bims.view_list, bims.view_list_tip, view.view === 'list', () => {
-          bimsView.setView('list');
-        })}
         {opt('view.bims', bims.view_bims, bims.view_bims_tip, view.view === 'bims', () => {
-          bimsView.setView('bims');
+          bimsView.setView(view.view === 'bims' ? 'list' : 'bims');
         })}
       </span>
     </>
   );
 }
 
-/** What a bim's tag shows: its line (null: none) and its pill. Pure. */
+/** What a bim's tag shows: its line (null: none) and its pill; the hover card's first line is its name. Pure. */
 export function tagOf(l: Label): { readonly text: string | null; readonly pill: Label['pill'] } {
   // 'pill': the '?' / '✗' alone at rest, no name; hover, ctrl or an event give it its line
   if (l.mode === 'pill') return { text: null, pill: l.pill };
+  if (l.mode === 'hover') return { text: l.name, pill: l.pill };
   return { text: l.words === '' ? l.name : `${l.name} · ${l.words}`, pill: l.pill };
 }
 
@@ -79,17 +81,24 @@ export function tagRank(k: ActivityKind): number {
 /** px a label's chip adds to its words (its padding), and a pill beside it with its gap */
 const CHIP_PAD = 8;
 const PILL_ROOM = 20;
+/** the hover card: its widest (css px), its padding each side (--s-2), its title's lines, its gap under a flipped bim's feet */
+const CARD_W = 240;
+const CARD_PAD = 8;
+const CARD_LINES = 3;
+const CARD_GAP = 4;
+/** after a card closes, the next one shows at once for this long (the ds tips' warmth) */
+const WARM_MS = 1000;
 
 /** The labels' font for measuring a cut: the ds's sans at 12 px (office.css .bims-label). */
-function labelFont(): string {
+function labelFont(weight = ''): string {
   const ui = typeof document === 'undefined' ? '' : getComputedStyle(document.documentElement).getPropertyValue('--font-ui').trim();
-  return `12px ${ui === '' ? 'sans-serif' : ui}`;
+  return `${weight}12px ${ui === '' ? 'sans-serif' : ui}`;
 }
 
 /** The labels' content, to re-render the overlay only when it changes (not at each frame). Pure. */
 export function labelsSig(labels: ReadonlyMap<string, Label>): string {
   let s = '';
-  for (const l of labels.values()) s += `${l.name}\u0000${l.mode}\u0000${l.words}\u0000${l.pill ?? ''}\u0001`;
+  for (const l of labels.values()) s += `${l.name}\u0000${l.mode}\u0000${l.words}\u0000${l.title}\u0000${l.pill ?? ''}\u0001`;
   return s;
 }
 
@@ -122,7 +131,6 @@ export function Office({
   places,
   parts,
   onOpen,
-  fallback,
 }: {
   project: string;
   /** the project's live agents (main among them) */
@@ -132,8 +140,6 @@ export function Office({
   parts: Parts;
   /** a click on a bim: open that agent, as its row's click */
   onOpen: (agent: string) => void;
-  /** the list, shown while the renderer loads and when WebGL is lost */
-  fallback: ReactNode;
 }) {
   const [state, setState] = useState<OfficeState>('loading');
   const [labels, setLabels] = useState<ReadonlyMap<string, Label>>(new Map());
@@ -147,11 +153,22 @@ export function Office({
   // the office's width, for the cut of a long line (whole words, a glued '…')
   const [boxW, setBoxW] = useState(0);
   const measure = useMemo(() => textWidth(labelFont()), []);
-  const heads = useRef(new Map<string, { x: number; y: number }>());
+  const measureBold = useMemo(() => textWidth(labelFont('600 ')), []);
+  const heads = useRef(new Map<string, { x: number; y: number; feet: number }>());
   const kickRef = useRef<() => void>(() => undefined);
   // the bim under a point of the canvas, css px: the renderer's once loaded
   const pick = useRef<(x: number, y: number) => string | null>(() => null);
   const held = useModHeld('Control');
+  // his camera (zoom.ts): the view the renderer draws; `fitted` re-renders only for the '⤢ fit' button
+  const camRef = useRef<Cam>(FIT);
+  const [fitted, setFitted] = useState(true);
+  const applyCam = useRef<(c: Cam) => void>(() => undefined);
+  const moveCam = useCallback((c: Cam) => {
+    if (sameCam(c, camRef.current)) return;
+    camRef.current = c;
+    setFitted(atFit(c));
+    applyCam.current(c);
+  }, []);
   const live = useRef<Live>({ snap: { agents, cards, places }, agents, fresh: true, events: [], hover: null, held });
 
   // a fresh snapshot (the store gives new arrays only on a change): the timeline hears of it
@@ -183,8 +200,17 @@ export function Office({
       const h = heads.current.get(name);
       el.style.visibility = h === undefined ? 'hidden' : '';
       if (h === undefined) continue;
-      const rank = el.dataset.mode === 'hover' ? 0 : (ranks.current.get(name) ?? 3);
-      ins.push({ name, x: h.x, y: h.y, w: el.offsetWidth, h: el.offsetHeight, pill: el.dataset.mode === 'pill', rank });
+      const w = el.offsetWidth;
+      const th = el.offsetHeight;
+      if (el.dataset.mode === 'hover') {
+        // the card over its head; under its feet when it would leave the top, never over its bim
+        // (designer m_27920); placed with the pills, first, never moved
+        const top = h.y - th >= TAG_INSET ? h.y - th : h.feet + CARD_GAP;
+        ins.push({ name, x: h.x, y: top + th, w, h: th, pill: true, rank: 0 });
+        continue;
+      }
+      const rank = ranks.current.get(name) ?? 3;
+      ins.push({ name, x: h.x, y: h.y, w, h: th, pill: el.dataset.mode === 'pill', rank });
     }
     const { at, left } = placeTags(ins, box.clientWidth, box.clientHeight);
     const more = left > 0 && live.current.held ? bims.held_left_out({ n: left }) : '';
@@ -295,6 +321,26 @@ export function Office({
       raf = requestAnimationFrame(draw);
     };
     kickRef.current = kick;
+    applyCam.current = (c) => {
+      r?.setCam(c);
+      kick();
+    };
+
+    // a pinch (Chromium: a wheel with ctrlKey) zooms around the pointer; two fingers move the view
+    // while zoomed, and scroll the bar at the fit (nothing to move there)
+    const onWheel = (e: WheelEvent) => {
+      const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? box.clientHeight : 1;
+      const at = box.getBoundingClientRect();
+      if (e.ctrlKey) {
+        e.preventDefault();
+        moveCam(zoomAt(camRef.current, pinchFactor(e.deltaY * k), e.clientX - at.left, e.clientY - at.top, at.width, at.height));
+        return;
+      }
+      if (atFit(camRef.current)) return;
+      e.preventDefault();
+      moveCam(panBy(camRef.current, -e.deltaX * k, -e.deltaY * k, at.width, at.height));
+    };
+    box.addEventListener('wheel', onWheel, { passive: false });
 
     // the window away: nothing runs; back: one frame, and the loop if it moves
     const onWindow = () => {
@@ -336,6 +382,7 @@ export function Office({
         r = made;
         made.onLost(fail);
         pick.current = (x, y) => (lost ? null : made.pick(x, y));
+        made.setCam(camRef.current);
         timeline = parts.newTimeline();
         live.current.fresh = true;
         setState('on');
@@ -356,11 +403,13 @@ export function Office({
       schemeMq?.removeEventListener('change', onLook);
       theme.disconnect();
       sized.disconnect();
+      box.removeEventListener('wheel', onWheel);
       kickRef.current = () => undefined;
+      applyCam.current = () => undefined;
       pick.current = () => null;
       r?.dispose();
     };
-  }, [parts, layoutTags]);
+  }, [parts, layoutTags, moveCam]);
 
   // hover: the bim under the pointer, its line after the tip's delay; off it, at once
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -372,11 +421,18 @@ export function Office({
     },
     [],
   );
+  // a card that just closed keeps the next one warm: it shows at once (the ds tips' rule)
+  const warmUntil = useRef(0);
   const setHover = (name: string | null) => {
     if (live.current.hover === name) return;
+    if (name === null && live.current.hover !== null) warmUntil.current = Date.now() + WARM_MS;
     live.current.hover = name;
     kickRef.current();
   };
+  // a one-finger (or mouse) drag moves the view while zoomed; past DRAG_PX it is never a click
+  const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
+  const dragged = useRef(false);
+  const [dragging, setDragging] = useState(false);
   const pickEvent = (e: { clientX: number; clientY: number }): string | null => {
     const box = holder.current;
     if (box === null) return null;
@@ -385,92 +441,193 @@ export function Office({
   };
 
   if (state === 'lost')
+    // its own element: React would reuse the holder's div here, the height resize() set on it by
+    // hand included (a 212 px line, bims-qa m_27786); the rows show under it as always
     return (
-      <>
-        {/* its own element: React would reuse the holder's div here, the height resize() set on it
-            by hand included (a 212 px line, bims-qa m_27786) */}
-        <div key="lost" className="bims-lost" data-testid="app.right.bims.lost">
-          {bims.lost}
-        </div>
-        {fallback}
-      </>
-    );
-  return (
-    <>
-      <div
-        key="office"
-        className="bims-office"
-        ref={holder}
-        data-testid="app.right.bims"
-        data-state={state}
-        data-pointer={pointer || undefined}
-        onPointerMove={(e) => {
-          const name = pickEvent(e);
-          setPointer(name !== null);
-          if (name === pending.current) return;
-          pending.current = name;
-          clearTimeout(hoverTimer.current);
-          if (name === null) setHover(null);
-          else
-            hoverTimer.current = setTimeout(() => {
-              setHover(name);
-            }, HOVER_MS);
-        }}
-        onPointerLeave={() => {
-          pending.current = null;
-          clearTimeout(hoverTimer.current);
-          setPointer(false);
-          setHover(null);
-        }}
-        onClick={(e) => {
-          const name = pickEvent(e);
-          if (name !== null) onOpen(name);
-        }}
-      >
-        <canvas ref={canvas} className="bims-canvas" data-testid="app.right.bims.canvas" />
-        <div className="bims-overlay">
-          <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
-          <div ref={moreRef} className="bims-more" data-testid="app.right.bims.more" />
-          {[...labels.values()].map((l) => {
-            const tag = tagOf(l);
-            return (
-              <div
-                key={l.name}
-                className="bims-tag"
-                data-mode={l.mode}
-                ref={(el) => {
-                  if (el === null) tags.current.delete(l.name);
-                  else {
-                    tags.current.set(l.name, el);
-                    layoutTags();
-                  }
-                }}
-              >
-                {tag.text !== null && (
-                  <span className="bims-label" data-mode={l.mode} data-testid={`app.right.bims.label.${l.name}`}>
-                    {boxW > 0 ? cutWords(tag.text, boxW - 2 * TAG_INSET - CHIP_PAD - (tag.pill === null ? 0 : PILL_ROOM), measure) : tag.text}
-                  </span>
-                )}
-                {tag.pill !== null && (
-                  <span
-                    className={`bims-pill ${tag.pill}`}
-                    data-pill={tag.pill}
-                    data-testid={`app.right.bims.pill.${l.name}`}
-                    {...tipAttrs(tag.pill === 'asks' ? bims.pill_asks_tip({ agent: l.name }) : bims.pill_failed_tip({ agent: l.name }))}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpen(l.name);
-                    }}
-                  >
-                    {tag.pill === 'asks' ? '?' : '✗'}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      <div key="lost" className="bims-lost" data-testid="app.right.bims.lost">
+        {bims.lost}
       </div>
-      {state === 'loading' && fallback}
-    </>
+    );
+  const cardW = Math.min(CARD_W, boxW - 2 * TAG_INSET);
+  return (
+    <div
+      key="office"
+      className="bims-office"
+      ref={holder}
+      // esc goes back to the fit while the office has focus (a click gives it)
+      tabIndex={0}
+      aria-label={bims.view_bims_tip}
+      data-testid="app.right.bims"
+      data-state={state}
+      data-pointer={pointer || undefined}
+      data-zoomed={!fitted || undefined}
+      data-drag={dragging || undefined}
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape' || fitted) return;
+        e.stopPropagation();
+        moveCam(FIT);
+      }}
+      onPointerDown={(e) => {
+        if (e.button !== 0 || fitted || (e.target as Element).closest('button, .bims-pill') !== null) return;
+        drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+        dragged.current = false;
+      }}
+      onPointerUp={() => {
+        if (drag.current?.moved === true) dragged.current = true;
+        drag.current = null;
+        setDragging(false);
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        setDragging(false);
+      }}
+      onDoubleClick={(e) => {
+        // on the floor only: a double-click on a bim already opened it (designer m_27920)
+        if (pickEvent(e) === null) moveCam(FIT);
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (d !== null && d.id === e.pointerId) {
+          const dx = e.clientX - d.x;
+          const dy = e.clientY - d.y;
+          if (!d.moved && Math.hypot(dx, dy) < DRAG_PX) return;
+          if (!d.moved) {
+            d.moved = true;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDragging(true);
+            pending.current = null;
+            clearTimeout(hoverTimer.current);
+            setHover(null);
+          }
+          d.x = e.clientX;
+          d.y = e.clientY;
+          const box = e.currentTarget.getBoundingClientRect();
+          moveCam(panBy(camRef.current, dx, dy, box.width, box.height));
+          return;
+        }
+        const name = pickEvent(e);
+        setPointer(name !== null);
+        if (name === pending.current) return;
+        pending.current = name;
+        clearTimeout(hoverTimer.current);
+        if (name === null) setHover(null);
+        else if (Date.now() < warmUntil.current) setHover(name);
+        else
+          hoverTimer.current = setTimeout(() => {
+            setHover(name);
+          }, HOVER_MS);
+      }}
+      onPointerLeave={() => {
+        pending.current = null;
+        clearTimeout(hoverTimer.current);
+        setPointer(false);
+        setHover(null);
+      }}
+      onClick={(e) => {
+        if (dragged.current) {
+          dragged.current = false;
+          return;
+        }
+        const name = pickEvent(e);
+        if (name !== null) onOpen(name);
+      }}
+    >
+      <canvas ref={canvas} className="bims-canvas" data-testid="app.right.bims.canvas" />
+      <div className="bims-overlay">
+        <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
+        <div ref={moreRef} className="bims-more" data-testid="app.right.bims.more" />
+        {!fitted && (
+          <Press
+            look="bims-fit"
+            data-testid="app.right.bims.fit"
+            {...tipAttrs(bims.fit_tip, 'esc')}
+            onClick={(e) => {
+              e.stopPropagation();
+              moveCam(FIT);
+            }}
+          >
+            <span aria-hidden="true">⤢</span> {bims.fit}
+          </Press>
+        )}
+        {[...labels.values()].map((l) => {
+          const tagRef = (el: HTMLDivElement | null) => {
+            if (el === null) tags.current.delete(l.name);
+            else {
+              tags.current.set(l.name, el);
+              layoutTags();
+            }
+          };
+          if (l.mode === 'hover')
+            return <HoverCard key={l.name} label={l} width={cardW} measure={measure} measureBold={measureBold} tagRef={tagRef} onOpen={onOpen} />;
+          const tag = tagOf(l);
+          return (
+            <div key={l.name} className="bims-tag" data-mode={l.mode} ref={tagRef}>
+              {tag.text !== null && (
+                <span className="bims-label" data-mode={l.mode} data-testid={`app.right.bims.label.${l.name}`}>
+                  {boxW > 0 ? cutWords(tag.text, boxW - 2 * TAG_INSET - CHIP_PAD - (tag.pill === null ? 0 : PILL_ROOM), measure) : tag.text}
+                </span>
+              )}
+              {tag.pill !== null && <Pill name={l.name} pill={tag.pill} onOpen={onOpen} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** The '?' / '✗' pill: its own colours, its tip, a click opens its agent. */
+function Pill({ name, pill, onOpen }: { name: string; pill: 'asks' | 'failed'; onOpen: (agent: string) => void }) {
+  return (
+    <span
+      className={`bims-pill ${pill}`}
+      data-pill={pill}
+      data-testid={`app.right.bims.pill.${name}`}
+      {...tipAttrs(pill === 'asks' ? bims.pill_asks_tip({ agent: name }) : bims.pill_failed_tip({ agent: name }))}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen(name);
+      }}
+    >
+      {pill === 'asks' ? '?' : '✗'}
+    </span>
+  );
+}
+
+/**
+ * The hover card (Gabriel: multi-line, easy to read; designer m_27920): its name in 600 with its
+ * pill, its state dim under it, its title on at most CARD_LINES lines cut on a whole word with one
+ * glued '…' (tags.ts cutLines, measured, so the lines are ours, not the browser's). No accent but
+ * the pill's. The office's layoutTags places it: over the head, or under the feet.
+ */
+function HoverCard({ label, width, measure, measureBold, tagRef, onOpen }: {
+  label: Label;
+  width: number;
+  measure: (s: string) => number;
+  measureBold: (s: string) => number;
+  tagRef: (el: HTMLDivElement | null) => void;
+  onOpen: (agent: string) => void;
+}) {
+  const room = width - 2 * CARD_PAD;
+  const name = room > 0 ? cutWords(label.name, room - (label.pill === null ? 0 : PILL_ROOM), measureBold) : label.name;
+  const state = room > 0 ? cutWords(label.words, room, measure) : label.words;
+  const title = cutLines(label.title, room, CARD_LINES, measure);
+  return (
+    <div className="bims-card" data-mode="hover" ref={tagRef} style={width > 0 ? { maxWidth: `${String(width)}px` } : undefined} data-testid={`app.right.bims.label.${label.name}`}>
+      <div className="bims-card-head">
+        <span className="bims-card-name">{name}</span>
+        {label.pill !== null && <Pill name={label.name} pill={label.pill} onOpen={onOpen} />}
+      </div>
+      {state !== '' && (
+        <div className="bims-card-state" data-testid={`app.right.bims.card.state.${label.name}`}>
+          {state}
+        </div>
+      )}
+      {title.map((line, i) => (
+        <div key={i} className="bims-card-title" data-testid={i === 0 ? `app.right.bims.card.title.${label.name}` : undefined}>
+          {line}
+        </div>
+      ))}
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 // les bims: what the overlay shows over each bim at t (the spec's §2). Nothing at rest; the hover
-// tip `name · state · title`; the name alone while it walks or while ctrl is held; name + 2-3
+// card (its name, its state, its title: Office.tsx lays it out on lines); the name alone while it walks or while ctrl is held; name + 2-3
 // words for EVENT_S after an event (an activity change, read from the pose's segment: seg.from,
 // seg.t), at most EVENT_SLOTS at once, the newest first and the others after, in turn; the '?'
 // pink / '✗' red pill always, without a name. Pure: frames in, labels out; the fades are the
@@ -144,12 +144,10 @@ export const labelsOf: LabelsFn = (frames, o) => {
   for (const b of frames) {
     const { act, from } = b.pose.seg;
     const pill = pillOf(act);
-    const at = (mode: Label['mode'], words: string): void => void out.set(b.name, { name: b.name, mode, words, pill });
+    const at = (mode: Label['mode'], words: string, title = ''): void => void out.set(b.name, { name: b.name, mode, words, title, pill });
     if (o.hover === b.name) {
       const row = rows.get(b.name);
-      const state = stateWords(act, row?.watching[0]?.what ?? '');
-      const title = row?.title ?? '';
-      at('hover', title ? bims.tip({ state, title }) : state);
+      at('hover', stateWords(act, row?.watching[0]?.what ?? ''), row?.title ?? '');
     } else if (events.has(b.name)) at('event', eventWords(act, from));
     else if (o.held || (b.pose.moving && !b.main)) at('name', '');
     else if (pill) at('pill', '');

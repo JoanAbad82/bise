@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cutWords, placeTags, tagLeft, type TagIn } from './tags';
+import { cutLines, cutWords, placeTags, tagLeft, type TagIn } from './tags';
 
 const tag = (name: string, x: number, y: number, w = 60, pill = false, rank = 3): TagIn => ({ name, x, y, w, h: 16, pill, rank });
 const boxes = (at: ReturnType<typeof placeTags>['at'], tags: readonly TagIn[]) =>
@@ -86,5 +86,20 @@ describe('cutWords', () => {
   });
   it('a first word longer than the room is cut by characters', () => {
     expect(cutWords('averyveryverylongname', 6 * 8, w)).toBe('averyve…');
+  });
+});
+
+describe('cutLines (the hover card title)', () => {
+  const w = (s: string) => s.length * 6;
+  it('wraps whole words on lines of the room', () => {
+    expect(cutLines('no access to the CMS', 6 * 10, 3, w)).toEqual(['no access', 'to the CMS']);
+    expect(cutLines('short', 200, 3, w)).toEqual(['short']);
+    expect(cutLines('', 200, 3, w)).toEqual([]);
+  });
+  it('past its lines, the last one is cut with one glued …', () => {
+    expect(cutLines('one two three four five six seven', 6 * 9, 2, w)).toEqual(['one two', 'three…']);
+  });
+  it('a word longer than a line is cut on its own', () => {
+    expect(cutLines('averyveryverylongname ok', 6 * 8, 3, w)).toEqual(['averyve…', 'ok']);
   });
 });

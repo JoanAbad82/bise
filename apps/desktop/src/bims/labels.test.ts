@@ -16,21 +16,21 @@ describe('the labels (spec §2)', () => {
     const bims = [frame('perf', work, { t: 0, from: 'nap' }), frame('main', { k: 'main', at: 'main' }, { main: true })];
     expect(at(bims, 10).size).toBe(0);
   });
-  it("hover: 'name · state · title', the state alone without a title", () => {
+  it('hover: the card, its state and its title apart (the card lays them on lines), no title for an empty one', () => {
     const l = at([frame('perf', work, { t: 0 })], 10, { hover: 'perf' }).get('perf');
-    expect(l).toEqual({ name: 'perf', mode: 'hover', words: w.tip({ state: w.working, title: 'signup 4.1 s to 0.9 s' }), pill: null });
-    expect(at([frame('docs', { k: 'nap', at: 'lounge' })], 10, { hover: 'docs' }).get('docs')?.words).toBe(w.idle);
+    expect(l).toEqual({ name: 'perf', mode: 'hover', words: w.working, title: 'signup 4.1 s to 0.9 s', pill: null });
+    expect(at([frame('docs', { k: 'nap', at: 'lounge' })], 10, { hover: 'docs' }).get('docs')).toMatchObject({ words: w.idle, title: '' });
     const sleeper = { ...agent('nightly', { title: '', watching: [watch('cargo test')] }) };
     const l2 = labelsOf([frame('nightly', { k: 'sleep', at: 'desk' })], { t: 1, hover: 'nightly', held: false, agents: [sleeper] });
     expect(l2.get('nightly')?.words).toBe(w.state_waiting_for({ what: 'cargo test' }));
   });
   it('walking: its name alone, main excepted (nothing at rest, and its walks are its own)', () => {
-    expect(at([frame('perf', work, { t: 0, moving: true })], 10).get('perf')).toEqual({ name: 'perf', mode: 'name', words: '', pill: null });
+    expect(at([frame('perf', work, { t: 0, moving: true })], 10).get('perf')).toEqual({ name: 'perf', mode: 'name', words: '', title: '', pill: null });
     expect(at([frame('main', { k: 'main', at: 'main' }, { main: true, moving: true })], 10).size).toBe(0);
   });
   it('an event: name + its words for 3 s, then nothing', () => {
     const b = [frame('perf', { k: 'done', at: 'terrace' }, { t: 5, from: 'work' })];
-    expect(at(b, 5)).toEqual(new Map([['perf', { name: 'perf', mode: 'event', words: w.done, pill: null }]]));
+    expect(at(b, 5)).toEqual(new Map([['perf', { name: 'perf', mode: 'event', words: w.done, title: '', pill: null }]]));
     expect(at(b, 5 + EVENT_S - 0.01).get('perf')?.mode).toBe('event');
     expect(at(b, 5 + EVENT_S).size).toBe(0);
   });
@@ -59,12 +59,12 @@ describe('the labels (spec §2)', () => {
     expect(at(b, 0.5).get('a')?.mode).toBe('event');
   });
   it("the '?' pill: pink, no name, always, with any other label", () => {
-    expect(at([frame('perf', asks, { t: 0, from: 'work' })], 10).get('perf')).toEqual({ name: 'perf', mode: 'pill', words: '', pill: 'asks' });
+    expect(at([frame('perf', asks, { t: 0, from: 'work' })], 10).get('perf')).toEqual({ name: 'perf', mode: 'pill', words: '', title: '', pill: 'asks' });
     expect(at([frame('perf', asks, { t: 0, from: 'work' })], 1).get('perf')).toMatchObject({ mode: 'event', words: w.asks_you, pill: 'asks' });
     expect(at([frame('perf', asks)], 10, { hover: 'perf' }).get('perf')?.pill).toBe('asks');
   });
   it("the '✗' pill: red, no name, until the next state", () => {
-    expect(at([frame('perf', failed, { t: 0, from: 'work' })], 60).get('perf')).toEqual({ name: 'perf', mode: 'pill', words: '', pill: 'failed' });
+    expect(at([frame('perf', failed, { t: 0, from: 'work' })], 60).get('perf')).toEqual({ name: 'perf', mode: 'pill', words: '', title: '', pill: 'failed' });
     expect(at([frame('perf', work, { t: 60, from: 'failed' })], 64).size).toBe(0);
   });
   it('main: nothing at rest, its plain work <-> idle is no event', () => {

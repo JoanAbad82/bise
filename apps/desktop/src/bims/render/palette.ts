@@ -41,10 +41,11 @@ export const DAY: Palette = {
 };
 
 export const NIGHT: Palette = {
-  bg: '#141211', grass: '#3f6b35', dirt: '#6e4a31', floor: '#5a4636', wall: '#4a3d33', wallTop: '#5c4b3e',
-  desk: '#9a6f45', deskTop: '#b5865a', island: '#1f7a70', islandTop: '#ece2cf', ink: '#0d0b0a', rug: '#c99a2e',
+  // floor and desks one step lighter than the prototype's night, so a sitting bim never melts in (bims m_27836)
+  bg: '#141211', grass: '#3f6b35', dirt: '#6e4a31', floor: '#6d5643', wall: '#4a3d33', wallTop: '#5c4b3e',
+  desk: '#ad7f50', deskTop: '#c6966a', island: '#1f7a70', islandTop: '#ece2cf', ink: '#0d0b0a', rug: '#c99a2e',
   islandRug: '#3b5f7a', plant: '#3f8a3e', screenOn: '#fff2d6', screenOff: '#26221f', terrace: '#6b5a44',
-  window: '#2c4a6b', lampOn: '#ffcf8a', neon: '#ffd166', hemi: ['#ffd9a8', '#3a2c22', 1.35], sun: ['#a9b8e8', 0.7],
+  window: '#2c4a6b', lampOn: '#ffcf8a', neon: '#ffd166', hemi: ['#ffd9a8', '#3a2c22', 1.5], sun: ['#a9b8e8', 0.7],
   pendants: true,
 };
 

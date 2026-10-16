@@ -7,6 +7,7 @@
 // (bims-facts, architect m_27522): Agent.doing -> Activity.doing, hub/activity -> BimEvent, both
 // mapped in the feed only, never from thread text. Owner: bims-lead.
 import type { Agent, Card, Place } from '@/proto';
+import type { Cam } from './zoom';
 
 /** What the office reads at one moment: the bar's rows for one project, nothing else. */
 export interface Snapshot {
@@ -219,10 +220,12 @@ export interface OfficeRenderer {
   setOffice(office: Office, agents: readonly Agent[]): void;
   /** css px; the camera fits the office to the width (never cropped), returns the height it takes */
   setSize(widthPx: number, maxHeightPx: number): number;
+  /** his pinch and pan (zoom.ts): the view inside the fit; FIT is the whole office. The next frame shows it */
+  setCam(cam: Cam): void;
   /** draw time t; how the loop must run next (Motion). Reduced motion: never 'loop' */
   frame(t: number, bims: readonly BimFrame[], look: Look): Motion;
-  /** a bim's head on the canvas, css px from its top left (labels and pills go there); null off view */
-  headOf(name: string): { readonly x: number; readonly y: number } | null;
+  /** a bim's head on the canvas, css px from its top left (labels and pills go there), and its feet's y (the hover card flips under them); null off view */
+  headOf(name: string): { readonly x: number; readonly y: number; readonly feet: number } | null;
   /** the bim (or its desk) under a canvas point, css px; null on nothing */
   pick(x: number, y: number): string | null;
   /** WebGL lost: the shell falls back to the list with one line */
@@ -238,8 +241,10 @@ export interface Label {
   readonly name: string;
   /** 'name' while walking or ctrl held, 'event' the 3 s after an event, 'hover' the tip line, 'pill' the '?' / '✗' alone (no name drawn, words '') */
   readonly mode: 'name' | 'event' | 'hover' | 'pill';
-  /** the words after the name ('done', '→ dark-mode'); '' for a name alone */
+  /** the words after the name ('done', '→ dark-mode'); the hover card's state line; '' for a name alone */
   readonly words: string;
+  /** the hover card's title, under its state (its row's title); '' but on hover */
+  readonly title: string;
   /** '?' pink (asks you) or '✗' red (failed): shown without a name, always */
   readonly pill: 'asks' | 'failed' | null;
 }

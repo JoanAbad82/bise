@@ -24,7 +24,8 @@ test('(1) the list view never loads the three chunk', async () => {
     expect(parsed().filter((f) => chunks.includes(f)), 'the list loaded three').toEqual([]);
     await showOffice(s);
     expect(parsed().filter((f) => chunks.includes(f)), 'the office loads three (the control)').toHaveLength(1);
-    await s.page.getByTestId('app.right.agents.view.list').click();
+    // the toggle again: the rows alone
+    await s.page.getByTestId('app.right.agents.view.bims').click();
     await expect(s.page.getByTestId('app.right.bims')).toHaveCount(0);
     await expect(s.page.getByTestId(`app.right.agent.${NAMES[1] ?? ''}`)).toBeVisible();
   } finally {

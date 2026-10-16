@@ -1,5 +1,5 @@
-/* The office in the right bar (page bims-office v7, spec §2): the canvas at the AGENTS section's
-   top at its natural height, the label overlay over it. Colour is attention: the accent only for
+/* The office in the right bar (page bims-office v7, spec §2): the canvas above the AGENTS section's
+   rows at its natural height, the label overlay over it. Colour is attention: the accent only for
    the '?' pill (asks you), the error red only for '✗' (failed). Tokens only. Owner: bims-wire. */
 .bims-office {
   position: relative;
@@ -11,7 +11,18 @@
 .bims-office[data-state='loading'] {
   height: 0;
 }
-.bims-office[data-pointer] {
+.bims-office:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+/* zoomed: the floor can be dragged (zoom.ts); a bim under the pointer still says it opens */
+.bims-office[data-zoomed] {
+  cursor: grab;
+}
+.bims-office[data-drag] {
+  cursor: grabbing;
+}
+.bims-office[data-pointer]:not([data-drag]) {
   cursor: pointer;
 }
 .bims-canvas {
@@ -97,7 +108,59 @@
   background: var(--c-err);
   color: var(--c-on-ink);
 }
-/* WebGL lost: one line, then the list (never a blank section) */
+/* the hover card (Gabriel: multi-line, easy to read; designer m_27920): name 600 with its pill, the
+   state dim, the title on up to 3 lines (Office.tsx cuts them). No accent but the pill's. Over
+   every tag and pill: it is what he is looking at */
+.bims-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--c-solid) 92%, transparent);
+  box-shadow: var(--e-1);
+  color: var(--c-text);
+  font: var(--t-12) / 1.5 var(--font-ui);
+  white-space: nowrap;
+  will-change: transform;
+  z-index: 3;
+  animation: bims-in var(--d-base) var(--ease-out, ease-out);
+}
+.bims-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-tight);
+}
+.bims-card-name {
+  font-weight: 600;
+}
+.bims-card-state {
+  color: var(--c-text-2);
+}
+/* zoomed: back to the whole office, top right (zoom.ts FIT; esc and a double-click on the floor too) */
+.bims-fit {
+  position: absolute;
+  top: var(--s-1);
+  right: var(--s-1);
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
+  color: var(--c-text-2);
+  font: var(--t-11) / 1.6 var(--font-ui);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 4;
+}
+.bims-fit:hover {
+  color: var(--c-text);
+}
+.bims-fit:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+/* WebGL lost: one line over the rows (never a blank section) */
 .bims-lost {
   padding: var(--s-1) var(--pad-row-x);
   color: var(--c-text-3);
@@ -109,7 +172,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .bims-label {
+  .bims-label,
+  .bims-card {
     animation: none;
   }
 }
@@ -133,7 +197,7 @@
   z-index: 3;
   box-shadow: var(--e-3);
 }
-/* the AGENTS head's two small toggles: 'list | bims', '320 | wide' */
+/* the AGENTS head's small toggles: 'bims' (the office above the rows), '320 | wide' */
 .bims-switch {
   display: inline-flex;
   flex: none;

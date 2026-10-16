@@ -2,7 +2,7 @@
 //! les bims, the right bar's AGENTS section drawn as an office
 //! (apps/desktop/src/bims, spec les-bims-sc-narios-du-bureau §2): the
 //! event labels over a bim, the hover tip's state, the pills' tips and the
-//! bar's list | bims switch. Which word for which activity stays in
+//! bar's bims toggle and the camera's fit. Which word for which activity stays in
 //! labels.ts; an ordinal (`2nd`) is a TS fn.
 
 crate::words! { bims:
@@ -37,7 +37,7 @@ crate::words! { bims:
     /// never reaches a word); event: main back to idle after it asked or failed
     idle = "idle";
 
-    // ---- the hover tip's state, between the name and the title (`name · state · title`)
+    // ---- the hover card's state, its second line, between the name and the title
     /// state: a long turn, at its desk
     state_hot = "working · running hot";
     /// state: asleep at its desk until its watch ends (its first watch's name: `cargo test`)
@@ -52,8 +52,6 @@ crate::words! { bims:
     state_stopped = "stopped by you";
     /// state: it is coming in
     state_starting = "starting";
-    /// the hover tip after the name: its state, then its title
-    tip(state, title) = "{state} · {title}";
 
     // ---- the pills, the only part of the office that takes the pointer
     /// the '?' pill's tip
@@ -61,15 +59,11 @@ crate::words! { bims:
     /// the '✗' pill's tip
     pill_failed_tip(agent) = "{agent} failed. click opens it";
 
-    // ---- the bar's AGENTS head: list | bims, and the office's width
-    /// the switch's list side
-    view_list = "list";
-    /// the switch's office side
+    // ---- the bar's AGENTS head: the office on or off over the rows, and its width
+    /// the toggle: the office above the rows (pressed) or the rows alone
     view_bims = "bims";
-    /// the list side's tip
-    view_list_tip = "the agents as a list";
-    /// the office side's tip
-    view_bims_tip = "the agents in their office";
+    /// the toggle's tip
+    view_bims_tip = "the agents in their office, above the list";
     /// the width switch: the bar at 320 px
     width_narrow = "320";
     /// the width switch: the wide bar
@@ -79,7 +73,13 @@ crate::words! { bims:
     /// the wide width's tip
     width_wide_tip = "the bar at 640 px while the office shows";
     /// one line over the list when the office can't draw (WebGL lost)
-    lost = "can't draw the office here: the list shows instead";
+    lost = "can't draw the office here";
+
+    // ---- his camera: pinch to zoom, two fingers or a drag to move
+    /// the button back to the whole office, in its top-right corner while zoomed
+    fit = "fit";
+    /// its tip
+    fit_tip = "back to the whole office";
 
     // ---- ctrl held: every name that has room near its bim (designer m_27799)
     /// the office's bottom-right corner when names had no room, so 'every name' never quietly lies

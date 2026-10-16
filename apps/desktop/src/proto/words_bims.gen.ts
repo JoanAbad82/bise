@@ -46,20 +46,14 @@ export const bims = {
   state_stopped: "stopped by you",
   /** state: it is coming in */
   state_starting: "starting",
-  /** the hover tip after the name: its state, then its title */
-  tip: (a: { state: string | number; title: string | number }): string => String(a.state) + " · " + String(a.title),
   /** the '?' pill's tip */
   pill_asks_tip: (a: { agent: string | number }): string => String(a.agent) + " asks you. click opens it",
   /** the '✗' pill's tip */
   pill_failed_tip: (a: { agent: string | number }): string => String(a.agent) + " failed. click opens it",
-  /** the switch's list side */
-  view_list: "list",
-  /** the switch's office side */
+  /** the toggle: the office above the rows (pressed) or the rows alone */
   view_bims: "bims",
-  /** the list side's tip */
-  view_list_tip: "the agents as a list",
-  /** the office side's tip */
-  view_bims_tip: "the agents in their office",
+  /** the toggle's tip */
+  view_bims_tip: "the agents in their office, above the list",
   /** the width switch: the bar at 320 px */
   width_narrow: "320",
   /** the width switch: the wide bar */
@@ -69,7 +63,11 @@ export const bims = {
   /** the wide width's tip */
   width_wide_tip: "the bar at 640 px while the office shows",
   /** one line over the list when the office can't draw (WebGL lost) */
-  lost: "can't draw the office here: the list shows instead",
+  lost: "can't draw the office here",
+  /** the button back to the whole office, in its top-right corner while zoomed */
+  fit: "fit",
+  /** its tip */
+  fit_tip: "back to the whole office",
   /** the office's bottom-right corner when names had no room, so 'every name' never quietly lies */
   held_left_out: (a: { n: number }): string => a.n === 1 ? "+" + String(a.n) + " name · hover a bim" : "+" + String(a.n) + " names · hover a bim",
 } as const;

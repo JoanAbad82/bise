@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Office, Spot } from '../model';
-import { EL, aboveTop, fitSite, siteOf, toScreen } from './camera';
+import { FIT, zoomAt } from '../zoom';
+import { EL, aboveTop, fitSite, siteOf, toScreen, viewFit } from './camera';
 
 /** the prototype's office numbers for n agents (layout.ts owns the real ones; these only size the site) */
 function officeFor(n: number): Office {
@@ -57,6 +58,26 @@ describe('camera fit', () => {
     expect(Math.abs(s.y - c.y)).toBeLessThan(1e-9);
     expect((s.x - c.x) / (r.y - c.y)).toBeCloseTo(2, 6);
     expect(EL).toBeCloseTo(Math.PI / 6);
+  });
+
+  it('his camera: the fit at FIT, a zoom keeps the canvas size and shows the point under the pinch where it was', () => {
+    const f = fitSite(siteOf(officeFor(14)), 320, 2000);
+    expect(viewFit(f, FIT)).toEqual(f);
+    const c = zoomAt(FIT, 2, 80, 50, f.widthPx, f.heightPx);
+    const v = viewFit(f, c);
+    expect(v.widthPx).toBe(f.widthPx);
+    expect(v.heightPx).toBe(f.heightPx);
+    expect(v.scale).toBeCloseTo(f.scale / 2);
+    // a world point at (80, 50) in the fit is still at (80, 50) in the view
+    const p = { x: 3, y: 0, z: 5 };
+    const a = toScreen(f, p);
+    const zoomed = viewFit(f, zoomAt(FIT, 2, a.x, a.y, f.widthPx, f.heightPx));
+    const b = toScreen(zoomed, p);
+    expect(b.x).toBeCloseTo(a.x, 6);
+    expect(b.y).toBeCloseTo(a.y, 6);
+    // and the view never leaves the fit's rectangle
+    expect(v.left).toBeGreaterThanOrEqual(f.left - 1e-9);
+    expect(v.top).toBeLessThanOrEqual(f.top + 1e-9);
   });
 
   it('drops a plane in from above the top edge', () => {

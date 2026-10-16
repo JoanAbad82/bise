@@ -10,7 +10,8 @@ import { OrthographicCamera, PCFShadowMap, Scene, Vector3, WebGLRenderer } from 
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, MakeRenderer, Motion, Office, OfficeRenderer } from '../model';
 import { makeBim, type Bim } from './bim';
-import { BACK, DIST, type Fit, aboveTop, fitSite, siteOf, toScreen } from './camera';
+import { FIT, type Cam } from '../zoom';
+import { BACK, DIST, type Fit, aboveTop, fitSite, siteOf, toScreen, viewFit } from './camera';
 import { paletteOf } from './palette';
 import { pickAt, type Target } from './pick';
 import { flightAt, makePlane, type Plane } from './plane';
@@ -44,7 +45,10 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   let agents: readonly Agent[] = [];
   let world: World | null = null;
   let night: boolean | null = null;
+  /** the whole site fitted to the canvas, and what shows through his camera (fit = base at FIT) */
+  let base: Fit | null = null;
   let fit: Fit | null = null;
+  let cam: Cam = FIT;
   let size = { w: 0, maxH: 0 };
   const bims = new Map<string, Bim>();
   const rigs = new Map<string, Rig>();
@@ -101,7 +105,16 @@ export const makeRenderer: MakeRenderer = (canvas) => {
 
   function applyFit(): void {
     if (!office || size.w <= 0) return;
-    fit = fitSite(siteOf(office), size.w, size.maxH);
+    base = fitSite(siteOf(office), size.w, size.maxH);
+    applyView();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, STYLE.maxPixelRatio));
+    renderer.setSize(base.widthPx, base.heightPx, false);
+  }
+
+  // his pinch and pan: the fit seen closer (camera.ts viewFit), the canvas's size unchanged
+  function applyView(): void {
+    if (!base) return;
+    fit = viewFit(base, cam);
     const t = fit.target;
     camera.position.set(t.x + BACK.x * DIST, t.y + BACK.y * DIST, t.z + BACK.z * DIST);
     camera.up.set(0, 1, 0);
@@ -111,16 +124,14 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     camera.top = fit.top;
     camera.bottom = fit.bottom;
     camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, STYLE.maxPixelRatio));
-    renderer.setSize(fit.widthPx, fit.heightPx, false);
   }
 
-  function headOf(name: string): { x: number; y: number } | null {
+  function headOf(name: string): { x: number; y: number; feet: number } | null {
     const b = bims.get(name);
     if (!b || !fit || !b.group.visible) return null;
     const p = toScreen(fit, b.headTop(v));
     if (p.x < 0 || p.y < -20 || p.x > fit.widthPx || p.y > fit.heightPx) return null;
-    return p;
+    return { ...p, feet: toScreen(fit, b.feet(v)).y };
   }
 
   function drawPlanes(frames: readonly BimFrame[]): boolean {
@@ -159,7 +170,11 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     setSize(widthPx, maxHeightPx) {
       size = { w: Math.round(widthPx), maxH: Math.round(maxHeightPx) };
       applyFit();
-      return fit?.heightPx ?? 0;
+      return base?.heightPx ?? 0;
+    },
+    setCam(c) {
+      cam = c;
+      applyView();
     },
     frame(t, frames, look: Look): Motion {
       if (lost || !office) return 'still';

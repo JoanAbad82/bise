@@ -2,7 +2,9 @@
 // 30°: a floor tile's diagonal is twice as wide as it is tall), fitted to the bar's width so the
 // whole site (the floating grass block, the office on it, its trees) shows, never cropped. index.ts
 // copies a Fit onto three's OrthographicCamera; headOf and pick use toScreen, the same numbers.
+// His pinch and pan (zoom.ts Cam) are a view inside the fit (viewFit), the canvas's size unchanged.
 import type { Office, Pt } from '../model';
+import type { Cam } from '../zoom';
 
 export const AZ = Math.PI / 4;
 export const EL = Math.PI / 6;
@@ -81,6 +83,20 @@ export function fitSite(site: Site, widthPx: number, maxHeightPx: number): Fit {
   const halfW = (w * scale) / 2;
   const halfH = (heightPx * scale) / 2;
   return { target, left: cx - halfW, right: cx + halfW, top: cy + halfH, bottom: cy - halfH, scale, widthPx: w, heightPx };
+}
+
+/**
+ * The fit seen through his camera (zoom.ts Cam): the same canvas size, `zoom` times closer, its
+ * centre at (u, v) of the fit's rectangle. FIT gives the fit back. Pure.
+ */
+export function viewFit(fit: Fit, cam: Cam): Fit {
+  const w = fit.right - fit.left;
+  const h = fit.top - fit.bottom;
+  const cx = fit.left + cam.u * w;
+  const cy = fit.top - cam.v * h;
+  const halfW = w / (2 * cam.zoom);
+  const halfH = h / (2 * cam.zoom);
+  return { ...fit, left: cx - halfW, right: cx + halfW, top: cy + halfH, bottom: cy - halfH, scale: fit.scale / cam.zoom };
 }
 
 /** a world point on the canvas, css px from its top left */

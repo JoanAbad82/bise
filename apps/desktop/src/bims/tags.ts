@@ -80,6 +80,27 @@ export function placeTags(tags: readonly TagIn[], boxW: number, boxH: number): {
 }
 
 /**
+ * A text on at most `lines` lines of `max` px (the hover card's title): words wrapped whole, the
+ * last line cut as cutWords does (one glued '…') when the text needs more. A word longer than a
+ * line is cut on its own line. Pure.
+ */
+export function cutLines(text: string, max: number, lines: number, width: (s: string) => number): string[] {
+  const words = text.split(' ').filter((w) => w !== '');
+  if (words.length === 0) return [];
+  if (max <= 0) return [words.join(' ')];
+  const out: string[] = [];
+  let i = 0;
+  while (i < words.length && out.length < lines - 1) {
+    let line = words[i] ?? '';
+    i++;
+    while (i < words.length && width(`${line} ${words[i] ?? ''}`) <= max) line = `${line} ${words[i++] ?? ''}`;
+    out.push(width(line) <= max ? line : cutWords(line, max, width));
+  }
+  if (i < words.length) out.push(cutWords(words.slice(i).join(' '), max, width));
+  return out;
+}
+
+/**
  * A line cut to `max` px: whole words, then one glued '…' ('no access to the…', never ' …' nor a
  * word cut mid-way); a first word longer than the room is cut by characters. `width` measures a
  * string in the tag's font.

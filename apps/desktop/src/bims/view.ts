@@ -1,6 +1,7 @@
-// How the right bar shows its agents (page bims-office v7, bims m_27494): 'list' (the rows) or
-// 'bims' (the office), and with bims on, the bar at 320 or 'wide' (640 px while the office shows:
-// docked when the window has room for it and the thread's 520, sliding over the thread otherwise).
+// How the right bar shows its agents (page bims-office v7, bims m_27494): 'list' (the rows alone)
+// or 'bims' (the office above the rows: he keeps the list while the bims are open), and with bims
+// on, the bar at 320 or 'wide' (640 px while the office shows: docked when the window has room for
+// it and the thread's 520, sliding over the thread otherwise).
 // Both kept per window (keep.ts, like the sections' folds), one store for the window so the frame
 // (its column's width) and the bar (its head's toggles) read the same. Owner: bims-wire.
 import { useSyncExternalStore } from 'react';

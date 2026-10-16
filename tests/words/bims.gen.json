@@ -52,6 +52,16 @@
     "one": null,
     "text": "failed"
   },
+  "bims.fit": {
+    "args": [],
+    "one": null,
+    "text": "fit"
+  },
+  "bims.fit_tip": {
+    "args": [],
+    "one": null,
+    "text": "back to the whole office"
+  },
   "bims.held_left_out": {
     "args": [
       "n"
@@ -72,7 +82,7 @@
   "bims.lost": {
     "args": [],
     "one": null,
-    "text": "can't draw the office here: the list shows instead"
+    "text": "can't draw the office here"
   },
   "bims.pill_asks_tip": {
     "args": [
@@ -129,14 +139,6 @@
     "one": null,
     "text": "waiting on {agent}"
   },
-  "bims.tip": {
-    "args": [
-      "state",
-      "title"
-    ],
-    "one": null,
-    "text": "{state} · {title}"
-  },
   "bims.view_bims": {
     "args": [],
     "one": null,
@@ -145,17 +147,7 @@
   "bims.view_bims_tip": {
     "args": [],
     "one": null,
-    "text": "the agents in their office"
-  },
-  "bims.view_list": {
-    "args": [],
-    "one": null,
-    "text": "list"
-  },
-  "bims.view_list_tip": {
-    "args": [],
-    "one": null,
-    "text": "the agents as a list"
+    "text": "the agents in their office, above the list"
   },
   "bims.waiting": {
     "args": [],
