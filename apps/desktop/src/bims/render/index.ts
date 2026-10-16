@@ -18,7 +18,8 @@ import { flightAt, makePlane, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { STYLE } from './style';
 import { eggRig } from './egg';
-import { WORLD } from './palette';
+import { makeEggDecor, type EggDecor } from './eggdecor';
+import { MAIN_HOODIE, WORLD, outfitOf, type Outfit } from './palette';
 import { buildWorld, castShadows, lightDesk, type World } from './world';
 
 /** what the headless check reads (test mode only) */
@@ -48,6 +49,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   let world: World | null = null;
   let night: boolean | null = null;
   let eclipsed = false;
+  let eggDecor: EggDecor | null = null;
+  let april = false;
   /** the whole site fitted to the canvas, and what shows through his camera (fit = base at FIT) */
   let base: Fit | null = null;
   let fit: Fit | null = null;
@@ -85,6 +88,24 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     eclipsed = false;
     world = buildWorld(office, mainName(), STYLE, pal);
     scene.add(world.root);
+    if (eggDecor) { scene.remove(eggDecor.root); eggDecor.dispose(); }
+    eggDecor = makeEggDecor(office, STYLE);
+    scene.add(eggDecor.root);
+  }
+
+  // s3, april fools: each bim in the next one's outfit (hats shuffled), the first one in main's hoodie
+  function aprilOutfit(name: string, main: boolean): Outfit | undefined {
+    if (!april || main) return undefined;
+    const others = agents.filter((a) => !a.main).map((a) => a.name);
+    const i = others.indexOf(name);
+    const next = others[(i + 1) % others.length] ?? name;
+    const o = outfitOf(next, false);
+    return i === 0 ? { ...o, hoodie: MAIN_HOODIE } : o;
+  }
+  function dropBims(): void {
+    for (const b of bims.values()) { scene.remove(b.group); b.dispose(); }
+    bims.clear();
+    rigs.clear();
   }
 
   function syncBims(): void {
@@ -98,7 +119,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   function ensureBim(name: string, main: boolean): Bim {
     let b = bims.get(name);
     if (!b) {
-      b = makeBim(name, main, STYLE);
+      b = makeBim(name, main, STYLE, aprilOutfit(name, main));
       if (STYLE.shadows) castShadows(b.group);
       b.group.visible = false;
       bims.set(name, b);
@@ -189,6 +210,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
         eclipsed = eclipse;
         renderer.setClearColor(eclipse ? WORLD.eclipse : world.pal.bg);
       }
+      const fool = look.eggs?.april === true;
+      if (fool !== april) { april = fool; dropBims(); }
       if (!world || !fit) return 'still';
       const pal = world.pal;
       let motion: Motion = 'still';
@@ -213,6 +236,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
         lightDesk(d, pal, rig?.screen ?? 0, rig ? rig.lamp : name !== mainName());
       }
       if (!look.reduced && drawPlanes(frames)) motion = 'walk';
+      // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
+      if (eggDecor?.update(look.eggs) === true) motion = 'walk';
       renderer.render(scene, camera);
       if (probe) probe.frames++;
       return motion;
@@ -241,6 +266,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     dispose() {
       canvas.removeEventListener('webglcontextlost', onLost);
       if (world) { scene.remove(world.root); world.dispose(); world = null; }
+      if (eggDecor) { eggDecor.dispose(); eggDecor = null; }
       for (const b of bims.values()) b.dispose();
       bims.clear();
       for (const p of planes.values()) p.dispose();

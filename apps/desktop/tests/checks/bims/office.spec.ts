@@ -10,6 +10,9 @@
 //   (5) his camera: a pinch zooms around the pointer (the bims spread), two fingers move the view
 //       and never scroll the bar, a drag moves it and never opens a bim, '⤢ fit' / esc / a
 //       double-click on the floor bring the whole office back, each move draws, left alone it draws as the fit does;
+//   (6) his easter eggs, forced and frozen mid-play (eggs.ts withForced; never a random roll in a
+//       check): copy-fix's salto, signup-perf's speedrun '1:47', pricing-page's stare '!'; the
+//       office's eclipse sky, tree, cake and game on the whiteboard; at night the ghost;
 //   (3) reduced motion: 0 frames at rest with typing bims, and a bim that changes place fades
 //       (never drawn between its two spots, model.ts Look.reduced).
 // The three chunk, the frame budget and WebGL lost: budget.spec.ts (the land set's part).
@@ -247,7 +250,9 @@ test('(3) reduced motion: no loop, a bim that moves fades (no walk)', async () =
 for (const { w, win, wide } of SIZES.filter((x) => x.wide !== 'over')) {
   const tag = wide === null ? String(w) : `${String(w)}-${wide}`;
   test(`(5) his camera at ${tag}: pinch, two fingers, drag, fit`, async () => {
-    const { s } = await open(office, { width: win });
+    // no idle bim: an office-life trip is a real walk (frames at the display's rate), not the camera's
+    const calm = snap(office.agents.filter((a) => !TRIPS.has(a.name)), office.cards, office.places);
+    const { s } = await open(calm, { width: win });
     try {
       await showOffice(s);
       await s.app.evaluate(({ BrowserWindow }, v) => {
@@ -272,9 +277,10 @@ for (const { w, win, wide } of SIZES.filter((x) => x.wide !== 'over')) {
         }
         return out;
       };
-      // the two heads nearest the office's centre at the fit: a pinch there keeps them on view
+      // the two heads nearest the office's centre at the fit, of bims that stay put (an idle one's
+      // office-life trip would walk it off view): a pinch there keeps them on view
       const fit0 = await heads();
-      const pair = [...fit0.entries()].sort(([, a], [, b]) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy)).slice(0, 2).map(([n]) => n);
+      const pair = [...fit0.entries()].filter(([n]) => !TRIPS.has(n)).sort(([, a], [, b]) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy)).slice(0, 2).map(([n]) => n);
       const spread = async (): Promise<number> => {
         const a = await headOf(s.page, pair[0] ?? '');
         const b = await headOf(s.page, pair[1] ?? '');
@@ -345,6 +351,36 @@ for (const { w, win, wide } of SIZES.filter((x) => x.wide !== 'over')) {
       await trackpad(s.cdp, cx, cy, { dy: 10 });
       expect(await spread(), 'a plain wheel at the fit does not move the office').toBeCloseTo(at, 0);
       expect(pinchAtFit, 'the bar can scroll').toBeGreaterThanOrEqual(0);
+    } finally {
+      await s.close();
+    }
+  });
+}
+
+/** (6) His easter eggs frozen mid-play (the check forces them: window.__biseEggs), day and night. */
+for (const theme of ['light', 'dark'] as const) {
+  test(`(6) easter eggs frozen mid-play, ${theme}`, async () => {
+    const { s, core } = await open(office, { theme, width: 1600 });
+    try {
+      await showOffice(s);
+      await s.page.getByTestId('app.right.agents.width.wide').click();
+      await settle(s);
+      await s.page.evaluate((night) => {
+        (window as unknown as { __biseEggs?: unknown }).__biseEggs = {
+          bims: { 'copy-fix': { kind: 'salto', since: 0.4 }, 'signup-perf': { kind: 'speedrun', since: 1 }, 'pricing-page': { kind: 'stare', since: 1 } },
+          office: night ? { ghost: 0.45, tree: true } : { eclipse: true, cake: true, doodle: true },
+        };
+      }, theme === 'dark');
+      // a row event kicks a frame (the loop draws on demand)
+      await core.send(rowsOf(office) as never);
+      await expect.poll(async () => (await overlay(s.page)).labels.filter((l) => l.mode === 'egg').map((l) => `${l.name}:${l.text}`).sort(), { timeout: 3000 })
+        .toEqual(['pricing-page:!', 'signup-perf:1:47']);
+      await sleep(400);
+      await shot(s, `eggs-${theme}.png`, `easter eggs frozen, ${theme === 'dark' ? 'night' : 'day'}, 640`, theme === 'dark'
+        ? "copy-fix mid-salto, '1:47' over signup-perf (speedrun), '!' over pricing-page (the stare); the ghost crossing, the christmas tree in the lounge"
+        : "copy-fix mid-salto, '1:47' over signup-perf, '!' over pricing-page; the eclipse's violet sky, the cake on the island, noughts and crosses on the whiteboard");
+      expect(await collisions(s.page), "the eggs' words follow the labels' rules").toEqual([]);
+      await s.page.evaluate(() => { delete (window as unknown as { __biseEggs?: unknown }).__biseEggs; });
     } finally {
       await s.close();
     }

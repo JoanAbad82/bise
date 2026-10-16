@@ -273,10 +273,12 @@ export function clockSig(l: Local, night: boolean, agents: readonly Agent[]): st
 export function withForced(e: Eggs, f: Forced | null | undefined): Eggs {
   if (f === null || f === undefined) return e;
   const bims = new Map(e.bims);
-  for (const [name, x] of Object.entries(f.bims ?? {})) bims.set(name, { kind: x.kind, since: x.since, dur: Infinity, label: FORCED_LABEL[x.kind] ?? '' });
+  for (const [name, x] of Object.entries(f.bims ?? {})) bims.set(name, { kind: x.kind, since: x.since, dur: FORCED_DUR[x.kind] ?? Infinity, label: FORCED_LABEL[x.kind] ?? '' });
   return { bims, office: { ...e.office, ...f.office } };
 }
 
+/** a forced egg's length, so a frozen one stands where its play would be at `since` */
+const FORCED_DUR: Partial<Record<EggKind, number>> = { salto: SALTO_S, hop: HOP_S, kickflip: KICK_S, itemget: 2.5, tap: 0.8, clap: SHOW_S, dance: DANCE_S, speedrun: 4, combo: SHOW_S, tetris: SHOW_S };
 const FORCED_LABEL: Partial<Record<EggKind, string>> = { speedrun: '1:47', combo: 'combo ×2', stare: '!', itemget: '♪ ♪ ♪', kickflip: 'kickflip +500', tetris: 'line clear' };
 
 /** The words over each bim that has an egg's label (labelsOf shows them where nothing else shows). Pure. */

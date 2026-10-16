@@ -24,8 +24,9 @@ export interface Bim {
 
 const GREY = new Color(WORLD.grey);
 
-export function makeBim(name: string, main: boolean, style: Style): Bim {
-  const o = outfitOf(name, main);
+/** `outfit`: another bim's (s3, april fools: hats shuffled, one in main's hoodie); its own by default */
+export function makeBim(name: string, main: boolean, style: Style, outfit?: Outfit): Bim {
+  const o = outfit ?? outfitOf(name, main);
   const mats = new Map<string, Mat>();
   const orig = new Map<Mat, Color>();
   const mat = (color: string, glow = 0): Mat => {
