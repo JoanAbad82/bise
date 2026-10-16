@@ -20,6 +20,7 @@ No network, no gh, no keychain, no notarization.
 """
 import json
 import os
+import plistlib
 import shutil
 import struct
 import subprocess
@@ -33,6 +34,7 @@ import desktop_feed as F  # noqa: E402
 import desktop_publish as P  # noqa: E402
 import desktop_release as R  # noqa: E402
 import desktop_sign as S  # noqa: E402
+import mac_sign as M  # noqa: E402
 
 SHA = "a" * 64
 SHB = "b" * 64
@@ -55,59 +57,6 @@ def thin(filetype):
     return b"\xcf\xfa\xed\xfe" + struct.pack("<III", 0x0100000C, 0, filetype) + b"\0" * 48
 
 
-def test_what_is_code():
-    check(S.macho_kind(thin(2)) == "exec", "MH_EXECUTE is an executable")
-    check(S.macho_kind(thin(6)) == "lib", "MH_DYLIB is a library")
-    check(S.macho_kind(thin(8)) == "lib", "MH_BUNDLE (a .node module) is signed like a library")
-    check(S.macho_kind(b"#!/bin/sh\necho hi\n" + b"\0" * 50) is None, "a script is not code")
-    fat = b"\xca\xfe\xba\xbe" + struct.pack(">I", 2) + struct.pack(">IIIII", 0x0100000C, 0, 4096, 100, 14) + b"\0" * 40
-    check(S.fat_slice(fat) == 4096, "a universal binary's first slice")
-    java = b"\xca\xfe\xba\xbe" + struct.pack(">I", 52) + b"\0" * 56
-    check(S.fat_slice(java) is None, "a Java class is not a universal binary")
-
-
-def test_the_order_and_argv():
-    items = [("Contents/MacOS/bise", "exec"), ("Contents/Frameworks/Electron Framework.framework", "bundle"),
-             ("Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework", "lib"),
-             ("Contents/Frameworks/bise Helper.app", "bundle"),
-             ("Contents/Frameworks/bise Helper.app/Contents/MacOS/bise Helper", "exec"),
-             ("Contents/Resources/bin/bise", "exec")]
-    order = [r for r, _ in S.plan(items)]
-    check(order[-1] == ".", "the app is signed last")
-    for inner, outer in (("Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework",
-                          "Contents/Frameworks/Electron Framework.framework"),
-                         ("Contents/Frameworks/bise Helper.app/Contents/MacOS/bise Helper", "Contents/Frameworks/bise Helper.app")):
-        check(order.index(inner) < order.index(outer), "%s before the bundle around it" % inner)
-    check(S.plan(list(reversed(items))) == S.plan(items), "the order doesn't depend on the walk")
-    ent = "/e.plist"
-    a = S.codesign_argv("/x/bise.app/Contents/Resources/bin/bise", "exec", "ABC", ent, "/k", "Contents/Resources/bin/bise")
-    check("--options" in a and a[a.index("--options") + 1] == "runtime", "hardened runtime")
-    check("--timestamp" in a and "--timestamp=none" not in a, "a certificate gets a secure timestamp")
-    check(a[a.index("--identifier") + 1] == "dev.bise.bise", "a bare executable is dev.bise.<name>")
-    check(a[a.index("--entitlements") + 1] == ent and a[a.index("--keychain") + 1] == "/k", "entitlements and keychain")
-    lib = S.codesign_argv("/x/l.dylib", "lib", "ABC", ent, None, "Contents/l.dylib")
-    check("--entitlements" not in lib and "--identifier" not in lib, "a library gets no entitlements")
-    fw = S.codesign_argv("/x/E.framework", "bundle", "ABC", ent, None, "Contents/Frameworks/E.framework")
-    check("--entitlements" not in fw, "a framework gets no entitlements")
-    for rel in (".", "Contents/Frameworks/bise Helper.app"):
-        check("--entitlements" in S.codesign_argv("/x", "bundle", "ABC", ent, None, rel), "%s gets the entitlements" % rel)
-    adhoc = S.codesign_argv("/x", "bundle", "-", ent, None, ".")
-    check("--timestamp=none" in adhoc and "--timestamp" not in adhoc, "ad hoc: no timestamp (Apple stamps certificates only)")
-    check(S.ident("Contents/Frameworks/bise Helper (GPU)") == "dev.bise.bise-Helper-GPU", S.ident("bise Helper (GPU)"))
-
-
-def test_entitlements_file():
-    import plistlib
-    with open(S.ENTITLEMENTS, "rb") as f:
-        e = plistlib.load(f)
-    for k in ("com.apple.security.cs.allow-jit", "com.apple.security.cs.allow-unsigned-executable-memory",
-              "com.apple.security.device.audio-input", "com.apple.security.automation.apple-events"):
-        check(e.get(k) is True, "entitlements: %s" % k)
-    check(not any("get-task-allow" in k or "disable-library-validation" in k for k in e), "nothing notarization refuses or needs not")
-    # the calendar is never read (Apple audit #554): no calendar entitlement
-    check(not any("calendars" in k or "personal-information" in k for k in e), "no calendar entitlement: %s" % list(e))
-
-
 def fake_app(root):
     """A fake bise.app: a real executable (a copy of /usr/bin/true, thin arm64 slice not needed:
     codesign signs any Mach-O), a nested framework holding a dylib-shaped copy, a script."""
@@ -123,7 +72,8 @@ def fake_app(root):
         f.write('<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>'
                 '<key>CFBundleIdentifier</key><string>dev.bise.x</string><key>CFBundleExecutable</key><string>X</string>'
                 '<key>CFBundlePackageType</key><string>FMWK</string></dict></plist>')
-    for dst in ("Contents/MacOS/bise", "Contents/Resources/bin/sb-core", "Contents/Frameworks/X.framework/Versions/A/X"):
+    for dst in ("Contents/MacOS/bise", "Contents/Resources/bin/sb-core", "Contents/Resources/bin/bise",
+                "Contents/Resources/bin/bend-jsrt", "Contents/Frameworks/X.framework/Versions/A/X"):
         p = os.path.join(app, dst)
         shutil.copy("/usr/bin/true", p)
         subprocess.run(["codesign", "--remove-signature", p], capture_output=True)
@@ -132,7 +82,20 @@ def fake_app(root):
     os.symlink("Versions/Current/Resources", os.path.join(fw, "Resources"))
     with open(os.path.join(app, "Contents/Resources/bin/run.sh"), "w") as f:
         f.write("#!/bin/sh\n")
+    with open(os.path.join(app, "Contents/Resources/bin/VERSION"), "w") as f:
+        f.write("id=2026.10.2-38\n")
     return app
+
+
+def tree(top):
+    """A bundle's files and links, relative to it. Pure enough: a walk."""
+    out = []
+    for d, dirs, files in os.walk(top):
+        for n in dirs + files:
+            p = os.path.join(d, n)
+            if n != "_CodeSignature" and "_CodeSignature" not in os.path.relpath(p, top).split(os.sep):
+                out.append((os.path.relpath(p, top), "link" if os.path.islink(p) else "dir" if os.path.isdir(p) else "file"))
+    return sorted(out)
 
 
 def test_signs_a_fake_bundle():
@@ -140,16 +103,40 @@ def test_signs_a_fake_bundle():
         return
     with tempfile.TemporaryDirectory() as t:
         app = fake_app(t)
-        found = dict(S.scan(app))
+        found = dict(M.scan(app))
         check("Contents/Resources/bin/run.sh" not in found, "a script is not signed on its own")
         check("Contents/Frameworks/X.framework/X" not in found, "a symlink is signed where it points")
         check(found.get("Contents/Frameworks/X.framework") == "bundle", "the framework is a bundle")
+        # the runtime's bise as the terminal ships it: bin/bise.app (dev.bise.cli) + the link
+        R.cli_bundle(app)
+        bindir = os.path.join(app, "Contents/Resources/bin")
+        check(os.readlink(os.path.join(bindir, "bise")) == "bise.app/Contents/MacOS/bise", "bin/bise is a link into bise.app")
+        check(raises(R.ReleaseError, R.cli_bundle, app), "a second time: the pack must give a real bise")
         steps = S.sign(app, "-")
         check(steps[-1] == (".", "bundle"), steps[-1])
+        rels = [r for r, _ in steps]
+        check(rels.index("Contents/Resources/bin/bise.app") < rels.index("."), "the nested bise.app before the app")
         d = subprocess.run(["codesign", "-dv", os.path.join(app, "Contents/Resources/bin/sb-core")], capture_output=True, text=True).stderr
         check("Identifier=dev.bise.sb-core" in d and R.hardened(d), d)
         e = subprocess.run(["codesign", "-d", "--entitlements", ":-", app], capture_output=True, text=True).stdout
         check("allow-jit" in e, "the app carries its entitlements")
+        nested = os.path.join(bindir, "bise.app")
+        r = subprocess.run(["codesign", "--verify", "--deep", "--strict", app], capture_output=True, text=True)
+        check(r.returncode == 0, "the outer app verifies deep and strict: %s" % r.stderr)
+        d = subprocess.run(["codesign", "-dv", nested], capture_output=True, text=True).stderr
+        check("Identifier=dev.bise.cli" in d and R.hardened(d), "the nested bundle is dev.bise.cli, hardened: %s" % d)
+        e = subprocess.run(["codesign", "-d", "--entitlements", ":-", nested], capture_output=True, text=True).stdout
+        check("audio-input" in e and "allow-jit" not in e, "the nested bise.app has the terminal's entitlements: %s" % e)
+        e = subprocess.run(["codesign", "-d", "--entitlements", ":-", os.path.join(bindir, "bend-jsrt")], capture_output=True, text=True).stdout
+        check("allow-jit" in e and "audio-input" not in e, "bend-jsrt: V8's own file: %s" % e)
+        # the same bundle as a terminal release's app root (build-dist.sh: mac_sign.py bundle)
+        root = os.path.join(t, "app")
+        os.makedirs(root)
+        M.bundle(os.path.join(root, "bise.app"), "/usr/bin/true", M.CLI_ID, "2026.10.2-38", link=True)
+        check(tree(os.path.join(root, "bise.app")) == tree(nested), "one tree: %s vs %s" % (tree(os.path.join(root, "bise.app")), tree(nested)))
+        with open(os.path.join(root, "bise.app/Contents/Info.plist"), "rb") as a, open(os.path.join(nested, "Contents/Info.plist"), "rb") as b:
+            check(sorted(plistlib.load(a)) == sorted(plistlib.load(b)), "one Info.plist's keys")
+        check(os.readlink(os.path.join(root, "bise")) == os.readlink(os.path.join(bindir, "bise")), "one link")
 
 
 def wire(states, version=1):
@@ -310,8 +297,6 @@ def test_pack_and_dmg_settings():
             # the calendar is never read (Apple audit #554): no calendar usage string in Info.plist
             info = mac.get("extendInfo", {})
             check(not [k for k in info if "Calendar" in k], "no calendar usage string: %s" % list(info))
-    na = R.notary_argv("/x.zip")
-    check("--wait" in na and "${APPLE_API_KEY_PATH}" in na, "notarytool waits, the key is a path from the env")
     check(R.dmgbuild_argv("s.py", "bise", "o.dmg")[-4:] == ["-s", "s.py", "bise", "o.dmg"], "dmgbuild's argv")
 
 

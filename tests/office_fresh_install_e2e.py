@@ -83,6 +83,17 @@ def install_app(tmp, app):
     return home, os.path.join(dst, "bise")
 
 
+def app_root(exe):
+    """The app root of a bise: <root>/<x>.app/Contents/MacOS with a VERSION in <root> is <root>
+    (a release's bise.app, cli-sign), else the exe's dir. A copy of the rule's owner,
+    bise_home::exe_home_dir (rust/home/src/lib.rs): change both together."""
+    d = os.path.dirname(exe)
+    up = os.path.dirname(os.path.dirname(os.path.dirname(d)))
+    bundled = (os.path.basename(d) == "MacOS" and os.path.basename(os.path.dirname(d)) == "Contents"
+               and os.path.dirname(os.path.dirname(d)).endswith(".app"))
+    return up if bundled and os.path.isfile(os.path.join(up, "VERSION")) else d
+
+
 def main():
     args = sys.argv[1:]
     if len(args) != 2 or args[0] not in ("--tarball", "--app"):
@@ -92,7 +103,7 @@ def main():
     ok = False
     try:
         home, exe = (install_tarball if args[0] == "--tarball" else install_app)(E.tmp, os.path.abspath(args[1]))
-        root = os.path.dirname(exe)
+        root = app_root(exe)
         for p in ("slides", "sheets", "docs"):
             check(os.path.isfile(os.path.join(root, "plugins", p, "plugin.json")), "plugins/%s shipped in %s" % (p, root))
         check(os.path.isfile(os.path.join(root, "office", "dist", "office.js")), "office/dist/office.js shipped")

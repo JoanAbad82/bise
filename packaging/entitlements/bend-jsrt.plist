@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- bend-jsrt, the V8 engine: its hardened runtime entitlements, one file for both products (the
+     terminal release, scripts/dist_sign.py, and the desktop app, scripts/desktop_sign.py:
+     mac_sign.entitlements_for gives this path to both; tests/mac_sign_test.py pins it). V8
+     writes and runs its own code: JIT, and unsigned executable memory for its code pages. -->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+</dict>
+</plist>

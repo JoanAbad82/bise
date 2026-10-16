@@ -206,6 +206,13 @@ the old `release.sh` ("an EDR quarantine … must FAIL LOUDLY"). Consequences:
 - Run the packaging tests in CI (a GitHub macOS runner) or a VM by
   default; `test-install.sh` is written for that (it also works locally,
   unstripped).
+- **Done (cli-sign, docs/issues/15-tcc-one-grant.md "Releases")**: the
+  terminal release's darwin app root is `bise.app` (dev.bise.cli) + the
+  `bise` link, signed by `scripts/dist_sign.py` (the signing core
+  `scripts/mac_sign.py`, shared with the desktop's `desktop_sign.py`;
+  entitlements in `packaging/entitlements/`), notarized in one submission
+  (`scripts/notary.py`), bise.app and the helper stapled. The bullets
+  below are the requirement it meets.
 - **Every macOS binary is signed with a Developer ID Application
   certificate, hardened runtime, secure timestamp, then notarized**
   (`xcrun notarytool submit … --wait`, with an App Store Connect API
@@ -231,7 +238,9 @@ the old `release.sh` ("an EDR quarantine … must FAIL LOUDLY"). Consequences:
 ## 7. Build matrix / CI (GitHub Actions)
 
 Done for macOS (BISE-168): `.github/workflows/release.yml`, `darwin-arm64`
-(macos-15) and `darwin-x86_64` (macos-15-intel), ad-hoc signed, a
+(macos-15) and `darwin-x86_64` (macos-15-intel), Developer ID signed and
+notarized on a `v*` tag once the variable `RELEASE_SIGN` is `on` (else ad
+hoc; release.yml's header), a
 draft release made by make-release.sh on a `v*` tag (§11, BISE-220); the plan below still holds for
 Linux (`linux-x86_64` ubuntu-24.04, `linux-arm64` ubuntu-24.04-arm) and
 signing (BISE-169). Per job:
@@ -478,8 +487,11 @@ OFF until the repository variable `DESKTOP_RELEASE` is `on`.
   the native helper (macOS 14 floor), `pnpm build`, electron-builder `--dir`
   (ad hoc), then `scripts/desktop_sign.py`: every piece of code signed on its
   own, deepest first, never `--deep`, hardened runtime, a timestamp, the
-  entitlements (`apps/desktop/resources/entitlements.mac.plist`: JIT, the
-  microphone, Apple Events) on the executables and the apps. Then
+  entitlements (`packaging/entitlements/desktop.plist`: JIT, the
+  microphone, Apple Events) on the executables and the apps; before it,
+  `cli_bundle` makes the runtime's `bin/bise.app` (dev.bise.cli, the
+  terminal release's bundle, its `bise.plist`) with `bin/bise` a link into
+  it, and bend-jsrt gets `bend-jsrt.plist` (`scripts/mac_sign.py`). Then
   notarytool (App Store Connect API key) and stapler on the app, the zip for the
   updater (`ditto`), the DMG (dmgbuild: the designer's window,
   `apps/desktop/resources/dmg/layout.json` and `background.png` + `@2x`),

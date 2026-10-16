@@ -593,6 +593,12 @@ pub(crate) fn uninstall(args: &[String]) -> i32 {
 mod tests {
     use super::*;
 
+    /// Tests that fork children (codesign, cp) and the test that checks a
+    /// lease's flock is gone once dropped take turns: a child between its
+    /// fork and its exec holds a copy of every open fd, the lease's too, so
+    /// `in_use` would still see it held (cli-sign: 1 red in 10 runs).
+    static FORKS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn rosetta_gets_the_native_build() {
         assert_eq!(rosetta_target("darwin-x86_64", true), "darwin-arm64");
@@ -645,6 +651,38 @@ mod tests {
         assert!(e.starts_with("sb-core is missing from ") && e.ends_with("bise.app/Contents/Resources/bin"), "{e}");
         assert!(place(&versions, "../x", &bin, true).unwrap_err().contains("no usable VERSION id"));
         assert!(!versions.join("root-new").exists());
+        let _ = std::fs::remove_dir_all(&t);
+    }
+
+    /// A release's (and the desktop runtime's) bise is a signed bise.app
+    /// with `bise` a link into it (cli-sign): placing it, copied or moved,
+    /// keeps the bundle byte for byte and the link a link, so its signature
+    /// (what TCC keys his folder grant on) still verifies.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_placed_bundle_keeps_its_signature() {
+        let _turn = FORKS.lock().unwrap_or_else(|e| e.into_inner());
+        let t = std::env::temp_dir().join(format!("bise-place-sig-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let versions = t.join("prefix/versions");
+        for (id, copy) in [("v-copied", true), ("v-moved", false)] {
+            let root = t.join(id);
+            let macos = root.join("bise.app/Contents/MacOS");
+            std::fs::create_dir_all(&macos).unwrap();
+            std::fs::copy("/usr/bin/true", macos.join("bise")).unwrap();
+            std::fs::write(root.join("bise.app/Contents/Info.plist"), "<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>dev.bise.cli</string><key>CFBundleExecutable</key><string>bise</string></dict></plist>").unwrap();
+            let signed = Command::new("codesign").args(["--force", "-s", "-"]).arg(root.join("bise.app")).status().unwrap();
+            assert!(signed.success());
+            std::os::unix::fs::symlink("bise.app/Contents/MacOS/bise", root.join("bise")).unwrap();
+            for f in ["repl-live", "sb-core"] {
+                std::fs::write(root.join(f), "x").unwrap();
+            }
+            std::fs::write(root.join("VERSION"), format!("id={id}\n")).unwrap();
+            let dir = place(&versions, id, &root, copy).unwrap();
+            assert_eq!(std::fs::read_link(dir.join("bise")).unwrap(), Path::new("bise.app/Contents/MacOS/bise"), "{id}: the link stays a link");
+            let v = Command::new("codesign").args(["--verify", "--strict"]).arg(dir.join("bise.app")).output().unwrap();
+            assert!(v.status.success(), "{id}: {}", String::from_utf8_lossy(&v.stderr));
+        }
         let _ = std::fs::remove_dir_all(&t);
     }
 
@@ -725,6 +763,7 @@ mod tests {
     /// among the newest, current or run from (architect m_21930: ~100 MB each).
     #[test]
     fn a_legacy_roots_second_dir_is_listed_and_pruned_like_the_others() {
+        let _turn = FORKS.lock().unwrap_or_else(|e| e.into_inner());
         let t = std::env::temp_dir().join(format!("bise-prune-legacy-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&t);
         let versions = t.join("prefix/versions");

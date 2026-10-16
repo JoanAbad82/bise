@@ -117,40 +117,17 @@ jobs:
           echo "RUNTIME_ROOT=$root" >> "$GITHUB_ENV"
           cat "$root/VERSION"
 
-      # his Developer ID in a throwaway keychain, the API key in a 0600 file;
-      # both gone in the last step, whatever happened
+      # his Developer ID in a throwaway keychain, the API key in a 0600 file
+      # (.github/actions/mac-signing, the terminal release's too); both gone
+      # in the last step, whatever happened
       - name: The signing keychain
         if: ${{ env.ACTION == 'build' }}
-        env:
-          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
-          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          for s in MAC_CERT_P12_BASE64 MAC_CERT_PASSWORD APPLE_API_KEY_P8 APPLE_TEAM_ID; do
-            [ -n "${!s}" ] || { echo "the environment desktop-release has no secret $s"; exit 1; }
-          done
-          kc="$RUNNER_TEMP/desktop-sign.keychain-db"
-          pass="$(openssl rand -hex 24)"
-          security create-keychain -p "$pass" "$kc"
-          security set-keychain-settings -lut 7200 "$kc"
-          security unlock-keychain -p "$pass" "$kc"
-          umask 077
-          printf '%s' "$MAC_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$MAC_CERT_PASSWORD" -f pkcs12 -T /usr/bin/codesign
-          rm -f "$RUNNER_TEMP/cert.p12"
-          curl -fsSL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
-          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$kc" || true
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$kc" > /dev/null
-          read -r -a kcs <<< "$(security list-keychains -d user | tr -d '"' | xargs)"
-          security list-keychains -d user -s "$kc" "${kcs[@]}"
-          id="$(security find-identity -v -p codesigning "$kc" | grep -F "Developer ID Application:" | grep -F "($APPLE_TEAM_ID)" | awk '{print $2}' | head -n 1)"
-          [ -n "$id" ] || { echo "no Developer ID Application identity of team $APPLE_TEAM_ID in MAC_CERT_P12_BASE64"; exit 1; }
-          printf '%s\n' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
-          {
-            echo "SIGN_ID=$id"
-            echo "SIGN_KEYCHAIN=$kc"
-          } >> "$GITHUB_ENV"
+        uses: ./.github/actions/mac-signing
+        with:
+          cert-p12-base64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          cert-password: ${{ secrets.MAC_CERT_PASSWORD }}
+          api-key-p8: ${{ secrets.APPLE_API_KEY_P8 }}
+          team-id: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Build, sign${{ env.ACTION == 'build' && ', notarize, staple' || ' (ad hoc)' }}
         env:
@@ -159,7 +136,6 @@ jobs:
         run: |
           args=(--out "$RUNNER_TEMP/desk" --runtime-root "$RUNTIME_ROOT" --repo "$GH_REPO")
           if [ "$ACTION" = build ]; then
-            export APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
             args+=(--tag "$TAG" --identity "$SIGN_ID" --keychain "$SIGN_KEYCHAIN" --notarize)
           fi
           "$PY" -B scripts/desktop_release.py build "${args[@]}"

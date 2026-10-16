@@ -124,22 +124,9 @@ app() {  # <app> <exe> <version id>
   local a="$1" exe="$2" v="$3" h
   if off; then return 1; fi
   if ! h="$(identity)"; then say "no '$NAME' identity: no bise.app, a plain bise (asks again for folders)"; return 1; fi
-  mkdir -p "$a/Contents/MacOS"
-  cp "$exe" "$a/Contents/MacOS/bise"
-  cat > "$a/Contents/Info.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleIdentifier</key><string>dev.bise.bise</string>
-  <key>CFBundleName</key><string>bise</string>
-  <key>CFBundleExecutable</key><string>bise</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>$v</string>
-  <key>LSUIElement</key><true/>
-</dict>
-</plist>
-PLIST
+  # the layout: the one bundle builder (a release's bise.app is dev.bise.cli)
+  python3 -B "$REPO/scripts/mac_sign.py" bundle "$a" "$exe" --id dev.bise.bise --version "$v" \
+    || { rm -rf "$a"; say "no bise.app: a plain bise"; return 1; }
   if codesign_as "$h" dev.bise.bise "$a"; then return 0; fi
   rm -rf "$a"; say "signing $a failed: a plain bise (asks again for folders)"; return 1
 }

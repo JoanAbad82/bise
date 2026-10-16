@@ -12,7 +12,10 @@
 #   bise-<id>-<os>-<arch>/
 #     install.sh           the installer (the same file curl | sh fetches)
 #     app/                 the app root, exactly as versions.sh builds it:
-#       bise                 Rust: TUI + Switchboard daemon + sb CLI
+#       bise                 Rust: TUI + Switchboard daemon + sb CLI; on
+#                            macOS a link to bise.app/Contents/MacOS/bise
+#       bise.app             macOS: the bundle dev.bise.cli around it, so
+#                            one folder grant lasts across versions (step 5)
 #       sb                   -> bise (the agents' command: bise called as sb)
 #       repl-live            native Bend REPL (runtime/repl-live.bend)
 #       repl-scripted        native Bend REPL, no provider (runtime/repl.bend)
@@ -43,10 +46,10 @@ elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
 else STATE="$HOME/.local/state/switchboard"; fi
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
 export PATH="$HOME/.cargo/bin:$HOME/.bend/bin:$PATH"
-# a release is ad hoc signed, a plain bise in its app root: never the dev
-# identity nor its bise.app (dev-sign.sh is for this Mac's dev builds; a
-# release bundle needs a Developer ID, docs/issues/15-tcc-one-grant.md).
-# Without this, CI's first versions.sh made a keychain on the runner.
+# never the dev identity nor its bise.app (dev-sign.sh is for this Mac's
+# dev builds): a release makes its own bise.app (dev.bise.cli, step 5),
+# signed with BISE_SIGN_ID. Without this, CI's first versions.sh made a
+# keychain on the runner.
 export SB_DEV_SIGN=0
 
 rev=HEAD
@@ -148,41 +151,60 @@ done
 cp "$HERE/install.sh" "$stage/$name/install.sh"
 chmod +x "$stage/$name/install.sh"
 
-# 5. sign, NEVER strip. The endpoint security agent (CrowdStrike) on the
-#    dev Macs deleted a stripped sb-core within a second of its creation
-#    (ad-hoc signed or not); unstripped + ad-hoc signed binaries are left
-#    alone. Stripping would save ~25 MB (mostly V8): only reconsider it
-#    with Developer ID signing + notarization (docs/packaging.md §6).
-#    Ad-hoc (-) by default; BISE_SIGN_ID=<Developer ID> adds the hardened
-#    runtime + timestamp (entitlements still to add: JIT for bend-jsrt,
-#    audio-input for bise).
+# 5. the bundle (macOS): app/bise.app (dev.bise.cli) around the command,
+#    app/bise a link into it (scripts/mac_sign.py bundle, the one builder:
+#    the desktop app's runtime gets the same). macOS keys a folder grant on
+#    a bundle's id + signature, a plain file's on its path: every version is
+#    a new dir, so a plain bise asked again after each update (docs/issues/
+#    15-tcc-one-grant.md). Signed below, after the helper (step 5c).
 if [ "$os" = darwin ]; then
-  for b in bise repl-live repl-scripted sb-core "$jsrt_at"; do
-    codesign -s "${BISE_SIGN_ID:--}" --force ${BISE_SIGN_ID:+--options runtime --timestamp} "$app/$b" 2>/dev/null
-  done
+  vid="$(sed -n 's/^id=//p' "$app/VERSION")"
+  mv "$app/bise" "$stage/bise.exe"
+  python3 -B "$REPO/scripts/mac_sign.py" bundle "$app/bise.app" "$stage/bise.exe" \
+    --id dev.bise.cli --version "${vid:-$id}" --link
+  rm -f "$stage/bise.exe"
 fi
 
 # 5b. computer use's helper (macOS, docs/computer-use-design.md §5.2):
-#     app/bise Computer Use.app from the commit's computer-use/macos-app.
-#     Its bundle.sh signs it (BISE_SIGN_ID: Developer ID, hardened runtime,
-#     timestamp; else ad-hoc) and, with BISE_NOTARY_PROFILE (a notarytool
-#     keychain profile), notarizes and staples it. Cached by the folder's
-#     tree hash and the signing identity.
+#     app/bise Computer Use.app from the commit's computer-use/macos-app,
+#     built ad hoc by its bundle.sh (signed with the rest in 5c). Cached by
+#     the folder's tree hash.
 helper=""
 if [ "$os" = darwin ] && git cat-file -e "$commit:computer-use/macos-app/Package.swift" 2>/dev/null; then
-  hkey="$(git rev-parse "$commit:computer-use/macos-app")-$(printf %s "${BISE_SIGN_ID:-adhoc}${BISE_NOTARY_PROFILE:+-notarized}" | shasum | cut -c1-8)"
+  hkey="$(git rev-parse "$commit:computer-use/macos-app")"
   hcache="$BUILD/cache/cu-helper-$hkey"
   if [ ! -d "$hcache/bise Computer Use.app" ]; then
     say "building the computer-use helper ($hkey)..."
     hsrc="$(mktemp -d /tmp/bise-cu-helper.XXXXXX)"
     git archive "$commit" computer-use/macos-app | tar -x -C "$hsrc"
     rm -rf "$hcache.tmp" && mkdir -p "$hcache.tmp"
-    "$hsrc/computer-use/macos-app/scripts/bundle.sh" --out "$hcache.tmp" >/dev/null \
+    env -u BISE_SIGN_ID -u BISE_NOTARY_PROFILE "$hsrc/computer-use/macos-app/scripts/bundle.sh" --out "$hcache.tmp" >/dev/null \
       || { rm -rf "$hsrc" "$hcache.tmp"; say "the computer-use helper did not build"; exit 1; }
     rm -rf "$hsrc" "$hcache" && mv "$hcache.tmp" "$hcache"
   fi
   helper="$app/bise Computer Use.app"
   ditto "$hcache/bise Computer Use.app" "$helper"
+fi
+
+# 5c. sign, NEVER strip (scripts/dist_sign.py): every piece of code inside
+#     out, hardened runtime, the entitlements of packaging/entitlements/
+#     (bise.app: the mic, Apple Events; bend-jsrt: V8's JIT), each checked.
+#     BISE_SIGN_ID (+ BISE_SIGN_KEYCHAIN): a Developer ID, whose designated
+#     requirement (identifier + team, no hash) is the same for every
+#     version; else ad hoc. BISE_NOTARIZE=1: one notarization of the whole
+#     app root, the bundles stapled (bare binaries and the tarball can't
+#     be). BISE_SIGN_REQUIRED=1 (release.yml on a v* tag or input sign): no
+#     identity or no notary credentials fails here, never an ad hoc release.
+#     Never strip: the endpoint security agent (CrowdStrike) on the dev Macs
+#     deleted a stripped sb-core within a second of its creation; unstripped
+#     binaries are left alone (docs/packaging.md §6).
+if [ "$os" = darwin ]; then
+  sargs=()
+  [ "${BISE_SIGN_REQUIRED:-0}" = 1 ] && sargs+=(--required)
+  [ "${BISE_NOTARIZE:-0}" = 1 ] && sargs+=(--notarize --work "$stage/notary")
+  python3 -B "$REPO/scripts/dist_sign.py" "$app" "${sargs[@]}" \
+    || { say "signing failed"; exit 1; }
+  rm -rf "$stage/notary"
 fi
 
 # 6. verify: a missing piece must fail here, not on the user's machine

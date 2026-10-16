@@ -31,6 +31,8 @@ echo "== Waits count awake time, not the wall clock (tests/wait_test.py)"
 python3 -B tests/wait_test.py || exit 1
 echo "== The terminal and the desktop app release apart (tests/release_split_test.py)"
 python3 tests/release_split_test.py || exit 1
+echo "== One macOS signing core, the terminal release signed (tests/mac_sign_test.py)"
+python3 -B tests/mac_sign_test.py || exit 1
 echo "== The desktop release: signing order, feed, channels (tests/desktop_release_test.py)"
 python3 -B tests/desktop_release_test.py || exit 1
 echo "== publish-release.sh tags unsigned and says each step (tests/publish_release_test.py)"

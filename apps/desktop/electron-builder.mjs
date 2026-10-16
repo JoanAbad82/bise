@@ -1,6 +1,8 @@
 // Packaging bise desktop (electron-builder; `pnpm dist`). Owner: amb-mac.
 // The app carries what it runs, so nothing is looked up on PATH:
-//   Contents/Resources/bin/bise          the bise it runs (src/main/paths.ts binPath)
+//   Contents/Resources/bin/bise          the bise it runs (src/main/paths.ts binPath); in a
+//                                        release, a link into bin/bise.app (dev.bise.cli), made
+//                                        after the pack by scripts/desktop_release.py cli_bundle
 //   Contents/Resources/bin/VERSION, repl-live, sb-core, bend-jsrt, prompts/, plugins/, kit/,
 //                                        computer-use/extension: the runtime (BISE_PACK_ROOT),
 //                                        a version dir's layout; the core installs it as
@@ -117,8 +119,10 @@ export default {
   asar: true,
   extraResources: [
     // the runtime first, then bise over it (a snapshot's own bise never wins); its rust/
-    // (an old path's hard link to bend-jsrt) would be a second 100 MB copy
-    { from: root, to: 'bin', filter: ['**/*', '!rust/**', '!bise'] },
+    // (an old path's hard link to bend-jsrt) would be a second 100 MB copy; its bise.app (a
+    // release's, or a dev version's) neither: a release build makes bin/bise.app around this bise
+    // after the pack (scripts/desktop_release.py cli_bundle, the terminal's one bundle builder)
+    { from: root, to: 'bin', filter: ['**/*', '!rust/**', '!bise', '!bise.app', '!bise.app/**'] },
     { from: bise, to: 'bin/bise' },
     ...(version === null ? [] : [{ from: version, to: 'VERSION' }]),
   ],

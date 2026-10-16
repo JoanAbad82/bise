@@ -44,6 +44,8 @@ REPO = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import desktop_feed as F  # noqa: E402
 import desktop_sign as S  # noqa: E402
+import mac_sign as M  # noqa: E402
+import notary as N  # noqa: E402
 
 DESKTOP = os.path.join(REPO, "apps", "desktop")
 DMG_DIR = os.path.join(DESKTOP, "resources", "dmg")
@@ -170,44 +172,35 @@ def pack_env(base, p, runtime_root):
     electron-builder 26 starts on its own when it sees them; its config also says notarize: false)
     reach it. Pure."""
     env = {k: v for k, v in base.items() if not k.startswith(("BISE_PACK_", "CSC_", "APPLE_"))}
-    env.update({"BISE_PACK_NAME": NAME, "BISE_PACK_APP_ID": APP_ID, "BISE_PACK_BISE": os.path.join(runtime_root, "bise"),
+    env.update({"BISE_PACK_NAME": NAME, "BISE_PACK_APP_ID": APP_ID, "BISE_PACK_BISE": os.path.realpath(os.path.join(runtime_root, "bise")),
                 "BISE_PACK_HELPER": p["helper"], "BISE_PACK_ROOT": runtime_root, "BISE_PACK_VERSION": p["version"],
                 "BISE_PACK_IDENTITY": "-", "BISE_PACK_OUT": p["dist"], "CSC_IDENTITY_AUTO_DISCOVERY": "false"})
     return env
 
 
-def notary_argv(path):
-    """notarytool's submit (the App Store Connect API key: a file path and two ids from the env). Pure."""
-    return ["xcrun", "notarytool", "submit", path, "--key", "${APPLE_API_KEY_PATH}", "--key-id", "${APPLE_API_KEY_ID}",
-            "--issuer", "${APPLE_API_ISSUER}", "--wait", "--timeout", "45m", "--output-format", "json"]
-
-
 def notarize(path, p):
-    """Submit, wait, read the verdict (its log on a refusal), staple, validate."""
-    env = os.environ
-    for k in ("APPLE_API_KEY_PATH", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"):
-        if not env.get(k):
-            raise ReleaseError("--notarize needs %s" % k)
-    sub = path
-    if path.endswith(".app"):
-        os.makedirs(p["notary"], exist_ok=True)
-        sub = os.path.join(p["notary"], NAME + "-app.zip")
-        run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", path, sub])
-    argv = [env[a[2:-1]] if a.startswith("${") else a for a in notary_argv(sub)]
-    r = subprocess.run(argv, capture_output=True, text=True)
+    """Submit, wait, read the verdict (its log on a refusal), staple, validate (scripts/notary.py)."""
     try:
-        res = json.loads(r.stdout or "{}")
-    except ValueError:
-        res = {}
-    if res.get("status") != "Accepted":
-        if res.get("id"):
-            log = subprocess.run(["xcrun", "notarytool", "log", res["id"], "--key", env["APPLE_API_KEY_PATH"], "--key-id",
-                                  env["APPLE_API_KEY_ID"], "--issuer", env["APPLE_API_ISSUER"]], capture_output=True, text=True)
-            say(log.stdout[-4000:])
-        raise ReleaseError("notarization of %s: %s %s" % (os.path.basename(path), res.get("status") or "no verdict", (r.stderr or "").strip()[-400:]))
-    say("notarized %s (%s)" % (os.path.basename(path), res.get("id")))
-    run(["xcrun", "stapler", "staple", path])
-    run(["xcrun", "stapler", "validate", path])
+        N.submit(path, p["notary"])
+        N.staple(path)
+    except N.NotaryError as e:
+        raise ReleaseError(str(e))
+
+
+def cli_bundle(app):
+    """The runtime's bise as the terminal release ships it (mac_sign.bundle, the one builder):
+    Contents/Resources/bin/bise.app (dev.bise.cli) around the packed bin/bise, and bin/bise a link
+    into it. The core places bin/ as <prefix>/versions/<id> and runs hubs from there: one bundle id
+    and one Developer ID, so his folder grants follow the hub across the terminal and the app."""
+    bindir = os.path.join(app, "Contents", "Resources", "bin")
+    exe = os.path.join(bindir, "bise")
+    if os.path.islink(exe):
+        raise ReleaseError("%s is a link: the pack must copy the runtime's real bise" % exe)
+    v = F.read_version(open(os.path.join(bindir, "VERSION")).read())
+    try:
+        M.bundle(os.path.join(bindir, "bise.app"), exe, M.CLI_ID, v.get("id") or "0", link=True)
+    except M.SignError as e:
+        raise ReleaseError(str(e))
 
 
 def layout(dmg_dir=DMG_DIR):
@@ -376,6 +369,7 @@ def build(a):
     run(["pnpm", "dist"], cwd=DESKTOP, env=pack_env(os.environ, p, root))
     if not os.path.isdir(p["app"]):
         raise ReleaseError("electron-builder made no %s" % p["app"])
+    cli_bundle(p["app"])
     S.sign(p["app"], a.identity, a.keychain, say=say)
     if a.notarize:
         notarize(p["app"], p)

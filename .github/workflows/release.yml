@@ -8,9 +8,17 @@
 # <tag> --publish). Same build path as /version on a dev Mac:
 # build-dist.sh -> versions.sh -> bins.sh.
 #
-# Signing: ad-hoc only (build-dist.sh; user decision, no Developer ID):
-# files fetched by curl or brew carry no quarantine flag, so Gatekeeper
-# lets them run. BISE-169 adds Developer ID + notarization later.
+# Signing (cli-sign, docs/packaging.md §6): the darwin jobs sign with his
+# Developer ID (the desktop's: environment desktop-release, his approval on
+# each run; .github/actions/mac-signing), hardened, notarized, bise.app
+# stapled (scripts/dist_sign.py from build-dist.sh), when
+#   - a v* tag and the repository variable RELEASE_SIGN is 'on': required,
+#     a missing secret fails the job (a tag never ships ad hoc quietly);
+#   - Actions > release > Run workflow with 'sign' checked: the signed dry
+#     run (build + sign + notarize, the archives as run artifacts, no
+#     release; on main or a tag: the environment allows only those).
+# Else ad hoc, as before (a fork, a dispatch without 'sign', and a tag
+# while RELEASE_SIGN is off: a warning says so). Linux jobs never sign.
 #
 # Triggers: a v* tag (build + draft release) and the Actions tab (build
 # only). Not every push to main: macOS minutes cost 10x on a private
@@ -22,6 +30,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      sign:
+        description: "darwin: sign with the Developer ID and notarize (his approval: environment desktop-release)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -55,22 +68,30 @@ jobs:
       matrix:
         include:
           - target: darwin-arm64
+            os: darwin
             runner: macos-15
             bend_arch: arm64
           - target: darwin-x86_64
+            os: darwin
             runner: macos-15-intel
             bend_arch: x64
           # Linux (docs/ports-plan.md): built on Ubuntu 22.04, so every
           # binary needs glibc 2.34 at most (the floor). NixOS takes the
           # same archives through the flake (nix/package.nix patches them)
           - target: linux-x86_64
+            os: linux
             runner: ubuntu-22.04
             bend_arch: x64
           - target: linux-arm64
+            os: linux
             runner: ubuntu-22.04-arm
             bend_arch: arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    # the Developer ID's secrets only for a signed darwin build (see the top)
+    environment: ${{ (matrix.os == 'darwin' && (inputs.sign || (startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_SIGN == 'on'))) && 'desktop-release' || '' }}
+    env:
+      SIGN: ${{ (matrix.os == 'darwin' && (inputs.sign || (startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_SIGN == 'on'))) && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -181,9 +202,29 @@ jobs:
           mkdir -p rust/jsrt/target/debug
           ln -f rust/jsrt/target/release/bend-jsrt rust/jsrt/target/debug/bend-jsrt
 
-      - name: build-dist.sh
-        id: dist
+      - name: The signing keychain
+        if: ${{ env.SIGN == '1' }}
+        uses: ./.github/actions/mac-signing
+        with:
+          cert-p12-base64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          cert-password: ${{ secrets.MAC_CERT_PASSWORD }}
+          api-key-p8: ${{ secrets.APPLE_API_KEY_P8 }}
+          team-id: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: A tag, unsigned
+        if: ${{ matrix.os == 'darwin' && env.SIGN != '1' && startsWith(github.ref, 'refs/tags/v') }}
         run: |
+          echo "::warning::RELEASE_SIGN is not 'on': this tag's darwin archive is ad hoc signed (its folder grants won't last across updates)"
+
+      - name: build-dist.sh${{ env.SIGN == '1' && ' (Developer ID, notarized)' || '' }}
+        id: dist
+        env:
+          APPLE_API_KEY_ID: ${{ env.SIGN == '1' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER: ${{ env.SIGN == '1' && secrets.APPLE_API_ISSUER || '' }}
+        run: |
+          if [ "$SIGN" = 1 ]; then
+            export BISE_SIGN_ID="$SIGN_ID" BISE_SIGN_KEYCHAIN="$SIGN_KEYCHAIN" BISE_NOTARIZE=1 BISE_SIGN_REQUIRED=1
+          fi
           tarball="$(packaging/build-dist.sh HEAD --out "$RUNNER_TEMP/dist")"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           ls -la "$RUNNER_TEMP/dist"
@@ -201,6 +242,12 @@ jobs:
             ${{ runner.temp }}/dist/*.tar.gz.sha256
           if-no-files-found: error
           retention-days: 14
+
+      - name: Forget the keychain and the key
+        if: ${{ always() && env.SIGN == '1' }}
+        run: |
+          if [ -n "${SIGN_KEYCHAIN:-}" ]; then security delete-keychain "$SIGN_KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/cert.p12"
 
       # saved even when a later step failed: the next run starts warm
       - name: Save cargo
