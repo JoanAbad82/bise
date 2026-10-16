@@ -5,6 +5,7 @@
 // archived row; /archived shows old alone with its restore, and neither the live ones nor
 // '+ new agent'. The scripted core (FakeCore). Owner: amb-home (amb-win's src/agents).
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -124,7 +125,7 @@ test('agents/archived-list: /agents lists only the live agents, /archived only t
     await expect(arch.locator(T.restore('old')), 'with its restore').toBeVisible();
     for (const n of ['main', 'perf', 'docs']) await expect(arch.locator(T.row(n)), `${n} is not archived`).toHaveCount(0);
     await expect(page.getByTestId('agents.new'), "no '+ new agent' on the archived list").toHaveCount(0);
-    await expect(arch).toContainText('1 archived');
+    await expect(arch).toContainText(panel.archived_count({ n: 1 }));
     await expect(page.getByTestId('app.title.crumb'), "the crumb: 'acme › archived'").toHaveText(/acme\s*›\s*archived/);
     // an archived row: its name, restore on the same row, then its end dim: '✓ done · <age>'
     await expect(page.getByTestId('agents.end.old')).toHaveText(/^✓ done · /);

@@ -12,6 +12,7 @@ import { rmSync } from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, testUserData, test, expect } from '../../harness';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -74,11 +75,11 @@ for (const theme of ['light', 'dark']) {
       const { page } = s;
       await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 10_000 });
       await expect(page.getByTestId('app.right.artifacts.head')).toContainText('ARTIFACTS · 370');
-      await shows(page, 'artifacts', 5, 'show 50 more · 365 left', false, 'at the cap');
+      await shows(page, 'artifacts', 5, panel.show_more_left({ n: 50, left: 365 }), false, 'at the cap');
       await page.getByTestId('app.right.artifacts.more').click();
-      await shows(page, 'artifacts', 55, 'show 50 more · 315 left', true, 'one page');
+      await shows(page, 'artifacts', 55, panel.show_more_left({ n: 50, left: 315 }), true, 'one page');
       await page.getByTestId('app.right.artifacts.more').click();
-      await shows(page, 'artifacts', 105, 'show 50 more · 265 left', true, 'two pages');
+      await shows(page, 'artifacts', 105, panel.show_more_left({ n: 50, left: 265 }), true, 'two pages');
       const more = page.getByTestId('app.right.artifacts.more');
       const less = page.getByTestId('app.right.artifacts.less');
       await more.scrollIntoViewIfNeeded();
@@ -92,16 +93,16 @@ for (const theme of ['light', 'dark']) {
       await page.waitForTimeout(600);
       await page.reload();
       await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 10_000 });
-      await shows(page, 'artifacts', 105, 'show 50 more · 265 left', true, 'after a reload');
+      await shows(page, 'artifacts', 105, panel.show_more_left({ n: 50, left: 265 }), true, 'after a reload');
 
       // perf's thread: its own 120, at the cap; opened there to its end, only 'show less'
       await page.getByTestId('app.right.agent.perf').click();
       await expect(page.getByTestId('app.right.artifacts.scope')).toBeVisible({ timeout: 10_000 });
-      await shows(page, 'artifacts', 5, 'show 50 more · 115 left', false, "perf's, at the cap");
+      await shows(page, 'artifacts', 5, panel.show_more_left({ n: 50, left: 115 }), false, "perf's, at the cap");
       await page.getByTestId('app.right.artifacts.more').click();
-      await shows(page, 'artifacts', 55, 'show 50 more · 65 left', true, "perf's, one page");
+      await shows(page, 'artifacts', 55, panel.show_more_left({ n: 50, left: 65 }), true, "perf's, one page");
       await page.getByTestId('app.right.artifacts.more').click();
-      await shows(page, 'artifacts', 105, 'show 15 more', true, "perf's, two pages");
+      await shows(page, 'artifacts', 105, panel.show_more({ n: 15 }), true, "perf's, two pages");
       await page.getByTestId('app.right.artifacts.more').click();
       await shows(page, 'artifacts', 120, '', true, "perf's, all");
       await page.getByTestId('app.right.artifacts.less').hover();
@@ -109,18 +110,19 @@ for (const theme of ['light', 'dark']) {
 
       // back on storefront's main: its own pages, as he left them; 'show less' to the cap, the head in view
       await page.getByTestId('app.sidebar.project.' + P).click();
-      await shows(page, 'artifacts', 105, 'show 50 more · 265 left', true, 'storefront again');
+      await shows(page, 'artifacts', 105, panel.show_more_left({ n: 50, left: 265 }), true, 'storefront again');
       await page.getByTestId('app.right.artifacts.less').click();
-      await shows(page, 'artifacts', 5, 'show 50 more · 365 left', false, 'show less');
+      await shows(page, 'artifacts', 5, panel.show_more_left({ n: 50, left: 365 }), false, 'back to the cap');
       await expect(page.getByTestId('app.right.artifacts.head')).toBeInViewport();
 
       // AGENTS: the cap 8, then 50 at a time; its numbers read from its own 'show 50 more · N left'
       const first = (await page.getByTestId('app.right.agents.more').textContent()) ?? '';
-      const left = Number(/^show 50 more · (\d+) left$/u.exec(first)?.[1] ?? 'NaN');
+      const [pre = '', post = ''] = panel.show_more_left({ n: 50, left: '\u0000' }).split('\u0000');
+      const left = first.startsWith(pre) && first.endsWith(post) ? Number(first.slice(pre.length, first.length - post.length)) : Number.NaN;
       expect(left, `AGENTS' cap row: ${first}`).toBeGreaterThan(100);
       const capped = await rowsOf(page, 'agents').count();
       await page.getByTestId('app.right.agents.more').click();
-      await shows(page, 'agents', capped + 50, `show 50 more · ${String(left - 50)} left`, true, 'AGENTS, one page');
+      await shows(page, 'agents', capped + 50, panel.show_more_left({ n: 50, left: left - 50 }), true, 'AGENTS, one page');
       await page.getByTestId('app.right.agents.less').click();
       await shows(page, 'agents', capped, first, false, 'AGENTS, show less');
 
@@ -128,7 +130,7 @@ for (const theme of ['light', 'dark']) {
       await page.waitForTimeout(600);
       await page.reload();
       await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 10_000 });
-      await shows(page, 'artifacts', 5, 'show 50 more · 365 left', false, 'after show less and a reload');
+      await shows(page, 'artifacts', 5, panel.show_more_left({ n: 50, left: 365 }), false, 'after show less and a reload');
 
       // 'all ›' still opens the full list
       await page.getByTestId('app.right.artifacts.all').click();

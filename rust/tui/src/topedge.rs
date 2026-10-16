@@ -13,6 +13,7 @@
 //! last (`∿ 3 · ? 1`).
 
 use crate::artifacts::Artifact;
+use bise_proto::words;
 use crate::chrome::fit;
 use crate::theme::{self, accent, dim};
 use ratatui::style::Style;
@@ -56,7 +57,7 @@ pub(crate) fn notice(new: u64, rows: &[Artifact], link: &dyn Fn(String, Style) -
     let st = Style::default().fg(accent());
     let quiet = Style::default().fg(dim());
     let arrow = || link("↗ ".to_string(), st);
-    let words = |n: u64| if n == 1 { "1 new artifact".to_string() } else { format!("{} new artifacts", n) };
+    let new_words = |n: u64| words::panel::new_artifacts(n);
     let mut out = Vec::new();
     let one = |spans: Vec<Span<'static>>, cut_to: Option<usize>, rich: bool| Form { spans, cut_to, rich };
     let names = who_made(rows);
@@ -73,7 +74,7 @@ pub(crate) fn notice(new: u64, rows: &[Artifact], link: &dyn Fn(String, Style) -
             out.push(one(spans, Some(head + CUT_MIN), true));
         }
     } else if !names.is_empty() {
-        let mut spans = vec![arrow(), link(words(new), st), link(sep(), quiet)];
+        let mut spans = vec![arrow(), link(new_words(new), st), link(sep(), quiet)];
         let head = width(&spans);
         // at most the 2 newest makers, then `+N` for the rest
         let shown = names.len().min(2);
@@ -87,8 +88,8 @@ pub(crate) fn notice(new: u64, rows: &[Artifact], link: &dyn Fn(String, Style) -
             out.push(one(spans, Some(head + CUT_MIN), true));
         }
     }
-    out.push(one(vec![arrow(), link(words(new), st)], None, true));
-    out.push(one(vec![arrow(), link(format!("{} new", new), st)], None, false));
+    out.push(one(vec![arrow(), link(new_words(new), st)], None, true));
+    out.push(one(vec![arrow(), link(words::panel::count_new(new), st)], None, false));
     out.push(one(vec![link(format!("↗ {}", new), st)], None, false));
     out
 }

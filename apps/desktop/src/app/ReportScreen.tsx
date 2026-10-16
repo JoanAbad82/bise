@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import type { BiseApi, CrashReport } from '@/shared/api';
 import { Button, Head } from '@/ds';
 import { Markdown } from '@/thread/Markdown';
+import { panel } from '@/proto/words_panel.gen';
 
 const bise = (): BiseApi | undefined => (window as { bise?: BiseApi }).bise;
 
@@ -49,7 +50,7 @@ export function ReportScreen({ log }: { log?: 'restart' | undefined } = {}) {
   return (
     <section className="app-report" data-testid="app.report">
       <Head
-        title={restart ? 'update log' : 'crash report'}
+        title={restart ? panel.crumb_update_log : panel.crumb_crash}
         sub={r != null ? reportWhere(r.path, home) : undefined}
         end={
           r != null ? (

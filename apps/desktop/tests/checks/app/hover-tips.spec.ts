@@ -12,6 +12,7 @@
 // Shots: hover-tips-<theme>-<mark>.png (designer's sign). Owner: amb-win.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -51,7 +52,7 @@ const pr = (number: number, over: Record<string, unknown> = {}) => ({
   state: 'open',
   checks: 'pass',
   review: 'none',
-  words: 'checks pass',
+  words: panel.pr_checks_pass,
   text: '',
   ...over,
 });
@@ -133,33 +134,33 @@ for (const theme of ['light', 'dark']) {
       await page.getByTestId('app.sidebar.scheduled.end').hover();
       await page.waitForTimeout(150);
       await expect(tip, 'not before the delay').toHaveCount(0);
-      await expect(tip).toHaveText('1 scheduled task, in all your projects');
+      await expect(tip).toHaveText(panel.tip_scheduled({ n: 1 }));
       await page.mouse.move(700, 500);
       await expect(tip, 'gone when the pointer leaves').toHaveCount(0);
 
       // the sidebar's marks. A project row's end words give way under its ⋯ on hover (Benjamin's
       // ⋯ flush right, designer m_26343: the mark's tip says who works and who waits): their tips
       // stay on them, read as attributes
-      await expect(page.getByTestId(`app.sidebar.project.${P}.end`)).toHaveAttribute('data-tip', '2 agents working');
-      await expect(page.getByTestId(`app.sidebar.project.${P}.count`)).toHaveAttribute('data-tip', '1 waiting for you');
+      await expect(page.getByTestId(`app.sidebar.project.${P}.end`)).toHaveAttribute('data-tip', panel.tip_agents_working({ n: 2 }));
+      await expect(page.getByTestId(`app.sidebar.project.${P}.count`)).toHaveAttribute('data-tip', panel.tip_waiting_you({ n: 1 }));
       await expect(page.getByTestId('app.sidebar.project.docs-cff418c0.end'), 'quiet: no end words (its mark says it)').toHaveCount(0);
       // the pink count is the inbox row's (inbox-history pick A)
-      await hover('app.sidebar.inbox.count', '2 waiting for you, in all your projects', 'sidebar-inbox');
-      await hover('app.sidebar.artifacts.end', "1 artifact you haven't opened yet, from perf", 'sidebar-new');
-      await hover('app.sidebar.scheduled.end', '1 scheduled task, in all your projects', 'sidebar-scheduled');
+      await hover('app.sidebar.inbox.count', panel.tip_waiting_you_all({ n: 2 }), 'sidebar-inbox');
+      await hover('app.sidebar.artifacts.end', panel.tip_not_opened_from({ what: panel.tip_not_opened({ n: 1 }), who: 'perf' }), 'sidebar-new');
+      await hover('app.sidebar.scheduled.end', panel.tip_scheduled({ n: 1 }), 'sidebar-scheduled');
 
       // the right bar's marks
       // under 70 % the % is in the sign's tip, its column empty (desktop-delight v2)
-      await hover('app.right.agent.perf.sign', "∿ perf is working · 17% of perf's context used: 44k of 256k", 'right-sign');
-      await hover('app.right.agent.perf.time', 'working for 6 min on this turn', 'right-time');
-      await hover('app.right.agent.search.sign', "? search waits for you · 40% of search's context used: 102k of 256k", 'right-asks');
-      await hover('app.right.agent.pay.mark', '#415 · checks fail: e2e/login · ψ worktree on sb/checkout · click opens the PR', 'right-pr');
+      await hover('app.right.agent.perf.sign', `∿ ${panel.tip_working({ agent: 'perf' })} · ${panel.tip_context_of({ pct: '17%', agent: 'perf', used: '44k', window: '256k' })}`, 'right-sign');
+      await hover('app.right.agent.perf.time', panel.tip_working_for({ len: '6 min' }), 'right-time');
+      await hover('app.right.agent.search.sign', `? ${panel.tip_asks({ agent: 'search' })} · ${panel.tip_context_of({ pct: '40%', agent: 'search', used: '102k', window: '256k' })}`, 'right-asks');
+      await hover('app.right.agent.pay.mark', `${panel.wt_said_on({ said: `#415 · ${panel.pr_checks_fail}: e2e/login`, g: 'ψ' })}sb/checkout · ${panel.tip_opens_pr}`, 'right-pr');
 
       // warm: the next mark at once, no blink
       await page.getByTestId('app.right.agent.perf.time').hover();
-      await expect(tip).toHaveText('working for 6 min on this turn');
+      await expect(tip).toHaveText(panel.tip_working_for({ len: '6 min' }));
       await page.getByTestId('app.right.agent.perf.sign').hover();
-      await expect(tip).toHaveText(/^∿ perf is working/u, { timeout: 100 });
+      await expect(tip).toHaveText(`∿ ${panel.tip_working({ agent: 'perf' })} · ${panel.tip_context_of({ pct: '17%', agent: 'perf', used: '44k', window: '256k' })}`, { timeout: 100 });
 
       // the pointer over the tip: the row under it still gets it (hover tint, the click)
       const box = await tip.boundingBox();

@@ -12,6 +12,7 @@
 //! branch never cuts.
 
 use super::*;
+use bise_proto::words;
 use std::cell::RefCell;
 use unicode_width::UnicodeWidthStr;
 
@@ -32,21 +33,21 @@ pub(crate) fn line(t: &Tip, width: usize) -> Line<'static> {
     let psi = theme::glyph(G_WORKTREE);
     let (head, folder) = match t {
         Tip::Feature { name, trying: false } => {
-            (vec![Span::styled(format!("{psi} feature branch "), d), Span::styled(name.clone(), x), Span::styled(": its agents land on it", d)], None)
+            (vec![Span::styled(words::panel::wt_feature_branch(psi), d), Span::styled(name.clone(), x), Span::styled(words::panel::wt_feature_lands, d)], None)
         }
         Tip::Feature { name, trying: true } => (
             vec![
-                Span::styled(format!("{} feature ", theme::glyph(G_BUILDING)), d),
+                Span::styled(words::panel::wt_feature(theme::glyph(G_BUILDING)), d),
                 Span::styled(name.clone(), x),
-                Span::styled(": its try build is running", d),
+                Span::styled(words::panel::wt_feature_trying, d),
             ],
             None,
         ),
         Tip::Worktree { agents, branch, path } => {
-            let who = if *agents >= 2 { format!("{psi} worktree shared by {agents} agents") } else { format!("{psi} worktree: its own copy of the repo") };
+            let who = if *agents >= 2 { words::panel::wt_shared(psi, agents) } else { words::panel::wt_own(psi) };
             let v = match branch {
-                Some(b) => vec![Span::styled(format!("{who}, on "), d), Span::styled(b.clone(), x)],
-                None => vec![Span::styled(format!("{who}, no branch"), d)],
+                Some(b) => vec![Span::styled(words::panel::wt_on(&who), d), Span::styled(b.clone(), x)],
+                None => vec![Span::styled(words::panel::wt_no_branch(&who), d)],
             };
             (v, path.as_deref().map(crate::open_file::tilde))
         }

@@ -3,6 +3,7 @@
 // screen that is no agent's): that project's; a sub-agent's thread, review or log: only what that
 // agent made, its own timers and alarms. AGENTS and ARCHIVED keep the project's (or every
 // project's) list. Pure. Owner: amb-win.
+import { panel } from '@/proto/words_panel.gen';
 import type { Route } from './route';
 import { MAIN } from './route';
 
@@ -43,8 +44,8 @@ export function scopeWords(scope: BarScope, section: 'artifacts' | 'scheduled', 
   if (scope.level !== 'agent') return null;
   const a = scope.agent;
   return section === 'artifacts'
-    ? { words: `by ${a}`, tip: `only what ${a} made · all › shows ${projectName}'s`, empty: `${a} made nothing yet` }
-    : { words: `for ${a}`, tip: `only ${a}'s scheduled tasks and alarms · all › shows ${projectName}'s`, empty: `nothing wakes ${a}` };
+    ? { words: panel.scope_by({ agent: a }), tip: panel.scope_by_tip({ agent: a, project: projectName }), empty: panel.scope_by_none({ agent: a }) }
+    : { words: panel.scope_for({ agent: a }), tip: panel.scope_for_tip({ agent: a, project: projectName }), empty: panel.scope_for_none({ agent: a }) };
 }
 
 /**
@@ -52,6 +53,5 @@ export function scopeWords(scope: BarScope, section: 'artifacts' | 'scheduled', 
  * count says the scope instead ('2 scheduled for perf', '1 artifact by perf'). Pure.
  */
 export function scopeCountTip(section: 'artifacts' | 'scheduled', n: number, scope: ScopeWords): string {
-  const what = section === 'scheduled' ? 'scheduled' : n === 1 ? 'artifact' : 'artifacts';
-  return `${String(n)} ${what} ${scope.words}`;
+  return section === 'scheduled' ? panel.scope_count_scheduled({ n, scope: scope.words }) : panel.scope_count_artifacts({ n, scope: scope.words });
 }

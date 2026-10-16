@@ -13,6 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, in_view, MAIN_IDLE  # noqa: E402
+from words import w, w_re  # noqa: E402
 
 COLS, ROWS = 150, 42
 PANEL_X = COLS - max(28, min(40, COLS // 4))
@@ -65,7 +66,7 @@ def main():
         # the last spawn is in main's feed, main is idle
         t.wait("new agent @a%d" % (9 + SOLO), 400)
         t.wait_re(MAIN_IDLE, 240)
-        sc = t.wait_re(r"↓ \d+ more", 30)
+        sc = t.wait_re("↓ " + w_re("panel.more"), 30)
         assert "✗" not in "".join(panel(sc)), "an agent failed: " + sc
 
         # the mouse: `↓ n more` a page at a time, down to the last agent
@@ -98,7 +99,7 @@ def main():
         assert more_row(sc, "↑") is None, sc
         y = ROWS // 2
         press(t, x_of(sc, y, "○"), y, button=65)
-        sc = t.wait_re(r"↑ 3 more")
+        sc = t.wait_re(re.escape("↑ " + w("panel.more", n=3)))
         assert not re.search(r"\b0 \S+ main\b", "\n".join(panel(sc))), sc
 
         # the keyboard: Esc to main, Alt+↑ selects the last agent from

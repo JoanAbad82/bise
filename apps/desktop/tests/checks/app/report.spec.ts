@@ -10,6 +10,7 @@ import path from 'node:path';
 import { test, expect } from '../../harness';
 import { onWorld } from '../native/world';
 import { COPY_LINE, REVEAL_LINE } from '../../../src/shared/api';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const PANIC = path.join(__dirname, 'fakes', 'core-panic.mjs');
 type Report = { path: string; text: string } | null;
@@ -25,7 +26,7 @@ test('app/report: the crash report in the window, with copy and show in Finder',
       await page.reload();
       const screen = page.getByTestId('app.report');
       await expect(screen).toBeVisible({ timeout: 10_000 });
-      await expect(screen.locator('.b-head .t1')).toHaveText('crash report');
+      await expect(screen.locator('.b-head .t1')).toHaveText(panel.crumb_crash);
       await expect(screen.locator('.b-head .t2')).toHaveText(/^~\/\.bise\/reports\/crash-\d\d-\d\d\.md$/);
       await expect(page.getByTestId('app.report.text')).toContainText('bise crashed: core panicked: no hub for acme: the workspace moved');
       await expect(page.getByTestId('app.report.text')).toContainText("thread 'main' panicked at rust/core/src/hub.rs:212:9:");

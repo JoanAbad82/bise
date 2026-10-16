@@ -11,6 +11,7 @@
 //   - under 1000 px it slides over the thread (⌥⌘0), esc closes it.
 // Shots: right-bar-<theme>-<width>.png, -bise, -800-over. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -78,7 +79,7 @@ for (const theme of ['light', 'dark']) {
       const names = async () => page.locator('[data-testid="app.right.agents"] .app-rb-row[data-testid^="app.right.agent."]').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')?.replace('app.right.agent.', '')));
       expect(await names()).toEqual([...NAMES.slice(0, 8), 'search']);
       await expect(page.getByTestId('app.right.agent.search').locator('.app-rb-g')).toHaveText('?');
-      await expect(page.getByTestId('app.right.agents.more')).toHaveText('show 4 more');
+      await expect(page.getByTestId('app.right.agents.more')).toHaveText(panel.show_more({ n: 4 }));
       // it never folds while one waits
       await page.getByTestId('app.right.agents.head').click();
       await expect(page.getByTestId('app.right.agent.perf')).toBeVisible();
@@ -204,13 +205,13 @@ for (const theme of ['light', 'dark']) {
       // 'show 4 more' -> every agent, 'show less' in the same row -> back at the cap
       const names = async () => page.locator('[data-testid="app.right.agents"] .app-rb-row[data-testid^="app.right.agent."]').count();
       const more = page.getByTestId('app.right.agents.more');
-      await expect(more).toHaveText('show 4 more');
+      await expect(more).toHaveText(panel.show_more({ n: 4 }));
       const at = await more.boundingBox();
       await more.click();
       expect(await names()).toBe(13);
       await expect(more).toHaveCount(0);
       const less = page.getByTestId('app.right.agents.less');
-      await expect(less).toHaveText('show less');
+      await expect(less).toHaveText(panel.show_less);
       expect(Math.round((await less.boundingBox())?.height ?? 0), "'show less' is 28 px, as 'show N more'").toBe(Math.round(at?.height ?? 0));
       await less.hover();
       await page.screenshot({ path: test.info().outputPath(`heads-${theme}-less.png`) });
@@ -218,7 +219,7 @@ for (const theme of ['light', 'dark']) {
       await bar.locator('.app-rb-body').evaluate((el) => { el.scrollTop = el.scrollHeight; });
       await less.click();
       expect(await names()).toBe(9);
-      await expect(more).toHaveText('show 4 more');
+      await expect(more).toHaveText(panel.show_more({ n: 4 }));
       await expect(less).toHaveCount(0);
       await expect(page.getByTestId('app.right.agents.head')).toBeInViewport();
       // a section under its cap has neither

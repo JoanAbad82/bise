@@ -9,6 +9,7 @@ import { rmSync } from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, testUserData, test, expect } from '../../harness';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -59,7 +60,7 @@ async function folded(page: Page, what: string): Promise<void> {
 async function opened(page: Page, what: string): Promise<void> {
   await expect(page.getByTestId('app.right.archived.head'), what).toHaveAttribute('aria-expanded', 'true', { timeout: 10_000 });
   await expect(page.getByTestId('app.right.archived.hero-img'), what).toBeVisible();
-  await expect(page.getByTestId('app.right.archived.more'), `${what}: the cap`).toHaveText('show 2 more');
+  await expect(page.getByTestId('app.right.archived.more'), `${what}: the cap`).toHaveText(panel.show_more({ n: 2 }));
 }
 
 for (const theme of ['light', 'dark']) {

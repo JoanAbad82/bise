@@ -15,6 +15,7 @@ import { Act, Dot, Press, Ring, Slide, tipAttrs } from '@/ds';
 import { markTip } from './tipwords';
 import type { Agent } from '@/proto';
 import { common } from '@/proto/words_common.gen';
+import { panel } from '@/proto/words_panel.gen';
 import { useAllArtifacts } from '@/artifacts';
 import { LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { AddButton, AddDrop, useAddPlace } from '@/artifacts/Drops';
@@ -159,7 +160,7 @@ function Section({
         {/* nothing to open at 0: the head stays, 'all ›' goes (designer m_20272 (4)) */}
         {(full ?? rows.length) > 0 && (
           <Act onClick={onAll} testId={`app.right.${id}.all`}>
-            all ›
+            {panel.all}
           </Act>
         )}
       </div>
@@ -207,7 +208,7 @@ function Section({
                   }}
                   data-testid={`app.right.${id}.less`}
                 >
-                  show less
+                  {panel.show_less}
                 </Press>
               )}
             </div>
@@ -321,16 +322,16 @@ function Row({ r, onOpen, on, onOpenPr }: { r: BarRow; onOpen: () => void; on?: 
         </>
       )}
       {r.leaves === true && (
-        <span className="app-rb-out" {...tipAttrs('↗ opens in your browser')} data-testid={`${r.testId}.leaves`}>
+        <span className="app-rb-out" {...tipAttrs(panel.opens_in_browser)} data-testid={`${r.testId}.leaves`}>
           {LEAVES}
         </span>
       )}
       {r.sub !== '' && (r.fit === true ? <FitWords className="app-rb-sub" text={r.sub} testId={`${r.testId}.sub`} /> : <span className="app-rb-sub">{r.sub}</span>)}
       {/* a new artifact: the signed 'new' chip (designer m_20132: 1 px line, r 9, ink, t-11) */}
-      {r.end === 'new' && r.id !== undefined ? (
+      {r.end === panel.new_chip && r.id !== undefined ? (
         <span className="app-rb-end">
           <span className="app-rb-new" {...tipAttrs(r.tips?.end)} data-testid={`${r.testId}.new`}>
-            new
+            {panel.new_chip}
           </span>
         </span>
       ) : (
@@ -359,7 +360,7 @@ function WatchDetail({ r, onStop, onAgent }: { r: BarRow; onStop: () => void; on
       </div>
       <div className="app-rb-detail-acts">
         <Act onClick={onAgent} testId={`${r.testId}.open`}>
-          open {r.name}
+          {panel.open_agent({ agent: r.name })}
         </Act>
         <Act onClick={onStop} testId={`${r.testId}.stop`}>
           {common.stop_watching}
@@ -467,21 +468,21 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   const here = (p: string, agent: string) => route.screen === 'thread' && route.project === p && route.agent === agent;
   return (
     // ⌥ held: every agent row shows its context ring (and its %), else only the hovered one (app.css)
-    <aside className={over === true ? 'app-panel app-rb over' : 'app-panel app-rb'} data-testid="app.panel" data-held={alt ? 'alt' : undefined} aria-label={`what happens in ${name}`}>
+    <aside className={over === true ? 'app-panel app-rb over' : 'app-panel app-rb'} data-testid="app.panel" data-held={alt ? 'alt' : undefined} aria-label={panel.bar_label({ name })}>
       <div className="app-rb-top" data-testid="app.right.top">
         <b>{name}</b>
-        {working > 0 && <span className="app-rb-dim">{String(working)} working</span>}
+        {working > 0 && <span className="app-rb-dim">{panel.count_working({ n: working })}</span>}
         <kbd className="app-rb-key">⌥⌘0</kbd>
       </div>
       <div className="app-rb-body">
         <Section
           id="agents"
-          title="AGENTS"
+          title={panel.bar_agents}
           rows={live}
           count={agentCount}
           cap={8}
           pageScope={project}
-          summary={live.length === 0 ? '' : `${String(working)} working`}
+          summary={live.length === 0 ? '' : panel.count_working({ n: working })}
           noFold={waits}
           onAll={() => {
             router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
@@ -509,7 +510,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
         </Section>
         <Section
           id="archived"
-          title="ARCHIVED"
+          title={panel.bar_archived}
           rows={archived}
           cap={5}
           pageScope={project}
@@ -524,13 +525,13 @@ export function RightBar({ project, name, over }: { project: string; name: strin
         <AddDrop place={addHere} testId="app.right.artifacts.drop">
           <Section
             id="artifacts"
-            title="ARTIFACTS"
+            title={panel.bar_artifacts}
             rows={made}
             full={allMade.length}
             scope={scopeWords(scope, 'artifacts', name)}
             cap={5}
             pageScope={inView}
-            summary={made.some((r) => r.end === 'new') ? `${String(made.filter((r) => r.end === 'new').length)} new` : ''}
+            summary={made.some((r) => r.end === panel.new_chip) ? panel.count_new({ n: made.filter((r) => r.end === panel.new_chip).length }) : ''}
             onAll={() => {
               router.go({ screen: 'artifacts', project });
             }}
@@ -541,7 +542,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
         </AddDrop>
         <Section
           id="scheduled"
-          title="SCHEDULED & WATCHING"
+          title={panel.bar_scheduled}
           rows={later}
           full={allLater.length}
           scope={scopeWords(scope, 'scheduled', name)}

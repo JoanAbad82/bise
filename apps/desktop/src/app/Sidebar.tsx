@@ -12,6 +12,7 @@
 import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
 import { IconButton, Kbd, PickerPop, SearchButton, SectionHead, Side, tipAttrs } from '@/ds';
 import type { ProjectRow } from '@/proto';
+import { panel } from '@/proto/words_panel.gen';
 import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
 import { useWaitingCount } from '@/inbox/waiting';
@@ -74,7 +75,7 @@ function useNewMakers(ids: string): string[] {
 /** The artifacts row's end: '1 new · designer' when one agent made them, else '3 new'; '' when none is new. Pure. */
 export function newWords(fresh: number, makers: readonly string[]): string {
   if (fresh <= 0) return '';
-  return makers.length === 1 ? `${String(fresh)} new · ${makers[0] ?? ''}` : `${String(fresh)} new`;
+  return makers.length === 1 ? panel.count_new_by({ n: fresh, who: makers[0] ?? '' }) : panel.count_new({ n: fresh });
 }
 
 /** '2 new · designer': the 'n new' part in the accent, as the artifacts' own 'new' chip (amb-kit, try gate D4); its words say it without the color. */
@@ -210,7 +211,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
       lights={false}
       foot={
         <>
-          <SRow kind="ft" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.add" />
+          <SRow kind="ft" lead="+" name={panel.add_project} end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.add" />
           <SRow kind="ft" lead="⚙" name="settings" end={<kbd>⌘,</kbd>} onClick={() => { router.go({ screen: 'settings' }); }} testId="app.sidebar.settings" />
         </>
       }
@@ -222,26 +223,26 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
           thread's top, so a half-hidden row reads as 'more above' (designer m_15023). */}
       <div className={`app-side-top${full ? ' full' : ''}${scrolled ? ' scrolled' : ''}`} data-testid="app.sidebar.top" data-full={full} data-scrolled={scrolled}>
         <div className="b-lights" data-testid="app.sidebar.lights" />
-        <SearchButton label="search or jump" keys="⌘K" onClick={onSearch} testId="app.sidebar.search" />
+        <SearchButton label={panel.search} keys="⌘K" onClick={onSearch} testId="app.sidebar.search" />
       </div>
       <SRow
         kind="top"
         lead={<LiveBiseMark testId="app.sidebar.bise.mark" />}
-        name="bise"
+        name={panel.bise}
         hint={cmd ? 0 : undefined}
         on={route.screen === 'bise' || (home !== undefined && inView === home.project && route.screen === 'thread' && route.agent === MAIN)}
         onClick={() => { router.go({ screen: 'bise' }); }}
         testId="app.sidebar.bise"
       />
-      <SRow kind="top" lead="?" name="inbox" count={waits} countTip={waitsTip(waits, true)}
+      <SRow kind="top" lead="?" name={panel.inbox} count={waits} countTip={waitsTip(waits, true)}
         on={route.screen === 'inbox'} onClick={() => { router.go({ screen: 'inbox' }); }} testId="app.sidebar.inbox" />
-      <SRow kind="top" lead="↗" name="artifacts" end={<NewEnd words={newWords(fresh, makers)} />} endTip={newTip(fresh, makers)}
+      <SRow kind="top" lead="↗" name={panel.artifacts} end={<NewEnd words={newWords(fresh, makers)} />} endTip={newTip(fresh, makers)}
         on={route.screen === 'artifacts' && route.project === ''}
         onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
-      <SRow kind="top" lead="◷" name="scheduled" end={scheduled > 0 ? String(scheduled) : ''} endTip={scheduledTip(scheduled)} on={route.screen === 'scheduled'}
+      <SRow kind="top" lead="◷" name={panel.scheduled} end={scheduled > 0 ? String(scheduled) : ''} endTip={scheduledTip(scheduled)} on={route.screen === 'scheduled'}
         onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
-      <SectionHead>projects</SectionHead>
-      {projects.length === 0 && <SRow kind="more" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.empty-add" />}
+      <SectionHead>{panel.projects}</SectionHead>
+      {projects.length === 0 && <SRow kind="more" lead="+" name={panel.add_project} end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.empty-add" />}
       {projects.map((p, i) => (
         <ProjectItem key={p.project} p={p} on={inView === p.project} route={route} hint={cmd && i < 9 ? i + 1 : undefined} />
       ))}
@@ -277,7 +278,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
           <IconButton
             ref={more}
             size="row"
-            label={`${p.name}: its agents, what needs you first`}
+            label={panel.project_menu({ name: p.name })}
             pressed={menu}
             onClick={(e) => {
               e.stopPropagation();
@@ -309,7 +310,7 @@ function ProjectMenu({ p, anchor, onClose }: { p: ProjectRow; anchor: RefObject<
       anchor={anchor}
       align="start"
       groups={[
-        { id: 'all', rows: [{ id: 'agents', name: 'all agents', testId: `${id}.agents` }] },
+        { id: 'all', rows: [{ id: 'agents', name: panel.all_agents, testId: `${id}.agents` }] },
         ...groups.map((g) => ({
           id: g.head,
           head: g.head,

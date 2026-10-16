@@ -9,6 +9,7 @@
 // button and '2 waiting', ⌘\ slides the sidebar over a scrim and esc closes it. Shots light and
 // dark at 1400 and 800 for designer's sign-off. The scripted core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { panel as W } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -66,7 +67,7 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     const side = page.getByTestId('app.sidebar');
     await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 10_000 });
     expect(Math.round((await side.boundingBox())?.width ?? 0), 'the sidebar is 240 px').toBe(240);
-    await expect(page.getByTestId('app.sidebar.search')).toContainText('search or jump');
+    await expect(page.getByTestId('app.sidebar.search')).toContainText(W.search);
     // the grid (designer m_21057, desktop-spacing): the title bar's band 40; the field 28 px, 4 under
     // it (44-72); the place rows on 28 from 76 (bise, inbox, artifacts, scheduled); 'projects' 16 above, a 16 px line, 4 below; the
     // first project at 224 (the inbox row under bise); the right bar's rule is the title bar's (one line across the columns)
@@ -100,11 +101,11 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt')).toHaveCount(0);
     await expect(page.getByTestId('app.sidebar.bise.mark'), "something waits: bise's ':*' in the accent").toHaveAttribute('data-waits', 'true');
     // tui-parity R17: who made it, until he opens the artifacts
-    await expect(page.getByTestId('app.sidebar.artifacts')).toContainText('1 new · perf');
+    await expect(page.getByTestId('app.sidebar.artifacts')).toContainText(W.count_new_by({ n: 1, who: 'perf' }));
     await expect(page.getByTestId('app.sidebar.scheduled')).toContainText('1');
     // it works and asks him: '?' in the accent wins, its tip says both (desktop-delight v2)
     await expect(page.getByTestId(`app.sidebar.project.${P}.mark`), "it asks him: '?'").toHaveAttribute('data-mark', 'asks');
-    await expect(page.getByTestId(`app.sidebar.project.${P}.mark`)).toHaveAttribute('data-tip', 'storefront: search waits for you · 2 agents working');
+    await expect(page.getByTestId(`app.sidebar.project.${P}.mark`)).toHaveAttribute('data-tip', W.tip_of({ who: 'storefront', what: `${W.tip_name_waits({ names: 'search' })} · ${W.tip_agents_working({ n: 2 })}` }));
     await expect(page.getByTestId(`app.sidebar.project.${P}`), "no '∿ 2' words: the mark says it").not.toContainText('∿');
     // places only: the agents are in the right bar (designer's desktop-right-bar v5)
     await expect(side.locator('[data-testid^="app.sidebar.agent."]'), 'no agent row in the sidebar').toHaveCount(0);
@@ -121,7 +122,7 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.right.agent.perf')).toContainText('14 min');
     // 9 live agents: 8 then 'show 1 more'
     const more = page.getByTestId('app.right.agents.more');
-    await expect(more).toHaveText('show 1 more');
+    await expect(more).toHaveText(W.show_more({ n: 1 }));
     await expect(page.getByTestId('app.right.agent.old-ui')).toHaveCount(0);
     // the titlebar and panel A
     await expect(page.getByTestId('app.title.crumb')).toHaveText('storefront›perf');
@@ -137,8 +138,8 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.right.top')).toContainText('⌥⌘0');
     expect(Math.round((await panel.boundingBox())?.width ?? 0), 'the panel is 320 px').toBe(320);
     // on perf's thread the section is perf's (bar-scope, main m_25024): deploy-watch's task is in 'all ›'
-    await expect(page.getByTestId('app.right.scheduled.scope')).toHaveText('for perf');
-    await expect(page.getByTestId('app.right.scheduled.none')).toHaveText('nothing wakes perf');
+    await expect(page.getByTestId('app.right.scheduled.scope')).toHaveText(W.scope_for({ agent: 'perf' }));
+    await expect(page.getByTestId('app.right.scheduled.none')).toHaveText(W.scope_for_none({ agent: 'perf' }));
     await expect(page.getByTestId('app.right.scheduled.all')).toBeVisible();
     await page.mouse.move(1, 400);
     await page.screenshot({ path: shot('w1400-light') });
@@ -207,7 +208,7 @@ test('app/sidebar-v6: no project yet: only bise, the top rows and add a project'
     await expect(page.getByTestId('app.sidebar.bise.mark')).not.toHaveAttribute('data-waits', 'true');
     // bise's empty thread: the large ':*' written in mist, ink at rest (designer's bise-presence v10)
     await expect(page.getByTestId('thread.noproject').locator('[data-glyph][data-mood="rest"] canvas')).toBeVisible();
-    await expect(page.getByTestId('thread.noproject.add')).toContainText('add a project');
+    await expect(page.getByTestId('thread.noproject.add')).toContainText(W.add_project);
     await expect(page.getByTestId('composer')).toBeVisible();
     await expect(page.getByTestId('app.panel')).toHaveCount(0);
     await expect(page.getByTestId('app.title.panel')).toHaveCount(0);
@@ -216,7 +217,7 @@ test('app/sidebar-v6: no project yet: only bise, the top rows and add a project'
       const box = await page.getByTestId(id).boundingBox();
       expect(Math.round(box?.height ?? 0), `${id} is a 28 px row`).toBe(28);
     }
-    await expect(page.getByTestId('app.sidebar.add')).toContainText('add a project');
+    await expect(page.getByTestId('app.sidebar.add')).toContainText(W.add_project);
     await expect(page.getByTestId('app.sidebar.settings')).toContainText('settings');
     await page.screenshot({ path: shot('empty-light') });
     await core.send(prefs('dark') as never);

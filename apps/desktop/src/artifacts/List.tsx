@@ -11,6 +11,7 @@ import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
 import { leaves, LEAVES, useGoArtifact } from './leave';
 import './artifacts.css';
 import { Press } from '@/ds';
+import { panel } from '@/proto/words_panel.gen';
 
 export interface RowsProps {
   items: readonly Item[];
@@ -174,7 +175,7 @@ export function ArtifactList({ project, onOpen, testId = 'artifacts.panel' }: { 
   const more =
     archived.length > 0 ? (
       <Press look="art-archived" onClick={() => { setShowArchived((o) => !o); }} data-testid={`${testId}.archived`}>
-        {showArchived ? 'hide the archived ones' : `${String(archived.length)} archived`}
+        {showArchived ? 'hide the archived ones' : panel.archived_count({ n: archived.length })}
       </Press>
     ) : null;
   if (items.length === 0) {

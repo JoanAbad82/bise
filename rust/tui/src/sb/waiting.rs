@@ -9,6 +9,7 @@
 
 use super::*;
 use bise_proto::thread::words::{alarms_of, pause_of, Alarm, PauseLine};
+use bise_proto::words;
 use unicode_width::UnicodeWidthStr;
 
 /// One alarm of a live agent, as the panel, the rule and /scheduled
@@ -130,7 +131,7 @@ pub(super) fn watching_lines(sb: &Sb, w: usize, lines: &mut Vec<Line<'static>>, 
     }
     lines.push(Line::from(""));
     owners.push((lines.len(), super::panel::Hit::Watch(None)));
-    lines.push(Line::from(Span::styled(" watching", Style::default().fg(text()))));
+    lines.push(Line::from(Span::styled(format!(" {}", words::panel::watching), Style::default().fg(text()))));
     for wt in &all {
         for row in watch_rows(wt, w, None) {
             owners.push((lines.len(), super::panel::Hit::Watch(Some(wt.alarm.id))));
@@ -148,7 +149,7 @@ pub(crate) fn rule_states(sb: &Sb, bare: bool, states: Vec<Vec<Span<'static>>>) 
     if !bare || n == 0 {
         return (states, 0);
     }
-    let count = Span::styled(format!("{} {} watching", crate::theme::glyph(G_WATCHING), n), Style::default().fg(faint()));
+    let count = Span::styled(format!("{} {}", crate::theme::glyph(G_WATCHING), words::panel::watching_count(n)), Style::default().fg(faint()));
     let w = count.content.width() as u16;
     let mut out: Vec<Vec<Span<'static>>> = states
         .into_iter()

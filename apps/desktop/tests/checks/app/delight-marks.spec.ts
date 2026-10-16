@@ -17,6 +17,7 @@ import { writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { FakeCore, Recorder, launchDesktop, test, expect } from '../../harness';
 import type { Frame } from '../../harness/frames';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -90,7 +91,7 @@ test('app/delight-marks: the sidebar marks and their tips, the done kiss, the wi
     // MARK: bise's ':*' (text-3, no wait at home... but ts-pattern waits: the accent), the projects' marks
     const bise = page.getByTestId('app.sidebar.bise.mark');
     await expect(bise).toHaveAttribute('data-waits', 'true');
-    await expect(bise).toHaveAttribute('data-tip', 'bise: 1 thing waits for you');
+    await expect(bise).toHaveAttribute('data-tip', panel.tip_of({ who: 'bise', what: panel.tip_things_wait({ n: 1 }) }));
     await expect(page.getByTestId('app.sidebar.bise').getByTestId('bise.pearl.rest'), 'the orb left the sidebar').toHaveCount(0);
     await expect(page.getByTestId('app.sidebar').locator('.b-pearl'), 'no pearl in the sidebar').toHaveCount(0);
     await expect(mark(P)).toHaveAttribute('data-mark', 'works');
@@ -135,17 +136,17 @@ test('app/delight-marks: the sidebar marks and their tips, the done kiss, the wi
     await expect(breath, "still: '∿'").toHaveText('∿');
     expect(await breath.evaluate((el) => getComputedStyle(el.firstElementChild as HTMLElement).color), 'still in text-2').toBe(look.t2);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect(mark(P)).toHaveAttribute('data-tip', 'storefront: perf, search and docs are working · 3 agents');
+    await expect(mark(P)).toHaveAttribute('data-tip', panel.tip_of({ who: 'storefront', what: `${panel.tip_names_working({ names: panel.names_and({ names: 'perf, search', last: 'docs' }) })} · ${panel.tip_agents({ n: 3 })}` }));
     await expect(mark(TS)).toHaveAttribute('data-mark', 'asks');
     await expect(mark(TS)).toHaveText('?');
-    await expect(mark(TS)).toHaveAttribute('data-tip', 'ts-pattern: pattern-error-dx waits for you');
+    await expect(mark(TS)).toHaveAttribute('data-tip', panel.tip_of({ who: 'ts-pattern', what: panel.tip_name_waits({ names: 'pattern-error-dx' }) }));
     await expect(mark(DOCS)).toHaveText('·');
-    await expect(mark(DOCS)).toHaveAttribute('data-tip', 'docs-site: all quiet');
+    await expect(mark(DOCS)).toHaveAttribute('data-tip', panel.tip_of({ who: 'docs-site', what: panel.tip_quiet }));
     const col = await mark(P).evaluate((el) => (el.closest('.app-g') as HTMLElement).getBoundingClientRect().width);
     expect(col, 'the 18 px mark column').toBe(18);
     // the row drops 'all quiet' and '∿ n'; the pink count stays
     await expect(page.getByTestId(`app.sidebar.project.${P}`)).not.toContainText('∿');
-    await expect(page.getByTestId(`app.sidebar.project.${DOCS}`)).not.toContainText('all quiet');
+    await expect(page.getByTestId(`app.sidebar.project.${DOCS}`)).not.toContainText(panel.tip_quiet);
     await expect(page.getByTestId(`app.sidebar.project.${TS}`).locator('.app-cnt')).toHaveText('1');
     const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--c-accent').trim());
     expect(accent).not.toBe('');

@@ -4,4 +4,280 @@
 // bise_proto::words::panel: rust/proto/src/words/panel.rs, never a word typed here.
 
 export const panel = {
+  /** the product's name: the TUI's logo, the sidebar's top row, a card row of bise's own */
+  bise: "bise",
+  /** the TUI panel's title; the desktop's crumb of a project's agents list */
+  agents: "agents",
+  /** the TUI header with no agent and no card */
+  no_agents: "no agents yet",
+  /** a count of agents at work (the TUI header, the right bar's top and AGENTS folded) */
+  count_working: (a: { n: string | number }): string => String(a.n) + " working",
+  /** the TUI header's count of agents waiting on an event or another agent */
+  count_waiting: (a: { n: string | number }): string => String(a.n) + " waiting",
+  /** the TUI header's count of agents that ask him something */
+  count_needs_you: (a: { n: string | number }): string => String(a.n) + " needs you",
+  /** the TUI header's count of agents done */
+  count_done: (a: { n: string | number }): string => String(a.n) + " done",
+  /** the TUI header's open PRs (ctrl held) */
+  count_prs: (a: { n: number }): string => a.n === 1 ? String(a.n) + " PR" : String(a.n) + " PRs",
+  /** the TUI header's open cards */
+  count_inbox: (a: { n: string | number }): string => String(a.n) + " in the inbox",
+  /** what came new: the TUI top edge's short form, the sidebar's and ARTIFACTS' folded end */
+  count_new: (a: { n: string | number }): string => String(a.n) + " new",
+  /** the sidebar's artifacts end when one agent made them all */
+  count_new_by: (a: { n: string | number; who: string | number }): string => String(a.n) + " new · " + String(a.who),
+  /** the TUI top edge's new artifacts */
+  new_artifacts: (a: { n: number }): string => a.n === 1 ? String(a.n) + " new artifact" : String(a.n) + " new artifacts",
+  /** a row of hidden rows: the TUI panel's `↑ 6 more`, the sidebar's fold */
+  more: (a: { n: string | number }): string => String(a.n) + " more",
+  /** the sidebar's fold when every folded agent is from today */
+  more_today: (a: { n: string | number }): string => String(a.n) + " more today",
+  /** it asks him something (the TUI's columns with ctrl held, the sidebar's tip) */
+  asks_you: "asks you",
+  /** at work */
+  state_working: "working",
+  /** waiting on an event or another agent */
+  state_waiting: "waiting",
+  /** failed */
+  state_failed: "failed",
+  /** done */
+  state_done: "done",
+  /** at rest */
+  state_idle: "idle",
+  /** stopped (an archived agent that was neither done nor failed) */
+  state_stopped: "stopped",
+  /** archived: the TUI status line's note, the desktop's crumb of /archived */
+  archived: "archived",
+  /** a role made of a raw tag (a model's `<think>`) */
+  role_thinking: "thinking",
+  /** an agent's next wake, at a clock */
+  wakes_at: (a: { at: string | number }): string => "wakes at " + String(a.at),
+  /** the panel's cards section title */
+  inbox: "inbox",
+  /** the archived section's folded row; the desktop's /archived and artifacts lists */
+  archived_count: (a: { n: string | number }): string => String(a.n) + " archived",
+  /** the desktop's /agents head: the live agents */
+  live_count: (a: { n: string | number }): string => String(a.n) + " live",
+  /** the desktop's /archived with none */
+  no_archived: "no archived agent",
+  /** his messages held for after an agent's turn */
+  queued: (a: { n: string | number }): string => String(a.n) + " queued",
+  /** the watching section's title */
+  watching: "watching",
+  /** the watching count under the panel */
+  watching_count: (a: { n: string | number }): string => String(a.n) + " watching",
+  /** the TUI header's pause mark (cost-pause) */
+  paused: "paused",
+  /** a computer-use agent's app (ctrl held) */
+  driving: (a: { app: string | number }): string => "driving " + String(a.app),
+  /** a computer-use agent's app and where (ctrl held) */
+  driving_in: (a: { app: string | number; place: string | number }): string => "driving " + String(a.app) + " · " + String(a.place),
+  /** the agent selected in preview */
+  preview_of: (a: { agent: string | number }): string => "preview of " + String(a.agent),
+  /** a hub version building */
+  building: (a: { rev: string | number }): string => "building " + String(a.rev),
+  /** a hub version or a feature on trial */
+  on_trial: (a: { rev: string | number }): string => String(a.rev) + " on trial",
+  /** the hub's version */
+  version: (a: { v: string | number }): string => "v " + String(a.v),
+  /** the hub is gone */
+  hub_disconnected: "hub disconnected · reconnecting…",
+  /** the flow (ctrl held): through PRs */
+  lands_via_prs: "lands via PRs",
+  /** the flow (ctrl held): straight to main */
+  lands_on_main: "lands on main",
+  /** a PR's state: a draft */
+  pr_draft: "draft",
+  /** a PR's review: changes requested */
+  pr_changes_asked: "changes asked",
+  /** a PR's review: approved */
+  pr_approved: "approved",
+  /** a PR's review: pending */
+  pr_in_review: "in review",
+  /** a PR's checks pass */
+  pr_checks_pass: "checks pass",
+  /** a PR's checks run */
+  pr_checks_running: "checks running",
+  /** a PR's checks fail */
+  pr_checks_fail: "checks fail",
+  /** a PR with nothing else to say */
+  pr_open: "open",
+  /** the forge is late */
+  pr_state_from: (a: { age: string | number }): string => "state from " + String(a.age) + " ago",
+  /** a feature branch's tip, before its name */
+  wt_feature_branch: (a: { g: string | number }): string => String(a.g) + " feature branch ",
+  /** a feature branch's tip, after its name */
+  wt_feature_lands: ": its agents land on it",
+  /** a feature on try, before its name */
+  wt_feature: (a: { g: string | number }): string => String(a.g) + " feature ",
+  /** a feature on try, after its name */
+  wt_feature_trying: ": its try build is running",
+  /** a worktree 2 or more agents share */
+  wt_shared: (a: { g: string | number; n: string | number }): string => String(a.g) + " worktree shared by " + String(a.n) + " agents",
+  /** a worktree of one agent */
+  wt_own: (a: { g: string | number }): string => String(a.g) + " worktree: its own copy of the repo",
+  /** a worktree's branch follows */
+  wt_on: (a: { who: string | number }): string => String(a.who) + ", on ",
+  /** a detached worktree */
+  wt_no_branch: (a: { who: string | number }): string => String(a.who) + ", no branch",
+  /** a mark's tip: the PR's or the land's words, then its branch */
+  wt_said_on: (a: { said: string | number; g: string | number }): string => String(a.said) + " · " + String(a.g) + " worktree on ",
+  /** AGENTS' head */
+  bar_agents: "AGENTS",
+  /** ARCHIVED's head */
+  bar_archived: "ARCHIVED",
+  /** ARTIFACTS' head */
+  bar_artifacts: "ARTIFACTS",
+  /** SCHEDULED & WATCHING's head */
+  bar_scheduled: "SCHEDULED & WATCHING",
+  /** a head's link to the full list */
+  all: "all ›",
+  /** a long section's next page, more than a page left */
+  show_more_left: (a: { n: string | number; left: string | number }): string => "show " + String(a.n) + " more · " + String(a.left) + " left",
+  /** a long section's last page */
+  show_more: (a: { n: string | number }): string => "show " + String(a.n) + " more",
+  /** back to the cap */
+  show_less: "show less",
+  /** a new artifact's chip */
+  new_chip: "new",
+  /** a browser-only artifact's mark */
+  opens_in_browser: "↗ opens in your browser",
+  /** an alarm's end */
+  until: (a: { at: string | number }): string => "until " + String(a.at),
+  /** an alarm's detail: its agent's link */
+  open_agent: (a: { agent: string | number }): string => "open " + String(a.agent),
+  /** the bar's label for screen readers */
+  bar_label: (a: { name: string | number }): string => "what happens in " + String(a.name),
+  /** ARTIFACTS on a sub-agent's thread */
+  scope_by: (a: { agent: string | number }): string => "by " + String(a.agent),
+  /** its tip */
+  scope_by_tip: (a: { agent: string | number; project: string | number }): string => "only what " + String(a.agent) + " made · all › shows " + String(a.project) + "'s",
+  /** its line at 0 rows */
+  scope_by_none: (a: { agent: string | number }): string => String(a.agent) + " made nothing yet",
+  /** SCHEDULED & WATCHING on a sub-agent's thread */
+  scope_for: (a: { agent: string | number }): string => "for " + String(a.agent),
+  /** its tip */
+  scope_for_tip: (a: { agent: string | number; project: string | number }): string => "only " + String(a.agent) + "'s scheduled tasks and alarms · all › shows " + String(a.project) + "'s",
+  /** its line at 0 rows */
+  scope_for_none: (a: { agent: string | number }): string => "nothing wakes " + String(a.agent),
+  /** a folded scoped SCHEDULED's count tip */
+  scope_count_scheduled: (a: { n: string | number; scope: string | number }): string => String(a.n) + " scheduled " + String(a.scope),
+  /** a folded scoped ARTIFACTS' count tip */
+  scope_count_artifacts: (a: { n: number; scope: string | number }): string => a.n === 1 ? String(a.n) + " artifact " + String(a.scope) : String(a.n) + " artifacts " + String(a.scope),
+  /** an agent's sign: at work */
+  tip_working: (a: { agent: string | number }): string => String(a.agent) + " is working",
+  /** an agent's sign: it asks him */
+  tip_asks: (a: { agent: string | number }): string => String(a.agent) + " waits for you",
+  /** an agent's sign: waiting, nothing more known */
+  tip_waiting: (a: { agent: string | number }): string => String(a.agent) + " is waiting",
+  /** an agent's sign: a pause, its words */
+  tip_paused: (a: { agent: string | number; state: string | number; note: string | number }): string => String(a.agent) + " " + String(a.state) + " " + String(a.note),
+  /** an agent's sign: failed */
+  tip_failed: (a: { agent: string | number }): string => String(a.agent) + " failed",
+  /** an agent's sign: done */
+  tip_done: (a: { agent: string | number }): string => String(a.agent) + " is done",
+  /** an agent's sign: stopped */
+  tip_stopped: (a: { agent: string | number }): string => String(a.agent) + " stopped",
+  /** an agent's sign: at rest */
+  tip_idle: (a: { agent: string | number }): string => String(a.agent) + " is idle",
+  /** an agent's sign: at rest, a wake ahead */
+  tip_idle_wakes: (a: { agent: string | number; at: string | number }): string => String(a.agent) + " is idle: wakes at " + String(a.at),
+  /** the time column: a pause */
+  tip_waiting_for: (a: { len: string | number }): string => "waiting for " + String(a.len),
+  /** the time column: a turn */
+  tip_working_for: (a: { len: string | number }): string => "working for " + String(a.len) + " on this turn",
+  /** the % column */
+  tip_context: (a: { pct: string | number; agent: string | number }): string => String(a.pct) + " of " + String(a.agent) + "'s context used",
+  /** the % column, with the window */
+  tip_context_of: (a: { pct: string | number; agent: string | number; used: string | number; window: string | number }): string => String(a.pct) + " of " + String(a.agent) + "'s context used: " + String(a.used) + " of " + String(a.window),
+  /** a mark's click: an orphan PR's branch */
+  tip_opens_branch: "click opens its branch",
+  /** a mark's click: the PR */
+  tip_opens_pr: "click opens the PR",
+  /** a mark's click: the worktree's changes */
+  tip_opens_changes: "click opens its changes",
+  /** an archived agent's age, just now */
+  tip_archived_now: (a: { state: string | number }): string => String(a.state) + " just now",
+  /** an archived agent's age */
+  tip_archived_ago: (a: { state: string | number; age: string | number }): string => String(a.state) + " " + String(a.age) + " ago",
+  /** an artifact's new chip */
+  tip_new_chip: "new: you haven't opened it yet",
+  /** an artifact's end: today's clock */
+  tip_made_at: (a: { at: string | number }): string => "made at " + String(a.at),
+  /** an artifact's end: now */
+  tip_made_now: "made just now",
+  /** an artifact's end: its age */
+  tip_made_ago: (a: { age: string | number }): string => "made " + String(a.age) + " ago",
+  /** the global screens' rows; its crumb; the panel button */
+  artifacts: "artifacts",
+  /** the scheduled row */
+  scheduled: "scheduled",
+  /** the projects' head */
+  projects: "projects",
+  /** no project yet */
+  add_project: "add a project",
+  /** the search button */
+  search: "search or jump",
+  /** a project's ⋯ button */
+  project_menu: (a: { name: string | number }): string => String(a.name) + ": its agents, what needs you first",
+  /** a project's ⋯ menu: every agent */
+  all_agents: "all agents",
+  /** a project row: its folder is gone */
+  folder_gone: "folder gone",
+  /** a project row: its hub refused this core */
+  refused: "refused",
+  /** two or three names */
+  names_and: (a: { names: string | number; last: string | number }): string => String(a.names) + " and " + String(a.last),
+  /** four names or more */
+  names_more: (a: { names: string | number; n: string | number }): string => String(a.names) + " and " + String(a.n) + " more",
+  /** a mark's tip: what it is and what it says */
+  tip_of: (a: { who: string | number; what: string | number }): string => String(a.who) + ": " + String(a.what),
+  /** bise's or a project's mark: things wait for him */
+  tip_things_wait: (a: { n: number }): string => a.n === 1 ? String(a.n) + " thing waits for you" : String(a.n) + " things wait for you",
+  /** a project's mark: one named agent waits for him */
+  tip_name_waits: (a: { names: string | number }): string => String(a.names) + " waits for you",
+  /** a project's mark: named agents wait for him */
+  tip_names_wait: (a: { names: string | number }): string => String(a.names) + " wait for you",
+  /** bise's mark: at work */
+  tip_working_with: (a: { n: number }): string => a.n === 1 ? "working with " + String(a.n) + " agent" : "working with " + String(a.n) + " agents",
+  /** a project's mark or count: at work */
+  tip_agents_working: (a: { n: number }): string => a.n === 1 ? String(a.n) + " agent working" : String(a.n) + " agents working",
+  /** a project's mark: one named agent at work */
+  tip_name_working: (a: { names: string | number }): string => String(a.names) + " is working",
+  /** a project's mark: named agents at work */
+  tip_names_working: (a: { names: string | number }): string => String(a.names) + " are working",
+  /** a project's mark: how many agents */
+  tip_agents: (a: { n: number }): string => a.n === 1 ? String(a.n) + " agent" : String(a.n) + " agents",
+  /** nothing goes on */
+  tip_quiet: "all quiet",
+  /** a pink count */
+  tip_waiting_you: (a: { n: string | number }): string => String(a.n) + " waiting for you",
+  /** bise's pink count */
+  tip_waiting_you_all: (a: { n: string | number }): string => String(a.n) + " waiting for you, in all your projects",
+  /** a gone folder's tip, its path unknown */
+  tip_gone: "folder gone: its folder is no longer on disk",
+  /** a gone folder's tip */
+  tip_gone_at: (a: { path: string | number }): string => "folder gone: " + String(a.path) + " is no longer on disk",
+  /** the artifacts row's end */
+  tip_not_opened: (a: { n: number }): string => a.n === 1 ? String(a.n) + " artifact you haven't opened yet" : String(a.n) + " artifacts you haven't opened yet",
+  /** the artifacts row's end, who made them */
+  tip_not_opened_from: (a: { what: string | number; who: string | number }): string => String(a.what) + ", from " + String(a.who),
+  /** the scheduled row's count */
+  tip_scheduled: (a: { n: number }): string => a.n === 1 ? String(a.n) + " scheduled task, in all your projects" : String(a.n) + " scheduled tasks, in all your projects",
+  /** the crumb of an agent's changes */
+  crumb_changes: "changes",
+  /** the crumb of an agent's session log */
+  crumb_log: "session log",
+  /** the crumb of settings */
+  crumb_settings: "settings",
+  /** the crumb of an unknown route */
+  crumb_not_found: "not found",
+  /** the crumb of the update log */
+  crumb_update_log: "update log",
+  /** the crumb of a crash report */
+  crumb_crash: "crash report",
+  /** the crumb of the lab */
+  crumb_lab: "lab",
+  /** the panel button with its count */
+  artifacts_count: (a: { n: string | number }): string => "artifacts · " + String(a.n),
 } as const;

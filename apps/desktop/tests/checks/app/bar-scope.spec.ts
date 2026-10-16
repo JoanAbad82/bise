@@ -10,6 +10,7 @@
 //   - AGENTS keeps every agent at each level.
 // Shots: bar-scope-<theme>-<bise|main|perf|bench>.png. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -103,11 +104,11 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf');
       await expect.poll(head('artifacts')).toBe('ARTIFACTS · 1');
       await expect(page.getByTestId('app.right.artifacts.scope')).toHaveText('by perf');
-      await expect(page.getByTestId('app.right.artifacts.scope')).toHaveAttribute('data-tip', "only what perf made · all › shows storefront's");
+      await expect(page.getByTestId('app.right.artifacts.scope')).toHaveAttribute('data-tip', panel.scope_by_tip({ agent: 'perf', project: 'storefront' }));
       expect(await ids('artifacts')).toEqual([`app.right.artifact.${P}.product-page`]);
       await expect.poll(head('scheduled')).toBe('SCHEDULED & WATCHING · 2');
       await expect(page.getByTestId('app.right.scheduled.scope')).toHaveText('for perf');
-      await expect(page.getByTestId('app.right.scheduled.scope')).toHaveAttribute('data-tip', "only perf's scheduled tasks and alarms · all › shows storefront's");
+      await expect(page.getByTestId('app.right.scheduled.scope')).toHaveAttribute('data-tip', panel.scope_for_tip({ agent: 'perf', project: 'storefront' }));
       expect(await ids('scheduled')).toEqual([`app.right.scheduled.${P}.4`, 'app.right.watching.perf.7']);
       // AGENTS keeps every agent
       await expect(page.getByTestId('app.right.agent.bench')).toBeVisible();
@@ -131,7 +132,7 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'bench');
       await expect.poll(head('artifacts')).toBe('ARTIFACTS · 0');
       await expect(page.getByTestId('app.right.artifacts.scope')).toHaveText('by bench');
-      await expect(page.getByTestId('app.right.artifacts.none')).toHaveText('bench made nothing yet');
+      await expect(page.getByTestId('app.right.artifacts.none')).toHaveText(panel.scope_by_none({ agent: 'bench' }));
       await expect.poll(head('scheduled')).toBe('SCHEDULED & WATCHING · 1');
       expect(await ids('scheduled')).toEqual(['app.right.watching.bench.9']);
       await expect(page.getByTestId('app.right.artifacts.all')).toBeVisible();

@@ -5,6 +5,7 @@
 // the right panel is open by default from 1100 px). Owner: amb-win. Pure:
 // Sidebar.tsx and App.tsx draw these.
 import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
+import { panel } from '@/proto/words_panel.gen';
 import { MAIN, type Route } from './route';
 import { shortAge } from '@/agents/model';
 import { pauseLine, shownPause } from '@/thread/wake';
@@ -44,9 +45,9 @@ export function turnShort(ms: number): string {
  */
 export function signOf(a: Agent, now: number, wake?: number): Sign {
   const what = a.title !== '' ? a.title : a.purpose;
-  if (a.waits > 0) return { g: '?', tone: 'acc', end: '', endTone: 'dim', count: a.waits, title: `asks you · ${what}` };
+  if (a.waits > 0) return { g: '?', tone: 'acc', end: '', endTone: 'dim', count: a.waits, title: `${panel.asks_you} · ${what}` };
   // R9/S3: whom it waits on, typed by the hub (the TUI's panel: ? when it is him, … another agent)
-  if (a.waiting_on?.who === 'you') return { g: '?', tone: 'acc', end: '', endTone: 'dim', count: 0, title: `asks you · ${what}` };
+  if (a.waiting_on?.who === 'you') return { g: '?', tone: 'acc', end: '', endTone: 'dim', count: 0, title: `${panel.asks_you} · ${what}` };
   // a pause (agent-waiting-states A): it continues when a command ends or another agent answers:
   // '…' in ink, how long on the right ('3 min'), the pause line on hover; never the accent (it
   // doesn't wait on him). An alarm leaves it idle: it is free.
@@ -56,20 +57,20 @@ export function signOf(a: Agent, now: number, wake?: number): Sign {
   if (pause !== null) return { g: '…', tone: 'ink', end: pause.len, endTone: 'dim', count: 0, title: `${pause.title} · ${what}` };
   switch (a.status) {
     case 'working':
-      return { g: '∿', tone: 'ink', end: turnShort(a.turn_ms ?? now - a.since_ms), endTone: 'dim', count: 0, title: `working · ${what}` };
+      return { g: '∿', tone: 'ink', end: turnShort(a.turn_ms ?? now - a.since_ms), endTone: 'dim', count: 0, title: `${panel.state_working} · ${what}` };
     case 'waiting':
     case 'blocked':
-      return { g: '⋯', tone: 'dim', end: 'waiting', endTone: 'dim', count: 0, title: `waiting · ${what}` };
+      return { g: '⋯', tone: 'dim', end: panel.state_waiting, endTone: 'dim', count: 0, title: `${panel.state_waiting} · ${what}` };
     case 'failed':
-      return { g: '✗', tone: 'err', end: 'failed', endTone: 'err', count: 0, title: `failed · ${what}` };
+      return { g: '✗', tone: 'err', end: panel.state_failed, endTone: 'err', count: 0, title: `${panel.state_failed} · ${what}` };
     default:
       break;
   }
-  if (wake !== undefined) return { g: '◷', tone: 'dim', end: hm(wake), endTone: 'dim', count: 0, title: `wakes at ${hm(wake)} · ${what}` };
-  if (a.status === 'done') return { g: '✓', tone: 'dim', end: 'done', endTone: 'dim', count: 0, title: `done · ${what}` };
+  if (wake !== undefined) return { g: '◷', tone: 'dim', end: hm(wake), endTone: 'dim', count: 0, title: `${panel.wakes_at({ at: hm(wake) })} · ${what}` };
+  if (a.status === 'done') return { g: '✓', tone: 'dim', end: panel.state_done, endTone: 'dim', count: 0, title: `${panel.state_done} · ${what}` };
   // at rest: the hub's word, the one the agent's head chip says too (designer m_19784 (5): '– stopped'
   // here and 'idle' there disagreed); the TUI's ○ for idle
-  return { g: '○', tone: 'dim', end: 'idle', endTone: 'dim', count: 0, title: `idle · ${what}` };
+  return { g: '○', tone: 'dim', end: panel.state_idle, endTone: 'dim', count: 0, title: `${panel.state_idle} · ${what}` };
 }
 
 /**
@@ -105,8 +106,8 @@ export function folds(a: Agent, now: number, wake?: number): boolean {
 /** The fold's words: '3 more today', or '3 more' when some are older than today. Pure. */
 export function moreWords(folded: readonly Agent[], now: number): string {
   const today = new Date(now).setHours(0, 0, 0, 0);
-  const n = String(folded.length);
-  return folded.every((a) => a.since_ms >= today) ? `${n} more today` : `${n} more`;
+  const n = folded.length;
+  return folded.every((a) => a.since_ms >= today) ? panel.more_today({ n }) : panel.more({ n });
 }
 
 /**
@@ -115,8 +116,8 @@ export function moreWords(folded: readonly Agent[], now: number): string {
  * its mark does (desktop-delight v2, Marks.tsx). Pure.
  */
 export function projectSide(p: ProjectRow, refused = false): { text: string; err: boolean; count: number } {
-  if (p.missing === true) return { text: 'folder gone', err: true, count: 0 };
-  if (refused) return { text: 'refused', err: true, count: 0 };
+  if (p.missing === true) return { text: panel.folder_gone, err: true, count: 0 };
+  if (refused) return { text: panel.refused, err: true, count: 0 };
   return { text: p.working > 0 ? String(p.working) : '', err: false, count: p.waits };
 }
 
@@ -150,20 +151,20 @@ export function panelProject(route: Route, home: string | undefined, projects: n
 export function crumbOf(route: Route, name: (project: string) => string): string[] {
   switch (route.screen) {
     case 'bise':
-      return ['bise'];
+      return [panel.bise];
     case 'thread':
       return route.agent === MAIN ? [name(route.project)] : [name(route.project), route.agent];
     case 'agents':
       // /archived is its own list, its crumb says so (designer m_19489)
-      return [name(route.project), route.archived === true ? 'archived' : 'agents'];
+      return [name(route.project), route.archived === true ? panel.archived : panel.agents];
     case 'changes':
     case 'prs':
     case 'environments':
       return [name(route.project), route.screen];
     case 'review':
-      return [name(route.project), route.agent, 'changes'];
+      return [name(route.project), route.agent, panel.crumb_changes];
     case 'log':
-      return [name(route.project), route.agent, 'session log'];
+      return [name(route.project), route.agent, panel.crumb_log];
     case 'feature':
       return [name(route.project), `ψ ${route.name}`];
     case 'commit':
@@ -171,16 +172,16 @@ export function crumbOf(route: Route, name: (project: string) => string): string
     case 'branch':
       return [name(route.project), route.branch];
     case 'artifacts':
-      return route.project === '' ? ['artifacts'] : [name(route.project), 'artifacts'];
+      return route.project === '' ? [panel.artifacts] : [name(route.project), panel.artifacts];
     case 'settings':
-      return route.page === undefined ? ['settings'] : ['settings', route.page];
+      return route.page === undefined ? [panel.crumb_settings] : [panel.crumb_settings, route.page];
     case 'notfound':
-      return ['not found'];
+      return [panel.crumb_not_found];
     case 'report':
       // the page's own words (designer m_17010)
-      return [route.log === 'restart' ? 'update log' : 'crash report'];
+      return [route.log === 'restart' ? panel.crumb_update_log : panel.crumb_crash];
     case 'lab':
-      return ['lab', route.lab];
+      return [panel.crumb_lab, route.lab];
     default:
       return [route.screen];
   }
@@ -202,6 +203,6 @@ export function panelAt(width: number, kept: boolean | undefined): { docked: boo
  * the count goes ('artifacts', '' when narrow), designer m_18734. Pure.
  */
 export function panelWords(narrow: boolean, count: number): string {
-  if (count <= 0) return narrow ? '' : 'artifacts';
-  return narrow ? String(count) : `artifacts · ${String(count)}`;
+  if (count <= 0) return narrow ? '' : panel.artifacts;
+  return narrow ? String(count) : panel.artifacts_count({ n: count });
 }

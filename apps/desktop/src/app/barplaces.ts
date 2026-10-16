@@ -4,6 +4,7 @@
 // worktree are a group under a 'ψ <branch>' head, an open PR with no live agent is a row of its own.
 // The words are the hub's (`Pr.words`, `Place.lid`), never rebuilt here. Pure. Owner: amb-win.
 import type { Agent, Card, Place, Pr } from '@/proto';
+import { panel } from '@/proto/words_panel.gen';
 
 /** A mark's tint: accent (an inbox card asks him to merge it), err (its checks fail), mid (text-2), dim (text-3). */
 export type MarkTone = 'acc' | 'err' | 'mid' | 'dim';
@@ -88,12 +89,12 @@ export function worktreeParts(p: Place, home?: string): TipPart[] {
   const label = placeLabel(p);
   if (p.feature === true) {
     return p.trying === true
-      ? [{ t: 'Δ feature ' }, { t: label, mono: true }, { t: ': its try build is running' }]
-      : [{ t: 'ψ feature branch ' }, { t: label, mono: true }, { t: ': its agents land on it' }];
+      ? [{ t: panel.wt_feature({ g: 'Δ' }) }, { t: label, mono: true }, { t: panel.wt_feature_trying }]
+      : [{ t: panel.wt_feature_branch({ g: 'ψ' }) }, { t: label, mono: true }, { t: panel.wt_feature_lands }];
   }
   const n = (p.agents ?? []).length;
-  const who = n >= 2 ? `ψ worktree shared by ${String(n)} agents` : 'ψ worktree: its own copy of the repo';
-  const out: TipPart[] = p.branch != null && p.branch !== '' ? [{ t: `${who}, on ` }, { t: p.branch, mono: true }] : [{ t: `${who}, no branch` }];
+  const who = n >= 2 ? panel.wt_shared({ g: 'ψ', n }) : panel.wt_own({ g: 'ψ' });
+  const out: TipPart[] = p.branch != null && p.branch !== '' ? [{ t: panel.wt_on({ who }) }, { t: p.branch, mono: true }] : [{ t: panel.wt_no_branch({ who }) }];
   const path = p.path ?? (p.id.startsWith('pt:') ? p.id.slice(3) : undefined);
   if (path !== undefined && path !== '') out.push({ t: ' · ' }, { t: tilde(path, home), mono: true });
   return out;
@@ -105,9 +106,9 @@ export function worktreeParts(p: Place, home?: string): TipPart[] {
  */
 export function tipParts(p: Place, home?: string): TipPart[] {
   const pr = livePr(p);
-  const said = p.lid != null && p.lid !== '' ? p.lid : pr !== null ? `#${String(pr.number)} · ${pr.words !== '' ? pr.words : 'open'}` : null;
+  const said = p.lid != null && p.lid !== '' ? p.lid : pr !== null ? `#${String(pr.number)} · ${pr.words !== '' ? pr.words : panel.pr_open}` : null;
   if (said === null) return worktreeParts(p, home);
-  return [{ t: `${said} · ψ worktree on ` }, { t: placeLabel(p), mono: true }];
+  return [{ t: panel.wt_said_on({ said, g: 'ψ' }) }, { t: placeLabel(p), mono: true }];
 }
 
 /** [`tipParts`] as one string. */

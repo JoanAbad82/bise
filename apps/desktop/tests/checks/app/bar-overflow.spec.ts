@@ -13,6 +13,7 @@
 // Shots: bar-overflow-<theme>-<size>-<where>.png. Owner: bar-overflow.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import type { Page } from '@playwright/test';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -28,7 +29,7 @@ const use = (pct: number) => ({ usage: { model: 'm', context: pct * 1000, window
 const agent = (name: string, status: string, over: Record<string, unknown> = {}) => ({
   name, main: name === 'main', status, archived: false, title: '', purpose: `${name}'s job`, since_ms: NOW - 14 * MIN, waits: 0, watching: [], ...over,
 });
-const pr = (n: number, branch: string) => ({ number: n, url: `https://github.com/acme/shop/pull/${String(n)}`, title: `pr ${String(n)}`, state: 'open', branch, base: 'main', checks: 'pass', failing: [], review: 'none', words: 'checks pass' });
+const pr = (n: number, branch: string) => ({ number: n, url: `https://github.com/acme/shop/pull/${String(n)}`, title: `pr ${String(n)}`, state: 'open', branch, base: 'main', checks: 'pass', failing: [], review: 'none', words: panel.pr_checks_pass });
 const NAMES = [LONG, QUIET, 'architect', 'debt-t5', 'debt-t9', 'dmg-benjamin', 'try-gate-c2ba', 'dist-plan', 'landing-shots', 'plan-ok', 'notif-artifact', 'electron-fuses', 'inbox-open', 'thread-perf', 'projmenu-flake', 'desk-cut-4', 'bar-overflow'];
 const NOW_LINE = 'holding the notif-artifact pick until the architect answers on the seam between the hub and the app';
 const live = NAMES.map((n, i) => agent(n, i % 3 === 0 ? 'working' : i % 3 === 1 ? 'idle' : 'done', { purpose: NOW_LINE, title: NOW_LINE, ...(i % 3 === 0 ? { turn_ms: (i + 1) * MIN } : {}), ...use(i % 2 === 0 ? 85 : 30) }));

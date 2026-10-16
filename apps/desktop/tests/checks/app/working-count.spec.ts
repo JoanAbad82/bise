@@ -6,6 +6,7 @@
 // left marks at work (the breath) show the same frame on one clock. Shots
 // light and dark for designer's sign. The scripted core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const P = 'acme-1a2b3c4d';
 const TS = 'tspat-0a0b0c0d';
@@ -44,7 +45,7 @@ test("app/working-count: a project's row ends with how many agents work in it, w
     await expect(row(P)).toBeVisible({ timeout: 10_000 });
 
     await expect(end(P), "storefront: '3' at work").toHaveText('3');
-    await expect(end(P)).toHaveAttribute('data-tip', '3 agents working');
+    await expect(end(P)).toHaveAttribute('data-tip', panel.tip_agents_working({ n: 3 }));
     await expect(row(P), "never '∿ 3'").not.toContainText('∿');
     const look = await end(P).evaluate((el) => {
       const r = el.getBoundingClientRect();
@@ -70,7 +71,7 @@ test("app/working-count: a project's row ends with how many agents work in it, w
     expect(order, 'the count right of the number, 8 px apart').toBe(8);
     await expect(end(DOCS), 'docs-site: quiet, no end words').toHaveCount(0);
     await expect(end(API), "api: '1'").toHaveText('1');
-    await expect(end(API)).toHaveAttribute('data-tip', '1 agent working');
+    await expect(end(API)).toHaveAttribute('data-tip', panel.tip_agents_working({ n: 1 }));
 
     // the left marks at work breathe on one shared clock: storefront's and api's show the same frame
     const phase = await page.evaluate(async ([a, b]) => {

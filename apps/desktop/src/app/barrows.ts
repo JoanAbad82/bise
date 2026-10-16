@@ -10,9 +10,10 @@ import { howOften, nextWords } from '@/scheduled/model';
 import { shortAge } from '@/agents/model';
 import { alarms, pauseLine, waitLen } from '@/thread/wake';
 import type { Agent, Card, ComputerAgent, Place } from '@/proto';
+import { panel } from '@/proto/words_panel.gen';
 import { asksMerge, livePr, markOf, orphanPlaces, placeLabel, placeOf, sharedPlaces, tipWords, type Mark } from './barplaces';
 import { computerDot, signOf, type Sign, type Tone } from './side';
-import { archivedAgeTip, madeTip, NEW_CHIP_TIP, pctTip, signTip, timeTip } from './tipwords';
+import { archivedAgeTip, madeTip, pctTip, signTip, stateWord, timeTip } from './tipwords';
 
 /** One agent with its project, across the projects shown. */
 export interface ProjAgent {
@@ -85,7 +86,7 @@ export interface AgentExtras {
  * at the source, role.rs `clean`). Such words read 'thinking'.
  */
 export function roleWords(t: string): string {
-  return /<\/?[a-z][a-z0-9_-]*(\s[^>]*)?>/i.test(t) ? 'thinking' : t;
+  return /<\/?[a-z][a-z0-9_-]*(\s[^>]*)?>/i.test(t) ? panel.role_thinking : t;
 }
 
 const idOf = (all: boolean, project: string, name: string) => (all ? `${project}.${name}` : name);
@@ -278,10 +279,10 @@ export function archivedRows(agents: readonly ProjAgent[], now: number, all: boo
         sub: all ? x.projectName : '',
         end: shortAge(now - x.a.since_ms),
         endTone: 'dim',
-        title: `${st} · ${x.a.title !== '' ? x.a.title : x.a.purpose}`,
+        title: `${stateWord(st)} · ${x.a.title !== '' ? x.a.title : x.a.purpose}`,
         testId: `app.right.archived.${idOf(all, x.project, x.a.name)}`,
         waits: false,
-        tips: { glyph: `${st === 'done' ? '✓' : st === 'failed' ? '✗' : '–'} ${x.a.name} ${st === 'done' ? 'is done' : st}`, end: archivedAgeTip(st, now - x.a.since_ms) },
+        tips: { glyph: `${st === 'done' ? '✓' : st === 'failed' ? '✗' : '–'} ${(st === 'done' ? panel.tip_done : st === 'failed' ? panel.tip_failed : panel.tip_stopped)({ agent: x.a.name })}`, end: archivedAgeTip(st, now - x.a.since_ms) },
       };
     });
 }
@@ -306,12 +307,12 @@ export function artifactRows(items: readonly Item[], now: number): BarRow[] {
       name: it.a.title,
       sub: '',
       leaves: leaves(it.a),
-      end: it.a.new ? 'new' : now - it.a.at_ms < 86_400_000 ? hm(it.a.at_ms) : shortAge(now - it.a.at_ms),
+      end: it.a.new ? panel.new_chip : now - it.a.at_ms < 86_400_000 ? hm(it.a.at_ms) : shortAge(now - it.a.at_ms),
       endTone: it.a.new ? 'ink' : 'dim',
       title: `${it.a.title} · ${it.projectName}`,
       testId: `app.right.artifact.${it.project}.${it.a.id}`,
       waits: false,
-      tips: { end: it.a.new ? NEW_CHIP_TIP : madeTip(now - it.a.at_ms < 86_400_000 ? hm(it.a.at_ms) : shortAge(now - it.a.at_ms)) },
+      tips: { end: it.a.new ? panel.tip_new_chip : madeTip(now - it.a.at_ms < 86_400_000 ? hm(it.a.at_ms) : shortAge(now - it.a.at_ms)) },
     }));
 }
 
@@ -353,7 +354,7 @@ export function watchRows(agents: readonly ProjAgent[], now: number, all: boolea
         name: x.a.name,
         sub: al.note,
         fit: true,
-        end: al.end === '' ? '' : `until ${al.end}`,
+        end: al.end === '' ? '' : panel.until({ at: al.end }),
         endTone: 'dim' as const,
         title: al.title,
         testId: `app.right.watching.${idOf(all, x.project, x.a.name)}.${String(al.id)}`,
@@ -390,6 +391,6 @@ export function pageRows(rows: readonly BarRow[], cap: number, pages = 0): Paged
   const limit = cap + p * PAGE;
   const shown = rows.filter((r, i) => i < limit || r.waits);
   const hidden = rows.length - shown.length;
-  const more = hidden === 0 ? '' : hidden > PAGE ? `show ${String(PAGE)} more · ${String(hidden)} left` : `show ${String(hidden)} more`;
+  const more = hidden === 0 ? '' : hidden > PAGE ? panel.show_more_left({ n: PAGE, left: hidden }) : panel.show_more({ n: hidden });
   return { shown, hidden, pages: p, more, less: p > 0 };
 }

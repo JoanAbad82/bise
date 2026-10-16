@@ -17,6 +17,7 @@ import bise_env  # noqa: E402
 from words import w, w_re  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
+from words import w  # noqa: E402
 
 def tmux(*a):
     return subprocess.run(["tmux", *a], capture_output=True, text=True).stdout
@@ -342,7 +343,7 @@ def main():
         t.keys("M-Down")
         t.keys("M-Down")
         t.keys("Space")
-        t.wait("preview of t1")
+        t.wait(w("panel.preview_of", agent="t1"))
         t.keys("Escape")
         # a slash command and its notice
         t.typed("/agents")
@@ -359,7 +360,7 @@ def main():
         t.wait(w("composer.drop_question", agent="t1"))
         t.typed("y")
         t.wait("@t1 archived", 20)
-        t.wait("1 archived")
+        t.wait(w("panel.archived_count", n=1))
         # /agents lists live agents only: t1 now under /archived
         t.typed("/agents")
         t.keys("Enter")

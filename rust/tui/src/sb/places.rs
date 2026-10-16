@@ -12,6 +12,7 @@
 //! for the divider and the header.
 
 use super::*;
+use bise_proto::words;
 use unicode_width::UnicodeWidthStr;
 
 /// A worktree as the hub sends it (`rows::Place`, state_rows.rs).
@@ -87,20 +88,20 @@ impl Pr {
         let mut parts: Vec<Vec<Span<'static>>> = Vec::new();
         let w = |t: &str| vec![Span::styled(t.to_string(), st)];
         if self.state == "draft" {
-            parts.push(w("draft"));
+            parts.push(w(words::panel::pr_draft));
         }
         match self.review.as_str() {
-            "changes_requested" => parts.push(w("changes asked")),
-            "approved" => parts.push(w("approved")),
-            "pending" => parts.push(w("in review")),
+            "changes_requested" => parts.push(w(words::panel::pr_changes_asked)),
+            "approved" => parts.push(w(words::panel::pr_approved)),
+            "pending" => parts.push(w(words::panel::pr_in_review)),
             _ => {}
         }
         match self.checks.as_str() {
-            "pass" => parts.push(w("checks pass")),
-            "running" => parts.push(w("checks running")),
+            "pass" => parts.push(w(words::panel::pr_checks_pass)),
+            "running" => parts.push(w(words::panel::pr_checks_running)),
             "fail" => {
                 let red = if no_color() { st.add_modifier(Modifier::BOLD) } else { st.fg(error()) };
-                let mut v = vec![Span::styled("checks fail", red)];
+                let mut v = vec![Span::styled(words::panel::pr_checks_fail, red)];
                 if !self.failing.is_empty() {
                     v.push(Span::styled(format!(": {}", self.failing.join(", ")), st));
                 }
@@ -109,10 +110,10 @@ impl Pr {
             _ => {}
         }
         if parts.is_empty() {
-            parts.push(w("open"));
+            parts.push(w(words::panel::pr_open));
         }
         if let Some(ms) = self.stale_ms {
-            parts.push(w(&format!("state from {} ago", panel::short_age(ms))));
+            parts.push(w(&words::panel::pr_state_from(panel::short_age(ms))));
         }
         let mut out = Vec::new();
         for (k, p) in parts.into_iter().enumerate() {
@@ -354,7 +355,7 @@ pub(crate) fn trial_notes(places: &[Place]) -> Vec<String> {
     places
         .iter()
         .filter(|p| p.feature && p.trying)
-        .map(|p| format!("{} {} on trial", G_BUILDING, p.branch.as_deref().unwrap_or(&p.id)))
+        .map(|p| format!("{} {}", G_BUILDING, words::panel::on_trial(p.branch.as_deref().unwrap_or(&p.id))))
         .collect()
 }
 
@@ -366,8 +367,8 @@ pub(crate) fn open_prs(places: &[Place]) -> usize {
 /// §7): `lands via PRs`, `lands on main`; "" when the hub has not said.
 pub(crate) fn flow_words(flow: &str) -> &'static str {
     match flow {
-        "pr" => "lands via PRs",
-        "trunk" => "lands on main",
+        "pr" => words::panel::lands_via_prs,
+        "trunk" => words::panel::lands_on_main,
         _ => "",
     }
 }

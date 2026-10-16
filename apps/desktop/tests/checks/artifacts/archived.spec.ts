@@ -8,6 +8,7 @@
 //     live one only.
 // Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const SHOP = 'shop-1a2b3c4d';
@@ -49,7 +50,7 @@ test("artifacts/archived: archived ones behind a faint 'N archived' row, a shows
     const rows = () => page.getByTestId('artifacts.list').locator('[role=option]');
     await expect(rows()).toHaveCount(1, { timeout: 10_000 });
     await expect(page.getByTestId('artifacts.list.row.before-after')).toBeVisible();
-    await expect(page.getByTestId('artifacts.archived')).toHaveText('2 archived');
+    await expect(page.getByTestId('artifacts.archived')).toHaveText(panel.archived_count({ n: 2 }));
     await expect(page.getByTestId('artifacts.keys')).toContainText('a archived');
     await page.screenshot({ path: test.info().outputPath('archived-row-light.png') });
     await core.send({ ev: 'prefs', prefs: { onboarded: true, theme: 'dark' } } as never);

@@ -14,6 +14,7 @@ import { useNow } from '@/app/clock';
 import { keep, useKeptScroll } from '@/app/keep';
 import { useListKeys } from '@/app/listkeys';
 import { archivedEnd, archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
+import { panel } from '@/proto/words_panel.gen';
 import { NewAgentSheet, Tune } from './Tune';
 import './agents.css';
 
@@ -70,8 +71,8 @@ export function AgentsScreen({ project, projectName, archived: showArchived = fa
   return (
     <section ref={section} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project} data-archived={showArchived ? 'true' : undefined}>
       <Head
-        title={showArchived ? 'archived' : 'agents'}
-        sub={showArchived ? `${projectName ?? project} · ${archived.length} archived` : `${projectName ?? project} · ${live.length} live`}
+        title={showArchived ? panel.archived : panel.agents}
+        sub={`${projectName ?? project} · ${showArchived ? panel.archived_count({ n: archived.length }) : panel.live_count({ n: live.length })}`}
         end={
           !showArchived && <Button
             kind="ghost"
@@ -93,7 +94,7 @@ export function AgentsScreen({ project, projectName, archived: showArchived = fa
             }}
           />
         )}
-        {shown.length === 0 && <Empty title={showArchived ? 'no archived agent' : 'no agents yet'} />}
+        {shown.length === 0 && <Empty title={showArchived ? panel.no_archived : panel.no_agents} />}
         {shown.map((a) => (
           <AgentItem key={a.name} project={project} a={a} sel={sel === a.name} peek={peek === a.name} />
         ))}

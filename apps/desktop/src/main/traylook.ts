@@ -7,6 +7,7 @@
 // beats: the shape and the colour only. Its tip says the state in words (law 6).
 import { PLAIN_ARMS, rasterMark, type Rgba } from '../shared/mark';
 import type { Counts } from './counts';
+import { panel } from '../proto/words_panel.gen';
 
 /** The icon's box in points (designer: 15 px in the menu bar). */
 export const TRAY_PT = 15;
@@ -32,9 +33,10 @@ export const newWait = (before: Counts, now: Counts): boolean => now.waiting > b
 
 /** The tip (law 6: every mark explains itself). Pure. */
 export function trayTip(c: Counts): string {
-  if (c.waiting > 0) return c.waiting === 1 ? 'bise: 1 thing waits for you' : `bise: ${String(c.waiting)} things wait for you`;
-  if (c.working > 0) return c.working === 1 ? 'bise: working with 1 agent' : `bise: working with ${String(c.working)} agents`;
-  return 'bise: all quiet';
+  const tip = (what: string) => panel.tip_of({ who: panel.bise, what });
+  if (c.waiting > 0) return tip(panel.tip_things_wait({ n: c.waiting }));
+  if (c.working > 0) return tip(panel.tip_working_with({ n: c.working }));
+  return tip(panel.tip_quiet);
 }
 
 /** The star's turn in degrees at a working step: a third of its 60° symmetry per step. Pure. */

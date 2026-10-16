@@ -18,6 +18,7 @@
 //     after a word with '…', the hover's tint, 'new' in ink.
 // Shots: agents-bar-<theme>-<width>.png, agents-bar-<theme>-tip.png. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -38,7 +39,7 @@ const normColor = <T extends { c: string }>(x: T): T => {
   const m = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)\)$/u.exec(x.c);
   return m === null ? x : { ...x, c: `rgb(${[m[1], m[2], m[3]].map((v) => String(Math.round(Number(v) * 255))).join(', ')})` };
 };
-const pr = (number: number, over: Record<string, unknown> = {}) => ({ number, url: `https://github.com/acme/shop/pull/${String(number)}`, branch: '', agents: [], state: 'open', checks: 'pass', review: 'none', words: 'checks pass', text: '', ...over });
+const pr = (number: number, over: Record<string, unknown> = {}) => ({ number, url: `https://github.com/acme/shop/pull/${String(number)}`, branch: '', agents: [], state: 'open', checks: 'pass', review: 'none', words: panel.pr_checks_pass, text: '', ...over });
 const world = (theme: string) => [
   prefs(theme),
   {
@@ -69,11 +70,11 @@ const world = (theme: string) => [
     ],
     places: [
       { id: 'wt:sb/perf', branch: 'sb/perf', agents: ['perf'], path: '/tmp/wt/perf/shop' },
-      { id: 'wt:sb/search', branch: 'sb/search', agents: ['search'], pr: pr(416, { branch: 'sb/search', words: 'approved · checks pass', review: 'approved' }) },
+      { id: 'wt:sb/search', branch: 'sb/search', agents: ['search'], pr: pr(416, { branch: 'sb/search', words: `${panel.pr_approved} · ${panel.pr_checks_pass}`, review: 'approved' }) },
       { id: 'wt:sb/checkout', branch: 'sb/checkout', agents: ['pay'], pr: pr(415, { branch: 'sb/checkout', checks: 'fail', failing: ['e2e/login'], words: 'checks fail: e2e/login' }) },
       { id: 'wt:sb/launch', branch: 'sb/launch', agents: ['launch'], lid: 'waits to land · 2nd', landing: 2 },
       { id: `wt:sb/${LONG}`, branch: `sb/${LONG}`, agents: [LONG], pr: pr(417, { state: 'draft', words: 'draft · checks running', checks: 'running' }) },
-      { id: 'wt:sb/flash-sale', branch: 'sb/flash-sale', agents: ['stock', 'pricing'], pr: pr(418, { branch: 'sb/flash-sale', words: 'changes asked · checks pass', review: 'changes' }) },
+      { id: 'wt:sb/flash-sale', branch: 'sb/flash-sale', agents: ['stock', 'pricing'], pr: pr(418, { branch: 'sb/flash-sale', words: `${panel.pr_changes_asked} · ${panel.pr_checks_pass}`, review: 'changes' }) },
       { id: 'wt:sb/palette', branch: 'sb/palette', agents: [], pr: pr(420, { branch: 'sb/palette' }) },
     ],
   },
@@ -108,7 +109,7 @@ for (const theme of ['light', 'dark']) {
         'app.right.agent.perf', 'app.right.agent.search', 'app.right.agent.pay', 'app.right.agent.docs', 'app.right.agent.launch',
         `app.right.agent.${LONG}`, 'app.right.agent.broken', 'app.right.agent.bench', 'app.right.group.sb/flash-sale', 'app.right.agent.pricing',
       ]);
-      await expect(page.getByTestId('app.right.agents.more')).toHaveText('show 2 more');
+      await expect(page.getByTestId('app.right.agents.more')).toHaveText(panel.show_more({ n: 2 }));
       await expect(page.getByTestId('app.right.agents.head').locator('.app-rb-label')).toHaveText('AGENTS · 10');
       await page.getByTestId('app.right.agents.more').click();
       await expect(page.getByTestId('app.right.pr.420')).toBeVisible();
