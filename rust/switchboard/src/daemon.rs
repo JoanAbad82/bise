@@ -33,6 +33,8 @@ mod lines;
 mod page_cards;
 mod pages;
 mod projects;
+mod prompt_inputs;
+use prompt_inputs::{plugins_fingerprint, prompt_is_stale, PromptInputs, PROMPT_PLUGINS_FILE};
 mod proto;
 mod repl;
 mod repl_starts;
@@ -2228,47 +2230,6 @@ fn wait_previous_hub(paths: &Paths) {
         std::thread::sleep(Duration::from_millis(50));
     }
     log_line(paths, &format!("waited {} ms for the previous hub (pid {}) to stop", t0.elapsed().as_millis(), pid));
-}
-
-/// A hash of a REPL's spawn keys (never the keys themselves, kept).
-/// The plugins fingerprint of a workspace's roots (built-in, user,
-/// `<ws>/.agents/plugins`, the enable state).
-/// In an agent's dir: the plugins fingerprint its REPL's prompt was
-/// last built with.
-const PROMPT_PLUGINS_FILE: &str = "prompt-plugins.fp";
-
-/// Whether a session's prompt predates its plugins: the fingerprint of
-/// its last start differs from `fp` (none recorded: a session from
-/// before this file, its prompt rebuilt once).
-fn prompt_is_stale(adir: &Path, fp: u64) -> bool {
-    std::fs::read_to_string(adir.join(PROMPT_PLUGINS_FILE)).map(|s| s.trim() != fp.to_string()).unwrap_or(true)
-}
-
-/// What a live REPL's prompt was built from: its workspace, whether it is
-/// main, the plugins fingerprint of its roots and the skills fingerprint
-/// of the skill folders its startup scan reads.
-struct PromptInputs {
-    ws: PathBuf,
-    main: bool,
-    /// prompts::desktop_on at its start: bise-pages (prompts/skills-all)
-    desktop: bool,
-    plugins: u64,
-    skills: u64,
-}
-
-impl PromptInputs {
-    /// The one number kept in `<agent dir>/prompt-plugins.fp`.
-    fn combined(&self) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        self.plugins.hash(&mut h);
-        self.skills.hash(&mut h);
-        h.finish()
-    }
-}
-
-fn plugins_fingerprint(ws: &Path) -> u64 {
-    bend_plugins::resolve::fingerprint(&bend_plugins::resolve::Roots::standard(Some(ws)))
 }
 
 /// Dev: log every model request's body (`BISE_DEBUG_REQUESTS=1` in the
