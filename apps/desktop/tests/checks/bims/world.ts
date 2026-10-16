@@ -165,7 +165,7 @@ export const overlay = (page: Page): Promise<Shown> =>
     const vis = (e: Element): boolean => {
       const r = e.getBoundingClientRect();
       const st = getComputedStyle(e);
-      return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && Number(st.opacity) > 0.05;
+      return r.width > 0 && r.height > 0 && e.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && st.visibility !== 'hidden' && Number(st.opacity) > 0.05;
     };
     const all = (pre: string) => Array.from(document.querySelectorAll(`[data-testid^="${pre}"]`)).filter(vis);
     return {
@@ -173,6 +173,37 @@ export const overlay = (page: Page): Promise<Shown> =>
       pills: all('app.right.bims.pill.').map((e) => ({ name: (e.getAttribute('data-testid') ?? '').slice('app.right.bims.pill.'.length), pill: e.getAttribute('data-pill') ?? '', text: (e as HTMLElement).innerText.trim() })),
     };
   });
+
+/**
+ * What covers what in the overlay now (designer m_27792): a tag out of the office, label boxes that
+ * overlap another label or a pill, and pills not on top at their center (elementFromPoint).
+ */
+export const collisions = (page: Page): Promise<string[]> =>
+  page.evaluate(() => {
+    const boxes = (pre: string) => Array.from(document.querySelectorAll<HTMLElement>(`[data-testid^="${pre}"]`))
+      .map((e) => ({ e, id: (e.getAttribute('data-testid') ?? '').slice('app.right.bims.'.length), r: e.getBoundingClientRect() }))
+      .filter((b) => b.r.width > 0 && b.r.height > 0 && b.e.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && Number(getComputedStyle(b.e).opacity) > 0.05);
+    const labels = boxes('app.right.bims.label.');
+    const pills = boxes('app.right.bims.pill.');
+    const meet = (a: DOMRect, b: DOMRect): boolean => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+    const out: string[] = [];
+    const o = document.querySelector('[data-testid="app.right.bims"]')?.getBoundingClientRect();
+    for (const b of [...labels, ...pills]) {
+      if (o !== undefined && (b.r.left < o.left - 0.5 || b.r.right > o.right + 0.5 || b.r.top < o.top - 0.5 || b.r.bottom > o.bottom + 0.5)) out.push(`${b.id} is out of the office`);
+    }
+    labels.forEach((a, i) => {
+      for (const b of labels.slice(i + 1)) if (meet(a.r, b.r)) out.push(`${a.id} covers ${b.id}`);
+      for (const p of pills) if (meet(a.r, p.r)) out.push(`${a.id} meets ${p.id}`);
+    });
+    for (const p of pills) {
+      const top = document.elementFromPoint(p.r.left + p.r.width / 2, p.r.top + p.r.height / 2);
+      if (top === null || !(top === p.e || p.e.contains(top))) out.push(`${p.id} is under ${top?.getAttribute('data-testid') ?? top?.className ?? 'nothing'}`);
+    }
+    return out;
+  });
+
+/** A cut that isn't one glued '…' after a whole word (designer m_27792): ' …', '...', or '…' mid-text. */
+export const badCut = (text: string): boolean => / …|\.\.\.|…(?!$)/u.test(text);
 
 /**
  * The window hidden, as the app reads it (document.hidden + visibilitychange, App.tsx's useStill):

@@ -13,7 +13,7 @@
 import { test, expect, type Session } from '../../harness';
 import { office, snap } from '../../../src/bims/fixtures';
 import {
-  NAMES, P, TRIPS, drawnIn, headOf, open, overlay, probe, rowsOf, settle, shotOf, showOffice, sleep, withRows,
+  NAMES, P, TRIPS, badCut, collisions, drawnIn, headOf, open, overlay, probe, rowsOf, settle, shotOf, showOffice, sleep, withRows,
   writeIndex, type Placed, type Shot,
 } from './world';
 
@@ -31,6 +31,26 @@ async function shot(s: Session, file: string, title: string, says: string): Prom
 test.afterAll(() => {
   if (shots.length > 0) writeIndex(shots);
 });
+
+/**
+ * Under ⌃ (designer's pick A, bims-lead m_27800): every pill shown, each name shown or counted in
+ * 'app.right.bims.more' ('+N names · hover a bim'), the more line there only when a name is left out.
+ */
+async function heldAll(s: Session): Promise<void> {
+  const count = async (): Promise<string> => {
+    const o = await overlay(s.page);
+    const more = s.page.getByTestId('app.right.bims.more');
+    const words = (await more.isVisible().catch(() => false)) ? (await more.innerText()).trim() : '';
+    const n = Number(/^\+(\d+)/u.exec(words)?.[1] ?? '0');
+    return `${String(o.labels.filter((l) => l.mode === 'name').length + n)} names, ${String(o.pills.length)} pills, more '${words}' for ${String(n)}`;
+  };
+  await expect.poll(count, { timeout: 3000 }).toMatch(new RegExp(`^${String(NAMES.length)} names, 3 pills, `, 'u'));
+  const o = await overlay(s.page);
+  const missing = NAMES.length - o.labels.filter((l) => l.mode === 'name').length;
+  const more = s.page.getByTestId('app.right.bims.more');
+  if (missing > 0) await expect(more, 'the more line counts the names left out').toHaveText(new RegExp(`^\\+${String(missing)} `, 'u'));
+  else await expect(more, 'no more line when every name shows').toBeHidden();
+}
 
 /** 320 at rest; wide = 640, docked when the window has room, slid over the thread when not (bims-wire m_27585). */
 const SIZES = [
@@ -97,8 +117,9 @@ for (const { w, win, wide } of SIZES) {
 
       // ⌃ held: every bim's name
       await s.page.keyboard.down('Control');
-      await expect.poll(async () => (await overlay(s.page)).labels.filter((l) => l.mode === 'name').length, { timeout: 3000 }).toBe(NAMES.length);
-      await shot(s, `held-${tag}.png`, `⌃ held, ${tag} px`, 'every name, small, over each bim');
+      await heldAll(s);
+      await shot(s, `held-${tag}.png`, `⌃ held, ${tag} px`, 'every name, sans 12 on its chip; none covers another or a pill (moved ones have a leader)');
+      expect(await collisions(s.page), 'under ⌃ no name covers another, and the pills stay on top').toEqual([]);
       await s.page.keyboard.up('Control');
       await expect.poll(async () => (await overlay(s.page)).labels.filter((l) => !TRIPS.has(l.name)).length, { timeout: 2000 }).toBe(0);
 
@@ -120,6 +141,8 @@ for (const { w, win, wide } of SIZES) {
         return out;
       });
       expect(inside, 'the hover line and the pills stay inside the office (never cut at its edge)').toEqual([]);
+      const said = await hover.innerText();
+      expect(badCut(said), `the hover line's cut is one glued '…' after a word: ${said}`).toBe(false);
       const lines = await hover.evaluate((e) => Math.round(e.getBoundingClientRect().height / (parseFloat(getComputedStyle(e).lineHeight) || 18)));
       expect(lines, 'the hover line is one line').toBe(1);
       await shot(s, `hover-${tag}.png`, `hover, ${tag} px`, "cookie-banner hovered: 'name · state · title', one line, after 400 ms");
@@ -164,8 +187,9 @@ for (const { w, win, wide } of SIZES) {
       expect(arrows, "no '→ login-test' label for his plane").toBe(0);
 
       await s.page.keyboard.down('Control');
-      await expect.poll(async () => (await overlay(s.page)).labels.filter((l) => l.mode === 'name').length, { timeout: 3000 }).toBe(NAMES.length);
-      await shot(s, `held-${tag}.png`, `⌃ held, night, ${tag}`, 'every name, small, over each bim');
+      await heldAll(s);
+      await shot(s, `held-${tag}.png`, `⌃ held, night, ${tag}`, 'every name, sans 12 on its chip; none covers another or a pill');
+      expect(await collisions(s.page), 'under ⌃ no name covers another, and the pills stay on top').toEqual([]);
       await s.page.keyboard.up('Control');
     } finally {
       await s.close();

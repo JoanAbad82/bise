@@ -76,6 +76,7 @@ test('(4) a lost WebGL context shows the list with its line', async () => {
     expect(await loseContext(s.page), 'WEBGL_lose_context on the office canvas').toBe(true);
     await expect(s.page.getByTestId('app.right.bims.lost')).toBeVisible({ timeout: 5000 });
     await expect(s.page.getByTestId('app.right.bims.canvas')).toHaveCount(0);
+    await expect(s.page.getByTestId('app.right.agents.width.wide'), 'no width toggle while lost (designer m_27792)').toHaveCount(0);
     await expect(s.page.getByTestId('app.right.agent.signup-perf')).toBeVisible();
     const line = await s.page.getByTestId('app.right.bims.lost').boundingBox();
     const firstRow = await s.page.getByTestId(`app.right.agent.${office.agents[1]?.name ?? ''}`).boundingBox();
