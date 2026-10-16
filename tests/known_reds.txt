@@ -1,5 +1,5 @@
 # The tests red on main now, each with who fixes it (issue 28; tests/known_reds.py reads it).
 # One per line, tab-separated: <test>	<since>	<owner>	<why>. A red here is known: the full gate
 # and test:land say so; any other red is NEW. Remove the line in the commit that fixes it.
-history-perf	12c3d88dc	land-reds	test:land at load 30+ only: the 'zanzibar' jump (entry 1200) never drawn in 60 s, once in 10 runs; not explained yet, a red run now writes jump.json (what the list draws, the finds and pages asked). The walk to the oldest hit (a reveal's settle on a stale index after the older page came) is fixed, 5/5 at load 13-33
-inbox-open	1da997a46	land-reds	test:land at load 10-38 only, 2 in 12 runs before the reveal fixes (entry 50 not drawn in 5 s; its gap row missing); 5/5 green since at load 13-33, kept here until test:land shows it
+history-perf	12c3d88dc	land-reds	test:land, 1 run in ~4 even at load 3-9: step 4's current match not marked (hitShown 0: rows 49494-49503 drawn around it, count 1/50, no row with data-hit, so the mark (findmark useIsCurrent) isn't 49500 there); never alone (12/12 with logs and without); at load 30+ also the 'zanzibar' jump once in 10 (jump.json on a red run)
+inbox-open	1da997a46	land-reds	test:land, 1 run in ~4 even at load 6: after ⌘⏎ to entry 50 the gap row 'newer messages…' is never drawn as the list scrolls down (thread.gap not found); green alone (5/5); the earlier flash red is fixed
