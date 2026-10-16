@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { formatRoute, parseRoute } from '@/app/route';
 import { ahead, endsWords, howOften, nextRunWords, ordinal, runsWords, ScheduledHere, ScheduledView, type ScheduledTask, type Task } from './index';
 import { Store, StoreProvider } from '@/store';
+import { scheduled } from '@/proto/words_scheduled.gen';
 
 afterEach(cleanup);
 
@@ -20,12 +21,12 @@ describe('scheduled words', () => {
     expect(ahead(at(0, 14, 22), NOW)).toBe('14:22');
     expect(ahead(at(1, 7, 30), NOW)).toBe('tomorrow 07:30');
     expect(ahead(at(6, 7, 30), NOW)).toBe('the 9th, 07:30');
-    expect(runsWords(task(4))).toBe('6 of 24');
-    expect(runsWords(task(4, { times: null, done: 1 }))).toBe('1 run so far');
-    expect(nextRunWords(task(4), NOW)).toBe('the 7th of 24 · 14:22');
-    expect(endsWords(task(4), NOW)).toBe('after its 24th run');
-    expect(endsWords(task(4, { times: null, until_ms: at(0, 18, 0) }), NOW)).toBe('at 18:00');
-    expect(endsWords(task(4, { times: null }), NOW)).toBe("when it's stopped");
+    expect(runsWords(task(4))).toBe(scheduled.n_of({ count: 6, total: 24 }));
+    expect(runsWords(task(4, { times: null, done: 1 }))).toBe(scheduled.runs_so_far({ n: 1 }));
+    expect(nextRunWords(task(4), NOW)).toBe(`${scheduled.nth_of({ nth: '7th', total: 24 })} · 14:22`);
+    expect(endsWords(task(4), NOW)).toBe(scheduled.ends_after_nth({ nth: '24th' }));
+    expect(endsWords(task(4, { times: null, until_ms: at(0, 18, 0) }), NOW)).toBe(scheduled.ends_at({ at: '18:00' }));
+    expect(endsWords(task(4, { times: null }), NOW)).toBe(scheduled.ends_when_stopped);
   });
 
   it("the route is 'scheduled'", () => {
@@ -44,20 +45,20 @@ describe('the scheduled screen', () => {
     expect(rows[0]?.textContent).toContain('deploy-watch · storefront');
     // 'how often' holds only the rhythm; the count is the pane's 'its runs' (designer m_12105)
     expect(rows[0]?.textContent).toContain('every 5 min');
-    expect(rows[0]?.textContent).not.toContain('6 of 24');
-    expect(screen.getByTestId('scheduled.count').textContent).toBe('active · 2');
+    expect(rows[0]?.textContent).not.toContain(scheduled.n_of({ count: 6, total: 24 }));
+    expect(screen.getByTestId('scheduled.count').textContent).toBe(scheduled.count_desktop({ n: 2 }));
     const root = screen.getByTestId('scheduled.screen');
     fireEvent.keyDown(root, { key: 'Enter' });
     // its name (else its words' first line), never its id; who it wakes beside it (designer m_15929)
     expect(screen.getByTestId('scheduled.pane.title').textContent).toBe('check the deploy of storefrontdeploy-watch · storefront');
     expect(screen.getByTestId('scheduled.pane').textContent).not.toContain('#4');
     // the act, then its key: 'stop' + a dim 'x'
-    expect(screen.getByTestId('scheduled.stop').textContent).toBe('stop x');
-    expect(screen.getByTestId('scheduled.pane').textContent).toContain('the 7th of 24 · 14:22');
+    expect(screen.getByTestId('scheduled.stop').textContent).toBe(`${scheduled.key_stop} x`);
+    expect(screen.getByTestId('scheduled.pane').textContent).toContain(`${scheduled.nth_of({ nth: '7th', total: 24 })} · 14:22`);
     expect(screen.getByTestId('scheduled.pane.words').textContent).toContain('say so only when it fails');
     expect(screen.queryByTestId('scheduled.run')).toBeNull();
     fireEvent.keyDown(root, { key: 'x' });
-    expect(screen.getByTestId('scheduled.ask').textContent).toContain("stop this scheduled task? it won't wake deploy-watch again.");
+    expect(screen.getByTestId('scheduled.ask').textContent).toContain(scheduled.stop_ask_desktop({ agent: 'deploy-watch' }));
     fireEvent.keyDown(root, { key: 'Escape' });
     expect(stopped).toEqual([]);
     fireEvent.click(screen.getByTestId('scheduled.stop'));
@@ -98,7 +99,7 @@ describe('the scheduled screen', () => {
 
   it('nothing scheduled says how one comes', () => {
     render(<ScheduledView tasks={[]} ports={{ stop: () => undefined }} now={NOW} />);
-    expect(screen.getByTestId('scheduled.empty').textContent).toBe('nothing scheduled. ask an agent to “check the build every 5m” and it shows here.');
+    expect(screen.getByTestId('scheduled.empty').textContent).toBe(scheduled.empty_desktop);
   });
 });
 

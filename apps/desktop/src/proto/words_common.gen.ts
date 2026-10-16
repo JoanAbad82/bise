@@ -4,4 +4,6 @@
 // bise_proto::words::common: rust/proto/src/words/common.rs, never a word typed here.
 
 export const common = {
+  /** stop an agent's alarm: /scheduled's key bar (scheduled) and the desktop right bar's alarm detail (panel) */
+  stop_watching: "stop watching",
 } as const;

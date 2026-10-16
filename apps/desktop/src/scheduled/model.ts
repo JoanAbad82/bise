@@ -4,6 +4,7 @@
 // The task is amb-feed's typed rows::ScheduledTask (284bd5c6: HubEv scheduled {project, items},
 // HubCmd scheduled {project} and scheduled_stop {project, id}).
 import type { ScheduledTask } from '@/proto';
+import { scheduled } from '@/proto/words_scheduled.gen';
 
 export type { ScheduledTask };
 
@@ -42,30 +43,31 @@ export const rhythmWords = (e: string): string =>
 export const howOften = (t: ScheduledTask): string => {
   const e = rhythmWords(t.every.trim());
   // the hub may already say it ('every 5m'): never 'every every 5 min' (designer D11)
-  return /^every\b/iu.test(e) ? e : `every ${e}`;
+  return /^every\b/iu.test(e) ? e : scheduled.every({ when: e });
 };
 
 /** The runs: '3 of 24', '3 runs so far'. */
 export function runsWords(t: ScheduledTask): string {
-  if (t.times != null) return `${String(t.done)} of ${String(t.times)}`;
-  return t.done === 1 ? '1 run so far' : `${String(t.done)} runs so far`;
+  if (t.times != null) return scheduled.n_of({ count: t.done, total: t.times });
+  return scheduled.runs_so_far({ n: t.done });
 }
 
 /** The next run's column: '14:22', 'tomorrow 07:30', '—' when none is due. */
-export const nextWords = (t: ScheduledTask, now: number): string => (t.next_ms != null ? ahead(t.next_ms, now) : '—');
+export const nextWords = (t: ScheduledTask, now: number): string => (t.next_ms != null ? ahead(t.next_ms, now) : scheduled.next_none);
 
 /** The pane's 'next run': 'the 7th of 24 · 14:22'. */
 export function nextRunWords(t: ScheduledTask, now: number): string {
-  const which = t.times != null ? `the ${ordinal(t.done + 1)} of ${String(t.times)}` : `the ${ordinal(t.done + 1)}`;
+  const nth = ordinal(t.done + 1);
+  const which = t.times != null ? scheduled.nth_of({ nth, total: t.times }) : scheduled.nth({ nth });
   return t.next_ms != null ? `${which} · ${ahead(t.next_ms, now)}` : which;
 }
 
 /** When it ends: 'after its 24th run', 'at 18:00', 'when it's stopped' (the TUI's). */
 export function endsWords(t: ScheduledTask, now: number): string {
-  if (t.times === 1) return 'after its run';
-  if (t.times != null) return `after its ${ordinal(t.times)} run`;
-  if (t.until_ms != null) return `at ${ahead(t.until_ms, now)}`;
-  return "when it's stopped";
+  if (t.times === 1) return scheduled.ends_after_run;
+  if (t.times != null) return scheduled.ends_after_nth({ nth: ordinal(t.times) });
+  if (t.until_ms != null) return scheduled.ends_at({ at: ahead(t.until_ms, now) });
+  return scheduled.ends_when_stopped;
 }
 
 /** What it does, as lists show it: the hub's short name (sched-names), else its words' first line

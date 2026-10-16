@@ -23,8 +23,31 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
+from words import w, w_re  # noqa: E402
 
 SHOTS = os.environ.get("SCHED_SHOTS")
+
+# the scheduled screen's words, by key (bise_proto::words::scheduled): a word designer changes moves this test
+NAME = "fake timer name"   # the fake model's name for a task
+HEAD = w("scheduled.heading") + " · " + w("scheduled.subtitle")
+SUB = w("scheduled.subtitle")
+ENDED_TOO = "tab " + w("scheduled.key_ended_too")
+ACTIVE_ONLY = "tab " + w("scheduled.key_active_only")
+STOP_KEYS = "y %s   n %s esc %s" % (w("scheduled.key_stop"), w("scheduled.key_or"), w("scheduled.key_keep"))
+
+
+def active(n):
+    return w("scheduled.count_active", n=n)
+
+
+def keybar(*pairs):
+    """'⏎ open   r run now', the keys with their words by key."""
+    return "   ".join("%s %s" % (k, w("scheduled." + name)) for k, name in pairs)
+
+
+def label(name, value):
+    """An opened task's field: its label padded to 12 columns, then its value."""
+    return "%-12s%s" % (w("scheduled." + name), value)
 
 
 def shot(t, name):
@@ -71,59 +94,64 @@ def wide(t, E):
     setup(t, E)
     # main's thread: main's own, never t1's; the panel's ◷ and its legend
     # sched-names: its name (the fake model's), never its id (designer m_14531)
-    sc = t.wait("main scheduled fake timer name for t2 · every day 07:30")
-    assert "t1 scheduled" not in sc and "scheduled #" not in sc, sc
+    sc = t.wait(w("scheduled.set_for", by="main", title=NAME, agent="t2") + " · every day 07:30")
+    assert w("scheduled.set_own", agent="t1", title="") not in sc and "scheduled #" not in sc, sc
     sc = t.wait("◷ 07:30")
     assert "◷ 2m" in sc and "◷ 07:30" in sc, sc
     assert "= its next run" not in sc, sc
     no_switchboard(sc)
     shot(t, "150-main-thread")
     # /scheduled: the list, soonest first
-    command(t, "/scheduled", "scheduled · what wakes your agents, and when")
-    sc = t.wait("2 active   tab ended too")
-    assert "/ find: an agent, a name, the words" in sc, sc
+    command(t, "/scheduled", HEAD)
+    sc = t.wait(active(2) + "   " + ENDED_TOO)
+    assert "/ " + w("scheduled.find_hint") in sc, sc
     rows = [l for l in sc.splitlines() if "◷ t1" in l or "◷ t2" in l]
     # designer m_15602: its name right after its agent, no id on the screen
-    assert len(rows) == 2 and "◷ t1" in rows[0] and "fake timer name" in rows[0] and "› " in rows[0], sc
+    assert len(rows) == 2 and "◷ t1" in rows[0] and NAME in rows[0] and "› " in rows[0], sc
     assert "#" not in "\n".join(rows), sc
-    assert "every 2m" in rows[0] and "0 of 6" in rows[0] and "by t1" in rows[0], rows[0]
-    assert "every day 07:30" in rows[1] and "by main" in rows[1], rows[1]
-    assert "⏎ open   r run now   x stop   / find   tab ended too   esc close" in sc, sc
+    assert "every 2m" in rows[0] and w("scheduled.n_of", count=0, total=6) in rows[0] and w("scheduled.by", who="t1") in rows[0], rows[0]
+    assert "every day 07:30" in rows[1] and w("scheduled.by", who="main") in rows[1], rows[1]
+    assert keybar(("⏎", "key_open"), ("r", "key_run_now"), ("x", "key_stop"), ("/", "key_find"), ("tab", "key_ended_too"), ("esc", "key_close")) in sc, sc
     shot(t, "150-list")
     # one opened
     t.keys("Enter")
-    sc = t.wait("fake timer name · t1")
-    for want in ("wakes       t1", "set by      t1", "when        every 2m · 6 times", "ends        after its 6th run",
-                 "the words it sends", "check the build and tell me what failed", "r run now   x stop   esc back to the list"):
+    sc = t.wait(NAME + " · t1")
+    for want in (label("label_wakes", "t1"), label("label_set_by", "t1"),
+                 label("label_when", "every 2m · " + w("scheduled.n_times", n=6)),
+                 label("label_ends", w("scheduled.ends_after_nth", nth="6th")),
+                 w("scheduled.words_it_sends"), "check the build and tell me what failed",
+                 keybar(("r", "key_run_now"), ("x", "key_stop"), ("esc", "key_back"))):
         assert want in sc, want + "\n" + sc
     shot(t, "150-opened")
     # run now: outside the count
     t.keys("r")
-    sc = t.wait("ran now: t1 is on it. the next run stays at")
+    sc = t.wait_re(w_re("scheduled.ran_now_note", title=NAME, agent="t1"))
     shot(t, "150-run-now")
     t.keys("Escape")
-    t.wait("2 active   tab ended too")
+    t.wait(active(2) + "   " + ENDED_TOO)
     # x asks on the row: n keeps
     t.keys("x")
-    sc = t.wait("stop “fake timer name”? it won't wake t1 again.   y stop   n or esc keep")
+    ask = w("scheduled.stop_ask", title=NAME, agent="t1")
+    sc = t.wait(ask + "   " + STOP_KEYS)
     shot(t, "150-stop-ask")
     t.keys("n")
-    t.wait_gone("stop “fake timer name”?")
+    t.wait_gone(ask)
     t.keys("x")
-    t.wait("stop “fake timer name”?")
+    t.wait(ask)
     t.keys("y")
-    sc = t.wait("1 active   tab ended too")
+    sc = t.wait(active(1) + "   " + ENDED_TOO)
     t.keys("Tab")
-    sc = t.wait("1 active · 1 ended   tab active only")
-    assert "stopped by you" in sc, sc
+    sc = t.wait(active(1) + " · " + w("scheduled.count_ended", n=1) + "   " + ACTIVE_ONLY)
+    assert w("scheduled.stopped_by_you") in sc, sc
     shot(t, "150-ended")
     t.keys("Escape")
-    t.wait_gone("what wakes your agents")
+    t.wait_gone(SUB)
     # t1's thread: set, the run now, ended; never `switchboard`, never the stop's note
     t.keys("M-1")
-    sc = t.wait("fake timer name ended · stopped by you")
-    assert "t1 scheduled fake timer name · every 2m · 6 times · next" in sc, sc
-    assert "fake timer name · ran now, by you" in sc, sc
+    sc = t.wait(w("scheduled.ended", title=NAME, why=w("scheduled.stopped_by_you")))
+    assert "%s · every 2m · %s · %s" % (w("scheduled.set_own", agent="t1", title=NAME), w("scheduled.n_times", n=6),
+                                        w("scheduled.next_at", at="")) in sc, sc
+    assert NAME + " · " + w("scheduled.ran_now_by_you") in sc, sc
     # the fake model's `ack: <its input>` replies quote what the agent read:
     # only the thread's lines before them are bise's
     lines = sc.split(" ack: ")[0]
@@ -138,14 +166,14 @@ def light(t, width):
     command(t, "/theme light", "light")
     t.wait_re(MAIN_IDLE)
     shot(t, width + "-main-thread-light")
-    command(t, "/scheduled", "1 active")
+    command(t, "/scheduled", active(1))
     shot(t, width + "-list-light")
     t.keys("Enter")
-    t.wait("fake timer name · t2")
+    t.wait(NAME + " · t2")
     shot(t, width + "-opened-light")
     t.keys("Escape")
     t.keys("Escape")
-    t.wait_gone("tab ended too")
+    t.wait_gone(ENDED_TOO)
     command(t, "/theme dark", "dark")
 
 
@@ -153,21 +181,21 @@ def narrow(t):
     t.start(80, 30)
     t.wait("bise :*")
     t.wait_re(MAIN_IDLE)
-    command(t, "/scheduled", "scheduled")
-    sc = t.wait("1 active")
-    assert "what wakes your agents" not in sc, sc
-    assert "⏎ open   r run now   x stop   esc close" in sc, sc
+    command(t, "/scheduled", w("scheduled.heading"))
+    sc = t.wait(active(1))
+    assert SUB not in sc, sc
+    assert keybar(("⏎", "key_open"), ("r", "key_run_now"), ("x", "key_stop"), ("esc", "key_close")) in sc, sc
     # 80 columns (designer m_15602): who it wakes, its name, its next run; no rhythm
-    assert "◷ t2" in sc and "fake timer name" in sc and "daily 07:30" not in sc, sc
+    assert "◷ t2" in sc and NAME in sc and w("scheduled.daily", hm="07:30") not in sc, sc
     for line in sc.splitlines():
         assert len(line) <= 80, line
     shot(t, "80-list")
     t.keys("Enter")
-    t.wait("fake timer name · t2")
+    t.wait(NAME + " · t2")
     shot(t, "80-opened")
     t.keys("Escape")
     t.keys("Escape")
-    t.wait_gone("1 active")
+    t.wait_gone(active(1))
     light(t, "80")
 
 

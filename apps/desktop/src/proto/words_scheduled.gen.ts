@@ -4,4 +4,174 @@
 // bise_proto::words::scheduled: rust/proto/src/words/scheduled.rs, never a word typed here.
 
 export const scheduled = {
+  /** how often: one run only */
+  once: "once",
+  /** how often, short (the 80-column list): every day at `hm` */
+  daily: (a: { hm: string | number }): string => "daily " + String(a.hm),
+  /** how often, the desktop: the hub's rhythm when it lacks 'every' */
+  every: (a: { when: string | number }): string => "every " + String(a.when),
+  /** how many so far: `2 of 6` */
+  n_of: (a: { count: string | number; total: string | number }): string => String(a.count) + " of " + String(a.total),
+  /** how many in all, after how often: `6 times` */
+  n_times: (a: { n: string | number }): string => String(a.n) + " times",
+  /** until when it runs: `until 18:00` */
+  until: (a: { at: string | number }): string => "until " + String(a.at),
+  /** its next run: `next 14:22` */
+  next_at: (a: { at: string | number }): string => "next " + String(a.at),
+  /** why it ended: its one run is done */
+  ran_once: "ran once",
+  /** why it ended: it ran its count */
+  ran_n_times: (a: { n: string | number }): string => "ran its " + String(a.n) + " times",
+  /** why it ended: it ran its count (count unknown) */
+  ran_its_times: "ran its times",
+  /** why it ended: its end time passed */
+  end_time_passed: "its end time passed",
+  /** why it ended: its agent is gone */
+  agent_gone: (a: { agent: string | number }): string => String(a.agent) + " is gone",
+  /** why it ended: he stopped it */
+  stopped_by_you: "stopped by you",
+  /** why it ended: stopped, by whom unknown */
+  stopped: "stopped",
+  /** why it ended: an agent stopped it */
+  stopped_by: (a: { by: string | number }): string => "stopped by " + String(a.by),
+  /** the ◷ line when an agent sets its own */
+  set_own: (a: { agent: string | number; title: string | number }): string => String(a.agent) + " scheduled " + String(a.title),
+  /** the ◷ line when one agent sets it for another */
+  set_for: (a: { by: string | number; title: string | number; agent: string | number }): string => String(a.by) + " scheduled " + String(a.title) + " for " + String(a.agent),
+  /** the ◷ line when one ends, with why */
+  ended: (a: { title: string | number; why: string | number }): string => String(a.title) + " ended · " + String(a.why),
+  /** a run's ◷ line: he ran it now */
+  ran_now_by_you: "ran now, by you",
+  /** the screen's title (the TUI's frame and head, the desktop's head and back button) */
+  heading: "scheduled",
+  /** what the screen is, beside its title */
+  subtitle: "what wakes your agents, and when",
+  /** the TUI head's count: the active ones */
+  count_active: (a: { n: string | number }): string => String(a.n) + " active",
+  /** the TUI head's count: the ended ones (tab) */
+  count_ended: (a: { n: string | number }): string => String(a.n) + " ended",
+  /** the TUI head's count: the agents' alarms */
+  count_watching: (a: { n: string | number }): string => String(a.n) + " watching",
+  /** the desktop head's count */
+  count_desktop: (a: { n: string | number }): string => "active · " + String(a.n),
+  /** the TUI's search line, after `/ ` */
+  find_hint: "find: an agent, a name, the words",
+  /** the desktop's search field */
+  search_placeholder: "search scheduled tasks",
+  /** the TUI's list when the search finds none */
+  none_match: "nothing scheduled matches.",
+  /** the desktop's list when the search finds none */
+  none_match_desktop: "nothing matches. esc clears the search.",
+  /** the TUI's list with none (straight quotes; the desktop's has curly ones) */
+  empty: "nothing scheduled. ask an agent to \"check the build every 5m\" and it shows here.",
+  /** the desktop's list with none (curly quotes; the TUI's has straight ones) */
+  empty_desktop: "nothing scheduled. ask an agent to “check the build every 5m” and it shows here.",
+  /** the TUI's group head of the agents' alarms */
+  group_watching: "watching",
+  /** the TUI's group head of the ended ones */
+  group_ended: "ended",
+  /** an ended row: when */
+  ended_at: (a: { at: string | number }): string => "ended " + String(a.at),
+  /** an ended row, narrow: when it was stopped */
+  stopped_at: (a: { at: string | number }): string => "stopped " + String(a.at),
+  /** how many runs: `3 runs` */
+  runs: (a: { n: number }): string => a.n === 1 ? String(a.n) + " run" : String(a.n) + " runs",
+  /** the desktop's runs with no count: `3 runs so far` */
+  runs_so_far: (a: { n: number }): string => a.n === 1 ? String(a.n) + " run so far" : String(a.n) + " runs so far",
+  /** a wide row: who set it */
+  by: (a: { who: string | number }): string => "by " + String(a.who),
+  /** the desktop's next-run column when none is due */
+  next_none: "—",
+  /** the line over the TUI's key bar: the selected one */
+  detail: (a: { title: string | number; agent: string | number; when: string | number; by: string | number }): string => String(a.title) + " · wakes " + String(a.agent) + " " + String(a.when) + " · set by " + String(a.by),
+  /** the line over the TUI's key bar: its words, after the detail */
+  its_words: (a: { words: string | number }): string => "its words: " + String(a.words),
+  /** key: open the selected one */
+  key_open: "open",
+  /** key: run it now */
+  key_run_now: "run now",
+  /** key: stop it */
+  key_stop: "stop",
+  /** key: keep it (after the stop question) */
+  key_keep: "keep",
+  /** key: between two keys that do the same (`n or esc`) */
+  key_or: "or",
+  /** key: the TUI's search */
+  key_find: "find",
+  /** key: the desktop's search */
+  key_search: "search",
+  /** key: the search is done */
+  key_done: "done",
+  /** key: move the selection while searching */
+  key_choose: "choose",
+  /** key: clear the search */
+  key_clear_search: "clear the search",
+  /** key: close the screen */
+  key_close: "close",
+  /** key: back from one opened to the list */
+  key_back: "back to the list",
+  /** key (tab): show the ended ones too */
+  key_ended_too: "ended too",
+  /** key (tab): the active ones only */
+  key_active_only: "active only",
+  /** the TUI's question on the row, after `x` */
+  stop_ask: (a: { title: string | number; agent: string | number }): string => "stop “" + String(a.title) + "”? it won't wake " + String(a.agent) + " again.",
+  /** the desktop's question in the pane, after stop */
+  stop_ask_desktop: (a: { agent: string | number }): string => "stop this scheduled task? it won't wake " + String(a.agent) + " again.",
+  /** the TUI's note after `r` */
+  ran_now_note: (a: { title: string | number; agent: string | number; at: string | number }): string => String(a.title) + " · ran now: " + String(a.agent) + " is on it. the next run stays at " + String(a.at) + ".",
+  /** the TUI's note after a stop */
+  stopped_note: (a: { title: string | number; agent: string | number }): string => String(a.title) + " · stopped: it won't wake " + String(a.agent) + " again.",
+  /** the TUI's question on an alarm's row, after `x` */
+  watch_stop_ask: (a: { agent: string | number; note: string | number }): string => "stop watching? bise won't wake " + String(a.agent) + " " + String(a.note) + ".",
+  /** the TUI's note after it stops watching */
+  watch_stopped_note: (a: { agent: string | number; note: string | number }): string => "stopped watching: bise won't wake " + String(a.agent) + " " + String(a.note) + ".",
+  /** opened: its state, active */
+  state_active: "active",
+  /** opened: its state, ended */
+  state_ended: "ended",
+  /** opened label (TUI): its name */
+  label_name: "name",
+  /** opened label and column head: who it wakes */
+  label_wakes: "wakes",
+  /** opened label: who set it */
+  label_set_by: "set by",
+  /** opened label (TUI): how often */
+  label_when: "when",
+  /** opened label and column head (desktop): how often */
+  label_how_often: "how often",
+  /** opened label (TUI): when it ended */
+  label_ended: "ended",
+  /** opened label and column head: its next run */
+  label_next_run: "next run",
+  /** opened label (TUI): its runs so far */
+  label_so_far: "so far",
+  /** opened label (TUI): when it ends */
+  label_ends: "ends",
+  /** opened label (desktop): when it ends */
+  label_it_ends: "it ends",
+  /** opened label: the page it keeps fresh */
+  label_keeps_fresh: "keeps fresh",
+  /** the desktop list's first column head */
+  col_what: "what it does",
+  /** opened, so far (TUI): when it last ran */
+  last_at: (a: { at: string | number }): string => "last " + String(a.at),
+  /** when it ends: after its one run */
+  ends_after_run: "after its run",
+  /** when it ends: after its nth run (`6th`) */
+  ends_after_nth: (a: { nth: string | number }): string => "after its " + String(a.nth) + " run",
+  /** when it ends: at a time */
+  ends_at: (a: { at: string | number }): string => "at " + String(a.at),
+  /** when it ends: never on its own */
+  ends_when_stopped: "when it's stopped",
+  /** the desktop's next run: `the 7th of 24` */
+  nth_of: (a: { nth: string | number; total: string | number }): string => "the " + String(a.nth) + " of " + String(a.total),
+  /** the desktop's next run, no count: `the 7th` */
+  nth: (a: { nth: string | number }): string => "the " + String(a.nth),
+  /** opened: the head over its words */
+  words_it_sends: "the words it sends",
+  /** opened: the head over its runs */
+  its_runs: "its runs",
+  /** opened: no run yet */
+  none_yet: "none yet",
 } as const;

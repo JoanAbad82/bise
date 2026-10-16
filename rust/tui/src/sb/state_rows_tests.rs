@@ -137,7 +137,7 @@ fn a_scheduled_row_is_the_screens_task() {
     let t = task_of_row(&row);
     assert_eq!((t.label.as_str(), t.text.as_str(), t.fired, t.next_ms, t.last_ms, t.runs.len()), ("every 10m", "check HN", 6, 0, 90, 2));
     assert_eq!((t.ended_ms, t.end.as_str(), t.stopped_by.as_str(), t.active()), (Some(95), "stopped", "user", false));
-    assert_eq!(t.ended_words(), "stopped by you");
+    assert_eq!(t.ended_words(), bise_proto::words::scheduled::stopped_by_you);
     let mut live = row.clone();
     (live.ended_ms, live.end, live.stopped_by) = (None, None, None);
     assert!(task_of_row(&live).active());

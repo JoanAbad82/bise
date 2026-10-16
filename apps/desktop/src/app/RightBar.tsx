@@ -14,6 +14,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, t
 import { Act, Dot, Press, Ring, Slide, tipAttrs } from '@/ds';
 import { markTip } from './tipwords';
 import type { Agent } from '@/proto';
+import { common } from '@/proto/words_common.gen';
 import { useAllArtifacts } from '@/artifacts';
 import { LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { AddButton, AddDrop, useAddPlace } from '@/artifacts/Drops';
@@ -361,7 +362,7 @@ function WatchDetail({ r, onStop, onAgent }: { r: BarRow; onStop: () => void; on
           open {r.name}
         </Act>
         <Act onClick={onStop} testId={`${r.testId}.stop`}>
-          stop watching
+          {common.stop_watching}
         </Act>
       </div>
     </div>

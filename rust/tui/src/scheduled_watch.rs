@@ -51,15 +51,12 @@ pub(crate) fn confirm_row(w: &Watch) -> Line<'static> {
     Line::from(vec![
         Span::styled(format!("{} ", theme::glyph("›")), Style::default().fg(accent())),
         Span::styled(format!("{} ", theme::glyph(theme::G_WATCHING)), Style::default().fg(faint())),
-        Span::styled(format!("stop watching? bise won't wake {} {}.", w.agent, w.alarm.note), Style::default().fg(text())),
+        Span::styled(bise_proto::words::scheduled::watch_stop_ask(&w.agent, &w.alarm.note), Style::default().fg(text())),
         Span::raw("   "),
-        Span::styled("y", Style::default().fg(text())),
-        Span::styled(" stop   ", Style::default().fg(dim())),
-        Span::styled("n", Style::default().fg(text())),
-        Span::styled(" or ", Style::default().fg(dim())),
-        Span::styled("esc", Style::default().fg(text())),
-        Span::styled(" keep", Style::default().fg(dim())),
-    ])
+    ]
+    .into_iter()
+    .chain(crate::scheduled_screen::stop_keys())
+    .collect::<Vec<_>>())
 }
 
 /// `/scheduled` on alarm `id` (None: the first one): the panel's
@@ -80,7 +77,7 @@ pub(crate) fn stop(app: &mut crate::app::App, w: &Watch) {
     if let Some(sc) = app.scheduled.as_mut() {
         sc.confirm = None;
         sc.watch = None;
-        sc.note = Some((format!("stopped watching: bise won't wake {} {}.", w.agent, w.alarm.note), std::time::Instant::now()));
+        sc.note = Some((bise_proto::words::scheduled::watch_stopped_note(&w.agent, &w.alarm.note), std::time::Instant::now()));
     }
 }
 

@@ -8,6 +8,7 @@ import { Button, Field } from '@/ds';
 import { useListKeys } from '@/app/listkeys';
 import { useStore } from '@/store';
 import { useKeptScroll } from '@/app/keep';
+import { scheduled } from '@/proto/words_scheduled.gen';
 import { useAllScheduled } from './hooks';
 import { asks, bySoonest, matches, endsWords, howOften, keyOf, nextRunWords, nextWords, runsWords, wakes, type Task } from './model';
 import './scheduled.css';
@@ -106,26 +107,26 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
     >
       <div className="sch-main">
         <header className="sch-head">
-          <div className="sch-h1">scheduled</div>
-          <div className="sch-h2">what wakes your agents, and when</div>
-          <span className="sch-count" data-testid="scheduled.count">{`active · ${String(list.length)}`}</span>
+          <div className="sch-h1">{scheduled.heading}</div>
+          <div className="sch-h2">{scheduled.subtitle}</div>
+          <span className="sch-count" data-testid="scheduled.count">{scheduled.count_desktop({ n: list.length })}</span>
         </header>
         {list.length > 0 && (
           <span className="sch-search">
-            <Field slash placeholder="search scheduled tasks" value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="scheduled.search" />
+            <Field slash placeholder={scheduled.search_placeholder} value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="scheduled.search" />
           </span>
         )}
         {list.length === 0 ? (
-          <div className="sch-empty" data-testid="scheduled.empty">nothing scheduled. ask an agent to “check the build every 5m” and it shows here.</div>
+          <div className="sch-empty" data-testid="scheduled.empty">{scheduled.empty_desktop}</div>
         ) : shown.length === 0 ? (
-          <div className="sch-empty" data-testid="scheduled.none">nothing matches. esc clears the search.</div>
+          <div className="sch-empty" data-testid="scheduled.none">{scheduled.none_match_desktop}</div>
         ) : (
           <div className="sch-list" role="listbox" data-testid="scheduled.list">
             <div className="sch-row sch-cols" aria-hidden="true">
-              <span>what it does</span>
-              <span>wakes</span>
-              <span>how often</span>
-              <span>next run</span>
+              <span>{scheduled.col_what}</span>
+              <span>{scheduled.label_wakes}</span>
+              <span>{scheduled.label_how_often}</span>
+              <span>{scheduled.label_next_run}</span>
             </div>
             {shown.map((x) => (
               <div key={keyOf(x)} className={`sch-row${keyOf(x) === selKey ? ' on' : ''}${cur && keyOf(cur) === keyOf(x) ? ' open' : ''}`} role="option"
@@ -140,46 +141,46 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
           </div>
         )}
         <div className="sch-keys" data-testid="scheduled.keys">
-          <span><b>⏎</b> open</span>
-          {ports.runNow && <span><b>r</b> run now</span>}
-          <span><b>x</b> stop</span>
-          <span><b>/</b> search</span>
+          <span><b>⏎</b> {scheduled.key_open}</span>
+          {ports.runNow && <span><b>r</b> {scheduled.key_run_now}</span>}
+          <span><b>x</b> {scheduled.key_stop}</span>
+          <span><b>/</b> {scheduled.key_search}</span>
         </div>
       </div>
       {cur && (
         <aside className="sch-pane" data-testid="scheduled.pane">
-          <Button kind="ghost" onClick={() => { setOpen(null); setAsking(false); }} testId="scheduled.back">‹ scheduled</Button>
+          <Button kind="ghost" onClick={() => { setOpen(null); setAsking(false); }} testId="scheduled.back">{`‹ ${scheduled.heading}`}</Button>
           {/* the head, then its words once (designer m_12105: no title repeating the quote) */}
           {/* its name, never its id; who it wakes dim beside it, as the TUI's opened head (designer m_15929) */}
           <div className="sch-title" data-testid="scheduled.pane.title">
             {asks(cur.t)}
             <span className="sch-k3-sub">{wakes(cur)}</span>
           </div>
-          <div className="sch-label">the words it sends</div>
+          <div className="sch-label">{scheduled.words_it_sends}</div>
           <blockquote className="sch-quote" data-testid="scheduled.pane.words">{cur.t.words}</blockquote>
           <dl className="sch-kv">
-            <dt>wakes</dt><dd>{wakes(cur)}</dd>
-            <dt>set by</dt><dd>{cur.t.by}</dd>
-            <dt>how often</dt><dd>{howOften(cur.t)}</dd>
-            <dt>next run</dt><dd>{nextRunWords(cur.t, now)}</dd>
-            <dt>it ends</dt><dd>{endsWords(cur.t, now)}</dd>
-            {cur.t.page != null && cur.t.page !== '' && (<><dt>keeps fresh</dt><dd>{`↗ ${cur.t.page}`}</dd></>)}
+            <dt>{scheduled.label_wakes}</dt><dd>{wakes(cur)}</dd>
+            <dt>{scheduled.label_set_by}</dt><dd>{cur.t.by}</dd>
+            <dt>{scheduled.label_how_often}</dt><dd>{howOften(cur.t)}</dd>
+            <dt>{scheduled.label_next_run}</dt><dd>{nextRunWords(cur.t, now)}</dd>
+            <dt>{scheduled.label_it_ends}</dt><dd>{endsWords(cur.t, now)}</dd>
+            {cur.t.page != null && cur.t.page !== '' && (<><dt>{scheduled.label_keeps_fresh}</dt><dd>{`↗ ${cur.t.page}`}</dd></>)}
           </dl>
-          <div className="sch-label">its runs</div>
-          <div className="sch-runs">{cur.t.done === 0 ? 'none yet' : runsWords(cur.t)}</div>
+          <div className="sch-label">{scheduled.its_runs}</div>
+          <div className="sch-runs">{cur.t.done === 0 ? scheduled.none_yet : runsWords(cur.t)}</div>
           {asking ? (
             <div className="sch-ask" role="group" data-testid="scheduled.ask">
-              <span>{`stop this scheduled task? it won't wake ${cur.t.agent} again.`}</span>
+              <span>{scheduled.stop_ask_desktop({ agent: cur.t.agent })}</span>
               <span className="sch-acts">
-                <Button kind="danger" onClick={() => { stop(cur); }} testId="scheduled.ask.stop">stop ⏎</Button>
-                <Button kind="ghost" onClick={() => { setAsking(false); }} testId="scheduled.ask.keep">keep esc</Button>
+                <Button kind="danger" onClick={() => { stop(cur); }} testId="scheduled.ask.stop">{`${scheduled.key_stop} ⏎`}</Button>
+                <Button kind="ghost" onClick={() => { setAsking(false); }} testId="scheduled.ask.keep">{`${scheduled.key_keep} esc`}</Button>
               </span>
             </div>
           ) : (
             <div className="sch-acts">
               {/* the act, then its key dim, as the list foot's '⏎ open   x stop' (designer m_15929) */}
-              {ports.runNow && <Button kind="pri" onClick={() => { ports.runNow?.(cur.project, cur.t.id); }} testId="scheduled.run">run now <span className="sch-key">r</span></Button>}
-              <Button kind="danger" onClick={() => { setAsking(true); }} testId="scheduled.stop">stop <span className="sch-key">x</span></Button>
+              {ports.runNow && <Button kind="pri" onClick={() => { ports.runNow?.(cur.project, cur.t.id); }} testId="scheduled.run">{scheduled.key_run_now} <span className="sch-key">r</span></Button>}
+              <Button kind="danger" onClick={() => { setAsking(true); }} testId="scheduled.stop">{scheduled.key_stop} <span className="sch-key">x</span></Button>
             </div>
           )}
         </aside>

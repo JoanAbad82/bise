@@ -3,7 +3,15 @@
 # (tests/words.py's w(), the desktop's words_<area>.gen.ts); a count never goes up, a drop lowers it
 # in the same commit, at 0 its line goes. Only a change that adds keys to the catalog may raise a
 # count, by literals of those keys (another area's chunk moves them). Checked by tests/word_lint.py.
+2 apps/desktop/tests/checks/app/hover-tips.spec.ts
 1 apps/desktop/tests/checks/app/menus.spec.ts
 1 apps/desktop/tests/checks/app/trigger-ink.spec.ts
 3 apps/desktop/tests/checks/inbox/inbox-open.spec.ts
 6 apps/desktop/tests/checks/inbox/inbox-screen.spec.ts
+5 apps/desktop/tests/checks/thread/hierarchy.spec.ts
+2 apps/desktop/tests/checks/thread/news-rows.spec.ts
+1 apps/desktop/tests/checks/thread/tiers.spec.ts
+1 apps/desktop/tests/checks/thread/waiting-states.spec.ts
+3 apps/desktop/tests/checks/thread/wake.spec.ts
+2 tests/tui_scheduled_tmux.py
+3 tests/tui_wake_tmux.py

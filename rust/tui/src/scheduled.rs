@@ -70,6 +70,7 @@ pub(crate) fn is_stop_note(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bise_proto::words::scheduled;
 
     const NOW: u64 = 1_790_000_000_000;
 
@@ -78,9 +79,10 @@ mod tests {
     #[test]
     fn the_lines_are_the_shared_words() {
         let run = "timer #48 \"build check\" (every 2m, 2/6, set by answer-line): check the build\n(stop it: sb every --stop 48)";
-        assert!(matches!(run_line(run), Some(Ev::Scheduled { head, words, open: false }) if head == "build check · 2 of 6" && words == "check the build"));
+        assert!(matches!(run_line(run), Some(Ev::Scheduled { head, words, open: false }) if head == format!("build check · {}", scheduled::n_of(2, 6)) && words == "check the build"));
         let set = r#"{"ev":"set","id":3,"agent":"a","by":"a","label":"every 2m","text":"x","next_ms":1790000120000}"#;
-        assert!(matches!(hub_line_at(set, NOW), Some(Ev::Scheduled { head, .. }) if head.starts_with("a scheduled x · every 2m · next ")));
+        let want = format!("{} · every 2m · {}", scheduled::set_own("a", "x"), scheduled::next_at(""));
+        assert!(matches!(hub_line_at(set, NOW), Some(Ev::Scheduled { head, .. }) if head.starts_with(&want)));
         assert!(run_line("hello").is_none());
         assert!(is_stop_note("the user stopped timer #3 (x): don't set it again unless they ask"));
     }

@@ -6,6 +6,7 @@
 // words; light and dark; 1100 and 800, for designer's sign. The scripted core (FakeCore), fake
 // data. Owner: amb-web.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { scheduled } from '../../../src/proto/words_scheduled.gen';
 
 const SHOP = 'shop-1a2b3c4d';
 const H = 3600_000;
@@ -32,7 +33,7 @@ function world(now: number) {
   ];
 }
 
-const PLACEHOLDER = { artifacts: 'search artifacts', scheduled: 'search scheduled tasks' } as const;
+const PLACEHOLDER = { artifacts: 'search artifacts', scheduled: scheduled.search_placeholder } as const;
 
 for (const screen of ['artifacts', 'scheduled'] as const) {
   test(`ds/slash-search (${screen}): a boxed '/' at the field's right end; '/' focuses, the box hides`, async () => {

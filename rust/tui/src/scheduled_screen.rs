@@ -13,6 +13,7 @@ use crate::app::App;
 use crate::sb::Watch;
 use crate::scheduled::{ahead, clip, countdown, Task};
 use crate::theme::{self, accent, dim, faint, text};
+use bise_proto::words::{common, scheduled};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -160,19 +161,19 @@ fn row(t: &Task, selected: bool, width: usize, now: u64) -> Line<'static> {
         // narrow: one short form in the two last columns
         let at = ahead(e, now);
         let s = if t.end == "stopped" {
-            format!("stopped {at}")
+            scheduled::stopped_at(at)
         } else {
             // ran its times: that many runs (what the wide row says)
             let n = if t.end == "times" { t.times.unwrap_or(t.fired) } else { t.fired };
-            format!("ended {at} · {n} run{}", if n == 1 { "" } else { "s" })
+            format!("{} · {}", scheduled::ended_at(at), scheduled::runs(n))
         };
         spans.push(Span::styled(pad(&s, next_w + far_w), soft));
         return Line::from(spans);
     }
     let (next, far) = match t.ended_ms {
-        Some(e) => (format!("ended {}", ahead(e, now)), t.ended_words()),
+        Some(e) => (scheduled::ended_at(ahead(e, now)), t.ended_words()),
         None if wide => {
-            let mut n = format!("next {}", ahead(t.next_ms, now));
+            let mut n = scheduled::next_at(ahead(t.next_ms, now));
             if t.next_ms.saturating_sub(now) < 24 * 3_600_000 && !n.contains("tomorrow") {
                 n.push_str(&format!(" · {}", countdown(t.next_ms, now)));
             }
@@ -190,7 +191,7 @@ fn row(t: &Task, selected: bool, width: usize, now: u64) -> Line<'static> {
     spans.push(Span::styled(pad(&next, next_w), soft));
     spans.push(Span::styled(pad(&far, far_w), soft));
     if wide {
-        spans.push(Span::styled(pad(&format!("by {}", t.by), 17), soft));
+        spans.push(Span::styled(pad(&scheduled::by(&t.by), 17), soft));
         let used: usize = spans.iter().map(|s| s.content.width()).sum();
         let room = width.saturating_sub(used + 1);
         if let Some(p) = &t.page {
@@ -205,15 +206,25 @@ fn confirm_row(t: &Task) -> Line<'static> {
     Line::from(vec![
         Span::styled(format!("{} ", theme::glyph("›")), Style::default().fg(accent())),
         Span::styled(format!("{} ", theme::glyph(theme::G_SCHEDULED)), Style::default().fg(faint())),
-        Span::styled(format!("stop “{}”? it won't wake {} again.", t.title(), t.agent), Style::default().fg(text())),
+        Span::styled(scheduled::stop_ask(t.title(), &t.agent), Style::default().fg(text())),
         Span::raw("   "),
+    ]
+    .into_iter()
+    .chain(stop_keys())
+    .collect::<Vec<_>>())
+}
+
+/// `y stop   n or esc keep`, after a stop question on a row (a task's,
+/// an alarm's).
+pub(crate) fn stop_keys() -> Vec<Span<'static>> {
+    vec![
         Span::styled("y", Style::default().fg(text())),
-        Span::styled(" stop   ", Style::default().fg(dim())),
+        Span::styled(format!(" {}   ", scheduled::key_stop), Style::default().fg(dim())),
         Span::styled("n", Style::default().fg(text())),
-        Span::styled(" or ", Style::default().fg(dim())),
+        Span::styled(format!(" {} ", scheduled::key_or), Style::default().fg(dim())),
         Span::styled("esc", Style::default().fg(text())),
-        Span::styled(" keep", Style::default().fg(dim())),
-    ])
+        Span::styled(format!(" {}", scheduled::key_keep), Style::default().fg(dim())),
+    ]
 }
 
 fn keys(pairs: &[(&str, &str)]) -> Line<'static> {
@@ -231,35 +242,36 @@ fn keys(pairs: &[(&str, &str)]) -> Line<'static> {
 /// The key bar for the state the screen is in.
 pub(crate) fn key_bar(sc: &Screen, sel: Option<&Task>, wide: bool) -> Line<'static> {
     if sc.confirm.is_some() {
-        return keys(&[("y", "stop"), ("n or esc", "keep")]);
+        return keys(&[("y", scheduled::key_stop), (&format!("n {} esc", scheduled::key_or), scheduled::key_keep)]);
     }
     if sc.typing {
-        return keys(&[("⏎", "done"), ("↑↓", "choose"), ("esc", "clear the search")]);
+        return keys(&[("⏎", scheduled::key_done), ("↑↓", scheduled::key_choose), ("esc", scheduled::key_clear_search)]);
     }
-    let esc = if sc.query.is_empty() { "close" } else { "clear the search" };
-    let tab = if sc.ended_too { "active only" } else { "ended too" };
+    let esc = if sc.query.is_empty() { scheduled::key_close } else { scheduled::key_clear_search };
+    let tab = if sc.ended_too { scheduled::key_active_only } else { scheduled::key_ended_too };
     // an alarm: its agent, or stop watching (designer m_22934)
     if sc.watch.is_some() {
-        let mut pairs = vec![("⏎", "open"), ("x", "stop watching")];
+        let mut pairs = vec![("⏎", scheduled::key_open), ("x", common::stop_watching)];
         if wide {
-            pairs.extend([("/", "find"), ("tab", tab)]);
+            pairs.extend([("/", scheduled::key_find), ("tab", tab)]);
         }
         pairs.push(("esc", esc));
         return keys(&pairs);
     }
     let active = sel.is_some_and(Task::active);
     if sc.opened.is_some() {
-        return if active { keys(&[("r", "run now"), ("x", "stop"), ("esc", "back to the list")]) } else { keys(&[("esc", "back to the list")]) };
+        let back = ("esc", scheduled::key_back);
+        return if active { keys(&[("r", scheduled::key_run_now), ("x", scheduled::key_stop), back]) } else { keys(&[back]) };
     }
     let mut pairs: Vec<(&str, &str)> = Vec::new();
     if sel.is_some() {
-        pairs.push(("⏎", "open"));
+        pairs.push(("⏎", scheduled::key_open));
     }
     if active {
-        pairs.extend([("r", "run now"), ("x", "stop")]);
+        pairs.extend([("r", scheduled::key_run_now), ("x", scheduled::key_stop)]);
     }
     if wide {
-        pairs.extend([("/", "find"), ("tab", tab)]);
+        pairs.extend([("/", scheduled::key_find), ("tab", tab)]);
     }
     pairs.push(("esc", esc));
     keys(&pairs)
@@ -275,8 +287,7 @@ fn detail_line(sc: &Screen, sel: Option<&Task>, width: usize) -> Line<'static> {
         }
     }
     let Some(t) = sel else { return Line::default() };
-    let mut s = format!("{} · wakes {} {} · set by {}", t.title(), t.agent, t.when(), t.by);
-    s.push_str(&format!(" · its words: {}", clip(&t.text, 200)));
+    let s = format!("{} · {}", scheduled::detail(t.title(), &t.agent, t.when(), &t.by), scheduled::its_words(clip(&t.text, 200)));
     Line::from(Span::styled(cut(&s, width), dim_st))
 }
 
@@ -315,21 +326,24 @@ pub(crate) fn lines_with(sc: &mut Screen, all: &[Task], watches: &[Watch], width
     let n_ended = all.iter().filter(|t| !t.active()).count();
     let mut out: Vec<Line<'static>> = Vec::new();
     // the header: what it is, how many, the tab
-    let left = if wide { "scheduled · what wakes your agents, and when" } else { "scheduled" };
-    let mut count = if sc.ended_too { format!("{n_active} active · {n_ended} ended") } else { format!("{n_active} active") };
-    if !watches.is_empty() {
-        count.push_str(&format!(" · {} watching", watches.len()));
+    let left = if wide { format!("{} · {}", scheduled::heading, scheduled::subtitle) } else { scheduled::heading.to_string() };
+    let mut count = scheduled::count_active(n_active);
+    if sc.ended_too {
+        count.push_str(&format!(" · {}", scheduled::count_ended(n_ended)));
     }
-    let right = if wide { format!("{count}   tab {}", if sc.ended_too { "active only" } else { "ended too" }) } else { count };
+    if !watches.is_empty() {
+        count.push_str(&format!(" · {}", scheduled::count_watching(watches.len())));
+    }
+    let right = if wide { format!("{count}   tab {}", if sc.ended_too { scheduled::key_active_only } else { scheduled::key_ended_too }) } else { count };
     let gap = width.saturating_sub(left.width() + right.width() + 2).max(2);
     out.push(Line::from(vec![
-        Span::styled(left.to_string(), Style::default().fg(text())),
+        Span::styled(left, Style::default().fg(text())),
         Span::raw(" ".repeat(gap)),
         Span::styled(right, Style::default().fg(dim())),
     ]));
     // the search
     out.push(if sc.query.is_empty() && !sc.typing {
-        Line::from(Span::styled("/ find: an agent, a name, the words", Style::default().fg(faint())))
+        Line::from(Span::styled(format!("/ {}", scheduled::find_hint), Style::default().fg(faint())))
     } else {
         Line::from(vec![
             Span::styled("/ ", Style::default().fg(dim())),
@@ -342,9 +356,9 @@ pub(crate) fn lines_with(sc: &mut Screen, all: &[Task], watches: &[Watch], width
     let mut rows: Vec<(Line<'static>, Option<Key>)> = Vec::new();
     if list.is_empty() && alarms.is_empty() {
         let words = if !sc.query.is_empty() {
-            "nothing scheduled matches."
+            scheduled::none_match
         } else if n_active == 0 {
-            "nothing scheduled. ask an agent to \"check the build every 5m\" and it shows here."
+            scheduled::empty
         } else {
             ""
         };
@@ -361,7 +375,7 @@ pub(crate) fn lines_with(sc: &mut Screen, all: &[Task], watches: &[Watch], width
         if !rows.is_empty() {
             rows.push((Line::default(), None));
         }
-        rows.push((Line::from(Span::styled("  watching", Style::default().fg(dim()))), None));
+        rows.push((Line::from(Span::styled(format!("  {}", scheduled::group_watching), Style::default().fg(dim()))), None));
         for w in &alarms {
             let selected = key == Some(Key::Watch(w.alarm.id));
             let line = if selected && sc.confirm == Some(w.alarm.id) { crate::scheduled_watch::confirm_row(w) } else { crate::scheduled_watch::row(w, selected, width, wide) };
@@ -373,7 +387,7 @@ pub(crate) fn lines_with(sc: &mut Screen, all: &[Task], watches: &[Watch], width
             watching(&mut rows);
             ended_head = true;
             rows.push((Line::default(), None));
-            rows.push((Line::from(Span::styled("  ended", Style::default().fg(dim()))), None));
+            rows.push((Line::from(Span::styled(format!("  {}", scheduled::group_ended), Style::default().fg(dim()))), None));
         }
         let selected = key == Some(Key::Task(t.id));
         let line = if selected && sc.confirm == Some(t.id) { confirm_row(t) } else { row(t, selected, width, now) };
@@ -418,7 +432,7 @@ pub(crate) fn opened_lines(sc: &Screen, t: &Task, width: usize, height: usize, n
     let mut out = Vec::new();
     // designer m_15602: its name, never its id (the id is sb every's)
     let left = format!("{} · {}", t.title(), t.agent);
-    let right = format!("{} {}", theme::glyph(theme::G_SCHEDULED), if t.active() { "active" } else { "ended" });
+    let right = format!("{} {}", theme::glyph(theme::G_SCHEDULED), if t.active() { scheduled::state_active } else { scheduled::state_ended });
     let gap = width.saturating_sub(left.width() + right.width() + 2).max(2);
     out.push(Line::from(vec![
         Span::styled(left, Style::default().fg(text())),
@@ -426,48 +440,46 @@ pub(crate) fn opened_lines(sc: &Screen, t: &Task, width: usize, height: usize, n
         Span::styled(right, Style::default().fg(if t.active() { accent() } else { dim() })),
     ]));
     out.push(Line::default());
-    out.push(label("name", t.title()));
-    out.push(label("wakes", t.agent.clone()));
-    out.push(label("set by", t.by.clone()));
+    out.push(label(scheduled::label_name, t.title()));
+    out.push(label(scheduled::label_wakes, t.agent.clone()));
+    out.push(label(scheduled::label_set_by, t.by.clone()));
     let mut when = t.when();
     if let Some(n) = t.times.filter(|n| *n > 1) {
-        when.push_str(&format!(" · {n} times"));
+        when.push_str(&format!(" · {}", scheduled::n_times(n)));
     }
-    out.push(label("when", when));
+    out.push(label(scheduled::label_when, when));
     match t.ended_ms {
-        Some(e) => out.push(label("ended", format!("{} · {}", ahead(e, now), t.ended_words()))),
-        None => out.push(label("next run", format!("{} · {}", ahead(t.next_ms, now), countdown(t.next_ms, now)))),
+        Some(e) => out.push(label(scheduled::label_ended, format!("{} · {}", ahead(e, now), t.ended_words()))),
+        None => out.push(label(scheduled::label_next_run, format!("{} · {}", ahead(t.next_ms, now), countdown(t.next_ms, now)))),
     }
-    let mut far = crate::scheduled::so_far(t, now);
-    if far.starts_with("until") || far.is_empty() {
-        far = format!("{} run{}", t.fired, if t.fired == 1 { "" } else { "s" });
-    }
+    // so far: `2 of 6` with a count, else its runs (never `until …` here)
+    let mut far = if t.times.is_some() { crate::scheduled::so_far(t, now) } else { scheduled::runs(t.fired) };
     if t.last_ms > 0 {
-        far.push_str(&format!(" · last {}", ahead(t.last_ms, now)));
+        far.push_str(&format!(" · {}", scheduled::last_at(ahead(t.last_ms, now))));
     }
-    out.push(label("so far", far));
+    out.push(label(scheduled::label_so_far, far));
     let ends = match (t.times, t.until_ms) {
-        (Some(1), _) => "after its run".to_string(),
-        (Some(n), _) => format!("after its {}{} run", n, ordinal(n)),
-        (None, Some(u)) => format!("at {}", ahead(u, now)),
-        _ => "when it's stopped".to_string(),
+        (Some(1), _) => scheduled::ends_after_run.to_string(),
+        (Some(n), _) => scheduled::ends_after_nth(format!("{}{}", n, ordinal(n))),
+        (None, Some(u)) => scheduled::ends_at(ahead(u, now)),
+        _ => scheduled::ends_when_stopped.to_string(),
     };
     if t.active() {
-        out.push(label("ends", ends));
+        out.push(label(scheduled::label_ends, ends));
     }
     if let Some(p) = &t.page {
-        out.push(label("keeps fresh", format!("↗ {p}")));
+        out.push(label(scheduled::label_keeps_fresh, format!("↗ {p}")));
     }
     out.push(Line::default());
-    out.push(Line::from(Span::styled("the words it sends", Style::default().fg(dim()))));
+    out.push(Line::from(Span::styled(scheduled::words_it_sends, Style::default().fg(dim()))));
     let bar = Span::styled("│ ", Style::default().fg(theme::rule()));
     for l in wrap(&t.text, width.saturating_sub(4).max(10)) {
         out.push(Line::from(vec![bar.clone(), Span::styled(l, Style::default().fg(text()))]));
     }
     out.push(Line::default());
-    out.push(Line::from(Span::styled("its runs", Style::default().fg(dim()))));
+    out.push(Line::from(Span::styled(scheduled::its_runs, Style::default().fg(dim()))));
     if t.runs.is_empty() {
-        out.push(Line::from(Span::styled("  none yet", Style::default().fg(faint()))));
+        out.push(Line::from(Span::styled(format!("  {}", scheduled::none_yet), Style::default().fg(faint()))));
     }
     for r in t.runs.iter().rev() {
         out.push(Line::from(Span::styled(format!("  {}", crate::when::ended_now(*r)), Style::default().fg(dim()))));
@@ -522,7 +534,7 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
     if full.width < 30 || full.height < 10 {
         return;
     }
-    let area = crate::artifacts_screen::draw_frame(app, frame, full, "scheduled");
+    let area = crate::artifacts_screen::draw_frame(app, frame, full, scheduled::heading);
     let all = app.sb.timers.clone();
     let now = crate::when::now_ms();
     let watches = app.sb.watches(now);
@@ -589,7 +601,7 @@ fn run_now(app: &mut App) {
     let Some(t) = selected(app).filter(Task::active) else { return };
     app.sb.call("scheduled/run", serde_json::json!({"id": t.id}), crate::sb::rpc::Then::Shown);
     let now = crate::when::now_ms();
-    note(app, format!("{} · ran now: {} is on it. the next run stays at {}.", t.title(), t.agent, ahead(t.next_ms, now)));
+    note(app, scheduled::ran_now_note(t.title(), &t.agent, ahead(t.next_ms, now)));
 }
 
 /// `y` after `x`: the hub stops it (its agent hears it from bise).
@@ -600,7 +612,7 @@ fn stop(app: &mut App, id: u64) {
         sc.confirm = None;
         sc.opened = None;
     }
-    note(app, format!("{title} · stopped: it won't wake {agent} again."));
+    note(app, scheduled::stopped_note(title, agent));
 }
 
 pub(crate) fn on_key(app: &mut App, k: &KeyEvent) -> bool {

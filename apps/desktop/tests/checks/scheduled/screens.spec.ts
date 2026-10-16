@@ -5,6 +5,7 @@
 // says the task's words. The scripted core (FakeCore) sends amb-feed's typed HubEv scheduled; fake
 // data. Owner: amb-kit.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { scheduled } from '../../../src/proto/words_scheduled.gen';
 
 const HOME = 'bise-home-00000000';
 const SHOP = 'shop-1a2b3c4d';
@@ -56,7 +57,7 @@ test('scheduled/screens: the list and one task, light and dark, 1400 and 800', a
     await expect(page.getByTestId('scheduled.screen')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('scheduled.row.4')).toBeVisible({ timeout: 5000 });
     expect(await page.getByTestId('scheduled.row.4').textContent()).toContain('deploy-watch · storefront');
-    expect(await page.getByTestId('scheduled.count').textContent()).toBe('active · 4');
+    expect(await page.getByTestId('scheduled.count').textContent()).toBe(scheduled.count_desktop({ n: 4 }));
     const win = await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0]?.id ?? -1);
     const size = async (w: number) => {
       await s.app.evaluate(({ BrowserWindow }, [id, w2]) => BrowserWindow.fromId(id ?? -1)?.setContentSize(w2 ?? 0, 820), [win, w]);
@@ -133,7 +134,7 @@ test('scheduled/screens: the list and one task, light and dark, 1400 and 800', a
     // designer m_15929: the opened head is its name with who it wakes dim, never '#4'; 'stop' with a dim 'x'
     await size(1400);
     await expect(page.getByTestId('scheduled.pane.title')).toHaveText('deploy watchdeploy-watch · storefront');
-    await expect(page.getByTestId('scheduled.stop')).toHaveText('stop x');
+    await expect(page.getByTestId('scheduled.stop')).toHaveText(`${scheduled.key_stop} x`);
 
     // the right bar's SCHEDULED section on storefront's thread (it replaced panel A's 'scheduled
     // here', amb-win f35dfb09), and a ⌘K hit on a task's name, each light and dark
@@ -167,7 +168,7 @@ test('scheduled/screens: the empty list asks him in plain words, no sb command',
     const { page } = s;
     const empty = page.getByTestId('scheduled.empty');
     await expect(empty).toBeVisible({ timeout: 10_000 });
-    await expect(empty).toHaveText('nothing scheduled. ask an agent to “check the build every 5m” and it shows here.');
+    await expect(empty).toHaveText(scheduled.empty_desktop);
     for (const t of ['light', 'dark'] as const) {
       await core.send({ ev: 'prefs', prefs: { onboarded: true, theme: t } } as never);
       await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe(t);
