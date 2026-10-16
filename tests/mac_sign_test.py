@@ -184,6 +184,23 @@ def test_notary_parts():
     check(N.verdict('{"status": "Accepted", "id": "1"}')["status"] == "Accepted" and N.verdict("oops") == {}, "the verdict")
 
 
+def test_staple_retries():
+    class R:
+        def __init__(self, rc):
+            self.returncode, self.stdout, self.stderr = rc, "", "Error 68" if rc else ""
+    real, calls, waits = N.subprocess.run, [], []
+    try:
+        answers = [1, 1, 0, 0]  # staple fails twice (Apple's ticket not served yet), then works; validate works
+        N.subprocess.run = lambda argv, **kw: (calls.append(argv[2]), R(answers.pop(0)))[1]
+        N.staple("/a.app", tries=5, wait_s=30, sleep=waits.append)
+        check(calls == ["staple", "staple", "staple", "validate"] and waits == [30, 30], "staple is tried again after Error 68")
+        calls.clear()
+        N.subprocess.run = lambda argv, **kw: (calls.append(argv[2]), R(1))[1]
+        check(raises(N.NotaryError, N.staple, "/a.app", 3, 1, lambda s: None) and calls == ["staple"] * 3, "it fails after its tries")
+    finally:
+        N.subprocess.run = real
+
+
 def test_wanted_ids():
     steps = [("bise.app/Contents/MacOS/bise", "exec", None), ("bise Computer Use.app", "bundle", None),
              ("bise.app", "bundle", None), ("sb-core", "exec", None), ("plugins/x/bin/tool", "exec", None)]

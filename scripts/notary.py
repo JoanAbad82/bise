@@ -79,9 +79,25 @@ def submit(path, workdir, env=None):
     return res.get("id")
 
 
-def staple(path):
-    """Staple the ticket to a bundle or a DMG and validate it."""
+STAPLE_TRIES = 5
+STAPLE_WAIT_S = 30
+
+
+def staple(path, tries=STAPLE_TRIES, wait_s=STAPLE_WAIT_S, sleep=None):
+    """Staple the ticket to a bundle or a DMG and validate it.
+
+    Right after an accepted notarization Apple may not serve the ticket yet (stapler's
+    Error 68, run 38950522744's darwin-x86_64): each step is tried `tries` times,
+    `wait_s` apart, before it fails."""
+    import time
+    sleep = sleep or time.sleep
     for argv in (["xcrun", "stapler", "staple", path], ["xcrun", "stapler", "validate", path]):
-        r = subprocess.run(argv, capture_output=True, text=True)
-        if r.returncode:
-            raise NotaryError("%s: %s" % (" ".join(argv[:3]), (r.stderr or r.stdout).strip()[-400:]))
+        for n in range(1, tries + 1):
+            r = subprocess.run(argv, capture_output=True, text=True)
+            if not r.returncode:
+                break
+            err = (r.stderr or r.stdout).strip()[-400:]
+            if n == tries:
+                raise NotaryError("%s (%d tries): %s" % (" ".join(argv[:3]), tries, err))
+            say("%s failed (try %d of %d), again in %d s: %s" % (" ".join(argv[:3]), n, tries, wait_s, err[-160:]))
+            sleep(wait_s)
