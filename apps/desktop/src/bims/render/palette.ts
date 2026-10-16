@@ -23,6 +23,8 @@ export interface Palette {
   readonly terrace: string;
   readonly window: string;
   readonly lampOn: string;
+  /** a desk lamp's base, stem and shade: cream by day and by night (bims m_28080: dark ones read as posts) */
+  readonly lamp: string;
   readonly neon: string;
   /** hemisphere light: sky, ground, intensity */
   readonly hemi: readonly [string, string, number];
@@ -36,16 +38,17 @@ export const DAY: Palette = {
   bg: '#fdfbf7', grass: '#86c96f', dirt: '#9a6a45', floor: '#f6e7cf', wall: '#fffaf1', wallTop: '#f1e3c9',
   desk: '#e2b880', deskTop: '#f3d79e', island: '#2a9d8f', islandTop: '#fffaf0', ink: '#1d1a17', rug: '#ffd166',
   islandRug: '#bfe1f2', plant: '#5fb35a', screenOn: '#fdfbf7', screenOff: '#3a3530', terrace: '#ecd7ae',
-  window: '#cfeaff', lampOn: '#ffe7a8', neon: '#ffd166', hemi: ['#ffffff', '#e9dcc4', 1.55], sun: ['#fff4e0', 1.9],
+  window: '#cfeaff', lampOn: '#ffe7a8', lamp: '#f1e3c9', neon: '#ffd166', hemi: ['#ffffff', '#e9dcc4', 1.55], sun: ['#fff4e0', 1.9],
   pendants: false,
 };
 
 export const NIGHT: Palette = {
-  // floor and desks one step lighter than the prototype's night, so a sitting bim never melts in (bims m_27836)
-  bg: '#141211', grass: '#3f6b35', dirt: '#6e4a31', floor: '#6d5643', wall: '#4a3d33', wallTop: '#5c4b3e',
+  // floor two steps and desks one step lighter than the prototype's night, so a sitting bim never
+  // melts in (bims m_27836, m_28080)
+  bg: '#141211', grass: '#3f6b35', dirt: '#6e4a31', floor: '#7a6150', wall: '#4a3d33', wallTop: '#5c4b3e',
   desk: '#ad7f50', deskTop: '#c6966a', island: '#1f7a70', islandTop: '#ece2cf', ink: '#0d0b0a', rug: '#c99a2e',
   islandRug: '#3b5f7a', plant: '#3f8a3e', screenOn: '#fff2d6', screenOff: '#26221f', terrace: '#6b5a44',
-  window: '#2c4a6b', lampOn: '#ffcf8a', neon: '#ffd166', hemi: ['#ffd9a8', '#3a2c22', 1.5], sun: ['#a9b8e8', 0.7],
+  window: '#2c4a6b', lampOn: '#ffcf8a', lamp: '#e6d8bf', neon: '#ffd166', hemi: ['#ffd9a8', '#3a2c22', 1.5], sun: ['#a9b8e8', 0.7],
   pendants: true,
 };
 

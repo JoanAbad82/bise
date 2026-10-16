@@ -81,15 +81,15 @@ function laptop(k: Kit, parent: Object3D, x: number, z: number): MeshLambertMate
   return screen;
 }
 
-// a small light lamp, in the wall's cream (bims m_27836: black ones read as ink glyphs at 640),
-// its bulb lit at night only (lightDesk)
+// a small cream lamp on a short stem, day and night (bims m_27836, m_28080: dark ones read as ink
+// glyphs, a 'T' on each desk, at 640), its bulb lit at night only (lightDesk)
 function deskLamp(k: Kit, parent: Object3D, x: number, z: number): MeshLambertMaterial {
   const { style, pal } = k;
-  k.add(style.box(0.11, 0.025, 0.11), k.mat(pal.wallTop), parent, x, 0.56, z);
-  k.add(style.box(0.025, 0.2, 0.025), k.mat(pal.wallTop), parent, x, 0.67, z);
-  k.add(style.box(0.12, 0.06, 0.1), k.mat(pal.wall), parent, x - 0.03, 0.79, z);
-  const bulb = style.material(pal.wall, { emissive: pal.lampOn, ei: 0 }) as MeshLambertMaterial;
-  k.add(style.box(0.08, 0.02, 0.06), bulb, parent, x - 0.03, 0.755, z);
+  k.add(style.box(0.11, 0.025, 0.11), k.mat(pal.lamp), parent, x, 0.56, z);
+  k.add(style.box(0.025, 0.13, 0.025), k.mat(pal.lamp), parent, x, 0.635, z);
+  k.add(style.box(0.12, 0.06, 0.1), k.mat(pal.lamp), parent, x - 0.03, 0.725, z);
+  const bulb = style.material(pal.lamp, { emissive: pal.lampOn, ei: 0 }) as MeshLambertMaterial;
+  k.add(style.box(0.08, 0.02, 0.06), bulb, parent, x - 0.03, 0.69, z);
   return bulb;
 }
 
@@ -415,5 +415,5 @@ export function lightDesk(h: DeskHandles, pal: Palette, screen: number, lamp: bo
   // a desk lamp lights at night only (bims m_27836); by day it is a cream shade
   const lit = lamp && pal.pendants;
   h.lamp.emissiveIntensity = lit ? LAMP_ON_EI(pal) : 0;
-  h.lamp.color.set(lit ? pal.lampOn : pal.wall);
+  h.lamp.color.set(lit ? pal.lampOn : pal.lamp);
 }
