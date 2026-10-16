@@ -15,7 +15,7 @@ import { bims } from '@/proto/words_bims.gen';
 import { useModHeld } from '@/app/held';
 import type { ActivitiesFn, BimEvent, BimFrame, Label, LabelsFn, LayoutFn, Look, MakeRenderer, NewTimelineFn, Office as OfficeMap, OfficeRenderer, Snapshot, Timeline } from './model';
 import { away, CHECK_MS, HOVER_MS, nextAfter, TICK_MS } from './loop';
-import { useHisSends } from './sends';
+import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
 import './office.css';
 
@@ -138,16 +138,13 @@ export function Office({
     live.current.held = held;
     kickRef.current();
   }, [held]);
-  // his message: a plane to its bim (q-planes)
-  useHisSends(
-    project,
-    agents.map((a) => a.name),
-    (e) => {
-      live.current.events.push(e);
-      live.current.fresh = true;
-      kickRef.current();
-    },
-  );
+  // hub/activity: his message is a plane to its bim, an agent's to another a visit, a report a
+  // sheet to main's desk (events.ts)
+  useOfficeEvents(project, (e) => {
+    live.current.events.push(e);
+    live.current.fresh = true;
+    kickRef.current();
+  });
 
   const place = useCallback((el: HTMLDivElement, name: string) => {
     const h = heads.current.get(name);
