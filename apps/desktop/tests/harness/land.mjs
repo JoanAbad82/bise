@@ -78,6 +78,9 @@ export const LAND = [
   // an app from the DMG or Downloads asks once to move to Applications; 'Not now' is kept for its
   // build; settings › update moves it (apple-signing ag-move; the alert and the move stubbed)
   'checks/native/move-apps.spec.ts',
+  // les bims: the list never loads three, a still office draws nothing (~8 fps typing, 0 hidden),
+  // WebGL lost shows the list under its line (bims-qa; the sizes and labels: checks/bims/office)
+  'checks/bims/budget.spec.ts',
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));

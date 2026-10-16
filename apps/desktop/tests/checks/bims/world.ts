@@ -5,7 +5,10 @@
 // launchDesktop runs it off screen on a throwaway home.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { PNG } from 'pngjs';
 import type { CDPSession, Page } from '@playwright/test';
+import { FakeCore, Recorder, changedInside, expect, launchDesktop, type Box, type Session } from '../../harness';
+import { EXPECT, office } from '../../../src/bims/fixtures';
 import type { Snapshot } from '../../../src/bims/model';
 
 export const HOME = 'bise-home-00000000';
@@ -45,6 +48,62 @@ export function world(snap: Snapshot, theme: 'light' | 'dark' = 'light'): Record
     cardsOf(snap),
     { ev: 'thread', project: P, agent: 'main', entries: [{ pos: 1, at_ms: now - MIN, kind: 'agent', text: 'the office is open.' }], before: null, more: false },
   ];
+}
+
+// ---- the session -------------------------------------------------------------------------------
+
+export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+/** The idle bims: office-life trips, a name over them while they walk (spec §2, §7). */
+export const TRIPS = new Set(Object.entries(EXPECT).filter(([, k]) => k === 'nap|snack').map(([n]) => n));
+
+/** Every live bim's name in the office (archived rows have no bim). */
+export const NAMES = office.agents.filter((a) => !a.archived).map((a) => a.name);
+
+/** The office's world with these agents' rows replaced (an event: a row that changes). */
+export const withRows = (base: Snapshot, over: Record<string, Partial<(typeof office.agents)[number]>>): Snapshot => ({
+  ...base,
+  agents: base.agents.map((a) => (over[a.name] === undefined ? a : { ...a, ...over[a.name] })),
+});
+
+export async function open(snapshot: Snapshot, o: { theme?: 'light' | 'dark'; reduced?: boolean; width?: number } = {}): Promise<{ s: Session; core: FakeCore }> {
+  const core = new FakeCore(world(snapshot, o.theme ?? 'light') as never);
+  const s = await launchDesktop({ core, route: `project/${P}`, size: `${String(o.width ?? 1400)}x900` });
+  if (o.reduced === true) await s.page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(s.page.getByTestId('app.right.agents.view.list')).toBeVisible({ timeout: 20_000 });
+  return { s, core };
+}
+
+/** The office on, its renderer loaded and drawing. */
+export async function showOffice(s: Session): Promise<void> {
+  await s.page.getByTestId('app.right.agents.view.bims').click();
+  await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-state', 'on', { timeout: 20_000 });
+  await expect.poll(async () => (await probe(s.page))?.frames ?? 0, { timeout: 10_000 }).toBeGreaterThan(0);
+}
+
+/** Waits until the renderer stops drawing (no new frame for `quietMs`), at most `maxMs`. */
+export async function settle(s: Session, quietMs = 1500, maxMs = 20_000): Promise<void> {
+  const end = Date.now() + maxMs;
+  let last = (await probe(s.page))?.frames ?? 0;
+  let since = Date.now();
+  while (Date.now() < end) {
+    await sleep(250);
+    const n = (await probe(s.page))?.frames ?? 0;
+    if (n !== last) { last = n; since = Date.now(); } else if (Date.now() - since >= quietMs) return;
+  }
+}
+
+/** Frames the renderer drew in `ms` (the probe) and canvas frames the compositor showed (the Recorder). */
+export async function drawnIn(s: Session, ms: number): Promise<{ frames: number; shown: number }> {
+  const box = await s.page.getByTestId('app.right.bims.canvas').boundingBox();
+  if (box === null) throw new Error('no office canvas');
+  const rec = new Recorder(s.cdp, s.page);
+  const f0 = (await probe(s.page))?.frames ?? 0;
+  await rec.start();
+  await sleep(ms);
+  const fr = await rec.stop();
+  const f1 = (await probe(s.page))?.frames ?? 0;
+  const shown = changedInside(fr, box).filter((n) => n > 0).length;
+  return { frames: f1 - f0, shown };
 }
 
 // ---- the three chunk (check 1) ----------------------------------------------------------------
@@ -144,9 +203,38 @@ export const SHOTS = path.resolve(__dirname, '..', '..', '..', '.harness-cache',
 
 export type Shot = { file: string; title: string; says: string };
 
-/** Writes SHOTS/index.html: every shot of this run with what it should show. Returns its path. */
-export function writeIndex(shots: readonly Shot[]): string {
+/**
+ * What the compositor shows in `box` now (a screencast frame), written to SHOTS/<file>. Not
+ * page.screenshot: its capture draws the page again, and a WebGL canvas whose loop is still (no
+ * preserveDrawingBuffer) comes out blank there while the window shows it (checked: the screencast's
+ * frame has the office, the screenshot only the overlay).
+ */
+export async function shotOf(cdp: CDPSession, page: Page, box: Box, file: string): Promise<void> {
+  const rec = new Recorder(cdp, page);
+  await rec.start();
+  await new Promise((r) => setTimeout(r, 400)); // the screencast sends the frame shown now at its start
+  const frames = await rec.stop();
+  const f = frames.at(-1);
+  if (f === undefined) throw new Error(`no screencast frame for ${file}`);
+  const sc = f.scale;
+  const x0 = Math.round(box.x * sc), y0 = Math.round(box.y * sc);
+  const w = Math.min(Math.round(box.width * sc), f.png.width - x0), h = Math.min(Math.round(box.height * sc), f.png.height - y0);
+  const out = new PNG({ width: w, height: h });
+  PNG.bitblt(f.png, out, x0, y0, w, h, 0, 0);
   mkdirSync(SHOTS, { recursive: true });
+  writeFileSync(path.join(SHOTS, file), PNG.sync.write(out));
+}
+
+/**
+ * Adds `shots` to SHOTS/shots.json (both spec files write there; a shot of the same file replaces
+ * the old one) and writes SHOTS/index.html from it: every shot with what it should show.
+ */
+export function writeIndex(add: readonly Shot[]): string {
+  mkdirSync(SHOTS, { recursive: true });
+  const kept = path.join(SHOTS, 'shots.json');
+  const before = existsSync(kept) ? (JSON.parse(readFileSync(kept, 'utf8')) as Shot[]) : [];
+  const shots = [...before.filter((b) => !add.some((a) => a.file === b.file)), ...add];
+  writeFileSync(kept, JSON.stringify(shots, null, 1));
   const esc = (s: string): string => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
   const rows = shots.map((s) => `<figure><img src="${esc(s.file)}" alt=""><figcaption><b>${esc(s.title)}</b><br>${esc(s.says)}</figcaption></figure>`).join('\n');
   const html = `<!doctype html><meta charset="utf-8"><title>les bims · the check's shots</title>
