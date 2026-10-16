@@ -17,6 +17,7 @@
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { thread as tw } from '../../../src/proto/words.gen';
 
+import { common } from '../../../src/proto/words_common.gen';
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
 const MIN = 60_000;
@@ -143,7 +144,7 @@ for (const w of [1400, 1100, 800]) {
             const detail = bar.getByTestId('app.right.watching.main.4.detail');
             await expect(detail).toContainText('bise wakes main if the nightly gate goes red');
             await expect(detail).toContainText(/set yesterday \d\d:\d\d/u);
-            await expect(bar.getByTestId('app.right.watching.main.4.stop')).toHaveText('stop watching');
+            await expect(bar.getByTestId('app.right.watching.main.4.stop')).toHaveText(common.stop_watching);
             await page.mouse.move(1, 300);
             await shot('alarm-detail');
             await bar.getByTestId('app.right.watching.main.4.stop').click();

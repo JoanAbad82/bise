@@ -5,6 +5,7 @@
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
+import { settings } from '../../../src/proto/words_settings.gen';
 const HOME = 'bise-home-00000000';
 const P = 'telemetry-cf9cb2fe';
 const agent = (name: string) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: 0, watching: [] });
@@ -93,7 +94,7 @@ test("composer/question-space: '?' starts a message, focused or not; ⌘/ opens 
     expect(look.bg, 'opaque: a solid under the raised tint').toContain('gradient');
     expect(look.ret, "⏎'s cap in ink, as ⌘K's").toBe(look.cmdk);
     expect(look.ret, 'ink').toBe(look.text);
-    await expect(page.locator('[data-keys="⌘K"] .a')).toHaveText('find an agent, a page or an artifact');
+    await expect(page.locator('[data-keys="⌘K"] .a')).toHaveText(settings.key_find_agent);
     await page.mouse.move(1, 300);
     await page.screenshot({ path: test.info().outputPath('help-light-1100.png') });
     // one esc closes it (its filter is empty); a second would be the window's 'back'

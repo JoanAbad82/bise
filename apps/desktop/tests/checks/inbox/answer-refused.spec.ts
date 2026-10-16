@@ -14,6 +14,7 @@ import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { common } from '../../../src/proto/words_common.gen';
 import { inbox } from '../../../src/proto/words_inbox.gen';
 
+import { thread } from '../../../src/proto/words_thread.gen';
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
@@ -117,7 +118,7 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       // answer-in-thread A: his answer lives in search's and acme's main threads (the hub's rows);
       // a card of the project he is in moves nothing, and the thread he answered from shows nothing
       await expect(page.getByTestId('thread.list'), "still perf's thread").toContainText('p95 is 900 ms on mobile.');
-      await expect(page.getByTestId('thread.list')).not.toContainText('you answered search');
+      await expect(page.getByTestId('thread.list')).not.toContainText(thread.answered_to({ who: 'search' }));
     });
 
     await test.step('a close the hub refuses: card 13 is back with the words', async () => {
@@ -148,7 +149,7 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
     await test.step('a reload: the same (the hub dropped card 11), still no row of the window here', async () => {
       await page.reload();
       await settled('after a reload');
-      await expect(page.getByTestId('thread.list')).not.toContainText('you answered search');
+      await expect(page.getByTestId('thread.list')).not.toContainText(thread.answered_to({ who: 'search' }));
     });
 
     await test.step("a project switch (bise's main) and back: the same", async () => {

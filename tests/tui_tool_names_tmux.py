@@ -1,7 +1,7 @@
 """BISE-293: the first message answers on a provider as strict as the
 real ones about tool names (tmux, fake provider, throwaway hub).
 
-The user's first message on OpenAI ("show me what you can do") failed:
+The user's first message on OpenAI (w("composer.demo")) failed:
 OpenAI refuses a tool name off ^[a-zA-Z0-9_-]+$, and bise sent
 self.compact / self.reload. The fake provider now refuses such a name
 with the API's own 400 (tools and history calls), so:
@@ -22,8 +22,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, in_view  # noqa: E402
+from words import w  # noqa: E402
 
-DEMO = "show me what you can do"
+DEMO = w("composer.demo")
 NAME = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 

@@ -17,6 +17,7 @@ import { thread } from '../../../src/proto/words.gen';
 import { Lines } from '../native/world';
 import { hubOf, launchOn, realWorld, transcriptFeed, transcriptHas, tui, tuiReady, worldSay, type Tui } from '../world';
 
+import { panel } from '../../../src/proto/words_panel.gen';
 const T = {
   field: '[data-testid="composer.field"]',
   list: '[data-testid="thread.list"]',
@@ -118,7 +119,7 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       const failing412 = (): boolean =>
         transcriptFeed(w, 'shop', 'main', 'pr').some((l) => (l.json ? l.json['state'] === 'failing' && Number(l.json['number']) === 412 : l.raw.includes('sb pr : red : 412')));
       await expect.poll(failing412, { timeout: 60_000, message: "the hub's event: #412's checks fail" }).toBe(true);
-      const row = list.locator(T.pr).filter({ hasText: '#412' }).filter({ hasText: 'checks fail' }).last();
+      const row = list.locator(T.pr).filter({ hasText: '#412' }).filter({ hasText: panel.pr_checks_fail }).last();
       // the thread as it is when the hub has the event: its PR rows, or none
       note('pr-rows-at-event', (await list.locator(T.pr).allTextContents()).map((r) => r.trim().slice(0, 120)));
       await page.screenshot({ path: test.info().outputPath('pr-at-event.png') });
@@ -142,7 +143,7 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       const rowId = (await row.getAttribute('data-testid', { timeout: 5000 }).catch(() => null)) ?? '';
       const pr = rowId !== '' ? page.locator(`[data-testid="${rowId}"]`) : row;
       await expect.soft(pr, "the TUI's PR mark '↑' (designer m_19784 (3))").toContainText('↑', { timeout: 5000 });
-      await expect.soft(pr, "the hub's words, as the TUI").toContainText('checks fail', { timeout: 5000 });
+      await expect.soft(pr, "the hub's words, as the TUI").toContainText(panel.pr_checks_fail, { timeout: 5000 });
       await expect.soft(pr, 'failing: an err tone').toHaveAttribute('data-tone', 'err', { timeout: 5000 });
       const words = ((await pr.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
       note('pr', { id: rowId, window: words, tone: await pr.getAttribute('data-tone', { timeout: 2000 }).catch(() => null), tuiHas: flat(term().screen()).includes('#412 checks fail: e2e') });

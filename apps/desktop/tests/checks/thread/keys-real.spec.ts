@@ -13,6 +13,7 @@
 import { test, expect } from '../../harness';
 import { hubCall, hubOf, hubState, launchReal, realWorld, transcriptHas, tui, tuiReady, tuiSay, type Tui, type World } from '../world';
 
+import { composer } from '../../../src/proto/words_composer.gen';
 const T = {
   field: '[data-testid="composer.field"]',
   setupSkip: '[data-testid="setup.skip"]',
@@ -46,7 +47,7 @@ const other = (m: string): string => (m === 'yolo' ? 'auto' : 'yolo');
 let checker = '';
 let env = false;
 const words = (m: string): string => {
-  const what = m === 'auto' ? (checker === 'off' ? 'edits run, commands ask you' : 'safe calls run, risky ones ask you') : 'everything runs, nothing asks';
+  const what = m === 'auto' ? (checker === 'off' ? composer.approvals_auto_off : composer.approvals_auto) : composer.approvals_yolo;
   return `${what}${env ? ' (this session only: BISE_APPROVALS)' : ''}`;
 };
 

@@ -62,7 +62,7 @@ def check(cols, rows, dictation):
         if cols >= 150 and dictation:
             t.typed("/help")
             t.keys("Enter")
-            t.wait("type to filter", timeout=10)
+            t.wait(w("settings.prov_filter"), timeout=10)
             # the voice section is below the fold: the filter finds it
             t.typed("voice")
             sc = t.wait("ctrl+r twice", timeout=10)

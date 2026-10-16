@@ -11,6 +11,8 @@
 // giving a computer-use agent back the wheel waits on S29. Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
+import { common } from '../../../src/proto/words_common.gen';
+import { settings } from '../../../src/proto/words_settings.gen';
 const HOME = 'bise-home-00000000';
 const P = 'storefront-1a2b3c4d';
 const agent = (name: string) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: 0 });
@@ -21,7 +23,7 @@ const SIGNIN = {
   rank: 1,
   agent: 'main',
   question: 'the ChatGPT sign-in expired: sign in again so perf and main go on',
-  options: [{ n: 1, label: 'sign in' }],
+  options: [{ n: 1, label: settings.sign_in }],
   urgent: false,
   since_ms: 1791100100000,
   waiting: ['perf', 'main'],
@@ -67,12 +69,12 @@ test('thread/empty-enter: ⏎ on an empty composer signs in again when an expire
     // R15: his browser is on the sign-in: the thread says so; c copies the link, esc cancels
     await core.send({ ev: 'signing', id: 'chatgpt', url: 'https://auth.example.test/authorize?x=1' } as never);
     const line = page.getByTestId('thread.signin');
-    await expect(line).toContainText('waiting for you to sign in to ChatGPT in your browser…');
-    await expect(page.getByTestId('thread.signin.keys')).toHaveText('c copy the link   esc cancel');
+    await expect(line).toContainText(common.signing_wait({ label: 'ChatGPT' }));
+    await expect(page.getByTestId('thread.signin.keys')).toHaveText(settings.bar_copy_link);
     await page.screenshot({ path: test.info().outputPath('signin-line.png') });
     await field.click();
     await page.keyboard.press('c');
-    await expect(page.getByTestId('thread.signin.keys')).toHaveText('c copied   esc cancel');
+    await expect(page.getByTestId('thread.signin.keys')).toHaveText(settings.bar_copied);
     await expect(field, 'c copies, it types nothing').toHaveText('');
     await page.keyboard.press('Escape');
     expect(await core.waitCmd((x) => x.cmd === 'sign_in_cancel', 3000)).toMatchObject({ cmd: 'sign_in_cancel', id: 'chatgpt' });

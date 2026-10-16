@@ -13,6 +13,7 @@
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { common } from '../../../src/proto/words_common.gen';
 
+import { composer } from '../../../src/proto/words_composer.gen';
 const HOME = 'bise-home-00000000';
 const P = 'docs-1a2b3c4d';
 const NOW = Date.now();
@@ -111,7 +112,7 @@ test("inbox/ghost-badge: a card the hub keeps after his inbox answer is back in 
       await w.locator('[data-testid="composer.field"]').click();
       await w.keyboard.type('/inbox');
       await w.keyboard.press('Enter');
-      await expect(w.getByTestId('composer.answer.note')).toContainText('nothing waits for you.', { timeout: 3000 });
+      await expect(w.getByTestId('composer.answer.note')).toContainText(composer.nothing_waits, { timeout: 3000 });
     });
   } finally {
     await s.close();

@@ -13,6 +13,7 @@ import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect, type Session } from '../../harness';
 import { menuKey } from '../world';
 
+import { settings } from '../../../src/proto/words_settings.gen';
 const P = 'acme-1a2b3c4d';
 
 type Walk = {
@@ -170,9 +171,9 @@ test('app/list-walk: every list page walks with the TUI list keys', async () => 
         const list = page.getByTestId('settings.approvals.rules');
         await page.keyboard.press('End');
         await page.keyboard.press('Backspace');
-        await expect(list, 'approvals: ⌫ asks first').toContainText('remove it?');
+        await expect(list, 'approvals: ⌫ asks first').toContainText(settings.rule_remove_ask);
         await page.keyboard.press('Escape');
-        await expect(list, 'approvals: esc keeps the rule').not.toContainText('remove it?');
+        await expect(list, 'approvals: esc keeps the rule').not.toContainText(settings.rule_remove_ask);
         await expect(page.getByTestId('settings.root'), 'approvals: the first esc stays in settings').toBeVisible();
         expect(core.cmds().filter((c) => c.cmd === 'remove_rule'), 'approvals: nothing removed').toEqual([]);
       }

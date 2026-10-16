@@ -97,7 +97,7 @@ def main():
         assert "esc not now" in sc, sc
         # esc: voice stays off, said once
         t.keys("Escape")
-        t.wait("voice is off. /voice when you want it.")
+        t.wait(w("composer.voice_stays_off"))
         # /voice ⏎ opens the one voice screen (voice-menu), on its first
         # row, dictation: ⏎ on it with no setup that works opens the same
         # providers screen
@@ -141,8 +141,8 @@ def main():
         sc = t.wait_re(r"› dictation +on", 30)
         assert re.search(r"speech to text +Mistral · Voxtral Transcribe 3", sc), sc
         t.keys("Escape")
-        sc = t.wait("voice is on: mistral/voxtral-transcribe-3.", 30)
-        assert "press ctrl+r and talk, any key stops. /voice turns it off." in sc, sc
+        sc = t.wait(w("composer.voice_enabled", model="mistral/voxtral-transcribe-3."), 30)
+        assert w("composer.voice_on_how") in sc, sc
         assert len([r for r in E.fake_requests() if r.get("family") == "stt"]) == n, "checked once"
         cfg = open(os.path.join(root, "config.toml")).read()
         assert 'voice = "mistral/voxtral-transcribe-3"' in cfg, cfg
@@ -258,13 +258,13 @@ def main():
         # while talking: a wrong key
         set_key("bad-key-2")
         talk()
-        sc = t.wait("Mistral says the voice key is wrong. /provider fixes it.", 30)
-        assert "Invalid API Key" in sc and "your recording is kept: ctrl+r retry" in sc, sc
+        sc = t.wait(w("composer.voice_wrong_key", provider="Mistral"), 30)
+        assert "Invalid API Key" in sc and w("composer.voice_kept") in sc, sc
         # no credit (the kept clip goes again: no recording)
         os.remove(credit)
         set_key("broke-key-2")
         retry()
-        sc = t.wait("your Mistral account has no credit yet.", 30)
+        sc = t.wait(w("composer.voice_no_credit", provider="Mistral"), 30)
         # the provider down
         set_key("down-key-2")
         retry()
@@ -274,7 +274,7 @@ def main():
         # the key gone
         set_key(None)
         retry()
-        t.wait("voice needs a key. /voice picks one.", 30)
+        t.wait(w("composer.voice_needs_key"), 30)
         # a good key: the kept clip lands in the composer
         set_key("good-key-3")
         retry()

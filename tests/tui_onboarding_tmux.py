@@ -53,7 +53,7 @@ def env(state_root, home):
     return "BISE_HOME=%s HOME=%s BISE_CTRL_DIGITS=1 %s" % (state_root, home, blank)
 
 
-DEMO = "show me what you can do"
+DEMO = w("composer.demo")
 TRY = 'try: "%s"' % DEMO
 READY = "⏎ try it · or just type your own"
 
@@ -142,7 +142,7 @@ def main():
         for s in [w("settings.first_how"), "1  you talk to me: main, your team lead. any time, keep typing",
                   "2  i start an agent when a job needs one. they sync on their own",
                   "3  only the real decisions reach you, in your inbox · ctrl+1",
-                  "ctrl+o opens everything folded", "○ ○ ●"]:
+                  w("composer.tip_fold"), "○ ○ ●"]:
             assert s in flat(sc), sc
         assert "which model should do the work?" not in sc and "i'll work in" not in sc, sc
         shot("3-how-it-works", sc)
@@ -158,7 +158,7 @@ def main():
         sc = t.wait(TRY)
         assert composer_holds(sc, "h") and READY not in sc, sc
         t.keys("BSpace")
-        wait_until(lambda: composer_holds(t.screen(), "what's on your mind?"), 10,
+        wait_until(lambda: composer_holds(t.screen(), w("composer.placeholder_main")), 10,
                    lambda: "the placeholder: empty\n" + t.screen())
         sc = t.screen()
         # a click on the suggestion fills the composer, sends nothing
@@ -176,7 +176,7 @@ def main():
         # first one, so the first-item hint teaches the inbox (BISE-248)
         sc = t.wait("can i set bise up", 30)
         sc = t.wait("this is your inbox.")
-        assert "2 not now" not in sc and "what's on your mind?" in sc, sc
+        assert "2 not now" not in sc and w("composer.placeholder_main") in sc, sc
         shot("7-setup-card", sc)
         t.typed("\x1b[49;5u")             # ctrl+1 (the kitty form) opens it in place (BISE-302)
         sc = t.wait("1-2 answer")

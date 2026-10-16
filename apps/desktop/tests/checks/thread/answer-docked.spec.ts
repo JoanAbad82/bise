@@ -6,6 +6,7 @@
 // core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
+import { inbox } from '../../../src/proto/words_inbox.gen';
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
 const agent = (name: string) => ({ name, main: name === 'main', status: name === 'perf' ? 'waiting' : 'idle', archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: name === 'perf' ? 1 : 0 });
@@ -48,7 +49,7 @@ test("thread/answer-docked: the docked card's composer answers it; esc makes it 
     const composer = page.getByTestId('composer');
     await expect(composer, 'the label').toContainText('↳ answering perf · which bench?');
     const field = page.locator('[data-testid="composer.field"]').first();
-    await expect(field).toHaveAttribute('aria-placeholder', 'your answer to perf, then ⏎');
+    await expect(field).toHaveAttribute('aria-placeholder', inbox.answer_placeholder({ who: 'perf', key: '⏎' }));
     await page.screenshot({ path: test.info().outputPath('answering.png') });
     await field.click();
     await page.keyboard.type('cold, on the m2');
@@ -69,11 +70,11 @@ test('thread/answer-docked: esc in the field turns it back into a plain message'
   try {
     const { page } = s;
     await page.getByTestId('inbox.block.row.1').click({ timeout: 10_000 });
-    await expect(page.getByTestId('composer')).toContainText('answering perf');
+    await expect(page.getByTestId('composer')).toContainText(inbox.answering({ who: 'perf' }));
     const field = page.locator('[data-testid="composer.field"]').first();
     await field.click();
     await page.keyboard.press('Escape');
-    await expect(page.getByTestId('composer')).not.toContainText('answering perf');
+    await expect(page.getByTestId('composer')).not.toContainText(inbox.answering({ who: 'perf' }));
     await page.keyboard.type('just a note');
     await page.keyboard.press('Enter');
     const m = (await core.waitCmd((c) => (c as Cmd).cmd === 'send')) as Cmd;

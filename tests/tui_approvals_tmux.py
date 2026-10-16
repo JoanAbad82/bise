@@ -95,7 +95,7 @@ def session(E, env, home, bise, shot):
         sc = t.wait("auto · edits run, commands ask you")
         shot(t, "switch-flash", sc)
         # the explanation leaves the key bar after 3 s; the divider says auto
-        t.wait_gone("edits run, commands ask you", timeout=10)
+        t.wait_gone(w("composer.approvals_auto_off"), timeout=10)
         div = [l for l in t.screen().split("\n") if "you → main" in l][-1]
         assert " · auto " in div and " · yolo " not in div, div
         cfg = open(os.path.join(bise, "config.toml")).read()
@@ -106,7 +106,7 @@ def session(E, env, home, bise, shot):
         sc = t.wait("↑↓ choose · backspace remove · esc back")
         # the repo's own name stays (a long path is cut in its middle)
         assert "what runs without asking you in /" in sc and "/ws." in sc, sc
-        assert "off · every command asks you" in sc and "/models changes it" in sc, sc
+        assert w("settings.checker_off") in sc and "/models changes it" in sc, sc
         assert "› cargo test *" in sc and "2 days ago · 2 agents" in sc, sc
         assert "gmail.send_email" in sc and "a connector · every project" in sc, sc
         shot(t, "slash-approvals", sc)

@@ -7,7 +7,7 @@ BEND_RUN_DIR. Never the user's browser or apps: the fake gets the
 
 - /computer-use: chrome isn't open → the extension's load-unpacked steps
   (⏎ opens chrome://extensions, copies the folder: the flash) → the live
-  test runs by itself (∿), then ✓ ready; with the helper, the "for apps"
+  test runs by itself (∿), then ✓ ready; with the helper, the w("settings.cu_apps")
   rows: ⏎ asks Accessibility, the cursor moves on when it turns ✓,
   Screen Recording's relaunch shows its wait until the reopened helper
   says yes; an agent driving: its line and x stop all.
@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run  # noqa: E402
+from words import w  # noqa: E402
 
 COLS, ROWS = 150, 40
 # the setup screen again at 80 columns (Benjamin's steps were cut there)
@@ -192,7 +193,7 @@ def main():
                              "⏎ open Chrome   ↑↓ step   esc later",
                              "in yolo, agents act without asking, purchases included. ⇧⇥ for auto.",
                              "what the agents see goes only to their model:"])
-            assert "for apps" not in sc and "accessibility" not in sc, sc
+            assert w("settings.cu_apps") not in sc and "accessibility" not in sc, sc
             shot(t, "chrome-not-open", sc)
             t.keys("Enter")
             called("open -a /Applications/Google Chrome.app")

@@ -20,8 +20,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, in_view  # noqa: E402
+from words import w  # noqa: E402
 
-DEMO = "show me what you can do"
+DEMO = w("composer.demo")
 
 
 def main():

@@ -9,6 +9,7 @@
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { common, thread } from '../../../src/proto/words.gen';
 
+import { composer } from '../../../src/proto/words_composer.gen';
 const P = 'shop-ab9f3c3b';
 const NOW = Date.now();
 const MIN = 60_000;
@@ -101,7 +102,7 @@ test('thread/parts: his message, his card answer from their typed parts, never a
       await expect(page.getByTestId('thread.you.8')).toContainText('thanks, ship it');
       // the diff quote: its place names it, his words after
       await page.getByTestId('thread.you.4').evaluate((el) => { el.scrollIntoView({ block: 'center' }); });
-      await expect(page.getByTestId('thread.you.4.quote.1')).toContainText('src/cart.rs:12-13 · 2 lines');
+      await expect(page.getByTestId('thread.you.4.quote.1')).toContainText(composer.quote_about({ place: 'src/cart.rs:12-13', n: 2 }));
       await expect(page.getByTestId('thread.you.4.quote.1')).toContainText('let batch = shared();');
       await expect(page.getByTestId('thread.you.4')).toContainText('why shared here?');
       // his first message: quote, words with the paste's chip in place, the chips under them

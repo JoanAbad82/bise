@@ -22,6 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, in_view, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 CTRL = "\x1b[%d;5u"   # ctrl+digit, the kitty keyboard protocol's form
 
@@ -80,18 +81,18 @@ def one(t, cols, rows):
         open(page, "w").write(PAGE)
         t.typed('[[bash: sb page publish %s --id plan --title "the plan"]]' % page)
         t.keys("Enter")
-        t.wait("2 waiting for you", 90)
+        t.wait(w("common.waiting_for_you", n="2"), 90)
         # 1. his pick in the terminal's inbox
         t.typed(CTRL % ord("1"))
         t.wait("which table first?")
         t.keys("Right")
         t.keys("Enter")
-        t.wait("you answered main")
+        t.wait(w("thread.answered_to", who="main"))
         t.keys("Escape")
         t.wait_re(in_view("main"))
         sc = t.wait("the effort table now")
         clean(sc)
-        assert sc.count("you answered main") == 1, "one answer row, not doubled:\n" + sc
+        assert sc.count(w("thread.answered_to", who="main")) == 1, "one answer row, not doubled:\n" + sc
         # 2. his pick on the page itself
         port = int(open(os.path.join(t.E.state, "pages.port")).read().strip())
         st, body = request(port, "GET", "/p/plan")

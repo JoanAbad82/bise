@@ -42,7 +42,7 @@ def main():
         # a few frames later, still nothing for the user: no strip, no
         # "needs you" in the header
         # (no state says "the hub decided not to show it": a window)
-        gone = ("waiting for you", "ctrl+1 open", "needs you", "ia needs you")
+        gone = (w("thread.gate_waits"), "ctrl+1 open", "needs you", w("thread.card_needs_name", name="ia"))
         wait.holds(lambda: (lambda s: not any(g in s for g in gone) and s)(t.screen()), 1.5,
                    "nothing for the user: %r" % (gone,), poll=wait.SCREEN_POLL)
         # main escalates: one row in the user's inbox (once main is done
@@ -51,7 +51,7 @@ def main():
         t.wait_re(MAIN_IDLE)
         t.typed('[[bash: sb card "ship the export on friday?"]]')
         t.keys("Enter")
-        t.wait("waiting for you", 60)
+        t.wait(w("thread.gate_waits"), 60)
         sc = t.wait("? main · ship the export on friday?")
         # the inbox box only: main's thread may quote the task's question
         # ('ia asked: ia asks main · i answered: …')
@@ -64,7 +64,7 @@ def main():
         t.typed("yes friday")
         t.wait("⏎ " + w("inbox.key_send_answer"))
         t.keys("Enter")
-        t.wait_gone("waiting for you", 20)
+        t.wait_gone(w("thread.gate_waits"), 20)
         t.wait("✓ you answered main: yes friday")
         print("PASS tui inbox split")
 

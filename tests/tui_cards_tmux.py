@@ -15,6 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, in_view, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 COLS, ROWS = 150, 42
 
@@ -101,7 +102,7 @@ def main():
         t.keys("C-x")
         sc = t.wait("hello main 1")
         t.wait_re(in_view("main"))
-        t.wait_gone("waiting for you", 20)
+        t.wait_gone(w("thread.gate_waits"), 20)
         sc = t.wait("✓ you answered main: alpha")
         assert "✓ you answered main: draft for two" in sc, sc
     # a terminal without ctrl+1-9: never a ctrl key on screen; a click

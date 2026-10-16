@@ -9,6 +9,7 @@
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { thread } from '../../../src/proto/words.gen';
 
+import { composer } from '../../../src/proto/words_composer.gen';
 const P = 'acme-1a2b3c4d';
 type Cmd = { cmd?: string; text?: string; parts?: unknown[] };
 
@@ -45,7 +46,7 @@ test('review/quote: drag or shift+↓ over diff lines, then type: a quote saying
     await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), thread.from_thread({ name: 'perf' })).toBeVisible({ timeout: 5000 });
     const chip = page.locator('[data-testid="composer.chip.1"][data-kind="quote"]');
     await expect(chip, 'a quote chip').toBeVisible({ timeout: 3000 });
-    await expect(page.getByText('src/query.rs:10-12 · 4 lines')).toBeVisible();
+    await expect(page.getByText(composer.quote_about({ place: 'src/query.rs:10-12', n: 4 }))).toBeVisible();
     await page.keyboard.type('hy this order?');
     await page.screenshot({ path: test.info().outputPath('quoted.png') });
     await page.keyboard.press('Enter');

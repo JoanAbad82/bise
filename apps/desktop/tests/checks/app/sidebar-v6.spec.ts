@@ -11,6 +11,8 @@
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { panel as W } from '../../../src/proto/words_panel.gen';
 
+import { composer } from '../../../src/proto/words_composer.gen';
+import { thread } from '../../../src/proto/words_thread.gen';
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
@@ -202,7 +204,7 @@ test('app/sidebar-v6: no project yet: only bise, the top rows and add a project'
     await expect(page.getByTestId('app.sidebar.empty-add')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('[data-testid^="app.sidebar.project."]')).toHaveCount(0);
     // designer m_12093: the centre, the composer stays, no panel and no panel button without a project
-    await expect(page.getByTestId('thread.noproject')).toContainText('bise is here.');
+    await expect(page.getByTestId('thread.noproject')).toContainText(thread.noproj_title);
     // nothing waits on him: bise's ':*' at rest (desktop-delight v2)
     await expect(page.getByTestId('app.sidebar.bise.mark')).toBeVisible();
     await expect(page.getByTestId('app.sidebar.bise.mark')).not.toHaveAttribute('data-waits', 'true');
@@ -224,7 +226,7 @@ test('app/sidebar-v6: no project yet: only bise, the top rows and add a project'
     await page.waitForTimeout(300);
     await page.screenshot({ path: shot('empty-dark') });
     await page.getByTestId('thread.noproject.demo').click();
-    await expect(page.getByTestId('composer.field'), 'the demo fills the composer').toContainText('show me what you can do');
+    await expect(page.getByTestId('composer.field'), 'the demo fills the composer').toContainText(composer.demo);
     await page.getByTestId('app.sidebar.empty-add').click();
     await expect(page.locator('[data-testid^="settings"]').first(), 'it opens settings').toBeVisible({ timeout: 3000 });
   } finally {

@@ -26,8 +26,8 @@ where you see them.
 Python files are read with ast (every str constant but docstrings), the desktop's .ts/.tsx/.js/
 .mjs/.mts with a small tokenizer ('…', "…", `…` without ${}, comments skipped).
 
-tests/word_literals.txt ("<count> <path>", sorted by path) holds the words left as literals, a
-ratchet like tests/line_limits.txt:
+tests/word_literals.txt ("<count> <path>  # <owner: why it stays>", sorted by path) holds the
+words left as literals, a ratchet like tests/line_limits.txt:
   - a file's count never goes past its line, and a drop lowers its line in the same commit (the
     line goes at 0, or when the file is gone);
   - vs the base (GATE_BASE, default HEAD) a count goes up, or a path comes in, only by the
@@ -250,9 +250,10 @@ def parse(text):
         row = row.strip()
         if not row or row.startswith("#"):
             continue
-        parts = row.split()
+        # '<count> <path>  # <owner: why it stays>' (issue 29's done-criterion d)
+        parts = row.split(" #", 1)[0].split()
         if len(parts) != 2 or not parts[0].isdigit():
-            bad.append("%s:%d: '%s': want '<count> <path>'" % (LIST, n, row))
+            bad.append("%s:%d: '%s': want '<count> <path>  # <owner>'" % (LIST, n, row))
         elif parts[1] in caps:
             bad.append("%s:%d: %s is listed twice" % (LIST, n, parts[1]))
         else:
@@ -425,7 +426,8 @@ def self_test():
     want("hits", hits("tests/x_tmux.py", 'a = "in the inbox"\nb = "in perf\'s thread"\nc = "hello"\n', ms),
          [("in the inbox", "a.inbox"), ("in perf's thread", "a.thread")])
     want("parse", parse("# c\n3 tests/a_tmux.py\nx\n1 tests/a_tmux.py\n"),
-         ({"tests/a_tmux.py": 3}, ["%s:3: 'x': want '<count> <path>'" % LIST, "%s:4: tests/a_tmux.py is listed twice" % LIST]))
+         ({"tests/a_tmux.py": 3}, ["%s:3: 'x': want '<count> <path>  # <owner>'" % LIST, "%s:4: tests/a_tmux.py is listed twice" % LIST]))
+    want("parse owner", parse("2 tests/b_tmux.py  # lint shape: hub labels, not words\n")[0], {"tests/b_tmux.py": 2})
     h = [("in the inbox", "a.inbox")]
     caps = {"a": 2}
     want("same", check_files({"a": h * 2}, caps), [])

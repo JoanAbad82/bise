@@ -23,6 +23,7 @@ import { writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { common, thread } from '../../../src/proto/words.gen';
 
+import { composer } from '../../../src/proto/words_composer.gen';
 const HOME = 'bise-home-00000000';
 const P = 'storefront-1a2b3c4d';
 const MIN = 60_000;
@@ -183,7 +184,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     await expect(page.locator('.th-screen [data-testid="composer.tab.to"] [data-testid="thread.mark"]')).toHaveCount(1);
     // (4) the composer's words: the label's left, then the gust's cells
     await expect(page.getByTestId('composer.tab.to')).toHaveText(/^to perf[ ·~∿≈]{5}$/);
-    await expect(page.locator('[data-testid="composer.field"][aria-placeholder]')).toHaveAttribute('aria-placeholder', 'write to perf, then ⏎');
+    await expect(page.locator('[data-testid="composer.field"][aria-placeholder]')).toHaveAttribute('aria-placeholder', composer.placeholder_to({ agent: 'perf' }));
     // the artifact opens in the window
     await page.getByTestId('thread.artifact.10').click();
     // designer's artifact-open page: the artifact takes the right column, the maker's thread stays
@@ -216,7 +217,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             await expect(page.getByTestId('inbox.block.open.1')).toBeVisible();
             await expect(page.getByTestId('thread.starting'), 'a waiting agent is not starting').toHaveCount(0);
             await expect(page.getByTestId('composer.tab.to')).toHaveText(/^↳ answering search · which sizes/);
-            await expect(page.getByTestId('composer.tab.end')).toHaveText('esc to search instead');
+            await expect(page.getByTestId('composer.tab.end')).toHaveText(composer.tab_esc_instead({ agent: 'search' }));
             await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true');
           }
           if (label === 'bise · storefront') {

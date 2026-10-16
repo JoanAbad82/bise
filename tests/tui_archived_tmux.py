@@ -13,6 +13,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import wait  # noqa: E402
 from tui_tmux import tui_session, run, panel_row, in_view, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 COLS, ROWS = 150, 42
 PANEL_X = COLS - max(28, min(40, COLS // 4))
@@ -70,14 +71,14 @@ def main():
         print("---- expanded ----\n" + p)
         assert p.index("– t2") < p.index("– t1"), "newest first:\n" + p
         click_on(t, "– t1")
-        sc = t.wait("t1 is archived · /restore to talk to it")
+        sc = t.wait(w("composer.placeholder_archived", agent="t1"))
         # /restore once: the placeholder (the divider says archived)
         assert sc.count("/restore") == 1, sc
         # its history is in the feed
         t.wait("first-objective")
         t.typed("hello-archived")
         t.keys("Enter")
-        sc = t.wait("t1 is archived. /restore brings it back · esc → main")
+        sc = t.wait(w("composer.archived_warn", agent="t1"))
         print("---- archived feed ----\n" + sc)
         # the hub never got the line, it stays in the composer
         sc = wait.holds(lambda: (lambda s: "you: hello-archived" not in s and s)(t.screen()), 0.5,

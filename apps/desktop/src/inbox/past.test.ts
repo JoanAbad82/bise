@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
+import { inbox } from '@/proto/words_inbox.gen';
 import { ALL, dayHead, endWords, headWords, jumpOf, lineTwo, listsOf, mergeRecords, saidWords, whereWords, type InboxRecord } from './past';
 
 const NOW = new Date(2026, 9, 14, 15, 0).getTime();
@@ -51,7 +52,7 @@ describe('the rows words', () => {
   });
   it("says the record's second line, and drops the 'where' whole when narrow", () => {
     expect(whereWords({ kind: 'thread', agent: 'old' })).toBe("in old's thread");
-    expect(whereWords({ kind: 'unknown' })).toBe('in the inbox');
+    expect(whereWords({ kind: 'unknown' })).toBe(inbox.where_inbox);
     const r = rec(1, { said: 'yes', where: { kind: 'page', page: 'p' }, line2: 'you: yes · on a page' });
     expect(lineTwo(r)).toBe('you: yes · on a page');
     expect(lineTwo(r, true)).toBe('you: yes');

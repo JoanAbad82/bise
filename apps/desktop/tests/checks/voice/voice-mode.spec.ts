@@ -22,6 +22,7 @@
 import { writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
+import { thread } from '../../../src/proto/words_thread.gen';
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
 const agent = (name: string) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: 0 });
@@ -59,7 +60,7 @@ const vm = (state: string, extra: Record<string, unknown> = {}) => ({ ev: 'voice
 const STATES: readonly [string, Record<string, unknown>, string][] = [
   ['listening', {}, '● listening'],
   ['hearing', { heard: ASKED }, `${ASKED} …`],
-  ['sending', { heard: ASKED }, 'sending…'],
+  ['sending', { heard: ASKED }, thread.sending],
   ['thinking', {}, '∿ perf is on it'],
   ['speaking', { said: ANSWER }, 'speaking'],
   ['muted', { muted: true }, 'speaking · ○ muted'],
@@ -173,7 +174,7 @@ test("voice/voice-mode: ∿ and ctrl+r twice, every state in the composer's box,
     await core.send(vm('speaking', { said: ANSWER, lit: { pos: 3, said, cut: false } }) as never);
     await expect(page.locator('[data-testid="thread.lit.3"] .vm-said')).toHaveText(SAID, { timeout: 2000 });
     await expect(page.locator('[data-testid="thread.lit.3"] .vm-unsaid')).toHaveText(ANSWER.slice(SAID.length));
-    await expect(page.getByTestId('thread.voice.3')).toHaveText('∿ speaking');
+    await expect(page.getByTestId('thread.voice.3')).toHaveText(thread.speaking);
     const tones = await page.evaluate(() => {
       const c = (sel: string) => {
         const el = document.querySelector(sel);
@@ -185,7 +186,7 @@ test("voice/voice-mode: ∿ and ctrl+r twice, every state in the composer's box,
     shots.push({ label: 'dark · the answer lit', png: await page.screenshot() });
     // he cuts in: the rest stays faint with 'you cut in'
     await core.send(vm('listening', { lit: { pos: 3, said, cut: true } }) as never);
-    await expect(page.getByTestId('thread.voice.3')).toHaveText('you cut in', { timeout: 2000 });
+    await expect(page.getByTestId('thread.voice.3')).toHaveText(thread.you_cut_in, { timeout: 2000 });
     shots.push({ label: 'dark · you cut in', png: await page.screenshot() });
     // all said, no cut: the answer as any answer, nothing under it
     await core.send(vm('listening', { lit: { pos: 3, said: ANSWER.length, cut: false } }) as never);

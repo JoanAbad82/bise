@@ -46,7 +46,7 @@ def one(cols, rows, tmp):
         open(page, "w").write(PAGE)
         t.typed('[[bash: sb page publish %s --id composer-look --title "where does my answer go"]]' % page)
         t.keys("Enter")
-        t.wait("waiting for you", 90)
+        t.wait(w("thread.gate_waits"), 90)
         # the thread's line is the card's head alone (designer m_26776)
         sc = t.wait("? main asks: which composer look? ↗ where does my answer go")
         assert "1. A · a pink border" not in sc.split("main asks:")[0], "no card block in the thread:\n" + sc

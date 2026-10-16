@@ -11,6 +11,7 @@ import path from 'node:path';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import type { Page } from '@playwright/test';
 
+import { inbox } from '../../../src/proto/words_inbox.gen';
 const CARD = { id: 9, project: 'acme-1a2b3c4d', kind: 'question', rank: 1, agent: 'perf', question: 'keep the old hero as a fallback for slow phones?', options: [{ n: 1, label: 'yes, keep it' }, { n: 2, label: 'no, drop it' }], urgent: false, since_ms: Date.now() - 60_000 };
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -109,7 +110,7 @@ for (const c of ['archived', 'question'] as const) {
           await expect(dock).toContainText('keep the old hero');
           await dock.locator('[data-testid^="inbox.block.row."]').first().click();
           await expect(page.getByTestId('artifact.composer')).toHaveAttribute('data-answering', 'true');
-          await expect(page.getByTestId('artifact.composer')).toContainText('answering perf');
+          await expect(page.getByTestId('artifact.composer')).toContainText(inbox.answering({ who: 'perf' }));
         }
         await settle(page);
         await page.screenshot({ path: test.info().outputPath(`${c}-${theme}-800.png`) });

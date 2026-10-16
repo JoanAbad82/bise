@@ -17,6 +17,7 @@ import type { AddressInfo } from 'node:net';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { composer } from '../../../src/proto/words.gen';
 
+import { inbox } from '../../../src/proto/words_inbox.gen';
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
 const MIN = 60_000;
@@ -203,7 +204,7 @@ for (const theme of ['light', 'dark'] as const) {
       await shot('question');
       await page.getByTestId('inbox.block.row.2').click();
       await expect(page.getByTestId('inbox.block.open.2')).toBeVisible({ timeout: 3000 });
-      await expect(to).toHaveText('to perf · the merge waits for 1 or 2');
+      await expect(to).toHaveText(inbox.to_waits({ who: 'perf', waits: inbox.waits_for({ noun: 'merge', digits: inbox.digits_two }) }));
       await page.waitForTimeout(220);
       await plain('the merge open beside it');
       await shot('approval');

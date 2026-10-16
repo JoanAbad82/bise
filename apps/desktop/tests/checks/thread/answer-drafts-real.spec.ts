@@ -17,6 +17,7 @@ import { test, expect, type Session } from '../../harness';
 import { Lines } from '../native/world';
 import { hubOf, hubState, launchReal, realWorld, transcriptHas, tui, tuiReady, tuiSay, worldSay, type World } from '../world';
 
+import { inbox } from '../../../src/proto/words_inbox.gen';
 const T = {
   field: '[data-testid="composer.field"]',
   setupSkip: '[data-testid="setup.skip"]',
@@ -72,7 +73,7 @@ async function wordsOnCard(s: Session, c: Awaited<ReturnType<typeof draftsCard>>
   const { page } = s;
   await openThread(s);
   await openCard(s, `${c.project}-${String(c.id)}`, c.title);
-  await expect.soft(page.getByTestId('composer'), "the composer answers the card: 'answering bise · 2 drafts…'").toContainText('answering bise');
+  await expect.soft(page.getByTestId('composer'), "the composer answers the card: 'answering bise · 2 drafts…'").toContainText(inbox.answering({ who: 'bise' }));
   await page.screenshot({ path: test.info().outputPath('answering.png') });
   await page.locator(T.field).first().click();
   await page.keyboard.type(words);

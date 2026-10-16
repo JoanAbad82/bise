@@ -5,6 +5,7 @@
 // text goes once he said something. bise main's thread on the scripted core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
+import { composer } from '../../../src/proto/words_composer.gen';
 const HOME = 'bise-home-00000000';
 const world = () => [
   {
@@ -41,18 +42,18 @@ test("thread/first-run: main's empty thread offers 'show me what you can do'; a 
     const { page } = s;
     const first = page.getByTestId('setup.firstrun');
     await expect(first, 'the first-run text in the empty thread').toBeVisible({ timeout: 10_000 });
-    await expect(first).toContainText("what's on your mind?");
+    await expect(first).toContainText(composer.placeholder_main);
     await page.screenshot({ path: test.info().outputPath('first-run.png') });
 
     await page.getByTestId('setup.firstrun.demo').click();
     const field = page.getByTestId('composer.field');
-    await expect.poll(() => field.evaluate(fieldText), { message: 'the words alone in the composer' }).toBe('show me what you can do');
+    await expect.poll(() => field.evaluate(fieldText), { message: 'the words alone in the composer' }).toBe(composer.demo);
     await expect(page.getByTestId('setup.firstrun.ready'), 'its last line says ⏎ tries it').toContainText('try it');
     expect(core.cmds().some((c) => c.cmd === 'send'), 'a click never sends').toBe(false);
 
     await page.keyboard.press('Enter');
     const sent = (await core.waitCmd((c) => c.cmd === 'send', 3000)) as { text?: string; agent?: string };
-    expect(sent).toMatchObject({ agent: 'main', text: 'show me what you can do' });
+    expect(sent).toMatchObject({ agent: 'main', text: composer.demo });
     await expect(first, 'gone once he said something').toBeHidden({ timeout: 2000 });
   } finally {
     await s.close();

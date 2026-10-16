@@ -16,6 +16,7 @@ import { FakeHelper, expect, test } from '../../harness';
 import { hubOf, launchReal, realWorld, worldSay } from '../world';
 import { Lines, sleep } from '../native/world';
 
+import { inbox } from '../../../src/proto/words_inbox.gen';
 const OUT = process.env['BISE_NOTIFY_OUT'] ?? path.join(os.homedir(), '.bise', 'gate', 'try-gate', 'notify');
 const NOTIFY = 'bise-desktop: notify';
 type Line = { t: string; key?: string; note?: { key: string; title: string; body: string; actions: string[]; reply: boolean; silent: boolean }; cmd?: { cmd?: string; card?: number; reply?: string } };
@@ -76,7 +77,7 @@ test('gate/notify-real: R45-R47 on the real core: knock when away, words, choice
     const posts = lines().filter((l) => l.t === 'post' && (l.note?.body ?? '').includes(a)).length;
     row('R45 away', pa !== undefined && posts === 1, pa ? `one post: title ${JSON.stringify(pa.note?.title)}, body ${JSON.stringify(pa.note?.body)}, actions ${JSON.stringify(pa.note?.actions)}, reply ${String(pa.note?.reply)}, silent ${String(pa.note?.silent)} (posts for it: ${String(posts)})` : 'no post in 45 s');
     if (pa?.note) {
-      const okWords = /asks · shop$/.test(pa.note.title) && pa.note.actions.includes('open in bise') && pa.note.reply;
+      const okWords = /asks · shop$/.test(pa.note.title) && pa.note.actions.includes(inbox.key_open_in_bise) && pa.note.reply;
       row('R46 words', okWords, `'<who> asks · shop': ${pa.note.title}; choices then 'open in bise': ${JSON.stringify(pa.note.actions)}; a reply: ${String(pa.note.reply)}`);
       // R47: its 2nd choice answers, the hub gets '2', the notification closes
       const sent = await gesture(pa.note.key, { action: 1 });

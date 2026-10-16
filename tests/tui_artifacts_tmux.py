@@ -33,6 +33,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import Tui, tui_session, run, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 SHOTS = os.environ.get("ART_SHOTS")
 
@@ -161,7 +162,7 @@ def wide(t, E):
         t.keys("Enter")
         sc = t.wait("↗ q3 plan")
         t.typed("is it right?")
-        sc = t.wait("the ↗ chips go as the artifact's link and title, never as @name")
+        sc = t.wait(w("composer.bar_artifact_chips"))
         shot(t, "150-chip-composer")
         t.keys("Enter")
         sc = t.wait("ack:")

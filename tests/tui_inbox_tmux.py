@@ -77,7 +77,7 @@ def main():
         sc = t.wait_all([w("inbox.list_waiting", n=1), "› 1  main  third: ship the readme?", TODAY,
                          "✓ main  first: pick one", ALPHA,
                          "– main  second: never mind", MOOT])
-        assert sc.index("waiting for you") < sc.index(TODAY) < sc.index("✓ main"), sc
+        assert sc.index(w("thread.gate_waits")) < sc.index(TODAY) < sc.index("✓ main"), sc
         shot(t, "inbox-150")
         tmux("resize-window", "-t", t.name, "-x", "80")
         t.wait_gone("╭─ " + w("inbox.head") + " · " + w("common.count_waiting", n=1))  # the frame redrawn narrow

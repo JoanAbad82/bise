@@ -19,6 +19,7 @@ import path from 'node:path';
 import { FakeHelper, test, expect, type Session } from '../../harness';
 import { hubOf, launchReal, realWorld, transcriptHas, type World } from '../world';
 
+import { thread } from '../../../src/proto/words_thread.gen';
 const T = {
   field: '[data-testid="composer.field"]',
   setupSkip: '[data-testid="setup.skip"]',
@@ -134,7 +135,7 @@ test('voice/voice-real (real core): ctrl+r twice on checkout, his words reach it
       // it, carries '∿ speaking' under it and its words split in ink (said) and faint (not yet)
       const mark = page.locator(`${T.list} [data-testid^="thread.voice."][data-mark="speaking"]`);
       await expect(mark, "'∿ speaking' under one answer").toHaveCount(1, { timeout: 5000 });
-      await expect.soft(mark).toHaveText('∿ speaking');
+      await expect.soft(mark).toHaveText(thread.speaking);
       litPos = ((await mark.getAttribute('data-testid')) ?? '').replace('thread.voice.', '');
       note('lit_pos', litPos);
       // checkout's answer as its hub has it (any world's fake: 'ack: <his words>' or 'On it.')

@@ -16,6 +16,7 @@ import { test, expect, FakeHelper } from '../../harness';
 import { launchReal, realWorld } from '../world';
 import { fieldText } from './target';
 
+import { common } from '../../../src/proto/words_common.gen';
 const S = {
   field: '[data-testid="composer.field"]',
   mic: '[data-testid="composer.mic"]',
@@ -242,7 +243,7 @@ function takes(n0: number): Take[] {
       words(w);
       await page.locator(S.field).first().focus();
       await page.keyboard.press('Alt+Enter');
-      return offer !== null && offer.includes('try again') ? undefined : { ms: null, where: "no 'try again' line", text: offer ?? '' };
+      return offer !== null && offer.includes(common.try_again) ? undefined : { ms: null, where: "no 'try again' line", text: offer ?? '' };
     } };
   };
   t.push(tapTake(1200), holdTake(1200), tapTake(600), holdTake(700), lateCtrl(500), lateCtrl(900), restart(500), restart(1000), tapTake(2000), holdTake(2500), duringTalk(),

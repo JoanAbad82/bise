@@ -20,6 +20,7 @@ import { FakeCore, launchDesktop, test, expect, textProblems } from '../../harne
 import { common } from '../../../src/proto/words_common.gen';
 import { inbox } from '../../../src/proto/words_inbox.gen';
 
+import { thread } from '../../../src/proto/words_thread.gen';
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
@@ -146,7 +147,7 @@ test('inbox/inbox-open: ⏎ opens the item whole in the pane, ⌘⏎ lands on hi
       await expect(entry).toContainText('EU sizes, with a US hint');
       await expect(page.locator('.th-flash')).toHaveCount(1, { timeout: 3000 });
       await expect(page.locator('.th-flash')).toContainText('EU sizes, with a US hint');
-      await expect(page.getByText('your answer is further up')).toHaveCount(0);
+      await expect(page.getByText(thread.answer_further_up)).toHaveCount(0);
       // never a walk of older pages from the tail (its first page ends at 961)
       const pages = core.cmds().filter((c) => (c as Cmd).cmd === 'page' && (c as Cmd).agent === 'search') as Cmd[];
       expect(pages.map((c) => c.before).filter((b) => b === LEN - 39), 'no page asked from the tail down').toEqual([]);
@@ -165,7 +166,7 @@ test('inbox/inbox-open: ⏎ opens the item whole in the pane, ⌘⏎ lands on hi
         await page.waitForTimeout(60);
         if (!seen && (await page.getByTestId('thread.gap').isVisible())) {
           seen = true;
-          await expect(page.getByTestId('thread.gap')).toHaveText('newer messages…');
+          await expect(page.getByTestId('thread.gap')).toHaveText(thread.newer_messages);
           await page.screenshot({ path: test.info().outputPath('gap-light.png') });
         }
       }

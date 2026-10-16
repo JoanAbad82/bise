@@ -13,6 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, panel_row, in_view, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 
 def spawn(t, n, name, objective):
@@ -47,7 +48,7 @@ def main():
         t.keys("Enter")
         t.wait_re(in_view("dark-mode"), 20)
         # each view keeps its own draft: main's waits there
-        t.wait("talk to dark-mode directly")
+        t.wait(w("composer.placeholder_agent", agent="dark-mode"))
         # esc closes: nothing moves, the draft is back
         t.typed("second draft")
         t.keys("C-s")
@@ -64,7 +65,7 @@ def main():
         sc = t.wait("earlier · read-only")
         print("---- beta ----\n" + sc)
         t.keys("Enter")
-        t.wait("old-beta is archived · /restore to talk to it")
+        t.wait(w("composer.placeholder_archived", agent="old-beta"))
         t.wait("the csv export")
         # /switch on a query: back to main
         t.keys("C-u")

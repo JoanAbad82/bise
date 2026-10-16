@@ -61,7 +61,7 @@ def main():
         t.typed("hi")
         t.keys("Enter")
         sc = t.wait("no OpenRouter key yet. /provider sets it up.", 60)
-        assert "turn stopped: no OpenRouter key yet" in sc, sc
+        assert w("thread.turn_stopped", why="no OpenRouter key yet") in sc, sc
         assert "candidate discarded" not in sc and "OPENROUTER_API_KEY is not set" not in sc, sc
         # /model: Anthropic's models only, then another provider
         t.typed("/model ")

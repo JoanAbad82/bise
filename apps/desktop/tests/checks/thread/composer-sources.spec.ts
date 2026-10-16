@@ -8,6 +8,7 @@
 // as the stub doesn't answer these asks. Real keys. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
+import { composer } from '../../../src/proto/words_composer.gen';
 const HOME = 'bise-home-00000000';
 const agent = (name: string) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: 0 });
 const world = () => [
@@ -45,7 +46,7 @@ const COMMANDS = [
   { name: '/inbox', desc: 'open what waits for you', args: [], runs: 'window', runnable: false },
   { name: '/compact', desc: "compact the agent's context", args: [], runs: 'hub', runnable: false },
   { name: '/help', desc: 'the commands and the essential keys', args: [], runs: 'window', runnable: false },
-  { name: '/scheduled', desc: 'its timers', args: [], runs: 'window', runnable: false },
+  { name: '/scheduled', desc: composer.cmd_scheduled, args: [], runs: 'window', runnable: false },
 ];
 
 const F = '[data-testid="composer.field"]';

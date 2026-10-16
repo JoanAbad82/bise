@@ -19,6 +19,7 @@ import type { Card, CoreEv, HubEv } from '../../../src/proto';
 import { core_ev, hub_ev } from '../../../src/proto/fixtures.gen';
 import { onWorld, sleep, type World } from './world';
 
+import { inbox } from '../../../src/proto/words_inbox.gen';
 const NOTIFY = 'bise-desktop: notify';
 type Cmd = { cmd?: string; project?: string; card?: number; reply?: string };
 type Line = { t: string; key?: string; route?: string; note?: { key: string; title: string; body: string; actions: string[]; reply: boolean; silent: boolean }; cmd?: Cmd };
@@ -65,7 +66,7 @@ test('native/notify: a new question knocks only when bise is not in front; its b
       const post = await waitLine(w, (l) => l.t === 'post' && l.note?.key === `${P}#99`, 'a notification for card 99');
       expect(post.note?.title).toBe('perf asks · acme');
       expect(post.note?.body).toBe('which model for the review?');
-      expect(post.note?.actions).toEqual(['gpt-5', 'opus', 'sonnet', 'skip it', 'open in bise']);
+      expect(post.note?.actions).toEqual(['gpt-5', 'opus', 'sonnet', 'skip it', inbox.key_open_in_bise]);
       expect(post.note?.reply).toBe(true);
 
       // its second choice answers the hub as the window does

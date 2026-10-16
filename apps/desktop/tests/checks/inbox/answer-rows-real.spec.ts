@@ -10,6 +10,7 @@ import path from 'node:path';
 import { test, expect, type Session } from '../../harness';
 import { hubOf, launchOn, realWorld, type World } from '../world';
 
+import { thread } from '../../../src/proto/words_thread.gen';
 const T = {
   field: '[data-testid="composer.field"]',
   list: '[data-testid="thread.list"]',
@@ -156,14 +157,14 @@ test('inbox/answer-rows-real: an inbox pick leaves his row where he is and in th
 
   // 1. main's own card, from its project's thread, by a click: the hub's row, the option's words
   const c1 = await answer(w, `project/${tele}`, { question: 'which window for the p99 alert', how: 'click', n: 1, words: '5 min', shot: 'c1-telemetry' });
-  one(c1, 'thread.approval.', ['you answered bise', '5 min']);
+  one(c1, 'thread.approval.', [thread.answered_to({ who: 'bise' }), '5 min']);
   expect(c1.join(' '), "made in that very thread: the time alone").not.toContain('answered from');
 
   // 2. an agent's card (gift-ui, shop), from bise's thread, ⌘I then a digit: the window goes to
   // shop's main thread, his row there says 'answered from bise', the option's words never the
   // digit; nothing in bise's thread; the hub's row in gift-ui's
   const c2 = await answer(w, `project/${home}`, { question: 'gift cards: show the balance', how: 'digit', n: 2, words: 'only at checkout', cmdI: true, shot: 'c2-bise' });
-  one(c2, 'thread.approval.', ['you answered gift-ui', 'only at checkout', 'answered from bise']);
+  one(c2, 'thread.approval.', [thread.answered_to({ who: 'gift-ui' }), 'only at checkout', thread.from_line({ place: 'bise' })]);
   expect(await rowsWith2(w, `project/${home}`, 'only at checkout'), "nothing in bise's thread").toEqual([]);
   one(await rowsIn(w, `agent/${shop}/gift-ui`, 'only at checkout'), 'thread.approval.', ['you answered', 'only at checkout']);
 
@@ -171,5 +172,5 @@ test('inbox/answer-rows-real: an inbox pick leaves his row where he is and in th
   // shop's main thread, his row there says 'answered from p99'
   const said = `not yet, the e2e first ${String(Date.now() % 100000)}`;
   const c3 = await answer(w, `agent/${tele}/p99`, { question: 'merge checkout into main', how: 'words', n: 0, words: said, shot: 'c3-p99' });
-  one(c3, 'thread.approval.', ['you answered bise', said, 'answered from p99']);
+  one(c3, 'thread.approval.', [thread.answered_to({ who: 'bise' }), said, thread.from_line({ place: 'p99' })]);
 });

@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Card } from '@/proto';
+import { inbox } from '@/proto/words_inbox.gen';
 import { formatRoute, parseRoute } from '@/app/route';
 import { InboxView } from './List';
 import type { InboxRecord, Jump } from './past';
@@ -85,7 +86,7 @@ describe('the inbox screen', () => {
     // his own words: no option marked, his bubble
     expect(screen.getByTestId('inbox.detail.said').textContent).toBe('only for Safari 16');
     expect(screen.getByTestId('inbox.detail.options').querySelector('[aria-current]')).toBeNull();
-    expect(screen.getByTestId('inbox.detail.where').textContent).toBe('you answered in the inbox · 14:02');
+    expect(screen.getByTestId('inbox.detail.where').textContent).toBe(inbox.when_answered_at({ place: inbox.where_inbox, when: '14:02' }));
     expect(screen.getByTestId('inbox.detail').textContent).toContain('perf went on: kept a webp fallback for Safari 16');
     expect(screen.getByTestId('inbox.detail.go').textContent).toBe("go to your answer in perf's thread⌘⏎");
     fireEvent.keyDown(root, { key: 'ArrowDown' });

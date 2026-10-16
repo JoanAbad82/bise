@@ -16,6 +16,7 @@ import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, testUserData, test, expect } from '../../harness';
 import { testHome } from '../../harness/isolation';
 
+import { settings } from '../../../src/proto/words_settings.gen';
 const BUILD = 'd25';
 
 /** a fake bundle (never run: the app only reads its VERSION) at `app` */
@@ -61,9 +62,9 @@ test("native/move-apps: from the DMG, 'Not now' is kept for the build; settings 
     // same build, same userData: no alert (an answer 'move' would copy it)
     const second = await start(home, target, userData, 'move', 'settings/general');
     try {
-      await expect(second.page.getByTestId('settings.dist.label')).toHaveText('updates are off here', { timeout: 10_000 });
+      await expect(second.page.getByTestId('settings.dist.label')).toHaveText(settings.dist_off, { timeout: 10_000 });
       expect(existsSync(moved), 'never asked again for that build').toBe(false);
-      await expect(second.page.getByTestId('settings.dist.sub')).toHaveText("bise runs from the disk image, so it can't update itself.");
+      await expect(second.page.getByTestId('settings.dist.sub')).toHaveText(settings.dist_disk_image);
       await second.page.getByTestId('settings.dist.move').click();
       await expect.poll(() => existsSync(path.join(moved, 'Contents', 'Resources', 'VERSION')), { timeout: 10_000, message: 'his click moves it' }).toBe(true);
       await second.page.screenshot({ path: test.info().outputPath('move-apps-settings-1100.png') });

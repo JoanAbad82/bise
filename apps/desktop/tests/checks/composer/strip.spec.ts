@@ -20,6 +20,7 @@ import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { composer } from '../../../src/proto/words.gen';
 
+import { thread } from '../../../src/proto/words_thread.gen';
 const HOME = 'bise-home-00000000';
 const P = 'storefront-1a2b3c4d';
 const MIN = 60_000;
@@ -323,7 +324,7 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     await go('perf');
     await core.send(withPerf('231k · 86%') as never);
     await expect(page.getByTestId('composer.tab.context')).toHaveText('231k · 86%');
-    await shot('light', 1400, 'context past 80%');
+    await shot('light', 1400, thread.head_context({ words: 'past 80%' }));
     // crops of the gauge for designer (m_25940): 86% and 17%, light and dark
     const crop = async (pct: string) => {
       for (const t of ['light', 'dark'] as const) {

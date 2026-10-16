@@ -17,6 +17,7 @@
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
+import { thread } from '../../../src/proto/words_thread.gen';
 const P = 'acme-1a2b3c4d';
 const HOME = 'bise-home-00000000';
 const NOW = Date.now();
@@ -43,7 +44,7 @@ const world = (theme: 'light' | 'dark') => [
     agent: 'main',
     entries: [
       { pos: 1, at_ms: NOW - 9 * MIN, kind: 'you', text: LONG },
-      { pos: 2, at_ms: NOW - 8 * MIN, kind: 'thinking', text: 'thought for 3.2s', thinking: { ms: 3200, text: 'the parser first, then the loop.' } },
+      { pos: 2, at_ms: NOW - 8 * MIN, kind: 'thinking', text: thread.thought_for({ dur: '3.2s' }), thinking: { ms: 3200, text: 'the parser first, then the loop.' } },
       { pos: 3, at_ms: NOW - 7 * MIN, kind: 'agent', text: CODE },
     ],
     before: null,

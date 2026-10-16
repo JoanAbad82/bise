@@ -95,7 +95,7 @@ fn clashes(all: &[(&str, &[Word])]) -> Vec<String> {
 #[test]
 fn a_template_fills_and_a_plural_picks() {
     assert_eq!(inbox::where_thread("old"), "in old's thread");
-    assert_eq!(inbox::answered_at("avif", inbox::where_inbox), "you: avif · in the inbox");
+    assert_eq!(inbox::answered_at("avif", inbox::where_inbox), format!("you: avif · {}", inbox::where_inbox));
     assert_eq!(fill("{n} left of {n}", &[("n", &3)]), "3 left of 3");
     assert_eq!(fill("{x} {y}", &[("x", &"a")]), "a {y}");
     crate::words! { demo:

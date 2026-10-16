@@ -9,6 +9,7 @@ import type { Account, CoreEv, HubEv } from '../../../src/proto';
 import { core_ev, hub_ev } from '../../../src/proto/fixtures.gen';
 import { onWorld, sleep, type Lines } from './world';
 
+import { settings } from '../../../src/proto/words_settings.gen';
 const EXTERNAL = 'bise-desktop: external';
 type Ev = CoreEv | HubEv;
 
@@ -71,7 +72,7 @@ test('setup/check-again (S.8): each missing thing offers its fix, check again re
     await core.waitCmd((c) => c.cmd === 'setup_check', 1000);
     await helper.send({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen: 'allowed' });
     await core.send(accountsEv([{ ...SIGNED_OUT[0], state: 'signed_in', who: 'camille@example.com' } as Account, SIGNED_OUT[1] as Account]));
-    await expect(page.getByText('all set.'), 'everything granted: all set').toBeVisible();
+    await expect(page.getByText(settings.check_all_set), 'everything granted: all set').toBeVisible();
     await page.getByTestId('settings.check.model.fix').waitFor({ state: 'detached', timeout: 1000 }).catch(() => undefined);
     await expect(page.getByTestId('settings.check.model.fix'), 'the model fix is gone once signed in').toHaveCount(0);
     nothingLeft(out);

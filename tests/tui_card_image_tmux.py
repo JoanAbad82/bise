@@ -103,7 +103,7 @@ def main():
             t.keys("Enter")
             sc = t.wait("ack: look [Image #1] which color?", 60)
             assert "▣ clipboard" in sc and "<image name=" not in sc and ".b64" not in sc, sc
-            check_image(fake_bodies, "which color?", "main's thread")
+            check_image(fake_bodies, "which color?", w("thread.from_thread", name="main"))
             print("ok: a pasted image reaches main's model as an image block")
             t.wait_re(MAIN_IDLE)
             # 2. a card answer: t3 asks main, main escalates it to the user
@@ -115,7 +115,7 @@ def main():
             c.say('[[bash: sb card --for %s "which logo, the red or the blue?"]]' % msg)
             c.wait(lambda: any(cd["kind"] == "question" and cd["agent"] == "t3" for cd in c.cards()), 60, "t3's card")
             c.wait_idle("main")
-            t.wait("waiting for you", 30)
+            t.wait(w("thread.gate_waits"), 30)
             t.typed(CTRL % ord("1"))
             t.wait(w("inbox.your_answer"))
             t.typed("this one ")

@@ -18,6 +18,7 @@ import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { composer } from '../../../src/proto/words.gen';
 
+import { inbox } from '../../../src/proto/words_inbox.gen';
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
 const MIN = 60_000;
@@ -123,7 +124,7 @@ test('composer/answer-target: pink while his words answer a question, never for 
       await openRow(1);
       await expect(to).toHaveText(/^↳ answering search · which size system\b.*…$/u);
       await expect(end).toHaveText(composer.tab_esc_instead({ agent: 'bise' }));
-      await expect(field).toHaveAttribute('aria-placeholder', 'your answer to search, then ⏎');
+      await expect(field).toHaveAttribute('aria-placeholder', inbox.answer_placeholder({ who: 'search', key: '⏎' }));
       await expect(page.locator('.inbox-block-open')).toHaveAttribute('data-answering', 'true');
       await page.waitForTimeout(200);
       const a = await look(page);
@@ -176,7 +177,7 @@ test('composer/answer-target: pink while his words answer a question, never for 
 
       // (3) an approval: words never approve, nothing pink
       await openRow(2);
-      await expect(to).toHaveText('to perf · the merge waits for 1 or 2');
+      await expect(to).toHaveText(inbox.to_waits({ who: 'perf', waits: inbox.waits_for({ noun: 'merge', digits: inbox.digits_two }) }));
       await expect(end).toHaveText(composer.tab_esc_instead({ agent: 'bise' }));
       await expect(field).toHaveAttribute('aria-placeholder', composer.placeholder_to({ agent: 'perf' }));
       await page.waitForTimeout(200);

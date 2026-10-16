@@ -16,6 +16,7 @@ import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { thread } from '../../../src/proto/words.gen';
 
+import { panel } from '../../../src/proto/words_panel.gen';
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
 const NOW = Date.now();
@@ -37,7 +38,7 @@ const mainThread = [
   { pos: 6, at_ms: at(25), kind: 'to_agent', to: 'mcp-errors', text: 'good, keep the exit code too.' },
   { pos: 7, at_ms: at(20), kind: 'notice', text: '✓ flake-roots landed 1 commit on main (2c24ce15) · pushed', notice: { level: 'info', text: '✓ flake-roots landed 1 commit on main (2c24ce15) · pushed' } },
   { pos: 8, at_ms: at(20), kind: 'landed', text: '1 file +12 −2', landed: { agent: 'flake-roots', target: 'main', from: 'sb/flake-roots', sha: SHA, files: 1, add: 12, del: 2 } },
-  { pos: 9, at_ms: at(15), kind: 'pr', text: 'checks pass', pr: { number: 412, state: 'open', text: 'checks pass', url: 'https://github.com/acme/app/pull/412' } },
+  { pos: 9, at_ms: at(15), kind: 'pr', text: panel.pr_checks_pass, pr: { number: 412, state: 'open', text: panel.pr_checks_pass, url: 'https://github.com/acme/app/pull/412' } },
   { pos: 10, at_ms: at(10), kind: 'scheduled', text: 'scheduled #4 · 2 of 6 · check the build', scheduled: { id: 4, head: 'scheduled #4 · 2 of 6 · check the build' } },
   { pos: 11, at_ms: at(5), kind: 'card', text: 'merge mcp-errors into main?', card: { id: 1, agent: 'main', kind: 'question', question: 'merge mcp-errors into main?', options: ['merge', 'not yet'], answered: false } },
 ];

@@ -22,6 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 COLS, ROWS = 80, 34
 CTRL1 = "\x1b[49;5u"   # ctrl+1, the kitty keyboard protocol's form
@@ -70,7 +71,7 @@ def main():
         # main asks a question with two options
         t.typed("[[bash: sb card \"$(printf '%s\\n1. EU only\\n2. EU and US')\"]]" % QUESTION)
         t.keys("Enter")
-        t.wait("1 waiting for you", 60)
+        t.wait(w("common.waiting_for_you", n="1"), 60)
         t.typed(CTRL1)
         sc = t.wait("↳ answering main")
         d = divider(sc)
@@ -106,7 +107,7 @@ def main():
         # an approval: words never approve, the divider and bar stay plain
         t.typed("[[bash: git push origin main --force]]")
         t.keys("Enter")
-        t.wait("waiting for you", 60)
+        t.wait(w("thread.gate_waits"), 60)
         t.wait("$ git push origin main --force")
         t.typed(CTRL1)
         sc = t.wait("type why not, ⏎ says no")
