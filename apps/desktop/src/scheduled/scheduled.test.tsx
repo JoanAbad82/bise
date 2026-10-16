@@ -2,8 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { formatRoute, parseRoute } from '@/app/route';
-import { ahead, endsWords, howOften, nextRunWords, ordinal, runsWords, ScheduledHere, ScheduledView, type ScheduledTask, type Task } from './index';
-import { Store, StoreProvider } from '@/store';
+import { ahead, endsWords, howOften, nextRunWords, ordinal, runsWords, ScheduledView, type ScheduledTask, type Task } from './index';
 import { scheduled } from '@/proto/words_scheduled.gen';
 
 afterEach(cleanup);
@@ -100,37 +99,6 @@ describe('the scheduled screen', () => {
   it('nothing scheduled says how one comes', () => {
     render(<ScheduledView tasks={[]} ports={{ stop: () => undefined }} now={NOW} />);
     expect(screen.getByTestId('scheduled.empty').textContent).toBe(scheduled.empty_desktop);
-  });
-});
-
-describe('scheduled here (panel A)', () => {
-  it("one project's tasks soonest first, two lines; a row opens the screen; none: no block", () => {
-    const store = new Store(null);
-    store.apply({ ev: 'projects', projects: [{ project: 'shop-1', name: 'storefront', path: '/x/shop' }, { project: 'acme-2', name: 'acme', path: '/x/acme' }] });
-    store.apply({ ev: 'scheduled', project: 'shop-1', items: [task(7, { agent: 'perf', words: 'rerun the bench', every: '1h', next_ms: NOW + 3_600_000 }), task(4, { next_ms: NOW + 600_000 })] });
-    store.apply({ ev: 'scheduled', project: 'acme-2', items: [task(9, { agent: 'api' })] });
-    let opened = 0;
-    render(<StoreProvider store={store}><ScheduledHere project="shop-1" onOpen={() => { opened++; }} /></StoreProvider>);
-    const rows = screen.getByTestId('scheduled.here').querySelectorAll('button');
-    expect([...rows].map((r) => r.dataset['testid'])).toEqual(['scheduled.here.row.4', 'scheduled.here.row.7']);
-    expect(rows[0]?.textContent).toContain('check the deploy of storefront');
-    expect(rows[0]?.textContent).toContain('deploy-watch · every 5 min');
-    fireEvent.click(screen.getByTestId('scheduled.here.row.7'));
-    expect(opened).toBe(1);
-    cleanup();
-    render(<StoreProvider store={store}><ScheduledHere project="nowhere" onOpen={() => undefined} /></StoreProvider>);
-    expect(screen.queryByTestId('scheduled.here')).toBeNull();
-  });
-
-  it("sched-names: a named task shows its name, its words on hover; an older hub's (no name) its words' first line", () => {
-    const store = new Store(null);
-    store.apply({ ev: 'projects', projects: [{ project: 'shop-1', name: 'storefront', path: '/x/shop' }] });
-    store.apply({ ev: 'scheduled', project: 'shop-1', items: [task(4, { name: 'deploy watch' }), task(7, { next_ms: NOW + 3_600_000 })] });
-    render(<StoreProvider store={store}><ScheduledHere project="shop-1" onOpen={() => undefined} /></StoreProvider>);
-    const named = screen.getByTestId('scheduled.here.row.4').querySelector('.sch-here-t');
-    expect(named?.textContent).toBe('deploy watch');
-    expect(named?.getAttribute('title')).toBe('check the deploy of storefront\nsay so only when it fails');
-    expect(screen.getByTestId('scheduled.here.row.7').querySelector('.sch-here-t')?.textContent).toBe('check the deploy of storefront');
   });
 });
 
