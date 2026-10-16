@@ -202,7 +202,9 @@ if [ "$os" = darwin ]; then
   sargs=()
   [ "${BISE_SIGN_REQUIRED:-0}" = 1 ] && sargs+=(--required)
   [ "${BISE_NOTARIZE:-0}" = 1 ] && sargs+=(--notarize --work "$stage/notary")
-  python3 -B "$REPO/scripts/dist_sign.py" "$app" "${sargs[@]}" \
+  # ${a[@]+...}: macOS /bin/bash 3.2 calls an empty array unbound under set -u
+  # (an unsigned build: v2026.10.2-39's darwin jobs stopped here)
+  python3 -B "$REPO/scripts/dist_sign.py" "$app" ${sargs[@]+"${sargs[@]}"} \
     || { say "signing failed"; exit 1; }
   rm -rf "$stage/notary"
 fi
