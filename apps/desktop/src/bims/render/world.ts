@@ -14,8 +14,10 @@ import {
   type Object3D,
   PointLight,
 } from 'three';
-import type { Office, Spot } from '../model';
+import { type Box, furniture } from '../layout';
+import type { Office, Pt, Spot } from '../model';
 import { siteOf } from './camera';
+import { type Decor, type Foot, decorOf } from './decor';
 import { type Palette, WORLD, hash, rng, HOODIE } from './palette';
 import type { Style } from './style';
 
@@ -63,9 +65,6 @@ function kitOf(style: Style, pal: Palette): Kit {
   };
 }
 
-/** main's desk sits this far ahead of its chair (layout.ts furniture: main can walk behind the chair) */
-const MAIN_DZ = 0.6;
-
 const LAMP_ON_EI = (pal: Palette): number => (pal.pendants ? 1.1 : 0.55);
 
 /** a laptop, its lid towards the one who sits at it (towards -z), its screen a material of its own */
@@ -102,30 +101,41 @@ function chair(k: Kit, parent: Object3D, x: number, z: number, color: string, fa
   k.add(k.style.cylinder(0.03, 0.3), k.mat(k.pal.ink), g, 0, 0.15, 0);
 }
 
-/** one agent's desk: the spot is where it sits, the desk in front of it (its way, +z when face is 0) */
-function desk(k: Kit, parent: Object3D, d: Spot, name: string): DeskHandles {
+/** the furniture box in front of a chair (layout.ts furniture(): a desk is ahead of its spot, +z) */
+function boxAhead(boxes: readonly Box[], p: Pt): Box | null {
+  let best: Box | null = null;
+  for (const b of boxes) {
+    if (b.of || p.x < b.x0 || p.x > b.x1 || b.z0 < p.z) continue;
+    if (!best || b.z0 < best.z0) best = b;
+  }
+  return best;
+}
+
+/** one agent's desk: its furniture box (layout.ts), the chair at its spot */
+function desk(k: Kit, parent: Object3D, b: Box, d: Spot, name: string): DeskHandles {
   const { style, pal } = k;
   const h = hash(name);
+  const w = b.x1 - b.x0;
+  const dd = b.z1 - b.z0;
+  const cx = (b.x0 + b.x1) / 2;
+  const cz = (b.z0 + b.z1) / 2;
   const g = new Group();
-  g.position.set(d.x, 0, d.z);
-  g.rotation.y = d.face;
+  g.position.set(cx, 0, cz);
   parent.add(g);
-  k.add(style.box(1.5, 0.5, 0.7), k.mat(pal.desk), g, 0, 0.25, 0.5);
-  k.add(style.box(1.6, 0.06, 0.78), k.mat(pal.deskTop), g, 0, 0.52, 0.5);
+  k.add(style.box(w - 0.1, 0.5, dd - 0.08), k.mat(pal.desk), g, 0, 0.25, 0);
+  k.add(style.box(w, 0.06, dd), k.mat(pal.deskTop), g, 0, 0.52, 0);
   // a small plate without text, in the colour of its bim's hoodie (spec §2)
-  k.add(style.box(0.22, 0.08, 0.02), k.mat(HOODIE[h % HOODIE.length] ?? pal.desk), g, -0.5, 0.4, 0.86);
-  const screen = laptop(k, g, 0, 0.47);
-  const lamp = deskLamp(k, g, 0.62, 0.72);
-  chair(k, g, 0, -0.05, HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, 0);
-  if (h % 3 === 0) k.add(style.cylinder(0.06, 0.12), k.mat(WORLD.paper), g, 0.42, 0.61, 0.3);
+  k.add(style.box(0.22, 0.08, 0.02), k.mat(HOODIE[h % HOODIE.length] ?? pal.desk), g, -w / 3, 0.4, dd / 2 - 0.03);
+  const screen = laptop(k, g, d.x - cx, -0.03);
+  const lamp = deskLamp(k, g, w / 2 - 0.18, dd / 2 - 0.17);
+  chair(k, parent, d.x, d.z - 0.05, HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, d.face);
+  if (h % 3 === 0) k.add(style.cylinder(0.06, 0.12), k.mat(WORLD.paper), g, 0.42, 0.61, -0.2);
   if (h % 4 === 1) {
-    k.add(style.cylinder(0.08, 0.12), k.mat(WORLD.pot), g, -0.55, 0.61, 0.4);
-    k.add(style.ball(0.12), k.mat(pal.plant), g, -0.55, 0.76, 0.4);
+    k.add(style.cylinder(0.08, 0.12), k.mat(WORLD.pot), g, -0.55, 0.61, -0.1);
+    k.add(style.ball(0.12), k.mat(pal.plant), g, -0.55, 0.76, -0.1);
   }
-  if (h % 5 === 2) k.add(style.ball(0.07), k.mat(WORLD.orange), g, 0.4, 0.62, 0.62);
-  const c = Math.cos(d.face);
-  const s = Math.sin(d.face);
-  return { screen, lamp, top: { x: d.x + 0.5 * s, y: 0.55, z: d.z + 0.5 * c } };
+  if (h % 5 === 2) k.add(style.ball(0.07), k.mat(WORLD.orange), g, 0.4, 0.62, 0.12);
+  return { screen, lamp, top: { x: cx, y: 0.55, z: cz } };
 }
 
 function tree(k: Kit, parent: Object3D, x: number, z: number): void {
@@ -194,26 +204,29 @@ function glyph(k: Kit, parent: Object3D, x: number, y: number, z: number, color:
   }
 }
 
-function terrace(k: Kit, parent: Object3D, o: Office): void {
+/** a box on the floor from a footprint or a furniture box */
+function onFloor(k: Kit, parent: Object3D, b: Box, h: number, y: number, color: string): Mesh {
+  return k.add(k.style.box(b.x1 - b.x0, h, b.z1 - b.z0), k.mat(color), parent, (b.x0 + b.x1) / 2, y, (b.z0 + b.z1) / 2);
+}
+const boxOf = (f: Foot): Box => ({ x0: f.x - f.hw, x1: f.x + f.hw, z0: f.z - f.hd, z1: f.z + f.hd });
+
+function terrace(k: Kit, parent: Object3D, o: Office, d: Decor, boxes: readonly Box[]): void {
   const { style, pal } = k;
-  const { x0, W, D } = o;
-  k.add(style.box(W - 0.4, 0.08, 3.6), k.mat(pal.terrace), parent, 0 + x0 + W / 2, 0, D + 2.0);
-  const px = x0 + W - 1.1;
-  const pz = D + 1.6;
-  k.add(style.cylinder(0.03, 1.8), k.mat(pal.ink), parent, px, 0.9, pz);
-  k.add(style.box(1.4, 0.3, 1.4), k.mat(WORLD.parasol), parent, px, 1.85, pz);
-  o.terrace.forEach((t, i) => {
-    k.add(style.box(0.5, 0.08, 0.95), k.mat(WORLD.chair[i % 2] ?? WORLD.paper), parent, t.x, 0.2, t.z + 0.05);
-  });
+  onFloor(k, parent, boxOf(d.terrace), 0.08, 0, pal.terrace);
+  const p = d.parasol;
+  k.add(style.cylinder(0.03, 1.8), k.mat(pal.ink), parent, p.x, 0.9, p.z);
+  k.add(style.box(1.4, 0.3, 1.4), k.mat(WORLD.parasol), parent, p.x, 1.85, p.z);
+  // a deck chair per terrace spot (layout.ts furniture)
+  const isChair = (b: Box): boolean => b.of !== undefined && o.terrace.some((t) => t.x === b.of?.x && t.z === b.of.z);
+  boxes.filter(isChair).forEach((b, i) => onFloor(k, parent, b, 0.08, 0.2, WORLD.chair[i % 2] ?? WORLD.paper));
   // the palm and the mini ramp
-  const palmX = x0 + W - 0.45;
-  const palmZ = D + 3.2;
-  k.add(style.box(0.16, 1.6, 0.16), k.mat(WORLD.palmTrunk), parent, palmX, 0.8, palmZ);
+  const pm = d.palm;
+  k.add(style.box(0.16, 1.6, 0.16), k.mat(WORLD.palmTrunk), parent, pm.x, 0.8, pm.z);
   for (let i = 0; i < 4; i++) {
-    const f = k.add(style.box(0.9, 0.04, 0.22), k.mat(WORLD.leaf[0]), parent, palmX, 1.62, palmZ);
+    const f = k.add(style.box(0.9, 0.04, 0.22), k.mat(WORLD.leaf[0]), parent, pm.x, 1.62, pm.z);
     f.rotation.y = (i * Math.PI) / 2 + 0.4;
   }
-  k.add(style.box(1.2, 0.3, 0.7), k.mat(WORLD.ramp), parent, x0 + W - 1.6, 0.15, D + 3.1);
+  onFloor(k, parent, boxOf(d.ramp), 0.3, 0.15, WORLD.ramp);
 }
 
 export function buildWorld(o: Office, mainName: string, style: Style, pal: Palette): World {
@@ -235,14 +248,16 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
   const gz = (site.z0 + site.z1) / 2;
   k.add(style.box(gw, 1.2, gd), k.mat(pal.dirt), root, cx, -0.75, gz);
   k.add(style.box(gw, 0.16, gd), k.mat(pal.grass), root, cx, -0.1, gz);
+  const decor = decorOf(o);
+  const boxes = furniture(o);
   const r = rng(hash(`trees${W}`));
-  for (const [tx, tz] of [[x0 - 0.7, 1.0], [x0 - 0.7, D * 0.45], [x0 - 0.7, D * 0.85], [x0 + W * 0.3, -0.85], [x0 + W * 0.75, -0.85]] as const) tree(k, root, tx, tz);
+  for (const t of decor.trees) tree(k, root, t.x, t.z);
   for (let i = 0; i < 10; i++) {
     const fx = r() < 0.5 ? x0 - 0.35 - r() * 0.6 : x0 + W + 0.35 + r() * 0.6;
     k.add(style.box(0.16, 0.16, 0.16), k.mat(WORLD.flowers[i % 4] ?? WORLD.paper), root, fx, 0.06, r() * (D + 3));
   }
 
-  terrace(k, root, o);
+  terrace(k, root, o, decor, boxes);
   const floor = new Mesh(style.box(W, 0.14, D), style.floor(pal.floor, W, D));
   floor.position.set(cx, -0.05, D / 2);
   root.add(floor);
@@ -267,13 +282,14 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
   if (lx.length) {
     k.add(style.box(l1 - l0, 0.02, Math.max(...lz) - Math.min(...lz) + 1.1), k.mat(pal.rug), root, (l0 + l1) / 2, 0.035, (Math.min(...lz) + Math.max(...lz)) / 2);
   }
-  o.lounge.slice(0, 8).forEach((p, i) => {
-    const b = k.add(style.ball(0.34), k.mat(WORLD.bean[i % WORLD.bean.length] ?? pal.rug), root, p.x, 0.2, p.z - 0.05);
-    b.scale.set(1.05, 0.62, 1.05);
+  // a bean bag per lounge spot (layout.ts furniture)
+  const isBean = (b: Box): boolean => b.of !== undefined && o.lounge.some((l) => l.x === b.of?.x && l.z === b.of.z);
+  boxes.filter(isBean).forEach((b, i) => {
+    const bag = k.add(style.ball((b.x1 - b.x0) / 2 / 1.05 / 0.92), k.mat(WORLD.bean[i % WORLD.bean.length] ?? pal.rug), root, (b.x0 + b.x1) / 2, 0.2, (b.z0 + b.z1) / 2);
+    bag.scale.set(1.05, 0.62, 1.05);
   });
   mural(k, root, l0 + 0.15, l1 - 0.15);
-  bigPlant(k, root, x0 + 0.35, 3.5);
-  bigPlant(k, root, x0 + W - 0.35, 3.5);
+  for (const p of decor.plants) bigPlant(k, root, p.x, p.z);
 
   // the whiteboard, centred on its spots
   const bx = o.boardSpots.length ? o.boardSpots.reduce((s, p) => s + p.x, 0) / o.boardSpots.length : cx;
@@ -281,25 +297,30 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
 
   // main's desk: bigger, a tray, the neon :* behind it
   const md = o.mainDesk;
+  const mb = boxAhead(boxes, md) ?? { x0: md.x - 1.15, x1: md.x + 1.15, z0: md.z + 0.1, z1: md.z + 1.1 };
+  const mcx = (mb.x0 + mb.x1) / 2;
+  const mcz = (mb.z0 + mb.z1) / 2;
   const mg = new Group();
-  mg.position.set(md.x, 0, md.z);
-  mg.rotation.y = md.face;
+  mg.position.set(mcx, 0, mcz);
   root.add(mg);
-  k.add(style.box(2.2, 0.5, 0.9), k.mat(pal.desk), mg, 0, 0.25, MAIN_DZ);
-  k.add(style.box(2.3, 0.06, 1.0), k.mat(pal.deskTop), mg, 0, 0.52, MAIN_DZ);
-  const mainScreen = laptop(k, mg, 0.2, MAIN_DZ - 0.03);
-  const mainLamp = deskLamp(k, mg, 0.95, MAIN_DZ + 0.3);
-  k.add(style.box(0.7, 0.06, 0.5), k.mat(pal.wallTop), mg, -0.65, 0.58, MAIN_DZ);
-  k.add(style.box(0.34, 0.24, 0.26), k.mat(WORLD.crate), mg, -0.65, 0.73, MAIN_DZ);
-  chair(k, mg, 0, -0.15, WORLD.dark, 0);
+  const mw = mb.x1 - mb.x0;
+  const mdd = mb.z1 - mb.z0;
+  k.add(style.box(mw - 0.1, 0.5, mdd - 0.1), k.mat(pal.desk), mg, 0, 0.25, 0);
+  k.add(style.box(mw, 0.06, mdd), k.mat(pal.deskTop), mg, 0, 0.52, 0);
+  const mainScreen = laptop(k, mg, md.x - mcx + 0.2, -0.03);
+  const mainLamp = deskLamp(k, mg, mw / 2 - 0.2, mdd / 2 - 0.2);
+  k.add(style.box(0.7, 0.06, 0.5), k.mat(pal.wallTop), mg, -mw / 2 + 0.5, 0.58, 0);
+  k.add(style.box(0.34, 0.24, 0.26), k.mat(WORLD.crate), mg, -mw / 2 + 0.5, 0.73, 0);
+  chair(k, root, md.x, md.z - 0.05, WORLD.dark, md.face);
   const neon = style.material(pal.neon, { flat: true });
   glyph(k, root, md.x, 1.25, 0.02, pal.neon, 0.06, neon);
 
   // the kitchen island: its base, its top, a coffee machine, fruit, a boombox
   const iz = (isl.z0 + isl.z1) / 2;
   const il = isl.z1 - isl.z0;
-  k.add(style.box(isl.w - 0.1, 0.62, il), k.mat(pal.island), root, 0, 0.31, iz);
-  k.add(style.box(isl.w + 0.1, 0.07, il + 0.15), k.mat(pal.islandTop), root, 0, 0.66, iz);
+  const top = boxes.find((b) => !b.of && b.x0 < 0 && b.x1 > 0 && b.z0 < iz && b.z1 > iz) ?? { x0: -isl.w / 2, x1: isl.w / 2, z0: isl.z0, z1: isl.z1 };
+  k.add(style.box(top.x1 - top.x0 - 0.2, 0.62, top.z1 - top.z0 - 0.15), k.mat(pal.island), root, 0, 0.31, iz);
+  onFloor(k, root, top, 0.07, 0.66, pal.islandTop);
   k.add(style.box(0.5, 0.5, 0.42), k.mat(WORLD.coffee), root, 0, 0.95, isl.z0 + 0.35);
   k.add(style.box(0.18, 0.06, 0.04), style.material(WORLD.coffeeLed, { emissive: WORLD.coffeeLed, ei: 0.5 }), root, 0, 1.07, isl.z0 + 0.57);
   fruitBowl(k, root, 0, isl.z0 + 1.3);
@@ -318,12 +339,15 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
 
   // the desks
   const desks = new Map<string, DeskHandles>();
-  for (const [name, d] of o.desks) desks.set(name, desk(k, root, d, name));
-  const mainDesk: DeskHandles = { screen: mainScreen, lamp: mainLamp, top: { x: md.x, y: 0.55, z: md.z + MAIN_DZ } };
+  for (const [name, d] of o.desks) {
+    const b = boxAhead(boxes, d) ?? { x0: d.x - 0.8, x1: d.x + 0.8, z0: d.z + 0.11, z1: d.z + 0.89 };
+    desks.set(name, desk(k, root, b, d, name));
+  }
+  const mainDesk: DeskHandles = { screen: mainScreen, lamp: mainLamp, top: { x: mcx, y: 0.55, z: mcz } };
   desks.set(mainName, mainDesk);
 
   // the door mat
-  k.add(style.box(1.1, 0.04, 0.5), k.mat(WORLD.mat), root, o.door.x, 0.03, D - 0.15);
+  onFloor(k, root, boxOf(decor.doorMat), 0.04, 0.03, WORLD.mat);
 
   return {
     root,

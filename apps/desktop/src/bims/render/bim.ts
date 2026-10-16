@@ -152,6 +152,41 @@ export function makeBim(name: string, main: boolean, style: Style): Bim {
   g.add(cloud);
   for (const [cx, cy, r] of [[-0.12, 0, 0.12], [0.06, 0.04, 0.15], [0.2, -0.01, 0.1]] as const) add(style.ball(r), mat(WORLD.cloud), cloud, cx, cy, 0);
   cloud.position.set(0, 1.05, 0.47);
+  // what its turn does (Activity.doing)
+  const marker = add(style.box(0.04, 0.16, 0.04), mat(WORLD.marker), hand, 0, -0.02, 0.03);
+  const newspaper = new Group();
+  body.add(newspaper);
+  newspaper.position.set(0, 0.62, 0.34);
+  newspaper.rotation.x = -0.3;
+  add(style.box(0.46, 0.32, 0.015), mat(WORLD.paper), newspaper, 0, 0, 0);
+  for (let i = 0; i < 4; i++) add(style.box(0.36, 0.025, 0.005), mat(WORLD.ink), newspaper, 0, 0.1 - i * 0.065, 0.01);
+  const magnifier = new Group();
+  hand.add(magnifier);
+  add(style.box(0.03, 0.12, 0.03), mat(WORLD.trunk), magnifier, 0, 0.06, 0.05);
+  add(style.box(0.16, 0.16, 0.025), mat(WORLD.glass, 0.25), magnifier, 0, 0.19, 0.05);
+  const poster = new Group();
+  body.add(poster);
+  poster.position.set(0, 1.25, 0.12);
+  add(style.box(0.62, 0.44, 0.015), mat(WORLD.paper), poster, 0, 0, 0);
+  WORLD.mural.slice(0, 3).forEach((c, i) => add(style.box(0.16, 0.16, 0.005), mat(c), poster, -0.18 + i * 0.18, 0.04, 0.01));
+  // the big screen beside its desk (computer use): on a stand, to the bim's right as it faces it
+  const bigScreen = new Group();
+  g.add(bigScreen);
+  bigScreen.position.set(-0.3, 0, 0.55);
+  add(style.box(0.06, 0.8, 0.06), mat(WORLD.dark), bigScreen, 0, 0.4, 0);
+  add(style.box(0.75, 0.48, 0.05), mat(WORLD.dark), bigScreen, 0, 1.0, 0);
+  add(style.box(0.68, 0.41, 0.01), mat(WORLD.glass, 0.6), bigScreen, 0, 1.0, -0.03);
+  // the shredder beside the desk, a sheet going in
+  const shredder = new Group();
+  g.add(shredder);
+  shredder.position.set(0, 0, 0.4);
+  add(style.box(0.36, 0.42, 0.26), mat(WORLD.dark), shredder, 0, 0.21, 0);
+  const shred = add(style.box(0.24, 0.3, 0.012), mat(WORLD.paper), shredder, 0, 0.5, 0);
+  // build: a progress bar over its head
+  const progress = new Group();
+  g.add(progress);
+  add(style.box(0.62, 0.1, 0.03), mat(WORLD.dark), progress, 0, 0, 0);
+  const fill = add(style.box(0.58, 0.06, 0.035), mat(WORLD.bar, 0.3), progress, 0, 0, 0.005);
   const sweat = [0, 1, 2].map(() => add(style.box(0.06, 0.09, 0.04), mat(WORLD.sweat, 0.3), head, 0, 0, 0));
   const steam = [0, 1, 2].map(() => add(style.ball(0.08), mat(WORLD.steam), g, 0, 0, 0));
 
@@ -188,6 +223,20 @@ export function makeBim(name: string, main: boolean, style: Style): Bim {
       sheet.visible = p.sheet;
       skate.visible = p.skate;
       glasses.visible = p.glasses;
+      marker.visible = p.marker;
+      newspaper.visible = p.newspaper;
+      magnifier.visible = p.magnifier;
+      poster.visible = p.poster;
+      bigScreen.visible = p.bigScreen;
+      shredder.visible = p.shredder !== null;
+      if (p.shredder !== null) shred.position.y = 0.5 - p.shredder * 0.32;
+      progress.visible = p.progress !== null;
+      if (p.progress !== null) {
+        const f = Math.max(0.02, p.progress);
+        fill.scale.x = f;
+        fill.position.x = -0.29 * (1 - f);
+        progress.position.set(0, 1.62 * s + rig.y, 0);
+      }
       cloud.visible = p.cloud > 0.02;
       cloud.scale.setScalar(Math.max(0.01, p.cloud));
       sweat.forEach((d, i) => {

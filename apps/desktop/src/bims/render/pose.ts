@@ -3,7 +3,7 @@
 // bim.ts applies a Rig to the meshes; index.ts sums the Motion. Every still pose reads without
 // motion (asleep: eyes closed, head down; idle: sunk in the bean bag; failed: slumped; in line: the
 // box). Loops (typing, hot's sweat, the '?' hops) are 'loop' at LOOP_FPS; reduced motion has none.
-import type { ActivityKind, Motion, Pose } from '../model';
+import type { Activity, ActivityKind, Doing, Motion, Pose } from '../model';
 
 /** rotations in radians: [x, y, z] */
 export type Rot = readonly [number, number, number];
@@ -23,6 +23,16 @@ export interface Props {
   readonly cloud: number;
   /** hot: the sweat and steam loop's phase, null when not hot */
   readonly hot: number | null;
+  /** what its turn does (Activity.doing, spec §4 [t]): a marker (think), a newspaper (search), the big
+   * screen beside its desk (computer), a magnifier (image), a poster (publish), the shredder (compact) */
+  readonly marker: boolean;
+  readonly newspaper: boolean;
+  readonly bigScreen: boolean;
+  readonly magnifier: boolean;
+  readonly poster: boolean;
+  readonly shredder: number | null;
+  /** build: the progress bar over its head, 0..1 */
+  readonly progress: number | null;
 }
 
 export interface Rig {
@@ -65,6 +75,7 @@ export interface RigInput {
 const NO_PROPS: Props = {
   crate: false, mug: false, orange: false, pine: false, sheet: false, plane: false,
   skate: false, glasses: false, cloud: 0, hot: null,
+  marker: false, newspaper: false, bigScreen: false, magnifier: false, poster: false, shredder: null, progress: null,
 };
 
 const Z: Rot = [0, 0, 0];
@@ -104,13 +115,58 @@ const TYPING: ReadonlySet<ActivityKind> = new Set(['work', 'hot', 'main']);
 /** the loop phase of time t: frozen under reduced motion so a loop pose holds still */
 const loopT = (t: number, reduced: boolean): number => (reduced ? 0 : t);
 
-/** a kind's pose at rest, at loop time lt (lt is 0 under reduced motion) */
-function rest(k: ActivityKind, lt: number, ph: number, urgent: boolean, fruit: number): Body {
-  switch (k) {
-    case 'work':
-    case 'main':
-    case 'hot': {
-      const hot = k === 'hot';
+/** what doing kinds loop (a moving hand, a growing bar): typing's siblings; the others are still */
+const DOING_LOOPS: ReadonlySet<Doing> = new Set(['think', 'computer', 'compact', 'build', 'edit', 'tool', 'unknown']);
+
+/** a working bim (work, hot, main) by what its turn does; none or edit/tool: typing at its desk */
+function working(k: ActivityKind, act: Activity, lt: number, ph: number): Body {
+  const hot = k === 'hot';
+  const base = { ...NO_PROPS, hot: hot ? (lt * 0.9 + ph) % 1 : null };
+  const mouth = hot ? ('oh' as const) : ('smile' as const);
+  switch (act.doing) {
+    case 'think':
+      if (act.at === 'board') {
+        // at the whiteboard, writing equations
+        return {
+          ...STAND, mouth, armL: [-0.3, 0, 0], head: [-0.15, 0, 0],
+          armR: [-2.4 + Math.sin(lt * 6 + ph) * 0.2, 0, 0.2 + Math.sin(lt * 3 + ph) * 0.25],
+          props: { ...base, marker: true },
+        };
+      }
+      // thinking at its desk: chin on the hand, eyes up
+      return { ...STAND, ...SEATED, mouth, armR: [-2.2, 0, -0.5], armL: [-1.2, 0, 0], head: [-0.25, 0.2 + Math.sin(lt * 1.5 + ph) * 0.1, 0], screen: 0.6, props: base };
+    case 'search':
+      // reads a newspaper at its desk
+      return { ...STAND, ...SEATED, mouth, armL: [-1.3, 0, 0.35], armR: [-1.3, 0, -0.35], head: [0.2, 0, 0], screen: 0.5, props: { ...base, newspaper: true } };
+    case 'computer':
+      // standing by the big screen beside its desk, a mouse in hand
+      return {
+        ...STAND, dx: -0.75, dz: 0.1, face: 0, mouth, head: [0.05, -0.5, 0],
+        armR: [-1.0 + Math.sin(lt * 4 + ph) * 0.08, 0, Math.sin(lt * 3 + ph) * 0.1], armL: Z,
+        screen: 0.4, props: { ...base, bigScreen: true },
+      };
+    case 'image':
+      // a magnifier up to its eye
+      return { ...STAND, ...SEATED, mouth: 'oh', armR: [-2.0, 0, -0.3], armL: [-1.2, 0, 0], head: [0.1, 0, 0], screen: 0.9, props: { ...base, magnifier: true } };
+    case 'publish':
+      // a poster held up, on its way to the back wall
+      return { ...STAND, mouth: 'laugh', eyes: 0.3, armL: [-2.6, 0, 0.2], armR: [-2.6, 0, -0.2], props: { ...base, poster: true } };
+    case 'compact':
+      // tidies its desk: the pile of papers goes to the shredder beside it
+      return {
+        ...STAND, dx: 0.6, face: 0, mouth, armL: [-1.1, 0, 0], armR: [-1.1, 0, 0], head: [0.35, 0, 0],
+        screen: 0.4, props: { ...base, shredder: (lt * 0.8 + ph) % 1 },
+      };
+    case 'build':
+      // waits standing in front of its screen, arms crossed, a progress bar over its head
+      return {
+        ...STAND, dz: -0.15, mouth, armL: [-1.2, 0, 0.9], armR: [-1.2, 0, -0.9], head: [0.1, 0, 0],
+        screen: 0.9, props: { ...base, progress: ((lt + ph * 3) % 12) / 12 },
+      };
+    case 'edit':
+    case 'tool':
+    case 'unknown':
+    case undefined: {
       const sp = hot ? 22 : 12;
       return {
         ...STAND, ...SEATED,
@@ -118,11 +174,29 @@ function rest(k: ActivityKind, lt: number, ph: number, urgent: boolean, fruit: n
         armR: [-1.2 + Math.sin(lt * sp + ph + 2) * 0.18, 0, 0],
         head: [0.15 + Math.sin(lt * 2 + ph) * 0.04, Math.sin(lt * 0.7 + ph) * 0.15, 0],
         body: hot ? [0, 0, Math.sin(lt * 30) * 0.015] : Z,
-        mouth: hot ? 'oh' : 'smile',
+        mouth,
         screen: 0.9,
-        props: hot ? { ...NO_PROPS, hot: (lt * 0.9 + ph) % 1 } : NO_PROPS,
+        props: base,
       };
     }
+  }
+}
+
+/** whether a working bim's pose loops (typing and its siblings) or holds still (reading, a poster) */
+export function workLoops(act: Activity): boolean {
+  return act.doing === undefined || DOING_LOOPS.has(act.doing) || act.k === 'hot';
+}
+
+/** a kind's pose at rest, at loop time lt (lt is 0 under reduced motion) */
+function rest(act: Activity, lt: number, ph: number): Body {
+  const k = act.k;
+  const urgent = act.urgent === true;
+  const fruit = act.fruit ?? 0;
+  switch (k) {
+    case 'work':
+    case 'main':
+    case 'hot':
+      return working(k, act, lt, ph);
     case 'starting':
       // at the door: looks around, a little wave
       return { ...STAND, head: [0, 0.35, 0], armR: [0, 0, 2.4], face: Math.PI };
@@ -283,7 +357,7 @@ export function rigOf(inp: RigInput): Rig {
   const act = seg.act;
   const k: ActivityKind = act.k;
   const lt = loopT(t, reduced);
-  const target = rest(k, lt, phase, act.urgent === true, act.fruit ?? 0);
+  const target = rest(act, lt, phase);
   const place = placeOf(pose, reduced);
   const walkT = seg.path.len > 0.01 && seg.from !== null ? seg.path.len / seg.speed : 0;
   const arrived = reduced ? !place.fading : !pose.moving;
@@ -299,13 +373,13 @@ export function rigOf(inp: RigInput): Rig {
     b = target; // reduced: the end pose, fading in or out
     motion = 'walk';
   } else if (u < dur) {
-    const from = walkT > 0 ? STAND : seg.from === null ? target : rest(seg.from, lt, phase, false, 0);
+    const from = walkT > 0 ? STAND : seg.from === null ? target : rest({ k: seg.from, at: act.at }, lt, phase);
     const f = ease(u / dur);
     b = beat(seg.from, k, u / dur, blend(from, target, f));
     motion = 'walk';
   } else {
     b = target;
-    motion = !reduced && (TYPING.has(k) || k === 'asks') ? 'loop' : 'still';
+    motion = !reduced && ((TYPING.has(k) && workLoops(act)) || k === 'asks') ? 'loop' : 'still';
   }
 
   if (pose.plane && !reduced) {

@@ -85,6 +85,9 @@ export const WORLD = {
   coffeeLed: '#ffd166',
   gold: '#e9c46a',
   grey: '#9a958c',
+  ink: '#1d1a17',
+  glass: '#bfe1f2',
+  bar: '#7cc26b',
 } as const;
 
 export const HOODIE = ['#f39a4c', '#6cb4ee', '#7cc26b', '#ffd166', '#9b8fe0', '#2a9d8f', '#f28c28', '#4f6d7a', '#e9c46a', '#5aa9a0'];

@@ -23,7 +23,7 @@ export interface Site {
 }
 
 export function siteOf(o: Office): Site {
-  return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.1, yLow: -1.35, yHigh: 2.5 };
+  return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.8, yLow: -1.35, yHigh: 2.5 };
 }
 
 export interface V3 {

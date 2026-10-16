@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Activity, ActivityKind, Path, Pose, Segment, Spot } from '../model';
-import { FADE, PLANE_CATCH, PLANE_FLIGHT, louder, placeOf, rigOf, transitionOf } from './pose';
+import type { Activity, ActivityKind, Doing, Path, Pose, Segment, Spot } from '../model';
+import { FADE, PLANE_CATCH, PLANE_FLIGHT, louder, placeOf, rigOf, transitionOf, workLoops } from './pose';
 
 const desk: Spot = { x: 3, z: 6, wz: 5.35, ax: 1.2, face: 0 };
 const lounge: Spot = { x: -4, z: 1, wz: 4, ax: -4, face: 0 };
@@ -13,7 +13,7 @@ const walk: Path = {
 
 const KINDS: readonly ActivityKind[] = [
   'work', 'hot', 'sleep', 'waitagent', 'nap', 'snack', 'asks', 'blocked', 'failed', 'landing', 'done', 'stopped',
-  'starting', 'main', 'mainidle',
+  'starting', 'main', 'mainidle', 'coffee', 'visit', 'report',
 ];
 
 function poseOf(k: ActivityKind, o: { from?: ActivityKind | null; since?: number; path?: Path; act?: Partial<Activity>; plane?: number } = {}): Pose {
@@ -137,6 +137,42 @@ describe('pose: his paper plane', () => {
 
   it('draws no plane under reduced motion', () => {
     expect(rig(poseOf('sleep', { plane: 0.5 }), 5, true).motion).toBe('still');
+  });
+});
+
+describe('pose: what its turn does (Activity.doing)', () => {
+  const doing = (d: Doing, at: Activity['at'] = 'desk', k: ActivityKind = 'work') => rig(poseOf(k, { act: { doing: d, at } }), 3);
+
+  it('shows each doing kind by its prop', () => {
+    expect(doing('think', 'board').props.marker).toBe(true);
+    expect(doing('search').props.newspaper).toBe(true);
+    expect(doing('computer').props.bigScreen).toBe(true);
+    expect(doing('image').props.magnifier).toBe(true);
+    expect(doing('publish').props.poster).toBe(true);
+    expect(doing('compact').props.shredder).not.toBeNull();
+    const b = doing('build');
+    expect(b.props.progress).not.toBeNull();
+    expect(b.armL[2]).toBeGreaterThan(0.5); // arms crossed
+    for (const d of ['edit', 'tool', 'unknown'] as const) expect(doing(d)).toEqual(rig(poseOf('work'), 3));
+  });
+
+  it('thinks at its desk when it is not at the whiteboard', () => {
+    expect(doing('think', 'desk').props.marker).toBe(false);
+  });
+
+  it('loops the moving ones, holds the readers still, and keeps hot sweating', () => {
+    for (const d of ['think', 'computer', 'compact', 'build', 'edit', 'tool'] as const) expect(doing(d).motion).toBe('loop');
+    for (const d of ['search', 'image', 'publish'] as const) expect(doing(d).motion).toBe('still');
+    expect(workLoops({ k: 'hot', at: 'desk', doing: 'search' })).toBe(true);
+    expect(doing('search', 'desk', 'hot').props.hot).not.toBeNull();
+  });
+
+  it('holds still under reduced motion', () => {
+    for (const d of ['think', 'computer', 'compact', 'build'] as const) {
+      const p = poseOf('work', { act: { doing: d, at: 'board' } });
+      expect(rig(p, 1, true)).toEqual(rig(p, 8.2, true));
+      expect(rig(p, 1, true).motion).toBe('still');
+    }
   });
 });
 
