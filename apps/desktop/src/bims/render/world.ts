@@ -140,6 +140,13 @@ function desk(k: Kit, parent: Object3D, b: Box, d: Spot, name: string): DeskHand
 
 function tree(k: Kit, parent: Object3D, x: number, z: number): void {
   const { style } = k;
+  if (style.name === 'clay') {
+    // clay: a trunk and three soft spheres (bims m_27814)
+    k.add(style.cylinder(0.14, 1.3), k.mat(WORLD.trunk), parent, x, 0.65, z);
+    const balls: readonly [number, number, number, number][] = [[0, 1.75, 0, 0.62], [0.42, 1.45, 0.1, 0.45], [-0.38, 1.5, -0.1, 0.48]];
+    balls.forEach(([dx, y, dz, r], i) => k.add(style.ball(r), k.mat(WORLD.leaf[i % 2] ?? WORLD.trunk), parent, x + dx, y, z + dz));
+    return;
+  }
   k.add(style.box(0.36, 1.4, 0.36), k.mat(WORLD.trunk), parent, x, 0.7, z);
   const leaves: readonly [number, number, number][] = [[0, 1.6, 0], [0.45, 1.5, 0], [-0.45, 1.5, 0], [0, 2.05, 0], [0, 1.6, 0.45]];
   leaves.forEach(([dx, y, dz], i) => k.add(style.box(0.75, 0.75, 0.75), k.mat(WORLD.leaf[i % 2] ?? WORLD.trunk), parent, x + dx, y, z + dz));
@@ -169,17 +176,18 @@ function fruitBowl(k: Kit, parent: Object3D, x: number, z: number): void {
 /** the whiteboard: coloured strokes for the equations (no text) */
 function whiteboard(k: Kit, parent: Object3D, x: number): void {
   const { style } = k;
-  k.add(style.box(1.8, 0.95, 0.05), k.mat('#d8d2c6'), parent, x, 1.05, 0.02);
-  k.add(style.box(1.7, 0.85, 0.02), k.mat(WORLD.paper), parent, x, 1.05, 0.05);
+  const pz = style.pictureZ;
+  k.add(style.box(1.8, 0.95, 0.05), k.mat('#d8d2c6'), parent, x, 1.05, 0.02 + pz);
+  k.add(style.box(1.7, 0.85, 0.02), k.mat(WORLD.paper), parent, x, 1.05, 0.05 + pz);
   const r = rng(hash('board'));
   for (let i = 0; i < 5; i++) {
     const w = 0.5 + r() * 0.7;
     const c = WORLD.board[i % WORLD.board.length] ?? WORLD.marker;
-    k.add(style.box(w, 0.045, 0.01), k.mat(c), parent, x - 0.78 + w / 2 + (i % 2) * 0.08, 1.37 - i * 0.15, 0.065);
+    k.add(style.box(w, 0.045, 0.01), k.mat(c), parent, x - 0.78 + w / 2 + (i % 2) * 0.08, 1.37 - i * 0.15, 0.065 + pz);
   }
   // a little rising chart in the corner
   const pts = [[0.45, 0.72], [0.55, 0.88], [0.65, 0.8], [0.75, 1.02]];
-  for (const [px, py] of pts) k.add(style.box(0.06, 0.06, 0.01), k.mat(WORLD.mat), parent, x + (px ?? 0), py ?? 0, 0.065);
+  for (const [px, py] of pts) k.add(style.box(0.06, 0.06, 0.01), k.mat(WORLD.mat), parent, x + (px ?? 0), py ?? 0, 0.065 + pz);
 }
 
 /** the mural over the lounge: colour blobs and an ink :* in blocks */
@@ -188,9 +196,9 @@ function mural(k: Kit, parent: Object3D, x0: number, x1: number): void {
   const w = x1 - x0;
   WORLD.mural.forEach((c, i) => {
     const bw = w / 4;
-    k.add(style.box(bw, 0.45 + (i % 2) * 0.12, 0.02), k.mat(c), parent, x0 + bw / 2 + (i * (w - bw)) / 4, 1.15 + (i % 2 ? -0.06 : 0.08), 0.01);
+    k.add(style.box(bw, 0.45 + (i % 2) * 0.12, 0.02), k.mat(c), parent, x0 + bw / 2 + (i * (w - bw)) / 4, 1.15 + (i % 2 ? -0.06 : 0.08), 0.01 + style.pictureZ);
   });
-  glyph(k, parent, (x0 + x1) / 2, 1.18, 0.035, k.pal.ink, 0.07);
+  glyph(k, parent, (x0 + x1) / 2, 1.18, 0.035 + style.pictureZ, k.pal.ink, 0.07);
 }
 
 /** the :* in blocks: two dots and a three-bar star */
@@ -229,6 +237,16 @@ function terrace(k: Kit, parent: Object3D, o: Office, d: Decor, boxes: readonly 
   onFloor(k, parent, boxOf(d.ramp), 0.3, 0.15, WORLD.ramp);
 }
 
+/** every mesh under `root` casts and takes the sun's shadow (a style with shadows: clay) */
+export function castShadows(root: Object3D): void {
+  root.traverse((obj) => {
+    if (obj instanceof Mesh) {
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    }
+  });
+}
+
 export function buildWorld(o: Office, mainName: string, style: Style, pal: Palette): World {
   const k = kitOf(style, pal);
   const root = new Group();
@@ -239,6 +257,22 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
   const sun = new DirectionalLight(pal.sun[0], pal.sun[1]);
   sun.position.set(cx - 5, 14, 3);
   sun.target.position.set(cx, 0, D / 2);
+  if (style.shadows) {
+    // one soft shadow (clay, bims m_27814); a still office draws no frame, so it costs only when it moves
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius = 8;
+    sun.shadow.bias = -0.0008;
+    const cam = sun.shadow.camera;
+    const half = Math.max(W, D + 4) * 0.75 + 2;
+    cam.left = -half;
+    cam.right = half;
+    cam.top = half;
+    cam.bottom = -half;
+    cam.near = 1;
+    cam.far = 40;
+    cam.updateProjectionMatrix();
+  }
   root.add(sun, sun.target);
 
   // the floating grass block, its trees on the far sides (left and back) so nothing hides the office
@@ -246,7 +280,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
   const gw = site.x1 - site.x0;
   const gd = site.z1 - site.z0;
   const gz = (site.z0 + site.z1) / 2;
-  k.add(style.box(gw, 1.2, gd), k.mat(pal.dirt), root, cx, -0.75, gz);
+  k.add(style.box(gw, 1.2, gd, 0.45), k.mat(pal.dirt), root, cx, -0.75, gz);
   k.add(style.box(gw, 0.16, gd), k.mat(pal.grass), root, cx, -0.1, gz);
   const decor = decorOf(o);
   const boxes = furniture(o);
@@ -313,7 +347,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
   k.add(style.box(0.34, 0.24, 0.26), k.mat(WORLD.crate), mg, -mw / 2 + 0.5, 0.73, 0);
   chair(k, root, md.x, md.z - 0.05, WORLD.dark, md.face);
   const neon = style.material(pal.neon, { flat: true });
-  glyph(k, root, md.x, 1.25, 0.02, pal.neon, 0.06, neon);
+  glyph(k, root, md.x, 1.25, 0.02 + style.pictureZ, pal.neon, 0.06, neon);
 
   // the kitchen island: its base, its top, a coffee machine, fruit, a boombox
   const iz = (isl.z0 + isl.z1) / 2;
@@ -348,6 +382,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, pal: Palet
 
   // the door mat
   onFloor(k, root, boxOf(decor.doorMat), 0.04, 0.03, WORLD.mat);
+  if (style.shadows) castShadows(root);
 
   return {
     root,

@@ -6,7 +6,7 @@
 // only when frame() is called and says how the loop must run next (Motion). The look is style.ts.
 // In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, head } for the
 // headless check (bims-qa).
-import { OrthographicCamera, Scene, Vector3, WebGLRenderer } from 'three';
+import { OrthographicCamera, PCFShadowMap, Scene, Vector3, WebGLRenderer } from 'three';
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, MakeRenderer, Motion, Office, OfficeRenderer } from '../model';
 import { makeBim, type Bim } from './bim';
@@ -16,7 +16,7 @@ import { pickAt, type Target } from './pick';
 import { flightAt, makePlane, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { STYLE } from './style';
-import { buildWorld, lightDesk, type World } from './world';
+import { buildWorld, castShadows, lightDesk, type World } from './world';
 
 /** what the headless check reads (test mode only) */
 interface Probe {
@@ -33,8 +33,10 @@ const PLANE_FORESHORTEN = 1.25;
 const testMode = (): boolean => (window as Partial<Window> & { bise?: { test?: boolean } }).bise?.test === true;
 
 export const makeRenderer: MakeRenderer = (canvas) => {
-  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'low-power' });
+  const renderer = new WebGLRenderer({ canvas, antialias: STYLE.antialias, alpha: false, powerPreference: 'low-power' });
   renderer.shadowMap.enabled = STYLE.shadows;
+  // PCF with the sun's radius 8 (three r186 folded PCFSoft into it): one soft shadow
+  renderer.shadowMap.type = PCFShadowMap;
   const scene = new Scene();
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, DIST * 3);
 
@@ -89,6 +91,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     let b = bims.get(name);
     if (!b) {
       b = makeBim(name, main, STYLE);
+      if (STYLE.shadows) castShadows(b.group);
       b.group.visible = false;
       bims.set(name, b);
       scene.add(b.group);
