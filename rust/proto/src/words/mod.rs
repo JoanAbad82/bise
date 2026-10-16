@@ -32,6 +32,7 @@
 
 use std::fmt::Display;
 
+pub mod bims;
 pub mod common;
 pub mod composer;
 pub mod inbox;
@@ -57,6 +58,7 @@ pub struct Word {
 
 /// Every area's words, by area.
 pub const ALL: &[(&str, &[Word])] = &[
+    ("bims", bims::WORDS),
     ("common", common::WORDS),
     ("composer", composer::WORDS),
     ("inbox", inbox::WORDS),

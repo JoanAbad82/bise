@@ -3,6 +3,7 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 // bise_proto::words: the UI words, one module per area (rust/proto/src/words/).
 
+export { bims } from './words_bims.gen';
 export { common } from './words_common.gen';
 export { composer } from './words_composer.gen';
 export { inbox } from './words_inbox.gen';

@@ -3,7 +3,7 @@
 // (layout, paths, timeline, labels, render, qa), and a crowd for the 3-column layout. Every row is a
 // real proto row (rows.ts), only the fields the spec's [a] lines read are set past the required ones.
 import type { Agent, Card, Place } from '@/proto';
-import type { ActivityKind, Snapshot } from './model';
+import type { Activity, ActivityKind, BimFrame, Segment, Snapshot, Spot } from './model';
 
 /** the fixtures' wall clock (ms): a row's `since_ms` is a minute before it */
 export const NOW_MS = 1_791_100_000_000;
@@ -118,6 +118,22 @@ export function crowd(n: number): Snapshot {
   const agents = [mainAgent({ status: 'working' })];
   for (let i = 1; i <= n; i++) agents.push(agent(`agent-${String(i)}`, { status: 'working', turn_ms: MIN_MS }));
   return { agents, cards: [], places: [] };
+}
+
+const SPOT: Spot = { x: 0, z: 0, wz: 0, ax: 0, face: 0 };
+
+/**
+ * A bim's frame without an office: its segment started at `t` with `act`, after `from` (null: its
+ * first), standing at the origin unless `moving` (labels' tests; the real ones come from timeline.ts).
+ */
+export function frame(
+  name: string,
+  act: Activity,
+  o: { t?: number; from?: ActivityKind | null; moving?: boolean; main?: boolean; now?: number } = {},
+): BimFrame {
+  const t = o.t ?? 0;
+  const seg: Segment = { t, act, sig: act.k, spot: SPOT, path: { pts: [SPOT], seg: [], len: 0 }, speed: 2.4, from: o.from ?? null };
+  return { name, main: o.main ?? false, pose: { x: 0, z: 0, dir: 0, moving: o.moving ?? false, since: (o.now ?? t) - t, seg } };
 }
 
 /** a snapshot with these agents and nothing else (cards and places empty unless given) */
