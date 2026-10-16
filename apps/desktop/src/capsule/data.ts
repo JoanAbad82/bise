@@ -23,10 +23,12 @@ export function toSpotData(
   front: SpotFront | null,
 ): SpotData {
   const mine = [...projects].sort((a, b) => a.order - b.order);
+  const home = mine.find((p) => p.home);
   return {
     projects: mine
       .filter((p) => !p.home)
-      .map((p) => ({ id: p.project, name: p.name, path: p.path, branch: p.branch ?? 'main', agents: p.agents })),
+      .map((p) => ({ id: p.project, name: p.name, path: p.path, branch: p.branch ?? 'main', agents: p.agents, waits: p.waits, working: p.working, missing: p.missing })),
+    ...(home === undefined ? {} : { home: { waits: home.waits, working: home.working } }),
     agents: mine.flatMap((p) =>
       agentsOf(p.project).map((a) => ({ name: a.name, project: p.project, status: a.status, title: a.title, purpose: a.purpose, archived: a.archived })),
     ),

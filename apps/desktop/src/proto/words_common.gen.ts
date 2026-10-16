@@ -36,6 +36,8 @@ export const common = {
   open_agent: (a: { agent: string | number }): string => "open " + String(a.agent),
   /** who his words go to: the composer's tab (composer), a message he sent to another agent (thread) */
   to_agent: (a: { agent: string | number }): string => "to " + String(a.agent),
+  /** agents at work: bise's chip in the thread's head (thread), a project line's tip in the menu bar's dropdown (panel) */
+  agents_at_work: (a: { n: number }): string => a.n === 1 ? String(a.n) + " agent at work" : String(a.n) + " agents at work",
   /** nothing goes on: the tray's and the sidebar's tips (panel), bise's chip in the thread's head (thread) */
   all_quiet: "all quiet",
 } as const;

@@ -27,6 +27,16 @@ export interface SpotProject {
   readonly branch: string;
   readonly agents: number;
   readonly hosts?: readonly string[];
+  /** the hub row's counts, as the sidebar's mark reads them (the tray menu's project lines) */
+  readonly waits?: number;
+  readonly working?: number;
+  readonly missing?: boolean;
+}
+
+/** bise's home, out of `projects`: its own counts (the tray menu's 'bise' line). */
+export interface SpotHome {
+  readonly waits: number;
+  readonly working: number;
 }
 
 export interface SpotCard {
@@ -52,6 +62,7 @@ export interface SpotData {
   readonly projects: readonly SpotProject[];
   readonly cards: readonly SpotCard[];
   readonly front?: SpotFront | null;
+  readonly home?: SpotHome;
 }
 
 export type SpotItem =

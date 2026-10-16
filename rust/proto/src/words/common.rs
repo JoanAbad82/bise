@@ -50,6 +50,9 @@ crate::words! { common:
     /// who his words go to: the composer's tab (composer), a message he
     /// sent to another agent (thread)
     to_agent(agent) = "to {agent}";
+    /// agents at work: bise's chip in the thread's head (thread), a
+    /// project line's tip in the menu bar's dropdown (panel)
+    agents_at_work(n) = one "{n} agent at work" | "{n} agents at work";
     /// nothing goes on: the tray's and the sidebar's tips (panel), bise's
     /// chip in the thread's head (thread)
     all_quiet = "all quiet";

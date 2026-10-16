@@ -342,8 +342,6 @@ crate::words! { thread:
     chip_archived = "archived";
     /// its context gauge: `context 42k · 17%`
     head_context(words) = "context {words}";
-    /// bise's chip: agents at work
-    bise_at_work(n) = one "{n} agent at work" | "{n} agents at work";
     /// an empty thread: `checkout is starting`
     is_starting = "is starting";
     /// where it works: its own worktree

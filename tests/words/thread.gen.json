@@ -88,13 +88,6 @@
     "one": null,
     "text": "{n} messages between 1 agent"
   },
-  "thread.bise_at_work": {
-    "args": [
-      "n"
-    ],
-    "one": "{n} agent at work",
-    "text": "{n} agents at work"
-  },
   "thread.candidate_discarded": {
     "args": [
       "why"

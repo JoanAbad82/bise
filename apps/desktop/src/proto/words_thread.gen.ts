@@ -312,8 +312,6 @@ export const thread = {
   chip_archived: "archived",
   /** its context gauge: `context 42k · 17%` */
   head_context: (a: { words: string | number }): string => "context " + String(a.words),
-  /** bise's chip: agents at work */
-  bise_at_work: (a: { n: number }): string => a.n === 1 ? String(a.n) + " agent at work" : String(a.n) + " agents at work",
   /** an empty thread: `checkout is starting` */
   is_starting: "is starting",
   /** where it works: its own worktree */

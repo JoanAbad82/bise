@@ -272,4 +272,8 @@ export const panel = {
   crumb_lab: "lab",
   /** the panel button with its count */
   artifacts_count: (a: { n: string | number }): string => "artifacts · " + String(a.n),
+  /** a project line's tip: the branch it is on */
+  tray_on_branch: (a: { branch: string | number }): string => "on " + String(a.branch),
+  /** the projects left out of the menu, and where they are (a click opens bise) */
+  tray_more: (a: { n: string | number }): string => String(a.n) + " more in bise",
 } as const;

@@ -82,6 +82,10 @@ export const inbox = {
   page_chip: (a: { page: string | number }): string => "↗ " + String(a.page) + " · page",
   /** the desktop's detail: the page he answered on */
   page_chip_v: (a: { title: string | number; v: string | number }): string => "↗ " + String(a.title) + " · page · v" + String(a.v),
+  /** a notification's chip, what it is about: any artifact (card-links) */
+  art_chip: (a: { title: string | number; kind: string | number }): string => "↗ " + String(a.title) + " · " + String(a.kind),
+  /** a notification's chip with its version (card-links) */
+  art_chip_v: (a: { title: string | number; kind: string | number; v: string | number }): string => "↗ " + String(a.title) + " · " + String(a.kind) + " · v" + String(a.v),
   /** the detail's way to a page answer */
   jump_page: "open the page at your answer",
   /** the detail's way to an answer in a thread */

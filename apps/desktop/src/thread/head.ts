@@ -79,7 +79,7 @@ export function biseChip(agents: readonly Pick<Agent, 'main' | 'archived' | 'sta
   const waits = agents.reduce((n, a) => n + a.waits, 0);
   if (waits > 0) return { text: common.waiting_for_you({ n: waits }), needs: true, live: false };
   const work = agents.filter((a) => !a.main && !a.archived && a.status === 'working').length;
-  if (work > 0) return { text: thread.bise_at_work({ n: work }), needs: false, live: true };
+  if (work > 0) return { text: common.agents_at_work({ n: work }), needs: false, live: true };
   return { text: common.all_quiet, needs: false, live: false };
 }
 

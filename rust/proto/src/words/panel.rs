@@ -290,4 +290,10 @@ crate::words! { panel:
     crumb_lab = "lab";
     /// the panel button with its count
     artifacts_count(n) = "artifacts · {n}";
+
+    // ---- the menu bar's dropdown: one line per project (designer m_27872)
+    /// a project line's tip: the branch it is on
+    tray_on_branch(branch) = "on {branch}";
+    /// the projects left out of the menu, and where they are (a click opens bise)
+    tray_more(n) = "{n} more in bise";
 }

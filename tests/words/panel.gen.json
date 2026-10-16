@@ -749,6 +749,20 @@
     "one": "working with {n} agent",
     "text": "working with {n} agents"
   },
+  "panel.tray_more": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} more in bise"
+  },
+  "panel.tray_on_branch": {
+    "args": [
+      "branch"
+    ],
+    "one": null,
+    "text": "on {branch}"
+  },
   "panel.until": {
     "args": [
       "at"

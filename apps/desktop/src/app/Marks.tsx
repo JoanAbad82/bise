@@ -101,7 +101,7 @@ export function DoneSign({ project, agent, glyph, testId }: { project: string; a
 const GLYPH: Record<Exclude<ProjectMarkKind, 'works'>, string> = { asks: '?', quiet: '·' };
 
 /** A project's mark in its 18 px column; its kiss when one of its agents just finished. */
-export function ProjectMark({ p, tip, testId }: { p: ProjectRow; tip?: string; testId?: string }) {
+export function ProjectMark({ p, tip, testId }: { p: Pick<ProjectRow, 'project' | 'waits' | 'working' | 'missing'>; tip?: string; testId?: string }) {
   const kind = projectMark(p);
   const at = useKiss(p.project);
   return (

@@ -94,6 +94,23 @@
     "one": null,
     "text": "answering {who}"
   },
+  "inbox.art_chip": {
+    "args": [
+      "title",
+      "kind"
+    ],
+    "one": null,
+    "text": "↗ {title} · {kind}"
+  },
+  "inbox.art_chip_v": {
+    "args": [
+      "title",
+      "kind",
+      "v"
+    ],
+    "one": null,
+    "text": "↗ {title} · {kind} · v{v}"
+  },
   "inbox.block_head_projects": {
     "args": [
       "n",

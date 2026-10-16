@@ -32,6 +32,8 @@ import { beatOf, presenceOf } from "./presence";
 import type { PreviewLine } from "@/spotlight/preview";
 import type { Part } from "@/proto";
 import { ScreenAsk, ShotRow, type TalkShot } from "./shot";
+import { MenuProjects } from "./MenuProjects";
+import { hasProjects, menuCounts } from "./projects";
 import "./capsule.css";
 
 export const W = {
@@ -52,7 +54,7 @@ export const W = {
   openBise: "open bise",
   inbox: "inbox",
   settings: "settings…",
-  quit: "quit bise ambient",
+  quit: "quit bise",
   head: (work: number, waits: number): string =>
     `${work > 0 ? `${work} at work` : "nobody at work"}${waits > 0 ? ` · ${waits} waiting for you` : ""}`,
   // never 'open bise' twice: the menu's own item says it (designer m_21314); a click opens ⌘I
@@ -411,14 +413,14 @@ function TrayMenu({
   onOpenCard: (id: string) => void;
   onQuit: (() => void) | null;
 }): JSX.Element {
-  const work = spot.agents.filter((a) => a.status === "working").length;
+  const counts = menuCounts(spot);
   const rows = menuCards(spot);
   const more = spot.cards.length - rows.length;
   return (
     <div className="b-cap-menu" data-glass>
       <Menu testId="capsule.menu">
         <div className="b-cap-menu-head" data-testid="capsule.menu.head">
-          {W.head(work, spot.cards.length)}
+          {W.head(counts.work, counts.waits)}
         </div>
         {rows.length > 0 && (
           // the window's inbox block rows (one-inbox 3, designer m_19631): '1 ? agent question… ·
@@ -457,6 +459,13 @@ function TrayMenu({
               </MenuItem>
             )}
           </div>
+        )}
+        {/* one line per project (designer m_27872): bise's, then his, what waits and what works */}
+        {hasProjects(spot) && (
+          <>
+            <MenuSep />
+            <MenuProjects spot={spot} onOpenWindow={onOpenWindow} />
+          </>
         )}
         <MenuSep />
         <MenuItem
