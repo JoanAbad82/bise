@@ -1,7 +1,7 @@
 """notif-open: an inbox option that opens an artifact (tmux, fake
 provider, a throwaway hub, a fake page). main publishes a plan with two
-drafted mails: its hub opens ONE drafts notification ('2 drafts wait for
-you · <title> … 1 review / 2 send both'). The hub's row gives option 1 a
+drafted mails: its hub opens ONE drafts notification ('<title>: send
+these 2 emails? … 1 open the page / 2 send both'). The hub's row gives option 1 a
 typed act (bise_proto OptAct::Open: the page as its artifact, at its
 first draft). He picks 1 in the terminal's inbox:
 
@@ -50,7 +50,7 @@ def main():
         open(page, "w").write(PAGE)
         t.typed("[[bash: sb page publish %s --id rel --title \"release replies\"]]" % page)
         t.keys("Enter")
-        t.wait("drafts wait for you", 90)
+        t.wait("release replies: send these 2 emails?", 90)
         t.typed(CTRL % ord("1"))
         sc = t.wait("send both")
         print(sc)
@@ -64,7 +64,7 @@ def main():
         cards = c.cards()
         assert any((x.get("page") or {}).get("id") == "rel" for x in cards), "the drafts notification stays open: %r" % cards
         sc = t.screen()
-        assert "drafts wait for you" in sc, "still in the inbox:\n" + sc
+        assert "send these 2 emails?" in sc, "still in the inbox:\n" + sc
         print(sc)
         print("PASS '1 review' opens the page at its first draft, nothing sent: %s" % opened[0])
 
