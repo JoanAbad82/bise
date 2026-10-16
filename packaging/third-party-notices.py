@@ -111,6 +111,10 @@ MANUAL = [
         dict(name="pdfjs-dist 6.4.299 (pdf.js: pdf to canvas and text)", license="Apache-2.0", url="https://github.com/mozilla/pdf.js",
              files=["pdfjs-dist.LICENSE"]),
     ]),
+    ("apps/desktop: the bims office's renderer chunk (src/bims/render, loaded on demand)", [
+        dict(name="three 0.186.1 (three.js: the WebGL renderer, scene and geometry)", license="MIT",
+             url="https://github.com/mrdoob/three.js", files=["three.LICENSE"]),
+    ]),
     ("bise: data built in", [
         dict(name="gemoji (the emoji shortcode table, rust/tui/src/emoji.tsv)", license="MIT",
              url="https://github.com/github/gemoji", files=["gemoji.LICENSE"]),
