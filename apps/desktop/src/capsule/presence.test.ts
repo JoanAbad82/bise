@@ -4,7 +4,7 @@ import { beatOf, BEAT_CHARS, presenceOf, teamArms } from './presence';
 
 const agent = (name: string, status: 'working' | 'idle' | 'waiting', archived = false) => ({ name, project: 'p', status, title: '', archived });
 const data = (agents: SpotData['agents'], cards: SpotData['cards'] = []): SpotData => ({ agents, projects: [], cards });
-const card = (id: string, agentName: string) => ({ id, agent: agentName, project: 'p', text: 'ok?', kind: 'question' as const });
+const card = (id: string, agentName: string) => ({ id, card: 1, agent: agentName, project: 'p', text: 'ok?', kind: 'question' as const });
 
 describe("the capsule's ':*' (bise-presence v10)", () => {
   it('listening, thinking, answering from the view', () => {

@@ -119,6 +119,20 @@
     "one": null,
     "text": "{n} waiting · {projects} projects"
   },
+  "inbox.card_id": {
+    "args": [
+      "id"
+    ],
+    "one": null,
+    "text": "#{id}"
+  },
+  "inbox.card_id_tip": {
+    "args": [
+      "id"
+    ],
+    "one": null,
+    "text": "notification #{id}: the number bise and its agents use for it"
+  },
   "inbox.clear": {
     "args": [],
     "one": null,
@@ -529,6 +543,13 @@
     "one": null,
     "text": "no"
   },
+  "inbox.no_card": {
+    "args": [
+      "id"
+    ],
+    "one": null,
+    "text": "· no notification #{id}"
+  },
   "inbox.notify_not_now": {
     "args": [],
     "one": null,
@@ -614,6 +635,14 @@
     "args": [],
     "one": null,
     "text": "page"
+  },
+  "inbox.pos_n": {
+    "args": [
+      "pos",
+      "n"
+    ],
+    "one": null,
+    "text": "{pos} of {n}"
   },
   "inbox.pos_of": {
     "args": [
@@ -906,6 +935,14 @@
     "args": [],
     "one": null,
     "text": "why"
+  },
+  "inbox.with_id": {
+    "args": [
+      "meta",
+      "id"
+    ],
+    "one": null,
+    "text": "{meta} · #{id}"
   },
   "inbox.withdrawn": {
     "args": [

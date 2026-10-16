@@ -152,8 +152,8 @@ describe('the store mapping', () => {
     expect(d.agents).toMatchObject([{ name: 'perf', project: 'tel', status: 'working' }]);
     // every card names its project as the window's inbox block does: 'bise' for the home's (one-inbox 3)
     expect(d.cards).toEqual([
-      { id: 'home.2', agent: 'perf', project: 'home', text: 'go?', kind: 'question', pname: 'bise' },
-      { id: 'tel.4', agent: 'perf', project: 'tel', text: 'go?', kind: 'approval', pname: 'tel' },
+      { id: 'home.2', card: 2, agent: 'perf', project: 'home', text: 'go?', kind: 'question', pname: 'bise' },
+      { id: 'tel.4', card: 4, agent: 'perf', project: 'tel', text: 'go?', kind: 'approval', pname: 'tel' },
     ]);
     expect(cardKind(C(1, false))).toBe('question');
   });
@@ -177,7 +177,7 @@ describe('the capsule', () => {
     expect(ui.queryByTestId('capsule.menu.items')).toBeNull();
   });
   it("one-inbox 3: the tray menu lists the first 5 items as the block's rows, no age, a click opens one, the rest opens bise", () => {
-    const cards = Array.from({ length: 7 }, (_, i) => ({ id: `tel.${String(i + 1)}`, agent: `p${String(i + 1)}`, project: 'tel', text: `ship ${String(i + 1)}?\nmore words`, kind: 'question' as const, pname: 'telemetry' }));
+    const cards = Array.from({ length: 7 }, (_, i) => ({ id: `tel.${String(i + 1)}`, card: i + 1, agent: `p${String(i + 1)}`, project: 'tel', text: `ship ${String(i + 1)}?\nmore words`, kind: 'question' as const, pname: 'telemetry' }));
     const onOpenCard = vi.fn();
     const onOpenWindow = vi.fn();
     const ui = render(

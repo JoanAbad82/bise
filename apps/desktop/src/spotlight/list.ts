@@ -41,6 +41,8 @@ export interface SpotHome {
 
 export interface SpotCard {
   readonly id: string;
+  /** the hub's card id, its number ('#567', notif-id) */
+  readonly card: number;
   readonly agent: string;
   readonly project: string;
   readonly text: string;

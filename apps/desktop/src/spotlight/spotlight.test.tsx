@@ -43,6 +43,7 @@ const D: SpotData = {
   cards: [
     {
       id: "c1",
+      card: 1,
       agent: "alerts",
       project: "tel",
       kind: "question",

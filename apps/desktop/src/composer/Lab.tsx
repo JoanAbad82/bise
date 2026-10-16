@@ -352,6 +352,7 @@ const SPOT: SpotData = {
   cards: [
     {
       id: "c1",
+      card: 1,
       agent: "alerts",
       project: "telemetry",
       kind: "question",
@@ -359,6 +360,7 @@ const SPOT: SpotData = {
     },
     {
       id: "c2",
+      card: 2,
       agent: "t1-97894",
       project: "shop",
       kind: "approval",

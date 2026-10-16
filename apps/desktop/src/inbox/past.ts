@@ -10,6 +10,7 @@ import { inbox } from '@/proto/words_inbox.gen';
 import { shownName } from '@/agents/model';
 import { dayOf, timeOf } from '@/artifacts/model';
 import { age, titleOf } from './InboxCard';
+import { idOf } from './id';
 
 export type { InboxRecord, Where as InboxWhere } from '@/proto/inbox';
 
@@ -81,8 +82,13 @@ export function headWords(cards: readonly Card[], records: readonly InboxRecord[
 
 /** The rows the filter keeps: what waits (in the hub's order, given), then the past by day, newest first. Pure. */
 export function listsOf(cards: readonly Card[], records: readonly InboxRecord[], names: Readonly<Record<string, string>>, f: Filter, now: number): Lists {
-  const ws = words(f.q);
   const pname = (p: string) => names[p] ?? p;
+  // '567' or '#567' that is a notification's number: that row alone (notif-id, designer m_27855)
+  const id = idOf(f.q);
+  if (id !== null && (cards.some((c) => c.id === id) || records.some((r) => r.card === id))) {
+    return listsOf(cards.filter((c) => c.id === id), records.filter((r) => r.card === id), names, { ...f, q: '' }, now);
+  }
+  const ws = words(f.q);
   const keepWait = f.state === 'all' || f.state === 'waiting';
   const waiting: WaitRow[] = keepWait
     ? cards

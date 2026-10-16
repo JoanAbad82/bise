@@ -186,6 +186,16 @@ export const inbox = {
   scroll_end: "end · pgup",
   /** the TUI's position among the items */
   pos_of: (a: { pos: string | number; n: string | number; age: string | number }): string => String(a.pos) + " of " + String(a.n) + " · " + String(a.age),
+  /** the TUI's position among the items, no age (short of room) */
+  pos_n: (a: { pos: string | number; n: string | number }): string => String(a.pos) + " of " + String(a.n),
+  /** a notification's number, the hub's card id (notif-id, designer m_27855): never cut */
+  card_id: (a: { id: string | number }): string => "#" + String(a.id),
+  /** a meta line with the notification's number last (`2m · #567`) */
+  with_id: (a: { meta: string | number; id: string | number }): string => String(a.meta) + " · #" + String(a.id),
+  /** the desktop's tip on a notification's number */
+  card_id_tip: (a: { id: string | number }): string => "notification #" + String(a.id) + ": the number bise and its agents use for it",
+  /** `/inbox 567` when no notification has that number */
+  no_card: (a: { id: string | number }): string => "· no notification #" + String(a.id),
   /** a closed card's age (the desktop) */
   closed_age: (a: { age: string | number }): string => String(a.age) + " · closed",
   /** the option he picked on a page (the TUI and the desktop) */

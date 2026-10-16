@@ -43,7 +43,7 @@ export function toSpotData(
  */
 function cardsInOrder(mine: readonly ProjectRow[], cardsOf: (project: string) => readonly Card[]): SpotCard[] {
   const all = mine.flatMap((p) => cardsOf(p.project).map((c) => ({ ...c, project: p.project, pname: p.home ? 'bise' : p.name })));
-  return sortCards(all).map((c) => ({ id: `${c.project}.${String(c.id)}`, agent: c.agent, project: c.project, text: c.question, kind: cardKind(c), pname: c.pname }));
+  return sortCards(all).map((c) => ({ id: `${c.project}.${String(c.id)}`, card: c.id, agent: c.agent, project: c.project, text: c.question, kind: cardKind(c), pname: c.pname }));
 }
 
 /** How many of a thread's newest entries the selected agent's preview reads (its last actions). */

@@ -353,18 +353,28 @@ fn last_step(app: &App, agent: &str) -> Option<String> {
 /// its meta).
 fn head_line(sb: &Sb, c: &Card, s: &Shape, w: usize) -> Drawn {
     let (_, glyph, _) = kind_look(&c.kind);
-    let meta = match &s.meta {
-        Some(own) => own.clone(),
+    // the metas from the longest; the notification's number last, never cut:
+    // short of room the age goes first, then the position (notif-id,
+    // designer m_27855). An item of the TUI's own (no hub id): its meta.
+    let metas: Vec<String> = match &s.meta {
+        Some(own) => vec![own.clone()],
         // the hub closed it while your words were typed (designer m_24087)
-        None if sb.closed_in_view().is_some_and(|g| g.id == c.id) => inbox::closed_age(short_age(c.age_now())),
+        None if sb.closed_in_view().is_some_and(|g| g.id == c.id) => {
+            vec![inbox::with_id(inbox::closed_age(short_age(c.age_now())), c.id), inbox::card_id(c.id)]
+        }
         None => {
             let ids: Vec<u64> = sb.sorted_cards().iter().map(|c| c.id).collect();
             let pos = ids.iter().position(|x| *x == c.id).unwrap_or(0) + 1;
-            inbox::pos_of(pos, ids.len(), short_age(c.age_now()))
+            vec![
+                inbox::with_id(inbox::pos_of(pos, ids.len(), short_age(c.age_now())), c.id),
+                inbox::with_id(inbox::pos_n(pos, ids.len()), c.id),
+                inbox::card_id(c.id),
+            ]
         }
     };
     let head_w = glyph.width() + 1;
-    let meta = if head_w + s.title.width().min(12) + 2 + meta.width() <= w { meta } else { String::new() };
+    let fits = |m: &String| head_w + s.title.width().min(12) + 2 + m.width() <= w;
+    let meta = metas.iter().find(|m| fits(m)).or(metas.last().filter(|_| s.meta.is_none())).cloned().unwrap_or_default();
     let title = cut(&s.title, w.saturating_sub(head_w + if meta.is_empty() { 0 } else { meta.width() + 2 }));
     let fill = w.saturating_sub(head_w + title.width() + meta.width());
     Drawn::plain(Line::from(vec![

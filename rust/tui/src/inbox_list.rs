@@ -9,6 +9,8 @@
 //! `✓ perf  webp or avif for the hero?` with `14:02` on the right, and
 //! under it `you: avif · in the inbox`; a withdrawn one `–`, dim,
 //! `withdrawn: <why>`. The same at 80 and 150 columns: the question cuts.
+//! The right column ends on the notification's number (`14:02 · #567`,
+//! notif-id, designer m_27855): it never cuts.
 
 use bise_proto::inbox::{words, InboxRecord, InboxState};
 use bise_proto::words::inbox;
@@ -89,6 +91,21 @@ pub(crate) fn rows(waiting: &[Waiting], past: &[InboxRecord], more: bool, now: u
     out
 }
 
+/// `567` or `#567` (`/inbox 567`, notif-id): a notification's number.
+pub(crate) fn id_of(arg: &str) -> Option<u64> {
+    arg.strip_prefix('#').unwrap_or(arg).parse().ok()
+}
+
+/// Where `/inbox <id>` lands in the past answers loaded so far: its row,
+/// `Err(true)` when an older page may hold it (`more` and the last loaded
+/// card is newer), `Err(false)` when no notification has that number.
+pub(crate) fn find_past(past: &[InboxRecord], more: bool, id: u64) -> Result<Pick, bool> {
+    if past.iter().any(|r| r.card == id) {
+        return Ok(Pick::Past(id));
+    }
+    Err(more && past.last().is_some_and(|r| r.card > id))
+}
+
 /// The picks in order (↑↓ walk them).
 pub(crate) fn picks(rows: &[Row]) -> Vec<Pick> {
     let mut out: Vec<Pick> = Vec::new();
@@ -119,14 +136,16 @@ pub(crate) fn text(r: &Row, width: usize) -> (String, String) {
         Row::WaitHead(n) => (inbox::list_waiting(n), String::new()),
         Row::Wait(w) => {
             let head = format!("{}  {}  ", w.n, w.agent);
-            let room = width.saturating_sub(head.width() + w.age.width() + 2);
-            (format!("{head}{}", cut(&one_line(&w.text), room)), w.age.clone())
+            let end = inbox::with_id(&w.age, w.id);
+            let room = width.saturating_sub(head.width() + end.width() + 2);
+            (format!("{head}{}", cut(&one_line(&w.text), room)), end)
         }
         Row::Day(d) => (d.clone(), String::new()),
-        Row::Past { done, asker, question, time, .. } => {
+        Row::Past { card, done, asker, question, time } => {
             let head = format!("{} {asker}  ", if *done { "✓" } else { "–" });
-            let room = width.saturating_sub(head.width() + time.width() + 2);
-            (format!("{head}{}", cut(question, room)), time.clone())
+            let end = inbox::with_id(time, card);
+            let room = width.saturating_sub(head.width() + end.width() + 2);
+            (format!("{head}{}", cut(question, room)), end)
         }
         Row::Said { text, .. } => (format!("  {}", cut(text, width.saturating_sub(2))), String::new()),
         Row::Empty => (inbox::list_empty.into(), String::new()),
@@ -235,6 +254,26 @@ mod tests {
     }
 
     #[test]
+    fn an_id_finds_its_row_or_says_none() {
+        assert_eq!(id_of("567"), Some(567));
+        assert_eq!(id_of("#567"), Some(567));
+        assert_eq!(id_of("abc"), None);
+        let past = [rec(9, NOW, true), rec(5, NOW, false)];
+        assert_eq!(find_past(&past, true, 5), Ok(Pick::Past(5)));
+        assert_eq!(find_past(&past, true, 3), Err(true));
+        assert_eq!(find_past(&past, false, 3), Err(false));
+        assert_eq!(find_past(&past, true, 7), Err(false));
+    }
+
+    #[test]
+    fn the_number_ends_the_right_column_and_never_cuts() {
+        let rs = rows(&[wait(1, 567)], &[rec(5, NOW, true)], false, NOW, 0);
+        assert_eq!(text(&rs[1], 80).1, inbox::with_id("now", 567));
+        let (l, r) = text(&rs[1], 24);
+        assert!(r.ends_with(&inbox::card_id(567)) && l.ends_with('…'), "{l} {r}");
+    }
+
+    #[test]
     fn a_row_fits_80_and_150_columns() {
         let rs = rows(&[], &[rec(5, NOW, true), rec(4, NOW, false)], false, NOW, 0);
         for w in [80, 150, 30] {
@@ -243,7 +282,7 @@ mod tests {
                 assert!(l.width() + rt.width() < w.max(l.width() + 1), "{w}: {l} {rt}");
             }
         }
-        assert_eq!(text(&rs[1], 80), ("✓ perf  webp or avif for the hero?".into(), "12:41".into()));
+        assert_eq!(text(&rs[1], 80), ("✓ perf  webp or avif for the hero?".into(), inbox::with_id("12:41", 5)));
         assert_eq!(text(&rs[2], 80).0, "  you: avif · in the inbox");
         assert_eq!(text(&rs[4], 80).0, "  withdrawn: moot");
         assert!(text(&rs[1], 20).0.ends_with('…'));

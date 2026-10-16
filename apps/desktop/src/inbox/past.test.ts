@@ -38,6 +38,9 @@ describe('listsOf: waiting first, then the past by day', () => {
     // his answer's words are searched too
     expect(listsOf(cards, records, NAMES, { ...ALL, q: 'safari' }, NOW).order).toEqual(['p:shop/1']);
     expect(listsOf(cards, records, NAMES, { ...ALL, q: 'storefront size' }, NOW).order).toEqual(['w:shop/3']);
+    // a notification's number (notif-id): that row alone, '#' or not
+    expect(listsOf(cards, records, NAMES, { ...ALL, q: '#5' }, NOW).order).toEqual(['p:shop/5']);
+    expect(listsOf(cards, records, NAMES, { ...ALL, q: '3' }, NOW).order).toEqual(['w:shop/3']);
   });
   it('counts waiting and answered, not withdrawn', () => {
     expect(headWords(cards, records)).toBe('2 waiting · 2 answered');

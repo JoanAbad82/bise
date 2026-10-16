@@ -31,6 +31,22 @@ pub(crate) struct Screen {
     pub(crate) sel: Option<Pick>,
     /// the first row shown
     pub(crate) top: usize,
+    /// `/inbox 567`: the past answer to select once a page holds it
+    pub(crate) want: Option<u64>,
+}
+
+/// `/inbox`, `/inbox 567`, `/inbox #567` (notif-id, designer m_27855):
+/// a waiting one opens to answer; an answered or withdrawn one opens the
+/// screen on its row; no such number says so in the thread.
+pub(crate) fn command(app: &mut App, typed: &str) {
+    let Some(id) = typed.split_whitespace().nth(1).and_then(list::id_of) else { return open(app) };
+    if crate::sb::inbox::waiting(app).iter().any(|w| w.id == id) {
+        return crate::sb::inbox::open_waiting(app, id);
+    }
+    open(app);
+    if let Some(sc) = app.inbox.as_mut() {
+        sc.want = Some(id);
+    }
 }
 
 /// `/inbox`: the screen, its first page asked.
@@ -74,6 +90,22 @@ pub(crate) fn answered(app: &mut App, before: Option<u64>, ev: bise_proto::hub::
         }
     }
     sc.more = page.more;
+    let Some(id) = sc.want else { return };
+    match list::find_past(&sc.past, sc.more, id) {
+        Ok(p) => {
+            sc.sel = Some(p);
+            sc.want = None;
+        }
+        Err(true) => {
+            let last = sc.past.last().map(|r| r.card);
+            sc.asking = true;
+            app.sb.call("inbox/history", serde_json::json!({"before": last}), crate::sb::rpc::Then::Inbox(last));
+        }
+        Err(false) => {
+            app.inbox = None;
+            app.events.push(crate::wire::Ev::Info(bise_proto::words::inbox::no_card(id)));
+        }
+    }
 }
 
 /// `inbox/recorded`: a card closed or got its answer's position.

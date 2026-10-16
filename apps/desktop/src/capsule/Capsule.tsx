@@ -15,6 +15,7 @@ import {
   type UIEvent,
 } from "react";
 import { shownName } from "@/agents/model";
+import { inbox } from "@/proto/words_inbox.gen";
 import { BiseMark, Menu, MenuItem, MenuSep, Press, Row } from "@/ds";
 import {
   LiveText,
@@ -442,6 +443,9 @@ function TrayMenu({
                   </>
                 }
                 end={c.pname}
+                // its number in the tip only: the row is a glance, the number would cost it the
+                // question (notif-id, designer m_27959)
+                tip={inbox.with_id({ meta: firstLine(c.text), id: c.card })}
                 onClick={() => {
                   onOpenCard(c.id);
                 }}

@@ -16,6 +16,7 @@ import type { Card as CardRow } from '@/proto';
 import type { ArtLink } from '@/proto/rows';
 import { aboutOf, aboutWords } from './about';
 import { inbox } from '@/proto/words_inbox.gen';
+import { CardId } from './CardId';
 import { common } from '@/proto/words_common.gen';
 import { Act, ArtChip, Kbd, tipAttrs } from '@/ds';
 import { refusedLine, useRefused, useStore } from '@/store';
@@ -124,7 +125,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
         </span>
         <b>{titleOf(card)}</b>
         {home !== true && <span className="ic-p" data-testid={`${id}.project`}>{`· ${where}`}</span>}
-        <span className="ic-k">{closed ? inbox.closed_age({ age: age(now - card.since_ms) }) : age(now - card.since_ms)}</span>
+        <span className="ic-k">{closed ? inbox.closed_age({ age: age(now - card.since_ms) }) : age(now - card.since_ms)}<CardId id={card.id} testId={`${id}.id`} /></span>
       </div>
       <div className="ic-q" data-testid={`${id}.q`}>
         {full === false && card.kind !== 'plan' ? <Folded text={card.question} project={card.project} testId={`${id}.more`} q={`${id}.q`} /> : <Question card={card} id={id} />}

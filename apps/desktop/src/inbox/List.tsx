@@ -16,6 +16,8 @@ import { useListKeys } from '@/app/listkeys';
 import { Dropdown, Field, Press } from '@/ds';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
+import { CardId } from './CardId';
+import { idOf } from './id';
 import { timeOf } from '@/artifacts/model';
 import { ALL, askersOf, closedMs, dayHead, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type StateFilter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
 import './past.css';
@@ -112,6 +114,21 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
       move(e.key === 'ArrowDown' ? 1 : -1);
     }
   };
+  // a notification's number in the search ('567', '#567'): its row selected at once, a past one open
+  // in the pane; a waiting one waits for ⏎ ('56' on the way to '567' never answers anything)
+  const search = (q: string) => {
+    const g = { ...f, q };
+    setF(g);
+    const id = idOf(q);
+    if (id === null) return;
+    const l = listsOf(cards, records, names, g, now);
+    const p = l.days.flatMap((d) => d.rows).find((r) => r.r.card === id);
+    const w = l.waiting.find((x) => x.card.id === id);
+    if (p !== undefined) {
+      setSel(p.key);
+      setPaned(true);
+    } else if (w !== undefined) setSel(w.key);
+  };
   const set = (g: Partial<Filter>) => {
     setF({ ...f, ...g });
   };
@@ -160,7 +177,7 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
             ))}
           </span>
           <span className="ip-search">
-            <Field slash placeholder={inbox.search} value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} onKeyDown={searchKey} testId="inbox.search" />
+            <Field slash placeholder={inbox.search} value={f.q} onChange={(e) => { search(e.currentTarget.value); }} onKeyDown={searchKey} testId="inbox.search" />
           </span>
         </div>
       )}
@@ -238,7 +255,7 @@ function WaitLine({ w, on, end, narrowEnd, onClick }: { w: WaitRow; on: boolean;
         <span className="ip-who">{w.title}</span>
         <span className="ip-q">{w.question}</span>
       </span>
-      <span className="ip-end"><span className="ip-wide-only">{end}</span><span className="ip-narrow-only">{narrowEnd}</span></span>
+      <span className="ip-end"><span className="ip-wide-only">{end}</span><span className="ip-narrow-only">{narrowEnd}</span><CardId id={w.card.id} testId={`inbox.row.${w.key}.id`} /></span>
     </div>
   );
 }
@@ -254,7 +271,7 @@ function PastLine({ p, on, open, project, onClick }: { p: PastRow; on: boolean; 
         <span className="ip-who">{shownName(r.asker)}</span>
         <span className="ip-q">{r.question}</span>
       </span>
-      <span className="ip-end"><span className="ip-proj">{`${project} · `}</span>{closedMs(r) > 0 ? timeOf(closedMs(r)) : ''}</span>
+      <span className="ip-end"><span className="ip-proj">{`${project} · `}</span>{closedMs(r) > 0 ? timeOf(closedMs(r)) : ''}<CardId id={r.card} lead={closedMs(r) > 0} testId={`inbox.row.${p.key}.id`} /></span>
       <span className="ip-two" data-testid={`inbox.row.${p.key}.said`}>
         {/* the 'where' in its own span, which 800 drops whole (past.css) */}
         {short}{short !== r.line2 && <span className="ip-where">{r.line2.slice(short.length)}</span>}

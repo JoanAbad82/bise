@@ -198,6 +198,16 @@ crate::words! { inbox:
     scroll_end = "end · pgup";
     /// the TUI's position among the items
     pos_of(pos, n, age) = "{pos} of {n} · {age}";
+    /// the TUI's position among the items, no age (short of room)
+    pos_n(pos, n) = "{pos} of {n}";
+    /// a notification's number, the hub's card id (notif-id, designer m_27855): never cut
+    card_id(id) = "#{id}";
+    /// a meta line with the notification's number last (`2m · #567`)
+    with_id(meta, id) = "{meta} · #{id}";
+    /// the desktop's tip on a notification's number
+    card_id_tip(id) = "notification #{id}: the number bise and its agents use for it";
+    /// `/inbox 567` when no notification has that number
+    no_card(id) = "· no notification #{id}";
     /// a closed card's age (the desktop)
     closed_age(age) = "{age} · closed";
     /// the option he picked on a page (the TUI and the desktop)

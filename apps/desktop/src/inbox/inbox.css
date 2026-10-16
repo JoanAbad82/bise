@@ -147,3 +147,7 @@
 .ic-why { display: block; color: var(--c-text-2); font-size: var(--t-12); }
 .ic-opt.picked .ic-why { color: var(--c-on-ink); }
 .ic-mine { font-size: var(--t-12); color: var(--c-text-3); }
+
+/* a notification's number (notif-id, designer m_27855): mono, text-3, 12 px, never cut */
+.card-id { flex: none; white-space: nowrap; color: var(--c-text-3); }
+.card-id-n { font-family: var(--font-mono); font-size: 12px; }

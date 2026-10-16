@@ -31,6 +31,7 @@ import { keep } from '@/app/keep';
 import { useModHeld } from '@/app/held';
 import { answerTip } from '@/app/tipwords';
 import './inbox.css';
+import { CardId } from './CardId';
 import { aboutOf, openAct } from './about';
 
 /** What the composer under the block does with his words while an item is open. */
@@ -789,7 +790,12 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
                 {!isNotify(c) && <RefusedMark card={c} />}
               </>
             }
-            end={`${projectWord(row, c.project)} · ${age(now - c.since_ms)}`}
+            end={
+              <>
+                {`${projectWord(row, c.project)} · ${age(now - c.since_ms)}`}
+                <CardId id={c.id} testId={`inbox.block.row.${String(n)}.id`} />
+              </>
+            }
             onClick={() => {
               openTo(cardKey(c));
             }}

@@ -38,9 +38,9 @@ fn waiting_on_top_and_the_keys_at_the_bottom() {
         let t = texts(&lines(&mut sc, &rows, width, 14));
         assert_eq!(sc.sel, Some(Pick::Card(30)));
         assert_eq!(t[0], "  waiting for you · 1");
-        // its age in the time column: no hole under the answers' times
-        assert!(t[1].starts_with("› 1  docs  ship the readme?") && t[1].ends_with("6m"), "{}", t[1]);
-        assert!(t[3].starts_with("  ✓ perf  webp or avif for hero 3?") && t[3].ends_with("12:38"), "{}", t[3]);
+        // its age in the time column, the number last (notif-id): no hole under the answers' times
+        assert!(t[1].starts_with("› 1  docs  ship the readme?") && t[1].ends_with("6m · #30"), "{}", t[1]);
+        assert!(t[3].starts_with("  ✓ perf  webp or avif for hero 3?") && t[3].ends_with("12:38 · #3"), "{}", t[3]);
         assert_eq!(t[4], "    you: avif · in the inbox");
         assert_eq!(t[6], "    withdrawn: moot");
         // ⏎ says what it does on the selected row
