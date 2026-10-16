@@ -13,6 +13,7 @@
 //   - from_agent 'a → b': gift-ui's message to main in main's view names only the sender.
 import path from 'node:path';
 import { test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 import { Lines } from '../native/world';
 import { hubOf, launchOn, realWorld, transcriptFeed, transcriptHas, tui, tuiReady, worldSay, type Tui } from '../world';
 
@@ -222,7 +223,7 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
     });
 
     await test.step("from_agent: gift-ui → main in main's view", async () => {
-      const head = list.locator('[data-testid^="thread.entry."]').filter({ hasText: 'waiting for your answer' }).first();
+      const head = list.locator('[data-testid^="thread.entry."]').filter({ hasText: thread.report_waiting }).first();
       const words = ((await head.textContent().catch(() => '')) ?? '').trim();
       note('from-agent-main', words.slice(0, 200));
       expect.soft(words, "the sender's name").toContain('gift-ui');

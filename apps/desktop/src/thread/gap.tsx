@@ -6,6 +6,7 @@
 // Owner: inbox-open.
 import { useEffect } from 'react';
 import { Marker } from '@/ds';
+import { thread } from '@/proto/words.gen';
 import { threadKey, useStore, useThreadOrder } from '@/store';
 import './gap.css';
 
@@ -39,7 +40,7 @@ export function GapRow({ project, agent }: { project: string; agent: string }) {
   }, [store, project, agent, from]);
   return (
     <div className="th-gap" data-testid="thread.gap">
-      <Marker>newer messages…</Marker>
+      <Marker>{thread.newer_messages}</Marker>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { copyFileSync, mkdtempSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common, thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -42,28 +43,28 @@ const world = () => [
     agent: 'main',
     entries: [
       { pos: 1, at_ms: NOW - 5 * MIN, kind: 'agent', text: 'gift-ui asks: show the balance on the cart page, or only at checkout?' },
-      { pos: 2, at_ms: NOW - 4 * MIN, kind: 'approval', text: 'you answered gift-ui', approval: { ok: true, text: 'you answered gift-ui', note: 'the balance on the cart page' }, parts: [{ kind: 'text', text: 'the balance on the cart page' }, { kind: 'image', name: SHA, source: PNG }] },
+      { pos: 2, at_ms: NOW - 4 * MIN, kind: 'approval', text: thread.answered_to({ who: 'gift-ui' }), approval: { ok: true, text: thread.answered_to({ who: 'gift-ui' }), note: 'the balance on the cart page' }, parts: [{ kind: 'text', text: 'the balance on the cart page' }, { kind: 'image', name: SHA, source: PNG }] },
       { pos: 3, at_ms: NOW - 3 * MIN, kind: 'answered', text: 'answered gift-ui for you', answered: { agent: 'gift-ui', question: 'which colour for the badge?', answer: 'the green one', why: 'he showed it', images: [{ name: SHA, path: PNG }] } },
       // his answer to main's OWN card, as the hub still sends it: a raw line from 'switchboard' (designer m_15195)
       { pos: 4, at_ms: NOW - 2 * MIN, kind: 'from_agent', from: 'switchboard', text: 'the user answered card #1 ("merge checkout into main? (2 files, tests pass) 1. merge 2. not yet"): "[Image #1] this one"' },
       // the same answer as a newer hub sends it (amb-feed c02ad231): ONE typed approval row, the raw line gone
-      { pos: 5, at_ms: NOW - 1 * MIN, kind: 'approval', text: 'you answered main: [Image #1] this one', approval: { ok: true, text: 'you answered main: [Image #1] this one' }, parts: [{ kind: 'image', name: SHA, source: PNG }, { kind: 'text', text: 'this one' }] },
+      { pos: 5, at_ms: NOW - 1 * MIN, kind: 'approval', text: common.fold_answered({ agent: 'main', pick: '[Image #1] this one' }), approval: { ok: true, text: common.fold_answered({ agent: 'main', pick: '[Image #1] this one' }) }, parts: [{ kind: 'image', name: SHA, source: PNG }, { kind: 'text', text: 'this one' }] },
     ],
     before: null,
     more: false,
   },
 ];
 
-test("thread/answer-images: 'you answered gift-ui' shows his words and the image chip with its thumbnail, never the marker or a path", async () => {
+test("thread/answer-images: his answer to gift-ui shows his words and the image chip with its thumbnail, never the marker or a path", async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: `project/${P}`, size: '1100x760' });
   try {
     const { page } = s;
     const row = page.getByTestId('thread.approval.2');
-    await expect(row).toContainText('you answered gift-ui', { timeout: 10_000 });
+    await expect(row).toContainText(thread.answered_to({ who: 'gift-ui' }), { timeout: 10_000 });
     await expect(row).toContainText('the balance on the cart page');
     const chip = page.getByTestId('thread.approval.2.image.1');
-    await expect(chip).toHaveText('image 1');
+    await expect(chip).toHaveText(thread.image_n({ n: 1 }));
     const thumb = chip.locator('img.thumb');
     await expect.poll(() => thumb.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0), { message: 'its thumbnail is drawn from his path' }).toBe(true);
     expect(Math.round((await thumb.boundingBox())?.width ?? 0), 'a 16 px thumbnail').toBe(16);
@@ -73,15 +74,15 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
       expect(text, `${id}: never a b64 path`).not.toContain('b64');
       expect(text, `${id}: never his path`).not.toContain(PNG);
     }
-    await expect(page.getByTestId('thread.answered.3.image.1'), "bise's answer for him: the same chip").toHaveText('image 1');
+    await expect(page.getByTestId('thread.answered.3.image.1'), "bise's answer for him: the same chip").toHaveText(thread.image_n({ n: 1 }));
     // its author named, and him as 'you' (designer m_21658)
     await expect(page.getByTestId('thread.answered.3')).toContainText('bise answered gift-ui for you');
     await expect(page.getByTestId('thread.answered.3')).toContainText('you showed it');
     // main's own card answered: the '✓ you answered' row with the chip, never the hub's raw line
     // the same order as the rows above (designer m_15420): what was asked, his words, the chip
-    await expect(page.getByTestId('thread.cardanswer.4.head')).toHaveText('✓you answered bise · merge checkout into main? (2 files, tests pass)');
+    await expect(page.getByTestId('thread.cardanswer.4.head')).toHaveText(`✓${thread.answered_card({ who: 'bise', question: 'merge checkout into main? (2 files, tests pass)' })}`);
     await expect(page.getByTestId('thread.cardanswer.4.words')).toHaveText('this one');
-    await expect(page.getByTestId('thread.cardanswer.4.image.1')).toHaveText('image 1');
+    await expect(page.getByTestId('thread.cardanswer.4.image.1')).toHaveText(thread.image_n({ n: 1 }));
     // the raw line names no file: the chip keeps its 16 px slot with a faint image glyph (designer m_15943)
     const slot = await page.getByTestId('thread.cardanswer.4.image.1').locator('.thumb').boundingBox();
     expect(Math.round(slot?.width ?? 0), 'the same 16 px slot as the chips with a thumbnail').toBe(16);
@@ -91,9 +92,9 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
     // a newer hub's typed row: the chip is the image, so his words never say '[Image #1]' too (designer m_15891)
     // messages-right v1: his side, '✓ you answered bise' dim over his words in the bubble (the name the
     // thread draws, designer m_21658)
-    await expect(page.getByTestId('thread.approval.5.head')).toHaveText('✓you answered bise');
+    await expect(page.getByTestId('thread.approval.5.head')).toHaveText(`✓${thread.answered_to({ who: 'bise' })}`);
     await expect(page.getByTestId('thread.approval.5.words')).toHaveText('this one');
-    await expect(page.getByTestId('thread.approval.5.image.1')).toHaveText('image 1');
+    await expect(page.getByTestId('thread.approval.5.image.1')).toHaveText(thread.image_n({ n: 1 }));
     expect(await page.getByTestId('thread.approval.5').innerText(), "the chip is the image: no '[Image #1]' tag anywhere (designer m_21561)").not.toContain('[Image #');
     const all = await page.getByTestId('thread.list').innerText();
     expect(all, 'never the raw line').not.toContain('the user answered card');

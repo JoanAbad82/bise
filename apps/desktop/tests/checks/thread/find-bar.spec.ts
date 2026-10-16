@@ -6,6 +6,7 @@
 // current stronger, no box around its row: designer m_25774); each button explains itself in the ds tip with its key; the
 // count says '1/2'; esc closes it. Shots for designer's sign. The scripted core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 import type { Page } from '@playwright/test';
 
 const P = 'acme-1a2b3c4d';
@@ -141,15 +142,15 @@ test('thread/find-bar: a compact bar at the top right, on the spacing tokens, it
     await page.setViewportSize({ width: 1400, height: 860 });
     const tip = page.getByTestId('tip');
     for (const [id, words] of [
-      ['older', 'older match'],
-      ['newer', 'newer match'],
-      ['close', 'close find'],
+      ['older', thread.find_older],
+      ['newer', thread.find_newer],
+      ['close', thread.find_close],
     ] as const) {
       await page.getByTestId(`thread.find.${id}`).hover();
       await expect(tip, `${id}: its words`).toContainText(words);
     }
     await page.getByTestId('thread.find.older').hover();
-    await expect(tip).toContainText('older match');
+    await expect(tip).toContainText(thread.find_older);
     await page.screenshot({ path: test.info().outputPath('find-tip.png') });
 
     // ↑ and ↓ move the count, esc closes

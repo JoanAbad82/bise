@@ -6,16 +6,14 @@
 // there is none. Owner: file-chips (amb-win's thread).
 import { useEffect, useState, type ReactNode } from 'react';
 import { Chip } from '@/ds';
-
-/** The hover words of an attachment's chip (designer m_21765). */
-export const OPEN_TITLE = 'preview · right-click: show in Finder';
+import { thread } from '@/proto/words.gen';
 
 /** 'deck.pptx is gone from ~/Desktop' (the TUI's open_file gone_words). Pure. */
 export function goneWords(path: string, home: string): string {
   const cut = path.lastIndexOf('/');
   const dir = cut <= 0 ? '/' : path.slice(0, cut);
   const shown = home !== '' && (dir === home || dir.startsWith(`${home}/`)) ? `~${dir.slice(home.length)}` : dir;
-  return `${path.slice(cut + 1)} is gone from ${shown}`;
+  return thread.attach_gone({ name: path.slice(cut + 1), dir: shown });
 }
 
 const bise = (): Partial<Window['bise']> | undefined => (window as Partial<Window>).bise;
@@ -47,7 +45,7 @@ export function FileThumb({ path }: { path: string }) {
 export function AttachChip({ of, path, missing, thumb, testId, children }: { of: 'image' | 'file'; path: string; missing: boolean; thumb: ReactNode; testId: string; children: ReactNode }) {
   const [gone, setGone] = useState(missing);
   const home = bise()?.home ?? '';
-  const title = gone ? goneWords(path, home) : `${path}\n${OPEN_TITLE}`;
+  const title = gone ? goneWords(path, home) : `${path}\n${thread.attach_open}`;
   // the chip itself is the row's child (thread/parts measures the row's children)
   return (
     <Chip
@@ -73,7 +71,7 @@ export function AttachChip({ of, path, missing, thumb, testId, children }: { of:
       {gone && (
         <>
           <span className="th-attach-sep"> · </span>
-          <span className="th-attach-missing">missing</span>
+          <span className="th-attach-missing">{thread.attach_missing}</span>
         </>
       )}
     </Chip>

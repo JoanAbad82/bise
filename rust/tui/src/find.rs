@@ -332,7 +332,7 @@ impl Find {
             return String::new();
         }
         if self.total == 0 {
-            return if self.busy() { String::new() } else { "no match".into() };
+            return if self.busy() { String::new() } else { bise_proto::words::thread::find_none.into() };
         }
         let plus = if more { "+" } else { "" };
         match self.rank() {

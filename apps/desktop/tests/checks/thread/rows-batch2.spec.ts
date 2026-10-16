@@ -16,6 +16,7 @@
 //     shop's agents at 0% carry no gauge in the right bar (any shown is the TUI panel's).
 import path from 'node:path';
 import { test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 import { hubAgents, hubOf, launchReal, realWorld, transcriptHas, tui, tuiReady, tuiSay, type Tui } from '../world';
 
 const T = {
@@ -55,7 +56,7 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
     const { page } = s;
     await expect(page.locator(`${T.field}, ${T.setupSkip}`).first()).toBeVisible({ timeout: 10_000 }).catch(() => undefined);
     if (await page.locator(T.setupSkip).isVisible()) await page.locator(T.setupSkip).click();
-    await expect(page.locator(T.field).first(), "bise's thread").toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(T.field).first(), thread.from_thread({ name: 'bise' })).toBeVisible({ timeout: 10_000 });
     t = tui(w, 'bise');
     await tuiReady(t);
     const list = page.locator(T.list);
@@ -115,10 +116,10 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       if (/│\s+\/compact\s/.test(t?.screen() ?? '')) t?.keys('Enter');
       await expect.soft(list.locator(`${T.compacting}, ${T.compacted}`).last(), "'compacting…' then 'context compacted'").toBeVisible({ timeout: 60_000 });
       const head = list.locator(T.compacted).last();
-      await expect.soft(head, "a folded 'context compacted'").toContainText('context compacted', { timeout: 60_000 });
+      await expect.soft(head, "a folded 'context compacted'").toContainText(thread.compacted, { timeout: 60_000 });
       await head.click({ timeout: 5000 }).catch(() => undefined);
       const box = list.locator('[data-testid^="thread.compacted."]:not([data-testid$=".head"])').last();
-      const text = (await box.innerText().catch(() => '')).replace('context compacted', '').trim();
+      const text = (await box.innerText().catch(() => '')).replace(thread.compacted, '').trim();
       // the TUI's summary, opened (ctrl+o opens everything folded): the reference for its words
       t?.keys('C-o');
       await sleep(800);
@@ -184,7 +185,7 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       tuiSay(ts, `/restore ${AG}`);
       await expect.poll(live, { timeout: 15_000, message: `${AG} restored (the TUI)` }).toBe(true);
       await second.locator('[data-testid$=".again"]').click({ timeout: 5000 }).catch(() => undefined);
-      await expect.soft(second, "it says 'sent again'").toContainText('sent again', { timeout: 5000 });
+      await expect.soft(second, "it says 'sent again'").toContainText(thread.sent_again, { timeout: 5000 });
       await expect.soft.poll(() => transcriptHas(w, 'shop', AG, `second try ${n}`), { timeout: 15_000, message: `send again reaches ${AG}: his words never lost` }).toBe(true);
       test.info().attachments.push({ name: 'tui-shop-nd', contentType: 'text/plain', body: Buffer.from(ts.screen()) });
       await page.screenshot({ path: test.info().outputPath('sent-again.png') });

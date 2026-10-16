@@ -6,6 +6,7 @@
 // qa-native's check does. The scripted core (FakeCore), fake data. Owner: amb-win.
 import type { Locator, Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
@@ -24,15 +25,15 @@ const world = () => [
     agent: 'perf',
     entries: [
       ...older,
-      { pos: 40, at_ms: NOW - 8 * MIN, kind: 'thinking', text: 'thought for 3.2s', thinking: { ms: 3200, text: `${PARA}${PARA}${PARA}${PARA}` } },
+      { pos: 40, at_ms: NOW - 8 * MIN, kind: 'thinking', text: thread.thought_for({ dur: '3.2s' }), thinking: { ms: 3200, text: `${PARA}${PARA}${PARA}${PARA}` } },
       {
         pos: 41,
         at_ms: NOW - 7 * MIN,
         kind: 'tools',
-        text: 'read 6 files',
+        text: thread.did_read({ n: 6 }),
         tools: {
           count: 6,
-          summary: 'read 6 files',
+          summary: thread.did_read({ n: 6 }),
           items: Array.from({ length: 6 }, (_, i) => ({ pos: 42 + i, at_ms: NOW - 7 * MIN + i * 1000, text: `read_file: {"path":"core/part${String(i)}.rs"}`, kind: 'read', state: 'ok', ms: 20 })),
         },
       },
@@ -59,7 +60,7 @@ test('thread/fold-hold: an opened or closed row keeps its y at the end of a long
   try {
     const { page } = s;
     const pill = page.getByTestId('thread.tools.41');
-    await expect(pill).toContainText('read 6 files', { timeout: 10_000 });
+    await expect(pill).toContainText(thread.did_read({ n: 6 }), { timeout: 10_000 });
     await expect(page.getByTestId('thread.list')).toHaveAttribute('data-stuck', 'true');
     const think = page.getByTestId('thread.think.40.head');
 

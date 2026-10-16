@@ -7,6 +7,7 @@
 // words '42k · 17%', in the thread's head and its right-bar row's tip (under 70 %). The scripted core (FakeCore) with
 // the fixtures' entries. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -39,11 +40,11 @@ const world = () => [
     agent: 'perf',
     entries: [
       { pos: 20, at_ms: 1791100020000, kind: 'you', text: 'profile the cold run' },
-      { pos: 21, at_ms: 1791100021000, kind: 'thinking', text: 'thought for 3.2s', thinking: { ms: 3200, text: 'the cold run is the slow one' } },
+      { pos: 21, at_ms: 1791100021000, kind: 'thinking', text: thread.thought_for({ dur: '3.2s' }), thinking: { ms: 3200, text: 'the cold run is the slow one' } },
       { pos: 22, at_ms: 1791100022000, kind: 'compacting', text: 'compacting' },
       { pos: 23, at_ms: 1791100023000, kind: 'compacted', text: 'we profiled the hub; the cold run is slow' },
-      { pos: 24, at_ms: 1791100024000, kind: 'notice', text: 'turn failed: provider 500', notice: { level: 'err', text: 'turn failed: provider 500' } },
-      { pos: 25, at_ms: 1791100025000, kind: 'notice', text: 'retry', notice: { level: 'warn', text: 'model call failed (attempt 2/10): provider 529 (transient) · retry 3/10 in 4s' } },
+      { pos: 24, at_ms: 1791100024000, kind: 'notice', text: thread.turn_failed({ why: 'provider 500' }), notice: { level: 'err', text: thread.turn_failed({ why: 'provider 500' }) } },
+      { pos: 25, at_ms: 1791100025000, kind: 'notice', text: 'retry', notice: { level: 'warn', text: thread.retry({ attempt: 2, max: 10, why: 'provider 529 (transient)', next: 3, secs: 4 }) } },
       { pos: 26, at_ms: 1791100026000, kind: 'not_delivered', text: 'then the warm run', not_delivered: { to: 'alerts', text: 'then the warm run' } },
       { pos: 27, at_ms: 1791100027000, kind: 'unknown', text: 'a row from a newer hub' },
     ],
@@ -59,7 +60,7 @@ test("thread/batch2-rows: thinking, compaction, notices, not delivered and the c
     const { page } = s;
     await expect(page.getByTestId('thread.screen')).toBeVisible({ timeout: 10_000 });
     const think = page.getByTestId('thread.think.21');
-    await expect(think).toContainText('thought for 3.2s');
+    await expect(think).toContainText(thread.thought_for({ dur: '3.2s' }));
     await expect(think, 'folded').not.toContainText('the cold run is the slow one');
     await page.getByTestId('thread.think.21.head').click();
     await expect(think, 'opens to what it thought').toContainText('the cold run is the slow one');
@@ -79,11 +80,11 @@ test("thread/batch2-rows: thinking, compaction, notices, not delivered and the c
     await page.screenshot({ path: test.info().outputPath('batch2.png') });
 
     const nd = page.getByTestId('thread.notdelivered.26');
-    await expect(nd).toContainText('not delivered to alerts');
+    await expect(nd).toContainText(thread.not_delivered({ to: 'alerts' }));
     await page.getByTestId('thread.notdelivered.26.again').click();
     const sent = await core.waitCmd((c) => c.cmd === 'send', 3000);
     expect(sent, 'sent again to the agent it missed').toMatchObject({ project: P, agent: 'alerts', text: 'then the warm run' });
-    await expect(nd).toContainText('sent again');
+    await expect(nd).toContainText(thread.sent_again);
   } finally {
     await s.close();
     core.dispose();

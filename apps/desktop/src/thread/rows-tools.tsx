@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Fold, Tool } from '@/ds';
 import type { Entry } from '@/proto';
+import { thread } from '@/proto/words.gen';
 import { useStore, useToolOut } from '@/store';
 import { liveTime, useLiveStep, useSecondsSince } from './live-step';
 import { useFold } from './folds';
@@ -18,17 +19,17 @@ import { Pulse } from '@/working/Signs';
  */
 export function cutWords(out: string, total?: number): string {
   const kb = (b: number): string => `${String(Math.max(1, Math.round(b / 1024)))} KB`;
-  if (total == null || total <= 0) return '… cut after 4 KB';
-  return `… ${kb(new TextEncoder().encode(out).length)} of ${kb(total)} shown`;
+  if (total == null || total <= 0) return thread.out_cut;
+  return thread.out_shown({ shown: kb(new TextEncoder().encode(out).length), total: kb(total) });
 }
 
 /** A thinking row's head, as the TUI's words::thought_for: 'thought for 3.2s', 'thought' (time unknown). Pure. */
 export function thoughtFor(ms: number): string {
-  if (ms <= 0) return 'thought';
+  if (ms <= 0) return thread.thought;
+  // words::think_time's format
   const s = Math.floor(ms / 1000);
-  if (ms < 10_000) return `thought for ${String(s)}.${String(Math.floor((ms % 1000) / 100))}s`;
-  if (ms < 60_000) return `thought for ${String(s)}s`;
-  return `thought for ${String(Math.floor(ms / 60_000))}m${String(Math.floor((ms % 60_000) / 1000))}s`;
+  const dur = ms < 10_000 ? `${String(s)}.${String(Math.floor((ms % 1000) / 100))}s` : ms < 60_000 ? `${String(s)}s` : `${String(Math.floor(ms / 60_000))}m${String(Math.floor((ms % 60_000) / 1000))}s`;
+  return thread.thought_for({ dur });
 }
 
 /** What the model thought: one folded line, open to its words (⌘E opens them all). */

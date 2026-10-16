@@ -5,6 +5,7 @@
 // found by its words. Here: the target of a row, the search in a thread's loaded entries, and the
 // one pending jump the thread screen takes (useAnswerReveal). Owner: amb-win.
 import type { Entry, EntryCard } from '@/proto';
+import { thread } from '@/proto/words.gen';
 import type { Router } from '@/app/router';
 import { sameRoute, type Route } from '@/app/route';
 import { shownName } from '@/agents/model';
@@ -22,11 +23,8 @@ export interface AnswerAt {
 /** How many older pages the thread loads looking for the answer before it says it is further up (designer m_24211). */
 export const ANSWER_PAGES = 20;
 
-/** How long the 'your answer is further up' line stays (designer m_24211). */
+/** How long the miss line (thread.answer_further_up) stays (designer m_24211). */
 export const MISS_MS = 4000;
-
-/** The miss line's words (designer m_24211). */
-export const MISS_WORDS = 'your answer is further up';
 
 /**
  * An answered card's row: its asker's thread (the card's `@agent`; an older hub's card without it
@@ -63,11 +61,11 @@ export function answeredFromWords(
   time: string,
 ): { words: string; tip: string } | null {
   if (from !== 'inbox' && from.project === here.project && from.agent === here.agent) return null;
-  const at = time === '' ? '' : ` at ${time}`;
+  const at = time === '' ? '' : thread.from_at({ time });
   const tail = time === '' ? '' : ` · ${time}`;
-  if (from === 'inbox') return { words: `answered from the inbox screen${tail}`, tip: `you answered this from the inbox screen${at}` };
+  if (from === 'inbox') return { words: thread.from_line({ place: thread.from_inbox_screen }) + tail, tip: thread.from_tip({ place: thread.from_inbox_screen }) + at };
   const name = from.agent !== 'main' ? shownName(from.agent) : from.project === home ? shownName('main') : projectName(from.project);
-  return { words: `answered from ${name}${tail}`, tip: `you answered this from ${name}'s thread${at}` };
+  return { words: thread.from_line({ place: name }) + tail, tip: thread.from_tip({ place: thread.from_thread({ name }) }) + at };
 }
 
 /** The answer's pos among a thread's loaded entries: the newest approval for that card. Pure. */

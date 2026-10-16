@@ -96,10 +96,6 @@ export const inbox = {
   when_answered_at: (a: { place: string | number; when: string | number }): string => "you answered " + String(a.place) + " · " + String(a.when),
   /** a waiting page item's right column on the desktop */
   wait_end_page: (a: { project: string | number; age: string | number }): string => String(a.project) + " · page · " + String(a.age),
-  /** a question's title (any other kind asks too) */
-  title_asks: (a: { agent: string | number }): string => String(a.agent) + " asks",
-  /** a plan's title */
-  title_plan: (a: { agent: string | number }): string => String(a.agent) + " proposes a plan",
   /** a blocked agent's title */
   title_blocked: (a: { agent: string | number }): string => String(a.agent) + " is blocked",
   /** a failed agent's title */
@@ -180,8 +176,6 @@ export const inbox = {
   your_answer: "your answer",
   /** the TUI's divider: the question closed under his words */
   question_closed: "the question is closed: ⏎ sends your words as a message",
-  /** how many lines are folded away */
-  more_lines: (a: { n: number }): string => a.n === 1 ? String(a.n) + " more line" : String(a.n) + " more lines",
   /** the TUI's scroll mark: lines under the view */
   scroll_more: (a: { n: number }): string => a.n === 1 ? String(a.n) + " more line · pgdn" : String(a.n) + " more lines · pgdn",
   /** the TUI's scroll mark: at the end */
@@ -222,10 +216,6 @@ export const inbox = {
   heard_undo: (a: { line: string | number }): string => String(a.line) + " · esc undoes",
   /** the line in the desktop block's place when nothing waits */
   zero: "nothing waits for you",
-  /** the desktop's mark on an item whose answer was refused */
-  not_sent: "not sent",
-  /** the desktop's way to send it again */
-  try_again: "try again",
   /** an approval to edit a file */
   wants_edit_file: (a: { agent: string | number; file: string | number }): string => String(a.agent) + " wants to edit " + String(a.file),
   /** an approval to edit */
@@ -276,16 +266,6 @@ export const inbox = {
   noun_signin: "sign-in",
   /** the item's noun: an approval */
   noun_approval: "approval",
-  /** a picked option folded */
-  fold_answered: (a: { agent: string | number; pick: string | number }): string => "you answered " + String(a.agent) + ": " + String(a.pick),
-  /** a gate he said no to */
-  fold_no: (a: { agent: string | number; what: string | number }): string => "you said no to " + String(a.agent) + ": " + String(a.what),
-  /** a gate he let run outside the sandbox */
-  fold_outside: (a: { agent: string | number; what: string | number }): string => "you let " + String(a.agent) + " run it outside the sandbox: " + String(a.what),
-  /** a gate he allowed */
-  fold_allowed: (a: { agent: string | number; what: string | number }): string => "you allowed " + String(a.agent) + ": " + String(a.what),
-  /** a page's pick folded */
-  picked: (a: { name: string | number }): string => "you picked " + String(a.name),
   /** the last item answered */
   clear: "inbox clear",
   /** his words to a closed question, kept */

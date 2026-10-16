@@ -14,4 +14,43 @@ crate::words! { common:
     /// a count of what waits on him: the desktop sidebar's pink count's
     /// tip (panel), the TUI box's border (inbox)
     waiting_for_you(n) = "{n} waiting for you";
+
+    // ---- his answer folded: the TUI's box (inbox) and the thread's
+    // approval row, the hub's fold and the desktop (thread)
+    /// a picked option or a short answer folded
+    fold_answered(agent, pick) = "you answered {agent}: {pick}";
+    /// a gate he said no to
+    fold_no(agent, what) = "you said no to {agent}: {what}";
+    /// a gate he let run outside the sandbox
+    fold_outside(agent, what) = "you let {agent} run it outside the sandbox: {what}";
+    /// a gate he allowed
+    fold_allowed(agent, what) = "you allowed {agent}: {what}";
+    /// a page's pick folded
+    picked(name) = "you picked {name}";
+
+    // ---- an item's title: the TUI's box and the desktop's card (inbox),
+    // the card's line in the TUI's feed and the desktop's thread (thread)
+    /// a question's title (any other kind asks too)
+    title_asks(agent) = "{agent} asks";
+    /// a plan's title
+    title_plan(agent) = "{agent} proposes a plan";
+
+    /// how many lines are folded away: an item's body (inbox), a tool's
+    /// closed box in the TUI's feed (thread)
+    more_lines(n) = one "{n} more line" | "{n} more lines";
+    /// a send that was refused: an item's answer (inbox), his message in
+    /// the thread (thread)
+    not_sent = "not sent";
+    /// the way to send it again: an item's answer (inbox), his message in
+    /// the thread (thread)
+    try_again = "try again";
+    /// a link that opens an agent: an alarm's detail in the right bar
+    /// (panel), a pause line's agent (thread)
+    open_agent(agent) = "open {agent}";
+    /// who his words go to: the composer's tab (composer), a message he
+    /// sent to another agent (thread)
+    to_agent(agent) = "to {agent}";
+    /// nothing goes on: the tray's and the sidebar's tips (panel), bise's
+    /// chip in the thread's head (thread)
+    all_quiet = "all quiet";
 }

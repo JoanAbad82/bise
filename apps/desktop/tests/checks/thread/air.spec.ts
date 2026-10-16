@@ -10,6 +10,7 @@
 //   - the answer's prose is at 1.65 × its font size, the tool line at 1.5 ×;
 // Frames: air-<theme>-<width>-{box,nobox}.png. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -43,7 +44,7 @@ const world = (theme: string, card: boolean) => [
     entries: [
       { pos: 1, at_ms: NOW - 8 * MIN, kind: 'you', text: 'why do the cart totals drift at night?' },
       { pos: 2, at_ms: NOW - 6 * MIN, kind: 'agent', text: ANSWER },
-      { pos: 3, at_ms: NOW - 5 * MIN, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 3, at_ms: NOW - 5 * MIN, text: 'pnpm replay --nights 3', kind: 'run', state: 'ok', ms: 6000 }] } },
+      { pos: 3, at_ms: NOW - 5 * MIN, kind: 'tools', text: thread.did_run({ n: 1 }), tools: { count: 1, summary: thread.did_run({ n: 1 }), items: [{ pos: 3, at_ms: NOW - 5 * MIN, text: 'pnpm replay --nights 3', kind: 'run', state: 'ok', ms: 6000 }] } },
     ],
     before: null,
     more: false,

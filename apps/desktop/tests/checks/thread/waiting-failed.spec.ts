@@ -8,6 +8,7 @@
 //     TUI renders): '✗ turn failed: provider 500'; a plan line (the text is why itself) is a ▲ with its words.
 // Shots: perf's thread (head + failed row), light and dark. Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const P = 'acme-1a2b3c4d';
 const AT = 1791100000000;
@@ -19,7 +20,7 @@ const agents = [
 ];
 const entries = [
   { pos: 901, at_ms: AT, kind: 'agent', text: 'running the bench on the product page.' },
-  { pos: 902, at_ms: AT + 60_000, kind: 'turn_failed', text: 'turn failed: provider 500', turn_failed: { why: 'provider 500' } },
+  { pos: 902, at_ms: AT + 60_000, kind: 'turn_failed', text: thread.turn_failed({ why: 'provider 500' }), turn_failed: { why: 'provider 500' } },
   { pos: 903, at_ms: AT + 120_000, kind: 'turn_failed', text: "you've hit your ChatGPT plan's limit · it resets at 14:00", turn_failed: { why: "you've hit your ChatGPT plan's limit · it resets at 14:00" } },
 ];
 

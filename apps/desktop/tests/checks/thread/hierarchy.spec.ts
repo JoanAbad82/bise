@@ -14,6 +14,7 @@
 // Frames: hierarchy-<theme>-<width>.png and hierarchy-<theme>-hover.png. Owner: amb-win.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread as tw } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -28,7 +29,7 @@ const ag = (name: string, purpose = `${name}'s job`) => ({ name, main: name === 
 const ANSWER = '## What changed\n\nThe notes line now says who wrote it and when; docs-line adds it to the README.';
 const thread = [
   { pos: 1, at_ms: at(40), kind: 'you', text: 'can the notes say who wrote them?' },
-  { pos: 2, at_ms: at(39), kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 2, at_ms: at(39), text: 'rg -n notes src', kind: 'run', state: 'ok', ms: 300 }] } },
+  { pos: 2, at_ms: at(39), kind: 'tools', text: tw.did_run({ n: 1 }), tools: { count: 1, summary: tw.did_run({ n: 1 }), items: [{ pos: 2, at_ms: at(39), text: 'rg -n notes src', kind: 'run', state: 'ok', ms: 300 }] } },
   { pos: 3, at_ms: at(39), kind: 'agent', text: ANSWER },
   { pos: 4, at_ms: at(38), kind: 'notice', text: '✚ main → new agent @docs-line : add a notes line', notice: { level: 'info', text: '✚ main → new agent @docs-line : add a notes line' } },
   { pos: 5, at_ms: at(37), kind: 'landed', text: '1 file +2', landed: { agent: 'docs-line', target: 'main', from: 'sb/docs-line', sha: '689c392aa1b2c3d4', files: 1, add: 2, del: 0 } },
@@ -120,7 +121,7 @@ for (const theme of ['light', 'dark']) {
         // another agent's wake in main's thread: dim (text-3), named for whom, its rc never red
         const wf = page.getByTestId('thread.wake.9');
         await expect(wf).toHaveAttribute('data-for', 'docs-line');
-        await expect(wf).toContainText("docs-line's cargo test ended");
+        await expect(wf).toContainText(tw.wake_of({ agent: 'docs-line', head: tw.wake_ended({ what: 'cargo test' }) }));
         await expect(page.locator('[data-testid="thread.wake.9"] [data-err]')).toHaveCount(0);
         await page.screenshot({ path: test.info().outputPath(`hierarchy-${theme}-${String(w)}.png`) });
         // H3's record for designer: the quiet rows with the scheduled one, close
@@ -170,7 +171,7 @@ const perf = [
   { pos: 8, at_ms: at(16), kind: 'agent', text: 'Still true at 500: the p99 holds at 290 ms.' },
   { pos: 9, at_ms: at(15), kind: 'notice', text: tries(10), notice: { level: 'warn', text: tries(10) } },
   // H13: a long command is cut with …, its ✓ and time stay at its end
-  { pos: 10, at_ms: at(14), kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 10, at_ms: at(14), text: `bash /Users/someone/.bise/gate/w-tuiparity/rich/${'p99-ask-'.repeat(20)}.sh`, kind: 'run', state: 'ok', ms: 700 }] } },
+  { pos: 10, at_ms: at(14), kind: 'tools', text: tw.did_run({ n: 1 }), tools: { count: 1, summary: tw.did_run({ n: 1 }), items: [{ pos: 10, at_ms: at(14), text: `bash /Users/someone/.bise/gate/w-tuiparity/rich/${'p99-ask-'.repeat(20)}.sh`, kind: 'run', state: 'ok', ms: 700 }] } },
   { pos: 11, at_ms: at(14), kind: 'agent', text: 'Trying again.' },
   // the hub's typed retry (amb-feed dd17152f): one entry per run, ended 'recovered': one dim line
   { pos: 12, at_ms: at(13), kind: 'notice', text: tries(2, 3), notice: { level: 'warn', text: tries(2, 3), retry: { attempt: 2, max: 10, why: 'no answer in 90 s (timeout)', wait_ms: 4000, end: 'recovered' } } },

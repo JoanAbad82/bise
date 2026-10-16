@@ -6,6 +6,7 @@ use crate::render::*;
 use crate::wire::*;
 use crate::feedsel;
 use bise_proto::thread::lines;
+use bise_proto::words::thread;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use unicode_segmentation::UnicodeSegmentation;
@@ -502,12 +503,18 @@ fn made_run_pad(events: &[Ev], i: usize) -> usize {
     back.chain(fwd).max().unwrap_or(0)
 }
 
+/// `turn interrupted`, `turn interrupted by main`: a stop someone asked
+/// for (the catalog's words, read back from the notice).
+pub(crate) fn is_interrupt(t: &str) -> bool {
+    t == thread::turn_interrupted || t.starts_with(&thread::turn_interrupted_by(""))
+}
+
 /// The REPL's own lines for an interrupted turn: its discarded candidate,
 /// `turn interrupted`, the dropped in-flight response.
 pub(crate) fn is_cut_noise(ev: &Ev) -> bool {
     match ev {
-        Ev::Warn(t) => t == "candidate discarded: interrupt" || t == "turn interrupted" || t.starts_with("turn interrupted by "),
-        Ev::Info(t) => t == "in-flight response dropped (turn interrupted)",
+        Ev::Warn(t) => *t == thread::candidate_discarded("interrupt") || is_interrupt(t),
+        Ev::Info(t) => t == thread::response_dropped,
         _ => false,
     }
 }
@@ -563,9 +570,9 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
     // BISE-293: a turn that fails for the reason its candidate was
     // discarded says it once: the failure takes the warning's place
     if let Ev::Err(t) = &ev {
-        let why = t.strip_prefix("turn failed: ");
+        let why = t.strip_prefix(&thread::turn_failed(""));
         if let (Some(why), Some(Ev::Warn(w))) = (why, events.last()) {
-            if w.strip_prefix("candidate discarded: ") == Some(why) {
+            if w.strip_prefix(&thread::candidate_discarded("")) == Some(why) {
                 let i = events.len() - 1;
                 events[i] = ev;
                 if let Some(c) = cache.get_mut(i) {
@@ -1461,8 +1468,8 @@ pub(crate) fn turn_end_of(events: &[Ev], i: usize) -> Option<u64> {
     let ends_turn = |e: &Ev| match e {
         Ev::TurnDone => true,
         // "turn interrupted by main": a stop mid-answer (wire.rs)
-        Ev::Warn(t) => t == "turn interrupted" || t.starts_with("turn interrupted by ") || crate::wire::is_plan_line(t),
-        Ev::Err(t) => t.starts_with("turn failed: ") || t.starts_with("turn stopped: "),
+        Ev::Warn(t) => is_interrupt(t) || crate::wire::is_plan_line(t),
+        Ev::Err(t) => t.starts_with(&thread::turn_failed("")) || t.starts_with(&thread::turn_stopped("")),
         _ => false,
     };
     let e = events.get(i)?;

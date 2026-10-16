@@ -868,13 +868,6 @@
     "one": null,
     "text": "your own folder: {path}"
   },
-  "composer.tab_to": {
-    "args": [
-      "agent"
-    ],
-    "one": null,
-    "text": "to {agent}"
-  },
   "composer.tab_worktree_at": {
     "args": [
       "path"

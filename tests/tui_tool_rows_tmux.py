@@ -14,6 +14,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 
 def main():
@@ -76,7 +77,7 @@ def main():
         assert "± write src/a.ts" not in sc, sc
         t.keys("C-o")
         sc = t.wait("± write src/a.ts ✓ +3 ▾")
-        assert "± ▾ 3 files" in sc, sc
+        assert "± ▾ " + w("thread.files", n=3) in sc, sc
         t.keys("C-o")
         t.wait_gone("± write src/a.ts")
         print("PASS tui tool rows")

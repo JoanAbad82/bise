@@ -13,6 +13,7 @@
 //     the tail back and the bar goes.
 // 'space opens the selected one' (F2's TUI half) has no selected row in the window: not checked.
 import { test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 import { launchReal, realWorld, transcriptHas, worldSay } from '../world';
 
 const T = {
@@ -59,12 +60,12 @@ test('thread/rows: long messages fold, ⌘E folds all, a code block copies alone
     const mine = list.locator('[data-testid^="thread.entry."]', { hasText: `line 1 of 80 ${n}`, has: page.locator(T.folds) }).first();
     await expect(mine, 'his long message is drawn').toBeVisible({ timeout: 10_000 });
     const fold = mine.locator(T.folds);
-    await expect(fold, 'it folds: show all · 80 lines').toContainText('show all · 80 lines', { timeout: 5000 });
+    await expect(fold, 'it folds: show all, 80 lines').toContainText(thread.show_all({ n: 80 }), { timeout: 5000 });
     await expect(mine.getByText(`line 80 of 80 ${n}`), 'its last line is folded away').toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath('b11-folded.png') });
     await fold.click();
     await expect(mine.getByText(`line 80 of 80 ${n}`), 'a click opens it whole').toHaveCount(1, { timeout: 3000 });
-    await expect(fold).toContainText('fold it');
+    await expect(fold).toContainText(thread.fold_it);
     // his line breaks kept, as he typed them and as the TUI shows them (one line each)
     const shown = await mine.evaluate((el) => (el as HTMLElement).innerText);
     const ownLines = shown.split('\n').filter((l) => new RegExp(`^line \\d+ of 80 ${n}$`).test(l.trim())).length;

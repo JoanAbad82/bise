@@ -4,6 +4,7 @@
 // accent, tooltip 'sent with fn, from another app'), the time after it on hover. A plain message
 // has no mark; the word 'capsule' is never on screen. Light and dark at 1100. Owner: amb-feed.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const P = 'shop-ab9f3c3b';
 const NOW = Date.now();
@@ -44,7 +45,7 @@ const world = (theme: string) => [
   },
 ];
 
-test("thread/from-fn: his fn message hides the capsule's line, 'from fn' first on its row", async () => {
+test(`thread/from-fn: his fn message hides the capsule's line, '${thread.from_fn}' first on its row`, async () => {
   test.setTimeout(120_000);
   for (const theme of ['light', 'dark']) {
     const core = new FakeCore(world(theme) as unknown as ConstructorParameters<typeof FakeCore>[0]);
@@ -56,8 +57,8 @@ test("thread/from-fn: his fn message hides the capsule's line, 'from fn' first o
         const you = page.getByTestId(`thread.you.${String(pos)}`);
         await expect(you, `${theme}: no capsule line in his bubble`).not.toContainText('[from the capsule');
         const via = page.getByTestId(`thread.you.${String(pos)}.via`);
-        await expect(via).toHaveText('from fn');
-        await expect(via).toHaveAttribute('title', 'sent with fn, from another app');
+        await expect(via).toHaveText(thread.from_fn);
+        await expect(via).toHaveAttribute('title', thread.from_fn_tip);
       }
       await expect(page.getByTestId('thread.you.1.via'), 'a plain message has no mark').toHaveCount(0);
       expect(await page.locator('.th-screen').innerText(), 'never the word capsule').not.toMatch(/capsule/iu);

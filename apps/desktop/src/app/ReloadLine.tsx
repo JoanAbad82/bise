@@ -6,6 +6,7 @@
 // shows as new), then folds; '▲ couldn't reload' stays until his retry or ✕. Owner: amb-home.
 import { useEffect, useState } from 'react';
 import type { SwitchRow } from '@/proto';
+import { thread } from '@/proto/words.gen';
 import { useHubSwitch, useProjects, useStore } from '@/store';
 import { slashOf } from '@/thread/commands';
 import { turnAge } from '@/working/gust';
@@ -29,8 +30,8 @@ export type ReloadView = {
 /** The core's probation reason, in his words (designer m_20853 (3)); other reasons pass through. */
 export function reasonWords(r: Pick<SwitchRow, 'reason' | 'from'>): string {
   if (r.reason === 'the hub died during its probation')
-    return `the new version stopped right after it started. you're still on ${r.from ?? 'the version before'}.`;
-  return r.reason ?? 'the new version failed';
+    return thread.reload_died({ from: r.from ?? thread.reload_before });
+  return r.reason ?? thread.reload_failed_why;
 }
 
 /** The line's words and tone at `now`, or none (no switch, an unknown phase, a done one past its fold). Pure. */
@@ -38,16 +39,16 @@ export function reloadView(r: SwitchRow | null, now: number): ReloadView | null 
   if (r === null) return null;
   switch (r.phase) {
     case 'reloading':
-      return { text: `reloading bise on ${r.to}`, tone: 'running', fold: false, shas: [r.to], elapsed: turnAge(now - r.at_ms) };
+      return { text: thread.reloading({ to: r.to }), tone: 'running', fold: false, shas: [r.to], elapsed: turnAge(now - r.at_ms) };
     case 'up':
     case 'passed': {
       const age = now - r.at_ms;
       if (age >= SHOW_DONE_MS + FOLD_MS) return null;
-      return { text: `✓ reloaded on ${r.to}`, tone: 'done', fold: age >= SHOW_DONE_MS, shas: [r.to] };
+      return { text: thread.reloaded({ to: r.to }), tone: 'done', fold: age >= SHOW_DONE_MS, shas: [r.to] };
     }
     case 'rolled_back': {
       const why = reasonWords(r);
-      return { text: `▲ couldn't reload: ${why}`, tone: 'failed', fold: false, shas: [r.to, r.from].filter((s): s is string => s !== undefined && why.includes(s)) };
+      return { text: thread.reload_failed({ why }), tone: 'failed', fold: false, shas: [r.to, r.from].filter((s): s is string => s !== undefined && why.includes(s)) };
     }
     default:
       return null;
@@ -127,7 +128,7 @@ export function useReloadLine(): StatusPart | null {
     fold: v.fold,
     ...(failed
       ? {
-          acts: [{ id: 'retry', text: 'retry', onClick: retry }],
+          acts: [{ id: 'retry', text: thread.reload_retry, onClick: retry }],
           close: () => {
             setClosed(row.at_ms);
           },
@@ -138,5 +139,5 @@ export function useReloadLine(): StatusPart | null {
 
 /** Under 160 px of room: the sign and short words (designer m_21067). Pure. */
 export function shortWords(tone: ReloadView['tone']): string {
-  return tone === 'running' ? 'reloading…' : tone === 'done' ? '✓ reloaded' : "▲ couldn't reload";
+  return tone === 'running' ? thread.reload_short_running : tone === 'done' ? thread.reload_short_done : thread.reload_short_failed;
 }

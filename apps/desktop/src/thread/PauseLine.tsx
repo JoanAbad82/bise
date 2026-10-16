@@ -8,6 +8,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Act } from '@/ds';
 import type { Agent } from '@/proto';
+import { common } from '@/proto/words.gen';
 import { useNowFor } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { shownName } from '@/agents/model';
@@ -69,7 +70,7 @@ export function PauseLine({ a, project }: { a: Agent | undefined; project: strin
           <>
             <Act
               testId="thread.waiting.who"
-              title={`open ${shownName(line.who)}`}
+              title={common.open_agent({ agent: shownName(line.who) })}
               onClick={() => {
                 router.go({ screen: 'thread', project, agent: line.who });
               }}

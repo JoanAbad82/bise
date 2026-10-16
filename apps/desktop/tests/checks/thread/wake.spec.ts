@@ -7,6 +7,7 @@
 // 'rc 0' never red, '– stopped waiting for the reindex'. Never the accent, nothing in the inbox.
 // Light and dark at 1100, one frame each. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
@@ -16,7 +17,7 @@ const prefs = (theme: string) => ({
   prefs: { onboarded: true, theme, context: { shot: true, url: true, file: true, window_text: false }, excluded_apps: [], quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 20, away_card: true }, voice: { fn_hold: true, fn_twice: 'spotlight', language: 'auto' }, shots_keep_days: 7 },
 });
 const ag = (name: string, over: Record<string, unknown> = {}) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: `${name}'s job`, since_ms: NOW - 30 * MIN, waits: 0, watching: [], ...over });
-const tool = (pos: number, at: number, text: string) => ({ pos, at_ms: at, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos, at_ms: at, text, kind: 'run', state: 'ok', ms: 300 }] } });
+const tool = (pos: number, at: number, text: string) => ({ pos, at_ms: at, kind: 'tools', text: thread.did_run({ n: 1 }), tools: { count: 1, summary: thread.did_run({ n: 1 }), items: [{ pos, at_ms: at, text, kind: 'run', state: 'ok', ms: 300 }] } });
 const world = () => [
   prefs('light'),
   {
@@ -48,7 +49,7 @@ const world = () => [
       { pos: 4, at_ms: NOW - 17 * MIN, kind: 'agent', text: '2 tests fail in cart::total. i look.' },
       { pos: 5, at_ms: NOW - 9 * MIN, kind: 'wake', text: 'cargo test ended · rc 0 · after 2m04s', wake: { id: 5, ev: 'ended', kind: 'bg', what: 'cargo test', rc: 0, after_ms: 124_000, tail: ['test cart::total ... ok', 'test checkout::pay ... ok', 'test result: ok. 212 passed; 0 failed'] } },
       { pos: 6, at_ms: NOW - 9 * MIN, kind: 'agent', text: 'all 212 tests pass. i stop watching the reindex and run the bench.' },
-      { pos: 7, at_ms: NOW - 8 * MIN, kind: 'wake', text: 'stopped waiting for the reindex', wake: { id: 7, ev: 'stopped', kind: 'pid', what: 'the reindex', noted: true, after_ms: 60_000 } },
+      { pos: 7, at_ms: NOW - 8 * MIN, kind: 'wake', text: thread.wake_stopped({ what: 'the reindex' }), wake: { id: 7, ev: 'stopped', kind: 'pid', what: 'the reindex', noted: true, after_ms: 60_000 } },
       tool(8, NOW - 2 * MIN - 5000, 'cargo bench'),
     ],
     before: null,
@@ -85,7 +86,7 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
       expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: '…' in ink`).toBe(await token('--c-text'));
       expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: never the accent`).not.toBe(accent);
       // the head: a dim chip, since when, not 'idle'
-      await expect(page.getByTestId('thread.head.state')).toHaveText('… waiting · 2 min');
+      await expect(page.getByTestId('thread.head.state')).toHaveText(thread.chip_paused({ len: '2 min' }));
       // the thread's end: the state first, then what for, dim
       await expect(page.getByTestId('thread.waiting')).toHaveText('continues when cargo bench ends · running for 2 min');
       await expect(page.getByTestId('thread.waiting')).toHaveAttribute('title', 'continues when cargo bench ends · running for 2 min');
@@ -96,8 +97,8 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
       await expect(page.locator('[data-testid="thread.wake.5"] [data-err]'), 'rc 0 is never red').toHaveCount(0);
       expect(await color('[data-testid="thread.wake.5"]'), `${t}: a wake line dim`).toBe(await token('--c-text-2'));
       await expect(page.getByTestId('thread.wake.7')).toHaveText(/^–\s*stopped waiting for the reindex$/u);
-      await expect(page.getByTestId('thread.wake.3.fold')).toContainText('its last 2 lines');
-      await expect(page.getByTestId('thread.wake.5.fold')).toContainText('its last 3 lines');
+      await expect(page.getByTestId('thread.wake.3.fold')).toContainText(thread.wake_tail({ n: 2 }));
+      await expect(page.getByTestId('thread.wake.5.fold')).toContainText(thread.wake_tail({ n: 3 }));
       await expect(page.getByTestId('thread.wake.7.fold')).toHaveCount(0);
       await page.mouse.move(1, 300);
       await page.waitForTimeout(200);

@@ -360,7 +360,7 @@ function WatchDetail({ r, onStop, onAgent }: { r: BarRow; onStop: () => void; on
       </div>
       <div className="app-rb-detail-acts">
         <Act onClick={onAgent} testId={`${r.testId}.open`}>
-          {panel.open_agent({ agent: r.name })}
+          {common.open_agent({ agent: r.name })}
         </Act>
         <Act onClick={onStop} testId={`${r.testId}.stop`}>
           {common.stop_watching}

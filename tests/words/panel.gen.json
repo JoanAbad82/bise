@@ -279,13 +279,6 @@
     "one": null,
     "text": "{rev} on trial"
   },
-  "panel.open_agent": {
-    "args": [
-      "agent"
-    ],
-    "one": null,
-    "text": "open {agent}"
-  },
   "panel.opens_in_browser": {
     "args": [],
     "one": null,
@@ -692,11 +685,6 @@
     ],
     "one": null,
     "text": "{agent} {state} {note}"
-  },
-  "panel.tip_quiet": {
-    "args": [],
-    "one": null,
-    "text": "all quiet"
   },
   "panel.tip_scheduled": {
     "args": [

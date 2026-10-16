@@ -7,6 +7,7 @@
 // the keyboard too, and esc ends a selection without leaving. The scripted core (FakeCore, every
 // fixture). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const P = 'acme-1a2b3c4d';
 type Cmd = { cmd?: string; text?: string; parts?: unknown[] };
@@ -41,7 +42,7 @@ test('review/quote: drag or shift+↓ over diff lines, then type: a quote saying
     await page.screenshot({ path: test.info().outputPath('selected.png') });
 
     await page.keyboard.type('w');
-    await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), "perf's thread").toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), thread.from_thread({ name: 'perf' })).toBeVisible({ timeout: 5000 });
     const chip = page.locator('[data-testid="composer.chip.1"][data-kind="quote"]');
     await expect(chip, 'a quote chip').toBeVisible({ timeout: 3000 });
     await expect(page.getByText('src/query.rs:10-12 · 4 lines')).toBeVisible();

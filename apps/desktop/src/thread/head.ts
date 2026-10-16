@@ -2,6 +2,7 @@
 // role line, the branch line, the composer's label and placeholder. Pure: AgentHead.tsx draws
 // them. The words are the TUI's. Owner: amb-home.
 import type { Agent, EntryKind } from '@/proto';
+import { common, thread } from '@/proto/words.gen';
 import { ago } from '@/agents/model';
 import { paused, pauseLine } from './wake';
 import { composer } from '../proto/words.gen';
@@ -33,25 +34,25 @@ export const STARTING_MS = 20_000;
 /** An agent's state chip at `now`. Pure. */
 export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'waiting_on'> & { watching?: Agent['watching']; turn_ms?: Agent['turn_ms'] }, now: number): StateChip {
   // R9/S3: whom it waits on, the hub's own fact (the TUI's panel reads the same field)
-  if (a.waits > 0 || a.waiting_on?.who === 'you') return { text: '? waiting for you', needs: true, live: false };
+  if (a.waits > 0 || a.waiting_on?.who === 'you') return { text: thread.chip_waits, needs: true, live: false };
   // a pause (agent-waiting-states A): it continues when a command ends or another agent answers, a
   // dim chip with how long ('… waiting · 3 min'); what for in the line over the composer. An alarm
   // leaves it idle: it is free.
   const pause = pauseLine(a, now);
-  if (pause !== null) return { text: `… waiting · ${pause.len}`, needs: false, live: false };
-  if (a.status === 'waiting' || a.status === 'blocked') return { text: '? waiting for you', needs: true, live: false };
+  if (pause !== null) return { text: thread.chip_paused({ len: pause.len }), needs: false, live: false };
+  if (a.status === 'waiting' || a.status === 'blocked') return { text: thread.chip_waits, needs: true, live: false };
   switch (a.status) {
     case 'working': {
       const since = now - a.since_ms;
-      if (a.since_ms > 0 && since < STARTING_MS) return { text: 'starting', needs: false, live: true };
+      if (a.since_ms > 0 && since < STARTING_MS) return { text: thread.chip_starting, needs: false, live: true };
       // the current turn's age, the one the composer's label and the right bar say (designer m_20272 (1))
       const t = ago(a.turn_ms != null ? now - a.turn_ms : a.since_ms, now);
-      return { text: t === 'now' ? 'working' : `working · ${t}`, needs: false, live: true, breath: true };
+      return { text: t === 'now' ? thread.chip_working : thread.chip_working_for({ age: t }), needs: false, live: true, breath: true };
     }
     case 'done':
-      return { text: '✓ done', needs: false, live: false };
+      return { text: thread.chip_done, needs: false, live: false };
     case 'failed':
-      return { text: '✗ failed', needs: false, live: false };
+      return { text: thread.chip_failed, needs: false, live: false };
     default:
       // at rest is the default: no chip (desktop-delight v2); only working, waiting, failed or done
       return { text: '', needs: false, live: false };
@@ -70,16 +71,16 @@ export function roleOf(a: Pick<Agent, 'purpose' | 'title'>): string {
 export function usageLine(words: string | null | undefined): string {
   const w = (words ?? '').trim();
   if (w === '' || /(^|\s)0%$/.test(w)) return '';
-  return `context ${w}`;
+  return thread.head_context({ words: w });
 }
 
 /** A project's bise chip: '2 agents at work', '1 waiting for you', 'all quiet'. */
 export function biseChip(agents: readonly Pick<Agent, 'main' | 'archived' | 'status' | 'waits'>[]): StateChip {
   const waits = agents.reduce((n, a) => n + a.waits, 0);
-  if (waits > 0) return { text: `${String(waits)} waiting for you`, needs: true, live: false };
+  if (waits > 0) return { text: common.waiting_for_you({ n: waits }), needs: true, live: false };
   const work = agents.filter((a) => !a.main && !a.archived && a.status === 'working').length;
-  if (work > 0) return { text: `${String(work)} ${work === 1 ? 'agent' : 'agents'} at work`, needs: false, live: true };
-  return { text: 'all quiet', needs: false, live: false };
+  if (work > 0) return { text: thread.bise_at_work({ n: work }), needs: false, live: true };
+  return { text: common.all_quiet, needs: false, live: false };
 }
 
 /** The composer's label and placeholder: 'to perf' / 'write to perf, then ⏎'. */
@@ -92,7 +93,7 @@ export function workingRowShows(a: Agent | undefined): boolean {
 }
 
 export function composerWords(name: string): { label: string; placeholder: string } {
-  return { label: composer.tab_to({ agent: name }), placeholder: composer.placeholder_to({ agent: name }) };
+  return { label: common.to_agent({ agent: name }), placeholder: composer.placeholder_to({ agent: name }) };
 }
 
 /** K2, ⏎ on an empty composer (the TUI's sb/keys.rs + input.rs): never an empty send. A sign-in

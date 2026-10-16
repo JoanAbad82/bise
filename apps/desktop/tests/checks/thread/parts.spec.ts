@@ -7,6 +7,7 @@
 // '<selection', '<pasted' or '<image' anywhere on screen. An older entry with no parts still draws
 // from its text. Light and dark at 1100, one frame each. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common, thread } from '../../../src/proto/words.gen';
 
 const P = 'shop-ab9f3c3b';
 const NOW = Date.now();
@@ -67,8 +68,8 @@ const world = () => [
         pos: 6,
         at_ms: NOW - 8 * MIN,
         kind: 'approval',
-        text: 'you answered main: <image name="[Image #1]" path="/nowhere/after.png" mime="image/png" b64=""> this one',
-        approval: { ok: true, text: 'you answered main: <image name="[Image #1]" path="/nowhere/after.png" mime="image/png" b64=""> this one' },
+        text: common.fold_answered({ agent: 'main', pick: '<image name="[Image #1]" path="/nowhere/after.png" mime="image/png" b64=""> this one' }),
+        approval: { ok: true, text: common.fold_answered({ agent: 'main', pick: '<image name="[Image #1]" path="/nowhere/after.png" mime="image/png" b64=""> this one' }) },
         parts: [
           { kind: 'image', name: '[Image #1]', source: '/nowhere/after.png', mime: 'image/png' },
           { kind: 'text', text: ' this one' },
@@ -108,7 +109,7 @@ test('thread/parts: his message, his card answer from their typed parts, never a
       await expect(page.getByTestId('thread.you.2.quote.1')).toContainText('the batch size is the shared one.');
       await expect(page.getByTestId('thread.you.2')).toContainText('what does ▤ 1 mean?');
       await expect(page.getByTestId('thread.you.2.paste.1')).toHaveText('▤ 1 · 14 lines');
-      await expect(page.getByTestId('thread.you.2.image.1')).toHaveText('image 1');
+      await expect(page.getByTestId('thread.you.2.image.1')).toHaveText(thread.image_n({ n: 1 }));
       await expect(page.getByTestId('thread.you.2.file')).toHaveText('notes.md');
       // designer m_17969: the parts in one row (paste, file, image), the artifact chip's look:
       // a 1 px line, r 9, --gap-inline (8) apart as every chip row since desktop-spacing (was 6),

@@ -4,6 +4,7 @@
 // text, kept for search and copy): no '<selection …>', '<pasted …>' or '<image …>' tag ever shows.
 // The TUI does the same (rust/tui/src/said.rs view_of / gist). Owner: amb-win. Pure.
 import type { Part } from '@/proto';
+import { common, thread } from '@/proto/words.gen';
 import { anchorLabel } from '@/composer/anchor';
 
 /** A quote he sent: who wrote it, its text, and from a diff where (file, its new / old lines). */
@@ -165,10 +166,11 @@ function oneLine(s: string, max: number): string {
 export function pageNoteWords(n: PageNoteOf, on: boolean): string {
   const text = (n.text ?? '').trim();
   const quote = oneLine(n.quote ?? '', 60);
-  if (n.kind === 'edit') return `"${quote}" → "${oneLine(text, 60)}"`;
-  const marks: Record<string, string> = { keep: '♡ keep', drop: '✗ drop', unsure: '~ not sure', approve: '✓ approve', skip: 'skip' };
-  const mark = n.kind === 'tick' && (text === '' || text === 'done') ? '✓ done' : (marks[n.kind] ?? text);
-  return on && quote !== '' ? `"${quote}": ${mark}` : mark;
+  if (n.kind === 'edit') return thread.note_edit({ old: quote, new: oneLine(text, 60) });
+  const marks: Record<string, string> = { keep: thread.mark_keep, drop: thread.mark_drop, unsure: thread.mark_unsure, approve: thread.mark_approve, skip: thread.mark_skip };
+  // the kit's tick says 'done' (its data, not his words)
+  const mark = n.kind === 'tick' && (text === '' || text === 'done') ? thread.mark_done : (marks[n.kind] ?? text);
+  return on && quote !== '' ? thread.note_on({ quote, mark }) : mark;
 }
 
 /** What he did on a page as its row, bise-proto's words::page_answer word for word: one answer to
@@ -186,20 +188,21 @@ export function pageAnswer(p: PagePart): { head: string; on: string; asked: stri
   const only = p.notes.length === 1 ? p.notes[0] : undefined;
   // a drawn pick's option (notif-artifact, designer m_26560): 'you picked A' (its name before ' · ')
   const name = only !== undefined && only.kind === 'pick' && (only.asked ?? '') !== '' ? pickedName(only.text ?? '') : '';
-  if (only !== undefined && name !== '') return { head: `you picked ${name}`, on: '', asked: (only.asked ?? '').trim(), words: '' };
+  if (only !== undefined && name !== '') return { head: common.picked({ name }), on: '', asked: (only.asked ?? '').trim(), words: '' };
   if (only !== undefined && (only.asked ?? '') !== '') {
     const w = pageNoteWords(only, false).trim();
     const short = !w.includes('\n') && Array.from(w).length <= ON_THE_LINE;
-    return short ? { head: `you answered ${p.to}: ${w}`, on: '', asked: (only.asked ?? '').trim(), words: '' } : { head: `you answered ${p.to}`, on: '', asked: (only.asked ?? '').trim(), words: w };
+    return short
+      ? { head: common.fold_answered({ agent: p.to, pick: w }), on: '', asked: (only.asked ?? '').trim(), words: '' }
+      : { head: thread.answered_to({ who: p.to }), on: '', asked: (only.asked ?? '').trim(), words: w };
   }
   // a note is not an answer (designer m_20985): what he sent, then the page's name, `on`, which the
   // row draws pink and clickable (desktop-agents-bar §5)
-  const n = p.notes.length;
   const head = p.notes.every((x) => x.kind === 'start')
-    ? `you asked ${p.to} for an agent on`
-    : n === 1
-      ? `you sent ${p.to} a note on`
-      : `you sent ${p.to} ${String(n)} notes on`;
+    ? thread.asked_agent({ to: p.to })
+    : p.notes.length === 1
+      ? thread.sent_note({ to: p.to })
+      : thread.sent_notes({ to: p.to, n: p.notes.length });
   return {
     head,
     on: title,

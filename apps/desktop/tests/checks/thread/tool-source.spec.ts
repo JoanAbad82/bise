@@ -4,6 +4,7 @@
 // args' JSON, never the description again (it is the row's words); the output under a rule.
 // Shots: tool-source-<theme>-<w>.png at 1100 and 800. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
@@ -36,10 +37,10 @@ const world = (theme: string) => [
         pos: 2,
         at_ms: NOW - 3 * MIN,
         kind: 'tools',
-        text: 'ran 2 commands',
+        text: thread.did_run({ n: 2 }),
         tools: {
           count: 2,
-          summary: 'ran 2 commands',
+          summary: thread.did_run({ n: 2 }),
           items: [
             { pos: 3, id: 1, at_ms: NOW - 3 * MIN, name: 'run_typescript', intent: "recherche du message d'erreur BoursoBank", text: "recherche du message d'erreur BoursoBank", kind: 'run', state: 'ok', ms: 7600, code: JSON.stringify({ code: TS, description: "recherche du message d'erreur BoursoBank" }), out: '[{"q":"\\"nombre maximal de tentatives\\" Boursorama","ok":true},{"q":"BoursoBank crédit immobilier","ok":true}]' },
             { pos: 4, id: 2, at_ms: NOW - 3 * MIN + 9000, name: 'bash', intent: 'the tests, then the lint', text: 'the tests, then the lint', kind: 'run', state: 'ok', ms: 2300, code: JSON.stringify({ arg: SH, description: 'the tests, then the lint' }), out: 'test result: ok. 12 passed\nok: /nowhere/acme' },

@@ -12,7 +12,7 @@ use super::super::card_draw::{fg, Drawn};
 use super::{cut, Card, CardHit, Enter, Shape};
 use crate::theme;
 use crate::App;
-use bise_proto::words::inbox;
+use bise_proto::words::{common, inbox};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
@@ -71,9 +71,9 @@ pub(in crate::sb) fn page_link_line(c: &Card, w: usize) -> Option<Drawn> {
 /// that agent's (plan-ok, `lean-install proposes a plan`); the rest ask.
 pub(in crate::sb) fn other_title(kind: &str, agent: &str) -> String {
     if kind == "plan" {
-        return inbox::title_plan(agent);
+        return common::title_plan(agent);
     }
-    inbox::title_asks(agent)
+    common::title_asks(agent)
 }
 
 /// A linked card's hint under its options: who reads typed words (`or
@@ -97,7 +97,7 @@ pub(in crate::sb) fn page_hint(c: &Card, s: &Shape) -> Option<String> {
 pub(in crate::sb) fn picked_fold(c: &Card, reply: &str) -> Option<String> {
     c.page.as_ref()?;
     let name = reply.split_once(" · ").map(|(k, _)| k.trim()).filter(|k| !k.is_empty() && k.width() <= 12)?;
-    Some(inbox::picked(name))
+    Some(common::picked(name))
 }
 
 /// Card `id`'s page in the browser at its block; false: no linked page.

@@ -396,8 +396,6 @@ crate::words! { composer:
     voice_button = "voice";
     /// the desktop's + button
     attach_files = "attach files";
-    /// the tab: who his words go to
-    tab_to(agent) = "to {agent}";
     /// the desktop's empty composer in an agent's thread
     placeholder_to(agent) = "write to {agent}, then ⏎";
     /// the tab on an open artifact

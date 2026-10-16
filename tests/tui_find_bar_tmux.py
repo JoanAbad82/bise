@@ -17,6 +17,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, tmux  # noqa: E402
+from words import w  # noqa: E402
 
 LINES = 2500
 OLD = 5
@@ -55,7 +56,7 @@ def main():
         t.wait("bise :*")
         t.wait("filler %d" % LINES)
         t.keys("C-f")
-        sc = t.wait("find in main")
+        sc = t.wait(w("thread.find_in", name="main"))
         lines = sc.splitlines()
         # the corner: the box's top border on the row under the frame's
         # top edge, its right border against the panel's rule

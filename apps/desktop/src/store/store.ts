@@ -29,6 +29,7 @@ import type {
 import { actedAdd, actedAnswered, actedKey, actedOf, actedPrune, cardRefusedOf, type Acted } from "./acted";
 import { refusedAdd, refusedDrop, refusedListOf, refusedOf, refusedPrune, type Attempt, type Refused } from "./refused";
 import type { CoreState } from "@/shared/api";
+import { common } from "@/proto/words.gen";
 import {
   type Ev,
   type EvOf,
@@ -103,7 +104,7 @@ export class Store extends StoreVoice {
     for (const [key, t] of this.threads) {
       if (!t.pending.some((p) => p.state === "sending")) continue;
       t.pending = t.pending.map((p) =>
-        p.state === "sending" ? { ...p, state: "failed", why: "not sent" } : p,
+        p.state === "sending" ? { ...p, state: "failed", why: common.not_sent } : p,
       );
       this.emit(`pending:${key}`);
     }
@@ -482,7 +483,7 @@ export class Store extends StoreVoice {
     t.pending = [...t.pending, p];
     this.emit(`pending:${key}`);
     if (this.coreState === "down") {
-      this.failOldest(a.project, "not sent");
+      this.failOldest(a.project, common.not_sent);
       return p.cid;
     }
     // G: the cid goes along (echoed on its error); with parts, no text: the hub renders it (m_22248)

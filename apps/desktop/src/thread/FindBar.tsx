@@ -7,6 +7,7 @@
 // match only when it moves by his doing (find.ts `moved`), never because a line came. Owner: thread-perf.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Field, IconButton } from '@/ds';
+import { thread } from '@/proto/words.gen';
 import { useStore, useThreadHits, useThreadOrder } from '@/store';
 import { findText } from './entry';
 import { counter, currentMatch, EMPTY, found, newer, offsetsIn, older, refresh, search, type FindState, type Findable } from './find';
@@ -148,8 +149,8 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
       <Field
         ref={field}
         testId="thread.find.field"
-        placeholder="find in this thread"
-        aria-label="find in this thread"
+        placeholder={thread.find_placeholder}
+        aria-label={thread.find_placeholder}
         defaultValue={first}
         onChange={(e) => {
           keepNeedle(e.currentTarget.value);
@@ -171,7 +172,7 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
       </span>
       <span className="th-find-acts">
         <IconButton
-          label="older match"
+          label={thread.find_older}
           keys="⏎"
           onClick={() => {
             setS(older);
@@ -181,7 +182,7 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
           ↑
         </IconButton>
         <IconButton
-          label="newer match"
+          label={thread.find_newer}
           keys="⇧⏎"
           onClick={() => {
             setS(newer);
@@ -190,7 +191,7 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
         >
           ↓
         </IconButton>
-        <IconButton label="close find" keys="esc" onClick={close} testId="thread.find.close">
+        <IconButton label={thread.find_close} keys="esc" onClick={close} testId="thread.find.close">
           ×
         </IconButton>
       </span>

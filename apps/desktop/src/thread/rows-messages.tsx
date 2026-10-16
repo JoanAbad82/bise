@@ -5,6 +5,7 @@ import { memo, useContext, useEffect, useState, type ReactNode } from 'react';
 import { RouterContext } from '@/app/router';
 import { Button, Chip, Fold, Press } from '@/ds';
 import type { Entry } from '@/proto';
+import { common, thread } from '@/proto/words.gen';
 import { useAgents, useArtifacts, useCoreState, useHubRefused, usePending, useProjects, useStore } from '@/store';
 import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
@@ -132,7 +133,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   };
   const chip = e.context != null ? chipOf(e.context) : null;
   // in bise's or a main's thread, a message that went to someone else says so; to the owner, nothing
-  const to = e.to != null && e.to !== '' && e.to !== ctx.agent ? `to ${e.to}` : undefined;
+  const to = e.to != null && e.to !== '' && e.to !== ctx.agent ? common.to_agent({ agent: e.to }) : undefined;
   // a steer: the hub's receipt says where the agent read it (the list placed it there), with
   // 'steered · perf read it mid-turn' under it (amb-feed 9633cd2a; no more guessing from neighbors)
   const steered = e.steered_at != null;
@@ -143,7 +144,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   const mark = steered ? null : deliveryMark(e.delivery, shownName(to !== undefined && e.to != null ? e.to : ctx.agent));
   // H12 (designer m_19832): no time under his bubbles, only on hover; the steer, the said line and
   // the delivery mark stay
-  const words = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : saidMs !== null ? saidFor(saidMs) : undefined;
+  const words = steered ? thread.steered({ agent: shownName(ctx.agent) }) : saidMs !== null ? saidFor(saidMs) : undefined;
   // typed with fn space (designer m_22714): 'from fn' first on the row, always; the time after it
   // keeps H12's hover rule (its ' · ' with it). Read from the hub's hint part, never its words
   const fromFn = drawn !== null && viaFn(drawn, saidMs !== null);
@@ -155,7 +156,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   const routed: ReactNode =
     went != null ? (
       <>
-        {'sent to '}
+        {thread.sent_to({ name: '' })}
         <span
           className="th-answer-link"
           role="link"
@@ -170,7 +171,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
         </span>
       </>
     ) : e.via === 'bise' ? (
-      'via bise'
+      thread.via_bise
     ) : undefined;
   const time =
     e.at_ms > 0 ? (
@@ -185,10 +186,10 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
       <>
         <span
           className="th-you-via"
-          title={went != null ? `bise sent your words to ${went.name}'s main · click opens it there` : routed !== undefined ? 'your words, sent to bise and brought here' : 'sent with fn, from another app'}
+          title={went != null ? thread.went_tip({ name: went.name }) : routed !== undefined ? thread.via_bise_tip : thread.from_fn_tip}
           data-testid={`thread.you.${String(e.pos)}.via`}
         >
-          {fromFn && 'from fn'}
+          {fromFn && thread.from_fn}
           {fromFn && routed !== undefined && ' · '}
           {routed}
         </span>
@@ -217,7 +218,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
       {text !== '' && <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} breaks />}
       {fold !== undefined && (
         <Fold open={open} onToggle={toggle} hint={hint} testId={`thread.fold.${e.pos}`}>
-          {open ? 'fold it' : `show all · ${String(fold.lines)} lines`}
+          {open ? thread.fold_it : thread.show_all({ n: fold.lines })}
         </Fold>
       )}
       {view !== null && <PartChips view={view} ctx={ctx} pos={e.pos} />}
@@ -308,7 +309,7 @@ export function PartChips({ view, ctx, pos, named = false }: { view: YouView; ct
 
 /** An image part's chip words: its file name when it has one, else 'image 1' (its order here), never the '[Image #n]' tag (designer m_17969). Pure. */
 export function partImageWords(name: string, i: number): string {
-  return name !== '' && !name.startsWith('[') ? name : `image ${String(i + 1)}`;
+  return name !== '' && !name.startsWith('[') ? name : thread.image_n({ n: i + 1 });
 }
 
 /** '◫ with Chrome · localhost:4801/sett…': a url opens in his browser, a file in his editor; a shot alone isn't kept. */
@@ -348,11 +349,12 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
   // under his bubble, in its time's place (messages-right v1): 'sending…' until it lands, the
   // reason it wasn't sent in --c-err with 'try again' (his words stay in the bubble), where it went
   const queued = p.mode === 'queued' && !failed && hold === undefined;
-  const why = p.why !== undefined && p.why !== 'not sent' ? `: ${p.why}` : '';
+  // the store's own 'not sent' (store.ts): no why to add
+  const why = p.why !== undefined && p.why !== common.not_sent ? p.why : '';
   const under =
-    hold?.state === 'held' ? undefined : hold?.state === 'sent' ? `sent to ${hold.name}` : failed ? (
+    hold?.state === 'held' ? undefined : hold?.state === 'sent' ? thread.sent_to({ name: hold.name }) : failed ? (
       <span className="th-you-fail">
-        <span className="th-you-err">{`▲ not sent${why}`}</span>
+        <span className="th-you-err">{why === '' ? thread.not_sent : thread.not_sent_because({ why })}</span>
         <Press
           look="th-you-act"
           onClick={() => {
@@ -360,7 +362,7 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
           }}
           data-testid={`thread.retry.${cid}`}
         >
-          try again
+          {common.try_again}
         </Press>
         <Press
           look="th-you-act"
@@ -369,13 +371,13 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
           }}
           data-testid={`thread.dismiss.${cid}`}
         >
-          drop
+          {thread.drop}
         </Press>
       </span>
     ) : queued ? (
-      `queued · sends when ${ctx.agent}'s turn ends`
+      thread.queued_until({ agent: ctx.agent })
     ) : (
-      (connecting ?? 'sending…')
+      (connecting ?? thread.sending)
     );
   return (
     <div className={failed ? 'th-row th-pending th-failed' : hold?.state === 'sent' ? 'th-row th-routed' : 'th-row th-pending'} data-testid={`thread.pending.${cid}`} data-state={state} data-side="you">
@@ -402,7 +404,7 @@ function useConnecting(project: string): string | undefined {
   const name = row === undefined || row.home ? 'bise' : row.name;
   if (refused) return refusedLead(name);
   if (core === 'up' && agents.length > 0) return undefined;
-  return `connecting to ${name}…`;
+  return thread.connecting({ name });
 }
 
 /** Seconds left to change a held route, ticking while it shows. */
@@ -431,7 +433,7 @@ function HoldLine({ hold }: { hold: Hold }) {
   return (
     <div className="th-hold" data-testid="thread.route" role="status" title={hold.why}>
       <span className="th-hold-to">
-        → bise · {hold.name} · {left} s to change
+        {thread.hold_line({ name: hold.name, left })}
       </span>
       <Button
         kind="ghost"
@@ -440,7 +442,7 @@ function HoldLine({ hold }: { hold: Hold }) {
         }}
         testId="thread.route.keep"
       >
-        keep it with bise (esc)
+        {thread.route_keep}
       </Button>
       {others.map((o) => (
         <Chip

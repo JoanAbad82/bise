@@ -17,6 +17,7 @@
 // Owner: inbox-open.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect, textProblems } from '../../harness';
+import { common } from '../../../src/proto/words_common.gen';
 import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
@@ -34,7 +35,7 @@ const LEN = 1000;
 const ENTRIES = Array.from({ length: LEN }, (_, i) => {
   const pos = i + 1;
   const at_ms = NOW - 21 * DAY + i * (20 * DAY / LEN);
-  if (pos === ANSWER) return { pos, at_ms, kind: 'approval', text: inbox.fold_answered({ agent: 'search', pick: 'EU sizes, with a US hint' }), approval: { ok: true, text: inbox.fold_answered({ agent: 'search', pick: 'EU sizes, with a US hint' }), card: 21 } };
+  if (pos === ANSWER) return { pos, at_ms, kind: 'approval', text: common.fold_answered({ agent: 'search', pick: 'EU sizes, with a US hint' }), approval: { ok: true, text: common.fold_answered({ agent: 'search', pick: 'EU sizes, with a US hint' }), card: 21 } };
   return { pos, at_ms, kind: 'agent', text: `search note ${String(pos)}: checked the size filter on page ${String(pos)}` };
 });
 const asked = (d: number) => NOW - d * DAY;

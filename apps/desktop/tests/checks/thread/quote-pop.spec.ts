@@ -6,6 +6,7 @@
 // The scripted core (FakeCore). Owner: amb-web.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 import { expectShown } from './shown';
 import { composer } from '../../../src/proto/words.gen';
 
@@ -132,7 +133,7 @@ test('review/quote-pop: a click on the pop asks about the picked lines, the thre
     const pop = page.getByTestId('review.quote.pop');
     await expect(pop).toHaveText('type to ask perf about it · tab quote · ⌘C copy');
     await page.getByTestId('review.quote.pop.ask').click();
-    await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), "perf's thread").toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), thread.from_thread({ name: 'perf' })).toBeVisible({ timeout: 5000 });
     const chip = page.locator('[data-testid="composer.chip.1"][data-kind="quote"]');
     await expect(chip, 'a quote chip').toBeVisible({ timeout: 3000 });
     await expect(page.getByText(composer.quote_about({ place: 'src/query.rs:10-11', n: 3 }))).toBeVisible();
@@ -158,7 +159,7 @@ test('review/quote-pop: tab asks about the picked lines, the thread opens with t
     const pop = page.getByTestId('review.quote.pop');
     await expect(pop).toBeVisible();
     await page.keyboard.press('Tab');
-    await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), "perf's thread").toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), thread.from_thread({ name: 'perf' })).toBeVisible({ timeout: 5000 });
     const chip = page.locator('[data-testid="composer.chip.1"][data-kind="quote"]');
     await expect(chip, 'a quote chip').toBeVisible({ timeout: 3000 });
     await expect(page.getByText(composer.quote_about({ place: 'src/query.rs:10-11', n: 3 }))).toBeVisible();

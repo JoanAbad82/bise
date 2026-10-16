@@ -37,7 +37,7 @@
 //! opens them is not built yet.
 
 use super::*;
-use bise_proto::words::inbox;
+use bise_proto::words::{common, inbox};
 use crate::editor::Editor;
 use crate::theme;
 use std::cell::RefCell;
@@ -703,7 +703,7 @@ pub(super) fn glyph_color(kind: &str) -> Color {
 /// A card's title, after its glyph (copy deck §17: `{name} needs you`).
 fn kind_title(kind: &str, agent: &str) -> String {
     match kind {
-        "question" => inbox::title_asks(agent),
+        "question" => common::title_asks(agent),
         "blocked" => inbox::title_blocked(agent),
         "failed" => inbox::title_failed(agent),
         "restart" => inbox::title_restart.into(),
@@ -882,7 +882,7 @@ pub(super) fn fold_of(c: &Card, reply: &str, picked: Option<&str>) -> Fold {
     if !gate {
         // a picked option: its short label on the line (`both`)
         let (text, note) = match picked {
-            Some(p) => (picked_fold(c, reply).unwrap_or_else(|| inbox::fold_answered(&c.agent, p)), String::new()),
+            Some(p) => (picked_fold(c, reply).unwrap_or_else(|| common::fold_answered(&c.agent, p)), String::new()),
             None => answered(&c.agent, reply),
         };
         return Fold { ok: true, text, note, asked: c.text.trim().to_string() };
@@ -891,13 +891,13 @@ pub(super) fn fold_of(c: &Card, reply: &str, picked: Option<&str>) -> Fold {
     let no = reply == "no" || reply == "deny" || reply.starts_with("deny: ");
     if no {
         let note = reply.strip_prefix("deny: ").unwrap_or("").trim().to_string();
-        return Fold { ok: false, text: inbox::fold_no(&c.agent, &what), note, asked: String::new() };
+        return Fold { ok: false, text: common::fold_no(&c.agent, &what), note, asked: String::new() };
     }
     let outside = c.text.lines().next().is_some_and(|h| h.ends_with("outside the sandbox"));
     let text = if outside {
-        inbox::fold_outside(&c.agent, &what)
+        common::fold_outside(&c.agent, &what)
     } else {
-        inbox::fold_allowed(&c.agent, &what)
+        common::fold_allowed(&c.agent, &what)
     };
     Fold { ok: true, text, note: String::new(), asked: String::new() }
 }

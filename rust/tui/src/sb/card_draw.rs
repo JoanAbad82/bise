@@ -547,7 +547,7 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
         let more = more + (keep - middle.len());
         let f = fg(theme::faint());
         middle.push(Drawn::plain(Line::from(vec![
-            Span::styled(format!("{} {} · ", theme::ellipsis(), inbox::more_lines(more)), f),
+            Span::styled(format!("{} {} · ", theme::ellipsis(), common::more_lines(more)), f),
             Span::styled("ctrl+o", fg(theme::text())),
             Span::styled(format!(" {}", inbox::key_full), f),
         ])));

@@ -9,6 +9,7 @@
 // Owner: amb-win.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
@@ -29,15 +30,15 @@ const world = () => [
     agent: 'perf',
     entries: [
       { pos: 1, at_ms: NOW - 8 * MIN, kind: 'you', text: 'map the submission loop' },
-      { pos: 2, at_ms: NOW - 7 * MIN, kind: 'thinking', text: 'thought for 3.2s', thinking: { ms: 3200, text: 'the loop reads core state first, then the channels' } },
+      { pos: 2, at_ms: NOW - 7 * MIN, kind: 'thinking', text: thread.thought_for({ dur: '3.2s' }), thinking: { ms: 3200, text: 'the loop reads core state first, then the channels' } },
       {
         pos: 3,
         at_ms: NOW - 7 * MIN,
         kind: 'tools',
-        text: 'ran 1 command, read 2 files',
+        text: `${thread.did_run({ n: 1 })}, ${thread.did_read({ n: 2 })}`,
         tools: {
           count: 3,
-          summary: 'ran 1 command, read 2 files',
+          summary: `${thread.did_run({ n: 1 })}, ${thread.did_read({ n: 2 })}`,
           items: [
             { pos: 4, at_ms: NOW - 7 * MIN, text: 'rg submission core/', kind: 'run', state: 'ok', ms: 900, code: 'rg submission core/', out: 'core/loop.rs:12: fn submission_loop' },
             { pos: 5, at_ms: NOW - 7 * MIN + 2000, text: 'read_file: {"path":"core/loop.rs"}', kind: 'read', state: 'ok', ms: 20 },
@@ -66,7 +67,7 @@ test("thread/folds-open: a click opens a steps pill, a thinking and a '$' line; 
     const { page } = s;
     const o = opened(page);
     const pill = page.getByTestId('thread.tools.3');
-    await expect(pill, "the folded steps' pill").toContainText('read 2 files', { timeout: 10_000 });
+    await expect(pill, "the folded steps' pill").toContainText(thread.did_read({ n: 2 }), { timeout: 10_000 });
     await expect(o.steps).toHaveCount(0);
     await page.mouse.move(1, 300);
     await page.screenshot({ path: test.info().outputPath('closed-dark.png') });

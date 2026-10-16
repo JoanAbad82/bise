@@ -6,6 +6,7 @@
 // StartingLine: the empty thread's line. The words are head.ts's. Owner: amb-home.
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { Agent } from '@/proto';
+import { thread } from '@/proto/words.gen';
 import { useAgents, useComputerLive, useDiff } from '@/store';
 import { useNowFor } from '@/app/clock';
 import { pauseInSeconds } from './wake';
@@ -16,7 +17,7 @@ import { archivedFit, biseChip, roleOf, stateChip, type StateChip } from './head
 import { Button, Press } from '@/ds';
 
 /** an agent whose wheel he took waits for him, like any agent that asks him */
-const HELD: StateChip = { text: '? waiting for you', needs: true, live: false };
+const HELD: StateChip = { text: thread.chip_waits, needs: true, live: false };
 
 function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
   if (chip.text === '') return null;
@@ -77,11 +78,11 @@ function Restore({ icon, onRestore }: { icon: boolean; onRestore: () => void }) 
     <>
       <span className={icon ? 'ah-restore-full ah-gone' : 'ah-restore-full'} aria-hidden={icon || undefined}>
         <Button size="sm" onClick={onRestore} testId={icon ? undefined : 'thread.head.restore'}>
-          ↺ restore
+          ↺ {thread.restore}
         </Button>
       </span>
       <span className={icon ? 'ah-icon' : 'ah-icon ah-gone'} aria-hidden={!icon || undefined}>
-        <Button size="sm" onClick={onRestore} testId={icon ? 'thread.head.restore' : undefined} title="restore">
+        <Button size="sm" onClick={onRestore} testId={icon ? 'thread.head.restore' : undefined} title={thread.restore}>
           ↺
         </Button>
       </span>
@@ -127,10 +128,10 @@ export function AgentHead({ project, a, more, note, starting = false, restore, n
           restore turns to its icon (designer m_21714) */}
       {restore !== undefined ? (
         <span className={arch.stage >= 1 ? 'ah-chip ah-archived ah-gone' : 'ah-chip ah-archived'} data-testid="thread.head.state" aria-hidden={arch.stage >= 1 || undefined}>
-          archived
+          {thread.chip_archived}
         </span>
       ) : (
-        <Chip chip={starting && a.waits === 0 ? { text: 'starting', needs: false, live: true } : held ? HELD : stateChip(a, now)} testId="thread.head.state" />
+        <Chip chip={starting && a.waits === 0 ? { text: thread.chip_starting, needs: false, live: true } : held ? HELD : stateChip(a, now)} testId="thread.head.state" />
       )}
       {note !== undefined && (
         <span className="ah-note" data-testid="thread.voice">
@@ -181,12 +182,12 @@ export function BiseHead({ project, name, more }: { project: string; name: strin
 
 /** The empty thread (v6 (5), the working page): '· checkout is starting · its own folder, sb/checkout', the '·' pulsing. */
 export function StartingLine({ a }: { a: Agent }) {
-  const where = a.branch != null && a.branch !== '' ? `its own folder, ${a.branch}` : "the project's folder";
+  const where = a.branch != null && a.branch !== '' ? thread.own_folder({ branch: a.branch }) : thread.project_folder;
   return (
     <div className="th-live th-starting" role="status" data-testid="thread.starting">
       <Pulse kind="starting" />
       <span className="th-live-words">
-        <b className="th-live-name">{a.name}</b> is starting
+        <b className="th-live-name">{a.name}</b> {thread.is_starting}
         <span className="th-live-dot"> · </span>
         <span className="th-live-act">{where}</span>
       </span>

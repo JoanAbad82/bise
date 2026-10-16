@@ -358,8 +358,6 @@ export const composer = {
   voice_button: "voice",
   /** the desktop's + button */
   attach_files: "attach files",
-  /** the tab: who his words go to */
-  tab_to: (a: { agent: string | number }): string => "to " + String(a.agent),
   /** the desktop's empty composer in an agent's thread */
   placeholder_to: (a: { agent: string | number }): string => "write to " + String(a.agent) + ", then ⏎",
   /** the tab on an open artifact */

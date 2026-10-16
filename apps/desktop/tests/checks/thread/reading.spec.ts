@@ -16,6 +16,7 @@
 // ambient. Owner: amb-home.
 import { writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const prefs = (theme: 'light' | 'dark') => ({
@@ -48,7 +49,7 @@ const CONTEXT_BLOCK = '\n\n<screen_context app="Chrome">\nThis is what was in fr
 
 const world = (now: number) => {
   const y = now - 86_400_000;
-  const restored = (pos: number, at: number) => ({ pos, at_ms: at, kind: 'notice', text: 'session restored · 6 messages', notice: { level: 'info', text: 'session restored · 6 messages' } });
+  const restored = (pos: number, at: number) => ({ pos, at_ms: at, kind: 'notice', text: thread.session_restored({ count: 6 }), notice: { level: 'info', text: thread.session_restored({ count: 6 }) } });
   return [
     prefs('light'),
     { ev: 'projects', projects: [{ project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true }] },
@@ -60,7 +61,7 @@ const world = (now: number) => {
       agent: 'main',
       entries: [
         { pos: 1, at_ms: y, kind: 'you', text: ASK + CONTEXT_BLOCK, context: { app: 'Chrome', url: 'http://localhost:4801/settings', title: 'settings · bench' } },
-        { pos: 2, at_ms: y + 1000, kind: 'thinking', text: 'thought for 0.0s', thinking: { ms: 0, text: '' } },
+        { pos: 2, at_ms: y + 1000, kind: 'thinking', text: thread.thought_for({ dur: '0.0s' }), thinking: { ms: 0, text: '' } },
         { pos: 3, at_ms: y + MIN, kind: 'agent', text: `${PROSE}\n\n${CODE}` },
         { pos: 4, at_ms: y + 2 * MIN, kind: 'agent', text: `the three runs:\n\n${TABLE}` },
         restored(5, now - 30 * MIN),
@@ -115,10 +116,10 @@ test('thread/reading: one column, no raw context, no empty thinking, one restore
     expect(body).not.toContain('screen_context');
     expect(body).not.toContain('This is what was in front of the user');
     await expect(page.getByTestId('thread.entry.1')).toContainText(ASK);
-    await expect(page.getByTestId('thread.context.1')).toHaveText('◫ with Chrome · localhost:4801/sett…');
+    await expect(page.getByTestId('thread.context.1')).toHaveText(`${thread.ctx_with({ app: 'Chrome' })} · localhost:4801/sett…`);
     // (c) no 0.0 s thinking
     await expect(page.getByTestId('thread.think.2')).toHaveCount(0);
-    expect(body).not.toContain('thought for 0.0s');
+    expect(body).not.toContain(thread.thought_for({ dur: '0.0s' }));
     // (f) no avatars; bise's ':*' on its name line (bise-presence v10: still and ink, designer m_24599)
     await expect(page.locator('.b-av')).toHaveCount(0);
     await expect(page.locator('[data-testid="thread.entry.3"] .b-who .b-bise')).toHaveCount(1);

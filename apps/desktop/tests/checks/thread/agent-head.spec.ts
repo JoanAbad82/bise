@@ -21,6 +21,7 @@
 // Owner: amb-home.
 import { writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common, thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'storefront-1a2b3c4d';
@@ -91,10 +92,10 @@ const world = (now: number) => {
           pos: 7,
           at_ms: now - 10 * MIN,
           kind: 'tools',
-          text: 'edited 2 files',
+          text: thread.did_edit({ n: 2 }),
           tools: {
             count: 2,
-            summary: 'edited 2 files',
+            summary: thread.did_edit({ n: 2 }),
             items: [
               { pos: 8, at_ms: now - 10 * MIN, text: 'web/product/Hero.tsx', kind: 'edit' },
               { pos: 9, at_ms: now - 10 * MIN + 4000, text: 'web/product/Reviews.tsx', kind: 'edit' },
@@ -208,7 +209,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
         for (const w of [1400, 800]) {
           await size(w, 900);
           if (label === 'search') {
-            await expect(page.getByTestId('thread.head.state')).toHaveText('? waiting for you');
+            await expect(page.getByTestId('thread.head.state')).toHaveText(thread.chip_waits);
             await expect(page.getByTestId('thread.head.state')).toHaveAttribute('data-needs', 'true');
             // designer m_12065 (4): its question docked above the composer, the label in the accent
             if (!(await page.getByTestId('inbox.block.open.1').isVisible())) await page.getByTestId('inbox.block.row.1').click();
@@ -221,7 +222,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
           if (label === 'bise · storefront') {
             await expect(page.getByTestId('thread.head.name')).toHaveText('bise · storefront');
             await expect(page.getByTestId('thread.head.mark'), "bise's ':*'").toHaveCount(1);
-            await expect(page.getByTestId('thread.head.state')).toHaveText('1 waiting for you');
+            await expect(page.getByTestId('thread.head.state')).toHaveText(common.waiting_for_you({ n: 1 }));
             // (3) its handoffs
             await expect(page.getByTestId('thread.handoff.3')).toHaveText('✚new agent perf · product page speed');
             await expect(page.getByTestId('thread.handoff.4')).toHaveText('✚new agent search · size filter on search');

@@ -19,6 +19,7 @@
 // Owner: inbox-screen.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect, textProblems } from '../../harness';
+import { common } from '../../../src/proto/words_common.gen';
 import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
@@ -65,8 +66,8 @@ const world = () => [
   {
     ev: 'thread', project: P, agent: 'perf', before: null, more: false,
     entries: [
-      { pos: 1, at_ms: today(11, 40), kind: 'approval', text: inbox.fold_answered({ agent: 'perf', pick: 'after the bench' }), approval: { ok: true, text: inbox.fold_answered({ agent: 'perf', pick: 'after the bench' }), card: 5 } },
-      { pos: 2, at_ms: today(13, 58), kind: 'approval', text: inbox.fold_answered({ agent: 'perf', pick: 'only for Safari 16' }), approval: { ok: true, text: inbox.fold_answered({ agent: 'perf', pick: 'only for Safari 16' }), card: 7 } },
+      { pos: 1, at_ms: today(11, 40), kind: 'approval', text: common.fold_answered({ agent: 'perf', pick: 'after the bench' }), approval: { ok: true, text: common.fold_answered({ agent: 'perf', pick: 'after the bench' }), card: 5 } },
+      { pos: 2, at_ms: today(13, 58), kind: 'approval', text: common.fold_answered({ agent: 'perf', pick: 'only for Safari 16' }), approval: { ok: true, text: common.fold_answered({ agent: 'perf', pick: 'only for Safari 16' }), card: 7 } },
       { pos: 3, at_ms: today(14, 0), kind: 'agent', text: 'kept a webp fallback for Safari 16' },
     ],
   },

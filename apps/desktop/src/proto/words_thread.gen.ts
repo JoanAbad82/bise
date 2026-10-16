@@ -4,4 +4,414 @@
 // bise_proto::words::thread: rust/proto/src/words/thread.rs, never a word typed here.
 
 export const thread = {
+  /** a thinking row's head, its time unknown */
+  thought: "thought",
+  /** a thinking row's head: `thought for 3.2s` */
+  thought_for: (a: { dur: string | number }): string => "thought for " + String(a.dur),
+  /** the row while the agent compacts its context (the hub's fold) */
+  compacting: "compacting",
+  /** the desktop's row while the agent compacts its context */
+  compacting_context: "compacting its context…",
+  /** the desktop's row once it compacted (opens to the summary) */
+  compacted: "context compacted",
+  /** a message from an agent the hub didn't name */
+  an_agent: "an agent",
+  /** voice mode: he spoke over the agent */
+  you_cut_in: "you cut in",
+  /** voice mode: the agent says its answer aloud */
+  speaking: "∿ speaking",
+  /** a tool's output, cut by the hub, its size unknown */
+  out_cut: "… cut after 4 KB",
+  /** a tool's output, cut by the hub: `… 4 KB of 12 KB shown` */
+  out_shown: (a: { shown: string | number; total: string | number }): string => "… " + String(a.shown) + " of " + String(a.total) + " shown",
+  /** a message the hub couldn't deliver */
+  not_delivered: (a: { to: string | number }): string => "not delivered to " + String(a.to),
+  /** that message, sent again */
+  sent_again: "sent again",
+  /** the act that sends it again */
+  send_again: "send again",
+  /** a message the pause holds, under it */
+  held: "held until /resume",
+  /** a message its agent never got */
+  undelivered: (a: { name: string | number }): string => "not delivered: " + String(a.name) + " stopped.",
+  /** its keys while it waits for him */
+  undelivered_keys: " ⏎ send again · esc drop",
+  /** a request the provider refused (BISE-293) */
+  refused: (a: { head: string | number }): string => "the turn stopped: " + String(a.head),
+  /** another agent's message to him: `perf to you:` */
+  to_you: (a: { from: string | number }): string => String(a.from) + " to you:",
+  /** the fold of a run of messages between agents, one agent */
+  between_one: (a: { n: string | number }): string => String(a.n) + " messages between 1 agent",
+  /** the fold of a run of messages between agents */
+  between: (a: { n: string | number; agents: string | number }): string => String(a.n) + " messages between " + String(a.agents) + " agents",
+  /** a skill row while it reads (its name after) */
+  skill_reading: "reading skill",
+  /** a skill row once read */
+  skill_read: "read skill",
+  /** a skill call that failed, its reason unknown */
+  skill_failed: "failed",
+  /** a command's exit code, right of its row */
+  exit: (a: { code: string | number }): string => "exit " + String(a.code),
+  /** a call /pause cut, right of its row */
+  pause_cut: "– stopped by the pause",
+  /** a call a gate holds for his answer */
+  gate_waits: "waiting for you",
+  /** a call the gate checks (the ellipsis after it is the theme's) */
+  gate_checking: "checking",
+  /** the TUI's find field, empty */
+  find_in: (a: { name: string | number }): string => "find in " + String(a.name),
+  /** the find counter, nothing found */
+  find_none: "no match",
+  /** a notification the agent received */
+  notification_received: (a: { text: string | number }): string => "notification : " + String(a.text),
+  /** a notification handed to the model */
+  notification_delivered: (a: { text: string | number }): string => "notification delivered to the model: " + String(a.text),
+  /** the harness crashed and came back */
+  harness_restarted: (a: { why: string | number }): string => "the harness crashed (" + String(a.why) + ") and restarted — the current turn is interrupted, the history is restored up to the last model call",
+  /** a model answer the runtime threw away */
+  candidate_discarded: (a: { why: string | number }): string => "candidate discarded: " + String(a.why),
+  /** a compaction that failed */
+  compaction_failed: (a: { why: string | number }): string => "compaction failed: " + String(a.why),
+  /** a session restored from its history: `session restored · 14 messages` */
+  session_restored: (a: { count: string | number }): string => "session restored · " + String(a.count) + " messages",
+  /** the desktop's restored row, its time unknown (and the start it knows the notice by) */
+  restored: "session restored",
+  /** the desktop's restored row: `session restored · 14:02` */
+  restored_at: (a: { at: string | number }): string => "session restored · " + String(a.at),
+  /** the model answered nothing */
+  empty_response: "empty response from the model — retrying",
+  /** a turn someone stopped (a ▲, dim) */
+  turn_interrupted: "turn interrupted",
+  /** a turn someone named stopped: `turn interrupted by main` */
+  turn_interrupted_by: (a: { by: string | number }): string => "turn interrupted by " + String(a.by),
+  /** a turn that stopped for another reason */
+  turn_stopped: (a: { why: string | number }): string => "turn stopped: " + String(a.why),
+  /** a turn that failed, and why */
+  turn_failed: (a: { why: string | number }): string => "turn failed: " + String(a.why),
+  /** a turn stopped on a provider with no key (BISE-294) */
+  no_key: (a: { provider: string | number }): string => "turn stopped: no " + String(a.provider) + " key yet. /provider sets it up.",
+  /** the in-flight completion had no turn to land on (an interrupt) */
+  response_dropped: "in-flight response dropped (turn interrupted)",
+  /** his queued message, taken back before delivery */
+  taken_back: "taken back",
+  /** a model call that failed and waits to retry */
+  retry: (a: { attempt: string | number; max: string | number; why: string | number; next: string | number; secs: string | number }): string => "model call failed (attempt " + String(a.attempt) + "/" + String(a.max) + "): " + String(a.why) + " · retry " + String(a.next) + "/" + String(a.max) + " in " + String(a.secs) + "s",
+  /** the desktop's retry row, the call went through in the end */
+  retry_through: (a: { n: number }): string => a.n === 1 ? "model call failed " + String(a.n) + " time · went through" : "model call failed " + String(a.n) + " times · went through",
+  /** the desktop's retry row, its last try failed */
+  retry_last: (a: { attempt: string | number; max: string | number }): string => "model call failed · try " + String(a.attempt) + " of " + String(a.max) + " failed",
+  /** the desktop's retry row, its next try: `retry 3 of 10 in 4 s` */
+  retry_next: (a: { attempt: string | number; max: string | number; wait: string | number }): string => "model call failed · retry " + String(a.attempt) + " of " + String(a.max) + " in " + String(a.wait),
+  /** a model call that failed, its line not the usual shape */
+  retry_odd: (a: { why: string | number }): string => "model call failed: " + String(a.why),
+  /** a spawn line from the hub */
+  spawn: (a: { text: string | number }): string => "✚ " + String(a.text),
+  /** a direct message between two agents */
+  direct: (a: { text: string | number }): string => "⇄ " + String(a.text),
+  /** a message he routed by hand */
+  route: (a: { text: string | number }): string => "→ " + String(a.text),
+  /** a card closed (its words end with a space, as they always did) */
+  card_closed: (a: { text: string | number }): string => "card " + String(a.text) + " ",
+  /** while it reloads */
+  reloading: (a: { to: string | number }): string => "reloading bise on " + String(a.to),
+  /** once the new hub is up */
+  reloaded: (a: { to: string | number }): string => "✓ reloaded on " + String(a.to),
+  /** it rolled back */
+  reload_failed: (a: { why: string | number }): string => "▲ couldn't reload: " + String(a.why),
+  /** it rolled back, the hub didn't say why */
+  reload_failed_why: "the new version failed",
+  /** the desktop's words for a hub that died in its probation */
+  reload_died: (a: { from: string | number }): string => "the new version stopped right after it started. you're still on " + String(a.from) + ".",
+  /** the version it is still on, the hub didn't say which */
+  reload_before: "the version before",
+  /** the desktop's short line (under 160 px): reloading */
+  reload_short_running: "reloading…",
+  /** the desktop's short line: reloaded */
+  reload_short_done: "✓ reloaded",
+  /** the desktop's short line: it rolled back */
+  reload_short_failed: "▲ couldn't reload",
+  /** the desktop's act on a rolled-back line */
+  reload_retry: "retry",
+  /** the context gauge in full: `42k / 200k tokens · 21%` */
+  context_of: (a: { used: string | number; window: string | number; percent: string | number }): string => String(a.used) + " / " + String(a.window) + " tokens · " + String(a.percent) + "%",
+  /** the context gauge without a known window: `42k tokens` */
+  context_tokens: (a: { used: string | number }): string => String(a.used) + " tokens",
+  /** a usage sum that ran on his ChatGPT plan */
+  usage_plan: "your ChatGPT plan",
+  /** a landed row's files: `1 file`, `9 files` */
+  files: (a: { n: number }): string => a.n === 1 ? String(a.n) + " file" : String(a.n) + " files",
+  /** an artifact's chip: a pull request */
+  kind_pr: "PR",
+  /** an artifact's chip: a file (no kind) */
+  kind_file: "file",
+  /** a gate he let run outside the sandbox always */
+  outside_always: (a: { what: string | number }): string => "you always let " + String(a.what) + " run outside the sandbox here",
+  /** a longer answer's head, the words under it */
+  answered_to: (a: { who: string | number }): string => "you answered " + String(a.who),
+  /** his answer to main's own card, over his bubble (the desktop) */
+  answered_card: (a: { who: string | number; question: string | number }): string => "you answered " + String(a.who) + " · " + String(a.question),
+  /** a question he answered for an agent, its answer after it (bold; the desktop) */
+  you_answered_q: (a: { agent: string | number; question: string | number }): string => "you answered " + String(a.agent) + ": " + String(a.question) + " → ",
+  /** a question main answered for him, its answer after it (bold; the desktop) */
+  main_answered_q: (a: { main: string | number; agent: string | number; question: string | number }): string => String(a.main) + " answered " + String(a.agent) + " for you: " + String(a.question) + " → ",
+  /** a start on a page: he asked for an agent (the page's ↗ link after it) */
+  asked_agent: (a: { to: string | number }): string => "you asked " + String(a.to) + " for an agent on",
+  /** his notes on a page (the page's ↗ link after it) */
+  sent_notes: (a: { to: string | number; n: string | number }): string => "you sent " + String(a.to) + " " + String(a.n) + " notes on",
+  /** his one note on a page (the page's ↗ link after it) */
+  sent_note: (a: { to: string | number }): string => "you sent " + String(a.to) + " a note on",
+  /** an edit on a page: `"old" → "new"` */
+  note_edit: (a: { old: string | number; new: string | number }): string => "\"" + String(a.old) + "\" → \"" + String(a.new) + "\"",
+  /** a note with the words it is on: `"Revenue": use March` */
+  note_on: (a: { quote: string | number; mark: string | number }): string => "\"" + String(a.quote) + "\": " + String(a.mark),
+  /** a tick on a page */
+  mark_done: "✓ done",
+  /** a keep on a page */
+  mark_keep: "♡ keep",
+  /** a drop on a page */
+  mark_drop: "✗ drop",
+  /** an unsure mark on a page */
+  mark_unsure: "~ not sure",
+  /** an approve on a page */
+  mark_approve: "✓ approve",
+  /** a skip on a page */
+  mark_skip: "skip",
+  /** files read */
+  did_read: (a: { n: number }): string => a.n === 1 ? "read " + String(a.n) + " file" : "read " + String(a.n) + " files",
+  /** files edited */
+  did_edit: (a: { n: number }): string => a.n === 1 ? "edited " + String(a.n) + " file" : "edited " + String(a.n) + " files",
+  /** commands run */
+  did_run: (a: { n: number }): string => a.n === 1 ? "ran " + String(a.n) + " command" : "ran " + String(a.n) + " commands",
+  /** searches */
+  did_search: (a: { n: string | number }): string => "searched " + String(a.n) + " times",
+  /** one search */
+  did_search_once: "searched once",
+  /** any other step */
+  did_other: (a: { n: number }): string => a.n === 1 ? String(a.n) + " other step" : String(a.n) + " other steps",
+  /** the field's placeholder and label */
+  find_placeholder: "find in this thread",
+  /** the ↑ button */
+  find_older: "older match",
+  /** the ↓ button */
+  find_newer: "newer match",
+  /** the × button */
+  find_close: "close find",
+  /** an attachment's hover, after its path */
+  attach_open: "preview · right-click: show in Finder",
+  /** an attachment gone since: its hover */
+  attach_gone: (a: { name: string | number; dir: string | number }): string => String(a.name) + " is gone from " + String(a.dir),
+  /** an attachment gone since: its chip's end */
+  attach_missing: "missing",
+  /** the context chip: `◫ with Chrome` */
+  ctx_with: (a: { app: string | number }): string => "◫ with " + String(a.app),
+  /** the context chip, no app named */
+  ctx_screen: "the screen",
+  /** the context chip's hover, a screenshot alone */
+  ctx_shot_gone: "the screenshot isn't kept",
+  /** a report that only waits on his answer */
+  report_waiting: "waiting for your answer",
+  /** his message's delivery mark: received */
+  got_it: (a: { who: string | number }): string => String(a.who) + " got it",
+  /** his message's delivery mark: read */
+  read_it: (a: { who: string | number }): string => String(a.who) + " read it",
+  /** his message's delivery mark: failed */
+  didnt_get_it: (a: { who: string | number }): string => String(a.who) + " didn't get it",
+  /** where bise sent his words: `sent to harness` (the name a link) */
+  sent_to: (a: { name: string | number }): string => "sent to " + String(a.name),
+  /** his own words, bise brought them here */
+  via_bise: "via bise",
+  /** the hover of a message bise sent on */
+  went_tip: (a: { name: string | number }): string => "bise sent your words to " + String(a.name) + "'s main · click opens it there",
+  /** the hover of his words bise brought here */
+  via_bise_tip: "your words, sent to bise and brought here",
+  /** typed with fn space */
+  from_fn: "from fn",
+  /** its hover */
+  from_fn_tip: "sent with fn, from another app",
+  /** a long message, open: the act that folds it */
+  fold_it: "fold it",
+  /** a long message, folded */
+  show_all: (a: { n: string | number }): string => "show all · " + String(a.n) + " lines",
+  /** a send that failed */
+  not_sent: "▲ not sent",
+  /** a send that failed, and why */
+  not_sent_because: (a: { why: string | number }): string => "▲ not sent: " + String(a.why),
+  /** the other act on a failed send */
+  drop: "drop",
+  /** a queued message */
+  queued_until: (a: { agent: string | number }): string => "queued · sends when " + String(a.agent) + "'s turn ends",
+  /** a message on its way */
+  sending: "sending…",
+  /** a message on its way, the hub not there yet */
+  connecting: (a: { name: string | number }): string => "connecting to " + String(a.name) + "…",
+  /** a steer, where the agent read it */
+  steered: (a: { agent: string | number }): string => "steered · " + String(a.agent) + " read it mid-turn",
+  /** an image part with no name: `image 1` */
+  image_n: (a: { n: string | number }): string => "image " + String(a.n),
+  /** bise holds his words for a project's main */
+  hold_line: (a: { name: string | number; left: string | number }): string => "→ bise · " + String(a.name) + " · " + String(a.left) + " s to change",
+  /** the act that keeps them with bise */
+  route_keep: "keep it with bise (esc)",
+  /** a done card: `perf is done: 3 ops faster` */
+  card_done: (a: { name: string | number; body: string | number }): string => String(a.name) + " is done: " + String(a.body),
+  /** a failed card */
+  card_failed: (a: { name: string | number; body: string | number }): string => String(a.name) + " failed: " + String(a.body),
+  /** a plan on a page, cut to fit (`↗` after it) */
+  card_plan_on: (a: { name: string | number; page: string | number }): string => String(a.name) + " proposes a plan: " + String(a.page),
+  /** a question on a page */
+  card_page_asks: (a: { name: string | number; question: string | number; page: string | number }): string => String(a.name) + " asks: " + String(a.question) + " ↗ " + String(a.page),
+  /** a card's title, no agent named */
+  card_needs: "needs you",
+  /** a card's title */
+  card_needs_name: (a: { name: string | number }): string => String(a.name) + " needs you",
+  /** how a card was closed: answered by another agent */
+  closed_by: (a: { who: string | number }): string => "answered by " + String(a.who),
+  /** how a card was closed: closed */
+  closed_closed: "closed",
+  /** how a card was closed: accepted (a drop) */
+  closed_dropped: "dropped",
+  /** how a card was closed: refused (a keep) */
+  closed_kept: "kept",
+  /** how a card was closed: seen */
+  closed_seen: "seen",
+  /** how a card was closed: resumed */
+  closed_resumed: "resumed",
+  /** how a card was closed: its agent stopped */
+  closed_stopped: "agent stopped",
+  /** how a card was closed: answered */
+  closed_answered: "answered",
+  /** right under the ask it answers */
+  card_waits: "? waits for you · in the inbox below",
+  /** the line, no question */
+  card_line: (a: { asks: string | number }): string => "? " + String(a.asks) + " · in the inbox below",
+  /** the line with its question's first line */
+  card_line_q: (a: { asks: string | number; question: string | number }): string => "? " + String(a.asks) + ": " + String(a.question) + " · in the inbox below",
+  /** an answered card, right under its ask */
+  card_answered: "✓ answered",
+  /** an answered card with its question */
+  card_answered_q: (a: { question: string | number }): string => "✓ answered: " + String(a.question),
+  /** an answered card's link, in its own thread */
+  show_answer: "show your answer",
+  /** an answered card's link, in another thread */
+  open_in: (a: { thread: string | number }): string => "open it in " + String(a.thread),
+  /** its state chip: something waits on him */
+  chip_waits: "? waiting for you",
+  /** its state chip: paused, how long */
+  chip_paused: (a: { len: string | number }): string => "… waiting · " + String(a.len),
+  /** its state chip: its first seconds */
+  chip_starting: "starting",
+  /** its state chip: working, just now */
+  chip_working: "working",
+  /** its state chip: working, its turn's age */
+  chip_working_for: (a: { age: string | number }): string => "working · " + String(a.age),
+  /** its state chip: done */
+  chip_done: "✓ done",
+  /** its state chip: failed */
+  chip_failed: "✗ failed",
+  /** its state chip: an archived maker */
+  chip_archived: "archived",
+  /** its context gauge: `context 42k · 17%` */
+  head_context: (a: { words: string | number }): string => "context " + String(a.words),
+  /** bise's chip: agents at work */
+  bise_at_work: (a: { n: number }): string => a.n === 1 ? String(a.n) + " agent at work" : String(a.n) + " agents at work",
+  /** an empty thread: `checkout is starting` */
+  is_starting: "is starting",
+  /** where it works: its own worktree */
+  own_folder: (a: { branch: string | number }): string => "its own folder, " + String(a.branch),
+  /** where it works: the project's folder */
+  project_folder: "the project's folder",
+  /** a thread's older entries, loading */
+  older_messages: "older messages…",
+  /** a thread's newer entries past a gap, loading */
+  newer_messages: "newer messages…",
+  /** a jump to his answer that didn't find it */
+  answer_further_up: "your answer is further up",
+  /** the line under his answer made elsewhere: `answered from bise` */
+  from_line: (a: { place: string | number }): string => "answered from " + String(a.place),
+  /** that line's tip: `you answered this from bise's thread` */
+  from_tip: (a: { place: string | number }): string => "you answered this from " + String(a.place),
+  /** where he answered: a thread */
+  from_thread: (a: { name: string | number }): string => String(a.name) + "'s thread",
+  /** where he answered: the inbox screen */
+  from_inbox_screen: "the inbox screen",
+  /** when, in that tip: ` at 09:55` */
+  from_at: (a: { time: string | number }): string => " at " + String(a.time),
+  /** bise's own head line */
+  every_project: "every project",
+  /** an agent in voice mode, in its head */
+  voice_mode: "voice mode",
+  /** an archived agent's thread */
+  is_archived: (a: { agent: string | number }): string => String(a.agent) + " is archived ·",
+  /** the act that brings it back */
+  restore: "restore",
+  /** no project yet: the title */
+  noproj_title: "bise is here.",
+  /** no project yet: what a project gives */
+  noproj_says: "add a project to give it its own bise. bise will route what you ask to it.",
+  /** no project yet: the act */
+  noproj_add: "add a project",
+  /** the still's caption, its time unknown */
+  cu_still: "a still · esc closes",
+  /** the still's caption: `a still from 15:31 · esc closes` */
+  cu_still_from: (a: { at: string | number }): string => "a still from " + String(a.at) + " · esc closes",
+  /** the line's hover */
+  cu_see: "see what it drives",
+  /** the act while it drives */
+  cu_take: "take the wheel",
+  /** the act that stops it */
+  cu_stop: "stop",
+  /** the act once he took the wheel */
+  cu_give_back: "give it back",
+  /** the still's label (a click closes it) */
+  cu_close_still: "close the still",
+  /** the still's alt text */
+  cu_now: "what it drives now",
+  /** while the still comes */
+  cu_looking: "looking…",
+  /** no still to show */
+  cu_nothing: "nothing to show",
+  /** a pause line's head, whole */
+  pause_state: "continues when",
+  /** a pause on a command or a pid: `running for 3 min` */
+  pause_running_for: (a: { len: string | number }): string => "running for " + String(a.len),
+  /** a pause on anything else: `for 3 min` */
+  pause_for: (a: { len: string | number }): string => "for " + String(a.len),
+  /** more pauses than the one the line says: ` and 1 more` */
+  pause_more: (a: { n: string | number }): string => " and " + String(a.n) + " more",
+  /** what a watch waits for: a command, a pid ends */
+  event_ends: (a: { what: string | number }): string => String(a.what) + " ends",
+  /** what a watch waits for: a file appears */
+  event_appears: (a: { what: string | number }): string => String(a.what) + " appears",
+  /** what a watch waits for: an agent answers */
+  event_answers: (a: { name: string | number }): string => String(a.name) + " answers",
+  /** what a watch waited for, its end's line: a file */
+  label_file: (a: { what: string | number }): string => String(a.what) + " to appear",
+  /** what a watch waited for, its end's line: a reply */
+  label_reply: (a: { what: string | number }): string => String(a.what) + "'s reply",
+  /** an alarm in the right bar: `if the nightly gate goes red` */
+  alarm_if: (a: { event: string | number }): string => "if " + String(a.event),
+  /** an alarm's hover */
+  alarm_title: (a: { agent: string | number; event: string | number; set: string | number }): string => "bise wakes " + String(a.agent) + " if " + String(a.event) + " · set " + String(a.set),
+  /** an alarm's hover, when it stops watching */
+  alarm_stops: (a: { at: string | number }): string => " · stops watching " + String(a.at),
+  /** a command or a pid ended */
+  wake_ended: (a: { what: string | number }): string => String(a.what) + " ended",
+  /** a file appeared */
+  wake_appeared: (a: { what: string | number }): string => String(a.what) + " appeared",
+  /** its exit code */
+  wake_rc: (a: { rc: string | number }): string => "rc " + String(a.rc),
+  /** how long it waited */
+  wake_after: (a: { dur: string | number }): string => "after " + String(a.dur),
+  /** still running at the watch's end */
+  wake_still: (a: { what: string | number; dur: string | number }): string => String(a.what) + " still running after " + String(a.dur),
+  /** he stopped the watch */
+  wake_stopped: (a: { what: string | number }): string => "stopped waiting for " + String(a.what),
+  /** the watch ran out */
+  wake_expired: (a: { what: string | number; dur: string | number }): string => "stopped waiting for " + String(a.what) + " after " + String(a.dur),
+  /** another agent's wake, main's copy: `perf's cargo test ended` */
+  wake_of: (a: { agent: string | number; head: string | number }): string => String(a.agent) + "'s " + String(a.head),
+  /** a wake's folded output */
+  wake_tail: (a: { n: string | number }): string => "its last " + String(a.n) + " lines",
+  /** a wake's folded output, one line */
+  wake_tail_one: "its last line",
 } as const;

@@ -142,8 +142,6 @@ export const panel = {
   opens_in_browser: "↗ opens in your browser",
   /** an alarm's end */
   until: (a: { at: string | number }): string => "until " + String(a.at),
-  /** an alarm's detail: its agent's link */
-  open_agent: (a: { agent: string | number }): string => "open " + String(a.agent),
   /** the bar's label for screen readers */
   bar_label: (a: { name: string | number }): string => "what happens in " + String(a.name),
   /** ARTIFACTS on a sub-agent's thread */
@@ -246,8 +244,6 @@ export const panel = {
   tip_names_working: (a: { names: string | number }): string => String(a.names) + " are working",
   /** a project's mark: how many agents */
   tip_agents: (a: { n: number }): string => a.n === 1 ? String(a.n) + " agent" : String(a.n) + " agents",
-  /** nothing goes on */
-  tip_quiet: "all quiet",
   /** bise's pink count */
   tip_waiting_you_all: (a: { n: string | number }): string => String(a.n) + " waiting for you, in all your projects",
   /** a gone folder's tip, its path unknown */

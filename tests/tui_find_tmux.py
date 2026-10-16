@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 FILLER = " ".join(["filler"] * 350)
 
@@ -49,7 +50,7 @@ def main():
         assert "needle one" not in t.screen(), t.screen()
         t.typed("my draft")
         t.keys("C-f")
-        sc = t.wait("find in main")
+        sc = t.wait(w("thread.find_in", name="main"))
         # the box: top-right of the history, under the header; the
         # composer keeps the draft, the key bar says the box's keys
         box_y, box_x = where(sc, "⌕")
@@ -92,7 +93,7 @@ def main():
         t.keys("Escape")
         sc = t.wait_gone("⌕")
         sc = t.screen()
-        assert "find in main" not in sc and "ack: the needle one" in sc, sc
+        assert w("thread.find_in", name="main") not in sc and "ack: the needle one" in sc, sc
         t.typed(" kept")
         t.wait("my draft kept")
         print("PASS tui find")

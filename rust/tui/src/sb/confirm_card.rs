@@ -3,7 +3,7 @@
 //! `always: `) into a `Shape`, and its option 2's words.
 
 use super::{Card, Enter, Part, Shape};
-use bise_proto::words::inbox;
+use bise_proto::words::{common, inbox};
 use crate::theme;
 use ratatui::style::Style;
 use ratatui::text::Span;
@@ -63,7 +63,7 @@ pub(super) fn confirm_shape(c: &Card) -> Shape {
         text.lines().map(|l| vec![Span::raw(l.to_string())]).collect()
     }));
     if more > 0 {
-        parts.push(Part::Reason(format!("{} {}", theme::glyph("▸"), inbox::more_lines(more))));
+        parts.push(Part::Reason(format!("{} {}", theme::glyph("▸"), common::more_lines(more))));
     }
     if !reason.is_empty() {
         parts.push(Part::Reason(reason));

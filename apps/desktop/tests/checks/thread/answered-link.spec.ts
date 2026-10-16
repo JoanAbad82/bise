@@ -5,6 +5,10 @@
 // card whose answer isn't in docs' thread (and no older page): docs' thread at its end and the dim
 // line 'your answer is further up'. Real thread screen, scripted core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common, thread } from '../../../src/proto/words.gen';
+
+const DRIVE = common.fold_answered({ agent: 'docs', pick: 'the shared drive' });
+const SHARE = common.fold_answered({ agent: 'docs', pick: 'share it with him' });
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -33,7 +37,7 @@ const world = () => [
       { pos: 1, at_ms: NOW - 50 * MIN, kind: 'agent', text: 'docs needs your word on the folder.' },
       { pos: 2, at_ms: NOW - 49 * MIN, kind: 'card', text: 'comment lui donner accès ?', card: { id: 7, question: 'comment lui donner accès ?', options: [], answered: true, kind: 'question', agent: 'docs', closed: 'answered' } },
       // his answer to docs' card #8: its own row here (one fact, one row: no '✓ answered' line for #8)
-      { pos: 3, at_ms: NOW - 48 * MIN, kind: 'approval', text: 'you answered docs: the shared drive', approval: { ok: true, text: 'you answered docs: the shared drive', card: 8, to: 'docs' } },
+      { pos: 3, at_ms: NOW - 48 * MIN, kind: 'approval', text: DRIVE, approval: { ok: true, text: DRIVE, card: 8, to: 'docs' } },
       { pos: 4, at_ms: NOW - 40 * MIN, kind: 'card', text: 'which folder?', card: { id: 9, question: 'which folder?', options: [], answered: true, kind: 'question', agent: 'docs', closed: 'answered' } },
       { pos: 5, at_ms: NOW - 2 * MIN, kind: 'agent', text: 'le dossier est partagé.' },
     ],
@@ -46,8 +50,8 @@ const world = () => [
 const docs = () => [
   { pos: 1, at_ms: NOW - 50 * MIN, kind: 'agent', text: 'i need access to the folder.' },
   { pos: 2, at_ms: NOW - 49 * MIN, kind: 'to_agent', to: 'main', asks: true, text: 'comment lui donner accès ?' },
-  { pos: 3, at_ms: NOW - 48 * MIN, kind: 'approval', text: 'you answered docs: share it with him', approval: { ok: true, text: 'you answered docs: share it with him', card: 7, to: 'docs' } },
-  { pos: 4, at_ms: NOW - 47 * MIN, kind: 'approval', text: 'you answered docs: the shared drive', approval: { ok: true, text: 'you answered docs: the shared drive', card: 8, to: 'docs' } },
+  { pos: 3, at_ms: NOW - 48 * MIN, kind: 'approval', text: SHARE, approval: { ok: true, text: SHARE, card: 7, to: 'docs' } },
+  { pos: 4, at_ms: NOW - 47 * MIN, kind: 'approval', text: DRIVE, approval: { ok: true, text: DRIVE, card: 8, to: 'docs' } },
   ...Array.from({ length: 40 }, (_, i) => ({ pos: 5 + i, at_ms: NOW - (47 - i) * MIN, kind: 'agent', text: `step ${String(i + 1)}: ${'the folder is being shared, one more check. '.repeat(4)}` })),
 ];
 
@@ -57,10 +61,10 @@ test("thread/answered-link: '✓ answered' in main's thread opens the asker's th
   try {
     const { page } = s;
     const row = page.getByTestId('thread.card.7');
-    await expect(row).toHaveText('✓ answered: comment lui donner accès ?', { timeout: 10_000 });
+    await expect(row).toHaveText(thread.card_answered_q({ question: 'comment lui donner accès ?' }), { timeout: 10_000 });
     // where it goes, in its tooltip; a pointer over it
     const link = row.locator('xpath=..');
-    await expect(link).toHaveAttribute('title', "open it in docs's thread");
+    await expect(link).toHaveAttribute('title', thread.open_in({ thread: thread.from_thread({ name: 'docs' }) }));
     expect(await link.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
     await page.screenshot({ path: test.info().outputPath('main-before.png') });
 
@@ -84,7 +88,7 @@ test("thread/answered-link: '✓ answered' in main's thread opens the asker's th
     // card #9: no answer for it in docs' thread, no older page: its end, and the miss line
     await page.getByTestId('thread.card.9').click();
     const miss = page.getByTestId('thread.answer-miss');
-    await expect(miss).toHaveText('your answer is further up', { timeout: 5000 });
+    await expect(miss).toHaveText(thread.answer_further_up, { timeout: 5000 });
     await expect(page.getByTestId('thread.entry.43'), 'the thread at its end').toBeInViewport();
     await page.screenshot({ path: test.info().outputPath('docs-miss.png') });
     await expect(miss, 'gone after 4 s').toBeHidden({ timeout: 6000 });

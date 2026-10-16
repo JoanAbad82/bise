@@ -20,6 +20,7 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 import { hubOf, launchOn, realWorld, transcriptHas, tui, tuiAgents, tuiClick, tuiReady, type Tui } from '../world';
 
 const T = {
@@ -75,7 +76,7 @@ test("thread/computer-use: the live line, take, ⏎ gives it back, a message to 
   let t: Tui | undefined;
   try {
     const { page } = s;
-    await expect(page.locator(T.field).first(), "checkout's thread").toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(T.field).first(), thread.from_thread({ name: 'checkout' })).toBeVisible({ timeout: 15_000 });
     t = tui(w, 'shop');
     await tuiReady(t);
     // the TUI opens on main's thread: its live line is checkout's, shown with checkout in view (a
@@ -95,7 +96,7 @@ test("thread/computer-use: the live line, take, ⏎ gives it back, a message to 
       const line = page.locator(T.line);
       await expect.soft(line, 'the live line').toHaveAttribute('data-state', 'driving', { timeout: 10_000 });
       await expect.soft(page.locator(T.words), "the core's words").toContainText(`↖ driving ${PLACE}`, { timeout: 5000 });
-      await expect.soft(page.locator(T.take), 'take the wheel').toBeVisible();
+      await expect.soft(page.locator(T.take), thread.cu_take).toBeVisible();
       await expect.soft(page.locator(T.stop), 'stop').toBeVisible();
       await expect.soft(page.locator(T.mark), "the sidebar's mark on checkout").toBeVisible({ timeout: 5000 });
       await expect.soft.poll(() => flat(term.screen()).includes(`driving ${PLACE}`), { timeout: 10_000, message: "the TUI's row says the same" }).toBe(true);
@@ -103,14 +104,14 @@ test("thread/computer-use: the live line, take, ⏎ gives it back, a message to 
       await page.screenshot({ path: test.info().outputPath('driving.png') });
     });
 
-    await test.step('take the wheel: a pause, then paused in both', async () => {
+    await test.step(`${thread.cu_take}: a pause, then paused in both`, async () => {
       const before = acts('pause');
       await page.locator(T.take).click();
       await expect.soft.poll(() => acts('pause'), { timeout: 10_000, message: 'the broker got a pause for checkout' }).toBeGreaterThan(before);
       await expect.soft(page.locator(T.line), 'paused').toHaveAttribute('data-state', 'paused', { timeout: 10_000 });
       // amb-win e93879d4: the words '? you took the wheel', the act a button 'give it back ⏎'
       await expect.soft(page.locator(T.words), "the core's words").toContainText('? you took the wheel', { timeout: 5000 });
-      await expect.soft(page.locator(T.back), "its 'give it back' button").toContainText('give it back', { timeout: 5000 });
+      await expect.soft(page.locator(T.back), "its give-it-back button").toContainText(thread.cu_give_back, { timeout: 5000 });
       await expect.soft.poll(() => flat(term.screen()).includes('you took the wheel'), { timeout: 10_000, message: "the TUI's row says the same" }).toBe(true);
       await page.screenshot({ path: test.info().outputPath('paused.png') });
     });

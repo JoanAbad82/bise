@@ -4,6 +4,7 @@
 // amb-win (lead m_10311). The new app on the scripted core: a world whose gift-ui thread holds
 // those entries; the answer read outside the page, in the core's command log.
 import { FakeCore, FakeHelper, launchDesktop, test, expect } from '../../harness';
+import { thread as tw } from '../../../src/proto/words.gen';
 import { expectShown } from './shown';
 
 const HOME = 'bise-home-00000000';
@@ -81,7 +82,7 @@ test("thread/to-agent: gift-ui's own thread shows its message to main, its quest
     // one copy of the question (ambient m_10689): on the ask; main's card right under it with its options only
     await expect(page.getByTestId('thread.asks.4'), 'with a card for it, the ask itself carries no wait tag').toHaveCount(0);
     // b (designer m_15612): main's card for it is one dim line pointing at the inbox block, no options
-    await expect(page.getByTestId('thread.card.2'), "main's card for it: one line, the question stays on the ask").toHaveText('? waits for you · in the inbox below');
+    await expect(page.getByTestId('thread.card.2'), "main's card for it: one line, the question stays on the ask").toHaveText(tw.card_waits);
     await expect(page.getByTestId('thread.card.2.opt.2'), 'no options in the thread').toHaveCount(0);
     await expect(page.locator('[data-testid="thread.list"]').getByText(ASK, { exact: false }), 'the question shows once in the thread').toHaveCount(1);
     // in the DOM is not on screen (amb-win 35d08ae5): a short thread's rows are shown

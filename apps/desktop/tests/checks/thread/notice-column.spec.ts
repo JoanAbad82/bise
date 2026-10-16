@@ -7,6 +7,7 @@
 // notice-column-<theme>-<width>.png. Owner: amb-home.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread as tw } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -23,8 +24,8 @@ const thread = [
   { pos: 1, at_ms: at(30), kind: 'you', text: 'is the build in test yet?' },
   { pos: 2, at_ms: at(29), kind: 'agent', text: 'Not yet: it will be in the build after the one in test (37fa183d).' },
   { pos: 3, at_ms: at(25), kind: 'notice', text: 'the nightly gate starts at 02:00', notice: { level: 'info', text: 'the nightly gate starts at 02:00' } },
-  { pos: 4, at_ms: at(20), kind: 'notice', text: 'turn interrupted', notice: { level: 'warn', text: 'turn interrupted' } },
-  { pos: 5, at_ms: at(15), kind: 'wake', text: 'stopped waiting for the reindex', wake: { id: 7, ev: 'stopped', kind: 'pid', what: 'the reindex', noted: true, after_ms: 60_000 } },
+  { pos: 4, at_ms: at(20), kind: 'notice', text: tw.turn_interrupted, notice: { level: 'warn', text: tw.turn_interrupted } },
+  { pos: 5, at_ms: at(15), kind: 'wake', text: tw.wake_stopped({ what: 'the reindex' }), wake: { id: 7, ev: 'stopped', kind: 'pid', what: 'the reindex', noted: true, after_ms: 60_000 } },
   { pos: 6, at_ms: at(10), kind: 'compacted', text: 'we checked which build is in test' },
 ];
 const world = (theme: string) => [

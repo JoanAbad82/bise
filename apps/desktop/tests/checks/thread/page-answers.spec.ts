@@ -5,6 +5,7 @@
 // under it; three notes 'you sent bise 3 notes on <title>', one per line (designer m_21035). Never 'answer with:',
 // '<page-notes', '[from the page'. A light 1100 shot for designer. Owner: page-answer-row.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -64,7 +65,7 @@ test("thread/page-answers: his answers on a page are rows of his words, never th
   try {
     const { page } = s;
     const pick = page.getByTestId('thread.pageanswer.2');
-    await expect(pick).toContainText("you answered bise · read the lists from the providers' APIs?", { timeout: 10_000 });
+    await expect(pick).toContainText(thread.answered_card({ who: 'bise', question: "read the lists from the providers' APIs?" }), { timeout: 10_000 });
     await expect(page.getByTestId('thread.pageanswer.2.words')).toHaveText("the table now, the API's lists right after");
     await expect(page.getByTestId('thread.pageanswer.4')).toContainText('you sent bise a note on the plan');
     // the page's name is the artifact's pink inline name (desktop-agents-bar §5)
@@ -72,8 +73,8 @@ test("thread/page-answers: his answers on a page are rows of his words, never th
     await expect(page.getByTestId('thread.pageanswer.4.page')).toHaveClass(/b-artname/u);
     await expect(page.getByTestId('thread.pageanswer.4.words')).toHaveText('"the plan: ship the table": make it shorter');
     await expect(page.getByTestId('thread.pageanswer.5')).toContainText('you sent bise 3 notes on the plan');
-    await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText('✓ done');
-    await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText('"Q2" → "Q3"');
+    await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText(thread.mark_done);
+    await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText(thread.note_edit({ old: 'Q2', new: 'Q3' }));
     const all = await page.locator('body').innerText();
     for (const bad of ['answer with:', '<page-notes', '[from the page', 'you sent 1 note on your page']) {
       expect(all, `never the hub's template: ${bad}`).not.toContain(bad);

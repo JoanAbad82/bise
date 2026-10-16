@@ -11,6 +11,7 @@
 //   - 'keep it with bise' sends route_cancel for that rid; another project sends route_correct;
 //   - route_done 'sent' turns the row into 'sent to acme', the hold gone.
 import { test, expect, FakeCore, FakeHelper, launchDesktop } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const ACME = 'acme-1a2b3c4d';
@@ -77,7 +78,7 @@ test('thread/route-hold: the hold shows at once, counts down, keep and correct r
     await core.send({ ev: 'route', project: HOME, rid: 43, to: ACME, name: 'acme', text: w3, correct_until_ms: Date.now() + 2000, why: 'test' });
     await expect(row(w3).locator(T.hold)).toBeVisible({ timeout: 250 });
     await core.send({ ev: 'route_done', project: HOME, rid: 43, state: 'sent', to: ACME, xid: 9 });
-    await expect(row(w3), "the row says where it went").toContainText('sent to acme', { timeout: 1000 });
+    await expect(row(w3), "the row says where it went").toContainText(thread.sent_to({ name: 'acme' }), { timeout: 1000 });
     await expect(row(w3).locator(T.hold), 'the hold is gone').toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath('sent.png') });
   } finally {

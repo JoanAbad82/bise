@@ -103,10 +103,7 @@ crate::words! { inbox:
     wait_end_page(project, age) = "{project} · page · {age}";
 
     // ---- an item's title (the TUI's kind_title, the desktop's kindTitle)
-    /// a question's title (any other kind asks too)
-    title_asks(agent) = "{agent} asks";
-    /// a plan's title
-    title_plan(agent) = "{agent} proposes a plan";
+    // (a question's and a plan's: common::title_asks, title_plan)
     /// a blocked agent's title
     title_blocked(agent) = "{agent} is blocked";
     /// a failed agent's title
@@ -191,8 +188,6 @@ crate::words! { inbox:
     your_answer = "your answer";
     /// the TUI's divider: the question closed under his words
     question_closed = "the question is closed: ⏎ sends your words as a message";
-    /// how many lines are folded away
-    more_lines(n) = one "{n} more line" | "{n} more lines";
     /// the TUI's scroll mark: lines under the view
     scroll_more(n) = one "{n} more line · pgdn" | "{n} more lines · pgdn";
     /// the TUI's scroll mark: at the end
@@ -233,10 +228,6 @@ crate::words! { inbox:
     heard_undo(line) = "{line} · esc undoes";
     /// the line in the desktop block's place when nothing waits
     zero = "nothing waits for you";
-    /// the desktop's mark on an item whose answer was refused
-    not_sent = "not sent";
-    /// the desktop's way to send it again
-    try_again = "try again";
 
     // ---- approvals and gates (the TUI's shapes, the desktop's rowWords and withConfirmOptions)
     /// an approval to edit a file
@@ -290,17 +281,7 @@ crate::words! { inbox:
     /// the item's noun: an approval
     noun_approval = "approval";
 
-    // ---- his answer folded (the TUI's box)
-    /// a picked option folded
-    fold_answered(agent, pick) = "you answered {agent}: {pick}";
-    /// a gate he said no to
-    fold_no(agent, what) = "you said no to {agent}: {what}";
-    /// a gate he let run outside the sandbox
-    fold_outside(agent, what) = "you let {agent} run it outside the sandbox: {what}";
-    /// a gate he allowed
-    fold_allowed(agent, what) = "you allowed {agent}: {what}";
-    /// a page's pick folded
-    picked(name) = "you picked {name}";
+    // ---- his answer folded (the TUI's box): common::fold_*, picked
     /// the last item answered
     clear = "inbox clear";
     /// his words to a closed question, kept

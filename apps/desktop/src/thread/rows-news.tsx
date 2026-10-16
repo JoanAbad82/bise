@@ -5,6 +5,7 @@ import { useOpenArtifact } from './openArtifact';
 import { useState, type ReactNode } from 'react';
 import { Act, ArtChip, BriefLine, Button, Fold, Marker, Press, SchedHead } from '@/ds';
 import type { Entry } from '@/proto';
+import { thread } from '@/proto/words.gen';
 import { useAgents, useArtifacts, useStore } from '@/store';
 import { leaves, LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { glyphOf } from '@/artifacts/model';
@@ -188,7 +189,7 @@ export function CompactedRow({ e }: { e: Entry }) {
   return (
     <div className="th-compact" data-testid={`thread.compacted.${e.pos}`}>
       <Fold open={open} onToggle={e.text === '' ? undefined : toggle} hint={e.text === '' ? undefined : hint} testId={`thread.compacted.${e.pos}.head`}>
-        context compacted
+        {thread.compacted}
       </Fold>
       {open && e.text !== '' && <div className="th-think-body">{e.text}</div>}
     </div>
@@ -208,7 +209,7 @@ export function WakeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   // named for whom (designer m_19383: nothing addressed to another agent in ink)
   const other = e.wake?.agent != null && e.wake.agent !== '' && e.wake.agent !== ctx.agent ? e.wake.agent : null;
   const mark = line.mark;
-  const parts = other === null ? line.parts : [{ text: `${other}'s ${line.parts[0]?.text ?? ''}`, err: false }, ...line.parts.slice(1).map((p) => ({ ...p, err: false }))];
+  const parts = other === null ? line.parts : [{ text: thread.wake_of({ agent: other, head: line.parts[0]?.text ?? '' }), err: false }, ...line.parts.slice(1).map((p) => ({ ...p, err: false }))];
   const tail = e.wake?.tail ?? [];
   const words = wakeTail(tail.length);
   return (
@@ -255,16 +256,16 @@ export function NoticeRow({ e, ctx, retries }: { e: Entry; ctx: RowCtx; retries?
   const handoff = level === 'info' ? handoffOf(text) : null;
   if (handoff !== null) return <HandoffRow pos={e.pos} to={handoff.agent} brief={handoff.brief} ctx={ctx} />;
   // 'session restored · 14:02', one row centred like a day separator (ambient m_11777)
-  if (level === 'info' && text.startsWith('session restored')) {
+  if (level === 'info' && text.startsWith(thread.restored)) {
     return (
       <div className="th-day th-restored" data-testid={`thread.notice.${e.pos}`}>
-        <span>{e.at_ms > 0 ? `session restored · ${clock(e.at_ms)}` : 'session restored'}</span>
+        <span>{e.at_ms > 0 ? thread.restored_at({ at: clock(e.at_ms) }) : thread.restored}</span>
       </div>
     );
   }
-  // '▲ turn interrupted' / '▲ turn interrupted by main' (proto words.rs): the TUI draws it dim, a
-  // stop he or main asked for, read under a cut reply as stopped, not as a failure
-  const interrupted = level === 'warn' && (text === 'turn interrupted' || text.startsWith('turn interrupted by '));
+  // '▲ turn interrupted' / '▲ turn interrupted by main' (the catalog's words): the TUI draws it dim,
+  // a stop he or main asked for, read under a cut reply as stopped, not as a failure
+  const interrupted = level === 'warn' && (text === thread.turn_interrupted || text.startsWith(thread.turn_interrupted_by({ by: '' })));
   return (
     <div className={`th-notice ${level}${interrupted ? ' interrupted' : ''}`} data-level={level} data-testid={`thread.notice.${e.pos}`}>
       <span className="th-notice-mark" aria-label={level === 'err' ? 'error' : level === 'warn' ? 'warning' : 'note'}>
@@ -350,18 +351,18 @@ export function NotDeliveredRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       }}
     >
       <div className="th-notdelivered-head">
-        <span aria-label="error">✗</span> not delivered to {to}
+        <span aria-label="error">✗</span> {thread.not_delivered({ to })}
       </div>
       <div className="th-notdelivered-text">{text}</div>
       {gone === 'sent' ? (
-        <div className="th-waits">sent again</div>
+        <div className="th-waits">{thread.sent_again}</div>
       ) : (
         <div className="th-notdelivered-acts">
           <Button kind="ghost" onClick={again} testId={`thread.notdelivered.${e.pos}.again`}>
-            ⏎ send again
+            ⏎ {thread.send_again}
           </Button>
           <Button kind="ghost" onClick={drop} testId={`thread.notdelivered.${e.pos}.drop`}>
-            esc drop
+            esc {thread.drop}
           </Button>
         </div>
       )}

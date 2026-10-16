@@ -7,6 +7,7 @@
 //   - a fold focused (tab to it, as his keyboard does) opens with space and closes with space again,
 //     and only that one (the other stays closed).
 import { test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 import { launchReal, realWorld } from '../world';
 
 const T = {
@@ -26,7 +27,7 @@ test('thread/folds: ⌘E opens and closes every fold, space toggles the focused 
     await expect(page.locator(`${T.field}, ${T.setupSkip}`).first()).toBeVisible({ timeout: 10_000 }).catch(() => undefined);
     if (await page.locator(T.setupSkip).isVisible()) await page.locator(T.setupSkip).click();
     const field = page.locator(T.field).first();
-    await expect(field, "bise's thread").toBeVisible({ timeout: 10_000 });
+    await expect(field, thread.from_thread({ name: 'bise' })).toBeVisible({ timeout: 10_000 });
     const list = page.locator(T.list);
     for (const tag of ['a', 'b']) {
       // typed line by line, as rows.spec's B11 (the clipboard isn't reliable under the harness)

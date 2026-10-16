@@ -220,38 +220,6 @@
     "one": null,
     "text": "projects"
   },
-  "inbox.fold_allowed": {
-    "args": [
-      "agent",
-      "what"
-    ],
-    "one": null,
-    "text": "you allowed {agent}: {what}"
-  },
-  "inbox.fold_answered": {
-    "args": [
-      "agent",
-      "pick"
-    ],
-    "one": null,
-    "text": "you answered {agent}: {pick}"
-  },
-  "inbox.fold_no": {
-    "args": [
-      "agent",
-      "what"
-    ],
-    "one": null,
-    "text": "you said no to {agent}: {what}"
-  },
-  "inbox.fold_outside": {
-    "args": [
-      "agent",
-      "what"
-    ],
-    "one": null,
-    "text": "you let {agent} run it outside the sandbox: {what}"
-  },
   "inbox.head": {
     "args": [],
     "one": null,
@@ -526,13 +494,6 @@
     "one": "+{n} file",
     "text": "+{n} files"
   },
-  "inbox.more_lines": {
-    "args": [
-      "n"
-    ],
-    "one": "{n} more line",
-    "text": "{n} more lines"
-  },
   "inbox.more_row": {
     "args": [
       "n",
@@ -550,11 +511,6 @@
     "args": [],
     "one": null,
     "text": "no"
-  },
-  "inbox.not_sent": {
-    "args": [],
-    "one": null,
-    "text": "not sent"
   },
   "inbox.notify_not_now": {
     "args": [],
@@ -641,13 +597,6 @@
     "args": [],
     "one": null,
     "text": "page"
-  },
-  "inbox.picked": {
-    "args": [
-      "name"
-    ],
-    "one": null,
-    "text": "you picked {name}"
   },
   "inbox.pos_of": {
     "args": [
@@ -777,13 +726,6 @@
     "one": null,
     "text": "the branch"
   },
-  "inbox.title_asks": {
-    "args": [
-      "agent"
-    ],
-    "one": null,
-    "text": "{agent} asks"
-  },
   "inbox.title_blocked": {
     "args": [
       "agent"
@@ -817,13 +759,6 @@
     "one": null,
     "text": "overlap"
   },
-  "inbox.title_plan": {
-    "args": [
-      "agent"
-    ],
-    "one": null,
-    "text": "{agent} proposes a plan"
-  },
   "inbox.title_restart": {
     "args": [],
     "one": null,
@@ -843,11 +778,6 @@
     ],
     "one": null,
     "text": "to {who} · {waits}"
-  },
-  "inbox.try_again": {
-    "args": [],
-    "one": null,
-    "text": "try again"
   },
   "inbox.type_below": {
     "args": [],

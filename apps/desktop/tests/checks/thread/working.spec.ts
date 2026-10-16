@@ -17,6 +17,7 @@
 // Owner: amb-home (the gust's motion: amb-web's working/).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'storefront-1a2b3c4d';
@@ -69,10 +70,10 @@ const world = (now: number) => {
           pos: 31,
           at_ms: now - 40_000,
           kind: 'tools',
-          text: 'ran 2 commands',
+          text: thread.did_run({ n: 2 }),
           tools: {
             count: 2,
-            summary: 'ran 2 commands',
+            summary: thread.did_run({ n: 2 }),
             items: [
               { pos: 41, at_ms: now - 40_000, text: 'pnpm build web/product', kind: 'run', state: 'ok' },
               { pos: 42, at_ms: now - 15_000, text: 'pnpm bench web/product --runs 3', kind: 'run', state: 'run' },
@@ -97,7 +98,7 @@ const world = (now: number) => {
           text: 'lecture du PDF de tarifs',
           tools: {
             count: 1,
-            summary: 'ran 1 command',
+            summary: thread.did_run({ n: 1 }),
             items: [{ pos: 51, at_ms: now - 10_000, text: "lecture du PDF de tarifs d'Efficience", intent: "lecture du PDF de tarifs d'Efficience", kind: 'run', state: 'run' }],
           },
         },

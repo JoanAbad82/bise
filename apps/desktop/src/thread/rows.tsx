@@ -10,6 +10,7 @@
 import { memo, type ReactNode } from 'react';
 import { ArtChip, Marker, Msg } from '@/ds';
 import type { Entry } from '@/proto';
+import { thread } from '@/proto/words.gen';
 import { useEntry } from '@/store';
 import { Answer } from './Markdown';
 import { GROUP_GAP_MS, THOUGHT_MS, answeredCardOf, repeatedReport, briefOf, clock, dayLabel, groupHead, lastOfRun, sameDay, sideOf, dropAuthor, reportStatus, thoughtNothing, thoughtShows, whoOf } from './entry';
@@ -216,7 +217,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
     case 'compacting':
       return (
         <div className="th-compact" data-testid={`thread.compacting.${e.pos}`}>
-          <Marker>compacting its context…</Marker>
+          <Marker>{thread.compacting_context}</Marker>
         </div>
       );
     case 'compacted':
@@ -259,7 +260,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
       // tier 4 (designer m_19387): a message from another agent, never body prose; its report to
       // this agent stays a status line (the default's report branch below)
       const report = reportStatus(e.text);
-      const from = shownName(e.from ?? 'an agent');
+      const from = shownName(e.from ?? thread.an_agent);
       if (report !== null) {
         return <ReportRow pos={e.pos} line={(e.from ?? ctx.agent) !== ctx.agent ? `${from}: ${report}` : report} text={e.text} next={next} ctx={ctx} waits={report.startsWith('blocked')} />;
       }
@@ -306,7 +307,7 @@ function AgentMsg({ e, ctx, who, head, live, still }: { e: Entry; ctx: RowCtx; w
   const mark =
     lit?.mark == null ? undefined : (
       <div className="vm-mark" data-testid={`thread.voice.${String(e.pos)}`} data-mark={lit.mark}>
-        {lit.mark === 'cut' ? 'you cut in' : '∿ speaking'}
+        {lit.mark === 'cut' ? thread.you_cut_in : thread.speaking}
       </div>
     );
   return (

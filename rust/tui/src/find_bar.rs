@@ -204,10 +204,10 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame, pane: Rect, feed: Rect) {
     let buf = frame.buffer_mut();
     buf.set_string(inner.x + 1, inner.y, crate::theme::glyph("⌕"), dim);
     f.hscroll = scroll_to_cursor(&f.ed.text, f.ed.cursor, f.hscroll, p.field.width as usize);
-    let line = field_line(&f.ed, f.hscroll, p.field.width as usize, &format!("find in {}", f.focus_name()));
+    let line = field_line(&f.ed, f.hscroll, p.field.width as usize, &bise_proto::words::thread::find_in(f.focus_name()));
     buf.set_line(p.field.x, p.field.y, &line, p.field.width);
     if let Some(c) = p.count {
-        let st = if count == "no match" { Style::default().fg(crate::theme::error()) } else { dim };
+        let st = if count == bise_proto::words::thread::find_none { Style::default().fg(crate::theme::error()) } else { dim };
         buf.set_string(c.x, c.y, &count, st);
     }
     let any = f.has_matches();

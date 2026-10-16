@@ -17,6 +17,9 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, tmux, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
+
+MORE = "▸ " + w("common.more_lines", n=6)
 
 LINES = 26
 SHOTS = 6
@@ -83,11 +86,11 @@ def main():
         t.keys("Enter")
         # folded in the history: 20 rows, the hint row, then the sizes
         # of the screenshots on several rows
-        t.wait("▸ 6 more lines")
+        t.wait(MORE)
         t.wait_re(MAIN_IDLE)
         sc = t.screen()
         assert re.search(r"│  line 20\b", sc) and not re.search(r"│  line 21\b", sc), sc
-        hint = find(sc, "▸ 6 more lines")
+        hint = find(sc, MORE)
         # the rows under the hint up to the blank one: the sizes
         under = sc.split("\n")[hint[1] + 1:]
         sizes = under[:next(i for i, r in enumerate(under) if not re.search(r"│  \S", r))]
@@ -98,7 +101,7 @@ def main():
         t.sync()
         assert not opened(t.screen()), t.screen()
         # a click on the hint opens it whole, `▾` after its last line
-        click_on(t, "▸ 6 more lines")
+        click_on(t, MORE)
         sc = t.wait_any([opened], 10)[1]
         assert "more lines" not in sc, sc
         # a click on the `▾` row folds it again
@@ -109,12 +112,12 @@ def main():
         click_on(t, "more lines")
         t.wait_any([opened], 10)
         click_on(t, "▾")
-        t.wait("▸ 6 more lines")
+        t.wait(MORE)
         # the keyboard: ctrl+o opens it, again folds it
         t.keys("C-o")
         t.wait_any([opened], 10)
         t.keys("C-o")
-        t.wait("▸ 6 more lines")
+        t.wait(MORE)
         print("PASS tui you fold click")
 
 

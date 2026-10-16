@@ -6,6 +6,7 @@
 // unmount, no jump). With reduced motion, no word is ever mid-fade. On the scripted core
 // (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 import type { Page } from '@playwright/test';
 
 const HOME = 'bise-home-00000000';
@@ -169,7 +170,7 @@ test("thread/streaming: a reply cut off mid-stream stays as he read it at 0.7, t
       { pos: 40, at_ms: t0 - 5000, kind: 'you', text: 'why is the cold bench slow?' },
       // R40 Hub::Kept: the words he read, then the turn's end (proto words.rs)
       { pos: 41, at_ms: t0 - 2000, kind: 'agent', text: said.trim(), cut: true },
-      { pos: 42, at_ms: t0 - 2000, kind: 'notice', text: 'turn interrupted by main', notice: { level: 'warn', text: 'turn interrupted by main' } },
+      { pos: 42, at_ms: t0 - 2000, kind: 'notice', text: thread.turn_interrupted_by({ by: 'main' }), notice: { level: 'warn', text: thread.turn_interrupted_by({ by: 'main' }) } },
     ];
     await core.send({ ev: 'thread', project: P, agent: 'perf', entries, before: null, more: false } as never);
     const cut = page.getByTestId('thread.cut.41');
@@ -177,7 +178,7 @@ test("thread/streaming: a reply cut off mid-stream stays as he read it at 0.7, t
     await expect(cut).toContainText('keep the cache warm');
     expect(await cut.evaluate((el) => getComputedStyle(el).opacity), 'the cut reply is dim, still readable').toBe('0.7');
     const line = page.getByTestId('thread.notice.42');
-    await expect(line).toHaveText('▲turn interrupted by main');
+    await expect(line).toHaveText(`▲${thread.turn_interrupted_by({ by: 'main' })}`);
     await expect(line).toHaveClass(/interrupted/);
     const lineTone = await line.evaluate((el) => getComputedStyle(el).color);
     const markTone = await line.locator('.th-notice-mark').evaluate((el) => getComputedStyle(el).color);

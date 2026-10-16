@@ -8,6 +8,7 @@ use crate::wire::*;
 use crate::said::Said;
 use crate::wrap_line;
 use bise_proto::parts::Part;
+use bise_proto::words::thread;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -383,16 +384,16 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
                 .into_iter()
                 .map(|l| Line::from(l.spans.into_iter().map(|s| Span::styled(s.content, s.style.fg(dim()))).collect::<Vec<_>>()))
                 .collect();
-            rows.extend(glyph_line(G_NOTE, Style::default().fg(faint()), "held until /resume".into(), dim_st, width));
+            rows.extend(glyph_line(G_NOTE, Style::default().fg(faint()), thread::held.into(), dim_st, width));
             rows
         }
         Ev::MarkYou { .. } | Ev::YouId(_) | Ev::YouWent { .. } => vec![],
         // BISE-86 (book §13, §17): `✗ not delivered: {name} stopped.`, and
         // while it waits for an answer `⏎ send again · esc drop`
         Ev::Undelivered { name, open, .. } => {
-            let mut l = glyph_line(G_FAILED, err_st, format!("not delivered: {} stopped.", name), text_st, width);
+            let mut l = glyph_line(G_FAILED, err_st, thread::undelivered(name), text_st, width);
             if *open {
-                l[0].spans.push(Span::styled(" ⏎ send again · esc drop", dim_st));
+                l[0].spans.push(Span::styled(thread::undelivered_keys, dim_st));
             }
             l
         }
@@ -466,7 +467,7 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
         Ev::Wake { head, stopped, tail, open } => wake_lines(head, *stopped, tail, *open, width),
         // an interrupted turn ("turn interrupted by main" too) is dim;
         // any other warning reads as text
-        Ev::Warn(t) if t == "turn interrupted" || t.starts_with("turn interrupted by ") => glyph_line(G_INTERRUPTED, dim_st, t.clone(), dim_st, width),
+        Ev::Warn(t) if crate::feed::is_interrupt(t) => glyph_line(G_INTERRUPTED, dim_st, t.clone(), dim_st, width),
         // the plan's limit line: its usage page clickable (OSC 8)
         Ev::Warn(t) if crate::wire::is_plan_line(t) && t.contains(crate::wire::PLAN_USAGE_TEXT) => {
             use unicode_width::UnicodeWidthStr;
@@ -494,7 +495,7 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
             // (400).`), the provider's own words dim under it
             None => match crate::wire::refusal_parts(t) {
                 Some((head, said)) => {
-                    let mut l = glyph_line(G_FAILED, err_st, format!("the turn stopped: {}", head), err_st, width);
+                    let mut l = glyph_line(G_FAILED, err_st, thread::refused(head), err_st, width);
                     if !said.is_empty() {
                         l.extend(glyph_line(" ", dim_st, said.to_string(), dim_st, width));
                     }
@@ -827,7 +828,7 @@ fn l2_lines(from: &str, body: &str, width: usize) -> Vec<Line<'static>> {
     let (glyph, glyph_st, lead) = if from == "main" {
         (G_MAIN, main_mark_st(), String::new())
     } else {
-        (G_MSG, bold_st, format!("{} to you:", from))
+        (G_MSG, bold_st, thread::to_you(from))
     };
     let mut lines = md_lines(&unescape_md(body.trim()), width.saturating_sub(3), width.saturating_sub(3));
     if lines.is_empty() {
@@ -847,13 +848,8 @@ fn l2_lines(from: &str, body: &str, width: usize) -> Vec<Line<'static>> {
 /// from the right with `…` to fit `width`; the last run, still growing,
 /// carries the working pulse.
 pub(crate) fn fold_line(n: usize, agents: usize, open: bool, live: bool, tick: u32, width: usize) -> Line<'static> {
-    let label = format!(
-        "{} {} messages between {} agent{}",
-        if open { G_OPEN } else { G_CLOSED },
-        n,
-        agents,
-        if agents == 1 { "" } else { "s" }
-    );
+    let between = if agents == 1 { thread::between_one(n) } else { thread::between(n, agents) };
+    let label = format!("{} {}", if open { G_OPEN } else { G_CLOSED }, between);
     let pulse = if live { 2 } else { 0 };
     let room = width.saturating_sub(L3_X.len() + pulse).max(1);
     let mut row = vec![Span::raw(L3_X), Span::styled(fit_chars(&label, room), Style::default().fg(dim()))];
@@ -889,15 +885,15 @@ fn card_lines(card: &crate::wire::CardParts, closed: &str, width: usize) -> Vec<
     match kind {
         "done" => {
             let check = Style::default().fg(accent());
-            return glyph_line(done_glyph(), check, format!("{} is done: {}", name, body), text_st, width);
+            return glyph_line(done_glyph(), check, thread::card_done(name, body), text_st, width);
         }
         k if k.contains("fail") => {
-            return glyph_line(G_FAILED, Style::default().fg(error()), format!("{} failed: {}", name, body), text_st, width)
+            return glyph_line(G_FAILED, Style::default().fg(error()), thread::card_failed(name, body), text_st, width)
         }
         _ => {}
     }
-    let page = card.page.as_ref().map(|p| if kind == "plan" { format!("{} ↗", crate::sb::answer_target::question_cut(&format!("{name} proposes a plan: {p}"), width.saturating_sub(8).max(12))) } else { format!("{name} asks: {} ↗ {p}", card.question.lines().next().unwrap_or("")) });
-    let mut title = page.clone().unwrap_or_else(|| if name.is_empty() { "needs you".to_string() } else if kind == "plan" { format!("{name} proposes a plan") } else { format!("{} needs you", name) });
+    let page = card.page.as_ref().map(|p| if kind == "plan" { format!("{} ↗", crate::sb::answer_target::question_cut(&thread::card_plan_on(name, p), width.saturating_sub(8).max(12))) } else { thread::card_page_asks(name, card.question.lines().next().unwrap_or(""), p) });
+    let mut title = page.clone().unwrap_or_else(|| if name.is_empty() { thread::card_needs.to_string() } else if kind == "plan" { bise_proto::words::common::title_plan(name) } else { thread::card_needs_name(name) });
     let (bar_st, title_st, body_st) = if closed.is_empty() {
         let accent_st = Style::default().fg(accent()).add_modifier(Modifier::BOLD);
         (Style::default().fg(accent()), accent_st, text_st)
@@ -919,17 +915,18 @@ fn card_lines(card: &crate::wire::CardParts, closed: &str, width: usize) -> Vec<
 /// result: `answered`, `answered via @x`, `closed`, `accepted`, …).
 pub(crate) fn closed_word(res: &str) -> String {
     let res = res.trim();
+    // the hub's words on the left, his on the right
     if let Some(who) = res.strip_prefix("answered via @") {
-        return format!("answered by {}", who);
+        return thread::closed_by(who);
     }
     match res {
-        "closed" => "closed".into(),
-        "accepted" => "dropped".into(),
-        "refused" => "kept".into(),
-        "vue" => "seen".into(),
-        "reprise" => "resumed".into(),
-        "task stopped" => "agent stopped".into(),
-        "" => "answered".into(),
+        "closed" => thread::closed_closed.into(),
+        "accepted" => thread::closed_dropped.into(),
+        "refused" => thread::closed_kept.into(),
+        "vue" => thread::closed_seen.into(),
+        "reprise" => thread::closed_resumed.into(),
+        "task stopped" => thread::closed_stopped.into(),
+        "" => thread::closed_answered.into(),
         r => r.to_string(),
     }
 }
@@ -1608,7 +1605,7 @@ pub(crate) fn wake_lines(head: &[(String, bool)], stopped: bool, tail: &[String]
     }
     let n = tail.len();
     if n > 0 {
-        let what = if n == 1 { "its last line".to_string() } else { format!("its last {} lines", n) };
+        let what = if n == 1 { thread::wake_tail_one.to_string() } else { thread::wake_tail(n) };
         row.push(Span::styled(format!("  {} {}", glyph(if open { G_OPEN } else { G_CLOSED }), what), st));
     }
     let mut ls = wrap_line(Line::from(row), width.max(1));

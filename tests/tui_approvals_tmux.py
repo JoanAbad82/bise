@@ -29,6 +29,7 @@ from words import w  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run, in_view, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 COLS, ROWS = 140, 40
 
@@ -114,7 +115,7 @@ def session(E, env, home, bise, shot):
         # a force push to main: the row waits for you, a card with no always
         t.typed("[[bash: git push origin main --force]]")
         t.keys("Enter")
-        sc = t.wait("waiting for you")
+        sc = t.wait(w("thread.gate_waits"))
         t.wait("? main · $ git push origin main --force")
         sc = t.screen()
         shot(t, "tool-row-and-strip", sc)
@@ -137,7 +138,7 @@ def session(E, env, home, bise, shot):
         sc = t.wait("? t1 · $ curl -s -m 1 http://127.0.0.1:9/", timeout=60)
         shot(t, "card-in-main-view", sc)
         t.keys("M-1")
-        sc = t.wait("waiting for you")
+        sc = t.wait(w("thread.gate_waits"))
         assert "? t1 · $ curl" in sc, sc
         shot(t, "card-in-task-view", sc)
         open_card(t, "t1")
@@ -145,7 +146,7 @@ def session(E, env, home, bise, shot):
         t.wait("type why not, ⏎ says no")
         shot(t, "card-checker-off", sc)
         t.keys("1")
-        sc = t.wait(w("inbox.fold_allowed", agent="t1", what="curl -s -m 1 http://127.0.0.1:9/"))
+        sc = t.wait(w("common.fold_allowed", agent="t1", what="curl -s -m 1 http://127.0.0.1:9/"))
         shot(t, "fold-allowed", sc)
         # "always": its rule in /approvals, from t2, today; then removed
         t.keys("M-0")
@@ -157,7 +158,7 @@ def session(E, env, home, bise, shot):
         t.keys("2")
         # answered from main's view: t2's thread opens at the answer
         # (answer-in-thread A, 787e6ee82); the rest of this run is there
-        sc = t.wait(w("inbox.fold_allowed", agent="t2", what="curl -s -m 1 http://127.0.0.1:9/x"))
+        sc = t.wait(w("common.fold_allowed", agent="t2", what="curl -s -m 1 http://127.0.0.1:9/x"))
         assert "you're talking to t2 directly" in sc, sc
         t.typed("/approvals")
         t.keys("Enter")
@@ -209,7 +210,7 @@ def session(E, env, home, bise, shot):
         shot(t, "card-sandbox", sc)
         t.keys("1")
         # the fold says the sandbox was off for it (designer)
-        sc = t.wait(w("inbox.fold_outside", agent="t3", what="echo hi > ~/Desktop/x.txt"))
+        sc = t.wait(w("common.fold_outside", agent="t3", what="echo hi > ~/Desktop/x.txt"))
         shot(t, "fold-sandbox-rerun", sc)
         out = os.path.join(home, "Desktop", "x.txt")
         wait.until(lambda: os.path.exists(out), 30, "the rerun's %s" % out)

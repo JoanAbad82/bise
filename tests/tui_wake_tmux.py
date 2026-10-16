@@ -37,6 +37,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, in_view, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
+
+PAUSED = w("thread.pause_state")
 
 SHOTS = os.environ.get("WAKE_SHOTS")
 SECS = int(os.environ.get("WAKE_TUI_SECS", "25"))
@@ -125,12 +128,12 @@ def wide(t, E, bin_dir):
     assert rows[k - 1][1:col + 20].strip("│ ") == "", rows[k - 1]
     shot(t, "150-waiting")
     # the command ends: the hub's line, the live line gone
-    sc = t.wait("cargo test ended · rc 0 · after", SECS + 60)
-    assert "its last 3 lines" in sc, sc
+    sc = t.wait(" · ".join([w("thread.wake_ended", what="cargo test"), w("thread.wake_rc", rc=0), w("thread.wake_after", dur="")]), SECS + 60)
+    assert w("thread.wake_tail", n=3) in sc, sc
     # bise's wake is no message row of its own (the fake model's reply
     # echoes its words, `ack: <agent_message …> background 0 ended`)
     assert "✉︎ bise" not in sc and "✉ bise" not in sc, "bise's wake folds into the line: " + sc
-    assert not any(r.strip("│ ").startswith("background 0 ended") for r in sc.splitlines()), sc
+    assert not any(r.strip("│ ").startswith(w("thread.wake_ended", what="background 0")) for r in sc.splitlines()), sc
     t.wait_gone("continues when cargo test", 20)
     shot(t, "150-ended")
     # a file with a note: an alarm. perf is free (○, no live line); the
@@ -140,13 +143,13 @@ def wide(t, E, bin_dir):
     # designer m_22997: the agent and its end on a row, the note under it
     sc = t.wait_re(r"◌ perf +→\S+ +│\n.*│ +if the reindex", 30)
     assert "○ perf" in row(sc, "perf"), row(sc, "perf")
-    assert "continues when" not in sc, sc
+    assert PAUSED not in sc, sc
     shot(t, "150-alarm")
     light(t, "150-alarm-light", "if the reindex")
     with open(rc, "w") as f:
         f.write("101\n")
     # a note names the thing (designer m_17730): `ended`, no `appeared`
-    t.wait("the reindex ended · rc 101", 30)
+    t.wait(" · ".join([w("thread.wake_ended", what="the reindex"), w("thread.wake_rc", rc=101)]), 30)
     ansi = t.screen(colors=True)
     assert re.search(r"\x1b\[[0-9;]*m\s*rc 101", ansi), "the rc in its own color"
     shot(t, "150-failed")
@@ -168,13 +171,13 @@ def narrow(t, E):
     t.start(80, 30)
     t.wait("bise :*")
     view(t, "perf")
-    t.wait("cargo test ended · rc 0")
+    t.wait(" · ".join([w("thread.wake_ended", what="cargo test"), w("thread.wake_rc", rc=0)]))
     sb(E, "perf", "wake", "--on-file", os.path.join(E.tmp, "x.rc"), "--note", "the reindex")
     sc = t.wait_re(r"you → perf .*◌ 1 watching", 30)
     for line in sc.splitlines():
         # `✉︎` is 2 code points (its text-style selector) in 1 cell
         assert len(line.replace("\ufe0e", "")) <= 80, line
-    assert "continues when" not in sc, sc
+    assert PAUSED not in sc, sc
     shot(t, "80-alarm")
     light(t, "80-alarm-light", "◌ 1 watching")
     # /scheduled lists it under `watching`: x stops it
@@ -214,7 +217,7 @@ def reply_row(t, E):
     # it counts up live
     t.wait_re(r"… continues when search answers · (?:%s)s" % "|".join(str(n) for n in range(first + 3, 60)), 20)
     # search's turn ends: its reply wakes docs, the line goes
-    t.wait_gone("continues when search answers", 90)
+    t.wait_gone("%s %s" % (PAUSED, w("thread.event_answers", name="search")), 90)
     shot(t, "150-reply-answered")
 
 

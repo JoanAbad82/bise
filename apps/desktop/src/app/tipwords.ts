@@ -27,7 +27,7 @@ export function biseTip(waits: number, working: number): string {
   const tip = (what: string) => panel.tip_of({ who: panel.bise, what });
   if (waits > 0) return tip(panel.tip_things_wait({ n: waits }));
   if (working > 0) return tip(panel.tip_working_with({ n: working }));
-  return tip(panel.tip_quiet);
+  return tip(common.all_quiet);
 }
 
 /**
@@ -47,7 +47,7 @@ export function projectTip(p: Pick<ProjectRow, 'name' | 'waits' | 'working' | 'm
     const names = (who.working.length === 1 ? panel.tip_name_working : panel.tip_names_working)({ names: namesWords(who.working) });
     return panel.tip_of({ who: p.name, what: n > 1 ? `${names} · ${panel.tip_agents({ n })}` : names });
   }
-  return panel.tip_of({ who: p.name, what: panel.tip_quiet });
+  return panel.tip_of({ who: p.name, what: common.all_quiet });
 }
 
 /** A project's working count '3': '3 agents working'. */

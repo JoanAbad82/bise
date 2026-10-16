@@ -4,6 +4,7 @@
 // turn of today shows its clock only; the time goes when the mouse leaves. The scripted core
 // (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -36,7 +37,7 @@ const world = (today: number) => [
     project: P,
     agent: 'main',
     entries: [
-      { pos: 1, at_ms: OLD, kind: 'tools', text: 'read 3 files', tools: { count: 1, summary: 'read 3 files', items: [{ pos: 10, at_ms: OLD, text: 'src/a.rs', kind: 'read', state: 'ok' }] } },
+      { pos: 1, at_ms: OLD, kind: 'tools', text: thread.did_read({ n: 3 }), tools: { count: 1, summary: thread.did_read({ n: 3 }), items: [{ pos: 10, at_ms: OLD, text: 'src/a.rs', kind: 'read', state: 'ok' }] } },
       { pos: 2, at_ms: today, kind: 'agent', text: 'all good today' },
     ],
     before: null,

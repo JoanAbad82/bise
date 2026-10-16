@@ -7,6 +7,7 @@ import { Act, Answered, ArtName, CardLine, Chip, Marker, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import { ArtWords } from '@/inbox/artWords';
 import type { Entry, EntryCard } from '@/proto';
+import { common, thread } from '@/proto/words.gen';
 import { RouterContext } from '@/app/router';
 import { answeredFromWords, answerPos, approvalTarget, cardTarget, openAnswer, type AnswerAt } from './answerlink';
 import { useAnsweredFrom, useEntry, useProjects, useStore, useThreadOrder } from '@/store';
@@ -31,7 +32,8 @@ export function AnsweredRow({ e }: { e: Entry }) {
   return (
     <div className="th-answered" data-testid={`thread.answered.${e.pos}`}>
       <NewsLine mark="↳" tone="plain" testId={`thread.answered.${e.pos}.head`}>
-        {mine ? 'you answered' : `${shownName('main')} answered`} {a.agent}{mine ? '' : ' for you'}: {a.question} → <b>{a.answer}</b>
+        {mine ? thread.you_answered_q({ agent: a.agent, question: a.question }) : thread.main_answered_q({ main: shownName('main'), agent: a.agent, question: a.question })}
+        <b>{a.answer}</b>
       </NewsLine>
       {a.why !== '' && !mine && <div className="th-news-note">{toYou(a.why)}</div>}
       <ImageChips images={a.images ?? []} testId={`thread.answered.${e.pos}`} />
@@ -109,7 +111,7 @@ export function CardAnsweredRow({ pos, a, at, timeAlways }: { pos: number; a: { 
   return (
     <div className="th-approval" data-card={a.card}>
       <YouBubble
-        head={<AnsweredHead ok>{`you answered ${shownName('main')} · ${a.question}`}</AnsweredHead>}
+        head={<AnsweredHead ok>{thread.answered_card({ who: shownName('main'), question: a.question })}</AnsweredHead>}
         under={at > 0 ? clock(at) : undefined}
         timeAlways={timeAlways}
         testId={id}
@@ -451,7 +453,7 @@ function AnsweredCard({ c, ctx, follows }: { c: EntryCard; ctx: RowCtx; follows:
   const at = cardTarget(ctx.project, ctx.agent, c);
   // one fact, one row (designer m_24812): his own '✓ you answered' row in this thread says it
   if (answerPos(order, (p) => store.entry(ctx.tkey, p), c.id) !== null) return null;
-  const row = <Answered testId={`thread.card.${String(c.id)}`}>{follows ? '✓ answered' : `✓ answered: ${c.question}`}</Answered>;
+  const row = <Answered testId={`thread.card.${String(c.id)}`}>{follows ? thread.card_answered : thread.card_answered_q({ question: c.question })}</Answered>;
   if (at === null) return row;
   return (
     <AnswerLink at={at} here={ctx.agent}>
@@ -462,7 +464,7 @@ function AnsweredCard({ c, ctx, follows }: { c: EntryCard; ctx: RowCtx; follows:
 
 /** A '✓ answered' row as a link to his answer: its tooltip says where it goes. Pure. */
 export function answerLinkTitle(at: AnswerAt, here: string): string {
-  return at.agent === here ? 'show your answer' : `open it in ${shownName(at.agent)}'s thread`;
+  return at.agent === here ? thread.show_answer : thread.open_in({ thread: thread.from_thread({ name: shownName(at.agent) }) });
 }
 
 function AnswerLink({ at, here, children, testId }: { at: AnswerAt; here: string; children: ReactNode; testId?: string }) {
@@ -493,9 +495,9 @@ function AnswerLink({ at, here, children, testId }: { at: AnswerAt; here: string
  * the inbox below'. Pure.
  */
 export function cardLine(who: string, question: string, follows: boolean, kind = 'question'): string {
-  if (follows) return '? waits for you · in the inbox below';
+  if (follows) return thread.card_waits;
   const first = question.split('\n').find((l) => l.trim() !== '')?.trim() ?? '';
   // a plan an agent proposes (plan-ok): its own words, as in the inbox
-  const asks = kind === 'plan' ? `${who} proposes a plan` : `${who} asks`;
-  return first === '' ? `? ${asks} · in the inbox below` : `? ${asks}: ${first} · in the inbox below`;
+  const asks = kind === 'plan' ? common.title_plan({ agent: who }) : common.title_asks({ agent: who });
+  return first === '' ? thread.card_line({ asks }) : thread.card_line_q({ asks, question: first });
 }

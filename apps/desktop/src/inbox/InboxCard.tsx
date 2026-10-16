@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
 import type { CardPage } from '@/proto/rows';
 import { inbox } from '@/proto/words_inbox.gen';
+import { common } from '@/proto/words_common.gen';
 import { Act, ArtChip, Kbd, tipAttrs } from '@/ds';
 import { refusedLine, useRefused, useStore } from '@/store';
 import { cardKey } from './order';
@@ -190,7 +191,7 @@ function RefusedNote({ card, id }: { card: CardRow; id: string }) {
             }}
             testId={`${id}.retry`}
           >
-            {inbox.try_again}
+            {common.try_again}
           </Act>
         </>
       )}
@@ -201,7 +202,7 @@ function RefusedNote({ card, id }: { card: CardRow; id: string }) {
 /** A folded row's mark for a card whose answer or close was refused here: 'not sent', or nothing. */
 export function RefusedMark({ card }: { card: CardRow }) {
   const refused = useRefused(card.project, card.id);
-  return refused === null ? null : <span className="ic-refused-mark">{inbox.not_sent}</span>;
+  return refused === null ? null : <span className="ic-refused-mark">{common.not_sent}</span>;
 }
 
 /** The footer's keys (ambient's six forms), each pair a button. */
@@ -282,7 +283,7 @@ function Folded({ text, project, testId, q }: { text: string; project: string; t
     <>
       <ArtWords text={lines.slice(0, FOLD_SHOW).join('\n')} project={project} testId={q} />
       <span data-testid={testId}>
-        {`\n… ${inbox.more_lines({ n: more })} `}
+        {`\n… ${common.more_lines({ n: more })} `}
         <Kbd>ctrl o</Kbd>
       </span>
     </>
@@ -328,10 +329,10 @@ export function kindTitle(kind: string, agent0: string): string {
   const agent = agent0 === 'main' ? 'bise' : agent0;
   switch (kind) {
     case 'question':
-      return inbox.title_asks({ agent });
+      return common.title_asks({ agent });
     // a plan an agent proposes (plan-ok, Gabriel's pick A): its own card, its words reach it
     case 'plan':
-      return inbox.title_plan({ agent });
+      return common.title_plan({ agent });
     case 'blocked':
       return inbox.title_blocked({ agent });
     case 'failed':
@@ -347,7 +348,7 @@ export function kindTitle(kind: string, agent0: string): string {
     default:
       // never a card's kind id (designer m_15412): any other kind asks like a question; its text
       // says what it asks ('merge sb/perf into main?')
-      return inbox.title_asks({ agent });
+      return common.title_asks({ agent });
   }
 }
 

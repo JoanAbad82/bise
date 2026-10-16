@@ -36,7 +36,7 @@ import { SignInLine, useThreadSignIn } from './signin';
 import { type ThreadListHandle } from './ThreadList';
 import { ComputerLine } from './ComputerLine';
 import { entryKey } from './entry';
-import { MISS_WORDS } from './answerlink';
+import { thread } from '@/proto/words.gen';
 import { flashEntry, useAnswerReveal } from './useAnswerReveal';
 import { useFindGo } from './useFindGo';
 import { quoteSourcePos } from './quote';
@@ -293,7 +293,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         {counts}
       </a>
     );
-  const lead = bise ? 'every project' : agent === 'main' ? '' : (projectName ?? project);
+  const lead = bise ? thread.every_project : agent === 'main' ? '' : (projectName ?? project);
   const sub = (
     <>
       {/* bise's own head: 'every project' alone (designer D7b) */}
@@ -314,7 +314,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
       {/* voice mode on this agent (ambient's spec m_11632, amb-home m_11684) */}
       {voice !== 'off' && (
         <span className="th-voice" data-testid="thread.voice">
-          {' · voice mode'}
+          {` · ${thread.voice_mode}`}
         </span>
       )}
     </>
@@ -381,7 +381,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         ) : agent === MAIN ? (
           <BiseHead project={project} name={projectName ?? project} more={more} />
         ) : (
-          <AgentHead project={project} a={me} more={more} note={voice !== 'off' ? 'voice mode' : undefined} starting={fresh} named={artifact !== undefined} />
+          <AgentHead project={project} a={me} more={more} note={voice !== 'off' ? thread.voice_mode : undefined} starting={fresh} named={artifact !== undefined} />
         )}
         {/* S29/L19 W1: it drives his computer: one line under the head, from computer_live only */}
         {!bise && <ComputerLine project={project} agent={agent} />}
@@ -399,7 +399,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         )}
         {answerMiss && (
           <div className="th-answer-miss" data-testid="thread.answer-miss">
-            {MISS_WORDS}
+            {thread.answer_further_up}
           </div>
         )}
         {topTip !== null && (
@@ -530,7 +530,7 @@ function History({ project, agent }: { project: string; agent: string }) {
   return (
     <div className="th-history" data-testid="thread.archived">
       {/* designer's ⌘K screen (amb-win m_11920): '<name> is archived · ⌘⏎ restore' */}
-      <span>{agent} is archived ·</span>
+      <span>{thread.is_archived({ agent })}</span>
       <Button
         kind="ghost"
         onClick={() => {
@@ -538,7 +538,7 @@ function History({ project, agent }: { project: string; agent: string }) {
         }}
         testId="thread.restore"
       >
-        <kbd>⌘⏎</kbd> restore
+        <kbd>⌘⏎</kbd> {thread.restore}
       </Button>
     </div>
   );

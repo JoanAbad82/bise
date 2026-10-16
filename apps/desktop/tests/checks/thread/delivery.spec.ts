@@ -7,6 +7,7 @@
 // one says '▲ not sent' in the error tone; earlier bubbles of a run show time + mark on hover.
 // Light and dark, 1100 and 600. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const P = 'shop-ab9f3c3b';
 const NOW = Date.now();
@@ -44,7 +45,7 @@ const world = () => [
       { pos: 7, at_ms: NOW - 10 * MIN, kind: 'agent', text: 'merged. the thumbnails are 380 KB now.' },
       // a steer: its line is its ✓✓
       { pos: 8, at_ms: NOW - 6 * MIN + 1000, kind: 'you', msg_id: 15, delivery: 'read', steered_at: 9, text: 'also try webp' },
-      { pos: 9, at_ms: NOW - 6 * MIN, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 9, at_ms: NOW - 6 * MIN, text: 'pnpm bench', kind: 'run', state: 'ok', ms: 6000 }] } },
+      { pos: 9, at_ms: NOW - 6 * MIN, kind: 'tools', text: thread.did_run({ n: 1 }), tools: { count: 1, summary: thread.did_run({ n: 1 }), items: [{ pos: 9, at_ms: NOW - 6 * MIN, text: 'pnpm bench', kind: 'run', state: 'ok', ms: 6000 }] } },
       { pos: 10, at_ms: NOW - 5 * MIN, kind: 'agent', text: 'webp saves another 30%.' },
       // a failed one: '▲ not sent' in the error tone
       { pos: 11, at_ms: NOW - 4 * MIN, kind: 'you', msg_id: 16, delivery: 'failed', text: 'and tell launch' },
@@ -82,9 +83,9 @@ test("thread/delivery: ✓ got it faint, ✓✓ read it dim after the time under
     const check = async (t: string) => {
       // the bottom rows (the virtual list draws what shows)
       await expect(mark(13)).toHaveText('✓');
-      await expect(mark(13)).toHaveAttribute('title', 'bise got it');
+      await expect(mark(13)).toHaveAttribute('title', thread.got_it({ who: 'bise' }));
       await expect(under(13)).toHaveText(/^\d\d:\d\d ✓$/u);
-      await expect(mark(11)).toHaveText('▲ not sent');
+      await expect(mark(11)).toHaveText(thread.not_sent);
       await expect(mark(15), `${t}: sent shows the time alone`).toHaveCount(0);
       await expect(under(15)).toHaveText(/^\d\d:\d\d$/u);
       expect(await color(13), `${t}: ✓ faint`).toBe(await token('--c-text-3'));
@@ -98,11 +99,11 @@ test("thread/delivery: ✓ got it faint, ✓✓ read it dim after the time under
       // to perf: perf got it
       await page.getByTestId('thread.you.6').evaluate((el) => { el.scrollIntoView({ block: 'center' }); });
       await expect(mark(6)).toHaveText('✓');
-      await expect(mark(6)).toHaveAttribute('title', 'perf got it');
+      await expect(mark(6)).toHaveAttribute('title', thread.got_it({ who: 'perf' }));
       // the run: the last's ✓✓ always, dim, never the accent; the first's on hover
       await page.getByTestId('thread.you.4').evaluate((el) => { el.scrollIntoView({ block: 'center' }); });
       await expect(mark(4)).toHaveText('✓✓');
-      await expect(mark(4)).toHaveAttribute('title', 'bise read it');
+      await expect(mark(4)).toHaveAttribute('title', thread.read_it({ who: 'bise' }));
       expect(await color(4), `${t}: ✓✓ dim`).toBe(await token('--c-text-2'));
       expect(await color(4), `${t}: never the accent`).not.toBe(accent);
       const op = (pos: number) => under(pos).evaluate((e) => Number(getComputedStyle(e).opacity));
@@ -178,7 +179,7 @@ test('thread/delivery: the four marks in one frame (✓, ✓✓, steered, said �
         { pos: 1, at_ms: NOW - 20 * MIN, kind: 'you', msg_id: 21, delivery: 'read', text: 'cap the thumbnails at 400 KB' },
         { pos: 2, at_ms: NOW - 18 * MIN, kind: 'agent', text: 'capped. running the bench three more times…' },
         { pos: 3, at_ms: NOW - 12 * MIN + 1000, kind: 'you', msg_id: 22, delivery: 'read', steered_at: 4, text: 'also try webp' },
-        { pos: 4, at_ms: NOW - 12 * MIN, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 4, at_ms: NOW - 12 * MIN, text: 'pnpm bench --webp', kind: 'run', state: 'ok', ms: 4000 }] } },
+        { pos: 4, at_ms: NOW - 12 * MIN, kind: 'tools', text: thread.did_run({ n: 1 }), tools: { count: 1, summary: thread.did_run({ n: 1 }), items: [{ pos: 4, at_ms: NOW - 12 * MIN, text: 'pnpm bench --webp', kind: 'run', state: 'ok', ms: 4000 }] } },
         { pos: 5, at_ms: NOW - 10 * MIN, kind: 'agent', text: 'webp saves another 30%. still benching the phones…' },
         { pos: 6, at_ms: NOW - 8 * MIN, kind: 'you', msg_id: 23, delivery: 'received', text: 'and keep the old jpegs for a week' },
         { pos: 7, at_ms: NOW - 6 * MIN, kind: 'agent', text: 'done: phones 380 KB, the old jpegs stay until friday.' },

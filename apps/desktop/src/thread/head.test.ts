@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { common } from '@/proto/words.gen';
 import { archivedFit, biseChip, composerWords, emptyEnter, emptyEnterAct, nothingOwnYet, roleOf, stateChip, STARTING_MS, usageLine } from './head';
 
 const NOW = 1_791_100_000_000;
@@ -25,7 +26,7 @@ describe("the agent view's head (designer's desktop-screens v6)", () => {
     const a = (status: 'working' | 'idle', waits = 0, main = false) => ({ main, archived: false, status, waits });
     expect(biseChip([a('idle', 0, true), a('working'), a('working')]).text).toBe('2 agents at work');
     expect(biseChip([a('working'), a('idle', 1)])).toEqual({ text: '1 waiting for you', needs: true, live: false });
-    expect(biseChip([a('idle', 0, true)]).text).toBe('all quiet');
+    expect(biseChip([a('idle', 0, true)]).text).toBe(common.all_quiet);
   });
 
   it("the composer: 'to perf', 'write to perf, then ⏎'", () => {

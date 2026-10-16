@@ -5,6 +5,7 @@
 // PR's failing checks with the TUI's ↑ mark in the err tone and the hub's words (never color alone) and his 'no' to an approval with his
 // note, and the scheduled task's ◷ lines (batch 3b, pos 33-34) with its words under the set one. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common } from '../../../src/proto/words.gen';
 
 const P = 'acme-1a2b3c4d';
 
@@ -31,7 +32,7 @@ test('thread/news-rows: landed, PR news, artifact, answered, approval and agent-
     // the TUI's PR mark '↑' (designer m_19784 (3)), failing said by the err tone and the hub's words
     await expect(pr).toContainText('↑');
     const ap = page.getByTestId('thread.approval.31');
-    await expect(ap).toContainText('you said no to perf: rm -rf target');
+    await expect(ap).toContainText(common.fold_no({ agent: 'perf', what: 'rm -rf target' }));
     await expect(ap).toContainText('not that');
     // batch 3b (6e9d68f8): the scheduled task's ◷ lines, its words open under the set one
     const sched = page.getByTestId('thread.scheduled.33');

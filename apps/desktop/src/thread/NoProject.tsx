@@ -4,6 +4,7 @@
 // first-run text only its demo, as a quiet button. The composer stays under it: bise answers
 // without a project too. Owner: amb-win.
 import { Button, Pearl, Press } from '@/ds';
+import { thread } from '@/proto/words.gen';
 import { useProjects } from '@/store';
 import { composer } from '../proto/words.gen';
 import { useRouter } from '@/app/router';
@@ -16,11 +17,11 @@ export function NoProject({ onDemo }: { onDemo: (text: string) => void }) {
       <span className="th-noproj-pearl">
         <Pearl size={120} mood={waits ? 'need' : 'rest'} glyph />
       </span>
-      <p className="th-noproj-t">bise is here.</p>
-      <p className="th-noproj-s">add a project to give it its own bise. bise will route what you ask to it.</p>
+      <p className="th-noproj-t">{thread.noproj_title}</p>
+      <p className="th-noproj-s">{thread.noproj_says}</p>
       <div className="th-noproj-acts">
         <Button kind="pri" onClick={() => { router.go({ screen: 'settings', page: 'projects' }); }} testId="thread.noproject.add">
-          add a project <kbd>⌘N</kbd>
+          {thread.noproj_add} <kbd>⌘N</kbd>
         </Button>
         <Press
           look="th-noproj-demo"

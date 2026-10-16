@@ -17,6 +17,7 @@
 // Writes shots (light + dark at 1400 and 800: driving, paused, stopped) for designer.
 // Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'storefront-1a2b3c4d';
@@ -100,7 +101,7 @@ test('thread/computer-live: the live line under the head, its acts with the key,
     // driving
     await live([other, driving(now)]);
     await expect(words).toHaveText('↖ driving Chrome · amazon.fr · 2 min');
-    await expect(page.getByTestId('thread.computer.take')).toHaveText('take the wheel');
+    await expect(page.getByTestId('thread.computer.take')).toHaveText(thread.cu_take);
     await expect(page.getByTestId('thread.computer.stop')).toHaveText('stop');
     await expect(mark).toHaveText('↖');
     await page.getByTestId('thread.computer.take').click();
@@ -113,7 +114,7 @@ test('thread/computer-live: the live line under the head, its acts with the key,
     await expect(words).toHaveText('? you took the wheel');
     await expect(page.getByTestId('thread.computer.back')).toHaveText('give it back ⏎');
     // it waits for him until he gives it back: the head's chip says so, like the sidebar's '?'
-    await expect(page.getByTestId('thread.head.state')).toHaveText('? waiting for you');
+    await expect(page.getByTestId('thread.head.state')).toHaveText(thread.chip_waits);
     await expect(page.getByTestId('thread.head.state')).toHaveAttribute('data-needs', 'true');
     const field = page.locator('[data-testid="composer.field"]').first();
     await field.click();

@@ -5,6 +5,9 @@
 // it; esc on the empty composer brings him back to bise's view. Shots light and dark at 1400, 1100
 // and 800 wide: before send, landed (with the flash), back. Scripted core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common, thread } from '../../../src/proto/words.gen';
+
+const MERGED = common.fold_answered({ agent: 'pattern-error-dx', pick: 'merge it' });
 import type { Page } from '@playwright/test';
 
 const HOME = 'bise-home-00000000';
@@ -49,7 +52,7 @@ const tsThread = () => [
   ...Array.from({ length: 24 }, (_, i) => ({ pos: 1 + i, at_ms: NOW - (60 - i) * MIN, kind: 'agent', text: `step ${String(i + 1)}: ${'the exhaustive check now names the missing case. '.repeat(3)}` })),
   { pos: 30, at_ms: NOW - 9 * MIN, kind: 'from_agent', from: 'pattern-error-dx', to: 'main', text: 'the PR is green on every target. #384 is ready to merge.' },
   { pos: 31, at_ms: NOW - 9 * MIN, kind: 'card', text: '#384 is ready to merge', card: { id: 384, question: '#384 is ready to merge', options: [], answered: true, kind: 'question', agent: 'pattern-error-dx', closed: 'answered' } },
-  { pos: 32, at_ms: NOW, kind: 'approval', text: 'you answered pattern-error-dx: merge it', approval: { ok: true, text: 'you answered pattern-error-dx: merge it', card: 384, to: 'pattern-error-dx' } },
+  { pos: 32, at_ms: NOW, kind: 'approval', text: MERGED, approval: { ok: true, text: MERGED, card: 384, to: 'pattern-error-dx' } },
   { pos: 33, at_ms: NOW, kind: 'agent', text: 'merging #384 now. the release notes follow.' },
 ];
 type Cmd = { cmd?: string; card?: number; reply?: string; agent?: string; project?: string };
@@ -80,7 +83,7 @@ for (const size of ['1400x900', '1100x760', '800x700']) {
       await shots(page, core, `${w}-1-before-send`);
 
       // the hub takes it: its rows drop the card, its result says the answer
-      await core.result('answer', 384, { answer: { agent: 'pattern-error-dx', question: '#384 is ready to merge', said: '1', pick: 'merge it', notice: 'you answered pattern-error-dx: merge it' } }, [projects([])]);
+      await core.result('answer', 384, { answer: { agent: 'pattern-error-dx', question: '#384 is ready to merge', said: '1', pick: 'merge it', notice: MERGED } }, [projects([])]);
       await page.keyboard.press('1');
       const a = (await core.waitCmd((c) => (c as Cmd).cmd === 'answer' && (c as Cmd).card === 384, 5000)) as Cmd;
       expect(a.reply).toBe('1');
@@ -92,7 +95,7 @@ for (const size of ['1400x900', '1100x760', '800x700']) {
       await expect(answer, 'his answer in view').toBeInViewport({ timeout: 5000 });
       await expect(answer, 'flashed once').toHaveClass(/th-flash/u);
       // a normal row: the hub's head, the option's words (never the digit), where he made it
-      await expect(page.getByTestId('thread.approval.32.head')).toContainText('you answered pattern-error-dx');
+      await expect(page.getByTestId('thread.approval.32.head')).toContainText(thread.answered_to({ who: 'pattern-error-dx' }));
       await expect(page.getByTestId('thread.approval.32.words')).toHaveText('merge it');
       const from = page.getByTestId('thread.approval.32.from');
       await expect(from).toHaveText(/^answered from bise · \d\d:\d\d$/u);

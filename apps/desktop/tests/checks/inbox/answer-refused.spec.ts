@@ -11,6 +11,7 @@
 // Owner: amb-home.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common } from '../../../src/proto/words_common.gen';
 import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
@@ -70,7 +71,7 @@ const present = async (page: Page, id: number, question: string, why: string) =>
 async function notSent(page: Page, id: number, question: string): Promise<boolean> {
   await unfold(page);
   const row = rowOf(page, question);
-  if ((await row.count()) > 0) return ((await row.first().textContent()) ?? '').includes(inbox.not_sent);
+  if ((await row.count()) > 0) return ((await row.first().textContent()) ?? '').includes(common.not_sent);
   const line = cardIn(page, id).getByTestId(`inbox.block.card.${P}-${String(id)}.refused`);
   return (await line.count()) > 0 && ((await line.textContent()) ?? '').startsWith('not sent: ');
 }
@@ -98,7 +99,7 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       expect(a.reply).toBe('1');
       await present(page, 9, 'which bench?', 'card 9 is back');
       // try-gate-f2a7: the words on the card that came back, where he answered, never the project's line
-      await expect(rowOf(page, 'which bench?').first()).toContainText(inbox.not_sent, { timeout: 3000 });
+      await expect(rowOf(page, 'which bench?').first()).toContainText(common.not_sent, { timeout: 3000 });
       await open(page, 9, 'which bench?');
       await expect(cardIn(page, 9).getByTestId(`inbox.block.card.${P}-9.refused`)).toContainText('not sent: perf asked again: card 9 is not open any more · try again', { timeout: 3000 });
       await expect(page.locator('[data-testid="confirm.notice"][data-level="error"]')).toHaveCount(0);
@@ -108,7 +109,7 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
 
     await test.step("an answer the hub takes, to search's card from perf's thread (same project): out of the block, the window stays, no row here", async () => {
       // the hub's step drops card 11 from its rows before it answers (the real hub's order)
-      await core.result('answer', 11, { answer: { agent: 'search', question: 'reindex tonight or now?', said: '1', pick: 'tonight', notice: inbox.fold_answered({ agent: 'search', pick: 'tonight' }) } }, [projects(CARDS.filter((c) => c.id !== 11))]);
+      await core.result('answer', 11, { answer: { agent: 'search', question: 'reindex tonight or now?', said: '1', pick: 'tonight', notice: common.fold_answered({ agent: 'search', pick: 'tonight' }) } }, [projects(CARDS.filter((c) => c.id !== 11))]);
       await open(page, 11, 'reindex tonight or now?');
       await page.keyboard.press('1');
       await core.waitCmd((c) => (c as Cmd).cmd === 'answer' && (c as Cmd).card === 11, 5000);
@@ -184,7 +185,7 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       await expect.poll(() => nine().length, { message: 'his answer to card 9 goes again', timeout: 5000 }).toBe(before + 1);
       expect(nine().at(-1)?.reply).toBe('1');
       await expect.poll(async () => (await unfold(page), await inBlock(page, 9, 'which bench?')), { message: 'card 9 leaves', timeout: 3000 }).toBe(false);
-      await expect(page.locator('body')).not.toContainText(inbox.not_sent, { timeout: 3000 });
+      await expect(page.locator('body')).not.toContainText(common.not_sent, { timeout: 3000 });
     });
   } finally {
     await s.close();

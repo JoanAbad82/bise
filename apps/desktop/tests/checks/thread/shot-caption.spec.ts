@@ -9,6 +9,7 @@ import { copyFileSync, mkdtempSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const P = 'shop-ab9f3c3b';
 const PNG = path.join(mkdtempSync(path.join(os.tmpdir(), 'shot-caption-')), 'still.png');
@@ -75,7 +76,7 @@ test("thread/shot-caption: the talk's still reads 'image 1' with its caption 4 p
   try {
     const { page } = s;
     await expect(page.getByTestId('thread.you.4')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId('thread.you.2.image.1')).toHaveText('image 1');
+    await expect(page.getByTestId('thread.you.2.image.1')).toHaveText(thread.image_n({ n: 1 }));
     await expect(page.getByTestId('thread.you.2.image.1.caption')).toHaveText('Safari · cold bench');
     await expect(page.getByTestId('thread.you.2')).toContainText('why is this one so slow?');
     const geo = await page.evaluate(() => {

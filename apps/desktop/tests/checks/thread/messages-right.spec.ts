@@ -6,6 +6,7 @@
 // someone else than the thread's owner gets a dim 'to perf'; the time shows on hover only (H12).
 // Checked at 1100 and 600 px, light and dark. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common, thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -43,14 +44,14 @@ const world = () => [
       { pos: 6, at_ms: NOW - 12 * MIN, kind: 'you', to: 'perf', text: 'keep the 400 KB cap for the tablets too' },
       { pos: 7, at_ms: NOW - 10 * MIN, kind: 'agent', text: 'perf asks: merge the cap into main? 1. merge 2. not yet' },
       // his answer to a card: his side, '✓ you answered perf' over his words
-      { pos: 8, at_ms: NOW - 8 * MIN, kind: 'approval', text: 'you answered perf: 1 · merge', approval: { ok: true, text: 'you answered perf: 1 · merge' } },
+      { pos: 8, at_ms: NOW - 8 * MIN, kind: 'approval', text: common.fold_answered({ agent: 'perf', pick: '1 · merge' }), approval: { ok: true, text: common.fold_answered({ agent: 'perf', pick: '1 · merge' }) } },
       { pos: 9, at_ms: NOW - 6 * MIN, kind: 'agent', text: 'merged. the thumbnails are 380 KB now.' },
       // a steer (amb-tools' 7335fde7 seed, qa-native m_16425): written while the bench ran, so its
       // pos is before the bench's; the hub's receipt (steered_at 11) says the agent read it after
       // the bench: it shows there, between the two benches (amb-feed 9633cd2a)
       { pos: 10, at_ms: NOW - 5 * MIN + 1000, kind: 'you', text: 'also try webp', msg_id: 41, steered_at: 11 },
-      { pos: 11, at_ms: NOW - 5 * MIN, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 11, at_ms: NOW - 5 * MIN, text: 'pnpm bench', kind: 'run', state: 'ok', ms: 6000 }] } },
-      { pos: 12, at_ms: NOW - 4 * MIN + 2000, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 12, at_ms: NOW - 4 * MIN + 2000, text: 'pnpm bench --webp', kind: 'run', state: 'ok', ms: 4000 }] } },
+      { pos: 11, at_ms: NOW - 5 * MIN, kind: 'tools', text: thread.did_run({ n: 1 }), tools: { count: 1, summary: thread.did_run({ n: 1 }), items: [{ pos: 11, at_ms: NOW - 5 * MIN, text: 'pnpm bench', kind: 'run', state: 'ok', ms: 6000 }] } },
+      { pos: 12, at_ms: NOW - 4 * MIN + 2000, kind: 'tools', text: thread.did_run({ n: 1 }), tools: { count: 1, summary: thread.did_run({ n: 1 }), items: [{ pos: 12, at_ms: NOW - 4 * MIN + 2000, text: 'pnpm bench --webp', kind: 'run', state: 'ok', ms: 4000 }] } },
       { pos: 13, at_ms: NOW - 3 * MIN, kind: 'agent', text: 'webp saves another 30%, as you asked mid-way.' },
       // a quote he sent: first in his bubble, its rail and source, from its typed parts (the
       // window never parses the text's <selection>, delta review D1)
@@ -142,7 +143,7 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
     // source and text first in his bubble, then his words, never the raw tag; a queued bubble
     // the source by the name the thread shows ('bise' for a main, designer m_16360), as the steer and queued words
     await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('bise');
-    await expect(page.getByTestId('thread.you.10.under')).toHaveText('steered · bise read it mid-turn');
+    await expect(page.getByTestId('thread.you.10.under')).toHaveText(thread.steered({ agent: 'bise' }));
     await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('webp saves another 30%.');
     expect(await page.getByTestId('thread.you.14').innerText()).not.toContain('<selection');
     // queued: never a bubble in the thread, the composer's drawer (thread/queue-drawer.spec.ts)

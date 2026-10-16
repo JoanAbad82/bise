@@ -15,6 +15,7 @@
 // Shots for designer: waiting-<case>-<w>-<theme>.png (case: alarm, alarm-detail, pause, reply).
 // Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread as tw } from '../../../src/proto/words.gen';
 
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
@@ -158,7 +159,7 @@ for (const w of [1400, 1100, 800]) {
               return st !== null && st.scrollWidth <= st.clientWidth + 0.5 && el.scrollWidth <= el.clientWidth + 1;
             });
             expect(whole, `${theme}: the state whole, the line fits`).toBe(true);
-            await expect(page.getByTestId('thread.head.state')).toHaveText(view === 'pause' ? '… waiting · 3 min' : '… waiting · 1 min');
+            await expect(page.getByTestId('thread.head.state')).toHaveText(tw.chip_paused({ len: view === 'pause' ? '3 min' : '1 min' }));
             await expect(page.getByTestId('composer.tab')).not.toHaveText(/waiting|idle|since/u);
             const bar = await openBar();
             const row = bar.getByTestId(`app.right.agent.${agent}`);

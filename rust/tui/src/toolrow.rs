@@ -9,6 +9,7 @@
 use crate::render::{elapsed_label, fit_chars, fmt_duration, fmt_elapsed};
 use crate::theme::{self, *};
 use crate::wire::*;
+use bise_proto::words::thread;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
@@ -46,7 +47,7 @@ fn skill_name(td: &ToolData) -> Option<String> {
 fn skill_spans(td: &ToolData) -> Vec<Span<'static>> {
     let run = matches!(td.state, ToolState::Run);
     let dim_st = Style::default().fg(dim());
-    let verb = if run { "reading skill" } else { "read skill" };
+    let verb = if run { thread::skill_reading } else { thread::skill_read };
     match skill_name(td) {
         Some(n) => vec![
             Span::styled(format!("{} ", verb), dim_st),
@@ -62,7 +63,7 @@ fn skill_reason(td: &ToolData) -> String {
     let r = td.result.as_ref().map(|(_, r)| r.trim()).unwrap_or("");
     let head = r.split(':').next().unwrap_or("").trim();
     // the usage error starts `skill: call exactly with…`
-    let head = if head == "skill" || head.is_empty() { "failed" } else { head };
+    let head = if head == "skill" || head.is_empty() { thread::skill_failed } else { head };
     fit_chars(head, 40)
 }
 
@@ -89,12 +90,12 @@ pub(crate) fn kind_glyph(td: &ToolData) -> &'static str {
 /// `exit 1` from a failed bash result (`exit 1: <output>`).
 pub(crate) fn exit_code(td: &ToolData) -> Option<String> {
     let (_, r) = td.result.as_ref()?;
-    bise_proto::thread::lines::exit_code(r).map(|code| format!("exit {}", code))
+    bise_proto::thread::lines::exit_code(r).map(thread::exit)
 }
 
 /// A call /pause cut, on the right of its row (designer m_19111): a
 /// pause isn't a failure, so dim, no ✗.
-pub(crate) const PAUSE_CUT: &str = "– stopped by the pause";
+pub(crate) const PAUSE_CUT: &str = thread::pause_cut;
 
 /// The state on the right of a row, and its style.
 pub(crate) fn state_spans(td: &ToolData, tick: u32) -> Vec<Span<'static>> {
@@ -103,10 +104,10 @@ pub(crate) fn state_spans(td: &ToolData, tick: u32) -> Vec<Span<'static>> {
         _ if td.paused => vec![Span::styled(PAUSE_CUT, dim_st)],
         // approvals-design.md §3.1, §10: the gate holds it
         ToolState::Run if matches!(td.gate, Some((crate::wire::Gate::Card, _))) => {
-            vec![Span::styled("? ", Style::default().fg(accent())), Span::styled("waiting for you", dim_st)]
+            vec![Span::styled("? ", Style::default().fg(accent())), Span::styled(thread::gate_waits, dim_st)]
         }
         ToolState::Run if td.gate.is_some_and(|(g, t)| g == crate::wire::Gate::Check && t.elapsed().as_millis() >= 250) => {
-            vec![Span::styled(format!("checking{}", theme::ellipsis()), dim_st)]
+            vec![Span::styled(format!("{}{}", thread::gate_checking, theme::ellipsis()), dim_st)]
         }
         ToolState::Run => {
             let (g, c) = working_frame(tick);

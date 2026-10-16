@@ -6,6 +6,7 @@
 // sends main '/version <to>', ✕ folds it, and the next switch shows again.
 // The scripted core (FakeCore). Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const TO = 'f7178b72';
@@ -72,7 +73,7 @@ test('app/reload-line: reloading, then ✓ reloaded that folds; a stale one says
     await expect(line, 'folded after its 3 s').toHaveCount(0, { timeout: 5000 });
     // rolled back: stays, retry sends main /version <to>, ✕ folds it
     await core.send(sw('rolled_back', { reason: 'the hub died during its probation' }));
-    await expect(page.getByTestId('app.reload.text')).toHaveText("▲ couldn't reload: the new version stopped right after it started. you're still on 2065c746.", { timeout: 3000 });
+    await expect(page.getByTestId('app.reload.text')).toHaveText(thread.reload_failed({ why: thread.reload_died({ from: '2065c746' }) }), { timeout: 3000 });
     expect(await line.evaluate((el) => el.getBoundingClientRect().height), 'with retry and ✕, still 24 px').toBe(24);
     // at most 480 px, never a red banner from the crumb to the toggle (designer m_21244): the reason cuts with …
     const wide = await page.evaluate(() => {
@@ -121,7 +122,7 @@ test('app/reload-line: reloading, then ✓ reloaded that folds; a stale one says
       });
       expect(pill.crumbWhole, `${String(w)}: the crumb is never cut for it`).toBe(true);
       if (room.narrow) {
-        await expect(page.getByTestId('app.reload.short'), `${String(w)}: the short words`).toHaveText("▲ couldn't reload");
+        await expect(page.getByTestId('app.reload.short'), `${String(w)}: the short words`).toHaveText(thread.reload_short_failed);
         await expect(page.getByTestId('app.reload.text'), `${String(w)}: no long words`).toBeHidden();
         await expect(page.getByTestId('app.reload.retry'), `${String(w)}: the actions are in the popover`).toBeHidden();
         await page.getByTestId('app.reload.open').click();

@@ -9,6 +9,7 @@
 // inline, never stored); esc or a click closes it. Owner: amb-win.
 import { useEffect, useState } from 'react';
 import type { ComputerAgent } from '@/proto';
+import { thread } from '@/proto/words.gen';
 import { useComputerLive, usePeek, useStore } from '@/store';
 import { useNow } from '@/app/clock';
 import { ago } from '@/agents/model';
@@ -34,9 +35,9 @@ export function computerWords(r: ComputerAgent, now: number): string {
 
 /** The still's caption: 'a still from 15:31 · esc closes' (its arrival time, local). Pure. */
 export function stillCaption(at: number | null): string {
-  if (at === null) return 'a still · esc closes';
+  if (at === null) return thread.cu_still;
   const d = new Date(at);
-  return `a still from ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} · esc closes`;
+  return thread.cu_still_from({ at: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` });
 }
 
 /** This agent's row of his computer use, if it drives (another bise's agents have no project). Pure. */
@@ -83,23 +84,23 @@ function Line({ row }: { row: ComputerAgent }) {
             setOpen((o) => !o);
           }}
           data-testid="thread.computer.words"
-          title="see what it drives"
+          title={thread.cu_see}
         >
           {computerWords(row, now)}
         </Press>
         {state === 'driving' && (
           <>
             <Press look="th-cu-act" onClick={act('take')} data-testid="thread.computer.take">
-              take the wheel
+              {thread.cu_take}
             </Press>
             <Press look="th-cu-act" onClick={act('stop')} data-testid="thread.computer.stop">
-              stop
+              {thread.cu_stop}
             </Press>
           </>
         )}
         {state === 'paused' && (
           <Press look="th-cu-act" onClick={act('hand_back')} data-testid="thread.computer.back">
-            give it back <kbd className="th-cu-key">⏎</kbd>
+            {thread.cu_give_back} <kbd className="th-cu-key">⏎</kbd>
           </Press>
         )}
       </div>
@@ -120,14 +121,14 @@ function Peek({ rowKey, onClose }: { rowKey: string; onClose: () => void }) {
   if (shot !== seen.shot) setSeen({ shot, at: shot === null ? null : now });
   const at = seen.at;
   return (
-    <Press look="th-cu-peek" onClick={onClose} data-testid="thread.computer.peek" aria-label="close the still">
+    <Press look="th-cu-peek" onClick={onClose} data-testid="thread.computer.peek" aria-label={thread.cu_close_still}>
       {shot !== null ? (
         <>
-          <img src={`data:${shot.mime};base64,${shot.data}`} width={shot.width} height={shot.height} alt="what it drives now" />
+          <img src={`data:${shot.mime};base64,${shot.data}`} width={shot.width} height={shot.height} alt={thread.cu_now} />
           <span className="th-cu-cap" data-testid="thread.computer.peek.cap">{stillCaption(at)}</span>
         </>
       ) : (
-        <span className="th-cu-none">{peek === null ? 'looking…' : why === 'too_soon' ? 'looking…' : 'nothing to show'}</span>
+        <span className="th-cu-none">{peek === null || why === 'too_soon' ? thread.cu_looking : thread.cu_nothing}</span>
       )}
     </Press>
   );

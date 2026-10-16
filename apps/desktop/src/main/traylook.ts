@@ -7,6 +7,7 @@
 // beats: the shape and the colour only. Its tip says the state in words (law 6).
 import { PLAIN_ARMS, rasterMark, type Rgba } from '../shared/mark';
 import type { Counts } from './counts';
+import { common } from '../proto/words_common.gen';
 import { panel } from '../proto/words_panel.gen';
 
 /** The icon's box in points (designer: 15 px in the menu bar). */
@@ -36,7 +37,7 @@ export function trayTip(c: Counts): string {
   const tip = (what: string) => panel.tip_of({ who: panel.bise, what });
   if (c.waiting > 0) return tip(panel.tip_things_wait({ n: c.waiting }));
   if (c.working > 0) return tip(panel.tip_working_with({ n: c.working }));
-  return tip(panel.tip_quiet);
+  return tip(common.all_quiet);
 }
 
 /** The star's turn in degrees at a working step: a third of its 60° symmetry per step. Pure. */

@@ -17,6 +17,7 @@ import { writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { FakeCore, Recorder, launchDesktop, test, expect } from '../../harness';
 import type { Frame } from '../../harness/frames';
+import { common } from '../../../src/proto/words_common.gen';
 import { panel } from '../../../src/proto/words_panel.gen';
 
 const HOME = 'bise-home-00000000';
@@ -148,12 +149,12 @@ test('app/delight-marks: the sidebar marks and their tips, the done kiss, the wi
     await expect(mark(TS)).toHaveText('?');
     await expect(mark(TS)).toHaveAttribute('data-tip', panel.tip_of({ who: 'ts-pattern', what: panel.tip_name_waits({ names: 'pattern-error-dx' }) }));
     await expect(mark(DOCS)).toHaveText('·');
-    await expect(mark(DOCS)).toHaveAttribute('data-tip', panel.tip_of({ who: 'docs-site', what: panel.tip_quiet }));
+    await expect(mark(DOCS)).toHaveAttribute('data-tip', panel.tip_of({ who: 'docs-site', what: common.all_quiet }));
     const col = await mark(P).evaluate((el) => (el.closest('.app-g') as HTMLElement).getBoundingClientRect().width);
     expect(col, 'the 18 px mark column').toBe(18);
     // the row drops 'all quiet' and '∿ n'; the pink count stays
     await expect(page.getByTestId(`app.sidebar.project.${P}`)).not.toContainText('∿');
-    await expect(page.getByTestId(`app.sidebar.project.${DOCS}`)).not.toContainText(panel.tip_quiet);
+    await expect(page.getByTestId(`app.sidebar.project.${DOCS}`)).not.toContainText(common.all_quiet);
     await expect(page.getByTestId(`app.sidebar.project.${TS}`).locator('.app-cnt')).toHaveText('1');
     const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--c-accent').trim());
     expect(accent).not.toBe('');

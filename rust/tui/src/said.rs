@@ -41,8 +41,8 @@ impl Tag {
     /// Its words (designer signs them).
     pub(crate) fn words(&self) -> String {
         match self {
-            Tag::ViaBise => "via bise".to_string(),
-            Tag::Went(name) => format!("sent to {name}"),
+            Tag::ViaBise => bise_proto::words::thread::via_bise.to_string(),
+            Tag::Went(name) => bise_proto::words::thread::sent_to(name),
         }
     }
 }

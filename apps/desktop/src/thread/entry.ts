@@ -1,6 +1,7 @@
 // What a thread row shows of an entry (the hub folds the transcript; this
 // only picks words and the ds part). Owner: amb-win. Pure.
 import type { Entry } from '@/proto';
+import { thread } from '@/proto/words.gen';
 import { NAMELESS_KINDS } from './tiers';
 import { thinkingWords } from './thinking';
 import { rhythmWords } from '@/scheduled/model';
@@ -65,7 +66,7 @@ export function whoOf(e: Entry, ctx: { agent: string; bise: boolean }): { from: 
       // batch 3a: a message between two other agents says to whom ('perf → docs')
     {
       // a project's main is 'bise' in every name the window shows (ambient m_11437)
-      const from = shown(e.from ?? 'an agent');
+      const from = shown(e.from ?? thread.an_agent);
       return { from: 'agent', name: e.to != null && e.to !== '' && e.to !== ctx.agent ? `${from} → ${shown(e.to)}` : from, indent: true };
     }
     default:
@@ -224,9 +225,9 @@ export function chipOf(c: { app?: string | null; url?: string | null; title?: st
   if (app === '' && sources.length === 0 && !c.shot) return null;
   const first = sources[0];
   const more = sources.length > 1 ? ` +${String(sources.length - 1)}` : '';
-  const label = `◫ with ${app || 'the screen'}${first ? ` · ${first.what}` : ''}${more}`;
+  const label = `${thread.ctx_with({ app: app || thread.ctx_screen })}${first ? ` · ${first.what}` : ''}${more}`;
   const shotOnly = sources.length === 0 && Boolean(c.shot);
-  return { label, open: first?.open ?? null, tip: shotOnly ? "the screenshot isn't kept" : undefined };
+  return { label, open: first?.open ?? null, tip: shotOnly ? thread.ctx_shot_gone : undefined };
 }
 
 /** His agents often start with their own name ('perf: the parsed copy…'): the name line already
@@ -302,7 +303,7 @@ export function reportLine(text: string, kind?: string | null): string | null {
   const body = (m === null ? text : (m[2] ?? '')).trim();
   const first = body.split('\n')[0]?.trim() ?? '';
   const waiting = /^waiting for your answer\b/i.exec(first);
-  const words = waiting !== null ? 'waiting for your answer' : first;
+  const words = waiting !== null ? thread.report_waiting : first;
   return words === '' ? k : `${k} · ${words}`;
 }
 
@@ -500,13 +501,13 @@ export function toolLines(items: readonly ToolLike[]): {
   const n = (k: string) => items.filter((t) => t.kind === k && !lined.has(t.pos)).length;
   const shownRun = lines.filter((l) => l.mark === '$' || l.mark === 'ƒ').length;
   const shownEdit = lines.filter((l) => l.mark === '±').length;
-  const files = (x: number) => (x === 1 ? '1 file' : `${String(x)} files`);
+  // words::summary's words, without the steps shown as lines
   const parts: string[] = [];
-  if (n('read') > 0) parts.push(`read ${files(n('read'))}`);
-  if (n('edit') - shownEdit > 0) parts.push(`edited ${files(n('edit') - shownEdit)}`);
-  if (n('run') - shownRun > 0) parts.push(`ran ${n('run') - shownRun === 1 ? '1 command' : `${String(n('run') - shownRun)} commands`}`);
-  if (n('search') > 0) parts.push(`searched ${n('search') === 1 ? 'once' : `${String(n('search'))} times`}`);
-  if (n('other') > 0) parts.push(`${String(n('other'))} other ${n('other') === 1 ? 'step' : 'steps'}`);
+  if (n('read') > 0) parts.push(thread.did_read({ n: n('read') }));
+  if (n('edit') - shownEdit > 0) parts.push(thread.did_edit({ n: n('edit') - shownEdit }));
+  if (n('run') - shownRun > 0) parts.push(thread.did_run({ n: n('run') - shownRun }));
+  if (n('search') > 0) parts.push(n('search') === 1 ? thread.did_search_once : thread.did_search({ n: n('search') }));
+  if (n('other') > 0) parts.push(thread.did_other({ n: n('other') }));
   return { lines, rest, restWords: parts.join(', ') };
 }
 
@@ -598,11 +599,11 @@ export function lastOfRun(e: Entry, next: Entry | undefined): boolean {
 export function deliveryMark(d: Entry['delivery'], who: string): { glyph: string; tip: string; tone: 'got' | 'read' | 'failed' } | null {
   switch (d) {
     case 'received':
-      return { glyph: '✓', tip: `${who} got it`, tone: 'got' };
+      return { glyph: '✓', tip: thread.got_it({ who }), tone: 'got' };
     case 'read':
-      return { glyph: '✓✓', tip: `${who} read it`, tone: 'read' };
+      return { glyph: '✓✓', tip: thread.read_it({ who }), tone: 'read' };
     case 'failed':
-      return { glyph: '▲ not sent', tip: `${who} didn't get it`, tone: 'failed' };
+      return { glyph: thread.not_sent, tip: thread.didnt_get_it({ who }), tone: 'failed' };
     default:
       return null;
   }

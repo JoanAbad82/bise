@@ -71,7 +71,7 @@ def one(cols, rows, tmp):
         # 2: answered; the thread says what he picked
         t.keys("2")
         c.wait(lambda: not any((x.get("page") or {}).get("id") == "composer-look" for x in c.cards()), 20, "the item answered")
-        sc = t.wait(w("inbox.picked", name="B"))
+        sc = t.wait(w("common.picked", name="B"))
         print(sc)
         print("PASS the page's line, ctrl+t opens %s, '2' answers at %d cols" % (opened[0], cols))
 

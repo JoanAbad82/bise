@@ -14,6 +14,7 @@
 // and tiers-<theme>-wake.png. Owner: amb-win.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -30,7 +31,7 @@ const at = (m: number) => NOW - m * MIN;
 const mainThread = [
   { pos: 1, at_ms: at(30), kind: 'you', text: 'why are the MCP errors so hard to read?' },
   { pos: 2, at_ms: at(29), kind: 'agent', text: 'Because a failed call only gives the model its exit code.\n\nI asked mcp-errors to pass the tool\'s own words through; flake-roots fixed the flaky test on the way.' },
-  { pos: 3, at_ms: at(28), kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 3, at_ms: at(28), text: 'cargo test -p mcp', kind: 'run', state: 'ok', ms: 4100 }] } },
+  { pos: 3, at_ms: at(28), kind: 'tools', text: thread.did_run({ n: 1 }), tools: { count: 1, summary: thread.did_run({ n: 1 }), items: [{ pos: 3, at_ms: at(28), text: 'cargo test -p mcp', kind: 'run', state: 'ok', ms: 4100 }] } },
   { pos: 4, at_ms: at(27), kind: 'to_agent', to: 'mcp-errors', text: `here is what the model sees today:\n${OUTPUT}` },
   { pos: 5, at_ms: at(26), kind: 'from_agent', from: 'mcp-errors', text: 'on it: the error words go into the tool result.' },
   { pos: 6, at_ms: at(25), kind: 'to_agent', to: 'mcp-errors', text: 'good, keep the exit code too.' },

@@ -7,12 +7,15 @@
 // rule: what runs now is a duration, what's ahead a clock, a past clock only on hover and relative.
 // Never the accent: nothing of it waits on him; only a non-zero rc is red. Owner: amb-win.
 //
-// The words are bise-proto's (rust/proto/src/thread/words.rs: wait_len, clock_ahead, clock_past,
-// watch_event, pause_line, alarms), the TUI's too, said here with the same rules (the live age
-// needs the window's clock, so it can't come from the hub); both read
-// rust/proto/fixtures/wait_words.json (wake.test.ts here, words.rs wait_words_follow_the_fixture).
-// A wake line's head is the hub's own text (the entry's text is words::wake_head). Pure.
+// The words are the catalog's (rust/proto/src/words/thread.rs, read through words_thread.gen.ts);
+// the rules that pick them and the duration and clock formats are bise-proto's
+// (rust/proto/src/thread/words/wait.rs: wait_len, clock_ahead, clock_past, watch_event,
+// pause_line, alarms), said here the same way (the live age needs the window's clock, so it can't
+// come from the hub); both read rust/proto/fixtures/wait_words.json (wake.test.ts here,
+// wait_words_follow_the_fixture there). A wake line's head is the hub's own text (the entry's text
+// is words::wake_head). Pure.
 import type { Agent, AgentWatch, Entry, WatchKind } from '@/proto';
+import { thread } from '@/proto/words.gen';
 import { shownName } from '@/agents/model';
 
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
@@ -66,8 +69,8 @@ export function clockPast(atMs: number, atOff: number, nowMs: number, nowOff: nu
 /** What a watch waits for, after 'continues when' / 'if': 'cargo bench ends', 'build.rc appears', a note as is (words::watch_event). */
 export function watchEvent(kind: WatchKind, what: string, noted: boolean): string {
   if (noted) return what;
-  if (kind === 'reply') return `${what} answers`;
-  return kind === 'file' ? `${what} appears` : `${what} ends`;
+  if (kind === 'reply') return thread.event_answers({ name: what });
+  return kind === 'file' ? thread.event_appears({ what }) : thread.event_ends({ what });
 }
 
 /**
@@ -89,13 +92,13 @@ type Waits = Pick<Agent, 'status' | 'since_ms'> & { waiting_on?: Agent['waiting_
 
 /** An agent's pause line; null: nothing it continues on (an alarm is no pause) (words::pause_line). */
 export function pauseLine(a: Waits, nowMs: number, short = false): PauseLine | null {
-  const state = 'continues when';
+  const state = thread.pause_state;
   if (a.waiting_on?.who === 'agent') {
     // held again on a reply an earlier hold left pending (ask-wait): counted from the ask
     const name = a.waiting_on.name;
     const asked = (a.watching ?? []).filter((w) => w.kind === 'reply' && w.what === name).map((w) => w.since_ms);
     const len = waitLen(nowMs - Math.min(a.since_ms, ...asked), short);
-    const note = `${name} answers`;
+    const note = thread.event_answers({ name: name });
     return { state, note, who: name, more: '', dur: len, len, title: `${state} ${note} · ${len}` };
   }
   if (a.status !== 'idle') return null;
@@ -104,13 +107,13 @@ export function pauseLine(a: Waits, nowMs: number, short = false): PauseLine | n
   if (first === undefined) return null;
   const len = (w: AgentWatch): string => waitLen(nowMs - w.since_ms, short);
   const dur = (w: AgentWatch): string =>
-    short || w.kind === 'reply' ? len(w) : w.kind === 'bg' || w.kind === 'pid' ? `running for ${len(w)}` : `for ${len(w)}`;
+    short || w.kind === 'reply' ? len(w) : w.kind === 'bg' || w.kind === 'pid' ? thread.pause_running_for({ len: len(w) }) : thread.pause_for({ len: len(w) });
   const event = (w: AgentWatch): string => watchEvent(w.kind, w.what, w.noted === true);
   return {
     state,
     note: event(first),
     who: first.kind === 'reply' ? first.what : '',
-    more: ws.length > 1 ? ` and ${String(ws.length - 1)} more` : '',
+    more: ws.length > 1 ? thread.pause_more({ n: ws.length - 1 }) : '',
     dur: dur(first),
     len: len(first),
     title: ws.map((w) => `${state} ${event(w)} · ${dur(w)}`).join('\n'),
@@ -126,8 +129,8 @@ export function pauseLine(a: Waits, nowMs: number, short = false): PauseLine | n
 export function shownPause(p: PauseLine): PauseLine {
   const shown = shownName(p.who);
   if (p.who === '' || shown === p.who) return p;
-  const raw = `${p.who} answers`;
-  const said = `${shown} answers`;
+  const raw = thread.event_answers({ name: p.who });
+  const said = thread.event_answers({ name: shown });
   return { ...p, note: p.note === raw ? said : p.note, title: p.title.split(`${p.state} ${raw}`).join(`${p.state} ${said}`) };
 }
 
@@ -154,13 +157,13 @@ export function alarms(a: Pick<Agent, 'name'> & { watching?: readonly AgentWatch
       const event = watchEvent(w.kind, w.what, w.noted === true);
       const set = clockPast(w.since_ms, off(w.since_ms), nowMs, off(nowMs));
       const end = w.until_ms == null ? '' : clockAhead(w.until_ms, off(w.until_ms), nowMs, off(nowMs));
-      let title = `bise wakes ${a.name} if ${event} · set ${set}`;
+      let title = thread.alarm_title({ agent: a.name, event, set });
       if (end !== '') {
-        // 'at 08:07', 'tomorrow at 08:07', 'fri at 08:07' (designer m_23038)
+        // 'at 08:07', 'tomorrow at 08:07', 'fri at 08:07' (designer m_23038): a clock's format
         const cut = end.lastIndexOf(' ');
-        title += ` · stops watching ${cut < 0 ? `at ${end}` : `${end.slice(0, cut)} at ${end.slice(cut + 1)}`}`;
+        title += thread.alarm_stops({ at: cut < 0 ? `at ${end}` : `${end.slice(0, cut)} at ${end.slice(cut + 1)}` });
       }
-      return { id: w.id, note: `if ${event}`, end, title };
+      return { id: w.id, note: thread.alarm_if({ event }), end, title };
     });
 }
 
@@ -189,7 +192,7 @@ export function digitRuns(s: string): { text: string; digits: boolean }[] {
 /** A wake's folded output: 'its last 3 lines', 'its last line'; null without one (words::wake_tail). */
 export function wakeTail(lines: number): string | null {
   if (lines <= 0) return null;
-  return lines === 1 ? 'its last line' : `its last ${String(lines)} lines`;
+  return lines === 1 ? thread.wake_tail_one : thread.wake_tail({ n: lines });
 }
 
 /**
@@ -200,7 +203,7 @@ export function wakeTail(lines: number): string | null {
 export function wakeLine(e: Pick<Entry, 'text' | 'wake'>): { mark: string; parts: { text: string; err: boolean }[] } {
   const w = e.wake;
   const rc = w?.rc;
-  const red = rc != null && rc !== 0 ? `rc ${String(rc)}` : null;
+  const red = rc != null && rc !== 0 ? thread.wake_rc({ rc }) : null;
   const mark = w?.ev === 'stopped' || w?.ev === 'expired' ? '–' : '·';
   return { mark, parts: e.text.split(' · ').map((t) => ({ text: t, err: t === red })) };
 }

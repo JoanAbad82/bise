@@ -4,6 +4,7 @@
 import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import { Marker, Press } from '@/ds';
 import type { ComposerActions } from '@/composer';
+import { thread } from '@/proto/words.gen';
 import { useAgents, useEntry, useProjects, usePending, useStore, useThreadOrder } from '@/store';
 import { usePartialText } from '@/shared/partial';
 import { LIVE, liveKey, useLive, useStill } from './live';
@@ -242,5 +243,5 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   if (!view.loaded && keys.length === 0 && tail === undefined) return <div className="th-list th-loading" data-testid="thread.loading" />;
   // one list per thread (key): another agent's thread is a new mount, so it opens at its end or
   // where he left it (keep.ts), never with the last thread's scroll, stick or opened rows
-  return <ThreadList key={tkey} ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" reactKey={reactKey} onRead={onRead} {...(onReading === undefined ? {} : { onReading })} />;
+  return <ThreadList key={tkey} ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>{thread.older_messages}</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" reactKey={reactKey} onRead={onRead} {...(onReading === undefined ? {} : { onReading })} />;
 });

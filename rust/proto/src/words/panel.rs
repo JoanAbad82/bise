@@ -154,8 +154,6 @@ crate::words! { panel:
     opens_in_browser = "↗ opens in your browser";
     /// an alarm's end
     until(at) = "until {at}";
-    /// an alarm's detail: its agent's link
-    open_agent(agent) = "open {agent}";
     /// the bar's label for screen readers
     bar_label(name) = "what happens in {name}";
     /// ARTIFACTS on a sub-agent's thread
@@ -262,8 +260,6 @@ crate::words! { panel:
     tip_names_working(names) = "{names} are working";
     /// a project's mark: how many agents
     tip_agents(n) = one "{n} agent" | "{n} agents";
-    /// nothing goes on
-    tip_quiet = "all quiet";
     /// bise's pink count
     tip_waiting_you_all(n) = "{n} waiting for you, in all your projects";
     /// a gone folder's tip, its path unknown

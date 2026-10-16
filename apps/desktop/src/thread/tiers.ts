@@ -3,6 +3,7 @@
 // 3 news (landed, PR, artifact, scheduled, stopped, its own wake: one mono row), 4 ignorable
 // (messages between agents, tools, thinking, compaction, notices that are plumbing: dim mono).
 // Owner: amb-win. Pure.
+import { thread } from '@/proto/words.gen';
 
 /** The kinds drawn as one dim row (tiers 3 and 4): 8 px between two of them. */
 export const ROW_KINDS: ReadonlySet<string> = new Set([
@@ -164,7 +165,8 @@ export function retryRuns(order: readonly number[], entry: (pos: number) => Retr
 /** The retry row's words: 'model call failed · retry 3 of 10 in 4 s', or '… · try 10 of 10 failed' at the end. Pure. */
 export function retryWords(r: Retry): string {
   // the hub says the run ended and the call went through: one dim line that says so
-  if (r.end === 'recovered' || r.end === 'unknown') return `model call failed ${String(r.attempt)} ${r.attempt === 1 ? 'time' : 'times'} · went through`;
-  if (r.next === undefined) return `model call failed · try ${String(r.attempt)} of ${String(r.of)} failed`;
-  return `model call failed · retry ${String(r.next.attempt)} of ${String(r.of)} in ${r.next.wait.replace(/^(\d+(?:\.\d+)?)([a-z]+)$/u, '$1 $2')}`;
+  if (r.end === 'recovered' || r.end === 'unknown') return thread.retry_through({ n: r.attempt });
+  if (r.next === undefined) return thread.retry_last({ attempt: r.attempt, max: r.of });
+  // '4s' reads '4 s' (a duration's format)
+  return thread.retry_next({ attempt: r.next.attempt, max: r.of, wait: r.next.wait.replace(/^(\d+(?:\.\d+)?)([a-z]+)$/u, '$1 $2') });
 }
