@@ -140,7 +140,8 @@ for (const theme of ['light', 'dark']) {
       expect(new Set(cols.map((c) => c.mark)).size, 'mark column aligned').toBe(1);
       expect(new Set(cols.filter((c) => c.pw > 0).map((c) => c.pw)).size, 'one % column width on every row').toBe(1);
       const perfCols = cols.find((c) => c.id === 'app.right.agent.perf');
-      expect([perfCols?.tw, perfCols?.pw], "time 40, the % column 40 (a row's 71%: the number and its ring)").toEqual([40, 40]);
+      // the % column is 44 once a row shows its number (ee5528539, designer m_26968: at 40 '95%' lost its 9)
+      expect([perfCols?.tw, perfCols?.pw], "time 40, the % column 44 (a row's 71%: the number and its ring)").toEqual([40, 44]);
       const brokenCols = cols.find((c) => c.id === 'app.right.agent.broken');
       expect([brokenCols?.tw, brokenCols?.pw], 'no time and no usage: no columns').toEqual([0, 0]);
       expect(cols.find((c) => c.id === 'app.right.agent.launch')?.tw, 'no time: no time column').toBe(0);

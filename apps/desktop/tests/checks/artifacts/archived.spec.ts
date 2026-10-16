@@ -76,7 +76,9 @@ test("artifacts/archived: archived ones behind a faint 'N archived' row, a shows
     // v5): its ARTIFACTS section lists the live ones only; the archived wait on the artifacts screen
     await page.getByTestId(`app.sidebar.project.${SHOP}`).click();
     const section = page.getByTestId('app.right.artifacts');
-    await expect(section.locator('[data-testid^="app.right.artifact."]')).toHaveCount(1, { timeout: 5000 });
+    // its rows only (app.right.artifact.<project>.<id>), not their parts ('.sign', '.leaves': land-reds)
+    const rowIds = () => section.locator('[data-testid^="app.right.artifact."]').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid') ?? '').filter((t) => t.split('.').length === 5));
+    await expect.poll(rowIds, { timeout: 5000 }).toEqual([`app.right.artifact.${SHOP}.before-after`]);
     await expect(section.getByTestId('app.right.artifacts.head')).toHaveText('ARTIFACTS · 1');
   } finally {
     await s.close();

@@ -26,7 +26,9 @@ import e2e  # noqa: E402
 from tui_tmux import Tui, tui_session, run, MAIN_IDLE  # noqa: E402
 from tui_artifacts_tmux import nbsp_as_spaces, shot, sb, command, fakes  # noqa: E402
 
-NEW_ROW = re.compile(r"^[│\s]*›?\s*(.+?)\s{1,2}new\s{2,}")
+# the title column is padded to the widest title (/artifacts' list), then `new` before the kind:
+# '› gamma deck            new doc       main   now'
+NEW_ROW = re.compile(r"^[│\s]*›?\s*(.+?)\s{2,}new\b")
 
 
 def new_rows(sc):

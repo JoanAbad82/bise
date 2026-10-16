@@ -25,6 +25,13 @@ const TS = 'tspat-0a0b0c0d';
 const DOCS = 'docs-cff418c0';
 const NOW = Date.now();
 const MIN = 60_000;
+/** A computed colour as its 0-255 channels: Chromium writes one 'rgb(107, 100, 90)' and the same
+ *  colour reached through the ds's color-mix 'color(srgb 0.42 0.39 0.35)' (land-reds). */
+const channels = (c: string): number[] => {
+  const srgb = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/u.exec(c);
+  if (srgb !== null) return srgb.slice(1, 4).map((v) => Math.round(Number(v) * 255));
+  return (c.match(/\d+(?:\.\d+)?/gu) ?? []).slice(0, 3).map((v) => Math.round(Number(v)));
+};
 const use = (pct: number) => ({ usage: { model: 'm', context: pct * 1000, window: 100_000, words: `${String(pct)}k · ${String(pct)}%`, short: `${String(pct)}%` } });
 const agent = (name: string, status: string, over: Record<string, unknown> = {}) => ({
   name, main: name === 'main', status, archived: false, title: '', purpose: `${name}'s job`, since_ms: NOW - 2 * MIN, waits: 0, ...over,
@@ -111,7 +118,7 @@ test('app/delight-marks: the sidebar marks and their tips, the done kiss, the wi
       return { size: getComputedStyle(el).fontSize, color: getComputedStyle(cell).color, t2, off: Math.abs(r.x + r.width / 2 - (col.x + col.width / 2)) };
     });
     expect(look.size, '12 px').toBe('12px');
-    expect(look.color, 'text-2').toBe(look.t2);
+    expect(channels(look.color), 'text-2').toEqual(channels(look.t2));
     expect(look.off, 'centred in the column').toBeLessThanOrEqual(1);
     const seen = await breath.evaluate(async (el) => {
       const out: { t: number; g: string }[] = [];
@@ -134,7 +141,7 @@ test('app/delight-marks: the sidebar marks and their tips, the done kiss, the wi
     // reduced motion: one still '∿' in text-2
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(breath, "still: '∿'").toHaveText('∿');
-    expect(await breath.evaluate((el) => getComputedStyle(el.firstElementChild as HTMLElement).color), 'still in text-2').toBe(look.t2);
+    expect(channels(await breath.evaluate((el) => getComputedStyle(el.firstElementChild as HTMLElement).color)), 'still in text-2').toEqual(channels(look.t2));
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await expect(mark(P)).toHaveAttribute('data-tip', panel.tip_of({ who: 'storefront', what: `${panel.tip_names_working({ names: panel.names_and({ names: 'perf, search', last: 'docs' }) })} · ${panel.tip_agents({ n: 3 })}` }));
     await expect(mark(TS)).toHaveAttribute('data-mark', 'asks');

@@ -83,7 +83,17 @@ test('inbox/new-card-mid-answer: a new card never takes the card he answers nor 
       await core.send(projects([NINE, ...NEW]) as never);
       // the new ones wait as rows in the block (its head counts them, bise's notifications ask too)
       await expect(page.getByTestId('inbox.block'), 'the new approval waits as a row').toContainText('release wants to run npm publish', { timeout: 5000 });
-      await expect(page.getByTestId('inbox.block')).toContainText('+ 2 more');
+      // 4 wait: card 9 open, the rows that fit (fitRows: 1 or 2 more at 760, as the composer and
+      // head measure) and '+ N more' for the rest, never one lost or counted twice (land-reds:
+      // '+ 2 more' was one fit)
+      await expect(page.getByTestId('inbox.block')).toContainText('4 waiting');
+      await expect
+        .poll(async () => {
+          const shown = await page.locator('[data-testid^="inbox.block.row."]').count();
+          const more = Number(/\+ (\d+) more/u.exec((await page.getByTestId('inbox.block.more').textContent()) ?? '')?.[1] ?? 0);
+          return 1 + shown + more;
+        }, { timeout: 5000 })
+        .toBe(4);
       await page.waitForTimeout(500);
       await expect(nine(page), 'card 9 is still the open one').toBeVisible();
       await expect(field(page), 'his half answer is all there').toHaveText(HALF);
