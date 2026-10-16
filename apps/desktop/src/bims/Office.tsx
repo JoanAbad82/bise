@@ -624,7 +624,7 @@ function HoverCard({ label, width, measure, measureBold, tagRef, onOpen }: {
         </div>
       )}
       {title.map((line, i) => (
-        <div key={i} className="bims-card-title" data-testid={i === 0 ? `app.right.bims.card.title.${label.name}` : undefined}>
+        <div key={i} data-testid={i === 0 ? `app.right.bims.card.title.${label.name}` : undefined}>
           {line}
         </div>
       ))}
