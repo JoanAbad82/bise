@@ -161,9 +161,13 @@ def send_line.after(r: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Socket
     case (s, _):
       IO.pure(Socket, s)
 
+# the text, then its newline: two sends; appending the newline copied
+# the whole answer to add one char (view_all: 30 MB, ~0.2 s)
 def send_line(s: Socket, +text: String) -> IO(Socket):
   do IO<Socket>:
-    r : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(s, String.append(text, "\n"))
+    r0 : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(s, text)
+    s2 : Socket <- send_line.after(r0)
+    r : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(s2, "\n")
     send_line.after(r)
 
 # the received `data` after `part` (the line so far, newest first): the

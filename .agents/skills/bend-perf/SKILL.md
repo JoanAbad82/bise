@@ -128,3 +128,12 @@ numbers. The next audit starts from there.
   parallel parse); parse's fuel as a constant (-0.8%). What is left is the
   runtime's memory work: allocating and freeing each line, its parsed
   Json and each event (term_drop, span_fade, rfc_wrap in the sample).
+- 2026-10-17 (bp-view, chunk 3): view_all on the same journal copy,
+  back to back in one heavy slot (load ~8): 1.92 s -> 1.13-1.25 s, bytes
+  identical (sha256 f170e123b550). vendor json: quote_string in one pass
+  (escape_onto_str), and stringify prints a JArr of 256+ items in
+  parallel halves (PItems, 6 levels) joined once: 1.92 -> 1.5 s.
+  main.bend send_line: the newline as its own send, no 30 MB append:
+  1.5 -> 1.2 s. Left, serial: join_chunks_loop's copy of the 30 MB
+  (~0.2 s) and io_cbuf's String -> bytes (~0.17 s); next step if
+  view_all matters more: answer as a list of parts, one send each.
