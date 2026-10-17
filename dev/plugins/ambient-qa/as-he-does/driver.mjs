@@ -1206,6 +1206,7 @@ if (mode === 'quick') {
     // the chosen rows alone; rows37's before rowsE812's seed (its spawns' task_status would ride on
     // main's next request, the quote's included); the bims office first: it seeds nothing, and the
     // seeds below can take the 600 s watchdog before a late row (desk-cut-8's cand-d3d8b)
+    await rowsCF30(harness, say);
     await rowsDDDE(harness, say);
     await rowsD3D8(harness, say);
     await rows42D1(harness, say);
@@ -1220,6 +1221,7 @@ if (mode === 'quick') {
   } else {
     // first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the time the others take
     await rowsE812(harness, say);
+    await rowsCF30(harness, say);
     await rowsDDDE(harness, say);
     await rowsF2A7(harness, say);
     await rows233B(harness, say);
@@ -4073,6 +4075,159 @@ async function rows4E20(harness, say) {
 // his machine: no native save panel (the ⤓ / ⋯ items read, never clicked), no 'show in Finder',
 // no web link clicked (main's openLink would open his browser; links.spec has the stub), the paste a
 // synthetic ClipboardEvent (his pasteboard untouched), no 'add a project' (the folder picker)
+// cf3093e33's cut (desk-cut-13, main m_30074): menubar-sum 5c7b3b794 (checks/spotlight/menu-sum.spec.ts)
+// and at-perf 2b76eccc4 (checks/composer/at-perf.spec.ts), on the real hub of the world's harness.
+// The tray's click is native (main process): the menu opens the way it would, through the capsule's
+// own show at 'menu' (preload's capsule.show, the same Capsule.show the tray's click calls), its
+// window parked off every screen. Not checkable here: the submenu's side (subSide reads the real
+// screen; the window sits at -30000) and the resize's look on a real screen (designer's ask).
+async function rowsCF30(harness, say) {
+  const row = async (name, fn) => {
+    if (!wanted(name)) return;
+    try { await fn(name); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const capPage = () => browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().includes('surface=capsule'));
+  const capShot = async (cp, name) => {
+    const f = path.join(out, `${mode}${tag}-${++n}-${name}.png`);
+    try { await cp.screenshot({ path: f, timeout: 15000 }); res.shots.push(f); save(); } catch (e) { step(`frame ${name}`, false, String(e).slice(0, 200)); }
+  };
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+
+  // the tray menu's agents submenu with the keys: ↓ to the harness line (live: its main at work on a
+  // long bash), → opens its submenu on its first row and the window grows 340 → 620, ↓ moves in it,
+  // ← closes it (back to 340), → again then esc closes the submenu and the menu stays, ⏎ on an agent
+  // opens its thread in the window
+  await row('menu sub', async (name) => {
+    await harness();
+    await page.evaluate(() => window.bise.capsule.show('menu', true)).catch(() => {});
+    const cp = await until(async () => capPage() ?? null, 8000, 300);
+    if (!cp) { step(name, false, 'no capsule page'); return; }
+    const menu = cp.locator('[data-testid="capsule.menu"]');
+    const shown = await menu.waitFor({ timeout: 8000 }).then(() => true, () => false);
+    // the menu view comes only from the tray's click (machine.ts: window shown, why 'tray'); a page's
+    // capsule.show says why 'asked' (cand-cf30q: the capsule stayed blank). The tray icon sits in his
+    // menu bar, never clicked: the keys are menu-sum.spec's (FakeCore, test:land), not this run's
+    if (!shown) {
+      await page.evaluate(() => window.bise.capsule.hide()).catch(() => {});
+      step(`${name}: the tray menu's submenu keys (↑↓⏎→← esc): not reachable off-screen (its view opens on the tray's click only, a native icon in his menu bar); proven by checks/spotlight/menu-sum.spec.ts`, true, 'not proven here');
+      return;
+    }
+    await say('[[bash: sleep 45]]');
+    await page.waitForTimeout(2500);
+    const width = () => cp.evaluate(() => window.innerWidth).catch(() => -1);
+    // the harness line: the live one whose summary names harness's work ('›' after it)
+    const lineId = await until(async () => cp.evaluate(() => {
+      const ls = [...document.querySelectorAll('[data-testid^="capsule.menu.project."][data-testid$=".line"]')];
+      const l = ls.find((e) => /harness/.test(e.textContent ?? '') && e.querySelector('.go'));
+      return l ? (l.getAttribute('data-testid') ?? '').replace(/\.line$/, '') : null;
+    }), 15000, 500);
+    const lines = await cp.evaluate(() => [...document.querySelectorAll('[data-testid^="capsule.menu.project."][data-testid$=".line"]')]
+      .map((e) => ({ id: e.getAttribute('data-testid'), h: Math.round(e.getBoundingClientRect().height), go: !!e.querySelector('.go'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) }))).catch(() => []);
+    const w0 = await width();
+    if (!lineId) { await capShot(cp, 'cf30-menu'); step(name, false, { shown, w0, lines, why: 'no live harness line with a ›' }); return; }
+    const line = cp.locator(`[data-testid="${lineId}"]`);
+    // ↓ until the harness line is the selected one (its 'on' class)
+    let at = false;
+    for (let i = 0; i < 30 && !at; i++) {
+      await cp.keyboard.press('ArrowDown');
+      await cp.waitForTimeout(80);
+      at = /\bon\b/.test((await line.getAttribute('class').catch(() => '')) ?? '');
+    }
+    await capShot(cp, 'cf30-menu-keys');
+    const sub = cp.locator('[data-testid="capsule.menu.sub"]');
+    await cp.keyboard.press('ArrowRight');
+    const opened = await sub.waitFor({ timeout: 3000 }).then(() => true, () => false);
+    const head = ((await cp.locator('[data-testid="capsule.menu.sub.head"]').innerText({ timeout: 1000 }).catch(() => '')) ?? '').replace(/\s+/g, ' ').trim();
+    const agents = await sub.locator('[data-testid^="capsule.menu.sub.agent."]').evaluateAll((els) => els.map((e) => ({ id: (e.getAttribute('data-testid') ?? '').split('.').pop(), on: /\bon\b/.test(e.className) }))).catch(() => []);
+    const firstOn = agents.length > 0 && agents[0].on;
+    const w1 = await until(async () => ((await width()) === 620 ? 620 : null), 3000, 150) ?? await width();
+    await capShot(cp, 'cf30-menu-sub');
+    await cp.keyboard.press('ArrowDown');
+    await cp.waitForTimeout(150);
+    const agents2 = await sub.locator('[data-testid^="capsule.menu.sub.agent."]').evaluateAll((els) => els.map((e) => /\bon\b/.test(e.className))).catch(() => []);
+    // ↓ moves to the next row, or stays on the last when there is one row ('open harness' may follow)
+    const moved = agents.length > 1 ? agents2[1] === true : true;
+    await cp.keyboard.press('ArrowLeft');
+    const leftClosed = await until(async () => ((await sub.count()) === 0 ? true : null), 3000, 150) === true;
+    const w2 = await until(async () => ((await width()) === 340 ? 340 : null), 3000, 150) ?? await width();
+    await cp.keyboard.press('ArrowRight');
+    const again = await sub.waitFor({ timeout: 3000 }).then(() => true, () => false);
+    await cp.keyboard.press('Escape');
+    const escClosed = await until(async () => ((await sub.count()) === 0 ? true : null), 3000, 150) === true;
+    await cp.waitForTimeout(500);
+    const menuStays = (await menu.count()) > 0;
+    step(`${name}: ↓ selects the live harness line, → opens its agents' submenu on its first row (340 → 620), ↓ moves in it, ← closes it (back to 340), esc closes the submenu and the menu stays`,
+      shown && at && opened && firstOn && w0 === 340 && w1 === 620 && moved && leftClosed && w2 === 340 && again && escClosed && menuStays,
+      { shown, lineId, at, opened, head, agents, firstOn, w0, w1, moved, leftClosed, w2, again, escClosed, menuStays, lines });
+    // ⏎ on its first agent: its thread in the window
+    await cp.keyboard.press('ArrowRight');
+    await sub.waitFor({ timeout: 3000 }).catch(() => {});
+    const target = agents[0]?.id ?? null;
+    await cp.keyboard.press('Enter');
+    const went = target ? await until(async () => page.evaluate((nm) => {
+      const sel = nm === 'main' ? '[data-testid="app.right.agent.main"][aria-current="true"], [data-testid$=".main"][aria-current="true"]' : `[data-testid$=".${nm}"][aria-current="true"]`;
+      return document.querySelector(sel) ? true : null;
+    }, target), 5000, 300) === true : false;
+    await shot('cf30-menu-enter');
+    step(`${name}: ⏎ on a submenu agent opens its thread in the window`, went, { target });
+    step(`${name}: the submenu's side (left near the screen's right edge) and the 340/620 resize on a real screen: not checkable off-screen (the window sits at -30000)`, true, 'not proven here');
+    await page.evaluate(() => window.bise.capsule.hide()).catch(() => {});
+  });
+
+  // @ on the harness thread with every agent of the world: the list's rows within 100 ms of the '@'
+  // key and no long task while it opens (best of 3; the worst said too), then a filter typed
+  await row('at fast', async (name) => {
+    await harness();
+    await clear();
+    await page.keyboard.type('voir ', { delay: 10 });
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      const o = { t0: -1, t1: -1, long: 0 };
+      window.__cf30 = o;
+      document.addEventListener('keydown', (e) => { if (e.key === '@') { o.t0 = performance.now(); o.t1 = -1; o.long = 0; } }, { capture: true });
+      // the rows' first commit (a hidden window may hold rAF: the DOM write is the time read here)
+      new MutationObserver(() => {
+        if (o.t0 >= 0 && o.t1 < 0 && document.querySelector('[data-testid="composer.pick"] [role="menuitemradio"]')) o.t1 = performance.now();
+      }).observe(document.body, { childList: true, subtree: true });
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) if (o.t0 >= 0 && e.startTime >= o.t0 - 5) o.long = Math.max(o.long, e.duration); }).observe({ type: 'longtask' });
+    });
+    const opens = [];
+    let agentsListed = 0;
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.type('@');
+      await page.locator('[data-testid="composer.pick"] [role="menuitemradio"]').first().waitFor({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(600);
+      const o = await page.evaluate(() => ({ ...window.__cf30 }));
+      agentsListed = Math.max(agentsListed, await page.locator('[data-testid^="composer.pick.agent."]').count().catch(() => 0));
+      opens.push({ rowsMs: o.t1 >= 0 ? Math.round(o.t1 - o.t0) : null, longMs: Math.round(o.long) });
+      if (i === 0) await shot('cf30-at-open');
+      await page.keyboard.press('Backspace');
+      await page.waitForTimeout(400);
+    }
+    // a filter: one key every 60 ms, the longest task while he types
+    await page.keyboard.type('@');
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { window.__cf30.long = 0; window.__cf30.t0 = performance.now(); });
+    for (const k of 'task') { await page.keyboard.type(k); await page.waitForTimeout(60); }
+    await page.waitForTimeout(400);
+    const typeLongMs = Math.round(await page.evaluate(() => window.__cf30.long));
+    await clear();
+    const agentsAll = await page.locator('[data-testid^="app.right.agent."]').count().catch(() => -1);
+    const ok = opens.filter((o) => o.rowsMs !== null);
+    const best = ok.length ? Math.min(...ok.map((o) => o.rowsMs)) : null;
+    const bestLong = Math.min(...opens.map((o) => o.longMs));
+    step(`${name}: '@' draws its list within 100 ms and no long task while it opens (best of 3), none over 50 ms while he filters`,
+      best !== null && best < 100 && bestLong === 0 && typeLongMs <= 50,
+      { opens, best, bestLong, worstRows: ok.length ? Math.max(...ok.map((o) => o.rowsMs)) : null, worstLong: Math.max(...opens.map((o) => o.longMs)), typeLongMs, agentsListed, agentsAll,
+        note: "the world's agents, not 28 brief-long titles: the big-project numbers are at-perf.spec's (test:land)" });
+  });
+}
+
 // ddde0ba9e's cut (desk-cut-12, main m_29777): cmd-notice f7862037e (checks/composer/cmd-notice.spec.ts)
 // and at-chips 7856b6e00 (checks/composer/at-chips.spec.ts), on the real hub of the world's harness.
 async function rowsDDDE(harness, say) {
