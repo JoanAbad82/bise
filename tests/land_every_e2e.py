@@ -157,7 +157,7 @@ def main():
     try:
         c = E.start_hub()
         c.wait_status("main", "idle", 60)
-        c.say('[[bash: sb spawn wk --objective "{{bash: true}}"]]')
+        c.say('[[bash: sb spawn wk --place new --objective "{{bash: true}}"]]')
         c.wait(lambda: c.agent("wk") is not None, 60, "wk")
         c.wait_idle("wk", "main")
         wt = out(ws, "git worktree list --porcelain | sed -n 's/^worktree //p' | grep '/wk/'")
