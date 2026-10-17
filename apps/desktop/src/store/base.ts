@@ -5,6 +5,7 @@ import type { Entry } from "@/proto";
 import type { CoreCmd, CorePort, CoreState } from "@/shared/api";
 import type { Ev, FilesAnswer, Pending, ThreadOrder } from "./types";
 import type { Ask } from "./window";
+import { NO_FACTS, type HubFacts } from "./machine/types";
 
 export const EMPTY: readonly never[] = [];
 
@@ -39,6 +40,8 @@ export class StoreBase {
   protected readonly threads = new Map<string, Thread>();
   /** @internal for apply.ts */ readonly slices = new Map<string, unknown>();
   protected readonly evListeners = new Set<(ev: Ev) => void>();
+  /** what the hubs said that several slices read (machine/types.ts): one copy, as it came */
+  /** @internal for store.ts */ facts: HubFacts = NO_FACTS;
   protected coreState: CoreState = "down";
   protected cid = 0;
   /** R8: when this window last sent a /model (a setup_first after it is his; a replayed one isn't) */

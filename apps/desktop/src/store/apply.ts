@@ -28,9 +28,9 @@ const EMPTY: readonly never[] = [];
 export function applyTyped(s: Store, ev: Ev): void {
   switch (ev.ev) {
     case "projects":
-      s.put("projects", ev.projects);
-      // the cards he acted on that the hub's rows dropped come back to nothing (acted.ts)
-      s.rowsCame(ev.projects);
+      // the hub's rows (HubFacts), then the cards he acted on that they dropped come back to
+      // nothing (machine/cards.ts)
+      s.rowsCame(ev);
       for (const row of ev.projects) {
         if (
           row.cards !== undefined &&

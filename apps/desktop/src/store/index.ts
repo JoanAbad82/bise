@@ -1,6 +1,6 @@
 // '@/store': the one store of bise desktop and its hooks (owner: amb-core).
 // Read: useProjects, useAgents, useCards, useThreadOrder, useEntry, useTyping,
-// usePending, ... Act: useStore().send / answer / stop / subscribeThread /
+// usePending, ... Act: useStore().do(intent: a card's answer, close, retry; machine/types.ts) / send / stop / subscribeThread /
 // olderPage / files (useFiles), askSkills / dictateStart, dictateStop, dictateCancel (useDictation) / voiceMode, voiceMute, voiceType, voiceSend, voiceCut (useVoiceMode) /
 // command(any typed AppCmd | HubCmd). Tests: new Store(fakePort),
 // StoreProvider, replay(store, fixtures) from './replay'.

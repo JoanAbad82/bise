@@ -60,7 +60,7 @@ export class StoreReads extends StoreBase {
   // ---- reads (stable references between changes)
 
   projects(): readonly ProjectRow[] {
-    return this.slice("projects", EMPTY);
+    return this.facts.rows;
   }
   agents(project: string): readonly Agent[] {
     return this.slice(`agents:${project}`, EMPTY);

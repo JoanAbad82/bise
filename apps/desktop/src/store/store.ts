@@ -11,6 +11,15 @@
 // may hold one detached window around a far entry (jumpTo / newerPage, the gap
 // to the tail: window.ts).
 //
+// The store is becoming a pure state machine slice by slice (fast-try p4,
+// machine/): a slice is step(state, facts, input) -> [state, outputs], and
+// this class is its shell: it holds the state, stamps the clock, runs the
+// outputs at one edge (stepIn: a kept list is put, told and written, a command
+// goes to the core) and tells the listeners. HubFacts (machine/types.ts) holds
+// the hubs' projects rows once, read by every slice. Moved so far: the cards
+// slice (machine/cards.ts: his answers and closes in flight and how they
+// settle); his gestures on it come in as store.do(intent).
+//
 // The hub's yes/no questions (`confirm`, bar I9) belong to the connection
 // that asked: a new `welcome` for that project (the core reconnected, so the
 // hub sees a new connection) drops them, so he never answers an id the hub
@@ -24,10 +33,11 @@ import type {
   Entry,
   Mode,
   Part,
-  ProjectRow,
 } from "@/proto";
-import { actedAdd, actedAnswered, actedKey, actedOf, actedPrune, cardRefusedOf, type Acted } from "./acted";
-import { refusedAdd, refusedDrop, refusedListOf, refusedOf, refusedPrune, type Attempt, type Refused } from "./refused";
+import { cardRefusedOf, type Acted } from "./acted";
+import type { Refused } from "./refused";
+import { cardsInit, stepCards, type AnswerJump, type CardsState } from "./machine/cards";
+import { factsOf, type Input, type Intent, type WinEv } from "./machine/types";
 import type { CoreState } from "@/shared/api";
 import { common } from "@/proto/words.gen";
 import {
@@ -49,26 +59,17 @@ import { answers, listsLive, merged, planJump, planNewer } from "./window";
 import { trim } from "./trim";
 import { answered, echoOf, keepLanded, sentOf, ECHO_SLACK_MS, type Sent } from "./echo";
 import { EMPTY, type Thread } from "./base";
-import { answeredFromOf, answersOf, cardAnsweredOf, cardKeyOf, jumpOf, keptAnswers, type AnswerAt, type AnswerFrom, type AnsweredFrom, type CardAnswered } from "./answered";
+import { cardAnsweredOf, cardKeyOf, type AnswerFrom, type AnsweredFrom } from "./answered";
 import { StoreVoice } from "./voice";
 
 export { DICTATE_STOP_WAIT_MS } from "./voice";
 export type { StoreOptions } from "./base";
 
-/** The keep's key of where he made his answers (answered.ts). */
-const ANSWERS = "answered-from";
-
-/** Where the window goes for an answer the hub took: that thread, at that card's answer; `seq` counts them. */
-export interface AnswerJump extends AnswerAt {
-  readonly card: number;
-  readonly seq: number;
-}
+export type { AnswerJump } from "./machine/cards";
 
 export class Store extends StoreVoice {
-  /** inbox picks (3): where he was for each card he answered, until its result comes */
-  private readonly answering = new Map<string, AnswerFrom>();
-  /** what he sent for each card on its way, by cardKey: a refusal keeps it for 'try again' */
-  private readonly attempts = new Map<string, Attempt>();
+  /** the cards slice (machine/cards.ts): his answers and closes in flight, how they settled; his kept lists read back */
+  private cardsState: CardsState = cardsInit(this.asideKeep === null ? null : (k) => this.asideKeep?.read(k));
 
   // ---- the core's events
 
@@ -76,14 +77,20 @@ export class Store extends StoreVoice {
   apply(raw: unknown): boolean {
     const sent = sentOf(raw);
     if (sent !== null) return this.sendAnswered(sent);
+    // main's window-local answers to this window's own card requests (machine/types.ts WinEv)
     const done = cardAnsweredOf(raw);
-    if (done !== null) return this.cardAnswered(done);
+    if (done !== null) return this.settled({ ev: "card_answered", ...done });
     const refused = cardRefusedOf(raw);
-    if (refused !== null) return this.cardRefused(refused.project, refused.card, refused.text);
+    if (refused !== null) return this.settled({ ev: "card_refused", ...refused });
     const ev = typed(raw);
     if (ev === null) return false;
     this.applyTyped(ev);
     for (const fn of [...this.evListeners]) fn(ev);
+    return true;
+  }
+
+  private settled(ev: WinEv): true {
+    this.stepIn({ at_ms: this.now(), in: "win", ev });
     return true;
   }
 
@@ -209,44 +216,34 @@ export class Store extends StoreVoice {
   }
 
   /**
-   * answer-in-thread A: the window-local 'card_answered' (main's ipc.ts): his answer to a card this
-   * window sent, as sb-core wrote it. The hub took it: where he made it is kept (the row's
-   * 'answered from …'), and when it came from another project's thread (or bise's), the window
-   * goes to the asking project's main thread at his answer (answered.ts). Always a known event.
+   * One input through the cards slice (machine/cards.ts), then its outputs at the edge, in order:
+   * a kept list is put (its listeners told) and written to his asides, a command goes to the core;
+   * a new jump is told last.
    */
-  private cardAnswered(d: CardAnswered): true {
-    const k = cardKeyOf(d.project, d.card);
-    // the hub took it: no refusal of it holds
-    this.putRefused(refusedDrop(this.refused(), d.project, d.card));
-    this.attempts.delete(actedKey(d.project, d.card));
-    // the hub's rows came before its answer: still listed, the hub kept the card open (acted.ts)
-    this.putActed(actedAnswered(this.acted(), d.project, d.card, this.projects()));
-    const from = this.answering.get(k);
-    this.answering.delete(k);
-    if (from === undefined) return true;
-    const got = answeredFromOf(from, d.project, d.card, d.answer, this.now());
-    if (got !== null) {
-      const list = keptAnswers(this.answersFrom(), got);
-      this.put(ANSWERS, list);
-      this.asideKeep?.write(ANSWERS, list);
+  private stepIn(input: Input): void {
+    const was = this.cardsState;
+    const [next, outs] = stepCards(was, this.facts, input);
+    this.cardsState = next;
+    for (const o of outs) {
+      if (o.out === "cmd") {
+        this.command(o.cmd);
+        continue;
+      }
+      this.emit(o.key);
+      this.asideKeep?.write(o.key, o.value);
     }
-    const home = this.projects().find((p) => p.home)?.project ?? "";
-    const to = jumpOf(from, d.project, home, d.answer !== null);
-    if (to !== null) this.put("answer_jump", { ...to, card: d.card, seq: (this.slice<AnswerJump | null>("answer_jump", null)?.seq ?? 0) + 1 });
-    return true;
+    if (next.jump !== was.jump) this.emit("answer_jump");
+  }
+  /** His gesture (machine/types.ts Intent), through the machine. */
+  do(intent: Intent): void {
+    this.stepIn({ at_ms: this.now(), in: "do", intent });
   }
   /**
    * The cards he answered or closed in this window that the hub's rows still list (acted.ts):
    * every view leaves them out. Kept across a reload, as his asides.
    */
   acted(): readonly Acted[] {
-    if (!this.slices.has("acted") && this.asideKeep !== null) this.slices.set("acted", actedOf(this.asideKeep.read("acted")));
-    return this.slice<readonly Acted[]>("acted", EMPTY);
-  }
-  private putActed(list: readonly Acted[]): void {
-    if (list === this.acted()) return;
-    this.put("acted", list);
-    this.asideKeep?.write("acted", list);
+    return this.cardsState.acted;
   }
   /**
    * A page's item kept open across the views (notif-artifact, designer m_26776): the inbox block that
@@ -259,59 +256,27 @@ export class Store extends StoreVoice {
   keptOpen(): { readonly project: string; readonly card: number } | undefined {
     return this.slice<{ readonly project: string; readonly card: number } | undefined>("reopen", undefined);
   }
-  /** @internal for apply.ts: a projects event; the cards its rows no longer list leave the set */
-  rowsCame(rows: readonly ProjectRow[]): void {
-    this.putActed(actedPrune(this.acted(), rows, this.now()));
-    this.putRefused(refusedPrune(this.refused(), rows));
-    // what he sent matters only while it is on its way (acted)
-    const on = new Set(this.acted().map((a) => a.key));
-    for (const k of [...this.attempts.keys()]) if (!on.has(k)) this.attempts.delete(k);
-  }
-  /** He answered or closed it: out of every view until the hub's rows drop it, or its refusal; its last refusal goes. */
-  private acts(project: string, card: number, attempt: Attempt): void {
-    this.putActed(actedAdd(this.acted(), project, card, this.now()));
-    this.putRefused(refusedDrop(this.refused(), project, card));
-    this.attempts.set(actedKey(project, card), attempt);
+  /** @internal for apply.ts: a projects event: the hub's rows, then the cards its rows no longer list leave the set */
+  rowsCame(ev: EvOf<"projects">): void {
+    this.facts = factsOf(this.facts, ev);
+    this.emit("projects");
+    this.stepIn({ at_ms: this.now(), in: "ev", ev });
   }
   /**
    * The cards whose answer or close was refused in this window (refused.ts): each view that draws
    * the card says 'not sent: <words> · try again' on it. Kept across a reload, as his asides.
    */
   refused(): readonly Refused[] {
-    if (!this.slices.has("refused") && this.asideKeep !== null) this.slices.set("refused", refusedListOf(this.asideKeep.read("refused")));
-    return this.slice<readonly Refused[]>("refused", EMPTY);
+    return this.cardsState.refused;
   }
-  private putRefused(list: readonly Refused[]): void {
-    if (list === this.refused()) return;
-    this.put("refused", list);
-    this.asideKeep?.write("refused", list);
-  }
-  /**
-   * The window-local 'card_refused' (main's ipc.ts): the core or the hub refused his answer or
-   * close of that very card (the RPC error to that request, architect m_23524), or the core went
-   * before its hub said. The card is his again in every view, never hidden while it waits, and the
-   * words go on that card (refused.ts), never on the project's line (try-gate-f2a7). Always a known event.
-   */
-  private cardRefused(project: string, card: number, text: string): true {
-    const key = actedKey(project, card);
-    this.answering.delete(`${project}/${String(card)}`);
-    this.putActed(this.acted().filter((x) => x.key !== key));
-    this.putRefused(refusedAdd(this.refused(), project, card, text, this.now(), this.attempts.get(key)));
-    this.attempts.delete(key);
-    return true;
-  }
-  /** 'try again' on a refused card: what he sent, sent again (none known: nothing, the card stays his). */
+  /** 'try again' on a refused card: what he sent, sent again (none known: nothing, the card stays his). Sugar over store.do, removed by slice 1c. */
   retryCard(project: string, card: number): void {
-    const a = refusedOf(this.refused(), project, card)?.attempt;
-    if (a === undefined) return;
-    if (a.kind === "close") this.close(project, card);
-    else this.answer(project, card, a.reply, a.files, a.parts, a.from);
+    this.do({ i: "retry_card", project, card });
   }
 
   /** Where he made each answer this window sent (window-local, oldest first; kept across a reload). */
   answersFrom(): readonly AnsweredFrom[] {
-    if (!this.slices.has(ANSWERS) && this.asideKeep !== null) this.slices.set(ANSWERS, answersOf(this.asideKeep.read(ANSWERS)));
-    return this.slice<readonly AnsweredFrom[]>(ANSWERS, EMPTY);
+    return this.cardsState.answersFrom;
   }
   /** Where he made his answer to card `card` of `project`, when this window sent it. */
   answeredFrom(project: string, card: number): AnsweredFrom | null {
@@ -320,7 +285,7 @@ export class Store extends StoreVoice {
   }
   /** The newest jump to an answer the hub took (answer-in-thread A); null before any. */
   answerJump(): AnswerJump | null {
-    return this.slice<AnswerJump | null>("answer_jump", null);
+    return this.cardsState.jump;
   }
 
   /** A message of his is on its way (a pending row still sending): the app's update waits for it (update/moment.ts). */
@@ -616,7 +581,7 @@ export class Store extends StoreVoice {
     this.command({ cmd: "find", project, agent, needle, rid });
     return rid;
   }
-  /** His answer to card `card`: its words, and the images he pasted or dropped (R41: absolute paths, as a send's files). */
+  /** His answer to card `card`: its words, and the images he pasted or dropped (R41: absolute paths, as a send's files). Sugar over store.do, removed by slice 1c. */
   answer(
     project: string,
     card: number,
@@ -625,23 +590,14 @@ export class Store extends StoreVoice {
     parts?: readonly Part[],
     from?: AnswerFrom,
   ): void {
-    // answer-in-thread A: where he was, for the row's 'answered from …' and the jump (answered.ts)
-    if (from !== undefined) this.answering.set(`${project}/${String(card)}`, from);
-    // every view leaves it out until the hub's rows drop it (acted.ts), or the hub refuses it
-    this.acts(project, card, {
-      kind: "answer",
+    this.do({
+      i: "answer",
+      project,
+      card,
       reply,
       ...(files !== undefined ? { files } : {}),
       ...(parts !== undefined ? { parts } : {}),
       ...(from !== undefined ? { from } : {}),
-    });
-    this.command({
-      cmd: "answer",
-      project,
-      card,
-      reply,
-      ...(files !== undefined && files.length > 0 ? { files: [...files] } : {}),
-      ...(parts !== undefined && parts.length > 0 ? { parts: [...parts] } : {}),
     });
   }
   /** His answer to the hub's yes/no question (a no's line comes back as a notice). */
@@ -665,10 +621,9 @@ export class Store extends StoreVoice {
         now.filter((c) => c.id !== id),
       );
   }
-  /** Close a card without answering it (the TUI's /close N). */
+  /** Close a card without answering it (the TUI's /close N). Sugar over store.do, removed by slice 1c. */
   close(project: string, card: number): void {
-    this.acts(project, card, { kind: "close" });
-    this.command({ cmd: "close", project, card });
+    this.do({ i: "close", project, card });
   }
   stop(project: string, agent: string): void {
     this.command({ cmd: "stop", project, agent });
