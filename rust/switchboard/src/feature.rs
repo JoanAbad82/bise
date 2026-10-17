@@ -28,6 +28,7 @@
 //! through `land`'s helpers; the words are here too, pure and tested.
 
 use crate::land::{git, short};
+use crate::scratch::Scratch;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -188,33 +189,22 @@ pub fn create(shared: &Path, name: &str, now: u64) -> Result<Feature, String> {
     Ok(Feature { name: name.into(), base, created_ms: now, ..Feature::default() })
 }
 
-/// A scratch worktree, detached at `rev`, removed when dropped.
-pub struct Scratch {
-    shared: PathBuf,
-    pub dir: PathBuf,
-}
-
-impl Scratch {
-    pub fn new(shared: &Path, root: &Path, tag: &str, rev: &str) -> Result<Scratch, String> {
-        let dir = root.join(format!(".{}-{}", tag, crate::util::now_ms()));
-        std::fs::create_dir_all(root).map_err(|e| e.to_string())?;
-        git(shared, &["worktree", "add", "-q", "--detach", &dir.to_string_lossy(), rev])?;
-        Ok(Scratch { shared: shared.to_path_buf(), dir })
-    }
-}
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = git(&self.shared, &["worktree", "remove", "--force", &self.dir.to_string_lossy()]);
-        let _ = std::fs::remove_dir_all(&self.dir);
-        let _ = git(&self.shared, &["worktree", "prune"]);
-    }
-}
-
 /// The feature rebased on main in a scratch worktree, the check run
 /// there (`check`), then the branch moved (compare-and-swap). None:
 /// already on main's tip. Some(old tip, new tip).
 pub fn rebase(shared: &Path, scratch: &Path, name: &str, check: Option<&str>) -> Result<Option<(String, String)>, String> {
+    rebase_then(shared, scratch, name, check, &mut |_, _| Ok(()))
+}
+
+/// [`rebase`], with `verify(base, new tip)` before the branch moves (a
+/// merge's land check): an Err there moves nothing.
+fn rebase_then(
+    shared: &Path,
+    scratch: &Path,
+    name: &str,
+    check: Option<&str>,
+    verify: &mut dyn FnMut(&str, &str) -> Result<(), String>,
+) -> Result<Option<(String, String)>, String> {
     let main = crate::trunk::trunk_ref(shared)?;
     let b = branch_ref(name);
     let old = git(shared, &["rev-parse", "--verify", &b])?;
@@ -238,6 +228,7 @@ pub fn rebase(shared: &Path, scratch: &Path, name: &str, check: Option<&str>) ->
         crate::land::run_check(&s.dir, c)?;
     }
     let new = git(&s.dir, &["rev-parse", "HEAD"])?;
+    verify(&base, &new)?;
     git(shared, &["update-ref", &b, &new, &old]).map_err(|_| format!("{} moved meanwhile: sync it again", name))?;
     Ok(Some((old, new)))
 }
@@ -349,10 +340,21 @@ pub struct Merged {
 }
 
 /// `1 merge` (the user's go): rebased on main and checked in a scratch
-/// worktree (the check always runs: the full one), main fast-forwarded,
-/// pushed when the flow says so. The branch itself is deleted after, by
-/// [`trash`], once the agents are archived.
-pub fn merge(shared: &Path, scratch: &Path, name: &str, flow: &crate::flow::FlowConfig) -> Result<Merged, String> {
+/// worktree (the check always runs: the full one), then the repo's land
+/// check on the rebased tip in the warm check tree under `checks`
+/// (`land_check`, issue 28 part 2; red: neither the feature nor main
+/// moves), main fast-forwarded, pushed when the flow says so. The branch
+/// itself is deleted after, by [`trash`], once the agents are archived.
+/// `turn`: main's land-queue turn, held by the caller.
+pub fn merge(
+    shared: &Path,
+    scratch: &Path,
+    checks: &Path,
+    name: &str,
+    flow: &crate::flow::FlowConfig,
+    turn: &crate::land::Turn,
+) -> Result<Merged, String> {
+    use crate::land_check::{checked, in_check_tree, Via};
     let main = crate::trunk::trunk_ref(shared)?;
     let b = branch_ref(name);
     let base = git(shared, &["rev-parse", "--verify", &main])?;
@@ -360,11 +362,19 @@ pub fn merge(shared: &Path, scratch: &Path, name: &str, flow: &crate::flow::Flow
     if git(shared, &["merge-base", "--is-ancestor", &old, &base]).is_ok() {
         return Err(format!("nothing to merge: {} has no commit that {} lacks", name, short(&main)));
     }
-    let tip = match rebase(shared, scratch, name, flow.check.as_deref())? {
+    let via = Via::Merge(name);
+    let land_check = |base: &str, tip: &str| in_check_tree(shared, checks, base, tip, via, turn);
+    let tip = match rebase_then(shared, scratch, name, flow.check.as_deref(), &mut |b, t| {
+        if checked(via, true, true) { land_check(b, t) } else { Ok(()) }
+    })? {
         Some((_, new)) => new,
         None => {
-            // on main's tip already: the check still runs on what lands
-            check(shared, scratch, name, flow.check.as_deref())?
+            // on main's tip already: the checks still run on what lands
+            let tip = check(shared, scratch, name, flow.check.as_deref())?;
+            if checked(via, true, false) {
+                land_check(&base, &tip)?;
+            }
+            tip
         }
     };
     let commits = git(shared, &["rev-list", "--count", &format!("{}..{}", base, tip)])?.parse::<usize>().unwrap_or(0);

@@ -200,18 +200,15 @@ pub fn with_mode(text: &str, mode: FlowMode) -> String {
 /// Main's feed line for a land (dev-flow §7):
 /// `✓ dark-mode landed 3 commits on main (e4f5a6b) · pushed`. `pushed`:
 /// None when no push was tried (push = false, no remote, a branch).
-/// `unchecked`: a `--here` land moved main in a repo with a land check
-/// it did not run (issue 28): ` · not checked (--here)`, so it is never
-/// taken for green. The words are flow-prompts'.
-pub fn land_line(agent: &str, commits: usize, target: &str, sha: &str, pushed: Option<bool>, unchecked: bool) -> String {
+/// The words are flow-prompts'.
+pub fn land_line(agent: &str, commits: usize, target: &str, sha: &str, pushed: Option<bool>) -> String {
     let s = if commits == 1 { "" } else { "s" };
     let push = match pushed {
         Some(true) => " · pushed",
         Some(false) => " · not pushed",
         None => "",
     };
-    let check = if unchecked { " · not checked (--here)" } else { "" };
-    format!("✓ {} landed {} commit{} on {} ({}){}{}", agent, commits, s, target, sha, check, push)
+    format!("✓ {} landed {} commit{} on {} ({}){}", agent, commits, s, target, sha, push)
 }
 
 /// Main's feed line for a refused land (dev-flow §7): `dark-mode can't

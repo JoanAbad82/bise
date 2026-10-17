@@ -24,6 +24,14 @@ pub struct Queue {
 pub struct Turn {
     q: Queue,
     ticket: u64,
+    target: String,
+}
+
+impl Turn {
+    /// The ref this turn holds (`refs/heads/main`).
+    pub fn target(&self) -> &str {
+        &self.target
+    }
 }
 
 impl Drop for Turn {
@@ -65,6 +73,7 @@ impl Queue {
         Turn {
             q: self.clone(),
             ticket,
+            target: target.to_string(),
         }
     }
 

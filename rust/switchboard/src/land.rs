@@ -58,6 +58,9 @@ pub struct Job {
     /// use`): a plain land from its worktree moves it, never main, and is
     /// never pushed. None: main.
     pub onto: Option<String>,
+    /// The project's worktrees, the root of the land check's warm tree
+    /// (`scratch::CheckTree`; the daemon sets it, like `flow`).
+    pub checks: PathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -73,9 +76,6 @@ pub struct Outcome {
     /// New files of the place that no agent claimed, made since the agent
     /// started: not landed, named in the answer ([`left_out_note`]).
     pub left_out: Vec<String>,
-    /// A `--here` land moved main without the repo's land check
-    /// (`land_check`, issue 28): its line says so.
-    pub unchecked: bool,
 }
 
 // ---- git ----
@@ -183,13 +183,16 @@ fn tmp_index(tag: &str) -> PathBuf {
 /// Commit `files` (relative to `dir`, as they are in it) on `target`
 /// through a private index built from its tip, then move it with a
 /// compare-and-swap: a tip moved meanwhile (someone else committed)
-/// rebuilds from the new one, so nothing of theirs is lost. `after_read`:
-/// tests only (a commit lands between the read and the swap).
+/// rebuilds from the new one, so nothing of theirs is lost. `verify(old
+/// tip, new commit)`: before the swap (the land check of a `--here` onto
+/// the trunk); an Err moves nothing. `after_read`: tests only (a commit
+/// lands between the read and the swap).
 pub fn commit_files(
     dir: &Path,
     target: &str,
     files: &[String],
     message: &str,
+    verify: &mut dyn FnMut(&str, &str) -> Result<(), String>,
     after_read: &mut dyn FnMut(),
 ) -> Result<String, String> {
     let sign = signs(dir);
@@ -216,6 +219,7 @@ pub fn commit_files(
         })();
         let _ = std::fs::remove_file(&idx);
         let new = res?;
+        verify(&old, &new)?;
         after_read();
         if git(dir, &["update-ref", target, &new, &old]).is_ok() {
             sync_index(dir, target, files);
@@ -377,21 +381,20 @@ pub fn run_onto(job: &Job, queue: &Queue, joined: &mut dyn FnMut(), onto_now: &m
         return Err("sb land needs a commit message: sb land [--here] \"<message>\"".into());
     }
     let target = head_ref(&job.dir)?;
-    let _turn = queue.wait_turn(&target, &job.place, joined);
-    // --here is not checked (issue 28): said when it moves main in a repo
-    // that has a land check
-    let unchecked = target == main && crate::land_check::command(&job.dir, &target).is_some();
-    let new = commit_files(&job.dir, &target, &mine, &job.message, &mut || {})?;
+    let turn = queue.wait_turn(&target, &job.place, joined);
+    // onto the trunk: the land check on the new commit, in the warm check
+    // tree, before the swap (issue 28 part 2); a CAS miss checks again
+    let via = crate::land_check::Via::Here;
+    let mut verify = |old: &str, new: &str| {
+        if crate::land_check::checked(via, target == main, false) {
+            crate::land_check::in_check_tree(&job.shared, &job.checks, old, new, via, &turn)
+        } else {
+            Ok(())
+        }
+    };
+    let new = commit_files(&job.dir, &target, &mine, &job.message, &mut verify, &mut || {})?;
     let (pushed, push_error) = pushed(job, &target, &main);
-    Ok(Outcome {
-        target: short(&target).to_string(),
-        sha: shorten(&job.dir, &new),
-        commits: 1,
-        pushed,
-        push_error,
-        left_out,
-        unchecked,
-    })
+    Ok(Outcome { target: short(&target).to_string(), sha: shorten(&job.dir, &new), commits: 1, pushed, push_error, left_out })
 }
 
 /// Move `main` (a ref) from `base` to `tip`, a fast-forward: in the
@@ -426,7 +429,7 @@ fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String],
         if job.message.trim().is_empty() {
             return Err("you have changes not committed: give a message (sb land \"<message>\"), or commit them with sb land --here first".into());
         }
-        commit_files(&job.dir, &branch, mine, &job.message, &mut || {})?;
+        commit_files(&job.dir, &branch, mine, &job.message, &mut |_, _| Ok(()), &mut || {})?;
     }
     let dirty = git(&job.dir, &["status", "--porcelain", "--untracked-files=no"])?;
     if !dirty.is_empty() {
@@ -474,17 +477,24 @@ fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String],
                 )
             });
         }
-        // the merge case: the repo's land check on the rebased tree, in
-        // this turn, so land N is checked on top of N-1 (land_check)
-        let head = git(&job.dir, &["rev-parse", "HEAD"])?;
-        if let Some(check) = crate::land_check::command(&job.dir, &base) {
-            crate::land_check::run(&job.dir, &check, &base, &head)?;
-        }
         if let Some(check) = &job.flow.check {
             run_check(&job.dir, check)?;
         }
     }
     let tip = git(&job.dir, &["rev-parse", "HEAD"])?;
+    // the repo's land check on the tree main will point at, in this turn
+    // (land N is checked on top of N-1): onto the trunk, moved or not
+    // in the agent's worktree when it is clean at the tip, else (a file
+    // git shows could make the check pass or fail) in the check tree
+    let via = crate::land_check::Via::Worktree;
+    if crate::land_check::checked(via, main == real_main, moved) {
+        let clean = git(&job.dir, &["status", "--porcelain", "--untracked-files=all"])?.is_empty();
+        if !clean && main == real_main {
+            crate::land_check::in_check_tree(&job.shared, &job.checks, &base, &tip, via, &_turn)?;
+        } else if let Some(check) = crate::land_check::command(&job.dir, &base) {
+            crate::land_check::run(&job.dir, &check, &base, &tip, via)?;
+        }
+    }
     let commits = git(&job.dir, &["rev-list", "--count", &format!("{}..{}", base, tip)])?
         .parse::<usize>()
         .unwrap_or(0);
@@ -498,7 +508,6 @@ fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String],
         pushed,
         push_error,
         left_out,
-        unchecked: false,
     })
 }
 
@@ -542,6 +551,7 @@ mod tests {
             since_ms: 0,
             flow: FlowConfig::default(),
             onto: None,
+            checks: shared.parent().unwrap_or(shared).join("worktrees"),
         }
     }
 
@@ -606,7 +616,7 @@ mod tests {
                 sh(&w, "git worktree add -q ../other main 2>/dev/null || git worktree add -q --detach ../other main; cd ../other && echo b2 > b && git -c commit.gpgsign=false commit -qam other && git update-ref refs/heads/main HEAD");
             }
         };
-        let new = commit_files(&ws, "refs/heads/main", &["a".into()], "mine", &mut race).unwrap();
+        let new = commit_files(&ws, "refs/heads/main", &["a".into()], "mine", &mut |_, _| Ok(()), &mut race).unwrap();
         assert_eq!(git(&ws, &["rev-parse", "main"]).unwrap(), new);
         assert_eq!(log(&ws), lines(&["mine", "other", "init"]), "rebuilt on the moved tip");
         assert_eq!(git(&ws, &["show", "main:b"]).unwrap(), "b2", "their commit is kept");

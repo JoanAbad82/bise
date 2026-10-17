@@ -758,6 +758,7 @@ impl Shell {
             return;
         };
         job.flow = crate::flow::FlowConfig::load(&self.opts.paths);
+        job.checks = self.opts.paths.worktrees.clone();
         let (queue, tx) = (self.lands.clone(), self.tx.clone());
         std::thread::spawn(move || {
             let txj = tx.clone();
@@ -767,7 +768,7 @@ impl Shell {
             let (body, line) = match res {
                 Ok(o) => {
                     landed = art::landed_rec(&job.shared, &job.agent, &o.target, &o.sha, o.commits);
-                    let mut text = crate::flow::land_line(&job.agent, o.commits, &o.target, &o.sha, o.pushed, o.unchecked);
+                    let mut text = crate::flow::land_line(&job.agent, o.commits, &o.target, &o.sha, o.pushed);
                     if let Some(e) = &o.push_error {
                         text = format!("{} ({})", text, e);
                     }

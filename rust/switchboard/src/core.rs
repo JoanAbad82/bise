@@ -1588,6 +1588,7 @@ impl Hub {
             flow: crate::flow::FlowConfig::default(),
             // a feature's agent lands on the feature (dev-flow §5.1)
             onto: feature::onto(&a.ws),
+            checks: std::path::PathBuf::new(),
         })
     }
 

@@ -41,6 +41,7 @@ fn job(agent: &str, dir: &Path, shared: &Path, files: &[&str], onto: &str) -> Jo
         since_ms: 0,
         flow: crate::flow::FlowConfig { mode: Some(crate::flow::FlowMode::Trunk), ..Default::default() },
         onto: Some(format!("refs/heads/{}", onto)),
+        checks: shared.parent().unwrap().join("worktrees"),
     }
 }
 
@@ -94,7 +95,8 @@ fn new_lands_sync_merge_end_to_end() {
     // merge: rebased, checked, main fast-forwarded (the shared folder's
     // files too), linear; the branch then goes to the trash
     let flow = crate::flow::FlowConfig { mode: Some(crate::flow::FlowMode::Trunk), check: Some("test -f n".into()), ..Default::default() };
-    let m = merge(&ws, &scratch, "cu", &flow).unwrap();
+    let q = Queue::default();
+    let m = merge(&ws, &scratch, &scratch, "cu", &flow, &q.wait_turn("refs/heads/main", "feature:cu", &mut || {})).unwrap();
     assert_eq!((m.commits, m.pushed), (2, None), "no remote: no push");
     assert_eq!(out(&ws, &["log", "--format=%s", "main"]), "cu-b's work\u{a}cu-a's work\u{a}main again\u{a}main moves\u{a}init");
     assert_eq!(std::fs::read_to_string(ws.join("n")).unwrap(), "new\u{a}", "the shared folder moved with main");
@@ -139,7 +141,9 @@ fn a_conflicting_sync_says_the_files_and_moves_nothing() {
     let e = rebase(&ws, &scratch, "cu", None).unwrap_err();
     assert!(e.starts_with("a changed on main too"), "{}", e);
     assert_eq!(out(&ws, &["rev-parse", "cu"]), tip);
-    let e = merge(&ws, &scratch, "cu", &crate::flow::FlowConfig::default()).unwrap_err();
+    let q = Queue::default();
+    let turn = q.wait_turn("refs/heads/main", "feature:cu", &mut || {});
+    let e = merge(&ws, &scratch, &scratch, "cu", &crate::flow::FlowConfig::default(), &turn).unwrap_err();
     assert!(e.contains("conflicts"), "{}", e);
     assert_eq!(out(&ws, &["log", "-1", "--format=%s", "main"]), "main edits a");
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());

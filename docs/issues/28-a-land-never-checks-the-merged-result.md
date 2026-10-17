@@ -1,7 +1,9 @@
 # 28 · a land never checks the merged result
 
-Status: done (land-check, debt-audit pick 1, plan m_27077 and sha
-m_27119 signed by architect; on main at 8046e563e). Label: land, gate.
+Status: part 1 done (land-check, debt-audit pick 1, plan m_27077 and sha
+m_27119 signed by architect; on main at 8046e563e). Part 2 (every land
+that moves main, arch-review pick A): in progress, see "Part 2" below.
+Label: land, gate.
 
 ## The problem
 
@@ -43,16 +45,13 @@ the land queue's order and words are unchanged.
   (`[land] check`), read from main's tip (`git show <base>:bise.toml`,
   `flow::land_check`): every checkout sees it, and a branch cannot switch
   off the check it is checked by.
-- **When**: a worktree land whose base is behind main (the merge case),
-  after the rebase, inside the land queue's turn: land N is checked on
-  top of N-1 (`land_check.rs`). Red refuses the land with the step and
-  its error lines; the branch stays rebased, the agent fixes and lands
-  again. A fast-forward is not checked: no merge happened, the agent's
-  own gate ran on that tree.
-- **`--here` is not checked** (architect m_27077): checking it needs a
-  checkout of the commit (a cold target, no node_modules) inside main's
-  queue turn, and worktrees are the default (shared-guard). Its land
-  line says `· not checked (--here)` when the repo has a land check.
+- **When** (part 1; part 2 below checks every land that moves main): a
+  worktree land whose base is behind main (the merge case), after the
+  rebase, inside the land queue's turn: land N is checked on top of N-1
+  (`land_check.rs`). Red refuses the land with the step and its error
+  lines; the branch stays rebased, the agent fixes and lands again. A
+  fast-forward was not checked, nor a `--here` (its land line said
+  `· not checked (--here)`; gone in part 2).
 - **Known reds**: `tests/known_reds.txt` (test, since, owner, why), read
   by `tests/known_reds.py`. The full gate (its e2e/tmux reds) and
   test:land (its red checks) say which reds are known and which are NEW;
@@ -89,3 +88,47 @@ the land queue's order and words are unchanged.
   it took 9 s through the setup). A cold worktree's desktop step (pnpm
   install from the store, then typecheck and build): 18-19 s, the
   install ~4 s of it.
+
+## Part 2 · every land that moves main (arch-review pick A)
+
+Plan signed by architect (m_28364). 52 commits in 14 days repaired a red
+main (clippy 12, generated TS 9, desktop typecheck 7, file limit 6,
+word_lint 4): the land check ran only on a worktree land whose base had
+moved. Now nothing moves the trunk without `[land] check` green on the
+exact tree it will point at. The four ways main moves:
+
+1. **a worktree land whose base moved**: as in part 1, on the rebased tree;
+2. **a worktree land whose base did not move** (a fast-forward): checked
+   too, in the agent's worktree when `git status` is empty there, else in
+   the check tree;
+3. **`sb land --here` onto main** (main's checkout): the new commit is
+   checked in the check tree after `commit-tree`, before the compare-and-
+   swap; red: no ref moves, the files stay as they were;
+4. **`sb feature merge`**: the feature rebased in its scratch worktree,
+   then its tip checked in the check tree before the feature's ref and
+   main move; red: neither moves.
+
+A `--here` onto any other branch (an agent's `sb/<name>`) stays unchecked,
+and a worktree land onto a feature is checked only when the feature moved
+under it (as before). No bypass flag; a repo without `[land] check` at the
+trunk's tip lands as before.
+
+- **One decision**: `land_check::checked(via, onto_trunk, base_moved)`,
+  its 12-row table in land_check.rs's tests.
+- **The check tree** (`scratch::CheckTree`, with feature.rs's `Scratch`
+  moved there): `<worktrees>/.land-check/<workspace id>/<repo>`, reused
+  (a checkout and a clean: ~0.3 s, where a fresh worktree took 2.7 s and a
+  cold target), its `owner` file making gate.sh give it a clone of the
+  warm cargo seed; must be clean after the checkout or it is made again;
+  used only in the trunk's land-queue turn (it takes the turn).
+- **Words**: the refusal names the step and its log path, with what did
+  not move for each way: `... red at clippy on main + your files (log:
+  ...): <errors> nothing landed, your files are as they were: fix them,
+  then sb land --here again`.
+- **word_lint** joined `gate.sh land`'s steps (tests/*_tmux.py,
+  apps/desktop/tests and src, the words catalog, word_literals.txt).
+- **e2e**: tests/land_every_e2e.py (a clone of the repo, a throwaway hub,
+  the fake provider): each red (clippy, proto_ts, desktop, word_lint,
+  line_gate) refused on a worktree land with an unmoved base; line_gate
+  refused on the other three ways; main's sha unchanged after each; a
+  docs-only change lands on all four.

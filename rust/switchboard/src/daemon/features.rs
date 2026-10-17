@@ -132,6 +132,8 @@ struct Job {
     shared: PathBuf,
     state: PathBuf,
     scratch: PathBuf,
+    /// The land check's warm tree's root (`scratch::CheckTree`).
+    checks: PathBuf,
     flow: FlowConfig,
     queue: crate::land::Queue,
     features: Features,
@@ -205,6 +207,7 @@ impl Shell {
             shared: self.opts.paths.workspace.clone(),
             state: self.opts.paths.state.clone(),
             scratch: self.opts.paths.worktrees.join(".features"),
+            checks: self.opts.paths.worktrees.clone(),
             flow,
             queue: self.lands.clone(),
             features: self.features.clone(),
@@ -417,8 +420,8 @@ fn step(job: &Job) -> Out {
         "merge" => {
             let _feat_turn = job.queue.wait_turn(&feature_ref, &place, &mut || {});
             let main_ref = crate::trunk::trunk_ref(&job.shared)?;
-            let _main_turn = job.queue.wait_turn(&main_ref, &place, &mut || {});
-            let m = feature::merge(&job.shared, &job.scratch, name, &job.flow)?;
+            let main_turn = job.queue.wait_turn(&main_ref, &place, &mut || {});
+            let m = feature::merge(&job.shared, &job.scratch, &job.checks, name, &job.flow, &main_turn)?;
             let kept = feature::trash(&job.shared, name, now).unwrap_or_default();
             {
                 let mut g = job.features.lock();

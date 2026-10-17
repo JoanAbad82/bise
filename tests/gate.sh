@@ -163,6 +163,11 @@ map_paths() {  # <changed path>...
     esac
     # the kit's node checks (kit/*.check.mjs, no deps, ~0.1 s)
     case "$f" in kit/*) kit=1 ;; esac
+    # the words ratchet (tests/word_lint.py, issue 29): the tests it lints,
+    # the catalog and its generated words, its list (quick runs it always)
+    case "$f" in
+      tests/*_tmux.py|apps/desktop/tests/*|apps/desktop/src/*|tests/words/*|rust/proto/src/words/*|tests/word_literals.txt) words=1 ;;
+    esac
   done
 }
 kit_check() { local f; for f in "$root"/kit/check.mjs "$root"/kit/*.check.mjs; do echo "node ${f#"$root"/}"; node "$f" || return 1; done; }
@@ -296,7 +301,7 @@ if [ "$mode" = land ]; then
   map_paths $changed
   dwhy=""; [ -n "$changed" ] && dwhy="$(desktop_why $changed)"
   src=0; printf '%s\n' "$changed" | grep -qE '\.(rs|bend|ts|tsx|py)$|^tests/line_limits\.txt$' && src=1
-  if [ $src = 0 ] && [ -z "$pkgs" ] && [ -z "$dwhy" ] && [ "${proto_ts:-0}${office:-0}${kit:-0}" = 000 ]; then
+  if [ $src = 0 ] && [ -z "$pkgs" ] && [ -z "$dwhy" ] && [ "${proto_ts:-0}${office:-0}${kit:-0}${words:-0}" = 0000 ]; then
     echo "GATE land GREEN (0s): no step for these paths"; exit 0
   fi
 fi
@@ -583,6 +588,7 @@ if [ "$mode" = land ]; then
   }
   target="${CARGO_TARGET_DIR:-$root/rust/target}"
   [ $src = 1 ] && lstep line_gate env GATE_BASE="$base" python3 tests/line_gate.py $changed
+  [ "${words:-0}" = 1 ] && lstep word_lint env GATE_BASE="$base" python3 tests/word_lint.py $changed
   # quick's clippy, in its warm dir: the workspace, so both share every artifact
   [ -n "$pkgs" ] && lstep clippy bash -c "cd rust && cargo clippy --offline -q --workspace --all-targets --target-dir '$target/clippy' -- -D warnings"
   [ "${proto_ts:-0}" = 1 ] && lstep proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
