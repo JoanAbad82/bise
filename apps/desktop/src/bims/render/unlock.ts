@@ -3,7 +3,7 @@
 // it goes carrying a crate each (the land queue's carry, pose.ts), in UNLOCK_WALK s; the piece pops
 // up as they arrive, they stay a moment and fade. Reduced motion: no walk, the piece is there.
 // Office.tsx says when (Look.unlock) and shows the "new: <thing>" label (growth.ts). Owner: bims-grow.
-import { type Object3D, type Scene } from 'three';
+import { type Object3D } from 'three';
 import type { Activity, Office, Pose, Pt, Segment } from '../model';
 import { UNLOCK_LABEL, UNLOCK_WALK } from '../growth';
 import { along, path } from '../paths';
@@ -24,7 +24,7 @@ export interface Unlock {
   dispose(): void;
 }
 
-export function makeUnlock(scene: Scene, style: Style): Unlock {
+export function makeUnlock(scene: Object3D, style: Style): Unlock {
   const crew: Bim[] = [];
   const ensure = (): Bim[] => {
     if (crew.length === 0) {

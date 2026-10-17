@@ -1,14 +1,14 @@
-// The world (three), every map the same way: the lights and the sun's one soft shadow, the floating
-// grass block (as wide as the garden has grown), then the map's look (render/maps/<id>.ts) on the
-// plan's office: its shell, its eating place, its nap place, one desk per agent and main's, and
-// what the project's growth adds, each stage's pieces in a group of its own (the unlock moment
-// hides the newest). Built once per office, map, theme and growth; what changes per frame (a
-// desk's screen and lamp) is handed back as handles. Never the accent pink or the error red.
+// The world (three), every map the same way: the floating grass block (as wide as the garden has
+// grown), then the map's look (render/maps/<id>.ts) on the plan's office: its shell, its eating
+// place, its nap place, one desk per agent and main's, and what the project's growth adds, each
+// stage's pieces in a group of its own (the unlock moment hides the newest). Built once per office, map, theme and growth; what changes per frame (a
+// desk's screen and lamp) is handed back as handles. Its light is the view's (render/view.ts,
+// lightOffice here sets it for an office). Never the accent pink or the error red.
 import {
   type BufferGeometry,
   Group,
-  HemisphereLight,
-  DirectionalLight,
+  type HemisphereLight,
+  type DirectionalLight,
   type Material,
   Mesh,
   type MeshLambertMaterial,
@@ -55,30 +55,6 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   const pal = look.pal(night);
   const k = kitOf(style, pal);
   const root = new Group();
-  const { x0, W, D } = o;
-  const cx = x0 + W / 2;
-
-  root.add(new HemisphereLight(pal.hemi[0], pal.hemi[1], pal.hemi[2]));
-  const sun = new DirectionalLight(pal.sun[0], pal.sun[1]);
-  sun.position.set(cx - 5, 14, 3);
-  sun.target.position.set(cx, 0, D / 2);
-  if (style.shadows) {
-    // one soft shadow (clay, bims m_27814); a still office draws no frame, so it costs only when it moves
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.radius = 8;
-    sun.shadow.bias = -0.0008;
-    const cam = sun.shadow.camera;
-    const half = Math.max(W, D + 4) * 0.75 + 2;
-    cam.left = -half;
-    cam.right = half;
-    cam.top = half;
-    cam.bottom = -half;
-    cam.near = 1;
-    cam.far = 40;
-    cam.updateProjectionMatrix();
-  }
-  root.add(sun, sun.target);
 
   // the floating grass block, as wide as the garden has grown (camera.ts groundOf)
   const site = groundOf(o, grow);
@@ -133,6 +109,38 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
       });
     },
   };
+}
+
+/**
+ * The office's light on a view's two lights (render/view.ts): its palette's sky and sun, the sun up
+ * and a little to the west of the room, its one soft shadow over the office (clay, bims m_27814; a
+ * still office draws no frame, so it costs only when it moves).
+ */
+export function lightOffice(hemi: HemisphereLight, sun: DirectionalLight, pal: Palette, o: Office, style: Style): void {
+  const { x0, W, D } = o;
+  const cx = x0 + W / 2;
+  hemi.color.set(pal.hemi[0]);
+  hemi.groundColor.set(pal.hemi[1]);
+  hemi.intensity = pal.hemi[2];
+  sun.color.set(pal.sun[0]);
+  sun.intensity = pal.sun[1];
+  sun.position.set(cx - 5, 14, 3);
+  sun.target.position.set(cx, 0, D / 2);
+  sun.castShadow = style.shadows;
+  if (style.shadows) {
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius = 8;
+    sun.shadow.bias = -0.0008;
+    const cam = sun.shadow.camera;
+    const half = Math.max(W, D + 4) * 0.75 + 2;
+    cam.left = -half;
+    cam.right = half;
+    cam.top = half;
+    cam.bottom = -half;
+    cam.near = 1;
+    cam.far = 40;
+    cam.updateProjectionMatrix();
+  }
 }
 
 /** a desk's screen and lamp for this frame */

@@ -102,7 +102,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     const look = lookOf(t.office.map);
     const w = buildWorld(t.office, t.main, STYLE, look, isNight, t.grow);
     // no plot outline (bims m_28807): its floating grass block stays out, the town's lawn is its ground
-    // (world.ts adds it first, on the root, at these heights); its own lights stay out: the town has one sun
+    // (world.ts adds it first, on the root, at these heights); the town's one sun lights it (a world has no light)
     for (const c of [...w.root.children]) {
       if (c instanceof Mesh && (c.position.y === -0.75 || c.position.y === -0.1)) {
         w.root.remove(c);
