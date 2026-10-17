@@ -17,15 +17,16 @@ import type { Agent, Card, Place } from '@/proto';
 import { shownName } from '@/agents/model';
 import { bims } from '@/proto/words_bims.gen';
 import { useModHeld } from '@/app/held';
-import type { ActivitiesFn, ActivityKind, BimEvent, BimFrame, Label, LabelsFn, LayoutFn, Look, MakeRenderer, NewTimelineFn, Office as OfficeMap, OfficeRenderer, Snapshot, Timeline } from './model';
+import type { ActivitiesFn, ActivityKind, Label, LabelsFn, LayoutFn, MakeRenderer, NewTimelineFn, Office as OfficeMap, OfficeRenderer } from './model';
 import { away, CHECK_MS, HOVER_MS, nextAfter } from './loop';
-import { dayOf, wakeIn } from './skate';
+import { wakeIn } from './skate';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
 import { atFit, DRAG_PX, FIT, panBy, pinchFactor, sameCam, zoomAt, type Cam } from './zoom';
-import { clockSig, eggLabels, eggsAt, konamiDone, localOf, NO_EGGS, noteLands, withForced, type Forced, type Land } from './eggs';
-import { bedsAt, cropped, growOf, tipOf, UNLOCK_LABEL, UNLOCK_WALK, unlockLabel, unlockOf, type Grow } from './growth';
+import { konamiDone, localOf, type Forced } from './eggs';
+import { cropped, growOf, tipOf, unlockLabel } from './growth';
+import { makeDriver, type Clock } from './office-driver';
 import { growHigh } from './grow-keep';
 import { FOLD_MS } from './Fold';
 import { placeZzz, sleepers } from './zzz';
@@ -129,19 +130,12 @@ const nightNow = (): boolean => {
   return !(typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches);
 };
 
-/** What the loop reads, kept fresh by React and read by the frames. */
+/** What the loop reads of his pointer, kept fresh by React and read by the frames (the rows go to the driver). */
 interface Live {
-  snap: Snapshot;
-  agents: readonly Agent[];
-  /** the snapshot changed since the timeline last heard of it */
-  fresh: boolean;
-  events: BimEvent[];
   hover: string | null;
   held: boolean;
   /** the agent whose row the pointer is on (focus.ts): a halo under its bim */
   lit: string | null;
-  /** the project's map (/bims, his prefs): another one crossfades the office to it */
-  map: MapId;
 }
 
 /** The follow camera (focus.ts): the bim it aims at ('fit': back to the whole office, then null), and its last step's time. */
@@ -149,9 +143,6 @@ interface Follow {
   target: { readonly name: string } | 'fit' | null;
   at: number;
 }
-
-/** The office's agents in a stable shape: the live rows (archived ones have left). */
-const officeKey = (agents: readonly Agent[], map: MapId): string => `${map}|${agents.map((a) => `${a.name}${a.main ? '*' : ''}`).join(',')}`;
 
 /** the map's crossfade (/bims): the old office over the new one, faded out (office.css .bims-xfade, ~300 ms) */
 function crossfade(r: OfficeRenderer, cv: HTMLCanvasElement, fx: HTMLCanvasElement): void {
@@ -225,10 +216,10 @@ export function Office({
   // the bim under a point of the canvas, css px: the renderer's once loaded
   const pick = useRef<(x: number, y: number) => string | null>(() => null);
   const held = useModHeld('Control');
-  // the eggs' memory: today's lands (m6, m8) and when he typed the konami code (m1), with his last keys
-  const lands = useRef<{ day: string; lands: readonly Land[] }>({ day: '', lands: [] });
-  const konamiAt = useRef<number | null>(null);
+  // his last keys, for the konami code (m1); the driver keeps when he typed it
   const keys = useRef<string[]>([]);
+  // the office's brain (office-driver.ts): its timeline, eggs, growth and labels; the town drives its offices the same way
+  const driver = useMemo(() => makeDriver(parts), [parts]);
   // his camera (zoom.ts): the view the renderer draws; `fitted` re-renders only for the '⤢ fit' button
   const camRef = useRef<Cam>(FIT);
   const [fitted, setFitted] = useState(true);
@@ -242,7 +233,7 @@ export function Office({
     setFitted(atFit(c));
     applyCam.current(c);
   }, []);
-  const live = useRef<Live>({ snap: { agents, cards, places }, agents, fresh: true, events: [], hover: null, held, lit: null, map });
+  const live = useRef<Live>({ hover: null, held, lit: null });
   useEffect(() => {
     const was = followRef.current.target;
     if (follow === (was === null || was === 'fit' ? null : was.name)) return;
@@ -256,33 +247,20 @@ export function Office({
   // the `growth` prop changes) so a check can go back to a lower stage
   const high = useMemo(() => (testMode() ? ((window as { __biseGrow?: Growth }).__biseGrow ?? growth) : growHigh(project, growth)), [project, growth]);
   const growNow = useMemo(() => growOf(high), [high]);
-  const grow = useRef<Grow>(growNow);
-  const seen = useRef<Grow | null>(null);
-  const unlockAt = useRef<{ stage: number; at: number } | undefined>(undefined);
   const [newTag, setNewTag] = useState<{ text: string; x: number; y: number } | null>(null);
+  // the growth drawn: before the rows, so the first one is no unlock moment (no mark yet: a bare room)
   useEffect(() => {
-    grow.current = growNow;
     if (high === null) return;
-    // the first growth drawn is no moment; a stage past the last drawn one is
-    const u = unlockOf(seen.current, growNow);
-    if (u !== null) unlockAt.current = { stage: u, at: Date.now() / 1000 };
-    seen.current = growNow;
-    // the timeline hears of it too: a napper at its desk takes a bean bag the stage built (timeline.ts bedFor)
-    live.current = { ...live.current, fresh: true };
+    driver.grow(growNow, Date.now() / 1000);
     kickRef.current();
-  }, [high, growNow]);
+  }, [driver, high, growNow]);
 
-  // a fresh snapshot (the store gives new arrays only on a change): the timeline hears of it
+  // a fresh snapshot (the store gives new arrays only on a change) or his /bims pick (the office
+  // crossfades to the new map at the next frame): the driver hears of it
   useEffect(() => {
-    live.current = { ...live.current, snap: { agents, cards, places }, agents, fresh: true };
+    driver.rows({ agents, cards, places }, agents, map);
     kickRef.current();
-  }, [agents, cards, places]);
-  // his /bims pick: the office crossfades to the new map at the next frame
-  useEffect(() => {
-    if (live.current.map === map) return;
-    live.current = { ...live.current, map, fresh: true };
-    kickRef.current();
-  }, [map]);
+  }, [driver, agents, cards, places, map]);
   useEffect(() => {
     live.current.held = held;
     kickRef.current();
@@ -290,8 +268,7 @@ export function Office({
   // hub/activity: his message is a plane to its bim, an agent's to another a visit, a report a
   // sheet to main's desk (events.ts)
   useOfficeEvents(project, (e) => {
-    live.current.events.push(e);
-    live.current.fresh = true;
+    driver.event(e);
     kickRef.current();
   });
 
@@ -348,16 +325,14 @@ export function Office({
     if (cv === null || box === null) return undefined;
     let gone = false;
     let r: OfficeRenderer | null = null;
-    let timeline: Timeline | null = null;
-    let office: OfficeMap | null = null;
-    let shape = '';
+    // the renderer is loaded; the map last drawn (another one crossfades)
+    let started = false;
+    let drawnMap: OfficeMap['map'] | null = null;
     let lost = false;
     let raf = 0;
     let tick: ReturnType<typeof setTimeout> | undefined;
     let lastLabels = '';
     let lastNew = 'null';
-    let lastActs = '';
-    let lastEggs = '';
     let reduced = reducedMotion();
     let firstDrawn = false;
 
@@ -382,62 +357,35 @@ export function Office({
       if (h > 0) lastRatio = w / h;
       setBoxW(w);
     };
+    // the clock a frame is drawn at; in test mode only a check's forced eggs (window.__biseEggs), never a random roll
+    const clockNow = (t: number): Clock => ({
+      t,
+      local: localOf(new Date()),
+      night: nightNow(),
+      reduced,
+      ...(testMode() ? { forced: (window as { __biseEggs?: Forced }).__biseEggs ?? null } : {}),
+    });
     const draw = () => {
       raf = 0;
       tick = undefined;
-      if (r === null || timeline === null || gone || lost) return;
+      if (r === null || !started || gone || lost) return;
       const L = live.current;
       const t = Date.now() / 1000;
-      if (L.fresh) {
-        L.fresh = false;
-        const key = officeKey(L.agents, L.map);
-        if (office === null || key !== shape) {
-          shape = key;
-          const next = parts.layoutOf(L.agents, L.map);
-          // another map: the old office fades out over the new one; reduced motion: a cut
-          const fx = xfade.current;
-          if (office !== null && office.map !== next.map && !reduced && fx !== null) crossfade(r, cv, fx);
-          office = next;
-          // what he picked (data-want) and what is drawn (data-map: the loft for a map not ready yet)
-          if (holder.current !== null) Object.assign(holder.current.dataset, { want: L.map, map: office.map });
-          r.setOffice(office, L.agents);
-          resize();
-        }
-        const acts = parts.activities(L.snap, t);
-        lastActs = JSON.stringify([...acts]);
-        // a map with a park: who skates reads the stage, the jobs' high-water mark (never the live count), his day, reduced motion
-        const day = localOf(new Date());
-        const g = grow.current;
-        timeline.update(acts, office, t, L.events, bedsAt(g.stage), { stage: g.stage, jobs: g.jobs, dow: day.dow, day: dayOf(day.y, day.mo, day.d), reduced });
-        L.events = [];
-      }
-      if (office === null) return;
-      const main = new Set(L.agents.filter((a) => a.main).map((a) => a.name));
-      const frames: BimFrame[] = [];
-      for (const name of timeline.names(t)) {
-        const pose = timeline.poseAt(name, t);
-        if (pose !== null) frames.push({ name, main: main.has(name), pose });
-      }
-      // his easter eggs (eggs.ts): one pass between the poses and the labels. In test mode only a
-      // check's forced ones (window.__biseEggs), never a random roll
-      const night = nightNow();
-      const local = localOf(new Date());
-      lands.current = noteLands(lands.current, frames, local);
-      const forced = testMode() ? (window as { __biseEggs?: Forced }).__biseEggs : undefined;
-      const eg = testMode()
-        ? withForced(NO_EGGS, forced)
-        : eggsAt({ t, frames, agents: L.agents, cards: L.snap.cards.length, local, night, reduced, lands: lands.current.lands, konami: konamiAt.current, stage: grow.current.stage });
-      lastEggs = clockSig(local, night, L.agents);
       const ft = followRef.current.target;
       const fol = ft === null || ft === 'fit' ? null : ft.name;
-      const played = frames.map((f) => {
-        const e = eg.bims.get(f.name);
-        const lit = f.name === L.lit || f.name === fol;
-        return e === undefined ? (lit ? { ...f, lit } : f) : { ...f, egg: e, ...(lit ? { lit } : {}) };
-      });
-      // the office grows: what it draws, and the unlock moment while it lasts
-      const u = unlockAt.current;
-      const look: Look = { night, reduced, eggs: eg.office, grow: grow.current, ...(u ? { unlock: u } : {}) };
+      const step = driver.step(clockNow(t), { hover: L.hover, held: L.held, lit: L.lit, follow: fol });
+      if (step === null) return;
+      const { office, frames, played, look, labels: shown } = step;
+      if (step.reshaped) {
+        // another map: the old office fades out over the new one; reduced motion: a cut
+        const fx = xfade.current;
+        if (drawnMap !== null && drawnMap !== office.map && !reduced && fx !== null) crossfade(r, cv, fx);
+        drawnMap = office.map;
+        // what he picked (data-want) and what is drawn (data-map: the loft for a map not ready yet)
+        if (holder.current !== null) Object.assign(holder.current.dataset, { want: step.want, map: office.map });
+        r.setOffice(office, step.agents);
+        resize();
+      }
       const motion = r.frame(t, played, look);
       if (!firstDrawn) {
         firstDrawn = true;
@@ -445,6 +393,7 @@ export function Office({
       }
       // the follow camera, from where the bims stand now: the next frame draws the new view
       const chasing = chase(r, t, reduced);
+      const u = look.unlock;
       const said = unlockLabel(u, t, reduced, planOf(mapOf(office.map)).things);
       const at = said !== null && u ? r.pieceOf(u.stage) : null;
       const tag = said !== null && at !== null ? { text: said, x: Math.round(at.x), y: Math.round(at.y) } : null;
@@ -452,8 +401,6 @@ export function Office({
         lastNew = JSON.stringify(tag);
         setNewTag(tag);
       }
-      if (u && t - u.at > UNLOCK_WALK + UNLOCK_LABEL) unlockAt.current = undefined;
-      const shown = parts.labelsOf(played, { t, hover: L.hover, held: L.held, agents: L.agents, eggs: eggLabels(eg), follow: fol, park: office.park });
       ranks.current = new Map(frames.map((f) => [f.name, tagRank(f.pose.seg.act.k)]));
       heads.current = new Map();
       const box = holder.current;
@@ -483,7 +430,7 @@ export function Office({
         setLabels(shown);
       }
       // a resting skater (skate.ts): no frame during its rest, a timer for its next line
-      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: timeline.moving(t), labels: shown, away: awayNow(), lost, wake: wakeIn(frames, office.park) });
+      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: step.moving, labels: shown, away: awayNow(), lost, wake: wakeIn(frames, office.park) });
       if (next === 0) raf = requestAnimationFrame(draw);
       else if (next !== null) tick = setTimeout(draw, next);
     };
@@ -566,12 +513,9 @@ export function Office({
     // a still office looks at its rows' clock now and then (a long turn going hot, a trip to the
     // island): it draws only when an activity changed
     const check = setInterval(() => {
-      if (r === null || timeline === null || awayNow() || lost) return;
-      // the clock's eggs (the eclipse, friday 17:00, midnight) start and end without a row change
-      const clockNow = clockSig(localOf(new Date()), nightNow(), live.current.agents);
-      if (clockNow === lastEggs && JSON.stringify([...parts.activities(live.current.snap, Date.now() / 1000)]) === lastActs) return;
-      live.current.fresh = true;
-      kick();
+      if (r === null || !started || awayNow() || lost) return;
+      // the clock's eggs (the eclipse, friday 17:00, midnight) or an activity changed: a frame
+      if (driver.stale(clockNow(Date.now() / 1000))) kick();
     }, CHECK_MS);
 
     parts
@@ -583,8 +527,7 @@ export function Office({
         made.onLost(fail);
         pick.current = (x, y) => (lost ? null : made.pick(x, y));
         made.setCam(camRef.current);
-        timeline = parts.newTimeline();
-        live.current.fresh = true;
+        started = true;
         setState('on');
         bimsView.setLost(false);
         resize();
@@ -609,7 +552,7 @@ export function Office({
       pick.current = () => null;
       r?.dispose();
     };
-  }, [parts, layoutTags, moveCam]);
+  }, [parts, driver, layoutTags, moveCam]);
 
   // hover: the bim under the pointer, its line after the tip's delay; off it, at once
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -688,7 +631,7 @@ export function Office({
         keys.current = [...keys.current.slice(-9), e.key];
         if (konamiDone(keys.current)) {
           keys.current = [];
-          konamiAt.current = Date.now() / 1000;
+          driver.konami(Date.now() / 1000);
           kickRef.current();
         }
         if (e.key !== 'Escape' || fitted) return;
