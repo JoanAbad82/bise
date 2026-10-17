@@ -55,20 +55,44 @@ A candidate never carries his app's id (dev.bise.desktop.try): `cand.sh` refuses
 
 ## 2. Gate it
 
-Ask main for one gate agent per cut (`try-gate-<sha4>`). Its brief must say:
+The try path (fast-try p7): the candidate, the checks its change can break, the smoke. Never
+the full end-to-end between him and a try.
 
-- it runs on a throwaway world (`~/.bise/gate/real-shape`, fake accounts, fake provider) under
-  card #509's standing go;
-- `dev/plugins/ambient-qa/as-he-does/cand.sh <out> <cand app>` with the cand.json, through
-  `heavy-run --low`, wrapped in `caffeinate -d -i -s` (a display sleep on battery killed run q);
-- gates A (his front app unchanged, the candidate never in front), B (his
-  `~/Library/Application Support/bise try` untouched; only the cand plist, removed after),
-  C (TCC: silent preflights only, no prompt, no helper under his app): the run kills its own
-  pids at the first breach;
-- the quick pass plus one row per new item in the cut; on battery the quick pass is enough,
-  the full pass waits for AC;
-- every shot looked at as an image, one page plus one artifact for all the shots (never one
-  artifact per PNG), sent to the lead and designer.
+- the selected checks: the desktop checks gate.sh's map picks for the change (`tests/test_map.py`,
+  fast-try p2), plus `pnpm check`;
+- the smoke: `dev/plugins/ambient-qa/as-he-does/cand.sh --smoke` on the candidate (the packed
+  app, its real core, a throwaway home: the pill, the core line, a message to the fake provider
+  and its answer, a clean quit), with gates A, B and C;
+- a new item a check can't see (packaging, the core's spawn, the native helper, windows): its
+  own as-he-does row, run on the candidate with `AS_HE_DOES_ONLY=quick
+  AS_HE_DOES_QUICK_ROWS=<words of its row>`.
+
+Every as-he-does run is on a throwaway world (`~/.bise/gate/real-shape`, fake accounts, fake
+provider) under card #509's standing go, through `heavy-run`, wrapped in `caffeinate -d -i -s`
+(a display sleep on battery killed run q). Its gates: A (his front app unchanged, the candidate
+never in front), B (his `~/Library/Application Support/bise try` untouched; only the cand plist,
+removed after), C (TCC: silent preflights only, no prompt, no helper under his app): the run
+kills its own pids at the first breach. Every shot looked at as an image, one page plus one
+artifact for all the shots (never one artifact per PNG), sent to designer.
+
+### The full end-to-end: at night and before a desktop release
+
+`scripts/nightly_desktop.sh <out> [<sha>] [--until HH:MM]`, one step of the nightly
+(`scripts/nightly_gate.sh`, results in `~/.bise/run/nightly/desktop-<date>/summary.txt`, a red
+in the night's `red` file), by value: the candidate of the tip, every quick as-he-does row with
+the first run and a fake-voice take, `pnpm test:land`, the full as-he-does pass (first, cut,
+rows2, two restarts, second, the core with no env), the DMG (`scripts/desktop-dmg.sh`, mounted
+read-only and checked). Every tests/checks spec also runs once a night under coverage
+(try-select's step). Nothing new starts after 08:00 (`none`, never green); on battery nothing
+runs. A red as-he-does step is named `as-he-does/<mode>: <step>` (digits as N) and split by
+`tests/known_reds.py`: known with its owner, else NEW. A green sha goes in
+`~/.bise/run/nightly/desktop-green.tsv`.
+
+A desktop release tag comes only from `scripts/desktop_tag.py <desktop-vYYYY.M.N> [<sha>]`: it
+takes that green line, or runs the end-to-end then, and tags only on green (docs/packaging.md
+§12). The driver's watchdogs: no step for 600 s is a hang (`AS_HE_DOES_STALL_MS`); the quick
+pass's limit is 600 s per row group it runs (`AS_HE_DOES_WATCHDOG_MS` by hand wins); each step
+carries `at_s`, its seconds from the start.
 
 ## 3. Promote and stage
 

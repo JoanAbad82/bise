@@ -100,6 +100,18 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref || (inputs.tag != '' && format('refs/tags/{0}', inputs.tag) || github.ref) }}
           fetch-depth: 0
 
+      # the tag was cut by scripts/desktop_tag.py: annotated, its message
+      # carries 'nightly-desktop: green <its commit>' (the desktop app's full
+      # end-to-end, scripts/nightly_desktop.sh, green on that exact sha on
+      # his Mac; fast-try p7, architect m_29670). A hand 'git tag' stops here.
+      # The tag object fetched again as pushed: checkout can leave a
+      # lightweight copy of the ref it checked out.
+      - name: The tag's nightly desktop green
+        if: ${{ env.ACTION == 'build' }}
+        run: |
+          git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
+          python3 -B scripts/desktop_tag.py check "$TAG"
+
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: apps/desktop/package.json

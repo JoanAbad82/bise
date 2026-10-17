@@ -31,8 +31,35 @@ const MESSAGE = 'hello from the as-he-does proof';
 
 const res = { mode, steps: [], shots: [] };
 const save = () => fs.writeFileSync(path.join(out, `${mode}${tag}.json`), JSON.stringify(res, null, 1));
-const step = (name, ok, info) => { res.steps.push({ name, ok, info: info ?? null }); save(); };
-setTimeout(() => { step('driver watchdog', false, `${WATCHDOG_MS / 1000} s`); process.exit(2); }, WATCHDOG_MS).unref();
+// at_s: seconds from the driver's start, so a pass shows where its time went
+const T0 = Date.now();
+let lastStep = { name: null, at: T0 };
+const step = (name, ok, info) => {
+  res.steps.push({ name, ok, info: info ?? null, at_s: Math.round((Date.now() - T0) / 1000) });
+  lastStep = { name, at: Date.now() };
+  save();
+};
+// two watchdogs (gate-nightly, fast-try p7). The stall one: no step for STALL_MS (600 s, today's
+// whole-pass limit) is a hang, red. The pass one: WATCHDOG_MS, or for the quick pass 600 s per row
+// group it runs (sized below, where the groups are listed). Before, one 600 s limit for the whole
+// pass ended every quick pass red in its last rows (cand-*q 2026-10-14..17: 22 steps, then 'driver
+// watchdog'), and the rows past it never ran.
+const STALL_MS = Number(process.env.AS_HE_DOES_STALL_MS ?? 600000);
+// pids a row holds with SIGSTOP (rowsF2A7): always SIGCONT'd, also when the pass ends early
+const HELD = new Set();
+const unhold = () => { for (const p of HELD) { try { process.kill(p, 'SIGCONT'); } catch { /* gone */ } } HELD.clear(); };
+const watchdog = (why) => { unhold(); step('driver watchdog', false, why); process.exit(2); };
+let passTimer = null;
+const passLimit = (ms) => {
+  if (passTimer) clearTimeout(passTimer);
+  passTimer = setTimeout(() => watchdog({ limit_s: ms / 1000, last: lastStep.name }), ms);
+  passTimer.unref();
+};
+passLimit(WATCHDOG_MS);
+setInterval(() => {
+  const idle = Date.now() - lastStep.at;
+  if (idle > STALL_MS) watchdog({ stalled_s: Math.round(idle / 1000), after: lastStep.name });
+}, 5000).unref();
 
 // the app's CDP port answers some seconds after the open (c28260a9's first run: 3 drives refused at
 // once, ECONNREFUSED): retried for up to 90 s, then a failed step, never an uncaught error
@@ -80,9 +107,6 @@ const click = async (name, loc) => {
 // the window can go away under a pass (7e691aef's rerun: the candidate quit at 07:48:09, rows2 then
 // crashed in page.waitForTimeout): say it as a red step and end the pass, never an uncaught error
 let ending = false;
-// pids a row holds with SIGSTOP (rowsF2A7): always SIGCONT'd, also when the pass ends early
-const HELD = new Set();
-const unhold = () => { for (const p of HELD) { try { process.kill(p, 'SIGCONT'); } catch { /* gone */ } } HELD.clear(); };
 const closed = () => {
   if (ending) return;
   unhold();
@@ -1202,40 +1226,17 @@ if (mode === 'quick') {
   };
   const harness = () => click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
   await closeArtifact();
-  if (ONLY.length) {
-    // the chosen rows alone; rows37's before rowsE812's seed (its spawns' task_status would ride on
-    // main's next request, the quote's included); the bims office first: it seeds nothing, and the
-    // seeds below can take the 600 s watchdog before a late row (desk-cut-8's cand-d3d8b)
-    await rowsCF30(harness, say);
-    await rowsDDDE(harness, say);
-    await rowsD3D8(harness, say);
-    await rows42D1(harness, say);
-    await rows4E20(harness, say);
-    await newRows(harness, say);
-    await rows37(harness, say);
-    await rowsE812(harness, say);
-    await rowsF2A7(harness, say);
-    await rows233B(harness, say);
-    await rowsC2BA(harness, say);
-    await rowsDC47(harness, say);
-  } else {
-    // first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the time the others take
-    await rowsE812(harness, say);
-    await rowsCF30(harness, say);
-    await rowsDDDE(harness, say);
-    await rowsF2A7(harness, say);
-    await rows233B(harness, say);
-    await rowsC2BA(harness, say);
-    await rowsDC47(harness, say);
-    await rowsD3D8(harness, say);
-    await rows42D1(harness, say);
-    await rows4E20(harness, say);
-    await quickRows(harness, say);
-    await newRows(harness, say);
-    await rows37(harness, say);
-    await rows25(harness, say);
-    await rows0170(harness, say);
-  }
+  // the chosen rows alone (ONLY): rows37's before rowsE812's seed (its spawns' task_status would ride
+  // on main's next request, the quote's included); the bims office first: it seeds nothing.
+  // All rows: rowsE812 first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the
+  // time the others take
+  const groups = ONLY.length
+    ? [rowsCF30, rowsDDDE, rowsD3D8, rows42D1, rows4E20, newRows, rows37, rowsE812, rowsF2A7, rows233B, rowsC2BA, rowsDC47]
+    : [rowsE812, rowsCF30, rowsDDDE, rowsF2A7, rows233B, rowsC2BA, rowsDC47, rowsD3D8, rows42D1, rows4E20, quickRows, newRows, rows37, rows25, rows0170];
+  // the pass limit sized to its groups: 600 s each from here (the stall watchdog still ends a hang
+  // at 600 s with no step); AS_HE_DOES_WATCHDOG_MS set by hand wins
+  if (process.env.AS_HE_DOES_WATCHDOG_MS === undefined) passLimit(Date.now() - T0 + groups.length * 600000);
+  for (const g of groups) await g(harness, say);
 }
 
 // d0d45f92's rows (ambient-lead m_22519): the help sheet opaque, esc never stops a turn and ctrl+c
@@ -2277,6 +2278,22 @@ async function rowsF2A7(harness, say) {
     .filter((e) => /^thread\.(aside|approval)\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes(w))
     .map((e) => ({ id: e.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) })), words).catch(() => [{ id: 'unread', text: '' }]);
   const bodyHas = async (re) => { const b = flat(await page.locator('body').innerText({ timeout: 3000 }).catch(() => '')); const m = re.exec(b); return m ? m[0] : null; };
+  // the resolution the world's hub journaled for card `id` whose words hold `token` (the journal
+  // whose card_opened has both): 'answered', 'withdrawn by main: …', …; null if none
+  const closeOf = (token, id) => {
+    const hubs = process.env.AS_HE_DOES_BISE_HOME ? path.join(process.env.AS_HE_DOES_BISE_HOME, 'hubs') : null;
+    let dirs = [];
+    try { dirs = fs.readdirSync(hubs); } catch { return null; }
+    for (const d of dirs) {
+      let lines;
+      try { lines = fs.readFileSync(path.join(hubs, d, 'journal.jsonl'), 'utf8').split(String.fromCharCode(10)); } catch { continue; }
+      const evs = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      if (!evs.some((e) => e.type === 'card_opened' && e.card?.id === id && (e.card?.text ?? '').includes(token))) continue;
+      const c = evs.find((e) => e.type === 'card_closed' && e.id === id);
+      return c ? String(c.resolution) : null;
+    }
+    return null;
+  };
 
   const T = String(Date.now() % 100000);
   const [other] = await others();
@@ -2470,6 +2487,13 @@ async function rowsF2A7(harness, say) {
     const card = d0.id;
     await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 30000, 1000);
     if (card === null) { step("an answer to a withdrawn card", false, { listed: d0.listed, opened: !!d0.open }); return; }
+    // close the card dock() opened: with it open, the words below were its ANSWER, not a message to
+    // main (the hub's journal of cand-c845q: 'the user answered notification #9 ("[[bash: sleep 30
+    // && sb card --withdraw 9 …]]")', then the withdraw's 'no open notification #9'): the card gone,
+    // the next dock found nothing, red in 7 of 9 quick passes (gate-nightly, fast-try p7)
+    await page.keyboard.press('Escape');
+    const shut = await until(async () => (!(await d0.open.isVisible().catch(() => false)) ? true : null), 5000, 250);
+    if (!shut) { step("an answer to a withdrawn card", false, { why: 'the card stayed open after Escape: the words would answer it', card }); return; }
     await clear();
     await say(`[[bash: sleep 30 && sb card --withdraw ${card} "zq the plan changed"]] withdrawing`);
     const t0 = Date.now();
@@ -2495,8 +2519,11 @@ async function rowsF2A7(harness, say) {
     await shot('f2a7-withdrawn-words');
     const asides = await rowsWith('zqw-one');
     const after = await present(W);
-    step(`an answer to card ${String(card)} withdrawn by its asker meanwhile (the candidate's core held ~14 s): the hub's own 'card ${String(card)} isn't open' on screen, no 'you answered', the card not back (the hub dropped it)`,
-      hidden === true && !!words && asides.length === 0 && after === false, { hidden, words, asides, after, core: cores[0].slice(0, 160) });
+    // how the hub closed it, from its journal: 'withdrawn by main: …', never 'answered' (the row
+    // passed by accident before only if the words became its answer; architect m_29601)
+    const closedAs = closeOf(W, card);
+    step(`an answer to card ${String(card)} withdrawn by its asker meanwhile (the candidate's core held ~14 s): the hub's own 'card ${String(card)} isn't open' on screen, no 'you answered', the card not back (the hub dropped it), the hub's journal closed it 'withdrawn', not 'answered'`,
+      hidden === true && !!words && asides.length === 0 && after === false && /^withdrawn\b/.test(closedAs ?? ''), { hidden, words, asides, after, closedAs, core: cores[0].slice(0, 160) });
   });
 
   await row('a pause counts its seconds, then minutes', async () => {
