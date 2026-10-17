@@ -124,13 +124,21 @@ def main():
         c.wait(lambda: os.path.exists(slot) and "bg-job-done" in open(slot).read(), 30, "the job's output in its slot")
         # its end wakes rc (one turn); wait for that turn's model call before
         # the next message (not an 'ack: <agent_message' line: rc's brief
-        # from main was one already)
+        # from main was one already). rc's own calls only: the hub's role
+        # line call after rc's turn ('(role line)', role.rs) quotes rc's
+        # last report, the ack of that wake, and is no wake
         def woke():
-            return [r for r in E.fake_requests() if "background 0 ended" in (r.get("user") or "")]
+            return [r for r in E.fake_requests()
+                    if r.get("agent") == "rc" and "background 0 ended" in (r.get("user") or "")]
         c.wait(woke, 60, "the job's end in a model call of rc")
         c.wait_idle("rc")
         woken = woke()
         check(len(woken) == 1, "the job's end woke rc once: %d" % len(woken))
+        # the role line call that quotes the wake's ack came (after rc's
+        # turn, on a thread): the filter above told the two apart
+        c.wait(lambda: [r for r in E.fake_requests() if r.get("agent") == "(role line)"
+                        and "background 0 ended" in (r.get("user") or "")], 60,
+               "the role line call quoting rc's ack of the wake")
         c.say("[[bash: cat $TMPDIR/bg/0.out]]", focus="rc")
         c.wait_line("rc", "done: tool bash ok: bg-job-done", 60)
         c.wait_idle("rc")
