@@ -7,7 +7,9 @@ slot (remove the tree like the hub's start sweep did on 2026-10-13, land a commi
 fail), and a throwaway BISE_HOME. Checks: the tree is made in the slot at main's tip of
 that moment (~/.bise/run/nightly/tree/<repo>, its owner file), a removed tree is made
 again, a stale tree is checked out and cleaned, `last` and `red` for green, red and a gate
-that did not start (an infra failure, not a test red). Never his ~/.bise, no real gate.
+that did not start (an infra failure, not a test red); the desktop steps after the gate (a
+check red under coverage is a red night naming it, the coverage map and its audit are owned
+tools that never turn it red). Never his ~/.bise, no real gate.
 
   python3 -B tests/nightly_gate_test.py
 """
@@ -37,6 +39,27 @@ exec "$@"
 """
 
 
+# the coverage step (apps/desktop/tests/harness/coverage/covmap.mjs): checks red or green, a
+# tooling that never ran, a map refused (review-gates m_29723)
+FAKE_COVMAP = """const [mode] = process.argv.slice(2);
+const e = process.env;
+if (mode === 'checks') {
+  if (e.FAKE_COV_CHECKS === 'red') { console.log('FAIL keep-red'); process.exit(1); }
+  if (e.FAKE_COV_CHECKS === 'nohook') { console.log('covmap checks: the coverage hook never took a coverage'); process.exit(2); }
+  console.log('covmap checks: 3/3 green'); process.exit(0);
+}
+if (mode === 'map') {
+  if (e.FAKE_COV_MAP === 'refuse') { console.error('covmap: no map written: bundles instead of source files'); process.exit(1); }
+  console.log('covmap: map written'); process.exit(0);
+}
+process.exit(2);
+"""
+FAKE_AUDIT = """import os, sys
+print("fake audit")
+sys.exit(1 if os.environ.get("FAKE_AUDIT_MISS") else 0)
+"""
+
+
 def check(ok, what):
     if not ok:
         FAILS.append(what)
@@ -56,6 +79,12 @@ def main():
         shutil.copy(os.path.join(ROOT, "scripts", "nightly_gate.sh"), os.path.join(repo, "scripts"))
         with open(os.path.join(repo, "tests", "gate.sh"), "w") as f:
             f.write(FAKE_GATE)
+        cov = os.path.join(repo, "apps", "desktop", "tests", "harness", "coverage")
+        os.makedirs(cov)
+        with open(os.path.join(cov, "covmap.mjs"), "w") as f:
+            f.write(FAKE_COVMAP)
+        with open(os.path.join(repo, "tests", "desktop_pick_audit.py"), "w") as f:
+            f.write(FAKE_AUDIT)
         heavy = os.path.join(t, "heavy-run")
         with open(heavy, "w") as f:
             f.write(FAKE_HEAVY)
@@ -123,6 +152,29 @@ def main():
         rc, log, last, red = night(FAKE_HEAVY_FAIL="boom")
         check(rc != 0 and last.split()[1:3] == ["?", "infra"] and "heavy-run: boom" in last, "heavy fails: rc %s, last %r" % (rc, last))
         check(red is not None and "did not start" in red and "infra" in red and "heavy-run: boom" in red, "heavy fails: red %r" % red)
+
+        # the desktop steps after the gate (review-gates m_29723): a check red under coverage is a
+        # product red named in red; the map and its audit are try-select's tools, never a red night
+        rc, log, last, red = night()
+        check(rc == 0 and "STEP desktop-checks: green" in log and "STEP desktop-map: green" in log
+              and "STEP desktop-pick-audit: green" in log, "desktop steps green: rc %s, log %r" % (rc, log))
+        rc, log, last, red = night(FAKE_COV_CHECKS="red")
+        check(rc != 0 and last.split()[2] == "red" and red is not None and "keep-red" in red,
+              "a check red under coverage: a red night naming it: rc %s, last %r, red %r" % (rc, last, red))
+        check("STEP desktop-map: green" in log, "a red check: the map is still made: %r" % log)
+        rc, log, last, red = night(FAKE_COV_MAP="refuse")
+        check(rc == 0 and last.split()[2] == "green" and red is None
+              and "STEP desktop-map: red (owner try-select; not a product red)" in log
+              and "desktop-pick-audit" not in log.split("STEP desktop-map: red")[1],
+              "covmap refuses: the gate's verdict, owned, no audit: rc %s, last %r, log %r" % (rc, last, log))
+        rc, log, last, red = night(FAKE_AUDIT_MISS="1")
+        check(rc == 0 and red is None and "STEP desktop-pick-audit: red (owner try-select" in log,
+              "an audit miss: owned, the night green: rc %s, log %r" % (rc, log))
+        rc, log, last, red = night(FAKE_COV_CHECKS="nohook")
+        check(rc == 0 and red is None and "STEP desktop-checks: no result (exit 2)" in log,
+              "the hook never ran: no verdict, not red: rc %s, log %r" % (rc, log))
+        rc, log, last, red = night(FAKE_GATE_RC="1", FAKE_COV_MAP="refuse")
+        check(rc != 0 and red is not None and "e2e_fake" in red, "a red gate stays red whatever the map: %r" % red)
 
         # --tip: main's tip in a quiet slot, once per sha, never on a green one or a busy machine
         def tip_run(**fake):

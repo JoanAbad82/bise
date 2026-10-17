@@ -148,12 +148,15 @@ if [ "${1:-}" = --in-slot ]; then
     esac
     return $r
   }
-  # the desktop checks' coverage map (every harness check under V8 coverage), then its audit: a
-  # miss is owned by try-select (MISS lines, <gate dir>/desktop-pick-misses.tsv) and puts the
-  # selection back in shadow mode; neither turns a product-green night red
+  # every harness check of the desktop, once, under V8 coverage: a red check is a product red
+  # (FAIL <check>, the night red, review-gates m_29723); then the coverage map from that run and
+  # its audit, tools of the gate owned by try-select (fast-try p2): a refused map or a miss never
+  # turns the night red (MISS lines, <gate dir>/desktop-pick-misses.tsv; the selection goes back
+  # to shadow mode), and a missing map only makes the selection ALL
   day="$(date +%F)"
   covmap=apps/desktop/tests/harness/coverage/covmap.mjs
-  if night_step --own try-select desktop-map "$covmap" node "$covmap" run --day "$day"; then
+  night_step desktop-checks "$covmap" node "$covmap" checks
+  if night_step --own try-select desktop-map "$covmap" node "$covmap" map --day "$day"; then
     night_step --own try-select desktop-pick-audit tests/desktop_pick_audit.py python3 -B tests/desktop_pick_audit.py --day "$day"
   fi
   # the recorded ambient-core of the QA world, typed and checked for invariants (feature-tests, p5)
