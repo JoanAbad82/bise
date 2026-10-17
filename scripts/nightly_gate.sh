@@ -128,27 +128,33 @@ if [ "${1:-}" = --in-slot ]; then
   cd "$wt" || { echo "NOSTART cannot enter $wt"; exit 1; }
   GATE_ALL=1 /usr/bin/caffeinate -is bash tests/gate.sh full --all
   rc=$?
-  # the night's steps after the gate, in this tree and slot, in this order (fast-try p2, p5).
-  # night_step <name> <file> [<cmd>...]: skipped when <file> isn't in the tree; exit 0 green,
-  # 1 red: a "FAIL <name>" line (the red file names it) and the night is red; else no result
+  # the night's steps after the gate, in this tree and slot, in this order (fast-try p2, p5, p7).
+  # night_step [--own <owner>] <name> <file> [<cmd>...]: skipped when <file> isn't in the tree;
+  # exit 0 green, 1 red: a "FAIL <name>" line (the red file names it) and the night is red; else
+  # no result. --own: a tool of the gate, not the product: its red is a "STEP <name>: red (owner
+  # <owner>)" line, the night keeps the gate's verdict (review-gates m_29697 #1)
   night_step() {
+    local own=""
+    [ "$1" = --own ] && { own=$2; shift 2; }
     local n=$1 f=$2; shift 2
     [ -f "$f" ] || { echo "STEP $n: not in this tree, skipped"; return 0; }
     echo "STEP $n: start $(date +%T)"
     /usr/bin/caffeinate -is "$@"; local r=$?
     case $r in
       0) echo "STEP $n: green" ;;
-      1) echo "FAIL $n"; echo "STEP $n: red"; rc=1 ;;
+      1) if [ -n "$own" ]; then echo "STEP $n: red (owner $own; not a product red)"
+         else echo "FAIL $n"; echo "STEP $n: red"; rc=1; fi ;;
       *) echo "STEP $n: no result (exit $r)" ;;
     esac
     return $r
   }
   # the desktop checks' coverage map (every harness check under V8 coverage), then its audit: a
-  # miss is a red with its owner (MISS lines), and the selection goes back to shadow mode
+  # miss is owned by try-select (MISS lines, <gate dir>/desktop-pick-misses.tsv) and puts the
+  # selection back in shadow mode; neither turns a product-green night red
   day="$(date +%F)"
   covmap=apps/desktop/tests/harness/coverage/covmap.mjs
-  if night_step desktop-map "$covmap" node "$covmap" run --day "$day"; then
-    night_step desktop-pick-audit tests/desktop_pick_audit.py python3 -B tests/desktop_pick_audit.py --day "$day"
+  if night_step --own try-select desktop-map "$covmap" node "$covmap" run --day "$day"; then
+    night_step --own try-select desktop-pick-audit tests/desktop_pick_audit.py python3 -B tests/desktop_pick_audit.py --day "$day"
   fi
   # the recorded ambient-core of the QA world, typed and checked for invariants (feature-tests, p5)
   night_step core-record scripts/core_record.sh bash scripts/core_record.sh
