@@ -74,8 +74,6 @@ env:
   CHANNEL: ${{ inputs.channel }}
   RUNTIME: ${{ inputs.runtime }}
   GH_REPO: ${{ github.repository }}
-  # the helper's cache key: its sources and build script (scripts/desktop_release.py MACOS_TARGET 14.0)
-  HELPER_KEY: desktop-helper-macos15-arm64-${{ hashFiles('apps/desktop/native/mac/**') }}
 
 jobs:
   build:
@@ -112,14 +110,16 @@ jobs:
         with:
           node-version: 22
 
-      # the native helper by its sources' hash: saved on main (job warm, or
-      # a dry run there), read by tags
+      # the native helper by its sources' hash (its swift sources and
+      # build.sh; MACOS_TARGET 14.0 in desktop_release.py), the same key in
+      # its 4 cache steps (hashFiles is not allowed in env): saved on main
+      # (job warm, or a dry run there), read by tags
       - name: The native helper (cached)
         id: helper
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/helper
-          key: ${{ env.HELPER_KEY }}
+          key: desktop-helper-macos15-arm64-${{ hashFiles('apps/desktop/native/mac/**') }}
 
       - uses: actions/setup-python@v5
         with:
@@ -176,7 +176,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/helper
-          key: ${{ env.HELPER_KEY }}
+          key: desktop-helper-macos15-arm64-${{ hashFiles('apps/desktop/native/mac/**') }}
 
       # the draft (nothing reads a draft), then beta: the run he approved
       - name: Draft release, then beta
@@ -217,7 +217,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/helper
-          key: ${{ env.HELPER_KEY }}
+          key: desktop-helper-macos15-arm64-${{ hashFiles('apps/desktop/native/mac/**') }}
           lookup-only: true
 
       - name: Build the helper
@@ -231,7 +231,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/helper
-          key: ${{ env.HELPER_KEY }}
+          key: desktop-helper-macos15-arm64-${{ hashFiles('apps/desktop/native/mac/**') }}
 
   # the channels: his approval on every run (the environment's reviewers)
   publish:
