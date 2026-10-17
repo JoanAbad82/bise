@@ -219,42 +219,55 @@ crate::words! { bims:
     // ---- the office's map (/bims in the composer, page bims-maps v7): its name, its mood
     /// a map: the island in the middle (the first one)
     map_loft = "Loft";
+    /// the Loft's mood, under its name in the /bims picker
     map_loft_mood = "the kitchen island in the middle, bean bags at the back";
     /// a map: desks in a ring round a tree
     map_greenhouse = "Greenhouse";
+    /// the Greenhouse's mood, under its name in the /bims picker
     map_greenhouse_mood = "desks in a ring round a tree, glass walls";
     /// a map: pods of four
     map_campus = "Campus";
+    /// the Campus's mood, under its name in the /bims picker
     map_campus_mood = "pods of four, a long counter, steps to sit on";
     /// a map: a garage
     map_workshop = "Workshop";
+    /// the Workshop's mood, under its name in the /bims picker
     map_workshop_mood = "a garage: a workbench, ping-pong, the door rolled up";
     /// a map: a machiya
     map_kyoto = "Kyoto";
+    /// Kyoto's mood, under its name in the /bims picker
     map_kyoto_mood = "low tables on tatami round a small garden";
     /// a map: a riad
     map_riad = "Riad";
+    /// the Riad's mood, under its name in the /bims picker
     map_riad_mood = "galleries round a patio and its fountain";
     /// a map: a wooden house
     map_nordic = "Nordic";
+    /// Nordic's mood, under its name in the /bims picker
     map_nordic_mood = "one long wooden table, a stove, a sauna outside";
     /// a map: a Mexican patio house
     map_patio = "Patio";
+    /// the Patio's mood, under its name in the /bims picker
     map_patio_mood = "coloured walls round a patio, hammocks for naps";
     /// a map: a haveli
     map_haveli = "Haveli";
+    /// the Haveli's mood, under its name in the /bims picker
     map_haveli_mood = "a courtyard with arcades, a chai stall, a swing";
     /// a map: a tropical house
     map_tropical = "Tropical";
+    /// Tropical's mood, under its name in the /bims picker
     map_tropical_mood = "desks on a curve, a juice bar, hammocks";
     /// a map: white cubes
     map_cyclades = "Cyclades";
+    /// the Cyclades' mood, under its name in the /bims picker
     map_cyclades_mood = "little white cubes up steps, blue tables";
     /// a map: a yard round a baobab
     map_sahel = "Sahel";
+    /// Sahel's mood, under its name in the /bims picker
     map_sahel_mood = "a shade hangar round a yard and its baobab";
     /// a map: the office and its skatepark
     map_california = "California";
+    /// California's mood, under its name in the /bims picker
     map_california_mood = "a stucco office and a concrete skatepark";
     /// the /bims picker's tip on its row: what picking it does
     map_pick_tip(map) = "draw this project's office as the {map}";
@@ -270,9 +283,11 @@ crate::words! { bims:
     town_sign_label(project, at_work, asks) = "{project}: {at_work} working, {asks} asking you";
     /// the dived office's sign: opens the project's main thread
     town_open = "open";
+    /// that sign's tip: what a click on it does
     town_open_tip(project) = "open {project}";
     /// the dived office's way back to the whole town (esc does it too)
     town_back = "town";
+    /// that way back's tip: what a click on it does
     town_back_tip = "back to the whole town";
 
     // ---- California's skatepark (apps/desktop/src/bims/skate.ts): an idle bim skates there
@@ -280,23 +295,41 @@ crate::words! { bims:
     state_skating(dur) = "idle {dur} · skating";
     /// a trick's name, 1.5 s over the bim the office follows (the 2.2x zoom), never in the normal view
     trick_drop_in = "drop in";
+    /// a trick's name: pumping through the bowl for speed
     trick_pump = "pumps";
+    /// a trick's name: the front truck over the coping, back down fakie
     trick_rock_to_fakie = "rock to fakie";
+    /// a trick's name: both trucks stalled on the coping
     trick_axle_stall = "axle stall";
+    /// a trick's name: a half turn, chest first
     trick_fs_180 = "frontside 180";
+    /// a trick's name: a half turn, back first
     trick_bs_180 = "backside 180";
+    /// a trick's name: the board pops up with the bim
     trick_ollie = "ollie";
+    /// a trick's name: the board flips under the toes
     trick_kickflip = "kickflip";
+    /// a trick's name: the board flips under the heel
     trick_heelflip = "heelflip";
+    /// a trick's name: the board spins a half turn under the bim
     trick_shove_it = "pop shove-it";
+    /// a trick's name: a kickflip and a full spin of the board
     trick_tre_flip = "360 flip";
+    /// a trick's name: a grind on both trucks
     trick_fifty = "50-50";
+    /// a trick's name: a grind on the back truck
     trick_five_o = "5-0";
+    /// a trick's name: a slide on the board's middle
     trick_boardslide = "boardslide";
+    /// a trick's name: a grind on the front truck
     trick_nosegrind = "nosegrind";
+    /// a trick's name: rolling on the back wheels
     trick_manual = "manual";
+    /// a trick's name: a foot down, the board popped round it
     trick_no_comply = "no comply";
+    /// a trick's name: a long turn along the bowl's wall
     trick_carve = "carve";
+    /// a trick's name: in the air above the coping, chest to the wall
     trick_fs_air = "frontside air";
     /// the 900 (two and a half turns in the air, Tony Hawk 1999), tried at the 900th job
     trick_nine = "900";
