@@ -17,7 +17,11 @@
 # A hub runs FROM a version dir: rebuilding the tree never changes a
 # running system, only an explicit switch does.
 #
-#   scripts/versions.sh build [<rev>|--tree]   # build (cached), print the version dir
+#   scripts/versions.sh build [<rev>|--tree] [--also <name>]...
+#                                        # build (cached), print the version dir;
+#                                        # --also: one more of bins.sh's binaries
+#                                        # into its cache, compiled with the others
+#                                        # (build-dist.sh: repl-scripted)
 #   scripts/versions.sh id [<rev>|--tree]      # the id a build would get
 #   scripts/versions.sh list                   # built versions, newest first
 #   scripts/versions.sh prune [<n>]            # keep the n (3) newest versions and
@@ -28,7 +32,9 @@
 # cargo target dir and bins.sh's cache of the Bend binaries (one per
 # source hash, a Bend compile is 1-2 min) live in
 # SB_BUILD_DIR=~/.local/state/switchboard/build.
-# Commits are built in a temporary git worktree under /tmp (removed after).
+# Commits are built in a temporary git worktree under /tmp (removed after),
+# into one cargo target (target-commits) whose unchanged crates are kept
+# (scripts/cargo_mtimes.py); bins.sh's misses compile beside the cargo build.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -40,6 +46,7 @@ elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
 else STATE="$HOME/.local/state/switchboard"; fi
 VERSIONS="${SB_VERSIONS_DIR:-$STATE/versions}"
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
+BINS_ALSO=""
 export PATH="$HOME/.cargo/bin:$HOME/.bend/bin:$PATH"
 # the oldest macOS the binaries run on (BISE-164), this repo's value
 # (rust/.cargo/config.toml) for every commit: an old one has no
@@ -89,16 +96,33 @@ build_from() {
   rm -rf "$tmp"; mkdir -p "$tmp/rust/jsrt/target/debug"
   CLEAN_TMP="$tmp"
 
+  # the Bend binaries and the V8 engine that miss bins.sh's cache, compiled
+  # all at once while cargo builds the command (a release's miss was 680 s
+  # on CI's darwin-arm64, one after the other). A failure here is told
+  # again, loudly, by bin_path below (it compiles the missing one alone)
+  local want=(repl-live bend-jsrt) pf
+  if [ -f "$src/bend/hub/main.bend" ] || [ -f "$src/hub/main.bend" ]; then want+=(sb-core); fi
+  "$REPO/scripts/bins.sh" prefetch --src "$src" "${want[@]}" $BINS_ALSO &
+  pf=$!
+
   # release: the TUI draws ~10x faster than the debug build
   say "cargo build --release $id..."
   # one cargo target dir per SOURCE: cargo decides freshness by mtime,
   # and a commit checked out in a worktree (fresh mtimes) would otherwise
   # leave artifacts newer than the tree's edited files - the next --tree
   # build would ship stale Rust code. Worktrees are always freshly checked
-  # out, so they can share theirs.
-  local target="$BUILD/target-commits"
-  [ "$src" = "$REPO" ] && target="$BUILD/target-tree"
-  (cd "$src/rust" && CARGO_TARGET_DIR="$target" cargo build -q --release -p bend-harness)
+  # out, so they share theirs, and cargo_mtimes.py gives the files that did
+  # not change since its last build their mtime back: only the changed
+  # crates rebuild (a fresh worktree rebuilt all of them on each commit)
+  local target="$BUILD/target-commits" cargo_ok=1
+  if [ "$src" = "$REPO" ]; then
+    (cd "$src/rust" && CARGO_TARGET_DIR="$BUILD/target-tree" cargo build -q --release -p bend-harness) || cargo_ok=0
+    target="$BUILD/target-tree"
+  else
+    (cd "$src/rust" && CARGO_TARGET_DIR="$target" python3 -B "$REPO/scripts/cargo_mtimes.py" run --src "$src" --target "$target" -- cargo build -q --release -p bend-harness) || cargo_ok=0
+  fi
+  wait "$pf" || say "bins.sh prefetch failed: compiling one by one"
+  [ "$cargo_ok" = 1 ] || { say "cargo build failed"; exit 1; }
   # the command is bise since BISE-165: a commit before it builds
   # bend-harness (decided by its sources: the shared target dir may hold
   # both names); either way the version dir has bise
@@ -264,7 +288,16 @@ build() {
 }
 
 case "${1:-}" in
-  build) build "${2:---tree}" ;;
+  build)
+    shift; what=--tree BINS_ALSO=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --also) BINS_ALSO="$BINS_ALSO $2"; shift ;;
+        *) what="$1" ;;
+      esac
+      shift
+    done
+    build "$what" ;;
   prune) prune "${2:-}" ;;
   id) if [ "${2:---tree}" = "--tree" ]; then tree_id; else rev_id "$2"; fi ;;
   list)
@@ -274,5 +307,5 @@ case "${1:-}" in
       printf '%s\t%s\t%s\n' "$d" "$(sed -n 's/^built=//p' "$VERSIONS/$d/VERSION")" \
         "$(sed -n 's/^subject=//p' "$VERSIONS/$d/VERSION")"
     done ;;
-  *) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

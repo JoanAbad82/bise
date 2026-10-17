@@ -24,14 +24,43 @@ dog=""
 # the hub gets 5 s to stop on TERM, then KILL: a hub that never stops
 # must not hold the build (CI's darwin-x86_64 sat in build-dist for 25+
 # min on -33); never an unbounded wait
+# The hub's agents run in their own session (a REPL is setsid): stopping
+# the hub alone left main's REPL writing in agents/main, and the rm below
+# failed ('agents/main: Directory not empty'), which failed the build
+# (linux-x86_64 on -38 and -39). So the whole tree of the hub is stopped
+# (found by parent pid, taken before the hub dies), and the rm is retried:
+# a temp dir that still won't go is a warning, never a failed check.
+tree() {  # <pid>: it and its descendants, one per line
+  local all p q kids
+  all="$(ps -axo pid=,ppid= 2>/dev/null || true)"
+  kids="$1"; echo "$1"
+  while [ -n "$kids" ]; do
+    q=""
+    for p in $kids; do
+      q="$q $(awk -v p="$p" '$2 == p { print $1 }' <<<"$all")"
+    done
+    kids="$(echo $q)"
+    [ -z "$kids" ] || tr ' ' '\n' <<<"$kids"
+  done
+}
 cleanup() {
   [ -z "$dog" ] || kill "$dog" 2>/dev/null || true
   if [ -n "$pid" ]; then
-    kill "$pid" 2>/dev/null || true
-    for _ in $(seq 1 25); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
-    kill -9 "$pid" 2>/dev/null || true
+    local all; all="$(tree "$pid")"
+    kill $all 2>/dev/null || true
+    local p live
+    for _ in $(seq 1 25); do
+      live=""; for p in $all; do if kill -0 "$p" 2>/dev/null; then live=1; fi; done
+      [ -n "$live" ] || break; sleep 0.2
+    done
+    kill -9 $all 2>/dev/null || true
   fi
-  rm -rf "$home"
+  for _ in 1 2 3 4 5; do
+    rm -rf "$home" 2>/dev/null && return 0
+    sleep 1
+  done
+  say "warning: could not remove $home"
+  return 0
 }
 trap cleanup EXIT
 trap 'say "timed out after ${CHECK_DIST_PAGES_TIMEOUT:-120} s"; exit 124' TERM

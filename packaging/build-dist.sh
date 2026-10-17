@@ -76,11 +76,15 @@ name="bise-$id-$target"
 
 # 1. the app root of this commit (cached by versions.sh)
 say "versions.sh build $id..."
-vdir="$("$REPO/scripts/versions.sh" build "$id")"
+# (--also: repl-scripted compiles with the version's own Bend binaries,
+# beside its cargo build, instead of after it)
+vdir="$("$REPO/scripts/versions.sh" build "$id" --also repl-scripted)"
 h="$(sed -n 's/^bend_hash=//p' "$vdir/VERSION")"
 
-# 2. repl-scripted (versions.sh does not build it): bins.sh's cache,
-#    same key as repl-live (content hash of runtime/ core/ vendor/)
+# 2. repl-scripted (versions.sh puts it in bins.sh's cache only, and only
+#    when it builds the version): bins.sh's cache, same key as repl-live
+#    (content hash of runtime/ core/ vendor/); a version built before
+#    without it compiles it here
 scripted="$BUILD/cache/repl-scripted-$h"
 if [ ! -x "$scripted" ]; then
   wt="/tmp/bise-dist-src-$id-$$"

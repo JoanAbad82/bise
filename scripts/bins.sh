@@ -9,6 +9,11 @@
 #                                          sources (default <dir>: this repo)
 #   scripts/bins.sh path [--src <dir>] <name>    build if needed, print the cache file
 #   scripts/bins.sh key [--src <dir>] <name>     the cache key (hash of the sources)
+#   scripts/bins.sh prefetch [--src <dir>] <name>...  build the missing ones into the
+#                                          cache, all at once (one process each:
+#                                          a miss of all four is the longest
+#                                          compile, not their sum); exit 1 when
+#                                          one fails
 #   scripts/bins.sh macos-target                 the oldest macOS every binary runs on
 #   scripts/bins.sh minos <file>...              check each binary against it: exit 1
 #                                          when one needs a newer macOS (or says
@@ -191,6 +196,28 @@ cached() {  # <src> <name>
   echo "$f"
 }
 
+# cached for every <name> at once, each in its own process: a release's
+# miss compiled repl-live, sb-core, bend-jsrt and repl-scripted one after
+# the other (680 s on CI's darwin-arm64, 1207 s on x86_64). Their tmp files
+# are per name ($f.tmp.<pid>), the cargo one has its own target dir. Only
+# the names that miss are started (a hit is a key: no process)
+prefetch() {  # <src> <name>...
+  local src="$1" n pids=() names=() bad=0 i k; shift
+  for n in "$@"; do
+    k="$(key "$src" "$n")" || return 1
+    [ -x "$CACHE/$n-$k" ] && continue
+    ( cached "$src" "$n" >/dev/null ) &
+    pids+=($!); names+=("$n")
+  done
+  # ${a[@]+...}: macOS /bin/bash 3.2 calls an empty array unbound under set -u
+  i=0
+  for n in ${pids[@]+"${pids[@]}"}; do
+    wait "$n" || { say "prefetch: ${names[$i]} failed"; bad=1; }
+    i=$((i + 1))
+  done
+  return $bad
+}
+
 # <src>/<name> = the cache file (a new inode: a running binary keeps its own)
 place() {  # <src> <name>
   local src="$1" name="$2" f out="$1/$2"
@@ -210,13 +237,14 @@ case "${1:-}" in
   macos-target) echo "$MACOSX_DEPLOYMENT_TARGET"; exit 0 ;;
   minos) shift; check_minos "$@"; exit ;;
 esac
-case "${1:-}" in path|key) cmd="$1"; shift ;; ""|-h|--help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;; esac
+case "${1:-}" in path|key|prefetch) cmd="$1"; shift ;; ""|-h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;; esac
 src="$REPO"
 if [ "${1:-}" = --src ]; then src="$(cd "$2" && pwd)"; shift 2; fi
 [ $# -gt 0 ] || { say "which binary? (repl-live repl-scripted sb-core harness-demo)"; exit 2; }
 case "$cmd" in
   key) key "$src" "$1" ;;
   path) cached "$src" "$1" ;;
+  prefetch) prefetch "$src" "$@" ;;
   place) for n in "$@"; do
            [ "$n" = bend-jsrt ] && { say "bend-jsrt: 'bins.sh path bend-jsrt' (a dev tree runs its debug build)"; exit 2; }
            place "$src" "$n"
