@@ -63,7 +63,7 @@
 #                     it works (sb worktree <path>|none: the TUI's ψ, BISE-136).
 #   gate.sh seed-path print the seed to clone for the cwd repo's deps (this
 #                     key's, else the newest; exit 1 when none): a desktop
-#                     candidate's cargo target starts from it (cand_build.py).
+#                     candidate's cargo target starts from it (try_build.py).
 #   gate.sh wait <bg .out file | pid>
 #                     the bash tool put a gate in the background: block until
 #                     it ends (at most 25 s), then show its end and exit code.

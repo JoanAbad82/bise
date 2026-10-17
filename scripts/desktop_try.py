@@ -26,7 +26,10 @@ bend-harness), its repl-live, repl-scripted and sb-core (scripts/bins.sh), the n
 pnpm dist (electron-builder --mac --dir) as its own bundle 'bise try' (dev.bise.desktop.try:
 apps/desktop/dist/mac-arm64/bise try.app) with that bise packed inside it, so the app's core and
 every hub it starts run the try build. Signed with the stable 'bise ambient dev' identity
-(<build>/ambient/sign, or BISE_TRY_SIGN_DIR), else ad hoc.
+(<build>/ambient/sign, or BISE_TRY_SIGN_DIR), else ad hoc. A --candidate builds in the candidates'
+one build checkout, <build>/desktop-cand/work (try_build.py, fast-try p1): moved to each sha with git,
+so cargo, pnpm and vite rebuild only what changed. Its lock (desktop-cand/work.lock) serializes the
+candidates; remade when the gate seed changes; rm -rf work is always safe under the lock.
 
 The try home is ~/.bise/try/desktop (BISE_HOME): its own hubs, sockets, run dirs, journals,
 projects.json and prefs, and its own home workspace (BISE_HOME_WORKSPACE=<try>/bise, never his
@@ -65,7 +68,7 @@ from desktop_try_env import (GATE, SELF_CONTAINED, TryError, clone_names, config
                              under)  # split for its size
 from heavy_slot import HEAVY_RUN, heavy_argv, under_heavy_slot  # noqa: F401  (desktop_dmg, the tests read them here)
 from try_procs import hub_socks, stop_hub, try_pids  # split for its size
-from try_build import incremental, root_script  # noqa: F401  (root_script: desktop_app reads it here)
+from try_build import incremental, promote_install, root_script, work_build_paths, work_paths  # noqa: F401  (root_script: desktop_app's)
 
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DESKTOP = os.path.join(REPO, "apps", "desktop")
@@ -146,8 +149,8 @@ def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO, name=APP_
     native helper, then the new app (apps/desktop: pnpm install --frozen-lockfile, build, dist =
     electron-builder --mac --dir, the try's bise packed inside it), into apps/desktop/dist, or into
     `out` (BISE_PACK_OUT: the staging dir, a candidate's dir), as the bundle `name` with id `app_id`
-    (his try's, or a candidate's CAND_NAME/CAND_ID). `inc` (a candidate): cargo and node_modules
-    warm, only what changed rebuilds (try_build.incremental). Pure."""
+    (his try's, or a candidate's CAND_NAME/CAND_ID). `inc` (a candidate's sha): built in the
+    candidates' one build checkout, only what changed rebuilds (try_build.incremental). Pure."""
     q = shlex.quote
     desktop = os.path.join(repo, "apps", "desktop")
     lines = ["set -euo pipefail",
@@ -171,7 +174,7 @@ def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO, name=APP_
         lines.insert(lines.index("cd %s" % q(desktop)), "rm -rf %s" % q(out))
     if root:
         lines[lines.index("mkdir -p %s" % q(os.path.dirname(paths["helper"]))):0] = root_script(root)
-    return "\n".join(incremental(lines, repo, paths) if inc else lines) + "\n"
+    return "\n".join(incremental(lines, repo, paths, inc) if inc else lines) + "\n"
 
 
 def root_path(paths, stamp):
@@ -419,7 +422,7 @@ def resolve_sha(sha, env, repo=REPO):
 def cand_paths(paths, sha):
     d = os.path.join(paths["cand"], sha[:12])
     return {"dir": d, "src": os.path.join(d, "src"), "dist": os.path.join(d, "dist"), "root": os.path.join(d, "root-" + sha[:12]),
-            "json": os.path.join(d, "cand.json"), "bise": os.path.join(d, "bise"), "app": os.path.join(d, "dist", paths["arch"], CAND_NAME + ".app"),
+            "json": os.path.join(d, "cand.json"), "app": os.path.join(d, "dist", paths["arch"], CAND_NAME + ".app"),
             # --promote's repack with his try's name and id, before it moves into the try's staged place
             "promoted_dir": os.path.join(d, "promoted"), "promoted": os.path.join(d, "promoted", paths["arch"], APP_NAME + ".app")}
 
@@ -451,6 +454,7 @@ def repack_script(c, sign_dir=None):
     return "\n".join([
         "set -euo pipefail",
         "cd %s" % q(os.path.join(c["src"], "apps", "desktop")),
+        promote_install(),
         "rm -rf %s" % q(c["promoted_dir"]),
         "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s BISE_PACK_ROOT=%s%s BISE_PACK_OUT=%s pnpm dist"
         % (q(APP_NAME), q(APP_ID), q(packed_bise(app)), q(os.path.join(app, "Contents", "MacOS", "bise-mac-helper")), q(c["root"]),
@@ -474,10 +478,10 @@ def candidate(env, paths, sha, repo=REPO, sign=None):
         say("candidate %s is built: %s" % (sha[:8], c["app"]))
         return dict(json.load(open(c["json"])), **info)
     say("building candidate %s into %s (waits for a heavy slot)…" % (sha[:8], c["dir"]))
-    # incremental (fast-try p1): its bise in its own dir, from the candidates' warm target (try_build.py)
-    script = build_script(dict(paths, bise=c["bise"]), sign, out=c["dist"], root=c["root"], repo=c["src"], name=CAND_NAME, app_id=CAND_ID, inc=True)
+    # fast-try p1: built in the candidates' one build checkout, under its lock (try_build.py)
+    script = build_script(work_build_paths(paths), sign, out=c["dist"], root=c["root"], repo=c["src"], name=CAND_NAME, app_id=CAND_ID, inc=sha)
     lock = os.path.expanduser("~/.bise/run/heavy.lock")
-    r = subprocess.run(heavy_argv(["/bin/bash", "-c", script], lock), env=env)
+    r = subprocess.run(heavy_argv(["/usr/bin/lockf", "-k", work_paths(paths["cand"])["lock"], "/bin/bash", "-c", script], lock), env=env)
     if r.returncode != 0:
         raise TryError("the candidate build failed (exit %d)" % r.returncode)
     if not cand_built(c):

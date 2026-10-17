@@ -1,33 +1,37 @@
-"""cand_build: a desktop gate candidate builds only what changed (fast-try p1, architect m_29189).
+"""try_build: the pure shell steps of the try's builds: the snapshot app root (root_script), and how a
+desktop gate candidate builds only what changed (fast-try p1, architect m_29189, review-gates m_29380).
 
-`scripts/desktop-try.sh --candidate <sha>` builds each sha in a fresh worktree. Before this, every
+`scripts/desktop-try.sh --candidate <sha>` used to build each sha in a fresh worktree: every
 candidate recompiled all our crates (fresh files = fresh mtimes: 4 min 43 s on c84530b6, every
-registry dep already fresh) and installed node_modules from scratch (40 s). These are the lines
-desktop_try.build_script puts in their place for a candidate; --try and the release keep theirs.
+registry dep already fresh) and installed node_modules from scratch. Now a candidate builds in ONE
+build checkout kept between candidates, <build>/desktop-cand/work/:
 
-- cargo: one candidate target, <build>/desktop-cand/target, kept between candidates. Absent, it
-  starts as an APFS clone (cp -c, 0 bytes, ~3 s) of the gate seed of the candidate's deps
-  (`tests/gate.sh seed-path`: its key and dir stay in gate.sh), else a cold one. Cargo runs through
-  scripts/cargo_mtimes.py, as versions.sh does: a file whose blob the last good build there had gets
-  that build's mtime back, so cargo rebuilds the crates whose files changed and nothing else. That
-  target is never built without the wrapper (the manifest would lie), so not the try's <build>/target.
-  The bise is copied into the candidate's dir inside the same locked command: the other heavy slot's
-  candidate never packs it. Deleting the target is always safe: the next candidate clones it again.
-- node_modules: a clone of <build>/cache/desktop-node_modules-<key> (key: apps/desktop's
-  package.json and pnpm-lock.yaml, node -v, pnpm -v; made from the first install for that key; the
-  2 newest kept), then `pnpm install --frozen-lockfile` runs anyway and decides (a no-op when it
-  matches). The cache is never written but by a rename, never changed once there.
-- the Bend bins: scripts/bins.sh's own key and cache, unchanged; the Electron zip: electron-builder's
-  own cache.
+- work/src, a detached git worktree, moved to the candidate's sha (`git checkout --force`, then
+  `git clean -x` of all but node_modules: out/ never survives into the next pack; git rewrites only
+  the files that changed, so only theirs get a new mtime), and
+  work/target, its cargo target. Cargo, pnpm install (node_modules stays in work/src), vite and the
+  pack run there: each tool decides what is stale, as in any dev checkout. Every path a tool keeps
+  (cargo's dep-info, absolute for a file outside its package such as switchboard's
+  include_str!("../../../prompts/..."); pnpm's .bin shims) names work/src, which always holds the
+  sha being built: never another candidate's worktree (review-gates m_29380's stale prompt).
+- the whole build holds work.lock (lockf): the other heavy slot's candidate waits.
+- work/ is made whole or not at all: work/target first, an APFS clone (cp -c, ~3 s) of the gate
+  seed of the candidate's deps (`tests/gate.sh seed-path`: its key and dir stay in gate.sh), then
+  work/src, so every source file is newer than every seed artifact (the first build compiles all our
+  crates). A seed-path other than the one work/ was made from (work/.seed: the deps changed) makes
+  it again: that is its gc; one work/ at a time. Removing it is always safe: the next one remakes it.
+- the snapshot root (bins.sh's cache, root_script) is still made in the candidate's own worktree
+  (its VERSION unchanged), and out/ is cloned back into it after the pack, so --promote and the DMG
+  repack from the candidate's own worktree (they install its node_modules first: candidates no
+  longer carry one each).
 
-So a UI-only change (no Rust or Bend source changed) costs the vite build and the pack; nothing
-branches on a rule of its own. The pure lines are tested in tests/desktop_try_test.py.
+So a UI-only change costs the vite build and the pack; nothing branches on a rule of its own. The
+release (versions.sh, the DMG's own build) and --try are untouched. Tested in tests/desktop_try_test.py.
 """
 import os
 import shlex
 
 TOOLS = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-MODULES = "desktop-node_modules-"
 
 
 def root_script(root):
@@ -57,50 +61,58 @@ def root_script(root):
             "rm -rf %s && mv %s %s" % (q(root), q(t), q(root))]
 
 
-def incremental(lines, repo, paths):
-    """A candidate's build_script lines with the cargo and pnpm install steps made incremental
-    (cargo_lines, modules_lines): `paths` is the candidate's (its "bise" in its own dir). Pure."""
-    lines = list(lines)
-    i = next(n for n, l in enumerate(lines) if l.startswith("export CARGO_TARGET_DIR="))
-    lines[i:i + 2] = cargo_lines(repo, cand_target(paths["cand"]), paths["bise"])
-    i = lines.index("pnpm install --frozen-lockfile")
-    lines[i:i + 1] = modules_lines(os.path.join(os.path.dirname(paths["cand"]), "cache"))
-    return lines
+
+def work_paths(cand_dir):
+    """The candidates' one build checkout under <build>/desktop-cand: work/src (a git worktree),
+    work/target (its cargo target), work/.seed (the seed it was made from), work/ready (made whole),
+    and work.lock, next to it (held by the whole build)."""
+    w = os.path.join(cand_dir, "work")
+    return {"dir": w, "src": os.path.join(w, "src"), "target": os.path.join(w, "target"), "seed": os.path.join(w, ".seed"),
+            "ready": os.path.join(w, "ready"), "lock": os.path.join(cand_dir, "work.lock")}
 
 
-def cand_target(cand_dir):
-    """The one cargo target of every candidate: <build>/desktop-cand/target."""
-    return os.path.join(cand_dir, "target")
-
-
-def cargo_lines(repo, target, bise, tools=TOOLS):
-    """The candidate's bise: `target` seeded when absent, cargo through cargo_mtimes, the bise copied to
-    `bise` under its lock. Run from anywhere. Pure."""
+def work_lines(w, repo, sha, tools=TOOLS):
+    """work/ made when missing, half made or from another seed, then its src moved to `sha`; `repo`:
+    the candidate's own worktree (its deps key, its git). Run under w["lock"]. Pure."""
     q = shlex.quote
-    t, b = q(target), q(bise)
-    seed = ("if [ ! -d %s ]; then s=\"$(cd %s && %s seed-path || true)\"; tmp=%s.tmp.$$; "
-            "if [ -n \"$s\" ] && cp -cR \"$s\" \"$tmp\"; then mv \"$tmp\" %s 2>/dev/null || rm -rf \"$tmp\"; "
-            "echo \"cand: cargo target %s, a clone of the seed $s\"; "
-            "else rm -rf \"$tmp\"; echo \"cand: no seed to clone: a cold cargo target %s\"; fi; fi"
-            % (t, q(repo), q(os.path.join(tools, "tests", "gate.sh")), t, t, target, target))
-    build = "cd rust && cargo build -p bend-harness && { cp -c \"$CARGO_TARGET_DIR/debug/bise\" %s.tmp || cp \"$CARGO_TARGET_DIR/debug/bise\" %s.tmp; } && mv -f %s.tmp %s" % (b, b, b, b)
-    return ["export CARGO_TARGET_DIR=%s CARGO_INCREMENTAL=0" % t, seed,
-            "cd %s && python3 -B %s run --src %s --target %s -- /bin/sh -c %s"
-            % (q(repo), q(os.path.join(tools, "scripts", "cargo_mtimes.py")), q(repo), t, q(build))]
-
-
-def modules_lines(cache, keep=2):
-    """apps/desktop's node_modules from the lockfile's cache, then pnpm install; a miss fills the
-    cache. Run in apps/desktop. Pure."""
-    q = shlex.quote
-    c = q(cache)
-    rename = "python3 -c 'import os,sys; os.rename(sys.argv[1], sys.argv[2])'"   # never into an existing dir, as mv would
+    d, src = q(w["dir"]), q(w["src"])
     return [
-        "k=\"$({ cat package.json pnpm-lock.yaml; node -v; pnpm -v; } | shasum | cut -c1-12)\"; nm=%s/%s\"$k\"" % (c, MODULES),
-        "if [ -d \"$nm\" ] && [ ! -e node_modules ]; then if cp -cR \"$nm\" node_modules.tmp; then mv node_modules.tmp node_modules; touch \"$nm\"; "
-        "echo \"cand: node_modules, a clone of $nm\"; else rm -rf node_modules.tmp; fi; fi",
-        "pnpm install --frozen-lockfile",
-        "if [ ! -d \"$nm\" ]; then mkdir -p %s && rm -rf \"$nm.tmp.$$\" && cp -cR node_modules \"$nm.tmp.$$\" "
-        "&& { %s \"$nm.tmp.$$\" \"$nm\" 2>/dev/null || rm -rf \"$nm.tmp.$$\"; }; fi" % (c, rename),
-        "{ ls -dt %s/%s* 2>/dev/null || true; } | grep -v '\\.tmp\\.' | tail -n +%d | while read -r d; do rm -rf \"$d\"; done" % (c, MODULES, keep + 1),
+        "s=\"$(cd %s && %s seed-path || true)\"" % (q(repo), q(os.path.join(tools, "tests", "gate.sh"))),
+        "if [ ! -f %s ] || [ \"$(cat %s 2>/dev/null)\" != \"$s\" ]; then "
+        "echo \"cand: a new build checkout %s (seed: ${s:-none, a cold target})\"; "
+        "rm -rf %s && git -C %s worktree prune && mkdir -p %s && "
+        "if [ -n \"$s\" ]; then cp -cR \"$s\" %s; else mkdir %s; fi && "
+        "git -C %s worktree add -q --detach %s %s && printf '%%s' \"$s\" > %s && touch %s; fi"
+        % (q(w["ready"]), q(w["seed"]), w["dir"], d, q(repo), d, q(w["target"]), q(w["target"]), q(repo), src, q(sha), q(w["seed"]), q(w["ready"])),
+        # nothing the last build made survives but node_modules (pnpm install decides on it), out/ included
+        # (architect m_29409); git rewrites only the changed files: theirs alone get a new mtime
+        "git -C %s checkout -q --force --detach %s && git -C %s clean -ffdqx -e node_modules" % (src, q(sha), src),
     ]
+
+
+def incremental(lines, repo, paths, sha, tools=TOOLS):
+    """A candidate's build_script lines (made for its own worktree `repo`, with paths["target"] and
+    paths["bise"] the work's: work_build_paths) built in work/: work_lines first, cargo in work/src,
+    pnpm install, build and dist in work/src/apps/desktop, then out/ cloned back into `repo`. Pure."""
+    q = shlex.quote
+    w = work_paths(paths["cand"])
+    lines = list(lines)
+    lines[1:1] = work_lines(w, repo, sha, tools)
+    cargo = lines.index("cd %s/rust && cargo build -p bend-harness" % q(repo))
+    lines[cargo] = "cd %s/rust && cargo build -p bend-harness" % q(w["src"])
+    desktop = lines.index("cd %s" % q(os.path.join(repo, "apps", "desktop")))
+    lines[desktop] = "cd %s" % q(os.path.join(w["src"], "apps", "desktop"))
+    out = os.path.join(repo, "apps", "desktop", "out")
+    return lines + ["rm -rf %s && cp -cR out %s" % (q(out), q(out))]
+
+
+def work_build_paths(paths):
+    """The try paths of a candidate's build: its cargo target and bise are work/'s."""
+    w = work_paths(paths["cand"])
+    return dict(paths, target=w["target"], bise=os.path.join(w["target"], "debug", "bise"))
+
+
+def promote_install():
+    """--promote's and the DMG's repack, in the candidate's own apps/desktop: its node_modules (a
+    candidate no longer has one), installed from its lockfile when missing."""
+    return "if [ ! -d node_modules ]; then pnpm install --frozen-lockfile; fi"

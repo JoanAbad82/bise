@@ -31,7 +31,8 @@ import sys
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, HERE)
-from desktop_try import HEAVY_RUN, REPO, bundle_id, cand_paths, candidate, heavy_argv, his_env, packed_bise, resolve_sha, try_paths  # noqa: E402
+from desktop_try import (HEAVY_RUN, REPO, bundle_id, cand_paths, candidate, heavy_argv, his_env, packed_bise,  # noqa: E402
+                         promote_install, resolve_sha, try_paths)
 from desktop_try_env import TryError  # noqa: E402
 
 NAME = "bise"
@@ -95,6 +96,7 @@ def repack_script(c, s, sign_dir):
     return "\n".join([
         "set -euo pipefail",
         "cd %s" % q(os.path.join(c["src"], "apps", "desktop")),
+        promote_install(),
         "rm -rf %s" % q(s["dist"]),
         "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s BISE_PACK_ROOT=%s%s BISE_PACK_OUT=%s pnpm dist"
         % (q(NAME), q(APP_ID), q(packed_bise(app)), q(os.path.join(app, "Contents", "MacOS", "bise-mac-helper")), q(s["root"]), sign,

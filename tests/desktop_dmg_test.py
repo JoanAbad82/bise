@@ -65,7 +65,10 @@ def test_repack():
     check("BISE_PACK_NAME=bise BISE_PACK_APP_ID=dev.bise.desktop " in sc, sc)
     check("BISE_PACK_ROOT=/c/share/desktop-0123456789ab" in sc and "BISE_PACK_SIGN_DIR=/b/sign" in sc, sc)
     check("'/c/dist/mac-arm64/bise cand.app/Contents/Resources/bin/bise'" in sc, "the candidate's own bise: " + sc)
-    check("pnpm install" not in sc and "pnpm build" not in sc and "cargo" not in sc, "a repack, never a build")
+    # fast-try p1: a candidate's worktree has no node_modules (it built in the work checkout): the
+    # repack installs it from the candidate's lockfile when missing, and builds nothing
+    check("pnpm build" not in sc and "cargo" not in sc and sc.count("pnpm install") == 1
+          and "if [ ! -d node_modules ]; then pnpm install --frozen-lockfile; fi" in sc, "a repack, never a build: " + sc)
     check("BISE_PACK_VERSION" not in sc, "a dev build: never offered an app update")
 
 
