@@ -1233,9 +1233,12 @@ if (mode === 'quick') {
   const groups = ONLY.length
     ? [rowsCF30, rowsDDDE, rowsD3D8, rows42D1, rows4E20, newRows, rows37, rowsE812, rowsF2A7, rows233B, rowsC2BA, rowsDC47]
     : [rowsE812, rowsCF30, rowsDDDE, rowsF2A7, rows233B, rowsC2BA, rowsDC47, rowsD3D8, rows42D1, rows4E20, quickRows, newRows, rows37, rows25, rows0170];
-  // the pass limit sized to its groups: 600 s each from here (the stall watchdog still ends a hang
-  // at 600 s with no step); AS_HE_DOES_WATCHDOG_MS set by hand wins
-  if (process.env.AS_HE_DOES_WATCHDOG_MS === undefined) passLimit(Date.now() - T0 + groups.length * 600000);
+  // the pass limit sized to its groups: GROUP_MS each from here (the stall watchdog still ends a
+  // hang at 600 s with no step); AS_HE_DOES_WATCHDOG_MS set by hand wins. GROUP_MS is PROVISIONAL:
+  // set to at most 2x the measured per-group time (the at_s of the first all-rows quick pass on
+  // AC) so a pass 3x slower is red (review-gates m_29770)
+  const GROUP_MS = 600000;
+  if (process.env.AS_HE_DOES_WATCHDOG_MS === undefined) passLimit(Date.now() - T0 + groups.length * GROUP_MS);
   for (const g of groups) await g(harness, say);
 }
 

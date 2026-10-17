@@ -59,7 +59,8 @@ The try path (fast-try p7): the candidate, the checks its change can break, the 
 the full end-to-end between him and a try.
 
 - the selected checks: the desktop checks gate.sh's map picks for the change (`tests/test_map.py`,
-  fast-try p2), plus `pnpm check`;
+  fast-try p2), plus `pnpm check`. While the pick is in shadow mode (until review-gates' go) EVERY
+  check runs: the pick only logs what it would have skipped;
 - the smoke: `dev/plugins/ambient-qa/as-he-does/cand.sh --smoke` on the candidate (the packed
   app, its real core, a throwaway home: the pill, the core line, a message to the fake provider
   and its answer, a clean quit), with gates A, B and C;

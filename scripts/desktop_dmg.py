@@ -31,7 +31,7 @@ import sys
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, HERE)
-from desktop_try import REPO, bundle_id, cand_paths, candidate, heavy_argv, his_env, packed_bise, resolve_sha, try_paths  # noqa: E402
+from desktop_try import HEAVY_RUN, REPO, bundle_id, cand_paths, candidate, heavy_argv, his_env, packed_bise, resolve_sha, try_paths  # noqa: E402
 from desktop_try_env import TryError  # noqa: E402
 
 NAME = "bise"
@@ -155,11 +155,20 @@ def check_dmg(s):
         subprocess.run(["hdiutil", "detach", "-quiet", s["mnt"]])
 
 
+LOCK = os.path.expanduser("~/.bise/run/heavy.lock")
+
+
+def heavy_dmg_argv(script, under=None, heavy_run=HEAVY_RUN, lock=LOCK):
+    """The repack's argv: one heavy job at low priority (ambient-lead m_23935: heavy-run --low).
+    Already in a heavy slot (the nightly's scripts/nightly_desktop.sh holds both) heavy_argv's
+    rule: there, at nice 10, never waiting on a slot its own ancestor holds; no heavy-run on this
+    Mac: the old single lock. Pure (given `under`)."""
+    argv = heavy_argv(["/bin/bash", "-c", script], lock, under=under, heavy_run=heavy_run)
+    return [heavy_run, "--low"] + argv[1:] if argv[:1] == [heavy_run] else argv
+
+
 def heavy(script, env):
-    """One heavy job at low priority (ambient-lead m_23935): heavy_argv's rule, so already in a heavy
-    slot (the nightly's scripts/nightly_desktop.sh, holding both) it runs there at nice 10, never
-    waiting on a slot its own ancestor holds."""
-    return subprocess.run(heavy_argv(["/bin/bash", "-c", script], None), env=env).returncode
+    return subprocess.run(heavy_dmg_argv(script), env=env).returncode
 
 
 def build(env, sha, rev=None, repo=REPO):

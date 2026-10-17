@@ -97,6 +97,26 @@ def test_dmg_of_a_stand_in():
         shutil.rmtree(t, ignore_errors=True)
 
 
+def test_heavy_argv():
+    # the repack's slot (review-gates m_29770): heavy-run --low outside a slot, nice 10 inside one
+    # (the nightly holds both: never a wait on its own ancestor), the old lock without heavy-run
+    t = tempfile.mkdtemp(dir=os.environ.get("TMPDIR"))
+    try:
+        hr = os.path.join(t, "heavy-run")
+        with open(hr, "w") as f:
+            f.write("#!/bin/sh\n")
+        os.chmod(hr, 0o755)
+        out = D.heavy_dmg_argv("x", under=False, heavy_run=hr, lock="/l")
+        check(out == [hr, "--low", "/bin/bash", "-c", "x"], "outside a slot: %s" % out)
+        out = D.heavy_dmg_argv("x", under=True, heavy_run=hr, lock="/l")
+        check(out == ["nice", "-n", "10", "/bin/bash", "-c", "x"], "inside a slot: %s" % out)
+        out = D.heavy_dmg_argv("x", under=False, heavy_run=os.path.join(t, "none"), lock="/l")
+        check(out == ["/usr/bin/lockf", "-k", "/l", "nice", "-n", "10", "/bin/bash", "-c", "x"], "no heavy-run: %s" % out)
+        check(D.LOCK.endswith("/.bise/run/heavy.lock"), "a real lock: %s" % D.LOCK)
+    finally:
+        shutil.rmtree(t, ignore_errors=True)
+
+
 if __name__ == "__main__":
     for name, fn in sorted((n, f) for n, f in globals().items() if n.startswith("test_")):
         fn()

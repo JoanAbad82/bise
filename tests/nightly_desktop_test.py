@@ -160,9 +160,16 @@ def main():
         rc, o, _ = run("--until", "08:00", NOW=at(9, 0))
         check(rc == 0, "until tomorrow\n" + o)
 
-        # on battery nothing runs
+        # on battery nothing runs; a second run in a row with no result is red, naming the last green
         rc, o, calls = run(NIGHTLY_DESKTOP_BATTERY="1")
         check(rc == 2 and calls == [] and "STEP candidate: none (on battery)" in o, "battery\n" + o)
+        rc, o, calls = run(NIGHTLY_DESKTOP_BATTERY="1")
+        check(rc == 1 and "FAIL desktop-runs" in o and "hasn't run since " in o and "on %s" % sha in o, "battery twice: red\n" + o)
+        check("last green run: " in o and "none yet" not in o, "battery twice: the last green named\n" + o)
+        rc, o, _ = run()
+        check(rc == 0, "a green run after: green\n" + o)
+        rc, o, _ = run(NIGHTLY_DESKTOP_BATTERY="1")
+        check(rc == 2, "one none after a green: no result, not red\n" + o)
 
         # a candidate built before (another agent's) is kept
         rc, o, _ = run(FAKE_BUILT_BEFORE="1")

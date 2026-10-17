@@ -23,7 +23,8 @@
 # (known with its owner, else NEW). A known red is still red.
 # Out: <out>/<step>.log, <out>/quick/ and <out>/full/ (cand.sh's dirs), <out>/summary.txt. Exit 0
 # green (the sha appended to <BISE_HOME>/run/nightly/desktop-green.tsv), 1 red ('FAIL <step>'
-# lines), 2 no result. The candidate dir it built is removed at the end (disk); one built before
+# lines), 2 no result; a second run in a row with no result is red (desktop-runs.tsv keeps each
+# run's verdict; the summary names the last green run). The candidate dir it built is removed at the end (disk); one built before
 # (another agent's, desktop_try says "is built") is kept.
 # Tests: tests/nightly_desktop_test.py (fake desktop-try, cand.sh, dmg and pnpm: NIGHTLY_DESKTOP_*).
 nightly_desktop() {
@@ -67,7 +68,7 @@ note "nightly desktop: $sha in $here, $(date)${until:+, nothing new after $until
 steps=(candidate quick land full dmg)
 if on_battery; then
   for s in "${steps[@]}"; do record "$s" none "on battery"; done
-  return 2
+  verdict; return $?
 fi
 
 # the reds of one cand.sh dir: every ok:false step of its step JSONs
@@ -140,12 +141,31 @@ if [ -n "$made" ] && [ -d "$made" ]; then
 fi
 
 [ ${#reds[@]} -gt 0 ] && python3 -B "$here/tests/known_reds.py" split "${reds[@]}" | tee -a "$sum"
-case " ${state_of[*]} " in
-  *=red*) note "nightly desktop: red"; return 1 ;;
-  *=none*) note "nightly desktop: no result for some steps"; return 2 ;;
-esac
-mkdir -p "$bh/run/nightly" && printf '%s\t%s\n' "$sha" "$(date +%FT%T)" >>"$bh/run/nightly/desktop-green.tsv"
-note "nightly desktop: green"
-return 0
+verdict
+}
+
+# the run's verdict, kept in desktop-runs.tsv (<date>T<time>, sha, green|red|none): two runs in a
+# row with no result (battery, past --until) is a red of its own, owner gate-nightly (review-gates
+# m_29770): the rows must not silently never run. The summary names the last green run.
+verdict() {
+  local v=green hist="$bh/run/nightly/desktop-runs.tsv" prev last
+  case " ${state_of[*]} " in *=red*) v=red ;; *=none*) v=none ;; esac
+  mkdir -p "$bh/run/nightly"
+  prev="$(tail -1 "$hist" 2>/dev/null | cut -f3)"
+  last="$(awk -F'\t' '$3 == "green" { l = $1 " on " $2 } END { print l }' "$hist" 2>/dev/null)"
+  printf '%s\t%s\t%s\n' "$(date +%FT%T)" "$sha" "$v" >>"$hist"
+  note "last green run: ${last:-none yet}"
+  case $v in
+    red) note "nightly desktop: red"; return 1 ;;
+    none)
+      if [ "$prev" = none ]; then
+        record desktop-runs red "a second run in a row with no result: the end-to-end hasn't run since ${last:-ever} (owner gate-nightly)"
+        note "nightly desktop: red (no result twice)"; return 1
+      fi
+      note "nightly desktop: no result for some steps"; return 2 ;;
+  esac
+  printf '%s\t%s\n' "$sha" "$(date +%FT%T)" >>"$bh/run/nightly/desktop-green.tsv"
+  note "nightly desktop: green"
+  return 0
 }
 nightly_desktop "$@"; exit $?
