@@ -36,6 +36,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import e2e  # noqa: E402
 from e2e import Env, check  # noqa: E402
+import wait  # noqa: E402
 
 
 def sb(E, agent, *args):
@@ -148,8 +149,8 @@ def main():
         c.wait_idle("main")
         due = lambda: [l for l in open(hub_log) if "the REPL of main read" in l]  # noqa: E731
         c.wait(due, 30, "main due for its recycle")
-        time.sleep(3)  # six ticks: switch_idle_repls would have asked by now
-        check(recycles("main") == [], "main is not recycled while he talks to it: %r" % recycles("main"))
+        # six ticks: switch_idle_repls would have asked by now
+        wait.holds(lambda: recycles("main") == [], 3, "main is not recycled while he talks to it")
         ok = True
         print("repl recycle: ok (rss %d -> %d KB)" % (rss0, rss1))
     finally:
