@@ -97,11 +97,38 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     case 'hair':
       add(style.cap(0.228, 0.4), mat(o.hair), head, 0, 0.02, -0.02);
       break;
-    case 'headphones':
+    case 'headphones': {
+      // a headset (Gabriel: « cette barre orange est sensé etre un casque audio? »): a band that
+      // follows the head's curve over its hair from ear to ear, a cup in its hat colour on each
+      // ear over a dark cushion, and a small mic arm from the left cup to the mouth
       add(style.cap(0.226, 0.4), mat(o.hair), head, 0, 0.02, -0.02);
-      add(style.box(0.5, 0.05, 0.05), mat(WORLD.mat), head, 0, 0.26, 0);
-      for (const ex of [-0.24, 0.24]) add(style.ball(0.07), mat(WORLD.dark), head, ex, 0, 0);
+      const ink = mat(WORLD.dark);
+      const R = 0.262;
+      const SEGS = 7;
+      const SPAN = 1.3; // radians each side of the top: the band ends just above the cups
+      const step = (2 * SPAN) / SEGS;
+      for (let i = 0; i < SEGS; i++) {
+        const a = -SPAN + step * (i + 0.5);
+        const seg = add(style.box(R * step * 1.15, 0.034, 0.06, 0.012), ink, head, R * Math.sin(a), R * Math.cos(a), -0.01);
+        seg.rotation.z = -a;
+      }
+      for (const sx of [-1, 1]) {
+        add(style.box(0.03, 0.07, 0.035, 0.01), ink, head, sx * 0.258, 0.07, -0.01);
+        const cushion = add(style.cylinder(0.078, 0.03), ink, head, sx * 0.222, -0.01, -0.01);
+        cushion.rotation.z = Math.PI / 2;
+        const cup = add(style.cylinder(0.086, 0.055), mat(o.hatColor), head, sx * 0.258, -0.01, -0.01);
+        cup.rotation.z = Math.PI / 2;
+        const plate = add(style.cylinder(0.05, 0.012), ink, head, sx * 0.288, -0.01, -0.01);
+        plate.rotation.z = Math.PI / 2;
+      }
+      const from = new Vector3(-0.27, -0.05, 0.03);
+      const to = new Vector3(-0.12, -0.1, 0.19);
+      const dir = to.clone().sub(from);
+      const arm = add(style.box(0.018, 0.018, dir.length(), 0.006), ink, head, (from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
+      arm.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), dir.normalize());
+      add(style.ball(0.026), ink, head, to.x, to.y, to.z);
       break;
+    }
     case 'main': {
       // main: the ink hoodie, its :* on the chest in the neon's yellow, a gold chain
       add(style.cap(0.228, 0.4), mat(o.hair), head, 0, 0.02, -0.02);
