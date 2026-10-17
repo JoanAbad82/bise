@@ -66,7 +66,7 @@ def to_paste(t, name):
     t.wait(w("settings.first_which_provider"))
     t.press_until("Down", re.compile(r"› \d+ · %s " % re.escape(name)), sel=re.compile(r"› (\d+) · "))
     t.keys("Enter")
-    t.wait(w("settings.onb_model_title"))
+    t.wait(w("settings.first_which_model"))
     t.keys("Enter")
     return t.wait(w("settings.first_paste_key", provider=name))
 
