@@ -171,9 +171,12 @@ fn first_run(e: Env) -> Onb {
     o
 }
 
-/// Each frame: the sign-in, the check and the sign out answer.
+/// Each frame: the sign-in, the check and the sign out answer. Their
+/// threads get 30 s of wall time: under the gate's load (1469 tests, load
+/// 20+) a 2 s budget ran out before the plan check's thread ran (r38).
 fn settle(o: &mut Onb, e: Env) {
-    for _ in 0..400 {
+    let t0 = std::time::Instant::now();
+    while t0.elapsed() < std::time::Duration::from_secs(30) {
         o.tick(e);
         if !matches!(o.sub, Sub::Checking(..) | Sub::SignIn(..)) && o.signing_out.is_none() {
             return;

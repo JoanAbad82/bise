@@ -4,6 +4,22 @@
 
 use super::*;
 
+/// A broker started again on the paths of one just shut down. Its lock's
+/// flock can outlive the shutdown for a moment: a child another test forks
+/// (a spawn with `pre_exec`, plutil, sips) holds a copy of every open fd
+/// between its fork and its exec, the lock's too, so a start then is
+/// `Running` (release-37: 1 red, 40 tests at load 20+). Waits for the lock
+/// to be free, 10 s at most.
+fn start_again(o: Opts) -> Handle {
+    let t0 = Instant::now();
+    loop {
+        match broker::start(o.clone()) {
+            Err(broker::StartError::Running) if t0.elapsed() < Duration::from_secs(10) => std::thread::sleep(Duration::from_millis(20)),
+            r => return r.unwrap(),
+        }
+    }
+}
+
 /// The broker outlives its version dir (cu-helper, 14 Oct): an update
 /// prunes the version it started from, the helper app inside it with it.
 /// Before, it kept opening the gone path (`apps`: no_helper "doesn't
@@ -31,7 +47,7 @@ fn a_pruned_helper_path_is_found_again() {
     h.shutdown();
     // nothing anywhere: said so, not "doesn't answer"
     let o = Opts { launch_helper: true, helper_app: Some(pruned), find_helper: |_| None, ..opts(&p) };
-    let h = broker::start(o).unwrap();
+    let h = start_again(o);
     let mut a = agent(&p, "bt-bot", &d.join("t"));
     assert!(code(&mut a, "apps", json!({}))["message"].as_str().unwrap().contains("isn't installed"));
     assert_eq!(ok(&mut a, "status", json!({}))["apps"]["helper"], "absent");

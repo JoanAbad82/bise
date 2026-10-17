@@ -593,11 +593,21 @@ pub(crate) fn uninstall(args: &[String]) -> i32 {
 mod tests {
     use super::*;
 
-    /// Tests that fork children (codesign, cp) and the test that checks a
-    /// lease's flock is gone once dropped take turns: a child between its
-    /// fork and its exec holds a copy of every open fd, the lease's too, so
-    /// `in_use` would still see it held (cli-sign: 1 red in 10 runs).
-    static FORKS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// `to_prune` once a dropped lease is seen released, 10 s at most. A
+    /// child any test forks (codesign, cp, git...) holds a copy of every
+    /// open fd between its fork and its exec, the lease's too, so `in_use`
+    /// can still see it held for a moment (cli-sign, release-40: 2 reds;
+    /// a lock around this file's own forks was not enough).
+    fn pruned_once_released(all: &[release::Installed], current: &Path, want: usize) -> Vec<PathBuf> {
+        let t0 = std::time::Instant::now();
+        loop {
+            let gone = to_prune(all, 2, Some(current), "", &release::in_use);
+            if gone.len() == want || t0.elapsed() > Duration::from_secs(10) {
+                return gone;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
 
     #[test]
     fn rosetta_gets_the_native_build() {
@@ -661,7 +671,6 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn a_placed_bundle_keeps_its_signature() {
-        let _turn = FORKS.lock().unwrap_or_else(|e| e.into_inner());
         let t = std::env::temp_dir().join(format!("bise-place-sig-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&t);
         let versions = t.join("prefix/versions");
@@ -763,7 +772,6 @@ mod tests {
     /// among the newest, current or run from (architect m_21930: ~100 MB each).
     #[test]
     fn a_legacy_roots_second_dir_is_listed_and_pruned_like_the_others() {
-        let _turn = FORKS.lock().unwrap_or_else(|e| e.into_inner());
         let t = std::env::temp_dir().join(format!("bise-prune-legacy-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&t);
         let versions = t.join("prefix/versions");
@@ -803,7 +811,7 @@ mod tests {
         let gone = to_prune(&all, 2, Some(&versions.join("v4")), "", &release::in_use);
         assert_eq!(gone, [versions.join("root")]);
         drop(lease);
-        let gone = to_prune(&all, 2, Some(&versions.join("v4")), "", &release::in_use);
+        let gone = pruned_once_released(&all, &versions.join("v4"), 2);
         assert_eq!(gone.len(), 2, "{gone:?}");
         let _ = std::fs::remove_dir_all(&t);
     }
