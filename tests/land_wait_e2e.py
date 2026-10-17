@@ -115,6 +115,7 @@ def main():
         check(rc == 0 and secs < 5, "sb list during land B: rc %d in %.1f s: %s" % (rc, secs, o))
         wait.until(lambda: main_sha() == tip, SLEEP + 120, "B: main moves to %s with its sb gone" % tip)
         c.wait_line("wk", UNHEARD, 60)
+        time.sleep(3)  # a second message would be here by now
         heard = [l for l in c.lines("wk") if UNHEARD in l]
         check(len(heard) == 1, "B: wk hears its land once from bise: %s" % json.dumps(heard))
         print("B ok: main moved with its sb gone, wk told once, the second land refused")
