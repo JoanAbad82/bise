@@ -29,6 +29,23 @@ export default tseslint.config(
     languageOptions: { globals: globals.browser },
   },
   {
+    // a feature test (fast-try p5, architect m_29407) reads only what a screen shows and the
+    // commands sent: it imports the helpers' inputs and runner, never the app's internals; no
+    // snapshot, no fake, no mock
+    files: ['tests/feature/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { regex: '^(?!vitest$|\\./inputs$|\\./run$)', message: 'a feature test imports vitest, ./inputs and ./run only (tests/feature/run.ts)' },
+        ],
+      }],
+      'no-restricted-syntax': ['error',
+        { selector: "CallExpression[callee.property.name=/^(toMatchSnapshot|toMatchInlineSnapshot|toMatchFileSnapshot)$/]", message: 'no snapshot in a feature test: say what the screen shows' },
+        { selector: "MemberExpression[object.name='vi']", message: 'no fake or mock in a feature test: give typed inputs (./inputs)' },
+      ],
+    },
+  },
+  {
     files: ['**/*.mjs', '**/*.js'],
     languageOptions: { globals: globals.node },
   },

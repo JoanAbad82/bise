@@ -4,13 +4,13 @@
 // waiting', the inbox screen and the block above the composer all read this list. Owner: inbox-screen.
 import { useEffect, useMemo, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
-import { actedKeys, useActed, useProjects } from '@/store';
-import { blockList, notifyCard, useNotifyAsks } from './Block';
+import { useActed, useProjects } from '@/store';
+import { inboxCards, notifyCard, useNotifyAsks } from './Block';
 
 export function useWaitingList(): readonly Card[] {
   const rows = useProjects();
   const acted = useActed();
-  const real = useMemo(() => blockList(rows, actedKeys(acted)), [rows, acted]);
+  const real = useMemo(() => inboxCards(rows, acted), [rows, acted]);
   const asks = useNotifyAsks(real.length);
   // the Dock's badge and the window title (main/counts.ts) count it too
   useEffect(() => {

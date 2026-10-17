@@ -13,7 +13,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
 import { Dot, Kbd, Row } from '@/ds';
-import { actedKeys, useActed, useProjects, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
+import { actedKeys, useActed, useProjects, useStore, useVoiceAnswer, type Acted, type AnswerAt } from '@/store';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
 import { common } from '@/proto/words_common.gen';
@@ -204,6 +204,15 @@ export function blockList(rows: readonly ProjectRow[], gone: ReadonlySet<string>
 }
 
 /**
+ * What the inbox lists: every project's open items, the ones he answered or closed in this window
+ * left out (the store's acted set). Pure. The block, the waiting count and the feature tests
+ * (tests/feature) read this one function.
+ */
+export function inboxCards(rows: readonly ProjectRow[], acted: readonly Acted[]): Card[] {
+  return blockList(rows, actedKeys(acted));
+}
+
+/**
  * Folded, the block is its head and this many item lines, then a '+ N more' line: the TUI's box
  * (card_draw.rs STRIP_ROWS; his inbox-stack ask, back from H10's one line); fewer in a short window
  * (fitRows, designer m_26234).
@@ -348,7 +357,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   // the block to every project's items until he folds it (ghost-badge: '/inbox' beside an artifact
   // did nothing while another project's item waited)
   const [wide, setWide] = useState(false);
-  const all = useMemo(() => blockList(rows, gone), [rows, gone]);
+  const all = useMemo(() => inboxCards(rows, acted), [rows, acted]);
   const real = useMemo(() => (only === undefined || wide ? all : all.filter(only)), [all, only, wide]);
   const notify = useNotifyRow(real.length);
   const home = rows.find((r) => r.home)?.project ?? '';
