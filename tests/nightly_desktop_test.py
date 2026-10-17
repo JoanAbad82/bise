@@ -82,7 +82,7 @@ def main():
     t = os.path.realpath(tempfile.mkdtemp(prefix="nightly-desktop-test-", dir=os.environ.get("TMPDIR")))
     try:
         repo, home = os.path.join(t, "harness"), os.path.join(t, "home")
-        for d in (("apps", "desktop", "node_modules"), ("scripts",), ("tests",)):
+        for d in (("apps", "desktop", "node_modules", "@playwright", "test"), ("scripts",), ("tests",)):
             os.makedirs(os.path.join(repo, *d))
         shutil.copy(os.path.join(ROOT, "scripts", "nightly_desktop.sh"), os.path.join(repo, "scripts"))
         for f in ("known_reds.py", "known_reds.txt"):

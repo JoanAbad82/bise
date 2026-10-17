@@ -102,6 +102,9 @@ as_he_does() {
   else record "$mode" green; fi
 }
 
+# apps/desktop's node_modules, once (a fresh nightly tree has none)
+deps() { [ -d "$here/apps/desktop/node_modules/@playwright/test" ] || ( cd "$here/apps/desktop" && "$pnpm" install --frozen-lockfile --prefer-offline ); }
+
 app="" cdir="" made=""
 for s in "${steps[@]}"; do
   if late; then record "$s" none "past $until"; continue; fi
@@ -117,12 +120,12 @@ for s in "${steps[@]}"; do
       else reds+=("desktop/candidate"); record candidate red "desktop-try.sh --candidate exit $rc, $out/candidate.log"; app=""; fi ;;
     quick|full)
       if [ -z "$app" ]; then record "$s" none "no candidate"; continue; fi
+      # the driver's @playwright/test (cand.sh's PW_FROM: this tree's apps/desktop)
+      if ! deps >"$out/deps.log" 2>&1; then reds+=("desktop/deps"); record "$s" red "pnpm install failed, $out/deps.log"; continue; fi
       if [ $s = quick ]; then as_he_does quick AS_HE_DOES_ONLY=quick AS_HE_DOES_FIRSTRUN=1 AS_HE_DOES_FAKE_VOICE=1
       else as_he_does full; fi ;;
     land)
-      ( cd "$here/apps/desktop" \
-          && { [ -d node_modules ] || "$pnpm" install --frozen-lockfile --prefer-offline; } \
-          && "$pnpm" build && "$pnpm" test:land ) >"$out/land.log" 2>&1; rc=$?
+      { deps && ( cd "$here/apps/desktop" && "$pnpm" build && "$pnpm" test:land ); } >"$out/land.log" 2>&1; rc=$?
       if [ $rc = 0 ]; then record land green
       else reds+=("desktop/test:land"); record land red "exit $rc; $(grep -E '^(known reds|NEW reds)' "$out/land.log" | tr '\n' ' ')$out/land.log"; fi ;;
     dmg)
