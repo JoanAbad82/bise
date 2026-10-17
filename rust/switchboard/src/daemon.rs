@@ -50,6 +50,7 @@ mod dev_servers;
 mod dispatch;
 mod inbox;
 mod keys;
+mod land;
 use keys::hash_keys;
 mod loop_watch;
 mod merged;
@@ -750,47 +751,6 @@ impl Shell {
     /// The client snapshot with each agent's model and effort: its full
     /// id, the effort ("" when the model takes none), and the words it
     /// takes (the `/reasoning` list).
-    /// `sb land` (dev-flow §5) in a thread: in line on the queue (the
-    /// views say who waits), git and the check never on the hub's loop;
-    /// the answer to the agent, and a line in main's feed.
-    fn land(&mut self, token: Token, mut job: crate::land::Job) {
-        let Some(mut stream) = self.replies.remove(&token) else {
-            return;
-        };
-        (job.flow, job.checks) = (crate::flow::FlowConfig::load(&self.opts.paths), self.opts.paths.worktrees.clone());
-        let (queue, tx) = (self.lands.clone(), self.tx.clone());
-        std::thread::spawn(move || {
-            let txj = tx.clone();
-            let mut onto = features::onto_now(&tx, &job.agent, job.onto.clone());
-            let res = crate::land::run_onto(&job, &queue, &mut || drop(txj.send(Msg::Land { line: None })), &mut onto);
-            let mut landed: Option<Feed> = None;
-            let (body, line) = match res {
-                Ok(o) => {
-                    landed = art::landed_rec(&job.shared, &job.agent, &o.target, &o.sha, o.commits);
-                    let mut text = crate::flow::land_line(&job.agent, o.commits, &o.target, &o.sha, o.pushed);
-                    if let Some(e) = &o.push_error {
-                        text = format!("{} ({})", text, e);
-                    }
-                    let note = crate::land::left_out_note(&o.left_out);
-                    if !note.is_empty() {
-                        text = format!("{}. {}", text, note);
-                    }
-                    (json!({"ok": true, "text": text.clone()}), Feed::info(text))
-                }
-                Err(e) => (
-                    json!({"ok": false, "error": e}),
-                    Feed::warn(format!("@{} can't land: {}", job.agent, e)),
-                ),
-            };
-            write_json(&mut stream, &body);
-            let _ = tx.send(Msg::Land { line: Some(line) });
-            // the ± door of the land, right after its line (docs/artifacts.md)
-            if let Some(f) = landed {
-                let _ = tx.send(Msg::Land { line: Some(f) });
-            }
-        });
-    }
-
     /// The hub's snapshot (core_snapshot.rs), the shell's parts each from its one writer.
     fn snapshot(&mut self) -> crate::snapshot::Snapshot {
         // issue #4: each agent's model, for sb list / sb tasks too

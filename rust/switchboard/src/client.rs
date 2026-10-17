@@ -258,6 +258,41 @@ const STOP_WAIT: Duration = Duration::from_secs(30);
 /// The start of `request`'s error when the hub did not answer in time.
 pub const NO_ANSWER: &str = "the hub did not answer (busy) in";
 
+/// How long `sb land` waits for its land (land-wait): a land waits its
+/// turn, then its check (`land_check::MAX`), off the hub's loop; the
+/// agent's bash puts a long one in the background and wakes on its end.
+pub const LAND_WAIT: Duration = Duration::from_secs(2 * 3600);
+
+/// How long `sb <cmd>` waits for its answer (`timeout_s`: the request's
+/// own wait, `sb ask`, `sb wait`), and whether it is a read the client
+/// may retry. hub-lag: a request that changes something is in the hub's
+/// queue once written: it waits longer rather than give up on a busy
+/// hub and have it retried (a second message, a second task).
+pub fn wait_for(cmd: &str, timeout_s: u64) -> (Duration, bool) {
+    let idempotent = matches!(cmd, "list" | "tasks" | "history" | "show" | "inspect" | "wait");
+    if cmd == "land" {
+        return (LAND_WAIT, false);
+    }
+    let slack = if idempotent { 30 } else { 180 };
+    (Duration::from_secs(timeout_s + slack), idempotent)
+}
+
+/// What `sb <cmd>` prints for `request`'s error `e`: a land that is
+/// still on its way says its result comes as bise's message
+/// (daemon/land.rs), a hub gone mid-land what to check.
+pub fn said(cmd: &str, e: &str) -> String {
+    if cmd != "land" {
+        return e.to_string();
+    }
+    if e.starts_with(NO_ANSWER) {
+        return format!("still landing after {} h: bise sends you its result when it ends", LAND_WAIT.as_secs() / 3600);
+    }
+    if e.starts_with("unreadable answer") || e.starts_with("no answer from the hub") {
+        return "the hub stopped during your land: main moves only after a green check. see git log main, then sb land again if your commits are not there".into();
+    }
+    e.to_string()
+}
+
 /// One request, one JSON answer (the `sb` CLI).
 pub fn request(socket: &Path, req: &Value, timeout: Duration) -> Result<Value, String> {
     let mut s = UnixStream::connect(socket)
@@ -315,6 +350,25 @@ pub fn request_retry(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// land-wait: `sb land` waits for its land (2 h), never 180 s; a read
+    /// 30 s more than its own wait, a change 180 s.
+    #[test]
+    fn a_land_waits_for_its_land() {
+        assert_eq!(wait_for("land", 0), (LAND_WAIT, false));
+        assert_eq!(wait_for("list", 0), (Duration::from_secs(30), true));
+        assert_eq!(wait_for("wait", 60), (Duration::from_secs(90), true));
+        assert_eq!(wait_for("send", 0), (Duration::from_secs(180), false));
+    }
+
+    #[test]
+    fn a_land_that_ran_long_or_lost_its_hub_says_what_comes() {
+        let late = format!("{} 7200 s", NO_ANSWER);
+        assert_eq!(said("land", &late), "still landing after 2 h: bise sends you its result when it ends");
+        assert_eq!(said("send", &late), late);
+        assert!(said("land", "unreadable answer: EOF while parsing ()").starts_with("the hub stopped during your land: "));
+        assert_eq!(said("land", "hub injoignable (x) : no"), "hub injoignable (x) : no");
+    }
 
     /// The user's fresh install: a raw `Error: Custom { .. }` line in
     /// hub.err becomes one human line with the cause and the log.

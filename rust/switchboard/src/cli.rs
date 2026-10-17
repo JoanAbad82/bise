@@ -976,22 +976,9 @@ pub fn main(args: &[String]) -> i32 {
     req["op"] = json!("agent");
     req["from"] = json!(from);
     let cmd = if req["cmd"] == "withdraw" { "withdraw".to_string() } else { args[0].clone() };
-    let idempotent = matches!(
-        cmd.as_str(),
-        "list" | "tasks" | "history" | "show" | "inspect" | "wait"
-    );
-    // hub-lag: a request that changes something (send, report, spawn...)
-    // is in the hub's queue once written: wait longer for its answer
-    // rather than give up on a busy hub and have it retried (a second
-    // message, a second task)
-    let slack = if idempotent { 30 } else { 180 };
-    let timeout = req.get("timeout_s").and_then(|t| t.as_u64()).unwrap_or(0) + slack;
-    match crate::client::request_retry(
-        std::path::Path::new(&socket),
-        &req,
-        Duration::from_secs(timeout),
-        idempotent,
-    ) {
+    let own = req.get("timeout_s").and_then(|t| t.as_u64()).unwrap_or(0);
+    let (timeout, idempotent) = crate::client::wait_for(&cmd, own);
+    match crate::client::request_retry(std::path::Path::new(&socket), &req, timeout, idempotent) {
         Ok(v) => {
             let (ok, text) = render(&cmd, &v);
             if ok {
@@ -1003,7 +990,7 @@ pub fn main(args: &[String]) -> i32 {
             }
         }
         Err(e) => {
-            eprintln!("sb : {}", e);
+            eprintln!("sb : {}", crate::client::said(&cmd, &e));
             1
         }
     }

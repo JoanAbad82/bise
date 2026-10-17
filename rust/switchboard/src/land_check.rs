@@ -18,9 +18,12 @@
 //!
 //! A red check refuses the land with the step's name, its log and its
 //! error lines ([`refusal`], pure, in words for each [`Via`]); nothing
-//! moved.
+//! moved. A check that runs past [`MAX`] (it holds the queue's turn) is
+//! stopped, its process group with it, and refuses the land the same
+//! way ([`ran_past`], land-wait).
 
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 /// How a land moves its target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,21 +69,82 @@ pub fn in_check_tree(shared: &Path, root: &Path, base: &str, head: &str, via: Vi
 /// Run `check <base> <head>` in `dir` (a checkout at `head`). Err: the
 /// refusal, in [`refusal`]'s words for `via`.
 pub fn run(dir: &Path, check: &str, base: &str, head: &str, via: Via) -> Result<(), String> {
-    let out = std::process::Command::new("/bin/sh")
+    run_for(dir, check, base, head, via, MAX)
+}
+
+/// How long a land check may run (land-wait): it holds its target's land
+/// queue turn, so a check that hangs would hold every land behind it.
+/// Awake time ([`Instant`] stops while the Mac sleeps).
+pub const MAX: Duration = Duration::from_secs(40 * 60);
+
+/// [`run`], stopped at `max`: its process group gets TERM, then KILL 5 s
+/// later, and the land is refused ([`ran_past`]); nothing moved.
+pub fn run_for(dir: &Path, check: &str, base: &str, head: &str, via: Via, max: Duration) -> Result<(), String> {
+    use std::os::unix::process::CommandExt;
+    use std::process::Stdio;
+    let mut child = std::process::Command::new("/bin/sh")
         .arg("-c")
         .arg(format!("{} \"$@\"", check))
         .arg("land-check")
         .arg(base)
         .arg(head)
         .current_dir(dir)
-        .stdin(std::process::Stdio::null())
-        .output()
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .process_group(0)
+        .spawn()
         .map_err(|e| format!("the land check `{}` could not start: {}", check, e))?;
-    if out.status.success() {
+    let read = |r: Option<Box<dyn std::io::Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut b = Vec::new();
+            if let Some(mut r) = r {
+                let _ = r.read_to_end(&mut b);
+            }
+            b
+        })
+    };
+    let out = read(child.stdout.take().map(|s| Box::new(s) as Box<dyn std::io::Read + Send>));
+    let err = read(child.stderr.take().map(|s| Box::new(s) as Box<dyn std::io::Read + Send>));
+    let t0 = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(s)) => break Some(s),
+            Ok(None) if t0.elapsed() < max => std::thread::sleep(Duration::from_millis(200)),
+            _ => break None,
+        }
+    };
+    let Some(status) = status else {
+        stop_group(&mut child);
+        return Err(ran_past(check, max, via));
+    };
+    if status.success() {
         return Ok(());
     }
-    let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    let (out, err) = (out.join().unwrap_or_default(), err.join().unwrap_or_default());
+    let text = format!("{}{}", String::from_utf8_lossy(&out), String::from_utf8_lossy(&err));
     Err(refusal(check, &text, via))
+}
+
+/// TERM to the check's process group (gate.sh and its cargo, its
+/// tests), KILL to what is left 5 s later, then reap the shell.
+fn stop_group(child: &mut std::process::Child) {
+    let pg = child.id() as i32;
+    // SAFETY: signals to the group we made (process_group(0): its id is the child's pid)
+    unsafe { libc::kill(-pg, libc::SIGTERM) };
+    let t0 = Instant::now();
+    while t0.elapsed() < Duration::from_secs(5) && matches!(child.try_wait(), Ok(None)) {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    // SAFETY: as above
+    unsafe { libc::kill(-pg, libc::SIGKILL) };
+    let _ = child.wait();
+}
+
+/// The refusal of a check stopped at `max`, in [`words`] for `via`.
+pub fn ran_past(check: &str, max: Duration, via: Via) -> String {
+    let (_, then) = words(via);
+    format!("the land check `{}` ran past {} min (its bound): stopped. {}", check, max.as_secs() / 60, then)
 }
 
 /// What is red, and what to do now, for each way of landing.
@@ -203,6 +267,25 @@ mod tests {
     fn no_gate_words_the_tail_and_the_command() {
         let r = refusal("make check", "building\u{a}boom\u{a}", Via::Worktree);
         assert_eq!(r, "the land check `make check` is red on main + your branch: building\u{a}boom. your branch is rebased on main: fix it, then sb land again");
+    }
+
+    /// land-wait: a check past its bound is stopped, its children too,
+    /// and refuses the land in the words of its way; a green one passes.
+    #[test]
+    fn a_check_past_its_bound_is_stopped_and_refuses() {
+        let dir = std::env::temp_dir();
+        let t0 = Instant::now();
+        let r = run_for(&dir, "sleep 30 & sleep 30; true", "b", "h", Via::Worktree, Duration::from_millis(400));
+        assert!(t0.elapsed() < Duration::from_secs(10), "{:?}", t0.elapsed());
+        assert_eq!(
+            r.unwrap_err(),
+            "the land check `sleep 30 & sleep 30; true` ran past 0 min (its bound): stopped. your branch is rebased on main: fix it, then sb land again"
+        );
+        // the check gets `<base> <head>` as its args
+        let args = "f() { test \"$1\" = b && test \"$2\" = h; }; f";
+        assert!(run_for(&dir, args, "b", "h", Via::Here, Duration::from_secs(10)).is_ok());
+        let red = run_for(&dir, "echo boom; false", "b", "h", Via::Worktree, Duration::from_secs(10)).unwrap_err();
+        assert!(red.contains("boom"), "{}", red);
     }
 
     #[test]

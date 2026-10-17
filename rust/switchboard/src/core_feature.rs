@@ -9,6 +9,26 @@
 
 use super::*;
 
+/// What a feature step did (dev-flow §5.1), for the hub: a card to open
+/// or close, agents to archive, a line for main's feed.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FeatureDone {
+    pub name: String,
+    /// (kind, text): open this item (place `feature:<name>`), its others closed first.
+    pub open: Option<(String, String)>,
+    /// Close the feature's open items (with this result).
+    pub close: Option<String>,
+    pub archive: Vec<String>,
+    /// `sb feature retire`: (branch's new name, trunk); sb-core moves its agents to the trunk.
+    pub retire: Option<(String, String)>,
+    /// Told once the hub ran this step (the retire's thread waits for it).
+    pub ack: Option<feature::Ack>,
+    /// a record for main's feed (`info`, `warn`).
+    pub line: Option<Feed>,
+    /// His answer didn't go through: its open items open again with this line on them.
+    pub refused: Option<String>,
+}
+
 /// Where `sb land` puts a worktree agent's commits: its feature's branch,
 /// or None (the trunk). The land job takes it at the request and again
 /// once in line on a feature (a retire may have ended the feature

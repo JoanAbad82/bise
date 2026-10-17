@@ -3,6 +3,9 @@
 //! and the lid said from it (`landing`, `waits to land · 2nd`).
 //! Moved out of land.rs as is (feature-retire: land.rs stays under 1,000
 //! lines); `land` re-exports [`Queue`] and [`Turn`].
+//! land-wait: one land per place at a time ([`Queue::claim`], from its
+//! request to its end): a second is refused at once ([`busy`]), never a
+//! second check of the same commit in line.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Condvar, Mutex};
@@ -12,6 +15,50 @@ struct Line {
     /// (ticket, target ref, place id), the first one landing.
     waiting: Vec<(u64, String, String)>,
     next: u64,
+    /// The lands started and not ended, by [`claim_key`], since when (ms).
+    claims: BTreeMap<String, u64>,
+}
+
+/// A land started, from its request to its end; dropping it ends it.
+pub struct Claim {
+    q: Queue,
+    key: String,
+}
+
+impl Drop for Claim {
+    fn drop(&mut self) {
+        let (m, _) = &*self.q.inner;
+        m.lock().unwrap_or_else(|e| e.into_inner()).claims.remove(&self.key);
+    }
+}
+
+/// Whose land a land is: a worktree's branch is its place's (two lands
+/// of it land the same commits), a `--here` its agent's in its place
+/// (two agents of the shared folder land their own files at once).
+pub fn claim_key(place: &str, agent: &str, here: bool) -> String {
+    if here {
+        format!("{} {}", place, agent)
+    } else {
+        place.to_string()
+    }
+}
+
+/// Since when the land of `key` runs, if one does (land-wait: an agent
+/// whose sb gave up ran it again, a second check of the same commit).
+pub fn in_line(claims: &BTreeMap<String, u64>, key: &str) -> Option<u64> {
+    claims.get(key).copied()
+}
+
+/// The refusal of a second land of a place, its first started at
+/// `since_ms` (architect m_29755: the words say what an agent runs it
+/// again for, its commits made meanwhile).
+pub fn busy(since_ms: u64, now_ms: u64) -> String {
+    let s = now_ms.saturating_sub(since_ms) / 1000;
+    let ago = if s < 60 { format!("{} s", s) } else { format!("{} min", s / 60) };
+    format!(
+        "a land of this place is in line or checking (since {}): its result comes to you. Changes you made after it started land with your next sb land, once it ends.",
+        ago
+    )
 }
 
 /// The land queue, shared by the daemon's land threads.
@@ -54,6 +101,18 @@ pub(crate) fn ordinal(n: usize) -> String {
 }
 
 impl Queue {
+    /// Start the land of `key` ([`claim_key`]) at `now_ms`; Err: since
+    /// when the one already started runs ([`busy`] says it).
+    pub fn claim(&self, key: &str, now_ms: u64) -> Result<Claim, u64> {
+        let (m, _) = &*self.inner;
+        let mut l = m.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(since) = in_line(&l.claims, key) {
+            return Err(since);
+        }
+        l.claims.insert(key.to_string(), now_ms);
+        Ok(Claim { q: self.clone(), key: key.to_string() })
+    }
+
     /// Join the line for `target` and wait until first. `joined`: called
     /// once in line (the views refresh: the lid says it waits).
     pub fn wait_turn(&self, target: &str, place: &str, joined: &mut dyn FnMut()) -> Turn {
@@ -107,4 +166,40 @@ pub fn lid(rank: u32) -> String {
 /// The lids of [`Queue::ranks`], by place id.
 pub fn lids(ranks: &BTreeMap<String, u32>) -> BTreeMap<String, String> {
     ranks.iter().map(|(p, n)| (p.clone(), lid(*n))).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// land-wait: a second land of a place waits for nothing; it is
+    /// refused while the first runs, and taken once it ended.
+    #[test]
+    fn one_land_of_a_place_at_a_time() {
+        let q = Queue::default();
+        let first = q.claim(&claim_key("wt:a", "a", false), 1_000).expect("first");
+        assert_eq!(q.claim(&claim_key("wt:a", "b", false), 5_000).err(), Some(1_000));
+        // another place, and two agents' --here in the shared folder
+        let _b = q.claim(&claim_key("wt:b", "b", false), 5_000).expect("another place");
+        let _x = q.claim(&claim_key("shared", "x", true), 5_000).expect("x");
+        let _y = q.claim(&claim_key("shared", "y", true), 5_000).expect("y");
+        assert!(q.claim(&claim_key("shared", "x", true), 6_000).is_err());
+        drop(first);
+        assert!(q.claim(&claim_key("wt:a", "a", false), 9_000).is_ok());
+    }
+
+    #[test]
+    fn in_line_reads_the_claims() {
+        let claims: BTreeMap<String, u64> = [("wt:a".to_string(), 42)].into();
+        assert_eq!(in_line(&claims, "wt:a"), Some(42));
+        assert_eq!(in_line(&claims, "wt:b"), None);
+    }
+
+    #[test]
+    fn the_refusal_says_since_when_and_what_lands_next() {
+        let r = busy(0, 12 * 60_000 + 5_000);
+        assert!(r.starts_with("a land of this place is in line or checking (since 12 min): its result comes to you."), "{}", r);
+        assert!(r.ends_with("land with your next sb land, once it ends."), "{}", r);
+        assert!(busy(0, 40_000).contains("(since 40 s)"));
+    }
 }

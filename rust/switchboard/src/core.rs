@@ -646,6 +646,8 @@ pub enum Input {
     /// expired-ux: the ChatGPT sign-in is back (the daemon reads
     /// auth.json): the `signin` item closes, its agents go on.
     SignedIn,
+    /// bise's message to `to` (sb-core's IHubMsg): a land whose sb was gone (daemon/land.rs).
+    HubMsg { to: String, text: String },
     /// update-card: the end of `1` on an update item (`Effect::Update`):
     /// Ok, the switch started; Err, why it failed (nothing changed).
     /// desktop S2, a project hub: bise's message (`xin` on hub.sock) from
@@ -972,25 +974,6 @@ pub enum Effect {
     },
 }
 
-/// What a feature step did (dev-flow §5.1), for the hub: a card to open
-/// or close, agents to archive, a line for main's feed.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct FeatureDone {
-    pub name: String,
-    /// (kind, text): open this item (place `feature:<name>`), its others closed first.
-    pub open: Option<(String, String)>,
-    /// Close the feature's open items (with this result).
-    pub close: Option<String>,
-    pub archive: Vec<String>,
-    /// `sb feature retire`: (branch's new name, trunk); sb-core moves its agents to the trunk.
-    pub retire: Option<(String, String)>,
-    /// Told once the hub ran this step (the retire's thread waits for it).
-    pub ack: Option<feature::Ack>,
-    /// a record for main's feed (`info`, `warn`).
-    pub line: Option<Feed>,
-    /// His answer didn't go through: its open items open again with this line on them.
-    pub refused: Option<String>,
-}
 
 /// The sb-core executable when the app root has none: `sb-core` next to
 /// the executable; a debug build (the tests) also tries the root of the
@@ -2112,6 +2095,7 @@ impl Hub {
             Input::Merged { card, place, number, res } => self.merged(&mut fx, env, card, &place, number, res),
             Input::Release(c) => self.release_in(&mut fx, env, c),
             Input::SignedIn => self.signed_in(&mut fx, env),
+            Input::HubMsg { to, text } => self.core(&mut fx, env, None, In::HubMsg(ci::HubMsg { to, text })),
             Input::Updated { card, version, res } => self.updated(&mut fx, env, card, &version, res),
             Input::XIn { token, hub, xid, kind, text, name, parts } => {
                 self.core(&mut fx, env, None, In::XIn(ci::XIn { token, hub, xid, kind, text, name, parts }))
@@ -2561,6 +2545,7 @@ mod doing_link;
 
 #[path = "core_feature.rs"]
 pub mod feature;
+pub use feature::FeatureDone;
 
 #[path = "merge.rs"]
 mod merge;
