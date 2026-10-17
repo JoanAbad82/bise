@@ -192,8 +192,12 @@ class Env:
         self.hub = subprocess.Popen([EXE, "sbd", "--workspace", self.ws], cwd=ROOT, env=self.env,
                                     stdin=subprocess.DEVNULL, stdout=err, stderr=err)
         sock = os.path.join(self.state, "hub.sock")
-        wait.until(lambda: os.path.exists(sock), 20, "the hub's socket %s" % sock, poll=0.05)
-        return Client(sock)
+        # a connect that works, never the file alone: the file is there
+        # before the hub listens (bind, then listen) and, at a restart,
+        # the last hub's file can still be there; a connect then was
+        # refused (proc_cleanup's second start under load, "[Errno 61]
+        # Connection refused"). wait.until polls through the refusal.
+        return wait.until(lambda: Client(sock), 20, "the hub listening on %s" % sock, poll=0.05)
 
     def stop_hub(self, keep_agents=False):
         stop_hub(os.path.join(self.state, "hub.sock"), keep_agents)

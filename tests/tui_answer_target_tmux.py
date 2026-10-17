@@ -109,6 +109,11 @@ def main():
         t.keys("Enter")
         t.wait(w("thread.gate_waits"), 60)
         t.wait("$ git push origin main --force")
+        # the approval in the inbox (row 1) before ctrl+1: the thread's
+        # line comes before the hub's cards under load, and a ctrl+1 on an
+        # inbox of one opened the question (release-40's red: "answering
+        # main · which size system…" where the approval was wanted)
+        t.wait(w("inbox.head") + " · " + w("common.waiting_for_you", n="2"), 60)
         t.typed(CTRL1)
         sc = t.wait("type why not, ⏎ says no")
         assert "↳ answering" not in sc, sc
