@@ -7,7 +7,7 @@ import type { Item } from '@/artifacts/model';
 import { glyphOf, leaves } from '@/artifacts/model';
 import type { Task } from '@/scheduled/model';
 import { howOften, nextWords } from '@/scheduled/model';
-import { shortAge } from '@/agents/model';
+import { shortAge, shownName } from '@/agents/model';
 import { alarms, pauseLine, waitLen } from '@/thread/wake';
 import type { Agent, Card, ComputerAgent, Place } from '@/proto';
 import { panel } from '@/proto/words_panel.gen';
@@ -31,6 +31,8 @@ export interface BarRow {
   readonly id?: string;
   /** an agent's row, a worktree's head, an open PR with no agent; none: the other sections' rows */
   readonly kind?: 'agent' | 'group' | 'orphan';
+  /** the project's main ('bise'), AGENTS' first row: out of 'AGENTS · N' */
+  readonly main?: true;
   readonly glyph: string;
   readonly tone: 'ink' | 'acc' | 'err' | 'dim' | 'mid';
   readonly name: string;
@@ -142,7 +144,8 @@ export function timeOf(a: Agent, now: number): string {
 function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined, alt: boolean, extras: AgentExtras, mark: Mark | undefined, group: string | undefined): BarRow {
   const s = signOf(x.a, now, extras.wakes?.get(`${x.project}/${x.a.name}`));
   const sign = barSign(s);
-  const numbered = alt && n !== undefined && n >= 1 && n <= 9;
+  // main is ⌥0 (keys.ts), the others ⌥1-⌥9
+  const numbered = alt && n !== undefined && n >= (x.a.main ? 0 : 1) && n <= 9;
   const cu = computerDot(extras.computer?.find((r) => r.project === x.project && r.agent === x.a.name));
   const wake = extras.wakes?.get(`${x.project}/${x.a.name}`);
   // its context used: in the column from 70 %, else in its sign's tip only (desktop-delight v2)
@@ -156,7 +159,7 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
     agent: x.a.name,
     glyph: numbered ? `⌥${String(n)}` : sign.g,
     tone: numbered ? 'dim' : sign.tone,
-    name: x.a.name,
+    name: shownName(x.a.name),
     sub: all ? x.projectName : roleWords(x.a.title !== '' ? x.a.title : x.a.purpose),
     end: '',
     endTone: 'dim',
@@ -166,6 +169,7 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
     tips: { glyph: pct === '' || loud ? signWords : `${signWords} · ${pctTip(x.a, pct)}`, time: timeTip(x.a, now), pct: pctTip(x.a, pct) },
     testId: `app.right.agent.${idOf(all, x.project, x.a.name)}`,
     waits: s.g === '?',
+    ...(x.a.main ? { main: true as const } : {}),
     ...(!numbered && sign.working ? { working: true } : {}),
     ...(cu === null ? {} : { cu }),
     ...(pct === '' ? {} : { ctx: Number.parseInt(pct, 10) }),
@@ -175,8 +179,9 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
 }
 
 /**
- * AGENTS (desktop-agents-bar §2-§4), the TUI panel's order (sb.rs blocks, designer m_23651): the
- * live agents but main that share no worktree, by their ⌥ number (the shared checkout's and the
+ * AGENTS (desktop-agents-bar §2-§4), the TUI panel's order (sb.rs blocks, designer m_23651): a
+ * project's main first, named 'bise' (not on bise's thread: it is that thread), then the
+ * live agents that share no worktree, by their ⌥ number (the shared checkout's and the
  * ones alone in theirs, each with its mark), then the open PRs with no live agent (no sign, the
  * branch text-3, its '↑'), then each worktree 2 or more live agents share: a 'ψ <branch>' head with
  * its PR's '↑ #418', its rows with no mark, in the order of their smallest number. A head waits on
@@ -184,6 +189,14 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
  * On bise's thread (`all`) the agents stay in start order, no worktrees. Pure.
  */
 export function agentRows(agents: readonly ProjAgent[], now: number, all: boolean, alt = false, extras: AgentExtras = {}): BarRow[] {
+  // a project's main first, always, as the TUI's panel (his ask, main m_28881): 'bise', ⌥0, no mark
+  const main = all ? undefined : agents.find((x) => x.a.main && !x.a.archived);
+  const head = main === undefined ? [] : [agentRow(main, now, all, 0, alt, extras, undefined, undefined)];
+  return [...head, ...taskRows(agents, now, all, alt, extras)];
+}
+
+/** AGENTS' rows but main's (agentRows). Pure. */
+function taskRows(agents: readonly ProjAgent[], now: number, all: boolean, alt: boolean, extras: AgentExtras): BarRow[] {
   const live = agents.filter((x) => !x.a.archived && !x.a.main);
   const num = (name: string) => extras.numbers?.get(name);
   const byNum = (a: ProjAgent, b: ProjAgent) => (num(a.a.name) ?? Number.MAX_SAFE_INTEGER) - (num(b.a.name) ?? Number.MAX_SAFE_INTEGER);

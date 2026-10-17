@@ -417,7 +417,8 @@ function useAgentTip(project: string, rows: readonly BarRow[], route: ReturnType
   const tour = useTour(project);
   const liveDemo = tour.snap.members.filter((m) => !m.archived);
   const tipAt = tour.tip === 'start' ? liveDemo[0]?.name : tour.tip === 'steer' ? liveDemo.at(-1)?.name : undefined;
-  const first = rows.find((r) => r.agent !== undefined)?.agent;
+  // the first task's row, never main's (first in AGENTS too)
+  const first = rows.find((r) => r.agent !== undefined && r.main !== true)?.agent;
   const hint = useHint('first_agent', first !== undefined && tour.tip === null);
   const inAgent = route.screen === 'thread' && route.project === project && route.agent !== MAIN;
   useEffect(() => {
@@ -490,7 +491,8 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   const [watchOpen, setWatchOpen] = useState<string | null>(null);
   const working = agents.filter((x) => !x.a.archived && !x.a.main && x.a.status === 'working').length;
   const waits = live.some((r) => r.waits);
-  const agentCount = live.filter((r) => r.kind === undefined || r.kind === 'agent').length;
+  // 'AGENTS · N' counts the tasks: main's row is not one of them
+  const agentCount = live.filter((r) => (r.kind === undefined || r.kind === 'agent') && r.main !== true).length;
   const openAgent = (p: string, agent: string) => {
     router.go({ screen: 'thread', project: p, agent });
   };

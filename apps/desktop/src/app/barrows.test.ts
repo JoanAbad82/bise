@@ -10,10 +10,27 @@ const ag = (name: string, over: Partial<Agent> = {}): ProjAgent => ({
 });
 
 describe('the right bar rows (designer desktop-right-bar v5)', () => {
-  it('AGENTS: live ones but main, start order, the waiting one says waits in the accent', () => {
-    const rows = agentRows([ag('main', { main: true }), ag('perf', { status: 'working' }), ag('search', { waits: 1 }), ag('old', { archived: true })], NOW, false);
-    expect(rows.map((r) => r.name)).toEqual(['perf', 'search']);
-    expect(rows[1]).toMatchObject({ glyph: '?', tone: 'acc', end: '', waits: true, sub: "search's job" });
+  it('AGENTS: main first as bise, then the live ones in start order, the waiting one says waits in the accent', () => {
+    const rows = agentRows([ag('perf', { status: 'working' }), ag('main', { main: true }), ag('search', { waits: 1 }), ag('old', { archived: true })], NOW, false);
+    expect(rows.map((r) => r.name)).toEqual(['bise', 'perf', 'search']);
+    expect(rows[0]).toMatchObject({ kind: 'agent', main: true, agent: 'main', glyph: '○', sub: "main's job", testId: 'app.right.agent.main' });
+    expect(rows[1]?.main).toBeUndefined();
+    expect(rows[2]).toMatchObject({ glyph: '?', tone: 'acc', end: '', waits: true, sub: "search's job" });
+  });
+  it("main stays first past the ⌥ numbers and the worktrees, ⌥0 when ⌥ is held, its title as its line, the breeze while it works", () => {
+    const nums = new Map([['main', 0], ['docs', 1], ['perf', 2]]);
+    const list = [ag('perf'), ag('docs'), ag('main', { main: true, status: 'working', title: 'routing his asks' })];
+    const rows = agentRows(list, NOW, false, false, { numbers: nums });
+    expect(rows.map((r) => [r.name, r.sub, r.working ?? false])).toEqual([
+      ['bise', 'routing his asks', true],
+      ['docs', "docs's job", false],
+      ['perf', "perf's job", false],
+    ]);
+    expect(agentRows(list, NOW, false, true, { numbers: nums }).map((r) => r.glyph)).toEqual(['⌥0', '⌥1', '⌥2']);
+  });
+  it("bise's thread: no main row (it is that thread); an archived main none either", () => {
+    expect(agentRows([ag('main', { main: true }), ag('perf')], NOW, true).map((r) => r.name)).toEqual(['perf']);
+    expect(agentRows([ag('main', { main: true, archived: true }), ag('perf')], NOW, false).map((r) => r.name)).toEqual(['perf']);
   });
   it("bise's thread: the project's name in place of the role; ⌥ held: ⌥1-⌥9", () => {
     const rows = agentRows([ag('perf'), ag('docs')], NOW, true, true);
