@@ -71,7 +71,12 @@ The agent runtime (repl-live): `ps -o time` against its age, then `sample
    cons then one reverse.
 5. **Pure bulk work done one by one** where the items are independent and
    costly (parsing a batch of journal events, stringifying the view's agent
-   rows): split in balanced halves and use a parallel let.
+   rows): split in balanced halves and use a parallel let. Before you
+   fork, measure the sequential envelope around it: a batch that still
+   arrives as one JSON string pays a char-by-char decode first (bp-boot,
+   2026-10-17: the outer string cost more than the whole old replay), and
+   check the sample shows more than one core busy (1.1 cores = no gain).
+   Make the per-char work cheap (pattern 1) before you split it.
 
 ## 3. Change it safely
 
