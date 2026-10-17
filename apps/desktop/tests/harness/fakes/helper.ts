@@ -112,12 +112,13 @@ export class FakeCore extends Stub<CoreEv | HubEv, AppCmd | HubCmd> {
   }
 
   /**
-   * `cmd` for `card` is answered with `result` (card/answer's AnswerResult: the hub took it).
-   * `before`: the events its step sent first, as the real hub does (its rows without the card it
-   * closed come before the response; none: the hub kept the card open).
+   * `cmd` for `card` is answered with `result` (card/answer's AnswerResult: the hub took it; no
+   * card: a send's SendResult, its msg_id). `before`: the events its step sent first, as the real
+   * hub does (its rows without the card it closed come before the response; none: the hub kept
+   * the card open).
    */
-  async result(cmd: string, card: number, result: unknown, before: readonly unknown[] = []): Promise<void> {
-    await this.raw([JSON.stringify({ harness: 'result', cmd, card, result, before })]);
+  async result(cmd: string, card: number | undefined, result: unknown, before: readonly unknown[] = []): Promise<void> {
+    await this.raw([JSON.stringify({ harness: 'result', cmd, ...(card === undefined ? {} : { card }), result, before })]);
   }
 
   env(): Record<string, string> {

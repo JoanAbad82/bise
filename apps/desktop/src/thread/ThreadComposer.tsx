@@ -214,7 +214,7 @@ export const ThreadComposer = memo(function ThreadComposer({
       // (never a line with typed parts: '/word [Image #1]' or a quoted '/word' is a message)
       // any send ends the key line's notice (read through a ref: the send never re-binds per notice)
       doneRef.current();
-      const sl = out.files.length === 0 && out.parts === undefined ? slashLine(out.text) : null;
+      const sl = out.parts === undefined ? slashLine(out.text) : null;
       if (sl !== null) {
         onCommand(sl.name, sl.args);
         return;
@@ -225,7 +225,7 @@ export const ThreadComposer = memo(function ThreadComposer({
       // to its asker as a plain message, then the block lets the card go
       // an approval or a choice open: they go to its asker as a plain message, the item stays
       if (answer !== null && (answer.closed === true || answer.message === true) && answer.asker !== undefined) {
-        store.send({ project: answer.project, agent: answer.asker, text: out.text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}), ...(out.parts === undefined ? {} : { parts: out.parts }) });
+        store.send({ project: answer.project, agent: answer.asker, text: out.text, mode: 'now', ...(out.parts === undefined ? {} : { parts: out.parts }) });
         if (answer.closed === true) {
           sentClosed.current = true;
           leaveClosed();
@@ -243,16 +243,14 @@ export const ThreadComposer = memo(function ThreadComposer({
           project: answer.project,
           card: answer.card,
           reply: out.text,
-          files: out.files,
           ...(out.parts !== undefined ? { parts: out.parts } : {}),
           ...(from !== undefined ? { from } : {}),
         });
         onSent();
         return;
       }
-      // ⏎ while a turn runs steers it ('now', as the TUI); the files he
-      // attached or dropped go with it (amb-core item H: the hub renders them
-      // once, an image as a marker the model sees). Tab's queue: amb-web's
+      // ⏎ while a turn runs steers it ('now', as the TUI); the images and
+      // files he attached or dropped go with it as parts. Tab's queue: amb-web's
       const text = about === undefined ? out.text : aboutText(about, out.text);
       // S29/L19 W2: stopped until he writes: his message gives the wheel back first (read at send,
       // never subscribed: the rows moving must not re-render the composer)
@@ -261,7 +259,7 @@ export const ThreadComposer = memo(function ThreadComposer({
       // msg-parts: his quotes, pastes and images go typed, never templated by the window; an
       // artifact's question puts its 'about' lead in front of his words, as a text part too
       const parts = about === undefined || out.parts === undefined ? out.parts : aboutParts(about, out.parts);
-      store.send({ project, agent, text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}), ...(parts === undefined ? {} : { parts }) });
+      store.send({ project, agent, text, mode: 'now', ...(parts === undefined ? {} : { parts }) });
       onSent();
     },
     [store, project, agent, onSent, onCommand, answer, about],

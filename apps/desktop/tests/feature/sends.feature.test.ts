@@ -18,15 +18,16 @@ describe('his messages, in his words', () => {
     expect(w.view.sending()).toBe(true);
     expect(sends(w)).toEqual([{ cmd: 'send', project: ACME, agent: 'main', text: 'make it fast', mode: 'now', cid: 1 }]);
 
-    // the hub writes it in the thread (an entry without an id: an older transcript, matched by its words)
-    w.given(said(ACME, 'main', 7, 'make it fast', null, T0 + 200));
+    // the hub gives it its message id and writes it in the thread with that id (never by its words)
+    w.given(sent(ACME, 'main', 1, 7), said(ACME, 'main', 7, 'make it fast', 7, T0 + 200));
     expect(rows(w)).toEqual([]);
     expect(w.view.sending()).toBe(false);
   });
 
   it("its echo in a page of the thread takes the row away too", () => {
     const w = feature(T0).does(send(ACME, 'main', 'hello'));
-    w.given(ev('thread', { project: ACME, agent: 'main', before: null, more: false, entries: [{ kind: 'you', pos: 3, at_ms: T0 + 100, text: 'hello' }] }));
+    w.given(sent(ACME, 'main', 1, 30));
+    w.given(ev('thread', { project: ACME, agent: 'main', before: null, more: false, entries: [{ kind: 'you', pos: 3, at_ms: T0 + 100, msg_id: 30, text: 'hello' }] }));
     expect(rows(w)).toEqual([]);
   });
 
@@ -63,12 +64,14 @@ describe('his messages, in his words', () => {
   });
 
   it('try again on a queued message with a file sends it as it was: the same words, queued, the same file', () => {
-    const w = feature(T0).does(send(ACME, 'perf', 'after your turn: read this', { mode: 'queued', files: ['/Users/camille/acme/notes.md'] }));
+    const parts = [{ kind: 'text' as const, text: 'after your turn: read this ' }, { kind: 'file' as const, path: '/Users/camille/acme/notes.md', name: '[File #1]' }];
+    const w = feature(T0).does(send(ACME, 'perf', 'after your turn: read this', { mode: 'queued', parts }));
     w.given(sendError(ACME, 'the hub is busy', 1, 'refused'));
     w.does(resend(ACME, 'perf', 1));
+    // his words go in the parts: a text beside parts is refused by the hub, so it goes empty
     expect(sends(w)).toEqual([
-      { cmd: 'send', project: ACME, agent: 'perf', text: 'after your turn: read this', mode: 'queued', files: ['/Users/camille/acme/notes.md'], cid: 1 },
-      { cmd: 'send', project: ACME, agent: 'perf', text: 'after your turn: read this', mode: 'queued', files: ['/Users/camille/acme/notes.md'], cid: 2 },
+      { cmd: 'send', project: ACME, agent: 'perf', text: '', mode: 'queued', parts, cid: 1 },
+      { cmd: 'send', project: ACME, agent: 'perf', text: '', mode: 'queued', parts, cid: 2 },
     ]);
     expect(rows(w, 'perf')).toEqual(['after your turn: read this · sending']);
   });

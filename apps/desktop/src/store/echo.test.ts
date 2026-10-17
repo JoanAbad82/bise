@@ -32,23 +32,16 @@ const you = (pos: number, text: string, msg_id?: number): Entry => ({
 describe("echo (A1): his send meets its 'you' entry by its message id", () => {
   it("two sends of the same words meet their own entries, in either order", () => {
     const rows = [row(1, "ok", { msgId: 10 }), row(2, "ok", { msgId: 11 })];
-    expect(echoOf(rows, you(5, "ok", 11), 500)).toBe(1);
-    expect(echoOf(rows, you(4, "ok", 10), 500)).toBe(0);
+    expect(echoOf(rows, you(5, "ok", 11))).toBe(1);
+    expect(echoOf(rows, you(4, "ok", 10))).toBe(0);
   });
 
-  it("a send answered with an id never takes an entry by its words", () => {
-    expect(echoOf([row(1, "ok", { msgId: 10 })], you(4, "ok", 99), 500)).toBe(
-      -1,
-    );
-    expect(echoOf([row(1, "ok", { msgId: 10 })], you(4, "ok"), 500)).toBe(-1);
-  });
-
-  it("an older hub (answered {} or not yet): the words still match (TODO(A1): one release)", () => {
-    expect(echoOf([row(1, "ok", { msgId: null })], you(4, "ok", 99), 500)).toBe(
-      0,
-    );
-    expect(echoOf([row(1, "ok")], you(4, "ok"), 500)).toBe(0);
-    expect(echoOf([row(1, "ok")], you(4, "no"), 500)).toBe(-1);
+  it("never by its words: another id, no id, or a send not answered yet takes nothing", () => {
+    expect(echoOf([row(1, "ok", { msgId: 10 })], you(4, "ok", 99))).toBe(-1);
+    expect(echoOf([row(1, "ok", { msgId: 10 })], you(4, "ok"))).toBe(-1);
+    expect(echoOf([row(1, "ok", { msgId: null })], you(4, "ok", 99))).toBe(-1);
+    expect(echoOf([row(1, "ok")], you(4, "ok", 99))).toBe(-1);
+    expect(echoOf([row(1, "ok")], you(4, "ok"))).toBe(-1);
   });
 
   it("an answer gives its row the id; when that entry landed first, the row goes", () => {
@@ -124,14 +117,15 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
     store.send({ project: P, agent: "perf", text: "ok" });
     const [a, b] = store.pending(K).map((p) => p.cid);
     store.apply({ ev: "sent", project: P, agent: "perf", cid: a, msg_id: 10 });
-    // b is not answered yet: its words take this entry (old-hub path); it is b's own, id 11
+    // b is not answered yet: its entry (id 11) takes no row by its words, its id is kept
     store.apply({
       ev: "entry",
       project: P,
       agent: "perf",
       entry: you(4, "ok", 11),
     });
-    expect(store.pending(K).map((p) => p.cid)).toEqual([a]);
+    expect(store.pending(K).map((p) => p.cid)).toEqual([a, b]);
+    // b's answer: its entry landed already, the row goes
     store.apply({ ev: "sent", project: P, agent: "perf", cid: b, msg_id: 11 });
     expect(store.pending(K).map((p) => p.cid)).toEqual([a]);
     // a's answer came first; now its entry: gone

@@ -233,13 +233,11 @@ pub enum AppCmd {
         #[serde(default)]
         title: String,
     },
-    /// his words to main (the capsule, the spotlight); `files`: a drop on
-    /// the pearl, absolute paths only, sent with the words (amb-web m_9242)
+    /// his words to main (the capsule, the spotlight; its `files` list
+    /// went with the hub's in issue 31: a drop rides as parts)
     Send {
         #[serde(default)]
         text: String,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        files: Vec<String>,
     },
     /// fn space's typed text sent with tab: main starts an agent on it
     /// (only main starts agents; ambient-lead m_6513)

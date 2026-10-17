@@ -152,13 +152,12 @@ function same(a: CardsState, b: CardsState): boolean {
 function does(s: CardsState, f: HubFacts, intent: Intent, at: number): Step {
   switch (intent.i) {
     case "answer": {
-      const { project, card, reply, files, parts, from } = intent;
+      const { project, card, reply, parts, from } = intent;
       // answer-in-thread A: where he was, for the row's 'answered from …' and the jump (answered.ts)
       const answering = from === undefined ? s.answering : { ...s.answering, [cardKeyOf(project, card)]: from };
       const [next, out] = acts({ ...s, answering }, project, card, at, {
         kind: "answer",
         reply,
-        ...(files !== undefined ? { files } : {}),
         ...(parts !== undefined ? { parts } : {}),
         ...(from !== undefined ? { from } : {}),
       });
@@ -169,7 +168,6 @@ function does(s: CardsState, f: HubFacts, intent: Intent, at: number): Step {
           project,
           card,
           reply,
-          ...(files !== undefined && files.length > 0 ? { files: [...files] } : {}),
           ...(parts !== undefined && parts.length > 0 ? { parts: [...parts] } : {}),
         },
       });
@@ -203,7 +201,6 @@ function does(s: CardsState, f: HubFacts, intent: Intent, at: number): Step {
           project: intent.project,
           card: intent.card,
           reply: a.reply,
-          ...(a.files !== undefined ? { files: a.files } : {}),
           ...(a.parts !== undefined ? { parts: a.parts } : {}),
           ...(a.from !== undefined ? { from: a.from } : {}),
         },

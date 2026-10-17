@@ -80,7 +80,7 @@ def main():
         t.wait_gone("this is pm's own thread")
         # 3. a card: ctrl+1, 1
         settled(t)
-        t.typed("[[bash: sb card \"$(printf 'designer asks: where does the button go?\\n1. next to the filters\\n2. in the menu')\"]]")
+        t.typed("[[bash: sb notify \"$(printf 'designer asks: where does the button go?\\n1. next to the filters\\n2. in the menu')\"]]")
         t.keys("Enter")
         sc = t.wait("needs you. ctrl+1 opens", 30)
         print("---- card ----\n" + sc)

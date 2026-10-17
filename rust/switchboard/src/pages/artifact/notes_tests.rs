@@ -183,10 +183,10 @@ fn the_desktop_door_records_a_sent_note() {
 fn the_door_checks_the_artifact_then_adds_the_hint() {
     let a = Part::Anchor { artifact: "q3".into(), version: 2, rev: 0, anchor: serde_json::from_value(cell()).unwrap(), quote: String::new(), n: None };
     let none = |_: &std::path::Path| -> Result<crate::parts_in::Stored, String> { Err("no".into()) };
-    let said = |known: &dyn Fn(&str, u64) -> Result<u32, String>| crate::parts_in::said(&[a.clone(), Part::Text { text: "why?".into() }], &[], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known });
+    let said = |known: &dyn Fn(&str, u64) -> Result<u32, String>| crate::parts_in::said(&[a.clone(), Part::Text { text: "why?".into() }], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known });
     assert_eq!(said(&|_, _| Err("no".into())), Err("no".into()), "the door's words, as they are");
     // an anchor it can't read: a known kind with bad fields, or a newer kind (architect m_23912)
-    let odd = |at: Value| crate::parts_in::said(&[Part::Anchor { artifact: "q3".into(), version: 2, rev: 0, anchor: serde_json::from_value(at).unwrap(), quote: String::new(), n: None }], &[], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known: &|_, _| Ok(1) });
+    let odd = |at: Value| crate::parts_in::said(&[Part::Anchor { artifact: "q3".into(), version: 2, rev: 0, anchor: serde_json::from_value(at).unwrap(), quote: String::new(), n: None }], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known: &|_, _| Ok(1) });
     assert_eq!(odd(json!({"kind": "cell", "sheet": "Q3"})), Err("that part isn't in this version: the note can't go there".into()));
     assert_eq!(odd(json!({"kind": "voxel", "x": 1})), Err("this bise can't put a note on that kind of part (voxel): update bise".into()));
     let s = said(&|id, v| if id == "q3" && v == 2 { Ok(3) } else { Err("no".into()) }).unwrap();

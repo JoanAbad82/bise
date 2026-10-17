@@ -270,7 +270,7 @@ fn options(suggested: FlowMode) -> String {
 }
 
 /// The one-time question (dev-flow §2), as main puts it in the user's
-/// inbox with `sb card`.
+/// inbox with `sb notify`.
 pub fn question(f: &Flow) -> String {
     format!(
         "how should agents ship code here? {}\n{}",
@@ -427,7 +427,7 @@ pub fn main_section(f: Option<&Flow>, style: Option<&str>) -> String {
     };
     let ask = match f.source {
         Source::Suggested => format!(
-            "\n- The flow above is only suggested ({why}), not saved, and never holds work: {until} At the {when}, ask the user once in a card that blocks nothing, `sb card \"{q}\"`, save the answer with `sb flow pr|trunk`{then}, and never ask again.",
+            "\n- The flow above is only suggested ({why}), not saved, and never holds work: {until} At the {when}, ask the user once in a card that blocks nothing, `sb notify \"{q}\"`, save the answer with `sb flow pr|trunk`{then}, and never ask again.",
             why = f.why.clone().unwrap_or_default().trim_end_matches('.'),
             until = match f.mode {
                 FlowMode::Trunk => "lands stay local (nothing pushed) until it is saved.",

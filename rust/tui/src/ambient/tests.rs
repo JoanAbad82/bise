@@ -537,27 +537,16 @@ fn the_fn_context_rides_the_next_message_once() {
     assert!(Cmd::parse(r#"{"cmd":"fn_context"}"#).is_err());
 }
 
-/// T1 run 5 step 18 (amb-web m_9242): a drop sent from the spotlight,
-/// {cmd:'send', text, files}, reaches bise's main with the files' paths
-/// after his words (alone when he typed nothing); a relative path is
-/// refused, never sent.
+/// The `files` list of a send went in issue 31 (a drop rides as parts): an
+/// older window's list is ignored, never forwarded to the hub.
 #[test]
-fn a_dropped_file_reaches_main_with_his_words() {
+fn a_sends_files_list_is_ignored() {
     let mut t = T::new();
     t.ready();
-    let cmd = Cmd::parse(r#"{"cmd":"send","text":" summarize this ","files":["/w/q3-notes.md","/w/b.png"]}"#).unwrap();
+    let cmd = Cmd::parse(r#"{"cmd":"send","text":"hi","files":["/w/q3-notes.md"]}"#).unwrap();
+    assert_eq!(cmd, Cmd::Send { text: "hi".into() });
     t.cmd(cmd);
-    // item H: his words and the files as a field; the hub renders them once
-    let input = t.hub.next();
-    assert_eq!((input["text"].as_str(), input["files"].clone()), (Some("summarize this"), serde_json::json!(["/w/q3-notes.md", "/w/b.png"])));
-    t.cmd(Cmd::parse(r#"{"cmd":"send","text":"","files":["/w/q3-notes.md"]}"#).unwrap());
-    let input = t.hub.next();
-    assert_eq!((input["text"].as_str(), input["files"].clone()), (Some(""), serde_json::json!(["/w/q3-notes.md"])));
-    // a send without files has no files field
-    t.cmd(Cmd::parse(r#"{"cmd":"send","text":"hi"}"#).unwrap());
     assert!(t.hub.next().get("files").is_none());
-    assert_eq!(Cmd::parse(r#"{"cmd":"send","text":"hi","files":[]}"#), Ok(Cmd::Send { text: "hi".into() }));
-    assert!(Cmd::parse(r#"{"cmd":"send","text":"hi","files":["notes.md"]}"#).is_err());
 }
 
 #[test]

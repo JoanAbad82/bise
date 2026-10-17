@@ -47,7 +47,7 @@ describe('the composer', () => {
       a.submit();
       await Promise.resolve();
     });
-    expect(onSend).toHaveBeenCalledWith({ text: 'ça va ?\nsecond line', files: [] });
+    expect(onSend).toHaveBeenCalledWith({ text: 'ça va ?\nsecond line' });
     expect(getByTestId('composer.field')).toBe(field);
     expect(field.textContent).toBe('');
   });
@@ -155,7 +155,7 @@ describe('the composer', () => {
       a.submit();
       await Promise.resolve();
     });
-    expect(onSend).toHaveBeenCalledWith({ text: '- a\n```rust\nfn main() {}\n```', files: [] });
+    expect(onSend).toHaveBeenCalledWith({ text: '- a\n```rust\nfn main() {}\n```' });
   });
 
   it('keeps the draft of each target across a remount', async () => {

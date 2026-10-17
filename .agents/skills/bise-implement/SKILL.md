@@ -36,7 +36,9 @@ each from this repo. It is short. The architect agent keeps it current.
 6. No change pushes a file over 1,000 lines, or makes `daemon::run` longer:
    split first.
 7. Replace an old way and delete it in the same change; no "kept for one
-   release".
+   release". A compatibility shim an older install truly needs is registered
+   in `tests/shims.txt` with its owner and removal release, and its
+   `TODO(<tag>)` on each site (`tests/shims_check.py` checks both).
 8. Update the module's `//!` header in the same commit when what it owns
    changes.
 9. Tests on fake data (fake provider, throwaway hub, tmux); never the user's

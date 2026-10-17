@@ -1,0 +1,3 @@
+{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"what stands out here","mode":"now","files":["/Users/ana/notes/q3-notes.md","/Users/ana/Desktop/shot.png"]}
+{"cmd":"answer","project":"acme-1a2b3c4d","card":11,"reply":"this one","files":["/Users/ana/Desktop/shot.png"]}
+{"cmd":"slash","project":"acme-1a2b3c4d","agent":"perf","line":"why is this slow?","mode":"queued","context":{"app":"Safari","url":"https://grafana.acme.test/d/p99","title":"p99 latency"},"files":["/Users/ana/Desktop/shot.png"]}

@@ -47,6 +47,8 @@ test("thread/send-image-echo: a send with an image leaves 'sending…' when its 
     await page.keyboard.press('Meta+V');
     await expect(page.locator('[data-testid^="composer.chip."][data-kind="image"]')).toHaveCount(1, { timeout: 5000 });
     await page.keyboard.type(WORDS);
+    // the hub answers his send with its message id; its echo carries it (A1: no words match)
+    await core.result('send', undefined, { msg_id: 2 });
     await page.keyboard.press('Enter');
     const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as Record<string, unknown>;
     const img = ((sent['parts'] ?? []) as Record<string, unknown>[]).find((p) => p['kind'] === 'image');
@@ -56,7 +58,7 @@ test("thread/send-image-echo: a send with an image leaves 'sending…' when its 
     await expect(pending, 'his row at once, sending').toHaveCount(1);
     // the hub's echo: the marker it rendered for the model, then his words (rust/images marker())
     const marker = `<image name="[Image #1]" path="${file}" mime="image/png" b64="/h/images/ab12.b64">`;
-    await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: { pos: 2, at_ms: Date.now(), kind: 'you', text: `${marker} ${WORDS}` } } as never);
+    await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: { pos: 2, at_ms: Date.now(), kind: 'you', msg_id: 2, text: `${marker} ${WORDS}` } } as never);
     await expect(page.getByTestId('thread.row.2'), 'the delivered row').toBeVisible({ timeout: 5000 }).catch(() => undefined);
     await expect(pending, "the pending row leaves when its echo lands (never a second greyed 'sending…')").toHaveCount(0, { timeout: 3000 });
     await expect(page.locator('.th-row', { hasText: WORDS }), 'one row with his words').toHaveCount(1);

@@ -111,7 +111,6 @@ describe('the send', () => {
     expect(buildMessage(segs)).toEqual({
       // the text: his words with the chips' labels, never the model's template (delta review D2)
       text: 'what about ▤ 2 and [Image #3] ❝ 1?',
-      files: [],
       parts: [
         { kind: 'text', text: 'what about ' },
         { kind: 'paste', n: 2, text: 'a\nb' },
@@ -125,7 +124,6 @@ describe('the send', () => {
     // an image alone with words: typed too (main 18a32ce3: the hub stores it from its source)
     expect(buildMessage([{ kind: 'chip', chip: { kind: 'image', n: 1, path: '/i/a.png', name: 'a.png' } }, { kind: 'text', text: 'what is wrong' }])).toEqual({
       text: '[Image #1] what is wrong',
-      files: [],
       parts: [
         { kind: 'image', name: '[Image #1]', source: '/i/a.png' },
         { kind: 'text', text: ' what is wrong' },
@@ -147,7 +145,6 @@ describe('the send', () => {
       { kind: 'chip', chip: { kind: 'file', n: 2, path: '/Users/me/Desktop/deck.pptx', bytes: 2_100_000 } },
     ];
     const out = buildMessage(seg);
-    expect(out.files).toEqual([]);
     expect(out.parts).toEqual([
       { kind: 'text', text: "ajouter l'image " },
       { kind: 'image', name: '[Image #1]', source: '/h/images/logo.png' },
@@ -405,7 +402,7 @@ describe('artifacts in the @ list (commands.rs, W11)', () => {
       { kind: 'chip', chip: { kind: 'artifact', n: 1, id: 'pricing', title: 'Pricing [draft]', url: 'http://h/a/pricing' } },
       { kind: 'text', text: ' and fix it' },
     ];
-    expect(buildMessage(segs)).toEqual({ text: 'see [Pricing draft](http://h/a/pricing) and fix it', files: [] });
+    expect(buildMessage(segs)).toEqual({ text: 'see [Pricing draft](http://h/a/pricing) and fix it' });
     expect(chipStrip({ kind: 'artifact', n: 1, id: 'p', title: 'Perf notes', url: 'http://h/p' })).toBe('↗ Perf notes  http://h/p');
   });
   it('a label gets one space from the words, never two (qa-native R41: "[Image #1]what is…")', () => {

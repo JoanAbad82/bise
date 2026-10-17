@@ -138,7 +138,6 @@ fn requests_parse_in_the_core() {
         vec!["status", "blocked", "--note", "need key"],
         vec!["report", "done", "all good", "--decision", "v2"],
         vec!["notify", "--for", "m_2", "v1 or v2?"],
-        vec!["card", "--for", "m_2", "v1 or v2?"],
         vec!["stop", "x", "no", "longer", "needed"],
         vec!["close", "#3", "handled"],
         vec!["close", "4"],
@@ -153,16 +152,16 @@ fn requests_parse_in_the_core() {
 
 /// notif-rename (architect m_24654): `sb notify` is the agents' word; a
 /// notification is a card on the wire, so the hub's command keeps its name;
-/// `sb card`, the old word, still works for one release.
+/// `sb card`, the old word, is gone (issue 27, issue 31).
 #[test]
-fn notify_is_a_card_on_the_wire_and_sb_card_still_works() {
-    for word in ["notify", "card"] {
-        let r = build(&a(&[word, "--for", "m_2", "v1 or v2?"])).unwrap();
-        assert_eq!((r["cmd"].as_str(), r["text"].as_str(), r["for"].as_str()), (Some("card"), Some("v1 or v2?"), Some("m_2")), "{word}");
-        let w = build(&a(&[word, "--withdraw", "#4", "answered", "in", "chat"])).unwrap();
-        assert_eq!((w["cmd"].as_str(), w["card"].as_u64(), w["why"].as_str()), (Some("withdraw"), Some(4), Some("answered in chat")), "{word}");
-        assert_eq!(render(word, &json!({"ok": true, "card": 7})).1, "notification #7 opened for the user");
-    }
+fn notify_is_a_card_on_the_wire_and_sb_card_is_unknown() {
+    let r = build(&a(&["notify", "--for", "m_2", "v1 or v2?"])).unwrap();
+    assert_eq!((r["cmd"].as_str(), r["text"].as_str(), r["for"].as_str()), (Some("card"), Some("v1 or v2?"), Some("m_2")));
+    let w = build(&a(&["notify", "--withdraw", "#4", "answered", "in", "chat"])).unwrap();
+    assert_eq!((w["cmd"].as_str(), w["card"].as_u64(), w["why"].as_str()), (Some("withdraw"), Some(4), Some("answered in chat")));
+    assert_eq!(render("notify", &json!({"ok": true, "card": 7})).1, "notification #7 opened for the user");
+    assert!(build(&a(&["card", "v1 or v2?"])).is_err(), "sb card is an unknown command");
+    assert!(build(&a(&["card", "--withdraw", "#4", "why"])).is_err(), "sb card --withdraw is an unknown command");
     assert_eq!(render("withdraw", &json!({"ok": true, "card": 4})).1, "notification #4 withdrawn: the user sees why; the question is yours again");
     assert_eq!(render("close", &json!({"ok": true, "card": 3})).1, "notification #3 closed");
     let u = usage();
@@ -175,9 +174,9 @@ fn a_card_can_link_its_page_and_item() {
     let r = build(&a(&["notify", "--page", "launch-watch#hn-41", "reply to tptacek?"])).unwrap();
     assert_eq!((r["page"].as_str(), r["text"].as_str()), (Some("launch-watch#hn-41"), Some("reply to tptacek?")));
     crate::core::AgentReq::from_json(&r).unwrap();
-    assert_eq!(build(&a(&["card", "--page", "w", "q?"])).unwrap()["page"], "w");
-    assert!(build(&a(&["card", "q?"])).unwrap().get("page").is_none());
-    assert!(build(&a(&["card", "--page", "#hn-41", "q?"])).is_err(), "an item needs its page");
+    assert_eq!(build(&a(&["notify", "--page", "w", "q?"])).unwrap()["page"], "w");
+    assert!(build(&a(&["notify", "q?"])).unwrap().get("page").is_none());
+    assert!(build(&a(&["notify", "--page", "#hn-41", "q?"])).is_err(), "an item needs its page");
 }
 
 #[test]

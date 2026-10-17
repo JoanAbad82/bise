@@ -72,7 +72,7 @@ def live(t):
     title_is(t, "bise · " + folder)
     print("ok: bise and the folder (%r)" % title(t))
     # a card arrives
-    t.typed("[[bash: sb card \"$(printf 'pick one\\n1. alpha\\n2. beta')\"]]")
+    t.typed("[[bash: sb notify \"$(printf 'pick one\\n1. alpha\\n2. beta')\"]]")
     t.keys("Enter")
     title_is(t, "?1 bise · " + folder)
     print("ok: a card: %r" % title(t))

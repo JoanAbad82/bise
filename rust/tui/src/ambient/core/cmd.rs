@@ -44,10 +44,6 @@ pub enum Cmd {
     /// He's back after `away_ms` (amb-mac m_9038): `away_summary` answers.
     AwayBack { away_ms: u64 },
     Send { text: String },
-    /// A drop on the pearl sent from the spotlight (amb-web m_9242):
-    /// `send` with `files` (absolute paths): his words and the files' paths
-    /// to bise's main.
-    SendFiles { text: String, files: Vec<String> },
     /// fn space's typed text sent with tab: main starts an agent on it
     /// (only main starts agents; ambient-lead m_6513)
     Start { text: String },
@@ -146,16 +142,7 @@ impl Cmd {
             AppCmd::AwayBack { away_ms } => Cmd::AwayBack { away_ms },
             AppCmd::FnContext { context } => Cmd::FnContext(context),
             AppCmd::Shot { path, app, title } => Cmd::Shot { path: PathBuf::from(path), app, title },
-            AppCmd::Send { text, files } => {
-                let files: Vec<String> = files.iter().map(|f| f.trim()).filter(|f| !f.is_empty()).map(str::to_string).collect();
-                if let Some(f) = files.iter().find(|f| !f.starts_with('/')) {
-                    return Err(format!("send: a file must be an absolute path: {f:?}"));
-                }
-                match files.is_empty() {
-                    true => Cmd::Send { text },
-                    false => Cmd::SendFiles { text, files },
-                }
-            }
+            AppCmd::Send { text } => Cmd::Send { text },
             AppCmd::Start { text } => Cmd::Start { text },
             AppCmd::Answer { card, reply } => Cmd::Answer { card, reply },
             AppCmd::Hush => Cmd::Hush,

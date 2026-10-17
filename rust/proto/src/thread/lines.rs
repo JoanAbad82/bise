@@ -924,7 +924,7 @@ pub const STOP_NOTE: &str = "the user stopped timer #";
 /// The note bise sends main when the user answers one of main's own
 /// notifications (core.bend `answer.q.main`): for main's model only. The
 /// same step writes the route line the thread shows, so a client drops this
-/// twin, old head too. TODO(notif-rename): read the route line's typed card.
+/// twin, old head too. TODO(answer-route): read the route line's typed card.
 pub fn is_main_answer_note(text: &str) -> bool {
     text.starts_with(MAIN_ANSWER_NOTE) || text.starts_with("the user answered card #")
 }

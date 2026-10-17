@@ -49,7 +49,7 @@ def _seed_morning(info, timeout=600):
     says = [
         '/new fix-csv: {{bash: sb report done "CSV export keeps the due dates: PR https://github.test/acme/app/pull/241"}}',
         '/new cookies: {{bash: sb page publish %s --id cookie-question --title "the cookie banner"}}' % q,
-        '[[bash: sb card "the cookie banner: everyone opt-in, or only the EU? (page cookie-question)"]]',
+        '[[bash: sb notify "the cookie banner: everyone opt-in, or only the EU? (page cookie-question)"]]',
         '[[bash: sb page publish %s --id inbox --title "your inbox"]]' % ex("inbox-review.html"),
         '[[bash: sb page publish %s --id domain --title "buy the domain"]]' % ex("buy-domain.html"),
         '[[bash: sb page publish %s --id launch-watch --title "the launch"]]' % ex("launch-watch.html"),

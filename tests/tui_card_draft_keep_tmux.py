@@ -36,9 +36,9 @@ def main():
         # main asks A, then B some seconds later in the same turn; later
         # still it withdraws A (answered in chat) and asks C: the re-ask
         # that took Benjamin's half answer
-        t.typed("[[bash: a=$(sb card \"$(printf 'which bench?\\n1. cold\\n2. warm')\" | tr -dc 0-9); sleep 8; "
-                "sb card \"$(printf 'and the p99 too?\\n1. yes\\n2. no')\"; sleep 8; "
-                "sb card --withdraw $a \"answered in chat\"; sb card \"which bench, cold or warm?\"]]")
+        t.typed("[[bash: a=$(sb notify \"$(printf 'which bench?\\n1. cold\\n2. warm')\" | tr -dc 0-9); sleep 8; "
+                "sb notify \"$(printf 'and the p99 too?\\n1. yes\\n2. no')\"; sleep 8; "
+                "sb notify --withdraw $a \"answered in chat\"; sb notify \"which bench, cold or warm?\"]]")
         t.keys("Enter")
         t.wait(w("inbox.head") + " · " + w("common.waiting_for_you", n=1))
         # A opens in place; half an answer

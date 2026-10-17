@@ -9,9 +9,9 @@ import { aboutParts } from './ThreadComposer';
 import { createRouter, RouterContext } from '@/app/router';
 
 // the composer is amb-web's: here a stand-in that counts its renders
-const composer = vi.hoisted(() => ({ renders: 0, props: null as null | { busy?: boolean; onSend: (o: { text: string; files: string[] }) => void } }));
+const composer = vi.hoisted(() => ({ renders: 0, props: null as null | { busy?: boolean; onSend: (o: { text: string; parts?: unknown[] }) => void } }));
 vi.mock('@/composer', () => ({
-  Composer: (props: { busy?: boolean; onSend: (o: { text: string; files: string[] }) => void }) => {
+  Composer: (props: { busy?: boolean; onSend: (o: { text: string; parts?: unknown[] }) => void }) => {
     composer.renders += 1;
     composer.props = props;
     return <div data-testid="composer" />;
@@ -116,13 +116,14 @@ describe('the thread screen', () => {
       </StoreProvider>,
     );
     act(() => {
-      composer.props?.onSend({ text: 'hi there', files: [] });
+      composer.props?.onSend({ text: 'hi there' });
     });
     expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'perf', text: 'hi there', mode: 'now' });
+    const parts = [{ kind: 'text', text: 'look ' }, { kind: 'image', name: '[Image #1]', source: '/tmp/shot.png' }];
     act(() => {
-      composer.props?.onSend({ text: 'look', files: ['/tmp/shot.png'] });
+      composer.props?.onSend({ text: 'look [Image #1]', parts });
     });
-    expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'perf', text: 'look', files: ['/tmp/shot.png'] });
+    expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'perf', text: '', parts });
     const [p] = store.pending(K);
     if (p === undefined) throw new Error('no pending send');
     // drawn by the screen itself, in the same render as the send (outside the virtual list)

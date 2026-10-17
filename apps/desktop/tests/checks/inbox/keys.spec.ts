@@ -42,8 +42,8 @@ test('inbox/keys: ↑↓ ←→ ⌃N walk the inbox block, ctrl+o opens a folded
   const w = realWorld();
   const n = `k${String(Date.now() % 1_000_000)}`;
   const long = Array.from({ length: 14 }, (_, i) => `line ${String(i + 1)} of the long ask ${n}`).join('\\n');
-  worldSay('shop', `[[bash: sb card "$(printf '${long}')"]] asked`);
-  worldSay('shop', `[[bash: sb card "short ask ${n}: cart page or checkout?"]] asked`);
+  worldSay('shop', `[[bash: sb notify "$(printf '${long}')"]] asked`);
+  worldSay('shop', `[[bash: sb notify "short ask ${n}: cart page or checkout?"]] asked`);
   // the window's project id is the hub's folder (as review/feature), not the world's name
   const project = path.basename(path.dirname(hubOf(w, 'shop').sock));
   const s = await launchOn(w, `agent/${project}/main`, FIELD);
@@ -103,7 +103,7 @@ test('inbox/keys: ↑↓ ←→ ⌃N walk the inbox block, ctrl+o opens a folded
       const { key } = await current(page);
       const more = page.locator(`[data-testid="inbox.block.card.${key}.more"]`);
       await expect.soft(more, "folded: '… N more lines ctrl o'").toContainText('more lines', { timeout: 5000 });
-      // in the card: the thread's own `sb card "$(printf …)"` line has all 14 lines too
+      // in the card: the thread's own `sb notify "$(printf …)"` line has all 14 lines too
       const last = page.getByTestId(`inbox.block.card.${key}`).getByText(`line 14 of the long ask ${n}`);
       await expect.soft(last, 'its last line folded away').toHaveCount(0);
       await page.keyboard.press('Control+o');

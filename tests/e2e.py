@@ -621,7 +621,7 @@ def t_escalation_card(E, c):
         if r.get("from") == "t3" and "v1 ou v2" in r.get("body", "") and r.get("id"):
             msg_id = "m_%d" % r["id"]
     check(msg_id, "the question id")
-    c.say("[[bash: sb card --for %s \"v1 ou v2 ?\"]]" % msg_id)
+    c.say("[[bash: sb notify --for %s \"v1 ou v2 ?\"]]" % msg_id)
     c.wait(lambda: any(cd["kind"] == "question" for cd in c.cards()), 60, "a question card")
     card = [cd for cd in c.cards() if cd["kind"] == "question"][0]
     check(card["agent"] == "t3", "the card is t3's: %r" % card)
@@ -883,11 +883,11 @@ def t_main_controls(E, c):
     c.wait_idle("t1")
     # BISE-299: main cannot close a card of the user's inbox; it withdraws
     # its own, with a why the user reads
-    c.say('[[bash: sb card "e2e question?"]]')
+    c.say('[[bash: sb notify "e2e question?"]]')
     c.wait(lambda: any(cd["kind"] == "question" for cd in c.cards()), 60, "a question card")
     card = [cd for cd in c.cards() if cd["kind"] == "question"][0]
     c.wait_idle("main")
-    c.say('[[bash: sb card --withdraw %d "moot now"]]' % card["id"])
+    c.say('[[bash: sb notify --withdraw %d "moot now"]]' % card["id"])
     c.wait(lambda: not c.cards(), 60, "card withdrawn by main")
     c.wait_feed("main", "card-closed", 30, id=card["id"], res="withdrawn by main: moot now")
     c.wait_idle("main")

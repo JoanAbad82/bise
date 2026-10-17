@@ -124,7 +124,7 @@ test('gate/more: folds with a pill and a thinking row, an options-only docked it
       const cap = await capsulePage(s);
       for (const [step, words] of [['a', ''], ['b', 'my words ']] as const) {
         const k = `push${step}-${String(run)}`;
-        put(`more-${k}`, k, [{ tool: 'bash', arg: `sb card "${k} which window for the alert? 1. five minutes 2. fifteen minutes"` }], 'Asked you.');
+        put(`more-${k}`, k, [{ tool: 'bash', arg: `sb notify "${k} which window for the alert? 1. five minutes 2. fifteen minutes"` }], 'Asked you.');
         await go(s, `project/${tel}`);
         await field.click();
         await p.keyboard.press('Meta+a');

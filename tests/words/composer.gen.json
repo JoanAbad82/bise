@@ -842,6 +842,11 @@
     "one": null,
     "text": "{max} quotes at most: backspace on one to make room"
   },
+  "composer.refused_text_beside_parts": {
+    "args": [],
+    "one": null,
+    "text": "this message's text isn't its parts' text: update bise"
+  },
   "composer.ring_tip": {
     "args": [
       "pct",

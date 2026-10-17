@@ -619,7 +619,7 @@ def main():
         c.wait(ask, 90, "ask-cc's question card")
         first = ask()["id"]
         settle(c)
-        c.say('[[bash: sb card --withdraw %d "moot"]]' % first)
+        c.say('[[bash: sb notify --withdraw %d "moot"]]' % first)
         c.wait(lambda: not ask(), 30, "the withdrawn card closes")
         settle(c)
         c.say('[[bash: sb page publish %s --id ask-cc]]' % ap)
@@ -630,7 +630,7 @@ def main():
         c.say('[[bash: sb page publish %s --id ask-cc]]' % ap)
         c.wait(lambda: ask() and ask()["id"] != first, 90, "new words ask again")
         settle(c)
-        c.say('[[bash: sb card --withdraw %d "done here"]]' % ask()["id"])
+        c.say('[[bash: sb notify --withdraw %d "done here"]]' % ask()["id"])
         c.wait(lambda: not ask(), 30, "the second card closes")
         settle(c)
 
@@ -851,10 +851,10 @@ def main():
         c.say('[[bash: sb page publish %s --id bugs-watch --title "bugs watch"]]' % bugs)
         c.wait_line("main", "published bugs-watch v1", 90)
         c.wait_idle("main")
-        c.say('[[bash: sb card --page bugs-watch#gone "reply?" || echo "REFUSED"]]')
+        c.say('[[bash: sb notify --page bugs-watch#gone "reply?" || echo "REFUSED"]]')
         c.wait_line("main", "no block or item", 90)
         c.wait_idle("main")
-        c.say('[[bash: sb card --page bugs-watch#b2 "reply to the CSV report?"]]')
+        c.say('[[bash: sb notify --page bugs-watch#b2 "reply to the CSV report?"]]')
         # (its 3 drafts, b1, b2 and reply-nina, are a batch card of their
         # own since pm's C fail 42: not the one looked for here)
         # (hub/cards' CardPage has no `drafts`: a batch card is the one

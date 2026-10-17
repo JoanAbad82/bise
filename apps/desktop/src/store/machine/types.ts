@@ -29,7 +29,6 @@ export type Intent =
       readonly project: string;
       readonly card: number;
       readonly reply: string;
-      readonly files?: readonly string[];
       readonly parts?: readonly Part[];
       readonly from?: AnswerFrom;
     }

@@ -199,7 +199,7 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
       const k = `long-${String(run)}`;
       const long = [`${k} which plan for the cart?`, ...Array.from({ length: 14 }, (_, i) => `line ${String(i + 1)}: the cart page loads its totals twice when the coupon field is open`), '1. fix totals first 2. ship as is'].join('\\n');
       const tmp = path.join(sd, `.right-${k}.tmp`);
-      writeFileSync(tmp, JSON.stringify({ match: `${k}-start`, calls: [{ tool: 'bash', arg: `sb card "$(printf '${long}')"` }], reply: 'Asked you.' }));
+      writeFileSync(tmp, JSON.stringify({ match: `${k}-start`, calls: [{ tool: 'bash', arg: `sb notify "$(printf '${long}')"` }], reply: 'Asked you.' }));
       renameSync(tmp, path.join(sd, `right-${k}.json`));
       worldSay('shop', `${k}-start please ask me`);
       await go(s, `project/${shop}`);

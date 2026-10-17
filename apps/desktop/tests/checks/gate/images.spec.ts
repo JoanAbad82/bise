@@ -13,7 +13,7 @@
 // Paths: (1) the window composer, ⌘V in amb-mac's order (field, stage on the test clipboard, ⌘V, chip),
 // to main and to an agent; (2) a file dropped on the composer, to a project's main and to an agent;
 // (3) the spotlight: ⌘V in its field and a drop on the capsule, sent to bise; (4) a card answer with an
-// image (⌘I's answer field), to the asking agent. (5) an escalated question (sb card --for) is answered
+// image (⌘I's answer field), to the asking agent. (5) an escalated question (sb notify --for) is answered
 // through the same HubCmd::Answer as (4): (4) stands for it here. The terminal path is img-paste's.
 // Every path is written in a table (index.md next to the shots, BISE_R41_OUT); the test fails on any
 // path whose request has no image block, naming it.
@@ -393,10 +393,10 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
     }
 
     step('(5) escalated');
-    // (5) an agent's question escalated by main with `sb card --for`, answered with an image from ⌘I: the
+    // (5) an agent's question escalated by main with `sb notify --for`, answered with an image from ⌘I: the
     // ASKING agent's request must carry it. The chain runs on the world's fake scripts ($FAKE_SCRIPTS, read
     // live): shop's main asks gift-ui to ask; gift-ui sends main its question (sb send --expect-reply); main
-    // escalates it with sb card --for <that message's id> (read from main's own transcript).
+    // escalates it with sb notify --for <that message's id> (read from main's own transcript).
     {
       const sd = path.join(w.world, 'rich', 'scripts');
       const shopDir = path.dirname(hubOf(w, 'shop').sock);
@@ -411,7 +411,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
       put(`r41-esc-1-${String(run)}`, `${k}-start`, `sb send gift-ui "${k}-ask: please ask main which picture shows the bug"`, 'Asked gift-ui.');
       put(`r41-esc-2-${String(run)}`, `${k}-ask`, `sb send main --expect-reply "${q}"`, 'Asked main.');
       put(`r41-esc-3-${String(run)}`, `${k}-q`,
-        `id=$(grep -o 'agent_message from="gift-ui"[^>]*' "${shopDir}/agents/main/transcript.log" | grep -o 'id="m_[0-9]*"' | tail -1 | cut -d'"' -f2); echo "for $id"; sb card --for "$id" "${k}-card gift-ui asks: which of the two pictures shows the bug?"`,
+        `id=$(grep -o 'agent_message from="gift-ui"[^>]*' "${shopDir}/agents/main/transcript.log" | grep -o 'id="m_[0-9]*"' | tail -1 | cut -d'"' -f2); echo "for $id"; sb notify --for "$id" "${k}-card gift-ui asks: which of the two pictures shows the bug?"`,
         'I put it in your inbox.');
       worldSay('shop', `${k}-start please get gift-ui's question to me`);
       let note = '';
@@ -425,10 +425,10 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         note = `card open in the block after ${String(Math.round((Date.now() - t0) / 1000))} s`;
         const n = nonce('esc-answer');
         note += await answerFromComposer(` the second one ${n}`, 'R41-escalated');
-        rows.push({ path: '(5) escalated question (sb card --for), inbox block', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: await waitSeen(n, 60_000), note });
+        rows.push({ path: '(5) escalated question (sb notify --for), inbox block', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: await waitSeen(n, 60_000), note });
       } else {
         await shot('R41-escalated');
-        rows.push({ path: '(5) escalated question (sb card --for), inbox block', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '', hops: [] }, note: `no card with '${k}-card' in the inbox block after 90 s (the script chain: shop main -> gift-ui -> main -> sb card --for)` });
+        rows.push({ path: '(5) escalated question (sb notify --for), inbox block', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '', hops: [] }, note: `no card with '${k}-card' in the inbox block after 90 s (the script chain: shop main -> gift-ui -> main -> sb notify --for)` });
       }
     }
 

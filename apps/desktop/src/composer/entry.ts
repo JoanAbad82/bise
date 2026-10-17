@@ -1,9 +1,7 @@
 // A saved composer entry (a draft, a history or a queue entry; drafts.ts keeps them as strings),
 // editor-neutral: `{"v":2,"segs":[…]}`, the content as message.ts's segments. Pure, no editor.
 //
-// The reader also takes the old Lexical engine's entries (its editor-state JSON: paragraphs, text,
-// line breaks and 'bise-chip' nodes), so nothing he typed before the switch is lost. Keep that
-// reader one release after Lexical went (architect m_11500). An entry neither reads: null, and the
+// An entry it doesn't read (the old Lexical engine's, whose reader went in issue 31): null, and the
 // caller keeps its raw JSON (never dropped).
 import type { Chip, Segment } from './message';
 
@@ -39,7 +37,7 @@ function isSegment(x: unknown): x is Segment {
   return x.kind === 'chip' && isChip(x.chip);
 }
 
-/** An entry's segments, from either format; null when it reads as neither. */
+/** An entry's segments; null when it doesn't read (the caller keeps its raw JSON). */
 export function entrySegments(entry: string): Segment[] | null {
   let v: unknown;
   try {
@@ -47,32 +45,6 @@ export function entrySegments(entry: string): Segment[] | null {
   } catch {
     return null;
   }
-  if (!isObj(v)) return null;
-  if (v.v === V) return Array.isArray(v.segs) && v.segs.every(isSegment) ? tidy(v.segs) : null;
-  const root = v.root;
-  if (isObj(root) && Array.isArray(root.children)) return lexicalSegments(root.children);
-  return null;
-}
-
-/** The old engine's root children as segments, as its $readSegments read them: paragraphs joined
- *  by a newline, a line break a newline, a chip a chip, any other element's children in order. */
-function lexicalSegments(paras: readonly unknown[]): Segment[] {
-  const out: Segment[] = [];
-  const text = (t: string): void => {
-    out.push({ kind: 'text', text: t });
-  };
-  const visit = (n: unknown): void => {
-    if (!isObj(n)) return;
-    if (n.type === 'bise-chip') {
-      if (isChip(n.chip)) out.push({ kind: 'chip', chip: n.chip });
-    } else if (n.type === 'linebreak') text('\n');
-    else if (n.type === 'tab') text('\t');
-    else if (typeof n.text === 'string') text(n.text);
-    else if (Array.isArray(n.children)) n.children.forEach(visit);
-  };
-  paras.forEach((p, i) => {
-    if (i > 0) text('\n');
-    visit(p);
-  });
-  return tidy(out);
+  if (!isObj(v) || v.v !== V) return null;
+  return Array.isArray(v.segs) && v.segs.every(isSegment) ? tidy(v.segs) : null;
 }

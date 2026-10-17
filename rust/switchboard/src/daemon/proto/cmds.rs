@@ -29,20 +29,13 @@ const QUEUED_COMMAND: &str = "a command can't wait in the queue: send it now";
 /// model would read and what clients draw would differ.
 const PARTS_NOT_THE_LINE: &str = "this line isn't its parts' text: update bise";
 
-/// A send's text beside its parts that isn't their render: the parts win,
-/// the model reads parts::render alone (architect m_22248 (2)), and the
-/// hub writes one log line (its tag, cid, the two lengths; never the
-/// words). A released window (before 5440a964) sends his words with the
-/// chips' labels beside the parts, and the app and the hubs update apart
-/// (architect m_22341).
-/// TODO(parts-text): refuse it with its cid ("this message's text isn't
-/// its parts' text: update bise") the release after the window that
-/// sends no text beside parts ships.
-fn text_beside_parts(tag: &str, cid: Option<u64>, text: &str, parts: &[bise_proto::parts::Part]) {
-    let model = bise_proto::parts::render(parts);
-    if !text.is_empty() && text != model {
-        eprintln!("sbd: {tag} cid {cid:?}: a text beside its parts that isn't theirs ({} vs {} bytes): the parts win", text.len(), model.len());
-    }
+/// A send's text beside its parts that isn't their render: refused with
+/// its cid (words::composer::refused_text_beside_parts), the model and
+/// his thread would read two messages. Only a window before
+/// desktop-v2026.10.1 (8ed6bf275) sent his words with the chips' labels
+/// beside the parts; the log was their shim until issue 31.
+fn text_beside_parts(text: &str, parts: &[bise_proto::parts::Part]) -> bool {
+    !text.is_empty() && text != bise_proto::parts::render(parts)
 }
 
 fn lines_of(raw: Vec<(usize, Option<u64>, String)>) -> Vec<Line> {
@@ -115,8 +108,10 @@ impl Shell {
             // msg-parts: the model's text from his parts, the parts kept
             // on his message (a part this hub doesn't know: refused)
             HubCmd::Send { agent, text, opts, cid, parts, .. } => {
-                text_beside_parts(&tag, cid, &text, &parts);
-                match crate::parts_in::said(&parts, &opts.files, &crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &crate::daemon::fn_context::store_image, exists: &crate::daemon::fn_context::file_exists, known: &self.artifact_known() }) {
+                if text_beside_parts(&text, &parts) {
+                    return self.proto_error_cid(id, &tag, bise_proto::words::composer::refused_text_beside_parts, cid, cid.map(|_| "refused"));
+                }
+                match crate::parts_in::said(&parts, &crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &crate::daemon::fn_context::store_image, exists: &crate::daemon::fn_context::file_exists, known: &self.artifact_known() }) {
                     Ok(s) => {
                         self.artifact_notes_said(&s.parts);
                         self.proto_input(id, &tag, agent, s.text, opts, cid, s.parts)
@@ -124,10 +119,10 @@ impl Shell {
                     Err(e) => self.proto_error_cid(id, &tag, &e, cid, cid.map(|_| "refused")),
                 }
             }
-            HubCmd::Answer { card, reply, files, parts, .. } => {
+            HubCmd::Answer { card, reply, parts, .. } => {
                 let (reply, parts) = match parts.is_empty() {
                     true => (reply, String::new()),
-                    false => match crate::parts_in::said(&parts, &files, &crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &crate::daemon::fn_context::store_image, exists: &crate::daemon::fn_context::file_exists, known: &self.artifact_known() }) {
+                    false => match crate::parts_in::said(&parts, &crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &crate::daemon::fn_context::store_image, exists: &crate::daemon::fn_context::file_exists, known: &self.artifact_known() }) {
                         Ok(s) => {
                             self.artifact_notes_said(&s.parts);
                             (s.text, s.parts)
@@ -150,20 +145,9 @@ impl Shell {
                 // the reply as he wrote it, never read as a command (architect
                 // m_8366): the TUI's /answer handler with its fields
                 let text = reply.trim().to_string();
-                if text.is_empty() && files.is_empty() {
+                if text.is_empty() {
                     return self.proto_error(id, &tag, "an answer needs words or an option's number");
                 }
-                // R41 (architect m_13737): what he pasted with it (an older
-                // desktop's files list, TODO(file-chips) one release) as
-                // his parts, so an image reaches the asking agent's model as
-                // an image and his thread draws the chips
-                let (text, parts) = match files.is_empty() {
-                    true => (text, parts),
-                    false => {
-                        let s = super::fn_context::files_said(&text, &files);
-                        (s.text, s.parts)
-                    }
-                };
                 // inbox picks (3): his answer as sb-core wrote its route line
                 // comes back as the result; an older sb-core's: none ({})
                 self.hub.answered = None;
@@ -470,7 +454,7 @@ impl Shell {
                 // before; a line that isn't refuses (never a command)
                 if !parts.is_empty() {
                     let refused = cid.map(|_| "refused");
-                    let said = crate::parts_in::said(&parts, &opts.files, &crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &crate::daemon::fn_context::store_image, exists: &crate::daemon::fn_context::file_exists, known: &self.artifact_known() });
+                    let said = crate::parts_in::said(&parts, &crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &crate::daemon::fn_context::store_image, exists: &crate::daemon::fn_context::file_exists, known: &self.artifact_known() });
                     if let Ok(s) = &said {
                         self.artifact_notes_said(&s.parts);
                     }
@@ -506,18 +490,7 @@ impl Shell {
     /// `parts`: his parts' JSON (msg-parts, `parts_in::said`; "" none),
     /// carried on the op to sb-core's message.
     #[allow(clippy::too_many_arguments)]
-    fn proto_input(&mut self, id: ClientId, tag: &str, agent: String, text: String, mut opts: SendOpts, cid: Option<u64>, parts: String) {
-        // an older desktop's files list (TODO(file-chips): Send.files goes
-        // one release after the desktop sends file parts) as his parts,
-        // once, before routing (architect m_21764 A); never on a command
-        let files = std::mem::take(&mut opts.files);
-        let (text, parts) = match files.is_empty() || !parts.is_empty() || text.trim_start().starts_with('/') {
-            true => (text, parts),
-            false => {
-                let s = super::fn_context::files_said(&text, &files);
-                (s.text, s.parts)
-            }
-        };
+    fn proto_input(&mut self, id: ClientId, tag: &str, agent: String, text: String, opts: SendOpts, cid: Option<u64>, parts: String) {
         if !self.hub.st.agents.contains_key(&agent) {
             return self.proto_error_cid(id, tag, &format!("no agent {agent}"), cid, cid.map(|_| "refused"));
         }

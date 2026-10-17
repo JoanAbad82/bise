@@ -64,18 +64,28 @@ function rpcSide(write, hubEvs) {
       } else {
         // the events the hub's step sent before it answered (its rows without the card it closed):
         // the real hub broadcasts a step's cards before the request's response (FakeCore.result)
-        for (const ev of before0(cmd)) note(JSON.stringify(ev));
-        write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: r0(cmd) }));
+        const a = answerOf(cmd);
+        for (const ev of a?.before ?? []) note(JSON.stringify(ev));
+        write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: a?.result ?? {} }));
       }
       return cmd;
     },
   };
 }
 
-/** A request's result: card/answer's AnswerResult when a test set one (FakeCore.answers), else {}. */
+/**
+ * A request's answer a test set (FakeCore.result), or undefined: then its result is {}. A card's
+ * answer stays for every request on that card; one with no card (a send's msg_id) answers the
+ * next request alone, so each send of a test gets its own id.
+ */
 let answersBy = [];
-const r0 = (cmd) => answersBy.find((a) => a.cmd === cmd.cmd && a.card === cmd.card)?.result ?? {};
-const before0 = (cmd) => answersBy.find((a) => a.cmd === cmd.cmd && a.card === cmd.card)?.before ?? [];
+const answerOf = (cmd) => {
+  const i = answersBy.findIndex((a) => a.cmd === cmd.cmd && a.card === cmd.card);
+  if (i < 0) return undefined;
+  const a = answersBy[i];
+  if (a.card === undefined) answersBy = answersBy.filter((_, j) => j !== i);
+  return a;
+};
 
 /**
  * answer(cmd): the lines to write back for a command the app sent (a fake core answering a

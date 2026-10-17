@@ -71,7 +71,7 @@ export function feature(now = 1_791_100_000_000): Feature {
         store.do({ i: 'pick', project: g.project, card: g.card, n: g.n, ...(g.from === undefined ? {} : { from: fromOf(g.from) }) });
         return;
       case 'send':
-        store.send({ project: g.project, agent: g.agent, text: g.text, ...(g.mode === undefined ? {} : { mode: g.mode }), ...(g.files === undefined ? {} : { files: g.files }) });
+        store.send({ project: g.project, agent: g.agent, text: g.text, ...(g.mode === undefined ? {} : { mode: g.mode }), ...(g.parts === undefined ? {} : { parts: g.parts }) });
         return;
       case 'open':
         // the app's switch: the projects shown (App.tsx) and the thread followed (ThreadScreen.tsx)

@@ -8,11 +8,11 @@
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"perf","text":"and the warm one","mode":"now","cid":12}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"then the warm one","mode":"queued"}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"why is this slow?","mode":"now","context":{"app":"Safari","url":"https://grafana.acme.test/d/p99","title":"p99 latency"}}
-{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"what stands out here","mode":"now","files":["/Users/ana/notes/q3-notes.md","/Users/ana/Desktop/shot.png"]}
+{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"what stands out here","mode":"now"}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"","mode":"now","cid":13,"parts":[{"kind":"text","text":"regarding "},{"kind":"image","name":"[Image #1]","source":"/Users/ana/Desktop/a.png"},{"kind":"text","text":" and "},{"kind":"quote","from":"main","text":"the cache is warm","n":2},{"kind":"text","text":", which is right?"}]}
 {"cmd":"answer","project":"acme-1a2b3c4d","card":9,"reply":"1"}
 {"cmd":"answer","project":"acme-1a2b3c4d","card":10,"reply":"yes"}
-{"cmd":"answer","project":"acme-1a2b3c4d","card":11,"reply":"this one","files":["/Users/ana/Desktop/shot.png"]}
+{"cmd":"answer","project":"acme-1a2b3c4d","card":11,"reply":"this one"}
 {"cmd":"close","project":"acme-1a2b3c4d","card":9}
 {"cmd":"confirm","project":"acme-1a2b3c4d","id":3,"yes":true}
 {"cmd":"confirm","project":"acme-1a2b3c4d","id":4,"yes":false}
@@ -51,7 +51,7 @@
 {"cmd":"slash","project":"acme-1a2b3c4d","agent":"perf","line":"/rename perf perf2","cid":31}
 {"cmd":"slash","project":"acme-1a2b3c4d","agent":"main","line":"/flow"}
 {"cmd":"slash","project":"acme-1a2b3c4d","agent":"main","line":"@fix encore","mode":"now","voice":true,"via":"capsule"}
-{"cmd":"slash","project":"acme-1a2b3c4d","agent":"perf","line":"why is this slow?","mode":"queued","context":{"app":"Safari","url":"https://grafana.acme.test/d/p99","title":"p99 latency"},"files":["/Users/ana/Desktop/shot.png"]}
+{"cmd":"slash","project":"acme-1a2b3c4d","agent":"perf","line":"why is this slow?","mode":"queued","context":{"app":"Safari","url":"https://grafana.acme.test/d/p99","title":"p99 latency"}}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"what's running?","mode":"now","via":"capsule","voice":true}
 {"cmd":"diff","project":"acme-1a2b3c4d","branch":"sb/perf","req":4}
 {"cmd":"diff","project":"acme-1a2b3c4d","pr":31,"req":5}

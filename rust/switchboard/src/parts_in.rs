@@ -9,7 +9,6 @@
 //!   nothing, so his words would silently leave the model's text;
 //! - an image whose `b64_file` is not a `.b64` file inside the image
 //!   store: a part never makes the model read another file;
-//! - parts together with `files` (one list or the other);
 //! - a part of an artifact (`Part::Anchor`) whose artifact or version
 //!   this hub doesn't have (`known`); taken, the notes hint goes after his
 //!   words and the hub records the note (pages/artifact/notes.rs);
@@ -53,15 +52,12 @@ pub struct Door<'a> {
 /// `parts` checked, completed and rendered through `door`; `store`: the image store's
 /// folder; `put`: how an image part sent with its source only (no
 /// `b64_file`: the window's pasted or dropped file) gets into that store
-/// (the hub: `bend_images::store_file`, Send.files' storer). Its `.b64`
+/// (the hub: `bend_images::store_file`). Its `.b64`
 /// and mime fill the part once, then the kept parts and the rendered text
 /// are both made from that one list (they name the same file). Err: the
 /// words of the refusal (the client's error), nothing delivered.
-pub fn said(parts: &[Part], files: &[String], door: &Door) -> Result<Said, String> {
+pub fn said(parts: &[Part], door: &Door) -> Result<Said, String> {
     let Door { store, put, exists, known } = *door;
-    if !files.is_empty() {
-        return Err("a message's files go as its parts, not beside them".into());
-    }
     let mut parts = parts.to_vec();
     for p in &mut parts {
         match p {
@@ -118,57 +114,6 @@ pub fn said(parts: &[Part], files: &[String], door: &Door) -> Result<Said, Strin
     let text = parts::render(&parts);
     let json = serde_json::to_string(&parts).map_err(|e| format!("parts: {e}"))?;
     Ok(Said { text, parts: json })
-}
-
-/// What a path of a `files` list turned out to be (the shell looks: the
-/// file system and the image store).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Look {
-    /// an image now in the store: its `.b64` file and mime
-    Image(Stored),
-    /// a file, not an image
-    File,
-    /// not absolute, gone, or not a file (the shell logs it)
-    Skip,
-}
-
-/// A `files` list (`HubCmd::Send.files` / `Answer.files`, an older
-/// desktop: TODO(file-chips) both fields go one release after the desktop
-/// sends file parts) as his parts (architect m_21764 A, one owner of the
-/// list: [`parts::render`]): his words, then each image by its file name
-/// one per line after a blank line, then the other files unnamed, so the
-/// render is the old `attached::render` text byte for byte. Every path
-/// once; a relative path is never looked at.
-pub fn of_files(text: &str, files: &[String], look: &mut dyn FnMut(&str) -> Look) -> Vec<Part> {
-    let mut images: Vec<Part> = Vec::new();
-    let mut listed: Vec<Part> = Vec::new();
-    let mut seen: Vec<&str> = Vec::new();
-    for f in files {
-        let f = f.trim();
-        if f.is_empty() || !f.starts_with('/') || seen.contains(&f) {
-            continue;
-        }
-        seen.push(f);
-        match look(f) {
-            Look::Image(s) => images.push(Part::Image { name: parts::file_name(f).to_string(), source: f.to_string(), mime: s.mime, b64_file: s.b64, caption: String::new() }),
-            Look::File => listed.push(Part::File { path: f.to_string(), name: String::new(), missing: false }),
-            Look::Skip => {}
-        }
-    }
-    let mut out = Vec::new();
-    if !text.trim().is_empty() {
-        out.push(Part::Text { text: text.to_string() });
-    }
-    for (i, img) in images.into_iter().enumerate() {
-        match (i, out.is_empty()) {
-            (0, true) => {}
-            (0, false) => out.push(Part::Text { text: "\n\n".into() }),
-            _ => out.push(Part::Text { text: "\n".into() }),
-        }
-        out.push(img);
-    }
-    out.extend(listed);
-    out
 }
 
 /// A routed message as the project hub delivers it (R41 (6)): the text its
@@ -282,15 +227,15 @@ mod tests {
         let file = |name: &str, path: &str| Part::File { path: path.into(), name: name.into(), missing: false };
         let there = |p: &Path| p == Path::new("/u/deck.pptx");
         let ps = [t("ajouter "), img("/h/images/ab12.b64"), t(" dans "), file("[File #2]", "/u/deck.pptx"), t(" et "), file("[File #3]", "/u/gone.csv")];
-        let s = said(&ps, &[], &Door { store: Path::new("/h/images"), put: &none, exists: &there, known: &|_, _| Ok(1) }).unwrap();
+        let s = said(&ps, &Door { store: Path::new("/h/images"), put: &none, exists: &there, known: &|_, _| Ok(1) }).unwrap();
         let back: Vec<Part> = serde_json::from_str(&s.parts).unwrap();
         assert_eq!(back[3], file("[File #2]", "/u/deck.pptx"));
         assert_eq!(back[5], Part::File { path: "/u/gone.csv".into(), name: "[File #3]".into(), missing: true });
         assert!(s.text.ends_with(" dans <file name=\"[File #2]\" path=\"/u/deck.pptx\"> et <file name=\"[File #3]\" path=\"/u/gone.csv\" missing=\"true\">"), "{}", s.text);
         assert_eq!(s.text, parts::render(&back));
-        assert_eq!(said(&[file("[File #1]", "deck.pptx")], &[], &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }), Err("a file part needs an absolute path: deck.pptx".into()));
+        assert_eq!(said(&[file("[File #1]", "deck.pptx")], &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }), Err("a file part needs an absolute path: deck.pptx".into()));
         let listed = Part::File { path: "/u/gone.md".into(), name: String::new(), missing: false };
-        let s = said(std::slice::from_ref(&listed), &[], &Door { store: Path::new("/h/images"), put: &none, exists: &|_| false, known: &|_, _| Ok(1) }).unwrap();
+        let s = said(std::slice::from_ref(&listed), &Door { store: Path::new("/h/images"), put: &none, exists: &|_| false, known: &|_, _| Ok(1) }).unwrap();
         assert_eq!(serde_json::from_str::<Vec<Part>>(&s.parts).unwrap(), vec![listed]);
     }
 
@@ -320,7 +265,7 @@ mod tests {
             calls.set(calls.get() + 1);
             fake(p)
         };
-        let s = said(&[t("look"), img("")], &[], &Door { store, put: &counted, exists: &yes, known: &|_, _| Ok(1) }).unwrap();
+        let s = said(&[t("look"), img("")], &Door { store, put: &counted, exists: &yes, known: &|_, _| Ok(1) }).unwrap();
         assert_eq!(calls.get(), 1, "one store call");
         let back: Vec<Part> = serde_json::from_str(&s.parts).unwrap();
         assert_eq!(back[1], Part::Image { name: "[Image #1]".into(), source: "/d/s.png".into(), mime: "image/jpeg".into(), b64_file: "/h/images/f00d.b64".into(), caption: String::new() });
@@ -328,19 +273,19 @@ mod tests {
         assert_eq!(s.text, parts::render(&back), "the text is the kept parts' render");
         // a stored one: untouched, no store call
         calls.set(0);
-        assert!(said(&[img("/h/images/ab12.b64")], &[], &Door { store, put: &counted, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
+        assert!(said(&[img("/h/images/ab12.b64")], &Door { store, put: &counted, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
         assert_eq!(calls.get(), 0);
         // refused, with the store's words
         let bad = Part::Image { name: "[Image #1]".into(), source: "/d/notes.txt".into(), mime: String::new(), b64_file: String::new(), caption: String::new() };
-        assert_eq!(said(&[t("a"), bad], &[], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }), Err("image /d/notes.txt: not a PNG, JPEG, GIF or WebP image".into()));
+        assert_eq!(said(&[t("a"), bad], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }), Err("image /d/notes.txt: not a PNG, JPEG, GIF or WebP image".into()));
         let rel = Part::Image { name: "[Image #1]".into(), source: "shot.png".into(), mime: String::new(), b64_file: String::new(), caption: String::new() };
-        assert_eq!(said(&[rel], &[], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }), Err("an image part needs an absolute source: shot.png".into()));
+        assert_eq!(said(&[rel], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }), Err("an image part needs an absolute source: shot.png".into()));
     }
 
     #[test]
     fn parts_render_the_models_text_and_keep_their_json() {
         let ps = [Part::Quote { from: "main".into(), text: "q".into(), file: String::new(), new: String::new(), old: String::new(), n: None }, t("why?")];
-        let s = said(&ps, &[], &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }).unwrap();
+        let s = said(&ps, &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }).unwrap();
         assert_eq!(s.text, "<selection from=\"main\">\nq\n</selection>\nwhy?");
         let back: Vec<Part> = serde_json::from_str(&s.parts).unwrap();
         assert_eq!(back, ps);
@@ -351,7 +296,7 @@ mod tests {
     #[test]
     fn an_unknown_part_is_refused() {
         let ps = [t("a"), Part::Unknown(serde_json::json!({"kind": "voice", "secs": 3}))];
-        assert_eq!(said(&ps, &[], &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }), Err("this bise doesn't know part voice: update bise".into()));
+        assert_eq!(said(&ps, &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }), Err("this bise doesn't know part voice: update bise".into()));
     }
 
     /// architect m_22715: a hint (a model line hidden from him) only from
@@ -359,17 +304,17 @@ mod tests {
     #[test]
     fn a_clients_hint_part_is_refused() {
         let ps = [t("hi"), bise_proto::parts::capsule_hint("capsule").unwrap()];
-        assert_eq!(said(&ps, &[], &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }), Err("a hint part is the hub's: update bise".into()));
+        assert_eq!(said(&ps, &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }), Err("a hint part is the hub's: update bise".into()));
     }
 
     /// architect m_17621 Q2: b64_file only inside the image store.
     #[test]
     fn an_image_outside_the_store_is_refused() {
         let store = Path::new("/h/images");
-        assert!(said(&[img("/h/images/ab12.b64")], &[], &Door { store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
-        assert!(said(&[img("")], &[], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }).is_ok(), "no b64 yet: stored by the hub");
+        assert!(said(&[img("/h/images/ab12.b64")], &Door { store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
+        assert!(said(&[img("")], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }).is_ok(), "no b64 yet: stored by the hub");
         for bad in ["/etc/passwd", "/h/images/../secrets/k.b64", "/h/images/sub/a.b64", "rel/a.b64", "/h/images/a.png", "/h/imagesx/a.b64"] {
-            assert!(said(&[img(bad)], &[], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }).is_err(), "{bad}");
+            assert!(said(&[img(bad)], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }).is_err(), "{bad}");
         }
     }
 
@@ -391,9 +336,9 @@ mod tests {
         let dangling = store.join("gone.b64");
         let _ = std::fs::remove_file(&dangling);
         std::os::unix::fs::symlink(root.join("nothing"), &dangling).unwrap();
-        assert!(said(&[img(real.to_str().unwrap())], &[], &Door { store: &store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
-        assert!(said(&[img(link.to_str().unwrap())], &[], &Door { store: &store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_err(), "a link out");
-        assert!(said(&[img(dangling.to_str().unwrap())], &[], &Door { store: &store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_err(), "a dangling link");
+        assert!(said(&[img(real.to_str().unwrap())], &Door { store: &store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
+        assert!(said(&[img(link.to_str().unwrap())], &Door { store: &store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_err(), "a link out");
+        assert!(said(&[img(dangling.to_str().unwrap())], &Door { store: &store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_err(), "a dangling link");
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -450,10 +395,5 @@ mod tests {
         let r = restored(&text, "", &store, &none, &none);
         assert_eq!((r.text.as_str(), r.parts.as_str()), (text.as_str(), ""));
         let _ = std::fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn parts_and_files_together_are_refused() {
-        assert!(said(&[t("a")], &["/w/a.md".into()], &Door { store: Path::new("/h/images"), put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_err());
     }
 }

@@ -442,4 +442,7 @@ crate::words! { composer:
     cmd_scheduled = "its timers";
     /// the desktop's / list: /bims (the office's map for this project)
     cmd_bims = "the bims' office: pick its map";
+    /// a send refused: its text beside its parts isn't their text (a
+    /// window before desktop-v2026.10.1 sent his words beside the parts)
+    refused_text_beside_parts = "this message's text isn't its parts' text: update bise";
 }

@@ -43,8 +43,8 @@ test('inbox/drafts: each card keeps its own half answer in the composer, the thr
   const n = `d${String(Date.now() % 1_000_000)}`;
   const A = `first ask ${n}: which flag name?`;
   const B = `second ask ${n}: ship today or monday?`;
-  worldSay('shop', `[[bash: sb card "${A}"]] asked`);
-  worldSay('shop', `[[bash: sb card "${B}"]] asked`);
+  worldSay('shop', `[[bash: sb notify "${A}"]] asked`);
+  worldSay('shop', `[[bash: sb notify "${B}"]] asked`);
   const hub = hubOf(w, 'shop');
   type HubCard = { id: number; text?: string; question?: string };
   const ours = async () => (((await hubState(hub.sock))['cards'] as HubCard[] | undefined) ?? []).filter((c) => `${c.text ?? ''}${c.question ?? ''}`.includes(n));

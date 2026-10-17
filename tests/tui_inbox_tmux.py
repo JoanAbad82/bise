@@ -27,7 +27,7 @@ CTRL = "\x1b[%d;5u"   # ctrl+digit, the kitty keyboard protocol's form
 
 
 def card(text):
-    return "[[bash: sb card \"$(printf '%s')\"]]" % text
+    return "[[bash: sb notify \"$(printf '%s')\"]]" % text
 
 
 def shot(t, name):
@@ -56,7 +56,7 @@ def main():
         t.wait("✓ you answered main: alpha")
         t.wait_re(MAIN_IDLE)
         # one withdrawn, one left waiting
-        t.typed(card("second: never mind") + " [[bash: sb card --withdraw 2 'moot now']]")
+        t.typed(card("second: never mind") + " [[bash: sb notify --withdraw 2 'moot now']]")
         t.keys("Enter")
         t.wait("withdrawn")
         t.wait_re(MAIN_IDLE)

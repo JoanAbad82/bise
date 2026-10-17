@@ -26,7 +26,9 @@ test('thread/pending-echo: a page, a steer or a queued delivery turns his pendin
     const { page } = s;
     const field = page.locator(T.field).first();
     await expect(field, "bise's composer").toBeVisible({ timeout: 10_000 });
-    const send = async (words: string): Promise<void> => {
+    // the hub answers each send with its message id, and its echo carries it (A1: no words match)
+    const send = async (words: string, msgId: number): Promise<void> => {
+      await core.result('send', undefined, { msg_id: msgId });
       await field.click();
       await page.keyboard.type(words);
       await page.keyboard.press('Enter');
@@ -38,7 +40,7 @@ test('thread/pending-echo: a page, a steer or a queued delivery turns his pendin
 
     // 1. the echo comes in a page (an older 'ok' with the same words is in it too)
     const w1 = `il y a pas des updates de UI aussi? l'historique ${tag}`;
-    await send(w1);
+    await send(w1, 901);
     await expect(pending(w1), 'his row shows at once').toHaveCount(1, { timeout: 1000 });
     const old: Entry = { pos: 9001, at_ms: Date.now() - 3_600_000, kind: 'you', text: w1, msg_id: 900, delivery: 'read' };
     await core.send({ ev: 'thread', project: HOME, agent: 'main', entries: [old], before: null, more: false });
@@ -50,7 +52,7 @@ test('thread/pending-echo: a page, a steer or a queued delivery turns his pendin
 
     // 2. steered: received, then read mid-turn
     const w2 = `also try webp ${tag}`;
-    await send(w2);
+    await send(w2, 902);
     await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: you(9003, w2, { msg_id: 902, delivery: 'received' }) });
     await expect(pending(w2), 'the first echo takes his row').toHaveCount(0, { timeout: 2000 });
     await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: { pos: 9004, at_ms: Date.now(), kind: 'agent', text: `webp saves 30% ${tag}` } });
@@ -62,7 +64,7 @@ test('thread/pending-echo: a page, a steer or a queued delivery turns his pendin
 
     // 3. queued: no echo until it is said; then the row goes
     const w3 = `and the changelog ${tag}`;
-    await send(w3);
+    await send(w3, 903);
     await page.waitForTimeout(1500);
     await expect(pending(w3), 'still on its way while queued').toHaveCount(1);
     await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: you(9005, w3, { msg_id: 903, delivery: 'read' }) });

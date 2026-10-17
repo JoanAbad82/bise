@@ -73,6 +73,8 @@ test('thread/file-chips: a drop of documents makes file chips, ⏎ sends each wh
       await expect(page.locator('[data-testid^="composer.strip."]').filter({ hasText: '▯' }), 'no strip line for a file: its chip says it').toHaveCount(0);
       await shots(page, core, 'composer');
 
+      // the hub answers his send with its message id, and his entry carries it: the row goes (A1)
+      await core.result('send', undefined, { msg_id: 2 });
       await page.keyboard.press('Enter');
       const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as Record<string, unknown>;
       expect(sent['files'], 'never a files list').toBeUndefined();
@@ -101,7 +103,7 @@ test('thread/file-chips: a drop of documents makes file chips, ⏎ sends each wh
               : `<file name="${String(p['name'])}" path="${String(p['path'])}"${p['missing'] === true ? ' missing="true"' : ''}>`,
         )
         .join('');
-      await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: { pos: 2, at_ms: Date.now(), kind: 'you', text, parts: kept } } as never);
+      await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: { pos: 2, at_ms: Date.now(), kind: 'you', msg_id: 2, text, parts: kept } } as never);
       await expect(page.locator('[data-testid^="thread.pending."]'), "the echo with file markers ends 'sending…'").toHaveCount(0, { timeout: 3000 });
       const bubble = page.locator('[data-testid="thread.you.2.parts"]');
       await expect(bubble, 'his bubble draws the parts').toBeVisible({ timeout: 5000 });

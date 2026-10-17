@@ -3,10 +3,10 @@ his typed parts, and the check that a window-shaped message keeps its
 order (his m_22231, architect m_22248)."""
 
 import json
-import os
 
 from e2e import check
-from proto_rpc import req
+from proto_rpc import refused, req
+from words import w
 
 
 def quote_tag(frm, text, n=None):
@@ -38,10 +38,9 @@ def positional_round(c, E, yous, shot):
     """His m_22231: 'regarding [Image #1] and [Image #2] and ❝ 3, …' as
     the window sends it (parts, no text). His entry keeps the parts in
     their order, the model reads the quote at its place, after both
-    images. The released window's shape (his words with the chips'
-    labels beside the parts, not their render) is taken: the parts win,
-    the model reads their render, the hub logs one line without the
-    words (architect m_22341, TODO(parts-text))."""
+    images. A window before desktop-v2026.10.1 sent his words with the
+    chips' labels beside the parts (not their render): refused with its
+    cid, nothing delivered (issue 31; it was logged and taken before)."""
     quote = {"kind": "quote", "from": "main", "text": "the cache is warm", "n": 3}
     parts = [
         {"kind": "text", "text": "regarding "},
@@ -70,15 +69,13 @@ def positional_round(c, E, yous, shot):
     reqs = [r for r in E.fake_requests() if r.get("agent") == "main"]
     check(any(tail in r.get("user_tail", "") + r.get("user", "") for r in reqs), "the model read the quote after both images: %r" % [r.get("user_tail") for r in reqs][-2:])
     old = [{"kind": "quote", "from": "main", "text": "the released app"}, {"kind": "text", "text": "sent its words too"}]
+    before = len(yous())
     r = req(c, "turn/send", agent="main", text="sent its words too", parts=old, mode="now", cid=82)
-    check("error" not in r, "no error for it: %r" % r)
-    c.wait(lambda: any(x.get("parts") == old for x in yous()), 30, "the released window's send taken")
-    check([x for x in yous() if x.get("parts") == old][-1]["text"] == render(old), "its entry's text is the parts' render")
+    err = refused(r, "a text beside its parts")
+    check(err["message"] == w("composer.refused_text_beside_parts"), "its words: %r" % err)
     c.wait_idle("main", timeout=30)
-    tail = render(old)[-60:]
-    check(any(tail in r.get("user_tail", "") + r.get("user", "") for r in E.fake_requests() if r.get("agent") == "main"), "the model read the parts' render")
-    log = open(os.path.join(E.tmp, "hub.stderr")).read()
-    check("cid Some(82)" in log and "the parts win" in log and "sent its words too" not in log, "one log line, without the words")
+    check(len(yous()) == before and not any(x.get("parts") == old for x in yous()), "nothing delivered")
+    check(not any("sent its words too" in json.dumps(q) for q in E.fake_requests()), "the model never read it")
 
 
 CAPSULE_HINT = "\n\n[from the capsule: answer in one short line]"

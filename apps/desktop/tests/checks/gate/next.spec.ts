@@ -146,7 +146,7 @@ test('gate/next: core through initialize, the lights room, the one inbox block',
       mkdirSync(sd, { recursive: true });
       const k = `nxb-${String(run)}`;
       const tmp = path.join(sd, `.next-${k}.tmp`);
-      writeFileSync(tmp, JSON.stringify({ match: `${k}-start`, calls: [{ tool: 'bash', arg: `sb card "${k} which branch first? 1. checkout 2. gift-ui"` }], reply: 'Asked you.' }));
+      writeFileSync(tmp, JSON.stringify({ match: `${k}-start`, calls: [{ tool: 'bash', arg: `sb notify "${k} which branch first? 1. checkout 2. gift-ui"` }], reply: 'Asked you.' }));
       renameSync(tmp, path.join(sd, `next-${k}.json`));
       await go(s, `project/${shop}`);
       await s.app.evaluate((_e, v) => { (globalThis as { __biseTestFocused?: boolean }).__biseTestFocused = v; }, false);

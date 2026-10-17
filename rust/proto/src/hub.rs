@@ -483,14 +483,9 @@ pub enum Mode {
 /// one struct, flattened, so the wire keeps `send`'s names): `mode` none
 /// is now; `context` what was on his screen at fn (S9): the hub frames it
 /// after his words for the model (switchboard's fn_context::render) and
-/// keeps it on his thread entry; `files` what he attached or dropped
-/// (absolute paths, an older desktop's: TODO(file-chips) goes one release
-/// after the desktop sends file parts): the hub makes them his parts once
-/// (switchboard's parts_in::of_files), an image as an image-store marker
-/// the model sees, any other file in the list after his words, a path
-/// that isn't absolute or doesn't exist left out, never on a slash
-/// command; `voice` said in
-/// voice mode; `via` the client part that sent it (`capsule`,
+/// keeps it on his thread entry (his files go as `Send.parts`; the
+/// older desktops' `files` list was removed in issue 31, an older line's
+/// `files` is ignored); `voice` said in voice mode; `via` the client part that sent it (`capsule`,
 /// `capsule-start`, `ambient`: the capsule's hint for main).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -499,8 +494,6 @@ pub struct SendOpts {
     pub mode: Option<Mode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<FnContext>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub files: Vec<String>,
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub voice: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -515,7 +508,7 @@ impl SendOpts {
 
 /// What a client asks a hub.
 // one command is decoded at a time and never stored in bulk: the size of
-// its largest variant (Send, with its context and files) costs nothing
+// its largest variant (Send, with its context and parts) costs nothing
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -542,7 +535,7 @@ pub enum HubCmd {
     /// same connection and agent stops an older one still running
     Find { project: Project, agent: String, needle: String, rid: u64 },
     /// his words to an agent (main included), as the TUI sends them, with
-    /// how they go ([`SendOpts`]: mode, context, files, voice, via)
+    /// how they go ([`SendOpts`]: mode, context, voice, via)
     Send {
         project: Project,
         agent: String,
@@ -556,24 +549,20 @@ pub enum HubCmd {
         /// his message as typed parts (msg-parts, [`crate::parts`]): the
         /// hub renders the model's text from them (`text` is then
         /// ignored) and keeps them on his message, so every client draws
-        /// his quotes, pastes and images as chips. Empty: `text` (and
-        /// `files`) as before. Never with `files`; a part this hub
-        /// doesn't know is refused (it would drop words)
+        /// his quotes, pastes, images and files as chips. Empty: `text`
+        /// alone. A part this hub doesn't know is refused (it would drop
+        /// words)
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         parts: Vec<Part>,
     },
     /// a card's answer: an option's number or words (approvals and merges
-    /// included: the hub's one /answer path). `files`: what he pasted or
-    /// dropped with it, the same field as `Send.files` (TODO(file-chips):
-    /// one release), his parts by the same `parts_in::of_files` (an image
-    /// as its image-store marker, so the asking agent's model sees it;
-    /// R41, architect m_13737)
+    /// included: the hub's one /answer path). What he pasted or dropped
+    /// with it goes as `parts` (the older desktops' `files` list was
+    /// removed in issue 31; an older line's `files` is ignored)
     Answer {
         project: Project,
         card: u64,
         reply: String,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        files: Vec<String>,
         /// his answer as typed parts, as `Send.parts` (`reply` then ignored)
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         parts: Vec<Part>,

@@ -2,16 +2,10 @@
 // message id the hub gave it (the send's result, main's ipc.ts -> the window-local event 'sent'),
 // not by its words. Pure. Owner: amb-win (store.ts calls it; amb-core's file).
 import type { Entry } from "@/proto";
-import { sentParts, sentWords, type Pending } from "./types";
-
-/**
- * How much earlier than his send its echo (the hub's 'you' entry) may say it was written: the
- * window's clock and the hub's line times are the same machine's, read a few ms apart.
- */
-export const ECHO_SLACK_MS = 5000;
+import type { Pending } from "./types";
 
 /** The window-local 'sent' (never a hub event): the send `cid` of this window was answered with
- *  its message id; null: a hub that answers {} (older), the words match it instead. */
+ *  its message id; null: an answer without one (a refused send's row goes by its error). */
 export interface Sent {
   readonly project: string;
   readonly agent: string;
@@ -38,33 +32,14 @@ export function sentOf(raw: unknown): Sent | null {
 }
 
 /**
- * Which pending send `e` is the echo of, or -1. A send answered with an id meets only the entry
- * with that id (two sends of the same words never swap). The words stay only for a send the hub
- * answered without an id (an older hub) or not answered yet, and an entry without an id (an older
- * transcript): TODO(A1): drop them one release after the hub's msg_id result is out. Only an entry
- * written after the send (less `slackMs`) can be its echo.
+ * Which pending send `e` is the echo of, or -1: the send answered with the entry's message id
+ * (two sends of the same words never swap). An entry that lands before its send's answer has no
+ * row yet: the store keeps its id (`keepLanded`) and `answered` drops the row then. The words
+ * matched a send of an older hub (no id) until issue 31: every hub from v2026.10.2-35 answers one.
  */
-export function echoOf(
-  pending: readonly Pending[],
-  e: Entry,
-  slackMs: number,
-): number {
+export function echoOf(pending: readonly Pending[], e: Entry): number {
   const id = e.msg_id ?? null;
-  if (id !== null) {
-    const i = pending.findIndex((p) => p.msgId === id);
-    if (i >= 0) return i;
-  }
-  const typed =
-    e.parts != null && e.parts.length > 0 ? sentParts(e.parts) : null;
-  const said = sentWords(e.text);
-  return pending.findIndex(
-    (p) =>
-      typeof p.msgId !== "number" &&
-      e.at_ms >= p.at_ms - slackMs &&
-      (typed !== null && p.parts !== undefined
-        ? sentParts(p.parts) === typed
-        : sentWords(p.text) === said),
-  );
+  return id === null ? -1 : pending.findIndex((p) => p.msgId === id);
 }
 
 /** An entry of his with no row: its send's answer may come after it, so its id is kept (the last 32). */

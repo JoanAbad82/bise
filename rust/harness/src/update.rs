@@ -270,17 +270,10 @@ fn place(versions: &Path, id: &str, from: &Path, copy: bool) -> Result<PathBuf, 
         // never written over (a hub may run from it). One naming rule: a
         // VERSION id names one build (releases: the version; desktop_try:
         // root-<head8>[-<changes8>]-<recipe6>, root-<sha12> for a candidate),
-        // so a clash is an error that names both builds. One exception: the
-        // bundles packed before 0d546db5 all say id=root (ambient-lead
-        // m_21844), so an app's 'root' runtime goes to root-<commit12>, the
-        // name its build would have today, rather than leave that app without
-        // hubs (architect m_21930)
-        let commit = release::read_version(from).get("commit").cloned().unwrap_or_default();
-        let legacy = copy && id == LEGACY_ID && commit.len() >= 12 && commit.chars().all(|c| c.is_ascii_alphanumeric());
-        if !legacy {
-            return Err(format!("{} holds another build ({}) than {} ({}): one VERSION id, two builds", dir.display(), build_of(&dir), from.display(), build_of(from)));
-        }
-        return place(versions, &format!("{}-{}", id, &commit[..12]), from, copy);
+        // so a clash is an error that names both builds (the bundles packed
+        // before 0d546db5 said id=root and went to root-<commit12> until
+        // issue 31: every desktop release has 0d546db5)
+        return Err(format!("{} holds another build ({}) than {} ({}): one VERSION id, two builds", dir.display(), build_of(&dir), from.display(), build_of(from)));
     }
     std::fs::create_dir_all(versions).map_err(|e| format!("{}: {}", versions.display(), e))?;
     let tmp = versions.join(format!(".{}.{}.tmp", id, std::process::id()));
@@ -319,12 +312,6 @@ fn place(versions: &Path, id: &str, from: &Path, copy: bool) -> Result<PathBuf, 
         }
     }
 }
-
-/// The one VERSION id two builds shared: every desktop_try candidate before
-/// 0d546db5 (cand_paths named its root `root`).
-// TODO(amb-mac): drop LEGACY_ID and its branch in place() once no bundle packed
-// before 0d546db5 can still run: the release after his next app update.
-const LEGACY_ID: &str = "root";
 
 /// A root's build as an error names it: `id=<id> commit=<commit12>`.
 fn build_of(dir: &Path) -> String {
@@ -745,13 +732,14 @@ mod tests {
         let (a, b) = ("b4a25acbc155ff9315c299f62ad9089142565abf", "8b00ed2b0123456789abcdef0123456789abcdef");
         let dir_a = place(&versions, "root", &app("a", a), true).unwrap();
         assert_eq!(dir_a, versions.join("root"));
-        let dir_b = place(&versions, "root", &app("b", b), true).unwrap();
-        assert_eq!(dir_b, versions.join("root-8b00ed2b0123"));
-        assert_eq!(std::fs::read_to_string(dir_b.join("bise")).unwrap(), b, "B's own runtime");
+        // the same id, another commit (a bundle packed before 0d546db5; its
+        // root-<commit12> second dir went in issue 31): an error naming both
+        let e = place(&versions, "root", &app("b", b), true).unwrap_err();
+        assert!(e.contains("holds another build (id=root commit=b4a25acbc155)") && e.contains("(id=root commit=8b00ed2b0123)"), "{e}");
+        assert!(!versions.join("root-8b00ed2b0123").exists(), "no second name");
         assert_eq!(std::fs::read_to_string(dir_a.join("bise")).unwrap(), a, "A's dir untouched");
-        assert_eq!(place(&versions, "root", &app("b", b), true).unwrap(), dir_b, "B again: its dir");
         assert_eq!(place(&versions, "root", &app("a", a), true).unwrap(), dir_a, "A again: its dir");
-        // one naming rule (architect m_21930): any other id that names two
+        // one naming rule (architect m_21930): any id that names two
         // builds, or a half dir under it, is an error naming both, never a
         // second name
         std::fs::create_dir_all(versions.join("v2")).unwrap();
@@ -761,15 +749,17 @@ mod tests {
         let e = place(&versions, "v2", &c, true).unwrap_err();
         assert!(e.contains("holds another build (id=? commit=?)") && e.contains("(id=v2 commit=8b00ed2b0123)"), "{e}");
         assert!(!versions.join("v2-8b00ed2b0123").exists(), "no second name");
-        // a release (moved, its dir is current's target) never goes beside, even as root
+        // a release (moved, its dir is current's target) never goes beside either
         let e = place(&versions, "root", &app("r", "ffffffffffffffffffffffff"), false).unwrap_err();
         assert!(e.contains("holds another build (id=root commit=b4a25acbc155)"), "{e}");
         let _ = std::fs::remove_dir_all(&t);
     }
 
-    /// A legacy root's second dir (root-<commit12>) is a version like the
-    /// others: installed() lists it, and prune keeps it only while it is
-    /// among the newest, current or run from (architect m_21930: ~100 MB each).
+    /// A legacy root's second dir (root-<commit12>, made for the bundles
+    /// packed before 0d546db5 until issue 31; one may still sit in a
+    /// versions dir) is a version like the others: installed() lists it,
+    /// and prune keeps it only while it is among the newest, current or run
+    /// from (architect m_21930: ~100 MB each).
     #[test]
     fn a_legacy_roots_second_dir_is_listed_and_pruned_like_the_others() {
         let t = std::env::temp_dir().join(format!("bise-prune-legacy-{}", std::process::id()));

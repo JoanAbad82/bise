@@ -18,7 +18,7 @@
 // - the window goes to the asking project's main after an answer the hub took, made from another
 //   project's thread, unless the card is bise's own (the home project's).
 import { describe, expect, it } from "vitest";
-import type { Artifact, Card, CardAnswer, ProjectRow } from "@/proto";
+import type { Artifact, Card, CardAnswer, Part, ProjectRow } from "@/proto";
 import type { OptAct } from "@/proto/rows";
 import { core_ev } from "@/proto/fixtures.gen";
 import type { CoreCmd } from "@/shared/api";
@@ -157,7 +157,7 @@ function inputsOf(seed: number, n: number): Input[] {
       out.push(projectsEv());
     } else if (k < 42) {
       const from = fromOf();
-      out.push({ at_ms: at, in: "do", intent: { i: "answer", project: p, card: id, reply: r.pick(["1", "2", "the cold one"]), ...(r.chance(0.2) ? { files: ["/tmp/a.png"] } : {}), ...(from === undefined ? {} : { from }) } });
+      out.push({ at_ms: at, in: "do", intent: { i: "answer", project: p, card: id, reply: r.pick(["1", "2", "the cold one"]), ...(r.chance(0.2) ? { parts: [{ kind: "image" as const, name: "[Image #1]", source: "/tmp/a.png" }] } : {}), ...(from === undefined ? {} : { from }) } });
     } else if (k < 48) {
       // his option n: an act the row gives it opens (nothing sent), else his answer
       const from = fromOf();
@@ -181,7 +181,7 @@ function inputsOf(seed: number, n: number): Input[] {
 
 // ---- the spec model
 
-type Attempt = { kind: "close" } | { kind: "answer"; reply: string; files?: readonly string[]; from?: AnswerFrom };
+type Attempt = { kind: "close" } | { kind: "answer"; reply: string; parts?: readonly Part[]; from?: AnswerFrom };
 interface Model {
   /** in flight: key -> when he acted, insertion order = oldest first */
   flight: Map<string, number>;
@@ -211,10 +211,10 @@ function modelStep(m: Model, f: HubFacts, input: Input): CoreCmd[] {
     m.refused.delete(key(p, c));
     m.attempts.set(key(p, c), a);
   };
-  const answer = (p: string, c: number, reply: string, files: readonly string[] | undefined, from: AnswerFrom | undefined, at: number): void => {
+  const answer = (p: string, c: number, reply: string, parts: readonly Part[] | undefined, from: AnswerFrom | undefined, at: number): void => {
     if (from !== undefined) m.answering.set(`${p}/${String(c)}`, from);
-    act(p, c, at, { kind: "answer", reply, ...(files === undefined ? {} : { files }), ...(from === undefined ? {} : { from }) });
-    cmds.push({ cmd: "answer", project: p, card: c, reply, ...(files !== undefined && files.length > 0 ? { files: [...files] } : {}) });
+    act(p, c, at, { kind: "answer", reply, ...(parts === undefined ? {} : { parts }), ...(from === undefined ? {} : { from }) });
+    cmds.push({ cmd: "answer", project: p, card: c, reply, ...(parts !== undefined && parts.length > 0 ? { parts: [...parts] } : {}) });
   };
   const close = (p: string, c: number, at: number): void => {
     act(p, c, at, { kind: "close" });
@@ -265,7 +265,7 @@ function modelStep(m: Model, f: HubFacts, input: Input): CoreCmd[] {
     return cmds;
   }
   const it = input.intent;
-  if (it.i === "answer") answer(it.project, it.card, it.reply, it.files, it.from, input.at_ms);
+  if (it.i === "answer") answer(it.project, it.card, it.reply, it.parts, it.from, input.at_ms);
   else if (it.i === "close") close(it.project, it.card, input.at_ms);
   else if (it.i === "pick") {
     // the act the input's own row gives option n; none: his answer, its digit
@@ -275,7 +275,7 @@ function modelStep(m: Model, f: HubFacts, input: Input): CoreCmd[] {
   } else if (it.i === "retry_card") {
     const a = m.refused.get(key(it.project, it.card))?.attempt;
     if (a?.kind === "close") close(it.project, it.card, input.at_ms);
-    else if (a?.kind === "answer") answer(it.project, it.card, a.reply, a.files, a.from, input.at_ms);
+    else if (a?.kind === "answer") answer(it.project, it.card, a.reply, a.parts, a.from, input.at_ms);
   }
   return cmds;
 }

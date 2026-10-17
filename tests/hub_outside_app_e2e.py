@@ -10,9 +10,9 @@ Here, on a throwaway home: a stand-in bundle (Contents/Resources/bin: this tree'
 and a VERSION), `bise ambient-core` run from it as the app runs it, its hub up and main's REPL
 started by a message, then a NEW agent (t1). Then: the hub and both REPLs run from
 versions/<id>/bise's dir, and once the core is gone no process of the hub's tree (sbd, repl-live,
-plugins serve, computer-use) runs from the bundle. Last, app B with the same id and another commit
-(every promoted candidate said id=root, ambient-lead m_21844): its new hub runs from
-versions/<id>-<commit12>, B's own runtime, and A's dir is left as it was.
+plugins serve, computer-use) runs from the bundle. Last, app B, another build with its own id
+(root-<sha12>, as desktop_try names a candidate): its new hub runs from versions/<B's id>, B's own
+runtime, and A's dir is left as it was.
 
 Run: python3 -u tests/hub_outside_app_e2e.py (after cd rust && cargo build)
 """
@@ -29,17 +29,16 @@ from e2e import EXE, ROOT, check  # noqa: E402
 
 # the runtime the desktop pack puts next to bise (electron-builder.mjs, BISE_PACK_ROOT)
 RUNTIME = ("repl-live", "repl-scripted", "sb-core", "prompts", "kit", "plugins", "computer-use")
-# the id every candidate packed before 0d546db5 said (ambient-lead m_21844): the one id place()
-# still lets two builds share (an app's legacy root goes to root-<commit12>); any other clash is
-# an error (architect m_21930)
-ID = "root"
 A, B = "a1" * 20, "b2" * 20
+# a VERSION id names one build (desktop_try: root-<sha12> for a candidate); two builds under one id
+# are an error (architect m_21930; the legacy 'root' id's second dir went in issue 31)
+ID, ID_B = "root-" + A[:12], "root-" + B[:12]
 
 
-def bundle(tmp, name, commit):
+def bundle(tmp, name, commit, vid):
     """A stand-in '<name>.app' with its runtime in Contents/Resources/bin: bise copied (its
     canonical path must be in the bundle), the runtime linked to this tree, a VERSION with that
-    commit (every promoted candidate said id=root: ambient-lead m_21844, so the id is shared)."""
+    id and commit."""
     app = os.path.join(tmp, name + ".app")
     bin_dir = os.path.join(app, "Contents", "Resources", "bin")
     os.makedirs(bin_dir)
@@ -49,7 +48,7 @@ def bundle(tmp, name, commit):
         if os.path.exists(src):
             os.symlink(src, os.path.join(bin_dir, n))
     with open(os.path.join(bin_dir, "VERSION"), "w") as f:
-        f.write("id=%s%scommit=%s%s" % (ID, chr(10), commit, chr(10)))
+        f.write("id=%s%scommit=%s%s" % (vid, chr(10), commit, chr(10)))
     return app, bin_dir
 
 
@@ -91,9 +90,9 @@ def main():
         sys.exit("build first: cd rust && cargo build")
     E = e2e.Env()
     core = None
-    app, bin_dir = bundle(E.tmp, "bise a", A)
+    app, bin_dir = bundle(E.tmp, "bise a", A, ID)
     inside = os.path.join(app, "Contents") + "/"
-    app_b, bin_b = bundle(E.tmp, "bise b", B)
+    app_b, bin_b = bundle(E.tmp, "bise b", B, ID_B)
     # the throwaway home's versions dir: every hub an app starts runs from there. The core starts
     # the home hub and the workspace's, and SB_STATE_DIR gives both one socket: whichever wins
     # holds it (the other one exits), so the laws below are about the one hub on that dir
@@ -148,14 +147,14 @@ def main():
         check(left == [], "after the app quit nothing runs from the bundle: %r" % left)
         check(hubs_in(versions[0]) != [], "its hub lives on")
 
-        # app B, same id, another build: its new hub runs B's runtime, never A's dir
+        # app B, another build: its new hub runs B's runtime, never A's dir
         e2e.stop_hub(os.path.join(E.state, "hub.sock"), False)
         wait.until(lambda: hubs_in(versions[0]) == [], 30, "A's hub gone")
         core = Core(E, exe=os.path.join(bin_b, "bise"), cwd=E.tmp, env=E.env, err="core-b.stderr")
         core.wait(lambda e: e.get("ev") == "hub" and e.get("up") is True, 60, "B's hub up")
         wait.until(lambda: len(hubs_in(versions[0])) == 1, 30, "one hub on " + versions[0])
         exe_b = hubs_in(versions[0])[0].split(" sbd --workspace ")[0]
-        check(exe_b.endswith(os.path.join("versions", "%s-%s" % (ID, B[:12]), "bise")), "B's hub runs B's own dir: %s" % exe_b)
+        check(exe_b.endswith(os.path.join("versions", ID_B, "bise")), "B's hub runs B's own dir: %s" % exe_b)
         ver = open(os.path.join(os.path.dirname(exe_b), "VERSION")).read()
         check("commit=" + B in ver, "that dir is B's build: %r" % ver)
         check("commit=" + A in open(os.path.join(dir_a, "VERSION")).read(), "A's dir untouched")

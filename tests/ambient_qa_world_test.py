@@ -102,8 +102,8 @@ def world_fixtures_seed_every_desktop_shape():
         m = world.main_script(w, p)
         asks = [st for a in p["agents"] for st in a["steps"] if "ask" in st and not st.get("main_answers")]
         answered = [(a["name"], st["main_answers"]) for a in p["agents"] for st in a["steps"] if st.get("main_answers")]
-        check(m.count("sb spawn ") == len(p["agents"]) and m.count("sb card ") == len(p["cards"]) + len(asks), "main's script: %s" % p["name"])
-        check(m.count("sb card --for ") == len(asks), "an agent's question is main's card for that agent's message: %s" % p["name"])
+        check(m.count("sb spawn ") == len(p["agents"]) and m.count("sb notify ") == len(p["cards"]) + len(asks), "main's script: %s" % p["name"])
+        check(m.count("sb notify --for ") == len(asks), "an agent's question is main's card for that agent's message: %s" % p["name"])
         for who, ans in answered:
             # qa-flows m_11510 (b): main answers for him, a reply to the agent's message with its why
             check("sb send %s --reply-to \"$(cat " % who in m and "--why %s" % shlex.quote(ans["why"]) in m,

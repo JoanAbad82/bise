@@ -142,7 +142,7 @@ def parts_round(c, E):
     c.say('[[bash: sb send main --expect-reply "quel process ?"]]', focus="t3")
     mid = asked(c, "t3", "quel process", "t3 asks main (parts)")
     c.wait_idle("main", "t3", timeout=45)
-    c.say('[[bash: sb card --for %s "quel process ?"]]' % mid)
+    c.say('[[bash: sb notify --for %s "quel process ?"]]' % mid)
     c.wait(lambda: any(x["kind"] == "question" for x in c.cards()), 30, "the parts card")
     card = [x for x in c.cards() if x["kind"] == "question"][0]
     c.wait_idle("main", timeout=30)

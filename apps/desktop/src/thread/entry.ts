@@ -526,7 +526,7 @@ export function handoffOf(text: string): { agent: string; brief: string } | null
  * line or the old product name. Pure.
  */
 export function answeredCardOf(text: string): { card: number; question: string; words: string } | null {
-  // 'card' in transcripts written before notif-rename, read for good. TODO(notif-rename): read the
+  // 'card' in transcripts written before notif-rename, read for good. TODO(answer-route): read the
   // route line's typed card instead of these words.
   const m = /^the user answered (?:notification|card) #(\d+) \("([\s\S]*)"\):\s*"([\s\S]*)"\s*$/.exec(text.trim());
   if (m === null) return null;

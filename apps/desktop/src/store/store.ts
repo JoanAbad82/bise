@@ -58,7 +58,7 @@ import {
 import { applyTyped } from "./apply";
 import { answers, listsLive, merged, planJump, planNewer } from "./window";
 import { trim } from "./trim";
-import { answered, echoOf, keepLanded, sentOf, ECHO_SLACK_MS, type Sent } from "./echo";
+import { answered, echoOf, keepLanded, sentOf, type Sent } from "./echo";
 import { EMPTY, type Thread } from "./base";
 import { cardAnsweredOf, cardKeyOf, type AnsweredFrom } from "./answered";
 import { StoreVoice } from "./voice";
@@ -213,7 +213,7 @@ export class Store extends StoreVoice {
 
   /** His message landed: its pending send goes, by its id (A1, echo.ts); no row: its id is kept. */
   private landed(key: string, t: Thread, e: Entry): void {
-    const i = echoOf(t.pending, e, ECHO_SLACK_MS);
+    const i = echoOf(t.pending, e);
     if (i < 0) t.landedIds = keepLanded(t.landedIds, e.msg_id);
     if (i < 0) return;
     t.pending = t.pending.filter((_, j) => j !== i);
@@ -449,23 +449,19 @@ export class Store extends StoreVoice {
 
   /**
    * His words to an agent: shown at once as pending, then sent. Returns its cid.
-   * files: absolute paths he attached; the hub renders them once after his
-   * words (an image as one the model sees, any other file by its path).
+   * His images and files go as parts (the hub stores each image once).
    */
   send(a: {
     project: string;
     agent: string;
     text: string;
     mode?: Mode;
-    files?: readonly string[];
     parts?: readonly Part[];
   }): number {
     const key = threadKey(a.project, a.agent);
     const t = this.thread(key);
     this.cid += 1;
     const mode = a.mode ?? "now";
-    const files =
-      a.files !== undefined && a.files.length > 0 ? [...a.files] : undefined;
     // msg-parts: his message typed (quotes, words, pastes); the hub renders the model's text from them
     const parts =
       a.parts !== undefined && a.parts.length > 0 ? [...a.parts] : undefined;
@@ -475,7 +471,6 @@ export class Store extends StoreVoice {
       agent: a.agent,
       text: a.text,
       mode,
-      ...(files === undefined ? {} : { files }),
       ...(parts === undefined ? {} : { parts }),
       at_ms: this.now(),
       state: "sending",
@@ -493,7 +488,6 @@ export class Store extends StoreVoice {
       agent: a.agent,
       text: parts === undefined ? a.text : "",
       mode,
-      ...(files === undefined ? {} : { files }),
       ...(parts === undefined ? {} : { parts }),
       cid: p.cid,
     });
@@ -512,7 +506,6 @@ export class Store extends StoreVoice {
       agent: p.agent,
       text: p.text,
       mode: p.mode,
-      ...(p.files === undefined ? {} : { files: p.files }),
       ...(p.parts === undefined ? {} : { parts: p.parts }),
     });
   }
@@ -656,8 +649,6 @@ export class Store extends StoreVoice {
 export {
   TAGS,
   diffKey,
-  sentParts,
-  sentWords,
   takeKey,
   threadKey,
   toolOutKey,

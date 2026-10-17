@@ -2,7 +2,7 @@
 // as macOS notifications, on the REAL core and the real app, off-screen. Test mode never posts: main says
 // each step on 'bise-desktop: notify' + JSON (post, close, answer, open, failed), and this check plays
 // his side through main's test globals __biseTestFocused / __biseTestNotify(key, gesture). The cards are
-// real: shop's main opens them with `sb card` (the world's live fake scripts). Passes when:
+// real: shop's main opens them with `sb notify` (the world's live fake scripts). Passes when:
 //   - the cards that waited at start never knock;
 //   - a card arriving while no bise window has the keys knocks once: '<who> asks · shop', the question,
 //     its choices + 'open in bise', a reply; one arriving while a window has the keys knocks zero times;
@@ -52,7 +52,7 @@ test('gate/notify-real: R45-R47 on the real core: knock when away, words, choice
     mkdirSync(sd, { recursive: true });
     const tmp = path.join(sd, `.notify-${k}.tmp`);
     // the script matches his message only (a later answer quotes the question, never the start word)
-    writeFileSync(tmp, JSON.stringify({ match: `${k}-start`, calls: [{ tool: 'bash', arg: `sb card "${k} which window for the alert? 1. five minutes 2. fifteen minutes"` }], reply: 'Asked you.' }));
+    writeFileSync(tmp, JSON.stringify({ match: `${k}-start`, calls: [{ tool: 'bash', arg: `sb notify "${k} which window for the alert? 1. five minutes 2. fifteen minutes"` }], reply: 'Asked you.' }));
     renameSync(tmp, path.join(sd, `notify-${k}.json`));
     worldSay('shop', `${k}-start please ask me`);
     return waitFor((l) => l.t === 'post' && (l.note?.body ?? '').includes(k), 45_000);

@@ -1,4 +1,4 @@
-//! `sb notify` (and its old name `sb card`): the question, `--for`,
+//! `sb notify`: the question, `--for`,
 //! `--page|--artifact <id>[#<item>]` (card-links: one link, any artifact)
 //! and `--open <n>=<artifact>[#<anchor>]`. Moved out of cli.rs (the line
 //! limit, rule 5).

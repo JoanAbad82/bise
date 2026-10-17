@@ -142,8 +142,9 @@ def main():
         sheet = ids["q3.xlsx"]
         anchor = {"kind": "cell", "sheet": "Q3", "range": "C3"}
         part = {"kind": "anchor", "artifact": sheet, "version": 2, "anchor": anchor, "quote": "244", "n": 1}
-        r = c.rpc("turn/send", {"project": c.project(), "agent": "t1", "text": "why did South move?",
-                                "parts": [part], "mode": "now"})
+        # as the window sends it: his words in the parts, no text beside them (issue 31)
+        r = c.rpc("turn/send", {"project": c.project(), "agent": "t1", "text": "",
+                                "parts": [part, {"kind": "text", "text": " why did South move?"}], "mode": "now"})
         check("error" not in r, r)
         status, body = get("%s/a/%s/notes" % (base, sheet))
         notes = json.loads(body)["notes"]

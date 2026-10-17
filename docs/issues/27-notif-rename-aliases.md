@@ -1,6 +1,7 @@
 # 27 · the old word 'card' as a command, for one release
 
-Status: open until the release after notif-rename. Label: cli, words.
+Status: closed (issue 31): the `"card"` arm and `/cards` are gone; `sb
+card` is an unknown command (cli/tests.rs). Label: cli, words.
 Plan: page notif-rename, signed by designer (m_24653) and architect
 (m_24654).
 

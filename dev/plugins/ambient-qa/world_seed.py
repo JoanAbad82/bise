@@ -349,7 +349,7 @@ def main_script(world, project, rich=False):
         where = " --feature %s" % shlex.quote(a["feature"]) if a.get("feature") else (" --place %s" % a["place"] if a.get("place") else "")
         out.append("sb spawn %s%s --objective %s" % (a["name"], where, shlex.quote(brief)))
     for c in project["cards"]:
-        out.append("sb card %s" % shlex.quote(c))
+        out.append("sb notify %s" % shlex.quote(c))
     # an agent's question: wait (up to 300 s) for its message to main, then the card for it, or
     # main's own answer with its why (main_answers: the hub's 'answered' line)
     for a in project["agents"]:
@@ -362,7 +362,7 @@ def main_script(world, project, rich=False):
                     out.append("[ -s %s ] && sb send %s --reply-to \"$(cat %s)\" --why %s %s"
                                % (f, shlex.quote(a["name"]), f, shlex.quote(ans["why"]), shlex.quote(ans["text"])))
                 else:
-                    out.append("[ -s %s ] && sb card --for \"$(cat %s)\" %s" % (f, f, shlex.quote(st["ask"])))
+                    out.append("[ -s %s ] && sb notify --for \"$(cat %s)\" %s" % (f, f, shlex.quote(st["ask"])))
     out.append("echo seeded main")
     return "\n".join(out) + "\n"
 

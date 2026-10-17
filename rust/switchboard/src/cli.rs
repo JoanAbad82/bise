@@ -730,8 +730,8 @@ pub fn build(args: &[String]) -> Result<Value, String> {
                 _ => return Err("usage: sb rename <agent> <new-name>".into()),
             }
         }
-        // BISE-299 `sb notify --withdraw N "why"`; TODO(notif-rename): "card", its old name, goes one release after (docs/issues/27)
-        "notify" | "card" if rest.iter().any(|a| a == "--withdraw" || a.starts_with("--withdraw=")) => {
+        // BISE-299 `sb notify --withdraw N "why"`
+        "notify" if rest.iter().any(|a| a == "--withdraw" || a.starts_with("--withdraw=")) => {
             let (pos, o) = parse_args(rest, &["withdraw"], &[])?;
             let card = o
                 .get("withdraw")
@@ -742,7 +742,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             req.insert("card".into(), json!(card));
             req.insert("why".into(), json!(pos.join(" ")));
         }
-        "notify" | "card" => notify_req(rest, &mut req)?,
+        "notify" => notify_req(rest, &mut req)?,
         "inspect" => {
             let (pos, o) = parse_args(
                 rest,
@@ -880,7 +880,7 @@ pub fn render(cmd: &str, v: &Value) -> (bool, String) {
             }
         }
         "withdraw" => format!("notification #{} withdrawn: the user sees why; the question is yours again", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
-        "notify" | "card" => format!("notification #{} opened for the user", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
+        "notify" => format!("notification #{} opened for the user", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
         "report" => format!("reported ({})", s("message_id")),
         "follow" if v.get("on") == Some(&json!(false)) => format!("@{} no longer followed", s("agent")),
         "follow" => format!("following @{}: the user hears once when it ends", s("agent")),

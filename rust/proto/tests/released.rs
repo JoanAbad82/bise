@@ -85,6 +85,34 @@ fn released_message_lines_fold_to_the_same_entries() {
     }
 }
 
+/// An older desktop's `files` list (`send`, `answer`, `slash`, the app's
+/// `send`; removed from the wire in issue 31): its released lines still
+/// read as their command, the list ignored, every other key kept.
+#[test]
+fn released_files_lists_are_read_and_ignored() {
+    use bise_proto::app_cmd::AppCmd;
+    use bise_proto::hub::HubCmd;
+    let same_without_files = |file: &str, l: &str, now: Value| {
+        let mut was: Value = serde_json::from_str(l).unwrap();
+        assert!(was.as_object_mut().unwrap().remove("files").is_some(), "{file}: a line without files: {l}");
+        assert_eq!(lost(&was, &now, ""), None, "{file}: {l}");
+        assert!(now.get("files").is_none(), "{file}: files written back: {now}");
+    };
+    let hub = lines("hub_cmd_files.jsonl");
+    for l in &hub {
+        let m = HubCmd::decode(l).unwrap_or_else(|e| panic!("hub_cmd_files.jsonl: refused: {e}\n  {l}"));
+        assert!(!matches!(m, HubCmd::Unknown { .. }), "unknown: {l}");
+        same_without_files("hub_cmd_files.jsonl", l, m.to_value());
+    }
+    let app = lines("app_cmd_files.jsonl");
+    for l in &app {
+        let m = AppCmd::decode(l).unwrap_or_else(|e| panic!("app_cmd_files.jsonl: refused: {e}\n  {l}"));
+        assert!(!matches!(m, AppCmd::Unknown { .. }), "unknown: {l}");
+        same_without_files("app_cmd_files.jsonl", l, serde_json::to_value(&m).unwrap());
+    }
+    assert_eq!((hub.len(), app.len()), (3, 1));
+}
+
 /// A note's anchor (bise_proto::anchor, office-artifacts): its first
 /// version's lines (`anchor_v1.jsonl`, frozen when it was written, never
 /// edited) read as the kind they said, never `Unknown`, and write back with

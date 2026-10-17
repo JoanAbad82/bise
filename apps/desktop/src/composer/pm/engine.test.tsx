@@ -1,14 +1,12 @@
 // @vitest-environment happy-dom
 // The TipTap engine's laws from architect m_11500, kept after the Lexical engine went (slice 4):
-//   (1) the wire: each content of golden.ts sends exactly its golden text and files (the table
+//   (1) the wire: each content of golden.ts sends exactly its golden text and parts (the table
 //       was proven byte-identical to the Lexical engine's sends before it went, b04dd6b3);
-//   (2) old drafts: the Lexical engine's saved entries (fixtures/lexical-entries.json, made by it)
-//       read back and send the same; a draft, history and queue it saved come back in the field;
-//       an entry that doesn't read keeps its raw JSON aside;
+//   (2) old drafts: the saved entries read back and send the same; a draft, history and queue
+//       saved come back in the field; an entry that doesn't read (an old Lexical one too: its
+//       reader went in issue 31) keeps its raw JSON aside;
 //   (3) a draft saved and a send made while dictation is live hold none of its words.
 import { act, cleanup, render } from "@testing-library/react";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getSchema } from "@tiptap/core";
 import type { Node as PmNode } from "@tiptap/pm/model";
@@ -27,14 +25,11 @@ afterEach(cleanup);
 
 const schema = getSchema(FIELD_NODES);
 
-/** The Lexical engine's saved entries, one per golden content (made by it before it went). */
-const SAVED = JSON.parse(
-  readFileSync(join(__dirname, "fixtures/lexical-entries.json"), "utf8"),
-) as Record<string, string>;
+/** A golden content as the field saves it (`{"v":2,"segs":[…]}`). */
 const saved = (name: string): string => {
-  const e = SAVED[name];
-  if (e === undefined) throw new Error(`no saved entry for ${name}`);
-  return e;
+  const c = CASES.find((k) => k.name === name);
+  if (c === undefined) throw new Error(`no golden content ${name}`);
+  return entryOf(segmentsOf(pm(c.content)));
 };
 
 /** The content as the TipTap field's doc (one paragraph: paragraphs as hard breaks). */
@@ -86,20 +81,13 @@ describe("(2) old drafts: nothing he typed is lost", () => {
     }
   });
 
-  it("the saved Lexical entries (fixtures/lexical-entries.json, made by the old engine) read back and send the golden bytes", () => {
-    const saved = JSON.parse(
-      readFileSync(join(__dirname, "fixtures/lexical-entries.json"), "utf8"),
-    ) as Record<string, string>;
+  it("the saved entries read back and send the golden bytes", () => {
     for (const c of CASES) {
-      const entry = saved[c.name];
-      expect(entry, c.name).toBeDefined();
-      expect(buildMessage(entrySegments(entry ?? "") ?? []), c.name).toEqual(
-        c.golden,
-      );
+      expect(buildMessage(entrySegments(saved(c.name)) ?? []), c.name).toEqual(c.golden);
     }
   });
 
-  it("draft, history and queue saved by the Lexical engine come back in the new field; ↑ brings the history", async () => {
+  it("a saved draft, history and queue come back in the field; ↑ brings the history", async () => {
     const store = memStore();
     const draft = saved("a quote of diff lines");
     const sent = saved("an image");
@@ -126,18 +114,23 @@ describe("(2) old drafts: nothing he typed is lost", () => {
     expect(load(store, "p/main").history[1]).toBe(sent);
   });
 
-  it("a draft that doesn't read keeps its raw JSON aside, never dropped", async () => {
-    const store = memStore();
-    const raw = '{"some":"future format"}';
-    store.setItem(
-      "bise.composer.v1.p/main",
-      JSON.stringify({ draft: raw, history: [], queue: [] }),
-    );
-    const { getByTestId } = await mount({ store });
-    expect(getByTestId("composer.field").textContent).toBe("");
-    expect(
-      JSON.parse(store.getItem("bise.composer.v1.p/main.unread") ?? "[]"),
-    ).toEqual([raw]);
+  it("a draft that doesn't read keeps its raw JSON aside, never dropped (an old Lexical entry too)", async () => {
+    // the Lexical engine's editor state: its reader went in issue 31
+    const lexical = '{"root":{"children":[{"children":[{"text":"ça va","type":"text"}],"type":"paragraph"}],"type":"root"}}';
+    expect(entrySegments(lexical)).toBeNull();
+    for (const raw of ['{"some":"future format"}', lexical]) {
+      cleanup();
+      const store = memStore();
+      store.setItem(
+        "bise.composer.v1.p/main",
+        JSON.stringify({ draft: raw, history: [], queue: [] }),
+      );
+      const { getByTestId } = await mount({ store });
+      expect(getByTestId("composer.field").textContent).toBe("");
+      expect(
+        JSON.parse(store.getItem("bise.composer.v1.p/main.unread") ?? "[]"),
+      ).toEqual([raw]);
+    }
   });
 });
 
@@ -246,7 +239,7 @@ describe("(3) the live dictation is in nothing he keeps or sends", () => {
       again.a.submit();
       await Promise.resolve();
     });
-    expect(again.onSend).toHaveBeenLastCalledWith({ text: "note:", files: [] });
+    expect(again.onSend).toHaveBeenLastCalledWith({ text: "note:" });
     expect(onSend).not.toHaveBeenCalled();
   });
 });
@@ -311,7 +304,6 @@ describe("(4) a draft key of its own (an inbox card, amb-home m_20065)", () => {
     });
     expect(onSend).toHaveBeenLastCalledWith({
       text: "half an answer",
-      files: [],
     });
     expect(
       load(store, "p/main#card:7").draft,

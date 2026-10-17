@@ -37,7 +37,7 @@ fn cases() -> Vec<Vec<&'static str>> {
         vec!["drop", "t1"],
         vec!["notify", "a question?"],
         vec!["notify", "--withdraw", "3", "answered in chat"],
-        // the old name of sb notify, a hidden alias for one release (docs/issues/27)
+        // the old name of sb notify: an unknown command (docs/issues/27, 31)
         vec!["card", "a question?"],
         vec!["close", "1", "handled"],
         vec!["rename", "t1", "t2"],

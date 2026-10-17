@@ -95,6 +95,8 @@ for (const theme of ['light', 'dark'] as const) {
         );
         expect(inField.map((c) => c.kind), 'the four chips in his order').toEqual(['quote', 'image', 'file', 'paste']);
 
+        // the hub answers his send with its message id; its echo carries it (A1: no words match)
+        await core.result('send', undefined, { msg_id: 3 });
         await page.keyboard.press('Enter');
         const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as { parts?: unknown[]; cid?: number };
         const parts = sent.parts ?? [];
@@ -114,7 +116,7 @@ for (const theme of ['light', 'dark'] as const) {
         await page.locator(`${sel} .th-you`).screenshot({ path: test.info().outputPath(`sending-${theme}-${String(width)}.png`) });
 
         // the hub's echo: his parts, the model's text it rendered
-        await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: { pos: 3, at_ms: Date.now(), kind: 'you', text: 'rendered for the model', parts, delivery: 'received' } } as never);
+        await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: { pos: 3, at_ms: Date.now(), kind: 'you', msg_id: 3, text: 'rendered for the model', parts, delivery: 'received' } } as never);
         await expect(pending, 'the sending row leaves at its echo').toHaveCount(0, { timeout: 3000 });
         const landed = '[data-testid="thread.entry.3"]';
         await expect(page.locator(`${landed} .th-bubble`)).toBeVisible();

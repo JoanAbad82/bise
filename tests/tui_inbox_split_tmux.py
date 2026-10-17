@@ -49,7 +49,7 @@ def main():
         # with the tasks' messages: typed into a busy turn, the words
         # join it and the fake never runs the card command)
         t.wait_re(MAIN_IDLE)
-        t.typed('[[bash: sb card "ship the export on friday?"]]')
+        t.typed('[[bash: sb notify "ship the export on friday?"]]')
         t.keys("Enter")
         t.wait(w("thread.gate_waits"), 60)
         sc = t.wait("? main · ship the export on friday?")

@@ -80,7 +80,7 @@ PROJECTS = [
                     {"land": "gift cards: the balance API, checkout/gift.py"},
                     {"report": "done", "text": "gift card balance API landed on gift-cards (checkout/gift.py)."}]},
          # ...and an agent with an open QUESTION of its own: it asks main, main escalates it as a card
-         # tied to the agent's message (sb card --for), so the card is the agent's, not main's
+         # tied to the agent's message (sb notify --for), so the card is the agent's, not main's
          {"name": "gift-ui", "feature": "gift-cards", "objective": "gift cards: show the balance to the buyer",
           "steps": [{"write": "checkout/gift_ui.py", "text": "def label(balance):\n    return 'gift card: %.2f' % balance\n"},
                     {"commit": "gift cards: the balance label"},

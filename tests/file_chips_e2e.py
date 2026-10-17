@@ -10,8 +10,8 @@ only: a throwaway HOME, the fake provider, files made here.
      `missing="true"` in the model's text, never dropped;
   3. his entry keeps the parts (thread/subscribe), the same after the hub
      restarts (the journal);
-  4. an older desktop's `files` list: the old `[files he attached:]`
-     text, and parts on his entry;
+  4. an older desktop's `files` list (removed in issue 31): ignored, his
+     words alone go;
   5. a relative file path: refused, nothing delivered.
 
 Run: python3 -u tests/file_chips_e2e.py (after scripts/bins.sh)
@@ -114,14 +114,13 @@ def main():
         mine = [e for e in yous(c, project) if same(e)]
         check(len(mine) == 1, "the parts after a restart (the journal)")
 
-        # 4. an older desktop's files list: the old text, parts on the entry
+        # 4. an older desktop's files list (removed in issue 31): ignored, his words alone go
         r = c.rpc("turn/send", {"project": project, "agent": "main", "text": "lis ces fichiers", "files": [files["q3.pdf"], files["data.csv"]], "mode": "now"})
-        check("error" not in r, "a files list is taken: %r" % r)
-        old = "lis ces fichiers\n\n[files he attached:]\n%s\n%s" % (files["q3.pdf"], files["data.csv"])
-        c.wait(lambda: any(old in q.get("user", "") for q in E.fake_requests() if q.get("agent") == "main"), 60, "the old list's text")
-        listed = [{"kind": "text", "text": "lis ces fichiers"}, {"kind": "file", "path": files["q3.pdf"]}, {"kind": "file", "path": files["data.csv"]}]
-        c.wait(lambda: any(e.get("parts") == listed for e in yous(c, project)), 30, "the files list's parts on his entry")
-        check(True, "a files list: the old text, parts on his entry")
+        check("error" not in r, "a send with an old files list is taken: %r" % r)
+        c.wait(lambda: any(e.get("text") == "lis ces fichiers" for e in yous(c, project)), 60, "his words alone on his entry")
+        c.wait_status("main", "idle", 60)
+        check(not any(files["q3.pdf"] in q.get("user", "") and "lis ces fichiers" in q.get("user", "") for q in E.fake_requests() if q.get("agent") == "main"),
+              "the list never reaches the model")
 
         # 5. a relative path: refused
         r = c.rpc("turn/send", {"project": project, "agent": "main", "text": "", "parts": [{"kind": "file", "name": "[File #1]", "path": "deck.pptx"}], "mode": "now"})

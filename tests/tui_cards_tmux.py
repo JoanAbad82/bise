@@ -21,7 +21,7 @@ COLS, ROWS = 150, 42
 
 
 def card(text):
-    return "[[bash: sb card \"$(printf '%s')\"]]" % text
+    return "[[bash: sb notify \"$(printf '%s')\"]]" % text
 
 
 CTRL = "\x1b[%d;5u"   # ctrl+digit, the kitty keyboard protocol's form

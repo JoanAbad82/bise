@@ -908,10 +908,8 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
         "/archived" => sb.toggle_archived(),
         // the agent palette (BISE-265), on the rest of the line
         "/switch" => palette::open(app, typed.strip_prefix("/switch").unwrap_or("")),
-        // the inbox: what waits, then his past answers (inbox_screen.rs;
-        // `/cards`: its old name)
-        // TODO(notif-rename): /cards, the old word, goes one release after (docs/issues/27)
-        "/inbox" | "/cards" => crate::inbox_screen::command(app, &typed),
+        // the inbox: what waits, then his past answers (inbox_screen.rs)
+        "/inbox" => crate::inbox_screen::command(app, &typed),
         "/theme" => out.push(theme_command(typed.split_whitespace().nth(1), crate::theme_detect::choose)),
         "/keychain" => out.extend(crate::keychain::command(&typed)),
         // approvals-design.md §8: the mode, the checker, the rules; or a switch

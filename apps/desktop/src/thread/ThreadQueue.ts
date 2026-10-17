@@ -85,7 +85,7 @@ export function useThreadQueue(project: string, agent: string, composer: RefObje
   );
   const onQueue = useCallback(
     (o: Outgoing) => {
-      store.send({ project, agent, text: o.text, mode: 'queued', ...(o.files.length > 0 ? { files: [...o.files] } : {}), ...(o.parts === undefined ? {} : { parts: o.parts }) });
+      store.send({ project, agent, text: o.text, mode: 'queued', ...(o.parts === undefined ? {} : { parts: o.parts }) });
     },
     [store, project, agent],
   );

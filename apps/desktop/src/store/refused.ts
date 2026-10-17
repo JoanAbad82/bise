@@ -17,7 +17,6 @@ export type Attempt =
   | {
       readonly kind: "answer";
       readonly reply: string;
-      readonly files?: readonly string[];
       readonly parts?: readonly Part[];
       readonly from?: AnswerFrom;
     }

@@ -624,6 +624,9 @@ if [ "$mode" = land ]; then
   [ $src = 1 ] && lstep line_gate env GATE_BASE="$base" python3 tests/line_gate.py $changed
   [ "${words:-0}" = 1 ] && lstep word_lint env GATE_BASE="$base" python3 tests/word_lint.py $changed
   [ "${bendw:-0}" = 1 ] && lstep pick_gate bash -c 'python3 tests/pick_gate.py --self-test && python3 tests/pick_gate.py'
+  # every shim registered with its end date (issue 31); an overdue one is
+  # only a warning here (its owner gets the red at their quick gate)
+  lstep shims bash -c 'python3 tests/shims_check.py --self-test && python3 tests/shims_check.py --land'
   # quick's clippy, in its warm dir: the workspace, so both share every artifact
   [ -n "$pkgs" ] && lstep clippy bash -c "cd rust && cargo clippy --offline -q --workspace --all-targets --target-dir '$target/clippy' -- -D warnings"
   [ "${proto_ts:-0}" = 1 ] && lstep proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
@@ -664,6 +667,8 @@ if [ "$mode" = full ]; then
   python3 tests/line_gate.py --all || { echo "GATE full FAILED"; exit 1; }
   # every test against tests/word_literals.txt (issue 29, ~1 s)
   python3 tests/word_lint.py --all || { echo "GATE full FAILED"; exit 1; }
+  # every shim registered, none past its removal release (issue 31, ~0.1 s)
+  python3 tests/shims_check.py || { echo "GATE full FAILED"; exit 1; }
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
   rm -f "$red"; export SB_RED_FILE="$red"
   # the e2e/tmux tests this change can break (tests/test_map.py; the user's
@@ -736,6 +741,10 @@ python3 "$root/tests/bise_env.py" >/dev/null || { python3 "$root/tests/bise_env.
 python3 "$root/tests/conflict_markers.py" >/dev/null || { python3 "$root/tests/conflict_markers.py"; echo "GATE quick FAILED"; exit 1; }
 # tests/known_reds.txt parses (tests/known_reds.py, issue 28)
 python3 "$root/tests/known_reds.py" --self-test >/dev/null || { python3 "$root/tests/known_reds.py" --self-test; echo "GATE quick FAILED"; exit 1; }
+# every compatibility shim in tests/shims.txt with its removal release, none
+# past it (tests/shims_check.py, issue 31; always: the release moves with tags)
+python3 "$root/tests/shims_check.py" --self-test >/dev/null || { python3 "$root/tests/shims_check.py" --self-test; echo "GATE quick FAILED"; exit 1; }
+python3 "$root/tests/shims_check.py" || { echo "GATE quick FAILED"; exit 1; }
 # the full gate's test map knows every test and every top-level path (tests/test_map.py)
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # the desktop checks' selection: its shadow never fails a land, its audit, the coverage map's rules

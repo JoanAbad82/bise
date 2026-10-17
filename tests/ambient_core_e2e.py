@@ -147,7 +147,7 @@ def main():
         with core.lock:
             mains_after = sum(1 for e in core.evs if e.get("ev") == "main")
         check(mains_after == mains_before, "an agent's message to main sends no main event (%d new)" % (mains_after - mains_before))
-        c.say('[[bash: sb card --for %s "keep the banner on mobile?"]]' % msg)
+        c.say('[[bash: sb notify --for %s "keep the banner on mobile?"]]' % msg)
         core.wait(lambda e: e.get("ev") == "state" and any(cd["kind"] == "question" for cd in e["cards"]), 60, "the card")
         card = [cd for cd in core.last("state")["cards"] if cd["kind"] == "question"][0]
         check(card["agent"] == "t1", "t1's card: %r" % card)
@@ -160,7 +160,7 @@ def main():
         # main's own card with bare numbers ('1 a PR per task', pm's C
         # fail 41): fn + 2 from the capsule answers it, never refused
         c.wait_idle("main", "t1")
-        c.say('''[[bash: sb card "$(printf 'how should agents ship code here?\\n1 a PR per task\\n2 straight to main')"]]''')
+        c.say('''[[bash: sb notify "$(printf 'how should agents ship code here?\\n1 a PR per task\\n2 straight to main')"]]''')
         core.wait(lambda e: e.get("ev") == "state" and any("ship code" in cd["text"] for cd in e["cards"]), 60, "main's card")
         ship = [cd for cd in core.last("state")["cards"] if "ship code" in cd["text"]][0]
         check([o["label"] for o in ship["options"]] == ["a PR per task", "straight to main"], "its options: %r" % ship)
@@ -176,7 +176,7 @@ def main():
         # its question: the core's card keeps the question alone, the
         # options as its list, the label '? main needs you'
         c.wait_idle("main")
-        c.say('''[[bash: sb card "Que fais-tu ? 1. regarde le diff 2. arrête-le 3. laisse-le finir"]]''')
+        c.say('''[[bash: sb notify "Que fais-tu ? 1. regarde le diff 2. arrête-le 3. laisse-le finir"]]''')
         # the hub's card first (main's turn under load is the slow part), then the core's view of it
         c.wait(lambda: any("Que fais-tu" in cd["question"] for cd in c.cards()), 120, "main's inline card in the hub")
         core.wait(lambda e: e.get("ev") == "state" and any(cd["text"] == "Que fais-tu ?" for cd in e["cards"]), 60, "main's inline card, its body alone")

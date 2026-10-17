@@ -61,7 +61,7 @@
 {"cmd":"fn_context","context":{}}
 {"cmd":"shot","path":"/Users/camille/.bise/shots/fn-1.png","app":"Safari","title":"Stripe pricing"}
 {"cmd":"send","text":"is the build green?"}
-{"cmd":"send","text":"summarize this","files":["/Users/camille/q3-notes.md"]}
+{"cmd":"send","text":"summarize this"}
 {"cmd":"start","text":"fix the flaky login test"}
 {"cmd":"answer","card":3,"reply":"2"}
 {"cmd":"hush"}

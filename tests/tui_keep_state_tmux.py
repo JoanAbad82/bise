@@ -33,7 +33,7 @@ def composer(sc):
 
 
 def card(text):
-    return "[[bash: sb card \"$(printf '%s')\"]]" % text
+    return "[[bash: sb notify \"$(printf '%s')\"]]" % text
 
 
 def main():

@@ -175,6 +175,9 @@ The second time you write a rule down, write a test or a gate step instead.
 - Bad: the `bend-harness` link "kept for one release"
   (`harness/src/main.rs:2`, `scripts/versions.sh`) is still there many
   releases later.
+- An older install that must keep working gets a shim with an end date: its
+  `TODO(<tag>)` on each site and its line in `tests/shims.txt` (owner,
+  removal release); `tests/shims_check.py` goes red when that release is out.
 
 ### 9. The doc lives next to the code
 
@@ -207,6 +210,8 @@ new feed-text parsing in the TUI, no growth of `daemon::run`.
 6. (done.) The 1,000-line rule as a gate check, with a shrinking exceptions
    list: `tests/line_gate.py` in `gate.sh quick`, the list in
    `tests/line_limits.txt`.
-7. Delete the compatibility left "for one release".
+7. (done, issue 31.) Delete the compatibility left "for one release". A
+   compatibility shim is registered in `tests/shims.txt` with its owner and
+   its removal release (`tests/shims_check.py` in the quick gate and land).
 8. `docs/IMPLEMENTATION.md` becomes a short English index of the module
    headers, or goes.

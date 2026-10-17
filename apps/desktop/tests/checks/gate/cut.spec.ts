@@ -73,9 +73,9 @@ test('gate/cut: ask line, approval head, tool output, scheduled names, main answ
     const tel = ids['telemetry'] ?? 'telemetry';
 
     if (on('ASKLINE') || on('CHIPNOFILE')) {
-      // ASKLINE: shop's main asks him a question (sb card) -> one dim line in its thread, '?' in the accent
+      // ASKLINE: shop's main asks him a question (sb notify) -> one dim line in its thread, '?' in the accent
       const k = `cut-${String(run)}`;
-      put(`cut-ask-${String(run)}`, `${k}-start`, [{ tool: 'bash', arg: `sb card "${k} which branch first? 1. checkout 2. gift-ui"` }], 'Asked you.');
+      put(`cut-ask-${String(run)}`, `${k}-start`, [{ tool: 'bash', arg: `sb notify "${k} which branch first? 1. checkout 2. gift-ui"` }], 'Asked you.');
       worldSay('shop', `${k}-start please ask me`);
       await go(s, `project/${shop}`);
       const line = p.locator('[data-testid^="thread.card."]').filter({ hasText: k }).first();

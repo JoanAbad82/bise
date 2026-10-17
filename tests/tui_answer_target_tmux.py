@@ -69,7 +69,7 @@ def main():
         t.wait_re(MAIN_IDLE)
         plain = colored_divider(t)
         # main asks a question with two options
-        t.typed("[[bash: sb card \"$(printf '%s\\n1. EU only\\n2. EU and US')\"]]" % QUESTION)
+        t.typed("[[bash: sb notify \"$(printf '%s\\n1. EU only\\n2. EU and US')\"]]" % QUESTION)
         t.keys("Enter")
         t.wait(w("common.waiting_for_you", n="1"), 60)
         t.typed(CTRL1)

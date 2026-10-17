@@ -4,7 +4,7 @@
 // in src/proto/fixtures.gen.ts (rust/proto/fixtures), never a hand-kept value, so a proto change
 // breaks a builder or a test at typecheck and the compiler shows what to fix. Test-only (never in
 // the bundle): a feature test imports this and run.ts, nothing else of the app (eslint).
-import type { AnswerResult, Card, CoreEv, CoreCmd, HubEv, Mode, ProjectRow } from './app';
+import type { AnswerResult, Card, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow } from './app';
 import { core_ev, hub_ev } from './app';
 
 export type Ev = HubEv | CoreEv;
@@ -123,7 +123,7 @@ export type Gesture =
   | { readonly g: 'close'; readonly project: string; readonly card: number }
   | { readonly g: 'retry'; readonly project: string; readonly card: number }
   | { readonly g: 'pick'; readonly project: string; readonly card: number; readonly n: number; readonly from?: Here }
-  | { readonly g: 'send'; readonly project: string; readonly agent: string; readonly text: string; readonly mode?: Mode; readonly files?: readonly string[] }
+  | { readonly g: 'send'; readonly project: string; readonly agent: string; readonly text: string; readonly mode?: Mode; readonly parts?: readonly Part[] }
   | { readonly g: 'open'; readonly project: string; readonly agent: string }
   | { readonly g: 'resend' | 'dismiss'; readonly project: string; readonly agent: string; readonly cid: number };
 
@@ -133,8 +133,8 @@ export const close = (project: string, card: number): Gesture => ({ g: 'close', 
 export const retry = (project: string, card: number): Gesture => ({ g: 'retry', project, card });
 /** He picks option `n` of a card (a digit, a click on it). */
 export const pick = (project: string, card: number, n: number, from?: Here): Gesture => ({ g: 'pick', project, card, n, ...(from === undefined ? {} : { from }) });
-/** He sends `text` to that agent: now (the default) or queued after its turn, with files he attached. */
-export const send = (project: string, agent: string, text: string, opts: { readonly mode?: Mode; readonly files?: readonly string[] } = {}): Gesture =>
+/** He sends `text` to that agent: now (the default) or queued after its turn, with the parts he made (a file he attached is a file part). */
+export const send = (project: string, agent: string, text: string, opts: { readonly mode?: Mode; readonly parts?: readonly Part[] } = {}): Gesture =>
   ({ g: 'send', project, agent, text, ...opts });
 /** He switches to that project's agent's thread (the sidebar, a link, ⌘1-9). */
 export const open = (project: string, agent = 'main'): Gesture => ({ g: 'open', project, agent });

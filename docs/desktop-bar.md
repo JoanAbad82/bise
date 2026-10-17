@@ -66,7 +66,7 @@ terminal, with the same names and arguments, so his habits carry over. That is 3
   `/interrupt`, `/stop`, `/compact`, `/quit` (the agents keep running), `/restart` (restarts the core
   with nothing lost; the way out of S.5), `/update`.
 - Opens a screen:
-  - `/inbox` (also `/cards`): ⌘I, amb-home.
+  - `/inbox`: ⌘I, amb-home.
   - `/agents`, `/switch`, `/archived`, `/diff [<branch>]`, `/artifacts`, `/scheduled`: amb-win.
   - `/models`, `/provider`, `/plugins …`, `/computer-use`, `/voice`, `/theme` (auto follows macOS): settings or setup, amb-home.
   - `/welcome`, `/setup`: setup, amb-home. Here `/setup` checks again permissions, sign-in and the workspace.

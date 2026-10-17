@@ -446,10 +446,6 @@ impl Core {
                     self.send_to_main(text, false);
                 }
             }
-            // his dropped files go as the input's files field: the hub
-            // renders them once after his words (switchboard attached.rs,
-            // item H: an image as a marker the model sees, others listed)
-            Cmd::SendFiles { text, files } => self.send_input(text.trim().to_string(), false, "capsule", files),
             Cmd::Start { text } => {
                 let text = text.trim().to_string();
                 if !text.is_empty() {
@@ -540,11 +536,6 @@ impl Core {
     /// [`send_to_main`] with its `via`: "capsule" (one short line back),
     /// "capsule-start" (start an agent; the hub's hint says so).
     fn send_via(&mut self, words: String, voice: bool, via: &str) {
-        self.send_input(words, voice, via, Vec::new());
-    }
-
-    /// [`send_via`] with his files (absolute paths) as the input's `files`.
-    fn send_input(&mut self, words: String, voice: bool, via: &str, files: Vec<String>) {
         let shot = self.shot.take();
         // S9: the fn context goes as a field (the hub frames it after his
         // words, its one render); the shot goes as an image part, not in it
@@ -554,22 +545,10 @@ impl Core {
         if let Some(c) = ctx {
             input["context"] = json!(c);
         }
-        if !files.is_empty() {
-            input["files"] = json!(files);
-        }
         // the talk's still is his message's image part, its caption the app
         // and window (architect m_22000; the spotlight's parts, 7f029104):
         // the text is the label and his words for older readers, the hub
-        // renders the model's text from the parts. Parts never go beside
-        // files (the hub refuses them): a send with files leaves it unsent.
-        let shot = match (shot, files.is_empty()) {
-            (Some(s), false) => {
-                self.forget(vec![s]);
-                self.emit(voice::shot_ev(None));
-                None
-            }
-            (shot, _) => shot,
-        };
+        // renders the model's text from the parts
         if let Some(s) = &shot {
             let mut parts = vec![s.part()];
             if !words.is_empty() {

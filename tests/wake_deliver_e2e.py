@@ -93,7 +93,7 @@ def main():
         c.wait(lambda: any(r.get("from") == "t1" and "v1 or v2" in r.get("body", "") for r in c.feed("main", "msg-in")), 120, "t1's question")
         c.wait_idle("main", "t1")
         mid = next("m_%d" % r["id"] for r in c.feed("main", "msg-in") if r.get("from") == "t1" and r.get("id"))
-        c.say('[[bash: sb card --for %s "v1 or v2?"]]' % mid)
+        c.say('[[bash: sb notify --for %s "v1 or v2?"]]' % mid)
         c.wait(lambda: any(cd["kind"] == "question" for cd in c.cards()), 60, "the question card")
         card = [cd for cd in c.cards() if cd["kind"] == "question"][0]
         c.wait_idle("main", "t1")

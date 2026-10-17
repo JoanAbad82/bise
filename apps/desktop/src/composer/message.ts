@@ -46,7 +46,6 @@ export type Segment = { readonly kind: 'text'; readonly text: string } | { reado
 
 export interface Outgoing {
   readonly text: string;
-  readonly files: readonly string[];
   /** msg-parts: his message as typed parts, when it has more than words (a quote, a paste, an
    *  image); the hub renders the model's text from them and ignores `text` */
   readonly parts?: readonly Part[];
@@ -196,7 +195,6 @@ export function attachRow(c: Chip, home = ''): { readonly name: string; readonly
 const wordFollows = (t: string): boolean => t !== '' && !/^\s/u.test(t) && !(NO_SPACE_BEFORE as readonly string[]).includes(t.charAt(0));
 
 export function buildMessage(segments: readonly Segment[]): Outgoing {
-  const files: string[] = [];
   let quotes = 0;
   const bodyParts: Part[] = [];
   const say = (t: string): void => {
@@ -266,7 +264,7 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
   const text = body.trim().replace(/^(?:steer|say) /u, '').trim();
   // parts only when they say more than words (the TUI's of_parts); words alone stay text
   const typed = bodyParts.some((p) => p.kind !== 'text');
-  return typed ? { text, files, parts: trimParts(bodyParts) } : { text, files };
+  return typed ? { text, parts: trimParts(bodyParts) } : { text };
 }
 
 /** An anchor chip as its part: {kind:'anchor', artifact, version, anchor, quote?, n}. Pure. */

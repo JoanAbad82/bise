@@ -213,7 +213,7 @@ fn mains_flow_section_by_flow() {
     assert!(pr.contains("Every commit passes `./gate.sh --quick`"));
     assert!(pr.contains("- Commit messages: short subject lines."));
     assert!(pr.contains("ask once (\"main is shared here, sure?\")"));
-    assert!(!pr.contains("sb card"), "saved: no question");
+    assert!(!pr.contains("sb notify"), "saved: no question");
     let trunk = main_section(Some(&flow(FlowMode::Trunk, Source::Saved)), None);
     assert!(trunk.contains("ships straight to `main`, through `sb land`"));
     assert!(trunk.contains("The hub pushes `main` after every land."));
@@ -222,7 +222,7 @@ fn mains_flow_section_by_flow() {
     // not saved yet (issue #9): the question, once, in a card that holds
     // no work; PR suggested: commits on the task's branch meanwhile
     let s = main_section(Some(&flow(FlowMode::Pr, Source::Suggested)), None);
-    assert!(s.contains("ask the user once in a card that blocks nothing, `sb card \"how should agents ship code here? alice committed on main in the last 90 days.\\n1 a PR per task (you merge)  ← suggested\\n2 straight to main, tested commits\"`"));
+    assert!(s.contains("ask the user once in a card that blocks nothing, `sb notify \"how should agents ship code here? alice committed on main in the last 90 days.\\n1 a PR per task (you merge)  ← suggested\\n2 straight to main, tested commits\"`"));
     assert!(s.contains("never holds work: until it is saved, a task that changes code takes `--place new` and commits on its branch with `sb land --here`"));
     assert!(s.contains("keeps its commits for `sb restore`"));
     assert!(s.contains("At the first such task,"));
@@ -233,10 +233,10 @@ fn mains_flow_section_by_flow() {
     // no remote: no question at all
     let s = main_section(Some(&flow(FlowMode::Trunk, Source::Only)), None);
     assert!(s.contains("ships straight to `main`, through `sb land`"));
-    assert!(!s.contains("sb card"));
+    assert!(!s.contains("sb notify"));
     // forced: no question, one line the first time
     let s = main_section(Some(&flow(FlowMode::Pr, Source::Forced)), None);
-    assert!(!s.contains("sb card"));
+    assert!(!s.contains("sb notify"));
     assert!(s.contains("\"main is protected here: every agent opens a PR\""));
     assert!(s.contains("refused, `main` is protected"));
 }
@@ -320,11 +320,11 @@ fn the_question_is_asked_once_then_saved() {
     let others = det(Signal::Others { branch: "main".into(), names: vec!["alice".into()] });
     let text = "[worktree]\nbase = \"HEAD\"\n";
     let before = resolve(&FlowConfig::parse(text), Some(&others)).unwrap();
-    assert!(main_section(Some(&before), None).contains("ask the user once in a card that blocks nothing, `sb card"));
+    assert!(main_section(Some(&before), None).contains("ask the user once in a card that blocks nothing, `sb notify"));
     let saved = crate::flow::with_mode(text, switch(Some(&before), FlowMode::Trunk).map(|_| FlowMode::Trunk).unwrap());
     let after = resolve(&FlowConfig::parse(&saved), Some(&others)).unwrap();
     assert_eq!((after.mode, after.source), (FlowMode::Trunk, Source::Saved));
-    assert!(!main_section(Some(&after), None).contains("sb card"));
+    assert!(!main_section(Some(&after), None).contains("sb notify"));
     assert!(show(Some(&after)).contains("saved in .switchboard/config.toml"));
     assert!(saved.contains("base = \"HEAD\""), "the rest of the config stays");
 }

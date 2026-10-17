@@ -166,17 +166,12 @@ export type Mode = "now" | "queued";
  * one struct, flattened, so the wire keeps `send`'s names): `mode` none
  * is now; `context` what was on his screen at fn (S9): the hub frames it
  * after his words for the model (switchboard's fn_context::render) and
- * keeps it on his thread entry; `files` what he attached or dropped
- * (absolute paths, an older desktop's: TODO(file-chips) goes one release
- * after the desktop sends file parts): the hub makes them his parts once
- * (switchboard's parts_in::of_files), an image as an image-store marker
- * the model sees, any other file in the list after his words, a path
- * that isn't absolute or doesn't exist left out, never on a slash
- * command; `voice` said in
- * voice mode; `via` the client part that sent it (`capsule`,
+ * keeps it on his thread entry (his files go as `Send.parts`; the
+ * older desktops' `files` list was removed in issue 31, an older line's
+ * `files` is ignored); `voice` said in voice mode; `via` the client part that sent it (`capsule`,
  * `capsule-start`, `ambient`: the capsule's hint for main).
  */
-export type SendOpts = { mode?: Mode | null, context?: FnContext | null, files?: Array<string>, voice?: boolean, via?: string | null, };
+export type SendOpts = { mode?: Mode | null, context?: FnContext | null, voice?: boolean, via?: string | null, };
 
 /**
  * What a client asks a hub.
@@ -191,11 +186,11 @@ cid?: number | null,
  * his message as typed parts (msg-parts, [`crate::parts`]): the
  * hub renders the model's text from them (`text` is then
  * ignored) and keeps them on his message, so every client draws
- * his quotes, pastes and images as chips. Empty: `text` (and
- * `files`) as before. Never with `files`; a part this hub
- * doesn't know is refused (it would drop words)
+ * his quotes, pastes, images and files as chips. Empty: `text`
+ * alone. A part this hub doesn't know is refused (it would drop
+ * words)
  */
-parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, files?: Array<string>, voice?: boolean, via?: string | null, } | { "cmd": "answer", project: string, card: number, reply: string, files?: Array<string>, 
+parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, voice?: boolean, via?: string | null, } | { "cmd": "answer", project: string, card: number, reply: string, 
 /**
  * his answer as typed parts, as `Send.parts` (`reply` then ignored)
  */
@@ -213,7 +208,7 @@ limit?: number | null, } | { "cmd": "scheduled", project: string, } | { "cmd": "
  * that isn't a command takes `send`'s path with them (`line` is
  * then ignored); a command never has any
  */
-parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, files?: Array<string>, voice?: boolean, via?: string | null, } | { "cmd": "scheduled_run", project: string, id: number, } | { "cmd": "artifacts_add", project: string, agent: string, target: string, title?: string | null, } | { "cmd": "focus", project: string, focus: string, } | { "cmd": "versions", project: string, } | { "cmd": "version_info", project: string, } | { "cmd": "version_switch", project: string, to: string, } | { "cmd": "version_rollback", project: string, } | { "cmd": "version_restart", project: string, to?: string | null, } | { "cmd": "version_update", project: string, } | { "cmd": "release_plan", project: string, dry?: boolean, } | { "cmd": "release_run", project: string, tag: string, commit: string, dry?: boolean, } | { "cmd": "stop_hub", project: string, keep_agents?: boolean, } | { "cmd": "page_voice", project: string, page: string, phase: string, text?: string, };
+parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, voice?: boolean, via?: string | null, } | { "cmd": "scheduled_run", project: string, id: number, } | { "cmd": "artifacts_add", project: string, agent: string, target: string, title?: string | null, } | { "cmd": "focus", project: string, focus: string, } | { "cmd": "versions", project: string, } | { "cmd": "version_info", project: string, } | { "cmd": "version_switch", project: string, to: string, } | { "cmd": "version_rollback", project: string, } | { "cmd": "version_restart", project: string, to?: string | null, } | { "cmd": "version_update", project: string, } | { "cmd": "release_plan", project: string, dry?: boolean, } | { "cmd": "release_run", project: string, tag: string, commit: string, dry?: boolean, } | { "cmd": "stop_hub", project: string, keep_agents?: boolean, } | { "cmd": "page_voice", project: string, page: string, phase: string, text?: string, };
 
 /**
  * draft: the kind of an [`HubEv::Error`], one enum for every typed

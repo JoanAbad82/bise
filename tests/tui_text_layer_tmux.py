@@ -88,7 +88,7 @@ def main():
         t.wait("bise :*")
         t.wait_re(MAIN_IDLE)
         # a card with a url, and a tool whose output has one
-        t.typed("[[bash: sb card \"$(printf 'the bundle grew, see %s. split it?\\n1. yes\\n2. no')\"]] "
+        t.typed("[[bash: sb notify \"$(printf 'the bundle grew, see %s. split it?\\n1. yes\\n2. no')\"]] "
                 "[[bash: echo location: %s]]" % (CARD_URL, BOX_URL))
         t.keys("Enter")
         t.wait("inbox · 1 waiting for you")

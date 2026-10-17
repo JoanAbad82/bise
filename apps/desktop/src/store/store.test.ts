@@ -4,8 +4,6 @@ import type { Entry, Part } from "@/proto";
 import type { CoreCmd } from "@/shared/api";
 import { allFixtureEvents, replay } from "./replay";
 import {
-  sentParts,
-  sentWords,
   Store,
   TAGS,
   threadKey,
@@ -329,12 +327,14 @@ describe("store", () => {
         cid: 2,
       },
     ]);
-    const first = store.pending(K)[0]?.cid;
+    const first = store.pending(K)[0]?.cid ?? 0;
+    // the hub answers each send with its message id; the entry with that id takes its row
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: first, msg_id: 9 });
     store.apply({
       ev: "entry",
       project: P,
       agent: "perf",
-      entry: entry(9, "again", "you"),
+      entry: { ...entry(9, "again", "you"), msg_id: 9 },
     });
     expect(store.pending(K).map((p) => p.cid)).not.toContain(first);
     expect(store.pending(K)).toHaveLength(1);
@@ -346,7 +346,8 @@ describe("store", () => {
     const store = new Store({ send: (c) => sent.push(c) }, { now: () => now });
     store.setCore("up");
     const you = (pos: number, at_ms: number, text: string, more: Partial<Entry> = {}): Entry => ({ pos, at_ms, kind: "you", text, ...more });
-    store.send({ project: P, agent: "perf", text: "ok" });
+    const ok = store.send({ project: P, agent: "perf", text: "ok" });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: ok, msg_id: 12 });
     // the thread opened after the send: a page with an old 'ok' only, then one with his echo
     store.apply({ ev: "thread", project: P, agent: "perf", entries: [you(3, 20_000, "ok")], before: null, more: false });
     expect(store.pending(K).map((p) => p.text)).toEqual(["ok"]);
@@ -357,130 +358,41 @@ describe("store", () => {
     expect(store.pending(K)).toEqual([]);
     // a steered one: its echo is an entry, re-sent with its marks (received, then read + steered_at)
     now = 200_000;
-    store.send({ project: P, agent: "perf", text: "also try webp" });
+    const webp = store.send({ project: P, agent: "perf", text: "also try webp" });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: webp, msg_id: 13 });
     store.apply({ ev: "entry", project: P, agent: "perf", entry: you(11, 200_100, "also try webp", { msg_id: 13, delivery: "sent" }) });
     expect(store.pending(K)).toEqual([]);
     store.apply({ ev: "entry", project: P, agent: "perf", entry: you(11, 200_100, "also try webp", { msg_id: 13, delivery: "read", steered_at: 12 }) });
     expect(store.pending(K)).toEqual([]);
     // a queued one: its echo is written when it is said, later, and still takes it
     now = 300_000;
-    store.send({ project: P, agent: "perf", text: "and the changelog", mode: "queued" });
+    const log = store.send({ project: P, agent: "perf", text: "and the changelog", mode: "queued" });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: log, msg_id: 14 });
     store.apply({ ev: "entry", project: P, agent: "perf", entry: you(20, 360_000, "and the changelog", { msg_id: 14 }) });
     expect(store.pending(K)).toEqual([]);
   });
 
-  it("a send with an image goes when its echo lands with the hub's marker before his words (qa-native R41)", () => {
-    const { store } = fake();
-    store.send({
-      project: P,
-      agent: "perf",
-      text: "what is in this picture?",
-      files: ["/tmp/shot.png"],
-    });
-    store.send({
-      project: P,
-      agent: "perf",
-      text: "[Image #1] and this one",
-      files: ["/tmp/b.png"],
-    });
-    expect(store.pending(K)).toHaveLength(2);
-    const marker =
-      '<image name="[Image #1]" path="/tmp/shot.png" mime="image/png" b64="/h/images/ab12.b64">';
-    store.apply({
-      ev: "entry",
-      project: P,
-      agent: "perf",
-      entry: entry(
-        9,
-        `${marker}
-what is in this picture?`,
-        "you",
-      ),
-    });
-    expect(store.pending(K).map((p) => p.text)).toEqual([
-      "[Image #1] and this one",
-    ]);
-    store.apply({
-      ev: "entry",
-      project: P,
-      agent: "perf",
-      entry: entry(10, `${marker.replace("shot", "b")} and this one`, "you"),
-    });
-    expect(store.pending(K)).toEqual([]);
-    expect(
-      sentWords(
-        '<image name="[Image #2]" path="a b.png" mime="image/png" b64="x">  hi\n there',
-      ),
-    ).toBe("hi there");
-    // file-chips: a file's marker (missing or not) and its '[File #n]' label go the same way
-    expect(
-      sentWords(
-        'add <image name="[Image #1]" path="/u/a.png" mime="image/png" b64=""> to <file name="[File #2]" path="/u/deck.pptx"> and <file name="[File #3]" path="/u/q3.pdf" missing="true">',
-      ),
-    ).toBe("add to and");
-    expect(sentWords("add [Image #1] to [File #2] and [File #3]")).toBe(
-      "add to and",
-    );
-  });
-
-  it("a typed send matches its echo by parts, not by the hub's template text (delta review D2)", () => {
-    const mine: Part[] = [
-      { kind: "quote", from: "main", text: "q" },
-      { kind: "text", text: "why " },
-      { kind: "paste", n: 1, text: "x\ny" },
-      { kind: "image", name: "[Image #2]", source: "/i/a.png" },
-    ];
-    // the hub keeps the image with its stored copy filled in
-    const echo: Part[] = [
-      { kind: "quote", from: "main", text: "q" },
-      { kind: "text", text: "why " },
-      { kind: "paste", n: 1, text: "x\ny" },
-      {
-        kind: "image",
-        name: "[Image #2]",
-        source: "/i/a.png",
-        mime: "image/png",
-        b64_file: "/s/a.b64",
-      },
-    ];
-    expect(sentParts(echo)).toBe(sentParts(mine));
-    expect(sentParts([{ kind: "text", text: "why" }])).not.toBe(
-      sentParts(mine),
-    );
-    expect(
-      sentParts([
-        { kind: "quote", from: "main", text: "other" },
-        { kind: "text", text: "why" },
-      ]),
-    ).not.toBe(
-      sentParts([
-        { kind: "quote", from: "main", text: "q" },
-        { kind: "text", text: "why" },
-      ]),
-    );
-  });
-
-  it("a send carries the files he attached, typed, and a retry sends them again; no files means no field", () => {
+  it("a send carries its parts, and a retry sends them again; no parts means no field", () => {
     const { store, sent } = fake();
-    const files = [
-      "/Users/ana/notes/q3-notes.md",
-      "/Users/ana/Desktop/shot.png",
+    const parts: Part[] = [
+      { kind: "text", text: "what stands out here " },
+      { kind: "file", name: "[File #1]", path: "/Users/ana/notes/q3-notes.md" },
     ];
     const cid = store.send({
       project: P,
       agent: "main",
-      text: "what stands out here",
-      files,
+      text: "what stands out here [File #1]",
+      parts,
     });
-    store.send({ project: P, agent: "main", text: "plain", files: [] });
+    store.send({ project: P, agent: "main", text: "plain", parts: [] });
     expect(sent).toEqual([
       {
         cmd: "send",
         project: P,
         agent: "main",
-        text: "what stands out here",
+        text: "",
         mode: "now",
-        files,
+        parts,
         cid: 1,
       },
       {
@@ -498,9 +410,9 @@ what is in this picture?`,
       cmd: "send",
       project: P,
       agent: "main",
-      text: "what stands out here",
+      text: "",
       mode: "now",
-      files,
+      parts,
       cid: 3,
     });
   });
@@ -647,27 +559,14 @@ what is in this picture?`,
     for (const c of sent) expect(hub_cmd.map((h) => h.cmd)).toContain(c.cmd);
   });
 
-  it("R41: an answer carries the images he attached (absolute paths, as a send); none: no files field", () => {
+  it("R41: an answer carries the images he attached as parts (as a send); none: no parts field", () => {
     const { store, sent } = fake();
-    store.do({ i: "answer", project: P, card: 9, reply: "this one", files: ["/Users/me/.bise/images/a.png"] });
-    store.do({ i: "answer", project: P, card: 9, reply: "", files: ["/Users/me/.bise/images/b.png"] });
-    store.do({ i: "answer", project: P, card: 10, reply: "yes", files: [] });
+    const a: Part[] = [{ kind: "image", name: "[Image #1]", source: "/Users/me/.bise/images/a.png" }];
+    store.do({ i: "answer", project: P, card: 9, reply: "this one", parts: a });
+    store.do({ i: "answer", project: P, card: 10, reply: "yes", parts: [] });
     store.do({ i: "answer", project: P, card: 10, reply: "yes" });
     expect(sent.filter((c) => c.cmd === "answer")).toEqual([
-      {
-        cmd: "answer",
-        project: P,
-        card: 9,
-        reply: "this one",
-        files: ["/Users/me/.bise/images/a.png"],
-      },
-      {
-        cmd: "answer",
-        project: P,
-        card: 9,
-        reply: "",
-        files: ["/Users/me/.bise/images/b.png"],
-      },
+      { cmd: "answer", project: P, card: 9, reply: "this one", parts: a },
       { cmd: "answer", project: P, card: 10, reply: "yes" },
       { cmd: "answer", project: P, card: 10, reply: "yes" },
     ]);

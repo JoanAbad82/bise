@@ -69,7 +69,7 @@ def answers_round(c, E):
     c.say('/new t3: {{bash: sb send main --expect-reply "v1 ou v2 ?"}}')
     msg_id = asked(c, "t3", "v1 ou v2", "t3 asks main")
     c.wait_idle("main", "t3", timeout=45)
-    c.say('[[bash: sb card --for %s "v1 ou v2 ?"]]' % msg_id)
+    c.say('[[bash: sb notify --for %s "v1 ou v2 ?"]]' % msg_id)
     card = card_of(c, "v1 ou v2")
     c.wait_idle("main", timeout=30)
     # bar A.3 (architect m_10203): t3's own question and the card main
@@ -100,7 +100,7 @@ def answers_round(c, E):
     c.say('[[bash: sb send main --expect-reply "which screenshot?"]]', focus="t3")
     msg2 = asked(c, "t3", "which screenshot", "t3 asks main again")
     c.wait_idle("main", "t3", timeout=45)
-    c.say('[[bash: sb card --for %s "which screenshot?"]]' % msg2)
+    c.say('[[bash: sb notify --for %s "which screenshot?"]]' % msg2)
     card2 = card_of(c, "which screenshot")
     c.wait_idle("main", timeout=30)
     n_t3 = len([r for r in E.fake_requests() if r.get("agent") == "t3"])
@@ -136,7 +136,7 @@ def cards_round(c):
     m_15205): main's thread has one 'you answered main' row with his
     whole multi-line answer, and never the raw note to main. A close
     without answering: the card goes, no error."""
-    c.say('[[bash: sb card "merge checkout into main?"]]')
+    c.say('[[bash: sb notify "merge checkout into main?"]]')
     c.wait(lambda: any(x["kind"] == "question" and "merge checkout" in x.get("text", json.dumps(x)) for x in c.cards()), 30, "main's own card")
     own = [x for x in c.cards() if x["kind"] == "question" and "merge checkout" in x.get("text", json.dumps(x))][0]
     c.wait_idle("main", timeout=30)
@@ -150,7 +150,7 @@ def cards_round(c):
     raw = [x for x in mthread if x.get("text", "").startswith("the user answered notification #")]
     check(not raw, "no raw note to main in its thread: %r" % raw)
 
-    c.say('[[bash: sb card "close me from the window?"]]')
+    c.say('[[bash: sb notify "close me from the window?"]]')
     shut = card_of(c, "close me")
     c.wait_idle("main", timeout=30)
     ok(req(c, "card/close", card=shut["id"]), "card/close of an open card")
@@ -347,7 +347,7 @@ def slash_round(c):
     ok(run(c, "/artifacts"), "/artifacts")
     c.wait(lambda: len(notes(c, "hub/artifacts")) > na, 20, "/artifacts answered with hub/artifacts")
 
-    c.say('[[bash: sb card "close me by a slash line?"]]')
+    c.say('[[bash: sb notify "close me by a slash line?"]]')
     shut = card_of(c, "close me by")
     c.wait_idle("main", timeout=30)
     ok(run(c, "/close %d" % shut["id"]), "/close of an open card")

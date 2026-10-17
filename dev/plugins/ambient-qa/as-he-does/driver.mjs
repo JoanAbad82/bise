@@ -516,7 +516,7 @@ if (mode === 'rows2') {
   await closeArtifact();
   // one waiting item in another project: ai-docs' main opens a card for him (for bise's inbox block)
   await click('open ai-docs', page.locator('[data-testid="app.sidebar"]').getByText('ai-docs', { exact: true }).first());
-  await say("[[bash: sb card 'publish the ai-docs guide now?\n1. publish\n2. later']]");
+  await say("[[bash: sb notify 'publish the ai-docs guide now?\n1. publish\n2. later']]");
   const carded = await until(async () => (/done: tool bash ok/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
   step("ai-docs' main opened a card for him (the inbox item)", !!carded, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
   await harness();
@@ -1649,7 +1649,7 @@ async function rows37(harness, say) {
     await harness();
     await clear();
     await field.click({ timeout: 3000 }).catch(() => {});
-    await page.keyboard.type(`[[bash: sb card '${Q}`, { delay: 5 });
+    await page.keyboard.type(`[[bash: sb notify '${Q}`, { delay: 5 });
     for (const l of ['1. zqred', "2. zqblue']]"]) { await page.keyboard.press('Shift+Enter'); await page.keyboard.type(l, { delay: 5 }); }
     await page.keyboard.press('Enter');
     await bise();
@@ -2100,7 +2100,7 @@ async function rowsE812(harness, say) {
     await f.click({ timeout: 3000 }).catch(() => {});
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
-    await page.keyboard.type(`[[bash: sb card '${T} which size?`, { delay: 5 });
+    await page.keyboard.type(`[[bash: sb notify '${T} which size?`, { delay: 5 });
     for (const l of ['1. zqsmall', "2. zqlarge']]"]) { await page.keyboard.press('Shift+Enter'); await page.keyboard.type(l, { delay: 5 }); }
     await page.keyboard.press('Enter');
     if (other) await openProject(other.id); else await bise();
@@ -2342,7 +2342,7 @@ async function rowsF2A7(harness, say) {
   const otherName = other ? other.name : 'bise';
 
   // main's cards in harness, each '<question>' then its options on their own lines (Shift+Enter, as
-  // rows37: sb card is main's alone, 'reserved for main' from an agent, try-gate-f2a7's first run)
+  // rows37: sb notify is main's alone, 'reserved for main' from an agent, try-gate-f2a7's first run)
   const cards = async (list, tail) => {
     await field.click({ timeout: 3000 }).catch(() => {});
     await page.keyboard.press('Meta+a');
@@ -2351,7 +2351,7 @@ async function rowsF2A7(harness, say) {
     // and '5. 1. zqclick-one' on the third card of a message: no option 1 to click, try-gate-f2a7's
     // second run)
     const NL = String.fromCharCode(92) + 'n';
-    const one = (c) => `sb card "$(printf "%s${NL}" ${[c.q, ...c.opts].map((x) => `"${x}"`).join(' ')})"`;
+    const one = (c) => `sb notify "$(printf "%s${NL}" ${[c.q, ...c.opts].map((x) => `"${x}"`).join(' ')})"`;
     await page.keyboard.type(`[[bash: ${list.map(one).join(' && ')}]] ${tail}`, { delay: 5 });
     await page.keyboard.press('Enter');
   };
@@ -2478,7 +2478,7 @@ async function rowsF2A7(harness, say) {
     const shut = await until(async () => (!(await d0.open.isVisible().catch(() => false)) ? true : null), 5000, 250);
     if (!shut) { step("an answer to a withdrawn card", false, { why: 'the card stayed open after Escape: the words would answer it', card }); return; }
     await clear();
-    await say(`[[bash: sleep 30 && sb card --withdraw ${card} "zq the plan changed"]] withdrawing`);
+    await say(`[[bash: sleep 30 && sb notify --withdraw ${card} "zq the plan changed"]] withdrawing`);
     const t0 = Date.now();
     await goOther();
     await clear();
@@ -2632,7 +2632,7 @@ async function rows233B(harness, say) {
   const NL = String.fromCharCode(92) + 'n';
   const cards = async (list, tail) => {
     await clear();
-    const one = (c) => `sb card "$(printf "%s${NL}" ${[c.q, ...c.opts].map((x) => `"${x}"`).join(' ')})"`;
+    const one = (c) => `sb notify "$(printf "%s${NL}" ${[c.q, ...c.opts].map((x) => `"${x}"`).join(' ')})"`;
     await page.keyboard.type(`[[bash: ${list.map(one).join(' && ')}]] ${tail}`, { delay: 5 });
     await page.keyboard.press('Enter');
   };
@@ -2880,7 +2880,7 @@ async function rows233B(harness, say) {
     const md = path.join(FX, 'zq-art-reply.md');
     fs.writeFileSync(md, `the report is [zq art chip report](artifact:${id}), and here is plain text after it.`);
     await clear();
-    await say(`[[bash: sb card "$(printf "%s${NL}" "zqart${T} look at [zq art chip report](artifact:${id})?" "1. zqart-ok" "2. zqart-no")"]] [[reply: ${md}]] art`);
+    await say(`[[bash: sb notify "$(printf "%s${NL}" "zqart${T} look at [zq art chip report](artifact:${id})?" "1. zqart-ok" "2. zqart-no")"]] [[reply: ${md}]] art`);
     // main's answer (not his own bubble, which draws the name too): the row with 'plain text after it'
     const name = await until(async () => page.evaluate(() => {
       const rows = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."]')]
@@ -3354,10 +3354,10 @@ async function rowsC2BA(harness, say) {
   };
   const T = String(Date.now()).slice(-5);
   const NL = String.fromCharCode(92) + 'n';
-  // one card of main's, by its words in a printf (sb card is main's alone)
+  // one card of main's, by its words in a printf (sb notify is main's alone)
   const card = async (q, opts, tail) => {
     await clear();
-    await page.keyboard.type(`[[bash: sb card "$(printf "%s${NL}" ${[q, ...opts].map((x) => `"${x}"`).join(' ')})"]] ${tail}`, { delay: 3 });
+    await page.keyboard.type(`[[bash: sb notify "$(printf "%s${NL}" ${[q, ...opts].map((x) => `"${x}"`).join(' ')})"]] ${tail}`, { delay: 3 });
     await page.keyboard.press('Enter');
   };
   const dock = async (token, ms) => {
@@ -3609,7 +3609,7 @@ async function rowsC2BA(harness, say) {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(400);
     await clear();
-    await say(`[[bash: sleep 20 && sb card --withdraw ${String(d0.id)} "zc the plan changed"]] withdrawing ${how}`);
+    await say(`[[bash: sleep 20 && sb notify --withdraw ${String(d0.id)} "zc the plan changed"]] withdrawing ${how}`);
     const d = await dock(K, 10000);
     if (!d.open) return { error: 'not open again', id: d0.id };
     const HALF = `warm, but only after the reindex ${how}`;
@@ -4901,7 +4901,7 @@ async function fileChips(harness) {
   const csv = at('bench-zq.csv');
   fs.writeFileSync(csv, ['run,ms', 'cold,412', ''].join(NL));
   const Q = 'which bench zqbench?';
-  await fresh(`[[bash: sb card '${Q}`);
+  await fresh(`[[bash: sb notify '${Q}`);
   for (const l of ['1. cold', "2. warm']]"]) { await page.keyboard.press('Shift+Enter'); await page.keyboard.type(l, { delay: 5 }); }
   await page.keyboard.press('Enter');
   await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());

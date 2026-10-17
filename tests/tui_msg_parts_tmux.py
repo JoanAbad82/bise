@@ -174,7 +174,7 @@ def main():
             c.wait(lambda: any(r.get("from") == "t3" and ask in r.get("body", "") for r in c.feed("main", "msg-in")), 120, "t3 asks main")
             c.wait_idle("main", "t3", timeout=120)
             mid = ["m_%d" % r["id"] for r in c.feed("main", "msg-in") if r.get("from") == "t3" and ask in r.get("body", "")][0]
-            c.say('[[bash: sb card --for %s "%s"]]' % (mid, ask))
+            c.say('[[bash: sb notify --for %s "%s"]]' % (mid, ask))
             c.wait(lambda: any(cd["kind"] == "question" for cd in c.cards()), 60, "the card")
             card = [cd for cd in c.cards() if cd["kind"] == "question"][0]
             c.wait_idle("main")

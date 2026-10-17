@@ -191,8 +191,6 @@ export interface Pending {
   readonly agent: string;
   readonly text: string;
   readonly mode: Mode;
-  /** files he attached (absolute paths), sent with his words */
-  readonly files?: readonly string[];
   /** msg-parts: his message typed, sent with it (a retry sends them again) */
   readonly parts?: readonly Part[];
   readonly at_ms: number;
@@ -300,44 +298,3 @@ export function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-/**
- * His message as sent, from its typed parts, to match a pending send with its echo: the words
- * (spaces collapsed), each paste, quote and file by its content, each image by its name (the hub
- * fills its b64_file and mime on the kept part). Pure.
- */
-export function sentParts(parts: readonly Part[]): string {
-  return parts
-    .map((p) => {
-      switch (p.kind) {
-        case 'text':
-          return p.text;
-        case 'image':
-          return `\u0000image:${p.name}\u0000`;
-        case 'file':
-          return `\u0000file:${p.path}\u0000`;
-        // a part of an artifact: which one, which version, where (the hub may add its rev)
-        case 'anchor':
-          return `\u0000anchor:${p.artifact}:${String(p.version)}:${JSON.stringify(p.anchor)}\u0000`;
-        default:
-          return `\u0000${p.kind}:${p.text}\u0000`;
-      }
-    })
-    .join('')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
- * His words as sent, to match a pending send with its echo: the hub's image markers
- * (`<image name="[Image #1]" path=… mime=… b64=…>`, rust/images marker()) and the composer's
- * '[Image #n]' labels out, and the same for files (`<file name="[File #2]" path=…[ missing="true"]>`,
- * bise_proto parts, file-chips; '[File #n]'), spaces collapsed. Pure.
- */
-export function sentWords(text: string): string {
-  return text
-    .replace(/<image name="[^"]*" path="[^"]*" mime="[^"]*" b64="[^"]*">/g, ' ')
-    .replace(/<file name="[^"]*" path="[^"]*"(?: missing="true")?>/g, ' ')
-    .replace(/\[(?:Image|File) #\d+\]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
