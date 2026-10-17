@@ -49,6 +49,14 @@ It prints the boot replay time, a Tick, a `say`, `view_all`, and writes three
 `rfc_wrap`, `span_fade`, `term_drop`, `heap_alloc_miss` are the runtime's
 memory work (many allocations: usually string building).
 
+Under load, wall time is noise: compare **retired instructions and cycles**
+(`/usr/bin/time -l <sb-core>` around the run, or a driver that reads them),
+two runs each, base vs change. And read the sample for the runtime's own
+memory work (`term_drop`, `span_fade`, `rfc_wrap`, `heap_alloc_miss`): in
+bise's Bend the cost is usually allocating and freeing (a buffer appended
+and rescanned, a parsed value dropped, a unary `Nat` fuel built then
+thrown away), more than the compares themselves.
+
 The Rust side of a step: `SB_BENCH_JOURNAL=<copy> cargo test -p switchboard
 bench_step -- --ignored --nocapture` (sb-core vs rust split per step).
 
