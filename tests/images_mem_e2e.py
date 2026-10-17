@@ -28,7 +28,10 @@ for k in range(N):
     p = os.path.join(imgs, "%032x.b64" % k)
     open(p, "w").write(data)
     markers.append('<image name="[Image #%d]" path="shot%d.png" mime="image/png" b64="%s">' % (k + 1, k, p))
-env = {k: v for k, v in os.environ.items() if not k.startswith(("BEND_", "SB_"))}
+# BISE_ too: an agent's shell exports BISE_SESSION_CHOICE (its session's
+# model), which wins over BEND_MODEL; the REPL then sent that model's
+# request and the fake answered 400 (tool name pattern), with no image
+env = {k: v for k, v in os.environ.items() if not k.startswith(("BEND_", "SB_", "BISE_"))}
 env.update(HOME=tmp, XDG_STATE_HOME=os.path.join(tmp, "state"))
 fake = subprocess.Popen([sys.executable, "-u", os.path.join(HERE, "fake_provider.py")], stdout=subprocess.PIPE, text=True,
                         env={**env, "FAKE_LOG": os.path.join(tmp, "fake.log")})
