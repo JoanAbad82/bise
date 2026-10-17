@@ -50,13 +50,13 @@ export function feature(now = 1_791_100_000_000): Feature {
   const doOne = (g: Gesture): void => {
     switch (g.g) {
       case 'answer':
-        store.answer(g.project, g.card, g.reply, undefined, undefined, g.from === undefined ? undefined : fromOf(g.from));
+        store.do({ i: 'answer', project: g.project, card: g.card, reply: g.reply, ...(g.from === undefined ? {} : { from: fromOf(g.from) }) });
         return;
       case 'close':
-        store.close(g.project, g.card);
+        store.do({ i: 'close', project: g.project, card: g.card });
         return;
       case 'retry':
-        store.retryCard(g.project, g.card);
+        store.do({ i: 'retry_card', project: g.project, card: g.card });
         return;
       case 'send':
         store.send({ project: g.project, agent: g.agent, text: g.text });

@@ -568,7 +568,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
     }
     leave();
     // inbox picks (3): where he is, so his row shows here too when the asker's thread is elsewhere
-    store.answer(c.project, c.id, String(n), undefined, undefined, { at: answerAt(here, home) });
+    store.do({ i: 'answer', project: c.project, card: c.id, reply: String(n), from: { at: answerAt(here, home) } });
   };
   const close = (c: Card) => {
     // closed already: it just goes, his words to the thread's composer (ThreadComposer)
@@ -582,7 +582,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
       return;
     }
     leave();
-    store.close(c.project, c.id);
+    store.do({ i: 'close', project: c.project, card: c.id });
   };
   useEffect(() => {
     answerHeard.current = (project, card, n) => {

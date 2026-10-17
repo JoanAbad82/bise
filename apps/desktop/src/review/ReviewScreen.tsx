@@ -152,7 +152,7 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
               <Button
                 kind="pri"
                 onClick={() => {
-                  store.answer(project, card.id, '1');
+                  store.do({ i: 'answer', project, card: card.id, reply: '1' });
                 }}
                 testId="review.merge"
               >

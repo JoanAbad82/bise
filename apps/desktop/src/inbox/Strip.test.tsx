@@ -35,11 +35,11 @@ const ports = () => {
   const p: StripPorts = {
     answer: (project, c, reply) => {
       did.push(`answer ${project}-${String(c)} ${reply}`);
-      store.answer(project, c, reply);
+      store.do({ i: 'answer', project, card: c, reply });
     },
     close: (project, c) => {
       did.push(`close ${project}-${String(c)}`);
-      store.close(project, c);
+      store.do({ i: 'close', project, card: c });
     },
     openInbox: () => did.push('inbox'),
     act: (project, a) => did.push(`act ${project} ${JSON.stringify(a)}`),

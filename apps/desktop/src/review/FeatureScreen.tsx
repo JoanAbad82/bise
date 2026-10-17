@@ -70,7 +70,7 @@ export function FeatureScreen({ project, name }: { project: string; name: string
                     else if (c.back) setAsking(false);
                     else if (c.reply !== undefined) {
                       setAsking(false);
-                      store.answer(project, card.id, c.reply);
+                      store.do({ i: 'answer', project, card: card.id, reply: c.reply });
                     }
                   }}
                 >

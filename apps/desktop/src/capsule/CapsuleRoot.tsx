@@ -430,7 +430,7 @@ export function CapsuleRoot(): JSX.Element {
       e.preventDefault();
       if (k.t === "later") dispatch({ ev: "later" });
       else if (k.t === "close") dispatch({ ev: "card_done", id: fromSpot });
-      else if (k.t === "pick") store.answer(project, c.id, String(k.n));
+      else if (k.t === "pick") store.do({ i: "answer", project, card: c.id, reply: String(k.n) });
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -472,7 +472,7 @@ export function CapsuleRoot(): JSX.Element {
               dispatch({ ev: "later" });
             },
             pick: (n) => {
-              store.answer(project, c.id, String(n));
+              store.do({ i: "answer", project, card: c.id, reply: String(n) });
             },
             close: () => {
               dispatch({ ev: "card_done", id });

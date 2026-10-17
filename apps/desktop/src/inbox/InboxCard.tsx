@@ -190,7 +190,7 @@ function RefusedNote({ card, id }: { card: CardRow; id: string }) {
           {' · '}
           <Act
             onClick={() => {
-              store.retryCard(card.project, card.id);
+              store.do({ i: 'retry_card', project: card.project, card: card.id });
             }}
             testId={`${id}.retry`}
           >

@@ -41,7 +41,7 @@ describe("answer-in-thread A: where he answered, where the window goes", () => {
     const keep = { read: (k: string) => kept.get(k), write: (k: string, v: unknown) => kept.set(k, v) };
     const s = new Store({ send: () => undefined }, { now: () => 42, asides: keep });
     s.apply({ ev: "projects", projects: [{ project: "home", name: "bise", path: "/h", git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true }] });
-    s.answer("ts", 384, "2", undefined, undefined, { at: { project: "home", agent: "main" } });
+    s.do({ i: "answer", project: "ts", card: 384, reply: "2", from: { at: { project: "home", agent: "main" } } });
     expect(s.apply({ ev: "card_answered", project: "ts", card: 384, answer: gift })).toBe(true);
     expect(s.answeredFrom("ts", 384)?.from).toEqual({ project: "home", agent: "main" });
     expect(s.answerJump()).toEqual({ project: "ts", agent: "main", card: 384, seq: 1 });

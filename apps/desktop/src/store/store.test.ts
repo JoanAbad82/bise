@@ -642,17 +642,17 @@ what is in this picture?`,
     replay(store, hub_ev);
     expect(ends).toEqual(["perf", "docs"]);
     store.subscribeThread(P, "perf", 50);
-    store.answer(P, 9, "1");
+    store.do({ i: "answer", project: P, card: 9, reply: "1" });
     store.stop(P, "perf");
     for (const c of sent) expect(hub_cmd.map((h) => h.cmd)).toContain(c.cmd);
   });
 
   it("R41: an answer carries the images he attached (absolute paths, as a send); none: no files field", () => {
     const { store, sent } = fake();
-    store.answer(P, 9, "this one", ["/Users/me/.bise/images/a.png"]);
-    store.answer(P, 9, "", ["/Users/me/.bise/images/b.png"]);
-    store.answer(P, 10, "yes", []);
-    store.answer(P, 10, "yes");
+    store.do({ i: "answer", project: P, card: 9, reply: "this one", files: ["/Users/me/.bise/images/a.png"] });
+    store.do({ i: "answer", project: P, card: 9, reply: "", files: ["/Users/me/.bise/images/b.png"] });
+    store.do({ i: "answer", project: P, card: 10, reply: "yes", files: [] });
+    store.do({ i: "answer", project: P, card: 10, reply: "yes" });
     expect(sent.filter((c) => c.cmd === "answer")).toEqual([
       {
         cmd: "answer",

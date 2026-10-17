@@ -59,7 +59,7 @@ import { answers, listsLive, merged, planJump, planNewer } from "./window";
 import { trim } from "./trim";
 import { answered, echoOf, keepLanded, sentOf, ECHO_SLACK_MS, type Sent } from "./echo";
 import { EMPTY, type Thread } from "./base";
-import { cardAnsweredOf, cardKeyOf, type AnswerFrom, type AnsweredFrom } from "./answered";
+import { cardAnsweredOf, cardKeyOf, type AnsweredFrom } from "./answered";
 import { StoreVoice } from "./voice";
 
 export { DICTATE_STOP_WAIT_MS } from "./voice";
@@ -268,10 +268,6 @@ export class Store extends StoreVoice {
    */
   refused(): readonly Refused[] {
     return this.cardsState.refused;
-  }
-  /** 'try again' on a refused card: what he sent, sent again (none known: nothing, the card stays his). Sugar over store.do, removed by slice 1c. */
-  retryCard(project: string, card: number): void {
-    this.do({ i: "retry_card", project, card });
   }
 
   /** Where he made each answer this window sent (window-local, oldest first; kept across a reload). */
@@ -581,25 +577,6 @@ export class Store extends StoreVoice {
     this.command({ cmd: "find", project, agent, needle, rid });
     return rid;
   }
-  /** His answer to card `card`: its words, and the images he pasted or dropped (R41: absolute paths, as a send's files). Sugar over store.do, removed by slice 1c. */
-  answer(
-    project: string,
-    card: number,
-    reply: string,
-    files?: readonly string[],
-    parts?: readonly Part[],
-    from?: AnswerFrom,
-  ): void {
-    this.do({
-      i: "answer",
-      project,
-      card,
-      reply,
-      ...(files !== undefined ? { files } : {}),
-      ...(parts !== undefined ? { parts } : {}),
-      ...(from !== undefined ? { from } : {}),
-    });
-  }
   /** His answer to the hub's yes/no question (a no's line comes back as a notice). */
   confirm(project: string, id: number, yes: boolean): void {
     this.dropConfirm(project, id);
@@ -620,10 +597,6 @@ export class Store extends StoreVoice {
         `confirms:${project}`,
         now.filter((c) => c.id !== id),
       );
-  }
-  /** Close a card without answering it (the TUI's /close N). Sugar over store.do, removed by slice 1c. */
-  close(project: string, card: number): void {
-    this.do({ i: "close", project, card });
   }
   stop(project: string, agent: string): void {
     this.command({ cmd: "stop", project, agent });

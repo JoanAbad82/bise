@@ -49,10 +49,10 @@ export function ThreadInbox({ project }: { project: string }) {
       ports={{
         answer: (p, card, reply, parts) => {
           // answer-in-thread A: the row says 'answered from the inbox screen'; the window stays here
-          store.answer(p, card, reply, undefined, parts, { at: null, inbox: true });
+          store.do({ i: 'answer', project: p, card, reply, ...(parts !== undefined ? { parts } : {}), from: { at: null, inbox: true } });
         },
         close: (p, card) => {
-          store.close(p, card);
+          store.do({ i: 'close', project: p, card });
         },
         openInbox: () => {
           openInbox();

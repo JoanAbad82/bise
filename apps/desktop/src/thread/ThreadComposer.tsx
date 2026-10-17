@@ -238,7 +238,15 @@ export const ThreadComposer = memo(function ThreadComposer({
         asked.current = { project: answer.project, text: out.text };
         // inbox picks (3): this thread, so his row shows here too when the asker's thread is elsewhere
         const from = answer.asker === undefined ? undefined : { at: { project, agent } };
-        store.answer(answer.project, answer.card, out.text, out.files, out.parts, from);
+        store.do({
+          i: 'answer',
+          project: answer.project,
+          card: answer.card,
+          reply: out.text,
+          files: out.files,
+          ...(out.parts !== undefined ? { parts: out.parts } : {}),
+          ...(from !== undefined ? { from } : {}),
+        });
         onSent();
         return;
       }

@@ -62,8 +62,8 @@ describe("acted: the cards he answered or closed, one owner", () => {
     const sent: unknown[] = [];
     const s = new Store({ send: (c) => sent.push(c) }, { now: () => 7 });
     s.apply({ ev: "projects", projects: [row("ts-pattern", [384, 385])] });
-    s.answer("ts-pattern", 384, "1");
-    s.close("ts-pattern", 385);
+    s.do({ i: "answer", project: "ts-pattern", card: 384, reply: "1" });
+    s.do({ i: "close", project: "ts-pattern", card: 385 });
     expect(s.acted().map((a) => a.key)).toEqual(["ts-pattern-384", "ts-pattern-385"]);
     expect(sent).toEqual([
       { cmd: "answer", project: "ts-pattern", card: 384, reply: "1" },
@@ -83,9 +83,9 @@ describe("acted: the cards he answered or closed, one owner", () => {
   it("a refused answer or close shows that very card again with the words (architect m_23524)", () => {
     const s = new Store({ send: () => undefined }, { now: () => 7 });
     s.apply({ ev: "projects", projects: [row("shop", [2, 3, 4])] });
-    s.answer("shop", 2, "1");
-    s.answer("shop", 3, "1");
-    s.close("shop", 4);
+    s.do({ i: "answer", project: "shop", card: 2, reply: "1" });
+    s.do({ i: "answer", project: "shop", card: 3, reply: "1" });
+    s.do({ i: "close", project: "shop", card: 4 });
     // the first answer's result came after rows that dropped card 2 (the hub broadcasts a step's
     // cards before it answers): the hub took it, the entry goes with those rows
     s.apply({ ev: "projects", projects: [row("shop", [3, 4])] });
@@ -103,7 +103,7 @@ describe("acted: the cards he answered or closed, one owner", () => {
     s.apply({ ev: "card_refused", project: "shop", card: 3, text: "card 3 isn't open" });
     expect(s.acted()).toEqual([]);
     // another project's refusal touches nothing here
-    s.answer("shop", 2, "1");
+    s.do({ i: "answer", project: "shop", card: 2, reply: "1" });
     s.apply({ ev: "card_refused", project: "other", card: 2, text: "no" });
     expect(s.acted().map((a) => a.key)).toEqual(["shop-2"]);
   });
@@ -113,7 +113,7 @@ describe("acted: the cards he answered or closed, one owner", () => {
     // re-asked card from the inbox; the hub answered ok and kept it open
     const s = new Store({ send: () => undefined }, { now: () => 5_000 });
     s.apply({ ev: "projects", projects: [row("ai-docs", [19])] });
-    s.answer("ai-docs", 19, "the words he typed");
+    s.do({ i: "answer", project: "ai-docs", card: 19, reply: "the words he typed" });
     expect(s.acted().map((a) => a.key)).toEqual(["ai-docs-19"]);
     // the step's rows (still #19), then the hub's answer
     s.apply({ ev: "projects", projects: [row("ai-docs", [19])] });
@@ -132,7 +132,7 @@ describe("acted: the cards he answered or closed, one owner", () => {
   it("a reload keeps it until the rows drop it (his #384: never back once answered)", () => {
     const keep = keepOf();
     const s = new Store({ send: () => undefined }, { now: () => 7, asides: keep });
-    s.answer("ts-pattern", 384, "1");
+    s.do({ i: "answer", project: "ts-pattern", card: 384, reply: "1" });
     const again = new Store({ send: () => undefined }, { asides: keep });
     expect(again.acted().map((a) => a.key)).toEqual(["ts-pattern-384"]);
     again.apply({ ev: "projects", projects: [row("ts-pattern", [])] });

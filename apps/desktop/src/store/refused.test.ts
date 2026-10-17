@@ -48,9 +48,9 @@ describe("refused: the hub's words on the card that came back", () => {
     const sent: unknown[] = [];
     const s = new Store({ send: (c) => sent.push(c) }, { now: () => 7 });
     s.apply({ ev: "projects", projects: [row("ai-docs", []), row("harness", [7, 8, 9])] });
-    s.answer("harness", 7, "1", undefined, undefined, { at: { project: "ai-docs", agent: "main" } });
-    s.close("harness", 8);
-    s.answer("harness", 9, "keep it");
+    s.do({ i: "answer", project: "harness", card: 7, reply: "1", from: { at: { project: "ai-docs", agent: "main" } } });
+    s.do({ i: "close", project: "harness", card: 8 });
+    s.do({ i: "answer", project: "harness", card: 9, reply: "keep it" });
     s.apply({ ev: "card_refused", project: "harness", card: 7, text: "its hub didn't answer. try again in a moment." });
     s.apply({ ev: "error", project: "harness", cmd: "answer", text: "its hub didn't answer. try again in a moment." });
     s.apply({ ev: "card_refused", project: "harness", card: 8, text: "its hub didn't answer. try again in a moment." });
@@ -67,7 +67,7 @@ describe("refused: the hub's words on the card that came back", () => {
     expect(s.refused().map((r) => r.key)).toEqual(["harness-9"]);
     // 'try again': what he sent goes again, the words go while it is on its way, the card hides
     sent.length = 0;
-    s.retryCard("harness", 9);
+    s.do({ i: "retry_card", project: "harness", card: 9 });
     expect(sent).toEqual([expect.objectContaining({ cmd: "answer", project: "harness", card: 9, reply: "keep it" })]);
     expect(s.refused()).toEqual([]);
     expect(s.acted().map((a) => a.key)).toContain("harness-9");
@@ -81,22 +81,22 @@ describe("refused: the hub's words on the card that came back", () => {
   it("a retried close sends the close; a refusal it never sent from here has no 'try again'", () => {
     const sent: unknown[] = [];
     const s = new Store({ send: (c) => sent.push(c) }, { now: () => 7 });
-    s.close("harness", 8);
+    s.do({ i: "close", project: "harness", card: 8 });
     s.apply({ ev: "card_refused", project: "harness", card: 8, text: "no" });
     sent.length = 0;
-    s.retryCard("harness", 8);
+    s.do({ i: "retry_card", project: "harness", card: 8 });
     expect(sent).toEqual([expect.objectContaining({ cmd: "close", project: "harness", card: 8 })]);
     s.apply({ ev: "card_refused", project: "harness", card: 4, text: "bise restarted" });
     expect(refusedOf(s.refused(), "harness", 4)?.attempt).toBeUndefined();
     sent.length = 0;
-    s.retryCard("harness", 4);
+    s.do({ i: "retry_card", project: "harness", card: 4 });
     expect(sent).toEqual([]);
   });
 
   it("a reload keeps the words (and the try) until the rows drop the card", () => {
     const keep = keepOf();
     const s = new Store({ send: () => undefined }, { now: () => 7, asides: keep });
-    s.answer("harness", 7, "1");
+    s.do({ i: "answer", project: "harness", card: 7, reply: "1" });
     s.apply({ ev: "card_refused", project: "harness", card: 7, text: "no" });
     const again = new Store({ send: () => undefined }, { asides: keep });
     expect(again.refused().map((r) => [r.key, r.text, r.attempt?.kind])).toEqual([["harness-7", "no", "answer"]]);
