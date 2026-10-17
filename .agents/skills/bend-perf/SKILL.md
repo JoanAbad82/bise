@@ -73,6 +73,9 @@ The agent runtime (repl-live): `ps -o time` against its age, then `sample
    refuses the exponential case (the def called twice).
 2. **Expensive test first**: `str_in(names, to) && is_queued(st)` compares
    strings for every message, queued or not. Match the cheap test first.
+   In a hot loop use a real helper that matches, not a thunk
+   (`LZ.and(a, u => b)`): a closure and a cons per element cost more than
+   they save (bp-lazy: thunks gave 41 -> 28 ms, the match 41 -> 10.6 ms).
 3. **Full walks per step** over everything (all messages, all agents,
    archived included): keep the hot set apart (issue 21's split), or index it.
 4. **Appends in a loop**: `acc ++ piece` or `xs <> [x]`: chunks, then one join;
