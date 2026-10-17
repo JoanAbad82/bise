@@ -346,6 +346,32 @@ gitq tag v0.0.6x "$C1" && gitq push origin v0.0.6x
 out="$(PATH="$STUB2:$PATH" "$HERE/ci-release.sh" v0.0.6x "$W/cidist" "$W/ci3" --repo o/r --url "$CH" --draft 2>&1)" \
   && ok "CI rerun on a draft: files replaced, checked" || ko "rerun on draft: $out"
 check "... the stale file is gone" test ! -e "$GS/rel/v0.0.6x/old.tar.gz"
+# release.yml: the draft without darwin-x86_64 (off the desktop's path),
+# then --attach adds it, to a draft or a published release
+mkdir -p "$W/cidist3"; cp "$W/cidist"/bise-r6-darwin-arm64.* "$W/cidist"/bise-r6-linux-* "$W/cidist3/"
+gitq tag v0.0.9 "$C1" && gitq push origin v0.0.9
+CI3="PATH=$STUB2:$PATH"
+out="$(env "$CI3" "$HERE/ci-release.sh" v0.0.9 "$W/cidist3" "$W/ci9" --repo o/r --url "$CH" --commit "$C1" \
+  --targets "darwin-arm64 linux-x86_64 linux-arm64" --draft 2>&1)" \
+  && ok "CI's draft without darwin-x86_64" || ko "3-target draft: $out"
+check "... latest.json has no darwin-x86_64 yet" python3 -c "import json,sys; sys.exit('darwin-x86_64' in json.load(open('$GS/rel/v0.0.9/latest.json'))['targets'])"
+# what's new written and published before the Intel build is done
+python3 -c "import json; p='$GS/rel/v0.0.9/latest.json'; m=json.load(open(p)); m['notes']=['a new thing']; json.dump(m, open(p, 'w'))"
+rm "$GS/rel/v0.0.9/draft"
+out="$(env "$CI3" "$HERE/ci-release.sh" v0.0.9 "$W/cidist" "$W/ci9x" --repo o/r --url "$CH" --commit "$C1" --attach darwin-x86_64 2>&1)" \
+  && ok "--attach darwin-x86_64 to the published release, checked with 4 targets" || ko "attach: $out"
+check "... its archive and latest.json entry, the notes kept" python3 -c "
+import json, os, sys
+m = json.load(open('$GS/rel/v0.0.9/latest.json'))
+sys.exit(not (sorted(m['targets']) == ['darwin-arm64', 'darwin-x86_64', 'linux-arm64', 'linux-x86_64'] and m['notes'] == ['a new thing']
+              and os.path.exists('$GS/rel/v0.0.9/bise-r6-darwin-x86_64.tar.gz')))"
+out="$(env "$CI3" "$HERE/ci-release.sh" v0.0.9 "$W/cidist" "$W/ci9x" --repo o/r --url "$CH" --attach darwin-x86_64 2>&1)"
+has "$out" "nothing to do" && ok "--attach again: nothing to do" || ko "attach again: $out"
+mkdir -p "$W/cidist7"; cp "$W/cidist"/* "$W/cidist7/"
+pack r6 2026-01-07T00:00:00Z darwin-x86_64 "$C1" "$W/cidist7" >/dev/null
+out="$(env "$CI3" "$HERE/ci-release.sh" v0.0.9 "$W/cidist7" "$W/ci9y" --repo o/r --url "$CH" --attach darwin-x86_64 2>&1)" \
+  && ko "another darwin-x86_64 on a published release: accepted" \
+  || { has "$out" "never rewritten" && ok "another darwin-x86_64 on a published release: refused" || ko "attach other: $out"; }
 touch "$GS/ci-fails"
 out="$(P v0.0.7 --rev "$C1")"; has "$out" "the run failed" && ok "a failed CI run: said, nothing published" || ko "failed run: $out"
 check "... no release" test ! -e "$GS/rel/v0.0.7"

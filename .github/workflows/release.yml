@@ -20,15 +20,41 @@
 # Else ad hoc, as before (a fork, a dispatch without 'sign', and a tag
 # while RELEASE_SIGN is off: a warning says so). Linux jobs never sign.
 #
-# Triggers: a v* tag (build + draft release) and the Actions tab (build
-# only). Not every push to main: macOS minutes cost 10x on a private
-# repo and a cold build is long (the V8 engine); add `branches: [main]`
-# under `push` to build each push.
+# Triggers: a v* tag (build + draft release), the Actions tab (build
+# only), and the warming runs on main: a push that changes what the
+# archive is built from (darwin-arm64 + linux, no artifact) and a nightly
+# run (all 4).
+#
+# Speed (fast-release, ci-release-yml):
+#   - darwin-x86_64 is off the desktop's path: the draft needs
+#     darwin-arm64 + linux only (the desktop reads darwin-arm64); the
+#     Intel job (build-x86, ~2x slower) joins the release when done
+#     (ci-release.sh --attach: its archive, then latest.json with the 4
+#     targets). The run ends after it: publish-release.sh's watch still
+#     sees the 4 targets.
+#   - caches are saved on main only: a tag's caches are scoped to its
+#     tag (no other ref reads them) and evicted main's under the 10 GB
+#     limit, so tags restore main's and save nothing; the warming runs
+#     keep main's warm.
+#   - the V8 engine is built by bins.sh alone (bend-jsrt, in
+#     ~/sb-build/target-jsrt: cached, restored only when bins.sh's cache
+#     lacks this engine).
 name: release
 
 on:
   push:
     tags: ["v*"]
+    branches: [main]
+    paths:
+      - "rust/**"
+      - "bend/**"
+      - "packaging/**"
+      - "scripts/bins.sh"
+      - "scripts/versions.sh"
+      - "scripts/dist_sign.py"
+      - ".github/workflows/release.yml"
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
       sign:
@@ -39,9 +65,11 @@ on:
 permissions:
   contents: read
 
+# main's runs queue (one runs, the newest waits) so a warming run ends
+# and saves; another branch's dispatch replaces its older run
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') && github.ref != 'refs/heads/main' }}
 
 env:
   # THE command name (BISE-165): what test-install.sh installs and runs
@@ -61,6 +89,8 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  # the draft's targets; build-x86 below runs the same steps (a YAML
+  # anchor) for darwin-x86_64
   build:
     name: build ${{ matrix.target }}
     strategy:
@@ -71,10 +101,6 @@ jobs:
             os: darwin
             runner: macos-15
             bend_arch: arm64
-          - target: darwin-x86_64
-            os: darwin
-            runner: macos-15-intel
-            bend_arch: x64
           # Linux (docs/ports-plan.md): built on Ubuntu 22.04, so every
           # binary needs glibc 2.34 at most (the floor). NixOS takes the
           # same archives through the flake (nix/package.nix patches them)
@@ -89,10 +115,14 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     # the Developer ID's secrets only for a signed darwin build (see the top)
-    environment: ${{ (matrix.os == 'darwin' && (inputs.sign || (startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_SIGN == 'on'))) && 'desktop-release' || '' }}
-    env:
+    environment: &sign-environment ${{ (matrix.os == 'darwin' && (inputs.sign || (startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_SIGN == 'on'))) && 'desktop-release' || '' }}
+    env: &build-env
       SIGN: ${{ (matrix.os == 'darwin' && (inputs.sign || (startsWith(github.ref, 'refs/tags/v') && vars.RELEASE_SIGN == 'on'))) && '1' || '0' }}
-    steps:
+      # the caches are written by main's runs only (see the top)
+      SAVE_CACHES: ${{ github.ref == 'refs/heads/main' && '1' || '0' }}
+      # a push to main warms the caches: no archive kept
+      KEEP_ARCHIVE: ${{ github.event_name != 'push' || startsWith(github.ref, 'refs/tags/') }}
+    steps: &build-steps
       - uses: actions/checkout@v4
 
       - name: Environment
@@ -125,7 +155,7 @@ jobs:
 
       - name: Restore Bend ${{ env.BEND_VERSION }}
         id: bend-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.bend/bin
@@ -171,18 +201,10 @@ jobs:
           key: cargo-${{ matrix.target }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust/Cargo.lock', 'rust/.cargo/config.toml') }}
           restore-keys: cargo-${{ matrix.target }}-${{ env.RUST_VERSION }}-
 
-      # the V8 engine (rust/jsrt): the long build, rarely changed
-      - name: Restore jsrt
-        id: jsrt-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: rust/jsrt/target
-          key: jsrt-${{ matrix.target }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust/jsrt/Cargo.lock', 'rust/jsrt/Cargo.toml', 'rust/jsrt/src/**', 'rust/.cargo/config.toml') }}
-          restore-keys: jsrt-${{ matrix.target }}-${{ env.RUST_VERSION }}-
-
       # bins.sh's cache: one Bend binary per content hash of its sources
       # (+ the macOS target); the Bend version is in this key, not in
-      # bins.sh's. ~/.bend/lib: the packages the compiles fetched.
+      # bins.sh's. ~/.bend/lib: the packages the compiles fetched. The
+      # engine's crates are in the key too: a new bend-jsrt is saved.
       - name: Restore Bend binaries
         id: bins-cache
         uses: actions/cache/restore@v4
@@ -190,17 +212,28 @@ jobs:
           path: |
             ~/sb-build/cache
             ~/.bend/lib
-          key: bins-${{ matrix.target }}-bend${{ env.BEND_VERSION }}-${{ hashFiles('bend/runtime/**/*.bend', 'bend/core/**/*.bend', 'bend/vendor/**', 'bend/hub/**/*.bend', 'rust/.cargo/config.toml') }}
+          key: bins-${{ matrix.target }}-bend${{ env.BEND_VERSION }}-${{ hashFiles('bend/runtime/**/*.bend', 'bend/core/**/*.bend', 'bend/vendor/**', 'bend/hub/**/*.bend', 'rust/.cargo/config.toml', 'rust/jsrt/**', 'rust/images/**', 'rust/home/**') }}
           restore-keys: bins-${{ matrix.target }}-bend${{ env.BEND_VERSION }}-
 
-      - name: Build the V8 engine (release)
+      # the V8 engine: bins.sh builds bend-jsrt (versions.sh takes it from
+      # bins.sh's cache) in ~/sb-build/target-jsrt. Its dependencies (V8)
+      # are the long part: that target dir is restored only when bins.sh's
+      # cache lacks this engine (its key: the crates' files, bins.sh key)
+      - name: Is the engine built?
+        id: engine
         run: |
-          (cd rust/jsrt && CARGO_TARGET_DIR=target cargo build --release --locked)
-          # versions.sh links the engine from target/debug (the dev path);
-          # build-dist.sh ships the release one: give versions.sh that one
-          # too instead of a second (debug) V8 build
-          mkdir -p rust/jsrt/target/debug
-          ln -f rust/jsrt/target/release/bend-jsrt rust/jsrt/target/debug/bend-jsrt
+          k="$(scripts/bins.sh key bend-jsrt)"
+          if [ -f "$SB_BUILD_DIR/cache/bend-jsrt-$k" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; else echo "built=false" >> "$GITHUB_OUTPUT"; fi
+          echo "bend-jsrt-$k: $(test -f "$SB_BUILD_DIR/cache/bend-jsrt-$k" && echo in the cache || echo to build)"
+
+      - name: Restore the engine's target
+        id: jsrt-cache
+        if: steps.engine.outputs.built != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/sb-build/target-jsrt
+          key: jsrt-target-${{ matrix.target }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust/jsrt/Cargo.lock', 'rust/.cargo/config.toml') }}
+          restore-keys: jsrt-target-${{ matrix.target }}-${{ env.RUST_VERSION }}-
 
       - name: The signing keychain
         if: ${{ env.SIGN == '1' }}
@@ -234,6 +267,7 @@ jobs:
         run: packaging/test-install.sh "${{ steps.dist.outputs.tarball }}"
 
       - name: Upload the archive
+        if: env.KEEP_ARCHIVE == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.target }}
@@ -249,9 +283,20 @@ jobs:
           if [ -n "${SIGN_KEYCHAIN:-}" ]; then security delete-keychain "$SIGN_KEYCHAIN" || true; fi
           rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/cert.p12"
 
-      # saved even when a later step failed: the next run starts warm
+      # main only (tags restore main's: see the top); saved even when a
+      # later step failed, never from a cancelled run (half a build)
+      - name: Save Bend ${{ env.BEND_VERSION }}
+        if: "!cancelled() && env.SAVE_CACHES == '1' && steps.bend-cache.outputs.cache-hit != 'true'"
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.bend/bin
+            ~/.bend/bend2
+            ~/.bend/guide
+          key: ${{ steps.bend-cache.outputs.cache-primary-key }}
+
       - name: Save cargo
-        if: always() && steps.cargo-cache.outputs.cache-hit != 'true'
+        if: "!cancelled() && env.SAVE_CACHES == '1' && steps.cargo-cache.outputs.cache-hit != 'true'"
         uses: actions/cache/save@v4
         with:
           path: |
@@ -261,15 +306,21 @@ jobs:
             ~/sb-build/target-commits
           key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
-      - name: Save jsrt
-        if: always() && steps.jsrt-cache.outputs.cache-hit != 'true'
+      # only when bins.sh built the engine here (its target dir exists)
+      - name: Did bins.sh build the engine?
+        id: engine-built
+        if: "!cancelled() && steps.engine.outputs.built != 'true'"
+        run: if [ -d "$SB_BUILD_DIR/target-jsrt/release" ]; then echo "here=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Save the engine's target
+        if: "!cancelled() && env.SAVE_CACHES == '1' && steps.engine-built.outputs.here == 'true' && steps.jsrt-cache.outputs.cache-hit != 'true'"
         uses: actions/cache/save@v4
         with:
-          path: rust/jsrt/target
+          path: ~/sb-build/target-jsrt
           key: ${{ steps.jsrt-cache.outputs.cache-primary-key }}
 
       - name: Save Bend binaries
-        if: always() && steps.bins-cache.outputs.cache-hit != 'true'
+        if: "!cancelled() && env.SAVE_CACHES == '1' && steps.bins-cache.outputs.cache-hit != 'true'"
         uses: actions/cache/save@v4
         with:
           path: |
@@ -285,6 +336,9 @@ jobs:
   # reads it until the user publishes it (publish-release.sh <tag>
   # --publish, or gh release edit <tag> --draft=false). A published
   # release is never rewritten (a rerun only replaces a draft's files).
+  #
+  # The draft has darwin-arm64 + linux (what the desktop and most users
+  # read): it does not wait for the Intel job.
   release:
     name: draft release
     if: startsWith(github.ref, 'refs/tags/v')
@@ -307,5 +361,55 @@ jobs:
           TAG: ${{ github.ref_name }}
           CHANNEL: ${{ github.server_url }}/${{ github.repository }}/releases/latest/download
         run: |
+          # build-x86 may have uploaded already: the draft is the 3 targets
+          rm -f "$RUNNER_TEMP"/dist/*-darwin-x86_64.tar.gz "$RUNNER_TEMP"/dist/*-darwin-x86_64.tar.gz.sha256
           packaging/ci-release.sh "$TAG" "$RUNNER_TEMP/dist" "$RUNNER_TEMP/release" \
-            --repo "$GITHUB_REPOSITORY" --url "$CHANNEL" --commit "$GITHUB_SHA" --draft
+            --repo "$GITHUB_REPOSITORY" --url "$CHANNEL" --commit "$GITHUB_SHA" --draft \
+            --targets "darwin-arm64 linux-x86_64 linux-arm64"
+
+  # darwin-x86_64: the same steps as build (the anchors), on the Intel
+  # runner (~2x slower), off the draft's path. Not on a push to main (the
+  # warming run): the nightly run keeps its caches warm.
+  build-x86:
+    name: build ${{ matrix.target }}
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
+    strategy:
+      matrix:
+        include:
+          - target: darwin-x86_64
+            os: darwin
+            runner: macos-15-intel
+            bend_arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    environment: *sign-environment
+    env: *build-env
+    steps: *build-steps
+
+  # the Intel archive joins the tag's release (a draft, or published
+  # already: additive, the notes kept), latest.json then names the 4
+  # targets (ci-release.sh --attach, checked with every target)
+  attach-x86:
+    name: attach darwin-x86_64
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-x86, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/dist
+
+      - name: Attach darwin-x86_64 (ci-release.sh --attach)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          CHANNEL: ${{ github.server_url }}/${{ github.repository }}/releases/latest/download
+        run: |
+          packaging/ci-release.sh "$TAG" "$RUNNER_TEMP/dist" "$RUNNER_TEMP/release" \
+            --repo "$GITHUB_REPOSITORY" --url "$CHANNEL" --commit "$GITHUB_SHA" --attach darwin-x86_64

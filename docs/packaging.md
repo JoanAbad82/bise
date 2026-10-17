@@ -248,8 +248,10 @@ signing (BISE-169). Per job:
 1. checkout the tag/commit; install a **pinned** Bend (`bend update`
    is `curl | sh`: pin the version/hash instead) and the Rust toolchain;
 2. cache: cargo registry + target dirs, the Bend compile cache keyed by
-   `bend_hash`, the jsrt target (deno_core downloads a prebuilt
-   `librusty_v8` per target; the jsrt build is the long one);
+   `bend_hash`, bins.sh's jsrt target `$SB_BUILD_DIR/target-jsrt`
+   (deno_core downloads a prebuilt `librusty_v8` per target; the jsrt
+   build is the long one; restored only when bins.sh's cache lacks the
+   engine); saved on main only;
 3. build = `build-dist.sh` (`versions.sh` under the hood, so CI and
    `/version` build the same thing);
 4. macOS: sign (keychain from a base64 .p12 secret), notarize; Linux:
@@ -417,7 +419,14 @@ downloaded once by hand.
      make-release.sh (install.sh stamped with the channel, latest.json,
      tarballs + .sha256: the files install.sh and `bise update` read),
      `check-release.py`, a **draft** release. A rerun replaces a draft's
-     files; a published release is never touched.
+     files; a published release is never touched. The draft has
+     darwin-arm64 + linux (fast-release: the desktop reads darwin-arm64);
+     darwin-x86_64, ~2x slower, joins it when done (`ci-release.sh
+     --attach`: its archive, then latest.json with the 4 targets, notes
+     kept, even on a release published already). The run ends after it,
+     so publish-release.sh's watch sees the 4 targets. Caches are saved
+     by main's runs only (a push that changes rust/, bend/, packaging/,
+     and a nightly run); tags restore them.
   3. `publish-release.sh vX.Y.Z --publish` (or `gh release edit vX.Y.Z
      -R gvergnaud/bise --draft=false`): the draft becomes the latest
      release. A draft is not "latest": no install or update sees it before.
