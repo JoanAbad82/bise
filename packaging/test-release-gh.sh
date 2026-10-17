@@ -35,6 +35,10 @@ W=/tmp/prg REL=/tmp/prg/rel PK=/tmp/prg/pack SRV=/tmp/prg/srv STUB=/tmp/prg/stub
 TOKEN=tok-good
 
 pass=0; fail=0
+# the repo this test runs from: never written (fc1883f2a: publish-release.sh
+# committed the fake release's nix/sources.json here and it reached main)
+real_state() { git -C "$REPO" rev-parse HEAD; git -C "$REPO" diff --cached | shasum; shasum < "$REPO/nix/sources.json"; }
+REAL_BEFORE="$(real_state)"
 ok()  { pass=$((pass + 1)); echo "  ok   $*"; }
 ko()  { fail=$((fail + 1)); echo "  FAIL $*"; }
 check() { local what="$1"; shift; if "$@" >/dev/null 2>&1; then ok "$what"; else ko "$what"; fi; }
@@ -328,6 +332,7 @@ check "... no second run watched" test "$(grep -c '^run watch' "$GS/log")" = "$n
 check "... the flake's nix/sources.json committed: r6, linux, the tag's URLs" sh -c "
   [ \"\$(git -C '$G' log -1 --format=%s)\" = 'nix: sources for 0.0.6' ] &&
   python3 -c \"import json,sys; n=json.load(open('$G/nix/sources.json')); sys.exit(not (n['id'] == 'r6' and n['aarch64-linux']['url'] == 'https://github.com/o/r/releases/download/v0.0.6/bise-r6-linux-arm64.tar.gz' and 'x86_64-linux' in n and 'darwin-arm64' not in n))\""
+check "... the repo the test runs from: HEAD, index and nix/sources.json untouched" test "$(real_state)" = "$REAL_BEFORE"
 out="$(P v0.0.6 --publish)"; has "$out" "published already" && ok "again: already published, nothing done" || ko "again: $out"
 touch "$GS/rel/v0.0.6/stale"
 out="$(PATH="$STUB2:$PATH" "$HERE/ci-release.sh" v0.0.6 "$W/cidist" "$W/ci2" --repo o/r --url "$CH" --draft 2>&1)"
@@ -372,12 +377,21 @@ pack r6 2026-01-07T00:00:00Z darwin-x86_64 "$C1" "$W/cidist7" >/dev/null
 out="$(env "$CI3" "$HERE/ci-release.sh" v0.0.9 "$W/cidist7" "$W/ci9y" --repo o/r --url "$CH" --attach darwin-x86_64 2>&1)" \
   && ko "another darwin-x86_64 on a published release: accepted" \
   || { has "$out" "never rewritten" && ok "another darwin-x86_64 on a published release: refused" || ko "attach other: $out"; }
+# a checkout of another repo than --repo never gets the release's sources
+gitq remote set-url origin https://github.com/x/y.git
+nb="$(git -C "$G" rev-parse HEAD)"
+out="$(P v0.0.6x --publish)"; has "$out" "is not a checkout of github.com/o/r" \
+  && ok "--publish from a checkout of another repo: nix/sources.json not committed" || ko "other repo: $out"
+check "... no commit" test "$(git -C "$G" rev-parse HEAD)" = "$nb"
+gitq remote set-url origin https://github.com/o/r.git
 touch "$GS/ci-fails"
 out="$(P v0.0.7 --rev "$C1")"; has "$out" "the run failed" && ok "a failed CI run: said, nothing published" || ko "failed run: $out"
 check "... no release" test ! -e "$GS/rel/v0.0.7"
 rm "$GS/ci-fails"
 out="$(P --local v0.0.8 --from "$W/cidist/bise-r6-darwin-arm64.tar.gz" --add "$W/cidist/bise-r6-darwin-x86_64.tar.gz" --dry-run)"
 has "$out" "check-release: ok" && has "$out" "release create v0.0.8" && ok "--local: lays out, checks, prints the gh command" || ko "--local: $out"
+
+check "the repo the test runs from: HEAD, index and nix/sources.json untouched" test "$(real_state)" = "$REAL_BEFORE"
 
 echo "== $pass passed, $fail failed"
 [ "$fail" = 0 ] && rm -rf "$W"

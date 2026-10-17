@@ -285,17 +285,54 @@ gh release download "$tag" -R "$repo" -p latest.json -p install.sh -p nix-source
   || die "the draft is not what install.sh and bise update read: fix before publishing"
 site_check "$work/install.sh"
 
+# nix_sources_refused <root> <file>: why the release's nix-sources.json must
+# not be committed into <root> (empty: commit it). Only into a checkout of
+# $repo (a remote on github.com/$repo), only for $tag published on $repo
+# (not a draft), and only sources whose every URL is that tag's download
+# URL. fc1883f2a: a test's fake release (o/r v0.0.6) was committed into
+# the real repo and pushed to main; each of these refuses that.
+nix_sources_refused() {
+  local root="$1" file="$2" r ok="" u
+  for r in $(git -C "$root" remote 2>/dev/null); do
+    case "$(git -C "$root" remote get-url "$r" 2>/dev/null)" in
+      *github.com[:/]"$repo"|*github.com[:/]"$repo".git) ok=1 ;;
+    esac
+  done
+  [ -n "$ok" ] || { echo "$root is not a checkout of github.com/$repo"; return; }
+  [ "$(gh release view "$tag" -R "$repo" --json isDraft --jq .isDraft 2>/dev/null)" = false ] \
+    || { echo "$tag is not a published release of $repo"; return; }
+  u="https://github.com/$repo/releases/download/$tag/"
+  python3 -c 'import json, sys
+n = json.load(open(sys.argv[1]))
+urls = [v["url"] for v in n.values() if isinstance(v, dict) and "url" in v]
+sys.exit(0 if urls and all(x.startswith(sys.argv[2]) for x in urls) else 1)' "$file" "$u" \
+    || echo "its URLs are not all under $u"
+}
+
 # 4. publish
 if [ "$publish" = 1 ] && [ "$st" = draft ]; then
   gh release edit "$tag" -R "$repo" --draft=false --latest >/dev/null
   say "published $tag: the latest release, every install reads $channel/latest.json"
   # the flake (nix/sources.json) installs this release from now on: the
-  # release's nix-sources.json (make-release.sh), committed here, never by hand
-  root="$(git rev-parse --show-toplevel)"
+  # release's nix-sources.json (make-release.sh), committed here, never by hand.
+  # Here = this script's repo, never the caller's cwd: test-release-gh.sh
+  # runs a copy in a throwaway repo from the real one, and the commit went
+  # into the real one (fake sources landed on main: fc1883f2a)
+  root="$REPO_DIR"
   if [ -f "$work/nix-sources.json" ] && ! cmp -s "$work/nix-sources.json" "$root/nix/sources.json"; then
-    mkdir -p "$root/nix" && cp "$work/nix-sources.json" "$root/nix/sources.json"
-    git -C "$root" commit -q -m "nix: sources for ${tag#v}" -- nix/sources.json \
-      && say "committed nix/sources.json for ${tag#v}: push main so 'nix profile install github:$repo' gets it"
+    why="$(nix_sources_refused "$root" "$work/nix-sources.json")"
+    if [ -n "$why" ]; then
+      say "nix/sources.json NOT committed: $why"
+    else
+      mkdir -p "$root/nix" && cp "$work/nix-sources.json" "$root/nix/sources.json"
+      # (add first: a repo without it yet can't commit an untracked pathspec)
+      if git -C "$root" add -- nix/sources.json \
+         && git -C "$root" commit -q -m "nix: sources for ${tag#v}" -- nix/sources.json; then
+        say "committed nix/sources.json for ${tag#v}: push main so 'nix profile install github:$repo' gets it"
+      else
+        say "could not commit nix/sources.json in $root: commit it by hand ('nix: sources for ${tag#v}')"
+      fi
+    fi
   fi
 else
   say "not published: try it (gh release download $tag -R $repo), then: $0 $tag --publish"
