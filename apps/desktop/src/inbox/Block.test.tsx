@@ -588,6 +588,41 @@ describe('the open card closed by the hub mid answer', () => {
     f.remove();
   });
 
+  it('kept closed with his words, a refusal that comes for it then shows on it, and goes with the next rows', () => {
+    sessionStorage.setItem('bise.notify.notnow.launch', '1');
+    const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    replay(store, rowsWith([nine]));
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'main' })}>
+          <InboxBlock here={{ project: P, agent: 'main' }} onAnswer={() => undefined} now={NOW} />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    fireEvent.click(screen.getByTestId('inbox.block.row.1'));
+    const id = `inbox.block.card.${P}-9`;
+    const f = field('warm, after the reindex');
+    // the hub withdraws card 9: kept closed with his words, no refusal on it
+    act(() => {
+      replay(store, rowsWith([next]));
+    });
+    expect(screen.getByTestId(id).getAttribute('data-closed')).toBe('true');
+    expect(screen.queryByTestId(`${id}.refused`)).toBeNull();
+    // a refusal for it comes after (an earlier answer's, the core gone before its hub said): it shows
+    act(() => {
+      store.apply({ ev: 'card_refused', project: P, card: 9, text: 'the hub is busy' });
+    });
+    expect(screen.getByTestId(`${id}.refused`).textContent).toContain('not sent');
+    // the next rows still don't list card 9: its refusal goes, the kept card stays
+    act(() => {
+      replay(store, rowsWith([next]));
+    });
+    expect(screen.getByTestId(id).getAttribute('data-closed')).toBe('true');
+    expect(screen.queryByTestId(`${id}.refused`)).toBeNull();
+    f.remove();
+  });
+
   it('closed with nothing typed: it goes, as before', () => {
     sessionStorage.setItem('bise.notify.notnow.launch', '1');
     const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
