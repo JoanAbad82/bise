@@ -6,9 +6,11 @@
 // src/store) comes with the store.
 export { Settings, type SettingsData, type SettingsPorts, type SettingsProps } from './Settings';
 export { PAGES, KeyList, type Page } from './pages';
-export { Accounts, signedIn, keyField, keyErrorWords, type KeyError } from './accounts';
+export { Accounts, signedIn } from './accounts';
+export { keyField, failedWords, fromWords, retries, shortModel, type ProviderCheck, type Sent } from './keycheck';
+export type { KeyError } from './screen';
 export { onboarded, type Prefs } from './prefs';
 export { KEY_SECTIONS } from './keys';
-export { SettingsScreen, prefsOf, useKeyError, useCmdError } from './screen';
+export { SettingsScreen, prefsOf, useCmdError } from './screen';
 export { needsSetup, modelOrSetup, modelRow, holdForSetup, releaseHeld, useHeld, heldReady, type Held } from './hold';
 export { Roles, roleSource, effortsOf, effortOf } from './roles';

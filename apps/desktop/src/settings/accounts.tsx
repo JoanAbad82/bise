@@ -1,12 +1,13 @@
 // His model accounts (bar S.2, S.3; settings · models and the first
 // launch's model step): each subscription with its sign-in, and an API key.
 // The core owns them (`accounts` event; sign_in opens his browser, only on
-// his click; key_set stores the key, which never comes back in an event).
+// his click; provider_use checks a key live and saves it once it works; it never comes back in an event).
 // Owner: amb-home.
 import { useState } from 'react';
 import type { Account, AppCmd } from '@/proto';
 import { Act, Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
 import { common, settings } from '@/proto/words.gen';
+import { failedWords, keyField, type ProviderCheck, type Sent } from './keycheck';
 
 /**
  * The expired ChatGPT sign-in (bar V14 / S28 / L2): the agents its expiry stopped (the hub's
@@ -21,35 +22,6 @@ export interface SignIn {
 /** He is signed in to one account at least (the first launch's model step goes on). */
 export function signedIn(accounts: readonly Account[]): boolean {
   return accounts.some((a) => a.state === 'signed_in');
-}
-
-/** the core's last refusal of a key (error {cmd: key_set}), counted so the same words twice count */
-export interface KeyError {
-  n: number;
-  text: string;
-}
-
-/** a refusal's words for him: the core's text without its account id ("anthropic-key: …") */
-export function keyErrorWords(text: string, id: string | null): string {
-  const t = id !== null && text.startsWith(`${id}: `) ? text.slice(id.length + 2) : text;
-  return t.trim() === '' ? settings.key_refused : t.trim();
-}
-
-/**
- * The key's field after ⏎ (bar S.2): it stays, with what he typed, while the core checks; a
- * refusal newer than the send shows in place (field in error, the core's words); the key in the
- * core's accounts closes it. Pure, for the tests.
- */
-export function keyField(
-  sent: { n: number; base: readonly Account[] } | null,
-  keyError: KeyError | null,
-  accounts: readonly Account[],
-  id: string | null,
-): 'typing' | 'checking' | 'refused' | 'added' {
-  if (sent === null) return 'typing';
-  if (keyError !== null && keyError.n > sent.n) return 'refused';
-  if (accounts !== sent.base && accounts.some((a) => a.id === id && a.state === 'signed_in')) return 'added';
-  return 'checking';
 }
 
 /** A model waiting for its provider's setup (bar L5, hold.ts): which provider, and for which model. */
@@ -72,7 +44,8 @@ export function expiredWords(waiting: readonly string[]): string {
 export interface AccountsProps {
   accounts: readonly Account[];
   send: (cmd: AppCmd) => void;
-  keyError?: KeyError | null;
+  /** provider_use's last answer (the store's provider_check): the key field's check */
+  check?: ProviderCheck | null;
   want?: Want | null;
   /** the expired sign-in: the agents waiting, the sign-in under way */
   signin?: SignIn | null;
@@ -82,7 +55,7 @@ export interface AccountsProps {
   cancelSignIn?: (id: string) => void;
 }
 
-export function Accounts({ accounts, send, keyError = null, want = null, signin = null, copy, cancelSignIn }: AccountsProps) {
+export function Accounts({ accounts, send, check = null, want = null, signin = null, copy, cancelSignIn }: AccountsProps) {
   // the sign-ins he started here: a spinner until the core's next accounts
   const [signing, setSigning] = useState<{ base: readonly Account[]; ids: readonly string[] }>({ base: accounts, ids: [] });
   const busy = signing.base === accounts ? signing.ids : [];
@@ -92,9 +65,9 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
   const wantKey = want !== null ? accounts.find((a) => a.kind === 'key' && ofProvider(a, want.provider) && a.state !== 'signed_in') : undefined;
   const keyFor = picked ?? (wantKey !== undefined && closedFor !== want ? wantKey.id : null);
   const [bad, setBad] = useState(false);
-  // the key he sent: the refusals counted before it don't count for it
-  const [sent, setSent] = useState<{ n: number; base: readonly Account[] } | null>(null);
-  const field = keyField(sent, keyError, accounts, keyFor);
+  // the key he sent: checked live by the core (provider_use), saved only once it works
+  const [sent, setSent] = useState<Sent | null>(null);
+  const field = keyField(sent, check);
   if (field === 'added') {
     setKeyFor(null);
     setSent(null);
@@ -223,16 +196,16 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
                   return;
                 }
                 if (field === 'checking') return; // one send per key
-                send({ cmd: 'key_set', id: keyFor, key: k });
-                setSent({ n: keyError?.n ?? 0, base: accounts });
+                send({ cmd: 'provider_use', id: keyFor, key: k });
+                setSent({ id: keyFor, base: check });
               }
             }}
           />
           <Help err={bad || field === 'refused'} testId="settings.key.help">
             {bad
               ? settings.key_first
-              : field === 'refused' && keyError !== null
-                ? settings.key_check({ why: keyErrorWords(keyError.text, keyFor) })
+              : field === 'refused' && check !== null
+                ? settings.key_check({ why: failedWords(check, null, false).line.replace(/\.$/, '') })
                 : field === 'checking'
                   ? settings.key_checking
                   : settings.key_stays}

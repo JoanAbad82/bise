@@ -7,7 +7,9 @@
 import { useState } from 'react';
 import type { Account, AppCmd, Found, Perm } from '@/proto';
 import { Act, Button, Check, Chip, Field, Group, Help, Onb, type GroupItem } from '@/ds';
-import { Accounts, signedIn, type KeyError } from '@/settings';
+import type { ProviderCheck } from '@/settings';
+import { PayStep } from './PayStep';
+import { afterSignIn, PAY_START, ready, upOf, type PayState } from './pay';
 import {
   allAllowed, back, choose as choose_, chosenTicked, filterFound, finish, fnAct, next, pick, pickChosen, PERMS, START, stepOf, STEPS, ticked,
   type OnbState, type Perms,
@@ -23,6 +25,8 @@ export interface OnboardingPorts {
   done: () => void;
   /** the system's folder picker (window.bise.pickFolder, amb-mac): a path, or null when he cancels */
   pickFolder?: () => Promise<string | null>;
+  /** a link in his browser (a provider's keys or billing page) */
+  open?: (url: string) => void;
 }
 
 export interface OnboardingProps {
@@ -31,8 +35,10 @@ export interface OnboardingProps {
   perms: Perms;
   /** the helper's last fn act (talk_start, talk_end...), with a counter so the same act twice counts */
   fn?: { act: string; n: number } | null;
-  /** the core's last refusal of a key (bar S.2), shown on the model step's key field */
-  keyError?: KeyError | null;
+  /** provider_use's last answer (the model step's live check) */
+  check?: ProviderCheck | null;
+  /** the core's last refusal of a sign-in started here (error {cmd: sign_in}): its words */
+  signInError?: string | null;
   ports: OnboardingPorts;
   now?: number;
   /** his home folder (window.bise.home), shown as ~ in the paths */
@@ -45,7 +51,7 @@ const PERM_WORDS: Record<string, { label: string; sub: string; lost: string }> =
   screen: { label: settings.perm_screen, sub: settings.onb_screen_sub, lost: settings.onb_screen_lost },
 };
 
-export function Onboarding({ accounts, found, perms, fn = null, keyError = null, ports, now: pinned, home = '' }: OnboardingProps) {
+export function Onboarding({ accounts, found, perms, fn = null, check = null, signInError = null, ports, now: pinned, home = '' }: OnboardingProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [st, setSt] = useState<OnbState>(START);
@@ -59,7 +65,18 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
     setSeen(fn.n);
     setSt(s);
   }
-  const ok = signedIn(accounts);
+  // the model step (pay.ts): a sign-in he started here that ended signed in gets its check, once
+  const [pay, setPay] = useState<PayState>(PAY_START);
+  const [payAccounts, setPayAccounts] = useState(accounts);
+  if (payAccounts !== accounts) {
+    setPayAccounts(accounts);
+    const r = afterSignIn(pay, accounts, check);
+    if (r !== null) {
+      ports.send(r.cmd);
+      setPay(r.s);
+    }
+  }
+  const ok = ready(pay, check);
   const run = (r: { s: OnbState; cmds: AppCmd[]; done: boolean }) => {
     for (const c of r.cmds) ports.send(c);
     setSt(r.s);
@@ -127,15 +144,17 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
       break;
     case 'model':
       body = (
-        <Onb
-          {...frame}
-          title={settings.onb_model_title}
-          sub={settings.onb_model_sub}
-          cta={{ text: settings.onb_continue, onClick: go, state: ok ? undefined : 'disabled', testId: 'setup.next' }}
-        >
-          <Accounts accounts={accounts} send={ports.send} keyError={keyError} />
-          {!ok && <Help>{settings.onb_model_help}</Help>}
-        </Onb>
+        <PayStep
+          frame={frame}
+          accounts={accounts}
+          check={check}
+          s={pay}
+          set={setPay}
+          send={ports.send}
+          go={go}
+          signInError={signInError}
+          {...(ports.open ? { open: ports.open } : {})}
+        />
       );
       break;
     case 'projects': {
@@ -250,7 +269,10 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
           go();
         } else if (e.key === 'Escape') {
           e.preventDefault();
-          setSt(back(s));
+          // the model step's own levels first (a key field, a provider list, a check)
+          const up = at === 'model' ? upOf(pay, accounts) : null;
+          if (up !== null) setPay(up);
+          else setSt(back(s));
         }
       }}
     >

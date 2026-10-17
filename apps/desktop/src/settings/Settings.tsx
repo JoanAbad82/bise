@@ -1,7 +1,7 @@
 // The settings screen (route settings[/<page>]): its nav and one page.
 // Draws what the core sends (prefs, accounts, his projects, the repos
 // found) and says what he changes through `send` (the core's AppCmd:
-// prefs_set, sign_in, key_set, project_*); reads nothing itself (the
+// prefs_set, sign_in, provider_use, project_*); reads nothing itself (the
 // store-fed screen in index.tsx gives it its props). Owner: amb-home.
 //
 // A switch flips at once: the value he set shows until the core's next
@@ -15,7 +15,8 @@ import { putPref, type Prefs } from './prefs';
 import { PAGES, PageBody, pageOf, type Page } from './pages';
 import type { ComputerUse } from './computer';
 import type { Perms } from './check';
-import type { KeyError, SignIn } from './accounts';
+import type { SignIn } from './accounts';
+import type { ProviderCheck } from './keycheck';
 import type { AppUpdate, NotifyAuth, UpdateInfo, UpdateState } from '@/shared/api';
 import type { UpdatePorts } from './update';
 import type { DistPorts } from './appupdate';
@@ -33,8 +34,8 @@ export interface SettingsData {
   computerUse: ComputerUse | null;
   /** the helper's permissions (none: not known, or no helper) */
   perms: Perms;
-  /** the core's last refusal of a key (error {cmd: key_set}), shown on the key field (bar S.2) */
-  keyError?: KeyError | null;
+  /** provider_use's last answer (provider_check), shown on the key field (bar S.2) */
+  check?: ProviderCheck | null;
   /** which model does what (bar V17): the core's roles, and the home's models they pick from */
   roles?: readonly RoleRow[];
   models?: readonly Model[];

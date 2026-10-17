@@ -65,3 +65,7 @@
 {"ev":"agent_queued","agent":"perf","text":"then the warm one"}
 {"ev":"agent_typing","agent":"perf","text":"listing"}
 {"ev":"fake_voice","on":true,"words":"/Users/camille/.bise/fake-words.txt"}
+{"ev":"provider_check","id":"anthropic","name":"Anthropic","state":"checking","model":"anthropic/claude-opus-5-5","label":"opus 5.5","pasted":true}
+{"ev":"provider_check","id":"anthropic","name":"Anthropic","state":"works","model":"anthropic/claude-opus-5-5","label":"opus 5.5","pasted":true,"answer":"Hi! How can I help you today?","main":"anthropic/claude-opus-5-5","lines":["main uses anthropic/claude-opus-5-5.","small jobs and auto's checker use claude-haiku-4-5."]}
+{"ev":"provider_check","id":"anthropic","name":"Anthropic","state":"failed","model":"anthropic/claude-opus-5-5","label":"opus 5.5","pasted":true,"why":"wrong_key","said":"invalid x-api-key","url":"https://platform.claude.com/settings/keys"}
+{"ev":"provider_check","id":"chatgpt","name":"ChatGPT","state":"works","model":"chatgpt/gpt-6.1-sol","label":"gpt-6.1-sol","answer":"Hello!","main":"chatgpt/gpt-6.1-sol"}

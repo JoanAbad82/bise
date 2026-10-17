@@ -7,7 +7,8 @@
 {"cmd":"prefs_set","key":"quiet.call","value":true}
 {"cmd":"sign_in","id":"chatgpt"}
 {"cmd":"sign_in_cancel","id":"chatgpt"}
-{"cmd":"key_set","id":"anthropic-key","key":"sk-fake-0000"}
+{"cmd":"provider_use","id":"anthropic","key":"sk-fake-0000"}
+{"cmd":"provider_use","id":"chatgpt"}
 {"cmd":"key_remove","id":"anthropic-key"}
 {"cmd":"found_scan","dir":"/Users/camille/code"}
 {"cmd":"found_scan"}

@@ -852,9 +852,9 @@ fn a_model_whose_provider_has_no_key_waits_for_its_setup() {
     assert!(first(&t.take()).is_some());
     // the key works: the newest line reaches the hub, once
     ready(&["anthropic", "openrouter"]);
-    t.cmd(Cmd::parse(&json!({"cmd": "key_set", "id": "openrouter", "key": "sk-or-1"}).to_string()).unwrap());
+    t.cmd(Cmd::parse(&json!({"cmd": "setup_check"}).to_string()).unwrap());
     assert_eq!(w.end("shop").next(), model(6, "openrouter/x-ai/grok-4"));
-    t.cmd(Cmd::parse(&json!({"cmd": "key_set", "id": "openrouter", "key": "sk-or-2"}).to_string()).unwrap());
+    t.cmd(Cmd::parse(&json!({"cmd": "setup_check"}).to_string()).unwrap());
     let hi = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now"});
     typed(&mut t, hi.clone());
     assert_eq!(w.end("shop").next(), hi, "the held line went once");
@@ -865,7 +865,7 @@ fn a_model_whose_provider_has_no_key_waits_for_its_setup() {
     assert!(first(&t.take()).is_some());
     t.cmd(Cmd::parse(r#"{"cmd":"setup_first_cancel"}"#).unwrap());
     ready(&["anthropic", "openrouter"]);
-    t.cmd(Cmd::parse(&json!({"cmd": "key_set", "id": "openrouter", "key": "sk-or-3"}).to_string()).unwrap());
+    t.cmd(Cmd::parse(&json!({"cmd": "setup_check"}).to_string()).unwrap());
     typed(&mut t, hi.clone());
     assert_eq!(w.end("shop").next(), hi, "a cancelled line never runs");
     // a ready provider: straight to the hub, no setup_first

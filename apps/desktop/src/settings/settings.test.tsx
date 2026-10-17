@@ -164,14 +164,14 @@ describe('Settings', () => {
     expect(f.type).toBe('password');
     f.value = 'sk-test';
     fireEvent.keyDown(f, { key: 'Enter' });
-    expect(p.sent).toEqual([{ cmd: 'key_set', id: 'anthropic-key', key: 'sk-test' }]);
+    expect(p.sent).toEqual([{ cmd: 'provider_use', id: 'anthropic-key', key: 'sk-test' }]);
     // the field stays while the core checks, and a second ⏎ sends nothing more
     expect(screen.getByTestId('settings.key.help').textContent).toMatch(/checking/);
     fireEvent.keyDown(f, { key: 'Enter' });
     expect(p.sent.length).toBe(1);
   });
 
-  it('S.2: a key the core refuses says so in place, the field kept; the key added closes it', () => {
+  it('S.2: a key the live check refuses says so in place, the field kept; the key that works closes it', () => {
     const p = ports();
     const r = view('models', p);
     fireEvent.click(screen.getByTestId('settings.key.add'));
@@ -181,20 +181,21 @@ describe('Settings', () => {
     const again = (extra: Partial<Parameters<typeof Settings>[0]>) => {
       r.rerender(<Settings page="models" prefs={prefs()} accounts={extra.accounts ?? accounts()} projects={projects()} found={found()} plugins={null} computerUse={null} perms={{}} ports={p} {...extra} />);
     };
-    again({ keyError: { n: 1, text: 'anthropic-key: the provider refused this key (401)' } });
+    const refused = { ev: 'provider_check', id: 'anthropic-key', name: 'Anthropic', state: 'failed', model: 'anthropic/claude-opus-5-5', pasted: true, why: 'wrong_key', said: 'invalid x-api-key' } as const;
+    again({ check: refused });
     const help = screen.getByTestId('settings.key.help');
-    expect(help.textContent).toBe('the provider refused this key (401). check it, then ⏎ again');
+    expect(help.textContent).toBe('Anthropic says this key is wrong: “invalid x-api-key”. check it, then ⏎ again');
     expect(help.getAttribute('role')).toBe('alert');
     expect(screen.getByTestId<HTMLInputElement>('settings.key.field').value).toBe('sk-wrong');
     expect(document.body.textContent).not.toContain('sk-wrong');
-    // he fixes it and sends again: one more key_set
+    // he fixes it and sends again: one more provider_use, checking until its answer
     const g = screen.getByTestId<HTMLInputElement>('settings.key.field');
     fireEvent.change(g, { target: { value: 'sk-right' } });
     fireEvent.keyDown(g, { key: 'Enter' });
-    expect(p.sent.filter((c) => c.cmd === 'key_set').length).toBe(2);
+    expect(p.sent.filter((c) => c.cmd === 'provider_use').length).toBe(2);
     expect(screen.getByTestId('settings.key.help').textContent).toMatch(/checking/);
-    // the core adds it: the field goes, the row says added
-    again({ keyError: { n: 1, text: 'anthropic-key: the provider refused this key (401)' }, accounts: accounts().map((a) => (a.id === 'anthropic-key' ? { ...a, state: 'signed_in' } : a)) });
+    // it works: the field goes, the row says added
+    again({ check: { ...refused, state: 'works', why: undefined, said: undefined, main: 'anthropic/claude-opus-5-5' }, accounts: accounts().map((a) => (a.id === 'anthropic-key' ? { ...a, state: 'signed_in' } : a)) });
     expect(screen.queryByTestId('settings.key.field')).toBeNull();
   });
 
@@ -403,7 +404,7 @@ describe('which model does what (V17) and a model with no key (L5)', () => {
     const f = screen.getByTestId<HTMLInputElement>('settings.key.field');
     f.value = 'mk-1';
     fireEvent.keyDown(f, { key: 'Enter' });
-    expect(p.sent).toEqual([{ cmd: 'key_set', id: 'mistral', key: 'mk-1' }]);
+    expect(p.sent).toEqual([{ cmd: 'provider_use', id: 'mistral', key: 'mk-1' }]);
   });
 
   it("a role_set the core refused says so in its words", () => {

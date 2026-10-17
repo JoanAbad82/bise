@@ -67,7 +67,35 @@ state: string, who?: string | null,
 /**
  * L5: the catalog provider it sets up (a model row's `provider_id`)
  */
-provider?: string, };
+provider?: string, 
+/**
+ * a key found for it: where (never the key)
+ */
+from?: KeyFrom | null, 
+/**
+ * where its keys are made (the key field's "get one" link); "" none
+ */
+keys_url?: string, 
+/**
+ * a key of a coding plan (GLM, Kimi, MiniMax): the first run lists
+ * them under their own row
+ */
+coding?: boolean, };
+
+/**
+ * Where a provider's key was found (bise_catalog::auth::From).
+ */
+export type KeyFrom = { "t": "env", var: string, } | { "t": "auth_file" } | { "t": "env_file", path: string, } | { "t": "unknown" };
+
+/**
+ * Where a `provider_use` check is.
+ */
+export type CheckState = "checking" | "works" | "failed" | "unknown";
+
+/**
+ * Why a check failed (the TUI's keycheck::Why), each with its own fix.
+ */
+export type CheckWhy = "wrong_key" | "no_credit" | "model" | "no_access" | "unreachable" | "config" | "no_key" | "unknown";
 
 /**
  * A folder found by `found_scan` that could be a project.

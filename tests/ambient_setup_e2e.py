@@ -12,9 +12,11 @@ sign_in here).
 - project_add with land: the registry lists it and its repo's flow is trunk
   (.switchboard/config.toml); project_rename then project_remove change the
   registry; the home row can't be removed;
-- key_set for a provider that takes a key: `accounts` says it is signed in,
-  the key is in the throwaway home's key store and in no event; key_remove
-  takes it out.
+- provider_use for a provider that takes a key (the live check, on the fake
+  provider): a bad key is checking then failed, nothing saved; a good one
+  works with the model's answer, `accounts` says it is signed in, main's
+  model (BEND_MODEL, which runs) is kept, never written over, the key is in the throwaway home's key store and
+  in no event; key_remove takes it out.
 
 Run: python3 -u tests/ambient_setup_e2e.py
 """
@@ -116,11 +118,31 @@ def main():
 
         pid = keyed[0]["id"]
         secret = "sk-fake-ambient-setup-0000"
+        auth = os.path.join(E.env["BISE_HOME"], "auth.json")
         m = core.mark()
-        core.cmd(cmd="key_set", id=pid, key=secret)
+        core.cmd(cmd="provider_use", id=pid, key="sk-bad-ambient-0000")
+        failed = lambda e: e.get("ev") == "provider_check" and e.get("state") == "failed"
+        core.wait(failed, 40, "the bad key failed", since=m)
+        with core.lock:
+            bad = [e for e in core.evs[m:] if failed(e)][-1]
+        check(bad.get("why") == "wrong_key", "a wrong key: %r" % bad)
+        check(not os.path.exists(auth) or "sk-bad-ambient" not in open(auth).read(), "a failed key is never saved")
+        m = core.mark()
+        core.cmd(cmd="provider_use", id=pid, key=secret)
+        works = lambda e: e.get("ev") == "provider_check" and e.get("state") == "works"
+        core.wait(works, 40, "the good key works", since=m)
+        with core.lock:
+            ok_ev = [e for e in core.evs[m:] if works(e)][-1]
+        # this home's main runs already (BEND_MODEL, its Mistral key): a key that works never
+        # replaces it (architect m_28532); a fresh home's main is written (onboarding-keys.spec.ts)
+        check(ok_ev.get("main") == "mistral/mistral-small-latest", "main kept, it runs: %r" % ok_ev)
+        check(ok_ev.get("answer") and ok_ev.get("label"), "the model's answer and its name: %r" % ok_ev)
         core.wait(lambda e: e.get("ev") == "accounts" and any(a["id"] == pid and a["state"] == "signed_in" for a in e["items"]), 20,
                   "the key's account signed in", since=m)
-        check(secret in open(os.path.join(E.env["BISE_HOME"], "auth.json")).read(), "in the throwaway key store")
+        check(secret in open(auth).read(), "in the throwaway key store")
+        cfg_file = os.path.join(E.env["BISE_HOME"], "config.toml")
+        cfg = open(cfg_file).read() if os.path.exists(cfg_file) else ""
+        check("main =" not in cfg, "main's model not written over one that runs: %r" % cfg)
         with core.lock:
             check(not any(secret in json.dumps(e) for e in core.evs), "the key in no event")
         m = core.mark()

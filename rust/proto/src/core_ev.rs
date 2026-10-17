@@ -33,6 +33,36 @@ pub enum CoreEv {
     /// (the window copies it); once per sign-in, its end as before
     /// (accounts, or error {cmd: sign_in})
     Signing { id: String, url: String },
+    /// draft (architect m_28532): the answer to `provider_use`: checking,
+    /// then works (`model` answered `answer`; `main`: main's model now;
+    /// `lines`: what each role runs, in the catalog's words) or failed
+    /// (`why`, the provider's own words in `said`, the page that fixes
+    /// it in `url`: its keys or its billing)
+    ProviderCheck {
+        id: String,
+        name: String,
+        state: CheckState,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        model: String,
+        /// the model's name for people, as its chip says it (`opus 5.5`)
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        label: String,
+        /// the key checked was pasted (not found, not a sign-in)
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        pasted: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        answer: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        main: Option<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        lines: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        why: Option<CheckWhy>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        said: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+    },
     /// the answer to `found_scan`
     Found { dir: String, items: Vec<Found> },
     /// the answer to `away_back` (S9, amb-mac m_9038): what happened while
@@ -318,7 +348,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "provider_check", "found", "away_summary", "plugins", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })

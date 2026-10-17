@@ -73,14 +73,24 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
                 kind: "key".into(),
                 state: if keyed { "signed_in" } else { "signed_out" }.into(),
                 who: None,
+                from: None,
+                keys_url: String::new(),
+                coding: false,
             }]
         }),
-        key_set: Box::new(move |id, key| {
-            if key.trim().is_empty() {
-                return Err("an empty key".into());
-            }
-            d.borrow_mut().keys.push((id.into(), key.into()));
-            Ok(())
+        // the live port checks on a thread (firstkey.rs); this one answers
+        // at once: "sk-bad…" is refused, nothing saved; any other key works
+        provider_use: Box::new(move |id, key, seq, tx| {
+            let k = key.clone().unwrap_or_default();
+            let res = if k.starts_with("sk-bad") || k.trim().is_empty() {
+                Err(crate::firstkey::Failed { why: bise_proto::app_rows::CheckWhy::WrongKey, said: "invalid api key".into(), url: Some("https://keys.test".into()) })
+            } else {
+                d.borrow_mut().keys.push((id.into(), k));
+                Ok(crate::firstkey::Works { answer: "Hi!".into(), main: "anthropic/claude-opus-5-5".into(), lines: vec!["main uses anthropic/claude-opus-5-5.".into()] })
+            };
+            let used = crate::firstkey::Used { id: id.into(), name: "Anthropic".into(), model: "anthropic/claude-opus-5-5".into(), pasted: key.is_some(), res };
+            let _ = tx.send(Done::Used { seq, used });
+            ("Anthropic".into(), "anthropic/claude-opus-5-5".into())
         }),
         key_remove: Box::new(move |id| {
             e.borrow_mut().keys.retain(|(k, _)| k != id);
@@ -239,16 +249,53 @@ fn the_window_gets_prefs_and_accounts_and_sets_a_known_pref() {
 }
 
 #[test]
-fn a_key_set_shows_in_accounts_and_never_in_an_event() {
+fn a_provider_use_checks_then_saves_and_never_says_the_key() {
     let mut t = T::new();
     let w = setup(&mut t);
-    app(&mut t, r#"{"cmd":"key_set","id":"anthropic","key":"sk-fake-secret"}"#);
-    assert_eq!(w.borrow().keys, vec![("anthropic".to_string(), "sk-fake-secret".to_string())]);
+    // a refused key: checking, then failed with its fix; nothing saved
+    app(&mut t, r#"{"cmd":"provider_use","id":"anthropic","key":"sk-bad-0000"}"#);
+    let c = t.take();
+    assert_eq!(evs(&c, "provider_check")[0]["state"], "checking");
+    assert_eq!(evs(&c, "provider_check")[0]["model"], "anthropic/claude-opus-5-5");
+    t.until(|o| !evs(o, "provider_check").is_empty());
     let out = t.take();
+    let f = evs(&out, "provider_check")[0];
+    assert_eq!((f["state"].as_str(), f["why"].as_str(), f["url"].as_str()), (Some("failed"), Some("wrong_key"), Some("https://keys.test")));
+    assert!(evs(&out, "accounts").is_empty() && w.borrow().keys.is_empty(), "a failed key is never written");
+    // a good one: works, with the answer and main's model, then the accounts
+    app(&mut t, r#"{"cmd":"provider_use","id":"anthropic","key":"sk-fake-secret"}"#);
+    t.until(|o| evs(o, "provider_check").iter().any(|e| e["state"] == "works"));
+    let out = t.take();
+    let ok = evs(&out, "provider_check").into_iter().find(|e| e["state"] == "works").unwrap();
+    assert_eq!((ok["answer"].as_str(), ok["main"].as_str()), (Some("Hi!"), Some("anthropic/claude-opus-5-5")));
+    assert_eq!(w.borrow().keys, vec![("anthropic".to_string(), "sk-fake-secret".to_string())]);
     assert_eq!(evs(&out, "accounts")[0]["items"][0]["state"], "signed_in");
     assert!(!serde_json::to_string(&out).unwrap().contains("sk-fake-secret"));
-    app(&mut t, r#"{"cmd":"key_set","id":"anthropic","key":" "}"#);
-    assert_eq!(evs(&t.take(), "error")[0]["cmd"], "key_set");
+}
+
+/// architect m_28532: one check in flight per provider; a newer one's
+/// answer is the one that counts, the older's end is dropped.
+#[test]
+fn a_newer_provider_use_drops_the_older_answer() {
+    let mut t = T::new();
+    let _w = setup(&mut t);
+    // the fake answers at once: both ends wait on the channel, the bad
+    // one's first, with its older seq
+    app(&mut t, r#"{"cmd":"provider_use","id":"anthropic","key":"sk-bad-1"}"#);
+    app(&mut t, r#"{"cmd":"provider_use","id":"anthropic","key":"sk-good-2"}"#);
+    t.until(|o| evs(o, "provider_check").iter().any(|e| e["state"] == "works"));
+    t.core.tick(std::time::Instant::now());
+    t.out.extend(t.core.take_out());
+    let out = t.take();
+    let ends: Vec<&str> = evs(&out, "provider_check").iter().filter_map(|e| e["state"].as_str()).filter(|s| *s != "checking").collect();
+    assert_eq!(ends, vec!["works"], "only the newest answer");
+}
+
+#[test]
+fn a_key_removed_shows_signed_out() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    w.borrow_mut().keys.push(("anthropic".into(), "sk-1".into()));
     app(&mut t, r#"{"cmd":"key_remove","id":"anthropic"}"#);
     assert_eq!(evs(&t.take(), "accounts")[0]["items"][0]["state"], "signed_out");
 }
@@ -362,8 +409,8 @@ fn setup_lines_parse_as_the_cores_and_hub_commands_stay_typed() {
     assert!(matches!(Cmd::parse(r#"{"cmd":"found_scan","dir":"/x"}"#), Ok(Cmd::App(_))));
     assert!(matches!(Cmd::parse(r#"{"cmd":"project_rename","project":"a","name":"b"}"#), Ok(Cmd::App(_))));
     assert!(matches!(Cmd::parse(r#"{"cmd":"send","project":"a","agent":"main","text":"x","mode":"now"}"#), Ok(Cmd::Typed(_))));
-    let e = Cmd::parse(r#"{"cmd":"key_set","id":"a"}"#).err().unwrap();
-    assert!(e.starts_with("key_set"), "{e}");
+    let e = Cmd::parse(r#"{"cmd":"provider_use"}"#).err().unwrap();
+    assert!(e.starts_with("provider_use"), "{e}");
 }
 
 /// P.1: the plugins of bise's home or of a project, a toggle through the
@@ -479,7 +526,7 @@ fn computer_use_polls_while_its_page_is_open_and_fixes_on_his_act() {
 fn check_again_reads_prefs_accounts_and_projects_fresh() {
     let mut t = T::new();
     let w = setup(&mut t);
-    app(&mut t, r#"{"cmd":"key_set","id":"anthropic","key":"sk-1"}"#);
+    w.borrow_mut().keys.push(("anthropic".into(), "sk-1".into()));
     t.take();
     w.borrow_mut().keys.clear();
     app(&mut t, r#"{"cmd":"setup_check"}"#);

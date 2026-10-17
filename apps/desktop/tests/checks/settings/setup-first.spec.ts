@@ -5,7 +5,7 @@
 //   - a setup_first he didn't cause (the core's start replay after a restart or relaunch) keeps
 //     the wait and never moves the screen; the same cid again does nothing (ambient-lead m_12345);
 //   - after his own /model, setup_first opens settings · models on OpenRouter's setup: 'needs OpenRouter' and its key field;
-//   - his key goes as key_set; the accounts showing OpenRouter signed in take him back to perf's
+//   - his key goes as provider_use; the accounts showing OpenRouter signed in take him back to perf's
 //     thread, the window sends nothing else (the core sends the held line itself) and no cancel;
 //   - a second one, left without a key (he clicks perf in the sidebar): setup_first_cancel.
 // That the held line really runs once the key works is the core's (ambient tests/hubs.rs
@@ -61,7 +61,7 @@ test('settings/setup-first: a /model the core holds opens its provider setup; th
       const before = core.cmds().length;
       await page.getByTestId('settings.key.field').fill('sk-or-fake-1');
       await page.getByTestId('settings.key.field').press('Enter');
-      expect(await core.waitCmd((c) => (c as Cmd).cmd === 'key_set', 3000)).toMatchObject({ cmd: 'key_set', id: 'openrouter', key: 'sk-or-fake-1' });
+      expect(await core.waitCmd((c) => (c as Cmd).cmd === 'provider_use', 3000)).toMatchObject({ cmd: 'provider_use', id: 'openrouter', key: 'sk-or-fake-1' });
       await core.send(accounts('signed_in') as never);
       await expect(thread).toHaveAttribute('data-project', ACME, { timeout: 3000 });
       await expect(thread).toHaveAttribute('data-agent', 'perf');

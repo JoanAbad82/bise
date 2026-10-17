@@ -194,6 +194,10 @@ export function applyTyped(s: Store, ev: Ev): void {
     case "signing":
       s.put("signing", { id: ev.id, url: ev.url });
       return;
+    case "provider_check":
+      // the last check's state (provider_use): checking, works or failed
+      s.put("provider_check", ev);
+      return;
     case "found":
       s.put("found", ev.items);
       return;

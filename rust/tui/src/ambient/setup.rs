@@ -43,6 +43,9 @@ pub enum Done {
     /// core/app_update.rs): its `desktop.json` (Err: why not), the
     /// channel's base URL, this Mac's target
     Manifest { text: Result<String, String>, base: String, target: String },
+    /// a `provider_use` check ended (its seq: a newer one for the same
+    /// provider drops it)
+    Used { seq: u64, used: crate::firstkey::Used },
     /// N1: a /keychain move ended: its lines (item names and counts,
     /// never a secret) and whether it failed
     Keychain { lines: Vec<String>, failed: bool },
@@ -68,7 +71,10 @@ pub enum RegistryOp {
 pub type FlowFn = Box<dyn Fn(&Path, bool) -> Result<(), String>>;
 pub type WriteFn = Box<dyn Fn(&Value) -> Result<(), String>>;
 pub type IdFn = Box<dyn Fn(&str) -> Result<(), String>>;
-pub type KeySetFn = Box<dyn Fn(&str, &str) -> Result<(), String>>;
+/// (provider, the key pasted or none, its seq, the channel of its end) ->
+/// (the provider's name, the model it is checked with), at once; the
+/// check's end comes as `Done::Used`
+pub type ProviderUseFn = Box<dyn Fn(&str, Option<String>, u64, Sender<Done>) -> (String, String)>;
 pub type SignInFn = Box<dyn Fn(&str, Sender<Done>) -> Result<(), String>>;
 pub type PathFn = Box<dyn Fn(&Path) -> Result<(), String>>;
 /// Reads the desktop app's release channel he follows (stable or beta) on
@@ -112,7 +118,7 @@ pub struct SetupPorts {
     pub prefs: Box<dyn Fn() -> Option<Value>>,
     pub write_prefs: WriteFn,
     pub accounts: Box<dyn Fn() -> Vec<Account>>,
-    pub key_set: KeySetFn,
+    pub provider_use: ProviderUseFn,
     pub key_remove: IdFn,
     /// only a provider that signs in; its browser flow, `Done::SignedIn`
     /// at its end (never run by a test)
@@ -274,6 +280,9 @@ pub fn account_of(s: &bise_catalog::auth_cli::Status) -> Account {
         state: state.into(),
         who: s.email.clone(),
         provider: s.id.clone(),
+        from: None,
+        keys_url: String::new(),
+        coding: false,
     }
 }
 
@@ -325,15 +334,15 @@ pub fn walk(dir: &Path, depth: usize, skip: &[PathBuf]) -> Vec<Entry> {
     out
 }
 
-/// A stdin line fit for a log: a `key_set`'s key is never written.
+/// A stdin line fit for a log: a `provider_use`'s key is never written.
 pub fn redact(line: &str) -> String {
     match serde_json::from_str::<Value>(line) {
-        Ok(mut v) if v.get("cmd").and_then(Value::as_str) == Some("key_set") => {
+        Ok(mut v) if v.get("cmd").and_then(Value::as_str) == Some("provider_use") && v.get("key").is_some() => {
             v["key"] = Value::from("…");
             v.to_string()
         }
         Ok(_) => line.to_string(),
-        Err(_) if line.contains("key_set") => "(a key_set line that isn't JSON)".into(),
+        Err(_) if line.contains("provider_use") => "(a provider_use line that isn't JSON)".into(),
         Err(_) => line.to_string(),
     }
 }
@@ -460,16 +469,51 @@ pub fn live(flow: FlowFn) -> SetupPorts {
             let files = bise_catalog::auth::EnvFile::read_all(&paths.env_files);
             let keys = bise_catalog::auth::Keys { env: &env, store: &store, files: &files };
             let main = setup.catalog.resolve(&setup.model).provider;
-            auth_cli::statuses(&setup.catalog, &keys, &main, paths.home.as_deref()).iter().map(account_of).collect()
-        }),
-        key_set: Box::new(move |id, key| {
-            let paths = auth_paths();
-            let setup = bise_catalog::Setup::load(&paths.config);
-            let p = auth_cli::check_provider(&setup.catalog, id)?;
-            if p.key_env.is_empty() {
-                return Err(format!("{} takes no key", p.name));
+            let home = paths.home.as_deref();
+            let mut v = auth_cli::statuses(&setup.catalog, &keys, &main, home)
+                .iter()
+                .map(|s| {
+                    let mut a = account_of(s);
+                    if let Some(p) = setup.catalog.provider(&s.id) {
+                        a.from = (!p.signs_in()).then(|| keys.find(&p.id, &p.key_env)).flatten().map(|f| crate::firstkey::key_from(&f.from, home));
+                        a.keys_url = p.keys_url.clone();
+                        a.coding = crate::onboarding::CODING_PLANS.contains(&p.id.as_str());
+                    }
+                    a
+                })
+                .collect::<Vec<_>>();
+            // the coding plans are hidden from the catalog's list until set
+            // up; the first run offers them under their own row (the TUI's)
+            for id in crate::onboarding::CODING_PLANS {
+                if let Some(p) = setup.catalog.provider(id).filter(|p| !p.key_env.is_empty() && !v.iter().any(|a| a.id == p.id)) {
+                    v.push(Account {
+                        id: p.id.clone(),
+                        label: p.name.clone(),
+                        kind: "key".into(),
+                        state: "signed_out".into(),
+                        who: None,
+                        provider: p.id.clone(),
+                        from: None,
+                        keys_url: p.keys_url.clone(),
+                        coding: true,
+                    });
+                }
             }
-            auth_cli::login(&paths, p, key, &env).map(|_| ())
+            v
+        }),
+        // the key step's one path (firstkey.rs): checked live on its own
+        // thread, saved only once it works
+        provider_use: Box::new(move |id, key, seq, tx| {
+            let h = home();
+            let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+            let said = crate::firstkey::model_for(&h, &env, id);
+            let id = id.to_string();
+            std::thread::spawn(move || {
+                let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+                let used = crate::firstkey::use_provider(&h, &env, &id, key, &crate::firstkey::live_ports());
+                let _ = tx.send(Done::Used { seq, used });
+            });
+            said
         }),
         key_remove: Box::new(move |id| {
             let paths = auth_paths();
@@ -478,7 +522,8 @@ pub fn live(flow: FlowFn) -> SetupPorts {
         }),
         sign_in: Box::new(move |id, tx| {
             let setup = bise_catalog::Setup::load(&auth_paths().config);
-            if !setup.catalog.provider(id).is_some_and(|p| p.signs_in()) {
+            // the ChatGPT plan, or OpenRouter's login that mints a key
+            if !setup.catalog.provider(id).is_some_and(|p| p.signs_in() || p.id == bise_catalog::openrouter_login::ID) {
                 return Err(format!("{id} has no sign-in"));
             }
             sign_in_run(id, tx, &open)
@@ -619,9 +664,9 @@ mod tests {
 
     #[test]
     fn a_key_never_reaches_a_log_line() {
-        let l = redact(r#"{"cmd":"key_set","id":"anthropic","key":"sk-secret"}"#);
+        let l = redact(r#"{"cmd":"provider_use","id":"anthropic","key":"sk-secret"}"#);
         assert!(!l.contains("sk-secret") && l.contains("anthropic"), "{l}");
-        assert!(!redact(r#"{"cmd":"key_set","key":"sk-secret""#).contains("sk-secret"));
+        assert!(!redact(r#"{"cmd":"provider_use","key":"sk-secret""#).contains("sk-secret"));
         assert_eq!(redact(r#"{"cmd":"found_scan"}"#), r#"{"cmd":"found_scan"}"#);
     }
 }

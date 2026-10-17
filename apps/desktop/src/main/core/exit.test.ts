@@ -50,7 +50,7 @@ describe('redactLine', () => {
       'auth failed for sk-ant-api03-ABCDEFGHIJKLMNOP',
       'GET /v1 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig',
       'MISTRAL_API_KEY=abcdef123456 not set',
-      '{"cmd":"key_set","id":"anthropic","key":"sk-secret-1234567"}',
+      '{"cmd":"provider_use","id":"anthropic","key":"sk-secret-1234567"}',
       'config: {"api_key": "s3cr3tvalue", "model": "x"}',
       'token: ghp_abcdefghijklmnopqrst',
       'password=hunter22',
@@ -59,7 +59,7 @@ describe('redactLine', () => {
       const r = redactLine(l);
       for (const secret of ['ABCDEFGHIJKLMNOP', 'eyJhbGciOiJIUzI1NiJ9', 'abcdef123456', 'sk-secret', 's3cr3tvalue', 'ghp_abcdefghij', 'hunter22']) expect(r).not.toContain(secret);
     }
-    expect(redactLine('{"cmd":"key_set","key":"sk-x"')).toBe("(a key_set line that isn't JSON)");
+    expect(redactLine('{"cmd":"provider_use","key":"sk-x"')).toBe("(a provider_use line that isn't JSON)");
     expect(redactLine('  the hub did not start  ')).toBe('the hub did not start');
   });
   it('at most 300 characters', () => {

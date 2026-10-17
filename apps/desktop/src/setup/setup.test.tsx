@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Account, AppCmd, Found } from '@/proto';
@@ -26,6 +27,14 @@ const ports = (): OnboardingPorts & { sent: AppCmd[]; log: string[] } => {
   const log: string[] = [];
   return { sent, log, send: (c) => sent.push(c), perm: (p, a) => log.push(`perm ${p} ${a}`), done: () => log.push('done') };
 };
+
+/** The model step's check that works (ChatGPT, signed in in the fixture): its pick, then the answer. */
+const WORKS = { ev: 'provider_check', id: 'chatgpt', name: 'ChatGPT', state: 'works', model: 'chatgpt/gpt-6.1-sol', answer: 'Hi!' } as const;
+function passModel(rerender: (ui: ReactElement) => void, ui: (check: typeof WORKS) => ReactElement): void {
+  fireEvent.click(screen.getByTestId('setup.pay.chatgpt'));
+  rerender(ui(WORKS));
+  fireEvent.click(screen.getByTestId('setup.next'));
+}
 
 describe('the first launch model', () => {
   it('walks hello, permissions, model (only signed in), projects (scans, adds the ticked), fn (onboarded true)', () => {
@@ -73,21 +82,74 @@ describe('Onboarding', () => {
     expect(p.log.at(-1)).toBe('done');
   });
 
-  it('the model step waits for a sign-in; esc goes a step back', () => {
+  it('the model step waits for a key that works (live check), then goes on; esc goes a level, then a step back', () => {
     const p = ports();
     const out = accounts().map((a) => ({ ...a, state: 'signed_out' as const }));
     const { rerender } = render(<Onboarding accounts={out} found={[]} perms={{}} ports={p} now={NOW} />);
     const root = screen.getByTestId('setup.root');
     fireEvent.keyDown(root, { key: 'Enter' });
     fireEvent.keyDown(root, { key: 'Enter' });
+    expect(screen.getByTestId('setup.step.model')).toBeTruthy();
+    expect(screen.getByTestId('setup.step.model').textContent).toContain('how do you want to pay for the models?');
+    // nothing works yet: ⏎ stays
     fireEvent.keyDown(root, { key: 'Enter' });
     expect(screen.getByTestId('setup.step.model')).toBeTruthy();
-    rerender(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} />);
+    // an API key -> which provider -> its key field -> provider_use, checking
+    fireEvent.click(screen.getByTestId('setup.pay.api'));
+    fireEvent.click(screen.getByTestId('setup.pay.which.anthropic-key'));
+    const f = screen.getByTestId<HTMLInputElement>('setup.pay.key');
+    expect(f.type).toBe('password');
+    f.value = 'sk-test';
+    fireEvent.keyDown(f, { key: 'Enter' });
+    expect(p.sent).toEqual([{ cmd: 'provider_use', id: 'anthropic-key', key: 'sk-test' }]);
+    expect(screen.getByTestId('setup.step.model').textContent).toContain('checking your key');
+    const base = { ev: 'provider_check', id: 'anthropic-key', name: 'Anthropic', model: 'anthropic/claude-opus-5-5', pasted: true } as const;
+    rerender(<Onboarding accounts={out} found={[]} perms={{}} ports={p} now={NOW} check={{ ...base, state: 'failed', why: 'wrong_key', said: 'invalid x-api-key' }} />);
+    // the failure shows on the paste step, under its field; no 'try again' for a wrong key
+    expect(screen.getByTestId('setup.pay.failed').textContent).toContain('Anthropic says this key is wrong: “invalid x-api-key”');
+    expect(screen.queryByTestId('setup.pay.again')).toBeNull();
+    expect(document.body.textContent).not.toContain('sk-test');
+    const g = screen.getByTestId<HTMLInputElement>('setup.pay.key');
+    g.value = 'sk-right';
+    fireEvent.keyDown(g, { key: 'Enter' });
+    expect(p.sent.at(-1)).toEqual({ cmd: 'provider_use', id: 'anthropic-key', key: 'sk-right' });
+    rerender(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} check={{ ...base, state: 'works', label: 'opus 5.5', answer: 'Hi there!', main: 'anthropic/claude-opus-5-5', lines: ['main uses anthropic/claude-opus-5-5.'] }} />);
+    expect(screen.getByTestId('setup.step.model').textContent).toContain('it works: opus 5.5 answered.');
+    expect(screen.getByTestId('setup.pay.answer').textContent).toBe('it said: “Hi there!”');
     fireEvent.keyDown(root, { key: 'Enter' });
     expect(screen.getByTestId('setup.step.projects')).toBeTruthy();
-    expect(p.sent).toEqual([{ cmd: 'found_scan' }]);
+    expect(p.sent.at(-1)).toEqual({ cmd: 'found_scan' });
     fireEvent.keyDown(root, { key: 'Escape' });
     expect(screen.getByTestId('setup.step.model')).toBeTruthy();
+  });
+
+  it('the model step: ChatGPT signs in in his browser, then its plan is checked once', () => {
+    const p = ports();
+    const out = accounts().map((a) => ({ ...a, state: 'signed_out' as const }));
+    const { rerender } = render(<Onboarding accounts={out} found={[]} perms={{}} ports={p} now={NOW} />);
+    const root = screen.getByTestId('setup.root');
+    fireEvent.keyDown(root, { key: 'Enter' });
+    fireEvent.keyDown(root, { key: 'Enter' });
+    fireEvent.click(screen.getByTestId('setup.pay.chatgpt'));
+    expect(p.sent).toEqual([{ cmd: 'sign_in', id: 'chatgpt' }]);
+    rerender(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} />);
+    expect(p.sent).toEqual([{ cmd: 'sign_in', id: 'chatgpt' }, { cmd: 'provider_use', id: 'chatgpt' }]);
+    expect(screen.getByTestId('setup.step.model').textContent).toContain('checking your plan');
+    rerender(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} />);
+    expect(p.sent.length).toBe(2);
+  });
+
+  it('the model step lists a key found first, and checks it with no key sent', () => {
+    const p = ports();
+    const withEnv = accounts().map((a) => (a.kind === 'key' ? { ...a, state: 'signed_in' as const, from: { t: 'env' as const, var: 'ANTHROPIC_API_KEY' } } : a));
+    render(<Onboarding accounts={withEnv} found={[]} perms={{}} ports={p} now={NOW} />);
+    const root = screen.getByTestId('setup.root');
+    fireEvent.keyDown(root, { key: 'Enter' });
+    fireEvent.keyDown(root, { key: 'Enter' });
+    const rows = screen.getByTestId('setup.pay').querySelectorAll('[data-row]');
+    expect(rows[0]?.textContent).toContain('use the ANTHROPIC_API_KEY from your shell');
+    fireEvent.click(screen.getByTestId('setup.pay.found-anthropic-key'));
+    expect(p.sent).toEqual([{ cmd: 'provider_use', id: 'anthropic-key' }]);
   });
 
   it('the projects step (round 3): a filter narrows the found list; choose a folder… adds it ticked and it is added on ⏎', async () => {
@@ -99,8 +161,10 @@ describe('Onboarding', () => {
     };
     // the fixture's shop (recent, ticked) and a second repo not his yet, older (unticked); acme is known: not listed
     const list: Found[] = [...found(), { name: 'billing', path: '/Users/camille/code/billing', git: true, known: false, last_ms: NOW - 90 * 86_400_000 }];
-    render(<Onboarding accounts={accounts()} found={list} perms={{}} ports={{ ...p, pickFolder }} now={NOW} />);
-    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    const ui = (check: typeof WORKS | null = null) => <Onboarding accounts={accounts()} found={list} perms={{}} ports={{ ...p, pickFolder }} now={NOW} check={check} />;
+    const { rerender } = render(ui());
+    for (let i = 0; i < 2; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    passModel(rerender, ui);
     expect(screen.getByTestId('setup.step.projects')).toBeTruthy();
     // the rows' checks (the rows themselves carry setup.found.<path>)
     const names = () =>
@@ -120,6 +184,7 @@ describe('Onboarding', () => {
     expect(screen.getByTestId('setup.next').textContent).toBe('add 2 projects');
     fireEvent.click(screen.getByTestId('setup.next'));
     expect(p.sent).toEqual([
+      { cmd: 'provider_use', id: 'chatgpt' },
       { cmd: 'project_add', path: '/Users/camille/notes' },
       { cmd: 'project_add', path: '/Users/camille/code/shop' },
     ]);
@@ -133,8 +198,11 @@ describe('Onboarding', () => {
   });
 
   it('no picker in the shell: no choose a folder… button', () => {
-    render(<Onboarding accounts={accounts()} found={found()} perms={{}} ports={ports()} now={NOW} />);
-    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    const pp = ports();
+    const ui = (check: typeof WORKS | null = null) => <Onboarding accounts={accounts()} found={found()} perms={{}} ports={pp} now={NOW} check={check} />;
+    const { rerender } = render(ui());
+    for (let i = 0; i < 2; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    passModel(rerender, ui);
     expect(screen.queryByTestId('setup.choose')).toBeNull();
   });
 
@@ -142,14 +210,17 @@ describe('Onboarding', () => {
     const p = ports();
     const props = { accounts: accounts(), found: found(), perms: {}, ports: p, now: NOW };
     const { rerender } = render(<Onboarding {...props} />);
-    for (let i = 0; i < 4; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    for (let i = 0; i < 2; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    passModel(rerender, (check) => <Onboarding {...props} check={check} />);
+    fireEvent.click(screen.getByTestId('setup.next'));
     expect(screen.getByTestId('setup.step.fn')).toBeTruthy();
     expect(screen.getByTestId('setup.next').textContent).toBe('open bise without trying');
-    rerender(<Onboarding {...props} fn={{ act: 'talk_start', n: 1 }} />);
-    rerender(<Onboarding {...props} fn={{ act: 'talk_end', n: 2 }} />);
+    rerender(<Onboarding {...props} check={WORKS} fn={{ act: 'talk_start', n: 1 }} />);
+    rerender(<Onboarding {...props} check={WORKS} fn={{ act: 'talk_end', n: 2 }} />);
     expect(screen.getByTestId('setup.next').textContent).toBe('open bise');
     fireEvent.click(screen.getByTestId('setup.next'));
     expect(p.sent).toEqual([
+      { cmd: 'provider_use', id: 'chatgpt' },
       { cmd: 'project_add', path: '/Users/camille/code/shop' },
       { cmd: 'prefs_set', key: 'onboarded', value: true },
     ]);

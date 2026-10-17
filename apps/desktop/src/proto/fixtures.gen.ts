@@ -262,6 +262,10 @@ export const core_ev: readonly CoreEv[] = [
   {"agent":"perf","ev":"agent_queued","text":"then the warm one"},
   {"agent":"perf","ev":"agent_typing","text":"listing"},
   {"ev":"fake_voice","on":true,"words":"/Users/camille/.bise/fake-words.txt"},
+  {"ev":"provider_check","id":"anthropic","label":"opus 5.5","model":"anthropic/claude-opus-5-5","name":"Anthropic","pasted":true,"state":"checking"},
+  {"answer":"Hi! How can I help you today?","ev":"provider_check","id":"anthropic","label":"opus 5.5","lines":["main uses anthropic/claude-opus-5-5.","small jobs and auto's checker use claude-haiku-4-5."],"main":"anthropic/claude-opus-5-5","model":"anthropic/claude-opus-5-5","name":"Anthropic","pasted":true,"state":"works"},
+  {"ev":"provider_check","id":"anthropic","label":"opus 5.5","model":"anthropic/claude-opus-5-5","name":"Anthropic","pasted":true,"said":"invalid x-api-key","state":"failed","url":"https://platform.claude.com/settings/keys","why":"wrong_key"},
+  {"answer":"Hello!","ev":"provider_check","id":"chatgpt","label":"gpt-6.1-sol","main":"chatgpt/gpt-6.1-sol","model":"chatgpt/gpt-6.1-sol","name":"ChatGPT","state":"works"},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -275,7 +279,8 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"prefs_set","key":"quiet.call","value":true},
   {"cmd":"sign_in","id":"chatgpt"},
   {"cmd":"sign_in_cancel","id":"chatgpt"},
-  {"cmd":"key_set","id":"anthropic-key","key":"sk-fake-0000"},
+  {"cmd":"provider_use","id":"anthropic","key":"sk-fake-0000"},
+  {"cmd":"provider_use","id":"chatgpt"},
   {"cmd":"key_remove","id":"anthropic-key"},
   {"cmd":"found_scan","dir":"/Users/camille/code"},
   {"cmd":"found_scan"},

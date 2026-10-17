@@ -40,7 +40,18 @@ pub enum AppCmd {
     /// page and local listener go); its end is error {cmd: sign_in,
     /// text: '<id>: cancelled'}
     SignInCancel { id: String },
-    KeySet { id: String, key: String },
+    /// draft (architect m_28532): use provider `id` (the first run's
+    /// pick, settings' key): one tiny live call with `key` (none: the key
+    /// found for it, or its sign-in: the ChatGPT plan, OpenRouter's
+    /// minted key), answered by `provider_check` checking, then works or
+    /// failed. The key is saved only once it works; main's model is
+    /// written then when main has none or can't run. A newer one for the
+    /// same id drops the older's answer
+    ProviderUse {
+        id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        key: Option<String>,
+    },
     KeyRemove { id: String },
     /// folders that could be projects (none: his home folder, depth 2)
     FoundScan {
@@ -332,7 +343,7 @@ impl AppCmd {
         "prefs_set",
         "sign_in",
         "sign_in_cancel",
-        "key_set",
+        "provider_use",
         "key_remove",
         "found_scan",
         "away_back",

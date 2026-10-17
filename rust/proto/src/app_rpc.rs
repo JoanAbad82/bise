@@ -32,7 +32,7 @@ use serde_json::{Map, Value};
 /// The methods and notifications whose params never reach a log, the
 /// core's or the app's (a key, a screenshot's place, a computer-use
 /// still): a broken or refused one is logged as its name and size only.
-pub const NO_LOG: &[&str] = &["core/key_set", "core/shot", "core/computer_peek"];
+pub const NO_LOG: &[&str] = &["core/provider_use", "core/shot", "core/computer_peek"];
 
 /// The log's words for a line of this protocol: the line, or its name and
 /// size when it is a [`NO_LOG`] one (or might be: it names one).

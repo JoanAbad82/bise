@@ -103,6 +103,10 @@ export class StoreReads extends StoreBase {
       null,
     );
   }
+  /** provider_use's last answer (checking, works, failed); null before any. */
+  providerCheck(): EvOf<"provider_check"> | null {
+    return this.slice<EvOf<"provider_check"> | null>("provider_check", null);
+  }
   accounts(): readonly Account[] {
     return this.slice("accounts", EMPTY);
   }

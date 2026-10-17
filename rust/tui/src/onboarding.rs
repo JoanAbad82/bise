@@ -254,26 +254,7 @@ pub(crate) fn model_blocked(setup: &bise_catalog::Setup, found: &[Provider]) -> 
         || (r.caps.key_command.is_empty() && !r.key_env.is_empty() && !found.iter().any(|p| p.id == r.provider))
 }
 
-/// `provider/model`: the provider's pick (its catalog `model`), else the
-/// model in use when it is of that provider; None when neither.
-pub(crate) fn pick_of(p: &Provider, current: &str) -> Option<String> {
-    if !p.model.is_empty() {
-        return Some(format!("{}/{}", p.id, p.model));
-    }
-    bise_catalog::split_name(current).filter(|(pid, _)| *pid == p.id).map(|_| current.to_string())
-}
-
-/// Write `model` as main's model in config.toml (`[roles] main`, BISE-298;
-/// the rest of the file kept, the old `model` key dropped).
-pub(crate) fn save_model(home: &bise_home::Home, model: &str) -> io::Result<()> {
-    let file = home.config_file();
-    let text = std::fs::read_to_string(&file).unwrap_or_default();
-    if let Some(dir) = file.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    // BISE-298: main's role, the old `model` key dropped
-    std::fs::write(&file, bise_catalog::roles::with_role(&text, bise_catalog::roles::MAIN, model))
-}
+pub(crate) use crate::firstkey::save_model;
 
 /// auth.json has a key for this provider already.
 pub(crate) fn stored(home: &bise_home::Home, id: &str) -> bool {
@@ -868,7 +849,7 @@ impl Onb {
             return self.voice_models(p);
         }
         // a role's steps (BISE-301): the one recommended for the role first
-        let first = self.picking().and_then(|id| self.recommended(id, p)).or_else(|| pick_of(p, &self.model));
+        let first = self.picking().and_then(|id| self.recommended(id, p)).or_else(|| bise_catalog::roles::pick_for(&self.setup.catalog, &p.id, &self.model));
         let mut v: Vec<String> = first.into_iter().collect();
         // the plan: the account's own list (cached at sign-in and when
         // /models opens), then the catalog's
@@ -1638,29 +1619,13 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
 
 /// A model's id without its provider.
 fn short_model(m: &str) -> String {
-    bise_catalog::split_name(m).map_or(m.to_string(), |(_, id)| id.to_string())
+    crate::firstkey::short_model(m)
 }
 
-/// The first run's word on the roles one key runs (one key, every role):
-/// `small jobs and auto's checker use claude-haiku-4-5.`; Jev:
-/// `small jobs use gemini-3.8-flash. auto's checker: Jev, by OpenRouter.`
-/// None: no small jobs model.
+/// The first run's word on the roles one key runs (firstkey.rs, shared
+/// with the desktop's first run).
 fn helpers_line(o: &Onb) -> Option<String> {
-    let small = o.setup.small_model.clone();
-    if small.is_empty() {
-        return None;
-    }
-    let (checker, _) = o.role_model(bise_catalog::roles::CLASSIFY);
-    let short = short_model(&small);
-    Some(match bise_catalog::roles::jev_of(&checker) {
-        Some((via, _)) => {
-            let by = o.setup.catalog.provider(via).map_or(via.to_string(), |p| p.name.clone());
-            settings::first_small_jev(&short, by)
-        }
-        None if checker == small => settings::first_small_checker(&short),
-        None if checker == bise_catalog::roles::CHECKER_OFF || checker.is_empty() => settings::first_small(&short),
-        None => settings::first_small_and(&short, short_model(&checker)),
-    })
+    crate::firstkey::helpers_line(&o.setup, &o.role_model(bise_catalog::roles::CLASSIFY).0)
 }
 
 /// What the optional keys unlock, for those not set (BISE-266): the
@@ -1720,7 +1685,7 @@ fn model_list(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
                     settings::first_set_up(&p.name)
                 } else {
                     // BISE-266: enter moves the model to this provider
-                    match pick_of(&p, &o.model) {
+                    match bise_catalog::roles::pick_for(&o.setup.catalog, &p.id, &o.model) {
                         Some(m) => settings::first_will_use(&p.name, short_model(&m)),
                         None => settings::first_set_model(&p.name, bise_catalog::auth::tilde(&o.home.config_file(), Some(o.home.user_home()))),
                     }

@@ -34,3 +34,15 @@
 .setup-firstrun kbd { font: var(--t-12) var(--font-mono); color: var(--c-text-2); }
 /* the suggestion: the ds Act, underlined at rest as the TUI's link is (its span keeps the composer's focus) */
 .setup-firstrun-demo .b-act { text-decoration: underline; text-underline-offset: 3px; }
+/* the model step (pay.ts, designer m_28697): statement lines under a centred title are centred, 12 px
+   dim, model ids and key names in mono; a field's helper lines sit left under the full-width field */
+.setup .b-onb .t { text-wrap: balance; }
+.setup-works { width: 100%; text-align: center; }
+.setup-said { margin: 0 0 var(--s-2); color: var(--c-text); font: var(--t-15)/var(--lh-read) var(--font-read); }
+.setup-dim { margin: 0; color: var(--c-text-3); font-size: var(--t-12); }
+.setup-dim.err { color: var(--c-err); }
+.setup .b-onb code, .setup-dim code { font: var(--t-12) var(--font-mono); }
+.setup-key { width: 100%; text-align: left; }
+.setup-key .b-field { width: 100%; box-sizing: border-box; }
+.setup-key .b-help { font-size: var(--t-12); color: var(--c-text-2); }
+.setup-mark { color: var(--c-err); }

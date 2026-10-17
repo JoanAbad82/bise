@@ -5,9 +5,9 @@
 // amb-home.
 import { useEffect, useRef, useState } from 'react';
 import type { Artifact } from '@/proto';
-import { useAccounts, useArtifacts, useFound, usePrefs, useProjects, useStore } from '@/store';
+import { useAccounts, useArtifacts, useFound, usePrefs, useProjects, useProviderCheck, useStore } from '@/store';
 import { useRoute, useRouter } from '@/app/router';
-import { onboarded, prefsOf, useKeyError } from '@/settings';
+import { onboarded, prefsOf, useCmdError } from '@/settings';
 import { Onboarding } from './Onboarding';
 import { useHelper } from './helper';
 import { pickerPort } from '@/settings/picker';
@@ -23,7 +23,8 @@ export function OnboardingScreen() {
       home={(globalThis as { bise?: { home?: string } }).bise?.home ?? ''}
       perms={perms}
       fn={fn}
-      keyError={useKeyError()}
+      check={useProviderCheck()}
+      signInError={useCmdError('sign_in')?.text ?? null}
       ports={{
         send: (cmd) => {
           store.command(cmd);
@@ -36,6 +37,9 @@ export function OnboardingScreen() {
         },
         done: () => {
           router.go({ screen: 'bise' });
+        },
+        open: (url) => {
+          void window.bise.openExternal(url);
         },
         ...pickerPort(),
       }}

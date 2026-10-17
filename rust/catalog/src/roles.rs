@@ -448,6 +448,31 @@ pub fn save_role(file: &std::path::Path, id: &str, model: Option<&str>, effort: 
     })
 }
 
+/// The model a provider's key is checked with, and main runs when it is
+/// picked (the TUI's key step, the desktop's first run and settings):
+/// main's model when it is of that provider, else the provider's pick
+/// (its catalog `model`), else its first chat model. None: the catalog
+/// has no chat model for it (the TUI then asks for a name).
+pub fn pick_for(c: &crate::Catalog, provider: &str, main: &str) -> Option<String> {
+    if crate::split_name(main).is_some_and(|(p, _)| p == provider) {
+        return Some(main.to_string());
+    }
+    let p = c.provider(provider)?;
+    if !p.model.is_empty() {
+        return Some(format!("{}/{}", p.id, p.model));
+    }
+    c.models.iter().find(|m| m.provider == provider && !m.stt).map(|m| m.name())
+}
+
+/// What a key that just passed its check writes as main's model
+/// (architect m_28532): the checked model when main has none, or when
+/// main's model can't run (its provider has no working key or sign-in);
+/// never over a model that runs. None: main's model stays.
+pub fn model_to_write(main: &str, main_runs: bool, checked: &str) -> Option<String> {
+    let none = main.trim().is_empty() || main == "none";
+    ((none || !main_runs) && !checked.is_empty() && checked != main).then(|| checked.to_string())
+}
+
 /// Each write's own tmp name in this process (with the pid: across them).
 static TMP: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 

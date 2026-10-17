@@ -1,6 +1,6 @@
 //! The window's setup commands (bise desktop S11, core side; amb-home's
 //! file in amb-core's core, seams agreed m_9134): `prefs_set`,
-//! `sign_in`, `key_set`, `key_remove`, `found_scan`, `project_add`,
+//! `sign_in`, `provider_use`, `key_remove`, `found_scan`, `project_add`,
 //! `project_remove`, `project_move`, `project_rename` (proto::draft's
 //! `AppCmd`), answered by `prefs`, `accounts`, `found`, the projects list
 //! read again, or `error {cmd, text}`; and the agent plugins (P.1):
@@ -17,6 +17,8 @@
 use super::Core;
 use crate::ambient::setup::{rank, CuBusy, Done, RegistryOp, SetupPorts};
 use bise_proto::app_cmd::AppCmd;
+use bise_proto::app_rows::CheckState;
+use bise_proto::core_ev::CoreEv;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,13 +26,41 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Instant;
 
+/// A `provider_check` event (bise_proto's CoreEv, draft): the key never
+/// in it.
+pub(crate) fn provider_check(
+    id: &str,
+    name: &str,
+    state: CheckState,
+    model: &str,
+    pasted: bool,
+    works: Option<&crate::firstkey::Works>,
+    failed: Option<&crate::firstkey::Failed>,
+) -> Value {
+    let ev = CoreEv::ProviderCheck {
+        id: id.to_string(),
+        name: name.to_string(),
+        state,
+        model: model.to_string(),
+        label: if model.is_empty() { String::new() } else { bise_catalog::names::long_name(model) },
+        pasted,
+        answer: works.map(|w| w.answer.clone()).filter(|a| !a.is_empty()),
+        main: works.map(|w| w.main.clone()).filter(|m| !m.is_empty()),
+        lines: works.map(|w| w.lines.clone()).unwrap_or_default(),
+        why: failed.map(|f| f.why),
+        said: failed.map(|f| f.said.clone()).filter(|t| !t.is_empty()),
+        url: failed.and_then(|f| f.url.clone()),
+    };
+    serde_json::to_value(ev).unwrap_or_else(|_| json!({}))
+}
+
 /// The commands this file answers (never a hub's, never another of the
 /// core's own).
 pub const TAGS: &[&str] = &[
     "prefs_set",
     "sign_in",
     "sign_in_cancel",
-    "key_set",
+    "provider_use",
     "key_remove",
     "found_scan",
     "project_add",
@@ -90,6 +120,10 @@ pub(crate) struct Setup {
     keychain_moving: bool,
     /// N1: the last move's lines and whether it failed
     keychain_said: (Vec<String>, bool),
+    /// `provider_use`: the last seq given, and each provider's newest
+    /// (an older check's end is dropped, architect m_28532)
+    use_seq: u64,
+    using: std::collections::HashMap<String, u64>,
 }
 
 /// R8 (the TUI's sb.rs /model, architect m_12214): a `/model <model>`
@@ -119,7 +153,7 @@ impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false) });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false), use_seq: 0, using: Default::default() });
     }
 
     /// R8: his `/model <model>` in `agent`'s view, before it goes to the
@@ -233,6 +267,37 @@ impl Core {
         self.replay_held();
     }
 
+    /// `provider_use` (firstkey.rs): `checking` at once, the check on
+    /// its own thread, its end on the tick ([`Self::on_used`]).
+    fn provider_use(&mut self, id: String, key: Option<String>) {
+        let Some(s) = self.setup.as_mut() else { return };
+        s.use_seq += 1;
+        let seq = s.use_seq;
+        s.using.insert(id.clone(), seq);
+        let pasted = key.is_some();
+        let (name, model) = (s.ports.provider_use)(&id, key, seq, s.tx.clone());
+        self.emit(provider_check(&id, &name, CheckState::Checking, &model, pasted, None, None));
+    }
+
+    /// A check ended: dropped when a newer one for that provider runs;
+    /// else works (then the accounts and roles it changed) or failed.
+    fn on_used(&mut self, seq: u64, used: crate::firstkey::Used) {
+        let Some(s) = self.setup.as_mut() else { return };
+        if s.using.get(&used.id) != Some(&seq) {
+            return;
+        }
+        s.using.remove(&used.id);
+        let (state, works, failed) = match &used.res {
+            Ok(w) => (CheckState::Works, Some(w), None),
+            Err(f) => (CheckState::Failed, None, Some(f)),
+        };
+        self.emit(provider_check(&used.id, &used.name, state, &used.model, used.pasted, works, failed));
+        if works.is_some() {
+            self.emit_accounts();
+            self.emit_roles();
+        }
+    }
+
     fn setup_error(&mut self, cmd: &str, text: &str) {
         self.emit(json!({"ev": "error", "cmd": cmd, "text": text}));
     }
@@ -264,12 +329,9 @@ impl Core {
                 }
                 ("prefs_set", res)
             }
-            AppCmd::KeySet { id, key } => {
-                let res = (p.key_set)(&id, &key);
-                if res.is_ok() {
-                    self.emit_accounts();
-                }
-                ("key_set", res)
+            AppCmd::ProviderUse { id, key } => {
+                self.provider_use(id, key);
+                return;
             }
             AppCmd::Keychain { to } => ("keychain", self.keychain(to)),
             AppCmd::KeyRemove { id } => {
@@ -532,6 +594,7 @@ impl Core {
                     }
                     self.emit_accounts();
                 }
+                Done::Used { seq, used } => self.on_used(seq, used),
                 Done::CuCheck(v) => {
                     if let Some(c) = self.setup.as_mut().and_then(|s| s.cu.as_mut()) {
                         c.check = v;

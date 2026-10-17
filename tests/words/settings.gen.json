@@ -1732,6 +1732,13 @@
     "one": null,
     "text": "✓ allowed"
   },
+  "settings.onb_answered": {
+    "args": [
+      "answer"
+    ],
+    "one": null,
+    "text": "it said: “{answer}”"
+  },
   "settings.onb_back": {
     "args": [],
     "one": null,
@@ -1787,6 +1794,20 @@
     "one": null,
     "text": "try it: hold fn"
   },
+  "settings.onb_found_env": {
+    "args": [
+      "var"
+    ],
+    "one": null,
+    "text": "use the {var} from your shell"
+  },
+  "settings.onb_found_file": {
+    "args": [
+      "path"
+    ],
+    "one": null,
+    "text": "use the key in {path}"
+  },
   "settings.onb_git": {
     "args": [
       "when"
@@ -1804,6 +1825,14 @@
     "one": null,
     "text": "hi. i'm bise."
   },
+  "settings.onb_key_wrong": {
+    "args": [
+      "provider",
+      "said"
+    ],
+    "one": null,
+    "text": "{provider} says this key is wrong: “{said}”"
+  },
   "settings.onb_mic_lost": {
     "args": [],
     "one": null,
@@ -1813,21 +1842,6 @@
     "args": [],
     "one": null,
     "text": "to talk while you hold fn"
-  },
-  "settings.onb_model_help": {
-    "args": [],
-    "one": null,
-    "text": "sign in to one of them to go on"
-  },
-  "settings.onb_model_sub": {
-    "args": [],
-    "one": null,
-    "text": "your subscription is enough. you can change it per project."
-  },
-  "settings.onb_model_title": {
-    "args": [],
-    "one": null,
-    "text": "which model?"
   },
   "settings.onb_no_match": {
     "args": [
@@ -1856,6 +1870,11 @@
     "one": null,
     "text": "open bise without trying"
   },
+  "settings.onb_pay_sub": {
+    "args": [],
+    "one": null,
+    "text": "a plan you already have, or a key. you can add more later in settings › models."
+  },
   "settings.onb_perms_sub": {
     "args": [],
     "one": null,
@@ -1881,6 +1900,14 @@
     "one": null,
     "text": "your projects"
   },
+  "settings.onb_said": {
+    "args": [
+      "provider",
+      "said"
+    ],
+    "one": null,
+    "text": "{provider} said: “{said}”"
+  },
   "settings.onb_screen_lost": {
     "args": [],
     "one": null,
@@ -1900,6 +1927,11 @@
     "args": [],
     "one": null,
     "text": "start"
+  },
+  "settings.onb_try_again": {
+    "args": [],
+    "one": null,
+    "text": "try again"
   },
   "settings.open_system_settings": {
     "args": [],

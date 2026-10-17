@@ -60,6 +60,7 @@ export const TAGS = {
   files: true,
   roles: true,
   signing: true,
+  provider_check: true,
   app_update: true,
   hub_refused: true,
   index: true,

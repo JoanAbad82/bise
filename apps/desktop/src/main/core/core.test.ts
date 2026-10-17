@@ -42,7 +42,7 @@ describe('lines', () => {
     expect(JSON.parse(initializeLine('1.2'))).toEqual({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { proto: 1, client: { name: 'bise-desktop', version: '1.2' } } });
     expect(JSON.parse(INITIALIZED_LINE)).toEqual({ jsonrpc: '2.0', method: 'initialized' });
     expect(refusedLog('core/answer', { code: -32602, message: 'answer: no card id' })).toBe('core: core/answer refused (-32602): answer: no card id');
-    expect(refusedLog('core/key_set', { code: -32602, message: 'key "sk-SECRET"' })).toBe('core: core/key_set refused (-32602)');
+    expect(refusedLog('core/provider_use', { code: -32602, message: 'key "sk-SECRET"' })).toBe('core: core/provider_use refused (-32602)');
   });
 
   it("logs a line that is not an event, never a computer use still's bytes (S29)", () => {
@@ -52,7 +52,7 @@ describe('lines', () => {
     expect(notAnEventLog(broken)).toBe(`core: not an event: a core/computer_peek line (${String(broken.length)} bytes, not logged)`);
     expect(notAnEventLog('{"ev":"computer_peek","shot":{"data":"U0VDUkVU')).not.toContain('U0VDUkVU');
     expect(notAnEventLog('"shot":{"data":"U0VDUkVU')).not.toContain('U0VDUkVU');
-    expect(notAnEventLog('{"jsonrpc":"2.0","method":"core/key_set","params":{"key":"sk-SECRET"')).not.toContain('SECRET');
+    expect(notAnEventLog('{"jsonrpc":"2.0","method":"core/provider_use","params":{"key":"sk-SECRET"')).not.toContain('SECRET');
   });
 });
 

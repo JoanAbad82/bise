@@ -14,13 +14,13 @@ const MAX = 300;
 /** A line fit for the window: no key, no token, no password; at most 300 characters. */
 export function redactLine(line: string): string {
   let s = line.trim();
-  // a key_set command echoed in a log (the Rust core's setup::redact rule)
-  if (s.includes('key_set')) {
+  // a provider_use command with its key echoed in a log (the Rust core's setup::redact rule)
+  if (s.includes('provider_use')) {
     try {
       const v = JSON.parse(s) as Record<string, unknown>;
-      if (v['cmd'] === 'key_set') s = JSON.stringify({ ...v, key: '…' });
+      if (v['cmd'] === 'provider_use' && 'key' in v) s = JSON.stringify({ ...v, key: '…' });
     } catch {
-      s = "(a key_set line that isn't JSON)";
+      s = "(a provider_use line that isn't JSON)";
     }
   }
   s = s

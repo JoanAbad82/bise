@@ -2,7 +2,7 @@
 // BISE_PROTO_BLESS=1 cargo test -p bise-proto --features ts --test ts
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
-import type { Account, AwayProject, ComputerAgent, CuRow, Found, IndexRow, OpenWhat, PeekShot, PhasePage, PickCommand, PickFile, PickFolder, PickSkill, Plugin, PreviewAction, PreviewReport, PreviewWait, ProjectRow, RoleRow, StateAgent, StateCard, VoiceLit } from './app_rows';
+import type { Account, AwayProject, CheckState, CheckWhy, ComputerAgent, CuRow, Found, IndexRow, OpenWhat, PeekShot, PhasePage, PickCommand, PickFile, PickFolder, PickSkill, Plugin, PreviewAction, PreviewReport, PreviewWait, ProjectRow, RoleRow, StateAgent, StateCard, VoiceLit } from './app_rows';
 import type { Mode } from './hub';
 import type { JsonValue } from './json';
 import type { Page, ScheduledTask } from './rows';
@@ -11,7 +11,15 @@ import type { Entry, PageRef } from './thread';
 /**
  * What the core sends the app besides the hubs' events (S3b).
  */
-export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "signing", id: string, url: string, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "heard", text: string, final: boolean, } | { "ev": "shot", file: string | null, app?: string | null, title?: string | null, } | { "ev": "roles", items: Array<RoleRow>, } | { "ev": "commands", items: Array<PickCommand>, } | { "ev": "skills", project: string, items: Array<PickSkill>, } | { "ev": "files", project: string, rid: number, q: string, items: Array<PickFile>, folder?: PickFolder | null, partial?: boolean, } | { "ev": "voice_answer", project: string, card: number, n: number, line: string, ms: number, } | { "ev": "voice_mode", project: string, agent: string, on: boolean, state: string, heard?: string | null, said?: string | null, muted?: boolean, note?: string | null, fail?: string | null, lit?: VoiceLit | null, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, 
+export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "signing", id: string, url: string, } | { "ev": "provider_check", id: string, name: string, state: CheckState, model?: string, 
+/**
+ * the model's name for people, as its chip says it (`opus 5.5`)
+ */
+label?: string, 
+/**
+ * the key checked was pasted (not found, not a sign-in)
+ */
+pasted?: boolean, answer?: string | null, main?: string | null, lines?: Array<string>, why?: CheckWhy | null, said?: string | null, url?: string | null, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "heard", text: string, final: boolean, } | { "ev": "shot", file: string | null, app?: string | null, title?: string | null, } | { "ev": "roles", items: Array<RoleRow>, } | { "ev": "commands", items: Array<PickCommand>, } | { "ev": "skills", project: string, items: Array<PickSkill>, } | { "ev": "files", project: string, rid: number, q: string, items: Array<PickFile>, folder?: PickFolder | null, partial?: boolean, } | { "ev": "voice_answer", project: string, card: number, n: number, line: string, ms: number, } | { "ev": "voice_mode", project: string, agent: string, on: boolean, state: string, heard?: string | null, said?: string | null, muted?: boolean, note?: string | null, fail?: string | null, lit?: VoiceLit | null, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, 
 /**
  * on a final that failed, timed out or came back empty: the core
  * keeps this take's sound (memory only, its last 3 takes, 10 min

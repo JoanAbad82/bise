@@ -72,6 +72,67 @@ pub struct Account {
     /// L5: the catalog provider it sets up (a model row's `provider_id`)
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub provider: String,
+    /// a key found for it: where (never the key)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<KeyFrom>,
+    /// where its keys are made (the key field's "get one" link); "" none
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub keys_url: String,
+    /// a key of a coding plan (GLM, Kimi, MiniMax): the first run lists
+    /// them under their own row
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub coding: bool,
+}
+
+/// Where a provider's key was found (bise_catalog::auth::From).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "t", rename_all = "snake_case")]
+pub enum KeyFrom {
+    /// an environment variable (its name)
+    Env { var: String },
+    /// bise's auth.json
+    AuthFile,
+    /// an old `.env` file (its path, ~ for his home)
+    EnvFile { path: String },
+    #[serde(other)]
+    Unknown,
+}
+
+/// Where a `provider_use` check is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum CheckState {
+    Checking,
+    /// it answered: the key is saved, main's model written if it had to be
+    Works,
+    Failed,
+    #[serde(other)]
+    Unknown,
+}
+
+/// Why a check failed (the TUI's keycheck::Why), each with its own fix.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum CheckWhy {
+    /// the provider refused the key (a plan: its sign-in expired)
+    WrongKey,
+    /// the key works, the account can't pay (a plan: its limit)
+    NoCredit,
+    /// the provider doesn't know the model
+    Model,
+    /// the key may not use the model (a plan: plan use is off)
+    NoAccess,
+    /// no answer, or the provider's own trouble (`said`: the reason)
+    Unreachable,
+    /// the provider has no base URL, or a setting is wrong (`said`: what to set)
+    Config,
+    /// no key found nor given (the window asks for one)
+    NoKey,
+    #[serde(other)]
+    Unknown,
 }
 
 /// A folder found by `found_scan` that could be a project.

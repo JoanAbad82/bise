@@ -129,6 +129,7 @@ mod diffwire;
 mod computer_use;
 mod keybar;
 mod keycheck;
+mod firstkey;
 pub(crate) mod scan;
 mod onboarding;
 mod hints;

@@ -34,12 +34,20 @@ crate::words! { settings:
     onb_allowed = "✓ allowed";
     /// onboarding: a permission denied
     onb_denied = "denied";
-    /// onboarding: the model step's title
-    onb_model_title = "which model?";
-    /// onboarding: the model step's line
-    onb_model_sub = "your subscription is enough. you can change it per project.";
-    /// onboarding: the model step, not signed in
-    onb_model_help = "sign in to one of them to go on";
+    /// onboarding: the model step's line under "how do you want to pay for the models?"
+    onb_pay_sub = "a plan you already have, or a key. you can add more later in settings › models.";
+    /// onboarding: "it works", what the model answered to its one tiny call
+    onb_answered(answer) = "it said: “{answer}”";
+    /// onboarding: a check that failed, its button (the provider didn't answer, no network)
+    onb_try_again = "try again";
+    /// onboarding: a pasted key the provider refused, with its words (under the field)
+    onb_key_wrong(provider, said) = "{provider} says this key is wrong: “{said}”";
+    /// onboarding: the provider's own words under a failed check
+    onb_said(provider, said) = "{provider} said: “{said}”";
+    /// onboarding: a key found in his shell's environment, the pay list's row
+    onb_found_env(var) = "use the {var} from your shell";
+    /// onboarding: a key found in a file (auth.json, an old .env), the pay list's row
+    onb_found_file(path) = "use the key in {path}";
     /// onboarding: a folder he chose by hand
     onb_chosen = "chosen";
     /// onboarding: a found repo's age

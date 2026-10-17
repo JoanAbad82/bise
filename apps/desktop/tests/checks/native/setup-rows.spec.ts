@@ -42,11 +42,12 @@ test('setup/sign-in (S.2): a subscription signs in on his click; a key is sent o
     await expect(field, 'a password field').toHaveAttribute('type', 'password');
     await field.pressSequentially('sk-ant-wrong-0000');
     await field.press('Enter');
-    const sent = await core.waitCmd((c) => c.cmd === 'key_set', 1000);
-    expect(sent, 'the key goes to the core once, for that account').toMatchObject({ cmd: 'key_set', id: 'anthropic-key', key: 'sk-ant-wrong-0000' });
-    expect(core.cmds().filter((c) => c.cmd === 'key_set').length).toBe(1);
-    // the core refuses it, as it does for a 401 from the provider
-    await core.send({ ev: 'error', cmd: 'key_set', text: 'anthropic-key: the provider refused this key (401)' });
+    const sent = await core.waitCmd((c) => c.cmd === 'provider_use', 1000);
+    expect(sent, 'the key goes to the core once, for that account, to be checked live').toMatchObject({ cmd: 'provider_use', id: 'anthropic-key', key: 'sk-ant-wrong-0000' });
+    expect(core.cmds().filter((c) => c.cmd === 'provider_use').length).toBe(1);
+    // the live check refuses it, as the core does for a 401 from the provider
+    await core.send({ ev: 'provider_check', id: 'anthropic-key', name: 'Anthropic', state: 'checking', model: 'anthropic/claude-opus-5-5', pasted: true });
+    await core.send({ ev: 'provider_check', id: 'anthropic-key', name: 'Anthropic', state: 'failed', model: 'anthropic/claude-opus-5-5', pasted: true, why: 'wrong_key', said: 'invalid x-api-key' });
     await sleep(800);
     await page.screenshot({ path: test.info().outputPath('wrong-key.png') }); // the frame for the report
     const body = await text(s);

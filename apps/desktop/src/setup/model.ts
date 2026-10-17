@@ -3,8 +3,8 @@
 // steps, hello, permissions, model, projects, fn. Pure: which step, what
 // ⏎ does on each, what it sends. Owner: amb-home.
 //
-// The rules kept from the old window: the model step goes on only once he
-// is signed in somewhere (an agent with no model can't answer); the
+// The rules kept from the old window: the model step goes on only once a
+// provider's live check works (pay.ts: an agent with no model can't answer); the
 // projects step scans his folder when it comes up and adds the repos he
 // ticked (his recent ones come ticked: last commit under 30 days); the
 // last step, or skip, writes onboarded true (absent = a fresh home, the
@@ -72,6 +72,7 @@ export function allAllowed(p: Perms): boolean {
 }
 
 export interface Ctx {
+  /** the model step's check works (pay.ts ready) */
   signedIn: boolean;
   found: readonly Found[];
   now: number;

@@ -3,8 +3,13 @@
 // through it (store.command: the core's AppCmd). Owner: amb-home.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { JsonValue, Perm, ProjectRow } from '@/proto';
-import { useAccounts, useApprovals, useComputerUse, useCoreEvent, useFound, useKeychain, useModels, usePlugins, usePrefs, useProjects, useRoles, useSigning, useStore, type Ev } from '@/store';
-import type { KeyError } from './accounts';
+import { useAccounts, useApprovals, useComputerUse, useCoreEvent, useFound, useKeychain, useModels, usePlugins, usePrefs, useProjects, useRoles, useProviderCheck, useSigning, useStore, type Ev } from '@/store';
+
+/** the core's last refusal of a command (error {cmd, text}), counted so the same words twice count */
+export interface KeyError {
+  n: number;
+  text: string;
+}
 import { holdForSetup, useHeld } from './hold';
 import { useHeldSetup } from './setup-first';
 import { useRouter } from '@/app/router';
@@ -91,14 +96,6 @@ export function useDistUpdate(on: boolean): { readonly state: UpdateState; reado
 }
 
 /**
- * The core's refusals of a key (error {cmd: key_set, text}, bar S.2), counted: the key field shows
- * the one newer than its send. The store keeps no slice for them (a one-shot event).
- */
-export function useKeyError(): KeyError | null {
-  return useCmdError('key_set');
-}
-
-/**
  * The agents the expired ChatGPT sign-in stopped (bar V14): the `waiting` of the hub's one signin
  * card (Card.waiting), whichever project shows it. Read across every project's cards.
  */
@@ -141,7 +138,6 @@ export function useCmdError(cmd: string): KeyError | null {
 
 export function SettingsScreen({ page }: { page?: string | undefined }) {
   const store = useStore();
-  const keyError = useKeyError();
   const roleError = useCmdError('role_set');
   const accounts = useAccounts();
   const projects = useProjects();
@@ -201,7 +197,7 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
       plugins={usePlugins()}
       computerUse={useComputerUse()}
       perms={perms}
-      keyError={keyError}
+      check={useProviderCheck()}
       approvals={approvals}
       approvalsError={approvalsError}
       signin={{ waiting, signing }}

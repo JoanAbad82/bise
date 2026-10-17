@@ -415,7 +415,7 @@ function Models({ data, ports }: { data: SettingsData; ports: SettingsPorts }) {
       <Accounts
         accounts={data.accounts}
         send={ports.send}
-        keyError={data.keyError ?? null}
+        check={data.check ?? null}
         want={held !== null ? { provider: held.provider, providerName: held.providerName, model: held.model } : null}
         signin={data.signin ?? null}
         {...(ports.copy ? { copy: ports.copy } : {})}
