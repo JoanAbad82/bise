@@ -656,9 +656,8 @@ def list_filter(~f: Json -> Bool, +xs: List<&2, Json>) -> List<&2, Json>:
     case Nil{}:
       Nil{}
     case +h <> +t:
-      Bool.pick(List<&2, Json>, f(h),
-        h <> list_filter(~f, t),
-        list_filter(~f, t))
+      +rest = list_filter(~f, t)
+      Bool.pick(List<&2, Json>, f(h), h <> rest, rest)
 
 def arr_filter(~f: Json -> Bool, j: Json) -> Json:
   match j:

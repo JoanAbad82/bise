@@ -74,6 +74,10 @@ impl Shell {
         // msg-parts: his parts' JSON as the op carries it (proto_input),
         // never on a slash command
         let parts = v.get("parts").and_then(Value::as_str).filter(|_| !slash).unwrap_or_default().to_string();
+        // hub-tick: he talks to main: its own recycle waits (crate::recycle)
+        if self.hub.st.resolve(&focus).unwrap_or_else(|| MAIN.to_string()) == MAIN {
+            self.recycle.his_line_to_main(now_ms());
+        }
         self.step(Input::ClientInput { client, focus, text, queued, parts });
         self.fn_ctx = None;
     }

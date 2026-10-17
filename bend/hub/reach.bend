@@ -135,4 +135,5 @@ def replies_orphan(+s: M.St, xs: List<&2, WK.Watch>) -> List<&2, WK.Watch>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, WK.Watch>, WK.is_reply(h) && asked_gone(s, WK.reply_to_of(h)), h <> replies_orphan(s, t), replies_orphan(s, t))
+      +rest = replies_orphan(s, t)
+      Bool.pick(List<&2, WK.Watch>, WK.is_reply(h) && asked_gone(s, WK.reply_to_of(h)), h <> rest, rest)

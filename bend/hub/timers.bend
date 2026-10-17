@@ -288,7 +288,8 @@ def drop(xs: List<&2, Timer>, +id: Nat) -> List<&2, Timer>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Timer>, Nat.is_eq(Timer.id(h), id), drop(t, id), h <> drop(t, id))
+      +rest = drop(t, id)
+      Bool.pick(List<&2, Timer>, Nat.is_eq(Timer.id(h), id), rest, h <> rest)
 
 def fire_in(xs: List<&2, Timer>, +id: Nat, +fired: Nat, +next: Nat, +at: Nat, +undelivered: Bool) -> List<&2, Timer>:
   match xs:
@@ -326,7 +327,8 @@ def ids_in(xs: List<&2, Timer>, +ns: List<&2, String>) -> List<&2, Nat>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Nat>, str_in(ns, Timer.agent(h)), Timer.id(h) <> ids_in(t, ns), ids_in(t, ns))
+      +rest = ids_in(t, ns)
+      Bool.pick(List<&2, Nat>, str_in(ns, Timer.agent(h)), Timer.id(h) <> rest, rest)
 
 # ---- for the law stop_leaves_no_timer (bend/proofs/hub.bend) ----
 
@@ -343,7 +345,8 @@ def keep_out(xs: List<&2, Timer>, +ids: List<&2, Nat>) -> List<&2, Timer>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Timer>, nat_in(ids, Timer.id(h)), keep_out(t, ids), h <> keep_out(t, ids))
+      +rest = keep_out(t, ids)
+      Bool.pick(List<&2, Timer>, nat_in(ids, Timer.id(h)), rest, h <> rest)
 
 # every id of `xs` is in `ys`
 def all_in(xs: List<&2, Nat>, +ys: List<&2, Nat>) -> Bool:
@@ -400,7 +403,8 @@ def act_drop(xs: List<&2, Act>, +id: Nat) -> List<&2, Act>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Act>, Nat.is_eq(Act.id(h), id), act_drop(t, id), h <> act_drop(t, id))
+      +rest = act_drop(t, id)
+      Bool.pick(List<&2, Act>, Nat.is_eq(Act.id(h), id), rest, h <> rest)
 
 def act_find(xs: List<&2, Act>, +id: Nat) -> Maybe<&2, Act>:
   match xs:
@@ -427,7 +431,8 @@ def acts_due(xs: List<&2, Act>, +now: Nat) -> List<&2, Act>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Act>, Nat.is_le(Act.due(h), now), h <> acts_due(t, now), acts_due(t, now))
+      +rest = acts_due(t, now)
+      Bool.pick(List<&2, Act>, Nat.is_le(Act.due(h), now), h <> rest, rest)
 
 def what_json(w: What) -> J.Json:
   match w:

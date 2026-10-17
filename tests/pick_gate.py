@@ -11,15 +11,25 @@ Write the walk with a `match` on the condition (model.bend
 `map_agent.go`: the hit is a parameter, computed on the tail).
 
 The check: every `def` in bend/ whose body has a Bool.pick with a call to
-that same def in one branch and not the other. A filter (both branches
-call it on the tail) is not one: the runtime shares the call, measured
-linear (a 26-element filter in 0.06 s, issue 21). The ones left today are in
+that same def in one branch and not the other. The ones left today are in
 tests/pick_gate.list, `<file>:<def>`, a ratchet: a def not listed fails,
 a listed def that is gone (fixed, renamed, deleted) must leave the list in
 the same commit. The list only shrinks.
 
-    python3 tests/pick_gate.py          # check (the quick gate runs it)
-    python3 tests/pick_gate.py --list   # print what it finds, one per line
+The second check, with no list (hub-tick): a def that calls itself twice
+with the same arguments in one expression. Bend is strict and does not
+share the two calls: a filter written `Bool.pick(T, c, h <> f(t), f(t))`
+runs f on the tail twice at every element, 2^n calls for n elements
+(issue 21 read it as linear on a short list). reach.bend replies_orphan,
+run at every tick over the live watches, took 70 s with 14 of them and
+38 min with 23 on his hub (2026-10-17), 5 ms once computed once. It holds
+for every eager call, Bool.pick, `&&`, `||` or any def taking both as
+values; only pick_lazy's `u => ...` branches are lazy. Compute the call
+once (`+rest = f(t)`) or match on the condition.
+
+    python3 tests/pick_gate.py              # check (the quick gate runs it)
+    python3 tests/pick_gate.py --list       # print what it finds, one per line
+    python3 tests/pick_gate.py --self-test  # the doubled-call check on planted defs
 """
 import os
 import re
@@ -95,6 +105,115 @@ def walks(path):
     return found
 
 
+def logical_lines(body):
+    """A def body's lines, a statement split over lines (an open paren)
+    joined into one."""
+    out, cur, depth = [], "", 0
+    for line in body:
+        cur += " " + line.strip() if cur else line.strip()
+        depth += line.count("(") - line.count(")")
+        if depth <= 0:
+            out.append(cur)
+            cur, depth = "", 0
+    return out + ([cur] if cur else [])
+
+
+def self_calls(name, text):
+    """The argument text of each call of `name` in `text`."""
+    call = re.compile(r"(?<![\w.])" + re.escape(name) + r"\(")
+    for m in call.finditer(text):
+        j, depth = m.end(), 1
+        while j < len(text) and depth:
+            depth += {"(": 1, ")": -1}.get(text[j], 0)
+            j += 1
+        yield text[m.end():j - 1].replace(" ", "")
+
+
+def doubled_defs(lines):
+    """The defs of a .bend file's lines that call themselves twice with
+    the same arguments in one statement (pick_lazy's lazy branches aside)."""
+    found, name, body = [], None, []
+
+    def close():
+        if name is None:
+            return
+        for l in logical_lines(body):
+            if "pick_lazy(" in l:
+                continue
+            calls = list(self_calls(name, l))
+            if len(calls) != len(set(calls)):
+                found.append(name)
+                return
+
+    for line in lines:
+        m = DEF.match(line)
+        if m:
+            close()
+            name, body = m.group(1), []
+        elif line.strip() and not line[0].isspace():
+            # a law, a type, an import: the def's body ended
+            close()
+            name, body = None, []
+        elif name is not None:
+            body.append(code_of(line))
+    close()
+    return found
+
+
+def code_of(line):
+    """A line without its comment (a `#` outside a string literal)."""
+    quoted = False
+    for i, ch in enumerate(line):
+        if ch == '"' and (i == 0 or line[i - 1] != "\\"):
+            quoted = not quoted
+        elif ch == "#" and not quoted:
+            return line[:i] + "\n"
+    return line
+
+
+SELF_TEST = [
+    # (lines, the defs it must find)
+    ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      Bool.pick(L, c(h), h <> f(t), f(t))\n", ["f"]),
+    ("def g.go(xs: L) -> Nat:\n  match xs:\n    case Con{+h, +t}:\n      Bool.pick(Nat, c(h),\n        (1n + g.go(t) : Nat), g.go(t))\n", ["g.go"]),
+    ("def any(xs: L) -> Bool:\n  match xs:\n    case Con{+h, +t}:\n      any(t) || (c(h) && any(t))\n", ["any"]),
+    ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      +rest = f(t)\n      Bool.pick(L, c(h), h <> rest, rest)\n", []),
+    ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      pick_lazy(L, c(h), u => h <> f(t), u => f(t))\n", []),
+    ("def f(xs: L, ys: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      g(f(t, ys), f(ys, t))\n", []),
+    ("def f(xs: L) -> L:\n  match xs:\n    case Nil{}:\n      f2(t)\n    case Con{+h, +t}:\n      f(t)\n", []),
+    ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      g(h, \"#\", f(t))\n    case Nil{}:\n      f(t)\n", []),
+    ("def h(x: N) -> N:\n  x\n\nlaw h_twice:\n  {h(1n) == h(1n) : N}\n", []),
+]
+
+
+def self_test():
+    bad = 0
+    for text, want in SELF_TEST:
+        got = doubled_defs(text.splitlines(True))
+        if got != want:
+            print("FAIL pick_gate self-test: found %s, want %s in:\n%s" % (got, want, text))
+            bad += 1
+    if not bad:
+        print("ok   pick_gate self-test (%d planted defs)" % len(SELF_TEST))
+    return 1 if bad else 0
+
+
+def bend_files():
+    for d in DIRS:
+        for dirpath, dirnames, files in os.walk(os.path.join(ROOT, d)):
+            dirnames[:] = sorted(x for x in dirnames if not x.startswith("."))
+            for f in sorted(files):
+                if f.endswith(".bend"):
+                    yield os.path.join(dirpath, f)
+
+
+def doubled():
+    out = []
+    for p in bend_files():
+        with open(p, encoding="utf-8") as f:
+            out += ["%s:%s" % (os.path.relpath(p, ROOT), n) for n in doubled_defs(f)]
+    return out
+
+
 def scan():
     out = []
     for d in DIRS:
@@ -109,8 +228,16 @@ def scan():
 
 
 def main():
+    if "--self-test" in sys.argv:
+        return self_test()
     found = scan()
+    twice = doubled()
+    for d in twice:
+        print("FAIL pick_gate: %s calls itself twice with the same arguments in one expression: Bend computes both, "
+              "2^n calls on a list of n (Bool.pick, && and || take both values). Compute it once (+rest = f(t)) "
+              "or match on the condition; tests/pick_gate.py says why." % d)
     if "--list" in sys.argv:
+        found += ["%s (twice)" % d for d in twice]
         print("\n".join(found))
         return 0
     listed = [l.strip() for l in open(LIST, encoding="utf-8") if l.strip() and not l.startswith("#")]

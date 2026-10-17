@@ -8,6 +8,10 @@
 //! its kind and its agent or client) and its idle wait; a thread reads
 //! the mark once a second. The cadence is pure ([`say_at`]).
 //!
+//! A message with parts (a Tick) names its part as it goes
+//! ([`LoopWatch::phase`]): `hub loop busy 30 s on input Tick: sb-core`
+//! (hub-tick: a Tick sat 38 min in sb-core and the line said only Tick).
+//!
 //! What may still hold the loop: sb-core's line (`core::CoreLink::call`,
 //! strictly one request then one answer: sb-core reads the whole line
 //! before it writes, so the two pipes never fill at once), the git
@@ -80,6 +84,14 @@ impl LoopWatch {
         *m = Mark { what, since_ms: now_ms(), said: 0 };
     }
 
+    /// The message the loop runs is at `phase` now (hub-tick: a Tick's
+    /// parts): the busy lines name it, the spell keeps its start.
+    pub(super) fn phase(&self, phase: &str) {
+        let mut m = self.mark.lock().unwrap_or_else(|e| e.into_inner());
+        let base = m.what.split(": ").next().unwrap_or("").to_string();
+        m.what = format!("{}: {}", base, phase);
+    }
+
     /// The loop is done with it; a spell long enough to be said says its
     /// end too. The line to log, if any.
     pub(super) fn idle(&self) -> Option<String> {
@@ -145,5 +157,17 @@ mod tests {
         w.on("client line 3".into());
         w.mark.lock().unwrap().said = 1;
         assert!(w.idle().is_some_and(|l| l.starts_with("hub loop free after ") && l.ends_with(" on client line 3")));
+    }
+
+    /// hub-tick: a Tick's phases name the line, the spell keeps its start.
+    #[test]
+    fn a_phase_names_the_busy_line_and_keeps_the_spell() {
+        let w = LoopWatch::default();
+        w.on("input Tick".into());
+        let since = w.mark.lock().unwrap().since_ms;
+        w.phase("sb-core");
+        w.phase("wakes look");
+        let m = w.mark.lock().unwrap();
+        assert_eq!((m.what.as_str(), m.since_ms), ("input Tick: wakes look", since));
     }
 }

@@ -549,7 +549,8 @@ def legacy_cards(xs: List<&2, Card>) -> List<&2, Nat>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Nat>, user_kind(Card.kind(h)), legacy_cards(t), Card.id(h) <> legacy_cards(t))
+      +rest = legacy_cards(t)
+      Bool.pick(List<&2, Nat>, user_kind(Card.kind(h)), rest, Card.id(h) <> rest)
 
 # the open card that holds message `id` (an escalated question)
 def card_holding(xs: List<&2, Card>, +id: Nat) -> Maybe<&2, Nat>:

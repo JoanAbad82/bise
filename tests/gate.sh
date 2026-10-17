@@ -705,7 +705,9 @@ python3 "$root/tests/conflict_markers.py" >/dev/null || { python3 "$root/tests/c
 python3 "$root/tests/known_reds.py" --self-test >/dev/null || { python3 "$root/tests/known_reds.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # the full gate's test map knows every test and every top-level path (tests/test_map.py)
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
-# no new Bool.pick walk that never stops; the list of old ones only shrinks (tests/pick_gate.py)
+# no new Bool.pick walk that never stops; the list of old ones only shrinks; no
+# def that calls itself twice with the same arguments (2^n: hub-tick) (tests/pick_gate.py)
+python3 "$root/tests/pick_gate.py" --self-test >/dev/null || { python3 "$root/tests/pick_gate.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 python3 "$root/tests/pick_gate.py" || { echo "GATE quick FAILED"; exit 1; }
 # no changed source file over 1,000 lines or past its count in the shrink-only
 # tests/line_limits.txt (tests/line_gate.py, architecture-principles.md rule 5)

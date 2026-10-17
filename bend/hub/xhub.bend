@@ -125,7 +125,8 @@ def pendings(xs: List<&2, XH.Out>) -> List<&2, XH.Out>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, XH.Out>, is_pending(XH.Out.st(h)), h <> pendings(t), pendings(t))
+      +rest = pendings(t)
+      Bool.pick(List<&2, XH.Out>, is_pending(XH.Out.st(h)), h <> rest, rest)
 
 # the next try of a failed delivery: 1 s, 2 s, 4 s ... at most 60 s
 def backoff(+tries: Nat) -> Nat:

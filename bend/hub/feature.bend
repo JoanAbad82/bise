@@ -36,7 +36,8 @@ def unfeature.kvs(kvs: List<&2, Sigma<&2, &2, String, _ => J.Json>>) -> List<&2,
     case Nil{}:
       Nil{}
     case Tuple{+k, +v} <> +t:
-      Bool.pick(List<&2, Sigma<&2, &2, String, _ => J.Json>>, String.eq(k, "feature"), unfeature.kvs(t), Tuple{k, v} <> unfeature.kvs(t))
+      +rest = unfeature.kvs(t)
+      Bool.pick(List<&2, Sigma<&2, &2, String, _ => J.Json>>, String.eq(k, "feature"), rest, Tuple{k, v} <> rest)
 
 # the workspace after the retire: the same, without `feature`
 def unfeature(+ws: J.Json) -> J.Json:

@@ -79,7 +79,8 @@ def nat_del(xs: List<&2, Nat>, +n: Nat) -> List<&2, Nat>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Nat>, Nat.is_eq(h, n), nat_del(t, n), h <> nat_del(t, n))
+      +rest = nat_del(t, n)
+      Bool.pick(List<&2, Nat>, Nat.is_eq(h, n), rest, h <> rest)
 
 def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
   match xs:

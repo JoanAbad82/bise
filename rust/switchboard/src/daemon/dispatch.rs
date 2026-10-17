@@ -83,23 +83,35 @@ impl Shell {
                 let tick = matches!(i, Input::Tick);
                 if tick {
                     tick_queued.queued.store(false, Ordering::Release);
+                    self.loop_watch.phase("offsets");
                     self.flush_offsets();
+                    self.loop_watch.phase("sb-core");
                 }
                 self.step(i);
                 if tick {
+                    // each part named on a busy line (daemon/loop_watch.rs)
+                    let w = self.loop_watch.clone();
                     // the trunk's name and the features' facts, off the loop
                     if self.features.due(now_ms()) {
                         self.refresh_features();
                     }
+                    w.phase("page waits");
                     self.page_waits_check();
+                    w.phase("wakes look");
                     self.wakes_look();
+                    w.phase("starts");
                     self.check_starts(tick_queued.sent_ms.load(Ordering::Acquire));
+                    w.phase("plugins");
                     self.plugins_changed(false);
+                    w.phase("switches");
                     self.switch_idle_repls();
+                    w.phase("updates");
                     self.announce_update();
                     self.release_check(None);
                     self.plan_prs();
+                    w.phase("idle check");
                     self.idle_check();
+                    w.phase("computer use");
                     // computer use (design §7.3): each stop, one line in main's feed
                     for l in self.cu.poll() {
                         self.feed_rec(crate::model::MAIN, Feed::Computer(bise_proto::core::feed::Computer { text: l }));

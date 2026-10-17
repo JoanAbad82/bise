@@ -188,3 +188,8 @@ fn a_page_card_is_asked_by_the_first_live_agent() {
     let (got, _) = card(&mut t, &["lean-install"], "merge");
     assert_eq!(got, None, "no page card's kind");
 }
+
+/// hub-tick: a tick on a big history with many live watches (its own
+/// file: core.rs and core_tests.rs are at their line limits)
+#[path = "core_tick_tests.rs"]
+mod tick_tests;

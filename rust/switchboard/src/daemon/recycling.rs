@@ -16,6 +16,9 @@ use crate::recycle::{budget, Churn};
 pub(super) struct Recycle {
     churn: Churn,
     budget: u64,
+    /// when his last line to main came (ms; hub-tick: main's own recycle
+    /// waits [`crate::recycle::HIS_LINE_HOLD_MS`] after it)
+    his_main_ms: Option<u64>,
 }
 
 impl Recycle {
@@ -24,12 +27,17 @@ impl Recycle {
     }
 
     pub(super) fn with_budget(budget: u64) -> Recycle {
-        Recycle { churn: Churn::default(), budget }
+        Recycle { churn: Churn::default(), budget, his_main_ms: None }
     }
 
     /// `dir`'s REPL waits for its recycle.
     pub(super) fn is_due(&self, dir: &str) -> bool {
         self.churn.is_due(dir)
+    }
+
+    /// He wrote to main at `now_ms` (`Shell::step_input`).
+    pub(super) fn his_line_to_main(&mut self, now_ms: u64) {
+        self.his_main_ms = Some(now_ms);
     }
 }
 
@@ -49,10 +57,11 @@ impl Shell {
 
     /// Main's idle REPL at `dir` waits (crate::recycle::main_holds): its
     /// recycle is the hub's own (`explicit` false: no reload asked, same
-    /// binary) and a message is queued for main. `switch_idle_repls`
-    /// asks again at its next idle.
+    /// binary) and a message is queued for main or his last line to main
+    /// is recent. `switch_idle_repls` asks again at its next idle.
     pub(super) fn main_holds(&self, explicit: bool) -> bool {
-        crate::recycle::main_holds(explicit, crate::board::queued_count(&self.hub.st, crate::model::MAIN))
+        let since = self.recycle.his_main_ms.map(|t| crate::util::now_ms().saturating_sub(t));
+        crate::recycle::main_holds(explicit, crate::board::queued_count(&self.hub.st, crate::model::MAIN), since)
     }
 
     /// A new process of `dir` is connected (spawned, adopted, switched).

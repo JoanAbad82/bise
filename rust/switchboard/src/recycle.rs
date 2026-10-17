@@ -91,9 +91,16 @@ impl Churn {
 /// plugin, skill or key change) goes at main's next idle like any
 /// agent's. The 4.5 min main was down then was its wait for a start
 /// slot, which `repl_start::admit` removed (main never waits for one).
-pub fn main_holds(explicit: bool, queued: usize) -> bool {
-    !explicit && queued > 0
+/// hub-tick: it also holds while his last line to main is less than
+/// [`HIS_LINE_HOLD_MS`] old (`since_his_line_ms`, None: none since the
+/// hub started): main answered, went idle, and was recycled while he
+/// was still talking to it (2026-10-17 00:06, again later).
+pub fn main_holds(explicit: bool, queued: usize, since_his_line_ms: Option<u64>) -> bool {
+    !explicit && (queued > 0 || since_his_line_ms.is_some_and(|ms| ms < HIS_LINE_HOLD_MS))
 }
+
+/// How long after his last line to main its own recycle waits.
+pub const HIS_LINE_HOLD_MS: u64 = 10 * 60 * 1000;
 
 #[cfg(test)]
 mod main_holds_tests {
@@ -104,10 +111,22 @@ mod main_holds_tests {
     /// relaunched it while he talked to it.
     #[test]
     fn only_the_hubs_own_recycle_waits_and_only_for_a_queued_message() {
-        assert!(!main_holds(true, 0));
-        assert!(!main_holds(true, 1));
-        assert!(!main_holds(false, 0));
-        assert!(main_holds(false, 1));
+        assert!(!main_holds(true, 0, None));
+        assert!(!main_holds(true, 1, None));
+        assert!(!main_holds(false, 0, None));
+        assert!(main_holds(false, 1, None));
+    }
+
+    /// hub-tick: his line to main holds its own recycle 10 min; an
+    /// explicit relaunch beats the hold.
+    #[test]
+    fn his_recent_line_holds_mains_own_recycle_for_10_min() {
+        let min = 60 * 1000;
+        assert!(main_holds(false, 0, Some(9 * min)), "9 min old: held");
+        assert!(!main_holds(false, 0, Some(11 * min)), "11 min old: goes");
+        assert!(main_holds(false, 0, Some(0)), "just said: held");
+        assert!(!main_holds(true, 0, Some(0)), "explicit beats the hold");
+        assert!(!main_holds(true, 1, Some(9 * min)), "explicit beats both");
     }
 
     /// A due recycle with a message queued for main waits; the message
@@ -119,9 +138,9 @@ mod main_holds_tests {
         c.line("main", "  obs: usage: model=fake/claude-x in=3000000 out=10 cache_read=0 cache_write=0");
         assert!(c.idle("main", 1_000_000));
         let due = c.is_due("main");
-        assert!(due && main_holds(false, 1));
+        assert!(due && main_holds(false, 1, None));
         assert!(c.is_due("main"), "still due while it waits");
-        assert!(!main_holds(false, 0));
+        assert!(!main_holds(false, 0, None));
     }
 }
 

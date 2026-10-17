@@ -141,7 +141,8 @@ def drop(xs: List<&2, Watch>, +id: Nat) -> List<&2, Watch>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Watch>, Nat.is_eq(Watch.id(h), id), drop(t, id), h <> drop(t, id))
+      +rest = drop(t, id)
+      Bool.pick(List<&2, Watch>, Nat.is_eq(Watch.id(h), id), rest, h <> rest)
 
 def str_in(xs: List<&2, String>, +s: String) -> Bool:
   match xs:
@@ -299,8 +300,8 @@ def answered_of(xs: List<&2, Watch>, +to: String, +reply_to: Nat, +by: List<&2, 
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Nat>, answered(h, to, reply_to, by, user), Watch.id(h) <> answered_of(t, to, reply_to, by, user),
-        answered_of(t, to, reply_to, by, user))
+      +rest = answered_of(t, to, reply_to, by, user)
+      Bool.pick(List<&2, Nat>, answered(h, to, reply_to, by, user), Watch.id(h) <> rest, rest)
 
 # the reply watches of an agent (`ns`: its names): it moved on (done, failed)
 def replies_of(xs: List<&2, Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
@@ -308,7 +309,8 @@ def replies_of(xs: List<&2, Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Nat>, is_reply(h) && str_in(ns, Watch.agent(h)), Watch.id(h) <> replies_of(t, ns), replies_of(t, ns))
+      +rest = replies_of(t, ns)
+      Bool.pick(List<&2, Nat>, is_reply(h) && str_in(ns, Watch.agent(h)), Watch.id(h) <> rest, rest)
 
 # the words its agent hears when the asked agent is dropped
 def reply_gone_text(+x: Watch) -> String:
@@ -339,7 +341,8 @@ def due(xs: List<&2, Watch>, +now: Nat) -> List<&2, Watch>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Watch>, is_due(h, now), h <> due(t, now), due(t, now))
+      +rest = due(t, now)
+      Bool.pick(List<&2, Watch>, is_due(h, now), h <> rest, rest)
 
 # a tick with no watch past its max does nothing (idle-cpu)
 def any_due(xs: List<&2, Watch>, +now: Nat) -> Bool:
@@ -355,7 +358,8 @@ def ids_of(xs: List<&2, Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Nat>, str_in(ns, Watch.agent(h)), Watch.id(h) <> ids_of(t, ns), ids_of(t, ns))
+      +rest = ids_of(t, ns)
+      Bool.pick(List<&2, Nat>, str_in(ns, Watch.agent(h)), Watch.id(h) <> rest, rest)
 
 # ---- for the law wake_drop_ends (bend/proofs/hub.bend) ----
 
@@ -372,7 +376,8 @@ def keep_out(xs: List<&2, Watch>, +ids: List<&2, Nat>) -> List<&2, Watch>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Watch>, nat_in(ids, Watch.id(h)), keep_out(t, ids), h <> keep_out(t, ids))
+      +rest = keep_out(t, ids)
+      Bool.pick(List<&2, Watch>, nat_in(ids, Watch.id(h)), rest, h <> rest)
 
 # every id of `xs` is in `ys`
 def all_in(xs: List<&2, Nat>, +ys: List<&2, Nat>) -> Bool:

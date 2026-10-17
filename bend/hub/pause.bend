@@ -66,7 +66,8 @@ def held.go(xs: List<&2, M.MRec>) -> Nat:
     case Nil{}:
       0n
     case Con{+r, +t}:
-      Bool.pick(Nat, is_queued(M.MRec.st(r)), (1n + held.go(t) : Nat), held.go(t))
+      +rest = held.go(t)
+      Bool.pick(Nat, is_queued(M.MRec.st(r)), (1n + rest : Nat), rest)
 
 def held(+s: M.St) -> Nat:
   held.go(M.St.hot(s))
@@ -98,7 +99,8 @@ def his.go(xs: List<&2, M.MRec>) -> Nat:
     case Nil{}:
       0n
     case Con{+r, +t}:
-      Bool.pick(Nat, is_queued(M.MRec.st(r)) && Bool.not(String.eq(M.Msg.from(M.MRec.msg(r)), M.HUB())), (1n + his.go(t) : Nat), his.go(t))
+      +rest = his.go(t)
+      Bool.pick(Nat, is_queued(M.MRec.st(r)) && Bool.not(String.eq(M.Msg.from(M.MRec.msg(r)), M.HUB())), (1n + rest : Nat), rest)
 
 def his(+s: M.St) -> Nat:
   his.go(M.St.hot(s))
