@@ -4,13 +4,17 @@
 // pearl moves (bise works or listens: moods.ts MOVES), and stops once it has settled in any other
 // mood: at rest the pearl is one still frame, no loop (ambient-lead m_11707: battery, and his
 // 'clignote très bizarrement'); under reduced motion it is always still. A new mood, level or size
-// wakes the loop for as long as it needs. The drawing buffer is
+// wakes the loop for as long as it needs. Nobody looking (away.ts: the window hidden, or not in
+// front outside the capsule) there is no loop in any mood (bims-fix m_28756: two GPU helpers at
+// ~29% CPU for 55 min): hidden, nothing is drawn; seen but not in front, a wake draws the mood's
+// still frame once (moods.ts settle). Back, it picks up from the frame he last saw, no jump. The drawing buffer is
 // square, sized only when the element's size changes (a ResizeObserver), never per frame: a resize
 // clears the buffer, and a cleared frame is a flicker. No CSS transform ever lands on the canvas
 // (a scaled WebGL canvas showed as a thin sliver in round 9); the size is the `size` prop and the
 // shader's zoom. The background stays transparent: the pearl floats free (lead m_6479, L1).
 import { memo, useEffect, useRef, type JSX } from 'react';
-import { ease, moves, settled, start, type Mood, type PearlState } from './moods';
+import { awayNow, watchAway } from './away';
+import { ease, moves, settle, settled, start, type Mood, type PearlState } from './moods';
 import { ARM, EYE_R, EYES, markStroke, STAR } from '../shared/mark';
 import { FRAGMENT, markFragment, PINK, VERTEX } from './shader';
 
@@ -122,6 +126,8 @@ export const LivePearl = memo(function LivePearl(props: LivePearlProps): JSX.Ele
     themed.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
     let s: PearlState = start(Math.random() * 40);
     let last: number | null = null;
+    // the first frame's step: 1 s at the start (it settles at once), 0 after an away (the frame he last saw)
+    let firstDt = 1;
     let raf = 0;
     let helloAt: number | null = null;
 
@@ -138,12 +144,19 @@ export const LivePearl = memo(function LivePearl(props: LivePearlProps): JSX.Ele
       raf = 0;
       const p = live.current;
       const t = now / 1000;
-      const dt = last === null ? 1 : Math.max(0, t - last);
+      const dt = last === null ? firstDt : Math.max(0, t - last);
       last = t;
       const reduce = p.still === true;
       const level = p.level ?? 0;
-      s = ease(s, p.mood, level, dt, reduce);
-      if (p.hello === true && helloAt === null) helloAt = now;
+      // seen but not in front (a wake: a new mood, size or theme): the mood's still frame, no loop;
+      // the hello waits for him
+      const off = awayNow();
+      s = off ? settle(s, p.mood, reduce) : ease(s, p.mood, level, dt, reduce);
+      if (off) {
+        last = null;
+        firstDt = 0;
+      }
+      if (p.hello === true && helloAt === null && !off) helloAt = now;
       const gather = helloAt === null || reduce ? 0 : Math.max(0, 1 - (now - helloAt) / HELLO_MS);
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       gl.uniform2f(u.res, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -162,20 +175,36 @@ export const LivePearl = memo(function LivePearl(props: LivePearlProps): JSX.Ele
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       const calm = !moves(p.mood, reduce) && settled(s, p.mood, reduce) && gather === 0;
-      if (!calm) raf = requestAnimationFrame(frame);
+      if (!calm && !off) raf = requestAnimationFrame(frame);
     };
 
+    // hidden, nothing; seen but not in front, one still frame (frame's `off`)
     wake.current = () => {
-      if (raf === 0) raf = requestAnimationFrame(frame);
+      if (raf === 0 && !document.hidden) raf = requestAnimationFrame(frame);
     };
+    // the window hidden, shown, in front or not: the loop stops; then a wake decides again (the
+    // loop, one still frame, or nothing). The time away is not eased through: back, the first
+    // frame is the one he last saw.
+    const unwatch = watchAway(() => {
+      if (awayNow()) {
+        if (raf !== 0) cancelAnimationFrame(raf);
+        raf = 0;
+        if (last !== null) {
+          last = null;
+          firstDt = 0;
+        }
+      }
+      wake.current();
+    });
     fit();
     const ro = new ResizeObserver(() => {
       fit();
       wake.current();
     });
     ro.observe(cv);
-    raf = requestAnimationFrame(frame);
+    wake.current();
     return () => {
+      unwatch();
       ro.disconnect();
       themed.disconnect();
       scheme.removeEventListener('change', retint);

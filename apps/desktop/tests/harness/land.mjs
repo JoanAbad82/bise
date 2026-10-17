@@ -81,6 +81,8 @@ export const LAND = [
   // les bims: the list never loads three, a still office draws nothing (~8 fps typing, 0 hidden),
   // WebGL lost shows the list under its line (bims-qa; the sizes and labels: checks/bims/office)
   'checks/bims/budget.spec.ts',
+  // the live pearl draws at the display's rate seen, 0 frames blurred or hidden (pearl-idle, bims-fix m_28756)
+  'checks/pearl/idle.spec.ts',
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));

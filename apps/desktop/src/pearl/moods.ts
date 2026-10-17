@@ -71,6 +71,14 @@ export function ease(s: PearlState, mood: Mood, level: number, dt: number, reduc
   return n;
 }
 
+/**
+ * The mood's still frame, for a window he sees but is not in front (LivePearl's one frame there):
+ * every value on its target, the smoke and its clock where they were (no jump when he comes back).
+ */
+export function settle(s: PearlState, mood: Mood, reduce: boolean): PearlState {
+  return { ...s, ...target(mood, reduce), flow: s.flow, clock: s.clock };
+}
+
 /** Every value at its target: in a mood that does not move, nothing is left to draw. */
 export function settled(s: PearlState, mood: Mood, reduce: boolean): boolean {
   const m = target(mood, reduce);

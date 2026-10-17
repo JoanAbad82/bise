@@ -1,6 +1,6 @@
 // The pearl's easing: no jump between moods (bug 2), stillness under reduced motion.
 import { describe, expect, it } from 'vitest';
-import { ease, moves, settled, start, type PearlState } from './moods';
+import { ease, moves, settle, settled, start, type PearlState } from './moods';
 
 const run = (s0: PearlState, mood: Parameters<typeof ease>[1], ms: number, reduce = false, level = 0): PearlState[] => {
   const out: PearlState[] = [];
@@ -63,5 +63,15 @@ describe('the pearl', () => {
     expect(settled(last, 'work', true)).toBe(true);
     const f = last.flow;
     expect(ease(last, 'work', 1, 0.0167, true).flow - f).toBeLessThan(1e-4);
+  });
+});
+
+describe("the pearl's still frame (a window seen but not in front)", () => {
+  it('lands on the mood with the smoke and clock where they were', () => {
+    const s0 = run(start(3), 'work', 1000).at(-1) ?? start(3);
+    const s = settle(s0, 'need', false);
+    expect(settled(s, 'need', false)).toBe(true);
+    expect(s.flow).toBe(s0.flow);
+    expect(s.clock).toBe(s0.clock);
   });
 });
