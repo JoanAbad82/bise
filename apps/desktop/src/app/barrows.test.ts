@@ -28,8 +28,13 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
     ]);
     expect(agentRows(list, NOW, false, true, { numbers: nums }).map((r) => r.glyph)).toEqual(['⌥0', '⌥1', '⌥2']);
   });
-  it("bise's thread: no main row (it is that thread); an archived main none either", () => {
-    expect(agentRows([ag('main', { main: true }), ag('perf')], NOW, true).map((r) => r.name)).toEqual(['perf']);
+  it("bise's thread: bise's own main first (the home project's), its doing line; no other project's main; an archived main none", () => {
+    const home = (n: string, over: Partial<Agent> = {}): ProjAgent => ({ ...ag(n, over), project: 'home', projectName: 'bise' });
+    const list = [ag('main', { main: true }), ag('perf'), home('main', { main: true, title: 'routing his asks' })];
+    expect(agentRows(list, NOW, true, false, { home: 'home' }).map((r) => [r.name, r.sub, r.testId])).toEqual([
+      ['bise', 'routing his asks', 'app.right.agent.home.main'],
+      ['perf', 'storefront', 'app.right.agent.shop.perf'],
+    ]);
     expect(agentRows([ag('main', { main: true, archived: true }), ag('perf')], NOW, false).map((r) => r.name)).toEqual(['perf']);
   });
   it("bise's thread: the project's name in place of the role; ⌥ held: ⌥1-⌥9", () => {

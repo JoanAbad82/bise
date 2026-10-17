@@ -1,13 +1,16 @@
 // bims/hover · his seven asks of 2026-10 on les bims (task bims-hover), on FakeCore rows from
 // src/bims/fixtures.ts, off screen. Passes when:
-//   (a) a fresh window shows the list alone (the office closed: an easter egg), the title bar's
-//       bims icon not pressed; the icon opens it (the fold grows empty, then the scene fades in,
+//   (a) a fresh window shows the list alone (the office closed: an easter egg), the AGENTS head's
+//       cube not pressed; the cube opens it (the fold grows empty, then the scene fades in,
 //       all under 800 ms: a frame strip) and closes it again;
 //   (b) hovering an AGENTS row rings its bim at once and shows its card after the tip's delay;
 //       hovering a bim tints its row;
 //   (c) an agent's thread open: the office zooms on its bim (follow), a '?' out of the frame stays
 //       at the edge with its arrow; main's thread: the whole office again;
-//   (d) the deck chairs and the done bim on one, the sleepers' z's, light and dark.
+//   (d) the deck chairs and the done bim on one, the sleepers' z's, light and dark;
+//   (e)(f) the cube and 'the bims' in the AGENTS head left of 'all ›' (none in the title bar),
+//       closed, hovered, open at 320 and wide; (f2) at rest it blinks and hops, once each, then
+//       nothing runs; never open, hidden or under reduced motion; (f3) the hop's strip for bims.
 // Shots: .harness-cache/bims-shots (index.html), for bims and designer to sign. Owner: bims-hover.
 import { test, expect } from '../../harness';
 import type { Session } from '../../harness';
@@ -19,16 +22,17 @@ import { PNG } from 'pngjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { FakeCore } from '../../harness';
-import { P, SHOTS, headOf, open, settle, shotOf, sleep, writeIndex, type Shot } from './world';
+import { P, SHOTS, headOf, open, setHidden, settle, shotOf, sleep, writeIndex, type Shot } from './world';
 
 type Frame = Awaited<ReturnType<Recorder['stop']>>[number];
 /** n frames spread over the film, first and last included */
 const strip = (fr: readonly Frame[], n: number): Frame[] =>
   fr.length <= n ? [...fr] : Array.from({ length: n }, (_, i) => fr[Math.round((i * (fr.length - 1)) / (n - 1))]).filter((f): f is Frame => f !== undefined);
-function cropTo(f: Frame, box: Box, file: string): void {
+/** `below`: px past the box's bottom (the office grows under AGENTS' head) */
+function cropTo(f: Frame, box: Box, file: string, below = 320): void {
   const sc = f.scale;
   const x0 = Math.round(box.x * sc), y0 = Math.round(box.y * sc);
-  const w = Math.min(Math.round(box.width * sc), f.png.width - x0), h = Math.min(Math.round(box.height * sc) + Math.round(320 * sc), f.png.height - y0);
+  const w = Math.min(Math.round(box.width * sc), f.png.width - x0), h = Math.min(Math.round(box.height * sc) + Math.round(below * sc), f.png.height - y0);
   const out = new PNG({ width: w, height: h });
   PNG.bitblt(f.png, out, x0, y0, w, h, 0, 0);
   mkdirSync(SHOTS, { recursive: true });
@@ -67,14 +71,14 @@ async function grown(s: Session, core: FakeCore): Promise<void> {
 /** the office's camera zoom (window.__biseBims has none: read it from the '⤢ fit' button's presence) */
 const zoomed = async (s: Session): Promise<boolean> => (await s.page.getByTestId('app.right.bims').getAttribute('data-zoomed')) !== null;
 
-test('(a) closed by default; the title icon opens and closes the office, the open under 800 ms', async () => {
+test("(a) closed by default; the AGENTS head's cube opens and closes the office, the open under 800 ms", async () => {
   const { s } = await open(office, { width: 1600 });
   try {
     await expect(s.page.getByTestId('app.right.bims')).toHaveCount(0);
-    const icon = s.page.getByTestId('app.title.bims');
+    const icon = s.page.getByTestId('app.right.agents.bims');
     await expect(icon).toHaveAttribute('aria-pressed', 'false');
-    await expect(icon).toHaveAttribute('aria-label', bims.title_bims_tip);
-    await shot(s, 'hover-a-closed.png', 'a fresh window: the office closed', "the title bar's bims icon (the little house) beside the right bar's toggle, not pressed; AGENTS shows its rows", 'app.title');
+    await expect(icon).toHaveText(bims.cube_label);
+    await shot(s, 'hover-a-closed.png', 'a fresh window: the office closed', "the AGENTS head's cube and 'the bims' left of 'all ›', not pressed; AGENTS shows its rows", 'app.right.agents');
     // the chunk once, so the timing below is the open's own (the first open loads three)
     await icon.click();
     await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
@@ -121,7 +125,7 @@ test('(a) closed by default; the title icon opens and closes the office, the ope
 test('(b) a row hovered rings its bim and shows its card; a bim hovered tints its row', async () => {
   const { s } = await open(office, { width: 1600 });
   try {
-    await s.page.getByTestId('app.title.bims').click();
+    await s.page.getByTestId('app.right.agents.bims').click();
     await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
     await settle(s, 800, 6000);
     const row = s.page.getByTestId('app.right.agent.signup-perf');
@@ -145,7 +149,7 @@ test('(b) a row hovered rings its bim and shows its card; a bim hovered tints it
 test('(c) an agent opened: the office follows its bim; a pill out of frame stays at the edge; main: the whole office', async () => {
   const { s, core } = await open(office, { width: 1600 });
   try {
-    await s.page.getByTestId('app.title.bims').click();
+    await s.page.getByTestId('app.right.agents.bims').click();
     await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
     await grown(s, core);
     await settle(s, 800, 6000);
@@ -173,7 +177,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`(d) deck chairs and z's, ${theme}`, async () => {
     const { s, core } = await open(office, { theme, width: 1600 });
     try {
-      await s.page.getByTestId('app.title.bims').click();
+      await s.page.getByTestId('app.right.agents.bims').click();
       await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
       await grown(s, core);
       await settle(s, 800, 8000);
@@ -197,29 +201,40 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-// (e) the title bar's icon for designer (m_28198): closed, open, hovered; light and dark; 1100 and 800
+/** the AGENTS head alone (its line, 44 px): what designer signs of the cube and its label */
+async function headShot(s: Session, file: string, title: string, says: string): Promise<void> {
+  const box = await s.page.getByTestId('app.right.agents').boundingBox();
+  if (box === null) throw new Error(`no AGENTS for ${file}`);
+  await shotOf(s.cdp, s.page, { ...box, height: 44 }, file);
+  shots.push({ file, title, says });
+}
+
+// (e) the AGENTS head's cube and 'the bims' (his ask, main m_28901), for designer: closed, hovered,
+// open at 320 and wide; light and dark
 for (const theme of ['light', 'dark'] as const) {
-  for (const width of [1100, 800] as const) {
-    test(`(e) the title icon, ${theme}, ${String(width)}`, async () => {
-      const { s } = await open(office, { theme, width });
-      try {
-        const icon = s.page.getByTestId('app.title.bims');
-        const tag = `${theme}-${String(width)}`;
-        await s.page.mouse.move(5, 400);
-        await shot(s, `hover-e-closed-${tag}.png`, `the icon closed, ${theme}, ${String(width)} px`, 'a 16 px cube, text-3, just left of the right bar toggle', 'app.title');
-        await icon.click();
+  test(`(e) the head's cube, closed, hovered, open at 320 and wide, ${theme}`, async () => {
+    const { s } = await open(office, { theme, width: 1600 });
+    try {
+      const icon = s.page.getByTestId('app.right.agents.bims');
+      await s.page.mouse.move(5, 400);
+      await headShot(s, `hover-e-closed-${theme}.png`, `the cube closed, ${theme}`, "'AGENTS · 15' … the pink cube and 'the bims', then 'all ›'");
+      await icon.hover();
+      await sleep(700);
+      await headShot(s, `hover-e-hover-${theme}.png`, `the cube hovered, ${theme}`, `the hover tint behind cube and label, still pink; its tip '${bims.cube_open_tip}'`);
+      for (const wide of [false, true]) {
+        const w = wide ? 'wide' : '320';
+        if ((await icon.getAttribute('aria-pressed')) !== 'true') await icon.click();
         await expect(icon).toHaveAttribute('aria-pressed', 'true');
         await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
+        await s.page.getByTestId(wide ? 'app.right.agents.width.wide' : 'app.right.agents.width.narrow').click();
+        await sleep(400);
         await s.page.mouse.move(5, 400);
-        await shot(s, `hover-e-open-${tag}.png`, `the icon open, ${theme}, ${String(width)} px`, 'pressed in ink like the right bar toggle (never pink); the office above the rows', 'app.title');
-        await icon.hover();
-        await sleep(700);
-        await shot(s, `hover-e-hover-${tag}.png`, `the icon hovered, ${theme}, ${String(width)} px`, `ink, and its tip '${bims.title_bims_tip}'`, 'app.title');
-      } finally {
-        await s.close();
+        await headShot(s, `hover-e-open-${w}-${theme}.png`, `the office open, ${w}, ${theme}`, "'320 wide', then the cube pressed (the hover tint stays), then 'all ›'");
       }
-    });
-  }
+    } finally {
+      await s.close();
+    }
+  });
 }
 
 // ---- bims-fix (his two asks, main m_28300) ----------------------------------------------------
@@ -240,45 +255,157 @@ async function onTop(s: Session, id: string): Promise<boolean> {
   }, id);
 }
 
-// (f) the cube in his window state (the right bar open, a 1280 px window) and the AGENTS head's 'hide'
-for (const theme of ['light', 'dark'] as const) {
-  test(`(f) the cube in his window, and 'hide' in the AGENTS head at 320 and wide, ${theme}`, async () => {
-    const { s } = await open(office, { theme, width: 1280 });
-    try {
-      const icon = s.page.getByTestId('app.title.bims');
-      await expect(s.page.getByTestId('app.panel')).toBeVisible();
-      expect(await onTop(s, 'app.title.bims'), 'the cube shown, on top, inside the window').toBe(true);
-      // the cube left of the right bar's toggle, on its line
+// (f) the cube in his window state (the right bar open, a 1280 px window): in the AGENTS head, left
+// of 'all ›' on its line, the title bar has none; it opens and closes the office at 320 and wide
+test("(f) the cube in his window: in the AGENTS head left of 'all ›', none in the title bar; it opens and closes", async () => {
+  const { s } = await open(office, { width: 1280 });
+  try {
+    const icon = s.page.getByTestId('app.right.agents.bims');
+    await expect(s.page.getByTestId('app.panel')).toBeVisible();
+    // the title bar's cube is gone (moved, not copied)
+    await expect(s.page.getByTestId('app.title').locator('svg mask circle')).toHaveCount(0);
+    expect(await onTop(s, 'app.right.agents.bims'), 'the cube shown, on top, inside the window').toBe(true);
+    const all = s.page.getByTestId('app.right.agents.all');
+    for (const wide of [false, true]) {
+      const w = wide ? 'wide' : '320';
+      // left of 'all ›', on its line, apart from it
       const cb = await icon.boundingBox();
-      const pb = await s.page.getByTestId('app.title.panel').boundingBox();
-      if (cb === null || pb === null) throw new Error('no cube or no right bar toggle');
-      expect(cb.x + cb.width).toBeLessThanOrEqual(pb.x + 1);
-      expect(Math.abs(cb.y + cb.height / 2 - (pb.y + pb.height / 2))).toBeLessThan(2);
-      await expect(s.page.getByTestId('app.right.agents.hide')).toHaveCount(0);
+      const ab = await all.boundingBox();
+      if (cb === null || ab === null) throw new Error("no cube or no 'all ›'");
+      expect(cb.x + cb.width, `the cube before 'all ›' (${w})`).toBeLessThan(ab.x);
+      expect(Math.abs(cb.y + cb.height / 2 - (ab.y + ab.height / 2))).toBeLessThan(2);
+      if ((await icon.getAttribute('aria-pressed')) !== 'true') await icon.click();
+      await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
+      await s.page.getByTestId(wide ? 'app.right.agents.width.wide' : 'app.right.agents.width.narrow').click();
+      await sleep(400);
+      expect(await onTop(s, 'app.right.agents.bims'), `the cube on top at ${w}`).toBe(true);
+      // the width switch before the cube
+      const sw = await s.page.getByTestId('app.right.agents.width').boundingBox();
+      const cb2 = await icon.boundingBox();
+      if (sw === null || cb2 === null) throw new Error('no switch or no cube');
+      expect(sw.x + sw.width).toBeLessThanOrEqual(cb2.x);
+      await icon.click();
+      await expect(s.page.getByTestId('app.right.bims.fold')).toHaveCount(0, { timeout: 2000 });
+      await expect(icon).toHaveAttribute('aria-pressed', 'false');
+      await expect(s.page.getByTestId('app.right.agents.width')).toHaveCount(0);
+      await expect(s.page.getByTestId('app.panel')).toBeVisible();
+    }
+    // short room (designer m_28987): the label goes whole, never a clipped 'the bi'; the cube stays
+    const label = icon.locator('.bims-cube-label');
+    for (const px of [300, 240, 200, 180, 160, 140]) {
+      await s.page.getByTestId('app.right.agents').evaluate((el, w) => { (el as HTMLElement).style.width = `${String(w)}px`; }, px);
+      await sleep(50);
+      const [bb, lb, gb] = await Promise.all([icon.boundingBox(), label.boundingBox(), icon.locator('svg').boundingBox()]);
+      if (bb === null || lb === null || gb === null) throw new Error('no cube, label or glyph');
+      const whole = lb.x >= bb.x - 0.5 && lb.x + lb.width <= bb.x + bb.width + 0.5 && lb.y >= bb.y - 0.5 && lb.y + lb.height <= bb.y + bb.height + 0.5;
+      const gone = lb.y >= bb.y + bb.height - 0.5;
+      expect(whole || gone, `at ${String(px)} px the label is whole or gone (button ${JSON.stringify(bb)}, label ${JSON.stringify(lb)})`).toBe(true);
+      expect(gb.x >= bb.x - 0.5 && gb.x + gb.width <= bb.x + bb.width + 0.5, `at ${String(px)} px the cube stays whole`).toBe(true);
+    }
+  } finally {
+    await s.close();
+  }
+});
+
+/** what the cube does now ('blink', 'hop', none) and the window's animations on it */
+const cubeNow = (s: Session): Promise<{ move: string | null; anims: number }> =>
+  s.page.evaluate(() => {
+    const el = document.querySelector('[data-testid="app.right.agents.bims"]');
+    return { move: el?.getAttribute('data-move') ?? null, anims: el === null ? 0 : el.getAnimations({ subtree: true }).length };
+  });
+
+// (f2) the cube lives at rest (his ask, main m_28901): a blink, a hop, each once, then still; none
+// open, hidden, or under reduced motion. Paced for the check (__biseCubePace), 2-3 min in his app
+/** every move the cube starts from now, with the animations it runs then (recorded in the page: a hop lasts 900 ms) */
+const recordMoves = (s: Session): Promise<void> =>
+  s.page.evaluate(() => {
+    const el = document.querySelector('[data-testid="app.right.agents.bims"]');
+    const w = window as unknown as { __cubeMoves?: { move: string; anims: number }[] };
+    w.__cubeMoves = [];
+    if (el === null) return;
+    new MutationObserver(() => {
+      const move = el.getAttribute('data-move');
+      if (move !== null) w.__cubeMoves?.push({ move, anims: el.getAnimations({ subtree: true }).length });
+    }).observe(el, { attributes: true, attributeFilter: ['data-move'] });
+  });
+const movesSeen = (s: Session): Promise<{ move: string; anims: number }[]> =>
+  s.page.evaluate(() => (window as unknown as { __cubeMoves?: { move: string; anims: number }[] }).__cubeMoves ?? []);
+
+test('(f2) the cube blinks and hops at rest, once each, never open, hidden or with reduced motion', async () => {
+  const { s } = await open(office, { width: 1600 });
+  try {
+    await s.page.evaluate(() => { (window as unknown as { __biseCubePace?: unknown }).__biseCubePace = { blink: 600, hop: 1500 }; });
+    await recordMoves(s);
+    // the pace is read when the timers start: a hover and a leave start them again
+    const icon = s.page.getByTestId('app.right.agents.bims');
+    await icon.hover();
+    await s.page.mouse.move(5, 400);
+    await expect.poll(async () => (await movesSeen(s)).map((m) => m.move), { timeout: 4000 }).toEqual(expect.arrayContaining(['blink', 'hop']));
+    const seen = await movesSeen(s);
+    expect(seen.find((m) => m.move === 'blink')?.anims, 'a blink: the two eyes').toBe(2);
+    expect(seen.find((m) => m.move === 'hop')?.anims, 'a hop: the cube once').toBe(1);
+    // between moves, nothing runs
+    await expect.poll(async () => cubeNow(s), { timeout: 3000 }).toEqual({ move: null, anims: 0 });
+    // hidden: no move for 3 s
+    await setHidden(s.page, true);
+    for (let i = 0; i < 12; i++) {
+      await sleep(250);
+      expect(await cubeNow(s)).toEqual({ move: null, anims: 0 });
+    }
+    await recordMoves(s);
+    await setHidden(s.page, false);
+    await expect.poll(async () => (await movesSeen(s)).length, { timeout: 3000 }).toBeGreaterThan(0);
+    // open: still
+    await icon.click();
+    await expect(icon).toHaveAttribute('aria-pressed', 'true');
+    for (let i = 0; i < 12; i++) {
+      await sleep(250);
+      expect((await cubeNow(s)).move).toBeNull();
+    }
+    await icon.click();
+    // reduced motion: still (a hover and a leave start it again)
+    await s.page.emulateMedia({ reducedMotion: 'reduce' });
+    await icon.hover();
+    await s.page.mouse.move(5, 400);
+    for (let i = 0; i < 12; i++) {
+      await sleep(250);
+      expect(await cubeNow(s)).toEqual({ move: null, anims: 0 });
+    }
+  } finally {
+    await s.close();
+  }
+});
+
+// (f3) the hop, filmed for bims to sign: a strip of its frames, light and dark
+for (const theme of ['light', 'dark'] as const) {
+  test(`(f3) the hop and the blink, a strip, ${theme}`, async () => {
+    const { s } = await open(office, { theme, width: 1600 });
+    try {
+      await s.page.evaluate(() => { (window as unknown as { __biseCubePace?: unknown }).__biseCubePace = { blink: 60_000, hop: 1200 }; });
+      const icon = s.page.getByTestId('app.right.agents.bims');
+      await icon.hover();
       await s.page.mouse.move(5, 400);
-      await shot(s, `fix-f-cube-${theme}.png`, `his window (1280, the right bar open), ${theme}: the cube`, "the 16 px cube just left of the right bar's toggle; closed, AGENTS shows no 'hide'", 'app.title');
-      for (const wide of [false, true]) {
-        const w = wide ? 'wide' : '320';
-        await icon.click();
-        await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
-        await s.page.getByTestId(wide ? 'app.right.agents.width.wide' : 'app.right.agents.width.narrow').click();
-        await sleep(400);
-        const hide = s.page.getByTestId('app.right.agents.hide');
-        await expect(hide).toBeVisible();
-        expect(await onTop(s, 'app.right.agents.hide'), `'hide' shown and on top at ${w}`).toBe(true);
-        await expect(hide).toHaveText(bims.hide);
-        await settle(s, 800, 6000);
-        await s.page.mouse.move(5, 400);
-        await shot(s, `fix-f-hide-${w}-${theme}.png`, `the office open at ${w}, ${theme}`, "'320  wide · hide  all ›' in the AGENTS head: 'hide' in the switch's look, text-3, never pink", 'app.right.agents');
-        await hide.hover();
-        await sleep(700);
-        await shot(s, `fix-f-hide-hover-${w}-${theme}.png`, `'hide' hovered at ${w}, ${theme}`, `ink, the hover tint, its tip '${bims.hide_tip}'`, 'app.right.agents');
-        await hide.click();
-        await expect(s.page.getByTestId('app.right.bims.fold')).toHaveCount(0, { timeout: 2000 });
-        await expect(icon).toHaveAttribute('aria-pressed', 'false');
-        await expect(hide).toHaveCount(0);
-        await expect(s.page.getByTestId('app.panel')).toBeVisible();
+      const box = await icon.boundingBox();
+      if (box === null) throw new Error('no cube');
+      const rec = new Recorder(s.cdp, s.page);
+      await rec.start();
+      await expect.poll(async () => (await cubeNow(s)).move, { timeout: 3000 }).toBe('hop');
+      await sleep(1100);
+      const frames = await rec.stop();
+      // room above for the 5 px hop, the whole button below
+      const pad = { x: box.x - 8, y: box.y - 10, width: box.width + 16, height: box.height + 16 };
+      for (const [i, f] of strip(frames.slice(-40), 10).entries()) {
+        const file = `cube-hop-${theme}-${String(i)}.png`;
+        cropTo(f, pad, file, 0);
+        shots.push({ file, title: `the hop, ${theme}, frame ${String(i)}`, says: 'up 5 px, down, squashed as it lands, one small bounce; 900 ms' });
       }
+      await s.page.evaluate(() => { (window as unknown as { __biseCubePace?: unknown }).__biseCubePace = { blink: 600, hop: 60_000 }; });
+      await icon.hover();
+      await s.page.mouse.move(5, 400);
+      await expect.poll(async () => (await cubeNow(s)).move, { timeout: 3000 }).toBe('blink');
+      await sleep(100);
+      await shotOf(s.cdp, s.page, pad, `cube-blink-${theme}.png`);
+      shots.push({ file: `cube-blink-${theme}.png`, title: `a blink, ${theme}`, says: 'the eyes shut, 220 ms' });
     } finally {
       await s.close();
     }
@@ -291,7 +418,7 @@ for (const wide of [false, true]) {
   test(`(g) the follow camera close, ${w}`, async () => {
     const { s, core } = await open(office, { width: 1600 });
     try {
-      await s.page.getByTestId('app.title.bims').click();
+      await s.page.getByTestId('app.right.agents.bims').click();
       await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
       if (wide) await s.page.getByTestId('app.right.agents.width.wide').click();
       await grown(s, core);
@@ -338,7 +465,7 @@ for (const [stage, jobs] of [[0, 0], [3, 6]] as const) {
     const g = { jobs_done: jobs, days_used: 1, artifacts_made: 0 };
     const { s, core } = await open(NAPPERS, { width: 1600, growth: g });
     try {
-      await s.page.getByTestId('app.title.bims').click();
+      await s.page.getByTestId('app.right.agents.bims').click();
       await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
       // the check's growth, then the hub's event (as grow.spec): the office draws this stage
       await s.page.evaluate((x) => { (window as unknown as { __biseGrow?: unknown }).__biseGrow = x; }, g);

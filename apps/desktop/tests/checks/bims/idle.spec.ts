@@ -73,7 +73,7 @@ test('(1)(2) a still office draws nothing for 10 s; closed, nothing of the bims 
     const mine = found['open, still world'].filter((a) => a.bims && !a.paused);
     expect(mine.every((a) => a.name === 'bims-z'), `the office's only motion is the z's: ${JSON.stringify(mine)}`).toBe(true);
 
-    await s.page.getByTestId('app.title.bims').click();
+    await s.page.getByTestId('app.right.agents.bims').click();
     await expect(s.page.getByTestId('app.right.bims.fold')).toHaveCount(0, { timeout: 3000 });
     await sleep(500);
     expect(await probe(s.page), 'closed: the renderer is gone').toBeNull();

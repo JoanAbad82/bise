@@ -52,8 +52,12 @@ export const bims = {
   pill_failed_tip: (a: { agent: string | number }): string => String(a.agent) + " failed. click opens it",
   /** the office's name for a screen reader: the agents in it, above the list */
   view_bims_tip: "the agents in their office, above the list",
-  /** the title bar's icon that opens or closes the office (pressed while it shows); its tip (designer m_28198) */
-  title_bims_tip: "bims: your agents in their office",
+  /** the AGENTS head's cube, left of 'all ›', that opens or closes the office (pressed while it shows); its tip while the office is closed (designer m_28913) */
+  cube_open_tip: "show the bims: your agents in their office",
+  /** its tip while the office shows */
+  cube_close_tip: "hide the office",
+  /** the cube's label beside it, in the accent (his ask, main m_28901) */
+  cube_label: "the bims",
   /** the width switch: the bar at 320 px */
   width_narrow: "320",
   /** the width switch: the wide bar */
@@ -62,10 +66,6 @@ export const bims = {
   width_narrow_tip: "the bar at 320 px, the office fit to it",
   /** the wide width's tip */
   width_wide_tip: "the bar at 640 px while the office shows",
-  /** the AGENTS head's control that hides the office while it shows, after the width switch (his ask, bims-fix: he couldn't find how to hide it) */
-  hide: "hide",
-  /** its tip: the title bar's cube opens it again (designer m_28303) */
-  hide_tip: "hide the office · the cube in the title bar brings it back",
   /** one line over the list when the office can't draw (WebGL lost) */
   lost: "can't draw the office here",
   /** the button back to the whole office, in its top-right corner while zoomed */

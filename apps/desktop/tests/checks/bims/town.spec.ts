@@ -93,13 +93,13 @@ const probe = (s: Session): Promise<TownProbe | null> =>
 async function openTown(ps: readonly Fake[], theme: 'light' | 'dark', width = 1400): Promise<{ s: Session; core: FakeCore }> {
   const core = new FakeCore(townWorld(ps, theme) as never);
   const s = await launchDesktop({ core, route: 'bise', size: `${String(width)}x900` });
-  await expect(s.page.getByTestId('app.title.bims'), "bise's thread has the bims icon").toBeVisible({ timeout: 20_000 });
+  await expect(s.page.getByTestId('app.right.agents.bims'), "bise's thread has the bims cube").toBeVisible({ timeout: 20_000 });
   return { s, core };
 }
 
 async function showTown(s: Session): Promise<void> {
   const town = s.page.getByTestId('app.right.bims.town');
-  if ((await town.count()) === 0) await s.page.getByTestId('app.title.bims').click();
+  if ((await town.count()) === 0) await s.page.getByTestId('app.right.agents.bims').click();
   await expect(town).toHaveAttribute('data-state', 'on', { timeout: 20_000 });
   await expect.poll(async () => (await probe(s))?.frames ?? 0, { timeout: 10_000 }).toBeGreaterThan(0);
 }

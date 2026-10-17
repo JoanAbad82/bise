@@ -220,6 +220,9 @@ describe('the overlay', () => {
     expect(tagOf({ name: 'perf', mode: 'event', words: 'done', title: '', pill: null })).toEqual({ text: 'perf · done', pill: null });
     expect(tagOf({ name: 'perf', mode: 'name', words: '', title: '', pill: null })).toEqual({ text: 'perf', pill: null });
     expect(tagOf({ name: 'perf', mode: 'hover', words: 'working', title: 'fix', pill: 'failed' })).toEqual({ text: 'perf', pill: 'failed' });
+    // main is 'bise', as its AGENTS row (designer m_28987)
+    expect(tagOf({ name: 'main', mode: 'hover', words: 'working', title: '', pill: null })).toEqual({ text: 'bise', pill: null });
+    expect(tagOf({ name: 'main', mode: 'event', words: 'done', title: '', pill: null })).toEqual({ text: 'bise · done', pill: null });
   });
   it('labels re-render only when their content changes', () => {
     const a = new Map<string, Label>([['perf', { name: 'perf', mode: 'event', words: 'done', title: '', pill: null }]]);

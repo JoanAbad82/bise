@@ -8,7 +8,6 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useRef,
   useState,
   useSyncExternalStore,
@@ -37,8 +36,7 @@ import {
   panelProject,
 } from "./side";
 import { useWaitingTotal } from "./Sidebar";
-import { bimsView, useBimsView, usePanelColumn } from "@/bims/view";
-import { bims } from "@/proto/words_bims.gen";
+import { usePanelColumn } from "@/bims/view";
 
 export type Width = "narrow" | "mid" | "wide";
 
@@ -412,9 +410,6 @@ export function Titlebar({ frame }: { frame: FrameState }) {
   const crumb = crumbOf(route, name);
   const panelOn =
     frame.panel !== undefined && (frame.panel.docked || frame.over === "panel");
-  // les bims' icon (Gabriel: the head's toggle wasn't clear): a project's office, the town on bise's thread
-  const view = useBimsView();
-  const officeOn = panelOn && view.view === "bims";
   return (
     <div
       className={frame.side ? "app-title" : "app-title away"}
@@ -468,26 +463,6 @@ export function Titlebar({ frame }: { frame: FrameState }) {
       </StatusSlot>
       {/* the right bar's toggle (designer m_20274/m_20275): the left toggle's panel icon mirrored,
           pressed while the bar is open; the accent count of what waits on him in its place, none at 0 */}
-      {/* les bims' icon (Gabriel's pick D on page bims-icon, designer m_28575): the solid accent box
-          with its eyes cut out, the accent at rest, hovered and open; hover and open are the
-          button's own tints, like the right bar's toggle beside it */}
-      {frame.panel !== undefined && view.lost !== true && (
-        <span className="app-btg">
-        <IconButton
-          label={bims.title_bims_tip}
-          size="bar"
-          pressed={officeOn}
-          onClick={() => {
-            // open: the office, and the bar if it was closed; close: the rows alone, the bar stays
-            bimsView.setView(officeOn ? "list" : "bims");
-            if (!officeOn && !panelOn) frame.toggle("panel");
-          }}
-          testId="app.title.bims"
-        >
-          <BimsGlyph />
-        </IconButton>
-        </span>
-      )}
       {frame.panel !== undefined && (
         <span className="app-rtg">
           <IconButton
@@ -512,30 +487,5 @@ export function Titlebar({ frame }: { frame: FrameState }) {
         </span>
       )}
     </div>
-  );
-}
-
-/**
- * les bims' icon (designer m_28575, pick D): a solid isometric box in the accent, its top .45, its
- * right face .75, its left face full, each with a 1.5 stroke; two eyes on the left face cut out
- * with a mask, so the button's hover and pressed tints show through them.
- */
-function BimsGlyph() {
-  const id = `bims-eyes-${useId().replace(/:/g, "")}`;
-  return (
-    <svg className="app-bims-glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-      <defs>
-        <mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16">
-          <rect width="16" height="16" fill="#fff" />
-          <circle cx="4.21" cy="8.59" r="0.95" fill="#000" />
-          <circle cx="6.43" cy="9.87" r="0.95" fill="#000" />
-        </mask>
-      </defs>
-      <g mask={`url(#${id})`} fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
-        <polygon points="8,1.6 13.54,4.8 8,8 2.46,4.8" fillOpacity={0.45} />
-        <polygon points="2.46,11.2 8,14.4 8,8 2.46,4.8" />
-        <polygon points="13.54,11.2 8,14.4 8,8 13.54,4.8" fillOpacity={0.75} />
-      </g>
-    </svg>
   );
 }

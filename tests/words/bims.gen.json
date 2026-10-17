@@ -10,6 +10,21 @@
     "one": null,
     "text": "blocked"
   },
+  "bims.cube_close_tip": {
+    "args": [],
+    "one": null,
+    "text": "hide the office"
+  },
+  "bims.cube_label": {
+    "args": [],
+    "one": null,
+    "text": "the bims"
+  },
+  "bims.cube_open_tip": {
+    "args": [],
+    "one": null,
+    "text": "show the bims: your agents in their office"
+  },
   "bims.done": {
     "args": [],
     "one": null,
@@ -93,16 +108,6 @@
     ],
     "one": "+{n} name · hover a bim",
     "text": "+{n} names · hover a bim"
-  },
-  "bims.hide": {
-    "args": [],
-    "one": null,
-    "text": "hide"
-  },
-  "bims.hide_tip": {
-    "args": [],
-    "one": null,
-    "text": "hide the office · the cube in the title bar brings it back"
   },
   "bims.idle": {
     "args": [],
@@ -614,11 +619,6 @@
     ],
     "one": null,
     "text": "waiting on {agent}"
-  },
-  "bims.title_bims_tip": {
-    "args": [],
-    "one": null,
-    "text": "bims: your agents in their office"
   },
   "bims.town_back": {
     "args": [],

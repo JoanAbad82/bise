@@ -506,19 +506,6 @@ body:has(.app-shell) {
   left: auto;
   right: var(--s-1);
 }
-/* les bims' icon, just left of the right bar's toggle (designer m_28198): text-3, ink on hover and pressed */
-.app-btg {
-  display: inline-flex;
-}
-/* les bims' icon: the accent at rest, hovered and open (designer m_28575); the tints are the button's */
-.app-btg .b-ibtn,
-.app-btg .b-ibtn:hover,
-.app-btg .b-ibtn.on {
-  color: var(--c-accent);
-}
-.app-bims-glyph {
-  display: block;
-}
 .app-rtg {
   display: inline-flex;
   align-items: center;

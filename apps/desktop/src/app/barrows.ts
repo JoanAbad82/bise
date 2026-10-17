@@ -80,6 +80,8 @@ export interface AgentExtras {
   readonly computer?: readonly ComputerAgent[];
   /** the TUI's ⌥ numbers (agents/model numbersOf): the order and ⌥N; none: start order */
   readonly numbers?: ReadonlyMap<string, number>;
+  /** bise's home project: on bise's thread, its main is AGENTS' first row */
+  readonly home?: string;
 }
 
 /**
@@ -160,7 +162,8 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
     glyph: numbered ? `⌥${String(n)}` : sign.g,
     tone: numbered ? 'dim' : sign.tone,
     name: shownName(x.a.name),
-    sub: all ? x.projectName : roleWords(x.a.title !== '' ? x.a.title : x.a.purpose),
+    // bise's thread: the project's name, but main's own doing line (its project is bise's home)
+    sub: all && !x.a.main ? x.projectName : roleWords(x.a.title !== '' ? x.a.title : x.a.purpose),
     end: '',
     endTone: 'dim',
     time: timeOf(x.a, now),
@@ -180,7 +183,7 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
 
 /**
  * AGENTS (desktop-agents-bar §2-§4), the TUI panel's order (sb.rs blocks, designer m_23651): a
- * project's main first, named 'bise' (not on bise's thread: it is that thread), then the
+ * project's main first, named 'bise' (on bise's thread, the home project's), then the
  * live agents that share no worktree, by their ⌥ number (the shared checkout's and the
  * ones alone in theirs, each with its mark), then the open PRs with no live agent (no sign, the
  * branch text-3, its '↑'), then each worktree 2 or more live agents share: a 'ψ <branch>' head with
@@ -189,8 +192,9 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
  * On bise's thread (`all`) the agents stay in start order, no worktrees. Pure.
  */
 export function agentRows(agents: readonly ProjAgent[], now: number, all: boolean, alt = false, extras: AgentExtras = {}): BarRow[] {
-  // a project's main first, always, as the TUI's panel (his ask, main m_28881): 'bise', ⌥0, no mark
-  const main = all ? undefined : agents.find((x) => x.a.main && !x.a.archived);
+  // main first, always, as the TUI's panel (his ask, main m_28881): 'bise', ⌥0, no mark; on bise's
+  // thread, bise's own (the home project's: designer m_28913, the row in view there)
+  const main = agents.find((x) => x.a.main && !x.a.archived && (!all || x.project === extras.home));
   const head = main === undefined ? [] : [agentRow(main, now, all, 0, alt, extras, undefined, undefined)];
   return [...head, ...taskRows(agents, now, all, alt, extras)];
 }

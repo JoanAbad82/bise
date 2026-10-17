@@ -262,8 +262,8 @@
 .bims-switch {
   display: inline-flex;
   flex: none;
-  /* the group's gap before 'all ›': 'hide all ›' read as one action (designer m_28601) */
-  margin-right: var(--s-4);
+  /* '320 · wide', 12 px, then the cube (designer m_28913) */
+  margin-right: var(--s-3);
   gap: 0;
   color: var(--c-text-3);
   font-size: var(--t-11);
@@ -291,6 +291,107 @@
 .bims-switch > .bims-opt:focus-visible {
   outline: 2px solid var(--c-focus);
   outline-offset: -2px;
+}
+
+/* the AGENTS head's cube and 'the bims', left of 'all ›' (his ask, main m_28901; Cube.tsx;
+   designer m_28913): one button, the 16 px cube, 4 px, 'the bims' in sans 12 / 500, lowercase, the
+   accent at rest, hovered and open; hover the hover tint, open the pressed tint; 16 px before
+   'all ›'. Short of room, the label goes first: it wraps under the cube, clipped by the button's
+   one line, and the cube stays (its min width) */
+.bims-cube {
+  display: inline-flex;
+  flex: 0 1 auto;
+  /* the head lines its parts up on a baseline; the cube has none: centred on the head's line, as 'all ›' */
+  align-self: center;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  column-gap: var(--s-1);
+  /* a wrapped label starts 8 px below the line's bottom: wholly out of the clip, no sliver */
+  row-gap: var(--s-2);
+  min-width: calc(16px + 2 * var(--s-1));
+  max-height: var(--s-5);
+  overflow: hidden;
+  margin-right: var(--s-4);
+  padding: calc(var(--s-1) / 2) var(--s-1);
+  border: 0;
+  border-radius: var(--r-1);
+  background: none;
+  color: var(--c-accent);
+  font: inherit;
+  font-size: var(--t-12);
+  font-weight: 500;
+  line-height: 16px;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+.bims-cube-label {
+  white-space: nowrap;
+}
+.bims-cube:hover {
+  background: var(--c-hover);
+}
+.bims-cube[aria-pressed='true'] {
+  background: var(--c-press);
+}
+.bims-cube:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+.bims-glyph {
+  display: block;
+  overflow: visible;
+}
+/* at rest, now and then (moves.ts): a blink, the eyes shut and open; a hop, up, down, one small
+   bounce, squashed as it lands. Each runs once and leaves: no loop while the cube is still */
+.bims-cube[data-move='blink'] .bims-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bims-blink 220ms ease-in-out 1;
+}
+.bims-cube[data-move='hop'] .bims-glyph {
+  transform-origin: 50% 100%;
+  animation: bims-hop 900ms ease-out 1;
+}
+@keyframes bims-blink {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  40%,
+  60% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes bims-hop {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+  12% {
+    transform: translateY(0) scale(1.08, 0.88);
+  }
+  38% {
+    transform: translateY(-5px) scale(0.95, 1.06);
+  }
+  60% {
+    transform: translateY(0) scale(1.06, 0.9);
+  }
+  76% {
+    transform: translateY(-1.5px) scale(1, 1);
+  }
+  88% {
+    transform: translateY(0) scale(1.02, 0.97);
+  }
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-cube[data-move] .bims-eye,
+  .bims-cube[data-move] .bims-glyph {
+    animation: none;
+  }
 }
 
 /* a '?' / '✗' whose bim is out of the frame (the follow camera, his zoom): held at the frame's edge,

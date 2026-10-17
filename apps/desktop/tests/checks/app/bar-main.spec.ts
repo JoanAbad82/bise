@@ -53,8 +53,12 @@ for (const theme of ['light', 'dark'] as const) {
     const { s } = await open(office, { theme, width: 1600 });
     try {
       await s.page.mouse.move(5, 400);
-      await shot(s, `bar-main-list-${theme}.png`, `AGENTS with main first, ${theme}`, "'bise' on the first row, its breeze and its doing line, then the tasks; 'AGENTS · N' counts the tasks");
-      await s.page.getByTestId('app.title.bims').click();
+      await shot(s, `bar-main-list-${theme}.png`, `AGENTS with main first, main's thread open, ${theme}`, "'bise' on the first row, the row in view, its breeze and its doing line, then the tasks; 'AGENTS · N' counts the tasks");
+      await s.page.getByTestId('app.right.agent.signup-perf').click();
+      await s.page.mouse.move(5, 400);
+      await shot(s, `bar-main-list-other-${theme}.png`, `AGENTS with main first, another agent's thread open, ${theme}`, "'bise' first, not in view; signup-perf the row in view");
+      await s.page.getByTestId('app.right.agent.main').click();
+      await s.page.getByTestId('app.right.agents.bims').click();
       await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
       for (const wide of [false, true]) {
         const w = wide ? 'wide' : '320';

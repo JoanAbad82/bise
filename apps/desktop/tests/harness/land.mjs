@@ -30,6 +30,8 @@ export const LAND = [
   'checks/app/ring-look.spec.ts',
   // 'show 50 more' opens 50 at a time, 'show less' back to the cap, kept per section and scope (bar-more, his m_26894)
   'checks/app/bar-more.spec.ts',
+  // main first in AGENTS as 'bise', out of the count, its click opens its thread, its hover lights its bim (bar-main, his m_28881)
+  'checks/app/bar-main.spec.ts',
   // a project's ⋯ menu by priority: active (needs him, then at work), quiet, archived capped (his m_26450)
   'checks/app/proj-menu.spec.ts',
   // what slid over at 800 goes when the window grows past 1000: one bar, no scrim (try-gate dc4770c1)

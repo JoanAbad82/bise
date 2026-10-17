@@ -21,7 +21,7 @@ import { LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { AddButton, AddDrop, useAddPlace } from '@/artifacts/Drops';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
-import { useCards, useComputerLive, useGrowth, usePlaces, usePrefs, useStore, type Store } from '@/store';
+import { useCards, useComputerLive, useGrowth, usePlaces, usePrefs, useProjects, useStore, type Store } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
@@ -36,6 +36,7 @@ import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from '.
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
 import { BimsSwitch, Office } from '@/bims/Office';
+import { BimsToggle } from '@/bims/Cube';
 import { parts as bimsParts } from '@/bims/feed';
 import { BimsFold } from '@/bims/Fold';
 import { Town } from '@/bims/town/Town';
@@ -467,7 +468,9 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
   // the TUI's ⌥ numbers: the rows' order and ⌥N (a project's only; bise's thread keeps start order)
   const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a));
-  const live = agentRows(agents, now, all, alt, { wakes, places, cards, computer, ...(numbers === undefined ? {} : { numbers }) });
+  // bise's home: on bise's thread, its main is AGENTS' first row
+  const home = useProjects().find((p) => p.home)?.project;
+  const live = agentRows(agents, now, all, alt, { wakes, places, cards, computer, ...(numbers === undefined ? {} : { numbers }), ...(home === undefined ? {} : { home }) });
   // a mark, an orphan PR, a head: the PR in the review screen (its agent's), an orphan its branch
   const openPr: OpenPr = (r) => {
     if (r.kind === 'orphan' && r.branch !== undefined) router.go({ screen: 'branch', project: r.project, branch: r.branch });
@@ -497,6 +500,12 @@ export function RightBar({ project, name, over, column }: { project: string; nam
     router.go({ screen: 'thread', project: p, agent });
   };
   const here = (p: string, agent: string) => route.screen === 'thread' && route.project === p && route.agent === agent;
+  // main's row: on bise's thread, bise's own view (the row in view there)
+  const openRow = (r: BarRow) => {
+    if (all && r.main === true) router.go({ screen: 'bise' });
+    else openAgent(r.project, r.agent ?? '');
+  };
+  const rowHere = (r: BarRow) => (all && r.main === true ? route.screen === 'bise' : here(r.project, r.agent ?? ''));
   // the office above the AGENTS rows (les bims); on bise's thread the town: one office per project (bims/town)
   const bims = useBimsView();
   const office = bims.view === 'bims';
@@ -527,6 +536,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
           title={panel.bar_agents}
           rows={live}
           count={agentCount}
+          // 8 rows, main's among them: a 9th overflows the bar at 1000 px tall (bar-overflow)
           cap={8}
           pageScope={project}
           summary={live.length === 0 ? '' : panel.count_working({ n: working })}
@@ -534,7 +544,12 @@ export function RightBar({ project, name, over, column }: { project: string; nam
           onAll={() => {
             router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
           }}
-          act={<BimsSwitch view={bims} />}
+          act={
+            <>
+              <BimsSwitch view={bims} />
+              <BimsToggle view={bims} />
+            </>
+          }
           office={
             all ? (
               <BimsFold open={office}>
@@ -582,9 +597,9 @@ export function RightBar({ project, name, over, column }: { project: string; nam
               <Fragment key={r.key}>
                 <Row
                   r={r}
-                  on={here(r.project, r.agent ?? '')}
+                  on={rowHere(r)}
                   onOpenPr={openPr}
-                  onOpen={() => { openAgent(r.project, r.agent ?? ''); }}
+                  onOpen={() => { openRow(r); }}
                   lit={r.agent !== undefined && r.agent === litBim}
                   onLit={office && r.agent !== undefined ? (on) => { bimsLit.set(on ? { name: r.agent ?? '', from: 'row' } : null, 'row'); } : undefined}
                 />

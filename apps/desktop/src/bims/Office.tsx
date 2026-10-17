@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { Press, tipAttrs } from '@/ds';
 import { reducedMotion, textWidth } from '@/ds/hooks';
 import type { Agent, Card, Place } from '@/proto';
+import { shownName } from '@/agents/model';
 import { bims } from '@/proto/words_bims.gen';
 import { useModHeld } from '@/app/held';
 import type { ActivitiesFn, ActivityKind, BimEvent, BimFrame, Label, LabelsFn, LayoutFn, Look, MakeRenderer, NewTimelineFn, Office as OfficeMap, OfficeRenderer, Snapshot, Timeline } from './model';
@@ -48,7 +49,7 @@ export type OfficeState = 'loading' | 'on' | 'lost';
 /** the office's last width / height in this window: the fold grows to it before the renderer has loaded (Fold.tsx) */
 let lastRatio = 1.4;
 
-/** The AGENTS head's '320 | wide' while the office shows (view.ts keeps it per window); the title bar's icon opens and closes the office (Frame.tsx). */
+/** The AGENTS head's '320 | wide' while the office shows (view.ts keeps it per window); the cube after it opens and closes the office (Cube.tsx). */
 export function BimsSwitch({ view }: { view: BimsView }) {
   const opt = (id: string, label: string, tip: string, on: boolean, pick: () => void) => (
     <Press look="bims-opt" aria-pressed={on} {...tipAttrs(tip)} onClick={pick} data-testid={`app.right.agents.${id}`}>
@@ -62,14 +63,11 @@ export function BimsSwitch({ view }: { view: BimsView }) {
           {opt('width.narrow', bims.width_narrow, bims.width_narrow_tip, !view.wide, () => {
             bimsView.setWide(false);
           })}
+          <span className="bims-sep" aria-hidden="true">·</span>
           {opt('width.wide', bims.width_wide, bims.width_wide_tip, view.wide, () => {
             bimsView.setWide(true);
           })}
-          {/* hiding it where he looks (his ask, bims-fix: the title bar's cube alone, he couldn't find it) */}
-          <span className="bims-sep" aria-hidden="true">·</span>
-          <Press look="bims-opt" {...tipAttrs(bims.hide_tip)} onClick={() => { bimsView.setView('list'); }} data-testid="app.right.agents.hide">
-            {bims.hide}
-          </Press>
+          {/* hiding it: the cube after it (Cube.tsx), pressed while the office shows (designer m_28913) */}
         </span>
       )}
     </>
@@ -80,10 +78,12 @@ export function BimsSwitch({ view }: { view: BimsView }) {
 export function tagOf(l: Label): { readonly text: string | null; readonly pill: Label['pill'] } {
   // 'pill': the '?' / '✗' alone at rest, no name; hover, ctrl or an event give it its line
   if (l.mode === 'pill') return { text: null, pill: l.pill };
-  if (l.mode === 'hover') return { text: l.name, pill: l.pill };
+  // main's name as the window says it, 'bise', as its AGENTS row (designer m_28987)
+  const name = shownName(l.name);
+  if (l.mode === 'hover') return { text: name, pill: l.pill };
   // an easter egg's words stand alone ('1:47', 'combo ×2', '!'): the egg is the bim's, not news
   if (l.mode === 'egg') return { text: l.words, pill: l.pill };
-  return { text: l.words === '' ? l.name : `${l.name} · ${l.words}`, pill: l.pill };
+  return { text: l.words === '' ? name : `${name} · ${l.words}`, pill: l.pill };
 }
 
 /** A bim's place in line for a label's room (designer m_27799): with a pill first, then working, then quiet. Pure. */
@@ -853,7 +853,9 @@ function HoverCard({ label, width, measure, measureBold, tagRef, onOpen }: {
   onOpen: (agent: string) => void;
 }) {
   const room = width - 2 * CARD_PAD;
-  const name = room > 0 ? cutWords(label.name, room - (label.pill === null ? 0 : PILL_ROOM), measureBold) : label.name;
+  // main's card says 'bise', as its row (designer m_28987); its test id keeps the agent's name
+  const shown = shownName(label.name);
+  const name = room > 0 ? cutWords(shown, room - (label.pill === null ? 0 : PILL_ROOM), measureBold) : shown;
   const state = room > 0 ? cutWords(label.words, room, measure) : label.words;
   const title = cutLines(label.title, room, CARD_LINES, measure);
   return (
