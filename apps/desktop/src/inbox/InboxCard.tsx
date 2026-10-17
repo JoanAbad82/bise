@@ -19,7 +19,8 @@ import { inbox } from '@/proto/words_inbox.gen';
 import { CardId } from './CardId';
 import { common } from '@/proto/words_common.gen';
 import { Act, ArtChip, Kbd, tipAttrs } from '@/ds';
-import { refusedLine, useRefused, useStore } from '@/store';
+import { refusedLine, useStore } from '@/store';
+import type { InboxItem } from './listed';
 import { cardKey } from './order';
 import { ArtWords } from './artWords';
 import { takesWords } from './model';
@@ -44,7 +45,8 @@ export interface InboxCardActs {
 }
 
 export interface InboxCardProps {
-  card: CardRow;
+  /** the card, with the refusal of his act on it here (listed.ts) */
+  card: InboxItem;
   /** its project's name ("acme"); none: the id */
   project?: string;
   /** bise's own home: no '· project' in the header */
@@ -178,9 +180,9 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
  * hub's words on the card that came back, wherever it is drawn (the block, the strip, the capsule),
  * and 'try again' sends what he sent once more. Gone when he acts on it or the hub takes it.
  */
-function RefusedNote({ card, id }: { card: CardRow; id: string }) {
+function RefusedNote({ card, id }: { card: InboxItem; id: string }) {
   const store = useStore();
-  const refused = useRefused(card.project, card.id);
+  const refused = card.refused;
   if (refused === null) return null;
   return (
     <div className="ic-note ic-refused" role="alert" data-testid={`${id}.refused`}>
@@ -203,9 +205,8 @@ function RefusedNote({ card, id }: { card: CardRow; id: string }) {
 }
 
 /** A folded row's mark for a card whose answer or close was refused here: 'not sent', or nothing. */
-export function RefusedMark({ card }: { card: CardRow }) {
-  const refused = useRefused(card.project, card.id);
-  return refused === null ? null : <span className="ic-refused-mark">{common.not_sent}</span>;
+export function RefusedMark({ card }: { card: InboxItem }) {
+  return card.refused === null ? null : <span className="ic-refused-mark">{common.not_sent}</span>;
 }
 
 /** The footer's keys (ambient's six forms), each pair a button. */

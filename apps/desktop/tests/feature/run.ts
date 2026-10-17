@@ -7,7 +7,7 @@
 // Today the window is the Store: its port is an outbox (a sink: it answers nothing and holds no
 // state; the hub's answers come in through given()). When state-machine's step lands (fast-try
 // p4), the outbox becomes step's outputs and only this file changes, never a test.
-import { inboxCards, Latest, Store, type AnswerFrom, type Card } from './app';
+import { Latest, Store, type AnswerFrom, type InboxItem } from './app';
 import type { Cmd, Gesture, Here, Input } from './inputs';
 
 export interface Feature {
@@ -23,8 +23,8 @@ export interface Feature {
   sent(): readonly Cmd[];
   /** Each screen's "what I show". */
   readonly view: {
-    /** The inbox: every open item he hasn't acted on, in its order (inbox/Block.tsx inboxCards). */
-    inbox(): readonly Card[];
+    /** The inbox: every open item he hasn't acted on, in its order, each with its refusal (the store's inbox view, machine/cards.ts inboxView). */
+    inbox(): readonly InboxItem[];
   };
 }
 
@@ -92,7 +92,7 @@ export function feature(now = 1_791_100_000_000): Feature {
     },
     sent: () => [...outbox],
     view: {
-      inbox: () => inboxCards(store.projects(), store.acted()),
+      inbox: () => store.inboxItems(),
     },
   };
   return f;

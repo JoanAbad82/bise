@@ -13,14 +13,15 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
 import { Dot, Kbd, Row } from '@/ds';
-import { actedKeys, useActed, useProjects, useStore, useVoiceAnswer, type Acted, type AnswerAt } from '@/store';
+import { actedKeys, useActed, useInboxItems, useProjects, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
 import { common } from '@/proto/words_common.gen';
 import { age, dotOf, folds, InboxCard, RefusedMark } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
-import { cardKey, sortCards } from './order';
-import { pickWaits, takesWords, withConfirmOptions } from './model';
+import { cardKey } from './order';
+import { pickWaits, takesWords } from './model';
+import type { InboxItem } from './listed';
 import { fitRows, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
 import { cardKeyOf } from './Strip';
 import { ArtWords } from './artWords';
@@ -198,20 +199,6 @@ export function answerAt(here: Here, home: string): AnswerAt | null {
   return null;
 }
 
-/** Every project's open items, in the inbox's order (the hub's rank), the ones acted on here left out. Pure. */
-export function blockList(rows: readonly ProjectRow[], gone: ReadonlySet<string>): Card[] {
-  return sortCards(rows.flatMap((r) => (r.cards ?? []).map(withConfirmOptions))).filter((c) => !gone.has(cardKey(c)));
-}
-
-/**
- * What the inbox lists: every project's open items, the ones he answered or closed in this window
- * left out (the store's acted set). Pure. The block, the waiting count and the feature tests
- * (tests/feature) read this one function.
- */
-export function inboxCards(rows: readonly ProjectRow[], acted: readonly Acted[]): Card[] {
-  return blockList(rows, actedKeys(acted));
-}
-
 /**
  * Folded, the block is its head and this many item lines, then a '+ N more' line: the TUI's box
  * (card_draw.rs STRIP_ROWS; his inbox-stack ask, back from H10's one line); fewer in a short window
@@ -357,18 +344,19 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   // the block to every project's items until he folds it (ghost-badge: '/inbox' beside an artifact
   // did nothing while another project's item waited)
   const [wide, setWide] = useState(false);
-  const all = useMemo(() => inboxCards(rows, acted), [rows, acted]);
+  // the inbox's one view, from the store (machine/cards.ts inboxView): each item with its refusal
+  const all = useInboxItems();
   const real = useMemo(() => (only === undefined || wide ? all : all.filter(only)), [all, only, wide]);
   const notify = useNotifyRow(real.length);
   const home = rows.find((r) => r.home)?.project ?? '';
   const asks = notify.show && only === undefined;
-  const list = useMemo(() => (asks ? [...real, notifyCard(home, opened)] : real), [real, asks, home, opened]);
+  const list = useMemo((): readonly InboxItem[] => (asks ? [...real, { ...notifyCard(home, opened), refused: null }] : real), [real, asks, home, opened]);
   const names = useMemo(() => new Map(rows.map((r) => [r.project, r])), [rows]);
   // Benjamin's lost answer (card-draft-keep): a new card never moves the open one; the open one
   // closed by the hub (withdrawn, answered via main, its agent stopped) while his words are typed
   // stays open, closed, his words in its draft, until he sends them (to its asker) or leaves it
-  const [closed, setClosed] = useState<Card | null>(null);
-  const [seen, setSeen] = useState<Card | null>(null);
+  const [closed, setClosed] = useState<InboxItem | null>(null);
+  const [seen, setSeen] = useState<InboxItem | null>(null);
   const listed = list.find((c) => cardKey(c) === open);
   // decided while rendering, before the composer hears a thing: an effect would tell it 'none'
   // for one commit, and the swap and the prune would take his words with them

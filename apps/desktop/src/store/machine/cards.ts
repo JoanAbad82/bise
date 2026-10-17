@@ -9,6 +9,7 @@
 // changes nothing gives the same state back and no output (the hooks re-render on a new
 // reference only). A kept list is written in the same order as today's store wrote it.
 // Pure. Owner: amb-core.
+import { inboxCards, withRefused, type InboxItem } from "@/inbox/listed";
 import { actedAdd, actedAnswered, actedKey, actedOf, actedPrune, type Acted } from "../acted";
 import { refusedAdd, refusedDrop, refusedListOf, refusedOf, refusedPrune, type Attempt, type Refused } from "../refused";
 import { answeredFromOf, answersOf, cardKeyOf, jumpOf, keptAnswers, type AnswerAt, type AnswerFrom, type AnsweredFrom } from "../answered";
@@ -36,6 +37,14 @@ export interface CardsState {
 }
 
 const NONE: readonly never[] = [];
+
+/**
+ * The inbox's one view (architect m_29221 #2): every project's open items in the hub's order, the
+ * ones he acted on here left out, each with the refusal of his act on it here. Pure.
+ */
+export function inboxView(s: CardsState, f: HubFacts): InboxItem[] {
+  return withRefused(inboxCards(f.rows, s.acted), s.refused);
+}
 
 /** The slice at the window's start: his kept lists read back (none: a test with no keep). Pure. */
 export function cardsInit(read: ((key: string) => unknown) | null): CardsState {

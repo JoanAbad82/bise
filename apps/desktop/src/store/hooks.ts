@@ -10,7 +10,8 @@ import { keep } from '@/app/keep';
 import type { AnsweredFrom } from './answered';
 import type { AnswerJump } from './store';
 import type { Acted } from './acted';
-import { refusedOf, type Refused } from './refused';
+import type { Refused } from './refused';
+import type { InboxItem } from '@/inbox/listed';
 import { diffKey, toolOutKey, Store, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadHits, type ThreadOrder, type VoiceModeState, type TalkShot } from './store';
 
 /**
@@ -210,8 +211,13 @@ export const useAnsweredFrom = (project: string, card: number): AnsweredFrom | n
 export const useAnswerJump = (): AnswerJump | null => useSlice('answer_jump', (s) => s.answerJump());
 /** The cards he answered or closed in this window that the hub's rows still list: every view leaves them out (acted.ts). */
 export const useActed = (): readonly Acted[] => useSlice('acted', (s) => s.acted());
-/** The refusal of his answer or close of this card in this window (refused.ts), or null: every view that draws the card says it. */
-export const useRefused = (project: string, card: number): Refused | null => useSlice('refused', (s) => refusedOf(s.refused(), project, card));
+/** The inbox's one view: every project's open items he hasn't acted on here, each with its refusal (machine/cards.ts inboxView). */
+export const useInboxItems = (): readonly InboxItem[] => useSlice('inbox_items', (s) => s.inboxItems());
+/**
+ * The refusals of his answers and closes in this window (refused.ts): the thread's strip and the
+ * capsule make their items with them (inbox/listed.ts withRefused) until their own screens' views.
+ */
+export const useRefusedList = (): readonly Refused[] => useSlice('refused', (s) => s.refused());
 
 /** Calls `fn` on every applied event (one-shot things: open, route, job_end, error). Keep `fn` stable. */
 export function useCoreEvent(fn: (ev: Ev) => void): void {

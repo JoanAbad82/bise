@@ -17,7 +17,8 @@ import { newAgent } from "@/agents/actions";
 import { InboxCard } from "@/inbox";
 import { cardKeyOf } from "@/inbox/Strip";
 import type { Card, Grant, HelperEv } from "@/proto";
-import { threadKey, useHeard, useLevel, usePrefs, useProjects, useShot, useStore } from "@/store";
+import { threadKey, useHeard, useLevel, usePrefs, useProjects, useRefusedList, useShot, useStore } from "@/store";
+import { withRefused } from "@/inbox/listed";
 import { followPartial, type LivePartial } from "@/shared/partial";
 import type { SpotAnswer, SpotFront, SpotItem, SpotRoute } from "@/spotlight";
 import { W } from "@/spotlight/words";
@@ -452,6 +453,8 @@ export function CapsuleRoot(): JSX.Element {
       dispatch({ ev: "card_done", id: view.id });
   }, [spot.cards, view]);
 
+  // his refused answers and closes: the card says so (inbox/listed.ts withRefused), as in the window
+  const refused = useRefusedList();
   const cardOf = useCallback(
     (id: string) => {
       const [project = "", n = ""] = id.split(/\.(?=[^.]+$)/u);
@@ -463,7 +466,7 @@ export function CapsuleRoot(): JSX.Element {
       // acts.open its footer says '1–3 pick   ⏎ open in bise   esc later' by itself
       return (
         <InboxCard
-          card={c}
+          card={withRefused([c], refused)[0] ?? { ...c, refused: null }}
           project={store.projects().find((p) => p.project === project)?.name}
           now={Date.now()}
           surface="glass"
@@ -486,7 +489,7 @@ export function CapsuleRoot(): JSX.Element {
         />
       );
     },
-    [store, bise],
+    [store, bise, refused],
   );
 
   // fn's talk: the words the core heard so far and the mic's level (the talk view grows with them,

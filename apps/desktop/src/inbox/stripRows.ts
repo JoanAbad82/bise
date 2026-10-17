@@ -23,29 +23,29 @@ export function stripList(cards: readonly Card[], project: string, gone: Readonl
   return sortCards(cards.filter((c) => c.project === project)).filter((c) => !gone.has(cardKey(c)));
 }
 
-export interface StripRow {
-  readonly card: Card;
+export interface StripRow<C extends Card = Card> {
+  readonly card: C;
   /** its number: ctrl+n opens it */
   readonly n: number;
   /** open in place */
   readonly open: boolean;
 }
 
-export interface StripView {
-  readonly rows: readonly StripRow[];
+export interface StripView<C extends Card = Card> {
+  readonly rows: readonly StripRow<C>[];
   /** the items folded into '+ n more' */
   readonly more: number;
   /** the first of them (a click on '+ n more' opens it) */
-  readonly next: Card | undefined;
+  readonly next: C | undefined;
 }
 
 /**
  * The rows the box shows: the first STRIP_ROWS, and the open item where
  * its number puts it when it is further down; the rest fold into '+ n more'.
  */
-export function stripView(list: readonly Card[], open: string | null): StripView {
-  const rows: StripRow[] = [];
-  let next: Card | undefined;
+export function stripView<C extends Card>(list: readonly C[], open: string | null): StripView<C> {
+  const rows: StripRow<C>[] = [];
+  let next: C | undefined;
   list.forEach((card, i) => {
     const isOpen = cardKey(card) === open;
     if (i < STRIP_ROWS || isOpen) rows.push({ card, n: i + 1, open: isOpen });

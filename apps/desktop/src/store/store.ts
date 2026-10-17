@@ -36,7 +36,8 @@ import type {
 } from "@/proto";
 import { cardRefusedOf, type Acted } from "./acted";
 import type { Refused } from "./refused";
-import { cardsInit, stepCards, type AnswerJump, type CardsState } from "./machine/cards";
+import { cardsInit, inboxView, stepCards, type AnswerJump, type CardsState } from "./machine/cards";
+import type { InboxItem } from "@/inbox/listed";
 import { factsOf, type Input, type Intent, type WinEv } from "./machine/types";
 import type { CoreState } from "@/shared/api";
 import { common } from "@/proto/words.gen";
@@ -70,6 +71,8 @@ export type { AnswerJump } from "./machine/cards";
 export class Store extends StoreVoice {
   /** the cards slice (machine/cards.ts): his answers and closes in flight, how they settled; his kept lists read back */
   private cardsState: CardsState = cardsInit(this.asideKeep === null ? null : (k) => this.asideKeep?.read(k));
+  /** the inbox's view as last read, and what it was made of (inboxItems()) */
+  private inboxMemo: { rows: unknown; acted: unknown; refused: unknown; items: readonly InboxItem[] } | null = null;
 
   // ---- the core's events
 
@@ -218,9 +221,9 @@ export class Store extends StoreVoice {
   /**
    * One input through the cards slice (machine/cards.ts), then its outputs at the edge, in order:
    * a kept list is put (its listeners told) and written to his asides, a command goes to the core;
-   * a new jump is told last.
+   * a new jump is told last, then the inbox's view when its rows, acted or refused changed.
    */
-  private stepIn(input: Input): void {
+  private stepIn(input: Input, rowsCame = false): void {
     const was = this.cardsState;
     const [next, outs] = stepCards(was, this.facts, input);
     this.cardsState = next;
@@ -233,6 +236,16 @@ export class Store extends StoreVoice {
       this.asideKeep?.write(o.key, o.value);
     }
     if (next.jump !== was.jump) this.emit("answer_jump");
+    if (rowsCame || next.acted !== was.acted || next.refused !== was.refused) this.emit("inbox_items");
+  }
+  /** The inbox's one view (machine/cards.ts inboxView); the same array until its rows, acted or refused change. */
+  inboxItems(): readonly InboxItem[] {
+    const s = this.cardsState;
+    const m = this.inboxMemo;
+    if (m !== null && m.rows === this.facts.rows && m.acted === s.acted && m.refused === s.refused) return m.items;
+    const items = inboxView(s, this.facts);
+    this.inboxMemo = { rows: this.facts.rows, acted: s.acted, refused: s.refused, items };
+    return items;
   }
   /** His gesture (machine/types.ts Intent), through the machine. */
   do(intent: Intent): void {
@@ -260,7 +273,7 @@ export class Store extends StoreVoice {
   rowsCame(ev: EvOf<"projects">): void {
     this.facts = factsOf(this.facts, ev);
     this.emit("projects");
-    this.stepIn({ at_ms: this.now(), in: "ev", ev });
+    this.stepIn({ at_ms: this.now(), in: "ev", ev }, true);
   }
   /**
    * The cards whose answer or close was refused in this window (refused.ts): each view that draws

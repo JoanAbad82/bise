@@ -3,7 +3,8 @@
 // and stayed after the hub then took the late answer). One owner: the Store sets an entry on the
 // window-local 'card_refused' and takes it out when he acts on that card again (an answer, a close,
 // 'try again'), when that card's 'card_answered' comes, or when the hub's rows drop the card (the
-// hub took the late answer, or the card went). Every view that draws the card reads it (useRefused):
+// hub took the late answer, or the card went). Every view that draws the card reads it on its item
+// (inbox/listed.ts withRefused: the inbox's view, the strip's and the capsule's items):
 // 'not sent: <words> · try again' on the card that came back, wherever he is, across a project
 // switch and a reload (the list is kept with his asides). Nothing goes on the project's line. Pure.
 // Owner: amb-home.

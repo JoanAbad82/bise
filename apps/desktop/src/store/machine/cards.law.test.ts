@@ -21,8 +21,7 @@ import { describe, expect, it } from "vitest";
 import type { Card, CardAnswer, ProjectRow } from "@/proto";
 import { core_ev } from "@/proto/fixtures.gen";
 import type { CoreCmd } from "@/shared/api";
-import { inboxCards } from "@/inbox/Block";
-import { cardsInit, stepCards, type CardsState } from "./cards";
+import { cardsInit, inboxView, stepCards, type CardsState } from "./cards";
 import { NO_FACTS, factsOf, type HubFacts, type Input, type Output } from "./types";
 import type { AnswerFrom } from "../answered";
 
@@ -286,9 +285,11 @@ describe("the cards slice's law", () => {
         s = next;
         // 2. the hub owns open and closed: the inbox lists the rows' open cards less his own acts
         //    in flight, never one the rows don't list, never one he acted on that's still on its way
-        const shown = inboxCards(f.rows, s.acted);
+        const shown = inboxView(s, f);
         const open = f.rows.flatMap((r) => (r.cards ?? []).map((c) => key(r.project, c.id)));
         expect(new Set(ids(shown)), at).toEqual(new Set(open.filter((k) => !m.flight.has(k))));
+        // each item says the refusal the model holds for it, or none
+        for (const c of shown) expect(c.refused?.text ?? null, at).toBe(m.refused.get(key(c.project, c.id))?.text ?? null);
         // the refusals: their words and what he sent, on the cards the model says
         expect(new Map(s.refused.map((x) => [x.key, { text: x.text, ...(x.attempt === undefined ? {} : { attempt: x.attempt }) }])), at).toEqual(m.refused);
         expect(new Map(s.answersFrom.map((x) => [x.key, x.from])), at).toEqual(m.answersFrom);

@@ -15,7 +15,8 @@ import { age, dotOf, InboxCard, RefusedMark, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { ArtWords } from './artWords';
 import { STRIP_KEYS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
-import { actedKeys, useActed } from '@/store';
+import { actedKeys, useActed, useRefusedList } from '@/store';
+import { withRefused, type InboxItem } from './listed';
 import './inbox.css';
 import { aboutOf, openAct } from './about';
 
@@ -62,7 +63,9 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
   const gone = useMemo(() => actedKeys(acted), [acted]);
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
-  const list = useMemo(() => stripList(cards, project, gone), [cards, project, gone]);
+  // each item with the refusal of his act on it here (listed.ts), the strip's own filter as before
+  const refused = useRefusedList();
+  const list = useMemo(() => withRefused(stripList(cards, project, gone), refused), [cards, project, gone, refused]);
   const openCard = list.find((c) => cardKey(c) === open);
 
   const [on, setOn] = useState<number | null>(null);
@@ -261,7 +264,7 @@ export function useStripCard(project: string): Card | null {
   );
 }
 
-function StripRow({ c, n, now, onOpen }: { c: Card; n: number; now: number; onOpen: () => void }) {
+function StripRow({ c, n, now, onOpen }: { c: InboxItem; n: number; now: number; onOpen: () => void }) {
   const { who, what } = stripWords(c);
   return (
     // raw-controls (designer m_18343): the ds's Row as a button
