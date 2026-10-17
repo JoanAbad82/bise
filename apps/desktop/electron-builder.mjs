@@ -115,7 +115,8 @@ export default {
   productName,
   // BISE_PACK_OUT: another output dir (the try's staging, while his try runs from dist: amb-tools)
   directories: { output: process.env['BISE_PACK_OUT'] || 'dist' },
-  files: ['out/**', 'package.json'],
+  // never a source map (the nightly's coverage-map build makes them: BISE_DESKTOP_SOURCEMAP)
+  files: ['out/**', '!out/**/*.map', 'package.json'],
   asar: true,
   extraResources: [
     // the runtime first, then bise over it (a snapshot's own bise never wins); its rust/

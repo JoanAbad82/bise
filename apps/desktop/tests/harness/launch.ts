@@ -10,7 +10,7 @@
 // fails on it. close() proves again, stops the watch and kills what is left by pid.
 import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs';
 import path from 'node:path';
-import { _electron as electron, type CDPSession, type ElectronApplication, type Page } from '@playwright/test';
+import { _electron as electron, test, type CDPSession, type ElectronApplication, type Page } from '@playwright/test';
 import { DESKTOP_DIR, harnessElectron } from './electron';
 import { appEntryMissing } from './appentry';
 import type { FakeCore, FakeHelper } from './fakes/helper';
@@ -115,6 +115,23 @@ const chromiumArgs = (o: LaunchOptions): string[] =>
     ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-audio-capture=${o.micWav}`]
     : [];
 
+/** The nightly's map run's folder (BISE_HARNESS_COVERAGE, covmap.mjs run), else undefined. */
+const coverageDir = (): string | undefined => process.env['BISE_HARNESS_COVERAGE'] || undefined;
+let coverageLaunches = 0;
+
+/**
+ * In the map run: this launch's coverage folder, <dir>/<check>/<n> (<check>: the spec's path under
+ * tests/, '/' as '__'), and the hook to load in the app's main process. Outside it: undefined.
+ */
+function coverageLaunch(): { out: string; hook: string } | undefined {
+  const dir = coverageDir();
+  if (!dir) return undefined;
+  let spec = 'unknown';
+  try { spec = path.relative(path.resolve(__dirname, '..'), test.info().file); } catch { /* not in a test */ }
+  coverageLaunches += 1;
+  return { out: path.join(dir, spec.split(path.sep).join('__'), String(coverageLaunches)), hook: path.join(__dirname, 'coverage', 'hook.cjs') };
+}
+
 const killTree = (pid: number | undefined): void => {
   if (pid === undefined) return;
   try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
@@ -169,7 +186,10 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
   const sentinel = new Sentinel(h, (why) => { stopped = why; killTree(app?.process().pid); });
   await sentinel.start();
   try {
-    app = await electron.launch({ executablePath: harnessElectron(), args: [...chromiumArgs(o), ...args], env: appEnv });
+    // the nightly's map run (BISE_HARNESS_COVERAGE): V8's coverage of every JS target (coverage/hook.cjs)
+    const cov = coverageLaunch();
+    if (cov) appEnv['BISE_HARNESS_COVERAGE_OUT'] = cov.out;
+    app = await electron.launch({ executablePath: harnessElectron(), args: [...(cov ? ['-r', cov.hook] : []), ...chromiumArgs(o), ...args], env: appEnv });
     const pid = app.process().pid;
     if (pid !== undefined) sentinel.follow(pid);
     watch = new Watch(pid ?? -1, (why) => { stopped = why; killTree(pid); });
@@ -181,6 +201,8 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
     if (proof.violations.length) throw new Error(`proof step failed: ${proof.violations.join('; ')}`);
     const opened = app, w = watch;
     const close = async (): Promise<Proof> => {
+      // the coverage first, while every target is alive (a no-op outside the map run)
+      if (coverageDir()) await opened.evaluate(() => (globalThis as { __biseCoverageTake?: () => Promise<number> }).__biseCoverageTake?.()).catch(() => undefined);
       const end = await prove(opened, w).catch(() => undefined);
       w.stop();
       const tree = await sentinel.tree();

@@ -183,6 +183,20 @@ if [ "$mode" = wait ]; then
   [ -n "$rcf" ] && [ -f "$rcf" ] && echo "exit code: $(cat "$rcf")"
   exit 0
 fi
+# the desktop checks a change can break (tests/test_map.py desktop-pick, the nightly's coverage
+# map; fast-try p2). <from>: default the try's (~/.bise/dev/build/desktop-try/try.stamp's head);
+# <to>: default the working tree. Shadow mode until review-gates' go: it says and logs, everything
+# still runs.
+if [ "$mode" = desktop-pick ]; then
+  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo "$(dirname "$0")/..")" || exit 1
+  from="${2:-}"
+  if [ -z "$from" ]; then
+    stamp="$(bise_home)"; stamp="${stamp:-$HOME/.bise}/dev/build/desktop-try/try.stamp"
+    from="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["head"])' "$stamp" 2>/dev/null)" \
+      || { echo "desktop-pick: no try stamp at $stamp: gate.sh desktop-pick <from> [<to>]"; exit 2; }
+  fi
+  exec python3 tests/test_map.py desktop-pick --from "$from" ${3:+--to "$3"} ${GATE_PICK_LOG:+--log "$GATE_PICK_LOG"}
+fi
 if [ "$mode" = new ] || [ "$mode" = done ]; then
   # BISE-230: a task's folder <home>/worktrees/<project-id>/<name>/, like
   # the hub's own task worktrees: the worktree (<repo>/), its cargo target
@@ -587,7 +601,10 @@ if [ "$mode" = land ]; then
   desktop_land() {
     local miss; desktop_path; miss="$(desktop_deps strict)"
     [ -z "$miss" ] || { echo "error: $miss"; return 1; }
-    cd "$root/apps/desktop" && pnpm -s typecheck && pnpm -s build
+    cd "$root/apps/desktop" && pnpm -s typecheck && pnpm -s build || return 1
+    # pnpm build and a release ship no source map (only the nightly's coverage-map build has them)
+    local maps; maps="$(find out -name '*.map' 2>/dev/null | head -3)"
+    [ -z "$maps" ] || { echo "error: source maps in out/ ($maps): BISE_DESKTOP_SOURCEMAP is set?"; return 1; }
   }
   target="${CARGO_TARGET_DIR:-$root/rust/target}"
   [ $src = 1 ] && lstep line_gate env GATE_BASE="$base" python3 tests/line_gate.py $changed
@@ -597,6 +614,8 @@ if [ "$mode" = land ]; then
   [ -n "$pkgs" ] && lstep clippy bash -c "cd rust && cargo clippy --offline -q --workspace --all-targets --target-dir '$target/clippy' -- -D warnings"
   [ "${proto_ts:-0}" = 1 ] && lstep proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
   [ -n "$dwhy" ] && lstep desktop desktop_land
+  # the desktop checks this land would pick, said and logged (shadow mode: never fails the land)
+  [ -n "$dwhy" ] && { tests/desktop_pick_shadow.sh land "$base" "$head" || true; }
   [ "${office:-0}" = 1 ] && lstep office_check tests/office_check.sh strict
   [ "${kit:-0}" = 1 ] && lstep kit kit_check
   echo "GATE land GREEN ($((SECONDS - t0))s):${ran:- no step for these paths}"
@@ -705,6 +724,13 @@ python3 "$root/tests/conflict_markers.py" >/dev/null || { python3 "$root/tests/c
 python3 "$root/tests/known_reds.py" --self-test >/dev/null || { python3 "$root/tests/known_reds.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # the full gate's test map knows every test and every top-level path (tests/test_map.py)
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
+# the desktop checks' selection: its shadow never fails a land, its audit, the coverage map's rules
+# on synthetic coverage (fast-try p2; review-gates m_29412)
+python3 -B "$root/tests/desktop_pick_test.py" >/dev/null || { python3 -B "$root/tests/desktop_pick_test.py"; echo "GATE quick FAILED"; exit 1; }
+python3 -B "$root/tests/desktop_pick_audit.py" --self-test >/dev/null || { python3 -B "$root/tests/desktop_pick_audit.py" --self-test; echo "GATE quick FAILED"; exit 1; }
+if [ -d "$root/apps/desktop" ]; then
+  node "$root/apps/desktop/tests/harness/coverage/covmap.mjs" --self-test >/dev/null || { node "$root/apps/desktop/tests/harness/coverage/covmap.mjs" --self-test; echo "GATE quick FAILED"; exit 1; }
+fi
 # no new Bool.pick walk that never stops; the list of old ones only shrinks; no
 # def that calls itself twice with the same arguments (2^n: hub-tick) (tests/pick_gate.py)
 python3 "$root/tests/pick_gate.py" --self-test >/dev/null || { python3 "$root/tests/pick_gate.py" --self-test; echo "GATE quick FAILED"; exit 1; }

@@ -125,8 +125,34 @@ if [ "${1:-}" = --in-slot ]; then
   # test running across one ended at the wake, a timeout (5 reds; issue 26).
   # -i alone is not enough: at night the display is off, the Mac is in a
   # DarkWake, which ignores it; -s (PreventSystemSleep) holds on AC only
-  cd "$wt" && GATE_ALL=1 exec /usr/bin/caffeinate -is bash tests/gate.sh full --all
-  echo "NOSTART cannot enter $wt"; exit 1
+  cd "$wt" || { echo "NOSTART cannot enter $wt"; exit 1; }
+  GATE_ALL=1 /usr/bin/caffeinate -is bash tests/gate.sh full --all
+  rc=$?
+  # the night's steps after the gate, in this tree and slot, in this order (fast-try p2, p5).
+  # night_step <name> <file> [<cmd>...]: skipped when <file> isn't in the tree; exit 0 green,
+  # 1 red: a "FAIL <name>" line (the red file names it) and the night is red; else no result
+  night_step() {
+    local n=$1 f=$2; shift 2
+    [ -f "$f" ] || { echo "STEP $n: not in this tree, skipped"; return 0; }
+    echo "STEP $n: start $(date +%T)"
+    /usr/bin/caffeinate -is "$@"; local r=$?
+    case $r in
+      0) echo "STEP $n: green" ;;
+      1) echo "FAIL $n"; echo "STEP $n: red"; rc=1 ;;
+      *) echo "STEP $n: no result (exit $r)" ;;
+    esac
+    return $r
+  }
+  # the desktop checks' coverage map (every harness check under V8 coverage), then its audit: a
+  # miss is a red with its owner (MISS lines), and the selection goes back to shadow mode
+  day="$(date +%F)"
+  covmap=apps/desktop/tests/harness/coverage/covmap.mjs
+  if night_step desktop-map "$covmap" node "$covmap" run --day "$day"; then
+    night_step desktop-pick-audit tests/desktop_pick_audit.py python3 -B tests/desktop_pick_audit.py --day "$day"
+  fi
+  # the recorded ambient-core of the QA world, typed and checked for invariants (feature-tests, p5)
+  night_step core-record scripts/core_record.sh bash scripts/core_record.sh
+  exit $rc
 fi
 
 if [ "${1:-}" = --tip ]; then

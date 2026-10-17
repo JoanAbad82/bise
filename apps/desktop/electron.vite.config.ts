@@ -16,6 +16,11 @@ const src = resolve(__dirname, 'src');
 
 const BIMS_BUDGET = 800 * 1024;
 
+// Source maps only in the nightly's coverage-map build (BISE_DESKTOP_SOURCEMAP=1, covmap.mjs run:
+// fast-try p2, architect m_29221 #3): V8 sees the bundles, the maps name the source files that ran.
+// pnpm build and a release ship none (gate.sh land fails on a .map in out/).
+const sourcemap = process.env['BISE_DESKTOP_SOURCEMAP'] === '1';
+
 /** the chunks holding three or src/bims/render: their minified size printed, the build failed past the budget */
 function bimsBudget(): Plugin {
   const three = (id: string): boolean => /[/\\]node_modules[/\\]three[/\\]/.test(id);
@@ -55,11 +60,13 @@ function bimsBudget(): Plugin {
 export default defineConfig({
   main: {
     build: {
+      sourcemap,
       rollupOptions: { input: { index: resolve(src, 'main/index.ts') } },
     },
   },
   preload: {
     build: {
+      sourcemap,
       rollupOptions: {
         input: { index: resolve(src, 'main/preload.ts') },
         output: { format: 'cjs' },
@@ -71,6 +78,7 @@ export default defineConfig({
     resolve: { alias: { '@': src } },
     plugins: [react(), bimsBudget()],
     build: {
+      sourcemap,
       rollupOptions: { input: { index: resolve(src, 'renderer/index.html') } },
     },
   },
