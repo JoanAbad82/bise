@@ -440,4 +440,6 @@ crate::words! { composer:
     cmd_artifacts = "what its agents made";
     /// the desktop's / list: /scheduled
     cmd_scheduled = "its timers";
+    /// the desktop's / list: /bims (the office's map for this project)
+    cmd_bims = "the bims' office: pick its map";
 }

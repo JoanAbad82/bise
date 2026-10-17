@@ -10,8 +10,7 @@
 // at any t. Pure: the same updates give the same poses. Spots shared by several bims (bean
 // bags, island, whiteboard, deck chairs) go first come first served; past the last one, a bim
 // stands beside (spec §3).
-import type { Activity, BimEvent, Office, Pose, Segment, Spot, Timeline } from './model';
-import { exitOf } from './layout';
+import { type Activity, type BimEvent, type Office, type Pose, QUEUE_GAP, type Segment, type Spot, type Timeline } from './model';
 import { along, makePath, path } from './paths';
 
 /** tiles per second (spec §3): walk, hurry (an urgent ask), skate (done, leaving), carrying a box (landing) */
@@ -91,8 +90,8 @@ export function newTimeline(): Timeline {
   return {
     update(acts: ReadonlyMap<string, Activity>, next: Office, t: number, events: readonly BimEvent[]): void {
       const first = office === null;
-      // a room that grew (more rows, 3 columns): its world is rebuilt, every bim at its spot in it
-      const rebuilt = office !== null && (office.side !== next.side || office.rows !== next.rows);
+      // a room that grew (the loft's rows, its 3 columns) or another map: its world is rebuilt, every bim at its spot in it
+      const rebuilt = office !== null && (office.map !== next.map || office.size !== next.size);
       office = next;
       const held = new Map<string, string>();
       for (const [name, b] of bims) if (b.key && !b.leaving) held.set(b.key, name);
@@ -147,7 +146,7 @@ export function newTimeline(): Timeline {
         b.leaving = true;
         const act: Activity = { k: 'done', at: 'terrace' };
         const now = rebuilt ? null : poseOf(b, t);
-        const seg = walk(next, t, act, 'gone', now ?? exitOf(next), exitOf(next), last?.act.k ?? null);
+        const seg = walk(next, t, act, 'gone', now ?? next.exit, next.exit, last?.act.k ?? null);
         push(b, seg);
         b.outAt = t + seg.path.len / seg.speed;
       }
@@ -214,9 +213,13 @@ function fixedSpot(o: Office, name: string, act: Activity): Spot | null {
       const rank = Math.max(1, act.rank ?? 1);
       const place = o.queue[rank - 1];
       if (place) return place;
-      // past the queue's end: on the back corridor, in line behind the last place
-      const x = Math.max(o.x0 + 1.5, (o.queue[0]?.x ?? o.mainDesk.x) - 0.5 * (rank - o.queue.length));
-      return { x, z: o.crossBack, wz: o.crossBack, ax: x, face: Math.PI / 2 };
+      // past the queue's end: in line along the map's queueMore leg, from its first end
+      const [a, b] = o.queueMore;
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      const f = len > 0 ? Math.min(1, (QUEUE_GAP * (rank - o.queue.length)) / len) : 0;
+      const x = a.x + (b.x - a.x) * f;
+      const z = a.z + (b.z - a.z) * f;
+      return { x, z, wz: z, ax: x, face: o.queue.at(-1)?.face ?? Math.PI / 2 };
     }
     default:
       return null;

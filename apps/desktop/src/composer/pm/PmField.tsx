@@ -498,7 +498,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
       );
       if (cmd?.ready !== true) return;
       saved.current = remember(saved.current, entryNow());
-      props.current.command(pick.name, "");
+      props.current.command(pick.name, pick.args ?? "");
       clear();
       forget();
       writeNow();

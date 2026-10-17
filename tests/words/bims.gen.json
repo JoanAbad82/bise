@@ -109,6 +109,150 @@
     "one": null,
     "text": "can't draw the office here"
   },
+  "bims.map_california": {
+    "args": [],
+    "one": null,
+    "text": "California"
+  },
+  "bims.map_california_mood": {
+    "args": [],
+    "one": null,
+    "text": "a stucco office and a concrete skatepark"
+  },
+  "bims.map_campus": {
+    "args": [],
+    "one": null,
+    "text": "Campus"
+  },
+  "bims.map_campus_mood": {
+    "args": [],
+    "one": null,
+    "text": "pods of four, a long counter, steps to sit on"
+  },
+  "bims.map_current_tip": {
+    "args": [
+      "map"
+    ],
+    "one": null,
+    "text": "this project's office is the {map} now"
+  },
+  "bims.map_cyclades": {
+    "args": [],
+    "one": null,
+    "text": "Cyclades"
+  },
+  "bims.map_cyclades_mood": {
+    "args": [],
+    "one": null,
+    "text": "little white cubes up steps, blue tables"
+  },
+  "bims.map_greenhouse": {
+    "args": [],
+    "one": null,
+    "text": "Greenhouse"
+  },
+  "bims.map_greenhouse_mood": {
+    "args": [],
+    "one": null,
+    "text": "desks in a ring round a tree, glass walls"
+  },
+  "bims.map_haveli": {
+    "args": [],
+    "one": null,
+    "text": "Haveli"
+  },
+  "bims.map_haveli_mood": {
+    "args": [],
+    "one": null,
+    "text": "a courtyard with arcades, a chai stall, a swing"
+  },
+  "bims.map_kyoto": {
+    "args": [],
+    "one": null,
+    "text": "Kyoto"
+  },
+  "bims.map_kyoto_mood": {
+    "args": [],
+    "one": null,
+    "text": "low tables on tatami round a small garden"
+  },
+  "bims.map_loft": {
+    "args": [],
+    "one": null,
+    "text": "Loft"
+  },
+  "bims.map_loft_mood": {
+    "args": [],
+    "one": null,
+    "text": "the kitchen island in the middle, bean bags at the back"
+  },
+  "bims.map_nordic": {
+    "args": [],
+    "one": null,
+    "text": "Nordic"
+  },
+  "bims.map_nordic_mood": {
+    "args": [],
+    "one": null,
+    "text": "one long wooden table, a stove, a sauna outside"
+  },
+  "bims.map_patio": {
+    "args": [],
+    "one": null,
+    "text": "Patio"
+  },
+  "bims.map_patio_mood": {
+    "args": [],
+    "one": null,
+    "text": "coloured walls round a patio, hammocks for naps"
+  },
+  "bims.map_pick_tip": {
+    "args": [
+      "map"
+    ],
+    "one": null,
+    "text": "draw this project's office as the {map}"
+  },
+  "bims.map_riad": {
+    "args": [],
+    "one": null,
+    "text": "Riad"
+  },
+  "bims.map_riad_mood": {
+    "args": [],
+    "one": null,
+    "text": "galleries round a patio and its fountain"
+  },
+  "bims.map_sahel": {
+    "args": [],
+    "one": null,
+    "text": "Sahel"
+  },
+  "bims.map_sahel_mood": {
+    "args": [],
+    "one": null,
+    "text": "a shade hangar round a yard and its baobab"
+  },
+  "bims.map_tropical": {
+    "args": [],
+    "one": null,
+    "text": "Tropical"
+  },
+  "bims.map_tropical_mood": {
+    "args": [],
+    "one": null,
+    "text": "desks on a curve, a juice bar, hammocks"
+  },
+  "bims.map_workshop": {
+    "args": [],
+    "one": null,
+    "text": "Workshop"
+  },
+  "bims.map_workshop_mood": {
+    "args": [],
+    "one": null,
+    "text": "a garage: a workbench, ping-pong, the door rolled up"
+  },
   "bims.pill_asks_tip": {
     "args": [
       "agent"

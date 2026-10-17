@@ -3,7 +3,11 @@
 // number. Files, skills and commands come from the core once amb-core's step 4 generates their
 // events (until then their lists are empty: the pickers show nothing, never a guess).
 import { useMemo } from 'react';
-import { useAgents, useArtifacts, useCards, useProjects, useStore } from '@/store';
+import { useAgents, useArtifacts, useCards, usePrefs, useProjects, useStore } from '@/store';
+import { getPref, type Prefs } from '@/settings/prefs';
+import { mapOf, mapPrefKey } from '@/bims/maps/ids';
+import { readyMaps } from '@/bims/maps';
+import { mapChoices } from '@/bims/maps/words';
 import { prefixFirst } from './tokens';
 import { saveImageFile } from './attach';
 import { NO_SOURCES, type Choice, type ComposerSources, type DictatePort } from './sources';
@@ -17,6 +21,7 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
   const made = useArtifacts(project);
   const root = useProjects().find((p) => p.project === project)?.path;
   const store = useStore();
+  const map = mapOf(getPref(usePrefs() as Prefs | null, mapPrefKey(project)));
   // the mic through the store (bar I): only this window gets its words, a reload cancels
   const dictate = useMemo<DictatePort>(
     () => ({
@@ -55,6 +60,7 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       agent: live.filter((a) => !a.main).map((a): Choice => ({ value: a.name, desc: a.title })),
       archived: agents.filter((a) => a.archived).map((a): Choice => ({ value: a.name, desc: a.title })),
       card: cards.map((c): Choice => ({ value: String(c.id), desc: `${c.agent}: ${c.question}` })),
+      map: mapChoices(readyMaps(), map),
     };
     return {
       // `@` lists the others: not the agent he writes to (the TUI's filter_mentions)
@@ -74,7 +80,8 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       ...(noVision === undefined ? {} : { noVision }),
       dictate,
       ...(voice === undefined ? {} : { voice }),
-      choices: (kind, query) => (kind === 'agent' || kind === 'archived' || kind === 'card' ? prefixFirst(lists[kind], query, (c) => c.value) : []),
+      choices: (kind, query) =>
+        kind === 'agent' || kind === 'archived' || kind === 'card' || kind === 'map' ? prefixFirst(lists[kind], query, (c) => c.value) : [],
     };
-  }, [agents, cards, made, files, skills, commands, saveImage, inView, dictate, voice, project, store, root]);
+  }, [agents, cards, made, files, skills, commands, saveImage, inView, dictate, voice, project, store, root, map]);
 }

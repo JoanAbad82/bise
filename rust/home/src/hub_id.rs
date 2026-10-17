@@ -29,6 +29,20 @@ pub fn hub_id(workspace: &Path) -> String {
     format!("{}-{:08x}", base, fnv1a(&workspace.to_string_lossy()) as u32)
 }
 
+/// Whether `id` has [`hub_id`]'s shape: 1 to 32 of `[A-Za-z0-9_-]`, a dash,
+/// 8 lowercase hex digits (prefs' `bims.map.<id>` keys, architect m_28589).
+pub fn is_hub_id(id: &str) -> bool {
+    match id.rsplit_once('-') {
+        Some((name, h)) => {
+            (1..=32).contains(&name.len())
+                && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+                && h.len() == 8
+                && h.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        }
+        None => false,
+    }
+}
+
 /// The project a hub id names: its folder part, without the `-<8 hex>`
 /// [`hub_id`] adds (`harness-af1b2326` → `harness`); a name that is no hub
 /// id comes back whole. The computer-use broker titles a tab group with it
@@ -43,6 +57,16 @@ pub fn project_of_id(id: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_hub_id_has_its_shape() {
+        for p in ["/Users/me/lab/harness", "/tmp/my repo", "/", "/a/x_1", "/a/very-long-folder-name-that-goes-past-32-chars"] {
+            assert!(is_hub_id(&hub_id(Path::new(p))), "{p}");
+        }
+        for id in ["harness", "harness-af1b232", "harness-AF1B2326", "-af1b2326", "a.b-af1b2326", "x-af1b2326.y", ""] {
+            assert!(!is_hub_id(id), "{id}");
+        }
+    }
 
     /// The round trip: the project of a workspace's hub id is its sanitized
     /// folder name.

@@ -3,7 +3,7 @@
 // list never loads it). One place to rename a part. Owner: bims-wire.
 import { activities } from './activity';
 import { labelsOf } from './labels';
-import { layoutOf } from './layout';
+import { layoutOf } from './maps';
 import { newTimeline } from './timeline';
 import type { Parts } from './Office';
 

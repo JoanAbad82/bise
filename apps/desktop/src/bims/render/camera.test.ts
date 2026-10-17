@@ -3,7 +3,7 @@ import type { Office, Spot } from '../model';
 import { FIT, zoomAt } from '../zoom';
 import { EL, aboveTop, fitSite, siteOf, toScreen, viewFit } from './camera';
 
-/** the prototype's office numbers for n agents (layout.ts owns the real ones; these only size the site) */
+/** the prototype's office numbers for n agents (maps/loft.ts owns the real ones; these only size the site) */
 function officeFor(n: number): Office {
   const others = n - 1;
   const side = others > 16 ? 3 : 2;
@@ -12,9 +12,10 @@ function officeFor(n: number): Office {
   const D = 4.3 + rows * 2.3 + 1.0;
   const spot: Spot = { x: 0, z: 1, wz: 1, ax: 0, face: 0 };
   return {
-    side, rows, W, D, x0: -W / 2, crossBack: 4.05, crossFront: D - 0.5, ax: 1.2,
-    island: { z0: 4.5, z1: 4.5 + rows * 2.3 - 1, w: 1.4 },
+    map: 'loft', size: `${String(side)}x${String(rows)}`, W, D, x0: -W / 2,
+    island: { x0: -0.7, x1: 0.7, z0: 4.5, z1: 4.5 + rows * 2.3 - 1 },
     desks: new Map(), mainDesk: spot, islandSpots: [], lounge: [], boardSpots: [], queue: [], door: spot, terrace: [],
+    exit: spot, queueMore: [spot, spot], walks: [], furniture: [],
   };
 }
 

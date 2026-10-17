@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { activities } from './activity';
 import { agent, crowd, mainAgent, office as officeSnap } from './fixtures';
-import { exitOf, layoutOf } from './layout';
+import { loftLayout as layoutOf } from './maps/loft';
 import type { Activity, BimEvent, Office, Pose } from './model';
 import { COFFEE_S, MAX_WALK_S, PLANE_S, SETTLE_S, SPEED, VISIT_S, newTimeline } from './timeline';
 
@@ -105,7 +105,7 @@ describe('timeline', () => {
     expect(seg?.sig).toBe('gone');
     expect(seg?.speed).toBeGreaterThanOrEqual(SPEED.skate);
     const out = 3 + (seg?.path.len ?? 0) / (seg?.speed ?? 1);
-    expect(seg?.spot).toEqual(exitOf(o));
+    expect(seg?.spot).toEqual(o.exit);
     expect(tl.names(3.1)).toContain('a1');
     expect(tl.moving(3.1)).toBe(true);
     expect(tl.poseAt('a1', out + 0.01)).toBeNull();

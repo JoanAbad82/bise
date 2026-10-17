@@ -28,12 +28,22 @@ export type ArgKind =
   | 'model'
   | 'effort'
   | 'plugin'
+  // the office's maps (/bims): the ready ones, the project's checked (bims/maps/words.ts)
+  | 'map'
   | 'text';
 
 /** One value an argument can take, as its popup shows it. */
 export interface Choice {
   readonly value: string;
   readonly desc: string;
+  /** its row's name when it isn't the value ('Kyoto' for kyoto); the row then has no '/' glyph */
+  readonly label?: string;
+  /** the value it has now: its ✓ */
+  readonly current?: boolean;
+  /** the row's tip words, what picking it does (his rule: every mark explains itself) */
+  readonly tip?: string;
+  /** picking it runs the command with this value at once (/bims kyoto), no ⏎ */
+  readonly runs?: boolean;
 }
 
 export interface PickCommand {

@@ -1,6 +1,6 @@
 // les bims (page bims-office v7, spec artifact les-bims-sc-narios-du-bureau): the right bar's AGENTS
 // section drawn as an isometric office, one bim per agent row. This file is the contract between
-// the pure parts (activity.ts, layout.ts, paths.ts, timeline.ts, labels.ts: no three, no DOM, unit
+// the pure parts (activity.ts, maps/ (each map's plan), paths.ts, timeline.ts, labels.ts: no three, no DOM, unit
 // tests on fake rows) and the effectful ones (render/: three.js; Office.tsx: the canvas, the label
 // overlay, the loop). Time is real time in seconds (`t`), read by the shell and passed in.
 // It reads the rows (the spec's [a]) and the hub's two facts for his q-planes / q-data answers
@@ -10,6 +10,10 @@ import type { Agent, Card, Place } from '@/proto';
 import type { Cam } from './zoom';
 import type { BimEgg, OfficeEggs } from './eggs';
 import type { Grow } from './growth';
+import type { MapId } from './maps/ids';
+
+/** The office's maps (maps/ids.ts MAP_IDS); the project's pick, the loft when he never picked one. */
+export type { MapId };
 
 /** What the office reads at one moment: the bar's rows for one project, nothing else. */
 export interface Snapshot {
@@ -106,20 +110,35 @@ export interface Spot extends Pt {
   readonly face: number;
 }
 
-/** The office for N agents (layout.ts): pure numbers the renderer builds the world from. */
+/** A piece of furniture's floor box; `of`: the spot it belongs to (a bim sits in its bean bag). */
+export interface Box {
+  readonly x0: number;
+  readonly x1: number;
+  readonly z0: number;
+  readonly z1: number;
+  readonly of?: Pt;
+}
+
+/** A straight leg of a walk graph, between two points. */
+export type Leg = readonly [Pt, Pt];
+
+/**
+ * The office for N agents on one map (its plan, maps/<map>.ts): pure numbers the renderer builds the
+ * world from and the walks follow. Every map gives the same places (desks, main's desk and its land
+ * queue, the eating place and its spots, the nap place, the board, the door, the terrace, the way
+ * out) and its own walk graph; maps/contract.test.ts checks every plan against this contract.
+ */
 export interface Office {
-  /** desk columns on each side of the island (2, 3 past 16 agents) */
-  readonly side: number;
-  readonly rows: number;
-  /** floor size and its left edge */
+  /** the map its plan drew */
+  readonly map: MapId;
+  /** what places the desks (the loft: its columns and rows): when it changes the world is rebuilt and every bim stands at its spot again */
+  readonly size: string;
+  /** floor size and its left edge (x right, z towards the viewer, 0 at the back wall) */
   readonly W: number;
   readonly D: number;
   readonly x0: number;
-  /** the two corridors' z (the back one, the front one) and the aisles' x (±ax) */
-  readonly crossBack: number;
-  readonly crossFront: number;
-  readonly ax: number;
-  readonly island: { readonly z0: number; readonly z1: number; readonly w: number };
+  /** the eating place's floor box (the loft's kitchen island, a riad's fountain): an egg puts its cake on it */
+  readonly island: Box;
   /** one desk per non-main agent, by name, in start order; never moves while the agent lives */
   readonly desks: ReadonlyMap<string, Spot>;
   readonly mainDesk: Spot;
@@ -129,7 +148,22 @@ export interface Office {
   readonly queue: readonly Spot[];
   readonly door: Spot;
   readonly terrace: readonly Spot[];
+  /** where a leaving (archived) bim walks to, out of the map */
+  readonly exit: Spot;
+  /** the land queue past its last place: bims wait along this leg of `walks`, from its first end, QUEUE_GAP apart */
+  readonly queueMore: Leg;
+  /**
+   * The plan's walk graph: straight legs a bim walks along. Each place above is an end of a leg,
+   * the graph is connected, and no leg crosses `furniture` but the box of a place at its end
+   * (paths.ts splits it at its junctions and finds the walks).
+   */
+  readonly walks: readonly Leg[];
+  /** what a walk never crosses, where the look draws it: desks, main's desk, the eating place, each bed and deck chair */
+  readonly furniture: readonly Box[];
 }
+
+/** a land queue's places, apart (layout and the queue's overflow) */
+export const QUEUE_GAP = 0.5;
 
 /** A walk: its corners and the length of each leg (paths.ts). */
 export interface Path {
@@ -178,8 +212,8 @@ export const LOOP_FPS = 8;
 /** activity.ts `activities`: every live agent's activity at t (archived rows absent). */
 export type ActivitiesFn = (snap: Snapshot, t: number) => ReadonlyMap<string, Activity>;
 
-/** layout.ts `layoutOf`: the office for these agents (main and the others, start order). */
-export type LayoutFn = (agents: readonly Agent[]) => Office;
+/** maps/index.ts `layoutOf`: the office for these agents (main and the others, start order) on the project's map. */
+export type LayoutFn = (agents: readonly Agent[], map?: MapId) => Office;
 
 /** timeline.ts `newTimeline`: one per mounted office, fed at each snapshot change and each frame. */
 export interface Timeline {
@@ -251,6 +285,8 @@ export interface OfficeRenderer {
   pieceOf(stage: number): { readonly x: number; readonly y: number } | null;
   /** the bim (or its desk) under a canvas point, css px; null on nothing */
   pick(x: number, y: number): string | null;
+  /** the office as drawn now, copied onto a 2d canvas of the same pixel size (the map's crossfade, /bims) */
+  copyTo(target: HTMLCanvasElement): void;
   /** WebGL lost: the shell falls back to the list with one line */
   onLost(cb: () => void): void;
   dispose(): void;

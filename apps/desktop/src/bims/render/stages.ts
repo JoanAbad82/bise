@@ -7,21 +7,19 @@
 // decor). Built with world.ts's kit; nothing here decides.
 // Owner: bims-grow.
 import { Group, type Object3D } from 'three';
-import { type Box } from '../layout';
-import type { Office, Pt } from '../model';
+import type { Box, Office, Pt } from '../model';
 import type { Grow } from '../growth';
 import { type Decor, decorOf } from './decor';
 import { type Kit, boxOf, glyph, onFloor } from './kit';
 import { WORLD, hash, rng } from './palette';
+import type { Build } from './maps/look';
 
-/** each stage's pieces, by stage (1..14); 0: what every office has */
-export type Pieces = ReadonlyMap<number, Group>;
 
 const BEANS = [0, 0, 0, 2, 2, 4, 4, 4, 8] as const;
 const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;
 const at = <T>(xs: readonly T[], i: number): T => xs[Math.min(i, xs.length - 1)] as T;
 
-function tree(k: Kit, parent: Object3D, x: number, z: number, size: number): void {
+export function loftTree(k: Kit, parent: Object3D, x: number, z: number, size: number): void {
   const { style } = k;
   const g = new Group();
   g.position.set(x, 0, z);
@@ -135,36 +133,14 @@ export function islandLen(o: Office, stage: number): number {
   return full;
 }
 
-/** Builds every piece the growth has reached into `root`; returns each stage's group. */
-export function buildStages(k: Kit, root: Object3D, o: Office, g: Grow, boxes: readonly Box[]): Pieces {
+/** The loft's nap place (its look's lounge): its rug from stage 3, a bean bag per stage count, in its stage's group. */
+export function loftLounge(b: Build): void {
+  const { k, o, grow: g } = b;
   const { style, pal } = k;
-  const pieces = new Map<number, Group>();
-  const s = (n: number): Group | null => {
-    if (n > g.stage) return null;
-    let grp = pieces.get(n);
-    if (!grp) { grp = new Group(); pieces.set(n, grp); root.add(grp); }
-    return grp;
-  };
-  const d: Decor = decorOf(o);
-  const { x0, W, D } = o;
-  const x1 = x0 + W;
-  const isl = o.island;
+  const s = (n: number): Group | null => b.stage(n);
   const s0 = s(0);
-  if (!s0) return pieces;
-
-  // the terrace: grass in a new office; the first done bim makes it, with its first deck chair
-  // (bims m_28178). Its deck chairs come with the stages
-  const s1t = s(1);
-  if (s1t) onFloor(k, s1t, boxOf(d.terrace), 0.08, 0, pal.terrace);
-  const isChair = (b: Box): boolean => b.of !== undefined && o.terrace.some((t) => t.x === b.of?.x && t.z === b.of.z);
-  const chairs = boxes.filter(isChair);
-  const nChairs = at(CHAIRS, g.stage);
-  chairs.forEach((b, i) => {
-    if (i >= nChairs) return;
-    const st = ([1, 4, 7, 7, 10, 10, 10, 10] as const)[i] ?? 0;
-    deckChair(k, s(st) ?? s0, b, WORLD.chair[i % 2] ?? WORLD.paper);
-  });
-
+  if (!s0) return;
+  const boxes = o.furniture;
   // the lounge: its rug from stage 3, a bean bag per stage count, or per bim that may nap there
   const { l0, l1 } = loungeX(o);
   const lz = o.lounge.map((sp) => sp.z);
@@ -179,6 +155,33 @@ export function buildStages(k: Kit, root: Object3D, o: Office, g: Grow, boxes: r
     const bag = k.add(style.ball((b.x1 - b.x0) / 2 / 1.05 / 0.92), k.mat(WORLD.bean[i % WORLD.bean.length] ?? pal.rug), s(st) ?? s0, (b.x0 + b.x1) / 2, 0.2, (b.z0 + b.z1) / 2);
     bag.scale.set(1.05, 0.62, 1.05);
   });
+}
+
+/** The loft's growth (its look's growth): every piece the stages have reached, each in its stage's group. */
+export function buildStages(b: Build): void {
+  const { k, o, grow: g } = b;
+  const { style, pal } = k;
+  const boxes = o.furniture;
+  const s = (n: number): Group | null => b.stage(n);
+  const d: Decor = decorOf(o);
+  const { x0, W, D } = o;
+  const x1 = x0 + W;
+  const isl = o.island;
+  const s0 = s(0);
+  if (!s0) return;
+
+  // the terrace: grass in a new office; the first done bim makes it, with its first deck chair
+  // (bims m_28178). Its deck chairs come with the stages
+  const s1t = s(1);
+  if (s1t) onFloor(k, s1t, boxOf(d.terrace), 0.08, 0, pal.terrace);
+  const isChair = (b: Box): boolean => b.of !== undefined && o.terrace.some((t) => t.x === b.of?.x && t.z === b.of.z);
+  const chairs = boxes.filter(isChair);
+  const nChairs = at(CHAIRS, g.stage);
+  chairs.forEach((b, i) => {
+    if (i >= nChairs) return;
+    const st = ([1, 4, 7, 7, 10, 10, 10, 10] as const)[i] ?? 0;
+    deckChair(k, s(st) ?? s0, b, WORLD.chair[i % 2] ?? WORLD.paper);
+  });
 
   // stage 1: a plant; 2: the island's fruit, a first tree; 4: the whiteboard, a 2nd plant
   const s1 = s(1);
@@ -188,8 +191,9 @@ export function buildStages(k: Kit, root: Object3D, o: Office, g: Grow, boxes: r
   if (s2) {
     fruitBowl(k, s2, 0, isl.z0 + 1.3);
     const t = d.trees[0];
-    if (t) tree(k, s2, t.x, t.z, tSize);
+    if (t) loftTree(k, s2, t.x, t.z, tSize);
   }
+  const { l0, l1 } = loungeX(o);
   const s4 = s(4);
   if (s4) {
     whiteboard(k, s4, boardX(o));
@@ -226,7 +230,7 @@ export function buildStages(k: Kit, root: Object3D, o: Office, g: Grow, boxes: r
   }
   // 8: trees all round
   const s8 = s(8);
-  if (s8) for (const t of d.trees.slice(1)) tree(k, s8, t.x, t.z, tSize);
+  if (s8) for (const t of d.trees.slice(1)) loftTree(k, s8, t.x, t.z, tSize);
   // 9: the skate ramp
   const s9 = s(9);
   if (s9) onFloor(k, s9, boxOf(d.ramp), 0.3, 0.15, WORLD.ramp);
@@ -279,7 +283,6 @@ export function buildStages(k: Kit, root: Object3D, o: Office, g: Grow, boxes: r
   garden(k, s0, o, g);
   frames(k, s0, o, g);
   if (g.building && g.stage < 14) cones(k, s0, pieceAt(o, g.stage + 1));
-  return pieces;
 }
 
 /** the garden: more flowers on the grass the more days the project was used (the ground widens: camera.ts groundOf) */

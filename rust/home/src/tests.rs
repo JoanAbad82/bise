@@ -463,6 +463,22 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert_eq!(prefs::set_dotted(&o, "desktop_channel", json!("beta")).unwrap()["desktop_channel"], json!("beta"));
     assert!(prefs::set_dotted(&o, "desktop_channel", json!("nightly")).is_err());
     assert!(prefs::set_dotted(&o, "desktop_channel.x", json!(true)).is_err());
+    // the office's map per project (the desktop's /bims): bims.map.<hub id> = a slug, nothing else
+    let m = prefs::set_dotted(&o, "bims.map.harness-3abb2bd8", json!("kyoto")).unwrap();
+    assert_eq!(m["bims"], json!({"map": {"harness-3abb2bd8": "kyoto"}}));
+    assert_eq!(prefs::set_dotted(&m, "bims.map.harness-3abb2bd8", Value::Null).unwrap()["bims"], json!({"map": {}}), "null: back to the loft");
+    for (key, v) in [
+        ("bims", json!({})),
+        ("bims.map", json!({})),
+        ("bims.other.harness-3abb2bd8", json!("kyoto")),
+        ("bims.map.harness", json!("kyoto")),
+        ("bims.map.harness-3abb2bd8.x", json!("kyoto")),
+        ("bims.map.harness-3abb2bd8", json!("Kyoto")),
+        ("bims.map.harness-3abb2bd8", json!("a-very-long-map-name-past-32-chars")),
+        ("bims.map.harness-3abb2bd8", json!(3)),
+    ] {
+        assert!(prefs::set_dotted(&o, key, v.clone()).is_err(), "{key} = {v}");
+    }
     // S36: a one-time hint marked seen, the TUI's key in the same object
     let h = prefs::set_dotted(&json!({"hints": {"first_agent": true}}), "hints.first_card", json!(true)).unwrap();
     assert_eq!(h["hints"], json!({"first_agent": true, "first_card": true}));

@@ -510,12 +510,11 @@ body:has(.app-shell) {
 .app-btg {
   display: inline-flex;
 }
-.app-btg .b-ibtn {
-  color: var(--c-text-3);
-}
+/* les bims' icon: the accent at rest, hovered and open (designer m_28575); the tints are the button's */
+.app-btg .b-ibtn,
 .app-btg .b-ibtn:hover,
 .app-btg .b-ibtn.on {
-  color: var(--c-text);
+  color: var(--c-accent);
 }
 .app-bims-glyph {
   display: block;

@@ -10,7 +10,7 @@ import { along, path } from '../paths';
 import { makeBim, type Bim } from './bim';
 import { castShadows } from './world';
 import { rigOf } from './pose';
-import { pieceAt } from './stages';
+import type { MapLook } from './maps/look';
 import type { Style } from './style';
 
 /** how far apart the two carriers walk, sideways */
@@ -20,7 +20,7 @@ const POP = 0.4;
 
 export interface Unlock {
   /** the moment at t: hides the piece until it is brought in; true while something moves */
-  update(t: number, o: Office, u: { readonly stage: number; readonly at: number } | undefined, piece: Object3D | undefined, reduced: boolean): boolean;
+  update(t: number, o: Office, u: { readonly stage: number; readonly at: number } | undefined, piece: Object3D | undefined, reduced: boolean, look: MapLook): boolean;
   dispose(): void;
 }
 
@@ -42,7 +42,7 @@ export function makeUnlock(scene: Scene, style: Style): Unlock {
     for (const b of crew) b.group.visible = false;
   };
   return {
-    update(t, o, u, piece, reduced) {
+    update(t, o, u, piece, reduced, look) {
       if (!u) { hide(); if (piece) piece.scale.setScalar(1); return false; }
       const s = t - u.at;
       const end = UNLOCK_WALK + UNLOCK_LABEL;
@@ -58,7 +58,7 @@ export function makeUnlock(scene: Scene, style: Style): Unlock {
         const k = Math.min(1, Math.max(0.01, p));
         piece.scale.setScalar(k);
       }
-      const to: Pt = pieceAt(o, u.stage);
+      const to: Pt = look.pieceAt(o, u.stage);
       const walk = path(o, o.door, to);
       const speed = Math.max(0.5, walk.len / UNLOCK_WALK);
       const act: Activity = { k: 'landing', at: 'queue' };

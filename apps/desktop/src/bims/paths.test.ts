@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { crowd } from './fixtures';
-import { type Box, exitOf, furniture, layoutOf } from './layout';
-import type { Office, Path, Pt } from './model';
+import type { Box, Office, Path, Pt } from './model';
+import { loftLayout as layoutOf } from './maps/loft';
 import { along, type Leg, network, path } from './paths';
+
+const furniture = (o: Office) => o.furniture;
+const exitOf = (o: Office) => o.exit;
 
 const SIZES = [1, 5, 14, 17, 31];
 

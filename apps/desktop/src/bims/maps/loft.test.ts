@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { agent, crowd } from './fixtures';
-import { exitOf, furniture, layoutOf, WIDE_PAST } from './layout';
-import type { Office, Spot } from './model';
-import { path } from './paths';
+import { agent, crowd } from '../fixtures';
+import type { Spot } from '../model';
+import { path } from '../paths';
+import { type LoftOffice, loftLayout as layoutOf, WIDE_PAST } from './loft';
+
+const furniture = (o: LoftOffice) => o.furniture;
+const exitOf = (o: LoftOffice) => o.exit;
 
 /** every place a bim can stand, the exit aside */
-function spotsOf(o: Office): Spot[] {
+function spotsOf(o: LoftOffice): Spot[] {
   return [...o.desks.values(), o.mainDesk, ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, o.door, ...o.terrace];
 }
 

@@ -57,7 +57,26 @@ pub fn excluded_apps(v: Option<Value>) -> Vec<String> {
 
 /// The top keys of `prefs.json` the window may set (`prefs_set`,
 /// architect m_9130): anything else is refused, never written.
-pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel"];
+pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel", "bims"];
+
+/// `bims.map.<hub id>`: the office's map he picked for that project (the
+/// desktop's /bims, architect m_28589). Only that path, the id with
+/// [`crate::hub_id`]'s shape, the value a short slug: the map names are the
+/// desktop's drawing table (an unknown one draws the loft), never listed
+/// here. Unset reads as the loft; nothing writes a default.
+fn bims_key(parts: &[&str], v: &Value) -> Result<(), String> {
+    let slug = |s: &str| (1..=32).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+    match parts {
+        ["bims", "map", id] if crate::hub_id::is_hub_id(id) => {
+            if v.is_null() || v.as_str().is_some_and(slug) {
+                Ok(())
+            } else {
+                Err(format!("bims.map.{id} can't be {v}"))
+            }
+        }
+        _ => Err(format!("{} is not a bims preference", parts.join("."))),
+    }
+}
 
 /// The one-time hints the window may mark seen (`prefs_set {key:
 /// "hints.<name>", value: true}`, S36): the TUI's own keys (tui hints.rs
@@ -101,6 +120,9 @@ pub fn set_dotted(obj: &Value, key: &str, value: Value) -> Result<Value, String>
         }
     } else if !WINDOW_KEYS.contains(&top) {
         return Err(format!("{top} is not a preference the window sets"));
+    }
+    if top == "bims" {
+        bims_key(&parts, &value)?;
     }
     if parts.len() == 1 {
         if !value.is_null() {

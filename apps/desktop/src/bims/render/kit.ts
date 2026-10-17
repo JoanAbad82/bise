@@ -2,7 +2,7 @@
 // small shapes the room and its stages share (a box on the floor, the :* glyph). world.ts builds the
 // room with it, stages.ts what the project's growth adds. Split out of world.ts (bims-grow).
 import { type BufferGeometry, type Material, Mesh, type Object3D } from 'three';
-import type { Box } from '../layout';
+import type { Box } from '../model';
 import type { Foot } from './decor';
 import type { Palette } from './palette';
 import type { Style } from './style';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { crowd, office as fixture } from '../fixtures';
-import { exitOf, furniture, layoutOf } from '../layout';
+import { layoutOf } from '../maps';
 import { network } from '../paths';
 import type { Office } from '../model';
 import { siteOf } from './camera';
@@ -38,7 +38,7 @@ describe('decor', () => {
     for (const [what, o] of offices) {
       const d = decorOf(o);
       for (const f of [...d.plants, d.parasol, d.palm, d.ramp]) {
-        for (const b of furniture(o)) {
+        for (const b of o.furniture) {
           const hit = f.x + f.hw > b.x0 && f.x - f.hw < b.x1 && f.z + f.hd > b.z0 && f.z - f.hd < b.z1;
           expect(hit, `${what}: decor at ${f.x.toFixed(1)},${f.z.toFixed(1)} on furniture`).toBe(false);
         }
@@ -50,13 +50,13 @@ describe('decor', () => {
     for (const [what, o] of offices) {
       const { terrace: t } = decorOf(o);
       const site = siteOf(o);
-      for (const b of furniture(o).filter((x) => x.z0 > o.D)) {
+      for (const b of o.furniture.filter((x) => x.z0 > o.D)) {
         expect(b.z1 <= t.z + t.hd && b.z0 >= t.z - t.hd, `${what}: deck chair off the slab`).toBe(true);
       }
       expect(t.z + t.hd).toBeLessThanOrEqual(site.z1);
       expect(t.x - t.hw).toBeGreaterThanOrEqual(site.x0);
       // the leaving bim skates off the block's edge, out of the map
-      expect(exitOf(o).x).toBeLessThan(site.x0);
+      expect(o.exit.x).toBeLessThan(site.x0);
     }
   });
 });

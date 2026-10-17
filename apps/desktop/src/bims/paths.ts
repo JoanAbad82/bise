@@ -1,17 +1,15 @@
-// les bims: the walks (spec §3, "le graphe"). The office's walk network: the back and front
-// corridors, the two aisles, the door line out to the terrace's walkway, and each spot's way in
-// (spot -> its walkway `wz` -> its aisle or lane `ax` -> the corridor or the terrace walkway).
-// Every leg is axis-aligned and clear of the furniture (layout.ts `furniture`), so a walk made of
-// legs never crosses a desk, the island, a bean bag or a deck chair. `path` finds the shortest
-// walk from any point on the network (a spot, or where a bim stood when its state changed
-// mid-walk: no teleport) to a spot. Pure: the same office and points give the same walk.
-import type { Office, Path, Pt } from './model';
-import { exitOf, terraceWalk } from './layout';
+// les bims: the walks (spec §3, "le graphe"). An office's walk network is its map's walk graph
+// (Office.walks, maps/<map>.ts: the loft's corridors, aisles, door line and each spot's way in),
+// split at every junction. Every leg is straight and clear of the furniture (the map's contract,
+// maps/contract.test.ts), so a walk made of legs never crosses a desk, the island, a bed or a deck
+// chair. `path` finds the shortest walk from any point on the network (a spot, or where a bim
+// stood when its state changed mid-walk: no teleport) to a spot. Pure: the same office and points
+// give the same walk.
+import type { Leg, Office, Path, Pt } from './model';
+
+export type { Leg };
 
 const EPS = 1e-6;
-
-/** A leg of the network, between two points. */
-export type Leg = readonly [Pt, Pt];
 
 interface Net {
   readonly legs: readonly Leg[];
@@ -110,31 +108,9 @@ function netOf(o: Office): Net {
   return net;
 }
 
-/** the trunk (corridors, aisles, the door line, the terrace walkway) and every spot's way in */
+/** the map's walk graph, split at every junction (every leg's ends) */
 function build(o: Office): Net {
-  const tw = terraceWalk(o);
-  const exit = exitOf(o);
-  const spots = [
-    ...o.desks.values(), o.mainDesk, ...o.islandSpots, ...o.lounge, ...o.boardSpots,
-    ...o.queue, o.door, ...o.terrace, exit,
-  ];
-  // the back corridor runs from the leftmost lane to the rightmost one (the aisles at least)
-  const backX = spots.filter((s) => s.wz <= o.crossBack + EPS).map((s) => s.ax);
-  const trunk: Leg[] = [
-    [{ x: Math.min(-o.ax, ...backX), z: o.crossBack }, { x: Math.max(o.ax, ...backX), z: o.crossBack }],
-    [{ x: -o.ax, z: o.crossFront }, { x: o.ax, z: o.crossFront }],
-    [{ x: -o.ax, z: o.crossBack }, { x: -o.ax, z: o.crossFront }],
-    [{ x: o.ax, z: o.crossBack }, { x: o.ax, z: o.crossFront }],
-    [{ x: -o.ax, z: o.crossFront }, { x: -o.ax, z: tw }],
-    [{ x: exit.x, z: tw }, { x: -o.ax, z: tw }],
-  ];
-  const raw: Leg[] = [...trunk];
-  for (const s of spots) {
-    const walk = { x: s.x, z: s.wz };
-    const entry = { x: s.ax, z: s.wz };
-    raw.push([s, walk], [walk, entry]);
-    if (!trunk.some((l) => onLeg(l, entry))) raw.push([entry, { x: s.ax, z: s.wz < o.crossBack ? o.crossBack : tw }]);
-  }
+  const raw = o.walks;
   const legsIn = raw.filter(([a, b]) => !near(a, b));
   // the junctions: every leg's ends; each leg split at the junctions on it
   const nodes: Pt[] = [];
@@ -207,14 +183,15 @@ function sameLeg(a: Where, b: Where): boolean {
   return false;
 }
 
+/** p on the straight leg a-b (within 1e-4) */
 function onLeg([a, b]: Leg, p: Pt): boolean {
-  if (Math.abs(a.x - b.x) < EPS) {
-    return Math.abs(p.x - a.x) < 1e-4 && p.z >= Math.min(a.z, b.z) - 1e-4 && p.z <= Math.max(a.z, b.z) + 1e-4;
-  }
-  if (Math.abs(a.z - b.z) < EPS) {
-    return Math.abs(p.z - a.z) < 1e-4 && p.x >= Math.min(a.x, b.x) - 1e-4 && p.x <= Math.max(a.x, b.x) + 1e-4;
-  }
-  return false;
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const l2 = dx * dx + dz * dz;
+  if (l2 < EPS * EPS) return near(a, p);
+  const f = ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2;
+  if (f < -1e-4 || f > 1 + 1e-4) return false;
+  return Math.abs((p.x - a.x) * dz - (p.z - a.z) * dx) / Math.sqrt(l2) < 1e-4;
 }
 
 function simplify(points: readonly Pt[]): Pt[] {
@@ -231,11 +208,11 @@ function simplify(points: readonly Pt[]): Pt[] {
   return out;
 }
 
-/** three points on one horizontal or vertical line (every leg is one) */
+/** three points on one straight line, b between a and c (a turn back is two legs) */
 function inLine(a: Pt, b: Pt, c: Pt): boolean {
-  const vx = Math.abs(a.x - b.x) < 1e-4 && Math.abs(b.x - c.x) < 1e-4;
-  const vz = Math.abs(a.z - b.z) < 1e-4 && Math.abs(b.z - c.z) < 1e-4;
-  return vx || vz;
+  const cross = (b.x - a.x) * (c.z - b.z) - (b.z - a.z) * (c.x - b.x);
+  const dot = (b.x - a.x) * (c.x - b.x) + (b.z - a.z) * (c.z - b.z);
+  return Math.abs(cross) < 1e-6 && dot >= 0;
 }
 
 const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.z - b.z);

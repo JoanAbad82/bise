@@ -9,7 +9,13 @@ import type { Row } from './pick';
 
 /** A row's words on the ds Picker: the kind's glyph out of the label, a file's folder under its name. Pure. */
 export function pickerRow(r: Row, testId: string): PickerRow {
-  const base = { id: r.id, disabled: r.off, testId: `${testId}.${r.id}`, tip: r.desc === '' ? undefined : `${r.label} · ${r.desc}` };
+  const base = {
+    id: r.id,
+    disabled: r.off,
+    testId: `${testId}.${r.id}`,
+    tip: r.tip ?? (r.desc === '' ? undefined : `${r.label} · ${r.desc}`),
+    ...(r.current === true ? { current: true } : {}),
+  };
   const sec = r.desc === '' ? undefined : r.desc;
   switch (r.tag) {
     case 'cmd':

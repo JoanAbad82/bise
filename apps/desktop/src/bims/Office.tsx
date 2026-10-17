@@ -29,6 +29,7 @@ import { FOLD_MS } from './Fold';
 import { placeZzz, sleepers } from './zzz';
 import { aimAt, bimsLit, easeCam, edgeOf, useBimsLit } from './focus';
 import type { Growth } from '@/proto';
+import { DEFAULT_MAP, type MapId } from './maps/ids';
 import './office.css';
 
 /** The pure modules and the renderer's loader: feed.ts's, or fakes in a test. */
@@ -130,6 +131,8 @@ interface Live {
   held: boolean;
   /** the agent whose row the pointer is on (focus.ts): a halo under its bim */
   lit: string | null;
+  /** the project's map (/bims, his prefs): another one crossfades the office to it */
+  map: MapId;
 }
 
 /** The follow camera (focus.ts): the bim it aims at ('fit': back to the whole office, then null), and its last step's time. */
@@ -139,7 +142,21 @@ interface Follow {
 }
 
 /** The office's agents in a stable shape: the live rows (archived ones have left). */
-const officeKey = (agents: readonly Agent[]): string => agents.map((a) => `${a.name}${a.main ? '*' : ''}`).join(',');
+const officeKey = (agents: readonly Agent[], map: MapId): string => `${map}|${agents.map((a) => `${a.name}${a.main ? '*' : ''}`).join(',')}`;
+
+/** the map's crossfade (/bims): the old office over the new one, faded out (office.css .bims-xfade, ~300 ms) */
+function crossfade(r: OfficeRenderer, cv: HTMLCanvasElement, fx: HTMLCanvasElement): void {
+  fx.width = cv.width;
+  fx.height = cv.height;
+  fx.style.width = `${String(cv.clientWidth)}px`;
+  fx.style.height = `${String(cv.clientHeight)}px`;
+  r.copyTo(fx);
+  fx.dataset.on = '';
+  // the next frame lets it go: the transition runs from full to none
+  requestAnimationFrame(() => {
+    delete fx.dataset.on;
+  });
+}
 
 export function Office({
   project,
@@ -147,6 +164,7 @@ export function Office({
   cards,
   places,
   growth = null,
+  map = DEFAULT_MAP,
   parts,
   follow = null,
   onOpen,
@@ -158,6 +176,8 @@ export function Office({
   places: readonly Place[];
   /** how much the project has done (hub/growth); the office draws its high-water mark (growth.ts) */
   growth?: Growth | null;
+  /** the project's map (his /bims pick, prefs bims.map.<project>); the loft when he never picked one */
+  map?: MapId;
   parts: Parts;
   /** the agent whose thread is open (focus.ts followOf): the office zooms on its bim and follows it */
   follow?: string | null;
@@ -179,6 +199,7 @@ export function Office({
   const [labels, setLabels] = useState<ReadonlyMap<string, Label>>(new Map());
   const holder = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const xfade = useRef<HTMLCanvasElement>(null);
   const tags = useRef(new Map<string, HTMLDivElement>());
   const leaders = useRef<SVGSVGElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -212,7 +233,7 @@ export function Office({
     setFitted(atFit(c));
     applyCam.current(c);
   }, []);
-  const live = useRef<Live>({ snap: { agents, cards, places }, agents, fresh: true, events: [], hover: null, held, lit: null });
+  const live = useRef<Live>({ snap: { agents, cards, places }, agents, fresh: true, events: [], hover: null, held, lit: null, map });
   useEffect(() => {
     const was = followRef.current.target;
     if (follow === (was === null || was === 'fit' ? null : was.name)) return;
@@ -245,6 +266,12 @@ export function Office({
     live.current = { ...live.current, snap: { agents, cards, places }, agents, fresh: true };
     kickRef.current();
   }, [agents, cards, places]);
+  // his /bims pick: the office crossfades to the new map at the next frame
+  useEffect(() => {
+    if (live.current.map === map) return;
+    live.current = { ...live.current, map, fresh: true };
+    kickRef.current();
+  }, [map]);
   useEffect(() => {
     live.current.held = held;
     kickRef.current();
@@ -352,10 +379,16 @@ export function Office({
       const t = Date.now() / 1000;
       if (L.fresh) {
         L.fresh = false;
-        const key = officeKey(L.agents);
+        const key = officeKey(L.agents, L.map);
         if (office === null || key !== shape) {
           shape = key;
-          office = parts.layoutOf(L.agents);
+          const next = parts.layoutOf(L.agents, L.map);
+          // another map: the old office fades out over the new one; reduced motion: a cut
+          const fx = xfade.current;
+          if (office !== null && office.map !== next.map && !reduced && fx !== null) crossfade(r, cv, fx);
+          office = next;
+          // what he picked (data-want) and what is drawn (data-map: the loft for a map not ready yet)
+          if (holder.current !== null) Object.assign(holder.current.dataset, { want: L.map, map: office.map });
           r.setOffice(office, L.agents);
           resize();
         }
@@ -719,6 +752,7 @@ export function Office({
         className={`bims-canvas${boxW > 0 && cropped(growNow, boxW >= WIDE_FIT_PX) ? ' bims-fade' : ''}`}
         data-testid="app.right.bims.canvas"
       />
+      <canvas ref={xfade} className="bims-xfade" aria-hidden="true" data-testid="app.right.bims.xfade" />
       <div className="bims-overlay">
         <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
         <div ref={zzzRef} className="bims-zzzs" data-testid="app.right.bims.zzzs" />

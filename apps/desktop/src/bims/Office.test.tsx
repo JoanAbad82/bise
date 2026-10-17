@@ -39,6 +39,7 @@ function fakeRenderer() {
     }),
     headOf: vi.fn(() => ({ x: 10, y: 20, feet: 40 })),
     pick: vi.fn((x: number): string | null => (x < 50 ? 'perf' : null)),
+    copyTo: vi.fn(),
     onLost: (cb: () => void) => {
       lostCb = cb;
     },
@@ -345,5 +346,45 @@ describe('his camera (zoom.ts)', () => {
     expect(onOpen).not.toHaveBeenCalled();
     fireEvent.click(office(), { clientX: 10, clientY: 10 });
     expect(onOpen).toHaveBeenCalledWith('perf');
+  });
+});
+
+describe('the map (/bims)', () => {
+  /** parts whose office is the map asked for, so a new pick is another office */
+  const mapParts = (r: ReturnType<typeof fakeRenderer>) => {
+    const { parts } = fakeParts(r);
+    return { ...parts, layoutOf: (_agents: unknown, map?: string) => ({ map: map ?? 'loft' }) as OfficeMap };
+  };
+  const mountMap = (parts: Parts, map: 'loft' | 'kyoto') =>
+    render(<Office project="p1" agents={AGENTS} cards={[]} places={[]} map={map} parts={parts} onOpen={vi.fn()} />);
+
+  it('a new map crossfades: the old office copied over the new one, then let go', async () => {
+    const r = fakeRenderer();
+    const parts = mapParts(r);
+    const { rerender } = mountMap(parts, 'loft');
+    await flush(3);
+    expect(screen.getByTestId('app.right.bims').dataset.map).toBe('loft');
+    expect(r.copyTo).not.toHaveBeenCalled();
+    rerender(<Office project="p1" agents={AGENTS} cards={[]} places={[]} map="kyoto" parts={parts} onOpen={vi.fn()} />);
+    await flush();
+    expect(r.copyTo).toHaveBeenCalledTimes(1);
+    expect(r.setOffice).toHaveBeenCalledTimes(2);
+    const box = screen.getByTestId('app.right.bims');
+    expect([box.dataset.want, box.dataset.map]).toEqual(['kyoto', 'kyoto']);
+    expect(screen.getByTestId('app.right.bims.xfade').dataset.on).toBe('');
+    await flush();
+    expect(screen.getByTestId('app.right.bims.xfade').dataset.on).toBeUndefined();
+  });
+
+  it('a cut under reduced motion', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduce'), addEventListener() {}, removeEventListener() {} }));
+    const r = fakeRenderer();
+    const parts = mapParts(r);
+    const { rerender } = mountMap(parts, 'loft');
+    await flush(3);
+    rerender(<Office project="p1" agents={AGENTS} cards={[]} places={[]} map="kyoto" parts={parts} onOpen={vi.fn()} />);
+    await flush();
+    expect(r.setOffice).toHaveBeenCalledTimes(2);
+    expect(r.copyTo).not.toHaveBeenCalled();
   });
 });

@@ -453,6 +453,11 @@
     "one": null,
     "text": "what its agents made"
   },
+  "composer.cmd_bims": {
+    "args": [],
+    "one": null,
+    "text": "the bims' office: pick its map"
+  },
   "composer.cmd_diff": {
     "args": [],
     "one": null,

@@ -1,6 +1,6 @@
 // Where the office's decor stands (pure): the plants, the parasol, the palm, the mini ramp, the door
 // mat, the trees and flowers on the grass. The furniture bims sit at (desks, main's desk, the island,
-// bean bags, deck chairs) is layout.ts's furniture(); decor stays off its walk network (decor.test.ts
+// bean bags, deck chairs) is the plan's Office.furniture; decor stays off its walk network (decor.test.ts
 // walks paths.ts network() past every footprint).
 import type { Office } from '../model';
 

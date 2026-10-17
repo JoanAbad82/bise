@@ -12,6 +12,7 @@ import type { ArgKind, PickCommand } from '@/composer';
 import type { AppCmd, HubCmd, PickArg, PickCommand as CoreCommand } from '@/proto';
 import { MAIN, type Route } from '@/app/route';
 import { composer } from '../proto/words.gen';
+import { mapOf, mapPrefKey } from '@/bims/maps/ids';
 
 /** The window's own commands the TUI has no row for, after the core's. */
 export const windowCommands: readonly PickCommand[] = [
@@ -22,6 +23,7 @@ export const windowCommands: readonly PickCommand[] = [
   { name: 'prs', desc: composer.cmd_prs, args: false, ready: true },
   { name: 'artifacts', desc: composer.cmd_artifacts, args: false, ready: true },
   { name: 'scheduled', desc: composer.cmd_scheduled, args: false, ready: true },
+  { name: 'bims', desc: composer.cmd_bims, args: true, argKinds: ['map'], ready: true },
 ];
 
 /**
@@ -123,6 +125,10 @@ export function windowRun(name: string, args: string, at: { project: string; age
       return { quit: true };
     case 'welcome':
       return go({ screen: 'onboarding' });
+    case 'bims':
+      // '/bims kyoto' draws this project's office as that map, in every window (his prefs,
+      // architect m_28589); bare: none, the composer's list of maps is the menu
+      return arg === '' || at.project === '' ? undefined : { app: { cmd: 'prefs_set', key: mapPrefKey(at.project), value: mapOf(arg) } };
     default:
       return undefined;
   }

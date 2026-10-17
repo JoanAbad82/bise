@@ -21,7 +21,7 @@ import { LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { AddButton, AddDrop, useAddPlace } from '@/artifacts/Drops';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
-import { useCards, useComputerLive, useGrowth, usePlaces, useStore, type Store } from '@/store';
+import { useCards, useComputerLive, useGrowth, usePlaces, usePrefs, useStore, type Store } from '@/store';
 import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
@@ -38,6 +38,8 @@ import { DoneSign } from './Marks';
 import { BimsSwitch, Office } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
 import { BimsFold } from '@/bims/Fold';
+import { mapOf, mapPrefKey } from '@/bims/maps/ids';
+import { getPref, type Prefs } from '@/settings/prefs';
 import { showsWide, useBimsView, wideMode } from '@/bims/view';
 import { bimsLit, followOf, useBimsLit } from '@/bims/focus';
 
@@ -455,6 +457,8 @@ export function RightBar({ project, name, over, column }: { project: string; nam
   const places = usePlaces(project);
   const cards = useCards(project);
   const growth = useGrowth(project);
+  // the office's map he picked with /bims for this project (his prefs, every window reads them)
+  const officeMap = mapOf(getPref(usePrefs() as Prefs | null, mapPrefKey(project)));
   const computer = useComputerLive();
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
   // the TUI's ⌥ numbers: the rows' order and ⌥N (a project's only; bise's thread keeps start order)
@@ -534,6 +538,7 @@ export function RightBar({ project, name, over, column }: { project: string; nam
                 cards={cards}
                 places={places}
                 growth={growth}
+                map={officeMap}
                 parts={bimsParts}
                 follow={follow}
                 onOpen={(agent) => {

@@ -63,7 +63,7 @@ export function makeEggDecor(o: Office, style: Style, stage = 0): EggDecor {
   add(style.cylinder(0.3, 0.18), cream, cake, 0, 0.31, 0);
   add(style.cylinder(0.03, 0.18), mat(WORLD.pineapple), cake, 0, 0.49, 0);
   add(style.ball(0.045), mat(WORLD.gold, 0.9), cake, 0, 0.61, 0);
-  cake.position.set(0, 0.66, o.island.z1 - 0.6);
+  cake.position.set((o.island.x0 + o.island.x1) / 2, 0.66, o.island.z1 - 0.6);
   cake.visible = false;
   root.add(cake);
 
@@ -95,7 +95,7 @@ export function makeEggDecor(o: Office, style: Style, stage = 0): EggDecor {
     add(style.box(0.022, 0.2, 0.022), noteInk, n, 0.05, 0.1, 0);
     notes.add(n);
   }
-  notes.position.set(0, 0.95, o.island.z0 + islandLen(o, stage) - 0.6);
+  notes.position.set((o.island.x0 + o.island.x1) / 2, 0.95, o.island.z0 + islandLen(o, stage) - 0.6);
   notes.visible = false;
   root.add(notes);
 

@@ -8,6 +8,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   useSyncExternalStore,
@@ -467,8 +468,9 @@ export function Titlebar({ frame }: { frame: FrameState }) {
       </StatusSlot>
       {/* the right bar's toggle (designer m_20274/m_20275): the left toggle's panel icon mirrored,
           pressed while the bar is open; the accent count of what waits on him in its place, none at 0 */}
-      {/* les bims' icon (designer m_28198): a 16 px cube in the line set, text-3, ink on hover;
-          open = pressed in ink like the right bar's toggle beside it, never the accent */}
+      {/* les bims' icon (Gabriel's pick D on page bims-icon, designer m_28575): the solid accent box
+          with its eyes cut out, the accent at rest, hovered and open; hover and open are the
+          button's own tints, like the right bar's toggle beside it */}
       {frame.panel !== undefined && frame.panel.project !== "" && view.lost !== true && (
         <span className="app-btg">
         <IconButton
@@ -513,12 +515,27 @@ export function Titlebar({ frame }: { frame: FrameState }) {
   );
 }
 
-/** les bims' icon: an isometric cube outline (the office seen from above), 16 px, stroke 1.5, the button's colour. */
+/**
+ * les bims' icon (designer m_28575, pick D): a solid isometric box in the accent, its top .45, its
+ * right face .75, its left face full, each with a 1.5 stroke; two eyes on the left face cut out
+ * with a mask, so the button's hover and pressed tints show through them.
+ */
 function BimsGlyph() {
+  const id = `bims-eyes-${useId().replace(/:/g, "")}`;
   return (
-    <svg className="app-bims-glyph" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
-      <path d="M8 1.75 13.75 5v6L8 14.25 2.25 11V5Z" />
-      <path d="M2.25 5 8 8.25 13.75 5M8 8.25v6" />
+    <svg className="app-bims-glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <defs>
+        <mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16">
+          <rect width="16" height="16" fill="#fff" />
+          <circle cx="4.21" cy="8.59" r="0.95" fill="#000" />
+          <circle cx="6.43" cy="9.87" r="0.95" fill="#000" />
+        </mask>
+      </defs>
+      <g mask={`url(#${id})`} fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+        <polygon points="8,1.6 13.54,4.8 8,8 2.46,4.8" fillOpacity={0.45} />
+        <polygon points="2.46,11.2 8,14.4 8,8 2.46,4.8" />
+        <polygon points="13.54,11.2 8,14.4 8,8 13.54,4.8" fillOpacity={0.75} />
+      </g>
     </svg>
   );
 }

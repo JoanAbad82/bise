@@ -11,17 +11,21 @@ export interface Row {
   readonly label: string;
   readonly desc: string;
   /** A tag in front: `agent`, `dir`, `file`, `skill`, `cmd`, `emoji`. */
-  readonly tag: 'agent' | 'artifact' | 'dir' | 'file' | 'skill' | 'cmd' | 'emoji';
+  readonly tag: 'agent' | 'artifact' | 'dir' | 'file' | 'skill' | 'cmd' | 'emoji' | 'choice';
   /** Greyed, `not yet`: shown, picking it does nothing (bar 2.1). */
   readonly off: boolean;
   readonly pick: Pick;
+  /** a value it has now: its ✓ (an argument's Choice.current) */
+  readonly current?: boolean;
+  /** its tip words instead of 'label · desc' */
+  readonly tip?: string;
 }
 
 /** What a pick does: replace the trigger's word by `text` (and keep the list open on `browse`),
  *  or run the command now. */
 export type Pick =
   | { readonly kind: 'insert'; readonly text: string; readonly browse: boolean; readonly path?: string }
-  | { readonly kind: 'run'; readonly name: string }
+  | { readonly kind: 'run'; readonly name: string; readonly args?: string }
   | { readonly kind: 'artifact'; readonly id: string; readonly title: string; readonly url: string };
 
 /** At most this many rows in a list (the TUI's popup shows fewer; the rest is a query away). */
@@ -133,11 +137,13 @@ export function argRows(t: Trigger, commands: readonly PickCommand[], sources: {
   const list = typeof kind === 'object' ? prefixFirst(kind.words, t.query, (w) => w.value) : (sources.choices?.(kind, t.query) ?? []);
   return list.map((c) => ({
     id: `arg.${c.value}`,
-    label: c.value,
+    label: c.label ?? c.value,
     desc: c.desc,
-    tag: 'cmd',
+    tag: c.label === undefined ? 'cmd' : 'choice',
     off: false,
-    pick: { kind: 'insert', text: `${c.value} `, browse: false },
+    pick: c.runs === true && t.command !== undefined ? { kind: 'run', name: t.command, args: c.value } : { kind: 'insert', text: `${c.value} `, browse: false },
+    ...(c.current === true ? { current: true } : {}),
+    ...(c.tip === undefined ? {} : { tip: c.tip }),
   }));
 }
 
@@ -153,7 +159,9 @@ export function enterSends(t: Trigger | null, row: Row | undefined): boolean {
 
 /** Tab on a row: always completes (a command's name, then its arguments), never runs. */
 export function completion(row: Row): Pick {
-  return row.pick.kind === 'run' ? { kind: 'insert', text: `${row.pick.name} `, browse: false } : row.pick;
+  if (row.pick.kind !== 'run') return row.pick;
+  // an argument that runs at once (/bims kyoto): Tab writes its value, ⏎ or a click runs it
+  return { kind: 'insert', text: `${row.pick.args ?? row.pick.name} `, browse: false };
 }
 
 /** The keyboard's row after a move: wraps at both ends, skips nothing (greyed rows are visible). */

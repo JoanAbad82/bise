@@ -104,4 +104,60 @@ export const bims = {
   grow_tip: (a: { n: number; level: string | number; thing: string | number; at: string | number }): string => a.n === 1 ? "level " + String(a.level) + " · " + String(a.n) + " job done · next: " + String(a.thing) + " at " + String(a.at) : "level " + String(a.level) + " · " + String(a.n) + " jobs done · next: " + String(a.thing) + " at " + String(a.at),
   /** the same at the last level */
   grow_tip_top: (a: { n: number; level: string | number }): string => a.n === 1 ? "level " + String(a.level) + " · " + String(a.n) + " job done" : "level " + String(a.level) + " · " + String(a.n) + " jobs done",
+  /** a map: the island in the middle (the first one) */
+  map_loft: "Loft",
+  /**  */
+  map_loft_mood: "the kitchen island in the middle, bean bags at the back",
+  /** a map: desks in a ring round a tree */
+  map_greenhouse: "Greenhouse",
+  /**  */
+  map_greenhouse_mood: "desks in a ring round a tree, glass walls",
+  /** a map: pods of four */
+  map_campus: "Campus",
+  /**  */
+  map_campus_mood: "pods of four, a long counter, steps to sit on",
+  /** a map: a garage */
+  map_workshop: "Workshop",
+  /**  */
+  map_workshop_mood: "a garage: a workbench, ping-pong, the door rolled up",
+  /** a map: a machiya */
+  map_kyoto: "Kyoto",
+  /**  */
+  map_kyoto_mood: "low tables on tatami round a small garden",
+  /** a map: a riad */
+  map_riad: "Riad",
+  /**  */
+  map_riad_mood: "galleries round a patio and its fountain",
+  /** a map: a wooden house */
+  map_nordic: "Nordic",
+  /**  */
+  map_nordic_mood: "one long wooden table, a stove, a sauna outside",
+  /** a map: a Mexican patio house */
+  map_patio: "Patio",
+  /**  */
+  map_patio_mood: "coloured walls round a patio, hammocks for naps",
+  /** a map: a haveli */
+  map_haveli: "Haveli",
+  /**  */
+  map_haveli_mood: "a courtyard with arcades, a chai stall, a swing",
+  /** a map: a tropical house */
+  map_tropical: "Tropical",
+  /**  */
+  map_tropical_mood: "desks on a curve, a juice bar, hammocks",
+  /** a map: white cubes */
+  map_cyclades: "Cyclades",
+  /**  */
+  map_cyclades_mood: "little white cubes up steps, blue tables",
+  /** a map: a yard round a baobab */
+  map_sahel: "Sahel",
+  /**  */
+  map_sahel_mood: "a shade hangar round a yard and its baobab",
+  /** a map: the office and its skatepark */
+  map_california: "California",
+  /**  */
+  map_california_mood: "a stucco office and a concrete skatepark",
+  /** the /bims picker's tip on its row: what picking it does */
+  map_pick_tip: (a: { map: string | number }): string => "draw this project's office as the " + String(a.map),
+  /** the tip on the row of the map it has now */
+  map_current_tip: (a: { map: string | number }): string => "this project's office is the " + String(a.map) + " now",
 } as const;

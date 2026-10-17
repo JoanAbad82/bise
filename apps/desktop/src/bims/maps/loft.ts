@@ -1,13 +1,25 @@
-// les bims: the office for N agents (the prototype's layout(), spec §3). Pure numbers, in floor
-// tiles: x right (0 at the island's middle), z towards the viewer (0 at the back wall). The back
-// zone holds the lounge (left), the whiteboard and main's big desk with its land queue (right);
-// then the back corridor, 2 desk columns each side of the kitchen island (3 past 16 agents), the
-// front corridor, the door, and the terrace outside. Each spot says where it joins the walk
-// network (its walkway `wz`, its aisle or lane `ax`): paths.ts builds the network from that, so a
-// walk never crosses a desk, the island, a bean bag or a deck chair (`furniture` lists them, the
-// renderer draws them there). The office is the same at 320 px and wide: the camera fits it.
+// The loft, the first map (the prototype's layout(), spec §3; its look: render/maps/loft.ts). Pure
+// numbers, in floor tiles: x right (0 at the island's middle), z towards the viewer (0 at the back
+// wall). The back zone holds the lounge (left), the whiteboard and main's big desk with its land
+// queue (right); then the back corridor, 2 desk columns each side of the kitchen island (3 past 16
+// agents), the front corridor, the door, and the terrace outside. Its walk graph: the corridors,
+// the two aisles, the door line out to the terrace's walkway, and each spot's way in (its walkway
+// `wz`, then its aisle or lane `ax`), so a walk never crosses a desk, the island, a bean bag or a
+// deck chair (`furniture`). The office is the same at 320 px and wide: the camera fits it.
 import type { Agent } from '@/proto';
-import type { Office, Pt, Spot } from './model';
+import { type Box, type Leg, type Office, type Pt, QUEUE_GAP, type Spot } from '../model';
+import { type Plan, boxAt, deskNames, wayIn } from './plan';
+
+/** The loft's office: the numbers its look and its tests read past the common ones. */
+export interface LoftOffice extends Office {
+  /** desk columns on each side of the island (2, 3 past 16 agents) */
+  readonly side: number;
+  readonly rows: number;
+  /** the two corridors' z (the back one, the front one) and the aisles' x (±ax) */
+  readonly crossBack: number;
+  readonly crossFront: number;
+  readonly ax: number;
+}
 
 /** desk pitch across and along, the island's width, an aisle's width, the back zone's depth */
 const DX = 2.4;
@@ -19,7 +31,6 @@ const BACK_D = 4.3;
 export const WIDE_PAST = 16;
 const LOUNGE_N = 10;
 const QUEUE_N = 6;
-const QUEUE_GAP = 0.5;
 const TERRACE_N = 12;
 const TERRACE_GAP = 1.15;
 /** the terrace's walkway, past the floor's front edge: the door line ends there */
@@ -33,8 +44,8 @@ const EXIT_OUT = 2.5;
  * agent takes the first free desk, and the room never shrinks (fewer columns or rows would move
  * the desks under the bims). Without `prev`: desks in start order.
  */
-export function layoutOf(agents: readonly Agent[], prev?: Office): Office {
-  const others = agents.filter((a) => !a.main && !a.archived).map((a) => a.name);
+export function loftLayout(agents: readonly Agent[], prev?: LoftOffice): LoftOffice {
+  const others = deskNames(agents);
   const side = prev?.side === 3 || others.length > WIDE_PAST ? 3 : 2;
   const cols = side * 2;
   const slots = deskSlots(others, side, prev);
@@ -55,7 +66,7 @@ export function layoutOf(agents: readonly Agent[], prev?: Office): Office {
 
   // the island: from the desks' top, as long as the desk rows (3.5 at least)
   const z0 = BACK_D + 0.2;
-  const island = { z0, z1: z0 + Math.max(rows * DZ - 1.0, 3.5), w: ISL };
+  const island: Box = { x0: -ISL / 2, x1: ISL / 2, z0, z1: z0 + Math.max(rows * DZ - 1.0, 3.5) };
   const islandSpots: Spot[] = [];
   for (let i = 0; i < 12; i++) {
     const sx = i % 2 ? 1 : -1;
@@ -96,46 +107,70 @@ export function layoutOf(agents: readonly Agent[], prev?: Office): Office {
     terrace.push({ x, z, wz: z, ax: j < 3 ? x + TERRACE_GAP / 2 : x - TERRACE_GAP / 2, face: 0 });
   }
 
-  return {
-    side, rows, W, D, x0, crossBack, crossFront, ax, island,
-    desks, mainDesk, islandSpots, lounge, boardSpots, queue, door, terrace,
-  };
+  // a leaving bim: along the terrace's walkway, off its left edge
+  const tw = D + TERRACE_WALK;
+  const exit: Spot = { x: x0 - EXIT_OUT, z: tw, wz: tw, ax: x0 - EXIT_OUT, face: -Math.PI / 2 };
+  const places = { desks, mainDesk, islandSpots, lounge, boardSpots, queue, door, terrace, exit };
+  const base = { map: 'loft' as const, size: `${String(side)}x${String(rows)}`, W, D, x0, island, ...places };
+  const furniture = furnitureOf(base);
+  const walks = walksOf({ ...base, crossBack, crossFront, ax, tw });
+  // past the queue's last place: on the back corridor, in line towards its left end (walksOf's first leg)
+  const q0 = queue[0]?.x ?? mx;
+  const left = Math.min(...walks[0].map((p) => p.x));
+  const queueMore: Leg = [{ x: q0, z: crossBack }, { x: Math.min(q0, Math.max(left, x0 + 1.5)), z: crossBack }];
+  return { ...base, side, rows, crossBack, crossFront, ax, walks, furniture, queueMore };
 }
 
-/** the terrace's walkway z (the door line goes from the front corridor down to it) */
-export function terraceWalk(o: Office): number {
-  return o.D + TERRACE_WALK;
+/** the loft as a map (maps/index.ts) */
+export const loft: Plan<LoftOffice> = { id: 'loft', ready: true, layout: loftLayout };
+
+/**
+ * The loft's walk graph: the trunk (the back and front corridors, the two aisles, the door line,
+ * the terrace's walkway out to the exit) and every place's way in: spot -> its walkway `wz` -> its
+ * aisle or lane `ax` -> the back corridor (a place behind it) or the terrace's walkway (in front).
+ */
+function walksOf(o: Omit<Office, 'walks' | 'furniture' | 'queueMore'> & { crossBack: number; crossFront: number; ax: number; tw: number }): [Leg, ...Leg[]] {
+  const { crossBack, crossFront, ax, tw, exit } = o;
+  const spots = [...o.desks.values(), o.mainDesk, ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, o.door, ...o.terrace, exit];
+  // the back corridor runs from the leftmost lane to the rightmost one (the aisles at least)
+  const backX = spots.filter((s) => s.wz <= crossBack + 1e-6).map((s) => s.ax);
+  const trunk: [Leg, ...Leg[]] = [
+    [{ x: Math.min(-ax, ...backX), z: crossBack }, { x: Math.max(ax, ...backX), z: crossBack }],
+    [{ x: -ax, z: crossFront }, { x: ax, z: crossFront }],
+    [{ x: -ax, z: crossBack }, { x: -ax, z: crossFront }],
+    [{ x: ax, z: crossBack }, { x: ax, z: crossFront }],
+    [{ x: -ax, z: crossFront }, { x: -ax, z: tw }],
+    [{ x: exit.x, z: tw }, { x: -ax, z: tw }],
+  ];
+  const onTrunk = (p: Pt): boolean => trunk.some(([a, b]) => onAxisLeg(a, b, p));
+  const out: [Leg, ...Leg[]] = [trunk[0], ...trunk.slice(1)];
+  for (const s of spots) {
+    out.push(...wayIn(s));
+    const entry = { x: s.ax, z: s.wz };
+    if (!onTrunk(entry)) out.push([entry, { x: s.ax, z: s.wz < crossBack ? crossBack : tw }]);
+  }
+  return out;
 }
 
-/** where a leaving (archived) bim walks to: off the terrace's left edge, out of the map */
-export function exitOf(o: Office): Spot {
-  const z = terraceWalk(o);
-  const x = o.x0 - EXIT_OUT;
-  return { x, z, wz: z, ax: x, face: -Math.PI / 2 };
-}
-
-/** A piece of furniture's floor box; `of`: the spot it belongs to (a bim sits in its bean bag). */
-export interface Box {
-  readonly x0: number;
-  readonly x1: number;
-  readonly z0: number;
-  readonly z1: number;
-  readonly of?: Pt;
+/** p on the axis-aligned leg a-b */
+function onAxisLeg(a: Pt, b: Pt, p: Pt): boolean {
+  const t = 1e-4;
+  if (Math.abs(a.x - b.x) < 1e-6) return Math.abs(p.x - a.x) < t && p.z >= Math.min(a.z, b.z) - t && p.z <= Math.max(a.z, b.z) + t;
+  if (Math.abs(a.z - b.z) < 1e-6) return Math.abs(p.z - a.z) < t && p.x >= Math.min(a.x, b.x) - t && p.x <= Math.max(a.x, b.x) + t;
+  return false;
 }
 
 /**
  * What a walk never crosses, where the renderer draws it: each desk (its spot is the chair, the
  * desk in front, +z), main's desk, the island (its top), each bean bag and deck chair.
  */
-export function furniture(o: Office): Box[] {
-  const box = (x: number, z: number, w: number, d: number, of?: Pt): Box => ({
-    x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, ...(of ? { of } : {}),
-  });
+function furnitureOf(o: Pick<Office, 'desks' | 'mainDesk' | 'island' | 'lounge' | 'terrace'>): Box[] {
+  const box = boxAt;
   const out: Box[] = [];
   for (const d of o.desks.values()) out.push(box(d.x, d.z + 0.5, 1.6, 0.78));
   out.push(box(o.mainDesk.x, o.mainDesk.z + 0.6, 2.3, 1.0));
   const iz = (o.island.z0 + o.island.z1) / 2;
-  out.push(box(0, iz, o.island.w + 0.1, o.island.z1 - o.island.z0 + 0.15));
+  out.push(box((o.island.x0 + o.island.x1) / 2, iz, o.island.x1 - o.island.x0 + 0.1, o.island.z1 - o.island.z0 + 0.15));
   for (const l of o.lounge) out.push(box(l.x, l.z - 0.05, 0.72, 0.72, l));
   for (const t of o.terrace) out.push(box(t.x, t.z + 0.05, 0.5, 0.95, t));
   return out;
@@ -160,7 +195,7 @@ function slotOf(p: Pt, side: number): number {
 }
 
 /** each agent's desk slot: kept from `prev` when the columns did not change, else the first free one */
-function deskSlots(names: readonly string[], side: number, prev: Office | undefined): Map<string, number> {
+function deskSlots(names: readonly string[], side: number, prev: LoftOffice | undefined): Map<string, number> {
   const slots = new Map<string, number>();
   const taken = new Set<number>();
   if (prev?.side === side) {

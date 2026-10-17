@@ -12,7 +12,6 @@ import type { BimFrame, Look, MakeRenderer, Motion, Office, OfficeRenderer } fro
 import { makeBim, type Bim } from './bim';
 import { FIT, type Cam } from '../zoom';
 import { BACK, DIST, type Fit, aboveTop, fitSite, siteOf, toScreen, viewFit } from './camera';
-import { paletteOf } from './palette';
 import { pickAt, type Target } from './pick';
 import { flightAt, makePlane, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
@@ -23,7 +22,8 @@ import { MAIN_HOODIE, WORLD, outfitOf, type Outfit } from './palette';
 import { buildWorld, castShadows, lightDesk, type World } from './world';
 import { NO_GROW, growSig, type Grow } from '../growth';
 import { wideSiteOf } from './camera';
-import { pieceAt } from './stages';
+import { lookOf } from './maps';
+import type { MapLook } from './maps/look';
 import { makeUnlock } from './unlock';
 
 /** from this width (css px) the camera fits the building and a little ground (wideSiteOf); under it the building */
@@ -95,6 +95,11 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   };
   canvas.addEventListener('webglcontextlost', onLost);
 
+  /** the office's map's look (the loft before an office) */
+  function mapLook(): MapLook {
+    return lookOf(office?.map ?? 'loft');
+  }
+
   function mainName(): string {
     return agents.find((a) => a.main)?.name ?? 'main';
   }
@@ -103,10 +108,10 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     if (world) { scene.remove(world.root); world.dispose(); world = null; }
     night = isNight;
     if (!office) return;
-    const pal = paletteOf(isNight);
-    renderer.setClearColor(pal.bg);
+    const look = lookOf(office.map);
     eclipsed = false;
-    world = buildWorld(office, mainName(), STYLE, pal, grow);
+    world = buildWorld(office, mainName(), STYLE, look, isNight, grow);
+    renderer.setClearColor(world.pal.bg);
     scene.add(world.root);
     if (eggDecor) { scene.remove(eggDecor.root); eggDecor.dispose(); }
     eggDecor = makeEggDecor(office, STYLE, grow.stage);
@@ -139,7 +144,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   function ensureBim(name: string, main: boolean): Bim {
     let b = bims.get(name);
     if (!b) {
-      b = makeBim(name, main, STYLE, aprilOutfit(name, main));
+      const look = mapLook();
+      b = makeBim(name, main, STYLE, aprilOutfit(name, main), main ? undefined : (w) => look.wear?.(w));
       if (STYLE.shadows) castShadows(b.group);
       b.group.visible = false;
       bims.set(name, b);
@@ -225,6 +231,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
 
   const api: OfficeRenderer = {
     setOffice(o, as) {
+      // another map: its bims dress for it (the look's wear)
+      if (office && office.map !== o.map) dropBims();
       office = o;
       agents = as;
       rebuildWorld(night ?? false);
@@ -287,7 +295,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
       if (eggDecor?.update(look.eggs) === true) motion = 'walk';
       // the unlock moment: two bims bring the new piece in from the door
-      if (unlock.update(t, office, look.unlock, look.unlock ? world.pieces.get(look.unlock.stage) : undefined, look.reduced)) motion = 'walk';
+      if (unlock.update(t, office, look.unlock, look.unlock ? world.pieces.get(look.unlock.stage) : undefined, look.reduced, mapLook())) motion = 'walk';
       renderer.render(scene, camera);
       if (probe) probe.frames++;
       return motion;
@@ -304,7 +312,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     pieceOf(stage) {
       if (!fit || !office) return null;
       // a piece out of the frame (the garden cropped at 320): the frame's edge nearest it (bims m_28178)
-      const p = toScreen(fit, { ...pieceAt(office, stage), y: 1.2 });
+      const p = toScreen(fit, { ...mapLook().pieceAt(office, stage), y: 1.2 });
       const m = 12;
       return { x: Math.min(fit.widthPx - m, Math.max(m, p.x)), y: Math.min(fit.heightPx - m, Math.max(m * 2, p.y)) };
     },
@@ -324,6 +332,11 @@ export const makeRenderer: MakeRenderer = (canvas) => {
         });
       }
       return pickAt(targets, x, y);
+    },
+    copyTo(target) {
+      // drawn again first: the WebGL buffer is not kept past a frame (no preserveDrawingBuffer)
+      renderer.render(scene, camera);
+      target.getContext('2d')?.drawImage(canvas, 0, 0, target.width, target.height);
     },
     onLost(cb) {
       lostCbs.push(cb);

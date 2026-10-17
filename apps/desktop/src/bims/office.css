@@ -344,3 +344,16 @@
 @media (prefers-reduced-motion: reduce) {
   .bims-zzzs { display: none; }
 }
+/* the map's crossfade (/bims, maps-a): the old office drawn over the new one, then faded out; a cut under reduced motion (Office.tsx never shows it) */
+.bims-xfade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out, ease-out);
+}
+.bims-xfade[data-on] {
+  opacity: 1;
+  transition: none;
+}

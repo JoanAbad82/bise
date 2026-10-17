@@ -6,6 +6,7 @@ import { type BufferGeometry, Color, Group, type Material, Mesh, type MeshBasicM
 import { CHEEK, EYE, MOUTH, WORLD, outfitOf, type Outfit } from './palette';
 import type { Rig, Rot } from './pose';
 import type { Style } from './style';
+import type { Wear } from './maps/look';
 
 type Mat = MeshLambertMaterial | MeshBasicMaterial;
 
@@ -26,8 +27,11 @@ const GREY = new Color(WORLD.grey);
 /** eyes this shut or more (pose.ts: 0.15 asleep, 0.3 laughing) draw as closed lines */
 const CLOSED = 0.25;
 
-/** `outfit`: another bim's (s3, april fools: hats shuffled, one in main's hoodie); its own by default */
-export function makeBim(name: string, main: boolean, style: Style, outfit?: Outfit): Bim {
+/**
+ * `outfit`: another bim's (s3, april fools: hats shuffled, one in main's hoodie); its own by default.
+ * `wear`: the map's small thing every bim wears (render/maps/look.ts), after its outfit.
+ */
+export function makeBim(name: string, main: boolean, style: Style, outfit?: Outfit, wear?: (w: Wear) => void): Bim {
   const o = outfit ?? outfitOf(name, main);
   const mats = new Map<string, Mat>();
   const orig = new Map<Mat, Color>();
@@ -130,6 +134,7 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   }
   const [armL, armR] = arms as [Group, Group];
   const [legL, legR] = legs as [Group, Group];
+  wear?.({ style, name, head, body, arms, legs, mat, add });
 
   // props
   const crate = add(style.box(0.4, 0.3, 0.3), mat(WORLD.crate), body, 0, 0.62, 0.3);
