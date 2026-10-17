@@ -313,6 +313,8 @@ async function runChecks(argv) {
   const covDir = path.join(gdir, 'desktop-cov-run');
   rmSync(covDir, { recursive: true, force: true });
   mkdirSync(covDir, { recursive: true });
+  const electron = harnessElectronEnv(DESKTOP, process.env, os.homedir());
+  if (electron.missing) { console.log(`FAIL desktop-checks (${electron.missing})`); return 1; }
   const b = spawnSync('pnpm', ['-s', 'build'], { cwd: DESKTOP, stdio: 'inherit', env: { ...process.env, BISE_DESKTOP_SOURCEMAP: '1' } });
   if (b.status !== 0) { console.log('FAIL desktop-build (pnpm build)'); return 1; }
   const report = path.join(covDir, 'report.json');
@@ -322,7 +324,7 @@ async function runChecks(argv) {
   const [bin, args] = heavyArgv([playwright, 'test', '-c', path.join(here, '..', 'playwright.config.ts'), '--reporter=list,json', ...targets]);
   const run = (cov, out) => {
     const t0 = Date.now();
-    const env = { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: out, ...(cov ? { BISE_HARNESS_COVERAGE: covDir } : {}) };
+    const env = { ...process.env, ...electron.env, PLAYWRIGHT_JSON_OUTPUT_NAME: out, ...(cov ? { BISE_HARNESS_COVERAGE: covDir } : {}) };
     const r = spawnSync(bin, args, { cwd: DESKTOP, stdio: 'inherit', env });
     console.log(`covmap checks${cov ? '' : ' (without coverage)'}: rc ${r.status} in ${Math.round((Date.now() - t0) / 1000)} s`);
     return out;
@@ -333,6 +335,24 @@ async function runChecks(argv) {
   if (v.red.length) spawnSync('python3', [path.join(REPO, 'tests', 'known_reds.py'), 'split', ...v.red], { stdio: 'inherit' });
   console.log(`covmap checks: ${v.said}`);
   return v.red.length ? 1 : 0;
+}
+
+/**
+ * The Electron the harness launches (tests/harness/electron.ts), for a tree whose node_modules came
+ * without its binary (gate.sh installs with ELECTRON_SKIP_BINARY_DOWNLOAD: the nightly tree): the
+ * caller's BISE_HARNESS_ELECTRON_DIST, else the tree's own dist or patched clone, else the shared
+ * patched copy ~/.bise/dev/electron-dist/v<version>-lsui. {env} to add, or {missing: why}.
+ */
+export function harnessElectronEnv(desktop, env, home) {
+  if (env.BISE_HARNESS_ELECTRON_DIST) return { env: {} };
+  let version = '';
+  try { version = JSON.parse(readFileSync(path.join(desktop, 'node_modules', 'electron', 'package.json'), 'utf8')).version; } catch { /* no electron */ }
+  if (!version) return { missing: 'no node_modules/electron: pnpm install first' };
+  const app = (d) => existsSync(path.join(d, 'Electron.app', 'Contents', 'MacOS', 'Electron'));
+  if (app(path.join(desktop, 'node_modules', 'electron', 'dist')) || app(path.join(desktop, '.harness-cache', `electron-${version}`))) return { env: {} };
+  const shared = path.join(home, '.bise', 'dev', 'electron-dist', `v${version}-lsui`);
+  if (app(shared)) return { env: { BISE_HARNESS_ELECTRON_DIST: shared } };
+  return { missing: `no Electron ${version}: not in node_modules/electron/dist, .harness-cache, nor ${shared} (tests/harness/README.md 'Electron')` };
 }
 
 /** Whether a coverage run's launches took their coverage (a hook.json): false = the tooling broke. */
@@ -408,6 +428,23 @@ export function selfTest() {
   assert(JSON.stringify(lineStarts('ab\ncd\n')) === '[0,3,6]', 'lineStarts');
   ran = ranSources([{ ranges: [{ startOffset: 3, endOffset: 5, count: 1 }] }], [[1, 1, 0]], lineStarts('ab\ncd\n'));
   assert(ran.has(0), 'a segment on line 2');
+  // the harness's Electron in a tree installed without its binary (the nightly's)
+  const et = mkdtempSync(path.join(os.tmpdir(), 'covmap-e-'));
+  try {
+    const d = path.join(et, 'desktop');
+    const mk = (dir) => { mkdirSync(path.join(dir, 'Electron.app', 'Contents', 'MacOS'), { recursive: true }); writeFileSync(path.join(dir, 'Electron.app', 'Contents', 'MacOS', 'Electron'), ''); };
+    assert(harnessElectronEnv(d, {}, et).missing?.includes('pnpm install'), 'no electron package');
+    mkdirSync(path.join(d, 'node_modules', 'electron'), { recursive: true });
+    writeFileSync(path.join(d, 'node_modules', 'electron', 'package.json'), '{"version":"9.9.9"}');
+    assert(harnessElectronEnv(d, {}, et).missing?.includes('no Electron 9.9.9'), 'no binary anywhere: missing');
+    assert(Object.keys(harnessElectronEnv(d, { BISE_HARNESS_ELECTRON_DIST: '/x' }, et).env).length === 0, 'the caller\'s wins');
+    mk(path.join(et, '.bise', 'dev', 'electron-dist', 'v9.9.9-lsui'));
+    assert(harnessElectronEnv(d, {}, et).env?.BISE_HARNESS_ELECTRON_DIST === path.join(et, '.bise', 'dev', 'electron-dist', 'v9.9.9-lsui'), 'the shared copy');
+    mk(path.join(d, 'node_modules', 'electron', 'dist'));
+    assert(Object.keys(harnessElectronEnv(d, {}, et).env).length === 0, 'the tree\'s own dist');
+  } finally {
+    rmSync(et, { recursive: true, force: true });
+  }
   // a vite asset import's query: the file itself
   const sp = sourcePaths({ sources: ['../../src/composer/emoji.tsv?raw', '\0vite/preload', '../../node_modules/react/index.js'] }, path.join(DESKTOP, 'out', 'renderer', 'x.js.map'));
   assert(sp[0] === 'apps/desktop/src/composer/emoji.tsv' && sp[1] === null && sp[2] === null, `sourcePaths ${JSON.stringify(sp)}`);
