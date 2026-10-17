@@ -9,6 +9,7 @@ import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/answers.bend as HA
 import ../hub/picks.bend as HPK
+import ../hub/lazy.bend as HLZ
 import ../laws/inbox.bend as Laws
 
 def Laws.closed_without_him_has_no_answer(o, cx, id, res):
@@ -35,7 +36,7 @@ def hub_nat_in_del.step(b: Bool, -h: Nat, -t: List<&2, Nat>, -n: Nat, +e: {Nat.i
       ih
     case False{}:
       %Equal.sym(Bool, Nat.is_eq(h, n), False{}, e) : {HA.nat_in(Bool.pick(List<&2, Nat>, _, HA.nat_del(t, n), h <> HA.nat_del(t, n)), n) == False{} : Bool}
-      %Equal.sym(Bool, Nat.is_eq(h, n), False{}, e) : {Bool.or(_, HA.nat_in(HA.nat_del(t, n), n)) == False{} : Bool}
+      %Equal.sym(Bool, Nat.is_eq(h, n), False{}, e) : {HLZ.or(_, u => HA.nat_in(HA.nat_del(t, n), n)) == False{} : Bool}
       ih
 
 def hub_nat_in_del(xs: List<&2, Nat>, +n: Nat) -> {HA.nat_in(HA.nat_del(xs, n), n) == False{} : Bool}:

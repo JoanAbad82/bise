@@ -198,14 +198,14 @@ def rt_find(xs: List<&2, X.Rt>, +n: String) -> X.Rt:
     case Nil{}:
       X.Rt{n, M.RDown{}, False{}, None{}, 0n}
     case Con{+h, +t}:
-      Bool.pick(X.Rt, String.eq(X.Rt.name(h), n), h, rt_find(t, n))
+      pick_lazy(X.Rt, String.eq(X.Rt.name(h), n), u => h, u => rt_find(t, n))
 
 def rt_put(xs: List<&2, X.Rt>, +x: X.Rt) -> List<&2, X.Rt>:
   match xs:
     case Nil{}:
       [x]
     case Con{+h, +t}:
-      Bool.pick(List<&2, X.Rt>, String.eq(X.Rt.name(h), X.Rt.name(x)), x <> t, h <> rt_put(t, x))
+      pick_lazy(List<&2, X.Rt>, String.eq(X.Rt.name(h), X.Rt.name(x)), u => x <> t, u => h <> rt_put(t, x))
 
 # (the keyed lists' helpers, `KL.`: hub/keyed.bend)
 
@@ -465,7 +465,7 @@ def any_from_user(xs: List<&2, M.Msg>) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      String.eq(M.Msg.from(h), M.USER()) || any_from_user(t)
+      pick_lazy(Bool, String.eq(M.Msg.from(h), M.USER()), u => True{}, u => any_from_user(t))
 
 def leftover_at.go(m: Maybe<&2, M.MSt>) -> Bool:
   match m:
@@ -1211,7 +1211,7 @@ def wake_ans(xs: List<&2, J.Json>, +id: Nat) -> Maybe<&2, J.Json>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, J.Json>, Nat.is_eq(C.get_nat(h, "id"), id), Some{h}, wake_ans(t, id))
+      pick_lazy(Maybe<&2, J.Json>, Nat.is_eq(C.get_nat(h, "id"), id), u => Some{h}, u => wake_ans(t, id))
 
 def timers_tick.wake(-o: M.St, a: Maybe<&2, J.Json>, +cx: X.Cx<o>, +t: TM.Timer) -> X.Cx<o>:
   match a:
@@ -1970,8 +1970,8 @@ def question_card(cs: List<&2, M.Card>, +s: M.St, +to: String) -> Maybe<&2, Nat>
     case Nil{}:
       None{}
     case Con{+c, +t}:
-      Bool.pick(Maybe<&2, Nat>, String.eq(M.Card.kind(c), "question") && asked_by(for_msg_of(s, M.Card.for_msg(c)), to),
-        Some{M.Card.id(c)}, question_card(t, s, to))
+      pick_lazy(Maybe<&2, Nat>, String.eq(M.Card.kind(c), "question") && asked_by(for_msg_of(s, M.Card.for_msg(c)), to),
+        u => Some{M.Card.id(c)}, u => question_card(t, s, to))
 
 def says.sent(-o: M.St, p: X.Cx<o> & SendR, +to: String, +text: String) -> X.Cx<o>:
   match p:
@@ -2655,7 +2655,7 @@ def first_from(xs: List<&2, M.Msg>, +asker: String) -> Maybe<&2, Nat>:
     case Nil{}:
       None{}
     case Con{+m, +t}:
-      Bool.pick(Maybe<&2, Nat>, String.eq(M.Msg.from(m), asker), Some{M.Msg.id(m)}, first_from(t, asker))
+      pick_lazy(Maybe<&2, Nat>, String.eq(M.Msg.from(m), asker), u => Some{M.Msg.id(m)}, u => first_from(t, asker))
 
 def open_question.go(m: Maybe<&2, String>, +s: M.St, +me: String) -> Maybe<&2, Nat>:
   match m:
@@ -2735,9 +2735,9 @@ def reply_of(xs: List<&2, M.MRec>, +id: Nat, +replier: String) -> Maybe<&2, M.Ms
       None{}
     case Con{+r, +t}:
       +m = M.MRec.msg(r)
-      Bool.pick(Maybe<&2, M.Msg>,
+      pick_lazy(Maybe<&2, M.Msg>,
         M.maybe_nat_is(M.Msg.reply_to(m), id) && (String.eq(M.Msg.from(m), replier) || String.eq(M.Msg.from(m), M.USER())),
-        Some{m}, reply_of(t, id, replier))
+        u => Some{m}, u => reply_of(t, id, replier))
 
 def wait.mine(-o: M.St, mine: Bool, +cx: X.Cx<o>, +token: Nat, +from: String, +orig: M.Msg, +timeout: Nat) -> X.Cx<o>:
   match mine:

@@ -34,6 +34,8 @@ import Base
 
 import ../vendor/json.bend as J
 
+import ./lazy.bend as LZ
+
 # `spec`: what to look at (Rust's: kind, path, pid, start, label, slot,
 # tail, note); `max_text`: the wake at its max ("" with `quiet`); `quiet`:
 # its max ends it without a wake (a bash slot: a dev server runs for days);
@@ -134,7 +136,7 @@ def find(xs: List<&2, Watch>, +id: Nat) -> Maybe<&2, Watch>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, Watch>, Nat.is_eq(Watch.id(h), id), Some{h}, find(t, id))
+      LZ.pick(Maybe<&2, Watch>, Nat.is_eq(Watch.id(h), id), u => Some{h}, u => find(t, id))
 
 def drop(xs: List<&2, Watch>, +id: Nat) -> List<&2, Watch>:
   match xs:
@@ -149,7 +151,7 @@ def str_in(xs: List<&2, String>, +s: String) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      String.eq(h, s) || str_in(t, s)
+      LZ.or(String.eq(h, s), u => str_in(t, s))
 
 def cap(+xs: List<&2, Ended>) -> List<&2, Ended>:
   List.drop(&2, Ended, xs, Nat.sub(List.length(&2, Ended, xs), ENDED_KEPT()))
@@ -350,7 +352,7 @@ def any_due(xs: List<&2, Watch>, +now: Nat) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      is_due(h, now) || any_due(t, now)
+      LZ.or(is_due(h, now), u => any_due(t, now))
 
 # the ids of the live watches of an agent (`ns`: its names, own and old)
 def ids_of(xs: List<&2, Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
@@ -368,7 +370,7 @@ def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      Nat.is_eq(n, h) || nat_in(t, n)
+      LZ.or(Nat.is_eq(n, h), u => nat_in(t, n))
 
 # the watches whose id is not in `ids`
 def keep_out(xs: List<&2, Watch>, +ids: List<&2, Nat>) -> List<&2, Watch>:
@@ -385,7 +387,7 @@ def all_in(xs: List<&2, Nat>, +ys: List<&2, Nat>) -> Bool:
     case Nil{}:
       True{}
     case Con{+h, +t}:
-      nat_in(ys, h) && all_in(t, ys)
+      LZ.and(nat_in(ys, h), u => all_in(t, ys))
 
 # ---- JSON (the journal and the view) ----
 

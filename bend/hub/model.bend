@@ -12,6 +12,8 @@ import ./wakes.bend as WK
 
 import ./xhub-model.bend as XH
 
+import ./lazy.bend as LZ
+
 type Life is Data:
   LActive{}
   LStopped{}
@@ -270,7 +272,7 @@ def find(~A: Data, ~K: Data, ~key: A -> K, ~eq: K -> K -> Bool, xs: List<&2, A>,
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, A>, eq(key(h), k), Some{h}, find(~A, ~K, ~key, ~eq, t, k))
+      LZ.pick(Maybe<&2, A>, eq(key(h), k), u => Some{h}, u => find(~A, ~K, ~key, ~eq, t, k))
 
 def rec_of(xs: List<&2, MRec>, +id: Nat) -> Maybe<&2, MRec>:
   find(~MRec, ~Nat, ~(r => Msg.id(MRec.msg(r))), ~(a => b => Nat.is_eq(a, b)), xs, id)
@@ -289,7 +291,7 @@ def put_agent(xs: List<&2, Agent>, +n: String, +a: Agent) -> List<&2, Agent>:
     case Nil{}:
       [a]
     case Con{+h, +t}:
-      Bool.pick(List<&2, Agent>, String.eq(Agent.name(h), n), a <> t, h <> put_agent(t, n, a))
+      LZ.pick(List<&2, Agent>, String.eq(Agent.name(h), n), u => a <> t, u => h <> put_agent(t, n, a))
 
 def rename_in(xs: List<&2, String>, +old: String, +new: String) -> List<&2, String>:
   match xs:
@@ -326,14 +328,14 @@ def str_in(xs: List<&2, String>, +s: String) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      String.eq(h, s) || str_in(t, s)
+      LZ.or(String.eq(h, s), u => str_in(t, s))
 
 def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
   match xs:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      Nat.is_eq(h, n) || nat_in(t, n)
+      LZ.or(Nat.is_eq(h, n), u => nat_in(t, n))
 
 def maybe_str_is(m: Maybe<&2, String>, +s: String) -> Bool:
   match m:
@@ -411,7 +413,7 @@ def agent_alias(xs: List<&2, Agent>, +n: String) -> Maybe<&2, String>:
     case Nil{}:
       None{}
     case Con{+a, +t}:
-      Bool.pick(Maybe<&2, String>, str_in(Agent.aliases(a), n), Some{Agent.name(a)}, agent_alias(t, n))
+      LZ.pick(Maybe<&2, String>, str_in(Agent.aliases(a), n), u => Some{Agent.name(a)}, u => agent_alias(t, n))
 
 def get_agent(+st: St, +n: String) -> Maybe<&2, Agent>:
   agent_named(St.agents(st), n)
@@ -508,14 +510,14 @@ def map_msg(xs: List<&2, MRec>, +id: Nat, +op: MsgOp) -> List<&2, MRec>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, MRec>, Nat.is_eq(Msg.id(MRec.msg(h)), id), rec_op(h, op) <> t, h <> map_msg(t, id, op))
+      LZ.pick(List<&2, MRec>, Nat.is_eq(Msg.id(MRec.msg(h)), id), u => rec_op(h, op) <> t, u => h <> map_msg(t, id, op))
 
 def drop_card(xs: List<&2, Card>, +id: Nat) -> List<&2, Card>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Card>, Nat.is_eq(Card.id(h), id), t, h <> drop_card(t, id))
+      LZ.pick(List<&2, Card>, Nat.is_eq(Card.id(h), id), u => t, u => h <> drop_card(t, id))
 
 def put_card(xs: List<&2, Card>, +c: Card) -> List<&2, Card>:
   snoc(Card, drop_card(xs, Card.id(c)), c)
@@ -558,7 +560,7 @@ def card_holding(xs: List<&2, Card>, +id: Nat) -> Maybe<&2, Nat>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, Nat>, maybe_nat_is(Card.for_msg(h), id), Some{Card.id(h)}, card_holding(t, id))
+      LZ.pick(Maybe<&2, Nat>, maybe_nat_is(Card.for_msg(h), id), u => Some{Card.id(h)}, u => card_holding(t, id))
 
 def apply.settle.if(ok: Bool, +msgs: List<&2, MRec>, +id: Nat) -> List<&2, MRec>:
   match ok:
@@ -731,13 +733,21 @@ def hot_all(+st: St) -> St:
 def card_of(xs: List<&2, Card>, +id: Nat) -> Maybe<&2, Card>:
   find(~Card, ~Nat, ~Card.id, ~(a => b => Nat.is_eq(a, b)), xs, id)
 
+# queued_in's step: `q` (is the message queued) is matched first, most
+# messages are delivered; only a queued one is compared with the names
+def queued_in.keep(q: Bool, +ns: List<&2, String>, +m: Msg, +rest: List<&2, Msg>) -> List<&2, Msg>:
+  match q:
+    case True{}:
+      Bool.pick(List<&2, Msg>, str_in(ns, Msg.to(m)), m <> rest, rest)
+    case False{}:
+      rest
+
 def queued_in(xs: List<&2, MRec>, +ns: List<&2, String>) -> List<&2, Msg>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
-      +rest = queued_in(t, ns)
-      Bool.pick(List<&2, Msg>, str_in(ns, Msg.to(MRec.msg(r))) && is_queued(MRec.st(r)), MRec.msg(r) <> rest, rest)
+      queued_in.keep(is_queued(MRec.st(r)), ns, MRec.msg(r), queued_in(t, ns))
 
 def names_of.go(m: Maybe<&2, Agent>) -> List<&2, String>:
   match m:

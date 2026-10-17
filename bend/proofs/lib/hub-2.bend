@@ -10,6 +10,7 @@ import ../../hub/timers.bend as HTM
 import ../../hub/wakes.bend as HWK
 import ../../hub/gen/feed.bend as HFD
 import ./hub-1.bend as PL1
+import ../../hub/lazy.bend as HLZ
 
 def hub_cards_wakes(-o: HM.St, +life: HM.Life, +cx: HX.Cx<o>, +n: String)
     -> {HM.St.cards(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.St.cards(HX.d(o, cx)) : List<&2, HM.Card>}:
@@ -135,7 +136,7 @@ def hub_dropc_skip.go(+i: Nat, -ns: List<&2, Nat>, +h: HM.Card, +t: List<&2, HM.
     ef: {Nat.is_eq(HM.Card.id(h), i) == False{} : Bool},
     ih: {hub_dropc(ns, h <> HM.drop_card(t, i)) == h <> hub_dropc(ns, HM.drop_card(t, i)) : List<&2, HM.Card>})
     -> {hub_dropc(i <> ns, h <> t) == h <> hub_dropc(i <> ns, t) : List<&2, HM.Card>}:
-  %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), i), False{}, ef) : {hub_dropc(ns, Bool.pick(List<&2, HM.Card>, _, t, h <> HM.drop_card(t, i))) == h <> hub_dropc(i <> ns, t) : List<&2, HM.Card>}
+  %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), i), False{}, ef) : {hub_dropc(ns, HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, i))) == h <> hub_dropc(i <> ns, t) : List<&2, HM.Card>}
   ih
 
 def hub_dropc_skip(+ids: List<&2, Nat>, +h: HM.Card, +t: List<&2, HM.Card>, +nf: {HM.nat_in(ids, HM.Card.id(h)) == False{} : Bool})
@@ -147,8 +148,8 @@ def hub_dropc_skip(+ids: List<&2, Nat>, +h: HM.Card, +t: List<&2, HM.Card>, +nf:
       hub_dropc_skip.go(i, ns, h, t,
         Equal.trans(Bool, Nat.is_eq(HM.Card.id(h), i), Nat.is_eq(i, HM.Card.id(h)), False{},
           PL1.hub_eq_sym(HM.Card.id(h), i),
-          PL1.hub_or_false_l(Nat.is_eq(i, HM.Card.id(h)), HM.nat_in(ns, HM.Card.id(h)), nf)),
-        hub_dropc_skip(ns, h, HM.drop_card(t, i), PL1.hub_or_false_r(Nat.is_eq(i, HM.Card.id(h)), HM.nat_in(ns, HM.Card.id(h)), nf)))
+          PL1.hub_lor_false_l(Nat.is_eq(i, HM.Card.id(h)), HM.nat_in(ns, HM.Card.id(h)), nf)),
+        hub_dropc_skip(ns, h, HM.drop_card(t, i), PL1.hub_lor_false_r(Nat.is_eq(i, HM.Card.id(h)), HM.nat_in(ns, HM.Card.id(h)), nf)))
 
 def hub_c_sub.pick(c: Bool, +h: HM.Card, -t: List<&2, HM.Card>, -n: String, +x: Nat,
     +e: {Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))) == c : Bool}, e1: {Nat.is_eq(HM.Card.id(h), x) == False{} : Bool},
@@ -157,7 +158,7 @@ def hub_c_sub.pick(c: Bool, +h: HM.Card, -t: List<&2, HM.Card>, -n: String, +x: 
   match c:
     case True{}:
       %Equal.sym(Bool, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), True{}, e) : {HM.nat_in(Bool.pick(List<&2, Nat>, _, HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), x) == False{} : Bool}
-      PL1.hub_or_false(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HC.card_ids(t, n, Nil{}), x), e1, ih)
+      PL1.hub_lor_false(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HC.card_ids(t, n, Nil{}), x), e1, ih)
     case False{}:
       %Equal.sym(Bool, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), False{}, e) : {HM.nat_in(Bool.pick(List<&2, Nat>, _, HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), x) == False{} : Bool}
       ih
@@ -169,8 +170,8 @@ def hub_c_sub(+t: List<&2, HM.Card>, +x: Nat, +n: String, +nf: {HM.nat_in(HI.car
       {==}
     case Con{h, tt}:
       hub_c_sub.pick(Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), h, tt, n, x, {==},
-        PL1.hub_or_false_l(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(tt), x), nf),
-        hub_c_sub(tt, x, n, PL1.hub_or_false_r(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(tt), x), nf)))
+        PL1.hub_lor_false_l(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(tt), x), nf),
+        hub_c_sub(tt, x, n, PL1.hub_lor_false_r(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(tt), x), nf)))
 
 def hub_KC.pick(c: Bool, +h: HM.Card, +t: List<&2, HM.Card>, +n: String,
     +e: {Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))) == c : Bool}, +dh: {HM.nat_in(HI.card_ids(t), HM.Card.id(h)) == False{} : Bool},
@@ -179,7 +180,7 @@ def hub_KC.pick(c: Bool, +h: HM.Card, +t: List<&2, HM.Card>, +n: String,
   match c:
     case True{}:
       %Equal.sym(Bool, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), True{}, e) : {HC.card_ids(hub_dropc(Bool.pick(List<&2, Nat>, _, HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), h <> t), n, Nil{}) == Nil{} : List<&2, Nat>}
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), HM.Card.id(h)), True{}, PL1.hub_eq_refl(HM.Card.id(h))) : {HC.card_ids(hub_dropc(HC.card_ids(t, n, Nil{}), Bool.pick(List<&2, HM.Card>, _, t, h <> HM.drop_card(t, HM.Card.id(h)))), n, Nil{}) == Nil{} : List<&2, Nat>}
+      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), HM.Card.id(h)), True{}, PL1.hub_eq_refl(HM.Card.id(h))) : {HC.card_ids(hub_dropc(HC.card_ids(t, n, Nil{}), HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, HM.Card.id(h)))), n, Nil{}) == Nil{} : List<&2, Nat>}
       ih
     case False{}:
       %Equal.sym(Bool, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), False{}, e) : {HC.card_ids(hub_dropc(Bool.pick(List<&2, Nat>, _, HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), h <> t), n, Nil{}) == Nil{} : List<&2, Nat>}
@@ -264,7 +265,7 @@ def hub_below_notin(+ns: List<&2, Nat>, +x: Nat, bl: HI.Below(ns, x)) -> {HM.nat
     case Con{y, t}:
       match bl:
         case HX.Both{ly, bt}:
-          PL1.hub_or_false(Nat.is_eq(y, x), HM.nat_in(t, x),
+          PL1.hub_lor_false(Nat.is_eq(y, x), HM.nat_in(t, x),
             Equal.trans(Bool, Nat.is_eq(y, x), Nat.is_eq(x, y), False{}, PL1.hub_eq_sym(y, x), PL1.hub_lt_neq(y, x, ly)),
             hub_below_notin(t, x, bt))
 
@@ -274,7 +275,7 @@ def hub_drop_absent.go(c: Bool, +h: HM.Card, +t: List<&2, HM.Card>, -id: Nat, +e
     case True{}:
       PL1.hub_absurd_eq(PL1.hub_tf_absurd(ec), List<&2, HM.Card>, HM.drop_card(h <> t, id), h <> t)
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), False{}, e) : {Bool.pick(List<&2, HM.Card>, _, t, h <> HM.drop_card(t, id)) == h <> t : List<&2, HM.Card>}
+      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), False{}, e) : {HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id)) == h <> t : List<&2, HM.Card>}
       Equal.cong(List<&2, HM.Card>, List<&2, HM.Card>, xs => h <> xs, HM.drop_card(t, id), t, ih)
 
 # dropping an id no card has changes nothing
@@ -284,8 +285,8 @@ def hub_drop_absent(+cs: List<&2, HM.Card>, +id: Nat, +nf: {HM.nat_in(HI.card_id
       {==}
     case Con{h, t}:
       hub_drop_absent.go(Nat.is_eq(HM.Card.id(h), id), h, t, id, {==},
-        PL1.hub_or_false_l(Nat.is_eq(HM.Card.id(h), id), HM.nat_in(HI.card_ids(t), id), nf),
-        hub_drop_absent(t, id, PL1.hub_or_false_r(Nat.is_eq(HM.Card.id(h), id), HM.nat_in(HI.card_ids(t), id), nf)))
+        PL1.hub_lor_false_l(Nat.is_eq(HM.Card.id(h), id), HM.nat_in(HI.card_ids(t), id), nf),
+        hub_drop_absent(t, id, PL1.hub_lor_false_r(Nat.is_eq(HM.Card.id(h), id), HM.nat_in(HI.card_ids(t), id), nf)))
 
 def hub_cids_snoc(+cs: List<&2, HM.Card>, +c: HM.Card) -> {HI.card_ids(HM.snoc(HM.Card, cs, c)) == HM.snoc(Nat, HI.card_ids(cs), HM.Card.id(c)) : List<&2, Nat>}:
   match cs:
@@ -299,12 +300,12 @@ def hub_drop_notin.go(c: Bool, +h: HM.Card, +t: List<&2, HM.Card>, -id: Nat, +x:
     -> {HM.nat_in(HI.card_ids(HM.drop_card(h <> t, id)), x) == False{} : Bool}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), True{}, e) : {HM.nat_in(HI.card_ids(Bool.pick(List<&2, HM.Card>, _, t, h <> HM.drop_card(t, id))), x) == False{} : Bool}
-      PL1.hub_or_false_r(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf)
+      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), True{}, e) : {HM.nat_in(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id))), x) == False{} : Bool}
+      PL1.hub_lor_false_r(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf)
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), False{}, e) : {HM.nat_in(HI.card_ids(Bool.pick(List<&2, HM.Card>, _, t, h <> HM.drop_card(t, id))), x) == False{} : Bool}
-      PL1.hub_or_false(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(HM.drop_card(t, id)), x),
-        PL1.hub_or_false_l(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf), ih)
+      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), False{}, e) : {HM.nat_in(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id))), x) == False{} : Bool}
+      PL1.hub_lor_false(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(HM.drop_card(t, id)), x),
+        PL1.hub_lor_false_l(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf), ih)
 
 # dropping a card never brings back an id
 def hub_drop_notin(+cs: List<&2, HM.Card>, +id: Nat, +x: Nat, +nf: {HM.nat_in(HI.card_ids(cs), x) == False{} : Bool})
@@ -314,7 +315,7 @@ def hub_drop_notin(+cs: List<&2, HM.Card>, +id: Nat, +x: Nat, +nf: {HM.nat_in(HI
       {==}
     case Con{h, t}:
       hub_drop_notin.go(Nat.is_eq(HM.Card.id(h), id), h, t, id, x, {==}, nf,
-        hub_drop_notin(t, id, x, PL1.hub_or_false_r(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf)))
+        hub_drop_notin(t, id, x, PL1.hub_lor_false_r(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf)))
 
 def hub_ucards_cons(+h: HM.Card, -ys: List<&2, HM.Card>, -n: Nat, nf: {HM.nat_in(HI.card_ids(ys), HM.Card.id(h)) == False{} : Bool},
     lh: {Nat.is_lt(HM.Card.id(h), n) == True{} : Bool}, u: HX.Both<HI.Distinct(HI.card_ids(ys)), HI.Below(HI.card_ids(ys), n)>)
@@ -328,10 +329,10 @@ def hub_ucards_drop.go(c: Bool, +h: HM.Card, +t: List<&2, HM.Card>, +id: Nat, -n
     +ut: HX.Both<HI.Distinct(HI.card_ids(t)), HI.Below(HI.card_ids(t), n)>, ih: HX.Both<HI.Distinct(HI.card_ids(HM.drop_card(t, id))), HI.Below(HI.card_ids(HM.drop_card(t, id)), n)>) -> HX.Both<HI.Distinct(HI.card_ids(HM.drop_card(h <> t, id))), HI.Below(HI.card_ids(HM.drop_card(h <> t, id)), n)>:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), True{}, e) : HX.Both<HI.Distinct(HI.card_ids(Bool.pick(List<&2, HM.Card>, _, t, h <> HM.drop_card(t, id)))), HI.Below(HI.card_ids(Bool.pick(List<&2, HM.Card>, _, t, h <> HM.drop_card(t, id))), n)>
+      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), True{}, e) : HX.Both<HI.Distinct(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id)))), HI.Below(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id))), n)>
       ut
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), False{}, e) : HX.Both<HI.Distinct(HI.card_ids(Bool.pick(List<&2, HM.Card>, _, t, h <> HM.drop_card(t, id)))), HI.Below(HI.card_ids(Bool.pick(List<&2, HM.Card>, _, t, h <> HM.drop_card(t, id))), n)>
+      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), False{}, e) : HX.Both<HI.Distinct(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id)))), HI.Below(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id))), n)>
       hub_ucards_cons(h, HM.drop_card(t, id), n, hub_drop_notin(t, id, HM.Card.id(h), dh), lh, ih)
 
 # closing a card keeps the open cards unique
@@ -765,8 +766,8 @@ def hub_free_of.absurd1(-a: HM.Agent, -t: List<&2, HM.Agent>, -n: String, x: Emp
 
 def hub_free_of.pick(c1: Bool, c2: Bool, +a: HM.Agent, +t: List<&2, HM.Agent>, +n: String,
     +e1: {String.eq(HM.Agent.name(a), n) == c1 : Bool}, +e2: {HM.str_in(HM.Agent.aliases(a), n) == c2 : Bool},
-    hn: {Bool.pick(Maybe<&2, HM.Agent>, c1, Some{a}, HM.agent_named(t, n)) == None{} : Maybe<&2, HM.Agent>},
-    ha: {Bool.pick(Maybe<&2, String>, c2, Some{HM.Agent.name(a)}, HM.agent_alias(t, n)) == None{} : Maybe<&2, String>},
+    hn: {HLZ.pick(Maybe<&2, HM.Agent>, c1, u => Some{a}, u => HM.agent_named(t, n)) == None{} : Maybe<&2, HM.Agent>},
+    ha: {HLZ.pick(Maybe<&2, String>, c2, u => Some{HM.Agent.name(a)}, u => HM.agent_alias(t, n)) == None{} : Maybe<&2, String>},
     k: @p: {HM.agent_named(t, n) == None{} : Maybe<&2, HM.Agent>} -> @q: {HM.agent_alias(t, n) == None{} : Maybe<&2, String>} -> hub_free(HI.profile(t), n))
     -> hub_free(HI.profile(a <> t), n):
   match c1 c2:
@@ -775,7 +776,7 @@ def hub_free_of.pick(c1: Bool, c2: Bool, +a: HM.Agent, +t: List<&2, HM.Agent>, +
     case False{} True{}:
       hub_free_of.absurd1(a, t, n, hub_some_none_s(HM.Agent.name(a), ha))
     case False{} False{}:
-      HX.Both{PL1.hub_or_false(String.eq(HM.Agent.name(a), n), HM.str_in(HM.Agent.aliases(a), n), e1, e2), k(hn, ha)}
+      HX.Both{PL1.hub_lor_false(String.eq(HM.Agent.name(a), n), HM.str_in(HM.Agent.aliases(a), n), e1, e2), k(hn, ha)}
 
 # a name no agent has as a name or an old name is free in the profile
 def hub_free_of(+xs: List<&2, HM.Agent>, +n: String, hn: {HM.agent_named(xs, n) == None{} : Maybe<&2, HM.Agent>}, ha: {HM.agent_alias(xs, n) == None{} : Maybe<&2, String>})
@@ -845,8 +846,8 @@ def hub_apart_new(+p: List<&2, String>, +n: String, +f: {HM.str_in(p, n) == Fals
     case Nil{}:
       Unit{}
     case Con{m, al}:
-      HX.Both{PL1.hub_or_false(String.eq(n, m), False{}, hub_str_eq_sym_false(m, n, PL1.hub_or_false_l(String.eq(m, n), HM.str_in(al, n), f)), {==}),
-        PL1.hub_or_false_r(String.eq(m, n), HM.str_in(al, n), f)}
+      HX.Both{PL1.hub_lor_false(String.eq(n, m), False{}, hub_str_eq_sym_false(m, n, PL1.hub_lor_false_l(String.eq(m, n), HM.str_in(al, n), f)), {==}),
+        PL1.hub_lor_false_r(String.eq(m, n), HM.str_in(al, n), f)}
 
 def hub_allapart_new(+ps: List<&2, List<&2, String>>, +n: String, f: hub_free(ps, n)) -> hub_allapart(ps, [n]):
   match ps:
@@ -859,12 +860,12 @@ def hub_allapart_new(+ps: List<&2, List<&2, String>>, +n: String, f: hub_free(ps
 
 def hub_put_absent.pick(c: Bool, +h: HM.Agent, +t: List<&2, HM.Agent>, +n: String, +a: HM.Agent, +e: {String.eq(HM.Agent.name(h), n) == c : Bool},
     ec: {c == False{} : Bool}, ih: {HI.profile(HM.put_agent(t, n, a)) == HM.snoc(List<&2, String>, HI.profile(t), HI.names(a)) : List<&2, List<&2, String>>})
-    -> {HI.profile(Bool.pick(List<&2, HM.Agent>, String.eq(HM.Agent.name(h), n), a <> t, h <> HM.put_agent(t, n, a))) == HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)) : List<&2, List<&2, String>>}:
+    -> {HI.profile(HLZ.pick(List<&2, HM.Agent>, String.eq(HM.Agent.name(h), n), u => a <> t, u => h <> HM.put_agent(t, n, a))) == HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)) : List<&2, List<&2, String>>}:
   match c:
     case True{}:
-      PL1.hub_absurd_eq(PL1.hub_tf_absurd(ec), List<&2, List<&2, String>>, HI.profile(Bool.pick(List<&2, HM.Agent>, String.eq(HM.Agent.name(h), n), a <> t, h <> HM.put_agent(t, n, a))), HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)))
+      PL1.hub_absurd_eq(PL1.hub_tf_absurd(ec), List<&2, List<&2, String>>, HI.profile(HLZ.pick(List<&2, HM.Agent>, String.eq(HM.Agent.name(h), n), u => a <> t, u => h <> HM.put_agent(t, n, a))), HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)))
     case False{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), n), False{}, e) : {HI.profile(Bool.pick(List<&2, HM.Agent>, _, a <> t, h <> HM.put_agent(t, n, a))) == HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)) : List<&2, List<&2, String>>}
+      %Equal.sym(Bool, String.eq(HM.Agent.name(h), n), False{}, e) : {HI.profile(HLZ.pick(List<&2, HM.Agent>, _, u => a <> t, u => h <> HM.put_agent(t, n, a))) == HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)) : List<&2, List<&2, String>>}
       Equal.cong(List<&2, List<&2, String>>, List<&2, List<&2, String>>, x => HI.names(h) <> x, HI.profile(HM.put_agent(t, n, a)), HM.snoc(List<&2, String>, HI.profile(t), HI.names(a)), ih)
 
 # a new agent under a free name goes last
@@ -877,7 +878,7 @@ def hub_put_absent(+xs: List<&2, HM.Agent>, +n: String, +a: HM.Agent, f: hub_fre
       match f:
         case HX.Both{f1, f2}:
           hub_put_absent.pick(String.eq(HM.Agent.name(h), n), h, t, n, a, {==},
-            PL1.hub_or_false_l(String.eq(HM.Agent.name(h), n), HM.str_in(HM.Agent.aliases(h), n), f1), hub_put_absent(t, n, a, f2))
+            PL1.hub_lor_false_l(String.eq(HM.Agent.name(h), n), HM.str_in(HM.Agent.aliases(h), n), f1), hub_put_absent(t, n, a, f2))
 
 # ---- L4 support: names apart — a rename ----
 
@@ -885,10 +886,10 @@ def hub_str_in_snoc_false(+l: List<&2, String>, +y: String, +z: String, +a: {HM.
     -> {HM.str_in(HM.snoc(String, l, y), z) == False{} : Bool}:
   match l:
     case Nil{}:
-      PL1.hub_or_false(String.eq(y, z), False{}, b, {==})
+      PL1.hub_lor_false(String.eq(y, z), False{}, b, {==})
     case Con{h, t}:
-      PL1.hub_or_false(String.eq(h, z), HM.str_in(HM.snoc(String, t, y), z), PL1.hub_or_false_l(String.eq(h, z), HM.str_in(t, z), a),
-        hub_str_in_snoc_false(t, y, z, PL1.hub_or_false_r(String.eq(h, z), HM.str_in(t, z), a), b))
+      PL1.hub_lor_false(String.eq(h, z), HM.str_in(HM.snoc(String, t, y), z), PL1.hub_lor_false_l(String.eq(h, z), HM.str_in(t, z), a),
+        hub_str_in_snoc_false(t, y, z, PL1.hub_lor_false_r(String.eq(h, z), HM.str_in(t, z), a), b))
 
 # the renamed entry against one listed after it
 def hub_apart_ren_after(+m: String, +al: List<&2, String>, +new: String, +y: List<&2, String>, ay: HI.Apart(m <> al, y), fy: {HM.str_in(y, new) == False{} : Bool})
@@ -899,7 +900,7 @@ def hub_apart_ren_after(+m: String, +al: List<&2, String>, +new: String, +y: Lis
     case Con{yn, ya}:
       match ay:
         case HX.Both{+a1, +a2}:
-          HX.Both{fy, hub_str_in_snoc_false(al, m, yn, a2, hub_str_eq_sym_false(yn, m, PL1.hub_or_false_l(String.eq(yn, m), HM.str_in(ya, m), a1)))}
+          HX.Both{fy, hub_str_in_snoc_false(al, m, yn, a2, hub_str_eq_sym_false(yn, m, PL1.hub_lor_false_l(String.eq(yn, m), HM.str_in(ya, m), a1)))}
 
 def hub_aa_ren(+m: String, +al: List<&2, String>, +new: String, +ps: List<&2, List<&2, String>>, a: HI.ApartAll(m <> al, ps), f: hub_free(ps, new))
     -> HI.ApartAll(new <> HM.snoc(String, al, m), ps):
@@ -920,10 +921,10 @@ def hub_apart_ren_before(+x: List<&2, String>, +m: String, +al: List<&2, String>
     case Con{xn, xa}:
       match ax:
         case HX.Both{+b1, +b2}:
-          HX.Both{PL1.hub_or_false(String.eq(new, xn), HM.str_in(HM.snoc(String, al, m), xn),
-              hub_str_eq_sym_false(xn, new, PL1.hub_or_false_l(String.eq(xn, new), HM.str_in(xa, new), fx)),
-              hub_str_in_snoc_false(al, m, xn, PL1.hub_or_false_r(String.eq(m, xn), HM.str_in(al, xn), b1), PL1.hub_or_false_l(String.eq(m, xn), HM.str_in(al, xn), b1))),
-            PL1.hub_or_false_r(String.eq(xn, new), HM.str_in(xa, new), fx)}
+          HX.Both{PL1.hub_lor_false(String.eq(new, xn), HM.str_in(HM.snoc(String, al, m), xn),
+              hub_str_eq_sym_false(xn, new, PL1.hub_lor_false_l(String.eq(xn, new), HM.str_in(xa, new), fx)),
+              hub_str_in_snoc_false(al, m, xn, PL1.hub_lor_false_r(String.eq(m, xn), HM.str_in(al, xn), b1), PL1.hub_lor_false_l(String.eq(m, xn), HM.str_in(al, xn), b1))),
+            PL1.hub_lor_false_r(String.eq(xn, new), HM.str_in(xa, new), fx)}
 
 def hub_aa_map_ren.top(+x: List<&2, String>, h: HM.Agent, +t: List<&2, HM.Agent>, +new: String, ah: HI.Apart(x, HI.names(h)), +fx: {HM.str_in(x, new) == False{} : Bool},
     at: HI.ApartAll(x, HI.profile(t))) -> HI.ApartAll(x, HI.profile(HM.agent_op(h, HM.ORename{new}) <> t)):

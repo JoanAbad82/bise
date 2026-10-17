@@ -11,6 +11,8 @@ import ./model.bend as M
 
 import ./picks.bend as PK
 
+import ./lazy.bend as LZ
+
 type Fx is Data:
   FJ{ev: M.Ev}
   FO{o: J.Json}
@@ -618,7 +620,7 @@ def any_waiter(xs: List<&2, Waiter>, +n: String) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      String.eq(Waiter.agent(h), n) || any_waiter(t, n)
+      LZ.or(String.eq(Waiter.agent(h), n), u => any_waiter(t, n))
 
 def waiters_of(xs: List<&2, Waiter>, +n: String) -> List<&2, Waiter>:
   match xs:
@@ -669,11 +671,11 @@ def waiter_pick(xs: List<&2, Waiter>, +to: String, +reply_to: Maybe<&2, Nat>, +a
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, Waiter>, waiter_hit(h, to, reply_to, asks), Some{h}, waiter_pick(t, to, reply_to, asks))
+      LZ.pick(Maybe<&2, Waiter>, waiter_hit(h, to, reply_to, asks), u => Some{h}, u => waiter_pick(t, to, reply_to, asks))
 
 def waiter_drop(xs: List<&2, Waiter>, +tok: Nat) -> List<&2, Waiter>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Waiter>, Nat.is_eq(Waiter.token(h), tok), t, h <> waiter_drop(t, tok))
+      LZ.pick(List<&2, Waiter>, Nat.is_eq(Waiter.token(h), tok), u => t, u => h <> waiter_drop(t, tok))

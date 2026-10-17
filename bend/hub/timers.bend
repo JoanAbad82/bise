@@ -21,6 +21,8 @@ import ../vendor/json.bend as J
 
 import ./wakes.bend as WK
 
+import ./lazy.bend as LZ
+
 # when a timer fires: every `ms`, or every day at that minute (local time,
 # the hub's next_daily)
 type Sched is Data:
@@ -271,7 +273,7 @@ def find(xs: List<&2, Timer>, +id: Nat) -> Maybe<&2, Timer>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, Timer>, Nat.is_eq(Timer.id(h), id), Some{h}, find(t, id))
+      LZ.pick(Maybe<&2, Timer>, Nat.is_eq(Timer.id(h), id), u => Some{h}, u => find(t, id))
 
 # replace the timer of the same id, else insert it in id order
 def put(xs: List<&2, Timer>, +x: Timer) -> List<&2, Timer>:
@@ -279,8 +281,8 @@ def put(xs: List<&2, Timer>, +x: Timer) -> List<&2, Timer>:
     case Nil{}:
       [x]
     case Con{+h, +t}:
-      Bool.pick(List<&2, Timer>, Nat.is_eq(Timer.id(h), Timer.id(x)), x <> t,
-        Bool.pick(List<&2, Timer>, Nat.is_lt(Timer.id(x), Timer.id(h)), x <> h <> t, h <> put(t, x)))
+      LZ.pick(List<&2, Timer>, Nat.is_eq(Timer.id(h), Timer.id(x)), u => x <> t,
+        u => LZ.pick(List<&2, Timer>, Nat.is_lt(Timer.id(x), Timer.id(h)), v => x <> h <> t, v => h <> put(t, x)))
 
 # every timer but those of id `id`
 def drop(xs: List<&2, Timer>, +id: Nat) -> List<&2, Timer>:
@@ -318,7 +320,7 @@ def str_in(xs: List<&2, String>, +s: String) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      String.eq(h, s) || str_in(t, s)
+      LZ.or(String.eq(h, s), u => str_in(t, s))
 
 # the ids of the timers whose agent is one of `ns` (an agent's names: its
 # own and its old ones)
@@ -337,7 +339,7 @@ def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      Nat.is_eq(n, h) || nat_in(t, n)
+      LZ.or(Nat.is_eq(n, h), u => nat_in(t, n))
 
 # the timers whose id is not in `ids`
 def keep_out(xs: List<&2, Timer>, +ids: List<&2, Nat>) -> List<&2, Timer>:
@@ -354,7 +356,7 @@ def all_in(xs: List<&2, Nat>, +ys: List<&2, Nat>) -> Bool:
     case Nil{}:
       True{}
     case Con{+h, +t}:
-      nat_in(ys, h) && all_in(t, ys)
+      LZ.and(nat_in(ys, h), u => all_in(t, ys))
 
 # ---- the state's changes, one per journal line ----
 
@@ -411,7 +413,7 @@ def act_find(xs: List<&2, Act>, +id: Nat) -> Maybe<&2, Act>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, Act>, Nat.is_eq(Act.id(h), id), Some{h}, act_find(t, id))
+      LZ.pick(Maybe<&2, Act>, Nat.is_eq(Act.id(h), id), u => Some{h}, u => act_find(t, id))
 
 # act_set: one more act (its id the next free one)
 def act_set(+tm: Tms, +a: Act) -> Tms:
@@ -467,7 +469,7 @@ def any_work(xs: List<&2, Timer>, +now: Nat) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      is_due(h, now) || past_until(h, now) || any_work(t, now)
+      LZ.or(is_due(h, now) || past_until(h, now), u => any_work(t, now))
 
 # why a timer ends at a tick (None: it does not): its agent is gone
 # (unknown or archived), or its end time passed

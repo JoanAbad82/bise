@@ -8,6 +8,8 @@ import ./model.bend as M
 
 import ./cx.bend as X
 
+import ./lazy.bend as LZ
+
 # the entries whose key is not `n`
 def del_key(~A: Data, ~key: A -> String, xs: List<&2, A>, +n: String) -> List<&2, A>:
   match xs:
@@ -23,7 +25,7 @@ def get_key(~A: Data, ~B: Data, ~key: A -> String, ~val: A -> B, xs: List<&2, A>
     case Nil{}:
       dflt
     case Con{+h, +t}:
-      Bool.pick(B, String.eq(key(h), n), val(h), get_key(~A, ~B, ~key, ~val, t, n, dflt))
+      LZ.pick(B, String.eq(key(h), n), u => val(h), u => get_key(~A, ~B, ~key, ~val, t, n, dflt))
 
 def steer_get(xs: List<&2, X.Steer>, +n: String) -> List<&2, Nat>:
   get_key(~X.Steer, ~List<&2, Nat>, ~X.Steer.agent, ~X.Steer.ids, xs, n, Nil{})

@@ -10,6 +10,8 @@ import Base
 
 import ../vendor/json.bend as J
 
+import ./lazy.bend as LZ
+
 # his own words forwarded by reference (his authority), or bise's own
 # question (none)
 type XKind is Data:
@@ -229,7 +231,7 @@ def route_of(xs: List<&2, Route>, +rid: Nat) -> Maybe<&2, Route>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, Route>, Nat.is_eq(Route.rid(h), rid), Some{h}, route_of(t, rid))
+      LZ.pick(Maybe<&2, Route>, Nat.is_eq(Route.rid(h), rid), u => Some{h}, u => route_of(t, rid))
 
 def Route.with_to(x: Route, +to: String, +name: String) -> Route:
   match x:
@@ -257,7 +259,7 @@ def route_set(xs: List<&2, Route>, +rid: Nat, +op: RouteOp) -> List<&2, Route>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Route>, Nat.is_eq(Route.rid(h), rid), route_op(op, h) <> t, h <> route_set(t, rid, op))
+      LZ.pick(List<&2, Route>, Nat.is_eq(Route.rid(h), rid), u => route_op(op, h) <> t, u => h <> route_set(t, rid, op))
 
 def kind_str(k: XKind) -> String:
   match k:
@@ -294,14 +296,14 @@ def out_of(xs: List<&2, Out>, +xid: Nat) -> Maybe<&2, Out>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, Out>, Nat.is_eq(Out.xid(h), xid), Some{h}, out_of(t, xid))
+      LZ.pick(Maybe<&2, Out>, Nat.is_eq(Out.xid(h), xid), u => Some{h}, u => out_of(t, xid))
 
 def xin_of(xs: List<&2, XIn>, +hub: String, +xid: Nat) -> Maybe<&2, XIn>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, XIn>, String.eq(XIn.hub(h), hub) && Nat.is_eq(XIn.xid(h), xid), Some{h}, xin_of(t, hub, xid))
+      LZ.pick(Maybe<&2, XIn>, String.eq(XIn.hub(h), hub) && Nat.is_eq(XIn.xid(h), xid), u => Some{h}, u => xin_of(t, hub, xid))
 
 # the inbox record whose message is `msg` (its answer goes back)
 def xin_by_msg(xs: List<&2, XIn>, +msg: Nat) -> Maybe<&2, XIn>:
@@ -309,7 +311,7 @@ def xin_by_msg(xs: List<&2, XIn>, +msg: Nat) -> Maybe<&2, XIn>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, XIn>, Nat.is_eq(XIn.msg(h), msg), Some{h}, xin_by_msg(t, msg))
+      LZ.pick(Maybe<&2, XIn>, Nat.is_eq(XIn.msg(h), msg), u => Some{h}, u => xin_by_msg(t, msg))
 
 # the forward of his message `msg` (one per message)
 def out_by_msg(xs: List<&2, Out>, +msg: Nat) -> Maybe<&2, Out>:
@@ -317,7 +319,7 @@ def out_by_msg(xs: List<&2, Out>, +msg: Nat) -> Maybe<&2, Out>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      Bool.pick(Maybe<&2, Out>, Nat.is_eq(Out.msg(h), msg), Some{h}, out_by_msg(t, msg))
+      LZ.pick(Maybe<&2, Out>, Nat.is_eq(Out.msg(h), msg), u => Some{h}, u => out_by_msg(t, msg))
 
 # ---- the journal's changes ----
 
@@ -366,7 +368,7 @@ def out_set(xs: List<&2, Out>, +xid: Nat, +op: OutOp) -> List<&2, Out>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, Out>, Nat.is_eq(Out.xid(h), xid), out_op(op, h) <> t, h <> out_set(t, xid, op))
+      LZ.pick(List<&2, Out>, Nat.is_eq(Out.xid(h), xid), u => out_op(op, h) <> t, u => h <> out_set(t, xid, op))
 
 def XIn.done(x: XIn) -> XIn:
   match x:
@@ -378,7 +380,7 @@ def xin_set(xs: List<&2, XIn>, +hub: String, +xid: Nat) -> List<&2, XIn>:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(List<&2, XIn>, String.eq(XIn.hub(h), hub) && Nat.is_eq(XIn.xid(h), xid), XIn.done(h) <> t, h <> xin_set(t, hub, xid))
+      LZ.pick(List<&2, XIn>, String.eq(XIn.hub(h), hub) && Nat.is_eq(XIn.xid(h), xid), u => XIn.done(h) <> t, u => h <> xin_set(t, hub, xid))
 
 def x_out(+x: Xs, +o: Out) -> Xs:
   match x:

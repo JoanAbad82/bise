@@ -9,6 +9,7 @@ import ../hub/picks.bend as HPK
 import ../hub/keyed.bend as HKL
 import ../hub/gen/feed.bend as HFD
 import ../hub/said.bend as HSD
+import ../hub/lazy.bend as HLZ
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
 import ../laws/threads.bend as Laws
@@ -17,15 +18,15 @@ import ../laws/threads.bend as Laws
 
 def hub_rt_put_find.pick(c: Bool, +h: HX.Rt, +t: List<&2, HX.Rt>, +n: String, +run: HM.Run, +w: Bool, +tm: Maybe<&2, Nat>, +k: Nat,
     +e: {String.eq(HX.Rt.name(h), n) == c : Bool}, ih: {HC.rt_find(HC.rt_put(t, HX.Rt{n, run, w, tm, k}), n) == HX.Rt{n, run, w, tm, k} : HX.Rt})
-    -> {HC.rt_find(Bool.pick(List<&2, HX.Rt>, String.eq(HX.Rt.name(h), n), HX.Rt{n, run, w, tm, k} <> t, h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}:
+    -> {HC.rt_find(HC.pick_lazy(List<&2, HX.Rt>, String.eq(HX.Rt.name(h), n), u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}:
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), True{}, e) : {HC.rt_find(Bool.pick(List<&2, HX.Rt>, _, HX.Rt{n, run, w, tm, k} <> t, h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}
-      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {Bool.pick(HX.Rt, _, HX.Rt{n, run, w, tm, k}, HC.rt_find(t, n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), True{}, e) : {HC.rt_find(HC.pick_lazy(List<&2, HX.Rt>, _, u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HC.pick_lazy(HX.Rt, _, u => HX.Rt{n, run, w, tm, k}, u => HC.rt_find(t, n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
       {==}
     case False{}:
-      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), False{}, e) : {HC.rt_find(Bool.pick(List<&2, HX.Rt>, _, HX.Rt{n, run, w, tm, k} <> t, h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}
-      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), False{}, e) : {Bool.pick(HX.Rt, _, h, HC.rt_find(HC.rt_put(t, HX.Rt{n, run, w, tm, k}), n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), False{}, e) : {HC.rt_find(HC.pick_lazy(List<&2, HX.Rt>, _, u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), False{}, e) : {HC.pick_lazy(HX.Rt, _, u => h, u => HC.rt_find(HC.rt_put(t, HX.Rt{n, run, w, tm, k}), n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
       ih
 
 # putting an agent's runtime state and reading it back gives it
@@ -33,7 +34,7 @@ def hub_rt_put_find(+xs: List<&2, HX.Rt>, +n: String, +run: HM.Run, +w: Bool, +t
     -> {HC.rt_find(HC.rt_put(xs, HX.Rt{n, run, w, tm, k}), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}:
   match xs:
     case Nil{}:
-      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {Bool.pick(HX.Rt, _, HX.Rt{n, run, w, tm, k}, HC.rt_find(Nil{}, n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HC.pick_lazy(HX.Rt, _, u => HX.Rt{n, run, w, tm, k}, u => HC.rt_find(Nil{}, n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
       {==}
     case Con{h, t}:
       hub_rt_put_find.pick(String.eq(HX.Rt.name(h), n), h, t, n, run, w, tm, k, {==}, hub_rt_put_find(t, n, run, w, tm, k))
@@ -213,14 +214,14 @@ def hub_seen_snoc_del.pick(c: Bool, +h: HX.Steer, +t: List<&2, HX.Steer>, +n: St
       ih
     case False{}:
       %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {HKL.steer_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HKL.steer_del(t, n), h <> HKL.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == k : Nat}
-      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {Bool.pick(Nat, _, HX.Steer.seen(h), HKL.steer_seen(HM.snoc(HX.Steer, HKL.steer_del(t, n), HX.Steer{n, s, k, r}), n)) == k : Nat}
+      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {HLZ.pick(Nat, _, u => HX.Steer.seen(h), u => HKL.steer_seen(HM.snoc(HX.Steer, HKL.steer_del(t, n), HX.Steer{n, s, k, r}), n)) == k : Nat}
       ih
 
 def hub_seen_snoc_del(+xs: List<&2, HX.Steer>, +n: String, +s: List<&2, Nat>, +k: Nat, +r: Nat)
     -> {HKL.steer_seen(HM.snoc(HX.Steer, HKL.steer_del(xs, n), HX.Steer{n, s, k, r}), n) == k : Nat}:
   match xs:
     case Nil{}:
-      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {Bool.pick(Nat, _, k, 0n) == k : Nat}
+      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HLZ.pick(Nat, _, u => k, u => 0n) == k : Nat}
       {==}
     case Con{h, t}:
       hub_seen_snoc_del.pick(String.eq(HX.Steer.agent(h), n), h, t, n, s, k, r, {==}, hub_seen_snoc_del(t, n, s, k, r))
@@ -250,14 +251,14 @@ def hub_rx_seen_snoc_del.pick(c: Bool, +h: HX.Steer, +t: List<&2, HX.Steer>, +n:
       ih
     case False{}:
       %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {HKL.steer_rx_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HKL.steer_del(t, n), h <> HKL.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == r : Nat}
-      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {Bool.pick(Nat, _, HX.Steer.rx_seen(h), HKL.steer_rx_seen(HM.snoc(HX.Steer, HKL.steer_del(t, n), HX.Steer{n, s, k, r}), n)) == r : Nat}
+      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {HLZ.pick(Nat, _, u => HX.Steer.rx_seen(h), u => HKL.steer_rx_seen(HM.snoc(HX.Steer, HKL.steer_del(t, n), HX.Steer{n, s, k, r}), n)) == r : Nat}
       ih
 
 def hub_rx_seen_snoc_del(+xs: List<&2, HX.Steer>, +n: String, +s: List<&2, Nat>, +k: Nat, +r: Nat)
     -> {HKL.steer_rx_seen(HM.snoc(HX.Steer, HKL.steer_del(xs, n), HX.Steer{n, s, k, r}), n) == r : Nat}:
   match xs:
     case Nil{}:
-      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {Bool.pick(Nat, _, r, 0n) == r : Nat}
+      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HLZ.pick(Nat, _, u => r, u => 0n) == r : Nat}
       {==}
     case Con{h, t}:
       hub_rx_seen_snoc_del.pick(String.eq(HX.Steer.agent(h), n), h, t, n, s, k, r, {==}, hub_rx_seen_snoc_del(t, n, s, k, r))
@@ -334,16 +335,16 @@ def hub_nat_eq_sound(+a: Nat, +b: Nat, e: {Nat.is_eq(a, b) == True{} : Bool}) ->
 def hub_uq_own.pick(c: Bool, +m: HM.Msg, +s: HM.MSt, +se: Bool, +t: List<&2, HM.MRec>, +id: Nat, +x: HM.MSt,
     +e: {Nat.is_eq(HM.Msg.id(m), id) == c : Bool},
     ih: {HM.state_of.go(HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), id)) == HC.st_after(HM.rec_of(t, id), x) : Maybe<&2, HM.MSt>})
-    -> {HM.state_of.go(HM.rec_of(Bool.pick(List<&2, HM.MRec>, Nat.is_eq(HM.Msg.id(m), id), HM.MRec{m, x, se} <> t, HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), id))
+    -> {HM.state_of.go(HM.rec_of(HLZ.pick(List<&2, HM.MRec>, Nat.is_eq(HM.Msg.id(m), id), u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), id))
         == HC.st_after(HM.rec_of(HM.MRec{m, s, se} <> t, id), x) : Maybe<&2, HM.MSt>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), True{}, e) : {HM.state_of.go(HM.rec_of(Bool.pick(List<&2, HM.MRec>, _, HM.MRec{m, x, se} <> t, HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), id)) == HC.st_after(HM.rec_of(HM.MRec{m, s, se} <> t, id), x) : Maybe<&2, HM.MSt>}
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), True{}, e) : {HM.state_of.go(Bool.pick(Maybe<&2, HM.MRec>, _, Some{HM.MRec{m, x, se}}, HM.rec_of(t, id))) == HC.st_after(Bool.pick(Maybe<&2, HM.MRec>, _, Some{HM.MRec{m, s, se}}, HM.rec_of(t, id)), x) : Maybe<&2, HM.MSt>}
+      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), True{}, e) : {HM.state_of.go(HM.rec_of(HLZ.pick(List<&2, HM.MRec>, _, u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), id)) == HC.st_after(HM.rec_of(HM.MRec{m, s, se} <> t, id), x) : Maybe<&2, HM.MSt>}
+      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), True{}, e) : {HM.state_of.go(HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, x, se}}, u => HM.rec_of(t, id))) == HC.st_after(HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, s, se}}, u => HM.rec_of(t, id)), x) : Maybe<&2, HM.MSt>}
       {==}
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), False{}, e) : {HM.state_of.go(HM.rec_of(Bool.pick(List<&2, HM.MRec>, _, HM.MRec{m, x, se} <> t, HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), id)) == HC.st_after(HM.rec_of(HM.MRec{m, s, se} <> t, id), x) : Maybe<&2, HM.MSt>}
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), False{}, e) : {HM.state_of.go(Bool.pick(Maybe<&2, HM.MRec>, _, Some{HM.MRec{m, s, se}}, HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), id))) == HC.st_after(Bool.pick(Maybe<&2, HM.MRec>, _, Some{HM.MRec{m, s, se}}, HM.rec_of(t, id)), x) : Maybe<&2, HM.MSt>}
+      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), False{}, e) : {HM.state_of.go(HM.rec_of(HLZ.pick(List<&2, HM.MRec>, _, u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), id)) == HC.st_after(HM.rec_of(HM.MRec{m, s, se} <> t, id), x) : Maybe<&2, HM.MSt>}
+      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), False{}, e) : {HM.state_of.go(HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, s, se}}, u => HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), id))) == HC.st_after(HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, s, se}}, u => HM.rec_of(t, id)), x) : Maybe<&2, HM.MSt>}
       ih
 
 def hub_uq_own(+xs: List<&2, HM.MRec>, +id: Nat, +x: HM.MSt)
@@ -363,19 +364,19 @@ def hub_uq_other.pick(c: Bool, +m: HM.Msg, +s: HM.MSt, +se: Bool, +t: List<&2, H
     +e: {Nat.is_eq(HM.Msg.id(m), id) == c : Bool},
     eo: {Nat.is_eq(id, y) == False{} : Bool},
     ih: {HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), y) == HM.rec_of(t, y) : Maybe<&2, HM.MRec>})
-    -> {HM.rec_of(Bool.pick(List<&2, HM.MRec>, Nat.is_eq(HM.Msg.id(m), id), HM.MRec{m, x, se} <> t, HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), y)
+    -> {HM.rec_of(HLZ.pick(List<&2, HM.MRec>, Nat.is_eq(HM.Msg.id(m), id), u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), y)
         == HM.rec_of(HM.MRec{m, s, se} <> t, y) : Maybe<&2, HM.MRec>}:
   match c:
     case True{}:
       +same = hub_nat_eq_sound(HM.Msg.id(m), id, e)
       +ny = Equal.trans(Bool, Nat.is_eq(HM.Msg.id(m), y), Nat.is_eq(id, y), False{},
         Equal.cong(Nat, Bool, a => Nat.is_eq(a, y), HM.Msg.id(m), id, same), eo)
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), True{}, e) : {HM.rec_of(Bool.pick(List<&2, HM.MRec>, _, HM.MRec{m, x, se} <> t, HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), y) == HM.rec_of(HM.MRec{m, s, se} <> t, y) : Maybe<&2, HM.MRec>}
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), y), False{}, ny) : {Bool.pick(Maybe<&2, HM.MRec>, _, Some{HM.MRec{m, x, se}}, HM.rec_of(t, y)) == Bool.pick(Maybe<&2, HM.MRec>, _, Some{HM.MRec{m, s, se}}, HM.rec_of(t, y)) : Maybe<&2, HM.MRec>}
+      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), True{}, e) : {HM.rec_of(HLZ.pick(List<&2, HM.MRec>, _, u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), y) == HM.rec_of(HM.MRec{m, s, se} <> t, y) : Maybe<&2, HM.MRec>}
+      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), y), False{}, ny) : {HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, x, se}}, u => HM.rec_of(t, y)) == HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, s, se}}, u => HM.rec_of(t, y)) : Maybe<&2, HM.MRec>}
       {==}
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), False{}, e) : {HM.rec_of(Bool.pick(List<&2, HM.MRec>, _, HM.MRec{m, x, se} <> t, HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), y) == HM.rec_of(HM.MRec{m, s, se} <> t, y) : Maybe<&2, HM.MRec>}
-      Equal.cong(Maybe<&2, HM.MRec>, Maybe<&2, HM.MRec>, z => Bool.pick(Maybe<&2, HM.MRec>, Nat.is_eq(HM.Msg.id(m), y), Some{HM.MRec{m, s, se}}, z),
+      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), False{}, e) : {HM.rec_of(HLZ.pick(List<&2, HM.MRec>, _, u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), y) == HM.rec_of(HM.MRec{m, s, se} <> t, y) : Maybe<&2, HM.MRec>}
+      Equal.cong(Maybe<&2, HM.MRec>, Maybe<&2, HM.MRec>, z => HLZ.pick(Maybe<&2, HM.MRec>, Nat.is_eq(HM.Msg.id(m), y), u => Some{HM.MRec{m, s, se}}, u => z),
         HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), y), HM.rec_of(t, y), ih)
 
 def hub_uq_other(+xs: List<&2, HM.MRec>, +id: Nat, +x: HM.MSt, +y: Nat, +eo: {Nat.is_eq(id, y) == False{} : Bool})

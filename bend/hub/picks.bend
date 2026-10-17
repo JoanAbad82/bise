@@ -5,13 +5,7 @@ import Base
 
 import ../vendor/json.bend as J
 
-# a when b is true, else c, only the one taken computed (core's pick_lazy)
-def lazy(-A: Type, c: Bool, a: Unit -> A, b: Unit -> A) -> A:
-  match c:
-    case True{}:
-      a(Unit{})
-    case False{}:
-      b(Unit{})
+import ./lazy.bend as LZ
 
 # his pick: the option's number and its words, both or neither
 type Pick is Data:
@@ -22,7 +16,7 @@ def digits(cs: List<&2, Char>) -> Bool:
     case Nil{}:
       True{}
     case Con{+h, +t}:
-      Char.is_digit(h) && digits(t)
+      LZ.and(Char.is_digit(h), u => digits(t))
 
 # an option's number (`1`), not words
 def is_number(+t: String) -> Bool:
@@ -37,7 +31,7 @@ def any_opt(xs: List<&2, String>, +n: String) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      opt_line(String.trim(h), n) || any_opt(t, n)
+      LZ.or(opt_line(String.trim(h), n), u => any_opt(t, n))
 
 # one of the card's options: a number with its line (`2.` or `2)`) in the
 # card's text
@@ -51,14 +45,14 @@ def opt_words(xs: List<&2, String>, +n: String) -> Maybe<&2, String>:
       None{}
     case Con{+h, +t}:
       +l = String.trim(h)
-      lazy(Maybe<&2, String>, opt_line(l, n), u => Some{String.trim(String.drop(l, Nat.add(String.length(n), 1n)))}, u => opt_words(t, n))
+      LZ.pick(Maybe<&2, String>, opt_line(l, n), u => Some{String.trim(String.drop(l, Nat.add(String.length(n), 1n)))}, u => opt_words(t, n))
 
 # his pick (inbox picks, architect m_22243): an option's number and that
 # option's words (`2` on '2. only at checkout' -> 2, 'only at
 # checkout'); words, or a number that isn't an option: none. `said`
 # stays what he said
 def option_words(+card: String, +t: String) -> Maybe<&2, String>:
-  lazy(Maybe<&2, String>, is_option(card, t), u => opt_words(String.lines(card), String.trim(t)), u => None{})
+  LZ.pick(Maybe<&2, String>, is_option(card, t), u => opt_words(String.lines(card), String.trim(t)), u => None{})
 
 def pick_of(n: Maybe<&2, Nat>, +w: Maybe<&2, String>) -> Maybe<&2, Pick>:
   match n:

@@ -24,6 +24,8 @@ import ./model.bend as M
 
 import ./cx.bend as X
 
+import ./lazy.bend as LZ
+
 def is_paused(+s: M.St) -> Bool:
   Maybe.is_some(&2, Nat, M.St.paused(s))
 
@@ -39,7 +41,7 @@ def rt_of(xs: List<&2, X.Rt>, +n: String) -> X.Rt:
     case Nil{}:
       X.Rt{n, M.RDown{}, False{}, None{}, 0n}
     case Con{+h, +t}:
-      Bool.pick(X.Rt, String.eq(X.Rt.name(h), n), h, rt_of(t, n))
+      LZ.pick(X.Rt, String.eq(X.Rt.name(h), n), u => h, u => rt_of(t, n))
 
 # the agents a pause stops: the busy ones, in the hub's order
 def busy.go(ns: List<&2, String>, +rts: List<&2, X.Rt>) -> List<&2, String>:
@@ -80,7 +82,7 @@ def str_in(xs: List<&2, String>, +s: String) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      String.eq(h, s) || str_in(t, s)
+      LZ.or(String.eq(h, s), u => str_in(t, s))
 
 def woken.go(xs: List<&2, M.MRec>, +acc: List<&2, String>) -> List<&2, String>:
   match xs:

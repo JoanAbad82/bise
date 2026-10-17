@@ -10,6 +10,7 @@ import Base
 import ./model.bend as M
 import ./cx.bend as X
 import ./picks.bend as PK
+import ./lazy.bend as LZ
 
 def opt_words(m: Maybe<&2, String>) -> String:
   match m:
@@ -87,7 +88,7 @@ def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      Nat.is_eq(h, n) || nat_in(t, n)
+      LZ.or(Nat.is_eq(h, n), u => nat_in(t, n))
 
 # a card whose route line the shell will place (answer_pos): due
 def due_add(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:

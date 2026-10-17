@@ -18,6 +18,7 @@ import ./core.bend as H
 
 import ./timers.bend as TM
 import ./wakes.bend as WK
+import ./lazy.bend as LZ
 
 def jdecl(d: Maybe<&2, M.Decl>, +note: String) -> J.Json:
   match d:
@@ -41,8 +42,8 @@ def waits_on(+ws: List<&2, X.Waiter>, +s: M.St, +n: String) -> Maybe<&2, String>
     case Nil{}:
       None{}
     case Con{+w, +t}:
-      Bool.pick(Maybe<&2, String>, String.eq(X.Waiter.agent(w), n),
-        waits_to(M.msg_of(s, X.Waiter.msg(w))), waits_on(t, s, n))
+      LZ.pick(Maybe<&2, String>, String.eq(X.Waiter.agent(w), n),
+        u => waits_to(M.msg_of(s, X.Waiter.msg(w))), u => waits_on(t, s, n))
 
 def agent_json(+a: M.Agent, +x: X.Rt, +wo: Maybe<&2, String>) -> J.Json:
   V.agent(M.Agent.name(a), M.Agent.dir(a), M.Agent.is_main(a), M.Agent.parent(a),
@@ -105,7 +106,7 @@ def ids_in(ids: List<&2, Nat>, +xs: List<&2, M.MRec>) -> Bool:
     case Nil{}:
       True{}
     case Con{+i, +t}:
-      Maybe.is_some(&2, M.MRec, M.rec_of(xs, i)) && ids_in(t, xs)
+      LZ.and(Maybe.is_some(&2, M.MRec, M.rec_of(xs, i)), u => ids_in(t, xs))
 
 # where the view finds the step's messages (issue 21): the hot ones when
 # they are all there (a message sent and still queued, or owing a reply);
@@ -272,7 +273,7 @@ def mark_in(xs: List<&2, Mark>, +m: Mark) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      mark_eq(h, m) || mark_in(t, m)
+      LZ.or(mark_eq(h, m), u => mark_in(t, m))
 
 def gone.keep(kept: Bool, +m: Mark, +rest: List<&2, String>) -> List<&2, String>:
   match kept:
@@ -346,7 +347,7 @@ def timer_evs(+ended: Bool, evs: List<&2, M.Ev>) -> Bool:
     case Nil{}:
       False{}
     case Con{+e, +t}:
-      timer_ev(ended, e) || timer_evs(ended, t)
+      LZ.or(timer_ev(ended, e), u => timer_evs(ended, t))
 
 # the timers (`sb every`) only when a step changed them: an idle tick
 # carries none (idle-cpu), a fire no ended ones

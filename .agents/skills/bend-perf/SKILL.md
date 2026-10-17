@@ -137,3 +137,14 @@ numbers. The next audit starts from there.
   1.5 -> 1.2 s. Left, serial: join_chunks_loop's copy of the 30 MB
   (~0.2 s) and io_cbuf's String -> bytes (~0.17 s); next step if
   view_all matters more: answer as a list of parts, one send each.
+- 2026-10-17 (bp-lazy, chunk 1): searches stop at their hit. hub/lazy.bend
+  (LZ.pick, LZ.or, LZ.and: the second side a thunk `u => f(t)`) in every
+  Maybe/Bool search of bend/hub and the put/set ones (the full maps,
+  rename/mark, stay maps: no law says their key is unique); queued_in
+  matches is_queued first (queued_in.keep), str_in only for a queued
+  message. Same journal copy, back to back: Tick 41.4 -> 10.6 ms (the
+  first try, LZ.and in a Bool.pick, gave 28 ms: a closure and a cons per
+  message, then dropped), say ~15.5 -> ~13.4 ms, replay 21.5 -> 17.8 s;
+  digest identical. pick_gate's third check refuses a strict search in
+  bend/hub. Left: queued_in still walks every hot message (14k on his
+  hub, term_drop is most of the 10 ms).
