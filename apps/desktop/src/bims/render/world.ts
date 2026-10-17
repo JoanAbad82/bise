@@ -51,7 +51,8 @@ export function castShadows(root: Object3D): void {
   });
 }
 
-export function buildWorld(o: Office, mainName: string, style: Style, look: MapLook, night: boolean, grow: Grow = NO_GROW): World {
+/** `ground`: its floating grass block (the town's lawn is its ground there: bims m_28807) */
+export function buildWorld(o: Office, mainName: string, style: Style, look: MapLook, night: boolean, grow: Grow = NO_GROW, ground = true): World {
   const pal = look.pal(night);
   const k = kitOf(style, pal);
   const root = new Group();
@@ -64,8 +65,10 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   const gz = (site.z0 + site.z1) / 2;
   // holed where the map carves under its floor (California's bowl), so the carving shows
   const pits = look.pits?.(o, grow.stage) ?? [];
-  k.add(slabWithPits(style, gw, 1.2, gd, 0.45, gx, gz, pits), k.mat(pal.dirt), root, gx, -0.75, gz);
-  k.add(slabWithPits(style, gw, 0.16, gd, 0, gx, gz, pits), k.mat(pal.grass), root, gx, -0.1, gz);
+  if (ground) {
+    k.add(slabWithPits(style, gw, 1.2, gd, 0.45, gx, gz, pits), k.mat(pal.dirt), root, gx, -0.75, gz);
+    k.add(slabWithPits(style, gw, 0.16, gd, 0, gx, gz, pits), k.mat(pal.grass), root, gx, -0.1, gz);
+  }
 
   // the map's look on the plan's office; the stages' groups made as the builders ask for them
   const pieces = new Map<number, Group>();

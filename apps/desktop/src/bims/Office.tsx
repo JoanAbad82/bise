@@ -23,7 +23,7 @@ import { wakeIn } from './skate';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
-import { atFit, DRAG_PX, FIT, panBy, pinchFactor, sameCam, zoomAt, type Cam } from './zoom';
+import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from './zoom';
 import { konamiDone, localOf, type Forced } from './eggs';
 import { cropped, growOf, tipOf, unlockLabel } from './growth';
 import { makeDriver, type Clock } from './office-driver';
@@ -470,16 +470,11 @@ export function Office({
     // a pinch (Chromium: a wheel with ctrlKey) zooms around the pointer; two fingers move the view
     // while zoomed, and scroll the bar at the fit (nothing to move there)
     const onWheel = (e: WheelEvent) => {
-      const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? box.clientHeight : 1;
       const at = box.getBoundingClientRect();
-      if (e.ctrlKey) {
-        e.preventDefault();
-        moveCam(zoomAt(camRef.current, pinchFactor(e.deltaY * k), e.clientX - at.left, e.clientY - at.top, at.width, at.height));
-        return;
-      }
-      if (atFit(camRef.current)) return;
+      const c = wheelCam(camRef.current, { dx: e.deltaX, dy: e.deltaY, mode: e.deltaMode, ctrl: e.ctrlKey }, e.clientX - at.left, e.clientY - at.top, at.width, at.height, box.clientHeight);
+      if (c === null) return;
       e.preventDefault();
-      moveCam(panBy(camRef.current, -e.deltaX * k, -e.deltaY * k, at.width, at.height));
+      moveCam(c);
     };
     box.addEventListener('wheel', onWheel, { passive: false });
 

@@ -153,6 +153,24 @@ export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: To
     for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) tree(q.x + dx * (q.w / 2 - 1.1), q.z + dz * (q.d / 2 - 1.1), 0.8);
   }
 
+  // the home's square (bims m_29650): paving round its ground, a tree at each corner, a bench on each side, no fence
+  const h = plan.heart;
+  if (h !== null) {
+    const hx = (h.x0 + h.x1) / 2;
+    const hz = (h.z0 + h.z1) / 2;
+    k.add(style.box(h.x1 - h.x0, 0.05, h.z1 - h.z0, 0.3), k.mat(c.stone), root, hx, LAWN_TOP + 0.01, hz);
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) tree(dx < 0 ? h.x0 + 0.9 : h.x1 - 0.9, dz < 0 ? h.z0 + 0.9 : h.z1 - 0.9, 0.85);
+    for (const sx of [-1, 1]) {
+      const bx = sx < 0 ? h.x0 + 0.5 : h.x1 - 0.5;
+      const bench = new Group();
+      bench.position.set(bx, 0, hz);
+      bench.rotation.y = Math.PI / 2;
+      root.add(bench);
+      k.add(style.box(1.3, 0.1, 0.4), k.mat(c.wood), bench, 0, LAWN_TOP + 0.32, 0);
+      for (const bx2 of [-0.5, 0.5]) k.add(style.box(0.1, 0.3, 0.3), k.mat(c.rail), bench, bx2, LAWN_TOP + 0.15, 0);
+    }
+  }
+
   // the trees: a trunk and three round leaves (the prototype's clayTree)
   for (const t of plan.trees) tree(t.x, t.z, t.size);
   return root;

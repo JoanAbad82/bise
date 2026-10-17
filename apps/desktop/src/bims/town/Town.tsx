@@ -6,9 +6,11 @@
 // (DIVE_S) to the exact fit that project's Office opens with, then that Office takes over in the
 // same box (its bims live, its cards, its clicks), the sign keeps an 'open' that opens the project's
 // main thread; esc or '⤢ town' fades the town back in at that framing and eases out. Reduced motion:
-// cuts. The dive is kept per window (keep.ts). The far offices are merged objects with still
-// silhouettes; the town draws one frame on a change (a row, a size, the theme) and during the dive,
-// never on a timer: an idle town draws nothing. Owner: maps-e.
+// cuts. The dive is kept per window (keep.ts). Each office is its project's own (page town-live):
+// one brain per project (office-driver.ts, the minimap's) fed its rows; from afar its scene baked
+// still with the real bims at their state's spot, baked again only when a still pose changes; close
+// up (the dive) the offices in view posed live at the minimap's own rates (loop.ts). An idle town
+// draws nothing. Owner: maps-e.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Press, tipAttrs } from '@/ds';
 import { reducedMotion } from '@/ds/hooks';
@@ -16,14 +18,16 @@ import { bims } from '@/proto/words_bims.gen';
 import { keep } from '@/app/keep';
 import type { ActivitiesFn, LayoutFn } from '../model';
 import { Office, type Parts } from '../Office';
-import { bedsAt, growOf } from '../growth';
+import { growOf } from '../growth';
 import { growHigh } from '../grow-keep';
-import { away, CHECK_MS } from '../loop';
+import { away, CHECK_MS, nextAfter } from '../loop';
+import { localOf } from '../eggs';
+import { makeDriver, NO_ATTENTION, type Clock, type OfficeDriver } from '../office-driver';
 import type { Fit } from '../render/camera';
+import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from '../zoom';
 import { DIVE_S, diveAt } from './dive';
 import { liveAgents, signOf, townProjects, type TownProject } from './sites';
-import { stillOf, stillSig } from './stand';
-import type { MakeTownRenderer, TownOffice, TownRenderer } from './types';
+import type { MakeTownRenderer, TownRenderer, TownSite } from './types';
 import { placeTags, type TagIn } from '../tags';
 
 /** The town's parts: the office's (its dive opens one), the pure modules it reads, its renderer's loader. */
@@ -38,10 +42,18 @@ export interface TownParts {
 type Phase = 'town' | 'in' | 'swapIn' | 'office' | 'swapOut' | 'out';
 
 const DIVE_KEY = 'bims.town.dive';
+/** offices baked again per frame at most (page town-live: ~85 ms each, the town fills in) */
+const BAKES_PER_FRAME = 1;
 /** the fade between the town and the Office (office.css .bims-town-top) */
 const SWAP_MS = 260;
 
 const testMode = (): boolean => (window as { bise?: { test?: boolean } }).bise?.test === true;
+/** test mode: why each frame was asked for (window.__biseTownWhy, the idle checks print it) */
+const whyFrame = (why: string): void => {
+  if (!testMode()) return;
+  const w = window as { __biseTownWhy?: { t: number; why: string }[] };
+  w.__biseTownWhy = [...(w.__biseTownWhy ?? []).slice(-99), { t: Date.now(), why }];
+};
 const awayNow = (): boolean => away({ hidden: document.hidden, focused: document.hasFocus(), test: testMode() });
 const nightNow = (): boolean => {
   const set = document.documentElement.dataset.theme;
@@ -49,15 +61,13 @@ const nightNow = (): boolean => {
   return !(typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches);
 };
 
-/** One project's office for the town: its plan's office on its map, its growth (the office's high-water mark), its still bims. */
-function townOfficeOf(p: TownProject, parts: TownParts, t: number): TownOffice {
-  const agents = liveAgents(p);
-  const office = parts.layoutOf(agents, p.map);
-  const grow = growOf(testMode() ? p.growth : growHigh(p.id, p.growth));
-  const main = agents.find((a) => a.main)?.name ?? 'main';
-  const acts = parts.activities({ agents: p.agents, cards: p.cards, places: p.places }, t);
-  return { id: p.id, office, main, grow, still: stillOf(office, acts, main, bedsAt(grow.stage)) };
+/** One project's office for the plan: its office on its map, its growth (the office's high-water mark). */
+function siteOf(p: TownProject, parts: TownParts): TownSite {
+  return { id: p.id, office: parts.layoutOf(liveAgents(p), p.map), grow: growOf(testMode() ? p.growth : growHigh(p.id, p.growth)), ...(p.home === true ? { home: true } : {}) };
 }
+
+/** the clock a town frame is drawn at (office-driver.ts Clock); a check's town rolls no egg */
+const clockAt = (t: number): Clock => ({ t, local: localOf(new Date(t * 1000)), night: nightNow(), reduced: reducedMotion(), ...(testMode() ? { forced: null } : {}) });
 
 export function Town({
   projects,
@@ -65,7 +75,7 @@ export function Town({
   onOpenProject,
   onOpenAgent,
 }: {
-  /** every project but bise's home (town/useTown.ts) */
+  /** every project, bise's home among them (town/useTown.ts) */
   projects: readonly TownProject[];
   parts: TownParts;
   /** 'open' on the dived office's sign: the project's main thread */
@@ -89,28 +99,91 @@ export function Town({
   const canvas = useRef<HTMLCanvasElement>(null);
   const signs = useRef(new Map<string, HTMLDivElement>());
   const rRef = useRef<TownRenderer | null>(null);
-  const kickRef = useRef<() => void>(() => undefined);
+  const kickRef = useRef<(why?: string) => void>(() => undefined);
   // the dive's way: from the town's fit to the Office's, its start time (s, set by its first frame); null: still
   const anim = useRef<{ from: Fit; to: Fit; at: number | null; back: boolean } | null>(null);
   const [pointer, setPointer] = useState(false);
+  // his camera over the town (zoom.ts, the minimap's): pinch to zoom, two fingers or a drag to move,
+  // esc or a double-click on the lawn back to the whole town; `fitted` re-renders the box's data-zoomed
+  const camRef = useRef<Cam>(FIT);
+  const [fitted, setFitted] = useState(true);
+  const moveCam = useCallback((c: Cam) => {
+    if (sameCam(c, camRef.current)) return;
+    camRef.current = c;
+    setFitted(atFit(c));
+    rRef.current?.setCam(c);
+    kickRef.current('cam');
+  }, []);
+  // a drag moves the view while zoomed; past DRAG_PX it is never a click
+  const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
+  const dragged = useRef(false);
 
-  // the town's offices and its plan: the offices when a row changes, the plan only when a ground does
-  const [at, setAt] = useState(() => Date.now() / 1000);
-  const offices = useMemo(() => shown.map((p) => townOfficeOf(p, parts, at)), [shown, parts, at]);
-  const live = useRef({ offices, dived });
+  // the town's offices: each project's ground for the plan (laid again only when a ground changes),
+  // and its brain (office-driver.ts, the minimap's), told of its rows: the same office as its minimap
+  const sites = useMemo(() => shown.map((p) => siteOf(p, parts)), [shown, parts]);
+  const drivers = useRef(new Map<string, OfficeDriver>());
+  useEffect(() => {
+    const t = Date.now() / 1000;
+    const keepIds = new Set(shown.map((p) => p.id));
+    for (const id of [...drivers.current.keys()]) if (!keepIds.has(id)) drivers.current.delete(id);
+    for (const p of shown) {
+      let d = drivers.current.get(p.id);
+      if (d === undefined) {
+        d = makeDriver(parts.office);
+        drivers.current.set(p.id, d);
+      }
+      const agents = liveAgents(p);
+      d.rows({ agents: p.agents, cards: p.cards, places: p.places }, agents, p.map);
+      d.grow(sites.find((x) => x.id === p.id)?.grow ?? growOf(null), t);
+    }
+    kickRef.current('rows');
+  }, [shown, parts, sites]);
+  const live = useRef({ sites, dived });
   useLayoutEffect(() => {
-    live.current = { offices, dived };
+    live.current = { sites, dived };
     phaseRef.current = phase;
   });
   const signsOf = useMemo(() => new Map(shown.map((p) => [p.id, signOf(p)])), [shown]);
 
-  // a still town looks at its rows' clock now and then (a long turn, a trip): new stills only on a change
+  /**
+   * The offices not posed live, baked still again where a still pose changed (the renderer compares):
+   * BAKES_PER_FRAME at most (a bake is ~85 ms), the town filling in a few frames; true: more to bake.
+   */
+  const stills = useCallback((r: TownRenderer): boolean => {
+    const c = clockAt(Date.now() / 1000);
+    const on = new Set(r.liveIds());
+    let baked = 0;
+    for (const [id, d] of drivers.current) {
+      if (on.has(id)) continue;
+      const st = d.still(c);
+      if (st === null) continue;
+      if (baked >= BAKES_PER_FRAME) return true;
+      if (r.still(id, st)) baked++;
+    }
+    return false;
+  }, []);
+
+  // a still town looks at its rows' clock now and then (a long turn, a trip): a frame only when an
+  // office was baked again (an agent's state changed), never for office life
   useEffect(() => {
     const id = setInterval(() => {
-      if (awayNow()) return;
-      const t = Date.now() / 1000;
-      const now = shown.map((p) => stillSig(townOfficeOf(p, parts, t).still)).join('|');
-      if (now !== live.current.offices.map((o) => stillSig(o.still)).join('|')) setAt(t);
+      const r = rRef.current;
+      if (awayNow() || r === null) return;
+      const c = clockAt(Date.now() / 1000);
+      const stale = [...drivers.current.values()].map((d) => d.stale(c)).some(Boolean);
+      if (!stale) return;
+      if (r.liveIds().length > 0) {
+        kickRef.current('check-live');
+        return;
+      }
+      const on = new Set(r.liveIds());
+      let baked = false;
+      for (const [pid, d] of drivers.current) {
+        if (on.has(pid)) continue;
+        const st = d.still(c);
+        if (st !== null && r.still(pid, st)) baked = true;
+      }
+      if (baked) kickRef.current('check-baked');
     }, CHECK_MS);
     return () => {
       clearInterval(id);
@@ -150,9 +223,11 @@ export function Town({
     if (cv === null || box === null) return undefined;
     let gone = false;
     let raf = 0;
+    let tick: ReturnType<typeof setTimeout> | undefined;
     let r: TownRenderer | null = null;
     const draw = () => {
       raf = 0;
+      tick = undefined;
       if (r === null || gone || awayNow()) return;
       const a = anim.current;
       let more = false;
@@ -173,13 +248,34 @@ export function Town({
         const fit = r.townFit();
         if (fit !== null) box.style.height = `${String(fit.heightPx)}px`;
       }
-      const ph = phaseRef.current;
-      r.frame(nightNow(), ph === 'town' ? null : live.current.dived);
+      // the offices from afar baked still (again only on a change), the ones close up posed live:
+      // each asks for its next frame as its minimap would (loop.ts nextAfter), the soonest wins
+      const baking = stills(r);
+      const t = Date.now() / 1000;
+      const c = clockAt(t);
+      let next: number | null = null;
+      for (const id of r.liveIds()) {
+        const step = drivers.current.get(id)?.step(c, NO_ATTENTION);
+        if (step == null) continue;
+        const motion = r.live(id, step, t);
+        const n = nextAfter({ motion, moving: step.moving, labels: new Map(), away: awayNow(), lost: false });
+        if (n !== null) next = next === null ? n : Math.min(next, n);
+      }
+      r.frame(nightNow());
       placeSigns(r);
-      if (more) raf = requestAnimationFrame(draw);
+      if (more || baking || next === 0) {
+        whyFrame(more ? 'dive' : baking ? 'baking' : 'live');
+        raf = requestAnimationFrame(draw);
+      } else if (next !== null) {
+        whyFrame('live-tick');
+        tick = setTimeout(draw, next);
+      }
     };
-    const kick = () => {
+    const kick = (why = 'kick') => {
       if (r === null || gone || awayNow() || raf !== 0) return;
+      whyFrame(why);
+      if (tick !== undefined) clearTimeout(tick);
+      tick = undefined;
       raf = requestAnimationFrame(draw);
     };
     kickRef.current = kick;
@@ -198,18 +294,31 @@ export function Town({
     };
     const sized = new ResizeObserver(() => {
       resize();
-      kick();
+      kick('resize');
     });
     sized.observe(box);
+    // a pinch (Chromium: a wheel with ctrlKey) zooms the town around the pointer; two fingers move it while zoomed
+    const onWheel = (e: WheelEvent) => {
+      if (phaseRef.current !== 'town') return;
+      const at = box.getBoundingClientRect();
+      const c = wheelCam(camRef.current, { dx: e.deltaX, dy: e.deltaY, mode: e.deltaMode, ctrl: e.ctrlKey }, e.clientX - at.left, e.clientY - at.top, at.width, at.height, box.clientHeight);
+      if (c === null) return;
+      e.preventDefault();
+      moveCam(c);
+    };
+    box.addEventListener('wheel', onWheel, { passive: false });
     const onWindow = () => {
-      if (!awayNow()) kick();
+      if (!awayNow()) kick('window');
     };
     document.addEventListener('visibilitychange', onWindow);
     window.addEventListener('focus', onWindow);
-    const theme = new MutationObserver(kick);
+    const onTheme = (): void => {
+      kick('theme');
+    };
+    const theme = new MutationObserver(onTheme);
     theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     const schemeMq = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: light)') : null;
-    schemeMq?.addEventListener('change', kick);
+    schemeMq?.addEventListener('change', onTheme);
     parts
       .load()
       .then((make) => {
@@ -220,10 +329,11 @@ export function Town({
         made.onLost(() => {
           if (!gone) setState('lost');
         });
-        made.setTown(live.current.offices);
+        made.setTown(live.current.sites);
+        made.setCam(camRef.current);
         resize();
         setState('on');
-        kick();
+        kick('load');
       })
       .catch(() => {
         if (!gone) setState('lost');
@@ -231,28 +341,30 @@ export function Town({
     return () => {
       gone = true;
       if (raf !== 0) cancelAnimationFrame(raf);
+      if (tick !== undefined) clearTimeout(tick);
       sized.disconnect();
+      box.removeEventListener('wheel', onWheel);
       document.removeEventListener('visibilitychange', onWindow);
       window.removeEventListener('focus', onWindow);
       theme.disconnect();
-      schemeMq?.removeEventListener('change', kick);
+      schemeMq?.removeEventListener('change', onTheme);
       kickRef.current = () => undefined;
       rRef.current = null;
       r?.dispose();
     };
-  }, [parts, placeSigns]);
+  }, [parts, placeSigns, stills, moveCam]);
 
-  // a change of the town: what changed is built again, one frame
+  // a change of the town: its plan again if a ground changed, the offices' rows heard at the next frame
   useEffect(() => {
     const r = rRef.current;
     if (r === null) return;
-    r.setTown(offices);
+    r.setTown(sites);
     if (phaseRef.current === 'town') r.setView(null);
-    kickRef.current();
-  }, [offices]);
+    kickRef.current('sites');
+  }, [sites]);
   // the signs' words changed (a count): placed again
   useEffect(() => {
-    kickRef.current();
+    kickRef.current('signs');
   }, [signsOf, phase]);
 
   const keepDive = (id: string | null) => {
@@ -264,14 +376,18 @@ export function Town({
     const r = rRef.current;
     const box = holder.current;
     if (r === null || box === null || phaseRef.current !== 'town') return;
-    const from = r.townFit();
+    const from = r.shownFit();
     const to = r.diveFit(id, box.clientWidth);
     if (from === null || to === null) return;
     keepDive(id);
+    // the way out eases to the whole town
+    camRef.current = FIT;
+    setFitted(true);
+    r.setCam(FIT);
     anim.current = { from, to, at: null, back: false };
     setPhase('in');
     phaseRef.current = 'in';
-    kickRef.current();
+    kickRef.current('dive');
   };
   /** back to the town: it fades in over the Office at the Office's framing, then eases out */
   const backOut = useCallback(() => {
@@ -298,7 +414,7 @@ export function Town({
       if (r !== null && box !== null && to !== null) {
         r.setView(to);
         box.style.height = `${String(to.heightPx)}px`;
-        kickRef.current();
+        kickRef.current('swapOut');
         const id = setTimeout(() => {
           const from = r.townFit();
           keepDive(null);
@@ -309,7 +425,7 @@ export function Town({
           anim.current = { from, to, at: null, back: true };
           setPhase('out');
           phaseRef.current = 'out';
-          kickRef.current();
+          kickRef.current('swapOut2');
         }, reduced ? 0 : SWAP_MS);
         return () => {
           clearTimeout(id);
@@ -374,20 +490,60 @@ export function Town({
         data-pointer={pointer || undefined}
         data-top={officeOn || undefined}
         data-fade={phase === 'swapIn' ? 'out' : undefined}
+        data-zoomed={!fitted || undefined}
+        onPointerDown={(e) => {
+          if (e.button !== 0 || fitted || phaseRef.current !== 'town') return;
+          drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+          dragged.current = false;
+        }}
+        onPointerUp={() => {
+          if (drag.current?.moved === true) dragged.current = true;
+          drag.current = null;
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+        }}
         onPointerMove={(e) => {
+          const d = drag.current;
+          if (d !== null && d.id === e.pointerId) {
+            const dx = e.clientX - d.x;
+            const dy = e.clientY - d.y;
+            if (!d.moved && Math.hypot(dx, dy) < DRAG_PX) return;
+            if (!d.moved) {
+              d.moved = true;
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }
+            d.x = e.clientX;
+            d.y = e.clientY;
+            const box = e.currentTarget.getBoundingClientRect();
+            moveCam(panBy(camRef.current, dx, dy, box.width, box.height));
+            return;
+          }
           setPointer(pickAt(e) !== null);
         }}
         onPointerLeave={() => {
           setPointer(false);
         }}
         onClick={(e) => {
+          if (dragged.current) {
+            dragged.current = false;
+            return;
+          }
           const id = pickAt(e);
           if (id !== null) diveInto(id);
         }}
+        onDoubleClick={(e) => {
+          // on the lawn only: a click on an office already dived into it
+          if (pickAt(e) === null) moveCam(FIT);
+        }}
         onKeyDown={(e) => {
-          if (e.key === 'Escape' && officeOn) {
+          if (e.key !== 'Escape') return;
+          if (officeOn) {
             e.stopPropagation();
             backOut();
+          } else if (!fitted) {
+            e.stopPropagation();
+            moveCam(FIT);
           }
         }}
       >

@@ -122,3 +122,46 @@ describe('town plan', () => {
     expect(line.at(-1)).toEqual({ x: 10, z: 10 });
   });
 });
+
+describe('town plan: bise\'s home at the heart (bims m_29650)', () => {
+  const homeSite = (): TownSite => {
+    const agents = [mainAgent()];
+    return siteOf('home', layoutOf(agents), growOf({ jobs_done: 60, days_used: 14, artifacts_made: 0 }), true);
+  };
+
+  it('stands in the middle row, offices on both sides, its square round it, the road at its door, nothing crossing', () => {
+    for (const n of [0, 1, 3, 7, 12, 19]) {
+      const ss = [...sites(n, n * 7 + 3), homeSite()];
+      const plan = townPlan(ss, townSeed(ss.map((x) => x.id)));
+      expect(crossings(plan), `${String(n)} offices and home`).toEqual({ road: 0, river: 0 });
+      const h = plan.offices.find((p) => p.id === 'home');
+      expect(h, 'home is in the town').toBeDefined();
+      expect(plan.heart, 'its square').not.toBeNull();
+      if (h === undefined || plan.heart === null) continue;
+      expect(plan.heart.x0).toBeLessThan(h.fp.x0);
+      expect(plan.heart.z1).toBeGreaterThan(h.fp.z1);
+      // its path reaches the road like every door's
+      expect(plan.paths.some((p) => Math.abs(p.x - h.door.x) < 1e-6), 'a path from its door to the road').toBe(true);
+      // no tree or house on its square
+      const onHeart = (x: number, z: number): boolean => x > (plan.heart?.x0 ?? 0) && x < (plan.heart?.x1 ?? 0) && z > (plan.heart?.z0 ?? 0) && z < (plan.heart?.z1 ?? 0);
+      expect(plan.trees.filter((t) => onHeart(t.x, t.z))).toEqual([]);
+      expect(plan.houses.filter((t) => onHeart(t.x, t.z))).toEqual([]);
+      if (n >= 3) {
+        // the middle row split round it: an office west and one east of it at about its depth
+        const row = plan.offices.filter((p) => p.id !== 'home' && Math.abs((p.fp.z0 + p.fp.z1) / 2 - (h.fp.z0 + h.fp.z1) / 2) < 8);
+        expect(row.some((p) => p.fp.x1 <= h.fp.x0), 'an office west of it').toBe(true);
+        expect(row.some((p) => p.fp.x0 >= h.fp.x1), 'an office east of it').toBe(true);
+      }
+    }
+  });
+
+  it('its ground is 15% wider than its office would have, its door the same', () => {
+    const agents = [mainAgent()];
+    const o = layoutOf(agents);
+    const g = growOf({ jobs_done: 60, days_used: 14, artifacts_made: 0 });
+    const plain = siteOf('x', o, g);
+    const home = siteOf('x', o, g, true);
+    expect(home.fp.x1 - home.fp.x0).toBeCloseTo((plain.fp.x1 - plain.fp.x0) * 1.15, 6);
+    expect(home.doorX).toBe(plain.doorX);
+  });
+});

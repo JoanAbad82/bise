@@ -59,10 +59,16 @@ export interface OfficeScene {
   desk(name: string): DeskHandles | undefined;
   /** where a stage's piece stands (the map's look), office units */
   pieceAt(stage: number): { readonly x: number; readonly z: number } | null;
+  /** its world alone (no bim, plane, halo): the town bakes its walls while its bims move */
+  world(): Group | null;
+  /** what the last frame lit on its desks (screens, lamps): the town's wall bake follows it */
+  litSig(): string;
   dispose(): void;
 }
 
-export function makeOfficeScene(style: Style): OfficeScene {
+/** `ground`: its floating grass block (false in the town: its lawn is the ground) */
+export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } = {}): OfficeScene {
+  const ground = o.ground ?? true;
   const root = new Group();
   let office: Office | null = null;
   let agents: readonly Agent[] = [];
@@ -99,7 +105,7 @@ export function makeOfficeScene(style: Style): OfficeScene {
     if (!office) return;
     const look = lookOf(office.map);
     eclipsed = false;
-    world = buildWorld(office, mainName(), style, look, isNight, grow);
+    world = buildWorld(office, mainName(), style, look, isNight, grow, ground);
     root.add(world.root);
     if (eggDecor) { root.remove(eggDecor.root); eggDecor.dispose(); }
     eggDecor = makeEggDecor(office, style, grow.stage);
@@ -265,6 +271,13 @@ export function makeOfficeScene(style: Style): OfficeScene {
     desk: (name) => world?.desks.get(name),
     pieceAt(stage) {
       return office ? mapLook().pieceAt(office, stage) : null;
+    },
+    world: () => world?.root ?? null,
+    litSig() {
+      if (!world) return '';
+      let s = '';
+      for (const [name, d] of world.desks) s += `${name}:${d.screen.emissiveIntensity > 0 ? 1 : 0}${d.lamp.emissiveIntensity > 0 ? 1 : 0};`;
+      return s;
     },
     dispose() {
       if (world) { root.remove(world.root); world.dispose(); world = null; }

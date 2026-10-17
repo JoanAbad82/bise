@@ -8,13 +8,16 @@
 //     budget (FRAME_MS) in few draw calls (its offices merged);
 //   - a click on an office dives in: the town eases to that office's own framing, its Office takes
 //     over (its bims live), its sign has 'open'; esc eases back to the whole town; the dive is kept
-//     on a reload; 'open' opens the project's main thread.
+//     on a reload; 'open' opens the project's main thread;
+//   - a pinch zooms the town (page town-live): past LIVE_ZOOM the offices in view are posed live, 4
+//     at most, their bims baked no more; esc goes back to the whole town, no office live, and an idle
+//     town draws no frame again.
 // Shots for bims (.harness-cache/bims-shots): 3 and 12 projects, 320 and wide, day and night; the
 // dive's last town frame and the Office's first, side by side. Owner: maps-e.
 import { test, expect, FakeCore, launchDesktop, type Session } from '../../harness';
 import { agent, card, mainAgent } from '../../../src/bims/fixtures';
 import { STAGE_AT } from '../../../src/bims/growth';
-import { shotOf, sleep, writeIndex, type Shot } from './world';
+import { shotOf, sleep, trackpad, writeIndex, type Shot } from './world';
 
 const shots: Shot[] = [];
 test.describe.configure({ timeout: 150_000 });
@@ -86,7 +89,7 @@ function townWorld(ps: readonly Fake[], theme: 'light' | 'dark'): Record<string,
   return evs;
 }
 
-type TownProbe = { frames: number; calls: number; ms: number; offices: number; merged: { from: number; to: number }; check: { road: number; river: number } };
+type TownProbe = { frames: number; calls: number; ms: number; offices: number; merged: { from: number; to: number }; live: string[]; recent: number[]; check: { road: number; river: number } };
 const probe = (s: Session): Promise<TownProbe | null> =>
   s.page.evaluate(() => (window as unknown as { __biseTown?: TownProbe }).__biseTown ?? null);
 
@@ -168,7 +171,7 @@ test('(town) 12 projects: a frame under the budget, offices merged', async () =>
     await showTown(s);
     await settled(s);
     const p = await probe(s);
-    expect(p?.offices, 'one office per project').toBe(12);
+    expect(p?.offices, "one office per project, bise's home among them").toBe(13);
     expect(p?.ms ?? 999, `a frame's render call, ms (budget ${String(FRAME_MS)})`).toBeLessThan(FRAME_MS);
     expect(p?.merged.to ?? 999, 'merged: far fewer draw calls than meshes').toBeLessThan((p?.merged.from ?? 0) / 10);
     // a row changes: one frame, then still again
@@ -225,3 +228,41 @@ for (const theme of ['light', 'dark'] as const) {
     }
   });
 }
+
+test('(town) a pinch zooms in: the offices in view go live, 4 at most; esc: the whole town, idle', async () => {
+  const { s } = await openTown(fakes(12), 'light');
+  try {
+    await showTown(s);
+    await settled(s);
+    expect((await probe(s))?.live ?? [], 'from afar, no office live').toEqual([]);
+    const box = await s.page.getByTestId('app.right.bims.town').boundingBox();
+    if (box === null) throw new Error('no town');
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    // fingers apart: a ctrl wheel with deltaY < 0, as Chromium sends a trackpad pinch
+    for (let i = 0; i < 12; i++) await trackpad(s.cdp, x, y, { dy: -20, pinch: true });
+    await expect(s.page.getByTestId('app.right.bims.town')).toHaveAttribute('data-zoomed', 'true');
+    await expect.poll(async () => (await probe(s))?.live.length ?? 0, { timeout: 5000, message: 'offices in view posed live' }).toBeGreaterThan(0);
+    expect((await probe(s))?.live.length ?? 99, 'never more than 4 live offices').toBeLessThanOrEqual(4);
+    // the live offices draw at their own rates: a second of their frames, the median's render call
+    await sleep(1000);
+    const zp = await probe(s);
+    const recent = [...(zp?.recent ?? [])].sort((a, b) => a - b);
+    const median = recent[Math.floor(recent.length / 2)] ?? 999;
+    console.log(`town 12 zoomed: ${String(zp?.live.length)} live, median frame ${median.toFixed(2)} ms of ${String(recent.length)}, ${String(zp?.calls)} draw calls`);
+    expect(median, "a live frame's render call, median ms").toBeLessThan(FRAME_MS);
+    await shot(s, 'app.right.bims.town', 'town-12-zoomed-light.png', 'town, 12 projects, pinched in', 'the offices in view live: their real bims at work');
+    await s.page.getByTestId('app.right.bims.town').focus();
+    await s.page.keyboard.press('Escape');
+    await expect(s.page.getByTestId('app.right.bims.town')).not.toHaveAttribute('data-zoomed', 'true');
+    await expect.poll(async () => (await probe(s))?.live.length ?? 99, { timeout: 5000 }).toBe(0);
+    await settled(s);
+    const f0 = (await probe(s))?.frames ?? 0;
+    const w0 = Date.now();
+    await sleep(3000);
+    const whys = await s.page.evaluate((since) => ((window as unknown as { __biseTownWhy?: { t: number; why: string }[] }).__biseTownWhy ?? []).filter((x) => x.t >= since).map((x) => x.why), w0);
+    expect(((await probe(s))?.frames ?? 0) - f0, `back at the whole town, idle: no frame (asked by: ${whys.join(', ')})`).toBe(0);
+  } finally {
+    await s.close();
+  }
+});

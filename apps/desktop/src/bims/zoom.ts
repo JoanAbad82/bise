@@ -57,6 +57,27 @@ export function panBy(c: Cam, dx: number, dy: number, w: number, h: number): Cam
   return clampCam({ zoom: c.zoom, u: c.u - dx / (w * c.zoom), v: c.v - dy / (h * c.zoom) });
 }
 
+/** A wheel as Chromium sends it: a trackpad pinch is a wheel with ctrl, two fingers a plain one. */
+export interface Wheel {
+  readonly dx: number;
+  readonly dy: number;
+  /** WheelEvent.deltaMode: 0 px, 1 lines, 2 pages */
+  readonly mode: number;
+  readonly ctrl: boolean;
+}
+
+/**
+ * What a wheel does to the view at (x, y) of a w × h box (css px; `page`: a page's height): a pinch
+ * zooms around the pointer, two fingers move the view while zoomed; null at the fit (nothing to
+ * move: the bar scrolls). The office and the town move their cameras with it. Pure.
+ */
+export function wheelCam(c: Cam, e: Wheel, x: number, y: number, w: number, h: number, page: number): Cam | null {
+  const k = e.mode === 1 ? 16 : e.mode === 2 ? page : 1;
+  if (e.ctrl) return zoomAt(c, pinchFactor(e.dy * k), x, y, w, h);
+  if (atFit(c)) return null;
+  return panBy(c, -e.dx * k, -e.dy * k, w, h);
+}
+
 export function sameCam(a: Cam, b: Cam): boolean {
   return Math.abs(a.zoom - b.zoom) < 1e-9 && Math.abs(a.u - b.u) < 1e-9 && Math.abs(a.v - b.v) < 1e-9;
 }

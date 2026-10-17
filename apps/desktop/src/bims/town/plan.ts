@@ -25,6 +25,8 @@ export interface TownSite {
   readonly fp: Rect;
   /** its door's x: the dirt path leaves the ground's front edge there */
   readonly doorX: number;
+  /** bise's own home (bims m_29650): at the heart of the town, on its own square, the middle row split round it */
+  readonly home?: boolean;
 }
 
 /** An office where the town put it: add (x, z) to its own points. */
@@ -83,6 +85,8 @@ export interface TownPlan {
   readonly houses: readonly House[];
   readonly trees: readonly Tree[];
   readonly squares: readonly Square[];
+  /** the home's square (its ground and HEART_M round it), paved, a tree at each corner; null: no home */
+  readonly heart: Rect | null;
   /** the town's ground: everything is drawn inside it */
   readonly lawn: Rect;
   /** the seed it was laid with (the first one with no crossing) */
@@ -102,6 +106,9 @@ export const TOWN_MAX = 20;
 /** the margins `crossings` keeps from an office: the road's and the river's half widths and a little */
 const ROAD_KEEP = ROAD + 0.3;
 const RIVER_KEEP = BANK - 0.2;
+/** the room on each side of the home in its row (its square's paving), and its square's margin round its ground */
+const HEART_GAP = 7;
+export const HEART_M = 2.5;
 /** how many seeds the plan tries before keeping its best */
 const TRIES = 12;
 
@@ -233,8 +240,9 @@ function lineUp(sites: readonly TownSite[], gi: number, r: () => number, beat: R
   let riverX = 0;
   sites.forEach((s, i) => {
     const river = i > 0 && i - 1 === gi;
-    let gap = i === 0 ? 0 : river ? RIVER_GAP : 3 + r() * 4;
-    if (i > 0 && !river && beat.since >= beat.next) {
+    const heart = s.home === true || sites[i - 1]?.home === true;
+    let gap = i === 0 ? 0 : river ? RIVER_GAP : heart ? HEART_GAP : 3 + r() * 4;
+    if (i > 0 && !river && !heart && beat.since >= beat.next) {
       gap = SQUARE_W + 2 + r() * 2;
       squares.push(cur + gap / 2);
       beat.since = 0;
@@ -256,11 +264,19 @@ function lineUp(sites: readonly TownSite[], gi: number, r: () => number, beat: R
 /** the plan for one seed */
 function layOut(sites: readonly TownSite[], seed: number): TownPlan {
   const r = rngOf(seed);
+  const home = sites.find((x) => x.home === true);
+  const others = sites.filter((x) => x.home !== true);
   const groups: TownSite[][] = [];
   let from = 0;
-  for (const k of rowSizes(sites.length, perRow(sites.length), r)) {
-    groups.push(sites.slice(from, from + k));
+  for (const k of rowSizes(others.length, perRow(sites.length), r)) {
+    groups.push(others.slice(from, from + k));
     from += k;
+  }
+  // the home at the heart: the middle row's middle, the row split round its square
+  if (home !== undefined) {
+    const mid = groups[Math.floor(groups.length / 2)];
+    if (mid === undefined) groups.push([home]);
+    else mid.splice(Math.ceil(mid.length / 2), 0, home);
   }
   const rows: Row[] = [];
   const squares: Square[] = [];
@@ -349,6 +365,8 @@ function layOut(sites: readonly TownSite[], seed: number): TownPlan {
   }
 
   const lawn: Rect = { x0: minX - 12, x1: maxX + 14, z0: minZ - 10, z1: maxZ + 10 };
+  const hp = home === undefined ? undefined : offices.find((p) => p.id === home.id);
+  const heart: Rect | null = hp === undefined ? null : { x0: hp.fp.x0 - HEART_M, x1: hp.fp.x1 + HEART_M, z0: hp.fp.z0 - HEART_M, z1: hp.fp.z1 + HEART_M };
   const inLawn = (x: number, z: number): boolean => x > lawn.x0 && x < lawn.x1 && z > lawn.z0 && z < lawn.z1;
 
   // bridges: where the road meets the river, one per crossing
@@ -383,7 +401,7 @@ function layOut(sites: readonly TownSite[], seed: number): TownPlan {
   // houses along the road and trees in clumps, only where nothing else is
   const near = (pts: readonly Pt[], x: number, z: number, m: number): boolean => pts.some((q) => Math.abs(q.x - x) < m && Math.abs(q.z - z) < m && Math.hypot(q.x - x, q.z - z) < m);
   const free = (x: number, z: number, m: number): boolean =>
-    inLawn(x, z) && !squares.some((q) => Math.abs(q.x - x) < q.w / 2 + m + 0.4 && Math.abs(q.z - z) < q.d / 2 + m + 0.4) && !inside(offices, x, z, 1.2 + m) && !near(road, x, z, ROAD + 1.2 + m) && !near(river, x, z, BANK + 0.6 + m) &&
+    inLawn(x, z) && (heart === null || x < heart.x0 - m || x > heart.x1 + m || z < heart.z0 - m || z > heart.z1 + m) && !squares.some((q) => Math.abs(q.x - x) < q.w / 2 + m + 0.4 && Math.abs(q.z - z) < q.d / 2 + m + 0.4) && !inside(offices, x, z, 1.2 + m) && !near(road, x, z, ROAD + 1.2 + m) && !near(river, x, z, BANK + 0.6 + m) &&
     paths.every((pa) => Math.abs(pa.x - x) > 1.2 + m || z < pa.z0 || z > pa.z1);
   const houses: House[] = [];
   const houseMax = Math.min(10, 3 + offices.length);
@@ -413,7 +431,7 @@ function layOut(sites: readonly TownSite[], seed: number): TownPlan {
       if (free(x, z, 0) && !near(houses, x, z, 2.2) && !near(trees, x, z, 0.7)) trees.push({ x, z, size: 0.75 + r() * 0.5 });
     }
   }
-  return { offices, road, river, bridges, paths, footbridges, houses, trees, squares, lawn, seed };
+  return { offices, road, river, bridges, paths, footbridges, houses, trees, squares, heart, lawn, seed };
 }
 
 /**

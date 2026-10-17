@@ -1,40 +1,36 @@
-// The town's renderer (three; page bims-maps v9, town.js townStill2): every project's office built by
-// its own map's look (world.ts buildWorld, its growth, its desks lit for the agents at work) where the
-// town's plan put it, merged into one object (merge.ts) with its bims as still silhouettes, and the
-// town around them (townscape.ts), merged too. One hemisphere light and one sun with its soft
-// shadow for the whole town. It draws only when frame() is called (Town.tsx calls it on a change
-// and during the dive); a far office is built again only when its signature changes. In test mode
-// lays the town's plan (town/plan.ts) when an office's ground changes. In test mode it exposes
-// window.__biseTown = { frames, calls, ms, offices, merged, check } for the town's check. Owner: maps-e.
-import { type BufferGeometry, DirectionalLight, Group, HemisphereLight, type Material, Mesh, MeshLambertMaterial, MeshStandardMaterial, OrthographicCamera, PCFShadowMap, Scene, Vector3, WebGLRenderer } from 'three';
-import { growSig } from '../growth';
-import { BACK, DIST, RIGHT, UP, type Fit, toScreen } from './camera';
+// The town's renderer (three; page bims-maps v9, page town-live): every project's office is its own
+// office scene (office-scene.ts, the minimap's: its map's look, its growth, its bims, its eggs)
+// where the town's plan put it, and the town around them (townscape.ts), merged. From afar an
+// office is a bake of its scene posed still (merge.ts: a handful of draw calls), baked again only
+// when its still pose changes; close up (his pinch past LIVE_ZOOM, or the dive) the offices in view,
+// LIVE_MAX at most, show their scene itself, posed live each frame. One hemisphere light and one sun
+// with its soft shadow for the whole town (view.ts). It draws only when frame() is called. In test
+// mode it exposes window.__biseTown = { frames, calls, ms, offices, merged, live, check } for the
+// town's check. Owner: maps-e.
+import { Group, type Material, Vector3 } from 'three';
+import type { Motion } from '../model';
+import type { Step } from '../office-driver';
+import { growSig, NO_GROW } from '../growth';
+import { BACK, RIGHT, UP, type Fit, toScreen, viewFit } from './camera';
+import { atFit, FIT, type Cam } from '../zoom';
 import { lookOf } from './maps';
 import { DAY, NIGHT } from './palette';
 import { STYLE } from './style';
-import { buildWorld, lightDesk } from './world';
 import { mergeRoot, type Merged } from './merge';
+import { makeOfficeScene, type OfficeScene } from './office-scene';
+import { makeView } from './view';
 import { TOWN_DAY, TOWN_NIGHT, buildTownscape } from './townscape';
-import { stillSig } from '../town/stand';
 import { diveFit, townFit } from '../town/camera';
 import { siteOf, townSeed } from '../town/ground';
 import { crossings, townPlan, type Placed, type TownPlan } from '../town/plan';
-import type { MakeTownRenderer, TownOffice, TownRenderer } from '../town/types';
+import type { MakeTownRenderer, TownRenderer, TownSite } from '../town/types';
 
 /** a sign's anchor: over the back wall's middle, this high */
 const SIGN_Y = 2.6;
-/** the dim of the offices around the one the town dives into */
-const DIM = 0.72;
-/** a silhouette's tone by day and by night: the ink, softened */
-const SIL = { day: '#4a423b', night: '#d9d0c2' } as const;
-
-interface Built {
-  readonly sig: string;
-  readonly merged: Merged;
-  readonly holder: Group;
-  /** the materials the dim darkens, with their own colour */
-  readonly tints: readonly { readonly m: MeshStandardMaterial | MeshLambertMaterial; readonly r: number; readonly g: number; readonly b: number }[];
-}
+/** past this zoom over the town's fit, the offices in view are posed live (bims m_29006) */
+export const LIVE_ZOOM = 1.6;
+/** at most this many live offices at once (architect m_28994: battery) */
+export const LIVE_MAX = 4;
 
 interface Probe {
   frames: number;
@@ -42,176 +38,191 @@ interface Probe {
   ms: number;
   offices: number;
   merged: { from: number; to: number };
+  /** the offices drawn live at the last frame */
+  live: string[];
+  /** the last frames' render calls, ms (the zoomed check reads their median: one frame on a busy machine says little) */
+  recent: number[];
   /** the plan's road and river points inside an office: 0 and 0 */
   check: { road: number; river: number };
 }
 
+/** one office of the town: its scene, its bake from afar (and the still pose it was baked from) */
+interface Spot {
+  readonly scene: OfficeScene;
+  /** what its scene was set to (office-scene setOffice): its plan's shape */
+  shape: string;
+  bake: { readonly sig: string; readonly merged: Merged; readonly holder: Group } | null;
+  /** its scene is in the town now, posed live */
+  live: boolean;
+  /** live: its walls baked (its world's hundreds of meshes in a handful), its bims moving over them */
+  walls: { readonly sig: string; readonly merged: Merged } | null;
+}
+
 const testMode = (): boolean => (window as Partial<Window> & { bise?: { test?: boolean } }).bise?.test === true;
 
-/** an office's signature: what makes it look different (its map, its desks, its growth, its bims, the theme) */
-const sigOf = (t: TownOffice, night: boolean): string =>
-  `${t.office.map}|${t.office.size}|${[...t.office.desks.keys()].join(',')}|${growSig(t.grow)}|${stillSig(t.still)}|${night ? 'n' : 'd'}`;
+/**
+ * What makes two still offices look the same (bims m_29006): the office, its growth, the theme and
+ * each agent's state, never its office life (a snack trip, a nap): a far office is baked again only
+ * when an agent's state changes, as the minimap's row-clock check would see it.
+ */
+function stillSig(s: Step): string {
+  const bims = s.agents.map((a) => `${a.name}:${a.status}${a.main ? '*' : ''}`).join(';');
+  return `${s.office.map}|${s.office.size}|${[...s.office.desks.keys()].join(',')}|${growSig(s.look.grow ?? NO_GROW)}|${s.look.night ? 'n' : 'd'}|${bims}`;
+}
+
+const shapeOf = (s: Step): string => `${s.office.map}|${s.office.size}|${s.agents.map((a) => `${a.name}${a.main ? '*' : ''}`).join(',')}`;
 
 export const makeTownRenderer: MakeTownRenderer = (canvas) => {
-  const renderer = new WebGLRenderer({ canvas, antialias: STYLE.antialias, alpha: false, powerPreference: 'low-power' });
-  renderer.shadowMap.enabled = STYLE.shadows;
-  renderer.shadowMap.type = PCFShadowMap;
-  renderer.shadowMap.autoUpdate = false;
-  const scene = new Scene();
-  const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, DIST * 3);
-  const hemi = new HemisphereLight();
-  const sun = new DirectionalLight();
-  scene.add(hemi, sun, sun.target);
+  // the town's shadow is drawn again only when something in it moved (a bake, a live office's frame)
+  const v3 = makeView(canvas, { shadowAuto: false });
+  const { renderer, scene, sun } = v3;
 
   let plan: TownPlan | null = null;
   let planKey = '';
-  let offices: readonly TownOffice[] = [];
+  let sites: readonly TownSite[] = [];
   let night: boolean | null = null;
   let size = { w: 0, maxH: 0 };
   let base: Fit | null = null;
   let view: Fit | null = null;
+  let cam: Cam = FIT;
   let shadowsDirty = true;
-  let lost = false;
-  const lostCbs: (() => void)[] = [];
-  const built = new Map<string, Built>();
+  const spots = new Map<string, Spot>();
   let scape: { sig: string; merged: Merged } | null = null;
-  let dimmed: string | null | undefined;
   const v = new Vector3();
-  const probe: Probe | null = testMode() ? { frames: 0, calls: 0, ms: 0, offices: 0, merged: { from: 0, to: 0 }, check: { road: 0, river: 0 } } : null;
+  const probe: Probe | null = testMode() ? { frames: 0, calls: 0, ms: 0, offices: 0, merged: { from: 0, to: 0 }, live: [], recent: [], check: { road: 0, river: 0 } } : null;
   if (probe) (window as unknown as { __biseTown?: Probe }).__biseTown = probe;
-
-  const onLost = (e: Event): void => {
-    e.preventDefault();
-    lost = true;
-    for (const cb of lostCbs) cb();
-  };
-  canvas.addEventListener('webglcontextlost', onLost);
 
   const placedOf = (id: string): Placed | undefined => plan?.offices.find((p) => p.id === id);
 
-  function dropOffice(id: string): void {
-    const b = built.get(id);
-    if (!b) return;
-    scene.remove(b.holder);
-    b.merged.dispose();
-    built.delete(id);
+  function spotOf(id: string): Spot {
+    let s = spots.get(id);
+    if (!s) {
+      // no grass block of its own (bims m_28807): the town's lawn is its ground
+      s = { scene: makeOfficeScene(STYLE, { ground: false }), shape: '', bake: null, live: false, walls: null };
+      spots.set(id, s);
+    }
+    return s;
   }
 
-  /** an office's world, its desks lit as its agents work, its silhouettes, merged into one */
-  function buildOffice(t: TownOffice, isNight: boolean): Built {
-    const look = lookOf(t.office.map);
-    const w = buildWorld(t.office, t.main, STYLE, look, isNight, t.grow);
-    // no plot outline (bims m_28807): its floating grass block stays out, the town's lawn is its ground
-    // (world.ts adds it first, on the root, at these heights); the town's one sun lights it (a world has no light)
-    for (const c of [...w.root.children]) {
-      if (c instanceof Mesh && (c.position.y === -0.75 || c.position.y === -0.1)) {
-        w.root.remove(c);
-        (c.geometry as BufferGeometry).dispose();
-      }
-    }
-    const pal = w.pal;
-    const lit = new Set(t.still.lit);
-    for (const [name, d] of w.desks) lightDesk(d, pal, lit.has(name) ? 1 : 0, lit.has(name) || (isNight && name !== t.main));
-    // the silhouettes: a body and a head, the ink's tone, where each bim is now
-    const sil = STYLE.material(isNight ? SIL.night : SIL.day);
-    for (const s of t.still.stands) {
-      const k = s.main ? 1.18 : 1;
-      const body = STYLE.capsule(0.2 * k, 0.3 * k);
-      const head = STYLE.ball(0.2 * k);
-      w.root.add(meshAt(body, sil, s.x, 0.45 * k, s.z), meshAt(head, sil, s.x, 0.98 * k, s.z));
-    }
-    const merged = mergeRoot(w.root, STYLE, STYLE.shadows);
-    // the world's own geometries went into the merge; its materials are kept but the baked one's
-    w.dispose();
+  function dropBake(s: Spot): void {
+    if (!s.bake) return;
+    scene.remove(s.bake.holder);
+    s.bake.merged.dispose();
+    s.bake = null;
+  }
+
+  function dropWalls(s: Spot): void {
+    if (!s.walls) return;
+    s.scene.root.remove(s.walls.merged.group);
+    s.walls.merged.dispose();
+    s.walls = null;
+    const w = s.scene.world();
+    if (w) w.visible = true;
+  }
+
+  /**
+   * A live office's walls baked (page town-live: 4 live offices in 6 ms, not 14), baked again when its
+   * world was built again (growth, theme, shape) or a desk lit or went dark; its world hidden under them.
+   */
+  function walls(s: Spot, step: Step): void {
+    const w = s.scene.world();
+    if (!w) return;
+    const sig = `${s.shape}|${growSig(step.look.grow ?? NO_GROW)}|${step.look.night ? 'n' : 'd'}|${s.scene.litSig()}|${String(w.id)}`;
+    if (s.walls?.sig === sig) return;
+    dropWalls(s);
+    const at = s.scene.root.position.clone();
+    s.scene.root.position.set(0, 0, 0);
+    w.visible = true;
+    const merged = mergeRoot(w, STYLE, STYLE.shadows);
+    s.scene.root.position.copy(at);
     for (const c of merged.group.children) {
-      // the merged meshes kept some of the world's materials (a lit screen, the floor's planks): new ones, w.dispose() freed them
       const m = (c as unknown as { material: Material }).material;
       if (m !== merged.baked) (c as unknown as { material: Material }).material = m.clone();
     }
-    sil.dispose();
-    const holder = new Group();
-    holder.add(merged.group);
-    const tints: Built['tints'][number][] = [];
-    for (const c of merged.group.children) {
-      const m = (c as unknown as { material: Material }).material;
-      if (m instanceof MeshStandardMaterial || m instanceof MeshLambertMaterial) tints.push({ m, r: m.color.r, g: m.color.g, b: m.color.b });
+    w.visible = false;
+    s.scene.root.add(merged.group);
+    s.walls = { sig, merged };
+  }
+
+  function dropSpot(id: string): void {
+    const s = spots.get(id);
+    if (!s) return;
+    dropWalls(s);
+    dropBake(s);
+    scene.remove(s.scene.root);
+    s.scene.dispose();
+    spots.delete(id);
+  }
+
+  /** its scene told of its office, posed for this step (the town's frame: planes sized to the view) */
+  function posed(s: Spot, step: Step, t: number): Motion | null {
+    if (step.reshaped || s.shape !== shapeOf(step)) {
+      s.shape = shapeOf(step);
+      s.scene.setOffice(step.office, step.agents);
     }
-    return { sig: sigOf(t, isNight), merged, holder, tints };
+    s.scene.prepare(step.look);
+    const f = shownFit();
+    return f ? s.scene.frame(t, step.played, step.look, f) : null;
   }
 
-  function meshAt(geo: BufferGeometry, m: Material, x: number, y: number, z: number): Mesh {
-    const out = new Mesh(geo, m);
-    out.position.set(x, y, z);
-    return out;
-  }
-
-  function sync(isNight: boolean): void {
-    if (!plan) return;
-    const keep = new Set(offices.map((t) => t.id));
-    for (const id of [...built.keys()]) if (!keep.has(id)) dropOffice(id);
-    for (const t of offices) {
-      const p = placedOf(t.id);
+  /** where each office stands, its bake or its live scene shown */
+  function place(): void {
+    for (const [id, s] of spots) {
+      const p = placedOf(id);
       if (!p) continue;
-      const sig = sigOf(t, isNight);
-      let b = built.get(t.id);
-      if (!b || b.sig !== sig) {
-        dropOffice(t.id);
-        b = buildOffice(t, isNight);
-        built.set(t.id, b);
-        scene.add(b.holder);
-        shadowsDirty = true;
-      }
-      if (b.holder.position.x !== p.x || b.holder.position.z !== p.z) {
-        b.holder.position.set(p.x, 0, p.z);
-        shadowsDirty = true;
-      }
+      s.scene.root.position.set(p.x, 0, p.z);
+      if (s.bake) s.bake.holder.position.set(p.x, 0, p.z);
+      if (s.bake) s.bake.holder.visible = !s.live;
     }
+    shadowsDirty = true;
+  }
+
+  function syncScape(isNight: boolean): void {
+    if (!plan) return;
     // where an office carves under its floor (California's bowl), in the town's frame: the lawn leaves a hole there
-    const pits = offices.flatMap((t) => {
+    const pits = sites.flatMap((t) => {
       const p = placedOf(t.id);
       const own = lookOf(t.office.map).pits?.(t.office, t.grow.stage) ?? [];
       return p ? own.map((b) => ({ x0: b.x0 + p.x, x1: b.x1 + p.x, z0: b.z0 + p.z, z1: b.z1 + p.z })) : [];
     });
     const sSig = `${String(plan.seed)}|${JSON.stringify(plan.lawn)}|${String(plan.road.length)}|${String(plan.trees.length)}|${String(plan.offices.length)}|${isNight ? 'n' : 'd'}|${JSON.stringify(pits)}`;
-    if (scape?.sig !== sSig) {
-      if (scape) {
-        scene.remove(scape.merged.group);
-        scape.merged.dispose();
-      }
-      const pal = isNight ? NIGHT : DAY;
-      const root = buildTownscape(plan, STYLE, pal, isNight ? TOWN_NIGHT : TOWN_DAY, pits);
-      const merged = mergeRoot(root, STYLE, STYLE.shadows);
-      root.traverse((o) => {
-        const g = (o as unknown as { geometry?: { dispose(): void } }).geometry;
-        g?.dispose();
-      });
-      scene.add(merged.group);
-      scape = { sig: sSig, merged };
-      lightUp(isNight);
-      shadowsDirty = true;
+    if (scape?.sig === sSig) return;
+    if (scape) {
+      scene.remove(scape.merged.group);
+      scape.merged.dispose();
     }
-    if (probe) {
-      probe.offices = built.size;
-      let from = scape.merged.from;
-      let to = scape.merged.to;
-      for (const b of built.values()) {
-        from += b.merged.from;
-        to += b.merged.to;
-      }
-      probe.merged = { from, to };
+    const pal = isNight ? NIGHT : DAY;
+    const root = buildTownscape(plan, STYLE, pal, isNight ? TOWN_NIGHT : TOWN_DAY, pits);
+    const merged = mergeRoot(root, STYLE, STYLE.shadows);
+    root.traverse((o) => {
+      const g = (o as unknown as { geometry?: { dispose(): void } }).geometry;
+      g?.dispose();
+    });
+    scene.add(merged.group);
+    scape = { sig: sSig, merged };
+    lightUp(isNight);
+    shadowsDirty = true;
+  }
+
+  function count(): void {
+    if (!probe) return;
+    probe.offices = spots.size;
+    let from = scape?.merged.from ?? 0;
+    let to = scape?.merged.to ?? 0;
+    for (const s of spots.values()) {
+      if (!s.bake) continue;
+      from += s.bake.merged.from;
+      to += s.bake.merged.to;
     }
+    probe.merged = { from, to };
   }
 
   /** the one light of the town: the loft's palette's sky and sun, the sun's shadow over the whole lawn */
   function lightUp(isNight: boolean): void {
     if (!plan) return;
     const pal = isNight ? NIGHT : DAY;
-    hemi.color.set(pal.hemi[0]);
-    hemi.groundColor.set(pal.hemi[1]);
-    hemi.intensity = pal.hemi[2];
-    sun.color.set(pal.sun[0]);
-    sun.intensity = pal.sun[1];
-    renderer.setClearColor(pal.bg);
+    v3.tint(pal);
+    v3.sky(pal.bg);
     const { lawn } = plan;
     const cx = (lawn.x0 + lawn.x1) / 2;
     const cz = (lawn.z0 + lawn.z1) / 2;
@@ -241,29 +252,14 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     applyView();
   }
 
-  function applyView(): void {
-    const f = view ?? base;
-    if (!f) return;
-    const t = f.target;
-    camera.position.set(t.x + BACK.x * DIST, t.y + BACK.y * DIST, t.z + BACK.z * DIST);
-    camera.up.set(0, 1, 0);
-    camera.lookAt(t.x, t.y, t.z);
-    camera.left = f.left;
-    camera.right = f.right;
-    camera.top = f.top;
-    camera.bottom = f.bottom;
-    camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, STYLE.maxPixelRatio));
-    renderer.setSize(f.widthPx, f.heightPx, false);
-  }
+  /** what is drawn: the dive's way, else the town's fit through his camera */
+  const shownFit = (): Fit | null => view ?? (base && !atFit(cam) ? viewFit(base, cam) : base);
 
-  function dim(id: string | null): void {
-    if (dimmed === id) return;
-    dimmed = id;
-    for (const [oid, b] of built) {
-      const k = id !== null && oid !== id ? DIM : 1;
-      for (const t of b.tints) t.m.color.setRGB(t.r * k, t.g * k, t.b * k);
-    }
+  function applyView(): void {
+    const f = shownFit();
+    if (!f) return;
+    v3.look(f);
+    v3.size(f);
   }
 
   /** the canvas point (css px) seen at height y on the ground (the iso view's ray down) */
@@ -274,19 +270,88 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     return { x: f.target.x + a * RIGHT.x + b * UP.x + t * BACK.x, z: f.target.z + a * RIGHT.z + b * UP.z + t * BACK.z };
   }
 
+  /** an office's ground on the canvas: whether any of it shows in this view */
+  function inView(f: Fit, p: Placed): boolean {
+    const corners = [
+      { x: p.fp.x0, z: p.fp.z0 }, { x: p.fp.x1, z: p.fp.z0 }, { x: p.fp.x0, z: p.fp.z1 }, { x: p.fp.x1, z: p.fp.z1 },
+    ].map((c) => toScreen(f, { x: c.x, y: 0, z: c.z }));
+    const x0 = Math.min(...corners.map((c) => c.x));
+    const x1 = Math.max(...corners.map((c) => c.x));
+    const y0 = Math.min(...corners.map((c) => c.y)) - 3 / f.scale;
+    const y1 = Math.max(...corners.map((c) => c.y));
+    return x1 > 0 && x0 < f.widthPx && y1 > 0 && y0 < f.heightPx;
+  }
+
   const api: TownRenderer = {
     setTown(os) {
       // what makes two towns the same layout: each office's ground (its map, its desks, its growth), not its bims
-      const key = os.map((o) => `${o.id}:${o.office.map}:${o.office.size}:${String(o.grow.stage)}:${String(o.grow.garden)}`).join('|');
+      const key = os.map((o) => `${o.id}:${o.office.map}:${o.office.size}:${String(o.grow.stage)}:${String(o.grow.garden)}:${o.home === true ? 'h' : ''}`).join('|');
       if (plan === null || key !== planKey) {
         planKey = key;
-        plan = townPlan(os.map((o) => siteOf(o.id, o.office, o.grow)), townSeed(os.map((o) => o.id)));
+        plan = townPlan(os.map((o) => siteOf(o.id, o.office, o.grow, o.home === true)), townSeed(os.map((o) => o.id)));
         if (probe) probe.check = { ...crossings(plan) };
       }
-      offices = os;
-      dimmed = undefined;
-      sync(night ?? false);
+      sites = os;
+      const keep = new Set(os.map((o) => o.id));
+      for (const id of [...spots.keys()]) if (!keep.has(id)) dropSpot(id);
+      for (const o of os) spotOf(o.id);
+      syncScape(night ?? false);
+      place();
       applyFit();
+      count();
+    },
+    still(id, step) {
+      const p = placedOf(id);
+      if (!p) return false;
+      const s = spotOf(id);
+      const sig = stillSig(step);
+      if (s.bake?.sig === sig) return false;
+      if (posed(s, step, step.frames[0]?.pose.since ?? 0) === null && !s.scene.office()) return false;
+      // baked where it stands in its own units, then placed: a new plan moves the bake, never bakes it again
+      s.scene.root.position.set(0, 0, 0);
+      const merged = mergeRoot(s.scene.root, STYLE, STYLE.shadows);
+      for (const c of merged.group.children) {
+        // the materials it kept (a lit screen, the glass) are its scene's: its own copies, so a rebuilt scene can't take them
+        const m = (c as unknown as { material: Material }).material;
+        if (m !== merged.baked) (c as unknown as { material: Material }).material = m.clone();
+      }
+      s.scene.root.position.set(p.x, 0, p.z);
+      dropBake(s);
+      const holder = new Group();
+      holder.add(merged.group);
+      holder.position.set(p.x, 0, p.z);
+      holder.visible = !s.live;
+      scene.add(holder);
+      s.bake = { sig, merged, holder };
+      // the bake's pose is no longer the live one: a live office poses itself at its next frame
+      shadowsDirty = true;
+      count();
+      return true;
+    },
+    live(id, step, t) {
+      const s = spots.get(id);
+      if (!s) return 'still';
+      const m = posed(s, step, t);
+      walls(s, step);
+      shadowsDirty = true;
+      return m ?? 'still';
+    },
+    liveIds() {
+      const f = shownFit();
+      if (!f || !base || !plan) return [];
+      // close enough: the fit's width shows LIVE_ZOOM times less of the town
+      if ((base.right - base.left) / (f.right - f.left) < LIVE_ZOOM) return [];
+      const cx = f.widthPx / 2;
+      const cy = f.heightPx / 2;
+      return plan.offices
+        .filter((p) => inView(f, p))
+        .map((p) => {
+          const c = toScreen(f, { x: (p.fp.x0 + p.fp.x1) / 2, y: 0, z: (p.fp.z0 + p.fp.z1) / 2 });
+          return { id: p.id, d: Math.hypot(c.x - cx, c.y - cy) };
+        })
+        .sort((a, b) => a.d - b.d)
+        .slice(0, LIVE_MAX)
+        .map((x) => x.id);
     },
     setSize(widthPx, maxHeightPx) {
       size = { w: Math.round(widthPx), maxH: Math.round(maxHeightPx) };
@@ -294,48 +359,67 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
       return base?.heightPx ?? 0;
     },
     townFit: () => base,
+    shownFit,
     diveFit(id, widthPx) {
       const p = placedOf(id);
-      const t = offices.find((o) => o.id === id);
-      return p && t ? diveFit(p, t.office, widthPx) : null;
+      const o = spots.get(id)?.scene.office();
+      return p && o ? diveFit(p, o, widthPx) : null;
     },
     setView(f) {
       view = f;
       applyView();
     },
-    frame(isNight, dimBut) {
-      if (lost || !plan) return;
+    setCam(c) {
+      cam = c;
+      applyView();
+    },
+    frame(isNight) {
+      if (v3.lost() || !plan) return;
       if (night !== isNight) {
         night = isNight;
-        sync(isNight);
+        syncScape(isNight);
         lightUp(isNight);
       }
-      dim(dimBut);
+      // the live offices' scenes in the town, the others' bakes
+      const live = new Set(api.liveIds());
+      for (const [id, s] of spots) {
+        const on = live.has(id) && s.scene.office() !== null;
+        if (on === s.live) continue;
+        s.live = on;
+        if (on) scene.add(s.scene.root);
+        else {
+          scene.remove(s.scene.root);
+          dropWalls(s);
+        }
+        if (s.bake) s.bake.holder.visible = !on;
+        shadowsDirty = true;
+      }
       const t0 = performance.now();
       if (shadowsDirty) {
         renderer.shadowMap.needsUpdate = true;
         shadowsDirty = false;
       }
-      renderer.render(scene, camera);
+      v3.render();
       if (probe) {
         probe.frames++;
         probe.ms = performance.now() - t0;
+        probe.recent = [...probe.recent.slice(-29), probe.ms];
         probe.calls = renderer.info.render.calls;
+        probe.live = [...spots].filter(([, s]) => s.live).map(([id]) => id);
       }
     },
     signAt(id) {
-      const f = view ?? base;
+      const f = shownFit();
       const p = placedOf(id);
-      const t = offices.find((o) => o.id === id);
-      if (!f || !p || !t) return null;
-      const o = t.office;
+      const o = spots.get(id)?.scene.office() ?? sites.find((x) => x.id === id)?.office;
+      if (!f || !p || !o) return null;
       v.set(p.x + o.x0 + o.W / 2, SIGN_Y, p.z - 0.3);
       const s = toScreen(f, v);
       if (s.x < 0 || s.x > f.widthPx || s.y < 0 || s.y > f.heightPx) return null;
       return s;
     },
     pick(x, y) {
-      const f = view ?? base;
+      const f = shownFit();
       if (!f || !plan) return null;
       // from the roofs down: the first office the ray meets
       for (let h = 2.6; h >= 0; h -= 0.2) {
@@ -346,21 +430,19 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
       return null;
     },
     copyTo(target) {
-      renderer.render(scene, camera);
-      target.getContext('2d')?.drawImage(canvas, 0, 0, target.width, target.height);
+      v3.copyTo(target);
     },
     onLost(cb) {
-      lostCbs.push(cb);
+      v3.onLost(cb);
     },
     dispose() {
-      canvas.removeEventListener('webglcontextlost', onLost);
-      for (const id of [...built.keys()]) dropOffice(id);
+      for (const id of [...spots.keys()]) dropSpot(id);
       if (scape) {
         scene.remove(scape.merged.group);
         scape.merged.dispose();
         scape = null;
       }
-      renderer.dispose();
+      v3.dispose();
       if (probe) delete (window as unknown as { __biseTown?: Probe }).__biseTown;
     },
   };

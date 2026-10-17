@@ -11,6 +11,7 @@ import type { BimEvent, BimFrame, Label, Look, NewTimelineFn, ActivitiesFn, Labe
 import { clockSig, eggLabels, eggsAt, NO_EGGS, noteLands, withForced, type Forced, type Land, type Local } from './eggs';
 import { bedsAt, NO_GROW, UNLOCK_LABEL, UNLOCK_WALK, unlockOf, type Grow } from './growth';
 import { dayOf } from './skate';
+import { MAX_WALK_S, SETTLE_S } from './timeline';
 import type { MapId } from './maps/ids';
 
 /** The pure modules a driver runs on: feed.ts's, or fakes in a test. */
@@ -71,12 +72,21 @@ export interface OfficeDriver {
   konami(t: number): void;
   /** the frame at this clock; null before any rows */
   step(c: Clock, a: Attention): Step | null;
+  /**
+   * The office still (the town's far offices, page town-live): the rows heard at c.t, every bim
+   * posed STILL_AHEAD s later (its walk done, at its state's spot), reduced motion, no egg, no
+   * halo, no unlock moment; the labels are the pills ('?', '✗'). null before any rows.
+   */
+  still(c: Clock): Step | null;
   /** the still office's check: true when the clock's eggs or an activity changed since the last step (the next step hears the rows again) */
   stale(c: Clock): boolean;
 }
 
 /** The office's agents in a stable shape (the live rows: archived ones have left). Pure. */
 export const officeKey = (agents: readonly Agent[], map: MapId): string => `${map}|${agents.map((a) => `${a.name}${a.main ? '*' : ''}`).join(',')}`;
+
+/** how far ahead a still office is posed: past a walk (MAX_WALK_S) and its settling */
+export const STILL_AHEAD = MAX_WALK_S + SETTLE_S + 1;
 
 export function makeDriver(parts: DriverParts): OfficeDriver {
   const timeline: Timeline = parts.newTimeline();
@@ -119,8 +129,29 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       konamiAt = t;
     },
     step(c, a) {
+      const heard = hear(c);
+      if (heard === null) return null;
+      return pose(heard.office, heard.reshaped, c, a);
+    },
+    still(c) {
+      const heard = hear(c);
+      if (heard === null) return null;
+      return pose(heard.office, heard.reshaped, { ...c, t: c.t + STILL_AHEAD, reduced: true, forced: { bims: {} } }, NO_ATTENTION, true);
+    },
+    stale(c) {
+      if (snap === null) return false;
+      // the clock's eggs (the eclipse, friday 17:00, midnight) start and end without a row change
+      const changed = clockSig(c.local, c.night, agents) !== lastClock || JSON.stringify([...parts.activities(snap, c.t)]) !== lastActs;
+      // the next step hears the rows again: the timeline walks the bims to their new activities
+      if (changed) fresh = true;
+      return changed;
+    },
+  };
+
+  /** the rows since the last frame, heard at c.t: the office laid again if its shape changed, the timeline told */
+  function hear(c: Clock): { office: Office; reshaped: boolean } | null {
       if (snap === null || map === null) return null;
-      const { t, local, night, reduced } = c;
+      const { t, local, reduced } = c;
       let reshaped = false;
       if (fresh) {
         fresh = false;
@@ -136,7 +167,12 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
         timeline.update(acts, office, t, events, bedsAt(g.stage), { stage: g.stage, jobs: g.jobs, dow: local.dow, day: dayOf(local.y, local.mo, local.d), reduced });
         events = [];
       }
-      if (office === null) return null;
+      return office === null ? null : { office, reshaped };
+  }
+
+  /** every bim at c.t, its egg and halo, the look and the labels; `still`: no unlock moment */
+  function pose(office: Office, reshaped: boolean, c: Clock, a: Attention, still = false): Step {
+      const { t, local, night, reduced } = c;
       const main = new Set(agents.filter((x) => x.main).map((x) => x.name));
       const frames: BimFrame[] = [];
       for (const name of timeline.names(t)) {
@@ -145,7 +181,7 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       }
       // his easter eggs (eggs.ts): one pass between the poses and the labels; a check's forced ones alone
       lands = noteLands(lands, frames, local);
-      const eg = c.forced !== undefined ? withForced(NO_EGGS, c.forced) : eggsAt({ t, frames, agents, cards: snap.cards.length, local, night, reduced, lands: lands.lands, konami: konamiAt, stage: g.stage });
+      const eg = c.forced !== undefined ? withForced(NO_EGGS, c.forced) : eggsAt({ t, frames, agents, cards: snap?.cards.length ?? 0, local, night, reduced, lands: lands.lands, konami: konamiAt, stage: g.stage });
       lastClock = clockSig(local, night, agents);
       const played = frames.map((f) => {
         const e = eg.bims.get(f.name);
@@ -153,19 +189,10 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
         return e === undefined ? (lit ? { ...f, lit } : f) : { ...f, egg: e, ...(lit ? { lit } : {}) };
       });
       // the office grows: what it draws, and the unlock moment while it lasts
-      const u = unlock;
+      const u = still ? undefined : unlock;
       const look: Look = { night, reduced, eggs: eg.office, grow: g, ...(u ? { unlock: u } : {}) };
       if (u && t - u.at > UNLOCK_WALK + UNLOCK_LABEL) unlock = undefined;
       const labels = parts.labelsOf(played, { t, hover: a.hover, held: a.held, agents, eggs: eggLabels(eg), follow: a.follow, park: office.park });
-      return { office, agents, want: map, reshaped, frames, played, look, labels, moving: timeline.moving(t) };
-    },
-    stale(c) {
-      if (snap === null) return false;
-      // the clock's eggs (the eclipse, friday 17:00, midnight) start and end without a row change
-      const changed = clockSig(c.local, c.night, agents) !== lastClock || JSON.stringify([...parts.activities(snap, c.t)]) !== lastActs;
-      // the next step hears the rows again: the timeline walks the bims to their new activities
-      if (changed) fresh = true;
-      return changed;
-    },
-  };
+      return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t) };
+  }
 }
