@@ -46,6 +46,22 @@ export default tseslint.config(
     },
   },
   {
+    // the nightly invariants on a real core go through the same runner: the same rules, plus the
+    // window-local events main builds (src/shared/local.ts)
+    files: ['tests/nightly/*.test.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { regex: '^(?!vitest$|\\.\\./feature/inputs$|\\.\\./feature/run$|@/shared/local$)', message: 'a nightly check imports vitest, ../feature/inputs, ../feature/run and @/shared/local only' },
+        ],
+      }],
+      'no-restricted-syntax': ['error',
+        { selector: "CallExpression[callee.property.name=/^(toMatchSnapshot|toMatchInlineSnapshot|toMatchFileSnapshot)$/]", message: 'no snapshot in a nightly check: invariants only' },
+        { selector: "MemberExpression[object.name='vi']", message: 'no fake or mock in a nightly check: the recording is the input' },
+      ],
+    },
+  },
+  {
     files: ['**/*.mjs', '**/*.js'],
     languageOptions: { globals: globals.node },
   },
