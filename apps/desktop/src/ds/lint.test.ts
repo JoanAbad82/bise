@@ -59,7 +59,8 @@ describe('the ds laws (designer m_18343)', () => {
     // capsule's tray menu is its own window, drawn in the Picker's still shell (Menu)
     const may: Record<string, readonly string[]> = {
       'composer/Picker.tsx': ['imports Picker', 'class b-picker-path'],
-      'capsule/Capsule.tsx': ['imports Menu', 'imports MenuItem', 'imports MenuSep'],
+      // its submenu (a live project's agents) is a second column of the same window, the same shell
+      'capsule/TrayMenu.tsx': ['imports Menu', 'imports MenuItem', 'imports MenuSep'],
       // the tray menu's projects block, drawn inside that Menu (its 'N more in bise' row)
       'capsule/MenuProjects.tsx': ['imports MenuItem'],
     };

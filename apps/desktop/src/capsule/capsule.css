@@ -122,6 +122,8 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
 .b-cap-tray.left { flex-direction: row-reverse; }
 .b-cap-sub { width: 280px; flex: none; box-sizing: border-box; border-left: 1px solid var(--c-line); }
 .b-cap-tray.left .b-cap-sub { border-left: 0; border-right: 1px solid var(--c-line); }
+/* its rows, moved down (TrayMenu's margin-top) to start level with the project's row */
+.b-cap-sub-in { display: flow-root; }
 .b-capsule .b-cap-sub .b-menu { width: 280px; min-width: 0; max-width: none; }
 .b-cap-sub-head { display: flex; gap: var(--s-2); align-items: baseline; padding: var(--s-1) var(--pad-row-x); font-size: var(--t-12); white-space: nowrap; overflow: hidden; }
 .b-cap-sub-head .nm { color: var(--c-text); font-size: var(--t-13); }

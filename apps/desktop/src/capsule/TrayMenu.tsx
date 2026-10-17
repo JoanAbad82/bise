@@ -275,7 +275,7 @@ export function TrayMenu({ spot, onOpenWindow, onOpenCard, onQuit, onClose, escR
   };
 
   return (
-    <div ref={tray} className={`b-cap-tray ${side}${subLine === undefined ? "" : " has-sub"}`} data-testid="capsule.tray">
+    <div ref={tray} className={`b-cap-tray ${side}`} data-testid="capsule.tray">
       <div ref={menuCol} className="b-cap-menu" data-glass onMouseMove={onMove}>
         <Menu testId="capsule.menu">
           <div className="b-cap-menu-head" data-testid="capsule.menu.head">
