@@ -40,11 +40,13 @@ import ./gen/journal.bend as GJ
 
 import ./gen/fx.bend as F
 
+# `part`: the chars read after the last newline, newest first (Cut)
 type Got is Type:
-  Got{s: Socket, h: H.Hub, buf: String}
+  Got{s: Socket, h: H.Hub, part: String}
 
-type Split is Data:
-  Split{line: String, rest: String}
+type Cut is Data:
+  Line{line: String, rest: String}
+  More{part: String}
 
 type Flow is Type:
   Go{h: H.Hub}
@@ -164,24 +166,25 @@ def send_line(s: Socket, +text: String) -> IO(Socket):
     r : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(s, String.append(text, "\n"))
     send_line.after(r)
 
-# split the buffer at the first newline: (line, rest), or None
-def split_line.go(s: String, +acc: String) -> Maybe<&2, Split>:
-  match s:
+# the received `data` after `part` (the line so far, newest first): the
+# first whole line and the data after it, or More: the line so far with
+# `data` in it. Each char is read once: a line that comes in many recvs
+# is never appended to nor scanned again (the old buffer was appended to
+# and rescanned from its start at each recv: quadratic in a big line)
+def cut(data: String, +part: String) -> Cut:
+  match data:
     case SNil{}:
-      None{}
+      More{part}
     case SCon{'\n', +t}:
-      Some{Split{String.reverse(acc), t}}
+      Line{String.reverse(part), t}
     case SCon{+c, +t}:
       # a pattern, not Bool.pick: pick computes both of its arguments, so
       # it reversed the whole prefix at every char (quadratic in the line)
-      split_line.go(t, SCon{c, acc})
-
-def split_line(+s: String) -> Maybe<&2, Split>:
-  split_line.go(s, "")
+      cut(t, SCon{c, part})
 
 @unsafe
-def lines(s: Socket, +h: H.Hub, +buf: String) -> IO(Got):
-  lines.split(split_line(buf), s, h, buf)
+def lines(s: Socket, +h: H.Hub, +part: String, +data: String) -> IO(Got):
+  lines.split(cut(data, part), s, h)
 
 @unsafe
 def lines.answer(p: H.Hub & String, s: Socket, +rest: String) -> IO(Got):
@@ -189,40 +192,40 @@ def lines.answer(p: H.Hub & String, s: Socket, +rest: String) -> IO(Got):
     case (+h2, +out):
       do IO<Got>:
         s2 : Socket <- send_line(s, out)
-        lines(s2, h2, rest)
+        lines(s2, h2, "", rest)
 
 @unsafe
-def lines.split(m: Maybe<&2, Split>, s: Socket, +h: H.Hub, +buf: String) -> IO(Got):
+def lines.split(m: Cut, s: Socket, +h: H.Hub) -> IO(Got):
   match m:
-    case None{}:
-      IO.pure(Got, Got{s, h, buf})
-    case Some{Split{+l, +rest}}:
+    case More{+part}:
+      IO.pure(Got, Got{s, h, part})
+    case Line{+l, +rest}:
       lines.answer(handle(h, l), s, rest)
 
 @unsafe
-def conn.after(rm: Socket & Result<&1, &1, U32 & String, String>, +h: H.Hub, +buf: String) -> IO(H.Hub):
+def conn.after(rm: Socket & Result<&1, &1, U32 & String, String>, +h: H.Hub, +part: String) -> IO(H.Hub):
   match rm:
     case (s, Fail{_}):
       do IO<H.Hub>:
         Socket.close(s)
         IO.pure(H.Hub, h)
     case (s, Done{+data}):
-      conn.data(String.is_empty(data), s, h, String.append(buf, data))
+      conn.data(String.is_empty(data), s, h, part, data)
 
 @unsafe
-def conn(s: Socket, +h: H.Hub, +buf: String) -> IO(H.Hub):
+def conn(s: Socket, +h: H.Hub, +part: String) -> IO(H.Hub):
   do IO<H.Hub>:
     rm : Socket & Result<&1, &1, U32 & String, String> <- TCP.recv(s, 65536)
-    conn.after(rm, h, buf)
+    conn.after(rm, h, part)
 
 @unsafe
 def conn.next(r: Got) -> IO(H.Hub):
   match r:
-    case Got{s, +h, +buf}:
-      conn(s, h, buf)
+    case Got{s, +h, +part}:
+      conn(s, h, part)
 
 @unsafe
-def conn.data(closed: Bool, s: Socket, +h: H.Hub, +buf: String) -> IO(H.Hub):
+def conn.data(closed: Bool, s: Socket, +h: H.Hub, +part: String, +data: String) -> IO(H.Hub):
   match closed:
     case True{}:
       do IO<H.Hub>:
@@ -230,7 +233,7 @@ def conn.data(closed: Bool, s: Socket, +h: H.Hub, +buf: String) -> IO(H.Hub):
         IO.pure(H.Hub, h)
     case False{}:
       do IO<H.Hub>:
-        r : Got <- lines(s, h, buf)
+        r : Got <- lines(s, h, part, data)
         conn.next(r)
 
 @unsafe
