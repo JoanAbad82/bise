@@ -22,7 +22,7 @@ test.afterAll(() => {
 const TEAM = snap([
   mainAgent({ status: 'working', turn_ms: 60_000 }),
   agent('signup-perf', { status: 'working', turn_ms: 120_000, title: 'profiling signup' }),
-  agent('dark-mode', { status: 'working', turn_ms: 60_000, title: 'dark mode tokens' }),
+  agent('dark-mode', { status: 'working', turn_ms: 60_000, title: 'night palette' }),
   agent('nightly', { status: 'waiting', title: 'waits on the gate' }),
   agent('empty-state', { status: 'idle', title: 'empty inbox shipped' }),
   agent('kick', { status: 'idle', title: 'idle' }),
