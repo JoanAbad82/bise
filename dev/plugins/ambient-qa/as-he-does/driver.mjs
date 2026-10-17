@@ -2525,8 +2525,19 @@ async function rowsF2A7(harness, say) {
     // how the hub closed it, from its journal: 'withdrawn by main: …', never 'answered' (the row
     // passed by accident before only if the words became its answer; architect m_29601)
     const closedAs = closeOf(W, card);
-    step(`an answer to card ${String(card)} withdrawn by its asker meanwhile (the candidate's core held ~14 s): the hub's own 'card ${String(card)} isn't open' on screen, no 'you answered', the card not back (the hub dropped it), the hub's journal closed it 'withdrawn', not 'answered'`,
-      hidden === true && !!words && asides.length === 0 && after === false && /^withdrawn\b/.test(closedAs ?? ''), { hidden, words, asides, after, closedAs, core: cores[0].slice(0, 160) });
+    // what he sees: main's withdraw on that card in harness' thread (req_withdraw: 'the user sees
+    // it withdrawn in main's feed'). No 'isn't open' words: refused.ts drops a refusal with the
+    // card's rows, a withdrawn card's included (architect m_30024)
+    await harness();
+    const withdrawLine = await until(async () => {
+      const t = flat(await text('[data-testid="thread.list"]'));
+      return t.includes('withdrawn by main: zq the plan changed') ? 'withdrawn by main: zq the plan changed' : null;
+    }, 20000, 1000);
+    await page.mouse.move(1, 300);
+    await shot('f2a7-withdrawn-in-harness');
+    step(`an answer to card ${String(card)} withdrawn by its asker meanwhile (the candidate's core held ~14 s): hidden at once, no 'you answered', the card not back (the hub dropped it), the hub's journal closed it 'withdrawn', not 'answered', and harness' thread shows main's withdraw on it`,
+      hidden === true && asides.length === 0 && after === false && /^withdrawn\b/.test(closedAs ?? '') && !!withdrawLine,
+      { hidden, words, asides, after, closedAs, withdrawLine, core: cores[0].slice(0, 160) });
   });
 
   await row('a pause counts its seconds, then minutes', async () => {
