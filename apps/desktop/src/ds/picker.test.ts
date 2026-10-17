@@ -79,4 +79,26 @@ describe("ds/picker", () => {
     expect(cutWords("an agent, reads", fits(10))).toBe("an agent…");
     expect(cutWords("unbreakable", fits(3))).toBe("unbreakable…");
   });
+
+  it("tries a long text's cuts by halving, the same cut as word by word (at-perf: each try is a layout)", () => {
+    const long = Array.from({ length: 400 }, (_, i) => `word${String(i)}${i % 7 === 0 ? "," : ""}`).join(" ");
+    const slow = (text: string, fits: (t: string) => boolean): string => {
+      if (fits(text)) return text;
+      const words = text.split(/(?<=\s)/u);
+      for (let n = words.length - 1; n >= 1; n -= 1) {
+        const t = `${words.slice(0, n).join("").replace(/[\s,;:·]+$/u, "")}…`;
+        if (fits(t)) return t;
+      }
+      return `${(words[0] ?? "").trim()}…`;
+    };
+    for (const room of [3, 10, 37, 60, 200, 2000, 5000]) {
+      let tries = 0;
+      const fits = (t: string) => {
+        tries += 1;
+        return t.length <= room;
+      };
+      expect(cutWords(long, fits)).toBe(slow(long, (t) => t.length <= room));
+      expect(tries).toBeLessThanOrEqual(11);
+    }
+  });
 });

@@ -4,10 +4,20 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArtChip, ArtName, ComposerFrame, Dock, Dot, Field, Msg, Opts, Row, Seg, Spot, SpotRow, Tabs, Toggle } from "./index";
+import { CUT_CHARS, PickerCut } from "./picker";
 
 afterEach(cleanup);
 
 describe("src/ds", () => {
+  it("an inline secondary as long as a brief draws only its start (at-perf: 28 of them laid out on every '@')", () => {
+    const brief = "the composer's picker reads the core's answer and draws its rows. ".repeat(40);
+    const { container } = render(<PickerCut text={brief} />);
+    const s = container.querySelector(".s");
+    expect(s?.textContent).toBe(brief.slice(0, CUT_CHARS));
+    const short = render(<PickerCut text="sort_unstable in the hot query" />);
+    expect(short.container.querySelector(".s")?.textContent).toBe("sort_unstable in the hot query");
+  });
+
   it("the composer's frame keeps the editor's node when send, dock or focus change", () => {
     const editor = <div contentEditable suppressContentEditableWarning data-testid="composer.editor">hi</div>;
     const { getByTestId, rerender } = render(<ComposerFrame send="off" testId="composer">{editor}</ComposerFrame>);

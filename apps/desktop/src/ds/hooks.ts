@@ -186,17 +186,66 @@ export function usePickerList(o: { first: string | null; active: string | null |
   return { shell, list, on, setOwn, point, edges, onScroll };
 }
 
+type Cut = (text: string, fits: (t: string) => boolean) => string;
+/** `more`: `text` is the start of longer words, so it never shows whole (picker.tsx CUT_CHARS). */
+type Fit = { readonly el: HTMLElement; readonly text: string; readonly cut: Cut; readonly more: boolean };
+
+/** Does `t` fit `el`'s room, by its own layout: one write and one layout per try (the slow way). */
+const fitsByLayout = (el: HTMLElement) => (t: string) => {
+  el.textContent = t;
+  return el.scrollWidth <= el.clientWidth;
+};
+
+/** `f`'s cut, read off the layout of its whole words (no write): a cut's width is its prefix's,
+ *  read by a Range on the text drawn, plus the '…'; its room, the box's width while the whole
+ *  text overflows it. */
+function cutByReading(f: Fit): string {
+  const { el, text } = f;
+  const room = el.clientWidth;
+  if (!f.more && el.scrollWidth <= room) return text;
+  const node = el.firstChild;
+  if (!(node instanceof Text) || node.data !== text) return f.cut(text, fitsByLayout(el));
+  const dots = textWidth(getComputedStyle(el).font)("…");
+  const range = document.createRange();
+  return f.cut(text, (t) => {
+    const head = t.endsWith("…") ? t.slice(0, -1) : t;
+    if (t === text || !text.startsWith(head)) return false;
+    range.setStart(node, 0);
+    range.setEnd(node, head.length);
+    return range.getBoundingClientRect().width + dots <= room + 0.5;
+  });
+}
+
+/** The cuts asked in one render, done together once it is committed, before its frame is drawn:
+ *  every whole text in, the cuts read (one layout for all), every cut out, then a check (one more
+ *  layout) that redoes the slow way a cut a rounding left too wide. Each row cutting alone
+ *  wrote and laid the page out once per word it tried: an '@' list of 28 agents whose titles are
+ *  briefs froze the window for 20 s (at-perf). */
+let pending: Fit[] = [];
+function fitAll(): void {
+  const fits = pending.filter((f) => f.el.isConnected);
+  pending = [];
+  for (const f of fits) if (f.el.textContent !== f.text) f.el.textContent = f.text;
+  const cuts = fits.map(cutByReading);
+  fits.forEach((f, i) => {
+    const t = cuts[i] ?? f.text;
+    if (f.el.textContent !== t) f.el.textContent = t;
+  });
+  fits.forEach((f, i) => {
+    if (cuts[i] !== f.text && f.el.scrollWidth > f.el.clientWidth) f.el.textContent = f.cut(f.text, fitsByLayout(f.el));
+  });
+}
+
 /** `el`'s words cut to its room by `cut` (picker.tsx cutWords: after a whole word, one '…'), again
- *  when `text` changes. */
-export function useFitText(ref: RefObject<HTMLElement | null>, text: string, cut: (text: string, fits: (t: string) => boolean) => string): void {
+ *  when `text` changes; the cuts of one render go together (fitAll). `more`: `text` is the start
+ *  of longer words, always cut. */
+export function useFitText(ref: RefObject<HTMLElement | null>, text: string, cut: Cut, more = false): void {
   useLayoutEffect(() => {
     const el = ref.current;
     if (el === null) return;
-    el.textContent = cut(text, (t) => {
-      el.textContent = t;
-      return el.scrollWidth <= el.clientWidth;
-    });
-  }, [ref, text, cut]);
+    if (pending.length === 0) queueMicrotask(fitAll);
+    pending.push({ el, text, cut, more });
+  }, [ref, text, cut, more]);
 }
 
 /** An open/closed state: `toggle` flips it, `close` closes it (a Dropdown's menu). */

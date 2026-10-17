@@ -62,6 +62,9 @@ export const LAND = [
   'checks/composer/at-files.spec.ts',
   // the @ / $ lists stay the same node, visible with rows, on every frame while he types (his flicker, at-steady)
   'checks/composer/picker-steady.spec.ts',
+  // '@' on a big project (28 agents titled by their briefs, a 50k-file tree) draws its rows within
+  // 100 ms, no long task while it opens or filters (his « le submenu de @ … freeze la ui », at-perf)
+  'checks/composer/at-perf.spec.ts',
   'checks/composer/answer-target.spec.ts',
   // any file a chip like an image's, in place in the parts, the bubble opens it (file-chips)
   'checks/thread/file-chips.spec.ts',

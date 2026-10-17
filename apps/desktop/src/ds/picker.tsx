@@ -124,24 +124,42 @@ export function glyphColumn(groups: readonly PickerGroup[]): boolean {
 }
 
 /** Cut `text` after a whole word with one '…' so it fits `fits(t)`; the whole text when it fits,
- *  the first word cut when nothing else does. Pure. */
+ *  the first word cut when nothing else does. The most words that fit, found by halving (a longer
+ *  cut never fits where a shorter one doesn't): `fits` runs ~log2(words) times, not once per word
+ *  (each run is a layout; an agent's title of 400 words made '@' freeze, at-perf). Pure. */
 export function cutWords(text: string, fits: (t: string) => boolean): string {
   if (fits(text)) return text;
   const words = text.split(/(?<=\s)/u);
-  for (let n = words.length - 1; n >= 1; n -= 1) {
-    const t = `${words.slice(0, n).join("").replace(/[\s,;:·]+$/u, "")}…`;
-    if (fits(t)) return t;
+  const cut = (n: number) => `${words.slice(0, n).join("").replace(/[\s,;:·]+$/u, "")}…`;
+  // the answer is in [lo, hi]: lo - 1 words fit (or none), hi + 1 don't
+  let lo = 1;
+  let hi = words.length - 1;
+  let best: string | null = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const t = cut(mid);
+    if (fits(t)) {
+      best = t;
+      lo = mid + 1;
+    } else hi = mid - 1;
   }
-  return `${(words[0] ?? "").trim()}…`;
+  return best ?? `${(words[0] ?? "").trim()}…`;
 }
+
+/** The most characters of an inline secondary drawn before it is cut: the widest picker (640 px)
+ *  holds far fewer 12 px characters, and an agent's title can be a whole brief (at-perf: 28 rows
+ *  of 2,000 characters laid out on every '@'). */
+export const CUT_CHARS = 512;
 
 /** An inline secondary, cut after a whole word to the room left (its full words in the row's tip). */
 export function PickerCut({ text }: { text: string }) {
   const ref = useRef<HTMLSpanElement>(null);
-  useFitText(ref, text, cutWords);
+  const more = text.length > CUT_CHARS;
+  const shown = more ? text.slice(0, CUT_CHARS) : text;
+  useFitText(ref, shown, cutWords, more);
   return (
     <span ref={ref} className="s">
-      {text}
+      {shown}
     </span>
   );
 }
