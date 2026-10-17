@@ -46,7 +46,11 @@ after; none left on a snapshot (the ones left read other events, the art
 store's rows, card_links.json at its load). bench_step on his journal copy
 (739 agents, same debug build): the snapshot alone 24.2 ms -> 3.8 ms, hello
 + its snapshot 146 ms -> 74 ms, every row built from nothing 134 ms -> 66
-ms. core.rs 2685 -> 2587 lines, daemon.rs 2243 -> 2241, both limits lowered.
+ms. core.rs 2685 -> 2583 lines, core_tests.rs 4612 -> 4604, daemon.rs 2243 -> 2241, their limits lowered.
 
-Left for later, each its own chunk (no wire change here): the lossy typed
-rows, like the Agent row's last report on an archived agent.
+Left for later, each its own chunk (no wire change here):
+- the lossy typed rows, like the Agent row's last report on an archived
+  agent;
+- the same pattern elsewhere (architect m_28642): the art store's
+  `artifacts` event and the diff are built as `Value` and read back by key
+  in proto_view (`artifacts`, `diff`, `hunk`).
