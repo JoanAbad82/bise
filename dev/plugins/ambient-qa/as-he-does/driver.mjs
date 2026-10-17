@@ -1206,6 +1206,7 @@ if (mode === 'quick') {
     // the chosen rows alone; rows37's before rowsE812's seed (its spawns' task_status would ride on
     // main's next request, the quote's included); the bims office first: it seeds nothing, and the
     // seeds below can take the 600 s watchdog before a late row (desk-cut-8's cand-d3d8b)
+    await rowsDDDE(harness, say);
     await rowsD3D8(harness, say);
     await rows42D1(harness, say);
     await rows4E20(harness, say);
@@ -1219,6 +1220,7 @@ if (mode === 'quick') {
   } else {
     // first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the time the others take
     await rowsE812(harness, say);
+    await rowsDDDE(harness, say);
     await rowsF2A7(harness, say);
     await rows233B(harness, say);
     await rowsC2BA(harness, say);
@@ -4071,6 +4073,87 @@ async function rows4E20(harness, say) {
 // his machine: no native save panel (the ⤓ / ⋯ items read, never clicked), no 'show in Finder',
 // no web link clicked (main's openLink would open his browser; links.spec has the stub), the paste a
 // synthetic ClipboardEvent (his pasteboard untouched), no 'add a project' (the folder picker)
+// ddde0ba9e's cut (desk-cut-12, main m_29777): cmd-notice f7862037e (checks/composer/cmd-notice.spec.ts)
+// and at-chips 7856b6e00 (checks/composer/at-chips.spec.ts), on the real hub of the world's harness.
+async function rowsDDDE(harness, say) {
+  const row = async (name, fn) => {
+    if (!wanted(name)) return;
+    try { await fn(name); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  const frame = page.locator('[data-testid="composer"]:visible').first();
+  const rect = async () => {
+    const b = await frame.boundingBox().catch(() => null);
+    return b && { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+  };
+  const same = (a, b) => !!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+  // a refused '/bime': the hub's 'unknown command' on the composer's key line, as an error, no box
+  // under the screen, the composer's rect the same before, during and after; his first key ends it
+  await row('cmd notice', async (name) => {
+    await harness();
+    await clear();
+    await page.waitForTimeout(500);
+    const before = await rect();
+    await page.keyboard.type('/bime', { delay: 20 });
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Enter');
+    const line = page.locator('[data-testid="composer"] .keys [data-testid="confirm.notice"]').first();
+    const shown = await line.waitFor({ timeout: 8000 }).then(() => true, () => false);
+    const words = ((await line.innerText({ timeout: 1000 }).catch(() => '')) ?? '').replace(/\s+/g, ' ').trim();
+    const level = await line.getAttribute('data-level', { timeout: 1000 }).catch(() => null);
+    const during = await rect();
+    const boxes = await page.locator('.confirm-bar').count().catch(() => -1);
+    await page.mouse.move(5, 400);
+    await shot('ddde-cmd-notice');
+    await page.keyboard.type('x', { delay: 20 });
+    const gone = await until(async () => ((await line.count()) === 0 ? true : null), 3000, 200) === true;
+    await page.waitForTimeout(300);
+    const after = await rect();
+    await clear();
+    step(`${name}: a refused '/bime' says 'unknown command' on the key line as an error, no box under it, the composer's rect the same before/during/after, his first key ends it`,
+      shown && /unknown command: \/bime/.test(words) && level === 'err' && boxes === 0 && same(before, during) && same(before, after) && gone,
+      { shown, words, level, boxes, before, during, after, gone });
+  });
+
+  // an @-picked file: a data-kind=file chip where the @ was, its name, no path as text, the caret after it
+  await row('at chip', async (name) => {
+    const HP = process.env.AS_HE_DOES_HARNESS ?? null;
+    if (!HP) { step(name, false, 'AS_HE_DOES_HARNESS not set'); return; }
+    const FN = `ddchip${String(Date.now()).slice(-5)}`;
+    const rel = `qa/${FN}.md`;
+    fs.mkdirSync(path.join(HP, 'qa'), { recursive: true });
+    fs.writeFileSync(path.join(HP, rel), 'a file for the at-chip row\n');
+    const { execFileSync } = await import('node:child_process');
+    try { execFileSync('git', ['-C', HP, 'add', rel], { stdio: 'ignore' }); } catch { /* the list may read the tree too */ }
+    await harness();
+    await clear();
+    await page.keyboard.type('voir ', { delay: 10 });
+    await page.keyboard.type(`@${FN}`, { delay: 30 });
+    const item = page.locator(`[data-testid="composer.pick.file.${rel}"]`).first();
+    const listed = await item.waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const ids = await page.locator('[data-testid="composer.pick"] [data-testid^="composer.pick."]').evaluateAll((rs) => rs.map((r) => r.getAttribute('data-testid') ?? '')).catch(() => []);
+    if (listed) await page.keyboard.press('Enter');
+    await page.keyboard.type('stp', { delay: 10 });
+    const chip = page.locator('[data-testid^="composer.chip."][data-kind="file"]').first();
+    const isChip = await chip.waitFor({ timeout: 4000 }).then(() => true, () => false);
+    const chipText = ((await chip.innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim();
+    const order = await field.evaluate((el) => Array.from(el.querySelector('p')?.childNodes ?? [], (n) => (n instanceof HTMLElement && n.dataset.kind !== undefined ? `<${n.dataset.kind}>` : (n.textContent ?? ''))).join('')).catch(() => null);
+    const text = await field.evaluate((el) => el.textContent ?? '').catch(() => '');
+    await page.mouse.move(5, 400);
+    await shot('ddde-at-chip');
+    await clear();
+    step(`${name}: '@${FN}' then ⏎ puts a file chip where the @ was (its name ${FN}.md), no path as text, what he types next lands after it`,
+      listed && isChip && chipText.includes(`${FN}.md`) && !text.includes('qa/') && /^voir <file>\s?stp$/.test(order ?? ''),
+      { listed, ids: ids.slice(0, 6), isChip, chipText, order, text: text.slice(0, 120) });
+  });
+}
+
 async function rowsDC47(harness, say) {
   const row = async (name, fn) => {
     if (!wanted(name)) return;
