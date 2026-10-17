@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // The tray menu's projects block (designer m_27872): which lines show, their tips, the built menu.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import type { SpotData, SpotProject } from '@/spotlight';
 import { common } from '@/proto/words.gen';
 import { panel } from '@/proto/words_panel.gen';
@@ -63,8 +63,9 @@ describe("the tray menu's projects (designer m_27872)", () => {
     const ui = menu(day, onOpenWindow);
     const block = ui.getByTestId('capsule.menu.projects');
     expect(block.textContent.startsWith(panel.projects)).toBe(true);
-    expect(ui.getByTestId('capsule.menu.project.harness').textContent).toBe('?harness? 1∿ 3');
-    expect(ui.getByTestId('capsule.menu.project.site').querySelector('.b-cap-pj-end')?.textContent).toBe('∿ 1');
+    // a live line ends with '›', its submenu (designer m_29577)
+    expect(ui.getByTestId('capsule.menu.project.harness').textContent).toBe('?harness? 1∿ 3›');
+    expect(ui.getByTestId('capsule.menu.project.site').querySelector('.b-cap-pj-end')?.textContent).toBe('∿ 1›');
     expect(ui.getByTestId('capsule.menu.project.dotfiles').querySelector('.b-cap-pj-end')).toBeNull();
     expect(ui.getByTestId('capsule.menu.project.notes').querySelector('.b-cap-pj-end')).toBeNull();
     expect(ui.getByTestId('capsule.menu.project.dotfiles.line').className).toBe('quiet');
@@ -88,5 +89,95 @@ describe("the tray menu's projects (designer m_27872)", () => {
     expect(onOpenWindow).toHaveBeenCalledWith();
     ui.unmount();
     expect(menu({ agents: [], projects: [], cards: [] }).queryByTestId('capsule.menu.projects')).toBeNull();
+  });
+});
+
+describe("a live line's summary and its submenu (designer m_29577)", () => {
+  const live: SpotData = {
+    home: { id: 'home', waits: 0, working: 1 },
+    projects: [P('shop', 1, 2), P('docs')],
+    agents: [
+      { name: 'main', project: 'home', status: 'working', title: '', main: true, note: 'watching the launch' },
+      { name: 'perf', project: 'shop', status: 'working', title: 'cache', note: 'merging the cache fix', since: 1000, sign: { g: '∿', tone: 'ink' } },
+      { name: 'web', project: 'shop', status: 'working', title: 'the web build', since: 500, sign: { g: '∿', tone: 'ink' } },
+      { name: 'search', project: 'shop', status: 'idle', title: 'search', since: 10, sign: { g: '○', tone: 'dim' } },
+    ],
+    cards: [{ id: 'shop.4', card: 4, agent: 'search', project: 'shop', text: 'which size system should the filter use?', kind: 'question' }],
+  };
+  const key = (k: string) => {
+    fireEvent.keyDown(window, { key: k });
+  };
+
+  it("the second line: what waits first, bise's note; a quiet line has none", () => {
+    const ui = menu(live);
+    // its whole words: the cut (whole words, measured) has no room here (happy-dom lays out nothing), the tip keeps them
+    const words = (id: string): string | null | undefined => ui.getByTestId(`capsule.menu.project.${id}.sum`).querySelector('.t')?.getAttribute('title');
+    expect(ui.getByTestId('capsule.menu.project.shop.sum').querySelector('.w')?.textContent).toBe('?');
+    expect(words('shop')).toBe('search · which size system should the filter use?');
+    expect(words('bise')).toBe('watching the launch');
+    expect(ui.queryByTestId('capsule.menu.project.docs.sum')).toBeNull();
+    expect(ui.getByTestId('capsule.menu.project.docs.line').className).toBe('quiet');
+  });
+
+  it('keys: ↓ selects, → opens the submenu on its first row, ↓ moves in it, ⏎ opens that thread, ← and esc close it', () => {
+    const onOpenWindow = vi.fn();
+    const onClose = vi.fn();
+    const ui = render(
+      <Capsule
+        view={{ kind: 'menu' }} spot={live} answer={null} heard="" level={0}
+        card={() => null} route={null} onRouteKeep={vi.fn()} onRouteTo={vi.fn()} onAsk={vi.fn()} onOpen={vi.fn()}
+        onOpenWindow={onOpenWindow} onClose={onClose} onQuit={null} onSize={vi.fn()}
+      />,
+    );
+    // the inbox row, then bise, then shop
+    for (let i = 0; i < 3; i++) act(() => { key('ArrowDown'); });
+    expect(ui.getByTestId('capsule.menu.project.shop').className).toContain('on');
+    act(() => { key('ArrowRight'); });
+    expect(ui.getByTestId('capsule.menu.sub.head').textContent).toBe('shop2 working · 1 waiting for you');
+    // waiting on him first, then at work newest first; never the idle one twice
+    expect(ui.getAllByTestId(/^capsule\.menu\.sub\.agent\./u).map((e) => e.getAttribute('data-testid'))).toEqual(['search', 'perf', 'web'].map((n) => `capsule.menu.sub.agent.${n}`));
+    expect(ui.getByTestId('capsule.menu.sub.agent.search').className).toContain('on');
+    act(() => { key('ArrowDown'); });
+    act(() => { key('Enter'); });
+    expect(onOpenWindow).toHaveBeenLastCalledWith('agent/shop/perf');
+    act(() => { key('ArrowLeft'); });
+    expect(ui.queryByTestId('capsule.menu.sub')).toBeNull();
+    act(() => { key('ArrowRight'); });
+    expect(ui.getByTestId('capsule.menu.sub')).toBeTruthy();
+    // esc: the submenu first, then the menu
+    act(() => { key('Escape'); });
+    expect(ui.queryByTestId('capsule.menu.sub')).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    vi.useFakeTimers({ now: Date.now() + 1000 });
+    act(() => { key('Escape'); });
+    vi.useRealTimers();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // a quiet line has no submenu
+    act(() => { key('ArrowDown'); });
+    act(() => { key('ArrowRight'); });
+    expect(ui.getByTestId('capsule.menu.project.docs').className).toContain('on');
+    expect(ui.queryByTestId('capsule.menu.sub')).toBeNull();
+  });
+
+  it('pointer: resting on a live line opens its submenu, its last row opens the project; a quiet line closes it', () => {
+    vi.useFakeTimers();
+    try {
+      const onOpenWindow = vi.fn();
+      const ui = menu(live, onOpenWindow);
+      fireEvent.mouseMove(ui.getByTestId('capsule.menu.project.shop'));
+      expect(ui.queryByTestId('capsule.menu.sub')).toBeNull();
+      act(() => { vi.advanceTimersByTime(160); });
+      expect(ui.getByTestId('capsule.menu.sub')).toBeTruthy();
+      expect(ui.getByTestId('capsule.menu.sub.open').textContent).toBe('open shop');
+      fireEvent.mouseMove(ui.getByTestId('capsule.menu.sub.open'));
+      expect(ui.getByTestId('capsule.menu.sub.open').className).toContain('on');
+      ui.getByTestId('capsule.menu.sub.open').click();
+      expect(onOpenWindow).toHaveBeenLastCalledWith('agent/shop/main');
+      fireEvent.mouseMove(ui.getByTestId('capsule.menu.project.docs'));
+      act(() => { vi.advanceTimersByTime(400); });
+      expect(ui.queryByTestId('capsule.menu.sub')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

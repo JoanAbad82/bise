@@ -14,16 +14,13 @@ import {
   type RefObject,
   type UIEvent,
 } from "react";
-import { shownName } from "@/agents/model";
-import { inbox } from "@/proto/words_inbox.gen";
-import { BiseMark, Menu, MenuItem, MenuSep, Press, Row } from "@/ds";
+import { BiseMark, Press } from "@/ds";
 import {
   LiveText,
   RouteLine,
   Spotlight,
   answerLines,
   type SpotAnswer,
-  type SpotCard,
   type SpotData,
   type SpotItem,
   type SpotRoute,
@@ -33,8 +30,7 @@ import { beatOf, presenceOf } from "./presence";
 import type { PreviewLine } from "@/spotlight/preview";
 import type { Part } from "@/proto";
 import { ScreenAsk, ShotRow, type TalkShot } from "./shot";
-import { MenuProjects } from "./MenuProjects";
-import { hasProjects, menuCounts } from "./projects";
+import { TrayMenu } from "./TrayMenu";
 import "./capsule.css";
 
 export const W = {
@@ -52,17 +48,7 @@ export const W = {
     ["⏎", "open in bise"],
     ["esc", "close"],
   ] as const,
-  openBise: "open bise",
-  inbox: "inbox",
-  settings: "settings…",
-  quit: "quit bise",
-  head: (work: number, waits: number): string =>
-    `${work > 0 ? `${work} at work` : "nobody at work"}${waits > 0 ? ` · ${waits} waiting for you` : ""}`,
-  // never 'open bise' twice: the menu's own item says it (designer m_21314); a click opens ⌘I
-  more: (n: number): string => `+ ${String(n)} more in the inbox`,
 } as const;
-
-const firstLine = (s: string): string => s.split("\n")[0] ?? "";
 
 export interface CapsuleProps {
   readonly view: View;
@@ -95,6 +81,8 @@ export interface CapsuleProps {
   readonly onClose: () => void;
   /** null: the app can't quit from a page yet (the row shows greyed). */
   readonly onQuit: (() => void) | null;
+  /** The tray menu's esc (TrayMenu): the helper's esc asks it first (its submenu closes before the menu). */
+  readonly menuEsc?: RefObject<(() => boolean) | null>;
   /** The page's size and the glass inside it: the page is the glass now (macOS vibrancy fills the
    *  window, glass.ts), so the rect is {0, 0, width, height}. */
   /** The front window's still for this talk (the core's {ev:'shot'}), null: none. */
@@ -266,6 +254,8 @@ export function Capsule(p: CapsuleProps): JSX.Element {
           onOpenWindow={p.onOpenWindow}
           onOpenCard={p.onOpenCard ?? (() => undefined)}
           onQuit={p.onQuit}
+          onClose={p.onClose}
+          escRef={p.menuEsc}
         />
       )}
     </div>
@@ -386,130 +376,6 @@ function Answer({
           </span>
         ))}
       </div>
-    </div>
-  );
-}
-
-/** The tray menu lists this many waiting items; the rest is '+ N more in the inbox', a click opens it (one-inbox 3). */
-export const MENU_ROWS = 5;
-
-const MARK: Record<SpotCard["kind"], string> = { question: "?", approval: "!", drafts: "✉" };
-
-/**
- * The items the tray menu lists under its head: the window's inbox block rows, in its order (the
- * hub's rank, then the oldest: data.ts), at most MENU_ROWS. fn+n opens row n. Pure.
- */
-export function menuCards(spot: SpotData): readonly SpotCard[] {
-  return spot.cards.slice(0, MENU_ROWS);
-}
-
-function TrayMenu({
-  spot,
-  onOpenWindow,
-  onOpenCard,
-  onQuit,
-}: {
-  spot: SpotData;
-  onOpenWindow: (route?: string) => void;
-  onOpenCard: (id: string) => void;
-  onQuit: (() => void) | null;
-}): JSX.Element {
-  const counts = menuCounts(spot);
-  const rows = menuCards(spot);
-  const more = spot.cards.length - rows.length;
-  return (
-    <div className="b-cap-menu" data-glass>
-      <Menu testId="capsule.menu">
-        <div className="b-cap-menu-head" data-testid="capsule.menu.head">
-          {W.head(counts.work, counts.waits)}
-        </div>
-        {rows.length > 0 && (
-          // the window's inbox block rows (one-inbox 3, designer m_19631): '1 ? agent question… ·
-          // project' at the tight row height, no age; a click or fn+n answers it here
-          <div className="b-cap-rows" data-testid="capsule.menu.items">
-            {rows.map((c, i) => (
-              <Row
-                key={c.id}
-                lead={
-                  <>
-                    <span className="strip-n">{i + 1}</span>
-                    <span className="ib-sign">{MARK[c.kind]}</span>
-                  </>
-                }
-                name={
-                  <>
-                    <span className="strip-who">{shownName(c.agent)}</span>
-                    <span className="strip-what">{firstLine(c.text)}</span>
-                  </>
-                }
-                end={c.pname}
-                // its number in the tip only: the row is a glance, the number would cost it the
-                // question (notif-id, designer m_27959)
-                tip={inbox.with_id({ meta: firstLine(c.text), id: c.card })}
-                onClick={() => {
-                  onOpenCard(c.id);
-                }}
-                testId={`capsule.menu.item.${String(i + 1)}`}
-              />
-            ))}
-            {more > 0 && (
-              <MenuItem
-                onClick={() => {
-                  onOpenWindow("inbox");
-                }}
-                testId="capsule.menu.more"
-              >
-                {W.more(more)}
-              </MenuItem>
-            )}
-          </div>
-        )}
-        {/* one line per project (designer m_27872): bise's, then his, what waits and what works */}
-        {hasProjects(spot) && (
-          <>
-            <MenuSep />
-            <MenuProjects spot={spot} onOpenWindow={onOpenWindow} />
-          </>
-        )}
-        <MenuSep />
-        <MenuItem
-          onClick={() => {
-            onOpenWindow();
-          }}
-          testId="capsule.menu.open"
-        >
-          {W.openBise}
-        </MenuItem>
-        <MenuItem
-          hotkey="⌘I"
-          onClick={() => {
-            onOpenWindow("inbox");
-          }}
-          testId="capsule.menu.inbox"
-        >
-          {W.inbox}
-        </MenuItem>
-        <MenuItem
-          hotkey="⌘,"
-          onClick={() => {
-            onOpenWindow("settings");
-          }}
-          testId="capsule.menu.settings"
-        >
-          {W.settings}
-        </MenuItem>
-        <MenuSep />
-        <MenuItem
-          hotkey="⌘Q"
-          disabled={onQuit === null}
-          onClick={() => {
-            onQuit?.();
-          }}
-          testId="capsule.menu.quit"
-        >
-          {W.quit}
-        </MenuItem>
-      </Menu>
     </div>
   );
 }

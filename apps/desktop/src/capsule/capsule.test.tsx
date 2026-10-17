@@ -147,6 +147,7 @@ describe('the store mapping', () => {
       (p) => (p === 'tel' ? [A('perf', 'working')] : []),
       (p) => (p === 'tel' ? [C(4, true)] : p === 'home' ? [C(2, false)] : []),
       null,
+      0,
     );
     expect(d.projects.map((p) => [p.id, p.branch])).toEqual([['shop', 'main'], ['tel', 'dev']]);
     expect(d.agents).toMatchObject([{ name: 'perf', project: 'tel', status: 'working' }]);

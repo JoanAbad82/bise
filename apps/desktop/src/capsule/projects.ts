@@ -8,6 +8,7 @@
 import { common } from '@/proto/words.gen';
 import { panel } from '@/proto/words_panel.gen';
 import type { SpotData } from '@/spotlight';
+import { summaryOf, type Summary } from './projsum';
 
 /** The tray menu lists this many projects (bise's own line apart), more when more are live. */
 export const MENU_PROJECTS = 6;
@@ -26,6 +27,10 @@ export interface ProjectLine {
   readonly tip: string;
   /** where a click goes (a window route) */
   readonly route: string;
+  /** a live line's second line (projsum.ts); null: one line */
+  readonly summary: Summary | null;
+  /** the project its agents and cards name (bise's home: its id; '' unknown) */
+  readonly project: string;
 }
 
 /** Something goes on there: it waits on him or works (a gone folder never). */
@@ -49,7 +54,11 @@ export function projectLines(spot: SpotData, max = MENU_PROJECTS): { readonly li
     const waits = p.waits ?? 0;
     const working = p.working ?? 0;
     const missing = p.missing === true;
-    return { id: p.id, name: p.name, waits, working, missing, tip: tipOf(p.name, missing ? 0 : waits, missing ? 0 : working, p.branch), route: `project/${p.id}` };
+    const live = isLive({ waits, working, missing });
+    return {
+      id: p.id, name: p.name, waits, working, missing, tip: tipOf(p.name, missing ? 0 : waits, missing ? 0 : working, p.branch), route: `project/${p.id}`,
+      summary: live ? summaryOf(spot, p.id) : null, project: p.id,
+    };
   });
   const live = all.filter(isLive).length;
   let room = Math.max(0, max - live);
@@ -61,7 +70,14 @@ export function projectLines(spot: SpotData, max = MENU_PROJECTS): { readonly li
   });
   const h = spot.home;
   const home: ProjectLine[] =
-    h === undefined ? [] : [{ id: '', name: panel.bise, waits: h.waits, working: h.working, missing: false, tip: tipOf(panel.bise, h.waits, h.working, null), route: 'bise' }];
+    h === undefined
+      ? []
+      : [
+          {
+            id: '', name: panel.bise, waits: h.waits, working: h.working, missing: false, tip: tipOf(panel.bise, h.waits, h.working, null), route: 'bise',
+            summary: h.id !== undefined && h.waits + h.working > 0 ? summaryOf(spot, h.id, true) : null, project: h.id ?? '',
+          },
+        ];
   return { lines: [...home, ...shown], more: all.length - shown.length };
 }
 

@@ -104,3 +104,36 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
 .b-cap-pjs .b-cap-pj-end .w { color: var(--c-accent); }
 .b-cap-pjs .b-cap-pj-end .k { color: var(--c-text-3); }
 .b-cap-pjs > .b-mi .n { color: var(--c-text-3); }
+/* a live line's second line (designer m_29577): 40 px rows, the name over what waits or works
+   ('? search · which size…', the '?' accent; 'perf · merging the cache fix  +2'), sans 12 text-3,
+   cut after a whole word; the end's '›' says it has a submenu */
+.b-cap-pjs .two .b-row { height: calc(var(--h-row-tight) + var(--s-3)); }
+.b-cap-pjs .two .b-row .nm { display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+.b-cap-pjs .two .b-row .nm .pj { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-cap-pj-sum { display: flex; gap: var(--s-1); min-width: 0; font: var(--t-12) var(--font-ui); color: var(--c-text-3); white-space: nowrap; }
+.b-cap-pj-sum .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-cap-pj-sum .w { flex: none; color: var(--c-accent); }
+.b-cap-pj-sum .more { flex: none; }
+.b-cap-pjs .b-cap-pj-end .go { color: var(--c-text-3); font-family: var(--font-ui); }
+/* the submenu (designer m_29577): a second column of the same glass (the window is the glass),
+   280 px, a 1 px rule on the menu's side, on the side the screen has room; its rows start level
+   with the project's row */
+.b-cap-tray { display: flex; align-items: stretch; }
+.b-cap-tray.left { flex-direction: row-reverse; }
+.b-cap-sub { width: 280px; flex: none; box-sizing: border-box; border-left: 1px solid var(--c-line); }
+.b-cap-tray.left .b-cap-sub { border-left: 0; border-right: 1px solid var(--c-line); }
+.b-capsule .b-cap-sub .b-menu { width: 280px; min-width: 0; max-width: none; }
+.b-cap-sub-head { display: flex; gap: var(--s-2); align-items: baseline; padding: var(--s-1) var(--pad-row-x); font-size: var(--t-12); white-space: nowrap; overflow: hidden; }
+.b-cap-sub-head .nm { color: var(--c-text); font-size: var(--t-13); }
+.b-cap-sub-head .cn { color: var(--c-text-3); overflow: hidden; text-overflow: ellipsis; }
+.b-cap-sub .b-row { height: var(--h-row-tight); font-size: var(--t-13); }
+.b-cap-sub .b-row .nm { display: flex; gap: var(--s-2); min-width: 0; overflow: hidden; white-space: nowrap; }
+.b-cap-sub .b-row .nm .who { flex: none; }
+.b-cap-sub .b-row .nm .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-3); }
+.b-cap-sub .b-row .end { flex: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); }
+/* the bar's sign (app/side's signOf): its glyph and tone, in the 15 px mono column */
+.b-cap-sub-g { flex: none; width: 15px; text-align: center; font: var(--t-12) var(--font-mono); }
+.b-cap-sub-g.ink { color: var(--c-text); }
+.b-cap-sub-g.acc { color: var(--c-accent); }
+.b-cap-sub-g.err { color: var(--c-err); }
+.b-cap-sub-g.dim { color: var(--c-text-3); }

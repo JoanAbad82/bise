@@ -23,7 +23,8 @@ import type { SpotAnswer, SpotFront, SpotItem, SpotRoute } from "@/spotlight";
 import { W } from "@/spotlight/words";
 import { useTheme } from "@/theme";
 import "@/ds/index.css";
-import { Capsule, isCorner, menuCards } from "./Capsule";
+import { Capsule, isCorner } from "./Capsule";
+import { menuCards } from "./TrayMenu";
 import { answeredOver, errorOver, heardOver, lingerOf, OVER_FADE_MS } from "./over";
 import { asksForScreen, shotOf, shotPref } from "./shot";
 import { useAgentPreview, useSpotData } from "./data";
@@ -96,6 +97,8 @@ export function CapsuleRoot(): JSX.Element {
   // the helper's fn keys read these: fn+n on the tray menu opens its row n (one-inbox 3)
   const viewRef = useRef(view);
   const menuRef = useRef(menuCards(spot));
+  // the tray menu's esc: its submenu closes first (TrayMenu sets it while it shows)
+  const menuEsc = useRef<(() => boolean) | null>(null);
   useEffect(() => {
     viewRef.current = view;
     menuRef.current = menuCards(spot);
@@ -369,6 +372,9 @@ export function CapsuleRoot(): JSX.Element {
     const offHelper = bise.onHelper((ev) => {
       if (ev.ev === "fn" && ev.act === "esc" && routeRef.current !== null)
         keepWithBise();
+      else if (ev.ev === "fn" && ev.act === "esc" && viewRef.current.kind === "menu" && menuEsc.current?.() === true) {
+        // the tray menu used it: its submenu closed, the menu stays
+      }
       else if (ev.ev === "fn" && ev.act === "key" && viewRef.current.kind === "menu" && /^[1-9]$/u.test(ev.key ?? "")) {
         // fn+n on the tray menu answers its row n in place (one-inbox 3)
         const c = menuRef.current[Number(ev.key) - 1];
@@ -567,6 +573,7 @@ export function CapsuleRoot(): JSX.Element {
       onClose={() => {
         dispatch({ ev: "close" });
       }}
+      menuEsc={menuEsc}
       onQuit={
         bise === undefined
           ? null

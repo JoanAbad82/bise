@@ -9,6 +9,7 @@ import { threadKey, useProjects, useStore, useThreadOrder } from '@/store';
 import type { SpotCard, SpotData, SpotFront } from '@/spotlight';
 import { previewLines, type PreviewLine } from '@/spotlight/preview';
 import { useNow } from '@/app/clock';
+import { signOf } from '@/app/side';
 
 export function cardKind(c: Card): SpotCard['kind'] {
   if (c.approval !== true) return 'question';
@@ -21,6 +22,7 @@ export function toSpotData(
   agentsOf: (project: string) => readonly Agent[],
   cardsOf: (project: string) => readonly Card[],
   front: SpotFront | null,
+  now: number,
 ): SpotData {
   const mine = [...projects].sort((a, b) => a.order - b.order);
   const home = mine.find((p) => p.home);
@@ -28,9 +30,15 @@ export function toSpotData(
     projects: mine
       .filter((p) => !p.home)
       .map((p) => ({ id: p.project, name: p.name, path: p.path, branch: p.branch ?? 'main', agents: p.agents, waits: p.waits, working: p.working, missing: p.missing })),
-    ...(home === undefined ? {} : { home: { waits: home.waits, working: home.working } }),
+    ...(home === undefined ? {} : { home: { id: home.project, waits: home.waits, working: home.working } }),
     agents: mine.flatMap((p) =>
-      agentsOf(p.project).map((a) => ({ name: a.name, project: p.project, status: a.status, title: a.title, purpose: a.purpose, archived: a.archived })),
+      agentsOf(p.project).map((a) => {
+        const s = signOf(a, now);
+        return {
+          name: a.name, project: p.project, status: a.status, title: a.title, purpose: a.purpose, archived: a.archived,
+          main: a.main, note: a.note, since: a.doing?.since_ms ?? (a.status === 'working' && a.turn_ms != null ? now - a.turn_ms : a.since_ms), sign: { g: s.g, tone: s.tone },
+        };
+      }),
     ),
     cards: cardsInOrder(mine, cardsOf),
     front,
@@ -103,7 +111,7 @@ export function useSpotData(front: SpotFront | null): SpotData {
     const parts: unknown[] = [projects, front, ...projects.flatMap((p) => [store.agents(p.project), store.cards(p.project)])];
     const c = cache.current;
     if (c !== null && c.parts.length === parts.length && c.parts.every((x, i) => x === parts[i])) return c.value;
-    const value = toSpotData(projects, (p) => store.agents(p), (p) => store.cards(p), front);
+    const value = toSpotData(projects, (p) => store.agents(p), (p) => store.cards(p), front, Date.now());
     cache.current = { parts, value };
     return value;
   };

@@ -18,6 +18,14 @@ export interface SpotAgent {
   readonly title: string;
   readonly purpose?: string;
   readonly archived?: boolean;
+  /** the project's main (its thread is the project's own) */
+  readonly main?: boolean;
+  /** what it says it does now (`sb status --note`) */
+  readonly note?: string;
+  /** since when it does what it does now (ms): its live step's start, else its state's */
+  readonly since?: number;
+  /** the right bar's sign for it (app/side's signOf): the tray menu's submenu shows the same */
+  readonly sign?: { readonly g: string; readonly tone: 'ink' | 'acc' | 'err' | 'dim' };
 }
 
 export interface SpotProject {
@@ -35,6 +43,8 @@ export interface SpotProject {
 
 /** bise's home, out of `projects`: its own counts (the tray menu's 'bise' line). */
 export interface SpotHome {
+  /** its project id (its agents' and cards' `project`) */
+  readonly id?: string;
   readonly waits: number;
   readonly working: number;
 }

@@ -89,8 +89,8 @@ test('spotlight/menu-projects: one line per project, bise first, live ones never
     const ids = async (): Promise<string[]> =>
       block.locator('[data-testid^="capsule.menu.project."]:not([data-testid$=".line"])').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? ''));
     expect(await ids(), "bise's line, then his order").toEqual(['bise', 'harness-1', 'site-2', 'dotfiles-3', 'notes-4'].map((i) => `capsule.menu.project.${i}`));
-    await expect(line('harness-1').locator('.b-cap-pj-end')).toHaveText('? 1∿ 3');
-    await expect(line('bise').locator('.b-cap-pj-end')).toHaveText('? 1∿ 2');
+    await expect(line('harness-1').locator('.b-cap-pj-end')).toHaveText('? 1∿ 3›');
+    await expect(line('bise').locator('.b-cap-pj-end')).toHaveText('? 1∿ 2›');
     await expect(line('dotfiles-3').locator('.b-cap-pj-end'), 'a quiet one has no end').toHaveCount(0);
     await expect(cap.locator('[data-testid="capsule.menu.project.harness-1.line"]')).toHaveAttribute('title', 'harness · 1 waiting for you · 3 agents at work · on main');
     for (const id of ['bise', 'harness-1', 'site-2', 'dotfiles-3', 'notes-4']) {
