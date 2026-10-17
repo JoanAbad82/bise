@@ -3,4 +3,3 @@
 # and test:land say so; any other red is NEW. Remove the line in the commit that fixes it.
 history-perf	12c3d88dc	land-reds	test:land, 1 run in ~4 even at load 3-9: step 4's current match not marked (hitShown 0: rows 49494-49503 drawn around it, count 1/50, no row with data-hit, so the mark (findmark useIsCurrent) isn't 49500 there); never alone (12/12 with logs and without); at load 30+ also the 'zanzibar' jump once in 10 (jump.json on a red run)
 inbox-open	1da997a46	land-reds	test:land, 1 run in ~4 even at load 6: after ⌘⏎ to entry 50 the gap row 'newer messages…' is never drawn as the list scrolls down (thread.gap not found); green alone (5/5); the earlier flash red is fixed
-budget	962bafef0	skate-check	test (5), the skater frame-rate check, under load (~10): it counts frames by wall clock, so a skate line of 8-12 s drifts into the at-rest 0-frames window (maps-b m_28886); skate-check reads the phase from the test hook instead

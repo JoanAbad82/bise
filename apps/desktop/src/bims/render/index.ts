@@ -4,8 +4,8 @@
 // one bim per BimFrame posed by pose.ts (bim.ts), his paper planes (plane.ts), through the iso
 // camera (camera.ts); it answers where heads are and what is under a point (pick.ts). It renders
 // only when frame() is called and says how the loop must run next (Motion). The look is style.ts.
-// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, head, zoom } for the
-// headless check (bims-qa).
+// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, skate, head, zoom } for
+// the headless checks (bims-qa; skate: each skater's phase per frame, budget.spec (5)).
 import { Color, Mesh, MeshBasicMaterial, OrthographicCamera, PCFShadowMap, RingGeometry, Scene, Vector3, WebGLRenderer } from 'three';
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, MakeRenderer, Motion, Office, OfficeRenderer } from '../model';
@@ -16,6 +16,7 @@ import { pickAt, type Target } from './pick';
 import { flightAt, makePlane, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { skateRig } from './skate';
+import { sinceArrived, skateAt } from '../skate';
 import { STYLE } from './style';
 import { eggRig } from './egg';
 import { makeEggDecor, type EggDecor } from './eggdecor';
@@ -34,6 +35,8 @@ const WIDE_FIT_PX = 480;
 interface Probe {
   frames: number;
   trace: { t: number; name: string; x: number; z: number; op: number }[];
+  /** each drawn frame of an arrived skater: its session n (skate.ts skateAt) and whether it rides its line or rests */
+  skate: { t: number; name: string; n: number; phase: 'line' | 'rest' }[];
   head(name: string): { x: number; y: number } | null;
   /** his camera's zoom now (zoom.ts Cam; 1 = the fit): the follow check reads how close it looks */
   zoom(): number;
@@ -90,7 +93,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   const halos = new Map<string, Mesh>();
 
   const probe: Probe | null = testMode()
-    ? { frames: 0, trace: [], head: (name) => headOf(name), zoom: () => cam.zoom }
+    ? { frames: 0, trace: [], skate: [], head: (name) => headOf(name), zoom: () => cam.zoom }
     : null;
   if (probe) (window as unknown as { __biseBims?: Probe }).__biseBims = probe;
 
@@ -292,6 +295,12 @@ export const makeRenderer: MakeRenderer = (canvas) => {
         if (probe) {
           probe.trace.push({ t, name: f.name, x: rig.x, z: rig.z, op: rig.opacity });
           if (probe.trace.length > TRACE_MAX) probe.trace.splice(0, probe.trace.length - TRACE_MAX);
+          const p = f.pose.seg.pastime;
+          if (skater && p) {
+            const now = skateAt(f.name, p, sinceArrived(f.pose));
+            probe.skate.push({ t, name: f.name, n: now.n, phase: now.move === null ? 'rest' : 'line' });
+            if (probe.skate.length > TRACE_MAX) probe.skate.splice(0, probe.skate.length - TRACE_MAX);
+          }
         }
       }
       for (const [name, b] of bims) if (!shown.has(name)) b.group.visible = false;
