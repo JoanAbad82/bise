@@ -8,6 +8,7 @@
 //! [`Shell::growth_changed`] is the one emit point.
 
 use super::*;
+use crate::snapshot::Snapshot;
 use bise_proto::rows::{growth, growth_key, Growth, GrowthKey, GrowthRow};
 
 /// The inputs, the key they had at the last computation, its value, and
@@ -38,7 +39,7 @@ impl Shell {
     /// The growth of `snap`'s agents and `arts` artifacts (each kept for
     /// the next call when given; the artifact count read once from the
     /// store when never given yet).
-    pub(in crate::daemon) fn growth_of(&mut self, snap: Option<&Value>, arts: Option<u32>) -> Growth {
+    pub(in crate::daemon) fn growth_of(&mut self, snap: Option<&Snapshot>, arts: Option<u32>) -> Growth {
         if let Some(snap) = snap {
             self.proto.growth.rows = proto_view::growth_rows(snap);
         }
@@ -54,14 +55,14 @@ impl Shell {
 
     /// `hub/growth` now (initialize's state). Not marked sent: a value
     /// the other connections haven't had yet still goes to all of them.
-    pub(in crate::daemon) fn growth_ev(&mut self, snap: &Value) -> HubEv {
+    pub(in crate::daemon) fn growth_ev(&mut self, snap: &Snapshot) -> HubEv {
         HubEv::Growth { project: self.project(), growth: self.growth_of(Some(snap), None) }
     }
 
     /// The one emit point: after the agents push (`snap`) or the
     /// artifacts push (`arts`), `hub/growth` to every typed connection
     /// when the value changed.
-    pub(in crate::daemon) fn growth_changed(&mut self, ids: &[ClientId], snap: Option<&Value>, arts: Option<u32>) {
+    pub(in crate::daemon) fn growth_changed(&mut self, ids: &[ClientId], snap: Option<&Snapshot>, arts: Option<u32>) {
         let g = self.growth_of(snap, arts);
         if self.proto.growth.sent == Some(g) {
             return;

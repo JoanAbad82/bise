@@ -2575,10 +2575,6 @@ pub mod signin_card;
 mod snapshot;
 
 #[cfg(test)]
-#[path = "core_snapshot_old.rs"]
-pub(crate) mod snapshot_old;
-
-#[cfg(test)]
 #[path = "core_tests.rs"]
 mod tests;
 

@@ -258,6 +258,12 @@ impl Pages {
         self.store.list().iter().map(|m| self.page_json(m)).collect()
     }
 
+    /// The pages as the typed rows (the hub's snapshot, `hub/pages`),
+    /// newest first.
+    pub fn list_rows(&self) -> Vec<bise_proto::rows::Page> {
+        self.store.list().iter().filter_map(|m| serde_json::from_value(self.page_json(m)).ok()).collect()
+    }
+
     pub fn page_json(&self, m: &Meta) -> Value {
         let notes = self.store.notes(&m.id);
         let open = notes.iter().filter(|n| n.open()).count();

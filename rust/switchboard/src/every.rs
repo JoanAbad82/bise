@@ -261,8 +261,11 @@ impl Timers {
             .collect();
     }
 
-    /// The timers in the hub's state: the running ones, then the ones
-    /// that ended in the last [`ENDED_SHOWN_MS`] (with `ended_ms`).
+    /// The timers as the older state event carried them: the running
+    /// ones, then the ones that ended in the last [`ENDED_SHOWN_MS`] (with
+    /// `ended_ms`). Test-only since issue 30: the typed rows
+    /// (`proto_view::scheduled`) are checked against it.
+    #[cfg(test)]
     pub fn state(&self, now: u64) -> Vec<Value> {
         let ended = self.ended.iter().filter(|e| e.ended_ms + ENDED_SHOWN_MS > now).map(Ended::json);
         self.map.values().map(Timer::json).chain(ended).collect()

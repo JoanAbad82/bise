@@ -2,7 +2,7 @@
 //! those who must not start it to know them: the window's sidebar (a
 //! project whose hub is stopped), `bise project list`, and bise reading
 //! other projects (stream C). Written only by its own hub (the shell:
-//! `daemon/projects.rs`), from the client snapshot, debounced and at a
+//! `daemon/projects.rs`), from the hub's typed snapshot, debounced and at a
 //! clean stop; read-only for everyone else. Its shape is bise-proto's
 //! [`ProjectView`] (agents and cards are the window's rows).
 //!
@@ -14,8 +14,8 @@
 
 use crate::proto_view::{self, Since};
 use bise_proto::draft::{ProjectView, VIEW_ARTIFACTS};
+use crate::snapshot::Snapshot;
 use bise_proto::rows::{Artifact, Growth, ScheduledTask};
-use serde_json::Value;
 use std::path::Path;
 
 /// The file's name in the hub's state folder.
@@ -25,8 +25,8 @@ pub const V: u32 = 1;
 /// At most one write per this many ms while things change.
 pub const DEBOUNCE_MS: u64 = 2_000;
 
-/// The view of the hub of `project` (its hub id) from its client
-/// snapshot (`core::Hub::snapshot`).
+/// The view of the hub of `project` (its hub id) from its snapshot
+/// (`core::Hub::snapshot`, filled by the shell).
 /// `vision`: the hub's model catalog's rule (K4, see `proto_view::agents`).
 /// `artifacts`: the rows its typed `artifacts` event gives (the same
 /// builder, `daemon/proto/emit.rs` artifact_rows): the newest
@@ -37,7 +37,7 @@ pub const DEBOUNCE_MS: u64 = 2_000;
 /// (daemon/proto/growth.rs, one computation for both).
 #[allow(clippy::too_many_arguments)]
 pub fn of(
-    snap: &Value,
+    snap: &Snapshot,
     project: &str,
     now: u64,
     last_activity_ms: u64,
@@ -140,19 +140,29 @@ pub fn running(state: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::model::{Mode, Status};
+    use crate::snapshot::{AgentRow, CardRow};
+    use serde_json::Value;
 
-    fn snap() -> Value {
-        json!({
-            "agents": [
-                {"name": "main", "main": true, "status": "idle", "objective": "", "created_ms": 1},
-                {"name": "p99", "main": false, "status": "working", "objective": "why p99 rises", "created_ms": 5,
-                 "mode": "worktree", "branch": "sb/p99", "path": "/w/p99", "turn_ms": 4000, "parent": "main"},
+    fn snap() -> Snapshot {
+        Snapshot {
+            agents: vec![
+                AgentRow { main: true, created_ms: 1, ..AgentRow::test("main") },
+                AgentRow {
+                    status: Status::Working,
+                    objective: "why p99 rises".into(),
+                    created_ms: 5,
+                    mode: Mode::Worktree,
+                    branch: Some("sb/p99".into()),
+                    path: "/w/p99".into(),
+                    turn_ms: Some(4000),
+                    parent: Some("main".into()),
+                    ..AgentRow::test("p99")
+                },
             ],
-            "cards": [
-                {"id": 3, "kind": "question", "agent": "p99", "text": "ship it?\n1. yes\n2. no", "created_ms": 7},
-            ],
-        })
+            cards: vec![CardRow { id: 3, kind: "question".into(), agent: "p99".into(), text: "ship it?\n1. yes\n2. no".into(), ..CardRow::default() }],
+            ..Snapshot::default()
+        }
     }
 
     #[test]

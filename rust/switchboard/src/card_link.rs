@@ -11,10 +11,44 @@
 //! closes.
 
 use crate::pages::Pages;
-use bise_proto::rows::OptAct;
-use serde_json::{json, Value};
+use bise_proto::anchor::Anchor;
+use bise_proto::rows::{ArtLink, OptAct};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+
+/// A card's page (a step card's shape): the page, its block, the item in
+/// it, its url there; its title and version for the chip; `drafts`: a
+/// drafts batch's card (the page opens at the first).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PageLink {
+    pub id: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v: Option<u64>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub drafts: bool,
+}
+
+/// One card's link, `{page?, artifact?, opens?}` in its file: its page,
+/// what it is about, and the options that open an artifact (by option).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct CardLink {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<PageLink>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact: Option<ArtLink>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub opens: BTreeMap<u32, OptAct>,
+}
 
 /// Where the hub keeps its cards' links, so they survive a restart like
 /// the cards themselves (step cards reload theirs from steps.json).
@@ -22,22 +56,21 @@ pub fn file(state: &Path) -> PathBuf {
     state.join("card_links.json")
 }
 
-/// The links saved by [`save`], each `{page?, opens?}`; none when the
-/// file is missing or broken. A link an older hub saved (the page's
-/// `{id, url, ...}` itself) reads as its `page`.
-pub fn load(path: &Path) -> BTreeMap<u64, Value> {
+/// The links saved by [`save`], read into typed links once, at the
+/// hub's start; none when the file is missing or broken, a link that
+/// doesn't read left out. A link an older hub saved (the page's `{id,
+/// url, ...}` itself) reads as its `page`.
+pub fn load(path: &Path) -> BTreeMap<u64, CardLink> {
     let Ok(text) = std::fs::read_to_string(path) else { return BTreeMap::new() };
     let Ok(Value::Object(m)) = serde_json::from_str::<Value>(&text) else { return BTreeMap::new() };
     m.into_iter()
-        .filter_map(|(k, v)| Some((k.parse().ok()?, v)).filter(|(_, v): &(u64, Value)| v.is_object()))
-        .map(|(k, v)| if v.get("id").is_some() && v.get("url").is_some() { (k, json!({"page": v})) } else { (k, v) })
+        .filter_map(|(k, v)| {
+            let card: u64 = k.parse().ok()?;
+            let older = v.get("id").is_some() && v.get("url").is_some();
+            let link = if older { CardLink { page: Some(serde_json::from_value(v).ok()?), ..CardLink::default() } } else { serde_json::from_value(v).ok()? };
+            Some((card, link))
+        })
         .collect()
-}
-
-/// A card's `opens` as the hub's snapshot carries them: `{"<n>": <act>}`
-/// (bise_proto::rows::opens_of reads them back).
-pub fn opens_json(opens: &[(u32, OptAct)]) -> Value {
-    Value::Object(opens.iter().filter_map(|(n, a)| Some((n.to_string(), serde_json::to_value(a).ok()?))).collect())
 }
 
 /// `--open`'s `<n>=<artifact>[#<anchor>]`: the option, the artifact and
@@ -82,10 +115,10 @@ pub fn open_act(pages: Option<&Pages>, art: &dyn Fn(&str) -> Option<crate::artif
 
 
 /// Card → link, written whole (a temp file, then a rename).
-pub fn save(path: &Path, links: &BTreeMap<u64, Value>) -> Result<(), String> {
-    let m: serde_json::Map<String, Value> = links.iter().map(|(k, v)| (k.to_string(), v.clone())).collect();
+pub fn save(path: &Path, links: &BTreeMap<u64, CardLink>) -> Result<(), String> {
+    let text = serde_json::to_string(links).map_err(|e| e.to_string())?;
     let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, Value::Object(m).to_string()).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    std::fs::write(&tmp, text).map_err(|e| format!("{}: {e}", tmp.display()))?;
     std::fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
@@ -93,7 +126,7 @@ pub fn save(path: &Path, links: &BTreeMap<u64, Value>) -> Result<(), String> {
 /// `<id>#<item>`): {id, url} for the page, {id, block, url#block} for a
 /// block, {id, block, item, url#item} for an item (`<li data-id>`, any
 /// kit), found on the page's latest version. Err: the line the agent reads.
-pub fn link(pages: &Pages, spec: &str) -> Result<Value, String> {
+pub fn link(pages: &Pages, spec: &str) -> Result<PageLink, String> {
     let (id, item) = match spec.trim().split_once('#') {
         Some((id, item)) => (id.trim(), Some(item.trim()).filter(|i| !i.is_empty())),
         None => (spec.trim(), None),
@@ -102,11 +135,13 @@ pub fn link(pages: &Pages, spec: &str) -> Result<Value, String> {
     let url = pages.url(id);
     // the card's chip, '↗ <title> · page · v<n>' (notif-artifact)
     let (title, v) = (meta.title.clone(), meta.version());
-    let Some(item) = item else { return Ok(json!({"id": id, "url": url, "title": title, "v": v})) };
+    let page = PageLink { id: id.to_string(), url: url.clone(), title: Some(title), v: Some(v), ..PageLink::default() };
+    let Some(item) = item else { return Ok(page) };
     let html = pages.store.html(id, v).unwrap_or_default();
+    let url = format!("{url}#{item}");
     match block_of(&html, item) {
-        Some(b) if b == item => Ok(json!({"id": id, "block": b, "url": format!("{url}#{item}"), "title": title, "v": v})),
-        Some(b) => Ok(json!({"id": id, "block": b, "item": item, "url": format!("{url}#{item}"), "title": title, "v": v})),
+        Some(b) if b == item => Ok(PageLink { block: Some(b), url, ..page }),
+        Some(b) => Ok(PageLink { block: Some(b), item: Some(item.to_string()), url, ..page }),
         None => Err(format!("page {id:?} has no block or item {item:?} in v{v}")),
     }
 }
@@ -116,48 +151,40 @@ pub fn link(pages: &Pages, spec: &str) -> Result<Value, String> {
 /// link (no id).
 ///
 /// [`Anchor::Block`]: bise_proto::anchor::Anchor::Block
-pub fn art_of_page(page: &Value) -> Option<Value> {
-    let id = page.get("id").and_then(Value::as_str).filter(|i| !i.is_empty())?;
-    let s = |k: &str| page.get(k).and_then(Value::as_str).filter(|x| !x.is_empty());
-    let mut a = json!({"id": id, "kind": "page", "title": s("title").unwrap_or(id)});
-    if let Some(v) = page.get("v").and_then(Value::as_u64) {
-        a["v"] = json!(v);
-    }
-    if let Some(u) = s("url") {
-        a["url"] = json!(u);
-    }
-    if let Some(at) = s("item").or(s("block")) {
-        a["at"] = json!({"kind": "block", "block": at});
-    }
-    Some(a)
+pub fn art_of_page(page: &PageLink) -> Option<ArtLink> {
+    let id = Some(page.id.as_str()).filter(|i| !i.is_empty())?;
+    let s = |x: &Option<String>| x.clone().filter(|x| !x.is_empty());
+    Some(ArtLink {
+        id: id.to_string(),
+        kind: "page".into(),
+        title: s(&page.title).unwrap_or_else(|| id.to_string()),
+        v: page.v,
+        url: Some(page.url.clone()).filter(|u| !u.is_empty()),
+        at: s(&page.item).or_else(|| s(&page.block)).map(|block| Anchor::Block { block, quote: String::new() }),
+    })
 }
 
 /// `--artifact <id>[#<item>]`: a page (its id) links like `--page`, its
 /// `page` and its `artifact`; any other artifact its `artifact` alone,
 /// `{id, kind, title, v, url?}` (`url` only for a link). Err: the line the
 /// agent reads (no such artifact, an item on an artifact that is no page).
-pub fn artifact(pages: Option<&Pages>, art: &dyn Fn(&str) -> Option<crate::artifacts::Meta>, spec: &str) -> Result<(Option<Value>, Value), String> {
+pub fn artifact(pages: Option<&Pages>, art: &dyn Fn(&str) -> Option<crate::artifacts::Meta>, spec: &str) -> Result<(Option<PageLink>, ArtLink), String> {
     let (id, item) = match spec.trim().split_once('#') {
         Some((id, item)) => (id.trim(), Some(item.trim()).filter(|i| !i.is_empty())),
         None => (spec.trim(), None),
     };
     if let Some(p) = pages.filter(|p| p.store.meta(id).is_some()) {
         let page = link(p, spec)?;
-        let a = art_of_page(&page).unwrap_or(Value::Null);
+        let a = art_of_page(&page).ok_or_else(|| format!("no page {id:?} (sb page list)"))?;
         return Ok((Some(page), a));
     }
     let m = art(id).ok_or_else(|| format!("no artifact {id:?} (sb artifact list)"))?;
     if let Some(i) = item {
         return Err(format!("{id:?} is a {}, not a page: no #{i} in it (sb notify --artifact {id})", m.kind));
     }
-    let mut a = json!({"id": m.id, "kind": m.kind, "title": m.title});
-    if let Some(v) = m.current() {
-        a["v"] = json!(v.v);
-        if v.target.starts_with("http://") || v.target.starts_with("https://") {
-            a["url"] = json!(v.target);
-        }
-    }
-    Ok((None, a))
+    let cur = m.current();
+    let url = cur.map(|v| v.target.clone()).filter(|t| t.starts_with("http://") || t.starts_with("https://"));
+    Ok((None, ArtLink { id: m.id.clone(), kind: m.kind.clone(), title: m.title.clone(), v: cur.map(|v| v.v), url, at: None }))
 }
 
 /// The block of `target` in a fragment: a block's own id (`<section
@@ -206,12 +233,17 @@ mod tests {
         std::fs::create_dir_all(&d).unwrap();
         let f = file(&d);
         assert!(load(&f).is_empty(), "no file: no links");
+        let page = |id: &str, url: &str| PageLink { id: id.into(), url: url.into(), ..PageLink::default() };
         let links = BTreeMap::from([
-            (7, json!({"page": {"id": "launch-watch", "block": "comments", "item": "hn-41", "url": "http://h/p/launch-watch#hn-41"}})),
-            (8, json!({"opens": {"1": {"act": "open", "artifact": "w", "url": "http://h/p/w"}}})),
-            (9, json!({"page": {"id": "w", "url": "http://h/p/w"}})),
+            (7, CardLink { page: Some(PageLink { block: Some("comments".into()), item: Some("hn-41".into()), ..page("launch-watch", "http://h/p/launch-watch#hn-41") }), ..CardLink::default() }),
+            (8, CardLink { opens: BTreeMap::from([(1, OptAct::artifact("w", None, Some("http://h/p/w")))]), ..CardLink::default() }),
+            (9, CardLink { page: Some(page("w", "http://h/p/w")), ..CardLink::default() }),
         ]);
+        // the file's shape is the older hub's: {"<card>": {page?, artifact?, opens?}}
         save(&f, &links).unwrap();
+        let text: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
+        assert_eq!(text["8"], serde_json::json!({"opens": {"1": {"act": "open", "artifact": "w", "url": "http://h/p/w"}}}));
+        assert_eq!(text["9"], serde_json::json!({"page": {"id": "w", "url": "http://h/p/w"}}));
         assert_eq!(load(&f), links);
         // an older hub's link (the page itself) reads as its page
         std::fs::write(&f, r#"{"9": {"id": "w", "url": "http://h/p/w"}}"#).unwrap();
@@ -244,16 +276,14 @@ mod tests {
         p.publish(&pb, 1, &|_| false).unwrap();
         let u = "http://127.0.0.1:47123/p/launch-watch";
         let t = p.store.meta("launch-watch").unwrap().title;
-        assert_eq!(link(&p, "launch-watch").unwrap(), json!({"id": "launch-watch", "url": u, "title": t, "v": 1}));
+        let whole = PageLink { id: "launch-watch".into(), url: u.into(), title: Some(t), v: Some(1), ..PageLink::default() };
+        assert_eq!(link(&p, "launch-watch").unwrap(), whole);
         assert_eq!(
             link(&p, "launch-watch#hn-41").unwrap(),
-            json!({"id": "launch-watch", "block": "comments", "item": "hn-41", "url": format!("{u}#hn-41"), "title": t, "v": 1})
+            PageLink { block: Some("comments".into()), item: Some("hn-41".into()), url: format!("{u}#hn-41"), ..whole.clone() }
         );
-        assert_eq!(
-            link(&p, " launch-watch#next ").unwrap(),
-            json!({"id": "launch-watch", "block": "next", "url": format!("{u}#next"), "title": t, "v": 1})
-        );
-        assert_eq!(link(&p, "launch-watch#").unwrap()["url"], u, "an empty item: the page");
+        assert_eq!(link(&p, " launch-watch#next ").unwrap(), PageLink { block: Some("next".into()), url: format!("{u}#next"), ..whole.clone() });
+        assert_eq!(link(&p, "launch-watch#").unwrap().url, u, "an empty item: the page");
         assert!(link(&p, "launch-watch#gone").unwrap_err().contains("no block or item \"gone\""));
         assert!(link(&p, "nope#hn-41").unwrap_err().contains("no page \"nope\""));
         let _ = std::fs::remove_dir_all(d);
@@ -287,7 +317,6 @@ mod tests {
         for bad in ["1", "=plan", "0=plan", "x=plan", "1=", "1=#a"] {
             assert!(parse_open(bad).unwrap_err().contains("--open expects <n>=<artifact>[#<anchor>]"), "{bad}");
         }
-        assert_eq!(opens_json(&[(1, OptAct::artifact("w", Some("b"), None))]), json!({"1": {"act": "open", "artifact": "w", "at": "b"}}));
         let _ = std::fs::remove_dir_all(d);
     }
 
@@ -309,21 +338,21 @@ mod tests {
         let file = |id: &str| (id == "les-bims-prototype").then(|| meta("/w/bims.html"));
         let (page, a) = artifact(Some(&p), &file, "bims-office#hn-41").unwrap();
         assert_eq!(page.unwrap(), link(&p, "bims-office#hn-41").unwrap(), "a page: --page's link");
-        assert_eq!(a, json!({"id": "bims-office", "kind": "page", "title": t, "v": 1, "url": format!("{u}#hn-41"), "at": {"kind": "block", "block": "hn-41"}}));
-        let al: bise_proto::rows::ArtLink = serde_json::from_value(a).unwrap();
-        assert_eq!(al.at, Some(bise_proto::anchor::Anchor::Block { block: "hn-41".into(), quote: String::new() }));
+        let block = |b: &str| Some(Anchor::Block { block: b.into(), quote: String::new() });
+        assert_eq!(a, ArtLink { id: "bims-office".into(), kind: "page".into(), title: t, v: Some(1), url: Some(format!("{u}#hn-41")), at: block("hn-41") });
         assert_eq!(
             artifact(Some(&p), &file, "les-bims-prototype").unwrap(),
-            (None, json!({"id": "les-bims-prototype", "kind": "site", "title": "les bims · prototype", "v": 2}))
+            (None, ArtLink { id: "les-bims-prototype".into(), kind: "site".into(), title: "les bims · prototype".into(), v: Some(2), url: None, at: None })
         );
         let link_ = |_: &str| Some(meta("https://bims.test/"));
-        assert_eq!(artifact(None, &link_, "les-bims-prototype").unwrap().1["url"], "https://bims.test/", "a link opens outside the app too");
+        assert_eq!(artifact(None, &link_, "les-bims-prototype").unwrap().1.url.as_deref(), Some("https://bims.test/"), "a link opens outside the app too");
         assert!(artifact(Some(&p), &file, "les-bims-prototype#look").unwrap_err().contains("is a site, not a page"));
         assert!(artifact(Some(&p), &file, "nope").unwrap_err().contains("no artifact \"nope\""));
         assert!(artifact(Some(&p), &file, "bims-office#gone").unwrap_err().contains("no block or item \"gone\""));
         // the snapshot's page links (a page question's card) get theirs
-        assert_eq!(art_of_page(&json!({"id": "w", "url": "http://h/p/w#q1", "block": "q1"})).unwrap(), json!({"id": "w", "kind": "page", "title": "w", "url": "http://h/p/w#q1", "at": {"kind": "block", "block": "q1"}}));
-        assert_eq!(art_of_page(&json!({"url": "x"})), None);
+        let q1 = PageLink { id: "w".into(), url: "http://h/p/w#q1".into(), block: Some("q1".into()), ..PageLink::default() };
+        assert_eq!(art_of_page(&q1).unwrap(), ArtLink { id: "w".into(), kind: "page".into(), title: "w".into(), v: None, url: Some("http://h/p/w#q1".into()), at: block("q1") });
+        assert_eq!(art_of_page(&PageLink { url: "x".into(), ..PageLink::default() }), None);
         let _ = std::fs::remove_dir_all(d);
     }
 }

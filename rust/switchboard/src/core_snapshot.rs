@@ -82,6 +82,7 @@ impl Hub {
             link: if c.kind == update_card::KIND { self.update_link(c) } else { None },
             place: c.place.clone(),
             pr: c.pr,
+            ..CardRow::default()
         }
     }
 
@@ -105,11 +106,5 @@ impl Hub {
             m.id,
             clip(&one_line(&m.text), 120)
         ))
-    }
-
-    /// The snapshot as JSON, for the readers that still take it untyped
-    /// (sha 1 of issue 30; they read fields in the next change).
-    pub fn snapshot_value(&mut self, now: u64) -> Value {
-        serde_json::to_value(self.snapshot(now)).unwrap_or_default()
     }
 }

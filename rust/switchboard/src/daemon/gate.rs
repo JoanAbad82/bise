@@ -903,12 +903,12 @@ impl Shell {
 
     /// The snapshot's gate cards held by several agents: `agent` lists
     /// them (`t10a, t10b`: the TUI's "2 agents want to run").
-    pub(super) fn gate_card_agents(&self, snap: &mut Value) {
-        for c in snap["cards"].as_array_mut().into_iter().flatten() {
-            let Some(g) = c["id"].as_u64().and_then(|id| self.gates.cards.get(&id)) else { continue };
+    pub(super) fn gate_card_agents(&self, snap: &mut crate::snapshot::Snapshot) {
+        for c in &mut snap.cards {
+            let Some(g) = self.gates.cards.get(&c.id) else { continue };
             let names: Vec<String> = g.dirs.iter().filter_map(|d| self.gates.waiting.get(d).map(|w| w.agent.clone())).collect();
             if names.len() > 1 {
-                c["agent"] = json!(names.join(", "));
+                c.agent = names.join(", ");
             }
         }
     }

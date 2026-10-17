@@ -72,12 +72,13 @@ fn a_real_hub() -> (T, u64) {
 #[test]
 fn the_typed_state_rows_carry_everything_the_older_state_did() {
     let (mut t, now) = a_real_hub();
-    let snap = t.hub.snapshot_checked(now);
+    let snap = t.hub.snapshot(now);
 
     // places: each key, its PR's too (review's `pending` is `none` +
     // in_review, `changes_requested` is `changes`; checks' state + failing)
     let places = crate::proto_view::places(&snap);
-    let older = snap["places"].as_array().unwrap();
+    let older = serde_json::to_value(&snap.places).unwrap();
+    let older = older.as_array().unwrap();
     assert_eq!(places.len(), older.len());
     assert!(places.iter().any(|p| p.pr.as_ref().is_some_and(|pr| pr.in_review && pr.stale_ms.is_some() && pr.failing == ["ci/test"])), "{places:?}");
     for (o, p) in older.iter().zip(&places) {
@@ -109,24 +110,20 @@ fn the_typed_state_rows_carry_everything_the_older_state_did() {
     }
 
     // cards: his then the others, every open card once, each list in the
-    // snapshot's order; each key (`age_ms` is `since_ms` back from now)
+    // snapshot's order; each field (`age_ms` is `since_ms` back from now)
     let (his, others) = crate::proto_view::cards(&snap, "p", now, crate::model::user_kind);
-    let older = snap["cards"].as_array().unwrap();
-    let at = |id: u64| older.iter().position(|c| c["id"] == id).expect("a card of the snapshot");
+    let at = |id: u64| snap.cards.iter().position(|c| c.id == id).expect("a card of the snapshot");
     for list in [&his, &others] {
         let pos: Vec<usize> = list.iter().map(|c| at(c.id)).collect();
         assert!(pos.windows(2).all(|w| w[0] < w[1]), "the snapshot's order: {pos:?}");
     }
-    assert_eq!(his.len() + others.len(), older.len(), "every open card once");
+    assert_eq!(his.len() + others.len(), snap.cards.len(), "every open card once");
     assert!(his.iter().any(|c| c.kind == "question" && c.options.len() == 2) && others.iter().any(|c| c.kind == "drop"), "{his:?} {others:?}");
     for c in his.iter().chain(&others) {
-        let (o, ty) = (&older[at(c.id)], serde_json::to_value(c).unwrap());
-        for k in o.as_object().unwrap().keys() {
-            match k.as_str() {
-                "age_ms" => assert_eq!(now - c.since_ms, o["age_ms"].as_u64().unwrap(), "card age_ms"),
-                k => same(o, &ty, k, k, "card"),
-            }
-        }
+        let o = &snap.cards[at(c.id)];
+        assert_eq!((&c.kind, &c.agent, &c.text, c.for_msg, c.pr), (&o.kind, &o.agent, &o.text, o.for_msg, o.pr), "card");
+        assert_eq!((&c.note, &c.place, &c.link, &c.waiting), (&o.note, &o.place, &o.link, &o.waiting), "card");
+        assert_eq!(now - c.since_ms, o.age_ms, "card age_ms");
     }
 
     // timers: the live ones then the ended ones of the week, as the

@@ -13,9 +13,9 @@
 use super::{log_line, rename_logged, write_logged, Shell};
 use crate::paths::Paths;
 use crate::proto_view::Since;
+use crate::snapshot::Snapshot;
 use crate::util::now_ms;
 use crate::view::{self, Writer};
-use serde_json::Value;
 
 /// The hub's view writer (one field of the Shell).
 #[derive(Default)]
@@ -47,7 +47,7 @@ impl Projects {
 impl Shell {
     /// The hub's state changed (sb-core's `state` effect): `snap` is the
     /// snapshot it just broadcast (written now when due, else at a tick).
-    pub(super) fn view_changed(&mut self, snap: &Value) {
+    pub(super) fn view_changed(&mut self, snap: &Snapshot) {
         let now = now_ms();
         self.projects.writer.changed(now);
         if self.projects.writer.due(now) {
@@ -69,7 +69,7 @@ impl Shell {
         self.view_write(&snap, Some(now_ms()));
     }
 
-    fn view_write(&mut self, snap: &Value, stopped_ms: Option<u64>) {
+    fn view_write(&mut self, snap: &Snapshot, stopped_ms: Option<u64>) {
         let now = now_ms();
         let project = crate::paths::workspace_id(&self.opts.paths.workspace);
         // ⌘K's index: the same rows as the typed artifacts event

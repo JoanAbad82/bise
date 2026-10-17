@@ -181,7 +181,6 @@ pub fn build(i: &RowIn) -> AgentRow {
         mode: a.ws.mode.clone(),
         path: a.ws.path.clone(),
         branch: a.ws.branch.clone(),
-        dropped: a.ws.dropped,
         place: a.place.clone(),
         place_id: crate::place::view_id(a),
         created_ms: a.created_ms,
@@ -203,6 +202,7 @@ pub fn build(i: &RowIn) -> AgentRow {
         waiting_on: a.waiting_on.clone().filter(|_| a.waiting),
         watching: i.watching.clone(),
         doing: crate::doing::row(a.run == crate::model::Run::Busy, i.doing, &i.watching),
+        model: None,
     }
 }
 

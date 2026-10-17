@@ -42,7 +42,7 @@ pub(super) struct PageState {
     /// `sb card --page`: an agent's card → its page link (card_link.rs),
     /// shown on the card while it is open; its answer goes to the agent
     /// as usual (unlike `page_cards`, whose answers take the page's path)
-    pub(super) card_links: BTreeMap<u64, Value>,
+    pub(super) card_links: BTreeMap<u64, crate::card_link::CardLink>,
 }
 
 impl PageState {

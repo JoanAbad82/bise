@@ -1,7 +1,7 @@
 //! The typed protocol's rows and live entries from the hub's own views
 //! (bise desktop S3a; the shell is `daemon/proto.rs`): pure functions
-//! from the client snapshot (`core::Hub::snapshot`, the `state` event)
-//! to `bise_proto` rows, and the live fold of a subscribed thread (only
+//! from the hub's typed snapshot (`crate::snapshot::Snapshot`, read by
+//! field) to `bise_proto` rows, and the live fold of a subscribed thread (only
 //! the entries that changed go out).
 
 use bise_proto::rows::{question, Phase, Agent, Artifact, ArtifactPr, ArtifactVersion, Card, CardPage, AgentMode, Report, ReportKind, Status};
@@ -11,6 +11,7 @@ use bise_proto::thread::lines::unescape;
 use bise_proto::thread::words::one_line;
 use bise_proto::thread::{self, Ctx, Entry, Line};
 use bise_proto::Pos;
+use crate::snapshot::{AgentRow, Snapshot};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -41,20 +42,17 @@ fn s(v: &Value, k: &str) -> String {
     v.get(k).and_then(Value::as_str).unwrap_or("").trim().to_string()
 }
 
-fn ms(v: &Value, k: &str) -> Option<u64> {
-    v.get(k).and_then(Value::as_u64).filter(|m| *m > 0)
-}
 
 /// When each agent's status last changed, as the hub saw it (a view's
 /// memory, lost on restart: then the first sight counts).
 pub type Since = BTreeMap<String, (Status, u64)>;
 
-/// The snapshot's agents as rows. `cards`: the snapshot's open cards (an
-/// agent's `waits`); `user_kind`: the hub's (his cards); `vision`: the
-/// hub's model catalog's rule (`bise_catalog::Catalog::vision`, K4), read
-/// at each call so a /model change shows on the next agents event.
+/// The snapshot's agents as rows. `user_kind`: the hub's (his cards; an
+/// agent's `waits` counts its open ones); `vision`: the hub's model
+/// catalog's rule (`bise_catalog::Catalog::vision`, K4), read at each
+/// call so a /model change shows on the next agents event.
 pub fn agents(
-    snap: &Value,
+    snap: &Snapshot,
     since: &mut Since,
     now: u64,
     user_kind: fn(&str) -> bool,
@@ -63,96 +61,109 @@ pub fn agents(
     // its head (heads.rs): its newest entry's pos
     head: &dyn Fn(&str) -> Option<bise_proto::Pos>,
 ) -> Vec<Agent> {
-    let list = |k: &str| snap.get(k).and_then(Value::as_array).cloned().unwrap_or_default();
-    let cards = list("cards");
-    let mut out = Vec::new();
-    for a in list("agents") {
-        let name = s(&a, "name");
-        let (status, archived) = Status::of_hub(&s(&a, "status"));
-        let working = status.working();
-        let first = ms(&a, "report_ms").filter(|_| !working).or(ms(&a, "created_ms")).unwrap_or(now);
-        let at = match since.get(&name) {
-            Some((st, at)) if *st == status => *at,
-            Some(_) => now,
-            None => first,
-        };
-        since.insert(name.clone(), (status, at));
-        let title = [s(&a, "note"), s(&a, "role"), s(&a, "report"), s(&a, "objective")].into_iter().find(|t| !t.is_empty()).unwrap_or_default();
-        let mode = match s(&a, "mode").as_str() {
-            "worktree" => Some(AgentMode::Worktree),
-            "shared" => Some(AgentMode::Shared),
-            "" => None,
-            _ => Some(AgentMode::Unknown),
-        };
-        let worktree = mode == Some(AgentMode::Worktree);
-        let report = Some(s(&a, "report")).filter(|r| !r.is_empty()).map(|text| Report {
-            kind: match status {
-                Status::Done => ReportKind::Done,
-                Status::Failed => ReportKind::Failed,
-                Status::Blocked => ReportKind::Blocked,
-                _ => ReportKind::Progress,
-            },
-            text,
-            at_ms: ms(&a, "report_ms").unwrap_or(0),
-        });
-        let waits = cards.iter().filter(|c| s(c, "agent") == name && his(&s(c, "kind"), user_kind)).count() as u32;
-        out.push(Agent {
-            main: a.get("main").and_then(Value::as_bool).unwrap_or(false),
-            status,
-            phase: Phase::of_hub(&s(&a, "status")),
-            archived,
-            title: one_line(&title, 120),
-            purpose: one_line(&s(&a, "objective"), 200),
-            since_ms: at,
-            waits,
-            parent: Some(s(&a, "parent")).filter(|p| !p.is_empty()),
-            // its worktree's branch as released; the shared checkout's
-            // branch apart (P4b-fix, the wire rule)
-            branch: Some(s(&a, "branch")).filter(|b| worktree && !b.is_empty()),
-            checkout_branch: Some(s(&a, "branch")).filter(|b| !worktree && !b.is_empty()),
-            worktree: Some(s(&a, "path")).filter(|p| worktree && !p.is_empty()),
-            turn_ms: a.get("turn_ms").and_then(Value::as_u64).filter(|_| working),
-            report,
-            // his queued inputs (sb-core holds them, amb-hub 7dcb56ab)
-            queued: a.get("queued_inputs").cloned().and_then(|q| serde_json::from_value(q).ok()).unwrap_or_default(),
-            // where its thread is on disk, for stream C's readers (S2 step 3)
-            dir: Some(s(&a, "dir")).filter(|d| !d.is_empty()).unwrap_or_else(|| name.clone()),
-            aliases: a.get("aliases").cloned().and_then(|x| serde_json::from_value(x).ok()).unwrap_or_default(),
-            // K4: its model and whether it reads images (the composer
-            // refuses an image when false)
-            vision: Some(s(&a, "model")).filter(|m| !m.is_empty()).and_then(|m| vision(&m)),
-            model: Some(s(&a, "model")).filter(|m| !m.is_empty()),
-            effort: Some(s(&a, "effort")).filter(|e| !e.is_empty()),
-            // S13: its context after its last call (the hub's live usage)
-            usage: usage(&name),
-            // R9/S3: model.rs's waiting_on, the field the TUI's panel reads
-            waiting_on: bise_proto::rows::WaitingOn::of_word(&s(&a, "waiting_on")),
-            // event-wake: what it waits for (wake.rs `Wakes::watching`)
-            watching: a.get("watching").cloned().and_then(|w| serde_json::from_value(w).ok()).unwrap_or_default(),
-            // les bims: what it is doing now (snapshot_rows, crate::doing::row)
-            doing: a.get("doing").cloned().and_then(|d| serde_json::from_value(d).ok()),
-            // P4b: the terminal's facts, each the snapshot's own field
-            mode,
-            path: s(&a, "path"),
-            objective: s(&a, "objective"),
-            note: s(&a, "note"),
-            role: s(&a, "role"),
-            msgs_queued: a.get("queued").and_then(Value::as_u64).unwrap_or(0) as u32,
-            inbox: a.get("inbox").and_then(Value::as_u64).unwrap_or(0) as u32,
-            created_ms: ms(&a, "created_ms"),
-            place: Some(s(&a, "place")).filter(|p| !p.is_empty()),
-            place_id: s(&a, "place_id"),
-            efforts: a.get("efforts").cloned().and_then(|e| serde_json::from_value(e).ok()).unwrap_or_default(),
-            changes: a.get("changes").cloned().and_then(|c| serde_json::from_value(c).ok()),
-            last_pos: head(&name),
-            // issue 22: its ended turns from the same sb-core view as its
-            // status (set_rt's count), never from its lines
-            turns: a.get("turns").and_then(Value::as_u64).unwrap_or(0),
-            name,
-        });
-    }
+    let out: Vec<Agent> = snap.agents.iter().map(|a| agent(snap, a, since, now, user_kind, vision, usage, head)).collect();
     since.retain(|n, _| out.iter().any(|a| &a.name == n));
     out
+}
+
+/// A non-empty, trimmed text.
+fn some(s: &str) -> Option<String> {
+    Some(s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn agent(
+    snap: &Snapshot,
+    a: &AgentRow,
+    since: &mut Since,
+    now: u64,
+    user_kind: fn(&str) -> bool,
+    vision: &dyn Fn(&str) -> Option<bool>,
+    usage: &dyn Fn(&str) -> Option<bise_proto::rows::AgentUsage>,
+    head: &dyn Fn(&str) -> Option<bise_proto::Pos>,
+) -> Agent {
+    let name = a.name.clone();
+    let (status, archived) = Status::of_hub(a.status.as_str());
+    let working = status.working();
+    let report_ms = a.report_ms.filter(|m| *m > 0);
+    let created_ms = Some(a.created_ms).filter(|m| *m > 0);
+    let first = report_ms.filter(|_| !working).or(created_ms).unwrap_or(now);
+    let at = match since.get(&name) {
+        Some((st, at)) if *st == status => *at,
+        Some(_) => now,
+        None => first,
+    };
+    since.insert(name.clone(), (status, at));
+    let report_text = a.report.as_deref().and_then(some);
+    let title = [some(&a.note), some(&a.role), report_text.clone(), some(&a.objective)].into_iter().flatten().next().unwrap_or_default();
+    let worktree = a.mode == crate::model::Mode::Worktree;
+    let report = report_text.map(|text| Report {
+        kind: match status {
+            Status::Done => ReportKind::Done,
+            Status::Failed => ReportKind::Failed,
+            Status::Blocked => ReportKind::Blocked,
+            _ => ReportKind::Progress,
+        },
+        text,
+        at_ms: report_ms.unwrap_or(0),
+    });
+    let waits = snap.cards.iter().filter(|c| c.agent.trim() == name && his(c.kind.trim(), user_kind)).count() as u32;
+    let branch = a.branch.as_deref().and_then(some);
+    let model = a.model.as_ref().and_then(|m| some(&m.name));
+    Agent {
+        main: a.main,
+        status,
+        phase: Phase::of_hub(a.status.as_str()),
+        archived,
+        title: one_line(&title, 120),
+        purpose: one_line(a.objective.trim(), 200),
+        since_ms: at,
+        waits,
+        parent: a.parent.as_deref().and_then(some),
+        // its worktree's branch as released; the shared checkout's
+        // branch apart (P4b-fix, the wire rule)
+        branch: branch.clone().filter(|_| worktree),
+        checkout_branch: branch.filter(|_| !worktree),
+        worktree: some(&a.path).filter(|_| worktree),
+        turn_ms: a.turn_ms.filter(|_| working),
+        report,
+        // his queued inputs (sb-core holds them, amb-hub 7dcb56ab)
+        queued: a.queued_inputs.clone(),
+        // where its thread is on disk, for stream C's readers (S2 step 3)
+        dir: some(&a.dir).unwrap_or_else(|| name.clone()),
+        aliases: a.aliases.clone(),
+        // K4: its model and whether it reads images (the composer
+        // refuses an image when false)
+        vision: model.as_deref().and_then(vision),
+        model,
+        effort: a.model.as_ref().and_then(|m| some(&m.effort)),
+        // S13: its context after its last call (the hub's live usage)
+        usage: usage(&name),
+        // R9/S3: model.rs's waiting_on, the field the TUI's panel reads
+        waiting_on: bise_proto::rows::WaitingOn::of_word(a.waiting_on.as_deref().unwrap_or("").trim()),
+        // event-wake: what it waits for (wake.rs `Wakes::watching`)
+        watching: a.watching.clone(),
+        // les bims: what it is doing now (snapshot_rows, crate::doing::row)
+        doing: a.doing,
+        // P4b: the terminal's facts, each the snapshot's own field
+        mode: Some(if worktree { AgentMode::Worktree } else { AgentMode::Shared }),
+        path: a.path.trim().to_string(),
+        objective: a.objective.trim().to_string(),
+        note: a.note.trim().to_string(),
+        role: a.role.trim().to_string(),
+        msgs_queued: a.queued as u32,
+        inbox: a.inbox as u32,
+        created_ms,
+        place: a.place.as_deref().and_then(some),
+        place_id: a.place_id.trim().to_string(),
+        efforts: a.model.as_ref().map(|m| m.efforts.clone()).unwrap_or_default(),
+        changes: a.model.as_ref().and_then(|m| m.changes),
+        last_pos: head(&name),
+        // issue 22: its ended turns from the same sb-core view as its
+        // status (set_rt's count), never from its lines
+        turns: a.turns,
+        name,
+    }
 }
 
 /// ⌘K and the scheduled screen (architect m_11874): the live timers as
@@ -209,10 +220,10 @@ fn task_row(t: &crate::every::Timer) -> bise_proto::rows::ScheduledTask {
 /// P4c-4a: the snapshot's `places` (`place::views`, the worktrees the
 /// terminal's panel draws) as rows, each PR by the one builder
 /// (`forge::news::pr_row`, `/prs`'s) with its place's agents.
-pub fn places(snap: &Value) -> Vec<bise_proto::rows::Place> {
-    let views: Vec<crate::place::PlaceView> = snap.get("places").cloned().and_then(|p| serde_json::from_value(p).ok()).unwrap_or_default();
-    views
-        .into_iter()
+pub fn places(snap: &Snapshot) -> Vec<bise_proto::rows::Place> {
+    snap.places
+        .iter()
+        .cloned()
         .map(|p| bise_proto::rows::Place {
             pr: p.pr.as_ref().map(|pr| crate::forge::news::pr_row(pr, &p.agents)),
             id: p.id,
@@ -231,20 +242,19 @@ pub fn places(snap: &Value) -> Vec<bise_proto::rows::Place> {
 /// last progress (else its objective), `--step n/m`, since its last
 /// report (else its creation). A follow ends with its job (job_end), so
 /// every row runs.
-pub fn jobs(snap: &Value) -> Vec<Followed> {
-    let list = snap.get("agents").and_then(Value::as_array).cloned().unwrap_or_default();
-    let n = |a: &Value, k: &str| a.get(k).and_then(Value::as_u64).and_then(|x| u32::try_from(x).ok());
-    list.iter()
-        .filter(|a| a.get("follow").and_then(Value::as_bool).unwrap_or(false))
+pub fn jobs(snap: &Snapshot) -> Vec<Followed> {
+    snap.agents
+        .iter()
+        .filter(|a| a.follow)
         .map(|a| {
-            let progress = Some(s(a, "report")).filter(|r| !r.is_empty() && s(a, "report_kind") == "progress");
+            let progress = a.report.as_deref().and_then(some).filter(|_| a.report_kind.as_deref().map(str::trim) == Some("progress"));
             Followed {
-                agent: s(a, "name"),
-                label: one_line(&progress.unwrap_or_else(|| s(a, "objective")), 120),
-                step: n(a, "step"),
-                of: n(a, "of"),
+                agent: a.name.trim().to_string(),
+                label: one_line(&progress.unwrap_or_else(|| a.objective.trim().to_string()), 120),
+                step: a.step,
+                of: a.of,
                 state: JobState::Running,
-                since_ms: ms(a, "report_ms").or(ms(a, "created_ms")).unwrap_or(0),
+                since_ms: a.report_ms.filter(|m| *m > 0).or(Some(a.created_ms).filter(|m| *m > 0)).unwrap_or(0),
             }
         })
         .collect()
@@ -261,27 +271,22 @@ fn his(kind: &str, user_kind: fn(&str) -> bool) -> bool {
 /// done, a blocked..., which the terminal's inbox draws too). Each with
 /// the snapshot's words (`text`, its `question` and `options` parsed
 /// from them), note, place, PR, link and the message it answers.
-pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool) -> (Vec<Card>, Vec<Card>) {
-    let list = snap.get("cards").and_then(Value::as_array).cloned().unwrap_or_default();
-    let opt = |c: &Value, k: &str| Some(s(c, k)).filter(|x| !x.is_empty());
-    let n = |c: &Value, k: &str| c.get(k).and_then(Value::as_u64);
-    list.iter()
+pub fn cards(snap: &Snapshot, project: &str, now: u64, user_kind: fn(&str) -> bool) -> (Vec<Card>, Vec<Card>) {
+    snap.cards
+        .iter()
         .map(|c| {
-            let kind = s(c, "kind");
-            let text = c.get("text").and_then(Value::as_str).unwrap_or("").to_string();
-            let (q, mut options) = question(&text);
-            let page = c.get("page").filter(|p| p.is_object()).map(|p| CardPage {
-                id: s(p, "id"),
-                url: s(p, "url"),
-                block: Some(s(p, "block")).filter(|b| !b.is_empty()),
-                item: Some(s(p, "item")).filter(|i| !i.is_empty()),
-                title: Some(s(p, "title")).filter(|t| !t.is_empty()),
-                v: n(p, "v"),
+            let kind = c.kind.trim().to_string();
+            let (q, mut options) = question(&c.text);
+            let page = c.page.as_ref().map(|p| CardPage {
+                id: p.id.trim().to_string(),
+                url: p.url.trim().to_string(),
+                block: p.block.as_deref().and_then(some),
+                item: p.item.as_deref().and_then(some),
+                title: p.title.as_deref().and_then(some),
+                v: p.v,
             });
-            // what it is about, any artifact (card-links); a bad one reads as none
-            let artifact = c.get("artifact").and_then(|a| serde_json::from_value::<bise_proto::rows::ArtLink>(a.clone()).ok());
             // a page's pick: each option's why, the agent's own (snapshot_pages)
-            if let Some(p) = c.get("pick").and_then(|p| serde_json::from_value::<crate::pages::questions::Pick>(p.clone()).ok()) {
+            if let Some(p) = &c.pick {
                 for o in &mut options {
                     let i = o.n as usize;
                     o.why = p.options.get(i.wrapping_sub(1)).map(|x| x.why.clone()).filter(|w| !w.is_empty());
@@ -289,32 +294,33 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 }
             }
             Card {
-                id: n(c, "id").unwrap_or(0),
+                id: c.id,
                 project: project.to_string(),
                 urgent: kind == "confirm",
                 approval: Card::approval_kind(&kind),
                 rank: Some(bise_proto::rows::card_rank(&kind)),
-                agent: s(c, "agent"),
+                agent: c.agent.trim().to_string(),
                 question: q,
                 options,
-                since_ms: now.saturating_sub(n(c, "age_ms").unwrap_or(0)),
+                since_ms: now.saturating_sub(c.age_ms),
                 page,
-                artifact,
+                // what it is about, any artifact (card-links)
+                artifact: c.artifact.clone(),
                 // V14: the signin card's stopped agents (core.rs signin_waiting)
-                waiting: c.get("waiting").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect()),
-                note: opt(c, "note"),
-                place: opt(c, "place"),
-                pr: n(c, "pr"),
-                link: opt(c, "link"),
-                for_msg: n(c, "for_msg"),
-                // a drafts batch's fields (daemon/page_cards.rs snapshot_pages)
-                batch: c.get("batch").filter(|b| b.is_object()).and_then(|b| serde_json::from_value(b.clone()).ok()),
-                text,
+                waiting: c.waiting.clone(),
+                note: c.note.as_deref().and_then(some),
+                place: c.place.as_deref().and_then(some),
+                pr: c.pr,
+                link: c.link.as_deref().and_then(some),
+                for_msg: c.for_msg,
+                // a drafts batch's fields (daemon/page_cards.rs snapshot_card_links)
+                batch: c.batch.clone(),
+                text: c.text.clone(),
                 kind,
             }
             // card-state (architect m_23450): each option says what a client does itself;
             // an option its asker set to open an artifact (notif-open) says that
-            .with_acts(&bise_proto::rows::opens_of(c.get("opens")))
+            .with_acts(&c.opens)
         })
         .partition(|c| his(&c.kind, user_kind))
 }
@@ -571,6 +577,8 @@ fn json(e: &Entry) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::card_link::PageLink;
+    use crate::snapshot::CardRow;
     use serde_json::json;
 
     fn uk(k: &str) -> bool {
@@ -584,20 +592,19 @@ mod tests {
     fn a_drafts_batch_card_carries_its_batch() {
         let batch = json!({"count": 3, "title": "inbox replies", "what": "replies", "names": ["legal", "Lucas", "Marc"],
             "topics": ["the contract", "the dates", "the invoice"], "line": "replies to legal, Lucas and Marc", "actions": "1 to close"});
-        let snap = json!({"cards": [
-            {"id": 7, "kind": "question", "agent": "main", "text": "send the 3 replies?\n1. send\n2. open the page", "age_ms": 0,
-             "page": {"id": "replies", "block": "drafts", "item": "d1", "drafts": true, "url": "http://p/replies#d1"}, "batch": batch},
-            {"id": 8, "kind": "question", "agent": "main", "text": "ok?", "age_ms": 0}]});
+        let card = |id: u64, text: &str| CardRow { id, kind: "question".into(), agent: "main".into(), text: text.into(), ..CardRow::default() };
+        let page = PageLink { id: "replies".into(), block: Some("drafts".into()), item: Some("d1".into()), drafts: true, url: "http://p/replies#d1".into(), ..PageLink::default() };
+        let snap = Snapshot {
+            cards: vec![
+                CardRow { page: Some(page), batch: serde_json::from_value(batch.clone()).ok(), ..card(7, "send the 3 replies?\n1. send\n2. open the page") },
+                card(8, "ok?"),
+            ],
+            ..Snapshot::default()
+        };
         let (his, _) = cards(&snap, "p", 10, uk);
         let typed = serde_json::to_value(his[0].batch.as_ref().expect("its batch")).unwrap();
-        assert_eq!(typed, batch, "every key of the older batch, the same value");
+        assert_eq!(typed, batch, "every key of the drafts' info, the same value");
         assert_eq!(his[1].batch, None);
-        // no actions: left out, as the older null
-        let mut none = batch.clone();
-        none["actions"] = Value::Null;
-        let snap = json!({"cards": [{"id": 7, "kind": "question", "agent": "main", "text": "x", "age_ms": 0, "batch": none}]});
-        let (his, _) = cards(&snap, "p", 10, uk);
-        assert_eq!(his[0].batch.as_ref().map(|b| b.actions.clone()), Some(None));
     }
 
     /// Law (card-state, architect m_23450): each option of a card row says
@@ -609,13 +616,16 @@ mod tests {
     #[test]
     fn each_option_says_what_a_client_does_itself() {
         use bise_proto::rows::{opt_act, OptAct};
-        let snap = json!({"cards": [
-            {"id": 384, "kind": "merge", "agent": "pattern-error-dx", "pr": 384, "place": "p1", "age_ms": 0,
-             "text": "#384 is ready to merge\nP2 errors\ngithub.com/gvergnaud/ts-pattern/pull/384\n\n1. squash and merge\n2. open it on GitHub\n3. not yet"},
-            {"id": 5, "kind": "update", "agent": "main", "link": "https://bise.dev/notes", "age_ms": 0,
-             "text": "bise 1.2 is out\n\n1. update now\n2. later\n3. release notes"},
-            {"id": 6, "kind": "signin", "agent": "main", "age_ms": 0, "text": "sign in again?\n\n1. sign in again\n2. later"},
-            {"id": 7, "kind": "question", "agent": "docs", "age_ms": 0, "text": "where?\n1. here\n2. there"}]});
+        let card = |id: u64, kind: &str, agent: &str, text: &str| CardRow { id, kind: kind.into(), agent: agent.into(), text: text.into(), ..CardRow::default() };
+        let snap = Snapshot {
+            cards: vec![
+                CardRow { pr: Some(384), place: Some("p1".into()), ..card(384, "merge", "pattern-error-dx", "#384 is ready to merge\nP2 errors\ngithub.com/gvergnaud/ts-pattern/pull/384\n\n1. squash and merge\n2. open it on GitHub\n3. not yet") },
+                CardRow { link: Some("https://bise.dev/notes".into()), ..card(5, "update", "main", "bise 1.2 is out\n\n1. update now\n2. later\n3. release notes") },
+                card(6, "signin", "main", "sign in again?\n\n1. sign in again\n2. later"),
+                card(7, "question", "docs", "where?\n1. here\n2. there"),
+            ],
+            ..Snapshot::default()
+        };
         let (his, _) = cards(&snap, "p", 10, |_| true);
         let acts = |id: u64| his.iter().find(|c| c.id == id).unwrap().options.iter().map(|o| o.act.clone()).collect::<Vec<_>>();
         let pr = Some(OptAct::link(Some("https://github.com/gvergnaud/ts-pattern/pull/384")));
@@ -631,7 +641,7 @@ mod tests {
             }
         }
         // a merge whose text has no link: still the app's own, nothing to open
-        let snap = json!({"cards": [{"id": 9, "kind": "merge", "agent": "x", "pr": 9, "age_ms": 0, "text": "#9 is ready\n\n1. merge\n2. open it on GitHub\n3. not yet"}]});
+        let snap = Snapshot { cards: vec![CardRow { pr: Some(9), ..card(9, "merge", "x", "#9 is ready\n\n1. merge\n2. open it on GitHub\n3. not yet") }], ..Snapshot::default() };
         let (his, _) = cards(&snap, "p", 10, |_| true);
         assert_eq!(his[0].options[1].act, Some(OptAct::link(None)));
     }
@@ -684,24 +694,48 @@ mod tests {
         assert_eq!(every, ["every 2m", "every day 07:30", "once", "every 1m", "every 5m"]);
     }
 
-    fn snap() -> Value {
-        json!({"ev": "state",
-            "agents": [
-                {"name": "main", "main": true, "status": "idle", "objective": "", "created_ms": 5},
-                {"name": "perf", "main": false, "status": "working", "objective": "make the e2e fast\nmore", "note": "",
-                 "role": "profiling the hub", "mode": "worktree", "branch": "sb/perf", "path": "/w/perf", "parent": "main",
-                 "turn_ms": 4200, "created_ms": 7, "queued": 1,
-                 "queued_inputs": [{"id": 3, "text": "then the cold run", "created_ms": 8}]},
-                {"name": "old", "main": false, "status": "archived", "objective": "an old fix", "report": "fixed in 0.4",
-                 "report_ms": 9, "mode": "shared", "branch": "main", "path": "/w"},
+    fn snap() -> Snapshot {
+        let card = |id: u64, kind: &str, agent: &str, text: &str, age_ms: u64| CardRow { id, kind: kind.into(), agent: agent.into(), text: text.into(), age_ms, ..CardRow::default() };
+        Snapshot {
+            agents: vec![
+                AgentRow { main: true, created_ms: 5, ..AgentRow::test("main") },
+                AgentRow {
+                    status: crate::model::Status::Working,
+                    objective: "make the e2e fast\nmore".into(),
+                    role: "profiling the hub".into(),
+                    mode: crate::model::Mode::Worktree,
+                    branch: Some("sb/perf".into()),
+                    path: "/w/perf".into(),
+                    parent: Some("main".into()),
+                    turn_ms: Some(4200),
+                    created_ms: 7,
+                    queued: 1,
+                    queued_inputs: vec![bise_proto::draft::Queued { id: 3, text: "then the cold run".into(), created_ms: 8, parts: vec![] }],
+                    ..AgentRow::test("perf")
+                },
+                AgentRow {
+                    status: crate::model::Status::Archived,
+                    objective: "an old fix".into(),
+                    report: Some("fixed in 0.4".into()),
+                    report_ms: Some(9),
+                    branch: Some("main".into()),
+                    path: "/w".into(),
+                    ..AgentRow::test("old")
+                },
             ],
-            "cards": [
-                {"id": 9, "kind": "question", "agent": "perf", "text": "which bench?\n1. cold\n2. warm", "age_ms": 1000},
-                {"id": 10, "kind": "confirm", "agent": "perf", "text": "run it?", "age_ms": 0,
-                 "page": {"id": "p", "url": "http://x/p/p", "block": "q1"}},
-                {"id": 11, "kind": "drop", "agent": "old", "text": "archive old?", "age_ms": 0},
-                {"id": 12, "kind": "done", "agent": "perf", "text": "perf is done", "age_ms": 0},
-            ]})
+            cards: vec![
+                card(9, "question", "perf", "which bench?\n1. cold\n2. warm", 1000),
+                CardRow { page: Some(PageLink { id: "p".into(), url: "http://x/p/p".into(), block: Some("q1".into()), ..PageLink::default() }), ..card(10, "confirm", "perf", "run it?", 0) },
+                card(11, "drop", "old", "archive old?", 0),
+                card(12, "done", "perf", "perf is done", 0),
+            ],
+            ..Snapshot::default()
+        }
+    }
+
+    fn with_model(mut a: AgentRow, model: &str) -> AgentRow {
+        a.model = Some(crate::snapshot::Model { name: model.into(), ..Default::default() });
+        a
     }
 
     /// K4 (architect m_10064): an agent's row carries its model and
@@ -713,14 +747,14 @@ mod tests {
         let vision = |m: &str| cat.vision(m);
         let mut since = Since::new();
         let mut s = snap();
-        s["agents"][1]["model"] = json!("mistral/codestral-latest");
-        s["agents"][2]["model"] = json!("ollama/llava");
+        s.agents[1] = with_model(s.agents[1].clone(), "mistral/codestral-latest");
+        s.agents[2] = with_model(s.agents[2].clone(), "ollama/llava");
         let a = agents(&s, &mut since, 100, uk, &vision, &|_| None, &|_| None);
         assert_eq!((a[1].model.as_deref(), a[1].vision), (Some("mistral/codestral-latest"), Some(false)), "listed, no vision");
         assert_eq!((a[2].model.as_deref(), a[2].vision), (Some("ollama/llava"), None), "unlisted: never a guess");
         assert_eq!((a[0].model.as_deref(), a[0].vision), (None, None), "no model in the snapshot");
         // his /model switch: the next rows follow
-        s["agents"][1]["model"] = json!("anthropic/claude-haiku-4-5");
+        s.agents[1] = with_model(s.agents[1].clone(), "anthropic/claude-haiku-4-5");
         assert_eq!(agents(&s, &mut since, 200, uk, &vision, &|_| None, &|_| None)[1].vision, Some(true));
     }
 
@@ -746,7 +780,7 @@ mod tests {
         assert!(o.queued.is_empty());
         // a status change moves since; the same keeps it
         let mut s2 = snap();
-        s2["agents"][1]["status"] = json!("idle");
+        s2.agents[1].status = crate::model::Status::Idle;
         assert_eq!(agents(&s2, &mut since, 200, uk, &|_| None, &|_| None, &|_| None)[1].since_ms, 200);
         assert_eq!(agents(&s2, &mut since, 300, uk, &|_| None, &|_| None, &|_| None)[1].since_ms, 200);
         let (c, others) = cards(&snap(), "acme", 5_000, uk);

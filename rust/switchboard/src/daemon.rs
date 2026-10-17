@@ -241,7 +241,7 @@ enum Msg {
     /// An agent's changes, computed off the loop (`daemon/art.rs`).
     Changes {
         name: String,
-        v: Value,
+        v: Option<bise_proto::rows::Changes>,
     },
     /// a thread's typed event: an answer or a hub-wide notification
     Typed {
@@ -791,7 +791,8 @@ impl Shell {
         });
     }
 
-    fn snapshot(&mut self) -> Value {
+    /// The hub's snapshot (core_snapshot.rs), the shell's parts each from its one writer.
+    fn snapshot(&mut self) -> crate::snapshot::Snapshot {
         // issue #4: each agent's model, for sb list / sb tasks too
         let used = self.refresh_models();
         // the repo's flow, as config.toml says now (flow-prompts saves it)
@@ -803,31 +804,28 @@ impl Shell {
         self.hub.landing = self.lands.ranks();
         // the features' lids and Δ (dev-flow §5.1)
         self.feature_views();
-        let mut snap = self.hub.snapshot_value(now_ms());
-        // sb every's timers, running then a week of ended ones (/scheduled);
-        // an ended one has `ended_ms` (amb-mac's menu and the capsule's
-        // watched pages skip those)
-        snap["timers"] = json!(self.hub.timers().state(now_ms()));
+        let mut snap = self.hub.snapshot(now_ms());
         // the pages (docs/ambient-pages.md §2.3), newest first, and the
         // cards' page links (daemon/page_cards.rs)
         self.snapshot_pages(&mut snap);
+        self.snapshot_card_links(&mut snap);
         // one gate card for several agents' identical calls: it names them all
         self.gate_card_agents(&mut snap);
-        if let Some(list) = snap["agents"].as_array_mut() {
-            for v in list {
-                let name = v["name"].as_str().unwrap_or("").to_string();
-                let Some(u) = used.get(&name) else {
-                    continue;
-                };
-                v["model"] = json!(u.model.name);
-                v["effort"] = json!(u.effort);
-                v["efforts"] = json!(u.model.efforts());
-                v["model_from"] = json!(u.model_from);
-                // the "± 9 files so far" door (docs/artifacts.md)
-                v["changes"] = self.art.changes.get(&name).cloned().unwrap_or(Value::Null);
-            }
-        }
+        self.snapshot_models(&mut snap, &used);
         snap
+    }
+
+    /// Each agent's model and its "± 9 files so far" door (docs/artifacts.md).
+    fn snapshot_models(&self, snap: &mut crate::snapshot::Snapshot, used: &BTreeMap<String, bise_catalog::InUse>) {
+        for a in &mut snap.agents {
+            let Some(u) = used.get(&a.name) else { continue };
+            a.model = Some(crate::snapshot::Model {
+                name: u.model.name.clone(),
+                effort: u.effort.clone(),
+                efforts: u.model.efforts(),
+                changes: self.art.changes.get(&a.name).cloned().flatten(),
+            });
+        }
     }
 
     /// The state to the clients, with its page hooks and view.json: what
@@ -838,7 +836,7 @@ impl Shell {
         self.page_agent_push();
         self.page_watch_push();
         let snap = self.snapshot();
-        self.broadcast(&snap);
+        self.proto_state(&snap);
         self.view_changed(&snap);
         self.state_gate.sent(now_ms());
     }
@@ -847,7 +845,7 @@ impl Shell {
     /// push still pending waits its period from now (state_gate `shown`).
     fn state_now(&mut self) {
         let snap = self.snapshot();
-        self.broadcast(&snap);
+        self.proto_state(&snap);
         self.state_gate.shown(now_ms());
     }
 

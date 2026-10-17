@@ -6,9 +6,7 @@ use super::super::*;
 use bise_proto::rows::{Doing, DoingKind};
 
 fn row_doing(t: &mut T, name: &str) -> Option<Doing> {
-    let snap = t.hub.snapshot_checked(t.env.now);
-    let a = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == name).unwrap().clone();
-    serde_json::from_value(a["doing"].clone()).ok()
+    t.hub.snapshot(t.env.now).agent(name).doing
 }
 
 fn line(t: &mut T, agent: &str, l: &str) -> Vec<Effect> {

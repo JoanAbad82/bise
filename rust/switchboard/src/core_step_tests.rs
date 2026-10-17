@@ -110,20 +110,20 @@ fn a_watch_is_a_pause_or_an_alarm_on_the_agents_row() {
     let mut t = T::new();
     t.spawn_task("perf");
     t.go(Input::ReplIdle { agent: "perf".into(), leftover: false });
-    let row = |t: &mut T| t.hub.snapshot_checked(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap().clone();
+    let row = |t: &mut T| t.hub.snapshot(t.env.now).agent("perf").clone();
     let spec = |what| Spec { what, tail: None, note: String::new() };
     let file = || spec(What::File { path: "/t/build.rc".into() });
     let add = |t: &mut T, s: Spec, then| t.req("perf", AgentReq::Wake(WakeReq::Add { spec: s, max_ms: MAX_DEFAULT_MS, then })).1;
-    let status = row(&mut t)["status"].clone();
+    let status = row(&mut t).status;
     add(&mut t, spec(What::Pid { pid: 4242, start: String::new() }), None);
     add(&mut t, file(), None);
     add(&mut t, file(), Some(true));
     add(&mut t, spec(What::Pid { pid: 4243, start: String::new() }), Some(false));
     let r = row(&mut t);
-    let ws: Vec<bise_proto::rows::AgentWatch> = serde_json::from_value(r["watching"].clone()).unwrap();
-    assert_eq!(ws.iter().map(|w| w.resumes).collect::<Vec<_>>(), [true, false, true, false], "{r}");
-    assert!(ws.iter().all(|w| w.until_ms == Some(w.since_ms + MAX_DEFAULT_MS)), "{r}");
-    assert_eq!(r["status"], status, "a watch never moves the agent's status");
+    let ws = r.watching.clone();
+    assert_eq!(ws.iter().map(|w| w.resumes).collect::<Vec<_>>(), [true, false, true, false], "{r:?}");
+    assert!(ws.iter().all(|w| w.until_ms == Some(w.since_ms + MAX_DEFAULT_MS)), "{r:?}");
+    assert_eq!(r.status, status, "a watch never moves the agent's status");
     // its journal line keeps it: a replay reads the same
     let mut h = Hub::new("/w");
     assert!(h.replay(&t.journal.borrow().clone()).is_empty());
@@ -148,7 +148,7 @@ fn a_watch_is_a_pause_or_an_alarm_on_the_agents_row() {
     // the agent's own stop tells it nothing
     let (_, fx) = t.req("perf", AgentReq::Wake(WakeReq::Stop(ws[2].id)));
     assert!(!fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "message_sent")), "{fx:?}");
-    assert_eq!(row(&mut t)["watching"].as_array().unwrap().len(), 2);
+    assert_eq!(row(&mut t).watching.len(), 2);
 }
 
 /// ask-wait's tests, out of core_tests.rs too.
@@ -166,10 +166,6 @@ mod core_doing_tests;
 /// queued_steer's tests, out of core_tests.rs too.
 #[path = "core_queue_tests.rs"]
 mod core_queue_tests;
-
-/// issue 30 sha 1: the typed snapshot is the older builder's.
-#[path = "core_snapshot_tests.rs"]
-mod core_snapshot_tests;
 
 /// plan-ok (architect m_26549, m_26571): a page's own card is asked by
 /// the first live agent of its chain, else main; it shows in that

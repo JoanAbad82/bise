@@ -113,9 +113,7 @@ pub enum Declared {
 }
 
 /// The status every view shows (RFC 0001 §9.1, RFC 0003 `ListedAgent`).
-/// Its JSON is [`Status::as_str`] (the snapshot's `status`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
     Starting,
     Working,

@@ -1,7 +1,7 @@
 # 30 · the hub's state is untyped JSON
 
-Status: in progress (sha 1 landed: the typed `Snapshot`, proved equal to the
-older builder; sha 2: the readers on fields, the old way deleted). Label:
+Status: done (sha 1: the typed `Snapshot`, proved equal to the older
+builder; sha 2: the readers on fields, the old way deleted). Label:
 hub, debt. Plan: arch-review pick B (Gabriel), architect's
 brief-typed-snapshot, plan signed by architect (m_28470).
 
@@ -41,4 +41,12 @@ bise-proto's `ProjectView`.
 
 ## Status
 
-Sha 1 landed. Sha 2 in progress.
+Done. Switchboard's `.get("` reads outside `*_tests.rs`: 273 before, 235
+after; none left on a snapshot (the ones left read other events, the art
+store's rows, card_links.json at its load). bench_step on his journal copy
+(739 agents, same debug build): the snapshot alone 24.2 ms -> 3.8 ms, hello
++ its snapshot 146 ms -> 74 ms, every row built from nothing 134 ms -> 66
+ms. core.rs 2685 -> 2587 lines, daemon.rs 2243 -> 2241, both limits lowered.
+
+Left for later, each its own chunk (no wire change here): the lossy typed
+rows, like the Agent row's last report on an archived agent.

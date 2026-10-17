@@ -423,13 +423,12 @@ fn a_waiting_agent_says_who_it_waits_on() {
         },
     );
     let agent = |t: &mut T, n: &str| {
-        let snap = t.hub.snapshot_checked(0);
-        snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == n).cloned().unwrap()
+        t.hub.snapshot(0).agent(n).clone()
     };
     let docs = agent(&mut t, "docs");
-    assert_eq!(docs["status"], "waiting");
-    assert_eq!(docs["waiting_on"], MAIN, "{}", docs);
-    assert!(agent(&mut t, MAIN)["waiting_on"].is_null());
+    assert_eq!(docs.status, Status::Waiting);
+    assert_eq!(docs.waiting_on.as_deref(), Some(MAIN), "{docs:?}");
+    assert!(agent(&mut t, MAIN).waiting_on.is_none());
     let id = t.hub.st.msgs().values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
     let (_, fx) = t.req(
         MAIN,
@@ -444,7 +443,7 @@ fn a_waiting_agent_says_who_it_waits_on() {
         },
     );
     assert!(reply(&fx, tok).is_some(), "the wait ends");
-    assert!(agent(&mut t, "docs")["waiting_on"].is_null());
+    assert!(agent(&mut t, "docs").waiting_on.is_none());
 }
 
 #[test]
@@ -1605,9 +1604,9 @@ fn main_cannot_answer_an_escalated_question_only_the_user_can() {
         },
     );
     assert!(t.hub.st.cards.contains_key(&card));
-    let snap = t.hub.snapshot_checked(t.env.now);
-    let note = snap["cards"][0]["note"].as_str().unwrap_or("");
-    assert!(note.contains("@main wrote to @docs"), "{}", snap);
+    let snap = t.hub.snapshot(t.env.now);
+    let note = snap.cards[0].note.as_deref().unwrap_or("");
+    assert!(note.contains("@main wrote to @docs"), "{:?}", snap.cards);
     // main's reply to the question is refused: the card stays
     let (tok, fx) = t.req(
         MAIN,
@@ -1678,12 +1677,11 @@ fn agent_traffic_never_reaches_the_user_inbox() {
         t.req("b", AgentReq::Report { kind: kind.into(), summary: format!("{} summary", kind), decisions: vec![], step: None, result: None });
     }
     assert!(t.hub.st.cards.is_empty(), "{:?}", t.hub.st.cards);
-    assert_eq!(t.hub.snapshot_checked(t.env.now)["cards"].as_array().unwrap().len(), 0);
+    assert_eq!(t.hub.snapshot(t.env.now).cards.len(), 0);
     // they are main's: its inbox counts the two questions, a blocked task
     // wakes main with a message
-    let snap = t.hub.snapshot_checked(t.env.now);
-    let main = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == MAIN).unwrap().clone();
-    assert_eq!(main["inbox"], 2, "{main}");
+    let snap = t.hub.snapshot(t.env.now);
+    assert_eq!(snap.agent(MAIN).inbox, 2, "{:?}", snap.agent(MAIN));
     assert!(t.hub.st.msgs().values().any(|m| m.to == MAIN && m.text.contains("@a is blocked: need a key")));
 }
 
@@ -1970,13 +1968,13 @@ fn a_worktree_shared_by_two_agents_goes_with_its_last_one() {
     let (tok, fx) = spawn_in(&mut t, "d", "nowhere");
     assert!(err_of(&fx, tok).contains("no place nowhere"), "{:?}", fx);
     // the snapshot: one box, its agents in order
-    let snap = t.hub.snapshot_checked(0);
+    let snap = t.hub.snapshot(0);
     assert_eq!(
-        snap["places"],
+        serde_json::to_value(&snap.places).unwrap(),
         json!([{"id": "wt:a", "branch": "sb/a", "agents": ["a", "b", "c"], "pr": null, "lid": null, "feature": false, "trying": false, "path": "/state/worktrees/a"}])
     );
-    assert_eq!(snap["agents"][1]["place_id"], "wt:a");
-    assert_eq!(snap["agents"][0]["place_id"], "shared");
+    assert_eq!(snap.agents[1].place_id, "wt:a");
+    assert_eq!(snap.agents[0].place_id, "shared");
     // files are tracked in a worktree too; an overlap is within the place
     // (b's change of src/x.rs is one, the shared folder's s's is not)
     t.spawn_task("s");
@@ -2006,7 +2004,7 @@ fn a_worktree_shared_by_two_agents_goes_with_its_last_one() {
         assert!(a.ws.dropped, "{} dropped", n);
         assert_eq!(a.snapshot_ref.as_deref(), Some("refs/switchboard/trash/b/1"), "{}", n);
     }
-    assert_eq!(t.hub.snapshot_checked(0)["places"], json!([]));
+    assert!(t.hub.snapshot(0).places.is_empty());
     // a's restore brings the place back; c rejoins it, no second folder
     let (tok, fx) = t.req(MAIN, AgentReq::Restore { agent: "a".into() });
     assert_eq!(reply(&fx, tok).unwrap()["name"], "a", "{:?}", fx);
@@ -2015,7 +2013,7 @@ fn a_worktree_shared_by_two_agents_goes_with_its_last_one() {
     let (wa, wc) = (&t.hub.st.agents["a"].ws, &t.hub.st.agents["c"].ws);
     assert!(!wa.dropped && wa == wc, "{:?} {:?}", wa, wc);
     assert_eq!(t.hub.st.agents["c"].snapshot_ref, None);
-    assert_eq!(t.hub.snapshot_checked(0)["places"][0]["agents"], json!(["a", "c"]));
+    assert_eq!(t.hub.snapshot(0).places[0].agents, ["a", "c"]);
 }
 
 /// `sb move`: an agent that changed nothing yet joins another place,
@@ -2465,9 +2463,7 @@ fn ask_role(fx: &[Effect]) -> Option<(String, String, String)> {
 }
 
 fn role_of(t: &mut T, name: &str) -> String {
-    let snap = t.hub.snapshot_checked(t.env.now);
-    let a = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == name).unwrap().clone();
-    a["role"].as_str().unwrap().to_string()
+    t.hub.snapshot(t.env.now).agent(name).role.clone()
 }
 
 /// BISE-126: a task's role line starts as its objective's first
@@ -2546,12 +2542,9 @@ fn a_private_worktree_is_a_place() {
         t.req(a, AgentReq::Worktree { path: "/p/docs-wt".into() });
     }
     let view = |t: &mut T| {
-        let snap = t.hub.snapshot_checked(0);
-        snap["places"].as_array().unwrap().iter().find(|p| p["id"] == "pt:/p/docs-wt").cloned().unwrap_or(Value::Null)
+        t.hub.snapshot(0).place_json("pt:/p/docs-wt")
     };
-    let snap = t.hub.snapshot_checked(0);
-    let docs = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == "docs").unwrap().clone();
-    assert_eq!(docs["place_id"], "pt:/p/docs-wt");
+    assert_eq!(t.hub.snapshot(0).agent("docs").place_id, "pt:/p/docs-wt");
     assert_eq!(view(&mut t)["agents"], json!(["docs", "api"]));
     assert_eq!(view(&mut t)["branch"], Value::Null);
     let w = t.hub.pr_watches();
@@ -2757,9 +2750,9 @@ fn bench_step() {
         let _rows = warm.agents.clone();
         eprintln!("  watching {:?} ({} watches), {} agents compared {:?}, rows cloned {:?}", t_w, n, same, t_eq, t0.elapsed());
         let t0 = std::time::Instant::now();
-        let text = serde_json::to_string(&warm).unwrap();
+        let text = format!("{warm:?}");
         eprintln!(
-            "  snapshot from nothing {:?} ({} rows built), kept {:?} ({} rows built again); its JSON text ({} bytes) {:?}",
+            "  snapshot from nothing {:?} ({} rows built), kept {:?} ({} rows built again); its Debug text ({} bytes) {:?}",
             t_cold,
             built,
             snap,
@@ -2812,7 +2805,7 @@ fn bench_byte_equal() {
     // the digest of what the outside sees now (the same hasher, keys 0,
     // in both runs: one test binary, only SB_CORE_BIN differs)
     let seen = |what: &str, h: &mut Hub, now: u64| {
-        let snap = serde_json::to_string(&h.snapshot(now)).unwrap();
+        let snap = format!("{:?}", h.snapshot(now));
         let mut parts = vec![snap];
         for (n, text) in crate::contexts::fresh(&h.st, now, &h.models) {
             parts.push(format!("context {n}\n{text}"));
@@ -2970,8 +2963,7 @@ mod prs {
     }
 
     pub(super) fn place_view(t: &mut T, now: u64) -> Value {
-        let snap = t.hub.snapshot_checked(now);
-        snap["places"].as_array().unwrap().iter().find(|p| p["id"] == "wt:dark").cloned().unwrap_or(Value::Null)
+        t.hub.snapshot(now).place_json("wt:dark")
     }
 
     fn events(fx: &[Effect]) -> Vec<String> {
@@ -3084,9 +3076,9 @@ mod prs {
         assert_eq!((c.agent.as_str(), c.place.as_deref(), c.pr), ("dark", Some("wt:dark"), Some(412)));
         assert!(c.text.starts_with("#412 is ready to merge\ndark mode\napproved by alice · 3 of 3 checks pass"), "{}", c.text);
         assert!(c.text.ends_with("1. squash and merge\n2. open it on GitHub\n3. not yet"), "{}", c.text);
-        let snap = t.hub.snapshot_checked(2_000);
-        let sc = snap["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "merge").cloned().unwrap();
-        assert_eq!((sc["place"].clone(), sc["pr"].clone()), (json!("wt:dark"), json!(412)));
+        let snap = t.hub.snapshot(2_000);
+        let sc = snap.card_of("merge").unwrap();
+        assert_eq!((sc.place.as_deref(), sc.pr), (Some("wt:dark"), Some(412)));
         // the same answer: the same item
         t.go(report(3_000, Ok(vec![ready_pr("tip1", &["alice"])]), None));
         assert_eq!(merge_cards(&t).iter().map(|c| c.id).collect::<Vec<_>>(), [c.id]);
@@ -3114,8 +3106,8 @@ mod prs {
             fx
         );
         assert_eq!(merge_cards(&t).len(), 1);
-        let note = |t: &mut T| t.hub.snapshot_checked(8_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "merge").map(|x| x["note"].clone());
-        assert_eq!(note(&mut t), Some(json!("merging…")));
+        let note = |t: &mut T| t.hub.snapshot(8_000).card_of("merge").map(|x| x.note.clone());
+        assert_eq!(note(&mut t), Some(Some("merging…".to_string())));
         // twice: one merge
         let fx = t.user(MAIN, &format!("/answer {} 1", id));
         assert!(!fx.iter().any(|e| matches!(e, Effect::Merge { .. })));
@@ -3128,7 +3120,7 @@ mod prs {
         assert_eq!(closed_as(&t, id).as_deref(), Some("merge failed"));
         t.go(report(9_000, Ok(vec![ready_pr("tip2", &["alice", "bob"])]), None));
         let id = merge_cards(&t)[0].id;
-        assert_eq!(note(&mut t), Some(json!("gh couldn't merge it: Pull request is not mergeable")));
+        assert_eq!(note(&mut t), Some(Some("gh couldn't merge it: Pull request is not mergeable".to_string())));
         // merged: closed, main told; the forge's next answer archives the place
         t.user(MAIN, &format!("/answer {} 1", id));
         let fx = t.go(Input::Merged { card: id, place: "wt:dark".into(), number: 412, res: Ok(()) });
@@ -3177,9 +3169,9 @@ mod prs {
             c.text,
             "bise v2026.10.2-5 is out\nthe inbox keeps your place\n/update from any thread\nyou're on v2026.10.2-4\n\n1. update now · your agents keep running\n2. later\n3. release notes ↗"
         );
-        let snap = t.hub.snapshot_checked(2_000);
-        let sc = snap["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "update").cloned().unwrap();
-        assert_eq!(sc["link"], json!("https://github.com/o/r/releases/tag/v2026.10.2-5"));
+        let snap = t.hub.snapshot(2_000);
+        let sc = snap.card_of("update").unwrap();
+        assert_eq!(sc.link.as_deref(), Some("https://github.com/o/r/releases/tag/v2026.10.2-5"));
         // the next check: still one
         t.go(release("5", true, None));
         assert_eq!(update_cards(&t).iter().map(|c| c.id).collect::<Vec<_>>(), [c.id]);
@@ -3203,8 +3195,8 @@ mod prs {
         assert!(fx.iter().any(|e| matches!(e, Effect::Update { id: r, version, .. } if r == "6" && version == "v2026.10.2-6")), "{:?}", fx);
         let fx = t.user(MAIN, &format!("/answer {} 1", id));
         assert!(!fx.iter().any(|e| matches!(e, Effect::Update { .. })));
-        let note = |t: &mut T| t.hub.snapshot_checked(3_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "update").map(|x| x["note"].clone());
-        assert_eq!(note(&mut t), Some(json!("updating to v2026.10.2-6…")));
+        let note = |t: &mut T| t.hub.snapshot(3_000).card_of("update").map(|x| x.note.clone());
+        assert_eq!(note(&mut t), Some(Some("updating to v2026.10.2-6…".to_string())));
         // failed: closed, main told, the running version stays
         let fx = t.go(Input::Updated { card: id, version: "v2026.10.2-6".into(), res: Err("cannot download the release.".into()) });
         assert!(
@@ -4439,7 +4431,7 @@ fn an_agents_row_says_running_and_turns_from_one_source() {
     let mut t = T::new();
     t.spawn_task("a");
     let row = |t: &mut T| -> (bool, u64) {
-        let snap = t.hub.snapshot_checked(t.env.now);
+        let snap = t.hub.snapshot(t.env.now);
         let mut since = crate::proto_view::Since::new();
         let rows = crate::proto_view::agents(&snap, &mut since, t.env.now, crate::model::user_kind, &|_| None, &|_| None, &|_| None);
         let a = rows.iter().find(|r| r.name == "a").expect("a's row");
@@ -4510,7 +4502,7 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let mut t = T::new();
     t.spawn_task("perf");
     t.go(Input::ReplIdle { agent: "perf".into(), leftover: false });
-    let watching = |t: &mut T| t.hub.snapshot_checked(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap()["watching"].clone();
+    let watching = |t: &mut T| serde_json::to_value(&t.hub.snapshot(t.env.now).agent("perf").watching).unwrap();
     assert_eq!(watching(&mut t), json!([]));
     let spec = crate::wake::Spec { what: crate::wake::What::Pid { pid: 4242, start: String::new() }, tail: None, note: "the build".into() };
     let (tok, _) = t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS, then: None }));

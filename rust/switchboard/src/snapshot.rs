@@ -3,32 +3,25 @@
 //! and what the views read by field: the typed rows (proto_view), the
 //! growth rows, view.json.
 //!
-//! The hub's view, not wire: the wire rows stay bise_proto's
-//! (`rows::Agent`, `rows::Card`...), mapped from these. Its JSON
-//! (`serde_json::to_value`) is the older untyped snapshot's, key for key:
-//! the field names, `null`s and skipped keys below are that shape, pinned
-//! by the golden files under `tests/snapshot/` (core_snapshot_tests.rs).
+//! The hub's view, not wire, and never sent: the wire rows stay
+//! bise_proto's (`rows::Agent`, `rows::Card`...), mapped from these by
+//! proto_view. The hub builds the core of it (agents, cards, places,
+//! flow); the shell fills the rest, one writer per area (daemon.rs
+//! `snapshot`: the pages, the cards' page links, the agents' models).
 
+use crate::card_link::PageLink;
 use crate::flow::FlowMode;
 use crate::model::{Declared, Mode, Status};
+use crate::pages::questions::Pick;
 use crate::place::PlaceView;
 use bise_proto::draft::Queued;
-use bise_proto::rows::{AgentWatch, Doing};
-use serde::Serialize;
-
-/// The snapshot's tag (`"ev": "state"`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
-pub enum StateEv {
-    #[default]
-    #[serde(rename = "state")]
-    State,
-}
+use bise_proto::rows::{AgentWatch, ArtLink, CardBatch, Changes, Doing, OptAct, Page};
+use std::collections::BTreeMap;
 
 /// The hub's state for the views: its agents, its open cards, its
 /// places, the repo's flow.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Snapshot {
-    pub ev: StateEv,
     /// every agent, archived ones included, in the hub's order
     pub agents: Vec<AgentRow>,
     /// the open cards, oldest first
@@ -36,10 +29,15 @@ pub struct Snapshot {
     /// the worktrees the views draw (`place::views`)
     pub places: Vec<PlaceView>,
     pub flow: Option<FlowMode>,
+    /// the shell's: the pages (docs/ambient-pages.md §2.3), newest first
+    pub pages: Vec<Page>,
+    /// the shell's: his late promises (checklist rows of his past
+    /// data-due), a count for the morning page and the menu bar
+    pub overdue: u32,
 }
 
 /// One agent as the views see it (snapshot_rows.rs builds it).
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AgentRow {
     pub name: String,
     pub main: bool,
@@ -51,7 +49,6 @@ pub struct AgentRow {
     pub mode: Mode,
     pub path: String,
     pub branch: Option<String>,
-    pub dropped: bool,
     /// BISE-136: a private worktree (gate.sh new), else null
     pub place: Option<String>,
     /// dev-flow §3.1: the id of the place it is in (`places`) (BISE-136:
@@ -95,10 +92,24 @@ pub struct AgentRow {
     /// les bims: what it is doing now, only while its turn runs (or
     /// paused on a backgrounded command: a build)
     pub doing: Option<Doing>,
+    /// the shell's (issue #4): its model, for sb list / sb tasks too
+    pub model: Option<Model>,
+}
+
+/// An agent's model as the shell knows it (the catalog's choice).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Model {
+    pub name: String,
+    /// "" when the model takes no effort
+    pub effort: String,
+    pub efforts: Vec<String>,
+    /// the "± 9 files so far" door (docs/artifacts.md): its changes
+    /// against its base, none when not measured
+    pub changes: Option<Changes>,
 }
 
 /// One open card as the views see it.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct CardRow {
     pub id: u64,
     pub kind: String,
@@ -118,4 +129,71 @@ pub struct CardRow {
     /// place's box and opens its link
     pub place: Option<String>,
     pub pr: Option<u64>,
+    /// the shell's (daemon/page_cards.rs): the page it asks on, what it
+    /// is about, the options that open an artifact, a drafts batch's
+    /// fields, a drawn pick's why lines
+    pub page: Option<PageLink>,
+    pub artifact: Option<ArtLink>,
+    pub opens: BTreeMap<u32, OptAct>,
+    pub batch: Option<CardBatch>,
+    pub pick: Option<Pick>,
+}
+
+#[cfg(test)]
+impl Snapshot {
+    /// The row of `name` (a test's lookup).
+    pub fn agent(&self, name: &str) -> &AgentRow {
+        self.agents.iter().find(|a| a.name == name).unwrap_or_else(|| panic!("no row {name}"))
+    }
+
+    /// The first open card of `kind`.
+    pub fn card_of(&self, kind: &str) -> Option<&CardRow> {
+        self.cards.iter().find(|c| c.kind == kind)
+    }
+
+    /// The place `id` as its view's JSON (`null`: none).
+    pub fn place_json(&self, id: &str) -> serde_json::Value {
+        self.places.iter().find(|p| p.id == id).map_or(serde_json::Value::Null, |p| serde_json::to_value(p).unwrap())
+    }
+}
+
+#[cfg(test)]
+impl AgentRow {
+    /// A task's row with nothing in it but its name (tests build the
+    /// rest with `..AgentRow::test(name)`).
+    pub fn test(name: &str) -> AgentRow {
+        AgentRow {
+            name: name.into(),
+            main: false,
+            status: Status::Idle,
+            objective: String::new(),
+            role: String::new(),
+            parent: None,
+            mode: Mode::Shared,
+            path: String::new(),
+            branch: None,
+            place: None,
+            place_id: String::new(),
+            created_ms: 0,
+            dir: name.into(),
+            aliases: Vec::new(),
+            note: String::new(),
+            declared: None,
+            report: None,
+            report_ms: None,
+            follow: false,
+            report_kind: None,
+            step: None,
+            of: None,
+            queued: 0,
+            queued_inputs: Vec::new(),
+            inbox: 0,
+            turn_ms: None,
+            turns: 0,
+            waiting_on: None,
+            watching: Vec::new(),
+            doing: None,
+            model: None,
+        }
+    }
 }

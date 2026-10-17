@@ -12,10 +12,9 @@ fn an_agent_says_where_it_works() {
     let mut t = T::new();
     t.spawn_task("docs");
     let place = |t: &mut T| {
-        let snap = t.hub.snapshot_checked(0);
-        snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == "docs").unwrap()["place"].clone()
+        t.hub.snapshot(0).agent("docs").place.clone()
     };
-    assert!(place(&mut t).is_null());
+    assert!(place(&mut t).is_none());
     // the fallback: a linked worktree has a .git file
     let wt = std::env::temp_dir().join(format!("sb-place-{}", std::process::id()));
     std::fs::create_dir_all(&wt).unwrap();
@@ -28,27 +27,27 @@ fn an_agent_says_where_it_works() {
         })
     };
     bash(&mut t, "cd /tmp && ls");
-    assert!(place(&mut t).is_null(), "not a linked worktree");
+    assert!(place(&mut t).is_none(), "not a linked worktree");
     let fx = bash(&mut t, &format!("cd {} && cargo test", wt));
-    assert_eq!(place(&mut t), json!(wt));
+    assert_eq!(place(&mut t), Some(wt.clone()));
     assert!(fx.contains(&Effect::State), "the views learn it");
     // wt-sign (Benjamin's 'ψ ven-bots' on main's line): main looking into
     // a task's worktree is no move; main works in the workspace
     t.go(Input::ReplLine { agent: MAIN.into(), line: format!("tool #2 bash : {}", json!({"arg": format!("cd {} && git log", wt)})) });
-    let snap = t.hub.snapshot_checked(0);
-    let main = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == MAIN).unwrap().clone();
-    assert!(main["place"].is_null() && main["place_id"] == "shared", "{main}");
+    let snap = t.hub.snapshot(0);
+    let main = snap.agent(MAIN);
+    assert!(main.place.is_none() && main.place_id == "shared", "{main:?}");
     // told: the fallback stops guessing
     let (tok, fx) = t.req("docs", AgentReq::Worktree { path: "/tmp/docs-wt".into() });
     assert!(fx.contains(&Effect::Reply { token: tok, body: json!({"ok": true, "path": "/tmp/docs-wt"}) }), "{:?}", fx);
-    assert_eq!(place(&mut t), json!("/tmp/docs-wt"));
+    assert_eq!(place(&mut t).as_deref(), Some("/tmp/docs-wt"));
     let (_, fx) = t.req(MAIN, AgentReq::Tasks);
     assert!(format!("{:?}", fx).contains("private worktree /tmp/docs-wt"), "{:?}", fx);
     bash(&mut t, &format!("cd {} && cargo test", wt));
-    assert_eq!(place(&mut t), json!("/tmp/docs-wt"));
+    assert_eq!(place(&mut t).as_deref(), Some("/tmp/docs-wt"));
     // none: its own workspace again
     t.req("docs", AgentReq::Worktree { path: String::new() });
-    assert!(place(&mut t).is_null());
+    assert!(place(&mut t).is_none());
     // the CLI's JSON: an absolute path or none
     let r = |p: &str| AgentReq::from_json(&json!({"cmd": "worktree", "path": p}));
     assert_eq!(r("none"), Ok(AgentReq::Worktree { path: String::new() }));

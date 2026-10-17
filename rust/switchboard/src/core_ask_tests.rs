@@ -13,7 +13,7 @@ fn a_reply_still_pending_after_the_hold_is_a_pause() {
     let mut t = T::new();
     t.spawn_task("a");
     t.spawn_task("b");
-    let watching = |t: &mut T, n: &str| t.hub.snapshot_checked(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == n).unwrap()["watching"].clone();
+    let watching = |t: &mut T, n: &str| serde_json::to_value(&t.hub.snapshot(t.env.now).agent(n).watching).unwrap();
     let asked_at = t.env.now;
     let ask = |t: &mut T, text: &str| t.req("a", AgentReq::Ask { to: "b".into(), text: text.into(), timeout_s: 600 }).0;
     let tok = ask(&mut t, "which port?");

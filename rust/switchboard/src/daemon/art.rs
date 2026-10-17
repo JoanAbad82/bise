@@ -28,7 +28,7 @@ pub(super) struct Art {
     /// the same sends nothing.
     last: String,
     /// Each agent's `changes` ({files, add, del} or null), by name.
-    pub(super) changes: BTreeMap<String, Value>,
+    pub(super) changes: BTreeMap<String, Option<bise_proto::rows::Changes>>,
     /// When each agent's changes were last asked, and those being
     /// computed now.
     asked: BTreeMap<String, std::time::Instant>,
@@ -342,7 +342,7 @@ impl Shell {
     }
 
     /// An agent's changes are computed: the state again when they moved.
-    pub(super) fn on_changes(&mut self, name: String, v: Value) {
+    pub(super) fn on_changes(&mut self, name: String, v: Option<bise_proto::rows::Changes>) {
         self.art.busy.remove(&name);
         let moved = self.art.changes.get(&name) != Some(&v);
         self.art.changes.insert(name.clone(), v);
@@ -464,7 +464,7 @@ impl Shell {
 /// files included) or of its own files in the shared folder; null when
 /// there are none or git cannot say (a folder that is gone: diff.rs
 /// never runs git in it).
-fn changes_of(place: &Where) -> Value {
+fn changes_of(place: &Where) -> Option<bise_proto::rows::Changes> {
     let files = match place {
         Where::Checkout { dir, base } => {
             let base = base.clone().unwrap_or_else(|| diff::trunk(dir));
@@ -475,9 +475,9 @@ fn changes_of(place: &Where) -> Value {
     match files {
         Ok(f) if !f.is_empty() => {
             let (files, add, del) = diff::stat(&f);
-            json!({"files": files, "add": add, "del": del})
+            Some(bise_proto::rows::Changes { files: files as u64, add, del })
         }
-        _ => Value::Null,
+        _ => None,
     }
 }
 
@@ -717,17 +717,17 @@ mod tests {
         sh(&shared, &["commit", "-q", "-m", "init"]);
         sh(&shared, &["worktree", "add", "-q", "-b", "sb/t1", wt.to_str().unwrap()]);
         let place = Where::Checkout { dir: wt.clone(), base: None };
-        assert_eq!(changes_of(&place), Value::Null, "nothing yet");
+        assert_eq!(changes_of(&place), None, "nothing yet");
         std::fs::create_dir_all(wt.join("out")).unwrap();
         std::fs::write(wt.join("out/plans.csv"), "plan,price\nfree,0\npro,20\n").unwrap();
         sh(&wt, &["add", "out"]);
         sh(&wt, &["commit", "-q", "-m", "plans"]);
         std::fs::write(wt.join("README"), "hello\nmore\n").unwrap();
         std::fs::write(wt.join("new.txt"), "x\n").unwrap();
-        assert_eq!(changes_of(&place), json!({"files": 3, "add": 5, "del": 0}));
+        assert_eq!(changes_of(&place), Some(bise_proto::rows::Changes { files: 3, add: 5, del: 0 }));
         // its folder gone: null, and no git in it
         sh(&shared, &["worktree", "remove", "--force", wt.to_str().unwrap()]);
-        assert_eq!(changes_of(&place), Value::Null);
+        assert_eq!(changes_of(&place), None);
         let _ = std::fs::remove_dir_all(&root);
     }
 

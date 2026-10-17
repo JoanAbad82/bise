@@ -11,6 +11,7 @@ use super::*;
 use crate::daemon::rpc::Typed;
 use bise_proto::hub::JobState;
 use bise_proto::rows::{AgentUsage, FlowMode};
+use crate::snapshot::Snapshot;
 
 impl Shell {
     /// desktop S2 step 2: sb-core's `route`/`route_done` effects, to every
@@ -35,7 +36,7 @@ impl Shell {
     }
 
     /// The rows of the snapshot: `agents`, `cards`.
-    pub(in crate::daemon) fn proto_rows(&mut self, snap: &Value) -> (HubEv, HubEv) {
+    pub(in crate::daemon) fn proto_rows(&mut self, snap: &Snapshot) -> (HubEv, HubEv) {
         let project = self.project();
         let now = now_ms();
         self.seed_usage(snap);
@@ -68,13 +69,8 @@ impl Shell {
     /// longer blanks the gauge. Once per agent, never per broadcast; live
     /// lines then move it (`proto_usage_line`). No usage, no row: never
     /// an invented 0.
-    fn seed_usage(&mut self, snap: &Value) {
-        let names: Vec<String> = snap
-            .get("agents")
-            .and_then(Value::as_array)
-            .map(|a| a.iter().filter_map(|x| x.get("name").and_then(Value::as_str).map(str::to_string)).collect())
-            .unwrap_or_default();
-        for name in names {
+    fn seed_usage(&mut self, snap: &Snapshot) {
+        for name in snap.agents.iter().map(|a| a.name.clone()) {
             if !self.proto.seeded.insert(name.clone()) || self.proto.usage.contains_key(&name) {
                 continue;
             }
@@ -131,11 +127,9 @@ impl Shell {
     }
 
     /// The typed `pages` of a snapshot (its `pages` rows and `overdue`,
-    /// `snapshot_pages`): one builder, the older state's own rows.
-    pub(in crate::daemon) fn pages_ev(&self, snap: &Value) -> HubEv {
-        let items = snap.get("pages").and_then(Value::as_array).map_or_else(Vec::new, |a| a.iter().filter_map(|p| serde_json::from_value(p.clone()).ok()).collect());
-        let overdue = snap.get("overdue").and_then(Value::as_u64).map_or(0, |n| u32::try_from(n).unwrap_or(u32::MAX));
-        HubEv::Pages { project: self.project(), items, overdue }
+    /// `snapshot_pages`).
+    pub(in crate::daemon) fn pages_ev(&self, snap: &Snapshot) -> HubEv {
+        HubEv::Pages { project: self.project(), items: snap.pages.clone(), overdue: snap.overdue }
     }
 
     /// A hub line whose fields are its typed event's (`versions`,
@@ -170,6 +164,103 @@ impl Shell {
         proto_view::artifacts(ev, page_url, base.as_deref())
     }
 
+    /// The hub's state changed (push_state, state_now): each typed event
+    /// it feeds again, only when it changed.
+    pub(in crate::daemon) fn proto_state(&mut self, snap: &Snapshot) {
+        let live: BTreeSet<ClientId> = self.clients.keys().copied().collect();
+        self.proto.conns.retain(|id, _| live.contains(id));
+        if self.proto.conns.is_empty() {
+            return;
+        }
+        let ids: Vec<ClientId> = self.proto.conns.keys().copied().collect();
+        let (agents, cards) = self.proto_rows(snap);
+        let (a, c) = (agents.encode(), cards.encode());
+        let new = (a != self.proto.last.0, c != self.proto.last.1);
+        self.proto.last = (a, c);
+        if new.0 {
+            self.proto_note(&ids, &agents);
+        }
+        // les bims: the project's growth, when it changed
+        self.growth_changed(&ids, Some(snap), None);
+        if new.1 {
+            self.proto_note(&ids, &cards);
+        }
+        if new.1 {
+            self.proto_live(|l, ctx| l.refold(ctx));
+        }
+        // P4b: the repo's flow, when it changed
+        let flow = self.flow_ev();
+        let f = flow.encode();
+        if f != self.proto.flow {
+            self.proto.flow = f;
+            self.proto_note(&ids, &flow);
+        }
+        // cost-pause: the project's pause, when it changed
+        let paused = self.paused_ev();
+        let p = paused.encode();
+        if p != self.proto.paused {
+            self.proto.paused = p;
+            self.proto_note(&ids, &paused);
+        }
+        // S10: the followed jobs, when they changed
+        let jobs = HubEv::Jobs { project: self.project(), items: proto_view::jobs(snap) };
+        let j = jobs.encode();
+        if j != self.proto.jobs {
+            self.proto.jobs = j;
+            self.proto_note(&ids, &jobs);
+        }
+        // bar A.6: a feature made, synced, built, merged or
+        // dropped, its card or its agents (the steps' ends and
+        // the facts' refresh come back as a snapshot)
+        let feats = self.features_ev();
+        let f = feats.encode();
+        if f != self.proto.features {
+            self.proto.features = f;
+            self.proto_note(&ids, &feats);
+        }
+        // bar A.7: a PR opened, closed, reviewed or checked (the
+        // forge poll's report lands as a state change)
+        let prs = self.prs_ev();
+        let p = prs.encode();
+        if p != self.proto.prs {
+            self.proto.prs = p;
+            self.proto_note(&ids, &prs);
+        }
+        // P4c-5: the pages and his late promises (the snapshot's)
+        let pages = self.pages_ev(snap);
+        let p = pages.encode();
+        if p != self.proto.pages {
+            self.proto.pages = p;
+            self.proto_note(&ids, &pages);
+        }
+        // ⌘K: a timer set, run, stopped or ended (each comes back
+        // as a state change)
+        let sched = self.scheduled_ev();
+        let s = sched.encode();
+        if s != self.proto.scheduled {
+            self.proto.scheduled = s;
+            self.proto_note(&ids, &sched);
+        }
+        // bar A.5: config.toml or auth.json moved (a stat): the
+        // models again when their rows changed
+        if self.models_moved() {
+            let models = self.models_ev();
+            let m = models.encode();
+            if m != self.proto.models {
+                self.proto.models = m;
+                self.proto_note(&ids, &models);
+            }
+        }
+        // an agent came, went, started or ended a turn: its
+        // worktree may have changed (commits, files)
+        let key = self.worktrees_key();
+        if key != self.proto.worktrees {
+            self.proto.worktrees = key;
+            self.worktrees_typed(Typed::All(ids.clone()));
+            self.dev_servers_typed(Typed::All(ids.clone()));
+        }
+    }
+
     /// An event the hub broadcasts, for the typed connections: `state` →
     /// `agents`/`cards` when they changed (and the subscribed threads
     /// refolded: a card answered), `line` → its thread's changed entries
@@ -182,94 +273,6 @@ impl Shell {
         }
         let ids: Vec<ClientId> = self.proto.conns.keys().copied().collect();
         match v.get("ev").and_then(Value::as_str) {
-            Some("state") => {
-                let (agents, cards) = self.proto_rows(v);
-                let (a, c) = (agents.encode(), cards.encode());
-                let new = (a != self.proto.last.0, c != self.proto.last.1);
-                self.proto.last = (a, c);
-                if new.0 {
-                    self.proto_note(&ids, &agents);
-                }
-                // les bims: the project's growth, when it changed
-                self.growth_changed(&ids, Some(v), None);
-                if new.1 {
-                    self.proto_note(&ids, &cards);
-                }
-                if new.1 {
-                    self.proto_live(|l, ctx| l.refold(ctx));
-                }
-                // P4b: the repo's flow, when it changed
-                let flow = self.flow_ev();
-                let f = flow.encode();
-                if f != self.proto.flow {
-                    self.proto.flow = f;
-                    self.proto_note(&ids, &flow);
-                }
-                // cost-pause: the project's pause, when it changed
-                let paused = self.paused_ev();
-                let p = paused.encode();
-                if p != self.proto.paused {
-                    self.proto.paused = p;
-                    self.proto_note(&ids, &paused);
-                }
-                // S10: the followed jobs, when they changed
-                let jobs = HubEv::Jobs { project: self.project(), items: proto_view::jobs(v) };
-                let j = jobs.encode();
-                if j != self.proto.jobs {
-                    self.proto.jobs = j;
-                    self.proto_note(&ids, &jobs);
-                }
-                // bar A.6: a feature made, synced, built, merged or
-                // dropped, its card or its agents (the steps' ends and
-                // the facts' refresh come back as a snapshot)
-                let feats = self.features_ev();
-                let f = feats.encode();
-                if f != self.proto.features {
-                    self.proto.features = f;
-                    self.proto_note(&ids, &feats);
-                }
-                // bar A.7: a PR opened, closed, reviewed or checked (the
-                // forge poll's report lands as a state change)
-                let prs = self.prs_ev();
-                let p = prs.encode();
-                if p != self.proto.prs {
-                    self.proto.prs = p;
-                    self.proto_note(&ids, &prs);
-                }
-                // P4c-5: the pages and his late promises (the snapshot's)
-                let pages = self.pages_ev(v);
-                let p = pages.encode();
-                if p != self.proto.pages {
-                    self.proto.pages = p;
-                    self.proto_note(&ids, &pages);
-                }
-                // ⌘K: a timer set, run, stopped or ended (each comes back
-                // as a state change)
-                let sched = self.scheduled_ev();
-                let s = sched.encode();
-                if s != self.proto.scheduled {
-                    self.proto.scheduled = s;
-                    self.proto_note(&ids, &sched);
-                }
-                // bar A.5: config.toml or auth.json moved (a stat): the
-                // models again when their rows changed
-                if self.models_moved() {
-                    let models = self.models_ev();
-                    let m = models.encode();
-                    if m != self.proto.models {
-                        self.proto.models = m;
-                        self.proto_note(&ids, &models);
-                    }
-                }
-                // an agent came, went, started or ended a turn: its
-                // worktree may have changed (commits, files)
-                let key = self.worktrees_key();
-                if key != self.proto.worktrees {
-                    self.proto.worktrees = key;
-                    self.worktrees_typed(Typed::All(ids.clone()));
-                    self.dev_servers_typed(Typed::All(ids.clone()));
-                }
-            }
             // bar V8/W21: the mode switched or a rule left (set_mode,
             // remove_rule broadcast the TUI's event): the typed one to all
             Some("approvals") => {
@@ -412,8 +415,8 @@ impl Shell {
 
     /// P4b: each agent the heads don't know yet, from the lines the hub
     /// buffered of it (its transcript's tail at start), folded once.
-    fn seed_heads(&mut self, snap: &Value) {
-        let names: Vec<String> = snap["agents"].as_array().into_iter().flatten().filter_map(|a| a["name"].as_str().map(String::from)).filter(|n| !self.proto.heads.has(n)).collect();
+    fn seed_heads(&mut self, snap: &Snapshot) {
+        let names: Vec<String> = snap.agents.iter().map(|a| a.name.clone()).filter(|n| !self.proto.heads.has(n)).collect();
         if names.is_empty() {
             return;
         }

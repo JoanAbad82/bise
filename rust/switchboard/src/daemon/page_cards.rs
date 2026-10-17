@@ -8,6 +8,8 @@
 //! Moved out of daemon/pages.rs unchanged (architect's 1,000-line rule).
 
 use super::*;
+use crate::card_link::{CardLink, PageLink};
+use crate::snapshot::Snapshot;
 
 // a plan's own card (plan-ok): its own file, beside the drafts' batch card
 #[path = "page_plan.rs"]
@@ -24,103 +26,99 @@ pub(super) enum Page {
 }
 
 impl Shell {
-    /// The snapshot's pages (docs/ambient-pages.md §2.3), newest first, and
-    /// each card's page link. Moved out of Shell::snapshot unchanged
-    /// (architect m_12280).
-    pub(super) fn snapshot_pages(&mut self, snap: &mut Value) {
+    /// The snapshot's pages (docs/ambient-pages.md §2.3), newest first,
+    /// and his late promises (checklist rows of his past data-due): a
+    /// count for the morning page and the menu bar, never a card. Its one
+    /// writer (daemon.rs `snapshot`).
+    pub(super) fn snapshot_pages(&self, snap: &mut Snapshot) {
         if let Some(p) = &self.pg.pages {
-            snap["pages"] = json!(p.list_json());
-            snap["pages_url"] = json!(p.base());
-            // his late promises (checklist rows of his past data-due): a
-            // count for the morning page and the menu bar, never a card
-            snap["overdue"] = json!(p.overdue());
-            // a page question's card links its block (fn + ⏎ opens it)
-            let p = p.clone();
-            let qs = self.page_cards().clone();
-            let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
-            let n = self.pg.card_links.len();
-            self.pg.card_links.retain(|c, _| open.contains(c));
-            if self.pg.card_links.len() != n {
-                self.save_card_links();
+            snap.pages = p.list_rows();
+            snap.overdue = u32::try_from(p.overdue()).unwrap_or(u32::MAX);
+        }
+    }
+
+    /// Each open card's links (its one writer): an agent's card linked
+    /// with `sb notify --page`, its options' artifacts with `--open`
+    /// (card_link.rs); a page question's or step's card its block (fn + ⏎
+    /// opens it), a drafts batch or a plan its page; every linked card
+    /// says what it is about in one link, pages included (card-links,
+    /// architect m_27431).
+    pub(super) fn snapshot_card_links(&mut self, snap: &mut Snapshot) {
+        let Some(p) = self.pg.pages.clone() else { return };
+        let qs = self.page_cards().clone();
+        let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+        let n = self.pg.card_links.len();
+        self.pg.card_links.retain(|c, _| open.contains(c));
+        if self.pg.card_links.len() != n {
+            self.save_card_links();
+        }
+        for c in &mut snap.cards {
+            if let Some(link) = self.pg.card_links.get(&c.id) {
+                if link.page.is_some() {
+                    c.page = link.page.clone();
+                }
+                if link.artifact.is_some() {
+                    c.artifact = link.artifact.clone();
+                }
+                if !link.opens.is_empty() {
+                    c.opens = link.opens.clone();
+                }
             }
-            if let Some(cards) = snap["cards"].as_array_mut() {
-                for c in &mut *cards {
-                    // an agent's card linked with `sb notify --page`, its
-                    // options' artifacts with `--open` (card_link.rs)
-                    if let Some(link) = c["id"].as_u64().and_then(|n| self.pg.card_links.get(&n)) {
-                        if let Some(page) = link.get("page") {
-                            c["page"] = page.clone();
-                        }
-                        if let Some(a) = link.get("artifact") {
-                            c["artifact"] = a.clone();
-                        }
-                        if let Some(opens) = link.get("opens") {
-                            c["opens"] = opens.clone();
-                        }
-                    }
-                    let Some((id, block)) = c["id"].as_u64().and_then(|n| qs.get(&n)) else { continue };
-                    // drafts batched in one card: the page opens at the
-                    // first (ambient-lead m_5977)
-                    if let Some((b, anchor)) = block.strip_prefix("drafts:").and_then(|k| k.split_once(':')) {
-                        let url = format!("{}#{}", p.url(id), anchor);
-                        // its 1 review opens the page (an artifact) at
-                        // the first, in the app, nothing sent (notif-open)
-                        c["opens"] = crate::card_link::opens_json(&[(1, bise_proto::rows::OptAct::artifact(id, Some(anchor), Some(&url)))]);
-                        c["page"] = json!({"id": id, "block": b, "item": anchor, "drafts": true, "url": url});
-                        // its fields for the capsule's words (amb-web
-                        // m_6061): {count, title, what, names}
-                        let card = c["id"].as_u64();
-                        if let Some(s) = p.store.steps(id).into_iter().find(|s| Some(s.card) == card && !s.info.is_null()) {
-                            c["batch"] = s.info;
-                        }
-                        continue;
-                    }
-                    // a plan's own card (plan-ok): the page at the plan; its
-                    // last option ('open the plan and its alternatives')
-                    // opens it in the app, nothing sent (notif-open)
-                    if let Some(b) = block.strip_prefix("plan:") {
-                        let url = format!("{}#{}", p.url(id), b);
-                        let n = c["text"].as_str().map_or(0, |t| bise_proto::rows::split_choices(t).1.len()) as u32;
-                        if n > 0 {
-                            c["opens"] = crate::card_link::opens_json(&[(n, bise_proto::rows::OptAct::artifact(id, Some(b), Some(&url)))]);
-                        }
-                        c["page"] = json!({"id": id, "block": b, "url": url});
-                        // its chip, '↗ lean installs · page · v1' (designer m_26845)
-                        if let Some(meta) = p.store.meta(id) {
-                            c["page"]["title"] = json!(meta.title);
-                            c["page"]["v"] = json!(meta.version());
-                        }
-                        continue;
-                    }
-                    // a step of his: its row (roadmap D)
-                    c["page"] = match block.strip_prefix("row:").and_then(|k| k.split_once('/')) {
-                        Some((b, item)) => json!({"id": id, "block": b, "item": item, "url": format!("{}#{}", p.url(id), item)}),
-                        None => json!({"id": id, "block": block, "url": format!("{}#{}", p.url(id), block)}),
-                    };
-                    // the card's chip, '↗ <title> · page · v<n>' (notif-artifact)
-                    if let Some(meta) = p.store.meta(id) {
-                        c["page"]["title"] = json!(meta.title);
-                        c["page"]["v"] = json!(meta.version());
-                    }
-                    // a drawn pick: its options' why lines, the agent's own;
-                    // past 4 options its last one opens the page for the rest
-                    if let Some(q) = p.store.questions(id).into_iter().find(|q| q.block == *block && q.pick.is_some()) {
-                        if let Some((n, _)) = q.more() {
-                            let url = format!("{}#{}", p.url(id), block);
-                            c["opens"] = crate::card_link::opens_json(&[(n as u32, bise_proto::rows::OptAct::artifact(id, Some(block), Some(&url)))]);
-                        }
-                        c["pick"] = json!(q.pick);
-                    }
+            let Some((id, block)) = qs.get(&c.id) else { continue };
+            // drafts batched in one card: the page opens at the first
+            // (ambient-lead m_5977)
+            if let Some((b, anchor)) = block.strip_prefix("drafts:").and_then(|k| k.split_once(':')) {
+                let url = format!("{}#{}", p.url(id), anchor);
+                // its 1 review opens the page (an artifact) at the first,
+                // in the app, nothing sent (notif-open)
+                c.opens = BTreeMap::from([(1, bise_proto::rows::OptAct::artifact(id, Some(anchor), Some(&url)))]);
+                c.page = Some(PageLink { id: id.clone(), block: Some(b.into()), item: Some(anchor.into()), drafts: true, url, ..PageLink::default() });
+                // its fields for the capsule's words (amb-web m_6061):
+                // {count, title, what, names}
+                if let Some(s) = p.store.steps(id).into_iter().find(|s| s.card == c.id && !s.info.is_null()) {
+                    c.batch = serde_json::from_value(s.info).ok();
                 }
-                // every linked card says what it is about in one link,
-                // pages included (card-links, architect m_27431)
-                for c in cards.iter_mut().filter(|c| c.get("artifact").is_none()) {
-                    if let Some(a) = c.get("page").and_then(crate::card_link::art_of_page) {
-                        c["artifact"] = a;
-                    }
+                continue;
+            }
+            // a plan's own card (plan-ok): the page at the plan; its last
+            // option ('open the plan and its alternatives') opens it in
+            // the app, nothing sent (notif-open)
+            if let Some(b) = block.strip_prefix("plan:") {
+                let url = format!("{}#{}", p.url(id), b);
+                let n = bise_proto::rows::split_choices(&c.text).1.len() as u32;
+                if n > 0 {
+                    c.opens = BTreeMap::from([(n, bise_proto::rows::OptAct::artifact(id, Some(b), Some(&url)))]);
                 }
+                // its chip, '↗ lean installs · page · v1' (designer m_26845)
+                c.page = Some(PageLink { id: id.clone(), block: Some(b.into()), url, ..Self::page_chip(&p, id) });
+                continue;
+            }
+            // a step of his: its row (roadmap D); the card's chip, '↗
+            // <title> · page · v<n>' (notif-artifact)
+            c.page = Some(match block.strip_prefix("row:").and_then(|k| k.split_once('/')) {
+                Some((b, item)) => PageLink { id: id.clone(), block: Some(b.into()), item: Some(item.into()), url: format!("{}#{}", p.url(id), item), ..Self::page_chip(&p, id) },
+                None => PageLink { id: id.clone(), block: Some(block.clone()), url: format!("{}#{}", p.url(id), block), ..Self::page_chip(&p, id) },
+            });
+            // a drawn pick: its options' why lines, the agent's own; past
+            // 4 options its last one opens the page for the rest
+            if let Some(q) = p.store.questions(id).into_iter().find(|q| q.block == *block && q.pick.is_some()) {
+                if let Some((n, _)) = q.more() {
+                    let url = format!("{}#{}", p.url(id), block);
+                    c.opens = BTreeMap::from([(n as u32, bise_proto::rows::OptAct::artifact(id, Some(block), Some(&url)))]);
+                }
+                c.pick = q.pick;
             }
         }
+        for c in snap.cards.iter_mut().filter(|c| c.artifact.is_none()) {
+            c.artifact = c.page.as_ref().and_then(crate::card_link::art_of_page);
+        }
+    }
+
+    /// A page's chip on its card: its title and version (none when it is
+    /// gone).
+    fn page_chip(p: &crate::pages::Pages, id: &str) -> PageLink {
+        let meta = p.store.meta(id);
+        PageLink { title: meta.as_ref().map(|m| m.title.clone()), v: meta.as_ref().map(|m| m.version()), ..PageLink::default() }
     }
 
     /// `sb notify --page|--artifact <id>[#<item>]` and `--open
@@ -128,31 +126,28 @@ impl Shell {
     /// isn't there is refused before the card opens (pm's B m_6008).
     /// Ok(None): no link; Ok(Some): the card's link `{page?, artifact?,
     /// opens?}` (card_link.rs, card-links); Err: the refusal's words.
-    pub(super) fn card_page_link(&self, cmd: &str, v: &Value) -> Result<Option<Value>, String> {
+    pub(super) fn card_page_link(&self, cmd: &str, v: &Value) -> Result<Option<CardLink>, String> {
         if cmd != "card" {
             return Ok(None);
         }
         let store = crate::artifacts::Store::new(&self.opts.paths.state);
         let art = |id: &str| store.get(id);
-        let mut link = serde_json::Map::new();
+        let mut link = CardLink::default();
         if let Some(spec) = v.get("artifact").or(v.get("page")).and_then(Value::as_str) {
             let (page, a) = crate::card_link::artifact(self.pg.pages.as_deref(), &art, spec)?;
-            if let Some(p) = page {
-                link.insert("page".into(), p);
-            }
-            link.insert("artifact".into(), a);
+            link.page = page;
+            link.artifact = Some(a);
         }
         let specs: Vec<&str> = v.get("open").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
         if !specs.is_empty() {
-            let opens = specs.iter().map(|s| crate::card_link::open_act(self.pg.pages.as_deref(), &art, s)).collect::<Result<Vec<_>, _>>()?;
-            link.insert("opens".into(), crate::card_link::opens_json(&opens));
+            link.opens = specs.iter().map(|s| crate::card_link::open_act(self.pg.pages.as_deref(), &art, s)).collect::<Result<_, _>>()?;
         }
-        Ok((!link.is_empty()).then_some(Value::Object(link)))
+        Ok((link != CardLink::default()).then_some(link))
     }
 
     /// The card that step opened (an open card not in `before`) gets its
     /// link (`{page?, opens?}`), saved, and the clients see it at once.
-    pub(super) fn link_new_card(&mut self, before: &[u64], l: Value) {
+    pub(super) fn link_new_card(&mut self, before: &[u64], l: CardLink) {
         let new = self.hub.st.open_cards().map(|c| c.id).filter(|c| !before.contains(c)).max();
         if let Some(card) = new {
             self.pg.card_links.insert(card, l);
