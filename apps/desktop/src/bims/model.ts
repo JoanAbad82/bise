@@ -218,7 +218,8 @@ export type LayoutFn = (agents: readonly Agent[], map?: MapId) => Office;
 /** timeline.ts `newTimeline`: one per mounted office, fed at each snapshot change and each frame. */
 export interface Timeline {
   /** a new snapshot's activities (or the same ones at a later t): new segments for what changed */
-  update(acts: ReadonlyMap<string, Activity>, office: Office, t: number, events: readonly BimEvent[]): void;
+  /** `beds`: the lounge spots with a bean bag at this stage (growth.ts bedsAt; all when absent): past them a napper naps at its desk */
+  update(acts: ReadonlyMap<string, Activity>, office: Office, t: number, events: readonly BimEvent[], beds?: number): void;
   /** where a bim is at t; null for one the timeline doesn't know (or that has left) */
   poseAt(name: string, t: number): Pose | null;
   /** the bims on the map at t, a leaving one until it's out */

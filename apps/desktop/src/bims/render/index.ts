@@ -4,7 +4,7 @@
 // one bim per BimFrame posed by pose.ts (bim.ts), his paper planes (plane.ts), through the iso
 // camera (camera.ts); it answers where heads are and what is under a point (pick.ts). It renders
 // only when frame() is called and says how the loop must run next (Motion). The look is style.ts.
-// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, head } for the
+// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, head, zoom } for the
 // headless check (bims-qa).
 import { Color, Mesh, MeshBasicMaterial, OrthographicCamera, PCFShadowMap, RingGeometry, Scene, Vector3, WebGLRenderer } from 'three';
 import type { Agent } from '@/proto';
@@ -34,6 +34,8 @@ interface Probe {
   frames: number;
   trace: { t: number; name: string; x: number; z: number; op: number }[];
   head(name: string): { x: number; y: number } | null;
+  /** his camera's zoom now (zoom.ts Cam; 1 = the fit): the follow check reads how close it looks */
+  zoom(): number;
 }
 const TRACE_MAX = 3000;
 /** his plane's length in office units (plane.ts's wings), its least length on screen, and the iso view's shortening of it */
@@ -84,7 +86,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   const halos = new Map<string, Mesh>();
 
   const probe: Probe | null = testMode()
-    ? { frames: 0, trace: [], head: (name) => headOf(name) }
+    ? { frames: 0, trace: [], head: (name) => headOf(name), zoom: () => cam.zoom }
     : null;
   if (probe) (window as unknown as { __biseBims?: Probe }).__biseBims = probe;
 

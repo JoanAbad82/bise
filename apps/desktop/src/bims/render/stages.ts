@@ -8,14 +8,13 @@
 // Owner: bims-grow.
 import { Group, type Object3D } from 'three';
 import type { Box, Office, Pt } from '../model';
-import type { Grow } from '../growth';
+import { bedsAt, type Grow } from '../growth';
 import { type Decor, decorOf } from './decor';
 import { type Kit, boxOf, glyph, onFloor } from './kit';
 import { WORLD, hash, rng } from './palette';
 import type { Build } from './maps/look';
 
 
-const BEANS = [0, 0, 0, 2, 2, 4, 4, 4, 8] as const;
 const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;
 const at = <T>(xs: readonly T[], i: number): T => xs[Math.min(i, xs.length - 1)] as T;
 
@@ -148,7 +147,7 @@ export function loftLounge(b: Build): void {
   if (s3 && lz.length) k.add(style.box(l1 - l0, 0.02, Math.max(...lz) - Math.min(...lz) + 1.1), k.mat(pal.rug), s3, (l0 + l1) / 2, 0.035, (Math.min(...lz) + Math.max(...lz)) / 2);
   const isBean = (b: Box): boolean => b.of !== undefined && o.lounge.some((l) => l.x === b.of?.x && l.z === b.of.z);
   const beans = boxes.filter(isBean);
-  const nBeans = at(BEANS, g.stage);
+  const nBeans = bedsAt(g.stage);
   beans.forEach((b, i) => {
     if (i >= nBeans) return;
     const st = i < 2 ? 3 : i < 4 ? 5 : 8;

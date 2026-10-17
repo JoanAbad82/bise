@@ -251,13 +251,19 @@
 .app-panel.app-rb[data-wide='over']:not(.over) {
   justify-self: end;
   position: relative;
-  z-index: 3;
+  /* over the thread's composer and its pick (z 10, composer.css), solid like the sliding bar
+     (.app-panel.over): through the window's translucent ground the composer showed in the rows
+     (designer m_28601) */
+  z-index: 11;
+  background: var(--c-solid);
   box-shadow: var(--e-3);
 }
 /* the AGENTS head's small toggles: 'bims' (the office above the rows), '320 | wide' */
 .bims-switch {
   display: inline-flex;
   flex: none;
+  /* the group's gap before 'all ›': 'hide all ›' read as one action (designer m_28601) */
+  margin-right: var(--s-4);
   gap: 0;
   color: var(--c-text-3);
   font-size: var(--t-11);
@@ -277,6 +283,10 @@
 }
 .bims-switch > .bims-opt[aria-pressed='true'] {
   color: var(--c-text);
+}
+.bims-switch > .bims-sep {
+  padding: 0 1px;
+  user-select: none;
 }
 .bims-switch > .bims-opt:focus-visible {
   outline: 2px solid var(--c-focus);

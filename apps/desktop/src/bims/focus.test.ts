@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aimAt, bimsLit, easeCam, edgeOf, FOLLOW_ZOOM, followOf, settled } from './focus';
+import { MAX_ZOOM } from './zoom';
 import { foldOf } from './Fold';
 import { FIT } from './zoom';
 
@@ -27,6 +28,10 @@ describe('the follow camera', () => {
     const corner = aimAt(0, 1);
     expect(corner.u).toBeCloseTo(0.5 / FOLLOW_ZOOM);
     expect(corner.v).toBeCloseTo(1 - 0.5 / FOLLOW_ZOOM);
+  });
+  it('looks about twice as close as the first follow (his shot: the bim and its desk fill the view), within his pinch', () => {
+    expect(FOLLOW_ZOOM).toBeGreaterThanOrEqual(4);
+    expect(FOLLOW_ZOOM).toBeLessThanOrEqual(MAX_ZOOM);
   });
   it('eases there in about 300 ms, at once under reduced motion', () => {
     const to = aimAt(0.3, 0.6);

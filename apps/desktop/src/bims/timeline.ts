@@ -88,7 +88,7 @@ export function newTimeline(): Timeline {
   };
 
   return {
-    update(acts: ReadonlyMap<string, Activity>, next: Office, t: number, events: readonly BimEvent[]): void {
+    update(acts: ReadonlyMap<string, Activity>, next: Office, t: number, events: readonly BimEvent[], beds?: number): void {
       const first = office === null;
       // a room that grew (the loft's rows, its 3 columns) or another map: its world is rebuilt, every bim at its spot in it
       const rebuilt = office !== null && (office.map !== next.map || office.size !== next.size);
@@ -100,11 +100,12 @@ export function newTimeline(): Timeline {
       for (const [name, row] of acts) {
         let b = bims.get(name);
         if (b?.over && t >= b.over.until) b.over = null;
-        const act = b?.over?.act ?? row;
+        const act = bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, beds);
         const sig = sigOf(act);
         const last = b?.segs.at(-1);
         const fixed = fixedSpot(next, name, act);
-        if (b && last && !b.leaving && last.sig === sig && !rebuilt && (!fixed || near(fixed, last.spot))) continue;
+        // a napper at its desk goes to a bean bag built since (bedFor): the same sig, another place
+        if (b && last && !b.leaving && last.sig === sig && last.act.at === act.at && !rebuilt && (!fixed || near(fixed, last.spot))) continue;
         if (b?.key) held.delete(b.key);
         const shared = fixed ? null : sharedSpot(next, act.at as Shared, held, b?.pref);
         const spot = fixed ?? shared?.spot ?? next.door;
@@ -224,6 +225,19 @@ function fixedSpot(o: Office, name: string, act: Activity): Spot | null {
     default:
       return null;
   }
+}
+
+/**
+ * A napper with no bean bag free at this stage (`beds`: the lounge spots that have one) naps at its
+ * desk, head down: never lying in the air where a bean bag isn't built yet (his bug, bims-fix). The
+ * bean bag it holds stays its own. Pure.
+ */
+function bedFor(act: Activity, mine: string | null, held: ReadonlyMap<string, string>, spots: number, beds: number | undefined): Activity {
+  if (act.k !== 'nap' || act.at !== 'lounge') return act;
+  const n = Math.min(spots, beds ?? spots);
+  const free = (i: number): boolean => { const k = `lounge:${String(i)}`; return k === mine || !held.has(k); };
+  for (let i = 0; i < n; i++) if (free(i)) return act;
+  return { ...act, at: 'desk' };
 }
 
 /** the first free spot of that kind (its last one if free); all taken: standing beside one; none: null */

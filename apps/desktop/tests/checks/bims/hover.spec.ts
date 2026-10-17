@@ -11,7 +11,7 @@
 // Shots: .harness-cache/bims-shots (index.html), for bims and designer to sign. Owner: bims-hover.
 import { test, expect } from '../../harness';
 import type { Session } from '../../harness';
-import { office } from '../../../src/bims/fixtures';
+import { agent, office, snap } from '../../../src/bims/fixtures';
 import { bims } from '../../../src/proto/words_bims.gen';
 import { thread } from '../../../src/proto/words_thread.gen';
 import { Recorder, type Box } from '../../harness';
@@ -220,4 +220,144 @@ for (const theme of ['light', 'dark'] as const) {
       }
     });
   }
+}
+
+// ---- bims-fix (his two asks, main m_28300) ----------------------------------------------------
+
+/** the follow camera's zoom now (the renderer's probe; 1 = the fit) */
+const zoomNow = (s: Session): Promise<number> =>
+  s.page.evaluate(() => (window as unknown as { __biseBims?: { zoom: () => number } }).__biseBims?.zoom() ?? 0);
+
+/** the element at the centre of a test id's box is that element (or inside it): shown, not covered */
+async function onTop(s: Session, id: string): Promise<boolean> {
+  return s.page.evaluate((t) => {
+    const el = document.querySelector(`[data-testid="${t}"]`);
+    if (el === null) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4 || r.right > window.innerWidth || r.bottom > window.innerHeight || r.left < 0 || r.top < 0) return false;
+    const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return at !== null && (at === el || el.contains(at));
+  }, id);
+}
+
+// (f) the cube in his window state (the right bar open, a 1280 px window) and the AGENTS head's 'hide'
+for (const theme of ['light', 'dark'] as const) {
+  test(`(f) the cube in his window, and 'hide' in the AGENTS head at 320 and wide, ${theme}`, async () => {
+    const { s } = await open(office, { theme, width: 1280 });
+    try {
+      const icon = s.page.getByTestId('app.title.bims');
+      await expect(s.page.getByTestId('app.panel')).toBeVisible();
+      expect(await onTop(s, 'app.title.bims'), 'the cube shown, on top, inside the window').toBe(true);
+      // the cube left of the right bar's toggle, on its line
+      const cb = await icon.boundingBox();
+      const pb = await s.page.getByTestId('app.title.panel').boundingBox();
+      if (cb === null || pb === null) throw new Error('no cube or no right bar toggle');
+      expect(cb.x + cb.width).toBeLessThanOrEqual(pb.x + 1);
+      expect(Math.abs(cb.y + cb.height / 2 - (pb.y + pb.height / 2))).toBeLessThan(2);
+      await expect(s.page.getByTestId('app.right.agents.hide')).toHaveCount(0);
+      await s.page.mouse.move(5, 400);
+      await shot(s, `fix-f-cube-${theme}.png`, `his window (1280, the right bar open), ${theme}: the cube`, "the 16 px cube just left of the right bar's toggle; closed, AGENTS shows no 'hide'", 'app.title');
+      for (const wide of [false, true]) {
+        const w = wide ? 'wide' : '320';
+        await icon.click();
+        await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
+        await s.page.getByTestId(wide ? 'app.right.agents.width.wide' : 'app.right.agents.width.narrow').click();
+        await sleep(400);
+        const hide = s.page.getByTestId('app.right.agents.hide');
+        await expect(hide).toBeVisible();
+        expect(await onTop(s, 'app.right.agents.hide'), `'hide' shown and on top at ${w}`).toBe(true);
+        await expect(hide).toHaveText(bims.hide);
+        await settle(s, 800, 6000);
+        await s.page.mouse.move(5, 400);
+        await shot(s, `fix-f-hide-${w}-${theme}.png`, `the office open at ${w}, ${theme}`, "'320  wide · hide  all ›' in the AGENTS head: 'hide' in the switch's look, text-3, never pink", 'app.right.agents');
+        await hide.hover();
+        await sleep(700);
+        await shot(s, `fix-f-hide-hover-${w}-${theme}.png`, `'hide' hovered at ${w}, ${theme}`, `ink, the hover tint, its tip '${bims.hide_tip}'`, 'app.right.agents');
+        await hide.click();
+        await expect(s.page.getByTestId('app.right.bims.fold')).toHaveCount(0, { timeout: 2000 });
+        await expect(icon).toHaveAttribute('aria-pressed', 'false');
+        await expect(hide).toHaveCount(0);
+        await expect(s.page.getByTestId('app.panel')).toBeVisible();
+      }
+    } finally {
+      await s.close();
+    }
+  });
+}
+
+// (g) the follow camera close (his shot 3): the followed bim at least 3x its fit size on screen, at 320 and wide
+for (const wide of [false, true]) {
+  const w = wide ? 'wide' : '320';
+  test(`(g) the follow camera close, ${w}`, async () => {
+    const { s, core } = await open(office, { width: 1600 });
+    try {
+      await s.page.getByTestId('app.title.bims').click();
+      await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
+      if (wide) await s.page.getByTestId('app.right.agents.width.wide').click();
+      await grown(s, core);
+      await settle(s, 800, 6000);
+      expect(await zoomNow(s)).toBeCloseTo(1);
+      await shot(s, `fix-g-fit-${w}.png`, `the whole office, ${w}`, 'the fit, before he opens an agent');
+      // at its left: wide slid over, the 320 column's resize border runs down the bar's middle
+      await s.page.getByTestId('app.right.agent.signup-perf').click({ position: { x: 24, y: 10 } });
+      await s.page.mouse.move(5, 300);
+      await expect.poll(() => zoomNow(s), { timeout: 3000 }).toBeGreaterThanOrEqual(3);
+      await settle(s, 800, 6000);
+      // its head on the canvas, near the middle (the camera aims at it), inside the frame
+      const h = await headOf(s.page, 'signup-perf');
+      const box = await s.page.getByTestId('app.right.bims.canvas').boundingBox();
+      if (h === null || box === null) throw new Error('signup-perf off the view');
+      expect(h.x).toBeGreaterThan(box.x);
+      expect(h.x).toBeLessThan(box.x + box.width);
+      expect(h.y).toBeGreaterThan(box.y);
+      expect(h.y).toBeLessThan(box.y + box.height);
+      await shot(s, `fix-g-follow-${w}.png`, `signup-perf opened, ${w} (zoom ${(await zoomNow(s)).toFixed(1)}x)`, 'the bim and its desk fill a good part of the view, about his shot 3');
+      await s.page.getByTestId('app.right.agent.login-test').click({ position: { x: 24, y: 10 } });
+      await s.page.mouse.move(5, 300);
+      await sleep(500);
+      await settle(s, 800, 6000);
+      expect(await zoomNow(s)).toBeGreaterThanOrEqual(3);
+      await shot(s, `fix-g-follow-next-${w}.png`, `login-test opened, ${w}`, 'the camera moved to login-test, as close, held inside the office');
+      // '⤢ fit': the whole office again
+      await s.page.getByTestId('app.right.bims.fit').click();
+      await expect.poll(() => zoomNow(s), { timeout: 3000 }).toBeCloseTo(1);
+    } finally {
+      await s.close();
+    }
+  });
+}
+
+// (h) his ai-docs office (main m_28473): idle bims nap only on a bean bag the stage built; past them, at their desk
+const NAPPERS = snap([
+  agent('main', { main: true, place_id: '', status: 'idle' }),
+  ...['docs-a', 'docs-b', 'docs-c', 'docs-d'].map((n) => agent(n, { status: 'idle', title: 'idle' })),
+  agent('etrade-question', { status: 'working', title: 'reads the api', turn_ms: 60_000 }),
+]);
+for (const [stage, jobs] of [[0, 0], [3, 6]] as const) {
+  test(`(h) nappers at stage ${String(stage)}: on a built bean bag or at their desk, never in the air`, async () => {
+    const g = { jobs_done: jobs, days_used: 1, artifacts_made: 0 };
+    const { s, core } = await open(NAPPERS, { width: 1600, growth: g });
+    try {
+      await s.page.getByTestId('app.title.bims').click();
+      await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
+      // the check's growth, then the hub's event (as grow.spec): the office draws this stage
+      await s.page.evaluate((x) => { (window as unknown as { __biseGrow?: unknown }).__biseGrow = x; }, g);
+      await core.send({ ev: 'growth', project: P, growth: g } as never);
+      await expect.poll(() => s.page.getByTestId('app.right.bims').getAttribute('data-stage'), { timeout: 5000 }).toBe(String(stage));
+      await settle(s, 800, 8000);
+      await s.page.mouse.move(5, 400);
+      const where = stage === 0 ? 'no bean bag yet: the four nap at their desks, heads down' : 'two bean bags: two nap on them, the others at their desks';
+      await shot(s, `fix-h-nap-stage${String(stage)}.png`, `idle bims at stage ${String(stage)}`, where);
+      // close on two of them (the follow camera): a bean bag under the one in the lounge, a desk under the other
+      for (const n of ['docs-a', 'docs-c']) {
+        await s.page.getByTestId(`app.right.agent.${n}`).click({ position: { x: 24, y: 10 } });
+        await s.page.mouse.move(5, 400);
+        await sleep(500);
+        await settle(s, 800, 6000);
+        await shot(s, `fix-h-nap-stage${String(stage)}-${n}.png`, `${n} at stage ${String(stage)}, close`, 'lying on a bean bag the stage built, or head down at its desk: never in the air');
+      }
+    } finally {
+      await s.close();
+    }
+  });
 }

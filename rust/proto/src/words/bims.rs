@@ -72,6 +72,10 @@ crate::words! { bims:
     width_narrow_tip = "the bar at 320 px, the office fit to it";
     /// the wide width's tip
     width_wide_tip = "the bar at 640 px while the office shows";
+    /// the AGENTS head's control that hides the office while it shows, after the width switch (his ask, bims-fix: he couldn't find how to hide it)
+    hide = "hide";
+    /// its tip: the title bar's cube opens it again (designer m_28303)
+    hide_tip = "hide the office · the cube in the title bar brings it back";
     /// one line over the list when the office can't draw (WebGL lost)
     lost = "can't draw the office here";
 

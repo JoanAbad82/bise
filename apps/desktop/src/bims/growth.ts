@@ -18,6 +18,14 @@ export const GARDEN_AT = [1, 3, 7, 14, 30, 60, 100, 365] as const;
 export const FRAME_EVERY = 10;
 export const FRAMES_MAX = 30;
 export const GOLDEN_AT = 500;
+
+/** the lounge's bean bags built at each stage (the last count holds past it): bean bag i stands on lounge spot i */
+const BEDS = [0, 0, 0, 2, 2, 4, 4, 4, 8] as const;
+
+/** How many of the lounge's spots have a bean bag at this stage: a bim naps only on one (his bug, bims-fix: they lay in the air). Pure. */
+export function bedsAt(stage: number): number {
+  return BEDS[Math.max(0, Math.min(stage, BEDS.length - 1))] ?? 0;
+}
 /** the share of the way to the next stage past which its cones stand */
 export const BUILD_AT = 0.7;
 /** the unlock moment: two bims walk the piece in from the door (s), then its label shows (s) */

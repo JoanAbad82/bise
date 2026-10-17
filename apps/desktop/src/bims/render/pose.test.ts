@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity, ActivityKind, Doing, Path, Pose, Segment, Spot } from '../model';
 import { FADE, PLANE_CATCH, PLANE_FLIGHT, louder, placeOf, rigOf, transitionOf, workLoops } from './pose';
+import type { BimEgg } from '../eggs';
+import { eggRig } from './egg';
+import { headClearance } from './laptop';
 
 const desk: Spot = { x: 3, z: 6, wz: 5.35, ax: 1.2, face: 0 };
 const lounge: Spot = { x: -4, z: 1, wz: 4, ax: -4, face: 0 };
@@ -181,5 +184,38 @@ describe('louder', () => {
     expect(louder('still', 'loop')).toBe('loop');
     expect(louder('loop', 'walk')).toBe('walk');
     expect(louder('still', 'still')).toBe('still');
+  });
+});
+
+describe('pose: asleep at its desk, the head clear of the laptop (his bug, bims-fix)', () => {
+  // a napper with no bean bag built naps at its desk (timeline.ts bedFor): the same pose
+  const sleepers: readonly ActivityKind[] = ['sleep', 'waitagent', 'nap'];
+  const eggs = (since: number): (BimEgg | null)[] => [
+    null,
+    { kind: 'lookup', since: 0, dur: Infinity, label: '' },
+    { kind: 'stare', since: 0, dur: Infinity, label: '!' },
+    ...[0, 0.2, 0.4, 0.6, 0.8].map((u): BimEgg => ({ kind: 'dance', since: since + u * 9, dur: 30, label: '' })),
+    // the konami salto (a 1.2 s back flip from the chair, every seated bim) sweeps through its desk by
+    // nature: a flip, not the sleep pose; its start and end are the pose itself
+    ...[0, 1].map((u): BimEgg => ({ kind: 'salto', since: u * 1.2, dur: 1.2, label: '' })),
+  ];
+  it('at rest, any time, with every egg a sleeper can get', () => {
+    for (const k of sleepers) {
+      for (const t of [0, 1.3, 2.7, 5, 9.1]) {
+        for (const e of eggs(t)) {
+          const r = eggRig(rig(poseOf(k, k === 'nap' ? { act: { at: 'desk' } } : {}), t), e);
+          expect(headClearance(r), `${k} at ${String(t)} s, egg ${e?.kind ?? 'none'}`).toBeGreaterThan(0.02);
+        }
+      }
+    }
+  });
+  it('all through its yawn from work, and through waking back to it', () => {
+    for (const k of sleepers) {
+      for (let s = 0; s <= 2; s += 0.05) {
+        const at = k === 'nap' ? { act: { at: 'desk' as const } } : {};
+        expect(headClearance(rig(poseOf(k, { from: 'work', since: s, ...at }), 10 + s)), `${k} from work at +${s.toFixed(2)} s`).toBeGreaterThan(0.02);
+        expect(headClearance(rig(poseOf('work', { from: k, since: s }), 10 + s)), `work from ${k} at +${s.toFixed(2)} s`).toBeGreaterThan(0.02);
+      }
+    }
   });
 });

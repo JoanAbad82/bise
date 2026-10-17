@@ -9,6 +9,7 @@ import type { Spot } from '../../model';
 import { decorOf } from '../decor';
 import { boxAhead, chair, deskLamp, laptop } from '../furniture';
 import { boxOf, glyph, onFloor } from '../kit';
+import { LAPTOP } from '../laptop';
 import { HOODIE, WORLD, hash, paletteOf } from '../palette';
 import { buildStages, islandLen, loftLounge, loftTree, pieceAt } from '../stages';
 import type { Build, DeskHandles, MapLook } from './look';
@@ -52,7 +53,7 @@ function mainDesk({ k, root, o }: Build): DeskHandles {
   const mdd = mb.z1 - mb.z0;
   k.add(style.box(mw - 0.1, 0.5, mdd - 0.1), k.mat(pal.desk), mg, 0, 0.25, 0);
   k.add(style.box(mw, 0.06, mdd), k.mat(pal.deskTop), mg, 0, 0.52, 0);
-  const screen = laptop(k, mg, md.x - mcx + 0.2, -0.03);
+  const screen = laptop(k, mg, md.x - mcx + 0.2, LAPTOP.dz);
   const lamp = deskLamp(k, mg, mw / 2 - 0.2, mdd / 2 - 0.2);
   k.add(style.box(0.7, 0.06, 0.5), k.mat(pal.wallTop), mg, -mw / 2 + 0.5, 0.58, 0);
   k.add(style.box(0.34, 0.24, 0.26), k.mat(WORLD.crate), mg, -mw / 2 + 0.5, 0.73, 0);
@@ -104,7 +105,7 @@ function desk({ k, root: parent, o }: Build, d: Spot, name: string): DeskHandles
   k.add(style.box(w, 0.06, dd, 0.03), k.mat(pal.deskTop), g, 0, 0.52, 0);
   // a small plate without text, in the colour of its bim's hoodie (spec §2)
   k.add(style.box(0.22, 0.08, 0.02), k.mat(HOODIE[h % HOODIE.length] ?? pal.desk), g, -w / 3, 0.4, dd / 2 - 0.03);
-  const screen = laptop(k, g, d.x - cx, -0.03);
+  const screen = laptop(k, g, d.x - cx, LAPTOP.dz);
   const lamp = deskLamp(k, g, w / 2 - 0.18, dd / 2 - 0.17);
   chair(k, parent, d.x, d.z - 0.05, HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, d.face);
   if (h % 3 === 0) k.add(style.cylinder(0.06, 0.12), k.mat(WORLD.paper), g, 0.42, 0.61, -0.2);

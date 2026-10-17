@@ -29,7 +29,7 @@ export const rowsOf = (snap: Snapshot): Record<string, unknown> => ({ ev: 'agent
 export const cardsOf = (snap: Snapshot): Record<string, unknown> => ({ ev: 'cards', project: P, cards: snap.cards.map((c) => ({ ...c, project: P })) });
 
 /** The start world: bise's home and one project whose bar shows `snap`. */
-export function world(snap: Snapshot, theme: 'light' | 'dark' = 'light'): Record<string, unknown>[] {
+export function world(snap: Snapshot, theme: 'light' | 'dark' = 'light', growth: Record<string, number> = { jobs_done: 100, days_used: 14, artifacts_made: 120 }): Record<string, unknown>[] {
   const working = snap.agents.filter((a) => a.status === 'working').length;
   const waits = snap.agents.reduce((n, a) => n + a.waits, 0);
   const now = Date.now();
@@ -46,7 +46,7 @@ export function world(snap: Snapshot, theme: 'light' | 'dark' = 'light'): Record
     rowsOf(snap),
     // a grown office (growth.ts stage 9: the lounge, the whiteboard, the terrace, the ramp), as
     // these checks drew it before the office grew; grow.spec.ts walks the stages
-    { ev: 'growth', project: P, growth: { jobs_done: 100, days_used: 14, artifacts_made: 120 } },
+    { ev: 'growth', project: P, growth },
     { ev: 'agents', project: HOME, agents: [{ name: 'main', main: true, status: 'idle', archived: false, title: '', purpose: '', since_ms: now, waits: 0, watching: [], dir: 'main' }] },
     cardsOf(snap),
     { ev: 'thread', project: P, agent: 'main', entries: [{ pos: 1, at_ms: now - MIN, kind: 'agent', text: 'the office is open.' }], before: null, more: false },
@@ -68,8 +68,9 @@ export const withRows = (base: Snapshot, over: Record<string, Partial<(typeof of
   agents: base.agents.map((a) => (over[a.name] === undefined ? a : { ...a, ...over[a.name] })),
 });
 
-export async function open(snapshot: Snapshot, o: { theme?: 'light' | 'dark'; reduced?: boolean; width?: number } = {}): Promise<{ s: Session; core: FakeCore }> {
-  const core = new FakeCore(world(snapshot, o.theme ?? 'light') as never);
+/** `growth`: the project's counters (a grown office, stage 9, when absent) */
+export async function open(snapshot: Snapshot, o: { theme?: 'light' | 'dark'; reduced?: boolean; width?: number; growth?: Record<string, number> } = {}): Promise<{ s: Session; core: FakeCore }> {
+  const core = new FakeCore(world(snapshot, o.theme ?? 'light', o.growth) as never);
   const s = await launchDesktop({ core, route: `project/${P}`, size: `${String(o.width ?? 1400)}x900` });
   if (o.reduced === true) await s.page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(s.page.getByTestId('app.title.bims')).toBeVisible({ timeout: 20_000 });

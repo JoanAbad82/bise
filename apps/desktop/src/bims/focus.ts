@@ -36,8 +36,11 @@ export function useBimsLit(): Lit | null {
   );
 }
 
-/** How close the follow camera looks (2.2x the fit). */
-export const FOLLOW_ZOOM = 2.2;
+/**
+ * How close the follow camera looks: 4.4x the fit (Gabriel, bims-fix: at 2.2x the bim was lost in
+ * the room; he wants it and its desk filling a good part of the view, about twice that).
+ */
+export const FOLLOW_ZOOM = 4.4;
 /** the follow camera's ease: about 300 ms to settle */
 const FOLLOW_TAU = 0.1;
 

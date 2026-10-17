@@ -4,6 +4,7 @@
 // and go grey (stopped). apply() copies a pose.ts Rig onto the meshes; nothing here decides.
 import { type BufferGeometry, Color, Group, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, type Object3D, Vector3 } from 'three';
 import { CHEEK, EYE, MOUTH, WORLD, outfitOf, type Outfit } from './palette';
+import { HEAD_Y } from './laptop';
 import type { Rig, Rot } from './pose';
 import type { Style } from './style';
 import type { Wear } from './maps/look';
@@ -60,7 +61,7 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
 
   add(style.capsule(0.21, 0.22), mat(o.hoodie), body, 0, 0.5, 0);
   const head = new Group();
-  head.position.set(0, 0.93, 0);
+  head.position.set(0, HEAD_Y, 0);
   body.add(head);
   add(style.ball(0.22), mat(o.skin), head, 0, 0, 0);
   const eyes = [-0.075, 0.075].map((ex) => add(style.box(0.07, 0.08, 0.02), mat(EYE), head, ex, 0.03, 0.205));

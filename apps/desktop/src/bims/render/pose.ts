@@ -192,6 +192,22 @@ export function workLoops(act: Activity): boolean {
   return act.doing === undefined || DOING_LOOPS.has(act.doing) || act.k === 'hot';
 }
 
+/** napping: sunk in a bean bag, facing the room */
+const napping: Body = {
+  ...STAND, y: 0.22, dz: 0.15, body: [-0.9, 0, 0], legL: -0.4, legR: -0.4, armL: [0, 0, -0.5], armR: [0, 0, 0.5],
+  eyes: 0.15, mouth: 'oh', face: 0,
+};
+
+/**
+ * asleep at its desk: head down on the arms in front of the laptop, eyes closed, screen off. Leaning
+ * less than the head bows: at 0.5 the head went through the lid (Gabriel, bims-fix; laptop.ts
+ * headClearance, pose.test.ts)
+ */
+const asleep: Body = {
+  ...STAND, ...SEATED, body: [0.3, 0, 0], head: [0.6, 0, 0], armL: [-1.4, 0, 0], armR: [-1.4, 0, 0],
+  eyes: 0.15, mouth: 'oh',
+};
+
 /** a kind's pose at rest, at loop time lt (lt is 0 under reduced motion) */
 function rest(act: Activity, lt: number, ph: number): Body {
   const k = act.k;
@@ -205,19 +221,12 @@ function rest(act: Activity, lt: number, ph: number): Body {
     case 'starting':
       // at the door: looks around, a little wave
       return { ...STAND, head: [0, 0.35, 0], armR: [0, 0, 2.4], face: Math.PI };
+    case 'nap':
+      // no bean bag free at this stage (timeline.ts bedFor): it naps at its desk, as one asleep
+      return act.at === 'desk' ? asleep : napping;
     case 'sleep':
     case 'waitagent':
-      // asleep at its desk: head down on the arms, eyes closed, screen off
-      return {
-        ...STAND, ...SEATED, body: [0.5, 0, 0], head: [0.55, 0, 0], armL: [-1.4, 0, 0], armR: [-1.4, 0, 0],
-        eyes: 0.15, mouth: 'oh',
-      };
-    case 'nap':
-      // sunk in a bean bag, facing the room
-      return {
-        ...STAND, y: 0.22, dz: 0.15, body: [-0.9, 0, 0], legL: -0.4, legR: -0.4, armL: [0, 0, -0.5], armR: [0, 0, 0.5],
-        eyes: 0.15, mouth: 'oh', face: 0,
-      };
+      return asleep;
     case 'snack': {
       const props = { ...NO_PROPS, pine: fruit === 0, orange: fruit === 1, mug: fruit === 2 };
       return { ...STAND, armR: [-1.5, 0, 0], head: [-0.1, 0, 0.06], mouth: 'laugh', eyes: 0.3, props };

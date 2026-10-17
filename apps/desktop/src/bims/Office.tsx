@@ -23,7 +23,7 @@ import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
 import { atFit, DRAG_PX, FIT, panBy, pinchFactor, sameCam, zoomAt, type Cam } from './zoom';
 import { clockSig, eggLabels, eggsAt, konamiDone, localOf, NO_EGGS, noteLands, withForced, type Forced, type Land } from './eggs';
-import { cropped, growOf, tipOf, UNLOCK_LABEL, UNLOCK_WALK, unlockLabel, unlockOf, type Grow } from './growth';
+import { bedsAt, cropped, growOf, tipOf, UNLOCK_LABEL, UNLOCK_WALK, unlockLabel, unlockOf, type Grow } from './growth';
 import { growHigh } from './grow-keep';
 import { FOLD_MS } from './Fold';
 import { placeZzz, sleepers } from './zzz';
@@ -63,6 +63,11 @@ export function BimsSwitch({ view }: { view: BimsView }) {
           {opt('width.wide', bims.width_wide, bims.width_wide_tip, view.wide, () => {
             bimsView.setWide(true);
           })}
+          {/* hiding it where he looks (his ask, bims-fix: the title bar's cube alone, he couldn't find it) */}
+          <span className="bims-sep" aria-hidden="true">·</span>
+          <Press look="bims-opt" {...tipAttrs(bims.hide_tip)} onClick={() => { bimsView.setView('list'); }} data-testid="app.right.agents.hide">
+            {bims.hide}
+          </Press>
         </span>
       )}
     </>
@@ -258,6 +263,8 @@ export function Office({
     const u = unlockOf(seen.current, growNow);
     if (u !== null) unlockAt.current = { stage: u, at: Date.now() / 1000 };
     seen.current = growNow;
+    // the timeline hears of it too: a napper at its desk takes a bean bag the stage built (timeline.ts bedFor)
+    live.current = { ...live.current, fresh: true };
     kickRef.current();
   }, [high, growNow]);
 
@@ -394,7 +401,7 @@ export function Office({
         }
         const acts = parts.activities(L.snap, t);
         lastActs = JSON.stringify([...acts]);
-        timeline.update(acts, office, t, L.events);
+        timeline.update(acts, office, t, L.events, bedsAt(grow.current.stage));
         L.events = [];
       }
       if (office === null) return;
@@ -667,6 +674,7 @@ export function Office({
       style={state === 'loading' ? ({ '--bims-ratio': String(lastRatio) } as CSSProperties) : undefined}
       data-pointer={pointer || undefined}
       data-zoomed={!fitted || undefined}
+      data-stage={growNow.stage}
       data-drag={dragging || undefined}
       onKeyDown={(e) => {
         keys.current = [...keys.current.slice(-9), e.key];

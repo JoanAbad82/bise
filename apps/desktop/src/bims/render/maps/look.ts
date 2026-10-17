@@ -51,7 +51,7 @@ export interface MapLook {
   shell(b: Build): void;
   /** the eating place (the loft's kitchen island, a riad's fountain) on Office.island */
   island(b: Build): void;
-  /** the nap place: a bed per lounge spot the stage has reached (the loft's bean bags) */
+  /** the nap place: a bed per lounge spot the stage has reached (growth.ts bedsAt: lounge spot i has one from that count, the loft's bean bags); a napper past them naps at its desk (timeline.ts bedFor) */
   lounge(b: Build): void;
   /** one agent's desk at its spot (its box in Office.furniture), its screen and lamp handed back */
   desk(b: Build, spot: Spot, name: string): DeskHandles;

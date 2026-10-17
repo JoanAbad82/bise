@@ -3,6 +3,7 @@ import { activities } from './activity';
 import { agent, crowd, mainAgent, office as officeSnap } from './fixtures';
 import { loftLayout as layoutOf } from './maps/loft';
 import type { Activity, BimEvent, Office, Pose } from './model';
+import { bedsAt, LAST_STAGE } from './growth';
 import { COFFEE_S, MAX_WALK_S, PLANE_S, SETTLE_S, SPEED, VISIT_S, newTimeline } from './timeline';
 
 /** a value the test knows is there */
@@ -147,19 +148,29 @@ describe('timeline', () => {
     expect(tl.poseAt('a1', 1)?.seg.speed).toBeGreaterThanOrEqual(SPEED.hurry);
   });
 
-  it('gives each napper its own bean bag, back to it after a snack; the 11th stands beside', () => {
+  it('gives each napper its own bean bag, back to it after a snack; past the last, at its desk (never lying beside one in the air)', () => {
     const o = office(12);
     const tl = newTimeline();
     const nappers = Array.from({ length: 11 }, (_, i) => `a${String(i + 1)}`);
     tl.update(new Map(nappers.map((n) => [n, NAP])), o, 0, []);
     const spots = nappers.map((n) => `${String(tl.poseAt(n, 0)?.x)},${String(tl.poseAt(n, 0)?.z)}`);
     expect(new Set(spots).size).toBe(11);
-    const beside = tl.poseAt('a11', 0);
-    expect(o.lounge.some((l) => l.x === beside?.x && l.z === beside.z)).toBe(false);
+    expect(o.lounge).toHaveLength(10);
+    expect(at(tl.poseAt('a11', 0))).toEqual({ x: o.desks.get('a11')?.x, z: o.desks.get('a11')?.z });
+    // a3 off for a snack: a11, at its desk, takes the bean bag it left; a3 back naps at its own desk
     const home = at(tl.poseAt('a3', 0));
     tl.update(new Map(nappers.map((n) => [n, n === 'a3' ? { k: 'snack', at: 'island', key: 1, fruit: 0 } : NAP])), o, 10, []);
     tl.update(new Map(nappers.map((n) => [n, NAP])), o, 20, []);
-    expect(at(tl.poseAt('a3', 30))).toEqual(home);
+    expect(at(tl.poseAt('a11', 30))).toEqual(home);
+    expect(at(tl.poseAt('a3', 30))).toEqual({ x: o.desks.get('a3')?.x, z: o.desks.get('a3')?.z });
+    // with nobody waiting for one, a napper back from its snack gets its own bean bag again
+    const few = nappers.slice(0, 10);
+    const tl2 = newTimeline();
+    tl2.update(new Map(few.map((n) => [n, NAP])), o, 0, []);
+    const home2 = at(tl2.poseAt('a3', 0));
+    tl2.update(new Map(few.map((n) => [n, n === 'a3' ? { k: 'snack', at: 'island', key: 1, fruit: 0 } : NAP])), o, 10, []);
+    tl2.update(new Map(few.map((n) => [n, NAP])), o, 20, []);
+    expect(at(tl2.poseAt('a3', 30))).toEqual(home2);
   });
 
   it('flies his paper plane to the agent he writes to', () => {
@@ -270,5 +281,59 @@ describe('timeline', () => {
       tl.update(acts(rows), o, 20, [msg('a1', 'a2', 5)]);
       expect(tl.poseAt('a1', 20)?.seg.act.k).toBe('work');
     });
+  });
+});
+
+describe('timeline: a napper lies only on a bean bag that is built (his bug, bims-fix)', () => {
+  it('no bean bag at this stage: every napper naps at its desk', () => {
+    const o = office();
+    const tl = newTimeline();
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP }), o, 10, [], bedsAt(0));
+    for (const n of ['a1', 'a2']) {
+      expect(at(tl.poseAt(n, 10))).toEqual({ x: o.desks.get(n)?.x, z: o.desks.get(n)?.z });
+      expect(tl.poseAt(n, 10)?.seg.act).toEqual({ k: 'nap', at: 'desk' });
+    }
+  });
+  it('two bean bags: the first two nappers on them, the third at its desk; staying put on the next update', () => {
+    const o = office();
+    const tl = newTimeline();
+    const beds = bedsAt(3);
+    expect(beds).toBe(2);
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 10, [], beds);
+    expect(at(tl.poseAt('a1', 10))).toEqual({ x: must(o.lounge[0]).x, z: must(o.lounge[0]).z });
+    expect(at(tl.poseAt('a2', 10))).toEqual({ x: must(o.lounge[1]).x, z: must(o.lounge[1]).z });
+    expect(at(tl.poseAt('a3', 10))).toEqual({ x: o.desks.get('a3')?.x, z: o.desks.get('a3')?.z });
+    const before = tl.poseAt('a1', 10)?.seg;
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 20, [], beds);
+    expect(tl.poseAt('a1', 20)?.seg).toBe(before);
+    expect(tl.moving(20)).toBe(false);
+  });
+  it('the stage grows (or its growth comes after the rows): a napper at its desk goes to the new bean bag', () => {
+    const o = office();
+    const tl = newTimeline();
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 10, [], 0);
+    expect(at(tl.poseAt('a1', 10))).toEqual({ x: o.desks.get('a1')?.x, z: o.desks.get('a1')?.z });
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 11, [], 2);
+    const end = 11 + MAX_WALK_S + 1;
+    expect(at(tl.poseAt('a1', end))).toEqual({ x: must(o.lounge[0]).x, z: must(o.lounge[0]).z });
+    expect(at(tl.poseAt('a2', end))).toEqual({ x: must(o.lounge[1]).x, z: must(o.lounge[1]).z });
+    expect(at(tl.poseAt('a3', end))).toEqual({ x: o.desks.get('a3')?.x, z: o.desks.get('a3')?.z });
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, end, [], 2);
+    expect(tl.moving(end)).toBe(false);
+  });
+  it('every stage: a napper in the lounge stands on a spot whose bean bag the stage built', () => {
+    const o = office(12);
+    for (let stage = 0; stage <= LAST_STAGE; stage++) {
+      const tl = newTimeline();
+      const all = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`a${String(i + 1)}`, NAP]));
+      tl.update(acts({ main: MAIN, ...all }), o, 10, [], bedsAt(stage));
+      for (const n of Object.keys(all)) {
+        const p = must(tl.poseAt(n, 10) ?? undefined);
+        const i = o.lounge.findIndex((l) => l.x === p.x && l.z === p.z);
+        if (p.seg.act.at === 'lounge') expect(i, `${n} at stage ${String(stage)}`).toBeGreaterThanOrEqual(0);
+        if (i >= 0) expect(i, `${n}'s bean bag at stage ${String(stage)}`).toBeLessThan(bedsAt(stage));
+        else expect(at(p), `${n} at its desk at stage ${String(stage)}`).toEqual({ x: o.desks.get(n)?.x, z: o.desks.get(n)?.z });
+      }
+    }
   });
 });

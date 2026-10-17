@@ -94,6 +94,16 @@
     "one": "+{n} name · hover a bim",
     "text": "+{n} names · hover a bim"
   },
+  "bims.hide": {
+    "args": [],
+    "one": null,
+    "text": "hide"
+  },
+  "bims.hide_tip": {
+    "args": [],
+    "one": null,
+    "text": "hide the office · the cube in the title bar brings it back"
+  },
   "bims.idle": {
     "args": [],
     "one": null,

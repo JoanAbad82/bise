@@ -4,19 +4,21 @@
 import { Group, type MeshLambertMaterial, type Object3D } from 'three';
 import type { Box, Pt } from '../model';
 import type { Kit } from './kit';
+import { LAPTOP } from './laptop';
 import { WORLD } from './palette';
 
-/** a laptop, its lid towards the one who sits at it (towards -z), its screen a material of its own */
+/** a laptop, its lid towards the one who sits at it (towards -z), its screen a material of its own; its sizes: laptop.ts LAPTOP (a sleeper's head stays clear of it) */
 export function laptop(k: Kit, parent: Object3D, x: number, z: number): MeshLambertMaterial {
   const { style, pal } = k;
-  k.add(style.box(0.5, 0.03, 0.34), k.mat(WORLD.metal), parent, x, 0.56, z);
+  const { base, lid: l } = LAPTOP;
+  k.add(style.box(base.w, base.h, base.d), k.mat(WORLD.metal), parent, x, base.y, z);
   const lid = new Group();
-  lid.position.set(x, 0.57, z + 0.16);
-  lid.rotation.x = 0.2;
+  lid.position.set(x, l.y, z + l.back);
+  lid.rotation.x = l.tilt;
   parent.add(lid);
-  k.add(style.box(0.5, 0.34, 0.025), k.mat(WORLD.metal), lid, 0, 0.17, 0);
+  k.add(style.box(l.w, l.h, l.d), k.mat(WORLD.metal), lid, 0, l.h / 2, 0);
   const screen = style.material(pal.screenOff, { emissive: pal.screenOn, ei: 0 }) as MeshLambertMaterial;
-  k.add(style.box(0.44, 0.28, 0.01), screen, lid, 0, 0.17, -0.016);
+  k.add(style.box(0.44, 0.28, 0.01), screen, lid, 0, l.h / 2, -0.016);
   return screen;
 }
 
