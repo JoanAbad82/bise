@@ -1208,6 +1208,7 @@ if (mode === 'quick') {
     // seeds below can take the 600 s watchdog before a late row (desk-cut-8's cand-d3d8b)
     await rowsD3D8(harness, say);
     await rows42D1(harness, say);
+    await rows4E20(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
     await rowsE812(harness, say);
@@ -1224,6 +1225,7 @@ if (mode === 'quick') {
     await rowsDC47(harness, say);
     await rowsD3D8(harness, say);
     await rows42D1(harness, say);
+    await rows4E20(harness, say);
     await quickRows(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
@@ -3964,6 +3966,68 @@ async function rows42D1(harness, say) {
     const backPlain = !(await pinkNow());
     step(`${name}: main's composer plain, a sub-agent's thread pink with its tip, main's plain again`, !mainPink && subPink && backPlain, { id, mainPink, subPink, tip, backPlain });
   });
+}
+
+// 4e20ef9ff's cut (desk-cut-10, main m_28811/m_28814): /bims picks harness' office map from the
+// composer's list (maps-a 229bc4c23), here a chunk C map (maps-c 4e20ef9ff): the office draws it
+// (data-want and data-map), the world's prefs.json keeps it under bims.map.<hub id>, a reload of
+// the window draws it again; then put back as it was. Runs after rowsD3D8 (harness has AGENTS rows).
+async function rows4E20(harness, say) {
+  const name = 'bims map pick';
+  if (!wanted(name)) return;
+  // AS_HE_DOES_BIMS_MAP: the map to pick (maps-d's california on the cut after)
+  const PICK = process.env.AS_HE_DOES_BIMS_MAP ?? 'patio';
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const office = page.locator('[data-testid="app.right.bims"]').first();
+  const icon = page.locator('[data-testid="app.title.bims"]').first();
+  const drawnMap = async () => ({ want: await office.getAttribute('data-want', { timeout: 1000 }).catch(() => null), map: await office.getAttribute('data-map', { timeout: 1000 }).catch(() => null) });
+  const prefsFile = process.env.AS_HE_DOES_BISE_HOME ? path.join(process.env.AS_HE_DOES_BISE_HOME, 'prefs.json') : null;
+  const prefsMap = () => {
+    try {
+      const m = JSON.parse(fs.readFileSync(prefsFile, 'utf8'))?.bims?.map ?? {};
+      return Object.fromEntries(Object.entries(m).filter(([k]) => k.startsWith('harness')));
+    } catch { return null; }
+  };
+  const pick = async (id) => {
+    await field.click({ timeout: 3000 });
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('/bims ', { delay: 20 });
+    const row = page.locator(`[data-testid$=".pick.arg.${id}"]`).first();
+    const listed = await row.waitFor({ timeout: 5000 }).then(() => true, () => false);
+    const rows = await page.evaluate(() => [...document.querySelectorAll('[data-testid*=".pick.arg."]')].map((e) => (e.getAttribute('data-testid') ?? '').replace(/^.*\.pick\.arg\./, ''))).catch(() => []);
+    if (listed) await row.click({ timeout: 3000 });
+    return { listed, rows };
+  };
+  try {
+    await harness();
+    const was = await icon.getAttribute('aria-pressed', { timeout: 5000 }).catch(() => null);
+    if (was !== 'true' && !(await click('bims on (map)', icon))) return;
+    await office.waitFor({ timeout: 15000 });
+    await page.waitForTimeout(2000);
+    const before = { drawn: await drawnMap(), prefs: prefsMap() };
+    const p = await pick(PICK);
+    const after = await until(async () => { const d = await drawnMap(); return d.want === PICK && d.map === PICK ? d : null; }, 10000, 500);
+    const field1 = ((await field.innerText({ timeout: 2000 }).catch(() => '')) ?? '').trim();
+    await page.waitForTimeout(2500);
+    await shot(`4e20-bims-${PICK}`);
+    const saved = await until(async () => { const m = prefsMap(); return m && Object.values(m).includes(PICK) ? m : null; }, 8000, 500);
+    // the window reloaded: the core's prefs draw it again (his pick is never the window's state)
+    await page.reload({ timeout: 30000 });
+    await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 30000 });
+    await harness();
+    if ((await icon.getAttribute('aria-pressed', { timeout: 5000 }).catch(() => null)) !== 'true') await click('bims on after reload', icon);
+    const kept = await until(async () => { const d = await drawnMap(); return d.want === PICK && d.map === PICK ? d : null; }, 20000, 500);
+    await page.waitForTimeout(2000);
+    await shot(`4e20-bims-${PICK}-reloaded`);
+    // back as it was: the map he had (the loft when none), the office closed if it was
+    const back = await pick(before.drawn.want ?? 'loft');
+    await until(async () => ((await drawnMap()).want === (before.drawn.want ?? 'loft') ? true : null), 10000, 500);
+    if (was !== 'true') await click('bims off (map)', icon);
+    step(`${name}: /bims lists the ready maps (chunk C's ${PICK} among them), picking it draws harness' office as ${PICK} at once and empties the field, prefs.json keeps it under bims.map.<hub id>, a reload draws it again`,
+      p.listed && after !== null && field1 === '' && saved !== null && kept !== null,
+      { before, rows: p.rows, after, field1, saved, kept, back: back.listed, prefsFile });
+  } catch (e) { step(name, false, String(e).slice(0, 300)); }
 }
 
 // dc4770c14's cut (desk-cut-4 m_26522): one row per new item since 3ce74eb9a. Nothing here reaches

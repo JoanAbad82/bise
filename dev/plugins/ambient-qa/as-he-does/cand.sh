@@ -161,7 +161,7 @@ candprefs() {
   grep 'cand prefs:' $O/run.out 2>/dev/null >> $O/cand-prefs.txt
 }
 # the candidate's userData in the world (userdata.ts standInPaths: HOME is the world's): window-frame.json
-drive() { AS_HE_DOES_USERDATA="$H/Library/Application Support/$(basename "$A" .app)" AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
+drive() { AS_HE_DOES_BISE_HOME=$H/.bise AS_HE_DOES_USERDATA="$H/Library/Application Support/$(basename "$A" .app)" AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
 
 rm -f $O/BREACH $O/stop $O/pids.txt $O/hubs-steps.jsonl $O/hubs-outside.txt
 say "his app before: $(hispids)" | tee $O/his.txt
@@ -248,6 +248,19 @@ if [ "${AS_HE_DOES_ONLY:-}" = quick ]; then
   L=$(find "$H" -name core.log -newer $O/before.json -not -path "*/.bise/hubs/*" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
   [ -n "$L" ] && cp "$L" $O/core-first.log
   stopcand; breach; libgate first-stop
+  if [ "${AS_HE_DOES_FIRSTRUN:-}" = 1 ]; then
+    # the first run's live key check (desk-cut-10, onboard-keys-2): the candidate again on a FRESH
+    # home under the world (stopcand stops what names $G/w), no key, no prefs, every provider's
+    # base_url on the world's fake provider, the keychain probe off, no browser or link opener;
+    # the gates still run. firstrun.mjs never goes past the model step.
+    WH=$H; H=$G/w/first-$(date +%H%M%S)/h; mkdir -p $H/.bise
+    for p in anthropic openai mistral chatgpt openrouter; do printf '[providers.%s]\nbase_url = "http://127.0.0.1:%s/v1"\n\n' $p $PORT; done > $H/.bise/config.toml
+    FV=(--env BISE_DETECT_KEYCHAIN=0 --env BISE_OPEN=true --env BISE_BROWSER=true)
+    say "first run: fresh home $H"; opencand; breach; libgate firstrun-open
+    AS_HE_DOES_FIRST_HOME=$H/.bise node $HERE/firstrun.mjs $PORT_CDP $O > $O/driver-firstrun.log 2>&1; tail -4 $O/driver-firstrun.log; breach
+    stopcand; breach; libgate firstrun-stop
+    H=$WH
+  fi
   touch $O/stop; wait $FPID $CCPID; kill $TPID $NPID $CPID 2>/dev/null
   kill $(cat $G/fake/fake.pid) 2>/dev/null
   w=$(ps -axo pid=,command= | grep -F "$G/w" | grep -v grep | awk '{print $1}'); [ -n "$w" ] && killpids $w
