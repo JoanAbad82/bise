@@ -134,10 +134,18 @@ trunk's tip lands as before.
   line_gate) refused on a worktree land with an unmoved base; line_gate
   refused on the other three ways; main's sha unchanged after each; a
   docs-only change lands on all four.
-- **Land wall time** (the e2e's lands, a throwaway hub at load ~80):
-  docs-only, before (no `[land]` at main's tip) p50 0.83 s, max 1.20 s;
-  after p50 0.96 s, max 1.37 s (+0.13 s p50: the check tree's checkout
-  and `gate.sh land`'s "no step"); refused reds p50 2.17 s, max 35.8 s
-  (clippy, warm target).
+- **Land wall time** (the e2e's lands, a throwaway hub at load 80-130),
+  two runs: docs-only, before (no `[land]` at main's tip) p50 0.83 s /
+  0.42 s, max 1.20 s / 0.47 s; after p50 0.96 s / 0.86 s, max 1.37 s /
+  1.41 s (+0.13 s / +0.44 s p50: the check tree's checkout and `gate.sh
+  land`'s "no step"); refused reds p50 2.17 s / 4.95 s, max 35.8 s /
+  70.0 s (clippy, warm target).
+- **The desktop red** was refused at `desktop` (main unmoved) in the
+  e2e run on land-every's worktree with apps/desktop/node_modules
+  installed from the lockfile (`pnpm install --frozen-lockfile --offline`,
+  `pnpm check` green); without node_modules the e2e skips it and says so.
+  The full gate on e12b6f3bc: Rust, e2e and tmux green (rpc_e2e red in the
+  pool, green alone: FLAKY), desktop_check red only on a stale linked
+  node_modules (no `three`), green after the real install.
 - **Known gap**: nothing removes a project's worktrees folder when the
   project goes, `.land-check/` included (scratch.rs's header says so).
