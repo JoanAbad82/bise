@@ -3,3 +3,5 @@ node_modules/
 *.tsbuildinfo
 .harness-cache/
 test-results/
+# tonight's core recording (scripts/core_record.sh): never committed
+tests/nightly/rec/

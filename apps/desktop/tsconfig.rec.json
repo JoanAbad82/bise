@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "lib": ["ES2023"],
+    "types": [],
+    "noEmit": true
+  },
+  "include": ["tests/nightly/rec/recorded.gen.ts"]
+}

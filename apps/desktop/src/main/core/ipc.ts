@@ -16,7 +16,7 @@ import { Latest } from '../../shared/latest';
 import { CoreProcess } from './process';
 import { DictationRoutes, type Route } from './dictation';
 import { SubRoutes } from './subs';
-import type { AnswerResult, SendResult } from '../../proto';
+import { answeredEv, refusedEv, RESTARTED_WORDS } from '../../shared/local';
 
 let core: CoreProcess | null = null;
 // the last state events, for a window or a main-side listener that comes after they went out
@@ -201,29 +201,23 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         const by = ak === null ? undefined : answers.get(ak);
         if (ak !== null && by !== undefined) {
           answers.delete(ak);
-          // a close taken: the hub's rows drop the card, nothing more to say
-          if (cmd['cmd'] === 'close') return;
-          // the step closed no card (or a page took it) answers {}: answer null, no row
-          const answer = (result as AnswerResult | null)?.answer ?? null;
-          toWindow({ to: 'window', window: by.window, ev: { ev: 'card_answered', project: cmd['project'], card: cmd['card'], answer } });
+          const ev = answeredEv(cmd, result);
+          if (ev !== null) toWindow({ to: 'window', window: by.window, ev });
           return;
         }
         const sk = sendKey(cmd);
         const to = sk === null ? undefined : sends.get(sk);
         if (sk === null || to === undefined) return;
         sends.delete(sk);
-        // turn/send's result (bise-proto rpc SendResult); an older hub answers {}: msg_id null,
-        // the window falls back to the words
-        const id = (result as SendResult | null)?.msg_id ?? null;
-        const ev = { ev: 'sent', project: cmd['project'], agent: cmd['agent'], cid: cmd['cid'], msg_id: id };
-        toWindow({ to: 'window', window: to, ev });
+        const ev = answeredEv(cmd, result);
+        if (ev !== null) toWindow({ to: 'window', window: to, ev });
       },
       onRefused: (cmd, error) => {
         const ak = answerKey(cmd);
         const by = ak === null ? undefined : answers.get(ak);
         if (ak === null || by === undefined) return;
         answers.delete(ak);
-        toWindow({ to: 'window', window: by.window, ev: { ev: 'card_refused', project: by.project, card: by.card, text: error.message } });
+        toWindow({ to: 'window', window: by.window, ev: refusedEv(by.project, by.card, error.message) });
       },
       onState: (s) => {
         // a new core starts from nothing: it says its state again
@@ -234,7 +228,7 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
           // an answer or close the last core never answered: its card shows again (the hub's
           // rows hide it if the hub took it)
           for (const by of answers.values())
-            toWindow({ to: 'window', window: by.window, ev: { ev: 'card_refused', project: by.project, card: by.card, text: "bise restarted before your answer was confirmed: if the card is still here, answer it again." } });
+            toWindow({ to: 'window', window: by.window, ev: refusedEv(by.project, by.card, RESTARTED_WORDS) });
           answers.clear();
         }
         // a core gone took its mic with it: its dictations end

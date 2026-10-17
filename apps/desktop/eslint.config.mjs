@@ -7,7 +7,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['out/', 'dist/', 'node_modules/', '.harness-cache/', 'src/proto/'] },
+  { ignores: ['out/', 'dist/', 'node_modules/', '.harness-cache/', 'src/proto/', 'tests/nightly/rec/'] },
   js.configs.recommended,
   {
     files: ['**/*.ts', '**/*.tsx'],

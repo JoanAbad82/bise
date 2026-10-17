@@ -25,6 +25,8 @@ export interface Feature {
   readonly view: {
     /** The inbox: every open item he hasn't acted on, in its order, each with its refusal (the store's inbox view, machine/cards.ts inboxView). */
     inbox(): readonly InboxItem[];
+    /** A message of his is still on its way (a pending row sending: store.sending, the app's update waits on it). */
+    sending(): boolean;
   };
 }
 
@@ -93,6 +95,7 @@ export function feature(now = 1_791_100_000_000): Feature {
     sent: () => [...outbox],
     view: {
       inbox: () => store.inboxItems(),
+      sending: () => store.sending(),
     },
   };
   return f;
