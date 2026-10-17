@@ -1245,10 +1245,10 @@ impl Revive {
 pub const PR_STALE_MS: u64 = 10 * 60 * 1000;
 
 const REVIVE_LIMIT: usize = 3;
-/// Journal events per `replay_many` line at boot (~50 KB). sb-core's
-/// parse of a line grows faster than its length: on a 37.7k-event
-/// journal, 500 per line replayed in 17 s, 5000 in 23 s, 100 in 12 s.
-const REPLAY_BATCH: usize = 100;
+/// Journal events per `replay_many` line at boot (~110 KB). On a 112k-event
+/// journal (retired instructions, main.bend `cut`): 100 per line 118G, 250
+/// 114G, 500 112G; cycles flat from 100 to 500, rising past 1000.
+const REPLAY_BATCH: usize = 250;
 const REVIVE_WINDOW_MS: u64 = 60_000;
 
 type Fx = Vec<Effect>;

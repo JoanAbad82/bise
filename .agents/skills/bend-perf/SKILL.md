@@ -114,3 +114,17 @@ numbers. The next audit starts from there.
   restore only. Step answers are small (tick 138 B), not the whole view.
   34 searches in bend/hub walk the whole list (eager pick); zero parallel
   lets or IO.fork in bend/. repl-live: idle in poll (network-bound).
+- 2026-10-17 (bp-boot): the boot replay, his journal copy (112,470 events),
+  sb-core under `/usr/bin/time -l` (retired instructions; wall time was
+  noise at load 20+). Base, batch 100: 133.3G instructions, 46.9G cycles.
+  Eager picks in vendor json's classifiers made lazy (matches on the
+  char): -1% (132.0G). The input path (main.bend read each recv'd chunk
+  by appending to the buffer and rescanning it whole): each char read once,
+  119.3G (-10%), cycles 34.7-38.5G (-18%). REPLAY_BATCH 100 -> 250: 113.7G
+  (batch 500: 112.2G; cycles flat 100-500, up past 1000). Tried and
+  dropped: a `replay_lines` link with the batch's lines parsed in parallel
+  (the outer JSON string's decode alone cost more than the old replay:
+  every quote escaped; parse_step is ~5% of the replay, the cap of any
+  parallel parse); parse's fuel as a constant (-0.8%). What is left is the
+  runtime's memory work: allocating and freeing each line, its parsed
+  Json and each event (term_drop, span_fade, rfc_wrap in the sample).
