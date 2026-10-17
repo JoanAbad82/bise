@@ -29,6 +29,15 @@
 #                     tests/test_map.py picks for the tree's changes vs its
 #                     merge-base with main (GATE_FULL_BASE); main's tip, shared
 #                     code or an unknown path: all of them.
+#                     A red test gets one rerun alone inside the gate
+#                     (run_all.sh: FLAKY lines, <gate dir>/flaky.tsv).
+#                     Green with every test on a clean tree (no diff, no
+#                     untracked file): its sha goes to <gate dir>/green-shas.tsv
+#                     (this file owns it: <sha> <end epoch> <secs> <agent>
+#                     <log>). A full gate on a clean tree whose sha is there
+#                     runs only line_gate and word_lint (GATE_FORCE=1: all
+#                     of it): a release on a sha that scripts/nightly_gate.sh
+#                     --tip (main's tip, in a quiet slot) gated skips its own.
 #   gate.sh rerun     after a full gate red only on e2e/tmux tests: those
 #                     tests alone, one by one, on the same tree (HEAD + diff +
 #                     untracked; <gate dir>/red-<state>), instead of a whole
@@ -459,6 +468,17 @@ gate_lock() {
 # a rerun too: it runs e2e/tmux tests like a full gate's, and next to one
 # (audit-blind's rerun beside its second full gate, 2026-10-14) both sets
 # timed out at ~350 s (partial_e2e, repl_start_e2e, subscriptions_e2e)
+# a full gate on a clean tree whose sha a full gate with every test passed
+# (green-shas.tsv, written below): the static checks only, no lock wait
+green_file="$gdir/green-shas.tsv"
+clean_tree() { [ -z "$(git status --porcelain 2>/dev/null)" ]; }
+if [ "$mode" = full ] && [ "${GATE_FORCE:-}" != 1 ] && clean_tree \
+  && g="$(awk -F'\t' -v s="$(git rev-parse HEAD)" '$1 == s { l = $0 } END { print l }' "$green_file" 2>/dev/null)" && [ -n "$g" ]; then
+  python3 tests/line_gate.py --all && python3 tests/word_lint.py --all || { echo "GATE full FAILED"; exit 1; }
+  IFS=$'\t' read -r _ gend gsecs gagent glogf <<<"$g"
+  echo "GATE full GREEN (0s): $(git rev-parse --short HEAD) passed a full gate with every test at $(date -r "$gend" '+%F %T') (${gsecs}s, ${gagent:-?}, $glogf): line_gate and word_lint only (GATE_FORCE=1 runs it all)"
+  exit 0
+fi
 case "$mode" in full|rerun) gate_lock ;; esac
 export PATH="$HOME/.bend/bin:$HOME/.cargo/bin:$PATH"
 # the oldest macOS the binaries run on (rust/.cargo/config.toml, BISE-164):
@@ -649,6 +669,11 @@ if [ "$mode" = full ]; then
   for f in ./harness-demo rust/jsrt/target/debug/bend-jsrt; do [ -e "$f" ] && bins+=("$f"); done
   if [ $rc = 0 ]; then scripts/bins.sh minos "${bins[@]}" || rc=1; fi
   [ $rc = 0 ] && echo "GATE full GREEN ($((SECONDS - s))s)$([ ${#pick_args[@]} = 0 ] || echo ": $(echo $picked | wc -w | tr -d ' ') e2e/tmux tests picked")" || echo "GATE full FAILED"
+  # every test and the desktop's checks ran, on a clean tree: its sha is green
+  if [ $rc = 0 ] && [ ${#pick_args[@]} = 0 ] && [ -n "$dwhy" ] && clean_tree; then
+    printf '%s\t%s\t%s\t%s\t%s\n' "$(git rev-parse HEAD)" "$(date +%s)" "$((SECONDS - s))" "${SB_AGENT:-${USER:-?}}" "${glog:-?}" >>"$green_file"
+    echo "green sha recorded: $(git rev-parse --short HEAD) ($green_file)"
+  fi
   exit $rc
 fi
 

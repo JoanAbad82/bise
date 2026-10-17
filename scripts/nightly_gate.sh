@@ -8,6 +8,22 @@
 #                                       (default 04:30; a Mac asleep then
 #                                       runs it at its wake)
 #   scripts/nightly_gate.sh --uninstall
+#   scripts/nightly_gate.sh --tip       main's tip, once, if the machine is
+#                                       quiet now (both heavy slots and the
+#                                       full gate lock free, load below
+#                                       TIP_GATE_MAX_LOAD, default the
+#                                       cores): the same gate in the same
+#                                       tree, in one heavy slot. A green
+#                                       one records the sha (gate.sh's
+#                                       green-shas.tsv): a release on it
+#                                       skips its gate. Nothing to do (the
+#                                       tip green or tried, a busy machine):
+#                                       exits at once. Its results:
+#                                       tip-<time>.log and tip-last (<sha>
+#                                       green|red|infra <secs> <log>).
+#   scripts/nightly_gate.sh --install-tip | --uninstall-tip
+#                                       a launchd job that runs --tip when
+#                                       main moves and every 10 min
 # It waits for both heavy slots (~/.bise/run/heavy-run --alone: no agent's
 # heavy job beside it; hours on a busy night; on battery it waits for AC),
 # then, in the slot, checks main's tip out in its tree and runs the gate:
@@ -59,6 +75,31 @@ fi
 if [ "${1:-}" = --uninstall ]; then
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null; rm -f "$plist"; echo "removed $LABEL"; exit 0
 fi
+TIP_LABEL=dev.bise.tip-gate
+tip_plist="$HOME/Library/LaunchAgents/$TIP_LABEL.plist"
+if [ "${1:-}" = --install-tip ]; then
+  gd="$(git -C "$main_tree" rev-parse --absolute-git-dir)"
+  mkdir -p "$(dirname "$tip_plist")"
+  cat >"$tip_plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$TIP_LABEL</string>
+  <key>ProgramArguments</key><array><string>/bin/bash</string><string>$main_tree/scripts/nightly_gate.sh</string><string>--tip</string></array>
+  <key>WatchPaths</key><array><string>$gd/refs/heads/main</string><string>$gd/packed-refs</string></array>
+  <key>StartInterval</key><integer>600</integer>
+  <key>StandardOutPath</key><string>$out/tip-launchd.out</string>
+  <key>StandardErrorPath</key><string>$out/tip-launchd.out</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$HOME/.bend/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+</dict></plist>
+EOF
+  launchctl bootout "gui/$(id -u)/$TIP_LABEL" 2>/dev/null
+  launchctl bootstrap "gui/$(id -u)" "$tip_plist" && echo "installed: $TIP_LABEL when main moves and every 10 min ($tip_plist); results in $out/tip-*"
+  exit $?
+fi
+if [ "${1:-}" = --uninstall-tip ]; then
+  launchctl bootout "gui/$(id -u)/$TIP_LABEL" 2>/dev/null; rm -f "$tip_plist"; echo "removed $TIP_LABEL"; exit 0
+fi
 
 ulimit -n 10240 2>/dev/null
 unset SB_AGENT SB_SOCKET CARGO_TARGET_DIR
@@ -86,6 +127,36 @@ if [ "${1:-}" = --in-slot ]; then
   # DarkWake, which ignores it; -s (PreventSystemSleep) holds on AC only
   cd "$wt" && GATE_ALL=1 exec /usr/bin/caffeinate -is bash tests/gate.sh full --all
   echo "NOSTART cannot enter $wt"; exit 1
+fi
+
+if [ "${1:-}" = --tip ]; then
+  # main's tip in a quiet slot (fast-release, gate-lane): nothing to do or a
+  # busy machine exits at once, the next move of main or tick tries again
+  bh="${BISE_HOME:-$HOME/.bise}"
+  tip="$(git -C "$main_tree" rev-parse --verify -q main)" || exit 0
+  grep -q "^$tip	" "$bh/gate/green-shas.tsv" 2>/dev/null && exit 0
+  [ "$(cut -d' ' -f1 "$out/tip-last" 2>/dev/null)" = "$tip" ] && exit 0
+  for l in "$bh/run/heavy.lock" "$bh/run/heavy2.lock"; do
+    [ -e "$l" ] || continue
+    /usr/bin/lockf -k -t 0 "$l" /usr/bin/true 2>/dev/null || exit 0
+  done
+  o="$(cat "$bh/gate/full-$(id -u).lock/owner" 2>/dev/null)"
+  [ -n "$o" ] && kill -0 "${o%% *}" 2>/dev/null && exit 0
+  load="$(sysctl -n vm.loadavg 2>/dev/null | awk '{ print int($2) }')"
+  [ "${load:-0}" -lt "${TIP_GATE_MAX_LOAD:-$(sysctl -n hw.ncpu 2>/dev/null || echo 8)}" ] || exit 0
+  # one tip run at a time (lockf -t 0: a second one exits 75)
+  [ -n "${TIP_LOCKED:-}" ] || TIP_LOCKED=1 exec /usr/bin/lockf -t 0 "$out/tip.lock" /bin/bash "$here/scripts/nightly_gate.sh" --tip
+  log="$out/tip-$(date +%Y%m%d-%H%M%S).log" s=$SECONDS
+  echo "QUEUED $(date): main $tip, a quiet machine (load $load)" >"$log"
+  # one heavy slot: an agent's heavy job may take the other
+  "${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
+  rc=$?
+  sha="$(awk '/^START /{print $NF; exit}' "$log")"
+  if [ -z "$sha" ]; then state=infra; sha="$tip"
+  else sha="$(git -C "$main_tree" rev-parse "$sha" 2>/dev/null || echo "$tip")"; [ $rc = 0 ] && state=green || state=red; fi
+  echo "$sha $state $((SECONDS - s)) $log" >"$out/tip-last"
+  find "$out" -name 'tip-*.log' -mtime +7 -delete 2>/dev/null
+  exit $rc
 fi
 
 day="$(date +%F)" log="$out/$(date +%F).log" s=$SECONDS

@@ -124,6 +124,52 @@ def main():
         check(rc != 0 and last.split()[1:3] == ["?", "infra"] and "heavy-run: boom" in last, "heavy fails: rc %s, last %r" % (rc, last))
         check(red is not None and "did not start" in red and "infra" in red and "heavy-run: boom" in red, "heavy fails: red %r" % red)
 
+        # --tip: main's tip in a quiet slot, once per sha, never on a green one or a busy machine
+        def tip_run(**fake):
+            env = dict(env0, **dict({"TIP_GATE_MAX_LOAD": "100000"}, **fake))
+            before = set(f for f in os.listdir(out) if f.startswith("tip-") and f.endswith(".log"))
+            p = subprocess.run(["bash", os.path.join(repo, "scripts", "nightly_gate.sh"), "--tip"], env=env,
+                               capture_output=True, text=True, timeout=60)
+            new = sorted(set(f for f in os.listdir(out) if f.startswith("tip-") and f.endswith(".log")) - before)
+            log = open(os.path.join(out, new[-1])).read() if new else ""
+            lastf = os.path.join(out, "tip-last")
+            return p.returncode, log, open(lastf).read().split() if os.path.exists(lastf) else []
+
+        full = git(repo, "rev-parse", "main")
+        gate_dir = os.path.join(home, "gate")
+        os.makedirs(gate_dir, exist_ok=True)
+        green = os.path.join(gate_dir, "green-shas.tsv")
+        # 7. the tip already green: nothing runs
+        with open(green, "w") as f:
+            f.write("%s\t1\t600\tx\tlog\n" % full)
+        rc, log, last = tip_run()
+        check(rc == 0 and log == "", "tip green: no run (rc %s, log %r)" % (rc, log))
+        os.remove(green)
+        # 8. another full gate holds the lock (a live pid): nothing runs
+        lock = os.path.join(gate_dir, "full-%d.lock" % os.getuid())
+        os.makedirs(lock)
+        with open(os.path.join(lock, "owner"), "w") as f:
+            f.write("%d x agent root\n" % os.getpid())
+        rc, log, last = tip_run()
+        check(rc == 0 and log == "", "tip with a full gate running: no run (rc %s, log %r)" % (rc, log))
+        shutil.rmtree(lock)
+        # 9. a busy machine (load over the limit): nothing runs
+        rc, log, last = tip_run(TIP_GATE_MAX_LOAD="0")
+        check(rc == 0 and log == "", "tip on a busy machine: no run (rc %s, log %r)" % (rc, log))
+        # 10. quiet: the gate runs in the tree with --all in one slot, tip-last says green
+        rc, log, last = tip_run()
+        check(rc == 0 and "fake gate %s in %s GATE_ALL=1 args=full --all" % (short(), wt) in log, "tip quiet: the gate ran: rc %s, %r" % (rc, log))
+        check("heavy-run: both slots" not in log, "tip quiet: one heavy slot, not --alone: %r" % log)
+        check(last[:2] == [full, "green"], "tip quiet: tip-last %r" % last)
+        # 11. the same sha again (tried): nothing runs; a red one is not retried either
+        rc, log, last = tip_run()
+        check(rc == 0 and log == "", "tip tried: no second run (rc %s, log %r)" % (rc, log))
+        git(repo, "commit", "-q", "--allow-empty", "-m", "moved")
+        rc, log, last = tip_run(FAKE_GATE_RC="1")
+        check(rc != 0 and last[:2] == [git(repo, "rev-parse", "main"), "red"], "tip red: rc %s, tip-last %r" % (rc, last))
+        rc, log, last = tip_run()
+        check(log == "", "tip red: not retried on the same sha (%r)" % log)
+
         # 6. main's tip has no tests/gate.sh: NOSTART, an infra red
         git(repo, "rm", "-q", "tests/gate.sh")
         git(repo, "commit", "-q", "-m", "no gate")
@@ -136,7 +182,7 @@ def main():
     if FAILS:
         print("nightly_gate_test: FAIL\n  " + "\n  ".join(FAILS))
         return 1
-    print("nightly_gate_test: ok (6 nights)")
+    print("nightly_gate_test: ok (6 nights, 5 tip runs)")
     return 0
 
 
