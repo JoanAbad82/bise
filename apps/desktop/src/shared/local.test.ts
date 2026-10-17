@@ -24,6 +24,7 @@ describe("the window-local events main builds from the core's answers (ipc.ts, t
 
   it("a refusal: card_refused with the core's words; a core gone before it answered says so", () => {
     expect(refusedEv(P, 9, "notification #9 isn't open")).toEqual({ ev: 'card_refused', project: P, card: 9, text: "notification #9 isn't open" });
-    expect(refusedEv(P, 9, RESTARTED_WORDS).text).toMatch(/^bise restarted before your answer was confirmed/);
+    expect(refusedEv(P, 9, RESTARTED_WORDS)).toEqual({ ev: 'card_refused', project: P, card: 9, text: RESTARTED_WORDS });
+    expect(RESTARTED_WORDS).toMatch(/^bise restarted before your answer was confirmed/);
   });
 });
