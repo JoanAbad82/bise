@@ -30,7 +30,8 @@ import { FOLD_MS } from './Fold';
 import { placeZzz, sleepers } from './zzz';
 import { aimAt, bimsLit, easeCam, edgeOf, useBimsLit } from './focus';
 import type { Growth } from '@/proto';
-import { DEFAULT_MAP, type MapId } from './maps/ids';
+import { DEFAULT_MAP, type MapId, mapOf } from './maps/ids';
+import { planOf } from './maps';
 import './office.css';
 
 /** The pure modules and the renderer's loader: feed.ts's, or fakes in a test. */
@@ -444,7 +445,7 @@ export function Office({
       }
       // the follow camera, from where the bims stand now: the next frame draws the new view
       const chasing = chase(r, t, reduced);
-      const said = unlockLabel(u, t, reduced);
+      const said = unlockLabel(u, t, reduced, planOf(mapOf(office.map)).things);
       const at = said !== null && u ? r.pieceOf(u.stage) : null;
       const tag = said !== null && at !== null ? { text: said, x: Math.round(at.x), y: Math.round(at.y) } : null;
       if (JSON.stringify(tag) !== lastNew) {
@@ -772,8 +773,8 @@ export function Office({
         <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
         <div ref={zzzRef} className="bims-zzzs" data-testid="app.right.bims.zzzs" />
         <div ref={moreRef} className="bims-more" data-testid="app.right.bims.more" />
-        {/* the ground's corner: hover says the level, the jobs done, the next piece */}
-        <span className="bims-level" data-testid="app.right.bims.level" {...tipAttrs(tipOf(growNow))} />
+        {/* the ground's corner: hover says the level, the jobs done, the next piece (the map's own) */}
+        <span className="bims-level" data-testid="app.right.bims.level" {...tipAttrs(tipOf(growNow, planOf(map).things))} />
         {newTag !== null && (
           <div className="bims-label bims-new" data-mode="event" style={{ left: `${String(newTag.x)}px`, top: `${String(newTag.y)}px` }} data-testid="app.right.bims.new">
             {newTag.text}

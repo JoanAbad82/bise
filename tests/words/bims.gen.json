@@ -347,6 +347,226 @@
     "one": null,
     "text": "the skate ramp"
   },
+  "bims.stage_fruit": {
+    "args": [],
+    "one": null,
+    "text": "a fruit bowl and a tree"
+  },
+  "bims.stage_kyoto_1": {
+    "args": [],
+    "one": null,
+    "text": "a bonsai"
+  },
+  "bims.stage_kyoto_10": {
+    "args": [],
+    "one": null,
+    "text": "the shishi-odoshi"
+  },
+  "bims.stage_kyoto_11": {
+    "args": [],
+    "one": null,
+    "text": "the arcade cabinet"
+  },
+  "bims.stage_kyoto_12": {
+    "args": [],
+    "one": null,
+    "text": "the koi pond"
+  },
+  "bims.stage_kyoto_13": {
+    "args": [],
+    "one": null,
+    "text": "the koinobori"
+  },
+  "bims.stage_kyoto_14": {
+    "args": [],
+    "one": null,
+    "text": "the golden maneki-neko"
+  },
+  "bims.stage_kyoto_2": {
+    "args": [],
+    "one": null,
+    "text": "a bento and a maple"
+  },
+  "bims.stage_kyoto_3": {
+    "args": [],
+    "one": null,
+    "text": "the zabuton"
+  },
+  "bims.stage_kyoto_4": {
+    "args": [],
+    "one": null,
+    "text": "the slate"
+  },
+  "bims.stage_kyoto_5": {
+    "args": [],
+    "one": null,
+    "text": "the wave and the wind bell"
+  },
+  "bims.stage_kyoto_6": {
+    "args": [],
+    "one": null,
+    "text": "the matcha set"
+  },
+  "bims.stage_kyoto_7": {
+    "args": [],
+    "one": null,
+    "text": "the paper umbrella"
+  },
+  "bims.stage_kyoto_8": {
+    "args": [],
+    "one": null,
+    "text": "maples all round"
+  },
+  "bims.stage_kyoto_9": {
+    "args": [],
+    "one": null,
+    "text": "the go board"
+  },
+  "bims.stage_more_fruit": {
+    "args": [],
+    "one": null,
+    "text": "more fruit and flowers"
+  },
+  "bims.stage_nordic_1": {
+    "args": [],
+    "one": null,
+    "text": "a fern"
+  },
+  "bims.stage_nordic_10": {
+    "args": [],
+    "one": null,
+    "text": "the hot tub"
+  },
+  "bims.stage_nordic_11": {
+    "args": [],
+    "one": null,
+    "text": "the sauna's porch"
+  },
+  "bims.stage_nordic_12": {
+    "args": [],
+    "one": null,
+    "text": "the lake and its jetty"
+  },
+  "bims.stage_nordic_13": {
+    "args": [],
+    "one": null,
+    "text": "the midsummer pole"
+  },
+  "bims.stage_nordic_14": {
+    "args": [],
+    "one": null,
+    "text": "the golden Dala horse"
+  },
+  "bims.stage_nordic_2": {
+    "args": [],
+    "one": null,
+    "text": "kanelbullar and a birch"
+  },
+  "bims.stage_nordic_3": {
+    "args": [],
+    "one": null,
+    "text": "the sheepskins"
+  },
+  "bims.stage_nordic_4": {
+    "args": [],
+    "one": null,
+    "text": "the blackboard"
+  },
+  "bims.stage_nordic_5": {
+    "args": [],
+    "one": null,
+    "text": "the rya and the record player"
+  },
+  "bims.stage_nordic_6": {
+    "args": [],
+    "one": null,
+    "text": "blueberries and coffee"
+  },
+  "bims.stage_nordic_7": {
+    "args": [],
+    "one": null,
+    "text": "the campfire"
+  },
+  "bims.stage_nordic_8": {
+    "args": [],
+    "one": null,
+    "text": "firs all round"
+  },
+  "bims.stage_nordic_9": {
+    "args": [],
+    "one": null,
+    "text": "the kubb set"
+  },
+  "bims.stage_riad_1": {
+    "args": [],
+    "one": null,
+    "text": "a pot of mint"
+  },
+  "bims.stage_riad_10": {
+    "args": [],
+    "one": null,
+    "text": "the fountain's second tier"
+  },
+  "bims.stage_riad_11": {
+    "args": [],
+    "one": null,
+    "text": "the hammam"
+  },
+  "bims.stage_riad_12": {
+    "args": [],
+    "one": null,
+    "text": "the zellige basin"
+  },
+  "bims.stage_riad_13": {
+    "args": [],
+    "one": null,
+    "text": "the balloon over the Atlas"
+  },
+  "bims.stage_riad_14": {
+    "args": [],
+    "one": null,
+    "text": "the golden lantern"
+  },
+  "bims.stage_riad_2": {
+    "args": [],
+    "one": null,
+    "text": "the tea tray"
+  },
+  "bims.stage_riad_3": {
+    "args": [],
+    "one": null,
+    "text": "the poufs"
+  },
+  "bims.stage_riad_4": {
+    "args": [],
+    "one": null,
+    "text": "the slate"
+  },
+  "bims.stage_riad_5": {
+    "args": [],
+    "one": null,
+    "text": "the Berber rug and the darbouka"
+  },
+  "bims.stage_riad_6": {
+    "args": [],
+    "one": null,
+    "text": "a tajine and jasmine"
+  },
+  "bims.stage_riad_7": {
+    "args": [],
+    "one": null,
+    "text": "the awning"
+  },
+  "bims.stage_riad_8": {
+    "args": [],
+    "one": null,
+    "text": "the four orange trees"
+  },
+  "bims.stage_riad_9": {
+    "args": [],
+    "one": null,
+    "text": "the draughts table"
+  },
   "bims.state_hot": {
     "args": [],
     "one": null,

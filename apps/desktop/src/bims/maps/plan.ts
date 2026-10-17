@@ -1,11 +1,14 @@
 // A map's plan (the pure half of the prototype's REG entry, page bims-maps v5: plan + after): where
 // the room, the desks, main's desk and its land queue, the eating place and its spots, the nap
 // place, the board, the door, the terrace and the way out are, the furniture a walk never crosses,
-// and the map's own walk graph. One file per map (maps/<id>.ts); the look that draws it is
-// render/maps/<id>.ts. maps/contract.test.ts checks every plan for 0..31 agents: every place on
+// and the map's own walk graph, and the words for what each growth stage brings (things). One
+// file per map (maps/<id>.ts); the look that draws it is render/maps/<id>.ts. maps/contract.test.ts checks every plan for 0..31 agents: every place on
 // the graph, the graph connected, no leg through furniture. Pure, no three. Owner: maps-a.
 import type { Agent } from '@/proto';
 import type { Box, Leg, MapId, Office, Pt, Spot } from '../model';
+import type { Stage, Things } from '../growth';
+
+export type { Stage, Things };
 
 export interface Plan<O extends Office = Office> {
   readonly id: MapId;
@@ -17,7 +20,13 @@ export interface Plan<O extends Office = Office> {
    * purpose: a plan's own office type (the loft's LoftOffice) stands for Office in the table.
    */
   layout(agents: readonly Agent[], prev?: O): O;
+  /**
+   * What each building stage brings on this map, in words (growth.ts thingOf: the tag over a new
+   * piece, the corner tip's next): the words_bims catalog's entries, never text. Absent: the loft's.
+   */
+  readonly things?: Things;
 }
+
 
 /** The non-main live agents' names, in start order: one desk each. Pure. */
 export const deskNames = (agents: readonly Agent[]): string[] => agents.filter((a) => !a.main && !a.archived).map((a) => a.name);

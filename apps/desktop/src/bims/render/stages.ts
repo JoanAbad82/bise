@@ -36,7 +36,7 @@ export function loftTree(k: Kit, parent: Object3D, x: number, z: number, size: n
   leaves.forEach(([dx, y, dz], i) => k.add(style.box(0.75, 0.75, 0.75), k.mat(WORLD.leaf[i % 2] ?? WORLD.trunk), g, dx, y, dz));
 }
 
-function bigPlant(k: Kit, parent: Object3D, x: number, z: number): void {
+export function bigPlant(k: Kit, parent: Object3D, x: number, z: number): void {
   k.add(k.style.cylinder(0.2, 0.36), k.mat(WORLD.pot), parent, x, 0.18, z);
   for (let i = 0; i < 3; i++) {
     const l = k.add(k.style.ball(0.26 - i * 0.04), k.mat(i % 2 ? WORLD.leaf[0] : k.pal.plant), parent, x + (i - 1) * 0.12, 0.55 + i * 0.22, z + (i % 2) * 0.08);
@@ -50,7 +50,7 @@ function pineapple(k: Kit, parent: Object3D, x: number, y: number, z: number): v
   k.add(k.style.box(0.08, 0.16, 0.08), k.mat(WORLD.pineLeaf), parent, x, y + 0.3, z);
 }
 
-function fruitBowl(k: Kit, parent: Object3D, x: number, z: number): void {
+export function fruitBowl(k: Kit, parent: Object3D, x: number, z: number): void {
   k.add(k.style.box(0.5, 0.12, 0.5), k.mat(WORLD.paper), parent, x, 0.76, z);
   const fr = [WORLD.orange, WORLD.orange, WORLD.banana, WORLD.leaf[0]];
   fr.forEach((c, i) => k.add(k.style.ball(0.09), k.mat(c), parent, x + Math.cos(i * 1.7) * 0.13, 0.86, z + Math.sin(i * 1.7) * 0.12));
@@ -58,7 +58,7 @@ function fruitBowl(k: Kit, parent: Object3D, x: number, z: number): void {
 }
 
 /** the whiteboard: coloured strokes for the equations (no text) */
-function whiteboard(k: Kit, parent: Object3D, x: number): void {
+export function whiteboard(k: Kit, parent: Object3D, x: number): void {
   const { style } = k;
   const pz = style.pictureZ;
   k.add(style.box(1.8, 0.95, 0.05), k.mat('#d8d2c6'), parent, x, 1.05, 0.02 + pz);
@@ -75,7 +75,7 @@ function whiteboard(k: Kit, parent: Object3D, x: number): void {
 }
 
 /** the mural over the lounge: colour blobs and an ink :* in blocks */
-function mural(k: Kit, parent: Object3D, x0: number, x1: number): void {
+export function mural(k: Kit, parent: Object3D, x0: number, x1: number): void {
   const { style } = k;
   const w = x1 - x0;
   WORLD.mural.forEach((c, i) => {
@@ -86,7 +86,7 @@ function mural(k: Kit, parent: Object3D, x0: number, x1: number): void {
 }
 
 /** the boombox on the island's far end (o3's notes, t1's friday party play over it) */
-function boombox(k: Kit, parent: Object3D, z: number): void {
+export function boombox(k: Kit, parent: Object3D, z: number): void {
   k.add(k.style.box(0.55, 0.28, 0.2), k.mat(WORLD.dark), parent, 0, 0.84, z);
   for (const dx of [-0.15, 0.15]) k.add(k.style.box(0.14, 0.14, 0.02), k.mat(WORLD.wheel), parent, dx, 0.84, z + 0.11);
 }

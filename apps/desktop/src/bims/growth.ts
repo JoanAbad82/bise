@@ -33,11 +33,11 @@ export const UNLOCK_WALK = 3;
 export const UNLOCK_LABEL = 3;
 
 /** The unlock label's words while it shows at t (null: not now). Pure. */
-export function unlockLabel(u: { readonly stage: number; readonly at: number } | undefined, t: number, reduced: boolean): string | null {
+export function unlockLabel(u: { readonly stage: number; readonly at: number } | undefined, t: number, reduced: boolean, things?: Things): string | null {
   if (!u) return null;
   const s = t - u.at;
   const from = reduced ? 0 : UNLOCK_WALK;
-  return s >= from && s < from + UNLOCK_LABEL ? newLabel(u.stage) : null;
+  return s >= from && s < from + UNLOCK_LABEL ? newLabel(u.stage, things) : null;
 }
 
 /** What the office draws from the counters. */
@@ -115,27 +115,34 @@ export function unlockOf(before: Grow | null, now: Grow): number | null {
   return now.stage;
 }
 
+/** a building stage past the bare room (STAGE_AT: 1 .. 14) */
+export type Stage = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+
+/** a map's words for each stage's piece (maps/plan.ts Plan.things; bims m_28856: Nordic 9 is the kubb set, not the skate ramp) */
+export type Things = Readonly<Record<Stage, string>>;
+
 const THINGS = [
   '',
   bims.stage_1, bims.stage_2, bims.stage_3, bims.stage_4, bims.stage_5, bims.stage_6, bims.stage_7,
   bims.stage_8, bims.stage_9, bims.stage_10, bims.stage_11, bims.stage_12, bims.stage_13, bims.stage_14,
 ] as const;
 
-/** What a stage brings, in words ('' for 0). */
-export function thingOf(stage: number): string {
-  return THINGS[stage] ?? '';
+/** What a stage brings on a map, in words: its own (Plan.things, bims m_28856), else the loft's ('' for 0). */
+export function thingOf(stage: number, things?: Things): string {
+  const own = stage >= 1 && stage <= 14 ? things?.[stage as Stage] : undefined;
+  return own ?? THINGS[stage] ?? '';
 }
 
 /** The unlock moment's label over the new piece. */
-export function newLabel(stage: number): string {
-  return bims.grow_new({ thing: thingOf(stage) });
+export function newLabel(stage: number, things?: Things): string {
+  return bims.grow_new({ thing: thingOf(stage, things) });
 }
 
 /** The ground's corner tip: the level, the jobs done, the next piece and at how many. */
-export function tipOf(g: Grow): string {
+export function tipOf(g: Grow, things?: Things): string {
   const next = STAGE_AT[g.stage + 1];
   if (next === undefined) return bims.grow_tip_top({ n: g.jobs, level: g.stage });
-  return bims.grow_tip({ n: g.jobs, level: g.stage, thing: thingOf(g.stage + 1), at: next });
+  return bims.grow_tip({ n: g.jobs, level: g.stage, thing: thingOf(g.stage + 1, things), at: next });
 }
 
 /** what the ground grows by with the garden's level (the days used), each side, world units */

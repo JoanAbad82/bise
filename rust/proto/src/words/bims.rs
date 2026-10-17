@@ -119,6 +119,96 @@ crate::words! { bims:
     stage_13 = "the balloon";
     /// stage 14: the last one, in the garden
     stage_14 = "main's golden statue";
+    // ---- each map's own pieces (page bims-maps « comment chaque map grandit », bims m_28856): the
+    // tag over a new piece and the corner tip name the map's, not the loft's (maps/<id>.ts things)
+    /// stage 2 on a map that grows like the loft but has no kitchen island (greenhouse, campus, workshop)
+    stage_fruit = "a fruit bowl and a tree";
+    /// stage 6 on those maps
+    stage_more_fruit = "more fruit and flowers";
+    /// kyoto, stage 1: a bonsai by the door
+    stage_kyoto_1 = "a bonsai";
+    /// kyoto, stage 2: a bento on the counter, the first maple
+    stage_kyoto_2 = "a bento and a maple";
+    /// kyoto, stage 3: two floor cushions by the kotatsu
+    stage_kyoto_3 = "the zabuton";
+    /// kyoto, stage 4: a slate for the brush
+    stage_kyoto_4 = "the slate";
+    /// kyoto, stage 5: a painted wave, a wind bell under the eave
+    stage_kyoto_5 = "the wave and the wind bell";
+    /// kyoto, stage 6: a matcha set on the counter, moss in the garden
+    stage_kyoto_6 = "the matcha set";
+    /// kyoto, stage 7: a paper umbrella over the terrace
+    stage_kyoto_7 = "the paper umbrella";
+    /// kyoto, stage 8: maples all round, the kotatsu full
+    stage_kyoto_8 = "maples all round";
+    /// kyoto, stage 9: a goban by the engawa
+    stage_kyoto_9 = "the go board";
+    /// kyoto, stage 10: the bamboo that tips in the garden
+    stage_kyoto_10 = "the shishi-odoshi";
+    /// kyoto, stage 11: an old arcade cabinet by the kotatsu
+    stage_kyoto_11 = "the arcade cabinet";
+    /// kyoto, stage 12: a koi pond and its orange bridge
+    stage_kyoto_12 = "the koi pond";
+    /// kyoto, stage 13: carp streamers on a pole
+    stage_kyoto_13 = "the koinobori";
+    /// kyoto, stage 14: the last one, in the garden
+    stage_kyoto_14 = "the golden maneki-neko";
+    /// riad, stage 1: a pot of mint by the door
+    stage_riad_1 = "a pot of mint";
+    /// riad, stage 2: the tea tray, the first orange tree
+    stage_riad_2 = "the tea tray";
+    /// riad, stage 3: two leather poufs
+    stage_riad_3 = "the poufs";
+    /// riad, stage 4: a slate in carved plaster
+    stage_riad_4 = "the slate";
+    /// riad, stage 5: a rug on the wall, a drum
+    stage_riad_5 = "the Berber rug and the darbouka";
+    /// riad, stage 6: a tajine on the tea table, jasmine outside
+    stage_riad_6 = "a tajine and jasmine";
+    /// riad, stage 7: a canvas awning over the terrace
+    stage_riad_7 = "the awning";
+    /// riad, stage 8: the patio's four orange trees, the poufs full
+    stage_riad_8 = "the four orange trees";
+    /// riad, stage 9: a draughts board in the patio
+    stage_riad_9 = "the draughts table";
+    /// riad, stage 10: the fountain grows
+    stage_riad_10 = "the fountain's second tier";
+    /// riad, stage 11: a steaming hammam in the garden
+    stage_riad_11 = "the hammam";
+    /// riad, stage 12: a long basin edged in zellige
+    stage_riad_12 = "the zellige basin";
+    /// riad, stage 13: a balloon, the Atlas behind
+    stage_riad_13 = "the balloon over the Atlas";
+    /// riad, stage 14: the last one, in the garden
+    stage_riad_14 = "the golden lantern";
+    /// nordic, stage 1: a fern by the door
+    stage_nordic_1 = "a fern";
+    /// nordic, stage 2: buns on the counter, the first birch
+    stage_nordic_2 = "kanelbullar and a birch";
+    /// nordic, stage 3: two sheepskins by the stove
+    stage_nordic_3 = "the sheepskins";
+    /// nordic, stage 4: a blackboard in a pine frame
+    stage_nordic_4 = "the blackboard";
+    /// nordic, stage 5: a rug on the wall, a record player
+    stage_nordic_5 = "the rya and the record player";
+    /// nordic, stage 6: fika on the counter
+    stage_nordic_6 = "blueberries and coffee";
+    /// nordic, stage 7: a campfire and its log benches
+    stage_nordic_7 = "the campfire";
+    /// nordic, stage 8: firs all round, more sheepskins
+    stage_nordic_8 = "firs all round";
+    /// nordic, stage 9: a kubb game in the grass
+    stage_nordic_9 = "the kubb set";
+    /// nordic, stage 10: a steaming wooden tub
+    stage_nordic_10 = "the hot tub";
+    /// nordic, stage 11: the sauna grows a porch
+    stage_nordic_11 = "the sauna's porch";
+    /// nordic, stage 12: a lake to plunge in
+    stage_nordic_12 = "the lake and its jetty";
+    /// nordic, stage 13: a pole with flowers
+    stage_nordic_13 = "the midsummer pole";
+    /// nordic, stage 14: the last one, in the garden
+    stage_nordic_14 = "the golden Dala horse";
     /// the event label 3 s over the new piece as two bims carry it in
     grow_new(thing) = "new: {thing}";
     /// the tip on the ground's corner: the level, the jobs done, the next piece and when
