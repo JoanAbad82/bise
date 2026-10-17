@@ -2,7 +2,8 @@
 // his paper plane's catch, and where the bim stands under reduced motion (fades, never a walk).
 // bim.ts applies a Rig to the meshes; index.ts sums the Motion. Every still pose reads without
 // motion (asleep: eyes closed, head down; idle: sunk in the bean bag; failed: slumped; in line: the
-// box). Loops (typing, hot's sweat, the '?' hops) are 'loop' at LOOP_FPS; reduced motion has none.
+// box). Loops (typing, hot's sweat, the '?' hops, eating at the island) are 'loop' at LOOP_FPS;
+// reduced motion has none.
 import type { Activity, ActivityKind, Doing, Motion, Pose } from '../model';
 
 /** rotations in radians: [x, y, z] */
@@ -37,6 +38,8 @@ export interface Props {
   readonly coin: number | null;
   readonly golden: boolean;
   readonly crateUp: boolean;
+  /** the fruit in hand eaten so far (snack): 0 whole .. 1 gone */
+  readonly eaten: number;
 }
 
 export interface Rig {
@@ -86,7 +89,7 @@ export const NO_PROPS: Props = {
   crate: false, mug: false, orange: false, pine: false, sheet: false, plane: false,
   skate: false, glasses: false, cloud: 0, hot: null,
   marker: false, newspaper: false, bigScreen: false, magnifier: false, poster: false, shredder: null, progress: null,
-  coin: null, golden: false, crateUp: false,
+  coin: null, golden: false, crateUp: false, eaten: 0,
 };
 
 const Z: Rot = [0, 0, 0];
@@ -214,8 +217,63 @@ const asleep: Body = {
   eyes: 0.15, mouth: 'oh',
 };
 
-/** a kind's pose at rest, at loop time lt (lt is 0 under reduced motion) */
-function rest(act: Activity, lt: number, ph: number): Body {
+/**
+ * Eating at the island (Gabriel and Lucas, bims-life: a bim at the bar stays a while and eats): a
+ * loop from its arrival (`stay`, s). It reaches into the bowl and picks a fruit (PICK_S), then BITES
+ * times: the fruit up to its mouth, a bite (the fruit shrinks), down to its chest, chewing; then the
+ * next fruit. A mug (fruit 2) is sipped, never smaller. Reduced motion: chewing, a fruit in hand.
+ */
+export const PICK_S = 1.6;
+export const BITE_S = 2.6;
+export const BITES = 4;
+export const FRUIT_S = PICK_S + BITES * BITE_S;
+
+const lerp3 = (a: Rot, b: Rot, f: number): Rot => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+const HOLD: Rot = [-1.3, 0, -0.2];
+const MOUTH: Rot = [-2.25, 0, -0.45];
+const BOWL: Rot = [-0.75, 0, 0.1];
+
+function eating(fruit: number, stay: number, ph: number): Body {
+  const n = Math.floor(stay / FRUIT_S);
+  const u = stay - n * FRUIT_S;
+  const mug = fruit === 2;
+  const kind = mug ? 2 : (fruit + n) % 2;
+  const held = (eaten: number, on: boolean): Props => ({ ...NO_PROPS, pine: on && kind === 0, orange: on && kind === 1, mug: on && mug, eaten: mug ? 0 : eaten });
+  if (u < PICK_S) {
+    // into the bowl, eyes on it; the fruit in hand once picked, back up to its chest
+    const f = u / PICK_S;
+    const down = f < 0.5 ? ease(f * 2) : 1 - ease((f - 0.5) * 2);
+    return {
+      ...STAND, body: [0.22 * down, 0, 0], head: [0.1 + 0.3 * down, 0, 0],
+      armR: f < 0.5 ? lerp3(HOLD, BOWL, ease(f * 2)) : lerp3(BOWL, HOLD, ease((f - 0.5) * 2)),
+      armL: [-0.15, 0, 0], mouth: 'smile', props: held(0, f >= 0.5),
+    };
+  }
+  const b = Math.floor((u - PICK_S) / BITE_S);
+  const v = u - PICK_S - b * BITE_S;
+  const before = b / BITES;
+  const after = (b + 1) / BITES;
+  if (v < 0.5) {
+    // up to its mouth, mouth open
+    return { ...STAND, armR: lerp3(HOLD, MOUTH, ease(v / 0.5)), head: [-0.05, 0, 0], mouth: 'oh', props: held(before, true) };
+  }
+  if (v < 0.75) {
+    // the bite: a nod into it, the fruit a bite smaller
+    return { ...STAND, armR: MOUTH, head: [0.15, 0, 0], mouth: 'smile', eyes: 0.6, props: held(after, after < 1) };
+  }
+  if (v < 1.15) {
+    return { ...STAND, armR: lerp3(MOUTH, HOLD, ease((v - 0.75) / 0.4)), head: [0.05, 0, 0], mouth: 'smile', props: held(after, after < 1) };
+  }
+  // chewing: the mouth goes, the head bobs, eyes half shut with pleasure
+  const c = Math.sin((v - 1.15) * Math.PI * 6 + ph);
+  return {
+    ...STAND, armR: HOLD, head: [0.04 + c * 0.04, 0, Math.sin((v - 1.15) * 2 + ph) * 0.05],
+    mouth: c > 0 ? 'oh' : 'smile', eyes: 0.4, props: held(after, after < 1),
+  };
+}
+
+/** a kind's pose at rest, at loop time lt (lt is 0 under reduced motion); `stay`: s since it arrived (its own loops from there) */
+function rest(act: Activity, lt: number, ph: number, stay = lt): Body {
   const k = act.k;
   const urgent = act.urgent === true;
   const fruit = act.fruit ?? 0;
@@ -233,10 +291,8 @@ function rest(act: Activity, lt: number, ph: number): Body {
     case 'sleep':
     case 'waitagent':
       return asleep;
-    case 'snack': {
-      const props = { ...NO_PROPS, pine: fruit === 0, orange: fruit === 1, mug: fruit === 2 };
-      return { ...STAND, armR: [-1.5, 0, 0], head: [-0.1, 0, 0.06], mouth: 'laugh', eyes: 0.3, props };
-    }
+    case 'snack':
+      return eating(fruit, stay, ph);
     case 'asks': {
       // standing by its desk, hand up, hops (faster and with a sheet when urgent)
       const sp = urgent ? 5.2 : 2.6;
@@ -378,12 +434,13 @@ export function rigOf(inp: RigInput): Rig {
   const act = seg.act;
   const k: ActivityKind = act.k;
   const lt = loopT(t, reduced);
-  const target = rest(act, lt, phase);
   const place = placeOf(pose, reduced);
   const walkT = seg.path.len > 0.01 && seg.from !== null ? seg.path.len / seg.speed : 0;
   const arrived = reduced ? !place.fading : !pose.moving;
   const dur = reduced ? 0 : transitionOf(seg.from, k);
   const u = pose.since - (reduced ? Math.min(FADE, walkT) : walkT);
+  // a loop of its own from its arrival (eating); reduced motion holds it chewing, a fruit in hand
+  const target = rest(act, lt, phase, reduced ? PICK_S + BITE_S - 0.2 : Math.max(0, u - dur));
 
   let b: Body;
   let motion: Motion;
@@ -400,7 +457,7 @@ export function rigOf(inp: RigInput): Rig {
     motion = 'walk';
   } else {
     b = target;
-    motion = !reduced && ((TYPING.has(k) && workLoops(act)) || k === 'asks') ? 'loop' : 'still';
+    motion = !reduced && ((TYPING.has(k) && workLoops(act)) || k === 'asks' || k === 'snack') ? 'loop' : 'still';
   }
 
   if (pose.plane && !reduced) {

@@ -3,6 +3,7 @@
 // workbench (the eating place) with its vise and toolbox, the ping-pong table, the roller door
 // rolled up on the right by the nap place, a scooter inside it, an old car in the front middle, the neon :* over the board; its growth is the loft's (blook.ts
 // loftGrower), the mural in the back left corner. Owner: maps-b.
+import { Group, type Object3D } from 'three';
 import type { WorkshopOffice } from '../../maps/workshop';
 import { decorOf } from '../decor';
 import { boxOf, onFloor } from '../kit';
@@ -44,14 +45,19 @@ function shell(b: Build): void {
   k.add(style.box(1.2, 0.5, 0.04), k.mat('#c49a6c'), root, px, 1.75, 0.03 + style.pictureZ);
   for (let i = 0; i < 6; i++) k.add(style.box(0.06, 0.3, 0.04), k.mat(TOOLS[i % TOOLS.length] ?? WORLD.dark), root, px - 0.45 + i * 0.18, 1.75 + (i % 2) * 0.06, 0.07 + style.pictureZ);
   // the roller door on the right edge, most of the way up: its two posts, the drum's housing, the
-  // bottom of its slats under it; a scooter parked inside it
+  // bottom of its slats under it; a scooter parked inside it, along the wall (across the room it
+  // stood where the nap place's last napper lays its head on a small office: Gabriel, bims-life)
   const rz0 = 4.3;
   const rz1 = D - 0.4;
   for (const z of [rz0, rz1]) k.add(style.box(0.16, WALL_H, 0.16), k.mat(pal.wallTop), root, x1 + 0.05, WALL_H / 2, z);
   k.add(style.box(0.36, 0.34, rz1 - rz0 + 0.2), k.mat(pal.wallTop), root, x1 + 0.05, WALL_H - 0.05, (rz0 + rz1) / 2);
   k.add(style.box(0.06, 0.4, rz1 - rz0 - 0.16), k.mat('#9aa3ab'), root, x1 + 0.05, WALL_H - 0.42, (rz0 + rz1) / 2);
   for (let i = 0; i < 3; i++) k.add(style.box(0.07, 0.02, rz1 - rz0 - 0.16), k.mat('#77838c'), root, x1 + 0.05, WALL_H - 0.3 - i * 0.12, (rz0 + rz1) / 2);
-  scooter(k, root, x1 - 0.7, rz0 + 0.4);
+  const sc = new Group();
+  sc.position.set(x1 - 0.35, 0, rz0 + 0.65);
+  sc.rotation.y = -Math.PI / 2;
+  root.add(sc);
+  scooter(k, sc, 0, 0);
   // an old car being fixed in the front middle, on its way to the roller door; tyres stacked by it
   const bench = benchOf(o);
   const free0 = bench.x + 1.6;
@@ -86,7 +92,7 @@ function car(k: Build['k'], root: Build['root'], x: number, z: number): void {
 }
 
 /** a scooter, its nose towards the roller door */
-function scooter(k: Build['k'], root: Build['root'], x: number, z: number): void {
+function scooter(k: Build['k'], root: Object3D, x: number, z: number): void {
   const { style } = k;
   const body = k.mat('#6cb4ee');
   for (const dx of [-0.42, 0.42]) {

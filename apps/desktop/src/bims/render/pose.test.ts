@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity, ActivityKind, Doing, Path, Pose, Segment, Spot } from '../model';
-import { FADE, PLANE_CATCH, PLANE_FLIGHT, louder, placeOf, rigOf, transitionOf, workLoops } from './pose';
+import { BITE_S, BITES, FADE, FRUIT_S, PICK_S, PLANE_CATCH, PLANE_FLIGHT, louder, placeOf, rigOf, transitionOf, workLoops } from './pose';
 import type { BimEgg } from '../eggs';
 import { eggRig } from './egg';
 import { headClearance } from './laptop';
@@ -41,10 +41,41 @@ describe('pose: the kinds at rest', () => {
     for (const k of KINDS) expect(rig(poseOf(k), 5).opacity).toBe(1);
   });
 
-  it('loops only typing and the "?" hops; the other poses are still (model.ts Motion)', () => {
+  it('loops only typing, the "?" hops and eating; the other poses are still (model.ts Motion)', () => {
     const loops = new Set(KINDS.filter((k) => rig(poseOf(k), 5).motion === 'loop'));
-    expect([...loops].sort()).toEqual(['asks', 'hot', 'main', 'work']);
+    expect([...loops].sort()).toEqual(['asks', 'hot', 'main', 'snack', 'work']);
     for (const k of KINDS) if (!loops.has(k)) expect(rig(poseOf(k), 5).motion).toBe('still');
+  });
+
+  it('eats at the island: picks a fruit from the bowl, bites it smaller, chews; then the next fruit (bims-life)', () => {
+    const at = (since: number, fruit = 0) => rig(poseOf('snack', { since, act: { at: 'island', fruit } }), 100 + since);
+    // reaching into the bowl: leaning in, nothing in hand yet
+    const reach = at(PICK_S * 0.4);
+    expect(reach.body[0]).toBeGreaterThan(0.1);
+    expect(reach.props.pine || reach.props.orange).toBe(false);
+    // picked, at its mouth, mouth open
+    const up = at(PICK_S + 0.45);
+    expect(up.props.pine).toBe(true);
+    expect(up.mouth).toBe('oh');
+    expect(up.armR[0]).toBeLessThan(-2);
+    // each bite leaves less of it; after the last one the hand is empty
+    const left = [0, 1, 2].map((b) => at(PICK_S + b * BITE_S + 1.5).props.eaten);
+    expect(left).toEqual([1 / BITES, 2 / BITES, 3 / BITES]);
+    const gone = at(PICK_S + (BITES - 1) * BITE_S + 1.5);
+    expect(gone.props.pine || gone.props.orange).toBe(false);
+    // chewing moves the mouth
+    const mouths = new Set(Array.from({ length: 12 }, (_, i) => at(PICK_S + 1.3 + i * 0.1).mouth));
+    expect(mouths.size).toBeGreaterThan(1);
+    // the next fruit: the other one, whole
+    const next = at(FRUIT_S + PICK_S + 0.45);
+    expect(next.props.orange).toBe(true);
+    expect(next.props.eaten).toBe(0);
+    // a mug is sipped, never smaller
+    expect(at(PICK_S + 1.5, 2).props).toMatchObject({ mug: true, eaten: 0 });
+    // reduced motion: still, chewing with a fruit in hand
+    const r = rig(poseOf('snack', { since: 40, act: { at: 'island', fruit: 1 } }), 40, true);
+    expect(r.motion).toBe('still');
+    expect(r.props.orange).toBe(true);
   });
 
   it('a still pose is the same at any time', () => {

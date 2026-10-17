@@ -226,7 +226,8 @@ function shell(b: Build): void {
   // the banquette along the back wall behind the poufs, its cushions
   const [l0, l1] = loungeX(o);
   k.add(style.box(l1 - l0, 0.35, 0.5), k.mat(BLUE), root, (l0 + l1) / 2, 0.18, 0.3);
-  for (let i = 0; i < 5; i++) k.add(style.box(0.5, 0.36, 0.14), k.mat(([SAFFRON, TEAL, WORLD.orange, '#9b8fe0', SAFFRON] as const)[i] ?? SAFFRON), root, l0 + 0.4 + (i * (l1 - l0 - 0.8)) / 4, 0.5, 0.12);
+  // its cushions thin against the wall: a napper on a pouf lays its head just in front of them (Gabriel, bims-life)
+  for (let i = 0; i < 5; i++) k.add(style.box(0.5, 0.36, 0.1), k.mat(([SAFFRON, TEAL, WORLD.orange, '#9b8fe0', SAFFRON] as const)[i] ?? SAFFRON), root, l0 + 0.4 + (i * (l1 - l0 - 0.8)) / 4, 0.5, 0.08);
   // the brass tea table in front of the poufs
   const t = teaTable(o);
   k.add(style.cylinder(0.06, 0.4), k.mat(BRASS), root, t.x, 0.2, t.z);

@@ -253,6 +253,10 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       mug.visible = p.mug;
       orange.visible = p.orange;
       pine.visible = p.pine;
+      // bitten (eating at the island): a fruit a bite smaller each time
+      const left = Math.max(0.15, 1 - p.eaten * 0.85);
+      orange.scale.setScalar(left);
+      pine.scale.setScalar(left);
       plane.visible = p.plane;
       sheet.visible = p.sheet;
       skate.visible = p.skate;

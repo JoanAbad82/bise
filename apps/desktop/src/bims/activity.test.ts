@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activities, activity, HOT_MS, idleLife, SNACK_EVERY, SNACK_S, SNACK_SPREAD } from './activity';
+import { activities, activity, HOT_MS, idleLife, LIFE_MIN, LIFE_SPREAD, SNACK_MIN, SNACK_SPREAD } from './activity';
 import { agent, card, EXPECT, landing, mainAgent, mainIdle, office, snap, watch } from './fixtures';
 import type { Activity } from './model';
 
@@ -43,19 +43,30 @@ describe("the rows -> bims mapping (spec §4, [a] lines)", () => {
   it('waiting on an agent: asleep at its desk, says on whom', () => {
     expect(one(agent('a', { status: 'waiting', waiting_on: { who: 'agent', name: 'b' } }))).toEqual({ k: 'waitagent', at: 'desk', on: 'b' });
   });
-  it('idle: in the lounge, a snack trip now and then (30-60 s apart, under 6 s), replayable', () => {
+  it('idle: in its bean bag, a long trip to the island every 4-7 min (30-90 s there), replayable', () => {
     const a = agent('empty-state');
-    const ks = Array.from({ length: 240 }, (_, i) => one(a, i / 2).k);
+    const ks = Array.from({ length: 2 * 900 }, (_, i) => one(a, i / 2).k);
     expect(new Set(ks)).toEqual(new Set(['nap', 'snack']));
-    expect(ks.filter((k) => k === 'snack').length).toBeLessThanOrEqual(Math.ceil(120 / SNACK_EVERY) * SNACK_S * 2);
-    expect(Array.from({ length: 240 }, (_, i) => one(a, i / 2).k)).toEqual(ks);
-    // every bim has a cycle in [SNACK_EVERY, SNACK_EVERY + SNACK_SPREAD)
+    expect(Array.from({ length: 2 * 900 }, (_, i) => one(a, i / 2).k)).toEqual(ks);
+    // every bim has a cycle in [LIFE_MIN, LIFE_MIN + LIFE_SPREAD), each trip SNACK_MIN..SNACK_MIN+SNACK_SPREAD s long
     const trips = (name: string) => {
       const starts: number[] = [];
-      for (let t = 0; t < 200; t += 0.25) if (idleLife(name, t).k === 'snack' && idleLife(name, t - 0.25).k !== 'snack') starts.push(t);
-      return starts.slice(1).map((s, i) => s - (starts[i] ?? 0));
+      const lens: number[] = [];
+      let from = -1;
+      for (let t = 0; t < 2000; t += 0.25) {
+        const now = idleLife(name, t).k === 'snack';
+        const before = idleLife(name, t - 0.25).k === 'snack';
+        if (now && !before) { starts.push(t); from = t; }
+        if (!now && before && from >= 0) lens.push(t - from);
+      }
+      return { gaps: starts.slice(1).map((s, i) => s - (starts[i] ?? 0)), lens };
     };
-    for (const n of ['x', 'release', 'search-index']) for (const gap of trips(n)) expect(gap >= SNACK_EVERY && gap < SNACK_EVERY + SNACK_SPREAD).toBe(true);
+    for (const n of ['x', 'release', 'search-index']) {
+      const { gaps, lens } = trips(n);
+      expect(gaps.length).toBeGreaterThan(2);
+      for (const gap of gaps) expect(gap >= LIFE_MIN && gap < LIFE_MIN + LIFE_SPREAD).toBe(true);
+      for (const len of lens) expect(len >= SNACK_MIN && len < SNACK_MIN + SNACK_SPREAD).toBe(true);
+    }
   });
   it('a snack trip: at the island, its trip number and a fruit, the same for the same t', () => {
     let t = 0;

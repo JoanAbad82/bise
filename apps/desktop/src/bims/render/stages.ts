@@ -98,6 +98,11 @@ function loungeX(o: Office): { l0: number; l1: number } {
 }
 const boardX = (o: Office): number => (o.boardSpots.length ? o.boardSpots.reduce((s, p) => s + p.x, 0) / o.boardSpots.length : o.x0 + o.W / 2);
 
+/** the arcade cabinet's width (x) */
+const ARCADE_W = 0.55;
+/** stage 11's arcade cabinet: on the back wall just past the whiteboard, where no napper lies */
+const arcadeAt = (o: Office): Pt => ({ x: boardX(o) + 0.9 + 0.25 + ARCADE_W / 2, z: 0.3 });
+
 /** where each stage's piece stands (its cones while it is built; the unlock walks there) */
 export function pieceAt(o: Office, stage: number): Pt {
   const d = decorOf(o);
@@ -116,7 +121,7 @@ export function pieceAt(o: Office, stage: number): Pt {
     d.trees[1] ?? o.door,
     d.ramp,
     { x: o.x0 - 1.9, z: o.D * 0.55 },
-    { x: l1 - 0.35, z: 0.3 },
+    arcadeAt(o),
     { x: o.x0 - 1.9, z: o.D + 2.2 },
     { x: x1 + 1.2, z: 1.2 },
     { x: o.x0 - 1.9, z: 1.4 },
@@ -242,11 +247,12 @@ export function buildStages(b: Build): void {
     k.add(style.cylinder(0.13, 0.6), k.mat('#d8d2c6'), s10, f.x, 0.5, f.z);
     k.add(style.ball(0.12), k.mat('#8fd3ff'), s10, f.x, 0.85, f.z);
   }
-  // 11: an arcade cabinet at the lounge's end, its screen lit
+  // 11: an arcade cabinet past the whiteboard, its screen lit (at the lounge's end it stood where
+  // the last bean bag's napper lays its head: Gabriel, bims-life)
   const s11 = s(11);
   if (s11) {
     const a = pieceAt(o, 11);
-    k.add(style.box(0.55, 1.1, 0.45), k.mat(WORLD.ramp), s11, a.x, 0.55, a.z);
+    k.add(style.box(ARCADE_W, 1.1, 0.45), k.mat(WORLD.ramp), s11, a.x, 0.55, a.z);
     k.add(style.box(0.45, 0.32, 0.03), style.material(WORLD.dark, { emissive: '#6cb4ee', ei: 0.5 }), s11, a.x, 0.82, a.z + 0.24);
     k.add(style.box(0.5, 0.06, 0.25), k.mat(WORLD.dark), s11, a.x, 0.6, a.z + 0.28);
   }
@@ -301,7 +307,8 @@ function frames(k: Kit, parent: Object3D, o: Office, g: Grow): void {
   if (g.frames === 0) return;
   const { style } = k;
   const pitch = 0.36;
-  const xa = boardX(o) + 1.1;
+  // from stage 11 the arcade cabinet stands at the span's start: the frames hang past it
+  const xa = g.stage >= 11 ? arcadeAt(o).x + ARCADE_W / 2 + 0.1 : boardX(o) + 1.1;
   const xb = o.mainDesk.x - 0.5;
   const cols = Math.max(1, Math.floor((xb - xa) / pitch));
   const border = k.mat(g.golden ? WORLD.gold : WORLD.crate);

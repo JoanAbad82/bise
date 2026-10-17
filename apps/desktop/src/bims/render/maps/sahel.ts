@@ -55,6 +55,16 @@ function hangar(k: Kit, g: Object3D, x0: number, x1: number, z0: number, z1: num
   for (let i = 0; i < 3; i++) k.add(k.style.box(x1 - x0, 0.03, 0.4), k.mat(STRAW), g, (x0 + x1) / 2, 2.06, z0 + 0.5 + (i * (z1 - z0 - 1)) / 2);
 }
 
+/**
+ * A buttress's x on the back wall, moved into the lane beside a nap spot it stood behind: there a
+ * napper's head went into it (Gabriel, bims-life). The lanes are half a spot's pitch either side.
+ */
+function offNap(o: SahelOffice, x: number): number {
+  const s = o.lounge.find((l) => Math.abs(l.x - x) < 0.6);
+  if (!s) return x;
+  return s.x + (x >= s.x ? 1 : -1) * Math.abs(s.ax - s.x);
+}
+
 function shell(b: Build): void {
   const { k, root } = b;
   const o = office(b);
@@ -70,8 +80,8 @@ function shell(b: Build): void {
   k.add(k.style.box(0.4, 1.2, D + 0.2), banco, root, x0 - 0.2, 0.6, D / 2);
   for (let x = x0 + 0.6; x < x0 + W; x += 0.9) k.add(k.style.cylinder(0.035, 0.5), k.mat(WOOD), root, x, 1.2, 0.05).rotation.x = Math.PI / 2;
   for (let x = x0; x <= x0 + W + 0.01; x += W / 4) {
-    k.add(k.style.box(0.55, 1.8, 0.6), banco, root, x, 0.9, -0.15);
-    cone(k, root, 0.25, 0.5, k.pal.wall, x, 2.05, -0.15);
+    k.add(k.style.box(0.55, 1.8, 0.6), banco, root, offNap(o, x), 0.9, -0.15);
+    cone(k, root, 0.25, 0.5, k.pal.wall, offNap(o, x), 2.05, -0.15);
   }
   // the hangar over the desks, a woven mat under each desk
   hangar(k, root, H.x0, H.x1, H.z0, H.z1);

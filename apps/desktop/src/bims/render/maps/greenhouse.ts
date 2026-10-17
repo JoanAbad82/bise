@@ -8,7 +8,7 @@ import { decorOf } from '../decor';
 import { boxOf, onFloor } from '../kit';
 import { WORLD } from '../palette';
 import { loftLounge, loftTree } from '../stages';
-import { bigDesk, boxHolding, grow, loftGrower, palettes, pieceAtOf, turnedDesk } from './blook';
+import { bigDesk, boxHolding, grow, loftGrower, palettes, pastBoard, pieceAtOf, turnedDesk } from './blook';
 import type { Build, MapLook } from './look';
 
 const STEEL = '#3d405b';
@@ -24,7 +24,7 @@ const grower = loftGrower({
     const xs = o.lounge.map((s) => s.x);
     return [Math.min(...xs) - 0.4, Math.max(...xs) + 0.4];
   },
-  arcade: (o) => ({ x: Math.max(...o.lounge.map((s) => s.x)) + 0.2, z: 0.3 }),
+  arcade: pastBoard,
   nap: (o) => ({ x: (o.lounge[0]?.x ?? o.x0) + 1.0, z: 1.5 }),
 });
 

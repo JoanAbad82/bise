@@ -192,7 +192,11 @@ export function grow(b: Build, g: Grower): void {
 /** a frame per 10 artifacts along the map's span, rows going down, golden from 500 */
 function frames(k: Kit, parent: Object3D, o: Office, gr: Grow, g: Grower): void {
   if (gr.frames === 0) return;
-  const { xa, xb, y, z } = g.frameSpan(o);
+  const span = g.frameSpan(o);
+  const { xb, y, z } = span;
+  // from stage 11 the arcade cabinet may stand at the span's start (past the board): the frames hang past it
+  const a = gr.stage >= 11 ? g.pieces[11]?.at(o) : undefined;
+  const xa = a && a.z < 1 && a.x + ARCADE_W / 2 > span.xa && a.x - ARCADE_W / 2 < xb ? Math.max(span.xa, a.x + ARCADE_W / 2 + 0.1) : span.xa;
   const pitch = 0.36;
   const cols = Math.max(1, Math.floor((xb - xa) / pitch));
   for (let i = 0; i < gr.frames; i++) {
@@ -317,9 +321,18 @@ export function loftGrower(s: LoftSpots): Grower {
   };
 }
 
+/** the arcade cabinet's width (x) */
+export const ARCADE_W = 0.55;
+
+/**
+ * The arcade cabinet's place on the back wall past the whiteboard: behind the nap place's last bed
+ * the napper laid its head inside it (Gabriel, bims-life; render/lying.test.ts).
+ */
+export const pastBoard = (o: Office): Pt => ({ x: boardXOf(o) + 0.9 + 0.25 + ARCADE_W / 2, z: 0.3 });
+
 /** an arcade cabinet, its screen lit, facing the room (+z) */
 export function arcade(k: Kit, g: Object3D, p: Pt): void {
-  k.add(k.style.box(0.55, 1.1, 0.45), k.mat(WORLD.ramp), g, p.x, 0.55, p.z);
+  k.add(k.style.box(ARCADE_W, 1.1, 0.45), k.mat(WORLD.ramp), g, p.x, 0.55, p.z);
   k.add(k.style.box(0.45, 0.32, 0.03), k.style.material(WORLD.dark, { emissive: '#6cb4ee', ei: 0.5 }), g, p.x, 0.82, p.z + 0.24);
   k.add(k.style.box(0.5, 0.06, 0.25), k.mat(WORLD.dark), g, p.x, 0.6, p.z + 0.28);
 }

@@ -130,14 +130,20 @@ function lounge(b: Build): void {
   beds(b, (g, box, i) => {
     k.add(k.style.box(0.58, 0.16, 0.58), k.mat(CUSHIONS[i % 4] ?? SAFFRON), g, (box.x0 + box.x1) / 2, 0.1, (box.z0 + box.z1) / 2);
   });
+  // the jhoola along the lounge's side wall, between its two rows, its back to the wall: on the
+  // back wall it hung where the first row's nappers lay their heads (Gabriel, bims-life)
   const s8 = b.stage(8);
+  const lz = o.lounge.map((s) => s.z);
   if (s8 && xs.length) {
-    const sx = (Math.min(...xs) + Math.max(...xs)) / 2;
-    for (const ox of [-1.2, 1.2]) k.add(k.style.cylinder(0.07, 1.6), k.mat('#6b4a32'), s8, sx + ox, 0.8, 0.35);
-    k.add(k.style.box(2.6, 0.1, 0.1), k.mat('#6b4a32'), s8, sx, 1.6, 0.35);
-    for (const ox of [-0.7, 0.7]) k.add(k.style.cylinder(0.012, 1.0), k.mat('#b08a3c'), s8, sx + ox, 1.1, 0.35);
-    k.add(k.style.box(1.6, 0.08, 0.45), k.mat('#8a5a3c'), s8, sx, 0.6, 0.35);
-    k.add(k.style.box(1.6, 0.35, 0.06), k.mat('#8a5a3c'), s8, sx, 0.8, 0.16);
+    const side = Math.min(...xs) - o.x0 < o.x0 + o.W - Math.max(...xs) ? 1 : -1;
+    const wx = side === 1 ? o.x0 : o.x0 + o.W;
+    const sz = (Math.min(...lz) + Math.max(...lz)) / 2;
+    const at = (d: number): number => wx + side * d;
+    for (const oz of [-1.2, 1.2]) k.add(k.style.cylinder(0.07, 1.6), k.mat('#6b4a32'), s8, at(0.3), 0.8, sz + oz);
+    k.add(k.style.box(0.1, 0.1, 2.6), k.mat('#6b4a32'), s8, at(0.3), 1.6, sz);
+    for (const oz of [-0.7, 0.7]) k.add(k.style.cylinder(0.012, 1.0), k.mat('#b08a3c'), s8, at(0.3), 1.1, sz + oz);
+    k.add(k.style.box(0.45, 0.08, 1.6), k.mat('#8a5a3c'), s8, at(0.3), 0.6, sz);
+    k.add(k.style.box(0.06, 0.35, 1.6), k.mat('#8a5a3c'), s8, at(0.11), 0.8, sz);
   }
 }
 

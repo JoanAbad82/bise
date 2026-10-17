@@ -9,10 +9,17 @@ import type { Activity, Snapshot } from './model';
 
 /** a turn longer than this runs hot (sweat, steam): the spec's 10 min, to tune */
 export const HOT_MS = 10 * 60_000;
-/** office life (§7): one trip every SNACK_EVERY..SNACK_EVERY+SNACK_SPREAD s per bim, SNACK_S s long */
-export const SNACK_EVERY = 30;
-export const SNACK_SPREAD = 31;
-export const SNACK_S = 6;
+/**
+ * office life (§7): long stays, few walks (Gabriel and Lucas, bims-life: they walked too often and
+ * left the bar too soon). Each idle bim lives a cycle of LIFE_MIN..LIFE_MIN+LIFE_SPREAD s (from its
+ * name): one trip to the island, SNACK_MIN..SNACK_MIN+SNACK_SPREAD s there eating (trip n's length
+ * and fruit from the name and n), the rest asleep in its bean bag. Two walks of MAX_WALK_S at most
+ * per cycle: under 5% of an idle bim's time.
+ */
+export const LIFE_MIN = 240;
+export const LIFE_SPREAD = 181;
+export const SNACK_MIN = 30;
+export const SNACK_SPREAD = 61;
 
 /** FNV-1a of a name: the bim's own rhythm, the same on every run */
 export function hash(s: string): number {
@@ -21,16 +28,21 @@ export function hash(s: string): number {
   return h >>> 0;
 }
 
+/** How long trip n of this bim stays at the island, s (SNACK_MIN..SNACK_MIN+SNACK_SPREAD). */
+export function snackLen(name: string, n: number): number {
+  return SNACK_MIN + (hash(`${name}#${String(n)}`) % SNACK_SPREAD);
+}
+
 /**
- * An idle bim at time t (s): in its bean bag, or on a snack trip to the island. Each bim has its
- * own cycle (30-60 s, from its name) and phase; trip n's fruit comes from the name and n.
+ * An idle bim at time t (s): in its bean bag, or on a trip to the island eating. Each bim has its
+ * own cycle (LIFE_MIN.., from its name) and phase; trip n's length and fruit come from the name and n.
  */
 export function idleLife(name: string, t: number): Activity {
   const h = hash(name);
-  const cyc = SNACK_EVERY + (h % SNACK_SPREAD);
+  const cyc = LIFE_MIN + (h % LIFE_SPREAD);
   const at = t + (h % cyc);
   const n = Math.floor(at / cyc);
-  if (at - n * cyc < SNACK_S) return { k: 'snack', at: 'island', key: n, fruit: (h + n) % 3 };
+  if (at - n * cyc < snackLen(name, n)) return { k: 'snack', at: 'island', key: n, fruit: (h + n) % 3 };
   return { k: 'nap', at: 'lounge' };
 }
 

@@ -10,10 +10,13 @@
 //       one that lands it, counted by the phase each frame drew (the probe's skate, skate.ts
 //       skateAt), never by the wall clock (load 10 slid a line into a 'rest' window); 0 blurred
 //       or hidden. (5b) reduced motion: nobody skates;
+//   (6) an idle bim eating at the island (bims-life): the loop's ~8 fps (LOOP_FPS) while it eats,
+//       0 blurred or hidden, 0 once it naps again (the office's clock set: page.clock);
 //   (4) a lost WebGL context shows the list right under its one line (no office-high hole).
 // The sizes, labels, night, planes and reduced motion: office.spec.ts. Owner: bims-qa.
 import { test, expect } from '../../harness';
 import { agent, office, snap, watch } from '../../../src/bims/fixtures';
+import { idleLife } from '../../../src/bims/activity';
 import {
   NAMES, P, drawnIn, loseContext, open, rowsOf, setHidden, settle, shotOf, showOffice, sleep, threeChunks, watchScripts,
   withRows, writeIndex,
@@ -166,6 +169,57 @@ test('(5) a skater: 30 fps during its line, nothing at rest, nothing blurred or 
     expect(hid.reduce((a, b) => a + b, 0), `hidden: 0 frames over a whole session (${hid.join(' ')})`).toBe(0);
     await setHidden(s.page, false);
     await expect.poll(async () => (await drawnIn(s, 1000)).frames, { timeout: 30_000 }).toBeGreaterThan(0);
+  } finally {
+    await s.close();
+  }
+});
+
+/** STILL and one idle bim that eats at the island (activity.ts idleLife, pose.ts eating) */
+const EATER = snap([...STILL.agents, agent('munch', { status: 'idle', title: 'idle, eating' })]);
+
+/** the first second from `from` where munch has been at the island 2 s and stays a minute more (s) */
+function eatTime(from: number): number {
+  for (let t = from; t < from + 20_000; t++) if (idleLife('munch', t - 2).k !== 'snack' && idleLife('munch', t).k === 'snack' && idleLife('munch', t + 60).k === 'snack') return t + 2;
+  throw new Error('munch never eats');
+}
+
+test('(6) an eater: the loop rate while it eats, nothing once it naps, nothing blurred or hidden', async () => {
+  test.setTimeout(120_000);
+  const { s } = await open(EATER);
+  try {
+    // the office's first look while it eats: it stands at the island (no walk), its loop from there; the clock flows
+    const t = eatTime(1_791_100_000);
+    await s.page.clock.setSystemTime(t * 1000);
+    await showOffice(s);
+    await sleep(1500);
+    const eat = await perSecond(s, 4);
+    const fps = eat.reduce((a, b) => a + b, 0) / eat.length;
+    expect(fps, `eating: the loop's ~8 fps (${eat.join(' ')})`).toBeGreaterThan(4);
+    expect(Math.max(...eat), `never the display rate (${eat.join(' ')})`).toBeLessThan(12);
+
+    await s.page.evaluate(() => {
+      (window as unknown as { __biseBlur?: boolean }).__biseBlur = true;
+      window.dispatchEvent(new Event('blur'));
+    });
+    await sleep(300);
+    const blur = await perSecond(s, 3);
+    expect(blur.reduce((a, b) => a + b, 0), `blurred: 0 frames while it eats (${blur.join(' ')})`).toBe(0);
+    await s.page.evaluate(() => {
+      (window as unknown as { __biseBlur?: boolean }).__biseBlur = false;
+      window.dispatchEvent(new Event('focus'));
+    });
+    await setHidden(s.page, true);
+    await sleep(300);
+    const hid = await perSecond(s, 3);
+    expect(hid.reduce((a, b) => a + b, 0), `hidden: 0 frames while it eats (${hid.join(' ')})`).toBe(0);
+    await setHidden(s.page, false);
+
+    // its trip over: it walks back to its bean bag (the office's row-clock check), then nothing draws
+    let back = t;
+    while (idleLife('munch', back).k === 'snack') back++;
+    await s.page.clock.setSystemTime((back + 1) * 1000);
+    await settle(s, 1500, 20_000);
+    expect((await drawnIn(s, 3000)).frames, 'napping again: 0 frames').toBe(0);
   } finally {
     await s.close();
   }
