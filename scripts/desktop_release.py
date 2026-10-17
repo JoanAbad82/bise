@@ -7,9 +7,12 @@
       --dry-run: a seam skew (below) is a warning, as a dry run ships nothing.
   scripts/desktop-release.sh build --out <dir> --runtime-root <root> [--tag desktop-vYYYY.M.N]
       [--identity <sha1|->] [--keychain <kc>] [--notarize] [--built <UTC Z>] [--repo owner/name]
-      the native helper, the app (pnpm build, electron-builder --dir), signed inside out
-      (desktop_sign.py), the zip (the updater's) and the DMG (the designer's window:
-      apps/desktop/resources/dmg/), each notarized and stapled with --notarize, the gates, and
+      [--helper <a built helper>]
+      the native helper (built, or --helper: CI's cache of it), the app (pnpm build,
+      electron-builder --dir, unsigned), signed inside out (desktop_sign.py), the DMG (the
+      designer's window: apps/desktop/resources/dmg/), with --notarize one notarization, the
+      DMG's (Apple notarizes the app inside it too), stapled on the DMG and on the app, then
+      the zip (the updater's) of the stapled app, the gates, and
       <out>/release/: bise-mac-arm64.{dmg,zip} + .sha256, VERSION, desktop.json (with --tag).
   scripts/desktop-release.sh dmg <bise.app> <out.dmg> [--identity <sha1|->]
       the DMG alone, from a built app (a look check).
@@ -165,24 +168,40 @@ def paths(out_dir):
             "feed": os.path.join(rel, F.FEED), "notary": os.path.join(o, "notary")}
 
 
+def helper_argv(out_path):
+    """The native helper's build (apps/desktop/native/mac/build.sh). Pure."""
+    return [os.path.join(DESKTOP, "native", "mac", "build.sh"), out_path]
+
+
 def pack_env(base, p, runtime_root):
     """electron-builder's inputs (electron-builder.mjs): the shipping bundle 'bise', the runtime's
-    bise, the helper, the runtime, the app's VERSION; ad hoc here, signed after by desktop_sign and
-    notarized after by notarize: no CSC_* (its signing) and no APPLE_* (its notarization, which
+    bise, the helper, the runtime, the app's VERSION; unsigned here (BISE_PACK_IDENTITY none: its
+    deep ad hoc signing cost 16 s and desktop_sign signs every piece after anyway), notarized
+    after by notarize: no CSC_* (its signing) and no APPLE_* (its notarization, which
     electron-builder 26 starts on its own when it sees them; its config also says notarize: false)
     reach it. Pure."""
     env = {k: v for k, v in base.items() if not k.startswith(("BISE_PACK_", "CSC_", "APPLE_"))}
     env.update({"BISE_PACK_NAME": NAME, "BISE_PACK_APP_ID": APP_ID, "BISE_PACK_BISE": os.path.realpath(os.path.join(runtime_root, "bise")),
                 "BISE_PACK_HELPER": p["helper"], "BISE_PACK_ROOT": runtime_root, "BISE_PACK_VERSION": p["version"],
-                "BISE_PACK_IDENTITY": "-", "BISE_PACK_OUT": p["dist"], "CSC_IDENTITY_AUTO_DISCOVERY": "false"})
+                "BISE_PACK_IDENTITY": "none", "BISE_PACK_OUT": p["dist"], "CSC_IDENTITY_AUTO_DISCOVERY": "false"})
     return env
 
 
-def notarize(path, p):
-    """Submit, wait, read the verdict (its log on a refusal), staple, validate (scripts/notary.py)."""
+def notarize(p):
+    """One notarization for both: the signed DMG, which holds the signed app, is submitted (Apple
+    notarizes the code nested in it, the app's cdhashes too); the DMG is stapled, then the app
+    in dist from the same ticket (the updater's zip is made from it after). Apple refusing the
+    app's ticket from the DMG's submission: the app goes on its own (the old, second wait).
+    Submit, wait, read the verdict (its log on a refusal), staple, validate: scripts/notary.py."""
     try:
-        N.submit(path, p["notary"])
-        N.staple(path)
+        N.submit(p["dmg"], p["notary"])
+        N.staple(p["dmg"])
+        try:
+            N.staple(p["app"])
+        except N.NotaryError as e:
+            say("no ticket for the app from the DMG's submission (%s): notarizing the app alone" % str(e)[-160:])
+            N.submit(p["app"], p["notary"])
+            N.staple(p["app"])
     except N.NotaryError as e:
         raise ReleaseError(str(e))
 
@@ -361,9 +380,14 @@ def build(a):
     os.makedirs(p["release"])
     with open(p["version"], "w") as f:
         f.write(F.version_text(rid, built, commit, rv.get("id", "")))
-    env = dict(os.environ, MACOSX_DEPLOYMENT_TARGET=MACOS_TARGET)
-    env.pop("HELPER_SIGN_ID", None)
-    run([os.path.join(DESKTOP, "native", "mac", "build.sh"), p["helper"]], env=env)
+    if a.helper:
+        # CI's cache of the helper, keyed on its sources (desktop-release.yml): signed again below
+        shutil.copy2(a.helper, p["helper"])
+        say("helper %s (built before from the same sources)" % a.helper)
+    else:
+        env = dict(os.environ, MACOSX_DEPLOYMENT_TARGET=MACOS_TARGET)
+        env.pop("HELPER_SIGN_ID", None)
+        run(helper_argv(p["helper"]), env=env)
     run(["pnpm", "install", "--frozen-lockfile"], cwd=DESKTOP)
     run(["pnpm", "build"], cwd=DESKTOP)
     run(["pnpm", "dist"], cwd=DESKTOP, env=pack_env(os.environ, p, root))
@@ -371,12 +395,10 @@ def build(a):
         raise ReleaseError("electron-builder made no %s" % p["app"])
     cli_bundle(p["app"])
     S.sign(p["app"], a.identity, a.keychain, say=say)
-    if a.notarize:
-        notarize(p["app"], p)
-    run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", p["app"], p["zip"]])
     make_dmg(p["app"], p["dmg"], a.identity, a.keychain)
     if a.notarize:
-        notarize(p["dmg"], p)
+        notarize(p)
+    run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", p["app"], p["zip"]])
     bad = check(p, signed=a.notarize)
     if bad:
         raise ReleaseError("the gates: " + "; ".join(bad))
@@ -406,6 +428,7 @@ def main(argv):
     b.add_argument("--tag")
     b.add_argument("--identity", default="-")
     b.add_argument("--keychain")
+    b.add_argument("--helper", help="a native helper built before from the same sources (CI's cache)")
     b.add_argument("--notarize", action="store_true")
     b.add_argument("--built")
     b.add_argument("--repo", default="gvergnaud/bise")

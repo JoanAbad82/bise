@@ -267,7 +267,7 @@ def test_pack_and_dmg_settings():
     check("BISE_PACK_SIGN_DIR" not in env and "CSC_LINK" not in env and "CSC_KEY_PASSWORD" not in env,
           "no other signing reaches electron-builder")
     check(not [k for k in env if k.startswith("APPLE_")], "no notary key reaches electron-builder (it would notarize)")
-    check(env["PATH"] == "/bin" and env["CSC_IDENTITY_AUTO_DISCOVERY"] == "false" and env["BISE_PACK_IDENTITY"] == "-", env)
+    check(env["PATH"] == "/bin" and env["CSC_IDENTITY_AUTO_DISCOVERY"] == "false" and env["BISE_PACK_IDENTITY"] == "none", env)
     check(env["BISE_PACK_APP_ID"] == "dev.bise.desktop" and env["BISE_PACK_NAME"] == "bise", env)
     check(env["BISE_PACK_BISE"] == "/rt/bise" and env["BISE_PACK_ROOT"] == "/rt" and env["BISE_PACK_VERSION"] == "/o/VERSION", env)
     check(p["dmg"].endswith("/release/bise-mac-arm64.dmg") and p["zip"].endswith("/release/bise-mac-arm64.zip"), p)
@@ -294,6 +294,7 @@ def test_pack_and_dmg_settings():
             check(r.returncode == 0, r.stderr)
             mac = json.loads(r.stdout)
             check(mac.get("notarize") is False, "electron-builder's config says notarize: false: %s" % mac)
+            check(mac.get("identity") is None, "a release's pack signs nothing (desktop_sign signs after): %s" % mac.get("identity"))
             # the calendar is never read (Apple audit #554): no calendar usage string in Info.plist
             info = mac.get("extendInfo", {})
             check(not [k for k in info if "Calendar" in k], "no calendar usage string: %s" % list(info))

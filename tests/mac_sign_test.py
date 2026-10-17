@@ -192,11 +192,14 @@ def test_staple_retries():
     try:
         answers = [1, 1, 0, 0]  # staple fails twice (Apple's ticket not served yet), then works; validate works
         N.subprocess.run = lambda argv, **kw: (calls.append(argv[2]), R(answers.pop(0)))[1]
-        N.staple("/a.app", tries=5, wait_s=30, sleep=waits.append)
-        check(calls == ["staple", "staple", "staple", "validate"] and waits == [30, 30], "staple is tried again after Error 68")
+        N.staple("/a.app", sleep=waits.append)
+        check(calls == ["staple", "staple", "staple", "validate"] and waits == [3, 5], "staple is tried again after Error 68, short first")
+        check(N.STAPLE_WAITS == (3, 5, 10, 20, 30), "the backoff: 3, 5, 10, 20, 30 s")
         calls.clear()
+        waits.clear()
         N.subprocess.run = lambda argv, **kw: (calls.append(argv[2]), R(1))[1]
-        check(raises(N.NotaryError, N.staple, "/a.app", 3, 1, lambda s: None) and calls == ["staple"] * 3, "it fails after its tries")
+        check(raises(N.NotaryError, N.staple, "/a.app", (1, 2), waits.append) and calls == ["staple"] * 3 and waits == [1, 2],
+              "it fails after its tries")
     finally:
         N.subprocess.run = real
 

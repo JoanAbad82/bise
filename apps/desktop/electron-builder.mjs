@@ -134,10 +134,12 @@ export default {
     // bise, which breaks Electron's own seal, so a dir build is re-signed
     // deep: with BISE_PACK_SIGN_DIR by signStable (above), else
     // BISE_PACK_IDENTITY names a codesigning identity (CSC_KEYCHAIN: its
-    // keychain), else ad hoc ('-'). No hardened runtime here: a release
-    // re-signs it with the Developer ID and its entitlements after
-    // (scripts/desktop_sign.py).
-    identity: signDir === undefined ? (process.env['BISE_PACK_IDENTITY'] ?? '-') : null,
+    // keychain), else ad hoc ('-'). BISE_PACK_IDENTITY=none: not signed here
+    // at all (a release: scripts/desktop_release.py, whose desktop_sign.py
+    // signs every piece inside out right after; the deep ad hoc pass cost
+    // 16 s for nothing). No hardened runtime here: a release re-signs it with
+    // the Developer ID and its entitlements after (scripts/desktop_sign.py).
+    identity: signDir !== undefined || process.env['BISE_PACK_IDENTITY'] === 'none' ? null : (process.env['BISE_PACK_IDENTITY'] ?? '-'),
     hardenedRuntime: false,
     // never notarize here: electron-builder 26 starts its own notarization as
     // soon as APPLE_API_KEY_ID/APPLE_API_ISSUER (or APPLE_ID...) are in the env,
