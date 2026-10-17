@@ -50,6 +50,29 @@ describe('the inbox, in his words', () => {
     expect(w.sent()).toContainEqual({ cmd: 'close', project: ACME, card: 9 });
   });
 
+  it("a refused answer and a refused close: both leave at once, then both come back, each with the core's words", () => {
+    const close9 = card({ project: ACME, id: 10, agent: 'perf', question: 'close me?' });
+    const w = feature().given(projects(home, acme(which, close9)));
+    w.does(answer(ACME, 9, '1', { project: BISE, agent: 'main' }), close(ACME, 10));
+    expect(ids(w.view.inbox())).toEqual([]);
+
+    // its hub never answered: the core refuses both (main's window-local card_refused, its words)
+    const why = "its hub didn't answer in 30 s: try again in a moment.";
+    w.given(cardRefused(ACME, 9, why), cardRefused(ACME, 10, why));
+    const back = w.view.inbox();
+    expect(ids(back)).toEqual([`${ACME}-9`, `${ACME}-10`]);
+    expect(back.map((c) => c.refused?.text)).toEqual([why, why]);
+
+    // still there, with the words, through a reload; his next answer takes the words away
+    w.reload();
+    expect(w.view.inbox().map((c) => [c.id, c.refused?.text])).toEqual([[9, why], [10, why]]);
+    w.does(answer(ACME, 10, '2'));
+    expect(w.view.inbox().map((c) => [c.id, c.refused?.text ?? null])).toEqual([[9, why]]);
+    // a minute on, the hub's rows still list it and nothing came: it shows again, without the old words
+    w.later(61_000).given(projects(home, acme(which, close9)));
+    expect(w.view.inbox().map((c) => [c.id, c.refused?.text ?? null])).toEqual([[9, why], [10, null]]);
+  });
+
   it('a refused answer shows the card again, and try again sends the same words', () => {
     const w = feature().given(projects(home, acme(which)));
     w.does(answer(ACME, 9, 'the cold one'));

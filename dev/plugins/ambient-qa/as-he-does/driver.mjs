@@ -2213,14 +2213,12 @@ async function rowsF2A7(harness, say) {
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
   };
-  const HP = process.env.AS_HE_DOES_HARNESS ?? null;
   const APP = process.env.AS_HE_DOES_APP ?? null;
   const { execFileSync, spawn } = await import('node:child_process');
   const psLines = () => { try { return execFileSync('/bin/ps', ['-axww', '-o', 'pid=,command='], { encoding: 'utf8' }).split(String.fromCharCode(10)); } catch { return []; } };
   const pidOf = (l) => Number(l.trim().split(/\s+/)[0]);
-  // the candidate's own ambient-core (under its bundle), and the world's harness hub (its workspace)
+  // the candidate's own ambient-core (under its bundle)
   const coreLines = () => (APP ? psLines().filter((l) => l.includes(`${APP}/Contents/`) && / ambient-core( |$)/.test(l)) : []);
-  const hubLines = () => (HP ? psLines().filter((l) => l.includes(' sbd --workspace ') && (l.includes(`--workspace ${HP} `) || l.endsWith(`--workspace ${HP}`))) : []);
   const signal = (pids, s) => pids.forEach((p) => {
     if (s === 'SIGSTOP') HELD.add(p); else HELD.delete(p);
     try { process.kill(p, s); } catch { /* gone */ }
@@ -2421,64 +2419,6 @@ async function rowsF2A7(harness, say) {
     await shot('f2a7-answers-after-reload');
     const ok = (s) => s.seen[otherName].length === 0 && s.seen.bise.length === 0 && ['digit', 'words', 'click'].every((k) => s.seen.harness[k].length === 1) && s.back.length === 0;
     step(`each answer once in harness' thread (where it was asked), no aside where he answered from (${otherName}, bise), after a project switch and after a reload; no card back`, ok(a) && ok(b), { a, b });
-  });
-
-  await row('a refused answer and close come back with the words', async () => {
-    const R = `zqR${T}`;
-    await harness();
-    await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 60000, 1000);
-    await clear();
-    await cards([{ q: `${R}a answer me?`, opts: ['1. zqra-one', '2. zqra-two'] }, { q: `${R}b close me?`, opts: ['1. zqrb-one', '2. zqrb-two'] }], 'seeded refusals');
-    const listed = await until(async () => ((await present(`${R}a`)) && (await present(`${R}b`)) ? true : null), 90000, 1000);
-    await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 30000, 1000);
-    await goOther();
-    await clear();
-    const hubs = hubLines();
-    const pids = hubs.map(pidOf);
-    if (!listed || pids.length !== 1) { step('a refused answer and close (the harness hub held)', false, { listed: !!listed, hubs: hubs.map((l) => l.slice(0, 200)) }); return; }
-    const t0 = Date.now();
-    let hidden = null;
-    let back = null;
-    let words = null;
-    try {
-      signal(pids, 'SIGSTOP');
-      const a = await dock(`${R}a`, 10000);
-      if (a.open) { await a.open.click({ position: { x: 4, y: 4 } }).catch(() => {}); await page.keyboard.press('1'); }
-      await page.waitForTimeout(800);
-      const b = await dock(`${R}b`, 10000);
-      if (b.open) { await b.open.click({ position: { x: 4, y: 4 } }).catch(() => {}); await page.keyboard.press('Meta+Backspace'); }
-      await page.waitForTimeout(800);
-      hidden = { a: !(await present(`${R}a`)), b: !(await present(`${R}b`)), a_open: !!a.open, b_open: !!b.open, at_ms: Date.now() - t0 };
-      await page.mouse.move(1, 300);
-      await shot('f2a7-refusal-hidden');
-      back = await until(async () => {
-        return (await present(`${R}a`)) && (await present(`${R}b`)) ? { at_ms: Date.now() - t0 } : null;
-      }, 50000, 1000);
-      // since the inbox stack (dfbd39d64) a refused item's row says 'not sent' in red (RefusedMark);
-      // the old words stay for an open item
-      words = await bodyHas(/its hub (didn't answer|went away)[^.]*\.( try again in a moment\.)?|\bnot sent\b/);
-      await page.mouse.move(1, 300);
-      await shot('f2a7-refusal-back');
-    } finally { signal(pids, 'SIGCONT'); }
-    const asides = [...(await rowsWith('zqra-one')), ...(await rowsWith('zqrb'))];
-    step(`a refused answer (digit) and a refused close (⌘⌫) from ${otherName}, the harness hub held past 30 s: both hidden at once, then both cards back with the words, no 'you answered'`,
-      !!hidden?.a && !!hidden?.b && !!back && !!words && asides.length === 0, { hidden, back, words, asides, hub: hubs[0].slice(0, 160) });
-    // the hub runs again: what it does with the late answer and close (info: the core dropped them)
-    await page.waitForTimeout(8000);
-    const after = { a: await present(`${R}a`), b: await present(`${R}b`), asides: [...(await rowsWith('zqra-one'))] };
-    await harness();
-    after.harness = [...(await rowsWith('zqra-one')), ...(await rowsWith(`${R}b`))];
-    await page.mouse.move(1, 300);
-    await shot('f2a7-refusal-hub-resumed');
-    res.notes = [...(res.notes ?? []), { what: 'refusal row: 8 s after SIGCONT of the harness hub', after }];
-    save();
-    // whatever stayed open, answered now (the hub runs), so the later rows see no open zqR card
-    for (const k of ['a', 'b']) {
-      if (!(await present(`${R}${k}`))) continue;
-      const d = await dock(`${R}${k}`, 5000);
-      if (d.open) await d.open.locator('[data-testid$=".opt.1"]').first().click({ timeout: 3000 }).catch(() => {});
-      await page.waitForTimeout(1500);
-    }
   });
 
   await row("an answer to a card the hub withdrew meanwhile: the hub's words", async () => {
