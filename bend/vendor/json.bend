@@ -177,6 +177,11 @@ type PrintTask is Data:
   PArr{items: List<&2, Json>}
   PObj{kvs: List<&2, Sigma<&2, &2, String, _ => Json>>}
   PLit{s: String}
+  # the n items of a big array (a comma first unless `first`), split in
+  # halves printed in parallel while `depth` lasts (stringify_go)
+  PItems{first: Bool, depth: Nat, n: Nat, items: List<&2, Json>}
+  # the output so far, printed in parallel halves: it replaces acc
+  PAcc{res: Result<&2, &2, String, List<&2, String>>}
 
 # Pretty printer stack task
 type PrettyTask is Data:
@@ -1103,10 +1108,39 @@ def escape_string(+s: String) -> String:
   +fuel = Nat.add(len, 10n)
   escape_str_loop(fuel, s, Nil{})
 
+# the escaped chars of one char, consed onto `rest` (escape_step, in order)
+def escape_onto(kind: EscCharKind, rest: String) -> String:
+  match kind:
+    case ECQuote{}:
+      SCon{Chr{92}, SCon{Chr{34}, rest}}
+    case ECSlash{}:
+      SCon{Chr{92}, SCon{Chr{92}, rest}}
+    case ECNewline{}:
+      SCon{Chr{92}, SCon{Chr{110}, rest}}
+    case ECCarriage{}:
+      SCon{Chr{92}, SCon{Chr{114}, rest}}
+    case ECTab{}:
+      SCon{Chr{92}, SCon{Chr{116}, rest}}
+    case ECBackspace{}:
+      SCon{Chr{92}, SCon{Chr{98}, rest}}
+    case ECFormFeed{}:
+      SCon{Chr{92}, SCon{Chr{102}, rest}}
+    case ECControl{+code}:
+      SCon{Chr{92}, SCon{Chr{117}, SCon{Chr{48}, SCon{Chr{48}, SCon{hex_to_char(U32.div(code, 16)), SCon{hex_to_char(U32.mod(code, 16)), rest}}}}}}
+    case ECOther{code}:
+      SCon{Chr{code}, rest}
+
+# `s` escaped, then `tail`: one pass, each char consed once (no length,
+# no reversal, no append: view_all's 30 MB spent most of its time here)
+def escape_onto_str(s: String, tail: String) -> String:
+  match s:
+    case SNil{}:
+      tail
+    case SCon{Chr{+code}, t}:
+      escape_onto(classify_esc_char(code), escape_onto_str(t, tail))
+
 def quote_string(+s: String) -> String:
-  +len = str_len(s)
-  +fuel = Nat.add(len, 10n)
-  "\"" ++ escape_str_loop(fuel, s, Nil{}) ++ "\""
+  SCon{Chr{34}, escape_onto_str(s, "\"")}
 
 def json_size_loop(fuel: Nat, +tasks: List<&2, SizeTask>, +acc: Nat) -> Nat:
   match fuel:
@@ -1163,64 +1197,138 @@ def join_chunks_loop(fuel: Nat, xs: List<&2, String>, cur: String) -> String:
         case h <> t:
           join_chunks_loop(p, t, h ++ cur)
 
-def stringify_loop(fuel: Nat, +tasks: List<&2, PrintTask>, +acc: List<&2, String>) -> Result<&2, &2, String, String>:
+# at least n items (walks n items at most: a small array pays nothing)
+def at_least(n: Nat, xs: List<&2, Json>) -> Bool:
+  match n:
+    case 0n:
+      True{}
+    case 1n+p:
+      match xs:
+        case Nil{}:
+          False{}
+        case _ <> t:
+          at_least(p, t)
+
+# an array's items after its "[": a big one (256 items or more) as
+# PItems, printed in parallel halves 6 levels deep (64 parts); a small
+# one item by item. A match, not Bool.pick: pick would count every array.
+def arr_tasks(big: Bool, +vh: Json, +vt: List<&2, Json>, +t: List<&2, PrintTask>) -> List<&2, PrintTask>:
+  match big:
+    case True{}:
+      PItems{True{}, 6n, 1n+List.length(&2, Json, vt), vh <> vt} <> PLit{"]"} <> t
+    case False{}:
+      PVal{vh} <> PArr{vt} <> PLit{"]"} <> t
+
+# PItems printed item by item: the first without a comma
+def items_tasks(first: Bool, items: List<&2, Json>, +t: List<&2, PrintTask>) -> List<&2, PrintTask>:
+  match first:
+    case True{}:
+      match items:
+        case Nil{}:
+          t
+        case h <> r:
+          PVal{h} <> PArr{r} <> t
+    case False{}:
+      PArr{items} <> t
+
+# two halves' output: `l` (with what came before) then `r`, chunks newest first
+def halves_join(l: Result<&2, &2, String, List<&2, String>>, r: Result<&2, &2, String, List<&2, String>>) -> Result<&2, &2, String, List<&2, String>>:
+  match l:
+    case Fail{e}:
+      Fail{e}
+    case Done{xs}:
+      match r:
+        case Fail{e}:
+          Fail{e}
+        case Done{ys}:
+          Done{List.append(&2, String, ys, xs)}
+
+# the output's chunks, newest first (joined once by stringify_loop). A
+# PItems with depth left splits its items in halves printed by a parallel
+# let: the left one gets `acc`, the right one starts empty, and PAcc
+# puts their joined output back as the new acc.
+def stringify_go(fuel: Nat, +tasks: List<&2, PrintTask>, +acc: List<&2, String>) -> Result<&2, &2, String, List<&2, String>>:
   match fuel:
     case 0n:
       match tasks:
         case Nil{}:
-          Done{join_chunks_loop(4294967295n, acc, "")}
+          Done{acc}
         case _:
           Fail{"fuel exhausted in stringify"}
     case 1n++p:
       match tasks:
         case Nil{}:
-          Done{join_chunks_loop(4294967295n, acc, "")}
+          Done{acc}
         case h <> t:
           match h:
             case PLit{s}:
-              stringify_loop(p, t, s <> acc)
+              stringify_go(p, t, s <> acc)
             case PVal{j}:
               match j:
                 case JNull{}:
-                  stringify_loop(p, t, "null" <> acc)
+                  stringify_go(p, t, "null" <> acc)
                 case JBool{b}:
                   match b:
                     case True{}:
-                      stringify_loop(p, t, "true" <> acc)
+                      stringify_go(p, t, "true" <> acc)
                     case False{}:
-                      stringify_loop(p, t, "false" <> acc)
+                      stringify_go(p, t, "false" <> acc)
                 case JNum{n}:
-                  stringify_loop(p, t, Nat.show(n) <> acc)
+                  stringify_go(p, t, Nat.show(n) <> acc)
                 case JNeg{n}:
-                  stringify_loop(p, t, Nat.show(n) <> "-" <> acc)
+                  stringify_go(p, t, Nat.show(n) <> "-" <> acc)
                 case JStr{s}:
-                  stringify_loop(p, t, quote_string(s) <> acc)
+                  stringify_go(p, t, quote_string(s) <> acc)
                 case JArr{vals}:
                   match vals:
                     case Nil{}:
-                      stringify_loop(p, t, "[]" <> acc)
+                      stringify_go(p, t, "[]" <> acc)
                     case vh <> vt:
-                      stringify_loop(p, PVal{vh} <> PArr{vt} <> PLit{"]"} <> t, "[" <> acc)
+                      stringify_go(p, arr_tasks(at_least(255n, vt), vh, vt, t), "[" <> acc)
                 case JObj{kvs}:
                   match kvs:
                     case Nil{}:
-                      stringify_loop(p, t, "{}" <> acc)
+                      stringify_go(p, t, "{}" <> acc)
                     case Tuple{k, v} <> kt:
-                      stringify_loop(p, PVal{v} <> PObj{kt} <> PLit{"}"} <> t, ":" <> quote_string(k) <> "{" <> acc)
+                      stringify_go(p, PVal{v} <> PObj{kt} <> PLit{"}"} <> t, ":" <> quote_string(k) <> "{" <> acc)
                 case JRaw{s}:
-                  stringify_loop(p, t, s <> acc)
+                  stringify_go(p, t, s <> acc)
             case PArr{items}:
               match items:
                 case Nil{}:
-                  stringify_loop(p, t, acc)
+                  stringify_go(p, t, acc)
                 case vh <> vt:
-                  stringify_loop(p, PVal{vh} <> PArr{vt} <> t, "," <> acc)
+                  stringify_go(p, PVal{vh} <> PArr{vt} <> t, "," <> acc)
             case PObj{kvs}:
               match kvs:
                 case Nil{}:
-                  stringify_loop(p, t, acc)
+                  stringify_go(p, t, acc)
                 case Tuple{k, v} <> kt:
-                  stringify_loop(p, PVal{v} <> PObj{kt} <> t, ":" <> quote_string(k) <> "," <> acc)
+                  stringify_go(p, PVal{v} <> PObj{kt} <> t, ":" <> quote_string(k) <> "," <> acc)
+            case PItems{first, depth, +n, +items}:
+              match depth:
+                case 0n:
+                  stringify_go(p, items_tasks(first, items, t), acc)
+                case 1n+q:
+                  +k = Nat.div(n, 2n)
+                  l r = stringify_go(p, [PItems{first, q, k, List.take(&2, Json, items, k)}], acc) stringify_go(p, [PItems{False{}, q, Nat.sub(n, k), List.drop(&2, Json, items, k)}], Nil{})
+                  stringify_go(p, PAcc{halves_join(l, r)} <> t, Nil{})
+            case PAcc{res}:
+              match res:
+                case Fail{e}:
+                  Fail{e}
+                case Done{xs}:
+                  stringify_go(p, t, xs)
+
+def stringify_loop.join(r: Result<&2, &2, String, List<&2, String>>) -> Result<&2, &2, String, String>:
+  match r:
+    case Fail{e}:
+      Fail{e}
+    case Done{acc}:
+      Done{join_chunks_loop(4294967295n, acc, "")}
+
+def stringify_loop(fuel: Nat, +tasks: List<&2, PrintTask>, +acc: List<&2, String>) -> Result<&2, &2, String, String>:
+  stringify_loop.join(stringify_go(fuel, tasks, acc))
 
 def stringify_checked(+j: Json) -> Result<&2, &2, String, String>:
   +size = json_size(j)
