@@ -667,8 +667,12 @@ def candidate_then_promote():
         info = T.candidate(env, paths, b[:8], repo=repo)
         c = T.cand_paths(paths, b)
         check(len(builds) == 1 and info["sha"] == b and info["app"] == c["app"] and T.cand_built(c), "the candidate is built: %s" % info)
-        check("cd %s/rust" % shlex.quote(c["src"]) in builds[0] and "BISE_PACK_OUT=%s" % shlex.quote(c["dist"]) in builds[0],
+        check("cd %s && python3" % shlex.quote(c["src"]) in builds[0] and "BISE_PACK_OUT=%s" % shlex.quote(c["dist"]) in builds[0],
               "built from its own worktree into its own dir")
+        # fast-try p1: the candidates' one warm target through cargo_mtimes, its own bise packed
+        check("cargo_mtimes.py run --src %s --target %s" % (shlex.quote(c["src"]), shlex.quote(os.path.join(paths["cand"], "target"))) in builds[0]
+              and "BISE_PACK_BISE=%s " % shlex.quote(c["bise"]) in builds[0] and "pnpm install --frozen-lockfile" in builds[0],
+              "incremental: warm target, its own bise, pnpm still decides: %s" % builds[0])
         check(git("rev-parse", "HEAD", cwd=c["src"]) == b, "the candidate's worktree is at b")
         check(git("rev-parse", "HEAD", cwd=trysrc) == a, "the try checkout never moved")
         check(open(T.stamp_path(paths)).read() == before and not os.path.exists(paths["staged_dir"]), "the try stamp and staged dir untouched")
@@ -730,8 +734,77 @@ def candidate_then_promote():
         shutil.rmtree(w, ignore_errors=True)
 
 
+def incremental_steps():
+    """fast-try p1 (scripts/try_build.py): the candidates' cargo target starts as a clone of the gate
+    seed and is kept; node_modules come from the lockfile's cache, pnpm install still runs, a new
+    lockfile is a new key, two kept. Real bash on a fake gate.sh, cargo_mtimes and pnpm."""
+    import try_build as B
+    w = tempfile.mkdtemp(prefix="dt-inc-")
+    try:
+        tools, repo, cand = (os.path.join(w, n) for n in ("tools", "repo", "build/desktop-cand"))
+        seed = os.path.join(w, "seed")
+        os.makedirs(os.path.join(seed, "debug"))
+        open(os.path.join(seed, "debug", "dep.rlib"), "w").write("warm")
+        os.makedirs(os.path.join(tools, "tests"))
+        os.makedirs(os.path.join(tools, "scripts"))
+        os.makedirs(os.path.join(repo, "rust"))
+        gate = os.path.join(tools, "tests", "gate.sh")
+        open(gate, "w").write("#!/bin/sh\n[ -f %s ] && exit 1\necho %s\n" % (shlex.quote(os.path.join(w, "noseed")), shlex.quote(seed)))
+        os.chmod(gate, 0o755)
+        # cargo_mtimes stand-in: runs the command (its own law is tests/cargo_mtimes_test.py)
+        open(os.path.join(tools, "scripts", "cargo_mtimes.py"), "w").write(
+            "import subprocess, sys\nsys.exit(subprocess.call(sys.argv[sys.argv.index('--') + 1:]))\n")
+        fake = os.path.join(w, "bin")
+        os.makedirs(fake)
+        open(os.path.join(fake, "cargo"), "w").write("#!/bin/sh\nmkdir -p \"$CARGO_TARGET_DIR/debug\" && echo bise > \"$CARGO_TARGET_DIR/debug/bise\"\n")
+        open(os.path.join(fake, "pnpm"), "w").write("#!/bin/sh\n[ \"$1\" = -v ] && { echo 10.0.0; exit 0; }\n"
+                                                    "echo \"$*\" >> %s\nmkdir -p node_modules && echo hi >> node_modules/x\n" % shlex.quote(os.path.join(w, "pnpm.log")))
+        for n in ("cargo", "pnpm"):
+            os.chmod(os.path.join(fake, n), 0o755)
+        env = dict(os.environ, PATH=fake + ":" + os.environ["PATH"])
+        paths = {"cand": cand, "bise": os.path.join(cand, "c1", "bise")}
+        os.makedirs(os.path.dirname(paths["bise"]))
+
+        def sh(lines, cwd):
+            return subprocess.run(["/bin/bash", "-c", "set -euo pipefail\n" + "\n".join(lines)], cwd=cwd, env=env, capture_output=True, text=True)
+        target = B.cand_target(cand)
+        r = sh(B.cargo_lines(repo, target, paths["bise"], tools=tools), w)
+        check(r.returncode == 0 and open(os.path.join(target, "debug", "dep.rlib")).read() == "warm" and open(paths["bise"]).read() == "bise\n"
+              and "a clone of the seed" in r.stdout, "the candidates' target starts as a clone of the seed, the bise in its own dir: %s" % (r.stdout + r.stderr))
+        open(os.path.join(target, "debug", "ours"), "w").write("kept")
+        r = sh(B.cargo_lines(repo, target, paths["bise"], tools=tools), w)
+        check(r.returncode == 0 and os.path.exists(os.path.join(target, "debug", "ours")) and "seed" not in r.stdout, "a kept target is never seeded again")
+        open(os.path.join(w, "noseed"), "w").close()
+        t2 = os.path.join(w, "t2")
+        r = sh(B.cargo_lines(repo, t2, paths["bise"], tools=tools), w)
+        check(r.returncode == 0 and "a cold cargo target" in r.stdout and os.path.isfile(os.path.join(t2, "debug", "bise")), "no seed: a cold target")
+        cache = os.path.join(w, "build", "cache")
+
+        def app(n, lock):
+            d = os.path.join(w, n, "apps", "desktop")
+            os.makedirs(d)
+            open(os.path.join(d, "package.json"), "w").write("{}")
+            open(os.path.join(d, "pnpm-lock.yaml"), "w").write(lock)
+            return d
+        keys = lambda: sorted(n for n in os.listdir(cache) if n.startswith(B.MODULES))  # noqa: E731
+        r = sh(B.modules_lines(cache), app("a", "v1"))
+        check(r.returncode == 0 and len(keys()) == 1 and "clone" not in r.stdout, "a miss installs, then fills the cache: %s" % (r.stdout + r.stderr))
+        d = app("b", "v1")
+        r = sh(B.modules_lines(cache), d)
+        check(r.returncode == 0 and "a clone of" in r.stdout and open(os.path.join(d, "node_modules", "x")).read() == "hi\nhi\n"
+              and open(os.path.join(w, "pnpm.log")).read().count("install --frozen-lockfile") == 2,
+              "a hit clones the cache and pnpm install still runs on it: %s" % (r.stdout + r.stderr))
+        check(open(os.path.join(cache, keys()[0], "x")).read() == "hi\n", "the cache is never changed by a candidate's install")
+        for n, lock in (("c", "v2"), ("d", "v3")):
+            check(sh(B.modules_lines(cache), app(n, lock)).returncode == 0, "a new lockfile installs")
+        check(len(keys()) == 2, "two keys kept: %s" % keys())
+    finally:
+        shutil.rmtree(w, ignore_errors=True)
+
+
 if __name__ == "__main__":
     pure()
+    incremental_steps()
     root_ships_what_a_version_dir_has()
     stamp_skips_build()
     staged_never_over_a_running_try()

@@ -65,6 +65,7 @@ from desktop_try_env import (GATE, SELF_CONTAINED, TryError, clone_names, config
                              under)  # split for its size
 from heavy_slot import HEAVY_RUN, heavy_argv, under_heavy_slot  # noqa: F401  (desktop_dmg, the tests read them here)
 from try_procs import hub_socks, stop_hub, try_pids  # split for its size
+from try_build import incremental, root_script  # noqa: F401  (root_script: desktop_app reads it here)
 
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DESKTOP = os.path.join(REPO, "apps", "desktop")
@@ -139,13 +140,14 @@ def try_paths(env, desktop=DESKTOP):
             "staged_dir": staged, "staged": os.path.join(staged, arch, APP_NAME + ".app")}
 
 
-def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO, name=APP_NAME, app_id=APP_ID):
+def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO, name=APP_NAME, app_id=APP_ID, inc=False):
     """The one build, run under the heavy lock: bise and its helpers for the try home (repl-live,
     repl-scripted, sb-core next to the checkout `repo`), the snapshot app root `root` (root_script), the
     native helper, then the new app (apps/desktop: pnpm install --frozen-lockfile, build, dist =
     electron-builder --mac --dir, the try's bise packed inside it), into apps/desktop/dist, or into
     `out` (BISE_PACK_OUT: the staging dir, a candidate's dir), as the bundle `name` with id `app_id`
-    (his try's, or a candidate's CAND_NAME/CAND_ID). Pure."""
+    (his try's, or a candidate's CAND_NAME/CAND_ID). `inc` (a candidate): cargo and node_modules
+    warm, only what changed rebuilds (try_build.incremental). Pure."""
     q = shlex.quote
     desktop = os.path.join(repo, "apps", "desktop")
     lines = ["set -euo pipefail",
@@ -169,34 +171,7 @@ def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO, name=APP_
         lines.insert(lines.index("cd %s" % q(desktop)), "rm -rf %s" % q(out))
     if root:
         lines[lines.index("mkdir -p %s" % q(os.path.dirname(paths["helper"]))):0] = root_script(root)
-    return "\n".join(lines) + "\n"
-
-
-def root_script(root):
-    """The try's own app root, a snapshot (ambient-lead m_11624): what a hub reads from
-    BISE_APP_ROOT, copied like scripts/versions.sh makes a version dir, so his running try never
-    reads this checkout (a checkout moved or rebuilt would change the runtime under his hubs):
-    repl-live and sb-core from bins.sh's cache (immutable, one per source hash), bend-jsrt (a hard
-    link to its cache file), prompts/, plugins/, kit/, office/dist, computer-use/extension, VERSION.
-    Built in <root>.tmp, then one rename. Run from the checkout. Pure."""
-    q = shlex.quote
-    t = root + ".tmp"
-    return ["rm -rf %s && mkdir -p %s/rust/jsrt/target/debug %s/computer-use" % (q(t), q(t), q(t)),
-            "b=\"$(scripts/bins.sh path --src \"$PWD\" repl-live)\" && cp \"$b\" %s/repl-live" % q(t),
-            "if [ -f bend/hub/main.bend ]; then b=\"$(scripts/bins.sh path --src \"$PWD\" sb-core)\" && cp \"$b\" %s/sb-core; fi" % q(t),
-            "js=\"$(scripts/bins.sh path --src \"$PWD\" bend-jsrt)\" && { ln -f \"$js\" %s/bend-jsrt 2>/dev/null || cp -c \"$js\" %s/bend-jsrt 2>/dev/null || cp \"$js\" %s/bend-jsrt; }"
-            % (q(t), q(t), q(t)),
-            "ln -f %s/bend-jsrt %s/rust/jsrt/target/debug/bend-jsrt" % (q(t), q(t)),
-            "cp -R prompts %s/prompts" % q(t),
-            "if [ -d plugins ]; then cp -R plugins %s/plugins; fi" % q(t),
-            "if [ -d kit ]; then cp -R kit %s/kit; fi" % q(t),
-            # the office SDK's bundles: the office skills' `bise office run` and the viewer
-            # (versions.sh copies them the same way; without them no agent of the app made a pptx)
-            "if [ -d office/dist ]; then mkdir -p %s/office && cp -R office/dist %s/office/dist; fi" % (q(t), q(t)),
-            "if [ -d computer-use/extension ]; then cp -R computer-use/extension %s/computer-use/extension && rm -rf %s/computer-use/extension/test; fi"
-            % (q(t), q(t)),
-            "printf 'id=%%s\\ncommit=%%s\\nrepo=%%s\\n' %s \"$(git rev-parse HEAD)\" \"$PWD\" > %s/VERSION" % (q(os.path.basename(root)), q(t)),
-            "rm -rf %s && mv %s %s" % (q(root), q(t), q(root))]
+    return "\n".join(incremental(lines, repo, paths) if inc else lines) + "\n"
 
 
 def root_path(paths, stamp):
@@ -444,7 +419,7 @@ def resolve_sha(sha, env, repo=REPO):
 def cand_paths(paths, sha):
     d = os.path.join(paths["cand"], sha[:12])
     return {"dir": d, "src": os.path.join(d, "src"), "dist": os.path.join(d, "dist"), "root": os.path.join(d, "root-" + sha[:12]),
-            "json": os.path.join(d, "cand.json"), "app": os.path.join(d, "dist", paths["arch"], CAND_NAME + ".app"),
+            "json": os.path.join(d, "cand.json"), "bise": os.path.join(d, "bise"), "app": os.path.join(d, "dist", paths["arch"], CAND_NAME + ".app"),
             # --promote's repack with his try's name and id, before it moves into the try's staged place
             "promoted_dir": os.path.join(d, "promoted"), "promoted": os.path.join(d, "promoted", paths["arch"], APP_NAME + ".app")}
 
@@ -499,7 +474,8 @@ def candidate(env, paths, sha, repo=REPO, sign=None):
         say("candidate %s is built: %s" % (sha[:8], c["app"]))
         return dict(json.load(open(c["json"])), **info)
     say("building candidate %s into %s (waits for a heavy slot)…" % (sha[:8], c["dir"]))
-    script = build_script(paths, sign, out=c["dist"], root=c["root"], repo=c["src"], name=CAND_NAME, app_id=CAND_ID)
+    # incremental (fast-try p1): its bise in its own dir, from the candidates' warm target (try_build.py)
+    script = build_script(dict(paths, bise=c["bise"]), sign, out=c["dist"], root=c["root"], repo=c["src"], name=CAND_NAME, app_id=CAND_ID, inc=True)
     lock = os.path.expanduser("~/.bise/run/heavy.lock")
     r = subprocess.run(heavy_argv(["/bin/bash", "-c", script], lock), env=env)
     if r.returncode != 0:

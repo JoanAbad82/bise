@@ -61,6 +61,9 @@
 #                     with such work: it says so in main's thread).
 #                     Inside an agent, new/done/quick/full tell the hub where
 #                     it works (sb worktree <path>|none: the TUI's ψ, BISE-136).
+#   gate.sh seed-path print the seed to clone for the cwd repo's deps (this
+#                     key's, else the newest; exit 1 when none): a desktop
+#                     candidate's cargo target starts from it (cand_build.py).
 #   gate.sh wait <bg .out file | pid>
 #                     the bash tool put a gate in the background: block until
 #                     it ends (at most 25 s), then show its end and exit code.
@@ -117,6 +120,11 @@ bise_home() {
 seeds_dir() { local h; h="$(bise_home)"; echo "${h:-$HOME/.bend-harness}/cache/gate-seed"; }
 seed_key() {  # in the repo root: the deps' key (Cargo.lock, Cargo.tomls, cargo config, rustc)
   { cat rust/Cargo.lock rust/.cargo/config.toml $(git ls-files 'rust/Cargo.toml' 'rust/*/Cargo.toml'); rustc -vV; } | shasum | cut -c1-12
+}
+seed_from() {  # in the repo root: the seed to clone, this deps key's, else the newest; nothing when none
+  local sd from; sd="$(seeds_dir)"; from="$sd/$(seed_key)"
+  [ -d "$from" ] || from="$(ls -dt "$sd"/* 2>/dev/null | grep -vE '\.(tmp|building|lock)$' | head -1)"
+  echo "$from"
 }
 proc_start() { ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' _; }
 older_than_a_minute() { [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ]; }
@@ -196,6 +204,13 @@ if [ "$mode" = desktop-pick ]; then
       || { echo "desktop-pick: no try stamp at $stamp: gate.sh desktop-pick <from> [<to>]"; exit 2; }
   fi
   exec python3 tests/test_map.py desktop-pick --from "$from" ${3:+--to "$3"} ${GATE_PICK_LOG:+--log "$GATE_PICK_LOG"}
+fi
+if [ "$mode" = seed-path ]; then
+  # the seed a desktop candidate's cargo target starts from (scripts/desktop_try.py), for the
+  # cwd's repo: one place for the seeds' dir and key
+  cd "$(git rev-parse --show-toplevel)" || exit 1
+  from="$(seed_from)"; [ -n "$from" ] || exit 1
+  echo "$from"; exit 0
 fi
 if [ "$mode" = new ] || [ "$mode" = done ]; then
   # BISE-230: a task's folder <home>/worktrees/<project-id>/<name>/, like
@@ -332,8 +347,7 @@ share_machine
 if [ -z "${CARGO_TARGET_DIR:-}" ] && [ -f "$root/.git" ] && [ -f "$(dirname "$root")/owner" ] && [ ! -d "$root/rust/target" ]; then
   tdir="$(dirname "$root")/target"
   if [ ! -d "$tdir" ]; then
-    s=$SECONDS sd="$(seeds_dir)" k="$(seed_key)"
-    from="$sd/$k"; [ -d "$from" ] || from="$(ls -dt "$sd"/* 2>/dev/null | grep -vE '\.(tmp|building|lock)$' | head -1)"
+    s=$SECONDS sd="$(seeds_dir)" k="$(seed_key)" from="$(seed_from)"
     if [ -n "$from" ] && cp -cR "$from" "$tdir.tmp" 2>/dev/null && mv "$tdir.tmp" "$tdir"; then
       echo "target: $tdir, a clone of the seed $(basename "$from")$([ "$from" = "$sd/$k" ] || echo ' (older deps: the changed ones rebuild)') ($((SECONDS - s))s)"
     else
