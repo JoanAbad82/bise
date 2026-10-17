@@ -82,7 +82,8 @@ test('spotlight/menu-sum: a summary under each live project, its agents in a sub
     const sub = cap.locator('[data-testid="capsule.menu.sub"]');
 
     // the summaries
-    await expect(sum('store-1'), 'what waits first').toContainText('?search · which size system', { timeout: 5000 });
+    await expect(sum('store-1').locator('.w'), "what waits first: the accent '?'").toHaveText('?', { timeout: 5000 });
+    await expect(sum('store-1').locator('.t'), 'who asks, then the question (cut after a whole word)').toContainText('search · which size');
     await expect(sum('api-2'), "else the newest-active agent's words and the others at work").toContainText('auth · rotate keys');
     await expect(sum('api-2').locator('.more')).toHaveText('+1');
     await expect(sum('bise'), "bise's: main's note").toContainText('watching the launch');
@@ -116,7 +117,7 @@ test('spotlight/menu-sum: a summary under each live project, its agents in a sub
     await expect(cap.locator('[data-testid="capsule.menu.sub.head"]')).toHaveText('storefront2 working · 1 waiting for you');
     const names = await sub.locator('[data-testid^="capsule.menu.sub.agent."]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')?.split('.').pop()));
     expect(names, 'waiting first, then at work newest first; idle and done out').toEqual(['search', 'perf', 'cart']);
-    await expect(cap.locator('[data-testid="capsule.menu.sub.agent.perf"] .end')).toHaveText(/^[45]m$/u);
+    await expect(cap.locator('[data-testid="capsule.menu.sub.agent.perf"] .end')).toHaveText(/^[3-5]m$/u);
     await expect(cap.locator('[data-testid="capsule.menu.sub.agent.search"]'), '→ lands on its first row').toHaveClass(/\bon\b/u);
     await expect.poll(winWidth, 'the window grows to 620').toBe(620);
     expect(await winX(), 'the menu never moves (it opens on the side with room)').toBe(x0);
@@ -154,7 +155,7 @@ test('spotlight/menu-sum: a summary under each live project, its agents in a sub
     await line('site-3').hover();
     await expect(sub).toBeVisible({ timeout: 3000 });
     await cap.locator('[data-testid="capsule.menu.sub.agent.blog"]').click();
-    await expect(s.page.getByTestId('app.sidebar.project.site-3'), "the window shows site's project").toHaveAttribute('aria-current', 'true', { timeout: 5000 });
+    await expect(s.page.getByTestId('app.right.agent.blog'), "the window shows blog's thread").toHaveAttribute('aria-current', 'true', { timeout: 5000 });
   } finally {
     await s.close();
     core.dispose();

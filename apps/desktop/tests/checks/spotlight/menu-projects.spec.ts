@@ -87,15 +87,16 @@ test('spotlight/menu-projects: one line per project, bise first, live ones never
     await expect(cap.locator('[data-testid^="capsule.menu.item."]')).toHaveCount(2);
     const line = (id: string) => cap.locator(`[data-testid="capsule.menu.project.${id}"]`);
     const ids = async (): Promise<string[]> =>
-      block.locator('[data-testid^="capsule.menu.project."]:not([data-testid$=".line"])').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? ''));
+      block.locator('[data-testid^="capsule.menu.project."]:not([data-testid$=".line"]):not([data-testid$=".sum"])').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? ''));
     expect(await ids(), "bise's line, then his order").toEqual(['bise', 'harness-1', 'site-2', 'dotfiles-3', 'notes-4'].map((i) => `capsule.menu.project.${i}`));
     await expect(line('harness-1').locator('.b-cap-pj-end')).toHaveText('? 1∿ 3›');
     await expect(line('bise').locator('.b-cap-pj-end')).toHaveText('? 1∿ 2›');
     await expect(line('dotfiles-3').locator('.b-cap-pj-end'), 'a quiet one has no end').toHaveCount(0);
     await expect(cap.locator('[data-testid="capsule.menu.project.harness-1.line"]')).toHaveAttribute('title', 'harness · 1 waiting for you · 3 agents at work · on main');
-    for (const id of ['bise', 'harness-1', 'site-2', 'dotfiles-3', 'notes-4']) {
+    // a live line with something to say has its second line (designer m_29577: 40 px); the rest, the tight row
+    for (const [id, px] of [['bise', 40], ['harness-1', 40], ['site-2', 28], ['dotfiles-3', 28], ['notes-4', 28]] as const) {
       const h = await line(id).evaluate((el) => el.getBoundingClientRect().height);
-      expect(h, `${id} is the tight row (28 px)`).toBeCloseTo(28, 2);
+      expect(h, `${id} is ${String(px)} px`).toBeCloseTo(px, 2);
     }
     const w = await cap.locator('[data-testid="capsule.menu"]').evaluate((el) => el.getBoundingClientRect().width);
     expect(w, 'the menu is 340 px wide with its projects').toBeCloseTo(340, 0);
