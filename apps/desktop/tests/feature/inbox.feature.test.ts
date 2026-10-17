@@ -12,7 +12,7 @@ const acme = (...cards: (typeof which)[]) => row({ project: ACME, name: 'acme', 
 /** The ids the inbox lists, as `project-id`. */
 const ids = (cards: readonly { project: string; id: number }[]): string[] => cards.map((c) => `${c.project}-${String(c.id)}`);
 
-describe('the inbox', () => {
+describe('the inbox, in his words', () => {
   it('a card answered from another project never comes back, through a switch and a reload, while the hub still lists it', () => {
     const w = feature().given(projects(home, acme(which)));
     expect(ids(w.view.inbox())).toEqual([`${ACME}-9`]);
