@@ -757,8 +757,7 @@ impl Shell {
         let Some(mut stream) = self.replies.remove(&token) else {
             return;
         };
-        job.flow = crate::flow::FlowConfig::load(&self.opts.paths);
-        job.checks = self.opts.paths.worktrees.clone();
+        (job.flow, job.checks) = (crate::flow::FlowConfig::load(&self.opts.paths), self.opts.paths.worktrees.clone());
         let (queue, tx) = (self.lands.clone(), self.tx.clone());
         std::thread::spawn(move || {
             let txj = tx.clone();

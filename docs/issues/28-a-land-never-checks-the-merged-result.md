@@ -1,9 +1,11 @@
 # 28 · a land never checks the merged result
 
 Status: part 1 done (land-check, debt-audit pick 1, plan m_27077 and sha
-m_27119 signed by architect; on main at 8046e563e). Part 2 (every land
-that moves main, arch-review pick A): in progress, see "Part 2" below.
-Label: land, gate.
+m_27119 signed by architect; on main at 8046e563e). Part 2 done (every
+land that moves main, arch-review pick A, land-every: plan m_28364 and
+shas m_28662 signed by architect): a worktree land whose base moved, one
+whose base did not, `sb land --here` onto main, `sb feature merge`; see
+"Part 2" below. Label: land, gate.
 
 ## The problem
 
@@ -132,3 +134,10 @@ trunk's tip lands as before.
   line_gate) refused on a worktree land with an unmoved base; line_gate
   refused on the other three ways; main's sha unchanged after each; a
   docs-only change lands on all four.
+- **Land wall time** (the e2e's lands, a throwaway hub at load ~80):
+  docs-only, before (no `[land]` at main's tip) p50 0.83 s, max 1.20 s;
+  after p50 0.96 s, max 1.37 s (+0.13 s p50: the check tree's checkout
+  and `gate.sh land`'s "no step"); refused reds p50 2.17 s, max 35.8 s
+  (clippy, warm target).
+- **Known gap**: nothing removes a project's worktrees folder when the
+  project goes, `.land-check/` included (scratch.rs's header says so).

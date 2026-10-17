@@ -1586,8 +1586,7 @@ impl Hub {
             add,
             since_ms: a.created_ms,
             flow: crate::flow::FlowConfig::default(),
-            // a feature's agent lands on the feature (dev-flow §5.1)
-            onto: feature::onto(&a.ws),
+            onto: feature::onto(&a.ws), // a feature's agent lands on the feature (dev-flow §5.1)
             checks: std::path::PathBuf::new(),
         })
     }
