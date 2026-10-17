@@ -45,7 +45,9 @@ FAKE_COVMAP = """const [mode] = process.argv.slice(2);
 const e = process.env;
 if (mode === 'checks') {
   if (e.FAKE_COV_CHECKS === 'red') { console.log('FAIL keep-red'); process.exit(1); }
-  if (e.FAKE_COV_CHECKS === 'nohook') { console.log('covmap checks: the coverage hook never took a coverage'); process.exit(2); }
+  // the hook broke: covmap.mjs's checksVerdict reruns the checks without coverage for the verdict
+  if (e.FAKE_COV_CHECKS === 'nohook') { console.log('covmap checks: 3/3 green (the coverage hook never took a coverage: this is the run without coverage; no map tonight)'); process.exit(0); }
+  if (e.FAKE_COV_CHECKS === 'nohook-red') { console.log('FAIL keep-red'); console.log('covmap checks: 2/3 green (the coverage hook never took a coverage: this is the run without coverage; no map tonight)'); process.exit(1); }
   console.log('covmap checks: 3/3 green'); process.exit(0);
 }
 if (mode === 'map') {
@@ -171,8 +173,11 @@ def main():
         check(rc == 0 and red is None and "STEP desktop-pick-audit: red (owner try-select" in log,
               "an audit miss: owned, the night green: rc %s, log %r" % (rc, log))
         rc, log, last, red = night(FAKE_COV_CHECKS="nohook")
-        check(rc == 0 and red is None and "STEP desktop-checks: no result (exit 2)" in log,
-              "the hook never ran: no verdict, not red: rc %s, log %r" % (rc, log))
+        check(rc == 0 and red is None and "STEP desktop-checks: green" in log,
+              "the hook broke, the checks green without it: a green night: rc %s, log %r" % (rc, log))
+        rc, log, last, red = night(FAKE_COV_CHECKS="nohook-red", FAKE_COV_MAP="refuse")
+        check(rc != 0 and red is not None and "keep-red" in red and "STEP desktop-map: red (owner try-select" in log,
+              "the hook broke and a check is red: a red night naming it, the map lost (owned): rc %s, red %r" % (rc, red))
         rc, log, last, red = night(FAKE_GATE_RC="1", FAKE_COV_MAP="refuse")
         check(rc != 0 and red is not None and "e2e_fake" in red, "a red gate stays red whatever the map: %r" % red)
 

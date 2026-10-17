@@ -8,8 +8,9 @@
 //   node covmap.mjs checks [--gate-dir <d>] [--only <spec>...]
 //        the build with source maps (BISE_DESKTOP_SOURCEMAP=1), every check under coverage
 //        (hook.cjs, BISE_HARNESS_COVERAGE) in one heavy slot: the PRODUCT verdict of the night's
-//        harness checks (review-gates m_29723): exit 1 and a "FAIL <check>" line per red check,
-//        exit 2 (no verdict) when the coverage hook itself never ran
+//        harness checks (review-gates m_29723): exit 1 and a "FAIL <check>" line per red check;
+//        when the coverage hook never took a coverage, the same checks once more without it give
+//        the verdict (m_29752: only the map is lost); no report at all is red
 //   node covmap.mjs map [--gate-dir <d>] [--day YYYY-MM-DD]
 //        the map from that run (`write`), then the source maps out of out/ again: a TOOL of the
 //        gate (owner try-select), its failure never a product red
@@ -30,7 +31,7 @@
 //   - the map refuses to be written when its files are bundles (out/**) instead of src/** or the
 //     renderer has no source map (architect m_29221 #3: nothing would ever be skipped, silently).
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -318,25 +319,47 @@ async function runChecks(argv) {
   const playwright = path.join(DESKTOP, 'node_modules', '.bin', 'playwright');
   const targets = only.length ? only.map((s) => path.join('tests', s)) : ['tests/checks/'];
   const [bin, args] = heavyArgv([playwright, 'test', '-c', path.join(here, '..', 'playwright.config.ts'), '--reporter=list,json', ...targets]);
-  const t0 = Date.now();
-  const r = spawnSync(bin, args, { cwd: DESKTOP, stdio: 'inherit', env: { ...process.env, BISE_HARNESS_COVERAGE: covDir, PLAYWRIGHT_JSON_OUTPUT_NAME: report } });
-  console.log(`covmap checks: rc ${r.status} in ${Math.round((Date.now() - t0) / 1000)} s`);
-  return verdict(covDir, report);
+  const run = (cov, out) => {
+    const t0 = Date.now();
+    const env = { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: out, ...(cov ? { BISE_HARNESS_COVERAGE: covDir } : {}) };
+    const r = spawnSync(bin, args, { cwd: DESKTOP, stdio: 'inherit', env });
+    console.log(`covmap checks${cov ? '' : ' (without coverage)'}: rc ${r.status} in ${Math.round((Date.now() - t0) / 1000)} s`);
+    return out;
+  };
+  run(true, report);
+  const v = checksVerdict(covDir, report, () => run(false, path.join(covDir, 'report-plain.json')));
+  for (const s of v.red) console.log(`FAIL ${s}`);
+  if (v.red.length) spawnSync('python3', [path.join(REPO, 'tests', 'known_reds.py'), 'split', ...v.red], { stdio: 'inherit' });
+  console.log(`covmap checks: ${v.said}`);
+  return v.red.length ? 1 : 0;
 }
 
-/** The checks' verdict from a coverage run's folder and report: 0 green, 1 red (FAIL lines), 2 none. */
-export function verdict(covDir, report) {
-  let results;
-  try { results = reportResults(JSON.parse(readFileSync(report, 'utf8'))); } catch { console.log('covmap checks: no playwright report: no verdict'); return 2; }
-  const specs = Object.keys(results).filter((s) => s.startsWith('checks/'));
+/** Whether a coverage run's launches took their coverage (a hook.json): false = the tooling broke. */
+export function hookRan(covDir) {
   const dirs = existsSync(covDir) ? readdirSync(covDir).filter((n) => n.startsWith('checks__')) : [];
-  const took = dirs.some((d) => readdirSync(path.join(covDir, d)).some((l) => existsSync(path.join(covDir, d, l, 'hook.json'))));
-  if (dirs.length && !took) { console.log('covmap checks: the coverage hook never took a coverage: the tooling is broken, no verdict'); return 2; }
-  const red = specs.filter((s) => !results[s]);
-  for (const s of red) console.log(`FAIL ${redName(s)}`);
-  if (red.length) spawnSync('python3', [path.join(REPO, 'tests', 'known_reds.py'), 'split', ...red.map(redName)], { stdio: 'inherit' });
-  console.log(`covmap checks: ${specs.length - red.length}/${specs.length} green`);
-  return red.length ? 1 : 0;
+  return dirs.length === 0 || dirs.some((d) => readdirSync(path.join(covDir, d)).some((l) => existsSync(path.join(covDir, d, l, 'hook.json'))));
+}
+
+/**
+ * The night's product verdict on the checks (review-gates m_29723, m_29752): the red checks (by
+ * known_reds' names), from the coverage run's report; when the hook never took a coverage, from
+ * one run of the same checks without coverage (rerunPlain() -> its report): only the map is lost.
+ * No report at all is red too: these checks run nowhere else at night.
+ */
+export function checksVerdict(covDir, report, rerunPlain) {
+  let from = report;
+  let note = '';
+  if (!hookRan(covDir)) {
+    from = rerunPlain();
+    note = ' (the coverage hook never took a coverage: this is the run without coverage; no map tonight)';
+  }
+  let results;
+  try { results = reportResults(JSON.parse(readFileSync(from, 'utf8'))); } catch {
+    return { red: ['desktop-checks'], said: `no playwright report (${from}): red, no verdict on the checks${note}` };
+  }
+  const specs = Object.keys(results).filter((x) => x.startsWith('checks/'));
+  const red = specs.filter((x) => !results[x]).map(redName);
+  return { red, said: `${specs.length - red.length}/${specs.length} green${note}` };
 }
 
 /** map: the map from the last checks run (desktop-cov-run), then no source map left in out/. */
@@ -399,6 +422,30 @@ export function selfTest() {
   // the report: a spec red in any of its tests is red
   const res = reportResults({ suites: [{ file: 'checks/a.spec.ts', specs: [{ tests: [{ status: 'expected' }] }, { tests: [{ status: 'unexpected' }] }] }, { file: 'checks/b.spec.ts', specs: [{ tests: [{ status: 'flaky' }] }] }] });
   assert(res['checks/a.spec.ts'] === false && res['checks/b.spec.ts'] === true, `report ${JSON.stringify(res)}`);
+  // the product verdict (review-gates m_29752): a broken hook falls back to a run without coverage
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'covmap-'));
+  try {
+    const rep = (file, red) => { writeFileSync(file, JSON.stringify({ suites: [{ file: 'checks/app/keep.spec.ts', specs: [{ tests: [{ status: red ? 'unexpected' : 'expected' }] }] }] })); return file; };
+    const launch = (hook) => { const d = path.join(tmp, 'cov', 'checks__app__keep.spec.ts', '1'); mkdirSync(d, { recursive: true }); rmSync(path.join(d, 'hook.json'), { force: true }); if (hook) writeFileSync(path.join(d, 'hook.json'), '{}'); };
+    const cov = path.join(tmp, 'cov');
+    let plain = 0;
+    const rerun = (red) => () => { plain += 1; return rep(path.join(tmp, 'plain.json'), red); };
+    launch(true);
+    let v = checksVerdict(cov, rep(path.join(tmp, 'r.json'), true), rerun(false));
+    assert(v.red.join() === 'keep' && plain === 0, `a red check under coverage: ${JSON.stringify(v)}`);
+    v = checksVerdict(cov, rep(path.join(tmp, 'r.json'), false), rerun(true));
+    assert(v.red.length === 0 && plain === 0, 'green under coverage');
+    launch(false);
+    v = checksVerdict(cov, rep(path.join(tmp, 'r.json'), false), rerun(true));
+    assert(v.red.join() === 'keep' && plain === 1 && v.said.includes('without coverage'), `the hook broke, a check red without coverage: ${JSON.stringify(v)}`);
+    v = checksVerdict(cov, path.join(tmp, 'none.json'), rerun(false));
+    assert(v.red.join() === 'keep' || plain === 2, 'the hook broke: the plain run decides');
+    launch(true);
+    v = checksVerdict(cov, path.join(tmp, 'none.json'), rerun(false));
+    assert(v.red.join() === 'desktop-checks', `no report: red (${JSON.stringify(v)})`);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
   console.log('covmap self-test: ok');
 }
 
