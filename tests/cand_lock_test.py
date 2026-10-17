@@ -6,7 +6,9 @@ folder with no executable: past its locks cand.sh stops at once ('no <its main>'
 any world, app or gate. A holder is a `lockf <lock> sleep` with its .holder line. Checks: free, it
 goes past the locks and writes its own holder lines; the world held, or the candidate's path held
 from another world, it says the holder in one line and gives up after CAND_LOCK_WAIT with exit 2,
-never past the lock; a holder that ends within the wait lets it through. Nothing of his is touched.
+never past the lock; two runs on one candidate and two candidates on one world (stand-in runs:
+CAND_LOCK_HOLD), the second refused naming the first's pid; a dead owner (killed -9) and a breach exit
+(3) free the locks; a holder that ends within the wait lets it through. Nothing of his is touched.
 
   python3 -B tests/cand_lock_test.py
 """
@@ -62,26 +64,65 @@ def main():
             raise AssertionError("the holder never took " + base)
 
         past = "no %s/Contents/MacOS/" % app
+        app2 = os.path.join(t, "other cand.app")
+        os.makedirs(os.path.join(app2, "Contents"))
+
+        def start(a, hold, rc=0):
+            """A stand-in run holding the locks `hold` s (CAND_LOCK_HOLD), in its own process group."""
+            e = dict(env, CAND_LOCK_HOLD=str(hold), CAND_LOCK_HOLD_RC=str(rc))
+            p = subprocess.Popen(["bash", CAND, os.path.join(t, "out-held"), a], env=e, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True, stdin=subprocess.DEVNULL, start_new_session=True)
+            holders.append(p)
+            for _ in range(100):
+                if subprocess.run(["/usr/bin/lockf", "-t", "0", os.path.join(world, "world.lock"), "true"], capture_output=True).returncode == 75:
+                    return p
+                time.sleep(0.1)
+            raise AssertionError("the stand-in run never took the world")
+
+        def inner_pid():
+            return open(os.path.join(world, "world.holder")).read().split()[1]
+
         # free: past both locks (its own check stops it), its holder lines written
         rc, o = run()
         check(rc == 2 and past in o and "held by" not in o, "free: %s %s" % (rc, o))
         for base in (os.path.join(world, "world"), cand_lock):
-            check(open(base + ".holder").read().startswith("pid ") and app in open(base + ".holder").read(), "free: holder " + base)
+            h = open(base + ".holder").read()
+            check(h.startswith("pid ") and app in h, "free: holder %s %r" % (base, h))
 
-        # the world held: one line naming it, gives up, never past the lock
-        p = hold(os.path.join(world, "world"), 30, "pid 1 since then, out other-run, app other.app")
+        # two runs on one candidate: the 2nd refused, naming the 1st's pid and how to stop it (by pid)
+        p = start(app, 30)
+        pid = inner_pid()
         rc, o = run(wait=1)
-        check(rc == 2 and "world is held by pid 1 since then, out other-run" in o and "gave up after 1 s" in o and past not in o,
-              "world held: %s %s" % (rc, o))
-        p.kill()
-        p.wait()
+        check(rc == 2 and ("is still held by pid %s" % pid) in o and "kill <pid>" in o and "never by name" in o and past not in o,
+              "same candidate: %s %s" % (rc, o))
+        check(("/locks/cand-" in o) and ("world is still held" in o), "same candidate: both locks named %s" % o)
 
-        # the candidate's path held (a smoke in another world): the same
-        p = hold(cand_lock, 30, "pid 2, a smoke on this app")
-        rc, o = run(wait=1)
-        check(rc == 2 and "is held by pid 2, a smoke on this app" in o and "gave up" in o and past not in o, "cand held: %s %s" % (rc, o))
-        p.kill()
+        # two candidates on one world: the 2nd refused on the world only
+        e2 = dict(env, CAND_LOCK_WAIT="1")
+        r = subprocess.run(["bash", CAND, os.path.join(t, "out2"), app2], env=e2, capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        o = r.stdout + r.stderr
+        check(r.returncode == 2 and ("world is still held by pid %s" % pid) in o and "/locks/cand-" not in o and "no %s/Contents/MacOS/" % app2 not in o,
+              "same world: %s %s" % (r.returncode, o))
+
+        # a dead owner (its whole run killed -9): the next run takes the locks at once
+        os.killpg(p.pid, 9)
         p.wait()
+        t0 = time.time()
+        rc, o = run(wait=30)
+        check(rc == 2 and past in o and time.time() - t0 < 10, "dead owner taken over: %s %s" % (rc, o))
+
+        # a run that ends on a breach's exit 3 frees both locks
+        p = start(app, 1, rc=3)
+        check(p.wait(timeout=30) == 3, "the stand-in breach exit")
+        rc, o = run(wait=1)
+        check(rc == 2 and past in o and "held by" not in o, "freed after exit 3: %s %s" % (rc, o))
+
+        # the candidate's path held from another world (a smoke): refused on that lock
+        hp = hold(cand_lock, 30, "pid 2, a smoke on this app")
+        rc, o = run(wait=1)
+        check(rc == 2 and "is still held by pid 2, a smoke on this app" in o and past not in o, "cand held: %s %s" % (rc, o))
+        hp.kill()
+        hp.wait()
 
         # a holder that ends within the wait: it says so, waits, then goes through
         hold(os.path.join(world, "world"), 2, "pid 3, a short run")
@@ -91,7 +132,10 @@ def main():
               "short holder: %s %s" % (rc, o))
     finally:
         for p in holders:
-            p.kill()
+            try:
+                os.killpg(p.pid, 9)
+            except (ProcessLookupError, PermissionError):
+                p.kill()
         shutil.rmtree(t, ignore_errors=True)
     for f in FAILS:
         print("FAIL", f)

@@ -32,18 +32,22 @@ if [ -z "${CAND_LOCKED:-}" ]; then
   holder() { cat "$1.holder" 2>/dev/null || echo "an unknown run"; }
   busy() { ! /usr/bin/lockf -t 0 "$1.lock" /usr/bin/true 2>/dev/null; }
   for l in "$G/world" "$CAND_LOCK"; do
-    busy "$l" && echo "$(date +%T) cand.sh: $l is held by $(holder "$l"); waiting up to ${CAND_LOCK_WAIT:-7200} s"
+    busy "$l" && echo "$(date +%T) cand.sh: $l is held by $(holder "$l"); waiting up to ${CAND_LOCK_WAIT:-7200} s (or stop that run: kill its pid)"
   done
   CAND_LOCKED=1 /usr/bin/lockf -t "${CAND_LOCK_WAIT:-7200}" "$G/world.lock" \
     /usr/bin/lockf -t "${CAND_LOCK_WAIT:-7200}" "$CAND_LOCK.lock" /bin/bash "$0" "${CAND_ARGS[@]}"
   rc=$?
   if [ $rc = 75 ]; then
-    for l in "$G/world" "$CAND_LOCK"; do busy "$l" && echo "cand.sh: gave up after ${CAND_LOCK_WAIT:-7200} s: $l is still held by $(holder "$l")"; done
+    for l in "$G/world" "$CAND_LOCK"; do busy "$l" && echo "cand.sh: gave up after ${CAND_LOCK_WAIT:-7200} s: $l is still held by $(holder "$l"); wait for it, or stop that run by its pid (kill <pid>), never by name"; done
     exit 2
   fi
   exit $rc
 fi
 for l in "$G/world" "$CAND_LOCK"; do echo "pid $$ since $(date '+%F %T'), out $O, app $A" > "$l.holder"; done
+# the locks live as long as this process (lockf's children): any exit frees them, a breach's exit 3,
+# a kill and a crash included (the kernel drops a dead owner's lock). CAND_LOCK_HOLD=<s>: the test's
+# stand-in run, holding the locks that long and nothing else (tests/cand_lock_test.py)
+[ -n "${CAND_LOCK_HOLD:-}" ] && { sleep "$CAND_LOCK_HOLD"; exit "${CAND_LOCK_HOLD_RC:-0}"; }
 # AS_HE_DOES_FAKE_VOICE=1: the candidate's core hears the words written to $VOICE (fake.rs: its
 # BISE_HOME is under ~/.bise/gate, never his), for dict1.mjs' ctrl+r take
 VOICE=$G/voice-cand.txt; FV=()
