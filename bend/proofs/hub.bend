@@ -15,6 +15,7 @@ import ../hub/xhub.bend as HXB
 import ../hub/pause.bend as HP
 import ../hub/reach.bend as HR
 import ../hub/answers.bend as HA
+import ../hub/lazy.bend as HLZ
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
 import ./lib/hub-3.bend as PL3
@@ -476,7 +477,7 @@ def Laws.route_fire_makes_no_turn(o, cx, r):
   {==}
 
 def Laws.route_unclear_goes_plain(o, cx, r, e):
-  %Equal.sym(Bool, HXB.is_unclear(r), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.route_plain(o, cx, r), u => HC.route_fire(o, Some{r}, cx)) == HC.route_plain(o, cx, r) : HX.Cx<o>}
+  %Equal.sym(Bool, HXB.is_unclear(r), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.route_plain(o, cx, r), u => HC.route_fire(o, Some{r}, cx)) == HC.route_plain(o, cx, r) : HX.Cx<o>}
   {==}
 
 def Laws.route_fire_says_where(o, cx, r, id, xid):

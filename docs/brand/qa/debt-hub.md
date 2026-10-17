@@ -160,8 +160,8 @@ tick and the dispatch all live in one file, and each feature touches it
 - **Fix:** split along the sections that already exist
   (`# ---- waits ----` …) into `hub/send.bend`, `waits.bend`,
   `cards.bend`, `tasks.bend`, `dispatch.bend`. It is a move, no logic
-  change, checked by PROOF. Write down the `Bool.pick` vs `pick_lazy`
-  rule in one line at the top of `cx.bend`.
+  change, checked by PROOF. The `Bool.pick` vs `LZ.pick` rule is
+  in `hub/lazy.bend`'s header (bend-perf).
 - **Cost:** 3–4 h (a move, then PROOF + a rebuild). **Gain:** smaller
   review surface and fewer merge conflicts on the hottest file.
 

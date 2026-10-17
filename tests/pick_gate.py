@@ -24,7 +24,7 @@ runs f on the tail twice at every element, 2^n calls for n elements
 run at every tick over the live watches, took 70 s with 14 of them and
 38 min with 23 on his hub (2026-10-17), 5 ms once computed once. It holds
 for every eager call, Bool.pick, `&&`, `||` or any def taking both as
-values; only pick_lazy's `u => ...` branches are lazy. Compute the call
+values; only LZ.pick's `u => ...` branches are lazy. Compute the call
 once (`+rest = f(t)`) or match on the condition.
 
 The third check, with no list, on bend/hub only (sb-core; bend-perf,
@@ -53,6 +53,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIST = os.path.join(ROOT, "tests", "pick_gate.list")
 DIRS = ["bend"]
 SEARCH_DIRS = [os.path.join("bend", "hub")]
+# hub/lazy.bend's lazy forms (LZ, or HLZ in the proofs): their thunks run only when taken
+LAZY = re.compile(r"(?<![\w.])H?LZ\.(?:pick|or|and)\(")
 DEF = re.compile(r"^def\s+([A-Za-z_][\w.]*)\s*\(")
 
 
@@ -146,14 +148,14 @@ def self_calls(name, text):
 
 def doubled_defs(lines):
     """The defs of a .bend file's lines that call themselves twice with
-    the same arguments in one statement (pick_lazy's lazy branches aside)."""
+    the same arguments in one statement (LZ.pick's lazy branches aside)."""
     found, name, body = [], None, []
 
     def close():
         if name is None:
             return
         for l in logical_lines(body):
-            if "pick_lazy(" in l:
+            if LAZY.search(l):
                 continue
             calls = list(self_calls(name, l))
             if len(calls) != len(set(calls)):
@@ -186,13 +188,12 @@ def code_of(line):
     return line
 
 
-LAZY = re.compile(r"(?<![\w.])(?:LZ\.pick|LZ\.or|LZ\.and|pick_lazy)\(")
 THUNK = re.compile(r"^\s*\w+\s*=>")
 
 
 def unthunked(text):
-    """`text` with the thunk arguments of LZ.pick, LZ.or, LZ.and and
-    pick_lazy (`u => ...`, run only when taken) blanked out."""
+    """`text` with the thunk arguments of LZ.pick, LZ.or and LZ.and
+    (`u => ...`, run only when taken) blanked out."""
     out, i = "", 0
     for m in LAZY.finditer(text):
         if m.start() < i:
@@ -285,7 +286,7 @@ SEARCH_SELF_TEST = [
     ("""def rt_find(xs: L, +n: String) -> Bool:
   match xs:
     case Con{+h, +t}:
-      pick_lazy(Bool, String.eq(h, n), u => True{}, u => rt_find(t, n))
+      LZ.pick(Bool, String.eq(h, n), u => True{}, u => rt_find(t, n))
 """, []),
     # a list result is the ratchet's (walks); a Bool of other calls is no search
     ("""def put(xs: L, +x: A) -> List<&2, A>:
@@ -305,7 +306,7 @@ SELF_TEST = [
     ("def g.go(xs: L) -> Nat:\n  match xs:\n    case Con{+h, +t}:\n      Bool.pick(Nat, c(h),\n        (1n + g.go(t) : Nat), g.go(t))\n", ["g.go"]),
     ("def any(xs: L) -> Bool:\n  match xs:\n    case Con{+h, +t}:\n      any(t) || (c(h) && any(t))\n", ["any"]),
     ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      +rest = f(t)\n      Bool.pick(L, c(h), h <> rest, rest)\n", []),
-    ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      pick_lazy(L, c(h), u => h <> f(t), u => f(t))\n", []),
+    ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      LZ.pick(L, c(h), u => h <> f(t), u => f(t))\n", []),
     ("def f(xs: L, ys: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      g(f(t, ys), f(ys, t))\n", []),
     ("def f(xs: L) -> L:\n  match xs:\n    case Nil{}:\n      f2(t)\n    case Con{+h, +t}:\n      f(t)\n", []),
     ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      g(h, \"#\", f(t))\n    case Nil{}:\n      f(t)\n", []),

@@ -18,15 +18,15 @@ import ../laws/threads.bend as Laws
 
 def hub_rt_put_find.pick(c: Bool, +h: HX.Rt, +t: List<&2, HX.Rt>, +n: String, +run: HM.Run, +w: Bool, +tm: Maybe<&2, Nat>, +k: Nat,
     +e: {String.eq(HX.Rt.name(h), n) == c : Bool}, ih: {HC.rt_find(HC.rt_put(t, HX.Rt{n, run, w, tm, k}), n) == HX.Rt{n, run, w, tm, k} : HX.Rt})
-    -> {HC.rt_find(HC.pick_lazy(List<&2, HX.Rt>, String.eq(HX.Rt.name(h), n), u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}:
+    -> {HC.rt_find(HLZ.pick(List<&2, HX.Rt>, String.eq(HX.Rt.name(h), n), u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}:
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), True{}, e) : {HC.rt_find(HC.pick_lazy(List<&2, HX.Rt>, _, u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}
-      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HC.pick_lazy(HX.Rt, _, u => HX.Rt{n, run, w, tm, k}, u => HC.rt_find(t, n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), True{}, e) : {HC.rt_find(HLZ.pick(List<&2, HX.Rt>, _, u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HLZ.pick(HX.Rt, _, u => HX.Rt{n, run, w, tm, k}, u => HC.rt_find(t, n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
       {==}
     case False{}:
-      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), False{}, e) : {HC.rt_find(HC.pick_lazy(List<&2, HX.Rt>, _, u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}
-      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), False{}, e) : {HC.pick_lazy(HX.Rt, _, u => h, u => HC.rt_find(HC.rt_put(t, HX.Rt{n, run, w, tm, k}), n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), False{}, e) : {HC.rt_find(HLZ.pick(List<&2, HX.Rt>, _, u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(HX.Rt.name(h), n), False{}, e) : {HLZ.pick(HX.Rt, _, u => h, u => HC.rt_find(HC.rt_put(t, HX.Rt{n, run, w, tm, k}), n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
       ih
 
 # putting an agent's runtime state and reading it back gives it
@@ -34,7 +34,7 @@ def hub_rt_put_find(+xs: List<&2, HX.Rt>, +n: String, +run: HM.Run, +w: Bool, +t
     -> {HC.rt_find(HC.rt_put(xs, HX.Rt{n, run, w, tm, k}), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}:
   match xs:
     case Nil{}:
-      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HC.pick_lazy(HX.Rt, _, u => HX.Rt{n, run, w, tm, k}, u => HC.rt_find(Nil{}, n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
+      %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HLZ.pick(HX.Rt, _, u => HX.Rt{n, run, w, tm, k}, u => HC.rt_find(Nil{}, n)) == HX.Rt{n, run, w, tm, k} : HX.Rt}
       {==}
     case Con{h, t}:
       hub_rt_put_find.pick(String.eq(HX.Rt.name(h), n), h, t, n, run, w, tm, k, {==}, hub_rt_put_find(t, n, run, w, tm, k))
@@ -52,31 +52,31 @@ def hub_rts_set_rt(-o: HM.St, cx: HX.Cx<o>, +x: HX.Rt) -> {hub_rts(o, HC.set_rt(
           {==}
 
 def Laws.interrupt_says_stopped_once(o, cx, n, e):
-  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.stopped(o, HC.interrupt.fx(o, cx, n), n), u => HC.notice(o, cx, "no turn in progress to interrupt")) == HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")) : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.stopped(o, HC.interrupt.fx(o, cx, n), n), u => HC.notice(o, cx, "no turn in progress to interrupt")) == HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")) : HX.Cx<o>}
   {==}
 
 def Laws.interrupt_idle_says_nothing(o, cx, n, e):
-  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.stopped(o, HC.interrupt.fx(o, cx, n), n), u => HC.notice(o, cx, "no turn in progress to interrupt")) == HC.notice(o, cx, "no turn in progress to interrupt") : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.stopped(o, HC.interrupt.fx(o, cx, n), n), u => HC.notice(o, cx, "no turn in progress to interrupt")) == HC.notice(o, cx, "no turn in progress to interrupt") : HX.Cx<o>}
   {==}
 
 def Laws.req_interrupt_says_stopped_once(o, cx, token, agent, n, e):
-  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.reply(o, HC.stopped(o, HC.interrupt.fx(o, cx, n), n), token, HC.ok_body(Nil{})), u => HC.reply_err(o, cx, token, "no turn in progress")) == HC.reply(o, HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")), token, HC.ok_body(Nil{})) : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.reply(o, HC.stopped(o, HC.interrupt.fx(o, cx, n), n), token, HC.ok_body(Nil{})), u => HC.reply_err(o, cx, token, "no turn in progress")) == HC.reply(o, HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")), token, HC.ok_body(Nil{})) : HX.Cx<o>}
   {==}
 
 def Laws.task_send_says_sent_once(o, cx, m, e):
-  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m), u => cx) == HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m) : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m), u => cx) == HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m) : HX.Cx<o>}
   {==}
 
 def Laws.other_send_says_no_sent(o, cx, m, e):
-  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m), u => cx) == cx : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m), u => cx) == cx : HX.Cx<o>}
   {==}
 
 def Laws.task_card_shows_in_its_feed(o, cx, id, agent, text, e):
-  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)), u => cx) == HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)) : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)), u => cx) == HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)) : HX.Cx<o>}
   {==}
 
 def Laws.other_card_no_extra_line(o, cx, id, agent, text, e):
-  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)), u => cx) == cx : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)), u => cx) == cx : HX.Cx<o>}
   {==}
 
 def Laws.unknown_sender_is_no_task_send(o, cx, from, to, e):
@@ -92,13 +92,13 @@ def Laws.main_card_answer_routes_once(o, cx, c, text, parts, via):
 
 def Laws.you_line_carries_its_id(o, cx, name, m, e):
   +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m)))
-  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m))))) == ln : HX.Cx<o>}
+  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m))))) == ln : HX.Cx<o>}
   {==}
 
 def Laws.you_parts_follow_the_id(o, cx, name, m, e):
   +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m)))
   +rec = HFD.you_parts(HC.parts_json(HM.Msg.parts(m)))
-  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, rec)) == HC.feed(o, ln, name, rec) : HX.Cx<o>}
+  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, rec)) == HC.feed(o, ln, name, rec) : HX.Cx<o>}
   {==}
 
 def Laws.parts_never_change_text(o, cx, name, m, p):
@@ -112,7 +112,7 @@ def Laws.no_parts_no_line(o, cx, who, card, said):
 def Laws.route_parts_follow_the_route(o, cx, who, card, said, parts, e):
   +ln = HC.feed(o, cx, HM.MAIN(), HFD.route(who, card, said, None{}, None{}, None{}))
   +rec = HFD.route_parts(HC.parts_json(parts))
-  %Equal.sym(Bool, String.is_empty(parts), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, HM.MAIN(), rec)) == HC.feed(o, ln, HM.MAIN(), rec) : HX.Cx<o>}
+  %Equal.sym(Bool, String.is_empty(parts), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, HM.MAIN(), rec)) == HC.feed(o, ln, HM.MAIN(), rec) : HX.Cx<o>}
   {==}
 
 def Laws.an_option_number_gets_its_words():
@@ -184,7 +184,7 @@ def Laws.the_noted_answer_is_read_back(o, cx, a):
 
 def Laws.an_agents_answer_is_in_the_askers_feed(o, cx, asker, c, said, parts, msg, e):
   +ln = HC.answer_line(o, cx, asker, asker, c, said, parts, msg)
-  %Equal.sym(Bool, String.eq(asker, HM.MAIN()), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => cx, u => ln) == ln : HX.Cx<o>}
+  %Equal.sym(Bool, String.eq(asker, HM.MAIN()), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => cx, u => ln) == ln : HX.Cx<o>}
   {==}
 
 def Laws.mains_own_answer_is_one_line(o, cx, c, said, parts, msg):
@@ -289,7 +289,7 @@ def Laws.unqueue_leaves_an_unknown_id(o, cx, id):
   hub_d_notice(o, cx, HC.cat(["no message ", HC.mid(id), " to take back"]))
 
 def Laws.unqueue_never_takes_anothers(o, cx, r, id, e):
-  %Equal.sym(Bool, String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HC.pick_lazy(HX.Cx<o>, _, u => HC.unqueue.take(o, HM.MRec.st(r), cx, id, HM.Msg.to(HM.MRec.msg(r))), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
+  %Equal.sym(Bool, String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.unqueue.take(o, HM.MRec.st(r), cx, id, HM.Msg.to(HM.MRec.msg(r))), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
   hub_d_notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"]))
 
 def Laws.steer_queued_steers_into_the_turn(o, cx, m, name, im):
@@ -317,7 +317,7 @@ def Laws.steer_queued_leaves_an_unknown_id(o, cx, id):
   hub_d_notice(o, cx, HC.cat(["no message ", HC.mid(id), " to send now"]))
 
 def Laws.steer_queued_never_steers_anothers(o, cx, r, id, e):
-  %Equal.sym(Bool, String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HC.pick_lazy(HX.Cx<o>, _, u => HC.steer_queued.take(o, HM.MRec.st(r), cx, HM.MRec.msg(r)), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
+  %Equal.sym(Bool, String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.steer_queued.take(o, HM.MRec.st(r), cx, HM.MRec.msg(r)), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
   hub_d_notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"]))
 
 # Nat.is_eq says equal: they are

@@ -9,6 +9,7 @@ import ../hub/core.bend as HC
 import ../hub/wakes.bend as HWK
 import ../hub/timers.bend as HTM
 import ../hub/reach.bend as HR
+import ../hub/lazy.bend as HLZ
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-3.bend as PL3
 import ../laws/wakes.bend as Laws
@@ -151,6 +152,6 @@ def Laws.ask_done_quiet(o, cx, agent):
 def Laws.ask_target_gone_tells(o, cx, w, e):
   +cx2 = HC.wake_end(o, cx, HWK.Watch.id(w), "gone")
   %Equal.sym(Bool, HR.agent_active(HC.st(o, cx2), HWK.Watch.agent(w)), True{}, e)
-    : {HC.replies_gone.each(o, Nil{}, HC.pick_lazy(HX.Cx<o>, _, u => HC.wake_say(o, cx2, HWK.Watch.agent(w), HWK.reply_gone_text(w)), u => cx2))
+    : {HC.replies_gone.each(o, Nil{}, HLZ.pick(HX.Cx<o>, _, u => HC.wake_say(o, cx2, HWK.Watch.agent(w), HWK.reply_gone_text(w)), u => cx2))
       == HC.wake_say(o, cx2, HWK.Watch.agent(w), HWK.reply_gone_text(w)) : HX.Cx<o>}
   {==}
