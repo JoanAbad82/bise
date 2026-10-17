@@ -10,7 +10,11 @@ export type LocalEv =
   | { readonly ev: 'sent'; readonly project: unknown; readonly agent: unknown; readonly cid: unknown; readonly msg_id: number | null }
   | { readonly ev: 'card_refused'; readonly project: unknown; readonly card: unknown; readonly text: string };
 
-/** The core answered `cmd` with `result`: the window's event, or null (a close taken: the rows say it; any other command). */
+/**
+ * The core answered `cmd` with `result`: the window's event, 'card_answered' for an answer
+ * (card/answer's result) or 'sent' for a send (turn/send's message id); null for a close taken
+ * (the rows say it) and any other command.
+ */
 export function answeredEv(cmd: Readonly<Record<string, unknown>>, result: unknown): LocalEv | null {
   // a close taken: the hub's rows drop the card, nothing more to say
   if (cmd['cmd'] === 'close') return null;

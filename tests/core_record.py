@@ -4,7 +4,9 @@
     core_record.py drive <out dir> [--timeout S]
         on the ambient-qa world that is up (scripts/core_record.sh brings it up and down):
         a `bise ambient-core --home --offscreen` child, as the desktop app starts it, in the
-        world's HOME (never his); a scripted window drives it (initialize, the projects shown,
+        world's HOME (never his); a scripted window drives it, starting as the app's window does
+        (apps/desktop/src/app/App.tsx useShown: a first shown, even empty; a change there
+        belongs here too) (initialize, the projects shown,
         each main followed, a message to bise's main, an answer to another project's card, a
         close, an answer to a card already answered, a second core = a reload) and every
         protocol line both ways goes to <out>/rec.jsonl, in order:
