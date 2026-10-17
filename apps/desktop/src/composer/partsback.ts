@@ -5,6 +5,12 @@
 import type { Part } from '@/proto';
 import type { Chip, Segment } from './message';
 
+/** An image's or a file's chip number from its label ('[Image #2]' → 2), null when it has none. Pure. */
+export function labelN(name: string): number | null {
+  const m = /#(\d+)/u.exec(name)?.[1];
+  return m === undefined ? null : Number(m);
+}
+
 /** The segments of his parts, chips numbered as sent (a part with no number gets the next one). Pure. */
 export function segmentsOfParts(parts: readonly Part[]): Segment[] {
   const out: Segment[] = [];
@@ -32,10 +38,10 @@ export function segmentsOfParts(parts: readonly Part[]): Segment[] {
         chip({ kind: 'paste', n: p.n, text: p.text });
         break;
       case 'image':
-        chip({ kind: 'image', n: num(/#(\d+)/u.exec(p.name)?.[1] === undefined ? null : Number(/#(\d+)/u.exec(p.name)?.[1])), path: p.source, name: p.source.split('/').at(-1) ?? p.name });
+        chip({ kind: 'image', n: num(labelN(p.name)), path: p.source, name: p.source.split('/').at(-1) ?? p.name });
         break;
       case 'file':
-        chip({ kind: 'file', n: num(/#(\d+)/u.exec(p.name ?? '')?.[1] === undefined ? null : Number(/#(\d+)/u.exec(p.name ?? '')?.[1])), path: p.path });
+        chip({ kind: 'file', n: num(labelN(p.name ?? '')), path: p.path });
         break;
       case 'anchor':
         chip({ kind: 'anchor', n: num(p.n), artifact: p.artifact, version: p.version, ...(p.rev === undefined ? {} : { rev: p.rev }), anchor: p.anchor, ...(p.quote === undefined ? {} : { quote: p.quote }), file: p.artifact });

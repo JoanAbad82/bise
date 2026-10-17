@@ -25,7 +25,6 @@ export const PENDING_CLASSES: readonly string[] = [
   'th-code-lang',
   'th-link-off',
   'th-restored',
-  'th-tail',
   'th-tool',
   'th-voice',
   'vm-said',

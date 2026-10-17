@@ -14,7 +14,8 @@ import { useAnsweredFrom, useEntry, useProjects, useStore, useThreadOrder } from
 import { Markdown } from './Markdown';
 import { clock, lastOfRun, reportStatus } from './entry';
 import { shownName } from '@/agents/model';
-import { PartChips, partImageWords, YouBubble } from './rows-messages';
+import { YouBubble } from './rows-messages';
+import { PartChips, partImageWords } from './YouBody';
 import { NewsLine, ReportRow } from './rows-news';
 import type { RowCtx } from './rows';
 import { drawnParts, pageAnswer, pageOf, youView } from './parts';
@@ -393,7 +394,7 @@ export function AgentNote({ pos, from, to, text: said, parts, ctx, testId, tag, 
             ))}
           </div>
         ))}
-      {attached && <PartChips view={view} ctx={ctx} pos={pos} named />}
+      {attached && <PartChips view={view} ctx={ctx} id={`thread.you.${String(pos)}`} named />}
     </div>
   );
 }

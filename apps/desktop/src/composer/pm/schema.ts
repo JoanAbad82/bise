@@ -9,6 +9,7 @@
 // The node views are plain DOM (no React portal), drawn once per node: typing never renders React.
 import { Node } from '@tiptap/core';
 import { chipLabel, fileChipName, type Chip } from '../message';
+import './chip.css';
 import { BARS, fitFor, flat, push, SAMPLE_MS, timeOf, wave, WAVE_MS } from './meter';
 
 export const Doc = Node.create({ name: 'doc', topNode: true, content: 'paragraph' });
@@ -33,11 +34,13 @@ export const HardBreak = Node.create({
   renderText: () => '\n',
 });
 
-/** A chip's DOM, the old engine's (composer.chip.<n>, data-kind, the image's thumbnail). */
-export function chipDom(c: Chip): HTMLElement {
+/** A chip's DOM, the old engine's (composer.chip.<n>, data-kind, the image's thumbnail). The one
+ *  inline chip: his sent bubble draws the same DOM in his words (thread/YouBody InlineChip, its
+ *  look in chip.css), with its own test id. */
+export function chipDom(c: Chip, testId = `composer.chip.${c.n}`): HTMLElement {
   const el = document.createElement('span');
-  el.className = `b-chip ${c.kind}`;
-  el.dataset.testid = `composer.chip.${c.n}`;
+  el.className = `b-chip b-inchip ${c.kind}`;
+  el.dataset.testid = testId;
   el.dataset.kind = c.kind;
   el.dataset.n = String(c.n);
   el.contentEditable = 'false';
@@ -79,6 +82,10 @@ function thumbImg(src: string): HTMLElement {
   img.src = src;
   img.alt = '';
   img.draggable = false;
+  // a file gone since (a bubble's image by its path): the no-file slot, same 16 px
+  img.onerror = () => {
+    img.replaceWith(noFileGlyph());
+  };
   return img;
 }
 

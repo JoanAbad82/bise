@@ -39,19 +39,6 @@
   pointer-events: none;
   user-select: none;
 }
-/* a quote, a paste, an artifact: ink in a 1 px line like the image chip, never the accent (designer m_21425) */
-.b-composer .b-chip.paste,
-.b-composer .b-chip.quote,
-.b-composer .b-chip.artifact {
-  height: var(--s-5);
-  padding: 0 var(--s-2);
-  margin: 0 1px;
-  vertical-align: 1px;
-  color: var(--c-text);
-  background: none;
-  border: 1px solid var(--c-line);
-  border-radius: 9px;
-}
 /* the TipTap field (pm/PmField.tsx, behind Composer.tsx ENGINE): its host adds no box; ProseMirror
    needs pre-wrap; the dictation's live words are dim after the take's chip */
 .b-composer .b-field-host {
@@ -176,42 +163,6 @@
 .b-composer .b-field .b-dictation .k-what {
   color: var(--c-text-3);
 }
-/* an image chip is the sent bubble's (designer m_18135, signed 900f998e): 1 px line, r 9, 'image 1'
-   in ink beside its 16 px thumbnail or the faint no-file glyph slot; never the accent */
-/* a file chip is the image chip's look (file-chips, designer m_21765): its system icon or ▯, its name */
-.b-composer .b-chip.file,
-.b-composer .b-chip.image {
-  gap: var(--s-1);
-  height: var(--s-5);
-  padding: 0 var(--s-2) 0 var(--s-1);
-  margin: 0 1px;
-  vertical-align: 1px;
-  color: var(--c-text);
-  background: none;
-  border: 1px solid var(--c-line);
-  border-radius: 9px;
-}
-.b-composer .b-chip.file .thumb,
-.b-composer .b-chip.image .thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  object-fit: cover;
-  flex: none;
-}
-.b-composer .b-chip.file .thumb.file {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--c-text-3);
-  font-size: 13px;
-  line-height: 16px;
-}
-.b-composer .b-chip.image .thumb.none {
-  display: inline-flex;
-  color: var(--c-text-3);
-  opacity: 0.7;
-}
 .b-composer-strip {
   display: flex;
   flex-direction: column;
@@ -290,11 +241,6 @@
 .b-composer .b-attach-row.lit .x,
 .b-composer .b-attach-row:hover .x {
   visibility: visible;
-}
-/* a chip lit by its row, a hover or the caret after it */
-.b-composer .b-chip.lit {
-  border-color: var(--c-text-3);
-  background: var(--c-hover);
 }
 .b-composer-strip .k {
   margin-left: var(--gap-inline);

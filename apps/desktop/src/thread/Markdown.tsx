@@ -10,7 +10,7 @@
 // hands it the shell's open-in-browser), and only http(s) and mailto links
 // are links at all. An `artifact:<id>[@vN]` link is the artifact's name,
 // pink inline (ArtName, desktop-agents-bar §5): a click goes to `onArtifact`.
-import { memo, useEffect, useState, type MouseEvent } from 'react';
+import { memo, useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { pathOf } from './paths';
@@ -66,6 +66,40 @@ export function hardBreaks(node: MdNode): void {
 // his messages keep every line he typed (shift+enter), as the TUI shows them (qa-flows 68b4f1ea)
 const withBreaks = [remarkGfm, () => hardBreaks];
 
+/** A chip's place in his words (YouBody): private-use marks around its index. Pure. */
+export const slotMark = (i: number): string => `\uE000${String(i)}\uE001`;
+/** His own words with the marks' chars escaped (an icon font's glyph he pasted), so no text of his
+ *  ever reads as a slot (architect m_29179); slotNodes puts them back. Pure. */
+export const slotText = (text: string): string => text.replace(/[\uE000-\uE002]/gu, (c) => `\uE002${c}`);
+const SLOT = /(?<!\uE002)\uE000(\d+)\uE001/gu;
+const unescape = (text: string): string => text.replace(/\uE002([\uE000-\uE002])/gu, '$1');
+
+/** Each slot mark in a text node becomes a slot span (drawn by Markdown's `slot`); in code, `label`
+ *  writes it as words, so code keeps its shape; his own escaped chars come back (slotText). Pure
+ *  (mutates the tree it is given). */
+export function slotNodes(node: MdNode & { data?: unknown }, label: (i: number) => string): void {
+  if (node.children === undefined) return;
+  const out: MdNode[] = [];
+  for (const c of node.children) {
+    if ((c.type === 'inlineCode' || c.type === 'code') && c.value !== undefined) {
+      c.value = unescape(c.value.replace(SLOT, (_, i: string) => label(Number(i))));
+      out.push(c);
+    } else if (c.type === 'text' && c.value !== undefined) {
+      let at = 0;
+      for (const m of c.value.matchAll(SLOT)) {
+        if (m.index > at) out.push({ type: 'text', value: unescape(c.value.slice(at, m.index)) });
+        out.push({ type: 'slot', data: { hName: 'span', hProperties: { dataSlot: m[1] } } } as MdNode);
+        at = m.index + m[0].length;
+      }
+      if (at < c.value.length) out.push({ type: 'text', value: unescape(c.value.slice(at)) });
+    } else {
+      slotNodes(c, label);
+      out.push(c);
+    }
+  }
+  node.children = out;
+}
+
 /** A code block's language from its class ('language-rust'). Pure. */
 export function langOf(className: unknown): string | undefined {
   const list = Array.isArray(className) ? className : typeof className === 'string' ? className.split(' ') : [];
@@ -86,6 +120,8 @@ export const Markdown = memo(function Markdown({
   onPath,
   breaks = false,
   fading,
+  slot,
+  slotLabel,
 }: {
   text: string;
   onLink?: (url: string) => void;
@@ -96,8 +132,18 @@ export const Markdown = memo(function Markdown({
   breaks?: boolean;
   /** a streamed answer: its new words fade in (Answer below) */
   fading?: FadeOpts;
+  /** his words' chips (YouBody): what draws the i-th slot mark (slotMark), and its words in code */
+  slot?: (i: number) => ReactNode;
+  slotLabel?: (i: number) => string;
 }) {
+  const label = slotLabel ?? (() => '');
+  const remark = slot === undefined ? (breaks ? withBreaks : plugins) : [...(breaks ? withBreaks : plugins), () => (tree: MdNode) => { slotNodes(tree, label); }];
   const components: Components = {
+    span({ node, children, ...rest }) {
+      const at = node?.properties.dataSlot;
+      if (slot !== undefined && (typeof at === 'string' || typeof at === 'number')) return slot(Number(at));
+      return <span {...rest}>{children}</span>;
+    },
     // a file path in inline code opens in his editor (tui-parity M4, B14);
     // a block's code (it ends with a newline) stays code
     code({ className, children }) {
@@ -185,7 +231,7 @@ export const Markdown = memo(function Markdown({
   return (
     // b-md: the ds's markdown colors, the TUI's (src/ds/css/md.css); th-md: the thread's layout
     <div className="th-md b-md">
-      <ReactMarkdown remarkPlugins={breaks ? withBreaks : plugins} rehypePlugins={fading === undefined ? undefined : [[fade, fading]]} components={components} urlTransform={keptUrl} skipHtml>
+      <ReactMarkdown remarkPlugins={remark} rehypePlugins={fading === undefined ? undefined : [[fade, fading]]} components={components} urlTransform={keptUrl} skipHtml>
         {text}
       </ReactMarkdown>
     </div>

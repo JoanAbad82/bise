@@ -80,28 +80,11 @@ export const EntryRow = memo(function EntryRow({
   const p = prev === undefined ? undefined : before;
   // one 'session restored' row, never the same notice stacked (the TUI's)
   if (e.kind === 'notice' && p?.kind === 'notice' && (p.notice?.text ?? p.text) === (e.notice?.text ?? e.text)) return null;
-  // ambient m_11777: a day separator between days; a name line opens a group (a new author, 5
-  // min of silence); the rows inside show their time on hover in its place
-  const day = e.at_ms > 0 && (p === undefined || !sameDay(p.at_ms, e.at_ms)) ? dayLabel(e.at_ms, today) : null;
-  // a news or plumbing row has no name line: a new author there opens no group (designer m_19387);
-  // nor does a message between agents right after another (an open run: 12 px apart, m_19784 (2))
-  // a report the message under it repeats is a quiet row (H8): no group of its own, 4 px from quiet rows
   const n0 = next === undefined ? undefined : afterIt;
-  const quietMe = repeatedReport(e, n0);
-  const quietPrev = p !== undefined && repeatedReport(p, e);
-  const nameless = p !== undefined && (quietMe || NAMELESS_KINDS.has(e.kind) || (NOTE_KINDS.has(e.kind) && NOTE_KINDS.has(p.kind)));
-  const head = groupHead(p, e, ctx) && !nameless && !underFold;
-  // same sender → same receiver as the message before: one chip for both (m_19784 (2))
-  const chained = sameRoute(p, e, ctx.agent);
-  // his on the right, the rest on the left (messages-right v1); a change of side opens more room
-  const side = sideOf(e);
-  const turn = p !== undefined && day === null && sideOf(p) !== side;
-  const gap = underFold ? 'row' : p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : quietPrev ? { kind: QUIET_REPORT } : p, quietMe ? { kind: QUIET_REPORT } : e);
+  const { day, pause, head, turn, gap, side, chained } = rowLayout({ prev: p, e, next: n0, ctx, today, afterFold, underFold });
   // H2: the name line opens an author's run on its first row, a tool or a thinking row too
-  // (designer m_21404 (3)); H12: after 5 min of silence a faint '· 14:31 ·' (the TUI's), the
-  // times themselves on hover only
+  // (designer m_21404 (3)); the times themselves on hover only
   const shown = named ?? (head || carry);
-  const pause = day === null && pauseOf(p, e);
   const n = next === undefined ? undefined : afterIt;
   return (
     <>
@@ -121,6 +104,47 @@ export const EntryRow = memo(function EntryRow({
     </>
   );
 });
+
+/** Where a row sits among its neighbors (EntryRow's, and his sending bubble's, PendingRow, so
+ *  nothing moves at its echo): its day separator, its '· 14:31 ·' pause, its name line, its turn
+ *  and its gap. Pure. */
+export function rowLayout({
+  prev: p,
+  e,
+  next: n0,
+  ctx,
+  today,
+  afterFold = false,
+  underFold = false,
+}: {
+  prev: Entry | undefined;
+  e: Entry;
+  next: Entry | undefined;
+  ctx: { agent: string; bise: boolean };
+  today: number;
+  afterFold?: boolean;
+  underFold?: boolean;
+}): { day: string | null; pause: boolean; head: boolean; turn: boolean; gap: ReturnType<typeof gapOf> | 'row'; side: 'you' | 'them'; chained: boolean } {
+  // ambient m_11777: a day separator between days; a name line opens a group (a new author, 5
+  // min of silence); the rows inside show their time on hover in its place
+  const day = e.at_ms > 0 && (p === undefined || !sameDay(p.at_ms, e.at_ms)) ? dayLabel(e.at_ms, today) : null;
+  // a news or plumbing row has no name line: a new author there opens no group (designer m_19387);
+  // nor does a message between agents right after another (an open run: 12 px apart, m_19784 (2))
+  // a report the message under it repeats is a quiet row (H8): no group of its own, 4 px from quiet rows
+  const quietMe = repeatedReport(e, n0);
+  const quietPrev = p !== undefined && repeatedReport(p, e);
+  const nameless = p !== undefined && (quietMe || NAMELESS_KINDS.has(e.kind) || (NOTE_KINDS.has(e.kind) && NOTE_KINDS.has(p.kind)));
+  const head = groupHead(p, e, ctx) && !nameless && !underFold;
+  // same sender → same receiver as the message before: one chip for both (m_19784 (2))
+  const chained = sameRoute(p, e, ctx.agent);
+  // his on the right, the rest on the left (messages-right v1); a change of side opens more room
+  const side = sideOf(e);
+  const turn = p !== undefined && day === null && sideOf(p) !== side;
+  const gap = underFold ? 'row' : p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : quietPrev ? { kind: QUIET_REPORT } : p, quietMe ? { kind: QUIET_REPORT } : e);
+  // H12: after 5 min of silence a faint '· 14:31 ·' (the TUI's)
+  const pause = day === null && pauseOf(p, e);
+  return { day, pause, head, turn, gap, side, chained };
+}
 
 /**
  * The room above a row inside one turn (designer m_19359, m_19387, m_19832 H1): 'tight' between two
@@ -337,7 +361,8 @@ export { THOUGHT_MS };
 
 // the row families live in their own files; importers keep reading them here
 export { answeredMark, approvalParts, cardFollows, cardLine, fileUrl, imageLabel, toAgentName, withoutImageMarks } from './rows-cards';
-export { LONG_CHARS, LONG_LINES, PendingRow, YouBubble, foldOf } from './rows-messages';
+export { PendingRow, YouBubble } from './rows-messages';
+export { LONG_CHARS, LONG_LINES, foldOf } from './YouBody';
 export { NOTICE_MARK } from './rows-news';
 export { cutWords, thoughtFor } from './rows-tools';
 export { liveTime } from './live-step';

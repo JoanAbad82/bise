@@ -1,38 +1,23 @@
-// A thread's message rows: his bubbles (delivery marks, quotes, folds of a long
-// message), his sends not confirmed yet, his queued messages, the route hold and
+// A thread's message rows: his bubbles (their delivery marks; their body, quotes, words, chips and
+// fold, is YouBody.tsx, the same while sending and once sent), his sends not confirmed yet, his queued messages, the route hold and
 // the agent's typing line. Owner: amb-win. Split out of rows.tsx (pure move).
 import { memo, useContext, useEffect, useState, type ReactNode } from 'react';
 import { RouterContext } from '@/app/router';
-import { Button, Chip, Fold, Press } from '@/ds';
+import { Button, Chip, Press } from '@/ds';
 import type { Entry } from '@/proto';
 import { common, thread } from '@/proto/words.gen';
-import { useAgents, useArtifacts, useCoreState, useHubRefused, usePending, useProjects, useStore } from '@/store';
+import { useAgents, useCoreState, useHubRefused, usePending, useProjects, useStore } from '@/store';
 import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
-import { useFold } from './folds';
-import { useFoldHint } from './foldHint';
-import { Markdown } from './Markdown';
 import { chipOf, clock, deliveryMark, lastOfRun, stripContext } from './entry';
 import { shownName } from '@/agents/model';
 import { saidFor, useSaidMs } from '@/voicemode';
 import type { RowCtx } from './rows';
-import { Thumb } from './rows-cards';
-import { AttachChip, FileThumb } from './AttachChip';
-import { anchorMeta, chipName, drawnParts, viaFn, youView, type YouView } from './parts';
-import { lineCount, quoteAbout } from '@/composer/message';
-/** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
-export const LONG_LINES = 12;
-export const LONG_CHARS = 1200;
-const SHOWN_LINES = 6;
-
-/** The folded words of a long message, or none when it shows whole. Pure. */
-export function foldOf(text: string): { head: string; lines: number } | undefined {
-  const lines = text.split('\n');
-  if (lines.length <= LONG_LINES && text.length <= LONG_CHARS) return undefined;
-  const head = lines.slice(0, SHOWN_LINES).join('\n');
-  return { head: head.length > LONG_CHARS ? `${head.slice(0, LONG_CHARS)}…` : head, lines: lines.length };
-}
-
+import { drawnParts, viaFn, youView } from './parts';
+import { YouBody } from './YouBody';
+import { rowLayout } from './rows';
+import { useToday } from '@/app/clock';
+import type { Pending } from '@/store';
 /**
  * His words on the right in a soft bubble (designer's messages-right v1; the look lives in
  * thread.css '.th-you'): no 'you' line, the side says who spoke. A dim head over it only when it
@@ -73,64 +58,14 @@ export function YouBubble({
   );
 }
 
-/** What a quote line says after its words: '· main · 1 line', or a diff quote's place. Pure. */
-export function quoteMeta(source: string, about: string, text: string): string {
-  if (about !== '') return about;
-  const n = text.split('\n').length;
-  return [source === '' ? '' : shownName(source), `${String(n)} line${n === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
-}
-
-/**
- * A quote in his bubble (tui-parity H7, designer m_19832): one line at the bubble's top, '❝ Agreed on
- * the api… · main · 1 line' in text-2, its words cut with …; a click opens it in place.
- */
-function QuoteLine({ source, about, text, n, testId }: { source: string; about: string; text: string; n: number | undefined; testId: string }) {
-  const [open, setOpen] = useState(false);
-  const meta = quoteMeta(source, about, text);
-  return (
-    <Press
-      look="th-you-quote"
-      data-open={open || undefined}
-      aria-expanded={open}
-      onClick={() => {
-        setOpen((o) => !o);
-      }}
-      data-testid={testId}
-    >
-      <span className="th-you-quote-line">
-        {/* a quote he put in his words: its number, the one his words show at its place (his m_22231) */}
-        <span className="th-you-quote-text">
-          ❝ {n === undefined ? '' : `${String(n)} `}
-          {open ? meta : (text.split('\n')[0] ?? '')}
-        </span>
-        {/* a flex item drops its leading space: a no-break one keeps '30%. · bise' apart (designer m_21404 (2)) */}
-        {!open && <span className="th-you-quote-src">{`\u00a0· ${meta}`}</span>}
-      </span>
-      {open && <span className="th-you-quote-whole">{text}</span>}
-    </Press>
-  );
-}
-
 export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefined }) {
-  const [open, setOpen] = useFold(false, e.pos);
-  const hint = useFoldHint();
-  // the fn context block the hub appended never shows: a chip from the typed context instead;
-  // the quotes he sent in front of his words show first in his bubble, with their rail and source
   // msg-parts: his message comes from its typed parts, never from Entry.text (the model's templated
   // text; the fold gives every 'you' entry its parts since msg-parts sha c). No parts (an older
-  // hub): the text drawn plain, never parsed for tags (architect's delta review D1)
-  // a part of a kind this window doesn't know (a newer hub's): drawn from its text, never empty
+  // hub): the text drawn plain, never parsed for tags (architect's delta review D1); a part of a
+  // kind this window doesn't know (a newer hub's): drawn from its text, never empty. The fn context
+  // block the hub appended never shows: a chip from the typed context instead
   const drawn = drawnParts(e.parts);
-  const view = drawn !== null ? youView(drawn) : null;
-  // a part of an artifact says the artifact's name, as his composer's row did (designer m_24208)
-  const arts = useArtifacts(ctx.project);
-  const titles = new Map(arts.map((a) => [a.id, a.title]));
-  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, n: q.n, about: q.anchor !== undefined ? anchorMeta(q.anchor, titles.get(q.anchor.artifact)) : q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : [];
-  const text = view !== null ? view.words : stripContext(e.text);
-  const fold = foldOf(text);
-  const toggle = () => {
-    setOpen((o) => !o);
-  };
+  const text = drawn !== null ? youView(drawn).words : stripContext(e.text);
   const chip = e.context != null ? chipOf(e.context) : null;
   // in bise's or a main's thread, a message that went to someone else says so; to the owner, nothing
   const to = e.to != null && e.to !== '' && e.to !== ctx.agent ? common.to_agent({ agent: e.to }) : undefined;
@@ -212,104 +147,22 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
     );
   return (
     <YouBubble head={to} under={under} timeAlways={words !== undefined || fromFn || routed !== undefined || (mark !== null && lastOfRun(e, next))} testId={`thread.you.${String(e.pos)}`}>
-      {quotes.map((q, i) => (
-        <QuoteLine key={i} source={q.source} about={q.about} text={q.text} n={q.n} testId={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`} />
-      ))}
-      {text !== '' && <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} breaks />}
-      {fold !== undefined && (
-        <Fold open={open} onToggle={toggle} hint={hint} testId={`thread.fold.${e.pos}`}>
-          {open ? thread.fold_it : thread.show_all({ n: fold.lines })}
-        </Fold>
-      )}
-      {view !== null && <PartChips view={view} ctx={ctx} pos={e.pos} />}
-      {chip !== null && (
-        <div className="b-ctx">
-          <ContextChip chip={chip} ctx={ctx} pos={e.pos} />
-        </div>
-      )}
+      <YouBody
+        parts={drawn}
+        plain={text}
+        ctx={ctx}
+        id={`thread.you.${String(e.pos)}`}
+        foldPos={e.pos}
+        extra={
+          chip !== null && (
+            <div className="b-ctx">
+              <ContextChip chip={chip} ctx={ctx} pos={e.pos} />
+            </div>
+          )
+        }
+      />
     </YouBubble>
   );
-}
-
-/**
- * What rides with his words when his message came as parts (msg-parts): one row of chips, wrapping
- * only when the bubble is full (designer m_17969): his long pastes ('▤ 1 · 240 lines', a click shows
- * the paste), his other files (open in his editor), his images (the thumbnail, else the no-file
- * glyph slot, and 'image 1' or its file name in ink). The artifact chip's look: 1 px line, r 9,
- * 6 px apart; never the accent (pink is for what waits on him). Never a tag.
- */
-export function PartChips({ view, ctx, pos, named = false }: { view: YouView; ctx: RowCtx; pos: number; named?: boolean }) {
-  const [shown, setShown] = useState<number | null>(null);
-  const paste = view.pastes.find((p) => p.n === shown);
-  if (view.pastes.length === 0 && view.images.length === 0 && view.files.length === 0) return null;
-  const id = `thread.you.${String(pos)}`;
-  return (
-    <>
-      <div className="th-parts" data-testid={`${id}.parts`}>
-        {view.pastes.map((p) => (
-          <Chip
-            key={`p${String(p.n)}`}
-            kind="part"
-            of="paste"
-            expanded={shown === p.n}
-            onClick={() => {
-              setShown((s) => (s === p.n ? null : p.n));
-            }}
-            testId={`${id}.paste.${String(p.n)}`}
-          >
-            ▤ {p.n} · {lineCount(p.text)} lines
-          </Chip>
-        ))}
-        {/* his images and files (file-chips): a click previews, a right-click shows it in Finder */}
-        {view.images.map((img, i) => (
-          <AttachChip key={`${img.path}#${String(i)}`} of="image" path={img.path} missing={false} thumb={<Thumb path={img.path} />} testId={`${id}.image.${String(i + 1)}`}>
-            {named ? chipName(img.path.split('/').at(-1) ?? img.path) : partImageWords(img.name, i)}
-          </AttachChip>
-        ))}
-        {view.files.map((f, i) =>
-          f.name === '' ? (
-            // a file of an older files list: in his editor, as before
-            <Chip
-              key={`${f.path}#${String(i)}`}
-              kind="part"
-              of="file"
-              title={f.path}
-              onClick={() => {
-                if (ctx.onPath !== undefined) ctx.onPath(f.path);
-                else void (window as Partial<Window>).bise?.openPath(f.path, {});
-              }}
-              testId={`${id}.file`}
-            >
-              {f.path.split('/').at(-1) ?? f.path}
-            </Chip>
-          ) : (
-            <AttachChip key={`${f.path}#${String(i)}`} of="file" path={f.path} missing={f.missing} thumb={<FileThumb path={f.path} />} testId={`${id}.file.${String(i + 1)}`}>
-              {named ? chipName(f.path.split('/').at(-1) ?? f.path) : (f.path.split('/').at(-1) ?? f.path)}
-            </AttachChip>
-          ),
-        )}
-      </div>
-      {/* an image's caption under the chips, a fact about it, never his words: the talk's still says
-          the app and window it shows (architect m_22000) */}
-      {view.images.map((img, i) =>
-        img.caption === '' ? null : (
-          <p key={`c${String(i)}`} className="th-part-caption" data-testid={`${id}.image.${String(i + 1)}.caption`}>
-            {img.caption}
-          </p>
-        ),
-      )}
-      {paste !== undefined && (
-        <pre className="th-part-paste" data-testid={`${id}.paste.${String(paste.n)}.text`}>
-          {paste.text}
-        </pre>
-      )}
-    </>
-  );
-}
-
-/** An image part's chip words: its file name when it has one, else 'image 1' (its order here), never the '[Image #n]' tag (designer m_17969). Pure. */
-export function partImageWords(name: string, i: number): string {
-  return name !== '' && !name.startsWith('[') ? name : thread.image_n({ n: i + 1 });
 }
 
 /** '◫ with Chrome · localhost:4801/sett…': a url opens in his browser, a file in his editor; a shot alone isn't kept. */
@@ -337,12 +190,19 @@ function ContextChip({ chip, ctx, pos }: { chip: NonNullable<ReturnType<typeof c
  * sending; failed, one line with retry and dismiss (never a send with no
  * trace). His words stay here and in the composer's history.
  */
-export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; cid: number }) {
+export const PendingRow = memo(function PendingRow({ ctx, cid, after }: { ctx: RowCtx; cid: number; after?: Entry | undefined }) {
   const store = useStore();
-  const p = usePending(ctx.tkey).find((x) => x.cid === cid);
+  const pending = usePending(ctx.tkey);
+  const i = pending.findIndex((x) => x.cid === cid);
+  const p = pending[i];
   const hold = useHoldOf(store, ctx.tkey, cid);
   const connecting = useConnecting(ctx.project);
+  const today = useToday();
   if (p === undefined) return null;
+  // its place among its neighbors as its entry will have it (rows.tsx rowLayout): the row the
+  // list ends on (`after`), else his send before it; nothing moves at its echo (bubble-parts)
+  const before = i > 0 ? pending[i - 1] : undefined;
+  const at = rowLayout({ prev: before !== undefined ? pendingEntry(before) : after, e: pendingEntry(p), next: undefined, ctx, today });
   // a routed send: its route's state is the row's (lead m_9854)
   const failed = p.state === 'failed' && hold?.state !== 'sent';
   const state = hold !== undefined && hold.state !== 'cancelled' ? hold.state : p.state;
@@ -380,14 +240,32 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
       (connecting ?? thread.sending)
     );
   return (
-    <div className={failed ? 'th-row th-pending th-failed' : hold?.state === 'sent' ? 'th-row th-routed' : 'th-row th-pending'} data-testid={`thread.pending.${cid}`} data-state={state} data-side="you">
+    <>
+    {at.day !== null && (
+      <div className="th-day" data-testid={`thread.sending.${cid}.day`}>
+        <span>{at.day}</span>
+      </div>
+    )}
+    {at.pause && (
+      <div className="th-pause" data-testid={`thread.sending.${cid}.pause`}>
+        · {clock(p.at_ms)} ·
+      </div>
+    )}
+    <div className={failed ? 'th-row th-pending th-failed' : hold?.state === 'sent' ? 'th-row th-routed' : 'th-row th-pending'} data-testid={`thread.pending.${cid}`} data-state={state} data-side="you" data-head={at.head} data-turn={at.turn || undefined} data-gap={at.gap}>
       <YouBubble under={under} state={failed ? 'failed' : queued ? 'queued' : 'sending'}>
-        <Markdown text={p.text} onLink={ctx.onLink} onArtifact={ctx.onArtifact} breaks />
+        {/* the same body as once it landed, from the same parts (bubble-parts): nothing moves at its echo */}
+        <YouBody parts={drawnParts(p.parts) ?? [{ kind: 'text', text: p.text }]} plain={p.text} ctx={ctx} id={`thread.sending.${String(cid)}`} />
       </YouBubble>
       {hold?.state === 'held' && <HoldLine hold={hold} />}
     </div>
+    </>
   );
 });
+
+/** His send as the entry its echo will be, for its place in the list (rowLayout). Pure. */
+export function pendingEntry(p: Pending): Entry {
+  return { pos: -1, at_ms: p.at_ms, kind: 'you', text: p.text, ...(p.parts === undefined ? {} : { parts: [...p.parts] }) };
+}
 
 /**
  * The wait before a send can go, named (lead m_10108): while the core

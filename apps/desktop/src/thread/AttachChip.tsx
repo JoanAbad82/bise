@@ -42,7 +42,7 @@ export function FileThumb({ path }: { path: string }) {
 }
 
 /** One attachment chip: `thumb` then its words; gone (by the hub, or at a click): '· missing'. */
-export function AttachChip({ of, path, missing, thumb, testId, children }: { of: 'image' | 'file'; path: string; missing: boolean; thumb: ReactNode; testId: string; children: ReactNode }) {
+export function AttachChip({ of, path, missing, thumb, testId, children, lit = false, onHover }: { of: 'image' | 'file'; path: string; missing: boolean; thumb: ReactNode; testId: string; children: ReactNode; lit?: boolean; onHover?: (over: boolean) => void }) {
   const [gone, setGone] = useState(missing);
   const home = bise()?.home ?? '';
   const title = gone ? goneWords(path, home) : `${path}\n${thread.attach_open}`;
@@ -53,6 +53,8 @@ export function AttachChip({ of, path, missing, thumb, testId, children }: { of:
       of={of}
       title={title}
       thumb={thumb}
+      {...(lit ? { state: 'hover' as const } : {})}
+      {...(onHover === undefined ? {} : { onHover })}
       onClick={() => {
         if (gone) return;
         void bise()

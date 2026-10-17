@@ -60,17 +60,21 @@ export interface ChipProps {
   onClick?: MouseEventHandler<HTMLButtonElement>;
   /** a right-click (an attachment's 'show in Finder', file-chips) */
   onContextMenu?: MouseEventHandler<HTMLElement>;
+  /** the mouse comes on it (true) or leaves it (false): his bubble lights the same chip in his words */
+  onHover?: (over: boolean) => void;
   testId?: string;
 }
 /** a chip: a small label; a real button when it has onClick */
-export function Chip({ children, tone, kind, thumb, of, title, expanded, state, onClick, onContextMenu, testId }: ChipProps) {
+export function Chip({ children, tone, kind, thumb, of, title, expanded, state, onClick, onContextMenu, onHover, testId }: ChipProps) {
   const cls = cx("b-chip", tone, kind, state === "hover" && "is-hover");
   const words = thumb === undefined ? children : <>{thumb}<span className="ink">{children}</span></>;
+  const enter = onHover === undefined ? undefined : () => { onHover(true); };
+  const leave = onHover === undefined ? undefined : () => { onHover(false); };
   if (onClick === undefined) {
-    return <span className={cls} data-kind={of} title={title} onContextMenu={onContextMenu} data-testid={testId}>{words}</span>;
+    return <span className={cls} data-kind={of} title={title} onContextMenu={onContextMenu} onMouseEnter={enter} onMouseLeave={leave} data-testid={testId}>{words}</span>;
   }
   return (
-    <button type="button" className={cls} data-kind={of} title={title} aria-expanded={expanded} onClick={onClick} onContextMenu={onContextMenu} data-testid={testId}>
+    <button type="button" className={cls} data-kind={of} title={title} aria-expanded={expanded} onClick={onClick} onContextMenu={onContextMenu} onMouseEnter={enter} onMouseLeave={leave} data-testid={testId}>
       {words}
     </button>
   );

@@ -239,6 +239,9 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
     },
     [store, project, agent],
   );
+  // the row his sends follow: the reply being written, else the list's last entry (rowLayout)
+  const lastShown = useEntry(tkey, shown.at(-1) ?? -1);
+  const tailPrev = live.entry ?? lastShown;
   // his own send goes to the bottom even when he had scrolled up
   const sent = pending.length;
   const last = useRef(sent);
@@ -250,8 +253,8 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   // drawer (QueueDrawer.tsx), never bubbles here: a sent one lands as his normal bubble
   const tail = pending.length === 0 ? undefined : (
     <div className="th-tail">
-      {pending.map((p) => (
-        <PendingRow key={pendingKey(String(p.cid))} ctx={ctx} cid={p.cid} />
+      {pending.map((p, i) => (
+        <PendingRow key={pendingKey(String(p.cid))} ctx={ctx} cid={p.cid} after={i === 0 ? tailPrev : undefined} />
       ))}
     </div>
   );

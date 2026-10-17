@@ -36,6 +36,13 @@
 .th-list-end {
   height: var(--s-3);
 }
+/* his sends on their way, after the list (ThreadRows tail): they take the list end's 12 px and end
+   on their own, so a bubble sits where its entry lands and nothing moves at its echo (bubble-parts) */
+.th-tail {
+  position: relative;
+  margin-top: calc(-1 * var(--s-3));
+  padding-bottom: var(--s-3);
+}
 
 /* scrolled up: back to the newest, with what came meanwhile */
 .th-to-end {
@@ -1687,8 +1694,14 @@
   text-align: left;
   cursor: pointer;
 }
-.th-you-quote:hover {
+.th-you-quote:hover,
+.th-you-quote[data-lit] {
   color: var(--c-text);
+}
+/* a chip in his words (YouBody InlineChip): the composer's own chip (composer/pm/chip.css); its
+   host adds no box */
+.th-inchip {
+  display: contents;
 }
 .th-you-quote-line {
   display: flex;

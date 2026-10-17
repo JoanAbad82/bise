@@ -6,6 +6,7 @@
 import type { Part } from '@/proto';
 import { common, thread } from '@/proto/words.gen';
 import { anchorLabel } from '@/composer/anchor';
+import { labelN } from '@/composer/partsback';
 
 /** A quote he sent: who wrote it, its text, and from a diff where (file, its new / old lines). */
 export interface PartQuote {
@@ -41,7 +42,7 @@ export interface YouView {
   readonly pastes: readonly { readonly n: number; readonly text: string }[];
   /** his images: their label ('[Image #2]'), where he took them from (the thumbnail) and their
    *  caption, a fact about the image ('Safari · cold bench', the talk's still), '' for none */
-  readonly images: readonly { readonly name: string; readonly path: string; readonly caption: string }[];
+  readonly images: readonly { readonly name: string; readonly path: string; readonly caption: string; readonly n: number | null }[];
   /** his files (file-chips): each by its absolute path, its chip's label ('[File #2]'; '' a file
    *  of an older files list) and whether the hub found it gone when he sent it */
   readonly files: readonly YouFile[];
@@ -50,6 +51,8 @@ export interface YouView {
 /** A file he attached, as his bubble draws it (bise_proto::parts Part::File). */
 export interface YouFile {
   readonly name: string;
+  /** its chip's number ('[File #3]' → 3), the one his words show at its place; null: none */
+  readonly n: number | null;
   readonly path: string;
   readonly missing: boolean;
 }
@@ -58,7 +61,7 @@ export interface YouFile {
 export function youView(parts: readonly Part[]): YouView {
   const quotes: PartQuote[] = [];
   const pastes: { n: number; text: string }[] = [];
-  const images: { name: string; path: string; caption: string }[] = [];
+  const images: { name: string; path: string; caption: string; n: number | null }[] = [];
   const files: YouFile[] = [];
   let words = '';
   for (const p of parts) {
@@ -82,14 +85,14 @@ export function youView(parts: readonly Part[]): YouView {
         pastes.push({ n: p.n, text: p.text });
         break;
       case 'image':
-        images.push({ name: p.name, path: p.source, caption: p.caption ?? '' });
+        images.push({ name: p.name, path: p.source, caption: p.caption ?? '', n: labelN(p.name) });
         break;
       case 'file':
-        files.push({ name: p.name ?? '', path: p.path, missing: p.missing === true });
+        files.push({ name: p.name ?? '', path: p.path, missing: p.missing === true, n: labelN(p.name ?? '') });
         break;
       case 'page':
         // what he did on a page: its own row (pageAnswer), never the hub's template
-        words += p.notes.map((n) => pageNoteWords(n, true)).filter((w) => w !== '').join('\n');
+        words += pageWords(p);
         break;
       case 'hint':
         // the hub's line for the model (the capsule's, his open steps), never his words (m_22706)
@@ -143,6 +146,14 @@ export function drawnParts(parts: readonly Part[] | null | undefined): readonly 
 
 type PagePart = Extract<Part, { kind: 'page' }>;
 type PageNoteOf = PagePart['notes'][number];
+
+/** What he did on a page, as his words: one note a line. Pure. */
+export function pageWords(p: PagePart): string {
+  return p.notes
+    .map((n) => pageNoteWords(n, true))
+    .filter((w) => w !== '')
+    .join('\n');
+}
 
 /** The page part of his message, when the hub wrote it from a page (his pick, note, tick). Pure. */
 export function pageOf(parts: readonly Part[] | null | undefined): PagePart | null {
