@@ -188,7 +188,12 @@ jobs:
         run: bend version | grep -F "$BEND_VERSION"
 
       # cargo: the registry + the release target of versions.sh (it builds
-      # a commit in a worktree, into $SB_BUILD_DIR/target-commits)
+      # a commit in a worktree, into $SB_BUILD_DIR/target-commits, with
+      # scripts/cargo_mtimes.py's manifest of the sources it was built from:
+      # unchanged crates are not rebuilt). The key has the Rust sources'
+      # hash: a main run with new Rust saves its target and manifest (with
+      # the Cargo.lock hash alone the key never changed, the save was
+      # skipped and the manifest never reached the cache: run 39021507942)
       - name: Restore cargo
         id: cargo-cache
         uses: actions/cache/restore@v4
@@ -198,8 +203,10 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git/db
             ~/sb-build/target-commits
-          key: cargo-${{ matrix.target }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust/Cargo.lock', 'rust/.cargo/config.toml') }}
-          restore-keys: cargo-${{ matrix.target }}-${{ env.RUST_VERSION }}-
+          key: cargo-${{ matrix.target }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust/Cargo.lock', 'rust/.cargo/config.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            cargo-${{ matrix.target }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust/Cargo.lock', 'rust/.cargo/config.toml') }}-
+            cargo-${{ matrix.target }}-${{ env.RUST_VERSION }}-
 
       # bins.sh's cache: one Bend binary per content hash of its sources
       # (+ the macOS target); the Bend version is in this key, not in
