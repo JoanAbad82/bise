@@ -156,13 +156,7 @@ fn list_sessions(sessions_dir: &str) {
 // ---- API keys (BISE-143, bise_catalog::auth) ----
 
 fn auth_paths() -> bise_catalog::auth_cli::Paths {
-    let h = bise_home::Home::from_env();
-    bise_catalog::auth_cli::Paths {
-        auth_file: h.auth_file(),
-        config: h.config_file(),
-        env_files: h.env_files(),
-        home: Some(h.user_home().to_path_buf()),
-    }
+    bise_catalog::auth_cli::Paths::of(&bise_home::Home::from_env())
 }
 
 /// The first run's live key check (BISE-266), for `login --check` and

@@ -35,6 +35,14 @@ pub(crate) fn save_model(home: &bise_home::Home, model: &str) -> std::io::Result
     std::fs::write(&file, bise_catalog::roles::with_role(&text, bise_catalog::roles::MAIN, model))
 }
 
+/// A pasted key, cleaned: trimmed, quotes off; None when it can't be one
+/// (empty, spaces or control characters inside): the catalog's rule
+/// (`auth_cli::clean_key`), the one the TUI's key step, `/setup`'s key
+/// card and the desktop's `provider_use` all apply.
+pub(crate) fn clean_key(s: &str) -> Option<String> {
+    bise_catalog::auth_cli::clean_key(s).ok()
+}
+
 /// A model's id without its provider.
 pub(crate) fn short_model(m: &str) -> String {
     bise_catalog::split_name(m).map_or(m.to_string(), |(_, id)| id.to_string())
@@ -178,7 +186,7 @@ pub(crate) fn model_for(home: &bise_home::Home, env: Env, id: &str) -> (String, 
 /// `roles::model_to_write` says so, main's model. Blocking.
 pub(crate) fn use_provider(home: &bise_home::Home, env: Env, id: &str, key: Option<String>, ports: &Ports) -> Used {
     let setup = crate::onboarding::setup_of(env, home);
-    let paths = crate::onboarding::auth_paths(home);
+    let paths = bise_catalog::auth_cli::Paths::of(home);
     let pasted = key.is_some();
     let fail = |name: &str, model: &str, why: CheckWhy, said: String, url: Option<String>| Used {
         id: id.to_string(),
@@ -195,7 +203,7 @@ pub(crate) fn use_provider(home: &bise_home::Home, env: Env, id: &str, key: Opti
         return fail(&p.name, "", CheckWhy::Model, String::new(), keys_url);
     };
     let the_key = match key {
-        Some(k) => match crate::onboarding::clean_key(&k) {
+        Some(k) => match crate::firstkey::clean_key(&k) {
             Some(k) => k,
             None => return fail(&p.name, &model, CheckWhy::NoKey, String::new(), keys_url),
         },

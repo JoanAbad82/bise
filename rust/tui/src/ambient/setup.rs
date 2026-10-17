@@ -450,10 +450,7 @@ fn sign_in_cancel(id: &str, open: &SignIns) -> Result<(), String> {
 pub fn live(flow: FlowFn) -> SetupPorts {
     use bise_catalog::auth_cli;
     let home = bise_home::Home::from_env;
-    let auth_paths = move || {
-        let h = home();
-        auth_cli::Paths { auth_file: h.auth_file(), config: h.config_file(), env_files: h.env_files(), home: Some(h.user_home().to_path_buf()) }
-    };
+    let auth_paths = move || bise_catalog::auth_cli::Paths::of(&home());
     let env = |k: &str| std::env::var(k).ok();
     // the open sign-ins: their process group and whether it was cancelled
     let open: SignIns = Default::default();

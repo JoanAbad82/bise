@@ -409,7 +409,7 @@ pub(crate) const CONNECTORS: (&str, &str) = ("mistral", "MISTRAL_API_KEY");
 /// auth.json, the old `.env` files.
 pub(crate) fn find_key(ctx: &Ctx, id: &str, key_env: &str) -> Option<String> {
     use bise_catalog::auth::{EnvFile, Keys, Store};
-    let paths = crate::onboarding::auth_paths(&ctx.home);
+    let paths = bise_catalog::auth_cli::Paths::of(&ctx.home);
     let store = Store::read(&paths.auth_file).unwrap_or_default();
     let files = EnvFile::read_all(&paths.env_files);
     let env = |k: &str| ctx.var(k).map(String::from);

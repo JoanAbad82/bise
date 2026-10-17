@@ -11,7 +11,7 @@
 //! nothing more here: the hub reads auth.json, closes the item, and the
 //! agents go on. Refused, cancelled or failed: one ▲ line in the thread.
 
-use crate::onboarding::{auth_paths, Flow, Kind, Logins, Poll, DENIED, UNFINISHED};
+use crate::onboarding::{Flow, Kind, Logins, Poll, DENIED, UNFINISHED};
 use crate::wire::Ev;
 use crate::App;
 use std::time::{Duration, Instant};
@@ -44,7 +44,7 @@ pub(crate) fn start(app: &mut App) {
         return;
     }
     let logins = Logins::real();
-    match (logins.start)(Kind::ChatGpt, &auth_paths(&bise_home::Home::from_env())) {
+    match (logins.start)(Kind::ChatGpt, &bise_catalog::auth_cli::Paths::of(&bise_home::Home::from_env())) {
         Ok(f) => {
             let _ = (logins.open)(f.url());
             app.resign = Some(ReSignIn { flow: f, copied: None });

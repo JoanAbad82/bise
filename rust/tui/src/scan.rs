@@ -240,7 +240,7 @@ pub(crate) fn render(env: Env, home: &Path, bise: &bise_home::Home, cwd: &Path) 
     for k in &found {
         o.push_str(&format!("  {:<11} {:<20} {}\n", k.provider, k.var, k.at));
     }
-    let paths = crate::onboarding::auth_paths(bise);
+    let paths = bise_catalog::auth_cli::Paths::of(bise);
     let store = bise_catalog::auth::Store::read(&paths.auth_file).unwrap_or_default();
     let saved = store.providers();
     o.push_str(&format!("  saved in bise: {}\n", if saved.is_empty() { "none".to_string() } else { saved.join(", ") }));

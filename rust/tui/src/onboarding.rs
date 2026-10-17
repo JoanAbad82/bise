@@ -124,7 +124,7 @@ pub(crate) fn chatgpt_hint(env: Env) -> bool {
     *HINT.get_or_init(|| {
         let home = home_of(env);
         let l = Logins::real();
-        (l.detect)(home.user_home(), env).codex_chatgpt && (l.state)(&auth_paths(&home)) == PlanState::NotSetUp
+        (l.detect)(home.user_home(), env).codex_chatgpt && (l.state)(&bise_catalog::auth_cli::Paths::of(&home)) == PlanState::NotSetUp
     })
 }
 
@@ -201,16 +201,6 @@ pub(crate) fn setup_of(env: Env, home: &bise_home::Home) -> bise_catalog::Setup 
         .with_keys(&bise_catalog::auth::Keys { env, store: &store, files: &files })
 }
 
-/// Where `login` keeps the keys (auth.json) and where the old ones are.
-pub(crate) fn auth_paths(home: &bise_home::Home) -> bise_catalog::auth_cli::Paths {
-    bise_catalog::auth_cli::Paths {
-        auth_file: home.auth_file(),
-        config: home.config_file(),
-        env_files: home.env_files(),
-        home: Some(home.user_home().to_path_buf()),
-    }
-}
-
 /// Every provider a key can be pasted for, in catalog order.
 pub(crate) fn key_providers(setup: &bise_catalog::Setup) -> Vec<Provider> {
     setup
@@ -229,7 +219,7 @@ pub(crate) fn key_providers(setup: &bise_catalog::Setup) -> Vec<Provider> {
 /// `.env` files.
 pub(crate) fn find_keys(env: Env, home: &bise_home::Home, setup: &bise_catalog::Setup) -> Vec<Provider> {
     use bise_catalog::auth::{EnvFile, Keys, Store};
-    let paths = auth_paths(home);
+    let paths = bise_catalog::auth_cli::Paths::of(home);
     let store = Store::read(&paths.auth_file).unwrap_or_default();
     let files = EnvFile::read_all(&paths.env_files);
     let keys = Keys { env, store: &store, files: &files };
@@ -259,13 +249,6 @@ pub(crate) use crate::firstkey::save_model;
 /// auth.json has a key for this provider already.
 pub(crate) fn stored(home: &bise_home::Home, id: &str) -> bool {
     bise_catalog::auth::Store::read(&home.auth_file()).is_ok_and(|s| s.key(id).is_some())
-}
-
-/// A pasted key, cleaned: trimmed, quotes off; None when it can't be one
-/// (empty, spaces or control characters inside).
-pub(crate) fn clean_key(s: &str) -> Option<String> {
-    let k = s.trim().trim_matches('"').trim_matches('\'');
-    (!k.is_empty() && !k.chars().any(|c| c.is_whitespace() || c.is_control())).then(|| k.to_string())
 }
 
 // ---- the steps ----
@@ -545,7 +528,7 @@ impl Onb {
         found.sort_by_key(|p| p.id != self.mine);
         self.found = found;
         self.keys = provider::key_states(env, &self.home, &self.setup);
-        self.plan = (self.logins.state)(&auth_paths(&self.home));
+        self.plan = (self.logins.state)(&bise_catalog::auth_cli::Paths::of(&self.home));
     }
 
     /// Put other sign-ins (the tests' fakes): the plan's state and what
@@ -798,7 +781,7 @@ impl Onb {
                 b.push(c);
                 Sub::Paste(p, m, b)
             }
-            (Sub::Paste(p, m, b), KeyCode::Enter) => match clean_key(&b) {
+            (Sub::Paste(p, m, b), KeyCode::Enter) => match crate::firstkey::clean_key(&b) {
                 None if b.trim().is_empty() => Sub::Paste(p, m, b),
                 None => {
                     self.note = Some(Note::NotAKey);
@@ -854,7 +837,7 @@ impl Onb {
         // the plan: the account's own list (cached at sign-in and when
         // /models opens), then the catalog's
         if p.plan {
-            for m in (self.logins.models)(&auth_paths(&self.home)) {
+            for m in (self.logins.models)(&bise_catalog::auth_cli::Paths::of(&self.home)) {
                 let full = format!("{}/{}", p.id, m.slug);
                 if !v.contains(&full) {
                     v.push(full);
@@ -894,7 +877,7 @@ impl Onb {
                     PlanState::SignedIn(a) => a.clone(),
                     _ => Account { email: String::new(), plan: None },
                 };
-                match (self.logins.token)(&auth_paths(&self.home)) {
+                match (self.logins.token)(&bise_catalog::auth_cli::Paths::of(&self.home)) {
                     Ok(t) => (t, Tried::Plan(who)),
                     Err(e) => return Sub::Failed(p, model, Tried::Plan(who), crate::keycheck::Fail { why: Why::WrongKey, said: e }),
                 }
@@ -958,7 +941,7 @@ impl Onb {
     /// The key of `p` where the harness finds it (env, auth.json, .env).
     fn found_key(&self, p: &Provider, env: Env) -> Option<bise_catalog::auth::Found> {
         use bise_catalog::auth::{EnvFile, Keys, Store};
-        let paths = auth_paths(&self.home);
+        let paths = bise_catalog::auth_cli::Paths::of(&self.home);
         let store = Store::read(&paths.auth_file).unwrap_or_default();
         let files = EnvFile::read_all(&paths.env_files);
         let keys = Keys { env, store: &store, files: &files };
@@ -1023,7 +1006,7 @@ impl Onb {
     /// Save a pasted key (`login`'s own code: auth.json, 0600); note the
     /// environment's key it replaces.
     fn save_key(&mut self, p: &Provider, key: &str, env: Env) -> Result<(), String> {
-        let paths = auth_paths(&self.home);
+        let paths = bise_catalog::auth_cli::Paths::of(&self.home);
         let cp = self.setup.catalog.provider(&p.id).ok_or_else(|| settings::first_unknown_provider(&p.id))?;
         bise_catalog::auth_cli::login(&paths, cp, key, env).map(|_| ())?;
         let store = bise_catalog::auth::Store::read(&paths.auth_file).unwrap_or_default();
@@ -2244,9 +2227,9 @@ mod tests {
         let e = env_of(HashMap::from([("HOME", home.clone()), ("BEND_MODEL", "anthropic/claude-haiku-4-5".to_string())]));
         let o = Onb::new(&e);
         assert_eq!(o.mine, "anthropic");
-        assert_eq!(clean_key("  'sk-1'\n"), Some("sk-1".into()));
-        assert_eq!(clean_key("a b"), None);
-        assert_eq!(clean_key(" "), None);
+        assert_eq!(crate::firstkey::clean_key("  'sk-1'\n"), Some("sk-1".into()));
+        assert_eq!(crate::firstkey::clean_key("a b"), None);
+        assert_eq!(crate::firstkey::clean_key(" "), None);
     }
 
     #[test]
@@ -2606,7 +2589,7 @@ mod tests {
         assert!(cfg.starts_with("[roles]\nmain = \"openai/gpt-6-astra\""), "{}", cfg);
         // a key already in auth.json: enter replaces it only after a yes
         std::fs::create_dir_all(hm(&h).auth_file().parent().unwrap()).unwrap();
-        let paths = auth_paths(&o.home);
+        let paths = bise_catalog::auth_cli::Paths::of(&o.home);
         bise_catalog::auth_cli::login(&paths, o.setup.catalog.provider("groq").unwrap(), "old", &e).unwrap();
         o.sub = Sub::Paste(Provider::of(o.setup.catalog.provider("groq").unwrap()), "groq/openai/gpt-oss-120b".into(), String::new());
         o.on_paste("new");

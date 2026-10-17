@@ -105,7 +105,7 @@ pub(crate) struct KeyState {
 
 /// Every catalog provider's key state (never the key).
 pub(crate) fn key_states(env: Env, home: &bise_home::Home, setup: &bise_catalog::Setup) -> Vec<KeyState> {
-    let paths = auth_paths(home);
+    let paths = bise_catalog::auth_cli::Paths::of(home);
     let store = Store::read(&paths.auth_file).unwrap_or_default();
     let none = Store::default();
     let files = EnvFile::read_all(&paths.env_files);
@@ -343,7 +343,7 @@ impl Onb {
 
     /// Remove `p`'s key from auth.json; the environment's stays.
     fn remove(&mut self, p: &Provider, env: Env) -> Sub {
-        let paths = auth_paths(&self.home);
+        let paths = bise_catalog::auth_cli::Paths::of(&self.home);
         let r = bise_catalog::auth_cli::logout(&paths, &p.id, env, &self.setup.catalog);
         self.refresh_keys(env);
         match r {

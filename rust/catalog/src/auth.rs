@@ -686,3 +686,11 @@ impl Resolution {
         out
     }
 }
+
+impl crate::auth_cli::Paths {
+    /// Where bise's home keeps the keys (auth.json), its config and the old
+    /// .env files: the one owner of where auth lives (architect m_28746).
+    pub fn of(h: &bise_home::Home) -> crate::auth_cli::Paths {
+        crate::auth_cli::Paths { auth_file: h.auth_file(), config: h.config_file(), env_files: h.env_files(), home: Some(h.user_home().to_path_buf()) }
+    }
+}

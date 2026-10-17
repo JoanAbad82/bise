@@ -256,7 +256,7 @@ impl Onb {
         if let Some(mut f) = self.flow.take() {
             f.cancel();
         }
-        match (self.logins.start)(k, &auth_paths(&self.home)) {
+        match (self.logins.start)(k, &bise_catalog::auth_cli::Paths::of(&self.home)) {
             Ok(f) => {
                 let _ = (self.logins.open)(f.url());
                 self.flow = Some(f);
@@ -341,7 +341,7 @@ impl Onb {
     /// screen reads it).
     pub(crate) fn fetch_plan_models(&self) {
         if matches!(self.plan, PlanState::SignedIn(_)) {
-            let (paths, f) = (auth_paths(&self.home), self.logins.fetch_models);
+            let (paths, f) = (bise_catalog::auth_cli::Paths::of(&self.home), self.logins.fetch_models);
             std::thread::spawn(move || f(&paths));
         }
     }
@@ -350,7 +350,7 @@ impl Onb {
     /// the refresh token over the network).
     pub(crate) fn sign_out(&mut self) {
         let (tx, rx) = std::sync::mpsc::channel();
-        let (paths, f) = (auth_paths(&self.home), self.logins.sign_out);
+        let (paths, f) = (bise_catalog::auth_cli::Paths::of(&self.home), self.logins.sign_out);
         std::thread::spawn(move || {
             let _ = tx.send(f(&paths));
         });
