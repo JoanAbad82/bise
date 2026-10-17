@@ -159,7 +159,7 @@ export const labelsOf: LabelsFn = (frames, o) => {
     const { act, from } = b.pose.seg;
     const pill = pillOf(act);
     const at = (mode: Label['mode'], words: string, title = ''): void => void out.set(b.name, { name: b.name, mode, words, title, pill });
-    const trick = o.follow === b.name ? trickNow(b.name, b.pose) : null;
+    const trick = o.follow === b.name ? trickNow(b.name, b.pose, o.park) : null;
     if (o.hover === b.name) {
       const row = rows.get(b.name);
       // a skater (skate.ts): how long it has been idle, and what it does with it

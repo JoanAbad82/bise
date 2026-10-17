@@ -8,15 +8,10 @@
 // battery rule). The 900 on the vert at the 900th job (the jobs' high-water mark). Pure: the clock,
 // the stage and his local day are passed in. render/skate.ts poses a skater from a line. Owner: maps-d.
 import { hash } from './activity';
-import type { Activity, BimFrame, FunIn, Office, Pastime, Pose } from './model';
+import type { Activity, BimFrame, FunIn, Office, Park, Pastime, Pose, Pt } from './model';
+import { type Feature, FEATURE_STAGE, enterLen, exitLen, lengthOf, portIn, portOut, route } from './parkpath';
 
-/** the park's pieces a trick rides on */
-export type Feature = 'flat' | 'funbox' | 'qp' | 'curb' | 'rail' | 'ramp' | 'stairs' | 'ledge' | 'bowl' | 'vert';
-
-/** the stage each piece is built at (growth.ts's stages; the brief: 3 curb .. 13 vert, 14 the golden board) */
-export const FEATURE_STAGE: Readonly<Record<Feature, number>> = {
-  flat: 0, funbox: 0, qp: 0, curb: 3, rail: 5, ramp: 7, stairs: 9, ledge: 9, bowl: 11, vert: 13,
-};
+export { FEATURE_STAGE, type Feature };
 /** the golden board at the mark */
 export const GOLDEN_STAGE = 14;
 
@@ -44,7 +39,8 @@ const ON: Readonly<Record<Feature, readonly TrickKey[]>> = {
   rail: ['fifty', 'boardslide'],
   ledge: ['fifty', 'five_o', 'boardslide', 'nosegrind'],
   stairs: ['ollie', 'kickflip', 'heelflip', 'shove_it'],
-  ramp: ['pump', 'rock_to_fakie', 'axle_stall', 'fs_180', 'bs_180'],
+  // the ramp's moves end at the far lip, turned round: an air, a 180, a stall, a grind on its coping
+  ramp: ['fs_air', 'fs_180', 'bs_180', 'axle_stall', 'rock_to_fakie', 'fifty', 'fs_air', 'pump'],
   bowl: ['carve', 'carve', 'fs_air'],
   vert: ['fs_air', 'axle_stall'],
 };
@@ -84,6 +80,9 @@ export const WINDOW_S = 600;
 export const NINE_JOBS = 900;
 /** a trick's name over a followed bim (s) */
 export const TRICK_LABEL_S = 1.5;
+/** a roll's push (tiles per second) round the pieces (parkpath.ts route), and its shortest (s) */
+export const PUSH = 3.2;
+const ROLL_MIN = 0.6;
 
 /** a seeded generator, the same on every run (mulberry32) */
 function rng(seed: number): () => number {
@@ -154,35 +153,46 @@ function block(f: Feature, r: () => number, rare: boolean): TrickKey[] {
  * chained from its rest spot and back, LINE_MIN..LINE_MAX s, each trick SLOW times its real length,
  * ~1 in 10 a bail. The pool session rides the bowl only; the 900 opens one line in three of its skater.
  */
-export function lineOf(name: string, n: number, p: Pastime): Line {
+export function lineOf(name: string, n: number, p: Pastime, park: Park): Line {
   const r = rng(hash(`${name}|line|${String(n)}`));
   const target = LINE_MIN + r() * (LINE_MAX - LINE_MIN);
   const have = p.pool ? (['bowl'] as Feature[]) : built(p.stage);
   const moves: Move[] = [];
   let t = 0;
-  const home = 1.2;
+  const homeAt: Pt = park.spots[p.slot] ?? park.spots[0] ?? { x: park.area.x0, z: park.area.z0 };
+  // where it is on the floor, past the piece it last rode (null: at its spot)
+  let at: Pt = homeAt;
+  let from: Feature | null = null;
+  // a roll: out of the piece it rode, round the others, onto the next one (up the stairs' bank)
+  const rollS = (a: Pt, f: Feature | null, b: Pt, to: Feature | null): number =>
+    Math.max(ROLL_MIN, (exitLen(f) + lengthOf(route(park, p.stage, a, b)) + enterLen(park, to)) / PUSH);
   const add = (trick: Move['trick'], on: Feature | null, dur: number, bail: boolean, side: 1 | -1): void => {
     moves.push({ trick, on, t0: t, dur, bail, side });
     t += dur;
   };
   if (p.nine && n % 3 === 0 && have.includes('vert')) {
-    add('roll', 'vert', 1.4, false, 1);
+    add('roll', 'vert', rollS(at, null, portIn(park, p.stage, 'vert', 1, p.slot), 'vert'), false, 1);
     // he tries it: lands one in two
     const bail = n % 2 === 1;
     add('nine', 'vert', TRICK_S.nine * SLOW + (bail ? BAIL_S : 0), bail, 1);
+    at = portOut(park, p.stage, 'vert', 1, p.slot);
+    from = 'vert';
   }
-  let last: Feature | null = null;
+  let last: Feature | null = from;
   for (let tries = 0; tries < 12; tries++) {
-    const choices = have.filter((f) => f !== last || have.length === 1);
+    // the bowl twice in the draw once built (Gabriel: « ce serait sympa de voir des skaters dedans parfois »)
+    const choices = have.filter((f) => f !== last || have.length === 1).flatMap((f) => (f === 'bowl' && have.length > 1 ? [f, f] : [f]));
     const f = pick(choices, r());
     const rare = r() < 1 / 8;
     const keys = block(f, r, rare);
     const side: 1 | -1 = r() < 0.5 ? 1 : -1;
-    const roll = 0.9 + r() * 0.6;
+    const roll = rollS(at, from, portIn(park, p.stage, f, side, p.slot), f);
+    const out = portOut(park, p.stage, f, side, p.slot);
+    const home = rollS(out, f, homeAt, null);
     const parts = keys.map((k) => ({ k, bail: !SAFE.has(k) && r() < 0.1 }));
     const dur = parts.reduce((s, x) => s + TRICK_S[x.k] * SLOW + (x.bail ? BAIL_S : 0), 0);
     if (t + roll + dur + home > LINE_MAX) {
-      if (t + home >= LINE_MIN) break;
+      if (t + rollS(at, from, homeAt, null) >= LINE_MIN) break;
       continue;
     }
     add('roll', f, roll, false, side);
@@ -193,8 +203,12 @@ export function lineOf(name: string, n: number, p: Pastime): Line {
       if (f === 'ramp') sd = sd === 1 ? -1 : 1;
     }
     last = f;
+    at = out;
+    from = f;
     if (t + home >= target) break;
   }
+  const home = rollS(at, from, homeAt, null);
+  // never past LINE_MAX: a home roll that would end it later rides faster
   add('roll', null, Math.min(LINE_MAX - t, Math.max(home, LINE_MIN - t)), false, 1);
   return { moves, len: t };
 }
@@ -212,11 +226,11 @@ export interface SkateNow {
   readonly restLeft: number;
 }
 
-export function skateAt(name: string, p: Pastime, u: number): SkateNow {
+export function skateAt(name: string, p: Pastime, u: number, park: Park): SkateNow {
   const v = Math.max(0, u);
   const n = Math.floor(v / SESSION_S);
   const at = v - n * SESSION_S;
-  const line = lineOf(name, n, p);
+  const line = lineOf(name, n, p, park);
   if (at >= line.len) return { n, line, move: null, f: 0, into: 0, restLeft: SESSION_S - at };
   const move = line.moves.find((m) => at < m.t0 + m.dur) ?? null;
   const into = move ? at - move.t0 : 0;
@@ -230,10 +244,10 @@ export function sinceArrived(pose: Pose): number {
 }
 
 /** the trick shown over a followed skater at its pose: the first TRICK_LABEL_S of each trick; null else */
-export function trickNow(name: string, pose: Pose): TrickKey | null {
+export function trickNow(name: string, pose: Pose, park: Park | undefined): TrickKey | null {
   const p = pose.seg.pastime;
-  if (!p || pose.moving) return null;
-  const now = skateAt(name, p, sinceArrived(pose));
+  if (!p || pose.moving || !park) return null;
+  const now = skateAt(name, p, sinceArrived(pose), park);
   const m = now.move;
   if (!m || m.trick === 'roll' || now.into >= TRICK_LABEL_S) return null;
   return m.trick;
@@ -243,12 +257,13 @@ export function trickNow(name: string, pose: Pose): TrickKey | null {
  * When the loop must wake for the next line (s from t): the soonest resting skater's rest left;
  * null with none resting (the rests draw nothing, so a timer starts the next line).
  */
-export function wakeIn(frames: readonly BimFrame[]): number | null {
+export function wakeIn(frames: readonly BimFrame[], park: Park | undefined): number | null {
+  if (!park) return null;
   let soon: number | null = null;
   for (const f of frames) {
     const p = f.pose.seg.pastime;
     if (!p || f.pose.moving) continue;
-    const now = skateAt(f.name, p, sinceArrived(f.pose));
+    const now = skateAt(f.name, p, sinceArrived(f.pose), park);
     if (now.move !== null) continue;
     soon = soon === null ? now.restLeft : Math.min(soon, now.restLeft);
   }

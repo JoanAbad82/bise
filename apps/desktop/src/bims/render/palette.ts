@@ -75,7 +75,9 @@ export const WORLD = {
   banana: '#ffd166',
   marker: '#2b6cb0',
   skate: '#f39a4c',
-  wheel: '#ffd166',
+  // dark wheels on light trucks: they read against the orange deck and the light concrete
+  wheel: '#3a3532',
+  truck: '#c9ccd1',
   sweat: '#8fd3ff',
   steam: '#ffffff',
   cloud: '#9a958c',

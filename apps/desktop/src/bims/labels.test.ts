@@ -3,6 +3,7 @@ import { bims as w } from '@/proto/words_bims.gen';
 import { agent, frame, mainAgent, watch } from './fixtures';
 import { EVENT_S, EVENT_SLOTS, eventWords, isEvent, labelsOf, stateWords, trickWords } from './labels';
 import { lineOf } from './skate';
+import { californiaLayout } from './maps/california';
 import type { Activity, BimFrame } from './model';
 
 const work: Activity = { k: 'work', at: 'desk' };
@@ -27,16 +28,17 @@ describe('the labels (spec §2)', () => {
   });
   it("a skater (skate.ts): its card says how long it has been idle and that it skates; its trick's name only when followed", () => {
     const pt = { kind: 'skate', slot: 0, pool: false, nine: false, stage: 14 } as const;
+    const park = californiaLayout(agents).park;
     const f = frame('docs', { k: 'nap', at: 'lounge' }, { t: 0, now: 0.5 });
     const sk: BimFrame = { ...f, pose: { ...f.pose, seg: { ...f.pose.seg, pastime: pt } } };
     const docs = agent('docs', { since_ms: 1_000_000 - 12 * 60_000 });
     const card = labelsOf([sk], { t: 1000, hover: 'docs', held: false, agents: [docs] }).get('docs');
     expect(card?.words).toBe(w.state_skating({ dur: '12 min' }));
     // its first trick, a moment in: the name over it when followed, nothing in the normal view
-    const first = lineOf('docs', 0, pt).moves.find((m) => m.trick !== 'roll');
+    const first = lineOf('docs', 0, pt, park).moves.find((m) => m.trick !== 'roll');
     if (!first || first.trick === 'roll') throw new Error('a line has a trick');
     const mid: BimFrame = { ...sk, pose: { ...sk.pose, since: first.t0 + 0.2 } };
-    expect(labelsOf([mid], { t: 1000, hover: null, held: false, agents: [docs], follow: 'docs' }).get('docs')).toMatchObject({ mode: 'egg', words: trickWords(first.trick) });
+    expect(labelsOf([mid], { t: 1000, hover: null, held: false, agents: [docs], follow: 'docs', park }).get('docs')).toMatchObject({ mode: 'egg', words: trickWords(first.trick) });
     expect(labelsOf([mid], { t: 1000, hover: null, held: false, agents: [docs] }).get('docs')).toBeUndefined();
   });
   it('walking: its name alone, main excepted (nothing at rest, and its walks are its own)', () => {

@@ -34,7 +34,8 @@ const WIDE_FIT_PX = 480;
 /** what the headless check reads (test mode only) */
 interface Probe {
   frames: number;
-  trace: { t: number; name: string; x: number; z: number; op: number }[];
+  /** each bim's place per frame; y its height off the floor (a skater up a ramp, in the bowl: below 0) */
+  trace: { t: number; name: string; x: number; z: number; y: number; op: number }[];
   /** each drawn frame of an arrived skater: its session n (skate.ts skateAt) and whether it rides its line or rests */
   skate: { t: number; name: string; n: number; phase: 'line' | 'rest' }[];
   head(name: string): { x: number; y: number } | null;
@@ -293,11 +294,11 @@ export const makeRenderer: MakeRenderer = (canvas) => {
         shown.add(f.name);
         motion = louder(motion, rig.motion);
         if (probe) {
-          probe.trace.push({ t, name: f.name, x: rig.x, z: rig.z, op: rig.opacity });
+          probe.trace.push({ t, name: f.name, x: rig.x, z: rig.z, y: rig.lift ?? 0, op: rig.opacity });
           if (probe.trace.length > TRACE_MAX) probe.trace.splice(0, probe.trace.length - TRACE_MAX);
           const p = f.pose.seg.pastime;
-          if (skater && p) {
-            const now = skateAt(f.name, p, sinceArrived(f.pose));
+          if (skater && p && park) {
+            const now = skateAt(f.name, p, sinceArrived(f.pose), park);
             probe.skate.push({ t, name: f.name, n: now.n, phase: now.move === null ? 'rest' : 'line' });
             if (probe.skate.length > TRACE_MAX) probe.skate.splice(0, probe.skate.length - TRACE_MAX);
           }

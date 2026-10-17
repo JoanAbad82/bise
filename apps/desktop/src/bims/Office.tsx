@@ -453,7 +453,7 @@ export function Office({
         setNewTag(tag);
       }
       if (u && t - u.at > UNLOCK_WALK + UNLOCK_LABEL) unlockAt.current = undefined;
-      const shown = parts.labelsOf(played, { t, hover: L.hover, held: L.held, agents: L.agents, eggs: eggLabels(eg), follow: fol });
+      const shown = parts.labelsOf(played, { t, hover: L.hover, held: L.held, agents: L.agents, eggs: eggLabels(eg), follow: fol, park: office.park });
       ranks.current = new Map(frames.map((f) => [f.name, tagRank(f.pose.seg.act.k)]));
       heads.current = new Map();
       const box = holder.current;
@@ -483,7 +483,7 @@ export function Office({
         setLabels(shown);
       }
       // a resting skater (skate.ts): no frame during its rest, a timer for its next line
-      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: timeline.moving(t), labels: shown, away: awayNow(), lost, wake: wakeIn(frames) });
+      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: timeline.moving(t), labels: shown, away: awayNow(), lost, wake: wakeIn(frames, office.park) });
       if (next === 0) raf = requestAnimationFrame(draw);
       else if (next !== null) tick = setTimeout(draw, next);
     };

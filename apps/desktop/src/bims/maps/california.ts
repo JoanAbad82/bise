@@ -127,32 +127,49 @@ export const california: Plan<CaliforniaOffice> = { id: 'california', ready: tru
 
 /**
  * The park on its slab (x px0..px1, z pz0..pz1), v10's drawing: the mini ramp across the back left
- * (lips 5.4 apart: 3 m of flat between two transitions of 1.2), the lone quarter pipe at the back
- * right, the 4-stair on the left, the funbox in the middle, the bowl at the front right, the ledge,
- * the flat rail and the curb along the front; the flat lane between, where the sandy path comes in.
+ * (lips 5.4 apart: 3 m of flat between two transitions of 1.2, its flat bottom open on its front
+ * side, where a skater rolls in), the lone quarter pipe at the back right, the 4-stair on the left
+ * with the bank up to its deck, the funbox in the middle, the ledge and the curb in a row, the flat
+ * rail along the front, the bowl carved at the front right; the flat lane between, where the sandy
+ * path comes in. The rest spots stand clear of the bench, every piece clear of the others' ways in
+ * (parkpath.ts's ports; skate.test.ts rides every line).
  */
 export function parkOf(px0: number, px1: number, pz0: number, pz1: number): Park {
   const flatZ = (pz0 + 7.6 + (pz1 - 4.0)) / 2;
   const spots: Spot[] = [];
-  const rest = px0 + 0.7;
-  for (const dz of [-0.55, 0.55]) spots.push({ x: rest, z: flatZ + dz, wz: flatZ, ax: rest, face: Math.PI / 2 });
+  const rest = px0 + 1.4;
+  for (const dz of [0.45, 1.45]) spots.push({ x: rest, z: flatZ + dz, wz: flatZ, ax: rest, face: Math.PI / 2 });
   for (let i = 0; i < POOL_N; i++) {
-    const x = px0 + 1.5 + i * 0.75;
-    spots.push({ x, z: flatZ, wz: flatZ, ax: x, face: Math.PI / 2 });
+    const x = px0 + 2.6 + i * 0.7;
+    spots.push({ x, z: flatZ + 1.45, wz: flatZ, ax: x, face: Math.PI / 2 });
   }
   const bar = (x0: number, x1: number, z: number, h: number): Bar => ({ x0, x1, z, h });
   return {
     area: { x0: px0, x1: px1, z0: pz0, z1: pz1 },
     spots,
-    flat: bar(px0 + 1.2, px0 + 7.2, flatZ, 0),
-    curb: bar(px0 + 5.2, px0 + 7.6, pz1 - 1.0, 0.2),
-    rail: bar(px0 + 0.7, px0 + 4.9, pz1 - 1.6, 0.42),
+    flat: bar(px0 + 2.6, px0 + 7.2, flatZ, 0),
+    curb: bar(px0 + 5.5, px0 + 7.0, pz1 - 3.4, 0.2),
+    rail: bar(px0 + 0.9, px0 + 4.9, pz1 - 1.6, 0.42),
     ledge: bar(px0 + 0.8, px0 + 4.8, pz1 - 3.4, 0.45),
-    stairs: { x0: px0, xTop: px0 + 2.4, xBottom: px0 + 2.4 + 4 * 0.42, z0: pz0 + 5.2, z1: pz0 + 7.6, h: 0.8, railZ: pz0 + 7.35 },
+    stairs: {
+      x0: px0, xTop: px0 + 2.4, xBottom: px0 + 2.4 + 4 * 0.42, z0: pz0 + 4.8, z1: pz0 + 7.2, h: 0.8, railZ: pz0 + 6.95,
+      bankX0: px0 + 0.8, bankZ: pz0 + 8.6,
+    },
     ramp: { xa: px0 + 1.0, xb: px0 + 1.0 + 1.2 + 3.0 + 1.2, r: 1.2, z0: pz0 + 0.2, z1: pz0 + 3.6 },
     qp: { x0: px1 - 3.8, x1: px1 - 0.6, zLip: pz0 + 0.6, r: 1.0, r13: 1.7 },
     funbox: { x: px0 + 8.6, z: pz0 + 7.2, hw: 1.0, hd: 1.1, h: 0.5, run: 1.35 },
-    bowl: { x: px1 - 3.0, z: pz1 - 3.4, hw: 2.3, hd: 2.5 },
+    bowl: { x: px1 - 3.0, z: pz1 - 3.4, hw: 2.3, hd: 2.5, rc: 1.4, depth: 0.95 },
+    // one bench by the rest spots on the grass side, one on the right edge past the quarter pipe
+    benches: [
+      { x0: px0 + 0.125, x1: px0 + 0.575, z0: flatZ - 1.9, z1: flatZ - 0.4 },
+      { x0: px1 - 0.575, x1: px1 - 0.125, z0: pz0 + 5.3, z1: pz0 + 6.8 },
+    ],
+    // the floodlights on the slab's back and left edges and its far corners, never on the camera's
+    // side (front, right) where a pole would stand between a piece and the view (bims m_28843)
+    poles: [
+      { x: px0 + 0.15, z: pz0 + 0.15 }, { x: px1 - 0.15, z: pz0 + 0.15 }, { x: px0 + 0.15, z: pz0 + 4.3 },
+      { x: px0 + 0.15, z: pz1 - 0.15 }, { x: (px0 + px1) / 2 + 1.0, z: pz0 + 0.15 },
+    ],
   };
 }
 

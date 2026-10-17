@@ -6,7 +6,7 @@
 // two bims bring it in (unlock.ts), at the look's pieceAt. One file per map
 // (render/maps/<id>.ts), never the app's pink or red (looks.test.ts reads every palette). Owner: maps-a.
 import type { BufferGeometry, Group, Material, Mesh, MeshLambertMaterial, Object3D } from 'three';
-import type { MapId, Office, Pt, Spot } from '../../model';
+import type { Box, MapId, Office, Pt, Spot } from '../../model';
 import type { Grow } from '../../growth';
 import type { Kit } from '../kit';
 import type { Palette } from '../palette';
@@ -65,4 +65,6 @@ export interface MapLook {
   pieceAt(o: Office, stage: number): Pt;
   /** a small thing every bim but main wears on this map; absent: nothing */
   wear?(w: Wear): void;
+  /** where the map carves under its floor at this stage (California's bowl): the ground block leaves a hole there (render/ground.ts); absent: none */
+  pits?(o: Office, stage: number): readonly Box[];
 }

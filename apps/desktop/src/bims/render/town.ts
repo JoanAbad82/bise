@@ -166,14 +166,20 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
         shadowsDirty = true;
       }
     }
-    const sSig = `${String(plan.seed)}|${JSON.stringify(plan.lawn)}|${String(plan.road.length)}|${String(plan.trees.length)}|${String(plan.offices.length)}|${isNight ? 'n' : 'd'}`;
+    // where an office carves under its floor (California's bowl), in the town's frame: the lawn leaves a hole there
+    const pits = offices.flatMap((t) => {
+      const p = placedOf(t.id);
+      const own = lookOf(t.office.map).pits?.(t.office, t.grow.stage) ?? [];
+      return p ? own.map((b) => ({ x0: b.x0 + p.x, x1: b.x1 + p.x, z0: b.z0 + p.z, z1: b.z1 + p.z })) : [];
+    });
+    const sSig = `${String(plan.seed)}|${JSON.stringify(plan.lawn)}|${String(plan.road.length)}|${String(plan.trees.length)}|${String(plan.offices.length)}|${isNight ? 'n' : 'd'}|${JSON.stringify(pits)}`;
     if (scape?.sig !== sSig) {
       if (scape) {
         scene.remove(scape.merged.group);
         scape.merged.dispose();
       }
       const pal = isNight ? NIGHT : DAY;
-      const root = buildTownscape(plan, STYLE, pal, isNight ? TOWN_NIGHT : TOWN_DAY);
+      const root = buildTownscape(plan, STYLE, pal, isNight ? TOWN_NIGHT : TOWN_DAY, pits);
       const merged = mergeRoot(root, STYLE, STYLE.shadows);
       root.traverse((o) => {
         const g = (o as unknown as { geometry?: { dispose(): void } }).geometry;

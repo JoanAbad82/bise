@@ -12,6 +12,7 @@ import {
 import { makePath } from './paths';
 
 const office = californiaLayout(crowd(8).agents);
+const park = office.park;
 const nap: Activity = { k: 'nap', at: 'lounge' };
 const work: Activity = { k: 'work', at: 'desk' };
 // a Monday, stage 9, no 900
@@ -56,7 +57,7 @@ describe('who skates', () => {
     expect(p.size).toBe(6);
     for (const x of p.values()) {
       expect(x.pool).toBe(true);
-      expect(lineOf('a', 0, x).moves.every((m) => m.on === 'bowl' || m.on === null)).toBe(true);
+      expect(lineOf('a', 0, x, park).moves.every((m) => m.on === 'bowl' || m.on === null)).toBe(true);
     }
   });
 
@@ -66,7 +67,7 @@ describe('who skates', () => {
     expect([...pastimes(idle6, office, 0, fun({ stage: 13, jobs: 901 })).values()].some((x) => x.nine)).toBe(false);
     expect([...pastimes(idle6, office, 0, fun({ stage: 12, jobs: 900 })).values()].some((x) => x.nine)).toBe(false);
     const nine: Pastime = { kind: 'skate', slot: 0, pool: false, nine: true, stage: 13 };
-    expect(lineOf('a', 0, nine).moves.some((m) => m.trick === 'nine')).toBe(true);
+    expect(lineOf('a', 0, nine, park).moves.some((m) => m.trick === 'nine')).toBe(true);
   });
 });
 
@@ -75,7 +76,7 @@ describe('a line', () => {
 
   it('8 to 12 s, chained tricks between rolls, home at the end; a rest at least as long', () => {
     for (let n = 0; n < 60; n++) {
-      const l = lineOf(`bim${String(n % 7)}`, n, p);
+      const l = lineOf(`bim${String(n % 7)}`, n, p, park);
       expect(l.len).toBeGreaterThanOrEqual(LINE_MIN - 1e-9);
       expect(l.len).toBeLessThanOrEqual(LINE_MAX + 1e-9);
       expect(SESSION_S - l.len).toBeGreaterThanOrEqual(l.len);
@@ -85,14 +86,14 @@ describe('a line', () => {
   });
 
   it('the same name and n give the same line', () => {
-    expect(lineOf('perf', 4, p)).toEqual(lineOf('perf', 4, p));
+    expect(lineOf('perf', 4, p, park)).toEqual(lineOf('perf', 4, p, park));
   });
 
   it('only the pieces the stage has built; the ramp opens with a drop in', () => {
     const p0: Pastime = { ...p, stage: 0 };
     for (let n = 0; n < 40; n++) {
-      for (const m of lineOf('x', n, p0).moves) if (m.on) expect(built(0)).toContain(m.on);
-      const ms = lineOf('y', n, p).moves;
+      for (const m of lineOf('x', n, p0, park).moves) if (m.on) expect(built(0)).toContain(m.on);
+      const ms = lineOf('y', n, p, park).moves;
       ms.forEach((m, i) => {
         if (m.on === 'ramp' && m.trick !== 'roll' && ms[i - 1]?.trick === 'roll') expect(m.trick).toBe('drop_in');
       });
@@ -105,7 +106,7 @@ describe('a line', () => {
     let tricks = 0;
     let bails = 0;
     for (let n = 0; n < 400; n++) {
-      for (const m of lineOf('z', n, p).moves) {
+      for (const m of lineOf('z', n, p, park).moves) {
         if (m.trick === 'roll') continue;
         tricks++;
         if (m.bail) {
@@ -119,12 +120,12 @@ describe('a line', () => {
   });
 
   it('in a line, then at rest until the next session', () => {
-    const l = lineOf('q', 0, p);
-    expect(skateAt('q', p, 0.5).move).not.toBe(null);
-    const r = skateAt('q', p, l.len + 0.5);
+    const l = lineOf('q', 0, p, park);
+    expect(skateAt('q', p, 0.5, park).move).not.toBe(null);
+    const r = skateAt('q', p, l.len + 0.5, park);
     expect(r.move).toBe(null);
     expect(r.restLeft).toBeCloseTo(SESSION_S - l.len - 0.5, 6);
-    expect(skateAt('q', p, SESSION_S + 0.1).n).toBe(1);
+    expect(skateAt('q', p, SESSION_S + 0.1, park).n).toBe(1);
   });
 });
 
@@ -135,19 +136,19 @@ describe('the loop and the label', () => {
   const pose = (since: number): Pose => ({ x: spot.x, z: spot.z, dir: 0, moving: false, since, seg });
 
   it('a resting skater wakes the loop for its next line; a riding one does not ask', () => {
-    const l = lineOf('q', 0, p);
-    expect(wakeIn([{ name: 'q', main: false, pose: pose(1) }])).toBe(null);
-    expect(wakeIn([{ name: 'q', main: false, pose: pose(l.len + 1) }])).toBeCloseTo(SESSION_S - l.len - 1, 6);
+    const l = lineOf('q', 0, p, park);
+    expect(wakeIn([{ name: 'q', main: false, pose: pose(1) }], park)).toBe(null);
+    expect(wakeIn([{ name: 'q', main: false, pose: pose(l.len + 1) }], park)).toBeCloseTo(SESSION_S - l.len - 1, 6);
   });
 
   it("a trick's name for its first 1.5 s, never during a roll or a rest", () => {
-    const l = lineOf('q', 0, p);
+    const l = lineOf('q', 0, p, park);
     const trick = l.moves.find((m) => m.trick !== 'roll');
     expect(trick).toBeDefined();
     if (!trick) return;
-    expect(trickNow('q', pose(trick.t0 + 0.1))).toBe(trick.trick);
-    if (trick.dur > TRICK_LABEL_S + 0.1) expect(trickNow('q', pose(trick.t0 + TRICK_LABEL_S + 0.05))).toBe(null);
-    expect(trickNow('q', pose(0.05))).toBe(null);
-    expect(trickNow('q', pose(l.len + 1))).toBe(null);
+    expect(trickNow('q', pose(trick.t0 + 0.1), park)).toBe(trick.trick);
+    if (trick.dur > TRICK_LABEL_S + 0.1) expect(trickNow('q', pose(trick.t0 + TRICK_LABEL_S + 0.05), park)).toBe(null);
+    expect(trickNow('q', pose(0.05), park)).toBe(null);
+    expect(trickNow('q', pose(l.len + 1), park)).toBe(null);
   });
 });

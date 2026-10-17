@@ -17,6 +17,7 @@ import {
 import type { Office } from '../model';
 import { NO_GROW, type Grow } from '../growth';
 import { groundOf } from './camera';
+import { slabWithPits } from './ground';
 import { kitOf } from './kit';
 import type { Palette } from './palette';
 import type { Build, DeskHandles, MapLook } from './maps/look';
@@ -85,8 +86,10 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   const gd = site.z1 - site.z0;
   const gx = (site.x0 + site.x1) / 2;
   const gz = (site.z0 + site.z1) / 2;
-  k.add(style.box(gw, 1.2, gd, 0.45), k.mat(pal.dirt), root, gx, -0.75, gz);
-  k.add(style.box(gw, 0.16, gd), k.mat(pal.grass), root, gx, -0.1, gz);
+  // holed where the map carves under its floor (California's bowl), so the carving shows
+  const pits = look.pits?.(o, grow.stage) ?? [];
+  k.add(slabWithPits(style, gw, 1.2, gd, 0.45, gx, gz, pits), k.mat(pal.dirt), root, gx, -0.75, gz);
+  k.add(slabWithPits(style, gw, 0.16, gd, 0, gx, gz, pits), k.mat(pal.grass), root, gx, -0.1, gz);
 
   // the map's look on the plan's office; the stages' groups made as the builders ask for them
   const pieces = new Map<number, Group>();

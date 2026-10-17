@@ -4,7 +4,8 @@
 // small houses, the trees in clumps and a little square every 4 or 5 offices, from the town's plan (town/plan.ts). Built once per plan and
 // theme and merged (merge.ts): a handful of draw calls. Never the app's pink or red. Owner: maps-e.
 import { BufferAttribute, BufferGeometry, ConeGeometry, Group, Mesh } from 'three';
-import type { Pt } from '../model';
+import type { Box, Pt } from '../model';
+import { slabWithPits } from './ground';
 import { ROAD, RIVER, BANK, type TownPlan } from '../town/plan';
 import { kitOf } from './kit';
 import type { Palette } from './palette';
@@ -76,7 +77,7 @@ function norm(dx: number, dz: number): Pt {
 }
 
 /** The town's ground and everything on it but the offices, as one group (not merged yet). */
-export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: TownColours): Group {
+export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: TownColours, pits: readonly Box[] = []): Group {
   const k = kitOf(style, pal);
   const root = new Group();
   const { lawn } = plan;
@@ -85,9 +86,9 @@ export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: To
   const ld = lawn.z1 - lawn.z0;
   const cx = (lawn.x0 + lawn.x1) / 2;
   const cz = (lawn.z0 + lawn.z1) / 2;
-  // the floating block, as each office's: dirt under a grass top
-  k.add(style.box(lw, 1.2, ld, 0.45), k.mat(pal.dirt), root, cx, LAWN_TOP - 0.08 - 0.6 - 0.01, cz);
-  k.add(style.box(lw, 0.16, ld, 0.05), k.mat(pal.grass), root, cx, LAWN_TOP - 0.08, cz);
+  // the floating block, as each office's: dirt under a grass top, holed where an office carves under its floor (render/ground.ts)
+  k.add(slabWithPits(style, lw, 1.2, ld, 0.45, cx, cz, pits), k.mat(pal.dirt), root, cx, LAWN_TOP - 0.08 - 0.6 - 0.01, cz);
+  k.add(slabWithPits(style, lw, 0.16, ld, 0.05, cx, cz, pits), k.mat(pal.grass), root, cx, LAWN_TOP - 0.08, cz);
 
   const flat = (g: BufferGeometry, color: string): void => {
     const m = new Mesh(g, k.mat(color));

@@ -9,9 +9,13 @@
 // stages are the office's (a plant, food and a palm, the chalkboard, the boombox, flowers, shade, more
 // palms, a beach shower, a tide pool); the frames are skateboard decks on the wall, golden at 500.
 // Never the app's pink or red. Owner: maps-d.
-import { ExtrudeGeometry, Group, type Material, type Object3D, PointLight, Shape, ShapeGeometry, TorusGeometry } from 'three';
-import type { Office, Park, Pt } from '../../model';
+import {
+  BufferGeometry, CatmullRomCurve3, ExtrudeGeometry, Float32BufferAttribute, Group, type Material, type Object3D, Path, PointLight, Shape, ShapeGeometry,
+  TubeGeometry, Vector2, Vector3,
+} from 'three';
+import type { Box, Office, Park, Pt } from '../../model';
 import type { CaliforniaOffice } from '../../maps/california';
+import { QP_DECK, stairRail } from '../../parkpath';
 import { FEATURE_STAGE, GOLDEN_STAGE } from '../../skate';
 import { type Kit, boxOf, glyph, onFloor } from '../kit';
 import { DAY, NIGHT, WORLD, hash, type Palette } from '../palette';
@@ -115,7 +119,7 @@ function shell(b: Build): void {
   k.add(style.box(gx1 - gx0, 0.06, D), k.mat(n ? GRASS.night : GRASS.day), root, (gx0 + gx1) / 2, 0.0, D / 2);
   k.add(style.box(gx1 - gx0 + 0.6, 0.07, 1.1), k.mat(n ? SAND.night : SAND.day), root, (gx0 + gx1) / 2, 0.01, o.pathZ);
   for (const z of [1.5, D * 0.55]) palm(k, root, (gx0 + gx1) / 2 + (z < 2 ? 0.5 : -0.5), z, 1);
-  parkSlab(k, root, o.park, n);
+  parkSlab(k, root, o.park, n, b.grow.stage >= FEATURE_STAGE.bowl);
 }
 
 /** the mural over the lounge: the sunset's bands, the half sun, three palms' silhouettes */
@@ -147,19 +151,23 @@ function shade(c: string): string {
 }
 
 /** the park's slab, its border and seams, the floodlights, the benches, the funbox and the lone quarter pipe (stage 0) */
-function parkSlab(k: Kit, root: Object3D, p: Park, n: boolean): void {
+function parkSlab(k: Kit, root: Object3D, p: Park, n: boolean, carved: boolean): void {
   const { style } = k;
   const a = p.area;
   const conc = k.mat(n ? CONCRETE.night : CONCRETE.day);
   const concD = k.mat(n ? CONCRETE_D.night : CONCRETE_D.day);
   const w = a.x1 - a.x0;
-  const d = a.z1 - a.z0;
-  k.add(style.box(w, 0.08, d), conc, root, (a.x0 + a.x1) / 2, 0.0, (a.z0 + a.z1) / 2);
+  k.add(slabGeo(k, p, carved), conc, root, (a.x0 + a.x1) / 2, 0.0, (a.z0 + a.z1) / 2);
   k.add(style.box(w + 0.2, 0.3, 0.2), concD, root, (a.x0 + a.x1) / 2, 0.15, a.z0 - 0.1);
-  for (let z = a.z0 + 2.0; z < a.z1; z += 2.0) k.add(style.box(w, 0.005, 0.03), k.mat('#b9b4ab'), root, (a.x0 + a.x1) / 2, 0.045, z);
-  // the floodlights on the slab's back and left edges and its far corners, never on the camera's side
-  // (front, right) where a pole would stand between a piece and the view (bims m_28843)
-  for (const [px, pz] of [[a.x0 + 0.15, a.z0 + 0.15], [a.x1 - 0.15, a.z0 + 0.15], [a.x0 + 0.15, (a.z0 + a.z1) / 2 + 1.6], [a.x0 + 0.15, a.z1 - 0.15], [(a.x0 + a.x1) / 2 + 1.0, a.z0 + 0.15]] as const) {
+  // the seams, cut where the bowl is
+  const b = p.bowl;
+  for (let z = a.z0 + 2.0; z < a.z1; z += 2.0) {
+    const cut = carved && Math.abs(z - b.z) < b.hd + 0.4;
+    const spans: readonly (readonly [number, number])[] = cut ? [[a.x0, b.x - b.hw - 0.4], [b.x + b.hw + 0.4, a.x1]] : [[a.x0, a.x1]];
+    for (const [x0, x1] of spans) if (x1 - x0 > 0.05) k.add(style.box(x1 - x0, 0.005, 0.03), k.mat('#b9b4ab'), root, (x0 + x1) / 2, 0.045, z);
+  }
+  // the floodlights (the plan's poles: never on the camera's side, bims m_28843)
+  for (const { x: px, z: pz } of p.poles) {
     k.add(style.cylinder(0.045, 3.0), k.mat(POLE), root, px, 1.5, pz);
     k.add(style.box(0.4, 0.2, 0.22), style.material('#fff3c4', { emissive: '#fff3c4', ei: n ? 1.5 : 0.1 }), root, px, 3.0, pz);
     if (n) {
@@ -168,8 +176,8 @@ function parkSlab(k: Kit, root: Object3D, p: Park, n: boolean): void {
       root.add(l);
     }
   }
-  // benches on the grass side, by the rest spots
-  for (const z of [a.z0 + 4.4, a.z1 - 6.0]) k.add(style.box(0.45, 0.35, 1.5, 0.05), k.mat('#c49a6c'), root, a.x0 + 0.35, 0.18, z);
+  // the benches (the plan's: one by the rest spots, one past the quarter pipe)
+  for (const bn of p.benches) k.add(style.box(bn.x1 - bn.x0, 0.35, bn.z1 - bn.z0, 0.05), k.mat('#c49a6c'), root, (bn.x0 + bn.x1) / 2, 0.18, (bn.z0 + bn.z1) / 2);
   funbox(k, root, p, conc);
 }
 
@@ -210,60 +218,147 @@ function stairs(k: Kit, parent: Object3D, p: Park, conc: Material): void {
     const h = s.h - (i + 1) * (s.h / 5);
     k.add(k.style.box(step, h, d), conc, parent, s.xTop + step * (i + 0.5), h / 2, z);
   }
+  // the bank up to the deck from the flat lane's side: a wedge from its foot (bankZ) up to the deck's edge
+  const bank = new Shape();
+  bank.moveTo(0, 0);
+  bank.lineTo(s.bankZ - s.z1, 0);
+  bank.lineTo(0, s.h);
+  bank.lineTo(0, 0);
+  const bw = s.xTop - s.bankX0;
+  const wedge = new ExtrudeGeometry(bank, { depth: bw, bevelEnabled: false });
+  // the shape's x along +z from the deck's edge, its y up; extruded along -x once turned
+  wedge.rotateY(-Math.PI / 2);
+  k.add(wedge, conc, parent, s.xTop, 0, s.z1);
+  // the handrail over the steps: from the deck's edge down to the last step, its posts under its ends
+  const { top, low } = stairRail(s);
   const run = s.xBottom - s.xTop;
-  const top = s.h + 0.4;
-  const low = 0.6;
   const len = Math.hypot(run, top - low);
-  const rail = k.add(k.style.cylinder(0.03, len), k.mat(COPING), parent, s.xTop + run / 2, (top + low) / 2, s.railZ);
-  rail.rotation.z = Math.PI / 2 + Math.atan2(top - low, run);
-  for (const [px, ph] of [[s.xTop - 0.02, top], [s.xBottom - 0.02, low]] as const) k.add(k.style.cylinder(0.025, ph), k.mat(COPING), parent, px, ph / 2, s.railZ);
+  const rail = k.add(k.style.cylinder(0.03, len + 0.06), k.mat(COPING), parent, s.xTop + run / 2, (top + low) / 2, s.railZ);
+  // a cylinder stands along y: laid along +x, then tipped down towards the bottom step
+  rail.rotation.z = Math.PI / 2 - Math.atan2(top - low, run);
+  const deckH = s.h;
+  const lastH = s.h / 5;
+  for (const [px, ph, foot] of [[s.xTop + 0.03, top, deckH], [s.xBottom - 0.03, low, lastH]] as const) {
+    k.add(k.style.cylinder(0.025, ph - foot), k.mat(COPING), parent, px, (ph + foot) / 2, s.railZ);
+  }
 }
 
-/** a rounded rectangle w by d, corners of radius r, flat on the floor (the prototype's rr()) */
-function roundRect(w: number, d: number, r: number): ShapeGeometry {
-  const s = new Shape();
-  const x = -w / 2;
-  const y = -d / 2;
-  const c = Math.min(r, w / 2, d / 2);
-  s.moveTo(x + c, y);
-  s.lineTo(x + w - c, y);
-  s.quadraticCurveTo(x + w, y, x + w, y + c);
-  s.lineTo(x + w, y + d - c);
-  s.quadraticCurveTo(x + w, y + d, x + w - c, y + d);
-  s.lineTo(x + c, y + d);
-  s.quadraticCurveTo(x, y + d, x, y + d - c);
-  s.lineTo(x, y + c);
-  s.quadraticCurveTo(x, y, x + c, y);
-  const g = new ShapeGeometry(s, 12);
-  g.rotateX(-Math.PI / 2);
+/** the slab's top: the floor a board rides at 0 stands this much under it (the bowl's rim meets it) */
+const SLAB_TOP = 0.04;
+/** each corner's steps round the bowl's contour, and its wall's rings from the coping to the floor */
+const BOWL_CORNER = 10;
+const BOWL_RINGS = 10;
+
+/** the bowl's contour at inset d, seen from above, as many points for every inset (its rings join) */
+function bowlRing(b: Park['bowl'], d: number): Pt[] {
+  const r = Math.max(0.001, b.rc - d);
+  const out: Pt[] = [];
+  const corners: readonly (readonly [number, number])[] = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+  corners.forEach(([sx, sz], c) => {
+    const cx = b.x + sx * (b.hw - b.rc);
+    const cz = b.z + sz * (b.hd - b.rc);
+    for (let i = 0; i <= BOWL_CORNER; i++) {
+      const a = (c * Math.PI) / 2 + (i / BOWL_CORNER) * (Math.PI / 2);
+      out.push({ x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r });
+    }
+  });
+  return out;
+}
+
+/** a mesh between rings of points (x, y, z), each triangle facing the bowl's inside (towards its middle, up) */
+function ringsGeo(rings: readonly (readonly (readonly [number, number, number])[])[], mid: readonly [number, number, number]): BufferGeometry {
+  const pos: number[] = [];
+  const tri = (a: readonly number[], b: readonly number[], c: readonly number[]): void => {
+    const ux = (b[0] ?? 0) - (a[0] ?? 0);
+    const uy = (b[1] ?? 0) - (a[1] ?? 0);
+    const uz = (b[2] ?? 0) - (a[2] ?? 0);
+    const vx = (c[0] ?? 0) - (a[0] ?? 0);
+    const vy = (c[1] ?? 0) - (a[1] ?? 0);
+    const vz = (c[2] ?? 0) - (a[2] ?? 0);
+    const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+    const to = [mid[0] - (a[0] ?? 0), mid[1] - (a[1] ?? 0), mid[2] - (a[2] ?? 0)];
+    const flip = (n[0] ?? 0) * (to[0] ?? 0) + (n[1] ?? 0) * (to[1] ?? 0) + (n[2] ?? 0) * (to[2] ?? 0) < 0;
+    for (const p of flip ? [a, c, b] : [a, b, c]) pos.push(p[0] ?? 0, p[1] ?? 0, p[2] ?? 0);
+  };
+  for (let k = 0; k + 1 < rings.length; k++) {
+    const r0 = rings[k] ?? [];
+    const r1 = rings[k + 1] ?? [];
+    for (let i = 0; i < r0.length; i++) {
+      const j = (i + 1) % r0.length;
+      const a = r0[i];
+      const b = r0[j];
+      const c = r1[i];
+      const d = r1[j];
+      if (!a || !b || !c || !d) continue;
+      tri(a, b, c);
+      tri(b, d, c);
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
   return g;
 }
 
 /**
- * the pool bowl, seen from above as a pool (bims m_28843: rounded all the way down, never a stepped
- * pit): the light coping ring, the blue tile band, then rounded rings darker towards the deep end,
- * the deep end offset towards the front
+ * the pool bowl carved into the ground (Gabriel: « il faut que le modèle 3d soit creusé dans le sol »;
+ * parkpath.ts bowlY, the same profile the skaters ride): its walls a quarter circle from the coping,
+ * vertical there, down to its flat floor, the blue tile band under the coping, darker towards the
+ * floor; the coping a metal pipe round the rim; a light deck round it on the slab
  */
 function bowl(k: Kit, parent: Object3D, p: Park, n: boolean): void {
   const b = p.bowl;
-  const bw = b.hw * 2;
-  const bd = b.hd * 2;
-  const layers: readonly (readonly [number, number, number, string, number])[] = [
-    [bw + 0.6, bd + 0.6, 1.6, '#ece8e0', 0],
-    [bw, bd, 1.4, '#3d6fb6', 0],
-    [bw - 0.3, bd - 0.3, 1.3, '#b9bdc3', 0],
-    [bw - 1.0, bd - 1.1, 1.1, '#9a9fa6', 0.15],
-    [bw - 1.8, bd - 2.0, 0.8, '#80858d', 0.3],
-    [bw - 2.6, bd - 3.0, 0.5, '#6a6f77', 0.45],
-  ];
-  layers.forEach(([w, d, r, c, oz], i) => {
-    const m = k.add(roundRect(w, d, r), k.mat(n ? shade(c) : c), parent, b.x, 0.045 + i * 0.004, b.z + oz);
-    m.castShadow = false;
-  });
-  // the coping: a metal ring round the lip
-  const ring = k.add(new TorusGeometry(1, 0.05, 6, 40), k.mat(COPING), parent, b.x, 0.06, b.z);
-  ring.rotation.x = -Math.PI / 2;
-  ring.scale.set((bw + 0.1) / 2, (bd + 0.1) / 2, 1);
+  const c = (x: string): Material => k.mat(n ? shade(x) : x);
+  const ring = (phi: number): (readonly [number, number, number])[] => {
+    const d = b.depth * (1 - Math.cos(phi));
+    const y = SLAB_TOP - b.depth * Math.sin(phi);
+    return bowlRing(b, d).map((q) => [q.x, y, q.z] as const);
+  };
+  const phis = Array.from({ length: BOWL_RINGS + 1 }, (_, i) => (i / BOWL_RINGS) * (Math.PI / 2));
+  const mid = [b.x, SLAB_TOP, b.z] as const;
+  // the tile band: the wall's top, under the coping
+  const band = 2;
+  k.add(ringsGeo(phis.slice(0, band + 1).map(ring), mid), c('#3d6fb6'), parent, 0, 0, 0);
+  k.add(ringsGeo(phis.slice(band).map(ring), mid), c('#b9bdc3'), parent, 0, 0, 0);
+  // the floor, its middle a little darker
+  const floorY = SLAB_TOP - b.depth;
+  const edge = ring(Math.PI / 2);
+  const centre = edge.map(([x, , z]) => [b.x + (x - b.x) * 0.55, floorY, b.z + (z - b.z) * 0.55] as const);
+  const up = [b.x, floorY + 1, b.z] as const;
+  k.add(ringsGeo([edge, centre], up), c('#9a9fa6'), parent, 0, 0, 0);
+  k.add(ringsGeo([centre, centre.map(() => [b.x, floorY, b.z] as const)], up), c('#80858d'), parent, 0, 0, 0);
+  // the coping: a metal pipe along the rim
+  const rim = bowlRing(b, -0.03).map((q) => new Vector3(q.x, SLAB_TOP + 0.02, q.z));
+  k.add(new TubeGeometry(new CatmullRomCurve3(rim, true), rim.length * 2, 0.05, 6, true), k.mat(COPING), parent, 0, 0, 0);
+  // the light deck round it, flat on the slab
+  const deck = new Shape(bowlRing({ ...b, hw: b.hw + 0.35, hd: b.hd + 0.35, rc: b.rc + 0.35 }, 0).map((q) => new Vector2(q.x - b.x, -(q.z - b.z))));
+  deck.holes.push(new Path(bowlRing(b, 0).map((q) => new Vector2(q.x - b.x, -(q.z - b.z)))));
+  const dg = new ShapeGeometry(deck, 4);
+  dg.rotateX(-Math.PI / 2);
+  const dm = k.add(dg, c('#ece8e0'), parent, b.x, SLAB_TOP + 0.005, b.z);
+  dm.castShadow = false;
+}
+
+/** the park's slab: whole, or cut where the bowl is carved once it is built */
+function slabGeo(k: Kit, p: Park, carved: boolean): BufferGeometry {
+  const a = p.area;
+  const w = a.x1 - a.x0;
+  const d = a.z1 - a.z0;
+  if (!carved) return k.style.box(w, 0.08, d);
+  // shape coordinates: x, and -z (the shape lies down with rotateX(-90°)), about the slab's middle
+  const cx = (a.x0 + a.x1) / 2;
+  const cz = (a.z0 + a.z1) / 2;
+  const s = new Shape();
+  s.moveTo(-w / 2, -d / 2);
+  s.lineTo(w / 2, -d / 2);
+  s.lineTo(w / 2, d / 2);
+  s.lineTo(-w / 2, d / 2);
+  s.lineTo(-w / 2, -d / 2);
+  s.holes.push(new Path(bowlRing(p.bowl, 0).map((q) => new Vector2(q.x - cx, -(q.z - cz)))));
+  const g = new ExtrudeGeometry(s, { depth: 0.08, bevelEnabled: false });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, -0.04, 0);
+  return g;
 }
 
 /** the park's pieces, each in its stage's group (skate.ts FEATURE_STAGE) */
@@ -279,7 +374,7 @@ function parkPieces(b: Build, p: Park): void {
   const qg = vert ?? st('qp');
   if (qg) {
     // its foot at zLip + r, its coping at zLip (where render/skate.ts stalls on it), its deck behind
-    const deck = 0.35;
+    const deck = QP_DECK;
     const g = quarterPipe(k, qg, (qp.x0 + qp.x1) / 2, qp.zLip + r, qp.x1 - qp.x0, r, deck, -Math.PI / 2, conc);
     // the vert: a guard rail along the back of its deck
     if (vert) k.add(k.style.box(0.04, 0.5, qp.x1 - qp.x0), k.mat(POLE), g, -(r + deck - 0.05), r + 0.25, 0);
@@ -505,4 +600,10 @@ export const california: MapLook = {
   },
   growth,
   pieceAt,
+  pits: (o, stage) => (stage >= FEATURE_STAGE.bowl && o.park ? [bowlPit(o.park.bowl)] : []),
 };
+
+/** the ground's hole under the bowl: its footprint and a little more (render/ground.ts) */
+function bowlPit(b: Park['bowl']): Box {
+  return { x0: b.x - b.hw - 0.1, x1: b.x + b.hw + 0.1, z0: b.z - b.hd - 0.1, z1: b.z + b.hd + 0.1 };
+}

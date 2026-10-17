@@ -186,16 +186,25 @@ export interface Park {
   readonly curb: Bar;
   readonly rail: Bar;
   readonly ledge: Bar;
-  /** the 4-stair: its deck's top (h) from x0 to xTop, the steps down to xBottom, across z0..z1; the handrail at railZ */
-  readonly stairs: { readonly x0: number; readonly xTop: number; readonly xBottom: number; readonly z0: number; readonly z1: number; readonly h: number; readonly railZ: number };
+  /**
+   * the 4-stair: its deck's top (h) from x0 to xTop, the steps down to xBottom, across z0..z1; the
+   * handrail at railZ; the bank a skater rides up to the deck: bankX0..xTop, from its foot at bankZ up to z1
+   */
+  readonly stairs: {
+    readonly x0: number; readonly xTop: number; readonly xBottom: number; readonly z0: number; readonly z1: number; readonly h: number; readonly railZ: number;
+    readonly bankX0: number; readonly bankZ: number;
+  };
   /** the mini ramp, across x: the left lip at xa, the right one at xb, transitions of radius r, z0..z1 wide */
   readonly ramp: { readonly xa: number; readonly xb: number; readonly r: number; readonly z0: number; readonly z1: number };
   /** the lone quarter pipe (the vert from stage 13), facing +z: its lip at zLip, x0..x1 wide; r and r13 its radius before and from 13 */
   readonly qp: { readonly x0: number; readonly x1: number; readonly zLip: number; readonly r: number; readonly r13: number };
   /** the funbox: its flat top's middle, half sizes, its height, each slope's run along x */
   readonly funbox: { readonly x: number; readonly z: number; readonly hw: number; readonly hd: number; readonly h: number; readonly run: number };
-  /** the pool bowl: its middle and half sizes */
-  readonly bowl: { readonly x: number; readonly z: number; readonly hw: number; readonly hd: number };
+  /** the pool bowl, carved into the ground: its middle, half sizes, its corners' radius (seen from above), its depth (its walls' transition radius too) */
+  readonly bowl: { readonly x: number; readonly z: number; readonly hw: number; readonly hd: number; readonly rc: number; readonly depth: number };
+  /** the benches by the rest spots, and the floodlights' poles: what a skater rides round */
+  readonly benches: readonly Box[];
+  readonly poles: readonly Pt[];
 }
 
 /** a land queue's places, apart (layout and the queue's overflow) */
@@ -307,6 +316,8 @@ export type LabelsFn = (
     readonly eggs?: ReadonlyMap<string, string>;
     /** the bim the office follows (focus.ts, the 2.2x zoom): a skater's trick name shows over it alone, never in the normal view */
     readonly follow?: string | null;
+    /** the office's park (skate.ts trickNow rides its lines on it) */
+    readonly park?: Park;
   },
 ) => ReadonlyMap<string, Label>;
 

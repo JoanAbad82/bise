@@ -163,8 +163,15 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   sheet.rotation.x = -0.35;
   const skate = new Group();
   g.add(skate);
-  add(style.box(0.28, 0.04, 0.85), mat(WORLD.skate), skate, 0, 0.08, 0);
-  for (const wz of [-0.3, 0.3]) for (const wx of [-0.1, 0.1]) add(style.box(0.05, 0.08, 0.08), mat(WORLD.wheel), skate, wx, 0.03, wz);
+  // the deck, its two trucks under it, four wheels out past its sides so they show from above (Gabriel: « les skateboards n'ont pas de roues! »)
+  add(style.box(0.28, 0.04, 0.85), mat(WORLD.skate), skate, 0, 0.1, 0);
+  for (const wz of [-0.28, 0.28]) {
+    add(style.box(0.3, 0.035, 0.06), mat(WORLD.truck), skate, 0, 0.065, wz);
+    for (const wx of [-0.17, 0.17]) {
+      const w = add(style.cylinder(0.045, 0.06), mat(WORLD.wheel), skate, wx, 0.045, wz);
+      w.rotation.z = Math.PI / 2;
+    }
+  }
   const glasses = add(style.box(0.26, 0.06, 0.03), mat(WORLD.sunglasses), head, 0, 0.04, 0.215);
   // the cloud over the laptop (failed): ahead of the bim, where its desk is
   const cloud = new Group();
