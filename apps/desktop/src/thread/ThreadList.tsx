@@ -9,7 +9,8 @@
 //   page in front (firstItemIndex goes down), far rows the store trimmed
 //   (it goes up; trim.ts, told the row he reads by onRead), a window's gap
 //   filled above him; the row is held at its y by its key (thread-perf);
-// - a jump of his (⌘F's match, his answer far back) wins over that hold;
+// - a jump of his (⌘F's match, his answer far back) wins over that hold; a reveal of a row not
+//   listed yet (⌘F's match in a fold that opens for it) waits for it, HOLD_MS at most;
 // - at the bottom it follows new rows; scrolled up, it stays where he is;
 // - the list never holds the composer: it sits beside it in the screen.
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
@@ -247,6 +248,9 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
   const revealUntil = useRef(0);
   const settling = useRef(false);
   const revealGen = useRef(0);
+  // a reveal asked before its row was listed (find-scroll: ⌘F's match in a fold that opens for it)
+  const waiting = useRef<{ key: string; until: number; shown?: () => void } | undefined>(undefined);
+  const self = useRef<ThreadListHandle | null>(null);
   const setStick = useCallback((on: boolean) => {
     stick.current = on;
     setStuck(on);
@@ -479,9 +483,10 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
 
   useImperativeHandle(
     ref,
-    () => ({
+    () => (self.current = {
       scrollTo(key) {
         const i = keys.indexOf(key);
+        waiting.current = undefined;
         if (i < 0) return;
         // a jump of his (⌘F, a quote's source) wins over the row held still
         held.current = undefined;
@@ -490,6 +495,8 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
       },
       reveal(key, shown) {
         const i = keys.indexOf(key);
+        // not a row yet (⌘F's match in a fold that opens for it, find-scroll): revealed when it comes
+        waiting.current = i < 0 ? { key, until: Date.now() + HOLD_MS, ...(shown === undefined ? {} : { shown }) } : undefined;
         if (i < 0) return;
         // a jump of his (⌘F's match, his answer far back) wins over the row held still: the window
         // that came in front for it would hold the row he read before (the keys' hold)
@@ -558,6 +565,13 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
     }),
     [keys, next.index, toEnd, holdRow, setStick],
   );
+  // a reveal that waits for its row: done once the row is listed (within HOLD_MS)
+  useLayoutEffect(() => {
+    const w = waiting.current;
+    if (w === undefined || !keys.includes(w.key)) return;
+    waiting.current = undefined;
+    if (Date.now() <= w.until) self.current?.reveal(w.key, w.shown);
+  }, [keys]);
 
   return (
     <div

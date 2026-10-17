@@ -17,6 +17,7 @@ import { landedEchoes, retryRuns } from './tiers';
 import { foldedRuns, runKey, runWords, withRuns } from './runs';
 import { absolute } from './paths';
 import { FoldsContext } from './folds';
+import { FindMarkContext } from './findmark';
 import { GapRow, isGapKey, withGap } from './gap';
 import { useGoArtifact } from '@/artifacts/leave';
 
@@ -109,6 +110,20 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   const runs = useMemo(() => foldedRuns(shown, (pos) => store.entry(tkey, pos), agent), [shown, store, tkey, agent]);
   // a press since the last render: every run listed now opens, or every one folds
   if (runsOpen.v !== foldAll.v) setRunsOpen({ open: foldAll.open ? new Set(runs.map((r) => r.start)) : new Set(), v: foldAll.v });
+  // ⌘F's current match in a folded run: the run opens, so its row is there to reveal and mark
+  // (find-scroll: ⏎ went to it and nothing moved, his 'ça reste au premier match')
+  const mark = useContext(FindMarkContext);
+  const findAt = useSyncExternalStore(
+    (l) => mark.subscribe(l),
+    () => mark.get(),
+  );
+  // once per match he goes to: closed again by his click, the fold stays closed
+  const [openedFor, setOpenedFor] = useState<number | undefined>(undefined);
+  const holder = findAt === undefined || findAt === openedFor ? undefined : runs.find((r) => !openRuns.has(r.start) && r.members.includes(findAt));
+  if (holder !== undefined) {
+    setOpenedFor(findAt);
+    setOpenRuns((open) => new Set([...open, holder.start]));
+  }
   // a window around a far entry (his answer weeks back, store/window.ts): the gap row between it
   // and the latest, under the window's last row
   const gap = view.gap;

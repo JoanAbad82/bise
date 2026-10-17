@@ -53,6 +53,9 @@ export const LAND = [
   // a 50k-entry thread with lines appending: ⌘F counts every hit via the hub, jumps far back, the read
   // row and the current match never move, no long task while he scrolls (his m_26614, thread-perf)
   'checks/thread/history-perf.spec.ts',
+  // ⌘F: ⏎ x3, ⇧⏎, ↓, ↑ each move the mark and scroll to the match, far above the loaded rows or in
+  // a folded run of agent messages (find-scroll, his 'ça reste au premier match')
+  'checks/thread/find-walk.spec.ts',
   'checks/thread/streaming.spec.ts',
   'checks/thread/esc-order.spec.ts',
   'checks/thread/first-run.spec.ts',
