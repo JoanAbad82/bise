@@ -14,6 +14,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import path from 'node:path';
 import { launchDesktop, test, expect, type Session } from '../../harness';
 import { testHome } from '../../harness/isolation';
+import { settings } from '../../../src/proto/words.gen';
 
 const ROOT = path.resolve(__dirname, '../../../../..');
 const BISE = process.env['ONB_BISE'] ?? path.join(ROOT, 'rust/target/debug/bise');
@@ -117,9 +118,9 @@ for (const theme of ['light', 'dark'] as const) {
       await field.fill('sk-good-key-123');
       await field.press('Enter');
       await expect(page.getByTestId('setup.pay.works')).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByTestId('setup.step.model')).toContainText('it works: opus 5.5 answered.');
+      await expect(page.getByTestId('setup.step.model')).toContainText(settings.first_works({ model: 'opus 5.5' }));
       await expect(page.getByTestId('setup.pay.answer'), "the model's own first words").toContainText('it said: “');
-      await expect(page.getByTestId('setup.pay.works')).toContainText('main uses anthropic/claude-opus-5-5.');
+      await expect(page.getByTestId('setup.pay.works')).toContainText(settings.first_main_uses({ model: 'anthropic/claude-opus-5-5' }));
       await shot(s, t('works'));
       expect(readFileSync(auth, 'utf8')).toContain('sk-good-key-123');
       expect(readFileSync(path.join(biseHome, 'config.toml'), 'utf8')).toContain('main = "anthropic/claude-opus-5-5"');
