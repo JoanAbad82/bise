@@ -7,7 +7,7 @@ wait). Agent wk lands from its worktree:
   A  its sb waits: the land lands, sb prints it (rc 0) after the check,
      and wk gets no bise message on top (its sb heard it);
      meanwhile main's `sb list` answers in seconds (the hub's loop is free).
-  B  its sb is killed 10 s in: main still moves, and wk gets bise's
+  B  its sb is killed once its check runs: main still moves, and wk gets bise's
      message with the result (daemon/land.rs UNHEARD); a second `sb land`
      of the place while B checks is refused at once (land_queue::busy).
 
@@ -16,6 +16,7 @@ Run: python3 -u tests/land_wait_e2e.py   (heavy: ~9 min; ~/.bise/run/heavy-run)
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 
@@ -59,6 +60,11 @@ class Runs:
         return r
 
 
+def checking():
+    """The land check (`sleep SLEEP; true`) runs now."""
+    return subprocess.run(["pgrep", "-f", "sleep %d; true" % SLEEP], capture_output=True).returncode == 0
+
+
 def commit(wt, name):
     sh(wt, "echo %s > %s.txt && git add -A && git commit -qm %s" % (name, name, name))
     return out(wt, "git rev-parse HEAD")
@@ -88,15 +94,14 @@ def main():
         # A: its sb waits past 180 s and prints the land; the hub answers meanwhile
         tip = commit(wt, "a")
         land = R.start("wk", "sb land 'a'")
-        time.sleep(40)
+        wait.until(checking, 60, "A's land check running")
         rc, secs, o = R.run("main", "sb list")
         check(rc == 0 and secs < 5, "sb list during a land check: rc %d in %.1f s: %s" % (rc, secs, o))
         rc, secs, o = R.end(land, SLEEP + 120)
         check(rc == 0, "A: sb land rc %d after %.0f s: %s" % (rc, secs, o))
         check(secs >= SLEEP, "A: the land waited for its check (%.0f s < %d s)" % (secs, SLEEP))
         check(main_sha() == tip, "A: main is wk's tip %s, not %s" % (tip, main_sha()))
-        time.sleep(3)
-        check(not any(UNHEARD in l for l in c.lines("wk")), "A: its sb heard it: no bise message on top")
+        wait.holds(lambda: not any(UNHEARD in l for l in c.lines("wk")), 3, "A: its sb heard it: no bise message on top")
         print("A ok: landed after %.0f s, sb list answered meanwhile" % secs)
 
         # B: its sb killed 10 s in; the land lands and wk hears it from bise
@@ -106,7 +111,7 @@ def main():
         c.say("[[bash: sb land 'b' > %s.out 2>&1 & echo $! > %s]]" % (pidf, pidf), focus="wk")
         wait.until(lambda: os.path.exists(pidf) and open(pidf).read().strip(), 30, "b's sb pid")
         c.wait_idle("wk")
-        time.sleep(10)
+        wait.until(checking, 60, "B's land check running")
         os.kill(int(open(pidf).read()), signal.SIGKILL)
         # a second land of the place while B checks: refused at once
         rc, secs, o = R.run("wk", "sb land 'again'")
@@ -115,11 +120,10 @@ def main():
         check(rc == 0 and secs < 5, "sb list during land B: rc %d in %.1f s: %s" % (rc, secs, o))
         wait.until(lambda: main_sha() == tip, SLEEP + 120, "B: main moves to %s with its sb gone" % tip)
         c.wait_line("wk", UNHEARD, 60)
-        time.sleep(3)  # a second message would be here by now
         # bise's messages delivered to wk (its `sb msg-in` lines), not the
-        # scripted model's echo of one
-        heard = [l for l in c.lines("wk") if l.startswith("sb msg-in") and UNHEARD in l]
-        check(len(heard) == 1, "B: wk hears its land once from bise: %s" % json.dumps(heard))
+        # scripted model's echo of one; a second would be here within 3 s
+        heard = lambda: [l for l in c.lines("wk") if l.startswith("sb msg-in") and UNHEARD in l]  # noqa: E731
+        wait.holds(lambda: len(heard()) == 1, 3, lambda: "B: wk hears its land once from bise: %s" % json.dumps(heard()))
         print("B ok: main moved with its sb gone, wk told once, the second land refused")
         print("OK land_wait_e2e")
     finally:
