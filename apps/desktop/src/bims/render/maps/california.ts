@@ -9,7 +9,7 @@
 // stages are the office's (a plant, food and a palm, the chalkboard, the boombox, flowers, shade, more
 // palms, a beach shower, a tide pool); the frames are skateboard decks on the wall, golden at 500.
 // Never the app's pink or red. Owner: maps-d.
-import { ExtrudeGeometry, Group, type Material, type Object3D, PointLight, Shape } from 'three';
+import { ExtrudeGeometry, Group, type Material, type Object3D, PointLight, Shape, ShapeGeometry, TorusGeometry } from 'three';
 import type { Office, Park, Pt } from '../../model';
 import type { CaliforniaOffice } from '../../maps/california';
 import { FEATURE_STAGE, GOLDEN_STAGE } from '../../skate';
@@ -157,7 +157,9 @@ function parkSlab(k: Kit, root: Object3D, p: Park, n: boolean): void {
   k.add(style.box(w, 0.08, d), conc, root, (a.x0 + a.x1) / 2, 0.0, (a.z0 + a.z1) / 2);
   k.add(style.box(w + 0.2, 0.3, 0.2), concD, root, (a.x0 + a.x1) / 2, 0.15, a.z0 - 0.1);
   for (let z = a.z0 + 2.0; z < a.z1; z += 2.0) k.add(style.box(w, 0.005, 0.03), k.mat('#b9b4ab'), root, (a.x0 + a.x1) / 2, 0.045, z);
-  for (const [px, pz] of [[a.x0 + 0.3, a.z0 + 0.3], [a.x1 - 0.3, a.z0 + 4.2], [a.x1 - 0.3, a.z1 - 7.0], [a.x0 + 0.3, a.z1 - 0.4]] as const) {
+  // the floodlights on the slab's back and left edges and its far corners, never on the camera's side
+  // (front, right) where a pole would stand between a piece and the view (bims m_28843)
+  for (const [px, pz] of [[a.x0 + 0.15, a.z0 + 0.15], [a.x1 - 0.15, a.z0 + 0.15], [a.x0 + 0.15, (a.z0 + a.z1) / 2 + 1.6], [a.x0 + 0.15, a.z1 - 0.15], [(a.x0 + a.x1) / 2 + 1.0, a.z0 + 0.15]] as const) {
     k.add(style.cylinder(0.045, 3.0), k.mat(POLE), root, px, 1.5, pz);
     k.add(style.box(0.4, 0.2, 0.22), style.material('#fff3c4', { emissive: '#fff3c4', ei: n ? 1.5 : 0.1 }), root, px, 3.0, pz);
     if (n) {
@@ -217,20 +219,51 @@ function stairs(k: Kit, parent: Object3D, p: Park, conc: Material): void {
   for (const [px, ph] of [[s.xTop - 0.02, top], [s.xBottom - 0.02, low]] as const) k.add(k.style.cylinder(0.025, ph), k.mat(COPING), parent, px, ph / 2, s.railZ);
 }
 
-/** the pool bowl, seen from above as a pool: its light coping ring, the blue tile band, the walls darker towards the deep end */
+/** a rounded rectangle w by d, corners of radius r, flat on the floor (the prototype's rr()) */
+function roundRect(w: number, d: number, r: number): ShapeGeometry {
+  const s = new Shape();
+  const x = -w / 2;
+  const y = -d / 2;
+  const c = Math.min(r, w / 2, d / 2);
+  s.moveTo(x + c, y);
+  s.lineTo(x + w - c, y);
+  s.quadraticCurveTo(x + w, y, x + w, y + c);
+  s.lineTo(x + w, y + d - c);
+  s.quadraticCurveTo(x + w, y + d, x + w - c, y + d);
+  s.lineTo(x + c, y + d);
+  s.quadraticCurveTo(x, y + d, x, y + d - c);
+  s.lineTo(x, y + c);
+  s.quadraticCurveTo(x, y, x + c, y);
+  const g = new ShapeGeometry(s, 12);
+  g.rotateX(-Math.PI / 2);
+  return g;
+}
+
+/**
+ * the pool bowl, seen from above as a pool (bims m_28843: rounded all the way down, never a stepped
+ * pit): the light coping ring, the blue tile band, then rounded rings darker towards the deep end,
+ * the deep end offset towards the front
+ */
 function bowl(k: Kit, parent: Object3D, p: Park, n: boolean): void {
   const b = p.bowl;
-  const layers: readonly (readonly [number, number, string, number])[] = [
-    [b.hw * 2 + 0.6, b.hd * 2 + 0.6, '#ece8e0', 0],
-    [b.hw * 2, b.hd * 2, '#3d6fb6', 0],
-    [b.hw * 2 - 0.3, b.hd * 2 - 0.3, '#b9bdc3', 0],
-    [b.hw * 2 - 1.0, b.hd * 2 - 1.1, '#9a9fa6', 0.15],
-    [b.hw * 2 - 1.8, b.hd * 2 - 2.0, '#80858d', 0.3],
-    [b.hw * 2 - 2.6, b.hd * 2 - 3.0, '#6a6f77', 0.45],
+  const bw = b.hw * 2;
+  const bd = b.hd * 2;
+  const layers: readonly (readonly [number, number, number, string, number])[] = [
+    [bw + 0.6, bd + 0.6, 1.6, '#ece8e0', 0],
+    [bw, bd, 1.4, '#3d6fb6', 0],
+    [bw - 0.3, bd - 0.3, 1.3, '#b9bdc3', 0],
+    [bw - 1.0, bd - 1.1, 1.1, '#9a9fa6', 0.15],
+    [bw - 1.8, bd - 2.0, 0.8, '#80858d', 0.3],
+    [bw - 2.6, bd - 3.0, 0.5, '#6a6f77', 0.45],
   ];
-  layers.forEach(([w, d, c, oz], i) => {
-    k.add(k.style.box(w, 0.02, d, Math.min(w, d) * 0.3), k.mat(n ? shade(c) : c), parent, b.x, 0.045 + i * 0.006, b.z + oz);
+  layers.forEach(([w, d, r, c, oz], i) => {
+    const m = k.add(roundRect(w, d, r), k.mat(n ? shade(c) : c), parent, b.x, 0.045 + i * 0.004, b.z + oz);
+    m.castShadow = false;
   });
+  // the coping: a metal ring round the lip
+  const ring = k.add(new TorusGeometry(1, 0.05, 6, 40), k.mat(COPING), parent, b.x, 0.06, b.z);
+  ring.rotation.x = -Math.PI / 2;
+  ring.scale.set((bw + 0.1) / 2, (bd + 0.1) / 2, 1);
 }
 
 /** the park's pieces, each in its stage's group (skate.ts FEATURE_STAGE) */
@@ -245,8 +278,11 @@ function parkPieces(b: Build, p: Park): void {
   const r = vert ? qp.r13 : qp.r;
   const qg = vert ?? st('qp');
   if (qg) {
-    const g = quarterPipe(k, qg, (qp.x0 + qp.x1) / 2, qp.zLip - 0.3, qp.x1 - qp.x0, r, 0.3, -Math.PI / 2, conc);
-    if (vert) k.add(k.style.box(qp.x1 - qp.x0, 0.6, 0.3), conc, g, 0.15, r + 0.3, 0);
+    // its foot at zLip + r, its coping at zLip (where render/skate.ts stalls on it), its deck behind
+    const deck = 0.35;
+    const g = quarterPipe(k, qg, (qp.x0 + qp.x1) / 2, qp.zLip + r, qp.x1 - qp.x0, r, deck, -Math.PI / 2, conc);
+    // the vert: a guard rail along the back of its deck
+    if (vert) k.add(k.style.box(0.04, 0.5, qp.x1 - qp.x0), k.mat(POLE), g, -(r + deck - 0.05), r + 0.25, 0);
   }
   const curb = st('curb');
   if (curb) bar(k, curb, p.curb, 'curb', conc);

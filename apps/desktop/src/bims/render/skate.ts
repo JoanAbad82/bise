@@ -110,7 +110,8 @@ function rideAt(m: Move, park: Park, stage: number, slot: number, f: number): At
     case 'ramp': {
       const { xa, xb, z0, z1 } = park.ramp;
       // from the lip it starts at to the other one, its trick at the far lip (the last quarter)
-      const [from, to] = m.side === 1 ? [xa + 0.05, xb - 0.05] : [xb - 0.05, xa + 0.05];
+      // lip to lip: a stall sits on the coping, the transition's top
+      const [from, to] = m.side === 1 ? [xa, xb] : [xb, xa];
       const u = ease(Math.min(1, f / 0.75));
       const x = mix(from, to, u);
       return { x, z: (z0 + z1) / 2 + lane, ys: rampY(park, x), air: 0 };
@@ -123,7 +124,8 @@ function rideAt(m: Move, park: Park, stage: number, slot: number, f: number): At
       // in from the flat, up the transition to the lip, the air over it, back down
       const out = bottom + 2.2;
       const x = (q.x0 + q.x1) / 2 + lane;
-      const z = f < 0.45 ? mix(out, q.zLip + 0.05, ease(f / 0.45)) : f > 0.7 ? mix(q.zLip + 0.05, out, ease((f - 0.7) / 0.3)) : q.zLip + 0.05;
+      // up to the coping (zLip, the transition's top: a stall sits on it), back down
+      const z = f < 0.45 ? mix(out, q.zLip, ease(f / 0.45)) : f > 0.7 ? mix(q.zLip, out, ease((f - 0.7) / 0.3)) : q.zLip;
       return { x, z, ys: trans(bottom - z, r), air: 0 };
     }
     case 'bowl': {
