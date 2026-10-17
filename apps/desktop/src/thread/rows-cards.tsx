@@ -67,7 +67,7 @@ export function ImageChip({ path, i, testId }: { path?: string; i: number; testI
   // 'image <n>', its order in this answer: never the store's file name (a sha .png on real data, R36)
   return (
     <Chip kind="part" of="image" {...(path === undefined ? {} : { title: path })} thumb={<Thumb {...(path === undefined ? {} : { path })} />} testId={testId}>
-      {partImageWords('', i)}
+      {partImageWords('', i + 1)}
     </Chip>
   );
 }

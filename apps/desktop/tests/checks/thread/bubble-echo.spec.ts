@@ -75,7 +75,7 @@ for (const theme of ['light', 'dark'] as const) {
         await page.mouse.down();
         await page.mouse.move(b.x + b.width - 4, b.y + b.height - 4, { steps: 8 });
         await page.mouse.up();
-        await page.keyboard.type('about ');
+        await page.keyboard.type('about it');
         const field = page.getByTestId('composer.field');
         await expect(field.locator('[data-kind="quote"]'), 'a quote chip').toHaveCount(1, { timeout: 5000 });
         await page.keyboard.type(', see ');
@@ -125,6 +125,8 @@ for (const theme of ['light', 'dark'] as const) {
         expect(await inner(page, landed, 'thread.you.3'), 'the same DOM inside the bubble').toBe(html);
         await page.locator(`${landed} .th-you`).screenshot({ path: test.info().outputPath(`sent-${theme}-${String(width)}.png`) });
 
+        // one part, one number: the image's row says the number its chip has in his words (designer m_29843)
+        await expect(page.locator(`${landed} [data-testid="thread.you.3.image.1"]`)).toContainText(`image ${String(inField[1]?.n)}`);
         // the mouse on the paste chip in his words lights its part chip
         await page.locator(`${landed} .th-bubble .b-inchip[data-kind="paste"]`).hover();
         await expect(page.locator(`${landed} [data-testid="thread.you.3.paste.${String(inField[3]?.n)}"]`)).toHaveClass(/is-hover/u);

@@ -49,6 +49,24 @@ describe('bubbleWords: his words with the composer chips at their place', () => 
       { kind: 'image', n: 1, path: '/a.png', name: 'a.png' },
     ]);
   });
+  it('his spacing around a chip stays his: no space added before punctuation after it', () => {
+    const q = { kind: 'quote', from: 'main', text: 'q', n: 1 } as const;
+    expect(bubbleWords([q, text(', see '), { kind: 'image', name: '[Image #2]', source: '/a.png' }, text('.')]).md).toBe(`${slotMark(0)}, see ${slotMark(1)}.`);
+    expect(bubbleWords([text('see('), q, text(')!')]).md).toBe(`see(${slotMark(0)})!`);
+  });
+  it("one part, one number: an image's part chip says the number its chip has in his words", () => {
+    const { store } = setup();
+    act(() => {
+      store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 43, at_ms: Date.now(), kind: 'you', text: 'x', parts: PARTS } });
+    });
+    const v = render(
+      <StoreProvider store={store}>
+        <EntryRow ctx={ctx} pos={43} />
+      </StoreProvider>,
+    );
+    expect(v.getByTestId('thread.you.43.chip.2').textContent).toBe('2');
+    expect(v.getByTestId('thread.you.43.image.1').textContent).toBe('image 2');
+  });
   it('what was never in his words stays out: a quote with no number, an older files list, the hint', () => {
     const w = bubbleWords([{ kind: 'quote', from: 'main', text: 'q' }, text('hi'), { kind: 'file', path: '/x.md' }, { kind: 'hint', of: 'capsule', text: 'h' }]);
     expect(w).toEqual({ md: 'hi', chips: [] });

@@ -283,7 +283,7 @@ export function PartChips({ view, ctx, id, named = false, link }: { view: YouVie
         {/* his images and files (file-chips): a click previews, a right-click shows it in Finder */}
         {view.images.map((img, i) => (
           <AttachChip key={`${img.path}#${String(i)}`} of="image" path={img.path} missing={false} thumb={<Thumb path={img.path} />} lit={lit(img.n)} {...on(img.n)} testId={`${id}.image.${String(i + 1)}`}>
-            {named ? chipName(img.path.split('/').at(-1) ?? img.path) : partImageWords(img.name, i)}
+            {named ? chipName(img.path.split('/').at(-1) ?? img.path) : partImageWords(img.name, img.n ?? i + 1)}
           </AttachChip>
         ))}
         {view.files.map((f, i) =>
@@ -327,7 +327,9 @@ export function PartChips({ view, ctx, id, named = false, link }: { view: YouVie
   );
 }
 
-/** An image part's chip words: its file name when it has one, else 'image 1' (its order here), never the '[Image #n]' tag (designer m_17969). Pure. */
-export function partImageWords(name: string, i: number): string {
-  return name !== '' && !name.startsWith('[') ? name : thread.image_n({ n: i + 1 });
+/** An image part's chip words: its file name when it has one, else 'image 2', `n` the number its
+ *  chip has in his words ('[Image #2]'; one part, one number everywhere, designer m_29843), never
+ *  the '[Image #n]' tag (designer m_17969). Pure. */
+export function partImageWords(name: string, n: number): string {
+  return name !== '' && !name.startsWith('[') ? name : thread.image_n({ n });
 }
