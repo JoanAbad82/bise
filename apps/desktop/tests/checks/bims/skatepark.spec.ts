@@ -67,6 +67,8 @@ for (const theme of ['light', 'dark'] as const) {
         ['bowl', (p) => p.y < -0.4],
       ]);
       const got = new Set<string>();
+      // each followed bim's lowest and highest board seen, and where (the failure says them)
+      const seen = new Map<string, { lo: Pt3; hi: Pt3 }>();
       await page.getByTestId('app.right.agents.width.narrow').click();
       for (let round = 0; round < 9 && got.size < want.size; round++) {
         const name = IDLE[round % IDLE.length] ?? 'kick';
@@ -76,6 +78,10 @@ for (const theme of ['light', 'dark'] as const) {
         const end = Date.now() + 30_000;
         while (Date.now() < end && got.size < want.size) {
           const p = (await places(s)).get(name);
+          if (p) {
+            const was = seen.get(name);
+            seen.set(name, { lo: !was || p.y < was.lo.y ? p : was.lo, hi: !was || p.y > was.hi.y ? p : was.hi });
+          }
           for (const [k, ok] of want) {
             if (got.has(k) || !p || !ok(p)) continue;
             got.add(k);
@@ -85,7 +91,8 @@ for (const theme of ['light', 'dark'] as const) {
           await sleep(60);
         }
       }
-      expect([...got].sort(), 'the moments caught').toEqual([...want.keys()].sort());
+      const said = [...seen].map(([n, v]) => `${n}: low ${JSON.stringify(v.lo)}, high ${JSON.stringify(v.hi)}`).join('; ');
+      expect([...got].sort(), `the moments caught (${said})`).toEqual([...want.keys()].sort());
     } finally {
       await s.close();
     }

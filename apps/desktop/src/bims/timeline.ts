@@ -109,7 +109,8 @@ export function newTimeline(): Timeline {
         const act = bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, beds);
         const pt = b?.over ? undefined : fun2.get(name);
         const parkSpot = pt ? next.park?.spots[pt.slot] : undefined;
-        const sig = pt && parkSpot ? `skate|${String(pt.slot)}|${pt.pool ? 'pool' : ''}|${pt.nine ? '900' : ''}` : sigOf(act);
+        // the stage too: a skater rides the park as built now, never one a stage behind (a new piece starts a new line)
+        const sig = pt && parkSpot ? `skate|${String(pt.slot)}|${pt.pool ? 'pool' : ''}|${pt.nine ? '900' : ''}|${String(pt.stage)}` : sigOf(act);
         const last = b?.segs.at(-1);
         const fixed = parkSpot ?? fixedSpot(next, name, act);
         // a napper at its desk goes to a bean bag built since (bedFor): the same sig, another place
