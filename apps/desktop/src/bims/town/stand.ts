@@ -1,7 +1,8 @@
 // Where a far office's bims stand (page bims-maps v9: « les bims de loin sont des silhouettes sans
 // animation »): each live agent's activity (activity.ts) at the spot its office keeps for it, still,
-// and which desks' screens are lit. Office life (a snack trip) reads as the lounge, so a far office
-// changes only when an agent's state does: the town redraws on change, never on a timer. Pure. Owner: maps-e.
+// and which desks' screens are lit. Office life (a snack trip) reads as a nap, so a far office
+// changes only when an agent's state does: the town redraws on change, never on a timer. A napper
+// lies only on a bed the stage built (growth.ts bedsAt, timeline.ts bedFor), else at its desk. Pure. Owner: maps-e.
 import type { Activity, Office, Spot } from '../model';
 
 export interface Stand {
@@ -19,8 +20,8 @@ export interface Still {
 
 const LIT = new Set<Activity['k']>(['work', 'hot', 'main', 'visit', 'report']);
 
-/** Every live bim's still spot and the lit desks, from its activity. Pure. */
-export function stillOf(o: Office, acts: ReadonlyMap<string, Activity>, mainName: string): Still {
+/** Every live bim's still spot and the lit desks, from its activity; `beds`: the lounge spots with a bed (bedsAt). Pure. */
+export function stillOf(o: Office, acts: ReadonlyMap<string, Activity>, mainName: string, beds: number): Still {
   const used = new Map<string, number>();
   const shared = (list: readonly Spot[], key: string): Spot | undefined => {
     const i = used.get(key) ?? 0;
@@ -38,9 +39,12 @@ export function stillOf(o: Office, acts: ReadonlyMap<string, Activity>, mainName
       case 'main':
         at = own;
         break;
-      case 'lounge':
-        at = shared(o.lounge, 'lounge') ?? own;
+      case 'lounge': {
+        const i = used.get('lounge') ?? 0;
+        if (i < Math.min(beds, o.lounge.length)) at = shared(o.lounge, 'lounge') ?? own;
+        else at = own;
         break;
+      }
       case 'island':
         at = shared(o.islandSpots, 'island') ?? own;
         break;

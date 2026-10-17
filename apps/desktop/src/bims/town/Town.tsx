@@ -16,7 +16,7 @@ import { bims } from '@/proto/words_bims.gen';
 import { keep } from '@/app/keep';
 import type { ActivitiesFn, LayoutFn } from '../model';
 import { Office, type Parts } from '../Office';
-import { growOf } from '../growth';
+import { bedsAt, growOf } from '../growth';
 import { growHigh } from '../grow-keep';
 import { away, CHECK_MS } from '../loop';
 import type { Fit } from '../render/camera';
@@ -56,7 +56,7 @@ function townOfficeOf(p: TownProject, parts: TownParts, t: number): TownOffice {
   const grow = growOf(testMode() ? p.growth : growHigh(p.id, p.growth));
   const main = agents.find((a) => a.main)?.name ?? 'main';
   const acts = parts.activities({ agents: p.agents, cards: p.cards, places: p.places }, t);
-  return { id: p.id, office, main, grow, still: stillOf(office, acts, main) };
+  return { id: p.id, office, main, grow, still: stillOf(office, acts, main, bedsAt(grow.stage)) };
 }
 
 export function Town({
