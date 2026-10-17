@@ -2,6 +2,11 @@
 // with no in-app view (model.ts leaves). A click or ⏎ on its row (the artifacts list, the right
 // bar, ⌘K, its thread chip) or space opens his browser at once: no panel, no history entry, the
 // list keeps its selection. Every other kind opens in the window as before. Owner: amb-web.
+// The rule is one (model.ts leaves) but its dispatch is in two places for now: an inbox option's
+// act decides it in the store's machine (store/machine/cards.ts opens, fast-try p4 1d); the rows
+// here (ThreadRows, Peek, RightBar, Palette, rows-news) still call useGoArtifact. Each of those
+// screens' slices moves its call to store.do (a nav intent through opens()); then useGoArtifact
+// is deleted (architect m_29955, rule 7).
 import { useCallback } from 'react';
 import { useRouter } from '@/app/router';
 import { useStore } from '@/store';

@@ -6,6 +6,8 @@ import { InboxStrip, cardKeyOf, type StripPorts } from './Strip';
 import { PICKED_MS } from './InboxCard';
 import type { ReactNode } from 'react';
 import { Store, StoreProvider } from '@/store';
+import type { Effect } from '@/store/machine/types';
+import { core_ev } from '@/proto/fixtures.gen';
 
 afterEach(() => {
   cleanup();
@@ -100,6 +102,23 @@ describe('InboxStrip (W7/K24)', () => {
     expect(screen.getByTestId('strip.card.acme-3.opt.1').className).toContain('on');
     fireEvent.keyDown(window, { key: '2', code: 'Digit2' });
     expect(did).toEqual(['close acme-1', 'close acme-2', 'answer acme-3 2']);
+  });
+
+  it("an option the hub's row gives an act (a merge's '2 open it on GitHub'): it opens, nothing is answered, the item stays open", () => {
+    const { did, p, wrapper, store } = ports();
+    const pr = 'https://github.com/x/pull/1';
+    const c: Card = { ...card(1, 0), options: [{ n: 1, label: 'squash and merge' }, { n: 2, label: 'open it on GitHub', act: { act: 'open', url: pr } }] };
+    const row = core_ev.flatMap((e) => (e.ev === 'projects' ? e.projects : []))[0];
+    if (row === undefined) throw new Error('rust/proto/fixtures has no projects row');
+    store.apply({ ev: 'projects', projects: [{ ...row, project: 'acme', name: 'acme', cards: [c] }] });
+    const ran: Effect[] = [];
+    store.onEffect((e) => ran.push(e));
+    render(<InboxStrip project="acme" cards={[c]} ports={p} now={NOW} />, { wrapper });
+    fireEvent.keyDown(window, { code: 'Digit1', key: '1', ctrlKey: true });
+    fireEvent.keyDown(window, { key: '2', code: 'Digit2' });
+    expect(did).toEqual([]);
+    expect(ran).toEqual([{ out: 'fx', fx: { fx: 'openExternal', args: [pr] } }]);
+    expect(screen.getByTestId('strip.card.acme-1')).toBeTruthy();
   });
 
   it("a digit typed in the composer with his words in it is his, not an option (amb-win, item 7)", () => {

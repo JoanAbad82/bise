@@ -73,7 +73,8 @@ let anchorFor: { key: string; at: string } | null = null;
 export function openAtAnchor(key: string, at: string): void {
   anchorFor = { key, at };
 }
-function takeAnchor(key: string): string | null {
+/** The block the view of 'project/id' opens at, read once (ArtifactOpen's first render; the edge's test reads it too). */
+export function takeAnchor(key: string): string | null {
   const at = anchorFor?.key === key ? anchorFor.at : null;
   anchorFor = null;
   return at;
