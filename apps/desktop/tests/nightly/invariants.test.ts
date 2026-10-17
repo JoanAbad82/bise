@@ -40,12 +40,17 @@ function gestureOf(c: Cmd): Gesture | null {
 
 const key = (project: unknown, card: unknown): string => `${str(project)}-${String(num(card))}`;
 
-/** The card keys a `projects` event lists, null for a row whose cards aren't loaded. */
+/**
+ * The card keys a `projects` event lists; null for a row whose cards aren't known. The core leaves
+ * an empty list out of a row (bise-proto app_rows.rs), so no `cards` with `waits` 0 is none; no
+ * `cards` with waits (a hub starting, a row from its files) is unknown.
+ */
 function listed(ev: Record<string, unknown>): Map<string, Set<string> | null> {
   const out = new Map<string, Set<string> | null>();
   for (const r of (ev['projects'] as readonly Record<string, unknown>[] | undefined) ?? []) {
     const cards = r['cards'] as readonly Record<string, unknown>[] | undefined;
-    out.set(str(r['project']), cards === undefined ? null : new Set(cards.map((c) => key(c['project'], c['id']))));
+    const none = cards === undefined && r['waits'] === 0;
+    out.set(str(r['project']), none ? new Set() : cards === undefined ? null : new Set(cards.map((c) => key(c['project'], c['id']))));
   }
   return out;
 }

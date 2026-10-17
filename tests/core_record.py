@@ -151,6 +151,21 @@ def rows_of(core):
     return []
 
 
+def show(core):
+    """As the window starts (App.tsx useShown): a first `shown`, even empty (the core sends the
+    projects rows only after one), then every project shown, until each one's hub welcomed this
+    core (held: its row carries its own cards; an empty list is left out of the row)."""
+    core.cmd({"cmd": "shown", "projects": []})
+    core.until(lambda: rows_of(core), 120, "projects rows after the first shown")
+    names = [r["project"] for r in rows_of(core) if not r.get("home")]
+    n0 = len(core.evs)
+    core.cmd({"cmd": "shown", "projects": names})
+    welcomed = lambda: {e.get("project") for e in core.evs[n0:] if e.get("ev") == "welcome"}
+    core.until(lambda: set(names) <= welcomed(), 180, "a welcome from every shown project's hub")
+    core.settled(60)
+    time.sleep(3)
+
+
 def drive(out, timeout):
     info = world_info()
     env = core_env(info)
@@ -166,11 +181,10 @@ def drive(out, timeout):
 
     core = Core(info["bise"], env, rec, err)
     try:
-        core.until(lambda: any(r.get("cards") is not None for r in rows_of(core)), 120, "projects rows with their cards")
+        show(core)
         rows = rows_of(core)
         home = next((r["project"] for r in rows if r.get("home")), None)
         others = [r for r in rows if not r.get("home")]
-        core.cmd({"cmd": "shown", "projects": [r["project"] for r in rows]})
         for r in rows:
             core.cmd({"cmd": "subscribe", "project": r["project"], "agent": "main"})
         if home is not None:
@@ -205,9 +219,8 @@ def drive(out, timeout):
     rec({"reload": True})
     core = Core(info["bise"], env, rec, err)
     try:
-        core.until(lambda: any(r.get("cards") is not None for r in rows_of(core)), 120, "projects rows after the reload")
+        show(core)
         rows = rows_of(core)
-        core.cmd({"cmd": "shown", "projects": [r["project"] for r in rows]})
         for r in rows:
             core.cmd({"cmd": "subscribe", "project": r["project"], "agent": "main"})
         core.settled(60)
