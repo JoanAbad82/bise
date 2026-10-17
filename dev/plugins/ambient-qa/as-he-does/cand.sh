@@ -8,6 +8,7 @@
 # the candidate's path), each a kill of the run's own pids at its first breach.
 #   cand.sh <out dir> <candidate app>
 set -u
+CAND_ARGS=("$@")
 O=${1:?out dir}; A=${2:?candidate app}; mkdir -p "$O"
 # the RESOLVED path (ambient-lead m_20102): ~/.bise/dev/build is a symlink to
 # ~/.local/state/switchboard/build and the processes carry the resolved one, so a lookup by the
@@ -17,6 +18,32 @@ P=${AS_HE_DOES_PYTHON:-$HOME/.pyenv/versions/3.11.13/bin/python3}
 HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)
 RS="$P -B $HERE/../realshape.py"
 G=$HOME/.bise/gate/real-shape; H=$G/w/h
+# One run per world and one run per candidate path (main m_30102): two runs in the two heavy slots
+# shared the world, and one's stop sweep (every pid naming $G/w) killed the other's hubs
+# (desk-cut-13 m_30091, 2026-10-18 00:06); a smoke and a full run on the same app kill each other's
+# app by path (review-gates m_29603). Each lock is a lockf on a file: <world>/world.lock and
+# ~/.bise/gate/locks/cand-<sha16 of the app path>.lock. A busy one: one line naming its holder,
+# then a wait of up to CAND_LOCK_WAIT s (7200), then exit 2 with that line; never a sweep.
+# Tested in tests/cand_lock_test.py.
+LOCKS=$HOME/.bise/gate/locks
+CAND_LOCK=$LOCKS/cand-$(printf '%s' "$A" | shasum -a 256 | cut -c1-16)
+if [ -z "${CAND_LOCKED:-}" ]; then
+  mkdir -p "$G" "$LOCKS"
+  holder() { cat "$1.holder" 2>/dev/null || echo "an unknown run"; }
+  busy() { ! /usr/bin/lockf -t 0 "$1.lock" /usr/bin/true 2>/dev/null; }
+  for l in "$G/world" "$CAND_LOCK"; do
+    busy "$l" && echo "$(date +%T) cand.sh: $l is held by $(holder "$l"); waiting up to ${CAND_LOCK_WAIT:-7200} s"
+  done
+  CAND_LOCKED=1 /usr/bin/lockf -t "${CAND_LOCK_WAIT:-7200}" "$G/world.lock" \
+    /usr/bin/lockf -t "${CAND_LOCK_WAIT:-7200}" "$CAND_LOCK.lock" /bin/bash "$0" "${CAND_ARGS[@]}"
+  rc=$?
+  if [ $rc = 75 ]; then
+    for l in "$G/world" "$CAND_LOCK"; do busy "$l" && echo "cand.sh: gave up after ${CAND_LOCK_WAIT:-7200} s: $l is still held by $(holder "$l")"; done
+    exit 2
+  fi
+  exit $rc
+fi
+for l in "$G/world" "$CAND_LOCK"; do echo "pid $$ since $(date '+%F %T'), out $O, app $A" > "$l.holder"; done
 # AS_HE_DOES_FAKE_VOICE=1: the candidate's core hears the words written to $VOICE (fake.rs: its
 # BISE_HOME is under ~/.bise/gate, never his), for dict1.mjs' ctrl+r take
 VOICE=$G/voice-cand.txt; FV=()
