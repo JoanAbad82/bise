@@ -220,8 +220,12 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     group: g,
     apply(rig) {
       g.visible = rig.opacity > 0.001;
-      g.position.set(rig.x, 0, rig.z);
-      g.rotation.y = rig.dir;
+      g.position.set(rig.x, rig.lift ?? 0, rig.z);
+      // a skater (skate.ts) tilts along its ramp or its carve: its way first, then pitch and roll
+      g.rotation.set(rig.tilt?.[0] ?? 0, rig.dir, rig.tilt?.[1] ?? 0, 'YXZ');
+      const bd = rig.board;
+      skate.position.set(bd?.x ?? 0, bd ? bd.y - 0.08 : 0, bd?.z ?? 0);
+      skate.rotation.set(bd?.rot[0] ?? 0, bd?.rot[1] ?? 0, bd?.rot[2] ?? 0, 'YXZ');
       body.position.set(0, rig.y, 0);
       setRot(body, rig.body);
       setRot(head, rig.head);

@@ -65,6 +65,12 @@ export interface Rig {
   /** 0 gone .. 1 shown (reduced motion's fades) */
   readonly opacity: number;
   readonly motion: Motion;
+  /** the whole bim off the floor (a skater on a rail, up a ramp; skate.ts); absent: on it */
+  readonly lift?: number;
+  /** the whole bim tilted along its way: pitch (nose up < 0) and roll (a ramp's wall, a carve) */
+  readonly tilt?: readonly [number, number];
+  /** its board's place and turn in the bim's frame (a flip, kicked up into the hand); absent: under its feet */
+  readonly board?: { readonly x: number; readonly y: number; readonly z: number; readonly rot: Rot };
 }
 
 export interface RigInput {
@@ -76,7 +82,7 @@ export interface RigInput {
   readonly reduced: boolean;
 }
 
-const NO_PROPS: Props = {
+export const NO_PROPS: Props = {
   crate: false, mug: false, orange: false, pine: false, sheet: false, plane: false,
   skate: false, glasses: false, cloud: 0, hot: null,
   marker: false, newspaper: false, bigScreen: false, magnifier: false, poster: false, shredder: null, progress: null,
@@ -409,16 +415,31 @@ export function rigOf(inp: RigInput): Rig {
   // the offset is in the bim's frame: z ahead along its way, x to its side
   const x = place.x + b.dx * c + b.dz * sn;
   const z = place.z - b.dx * sn + b.dz * c;
-  return {
+  const rig: Rig = {
     x, z, dir, y: b.y, body: b.body, head: b.head, armL: b.armL, armR: b.armR, legL: b.legL, legR: b.legR,
     eyes: b.eyes, mouth: b.mouth, props: b.props, screen: b.screen, lamp: b.lamp, grey: b.grey,
     opacity: place.opacity, motion,
   };
+  // to the park or back from it (skate.ts): its board in its hand; back, it kicks it up first
+  const carry = !arrived && !reduced && (seg.pastime !== undefined || seg.fromSkate === true);
+  return carry ? carrying(rig, seg.fromSkate === true ? pose.since : Infinity) : rig;
 }
 
-/** the loudest of several motions: 'walk' over 'loop' over 'still' */
+/** the kick up (s): the board flips from the floor into the hand */
+export const KICK_S = 0.4;
+
+/** walking with its board under its arm; `since` < KICK_S: the kick up from the floor */
+function carrying(r: Rig, since: number): Rig {
+  const hand = { x: 0.3, y: 0.62, z: 0.05, rot: [0, 0, Math.PI / 2] as Rot };
+  const k = since / KICK_S;
+  const board = k < 1 ? { x: hand.x * k, y: 0.08 + (hand.y - 0.08) * k, z: 0.35 * (1 - k), rot: [Math.PI * 2 * k, 0, (Math.PI / 2) * k] as Rot } : hand;
+  return { ...r, armR: [-0.4, 0, 0.35], props: { ...r.props, skate: true }, board };
+}
+
+/** the loudest of several motions: 'walk' over 'skate' over 'loop' over 'still' */
 export function louder(a: Motion, b: Motion): Motion {
   if (a === 'walk' || b === 'walk') return 'walk';
+  if (a === 'skate' || b === 'skate') return 'skate';
   if (a === 'loop' || b === 'loop') return 'loop';
   return 'still';
 }

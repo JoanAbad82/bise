@@ -15,6 +15,7 @@ import { BACK, DIST, type Fit, aboveTop, fitSite, siteOf, toScreen, viewFit } fr
 import { pickAt, type Target } from './pick';
 import { flightAt, makePlane, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
+import { skateRig } from './skate';
 import { STYLE } from './style';
 import { eggRig } from './egg';
 import { makeEggDecor, type EggDecor } from './eggdecor';
@@ -280,7 +281,10 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       for (const f of frames) {
         const b = ensureBim(f.name, f.main);
         // his easter egg on top of its pose (eggs.ts picks it, egg.ts plays it)
-        const rig = eggRig(rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced }), f.egg ?? null);
+        // a skater in the park (skate.ts): its line's pose once it is there; on the way, the walk's
+        const park = office.park;
+        const skater = park && !look.reduced ? skateRig(f.name, f.pose, park, b.outfit.phase) : null;
+        const rig = eggRig(skater ?? rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced }), f.egg ?? null);
         b.apply(rig);
         rigs.set(f.name, rig);
         shown.add(f.name);

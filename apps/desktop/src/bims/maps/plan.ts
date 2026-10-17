@@ -37,7 +37,7 @@ export function wayIn(s: Spot): Leg[] {
   return ([[s, walk], [walk, entry]] as const).filter(([a, b]) => Math.hypot(a.x - b.x, a.z - b.z) > 1e-6);
 }
 
-/** Every place of an office a bim may walk to (the contract: each is on the walk graph). Pure. */
+/** Every place of an office a bim may walk to (the contract: each is on the walk graph), its park's spots too. Pure. */
 export function placesOf(o: Office): Spot[] {
-  return [...o.desks.values(), o.mainDesk, ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, o.door, ...o.terrace, o.exit];
+  return [...o.desks.values(), o.mainDesk, ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, o.door, ...o.terrace, o.exit, ...(o.park?.spots ?? [])];
 }

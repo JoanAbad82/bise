@@ -7,7 +7,9 @@
 import { bims } from '@/proto/words_bims.gen';
 import type { Agent } from '@/proto';
 import { ordinal } from '@/scheduled/model';
+import { shortAge } from '@/agents/model';
 import type { Activity, ActivityKind, BimFrame, Label, LabelsFn, Segment } from './model';
+import { trickNow, type TrickKey } from './skate';
 
 /** how long an event label shows (s) */
 export const EVENT_S = 3;
@@ -109,6 +111,18 @@ export function stateWords(act: Activity, watch = ''): string {
   }
 }
 
+/** a trick's name over a followed skater (skate.ts keeps keys, the words are here) */
+export function trickWords(k: TrickKey): string {
+  const W: Readonly<Record<TrickKey, string>> = {
+    drop_in: bims.trick_drop_in, pump: bims.trick_pump, rock_to_fakie: bims.trick_rock_to_fakie, axle_stall: bims.trick_axle_stall,
+    fs_180: bims.trick_fs_180, bs_180: bims.trick_bs_180, ollie: bims.trick_ollie, kickflip: bims.trick_kickflip,
+    heelflip: bims.trick_heelflip, shove_it: bims.trick_shove_it, tre_flip: bims.trick_tre_flip, fifty: bims.trick_fifty,
+    five_o: bims.trick_five_o, boardslide: bims.trick_boardslide, nosegrind: bims.trick_nosegrind, manual: bims.trick_manual,
+    no_comply: bims.trick_no_comply, carve: bims.trick_carve, fs_air: bims.trick_fs_air, nine: bims.trick_nine,
+  };
+  return W[k];
+}
+
 /** the pill a bim wears whatever else shows: '?' asks you, '✗' failed */
 export function pillOf(act: Activity): Label['pill'] {
   return act.k === 'asks' ? 'asks' : act.k === 'failed' ? 'failed' : null;
@@ -145,10 +159,14 @@ export const labelsOf: LabelsFn = (frames, o) => {
     const { act, from } = b.pose.seg;
     const pill = pillOf(act);
     const at = (mode: Label['mode'], words: string, title = ''): void => void out.set(b.name, { name: b.name, mode, words, title, pill });
+    const trick = o.follow === b.name ? trickNow(b.name, b.pose) : null;
     if (o.hover === b.name) {
       const row = rows.get(b.name);
-      at('hover', stateWords(act, row?.watching[0]?.what ?? ''), row?.title ?? '');
+      // a skater (skate.ts): how long it has been idle, and what it does with it
+      const words = b.pose.seg.pastime && row ? bims.state_skating({ dur: shortAge(o.t * 1000 - row.since_ms) }) : stateWords(act, row?.watching[0]?.what ?? '');
+      at('hover', words, row?.title ?? '');
     } else if (events.has(b.name)) at('event', eventWords(act, from));
+    else if (trick !== null) at('egg', trickWords(trick));
     else if (o.eggs?.has(b.name) === true) at('egg', o.eggs.get(b.name) ?? '');
     else if (o.held || (b.pose.moving && !b.main)) at('name', '');
     else if (pill) at('pill', '');

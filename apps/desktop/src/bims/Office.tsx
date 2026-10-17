@@ -17,7 +17,8 @@ import type { Agent, Card, Place } from '@/proto';
 import { bims } from '@/proto/words_bims.gen';
 import { useModHeld } from '@/app/held';
 import type { ActivitiesFn, ActivityKind, BimEvent, BimFrame, Label, LabelsFn, LayoutFn, Look, MakeRenderer, NewTimelineFn, Office as OfficeMap, OfficeRenderer, Snapshot, Timeline } from './model';
-import { away, CHECK_MS, HOVER_MS, nextAfter, TICK_MS } from './loop';
+import { away, CHECK_MS, HOVER_MS, nextAfter } from './loop';
+import { dayOf, wakeIn } from './skate';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
@@ -118,7 +119,9 @@ export function labelsSig(labels: ReadonlyMap<string, Label>): string {
 }
 
 const testMode = (): boolean => (window as { bise?: { test?: boolean } }).bise?.test === true;
-const awayNow = (): boolean => away({ hidden: document.hidden, focused: document.hasFocus(), test: testMode() });
+/** a check says the window lost focus (window.__biseBlur): the harness's window never has it, so focus only counts then */
+const blurred = (): boolean => (window as { __biseBlur?: boolean }).__biseBlur === true;
+const awayNow = (): boolean => away({ hidden: document.hidden, focused: document.hasFocus() && !blurred(), test: testMode() && !blurred() });
 const nightNow = (): boolean => {
   const set = document.documentElement.dataset.theme;
   if (set !== undefined) return set === 'dark';
@@ -401,7 +404,10 @@ export function Office({
         }
         const acts = parts.activities(L.snap, t);
         lastActs = JSON.stringify([...acts]);
-        timeline.update(acts, office, t, L.events, bedsAt(grow.current.stage));
+        // a map with a park: who skates reads the stage, the jobs' high-water mark (never the live count), his day, reduced motion
+        const day = localOf(new Date());
+        const g = grow.current;
+        timeline.update(acts, office, t, L.events, bedsAt(g.stage), { stage: g.stage, jobs: g.jobs, dow: day.dow, day: dayOf(day.y, day.mo, day.d), reduced });
         L.events = [];
       }
       if (office === null) return;
@@ -446,7 +452,7 @@ export function Office({
         setNewTag(tag);
       }
       if (u && t - u.at > UNLOCK_WALK + UNLOCK_LABEL) unlockAt.current = undefined;
-      const shown = parts.labelsOf(played, { t, hover: L.hover, held: L.held, agents: L.agents, eggs: eggLabels(eg) });
+      const shown = parts.labelsOf(played, { t, hover: L.hover, held: L.held, agents: L.agents, eggs: eggLabels(eg), follow: fol });
       ranks.current = new Map(frames.map((f) => [f.name, tagRank(f.pose.seg.act.k)]));
       heads.current = new Map();
       const box = holder.current;
@@ -475,9 +481,10 @@ export function Office({
         lastLabels = sig;
         setLabels(shown);
       }
-      const next = chasing && !awayNow() ? 'raf' : nextAfter({ motion, moving: timeline.moving(t), labels: shown, away: awayNow(), lost });
-      if (next === 'raf') raf = requestAnimationFrame(draw);
-      else if (next === 'tick') tick = setTimeout(draw, TICK_MS);
+      // a resting skater (skate.ts): no frame during its rest, a timer for its next line
+      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: timeline.moving(t), labels: shown, away: awayNow(), lost, wake: wakeIn(frames) });
+      if (next === 0) raf = requestAnimationFrame(draw);
+      else if (next !== null) tick = setTimeout(draw, next);
     };
     // one step of the follow camera (focus.ts): ease towards its bim (or back to the fit); true while it moves
     const chase = (rr: OfficeRenderer, t: number, still: boolean): boolean => {

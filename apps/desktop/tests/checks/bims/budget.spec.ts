@@ -11,7 +11,7 @@
 import { test, expect } from '../../harness';
 import { agent, office, snap, watch } from '../../../src/bims/fixtures';
 import {
-  NAMES, drawnIn, loseContext, open, rowsOf, setHidden, settle, shotOf, showOffice, sleep, threeChunks, watchScripts,
+  NAMES, P, drawnIn, loseContext, open, rowsOf, setHidden, settle, shotOf, showOffice, sleep, threeChunks, watchScripts,
   withRows, writeIndex,
 } from './world';
 
@@ -68,6 +68,67 @@ test('(3) no frame while every bim is still or the window hidden; ~8 fps for a l
     expect(await drawnIn(s, 2000), 'hidden draws nothing').toEqual({ frames: 0, shown: 0 });
     await setHidden(s.page, false);
     await expect.poll(async () => (await drawnIn(s, 1000)).frames, { timeout: 4000 }).toBeGreaterThan(0);
+  } finally {
+    await s.close();
+  }
+});
+
+/** STILL and one idle bim: on California it skates (skate.ts), the only thing that moves */
+const SKATER = snap([...STILL.agents, agent('kick', { status: 'idle', title: 'idle, skating' })]);
+
+/** frames drawn in each second of `n` seconds */
+async function perSecond(s: Awaited<ReturnType<typeof open>>['s'], n: number): Promise<number[]> {
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push((await drawnIn(s, 1000)).frames);
+  return out;
+}
+
+test('(5) a skater: 30 fps during its line, nothing at rest, nothing blurred or hidden', async () => {
+  test.setTimeout(120_000);
+  const { s, core } = await open(SKATER);
+  try {
+    await core.send({ ev: 'prefs', prefs: { onboarded: true, theme: 'light', excluded_apps: [], bims: { map: { [P]: 'california' } } } } as never);
+    await showOffice(s);
+    await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-map', 'california', { timeout: 10_000 });
+    // its walk to the park (the display's rate), then lines of 8-12 s and rests at least as long
+    await sleep(7000);
+    const secs = await perSecond(s, 30);
+    expect(Math.max(...secs), `a line draws at 30 fps, never the display's rate (per second: ${secs.join(' ')})`).toBeLessThanOrEqual(33);
+    expect(secs.filter((n) => n >= 20).length, `it rides: some seconds at ~30 fps (${secs.join(' ')})`).toBeGreaterThanOrEqual(4);
+    expect(secs.filter((n) => n === 0).length, `at rest on its board: whole seconds with no frame (${secs.join(' ')})`).toBeGreaterThanOrEqual(4);
+
+    // the window not in front (blur): nothing, whatever it does
+    await s.page.evaluate(() => {
+      (window as unknown as { __biseBlur?: boolean }).__biseBlur = true;
+      window.dispatchEvent(new Event('blur'));
+    });
+    await sleep(300);
+    const blur = await perSecond(s, 26);
+    expect(blur.reduce((a, b) => a + b, 0), `blurred: 0 frames over a whole session (${blur.join(' ')})`).toBe(0);
+    await s.page.evaluate(() => {
+      (window as unknown as { __biseBlur?: boolean }).__biseBlur = false;
+      window.dispatchEvent(new Event('focus'));
+    });
+    // hidden: nothing either
+    await setHidden(s.page, true);
+    await sleep(300);
+    const hid = await perSecond(s, 26);
+    expect(hid.reduce((a, b) => a + b, 0), `hidden: 0 frames over a whole session (${hid.join(' ')})`).toBe(0);
+    await setHidden(s.page, false);
+    await expect.poll(async () => (await drawnIn(s, 1000)).frames, { timeout: 30_000 }).toBeGreaterThan(0);
+  } finally {
+    await s.close();
+  }
+});
+
+test('(5b) reduced motion: nobody skates, nothing draws', async () => {
+  const { s, core } = await open(SKATER, { reduced: true });
+  try {
+    await core.send({ ev: 'prefs', prefs: { onboarded: true, theme: 'light', excluded_apps: [], bims: { map: { [P]: 'california' } } } } as never);
+    await showOffice(s);
+    await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-map', 'california', { timeout: 10_000 });
+    await settle(s, 1500, 15_000);
+    expect((await drawnIn(s, 4000)).frames, 'reduced motion: the idle bim naps, no line').toBe(0);
   } finally {
     await s.close();
   }

@@ -160,6 +160,42 @@ export interface Office {
   readonly walks: readonly Leg[];
   /** what a walk never crosses, where the look draws it: desks, main's desk, the eating place, each bed and deck chair */
   readonly furniture: readonly Box[];
+  /** a skatepark (the California map): where idle bims skate (skate.ts); absent on a map without one */
+  readonly park?: Park;
+}
+
+/** A straight piece to grind or ride across, along x: a curb, a ledge, a rail, a flat lane (h 0). */
+export interface Bar {
+  readonly x0: number;
+  readonly x1: number;
+  readonly z: number;
+  readonly h: number;
+}
+
+/**
+ * A skatepark's numbers (pure, office units), what the skate poses ride on (render/skate.ts) and the
+ * look draws (render/maps/california.ts). Every piece is here whatever the stage; the stage says
+ * which are built (skate.ts FEATURE_STAGE). The spots are places of the walk graph like any other.
+ */
+export interface Park {
+  /** the slab */
+  readonly area: Box;
+  /** where a skater rests between two lines, on its board ([0], [1]); the rest: the pool session's line-up */
+  readonly spots: readonly Spot[];
+  readonly flat: Bar;
+  readonly curb: Bar;
+  readonly rail: Bar;
+  readonly ledge: Bar;
+  /** the 4-stair: its deck's top (h) from x0 to xTop, the steps down to xBottom, across z0..z1; the handrail at railZ */
+  readonly stairs: { readonly x0: number; readonly xTop: number; readonly xBottom: number; readonly z0: number; readonly z1: number; readonly h: number; readonly railZ: number };
+  /** the mini ramp, across x: the left lip at xa, the right one at xb, transitions of radius r, z0..z1 wide */
+  readonly ramp: { readonly xa: number; readonly xb: number; readonly r: number; readonly z0: number; readonly z1: number };
+  /** the lone quarter pipe (the vert from stage 13), facing +z: its lip at zLip, x0..x1 wide; r and r13 its radius before and from 13 */
+  readonly qp: { readonly x0: number; readonly x1: number; readonly zLip: number; readonly r: number; readonly r13: number };
+  /** the funbox: its flat top's middle, half sizes, its height, each slope's run along x */
+  readonly funbox: { readonly x: number; readonly z: number; readonly hw: number; readonly hd: number; readonly h: number; readonly run: number };
+  /** the pool bowl: its middle and half sizes */
+  readonly bowl: { readonly x: number; readonly z: number; readonly hw: number; readonly hd: number };
 }
 
 /** a land queue's places, apart (layout and the queue's overflow) */
@@ -184,6 +220,33 @@ export interface Segment {
   readonly speed: number;
   /** the activity before (the transition the renderer plays, spec §5), null for the first */
   readonly from: ActivityKind | null;
+  /** how the map draws an idle bim here (skate.ts): skating in the park; absent: the activity's own pose */
+  readonly pastime?: Pastime;
+  /** it skated just before: it walks off with its board kicked up into its hand */
+  readonly fromSkate?: boolean;
+}
+
+/**
+ * An idle bim's pastime on a map with a park (skate.ts, architect m_28726): a look, never a fact,
+ * so the activity stays 'nap' or 'snack'. `slot`: its park spot; `pool`: the Sunday pool session
+ * (the bowl only); `nine`: it tries the 900 on the vert (the 900th job); `stage`: what is built.
+ */
+export interface Pastime {
+  readonly kind: 'skate';
+  readonly slot: number;
+  readonly pool: boolean;
+  readonly nine: boolean;
+  readonly stage: number;
+}
+
+/** What the pastimes read past the activities (timeline.update): the stage, the jobs' high-water mark, his local day, reduced motion. */
+export interface FunIn {
+  readonly stage: number;
+  readonly jobs: number;
+  /** his local date: 0 sunday .. 6 saturday, and the days since 1970 (one Sunday in four) */
+  readonly dow: number;
+  readonly day: number;
+  readonly reduced: boolean;
 }
 
 /** Where a bim is at a time t (timeline.ts `poseAt`): the renderer's only input for its place. */
@@ -204,7 +267,7 @@ export interface Pose extends Pt {
  * 'still' stopped until the next snapshot, hover, size or theme change. Asleep, napping, on the
  * terrace, failed, blocked, stopped or in line are still poses: no breathing loop in v1.
  */
-export type Motion = 'walk' | 'loop' | 'still';
+export type Motion = 'walk' | 'skate' | 'loop' | 'still';
 export const LOOP_FPS = 8;
 
 // ---- the pure modules' entry points (each module exports a function of this type under that name)
@@ -218,8 +281,11 @@ export type LayoutFn = (agents: readonly Agent[], map?: MapId) => Office;
 /** timeline.ts `newTimeline`: one per mounted office, fed at each snapshot change and each frame. */
 export interface Timeline {
   /** a new snapshot's activities (or the same ones at a later t): new segments for what changed */
-  /** `beds`: the lounge spots with a bean bag at this stage (growth.ts bedsAt; all when absent): past them a napper naps at its desk */
-  update(acts: ReadonlyMap<string, Activity>, office: Office, t: number, events: readonly BimEvent[], beds?: number): void;
+  /**
+   * `beds`: the lounge spots with a bean bag at this stage (growth.ts bedsAt; all when absent): past them a napper naps at its desk.
+   * `fun`: what the pastimes read (skate.ts: who skates on a map with a park); absent: nobody skates
+   */
+  update(acts: ReadonlyMap<string, Activity>, office: Office, t: number, events: readonly BimEvent[], beds?: number, fun?: FunIn): void;
   /** where a bim is at t; null for one the timeline doesn't know (or that has left) */
   poseAt(name: string, t: number): Pose | null;
   /** the bims on the map at t, a leaving one until it's out */
@@ -239,6 +305,8 @@ export type LabelsFn = (
     readonly agents: readonly Agent[];
     /** the eggs' words by bim (eggs.ts eggLabels): shown where no hover or event label is */
     readonly eggs?: ReadonlyMap<string, string>;
+    /** the bim the office follows (focus.ts, the 2.2x zoom): a skater's trick name shows over it alone, never in the normal view */
+    readonly follow?: string | null;
   },
 ) => ReadonlyMap<string, Label>;
 

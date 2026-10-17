@@ -7,10 +7,13 @@
 // a BimEvent message from { who: 'you' }) put a paper plane on the target's pose; the agents'
 // messages and reports (the hub's hub/activity, spec §6) play a coffee, a visit or a report for a
 // few seconds over the row's activity (playEvents). `poseAt` / `names` / `moving` read it
-// at any t. Pure: the same updates give the same poses. Spots shared by several bims (bean
+// at any t. On a map with a park, some idle bims skate (skate.ts pastimes, a look over the activity):
+// their segment goes to a park spot and carries the pastime the renderer poses; back, the board in
+// hand (fromSkate). Pure: the same updates give the same poses. Spots shared by several bims (bean
 // bags, island, whiteboard, deck chairs) go first come first served; past the last one, a bim
 // stands beside (spec §3).
-import { type Activity, type BimEvent, type Office, type Pose, QUEUE_GAP, type Segment, type Spot, type Timeline } from './model';
+import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, QUEUE_GAP, type Segment, type Spot, type Timeline } from './model';
+import { pastimes } from './skate';
 import { along, makePath, path } from './paths';
 
 /** tiles per second (spec §3): walk, hurry (an urgent ask), skate (done, leaving), carrying a box (landing) */
@@ -88,7 +91,7 @@ export function newTimeline(): Timeline {
   };
 
   return {
-    update(acts: ReadonlyMap<string, Activity>, next: Office, t: number, events: readonly BimEvent[], beds?: number): void {
+    update(acts: ReadonlyMap<string, Activity>, next: Office, t: number, events: readonly BimEvent[], beds?: number, fun?: FunIn): void {
       const first = office === null;
       // a room that grew (the loft's rows, its 3 columns) or another map: its world is rebuilt, every bim at its spot in it
       const rebuilt = office !== null && (office.map !== next.map || office.size !== next.size);
@@ -96,16 +99,21 @@ export function newTimeline(): Timeline {
       const held = new Map<string, string>();
       for (const [name, b] of bims) if (b.key && !b.leaving) held.set(b.key, name);
       playEvents(bims, acts, events, t, seen);
+      for (const b of bims.values()) if (b.over && t >= b.over.until) b.over = null;
+      // a map with a park: some idle bims skate there (skate.ts; a look over the activity, never one played over an event)
+      const idleNow = new Map([...acts].filter(([name]) => bims.get(name)?.over == null));
+      const fun2 = pastimes(idleNow, next, t, fun);
 
       for (const [name, row] of acts) {
         let b = bims.get(name);
-        if (b?.over && t >= b.over.until) b.over = null;
         const act = bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, beds);
-        const sig = sigOf(act);
+        const pt = b?.over ? undefined : fun2.get(name);
+        const parkSpot = pt ? next.park?.spots[pt.slot] : undefined;
+        const sig = pt && parkSpot ? `skate|${String(pt.slot)}|${pt.pool ? 'pool' : ''}|${pt.nine ? '900' : ''}` : sigOf(act);
         const last = b?.segs.at(-1);
-        const fixed = fixedSpot(next, name, act);
+        const fixed = parkSpot ?? fixedSpot(next, name, act);
         // a napper at its desk goes to a bean bag built since (bedFor): the same sig, another place
-        if (b && last && !b.leaving && last.sig === sig && last.act.at === act.at && !rebuilt && (!fixed || near(fixed, last.spot))) continue;
+        if (b && last && !b.leaving && last.sig === sig && (parkSpot !== undefined || last.act.at === act.at) && !rebuilt && (!fixed || near(fixed, last.spot))) continue;
         if (b?.key) held.delete(b.key);
         const shared = fixed ? null : sharedSpot(next, act.at as Shared, held, b?.pref);
         const spot = fixed ?? shared?.spot ?? next.door;
@@ -118,7 +126,7 @@ export function newTimeline(): Timeline {
           bims.set(name, b);
           // the office's first look: everyone at their spot; later, a new agent comes in by the door
           const from = first ? spot : next.door;
-          push(b, walk(next, t, act, sig, from, spot, null));
+          push(b, dress(walk(next, t, act, sig, from, spot, null), pt, undefined));
           continue;
         }
         b.key = key;
@@ -126,11 +134,11 @@ export function newTimeline(): Timeline {
         b.outAt = Infinity;
         if (rebuilt && last) {
           // the world moved under it: it stands at its spot in the new room, its segment's clock kept
-          push(b, { ...last, act, sig, spot, path: makePath([spot]), t: last.sig === sig ? last.t : t });
+          push(b, dress({ ...last, act, sig, spot, path: makePath([spot]), t: last.sig === sig ? last.t : t }, pt, undefined));
           continue;
         }
         const now = poseOf(b, t);
-        const seg = walk(next, t, act, sig, now ?? spot, spot, last ? last.act.k : null);
+        const seg = dress(walk(next, t, act, sig, now ?? spot, spot, last ? last.act.k : null), pt, last);
         push(b, seg);
         if (b.over && b.over.act === act) b.over.until = t + seg.path.len / seg.speed + b.over.stay;
       }
@@ -186,6 +194,12 @@ export function newTimeline(): Timeline {
       return false;
     },
   };
+}
+
+/** a segment with its pastime (skate.ts), and whether it walks off the park with its board in hand */
+function dress(seg: Segment, pt: Pastime | undefined, last: Segment | undefined): Segment {
+  const plain: Segment = { t: seg.t, act: seg.act, sig: seg.sig, spot: seg.spot, path: seg.path, speed: seg.speed, from: seg.from };
+  return { ...plain, ...(pt ? { pastime: pt } : {}), ...(!pt && last?.pastime ? { fromSkate: true } : {}) };
 }
 
 /** what makes two activities the same stretch: its kind, its rank in the queue, its trip, the other bim of a message */
