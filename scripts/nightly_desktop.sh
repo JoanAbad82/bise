@@ -102,8 +102,19 @@ as_he_does() {
   else record "$mode" green; fi
 }
 
-# apps/desktop's node_modules, once (a fresh nightly tree has none)
-deps() { [ -d "$here/apps/desktop/node_modules/@playwright/test" ] || ( cd "$here/apps/desktop" && "$pnpm" install --frozen-lockfile --prefer-offline ); }
+# apps/desktop's node_modules, once (a fresh nightly tree has none); pnpm 10 skips Electron's
+# postinstall (tests/harness/README.md 'Electron'): the harness then takes the shared patched one,
+# ~/.bise/dev/electron-dist/v<version>-lsui (night1: every test:land check 'no Electron at …')
+deps() {
+  [ -d "$here/apps/desktop/node_modules/@playwright/test" ] || ( cd "$here/apps/desktop" && "$pnpm" install --frozen-lockfile --prefer-offline ) || return 1
+  local v shared
+  if [ -z "${BISE_HARNESS_ELECTRON_DIST:-}" ] && [ ! -d "$here/apps/desktop/node_modules/electron/dist/Electron.app" ]; then
+    v="$(jq -r .version "$here/apps/desktop/node_modules/electron/package.json" 2>/dev/null)"
+    shared="$HOME/.bise/dev/electron-dist/v$v-lsui"
+    [ -d "$shared/Electron.app" ] || { echo "no Electron: node_modules/electron/dist is empty and $shared has none"; return 1; }
+    export BISE_HARNESS_ELECTRON_DIST="$shared"
+  fi
+}
 
 app="" cdir="" made=""
 for s in "${steps[@]}"; do
