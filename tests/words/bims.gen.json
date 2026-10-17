@@ -393,6 +393,49 @@
     "one": null,
     "text": "bims: your agents in their office"
   },
+  "bims.town_back": {
+    "args": [],
+    "one": null,
+    "text": "town"
+  },
+  "bims.town_back_tip": {
+    "args": [],
+    "one": null,
+    "text": "back to the whole town"
+  },
+  "bims.town_label": {
+    "args": [],
+    "one": null,
+    "text": "the town: one office per project"
+  },
+  "bims.town_open": {
+    "args": [],
+    "one": null,
+    "text": "open"
+  },
+  "bims.town_open_tip": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "open {project}"
+  },
+  "bims.town_sign_label": {
+    "args": [
+      "project",
+      "at_work",
+      "asks"
+    ],
+    "one": null,
+    "text": "{project}: {at_work} working, {asks} asking you"
+  },
+  "bims.town_sign_tip": {
+    "args": [
+      "project"
+    ],
+    "one": null,
+    "text": "look inside {project}"
+  },
   "bims.view_bims_tip": {
     "args": [],
     "one": null,

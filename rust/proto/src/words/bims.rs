@@ -170,4 +170,18 @@ crate::words! { bims:
     map_pick_tip(map) = "draw this project's office as the {map}";
     /// the tip on the row of the map it has now
     map_current_tip(map) = "this project's office is the {map} now";
+
+    // ---- the town on bise's thread (page bims-maps v9): one office per project, a sign in front
+    /// the town's own label (its canvas, for a screen reader)
+    town_label = "the town: one office per project";
+    /// a sign's tip: a click on it (or on its office) dives into that office
+    town_sign_tip(project) = "look inside {project}";
+    /// a sign's label for a screen reader: its name, its agents at work, his open questions
+    town_sign_label(project, at_work, asks) = "{project}: {at_work} working, {asks} asking you";
+    /// the dived office's sign: opens the project's main thread
+    town_open = "open";
+    town_open_tip(project) = "open {project}";
+    /// the dived office's way back to the whole town (esc does it too)
+    town_back = "town";
+    town_back_tip = "back to the whole town";
 }

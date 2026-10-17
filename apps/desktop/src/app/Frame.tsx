@@ -412,7 +412,7 @@ export function Titlebar({ frame }: { frame: FrameState }) {
   const crumb = crumbOf(route, name);
   const panelOn =
     frame.panel !== undefined && (frame.panel.docked || frame.over === "panel");
-  // les bims' icon (Gabriel: the head's toggle wasn't clear): a project's bar only, like the office
+  // les bims' icon (Gabriel: the head's toggle wasn't clear): a project's office, the town on bise's thread
   const view = useBimsView();
   const officeOn = panelOn && view.view === "bims";
   return (
@@ -471,7 +471,7 @@ export function Titlebar({ frame }: { frame: FrameState }) {
       {/* les bims' icon (Gabriel's pick D on page bims-icon, designer m_28575): the solid accent box
           with its eyes cut out, the accent at rest, hovered and open; hover and open are the
           button's own tints, like the right bar's toggle beside it */}
-      {frame.panel !== undefined && frame.panel.project !== "" && view.lost !== true && (
+      {frame.panel !== undefined && view.lost !== true && (
         <span className="app-btg">
         <IconButton
           label={bims.title_bims_tip}

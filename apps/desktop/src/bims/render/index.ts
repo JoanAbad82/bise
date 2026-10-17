@@ -49,6 +49,9 @@ const HALO = { inner: 0.34, outer: 0.5, alpha: 0.28, day: '#1d1a17', night: '#f3
 
 const testMode = (): boolean => (window as Partial<Window> & { bise?: { test?: boolean } }).bise?.test === true;
 
+/** the town on bise's thread (render/town.ts): in this chunk too, so three loads once */
+export { makeTownRenderer } from './town';
+
 export const makeRenderer: MakeRenderer = (canvas) => {
   const renderer = new WebGLRenderer({ canvas, antialias: STYLE.antialias, alpha: false, powerPreference: 'low-power' });
   renderer.shadowMap.enabled = STYLE.shadows;

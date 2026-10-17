@@ -72,9 +72,9 @@ export function useBimsView(): BimsView {
   );
 }
 
-/** Whether the bar shows wide now: bims on, wide picked, and a project's bar (bise's thread keeps the list in v1). Pure. */
+/** Whether the bar shows wide now: bims on, wide picked, and a bar (a project's office, or the town on bise's thread). Pure. */
 export function showsWide(v: BimsView, project: string | undefined): boolean {
-  return v.view === 'bims' && v.wide && v.lost !== true && project !== undefined && project !== '';
+  return v.view === 'bims' && v.wide && v.lost !== true && project !== undefined;
 }
 
 /**

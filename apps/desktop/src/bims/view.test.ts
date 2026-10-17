@@ -31,7 +31,7 @@ describe('the kept view', () => {
     expect(showsWide({ view: 'bims', wide: true }, 'p1')).toBe(true);
     expect(showsWide({ view: 'list', wide: true }, 'p1')).toBe(false);
     expect(showsWide({ view: 'bims', wide: false }, 'p1')).toBe(false);
-    expect(showsWide({ view: 'bims', wide: true }, '')).toBe(false);
+    expect(showsWide({ view: 'bims', wide: true }, ''), "bise's thread: the town wide").toBe(true);
     expect(showsWide({ view: 'bims', wide: true }, undefined)).toBe(false);
   });
 });

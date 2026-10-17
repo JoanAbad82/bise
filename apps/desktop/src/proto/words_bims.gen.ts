@@ -164,4 +164,18 @@ export const bims = {
   map_pick_tip: (a: { map: string | number }): string => "draw this project's office as the " + String(a.map),
   /** the tip on the row of the map it has now */
   map_current_tip: (a: { map: string | number }): string => "this project's office is the " + String(a.map) + " now",
+  /** the town's own label (its canvas, for a screen reader) */
+  town_label: "the town: one office per project",
+  /** a sign's tip: a click on it (or on its office) dives into that office */
+  town_sign_tip: (a: { project: string | number }): string => "look inside " + String(a.project),
+  /** a sign's label for a screen reader: its name, its agents at work, his open questions */
+  town_sign_label: (a: { project: string | number; at_work: string | number; asks: string | number }): string => String(a.project) + ": " + String(a.at_work) + " working, " + String(a.asks) + " asking you",
+  /** the dived office's sign: opens the project's main thread */
+  town_open: "open",
+  /**  */
+  town_open_tip: (a: { project: string | number }): string => "open " + String(a.project),
+  /** the dived office's way back to the whole town (esc does it too) */
+  town_back: "town",
+  /**  */
+  town_back_tip: "back to the whole town",
 } as const;

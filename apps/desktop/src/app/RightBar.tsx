@@ -38,6 +38,9 @@ import { DoneSign } from './Marks';
 import { BimsSwitch, Office } from '@/bims/Office';
 import { parts as bimsParts } from '@/bims/feed';
 import { BimsFold } from '@/bims/Fold';
+import { Town } from '@/bims/town/Town';
+import { townParts } from '@/bims/town/feed';
+import { useTownProjects } from '@/bims/town/useTown';
 import { mapOf, mapPrefKey } from '@/bims/maps/ids';
 import { getPref, type Prefs } from '@/settings/prefs';
 import { showsWide, useBimsView, wideMode } from '@/bims/view';
@@ -492,9 +495,10 @@ export function RightBar({ project, name, over, column }: { project: string; nam
     router.go({ screen: 'thread', project: p, agent });
   };
   const here = (p: string, agent: string) => route.screen === 'thread' && route.project === p && route.agent === agent;
-  // the office above the AGENTS rows (les bims): a project's bar only, bise's thread keeps the list in v1
+  // the office above the AGENTS rows (les bims); on bise's thread the town: one office per project (bims/town)
   const bims = useBimsView();
-  const office = !all && bims.view === 'bims';
+  const office = bims.view === 'bims';
+  const townProjects = useTownProjects();
   const officeAgents = useMemo(() => agents.filter((x) => !x.a.archived).map((x) => x.a), [agents]);
   // the row <-> bim link (bims/focus.ts): a row hovered lights its bim, a bim hovered its row
   const lit = useBimsLit();
@@ -528,9 +532,20 @@ export function RightBar({ project, name, over, column }: { project: string; nam
           onAll={() => {
             router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
           }}
-          act={all ? undefined : <BimsSwitch view={bims} />}
+          act={<BimsSwitch view={bims} />}
           office={
-            all ? undefined : (
+            all ? (
+              <BimsFold open={office}>
+                <Town
+                  projects={townProjects}
+                  parts={townParts}
+                  onOpenProject={(p) => {
+                    router.go({ screen: 'thread', project: p, agent: 'main' });
+                  }}
+                  onOpenAgent={openAgent}
+                />
+              </BimsFold>
+            ) : (
               <BimsFold open={office}>
               <Office
                 project={project}

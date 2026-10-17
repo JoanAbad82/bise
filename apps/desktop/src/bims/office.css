@@ -367,3 +367,94 @@
   opacity: 1;
   transition: none;
 }
+/* the town on bise's thread (town/Town.tsx, maps-e): the town's canvas over the dived Office while
+   one fades into the other; the signs in front of the offices (name, ∿ working, the pink ? n) */
+.bims-town-box {
+  position: relative;
+  outline: none;
+}
+.bims-town-box > .bims-town[data-top] {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 3;
+  transition: opacity 260ms var(--ease-out, ease-out);
+}
+.bims-town-box > .bims-town[data-fade='out'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.bims-town-box > .bims-town[data-phase='office'] > .bims-canvas {
+  visibility: hidden;
+}
+/* the Office alone: the town's canvas hidden, the dived office's sign (its 'open') stays over it */
+.bims-town-box > .bims-town[data-phase='office'] {
+  pointer-events: none;
+}
+.bims-town[data-pointer] {
+  cursor: pointer;
+}
+.bims-sign {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 88%, transparent);
+  color: var(--c-text);
+  font: var(--t-11) / 1.6 var(--font-ui);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--c-text) 12%, transparent);
+}
+.bims-sign-name {
+  font-weight: 600;
+}
+.bims-sign-work {
+  color: var(--c-text-2);
+  font-family: var(--font-mono);
+}
+.bims-sign .bims-pill.asks {
+  padding: 0 var(--s-1);
+  height: auto;
+  line-height: 1.5;
+}
+.bims-sign[data-here] {
+  cursor: default;
+}
+.bims-sign-open {
+  padding: 0 0 0 var(--s-1);
+  border: 0;
+  background: none;
+  color: var(--c-text-2);
+  font: var(--t-11) / 1.6 var(--font-ui);
+  cursor: pointer;
+}
+.bims-sign-open:hover {
+  color: var(--c-text);
+}
+/* the dived office's way back to the town: top left (the Office's own '⤢ fit' is top right) */
+.bims-town-back {
+  position: absolute;
+  top: var(--s-1);
+  left: var(--s-1);
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
+  color: var(--c-text-2);
+  font: var(--t-11) / 1.6 var(--font-ui);
+  cursor: pointer;
+  z-index: 4;
+}
+.bims-town-back:hover {
+  color: var(--c-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-town-box > .bims-town[data-top] {
+    transition: none;
+  }
+}
