@@ -3,6 +3,8 @@
 // absolute path rides the send's image part; any other dropped or Finder-copied file goes by its
 // own path as a file part (file-chips). Shared by the window's composer and the spotlight, so both
 // attach the same way.
+import type { FileFacts } from '../shared/api';
+import type { Chip } from './message';
 import { isImagePath, type SavedImage } from './sources';
 
 /** window.bise when the page runs in bise's windows (unit tests have none). */
@@ -31,7 +33,26 @@ export async function fileIconOf(path: string): Promise<string | null> {
   return api.fileIcon(path);
 }
 
-/** A small thumbnail of an image as a data URL (48 px on its long side); null when it doesn't decode. */
+/** A file on disk's size, and an image's pixels and thumbnail (main's window.bise.fileFacts);
+ *  null: none (unit tests, out of the fence). */
+export async function fileFactsOf(path: string): Promise<FileFacts | null> {
+  const api = bise();
+  if (api?.fileFacts === undefined) return null;
+  return api.fileFacts(path);
+}
+
+/** A picked file's chip with what main read of it: an image's thumbnail, pixels and size, a
+ *  file's system icon and size; null when nothing was read (the chip stays as it is). */
+export async function pickedFacts(c: Chip): Promise<Chip | null> {
+  if (c.kind !== 'image' && c.kind !== 'file') return null;
+  const [facts, icon] = await Promise.all([fileFactsOf(c.path), c.kind === 'file' ? fileIconOf(c.path) : Promise.resolve(null)]);
+  if (facts === null && icon === null) return null;
+  const bytes = facts === null ? {} : { bytes: facts.bytes };
+  if (c.kind === 'file') return { ...c, ...bytes, ...(icon === null ? {} : { icon }) };
+  const dims = facts?.w !== undefined && facts.h !== undefined ? { w: facts.w, h: facts.h } : {};
+  return { ...c, ...bytes, ...dims, ...(facts?.thumb === undefined ? {} : { thumb: facts.thumb }) };
+}
+
 /** An image's pixels (the attachment list's row says '1200×630'), null when it can't be read. */
 export async function imageDims(f: File): Promise<{ w: number; h: number } | null> {
   try {

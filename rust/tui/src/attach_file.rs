@@ -4,13 +4,15 @@
 //! path="…">` marker the chip becomes where it was (`bise_proto::parts`).
 //!
 //! - in the composer: the label `[File #N]` (the images', quotes' and
-//!   pastes' one number sequence, `attach::next_number`), drawn `▯ 2`;
-//!   the strip's row `▯ 2  deck.pptx  2.1 MB  ~/Desktop`;
+//!   pastes' one number sequence, `attach::next_number`), drawn with
+//!   its name `▯ deck.pptx` (designer m_27881, `parts::file_chip_name`);
+//!   the strip's row keeps its number `▯ 2  deck.pptx  2.1 MB  ~/Desktop`;
 //! - sources ([`on_paste`], [`pick`]): a paste or a drop of paths that are
 //!   all files (an image by its extension goes to the image store, any
 //!   other file is a file chip; an image the store refuses too); an `@`
-//!   pick of an image or a document (`parts::pick_kind`: the one table),
-//!   a code file stays its `@path` text;
+//!   pick of any file the same way (`parts::chip_kind`: the one table),
+//!   code too, its chip where the `@token` was and the cursor after it
+//!   (at-chips);
 //! - in the history ([`spans`]): `▯ deck.pptx`, `▯ deck.pptx · missing`
 //!   (only `missing` in the error tone) when the hub found no file at send
 //!   time; the chip is a link (`open_file::chip_url`): a click previews,
@@ -22,10 +24,28 @@ use crate::theme::{error, glyph, G_FILE};
 use bise_proto::parts::{self, ChipKind, Part};
 use ratatui::style::Style;
 use ratatui::text::Span;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::Path;
 
 /// How a file chip's label starts: `[File #2]`.
 pub(crate) const OPEN: &str = "[File #";
+
+// the words each file chip shows, by its label (designer m_27881: its
+// name, `parts::file_chip_name`), as artifact chips keep their titles
+thread_local! {
+    static NAMES: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
+}
+
+/// The chip `label` stands for the file at `path`: it shows its name.
+pub(crate) fn name_chip(label: &str, path: &str) {
+    NAMES.with(|t| t.borrow_mut().insert(label.to_string(), parts::file_chip_name(path)));
+}
+
+/// The name a file chip shows (None: not a file chip, or not known).
+pub(crate) fn chip_words(label: &str) -> Option<String> {
+    label.starts_with(OPEN).then(|| NAMES.with(|t| t.borrow().get(label).cloned())).flatten()
+}
 
 /// The file labels `[File #N]` in `text` (`attach::chips`).
 pub(crate) fn chips(text: &str) -> Vec<(usize, usize, usize)> {
@@ -41,13 +61,14 @@ pub(crate) fn path_of(a: &Attachment) -> Option<String> {
 }
 
 /// Attach the file at `path` (absolute) as a chip at the cursor: the chip
-/// for the flash (`▯ 2`).
+/// for the flash (`▯ deck.pptx`).
 pub(crate) fn attach_path(app: &mut App, path: &Path) -> String {
     let n = attach::next_number(app);
     let label = parts::file_label(n);
     let abs = path.to_string_lossy().to_string();
     let bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
     let marker = parts::file_marker(&label, &abs, false);
+    name_chip(&label, &abs);
     app.attachments.push(Attachment { label: label.clone(), marker, info: Info { source: abs, bytes, ..Info::default() } });
     attach::insert_chip(&mut app.ed, &label);
     attach::chip_name(&label)
@@ -71,7 +92,7 @@ pub(crate) fn on_paste(app: &mut App, text: &str) -> Option<Result<Vec<String>, 
 /// `path` attached: an image chip when it is an image the store takes,
 /// else a file chip.
 fn attach_one(app: &mut App, path: &Path, shown: &str) -> String {
-    if parts::drop_kind(&path.to_string_lossy()) == ChipKind::Image {
+    if parts::chip_kind(&path.to_string_lossy()) == ChipKind::Image {
         if let Ok(l) = attach::attach_file(app, path, shown) {
             return l;
         }
@@ -79,13 +100,11 @@ fn attach_one(app: &mut App, path: &Path, shown: &str) -> String {
     attach_path(app, path)
 }
 
-/// The picked `@` entry is an image or a document: attached (the
-/// `@token` goes). Its chip, or None when it stays `@path` text (code).
-pub(crate) fn pick(app: &mut App, rel: &str) -> Option<Result<String, String>> {
-    let kind = parts::pick_kind(rel);
-    if kind == ChipKind::Text {
-        return None;
-    }
+/// The picked `@` file attached where the `@token` was, the cursor after
+/// its chip (at-chips): an image to the store (a file chip when the store
+/// refuses it), any other file, code too, a file chip. Its chip, or None
+/// when there is no `@token` or no such file (the pick stays its text).
+pub(crate) fn pick(app: &mut App, rel: &str) -> Option<String> {
     let (start, _) = crate::files::token(&app.ed.text, app.ed.cursor)?;
     let cursor = app.ed.cursor;
     // the root the `@` popup searched (commands::at_items)
@@ -105,18 +124,8 @@ pub(crate) fn pick(app: &mut App, rel: &str) -> Option<Result<String, String>> {
     let tail: String = chars.get(cursor..).unwrap_or(&[]).iter().collect();
     let tail = tail.strip_prefix(' ').map(str::to_string).unwrap_or(tail);
     let at = head.chars().count();
-    let before = app.ed.text.clone();
     app.ed.set(&format!("{head}{tail}"), at);
-    if kind == ChipKind::File {
-        return Some(Ok(attach_path(app, &path)));
-    }
-    match attach::attach_file(app, &path, rel) {
-        Ok(l) => Some(Ok(l)),
-        Err(e) => {
-            app.ed.set(&before, cursor);
-            Some(Err(e))
-        }
-    }
+    Some(attach_one(app, &path, rel))
 }
 
 /// The strip's right side for a file: `2.1 MB  ~/Desktop` (designer

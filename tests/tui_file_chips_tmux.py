@@ -2,8 +2,9 @@
 m_21765, main m_21751), in a real terminal (tmux) against the fake
 provider: a drop of a pdf, a csv, an xlsx, a docx and a pptx (their
 shell-escaped paths pasted, as a terminal does) and an image becomes one
-chip each in the composer (`▯ N`, `▣ N`), with the attachments box rows
-`▯ 5  deck.pptx  …  <folder>`; an `@` pick of a document is a chip too.
+chip each in the composer (`▯ deck.pptx`, `▣ N`), with the attachments box rows
+`▯ 5  deck.pptx  …  <folder>`; an `@` pick of a document, of code and of
+an image is a chip too, where the `@` was, the cursor after it (at-chips).
 On send the model gets each file as `<file name="[File #N]" path="…">`
 where its chip was, next to the image; the history shows `▯ deck.pptx`,
 and `· missing` for one deleted before the send. A click on a chip
@@ -82,6 +83,13 @@ def main():
     os.makedirs(os.path.join(E.ws, "docs"))
     with open(os.path.join(E.ws, "docs", "roadmap.pdf"), "w") as f:
         f.write("pdf")
+    # at-chips: an @ pick of code and of an image are chips at the @ too
+    os.makedirs(os.path.join(E.ws, "extension", "test"))
+    with open(os.path.join(E.ws, "extension", "test", "e2e.mjs"), "w") as f:
+        f.write("import { test } from 'node:test';\n")
+    os.makedirs(os.path.join(E.ws, "shots"))
+    with open(os.path.join(E.ws, "shots", "screen.png"), "wb") as f:
+        f.write(PNG)
     E.env["BEND_IMAGE_DIR"] = os.path.join(E.tmp, "images")
     rec = os.path.join(E.tmp, "opened")
     with tui_session(150, 42, "BISE_OPEN_RECORD=%s" % rec, E=E) as t:
@@ -93,7 +101,7 @@ def main():
         wait_until(lambda: "▣ 1" in composer(t), 10, lambda: "no image chip: %r" % composer(t))
         t.typed("dans la presentation powerpoint ")
         paste(t, paths["deck.pptx"].replace(" ", "\\ "))
-        wait_until(lambda: "▯ 2" in composer(t), 10, lambda: "no file chip: %r" % composer(t))
+        wait_until(lambda: "▯ deck.pptx" in composer(t), 10, lambda: "no file chip: %r" % composer(t))
         t.wait("╭─ %s ─" % w("composer.box_title"))
         # the row whole, its size with it: a wait on the name alone took a
         # screen captured while the row was drawn, name before size (issue 26)
@@ -102,12 +110,26 @@ def main():
         # the four other documents in one drop, and one deleted before the send
         t.typed("avec ")
         paste(t, " ".join(paths[n].replace(" ", "\\ ") for n in DOCS[:4] + ["gone.csv"]))
-        wait_until(lambda: "▯ 7" in composer(t), 10, lambda: "not five more chips: %r" % composer(t))
+        wait_until(lambda: "▯ gone.csv" in composer(t), 10, lambda: "not five more chips: %r" % composer(t))
         # an @ pick of a document: a chip, not its path
         t.typed(" @roadm")
         t.wait("docs/roadmap.pdf")
         t.keys("Tab")
-        wait_until(lambda: "▯ 8" in composer(t), 10, lambda: "the @ pick is no chip: %r" % composer(t))
+        wait_until(lambda: "▯ roadmap.pdf" in composer(t), 10, lambda: "the @ pick is no chip: %r" % composer(t))
+        # at-chips: code and an image picked with @ are chips where the @ was, the
+        # cursor right after them (the words typed next come after), no path as text
+        t.typed(" @e2e")
+        t.wait("extension/test/e2e.mjs")
+        t.keys("Enter")
+        wait_until(lambda: "▯ e2e.mjs" in composer(t), 10, lambda: "the @ pick of code is no chip: %r" % composer(t))
+        t.typed("puis @scre")
+        t.wait("shots/screen.png")
+        t.keys("Enter")
+        wait_until(lambda: "▣ 10" in composer(t), 10, lambda: "the @ pick of an image is no chip: %r" % composer(t))
+        t.typed("fin")
+        # a file chip says its name (designer m_27881), never its path; the box's row its number
+        assert "extension/test" not in composer(t) and "screen.png" not in composer(t), composer(t)
+        t.wait_re(r"▯ 9  e2e\.mjs")
         os.remove(paths["gone.csv"])
         t.keys("Enter")
         # the model's text: each chip at its place, next to the image block
@@ -117,10 +139,12 @@ def main():
         mk = lambda n, p, gone=False: '<file name="[File #%d]" path="%s"%s>' % (n, p, ' missing="true"' if gone else "")
         order = ["ajouter l'image", "<image name=[Image #1]", "dans la presentation powerpoint " + mk(2, paths["deck.pptx"]),
                  mk(3, paths["q3.pdf"]), mk(6, paths["brief.docx"]), mk(7, paths["gone.csv"], True),
-                 mk(8, os.path.join(os.path.realpath(E.ws), "docs", "roadmap.pdf"))]
+                 mk(8, os.path.join(os.path.realpath(E.ws), "docs", "roadmap.pdf")),
+                 mk(9, os.path.join(os.path.realpath(E.ws), "extension", "test", "e2e.mjs")) + " puis ",
+                 "<image name=[Image #10]", " fin"]
         at = [user.find(s) for s in order]
         assert all(i >= 0 for i in at) and at == sorted(at), (user, list(zip(order, at)))
-        assert len(reqs[-1]["images"]) == 1, reqs[-1]["images"]
+        assert len(reqs[-1]["images"]) == 2, reqs[-1]["images"]
         # the history: the chips by name, the gone one missing, no marker
         sc = shown(t, "▯ deck.pptx")
         assert "▯ gone.csv · missing" in sc and "▯ roadmap.pdf" in sc, sc

@@ -23,6 +23,11 @@ describe('attachRow', () => {
   it('a file: its name, its size and its folder under ~', () => {
     expect(attachRow(file, '/Users/g')).toEqual({ name: 'deck.pptx', info: '2.1 MB · ~/Desktop' });
   });
+  it('a long folder loses whole folders from the left, never a cut name (designer m_27940)', () => {
+    const deep: Chip = { kind: 'file', n: 2, path: '/Users/g/.bise/hubs/harness-3abb2bd8/agents/at-chips/tmp/e2e.mjs' };
+    expect(attachRow(deep, '/Users/g')?.info).toBe('~/…/harness-3abb2bd8/agents/at-chips/tmp');
+    expect(attachRow({ ...deep, path: '/opt/a-very-long-folder-name-that-alone-is-too-wide-for-the-row/x.rs' }, '/Users/g')?.info).toBe('/…/a-very-long-folder-name-that-alone-is-too-wide-for-the-row');
+  });
   it('a paste: its first words, its lines and size', () => {
     expect(attachRow(paste)?.info).toBe('14 lines · 0.1 kB');
   });
@@ -61,10 +66,10 @@ describe('AttachList', () => {
 });
 
 describe('the chips in the text', () => {
-  it("say their number: '❝ 1', the image's thumb slot and 2, '▯ 3'", () => {
+  it("say their number: '❝ 1', the image's thumb slot and 2; a file its name, '▯ deck.pptx' (designer m_27881)", () => {
     expect(chipDom(quote).textContent).toBe('❝ 1');
     expect(chipDom(img).textContent.endsWith('2')).toBe(true);
-    expect(chipDom(file).textContent).toBe('▯3');
+    expect(chipDom(file).textContent).toBe('▯deck.pptx');
     expect(chipDom(file).dataset.n).toBe('3');
   });
 });

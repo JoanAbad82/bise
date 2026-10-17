@@ -29,9 +29,9 @@
 //!   m_21764: a file by its path, ` missing="true"` when the hub found
 //!   none at send time), then the list of his files that have no chip (a
 //!   `files` list, an old journal).
-//! - [`pick_kind`] / [`drop_kind`]: the one table of what a path he
-//!   attaches becomes (an image chip, a file chip, text), with
-//!   [`IMAGE_EXTS`] / [`DOC_EXTS`] (the window reads them generated).
+//! - [`chip_kind`]: the one table of what a path he attaches becomes (an
+//!   image chip by [`IMAGE_EXTS`], which the window reads generated, else
+//!   a file chip), an `@` pick and a drop alike.
 //! - [`parse`]: an old text read back (an old journal, an older client
 //!   that sends text only). Lossless: `render(&parse(t)) == t` for every
 //!   text, because a tag is a part only when rendering that part again
@@ -283,8 +283,6 @@ pub enum ChipKind {
     Image,
     /// a file chip (`[File #N]`)
     File,
-    /// stays text (an `@path` he picked: code the agent reads itself)
-    Text,
 }
 
 /// The marks that take no space after a chip: '❝ 1, which?', never
@@ -297,12 +295,6 @@ pub const NO_SPACE_BEFORE: &[char] = &['.', ',', ';', ':', '!', '?', ')', ']'];
 /// The extensions of an image chip (bend_images' `has_image_ext`).
 pub const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp"];
 
-/// The extensions an `@` pick makes a file chip of: documents, not code.
-/// A dropped or pasted file is a chip whatever its extension.
-pub const DOC_EXTS: &[&str] = &[
-    "pdf", "csv", "tsv", "xls", "xlsx", "xlsm", "doc", "docx", "ppt", "pptx", "key", "numbers", "pages", "odt", "ods", "odp", "rtf", "epub",
-];
-
 /// A path's extension, lower case ("" none).
 fn ext_of(path: &str) -> String {
     let name = path.rsplit('/').next().unwrap_or(path);
@@ -312,25 +304,15 @@ fn ext_of(path: &str) -> String {
     }
 }
 
-/// What an `@` pick of `path` becomes: an image, a document's file chip,
-/// or its `@path` text.
-pub fn pick_kind(path: &str) -> ChipKind {
-    let ext = ext_of(path);
-    if IMAGE_EXTS.contains(&ext.as_str()) {
+/// What a file he attaches becomes (an `@` pick, a drop, a paste, the
+/// '+'): an image chip by its extension, else a file chip, code too
+/// (at-chips: a picked `e2e.mjs` is a chip at the `@`, its path in the
+/// attachment list, never its path as text).
+pub fn chip_kind(path: &str) -> ChipKind {
+    if IMAGE_EXTS.contains(&ext_of(path).as_str()) {
         ChipKind::Image
-    } else if DOC_EXTS.contains(&ext.as_str()) {
-        ChipKind::File
     } else {
-        ChipKind::Text
-    }
-}
-
-/// What a dropped or pasted file becomes: an image by its extension,
-/// else a file chip (never text: he dropped it to attach it).
-pub fn drop_kind(path: &str) -> ChipKind {
-    match pick_kind(path) {
-        ChipKind::Image => ChipKind::Image,
-        _ => ChipKind::File,
+        ChipKind::File
     }
 }
 
@@ -342,6 +324,22 @@ pub fn file_label(n: usize) -> String {
 /// The last segment of a path (the chip's words): `deck.pptx`.
 pub fn file_name(path: &str) -> &str {
     path.trim_end_matches('/').rsplit('/').next().unwrap_or(path)
+}
+
+/// The most characters a file chip in the composer shows of its name
+/// (designer m_27881; the window reads it generated).
+pub const FILE_CHIP_CHARS: usize = 24;
+
+/// A file chip's words in the composer (designer m_27881: its name, not
+/// its number, which stays in the attachment list's row): the file's
+/// name, cut at [`FILE_CHIP_CHARS`] with a glued `…`.
+pub fn file_chip_name(path: &str) -> String {
+    let name = file_name(path);
+    if name.chars().count() <= FILE_CHIP_CHARS {
+        return name.to_string();
+    }
+    let head: String = name.chars().take(FILE_CHIP_CHARS - 1).collect();
+    format!("{head}…")
 }
 
 /// The page part of a message, when it has one (a message the hub wrote

@@ -53,11 +53,12 @@ import {
   fileRows,
   skillRows,
   MAX_ROWS,
+  pickedChip,
   type Pick,
   type Row,
 } from "../pick";
-import { isDocPath, type ComposerSources, type PickFile } from "../sources";
-import { fileIconOf } from "../attach";
+import type { ComposerSources, PickFile } from "../sources";
+import { pickedFacts } from "../attach";
 import { registerGrab } from "../grab";
 import {
   argAt,
@@ -83,6 +84,7 @@ import {
   isBlank,
   nodeType,
   segmentsOf,
+  withChip,
 } from "./pmtext";
 import { useDictation } from "./dictation";
 import { fieldKey } from "./keys";
@@ -526,23 +528,28 @@ export function PmField(p: PmFieldProps): JSX.Element {
     }
     if (pick.path !== undefined && !pick.browse)
       props.current.sources.filePicked?.(pick.path); // B8/R14: the core's memory
-    // file-chips: a document (bise_proto::parts' table) becomes a file chip by its absolute
-    // path, as in the TUI; code stays its @path text
+    // at-chips: a picked file is its chip where the @word was, the caret right after it, as in
+    // the TUI (bise_proto::parts chip_kind: an image, else a file chip, code too); its path and
+    // facts go in the attachment list's row, filled in when main has read them
     const root = props.current.sources.root;
-    if (pick.path !== undefined && !pick.browse && root !== undefined && isDocPath(pick.path)) {
-      const path = `${root.replace(/\/+$/u, "")}/${pick.path}`;
+    if (pick.path !== undefined && !pick.browse && root !== undefined) {
+      const chip = pickedChip(root, pick.path, nextChipNumber(segmentsOf(st.doc)));
       replaceBefore(word, "");
-      void fileIconOf(path).then((icon) => {
-        const now = state();
-        if (now !== null)
-          dispatch(
-            insertChip(now, {
-              kind: "file",
-              n: nextChipNumber(segmentsOf(now.doc)),
-              path,
-              ...(icon === null ? {} : { icon }),
-            }),
-          );
+      const now = state();
+      if (now !== null) {
+        // one space after it, as the TUI's insert_chip and the old path text: what he types next
+        // is a new word (none when one is there already)
+        const tr = insertChip(now, chip);
+        const next = tr.doc.textBetween(tr.selection.from, Math.min(tr.doc.content.size - 1, tr.selection.from + 1), "\n", "\uFFFC");
+        if (!/^\s/u.test(next)) tr.insertText(" ");
+        dispatch(tr);
+      }
+      void pickedFacts(chip).then((full) => {
+        const later = state();
+        if (later !== null && full !== null) {
+          const tr = withChip(later, full);
+          if (tr !== null) dispatch(tr);
+        }
       });
       return;
     }

@@ -954,16 +954,12 @@ fn pick(app: &mut App, c: &PopItem) {
     }
     if let Some(p) = c.path.as_ref().filter(|_| !c.folder) {
         files::picked(p);
-        // an image or a document is attached, not inserted as a path
-        // (parts::pick_kind: code stays `@path`)
-        match crate::attach_file::pick(app, p) {
-            Some(Ok(l)) => {
-                flash(app, composer::attached(format!("{l} {}", crate::attach::file_name(p))));
-                app.popup_sel = 0;
-                return;
-            }
-            Some(Err(e)) => flash(app, composer::image_not_attached(e)),
-            None => {}
+        // a file is attached as a chip at the `@`, never inserted as a
+        // path (at-chips: parts::chip_kind, code too)
+        if let Some(l) = crate::attach_file::pick(app, p) {
+            flash(app, composer::attached(format!("{l} {}", crate::attach::file_name(p))));
+            app.popup_sel = 0;
+            return;
         }
     }
     app.ed.set(&c.fill, c.fill_cursor);

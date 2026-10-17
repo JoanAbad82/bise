@@ -4,7 +4,7 @@
 // bise-proto (amb-core's step 4: files, skills, commands); this file never names a protocol
 // message, so the composer doesn't change when the protocol does.
 
-import { DOC_EXTS, IMAGE_EXTS } from '@/proto/chips.gen';
+import { IMAGE_EXTS } from '@/proto/chips.gen';
 
 export interface PickAgent {
   readonly name: string;
@@ -156,6 +156,3 @@ const extOf = (path: string): string => {
 
 /** A file's path is an image the model can read (docs/images.md; bise_proto::parts' one table). */
 export const isImagePath = (path: string): boolean => (IMAGE_EXTS as readonly string[]).includes(extOf(path));
-
-/** An `@` pick of this path is a file chip (a document, not code: bise_proto::parts pick_kind). */
-export const isDocPath = (path: string): boolean => (DOC_EXTS as readonly string[]).includes(extOf(path));

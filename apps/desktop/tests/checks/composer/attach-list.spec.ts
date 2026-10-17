@@ -4,7 +4,7 @@
 //   - a quote (a drag over main's answer, then a key) and a drop of an image, a document and a
 //     second image make 4 rows in the box above his words, numbered by their chips' own n (1 2 3 4),
 //     each 28 px, inside the box; nothing above 'to bise' (no strip line);
-//   - the chips in the text say '❝ 1', the thumb slot and '2', '▯ 3';
+//   - the chips in the text say '❝ 1', the thumb slot and '2', '▯ deck.pptx' (a file its name);
 //   - a hovered row lights its chip, a hovered chip lights its row; the key line says
 //     'backspace on a chip removes it';
 //   - ✕ on row 2 removes the row and its chip, the others keep their numbers (1 3 4); backspace
@@ -110,7 +110,7 @@ for (const size of ['1100x720', '800x720']) {
         await expect(rows(page), 'four rows, in the order added').toHaveCount(4, { timeout: 5000 });
         const ns = await rows(page).evaluateAll((els) => els.map((e) => e.querySelector('.n')?.textContent));
         expect(ns, "each row says its chip's number").toEqual(['1', '2', '3', '4']);
-        await expect(page.locator('[data-testid="composer.chip.3"]'), "the document's chip says ▯ and its number").toHaveText('▯3');
+        await expect(page.locator('[data-testid="composer.chip.3"]'), "the document's chip says ▯ and its name (designer m_27881)").toHaveText('▯deck.pptx');
         await expect(page.getByTestId('composer.attach.3')).toContainText('deck.pptx');
         await expect(page.getByTestId('composer.attach.2').locator('.in3'), "an image row's facts: its pixels and size").toHaveText(/^\d+×\d+ · \d+ (B|kB)$/u);
         await expect(page.locator('[data-testid^="composer.strip."]'), "no strip line above 'to bise'").toHaveCount(0);

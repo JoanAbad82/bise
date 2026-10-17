@@ -2,11 +2,11 @@
 // links he opens, the clipboard, the menu's own keys. In test mode nothing
 // leaves the app: a link and a copy become stdout lines the harness reads
 // (EXTERNAL_LINE, COPY_LINE), never his browser or his clipboard.
-import { appendFile, existsSync, readFileSync } from 'node:fs';
+import { appendFile, existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, extname, isAbsolute, join } from 'node:path';
-import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell, type OpenDialogOptions } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, SAVE_COPY_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, TEST_SAVE_TO_ENV, type MenuAction, type SaveResult } from '../shared/api';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, session, shell, type OpenDialogOptions } from 'electron';
+import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, SAVE_COPY_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, TEST_SAVE_TO_ENV, type FileFacts, type MenuAction, type SaveResult } from '../shared/api';
 import { saveCopy } from './savecopy';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
@@ -153,6 +153,7 @@ export function installIpc(testMode: boolean): void {
     });
   });
   ipcMain.handle(IPC.fileIcon, (_e, raw: unknown): Promise<string | null> => fileIcon(raw, testMode));
+  ipcMain.handle(IPC.fileFacts, (_e, raw: unknown): FileFacts | null => fileFacts(raw));
   // a window's full screen now (window.bise.onFullScreen's first call)
   ipcMain.handle(IPC.fullScreen, (e): boolean => BrowserWindow.fromWebContents(e.sender)?.isFullScreen() ?? false);
   ipcMain.handle(IPC.pickFolder, (e): Promise<string | null> => pickFolder(BrowserWindow.fromWebContents(e.sender), testMode));
@@ -259,6 +260,26 @@ export async function fileIcon(raw: unknown, testMode: boolean): Promise<string 
   try {
     const img = await app.getFileIcon(p, { size: 'small' });
     return img.isEmpty() ? null : img.toDataURL();
+  } catch {
+    return null;
+  }
+}
+
+/** window.bise.fileFacts (at-chips): a picked file's size, and an image's pixels and 48 px
+ *  thumbnail (decoded here, never QuickLook); null out of the fence or unreadable. Test mode
+ *  reads too: the harness's files are its own. */
+export function fileFacts(raw: unknown): FileFacts | null {
+  const p = lookable(raw);
+  if (p === null) return null;
+  try {
+    const bytes = statSync(p).size;
+    if (MIME[extname(p).toLowerCase()]?.startsWith('image/') !== true) return { bytes };
+    const img = nativeImage.createFromPath(p);
+    if (img.isEmpty()) return { bytes };
+    const { width: w, height: h } = img.getSize();
+    const k = Math.min(1, 48 / Math.max(w, h));
+    const thumb = img.resize({ width: Math.max(1, Math.round(w * k)), height: Math.max(1, Math.round(h * k)) }).toDataURL();
+    return { bytes, w, h, thumb };
   } catch {
     return null;
   }

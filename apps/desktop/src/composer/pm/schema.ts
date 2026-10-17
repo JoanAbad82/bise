@@ -8,7 +8,7 @@
 //     send, not the draft), replaced by the words when the last ones come.
 // The node views are plain DOM (no React portal), drawn once per node: typing never renders React.
 import { Node } from '@tiptap/core';
-import { chipLabel, type Chip } from '../message';
+import { chipLabel, fileChipName, type Chip } from '../message';
 import { BARS, fitFor, flat, push, SAMPLE_MS, timeOf, wave, WAVE_MS } from './meter';
 
 export const Doc = Node.create({ name: 'doc', topNode: true, content: 'paragraph' });
@@ -50,11 +50,11 @@ export function chipDom(c: Chip): HTMLElement {
     return el;
   }
   if (c.kind === 'file') {
-    // '▯ 3' (or the file's 16 px system icon and 3): its name and size in the list's row
-    // (designer's composer-attachments A); '[File #3]' is the copied text
+    // '▯ e2e.mjs' (the file's 16 px system icon, else ▯, and its name: designer m_27881; its
+    // number, size and folder in the list's row); '[File #3]' is the copied text
     el.title = c.path;
     el.append(c.icon !== undefined ? thumbImg(c.icon) : fileGlyph());
-    el.append(String(c.n));
+    el.append(fileChipName(c.path));
     return el;
   }
   el.append(chipLabel(c));

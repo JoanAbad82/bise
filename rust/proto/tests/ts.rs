@@ -269,10 +269,11 @@ fn render_chips() -> String {
     let list = |xs: &[&str]| xs.iter().map(|x| format!("{x:?}")).collect::<Vec<_>>().join(", ");
     let mut s = String::new();
     header(&mut s);
-    writeln!(s, "// bise_proto::parts' chip table: an image chip by these extensions; an @ pick makes a file chip of a document's only, a drop or a paste of any file.").unwrap();
+    writeln!(s, "// bise_proto::parts' chip table: an image chip by these extensions, any other file a file chip (an @ pick, a drop, a paste).").unwrap();
     writeln!(s).unwrap();
     writeln!(s, "export const IMAGE_EXTS = [{}] as const;", list(parts::IMAGE_EXTS)).unwrap();
-    writeln!(s, "export const DOC_EXTS = [{}] as const;", list(parts::DOC_EXTS)).unwrap();
+    writeln!(s, "// a file chip shows its name, cut at this many characters with a glued '…'").unwrap();
+    writeln!(s, "export const FILE_CHIP_CHARS = {};", parts::FILE_CHIP_CHARS).unwrap();
     let marks = parts::NO_SPACE_BEFORE.iter().map(|c| format!("{:?}", c.to_string())).collect::<Vec<_>>().join(", ");
     writeln!(s, "// the marks that take no space after a chip ('❝ 1, which?')").unwrap();
     writeln!(s, "export const NO_SPACE_BEFORE = [{marks}] as const;").unwrap();

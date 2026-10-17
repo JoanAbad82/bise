@@ -2,15 +2,15 @@
 import { describe, expect, it } from 'vitest';
 import { argAt, browseText, filePick, parentQuery, prefixFirst, triggerAt } from './tokens';
 import { emojiToken, filterEmoji, get, typedEmoji, all as allEmoji, EMOJI_MAX } from './emoji';
-import { agoWords, artifactRows, emojiRows } from './pick';
+import { agoWords, artifactRows, emojiRows, pickedChip } from './pick';
 import TUI_EMOJI from '../../../../rust/tui/src/emoji.tsv?raw';
 import DESKTOP_EMOJI from './emoji.tsv?raw';
 import COMPOSER_PARTS from '../../../../rust/proto/fixtures/composer_parts.json';
 import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, TIP_EVERY_MS } from './keybar';
 import { noVisionLine } from './message';
-import { isDocPath, isImagePath } from './sources';
+import { isImagePath } from './sources';
 import { codeRuns, colorLines, proseRuns } from './mdcolor';
-import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Chip, type Segment } from './message';
+import { buildMessage, chipStrip, fileChipName, isLongPaste, lineCount, nextChipNumber, type Chip, type Segment } from './message';
 import { load, remember, save, takeOldQueue, HISTORY_MAX, type Store } from './drafts';
 import { argRows, commandLine, commandRows, completion, enterSends, move, type Row } from './pick';
 import { enterMakesNewline, indent, item, newline, outdentAtStart, subwordLeft, subwordRight, type Op } from './mdlive';
@@ -157,10 +157,30 @@ describe('the send', () => {
     expect(out.text).toBe("ajouter l'image [Image #1] dans la presentation powerpoint [File #2]");
     expect(chipStrip({ kind: 'file', n: 2, path: '/Users/me/Desktop/deck.pptx', bytes: 2_100_000 })).toBe('▯ 2  deck.pptx  2.1 MB');
   });
-  it('the one chip table (bise_proto::parts): images by extension, @ picks of documents only', () => {
+  it("at-chips: an @-picked file is its chip by its absolute path, an image's or a file's, code too; the send carries it where it was", () => {
+    const root = '/Users/me/acme/';
+    const img = pickedChip(root, 'shots/logo.png', 1);
+    const code = pickedChip(root, 'computer-use/extension/test/e2e.mjs', 2);
+    expect(img).toEqual({ kind: 'image', n: 1, path: '/Users/me/acme/shots/logo.png', name: 'logo.png' });
+    expect(code).toEqual({ kind: 'file', n: 2, path: '/Users/me/acme/computer-use/extension/test/e2e.mjs' });
+    expect(pickedChip(root, '../other/a.rs', 3)).toMatchObject({ kind: 'file', path: '/Users/me/other/a.rs' });
+    expect(pickedChip(root, '/abs/x.pdf', 4)).toMatchObject({ kind: 'file', path: '/abs/x.pdf' });
+    const out = buildMessage([{ kind: 'text', text: 'voir ' }, { kind: 'chip', chip: img }, { kind: 'text', text: ' et ' }, { kind: 'chip', chip: code }, { kind: 'text', text: ' stp' }]);
+    expect(out.parts).toEqual([
+      { kind: 'text', text: 'voir ' },
+      { kind: 'image', name: '[Image #1]', source: '/Users/me/acme/shots/logo.png' },
+      { kind: 'text', text: ' et ' },
+      { kind: 'file', name: '[File #2]', path: '/Users/me/acme/computer-use/extension/test/e2e.mjs' },
+      { kind: 'text', text: ' stp' },
+    ]);
+  });
+  it("a file chip's words: its name, cut at 24 with a glued '…' (bise_proto::parts file_chip_name)", () => {
+    expect(fileChipName('/w/computer-use/extension/test/e2e.mjs')).toBe('e2e.mjs');
+    expect(fileChipName('/w/a-very-long-file-name-for-the-chip.rs')).toBe('a-very-long-file-name-f…');
+  });
+  it('the one chip table (bise_proto::parts): images by extension, any other file a file chip', () => {
     expect(['a.png', 'b.JPG', 'c.webp'].every(isImagePath)).toBe(true);
-    expect(['q3.pdf', 'data.csv', 'plan.xlsx', 'brief.docx', 'deck.pptx'].every(isDocPath)).toBe(true);
-    expect(['src/main.rs', 'notes.md', '.pdf', 'Makefile'].some(isDocPath)).toBe(false);
+    expect(['src/main.rs', 'deck.pptx', '.png', 'Makefile'].some(isImagePath)).toBe(false);
   });
   it('the strip says what a chip holds', () => {
     expect(chipStrip({ kind: 'quote', n: 1, text: 'one\ntwo\nthree', from: 'main' })).toBe('❝ 1 “one two three”  bise · 3 lines');

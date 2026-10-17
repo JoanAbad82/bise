@@ -69,6 +69,9 @@ function answer(cmd) {
     case 'page': return of(['thread'], (ev) => ev.before !== null && ev.before !== undefined);
     case 'diff': return of(['diff'], (ev) => (cmd.commit ? ev.merged === cmd.commit : !ev.merged));
     case 'worktrees': case 'dev_servers': case 'merged': return of([cmd.cmd]);
+    // an @ query (at-chips): the world's newest `files` list of that project, whatever the query,
+    // answered with the ask's own rid and query
+    case 'files': return of(['files']).slice(-1).map((ev) => ({ ...ev, q: cmd.q, rid: cmd.rid }));
     // the inbox screen's history (inbox/history): the world's page of that project; an older one
     // (before) has none
     case 'inbox_history': return cmd.before == null ? of(['inbox_history']) : [];

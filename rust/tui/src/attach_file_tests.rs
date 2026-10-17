@@ -29,7 +29,8 @@ fn a_drop_of_files_makes_file_chips() {
     let mut app = composer("", 0);
     let paths: Vec<String> = ["q3.pdf", "data.csv", "plan.xlsx", "brief.docx", "deck.pptx"].iter().map(|f| dir.join(f).to_string_lossy().to_string()).collect();
     let labels = on_paste(&mut app, &paths.join(" ")).unwrap().unwrap();
-    assert_eq!(labels, ["▯ 1", "▯ 2", "▯ 3", "▯ 4", "▯ 5"]);
+    // each chip says its file's name (designer m_27881), the box's row its number
+    assert_eq!(labels, ["▯ q3.pdf", "▯ data.csv", "▯ plan.xlsx", "▯ brief.docx", "▯ deck.pptx"]);
     assert_eq!(app.ed.text, "[File #1] [File #2] [File #3] [File #4] [File #5] ");
     assert_eq!(shown(&app).len(), 5);
     assert_eq!(attach::strip_height(&app), 7);
@@ -74,14 +75,31 @@ fn the_sentence_keeps_each_chip_at_its_place() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// An `@` pick of code keeps its `@path` text (the document case needs
-/// the popup's root: the tmux test covers it).
+/// at-chips: an `@` pick of code is a file chip where the `@token` was,
+/// the cursor right after it, the words after it kept; the model reads
+/// the file's absolute path at that place. A path that is no file stays
+/// the pick's text.
 #[test]
-fn an_at_pick_of_code_stays_text() {
+fn an_at_pick_of_code_is_a_chip_at_the_at() {
+    let dir = docs("pick");
     let mut app = composer("", 0);
-    app.ed.set("look @main", 10);
-    assert!(pick(&mut app, "src/main.rs").is_none(), "code stays text");
-    assert_eq!(app.ed.text, "look @main");
+    crate::sb::bench::set_workspace(&mut app, &dir.to_string_lossy());
+    app.ed.set("look @mai then fix it", 9);
+    assert_eq!(pick(&mut app, "main.rs").as_deref(), Some("▯ main.rs"));
+    assert_eq!(attach::chip_text("[File #1]").trim(), "▯ main.rs");
+    assert_eq!(app.ed.text, "look [File #1] then fix it");
+    assert_eq!(app.ed.cursor, "look [File #1] ".chars().count());
+    let text = app.ed.text.clone();
+    let said = attach::expand(&mut app, &text);
+    let main = dir.join("main.rs").to_string_lossy().to_string();
+    assert_eq!(
+        said.parts,
+        vec![Part::Text { text: "look ".into() }, Part::File { path: main.clone(), name: "[File #1]".into(), missing: false }, Part::Text { text: " then fix it".into() }]
+    );
+    assert!(said.text.contains(&format!("look <file name=\"[File #1]\" path=\"{main}\"> then fix it")), "{}", said.text);
+    app.ed.set("and @gone", 9);
+    assert!(pick(&mut app, "gone.rs").is_none(), "no such file: stays text");
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// In the history: `▯ deck.pptx`, a link to its file; a missing one says

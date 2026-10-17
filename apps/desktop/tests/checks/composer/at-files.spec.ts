@@ -1,14 +1,13 @@
 // composer/at-files · bar 2.2 (docs/desktop-bar.md) · his bug 1: "@files ... dead".
 // Real keys only. The project is a git repo holding README.md (amb-tools' throwaway world; today's
 // window: its fake core). Passes when "@" opens a file picker, "@READ" puts README.md first (a
-// file name ranks before a path, as in the terminal), and tab inserts the bare path "README.md ",
-// as the terminal does (files.rs completion_inserts_the_reference: 'see @ap' -> 'see src/app.rs ';
-// a leading '@name' would route to an agent, docs/at-mentions.md). Bar 2.2's '@path' wording is
-// ambient-pm's to align.
+// file name ranks before a path, as in the terminal), and tab puts README.md's file chip where the
+// @ was (at-chips, as the terminal does: its path in the chip's title and the attachment list,
+// never as text).
 import { test, expect } from '../../harness';
 import { T, fieldText, onTarget, press } from './target';
 
-test('composer/at-files: @ opens the file picker, ranks by name, tab inserts the path', async () => {
+test('composer/at-files: @ opens the file picker, ranks by name, tab puts its chip', async () => {
   await onTarget(async ({ page }) => {
     await page.locator(T.field).click();
     await page.keyboard.type('lis @');
@@ -17,7 +16,11 @@ test('composer/at-files: @ opens the file picker, ranks by name, tab inserts the
     await page.keyboard.type('READ');
     await expect(picker.locator(T.pickerRow).first()).toContainText('README.md');
     await page.keyboard.press('Tab');
-    await expect.poll(() => page.locator(T.field).evaluate(fieldText)).toBe('lis README.md ');
+    const chip = page.locator(T.field).locator('[data-testid^="composer.chip."][data-kind="file"]');
+    await expect(chip, "README.md's chip").toHaveCount(1);
+    expect(await chip.getAttribute('title')).toMatch(/\/lab-project\/README\.md$/u);
+    await expect(chip, 'it says the file name (designer m_27881)').toHaveText('▯README.md');
+    expect((await page.locator(T.field).evaluate(fieldText)).replace(/\s+/gu, ' '), 'no path as text, the chip at the @').toBe('lis ▯ README.md ');
     await expect(picker).toBeHidden();
   });
 });
@@ -40,7 +43,7 @@ test('composer/at-files: a picked path ranks first in its tier next time', async
     const second = before[1] ?? '';
     await press(page, 'ArrowDown');
     await press(page, 'Enter');
-    expect((await field.evaluate(fieldText)).trim(), 'the pick went in').toBe(second);
+    expect(await field.locator('[data-testid^="composer.chip."]').getAttribute('title'), 'the pick went in, as its chip').toMatch(new RegExp(`/lab-project/${second.replace(/[.]/gu, '\\.')}$`, 'u'));
     await press(page, 'Meta+a');
     await press(page, 'Backspace');
     await page.keyboard.type('@src/');

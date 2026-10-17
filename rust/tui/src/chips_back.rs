@@ -48,6 +48,7 @@ pub(crate) fn of(parts: &[Part], text: &str, first: usize) -> (String, Vec<Attac
             Part::File { path, missing, .. } => {
                 let label = parts::file_label(n);
                 let marker = parts::file_marker(&label, path, *missing);
+                crate::attach_file::name_chip(&label, path);
                 (label, marker, Info { source: path.clone(), ..Info::default() })
             }
             // his notes on a page: their words; the hub's hints and a

@@ -334,22 +334,25 @@ fn an_images_caption_is_its_markers_last_attribute() {
 /// architect m_21764 B: the one table of what a path becomes.
 #[test]
 fn which_paths_become_a_chip() {
-    for (p, pick, drop) in [
-        ("/u/shot.PNG", ChipKind::Image, ChipKind::Image),
-        ("docs/deck.pptx", ChipKind::File, ChipKind::File),
-        ("/u/q3.xlsx", ChipKind::File, ChipKind::File),
-        ("a.pdf", ChipKind::File, ChipKind::File),
-        ("data.csv", ChipKind::File, ChipKind::File),
-        ("Brief.DOCX", ChipKind::File, ChipKind::File),
-        ("src/main.rs", ChipKind::Text, ChipKind::File),
-        ("notes.md", ChipKind::Text, ChipKind::File),
-        ("Makefile", ChipKind::Text, ChipKind::File),
-        ("/u/.pdf", ChipKind::Text, ChipKind::File),
+    for (p, kind) in [
+        ("/u/shot.PNG", ChipKind::Image),
+        ("a/b.jpeg", ChipKind::Image),
+        ("docs/deck.pptx", ChipKind::File),
+        ("a.pdf", ChipKind::File),
+        // at-chips: code is a file chip too, never its path as text
+        ("computer-use/extension/test/e2e.mjs", ChipKind::File),
+        ("src/main.rs", ChipKind::File),
+        ("Makefile", ChipKind::File),
+        ("/u/.png", ChipKind::File),
     ] {
-        assert_eq!((pick_kind(p), drop_kind(p)), (pick, drop), "{p}");
+        assert_eq!(chip_kind(p), kind, "{p}");
     }
     assert_eq!(file_label(2), "[File #2]");
     assert_eq!(file_name("/u/Desktop/deck.pptx"), "deck.pptx");
+    // designer m_27881: a file chip says its name, cut at 24 with a glued '…'
+    assert_eq!(file_chip_name("/w/computer-use/extension/test/e2e.mjs"), "e2e.mjs");
+    let long = file_chip_name("/w/a-very-long-file-name-for-the-chip.rs");
+    assert_eq!((long.as_str(), long.chars().count()), ("a-very-long-file-name-f…", FILE_CHIP_CHARS));
 }
 
 /// his m_22231: a quote with its chip's number sits at its place in his

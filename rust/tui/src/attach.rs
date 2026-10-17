@@ -13,7 +13,7 @@
 
 use crate::app::App;
 use bise_proto::words::composer;
-use crate::theme::{accent, dim, error, glyph, text, G_FAILED, G_FILE, G_IMAGE, G_PASTE, G_QUOTE};
+use crate::theme::{accent, dim, error, glyph, G_FAILED, G_IMAGE, G_PASTE};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use std::cell::RefCell;
@@ -197,6 +197,12 @@ fn part_of(a: &Attachment) -> bise_proto::parts::Part {
 
 // ---- chips (book §14): `▣ 1` in the composer, `▣ login.png` in the history ----
 
+// how a chip is drawn in the composer and the strip (its pill, its words)
+#[path = "attach_pill.rs"]
+mod pill;
+pub(crate) use pill::{chip_name, chip_pill, chip_text, chip_width, is_voice};
+use pill::{chip_parts, chip_pill_as, chip_text_as};
+
 /// What a clipboard image is called in the strip and the history.
 const CLIPBOARD: &str = "clipboard";
 
@@ -229,7 +235,7 @@ thread_local! {
 }
 
 /// The title an artifact chip shows.
-fn artifact_title(label: &str) -> Option<String> {
+pub(super) fn artifact_title(label: &str) -> Option<String> {
     label.starts_with(ARTIFACT_OPEN).then(|| ARTIFACT_TITLES.with(|t| t.borrow().get(label).cloned()).unwrap_or_default())
 }
 
@@ -296,88 +302,6 @@ pub(crate) fn chip_widen(text: &str, a: usize, b: usize) -> (usize, usize) {
             (a, b)
         }
     })
-}
-
-/// A chip's glyph (`▣`, `❝` or `▤`) and number, from its label
-/// `[Image #N]`, `[Quote #N]` or `[Paste #N]`.
-fn chip_parts(label: &str) -> (&'static str, &str) {
-    if let Some(n) = label.strip_prefix(crate::quote::OPEN) {
-        return (glyph(G_QUOTE), n.trim_end_matches(']'));
-    }
-    if let Some(n) = label.strip_prefix(crate::pasted::OPEN) {
-        return (glyph(G_PASTE), n.trim_end_matches(']'));
-    }
-    if let Some(n) = label.strip_prefix(crate::attach_file::OPEN) {
-        return (glyph(G_FILE), n.trim_end_matches(']'));
-    }
-    (G_IMAGE, label.trim_start_matches("[Image #").trim_end_matches(']'))
-}
-
-/// A chip named in a sentence (the flash): `▣ 1`, `❝ 1`.
-pub(crate) fn chip_name(label: &str) -> String {
-    if let Some(t) = artifact_title(label) {
-        return format!("↗ {t}");
-    }
-    let (g, n) = chip_parts(label);
-    format!("{g} {n}")
-}
-
-/// How the composer and the strip draw a chip (BISE-205): a pill
-/// ` ❝ 1 ` (one padding cell each side, on the `pill` tint), or, with no
-/// tint (`NO_COLOR`, `BISE_ASCII=1`), `[❝ 1]`. Same width both ways.
-pub(crate) fn chip_text(label: &str) -> String {
-    if let Some(t) = artifact_title(label) {
-        return match crate::render::chip_form() {
-            crate::render::ChipForm::Tinted => format!(" ↗ {t} "),
-            crate::render::ChipForm::Bracketed => format!("[↗ {t}]"),
-        };
-    }
-    let (g, n) = chip_parts(label);
-    match crate::render::chip_form() {
-        crate::render::ChipForm::Tinted => format!(" {g} {n} "),
-        crate::render::ChipForm::Bracketed => format!("[{g} {n}]"),
-    }
-}
-
-/// The columns the chip `label` takes in `inner` columns of text.
-pub(crate) fn chip_width(label: &str, inner: usize) -> usize {
-    use unicode_width::UnicodeWidthStr;
-    if is_voice(label) {
-        crate::voice::chip::width(inner)
-    } else {
-        chip_text(label).width()
-    }
-}
-
-/// `label` is the voice chip.
-pub(crate) fn is_voice(label: &str) -> bool {
-    label.starts_with(crate::voice::chip::OPEN)
-}
-
-/// The spans of [`chip_text`]: the glyph accent, the number in the text
-/// color, all on the pill tint (the brackets dim); `over` is patched on
-/// every span (the selection's background, the cursor's REVERSED), so
-/// the whole pill takes it.
-pub(crate) fn chip_pill(label: &str, over: Style) -> Vec<Span<'static>> {
-    let artifact = artifact_title(label);
-    let (g, n) = match &artifact {
-        Some(t) => ("↗", t.as_str()),
-        None => chip_parts(label),
-    };
-    let (open, close, bg) = match crate::render::chip_form() {
-        crate::render::ChipForm::Tinted => (" ", " ", Some(crate::theme::pill_bg())),
-        crate::render::ChipForm::Bracketed => ("[", "]", None),
-    };
-    let st = |fg| {
-        let s = Style::default().fg(fg);
-        bg.map_or(s, |b| s.bg(b)).patch(over)
-    };
-    vec![
-        Span::styled(open.to_string(), st(dim())),
-        Span::styled(g.to_string(), st(accent())),
-        Span::styled(format!(" {n}"), st(text())),
-        Span::styled(close.to_string(), st(dim())),
-    ]
 }
 
 /// The style of a chip in the history: accent (the background stays the
@@ -840,7 +764,7 @@ fn box_rows(app: &App) -> Vec<BoxRow> {
 /// preview takes the whole row.
 fn box_row(r: &BoxRow, iw: usize) -> Vec<Span<'static>> {
     use unicode_width::UnicodeWidthStr;
-    let chip = chip_text(&r.label).width() + 1;
+    let chip = chip_text_as(&r.label, false).width() + 1;
     let natural = r.preview.natural();
     let with_source = iw.saturating_sub(chip + ROW_GAP + r.source.width());
     let (preview, source) = if natural.width() <= with_source {
@@ -851,7 +775,7 @@ fn box_row(r: &BoxRow, iw: usize) -> Vec<Span<'static>> {
         (r.preview.cut(iw.saturating_sub(chip)), String::new())
     };
     let pad = iw.saturating_sub(chip + preview.width() + source.width());
-    let mut spans = chip_pill(&r.label, Style::default());
+    let mut spans = chip_pill_as(&r.label, Style::default(), false);
     spans.extend([
         Span::styled(format!(" {preview}"), Style::default().fg(dim())),
         Span::raw(" ".repeat(pad)),
@@ -867,7 +791,7 @@ fn box_width(rows: &[BoxRow], room: usize) -> usize {
     use unicode_width::UnicodeWidthStr;
     let longest = rows
         .iter()
-        .map(|r| chip_text(&r.label).width() + 1 + r.preview.natural().width() + ROW_GAP + r.source.width())
+        .map(|r| chip_text_as(&r.label, false).width() + 1 + r.preview.natural().width() + ROW_GAP + r.source.width())
         .max()
         .unwrap_or(0);
     (longest + 6).clamp(BOX_MIN, BOX_MAX).min(room)

@@ -1,7 +1,8 @@
 // The picker's rows for a trigger, and what picking one does. Pure: the plugin (Picker.tsx) asks
 // for the rows when the trigger changes and applies the pick to the editor.
 import { filterEmoji } from './emoji';
-import type { ComposerSources, PickAgent, PickArtifact, PickCommand, PickFile, PickSkill } from './sources';
+import { fileName, type Chip } from './message';
+import { isImagePath, type ComposerSources, type PickAgent, type PickArtifact, type PickCommand, type PickFile, type PickSkill } from './sources';
 import { agentPick, filePick, prefixFirst, skillPick, type Trigger } from './tokens';
 import { composer } from '../proto/words.gen';
 
@@ -81,6 +82,25 @@ export function fileRows(files: readonly PickFile[]): Row[] {
     const p = filePick(f.path, f.dir);
     return { id: `file.${f.path}`, label: f.dir && !f.path.endsWith('/') ? `${f.path}/` : f.path, desc: '', tag: f.dir ? 'dir' : 'file', off: false, pick: { kind: 'insert', text: p.text, browse: p.browse, path: f.path } };
   });
+}
+
+/** at-chips: the chip a file picked in the `@` list becomes, by its absolute path (`rel` from the
+ *  workspace `root`, or `../` out of it; an absolute `rel` as it is): an image chip by its
+ *  extension, else a file chip, code too (bise_proto::parts chip_kind, the TUI's pick). Its
+ *  thumbnail, icon and size come later (pickedFacts). Pure. */
+export function pickedChip(root: string, rel: string, n: number): Chip {
+  const path = rel.startsWith('/') ? rel : normalize(`${root.replace(/\/+$/u, '')}/${rel}`);
+  return isImagePath(path) ? { kind: 'image', n, path, name: fileName(path) } : { kind: 'file', n, path };
+}
+
+/** `/a/b/../c/./d` -> `/a/c/d`: a path the attachment list and the hub read plainly. */
+function normalize(path: string): string {
+  const out: string[] = [];
+  for (const s of path.split('/')) {
+    if (s === '..') out.pop();
+    else if (s !== '.' && s !== '') out.push(s);
+  }
+  return `/${out.join('/')}`;
 }
 
 /** The emoji list for `:cl` (emoji.rs filter): `👏 :clap:`, picking puts the emoji in place. */

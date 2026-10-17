@@ -65,9 +65,9 @@ pub fn kind(path: &str, store: &Path) -> Kind {
     if p.extension().is_some_and(|e| e == "b64") && p.parent() == Some(store) {
         return Kind::StoreB64;
     }
-    match parts::drop_kind(path) {
+    match parts::chip_kind(path) {
         ChipKind::Image => Kind::Image,
-        _ => Kind::File,
+        ChipKind::File => Kind::File,
     }
 }
 

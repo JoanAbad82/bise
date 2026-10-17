@@ -11,7 +11,7 @@
 // One number sequence per draft for images, pastes and quotes (a number points at one chip).
 
 import type { Part } from '@/proto';
-import { NO_SPACE_BEFORE } from '@/proto/chips.gen';
+import { FILE_CHIP_CHARS, NO_SPACE_BEFORE } from '@/proto/chips.gen';
 import type { Anchor } from '@/proto/anchor';
 import { anchorLabel, anchorWhere } from './anchor';
 import { composer } from '../proto/words.gen';
@@ -94,6 +94,31 @@ export function chipLabel(c: Chip): string {
 /** A path's last segment, the file chip's words: 'deck.pptx' (bise_proto::parts file_name). */
 export const fileName = (path: string): string => path.replace(/\/+$/u, '').split('/').at(-1) ?? path;
 
+/** A file chip's words in the field (designer m_27881): its name, cut at FILE_CHIP_CHARS with a glued
+ *  '…' (bise_proto::parts file_chip_name); its number stays in the attachment list's row. Pure. */
+export function fileChipName(path: string): string {
+  const cs = chars(fileName(path));
+  return cs.length <= FILE_CHIP_CHARS ? cs.join('') : `${cs.slice(0, FILE_CHIP_CHARS - 1).join('')}…`;
+}
+
+/** A folder as the attachment list's row shows it (designer m_27940): under his home from '~', and
+ *  when longer than `max` characters it loses whole folders from the left after its root
+ *  ('~/…/agents/at-chips/tmp'), never a folder cut in the middle (the last one stays whole). Pure. */
+export function shortDir(dir: string, home: string, max = 40): string {
+  const under = home !== '' && (dir === home || dir.startsWith(`${home}/`));
+  const root = under ? '~' : '';
+  const segs = (under ? dir.slice(home.length) : dir).split('/').filter((x) => x !== '');
+  const whole = `${root}/${segs.join('/')}`;
+  if (whole.length <= max || segs.length <= 1) return under && segs.length === 0 ? '~' : whole;
+  const keep: string[] = [segs[segs.length - 1] ?? ''];
+  for (let i = segs.length - 2; i >= 0; i -= 1) {
+    const next = `${root}/…/${[segs[i], ...keep].join('/')}`;
+    if (next.length > max) break;
+    keep.unshift(segs[i] ?? '');
+  }
+  return `${root}/…/${keep.join('/')}`;
+}
+
 /** `310 kB`, `2.1 MB`, decimal like Finder (the TUI's attach.rs size_text). */
 export function sizeText(bytes: number): string {
   if (bytes < 1000) return `${String(bytes)} B`;
@@ -147,7 +172,7 @@ export function attachRow(c: Chip, home = ''): { readonly name: string; readonly
     }
     case 'file': {
       const dir = c.path.replace(/\/+$/u, '').split('/').slice(0, -1).join('/');
-      const where = home !== '' && (dir === home || dir.startsWith(`${home}/`)) ? `~${dir.slice(home.length)}` : dir;
+      const where = dir === '' ? '' : shortDir(dir, home);
       return { name: fileName(c.path), info: [c.bytes === undefined ? '' : sizeText(c.bytes), where].filter((s) => s !== '').join(' · ') };
     }
     case 'artifact':

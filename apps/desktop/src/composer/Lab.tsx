@@ -243,8 +243,13 @@ function fakeMic(busy: () => boolean): DictatePort {
 let micBusy = false;
 const LAB_MIC = fakeMic(() => micBusy);
 
+/** The lab's project folder: an `@` pick is a chip by its path there (at-chips); a check writes
+ *  the files it reads under its test home (window.bise.home), else none are read. */
+export const LAB_ROOT = `${(window as { bise?: Window["bise"] }).bise?.home ?? "/Users/lab"}/lab-project`;
+
 const SOURCES: ComposerSources = {
   dictate: LAB_MIC,
+  root: LAB_ROOT,
   agents: [
     { name: "main", desc: "bise" },
     { name: "perf", desc: "sort_unstable in the hot query" },

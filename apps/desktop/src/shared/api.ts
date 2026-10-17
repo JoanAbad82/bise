@@ -102,6 +102,11 @@ export interface BiseApi {
    */
   readonly fileIcon: (path: string) => Promise<string | null>;
   /**
+   * A file he picked in the `@` list, read for its chip and its row (at-chips): its size, and
+   * for an image its pixels and a 48 px thumbnail as a data URL; same fence; null outside it.
+   */
+  readonly fileFacts: (path: string) => Promise<FileFacts | null>;
+  /**
    * An image he pasted or dropped (its bytes) put in bise's image store, the
    * TUI's (src/main/images.ts): its absolute path for a send's files, so the
    * model sees it (R41). null: not a PNG, JPEG, GIF or WebP, too big, or unwritable.
@@ -354,6 +359,14 @@ export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal' | 'save';
 /** window.bise.saveCopy's answer: where the copy went, why it failed, or null (he cancelled, or refused). */
 export type SaveResult = { readonly to: string } | { readonly error: string } | null;
 
+/** window.bise.fileFacts' answer: its bytes; an image's pixels and thumbnail when it decodes. */
+export interface FileFacts {
+  readonly bytes: number;
+  readonly w?: number;
+  readonly h?: number;
+  readonly thumb?: string;
+}
+
 /** The IPC channels between the preload and main (owner: amb-mac). */
 export const IPC = {
   openExternal: 'bise:open-external',
@@ -364,6 +377,7 @@ export const IPC = {
   showInFinder: 'bise:show-in-finder',
   saveCopy: 'bise:save-copy',
   fileIcon: 'bise:file-icon',
+  fileFacts: 'bise:file-facts',
   saveImage: 'bise:save-image',
   copy: 'bise:copy',
   menu: 'bise:menu',
