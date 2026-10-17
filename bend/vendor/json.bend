@@ -44,12 +44,6 @@ type Frame is Data:
   FObjVal{key: String, kvs: List<&2, Sigma<&2, &2, String, _ => Json>>}
 
 # String parser types
-type StrCharKind is Data:
-  SCQuote{}
-  SCSlash{}
-  SCControl{}
-  SCOther{}
-
 type StrRes is Data:
   SErr{msg: String}
   SOk{val: String, rest: String}
@@ -77,7 +71,7 @@ type StrState is Data:
   StrNormal{}
   StrEscaping{}
   StrEscCheck{res: EscRes}
-  StrChar{kind: StrCharKind, c: U32}
+  StrChar{ctl: Bool, c: U32}
 
 type PtrUnescState is Data:
   PUNormal{}
@@ -1330,26 +1324,46 @@ def pretty(j: Json) -> String:
 # 11. Parser Implementation (parse)
 # ==============================================================================
 
-def classify_str_char(+c: U32) -> StrCharKind:
-  Bool.pick(StrCharKind, U32.is_eq(c, 34), SCQuote{},
-    Bool.pick(StrCharKind, U32.is_eq(c, 92), SCSlash{},
-      Bool.pick(StrCharKind, U32.is_lt(c, 32), SCControl{},
-        SCOther{})))
+# The classifiers match on the code: a match runs one branch, where a
+# chain of Bool.pick computed every test and built every result for each
+# char (strict calls; .agents/skills/bend-perf/SKILL.md, pattern 1).
+
+def is_digit(+c: U32) -> Bool:
+  Bool.and(U32.is_ge(c, 48), U32.is_le(c, 57))
+
+def classify_char.digit(ok: Bool) -> CharKind:
+  match ok:
+    case True{}:
+      KindDigit{}
+    case False{}:
+      KindOther{}
 
 def classify_char(+c: U32) -> CharKind:
-  Bool.pick(CharKind, U32.is_eq(c, 91), KindLBracket{},
-    Bool.pick(CharKind, U32.is_eq(c, 93), KindRBracket{},
-      Bool.pick(CharKind, U32.is_eq(c, 123), KindLBrace{},
-        Bool.pick(CharKind, U32.is_eq(c, 125), KindRBrace{},
-          Bool.pick(CharKind, U32.is_eq(c, 34), KindQuote{},
-            Bool.pick(CharKind, U32.is_eq(c, 44), KindComma{},
-              Bool.pick(CharKind, U32.is_eq(c, 58), KindColon{},
-                Bool.pick(CharKind, U32.is_eq(c, 110), KindNull{},
-                  Bool.pick(CharKind, U32.is_eq(c, 116), KindTrue{},
-                    Bool.pick(CharKind, U32.is_eq(c, 102), KindFalse{},
-                      Bool.pick(CharKind, U32.is_eq(c, 45), KindMinus{},
-                        Bool.pick(CharKind, Bool.and(U32.is_ge(c, 48), U32.is_le(c, 57)), KindDigit{},
-                          KindOther{}))))))))))))
+  match c:
+    case 34:
+      KindQuote{}
+    case 44:
+      KindComma{}
+    case 58:
+      KindColon{}
+    case 123:
+      KindLBrace{}
+    case 125:
+      KindRBrace{}
+    case 91:
+      KindLBracket{}
+    case 93:
+      KindRBracket{}
+    case 110:
+      KindNull{}
+    case 116:
+      KindTrue{}
+    case 102:
+      KindFalse{}
+    case 45:
+      KindMinus{}
+    case _:
+      classify_char.digit(is_digit(c))
 
 def hex_digit_val(+c: U32) -> U32:
   Bool.pick(U32, Bool.and(U32.is_ge(c, 48), U32.is_le(c, 57)), U32.sub(c, 48),
@@ -1443,24 +1457,9 @@ def handle_unicode_hex4(h4: Hex4Res) -> EscRes:
     case H4Ok{val, rest}:
       check_surrogate(val, rest)
 
-def parse_escape_step(is_u: Bool, +c: U32, +rest: String) -> EscRes:
-  match is_u:
-    case True{}:
-      handle_unicode_hex4(parse_hex4(rest))
-    case False{}:
-      Bool.pick(EscRes, U32.is_eq(c, 34), EscChar{Chr{34}, rest},
-        Bool.pick(EscRes, U32.is_eq(c, 92), EscChar{Chr{92}, rest},
-          Bool.pick(EscRes, U32.is_eq(c, 47), EscChar{Chr{47}, rest},
-            Bool.pick(EscRes, U32.is_eq(c, 98), EscChar{Chr{8}, rest},
-              Bool.pick(EscRes, U32.is_eq(c, 102), EscChar{Chr{12}, rest},
-                Bool.pick(EscRes, U32.is_eq(c, 110), EscChar{Chr{10}, rest},
-                  Bool.pick(EscRes, U32.is_eq(c, 114), EscChar{Chr{13}, rest},
-                    Bool.pick(EscRes, U32.is_eq(c, 116), EscChar{Chr{9}, rest},
-                      EscErr{"invalid escape sequence"}))))))))
-
-def parse_escape_seq(+c: U32, rest: String) -> EscRes:
-  parse_escape_step(U32.is_eq(c, 117), c, rest)
-
+# a string's chars after its opening quote: the quote and the backslash
+# are patterns (one branch runs), any other char is checked once (a
+# control char is an error) by StrChar; an escape's char is a pattern too
 def parse_str.loop(fuel: Nat, st: StrState, s: String, acc: List<&2, Char>) -> StrRes:
   match fuel:
     case 0n:
@@ -1471,26 +1470,44 @@ def parse_str.loop(fuel: Nat, st: StrState, s: String, acc: List<&2, Char>) -> S
           match s:
             case SNil{}:
               SErr{"unterminated string literal"}
+            case SCon{'"', +t}:
+              SOk{str_from_rev_loop(acc, ""), t}
+            case SCon{'\\', +t}:
+              parse_str.loop(p, StrEscaping{}, t, acc)
             case SCon{Chr{+c}, +t}:
-              parse_str.loop(p, StrChar{classify_str_char(c), c}, t, acc)
+              parse_str.loop(p, StrChar{U32.is_lt(c, 32), c}, t, acc)
 
-        case StrChar{kind, c}:
-          match kind:
-            case SCQuote{}:
-              SOk{str_from_rev_loop(acc, ""), s}
-            case SCSlash{}:
-              parse_str.loop(p, StrEscaping{}, s, acc)
-            case SCControl{}:
+        case StrChar{ctl, c}:
+          match ctl:
+            case True{}:
               SErr{"unescaped control character in string"}
-            case SCOther{}:
+            case False{}:
               parse_str.loop(p, StrNormal{}, s, Chr{c} <> acc)
 
         case StrEscaping{}:
           match s:
             case SNil{}:
               SErr{"unterminated string escape"}
-            case SCon{Chr{+c}, +t}:
-              parse_str.loop(p, StrEscCheck{parse_escape_seq(c, t)}, "", acc)
+            case SCon{'"', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{34} <> acc)
+            case SCon{'\\', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{92} <> acc)
+            case SCon{'/', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{47} <> acc)
+            case SCon{'b', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{8} <> acc)
+            case SCon{'f', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{12} <> acc)
+            case SCon{'n', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{10} <> acc)
+            case SCon{'r', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{13} <> acc)
+            case SCon{'t', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{9} <> acc)
+            case SCon{'u', +t}:
+              parse_str.loop(p, StrEscCheck{handle_unicode_hex4(parse_hex4(t))}, "", acc)
+            case SCon{_, _}:
+              SErr{"invalid escape sequence"}
 
         case StrEscCheck{res}:
           match res:
@@ -1500,7 +1517,17 @@ def parse_str.loop(fuel: Nat, st: StrState, s: String, acc: List<&2, Char>) -> S
               SErr{msg}
 
 def is_json_ws(+c: U32) -> Bool:
-  Bool.or(U32.is_eq(c, 32), Bool.or(U32.is_eq(c, 9), Bool.or(U32.is_eq(c, 10), U32.is_eq(c, 13))))
+  match c:
+    case 32:
+      True{}
+    case 10:
+      True{}
+    case 9:
+      True{}
+    case 13:
+      True{}
+    case _:
+      False{}
 
 def skip_ws_loop(fuel: Nat, st: WsState, s: String) -> String:
   match fuel:
@@ -1524,14 +1551,29 @@ def skip_ws_loop(fuel: Nat, st: WsState, s: String) -> String:
 def skip_ws(s: String) -> String:
   skip_ws_loop(4294967295n, WsStart{}, s)
 
+def classify_num_char.digit(ok: Bool, +c: U32) -> NumCharKind:
+  match ok:
+    case True{}:
+      NCNonZeroDigit{U32.to_nat(U32.sub(c, 48))}
+    case False{}:
+      NCOther{c}
+
 def classify_num_char(+c: U32) -> NumCharKind:
-  Bool.pick(NumCharKind, U32.is_eq(c, 48), NCZero{},
-    Bool.pick(NumCharKind, Bool.and(U32.is_ge(c, 49), U32.is_le(c, 57)), NCNonZeroDigit{U32.to_nat(U32.sub(c, 48))},
-      Bool.pick(NumCharKind, U32.is_eq(c, 45), NCMinus{},
-        Bool.pick(NumCharKind, U32.is_eq(c, 43), NCPlus{},
-          Bool.pick(NumCharKind, U32.is_eq(c, 46), NCDot{},
-            Bool.pick(NumCharKind, Bool.or(U32.is_eq(c, 101), U32.is_eq(c, 69)), NCExp{},
-              NCOther{c}))))))
+  match c:
+    case 48:
+      NCZero{}
+    case 45:
+      NCMinus{}
+    case 43:
+      NCPlus{}
+    case 46:
+      NCDot{}
+    case 101:
+      NCExp{}
+    case 69:
+      NCExp{}
+    case _:
+      classify_num_char.digit(is_digit(c), c)
 
 def safe_mul_add(is_safe: Bool, acc: Nat, d: Nat) -> Nat:
   match is_safe:
