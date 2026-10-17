@@ -73,20 +73,22 @@ def work_paths(cand_dir):
 
 def work_lines(w, repo, sha, tools=TOOLS):
     """work/ made when missing, half made or from another seed, then its src moved to `sha`; `repo`:
-    the candidate's own worktree (its deps key, its git). Run under w["lock"]. Pure."""
+    the candidate's own worktree (its deps key, its git). A checkout that can't move (a killed build's
+    index.lock: review-gates m_29435) is made again once, then the build fails. Run under w["lock"]. Pure."""
     q = shlex.quote
     d, src = q(w["dir"]), q(w["src"])
     return [
         "s=\"$(cd %s && %s seed-path || true)\"" % (q(repo), q(os.path.join(tools, "tests", "gate.sh"))),
-        "if [ ! -f %s ] || [ \"$(cat %s 2>/dev/null)\" != \"$s\" ]; then "
-        "echo \"cand: a new build checkout %s (seed: ${s:-none, a cold target})\"; "
+        "make_work() { echo \"cand: a new build checkout %s (seed: ${s:-none, a cold target})\"; "
         "rm -rf %s && git -C %s worktree prune && mkdir -p %s && "
         "if [ -n \"$s\" ]; then cp -cR \"$s\" %s; else mkdir %s; fi && "
-        "git -C %s worktree add -q --detach %s %s && printf '%%s' \"$s\" > %s && touch %s; fi"
-        % (q(w["ready"]), q(w["seed"]), w["dir"], d, q(repo), d, q(w["target"]), q(w["target"]), q(repo), src, q(sha), q(w["seed"]), q(w["ready"])),
+        "git -C %s worktree add -q --detach %s %s && printf '%%s' \"$s\" > %s && touch %s; }"
+        % (w["dir"], d, q(repo), d, q(w["target"]), q(w["target"]), q(repo), src, q(sha), q(w["seed"]), q(w["ready"])),
         # nothing the last build made survives but node_modules (pnpm install decides on it), out/ included
         # (architect m_29409); git rewrites only the changed files: theirs alone get a new mtime
-        "git -C %s checkout -q --force --detach %s && git -C %s clean -ffdqx -e node_modules" % (src, q(sha), src),
+        "move_work() { git -C %s checkout -q --force --detach %s && git -C %s clean -ffdqx -e node_modules; }" % (src, q(sha), src),
+        "if [ ! -f %s ] || [ \"$(cat %s 2>/dev/null)\" != \"$s\" ]; then make_work; fi" % (q(w["ready"]), q(w["seed"])),
+        "if ! move_work; then echo \"cand: the build checkout can't move to %s: made again\"; make_work && move_work; fi" % sha[:12],
     ]
 
 

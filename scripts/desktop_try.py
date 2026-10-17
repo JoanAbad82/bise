@@ -481,7 +481,9 @@ def candidate(env, paths, sha, repo=REPO, sign=None):
     # fast-try p1: built in the candidates' one build checkout, under its lock (try_build.py)
     script = build_script(work_build_paths(paths), sign, out=c["dist"], root=c["root"], repo=c["src"], name=CAND_NAME, app_id=CAND_ID, inc=sha)
     lock = os.path.expanduser("~/.bise/run/heavy.lock")
-    r = subprocess.run(heavy_argv(["/usr/bin/lockf", "-k", work_paths(paths["cand"])["lock"], "/bin/bash", "-c", script], lock), env=env)
+    # the work lock first, then the heavy slot: a candidate waiting for the other never holds a slot (but
+    # when a caller wrapped us in heavy-run already)
+    r = subprocess.run(["/usr/bin/lockf", "-k", work_paths(paths["cand"])["lock"]] + heavy_argv(["/bin/bash", "-c", script], lock), env=env)
     if r.returncode != 0:
         raise TryError("the candidate build failed (exit %d)" % r.returncode)
     if not cand_built(c):

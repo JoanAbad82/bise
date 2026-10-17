@@ -675,7 +675,7 @@ def candidate_then_promote():
               and "cd %s && scripts/bins.sh" % shlex.quote(c["src"]) in builds[0] and "BISE_PACK_OUT=%s" % shlex.quote(c["dist"]) in builds[0]
               and "cp -cR out %s" % shlex.quote(os.path.join(c["src"], "apps", "desktop", "out")) in builds[0],
               "built in the work checkout at b, its root and out/ in its own worktree, into its own dir: %s" % builds[0])
-        check(cmds[0][-5:-3] == ["-k", wk["lock"]], "the whole build holds the work lock: %s" % cmds[0])
+        check(cmds[0][:3] == ["/usr/bin/lockf", "-k", wk["lock"]], "the whole build holds the work lock, taken before the heavy slot: %s" % cmds[0])
         check(git("rev-parse", "HEAD", cwd=c["src"]) == b, "the candidate's worktree is at b")
         check(git("rev-parse", "HEAD", cwd=trysrc) == a, "the try checkout never moved")
         check(open(T.stamp_path(paths)).read() == before and not os.path.exists(paths["staged_dir"]), "the try stamp and staged dir untouched")
@@ -803,6 +803,11 @@ def work_checkout_never_stale():
         check("a new build checkout" not in r.stdout and os.path.exists(os.path.join(wk["target"], "from-seed")), "the work checkout is kept between candidates")
         check(not os.path.exists(os.path.join(wk["src"], "apps", "desktop", "out")) and os.path.isdir(os.path.join(wk["src"], "apps", "desktop", "node_modules")),
               "nothing the last build made survives but node_modules (architect m_29409)")
+        # a killed build's index.lock (review-gates m_29435): the checkout is made again once, the build goes on
+        open(os.path.join(git("rev-parse", "--absolute-git-dir", cwd=wk["src"]), "index.lock"), "w").close()
+        r, _ = build(a)
+        check(r.returncode == 0 and "can't move" in r.stdout and subprocess.run([binary], capture_output=True, text=True).stdout == "words of A",
+              "a wedged checkout is made again and the candidate still builds: %s" % (r.stdout + r.stderr))
         open(os.path.join(w, "seed-now"), "w").write("")
         r, _ = build(a)
         check(r.returncode == 0 and "a new build checkout" in r.stdout and "none, a cold target" in r.stdout
