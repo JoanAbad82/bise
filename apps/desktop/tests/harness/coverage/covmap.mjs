@@ -109,7 +109,8 @@ export function ranSources(functions, segs, starts) {
 export function sourcePaths(map, mapFile) {
   return map.sources.map((s) => {
     if (!s || s.startsWith('\0') || s.includes('\0')) return null;
-    const abs = path.resolve(path.dirname(mapFile), map.sourceRoot || '', s);
+    // vite's asset imports name the file with a query (composer/emoji.tsv?raw): the file is the source
+    const abs = path.resolve(path.dirname(mapFile), map.sourceRoot || '', s.replace(/\?.*$/, ''));
     const rel = path.relative(REPO, abs).split(path.sep).join('/');
     if (rel.startsWith('..') || rel.includes('/node_modules/')) return null;
     return rel;
@@ -407,6 +408,9 @@ export function selfTest() {
   assert(JSON.stringify(lineStarts('ab\ncd\n')) === '[0,3,6]', 'lineStarts');
   ran = ranSources([{ ranges: [{ startOffset: 3, endOffset: 5, count: 1 }] }], [[1, 1, 0]], lineStarts('ab\ncd\n'));
   assert(ran.has(0), 'a segment on line 2');
+  // a vite asset import's query: the file itself
+  const sp = sourcePaths({ sources: ['../../src/composer/emoji.tsv?raw', '\0vite/preload', '../../node_modules/react/index.js'] }, path.join(DESKTOP, 'out', 'renderer', 'x.js.map'));
+  assert(sp[0] === 'apps/desktop/src/composer/emoji.tsv' && sp[1] === null && sp[2] === null, `sourcePaths ${JSON.stringify(sp)}`);
   // the whole-bundle guard (architect m_29221 #3)
   const ok = { files: ['apps/desktop/src/a.tsx'], shared: [], checks: { 'checks/x.spec.ts': { ran: ['apps/desktop/src/a.tsx'] } } };
   assert(mapFaults(ok).length === 0, 'a good night');
