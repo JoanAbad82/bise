@@ -371,7 +371,8 @@ jobs:
   # runner (~2x slower), off the draft's path. Not on a push to main (the
   # warming run): the nightly run keeps its caches warm.
   build-x86:
-    name: build ${{ matrix.target }}
+    # spelled out: a skipped job (a push to main) shows its name unexpanded
+    name: build darwin-x86_64
     if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     strategy:
       matrix:
