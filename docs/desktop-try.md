@@ -64,9 +64,11 @@ the full end-to-end between him and a try.
 - the smoke: `dev/plugins/ambient-qa/as-he-does/cand.sh --smoke` on the candidate (the packed
   app, its real core, a throwaway home: the pill, the core line, a message to the fake provider
   and its answer, a clean quit), with gates A, B and C;
-- a new item a check can't see (packaging, the core's spawn, the native helper, windows): its
-  own as-he-does row, run on the candidate with `AS_HE_DOES_ONLY=quick
-  AS_HE_DOES_QUICK_ROWS=<words of its row>`.
+- the as-he-does rows, when the change touches what only the packed app shows: the main
+  process (`apps/desktop/src/main/`), the core's spawn, packaging or the native helper (gate.sh's
+  map picks them), on the candidate with `AS_HE_DOES_ONLY=quick`; and a new item a check can't
+  see gets its own row (`AS_HE_DOES_QUICK_ROWS=<words of its row>`). In shadow mode everything
+  runs.
 
 Every as-he-does run is on a throwaway world (`~/.bise/gate/real-shape`, fake accounts, fake
 provider) under card #509's standing go, through `heavy-run`, wrapped in `caffeinate -d -i -s`
