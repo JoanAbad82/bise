@@ -248,7 +248,7 @@ const PIECES: Record<number, Piece> = {
     for (const s of [-1, 1]) cone(k, bl, 0.06, 0.25, '#2a9d8f', s * 0.25, 0.6, 0.3);
   },
   // a golden alebrije at main's mark
-  14: (k, g, p) =>
+  14: (k, g, p) => {
     plinth(k, g, p, (gold, y) => {
       const body = k.add(k.style.ball(0.22), gold, g, p.x, y + 0.3, p.z);
       body.scale.set(1.5, 0.9, 0.8);
@@ -257,7 +257,8 @@ const PIECES: Record<number, Piece> = {
       for (const dx of [-0.2, 0.2]) k.add(k.style.box(0.06, 0.2, 0.06), gold, g, p.x + dx, y + 0.1, p.z);
       const tail = cone(k, g, 0.05, 0.35, gold, p.x - 0.42, y + 0.45, p.z);
       tail.rotation.z = 0.8;
-    }),
+    });
+  },
 };
 
 /** a frame of cut tin (hojalata), its picture in a bright colour; a golden retablo from 500 */
@@ -297,7 +298,9 @@ export const patio: MapLook = {
   lounge,
   desk: (b, d, name) => deskOf(b, d, name, { thing: (kk, g, h) => { if (h % 3 === 0) agavePot(kk, g, 0.45, 0.35); } }),
   mainDesk: (b) => mainDeskOf(b, '#c98a5a', '#6b4a32'),
-  tree: ({ k: kk }, parent, x, z, size) => tree(kk, parent, x, z, size),
+  tree: ({ k: kk }, parent, x, z, size) => {
+    tree(kk, parent, x, z, size);
+  },
   growth,
   pieceAt,
   wear,

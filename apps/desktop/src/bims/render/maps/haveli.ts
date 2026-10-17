@@ -239,7 +239,7 @@ const PIECES: Record<number, Piece> = {
     kite(k, g, { x: p.x - 0.4, z: p.z + 2.6 }, '#7b5fc0', GOLD, 2.9);
   },
   // a golden peacock at main's mark
-  14: (k, g, p) =>
+  14: (k, g, p) => {
     plinth(k, g, p, (gold, y) => {
       k.add(k.style.ball(0.16), gold, g, p.x, y + 0.25, p.z).scale.set(1, 1.3, 0.9);
       k.add(k.style.capsule(0.05, 0.25), gold, g, p.x, y + 0.5, p.z + 0.05);
@@ -248,7 +248,8 @@ const PIECES: Record<number, Piece> = {
         const f = k.add(k.style.box(0.08, 0.55, 0.02), gold, g, p.x + Math.sin((i - 3) * 0.3) * 0.25, y + 0.45, p.z - 0.2);
         f.rotation.z = (i - 3) * 0.3;
       }
-    }),
+    });
+  },
 };
 
 /** a painted miniature in a thin gilt frame; a mirror mosaic (sheesh mahal) from 500 */
@@ -284,7 +285,9 @@ export const haveli: MapLook = {
   lounge,
   desk: (b, d, name) => deskOf(b, d, name, { mat: CUSHIONS[hash(name) % 4] }),
   mainDesk: (b) => mainDeskOf(b, '#a0673f', '#6b4a32'),
-  tree: ({ k }, parent, x, z, size) => tree(k, parent, x, z, size),
+  tree: ({ k }, parent, x, z, size) => {
+    tree(k, parent, x, z, size);
+  },
   growth,
   pieceAt,
   wear,

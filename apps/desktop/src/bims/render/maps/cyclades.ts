@@ -79,7 +79,9 @@ function shell(b: Build): void {
   // low whitewashed walls round the plot
   k.add(k.style.box(W + 0.2, 0.8, 0.25), k.mat(k.pal.wall), root, x0 + W / 2, 0.4, -0.12);
   k.add(k.style.box(0.25, 0.8, D + 0.2), k.mat(k.pal.wall), root, x0 - 0.12, 0.4, D / 2);
-  o.cubes.forEach((c, i) => cube(k, root, c.x, c.z, c.w, i === 0));
+  o.cubes.forEach((c, i) => {
+    cube(k, root, c.x, c.z, c.w, i === 0);
+  });
   // the cat, asleep on the first desk's corner
   const first = [...o.desks.values()].sort((p, q) => p.z - q.z || p.x - q.x)[0];
   if (first) {
@@ -145,7 +147,9 @@ function tree(k: Kit, parent: Object3D, x: number, z: number, size: number): voi
 
 const PIECES: Record<number, Piece> = {
   // a pot of basil
-  1: (k, g, p) => potted(k, g, p.x, p.z, WHITE, '#5fb35a', 0.3),
+  1: (k, g, p) => {
+    potted(k, g, p.x, p.z, WHITE, '#5fb35a', 0.3);
+  },
   // olives and feta on the first table, the first olive tree
   2: (k, g, p, b) => {
     k.add(k.style.box(0.2, 0.08, 0.14), k.mat(WHITE), g, p.x - 0.1, 0.62, p.z);
@@ -234,12 +238,13 @@ const PIECES: Record<number, Piece> = {
     }
   },
   // a golden amphora at main's mark
-  14: (k, g, p) =>
+  14: (k, g, p) => {
     plinth(k, g, p, (gold, y) => {
       k.add(k.style.ball(0.22), gold, g, p.x, y + 0.3, p.z).scale.set(1, 1.3, 1);
       k.add(k.style.cylinder(0.07, 0.25), gold, g, p.x, y + 0.65, p.z);
       for (const s of [-1, 1]) k.add(k.style.box(0.04, 0.2, 0.04), gold, g, p.x + s * 0.12, y + 0.62, p.z);
-    }),
+    });
+  },
 };
 
 /** a frame in a blue window surround; a golden mosaic from 500 */
@@ -279,7 +284,9 @@ export const cyclades: MapLook = {
   lounge,
   desk: (b, d, name) => deskOf(b, d, name, { chair: BLUE }),
   mainDesk: (b) => mainDeskOf(b, WHITE, BLUE),
-  tree: ({ k }, parent, x, z, size) => tree(k, parent, x, z, size),
+  tree: ({ k }, parent, x, z, size) => {
+    tree(k, parent, x, z, size);
+  },
   growth,
   pieceAt,
   wear,

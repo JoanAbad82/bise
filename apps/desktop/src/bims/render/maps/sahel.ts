@@ -48,10 +48,10 @@ function mat(k: Kit, g: Object3D, x: number, z: number, w: number, d: number, c:
   for (let i = 0; i < 5; i++) k.add(k.style.box(w, 0.02, d / 5), k.mat(i % 2 ? c : STRAW), g, x, 0.035, z - d / 2 + (i + 0.5) * (d / 5));
 }
 
-/** a branch shelter: four posts, a roof of crossed branches and straw */
+/** a branch shelter: four posts, a roof of a few thin branches and straw (bims: thick ones crossed the bims' heads at 320) */
 function hangar(k: Kit, g: Object3D, x0: number, x1: number, z0: number, z1: number): void {
   for (const x of [x0, x1]) for (const z of [z0, z1]) k.add(k.style.cylinder(0.08, 2.0), k.mat(WOOD), g, x, 1.0, z);
-  for (let z = z0; z <= z1 + 0.01; z += 0.9) k.add(k.style.cylinder(0.03, x1 - x0 + 0.4), k.mat('#b08a5a'), g, (x0 + x1) / 2, 2.02, z).rotation.z = Math.PI / 2;
+  for (let z = z0; z <= z1 + 0.01; z += 1.8) k.add(k.style.cylinder(0.018, x1 - x0 + 0.4), k.mat('#b08a5a'), g, (x0 + x1) / 2, 2.02, z).rotation.z = Math.PI / 2;
   for (let i = 0; i < 3; i++) k.add(k.style.box(x1 - x0, 0.03, 0.4), k.mat(STRAW), g, (x0 + x1) / 2, 2.06, z0 + 0.5 + (i * (z1 - z0 - 1)) / 2);
 }
 
@@ -233,12 +233,13 @@ const PIECES: Record<number, Piece> = {
     }
   },
   // a golden djembé at main's mark
-  14: (k, g, p) =>
+  14: (k, g, p) => {
     plinth(k, g, p, (gold, y) => {
       k.add(k.style.cylinder(0.1, 0.25), gold, g, p.x, y + 0.12, p.z);
       k.add(k.style.cap(0.22, 0.55), gold, g, p.x, y + 0.25, p.z).rotation.x = Math.PI;
       k.add(k.style.cylinder(0.22, 0.25), gold, g, p.x, y + 0.42, p.z);
-    }),
+    });
+  },
 };
 
 /** a studio portrait in black and white (Seydou Keïta, Malick Sidibé), a golden frame from 500 */
@@ -280,7 +281,9 @@ export const sahel: MapLook = {
   lounge,
   desk: (b, d, name) => deskOf(b, d, name, { chair: WOOD }),
   mainDesk: (b) => mainDeskOf(b, '#8a5a3c', WOOD),
-  tree: ({ k }, parent, x, z, size) => tree(k, parent, x, z, size),
+  tree: ({ k }, parent, x, z, size) => {
+    tree(k, parent, x, z, size);
+  },
   growth,
   pieceAt,
   wear,

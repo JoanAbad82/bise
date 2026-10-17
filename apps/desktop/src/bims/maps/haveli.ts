@@ -82,7 +82,7 @@ export function haveliLayout(agents: readonly Agent[], prev?: HaveliOffice): Hav
   const D = yz1 + 1.6;
   const crossFront = D - 0.5;
 
-  const walls = [X0 + 0.45, x1 - 0.45];
+  const walls = [X0 + 0.45, x1 - 0.45] as const;
   const back = backZone({ x0: X0, W, main: 'right', bed: [0.62, 0.62], reach: walls });
   const front = frontZone({ x0: X0, W, D, doorX: cx, terraceU: 1.0, out: 'left' });
   furniture.push(...back.furniture, ...front.furniture);

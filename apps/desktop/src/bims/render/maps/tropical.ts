@@ -76,7 +76,7 @@ function shell(b: Build): void {
   k.add(k.style.box(W, 0.02, 1.0), wave, root, x0 + W / 2, 0.03, D - 0.5);
   // the cobogó wall: concrete blocks pierced with circles
   k.add(k.style.box(W + 0.2, 1.7, 0.2), k.mat(k.pal.wall), root, x0 + W / 2, 0.85, -0.1);
-  const cob = patterned(k, nc('#e8e4dc', night, 0.55), W, 1.6, 0.8, (g, px) => {
+  const cob = patterned(k, nc('#e8e4dc', night, 0.55), W, 1.6, 0.8, (g) => {
     g.fillStyle = nc('#6b8f71', night);
     for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
       g.beginPath();
@@ -173,7 +173,9 @@ function tree(k: Kit, parent: Object3D, x: number, z: number, size: number): voi
 }
 
 const PIECES: Record<number, Piece> = {
-  1: (k, g, p) => monstera(k, g, p.x, p.z),
+  1: (k, g, p) => {
+    monstera(k, g, p.x, p.z);
+  },
   // açaí bowls on the bar, the first banana tree
   2: (k, g, p, b) => {
     for (let i = 0; i < 3; i++) {
@@ -250,15 +252,18 @@ const PIECES: Record<number, Piece> = {
     for (let i = 0; i < 4; i++) k.add(k.style.cylinder(0.3, 0.02), k.mat(BANANA), g, p.x - 0.5 + i * 0.35, 0.05, p.z + Math.sin(i * 2) * 0.25);
   },
   // a pipa (kite) on the wind
-  13: (k, g, p) => kite(k, g, p, '#f28c28', AZUL, 2.8),
+  13: (k, g, p) => {
+    kite(k, g, p, '#f28c28', AZUL, 2.8);
+  },
   // a golden cup at main's mark
-  14: (k, g, p) =>
+  14: (k, g, p) => {
     plinth(k, g, p, (gold, y) => {
       k.add(k.style.cylinder(0.12, 0.1), gold, g, p.x, y + 0.05, p.z);
       k.add(k.style.cylinder(0.04, 0.3), gold, g, p.x, y + 0.25, p.z);
       k.add(k.style.cap(0.22, 0.5), gold, g, p.x, y + 0.42, p.z).rotation.x = Math.PI;
       for (const s of [-1, 1]) k.add(k.style.box(0.05, 0.2, 0.05), gold, g, p.x + s * 0.25, y + 0.55, p.z);
-    }),
+    });
+  },
 };
 
 /** a bossa nova record sleeve: a square in a colour, a disc peeking out; a gold record from 500 */
@@ -294,7 +299,9 @@ export const tropical: MapLook = {
   lounge,
   desk: (b, d, name) => deskOf(b, d, name, { thing: (k, g, h) => { if (h % 4 === 1) potted(k, g, -0.5, 0.4, SUN, LEAF, 0.2); } }),
   mainDesk: (b) => mainDeskOf(b, '#a0673f', '#6b4a32'),
-  tree: ({ k }, parent, x, z, size) => tree(k, parent, x, z, size),
+  tree: ({ k }, parent, x, z, size) => {
+    tree(k, parent, x, z, size);
+  },
   growth,
   pieceAt,
   wear,
