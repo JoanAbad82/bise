@@ -93,7 +93,7 @@ struct Stepping {
     notices: Vec<String>,
     undelivered: bool,
     /// its notices are plain lines (`notice`), not failures: a confirm's
-    /// no ("drop of @x cancelled", bar I9)
+    /// no ("@x stays: nothing archived", bar I9)
     as_notice: bool,
 }
 

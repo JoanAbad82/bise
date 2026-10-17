@@ -197,7 +197,7 @@ test('thread/commands: /undo /cancel /flow /artifacts add /new -w --with-changes
       await say('/new --with-changes x: y');
       const said = await noticeAfter(before).catch(() => '');
       expect.soft(said, "the hub's refusal in place").toContain('--with-changes only works with -w');
-      await expect.soft(page.locator(T.notice), 'as an error').toHaveAttribute('data-level', 'error');
+      await expect.soft(page.locator(T.notice), 'as an error').toHaveAttribute('data-level', 'err');
       const seen = await tuiCmd(term(), '/new --with-changes x: y');
       const head = words('refused', said, seen);
       expect.soft(flat(seen), "the TUI's words").toContain(head);

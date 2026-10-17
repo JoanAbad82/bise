@@ -85,7 +85,7 @@ export class StoreReads extends StoreBase {
   confirms(project: string): readonly Confirm[] {
     return this.slice(`confirms:${project}`, EMPTY);
   }
-  /** the hub's last line to this window: a notice (a no's 'drop of @x cancelled', /flow) or a refused slash line */
+  /** the hub's last line to this window: a notice (a no's '@x stays: nothing archived', /flow) or a refused slash line */
   notice(project: string): HubLine | null {
     return this.slice<HubLine | null>(`notice:${project}`, null);
   }

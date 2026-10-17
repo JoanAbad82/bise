@@ -393,9 +393,8 @@ function Current({ top }: { top: ReactNode }) {
  */
 function RouteConfirm({ route }: { route: Route }) {
   const project = projectOf(route);
-  // a thread shows the hub's plain lines as its own quiet row (HubNoteRow); other screens here
-  const thread = route.screen === 'thread' || route.screen === 'bise';
-  return project === undefined ? null : <ConfirmBar project={project} plain={!thread} />;
+  // the hub's other lines are the composer's key line (ThreadComposer keyLineOf) or a thread row (HubNoteRow)
+  return project === undefined ? null : <ConfirmBar project={project} />;
 }
 
 /**

@@ -2270,7 +2270,7 @@ impl Hub {
             return;
         };
         if !yes {
-            fx.push(notice(client, &format!("drop of @{} cancelled", name)));
+            fx.push(notice(client, &format!("@{} stays: nothing archived", name)));
             return;
         }
         self.core(fx, env, Some(client), In::ConfirmDrop(ci::ConfirmDrop { name }));

@@ -4,7 +4,7 @@
 // m_18733): 'no' is the filled button and ⏎ answers it, 'yes' is the default
 // kind; the keycaps say y and n, so a trailing '(y/n)' is dropped from the
 // words. y answers yes, n or ⏎ answers no (the hub's line
-// then shows: "drop of @x cancelled"), esc puts it off: the question leaves
+// then shows: "@x stays: nothing archived"), esc puts it off: the question leaves
 // the window and the hub holds nothing for it (no lock, the agent free for
 // any other command); the same command asks again. The bar takes the keys
 // while it shows, then gives them back. amb-win mounts it in the thread
@@ -25,7 +25,7 @@ export function confirmWords(text: string): string {
 
 /**
  * The hub's last plain line to this window for the project (a typed command's result: /flow,
- * /help, a no's 'drop of @x cancelled', /restart's words) as ONE quiet row at the thread's end
+ * /help, a no's '@x stays: nothing archived', /restart's words) as ONE quiet row at the thread's end
  * (designer's desktop-notices page (1)): the thread's notice look, dim, its '·'. ThreadScreen
  * mounts it after the working row (amb-win m_20575). A refused line stays in ConfirmBar.
  */
@@ -95,11 +95,14 @@ function SwapAct() {
   );
 }
 
-/** `plain`: the screen has no thread (so no HubNoteRow): the hub's plain lines show here too. */
-export function ConfirmBar({ project, plain = false }: { project: string; plain?: boolean }) {
+/**
+ * The hub's yes/no question only. Its other lines never show here (his m_29126: a refused '/bime'
+ * stayed in a box under the composer for many messages and pushed it up): a refused line and the
+ * plain lines of a screen with no thread are the composer's key line (ThreadComposer keyLineOf).
+ */
+export function ConfirmBar({ project }: { project: string }) {
   const store = useStore();
   const asks = useConfirms(project);
-  const notice = useNotice(project);
   const q = asks[0];
   const bar = useRef<HTMLDivElement>(null);
   const before = useRef<Element | null>(null);
@@ -114,24 +117,7 @@ export function ConfirmBar({ project, plain = false }: { project: string; plain?
     };
   }, [q]);
 
-  if (q === undefined) {
-    if (notice === null) return null;
-    // a refused line (his words to fix) stays under the screen; on a thread the hub's plain lines
-    // are a quiet row in it (HubNoteRow: nothing under the composer but its keys), on a screen
-    // with no thread (agents, review…) they stay here, dim, or he'd never see a no's answer
-    if (notice.level === 'error') {
-      return (
-        <div className="confirm-bar error" role="alert" data-testid="confirm.notice" data-level="error">
-          {notice.text}
-        </div>
-      );
-    }
-    return plain ? (
-      <div className="confirm-bar note" role="status" data-testid="confirm.notice" data-level={notice.level}>
-        {notice.text}
-      </div>
-    ) : null;
-  }
+  if (q === undefined) return null;
   const yes = () => {
     store.confirm(project, q.id, true);
   };

@@ -392,7 +392,7 @@ pub enum HubEv {
         flash: bool,
     },
     /// a plain line from the hub to the window that sent `cmd` (a
-    /// confirm answered no: "drop of @x cancelled"; `/flow`'s answer to
+    /// confirm answered no: "@x stays: nothing archived"; `/flow`'s answer to
     /// a `slash`), not a failure. `cid`: the slash command's, when it
     /// had one (architect m_10911)
     Notice {

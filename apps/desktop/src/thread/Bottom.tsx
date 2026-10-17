@@ -59,6 +59,7 @@ export function BottomBlock({ project, agent }: { project: string; agent: string
         quoting={false}
         onReady={NOOP}
         onSent={NOOP}
+        hubNotes
       />
     </div>
   );

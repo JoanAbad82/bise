@@ -103,7 +103,7 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       await expect(rowOf(page, 'which bench?').first()).toContainText(common.not_sent, { timeout: 3000 });
       await open(page, 9, 'which bench?');
       await expect(cardIn(page, 9).getByTestId(`inbox.block.card.${P}-9.refused`)).toContainText('not sent: perf asked again: card 9 is not open any more · try again', { timeout: 3000 });
-      await expect(page.locator('[data-testid="confirm.notice"][data-level="error"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="confirm.notice"][data-level="err"]')).toHaveCount(0);
       await expect(page.locator('[data-testid^="thread.aside."]')).toHaveCount(0);
       await page.keyboard.press('Escape');
     });
@@ -130,7 +130,7 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       await present(page, 13, 'drop the old index?', 'card 13 is back');
       await open(page, 13, 'drop the old index?');
       await expect(cardIn(page, 13).getByTestId(`inbox.block.card.${P}-13.refused`)).toContainText('not sent: search is still on it: card 13 stays', { timeout: 3000 });
-      await expect(page.locator('[data-testid="confirm.notice"][data-level="error"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="confirm.notice"][data-level="err"]')).toHaveCount(0);
       await page.keyboard.press('Escape');
     });
 
@@ -143,7 +143,7 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       // the words stay on the cards that came back, never on the project's line
       await expect.poll(() => notSent(page, 9, 'which bench?'), { message: `${why}: card 9 says not sent`, timeout: 5000 }).toBe(true);
       if (refusedToo) await expect.poll(() => notSent(page, 13, 'drop the old index?'), { message: `${why}: card 13 says not sent`, timeout: 5000 }).toBe(true);
-      await expect(page.locator('[data-testid="confirm.notice"][data-level="error"]'), `${why}: no project error line`).toHaveCount(0);
+      await expect(page.locator('[data-testid="confirm.notice"][data-level="err"]'), `${why}: no project error line`).toHaveCount(0);
     };
 
     await test.step('a reload: the same (the hub dropped card 11), still no row of the window here', async () => {

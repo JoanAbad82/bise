@@ -5,7 +5,7 @@
 // and the frame never touches it. The frame's props change only when the screen's state changes
 // (send on/off/stop, the dock, the tabs), never per keystroke; focus shows through :focus-within
 // (css/live.css), so focusing or typing re-renders nothing here. The caret is the editor's own.
-import type { MouseEventHandler, ReactNode } from "react";
+import type { KeyboardEventHandler, MouseEventHandler, ReactNode } from "react";
 import { cx, st, sub, type UiState } from "./cx";
 import { Dot, Help, type DotState } from "./prim";
 import { Gust } from "./gust";
@@ -145,6 +145,8 @@ export interface ComposerFrameProps {
   onBoxDown?: () => void;
   /** in the box at its left, before the editor (voice mode's grey pearl while he types) */
   lead?: ReactNode;
+  /** a key pressed anywhere in the frame, before the editor takes it (a key-line notice goes at his first key) */
+  onKeyDownCapture?: KeyboardEventHandler<HTMLDivElement> | undefined;
   testId?: string;
 }
 
@@ -157,9 +159,9 @@ export function boxPress(target: EventTarget | null): boolean {
 }
 /** the composer's frame: tabs, dock, quote, the tab glued to the box, the box (the editor, then its
  *  32 px row: tools left, tools and send right), the keys */
-export function ComposerFrame({ children, tab, answering, answerTip, quiet, tools, toolsEnd, sent = 0, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
+export function ComposerFrame({ children, tab, answering, answerTip, quiet, tools, toolsEnd, sent = 0, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, onKeyDownCapture, testId }: ComposerFrameProps) {
   return (
-    <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId}
+    <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId} onKeyDownCapture={onKeyDownCapture}
       onMouseDown={onBoxDown && ((e) => {
         // the editor's own text keeps the click (the caret at the clicked line); elsewhere the frame focuses it
         if (e.button !== 0 || !boxPress(e.target)) return;

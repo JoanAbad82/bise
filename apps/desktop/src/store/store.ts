@@ -34,6 +34,7 @@ import {
   type Ev,
   type EvOf,
   type FilesAnswer,
+  type HubLine,
   type Pending,
   type ThreadOrder,
   sameJson,
@@ -647,6 +648,10 @@ export class Store extends StoreVoice {
   confirm(project: string, id: number, yes: boolean): void {
     this.dropConfirm(project, id);
     this.command({ cmd: "confirm", project, id, yes });
+  }
+  /** The hub's line he saw on the key line is over (he typed, sent, esc, its time): it goes, unless a newer one came. */
+  dropNotice(project: string, line: HubLine): void {
+    if (this.notice(project) === line) this.put(`notice:${project}`, null);
   }
   /** Put off (esc): the question leaves the window; the hub holds nothing for it, a later command asks again. */
   putOff(project: string, id: number): void {

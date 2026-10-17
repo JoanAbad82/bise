@@ -134,7 +134,7 @@ impl Hub {
                 if first != "/compact" {
                     fx.push(notice(
                         client,
-                        &format!("unknown command: {} (see /help)", first),
+                        &format!("unknown command: {} · see /help", first),
                     ));
                     return;
                 }
@@ -160,15 +160,15 @@ impl Hub {
             // the daemon runs these (proto_view::slash routes them before
             // the core; the TUI runs its own arms): a line that still
             // reaches the core gets today's words
-            UserCmd::Stop { .. } => fx.push(notice(client, "unknown command: /stop (see /help)")),
-            UserCmd::Approvals { .. } => fx.push(notice(client, "unknown command: /approvals (see /help)")),
+            UserCmd::Stop { .. } => fx.push(notice(client, "unknown command: /stop · see /help")),
+            UserCmd::Approvals { .. } => fx.push(notice(client, "unknown command: /approvals · see /help")),
             UserCmd::Version(v) => {
                 let first = match v {
                     bise_proto::slash::Version::Restart(_) => "/restart",
                     bise_proto::slash::Version::Update => "/update",
                     _ => "/version",
                 };
-                fx.push(notice(client, &format!("unknown command: {} (see /help)", first)));
+                fx.push(notice(client, &format!("unknown command: {} · see /help", first)));
             }
         }
     }

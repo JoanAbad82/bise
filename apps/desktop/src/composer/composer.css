@@ -346,34 +346,68 @@
 .b-composer:not(:focus-within) .keys .rest-tip {
   display: none;
 }
-/* the mic control (bar I): its key at rest, the meter alone while on ('listening…' is the field's); fixed width, so the
-   key line never moves when it changes */
+/* a one-off line in the key line's place (Composer `line`, keyline.ts: a refused command, the hub's
+   word on his answer): the same row and height, so the composer never moves (designer m_29135).
+   Words he reads: sans 12 text-2; only commands and paths in mono; the mark ✗ in the error color
+   (a whole red line shouts at a typo), a note's · text-2. One line, cut after a whole word with a
+   glued … (Composer KeyLineView), the whole words in its tip */
+.b-composer .keys .line {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap-inline);
+  font: var(--t-12) var(--font-ui);
+  color: var(--c-text-2);
+}
+.b-composer .keys .line .mark {
+  flex: none;
+}
+.b-composer .keys .line.err .mark {
+  color: var(--c-err);
+}
+.b-composer .keys .line .words {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+}
+.b-composer .keys .line .code {
+  font-family: var(--font-mono);
+}
+/* a selection in the field is the ds 9% text tint: the light theme's pale pink selection didn't
+   show on the field's fill, so a refused line put back selected looked unselected (designer m_29408) */
+.b-composer .in ::selection {
+  background: color-mix(in srgb, var(--c-text) 9%, transparent);
+}
+/* the mic control (bar I): its key at rest; while a take runs it hides (the field's chip is the mic).
+   As wide as its words, the key line's 3ch to the next pair like every pair (his m_29136: no space
+   kept after 'dictate'); no padding, no fill */
 .b-composer .keys .mic {
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: var(--gap-inline);
-  min-width: 15ch;
-  padding: 0 var(--s-1);
-  margin: 0 calc(-1 * var(--s-1));
+  padding: 0;
+  margin: 0;
   border: 0;
-  border-radius: var(--r-2);
   background: none;
   font: inherit;
   color: inherit;
   cursor: default;
-  transition:
-    background var(--d-fast) var(--ease-out),
-    color var(--d-fast) var(--ease-out);
+  transition: color var(--d-fast) var(--ease-out);
 }
 /* while a take runs, the field's chip is the mic (designer m_22700): the key line has no meter */
 .b-composer .keys .mic[hidden] {
   display: none;
 }
-/* hover (bar O.6): every composer control shows the pointer is on it, the ds ghost button's
-   hover (prim.css .b-btn.ghost); the padding sits in a negative margin, so the key line never moves */
-.b-composer .keys .mic:hover {
-  background: var(--c-hover);
+/* hover (bar O.6, his m_29136): the words go from grey to ink, fast; never a fill (the line has no
+   room for a padding around it, a fill looked cramped) */
+.b-composer .keys .mic .kk {
+  transition: color var(--d-fast) var(--ease-out);
+}
+.b-composer .keys .mic:hover,
+.b-composer .keys .mic:hover .kk {
   color: var(--c-text);
 }
 /* the ds send has no hover of its own: the ds primary button's (prim.css .b-btn.pri:hover) */
@@ -382,10 +416,6 @@
 }
 .b-composer .send:not(:disabled):not(.off):hover {
   background: color-mix(in srgb, var(--c-ink) 88%, var(--c-solid));
-}
-/* voice mode's ∿ (designer's voice-window page (1)): next to dictate, as wide as its words */
-.b-composer .keys .mic.voice {
-  min-width: 0;
 }
 /* TP-R6: the 3 s flash of an approvals switch on the label line, its mode word in accent (keybar.rs) */
 .b-composer .flash-word {

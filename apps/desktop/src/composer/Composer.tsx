@@ -10,16 +10,18 @@
 import {
   memo,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type JSX,
   type ReactNode,
 } from "react";
-import { ComposerFrame, Press } from "@/ds";
+import { ComposerFrame, cutWords, Press } from "@/ds";
 import "./composer.css";
 import { composer } from "../proto/words.gen";
 import type { ComposerActions, FieldBar } from "./actions";
+import { endsLine, monoRuns, type KeyLine } from "./keyline";
 import { PmField } from "./pm/PmField";
 import { QueueDrawer, type QueueDrawerProps } from "./QueueDrawer";
 
@@ -96,6 +98,10 @@ export interface ComposerProps {
   /** a modifier held alone (app/held.ts) and the screen's facts: the bar lists that modifier's
    *  keys (keybar.ts heldPairs, the TUI's ctrlhint.rs); ⌘ or ⌥ held, the ⌃R mic and voice step out */
   readonly held?: { readonly mod: HeldMod; readonly ctx: HeldCtx } | null;
+  /** a one-off line for him (a refused command, the hub's word on his answer): it takes the key
+   *  line's place, same row, same height (nothing moves); `onLineDone` at his first key in the frame */
+  readonly line?: KeyLine | null;
+  readonly onLineDone?: () => void;
   readonly testId?: string;
 }
 
@@ -217,8 +223,18 @@ export const Composer = memo(function Composer(
         actions.current?.focusEnd();
       }}
       lead={lead}
+      onKeyDownCapture={
+        props.line == null
+          ? undefined
+          : (e) => {
+              if (endsLine(e.key)) cb.current.onLineDone?.();
+            }
+      }
       keys={
-        <>
+        props.line != null ? (
+          // the key line's place, the same row and height: nothing moves (keyline.ts)
+          <KeyLineView line={props.line} />
+        ) : <>
           {sources.dictate !== undefined && !otherMod && (
             <Mic
               state={dictating}
@@ -326,6 +342,56 @@ export const Composer = memo(function Composer(
     </ComposerFrame>
   );
 });
+
+/** The one-off line on the key line's place (designer m_29135): its mark, then its words in sans
+ *  with the commands and paths in mono (keyline.ts monoRuns), cut after a whole word with one glued
+ *  '…' to the row's room, the whole words in its tip. Its words are drawn here, not by React (each
+ *  try of the cut measures them). */
+function KeyLineView({ line }: { line: KeyLine }): JSX.Element {
+  const words = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = words.current;
+    if (el === null) return;
+    const draw = (t: string) => {
+      el.replaceChildren(
+        ...monoRuns(t).map((r) => {
+          if (!r.mono) return document.createTextNode(r.text);
+          const c = document.createElement("span");
+          c.className = "code";
+          c.textContent = r.text;
+          return c;
+        }),
+      );
+    };
+    const fit = () => {
+      draw(cutWords(line.text, (t) => {
+        draw(t);
+        return el.scrollWidth <= el.clientWidth;
+      }));
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(fit);
+    ro.observe(el.parentElement ?? el);
+    return () => {
+      ro.disconnect();
+    };
+  }, [line.text]);
+  return (
+    <span
+      className={`line ${line.level}`}
+      role={line.level === "err" ? "alert" : "status"}
+      title={line.text}
+      data-testid={line.testId}
+      data-level={line.level}
+    >
+      <span className="mark" aria-hidden="true">
+        {line.level === "err" ? "✗" : "·"}
+      </span>
+      <span className="words" ref={words} />
+    </span>
+  );
+}
 
 /** The mic control in the key line (bar I): its key at rest. While a take runs it hides: the take's
  *  chip in the field shows the voice, the key line says 'any key stop · esc cancel' (designer

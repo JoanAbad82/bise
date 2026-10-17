@@ -7,10 +7,10 @@ import { ANCHOR_EVENT, type AnchorAct } from '@/artifacts/useFrameNote';
 import { load, save } from '@/composer/drafts';
 import { shownName } from '@/agents/model';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
-import type { ComposerActions } from '@/composer';
+import type { ComposerActions, KeyLine } from '@/composer';
 import type { Part } from '@/proto';
 import type { Outgoing } from '@/composer/message';
-import { threadKey, useApprovals, useCards, useCommands, useCoreEvent, useFiles, useSkills, useStore } from '@/store';
+import { threadKey, useApprovals, useCards, useCommands, useCoreEvent, useFiles, useNotice, useSkills, useStore, type HubLine } from '@/store';
 import { useRouter } from '@/app/router';
 import { pickCommands, slashLine, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
@@ -50,6 +50,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   keys,
   lead,
   mark,
+  hubNotes = false,
 }: {
   project: string;
   agent: string;
@@ -58,6 +59,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   tab: TabWords;
   /** after the label's first part: the addressee's working gust (LabelMark), else none */
   mark?: ReactNode;
+  /** the hub's plain lines show on the key line too (a screen with no thread: no HubNoteRow says them) */
+  hubNotes?: boolean;
   /** the tab's right instead of the context: 'esc to bise instead' while it answers, 'tab back to voice' */
   tabEnd?: string | undefined;
   /** the addressee's row: its model menu in the box's row (none: no menu) */
@@ -129,6 +132,21 @@ export const ThreadComposer = memo(function ThreadComposer({
   const asked = useRef<{ project: string; text: string } | null>(null);
   const actions = useRef<ComposerActions | null>(null);
   const [note, setNote] = useState<AnswerNote | null>(null);
+  // his last line the hub's router runs ('/bime'): refused, it comes back in the empty field, all
+  // selected, so one key replaces it or an arrow fixes it (designer m_29135); the key line says why
+  const slashSent = useRef<string | null>(null);
+  useCoreEvent(
+    useCallback(
+      (ev) => {
+        const back = refusedSlashOf(ev, project);
+        if (back === null) return;
+        const line = slashSent.current;
+        slashSent.current = null;
+        if (back && line !== null && fieldEmpty()) actions.current?.fill(line);
+      },
+      [project],
+    ),
+  );
   useCoreEvent(
     useCallback((ev) => {
       const n = answerNoteOf(ev, asked.current);
@@ -184,7 +202,9 @@ export const ThreadComposer = memo(function ThreadComposer({
         return;
       }
       // every other line he typed goes to the hub as typed: its router runs it (architect m_11011)
-      store.command(slashOf(name, args, at));
+      const cmd = slashOf(name, args, at);
+      slashSent.current = cmd.line;
+      store.command(cmd);
     },
     [router, store, project, agent],
   );
@@ -192,6 +212,8 @@ export const ThreadComposer = memo(function ThreadComposer({
     (out: Outgoing) => {
       // a '/word' line the composer's list doesn't know is still a command: the hub's router runs it
       // (never a line with typed parts: '/word [Image #1]' or a quoted '/word' is a message)
+      // any send ends the key line's notice (read through a ref: the send never re-binds per notice)
+      doneRef.current();
       const sl = out.files.length === 0 && out.parts === undefined ? slashLine(out.text) : null;
       if (sl !== null) {
         onCommand(sl.name, sl.args);
@@ -199,7 +221,6 @@ export const ThreadComposer = memo(function ThreadComposer({
       }
       // the open card's answer (any project's: the block lists them all): his words and the images
       // he attached, the hub's one /answer path (R41)
-      setNote(null);
       // the card he answered was closed by the hub while he typed (card-draft-keep): his words go
       // to its asker as a plain message, then the block lets the card go
       // an approval or a choice open: they go to its asker as a plain message, the item stays
@@ -316,20 +337,46 @@ export const ThreadComposer = memo(function ThreadComposer({
   const tabEl = <ComposerTab words={tabWords} mark={mark} end={end ?? undefined} testId="composer.tab" />;
   // a modifier held alone: the key line lists its keys (the TUI's ctrlhint.rs key bar)
   const held = useComposerHeld();
-  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
-  if (note === null) return field;
-  return (
-    <>
-      <div className={`th-notice ${note.level} th-hubnote`} role={note.level === 'err' ? 'alert' : 'status'} data-testid="composer.answer.note" data-level={note.level}>
-        <span className="th-notice-mark" aria-hidden="true">
-          {note.level === 'err' ? '✗' : '·'}
-        </span>{' '}
-        {note.text}
-      </div>
-      {field}
-    </>
-  );
+  // the one line on the key line's place (keyLineOf): it goes at his first key in the frame (esc
+  // too), at any send or command, a note also after LINE_MS; never outlives his next message,
+  // never moves the composer (designer m_29135)
+  const hubLine = useNotice(project);
+  const shown = useMemo(() => keyLineOf(hubLine, note, hubNotes), [hubLine, note, hubNotes]);
+  const lineDone = useCallback(() => {
+    setNote(null);
+    if (shown?.hub != null) store.dropNotice(project, shown.hub);
+  }, [shown, store, project]);
+  // an error has no timer: it says why his line is back in the field, until he acts (designer m_29135)
+  useEffect(() => {
+    if (shown === null || shown.line.level === 'err') return;
+    const t = window.setTimeout(lineDone, LINE_MS);
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [shown, lineDone]);
+  const doneRef = useRef(lineDone);
+  useEffect(() => {
+    doneRef.current = lineDone;
+  });
+  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
+  return field;
 });
+
+/** How long a key-line note stays when he does nothing (designer m_29135; an error has no timer). */
+export const LINE_MS = 8000;
+
+/**
+ * The one line on the composer's key line (his m_29126: a refused '/bime' stayed in a box under it
+ * for many messages and pushed the composer up): the hub's refused line first (his words to fix),
+ * then the composer's own note, then the hub's plain line where no thread row shows it (`hubNotes`).
+ * Pure.
+ */
+export function keyLineOf(hub: HubLine | null, note: AnswerNote | null, hubNotes: boolean): { line: KeyLine; hub: HubLine | null } | null {
+  if (hub !== null && hub.level === 'error') return { line: { level: 'err', text: hub.text, testId: 'confirm.notice' }, hub };
+  if (note !== null) return { line: { level: note.level, text: note.text, testId: 'composer.answer.note' }, hub: null };
+  if (hubNotes && hub !== null && hub.back !== true) return { line: { level: 'info', text: hub.text, testId: 'confirm.notice' }, hub };
+  return null;
+}
 
 /** The hub's word on an answer this composer sent: its notice (where his words went) or its refusal. */
 export interface AnswerNote {
@@ -344,6 +391,17 @@ export function answerNoteOf(ev: unknown, asked: { project: string } | null): An
   if (e.cmd !== 'answer' || e.project !== asked.project || typeof e.text !== 'string') return null;
   if (e.ev === 'notice') return { level: 'info', text: e.text };
   if (e.ev === 'error') return { level: 'err', text: e.text };
+  return null;
+}
+
+/** A core event as the hub's word on a slash line of this project: true refused, false taken (its
+ *  notice), null another event. Pure. */
+export function refusedSlashOf(ev: unknown, project: string): boolean | null {
+  if (typeof ev !== 'object' || ev === null) return null;
+  const e = ev as { ev?: unknown; cmd?: unknown; project?: unknown };
+  if (e.cmd !== 'slash' || e.project !== project) return null;
+  if (e.ev === 'error') return true;
+  if (e.ev === 'notice') return false;
   return null;
 }
 
