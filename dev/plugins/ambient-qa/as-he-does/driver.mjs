@@ -3871,6 +3871,12 @@ async function rowsC2BA(harness, say) {
 // N is at least growth.ts' stage for X (the client keeps a high-water mark, never less), the office
 // draws (no 'lost'), and a busy project stands past stage 0. 320 and wide shots to look at; the
 // view and the width are put back as they were.
+// the office's toggle: the AGENTS head's cube since 684c344c6 (bar-main), the title bar's before it
+async function bimsCube() {
+  const cube = page.locator('[data-testid="app.right.agents.bims"]').first();
+  return (await cube.count()) > 0 ? cube : page.locator('[data-testid="app.title.bims"]').first();
+}
+
 async function rowsD3D8(harness, say) {
   // growth.ts' STAGE_AT, here (not a module const: the quick block runs this row before the line
   // below it is reached, cand-d3d8d's TDZ)
@@ -3882,7 +3888,7 @@ async function rowsD3D8(harness, say) {
     // the office's toggle: the head's 'bims' pill until 42d13ed57, the title bar's cube icon after it
     // (closed by default; desk-cut-9 m_28268)
     const pill = page.locator('[data-testid="app.right.agents.view.bims"]').first();
-    const view = (await pill.count()) > 0 ? pill : page.locator('[data-testid="app.title.bims"]').first();
+    const view = (await pill.count()) > 0 ? pill : await bimsCube();
     const was = await view.getAttribute('aria-pressed', { timeout: 5000 }).catch(() => null);
     if (was !== 'true' && !(await click('bims on', view))) return;
     const tipNow = () => page.locator('[data-testid="app.right.bims.level"]').first().getAttribute('data-tip', { timeout: 1000 }).catch(() => null);
@@ -3930,7 +3936,9 @@ async function rows42D1(harness, say) {
   const shownOf = () => page.locator('[data-testid="app.right.bims"]').first().getAttribute('data-shown', { timeout: 1000 }).catch(() => null);
   await row('bims title icon', async (name) => {
     await harness();
-    const icon = page.locator('[data-testid="app.title.bims"]').first();
+    const icon = await bimsCube();
+    // 684c344c6: the cube lives in the AGENTS head, the title bar has none
+    const where = { head: await page.locator('[data-testid="app.right.agents"] [data-testid="app.right.agents.bims"]').count(), title: await page.locator('[data-testid="app.title.bims"]').count(), words: ((await icon.innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim() };
     // rowsD3D8 just closed it: the office stays mounted (data-shown) through its fade, under 800 ms
     // (Fold.tsx; cand-42d1b read 'pressed false, shown true' mid-close)
     await page.waitForTimeout(1500);
@@ -3945,7 +3953,35 @@ async function rows42D1(harness, say) {
     const on = (s) => s.pressed === 'true' && s.shown === 'true';
     const off = (s) => s.pressed !== 'true' && s.shown !== 'true';
     const flips = states.every((s) => on(s) || off(s)) && on(states[1]) !== on(states[0]) && on(states[2]) === on(states[0]);
-    step(`${name}: the title bar's cube opens and closes the office, pressed while it shows, and twice puts it back`, flips, states);
+    step(`${name}: the AGENTS head's cube ('the bims', none left in the title bar) opens and closes the office, pressed while it shows, and twice puts it back`,
+      flips && where.head === 1 && where.title === 0, { states, where });
+  });
+  // 684c344c6's cut (desk-cut-11, main m_29145; bar-main e1a3619ed, checks/app/bar-main.spec.ts):
+  // harness' AGENTS starts with main's row named 'bise'; from a sub-agent's thread its click opens
+  // main's thread (the row then current, the composer plain again)
+  await row('bar main row', async (name) => {
+    await harness();
+    await page.waitForTimeout(1000);
+    const ids = await page.evaluate(() => [...document.querySelectorAll('[data-testid="app.right.agents"] [data-testid^="app.right.agent."]')]
+      .map((e) => e.getAttribute('data-testid') ?? '').filter((t) => /^app\.right\.agent\.[^.]+$/.test(t))).catch(() => []);
+    const main = page.locator('[data-testid="app.right.agent.main"]').first();
+    const words = ((await main.innerText({ timeout: 2000 }).catch(() => '')) ?? '').trim();
+    const head = ((await page.locator('[data-testid="app.right.agents.head"]').first().innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim();
+    const other = ids.find((t) => t !== 'app.right.agent.main') ?? null;
+    if (other === null) { step(name, false, { ids, words, head, why: 'no sub-agent row in harness' }); return; }
+    const box = page.locator('[data-testid="composer.box"]:visible').first();
+    const pink = async () => (await box.getAttribute('data-answering', { timeout: 3000 }).catch(() => null)) === 'true';
+    if (!(await click(`open ${other}`, page.locator(`[data-testid="${other}"]`).first()))) return;
+    const otherCur = await until(async () => ((await page.locator(`[data-testid="${other}"]`).first().getAttribute('aria-current').catch(() => null)) === 'true' ? true : null), 8000, 500) === true;
+    if (!(await click('open main from its row', main))) return;
+    const mainCur = await until(async () => ((await main.getAttribute('aria-current').catch(() => null)) === 'true' ? true : null), 8000, 500) === true;
+    await page.waitForTimeout(1000);
+    const plain = !(await pink());
+    await page.mouse.move(5, 400);
+    await shot('684c-bar-main');
+    step(`${name}: AGENTS' first row is main's, named 'bise' (not 'main'); from a sub-agent's thread its click opens main's thread, the row current, the composer plain`,
+      ids[0] === 'app.right.agent.main' && /bise/.test(words) && !/\bmain\b/.test(words) && otherCur && mainCur && plain,
+      { first: ids[0], n: ids.length, words: words.slice(0, 120), head, other, otherCur, mainCur, plain });
   });
   await row('composer pink to a sub-agent', async (name) => {
     await harness();
@@ -3976,10 +4012,11 @@ async function rows4E20(harness, say) {
   const name = 'bims map pick';
   if (!wanted(name)) return;
   // AS_HE_DOES_BIMS_MAP: the map to pick (maps-d's california on the cut after)
-  const PICK = process.env.AS_HE_DOES_BIMS_MAP ?? 'patio';
+  // (a comma list: one row per map, each put back after it; maps-b's kyoto on desk-cut-11's cut)
+  const PICKS = (process.env.AS_HE_DOES_BIMS_MAP ?? 'patio').split(',').map((w) => w.trim()).filter(Boolean);
   const field = page.locator('[data-testid="composer.field"]:visible').first();
   const office = page.locator('[data-testid="app.right.bims"]').first();
-  const icon = page.locator('[data-testid="app.title.bims"]').first();
+  const icon = await bimsCube();
   const drawnMap = async () => ({ want: await office.getAttribute('data-want', { timeout: 1000 }).catch(() => null), map: await office.getAttribute('data-map', { timeout: 1000 }).catch(() => null) });
   const prefsFile = process.env.AS_HE_DOES_BISE_HOME ? path.join(process.env.AS_HE_DOES_BISE_HOME, 'prefs.json') : null;
   const prefsMap = () => {
@@ -3999,7 +4036,7 @@ async function rows4E20(harness, say) {
     if (listed) await row.click({ timeout: 3000 });
     return { listed, rows };
   };
-  try {
+  for (const PICK of PICKS) try {
     await harness();
     const was = await icon.getAttribute('aria-pressed', { timeout: 5000 }).catch(() => null);
     if (was !== 'true' && !(await click('bims on (map)', icon))) return;
@@ -4024,7 +4061,7 @@ async function rows4E20(harness, say) {
     const back = await pick(before.drawn.want ?? 'loft');
     await until(async () => ((await drawnMap()).want === (before.drawn.want ?? 'loft') ? true : null), 10000, 500);
     if (was !== 'true') await click('bims off (map)', icon);
-    step(`${name}: /bims lists the ready maps (chunk C's ${PICK} among them), picking it draws harness' office as ${PICK} at once and empties the field, prefs.json keeps it under bims.map.<hub id>, a reload draws it again`,
+    step(`${name}: /bims lists the ready maps (${PICK} among them), picking it draws harness' office as ${PICK} at once and empties the field, prefs.json keeps it under bims.map.<hub id>, a reload draws it again`,
       p.listed && after !== null && field1 === '' && saved !== null && kept !== null,
       { before, rows: p.rows, after, field1, saved, kept, back: back.listed, prefsFile });
   } catch (e) { step(name, false, String(e).slice(0, 300)); }
