@@ -178,4 +178,46 @@ export const bims = {
   town_back: "town",
   /**  */
   town_back_tip: "back to the whole town",
+  /** the hover's state of a skater: how long it has been idle (`12 min`), then what it does */
+  state_skating: (a: { dur: string | number }): string => "idle " + String(a.dur) + " · skating",
+  /** a trick's name, 1.5 s over the bim the office follows (the 2.2x zoom), never in the normal view */
+  trick_drop_in: "drop in",
+  /**  */
+  trick_pump: "pumps",
+  /**  */
+  trick_rock_to_fakie: "rock to fakie",
+  /**  */
+  trick_axle_stall: "axle stall",
+  /**  */
+  trick_fs_180: "frontside 180",
+  /**  */
+  trick_bs_180: "backside 180",
+  /**  */
+  trick_ollie: "ollie",
+  /**  */
+  trick_kickflip: "kickflip",
+  /**  */
+  trick_heelflip: "heelflip",
+  /**  */
+  trick_shove_it: "pop shove-it",
+  /**  */
+  trick_tre_flip: "360 flip",
+  /**  */
+  trick_fifty: "50-50",
+  /**  */
+  trick_five_o: "5-0",
+  /**  */
+  trick_boardslide: "boardslide",
+  /**  */
+  trick_nosegrind: "nosegrind",
+  /**  */
+  trick_manual: "manual",
+  /**  */
+  trick_no_comply: "no comply",
+  /**  */
+  trick_carve: "carve",
+  /**  */
+  trick_fs_air: "frontside air",
+  /** the 900 (two and a half turns in the air, Tony Hawk 1999), tried at the 900th job */
+  trick_nine: "900",
 } as const;

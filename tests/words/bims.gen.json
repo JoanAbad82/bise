@@ -359,6 +359,13 @@
     "one": null,
     "text": "waits to land · {nth}"
   },
+  "bims.state_skating": {
+    "args": [
+      "dur"
+    ],
+    "one": null,
+    "text": "idle {dur} · skating"
+  },
   "bims.state_starting": {
     "args": [],
     "one": null,
@@ -435,6 +442,106 @@
     ],
     "one": null,
     "text": "look inside {project}"
+  },
+  "bims.trick_axle_stall": {
+    "args": [],
+    "one": null,
+    "text": "axle stall"
+  },
+  "bims.trick_boardslide": {
+    "args": [],
+    "one": null,
+    "text": "boardslide"
+  },
+  "bims.trick_bs_180": {
+    "args": [],
+    "one": null,
+    "text": "backside 180"
+  },
+  "bims.trick_carve": {
+    "args": [],
+    "one": null,
+    "text": "carve"
+  },
+  "bims.trick_drop_in": {
+    "args": [],
+    "one": null,
+    "text": "drop in"
+  },
+  "bims.trick_fifty": {
+    "args": [],
+    "one": null,
+    "text": "50-50"
+  },
+  "bims.trick_five_o": {
+    "args": [],
+    "one": null,
+    "text": "5-0"
+  },
+  "bims.trick_fs_180": {
+    "args": [],
+    "one": null,
+    "text": "frontside 180"
+  },
+  "bims.trick_fs_air": {
+    "args": [],
+    "one": null,
+    "text": "frontside air"
+  },
+  "bims.trick_heelflip": {
+    "args": [],
+    "one": null,
+    "text": "heelflip"
+  },
+  "bims.trick_kickflip": {
+    "args": [],
+    "one": null,
+    "text": "kickflip"
+  },
+  "bims.trick_manual": {
+    "args": [],
+    "one": null,
+    "text": "manual"
+  },
+  "bims.trick_nine": {
+    "args": [],
+    "one": null,
+    "text": "900"
+  },
+  "bims.trick_no_comply": {
+    "args": [],
+    "one": null,
+    "text": "no comply"
+  },
+  "bims.trick_nosegrind": {
+    "args": [],
+    "one": null,
+    "text": "nosegrind"
+  },
+  "bims.trick_ollie": {
+    "args": [],
+    "one": null,
+    "text": "ollie"
+  },
+  "bims.trick_pump": {
+    "args": [],
+    "one": null,
+    "text": "pumps"
+  },
+  "bims.trick_rock_to_fakie": {
+    "args": [],
+    "one": null,
+    "text": "rock to fakie"
+  },
+  "bims.trick_shove_it": {
+    "args": [],
+    "one": null,
+    "text": "pop shove-it"
+  },
+  "bims.trick_tre_flip": {
+    "args": [],
+    "one": null,
+    "text": "360 flip"
   },
   "bims.view_bims_tip": {
     "args": [],
