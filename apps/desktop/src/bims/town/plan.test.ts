@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { agent, mainAgent } from '../fixtures';
 import { layoutOf } from '../maps';
 import { growOf } from '../growth';
-import { BANK, ROAD, crossings, perRow, rngOf, seedOf, smooth, townPlan, type TownPlan, type TownSite } from './plan';
+import { BANK, ROAD, crossings, perRow, rngOf, rowSizes, seedOf, smooth, townPlan, type TownPlan, type TownSite } from './plan';
 import { siteOf, townSeed } from './ground';
 
 /** a project's site: n agents, that many jobs done (its stage) and days used (its garden) */
@@ -86,14 +86,33 @@ describe('town plan', () => {
     }
   });
 
+  it('breaks the rhythm with a square every 4 or 5 offices, clear of the road, the river and the offices', () => {
+    for (const n of [12, 20]) {
+      const plan = townPlan(sites(n, n), 13);
+      expect(plan.squares.length, `${String(n)} projects`).toBeGreaterThanOrEqual(1);
+      for (const q of plan.squares) {
+        const inSq = (x: number, z: number, m: number): boolean => Math.abs(x - q.x) < q.w / 2 + m && Math.abs(z - q.z) < q.d / 2 + m;
+        expect(plan.road.filter((p) => inSq(p.x, p.z, ROAD)), 'the road through a square').toEqual([]);
+        expect(plan.river.filter((p) => inSq(p.x, p.z, BANK)), 'the river through a square').toEqual([]);
+        expect(plan.offices.filter((o) => o.fp.x0 < q.x + q.w / 2 && q.x - q.w / 2 < o.fp.x1 && o.fp.z0 < q.z + q.d / 2 && q.z - q.d / 2 < o.fp.z1).map((o) => o.id), 'an office on a square').toEqual([]);
+      }
+    }
+  });
+
   it('draws the same town for the same projects', () => {
     const ss = sites(6, 9);
     expect(townPlan(ss, 42)).toEqual(townPlan(ss, 42));
     expect(seedOf('a')).not.toBe(seedOf('b'));
   });
 
-  it('puts up to 3 offices in a row, then about a square', () => {
-    expect([1, 2, 3, 4, 6, 12, 20].map(perRow)).toEqual([1, 2, 3, 3, 3, 4, 6]);
+  it('puts about a square of offices in rows of uneven sizes', () => {
+    expect([1, 2, 3, 4, 6, 12, 20].map(perRow)).toEqual([1, 2, 2, 3, 3, 4, 6]);
+    for (const n of [3, 6, 12, 20]) {
+      const sizes = rowSizes(n, perRow(n), rngOf(n));
+      expect(sizes.reduce((a, b) => a + b, 0), `${String(n)} in all`).toBe(n);
+      expect(sizes.every((k) => k >= 1 && k <= perRow(n) + 2)).toBe(true);
+    }
+    expect(rowSizes(3, perRow(3), rngOf(1)), 'three: two and one, the road between').toEqual([2, 1]);
   });
 
   it('smooths a corner without leaving its reach', () => {

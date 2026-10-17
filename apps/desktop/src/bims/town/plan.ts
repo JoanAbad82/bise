@@ -62,6 +62,14 @@ export interface Tree extends Pt {
   readonly size: number;
 }
 
+/** a little square in a row's gap (bims m_28819: the rhythm breaks every 4 or 5 offices): a fountain, benches, trees */
+export interface Square {
+  readonly x: number;
+  readonly z: number;
+  readonly w: number;
+  readonly d: number;
+}
+
 export interface TownPlan {
   readonly offices: readonly Placed[];
   /** the road's middle line, points ~ROAD_STEP apart */
@@ -74,6 +82,7 @@ export interface TownPlan {
   readonly footbridges: readonly Pt[];
   readonly houses: readonly House[];
   readonly trees: readonly Tree[];
+  readonly squares: readonly Square[];
   /** the town's ground: everything is drawn inside it */
   readonly lawn: Rect;
   /** the seed it was laid with (the first one with no crossing) */
@@ -115,9 +124,22 @@ export function seedOf(s: string): number {
   return h >>> 0;
 }
 
-/** How many offices go in a row for n of them: one row up to 3, then about a square. Pure. */
+/** About how many offices go in a row for n of them: two up to 3 (3 is two and one, the road between), then about a square. Pure. */
 export function perRow(n: number): number {
-  return n <= 3 ? Math.max(1, n) : Math.ceil(Math.sqrt(n * 1.3));
+  return n <= 3 ? Math.min(2, Math.max(1, n)) : Math.ceil(Math.sqrt(n * 1.3));
+}
+
+/** The rows' sizes: about `per` each, one more or one less now and then (never a lattice), n in all. Pure. */
+export function rowSizes(n: number, per: number, r: () => number): number[] {
+  const out: number[] = [];
+  let left = n;
+  while (left > 0) {
+    const want = per <= 2 ? per : per + (r() < 0.3 ? -1 : r() < 0.45 ? 1 : 0);
+    const k = left - want === 1 && per > 2 ? left : Math.min(left, Math.max(1, want));
+    out.push(k);
+    left -= k;
+  }
+  return out;
 }
 
 const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.z - b.z);
@@ -193,14 +215,33 @@ interface Row {
   readonly stops: Pt[];
 }
 
-/** one row of offices from x = 0, the river's gap after office `gi` (past the last: east of it) */
-function lineUp(sites: readonly TownSite[], gi: number, r: () => number): { xs: number[]; riverX: number; width: number } {
+/** a square's width and depth: about an office's */
+const SQUARE_W = 8;
+const SQUARE_D = 7;
+
+/** the count since the last square, and when the next one comes (every 4 or 5 offices) */
+interface Rhythm {
+  since: number;
+  next: number;
+}
+
+/** one row of offices from x = 0, the river's gap after office `gi` (past the last: east of it), a square's gap when the rhythm says */
+function lineUp(sites: readonly TownSite[], gi: number, r: () => number, beat: Rhythm): { xs: number[]; riverX: number; width: number; squares: number[] } {
   const xs: number[] = [];
+  const squares: number[] = [];
   let cur = 0;
   let riverX = 0;
   sites.forEach((s, i) => {
-    const gap = i === 0 ? 0 : i - 1 === gi ? RIVER_GAP : 3 + r() * 4;
-    if (i > 0 && i - 1 === gi) riverX = cur + RIVER_GAP / 2;
+    const river = i > 0 && i - 1 === gi;
+    let gap = i === 0 ? 0 : river ? RIVER_GAP : 3 + r() * 4;
+    if (i > 0 && !river && beat.since >= beat.next) {
+      gap = SQUARE_W + 2 + r() * 2;
+      squares.push(cur + gap / 2);
+      beat.since = 0;
+      beat.next = 4 + Math.floor(r() * 2);
+    }
+    beat.since++;
+    if (river) riverX = cur + RIVER_GAP / 2;
     const x = cur + gap - s.fp.x0;
     xs.push(x);
     cur = x + s.fp.x1;
@@ -209,27 +250,33 @@ function lineUp(sites: readonly TownSite[], gi: number, r: () => number): { xs: 
     riverX = cur + RIVER_GAP / 2;
     cur += RIVER_GAP;
   }
-  return { xs, riverX, width: cur };
+  return { xs, riverX, width: cur, squares };
 }
 
 /** the plan for one seed */
 function layOut(sites: readonly TownSite[], seed: number): TownPlan {
   const r = rngOf(seed);
-  const per = perRow(sites.length);
   const groups: TownSite[][] = [];
-  for (let i = 0; i < sites.length; i += per) groups.push(sites.slice(i, i + per));
+  let from = 0;
+  for (const k of rowSizes(sites.length, perRow(sites.length), r)) {
+    groups.push(sites.slice(from, from + k));
+    from += k;
+  }
   const rows: Row[] = [];
+  const squares: Square[] = [];
+  const beat: Rhythm = { since: 0, next: 4 + Math.floor(r() * 2) };
   let top = 0;
   for (const [ri, g] of groups.entries()) {
     // the river's gap: after the middle office, one further every other row
     const gi = g.length === 1 ? 0 : Math.min(g.length - 2, Math.max(0, Math.floor(g.length / 2) - 1 + (ri % 2)));
-    const line = lineUp(g, gi, r);
+    const line = lineUp(g, gi, r, beat);
     const prev = rows[ri - 1];
     // the first row centred; the next ones shifted so their gap sits near the one above
     const shift = prev === undefined ? -line.width / 2 : prev.riverX + (r() - 0.5) * 6 - line.riverX;
     const offices: Placed[] = g.map((s, i) => {
       const x = (line.xs[i] ?? 0) + shift;
-      const z = top + r() * 3.5 - s.fp.z0;
+      // each office set back its own way from the row's line (bims m_28807: never a lattice)
+      const z = top + r() * 5 - s.fp.z0;
       return {
         id: s.id, x, z,
         fp: { x0: x + s.fp.x0, x1: x + s.fp.x1, z0: z + s.fp.z0, z1: z + s.fp.z1 },
@@ -238,7 +285,19 @@ function layOut(sites: readonly TownSite[], seed: number): TownPlan {
     });
     const front = Math.max(...offices.map((p) => p.fp.z1));
     const back = Math.min(...offices.map((p) => p.fp.z0));
-    const stops = offices.map((p) => ({ x: p.door.x, z: front + ROAD + 1.4 + r() * 2.2 }));
+    // the road passes each door 2 to 8 from its own front (bims m_28807, m_28819: uneven setbacks), and in
+    // each gap swings to the deeper of the two before it passes the next front: it bends, never
+    // cutting a corner
+    const sb = offices.map((p) => p.fp.z1 + 2 + r() * 6);
+    const stops: Pt[] = [];
+    offices.forEach((p, i) => {
+      const z = sb[i] ?? p.fp.z1 + 3;
+      stops.push({ x: p.door.x, z });
+      const next = offices[i + 1];
+      const zn = sb[i + 1];
+      if (next !== undefined && zn !== undefined) stops.push({ x: (p.fp.x1 + next.fp.x0) / 2, z: Math.max(z, zn) + r() * 1.2 });
+    });
+    for (const sx of line.squares) squares.push({ x: sx + shift, z: top + 1 + SQUARE_D / 2, w: SQUARE_W, d: SQUARE_D });
     const riverX = line.riverX + shift;
     const x0 = Math.min(shift, ...offices.map((p) => p.fp.x0), riverX - RIVER_GAP / 2);
     const x1 = Math.max(shift + line.width, ...offices.map((p) => p.fp.x1), riverX + RIVER_GAP / 2);
@@ -324,7 +383,7 @@ function layOut(sites: readonly TownSite[], seed: number): TownPlan {
   // houses along the road and trees in clumps, only where nothing else is
   const near = (pts: readonly Pt[], x: number, z: number, m: number): boolean => pts.some((q) => Math.abs(q.x - x) < m && Math.abs(q.z - z) < m && Math.hypot(q.x - x, q.z - z) < m);
   const free = (x: number, z: number, m: number): boolean =>
-    inLawn(x, z) && !inside(offices, x, z, 1.2 + m) && !near(road, x, z, ROAD + 1.2 + m) && !near(river, x, z, BANK + 0.6 + m) &&
+    inLawn(x, z) && !squares.some((q) => Math.abs(q.x - x) < q.w / 2 + m + 0.4 && Math.abs(q.z - z) < q.d / 2 + m + 0.4) && !inside(offices, x, z, 1.2 + m) && !near(road, x, z, ROAD + 1.2 + m) && !near(river, x, z, BANK + 0.6 + m) &&
     paths.every((pa) => Math.abs(pa.x - x) > 1.2 + m || z < pa.z0 || z > pa.z1);
   const houses: House[] = [];
   const houseMax = Math.min(10, 3 + offices.length);
@@ -354,7 +413,7 @@ function layOut(sites: readonly TownSite[], seed: number): TownPlan {
       if (free(x, z, 0) && !near(houses, x, z, 2.2) && !near(trees, x, z, 0.7)) trees.push({ x, z, size: 0.75 + r() * 0.5 });
     }
   }
-  return { offices, road, river, bridges, paths, footbridges, houses, trees, lawn, seed };
+  return { offices, road, river, bridges, paths, footbridges, houses, trees, squares, lawn, seed };
 }
 
 /**

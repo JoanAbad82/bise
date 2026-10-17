@@ -40,12 +40,14 @@ interface Fake {
 /** n fake projects: each its stage, a few agents (some working), questions in some */
 function fakes(n: number): Fake[] {
   return Array.from({ length: n }, (_, i) => {
-    const k = 2 + ((i * 5) % 7);
+    const stage = STAGES[i % STAGES.length] ?? 0;
+    // a young project: a few agents and no garden; an old one: many, its big ground
+    const k = 1 + Math.round(stage * 0.8) + (i % 2);
     const agents = [
       mainAgent({ status: i % 3 === 0 ? 'working' : 'idle' }),
       ...Array.from({ length: k }, (_, j) => agent(`${NAMES[i] ?? 'p'}-${String(j)}`, { status: j % 2 === 0 ? 'working' : j % 3 === 0 ? 'waiting' : 'idle', turn_ms: 1000 })),
     ];
-    return { id: `p${String(i)}-0000town`, name: NAMES[i] ?? `p${String(i)}`, stage: STAGES[i % STAGES.length] ?? 0, agents, asks: i % 4 === 1 ? 2 : i % 5 === 2 ? 1 : 0 };
+    return { id: `p${String(i)}-0000town`, name: NAMES[i] ?? `p${String(i)}`, stage, agents, asks: i % 4 === 1 ? 2 : i % 5 === 2 ? 1 : 0 };
   });
 }
 
@@ -77,7 +79,7 @@ function townWorld(ps: readonly Fake[], theme: 'light' | 'dark'): Record<string,
   for (const p of ps) {
     evs.push(
       { ev: 'agents', project: p.id, agents: p.agents, places: [] },
-      { ev: 'growth', project: p.id, growth: { jobs_done: STAGE_AT[p.stage] ?? 0, days_used: p.stage * 4, artifacts_made: p.stage * 12 } },
+      { ev: 'growth', project: p.id, growth: { jobs_done: STAGE_AT[p.stage] ?? 0, days_used: p.stage === 0 ? 0 : [1, 3, 7, 14, 30, 60, 100, 365][Math.min(7, Math.floor(p.stage / 2))] ?? 0, artifacts_made: p.stage * 12 } },
       { ev: 'cards', project: p.id, cards: Array.from({ length: p.asks }, (_, j) => card(100 + j, p.agents[1]?.name ?? 'main', { project: p.id })) },
     );
   }

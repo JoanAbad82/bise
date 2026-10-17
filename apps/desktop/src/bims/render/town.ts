@@ -101,7 +101,14 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
   function buildOffice(t: TownOffice, isNight: boolean): Built {
     const look = lookOf(t.office.map);
     const w = buildWorld(t.office, t.main, STYLE, look, isNight, t.grow);
-    // its own lights stay out: the town has one sun
+    // no plot outline (bims m_28807): its floating grass block stays out, the town's lawn is its ground
+    // (world.ts adds it first, on the root, at these heights); its own lights stay out: the town has one sun
+    for (const c of [...w.root.children]) {
+      if (c instanceof Mesh && (c.position.y === -0.75 || c.position.y === -0.1)) {
+        w.root.remove(c);
+        (c.geometry as BufferGeometry).dispose();
+      }
+    }
     const pal = w.pal;
     const lit = new Set(t.still.lit);
     for (const [name, d] of w.desks) lightDesk(d, pal, lit.has(name) ? 1 : 0, lit.has(name) || (isNight && name !== t.main));

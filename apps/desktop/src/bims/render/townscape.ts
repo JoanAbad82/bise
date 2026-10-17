@@ -1,7 +1,7 @@
 // What the town draws between its offices (town.js townStill2, page bims-maps v9): its floating
 // lawn, the road (a ribbon with its dashes), the river on its sandy banks, the wooden bridges where
 // the road crosses it, the dirt paths to the doors (a footbridge where one meets the river), a few
-// small houses and the trees in clumps, from the town's plan (town/plan.ts). Built once per plan and
+// small houses, the trees in clumps and a little square every 4 or 5 offices, from the town's plan (town/plan.ts). Built once per plan and
 // theme and merged (merge.ts): a handful of draw calls. Never the app's pink or red. Owner: maps-e.
 import { BufferAttribute, BufferGeometry, ConeGeometry, Group, Mesh } from 'three';
 import type { Pt } from '../model';
@@ -23,18 +23,20 @@ export interface TownColours {
   readonly leaves: readonly [string, string, string];
   readonly walls: readonly string[];
   readonly roofs: readonly string[];
+  /** a square's paving and its fountain's stone */
+  readonly stone: string;
 }
 
 export const TOWN_DAY: TownColours = {
   water: '#7cc3e8', bank: '#d9cf9c', road: '#9a9590', dash: '#f4f0e8', path: '#e2c79a', wood: '#c49a6c', rail: '#a0673f',
   trunk: '#a0673f', leaves: ['#5fb35a', '#7cc26b', '#4e9a48'],
-  walls: ['#f3d5b5', '#bfe1f2', '#fffaf0', '#ffe3a3', '#cfe8c3'], roofs: ['#ef8354', '#5c677d', '#2a9d8f'],
+  walls: ['#f3d5b5', '#bfe1f2', '#fffaf0', '#ffe3a3', '#cfe8c3'], roofs: ['#ef8354', '#5c677d', '#2a9d8f'], stone: '#e4dccd',
 };
 
 export const TOWN_NIGHT: TownColours = {
   water: '#1d3b52', bank: '#3c5a3a', road: '#3a3d44', dash: '#8d8a84', path: '#5c4b3e', wood: '#6b5440', rail: '#5c4b3e',
   trunk: '#6e4a31', leaves: ['#3f8a3e', '#4f9a4a', '#356f33'],
-  walls: ['#8a7663', '#5e7686', '#9a9284', '#9a8455', '#6f8466'], roofs: ['#8a4a33', '#3c4350', '#1f6a62'],
+  walls: ['#8a7663', '#5e7686', '#9a9284', '#9a8455', '#6f8466'], roofs: ['#8a4a33', '#3c4350', '#1f6a62'], stone: '#6f685f',
 };
 
 /** the lawn's top: the offices' own grass blocks stand a little over it */
@@ -137,13 +139,28 @@ export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: To
     roof.rotation.y = Math.PI / 4;
   }
 
+  // the little squares (bims m_28819): paving, a round fountain, two benches, a tree at each corner
+  for (const q of plan.squares) {
+    k.add(style.box(q.w - 1, 0.05, q.d - 1, 0.3), k.mat(c.stone), root, q.x, LAWN_TOP + 0.01, q.z);
+    k.add(style.cylinder(1.1, 0.36), k.mat(c.stone), root, q.x, LAWN_TOP + 0.2, q.z);
+    k.add(style.cylinder(0.92, 0.06), k.mat(c.water), root, q.x, LAWN_TOP + 0.38, q.z);
+    k.add(style.cylinder(0.16, 0.7), k.mat(c.stone), root, q.x, LAWN_TOP + 0.5, q.z);
+    for (const sz of [-1, 1]) {
+      k.add(style.box(1.3, 0.1, 0.4), k.mat(c.wood), root, q.x, LAWN_TOP + 0.32, q.z + sz * 2.1);
+      for (const sx of [-0.5, 0.5]) k.add(style.box(0.1, 0.3, 0.3), k.mat(c.rail), root, q.x + sx, LAWN_TOP + 0.15, q.z + sz * 2.1);
+    }
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) tree(q.x + dx * (q.w / 2 - 1.1), q.z + dz * (q.d / 2 - 1.1), 0.8);
+  }
+
   // the trees: a trunk and three round leaves (the prototype's clayTree)
-  for (const t of plan.trees) {
-    const s = t.size;
+  for (const t of plan.trees) tree(t.x, t.z, t.size);
+  return root;
+
+  function tree(x: number, z: number, s: number): void {
+    const t = { x, z };
     k.add(style.cylinder(0.14 * s, 1.2 * s), k.mat(c.trunk), root, t.x, LAWN_TOP + 0.6 * s, t.z);
     k.add(style.ball(0.55 * s), k.mat(c.leaves[0]), root, t.x, LAWN_TOP + 1.5 * s, t.z);
     k.add(style.ball(0.38 * s), k.mat(c.leaves[1]), root, t.x + 0.32 * s, LAWN_TOP + 1.25 * s, t.z + 0.2 * s);
     k.add(style.ball(0.34 * s), k.mat(c.leaves[2]), root, t.x - 0.3 * s, LAWN_TOP + 1.3 * s, t.z - 0.15 * s);
   }
-  return root;
 }
