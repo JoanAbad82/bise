@@ -40,7 +40,7 @@ def main():
         world = os.path.join(home, ".bise", "gate", "real-shape")
         locks = os.path.join(home, ".bise", "gate", "locks")
         cand_lock = os.path.join(locks, "cand-" + hashlib.sha256(app.encode()).hexdigest()[:16])
-        os.makedirs(world)
+        os.makedirs(os.path.join(world, "locks"))
         os.makedirs(locks)
         env = dict(os.environ, HOME=home)
         for k in ("CAND_LOCKED", "CAND_LOCK_WAIT"):
@@ -74,18 +74,18 @@ def main():
                                  stderr=subprocess.STDOUT, text=True, stdin=subprocess.DEVNULL, start_new_session=True)
             holders.append(p)
             for _ in range(100):
-                if subprocess.run(["/usr/bin/lockf", "-t", "0", os.path.join(world, "world.lock"), "true"], capture_output=True).returncode == 75:
+                if subprocess.run(["/usr/bin/lockf", "-t", "0", os.path.join(world, "locks", "world.lock"), "true"], capture_output=True).returncode == 75:
                     return p
                 time.sleep(0.1)
             raise AssertionError("the stand-in run never took the world")
 
         def inner_pid():
-            return open(os.path.join(world, "world.holder")).read().split()[1]
+            return open(os.path.join(world, "locks", "world.holder")).read().split()[1]
 
         # free: past both locks (its own check stops it), its holder lines written
         rc, o = run()
         check(rc == 2 and past in o and "held by" not in o, "free: %s %s" % (rc, o))
-        for base in (os.path.join(world, "world"), cand_lock):
+        for base in (os.path.join(world, "locks", "world"), cand_lock):
             h = open(base + ".holder").read()
             check(h.startswith("pid ") and app in h, "free: holder %s %r" % (base, h))
 
@@ -96,6 +96,20 @@ def main():
         check(rc == 2 and ("is still held by pid %s" % pid) in o and "kill <pid>" in o and "never by name" in o and past not in o,
               "same candidate: %s %s" % (rc, o))
         check(("/locks/cand-" in o) and ("world is still held" in o), "same candidate: both locks named %s" % o)
+
+        # a run waiting on the lock: the stop sweep of a run in that world (every pid whose command
+        # names <world>/w, cand.sh) never matches it (night2, 00:35: the lock was <world>/world.lock,
+        # whose path names <world>/w: another run's sweep killed the waiting one, exit 143)
+        w = subprocess.Popen(["bash", CAND, os.path.join(t, "out-wait"), app2], env=dict(env, CAND_LOCK_WAIT="20"),
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=True)
+        holders.append(w)
+        time.sleep(1.5)
+        ps = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout.splitlines()
+        swept = [l for l in ps if os.path.join(world, "w") in l]
+        waiting = [l for l in ps if "out-wait" in l]
+        check(waiting and not swept, "the sweep's pattern matches a waiting run: %s" % swept)
+        os.killpg(w.pid, 9)
+        w.wait()
 
         # two candidates on one world: the 2nd refused on the world only
         e2 = dict(env, CAND_LOCK_WAIT="1")
@@ -125,7 +139,7 @@ def main():
         hp.wait()
 
         # a holder that ends within the wait: it says so, waits, then goes through
-        hold(os.path.join(world, "world"), 2, "pid 3, a short run")
+        hold(os.path.join(world, "locks", "world"), 2, "pid 3, a short run")
         t0 = time.time()
         rc, o = run(wait=30)
         check(rc == 2 and "held by pid 3, a short run; waiting" in o and past in o and "gave up" not in o and time.time() - t0 >= 1,
