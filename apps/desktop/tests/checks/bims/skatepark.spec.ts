@@ -19,11 +19,12 @@ test.afterAll(() => {
 const TEAM = snap([
   mainAgent({ status: 'working', turn_ms: 60_000 }),
   agent('signup-perf', { status: 'working', turn_ms: 120_000, title: 'profiling signup' }),
-  agent('kick', { status: 'idle', title: 'idle' }),
-  agent('ollie', { status: 'idle', title: 'idle' }),
+  // agents' names, never a trick's: a walking bim's name tag can't read as a trick (bims m_29038)
+  agent('docs-sync', { status: 'idle', title: 'idle' }),
+  agent('api-tests', { status: 'idle', title: 'idle' }),
   agent('empty-state', { status: 'idle', title: 'idle' }),
 ]);
-const IDLE = ['kick', 'ollie', 'empty-state'];
+const IDLE = ['docs-sync', 'api-tests', 'empty-state'];
 
 async function shot(s: Session, file: string, title: string, says: string): Promise<void> {
   const bar = await s.page.getByTestId('app.right.bims').boundingBox();
@@ -71,7 +72,7 @@ for (const theme of ['light', 'dark'] as const) {
       const seen = new Map<string, { lo: Pt3; hi: Pt3 }>();
       await page.getByTestId('app.right.agents.width.narrow').click();
       for (let round = 0; round < 9 && got.size < want.size; round++) {
-        const name = IDLE[round % IDLE.length] ?? 'kick';
+        const name = IDLE[round % IDLE.length] ?? 'docs-sync';
         await page.getByTestId(`app.right.agent.${name}`).click({ position: { x: 24, y: 10 } });
         await page.mouse.move(5, 5);
         await sleep(1500);

@@ -58,7 +58,7 @@ interface Ctx {
 
 const RIDE: Stance = { knees: 0.5, arms: 1.0, up: 0, lean: 0, spin: 0, board: [0, 0, 0], boardUp: 0, mouth: 'smile', eyes: 1, sit: false };
 /** the board's top over the floor, on its wheels (bim.ts): the bim stands on it */
-const DECK = 0.12;
+const DECK = 0.17;
 const ease = (x: number): number => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const mix = (a: number, b: number, f: number): number => a + (b - a) * f;
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
@@ -481,10 +481,10 @@ function bail(u: number): Stance {
   return { ...RIDE, knees: mix(1.2, 0.5, (u - 0.8) / 0.2), mouth: 'laugh', eyes: 0.3 };
 }
 
-/** at rest between two lines: standing at its spot, one foot on its board (still: no frame) */
+/** at rest between two lines: standing at its spot, its board beside its feet, its wheels in view (still: no frame) */
 function rest(x: number, z: number, face: number): Rig {
   const r = rigFrom(x, z, face, 0, [0, 0], { ...RIDE, knees: 0, arms: 0.2 }, 'still');
-  return { ...r, y: 0, legL: 0, legR: -0.35, body: [0, 0, 0], head: [0, 0, 0], board: { x: 0.12, y: 0.08, z: 0.25, rot: [0, 0.3, 0] } };
+  return { ...r, y: 0, legL: 0, legR: -0.35, body: [0, 0, 0], head: [0, 0, 0], board: { x: 0.3, y: 0.08, z: 0.3, rot: [0, 0.3, 0] } };
 }
 
 /** the Rig from a place and a stance: the body sideways on the board (the prototype's stance), the head ahead */

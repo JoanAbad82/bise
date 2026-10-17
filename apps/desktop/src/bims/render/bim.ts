@@ -164,11 +164,11 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   const skate = new Group();
   g.add(skate);
   // the deck, its two trucks under it, four wheels out past its sides so they show from above (Gabriel: « les skateboards n'ont pas de roues! »)
-  add(style.box(0.28, 0.04, 0.85), mat(WORLD.skate), skate, 0, 0.1, 0);
-  for (const wz of [-0.28, 0.28]) {
-    add(style.box(0.3, 0.035, 0.06), mat(WORLD.truck), skate, 0, 0.065, wz);
-    for (const wx of [-0.17, 0.17]) {
-      const w = add(style.cylinder(0.045, 0.06), mat(WORLD.wheel), skate, wx, 0.045, wz);
+  add(style.box(0.28, 0.04, 0.85), mat(WORLD.skate), skate, 0, 0.15, 0);
+  for (const wz of [-0.27, 0.27]) {
+    add(style.box(0.38, 0.04, 0.07), mat(WORLD.truck), skate, 0, 0.11, wz);
+    for (const wx of [-0.21, 0.21]) {
+      const w = add(style.cylinder(0.065, 0.08), mat(WORLD.wheel), skate, wx, 0.065, wz);
       w.rotation.z = Math.PI / 2;
     }
   }
