@@ -13,6 +13,7 @@ O=${1:?out dir}; mkdir -p "$O"
 P=${AS_HE_DOES_PYTHON:-$HOME/.pyenv/versions/3.11.13/bin/python3}
 HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)
 RS="$P -B $HERE/../realshape.py"
+. "$HERE/ports.sh" || { echo "no $HERE/ports.sh"; exit 2; }
 G=$HOME/.bise/gate/real-shape; H=$G/w/h
 SRC=${AS_HE_DOES_SRC:-$HOME/.bise/dev/try-src}
 A="$SRC/apps/desktop/dist/mac-arm64/bise try.app"
@@ -33,17 +34,17 @@ libgate() { $RS libsnap --out $O/after-$1.json --diff $O/before.json || { echo "
 draftcase() {
   local tag=$1 pause=$2 text="draft kept across a restart ($1)" d=$O/restart-$1 lbl=amb-tools.restart-proof
   mkdir -p $d; rm -f $d/rc
-  AS_HE_DOES_TAG=$tag node $HERE/driver.mjs 9341 $O draft-type "$text" 2>&1 | tail -3
+  AS_HE_DOES_TAG=$tag node $HERE/driver.mjs $CDP_GATE $O draft-type "$text" 2>&1 | tail -3
   breach
   [ "$pause" -gt 0 ] && sleep "$pause"
   local t0; t0=$(date '+%Y-%m-%d %H:%M:%S')
   say "restart $tag (draft typed, ${pause} s pause)"
   launchctl remove $lbl 2>/dev/null
-  launchctl submit -l $lbl -- /bin/sh -c "cd '$SRC' && /usr/bin/env BISE_TRY_REAL='$H/.bise' BISE_DESKTOP_OFFSCREEN=1 BISE_TRY_OPEN='$HERE/open-cdp.sh' BISE_PROOF_CDP_PORT=9341 BISE_TRY_CHECKOUT='$SRC' $HOME/.local/bin/bise-ambient --real > '$d/log' 2>&1; echo \$? > '$d/rc'; launchctl remove $lbl"
+  launchctl submit -l $lbl -- /bin/sh -c "cd '$SRC' && /usr/bin/env BISE_TRY_REAL='$H/.bise' BISE_DESKTOP_OFFSCREEN=1 BISE_TRY_OPEN='$HERE/open-cdp.sh' BISE_PROOF_CDP_PORT=$CDP_GATE BISE_TRY_CHECKOUT='$SRC' $HOME/.local/bin/bise-ambient --real > '$d/log' 2>&1; echo \$? > '$d/rc'; launchctl remove $lbl"
   for i in $(seq 900); do [ -e $d/rc ] && break; [ -e $O/BREACH ] && break; sleep 0.5; done
   say "restart $tag: rc $(cat $d/rc 2>/dev/null || echo none): $(tail -2 $d/log 2>/dev/null | tr '\n' ' ' | cut -c1-300)"
   breach; libgate restart-$tag
-  AS_HE_DOES_TAG=$tag node $HERE/driver.mjs 9341 $O draft-check "$text" 2>&1 | tail -3
+  AS_HE_DOES_TAG=$tag node $HERE/driver.mjs $CDP_GATE $O draft-check "$text" 2>&1 | tail -3
   breach
   $P - "$O/tcc-debug.ndjson" "$t0" > $d/tcc-appleevents.txt <<'PY'
 import json, sys
@@ -100,9 +101,9 @@ $RS front --out $O/front.jsonl --stop-file $O/stop --bundle "$A" & FPID=$!
 sleep 1
 for n in first second; do
   say "launch $n"
-  (cd "$SRC" && BISE_TRY_REAL=$H/.bise BISE_DESKTOP_OFFSCREEN=1 BISE_TRY_OPEN=$HERE/open-cdp.sh BISE_PROOF_CDP_PORT=9341 scripts/desktop-try.sh --real) 2>&1
+  (cd "$SRC" && BISE_TRY_REAL=$H/.bise BISE_DESKTOP_OFFSCREEN=1 BISE_TRY_OPEN=$HERE/open-cdp.sh BISE_PROOF_CDP_PORT=$CDP_GATE scripts/desktop-try.sh --real) 2>&1
   breach; libgate $n-open
-  node $HERE/driver.mjs 9341 $O $n 2>&1 | tail -5
+  node $HERE/driver.mjs $CDP_GATE $O $n 2>&1 | tail -5
   breach
   if [ $n = first ]; then draftcase pause 5; draftcase atonce 0; fi
   # the app's core.log is in its actual userData, wherever the stand-in put it (amb-core's caveat,

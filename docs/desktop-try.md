@@ -24,7 +24,8 @@ How a desktop build reaches Gabriel's app. Written by ambient-lead when the role
 | candidates | `~/.bise/dev/build/desktop-cand/<sha12>/` (`dist/mac-arm64/bise cand.app`, `root-<sha12>`, `src/` worktree) |
 | staged / live try | `~/.bise/dev/build/desktop-try/` (`staged/mac-arm64/bise try.app`, `root-<sha8>-<recipe6>`, `try.stamp`) |
 | gate worlds and fixtures | `~/.bise/gate/real-shape/` (fx under `~/.bise/gate/real-shape/fx`, never a path naming a world project) |
-| the as-he-does gate | `dev/plugins/ambient-qa/as-he-does/` (`cand.sh`, `driver.mjs`, `run.sh`) |
+| the as-he-does gate | `dev/plugins/ambient-qa/as-he-does/` (`cand.sh`, `driver.mjs`, `run.sh`; CDP ports in `ports.sh`) |
+| the smoke boot's world and runs | `~/.bise/gate/smoke/` (`w/` rebuilt each run, `fake/`, out dirs where you put them) |
 
 `~/.bise/dev/build` is a symlink to `~/.local/state/switchboard/build`: processes carry the
 resolved path.
@@ -53,7 +54,25 @@ codesign --verify --deep --strict "$A"
 
 A candidate never carries his app's id (dev.bise.desktop.try): `cand.sh` refuses one that does.
 
-## 2. Gate it
+## 2. Smoke it, then gate it
+
+Every candidate gets the smoke boot first (fast-try p3, about 90 s), through heavy-run like any gate:
+
+```sh
+caffeinate -d -i -s ~/.bise/run/heavy-run --low \
+  dev/plugins/ambient-qa/as-he-does/cand.sh --smoke <out> <cand app>
+```
+
+One boot of the packaged candidate with its real core on its own throwaway world
+(`~/.bise/gate/smoke/w`, built fresh by `realshape.py smoke-world`: one onboarded `harness` repo,
+the fake provider only, asserted before the open) and its own CDP port (`ports.sh`: 9342, the full
+gate's is 9341), so it never shares a world or a port with a real-shape run. `driver.mjs smoke`:
+the status pill in the title bar, no "didn't start right" banner, the core comes up (the core line
+goes, no ▲ line), one message to harness' main and the fake provider's answer; then the clean quit
+(stopcand: 0 processes left or a breach). Gates A, B, C, the helper watch and the Library's final
+diff are the full run's own code, watching the whole run. It refuses to start while the candidate
+or its world already has processes (it names the pids to stop). Exit 0 green, 1 a red step (listed
+in `<out>/smoke-verdict.json` with the time), 2 refused, 3 a breach.
 
 The try path (fast-try p7): the candidate, the checks its change can break, the smoke. Never
 the full end-to-end between him and a try.

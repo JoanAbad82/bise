@@ -277,6 +277,14 @@ if (mode === 'first') {
     await click('cancel the add sheet', page.locator('[data-testid="settings.add.cancel"]').first());
     await page.locator('[data-testid="settings.add"]').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
+}
+if (mode === 'smoke') {
+  // cand.sh --smoke (fast-try p3): the core comes up. CoreLine.tsx shows nothing once the core is
+  // up (its 'starting bise…' goes) and a ▲ line when it can't start or can start no hub
+  const up = await until(async () => ((await page.locator('[data-testid="app.core"]').count()) === 0 ? 'gone' : null), 60000, 500);
+  step("the core comes up: the core line goes, no ▲ line", !!up, up ?? await text('[data-testid="app.core"]'));
+}
+if (mode === 'first' || mode === 'smoke') {
   // a message to a project's main, and its answer
   await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
   const composer = page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();

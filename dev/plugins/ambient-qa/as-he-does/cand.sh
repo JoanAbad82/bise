@@ -6,9 +6,14 @@
 # path, are stopped or restarted (SIGTERM, then wait). His app's pids are logged before and after:
 # unchanged is part of the proof. Gates as run.sh (A front app, B his Library, C TCC + a helper under
 # the candidate's path), each a kill of the run's own pids at its first breach.
-#   cand.sh <out dir> <candidate app>
+#   cand.sh [--smoke] <out dir> <candidate app>
+# --smoke (fast-try p3, every try): one boot on its own world (~/.bise/gate/smoke, built fresh from
+# realshape.py's SMOKE_SHAPE, CDP port 9342, never real-shape's world or port): the pill, the core
+# coming up, one message to harness' main and the fake provider's answer, a clean quit; the same
+# gates A/B/C, stop check and Library check as the full run. Exit 0 green, 1 a red step, 3 a breach.
 set -u
 CAND_ARGS=("$@")
+SMOKE=; [ "${1:-}" = --smoke ] && { SMOKE=1; shift; }
 O=${1:?out dir}; A=${2:?candidate app}; mkdir -p "$O"
 # the RESOLVED path (ambient-lead m_20102): ~/.bise/dev/build is a symlink to
 # ~/.local/state/switchboard/build and the processes carry the resolved one, so a lookup by the
@@ -17,7 +22,8 @@ A=$(cd "$A" && pwd -P) || { echo "no $2"; exit 2; }
 P=${AS_HE_DOES_PYTHON:-$HOME/.pyenv/versions/3.11.13/bin/python3}
 HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)
 RS="$P -B $HERE/../realshape.py"
-G=$HOME/.bise/gate/real-shape; H=$G/w/h
+G=$HOME/.bise/gate/real-shape; [ -n "$SMOKE" ] && G=$HOME/.bise/gate/smoke
+H=$G/w/h
 # One run per world and one run per candidate path (main m_30102): two runs in the two heavy slots
 # shared the world, and one's stop sweep (every pid naming $G/w) killed the other's hubs
 # (desk-cut-13 m_30091, 2026-10-18 00:06); a smoke and a full run on the same app kill each other's
@@ -58,7 +64,8 @@ HIS="$HOME/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app"
 # its main executable from its own Info.plist (amb-mac fb2e544f: candidates are "bise cand.app")
 EXE=$([ -f "$A/Contents/Info.plist" ] && /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$A/Contents/Info.plist" 2>/dev/null)
 MAIN="$A/Contents/MacOS/${EXE:-bise try}"
-PORT_CDP=9341
+. "$HERE/ports.sh" || { echo "no $HERE/ports.sh"; exit 2; }
+PORT_CDP=$CDP_GATE; [ -n "$SMOKE" ] && PORT_CDP=$CDP_SMOKE
 # PW_FROM: a checkout whose apps/desktop has node_modules (@playwright/test, pngjs); the workspace's
 # may have none (try-gate-25e5's first runs: every drive 'Cannot find module')
 export PW_FROM=${PW_FROM:-$T/apps/desktop}
@@ -192,12 +199,28 @@ candprefs() {
   grep 'cand prefs:' $O/run.out 2>/dev/null >> $O/cand-prefs.txt
 }
 # the candidate's userData in the world (userdata.ts standInPaths: HOME is the world's): window-frame.json
-drive() { AS_HE_DOES_BISE_HOME=$H/.bise AS_HE_DOES_USERDATA="$H/Library/Application Support/$(basename "$A" .app)" AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
+drive() { AS_HE_DOES_BISE_HOME=$H/.bise AS_HE_DOES_USERDATA="$H/Library/Application Support/$(basename "$A" .app)" AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; echo $? > $O/driver-$1${TAG:+-$TAG}.rc; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
 
-rm -f $O/BREACH $O/stop $O/pids.txt $O/hubs-steps.jsonl $O/hubs-outside.txt
+# the end of a quick or smoke run: the gates' watchers stop, the fake provider and the world's last
+# processes (by pid), the candidate's prefs domain, gate B's final diff, his app's pids again
+wrapup() {
+  touch $O/stop; wait $FPID $CCPID; kill $TPID $NPID $CPID 2>/dev/null
+  kill $(cat $G/fake/fake.pid) 2>/dev/null
+  w=$(ps -axo pid=,command= | grep -F "$G/w" | grep -v grep | awk '{print $1}'); [ -n "$w" ] && killpids $w
+  candprefs
+  libgate final
+  say "his app after: $(hispids)" | tee -a $O/his.txt
+}
+
+T0=$(date +%s)
+rm -f $O/BREACH $O/stop $O/pids.txt $O/hubs-steps.jsonl $O/hubs-outside.txt $O/smoke.json $O/smoke-verdict.json
 say "his app before: $(hispids)" | tee $O/his.txt
 $RS libsnap --out $O/before.json
-$RS build | tail -8
+if [ -n "$SMOKE" ]; then
+  $RS smoke-world --root $G/w | tail -8
+else
+  $RS build | tail -8
+fi
 # every model request in a line (the quote row reads it), in the world, never /tmp's default
 export FAKE_LOG=$G/fake/requests.jsonl AS_HE_DOES_FAKE_LOG=$G/fake/requests.jsonl
 # the files the driver's words carry, under the world (fx.mjs, regress-25e5): an out dir in an
@@ -219,6 +242,18 @@ key_env = "BISE_TRY_FAKE_KEY"
 key_command = "echo fake-key"
 small_model = "mistral-small-latest"
 TOML
+if [ -n "$SMOKE" ]; then
+  # the smoke talks to the fake provider only (architect m_29576): every base_url of the world's
+  # config on 127.0.0.1, main's role on fake/, and no provider key in the env a LaunchServices open
+  # gives the app (launchctl's; this shell's own env never reaches it through open)
+  CF=$H/.bise/config.toml
+  realurl=$(grep -E '^[[:space:]]*base_url' "$CF" | grep -vE '"http://127\.0\.0\.1:[0-9]+/')
+  realmain=$(grep -E '^[[:space:]]*main[[:space:]]*=' "$CF" | grep -vF '"fake/')
+  realkey=$(for k in $( { env | sed -n 's/^\([A-Z0-9_]*_API_KEY\)=.*/\1/p'; echo ANTHROPIC_API_KEY OPENAI_API_KEY MISTRAL_API_KEY GEMINI_API_KEY GOOGLE_API_KEY OPENROUTER_API_KEY GROQ_API_KEY DEEPSEEK_API_KEY XAI_API_KEY; } | tr ' ' '\n' | sort -u); do
+    [ -n "$(launchctl getenv "$k")" ] && echo "$k"; done)
+  [ -n "$realurl$realmain$realkey" ] && { say "refused: the smoke world is not on the fake provider: ${realurl:+urls: $realurl; }${realmain:+main: $realmain; }${realkey:+launchd env: $realkey}"; kill $(cat $G/fake/fake.pid) 2>/dev/null; exit 2; }
+  say "fake provider only: $CF on 127.0.0.1:$PORT, no provider key in launchd's env"
+fi
 # three saved rules, so settings › approvals has a list to walk (d0d45f92's rows; rules.rs's format)
 [ -e $H/.bise/approvals.toml ] || cat > $H/.bise/approvals.toml <<TOML
 [[allow]]
@@ -292,13 +327,33 @@ if [ "${AS_HE_DOES_ONLY:-}" = quick ]; then
     stopcand; breach; libgate firstrun-stop
     H=$WH
   fi
-  touch $O/stop; wait $FPID $CCPID; kill $TPID $NPID $CPID 2>/dev/null
-  kill $(cat $G/fake/fake.pid) 2>/dev/null
-  w=$(ps -axo pid=,command= | grep -F "$G/w" | grep -v grep | awk '{print $1}'); [ -n "$w" ] && killpids $w
-  candprefs
-  libgate final
-  say "his app after: $(hispids)" | tee -a $O/his.txt
+  wrapup
   say "done (quick)"; exit 0
+fi
+if [ -n "$SMOKE" ]; then
+  # the smoke (fast-try p3): the driver's prelude (pill, banner, sidebar), the core up, one message
+  # and its answer; then the clean quit (stopcand: 0 left or a breach) and the closing gates
+  AS_HE_DOES_ANSWER_MS=${AS_HE_DOES_ANSWER_MS:-90000} AS_HE_DOES_WATCHDOG_MS=${AS_HE_DOES_WATCHDOG_MS:-180000} drive smoke
+  stopcand; breach; libgate smoke-stop
+  wrapup
+  # his app: the same pids before and after, checked (an automatic verdict, review-gates m_29603)
+  his0=$(sed -n '1s/^[0-9:]* his app before: //p' $O/his.txt); his1=$(hispids)
+  [ "$his0" = "$his1" ] || { echo "his app's pids changed: before '$his0', after '$his1'" > $O/BREACH; say "BREACH: $(cat $O/BREACH)"; exit 3; }
+  # green = the driver ended by itself (rc 0) AND smoke.json holds every step of the pass, each ok:
+  # a driver that died between steps leaves only its green steps written (review-gates m_29603)
+  rc=$(cat $O/driver-smoke.rc 2>/dev/null)
+  red=$( { [ "$rc" = 0 ] || echo "driver exit ${rc:-none}"
+    [ -s $O/smoke.json ] || echo "no smoke.json"
+    jq -r '.steps[] | select(.ok != true) | .name' $O/smoke.json 2>/dev/null
+    for s in 'the status pill sits in the title bar; nothing moves under it (5 s from first draw)' \
+      "no 'didn't start right' banner" 'sidebar' 'the core comes up: the core line goes, no ▲ line' \
+      "a message to a project's main gets its answer"; do
+      jq -e --arg s "$s" 'any(.steps[]; .name == $s)' $O/smoke.json > /dev/null 2>&1 || echo "missing: $s"
+    done; } )
+  t=$(( $(date +%s) - T0 ))
+  jq -n --arg app "$A" --argjson s $t --arg red "$red" '{mode: "smoke", app: $app, seconds: $s, green: ($red == ""), red: ($red | split("\n") | map(select(. != "")))}' > $O/smoke-verdict.json
+  if [ -n "$red" ]; then say "smoke RED in ${t} s: $(echo "$red" | tr '\n' ';')"; exit 1; fi
+  say "smoke green in ${t} s"; exit 0
 fi
 drive first
 drive cut

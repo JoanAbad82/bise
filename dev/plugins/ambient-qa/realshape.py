@@ -148,6 +148,12 @@ def _repo(path):
         subprocess.run(c, cwd=path, env=env, check=True, capture_output=True)
 
 
+# cand.sh --smoke's world (fast-try p3): no read of his state, one onboarded 'harness' repo, built by
+# build() like the real-shape world so both stay one format
+SMOKE_SHAPE = {"tree": [], "projects": [{"rel": "harness", "kind": "repo", "name": "harness", "order": 0}],
+               "at_ms": 0, "onboarded": True}
+
+
 def build(shape, root=None):
     """A throwaway HOME (root/h) shaped like his: the folder tree with made-up names, his projects
     at the same paths relative to HOME (a worktree where his is one), ~/.bise/projects.json, ~/bise
@@ -801,6 +807,8 @@ def _cli(argv):
     sub.add_parser("snapshot")
     b = sub.add_parser("build")
     b.add_argument("--root")
+    sw = sub.add_parser("smoke-world", help="cand.sh --smoke's world: SMOKE_SHAPE built under --root (emptied first)")
+    sw.add_argument("--root", required=True)
     c = sub.add_parser("core")
     c.add_argument("--bundle", required=True)
     c.add_argument("--root")
@@ -844,6 +852,8 @@ def _cli(argv):
         print(json.dumps(counts(snapshot()), indent=1))
     elif a.do == "banner":
         print(json.dumps(banner(a.bundle), indent=1))
+    elif a.do == "smoke-world":
+        print(json.dumps(build(SMOKE_SHAPE, a.root), indent=1))
     elif a.do == "build":
         w = build(json.load(open(SHAPE)), a.root)
         print(json.dumps(dict(w, counts=counts(json.load(open(SHAPE)))), indent=1))
