@@ -13,7 +13,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
 import { Dot, Kbd, Row } from '@/ds';
-import { actedKeys, useActed, useInboxItems, useProjects, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
+import { actedKeys, useActed, useInboxItems, useProjects, useRefusedList, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
 import { common } from '@/proto/words_common.gen';
@@ -21,7 +21,7 @@ import { age, dotOf, folds, InboxCard, RefusedMark } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
 import { cardKey } from './order';
 import { pickWaits, takesWords } from './model';
-import type { InboxItem } from './listed';
+import { withRefused, type InboxItem } from './listed';
 import { fitRows, rowWords, STRIP_KEYS, STRIP_ROWS, stripKey } from './stripRows';
 import { cardKeyOf } from './Strip';
 import { ArtWords } from './artWords';
@@ -355,7 +355,11 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   // Benjamin's lost answer (card-draft-keep): a new card never moves the open one; the open one
   // closed by the hub (withdrawn, answered via main, its agent stopped) while his words are typed
   // stays open, closed, his words in its draft, until he sends them (to its asker) or leaves it
-  const [closed, setClosed] = useState<InboxItem | null>(null);
+  const [closedAt, setClosed] = useState<InboxItem | null>(null);
+  // the kept closed card is drawn with its live refusal, as every item (listed.ts withRefused): the
+  // one it had when the hub dropped it is gone with it (refusedPrune), never frozen on the card
+  const refusedNow = useRefusedList();
+  const closed = useMemo(() => (closedAt === null ? null : (withRefused([closedAt], refusedNow)[0] ?? null)), [closedAt, refusedNow]);
   const [seen, setSeen] = useState<InboxItem | null>(null);
   const listed = list.find((c) => cardKey(c) === open);
   // decided while rendering, before the composer hears a thing: an effect would tell it 'none'

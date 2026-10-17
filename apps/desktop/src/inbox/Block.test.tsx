@@ -556,6 +556,38 @@ describe('the open card closed by the hub mid answer', () => {
     f.remove();
   });
 
+  it('a refused card he types in, then the hub withdraws: kept closed with his words, it says no refusal and offers no try again', () => {
+    sessionStorage.setItem('bise.notify.notnow.launch', '1');
+    const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    replay(store, rowsWith([nine]));
+    const told: (Answering | null)[] = [];
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'main' })}>
+          <InboxBlock here={{ project: P, agent: 'main' }} onAnswer={(a) => told.push(a)} now={NOW} />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    // his answer is refused: the card is back with the words and 'try again'
+    act(() => {
+      store.do({ i: 'answer', project: P, card: 9, reply: '1' });
+      store.apply({ ev: 'card_refused', project: P, card: 9, text: 'the hub is busy' });
+    });
+    fireEvent.click(screen.getByTestId('inbox.block.row.1'));
+    const id = `inbox.block.card.${P}-9`;
+    expect(screen.getByTestId(`${id}.refused`).textContent).toContain('not sent');
+    const f = field('warm, after the reindex');
+    // the hub withdraws card 9 (its rows drop it): the refusal goes with it, the closed card stays
+    act(() => {
+      replay(store, rowsWith([next]));
+    });
+    expect(screen.getByTestId(id).getAttribute('data-closed')).toBe('true');
+    expect(screen.queryByTestId(`${id}.refused`)).toBeNull();
+    expect(screen.queryByTestId(`${id}.retry`)).toBeNull();
+    f.remove();
+  });
+
   it('closed with nothing typed: it goes, as before', () => {
     sessionStorage.setItem('bise.notify.notnow.launch', '1');
     const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };

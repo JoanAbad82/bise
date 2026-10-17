@@ -290,6 +290,12 @@ describe("the cards slice's law", () => {
         expect(new Set(ids(shown)), at).toEqual(new Set(open.filter((k) => !m.flight.has(k))));
         // each item says the refusal the model holds for it, or none
         for (const c of shown) expect(c.refused?.text ?? null, at).toBe(m.refused.get(key(c.project, c.id))?.text ?? null);
+        // a refusal whose card the hub withdrew (its loaded row no longer lists it) is gone after
+        // those rows: no item, kept or listed, can say it (architect m_29873)
+        if (input.in === "ev" && input.ev.ev === "projects") {
+          const loaded = loadedOf(f.rows);
+          for (const x of s.refused) expect(loaded.get(x.project)?.has(x.card) ?? true, `${at}: ${x.key}`).toBe(true);
+        }
         // the refusals: their words and what he sent, on the cards the model says
         expect(new Map(s.refused.map((x) => [x.key, { text: x.text, ...(x.attempt === undefined ? {} : { attempt: x.attempt }) }])), at).toEqual(m.refused);
         expect(new Map(s.answersFrom.map((x) => [x.key, x.from])), at).toEqual(m.answersFrom);
