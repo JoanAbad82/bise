@@ -285,7 +285,7 @@ export function buildStages(b: Build): void {
 }
 
 /** the garden: more flowers on the grass the more days the project was used (the ground widens: camera.ts groundOf) */
-function garden(k: Kit, parent: Object3D, o: Office, g: Grow): void {
+export function garden(k: Kit, parent: Object3D, o: Office, g: Grow): void {
   if (g.garden === 0) return;
   const r = rng(hash(`garden${o.W}`));
   const m = 0.9 + g.garden * 0.12;
@@ -317,7 +317,7 @@ function frames(k: Kit, parent: Object3D, o: Office, g: Grow): void {
 }
 
 /** the next piece under construction: four cones and a striped barrier */
-function cones(k: Kit, parent: Object3D, p: Pt): void {
+export function cones(k: Kit, parent: Object3D, p: Pt): void {
   const { style } = k;
   for (const [dx, dz] of [[-0.5, -0.4], [0.5, -0.4], [-0.5, 0.4], [0.5, 0.4]] as const) {
     k.add(style.cylinder(0.08, 0.28), k.mat(WORLD.orange), parent, p.x + dx, 0.14, p.z + dz);
@@ -335,7 +335,7 @@ export const DECK = { seat: 0.24, tilt: 0.6, back: 0.54, cloth: 0.05, rail: 0.04
  * over them): a wooden frame on four legs, the cloth seat towards the front (+z) and the backrest
  * rising to the back at the done bim's tilt, a prop under it. The done pose (pose.ts) lies on it.
  */
-function deckChair(k: Kit, parent: Object3D, b: Box, cloth: string): void {
+export function deckChair(k: Kit, parent: Object3D, b: Box, cloth: string): void {
   const { style, pal } = k;
   const x = (b.x0 + b.x1) / 2;
   const w = b.x1 - b.x0 - 0.04;
