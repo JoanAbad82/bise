@@ -27,7 +27,7 @@ fn a_queued_message_steered_now_goes_into_the_turn_once_with_its_id() {
     assert_eq!(t.hub.st.msg_state()[&id], MsgState::Delivered);
     assert!(matches!(t.hub.st.msg_state()[&other], MsgState::Queued { .. }), "the other waits");
     let rows = crate::board::Waiting::of(&t.hub.st).queued_inputs("a");
-    assert_eq!(rows.iter().map(|r| r["id"].as_u64().unwrap()).collect::<Vec<_>>(), [other]);
+    assert_eq!(rows.iter().map(|r| r.id).collect::<Vec<_>>(), [other]);
     // the turn's end says the other one, never the steered one again
     let fx = t.go(Input::ReplIdle { agent: "a".into(), leftover: false });
     let s = say_to(&fx, "a").expect("the other at the turn's end");

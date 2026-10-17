@@ -81,6 +81,7 @@ pub mod role;
 pub mod route;
 pub mod router;
 pub mod search;
+pub mod snapshot;
 pub mod snapshot_rows;
 pub mod sweep;
 pub mod switch;

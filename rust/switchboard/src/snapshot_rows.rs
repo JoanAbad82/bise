@@ -1,5 +1,5 @@
-//! The snapshot's agent rows (`state`'s `agents`, the TUI's and the
-//! desktop's roster, view.json), kept from one snapshot to the next: a row
+//! The snapshot's agent rows (typed [`AgentRow`]s, issue 30: the TUI's
+//! and the desktop's roster, view.json), kept from one snapshot to the next: a row
 //! is a pure function of its inputs ([`RowIn`]), so a row whose inputs
 //! are equal to last time's is the kept one, cloned, never rebuilt.
 //!
@@ -16,10 +16,11 @@
 //! target T3) says which agents a step changed.
 
 use crate::board::Waiting;
-use crate::model::{Agent, Mode, State};
+use crate::model::{Agent, State};
 use crate::util::{clip, one_line};
 use bise_proto::rows::{AgentWatch, Doing};
-use serde_json::{json, Value};
+use crate::snapshot::AgentRow;
+use bise_proto::draft::Queued;
 use std::collections::BTreeMap;
 
 /// Everything a row reads: the agent, and what the hub knows of it
@@ -32,7 +33,7 @@ pub struct RowIn<'a> {
     /// Messages waiting for its delivery.
     pub queued: usize,
     /// The user's queued inputs ([`crate::board::Waiting::queued_inputs`]).
-    pub queued_inputs: Vec<Value>,
+    pub queued_inputs: Vec<Queued>,
     /// main's inbox (0 for a task).
     pub inbox: usize,
     /// How long its turn has run (None: no turn).
@@ -49,12 +50,12 @@ struct Kept {
     agent: Agent,
     role: Option<String>,
     queued: usize,
-    queued_inputs: Vec<Value>,
+    queued_inputs: Vec<Queued>,
     inbox: usize,
     turn_ms: Option<u64>,
     watching: Vec<AgentWatch>,
     doing: Option<Doing>,
-    row: Value,
+    row: AgentRow,
 }
 
 impl Kept {
@@ -77,7 +78,7 @@ impl Kept {
 #[derive(Debug, Default)]
 struct Mail {
     queued: BTreeMap<String, usize>,
-    inputs: BTreeMap<String, Vec<Value>>,
+    inputs: BTreeMap<String, Vec<Queued>>,
     unanswered: BTreeMap<String, usize>,
 }
 
@@ -126,7 +127,7 @@ impl Rows {
 
     /// `i`'s row: the kept one when its inputs are the same, else built
     /// (and kept).
-    pub fn row(&mut self, i: RowIn) -> Value {
+    pub fn row(&mut self, i: RowIn) -> AgentRow {
         if let Some(k) = self.kept.get(&i.agent.name).filter(|k| k.same(&i)) {
             return k.row.clone();
         }
@@ -167,64 +168,42 @@ pub fn role_of(a: &Agent, line: Option<&str>) -> String {
 }
 
 /// A row from its inputs.
-pub fn build(i: &RowIn) -> Value {
+pub fn build(i: &RowIn) -> AgentRow {
     let a = i.agent;
-    json!({
-        "name": a.name,
-        "main": a.is_main,
-        "status": a.status().as_str(),
-        "objective": a.description(),
-        // what it is doing now, one line (BISE-126); "" for main
-        "role": role_of(a, i.role),
-        "parent": a.parent,
-        "mode": match a.ws.mode { Mode::Worktree => "worktree", Mode::Shared => "shared" },
-        "path": a.ws.path,
-        "branch": a.ws.branch,
-        "dropped": a.ws.dropped,
-        // BISE-136: a private worktree (gate.sh new), else null
-        "place": a.place,
-        // dev-flow §3.1: the id of the place it is in (`places`)
-        // (BISE-136: its private worktree's, `pt:<path>`; a
-        // feature's agent: its feature's, dev-flow §5.1)
-        "place_id": crate::place::view_id(a),
-        "created_ms": a.created_ms,
-        // its folder under agents/ and its former names (S2 C:
-        // view.json carries them for sb history --project)
-        "dir": a.dir,
-        "aliases": a.aliases,
-        "note": a.declared.as_ref().map(|(_, n)| n.clone()).unwrap_or_default(),
-        // the status it declared (done, blocked, working; null: none):
-        // les bims' growth counts the done ones, archived too (the
-        // archive keeps it; an auto turn report replaces report_kind)
-        "declared": a.declared.as_ref().map(|(d, _)| *d),
-        "report": a.last_report.as_ref().map(|r| clip(&one_line(&r.summary), 200)),
-        // when it last reported (an archived task: about when it stopped)
-        "report_ms": a.last_report.as_ref().map(|r| r.at_ms),
-        // S10: followed, and its progress step (`--step n/m`)
-        "follow": a.follow,
-        "report_kind": a.last_report.as_ref().map(|r| r.kind.clone()),
-        "step": a.last_report.as_ref().and_then(|r| r.step),
-        "of": a.last_report.as_ref().and_then(|r| r.of),
-        "queued": i.queued,
-        // the user's queued inputs waiting for the turn's end
-        // (the window's "send queued"): [{id, text, created_ms}]
-        "queued_inputs": i.queued_inputs,
-        // BISE-299: main's inbox, the agents' questions waiting
-        // for main (the user sees a quiet count, never asked)
-        "inbox": i.inbox,
-        "turn_ms": i.turn_ms,
-        // issue 22: its ended turns, from the same sb-core
-        // view as its status (the agents row's `turns`)
-        "turns": a.turns_ended,
-        // who it waits on (`sb wait` / `sb ask`), for `waits {name}`
-        "waiting_on": a.waiting_on.as_ref().filter(|_| a.waiting),
-        // event-wake: the events it waits for (the agents
-        // row's `watching`, wake-ui)
-        "watching": i.watching,
-        // les bims: what it is doing now, only while its turn runs (or
-        // paused on a backgrounded command: a build)
-        "doing": crate::doing::row(a.run == crate::model::Run::Busy, i.doing, &i.watching),
-    })
+    let report = a.last_report.as_ref();
+    AgentRow {
+        name: a.name.clone(),
+        main: a.is_main,
+        status: a.status(),
+        objective: a.description(),
+        role: role_of(a, i.role),
+        parent: a.parent.clone(),
+        mode: a.ws.mode.clone(),
+        path: a.ws.path.clone(),
+        branch: a.ws.branch.clone(),
+        dropped: a.ws.dropped,
+        place: a.place.clone(),
+        place_id: crate::place::view_id(a),
+        created_ms: a.created_ms,
+        dir: a.dir.clone(),
+        aliases: a.aliases.clone(),
+        note: a.declared.as_ref().map(|(_, n)| n.clone()).unwrap_or_default(),
+        declared: a.declared.as_ref().map(|(d, _)| *d),
+        report: report.map(|r| clip(&one_line(&r.summary), 200)),
+        report_ms: report.map(|r| r.at_ms),
+        follow: a.follow,
+        report_kind: report.map(|r| r.kind.clone()),
+        step: report.and_then(|r| r.step),
+        of: report.and_then(|r| r.of),
+        queued: i.queued,
+        queued_inputs: i.queued_inputs.clone(),
+        inbox: i.inbox,
+        turn_ms: i.turn_ms,
+        turns: a.turns_ended,
+        waiting_on: a.waiting_on.clone().filter(|_| a.waiting),
+        watching: i.watching.clone(),
+        doing: crate::doing::row(a.run == crate::model::Run::Busy, i.doing, &i.watching),
+    }
 }
 
 #[cfg(test)]

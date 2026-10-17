@@ -563,21 +563,14 @@ impl<'a> Waiting<'a> {
     /// (the window's "send queued"), oldest first: `{id, text,
     /// created_ms}` each, the snapshot's `queued_inputs` (bise-proto's
     /// `Agent.queued`).
-    pub fn queued_inputs(&self, name: &str) -> Vec<serde_json::Value> {
+    pub fn queued_inputs(&self, name: &str) -> Vec<bise_proto::draft::Queued> {
         self.queued
             .get(name)
             .into_iter()
             .flatten()
             .filter(|m| m.queued && m.from == USER)
-            .map(|m| {
-                let mut row = serde_json::json!({"id": m.id, "text": m.text, "created_ms": m.created_ms});
-                // his parts (msg-parts): a client edits it back from them
-                let parts = m.parts_list();
-                if !parts.is_empty() {
-                    row["parts"] = serde_json::json!(parts);
-                }
-                row
-            })
+            // his parts (msg-parts): a client edits it back from them
+            .map(|m| bise_proto::draft::Queued { id: m.id, text: m.text.clone(), created_ms: m.created_ms, parts: m.parts_list() })
             .collect()
     }
 
@@ -635,8 +628,8 @@ mod tests {
         st.put_msg_judged(m(1, parts), busy(), false);
         st.put_msg_judged(m(2, ""), busy(), false);
         let rows = Waiting::of(&st).queued_inputs("docs");
-        assert_eq!(rows[0]["parts"], serde_json::from_str::<serde_json::Value>(parts).unwrap());
-        assert!(rows[1].get("parts").is_none(), "{:?}", rows[1]);
+        assert_eq!(serde_json::to_value(&rows[0].parts).unwrap(), serde_json::from_str::<serde_json::Value>(parts).unwrap());
+        assert!(rows[1].parts.is_empty(), "{:?}", rows[1]);
     }
 
     #[test]
@@ -807,11 +800,11 @@ mod tests {
             assert_eq!(w.queued_count(n), queued_count(&st, n), "{n}");
             let ids = |ms: &[&Msg]| ms.iter().map(|m| m.id).collect::<Vec<_>>();
             assert_eq!(ids(w.unanswered(n)), ids(&st.unanswered_for(n)), "{n}");
-            let inputs: Vec<serde_json::Value> = st
+            let inputs: Vec<bise_proto::draft::Queued> = st
                 .msgs()
                 .values()
                 .filter(|m| m.to == n && m.queued && m.from == USER && st.is_queued(m))
-                .map(|m| serde_json::json!({"id": m.id, "text": m.text, "created_ms": m.created_ms}))
+                .map(|m| bise_proto::draft::Queued { id: m.id, text: m.text.clone(), created_ms: m.created_ms, parts: Vec::new() })
                 .collect();
             assert_eq!(w.queued_inputs(n), inputs, "{n}");
         }

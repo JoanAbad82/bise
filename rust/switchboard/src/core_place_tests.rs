@@ -12,7 +12,7 @@ fn an_agent_says_where_it_works() {
     let mut t = T::new();
     t.spawn_task("docs");
     let place = |t: &mut T| {
-        let snap = t.hub.snapshot(0);
+        let snap = t.hub.snapshot_checked(0);
         snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == "docs").unwrap()["place"].clone()
     };
     assert!(place(&mut t).is_null());
@@ -35,7 +35,7 @@ fn an_agent_says_where_it_works() {
     // wt-sign (Benjamin's 'ψ ven-bots' on main's line): main looking into
     // a task's worktree is no move; main works in the workspace
     t.go(Input::ReplLine { agent: MAIN.into(), line: format!("tool #2 bash : {}", json!({"arg": format!("cd {} && git log", wt)})) });
-    let snap = t.hub.snapshot(0);
+    let snap = t.hub.snapshot_checked(0);
     let main = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == MAIN).unwrap().clone();
     assert!(main["place"].is_null() && main["place_id"] == "shared", "{main}");
     // told: the fallback stops guessing

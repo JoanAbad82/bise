@@ -31,7 +31,7 @@ impl Rng {
 }
 
 /// Every row of `st` through the kept rows, and built from nothing.
-fn both(rows: &mut Rows, st: &State, roles: &BTreeMap<String, String>, watches: &BTreeMap<String, Vec<AgentWatch>>, now: u64) -> (Vec<Value>, Vec<Value>) {
+fn both(rows: &mut Rows, st: &State, roles: &BTreeMap<String, String>, watches: &BTreeMap<String, Vec<AgentWatch>>, now: u64) -> (Vec<AgentRow>, Vec<AgentRow>) {
     rows.mail(st);
     let mut fresh = Rows::default();
     fresh.mail(st);
@@ -127,6 +127,6 @@ fn an_unchanged_row_is_not_rebuilt() {
     st.put_msg_judged(msg(1, USER, "b", true), Some(MsgState::Queued { reason: "busy".into() }), false);
     let (kept, _) = both(&mut rows, &st, &roles, &watches, 5_000);
     assert_eq!(rows.built, 6, "b's row only");
-    assert_eq!(kept[2]["queued"], 1);
-    assert_eq!(kept[2]["queued_inputs"][0]["id"], 1);
+    assert_eq!(kept[2].queued, 1);
+    assert_eq!(kept[2].queued_inputs[0].id, 1);
 }

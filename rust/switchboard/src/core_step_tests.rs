@@ -110,7 +110,7 @@ fn a_watch_is_a_pause_or_an_alarm_on_the_agents_row() {
     let mut t = T::new();
     t.spawn_task("perf");
     t.go(Input::ReplIdle { agent: "perf".into(), leftover: false });
-    let row = |t: &mut T| t.hub.snapshot(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap().clone();
+    let row = |t: &mut T| t.hub.snapshot_checked(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap().clone();
     let spec = |what| Spec { what, tail: None, note: String::new() };
     let file = || spec(What::File { path: "/t/build.rc".into() });
     let add = |t: &mut T, s: Spec, then| t.req("perf", AgentReq::Wake(WakeReq::Add { spec: s, max_ms: MAX_DEFAULT_MS, then })).1;
@@ -166,6 +166,10 @@ mod core_doing_tests;
 /// queued_steer's tests, out of core_tests.rs too.
 #[path = "core_queue_tests.rs"]
 mod core_queue_tests;
+
+/// issue 30 sha 1: the typed snapshot is the older builder's.
+#[path = "core_snapshot_tests.rs"]
+mod core_snapshot_tests;
 
 /// plan-ok (architect m_26549, m_26571): a page's own card is asked by
 /// the first live agent of its chain, else main; it shows in that

@@ -36,7 +36,7 @@ fn law_a_places_rank_and_lid_agree() {
             if let Some(n) = rank {
                 t.hub.landing.insert("wt:dark".into(), n);
             }
-            let rows = crate::proto_view::places(&t.hub.snapshot(1_000));
+            let rows = crate::proto_view::places(&t.hub.snapshot_checked(1_000));
             assert!(!rows.is_empty());
             for row in rows {
                 let lid = row.lid.as_deref().unwrap_or("");

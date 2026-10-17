@@ -1,0 +1,115 @@
+//! The hub's client snapshot (issue 30): `Hub::snapshot` builds the typed
+//! [`crate::snapshot::Snapshot`] the views read by field: its agent rows
+//! (kept from one snapshot to the next, snapshot_rows.rs), its open cards
+//! with the notes the hub adds, its places with their lids and PRs, the
+//! repo's flow. Moved out of core.rs (the 1,000-line rule).
+
+use super::*;
+use crate::snapshot::{AgentRow, CardRow, Snapshot};
+
+impl Hub {
+    /// The held lines (the land queue's first, else `no PR yet`) and the
+    /// stale PRs' ages, by place id, for the views.
+    fn pr_views(&self, now: u64) -> (BTreeMap<String, String>, BTreeMap<String, u64>) {
+        let mut lids = crate::land_queue::lids(&self.landing);
+        // trunk flow: a branch lands on main, it never waits for a PR
+        let no_pr = if self.flow == Some(crate::flow::FlowMode::Trunk) { &BTreeMap::new() } else { &self.pr_lids };
+        for (id, l) in no_pr {
+            // a detached private worktree (BISE-136) has no branch to ask
+            // the forge about: its count shows without an answer
+            let asked = self.pr_ok_ms.contains_key(id) || self.detached_private(id);
+            if !self.prs.contains_key(id) && asked {
+                lids.entry(id.clone()).or_insert_with(|| l.clone());
+            }
+        }
+        let stale = self
+            .prs
+            .keys()
+            .filter_map(|id| {
+                let age = now.saturating_sub(*self.pr_ok_ms.get(id)?);
+                (self.pr_late.is_some() || age > PR_STALE_MS).then(|| (id.clone(), age))
+            })
+            .collect();
+        (lids, stale)
+    }
+
+    /// The client snapshot (agents, cards) for the views.
+    /// Its agent rows are kept from one snapshot to the next and rebuilt
+    /// only when their inputs changed (snapshot_rows.rs).
+    pub fn snapshot(&mut self, now: u64) -> Snapshot {
+        self.rows.mail(&self.st);
+        let mut agents: Vec<AgentRow> = Vec::with_capacity(self.st.order.len());
+        for a in self.st.order.iter().filter_map(|n| self.st.agents.get(n)) {
+            let role = self.roles.get(&a.dir).and_then(|r| r.line.as_deref());
+            let i = self.rows.input(a, role, now, self.st.wakes.watching(&a.name), self.doing.get(&a.name).copied());
+            agents.push(self.rows.row(i));
+        }
+        self.rows.keep_only(self.st.agents.keys());
+        self.snapshot_with(agents, now)
+    }
+
+    /// The snapshot around its agent rows: the cards, the places, the flow.
+    fn snapshot_with(&self, agents: Vec<AgentRow>, now: u64) -> Snapshot {
+        let cards = self.st.open_cards().map(|c| self.card_row(c, now)).collect();
+        let places = crate::place::places(&self.st, &self.prs);
+        let (mut lids, stale) = self.pr_views(now);
+        // a feature's lid: the land queue's (`landing`) wins
+        for (id, l) in &self.feature_lids {
+            lids.entry(id.clone()).or_insert_with(|| l.clone());
+        }
+        let places = crate::place::views(&places, &lids, &self.landing, &stale, &self.trying);
+        Snapshot { agents, cards, places, flow: self.flow, ..Snapshot::default() }
+    }
+
+    /// An open card as the views see it: its words and what the hub adds.
+    fn card_row(&self, c: &Card, now: u64) -> CardRow {
+        CardRow {
+            id: c.id,
+            kind: c.kind.clone(),
+            agent: c.agent.clone(),
+            text: c.text.clone(),
+            for_msg: c.for_msg,
+            age_ms: now.saturating_sub(c.created_ms),
+            note: match c.kind.as_str() {
+                "merge" => self.merge_note(c),
+                update_card::KIND => self.update_note(c),
+                signin_card::KIND => self.signin_note(),
+                _ => self.card_note(c),
+            },
+            // expired-ux: the agents that wait for the sign-in
+            waiting: (c.kind == signin_card::KIND).then(|| self.signin_waiting()),
+            // update-card: the release page its `3` opens
+            link: if c.kind == update_card::KIND { self.update_link(c) } else { None },
+            place: c.place.clone(),
+            pr: c.pr,
+        }
+    }
+
+    /// A question card whose asker heard from main since, without a
+    /// reply to the question: maybe answered another way (the card
+    /// stays open, the view says so).
+    fn card_note(&self, c: &Card) -> Option<String> {
+        if c.kind != "question" || c.agent == MAIN {
+            return None;
+        }
+        let m = self
+            .st
+            .msgs()
+            .values()
+            .rev()
+            .take_while(|m| m.created_ms >= c.created_ms)
+            .find(|m| m.from == MAIN && m.to == c.agent && m.reply_to != c.for_msg)?;
+        Some(format!(
+            "@main wrote to @{} since then (m_{}): {}",
+            c.agent,
+            m.id,
+            clip(&one_line(&m.text), 120)
+        ))
+    }
+
+    /// The snapshot as JSON, for the readers that still take it untyped
+    /// (sha 1 of issue 30; they read fields in the next change).
+    pub fn snapshot_value(&mut self, now: u64) -> Value {
+        serde_json::to_value(self.snapshot(now)).unwrap_or_default()
+    }
+}

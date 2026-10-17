@@ -803,7 +803,7 @@ impl Shell {
         self.hub.landing = self.lands.ranks();
         // the features' lids and Δ (dev-flow §5.1)
         self.feature_views();
-        let mut snap = self.hub.snapshot(now_ms());
+        let mut snap = self.hub.snapshot_value(now_ms());
         // sb every's timers, running then a week of ended ones (/scheduled);
         // an ended one has `ended_ms` (amb-mac's menu and the capsule's
         // watched pages skip those)

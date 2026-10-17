@@ -1967,111 +1967,6 @@ impl Hub {
         }
     }
 
-    /// The held lines (the land queue's first, else `no PR yet`) and the
-    /// stale PRs' ages, by place id, for the views.
-    fn pr_views(&self, now: u64) -> (BTreeMap<String, String>, BTreeMap<String, u64>) {
-        let mut lids = crate::land_queue::lids(&self.landing);
-        // trunk flow: a branch lands on main, it never waits for a PR
-        let no_pr = if self.flow == Some(crate::flow::FlowMode::Trunk) { &BTreeMap::new() } else { &self.pr_lids };
-        for (id, l) in no_pr {
-            // a detached private worktree (BISE-136) has no branch to ask
-            // the forge about: its count shows without an answer
-            let asked = self.pr_ok_ms.contains_key(id) || self.detached_private(id);
-            if !self.prs.contains_key(id) && asked {
-                lids.entry(id.clone()).or_insert_with(|| l.clone());
-            }
-        }
-        let stale = self
-            .prs
-            .keys()
-            .filter_map(|id| {
-                let age = now.saturating_sub(*self.pr_ok_ms.get(id)?);
-                (self.pr_late.is_some() || age > PR_STALE_MS).then(|| (id.clone(), age))
-            })
-            .collect();
-        (lids, stale)
-    }
-
-    /// The client snapshot (agents, cards) for the views.
-    /// Its agent rows are kept from one snapshot to the next and rebuilt
-    /// only when their inputs changed (snapshot_rows.rs).
-    pub fn snapshot(&mut self, now: u64) -> Value {
-        self.rows.mail(&self.st);
-        let mut agents: Vec<Value> = Vec::with_capacity(self.st.order.len());
-        for a in self.st.order.iter().filter_map(|n| self.st.agents.get(n)) {
-            let role = self.roles.get(&a.dir).and_then(|r| r.line.as_deref());
-            let i = self.rows.input(a, role, now, self.st.wakes.watching(&a.name), self.doing.get(&a.name).copied());
-            agents.push(self.rows.row(i));
-        }
-        self.rows.keep_only(self.st.agents.keys());
-        self.snapshot_with(agents, now)
-    }
-
-    /// The snapshot around its agent rows: the cards, the places, the flow.
-    fn snapshot_with(&self, agents: Vec<Value>, now: u64) -> Value {
-        let cards: Vec<Value> = self
-            .st
-            .open_cards()
-            .map(|c| {
-                json!({
-                    "id": c.id,
-                    "kind": c.kind,
-                    "agent": c.agent,
-                    "text": c.text,
-                    "for_msg": c.for_msg,
-                    "age_ms": now.saturating_sub(c.created_ms),
-                    "note": match c.kind.as_str() {
-                        "merge" => self.merge_note(c),
-                        update_card::KIND => self.update_note(c),
-                        signin_card::KIND => self.signin_note(),
-                        _ => self.card_note(c),
-                    },
-                    // expired-ux: the agents that wait for the sign-in
-                    // (⏎ in their thread signs in)
-                    "waiting": if c.kind == signin_card::KIND { Some(self.signin_waiting()) } else { None },
-                    // update-card: the release page its `3` opens
-                    "link": if c.kind == update_card::KIND { self.update_link(c) } else { None },
-                    // a hub item's place and PR (pr-merge): the TUI ties
-                    // it to the place's box and opens its link
-                    "place": c.place,
-                    "pr": c.pr,
-                })
-            })
-            .collect();
-        let places = crate::place::places(&self.st, &self.prs);
-        let (mut lids, stale) = self.pr_views(now);
-        // a feature's lid: the land queue's (`landing`) wins
-        for (id, l) in &self.feature_lids {
-            lids.entry(id.clone()).or_insert_with(|| l.clone());
-        }
-        let places = crate::place::views(&places, &lids, &self.landing, &stale, &self.trying);
-        json!({"ev": "state", "agents": agents, "cards": cards, "places": places,
-               "flow": self.flow.map(|f| f.as_str())})
-    }
-
-    /// A question card whose asker heard from main since, without a
-    /// reply to the question: maybe answered another way (the card
-    /// stays open, the view says so).
-    fn card_note(&self, c: &Card) -> Option<String> {
-        if c.kind != "question" || c.agent == MAIN {
-            return None;
-        }
-        let m = self
-            .st
-            .msgs()
-            .values()
-            .rev()
-            .take_while(|m| m.created_ms >= c.created_ms)
-            .find(|m| m.from == MAIN && m.to == c.agent && m.reply_to != c.for_msg)?;
-        Some(format!(
-            "@main wrote to @{} since then (m_{}): {}",
-            c.agent,
-            m.id,
-            clip(&one_line(&m.text), 120)
-        ))
-    }
-
-
     /// The role line the views show (BISE-126): the model's, else the
     /// objective's first sentence; none for main.
     pub fn role_line(&self, a: &Agent) -> String {
@@ -2675,6 +2570,13 @@ pub mod update_card;
 
 #[path = "signin_card.rs"]
 pub mod signin_card;
+
+#[path = "core_snapshot.rs"]
+mod snapshot;
+
+#[cfg(test)]
+#[path = "core_snapshot_old.rs"]
+pub(crate) mod snapshot_old;
 
 #[cfg(test)]
 #[path = "core_tests.rs"]
