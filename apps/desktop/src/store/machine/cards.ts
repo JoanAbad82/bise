@@ -8,8 +8,17 @@
 // them with acted.ts / refused.ts / answered.ts's rules, never one of its own. An input that
 // changes nothing gives the same state back and no output (the hooks re-render on a new
 // reference only). A kept list is written in the same order as today's store wrote it.
+// His pick of an option (slice 1d, architect m_29867): the act the hub's row gives it
+// (rows::opt_act, read from the event, never made here) decides, with the project's artifacts
+// (HubFacts) and optPlan.ts: its artifact's view beside the thread (nav), his browser (fx
+// openExternal), the app's sign-in (cmd); nothing is sent to the hub and the card stays. No act:
+// his answer. The app's edge (app/edge.tsx) runs nav and fx.
 // Pure. Owner: amb-core.
+import type { OptAct } from "@/proto/rows";
 import { inboxCards, withRefused, type InboxItem } from "@/inbox/listed";
+import { withConfirmOptions } from "@/inbox/model";
+import { optPlan } from "@/inbox/optPlan";
+import { leaves } from "@/artifacts/model";
 import { actedAdd, actedAnswered, actedKey, actedOf, actedPrune, type Acted } from "../acted";
 import { refusedAdd, refusedDrop, refusedListOf, refusedOf, refusedPrune, type Attempt, type Refused } from "../refused";
 import { answeredFromOf, answersOf, cardKeyOf, jumpOf, keptAnswers, type AnswerAt, type AnswerFrom, type AnsweredFrom } from "../answered";
@@ -68,7 +77,7 @@ export function stepCards(s: CardsState, f: HubFacts, input: Input): Step {
     case "win":
       return settled(s, f, input.ev, input.at_ms);
     case "do":
-      return does(s, input.intent, input.at_ms);
+      return does(s, f, input.intent, input.at_ms);
   }
 }
 
@@ -140,7 +149,7 @@ function same(a: CardsState, b: CardsState): boolean {
 }
 
 /** His gesture on a card. */
-function does(s: CardsState, intent: Intent, at: number): Step {
+function does(s: CardsState, f: HubFacts, intent: Intent, at: number): Step {
   switch (intent.i) {
     case "answer": {
       const { project, card, reply, files, parts, from } = intent;
@@ -171,13 +180,24 @@ function does(s: CardsState, intent: Intent, at: number): Step {
       out.push({ out: "cmd", cmd: { cmd: "close", project: intent.project, card: intent.card } });
       return [next, out];
     }
+    case "pick": {
+      // the act the hub's row gives option n (rows::opt_act, read, never made here): it opens,
+      // nothing is sent and the card stays (his #384 came back when it was); none: his answer
+      const act = actOf(f, intent.project, intent.card, intent.n);
+      if (act !== null) return [s, opens(f, intent.project, act)];
+      const { project, card, n, from } = intent;
+      return does(s, f, { i: "answer", project, card, reply: String(n), ...(from !== undefined ? { from } : {}) }, at);
+    }
+    case "open":
+      return [s, opens(f, intent.project, intent.act)];
     case "retry_card": {
       // what he sent, sent again; none known: nothing, the card stays his
       const a = refusedOf(s.refused, intent.project, intent.card)?.attempt;
       if (a === undefined) return [s, NONE];
-      if (a.kind === "close") return does(s, { i: "close", project: intent.project, card: intent.card }, at);
+      if (a.kind === "close") return does(s, f, { i: "close", project: intent.project, card: intent.card }, at);
       return does(
         s,
+        f,
         {
           i: "answer",
           project: intent.project,
@@ -190,6 +210,36 @@ function does(s: CardsState, intent: Intent, at: number): Step {
         at,
       );
     }
+  }
+}
+
+/** Option `n`'s act on card `card` of `project`, as the hub's row gives it (the lists' options), or null. */
+function actOf(f: HubFacts, project: string, card: number, n: number): OptAct | null {
+  const c = f.rows.find((r) => r.project === project)?.cards?.find((x) => x.id === card);
+  if (c === undefined) return null;
+  return withConfirmOptions(c).options.find((o) => o.n === n)?.act ?? null;
+}
+
+/**
+ * What an act does (optPlan.ts), concrete: the artifact's view beside the thread (at its block),
+ * a browser-only artifact or a link in his browser, the app's sign-in; nothing sent to the hub.
+ */
+function opens(f: HubFacts, project: string, act: OptAct): Output[] {
+  const listed = f.artifacts[project] ?? NONE;
+  const plan = optPlan(act, (id) => listed.some((a) => a.id === id));
+  switch (plan.t) {
+    case "artifact": {
+      // one that opens nowhere in the window (a PR, a link: artifacts/model.ts leaves) goes to his browser
+      const a = listed.find((x) => x.id === plan.id);
+      if (a !== undefined && leaves(a)) return [{ out: "fx", fx: { fx: "openExternal", args: [a.url] } }];
+      return [{ out: "nav", to: { project, artifact: plan.id, at: plan.at } }];
+    }
+    case "url":
+      return [{ out: "fx", fx: { fx: "openExternal", args: [plan.url] } }];
+    case "sign_in":
+      return [{ out: "cmd", cmd: { cmd: "sign_in", id: "chatgpt" } }];
+    case "none":
+      return [];
   }
 }
 

@@ -75,6 +75,9 @@ export function applyTyped(s: Store, ev: Ev): void {
       return;
     }
     case "artifacts":
+      // the hubs' facts several slices read (machine/types.ts HubFacts): one copy, as it came
+      s.factsCame(ev, `artifacts:${ev.project}`);
+      return;
     case "scheduled":
     case "worktrees":
     case "dev_servers":

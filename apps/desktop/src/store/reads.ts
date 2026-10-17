@@ -150,7 +150,7 @@ export class StoreReads extends StoreBase {
     );
   }
   artifacts(project: string): readonly Artifact[] {
-    return this.slice(`artifacts:${project}`, EMPTY);
+    return this.facts.artifacts[project] ?? EMPTY;
   }
   worktrees(project: string): readonly Worktree[] {
     return this.slice(`worktrees:${project}`, EMPTY);

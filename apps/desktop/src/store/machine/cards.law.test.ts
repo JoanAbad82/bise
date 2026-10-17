@@ -18,11 +18,12 @@
 // - the window goes to the asking project's main after an answer the hub took, made from another
 //   project's thread, unless the card is bise's own (the home project's).
 import { describe, expect, it } from "vitest";
-import type { Card, CardAnswer, ProjectRow } from "@/proto";
+import type { Artifact, Card, CardAnswer, ProjectRow } from "@/proto";
+import type { OptAct } from "@/proto/rows";
 import { core_ev } from "@/proto/fixtures.gen";
 import type { CoreCmd } from "@/shared/api";
 import { cardsInit, inboxView, stepCards, type CardsState } from "./cards";
-import { NO_FACTS, factsOf, type HubFacts, type Input, type Output } from "./types";
+import { NO_FACTS, factsOf, type Effect, type HubFacts, type Input, type Output } from "./types";
 import type { AnswerFrom } from "../answered";
 
 // ---- a seeded generator (mulberry32): a red reproduces from its seed
@@ -65,7 +66,32 @@ const IDS = [1, 2, 3, 4];
 const BURST = Array.from({ length: 60 }, (_, i) => 100 + i);
 const JUMPS = [0, 1, 1_000, 59_999, 60_000, 60_001, 90_000];
 
-const card = (project: string, id: number, rank: number, since: number): Card => ({ ...CARD, project, id, rank, since_ms: since, question: `q${String(id)}` });
+const card = (project: string, id: number, rank: number, since: number, act: OptAct | null): Card => ({
+  ...CARD,
+  kind: "question",
+  project,
+  id,
+  rank,
+  since_ms: since,
+  question: `q${String(id)}`,
+  options: [{ n: 1, label: "one" }, { n: 2, label: "two", ...(act === null ? {} : { act }) }],
+});
+/** the acts a hub's row may give an option (rows::opt_act): a link, an artifact (listed or not), both, a sign-in */
+const ACTS: readonly (OptAct | null)[] = [
+  null,
+  { act: "open", url: "https://github.com/x/pull/1" },
+  { act: "open", artifact: "a1", at: "m-1" },
+  { act: "open", artifact: "a1", url: "http://127.0.0.1:1/p/a1#m-1", at: "m-1" },
+  { act: "open", artifact: "gone", url: "http://127.0.0.1:1/p/gone" },
+  { act: "sign_in" },
+  { act: "open" },
+];
+/** a project's artifacts: none, a1 shown in the window, or a1 that only his browser opens */
+const ARTS: readonly Artifact[][] = [
+  [],
+  [{ id: "a1", kind: "page", title: "a1", agent: "main", url: "http://127.0.0.1:1/p/a1", version: 1, at_ms: 1, new: false }],
+  [{ id: "a1", kind: "pr", title: "a1", agent: "main", url: "https://github.com/x/pull/2", version: 1, at_ms: 1, new: false }],
+];
 const answerOf = (project: string, card: number): CardAnswer => ({ agent: "main", question: `q${String(card)}`, said: "1", notice: `answered ${project} ${String(card)}` });
 
 type Row = { project: string; cards: readonly Card[] | undefined; home: boolean };
@@ -79,6 +105,12 @@ function inputsOf(seed: number, n: number): Input[] {
   const burst = r.chance(0.2);
   if (burst) for (const id of BURST) listed.get(BETA)?.add(id);
   const ranks = new Map<string, number>();
+  const acts = new Map<string, OptAct | null>();
+  const actOf = (p: string, id: number): OptAct | null => {
+    const k = `${p}-${String(id)}`;
+    if (!acts.has(k)) acts.set(k, r.pick(ACTS));
+    return acts.get(k) ?? null;
+  };
   const rankOf = (p: string, id: number): number => {
     const k = `${p}-${String(id)}`;
     if (!ranks.has(k)) ranks.set(k, r.int(7));
@@ -89,7 +121,7 @@ function inputsOf(seed: number, n: number): Input[] {
     if (r.chance(0.1)) return null;
     if (r.chance(0.1)) return { project, cards: undefined, home: project === HOME };
     const ids = [...(listed.get(project) ?? [])];
-    return { project, cards: ids.map((id) => card(project, id, rankOf(project, id), 1_000 + id)), home: project === HOME };
+    return { project, cards: ids.map((id) => card(project, id, rankOf(project, id), 1_000 + id, actOf(project, id))), home: project === HOME };
   };
   const projectsEv = (): Input => {
     const rows = [HOME, ACME, BETA].flatMap((p) => {
@@ -126,7 +158,13 @@ function inputsOf(seed: number, n: number): Input[] {
     } else if (k < 42) {
       const from = fromOf();
       out.push({ at_ms: at, in: "do", intent: { i: "answer", project: p, card: id, reply: r.pick(["1", "2", "the cold one"]), ...(r.chance(0.2) ? { files: ["/tmp/a.png"] } : {}), ...(from === undefined ? {} : { from }) } });
-    } else if (k < 52) out.push({ at_ms: at, in: "do", intent: { i: "close", project: p, card: id } });
+    } else if (k < 48) {
+      // his option n: an act the row gives it opens (nothing sent), else his answer
+      const from = fromOf();
+      out.push({ at_ms: at, in: "do", intent: { i: "pick", project: p, card: id, n: r.pick([1, 2, 2]), ...(from === undefined ? {} : { from }) } });
+    } else if (k < 50) {
+      out.push({ at_ms: at, in: "ev", ev: { ev: "artifacts", project: p, items: r.pick(ARTS) } });
+    } else if (k < 54) out.push({ at_ms: at, in: "do", intent: { i: "close", project: p, card: id } });
     else if (k < 62) out.push({ at_ms: at, in: "do", intent: { i: "retry_card", project: p, card: id } });
     else if (k < 82) {
       // the hub took it: sometimes its rows dropped the card first, sometimes it kept it open
@@ -229,12 +267,40 @@ function modelStep(m: Model, f: HubFacts, input: Input): CoreCmd[] {
   const it = input.intent;
   if (it.i === "answer") answer(it.project, it.card, it.reply, it.files, it.from, input.at_ms);
   else if (it.i === "close") close(it.project, it.card, input.at_ms);
-  else {
+  else if (it.i === "pick") {
+    // the act the input's own row gives option n; none: his answer, its digit
+    const act = f.rows.find((r) => r.project === it.project)?.cards?.find((c) => c.id === it.card)?.options.find((o) => o.n === it.n)?.act ?? null;
+    if (act === null) answer(it.project, it.card, String(it.n), undefined, it.from, input.at_ms);
+    else if (act.act === "sign_in") cmds.push({ cmd: "sign_in", id: "chatgpt" });
+  } else if (it.i === "retry_card") {
     const a = m.refused.get(key(it.project, it.card))?.attempt;
     if (a?.kind === "close") close(it.project, it.card, input.at_ms);
     else if (a?.kind === "answer") answer(it.project, it.card, a.reply, a.files, a.from, input.at_ms);
   }
   return cmds;
+}
+
+/**
+ * What a pick opens, in the spec's words: a sign-in is a command; a link goes to his browser; an
+ * artifact the project lists opens beside the thread (at its block), unless only his browser can
+ * show it (a PR): then its own url; one not listed opens by its url, else still
+ * its view (which says it's gone); nothing at all for an act with neither.
+ */
+function modelEffects(f: HubFacts, input: Input): Effect[] {
+  if (input.in !== "do") return [];
+  const it = input.intent;
+  if (it.i !== "pick") return [];
+  const act = f.rows.find((r) => r.project === it.project)?.cards?.find((c) => c.id === it.card)?.options.find((o) => o.n === it.n)?.act ?? null;
+  if (act === null || act.act === "sign_in") return [];
+  const arts = f.artifacts[it.project] ?? [];
+  const id = act.artifact ?? null;
+  const url = act.url ?? null;
+  const a = id === null ? undefined : arts.find((x) => x.id === id);
+  if (id !== null && (a !== undefined || url === null)) {
+    if (a !== undefined && a.kind === "pr") return [{ out: "fx", fx: { fx: "openExternal", args: [a.url] } }];
+    return [{ out: "nav", to: { project: it.project, artifact: id, at: act.at ?? null } }];
+  }
+  return url === null ? [] : [{ out: "fx", fx: { fx: "openExternal", args: [url] } }];
 }
 
 // ---- the laws
@@ -277,6 +343,9 @@ describe("the cards slice's law", () => {
         const want = modelStep(m, f, input);
         expect(cmdsOf(outs), at).toEqual(want);
         if (input.in !== "do") expect(cmdsOf(outs), at).toEqual([]);
+        // 5'. the act comes from the input's own row (rows::opt_act), never made in step: what a
+        //     pick opens follows it, and nothing but a pick or an open opens anything
+        expect(outs.filter((o) => o.out === "nav" || o.out === "fx"), at).toEqual(modelEffects(f, input));
         // 4. what's kept is the state's own list, and a reload reads back the same
         for (const o of outs) if (o.out === "keep") keep.set(o.key, o.value);
         for (const o of outs) if (o.out === "keep") expect(o.value, at).toBe(o.key === "acted" ? next.acted : o.key === "refused" ? next.refused : next.answersFrom);

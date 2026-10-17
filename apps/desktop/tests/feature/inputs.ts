@@ -104,6 +104,7 @@ export type Gesture =
   | { readonly g: 'answer'; readonly project: string; readonly card: number; readonly reply: string; readonly from?: Here }
   | { readonly g: 'close'; readonly project: string; readonly card: number }
   | { readonly g: 'retry'; readonly project: string; readonly card: number }
+  | { readonly g: 'pick'; readonly project: string; readonly card: number; readonly n: number; readonly from?: Here }
   | { readonly g: 'send'; readonly project: string; readonly agent: string; readonly text: string }
   | { readonly g: 'open'; readonly project: string; readonly agent: string };
 
@@ -111,6 +112,8 @@ export const answer = (project: string, card: number, reply: string, from?: Here
   ({ g: 'answer', project, card, reply, ...(from === undefined ? {} : { from }) });
 export const close = (project: string, card: number): Gesture => ({ g: 'close', project, card });
 export const retry = (project: string, card: number): Gesture => ({ g: 'retry', project, card });
+/** He picks option `n` of a card (a digit, a click on it). */
+export const pick = (project: string, card: number, n: number, from?: Here): Gesture => ({ g: 'pick', project, card, n, ...(from === undefined ? {} : { from }) });
 export const send = (project: string, agent: string, text: string): Gesture => ({ g: 'send', project, agent, text });
 /** He switches to that project's agent's thread (the sidebar, a link, ⌘1-9). */
 export const open = (project: string, agent = 'main'): Gesture => ({ g: 'open', project, agent });

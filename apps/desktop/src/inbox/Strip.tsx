@@ -6,7 +6,7 @@
 // draws it from props; ThreadInbox (screen.tsx) is the one line the thread
 // mounts, fed by the store. Owner: amb-home.
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import type { Card, Part } from '@/proto';
+import type { Card } from '@/proto';
 import type { OptAct } from '@/proto/rows';
 import { inbox } from '@/proto/words_inbox.gen';
 import { common } from '@/proto/words_common.gen';
@@ -21,7 +21,8 @@ import './inbox.css';
 import { aboutOf, openAct } from './about';
 
 export interface StripPorts {
-  answer: (project: string, card: number, reply: string, parts?: readonly Part[]) => void;
+  /** his option `n` of a card (the store's pick): whether it answered (else an act opened, the item stays) */
+  pick: (project: string, card: number, n: number) => { readonly answered: boolean };
   close: (project: string, card: number) => void;
   /** the whole inbox (⌘I) */
   openInbox: () => void;
@@ -87,17 +88,12 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
   );
 
   // an item answered or closed leaves every view at once: the store's answer / close keep it out
-  // until the hub's rows drop it (acted.ts); here it only folds. An option the window does itself
-  // as the hub's row says (optAct.ts, the TUI's rule: the asker's artifact, a merge's '2 open it on
-  // GitHub'...) opens it or the app's sign-in, sends nothing, and the item stays.
+  // until the hub's rows drop it (acted.ts); here it only folds. The store's machine decides a
+  // pick (machine/cards.ts): an option the window does itself as the hub's row says (the asker's
+  // artifact, a merge's '2 open it on GitHub'...) opens it or the app's sign-in, sends nothing, and
+  // the item stays; the strip folds only when it answered.
   const answer = (c: Card, n: number) => {
-    const act = c.options.find((o) => o.n === n)?.act;
-    if (act != null) {
-      ports.act?.(c.project, act);
-      return;
-    }
-    openTo(null);
-    ports.answer(c.project, c.id, String(n));
+    if (ports.pick(c.project, c.id, n).answered) openTo(null);
   };
   // a card linked to a page (notif-artifact): the chip or 'o' opens it beside the thread at its
   // block, the act an option's --open takes (optAct.ts); nothing is sent, the item stays

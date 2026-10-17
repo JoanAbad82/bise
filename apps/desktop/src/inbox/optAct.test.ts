@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { optPlan, optTip } from './optAct';
+import { optTip } from './optAct';
+import { optPlan } from './optPlan';
 import { anchoredSrc } from '@/artifacts/Open';
 
 describe('an option the window does itself (notif-open)', () => {

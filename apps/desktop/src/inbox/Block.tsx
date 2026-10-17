@@ -549,18 +549,12 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
       else notify.later();
       return;
     }
-    // an option the window does itself, as the hub's row says (optAct.ts, the TUI's rule): the
-    // asker's artifact (a drafts card's '1 review': its page at the first draft) opens beside the
-    // thread, a merge's '2 open it on GitHub' or an update's '3 release notes' their page, a
-    // sign-in's '1' the app's own sign-in; nothing is sent, the card stays (his #384 came back when it was)
-    const act = c.options.find((o) => o.n === n)?.act;
-    if (act != null) {
-      doAct(c.project, act);
-      return;
-    }
-    leave();
-    // inbox picks (3): where he is, so his row shows here too when the asker's thread is elsewhere
-    store.do({ i: 'answer', project: c.project, card: c.id, reply: String(n), from: { at: answerAt(here, home) } });
+    // the store's machine decides (machine/cards.ts pick): an option the window does itself, as the
+    // hub's row says (a drafts card's '1 review' opens its page beside the thread, a merge's '2 open
+    // it on GitHub' its PR, a sign-in's '1' the app's own sign-in) sends nothing and the card stays;
+    // else his answer, with where he is (inbox picks 3). The block folds only when it answered.
+    const { answered } = store.do({ i: 'pick', project: c.project, card: c.id, n, from: { at: answerAt(here, home) } });
+    if (answered) leave();
   };
   const close = (c: Card) => {
     // closed already: it just goes, his words to the thread's composer (ThreadComposer)

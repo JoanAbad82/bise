@@ -33,9 +33,10 @@ const ports = () => {
   const did: string[] = [];
   const store = new Store(null);
   const p: StripPorts = {
-    answer: (project, c, reply) => {
-      did.push(`answer ${project}-${String(c)} ${reply}`);
-      store.do({ i: 'answer', project, card: c, reply });
+    pick: (project, c, n) => {
+      const r = store.do({ i: 'pick', project, card: c, n });
+      if (r.answered) did.push(`answer ${project}-${String(c)} ${String(n)}`);
+      return r;
     },
     close: (project, c) => {
       did.push(`close ${project}-${String(c)}`);

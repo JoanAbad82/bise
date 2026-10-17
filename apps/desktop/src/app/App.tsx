@@ -64,6 +64,7 @@ import '@/ds/index.css';
 import './app.css';
 import './zen.css';
 import { useKissWatch } from './Marks';
+import { StoreEdge } from './edge';
 
 export function App() {
   const [router] = useState(() => createRouter(firstRoute(), sessionHistory()));
@@ -84,6 +85,8 @@ export function App() {
   }, [router]);
   return (
     <RouterContext value={router}>
+      {/* the store's machine's effects run here, the one edge (edge.tsx) */}
+      <StoreEdge />
       <Shell />
     </RouterContext>
   );

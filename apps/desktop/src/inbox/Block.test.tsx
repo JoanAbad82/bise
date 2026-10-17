@@ -8,6 +8,7 @@ import { core_ev } from '@/proto/fixtures.gen';
 import { replay, Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
 import { emitAction } from '@/app/menu';
+import { StoreEdge } from '@/app/edge';
 import type { Card } from '@/proto';
 import { answeringOf, asksNotify, cutWords, headWords, InboxBlock, openInbox, projectWord, type Answering, type Here } from './Block';
 import { PICKED_MS } from './InboxCard';
@@ -51,6 +52,8 @@ const mount = (here: Here = { project: P, agent: 'perf' }, events: typeof core_e
   render(
     <StoreProvider store={store}>
       <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'perf' })}>
+        {/* the app's edge, as App.tsx mounts it: the store's effects (an act's page, his browser) run here */}
+        <StoreEdge />
         <InboxBlock here={here} onAnswer={(a) => told.push(a)} now={NOW} />
       </RouterContext>
     </StoreProvider>,
@@ -436,6 +439,8 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
       expect(opened).toEqual(['https://github.com/gvergnaud/ts-pattern/pull/384']);
       expect(hub()).toEqual([]);
       expect(screen.getByTestId('inbox.block').textContent).toContain('#384 is ready to merge');
+      // nothing was answered: the card stays open where he is (the block folds only on an answer)
+      expect(screen.getByTestId('inbox.block.open.1')).toBeTruthy();
     } finally {
       delete g.bise;
     }
@@ -460,6 +465,7 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
       render(
         <StoreProvider store={store}>
           <RouterContext value={router}>
+            <StoreEdge />
             <InboxBlock here={{ project: null, agent: null }} onAnswer={() => undefined} now={NOW} />
           </RouterContext>
         </StoreProvider>,

@@ -7,7 +7,7 @@
 // Today the window is the Store: its port is an outbox (a sink: it answers nothing and holds no
 // state; the hub's answers come in through given()). When state-machine's step lands (fast-try
 // p4), the outbox becomes step's outputs and only this file changes, never a test.
-import { Latest, Store, type AnswerFrom, type InboxItem } from './app';
+import { Latest, Store, type AnswerFrom, type Effect, type InboxItem } from './app';
 import type { Cmd, Gesture, Here, Input } from './inputs';
 
 export interface Feature {
@@ -21,6 +21,8 @@ export interface Feature {
   reload(): Feature;
   /** Every command that left the window, oldest first (since the start, across reloads). */
   sent(): readonly Cmd[];
+  /** Every effect the window ran (a move to an artifact's view, a window.bise call), oldest first. */
+  effects(): readonly Effect[];
   /** Each screen's "what I show". */
   readonly view: {
     /** The inbox: every open item he hasn't acted on, in its order, each with its refusal (the store's inbox view, machine/cards.ts inboxView). */
@@ -36,6 +38,7 @@ const fromOf = (here: Here): AnswerFrom => (here === 'inbox' ? { at: null, inbox
 /** A new window, its core up, nothing given yet. `now`: the clock's start (ms). */
 export function feature(now = 1_791_100_000_000): Feature {
   const outbox: Cmd[] = [];
+  const ran: Effect[] = [];
   const kept = new Map<string, unknown>();
   const latest = new Latest();
   let clock = now;
@@ -45,6 +48,8 @@ export function feature(now = 1_791_100_000_000): Feature {
       { now: () => clock, asides: { read: (k) => kept.get(k), write: (k, v) => { kept.set(k, v); } } },
     );
     s.setCore('up');
+    // the app's edge (app/edge.tsx) runs these; here they are recorded, as sent() records commands
+    s.onEffect((e) => ran.push(e));
     return s;
   };
   let store = open();
@@ -59,6 +64,9 @@ export function feature(now = 1_791_100_000_000): Feature {
         return;
       case 'retry':
         store.do({ i: 'retry_card', project: g.project, card: g.card });
+        return;
+      case 'pick':
+        store.do({ i: 'pick', project: g.project, card: g.card, n: g.n, ...(g.from === undefined ? {} : { from: fromOf(g.from) }) });
         return;
       case 'send':
         store.send({ project: g.project, agent: g.agent, text: g.text });
@@ -93,6 +101,7 @@ export function feature(now = 1_791_100_000_000): Feature {
       return f;
     },
     sent: () => [...outbox],
+    effects: () => [...ran],
     view: {
       inbox: () => store.inboxItems(),
       sending: () => store.sending(),

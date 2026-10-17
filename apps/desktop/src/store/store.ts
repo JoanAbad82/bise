@@ -38,7 +38,7 @@ import { cardRefusedOf, type Acted } from "./acted";
 import type { Refused } from "./refused";
 import { cardsInit, inboxView, stepCards, type AnswerJump, type CardsState } from "./machine/cards";
 import type { InboxItem } from "@/inbox/listed";
-import { factsOf, type Input, type Intent, type WinEv } from "./machine/types";
+import { factsOf, type Effect, type Input, type Intent, type Output, type WinEv } from "./machine/types";
 import type { CoreState } from "@/shared/api";
 import { common } from "@/proto/words.gen";
 import {
@@ -73,6 +73,8 @@ export class Store extends StoreVoice {
   private cardsState: CardsState = cardsInit(this.asideKeep === null ? null : (k) => this.asideKeep?.read(k));
   /** the inbox's view as last read, and what it was made of (inboxItems()) */
   private inboxMemo: { rows: unknown; acted: unknown; refused: unknown; items: readonly InboxItem[] } | null = null;
+  /** the app's edge for the machine's effects (onEffect) */
+  private readonly effects = new Set<(e: Effect) => void>();
 
   // ---- the core's events
 
@@ -221,22 +223,38 @@ export class Store extends StoreVoice {
   /**
    * One input through the cards slice (machine/cards.ts), then its outputs at the edge, in order:
    * a kept list is put (its listeners told) and written to his asides, a command goes to the core;
-   * a new jump is told last, then the inbox's view when its rows, acted or refused changed.
+   * a window move or a window.bise call goes to the app's edge (onEffect, app/edge.ts); a new jump
+   * is told last, then the inbox's view when its rows, acted or refused changed.
    */
-  private stepIn(input: Input, rowsCame = false): void {
+  private stepIn(input: Input, rowsCame = false): readonly Output[] {
     const was = this.cardsState;
     const [next, outs] = stepCards(was, this.facts, input);
     this.cardsState = next;
     for (const o of outs) {
-      if (o.out === "cmd") {
-        this.command(o.cmd);
-        continue;
+      switch (o.out) {
+        case "cmd":
+          this.command(o.cmd);
+          break;
+        case "keep":
+          this.emit(o.key);
+          this.asideKeep?.write(o.key, o.value);
+          break;
+        case "nav":
+        case "fx":
+          for (const fn of [...this.effects]) fn(o);
+          break;
       }
-      this.emit(o.key);
-      this.asideKeep?.write(o.key, o.value);
     }
     if (next.jump !== was.jump) this.emit("answer_jump");
     if (rowsCame || next.acted !== was.acted || next.refused !== was.refused) this.emit("inbox_items");
+    return outs;
+  }
+  /** The app's edge (app/edge.ts) runs the machine's window moves and window.bise calls; a test records them. */
+  onEffect(fn: (e: Effect) => void): () => void {
+    this.effects.add(fn);
+    return () => {
+      this.effects.delete(fn);
+    };
   }
   /** The inbox's one view (machine/cards.ts inboxView); the same array until its rows, acted or refused change. */
   inboxItems(): readonly InboxItem[] {
@@ -248,8 +266,10 @@ export class Store extends StoreVoice {
     return items;
   }
   /** His gesture (machine/types.ts Intent), through the machine. */
-  do(intent: Intent): void {
-    this.stepIn({ at_ms: this.now(), in: "do", intent });
+  do(intent: Intent): { readonly answered: boolean } {
+    const outs = this.stepIn({ at_ms: this.now(), in: "do", intent });
+    // what it did, from its outputs: a view folds the card only when his answer went (architect m_29867)
+    return { answered: outs.some((o) => o.out === "cmd" && o.cmd.cmd === "answer") };
   }
   /**
    * The cards he answered or closed in this window that the hub's rows still list (acted.ts):
@@ -268,6 +288,11 @@ export class Store extends StoreVoice {
   }
   keptOpen(): { readonly project: string; readonly card: number } | undefined {
     return this.slice<{ readonly project: string; readonly card: number } | undefined>("reopen", undefined);
+  }
+  /** @internal for apply.ts: an event the hubs' facts keep (machine/types.ts factsOf); its slice key told */
+  factsCame(ev: Ev, key: string): void {
+    this.facts = factsOf(this.facts, ev);
+    this.emit(key);
   }
   /** @internal for apply.ts: a projects event: the hub's rows, then the cards its rows no longer list leave the set */
   rowsCame(ev: EvOf<"projects">): void {
