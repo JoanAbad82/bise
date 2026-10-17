@@ -142,6 +142,7 @@ test('spotlight/menu-sum: a summary under each live project, its agents in a sub
       return r !== undefined && first !== undefined ? Math.abs(r.top - first.top) : 999;
     });
     expect(level, 'its rows start level with the row').toBeLessThan(14);
+    await expect(cap.locator('[data-testid="capsule.menu.sub.agent.ingest"] .what'), "a long title: the rows' cut, one glued '…' after a whole word").toHaveText(/\S…$/u);
     await cap.locator('[data-testid="capsule.menu.sub.agent.ingest"]').hover();
     await expect(cap.locator('[data-testid="capsule.menu.sub.agent.ingest"]')).toHaveClass(/\bon\b/u);
     for (const t of ['light', 'dark'] as const) {

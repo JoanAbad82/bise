@@ -12,6 +12,7 @@ import { shownName } from "@/agents/model";
 import { inbox } from "@/proto/words_inbox.gen";
 import { Menu, MenuItem, MenuSep, Row } from "@/ds";
 import { useNow } from "@/app/clock";
+import { FitWords } from "@/app/FitWords";
 import type { SpotCard, SpotData } from "@/spotlight";
 import { MenuProjects, PROJECTS_MORE, lineKey } from "./MenuProjects";
 import { hasProjects, isLive, menuCounts, projectLines, type ProjectLine } from "./projects";
@@ -361,7 +362,8 @@ export function TrayMenu({ spot, onOpenWindow, onOpenCard, onQuit, onClose, escR
                   name={
                     <>
                       <span className="who">{a.shown}</span>
-                      <span className="what">{a.words}</span>
+                      {/* the rows' cut: after a whole word, one glued '…' (designer m_30017) */}
+                      <FitWords text={a.words} className="what" whole />
                     </>
                   }
                   end={a.since === null ? undefined : ageShort(now - a.since)}
