@@ -25,7 +25,7 @@ export const RESUME_IDLE_S = 20;
 /** its glide back to the film's shot */
 export const RESUME_S = 2.4;
 /** the closest the visitor (or a close-up) gets, over the town's fit */
-export const MAX_ZOOM = 14;
+export const MAX_ZOOM = 28;
 
 /** where the subject sits, fractions of the frame: the town's middle, past the fade on the left */
 export const SAFE = { x: 0.575, y: 0.5 } as const;
@@ -36,7 +36,7 @@ export const OFFICE_BOX = { x0: 0.3, x1: 0.85, y0: 0.1, y1: 0.9 } as const;
 /** an OFFICE shot this much closer than its box's fit (bims m_31057: the office ~70% of the frame) */
 export const OFFICE_TIGHT = 1.3;
 /** each size past OFFICE: how much closer than that office's own OFFICE shot */
-export const CLOSER: Readonly<Record<Exclude<Size, 'wide' | 'office'>, number>> = { tight: 1.6, follow: 2.2, close: 3.2, closest: 7 };
+export const CLOSER: Readonly<Record<Exclude<Size, 'wide' | 'office'>, number>> = { tight: 1.6, follow: 2.2, close: 3.2, closest: 13 };
 
 /** a rectangle on the fit, fractions (u right, v down) */
 export interface Box {
@@ -173,13 +173,15 @@ export function glideOf(from: Shot | null, to: Shot): { readonly dur: number; re
   return { dur: Math.max(GLIDE_MIN_S, dur), across };
 }
 
-/** a target move past this, fractions of the frame (or log zoom), between two frames: a jump, glided, never cut */
-export const JUMP = 0.06;
-
-/** Whether the camera's target moved by more than a frame's drift: its subject came in or left. Pure. */
-export function jumped(a: Cam, b: Cam): boolean {
-  const z = Math.max(a.zoom, b.zoom);
-  return Math.abs(Math.log(a.zoom / b.zoom)) > JUMP || Math.abs(a.u - b.u) * z > JUMP || Math.abs(a.v - b.v) * z > JUMP;
+/**
+ * Whether a shot's subject is in the world now (a bim that has not come in yet, or has left, is
+ * not): when that changes mid-shot the camera glides to its new target, never cuts. Pure.
+ */
+export function present(shot: Shot, g: Geometry): boolean {
+  const s = shot.subject;
+  if (s.k === 'bim') return g.bim(s.office, s.name) !== null;
+  if (s.k === 'pair') return g.bim(s.office, s.names[0]) !== null || g.bim(s.office, s.names[1]) !== null;
+  return true;
 }
 
 /** a wide's slow drift (bims-film v7: never still, 2-3 % of the frame a second): its sway, fractions of the frame */

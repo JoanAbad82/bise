@@ -16,7 +16,7 @@ import { NO_ATTENTION, type Step } from '../bims/office-driver';
 import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
 import { CAST, SHOTS, type Shot } from './cast';
-import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, jumped, LEAD_S, officeOf, OFFICE_BOX, fitCam, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
+import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
 import { ENTRY, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
 import { eggWords, makeOverlay } from './overlay';
@@ -174,8 +174,8 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   let shotIx = -1;
   let glide: { from: Cam; start: number; dur: number; rise: number | null; to: (() => Cam | null) | null } | null = null;
   let spring: Spring = still({ zoom: 1, u: 0.5, v: 0.5 });
-  /** the target the camera went for last frame (a jump starts a glide) */
-  let lastTo: Cam | null = null;
+  /** whether the shot's subject was in the world last frame (null: a new shot) */
+  let subjectIn: boolean | null = null;
   let hover: { id: string; name: string } | null = null;
   let pointerOn = false;
   /** when his last gesture was (wall s): the loop runs at full rate a while after it */
@@ -204,8 +204,14 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       const rise = g.across ? Math.min(officeZoom(officeOf(prev?.subject ?? { k: 'town' })) ?? 1, officeZoom(officeOf(shot.subject)) ?? 1) : null;
       if (shotIx >= 0) glide = { from: spring.cam, start: t, dur: g.dur, rise, to: null };
       shotIx = i;
+      subjectIn = null;
     }
-    const framed = shotCam(shot, geo);
+    // a subject not in yet (it comes in by the door) or gone: the camera holds where it is, and
+    // glides to it once it's there (bims m_31555: never back to its office's frame, never a cut)
+    const here = present(shot, geo);
+    if (here && subjectIn === false && !reduced) glide = { from: spring.cam, start: t, dur: GLIDE_IN_S, rise: null, to: null };
+    subjectIn = here;
+    const framed = here ? shotCam(shot, geo) : null;
     // a wide never holds still (bims-film v7): it sways from its camera's leaving on
     const target = framed === null ? spring.cam : shot.size === 'wide' ? drift(framed, T - (shot.at - LEAD_S)) : framed;
     move(target, dt);
@@ -214,10 +220,6 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   /** the camera one frame on: along its glide, else the spring towards the target */
   function move(target: Cam, dt: number): void {
     const to = glide?.to?.() ?? target;
-    // the target jumped (its subject came in by the door, or left): a new glide from where the
-    // camera is, never a cut (Gabriel's review, main m_31507)
-    if (!reduced && lastTo !== null && jumped(lastTo, to)) glide = { from: spring.cam, start: t, dur: GLIDE_IN_S, rise: null, to: glide?.to ?? null };
-    lastTo = to;
     if (glide !== null) {
       const f = reduced ? 1 : (t - glide.start) / glide.dur;
       spring = still(glideCam(glide.from, to, Math.min(1, f), glide.rise));
