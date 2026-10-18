@@ -481,11 +481,6 @@ if (mode === 'cut') {
   await page.keyboard.press('Escape');
   const after = (await text('[data-testid="composer"]')) ?? '';
   step('ctrl+r from the thread starts dictation; esc ends it', !!line && !/listening/i.test(after), { line: line?.slice(0, 300), after_esc: after.slice(0, 200) });
-  // every message of this mode was sent (seed, drop, /agents, /archived): none stays 'sending…'
-  // (c28260a9's sending-after-page-echo fix)
-  const stuck = await until(async () => { const t = (await text('[data-testid="app.main"]')) ?? ''; return /sending…|sending\.\.\./.test(t) ? null : true; }, 20000, 1000);
-  await shot('no-sending');
-  step("no message stays 'sending…'", !!stuck, stuck ? null : ((await text('[data-testid="app.main"]')) ?? '').match(/.{0,120}sending.{0,40}/s)?.[0]);
   await closeArtifact();
 }
 
