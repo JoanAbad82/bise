@@ -21,6 +21,7 @@
 import Base
 
 import ./model.bend as M
+import ./text.bend as T
 import ./wakes.bend as WK
 import ./lazy.bend as LZ
 
@@ -108,7 +109,7 @@ def tells_asker(+asker: Maybe<&2, String>, +to: Maybe<&2, String>) -> Bool:
 # the asker's message: which card, which page, who got the pick, his words
 def answer_words(+card: Nat, +page: String, +to: String, +text: String) -> String:
   String.concat(["the user answered notification #", Nat.show(card), " on the page ", page, " (its pick went to @", to, "): \"",
-    M.one_line(text), "\""])
+    T.one_line(text), "\""])
 
 # ---- a reply still pending (ask-wait, core.bend replies_tick) ----
 

@@ -743,20 +743,20 @@ def hub_via_hot(-A: Type, -f: List<&2, HM.MRec> -> A, -a: List<&2, HM.MRec>, -b:
       Equal.sym(A, f(b), f(HM.hot_of(b)), wb)))
 
 # a right index moves along an equality of states
-def hub_hot_tr(-a: HM.St, -b: HM.St, e: {a == b : HM.St}, k: {HM.hot_of(HM.St.hot(b)) == HM.hot_of(HM.St.msgs(b)) : List<&2, HM.MRec>})
-    -> {HM.hot_of(HM.St.hot(a)) == HM.hot_of(HM.St.msgs(a)) : List<&2, HM.MRec>}:
-  %Equal.sym(HM.St, a, b, e) : {HM.hot_of(HM.St.hot(_)) == HM.hot_of(HM.St.msgs(_)) : List<&2, HM.MRec>}
+def hub_hot_tr(-a: HM.St, -b: HM.St, e: {a == b : HM.St}, k: {HM.hot_of(HM.St.hot(b)) == HM.hot_of(HM.every(b)) : List<&2, HM.MRec>})
+    -> {HM.hot_of(HM.St.hot(a)) == HM.hot_of(HM.every(a)) : List<&2, HM.MRec>}:
+  %Equal.sym(HM.St, a, b, e) : {HM.hot_of(HM.St.hot(_)) == HM.hot_of(HM.every(_)) : List<&2, HM.MRec>}
   k
 
 # a lifecycle event keeps a right index right (it touches no message)
-def hub_hot_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>})
-    -> {HM.hot_of(HM.St.hot(HM.apply(s, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.St.msgs(HM.apply(s, HM.ELifecycle{n, l, r}))) : List<&2, HM.MRec>}:
+def hub_hot_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HM.MRec>})
+    -> {HM.hot_of(HM.St.hot(HM.apply(s, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.every(HM.apply(s, HM.ELifecycle{n, l, r}))) : List<&2, HM.MRec>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       k
 
 # with a right index, queued_for reads every message
-def hub_hot_qf(+s: HM.St, +n: String, h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>})
-    -> {HM.queued_for(s, n) == HM.queued_in(HM.St.msgs(s), HM.names_of(s, n)) : List<&2, HM.Msg>}:
-  hub_via_hot(List<&2, HM.Msg>, x => HM.queued_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.St.msgs(s),
-    hub_qi_hot(HM.St.hot(s), HM.names_of(s, n)), hub_qi_hot(HM.St.msgs(s), HM.names_of(s, n)), h)
+def hub_hot_qf(+s: HM.St, +n: String, h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HM.MRec>})
+    -> {HM.queued_for(s, n) == HM.queued_in(HM.every(s), HM.names_of(s, n)) : List<&2, HM.Msg>}:
+  hub_via_hot(List<&2, HM.Msg>, x => HM.queued_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.every(s),
+    hub_qi_hot(HM.St.hot(s), HM.names_of(s, n)), hub_qi_hot(HM.every(s), HM.names_of(s, n)), h)

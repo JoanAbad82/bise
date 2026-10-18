@@ -182,7 +182,7 @@ law ask_reply_ends_quiet:
   for +from: String
   for +to: String
   for +r: Maybe<&2, Nat>
-  {HM.St.msgs(HX.d(o, HC.reply_answered(o, cx, from, to, r))) == HM.St.msgs(HX.d(o, cx)) : List<&2, HM.MRec>}
+  {HM.every(HX.d(o, HC.reply_answered(o, cx, from, to, r))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}
 
 # LAW: the asker moved on (done, failed): its reply watches end, all of
 # them...
@@ -198,7 +198,7 @@ law ask_done_quiet:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +agent: String
-  {HM.St.msgs(HX.d(o, HC.replies_end(o, cx, agent))) == HM.St.msgs(HX.d(o, cx)) : List<&2, HM.MRec>}
+  {HM.every(HX.d(o, HC.replies_end(o, cx, agent))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}
 
 # LAW: the asked agent gone, a reply watch ends and its active agent hears
 # it once, in the same step (ended, it is never an orphan again).

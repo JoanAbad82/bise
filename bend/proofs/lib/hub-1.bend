@@ -237,7 +237,7 @@ def hub_ids_map(+xs: List<&2, HM.MRec>, +id: Nat, +op: HM.MsgOp) -> {HI.ids(HM.m
       hub_ids_map.pick(Nat.is_eq(HM.Msg.id(HM.MRec.msg(h)), id), h, t, id, op, {==}, hub_ids_map(t, id, op))
 
 # settling a question keeps every id in place
-def hub_settle_if_ids(ok: Bool, +xs: List<&2, HM.MRec>, +id: Nat) -> {HI.ids(HM.apply.settle.if(ok, xs, id)) == HI.ids(xs) : List<&2, Nat>}:
+def hub_settle_if_ids(ok: Bool, +xs: List<&2, HM.MRec>, +id: Nat) -> {HI.ids(HI.settle1.if(ok, xs, id)) == HI.ids(xs) : List<&2, Nat>}:
   match ok:
     case True{}:
       hub_ids_map(xs, id, HM.OSettle{})
@@ -245,7 +245,7 @@ def hub_settle_if_ids(ok: Bool, +xs: List<&2, HM.MRec>, +id: Nat) -> {HI.ids(HM.
       {==}
 
 def hub_settle_go_ids(o: Maybe<&2, HM.MRec>, +xs: List<&2, HM.MRec>, +id: Nat, +from: String)
-    -> {HI.ids(HM.apply.settle.go(o, xs, id, from)) == HI.ids(xs) : List<&2, Nat>}:
+    -> {HI.ids(HI.settle1.go(o, xs, id, from)) == HI.ids(xs) : List<&2, Nat>}:
   match o:
     case None{}:
       {==}
@@ -253,7 +253,7 @@ def hub_settle_go_ids(o: Maybe<&2, HM.MRec>, +xs: List<&2, HM.MRec>, +id: Nat, +
       hub_settle_if_ids(String.eq(HM.Msg.to(HM.MRec.msg(r)), from) || String.eq(from, HM.USER()), xs, id)
 
 def hub_settle_ids(r: Maybe<&2, Nat>, +xs: List<&2, HM.MRec>, +from: String)
-    -> {HI.ids(HM.apply.settle(r, xs, from)) == HI.ids(xs) : List<&2, Nat>}:
+    -> {HI.ids(HI.settle1(r, xs, from)) == HI.ids(xs) : List<&2, Nat>}:
   match r:
     case None{}:
       {==}
@@ -373,99 +373,29 @@ def hub_unique_map(+ms: List<&2, HM.MRec>, +id: Nat, +op: HM.MsgOp, -nm: Nat,
 # a new message with the next free id keeps the state unique
 def hub_unique_sent(+ms: List<&2, HM.MRec>, +m: HM.Msg, +nm: Nat, k: {HM.Msg.id(m) == nm : Nat},
     u: HX.Both<HI.Distinct(HI.ids(ms)), HI.Below(HI.ids(ms), nm)>)
-    -> HX.Both<HI.Distinct(HI.ids(HM.apply.settle(HM.Msg.reply_to(m), HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}}), HM.Msg.from(m)))),
-               HI.Below(HI.ids(HM.apply.settle(HM.Msg.reply_to(m), HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}}), HM.Msg.from(m))),
+    -> HX.Both<HI.Distinct(HI.ids(HI.settle1(HM.Msg.reply_to(m), HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}}), HM.Msg.from(m)))),
+               HI.Below(HI.ids(HI.settle1(HM.Msg.reply_to(m), HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}}), HM.Msg.from(m))),
                  Nat.max(Nat.max(nm, 1n+HM.Msg.id(m)), 1n+HM.Msg.thread(m)))>:
   match u:
     case HX.Both{+d, +b}:
       +xs = HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}})
       +a = Nat.max(nm, 1n+HM.Msg.id(m))
       +top = Nat.max(a, 1n+HM.Msg.thread(m))
-      +e = Equal.trans(List<&2, Nat>, HI.ids(HM.apply.settle(HM.Msg.reply_to(m), xs, HM.Msg.from(m))), HI.ids(xs),
+      +e = Equal.trans(List<&2, Nat>, HI.ids(HI.settle1(HM.Msg.reply_to(m), xs, HM.Msg.from(m))), HI.ids(xs),
         HM.snoc(Nat, HI.ids(ms), HM.Msg.id(m)),
         hub_settle_ids(HM.Msg.reply_to(m), xs, HM.Msg.from(m)), hub_ids_snoc(ms, HM.MRec{m, HM.Queued{"new"}, False{}}))
       +lt = hub_lt_ge(HM.Msg.id(m), a, top,
         hub_lt_ge(HM.Msg.id(m), 1n+HM.Msg.id(m), a, hub_lt_succ(HM.Msg.id(m)), Nat.max_ge_r(nm, 1n+HM.Msg.id(m))),
         Nat.max_ge_l(a, 1n+HM.Msg.thread(m)))
-      HX.Both{hub_distinct_tr(HI.ids(HM.apply.settle(HM.Msg.reply_to(m), xs, HM.Msg.from(m))), HM.snoc(Nat, HI.ids(ms), HM.Msg.id(m)), e,
+      HX.Both{hub_distinct_tr(HI.ids(HI.settle1(HM.Msg.reply_to(m), xs, HM.Msg.from(m))), HM.snoc(Nat, HI.ids(ms), HM.Msg.id(m)), e,
           hub_distinct_snoc(HI.ids(ms), HM.Msg.id(m), d, hub_below_n(HI.ids(ms), HM.Msg.id(m), nm, k, b))),
-        hub_below_tr(HI.ids(HM.apply.settle(HM.Msg.reply_to(m), xs, HM.Msg.from(m))), HM.snoc(Nat, HI.ids(ms), HM.Msg.id(m)), top, e,
+        hub_below_tr(HI.ids(HI.settle1(HM.Msg.reply_to(m), xs, HM.Msg.from(m))), HM.snoc(Nat, HI.ids(ms), HM.Msg.id(m)), top, e,
           hub_below_snoc(HI.ids(ms), HM.Msg.id(m), top,
             hub_below_mono(HI.ids(ms), a, top, Nat.max_ge_l(a, 1n+HM.Msg.thread(m)),
               hub_below_mono(HI.ids(ms), nm, a, Nat.max_ge_l(nm, 1n+HM.Msg.id(m)), b)), lt))}
 
-# every event with its journal invariant (a fresh id for a new message)
-# keeps the state unique
-def hub_apply_unique(s: HM.St, e: HM.Ev, u: HI.Unique(s), k: HX.FreshEv(s, e)) -> HI.Unique(HM.apply(s, e)):
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
-      match e:
-        case HM.ETaskCreated{a, b, c, d, f}:
-          u
-        case HM.ELifecycle{a, b, c}:
-          u
-        case HM.EWorkspace{a, b}:
-          u
-        case HM.ESnapshot{a, b}:
-          u
-        case HM.EDeclared{a, b, c}:
-          u
-        case HM.EReported{a, b}:
-          u
-        case HM.EFileTouched{a, b}:
-          u
-        case HM.ERenamed{a, b}:
-          u
-        case HM.EMsgSent{m}:
-          hub_unique_sent(ms, m, nm, k, u)
-        case HM.EMsgState{id, x}:
-          hub_unique_map(ms, id, HM.OSt{x}, nm, u)
-        case HM.ESettled{id}:
-          hub_unique_map(ms, id, HM.OSettle{}, nm, u)
-        case HM.ECardOpened{c}:
-          u
-        case HM.ECardClosed{a, b, c}:
-          u
-        case HM.ECardAnswerPos{a, b, c}:
-          u
-        case HM.EMainNote{a, b}:
-          u
-        case HM.ENotesFlushed{}:
-          u
-        case HM.ETimerSet{a, b}:
-          u
-        case HM.ETimerFired{a, b, c, d, f}:
-          u
-        case HM.ETimerRun{a, b}:
-          u
-        case HM.ETimerStop{a, b, c}:
-          u
-        case HM.ETimerName{a, b, c, d}:
-          u
-        case HM.EX{a}:
-          u
-        case HM.EAct{a}:
-          u
-        case HM.EFollow{a, b, c}:
-          u
-        case HM.EJobEnd{a, b}:
-          u
-        case HM.EWake{a}:
-          u
-        case HM.EPaused{a}:
-          u
-        case HM.EResumed{a}:
-          u
-
-def hub_apply_all_unique(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.Unique(s), f: HX.Fresh(evs, s)) -> HI.Unique(HM.apply_all(evs, s)):
-  match evs:
-    case Nil{}:
-      u
-    case Con{e, t}:
-      match f:
-        case HX.Both{k, ft}:
-          hub_apply_all_unique(t, HM.apply(s, e), hub_apply_unique(s, e, u, k), ft)
-
+# an event keeps the state unique: hub-cold.bend (hc_apply_unique), over
+# every message of the split
 def hub_unique_tr(-x: HM.St, -y: HM.St, e: {x == y : HM.St}, u: HI.Unique(y)) -> HI.Unique(x):
   %Equal.sym(HM.St, x, y, e) : HI.Unique(_)
   u
@@ -507,83 +437,8 @@ def hub_prefix_tr(-a: List<&2, Nat>, -x: List<&2, Nat>, -y: List<&2, Nat>, e: {x
   %Equal.sym(List<&2, Nat>, x, y, e) : HI.IsPrefix(a, _)
   p
 
-# every event keeps the messages, in order (a new one comes last)
-def hub_apply_kept(s: HM.St, e: HM.Ev) -> HI.Kept(s, HM.apply(s, e)):
-  match s:
-    case HM.St{ag, od, +ms, ca, no, nm, nc, tm, xs, pz, +ho}:
-      match e:
-        case HM.EMsgSent{+m}:
-          hub_prefix_tr(HI.ids(ms),
-            HI.ids(HM.apply.settle(HM.Msg.reply_to(m), HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}}), HM.Msg.from(m))),
-            HM.snoc(Nat, HI.ids(ms), HM.Msg.id(m)),
-            Equal.trans(List<&2, Nat>,
-              HI.ids(HM.apply.settle(HM.Msg.reply_to(m), HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}}), HM.Msg.from(m))),
-              HI.ids(HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}})), HM.snoc(Nat, HI.ids(ms), HM.Msg.id(m)),
-              hub_settle_ids(HM.Msg.reply_to(m), HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}}), HM.Msg.from(m)),
-              hub_ids_snoc(ms, HM.MRec{m, HM.Queued{"new"}, False{}})),
-            hub_prefix_snoc(HI.ids(ms), HI.ids(ms), HM.Msg.id(m), hub_prefix_refl(HI.ids(ms))))
-        case HM.EMsgState{+id, +x}:
-          hub_prefix_tr(HI.ids(ms), HI.ids(HM.map_msg(ms, id, HM.OSt{x})), HI.ids(ms), hub_ids_map(ms, id, HM.OSt{x}), hub_prefix_refl(HI.ids(ms)))
-        case HM.ESettled{+id}:
-          hub_prefix_tr(HI.ids(ms), HI.ids(HM.map_msg(ms, id, HM.OSettle{})), HI.ids(ms), hub_ids_map(ms, id, HM.OSettle{}), hub_prefix_refl(HI.ids(ms)))
-        case HM.ETaskCreated{a, b, c, d, f}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ELifecycle{a, b, c}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EWorkspace{a, b}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ESnapshot{a, b}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EDeclared{a, b, c}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EReported{a, b}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EFileTouched{a, b}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ERenamed{a, b}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ECardOpened{c}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ECardClosed{a, b, c}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ECardAnswerPos{a, b, c}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EMainNote{a, b}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ENotesFlushed{}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ETimerSet{a, b}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ETimerFired{a, b, c, d, f}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ETimerRun{a, b}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ETimerStop{a, b, c}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.ETimerName{a, b, c, d}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EX{a}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EAct{a}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EFollow{a, b, c}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EJobEnd{a, b}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EWake{a}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EPaused{a}:
-          hub_prefix_refl(HI.ids(ms))
-        case HM.EResumed{a}:
-          hub_prefix_refl(HI.ids(ms))
-
-def hub_apply_all_kept(+evs: List<&2, HM.Ev>, +s: HM.St) -> HI.Kept(s, HM.apply_all(evs, s)):
-  match evs:
-    case Nil{}:
-      hub_prefix_refl(HI.ids(HM.St.msgs(s)))
-    case Con{e, t}:
-      hub_prefix_trans(HI.ids(HM.St.msgs(s)), HI.ids(HM.St.msgs(HM.apply(s, e))), HI.ids(HM.St.msgs(HM.apply_all(t, HM.apply(s, e)))),
-        hub_apply_kept(s, e), hub_apply_all_kept(t, HM.apply(s, e)))
+# every event keeps the messages in order: hub-cold.bend (hc_apply_kept),
+# over every message of the split
 
 def hub_kept_tr(-a: HM.St, -x: HM.St, -y: HM.St, e: {x == y : HM.St}, k: HI.Kept(a, y)) -> HI.Kept(a, x):
   %Equal.sym(HM.St, x, y, e) : HI.Kept(a, _)
@@ -706,28 +561,8 @@ def hub_rej(ids: List<&2, Nat>, +xs: List<&2, HM.MRec>) -> List<&2, HM.MRec>:
     case Con{+id, +t}:
       hub_rej(t, HM.map_msg(xs, id, HM.OSt{HM.Rejected{"recipient_unavailable"}}))
 
-def hub_msgs_state(s: HM.St, +id: Nat, +x: HM.MSt) -> {HM.St.msgs(HM.apply(s, HM.EMsgState{id, x})) == HM.map_msg(HM.St.msgs(s), id, HM.OSt{x}) : List<&2, HM.MRec>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
-      {==}
-
-def hub_msgs_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HM.St.msgs(HX.d(o, HC.reject_ids(o, ids, cx))) == hub_rej(ids, HM.St.msgs(HX.d(o, cx))) : List<&2, HM.MRec>}:
-  match ids:
-    case Nil{}:
-      {==}
-    case Con{id, t}:
-      +cx2 = HC.emit(o, cx, HM.EMsgState{id, HM.Rejected{"recipient_unavailable"}}, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.reject_ids(o, t, cx2))), hub_rej(t, HM.St.msgs(HX.d(o, cx2))),
-        hub_rej(id <> t, HM.St.msgs(HX.d(o, cx))),
-        hub_msgs_reject(o, t, cx2),
-        Equal.cong(List<&2, HM.MRec>, List<&2, HM.MRec>, xs => hub_rej(t, xs), HM.St.msgs(HX.d(o, cx2)),
-          HM.map_msg(HM.St.msgs(HX.d(o, cx)), id, HM.OSt{HM.Rejected{"recipient_unavailable"}}),
-          Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HM.apply(HX.d(o, cx), HM.EMsgState{id, HM.Rejected{"recipient_unavailable"}})),
-            HM.map_msg(HM.St.msgs(HX.d(o, cx)), id, HM.OSt{HM.Rejected{"recipient_unavailable"}}),
-            Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.St.msgs(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.EMsgState{id, HM.Rejected{"recipient_unavailable"}}),
-              hub_d_emit(o, cx, HM.EMsgState{id, HM.Rejected{"recipient_unavailable"}}, Unit{}, Unit{}, Unit{})),
-            hub_msgs_state(HX.d(o, cx), id, HM.Rejected{"recipient_unavailable"}))))
+# every message after stop_task's rejections: hub-cold.bend
+# (hc_msgs_reject), with the split's invariant
 
 def hub_rej_skip.go(+i: Nat, -ns: List<&2, Nat>, +h: HM.MRec, +t: List<&2, HM.MRec>,
     ef: {Nat.is_eq(HM.Msg.id(HM.MRec.msg(h)), i) == False{} : Bool},
@@ -830,22 +665,22 @@ def hub_d_hout(-o: HM.St, +cx: HX.Cx<o>, +kvs: List<&2, Sigma<&2, &2, String, _ 
         case HX.Core{d, fx, p, f, q, v}:
           {==}
 
-def hub_msgs_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.msgs(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.St.msgs(s) : List<&2, HM.MRec>}:
+def hub_msgs_closed(s: HM.St, +id: Nat, +res: String) -> {HM.every(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.every(s) : List<&2, HM.MRec>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       {==}
 
-def hub_msgs_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.St.msgs(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.St.msgs(s) : List<&2, HM.MRec>}:
+def hub_msgs_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.every(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.every(s) : List<&2, HM.MRec>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       {==}
 
-def hub_msgs_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.msgs(HX.d(o, a)) == HM.St.msgs(HX.d(o, b)) : List<&2, HM.MRec>}:
-  Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.St.msgs(s), HX.d(o, a), HX.d(o, b), e)
+def hub_msgs_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.every(HX.d(o, a)) == HM.every(HX.d(o, b)) : List<&2, HM.MRec>}:
+  Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.every(s), HX.d(o, a), HX.d(o, b), e)
 
 # ---- a drop's timer stops (HC.timers_gone) touch no message, agent or card ----
 
-def hub_msgs_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.St.msgs(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.St.msgs(s) : List<&2, HM.MRec>}:
+def hub_msgs_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.every(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.every(s) : List<&2, HM.MRec>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       {==}
@@ -861,17 +696,17 @@ def hub_cards_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.St.cards(
       {==}
 
 def hub_msgs_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
-    -> {HM.St.msgs(HX.d(o, HC.timers_gone.each(o, ids, cx, why))) == HM.St.msgs(HX.d(o, cx)) : List<&2, HM.MRec>}:
+    -> {HM.every(HX.d(o, HC.timers_gone.each(o, ids, cx, why))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, t}:
       +ev = {HM.ETimerStop{id, why, HC.now(o, cx)} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.timers_gone.each(o, t, cx2, why))), HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HX.d(o, cx)),
+      Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.timers_gone.each(o, t, cx2, why))), HM.every(HX.d(o, cx2)), HM.every(HX.d(o, cx)),
         hub_msgs_gone_each(o, t, cx2, why),
-        Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HM.apply(HX.d(o, cx), ev)), HM.St.msgs(HX.d(o, cx)),
-          Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.St.msgs(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+        Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), ev)), HM.every(HX.d(o, cx)),
+          Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_msgs_tstop(HX.d(o, cx), id, why, HC.now(o, cx))))
 
 def hub_agents_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
@@ -922,24 +757,24 @@ def hub_cards_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
           Equal.cong(HM.St, List<&2, HM.Card>, s => HM.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_cards_wake(HX.d(o, cx), HWK.WEnd{id, "gone", HC.now(o, cx)})))
 
-def hub_msgs_wake(s: HM.St, +e: HWK.WkEv) -> {HM.St.msgs(HM.apply(s, HM.EWake{e})) == HM.St.msgs(s) : List<&2, HM.MRec>}:
+def hub_msgs_wake(s: HM.St, +e: HWK.WkEv) -> {HM.every(HM.apply(s, HM.EWake{e})) == HM.every(s) : List<&2, HM.MRec>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       {==}
 
 # a drop's watch ends leave the messages and the agents as they were
 def hub_msgs_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HM.St.msgs(HX.d(o, HC.wakes_gone.each(o, ids, cx))) == HM.St.msgs(HX.d(o, cx)) : List<&2, HM.MRec>}:
+    -> {HM.every(HX.d(o, HC.wakes_gone.each(o, ids, cx))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, t}:
       +ev = {HM.EWake{HWK.WEnd{id, "gone", HC.now(o, cx)}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.wakes_gone.each(o, t, cx2))), HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HX.d(o, cx)),
+      Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.wakes_gone.each(o, t, cx2))), HM.every(HX.d(o, cx2)), HM.every(HX.d(o, cx)),
         hub_msgs_wakes_each(o, t, cx2),
-        Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HM.apply(HX.d(o, cx), ev)), HM.St.msgs(HX.d(o, cx)),
-          Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.St.msgs(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+        Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), ev)), HM.every(HX.d(o, cx)),
+          Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_msgs_wake(HX.d(o, cx), HWK.WEnd{id, "gone", HC.now(o, cx)})))
 
 def hub_agents_wake(s: HM.St, +e: HWK.WkEv) -> {HM.St.agents(HM.apply(s, HM.EWake{e})) == HM.St.agents(s) : List<&2, HM.Agent>}:
@@ -962,7 +797,7 @@ def hub_agents_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
           hub_agents_wake(HX.d(o, cx), HWK.WEnd{id, "gone", HC.now(o, cx)})))
 
 def hub_msgs_wakes(-o: HM.St, +life: HM.Life, +cx: HX.Cx<o>, +n: String)
-    -> {HM.St.msgs(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.St.msgs(HX.d(o, cx)) : List<&2, HM.MRec>}:
+    -> {HM.every(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}:
   match life:
     case HM.LActive{}:
       {==}

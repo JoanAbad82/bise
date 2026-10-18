@@ -11,6 +11,7 @@ import ../runtime/live-pure.bend as Lp
 import ../vendor/http/encoding/utf8.bend as U8
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/text.bend as HT
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/picks.bend as HPK
@@ -134,7 +135,7 @@ law main_card_answer_routes_once:
   {HC.answer.q.main(o, cx, c, text, parts, via)
     == HC.close_card_ans(o,
       HA.due_add(o, HC.answer_line(o,
-        HC.notify_main(o, cx, HC.cat([HC.MAIN_ANSWER_HEAD(), HC.ns(HM.Card.id(c)), " (\"", HM.one_line(HM.Card.text(c)), "\"): \"", HM.one_line(text), "\""])),
+        HC.notify_main(o, cx, HC.cat([HC.MAIN_ANSWER_HEAD(), HC.ns(HM.Card.id(c)), " (\"", HT.one_line(HM.Card.text(c)), "\"): \"", HT.one_line(text), "\""])),
         HM.MAIN(), HM.MAIN(), c, text, parts, None{}), HM.Card.id(c)),
       HM.Card.id(c), "answered", HA.his_ans(c, text, via)) : HX.Cx<o>}
 

@@ -9,9 +9,9 @@ import ../vendor/json.bend as J
 import ./model.bend as M
 
 import ./cx.bend as X
-
+import ./text.bend as T
 import ./codec.bend as C
-
+import ./cold.bend as CO
 import ./newtask.bend as NT
 
 import ./timers.bend as TM
@@ -912,7 +912,7 @@ def notify_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
 def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_taken(X.d(o, cx), name) == False{} : Bool}) -> X.Cx<o> & TaskR:
   +parent = NewTask.parent(t)
   +label = NT.branch_label(M.ws_branch(ws))
-  +obj = M.one_line(NewTask.objective(t))
+  +obj = T.one_line(NewTask.objective(t))
   +cx2 = emit(o, cx, M.ETaskCreated{name, parent, NewTask.brief(t), ws, now(o, cx)}, e, Unit{}, Unit{})
   +who = Bool.pick(String, String.eq(parent, M.USER()), "you", parent)
   +cx3 = feed(o, cx2, M.MAIN(), FD.spawn(cat([who, " → new agent @", name, label, " : ", obj])))
@@ -1823,7 +1823,7 @@ def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +tex
     case (+cx, SOk{+m}):
       +id = M.Card.id(c)
       +mid = M.Msg.id(m)
-      +cx2 = note_main(o, cx, cat(["the user answered notification #", ns(id), " (@", asker, " asked: \"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
+      +cx2 = note_main(o, cx, cat(["the user answered notification #", ns(id), " (@", asker, " asked: \"", T.one_line(M.Card.text(c)), "\"): \"", T.one_line(text), "\""]))
       +cx3 = answer_line(o, cx2, M.MAIN(), asker, c, text, parts, Some{mid})
       close_card_ans(o, A.due_add(o, asker_line(o, cx3, asker, c, text, parts, Some{mid}), id), id, "answered", A.his_ans(c, text, via))
 
@@ -1842,7 +1842,7 @@ def MAIN_ANSWER_HEAD() -> String:
 # notify's twin (lines.rs is_main_answer_note, its head MAIN_ANSWER_HEAD)
 def answer.q.main(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   +id = M.Card.id(c)
-  +cx2 = notify_main(o, cx, cat([MAIN_ANSWER_HEAD(), ns(id), " (\"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
+  +cx2 = notify_main(o, cx, cat([MAIN_ANSWER_HEAD(), ns(id), " (\"", T.one_line(M.Card.text(c)), "\"): \"", T.one_line(text), "\""]))
   +cx3 = answer_line(o, cx2, M.MAIN(), M.MAIN(), c, text, parts, None{})
   close_card_ans(o, A.due_add(o, cx3, id), id, "answered", A.his_ans(c, text, via))
 
@@ -2004,7 +2004,7 @@ def route.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focu
     case (+cx, SOk{+m}):
       +cx2 = route_line(o, cx, name, None{}, text, parts)
       +cx3 = LZ.pick(X.Cx<o>, Bool.not(String.eq(focus, M.MAIN())) || Bool.not(String.eq(name, focus)),
-        u => note_main(o, cx2, cat(["the user wrote directly to @", name, ": \"", M.one_line(text), "\""])), u => cx2)
+        u => note_main(o, cx2, cat(["the user wrote directly to @", name, ": \"", T.one_line(text), "\""])), u => cx2)
       cx3
 
 def route.target(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool, +parts: String) -> X.Cx<o>:
@@ -2210,7 +2210,7 @@ def st_after(m: Maybe<&2, M.MRec>, +x: M.MSt) -> Maybe<&2, M.MSt>:
 # message from the user changes (law unqueue_takes_back_only_his_queued);
 # anything else is a notice saying why, and nothing changes
 def unqueue(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
-  unqueue.go(o, M.rec_of(M.St.msgs(st(o, cx)), id), cx, id)
+  unqueue.go(o, M.rec_at(st(o, cx), id), cx, id)
 
 # his queued message said now (the window's 'send now', architect
 # m_25139): the pump's own delivery of that one message, its id and parts
@@ -2253,7 +2253,7 @@ def steer_queued.go(-o: M.St, r: Maybe<&2, M.MRec>, +cx: X.Cx<o>, +id: Nat) -> X
         u => notice(o, cx, cat([mid(id), " isn't one of your messages"])))
 
 def steer_queued(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
-  steer_queued.go(o, M.rec_of(M.St.msgs(st(o, cx)), id), cx, id)
+  steer_queued.go(o, M.rec_at(st(o, cx), id), cx, id)
 
 def passthrough(-o: M.St, +cx: X.Cx<o>, +focus: String, +l: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, has_agent(o, cx, focus) && is_idle(X.Rt.run(rt(o, cx, focus))),
@@ -2348,7 +2348,7 @@ def xanswer.kind(k: XH.XKind, +ob: XH.Out, +text: String) -> String:
     case XH.KInput{}:
       cat(["(answer to the user's ", mid(XH.Out.msg(ob)), " you forwarded) ", text])
     case XH.KAsk{}:
-      cat(["(answer to your question \"", M.clip(M.one_line(XH.Out.text(ob)), 200n), "\") ", text])
+      cat(["(answer to your question \"", T.clip(T.one_line(XH.Out.text(ob)), 200n), "\") ", text])
     case XH.KJobEnd{}:
       text
 
@@ -2423,7 +2423,7 @@ def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat) -> X.Cx<o>:
   +cx4 = xemit(o, cx3, XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RSent{}}})
   +cx5 = route_done(o, cx4, XH.Route.rid(r), "sent", XH.Route.to(r), Some{XH.Out.xid(ob)}, Some{id})
   note_main(o, cx5, cat(["the user's words went to the project ", XH.Route.name(r), " (", mid(id), ", routed by bise): \"",
-    M.clip(M.one_line(XH.Route.text(r)), 300n), "\"; its answer comes back to you from @", XH.Route.name(r)]))
+    T.clip(T.one_line(XH.Route.text(r)), 300n), "\"; its answer comes back to you from @", XH.Route.name(r)]))
 
 # his routed words as his message to main, journaled only: no send (a
 # send would pump main, a turn), no waiter, no card (law
@@ -2721,23 +2721,14 @@ def wait.existing(-o: M.St, m: Maybe<&2, M.Msg>, +cx: X.Cx<o>, +w: X.Waiter) -> 
     case None{}:
       wait.park(o, cx, w)
 
-def reply_of(xs: List<&2, M.MRec>, +id: Nat, +replier: String) -> Maybe<&2, M.Msg>:
-  match xs:
-    case Nil{}:
-      None{}
-    case Con{+r, +t}:
-      +m = M.MRec.msg(r)
-      LZ.pick(Maybe<&2, M.Msg>,
-        M.maybe_nat_is(M.Msg.reply_to(m), id) && (String.eq(M.Msg.from(m), replier) || String.eq(M.Msg.from(m), M.USER())),
-        u => Some{m}, u => reply_of(t, id, replier))
-
+# the first reply to a message: CO.reply_at (hub/cold.bend)
 def wait.mine(-o: M.St, mine: Bool, +cx: X.Cx<o>, +token: Nat, +from: String, +orig: M.Msg, +timeout: Nat) -> X.Cx<o>:
   match mine:
     case False{}:
       reply_err(o, cx, token, "you can only wait for the reply to your own messages")
     case True{}:
       +w = {X.Waiter{token, from, M.Msg.id(orig), Nat.add(now(o, cx), Nat.mul(1000n, Nat.min(timeout, WAIT_CAP())))} : X.Waiter}
-      wait.existing(o, reply_of(M.St.msgs(st(o, cx)), M.Msg.id(orig), M.Msg.to(orig)), cx, w)
+      wait.existing(o, CO.reply_at(st(o, cx), M.Msg.id(orig), M.Msg.to(orig)), cx, w)
 
 def wait.orig(-o: M.St, m: Maybe<&2, M.Msg>, +cx: X.Cx<o>, +token: Nat, +from: String, +id: Nat, +timeout: Nat) -> X.Cx<o>:
   match m:
@@ -2783,7 +2774,7 @@ def req_status(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +is_main: Boo
 
 # the job's name: the task's objective, one line
 def job_label(+a: M.Agent) -> String:
-  M.clip(M.one_line(J.get_str_or(M.Agent.brief(a), "objective", "")), 120n)
+  T.clip(T.one_line(J.get_str_or(M.Agent.brief(a), "objective", "")), 120n)
 
 # J: the end of a job followed for another hub (bise's home hub): to its
 # outbox, journaled, delivered until that hub has it (a restart of either
@@ -3036,7 +3027,7 @@ def req_close(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +token: Nat, +id: Na
     case None{}:
       reply_err(o, cx, token, String.append("no open notification #", ns(id)))
     case Some{+c}:
-      +res = Bool.pick(String, String.is_empty(M.one_line(note)), "closed by main", String.append("main: ", M.one_line(note)))
+      +res = Bool.pick(String, String.is_empty(T.one_line(note)), "closed by main", String.append("main: ", T.one_line(note)))
       LZ.pick(X.Cx<o>, M.user_kind(M.Card.kind(c)),
         u => reply_err(o, cx, token, cat(["notification #", ns(id), " is in the user's inbox: only the user answers or closes it (your own question, now moot: sb notify --withdraw ", ns(id), " \"why\")"])),
         u => reply(o, close_card(o, cx, id, res), token, ok_body([J.kv("card", J.JNum{id})])))
@@ -3052,9 +3043,9 @@ def req_withdraw(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +token: Nat, +id:
     case Some{+c}:
       +k = M.Card.kind(c)
       LZ.pick(X.Cx<o>, String.eq(k, "question") || String.eq(k, "drop"),
-        u => LZ.pick(X.Cx<o>, String.is_empty(M.one_line(why)),
+        u => LZ.pick(X.Cx<o>, String.is_empty(T.one_line(why)),
           u => reply_err(o, cx, token, "say why: sb notify --withdraw N \"why\" (the user reads it)"),
-          u => reply(o, close_card(o, cx, id, String.append("withdrawn by main: ", M.one_line(why))), token, ok_body([J.kv("card", J.JNum{id})]))),
+          u => reply(o, close_card(o, cx, id, String.append("withdrawn by main: ", T.one_line(why))), token, ok_body([J.kv("card", J.JNum{id})]))),
         u => reply_err(o, cx, token, cat(["notification #", ns(id), " is a ", k, ": only the user answers or closes it"])))
 
 # `sb rename <task> <new-name>`: the same rules as the user's /rename
@@ -3421,7 +3412,7 @@ def boot(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
 # agent: one more pause, from the ask (laws ask_timeout_pauses, ask_once)
 def reply_pause.need(-o: M.St, +cx: X.Cx<o>, +agent: String, +orig: M.Msg) -> Bool:
   Bool.not(Maybe.is_some(&2, WK.Watch, WK.reply_for(WK.Wakes.live(wks(o, cx)), agent, M.Msg.id(orig))))
-    && Bool.not(Maybe.is_some(&2, M.Msg, reply_of(M.St.msgs(st(o, cx)), M.Msg.id(orig), M.Msg.to(orig)))) && R.agent_active(st(o, cx), agent)
+    && Bool.not(Maybe.is_some(&2, M.Msg, CO.reply_at(st(o, cx), M.Msg.id(orig), M.Msg.to(orig)))) && R.agent_active(st(o, cx), agent)
 
 def reply_pause.go(-o: M.St, need: Bool, +cx: X.Cx<o>, +agent: String, +orig: M.Msg) -> X.Cx<o>:
   match need:
@@ -3488,8 +3479,8 @@ def auto_reply.local(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: Str
       +cx2 = emit(o, cx, M.ESettled{M.Msg.id(m)}, Unit{}, Unit{}, Unit{})
       # an agent writing to the user (C2 `msg-you`, level 2)
       +cx3 = feed(o, cx2, view, FD.msg_you(agent, body))
-      note_main(o, cx3, cat(["@", agent, " answered the user (asked from @", view, "'s view: \"", M.clip(M.one_line(M.Msg.text(m)), 500n),
-        "\"): \"", M.clip_tail(M.one_line(body), 2000n), "\""]))
+      note_main(o, cx3, cat(["@", agent, " answered the user (asked from @", view, "'s view: \"", T.clip(T.one_line(M.Msg.text(m)), 500n),
+        "\"): \"", T.clip_tail(T.one_line(body), 2000n), "\""]))
 
 # a message bise sent this hub (S2) is answered back to bise's hub
 def auto_reply.x(-o: M.St, r: Maybe<&2, XH.XIn>, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: M.Msg, +body: String) -> X.Cx<o>:
@@ -3514,7 +3505,7 @@ def idle.report(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String, +text: String)
   match go:
     case True{}:
       emit(o, cx, M.EReported{agent, J.obj([J.kv("at_ms", J.JNum{now(o, cx)}), J.kv("kind", J.JStr{"turn"}),
-        J.kv("summary", J.JStr{M.clip(text, 1000n)}), J.kv("decisions", J.JArr{Nil{}}), J.kv("auto", J.JBool{True{}})])}, Unit{}, Unit{}, Unit{})
+        J.kv("summary", J.JStr{T.clip(text, 1000n)}), J.kv("decisions", J.JArr{Nil{}}), J.kv("auto", J.JBool{True{}})])}, Unit{}, Unit{}, Unit{})
     case False{}:
       cx
 
@@ -3568,7 +3559,7 @@ def close_by_user(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat) -> X.C
     case None{}:
       notice(o, cx, String.append("no open notification #", ns(id)))
     case Some{+c}:
-      note_main(o, close_card(o, cx, id, "closed"), cat(["the user closed notification #", ns(id), " (", M.Card.kind(c), " @", M.Card.agent(c), ": \"", M.one_line(M.Card.text(c)), "\") without answering"]))
+      note_main(o, close_card(o, cx, id, "closed"), cat(["the user closed notification #", ns(id), " (", M.Card.kind(c), " @", M.Card.agent(c), ": \"", T.one_line(M.Card.text(c)), "\") without answering"]))
 
 # the gate's card closes without an answer (its agents were
 # interrupted): no card, nothing to do

@@ -25,7 +25,7 @@ def hub_cards_wakes(-o: HM.St, +life: HM.Life, +cx: HX.Cx<o>, +n: String)
       PL1.hub_cards_wakes_each(o, HWK.ids_of(HWK.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
 
 def hub_msgs_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
-    -> {HM.St.msgs(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.St.msgs(HX.d(o, cx)) : List<&2, HM.MRec>}:
+    -> {HM.every(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}:
   match g:
     case False{}:
       {==}
@@ -57,19 +57,19 @@ def hub_d_feed(-o: HM.St, +cx: HX.Cx<o>, +a: String, +rec: J.Json) -> {HX.d(o, H
 
 # closing cards keeps the messages
 def hub_msgs_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
-    -> {HM.St.msgs(HX.d(o, HC.close_ids(o, ids, cx, res))) == HM.St.msgs(HX.d(o, cx)) : List<&2, HM.MRec>}:
+    -> {HM.every(HX.d(o, HC.close_ids(o, ids, cx, res))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, rest}:
       +cx2 = HC.emit(o, cx, HM.ECardClosed{id, res, HM.no_ans()}, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
-      Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.St.msgs(HX.d(o, cx3)), HM.St.msgs(HX.d(o, cx)),
+      Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.every(HX.d(o, cx3)), HM.every(HX.d(o, cx)),
         hub_msgs_close_ids(o, rest, cx3, res),
-        Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx3)), HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HX.d(o, cx)),
+        Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, cx3)), HM.every(HX.d(o, cx2)), HM.every(HX.d(o, cx)),
           PL1.hub_msgs_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
-          Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()})), HM.St.msgs(HX.d(o, cx)),
-            Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.St.msgs(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()}),
+          Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()})), HM.every(HX.d(o, cx)),
+            Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()}),
               PL1.hub_d_emit(o, cx, HM.ECardClosed{id, res, HM.no_ans()}, Unit{}, Unit{}, Unit{})),
             PL1.hub_msgs_closed(HX.d(o, cx), id, res))))
 

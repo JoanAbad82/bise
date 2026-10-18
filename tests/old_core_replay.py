@@ -146,6 +146,31 @@ def written_by_this_tree(path):
     return lines
 
 
+def stale_ids_skipped():
+    """Issue 21 steps 3-4: this tree's sb-core keeps the messages split by
+    id (law ids_ascending), so a boot replay skips a message_sent whose id
+    is below next_msg (a reused id, an older id) and says where: the first
+    message keeps its record, the later ones come back in send order."""
+    out = subprocess.run(["bash", "scripts/bins.sh", "path", "sb-core"], cwd=ROOT, capture_output=True, text=True)
+    core = Core(out.stdout.strip().splitlines()[-1])
+    reused = dict(msg(2, "user", "main"), msg=dict(msg(2, "user", "main")["msg"], text="reused"))
+    older = dict(msg(1, "user", "main"), msg=dict(msg(1, "user", "main")["msg"], text="older"))
+    evs = [msg(1, "user", "main"), msg(2, "user", "main"), reused, older, msg(3, "user", "main")]
+    try:
+        out = core.call({"t": "replay_many", "evs": evs})
+        assert out.get("skipped") == [2, 3], "the reused and the older id are skipped: %r" % out
+        one = core.call({"t": "replay", "ev": older})
+        text = json.dumps(one)
+        assert "skipped" in text, "a single replay of an older id says so: %r" % one
+        view = core.call({"t": "view_all"})
+        msgs = view.get("view", view).get("msgs", [])
+        got = [(m["msg"]["id"], m["msg"]["text"]) for m in msgs]
+        assert got == [(1, "m1"), (2, "m2"), (3, "m3")], "every message once, in send order: %r" % got
+    finally:
+        core.kill()
+    print("ok   stale ids: a reused id and an older id are skipped, the messages stay in send order")
+
+
 def replay_written(core, path):
     """The base's sb-core replays the new core's journal file: the message,
     the card, the timer and the watch come back; it skips only new kinds."""
@@ -197,6 +222,7 @@ def main():
 
         call({"t": "init", "workspace": "/w"})
         written_by_this_tree(os.path.join(tmp, "journal.jsonl"))
+        stale_ids_skipped()
         replay_written(Core(binary), os.path.join(tmp, "journal.jsonl"))
         out = call({"t": "replay_many", "evs": FIXTURE})
         # the replay succeeds and no line it does not know fails it: a kind

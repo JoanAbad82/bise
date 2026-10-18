@@ -377,6 +377,69 @@ stop rule: plan A would not gain 10 % of the step, so it stays out),
 and ~5 ms on the Rust side building main's context, which must be
 current on every user line.
 
+## steps 3-4: the split (bp-hot, plan A, architect m_29535)
+
+sha 1 left ~4.9 ms of a user line in sb-core, mostly the O(n) `hot_of`
+over every message on each message event, and the say walks
+(`term_drop` + `span_fade` ~52 %, `hot_of` ~31 % of a say in `sample`).
+Plan A, now signed: `St.msgs` is gone. Field 3 is `St.hot`, the hot
+messages, ids ascending; field 11 is `St.old`, the cold ones, ids
+descending (newest first). `HM.every` puts them back together in send
+order (the old side with each hot one put in by id, turned around):
+what `view_all`, `msgs_unique` and `msgs_kept` read.
+
+**A message event** (`msg_op`, model.bend): on a hot record, the op,
+then the ones it made cold go to the old side (`ins_all`); on a cold
+record, the op in place, or back to the hot side if it made it hot
+(`ins_asc`, `drop_msg`). A new message is the last hot one. Lookups by
+id read the hot side, then the old side (`rec_in`, `rec_at`;
+`CO.reply_at`: the earliest reply of the two sides, the old side's walk
+stopping at the first id not above the message's). Nothing walks every
+message on a step any more. `apply_rev`, `msgs_rev`, `hot_all` and
+replay.bend are gone: the boot replay is `M.apply` per event
+(cold.bend `replay_batch`).
+
+**A reused or older id** would put a message out of send order: the
+replay skips a `message_sent` whose id is below `next_msg` and lists it
+in `skipped_at` (tests/old_core_replay.py `stale_ids_skipped`). A scan
+of his 17 journals and the 2 fixtures (+ old_core_replay's FIXTURE):
+31,328 sends, 0 non-fresh ids.
+
+**Laws** (bend/laws/hub.bend, proved in bend/proofs/hub.bend and
+bend/proofs/lib/hub-cold.bend, no unsafe): `HI.Split` says the two sides
+are right (hot ascending, old descending and all cold, no id on both,
+every id below `next_msg`); `split_at_init`, `split_kept_by_run` (every
+input kind, through `hub_run_replays` and `msg_ids_fresh`),
+`split_after_replay` (the boot's batch) prove it always holds.
+`ids_ascending`: every message is in send order. `cold_is_inert`: a
+fresh event does to `every` what it did to one list (`HI.apply1`: the
+new message last and its reply's settle, a state, a settle).
+`msgs_unique`, `msgs_kept` and `stop_leaves_no_queue` take `HI.Split`
+(proved by the three split laws) and keep their meaning over `every`;
+the walk laws (`hot_queued_for`, `hot_unanswered_for`, `hot_held`,
+`hot_woken`, `hot_his`) take it too. sha 1's index laws
+(`hot_is_the_hot_part`, `hot_at_init`, `hot_after_replay`,
+`hot_kept_by_run`, `hot_narrowed`) are replaced by the split laws.
+
+**Numbers** (his journal copy, 115,168 events, 29,506 messages; base
+a800e0f5d vs this sha; sb-core alone on its link):
+
+| step | base | split |
+|---|---|---|
+| say, median of 14 | 18.90 ms, 97.0M instructions | 2.01 ms, 19.7M instructions |
+| say, first | 15.4 ms | 2.3 ms |
+| tick after boot | 4.03 ms | 1.81 ms |
+| live tick | 1.82 ms, 16.94M instructions | 1.24 ms, 16.85M instructions |
+| view_all (31,150,434 bytes both) | 2978 ms | 1393 ms |
+| boot replay, machine alone (2 runs) | 8.0 / 8.0 s, 108.6G instructions | 7.5 / 7.9 s, 109.9G instructions |
+
+(load 21-28 but the replay row, run with heavy-run --alone; the
+replay's +1.2 % instructions include the runtime's worker spins: wall
+time is not worse.) Same answers: 242 steps of replay, view_all, ticks
+and says give the same bytes (view_all sha256 equal);
+`bench_byte_equal`: the same 5 digests; `old_core_replay` against
+v2026.10.2-28, -29 and main: green.
+
 ## Risks
 
 - A cold message that turns hot again (a state event on it): the index

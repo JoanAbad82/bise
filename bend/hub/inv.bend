@@ -43,7 +43,7 @@ def Below(ns: List<&2, Nat>, +n: Nat) -> Data:
 # delivery state, RFC 0003 §6.1): no two records share an id, and every
 # id is below the next free one (so a new message can never take one)
 def Unique(+s: M.St) -> Data:
-  X.Both<Distinct(ids(M.St.msgs(s))), Below(ids(M.St.msgs(s)), M.St.next_msg(s))>
+  X.Both<Distinct(ids(M.every(s))), Below(ids(M.every(s)), M.St.next_msg(s))>
 
 # `a` is the start of `b`
 def IsPrefix(a: List<&2, Nat>, b: List<&2, Nat>) -> Data:
@@ -58,7 +58,96 @@ def IsPrefix(a: List<&2, Nat>, b: List<&2, Nat>) -> Data:
 # law msgs_kept: the messages of a state, in order, start the messages
 # of any later state: a message once sent is never removed
 def Kept(+s1: M.St, +s2: M.St) -> Data:
-  IsPrefix(ids(M.St.msgs(s1)), ids(M.St.msgs(s2)))
+  IsPrefix(ids(M.every(s1)), ids(M.every(s2)))
+
+# ---- the split of the messages (issue 21 steps 3-4; laws split_*) ----
+
+# every id of `xs` is above `n`
+def Above(xs: List<&2, M.MRec>, +n: Nat) -> Data:
+  match xs:
+    case Nil{}:
+      Unit
+    case Con{+x, +t}:
+      X.Both<{Nat.is_gt(M.MRec.id(x), n) == True{} : Bool}, Above(t, n)>
+
+# ids ascending (each below every later one), descending
+def Asc(xs: List<&2, M.MRec>) -> Data:
+  match xs:
+    case Nil{}:
+      Unit
+    case Con{+x, +t}:
+      X.Both<Above(t, M.MRec.id(x)), Asc(t)>
+
+def Desc(xs: List<&2, M.MRec>) -> Data:
+  match xs:
+    case Nil{}:
+      Unit
+    case Con{+x, +t}:
+      X.Both<Below(ids(t), M.MRec.id(x)), Desc(t)>
+
+def AllCold(xs: List<&2, M.MRec>) -> Data:
+  match xs:
+    case Nil{}:
+      Unit
+    case Con{+x, +t}:
+      X.Both<{M.MRec.is_hot(x) == False{} : Bool}, AllCold(t)>
+
+# no id of `hs` is one of `os`
+def Disjoint(hs: List<&2, M.MRec>, +os: List<&2, M.MRec>) -> Data:
+  match hs:
+    case Nil{}:
+      Unit
+    case Con{+h, +t}:
+      X.Both<{M.nat_in(ids(os), M.MRec.id(h)) == False{} : Bool}, Disjoint(t, os)>
+
+# the two sides: hot ids ascending, old ids descending, every old one
+# cold, no id on both sides, every id below the next free one
+def Parts(+hs: List<&2, M.MRec>, +os: List<&2, M.MRec>, +nm: Nat) -> Data:
+  X.Both<Asc(hs), X.Both<Desc(os), X.Both<AllCold(os), X.Both<Disjoint(hs, os), X.Both<Below(ids(hs), nm), Below(ids(os), nm)>>>>>
+
+def Split(+s: M.St) -> Data:
+  Parts(M.St.hot(s), M.St.old(s), M.St.next_msg(s))
+
+# ---- every message as one list: what the split must keep (cold_is_inert) ----
+# The three message events on one list of every message, as model.bend's
+# apply did them before the split (issue 21 steps 3-4): a new message at
+# the end, settled by a reply from its recipient (or the user); a state
+# or a settle on the record of its id.
+def settle1.if(ok: Bool, +msgs: List<&2, M.MRec>, +id: Nat) -> List<&2, M.MRec>:
+  match ok:
+    case True{}:
+      M.map_msg(msgs, id, M.OSettle{})
+    case False{}:
+      msgs
+
+def settle1.go(orig: Maybe<&2, M.MRec>, +msgs: List<&2, M.MRec>, +id: Nat, +from: String) -> List<&2, M.MRec>:
+  match orig:
+    case None{}:
+      msgs
+    case Some{+o}:
+      settle1.if(String.eq(M.Msg.to(M.MRec.msg(o)), from) || String.eq(from, M.USER()), msgs, id)
+
+def settle1(r: Maybe<&2, Nat>, +msgs: List<&2, M.MRec>, +from: String) -> List<&2, M.MRec>:
+  match r:
+    case None{}:
+      msgs
+    case Some{+id}:
+      settle1.go(M.rec_of(msgs, id), msgs, id, from)
+
+def sent1(+msgs: List<&2, M.MRec>, +m: M.Msg) -> List<&2, M.MRec>:
+  settle1(M.Msg.reply_to(m), M.snoc(M.MRec, msgs, M.MRec{m, M.Queued{"new"}, False{}}), M.Msg.from(m))
+
+# every message after an event, on one list
+def apply1(+msgs: List<&2, M.MRec>, e: M.Ev) -> List<&2, M.MRec>:
+  match e:
+    case M.EMsgSent{+m}:
+      sent1(msgs, m)
+    case M.EMsgState{+id, +s}:
+      M.map_msg(msgs, id, M.OSt{s})
+    case M.ESettled{+id}:
+      M.map_msg(msgs, id, M.OSettle{})
+    case _:
+      msgs
 
 # the card ids, in the order of the state
 def card_ids(cs: List<&2, M.Card>) -> List<&2, Nat>:

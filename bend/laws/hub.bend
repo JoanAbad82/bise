@@ -16,6 +16,7 @@ import ../hub/gen/feed.bend as HFD
 import ../hub/pause.bend as HP
 import ../hub/reach.bend as HR
 import ../hub/answers.bend as HA
+import ../hub/cold.bend as CO
 
 # ---- Switchboard hub (hub/*.bend, the sb-core process) ----
 # The laws quantify over EVERY hub state, EVERY input (any JSON line the
@@ -206,12 +207,12 @@ law resumed_line_resumes:
 law pause_keeps_order:
   for +s: HM.St
   for +at: Nat
-  {HM.St.msgs(HM.apply(s, HM.EPaused{at})) == HM.St.msgs(s) : List<&2, HM.MRec>}
+  {HM.every(HM.apply(s, HM.EPaused{at})) == HM.every(s) : List<&2, HM.MRec>}
 
 law resume_keeps_order:
   for +s: HM.St
   for +at: Nat
-  {HM.St.msgs(HM.apply(s, HM.EResumed{at})) == HM.St.msgs(s) : List<&2, HM.MRec>}
+  {HM.every(HM.apply(s, HM.EResumed{at})) == HM.every(s) : List<&2, HM.MRec>}
 
 # ---- the watches of `sb wake` (event-wake, hub/wakes.bend) ----
 # Their lines (wake_set, wake_end) are events like the others: the replay
@@ -424,20 +425,26 @@ law init_unique:
   for +w: String
   HI.Unique(HM.init(w))
 
-# LAW (L2): from a state where each message is one record, any sequence
-# of inputs keeps it so: no two records ever share an id.
+# LAW (L2): from a state whose messages are split right (HI.Split: every
+# state the hub reaches, by split_at_init and split_kept_by_run), any
+# sequence of inputs keeps each message one record: no two records ever
+# share an id, every id is below the next free one.
 law msgs_unique:
   for +ins: List<&2, J.Json>
   for +h: HC.Hub
-  for u: HI.Unique(HC.Hub.d(h))
+  for u: HI.Split(HC.Hub.d(h))
   HI.Unique(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))))
 
 # LAW (L2): over any sequence of inputs, the messages of the first state
 # start, in order, the messages of the last: a message once sent is never
-# removed (its record, and so its state, stays).
+# removed (its record, and so its state, stays). Every message is
+# HM.every, the two sides put together; the hypothesis HI.Split holds in
+# every state the hub reaches: split_at_init and split_kept_by_run prove
+# it, for every input kind, and split_after_replay for the boot replay.
 law msgs_kept:
   for +ins: List<&2, J.Json>
   for +h: HC.Hub
+  for u: HI.Split(HC.Hub.d(h))
   HI.Kept(HC.Hub.d(h), HC.Hub.d(HC.RunR.hub(HC.run(ins, h))))
 
 # LAW (L3, delivered at most once, RFC 0003 §6.1): over any sequence of
@@ -450,20 +457,18 @@ law delivered_once:
   for +h: HC.Hub
   HX.Deliv(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h))
 
-# LAW (L12): stopping or dropping a task, in any state where each message
-# is one record (every state the hub reaches: msgs_unique) and the hot
-# index is right (hot_kept_by_run), leaves no message queued for it among
-# all its messages (each got recipient_unavailable). queued_for reads the
-# same (hot_queued_for).
+# LAW (L12): stopping or dropping a task, in any state whose messages are
+# split right (every state the hub reaches: split_kept_by_run), leaves no
+# message queued for it among all its messages (each got
+# recipient_unavailable). queued_for reads the same (hot_queued_for).
 law stop_leaves_no_queue:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +n: String
   for +life: HM.Life
   for +why: String
-  for u: HI.Unique(HX.d(o, cx))
-  for k: {HM.hot_of(HM.St.hot(HX.d(o, cx))) == HM.hot_of(HM.St.msgs(HX.d(o, cx))) : List<&2, HM.MRec>}
-  {HM.queued_in(HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n)) == Nil{} : List<&2, HM.Msg>}
+  for u: HI.Split(HX.d(o, cx))
+  {HM.queued_in(HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n)) == Nil{} : List<&2, HM.Msg>}
 
 # ---- queued user input (the window's "send queued", bise desktop) ----
 # The user's `input {queued: true}` is a queued-mode message (Msg.queued),
@@ -864,74 +869,82 @@ law names_apart:
   for u: HI.NamesApart(HC.Hub.d(h))
   HI.NamesApart(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))))
 
-# ---- the hot messages (issue 21): St.hot, the walks' index ----
-# St.msgs keeps every message (msgs_unique, msgs_kept unchanged); St.hot
-# is a part of it, in its order, with the same hot part (HM.MRec.is_hot:
-# queued, or owing a reply): exactly the hot messages after a message
-# event, every message after a boot replay (HM.hot_all). The walks read
-# St.hot; these laws say its hot part is always msgs', and that each
-# walk reads the same over it as over every message.
+# ---- the split messages (issue 21 steps 3-4): St.hot and St.old ----
+# The messages are two lists: St.hot, the hot ones (HM.MRec.is_hot:
+# queued, or owing a reply), ids ascending, what the walks read; and
+# St.old, the cold ones, ids descending (newest first), which a step
+# reads only by id. HM.every puts them back together, in send order: what
+# the laws msgs_unique, msgs_kept and view_all read. HI.Split says the
+# two sides are right; these laws say it always holds, and that each
+# message event does on the split what it did on one list.
 
-# LAW: any event keeps the index: if a state's index has the hot part of
-# its messages, the state after the event's has too.
-law hot_is_the_hot_part:
-  for +s: HM.St
-  for +e: HM.Ev
-  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
-  {HM.hot_of(HM.St.hot(HM.apply(s, e))) == HM.hot_of(HM.St.msgs(HM.apply(s, e))) : List<&2, HM.MRec>}
-
-# LAW: a new hub's index is right...
-law hot_at_init:
+# LAW: a new hub's split is right...
+law split_at_init:
   for +w: String
-  {HM.hot_of(HM.St.hot(HM.init(w))) == HM.hot_of(HM.St.msgs(HM.init(w))) : List<&2, HM.MRec>}
+  HI.Split(HM.init(w))
 
-# ...a boot replay's too (apply_rev leaves it; replay_many sets it to
-# every message at the end of its batch)...
-law hot_after_replay:
-  for +s: HM.St
-  {HM.hot_of(HM.St.hot(HM.hot_all(s))) == HM.hot_of(HM.St.msgs(HM.hot_all(s))) : List<&2, HM.MRec>}
-
-# ...and any sequence of inputs keeps it right.
-law hot_kept_by_run:
+# ...any sequence of inputs keeps it right (every input kind: each event
+# it journals is fresh, msg_ids_fresh)...
+law split_kept_by_run:
   for +ins: List<&2, J.Json>
   for +h: HC.Hub
-  for u: {HM.hot_of(HM.St.hot(HC.Hub.d(h))) == HM.hot_of(HM.St.msgs(HC.Hub.d(h))) : List<&2, HM.MRec>}
-  {HM.hot_of(HM.St.hot(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))))) == HM.hot_of(HM.St.msgs(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))))) : List<&2, HM.MRec>}
+  for u: HI.Split(HC.Hub.d(h))
+  HI.Split(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))))
 
-# LAW: a message event narrows the index to the hot messages exactly.
-law hot_narrowed:
+# ...and so does a boot replay's batch (it skips a message_sent whose id is
+# below next_msg: CO.replay_fresh).
+law split_after_replay:
+  for +ms: List<&2, Maybe<&2, HM.Ev>>
+  for +st: HM.St
+  for +i: Nat
+  for +sk: List<&2, Nat>
+  for u: HI.Split(st)
+  HI.Split(Pair.fst(HM.St, List<&2, Nat>, CO.replay_batch(ms, st, i, sk)))
+
+# LAW: every message of a split state is in send order: ids ascending.
+law ids_ascending:
   for +s: HM.St
-  for +m: HM.Msg
-  {HM.St.hot(HM.apply(s, HM.EMsgSent{m})) == HM.hot_of(HM.St.msgs(HM.apply(s, HM.EMsgSent{m}))) : List<&2, HM.MRec>}
+  for u: HI.Split(s)
+  HI.Asc(HM.every(s))
 
-# LAW: with a right index, each walk over the hot messages reads what it
+# LAW: the cold ones are inert: on a split state, any event with a fresh
+# id does to every message what it did to one list of them (HI.apply1:
+# the new message last and its reply's settle, a state, a settle).
+law cold_is_inert:
+  for +s: HM.St
+  for +e: HM.Ev
+  for u: HI.Split(s)
+  for k: HX.FreshEv(s, e)
+  {HM.every(HM.apply(s, e)) == HI.apply1(HM.every(s), e) : List<&2, HM.MRec>}
+
+# LAW: on a split state, each walk over the hot side reads what it
 # would read over every message: the cold ones are inert. The queues...
 law hot_queued_for:
   for +s: HM.St
   for +n: String
-  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
-  {HM.queued_for(s, n) == HM.queued_in(HM.St.msgs(s), HM.names_of(s, n)) : List<&2, HM.Msg>}
+  for h: HI.Split(s)
+  {HM.queued_for(s, n) == HM.queued_in(HM.every(s), HM.names_of(s, n)) : List<&2, HM.Msg>}
 
 # ...the replies owed...
 law hot_unanswered_for:
   for +s: HM.St
   for +n: String
-  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
-  {HM.unanswered_for(s, n) == HM.unanswered_in(HM.St.msgs(s), HM.names_of(s, n)) : List<&2, HM.Msg>}
+  for h: HI.Split(s)
+  {HM.unanswered_for(s, n) == HM.unanswered_in(HM.every(s), HM.names_of(s, n)) : List<&2, HM.Msg>}
 
 # ...and the pause's counts: the messages held, the agents a resume
 # wakes, the held messages that are not bise's own.
 law hot_held:
   for +s: HM.St
-  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
-  {HP.held(s) == HP.held.go(HM.St.msgs(s)) : Nat}
+  for h: HI.Split(s)
+  {HP.held(s) == HP.held.go(HM.every(s)) : Nat}
 
 law hot_woken:
   for +s: HM.St
-  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
-  {HP.woken(s) == List.length(&2, String, HP.woken.go(HM.St.msgs(s), Nil{})) : Nat}
+  for h: HI.Split(s)
+  {HP.woken(s) == List.length(&2, String, HP.woken.go(HM.every(s), Nil{})) : Nat}
 
 law hot_his:
   for +s: HM.St
-  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
-  {HP.his(s) == HP.his.go(HM.St.msgs(s)) : Nat}
+  for h: HI.Split(s)
+  {HP.his(s) == HP.his.go(HM.every(s)) : Nat}

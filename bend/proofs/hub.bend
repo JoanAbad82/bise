@@ -19,6 +19,11 @@ import ../hub/lazy.bend as HLZ
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
 import ./lib/hub-3.bend as PL3
+import ./lib/hub-cold.bend as PLC
+import ./lib/hub-cold-2.bend as PLC2
+import ./lib/hub-cold-3.bend as PLC3
+import ./lib/hub-cold-4.bend as PLC4
+import ../hub/cold.bend as CO
 import ../laws/hub.bend as Laws
 
 def Laws.hub_step_replays(h, i):
@@ -77,13 +82,13 @@ def Laws.init_unique(w):
   HX.Both{Unit{}, Unit{}}
 
 def Laws.msgs_unique(ins, h, u):
-  PL1.hub_unique_tr(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))), HM.apply_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h)),
-    Laws.hub_run_replays(ins, h),
-    PL1.hub_apply_all_unique(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h), u, Laws.msg_ids_fresh(ins, h)))
+  PLC4.hc_unique(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))),
+    PLC4.hc_split_tr(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))), HM.apply_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h)), Laws.hub_run_replays(ins, h),
+      PLC4.hc_split_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h), u, Laws.msg_ids_fresh(ins, h))))
 
-def Laws.msgs_kept(ins, h):
+def Laws.msgs_kept(ins, h, u):
   PL1.hub_kept_tr(HC.Hub.d(h), HC.Hub.d(HC.RunR.hub(HC.run(ins, h))), HM.apply_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h)),
-    Laws.hub_run_replays(ins, h), PL1.hub_apply_all_kept(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h)))
+    Laws.hub_run_replays(ins, h), PLC4.hc_kept_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h), u, Laws.msg_ids_fresh(ins, h)))
 
 def Laws.delivered_once(ins, h):
   match ins:
@@ -96,7 +101,7 @@ def Laws.delivered_once(ins, h):
           HC.Hub.d(HC.Out.hub(HC.commit(h, i))), HM.apply_all(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.Hub.d(h)),
           PL1.hub_commit_ok(h, i), Laws.delivered_once(rest, HC.Out.hub(HC.commit(h, i)))))
 
-def Laws.stop_leaves_no_queue(o, cx, n, life, why, u, k):
+def Laws.stop_leaves_no_queue(o, cx, n, life, why, u):
   +cx1 = HC.out(o, cx, [J.kv("fx", J.JStr{"kill"}), J.kv("agent", J.JStr{n})])
   +cx2 = HC.fail_waiters(o, cx1, n, "stopped")
   +r = HC.rr(o, cx2)
@@ -105,7 +110,7 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u, k):
   +cx4 = HC.upd_rt(o, cx3, x4)
   +ev = {HM.ELifecycle{n, life, Bool.pick(Maybe<&2, String>, String.is_empty(why), None{}, Some{why})} : HM.Ev}
   +cx5 = HC.emit(o, cx4, ev, Unit{}, Unit{}, Unit{})
-  +m5 = HM.St.msgs(HX.d(o, cx5))
+  +m5 = HM.every(HX.d(o, cx5))
   +n5 = HM.names_of(HX.d(o, cx5), n)
   # stop_task rejects the queued ones it finds in the hot index
   +ids = HC.ids_of(HM.queued_in(HM.St.hot(HX.d(o, cx5)), n5))
@@ -118,27 +123,20 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u, k):
     Equal.trans(HM.St, HX.d(o, cx3), HX.d(o, cx2), HX.d(o, cx), PL1.hub_d_with_r(o, cx2, HX.R.with_steered(r, HKL.steer_del(HX.R.steered(r), n))),
       Equal.trans(HM.St, HX.d(o, cx2), HX.d(o, cx1), HX.d(o, cx), PL1.hub_d_fail_waiters(o, cx1, n, "stopped"),
         PL1.hub_d_hout(o, cx, [J.kv("fx", J.JStr{"kill"}), J.kv("agent", J.JStr{n})]))))
-  # the messages of cx5 are those of cx
-  +e5 = Equal.trans(List<&2, HM.MRec>, m5, HM.St.msgs(HM.apply(HX.d(o, cx4), ev)), HM.St.msgs(HX.d(o, cx)),
-    Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.St.msgs(s), HX.d(o, cx5), HM.apply(HX.d(o, cx4), ev), PL1.hub_d_emit(o, cx4, ev, Unit{}, Unit{}, Unit{})),
-    Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HM.apply(HX.d(o, cx4), ev)), HM.St.msgs(HX.d(o, cx4)), HM.St.msgs(HX.d(o, cx)),
-      PL1.hub_msgs_life(HX.d(o, cx4), n, life, Bool.pick(Maybe<&2, String>, String.is_empty(why), None{}, Some{why})),
-      PL1.hub_msgs_eq(o, cx4, cx, e4)))
-  # the index of cx5 is right, so its queued ones are all of them
-  +k5 = PL3.hub_hot_tr(HX.d(o, cx5), HM.apply(HX.d(o, cx4), ev), PL1.hub_d_emit(o, cx4, ev, Unit{}, Unit{}, Unit{}),
-    PL3.hub_hot_life(HX.d(o, cx4), n, life, Bool.pick(Maybe<&2, String>, String.is_empty(why), None{}, Some{why}),
-      PL3.hub_hot_tr(HX.d(o, cx4), HX.d(o, cx), e4, k)))
-  +hq = PL3.hub_hot_qf(HX.d(o, cx5), n, k5)
+  # the split of cx5 is right, so its queued ones are all of them
+  +sp5 = PLC4.hc_split_tr(HX.d(o, cx5), HM.apply(HX.d(o, cx4), ev), PL1.hub_d_emit(o, cx4, ev, Unit{}, Unit{}, Unit{}),
+    PLC4.hc_split_apply(HX.d(o, cx4), ev, PLC4.hc_split_tr(HX.d(o, cx4), HX.d(o, cx), e4, u), Unit{}))
+  +hq = PL3.hub_hot_qf(HX.d(o, cx5), n, PLC4.hc_hot_index(HX.d(o, cx5), sp5))
   # the messages at the end: those of cx5 with the queued ones rejected
-  +ef = Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.msgs(HX.d(o, g)), PL1.hub_rej(ids, m5),
-    Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.msgs(HX.d(o, tg)), HM.St.msgs(HX.d(o, g)),
-      Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.msgs(HX.d(o, wg)), HM.St.msgs(HX.d(o, tg)),
+  +ef = Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.every(HX.d(o, g)), PL1.hub_rej(ids, m5),
+    Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.every(HX.d(o, tg)), HM.every(HX.d(o, g)),
+      Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.every(HX.d(o, wg)), HM.every(HX.d(o, tg)),
         PL1.hub_msgs_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
         PL1.hub_msgs_wakes(o, life, tg, n)),
       PL2.hub_msgs_gone(o, HR.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
-    Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, g)), HM.St.msgs(HX.d(o, cx6)), PL1.hub_rej(ids, m5),
+    Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, g)), HM.every(HX.d(o, cx6)), PL1.hub_rej(ids, m5),
       PL2.hub_msgs_close_ids(o, HC.card_ids(HM.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
-      PL1.hub_msgs_reject(o, ids, cx5)))
+      PLC4.hc_every_reject(o, ids, cx5, sp5)))
   # the names at the end: those of cx5 (no agent changes after it)
   +en = Equal.cong(List<&2, HM.Agent>, List<&2, String>, xs => n <> HM.names_of.go(HM.agent_named(xs, n)),
     HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, cx5)),
@@ -151,12 +149,10 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u, k):
       Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, g)), HM.St.agents(HX.d(o, cx6)), HM.St.agents(HX.d(o, cx5)),
         PL2.hub_agents_close_ids(o, HC.card_ids(HM.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
         PL2.hub_agents_reject(o, ids, cx5))))
-  PL2.hub_names_tr(HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL1.hub_rej(ids, m5), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n), n5, ef, en,
+  PL2.hub_names_tr(HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL1.hub_rej(ids, m5), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n), n5, ef, en,
     Equal.trans(List<&2, HM.Msg>, HM.queued_in(PL1.hub_rej(ids, m5), n5), HM.queued_in(PL1.hub_rej(HC.ids_of(HM.queued_in(m5, n5)), m5), n5), Nil{},
       Equal.cong(List<&2, HM.Msg>, List<&2, HM.Msg>, x => HM.queued_in(PL1.hub_rej(HC.ids_of(x), m5), n5), HM.queued_in(HM.St.hot(HX.d(o, cx5)), n5), HM.queued_in(m5, n5), hq),
-      PL1.hub_K(m5, n5, PL1.hub_distinct_tr(HI.ids(m5), HI.ids(HM.St.msgs(HX.d(o, cx))),
-        Equal.cong(List<&2, HM.MRec>, List<&2, Nat>, xs => HI.ids(xs), m5, HM.St.msgs(HX.d(o, cx)), e5),
-        PL1.hub_fst(HI.Distinct(HI.ids(HM.St.msgs(HX.d(o, cx)))), HI.Below(HI.ids(HM.St.msgs(HX.d(o, cx))), HM.St.next_msg(HX.d(o, cx))), u)))))
+      PL1.hub_K(m5, n5, PL1.hub_fst(HI.Distinct(HI.ids(m5)), HI.Below(HI.ids(m5), HM.St.next_msg(HX.d(o, cx5))), PLC4.hc_unique(HX.d(o, cx5), sp5)))))
 
 def Laws.stop_leaves_no_card(o, cx, n, life, why, u):
   +cx1 = HC.out(o, cx, [J.kv("fx", J.JStr{"kill"}), J.kv("agent", J.JStr{n})])
@@ -583,92 +579,21 @@ def Laws.xhub_ask_needs_words(text, b, e):
 
 # ---- the hot messages (issue 21) ----
 
-def Laws.hot_is_the_hot_part(s, e, h):
-  match s:
-    case HM.St{ag, od, ms, cs, ns, nm, nc, tm, xs, pz, ho}:
-      match e:
-        case HM.ETaskCreated{a, b, c, d, f}:
-          h
-        case HM.ELifecycle{a, b, c}:
-          h
-        case HM.EWorkspace{a, b}:
-          h
-        case HM.ESnapshot{a, b}:
-          h
-        case HM.EDeclared{a, b, c}:
-          h
-        case HM.EReported{a, b}:
-          h
-        case HM.EFileTouched{a, b}:
-          h
-        case HM.ERenamed{a, b}:
-          h
-        case HM.EMsgSent{m}:
-          PL3.hub_hot_idem(HM.apply.settle(HM.Msg.reply_to(m), HM.snoc(HM.MRec, ms, HM.MRec{m, HM.Queued{"new"}, False{}}), HM.Msg.from(m)))
-        case HM.EMsgState{i, st}:
-          PL3.hub_hot_idem(HM.map_msg(ms, i, HM.OSt{st}))
-        case HM.ESettled{i}:
-          PL3.hub_hot_idem(HM.map_msg(ms, i, HM.OSettle{}))
-        case HM.ECardOpened{c}:
-          h
-        case HM.ECardClosed{i, r, a}:
-          h
-        case HM.ECardAnswerPos{i, r, a}:
-          h
-        case HM.EMainNote{t, a}:
-          h
-        case HM.ENotesFlushed{}:
-          h
-        case HM.ETimerSet{t, a}:
-          h
-        case HM.ETimerFired{i, f, n, a, u}:
-          h
-        case HM.ETimerRun{i, a}:
-          h
-        case HM.ETimerStop{i, w, a}:
-          h
-        case HM.ETimerName{i, n, b, a}:
-          h
-        case HM.EX{x}:
-          h
-        case HM.EAct{x}:
-          h
-        case HM.EFollow{n, o, b}:
-          h
-        case HM.EJobEnd{n, st}:
-          h
-        case HM.EWake{x}:
-          h
-        case HM.EPaused{a}:
-          h
-        case HM.EResumed{a}:
-          h
+def Laws.split_at_init(w):
+  HX.Both{Unit{}, HX.Both{Unit{}, HX.Both{Unit{}, HX.Both{Unit{}, HX.Both{Unit{}, Unit{}}}}}}
 
-def Laws.hot_at_init(w):
-  {==}
+def Laws.split_kept_by_run(ins, h, u):
+  PLC4.hc_split_tr(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))), HM.apply_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h)), Laws.hub_run_replays(ins, h),
+    PLC4.hc_split_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h), u, Laws.msg_ids_fresh(ins, h)))
 
-def Laws.hot_after_replay(s):
-  match s:
-    case HM.St{ag, od, ms, cs, ns, nm, nc, tm, xs, pz, ho}:
-      {==}
+def Laws.split_after_replay(ms, st, i, sk, u):
+  PLC4.hc_replay_batch(ms, st, i, sk, u)
 
-def Laws.hot_narrowed(s, m):
-  match s:
-    case HM.St{ag, od, ms, cs, ns, nm, nc, tm, xs, pz, ho}:
-      {==}
+def Laws.ids_ascending(s, u):
+  PLC2.hc_every_asc(HM.St.hot(s), HM.St.old(s), HM.St.next_msg(s), u)
 
-# a replay keeps the index right, event by event
-def hub_hot_all(+evs: List<&2, HM.Ev>, +s: HM.St, h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>})
-    -> {HM.hot_of(HM.St.hot(HM.apply_all(evs, s))) == HM.hot_of(HM.St.msgs(HM.apply_all(evs, s))) : List<&2, HM.MRec>}:
-  match evs:
-    case Nil{}:
-      h
-    case Con{e, rest}:
-      hub_hot_all(rest, HM.apply(s, e), Laws.hot_is_the_hot_part(s, e, h))
-
-def Laws.hot_kept_by_run(ins, h, u):
-  %Equal.sym(HM.St, HC.Hub.d(HC.RunR.hub(HC.run(ins, h))), HM.apply_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h)), Laws.hub_run_replays(ins, h)) : {HM.hot_of(HM.St.hot(_)) == HM.hot_of(HM.St.msgs(_)) : List<&2, HM.MRec>}
-  hub_hot_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h), u)
+def Laws.cold_is_inert(s, e, u, k):
+  PLC4.hc_every_apply(s, e, u, PLC4.hc_fresh_ge(s, e, k))
 
 # a cold message owes no reply (PL3.hub_or_false_l: and is not queued)
 def hub_or_false_r(+x: Bool, -y: Bool, e: {Bool.or(x, y) == False{} : Bool}) -> {y == False{} : Bool}:
@@ -777,20 +702,20 @@ def hub_wk_hot(+xs: List<&2, HM.MRec>, +acc: List<&2, String>) -> {HP.woken.go(x
         hub_wk_hot(t, acc))
 
 def Laws.hot_queued_for(s, n, h):
-  PL3.hub_hot_qf(s, n, h)
+  PL3.hub_hot_qf(s, n, PLC4.hc_hot_index(s, h))
 
 def Laws.hot_unanswered_for(s, n, h):
-  PL3.hub_via_hot(List<&2, HM.Msg>, x => HM.unanswered_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.St.msgs(s),
-    hub_ui_hot(HM.St.hot(s), HM.names_of(s, n)), hub_ui_hot(HM.St.msgs(s), HM.names_of(s, n)), h)
+  PL3.hub_via_hot(List<&2, HM.Msg>, x => HM.unanswered_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.every(s),
+    hub_ui_hot(HM.St.hot(s), HM.names_of(s, n)), hub_ui_hot(HM.every(s), HM.names_of(s, n)), PLC4.hc_hot_index(s, h))
 
 def Laws.hot_held(s, h):
-  PL3.hub_via_hot(Nat, x => HP.held.go(x), HM.St.hot(s), HM.St.msgs(s), hub_held_hot(HM.St.hot(s)), hub_held_hot(HM.St.msgs(s)), h)
+  PL3.hub_via_hot(Nat, x => HP.held.go(x), HM.St.hot(s), HM.every(s), hub_held_hot(HM.St.hot(s)), hub_held_hot(HM.every(s)), PLC4.hc_hot_index(s, h))
 
 def Laws.hot_woken(s, h):
-  PL3.hub_via_hot(Nat, x => List.length(&2, String, HP.woken.go(x, Nil{})), HM.St.hot(s), HM.St.msgs(s),
+  PL3.hub_via_hot(Nat, x => List.length(&2, String, HP.woken.go(x, Nil{})), HM.St.hot(s), HM.every(s),
     Equal.cong(List<&2, String>, Nat, y => List.length(&2, String, y), HP.woken.go(HM.St.hot(s), Nil{}), HP.woken.go(HM.hot_of(HM.St.hot(s)), Nil{}), hub_wk_hot(HM.St.hot(s), Nil{})),
-    Equal.cong(List<&2, String>, Nat, y => List.length(&2, String, y), HP.woken.go(HM.St.msgs(s), Nil{}), HP.woken.go(HM.hot_of(HM.St.msgs(s)), Nil{}), hub_wk_hot(HM.St.msgs(s), Nil{})),
-    h)
+    Equal.cong(List<&2, String>, Nat, y => List.length(&2, String, y), HP.woken.go(HM.every(s), Nil{}), HP.woken.go(HM.hot_of(HM.every(s)), Nil{}), hub_wk_hot(HM.every(s), Nil{})),
+    PLC4.hc_hot_index(s, h))
 
 def Laws.hot_his(s, h):
-  PL3.hub_via_hot(Nat, x => HP.his.go(x), HM.St.hot(s), HM.St.msgs(s), hub_his_hot(HM.St.hot(s)), hub_his_hot(HM.St.msgs(s)), h)
+  PL3.hub_via_hot(Nat, x => HP.his.go(x), HM.St.hot(s), HM.every(s), hub_his_hot(HM.St.hot(s)), hub_his_hot(HM.every(s)), PLC4.hc_hot_index(s, h))

@@ -108,19 +108,62 @@ def ids_in(ids: List<&2, Nat>, +xs: List<&2, M.MRec>) -> Bool:
     case Con{+i, +t}:
       LZ.and(Maybe.is_some(&2, M.MRec, M.rec_of(xs, i)), u => ids_in(t, xs))
 
+# the lowest id of `ids` (0 when none)
+def ids_lo.go(ids: List<&2, Nat>, +acc: Nat) -> Nat:
+  match ids:
+    case Nil{}:
+      acc
+    case Con{+i, +t}:
+      ids_lo.go(t, Nat.min(acc, i))
+
+def ids_lo(ids: List<&2, Nat>) -> Nat:
+  match ids:
+    case Nil{}:
+      0n
+    case Con{+i, +t}:
+      ids_lo.go(t, i)
+
+# the head of `xs` has an id below `lo`
+def id_below(xs: List<&2, M.MRec>, +lo: Nat) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case Con{+h, _}:
+      Nat.is_lt(M.MRec.id(h), lo)
+
+# the cold messages of `ids`, newest first: St.old is newest first, so the
+# walk stops at the first id below the lowest one asked (`below`)
+def old_of(xs: List<&2, M.MRec>, below: Bool, +ids: List<&2, Nat>, +lo: Nat) -> List<&2, M.MRec>:
+  match xs below:
+    case Nil{} _:
+      Nil{}
+    case Con{_, _} True{}:
+      Nil{}
+    case Con{+r, +t} False{}:
+      +rest = old_of(t, id_below(t, lo), ids, lo)
+      Bool.pick(List<&2, M.MRec>, M.nat_in(ids, M.MRec.id(r)), r <> rest, rest)
+
 # where the view finds the step's messages (issue 21): the hot ones when
 # they are all there (a message sent and still queued, or owing a reply);
-# a message the step just turned cold is in msgs only, and all of them
-# (view_all) are msgs
-def view_recs.go(every: Bool, +s: M.St) -> List<&2, M.MRec>:
+# else the hot ones with the cold ones of `ids` (a message the step just
+# turned cold), in send order; all of them (view_all): M.every
+def view_recs.some(here: Bool, +s: M.St, +ids: List<&2, Nat>) -> List<&2, M.MRec>:
+  match here:
+    case True{}:
+      M.St.hot(s)
+    case False{}:
+      +lo = ids_lo(ids)
+      List.reverse(&2, M.MRec, M.ins_all(M.St.hot(s), old_of(M.St.old(s), id_below(M.St.old(s), lo), ids, lo)))
+
+def view_recs.go(every: Bool, +s: M.St, +ids: List<&2, Nat>) -> List<&2, M.MRec>:
   match every:
     case True{}:
-      M.St.msgs(s)
+      M.every(s)
     case False{}:
-      M.St.hot(s)
+      view_recs.some(ids_in(ids, M.St.hot(s)), s, ids)
 
 def view_recs(+s: M.St, +all: Bool, +ids: List<&2, Nat>) -> List<&2, M.MRec>:
-  view_recs.go(all || Bool.not(ids_in(ids, M.St.hot(s))), s)
+  view_recs.go(all, s, ids)
 
 # the messages of the view: no walk of every message when the step
 # touched none (an idle tick)

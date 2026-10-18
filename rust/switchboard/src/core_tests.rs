@@ -3659,26 +3659,26 @@ fn a_batched_replay_builds_the_same_state_as_one_event_at_a_time() {
         json!({"type": "message_sent", "msg": {"id": id, "thread": id, "from": from, "to": to, "reply_to": reply,
             "expect_reply": reply.is_none(), "auto": false, "text": format!("fake {}", id), "created_ms": 1000 + id, "plain": true}})
     };
-    for id in 1..=1200u64 {
-        ev.push(msg(id, "main", "a", None));
-        if id % 3 == 0 {
-            ev.push(json!({"type": "message_state", "id": id, "state": "delivered"}));
+    let q = |k: u64| k + (k - 1) / 5; // the k-th question's id: ids in send order (a replay skips one below next_msg)
+    for k in 1..=1200u64 {
+        ev.push(msg(q(k), "main", "a", None));
+        if k % 3 == 0 {
+            ev.push(json!({"type": "message_state", "id": q(k), "state": "delivered"}));
         }
-        if id % 5 == 0 {
+        if k % 5 == 0 {
             // an answer to an old question settles it (across batches)
-            ev.push(msg(id + 100_000, "a", "main", Some(id / 2)));
+            ev.push(msg(q(k) + 1, "a", "main", Some(q(k / 2))));
         }
-        if id % 7 == 0 {
-            ev.push(json!({"type": "message_settled", "id": id - 6}));
+        if k % 7 == 0 {
+            ev.push(json!({"type": "message_settled", "id": q(k - 6)}));
         }
-        if id == 600 {
+        if k == 600 {
             ev.push(json!({"type": "from_a_newer_hub", "name": "a"}));
         }
     }
     ev.push(json!({"type": "message_state", "id": 1, "state": "read"}));
     let mut batched = Hub::new("/w");
-    let skipped = batched.replay(&ev);
-    assert_eq!(skipped, vec![json!({"type": "from_a_newer_hub", "name": "a"})]);
+    assert_eq!(batched.replay(&ev), vec![json!({"type": "from_a_newer_hub", "name": "a"})]);
     let mut one = Hub::new("/w");
     for e in &ev {
         one.raw(&json!({"t": "replay", "ev": e}));

@@ -3,15 +3,10 @@
 # Rust daemon keeps a read-only mirror of it (rust/switchboard/src/
 # model.rs) fed by the journal events the hub emits.
 import Base
-
 import ../vendor/json.bend as J
-
 import ./timers.bend as TM
-
 import ./wakes.bend as WK
-
 import ./xhub-model.bend as XH
-
 import ./lazy.bend as LZ
 
 type Life is Data:
@@ -73,12 +68,12 @@ type Agent is Data:
     snap: Maybe<&2, String>, follow: Maybe<&2, String>}
 
 type St is Data:
-  St{agents: List<&2, Agent>, order: List<&2, String>, msgs: List<&2, MRec>,
+  St{agents: List<&2, Agent>, order: List<&2, String>, hot: List<&2, MRec>,
     cards: List<&2, Card>, notes: List<&2, String>, next_msg: Nat,
     next_card: Nat, tm: TM.Tms, x: XH.Xs, paused: Maybe<&2, Nat>,
-    hot: List<&2, MRec>}
+    old: List<&2, MRec>}
 # paused: the project's pause (cost-pause, hub/pause.bend), since that
-# ms; None: it runs
+# ms; None: it runs. hot and old: the messages, split (issue 21, St.hot)
 
 type Ev is Data:
   ETaskCreated{name: String, parent: String, brief: J.Json, ws: J.Json, at: Nat}
@@ -209,10 +204,13 @@ def St.order(x: St) -> List<&2, String>:
     case St{_, +order, _, _, _, _, _, _, _, _, _}:
       order
 
-def St.msgs(x: St) -> List<&2, MRec>:
+# the messages a step can still change or must read (MRec.is_hot:
+# queued, or owing a reply), ids ascending (their send order). The
+# walks (queued_for, unanswered_for, the pause's) read these only.
+def St.hot(x: St) -> List<&2, MRec>:
   match x:
-    case St{_, _, +msgs, _, _, _, _, _, _, _, _}:
-      msgs
+    case St{_, _, +hot, _, _, _, _, _, _, _, _}:
+      hot
 
 def St.cards(x: St) -> List<&2, Card>:
   match x:
@@ -244,17 +242,13 @@ def St.x(x: St) -> XH.Xs:
     case St{_, _, _, _, _, _, _, _, +xs, _, _}:
       xs
 
-# the walks' index: a part of msgs, in its order, holding every hot
-# message (MRec.is_hot) and maybe some cold ones: its hot part is msgs'
-# (law hot_is_the_hot_part). A message event narrows it to the hot
-# messages exactly; after a boot replay it is every message (hot_all).
-# On purpose: a superset gives the walks the same answers (laws
-# hot_queued_for...), and a filter per replay batch cost a boot 1.3 s
-# (issue 21 sha 1). Do not turn hot_all into hot_of.
-def St.hot(x: St) -> List<&2, MRec>:
+# every other message (cold: delivered, rejected or cancelled, owing
+# nothing), newest first (ids descending): a lookup by a recent id stops
+# near the head, and a message that turns cold goes in at the head
+def St.old(x: St) -> List<&2, MRec>:
   match x:
-    case St{_, _, _, _, _, _, _, _, _, _, +hot}:
-      hot
+    case St{_, _, _, _, _, _, _, _, _, _, +old}:
+      old
 
 def St.paused(x: St) -> Maybe<&2, Nat>:
   match x:
@@ -351,50 +345,7 @@ def maybe_nat_is(m: Maybe<&2, Nat>, +n: Nat) -> Bool:
     case Some{+x}:
       Nat.is_eq(x, n)
 
-def one_line.push(empty: Bool, +word: String, +acc: List<&2, String>) -> List<&2, String>:
-  match empty:
-    case True{}:
-      acc
-    case False{}:
-      snoc(String, acc, String.reverse(word))
-
-# matches, not Bool.pick: pick would push (snoc, reverse) at every char
-def one_line.word(space: Bool, +c: Char, +word: String) -> String:
-  match space:
-    case True{}:
-      ""
-    case False{}:
-      SCon{c, word}
-
-def one_line.acc(space: Bool, +word: String, +acc: List<&2, String>) -> List<&2, String>:
-  match space:
-    case True{}:
-      one_line.push(String.is_empty(word), word, acc)
-    case False{}:
-      acc
-
-# one line: whitespace runs collapse (util::one_line)
-def one_line.go(s: String, +word: String, +acc: List<&2, String>) -> List<&2, String>:
-  match s:
-    case SNil{}:
-      one_line.push(String.is_empty(word), word, acc)
-    case SCon{+c, +t}:
-      one_line.go(t, one_line.word(Char.is_space(c), c, word), one_line.acc(Char.is_space(c), word, acc))
-
-def one_line(+s: String) -> String:
-  String.join(one_line.go(s, "", Nil{}), " ")
-
-# at most `max` chars, with an ellipsis when cut (util::clip)
-def clip.pick(fits: Bool, +s: String, +max: Nat) -> String:
-  match fits:
-    case True{}:
-      s
-    case False{}:
-      String.append(String.take(s, Nat.sub(max, 1n)), "…")
-
-def clip(+s: String, +max: Nat) -> String:
-  clip.pick(Nat.is_le(String.length(s), max), s, max)
-
+# one_line, clip, clip_tail: hub/text.bend
 def trim_is_empty(+s: String) -> Bool:
   String.is_empty(String.trim(s))
 
@@ -562,32 +513,10 @@ def card_holding(xs: List<&2, Card>, +id: Nat) -> Maybe<&2, Nat>:
     case Con{+h, +t}:
       LZ.pick(Maybe<&2, Nat>, maybe_nat_is(Card.for_msg(h), id), u => Some{Card.id(h)}, u => card_holding(t, id))
 
-def apply.settle.if(ok: Bool, +msgs: List<&2, MRec>, +id: Nat) -> List<&2, MRec>:
-  match ok:
-    case True{}:
-      map_msg(msgs, id, OSettle{})
-    case False{}:
-      msgs
-
 def Msg.to(x: Msg) -> String:
   match x:
     case Msg{_, _, _, +to, _, _, _, _, _, _, _, _, _}:
       to
-
-def apply.settle.go(orig: Maybe<&2, MRec>, +msgs: List<&2, MRec>, +id: Nat, +from: String) -> List<&2, MRec>:
-  match orig:
-    case None{}:
-      msgs
-    case Some{+o}:
-      apply.settle.if(String.eq(Msg.to(MRec.msg(o)), from) || String.eq(from, USER()), msgs, id)
-
-# a reply from the recipient (or from the user) settles the question
-def apply.settle(r: Maybe<&2, Nat>, +msgs: List<&2, MRec>, +from: String) -> List<&2, MRec>:
-  match r:
-    case None{}:
-      msgs
-    case Some{+id}:
-      apply.settle.go(rec_of(msgs, id), msgs, id, from)
 
 def Msg.reply_to(x: Msg) -> Maybe<&2, Nat>:
   match x:
@@ -644,74 +573,196 @@ def hot_of(xs: List<&2, MRec>) -> List<&2, MRec>:
     case Con{+r, +t}:
       +rest = hot_of(t)
       Bool.pick(List<&2, MRec>, MRec.is_hot(r), r <> rest, rest)
+# the cold ones, in their order
+def cold_of(xs: List<&2, MRec>) -> List<&2, MRec>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+r, +t}:
+      +rest = cold_of(t)
+      Bool.pick(List<&2, MRec>, MRec.is_hot(r), rest, r <> rest)
+# ---- the split (issue 21 steps 3-4): St.hot ascending, St.old descending ----
+def MRec.id(+r: MRec) -> Nat:
+  Msg.id(MRec.msg(r))
+# the head of `xs` has an id above `n`
+def id_above(xs: List<&2, MRec>, +n: Nat) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case Con{+h, _}:
+      Nat.is_gt(MRec.id(h), n)
+# `r` into `xs` (ids descending), before the first id not above its own
+def ins_desc.go(xs: List<&2, MRec>, gt: Bool, +r: MRec) -> List<&2, MRec>:
+  match xs gt:
+    case Nil{} _:
+      [r]
+    case Con{+h, +t} True{}:
+      h <> ins_desc.go(t, id_above(t, MRec.id(r)), r)
+    case Con{+h, +t} False{}:
+      r <> h <> t
+def ins_desc(+xs: List<&2, MRec>, +r: MRec) -> List<&2, MRec>:
+  ins_desc.go(xs, id_above(xs, MRec.id(r)), r)
+# `r` into `xs` (ids ascending), before the first id above its own
+def ins_asc.go(xs: List<&2, MRec>, gt: Bool, +r: MRec) -> List<&2, MRec>:
+  match xs gt:
+    case Nil{} _:
+      [r]
+    case Con{+h, +t} True{}:
+      r <> h <> t
+    case Con{+h, +t} False{}:
+      h <> ins_asc.go(t, id_above(t, MRec.id(r)), r)
+def ins_asc(+xs: List<&2, MRec>, +r: MRec) -> List<&2, MRec>:
+  ins_asc.go(xs, id_above(xs, MRec.id(r)), r)
+# the messages of `hs` put into `os` (ids descending)
+def ins_all(hs: List<&2, MRec>, +os: List<&2, MRec>) -> List<&2, MRec>:
+  match hs:
+    case Nil{}:
+      os
+    case Con{+r, +t}:
+      ins_desc(ins_all(t, os), r)
+# every message in send order (view_all; the laws' HI.Unique, HI.Kept)
+def every(+st: St) -> List<&2, MRec>:
+  List.reverse(&2, MRec, ins_all(St.hot(st), St.old(st)))
+def drop_msg(xs: List<&2, MRec>, +id: Nat) -> List<&2, MRec>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      LZ.pick(List<&2, MRec>, Nat.is_eq(MRec.id(h), id), u => t, u => h <> drop_msg(t, id))
+# the two sides after a message event
+type Ms is Data:
+  Ms{hot: List<&2, MRec>, old: List<&2, MRec>}
+def Ms.hot(x: Ms) -> List<&2, MRec>:
+  match x:
+    case Ms{+hot, _}:
+      hot
+def Ms.old(x: Ms) -> List<&2, MRec>:
+  match x:
+    case Ms{_, +old}:
+      old
+# the op on a cold message: back to the hot side if it made it hot, else in place
+def msg_op.cold.go(back: Bool, +c: MRec, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +op: MsgOp) -> Ms:
+  match back:
+    case True{}:
+      Ms{ins_asc(hot, rec_op(c, op)), drop_msg(old, id)}
+    case False{}:
+      Ms{hot, map_msg(old, id, op)}
+def msg_op.cold(m: Maybe<&2, MRec>, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +op: MsgOp) -> Ms:
+  match m:
+    case None{}:
+      Ms{hot, old}
+    case Some{+c}:
+      msg_op.cold.go(MRec.is_hot(rec_op(c, op)), c, hot, old, id, op)
+# the op on a hot message: the one it made cold goes to the old side
+def msg_op.hot(+hs: List<&2, MRec>, +old: List<&2, MRec>) -> Ms:
+  Ms{hot_of(hs), ins_all(cold_of(hs), old)}
+def msg_op.in(in_hot: Bool, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +op: MsgOp) -> Ms:
+  match in_hot:
+    case True{}:
+      msg_op.hot(map_msg(hot, id, op), old)
+    case False{}:
+      msg_op.cold(rec_of(old, id), hot, old, id, op)
+# a message event's op on the message `id`, and its move when it turns cold (or hot)
+def msg_op(+hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +op: MsgOp) -> Ms:
+  msg_op.in(Maybe.is_some(&2, MRec, rec_of(hot, id)), hot, old, id, op)
+def rec_in.go(m: Maybe<&2, MRec>, +old: List<&2, MRec>, +id: Nat) -> Maybe<&2, MRec>:
+  match m:
+    case None{}:
+      rec_of(old, id)
+    case Some{+r}:
+      Some{r}
+# the record of the message `id`, hot or cold
+def rec_in(+hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat) -> Maybe<&2, MRec>:
+  rec_in.go(rec_of(hot, id), old, id)
+def rec_at(+st: St, +id: Nat) -> Maybe<&2, MRec>:
+  rec_in(St.hot(st), St.old(st), id)
+# a reply from the recipient (or from the user) settles the question
+def settle_in.if(ok: Bool, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat) -> Ms:
+  match ok:
+    case True{}:
+      msg_op(hot, old, id, OSettle{})
+    case False{}:
+      Ms{hot, old}
+def settle_in.go(orig: Maybe<&2, MRec>, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +from: String) -> Ms:
+  match orig:
+    case None{}:
+      Ms{hot, old}
+    case Some{+o}:
+      settle_in.if(String.eq(Msg.to(MRec.msg(o)), from) || String.eq(from, USER()), hot, old, id)
+def settle_in(r: Maybe<&2, Nat>, +hot: List<&2, MRec>, +old: List<&2, MRec>, +from: String) -> Ms:
+  match r:
+    case None{}:
+      Ms{hot, old}
+    case Some{+id}:
+      settle_in.go(rec_in(hot, old, id), hot, old, id, from)
 
 def apply(+st: St, e: Ev) -> St:
   match st:
-    case St{+agents, +order, +msgs, +cards, +notes, +nm, +nc, +tm, +xs, +pz, +hot}:
+    case St{+agents, +order, +hot, +cards, +notes, +nm, +nc, +tm, +xs, +pz, +old}:
       match e:
         case ETaskCreated{+name, +parent, +brief, +ws, +at}:
           St{put_agent(agents, name, new_agent(name, False{}, Some{parent}, ws, brief, at)),
             Bool.pick(List<&2, String>, str_in(order, name), order, snoc(String, order, name)),
-            msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+            hot, cards, notes, nm, nc, tm, xs, pz, old}
         case ELifecycle{+name, +life, +reason}:
-          St{map_agent(agents, name, OLife{life, reason}), order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+          St{map_agent(agents, name, OLife{life, reason}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case EWorkspace{+name, +ws}:
-          St{map_agent(agents, name, OWs{ws}), order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+          St{map_agent(agents, name, OWs{ws}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case ESnapshot{+name, +snap}:
-          St{map_agent(agents, name, OSnap{snap}), order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+          St{map_agent(agents, name, OSnap{snap}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case EDeclared{+name, +status, +note}:
-          St{map_agent(agents, name, ODeclared{status, note}), order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+          St{map_agent(agents, name, ODeclared{status, note}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case EReported{+name, +report}:
-          St{map_agent(agents, name, OReport{report}), order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+          St{map_agent(agents, name, OReport{report}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case EFileTouched{+name, +path}:
-          St{map_agent(agents, name, OFile{path}), order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+          St{map_agent(agents, name, OFile{path}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case ERenamed{+name, +nn}:
-          St{map_agent(agents, name, ORename{nn}), rename_in(order, name, nn), msgs, cards, notes, nm, nc, tm, xs, pz, hot}
-        # the three message events: `hot` is the hot part of the new
-        # messages (law hot_is_the_hot_part)
+          St{map_agent(agents, name, ORename{nn}), rename_in(order, name, nn), hot, cards, notes, nm, nc, tm, xs, pz, old}
+        # the three message events, on the split (law cold_is_inert: on
+        # every message, the same as one list's snoc, map_msg, settle)
         case EMsgSent{+m}:
-          +ms = apply.settle(Msg.reply_to(m), snoc(MRec, msgs, MRec{m, Queued{"new"}, False{}}), Msg.from(m))
-          St{agents, order, ms, cards, notes, Nat.max(Nat.max(nm, 1n+Msg.id(m)), 1n+Msg.thread(m)), nc, tm, xs, pz, hot_of(ms)}
+          +p = settle_in(Msg.reply_to(m), snoc(MRec, hot, MRec{m, Queued{"new"}, False{}}), old, Msg.from(m))
+          St{agents, order, Ms.hot(p), cards, notes, Nat.max(Nat.max(nm, 1n+Msg.id(m)), 1n+Msg.thread(m)), nc, tm, xs, pz, Ms.old(p)}
         case EMsgState{+id, +s}:
-          +ms = map_msg(msgs, id, OSt{s})
-          St{agents, order, ms, cards, notes, nm, nc, tm, xs, pz, hot_of(ms)}
+          +p = msg_op(hot, old, id, OSt{s})
+          St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p)}
         case ESettled{+id}:
-          +ms = map_msg(msgs, id, OSettle{})
-          St{agents, order, ms, cards, notes, nm, nc, tm, xs, pz, hot_of(ms)}
+          +p = msg_op(hot, old, id, OSettle{})
+          St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p)}
         case ECardOpened{+c}:
-          St{agents, order, msgs, put_card(cards, c), notes, nm, Nat.max(nc, 1n+Card.id(c)), tm, xs, pz, hot}
+          St{agents, order, hot, put_card(cards, c), notes, nm, Nat.max(nc, 1n+Card.id(c)), tm, xs, pz, old}
         case ECardClosed{+id, _, _}:
-          St{agents, order, msgs, drop_card(cards, id), notes, nm, nc, tm, xs, pz, hot}
+          St{agents, order, hot, drop_card(cards, id), notes, nm, nc, tm, xs, pz, old}
         case ECardAnswerPos{_, _, _}:
-          St{agents, order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+          St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case EMainNote{+text, _}:
-          St{agents, order, msgs, cards, snoc(String, notes, text), nm, nc, tm, xs, pz, hot}
+          St{agents, order, hot, cards, snoc(String, notes, text), nm, nc, tm, xs, pz, old}
         case ENotesFlushed{}:
-          St{agents, order, msgs, cards, Nil{}, nm, nc, tm, xs, pz, hot}
+          St{agents, order, hot, cards, Nil{}, nm, nc, tm, xs, pz, old}
         case ETimerSet{+t, _}:
-          St{agents, order, msgs, cards, notes, nm, nc, TM.set(tm, t), xs, pz, hot}
+          St{agents, order, hot, cards, notes, nm, nc, TM.set(tm, t), xs, pz, old}
         case ETimerFired{+id, +fired, +next, +at, +undelivered}:
-          St{agents, order, msgs, cards, notes, nm, nc, TM.fired(tm, id, fired, next, at, undelivered), xs, pz, hot}
+          St{agents, order, hot, cards, notes, nm, nc, TM.fired(tm, id, fired, next, at, undelivered), xs, pz, old}
         case ETimerRun{+id, +at}:
-          St{agents, order, msgs, cards, notes, nm, nc, TM.run(tm, id, at), xs, pz, hot}
+          St{agents, order, hot, cards, notes, nm, nc, TM.run(tm, id, at), xs, pz, old}
         case ETimerStop{+id, +why, +at}:
-          St{agents, order, msgs, cards, notes, nm, nc, TM.stop(tm, id, why, at), xs, pz, hot}
+          St{agents, order, hot, cards, notes, nm, nc, TM.stop(tm, id, why, at), xs, pz, old}
         case ETimerName{+id, +name, _, _}:
-          St{agents, order, msgs, cards, notes, nm, nc, TM.named(tm, id, name), xs, pz, hot}
+          St{agents, order, hot, cards, notes, nm, nc, TM.named(tm, id, name), xs, pz, old}
         case EX{+xe}:
-          St{agents, order, msgs, cards, notes, nm, nc, tm, XH.apply(xs, xe), pz, hot}
+          St{agents, order, hot, cards, notes, nm, nc, tm, XH.apply(xs, xe), pz, old}
         case EAct{+ae}:
-          St{agents, order, msgs, cards, notes, nm, nc, TM.act_apply(tm, ae), xs, pz, hot}
+          St{agents, order, hot, cards, notes, nm, nc, TM.act_apply(tm, ae), xs, pz, old}
         case EFollow{+name, +on, +hub}:
-          St{map_agent(agents, name, OFollow{Bool.pick(Maybe<&2, String>, on, Some{hub}, None{})}), order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+          St{map_agent(agents, name, OFollow{Bool.pick(Maybe<&2, String>, on, Some{hub}, None{})}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case EJobEnd{+name, _}:
-          St{map_agent(agents, name, OFollow{None{}}), order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
+          St{map_agent(agents, name, OFollow{None{}}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case EWake{+we}:
-          St{agents, order, msgs, cards, notes, nm, nc, TM.wk_apply(tm, we), xs, pz, hot}
+          St{agents, order, hot, cards, notes, nm, nc, TM.wk_apply(tm, we), xs, pz, old}
         case EPaused{+at}:
-          St{agents, order, msgs, cards, notes, nm, nc, tm, xs, Some{at}, hot}
+          St{agents, order, hot, cards, notes, nm, nc, tm, xs, Some{at}, old}
         case EResumed{_}:
-          St{agents, order, msgs, cards, notes, nm, nc, tm, xs, None{}, hot}
+          St{agents, order, hot, cards, notes, nm, nc, tm, xs, None{}, old}
 
 # the state after a journal: the replay of a list of events
 def apply_all(evs: List<&2, Ev>, +st: St) -> St:
@@ -720,15 +771,6 @@ def apply_all(evs: List<&2, Ev>, +st: St) -> St:
       st
     case Con{+e, +rest}:
       apply_all(rest, apply(st, e))
-
-# `hot` as every message: the end of a replay_many batch (replay.bend's
-# apply_rev does not keep the index, so the replay stays linear). Free,
-# where a filter per batch of 100 cost a boot +1.3 s; the first live
-# message event narrows it (apply's hot_of).
-def hot_all(+st: St) -> St:
-  match st:
-    case St{+agents, +order, +msgs, +cards, +notes, +nm, +nc, +tm, +xs, +pz, _}:
-      St{agents, order, msgs, cards, notes, nm, nc, tm, xs, pz, msgs}
 
 def card_of(xs: List<&2, Card>, +id: Nat) -> Maybe<&2, Card>:
   find(~Card, ~Nat, ~Card.id, ~(a => b => Nat.is_eq(a, b)), xs, id)
@@ -785,7 +827,7 @@ def msg_of.go(m: Maybe<&2, MRec>) -> Maybe<&2, Msg>:
       Some{MRec.msg(r)}
 
 def msg_of(+st: St, +id: Nat) -> Maybe<&2, Msg>:
-  msg_of.go(rec_of(St.msgs(st), id))
+  msg_of.go(rec_at(st, id))
 
 def state_of.go(m: Maybe<&2, MRec>) -> Maybe<&2, MSt>:
   match m:
@@ -795,7 +837,7 @@ def state_of.go(m: Maybe<&2, MRec>) -> Maybe<&2, MSt>:
       Some{MRec.st(r)}
 
 def state_of(+st: St, +id: Nat) -> Maybe<&2, MSt>:
-  state_of.go(rec_of(St.msgs(st), id))
+  state_of.go(rec_at(st, id))
 
 def ws_worktree(+ws: J.Json) -> Bool:
   String.eq(J.get_str_or(ws, "mode", "shared"), "worktree")
@@ -859,17 +901,6 @@ def Msg.with_parts(x: Msg, +p: String) -> Msg:
   match x:
     case Msg{+i, +th, +f, +to, +r, +e, +a, +tx, +c, +pl, +q, +v, _}:
       Msg{i, th, f, to, r, e, a, tx, c, pl, q, v, p}
-
-# the last `max` chars, after an ellipsis when cut (util::clip_tail)
-def clip_tail.pick(fits: Bool, +s: String, +max: Nat) -> String:
-  match fits:
-    case True{}:
-      s
-    case False{}:
-      String.append("…", String.drop(s, Nat.sub(String.length(s), Nat.sub(max, 1n))))
-
-def clip_tail(+s: String, +max: Nat) -> String:
-  clip_tail.pick(Nat.is_le(String.length(s), max), s, max)
 
 def Agent.is_main(x: Agent) -> Bool:
   match x:
