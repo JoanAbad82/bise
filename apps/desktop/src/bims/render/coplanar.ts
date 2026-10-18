@@ -1,10 +1,9 @@
 // Z-fight finder for a prop: two meshes whose faces lie in the same plane (within eps) and overlap
 // draw in turns, frame to frame (the workshop's old car, bims-vespa). Pure: it reads the meshes'
 // triangles in world space and returns the clashes; the map tests call it on a built prop.
-import { type BufferGeometry, Mesh, type Object3D, Vector3 } from 'three';
+import { Box3, type BufferGeometry, Mesh, type Object3D, Vector3 } from 'three';
 
 interface Tri {
-  readonly mesh: number;
   readonly p: readonly [Vector3, Vector3, Vector3];
   readonly n: Vector3;
   /** the plane: n·x = d */
@@ -18,7 +17,7 @@ export interface Clash {
   readonly area: number;
 }
 
-function trisOf(geo: BufferGeometry, mesh: Mesh, id: number, out: Tri[]): void {
+function trisOf(geo: BufferGeometry, mesh: Mesh, out: Tri[]): void {
   const pos = geo.getAttribute('position');
   const idx = geo.getIndex();
   const n = idx ? idx.count : pos.count;
@@ -29,7 +28,7 @@ function trisOf(geo: BufferGeometry, mesh: Mesh, id: number, out: Tri[]): void {
     const len = nn.length();
     if (len < 1e-9) continue;
     nn.divideScalar(len);
-    out.push({ mesh: id, p, n: nn, d: nn.dot(p[0]) });
+    out.push({ p, n: nn, d: nn.dot(p[0]) });
   }
 }
 
@@ -84,24 +83,35 @@ export function coplanarClashes(root: Object3D, eps = 0.005, minArea = 1e-6): Cl
   root.updateMatrixWorld(true);
   const meshes: Mesh[] = [];
   root.traverse((o) => { if (o instanceof Mesh) meshes.push(o as Mesh); });
-  const tris: Tri[] = [];
-  meshes.forEach((m, i) => { trisOf(m.geometry, m, i, tris); });
-  const name = (i: number): string => meshes[i]?.name || `mesh ${i}`;
-  const found = new Map<string, Clash>();
-  for (let i = 0; i < tris.length; i++) {
-    const a = tris[i] as Tri;
-    for (let j = i + 1; j < tris.length; j++) {
-      const b = tris[j] as Tri;
-      if (a.mesh === b.mesh) continue;
-      const key = `${Math.min(a.mesh, b.mesh)}:${Math.max(a.mesh, b.mesh)}`;
-      if (found.has(key)) continue;
-      const dot = a.n.dot(b.n);
-      if (Math.abs(dot) < 0.9995) continue;
+  const tris = meshes.map((m) => {
+    const out: Tri[] = [];
+    trisOf(m.geometry, m, out);
+    return out;
+  });
+  const boxes = meshes.map((m) => new Box3().setFromObject(m).expandByScalar(eps));
+  const name = (i: number): string => meshes[i]?.name || `mesh ${String(i)}`;
+  const found: Clash[] = [];
+  for (let i = 0; i < meshes.length; i++) {
+    for (let j = i + 1; j < meshes.length; j++) {
+      // two meshes whose bounds don't touch share no face
+      if (!(boxes[i] as Box3).intersectsBox(boxes[j] as Box3)) continue;
+      const area = clashOf(tris[i] ?? [], tris[j] ?? [], eps, minArea);
+      if (area > 0) found.push({ a: name(i), b: name(j), area });
+    }
+  }
+  return found;
+}
+
+/** the overlap of the first two faces of a and b in one plane, or 0 */
+function clashOf(as: readonly Tri[], bs: readonly Tri[], eps: number, minArea: number): number {
+  for (const a of as) {
+    for (const b of bs) {
+      if (Math.abs(a.n.dot(b.n)) < 0.9995) continue;
       if (b.p.some((v) => Math.abs(a.n.dot(v) - a.d) > eps)) continue;
       const ax = Math.abs(a.n.x) >= Math.abs(a.n.y) && Math.abs(a.n.x) >= Math.abs(a.n.z) ? 0 : Math.abs(a.n.y) >= Math.abs(a.n.z) ? 1 : 2;
       const area = overlap(flat(a, ax), flat(b, ax));
-      if (area > minArea) found.set(key, { a: name(a.mesh), b: name(b.mesh), area });
+      if (area > minArea) return area;
     }
   }
-  return [...found.values()];
+  return 0;
 }

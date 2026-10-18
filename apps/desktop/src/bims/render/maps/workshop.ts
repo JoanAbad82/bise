@@ -77,23 +77,37 @@ function shell(b: Build): void {
   onFloor(k, root, boxOf(decorOf(o).doorMat), 0.04, 0.03, WORLD.mat);
 }
 
-/** the Vespa's tilt on its side stand, towards +z (the stand's side) */
+/** the Vespa's tilt on its side stand, towards its +z (the stand's side) */
 const LEAN = 0.1;
+/** its turn: the nose (+x before it) to the camera's right-front, so its shield and headlight face it (bims) */
+const YAW = -Math.PI / 3;
+/** the top of the workshop's concrete (style.box(W, 0.14, D) at -0.05): the wheels stand on it */
+const FLOOR_TOP = 0.012;
 
 /**
- * a mint Vespa on its side stand, its nose towards the roller door (+x): round body, front shield,
- * a round headlight, a two-tone seat a bim can ride (~0.45 up, ~1.1 long). Every part stands off
- * the others (no two faces in one plane: the old car's z-fight, coplanar.test.ts).
+ * a mint Vespa on its side stand, its nose turned to the camera: round body, front shield, a round
+ * headlight, a two-tone seat a bim can ride (~0.45 up, ~1.1 long), a soft contact shadow under each
+ * wheel (designer). Every part stands off the others (no two faces in one plane: the old car's
+ * z-fight, coplanar.test.ts).
  */
 export function vespa(k: Build['k'], root: Object3D, x: number, z: number): Group {
   const { style } = k;
   const g = new Group();
   g.name = 'vespa';
-  g.position.set(x, 0.02, z);
-  g.rotation.x = LEAN;
+  g.position.set(x, FLOOR_TOP, z);
+  g.rotation.y = YAW;
   root.add(g);
+  const lean = new Group();
+  lean.rotation.x = LEAN;
+  g.add(lean);
+  const shade = style.material('#000000', { opacity: 0.28 });
+  for (const wx of [-0.36, 0.38]) {
+    const s = k.add(style.cylinder(0.11, 0.002), shade, g, wx, 0.006, 0.01);
+    s.name = 'wheel shadow';
+    s.scale.z = 0.5;
+  }
   const put = (name: string, geo: Parameters<typeof k.add>[0], color: string, px: number, py: number, pz: number) => {
-    const m = k.add(geo, k.mat(color), g, px, py, pz);
+    const m = k.add(geo, k.mat(color), lean, px, py, pz);
     m.name = name;
     return m;
   };
