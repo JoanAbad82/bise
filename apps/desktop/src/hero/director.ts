@@ -36,7 +36,7 @@ export const OFFICE_BOX = { x0: 0.3, x1: 0.85, y0: 0.1, y1: 0.9 } as const;
 /** an OFFICE shot this much closer than its box's fit (bims m_31057: the office ~70% of the frame) */
 export const OFFICE_TIGHT = 1.3;
 /** each size past OFFICE: how much closer than that office's own OFFICE shot */
-export const CLOSER: Readonly<Record<Exclude<Size, 'wide' | 'office'>, number>> = { tight: 1.6, follow: 2.2, close: 3.2, closest: 4 };
+export const CLOSER: Readonly<Record<Exclude<Size, 'wide' | 'office'>, number>> = { tight: 1.6, follow: 2.2, close: 3.2, closest: 7 };
 
 /** a rectangle on the fit, fractions (u right, v down) */
 export interface Box {
@@ -148,7 +148,7 @@ export function shotCam(shot: Shot, g: Geometry): Cam | null {
   if (s.k === 'office') return aimCam({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * CLOSER[shot.size]);
   // a subject gone missing (it left): its office's shot, never an empty frame
   if (at === null) return office;
-  return aimCam(at, office.zoom * CLOSER[shot.size]);
+  return aimCam(at, office.zoom * CLOSER[shot.size], shot.frame?.x ?? SAFE.x, shot.frame?.y ?? SAFE.y);
 }
 
 /** The shot playing at film time T: the last one whose camera has left (LEAD_S before its action). Pure. */

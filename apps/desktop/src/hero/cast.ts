@@ -91,6 +91,8 @@ export interface Shot {
   readonly subject: Subject;
   /** its glide in, s, past the director's own (the seam's long move back to 0:00's frame) */
   readonly glide?: number;
+  /** where its subject sits, fractions of the frame, past the director's safe point (the opening: main at 65%, bims m_31467) */
+  readonly frame?: { readonly x: number; readonly y: number };
 }
 
 const s = (m: number, sec: number): number => m * 60 + sec;
@@ -233,9 +235,12 @@ export const EGGS: readonly Egg[] = [
 
 const bim = (office: string, name: string): Subject => ({ k: 'bim', office, name });
 
+/** the opening's frame (bims m_31467): main's desk at 65 % across, the door still in frame for 0:04 */
+const OPEN_AT = { x: 0.65, y: 0.5 } as const;
+
 export const SHOTS: readonly Shot[] = [
   // the cold open (0:00-0:30): close from the first second, the product in 30 s
-  { at: 0, size: 'tight', subject: { k: 'office', office: HARNESS } },
+  { at: 0, size: 'tight', subject: { k: 'spot', office: HARNESS, spot: 'main' }, frame: OPEN_AT },
   { at: s(0, 4), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
   { at: s(0, 8), size: 'tight', subject: { k: 'office', office: HARNESS } },
   { at: s(0, 10), size: 'close', subject: bim(HARNESS, 'signup-flow') },
@@ -281,5 +286,5 @@ export const SHOTS: readonly Shot[] = [
   { at: s(4, 16), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
   { at: s(4, 24), size: 'wide', subject: { k: 'town' } },
   // the seam: a long move from the wide down to 0:00's frame, there by 4:57
-  { at: s(4, 50), size: 'tight', subject: { k: 'office', office: HARNESS }, glide: 8.5 },
+  { at: s(4, 50), size: 'tight', subject: { k: 'spot', office: HARNESS, spot: 'main' }, frame: OPEN_AT, glide: 8.5 },
 ];
