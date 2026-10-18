@@ -383,7 +383,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
     };
   }, [trigger, tkey, p.sources]);
 
-  const rows = useMemo<Row[]>(() => {
+  const fresh = useMemo<Row[]>(() => {
     if (trigger === null) return [];
     const all =
       trigger.kind === "at"
@@ -406,6 +406,15 @@ export function PmField(p: PmFieldProps): JSX.Element {
               : commandRows(trigger, p.sources.commands);
     return all.slice(0, MAX_ROWS);
   }, [trigger, tkey, files, p.sources, openedAt]);
+  // a key typed before this @'s first file answer came (a slow core, his first keys right after
+  // the @): no agent or artifact matches and no answer to keep, so the list had no row and closed
+  // until the answer came, then opened as a new node (as-he-does dcsteady, gone 69 of 72 frames).
+  // While this @'s answer for the query is on its way, the rows it showed last stay.
+  const session = trigger?.kind === "at" ? sessionKey(trigger) : "";
+  const [held, setHeld] = useState<{ session: string; rows: Row[] }>({ session: "", rows: [] });
+  if (session !== "" && fresh.length > 0 && (held.session !== session || held.rows !== fresh)) setHeld({ session, rows: fresh });
+  const waiting = session !== "" && files.key !== tkey;
+  const rows = fresh.length === 0 && waiting && held.session === session ? held.rows : fresh;
 
   const open =
     trigger !== null &&
