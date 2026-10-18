@@ -18,7 +18,7 @@ import { bims } from '@/proto/words_bims.gen';
 import { keep } from '@/app/keep';
 import type { ActivitiesFn, Label, LayoutFn } from '../model';
 import { Office, tagOf, tagRank, type Parts } from '../Office';
-import { placeTags, type TagIn } from '../tags';
+import { placeTags, TAG_INSET, type TagIn } from '../tags';
 import { growOf } from '../growth';
 import { growHigh } from '../grow-keep';
 import { CHECK_MS, nextAfter } from '../loop';
@@ -30,7 +30,7 @@ import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from '../zoom
 import { DIVE_S, diveAt } from './dive';
 import { liveAgents, signOf, townProjects, type TownProject } from './sites';
 import type { MakeTownRenderer, TownRenderer, TownSite } from './types';
-import { placeSigns as placeSignsAt, type SignIn } from './signs';
+import { placeSigns as placeSignsAt, type Box as SignBox, type SignIn } from './signs';
 
 /** The town's parts: the office's (its dive opens one), the pure modules it reads, its renderer's loader. */
 export interface TownParts {
@@ -44,12 +44,31 @@ export interface TownParts {
 type Phase = 'town' | 'in' | 'swapIn' | 'office' | 'swapOut' | 'out';
 
 const DIVE_KEY = 'bims.town.dive';
-/** a compact sign's padding round its pills (office.css .bims-sign) */
-const SIGN_PAD = 8;
+/** the gap between a sign's parts (office.css .bims-sign: var(--s-1)) */
+const SIGN_GAP = 4;
 /** offices baked again per frame at most (page town-live: ~85 ms each, the town fills in) */
 const BAKES_PER_FRAME = 1;
 /** the fade between the town and the Office (office.css .bims-town-top) */
 const SWAP_MS = 260;
+
+/**
+ * The part of the town's width seen, css px from its left: inside every ancestor that clips (the
+ * right bar's scroll box, its scrollbar out), TAG_INSET off each side (the panel's resize handle
+ * lies over the bar's first 4 px). Signs stay in it (town/signs.ts): none loses a letter.
+ */
+function seenX(box: HTMLElement): { readonly x0: number; readonly x1: number } {
+  const r = box.getBoundingClientRect();
+  let x0 = r.left;
+  let x1 = r.right;
+  for (let el = box.parentElement; el !== null; el = el.parentElement) {
+    const cs = getComputedStyle(el);
+    if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+    const left = el.getBoundingClientRect().left + el.clientLeft;
+    x0 = Math.max(x0, left);
+    x1 = Math.min(x1, left + el.clientWidth);
+  }
+  return { x0: x0 - r.left + TAG_INSET, x1: x1 - r.left - TAG_INSET };
+}
 
 /** test mode: why each frame was asked for (window.__biseTownWhy, the idle checks print it) */
 const whyFrame = (why: string): void => {
@@ -106,6 +125,8 @@ export function Town({
   const canvas = useRef<HTMLCanvasElement>(null);
   const signs = useRef(new Map<string, HTMLDivElement>());
   const rRef = useRef<TownRenderer | null>(null);
+  /** the town's width seen (seenX), at its last size */
+  const seenRef = useRef<{ readonly x0: number; readonly x1: number } | null>(null);
   const kickRef = useRef<(why?: string) => void>(() => undefined);
   // the dive's way: from the town's fit to the Office's, its start time (s, set by its first frame); null: still
   const anim = useRef<{ from: Fit; to: Fit; at: number | null; back: boolean } | null>(null);
@@ -206,29 +227,37 @@ export function Town({
     };
   }, [shown, parts]);
 
-  /** each sign over its office (tags.ts placeTags: none over another), the dived one alone while the Office shows */
-  const placeSigns = useCallback((r: TownRenderer) => {
+  /**
+   * each sign over its office (town/signs.ts: none over another mark, the live bims' labels `taken`
+   * first), the dived one alone while the Office shows; a sign with no room hides whole
+   */
+  const placeSigns = useCallback((r: TownRenderer, taken: readonly SignBox[]) => {
     const box = holder.current;
     if (box === null) return;
     const ins: SignIn[] = [];
     const ph = phaseRef.current;
     const only = ph === 'office' || ph === 'swapIn' || ph === 'swapOut';
+    const liveNow = new Set(only ? [] : r.liveIds());
+    // all written first (whole: no data-compact), then all measured: one layout, not one per sign
+    const shown: [string, HTMLDivElement, { readonly x: number; readonly y: number }][] = [];
     for (const [id, el] of signs.current) {
       const at = only && id !== live.current.dived ? null : r.signAt(id);
       el.style.visibility = at === null ? 'hidden' : '';
-      if (at === null) continue;
-      // measured whole (a compact sign shows its pills alone: office.css)
       delete el.dataset.compact;
-      const pill = el.querySelector<HTMLElement>('.bims-pill');
-      const first = id === live.current.dived || id === hoverRef.current;
-      ins.push({ id, x: at.x, y: at.y, w: el.offsetWidth, h: el.offsetHeight, pillW: pill === null ? 0 : pill.offsetWidth + SIGN_PAD, pillH: pill === null ? 0 : pill.offsetHeight + SIGN_PAD, rank: first ? 0 : pill !== null ? 1 : 2 });
+      if (at !== null) shown.push([id, el, at]);
     }
-    // at the town's fit a sign with no room keeps its pills alone; zoomed in or dived, every name shows
-    const atFitNow = !only && atFit(camRef.current) && anim.current === null;
+    for (const [id, el, at] of shown) {
+      const pill = el.querySelector<HTMLElement>('.bims-pill');
+      const work = el.querySelector<HTMLElement>('.bims-sign-work');
+      const first = id === live.current.dived || id === hoverRef.current;
+      // compact: its name and pills, the ∿ n and its gap out (office.css)
+      const compactW = work === null ? 0 : el.offsetWidth - work.offsetWidth - SIGN_GAP;
+      ins.push({ id, x: at.x, y: at.y, w: el.offsetWidth, h: el.offsetHeight, compactW, live: liveNow.has(id), rank: first ? 0 : pill !== null ? 1 : 2 });
+    }
     const fit = only ? null : r.townFit();
-    const w = box.clientWidth;
     const h = fit?.heightPx ?? box.clientHeight;
-    const at = placeSignsAt(ins, w, h, atFitNow);
+    const seen = seenRef.current ?? { x0: 0, x1: box.clientWidth };
+    const at = placeSignsAt(ins, { x0: seen.x0, y0: 0, x1: seen.x1, y1: h }, taken);
     for (const t of ins) {
       const el = signs.current.get(t.id);
       const p = at.get(t.id);
@@ -240,10 +269,10 @@ export function Town({
     }
   }, []);
 
-  /** each live bim's label over its head (tags.ts placeTags, the minimap's: pills first, none over another) */
-  const placeLabels = useCallback((r: TownRenderer) => {
+  /** each live bim's label over its head (tags.ts placeTags, the minimap's: pills first, none over another); their boxes */
+  const placeLabels = useCallback((r: TownRenderer): SignBox[] => {
     const box = holder.current;
-    if (box === null) return;
+    if (box === null) return [];
     const ins: TagIn[] = [];
     for (const [key, { el, id, name }] of labelEls.current) {
       const h = r.headOf(id, name);
@@ -253,14 +282,26 @@ export function Town({
       ins.push({ name: key, x: h.x, y: h.y, w: el.offsetWidth, h: el.offsetHeight, pill: mode === 'pill', rank: mode === 'hover' ? 0 : (ranks.current.get(key) ?? 3) });
     }
     const { at } = placeTags(ins, box.clientWidth, box.clientHeight);
+    const taken: SignBox[] = [];
     for (const t of ins) {
       const el = labelEls.current.get(t.name)?.el;
       const p = at.get(t.name);
       if (el === undefined) continue;
       el.style.visibility = p === undefined ? 'hidden' : '';
-      if (p !== undefined) el.style.transform = `translate(${p.left.toFixed(1)}px, ${p.top.toFixed(1)}px)`;
+      if (p === undefined) continue;
+      el.style.transform = `translate(${p.left.toFixed(1)}px, ${p.top.toFixed(1)}px)`;
+      taken.push({ x0: p.left, y0: p.top, x1: p.left + t.w, y1: p.top + t.h });
     }
+    return taken;
   }, []);
+
+  /** every mark: the live bims' labels first (they win), then the signs round them (bims m_31373) */
+  const placeMarks = useCallback(
+    (r: TownRenderer) => {
+      placeSigns(r, placeLabels(r));
+    },
+    [placeSigns, placeLabels],
+  );
 
   // the renderer: loaded once, fed the town at each change, one frame per kick
   useEffect(() => {
@@ -318,13 +359,12 @@ export function Town({
         if (n !== null) next = next === null ? n : Math.min(next, n);
       }
       r.frame(nightNow());
-      placeSigns(r);
       const sig = labelsKey(shownLabels);
       if (sig !== lastLabels) {
         lastLabels = sig;
         setLabels(shownLabels);
       }
-      placeLabels(r);
+      placeMarks(r);
       if (more || baking || next === 0) {
         whyFrame(more ? 'dive' : baking ? 'baking' : 'live');
         raf = requestAnimationFrame(draw);
@@ -345,6 +385,7 @@ export function Town({
       if (r === null) return;
       const w = box.clientWidth;
       if (w <= 0) return;
+      seenRef.current = seenX(box);
       r.setSize(w, 4000);
       const d = live.current.dived;
       const ph = phaseRef.current;
@@ -414,7 +455,12 @@ export function Town({
       rRef.current = null;
       r?.dispose();
     };
-  }, [parts, placeSigns, placeLabels, stills, moveCam]);
+  }, [parts, placeMarks, stills, moveCam]);
+  // new labels mounted (their refs set): every mark placed again round them, before the paint
+  useLayoutEffect(() => {
+    const r = rRef.current;
+    if (r !== null) placeMarks(r);
+  }, [labels, placeMarks]);
 
   // a change of the town: its plan again if a ground changed, the offices' rows heard at the next frame
   useEffect(() => {
@@ -599,7 +645,7 @@ export function Town({
           if (over !== hoverRef.current) {
             hoverRef.current = over;
             const r = rRef.current;
-            if (r !== null) placeSigns(r);
+            if (r !== null) placeMarks(r);
           }
         }}
         onPointerLeave={() => {
@@ -611,7 +657,7 @@ export function Town({
           if (hoverRef.current !== null) {
             hoverRef.current = null;
             const r = rRef.current;
-            if (r !== null) placeSigns(r);
+            if (r !== null) placeMarks(r);
           }
         }}
         onClick={(e) => {
@@ -657,11 +703,7 @@ export function Town({
                 data-testid={`app.right.bims.town.label.${id}.${l.name}`}
                 ref={(el) => {
                   if (el === null) labelEls.current.delete(key);
-                  else {
-                    labelEls.current.set(key, { el, id, name: l.name });
-                    const r = rRef.current;
-                    if (r !== null) placeLabels(r);
-                  }
+                  else labelEls.current.set(key, { el, id, name: l.name });
                 }}
               >
                 {text !== null && (

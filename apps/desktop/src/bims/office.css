@@ -537,8 +537,7 @@
 .bims-sign[data-here] {
   cursor: default;
 }
-/* no room for its name at the town's fit (town/signs.ts): its pills alone, the name back on hover or zoom */
-.bims-sign[data-compact] .bims-sign-name,
+/* no room for the whole sign (town/signs.ts): its name and pills, without ∿ n; never a bare pill */
 .bims-sign[data-compact] .bims-sign-work {
   display: none;
 }

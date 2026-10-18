@@ -456,3 +456,77 @@ test('(town) a lost WebGL context shows the line', async () => {
     await s.close();
   }
 });
+
+/**
+ * What is wrong with the town's marks now (bims m_31373): two shown marks (signs, the live bims'
+ * labels) over one another, a sign without its name (a bare pill), a sign cut by the town's edge.
+ */
+async function markFaults(s: Session, where: string): Promise<string[]> {
+  const out = await s.page.evaluate(() => {
+    const town = document.querySelector('[data-testid="app.right.bims.town"]');
+    if (town === null) return ['no town'];
+    const tb = town.getBoundingClientRect();
+    const shown = (e: HTMLElement): boolean => e.style.visibility !== 'hidden' && e.offsetWidth > 0;
+    const marks = [
+      ...Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="app.right.bims.town.sign."]')).filter(shown).map((e) => ({ e, what: `sign ${e.querySelector('.bims-sign-name')?.textContent ?? '?'}`, sign: true })),
+      ...Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="app.right.bims.town.label."]')).filter(shown).map((e) => ({ e, what: `label ${(e.dataset.testid ?? '').split('.').pop() ?? '?'}`, sign: false })),
+    ].map((m) => ({ ...m, r: m.e.getBoundingClientRect() }));
+    const faults: string[] = [];
+    const at = (r: DOMRect): string => `${String(Math.round(r.x - tb.x))},${String(Math.round(r.y - tb.y))}`;
+    for (const m of marks) {
+      if (!m.sign) continue;
+      const name = m.e.querySelector<HTMLElement>('.bims-sign-name');
+      if (name === null || name.offsetWidth === 0) faults.push(`${m.what} at ${at(m.r)}: a bare pill, no name`);
+      if (m.r.x < tb.x - 0.5 || m.r.y < tb.y - 0.5 || m.r.right > tb.right + 0.5 || m.r.bottom > tb.bottom + 0.5) faults.push(`${m.what} at ${at(m.r)}: cut by the town's edge`);
+      // seen whole: its two ends are its own on screen (nothing over them, no parent's clip)
+      for (const x of [m.r.x + 2, m.r.right - 2]) {
+        const hit = document.elementFromPoint(x, m.r.y + m.r.height / 2);
+        if (hit === null || !m.e.contains(hit)) faults.push(`${m.what} at ${at(m.r)}: its end at x ${String(Math.round(x - tb.x))} not seen (${hit === null ? 'off the window' : `${hit.tagName.toLowerCase()}.${hit.className} ${hit.getAttribute('data-testid') ?? ''}`})`);
+      }
+    }
+    for (const [i, a] of marks.entries()) {
+      for (const b of marks.slice(i + 1)) {
+        const over = a.r.x < b.r.right - 1 && b.r.x < a.r.right - 1 && a.r.y < b.r.bottom - 1 && b.r.y < a.r.bottom - 1;
+        if (over) faults.push(`${a.what} at ${at(a.r)} over ${b.what} at ${at(b.r)}`);
+      }
+    }
+    return faults;
+  });
+  return out.map((f) => `${where}: ${f}`);
+}
+
+// bims m_31373: at the fit and pinched in on live offices, 3/12/25/40 projects, light and dark
+for (const n of [3, 12, 25, 40]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`(town) ${String(n)} projects, ${theme}: no mark over another, none without its name, fit and live`, async () => {
+      const { s } = await openTown(fakes(n), theme);
+      try {
+        await showTown(s);
+        await settled(s);
+        const faults = await markFaults(s, 'fit');
+        const shownSigns = await s.page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="app.right.bims.town.sign."]')).filter((e) => e.style.visibility !== 'hidden').length);
+        console.log(`town ${String(n)} ${theme}: ${String(shownSigns)} signs shown at the fit`);
+        await shot(s, 'app.right.bims.town', `signs-${String(n)}-fit-${theme}.png`, `signs, ${String(n)} projects, the fit, ${theme}`, 'every sign whole with its name (compact: name and pills), none over another; no room: hidden whole');
+        const town = s.page.getByTestId('app.right.bims.town');
+        const box = await town.boundingBox();
+        if (box === null) throw new Error('no town');
+        // pinched in past the live zoom, then closer: the live offices' bims and their labels under the signs
+        for (const [step, k] of [['live', 5], ['close', 6]] as const) {
+          for (let i = 0; i < k; i++) await trackpad(s.cdp, box.x + box.width / 2, box.y + box.height / 2, { dy: -20, pinch: true });
+          await expect(town).toHaveAttribute('data-zoomed', 'true');
+          await expect.poll(async () => (await probe(s))?.live.length ?? 0, { timeout: 5000, message: 'offices in view posed live' }).toBeGreaterThan(0);
+          await sleep(600);
+          // the bims walk, their labels come and go: a few looks
+          for (let j = 0; j < 4; j++) {
+            faults.push(...(await markFaults(s, `${step} #${String(j)}`)));
+            await sleep(350);
+          }
+          await shot(s, 'app.right.bims.town', `signs-${String(n)}-${step}-${theme}.png`, `signs, ${String(n)} projects, pinched in (${step}), ${theme}`, "the live bims' labels win: a live office's sign above its back wall, or hidden");
+        }
+        expect(faults, 'no mark over another, none without its name').toEqual([]);
+      } finally {
+        await s.close();
+      }
+    });
+  }
+}
