@@ -161,6 +161,10 @@ if [ "${1:-}" = --in-slot ]; then
   fi
   # the recorded ambient-core of the QA world, typed and checked for invariants (feature-tests, p5)
   night_step core-record scripts/core_record.sh bash scripts/core_record.sh
+  # the desktop app's full end-to-end (fast-try p7): the packed candidate of this tip, every quick
+  # as-he-does row with the first run, test:land, the full as-he-does pass, the DMG; a product
+  # step; nothing new starts after 08:00 (scripts/nightly_desktop.sh, docs/desktop-try.md)
+  night_step desktop-full scripts/nightly_desktop.sh bash scripts/nightly_desktop.sh "$out/desktop-$day" --until 08:00
   exit $rc
 fi
 
