@@ -65,6 +65,9 @@ core_kinds! {
         /// his text, for the client's direct-exchange note
         UserSent = "user_sent" => FUserSent { text: Str },
         Renamed = "renamed" => FRenamed { old: Str, new: Str },
+        /// name-free: another agent takes the old name `from`; what still
+        /// says `from` (pages' and artifacts' agent) is agent `to`'s now
+        Retarget = "retarget" => FRetarget { from: Str, to: Str },
     }
 }
 

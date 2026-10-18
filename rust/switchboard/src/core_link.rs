@@ -218,6 +218,7 @@ impl Hub {
                 }
                 fx.push(Effect::Renamed { old, new });
             }
+            CoreFx::Retarget(cfx::Retarget { from, to }) => fx.push(Effect::Retarget { from, to }),
             // core_fx::plain took the others
             other => eprintln!("sb-core: effect {} not run here (skipped)", other.tag()),
         }

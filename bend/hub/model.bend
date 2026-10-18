@@ -9,6 +9,7 @@ import ./wakes.bend as WK
 import ./xhub-model.bend as XH
 import ./lazy.bend as LZ
 import ./gone.bend as G
+import ./names.bend as NM
 
 type Life is Data:
   LActive{}
@@ -285,8 +286,9 @@ def find(~A: Data, ~K: Data, ~key: A -> K, ~eq: K -> K -> Bool, xs: List<&2, A>,
 def rec_of(xs: List<&2, MRec>, +id: Nat) -> Maybe<&2, MRec>:
   find(~MRec, ~Nat, ~(r => Msg.id(MRec.msg(r))), ~(a => b => Nat.is_eq(a, b)), xs, id)
 
-def new_agent(+name: String, +is_main: Bool, +parent: Maybe<&2, String>, +ws: J.Json, +brief: J.Json, +created: Nat) -> Agent:
-  Agent{name, is_main, parent, LActive{}, None{}, Nil{}, Nil{}, ws, name, brief, created, None{}, "", J.JNull{}, None{}, None{}}
+# `dir`: its folder, the stable id of its files (hub/names.bend free_dir)
+def new_agent(+name: String, +dir: String, +is_main: Bool, +parent: Maybe<&2, String>, +ws: J.Json, +brief: J.Json, +created: Nat) -> Agent:
+  Agent{name, is_main, parent, LActive{}, None{}, Nil{}, Nil{}, ws, dir, brief, created, None{}, "", J.JNull{}, None{}, None{}}
 
 def Agent.name(x: Agent) -> String:
   match x:
@@ -300,13 +302,6 @@ def put_agent(xs: List<&2, Agent>, +n: String, +a: Agent) -> List<&2, Agent>:
       [a]
     case Con{+h, +t}:
       LZ.pick(List<&2, Agent>, String.eq(Agent.name(h), n), u => a <> t, u => h <> put_agent(t, n, a))
-
-def rename_in(xs: List<&2, String>, +old: String, +new: String) -> List<&2, String>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      Bool.pick(String, String.eq(h, old), new, h) <> rename_in(t, old, new)
 
 def MAIN() -> String:
   "main"
@@ -394,8 +389,26 @@ def resolve.pick(m: Maybe<&2, Agent>, +st: St, +n: String) -> Maybe<&2, String>:
 def resolve(+st: St, +n: String) -> Maybe<&2, String>:
   resolve.pick(get_agent(st, n), st, n)
 
+def reserved(+n: String) -> Bool:
+  String.eq(n, MAIN()) || String.eq(n, USER()) || String.eq(n, HUB()) || String.eq(n, GITHUB())
+
+def live_agent(m: Maybe<&2, Agent>) -> Bool:
+  match m:
+    case Some{Agent{_, _, _, LArchived{}, _, _, _, _, _, _, _, _, _, _, _, _}}:
+      False{}
+    case Some{_}:
+      True{}
+    case None{}:
+      False{}
+
+# name-free: a live (not archived) agent's name or bise's is taken; an
+# archived one's and an old name are free (core take, apply's strip)
 def name_taken(+st: St, +n: String) -> Bool:
-  String.eq(n, MAIN()) || String.eq(n, USER()) || String.eq(n, HUB()) || String.eq(n, GITHUB()) || Maybe.is_some(&2, String, resolve(st, n))
+  reserved(n) || live_agent(agent_named(St.agents(st), n))
+
+# no agent has it (any life), nor bise: a take's event (cx FreshEv)
+def name_held(+st: St, +n: String) -> Bool:
+  reserved(n) || Maybe.is_some(&2, Agent, agent_named(St.agents(st), n))
 
 def agent_op.decl(l: Life, +d: Maybe<&2, Decl>) -> Maybe<&2, Decl>:
   match l:
@@ -435,6 +448,26 @@ def agent_op(+a: Agent, op: AgentOp) -> Agent:
           Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, rp, snap, follow}
         case OFollow{+f}:
           Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, f}
+
+def Agent.strip(+a: Agent, +n: String) -> Agent:
+  match a:
+    case Agent{+name, +is_main, +parent, +life, +declared, +aliases, +files, +ws, +dir, +brief, +created, +failure, +note, +report, +snap, +follow}:
+      Agent{name, is_main, parent, life, declared, NM.drop_str(aliases, n), files, ws, dir, brief, created, failure, note, report, snap, follow}
+
+# the agents without the old name `n` (another agent takes it)
+def strip(xs: List<&2, Agent>, +n: String) -> List<&2, Agent>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+a, +t}:
+      Agent.strip(a, n) <> strip(t, n)
+
+def dirs_of(xs: List<&2, Agent>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{Agent{_, _, _, _, _, _, _, _, +dir, _, _, _, _, _, _, _}, +t}:
+      dir <> dirs_of(t)
 
 # the head of `xs` is the agent named `n`
 def name_at(xs: List<&2, Agent>, +n: String) -> Bool:
@@ -675,7 +708,7 @@ def apply(+st: St, e: Ev) -> St:
     case St{+agents, +order, +hot, +cards, +notes, +nm, +nc, +tm, +xs, +pz, +old, +gone}:
       match e:
         case ETaskCreated{+name, +parent, +brief, +ws, +at}:
-          St{put_agent(agents, name, new_agent(name, False{}, Some{parent}, ws, brief, at)),
+          St{put_agent(strip(agents, name), name, new_agent(name, NM.free_dir(dirs_of(agents), name), False{}, Some{parent}, ws, brief, at)),
             Bool.pick(List<&2, String>, str_in(order, name), order, snoc(String, order, name)),
             hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case ELifecycle{+name, +life, +reason}:
@@ -693,7 +726,7 @@ def apply(+st: St, e: Ev) -> St:
         case EFileTouched{+name, +path}:
           St{map_agent(agents, name, OFile{path}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case ERenamed{+name, +nn}:
-          St{map_agent(agents, name, ORename{nn}), rename_in(order, name, nn), hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
+          St{map_agent(strip(agents, nn), name, ORename{nn}), NM.rename_in(order, name, nn), hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         # the three message events, on the split (law cold_is_inert: on
         # every message, the same as one list's snoc, map_msg, settle)
         case EMsgSent{+m}:
@@ -840,7 +873,7 @@ def init(+workspace: String) -> St:
     J.kv("branch", J.JNull{}), J.kv("base_commit", J.JNull{}), J.kv("dropped", J.JBool{False{}})])
   +brief = J.obj([J.kv("objective", J.str("")), J.kv("context", J.str("")), J.kv("constraints", J.JArr{Nil{}}),
     J.kv("done_when", J.JNull{}), J.kv("report_format", J.JNull{})])
-  St{[new_agent(MAIN(), True{}, None{}, ws, brief, 0n)], [MAIN()], Nil{}, Nil{}, Nil{}, 1n, 1n, TM.empty(), XH.empty(), None{}, Nil{}, Nil{}}
+  St{[new_agent(MAIN(), MAIN(), True{}, None{}, ws, brief, 0n)], [MAIN()], Nil{}, Nil{}, Nil{}, 1n, 1n, TM.empty(), XH.empty(), None{}, Nil{}, Nil{}}
 
 def Msg.auto(x: Msg) -> Bool:
   match x:
@@ -951,19 +984,12 @@ def Agent.snap(x: Agent) -> Maybe<&2, String>:
     case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, +snap, _}:
       snap
 
-def Agent.follow.of(f: Maybe<&2, String>) -> Bool:
-  match f:
-    case None{}:
-      False{}
-    case Some{_}:
-      True{}
-
 # bise desktop S10: someone asked to hear when it ends (one job: off again
 # at its job_end)
 def Agent.follow(x: Agent) -> Bool:
   match x:
     case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, +f}:
-      Agent.follow.of(f)
+      Maybe.is_some(&2, String, f)
 
 # J: the hub its end goes back to ("" none: not followed, or followed by
 # this hub's own main or window)

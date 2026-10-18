@@ -236,6 +236,24 @@ def ev_names(e: M.Ev) -> List<&2, String>:
     case _:
       Nil{}
 
+# name-free: a take of an old name strips it from its holder (its row's
+# old names change); the step's `retarget` out names that holder
+def fx_name.of(is_rt: Bool, +x: J.Json) -> List<&2, String>:
+  match is_rt:
+    case True{}:
+      [J.get_str_or(x, "to", "")]
+    case False{}:
+      Nil{}
+
+def fx_names(xs: List<&2, X.Fx>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{X.FO{+x}, +t}:
+      List.append(&2, String, fx_name.of(String.eq(J.get_str_or(x, "fx", ""), "retarget"), x), fx_names(t))
+    case Con{_, +t}:
+      fx_names(t)
+
 def names_of(evs: List<&2, M.Ev>) -> List<&2, String>:
   match evs:
     case Nil{}:

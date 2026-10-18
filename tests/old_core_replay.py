@@ -138,7 +138,22 @@ WRITE = [
     {"t": "req", "token": 1, "from": "main", "req": {"cmd": "card", "text": "ship v2?", "for": None}},
     {"t": "req", "token": 2, "from": "main", "req": {"cmd": "withdraw", "card": 2, "why": "moot"}},
     {"t": "answer", "card": 2, "text": "yes, ship it"},
+    # name-free (architect m_31139): x archived, then a new x: the old one
+    # is renamed x-2 (renamed), the new one created (task_created), kinds
+    # every base knows; this tree's core gives the new x its own folder x.2
+    {"t": "new", "base": "x", "brief": {"objective": "one", "context": ""}, "brief_text": "one", "objective": "one",
+     "worktree": False, "with_changes": False},
+    {"t": "drop", "name": "x", "force": True},
+    {"t": "new", "base": "x", "brief": {"objective": "two", "context": ""}, "brief_text": "two", "objective": "two",
+     "worktree": False, "with_changes": False},
 ]
+
+# what this tree's sb-core says of the agents after WRITE (name-free)
+AGENTS = [("main", "main"), ("x-2", "x"), ("x", "x.2")]
+
+
+def agents_of(view):
+    return [(a["name"], a.get("dir")) for a in view.get("view", view).get("agents", [])]
 
 
 def written_by_this_tree(path):
@@ -150,13 +165,26 @@ def written_by_this_tree(path):
         for i, st in enumerate(WRITE):
             ans = core.call(dict(st, now=1760000000000 + i * 1000, git=False, ans=[]))
             lines += [x["ev"] for x in ans.get("fx", []) if x.get("fx") == "journal"]
+        live = agents_of(core.call({"t": "view_all"}))
     finally:
         core.kill()
     with open(path, "w") as f:
         f.writelines(json.dumps(l) + "\n" for l in lines)
     kinds = [l["type"] for l in lines]
     assert kinds == ["message_sent", "card_opened", "every_set", "wake_set", "route_held", "act_set",
-                     "card_opened", "card_closed", "card_withdrawn", "message_sent", "card_late"], kinds
+                     "card_opened", "card_closed", "card_withdrawn", "message_sent", "card_late",
+                     "task_created", "main_note", "message_sent", "lifecycle", "message_state", "main_note",
+                     "renamed", "task_created", "main_note", "message_sent"], kinds
+    assert live == AGENTS, "the archived x is x-2 in its folder, the new x in x.2: %r" % live
+    # the same journal replayed on this tree's sb-core: the same agents
+    again = Core(out.stdout.strip().splitlines()[-1])
+    try:
+        again.call({"t": "replay_many", "evs": lines})
+        back = agents_of(again.call({"t": "view_all"}))
+    finally:
+        again.kill()
+    assert back == AGENTS, "a reused name replays to the same agents: %r" % back
+    print("ok   name-free: a reused name (renamed x x-2, task_created x) replays to the same agents on this tree")
     return lines
 
 
@@ -198,6 +226,9 @@ def replay_written(core, path):
     view = core.call({"t": "view_all"})
     view = view.get("view", view)
     assert "ship the docs" in json.dumps(view.get("msgs", [])), "the message: %r" % view.get("msgs")
+    # name-free: the base reads renamed and task_created as it always did
+    names = [n for n, _ in agents_of(view)]
+    assert names == [n for n, _ in AGENTS], "the reused name's agents: %r" % names
     assert "he answered #2 after you withdrew it" in json.dumps(view.get("msgs", [])), "his late answer: %r" % view.get("msgs")
     assert [c["id"] for c in view.get("cards", [])] == [1], "the card: %r" % view.get("cards")
     assert [t["id"] for t in view.get("timers", [])] == [1], "the timer: %r" % view.get("timers")

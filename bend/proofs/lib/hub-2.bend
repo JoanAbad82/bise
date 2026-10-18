@@ -756,69 +756,8 @@ def hub_some_none(-a: HM.Agent, e: {Some{a} == None{} : Maybe<&2, HM.Agent>}) ->
   %Equal.sym(Maybe<&2, HM.Agent>, Some{a}, None{}, e) : hub_mdisc(_)
   Unit{}
 
-def hub_sdisc(m: Maybe<&2, String>) -> Type:
-  match m:
-    case None{}:
-      Unit
-    case Some{x}:
-      Empty
-
-def hub_some_none_s(-a: String, e: {Some{a} == None{} : Maybe<&2, String>}) -> Empty:
-  %Equal.sym(Maybe<&2, String>, Some{a}, None{}, e) : hub_sdisc(_)
-  Unit{}
-
-def hub_free_of.absurd1(-a: HM.Agent, -t: List<&2, HM.Agent>, -n: String, x: Empty) -> hub_free(HI.profile(a <> t), n):
-  match x:
-
-def hub_free_of.pick(c1: Bool, c2: Bool, +a: HM.Agent, +t: List<&2, HM.Agent>, +n: String,
-    +e1: {String.eq(HM.Agent.name(a), n) == c1 : Bool}, +e2: {HM.str_in(HM.Agent.aliases(a), n) == c2 : Bool},
-    hn: {HLZ.pick(Maybe<&2, HM.Agent>, c1, u => Some{a}, u => HM.agent_named(t, n)) == None{} : Maybe<&2, HM.Agent>},
-    ha: {HLZ.pick(Maybe<&2, String>, c2, u => Some{HM.Agent.name(a)}, u => HM.agent_alias(t, n)) == None{} : Maybe<&2, String>},
-    k: @p: {HM.agent_named(t, n) == None{} : Maybe<&2, HM.Agent>} -> @q: {HM.agent_alias(t, n) == None{} : Maybe<&2, String>} -> hub_free(HI.profile(t), n))
-    -> hub_free(HI.profile(a <> t), n):
-  match c1 c2:
-    case True{} _:
-      hub_free_of.absurd1(a, t, n, hub_some_none(a, hn))
-    case False{} True{}:
-      hub_free_of.absurd1(a, t, n, hub_some_none_s(HM.Agent.name(a), ha))
-    case False{} False{}:
-      HX.Both{PL1.hub_lor_false(String.eq(HM.Agent.name(a), n), HM.str_in(HM.Agent.aliases(a), n), e1, e2), k(hn, ha)}
-
-# a name no agent has as a name or an old name is free in the profile
-def hub_free_of(+xs: List<&2, HM.Agent>, +n: String, hn: {HM.agent_named(xs, n) == None{} : Maybe<&2, HM.Agent>}, ha: {HM.agent_alias(xs, n) == None{} : Maybe<&2, String>})
-    -> hub_free(HI.profile(xs), n):
-  match xs:
-    case Nil{}:
-      Unit{}
-    case Con{a, t}:
-      hub_free_of.pick(String.eq(HM.Agent.name(a), n), HM.str_in(HM.Agent.aliases(a), n), a, t, n, {==}, {==}, hn, ha,
-        p => q => hub_free_of(t, n, p, q))
-
-def hub_nt.absurd(-s: HM.St, -n: String, x: Empty) -> hub_free(HI.profile(HM.St.agents(s)), n):
-  match x:
-
-def hub_nt.alias(r: Maybe<&2, String>, +s: HM.St, +n: String, +er: {HM.agent_alias(HM.St.agents(s), n) == r : Maybe<&2, String>},
-    +en: {HM.agent_named(HM.St.agents(s), n) == None{} : Maybe<&2, HM.Agent>}, hs: {Maybe.is_some(&2, String, r) == False{} : Bool})
-    -> hub_free(HI.profile(HM.St.agents(s)), n):
-  match r:
-    case None{}:
-      hub_free_of(HM.St.agents(s), n, en, er)
-    case Some{x}:
-      hub_nt.absurd(s, n, PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, hs)))
-
-def hub_nt.named(m: Maybe<&2, HM.Agent>, +s: HM.St, +n: String, +em: {HM.agent_named(HM.St.agents(s), n) == m : Maybe<&2, HM.Agent>},
-    hs: {Maybe.is_some(&2, String, HM.resolve.pick(m, s, n)) == False{} : Bool})
-    -> hub_free(HI.profile(HM.St.agents(s)), n):
-  match m:
-    case Some{a}:
-      hub_nt.absurd(s, n, PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, hs)))
-    case None{}:
-      hub_nt.alias(HM.agent_alias(HM.St.agents(s), n), s, n, {==}, em, hs)
-
-# a name that is not taken is free among the agents' names
-def hub_nt(+s: HM.St, +n: String, e: {HM.name_taken(s, n) == False{} : Bool}) -> hub_free(HI.profile(HM.St.agents(s)), n):
-  hub_nt.named(HM.agent_named(HM.St.agents(s), n), s, n, {==},
-    PL1.hub_or_false_r(String.eq(n, HM.MAIN()) || String.eq(n, HM.USER()) || String.eq(n, HM.HUB()) || String.eq(n, HM.GITHUB()), Maybe.is_some(&2, String, HM.resolve(s, n)), e))
+# name-free: a name no agent has is free among the agents' names once
+# the take strips it from the old names (lib/hub-names.bend nm_free)
 
 # ---- L4 support: names apart — a new agent ----
 

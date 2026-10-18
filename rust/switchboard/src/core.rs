@@ -797,10 +797,10 @@ pub enum Effect {
         client: ClientId,
         body: Value,
     },
-    Renamed {
-        old: String,
-        new: String,
-    },
+    Renamed { old: String, new: String },
+    /// name-free: another agent takes the old name `from`: pages and
+    /// artifacts that still say it are `to`'s (daemon/names.rs)
+    Retarget { from: String, to: String },
     /// The state changed: broadcast a snapshot.
     State,
     /// Ask a small model for a task's role line (BISE-126), off the hub's

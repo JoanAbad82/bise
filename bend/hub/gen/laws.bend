@@ -1229,6 +1229,12 @@ law fx_renamed_bare:
 def fx_renamed_bare():
   {==}
 
+law fx_retarget_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"retarget"})])) == FX.FRetarget{"", ""} : FX.Fx}
+
+def fx_retarget_bare():
+  {==}
+
 law fx_unknown_tag:
   {FX.of(J.obj([J.kv("fx", J.JStr{"weather"})])) == FX.FNone{} : FX.Fx}
 
@@ -1507,6 +1513,14 @@ law fx_FRenamed_round:
   {FX.of(FX.json(FX.FRenamed{old, new})) == FX.FRenamed{old, new} : FX.Fx}
 
 def fx_FRenamed_round(old, new):
+  {==}
+
+law fx_FRetarget_round:
+  for from: String
+  for to: String
+  {FX.of(FX.json(FX.FRetarget{from, to})) == FX.FRetarget{from, to} : FX.Fx}
+
+def fx_FRetarget_round(from, to):
   {==}
 
 # ---- Answer ----

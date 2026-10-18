@@ -36,17 +36,28 @@ def candidate(+base: String, +i: Nat) -> String:
 
 # the first free `<base>-<i>` from i on (`taken`: that one is taken); a
 # match, never Bool.pick (tests/pick_gate.py)
-def unique_name.go(fuel: Nat, +s: M.St, +base: String, +i: Nat, +taken: Bool) -> String:
+def unique_name.go(~tk: M.St -> String -> Bool, fuel: Nat, +s: M.St, +base: String, +i: Nat, +taken: Bool) -> String:
   match fuel taken:
     case 0n _:
       candidate(base, i)
     case 1n+f True{}:
-      unique_name.go(f, s, base, 1n+i, M.name_taken(s, candidate(base, 1n+i)))
+      unique_name.go(~tk, f, s, base, 1n+i, tk(s, candidate(base, 1n+i)))
     case 1n+f False{}:
       candidate(base, i)
 
+# a new task's name: the base, or `<base>-2`... when a live agent has it
+# (an archived one's or an old name is taken from it: hub/take.bend)
 def unique_name(+s: M.St, +base: String) -> String:
-  Bool.pick(String, M.name_taken(s, base), unique_name.go(1000n, s, base, 2n, M.name_taken(s, candidate(base, 2n))), base)
+  Bool.pick(String, M.name_taken(s, base), unique_name.go(~(x => y => M.name_taken(x, y)), 1000n, s, base, 2n, M.name_taken(s, candidate(base, 2n))), base)
+
+# a name no agent has, as its name or an old name, nor bise
+def held_any(+s: M.St, +n: String) -> Bool:
+  M.reserved(n) || Maybe.is_some(&2, String, M.resolve(s, n))
+
+# name-free: the name an archived agent moves to when its own is taken:
+# `<base>-2`, `-3`... the first no agent has (as a name or an old name)
+def unique_free(+s: M.St, +base: String) -> String:
+  unique_name.go(~(x => y => held_any(x, y)), 1000n, s, base, 2n, held_any(s, candidate(base, 2n)))
 
 # its worktree in the spawn line: ` (worktree <branch>)`, "" none
 def branch_label(b: J.Json) -> String:

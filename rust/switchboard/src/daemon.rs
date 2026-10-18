@@ -30,6 +30,7 @@ mod fn_context;
 pub(crate) mod gate;
 mod history;
 mod lines;
+mod names;
 mod page_cards;
 mod pages;
 mod projects;
@@ -934,16 +935,8 @@ impl Shell {
                 // typed, or nothing: no client reads the older line
                 let _ = self.typed_notice(client, &body) || self.typed_confirm(client, &body) || self.rpc_effect(client, &body);
             }
-            Effect::Renamed { old, new } => {
-                if let Some(b) = self.buffers.remove(&old) {
-                    self.buffers.insert(new.clone(), b);
-                }
-                if let Some(p) = self.positions.remove(&old) {
-                    self.positions.insert(new.clone(), p);
-                }
-                self.proto_renamed(&old, &new);
-                self.broadcast(&json!({"ev": "renamed", "old": old, "new": new}));
-            }
+            Effect::Renamed { old, new } => self.renamed(old, new),
+            Effect::Retarget { from, to } => self.retarget(&from, &to),
             // sent by the loop when the gate allows (daemon/state_gate.rs)
             Effect::State => self.state_gate.changed(),
             Effect::AskRole { dir, key, request } => self.ask_role(dir, key, request),

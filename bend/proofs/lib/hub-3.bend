@@ -12,6 +12,8 @@ import ../../hub/xhub-model.bend as HXH
 import ../../hub/xhub.bend as HXB
 import ./hub-1.bend as PL1
 import ./hub-2.bend as PL2
+import ./hub-names.bend as PLN
+import ../../hub/names.bend as HN
 import ../../hub/lazy.bend as HLZ
 
 # entries listed before a renamed one stay apart from the renamed list
@@ -74,11 +76,14 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
     case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs, +pz, +ho, +gn}:
       match e:
         case HM.ETaskCreated{+n, pa, br, ws, at}:
-          hub_nok_tr(HI.profile(HM.put_agent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at))), HM.snoc(List<&2, String>, HI.profile(ag), [n]),
-            PL2.hub_put_absent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at), PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k)),
-            PL2.hub_nok_snoc(HI.profile(ag), [n], u, PL2.hub_allapart_new(HI.profile(ag), n, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k))))
+          hub_nok_tr(HI.profile(HM.put_agent(HM.strip(ag, n), n, HM.new_agent(n, HN.free_dir(HM.dirs_of(ag), n), False{}, Some{pa}, ws, br, at))),
+            HM.snoc(List<&2, String>, HI.profile(HM.strip(ag, n)), [n]),
+            PL2.hub_put_absent(HM.strip(ag, n), n, HM.new_agent(n, HN.free_dir(HM.dirs_of(ag), n), False{}, Some{pa}, ws, br, at),
+              PLN.nm_free(ag, n, PLN.nm_held(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k))),
+            PL2.hub_nok_snoc(HI.profile(HM.strip(ag, n)), [n], PLN.nm_ok(ag, n, u),
+              PL2.hub_allapart_new(HI.profile(HM.strip(ag, n)), n, PLN.nm_free(ag, n, PLN.nm_held(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k)))))
         case HM.ERenamed{old, +new}:
-          hub_nok_ren(ag, old, new, u, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, new, k))
+          hub_nok_ren(HM.strip(ag, new), old, new, PLN.nm_ok(ag, new, u), PLN.nm_free(ag, new, PLN.nm_held(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, new, k)))
         case HM.ELifecycle{+x, +l, +r}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OLife{l, r})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OLife{l, r}, {==}), u)
         case HM.EWorkspace{+x, +w}:

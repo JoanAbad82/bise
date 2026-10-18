@@ -332,6 +332,21 @@ def ids_in(xs: List<&2, Timer>, +ns: List<&2, String>) -> List<&2, Nat>:
       +rest = ids_in(t, ns)
       Bool.pick(List<&2, Nat>, str_in(ns, Timer.agent(h)), Timer.id(h) <> rest, rest)
 
+# name-free: the live timers set under the old name `n` (another agent
+# takes it), and one moved to its holder's name `agent` under id `id`
+def of_name(xs: List<&2, Timer>, +n: String) -> List<&2, Timer>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      +rest = of_name(t, n)
+      Bool.pick(List<&2, Timer>, String.eq(Timer.agent(h), n), h <> rest, rest)
+
+def moved(+t: Timer, +agent: String, +id: Nat) -> Timer:
+  match t:
+    case Timer{_, _, +by, +text, +sched, +next, +until, +times, +fired, +page, +last, +runs, +name, +held}:
+      Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held}
+
 # ---- for the law stop_leaves_no_timer (bend/proofs/hub.bend) ----
 
 def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:

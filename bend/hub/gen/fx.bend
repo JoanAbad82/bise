@@ -56,6 +56,8 @@ type Fx is Data:
   FUserSent{text: String}
   # renamed
   FRenamed{old: String, new: String}
+  # retarget
+  FRetarget{from: String, to: String}
   # any other tag
   FNone{}
 
@@ -132,6 +134,9 @@ def FUserSent.of(+i: J.Json) -> Fx:
 
 def FRenamed.of(+i: J.Json) -> Fx:
   FRenamed{K.get_s(i, "old"), K.get_s(i, "new")}
+
+def FRetarget.of(+i: J.Json) -> Fx:
+  FRetarget{K.get_s(i, "from"), K.get_s(i, "to")}
 
 def of.t0(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
@@ -250,16 +255,25 @@ def of.t13(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       FNone{}
 
-def of.t14(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t15(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t13(String.order(t, "reply"), t, i)
+      FNone{}
     case EQ{}:
       FRoute.of(i)
     case GT{}:
       FNone{}
 
-def of.t16(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t14(c: Cmp, +t: String, +i: J.Json) -> Fx:
+  match c:
+    case LT{}:
+      of.t13(String.order(t, "reply"), t, i)
+    case EQ{}:
+      FRetarget.of(i)
+    case GT{}:
+      of.t15(String.order(t, "route"), t, i)
+
+def of.t17(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
@@ -268,25 +282,25 @@ def of.t16(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       FNone{}
 
-def of.t17(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t18(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t16(String.order(t, "rt"), t, i)
+      of.t17(String.order(t, "rt"), t, i)
     case EQ{}:
       FSay.of(i)
     case GT{}:
       FNone{}
 
-def of.t15(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t16(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t14(String.order(t, "route"), t, i)
+      of.t14(String.order(t, "retarget"), t, i)
     case EQ{}:
       FRouteDone.of(i)
     case GT{}:
-      of.t17(String.order(t, "say"), t, i)
+      of.t18(String.order(t, "say"), t, i)
 
-def of.t19(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t20(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
@@ -295,16 +309,16 @@ def of.t19(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       FNone{}
 
-def of.t20(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t21(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t19(String.order(t, "user_sent"), t, i)
+      of.t20(String.order(t, "user_sent"), t, i)
     case EQ{}:
       FWorktreeCreate.of(i)
     case GT{}:
       FNone{}
 
-def of.t22(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t23(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
@@ -313,32 +327,32 @@ def of.t22(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       FNone{}
 
-def of.t23(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t24(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t22(String.order(t, "xdeliver"), t, i)
+      of.t23(String.order(t, "xdeliver"), t, i)
     case EQ{}:
       FXReply.of(i)
     case GT{}:
       FNone{}
 
-def of.t21(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t22(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t20(String.order(t, "worktree_create"), t, i)
+      of.t21(String.order(t, "worktree_create"), t, i)
     case EQ{}:
       FWorktreeDrop.of(i)
     case GT{}:
-      of.t23(String.order(t, "xreply"), t, i)
+      of.t24(String.order(t, "xreply"), t, i)
 
-def of.t18(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t19(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t15(String.order(t, "route_done"), t, i)
+      of.t16(String.order(t, "route_done"), t, i)
     case EQ{}:
       FSpawn.of(i)
     case GT{}:
-      of.t21(String.order(t, "worktree_drop"), t, i)
+      of.t22(String.order(t, "worktree_drop"), t, i)
 
 def of.t12(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
@@ -347,9 +361,9 @@ def of.t12(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case EQ{}:
       FRenamed.of(i)
     case GT{}:
-      of.t18(String.order(t, "spawn"), t, i)
+      of.t19(String.order(t, "spawn"), t, i)
 
-# the record of a tag (a binary search over the 24 sorted tags); any
+# the record of a tag (a binary search over the 25 sorted tags); any
 # other tag: FNone
 def of_tag(+t: String, +i: J.Json) -> Fx:
   of.t12(String.order(t, "renamed"), t, i)
@@ -410,6 +424,8 @@ def kvs(x: Fx) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("fx", J.JStr{"user_sent"}), J.kv("text", J.JStr{text})]
     case FRenamed{+old, +new}:
       [J.kv("fx", J.JStr{"renamed"}), J.kv("old", J.JStr{old}), J.kv("new", J.JStr{new})]
+    case FRetarget{+from, +to}:
+      [J.kv("fx", J.JStr{"retarget"}), J.kv("from", J.JStr{from}), J.kv("to", J.JStr{to})]
     case FNone{}:
       Nil{}
 
@@ -493,4 +509,7 @@ def user_sent(+text: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
 
 def renamed(+old: String, +new: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FRenamed{old, new})
+
+def retarget(+from: String, +to: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  kvs(FRetarget{from, to})
 

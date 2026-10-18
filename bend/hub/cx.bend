@@ -347,7 +347,8 @@ def journal(fx: List<&2, Fx>) -> List<&2, M.Ev>:
 
 # a new message (a new card) takes the next free id of the state it is
 # created in: no id is ever reused, so nothing overwrites another; a new
-# task or a new name takes a name nobody has (law L4: names stay apart)
+# task or a new name takes a name no agent has (law L4: names stay apart;
+# an old name may be taken: apply strips it, name-free)
 def FreshEv(+s: M.St, e: M.Ev) -> Data:
   match e:
     case M.EMsgSent{+m}:
@@ -355,9 +356,9 @@ def FreshEv(+s: M.St, e: M.Ev) -> Data:
     case M.ECardOpened{+c}:
       {M.Card.id(c) == M.St.next_card(s) : Nat}
     case M.ETaskCreated{+name, _, _, _, _}:
-      {M.name_taken(s, name) == False{} : Bool}
+      {M.name_held(s, name) == False{} : Bool}
     case M.ERenamed{_, +new}:
-      {M.name_taken(s, new) == False{} : Bool}
+      {M.name_held(s, new) == False{} : Bool}
     case _:
       Unit
 

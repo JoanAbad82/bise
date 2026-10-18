@@ -31,10 +31,13 @@ fn day(ms: u64) -> i64 {
 }
 
 impl Shell {
-    /// A line of agent `name`'s live REPL (before the feed).
+    /// A line of agent `name`'s live REPL (before the feed). The ledger
+    /// keys its rows by the agent's folder, which never changes (name-free:
+    /// an archived agent's name may go to a new one; its spend stays its).
     pub(super) fn usage_line(&mut self, name: &str, line: &str) {
         if self.usage.filled.is_some() {
-            self.usage.ledger.line(name, day(now_ms()), line);
+            let dir = self.dir_of(name).unwrap_or_else(|| name.to_string());
+            self.usage.ledger.line(&dir, day(now_ms()), line);
         }
     }
 
@@ -55,7 +58,8 @@ impl Shell {
         self.usage.ledger.forget_before(today);
         self.setup(); // the catalog's prices, re-read when config changed
         let setup = &self.setup.as_ref().expect("just set").1;
-        let live: BTreeSet<&str> = self.hub.st.agents.values().filter(|a| a.lifecycle != crate::model::Lifecycle::Archived).map(|a| a.name.as_str()).collect();
+        let live: BTreeSet<&str> = self.hub.st.agents.values().filter(|a| a.lifecycle != crate::model::Lifecycle::Archived).map(|a| a.dir.as_str()).collect();
+        let names: BTreeMap<&str, &str> = self.hub.st.agents.values().map(|a| (a.dir.as_str(), a.name.as_str())).collect();
         let cost = |model: &str, t: &Tokens| {
             let r = setup.catalog.resolve(model);
             if setup.catalog.provider(&r.provider).is_some_and(|p| p.signs_in()) {
@@ -63,7 +67,7 @@ impl Shell {
             }
             r.price.cost(t.input, t.output, t.cache_read, t.cache_write).map_or(Cost::Unknown, Cost::Usd)
         };
-        let report = self.usage.ledger.report(today, cost, |agent| !live.contains(agent));
+        let report = named(self.usage.ledger.report(today, cost, |dir| !live.contains(dir)), &names);
         usage_ev(self.project(), self.usage.filled != Some(true), report)
     }
 
@@ -72,7 +76,6 @@ impl Shell {
     fn usage_fill(&mut self, until: u64) {
         let since = week_start(day(until));
         let agents = self.opts.paths.agent_dir("x").parent().map(Path::to_path_buf);
-        let names: BTreeMap<String, String> = self.hub.st.agents.values().map(|a| (a.dir.clone(), a.name.clone())).collect();
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             let mut l = Ledger::default();
@@ -84,8 +87,7 @@ impl Shell {
                     continue;
                 }
                 let dir = e.file_name().to_string_lossy().to_string();
-                let name = names.get(&dir).cloned().unwrap_or(dir);
-                lines_backwards(&t, |raw| l.transcript_line(&name, raw, since, until, day));
+                lines_backwards(&t, |raw| l.transcript_line(&dir, raw, since, until, day));
             }
             let _ = tx.send(Msg::UsageCounted(Box::new(l)));
         });
@@ -135,6 +137,17 @@ fn usage_sum(s: &Sum) -> UsageSum {
         plan: s.plan,
         words: bise_proto::thread::words::usage_words(s.cost_usd, priced, plan_only, t.input, t.output, t.calls),
     }
+}
+
+/// A report by folder, each row under its agent's name now (a folder no
+/// agent has: its own name).
+fn named(mut r: Report, names: &BTreeMap<&str, &str>) -> Report {
+    for (n, _, _) in r.agents.iter_mut() {
+        if let Some(name) = names.get(n.as_str()) {
+            *n = name.to_string();
+        }
+    }
+    r
 }
 
 /// The typed answer of a report.

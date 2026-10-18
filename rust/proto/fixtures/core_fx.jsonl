@@ -16,6 +16,7 @@
 {"fx": "notice", "text": "no open card #999"}
 {"fx": "passthrough", "agent": "main", "line": "/status"}
 {"fx": "renamed", "old": "t9", "new": "t9b"}
+{"fx": "retarget", "from": "marketing", "to": "design"}
 {"fx": "reply", "token": 1, "body": {"ok": true}}
 {"fx": "route", "rid": 1, "to": "shop-1", "name": "shop", "text": "look", "due_ms": 1002000, "why": "you named shop"}
 {"fx": "route_done", "rid": 1, "state": "cancelled", "to": "shop-1", "xid": null}

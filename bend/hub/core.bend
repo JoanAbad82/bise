@@ -43,6 +43,7 @@ import ./lazy.bend as LZ
 import ./place.bend as PL
 import ./cardkind.bend as CK
 import ./gone.bend as G
+import ./take.bend as TK
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -920,7 +921,7 @@ def place.ask(-o: M.St, placing: Bool, +cx: X.Cx<o>, +name: String, +ws: J.Json)
     case False{}:
       cx
 
-def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_taken(X.d(o, cx), name) == False{} : Bool}) -> X.Cx<o> & TaskR:
+def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_held(X.d(o, cx), name) == False{} : Bool}) -> X.Cx<o> & TaskR:
   +parent = NewTask.parent(t)
   +label = Bool.pick(String, M.ws_placing(ws), " (worktree being made)", NT.branch_label(M.ws_branch(ws)))
   +obj = T.one_line(NewTask.objective(t))
@@ -935,7 +936,7 @@ def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Jso
   # (law brief_keeps_parts)
   create.sent(o, send(o, cx5, Snd.with_parts(m, NT.brief_parts(head, NewTask.parts(t)))), name)
 
-def create.go.free(-o: M.St, taken: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_taken(X.d(o, cx), name) == taken : Bool}) -> X.Cx<o> & TaskR:
+def create.go.free(-o: M.St, taken: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_held(X.d(o, cx), name) == taken : Bool}) -> X.Cx<o> & TaskR:
   match taken:
     case True{}:
       (cx, TErr{String.append("name already taken: ", name)})
@@ -943,9 +944,10 @@ def create.go.free(-o: M.St, taken: Bool, +cx: X.Cx<o>, +t: NewTask, +name: Stri
       create.go.new(o, cx, t, name, ws, e)
 
 # the name is still free (unique_name found it; it can only be taken if
-# its search ran out)
+# its search ran out); an archived agent's or an old name is freed first
 def create.go(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json) -> X.Cx<o> & TaskR:
-  create.go.free(o, M.name_taken(st(o, cx), name), cx, t, name, ws, {==})
+  +cx2 = TK.take(o, cx, name)
+  create.go.free(o, M.name_held(st(o, cx2), name), cx2, t, name, ws, {==})
 
 def ans_ok.go(m: Maybe<&2, J.Json>, +j: J.Json) -> Result<&2, &2, String, J.Json>:
   match m:
@@ -2022,25 +2024,10 @@ def user_isolate.res(-o: M.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
     case (+cx, THalt{}):
       cx
 
-def rename.apply.new(-o: M.St, +cx: X.Cx<o>, +old: String, +new: String, +e: {M.name_taken(X.d(o, cx), new) == False{} : Bool}) -> X.Cx<o>:
-  +cx2 = emit(o, cx, M.ERenamed{old, new}, e, Unit{}, Unit{})
-  +r = rr(o, cx2)
-  +cx3 = set_r(o, cx2, X.R.with_rts(X.R.with_waiters(X.R.with_steered(r, KL.steer_rename(X.R.steered(r), old, new)),
-    X.waiters_rename(X.R.waiters(r), old, new)), X.rt_rename(X.R.rts(r), old, new)))
-  +cx4 = out(o, cx3, F.renamed(old, new))
-  feed(o, cx4, M.MAIN(), FD.info(cat(["@", old, " s'appelle maintenant @", new])))
-
-def rename.apply.free(-o: M.St, taken: Bool, +cx: X.Cx<o>, +old: String, +new: String, +e: {M.name_taken(X.d(o, cx), new) == taken : Bool}) -> X.Cx<o>:
-  match taken:
-    case True{}:
-      notice(o, cx, String.append("invalid or taken name: ", new))
-    case False{}:
-      rename.apply.new(o, cx, old, new, e)
-
-# the rename itself (the user's /rename and main's sb rename)
-# the new name is free (the callers checked it on this state)
+# the rename itself (the user's /rename and main's sb rename): take.bend
+# frees the new name first (an archived agent's, an old name: name-free)
 def rename.apply(-o: M.St, +cx: X.Cx<o>, +old: String, +new: String) -> X.Cx<o>:
-  rename.apply.free(o, M.name_taken(st(o, cx), new), cx, old, new, {==})
+  TK.rename_to(o, cx, old, new)
 
 def rename.go(-o: M.St, ok: Bool, +cx: X.Cx<o>, +old: String, +new: String) -> X.Cx<o>:
   match ok:

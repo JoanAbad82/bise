@@ -441,6 +441,17 @@ impl Store {
         write_atomic(&self.dir().join(&m.id).join("meta.json"), &bytes)
     }
 
+    /// name-free (sb-core's `retarget` fx): another agent takes the old
+    /// name `from`, so the artifacts that still say `from` say `to`, the
+    /// agent that had it. The number moved.
+    pub fn retarget(&self, from: &str, to: &str) -> usize {
+        self.stored()
+            .into_iter()
+            .filter(|m| m.agent == from)
+            .filter(|m| self.save(&Meta { agent: to.to_string(), ..m.clone() }).is_ok())
+            .count()
+    }
+
     /// The page server's base (`http://127.0.0.1:<port>`), from
     /// `<state>/pages.port`.
     fn pages_base(&self) -> Option<String> {

@@ -363,6 +363,21 @@ def ids_of(xs: List<&2, Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
       +rest = ids_of(t, ns)
       Bool.pick(List<&2, Nat>, str_in(ns, Watch.agent(h)), Watch.id(h) <> rest, rest)
 
+# name-free: the live watches set under the old name `n` (another agent
+# takes it), and one moved to its holder's name `agent` under id `id`
+def of_name(xs: List<&2, Watch>, +n: String) -> List<&2, Watch>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      +rest = of_name(t, n)
+      Bool.pick(List<&2, Watch>, String.eq(Watch.agent(h), n), h <> rest, rest)
+
+def moved(+w: Watch, +agent: String, +id: Nat) -> Watch:
+  match w:
+    case Watch{_, _, +spec, +max_text, +set_at, +max_at, +quiet, +resumes}:
+      Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes}
+
 # ---- for the law wake_drop_ends (bend/proofs/hub.bend) ----
 
 def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:

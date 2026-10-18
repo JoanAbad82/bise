@@ -272,6 +272,17 @@ impl Store {
         write_json(&self.page_dir(&m.id).join("meta.json"), m)
     }
 
+    /// name-free (sb-core's `retarget` fx): another agent takes the old
+    /// name `from`, so the pages that still say `from` say `to`, the agent
+    /// that had it (its notes and questions go to it, not to the new one).
+    pub fn retarget(&self, from: &str, to: &str) -> usize {
+        self.list()
+            .into_iter()
+            .filter(|m| m.agent == from)
+            .filter(|m| self.save_meta(&Meta { agent: to.to_string(), ..m.clone() }).is_ok())
+            .count()
+    }
+
     /// Where a target's notes live: `pages/<id>/notes.json`,
     /// `artifacts/<id>/notes.json` (None: not an id).
     fn notes_file(&self, t: &Target) -> Option<PathBuf> {
