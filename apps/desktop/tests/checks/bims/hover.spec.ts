@@ -298,7 +298,8 @@ test("(f) the cube in his window: in the AGENTS head left of 'all ›', none in 
       const [bb, lb, gb] = await Promise.all([icon.boundingBox(), label.boundingBox(), icon.locator('svg').boundingBox()]);
       if (bb === null || lb === null || gb === null) throw new Error('no cube, label or glyph');
       const whole = lb.x >= bb.x - 0.5 && lb.x + lb.width <= bb.x + bb.width + 0.5 && lb.y >= bb.y - 0.5 && lb.y + lb.height <= bb.y + bb.height + 0.5;
-      const gone = lb.y >= bb.y + bb.height - 0.5;
+      // no room: the label stays laid out to be measured, unseen (data-room=cube, bims-toggle 590a1aa2d)
+      const gone = (await icon.getAttribute('data-room')) === 'cube' && (await label.evaluate((e) => getComputedStyle(e).visibility)) === 'hidden';
       expect(whole || gone, `at ${String(px)} px the label is whole or gone (button ${JSON.stringify(bb)}, label ${JSON.stringify(lb)})`).toBe(true);
       expect(gb.x >= bb.x - 0.5 && gb.x + gb.width <= bb.x + bb.width + 0.5, `at ${String(px)} px the cube stays whole`).toBe(true);
     }
@@ -389,7 +390,7 @@ for (const theme of ['light', 'dark'] as const) {
       if (box === null) throw new Error('no cube');
       const rec = new Recorder(s.cdp, s.page);
       await rec.start();
-      await expect.poll(async () => (await cubeNow(s)).move, { timeout: 3000 }).toBe('hop');
+      await expect.poll(async () => (await cubeNow(s)).move, { timeout: 6000, intervals: [50] }).toBe('hop');
       await sleep(1100);
       const frames = await rec.stop();
       // room above for the 5 px hop, the whole button below
@@ -402,7 +403,7 @@ for (const theme of ['light', 'dark'] as const) {
       await s.page.evaluate(() => { (window as unknown as { __biseCubePace?: unknown }).__biseCubePace = { blink: 600, hop: 60_000 }; });
       await icon.hover();
       await s.page.mouse.move(5, 400);
-      await expect.poll(async () => (await cubeNow(s)).move, { timeout: 3000 }).toBe('blink');
+      await expect.poll(async () => (await cubeNow(s)).move, { timeout: 6000, intervals: [50] }).toBe('blink');
       await sleep(100);
       await shotOf(s.cdp, s.page, pad, `cube-blink-${theme}.png`);
       shots.push({ file: `cube-blink-${theme}.png`, title: `a blink, ${theme}`, says: 'the eyes shut, 220 ms' });

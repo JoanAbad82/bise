@@ -283,8 +283,23 @@ test('(town) zoomed in: a live bim shows its line on hover, a click opens its ag
     for (let i = 0; i < 4; i++) await trackpad(s.cdp, box.x + box.width / 2, box.y + box.height / 2, { dy: -20, pinch: true });
     await expect(s.page.getByTestId('app.right.bims.town')).toHaveAttribute('data-zoomed', 'true');
     // a bim of a live office, not main (main's thread is the project's), well inside the view
-    const pickOne = async () =>
-      ((await probe(s))?.heads ?? []).find((h) => h.name !== 'main' && h.x > 30 && h.x < box.width - 30 && h.y > 40 && h.feet < box.height - 10);
+    // and alone where it is hovered: the nearest body wins the pick (render/pick.ts, 14 px), so a
+    // neighbour's body as close would take the hover (an office's bims stand ~5 px apart at this zoom)
+    const toSeg = (p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number => {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const l2 = dx * dx + dy * dy;
+      const f = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+      return Math.hypot(p.x - (a.x + dx * f), p.y - (a.y + dy * f));
+    };
+    const pickOne = async () => {
+      const heads = (await probe(s))?.heads ?? [];
+      return heads.find((h) => {
+        const p = { x: h.x, y: (h.y + h.feet) / 2 };
+        const alone = heads.every((o) => o === h || toSeg(p, { x: o.x, y: o.y }, { x: o.x, y: o.feet }) > 6);
+        return alone && h.name !== 'main' && h.x > 30 && h.x < box.width - 30 && h.y > 40 && h.feet < box.height - 10;
+      });
+    };
     await expect
       .poll(async () => (await pickOne()) !== undefined, { timeout: 5000, message: `a live bim in view (live ${JSON.stringify((await probe(s))?.live)}, heads ${JSON.stringify((await probe(s))?.heads.map((x) => `${x.name}@${String(Math.round(x.x))},${String(Math.round(x.y))}`))})` })
       .toBe(true);

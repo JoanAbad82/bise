@@ -31,6 +31,8 @@ const TEAM = snap([
 ]);
 
 async function california(s: Session, core: FakeCore, theme: 'light' | 'dark'): Promise<void> {
+  // a Wednesday: on his one-in-four Sunday every idle bim rides the bowl only, no line, no trick (skate.ts poolDay)
+  await s.page.evaluate(() => { (window as unknown as { __biseLocal?: unknown }).__biseLocal = { dow: 3 }; });
   await core.send({ ev: 'prefs', prefs: { onboarded: true, theme, excluded_apps: [], bims: { map: { [P]: 'california' } } } } as never);
   await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-map', 'california', { timeout: 10_000 });
 }

@@ -366,7 +366,12 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       return out;
     },
     feet(out) {
-      return out.set(g.position.x, 0, g.position.z);
+      // in the world, as headTop: in the town its office's root carries its place
+      out.set(g.position.x, 0, g.position.z);
+      const root = g.parent;
+      if (root === null) return out;
+      root.updateWorldMatrix(true, false);
+      return root.localToWorld(out);
     },
     dispose() {
       g.traverse((obj) => { if (obj instanceof Mesh) (obj.geometry as BufferGeometry).dispose(); });

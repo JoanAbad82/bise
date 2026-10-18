@@ -26,7 +26,7 @@ import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
 import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from './zoom';
-import { konamiDone, localOf, type Forced } from './eggs';
+import { konamiDone, localOf, type Forced, type Local } from './eggs';
 import { OPEN_DELAY_S, soonest } from './pokes';
 import { cropped, growOf, tipOf, unlockLabel } from './growth';
 import { makeDriver, type Clock } from './office-driver';
@@ -351,10 +351,11 @@ export function Office({
       if (h > 0) lastRatio = w / h;
       setBoxW(w);
     };
-    // the clock a frame is drawn at; in test mode only a check's forced eggs (window.__biseEggs), never a random roll
+    // the clock a frame is drawn at; in test mode only a check's forced eggs (window.__biseEggs), never a
+    // random roll, and its pinned calendar day (window.__biseLocal: a check never meets the Sunday pool)
     const clockNow = (t: number): Clock => ({
       t,
-      local: localOf(new Date()),
+      local: { ...localOf(new Date()), ...(testMode() ? (window as { __biseLocal?: Partial<Local> }).__biseLocal : undefined) },
       night: nightNow(),
       reduced,
       ...(testMode() ? { forced: (window as { __biseEggs?: Forced }).__biseEggs ?? null } : {}),

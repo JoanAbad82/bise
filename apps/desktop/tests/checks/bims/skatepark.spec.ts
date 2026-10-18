@@ -50,6 +50,8 @@ for (const theme of ['light', 'dark'] as const) {
     const { s, core } = await open(TEAM, { theme, width: 1600 });
     const { page } = s;
     try {
+      // a Wednesday: on his one-in-four Sunday every idle bim rides the bowl only, never the ramp (skate.ts poolDay)
+      await page.evaluate(() => { (window as unknown as { __biseLocal?: unknown }).__biseLocal = { dow: 3 }; });
       await showOffice(s);
       await core.send({ ev: 'prefs', prefs: { onboarded: true, theme, excluded_apps: [], bims: { map: { [P]: 'california' } } } } as never);
       await expect(page.getByTestId('app.right.bims')).toHaveAttribute('data-map', 'california', { timeout: 10_000 });
