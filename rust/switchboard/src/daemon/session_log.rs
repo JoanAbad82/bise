@@ -105,7 +105,6 @@ impl Shell {
                 return self.resume_log(a, dir, &sessions.join(id), &blobs, &resume_file, &legacy);
             }
         }
-        // a new session
         let new = bise_session::new_session_id();
         match Recorder::create(&sessions.join(&new), &blobs, self.session_start(a, &new), &writer_name()) {
             Ok(r) => {

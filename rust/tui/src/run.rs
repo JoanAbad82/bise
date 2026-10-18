@@ -1000,7 +1000,6 @@ mod paint_tests {
             assert_eq!(resets(&mut app), vec![], "popup, {mode:?}");
             app.ed.text.clear();
             app.ed.cursor = 0;
-            // /help
             sb::handle_input(&mut app, "/help");
             assert!(app.help.is_some());
             assert_eq!(resets(&mut app), vec![], "help, {mode:?}");

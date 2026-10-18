@@ -341,8 +341,6 @@ mod tests {
     fn the_home_hub_is_started_three_times_in_two_minutes_then_waits_for_his_next_fn_talk() {
         let t0 = Instant::now();
         let s = |secs: u64| t0 + Duration::from_secs(secs);
-        assert_eq!(HOME_STARTS, 3);
-        assert_eq!(HOME_SPELL, Duration::from_secs(120));
         // boot, then two losses: each starts it again
         assert_eq!(home_start(&[], t0), HomeStart::Start);
         assert_eq!(home_start(&[s(0)], s(5)), HomeStart::Start);

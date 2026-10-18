@@ -18,7 +18,7 @@
 1163 rust/proto/src/thread/fold_tests.rs
 1655 rust/switchboard/src/approvals/tiers.rs
 2475 rust/switchboard/src/core.rs
-4601 rust/switchboard/src/core_tests.rs
+4600 rust/switchboard/src/core_tests.rs
 2048 rust/switchboard/src/daemon.rs
 1187 rust/switchboard/src/daemon/gate.rs
 1207 rust/switchboard/src/daemon/versions.rs
@@ -31,12 +31,12 @@
 2943 rust/tui/src/onboarding.rs
 1116 rust/tui/src/onboarding/roles.rs
 2163 rust/tui/src/render.rs
-1018 rust/tui/src/run.rs
+1017 rust/tui/src/run.rs
 1711 rust/tui/src/sb.rs
 1383 rust/tui/src/sb/cards.rs
 1959 rust/tui/src/sb/panel.rs
-1036 rust/tui/src/term.rs
+1035 rust/tui/src/term.rs
 1031 rust/tui/src/ui.rs
-1154 rust/tui/src/voicemode/speak.rs
+1153 rust/tui/src/voicemode/speak.rs
 1232 rust/tui/src/voicemode/turn.rs
 1787 tests/fake_provider.py

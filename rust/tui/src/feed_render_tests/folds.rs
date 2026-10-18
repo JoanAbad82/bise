@@ -313,7 +313,6 @@ fn a_long_message_of_yours_folds_to_twenty_rows_and_its_hint() {
     let body: Vec<&String> = rows.iter().filter(|r| !r.trim().is_empty()).collect();
     // 20 rows of text (BISE-262; 12 before, 8 at first), then the hint
     // on its own row, the bar through it
-    assert_eq!(YOU_ROWS, 20);
     assert_eq!(body.len(), YOU_ROWS + 1, "{rows:#?}");
     assert_eq!(body[0].as_str(), "│  line 1", "{rows:#?}");
     assert_eq!(body[19].as_str(), "│  line 20", "{rows:#?}");

@@ -521,7 +521,6 @@ pub(crate) fn lines(sc: &mut Screen, all: &[Artifact], width: usize, height: usi
     let mut head = vec![Span::styled(title.to_string(), Style::default().fg(text()).add_modifier(Modifier::BOLD)), Span::raw(" ".repeat(gap))];
     head.extend(scope);
     out.push(Line::from(head));
-    // the search row
     let search = if sc.query.is_empty() && !sc.typing {
         Line::from(Span::styled("/ find: a title, an agent, a kind", Style::default().fg(faint())))
     } else {

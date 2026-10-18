@@ -95,7 +95,6 @@ fn login_writes_a_0600_file_in_a_0700_dir_and_logout_removes_the_key() {
     assert_eq!(store.providers(), vec!["groq", "openai"]);
     let left: Vec<_> = std::fs::read_dir(f.parent().unwrap()).unwrap().collect();
     assert_eq!(left.len(), 1, "{left:?}");
-    // logout
     let out = auth_cli::logout(&ps, "openai", &no_env, &c).unwrap();
     assert_eq!(out, vec!["removed the openai key".to_string()]);
     assert_eq!(Store::read(f).unwrap().key("openai"), None);

@@ -258,7 +258,6 @@ pub(crate) fn box_lines(
     let dim_st = Style::default().fg(dim());
     let faint_st = Style::default().fg(faint());
     let mut out = vec![box_top(td, tick, width)];
-    // the script, highlighted
     let script: Vec<Vec<Span<'static>>> = match code {
         Some((CodeLang::Bash, src)) => highlight_bash(src),
         Some((CodeLang::TypeScript, src)) => highlight_ts(src),

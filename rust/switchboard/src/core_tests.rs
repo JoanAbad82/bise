@@ -768,7 +768,6 @@ fn an_escalated_question_is_answered_by_the_user() {
     // main ends its turn: no automatic reply, the question is handed over
     let fx = t.turn(MAIN, "J'ai demandé à l'utilisateur.");
     assert!(reply(&fx, tok).is_none());
-    // the user answers the card
     let fx = t.user(MAIN, "/answer 1 v2");
     let r = reply(&fx, tok).expect("the task's wait ends with the user's answer");
     assert_eq!(r["from"], USER);

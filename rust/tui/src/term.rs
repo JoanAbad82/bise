@@ -152,7 +152,6 @@ pub(crate) fn mouse_bytes(
         MouseButton::Middle => 1,
         MouseButton::Right => 2,
     };
-    // (button code, a release)
     let (code, release) = match kind {
         _ if mode == M::None => return None,
         MouseEventKind::Down(b) => (button(b), false),

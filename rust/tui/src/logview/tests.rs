@@ -449,7 +449,6 @@ fn incsearch_wraps_and_esc_goes_back() {
     v.search_cancel();
     assert_eq!(v.sel, at);
     assert!(v.search.is_none());
-    // from the top
     (v.sel, v.top) = (0, (0, 0));
     v.start_search();
     v.search.as_mut().unwrap().text = "signup".into();

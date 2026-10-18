@@ -341,7 +341,6 @@ pub(crate) fn lines_with(sc: &mut Screen, all: &[Task], watches: &[Watch], width
         Span::raw(" ".repeat(gap)),
         Span::styled(right, Style::default().fg(dim())),
     ]));
-    // the search
     out.push(if sc.query.is_empty() && !sc.typing {
         Line::from(Span::styled(format!("/ {}", scheduled::find_hint), Style::default().fg(faint())))
     } else {
