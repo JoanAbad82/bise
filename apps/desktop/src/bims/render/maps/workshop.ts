@@ -1,7 +1,7 @@
 // The workshop's look (render/maps/look.ts; its plan: maps/workshop.ts): a garage, concrete floor
 // with an oil stain, tall grey walls, a pegboard of tools, wooden desks against the walls, the
 // workbench (the eating place) with its vise and toolbox, the ping-pong table, the roller door
-// rolled up on the right by the nap place, a scooter inside it, an old car in the front middle, the neon :* over the board; its growth is the loft's (blook.ts
+// rolled up on the right by the nap place, a scooter inside it, a mint Vespa in the front middle, the neon :* over the board; its growth is the loft's (blook.ts
 // loftGrower), the mural in the back left corner. Owner: maps-b.
 import { Group, type Mesh, type Object3D } from 'three';
 import type { WorkshopOffice } from '../../maps/workshop';
@@ -62,15 +62,13 @@ function shell(b: Build): void {
   sc.rotation.y = -Math.PI / 2;
   root.add(sc);
   scooter(k, sc, 0, 0);
-  // an old car being fixed in the front middle, on its way to the roller door; tyres stacked by it
+  // a Vespa in the front middle, on its side stand, its nose to the roller door (where the old car
+  // stood: its wheels z-fought, bims-vespa)
   const bench = benchOf(o);
   const free0 = bench.x + 1.6;
   const free1 = x1 - 4.6;
   const cz = (bench.z + 0.75 + o.crossFront) / 2;
-  if (free1 - free0 > 2.6) {
-    car(k, root, (free0 + free1) / 2 + 0.3, cz);
-    for (let i = 0; i < 3; i++) k.add(style.cylinder(0.26, 0.14), k.mat(WORLD.dark), root, free0 + 0.2, 0.08 + i * 0.15, cz + 0.2);
-  }
+  if (free1 - free0 > 2.6) vespa(k, root, (free0 + free1) / 2 + 0.3, cz);
   // an oil stain, a tyre against the left wall
   const oil = k.add(style.cylinder(0.5, 0.01), k.mat('#9a978f'), root, x0 + W * 0.62, 0.025, D * 0.72);
   oil.scale.z = 0.6;
@@ -79,20 +77,53 @@ function shell(b: Build): void {
   onFloor(k, root, boxOf(decorOf(o).doorMat), 0.04, 0.03, WORLD.mat);
 }
 
-/** an old car, its nose towards the roller door (+x), its bonnet up */
-function car(k: Build['k'], root: Build['root'], x: number, z: number): void {
+/** the Vespa's tilt on its side stand, towards +z (the stand's side) */
+const LEAN = 0.1;
+
+/**
+ * a mint Vespa on its side stand, its nose towards the roller door (+x): round body, front shield,
+ * a round headlight, a two-tone seat a bim can ride (~0.45 up, ~1.1 long). Every part stands off
+ * the others (no two faces in one plane: the old car's z-fight, coplanar.test.ts).
+ */
+export function vespa(k: Build['k'], root: Object3D, x: number, z: number): Group {
   const { style } = k;
-  const paint = k.mat('#e9c46a');
-  k.add(style.box(2.2, 0.4, 1.0, 0.15), paint, root, x, 0.38, z);
-  k.add(style.box(1.1, 0.38, 0.9, 0.15), paint, root, x - 0.25, 0.75, z);
-  k.add(style.box(1.0, 0.26, 0.92), k.mat('#2c4a6b'), root, x - 0.25, 0.78, z);
-  const lid = k.add(style.box(0.6, 0.04, 0.9), paint, root, x + 0.75, 0.8, z);
-  lid.rotation.z = 0.7;
-  for (const [dx, dz] of [[-0.7, -0.5], [0.7, -0.5], [-0.7, 0.5], [0.7, 0.5]] as const) {
-    const w = k.add(style.cylinder(0.2, 0.12), k.mat(WORLD.dark), root, x + dx, 0.2, z + dz);
-    w.rotation.x = Math.PI / 2;
+  const g = new Group();
+  g.name = 'vespa';
+  g.position.set(x, 0.02, z);
+  g.rotation.x = LEAN;
+  root.add(g);
+  const put = (name: string, geo: Parameters<typeof k.add>[0], color: string, px: number, py: number, pz: number) => {
+    const m = k.add(geo, k.mat(color), g, px, py, pz);
+    m.name = name;
+    return m;
+  };
+  const mint = '#9ed8c4';
+  const cream = '#f3ead8';
+  // two small solid wheels, each one mesh, and a hub cap through it that stands 0.02 out each side
+  for (const [name, wx] of [['back', -0.36], ['front', 0.38]] as const) {
+    put(`${name} wheel`, style.cylinder(0.13, 0.09), WORLD.dark, wx, 0.13, 0).rotation.x = Math.PI / 2;
+    put(`${name} hub`, style.cylinder(0.06, 0.13), cream, wx, 0.13, 0).rotation.x = Math.PI / 2;
   }
-  for (const dz of [-0.32, 0.32]) k.add(style.box(0.03, 0.1, 0.14), k.mat(WORLD.paper), root, x + 1.1, 0.45, z + dz);
+  // the round back over the engine, the floorboard, the front shield leaning back, the mudguard
+  put('body', style.ball(0.2), mint, -0.3, 0.3, 0).scale.set(1.55, 0.85, 1);
+  put('floorboard', style.box(0.42, 0.05, 0.26), mint, 0.02, 0.2, 0);
+  put('shield', style.box(0.05, 0.44, 0.3), mint, 0.25, 0.42, 0).rotation.z = 0.18;
+  put('mudguard', style.cap(0.15, 0.5), mint, 0.38, 0.15, 0).scale.z = 0.55;
+  // the two-tone seat: a cream band under a brown top
+  put('seat band', style.capsule(0.07, 0.34), cream, -0.3, 0.455, 0).rotation.z = Math.PI / 2;
+  put('seat', style.capsule(0.064, 0.3), '#8a6248', -0.3, 0.495, 0).rotation.z = Math.PI / 2;
+  // the steering column, the headset with its round headlight, the handlebar
+  put('column', style.cylinder(0.03, 0.34), cream, 0.3, 0.62, 0).rotation.z = 0.18;
+  put('headset', style.box(0.12, 0.08, 0.14), mint, 0.26, 0.8, 0);
+  put('handlebar', style.capsule(0.022, 0.42), WORLD.dark, 0.25, 0.83, 0).rotation.x = Math.PI / 2;
+  put('headlight rim', style.cylinder(0.05, 0.04), cream, 0.34, 0.8, 0).rotation.z = Math.PI / 2;
+  put('headlight', style.ball(0.042), WORLD.paper, 0.355, 0.8, 0);
+  put('taillight', style.ball(0.03), '#f39a4c', -0.61, 0.36, 0);
+  // the side stand, from under the floorboard down to the floor on the side it leans to
+  const [ty, tz, fy, fz] = [0.22, 0.06, 0.2 * Math.tan(LEAN), 0.2];
+  const stand = put('stand', style.cylinder(0.014, Math.hypot(ty - fy, tz - fz)), WORLD.dark, -0.08, (ty + fy) / 2, (tz + fz) / 2);
+  stand.rotation.x = Math.atan2(tz - fz, ty - fy);
+  return g;
 }
 
 /** a scooter, its nose towards the roller door */
