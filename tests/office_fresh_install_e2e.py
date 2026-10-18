@@ -30,6 +30,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import wait  # noqa: E402
+import e2e  # noqa: E402
 from e2e import Client, Env, check, refuse_real_home, refuse_real_keys, refuse_real_run_dir  # noqa: E402
 
 SYS_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
@@ -133,8 +134,8 @@ def main():
         env = {**E.env, "SB_SOCKET": os.path.join(E.state, "agent.sock"), "SB_AGENT": "main"}
         r = subprocess.run([os.path.join(E.state, "bin", "sb"), "spawn", "t1", "--place", "new", "--objective", brief],
                            cwd=E.ws, env=env, capture_output=True, text=True, timeout=60)
-        check(" in worktree " in r.stdout, "spawn: %s %s" % (r.stdout, r.stderr))
-        wt = r.stdout.split(" in worktree ")[1].split(" (branch ")[0]
+        check(r.returncode == 0 and "t1" in r.stdout, "spawn: %s %s" % (r.stdout, r.stderr))
+        wt, _ = e2e.placed_worktree(E.ws, "t1")
         c.wait(lambda: any(q["agent"] == "t1" and len(q["tool_texts"]) >= 4 for q in E.fake_requests()), 240,
                "t1 ran its four calls")
         c.wait_idle("t1", timeout=120)

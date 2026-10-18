@@ -26,6 +26,7 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
+import e2e  # noqa: E402
 from e2e import EXE, Env, check  # noqa: E402
 
 MAKE = r'''
@@ -105,8 +106,8 @@ def main():
         c = E.start_hub()
         c.wait_status("main", "idle", 60)
         out = sb("main", E.ws, "spawn", "t1", "--place", "new", "--objective", "make the q3 files").stdout
-        check(" in worktree " in out, out)
-        wt = out.split(" in worktree ")[1].split(" (branch ")[0]
+        check("t1" in out, out)
+        wt, _ = e2e.placed_worktree(E.ws, "t1")
         c.wait_idle("t1")
         tmp = os.path.join(E.tmp, "t1-tmp")
         os.makedirs(tmp)

@@ -19,6 +19,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import e2e  # noqa: E402
 from tui_tmux import Tui, tui_session, run, in_view, pane_rows, start_tui, tmux, wait_until  # noqa: E402
 from words import w  # noqa: E402
 
@@ -94,7 +95,14 @@ def queue(t, text):
 
 
 def scenario(theme):
-    with tui_session(COLS, ROWS) as t:
+    # main's turn lasts until the test says (its go file), never a fixed
+    # time: `sleep 40` went to the background at the bash tool's 30 s
+    # window under load (x3.3, 2 full gates), the turn ended, and tab no
+    # longer queued ('queued-three' stayed in the composer)
+    E = e2e.Env()
+    E.env["BEND_BG_AFTER"] = "600"
+    go = os.path.join(E.tmp, "turn-go")
+    with tui_session(COLS, ROWS, E=E) as t:
         t.wait("bise :*")
         t.wait_re(in_view("main"))
         if theme != "dark":
@@ -104,8 +112,8 @@ def scenario(theme):
         u = second_terminal(t)
         try:
             u.wait_re(in_view("main"))
-            # a slow turn: main runs `sleep 40`
-            t.typed("[[bash: sleep 40]]")
+            # a slow turn: main's command waits for the go file
+            t.typed("[[bash: while [ ! -e %s ]; do sleep 0.2; done]]" % go)
             t.keys("Enter")
             # tab queues on the hub: the model gets nothing yet; the key
             # bar offers it only once the composer has text (5e3873d)
@@ -171,6 +179,8 @@ def scenario(theme):
 
             # the turn ends: the hub says the rest in one turn, in
             # order (law user_queued_said_at_idle), queued-one not again
+            open(go, "w").close()
+
             def queued():
                 return [m for m in sent(t.E) if "queued-two" in m]
             got = wait_until(lambda: queued(), 90,

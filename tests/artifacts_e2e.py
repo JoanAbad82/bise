@@ -26,6 +26,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import e2e  # noqa: E402
 from e2e import EXE, Env, check, sh  # noqa: E402
 
 
@@ -60,8 +61,8 @@ def main():
         check(last_art(c)["rows"] == [] and last_art(c)["new"] == 0, last_art(c))
 
         out = sb("main", E.ws, "spawn", "t1", "--place", "new", "--objective", "hello t1")
-        check(" in worktree " in out, out)
-        wt = out.split(" in worktree ")[1].split(" (branch ")[0]
+        check("t1" in out, out)
+        wt, _ = e2e.placed_worktree(E.ws, "t1")
         c.wait_idle("t1")
 
         # an agent adds a file
@@ -150,7 +151,8 @@ def main():
         paths = sorted(f["path"] for f in d["files"])
         check(paths == ["README", "out/pricing-plans.csv"], paths)
         csv = [f for f in d["files"] if f["path"] == "out/pricing-plans.csv"][0]
-        check(csv["status"] == "added" and csv["abs"] == os.path.join(wt, "out/pricing-plans.csv"), csv)
+        # realpaths: git names the worktree /private/tmp/..., the hub /tmp/...
+        check(csv["status"] == "added" and os.path.realpath(csv["abs"]) == os.path.realpath(os.path.join(wt, "out/pricing-plans.csv")), csv)
         check(csv["hunks"][0]["lines"][0] == {"kind": "add", "new": 1, "text": "plan,price"}, csv["hunks"])
 
         r = c.rpc("branches/list", {"project": c.project()})

@@ -82,8 +82,8 @@ def sent_to(E, agent, needle, timeout=40):
 
 def worktree(E):
     out = sb(E, "main", E.ws, "spawn", "t1", "--place", "new", "--objective", "make the pricing page")
-    wt = out.split(" in worktree ")[1].split(" (branch ")[0]
-    branch = out.split(" (branch ")[1].split(")")[0]
+    assert "t1" in out, out
+    wt, branch = e2e.placed_worktree(E.ws, "t1")
     os.makedirs(os.path.join(wt, "src"))
     open(os.path.join(wt, "src", "pricing.tsx"), "w").write("".join("line %d\n" % i for i in range(40)))
     with open(os.path.join(wt, "README"), "a") as f:

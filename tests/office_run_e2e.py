@@ -19,6 +19,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
+import e2e  # noqa: E402
 from e2e import EXE, Env, check  # noqa: E402
 
 SCRIPT = r'''
@@ -54,8 +55,8 @@ def main():
         out = subprocess.run([EXE, "sb", "spawn", "t1", "--place", "new", "--objective", "hello t1"], cwd=E.ws, text=True,
                              capture_output=True, timeout=60,
                              env={**E.env, "SB_SOCKET": os.path.join(E.state, "agent.sock"), "SB_AGENT": "main"}).stdout
-        check(" in worktree " in out, out)
-        wt = out.split(" in worktree ")[1].split(" (branch ")[0]
+        check("t1" in out, out)
+        wt, _ = e2e.placed_worktree(E.ws, "t1")
         c.wait_idle("t1")
         tmp = os.path.join(E.tmp, "t1-tmp")
         os.makedirs(tmp)

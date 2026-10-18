@@ -163,7 +163,8 @@ def main():
         sent = r.request("turn/send", {"project": project, "agent": "main", "text": "hello over json-rpc", "mode": "now"})
         resp = r.response(sent)
         msg_id = resp.get("result", {}).get("msg_id")
-        check(isinstance(msg_id, int) and set(resp["result"]) == {"msg_id"}, "turn/send's result: %r" % resp)
+        # and why: made, a message of his (send-reason 96c7d4498)
+        check(isinstance(msg_id, int) and resp["result"] == {"msg_id": msg_id, "reason": "made"}, "turn/send's result: %r" % resp)
         r_wait = lambda pred, what: wait.until(pred, 90, what)  # noqa: E731
         r_wait(lambda: you_id("hello over json-rpc") is not None, "his entry, live")
         # the law on a real hub: the answered id is the id his entry carries
