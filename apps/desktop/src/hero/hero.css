@@ -1,0 +1,124 @@
+/* bise.dev/desktop's hero town (hero.ts): the canvas over the page's poster, faded in at its first
+   frame; the bims' words as the app draws them (office.css .bims-label, .bims-pill, .bims-zzz), on
+   the site's paper; The page lays out the box,
+   draws the controls and the first-visit line (designer m_30837). */
+.bims-hero {
+  position: relative;
+  overflow: hidden;
+  /* one finger scrolls the page; two are the town's (gestures.ts) */
+  touch-action: pan-x pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  --bh-text: #2b2723;
+  --bh-dim: #6f675c;
+  --bh-paper: #fbf8f1;
+  --bh-accent: #e0607a;
+  --bh-err: #d24b3e;
+  --bh-on: #fff;
+}
+html.pd .bims-hero {
+  --bh-text: #ece6da;
+  --bh-dim: #b8b0a3;
+  --bh-paper: #1f1c19;
+}
+.bims-hero .bh-canvas {
+  position: absolute;
+  inset: 0;
+  /* the renderer sizes its pixels (DPR, at most STYLE.maxPixelRatio), never its css box */
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.6s ease-out;
+}
+.bims-hero[data-ready='true'] .bh-canvas {
+  opacity: 1;
+}
+.bims-hero .bh-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font: 12px / 1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+}
+.bims-hero .bh-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 4px;
+  white-space: nowrap;
+  will-change: transform;
+  z-index: 1;
+}
+.bims-hero .bh-tag[data-mode='pill'] {
+  z-index: 2;
+}
+.bims-hero .bh-label {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bh-paper) 85%, transparent);
+  color: var(--bh-text);
+  animation: bh-in 0.12s ease-out;
+}
+.bims-hero .bh-tag[data-mode='name'] .bh-label {
+  color: var(--bh-dim);
+}
+.bims-hero .bh-pill {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 999px;
+  font: 600 11px / 1 ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--bh-on);
+}
+.bims-hero .bh-pill.asks {
+  background: var(--bh-accent);
+}
+.bims-hero .bh-pill.failed {
+  background: var(--bh-err);
+}
+.bims-hero .bims-zzzs {
+  position: absolute;
+  inset: 0;
+}
+.bims-hero .bims-zzz {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.bims-hero .bims-zzz > span {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  color: var(--bh-dim);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  animation: bh-z 3.6s steps(27) infinite;
+  will-change: transform, opacity;
+}
+.bims-hero .bims-zzz > span:nth-child(2) {
+  font-size: 11px;
+  animation-delay: 1.2s;
+}
+.bims-hero .bims-zzz > span:nth-child(3) {
+  font-size: 13px;
+  animation-delay: 2.4s;
+}
+@keyframes bh-z {
+  0% { opacity: 0; transform: translate(0, 0); }
+  20% { opacity: 0.85; }
+  70% { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(12px, -26px); }
+}
+@keyframes bh-in {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-hero .bh-canvas { transition: none; }
+}

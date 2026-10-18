@@ -7,6 +7,7 @@ import type { Grow } from '../growth';
 import type { Fit } from '../render/camera';
 import type { Cam } from '../zoom';
 import type { Step } from '../office-driver';
+import type { Placed } from './plan';
 
 /** One office's ground for the plan: its office (its map, its desks), its growth. */
 export interface TownSite {
@@ -48,10 +49,28 @@ export interface TownRenderer {
   headOf(id: string, name: string): { readonly x: number; readonly y: number; readonly feet: number } | null;
   /** the live office's bim under a canvas point (pick.ts: the nearest body); null: none */
   pickBim(x: number, y: number): { readonly id: string; readonly name: string } | null;
+  /** where the plan put an office (its offset and its ground, town units); null: no such office */
+  placedOf(id: string): Placed | null;
   /** the town as drawn, onto a 2d canvas of the same pixel size */
   copyTo(target: HTMLCanvasElement): void;
   onLost(cb: () => void): void;
   dispose(): void;
 }
 
-export type MakeTownRenderer = (canvas: HTMLCanvasElement) => TownRenderer;
+/**
+ * How a town is drawn past the app's own: bise.dev's hero (src/hero) poses every office live at
+ * every zoom (allLive: three offices, never one baked again as the camera moves) in a canvas the
+ * size of its box (box: the whole town in it, the sky around, the page's paper). The app passes none.
+ */
+export interface TownOpts {
+  /** every office posed live, in view or not (else: the ones in view past LIVE_ZOOM, LIVE_MAX at most) */
+  readonly allLive?: boolean;
+  /** the canvas is the whole width × height asked (setSize's maxHeightPx), the town whole and centred in it */
+  readonly box?: boolean;
+  /** the sky behind the town, by theme (the page's paper, so the canvas has no edge); absent: the palette's */
+  readonly sky?: { readonly day: string; readonly night: string };
+  /** at night, the light's strength times this (the hero on a dark page: bims m_31057); absent: 1 */
+  readonly nightLift?: number;
+}
+
+export type MakeTownRenderer = (canvas: HTMLCanvasElement, opts?: TownOpts) => TownRenderer;

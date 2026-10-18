@@ -20,6 +20,8 @@
     "test:e2e": "playwright test -c tests/harness/playwright.config.ts",
     "test": "vitest run",
     "gallery": "vite src/ds/gallery",
+    "hero": "vite -c hero.vite.config.ts",
+    "build:hero": "vite build -c hero.vite.config.ts",
     "dist": "electron-builder --config electron-builder.mjs --mac --dir"
   },
   "dependencies": {

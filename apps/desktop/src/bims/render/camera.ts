@@ -105,6 +105,20 @@ export function fitSite(site: Site, widthPx: number, maxHeightPx: number): Fit {
 }
 
 /**
+ * The site seen whole in a widthPx × heightPx box: fitted (fitSite, to the width or to the height,
+ * whichever holds it all), the box's size kept, the site centred, the rest of the box sky.
+ * bise.dev's hero (town opts box): its canvas is the page's box, the town never cropped at its fit. Pure.
+ */
+export function boxSite(site: Site, widthPx: number, heightPx: number): Fit {
+  const w = Math.max(1, widthPx);
+  const h = Math.max(1, heightPx);
+  const f = fitSite(site, w, h);
+  const cx = (f.left + f.right) / 2;
+  const cy = (f.top + f.bottom) / 2;
+  return { ...f, left: cx - (w * f.scale) / 2, right: cx + (w * f.scale) / 2, top: cy + (h * f.scale) / 2, bottom: cy - (h * f.scale) / 2, widthPx: w, heightPx: h };
+}
+
+/**
  * The fit seen through his camera (zoom.ts Cam): the same canvas size, `zoom` times closer, its
  * centre at (u, v) of the fit's rectangle. FIT gives the fit back. Pure.
  */

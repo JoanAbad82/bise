@@ -103,7 +103,7 @@ function stillSig(s: Step): string {
 
 const shapeOf = (s: Step): string => `${s.office.map}|${s.office.size}|${s.agents.map((a) => `${a.name}${a.main ? '*' : ''}`).join(',')}`;
 
-export const makeTownRenderer: MakeTownRenderer = (canvas) => {
+export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   // the town's shadow is drawn again only when something in it moved (a bake, a live office's frame)
   const v3 = makeView(canvas, { shadowAuto: false });
   const { renderer, scene, sun } = v3;
@@ -155,12 +155,15 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
 
   /**
    * A live office's walls baked (page town-live: 4 live offices in 6 ms, not 14), baked again when its
-   * world was built again (growth, theme, shape) or a desk lit or went dark; its world hidden under them.
+   * world was built again (growth, theme, shape), never when a desk lights (its screen and lamp stay
+   * live materials, merge.ts: a bake is ~100 ms, the hero's film lit one every few seconds); its world
+   * hidden under them.
    */
   function walls(s: Spot, step: Step): void {
     const w = s.scene.world();
     if (!w) return;
-    const sig = `${s.shape}|${growSig(step.look.grow ?? NO_GROW)}|${step.look.night ? 'n' : 'd'}|${s.scene.litSig()}|${String(w.id)}`;
+    // a desk lit or dimmed needs no new bake: its screen and lamp stay the world's own materials (below)
+    const sig = `${s.shape}|${growSig(step.look.grow ?? NO_GROW)}|${step.look.night ? 'n' : 'd'}|${String(w.id)}`;
     if (s.walls?.sig === sig) return;
     dropWalls(s);
     const at = s.scene.root.position.clone();
@@ -174,7 +177,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     s.scene.root.updateMatrixWorld(true);
     for (const c of merged.group.children) {
       const m = (c as unknown as { material: Material }).material;
-      if (m !== merged.baked) (c as unknown as { material: Material }).material = m.clone();
+      // the desks' screens and lamps stay shared: lightDesk lights the walls' copy too (dropped with this world)
+      if (m !== merged.baked && m.userData.live !== true) (c as unknown as { material: Material }).material = m.clone();
     }
     w.visible = false;
     s.scene.root.add(merged.group);
@@ -259,7 +263,11 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     if (!plan) return;
     const pal = isNight ? NIGHT : DAY;
     v3.tint(pal);
-    v3.sky(pal.bg);
+    if (isNight && opts.nightLift !== undefined) {
+      v3.hemi.intensity *= opts.nightLift;
+      sun.intensity *= opts.nightLift;
+    }
+    v3.sky(opts.sky ? (isNight ? opts.sky.night : opts.sky.day) : pal.bg);
     if (STYLE.shadows) {
       sun.castShadow = true;
       sun.shadow.mapSize.set(2048, 2048);
@@ -320,7 +328,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
 
   function applyFit(): void {
     if (!plan || size.w <= 0) return;
-    base = townFit(plan, size.w, size.maxH);
+    base = townFit(plan, size.w, size.maxH, opts.box === true);
     applyView();
   }
 
@@ -456,6 +464,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     liveIds() {
       const f = shownFit();
       if (!f || !base || !plan) return [];
+      // the hero's few offices: all of them, always (an office back in view would bake its walls again: ~100 ms)
+      if (opts.allLive === true) return plan.offices.map((p) => p.id);
       // close enough: the fit's width shows LIVE_ZOOM times less of the town
       if ((base.right - base.left) / (f.right - f.left) < LIVE_ZOOM) return [];
       const cx = f.widthPx / 2;
@@ -563,6 +573,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
       const feet = s.scene.feet(name, v);
       return { ...p, feet: feet ? toScreen(f, feet).y : p.y };
     },
+    placedOf: (id) => placedOf(id) ?? null,
     pickBim(x, y) {
       const f = shownFit();
       if (!f) return null;

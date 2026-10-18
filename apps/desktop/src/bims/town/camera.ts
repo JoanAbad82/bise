@@ -5,7 +5,7 @@
 // the two fits: town/dive.ts), and the near and far planes that hold the whole town for any view
 // of it (townDepth). The renderer's side: it reads render/camera.ts. Owner: maps-e.
 import type { Office } from '../model';
-import { BACK, DIST, fitSite, siteOf as buildingSite, wideSiteOf, type Fit, type Site } from '../render/camera';
+import { BACK, boxSite, DIST, fitSite, siteOf as buildingSite, wideSiteOf, type Fit, type Site } from '../render/camera';
 import type { Placed, TownPlan } from './plan';
 
 /** from this width (css px) the office fits its building and a little ground (render/index.ts's WIDE_FIT_PX) */
@@ -16,9 +16,9 @@ export function townSite(plan: TownPlan): Site {
   return { ...plan.lawn, yLow: -1.35, yHigh: 3.0 };
 }
 
-/** The town fitted to the width (its height follows, at most maxH). Pure. */
-export function townFit(plan: TownPlan, widthPx: number, maxH: number): Fit {
-  return fitSite(townSite(plan), widthPx, maxH);
+/** The town fitted to the width (its height follows, at most maxH); `box`: whole in a widthPx × maxH canvas (the hero). Pure. */
+export function townFit(plan: TownPlan, widthPx: number, maxH: number, box = false): Fit {
+  return box ? boxSite(townSite(plan), widthPx, maxH) : fitSite(townSite(plan), widthPx, maxH);
 }
 
 /** room before and after the town's ground on the camera's line (its roofs, a tree past the lawn's edge) */

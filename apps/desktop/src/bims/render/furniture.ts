@@ -18,6 +18,8 @@ export function laptop(k: Kit, parent: Object3D, x: number, z: number): MeshLamb
   parent.add(lid);
   k.add(style.box(l.w, l.h, l.d), k.mat(WORLD.metal), lid, 0, l.h / 2, 0);
   const screen = style.material(pal.screenOff, { emissive: pal.screenOn, ei: 0 }) as MeshLambertMaterial;
+  // lit and dimmed while an office is drawn live (lightDesk): never baked into its walls (merge.ts)
+  screen.userData.live = true;
   k.add(style.box(0.44, 0.28, 0.01), screen, lid, 0, l.h / 2, -0.016);
   return screen;
 }
@@ -30,6 +32,7 @@ export function deskLamp(k: Kit, parent: Object3D, x: number, z: number): MeshLa
   k.add(style.box(0.025, 0.13, 0.025), k.mat(pal.lamp), parent, x, 0.635, z);
   k.add(style.box(0.12, 0.06, 0.1), k.mat(pal.lamp), parent, x - 0.03, 0.725, z);
   const bulb = style.material(pal.lamp, { emissive: pal.lampOn, ei: 0 }) as MeshLambertMaterial;
+  bulb.userData.live = true;
   k.add(style.box(0.08, 0.02, 0.06), bulb, parent, x - 0.03, 0.69, z);
   return bulb;
 }

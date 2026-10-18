@@ -8,9 +8,13 @@ import { BufferAttribute, type BufferGeometry, Group, type Material, type Matrix
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Style } from './style';
 
-/** a material whose colour can go into the vertices: matte, opaque, no texture, no glow */
+/**
+ * a material whose colour can go into the vertices: matte, opaque, no texture, no glow, and not one
+ * that changes while it is drawn (userData.live: a desk's screen and lamp, furniture.ts)
+ */
 function bakeable(m: Material): m is MeshStandardMaterial | MeshLambertMaterial {
   if (!(m instanceof MeshStandardMaterial || m instanceof MeshLambertMaterial)) return false;
+  if (m.userData.live === true) return false;
   if (m.transparent || m.map !== null) return false;
   return m.emissiveIntensity === 0 || (m.emissive.r === 0 && m.emissive.g === 0 && m.emissive.b === 0);
 }
