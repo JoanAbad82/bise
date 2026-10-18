@@ -24,7 +24,7 @@ const PAGE = 'http://127.0.0.1:47123/p/issue-15';
 const drafts = card({
   project: ACME,
   id: 540,
-  question: '4 drafts wait for you',
+  question: 'issue #15: 4 drafts to review',
   options: [
     { n: 1, label: 'review', act: { act: 'open', url: `${PAGE}#m-pr16`, artifact: 'issue-15', at: 'm-pr16' } },
     { n: 2, label: 'send all 4' },
