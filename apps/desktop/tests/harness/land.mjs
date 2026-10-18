@@ -72,6 +72,8 @@ export const LAND = [
   'checks/composer/answer-target.spec.ts',
   // any file a chip like an image's, in place in the parts, the bubble opens it (file-chips)
   'checks/thread/file-chips.spec.ts',
+  // his ``` blocks: wrap in his bubble, a bare fence gray, md highlighted, the composer as the bubble (code-fences, main m_31084)
+  'checks/thread/code-fences.spec.ts',
   // an @-picked image or code file is a chip at the @, the caret after it, its parts in the send (at-chips)
   'checks/composer/at-chips.spec.ts',
   // a copy with chips pastes them back with their rows; cut+paste and copy+paste over it change nothing (chip-paste, his m_30833)

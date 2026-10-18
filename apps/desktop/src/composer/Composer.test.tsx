@@ -144,8 +144,9 @@ describe('the composer', () => {
     });
     const styleOf = (word: string): string | null =>
       Array.from(field.querySelectorAll('span')).find((s) => s.textContent === word)?.getAttribute('style') ?? null;
-    expect(styleOf('fn')).toContain('--c-accent');
-    expect(styleOf(' main')).toBeNull();
+    // the bubble's colors (thread/Code.tsx codeLines, code-fences)
+    expect(styleOf('fn')).toContain('--md-syn-keyword');
+    expect(styleOf(' ')).toBeNull();
     // the caret stayed at the end through the redraw: more words land after 'main'
     await act(async () => {
       a.insertText('() {}\n```');

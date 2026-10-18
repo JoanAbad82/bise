@@ -197,8 +197,8 @@ export const Markdown = memo(function Markdown({
         </a>
       );
     },
-    // a block keeps its shape: no wrapping, its own horizontal scroll; its
-    // language on top, a copy button on hover (tui-parity B15, M8)
+    // a block keeps its shape: no wrapping, its own horizontal scroll (in his bubble it wraps,
+    // thread.css); its language on top, a copy button on hover (tui-parity B15, M8)
     pre({ node, children }) {
       const code = node?.children.find((c) => c.type === 'element' && c.tagName === 'code');
       const lang = code?.type === 'element' ? langOf(code.properties.className) : undefined;
@@ -206,13 +206,15 @@ export const Markdown = memo(function Markdown({
       // a streamed answer: its new box fades in once, then its new whole lines (fade.ts)
       const fresh = code?.type === 'element' && typeof code.properties.dataFrom === 'string' ? Number(code.properties.dataFrom) : undefined;
       const boxIn = Array.isArray(node?.properties.className) && node.properties.className.includes('th-in');
+      const bare = breaks && lang === undefined;
       return (
         <div className={boxIn ? 'th-code th-in' : 'th-code'}>
           <div className="th-code-head">
             <span className="th-code-lang b-md-lang">{lang ?? ''}</span>
             <CodeCopy text={text} />
           </div>
-          <pre className="th-pre">{known(lang) ? <Code text={text} lang={lang} from={fresh} /> : fresh !== undefined ? <PlainCode text={text} from={fresh} /> : children}</pre>
+          {/* his words (breaks): a bare fence's block gray, as his composer draws it (code-fences) */}
+          <pre className="th-pre">{bare || known(lang) ? <Code text={text} lang={lang ?? ''} from={fresh} /> : fresh !== undefined ? <PlainCode text={text} from={fresh} /> : children}</pre>
         </div>
       );
     },

@@ -113,6 +113,9 @@ pub(crate) struct Palette {
     pub syntax_number: Color,
     pub syntax_call: Color,
     pub syntax_type: Color,
+    /// a bare fence's block (``` with no language): `text` 90 % toward
+    /// the ground (oklab), gray enough to say "code" (code-fences)
+    pub syntax_bare: Color,
 }
 
 /// Dark: for a dark terminal (checked on black, `#141211`, `#282c34`).
@@ -142,6 +145,7 @@ pub(crate) const DARK: Palette = Palette {
     syntax_number: rgb(0xf0b27a),
     syntax_call: rgb(0x8fc4f0),
     syntax_type: rgb(0xe8cf9a),
+    syntax_bare: rgb(0xd3cec3),
 };
 
 /// Light: for a light terminal (checked on white and our cream `#f7f4ee`).
@@ -173,6 +177,7 @@ pub(crate) const LIGHT: Palette = Palette {
     syntax_number: rgb(0x9a4a0c),
     syntax_call: rgb(0x1f63a8),
     syntax_type: rgb(0x7a5c00),
+    syntax_bare: rgb(0x2e2b29),
 };
 
 /// The palette of a mode.
@@ -306,6 +311,10 @@ pub(crate) fn syntax_call() -> Color {
 }
 pub(crate) fn syntax_type() -> Color {
     palette().syntax_type
+}
+/// A bare fence's block (``` with no language): gray text.
+pub(crate) fn syntax_bare() -> Color {
+    palette().syntax_bare
 }
 
 // ---- glyphs (book §6): one glyph per entity and per status ----

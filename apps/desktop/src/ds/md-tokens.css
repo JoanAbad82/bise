@@ -7,14 +7,17 @@
 :root, [data-theme="dark"] {
   --p-syn-keyword: #d7a6f0; --p-syn-string: #b9d99a; --p-syn-comment: #99928a;
   --p-syn-number: #f0b27a; --p-syn-call: #8fc4f0; --p-syn-type: #e8cf9a;
+  --p-syn-bare: #d3cec3;
 }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
   --p-syn-keyword: #8a3fb0; --p-syn-string: #44782a; --p-syn-comment: #726b60;
   --p-syn-number: #9a4a0c; --p-syn-call: #1f63a8; --p-syn-type: #7a5c00;
+  --p-syn-bare: #2e2b29;
 } }
 [data-theme="light"] {
   --p-syn-keyword: #8a3fb0; --p-syn-string: #44782a; --p-syn-comment: #726b60;
   --p-syn-number: #9a4a0c; --p-syn-call: #1f63a8; --p-syn-type: #7a5c00;
+  --p-syn-bare: #2e2b29;
 }
 :root, [data-theme="light"], [data-theme="dark"] {
   /* prose: the TUI's text */
@@ -49,4 +52,7 @@
   --md-syn-number: var(--p-syn-number);
   --md-syn-call: var(--p-syn-call);
   --md-syn-type: var(--p-syn-type);
+  /* a bare fence's block (``` with no language) in his words: the text at 90 % toward the ground
+     (oklab), gray enough to say "code" (his ask, code-fences) */
+  --md-syn-bare: var(--p-syn-bare);
 }

@@ -1493,10 +1493,24 @@
 .th-bubble .th-md > :last-child {
   margin-bottom: 0;
 }
-/* a code block takes the bubble's full width and scrolls */
+/* a code block takes the bubble's full width and wraps, as his composer does (code-fences, his ask:
+   his lines never hide past the bubble's edge); a word longer than the line breaks anywhere */
 .th-bubble pre {
   max-width: 100%;
   overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* a bare fence's box has no label, so no label row (designer m_31266): its copy rides on the box's
+   top right corner, on hover */
+.th-bubble .th-code {
+  position: relative;
+}
+.th-bubble .th-code-head:has(> .th-code-lang:empty) {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
 }
 /* inside: a quote first, then image chips, then his words */
 .th-bubble .b-quote {

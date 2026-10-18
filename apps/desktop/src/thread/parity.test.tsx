@@ -131,9 +131,9 @@ describe('code colors (tui-parity B15)', () => {
   it('a known language is tokenized into colored spans; its text stays exact; an unknown one stays plain', () => {
     const v = render(<Markdown text={'```rust\nfn main() { let x = "hi"; }\n```\n\n```zzz\nplain words\n```'} />);
     const pres = v.container.querySelectorAll('pre');
-    expect(pres[0]?.querySelectorAll('span.token').length ?? 0).toBeGreaterThan(3);
+    expect(pres[0]?.querySelectorAll('span[style*="color"]').length ?? 0).toBeGreaterThan(3);
     expect(pres[0]?.textContent).toBe('fn main() { let x = "hi"; }\n');
-    expect(pres[1]?.querySelectorAll('span.token').length).toBe(0);
+    expect(pres[1]?.querySelectorAll('span[style*="color"]').length).toBe(0);
     expect(pres[1]?.textContent).toBe('plain words\n');
   });
 

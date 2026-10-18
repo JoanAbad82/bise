@@ -9,7 +9,8 @@ import COMPOSER_PARTS from '../../../../rust/proto/fixtures/composer_parts.json'
 import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, TIP_EVERY_MS } from './keybar';
 import { noVisionLine } from './message';
 import { isImagePath } from './sources';
-import { codeRuns, colorLines, proseRuns } from './mdcolor';
+import { colorLines, cssText, proseRuns } from './mdcolor';
+import { codeLines } from '@/thread/Code';
 import { buildMessage, chipStrip, fileChipName, isLongPaste, lineCount, nextChipNumber, type Chip, type Segment } from './message';
 import { load, remember, save, takeOldQueue, HISTORY_MAX, type Store } from './drafts';
 import { argRows, commandLine, commandRows, completion, enterSends, move, type Row } from './pick';
@@ -469,12 +470,14 @@ describe('sending: no-vision line and prefixes (attach.rs, sb.rs)', () => {
 
 describe('live markdown colors (B9/W8)', () => {
   const cls = (runs: readonly { text: string; cls: string | null }[]) => runs.map((r) => `${r.cls ?? '-'}:${r.text}`);
-  it('code: keywords, strings, numbers, comments, types; # comments by the fence tag', () => {
-    expect(cls(codeRuns('fn main() { let x = 1; }', 'rust'))).toEqual(['kw:fn', '-: main() { ', 'kw:let', '-: x = ', 'num:1', '-:; }']);
-    expect(cls(codeRuns('const s = "a // b"; // note', 'ts'))).toEqual(['kw:const', '-: s = ', 'str:"a // b"', '-:; ', 'com:// note']);
-    expect(cls(codeRuns('x = 2 # why', 'py'))).toEqual(['-:x = ', 'num:2', '-: ', 'com:# why']);
-    expect(cls(codeRuns('let v: Vec<u8>', 'rust'))).toEqual(['kw:let', '-: v: ', 'type:Vec', '-:<u8>']);
-    expect(cls(codeRuns('a2b', 'rust'))).toEqual(['-:a2b']);
+  it("code: the bubble's own rule (codeLines), run for run and style for style (code-fences)", () => {
+    const text = '```rust\nfn main() { let x = 1; } // note\n```\n```md\n# Plan\n- **do** `it`\n```\n```\nplain words\n```';
+    const lines = colorLines(text);
+    const bubble = [...codeLines('fn main() { let x = 1; } // note', 'rust'), ...codeLines('# Plan\n- **do** `it`', 'md'), ...codeLines('plain words', '')];
+    const composer = [lines[1], lines[4], lines[5], lines[8]].map((runs) => (runs ?? []).map((r) => [r.text, r.css ?? '']));
+    expect(composer).toEqual(bubble.map((runs) => runs.filter((r) => r.text !== '').map((r) => [r.text, cssText(r.style)])));
+    // a bare fence's words: one gray run
+    expect(lines[8]).toEqual([{ text: 'plain words', cls: null, css: 'color: var(--md-syn-bare)' }]);
   });
   it('prose: list markers, headings, inline code; plain words stay one run', () => {
     expect(cls(proseRuns('- [ ] do `this` now'))).toEqual(['mark:- [ ] ', '-:do ', 'code:`this`', '-: now']);
@@ -483,7 +486,8 @@ describe('live markdown colors (B9/W8)', () => {
   });
   it('fences dim, the block between them is code, after it prose again', () => {
     const lines = colorLines('```rust\nfn x\n```\n- a');
-    expect(lines.map(cls)).toEqual([['fence:```rust'], ['kw:fn', '-: x'], ['fence:```'], ['mark:- ', '-:a']]);
+    expect(lines.map(cls)).toEqual([['fence:```rust'], ['-:fn', '-: ', '-:x'], ['fence:```'], ['mark:- ', '-:a']]);
+    expect(lines[1]?.[0]?.css).toBe('color: var(--md-syn-keyword); font-weight: 700');
   });
 });
 

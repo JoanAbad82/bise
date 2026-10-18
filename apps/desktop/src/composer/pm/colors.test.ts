@@ -32,8 +32,9 @@ describe('pm/colors: live markdown as decorations', () => {
     const got = styled('- a\n```rust\nfn main() {}\n```');
     expect(got).toContainEqual(['- ', COLOR_STYLE.mark]);
     expect(got).toContainEqual(['```rust', COLOR_STYLE.fence]);
-    expect(got).toContainEqual(['fn', COLOR_STYLE.kw]);
-    expect(got.some(([t]) => t.includes('main'))).toBe(false);
+    expect(got).toContainEqual(['fn', 'color: var(--md-syn-keyword); font-weight: 700']);
+    expect(got).toContainEqual(['main', 'color: var(--md-syn-call)']);
+    expect(got.some(([t]) => t === ' ')).toBe(false);
   });
 
   it('a chip inside a colored run is cut out of it', () => {

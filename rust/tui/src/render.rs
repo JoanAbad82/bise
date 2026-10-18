@@ -1004,9 +1004,9 @@ pub(crate) fn user_block_lines(said_msg: &Said, mark: Mark, open: bool, width: u
     // BISE-240: each long paste is its chip in the line (pasted.rs)
     let (quotes, pastes) = (&view.quotes, &view.pastes);
     let msg = view.body.as_str();
-    let mut lines: Vec<Line<'static>> = msg
-        .split('\n')
-        .map(|l| Line::from(crate::attach::chip_spans(l.trim_end_matches('\r'), style)))
+    // a fenced block's lines as the composer drew them (code-fences)
+    let mut lines: Vec<Line<'static>> = (msg.split('\n').zip(crate::mdlive::block_spans(msg)))
+        .map(|(l, b)| Line::from(b.unwrap_or_else(|| crate::attach::chip_spans(l.trim_end_matches('\r'), style))))
         .collect();
     // opened whole: `▾` after its last line (click it, or ctrl+o, to fold)
     if folds && open {

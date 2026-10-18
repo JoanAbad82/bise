@@ -35,6 +35,7 @@ export const MD_ROLES = {
   "--md-quote": "text", "--md-quote-bar": "text", "--md-rule": "rule", "--md-code-box": "faint", "--md-code-label": "dim",
   "--md-syn-plain": "text", "--md-syn-keyword": "syntax_keyword", "--md-syn-string": "syntax_string", "--md-syn-comment": "syntax_comment",
   "--md-syn-number": "syntax_number", "--md-syn-call": "syntax_call", "--md-syn-type": "syntax_type",
+  "--md-syn-bare": "syntax_bare",
 };
 
 /** A theme.rs palette (`pub(crate) const DARK: Palette = Palette { … };`) as {field: "#rrggbb"}. */

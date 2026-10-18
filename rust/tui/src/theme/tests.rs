@@ -25,7 +25,7 @@ fn contrast(a: Color, b: Color) -> f64 {
 }
 
 /// Every role you must be able to read.
-fn readable(p: &Palette) -> [(&'static str, Color); 11] {
+fn readable(p: &Palette) -> [(&'static str, Color); 12] {
     [
         ("text", p.text),
         ("dim", p.dim),
@@ -38,6 +38,7 @@ fn readable(p: &Palette) -> [(&'static str, Color); 11] {
         ("syntax_number", p.syntax_number),
         ("syntax_call", p.syntax_call),
         ("syntax_type", p.syntax_type),
+        ("syntax_bare", p.syntax_bare),
     ]
 }
 

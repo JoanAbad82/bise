@@ -19,8 +19,9 @@ export function colorDecorations(doc: PmNode): DecorationSet {
     for (const r of runs) {
       const from = at;
       at += r.text.length;
-      if (r.cls === null) continue;
-      const style = COLOR_STYLE[r.cls];
+      // a code run carries the bubble's own style (mdcolor codeLines); a prose run, its class's
+      const style = r.css ?? (r.cls === null ? null : COLOR_STYLE[r.cls]);
+      if (style === null) continue;
       // a chip (U+FFFC) inside a run keeps its own look: the run is cut around it
       let start = from;
       for (let i = from; i <= at; i += 1) {

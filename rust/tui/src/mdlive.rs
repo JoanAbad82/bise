@@ -22,6 +22,7 @@ use crate::editor::byte_at_char;
 use crate::syntax::{self, Lang, State, Tok};
 use crate::theme;
 use ratatui::style::{Modifier, Style};
+use ratatui::text::Span;
 use std::collections::HashMap;
 
 /// BISE-276: plain ⏎ on a list item continues the list too, like Slack
@@ -160,20 +161,35 @@ enum Kind {
     Close,
     /// a line of a code block
     Code(Option<&'static Lang>),
+    /// a line of a bare fence's block (``` with no tag): gray (code-fences)
+    Bare,
+    /// a line of a ```md / ```markdown block: colored as prose (code-fences)
+    Md,
 }
 
 /// Reads the lines in order: a fence opens a block, a bare fence closes
 /// it (CommonMark: a fence with a tag inside a block is code).
 #[derive(Default)]
 struct Walk {
-    open: Option<Option<&'static Lang>>,
+    /// the kind of the open block's lines
+    open: Option<Kind>,
+}
+
+/// The kind of the lines a fence with this info string opens.
+fn block_of(info: &str) -> Kind {
+    let tag = info.split(|c: char| c.is_whitespace() || c == ',' || c == '{').next().unwrap_or("");
+    match tag.to_ascii_lowercase().as_str() {
+        "" => Kind::Bare,
+        "md" | "markdown" => Kind::Md,
+        _ => Kind::Code(syntax::lang_of(info)),
+    }
 }
 
 impl Walk {
     fn next(&mut self, line: &str) -> Kind {
         match (self.open, fence(line)) {
             (None, Some(info)) => {
-                self.open = Some(syntax::lang_of(info));
+                self.open = Some(block_of(info));
                 Kind::Open
             }
             (None, None) => Kind::Prose,
@@ -181,7 +197,7 @@ impl Walk {
                 self.open = None;
                 Kind::Close
             }
-            (Some(l), _) => Kind::Code(l),
+            (Some(k), _) => k,
         }
     }
 }
@@ -214,7 +230,7 @@ fn line_at(text: &str, ci: usize) -> (usize, usize, &str, Kind) {
 /// In a code block (its lines or its opening fence), where a newline
 /// keeps the indentation and plain ⏎ makes one.
 fn in_code(kind: Kind) -> bool {
-    matches!(kind, Kind::Open | Kind::Code(_))
+    matches!(kind, Kind::Open | Kind::Code(_) | Kind::Bare | Kind::Md)
 }
 
 /// Plain ⏎ at `cursor` makes a newline instead of sending: in a code
@@ -460,6 +476,20 @@ pub(crate) fn styles(text: &str, lo: usize, hi: usize, cache: &mut Cache) -> Vec
                 }
                 vec![base; n]
             }
+            // a bare fence's block: gray, the desktop's --md-syn-bare
+            Kind::Bare => {
+                if !shown {
+                    continue;
+                }
+                vec![if no_color() { base } else { base.fg(theme::syntax_bare()) }; n]
+            }
+            // a ```md block: its markdown colored as the composer's prose
+            Kind::Md => {
+                if !shown {
+                    continue;
+                }
+                prose(l, base, mark)
+            }
             Kind::Code(Some(lang)) => {
                 let (runs, next) = cache.line(lang, st, l);
                 st = *next;
@@ -479,6 +509,33 @@ pub(crate) fn styles(text: &str, lo: usize, hi: usize, cache: &mut Cache) -> Vec
             if let Some(o) = (at + i).checked_sub(lo).and_then(|j| out.get_mut(j)) {
                 *o = s;
             }
+        }
+    }
+    out
+}
+
+/// His sent message's fenced blocks as the composer drew them (code-
+/// fences): the spans of each fence and block line (the fences dim, the
+/// code colored, a bare fence's words gray, a ```md block as prose); None
+/// for a prose line (his row keeps its own look there).
+pub(crate) fn block_spans(text: &str) -> Vec<Option<Vec<Span<'static>>>> {
+    let all = styles(text, 0, text.chars().count(), &mut Cache::default());
+    let mut walk = Walk::default();
+    lines_ci(text)
+        .map(|(at, l)| match walk.next(l) {
+            Kind::Prose => None,
+            _ => Some(runs(l.trim_end_matches('\r'), all.get(at..).unwrap_or_default())),
+        })
+        .collect()
+}
+
+/// A line's chars as spans, one per run of one style. Pure.
+fn runs(l: &str, styles: &[Style]) -> Vec<Span<'static>> {
+    let mut out: Vec<Span<'static>> = Vec::new();
+    for (c, s) in l.chars().zip(styles.iter().copied().chain(std::iter::repeat(Style::default().fg(theme::text())))) {
+        match out.last_mut() {
+            Some(last) if last.style == s => last.content.to_mut().push(c),
+            _ => out.push(Span::styled(c.to_string(), s)),
         }
     }
     out
@@ -815,6 +872,37 @@ mod tests {
         assert_eq!(styles(t, 0, n, &mut Cache::default())[last].fg, Some(theme::text()));
         // an unknown language: plain text
         assert_eq!(fg_of("```brainfuck\nconst\n```", "const").fg, Some(theme::text()));
+    }
+
+    /// code-fences: a bare fence's words gray, a ```md block colored as
+    /// prose, and his sent row's block lines the composer's very spans.
+    #[test]
+    fn bare_blocks_gray_md_blocks_as_prose_his_row_alike() {
+        assert_eq!(fg_of("```\nconst x\n```", "const").fg, Some(theme::syntax_bare()));
+        // an unknown tag is not bare: plain text
+        assert_eq!(fg_of("```zzz\nconst x\n```", "const").fg, Some(theme::text()));
+        let md = "```md\n# Plan\n- do `it`\n```";
+        assert!(fg_of(md, "Plan").add_modifier.contains(Modifier::BOLD), "a heading in a md block");
+        assert_eq!(fg_of(md, "- ").fg, Some(theme::dim()), "a list marker in a md block");
+        // his row: prose lines stay his (None), fence and block lines are the composer's styles
+        let t = "see\n```ts\nconst a = 1\n```\n```\nplain words\n```";
+        let rows = block_spans(t);
+        assert_eq!(rows.len(), 7);
+        assert!(rows[0].is_none());
+        let n = t.chars().count();
+        let all = styles(t, 0, n, &mut Cache::default());
+        for (k, (at, l)) in lines_ci(t).enumerate().skip(1) {
+            let spans = rows[k].as_ref().expect("a block line");
+            assert_eq!(spans.iter().map(|s| s.content.as_ref()).collect::<String>(), l);
+            let mut i = at;
+            for s in spans {
+                for _ in s.content.chars() {
+                    assert_eq!(s.style, all[i], "line {k}");
+                    i += 1;
+                }
+            }
+        }
+        assert_eq!(rows[5].as_ref().unwrap()[0].style.fg, Some(theme::syntax_bare()));
     }
 
     #[test]
