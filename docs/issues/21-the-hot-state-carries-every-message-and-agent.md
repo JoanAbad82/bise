@@ -7,9 +7,10 @@ fixed); chunk V (the Rust side of a step: the typed view, the hot sets,
 the caches) by hot-view ("Done: chunk V" below); steps 3-4 as one index
 by hot-core (sha 1, design B, "sha 1" below): a user line 98 -> 9.9 ms.
 Steps 3-4 redone as plan A by bp-hot (d1fe6f8d5, "steps 3-4: the split"
-below): say 18.9 -> 2.0 ms in sb-core. Archived agents (sha 2): signed,
-not started (main stopped bp-hot at sha 1), plan in "sha 2: the archived
-agents" below.
+below): say 18.9 -> 2.0 ms in sb-core. Not done: the archived agents
+(sha 2), ~86 % of a live tick (A/B: 1.01 -> 0.14 ms without them);
+signed, then stopped with the refactors (Gabriel, architect m_30924):
+bp-hot ends at sha 1. Plan in "sha 2: the archived agents" below.
 Plan agreed by architect
 (m_15238). Found by hub-fifo (2026-10-09). Label: hub, perf. Follows
 bcca8231 (one pass per step) and hub-fifo's inbox lanes and state throttle.
