@@ -515,8 +515,9 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
         if (h) heads.set(`${id}/${name}`, h);
       }
     }
-    // the followed bim: its egg's words, else its name (labels.ts names a bim only while it walks)
-    if (f !== null && naming) {
+    // the followed bim: its egg's words, else its name (labels.ts names a bim only while it walks);
+    // no name while it plays an egg: its prop wins (the hop's coin pops where the name sits, bims m_31600)
+    if (f !== null && naming && eggsAt(f.id, T).bims?.[f.name] === undefined) {
       const key = `${f.id}\u0000${f.name}`;
       const head = r.headOf(f.id, f.name);
       if (!own.some((x) => x.key === key) && inSafe(head) && steps.get(f.id)?.frames.some((x) => x.name === f.name) === true) {
