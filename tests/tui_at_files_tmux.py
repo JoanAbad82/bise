@@ -1,7 +1,7 @@
 """The `@` popup in a real terminal (tmux), against the fake provider:
 agents first, then the files and folders of the workspace (.gitignore
 respected); `@` opens it at the start or inline; picking a file puts its
-relative path in the composer, picking an agent `@name`.
+chip where the `@` was (`▯ app.rs`, at-chips), picking an agent `@name`.
 
 python3 -u tests/tui_at_files_tmux.py
 """
@@ -12,6 +12,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
 from tui_composer_tmux import composer, wait_composer  # noqa: E402
+
+
+def wait_composer_has(t, text, timeout=5):
+    """The composer's rows hold `text`, spaces collapsed (a chip draws a cell of room before its
+    sign: 'read  ▯ app.rs')."""
+    def shows(sc):
+        return text in " ".join(composer(t, sc).split())
+    shows.__doc__ = "composer has %r" % text
+    t.wait_any([shows], timeout, poll=0.1)
 
 
 def popup_rows(t):
@@ -69,13 +78,15 @@ def main():
         sc = t.wait("src/app.rs")
         assert "appcache" not in sc, sc
         t.keys("Tab")
-        wait_composer(t, "read src/app.rs")
+        # at-chips (7856b6e00): a picked file is a chip by its name where the @ was
+        wait_composer_has(t, "read ▯ app.rs")
         t.wait_gone("▪ src/app.rs")
         # a folder part narrows; Enter picks too
         t.typed("and @sb/me")
         t.wait("src/sb/mention.rs")
         t.keys("Enter")
-        wait_composer(t, "read src/app.rs and src/sb/mention.rs")
+        wait_composer_has(t, "read ▯ app.rs and ▯ mention.rs")
+        assert "src/" not in composer(t), composer(t)
         # mid-word @ (an email) opens nothing
         t.typed("to a@b")
         t.sync()
@@ -112,7 +123,7 @@ def main():
         wait_composer(t, "@rust/tui/src/")
         t.wait("▪ rust/tui/src/files.rs")
         t.keys("Enter")
-        wait_composer(t, "rust/tui/src/files.rs")
+        wait_composer_has(t, "▯ files.rs")
         t.wait_gone("▪ rust/tui/src/files.rs")
         assert "@" not in composer(t), composer(t)
         # at-recent: browsing a folder lists the last modified first,
