@@ -1,6 +1,8 @@
 // Where the office's tags go (designer m_27793, m_27799): each over its bim's head, inside the
-// office; tags never overlap. A '?' / '✗' pill alone never moves (but stays inside) and is placed
-// first: it is what needs him. Then the labels in their rank (the hovered one, then bims with a
+// office; tags never overlap (bims m_31446). A '?' / '✗' pill alone is placed first and never
+// yields to a name: it is what needs him; it stays inside, and one that meets a pill placed before
+// (two bims side by side) steps aside, beside it, up or down, with its leader (never hidden). Then
+// the labels in their rank (the hovered one, then bims with a
 // pill, then working ones, then the quiet ones): one that meets a tag placed before tries up one
 // label height, down one, up two, down two, half its width left and right, with a 1 px leader to
 // its bim once moved; one that still finds no room is left out and counted (the office says
@@ -30,6 +32,8 @@ export interface TagOut {
 
 /** px kept between a tag and the office's edges */
 export const TAG_INSET = 4;
+/** px between two pills that met (one stepped aside) */
+const PILL_GAP = 2;
 /** A tag's left edge: centred on the head at x, held TAG_INSET px inside a box `box` px wide. */
 export function tagLeft(x: number, w: number, box: number): number {
   const left = x - w / 2;
@@ -60,10 +64,15 @@ export function placeTags(tags: readonly TagIn[], boxW: number, boxH: number): {
     const x = tagLeft(t.x, t.w, boxW);
     const home = { left: x, top: t.y - t.h, w: t.w, h: t.h };
     if (t.pill) {
-      // never moved off its bim, but never out of the office either
-      const top = boxH <= 0 ? home.top : Math.max(TAG_INSET, Math.min(home.top, boxH - TAG_INSET - t.h));
-      placed.push({ ...home, top });
-      at.set(t.name, { left: x, top, lead: false });
+      // over its bim, never out of the office, never hidden; a name never moves it, but one that meets
+      // a pill placed before (two bims side by side) steps aside: beside it, then up, then down
+      const clamp = (top: number): number => (boxH <= 0 ? top : Math.max(TAG_INSET, Math.min(top, boxH - TAG_INSET - t.h)));
+      const own = { ...home, top: clamp(home.top) };
+      const by = (dx: number, dy: number): Rect => ({ ...own, left: tagLeft(t.x + dx, t.w, boxW), top: clamp(own.top + dy) });
+      const tries = [own, by(t.w + PILL_GAP, 0), by(-t.w - PILL_GAP, 0), by(0, -t.h - PILL_GAP), by(0, t.h + PILL_GAP), by(t.w + PILL_GAP, -t.h - PILL_GAP), by(-t.w - PILL_GAP, -t.h - PILL_GAP)];
+      const ok = tries.find((r) => !placed.some((p) => meets(p, r))) ?? own;
+      placed.push(ok);
+      at.set(t.name, { left: ok.left, top: ok.top, lead: ok !== own });
       continue;
     }
     const side = (dx: number) => ({ ...home, left: tagLeft(t.x + dx, t.w, boxW) });

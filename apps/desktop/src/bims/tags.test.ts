@@ -35,6 +35,14 @@ describe('placeTags (designer m_27793, m_27799)', () => {
     expect(at.get('lbl')).toEqual({ left: 70, top: 48, lead: true });
   });
 
+  it('two pills side by side: the second steps beside the first, with its leader; a name never moves a pill', () => {
+    const tags = [tag('a', 100, 80, 16, true, 1), tag('b', 104, 80, 16, true, 2), tag('walker', 100, 80, 60, false, 0)];
+    const { at } = placeTags(tags, 320, 200);
+    expect(at.get('a')).toEqual({ left: 92, top: 64, lead: false });
+    expect(at.get('b')).toEqual({ left: 114, top: 64, lead: true });
+    expect(at.get('walker')?.lead, 'the name yields').toBe(true);
+  });
+
   it('a pill stays inside the office (a head near its bottom edge)', () => {
     const { at } = placeTags([tag('pil', 100, 300, 16, true)], 320, 200);
     expect(at.get('pil')).toEqual({ left: 92, top: 180, lead: false });
@@ -53,10 +61,8 @@ describe('placeTags (designer m_27793, m_27799)', () => {
     expect(shown.length + left).toBe(16);
     const b = boxes(at, shown);
     for (const r of b) expect(r.top >= 0 && r.top + r.h <= 204 && r.left >= 4 && r.left + r.w <= 316).toBe(true);
-    // two pills never move, so only they may meet; a label never meets anything
-    for (let i = 0; i < b.length; i++)
-      for (let j = i + 1; j < b.length; j++)
-        if (!(must(shown[i]).pill && must(shown[j]).pill)) expect(overlap(must(b[i]), must(b[j])), `${String(i)} ${String(j)}`).toBe(false);
+    // nothing meets anything, two pills either (bims m_31446)
+    for (let i = 0; i < b.length; i++) for (let j = i + 1; j < b.length; j++) expect(overlap(must(b[i]), must(b[j])), `${String(i)} ${String(j)}`).toBe(false);
     // every pill shows
     for (const t of tags.filter((x) => x.pill)) expect(at.has(t.name)).toBe(true);
   });
