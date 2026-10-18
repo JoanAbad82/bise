@@ -15,7 +15,9 @@ import { sleepers } from '../bims/zzz';
 import { NO_ATTENTION, type Step } from '../bims/office-driver';
 import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
-import { CAST, FOLD_S, PAGE, SHOTS, type Shot } from './cast';
+import { BUBBLE_S, BUBBLES, CAST, FOLD_S, PAGE, REDUCED_T, SHOTS, STAMP, type Bubble, type Shot } from './cast';
+import { makeFeed } from './feed';
+import { makePage } from './page';
 import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
 import { ENTRY, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
@@ -106,10 +108,23 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   let warmed = false;
   const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced });
   const overlay = makeOverlay(box);
+  const feed = makeFeed(box);
+  // a click in the shop takes the camera, as a drag would (bims-film v13)
+  const page = makePage(overlay.root, dark ? 'dark' : 'light', () => {
+    lastTouch = wall();
+    setHands({ k: 'visitor', last: wall(), follow: null });
+  });
+  /** the reviewer's ✓ on checkout's crate */
+  const stamp = document.createElement('div');
+  stamp.className = 'bh-stamp';
+  stamp.textContent = '✓';
+  stamp.style.display = 'none';
+  overlay.root.append(stamp);
   const sites: TownSite[] = CAST.map((c) => ({ id: c.id, office: layoutOf(rowsAt(c, 0).agents, c.map), grow: growOf(growthOf(c)) }));
   r.setTown(sites);
   const runs = makeRuns();
-  let t = ORIGIN + Math.max(0, opts.startT ?? 0);
+  // reduced motion: the still of kiln full, every line ticked, the shop up with its cart open (bims-film v11)
+  let t = ORIGIN + Math.max(0, opts.startT ?? (reduced ? REDUCED_T : 0));
   for (const run of runs) advance(run, t, night(), reduced);
 
   const probe: Probe | null = opts.probe === true ? { frames: 0, ms: [], T: 0, hands: 'film', shot: 0, cam: { zoom: 1, u: 0.5, v: 0.5 }, phases: [], offices: [] } : null;
@@ -299,7 +314,6 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   let raf = 0;
   let lastMs = 0;
   let onScreen = false;
-  let drawn = 0;
   let gone = false;
   const running = (): boolean => !gone && onScreen && !document.hidden;
   // a check's film by the frame (the entry strip, its mp4): no loop, each frame drawn by probe.step
@@ -345,7 +359,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       const st = stepOf(run, n, reduced, attentionOf(run));
       if (st) steps.set(run.cast.id, st);
     }
-    if (waving && ems !== null && hands.k === 'film') entryCam(ems);
+    if (waving && hands.k === 'film') entryCam(ems);
     else if (hands.k === 'film') filmCam(dt);
     else visitorCam(dt, wall());
     // the first frame: the film's shot at once, no glide from nowhere
@@ -370,10 +384,12 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     // the words come in last in the build and leave first in the fold
     overlay.root.style.opacity = ems === null ? '' : String(wordsAt(ems));
     words();
+    feed.draw(T);
+    page.draw(T);
+    stamped(T);
     const t4 = performance.now();
     // ready (the page drops its still): the frame after the warm one (the GPU catches up on it
     // under the still: a 75 ms frame in dark), the build's t = 0 the frame after
-    drawn++;
     if (box.dataset.ready !== 'true' && !warmFrame) {
       box.dataset.ready = 'true';
       emit('ready');
@@ -384,7 +400,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       probe.phases = [...probe.phases.slice(-299), { brain: t1 - t0, pose: t2 - t1, draw: t3 - t2, words: t4 - t3 }];
       probe.T = filmT(t);
       // the build's ms in the wave, else the film's (≥ ENTRY.done: the checks read the build's frames by it)
-      probe.entry = waving && ems !== null ? ems : T * 1000;
+      probe.entry = waving ? ems : T * 1000;
       probe.hands = hands.k;
       probe.shot = shotIx;
       probe.cam = spring.cam;
@@ -505,6 +521,16 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     return out;
   }
 
+  /** the reviewer's ✓ on checkout's crate (carried before its chest: a little under its head), from the stamp to the fold */
+  function stamped(T: number): void {
+    const head = T >= STAMP.at && T < PAGE.fold ? r.headOf(STAMP.office, STAMP.on) : null;
+    stamp.style.display = head === null ? 'none' : '';
+    if (head !== null) stamp.style.transform = `translate(${head.x.toFixed(1)}px, ${(head.y + 14).toFixed(1)}px)`;
+  }
+
+  /** the bubble a bim says now (one at a time, BUBBLE_S), null none */
+  const bubbleAt = (T: number): Bubble | null => BUBBLES.find((b) => T >= b.at && T < b.at + BUBBLE_S) ?? null;
+
   function words(): void {
     const f = focusOf();
     const subjects = subjectsOf();
@@ -540,9 +566,15 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
         if (h) heads.set(`${id}/${name}`, h);
       }
     }
+    // a bubble: its words over its speaker, and no name meanwhile (a pair shows the bubble only: bims-film v9)
+    const bub = bubbleAt(T);
+    if (bub !== null) {
+      const head = r.headOf(bub.office, bub.bim);
+      if (inSafe(head)) own.push({ key: `${bub.office}\u0000${bub.bim}`, label: { name: bub.bim, mode: 'egg', words: bub.words, title: '', pill: null }, head, rank: 0 });
+    }
     // the followed bim: its egg's words, else its name (labels.ts names a bim only while it walks);
     // no name while it plays an egg: its prop wins (the hop's coin pops where the name sits, bims m_31600)
-    if (f !== null && naming && eggsAt(f.id, T).bims?.[f.name] === undefined) {
+    if (f !== null && naming && bub === null && eggsAt(f.id, T).bims?.[f.name] === undefined) {
       const key = `${f.id}\u0000${f.name}`;
       const head = r.headOf(f.id, f.name);
       if (!own.some((x) => x.key === key) && inSafe(head) && steps.get(f.id)?.frames.some((x) => x.name === f.name) === true) {
@@ -586,6 +618,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     setTheme(th) {
       dark = th === 'dark';
       box.dataset.theme = th;
+      page.setTheme(th);
       kick();
     },
     resumeFilm() {
@@ -601,6 +634,8 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       seen.disconnect();
       document.removeEventListener('visibilitychange', onVis);
       gestures.dispose();
+      page.dispose();
+      feed.dispose();
       overlay.dispose();
       r.dispose();
       canvas.remove();

@@ -153,6 +153,8 @@ export const ACME = 'acme-web';
 export const PAGE = { at: 53.5, fold: 61.2 } as const;
 /** the agent that reviews checkout's crate ('review it for me'): it pops beside it in main's queue (run.ts reviewSpot) */
 export const REVIEWER = 'review';
+/** reduced motion's still (bims-film v11): kiln full, every line ticked, the shop up with its cart open (kiln-app: 2.0 s in) */
+export const REDUCED_T = PAGE.at + 2;
 /** the fold: from the edge to the middle, FOLD_S long, ending at FILM_S */
 export const FOLD_S = FILM_S - PAGE.fold;
 /** a bubble's time over its speaker, s */
