@@ -54,6 +54,17 @@ codesign --verify --deep --strict "$A"
 
 A candidate never carries his app's id (dev.bise.desktop.try): `cand.sh` refuses one that does.
 
+A candidate builds only what changed (fast-try p1, `scripts/try_build.py`): every candidate builds in
+one checkout, `~/.bise/dev/build/desktop-cand/work/` (`src/` moved to each sha with git, `target/`
+first cloned from the gate seed), under `desktop-cand/work.lock`: one candidate builds at a time. A
+UI-only change takes ~40 s, a Rust change ~1 min, a remake ~4 min. `work/` weighs ~6.5 GB apparent
+(mostly blocks shared with the gate seed) plus ~350 MB of node_modules; it is remade when the seed
+changes, and `rm -rf work` is always safe under the lock. A candidate's own `src/` has no
+node_modules: `--promote` and the DMG install them from its lockfile first. Neither checkout has
+Electron's own binary (pnpm 10 skips its postinstall, as it always did here): a harness run there
+needs `BISE_HARNESS_ELECTRON_DIST=~/.bise/dev/electron-dist/v44.5.1-lsui`, and a cand.sh run
+`PW_FROM=<a checkout with node_modules>/apps/desktop`.
+
 ## 2. Smoke it, then gate it
 
 Every candidate gets the smoke boot first (fast-try p3, about 90 s), through heavy-run like any gate:
