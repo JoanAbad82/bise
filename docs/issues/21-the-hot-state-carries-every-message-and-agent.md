@@ -6,6 +6,10 @@ hot-core (sha 0, "Measure": the boot's growth was the agent walks,
 fixed); chunk V (the Rust side of a step: the typed view, the hot sets,
 the caches) by hot-view ("Done: chunk V" below); steps 3-4 as one index
 by hot-core (sha 1, design B, "sha 1" below): a user line 98 -> 9.9 ms.
+Steps 3-4 redone as plan A by bp-hot (d1fe6f8d5, "steps 3-4: the split"
+below): say 18.9 -> 2.0 ms in sb-core. Archived agents (sha 2): signed,
+not started (main stopped bp-hot at sha 1), plan in "sha 2: the archived
+agents" below.
 Plan agreed by architect
 (m_15238). Found by hub-fifo (2026-10-09). Label: hub, perf. Follows
 bcca8231 (one pass per step) and hub-fifo's inbox lanes and state throttle.
@@ -439,6 +443,54 @@ time is not worse.) Same answers: 242 steps of replay, view_all, ticks
 and says give the same bytes (view_all sha256 equal);
 `bench_byte_equal`: the same 5 digests; `old_core_replay` against
 v2026.10.2-28, -29 and main: green.
+
+## sha 2: the archived agents (signed by architect m_30761, not started)
+
+**Measure** (main d1fe6f8d5, heavy-run --alone, 2 runs each): his journal
+copy against the same copy without the own events (task_created,
+lifecycle, reported, declared, file_touched, workspace, snapshot) of the
+747 agents that end archived, of 773 (their messages stay): live tick
+1.01 -> 0.14 ms (16.84M -> 1.02M instructions), tick after boot 1.01 ->
+0.13 ms, say 0.95 -> 0.16 ms (17.7M -> 1.3M). Archived agents are ~86 %
+of a live tick: the 10 % rule says do it. A tick sample shows where: the
+agent lookups by name (`find` over St.agents) and `agents_json`'s walk of
+every agent, and the walks over St.order that look each name up.
+
+**Plan B2** (signed): St.agents keeps the agents not archived, in
+creation order; a new St field `arch` (13th, after withdrawn-answer's
+`gone`) keeps the archived ones, newest archived first.
+
+- Lookups by name (get_agent, agent_alias/resolve, name_taken, map_agent,
+  put_agent) read St.agents, then arch.
+- A lifecycle to archived moves the record from St.agents to arch's
+  head; out of archived (a restore: 2 in his journal) moves it back to
+  its creation place in St.agents (an insert by St.order's position),
+  never at the end. Other agent events change it on its side.
+- `every_agents` (view_all, the laws) walks St.order by name: St.order
+  holds every name, in creation order (today St.agents' names are
+  exactly St.order). A step's view (`agents_json` with `names`) walks
+  St.agents when every changed name is there, St.order otherwise.
+- The walks over St.order that keep only active agents (overlap_others,
+  boot.each; check busy.go, resume.pump, retirees) walk St.agents' names;
+  mates (live: false wants archived ones) and close_names keep St.order.
+- Laws: HI.AgentsSplit (no name on both sides, every arch agent archived,
+  every St.agents one not, every name of both in St.order) with
+  split_agents_at_init, split_agents_kept_by_run, split_agents_after_replay;
+  `live_order_follows_creation` (St.agents is a subsequence of St.order);
+  names_apart, name_taken and the agent laws over every_agents under it.
+  No unsafe.
+- Same checks as steps 3-4: same.py (view_all sha equal), bench_byte_equal,
+  old_core_replay -28/-29/main, numbers with instructions; no journal
+  change; new code outside core.bend.
+- Room: model.bend is at 998 of 1000 lines. Plan: the two-list helpers as
+  generic defs (key, update, archived? as parameters, like `find`) in a
+  new file model.bend imports, and model.bend keeps thin wrappers;
+  maybe_nat_is / maybe_str_is can move to text.bend if that is not enough.
+
+**Follow-up** (architect m_30761, not this sha): St then has 13
+positional fields and each new one costs ~110 pattern edits across
+model, replay and the proofs: accessors, or a sub-record for the cold
+parts (old, arch, gone), so the next field costs one edit.
 
 ## Risks
 
