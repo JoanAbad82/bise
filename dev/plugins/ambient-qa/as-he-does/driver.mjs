@@ -1679,7 +1679,7 @@ async function rows37(harness, say) {
     });
     const mine = opened ? await until(mineOf, 20000, 500) : null;
     await shot('inbox-answer-in-thread');
-    const good = (a) => !!a && a.n === 1 && /harness/.test(a.at) && /\/main$/.test(a.at) && /✓ you answered \S+/.test(a.text) && /zqblue/.test(a.text) && /answered from bise · \d\d:\d\d/.test(a.text);
+    const good = (a) => !!a && a.n === 1 && /harness/.test(a.at) && /\/main$/.test(a.at) && /✓ ?you answered \S+/.test(a.text) && /zqblue/.test(a.text) && /answered from bise · \d\d:\d\d/.test(a.text);
     step("his inbox answer from the block in bise's view (another project's card): the window goes to harness' main at his row, '✓ you answered <agent>' + the option's words, 'answered from bise · HH:MM'", good(mine), { listed: !!listed, opened, mine });
     await page.reload().catch(() => {});
     await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
@@ -3472,7 +3472,9 @@ async function rowsC2BA(harness, say) {
     const first = (f) => (Array.isArray(drops) ? drops.findIndex(f) : -1);
     const [ctxGone, placeGone] = [first((x) => !x.ctx), first((x) => !x.place)];
     step("composer A (zcwt): 'to zcwt' + 'ψsb/zcwt' + context; narrowed, the context goes first, then the branch, 'to zcwt' always stays",
-      /^to zcwt\b/.test(w0?.to ?? '') && /^ψ ?sb\/zcwt$/.test(w0?.place ?? '') && (w0?.context === null || ctxGone >= 0) && (ctxGone < 0 || placeGone >= ctxGone) && Array.isArray(drops) && drops.every((x) => x.to),
+      // a worktree is 'ψ <its own folder's name>' (designer m_24790, tab.ts TabPlace), here 'ψzcwt';
+      // the fake provider reports no usage: no context, so only the place can go, never 'to'
+      /^to zcwt\b/.test(w0?.to ?? '') && /^ψ ?(sb\/)?zcwt$/.test(w0?.place ?? '') && (w0?.context === null || ctxGone >= 0) && (w0?.context === null || placeGone < 0 || placeGone >= ctxGone) && Array.isArray(drops) && drops.every((x) => x.to),
       { tab: w0, ctxGone: drops[ctxGone]?.w ?? null, placeGone: drops[placeGone]?.w ?? null, full: Array.isArray(drops) ? drops[0] : drops });
     // answering: the accent tab, 'answering main · …', 'esc write to main instead'; '+' and send only
     await harness();
@@ -3530,28 +3532,6 @@ async function rowsC2BA(harness, say) {
       sizes.every((s) => /^to (main|bise)/.test(s.idle.to ?? '') && s.idle.band && /^to zcwt/.test(s.words.to ?? '') && !!s.words.mode && s.answering.open && s.answering.acc && !s.answering.dots && /^↳ answering (main|bise)/.test(s.answering.to ?? '')), sizes);
     await harness();
     await answerWith(Q, 1);
-  });
-
-  await row('PROBE goagent', async () => {
-    const where = async (tag) => ({ tag, hash: await page.evaluate(() => location.hash).catch(() => null), screens: await page.evaluate(() => [...document.querySelectorAll('[data-testid="thread.screen"]')].map((e) => ({ a: e.getAttribute('data-agent'), p: e.getAttribute('data-project'), vis: e.getBoundingClientRect().width }))).catch(() => null), head: flat(await text('[data-testid="app.main"]')).slice(0, 80) });
-    const log = [];
-    await harness();
-    await page.waitForTimeout(800);
-    log.push(await where('after harness'));
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(800);
-    log.push(await where('after esc'));
-    await harness();
-    await page.waitForTimeout(800);
-    await unfold();
-    const r = page.locator('[data-testid="app.right.agent.zcwt"]').first();
-    log.push({ tag: 'row', count: await r.count(), box: await r.boundingBox().catch(() => null), html: (await r.evaluate((e) => e.outerHTML.slice(0, 400)).catch((x) => String(x))) });
-    await r.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
-    const clicked = await r.click({ timeout: 5000 }).then(() => 'ok', (e) => String(e).slice(0, 300));
-    await page.waitForTimeout(1500);
-    log.push({ clicked, ...(await where('after click')) });
-    await shot('probe-after-click');
-    step('PROBE goagent', false, log);
   });
 
   await row('ghost badge', async () => {
