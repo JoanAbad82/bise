@@ -304,8 +304,13 @@ export interface Pose extends Pt {
   /** seconds since its segment started (the renderer's loops and transitions) */
   readonly since: number;
   readonly seg: Segment;
-  /** his message flying to it (q-planes): seconds since the plane left the top edge (flight ~1.5 s, then the catch ~2 s) */
-  readonly plane?: { readonly since: number };
+  /**
+   * his message flying to it (q-planes): seconds since the plane left his side of the screen (the
+   * flight, render/pose.ts PLANE_FLIGHT, then the catch). The app's timeline sets `since` alone; a
+   * film's driver (hero-town m_31686) may set the flight's length, its loops (0, 1, 2; unset: 1, the
+   * y1 egg 2) and where it leaves (a fraction of the view's width, unset: 0.5, the middle)
+   */
+  readonly plane?: { readonly since: number; readonly dur?: number; readonly loops?: 0 | 1 | 2; readonly startX?: number };
 }
 
 /**

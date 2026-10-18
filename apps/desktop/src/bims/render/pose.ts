@@ -413,9 +413,9 @@ function beat(from: ActivityKind | null, to: ActivityKind, f: number, b: Body): 
   return b;
 }
 
-/** his plane landing in the bim's hand at s seconds after it left the top edge (s >= PLANE_FLIGHT) */
-function caught(b: Body, s: number): Body {
-  const c = s - PLANE_FLIGHT;
+/** his plane landing in the bim's hand at s seconds after it left (s >= dur, its flight's length) */
+function caught(b: Body, s: number, dur: number): Body {
+  const c = s - dur;
   if (c < 0 || c > PLANE_CATCH) return b;
   // the plane in its hand from the catch's first frame: the flight ends there, never a gap (bims m_31601)
   if (c < 0.4) return { ...b, armR: [0, 0, 2.6], props: { ...b.props, plane: true }, eyes: 1, mouth: 'smile', screen: Math.max(b.screen, 0.4) };
@@ -483,8 +483,9 @@ export function rigOf(inp: RigInput): Rig {
 
   if (pose.plane && !reduced) {
     const s = pose.plane.since;
-    if (s < PLANE_FLIGHT + PLANE_CATCH) motion = 'walk';
-    if (arrived) b = caught(b, s);
+    const dur = pose.plane.dur ?? PLANE_FLIGHT;
+    if (s < dur + PLANE_CATCH) motion = 'walk';
+    if (arrived) b = caught(b, s, dur);
   }
 
   const dir = b.face ?? pose.dir;

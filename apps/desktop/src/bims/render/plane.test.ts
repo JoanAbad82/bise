@@ -142,6 +142,19 @@ describe('his paper plane', () => {
     }
   });
 
+  it("a film's knobs: where it leaves, how long, no loop (hero-town m_31686)", () => {
+    const left = cameraStart(fit, 0.1);
+    expect(toScreen(fit, left).x).toBeCloseTo(fit.widthPx * 0.1, 3);
+    expect(toScreen(fit, left).y).toBeGreaterThan(fit.heightPx);
+    const short = planFlight({ from: left, to: hand, seed: 4, loops: 0, unit: 1.4, dur: 1.6 });
+    const end = flightAt(short, 1.6);
+    expect(end.p.x).toBeCloseTo(hand.x, 6);
+    expect(end.p.z).toBeCloseTo(hand.z, 6);
+    const ss = Array.from({ length: 401 }, (_, i) => flightAt(short, (i / 400) * 1.6));
+    expect(Math.min(...ss.map((s) => s.up.y))).toBeGreaterThan(0); // never upside down: no loop
+    expect(Math.min(...ss.map((s) => s.p.y))).toBeGreaterThan(0.5);
+  });
+
   it('casts a soft shadow, fainter as it climbs', () => {
     const low = shadowOf({ x: 0, y: 0.5, z: 0 }, 0);
     const high = shadowOf({ x: 0, y: 4, z: 0 }, 0);

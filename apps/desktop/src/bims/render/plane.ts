@@ -43,8 +43,9 @@ const N = 240;
  * camera (an ortho view: the same spot on screen, in front of everything), and START_Y above the floor
  * at least. Pure.
  */
-export function cameraStart(fit: Fit): V3 {
-  const vx = (fit.left + fit.right) / 2;
+export function cameraStart(fit: Fit, startX = 0.5): V3 {
+  // startX: where along the bottom edge, a fraction of the view's width (a film's feed sits bottom left)
+  const vx = fit.left + (fit.right - fit.left) * clamp01(startX);
   const vy = fit.bottom - START_PX * fit.scale;
   const onScreen = add(add(fit.target, RIGHT, vx), UP, vy);
   // along BACK the screen spot stays; far enough toward him to be above the floor and in front of the office
@@ -95,6 +96,8 @@ export interface FlightPlan {
   readonly loops: number;
   readonly r: number;
   readonly loopFwd: V3;
+  /** its flight's length, seconds */
+  readonly dur: number;
   /** time (0..1) at u = i / N, from its speed along the path */
   readonly times: readonly number[];
 }
@@ -109,6 +112,8 @@ export interface PlanInput {
   readonly unit?: number;
   /** the '?' / '✗' pills on the way (the bims' heads): it never loops over one, it sweeps past (bims m_31314) */
   readonly avoid?: readonly V3[];
+  /** its flight's length, seconds (unset: PLANE_FLIGHT; a film's later, shorter ones) */
+  readonly dur?: number;
 }
 
 /** how far on screen (view-plane units) a point is from another: the iso view's own distance */
@@ -144,7 +149,8 @@ function glideY(f: FlightPlan, u: number, to: V3): number {
 export function planFlight(inp: PlanInput): FlightPlan {
   const { from, to } = inp;
   const unit = Math.max(1, inp.unit ?? 1);
-  const loops = Math.max(1, Math.round(inp.loops ?? 1));
+  // 0: no loop (a film's later, shorter flights), 1 his message's, 2 the y1 egg's
+  const loops = Math.max(0, Math.round(inp.loops ?? 1));
   const rand = rng(inp.seed);
   const way = sub(to, from);
   const level = Math.hypot(way.x, way.z);
@@ -157,7 +163,7 @@ export function planFlight(inp: PlanInput): FlightPlan {
   const seen = Math.hypot(dot(way, RIGHT), dot(way, UP));
   const r = Math.max(0.95 * unit, 0.13 * seen) * (0.9 + 0.25 * rand());
   const draft: FlightPlan = {
-    from, to, side, sign, loops, r, loopFwd,
+    from, to, side, sign, loops, r, loopFwd, dur: inp.dur ?? PLANE_FLIGHT,
     zig: Math.min(Math.max(1.3 * unit, 0.32 * seen) * (0.8 + 0.4 * rand()), 0.3 * Math.max(level, 1)),
     waves: 1.6 + 0.5 * rand(),
     lift: 0.5 + 0.08 * Math.hypot(way.x, way.y, way.z) + 0.3 * rand(),
@@ -236,6 +242,7 @@ function uAt(times: readonly number[], f: number): number {
 
 /** how far into the loop's window (0 out, 1 well in): the bank and the wobble give way to the loop's own turn */
 function inLoop(f: FlightPlan, u: number): number {
+  if (f.loops === 0) return 0;
   const half = (f.loopW * f.loops) / 2;
   return 1 - smooth(half * 0.6, half + 0.05, Math.abs(u - f.loopAt));
 }
@@ -245,7 +252,7 @@ function inLoop(f: FlightPlan, u: number): number {
  * moved since the plan; the path bends to it). Pure.
  */
 export function flightAt(f: FlightPlan, s: number, to: V3 = f.to): FlightFrame {
-  const u = uAt(f.times, clamp01(s / PLANE_FLIGHT));
+  const u = uAt(f.times, clamp01(s / f.dur));
   const du = 1 / N;
   const p = pathAt(f, u, to);
   const a = pathAt(f, Math.max(0, u - du), to);

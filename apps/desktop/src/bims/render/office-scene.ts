@@ -160,8 +160,10 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     const flying = new Set<string>();
     const site = office ? siteOf(office) : null;
     for (const f of frames) {
-      const s = f.pose.plane?.since;
-      if (s === undefined || s < 0 || s >= PLANE_FLIGHT) continue;
+      const fp = f.pose.plane;
+      const s = fp?.since;
+      const dur = fp?.dur ?? PLANE_FLIGHT;
+      if (s === undefined || s < 0 || s >= dur) continue;
       const rig = rigs.get(f.name);
       if (!rig) continue;
       flying.add(f.name);
@@ -174,9 +176,10 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       let p = planes.get(f.name);
       if (p?.leftAt !== leftAt) {
         if (p) { root.remove(p.mesh.group, p.mesh.shadow); p.mesh.dispose(); }
-        const loops = f.egg?.kind === 'loop' ? 2 : 1;
+        const loops = fp?.loops ?? (f.egg?.kind === 'loop' ? 2 : 1);
         const avoid = pillHeads(frames, f.name);
-        p = { mesh: makePlane(style), leftAt, plan: planFlight({ from: cameraStart(fit), to: hand, seed: hash(`${f.name}@${leftAt}`), loops, unit: size, avoid }) };
+        const from = cameraStart(fit, fp?.startX);
+        p = { mesh: makePlane(style), leftAt, plan: planFlight({ from, to: hand, seed: hash(`${f.name}@${leftAt}`), loops, unit: size, avoid, dur }) };
         planes.set(f.name, p);
         root.add(p.mesh.group, p.mesh.shadow);
       }
