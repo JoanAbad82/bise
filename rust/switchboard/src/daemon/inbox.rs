@@ -5,7 +5,11 @@
 //! CPU, reached a hello after hours ('no agents yet' in the TUI and the
 //! desktop app). One client's messages share the lane, so their order
 //! holds; a client only refers to state it has seen, so its lines never
-//! depend on a queued REPL line (architect m_14659). A stop goes in the
+//! depend on a queued REPL line (architect m_14659). An agent's read
+//! (`sb list`, `tasks`, `inspect`...: daemon/accept.rs `READS`) goes there
+//! too, on the same ground (hub-loop, m_30615): its `sb` waits for each
+//! answer, so its own writes are in before it reads; 25 agents polling
+//! reads are bounded like a flooding client, by [`URGENT_RUN`]. A stop goes in the
 //! urgent lane too (`Msg::is_urgent`): behind the REPLs' lines, a
 //! `bise switchboard --stop` ran 85 s late on 2026-10-11, under a client
 //! that had attached since. A flooding client

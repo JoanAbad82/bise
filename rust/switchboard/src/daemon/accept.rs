@@ -227,3 +227,81 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
         _ => {}
     }
 }
+
+/// The agents' requests that only read (hub-loop, architect m_30615):
+/// they go in the inbox's urgent lane with the clients' lines
+/// (`Msg::is_urgent`, daemon/inbox.rs). An agent's `sb` waits for its
+/// answer before its next command, so its own writes are applied before
+/// its read runs, and a read answers the state as it is now. Each op here
+/// changes nothing: no sb-core step that journals, no file written (`list`
+/// and `tasks` are sb-core reads, the test below; `inspect` reads
+/// transcripts, `history` and `show` the search index (daemon/tindex.rs:
+/// a cache of the transcripts it may bring up to date, not state), `page_list` and
+/// `page_waiting` the page store). Op names only: an op whose read or
+/// write depends on its args (`every`, `wake`, `artifact`) stays in order.
+pub(super) const READS: &[&str] = &["list", "tasks", "inspect", "history", "show", "page_list", "page_waiting"];
+
+/// An agent request that only reads ([`READS`]).
+pub(super) fn is_read(v: &Value) -> bool {
+    v.get("cmd").and_then(|c| c.as_str()).is_some_and(|c| READS.contains(&c))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::{AgentReq, Effect, Env, Hub, Input, Loss};
+    use crate::model::Workspace;
+
+    /// No git, no project: a read never asks for one.
+    struct NoEnv;
+
+    impl Env for NoEnv {
+        fn now(&self) -> u64 {
+            1_000_000
+        }
+        fn is_git(&mut self) -> bool {
+            false
+        }
+        fn worktree_create(&mut self, _: &str, _: bool) -> Result<Workspace, String> {
+            Err("a read made a worktree".into())
+        }
+        fn worktree_loss(&mut self, _: &Workspace) -> Loss {
+            Loss::default()
+        }
+        fn worktree_drop(&mut self, _: &str, _: &Workspace, _: &Loss) -> Result<Option<String>, String> {
+            Err("a read dropped a worktree".into())
+        }
+        fn worktree_restore(&mut self, _: &str, _: &Workspace, _: Option<&str>) -> Result<Workspace, String> {
+            Err("a read restored a worktree".into())
+        }
+    }
+
+    #[test]
+    fn only_the_listed_ops_are_reads() {
+        for c in READS {
+            assert!(is_read(&json!({"op": "agent", "cmd": c, "from": "t1"})), "{c}");
+        }
+        for c in ["send", "report", "status", "land", "spawn", "wake", "every", "artifact", "page_publish", "page_tick", "page_notes", "follow"] {
+            assert!(!is_read(&json!({"op": "agent", "cmd": c, "from": "t1"})), "{c} is not a read");
+        }
+        assert!(!is_read(&json!({"op": "version"})));
+    }
+
+    /// The sb-core reads (`list`, `tasks`) journal nothing, on a hub with
+    /// agents and their state; the others never step sb-core
+    /// (Shell::agent_request answers them before its sb-core arm).
+    #[test]
+    fn an_agents_read_journals_nothing() {
+        let (mut h, mut env) = (Hub::new("/w"), NoEnv);
+        let spawn = json!({"cmd": "spawn", "name": "t1", "objective": "o", "worktree": false});
+        h.handle(Input::Agent { token: 1, from: "main".into(), req: AgentReq::from_json(&spawn).expect("spawn") }, &mut env);
+        for (i, c) in ["list", "tasks"].iter().enumerate() {
+            for from in ["main", "t1"] {
+                let req = AgentReq::from_json(&json!({"cmd": c})).expect("a read");
+                let fx = h.handle(Input::Agent { token: 10 + i as u64, from: from.into(), req }, &mut env);
+                assert!(!fx.iter().any(|e| matches!(e, Effect::Journal(_))), "sb {c} from {from} journaled: {fx:?}");
+                assert!(fx.iter().any(|e| matches!(e, Effect::Reply { .. })), "sb {c} from {from} answered");
+            }
+        }
+    }
+}

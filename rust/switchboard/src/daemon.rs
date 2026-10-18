@@ -277,10 +277,9 @@ impl Msg {
     /// stop asked at 22:18:16 ran at 22:19:41 (2026-10-11), after the
     /// client had said "stopped" and a new `bise` had attached.
     fn is_urgent(m: &Msg) -> bool {
-        matches!(
-            m,
-            Msg::OlderHello { .. } | Msg::RpcNew { .. } | Msg::ClientLine { .. } | Msg::ClientGone { .. } | Msg::Typed { .. } | Msg::Shutdown { .. }
-        )
+        // an agent's read too (daemon/accept.rs READS, hub-loop)
+        matches!(m, Msg::OlderHello { .. } | Msg::RpcNew { .. } | Msg::ClientLine { .. } | Msg::ClientGone { .. } | Msg::Typed { .. } | Msg::Shutdown { .. })
+            || matches!(m, Msg::AgentNew { v, .. } if accept::is_read(v))
     }
 }
 
