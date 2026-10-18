@@ -9,6 +9,7 @@ import type { BufferGeometry, Group, Material, Mesh, MeshLambertMaterial, Object
 import type { Box, MapId, Office, Pt, Spot } from '../../model';
 import type { Grow } from '../../growth';
 import type { Kit } from '../kit';
+import type { Seat } from '../furniture';
 import type { Palette } from '../palette';
 import type { Style } from '../style';
 
@@ -18,6 +19,8 @@ export interface DeskHandles {
   readonly lamp: MeshLambertMaterial;
   /** the desk's centre at its top (pick, the overlay) */
   readonly top: { readonly x: number; readonly y: number; readonly z: number };
+  /** its chair (a poke's chair spin turns it with its bim); absent: a map without one (a cushion, a stool) */
+  readonly chair?: Seat;
 }
 
 /** What every builder gets: the kit (palette, shared materials), the world's root, the office, the growth. */

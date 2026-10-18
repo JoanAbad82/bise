@@ -57,10 +57,10 @@ function mainDesk({ k, root, o }: Build): DeskHandles {
   const lamp = deskLamp(k, mg, mw / 2 - 0.2, mdd / 2 - 0.2);
   k.add(style.box(0.7, 0.06, 0.5), k.mat(pal.wallTop), mg, -mw / 2 + 0.5, 0.58, 0);
   k.add(style.box(0.34, 0.24, 0.26), k.mat(WORLD.crate), mg, -mw / 2 + 0.5, 0.73, 0);
-  chair(k, root, md.x, md.z - 0.05, WORLD.dark, md.face);
+  const seat = chair(k, root, md.x, md.z - 0.05, WORLD.dark, md.face);
   const neon = style.material(pal.neon, { flat: true });
   glyph(k, root, md.x, 1.25, 0.02 + style.pictureZ, pal.neon, 0.06, neon);
-  return { screen, lamp, top: { x: mcx, y: 0.55, z: mcz } };
+  return { screen, lamp, top: { x: mcx, y: 0.55, z: mcz }, chair: seat };
 }
 
 /**
@@ -107,14 +107,14 @@ function desk({ k, root: parent, o }: Build, d: Spot, name: string): DeskHandles
   k.add(style.box(0.22, 0.08, 0.02), k.mat(HOODIE[h % HOODIE.length] ?? pal.desk), g, -w / 3, 0.4, dd / 2 - 0.03);
   const screen = laptop(k, g, d.x - cx, LAPTOP.dz);
   const lamp = deskLamp(k, g, w / 2 - 0.18, dd / 2 - 0.17);
-  chair(k, parent, d.x, d.z - 0.05, HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, d.face);
+  const seat = chair(k, parent, d.x, d.z - 0.05, HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, d.face);
   if (h % 3 === 0) k.add(style.cylinder(0.06, 0.12), k.mat(WORLD.paper), g, 0.42, 0.61, -0.2);
   if (h % 4 === 1) {
     k.add(style.cylinder(0.08, 0.12), k.mat(WORLD.pot), g, -0.55, 0.61, -0.1);
     k.add(style.ball(0.12), k.mat(pal.plant), g, -0.55, 0.76, -0.1);
   }
   if (h % 5 === 2) k.add(style.ball(0.07), k.mat(WORLD.orange), g, 0.4, 0.62, 0.12);
-  return { screen, lamp, top: { x: cx, y: 0.55, z: cz } };
+  return { screen, lamp, top: { x: cx, y: 0.55, z: cz }, chair: seat };
 }
 
 export const loft: MapLook = {

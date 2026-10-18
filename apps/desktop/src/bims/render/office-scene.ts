@@ -20,6 +20,7 @@ import { NO_GROW, growSig, type Grow } from '../growth';
 import { lookOf } from './maps';
 import type { MapLook } from './maps/look';
 import { makeUnlock } from './unlock';
+import { seatChair } from './furniture';
 import type { Style } from './style';
 
 /** his plane's length in office units (plane.ts's wings), its least length on screen, and the iso view's shortening of it */
@@ -246,6 +247,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       for (const [name, d] of world.desks) {
         const rig = rigs.get(name);
         lightDesk(d, pal, rig?.screen ?? 0, rig ? rig.lamp : name !== mainName());
+        seatChair(d.chair, rig?.seat);
       }
       if (!look.reduced && drawPlanes(frames, fit)) motion = 'walk';
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once

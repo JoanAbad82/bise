@@ -160,7 +160,12 @@ export const labelsOf: LabelsFn = (frames, o) => {
     const pill = pillOf(act);
     const at = (mode: Label['mode'], words: string, title = ''): void => void out.set(b.name, { name: b.name, mode, words, title, pill });
     const trick = o.follow === b.name ? trickNow(b.name, b.pose, o.park) : null;
-    if (o.hover === b.name) {
+    const poked = o.pokes?.get(b.name);
+    // his poke plays: its word in the label's place, the card steps aside (the '?' / '✗' pill stays)
+    if (poked !== undefined) {
+      if (poked !== '') at('egg', poked);
+      else if (pill) at('pill', '');
+    } else if (o.hover === b.name) {
       const row = rows.get(b.name);
       // a skater (skate.ts): how long it has been idle, and what it does with it
       const words = b.pose.seg.pastime && row ? bims.state_skating({ dur: shortAge(o.t * 1000 - row.since_ms) }) : stateWords(act, row?.watching[0]?.what ?? '');

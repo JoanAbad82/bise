@@ -3,7 +3,7 @@
 // places, his map pick, its growth, hub/activity's events), out per frame: the office's plan,
 // each bim's pose with its easter egg and halo, the look the renderer draws (night, eggs, growth,
 // the unlock moment) and the labels; plus what the still office's clock check compares. It keeps
-// the timeline, today's lands, his konami time and the unlock moment. No React, no three, no DOM:
+// the timeline, today's lands, his konami time, his pokes and the unlock moment. No React, no three, no DOM:
 // the caller hands it the clock (t, his local time, night, reduced motion) and the forced eggs of
 // a check. Owner: bims-wire.
 import type { Agent } from '@/proto';
@@ -13,6 +13,7 @@ import { bedsAt, NO_GROW, UNLOCK_LABEL, UNLOCK_WALK, unlockOf, type Grow } from 
 import { dayOf } from './skate';
 import { MAX_WALK_S, SETTLE_S } from './timeline';
 import type { MapId } from './maps/ids';
+import { forcedPokes, notePokes, NO_POKES, pokesAt, pokeWake, roomOf, type Click, type PokeLog } from './pokes';
 
 /** The pure modules a driver runs on: feed.ts's, or fakes in a test. */
 export interface DriverParts {
@@ -59,6 +60,8 @@ export interface Step {
   readonly labels: ReadonlyMap<string, Label>;
   /** whether anything walks at t (timeline.moving) */
   readonly moving: boolean;
+  /** s until a poke starts or ends that no frame would see (a delayed one, a word alone); null: none */
+  readonly wake: number | null;
 }
 
 export interface OfficeDriver {
@@ -70,6 +73,8 @@ export interface OfficeDriver {
   event(e: BimEvent): void;
   /** he typed the konami code at t */
   konami(t: number): void;
+  /** he clicked this bim: its poke (pokes.ts) starts at t */
+  poke(name: string, t: number): void;
   /** the frame at this clock; null before any rows */
   step(c: Clock, a: Attention): Step | null;
   /**
@@ -102,6 +107,8 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
   let unlock: { stage: number; at: number } | undefined;
   let lands: { day: string; lands: readonly Land[] } = { day: '', lands: [] };
   let konamiAt: number | null = null;
+  let clicks: Click[] = [];
+  let pokes: PokeLog = NO_POKES;
   let lastActs = '';
   let lastClock = '';
 
@@ -127,6 +134,9 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
     },
     konami(t) {
       konamiAt = t;
+    },
+    poke(name, t) {
+      clicks.push({ name, t });
     },
     step(c, a) {
       const heard = hear(c);
@@ -183,8 +193,12 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       lands = noteLands(lands, frames, local);
       const eg = c.forced !== undefined ? withForced(NO_EGGS, c.forced) : eggsAt({ t, frames, agents, cards: snap?.cards.length ?? 0, local, night, reduced, lands: lands.lands, konami: konamiAt, stage: g.stage });
       lastClock = clockSig(local, night, agents);
+      // his pokes (pokes.ts): a click heard against the bim's state now; a poke beats its egg while it plays
+      pokes = notePokes(pokes, clicks, frames, roomOf(office));
+      clicks = [];
+      const pk = c.forced !== undefined ? forcedPokes(c.forced?.pokes, reduced) : pokesAt(pokes, frames, t, reduced);
       const played = frames.map((f) => {
-        const e = eg.bims.get(f.name);
+        const e = pk.get(f.name) ?? eg.bims.get(f.name);
         const lit = f.name === a.lit || f.name === a.follow;
         return e === undefined ? (lit ? { ...f, lit } : f) : { ...f, egg: e, ...(lit ? { lit } : {}) };
       });
@@ -192,7 +206,9 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       const u = still ? undefined : unlock;
       const look: Look = { night, reduced, eggs: eg.office, grow: g, ...(u ? { unlock: u } : {}) };
       if (u && t - u.at > UNLOCK_WALK + UNLOCK_LABEL) unlock = undefined;
-      const labels = parts.labelsOf(played, { t, hover: a.hover, held: a.held, agents, eggs: eggLabels(eg), follow: a.follow, park: office.park });
-      return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t) };
+      const words = new Map([...pk].map(([n, x]) => [n, x.label]));
+      const labels = parts.labelsOf(played, { t, hover: a.hover, held: a.held, agents, eggs: eggLabels(eg), pokes: words, follow: a.follow, park: office.park });
+      const wake = c.forced !== undefined ? null : pokeWake(pokes, frames, t, reduced);
+      return { office, agents, want: map ?? office.map, reshaped, frames, played, look, labels, moving: timeline.moving(t), wake };
   }
 }

@@ -72,10 +72,10 @@ export function turnedDesk(b: Build, s: Spot, name: string, o: DeskOpts = {}): D
   k.add(style.box(0.22, 0.08, 0.02), k.mat(HOODIE[h % HOODIE.length] ?? pal.desk), g, -w / 3, 0.4, at - dd / 2 + 0.03);
   const screen = laptop(k, g, 0, at - 0.03);
   const lamp = deskLamp(k, g, w / 2 - 0.18, at + dd / 2 - 0.17);
-  if (o.chair !== false) chair(k, g, 0, -0.05, HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, 0);
+  const seat = o.chair !== false ? chair(k, g, 0, -0.05, HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, 0) : undefined;
   o.extra?.(g, h);
   const c = ahead(s, at);
-  return { screen, lamp, top: { x: c.x, y: 0.55, z: c.z } };
+  return { screen, lamp, top: { x: c.x, y: 0.55, z: c.z }, ...(seat ? { chair: seat } : {}) };
 }
 
 /** Main's desk at the back (its box in the plan's furniture): bigger, a tray, the neon :* on the wall behind. */
@@ -95,9 +95,9 @@ export function bigDesk(b: Build, box: Box, s: Spot, neon: { x?: number; y?: num
   const lamp = deskLamp(k, mg, mw / 2 - 0.2, mdd / 2 - 0.2);
   k.add(style.box(0.7, 0.06, 0.5), k.mat(pal.wallTop), mg, -mw / 2 + 0.5, 0.58, 0);
   k.add(style.box(0.34, 0.24, 0.26), k.mat(WORLD.crate), mg, -mw / 2 + 0.5, 0.73, 0);
-  chair(k, root, s.x, s.z - 0.05, WORLD.dark, s.face);
+  const seat = chair(k, root, s.x, s.z - 0.05, WORLD.dark, s.face);
   glyph(k, root, neon.x ?? s.x, neon.y ?? 1.25, (neon.z ?? 0.02) + style.pictureZ, pal.neon, 0.06, style.material(pal.neon, { flat: true }));
-  return { screen, lamp, top: { x: mcx, y: 0.55, z: mcz } };
+  return { screen, lamp, top: { x: mcx, y: 0.55, z: mcz }, chair: seat };
 }
 
 /** the furniture box with no place of its own that holds p (a desk, the eating place) */

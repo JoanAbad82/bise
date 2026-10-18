@@ -9,7 +9,8 @@
 // none while the window is away. A lost WebGL context (or a renderer that fails to load) shows one
 // line over the rows, never a blank section. Hover: the bim under the pointer (renderer.pick) shows
 // its card after the tip's 400 ms (at once for 1 s after one closed, the ds tips' warmth); a click
-// opens it as its row's click does. Owner: bims-wire.
+// opens it as its row's click does, and pokes it (pokes.ts: it reacts; the first click's poke
+// lands as the camera arrives). Owner: bims-wire.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Press, tipAttrs } from '@/ds';
 import { reducedMotion, textWidth } from '@/ds/hooks';
@@ -26,6 +27,7 @@ import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
 import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from './zoom';
 import { konamiDone, localOf, type Forced } from './eggs';
+import { OPEN_DELAY_S, soonest } from './pokes';
 import { cropped, growOf, tipOf, unlockLabel } from './growth';
 import { makeDriver, type Clock } from './office-driver';
 import { growHigh } from './grow-keep';
@@ -422,7 +424,7 @@ export function Office({
         setLabels(shown);
       }
       // a resting skater (skate.ts): no frame during its rest, a timer for its next line
-      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: step.moving, labels: shown, away: awayNow(), lost, wake: wakeIn(frames, office.park) });
+      const next = chasing && !awayNow() ? 0 : nextAfter({ motion, moving: step.moving, labels: shown, away: awayNow(), lost, wake: soonest(wakeIn(frames, office.park), step.wake) });
       if (next === 0) raf = requestAnimationFrame(draw);
       else if (next !== null) tick = setTimeout(draw, next);
     };
@@ -689,7 +691,11 @@ export function Office({
           return;
         }
         const name = pickEvent(e);
-        if (name !== null) onOpen(name);
+        if (name === null) return;
+        // his poke (pokes.ts): the first click opens the agent too, the poke lands as the camera arrives
+        driver.poke(name, Date.now() / 1000 + (name === follow ? 0 : OPEN_DELAY_S));
+        onOpen(name);
+        kickRef.current();
       }}
     >
       <canvas

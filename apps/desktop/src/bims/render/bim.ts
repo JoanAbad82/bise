@@ -246,6 +246,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   const setRot = (obj: Object3D, r: Rot): void => { obj.rotation.set(r[0], r[1], r[2]); };
   let lastGrey = -1;
   let lastOp = -1;
+  // how far a poke lifts its head (Rig.anchor): its labels stay where the state's pose has them
+  let anchor = 0;
 
   return {
     name,
@@ -254,7 +256,12 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     group: g,
     apply(rig) {
       g.visible = rig.opacity > 0.001;
-      g.position.set(rig.x, rig.lift ?? 0, rig.z);
+      // a poke's boop: squashed about its feet or its seat (the head never dips into the desk)
+      const q = rig.squash?.k ?? 0;
+      const sy = 1 - q * 0.32;
+      g.scale.set(1 + q * 0.18, sy, 1 + q * 0.18);
+      g.position.set(rig.x, (rig.lift ?? 0) + (rig.squash?.at ?? 0) * (1 - sy), rig.z);
+      anchor = rig.anchor ?? 0;
       // a skater (skate.ts) tilts along its ramp or its carve: its way first, then pitch and roll
       g.rotation.set(rig.tilt?.[0] ?? 0, rig.dir, rig.tilt?.[1] ?? 0, 'YXZ');
       const bd = rig.board;
@@ -280,7 +287,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       const p = rig.props;
       crate.visible = p.crate;
       // m6: the box held up over its head, else in front of its belly
-      crate.position.set(0, p.crateUp ? 1.62 * s : 0.62, p.crateUp ? 0 : 0.3);
+      if (p.crateAt) crate.position.set(0, p.crateAt[0], p.crateAt[1]);
+      else crate.position.set(0, p.crateUp ? 1.62 * s : 0.62, p.crateUp ? 0 : 0.3);
       fruit.material = p.golden ? golden : plainPine;
       coin.visible = p.coin !== null;
       if (p.coin !== null) coin.position.y = 1.5 * s + rig.y + p.coin * 0.5;
@@ -311,7 +319,17 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       }
       cloud.visible = p.cloud > 0.02;
       cloud.scale.setScalar(Math.max(0.01, p.cloud));
+      const flick = p.flick ?? null;
       sweat.forEach((d, i) => {
+        // a poke's turbo typing (render/poke.ts): drops at the temples flicking off sideways, never over its head
+        if (flick !== null) {
+          const k = (flick + i / 3) % 1;
+          const side = i === 1 ? 1 : -1;
+          d.visible = true;
+          d.position.set(side * (0.21 + k * 0.22), 0.04 + k * 0.05 - k * k * 0.22, 0.06);
+          d.scale.setScalar(1 - k * 0.5);
+          return;
+        }
         d.visible = p.hot !== null;
         if (p.hot === null) return;
         const k = (p.hot + i / 3) % 1;
@@ -319,8 +337,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
         d.scale.setScalar(1 - k * 0.6);
       });
       steam.forEach((q, i) => {
-        q.visible = p.hot !== null;
-        if (p.hot === null) return;
+        q.visible = p.hot !== null && flick === null;
+        if (!q.visible || p.hot === null) return;
         const k = (p.hot * 0.66 + i / 3) % 1;
         q.position.set(Math.sin(k * 6 + i) * 0.1, 1.28 * s + k * 0.9, 0);
         q.scale.setScalar(0.6 + k);
@@ -344,7 +362,7 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
     },
     headTop(out) {
       head.getWorldPosition(out);
-      out.y += 0.3 * s;
+      out.y += 0.3 * s - anchor;
       return out;
     },
     feet(out) {

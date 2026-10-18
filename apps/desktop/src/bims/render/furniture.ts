@@ -37,8 +37,16 @@ export function deskLamp(k: Kit, parent: Object3D, x: number, z: number): MeshLa
   return bulb;
 }
 
+/** a desk chair, where it stands in its parent: a poke's chair spin turns it with its bim (office-scene.ts seatChair) */
+export interface Seat {
+  readonly obj: Object3D;
+  readonly x: number;
+  readonly z: number;
+  readonly face: number;
+}
+
 /** a chair at (x, z), its back away from where it faces */
-export function chair(k: Kit, parent: Object3D, x: number, z: number, color: string, face: number): void {
+export function chair(k: Kit, parent: Object3D, x: number, z: number, color: string, face: number): Seat {
   const g = new Group();
   g.position.set(x, 0, z);
   g.rotation.y = face;
@@ -46,6 +54,15 @@ export function chair(k: Kit, parent: Object3D, x: number, z: number, color: str
   k.add(k.style.box(0.42, 0.08, 0.42), k.mat(color), g, 0, 0.32, 0);
   k.add(k.style.box(0.42, 0.42, 0.07), k.mat(color), g, 0, 0.55, -0.2);
   k.add(k.style.cylinder(0.03, 0.3), k.mat(k.pal.ink), g, 0, 0.15, 0);
+  return { obj: g, x, z, face };
+}
+
+/** a desk chair under a poke's chair spin (Rig.seat): rolled back along its own way and turned; none: where it stands */
+export function seatChair(c: Seat | undefined, s: { readonly back: number; readonly turn: number } | undefined): void {
+  if (!c) return;
+  const back = s?.back ?? 0;
+  c.obj.position.set(c.x - Math.sin(c.face) * back, 0, c.z - Math.cos(c.face) * back);
+  c.obj.rotation.y = c.face + (s?.turn ?? 0);
 }
 
 /** the furniture box in front of a chair (Office.furniture: a desk is ahead of its spot, +z) */

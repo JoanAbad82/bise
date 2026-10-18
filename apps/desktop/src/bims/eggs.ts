@@ -9,7 +9,7 @@
 // unless a check forces them (Office.tsx: window.__biseEggs), so a check never meets a random one.
 // Owner: bims-follow.
 import type { Agent } from '@/proto';
-import type { ActivityKind, BimFrame } from './model';
+import type { ActivityKind, BimFrame, PlayKind, PokeKind } from './model';
 
 export type EggKind =
   | 'salto' // m1: a done bim's back flip before it skates out (1 in 10); the konami code: every bim
@@ -30,7 +30,8 @@ export type EggKind =
   | 'dance'; // s1: halloween at midnight, idle and done bims dance 10 s
 
 export interface BimEgg {
-  readonly kind: EggKind;
+  /** an egg, or his poke (pokes.ts) that beats it while it plays */
+  readonly kind: EggKind | PlayKind;
   /** seconds into it, and how long it plays (Infinity: while its trigger holds) */
   readonly since: number;
   readonly dur: number;
@@ -90,6 +91,8 @@ export interface Land {
 export interface Forced {
   readonly bims?: Readonly<Record<string, { readonly kind: EggKind; readonly since: number }>>;
   readonly office?: Partial<OfficeEggs>;
+  /** his pokes frozen mid-play (pokes.ts forcedPokes) */
+  readonly pokes?: Readonly<Record<string, { readonly kind: PokeKind; readonly since: number }>>;
 }
 
 export interface EggIn {
@@ -124,7 +127,7 @@ const ECLIPSE_S = 30;
 const GHOST_S = 20;
 const DANCE_S = 10;
 const KONAMI_S = 1.4;
-const ROLLED: ReadonlySet<EggKind> = new Set(['salto', 'hop', 'moonwalk', 'itemget', 'kickflip', 'tap', 'golden', 'speedrun', 'combo', 'loop']);
+const ROLLED: ReadonlySet<BimEgg['kind']> = new Set<BimEgg['kind']>(['salto', 'hop', 'moonwalk', 'itemget', 'kickflip', 'tap', 'golden', 'speedrun', 'combo', 'loop']);
 /** the poses an office-wide egg may touch: idle and done (bims: never a busy bim) */
 const RESTING: ReadonlySet<ActivityKind> = new Set(['nap', 'snack', 'done', 'mainidle']);
 

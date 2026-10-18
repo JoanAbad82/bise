@@ -13,6 +13,8 @@
 //   (6) his easter eggs, forced and frozen mid-play (eggs.ts withForced; never a random roll in a
 //       check): copy-fix's salto, signup-perf's speedrun '1:47', pricing-page's stare '!'; the
 //       office's eclipse sky, tree, cake and game on the whiteboard; at night the ghost;
+//   (7) his pokes, forced and frozen mid-play (pokes.ts forcedPokes): each word in its bim's label
+//       place, the '?' / '✗' pills on, the chair spin's chair turned with its bim, day and night;
 //   (3) reduced motion: 0 frames at rest with typing bims, and a bim that changes place fades
 //       (never drawn between its two spots, model.ts Look.reduced).
 // The three chunk, the frame budget and WebGL lost: budget.spec.ts (the land set's part).
@@ -380,6 +382,48 @@ for (const theme of ['light', 'dark'] as const) {
         ? "copy-fix mid-salto, '1:47' over signup-perf (speedrun), '!' over pricing-page (the stare); the ghost crossing, the christmas tree in the lounge"
         : "copy-fix mid-salto, '1:47' over signup-perf, '!' over pricing-page; the eclipse's violet sky, the cake on the island, noughts and crosses on the whiteboard");
       expect(await collisions(s.page), "the eggs' words follow the labels' rules").toEqual([]);
+      await s.page.evaluate(() => { delete (window as unknown as { __biseEggs?: unknown }).__biseEggs; });
+    } finally {
+      await s.close();
+    }
+  });
+}
+
+/**
+ * (7) His pokes (page bims-pokes v4, pokes.ts), forced and frozen mid-play through window.__biseEggs.pokes
+ * (never a click's roll in a check), day and night: each word over its bim in the label's place,
+ * the '?' and '✗' pills still on, the spin's chair turned with its bim, the box at chest height.
+ */
+for (const theme of ['light', 'dark'] as const) {
+  test(`(7) pokes frozen mid-play, ${theme}`, async () => {
+    const { s, core } = await open(office, { theme, width: 1600 });
+    try {
+      await showOffice(s);
+      await s.page.getByTestId('app.right.agents.width.wide').click();
+      await settle(s);
+      await s.page.evaluate(() => {
+        (window as unknown as { __biseEggs?: unknown }).__biseEggs = {
+          bims: {},
+          pokes: {
+            'signup-perf': { kind: 'spin', since: 0.8 },
+            'login-test': { kind: 'startle', since: 0.5 },
+            onboarding: { kind: 'meme', since: 0.8 },
+            changelog: { kind: 'juggle', since: 0.6 },
+            'copy-fix': { kind: 'cheers', since: 0.75 },
+            'search-index': { kind: 'brave', since: 1.7 },
+            'cookie-banner': { kind: 'shrug', since: 0.65 },
+          },
+        };
+      });
+      await core.send(rowsOf(office) as never);
+      await expect.poll(async () => (await overlay(s.page)).labels.filter((l) => l.mode === 'egg').map((l) => `${l.name}:${l.text}`).sort(), { timeout: 3000 })
+        .toEqual(['changelog:whoa', 'cookie-banner:meh', 'copy-fix:cheers', 'login-test:huh?!', 'onboarding:me! me!', 'search-index:ok. ok.', 'signup-perf:wheee']);
+      const pills = (await overlay(s.page)).pills.map((p) => `${p.name}:${p.pill}`).sort();
+      expect(pills, "the '?' and '✗' pills stay on under a poke").toEqual(expect.arrayContaining(['onboarding:asks', 'search-index:failed']));
+      await sleep(400);
+      await shot(s, `pokes-${theme}.png`, `pokes frozen mid-play, ${theme === 'dark' ? 'night' : 'day'}, 640`,
+        "signup-perf mid chair spin (its chair rolled back and turned with it), login-test startled awake, onboarding's me! me!, changelog juggles its box at chest height, copy-fix's cheers, search-index's brave face (its cloud smaller, never gone), cookie-banner's shrug");
+      expect(await collisions(s.page), "the pokes' words follow the labels' rules").toEqual([]);
       await s.page.evaluate(() => { delete (window as unknown as { __biseEggs?: unknown }).__biseEggs; });
     } finally {
       await s.close();

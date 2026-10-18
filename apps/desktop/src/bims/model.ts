@@ -47,6 +47,32 @@ export type ActivityKind =
   | 'visit' // a message to a busy bim: the sender at its desk (post-it or tap, Activity.mode)
   | 'report'; // a report: the sender at main's desk with a sheet
 
+/** his pokes (pokes.ts, page bims-pokes v4): a click on a bim, and it reacts by what it does */
+export type PokeKind =
+  | 'hi' // stops, turns to you, waves
+  | 'boop' // squashes like a squeeze toy (the rare one)
+  | 'startle' // asleep at its desk: jumps up, '!', slumps back
+  | 'snooze' // asleep, napping: a lazy hand waves you off
+  | 'rollover' // napping in a bean bag: rolls onto its side and back
+  | 'shoo' // working: flaps a hand at you, eyes on the screen
+  | 'turbo' // working: types ten times faster, sweats
+  | 'spin' // working (not hot): one full spin on its chair
+  | 'bite' // eating: holds out its fruit
+  | 'hiccup' // eating: three hiccup hops
+  | 'meme' // waits on you: both arms up, jumps
+  | 'watch' // waits on you, blocked: taps its wrist
+  | 'shrug' // stopped, blocked
+  | 'fine' // failed: one arm rises bravely under its cloud
+  | 'brave' // failed: sniffs, the cloud shrinks, a small smile
+  | 'peek' // done on the terrace: lifts its sunglasses
+  | 'cheers' // done on the terrace: raises a mug
+  | 'juggle' // in the land queue: the box flies up, caught
+  | 'windmill' // skating: arms windmilling, saves it
+  | 'enough'; // his 3rd poke in 2.5 s: arms crossed, turns its back
+
+/** what a poke plays: its reaction, or under reduced motion its word alone */
+export type PlayKind = PokeKind | 'word';
+
 export type SpotKind = 'desk' | 'main' | 'lounge' | 'island' | 'board' | 'queue' | 'door' | 'terrace';
 
 export interface Activity {
@@ -314,6 +340,8 @@ export type LabelsFn = (
     readonly agents: readonly Agent[];
     /** the eggs' words by bim (eggs.ts eggLabels): shown where no hover or event label is */
     readonly eggs?: ReadonlyMap<string, string>;
+    /** his pokes' words by bim while they play (pokes.ts), '' between: over its hover card and its egg's word */
+    readonly pokes?: ReadonlyMap<string, string>;
     /** the bim the office follows (focus.ts, the 2.2x zoom): a skater's trick name shows over it alone, never in the normal view */
     readonly follow?: string | null;
     /** the office's park (skate.ts trickNow rides its lines on it) */

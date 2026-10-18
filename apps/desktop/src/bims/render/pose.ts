@@ -38,6 +38,10 @@ export interface Props {
   readonly coin: number | null;
   readonly golden: boolean;
   readonly crateUp: boolean;
+  /** a poke's turbo typing: its sweat's phase, drops flicking off at the temples (no steam); absent: none */
+  readonly flick?: number | null;
+  /** the box's place [y, z] in its arms (a poke's juggle); absent: its own */
+  readonly crateAt?: readonly [number, number];
   /** the fruit in hand eaten so far (snack): 0 whole .. 1 gone */
   readonly eaten: number;
 }
@@ -74,6 +78,12 @@ export interface Rig {
   readonly tilt?: readonly [number, number];
   /** its board's place and turn in the bim's frame (a flip, kicked up into the hand); absent: under its feet */
   readonly board?: { readonly x: number; readonly y: number; readonly z: number; readonly rot: Rot };
+  /** his pokes (render/poke.ts): the boop's squash (k 1 flat .. -0.25 stretched) about a height
+   * (the floor, a seat); the chair spin's chair, rolled back and turned with its bim; how far the
+   * poke lifts its head, so its labels and pills stay where the state's pose has them */
+  readonly squash?: { readonly k: number; readonly at: number };
+  readonly seat?: { readonly back: number; readonly turn: number };
+  readonly anchor?: number;
 }
 
 export interface RigInput {

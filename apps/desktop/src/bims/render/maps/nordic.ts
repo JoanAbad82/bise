@@ -281,10 +281,10 @@ function desk(b: Build, s: { x: number; z: number; face: number; wz: number; ax:
   root.add(g);
   const screen = laptop(k, g, 0, 0.47);
   const lamp = deskLamp(k, g, 0.5, 0.85);
-  chair(k, g, 0, -0.05, HOODIE[(h >> 5) % HOODIE.length] ?? PINE, 0);
+  const seat = chair(k, g, 0, -0.05, HOODIE[(h >> 5) % HOODIE.length] ?? PINE, 0);
   if (h % 3 === 0) k.add(k.style.cylinder(0.05, 0.1), k.mat(WORLD.paper), g, -0.45, 0.6, 0.75);
   const c = ahead(s, 0.5);
-  return { screen, lamp, top: { x: c.x, y: 0.55, z: c.z } };
+  return { screen, lamp, top: { x: c.x, y: 0.55, z: c.z }, chair: seat };
 }
 
 export const nordic: MapLook = {

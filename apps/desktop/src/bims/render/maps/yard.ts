@@ -147,9 +147,9 @@ export function deskOf(b: Build, d: Spot, name: string, dress: DeskDress = {}): 
   k.add(style.box(0.22, 0.08, 0.02), k.mat(HOODIE[h % HOODIE.length] ?? pal.desk), g, -w / 3, 0.4, 0.5 + dd / 2 - 0.03);
   const screen = laptop(k, g, 0, 0.47);
   const lamp = deskLamp(k, g, w / 2 - 0.18, 0.5 + dd / 2 - 0.17);
-  chair(k, root, d.x - Math.sin(d.face) * 0.05, d.z - Math.cos(d.face) * 0.05, dress.chair ?? HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, d.face);
+  const seat = chair(k, root, d.x - Math.sin(d.face) * 0.05, d.z - Math.cos(d.face) * 0.05, dress.chair ?? HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, d.face);
   dress.thing?.(k, g, h);
-  return { screen, lamp, top: { x: d.x + Math.sin(d.face) * 0.5, y: 0.55, z: d.z + Math.cos(d.face) * 0.5 } };
+  return { screen, lamp, top: { x: d.x + Math.sin(d.face) * 0.5, y: 0.55, z: d.z + Math.cos(d.face) * 0.5 }, chair: seat };
 }
 
 /** main's desk: its box ahead of its spot, a tray, the neon :* on the wall behind it */
@@ -171,9 +171,9 @@ export function mainDeskOf(b: Build, top: string, body: string): DeskHandles {
   const lamp = deskLamp(k, g, w / 2 - 0.2, dd / 2 - 0.2);
   k.add(style.box(0.7, 0.06, 0.5), k.mat(pal.wallTop), g, -w / 2 + 0.5, 0.58, 0);
   k.add(style.box(0.34, 0.24, 0.26), k.mat(WORLD.crate), g, -w / 2 + 0.5, 0.73, 0);
-  chair(k, root, md.x, md.z - 0.05, WORLD.dark, md.face);
+  const seat = chair(k, root, md.x, md.z - 0.05, WORLD.dark, md.face);
   glyph(k, root, md.x, 1.25, 0.02 + style.pictureZ, pal.neon, 0.06, style.material(pal.neon, { flat: true }));
-  return { screen, lamp, top: { x: cx, y: 0.55, z: cz } };
+  return { screen, lamp, top: { x: cx, y: 0.55, z: cz }, chair: seat };
 }
 
 const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;

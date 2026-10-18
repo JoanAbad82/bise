@@ -4,6 +4,8 @@
 // an egg only moves what its picture needs. A timed egg asks for frames while it plays ('walk'); a
 // lasting one (shades, golden, lookup, stare) is a still pose. Owner: bims-follow.
 import type { BimEgg } from '../eggs';
+import { isPoke } from '../pokes';
+import { pokeRig } from './poke';
 import type { Rig, Rot } from './pose';
 
 const ease = (u: number): number => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
@@ -12,6 +14,8 @@ const add = (r: Rot, d: Rot): Rot => [r[0] + d[0], r[1] + d[1], r[2] + d[2]];
 /** a bim's rig with its egg on top; null egg: the rig as is */
 export function eggRig(rig: Rig, egg: BimEgg | null): Rig {
   if (egg === null) return rig;
+  // his poke (pokes.ts) beats an egg: its body is render/poke.ts's; the word alone asks for no frame
+  if (isPoke(egg.kind)) return egg.kind === 'word' ? rig : { ...pokeRig(rig, egg.kind, egg.since, egg.dur), motion: 'walk' };
   const u = Number.isFinite(egg.dur) ? Math.min(1, Math.max(0, egg.since / egg.dur)) : 0;
   const s = egg.since;
   const timed = Number.isFinite(egg.dur);
