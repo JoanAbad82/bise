@@ -157,7 +157,7 @@ function inputsOf(seed: number, n: number): Input[] {
       out.push(projectsEv());
     } else if (k < 42) {
       const from = fromOf();
-      out.push({ at_ms: at, in: "do", cid: 0, intent: { i: "answer", project: p, card: id, reply: r.pick(["1", "2", "the cold one"]), ...(r.chance(0.2) ? { files: ["/tmp/a.png"] } : {}), ...(from === undefined ? {} : { from }) } });
+      out.push({ at_ms: at, in: "do", cid: 0, intent: { i: "answer", project: p, card: id, reply: r.pick(["1", "2", "the cold one"]), ...(r.chance(0.2) ? { parts: [{ kind: "image" as const, name: "[Image #1]", source: "/tmp/a.png" }] } : {}), ...(from === undefined ? {} : { from }) } });
     } else if (k < 48) {
       // his option n: an act the row gives it opens (nothing sent), else his answer
       const from = fromOf();
