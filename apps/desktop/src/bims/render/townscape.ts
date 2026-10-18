@@ -159,7 +159,15 @@ export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: To
     const hx = (h.x0 + h.x1) / 2;
     const hz = (h.z0 + h.z1) / 2;
     k.add(style.box(h.x1 - h.x0, 0.05, h.z1 - h.z0, 0.3), k.mat(c.stone), root, hx, LAWN_TOP + 0.01, hz);
-    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) tree(dx < 0 ? h.x0 + 0.9 : h.x1 - 0.9, dz < 0 ? h.z0 + 0.9 : h.z1 - 0.9, 0.85);
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+      const tx = dx < 0 ? h.x0 + 0.9 : h.x1 - 0.9;
+      const tz = dz < 0 ? h.z0 + 0.9 : h.z1 - 0.9;
+      tree(tx, tz, 1);
+      // a planter beside each corner's tree (bims m_30199: the square read empty zoomed in), along its long side
+      const px = tx - dx * 1.6;
+      k.add(style.box(1.1, 0.4, 0.7, 0.08), k.mat(c.stone), root, px, LAWN_TOP + 0.2, tz);
+      k.add(style.ball(0.42), k.mat(c.leaves[1]), root, px, LAWN_TOP + 0.55, tz);
+    }
     for (const sx of [-1, 1]) {
       const bx = sx < 0 ? h.x0 + 0.5 : h.x1 - 0.5;
       const bench = new Group();

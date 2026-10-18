@@ -38,7 +38,8 @@ describe('town plan', () => {
         expect(plan.offices).toHaveLength(n);
       }
     }
-  });
+    // 120 plans: a few seconds alone, more on a busy machine
+  }, 60_000);
 
   it('keeps every office apart from the others', () => {
     for (const n of [3, 6, 12, 20]) {

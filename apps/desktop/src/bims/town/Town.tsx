@@ -20,7 +20,8 @@ import type { ActivitiesFn, LayoutFn } from '../model';
 import { Office, type Parts } from '../Office';
 import { growOf } from '../growth';
 import { growHigh } from '../grow-keep';
-import { away, CHECK_MS, nextAfter } from '../loop';
+import { CHECK_MS, nextAfter } from '../loop';
+import { awayNow, nightNow, testMode } from '../room';
 import { localOf } from '../eggs';
 import { makeDriver, NO_ATTENTION, type Clock, type OfficeDriver } from '../office-driver';
 import type { Fit } from '../render/camera';
@@ -28,7 +29,7 @@ import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from '../zoom
 import { DIVE_S, diveAt } from './dive';
 import { liveAgents, signOf, townProjects, type TownProject } from './sites';
 import type { MakeTownRenderer, TownRenderer, TownSite } from './types';
-import { placeTags, type TagIn } from '../tags';
+import { placeSigns as placeSignsAt, type SignIn } from './signs';
 
 /** The town's parts: the office's (its dive opens one), the pure modules it reads, its renderer's loader. */
 export interface TownParts {
@@ -42,23 +43,18 @@ export interface TownParts {
 type Phase = 'town' | 'in' | 'swapIn' | 'office' | 'swapOut' | 'out';
 
 const DIVE_KEY = 'bims.town.dive';
+/** a compact sign's padding round its pills (office.css .bims-sign) */
+const SIGN_PAD = 8;
 /** offices baked again per frame at most (page town-live: ~85 ms each, the town fills in) */
 const BAKES_PER_FRAME = 1;
 /** the fade between the town and the Office (office.css .bims-town-top) */
 const SWAP_MS = 260;
 
-const testMode = (): boolean => (window as { bise?: { test?: boolean } }).bise?.test === true;
 /** test mode: why each frame was asked for (window.__biseTownWhy, the idle checks print it) */
 const whyFrame = (why: string): void => {
   if (!testMode()) return;
   const w = window as { __biseTownWhy?: { t: number; why: string }[] };
   w.__biseTownWhy = [...(w.__biseTownWhy ?? []).slice(-99), { t: Date.now(), why }];
-};
-const awayNow = (): boolean => away({ hidden: document.hidden, focused: document.hasFocus(), test: testMode() });
-const nightNow = (): boolean => {
-  const set = document.documentElement.dataset.theme;
-  if (set !== undefined) return set === 'dark';
-  return !(typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches);
 };
 
 /** One project's office for the plan: its office on its map, its growth (the office's high-water mark). */
@@ -103,6 +99,8 @@ export function Town({
   // the dive's way: from the town's fit to the Office's, its start time (s, set by its first frame); null: still
   const anim = useRef<{ from: Fit; to: Fit; at: number | null; back: boolean } | null>(null);
   const [pointer, setPointer] = useState(false);
+  // the office under his pointer: its sign shows whole first (its name back, bims m_30199)
+  const hoverRef = useRef<string | null>(null);
   // his camera over the town (zoom.ts, the minimap's): pinch to zoom, two fingers or a drag to move,
   // esc or a double-click on the lawn back to the whole town; `fitted` re-renders the box's data-zoomed
   const camRef = useRef<Cam>(FIT);
@@ -194,25 +192,33 @@ export function Town({
   const placeSigns = useCallback((r: TownRenderer) => {
     const box = holder.current;
     if (box === null) return;
-    const ins: TagIn[] = [];
+    const ins: SignIn[] = [];
     const ph = phaseRef.current;
+    const only = ph === 'office' || ph === 'swapIn' || ph === 'swapOut';
     for (const [id, el] of signs.current) {
-      const only = ph === 'office' || ph === 'swapIn' || ph === 'swapOut';
       const at = only && id !== live.current.dived ? null : r.signAt(id);
       el.style.visibility = at === null ? 'hidden' : '';
       if (at === null) continue;
-      ins.push({ name: id, x: at.x, y: at.y, w: el.offsetWidth, h: el.offsetHeight, pill: id === live.current.dived, rank: id === live.current.dived ? 0 : 2 });
+      // measured whole (a compact sign shows its pills alone: office.css)
+      delete el.dataset.compact;
+      const pill = el.querySelector<HTMLElement>('.bims-pill');
+      const first = id === live.current.dived || id === hoverRef.current;
+      ins.push({ id, x: at.x, y: at.y, w: el.offsetWidth, h: el.offsetHeight, pillW: pill === null ? 0 : pill.offsetWidth + SIGN_PAD, pillH: pill === null ? 0 : pill.offsetHeight + SIGN_PAD, rank: first ? 0 : pill !== null ? 1 : 2 });
     }
-    const fit = live.current.dived !== null && (ph === 'office' || ph === 'swapIn' || ph === 'swapOut') ? null : r.townFit();
+    // at the town's fit a sign with no room keeps its pills alone; zoomed in or dived, every name shows
+    const atFitNow = !only && atFit(camRef.current) && anim.current === null;
+    const fit = only ? null : r.townFit();
     const w = box.clientWidth;
     const h = fit?.heightPx ?? box.clientHeight;
-    const { at } = placeTags(ins, w, h);
+    const at = placeSignsAt(ins, w, h, atFitNow);
     for (const t of ins) {
-      const el = signs.current.get(t.name);
-      const p = at.get(t.name);
+      const el = signs.current.get(t.id);
+      const p = at.get(t.id);
       if (el === undefined) continue;
       el.style.visibility = p === undefined ? 'hidden' : '';
-      if (p !== undefined) el.style.transform = `translate(${p.left.toFixed(1)}px, ${p.top.toFixed(1)}px)`;
+      if (p === undefined) continue;
+      if (p.compact) el.dataset.compact = '';
+      el.style.transform = `translate(${p.left.toFixed(1)}px, ${p.top.toFixed(1)}px)`;
     }
   }, []);
 
@@ -519,10 +525,21 @@ export function Town({
             moveCam(panBy(camRef.current, dx, dy, box.width, box.height));
             return;
           }
-          setPointer(pickAt(e) !== null);
+          const over = pickAt(e);
+          setPointer(over !== null);
+          if (over !== hoverRef.current) {
+            hoverRef.current = over;
+            const r = rRef.current;
+            if (r !== null) placeSigns(r);
+          }
         }}
         onPointerLeave={() => {
           setPointer(false);
+          if (hoverRef.current !== null) {
+            hoverRef.current = null;
+            const r = rRef.current;
+            if (r !== null) placeSigns(r);
+          }
         }}
         onClick={(e) => {
           if (dragged.current) {

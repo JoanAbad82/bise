@@ -258,6 +258,11 @@
   background: var(--c-solid);
   box-shadow: var(--e-3);
 }
+/* the column's border he drags (.app-split.panel, fixed, z 30) stays at the 320 column's edge: over
+   the wide bar it cut the office in two, a col-resize strip that ate his pinch and clicks there */
+.app-shell:has(.app-panel.app-rb[data-wide='over']:not(.over)) .app-split.panel {
+  display: none;
+}
 /* the AGENTS head's small toggles: 'bims' (the office above the rows), '320 | wide' */
 .bims-switch {
   display: inline-flex;
@@ -525,6 +530,11 @@
 }
 .bims-sign[data-here] {
   cursor: default;
+}
+/* no room for its name at the town's fit (town/signs.ts): its pills alone, the name back on hover or zoom */
+.bims-sign[data-compact] .bims-sign-name,
+.bims-sign[data-compact] .bims-sign-work {
+  display: none;
 }
 .bims-sign-open {
   padding: 0 0 0 var(--s-1);

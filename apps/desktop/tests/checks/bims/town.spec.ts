@@ -11,13 +11,14 @@
 //     on a reload; 'open' opens the project's main thread;
 //   - a pinch zooms the town (page town-live): past LIVE_ZOOM the offices in view are posed live, 4
 //     at most, their bims baked no more; esc goes back to the whole town, no office live, and an idle
-//     town draws no frame again.
+//     town draws no frame again; blurred or hidden, a zoomed town draws nothing either;
+//   - the signs never sit on one another (town/signs.ts); a lost WebGL context shows the line.
 // Shots for bims (.harness-cache/bims-shots): 3 and 12 projects, 320 and wide, day and night; the
 // dive's last town frame and the Office's first, side by side. Owner: maps-e.
 import { test, expect, FakeCore, launchDesktop, type Session } from '../../harness';
 import { agent, card, mainAgent } from '../../../src/bims/fixtures';
 import { STAGE_AT } from '../../../src/bims/growth';
-import { shotOf, sleep, trackpad, writeIndex, type Shot } from './world';
+import { loseContext, setHidden, shotOf, sleep, trackpad, writeIndex, type Shot } from './world';
 
 const shots: Shot[] = [];
 test.describe.configure({ timeout: 150_000 });
@@ -262,6 +263,71 @@ test('(town) a pinch zooms in: the offices in view go live, 4 at most; esc: the 
     await sleep(3000);
     const whys = await s.page.evaluate((since) => ((window as unknown as { __biseTownWhy?: { t: number; why: string }[] }).__biseTownWhy ?? []).filter((x) => x.t >= since).map((x) => x.why), w0);
     expect(((await probe(s))?.frames ?? 0) - f0, `back at the whole town, idle: no frame (asked by: ${whys.join(', ')})`).toBe(0);
+  } finally {
+    await s.close();
+  }
+});
+
+test('(town) zoomed in, blurred or hidden: no frame; signs never overlap', async () => {
+  const { s } = await openTown(fakes(12), 'light', 1400);
+  try {
+    await showTown(s);
+    await settled(s);
+    await s.page.getByTestId('app.right.agents.width.wide').click();
+    await settled(s);
+    // the signs shown, none over another (bims m_30199)
+    const boxes = (await Promise.all(fakes(12).map((p) => s.page.getByTestId(`app.right.bims.town.sign.${p.id}`).boundingBox()))).filter((b): b is NonNullable<typeof b> => b !== null && b.width > 0);
+    for (const [i, a] of boxes.entries()) {
+      for (const b of boxes.slice(i + 1)) {
+        const over = a.x < b.x + b.width - 1 && b.x < a.x + a.width - 1 && a.y < b.y + b.height - 1 && b.y < a.y + a.height - 1;
+        expect(over, `two signs overlap at ${String(Math.round(a.x))},${String(Math.round(a.y))}`).toBe(false);
+      }
+    }
+    const box = await s.page.getByTestId('app.right.bims.town').boundingBox();
+    if (box === null) throw new Error('no town');
+    // wide, the town is taller than the window: pinch at the middle of what shows
+    const vh = s.page.viewportSize()?.height ?? 900;
+    const top = Math.max(box.y, 0);
+    const py = top + (Math.min(box.y + box.height, vh) - top) / 2;
+    const px = box.x + box.width / 2;
+    // nothing over the wide bar's middle: the 320 column's border handle sat there (app.split.panel)
+    const hit = await s.page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      return el?.closest('[data-testid="app.right.bims.town"]') !== null && el !== null ? 'town' : `${el?.tagName ?? 'nothing'} ${el?.getAttribute('data-testid') ?? ''}`;
+    }, [px, py] as const);
+    expect(hit, "the wide town's middle is the town's").toBe('town');
+    for (let i = 0; i < 12; i++) await trackpad(s.cdp, px, py, { dy: -20, pinch: true });
+    await expect(s.page.getByTestId('app.right.bims.town')).toHaveAttribute('data-zoomed', 'true');
+    await expect.poll(async () => (await probe(s))?.live.length ?? 0, { timeout: 5000 }).toBeGreaterThan(0);
+    await s.page.evaluate(() => {
+      (window as unknown as { __biseBlur?: boolean }).__biseBlur = true;
+      window.dispatchEvent(new Event('blur'));
+    });
+    await sleep(500);
+    let f0 = (await probe(s))?.frames ?? 0;
+    await sleep(2000);
+    expect(((await probe(s))?.frames ?? 0) - f0, 'blurred, zoomed in: 0 frames').toBe(0);
+    await s.page.evaluate(() => {
+      (window as unknown as { __biseBlur?: boolean }).__biseBlur = false;
+      window.dispatchEvent(new Event('focus'));
+    });
+    await setHidden(s.page, true);
+    await sleep(500);
+    f0 = (await probe(s))?.frames ?? 0;
+    await sleep(2000);
+    expect(((await probe(s))?.frames ?? 0) - f0, 'hidden, zoomed in: 0 frames').toBe(0);
+    await setHidden(s.page, false);
+  } finally {
+    await s.close();
+  }
+});
+
+test('(town) a lost WebGL context shows the line', async () => {
+  const { s } = await openTown(fakes(3), 'light');
+  try {
+    await showTown(s);
+    expect(await loseContext(s.page, 'app.right.bims.town.canvas'), 'WEBGL_lose_context on the town canvas').toBe(true);
+    await expect(s.page.getByTestId('app.right.bims.lost')).toBeVisible({ timeout: 5000 });
   } finally {
     await s.close();
   }

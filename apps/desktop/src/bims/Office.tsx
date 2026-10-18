@@ -18,7 +18,8 @@ import { shownName } from '@/agents/model';
 import { bims } from '@/proto/words_bims.gen';
 import { useModHeld } from '@/app/held';
 import type { ActivitiesFn, ActivityKind, Label, LabelsFn, LayoutFn, MakeRenderer, NewTimelineFn, Office as OfficeMap, OfficeRenderer } from './model';
-import { away, CHECK_MS, HOVER_MS, nextAfter } from './loop';
+import { CHECK_MS, HOVER_MS, nextAfter } from './loop';
+import { awayNow, nightNow, testMode } from './room';
 import { wakeIn } from './skate';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
@@ -120,15 +121,6 @@ export function labelsSig(labels: ReadonlyMap<string, Label>): string {
   return s;
 }
 
-const testMode = (): boolean => (window as { bise?: { test?: boolean } }).bise?.test === true;
-/** a check says the window lost focus (window.__biseBlur): the harness's window never has it, so focus only counts then */
-const blurred = (): boolean => (window as { __biseBlur?: boolean }).__biseBlur === true;
-const awayNow = (): boolean => away({ hidden: document.hidden, focused: document.hasFocus() && !blurred(), test: testMode() && !blurred() });
-const nightNow = (): boolean => {
-  const set = document.documentElement.dataset.theme;
-  if (set !== undefined) return set === 'dark';
-  return !(typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches);
-};
 
 /** What the loop reads of his pointer, kept fresh by React and read by the frames (the rows go to the driver). */
 interface Live {

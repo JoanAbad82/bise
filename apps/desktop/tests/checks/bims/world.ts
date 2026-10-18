@@ -229,15 +229,16 @@ export const setHidden = (page: Page, hidden: boolean): Promise<void> =>
   }, hidden);
 
 /** The office's WebGL context lost, as a GPU reset does it (WEBGL_lose_context on its own canvas). */
-export const loseContext = (page: Page): Promise<boolean> =>
-  page.evaluate(() => {
-    const c = document.querySelector<HTMLCanvasElement>('[data-testid="app.right.bims.canvas"]');
+/** WEBGL_lose_context on a bims canvas (the office's by default, the town's: 'app.right.bims.town.canvas') */
+export const loseContext = (page: Page, testId = 'app.right.bims.canvas'): Promise<boolean> =>
+  page.evaluate((id) => {
+    const c = document.querySelector<HTMLCanvasElement>(`[data-testid="${id}"]`);
     const gl = c?.getContext('webgl2') ?? c?.getContext('webgl') ?? null;
     const ext = gl?.getExtension('WEBGL_lose_context') ?? null;
     if (ext === null) return false;
     ext.loseContext();
     return true;
-  });
+  }, testId);
 
 
 // ---- the shots index (for the designer to sign) ---------------------------------------------------
