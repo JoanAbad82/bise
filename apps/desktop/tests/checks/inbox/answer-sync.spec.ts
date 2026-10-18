@@ -11,6 +11,7 @@
 //     the hub's last 'cards' event.
 // The real-core side: inbox/answer-everywhere (tests/checks/real.sh). Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { thread } from '../../../src/proto/words_thread.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -80,7 +81,7 @@ test('inbox/answer-sync: an answer on the inbox screen closes the card in the pr
     await test.step('his pick on the inbox screen: the hub takes it, docs and the inbox say 0', async () => {
       // the hub took it; the core lists docs from its files without #7 (its connection gone: no
       // new 'cards' from docs' hub), as the step's rows come before the answer
-      await core.result('answer', 7, { answer: { agent: 'writer', question: X.question, said: '1', pick: 'plain', notice: 'you answered writer' } }, [projects([])]);
+      await core.result('answer', 7, { answer: { agent: 'writer', question: X.question, said: '1', pick: 'plain', notice: thread.answered_to({ who: 'writer' }) } }, [projects([])]);
       await row.click();
       const open = w.locator('[data-testid^="inbox.block.open."]', { hasText: X.question });
       await expect(open).toBeVisible({ timeout: 5000 });
