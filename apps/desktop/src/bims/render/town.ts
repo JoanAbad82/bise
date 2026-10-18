@@ -641,10 +641,6 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
           }),
         };
       },
-      warm() {
-        // every program the town draws, compiled in parallel where the GPU allows (KHR_parallel_shader_compile)
-        void renderer.compileAsync(scene, v3.camera).catch(() => undefined);
-      },
       settle() {
         if (!held) return;
         held = false;

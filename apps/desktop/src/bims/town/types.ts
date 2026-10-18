@@ -105,8 +105,6 @@ export interface TownParts {
 export interface TownEntry {
   /** the loose things now (null before a town) */
   parts(): TownParts | null;
-  /** start compiling every shader the town needs, off the frame where the GPU allows it */
-  warm(): void;
   /** the build is over: the merged townscape and walls drawn from now on, the loose ones dropped */
   settle(): void;
 }

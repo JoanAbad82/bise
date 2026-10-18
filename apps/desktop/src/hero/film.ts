@@ -303,10 +303,9 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     const t0 = performance.now();
     const dt = lastMs === 0 ? 0 : Math.min(0.1, Math.max(0, (nowMs - lastMs) / 1000));
     lastMs = nowMs;
-    // the build's ms from 'ready' (the first frame); the film's clock waits for its end
-    // its clock starts once every office is baked and the shaders compile (those first frames stall
-    // 0.1-0.6 s): until then the paper alone, so nothing of the build ever jumps
-    if (building && entryFrom < 0 && warmed && drawn > CAST.length + 1) entryFrom = nowMs;
+    // the build's ms from the frame after 'ready' (the first frame bakes and compiles everything,
+    // unseen: build()); the film's clock waits for the build's end
+    if (building && entryFrom < 0 && warmed && drawn > 0) entryFrom = nowMs;
     const ems = building ? (opts.entryAt ?? (entryFrom < 0 ? 0 : nowMs - entryFrom)) : ENTRY.done;
     if (!reduced && ems >= ENTRY.done) t += dt;
     const n = night();
@@ -326,14 +325,14 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     }
     r.setCam(spring.cam);
     const t1 = performance.now();
-    // the build's first frame is the paper and the slab alone ('ready' at once); then one office's
-    // world (its walls' bake, ~100 ms) a frame, while the slab grows and nothing else shows yet
+    // the build's first frame bakes every office's walls and draws the whole map once, unseen, then
+    // the paper and the empty slab ('ready'): every stall before the clock starts
     const ids = r.liveIds();
-    for (const id of building ? ids.slice(0, drawn) : ids) {
+    for (const id of ids) {
       const st = steps.get(id);
       if (st) r.live(id, st, t);
     }
-    if (building) build(ems, ids.length);
+    if (building) build(ems, ids.length, n);
     const t2 = performance.now();
     r.frame(n);
     const t3 = performance.now();
@@ -383,12 +382,16 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   }
 
   /** the build's things where they are at ems; the town settled once it's all there */
-  function build(ems: number, offices: number): void {
+  function build(ems: number, offices: number, n: boolean): void {
     const parts = r.entry.parts();
     if (parts === null) return;
     if (!warmed && parts.offices.length >= offices) {
+      // before 'ready' (design m_31440: no frame of the build over 50 ms): the whole map drawn once,
+      // unseen (frame 0 draws over it in the same task), so every program (its shadows too) is
+      // compiled and every buffer uploaded before the clock starts
       warmed = true;
-      r.entry.warm();
+      entry.apply(ENTRY.built - 1, parts, r.shownFit()?.scale ?? 0.05);
+      r.frame(n);
     }
     if (ems < ENTRY.built) {
       entry.apply(ems, parts, r.shownFit()?.scale ?? 0.05);
