@@ -8,8 +8,9 @@
 // (undelivered: the hub's entry stands in), and the core going down (HubFacts.core) fails every
 // row still on its way. A send while the core is down sends nothing and fails at once.
 // Kept as today, with its end: 'sends-oldest' (an error without a cid fails the project's oldest
-// row on its way: no path without a cid was found, architect m_30504; ends with state-machine's
-// next land, which deletes it and rewrites feature test 7, architect m_30540).
+// row on its way: no path without a cid was found, architect m_30504). Its deletion, with feature
+// test 7 rewritten (architect m_30540), waits until fast-try's p4 resumes (paused after slice 2 by
+// Gabriel's word: no new refactors).
 // An input that changes nothing gives the same state back and no output. Pure. Owner: amb-core.
 import type { Entry } from "@/proto";
 import { common } from "@/proto/words.gen";

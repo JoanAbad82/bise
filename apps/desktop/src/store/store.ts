@@ -408,16 +408,17 @@ export class Store extends StoreVoice {
     mode?: Mode;
     parts?: readonly Part[];
   }): number {
-    // Sugar over store.do (machine/sends.ts), removed by slice 2's callers' land
+    // Sugar over store.do (machine/sends.ts): its 8 callers move to store.do and it goes when
+    // fast-try's p4 resumes (paused after slice 2 by Gabriel's word: no new refactors)
     return this.do({ i: "send", ...a }).cid ?? 0;
   }
 
-  /** A failed send goes again (same words, same mode), as a new pending row. Sugar over store.do, removed with send. */
+  /** A failed send goes again (same words, same mode), as a new pending row. Sugar over store.do, goes with send. */
   retry(key: string, cid: number): void {
     this.do({ i: "resend", key, cid });
   }
 
-  /** Drops a failed send (he gave up on it). Sugar over store.do, removed with send. */
+  /** Drops a failed send (he gave up on it). Sugar over store.do, goes with send. */
   dismiss(key: string, cid: number): void {
     this.do({ i: "dismiss", key, cid });
   }
