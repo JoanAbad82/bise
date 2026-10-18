@@ -18,6 +18,8 @@ const ids = {
   chipPaste: '[data-testid^="composer.chip."][data-kind="paste"]',
   /** the rows under the field, one per chip ('▤ 1 “first words…” · 240 lines') */
   strip: '[data-testid="composer.strip"]',
+  /** a paste chip's row in the attachment list ('1 ▤ “first words…” 200 lines · 3.9 kB') */
+  attachPaste: '[data-testid^="composer.attach."][role="listitem"][data-kind="paste"]',
   /** the composer's one-line note in the strip ('no undo: …') */
   note: '[data-testid="composer.note"]',
   /** the voice key while the window is in front: the terminal's ctrl+r (amb-web may pick another) */

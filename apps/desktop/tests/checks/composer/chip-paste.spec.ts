@@ -32,9 +32,19 @@ const fieldShape = (f: Locator): Promise<string> =>
           : (n.textContent ?? ''),
     ).join(''),
   );
-/** The attachment list's rows: their number and their words. */
+/** The attachment list's rows: their number and their words, never their ✕ (shown on a lit row
+ *  only: the caret after a chip lights it, so it came and went with where the paste left the
+ *  caret; test:land red once on 'the same rows'). */
 const rowsOf = (page: Page): Promise<string[]> =>
-  page.locator('[data-testid^="composer.attach."][role="listitem"]').evaluateAll((els) => els.map((e) => `${(e as HTMLElement).dataset.n ?? ''} ${(e as HTMLElement).innerText.replace(/\s+/gu, ' ').trim()}`));
+  page.locator('[data-testid^="composer.attach."][role="listitem"]').evaluateAll((els) =>
+    els.map((e) => {
+      const words = Array.from(e.children)
+        .filter((c) => !c.classList.contains('x'))
+        .map((c) => (c as HTMLElement).innerText)
+        .join(' ');
+      return `${(e as HTMLElement).dataset.n ?? ''} ${words.replace(/\s+/gu, ' ').trim()}`;
+    }),
+  );
 
 test('composer/chip-paste: cut then paste, copy then paste over it, give the same chips and rows; a second paste keeps their numbers', async () => {
   const before = pasteboardCount();
