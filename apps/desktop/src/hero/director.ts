@@ -167,8 +167,21 @@ export function glideOf(from: Shot | null, to: Shot): { readonly dur: number; re
   const a = from === null ? null : officeOf(from.subject);
   const b = officeOf(to.subject);
   const across = from !== null && a !== b && a !== null && b !== null;
-  const dur = from === null ? GLIDE_MIN_S : a === b ? GLIDE_IN_S : GLIDE_ACROSS_S;
+  const dur = to.glide ?? (from === null ? GLIDE_MIN_S : a === b ? GLIDE_IN_S : GLIDE_ACROSS_S);
   return { dur: Math.max(GLIDE_MIN_S, dur), across };
+}
+
+/** a wide's slow drift (bims-film v7: never still, 2-3 % of the frame a second): its sway, fractions of the frame */
+export const DRIFT = { amp: 0.04, period: 10 } as const;
+
+/**
+ * A wide `e` s after its camera left, swaying side to side: still at first (no jolt), at most
+ * 2π·amp/period (2.5 %) of the frame a second. Pure.
+ */
+export function drift(c: Cam, e: number): Cam {
+  const x = Math.max(0, e);
+  const sway = (DRIFT.amp / 2) * (1 - Math.cos((2 * Math.PI * x) / DRIFT.period));
+  return holdCam({ ...c, u: c.u + sway / c.zoom });
 }
 
 /** ease in and out (smootherstep) */

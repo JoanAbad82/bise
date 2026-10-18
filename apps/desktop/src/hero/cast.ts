@@ -89,6 +89,8 @@ export interface Shot {
   readonly at: number;
   readonly size: Size;
   readonly subject: Subject;
+  /** its glide in, s, past the director's own (the seam's long move back to 0:00's frame) */
+  readonly glide?: number;
 }
 
 const s = (m: number, sec: number): number => m * 60 + sec;
@@ -110,21 +112,39 @@ export const CAST: readonly Cast[] = [
     map: 'loft',
     stage: 13,
     bims: [
-      { name: 'main', main: true, life: [[0, { k: 'mainidle' }], [s(0, 12), { k: 'main' }], [s(3, 50), { k: 'mainidle' }]] },
+      // the cold open's task: his plane leaves at 0:00.5, main has it at 0:03.5; idle again once its day is over
+      { name: 'main', main: true, life: [[0, { k: 'mainidle' }], [s(0, 3.5), { k: 'main' }], [s(4, 20), { k: 'mainidle' }]] },
       {
+        // in by the door at 0:04, asks you at 0:10, your answer lands at 0:17 (the hop and the coin),
+        // the 3rd land at 3:02 (combo ×2 with dark-mode), off on its board at 4:18
         name: 'signup-flow',
-        life: [[0, gone], [s(0, 20), work], [s(3, 36), { k: 'landing', rank: 1 }], [s(3, 42), done], [s(4, 31), gone]],
+        life: [[0, gone], [s(0, 4), work], [s(0, 10), { k: 'asks' }], [s(0, 17), think], [s(2, 57), { k: 'landing', rank: 1 }], [s(3, 5.5), done], [s(4, 18), gone]],
       },
       {
+        // the day's first land: its crate carried to main's queue from 0:18, over its head in the queue, then the deck chairs
         name: 'dark-mode',
-        life: [[0, gone], [s(0, 24), work], [s(2, 30), think], [s(2, 50), work], [s(3, 2), { k: 'landing', rank: 1 }], [s(3, 11), done], [s(4, 33), gone]],
+        life: [[0, gone], [s(0, 4.6), work], [s(0, 18), { k: 'landing', rank: 1 }], [s(0, 26.5), done], [s(4, 21), gone]],
       },
-      { name: 'fix-flaky-test', life: [[0, work], [s(1, 16), { k: 'failed' }], [s(1, 40), work]] },
+      { name: 'fix-flaky-test', life: [[0, work], [s(0, 54), { k: 'failed' }], [s(1, 48), work]] },
       {
+        // an island trip at the seam (up from its bean bag at 4:57), the golden pineapple at 1:11,
+        // trips through the day (the town's '2 island trips at any time'), then its bean bag from 3:42
         name: 'docs-sync',
-        life: [[0, idle], [s(2, 0), { k: 'snack', fruit: 1, trip: 1 }], [s(2, 8), { k: 'snack', fruit: 0, trip: 2 }], [s(2, 16), idle]],
+        life: [
+          [0, { k: 'snack', fruit: 1, trip: 1 }],
+          [s(0, 20), idle],
+          [s(1, 5), { k: 'snack', fruit: 1, trip: 2 }],
+          [s(1, 9), { k: 'snack', fruit: 0, trip: 3 }],
+          [s(1, 20), idle],
+          [s(2, 0), { k: 'snack', fruit: 2, trip: 4 }],
+          [s(2, 14), idle],
+          [s(3, 28), { k: 'snack', fruit: 1, trip: 5 }],
+          [s(3, 42), idle],
+          // on its way to the island at 0:00 (the cold open's first frame)
+          [s(4, 57), { k: 'snack', fruit: 1, trip: 1 }],
+        ],
       },
-      { name: 'perf-audit', life: [[0, { k: 'sleep' }]] },
+      { name: 'perf-audit', life: [[0, { k: 'sleep' }], [s(3, 38), work], [s(4, 10), { k: 'sleep' }]] },
     ],
   },
   {
@@ -133,17 +153,19 @@ export const CAST: readonly Cast[] = [
     map: 'california',
     stage: 11,
     bims: [
-      { name: 'main', main: true, life: [[0, { k: 'main' }], [s(4, 4), { k: 'mainidle' }]] },
+      // his plane at 0:41 starts its day; 'line clear' at 3:12, the clap, then nothing waits here
+      { name: 'main', main: true, life: [[0, { k: 'mainidle' }], [s(0, 44), { k: 'main' }], [s(3, 18), { k: 'mainidle' }]] },
       {
+        // in at 0:46, the second '?' at 1:56 (two loops on its answer's way), the 4th land at 3:12, off at 4:34
         name: 'pricing-page',
-        life: [[0, gone], [s(0, 58), work], [s(1, 6), { k: 'asks' }], [s(1, 26), work], [s(3, 58), { k: 'landing', rank: 1 }], [s(4, 3), done], [s(4, 32), gone]],
+        life: [[0, gone], [s(0, 46), work], [s(1, 56), { k: 'asks' }], [s(2, 7), work], [s(3, 6), { k: 'landing', rank: 1 }], [s(3, 13), done], [s(4, 34), gone]],
       },
-      { name: 'og-images', life: [[0, gone], [s(1, 20), work], [s(3, 12), { k: 'landing', rank: 1 }], [s(3, 16), done], [s(3, 52), gone]] },
+      // in at 0:46.6, lands at 2:33 ('1:47' over its head), off down the road at 2:36
+      { name: 'og-images', life: [[0, gone], [s(0, 46.6), work], [s(2, 28), { k: 'landing', rank: 1 }], [s(2, 33), done], [s(2, 36), gone]] },
       // idle: they skate (the app's pastimes, 2 at most). A trip to their desk starts a skate session
-      // at the same film time every loop, so every loop rides the same lines: seo-meta's from 1:46
-      // bails at 2:44 (its 3rd line), i18n's from 4:50 kickflips at 0:47 (run.ts PRE_S covers both)
-      { name: 'seo-meta', life: [[0, idle], [s(1, 40), think], [s(1, 46), idle]] },
-      { name: 'i18n', life: [[0, idle], [s(4, 44), think], [s(4, 50), idle]] },
+      // at the same film time every loop, so every loop rides the same lines (run.ts PRE_S covers both)
+      { name: 'seo-meta', life: [[0, idle], [s(1, 17), think], [s(1, 23), idle]] },
+      { name: 'i18n', life: [[0, idle], [s(4, 30), think], [s(4, 36), idle]] },
     ],
   },
   {
@@ -153,70 +175,111 @@ export const CAST: readonly Cast[] = [
     stage: 9,
     bims: [
       { name: 'main', main: true, life: [[0, { k: 'main' }]] },
-      { name: 'api-tests', life: [[0, work], [s(2, 12), { k: 'wait', on: 'checkout' }], [s(2, 23), work]] },
-      { name: 'checkout', life: [[0, work], [s(2, 12), { k: 'wait', on: 'api-tests' }], [s(2, 23), idle], [s(2, 26), work]] },
-      { name: 'invoice-pdf', life: [[0, gone], [s(0, 58), work], [s(3, 22), { k: 'landing', rank: 1 }], [s(3, 28), done], [s(4, 46), gone]] },
+      // they wait on each other ('…' over both, 1:17-1:28), a message, a coffee (1:36), checkout's moonwalk back (1:41)
+      { name: 'api-tests', life: [[0, work], [s(1, 17), { k: 'wait', on: 'checkout' }], [s(1, 28), work]] },
+      { name: 'checkout', life: [[0, work], [s(1, 17), { k: 'wait', on: 'api-tests' }], [s(1, 28), idle], [s(1, 31), work]] },
+      // in with the hop and the coin at 1:02, the 2nd land at 2:55, off at 4:38
+      { name: 'invoice-pdf', life: [[0, gone], [s(0, 59.5), work], [s(2, 51), { k: 'landing', rank: 1 }], [s(2, 58), done], [s(4, 38), gone]] },
     ],
   },
 ];
 
 export const NOTES: readonly Note[] = [
-  { at: s(0, 11), office: HARNESS, from: 'you', to: 'main' },
-  { at: s(1, 24), office: SITE, from: 'you', to: 'pricing-page' },
-  { at: s(2, 24), office: ACME, from: 'api-tests', to: 'checkout' },
+  // the story's (bims-film v7): your task, your two answers, the agents' notes
+  { at: s(0, 0.5), office: HARNESS, from: 'you', to: 'main' },
+  { at: s(0, 14), office: HARNESS, from: 'you', to: 'signup-flow' },
+  { at: s(0, 41), office: SITE, from: 'you', to: 'main' },
+  { at: s(1, 29), office: ACME, from: 'api-tests', to: 'checkout' },
+  { at: s(2, 2), office: SITE, from: 'you', to: 'pricing-page' },
+  { at: s(3, 52), office: ACME, from: 'api-tests', to: 'main' },
+  // the town's background life: a plane of his to a working bim about every 20 s
+  { at: s(0, 28), office: ACME, from: 'you', to: 'api-tests' },
+  { at: s(1, 0), office: HARNESS, from: 'you', to: 'main' },
+  { at: s(1, 20), office: ACME, from: 'you', to: 'invoice-pdf' },
+  { at: s(1, 40), office: HARNESS, from: 'you', to: 'signup-flow' },
+  { at: s(2, 22), office: ACME, from: 'you', to: 'main' },
+  { at: s(2, 44), office: HARNESS, from: 'you', to: 'fix-flaky-test' },
+  { at: s(3, 24), office: ACME, from: 'you', to: 'api-tests' },
+  { at: s(3, 45), office: HARNESS, from: 'you', to: 'perf-audit' },
+  { at: s(4, 1), office: ACME, from: 'you', to: 'checkout' },
+  { at: s(4, 24), office: ACME, from: 'you', to: 'invoice-pdf' },
+  { at: s(4, 42), office: HARNESS, from: 'you', to: 'fix-flaky-test' },
 ];
 
 export const EGGS: readonly Egg[] = [
-  // the plane loops before pricing-page catches it
-  { at: s(1, 24), dur: 3.5, office: SITE, bim: 'pricing-page', kind: 'loop' },
+  // the cold open: your answer loops before signup-flow catches it, then its hop and coin
+  { at: s(0, 14), dur: 3.5, office: HARNESS, bim: 'signup-flow', kind: 'loop' },
+  { at: s(0, 17.2), dur: 0.6, office: HARNESS, bim: 'signup-flow', kind: 'hop' },
+  // in the queue with its crate: the crate over its head, then the deck chairs at 0:26.5
+  { at: s(0, 23.5), dur: 2.5, office: HARNESS, bim: 'dark-mode', kind: 'itemget' },
   // invoice-pdf's hop and coin on its way in
-  { at: s(1, 0.5), dur: 0.6, office: ACME, bim: 'invoice-pdf', kind: 'hop' },
-  { at: s(2, 8), dur: 8, office: HARNESS, bim: 'docs-sync', kind: 'golden' },
-  { at: s(2, 12.5), dur: 10.5, office: ACME, bim: 'api-tests', kind: 'stare' },
-  { at: s(2, 12.5), dur: 10.5, office: ACME, bim: 'checkout', kind: 'stare' },
-  { at: s(2, 31), dur: 0.8, office: ACME, bim: 'checkout', kind: 'tap' },
-  { at: s(2, 36), dur: 6, office: ACME, bim: 'checkout', kind: 'moonwalk' },
-  // in the queue with its crate (it gets there at 3:07.6): the crate over its head, then done at 3:11
-  { at: s(3, 8), dur: 2.5, office: HARNESS, bim: 'dark-mode', kind: 'itemget' },
-  { at: s(3, 16), dur: 4, office: SITE, bim: 'og-images', kind: 'speedrun' },
-  { at: s(3, 42), dur: 3, office: HARNESS, bim: 'main', kind: 'tetris' },
-  { at: s(3, 42), dur: 3, office: HARNESS, bim: 'dark-mode', kind: 'combo' },
-  { at: s(3, 42), dur: 3, office: HARNESS, bim: 'signup-flow', kind: 'combo' },
-  { at: s(4, 5), dur: 3, office: SITE, bim: 'main', kind: 'clap' },
-  { at: s(4, 20), dur: 1.2, office: HARNESS, bim: 'dark-mode', kind: 'kickflip' },
-  { at: s(4, 30), dur: 0.9, office: HARNESS, bim: 'signup-flow', kind: 'salto' },
+  { at: s(1, 2), dur: 0.6, office: ACME, bim: 'invoice-pdf', kind: 'hop' },
+  { at: s(1, 11), dur: 8, office: HARNESS, bim: 'docs-sync', kind: 'golden' },
+  { at: s(1, 17.5), dur: 10.5, office: ACME, bim: 'api-tests', kind: 'stare' },
+  { at: s(1, 17.5), dur: 10.5, office: ACME, bim: 'checkout', kind: 'stare' },
+  { at: s(1, 36), dur: 0.8, office: ACME, bim: 'checkout', kind: 'tap' },
+  { at: s(1, 41), dur: 6, office: ACME, bim: 'checkout', kind: 'moonwalk' },
+  // pricing-page's answer: two loops (a longer egg), then the hop
+  { at: s(2, 2), dur: 5, office: SITE, bim: 'pricing-page', kind: 'loop' },
+  { at: s(2, 7.5), dur: 0.6, office: SITE, bim: 'pricing-page', kind: 'hop' },
+  { at: s(2, 33), dur: 3, office: SITE, bim: 'og-images', kind: 'speedrun' },
+  { at: s(3, 3), dur: 3, office: HARNESS, bim: 'dark-mode', kind: 'combo' },
+  { at: s(3, 3), dur: 3, office: HARNESS, bim: 'signup-flow', kind: 'combo' },
+  { at: s(3, 12), dur: 3, office: SITE, bim: 'main', kind: 'tetris' },
+  { at: s(3, 15), dur: 3, office: SITE, bim: 'main', kind: 'clap' },
+  { at: s(3, 30), dur: 1.2, office: HARNESS, bim: 'dark-mode', kind: 'kickflip' },
+  { at: s(4, 16), dur: 0.9, office: HARNESS, bim: 'signup-flow', kind: 'salto' },
 ];
 
 const bim = (office: string, name: string): Subject => ({ k: 'bim', office, name });
 
 export const SHOTS: readonly Shot[] = [
-  { at: 0, size: 'wide', subject: { k: 'town' } },
-  { at: s(0, 10), size: 'office', subject: { k: 'office', office: HARNESS } },
-  { at: s(0, 20), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
-  { at: s(0, 34), size: 'office', subject: { k: 'office', office: HARNESS } },
-  { at: s(0, 44), size: 'close', subject: bim(SITE, 'i18n') },
-  { at: s(0, 58), size: 'wide', subject: { k: 'town' } },
-  { at: s(1, 6), size: 'follow', subject: bim(SITE, 'pricing-page') },
-  { at: s(1, 16), size: 'follow', subject: bim(HARNESS, 'fix-flaky-test') },
-  { at: s(1, 24), size: 'office', subject: { k: 'office', office: SITE } },
-  { at: s(1, 40), size: 'office', subject: { k: 'office', office: HARNESS } },
-  { at: s(1, 52), size: 'wide', subject: { k: 'town' } },
-  { at: s(2, 2), size: 'close', subject: bim(HARNESS, 'docs-sync') },
-  { at: s(2, 14), size: 'follow', subject: { k: 'pair', office: ACME, names: ['api-tests', 'checkout'] } },
-  { at: s(2, 24), size: 'follow', subject: bim(ACME, 'checkout') },
-  { at: s(2, 34), size: 'close', subject: bim(ACME, 'checkout') },
-  { at: s(2, 42), size: 'follow', subject: bim(SITE, 'seo-meta') },
-  { at: s(2, 56), size: 'wide', subject: { k: 'town' } },
-  { at: s(3, 4), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
-  { at: s(3, 16), size: 'close', subject: bim(SITE, 'og-images') },
-  { at: s(3, 26), size: 'office', subject: { k: 'office', office: ACME } },
-  { at: s(3, 38), size: 'close', subject: bim(HARNESS, 'main') },
-  { at: s(3, 52), size: 'follow', subject: bim(SITE, 'og-images') },
-  { at: s(3, 56), size: 'wide', subject: { k: 'town' } },
-  // the clap (4:05-4:08) seen closest, then back to the close-up (bims m_31230)
-  { at: s(4, 2), size: 'closest', subject: bim(SITE, 'main') },
-  { at: s(4, 8), size: 'close', subject: bim(SITE, 'main') },
-  { at: s(4, 16), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
-  { at: s(4, 30), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
-  { at: s(4, 44), size: 'wide', subject: { k: 'town' } },
+  // the cold open (0:00-0:30): close from the first second, the product in 30 s
+  { at: 0, size: 'tight', subject: { k: 'office', office: HARNESS } },
+  { at: s(0, 4), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
+  { at: s(0, 8), size: 'tight', subject: { k: 'office', office: HARNESS } },
+  { at: s(0, 10), size: 'close', subject: bim(HARNESS, 'signup-flow') },
+  { at: s(0, 14), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
+  { at: s(0, 20), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
+  { at: s(0, 23.5), size: 'close', subject: bim(HARNESS, 'dark-mode') },
+  { at: s(0, 26), size: 'wide', subject: { k: 'town' } },
+  // act 1: the town gets up
+  { at: s(0, 30), size: 'close', subject: bim(SITE, 'i18n') },
+  { at: s(0, 38), size: 'follow', subject: bim(SITE, 'seo-meta') },
+  { at: s(0, 44), size: 'office', subject: { k: 'office', office: SITE } },
+  { at: s(0, 52), size: 'follow', subject: bim(HARNESS, 'fix-flaky-test') },
+  { at: s(1, 0), size: 'office', subject: { k: 'office', office: ACME } },
+  { at: s(1, 8), size: 'close', subject: bim(HARNESS, 'docs-sync') },
+  { at: s(1, 16), size: 'wide', subject: { k: 'town' } },
+  // act 2: the small dramas
+  { at: s(1, 24), size: 'follow', subject: { k: 'pair', office: ACME, names: ['api-tests', 'checkout'] } },
+  { at: s(1, 32), size: 'follow', subject: bim(ACME, 'checkout') },
+  { at: s(1, 40), size: 'close', subject: bim(ACME, 'checkout') },
+  { at: s(1, 46), size: 'office', subject: { k: 'office', office: HARNESS } },
+  { at: s(1, 54), size: 'follow', subject: bim(SITE, 'pricing-page') },
+  { at: s(2, 2), size: 'tight', subject: bim(SITE, 'pricing-page') },
+  { at: s(2, 10), size: 'wide', subject: { k: 'town' } },
+  // act 3: the break
+  { at: s(2, 18), size: 'follow', subject: bim(SITE, 'seo-meta') },
+  { at: s(2, 26), size: 'close', subject: bim(SITE, 'og-images') },
+  { at: s(2, 36), size: 'follow', subject: bim(SITE, 'og-images') },
+  { at: s(2, 40), size: 'wide', subject: { k: 'town' } },
+  // act 4: the lands
+  { at: s(2, 52), size: 'follow', subject: bim(ACME, 'invoice-pdf') },
+  { at: s(3, 0), size: 'office', subject: { k: 'office', office: HARNESS } },
+  { at: s(3, 8), size: 'follow', subject: bim(SITE, 'pricing-page') },
+  // the clap (3:15-3:18) seen closest (bims m_31230)
+  { at: s(3, 14), size: 'closest', subject: bim(SITE, 'main') },
+  { at: s(3, 20), size: 'wide', subject: { k: 'town' } },
+  // act 5: the day's end, then again
+  { at: s(3, 28), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
+  { at: s(3, 36), size: 'office', subject: { k: 'office', office: HARNESS } },
+  { at: s(3, 44), size: 'close', subject: { k: 'spot', office: SITE, spot: 'park' } },
+  { at: s(3, 52), size: 'office', subject: { k: 'office', office: ACME } },
+  { at: s(4, 0), size: 'wide', subject: { k: 'town' } },
+  { at: s(4, 8), size: 'office', subject: { k: 'office', office: HARNESS } },
+  { at: s(4, 16), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
+  { at: s(4, 24), size: 'wide', subject: { k: 'town' } },
+  // the seam: a long move from the wide down to 0:00's frame, there by 4:57
+  { at: s(4, 50), size: 'tight', subject: { k: 'office', office: HARNESS }, glide: 8.5 },
 ];

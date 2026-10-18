@@ -38,16 +38,19 @@ describe('the hero film', () => {
       const r = runs.find((x) => x.cast.id === office);
       return r ? stepOf(r, false, false)?.played.find((f) => f.name === name) : undefined;
     };
-    expect(at(2 * 60 + 13, 'acme-web', 'checkout')?.egg?.kind).toBe('stare');
-    expect(at(2 * 60 + 31.2, 'acme-web', 'checkout')?.pose.seg.act.k).toBe('coffee');
-    const back = at(2 * 60 + 38, 'acme-web', 'checkout');
-    expect(back?.pose.moving).toBe(true);
-    expect(back?.egg?.kind).toBe('moonwalk');
-    // in the queue, its crate over its head; then done
-    const crate = at(3 * 60 + 9, 'harness', 'dark-mode');
+    // the cold open (bims-film v7): your answer's plane, the hop, the first land's crate over its head
+    expect(at(15, 'harness', 'signup-flow')?.pose.plane).toBeDefined();
+    expect(at(17.4, 'harness', 'signup-flow')?.egg?.kind).toBe('hop');
+    const crate = at(24.5, 'harness', 'dark-mode');
     expect(crate?.pose.seg.act.k).toBe('landing');
     expect(crate?.egg?.kind).toBe('itemget');
-    expect(at(3 * 60 + 12, 'harness', 'dark-mode')?.pose.seg.act.k).toBe('done');
-    expect(at(4 * 60 + 6, 'bise.dev', 'main')?.egg?.kind).toBe('clap');
+    expect(at(27, 'harness', 'dark-mode')?.pose.seg.act.k).toBe('done');
+    // the stare, the coffee, the moonwalk back
+    expect(at(60 + 20, 'acme-web', 'checkout')?.egg?.kind).toBe('stare');
+    expect(at(60 + 35.5, 'acme-web', 'checkout')?.pose.seg.act.k).toBe('coffee');
+    const back = at(60 + 43, 'acme-web', 'checkout');
+    expect(back?.pose.moving).toBe(true);
+    expect(back?.egg?.kind).toBe('moonwalk');
+    expect(at(3 * 60 + 16, 'bise.dev', 'main')?.egg?.kind).toBe('clap');
   });
 });

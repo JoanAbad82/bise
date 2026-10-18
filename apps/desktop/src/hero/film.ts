@@ -16,7 +16,7 @@ import { NO_ATTENTION, type Step } from '../bims/office-driver';
 import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
 import { CAST, SHOTS, type Shot } from './cast';
-import { aimCam, glideCam, glideOf, holdCam, officeOf, OFFICE_BOX, fitCam, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
+import { aimCam, drift, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
 import { ENTRY, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
 import { eggWords, makeOverlay } from './overlay';
@@ -188,10 +188,8 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     emit(h.k === 'film' ? 'film' : 'control');
   };
 
-  const wide = (): Cam | null => {
-    const first = SHOTS[0];
-    return first ? shotCam(first, geo) : null;
-  };
+  /** the three offices (the build's frame, his double-click's): never the film's first shot, which is close */
+  const wide = (): Cam | null => shotCam({ at: 0, size: 'wide', subject: { k: 'town' } }, geo);
 
   function filmCam(dt: number): void {
     const T = filmT(t);
@@ -205,7 +203,9 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       if (shotIx >= 0) glide = { from: spring.cam, start: t, dur: g.dur, rise, to: null };
       shotIx = i;
     }
-    const target = shotCam(shot, geo) ?? spring.cam;
+    const framed = shotCam(shot, geo);
+    // a wide never holds still (bims-film v7): it sways from its camera's leaving on
+    const target = framed === null ? spring.cam : shot.size === 'wide' ? drift(framed, T - (shot.at - LEAD_S)) : framed;
     move(target, dt);
   }
 
@@ -304,8 +304,10 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     const dt = lastMs === 0 ? 0 : Math.min(0.1, Math.max(0, (nowMs - lastMs) / 1000));
     lastMs = nowMs;
     // the build's ms from 'ready' (the first frame); the film's clock waits for its end
-    if (building && entryFrom < 0) entryFrom = nowMs;
-    const ems = building ? (opts.entryAt ?? nowMs - entryFrom) : ENTRY.done;
+    // its clock starts once every office is baked and the shaders compile (those first frames stall
+    // 0.1-0.6 s): until then the paper alone, so nothing of the build ever jumps
+    if (building && entryFrom < 0 && warmed && drawn > CAST.length + 1) entryFrom = nowMs;
+    const ems = building ? (opts.entryAt ?? (entryFrom < 0 ? 0 : nowMs - entryFrom)) : ENTRY.done;
     if (!reduced && ems >= ENTRY.done) t += dt;
     const n = night();
     for (const run of runs) {

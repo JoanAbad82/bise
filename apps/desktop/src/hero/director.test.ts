@@ -8,26 +8,26 @@ import { panAround, zoomAround } from './gestures';
 import { eggWords } from './overlay';
 
 describe('the shot list', () => {
-  it('holds each shot 4 to 16 s (the last wide runs on into 0:00) and goes wide about once a minute', () => {
-    const ats = SHOTS.map((s) => s.at);
-    const holds = ats.map((a, i) => (ats[i + 1] ?? FILM_S) - a);
-    for (const h of holds) {
-      expect(h).toBeGreaterThanOrEqual(4);
-      expect(h).toBeLessThanOrEqual(16);
+  it('moves at least every 10 s (a wide sways meanwhile), never holds less than 2 s, and goes wide about once a minute', () => {
+    const holds = SHOTS.map((s, i) => ({ s, hold: (SHOTS[i + 1]?.at ?? FILM_S) - s.at }));
+    for (const { s, hold } of holds) {
+      expect(hold).toBeGreaterThanOrEqual(2);
+      if (s.size !== 'wide' && s.at < FILM_S - 10) expect(hold).toBeLessThanOrEqual(10);
     }
     const wides = SHOTS.filter((s) => s.size === 'wide').map((s) => s.at);
     const gaps = wides.map((w, i) => (wides[i + 1] ?? (wides[0] ?? 0) + FILM_S) - w);
     for (const g of gaps) expect(g).toBeLessThanOrEqual(70);
   });
 
-  it('opens and closes the loop on the same wide', () => {
-    expect(SHOTS[0]?.size).toBe('wide');
-    expect(SHOTS.at(-1)?.size).toBe('wide');
+  it('opens close (the cold open) and closes the loop on that same frame', () => {
+    expect(SHOTS[0]?.size).toBe('tight');
+    expect(SHOTS.at(-1)?.size).toBe(SHOTS[0]?.size);
+    expect(SHOTS.at(-1)?.subject).toEqual(SHOTS[0]?.subject);
     expect(shotAt(SHOTS, FILM_S - 0.5)).toBe(0);
   });
 
   it('leaves LEAD_S before the action', () => {
-    const k = SHOTS.findIndex((s) => s.at === 70);
+    const k = SHOTS.findIndex((s) => s.at === 76);
     const s = SHOTS[k];
     if (s === undefined) return;
     expect(shotAt(SHOTS, s.at - LEAD_S - 0.01)).toBe(k - 1);
