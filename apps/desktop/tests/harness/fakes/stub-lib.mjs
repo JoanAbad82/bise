@@ -66,7 +66,7 @@ function rpcSide(write, hubEvs) {
         // the real hub broadcasts a step's cards before the request's response (FakeCore.result)
         const a = answerOf(cmd);
         for (const ev of a?.before ?? []) note(JSON.stringify(ev));
-        write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: a?.result ?? {} }));
+        write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: a?.result ?? defaultResult(cmd) }));
       }
       return cmd;
     },
@@ -74,7 +74,17 @@ function rpcSide(write, hubEvs) {
 }
 
 /**
- * A request's answer a test set (FakeCore.result), or undefined: then its result is {}. A card's
+ * A request's result when the test set none: a send is answered as today's hub does, a message
+ * made with its own id (bise_proto SendResult {msg_id, reason: 'made'}), so his row waits for its
+ * echo as in the app; every other request gets {}. A test that wants an older hub's {} or another
+ * reason sets it (FakeCore.result). Since send-reason (fb64c8ff1) the window drops a row on a
+ * send answered {} (echo.ts answered), which emptied thread/first-run's thread (review-refactor m_30967).
+ */
+let nextMsgId = 9000;
+const defaultResult = (cmd) => (cmd.cmd === 'send' ? { msg_id: nextMsgId++, reason: 'made' } : {});
+
+/**
+ * A request's answer a test set (FakeCore.result), or undefined: then its result is defaultResult's. A card's
  * answer stays for every request on that card; one with no card (a send's msg_id) answers the
  * next request alone, so each send of a test gets its own id.
  */
