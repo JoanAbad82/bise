@@ -2652,13 +2652,13 @@ fn bench_step() {
         .collect();
     let mut h = Hub::new("/w");
     // each line: wall time, and its split: sb-core (the wait for its
-    // answer, CoreLink::waited) and the Rust side (the rest)
+    // answer, its "sb-core" part in Hub::spent) and the Rust side (the rest)
     let split = |what: &str, wall: std::time::Duration, core: std::time::Duration| {
         eprintln!("{}: {:?} = sb-core {:?} + rust {:?}", what, wall, core, wall.saturating_sub(core));
     };
-    let (t0, w0) = (std::time::Instant::now(), h.link.waited);
+    let (t0, w0) = (std::time::Instant::now(), h.spent.now().get("sb-core").copied().unwrap_or_default());
     h.replay(&events);
-    split(&format!("boot (replay {} events)", events.len()), t0.elapsed(), h.link.waited - w0);
+    split(&format!("boot (replay {} events)", events.len()), t0.elapsed(), h.spent.now().get("sb-core").copied().unwrap_or_default() - w0);
     let mut env = FakeEnv::new();
     env.now = 1_790_722_300_000;
     h.handle(Input::Tick, &mut env);
@@ -2674,9 +2674,9 @@ fn bench_step() {
         let mut ts = Vec::new();
         for i in 0..10 {
             env.now += 500;
-            let (t0, w0) = (std::time::Instant::now(), h.link.waited);
+            let (t0, w0) = (std::time::Instant::now(), h.spent.now().get("sb-core").copied().unwrap_or_default());
             h.handle(mk(i), env);
-            ts.push((t0.elapsed(), h.link.waited - w0));
+            ts.push((t0.elapsed(), h.spent.now().get("sb-core").copied().unwrap_or_default() - w0));
         }
         ts.sort();
         split(&format!("{} (median of 10)", what), ts[5].0, ts[5].1);
@@ -2686,10 +2686,10 @@ fn bench_step() {
     time("REPL tool line", &mut h, &mut env, &|i| Input::ReplLine { agent: a.clone(), line: format!("tool #{} bash : echo {}", i, i) });
     {
         // hello: the client's input, then the snapshot the daemon sends it
-        let (t0, w0) = (std::time::Instant::now(), h.link.waited);
+        let (t0, w0) = (std::time::Instant::now(), h.spent.now().get("sb-core").copied().unwrap_or_default());
         h.handle(Input::ClientHello { client: 1 }, &mut env);
         let _ = h.snapshot(env.now);
-        split("hello + its snapshot", t0.elapsed(), h.link.waited - w0);
+        split("hello + its snapshot", t0.elapsed(), h.spent.now().get("sb-core").copied().unwrap_or_default() - w0);
     }
     time("user line to main", &mut h, &mut env, &|_| Input::ClientInput {
         client: 1,

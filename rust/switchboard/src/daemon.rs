@@ -855,9 +855,7 @@ impl Shell {
 
     fn step(&mut self, input: Input) {
         let fx = self.hub.handle(input, &mut self.env);
-        for e in fx {
-            self.run(e);
-        }
+        self.run_timed(fx);
         self.answers_flush();
         // a gate card closed without an answer is a no
         self.gate_sweep();
@@ -1788,6 +1786,8 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         .with_oneshot(opts.repl_bin.clone(), opts.app_root.clone(), opts.spawn_env);
     let mut sh = Shell {
         opts,
+        // before `hub` moves: its split of each message (crate::spent)
+        loop_watch: loop_watch::LoopWatch::start(&paths, hub.spent.clone()),
         hub,
         env,
         tx: tx.clone(),
@@ -1799,7 +1799,6 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         starts: Default::default(),
         start_queue: BTreeMap::new(),
         clients: BTreeMap::new(),
-        loop_watch: loop_watch::LoopWatch::start(&paths),
         replies: BTreeMap::new(),
         buffers: BTreeMap::new(),
         positions: BTreeMap::new(),

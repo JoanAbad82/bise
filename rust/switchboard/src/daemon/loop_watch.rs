@@ -12,6 +12,13 @@
 //! ([`LoopWatch::phase`]): `hub loop busy 30 s on input Tick: sb-core`
 //! (hub-tick: a Tick sat 38 min in sb-core and the line said only Tick).
 //!
+//! A message that held it 1 s or more, never said busy, says
+//! `hub loop held 2.1 s on <msg> (<split>)` at its end.
+//!
+//! Each busy line ends with its split (crate::spent, hub-loop): `(git
+//! worktree_create 11.2 s, sb-core 0.4 s, shell 0.4 s)`: sb-core's
+//! answers, its git queries and the effects, timed where they run.
+//!
 //! What may still hold the loop: sb-core's line (`core::CoreLink::call`,
 //! strictly one request then one answer: sb-core reads the whole line
 //! before it writes, so the two pipes never fill at once), the git
@@ -21,6 +28,7 @@
 
 use super::{log_line, Msg};
 use crate::paths::Paths;
+use crate::spent::Spent;
 use crate::util::now_ms;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -29,6 +37,9 @@ use std::time::Duration;
 const FIRST_MS: u64 = 5_000;
 const SECOND_MS: u64 = 30_000;
 const EVERY_MS: u64 = 60_000;
+/// A message that held the loop this long says so at its end (hub-loop:
+/// an agent's `sb` waits behind it).
+const HELD_MS: u64 = 1_000;
 
 /// When a loop busy for `busy_ms` is said again, `said` lines said
 /// already: the next line's due time (ms into the busy spell).
@@ -52,13 +63,16 @@ struct Mark {
 #[derive(Clone, Default)]
 pub(super) struct LoopWatch {
     mark: Arc<Mutex<Mark>>,
+    /// where the message spends its time (crate::spent, the hub's)
+    spent: Spent,
 }
 
 impl LoopWatch {
-    /// The watch and its thread (hub.log in `paths`).
-    pub(super) fn start(paths: &Paths) -> LoopWatch {
-        let w = LoopWatch::default();
-        let (mark, paths) = (w.mark.clone(), paths.clone());
+    /// The watch and its thread (hub.log in `paths`); `spent`: the
+    /// hub's split of each message (hub-loop).
+    pub(super) fn start(paths: &Paths, spent: Spent) -> LoopWatch {
+        let w = LoopWatch { spent, ..Default::default() };
+        let (mark, spent, paths) = (w.mark.clone(), w.spent.clone(), paths.clone());
         std::thread::spawn(move || loop {
             std::thread::sleep(Duration::from_secs(1));
             let line = {
@@ -68,7 +82,7 @@ impl LoopWatch {
                     None
                 } else {
                     m.said += 1;
-                    Some(format!("hub loop busy {} s on {}", busy / 1000, m.what))
+                    Some(format!("hub loop busy {} s on {} ({})", busy / 1000, m.what, split(busy, &spent)))
                 }
             };
             if let Some(l) = line {
@@ -81,6 +95,7 @@ impl LoopWatch {
     /// The loop takes `what`.
     pub(super) fn on(&self, what: String) {
         let mut m = self.mark.lock().unwrap_or_else(|e| e.into_inner());
+        self.spent.reset();
         *m = Mark { what, since_ms: now_ms(), said: 0 };
     }
 
@@ -96,7 +111,13 @@ impl LoopWatch {
     /// end too. The line to log, if any.
     pub(super) fn idle(&self) -> Option<String> {
         let mut m = self.mark.lock().unwrap_or_else(|e| e.into_inner());
-        let out = (m.said > 0).then(|| format!("hub loop free after {} s on {}", now_ms().saturating_sub(m.since_ms) / 1000, m.what));
+        let busy = now_ms().saturating_sub(m.since_ms);
+        let out = if m.said > 0 {
+            Some(format!("hub loop free after {} s on {} ({})", busy / 1000, m.what, split(busy, &self.spent)))
+        } else {
+            // a hold too short for a busy line, said once at its end
+            (busy >= HELD_MS).then(|| format!("hub loop held {:.1} s on {} ({})", busy as f64 / 1000.0, m.what, split(busy, &self.spent)))
+        };
         *m = Mark::default();
         out
     }
@@ -133,6 +154,37 @@ impl Msg {
     }
 }
 
+/// A busy spell's split (crate::spent): its longest parts, the shell's.
+fn split(busy_ms: u64, spent: &Spent) -> String {
+    crate::spent::words(Duration::from_millis(busy_ms), &spent.now())
+}
+
+impl super::Shell {
+    /// Run a step's effects, each timed in the split (crate::spent).
+    pub(super) fn run_timed(&mut self, fx: Vec<crate::core::Effect>) {
+        for e in fx {
+            let _t = self.hub.spent.part(fx_part(&e));
+            self.run(e);
+        }
+    }
+}
+
+/// An effect's name for the split: the ones that run a process or touch
+/// files by name, the rest as one.
+pub(super) fn fx_part(e: &crate::core::Effect) -> &'static str {
+    use crate::core::Effect as E;
+    match e {
+        E::Journal(_) => "fx journal",
+        E::Spawn { .. } => "fx spawn",
+        E::Kill { .. } => "fx kill",
+        E::Say { .. } => "fx say",
+        E::Line { .. } => "fx line",
+        E::Land { .. } => "fx land",
+        E::State => "fx state",
+        _ => "fx other",
+    }
+}
+
 /// An input's variant name (its Debug's first word).
 fn input_kind(i: &crate::core::Input) -> String {
     let d = format!("{i:?}");
@@ -154,9 +206,12 @@ mod tests {
         let w = LoopWatch::default();
         w.on("repl line route-name".into());
         assert_eq!(w.idle(), None);
+        w.on("repl line t1".into());
+        w.mark.lock().unwrap().since_ms -= 1_500;
+        assert!(w.idle().is_some_and(|l| l.starts_with("hub loop held 1.5 s on repl line t1 (")), "a hold of 1 s or more");
         w.on("client line 3".into());
         w.mark.lock().unwrap().said = 1;
-        assert!(w.idle().is_some_and(|l| l.starts_with("hub loop free after ") && l.ends_with(" on client line 3")));
+        assert!(w.idle().is_some_and(|l| l.starts_with("hub loop free after ") && l.ends_with(" on client line 3 (shell 0.0 s)")));
     }
 
     /// hub-tick: a Tick's phases name the line, the spell keeps its start.

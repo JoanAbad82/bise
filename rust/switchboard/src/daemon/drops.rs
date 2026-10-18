@@ -20,10 +20,10 @@ impl Shell {
                 .flat_map(|a| [a.name.clone(), a.dir.clone()].into_iter().chain(a.aliases.iter().cloned()))
                 .collect();
             // their temp folders (approvals-design.md §7.1); run/ stays
-            // with the rest of the agent's folder
-            for d in now.difference(&self.archived) {
-                crate::sweep::remove_agent_tmp(&self.opts.paths.agent_tmp(d));
-            }
+            // with the rest of the agent's folder; off the loop (hub-loop:
+            // a tmp/ can hold GBs)
+            let tmps: Vec<PathBuf> = now.difference(&self.archived).map(|d| self.opts.paths.agent_tmp(d)).collect();
+            std::thread::spawn(move || tmps.iter().for_each(|t| crate::sweep::remove_agent_tmp(t)));
             self.archived = now;
             self.sweep_worktrees(Some(names));
         }

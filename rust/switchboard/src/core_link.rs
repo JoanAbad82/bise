@@ -56,6 +56,8 @@ impl Hub {
     /// the input again, once; dead again on it, the input is dropped
     /// (None) and sb-core restarted once more (BISE-292).
     pub(super) fn call(&mut self, v: &Value) -> Option<Value> {
+        // its share of the loop's message (spent.rs), a restart included
+        let _t = self.spent.part("sb-core");
         let e = match self.link.call(v) {
             Ok(out) => return Some(out),
             Err(e) => e,
@@ -112,6 +114,14 @@ impl Hub {
             Ok(v) => json!({"ok": v}),
             Err(e) => json!({"err": e}),
         };
+        // its share of the loop's message, by query (spent.rs)
+        let _t = self.spent.part(match jstr(q, "q").as_str() {
+            "worktree_create" => "git worktree_create",
+            "worktree_loss" => "git worktree_loss",
+            "worktree_drop" => "git worktree_drop",
+            "worktree_restore" => "git worktree_restore",
+            _ => "git query",
+        });
         match jstr(q, "q").as_str() {
             "worktree_create" => {
                 let wc = q.get("with_changes").and_then(|x| x.as_bool()).unwrap_or(false);
