@@ -1249,7 +1249,10 @@ if (mode === 'quick') {
   // All rows: rowsE812 first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the
   // time the others take
   const groups = ONLY.length
-    ? [rowsCF30, rowsDDDE, rowsD3D8, rows42D1, rows4E20, newRows, rows37, rowsE812, rowsF2A7, rows233B, rowsC2BA, rowsDC47]
+    // the groups whose steps aren't named rows run whole, by the group's name
+    // (AS_HE_DOES_QUICK_ROWS=quickRows,rows25,rows0170)
+    ? [rowsCF30, rowsDDDE, rowsD3D8, rows42D1, rows4E20, newRows, rows37, rowsE812, rowsF2A7, rows233B, rowsC2BA, rowsDC47,
+      ...[['quickRows', quickRows], ['rows25', rows25], ['rows0170', rows0170]].filter(([n]) => ONLY.includes(n)).map(([, g]) => g)]
     : [rowsE812, rowsCF30, rowsDDDE, rowsF2A7, rows233B, rowsC2BA, rowsDC47, rowsD3D8, rows42D1, rows4E20, quickRows, newRows, rows37, rows25, rows0170];
   // the pass limit sized to its groups: GROUP_MS each from here (the stall watchdog still ends a
   // hang at 600 s with no step); AS_HE_DOES_WATCHDOG_MS set by hand wins. Measured (review-gates
@@ -1665,19 +1668,24 @@ async function rows37(harness, say) {
     const opened = await open.isVisible().catch(() => false);
     // the ⌘I-less path: a click on the option in the docked block
     if (opened) await open.locator('[data-testid$=".opt.2"]').first().click({ timeout: 3000 }).catch(() => {});
-    const asideOf = () => page.evaluate(() => {
-      const a = [...document.querySelectorAll('[data-testid^="thread.aside."]')].filter((e) => /^thread\.aside\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes('zqblue'));
-      return a.length ? { n: a.length, text: (a.at(-1).textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) } : null;
+    // answer-in-thread A (787e6ee82, designer m_24425/m_24628): his answer lives where the question
+    // was asked. From bise's view the window goes to harness' main at his answer, his row there
+    // ('✓ you answered bise', the option's words) with 'answered from bise · HH:MM' under it; bise's
+    // view keeps no aside row (AsideRow deleted)
+    const mineOf = () => page.evaluate(() => {
+      const scr = document.querySelector('[data-testid="thread.screen"]');
+      const a = [...document.querySelectorAll('[data-testid^="thread.approval."]')].filter((e) => /^thread\.approval\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes('zqblue'));
+      return a.length ? { at: `${scr?.getAttribute('data-project') ?? ''}/${scr?.getAttribute('data-agent') ?? ''}`, n: a.length, text: (a.at(-1).textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) } : null;
     });
-    const aside = opened ? await until(asideOf, 20000, 500) : null;
-    await shot('inbox-answer-aside');
-    const good = (a) => !!a && a.n === 1 && /✓/.test(a.text) && /you answered \S+ · harness/.test(a.text) && /zqblue/.test(a.text) && !/zqblue.*\b2\b/.test(a.text);
-    step("his inbox answer from the block in bise's view (no ⌘I, another project's card): '✓ you answered <agent> · harness' + the option's words", good(aside), { listed: !!listed, opened, aside });
+    const mine = opened ? await until(mineOf, 20000, 500) : null;
+    await shot('inbox-answer-in-thread');
+    const good = (a) => !!a && a.n === 1 && /harness/.test(a.at) && /\/main$/.test(a.at) && /✓ you answered \S+/.test(a.text) && /zqblue/.test(a.text) && /answered from bise · \d\d:\d\d/.test(a.text);
+    step("his inbox answer from the block in bise's view (another project's card): the window goes to harness' main at his row, '✓ you answered <agent>' + the option's words, 'answered from bise · HH:MM'", good(mine), { listed: !!listed, opened, mine });
     await page.reload().catch(() => {});
     await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
-    await bise();
-    const after = await until(asideOf, 20000, 500);
-    step('his answer row is there once after a reload', good(after), after);
+    await harness();
+    const after = await until(mineOf, 20000, 500);
+    step("his answer row is there once after a reload, 'answered from bise' kept", good(after), after);
     // the asker's thread: the hub's own row with the option's words
     await harness();
     const hub = await until(async () => page.evaluate(() => {
@@ -1804,7 +1812,12 @@ async function rows25(harness, say) {
     if (!seeded) throw new Error('no hero-25 row');
     await heroRow.click({ timeout: 5000 });
     const box = page.locator('[data-testid="artifact.image"]').first();
-    await box.waitFor({ timeout: 10000 });
+    if (!(await box.waitFor({ timeout: 10000 }).then(() => true, () => false))) {
+      await shot('pinch-no-image');
+      step('pinch on an image artifact', false, { why: 'no artifact.image 10 s after the hero-25 click', hash: await page.evaluate(() => location.hash).catch(() => null),
+        ids: await page.evaluate(() => [...new Set([...document.querySelectorAll('[data-testid^="artifact"], [data-testid^="app.art"]')].map((e) => e.getAttribute('data-testid')))].slice(0, 30)).catch(() => null) });
+      return;
+    }
     await until(async () => (await box.getAttribute('data-fit')) === 'true', 8000, 250);
     const img = page.locator('[data-testid="artifact.image.img"]').first();
     await until(async () => (await img.evaluate((e) => e.complete && e.naturalWidth > 0)), 10000, 250);
@@ -2623,7 +2636,9 @@ async function rows233B(harness, say) {
     await page.keyboard.type(`[[bash: ${list.map(one).join(' && ')}]] ${tail}`, { delay: 5 });
     await page.keyboard.press('Enter');
   };
-  const cardShown = (token) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox."], [data-testid^="strip."], [data-testid^="dock."]')]
+  // its own row or card: the block's '+ 3 more · ? bise · <the next question>' line names a card it
+  // doesn't draw (night-reds' run3: b behind it read as shown, its 'not sent' nowhere to read)
+  const cardShown = (token) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox.block.row."], [data-testid^="inbox.block.card."], [data-testid^="inbox.block.open."], [data-testid^="strip."], [data-testid^="dock."]')]
     .some((e) => (e.textContent ?? '').includes(t)), token).catch(() => 'unread');
   const present = async (token) => {
     if ((await cardShown(token)) !== false) return true;
@@ -2789,7 +2804,9 @@ async function rows233B(harness, say) {
     step("marks: ψ text-2 on a worktree with no PR (zqsolo), ↑ red on #501 (checks fail); the group 'ψ sb/zqg1' head 28 px with '↑ #503', its rows no mark; the orphan PR #502's row: no sign, its ↑",
       by1('app.right.agent.zqsolo')?.mark === 'ψ' && rgbOf(by1('app.right.agent.zqsolo')?.mc) === rgbOf(t2) && by1('app.right.agent.zqfails')?.mark === '↑' && rgbOf(by1('app.right.agent.zqfails')?.mc) === rgbOf(err)
         && !!headR && headR.h === 28 && headR.g === 'ψ' && /↑ #503/.test(headR.mark ?? '') && !by1('app.right.agent.zqg1')?.mark && !by1('app.right.agent.zqg2')?.mark
-        && (orphan ? (orphan.g ?? '') === '' && /↑/.test(orphan.mark ?? '') : !tips?.[1]) && (true),
+        // the orphan PR needs a place: sb drop removes zqgone's worktree now, its branch stays (night5,
+        // night-reds' rerun): #502 then has no place to hang on, so no orphan row (agents-bar.spec's)
+        && (orphan ? (orphan.g ?? '') === '' && /↑/.test(orphan.mark ?? '') : !tips?.[1] || !/refs\/heads\/sb\/zqgone\b/.test(git(['worktree', 'list', '--porcelain']) ?? '')) && (true),
       { zqsolo: by1('app.right.agent.zqsolo'), zqfails: by1('app.right.agent.zqfails'), head: headR, g1: by1('app.right.agent.zqg1'), g2: by1('app.right.agent.zqg2'), orphan, more: b1?.more, t2, t3 });
     const mk = page.locator('[data-testid="app.right.agent.zqfails.mark"]').first();
     await mk.hover({ timeout: 3000 }).catch(() => {});
@@ -3153,7 +3170,8 @@ async function rows0170(harness, say) {
     const full = 'if the zq nightly gate goes red';
     const subOk = !!a?.sub && (a.sub === full || (a.sub.endsWith('…') && full.startsWith(a.sub.slice(0, -1)) && full[a.sub.length - 1] === ' '));
     step("an alarm-only agent (harness' main): idle, NO line over the composer, never 'waiting' in its head",
-      !!a && line === null && !/waiting/.test(h), { line, head: h, label: await label() });
+      // 'N waiting for you' is the head's inbox pill (his cards, the world's earlier rows), never main's own state
+      !!a && line === null && !/waiting(?! for you)/.test(h), { line, head: h, label: await label() });
     step("its alarm in SCHEDULED & WATCHING: '◌ main · if the zq nightly gate goes red · until HH:MM', the note whole or cut on a word",
       !!a && /^SCHEDULED & WATCHING/.test(sched) && a.g === '◌' && subOk && /^until (tomorrow )?\d\d:\d\d$/.test(a.end ?? ''), { sched, alarm: a });
     step("its hover: 'bise wakes main if the zq nightly gate goes red · set at HH:MM · stops watching at HH:MM'",
@@ -3315,9 +3333,17 @@ async function rowsC2BA(harness, say) {
   // a menu left open (the composer's Picker) or a row folded again takes the first click
   // (cand-9d10q: 'to bise' after goAgent('zcwt'), the same click worked two rows later): esc, unfold,
   // scroll the row in, click, three times
+  // esc with nothing to close goes UP since esc-up (app/route.ts upOf): main's thread -> bise's
+  // view, an agent's -> its main (night5: the composer rows read bise's view, goAgent's click
+  // landed nowhere). Pressed only when a menu, the @ list, a docked card or an artifact is open.
+  const settle = async () => {
+    const open = await page.evaluate(() => !!document.querySelector('[data-testid="composer.mode.menu"], [data-testid="composer.model.menu"], [data-testid="composer.pick"], [data-testid="app.art"], [data-testid="artifact.page"]')
+      || document.querySelector('[data-testid="composer.box"]')?.getAttribute('data-answering') === 'true').catch(() => false);
+    if (open) await page.keyboard.press('Escape').catch(() => {});
+  };
   const goAgent = async (a) => {
     for (let i = 0; i < 3; i += 1) {
-      await page.keyboard.press('Escape').catch(() => {});
+      await settle();
       await unfold();
       const r = page.locator(`[data-testid="app.right.agent.${a}"]`).first();
       await r.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
@@ -3404,7 +3430,7 @@ async function rowsC2BA(harness, say) {
   await row('composer A', async () => {
     await harness();
     await idle();
-    await page.keyboard.press('Escape');
+    await settle();
     const m0 = await tabInfo();
     step("composer A (main): the tab 'to bise' + gust, the folder's name, context when known; 32 px, 16 px in each side, glued; no project, idle or model in it; the row '+', mode ⌄, model ⌄, send; keys line",
       // main is 'bise' to him (shownName); where: his folder's name since f8a0b301a (was 'shared folder');
@@ -3467,7 +3493,7 @@ async function rowsC2BA(harness, say) {
       for (const w of [1400, 1100, 800]) {
         await resizeWin(1400, 900);
         await page.waitForTimeout(400);
-        await page.keyboard.press('Escape');
+        await settle();
         await harness();
         await page.waitForTimeout(300);
         await resizeWin(w, 900);
@@ -3504,6 +3530,28 @@ async function rowsC2BA(harness, say) {
       sizes.every((s) => /^to (main|bise)/.test(s.idle.to ?? '') && s.idle.band && /^to zcwt/.test(s.words.to ?? '') && !!s.words.mode && s.answering.open && s.answering.acc && !s.answering.dots && /^↳ answering (main|bise)/.test(s.answering.to ?? '')), sizes);
     await harness();
     await answerWith(Q, 1);
+  });
+
+  await row('PROBE goagent', async () => {
+    const where = async (tag) => ({ tag, hash: await page.evaluate(() => location.hash).catch(() => null), screens: await page.evaluate(() => [...document.querySelectorAll('[data-testid="thread.screen"]')].map((e) => ({ a: e.getAttribute('data-agent'), p: e.getAttribute('data-project'), vis: e.getBoundingClientRect().width }))).catch(() => null), head: flat(await text('[data-testid="app.main"]')).slice(0, 80) });
+    const log = [];
+    await harness();
+    await page.waitForTimeout(800);
+    log.push(await where('after harness'));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(800);
+    log.push(await where('after esc'));
+    await harness();
+    await page.waitForTimeout(800);
+    await unfold();
+    const r = page.locator('[data-testid="app.right.agent.zcwt"]').first();
+    log.push({ tag: 'row', count: await r.count(), box: await r.boundingBox().catch(() => null), html: (await r.evaluate((e) => e.outerHTML.slice(0, 400)).catch((x) => String(x))) });
+    await r.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+    const clicked = await r.click({ timeout: 5000 }).then(() => 'ok', (e) => String(e).slice(0, 300));
+    await page.waitForTimeout(1500);
+    log.push({ clicked, ...(await where('after click')) });
+    await shot('probe-after-click');
+    step('PROBE goagent', false, log);
   });
 
   await row('ghost badge', async () => {
@@ -3684,7 +3732,11 @@ async function rowsC2BA(harness, say) {
     }
     await page.emulateMedia({ colorScheme: null }).catch(() => {});
     step("the lone ψ's tip: 'ψ worktree: its own copy of the repo, on sb/zcwt · <its folder>', branch and folder mono in ink (light and dark)",
-      shots.every((s) => /^ψ worktree: its own copy of the repo, on sb\/zcwt · \/.+zcwt/.test(s.words ?? '') && s.mono?.length === 2 && s.mono[0] === 'sb/zcwt' && /mono/i.test(s.font ?? '') && s.c === s.ink), shots);
+      // the hub's lid first when it says one (places.rs words_line, barplaces tipParts): 'no PR yet ·
+      // ψ worktree on sb/zcwt · click opens its changes', the branch mono; with no lid, what the
+      // worktree is and its folder ('ψ worktree: its own copy of the repo, on sb/zcwt · <folder>')
+      shots.every((s) => (/· ψ worktree on sb\/zcwt · click opens its changes$/.test(s.words ?? '') || (/^ψ worktree: its own copy of the repo, on sb\/zcwt · .+zcwt/.test(s.words ?? '') && s.mono?.length === 2))
+        && s.mono?.[0] === 'sb/zcwt' && /mono/i.test(s.font ?? '') && s.c === s.ink), shots);
   });
 
   await row('at newest first', async () => {
@@ -3699,7 +3751,7 @@ async function rowsC2BA(harness, say) {
       fs.utimesSync(p, t, t);
     });
     await harness();
-    await page.keyboard.press('Escape');
+    await settle();
     await clear();
     await page.keyboard.type(`@${dir}/`, { delay: 5 });
     const names = await until(async () => {
@@ -3715,7 +3767,7 @@ async function rowsC2BA(harness, say) {
 
   await row('no swipe', async () => {
     await harness();
-    await page.keyboard.press('Escape');
+    await settle();
     await goAgent('zcwt');
     await clear();
     await page.keyboard.type('zc words under a swipe', { delay: 5 });
@@ -3752,7 +3804,7 @@ async function rowsC2BA(harness, say) {
     const K = `zcK${T}`;
     await card(`${K} keep the webp next to [zc asks art](artifact:${id})?`, ['1. zck-yes', '2. zck-no'], 'seeded asks');
     await idle();
-    await page.keyboard.press('Escape');
+    await settle();
     const asks = await until(async () => page.evaluate((t) => {
       const e = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread."]')].filter((x) => (x.textContent ?? '').includes(t) && /asks/.test(x.textContent ?? '')).at(-1);
       if (!e) return null;
@@ -4699,10 +4751,11 @@ async function quickRows(harness, say) {
   step('⌘ hints show after 150 ms: none at 60 ms, there at 250 ms, gone on release', at60 === 0 && at250 > 0 && after === 0, { at60, at250, after });
   // /artifacts: the first row selected on open, ↓↓ moves to the third, ⏎ opens it
   await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
-  const rows = page.locator('[data-testid^="artifacts.list.row."]');
+  // the rows themselves (role option): a row's 'new' badge is artifacts.list.row.<id>.new, never a row
+  const rows = page.locator('[role="option"][data-testid^="artifacts.list.row."]');
   await rows.first().waitFor({ timeout: 8000 }).catch(() => {});
   const selected = () => page.evaluate(() => {
-    const all = [...document.querySelectorAll('[data-testid^="artifacts.list.row."]')];
+    const all = [...document.querySelectorAll('[role="option"][data-testid^="artifacts.list.row."]')];
     return { n: all.length, at: all.findIndex((r) => r.getAttribute('aria-selected') === 'true'), title: all.find((r) => r.getAttribute('aria-selected') === 'true')?.textContent?.trim().slice(0, 60) ?? null };
   });
   await page.evaluate(() => { document.querySelector('[data-testid="artifacts.screen"]')?.focus(); });

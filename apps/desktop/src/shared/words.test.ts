@@ -53,5 +53,6 @@ const d = 'sb is fine alone, so is sbx land';`;
       .filter((p) => judged(rel(p)))
       .flatMap((p) => wordsOf(readFileSync(p, 'utf8'), p.endsWith('.tsx')).filter((w) => SB_CMD.test(w.text)).map((w) => `${rel(p)}:${String(w.line)}: ${w.text.trim()}`));
     expect(hits, 'say what happens in plain words, not the sb command agents run').toEqual([]);
-  });
+    // it reads every source file: 5.1 s at load 25 (try-build's gate quick runs)
+  }, 30_000);
 });

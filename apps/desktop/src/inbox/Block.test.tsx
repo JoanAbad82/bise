@@ -498,7 +498,8 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     } finally {
       delete g.bise;
     }
-  });
+    // timed out at 5 s under load 25 (try-build's gate quick runs), ~2 s alone
+  }, 20_000);
 });
 
 // card-draft-keep (Benjamin's lost answer): the open card the hub closes while his words are typed
