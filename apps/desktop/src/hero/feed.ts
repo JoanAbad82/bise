@@ -69,6 +69,8 @@ export function feedAt(T: number): FeedState {
 }
 
 export interface Feed {
+  /** its panel (the film fades it in and out with the build) */
+  readonly root: HTMLElement;
   draw(T: number): void;
   dispose(): void;
 }
@@ -88,6 +90,7 @@ export function makeFeed(box: HTMLElement): Feed {
   let last = '';
 
   return {
+    root,
     draw(T) {
       const s = feedAt(T);
       const sig = JSON.stringify(s);

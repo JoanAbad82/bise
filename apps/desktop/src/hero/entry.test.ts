@@ -1,7 +1,7 @@
 // The entry build's timeline (design's hero-entry §2, Gabriel's ripple): its eases, one wave of
 // cubes from the middle out, and the whole map there by 2.4 s.
 import { describe, expect, it } from 'vitest';
-import { cellOf, easeInOut, ENTRY, gridOf, popAt, popOut, tileAt, tileStart, wordsAt } from './entry';
+import { cellOf, easeInOut, ENTRY, feedOpacity, gridOf, popAt, popOut, tileAt, tileStart, wordsAt } from './entry';
 
 const LAWN = { x0: -30, x1: 30, z0: -25, z1: 25 };
 
@@ -54,5 +54,12 @@ describe('the entry build', () => {
     expect(wordsAt(ENTRY.built)).toBeCloseTo(1);
     expect(wordsAt(2000)).toBe(0);
     expect(ENTRY.cam.to).toBe(ENTRY.done);
+  });
+
+  it('holds the finished town 0.6 s, then glides 1.2 s to the first shot, the feed fading in as it leaves (designer audit)', () => {
+    expect(ENTRY.cam.from - ENTRY.built).toBeGreaterThanOrEqual(600);
+    expect(ENTRY.cam.to - ENTRY.cam.from).toBeGreaterThanOrEqual(1200);
+    expect(feedOpacity(ENTRY.cam.from - 1)).toBe(0);
+    expect(feedOpacity(ENTRY.cam.from + ENTRY.feedIn)).toBe(1);
   });
 });

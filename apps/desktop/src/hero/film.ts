@@ -19,7 +19,7 @@ import { BUBBLE_S, BUBBLES, CAST, FOLD_S, PAGE, REDUCED_T, SHOTS, STAMP, type Bu
 import { makeFeed } from './feed';
 import { makePage, type KilnLoader } from './page';
 import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
-import { ENTRY, makeEntry, wordsAt } from './entry';
+import { ENTRY, feedOpacity, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
 import { eggWords, makeOverlay } from './overlay';
 import { advance, makeRuns, stepOf, type Run } from './run';
@@ -75,7 +75,7 @@ interface Probe {
 }
 
 /** the page's paper (designer m_30837) */
-const PAPER = { light: '#f2ede2', dark: '#171513' } as const;
+const PAPER = { light: '#f7f2e9', dark: '#24201c' } as const;
 /** the frame rate while nothing of his moves and the camera holds (designer: 30 when the page is idle) */
 const IDLE_MS = 1000 / 30;
 /** 'ready' on the first frame after the warm one this cheap, ms, or READY_WAIT frames after it at most */
@@ -391,6 +391,8 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     // the words come in last in the build and leave first in the fold
     overlay.root.style.opacity = ems === null ? '' : String(wordsAt(ems));
     words();
+    // the feed: nothing on the paper while the town grows, in as the camera leaves the wide; out with the words in the fold
+    feed.root.style.opacity = ems === null ? '' : String(T < PAGE.fold ? feedOpacity(ems) : wordsAt(ems));
     feed.draw(T);
     page.draw(T);
     stamped(T);
@@ -430,8 +432,9 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   function entryCam(ems: number): void {
     const from = wide();
     if (from === null) return;
-    const T = filmT(t);
-    shotIx = shotAt(SHOTS, T);
+    // one target the whole glide: the shot the film plays when the glide ends (a shot leaving
+    // mid-glide changed its target in one frame: the audit's cut), so the film takes over in place
+    shotIx = shotAt(SHOTS, ENTRY.cam.to / 1000);
     const shot = SHOTS[shotIx];
     const to = shot ? shotCam(shot, geo) : null;
     const f = (ems - ENTRY.cam.from) / (ENTRY.cam.to - ENTRY.cam.from);

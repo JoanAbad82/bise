@@ -6,7 +6,7 @@
 // their desks 30 ms apart (1800-), the words fade in last; the camera eases from the wide to the
 // film's first shot (2400-2800). Pure timing up top (tested), then what moves the renderer's loose
 // things (TownParts) each frame. Owner: hero-town.
-import { Box3, InstancedMesh, type Material, Matrix4, Mesh, type Object3D, Quaternion, Vector3, type WebGLProgramParametersWithUniforms } from 'three';
+import { Box3, BufferAttribute, BufferGeometry, Color, InstancedMesh, type Material, Matrix4, Mesh, type Object3D, Quaternion, Vector3, type WebGLProgramParametersWithUniforms } from 'three';
 import { STYLE } from '@/bims/render/style';
 import type { TownParts } from '@/bims/town/types';
 
@@ -22,10 +22,15 @@ export const ENTRY = {
   words: { from: 2250, to: 2400 },
   /** the whole map is there: the town settles into its merged draw */
   built: 2400,
-  /** the camera's ease from the wide to the first shot */
-  cam: { from: 2400, to: 2800 },
+  /**
+   * the camera's ease from the wide to the first shot: the finished town held 0.6 s, then one 1.2 s
+   * glide, expo in-out (designer's entry audit: no cut); the feed fades in as it leaves
+   */
+  cam: { from: 3000, to: 4200 },
+  /** the feed's fade in, from cam.from, ms */
+  feedIn: 200,
   /** the film runs */
-  done: 2800,
+  done: 4200,
 } as const;
 
 /** a cube's side, town units (the lawn in about two hundred: every one drawn each frame of the build) */
@@ -100,6 +105,61 @@ export function cellOf(lawn: TownParts['lawn'], x: number, z: number): { readonl
   return { x: lawn.x0 + (i + 0.5) * g.cw, z: lawn.z0 + (j + 0.5) * g.cd };
 }
 
+/**
+ * A geometry cut until no triangle edge is longer than `max` (its own units): a flat thing's vertices
+ * close enough that each rides its own cube (a road's long triangle sloped from a risen cube down to
+ * one not yet up). Every attribute interpolated along the cut edge. Pure: a new geometry.
+ */
+export function finer(geo: BufferGeometry, max: number): BufferGeometry {
+  const src = geo.index ? geo.toNonIndexed() : geo;
+  const names = Object.keys(src.attributes);
+  const sizes = names.map((n) => src.getAttribute(n).itemSize);
+  const pos = src.getAttribute('position');
+  type V = number[][];
+  const vert = (i: number): V => names.map((n, k) => Array.from({ length: sizes[k] ?? 0 }, (_, c) => src.getAttribute(n).getComponent(i, c)));
+  const mid = (a: V, b: V): V => a.map((xs, k) => xs.map((x, c) => (x + (b[k]?.[c] ?? x)) / 2));
+  const len = (a: V, b: V): number => Math.hypot(...[0, 1, 2].map((c) => (a[0]?.[c] ?? 0) - (b[0]?.[c] ?? 0)));
+  const out: V[] = [];
+  const cut = (a: V, b: V, c: V, depth: number): void => {
+    const ab = len(a, b);
+    const bc = len(b, c);
+    const ca = len(c, a);
+    const top = Math.max(ab, bc, ca);
+    if (top <= max || depth > 12) {
+      out.push(a, b, c);
+      return;
+    }
+    // split the longest edge: two triangles, the same winding
+    if (top === ab) {
+      const m = mid(a, b);
+      cut(a, m, c, depth + 1);
+      cut(m, b, c, depth + 1);
+    } else if (top === bc) {
+      const m = mid(b, c);
+      cut(a, b, m, depth + 1);
+      cut(a, m, c, depth + 1);
+    } else {
+      const m = mid(c, a);
+      cut(a, b, m, depth + 1);
+      cut(m, b, c, depth + 1);
+    }
+  };
+  for (let i = 0; i + 2 < pos.count; i += 3) cut(vert(i), vert(i + 1), vert(i + 2), 0);
+  const next = new BufferGeometry();
+  names.forEach((n, k) => {
+    const s = sizes[k] ?? 1;
+    const arr = new Float32Array(out.length * s);
+    out.forEach((v, i) => {
+      (v[k] ?? []).forEach((x, c) => {
+        arr[i * s + c] = x;
+      });
+    });
+    next.setAttribute(n, new BufferAttribute(arr, s));
+  });
+  if (src !== geo) src.dispose();
+  return next;
+}
+
 // ---- what moves the renderer's loose things
 
 interface Pop {
@@ -159,12 +219,22 @@ export function makeEntry(): Entry {
       sh.uniforms.uWaveCell = wave.cell;
       sh.uniforms.uWaveN = wave.n;
       sh.uniforms.uWaveDmax = wave.dmax;
-      const head = `uniform float uWaveMs;\nuniform vec2 uWaveC;\nuniform vec2 uWaveO;\nuniform vec2 uWaveCell;\nuniform vec2 uWaveN;\nuniform float uWaveDmax;\nvarying float vWaveP;`;
+      const head = `uniform float uWaveMs;\nuniform vec2 uWaveC;\nuniform vec2 uWaveO;\nuniform vec2 uWaveCell;\nuniform vec2 uWaveN;\nuniform float uWaveDmax;\nvarying float vWaveP;
+varying vec2 vWaveXZ;`;
+      // each fragment's own cube: a piece crossing cubes shows only over the risen ones (a vertex's
+      // wave interpolated across a long triangle showed road ahead of the rim: designer's entry audit)
+      const own = [
+        'vec2 fIJ = clamp(floor((vWaveXZ - uWaveO) / uWaveCell), vec2(0.0), uWaveN - 1.0);',
+        'vec2 fCC = uWaveO + (fIJ + 0.5) * uWaveCell;',
+        `float fSt = ${ENTRY.tiles.from.toFixed(1)} + ${ENTRY.tiles.span.toFixed(1)} * min(1.0, distance(fCC, uWaveC) / uWaveDmax);`,
+        'if (vWaveP <= 0.0 || uWaveMs <= fSt) discard;',
+      ].join('\n');
       sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${head}`).replace(
         '#include <begin_vertex>',
         [
           '#include <begin_vertex>',
           'vec2 wXZ = (modelMatrix * vec4(transformed, 1.0)).xz;',
+          'vWaveXZ = wXZ;',
           'vec2 wIJ = clamp(floor((wXZ - uWaveO) / uWaveCell), vec2(0.0), uWaveN - 1.0);',
           'vec2 wCC = uWaveO + (wIJ + 0.5) * uWaveCell;',
           `float wSt = ${ENTRY.tiles.from.toFixed(1)} + ${ENTRY.tiles.span.toFixed(1)} * min(1.0, distance(wCC, uWaveC) / uWaveDmax);`,
@@ -173,10 +243,44 @@ export function makeEntry(): Entry {
         ].join('\n'),
       );
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying float vWaveP;')
-        .replace('#include <clipping_planes_fragment>', 'if (vWaveP <= 0.0) discard;\n#include <clipping_planes_fragment>');
+        .replace('#include <common>', `#include <common>\n${head}`)
+        .replace('#include <clipping_planes_fragment>', `${own}\n#include <clipping_planes_fragment>`);
     };
     c.customProgramCacheKey = () => 'bims-hero-wave';
+    clones.push(c);
+    return c;
+  }
+
+  /**
+   * A rising cube's material: the slab's dirt on its outer faces only (away from the wave's middle),
+   * the grass on its other sides, so the cubes still rising read as lawn, not loose dirt (designer's
+   * entry audit §5). The settled slab is the slab's own mesh again.
+   */
+  function rimmed(m: Material, top: Color): Material {
+    const c = m.clone();
+    const uTop = { value: top };
+    c.onBeforeCompile = (sh: WebGLProgramParametersWithUniforms) => {
+      sh.uniforms.uWaveC = wave.c;
+      sh.uniforms.uRimTop = uTop;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform vec2 uWaveC;\nvarying float vRimIn;').replace(
+        '#include <begin_vertex>',
+        [
+          '#include <begin_vertex>',
+          '#ifdef USE_INSTANCING',
+          'vec3 rN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * objectNormal);',
+          'vec2 rC = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz - uWaveC;',
+          'float rOut = length(rC) > 1e-3 && length(rN.xz) > 1e-3 ? dot(normalize(rN.xz), normalize(rC)) : 1.0;',
+          'vRimIn = abs(rN.y) < 0.5 && rOut < 0.35 ? 1.0 : 0.0;',
+          '#else',
+          'vRimIn = 0.0;',
+          '#endif',
+        ].join('\n'),
+      );
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uRimTop;\nvarying float vRimIn;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, uRimTop, vRimIn);');
+    };
+    c.customProgramCacheKey = () => 'bims-hero-rim';
     clones.push(c);
     return c;
   }
@@ -207,6 +311,7 @@ export function makeEntry(): Entry {
 
     const lawnW = lawn.x1 - lawn.x0;
     const slabs: Mesh[] = [];
+    let grass: Color | null = null;
     const pops: Pop[] = [];
     root.updateMatrixWorld(true);
     for (const o of [...root.children]) {
@@ -217,8 +322,15 @@ export function makeEntry(): Entry {
       // flat things first: the road, the river and its banks cross the whole lawn too, and as cubes
       // they covered the grass (the build's lawn read grey, then jumped to green when it settled)
       if (m && size.y < 0.1 && !Array.isArray(m.material)) {
+        // the lawn's grass (flat, as wide as the lawn): its colour dresses the rising cubes' inner faces
+        const col = (m.material as Material & { color?: Color }).color;
+        if (size.x >= lawnW * 0.9 && col instanceof Color) grass = col.clone();
         // a road, the river, a dash, a path, a paving: each vertex rides its cube up
         m.material = riding(m.material);
+        // its vertices at most half a cube apart, so its slope follows the cubes under it (the old
+        // geometry may be shared: left as it is)
+        const k = Math.max(1e-6, Math.abs(m.matrixWorld.getMaxScaleOnAxis()));
+        m.geometry = finer(m.geometry, CELL / 2 / k);
         continue;
       }
       if (m && size.x >= lawnW * 0.9 && !Array.isArray(m.material)) {
@@ -234,7 +346,8 @@ export function makeEntry(): Entry {
       box.getSize(size);
       box.getCenter(centre);
       // the town's own box (its vertex colours, its bevel): a cube reads as a piece of the slab
-      const mesh = new InstancedMesh(STYLE.box(g.cw, size.y, g.cd), s.material as Material, cellsTimed.length);
+      const mat = s.material as Material;
+      const mesh = new InstancedMesh(STYLE.box(g.cw, size.y, g.cd), grass ? rimmed(mat, grass) : mat, cellsTimed.length);
       // no shadow of their own while they rise (a few hundred cubes in every shadow pass: the build stalled)
       mesh.castShadow = false;
       mesh.receiveShadow = s.receiveShadow;
@@ -336,6 +449,11 @@ export function makeEntry(): Entry {
       // loop's build (disposed, their program would compile again then: a stall)
     },
   };
+}
+
+/** the feed's opacity at ms of the build: none while the town grows, in as the camera leaves the wide */
+export function feedOpacity(ms: number): number {
+  return clamp01((ms - ENTRY.cam.from) / ENTRY.feedIn);
 }
 
 /** the words over the town (names, eggs, pills): their opacity at ms */

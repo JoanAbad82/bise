@@ -14,7 +14,7 @@ export type HeroEvent = 'control' | 'film' | 'ready' | 'lost';
 
 export interface MountOpts {
   readonly theme?: Theme;
-  /** the page's paper by theme (default bise.dev's: #f2ede2, #171513) */
+  /** the page's paper by theme (default bise.dev's: #f7f2e9, #24201c (designer 4523efc15)) */
   readonly ground?: { readonly light: string; readonly dark: string } | string;
   /** default: the system's prefers-reduced-motion */
   readonly reducedMotion?: boolean;
