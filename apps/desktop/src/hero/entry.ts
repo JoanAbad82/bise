@@ -6,7 +6,8 @@
 // their desks 30 ms apart (1800-), the words fade in last; the camera eases from the wide to the
 // film's first shot (2400-2800). Pure timing up top (tested), then what moves the renderer's loose
 // things (TownParts) each frame. Owner: hero-town.
-import { Box3, BoxGeometry, InstancedMesh, type Material, Matrix4, Mesh, type Object3D, Quaternion, Vector3, type WebGLProgramParametersWithUniforms } from 'three';
+import { Box3, InstancedMesh, type Material, Matrix4, Mesh, type Object3D, Quaternion, Vector3, type WebGLProgramParametersWithUniforms } from 'three';
+import { STYLE } from '@/bims/render/style';
 import type { TownParts } from '@/bims/town/types';
 
 /** the timeline, ms from 'ready' */
@@ -114,8 +115,6 @@ interface ScapeKit {
   readonly tiles: readonly { readonly mesh: InstancedMesh; readonly y: number }[];
   readonly cells: readonly { readonly x: number; readonly z: number; readonly start: number }[];
   readonly pops: readonly Pop[];
-  /** the cubes all settled: nothing of theirs to move any more */
-  settled: boolean;
 }
 
 export interface Entry {
@@ -232,7 +231,8 @@ export function makeEntry(): Entry {
       box.setFromObject(s);
       box.getSize(size);
       box.getCenter(centre);
-      const mesh = new InstancedMesh(new BoxGeometry(g.cw, size.y, g.cd), s.material as Material, cellsTimed.length);
+      // the town's own box (its vertex colours, its bevel): a cube reads as a piece of the slab
+      const mesh = new InstancedMesh(STYLE.box(g.cw, size.y, g.cd), s.material as Material, cellsTimed.length);
       mesh.castShadow = s.castShadow;
       mesh.receiveShadow = s.receiveShadow;
       mesh.frustumCulled = false;
@@ -240,7 +240,7 @@ export function makeEntry(): Entry {
       root.add(mesh);
       return { mesh, y: centre.y };
     });
-    const kit: ScapeKit = { tiles, cells: cellsTimed, pops, settled: false };
+    const kit: ScapeKit = { tiles, cells: cellsTimed, pops };
     scapes.set(root, kit);
     return kit;
   }
@@ -268,22 +268,19 @@ export function makeEntry(): Entry {
     p.o.scale.set(p.base.x * s, p.base.y * s, p.base.z * s);
   };
 
+  // every frame of the build, all of them: the unseen full frame before 'ready' sets them settled, frame 0 sets them back
   function moveTiles(k: ScapeKit, ms: number): void {
-    if (k.settled) return;
-    let all = true;
     for (const t of k.tiles) {
       for (let i = 0; i < k.cells.length; i++) {
         const c = k.cells[i];
         if (c === undefined) continue;
         const a = tileAt(ms, c.start);
-        if (a.s < 1 || a.y !== 0) all = false;
         p3.set(c.x, t.y + a.y, c.z);
         s3.setScalar(a.s);
         t.mesh.setMatrixAt(i, m4.compose(p3, q0, s3));
       }
       t.mesh.instanceMatrix.needsUpdate = true;
     }
-    k.settled = all && ms >= ENTRY.tiles.from + ENTRY.tiles.span + ENTRY.tiles.dur;
   }
 
   return {
