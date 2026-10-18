@@ -181,6 +181,30 @@ def main():
         rc, log, last, red = night(FAKE_GATE_RC="1", FAKE_COV_MAP="refuse")
         check(rc != 0 and red is not None and "e2e_fake" in red, "a red gate stays red whatever the map: %r" % red)
 
+        # launchd's PATH has no node (2026-10-18: desktop-checks and desktop-map 'node: No such
+        # file', exit 127): the script puts fnm's default alias dir (FNM_DIR) first, so an
+        # in-slot step finds node there
+        bare = "/usr/bin:/bin:/usr/sbin:/sbin"
+        fnm = os.path.join(t, "fnm")
+        os.makedirs(os.path.join(fnm, "aliases", "default", "bin"))
+        fake_node = os.path.join(fnm, "aliases", "default", "bin", "node")
+        with open(fake_node, "w") as f:
+            f.write("#!/bin/bash\necho \"fnm's node $*\"\n")
+        os.chmod(fake_node, 0o755)
+        rc, log, last, red = night(PATH=bare, FNM_DIR=fnm)
+        check(rc == 0 and red is None and "fnm's node " in log and "STEP desktop-checks: green" in log,
+              "no node on launchd's PATH: the steps find fnm's: rc %s, log %r" % (rc, log))
+        # no node at all: the product step that cannot run is a red night naming it, the owned
+        # tool's is no result (review-gates m_30808: 'no result' hid the harness checks)
+        rc, log, last, red = night(PATH=bare, FNM_DIR=os.path.join(t, "no-fnm"))
+        check(rc != 0 and last.split()[2] == "red" and "FAIL desktop-checks: cannot run (exit 127)" in log
+              and red is not None and "desktop-checks " in red,
+              "no node anywhere: desktop-checks red, cannot run: rc %s, last %r, red %r, log %r" % (rc, last, red, log))
+        check("STEP desktop-map: no result (exit 127: cannot run)" in log and "FAIL desktop-map" not in log,
+              "no node anywhere: the owned map is no result: %r" % log)
+        rc, log, last, red = night()
+        check(rc == 0 and red is None, "green again after: rc %s" % rc)
+
         # --tip: main's tip in a quiet slot, once per sha, never on a green one or a busy machine
         def tip_run(**fake):
             env = dict(env0, **dict({"TIP_GATE_MAX_LOAD": "100000"}, **fake))
@@ -239,7 +263,7 @@ def main():
     if FAILS:
         print("nightly_gate_test: FAIL\n  " + "\n  ".join(FAILS))
         return 1
-    print("nightly_gate_test: ok (6 nights, 5 tip runs)")
+    print("nightly_gate_test: ok (6 nights, the desktop steps, 5 tip runs)")
     return 0
 
 

@@ -52,6 +52,13 @@ main_tree="$(git -C "$here" worktree list --porcelain | sed -n '1s/^worktree //p
 out="${BISE_HOME:-$HOME/.bise}/run/nightly"
 mkdir -p "$out"
 plist="$HOME/Library/LaunchAgents/$LABEL.plist"
+# node and pnpm for the desktop steps: fnm's default alias (a stable path; fnm's per-shell
+# dirs are gone with their shell). launchd's PATH had neither: on 2026-10-18 desktop-checks
+# and desktop-map exited 127 'node: No such file', desktop-full red on 'pnpm: command not found'
+node_bin="${FNM_DIR:-$HOME/.local/share/fnm}/aliases/default/bin"
+[ -d "$node_bin" ] && PATH="$node_bin:$PATH"
+export PATH
+launchd_path="$HOME/.bend/bin:$HOME/.cargo/bin:$node_bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 if [ "${1:-}" = --install ]; then
   at="${2:-04:30}" h="${at%%:*}" m="${at##*:}"
@@ -65,7 +72,7 @@ if [ "${1:-}" = --install ]; then
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>$((10#$h))</integer><key>Minute</key><integer>$((10#$m))</integer></dict>
   <key>StandardOutPath</key><string>$out/launchd.out</string>
   <key>StandardErrorPath</key><string>$out/launchd.out</string>
-  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$HOME/.bend/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$launchd_path</string></dict>
 </dict></plist>
 EOF
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null
@@ -90,7 +97,7 @@ if [ "${1:-}" = --install-tip ]; then
   <key>StartInterval</key><integer>600</integer>
   <key>StandardOutPath</key><string>$out/tip-launchd.out</string>
   <key>StandardErrorPath</key><string>$out/tip-launchd.out</string>
-  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$HOME/.bend/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$launchd_path</string></dict>
 </dict></plist>
 EOF
   launchctl bootout "gui/$(id -u)/$TIP_LABEL" 2>/dev/null
@@ -130,9 +137,12 @@ if [ "${1:-}" = --in-slot ]; then
   rc=$?
   # the night's steps after the gate, in this tree and slot, in this order (fast-try p2, p5, p7).
   # night_step [--own <owner>] <name> <file> [<cmd>...]: skipped when <file> isn't in the tree;
-  # exit 0 green, 1 red: a "FAIL <name>" line (the red file names it) and the night is red; else
-  # no result. --own: a tool of the gate, not the product: its red is a "STEP <name>: red (owner
-  # <owner>)" line, the night keeps the gate's verdict (review-gates m_29697 #1)
+  # exit 0 green, 1 red: a "FAIL <name>" line (the red file names it) and the night is red; 126
+  # or 127 (its command not found or not runnable: a PATH without node) is red too, "FAIL <name>:
+  # cannot run": a product step that never ran proves nothing (desktop-checks is the one nightly
+  # run of the harness checks); else no result. --own: a tool of the gate, not the product: its
+  # red is a "STEP <name>: red (owner <owner>)" line, its 126/127 no result, the night keeps the
+  # gate's verdict (review-gates m_29697 #1)
   night_step() {
     local own=""
     [ "$1" = --own ] && { own=$2; shift 2; }
@@ -144,6 +154,8 @@ if [ "${1:-}" = --in-slot ]; then
       0) echo "STEP $n: green" ;;
       1) if [ -n "$own" ]; then echo "STEP $n: red (owner $own; not a product red)"
          else echo "FAIL $n"; echo "STEP $n: red"; rc=1; fi ;;
+      126|127) if [ -n "$own" ]; then echo "STEP $n: no result (exit $r: cannot run)"
+         else echo "FAIL $n: cannot run (exit $r)"; echo "STEP $n: red"; rc=1; fi ;;
       *) echo "STEP $n: no result (exit $r)" ;;
     esac
     return $r
@@ -219,7 +231,7 @@ if [ $rc = 0 ]; then
   echo "$day $sha green $((SECONDS - s))" >"$out/last"; rm -f "$out/red"
 else
   echo "$day $sha red $((SECONDS - s))" >"$out/last"
-  { echo "nightly full gate red on main $sha ($day, $((SECONDS - s)) s): $(grep -E '^FAIL ' "$log" | awk '{print $2}' | tr '\n' ' ')"
+  { echo "nightly full gate red on main $sha ($day, $((SECONDS - s)) s): $(grep -E '^FAIL ' "$log" | awk '{sub(/:$/, "", $2); print $2}' | tr '\n' ' ')"
     echo "log: $log"; } >"$out/red.tmp" && mv "$out/red.tmp" "$out/red"
 fi
 # old logs: two weeks
