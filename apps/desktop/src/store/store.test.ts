@@ -552,32 +552,36 @@ what is in this picture?`,
     expect(store.pending(K).map((p) => p.text)).toEqual(["one"]);
   });
 
-  it("cards: the hub's win over the projects row's; slices keep their reference until they change", () => {
+  it("cards: a project's are its projects row's, the one copy (inbox-sync); the same reference until they change", () => {
     const { store } = fake();
     replay(store, core_ev);
     replay(store, hub_ev);
+    const row = store.projects().find((r) => r.project === P);
     const cards = store.cards(P);
-    expect(cards.length).toBeGreaterThan(0);
-    store.apply({
-      ev: "projects",
-      projects: store.projects().map((r) => ({ ...r, cards: [] })),
-    });
+    expect(cards).toEqual(row?.cards ?? []);
+    // the same cards in a new rows event: the same array
+    store.apply({ ev: "projects", projects: store.projects().map((r) => ({ ...r, cards: r.cards?.map((c) => ({ ...c })) })) });
     expect(store.cards(P)).toBe(cards);
     expect(store.agents(P)).toBe(store.agents(P));
+    // the rows drop them: so does every reader, whatever the hub's last cards event said
+    store.apply({ ev: "projects", projects: store.projects().map((r) => ({ ...r, cards: [] })) });
+    expect(store.cards(P)).toEqual([]);
   });
 
-  it("cards: bise's own (`others`: a drop of an agent mid-turn) join his, by id, as the TUI's inbox", () => {
+  it("cards: a hub's own cards event changes nothing; the rows (his and bise's own by id, as the core lists them) do", () => {
     const { store } = fake();
+    replay(store, core_ev);
     const ask = "main suggests: archive @gone? the agent is mid-turn. (answer yes or no)";
     const q = { agent: "perf", id: 3, kind: "question", options: [], project: P, question: "which bench?", rank: 1, since_ms: 1, text: "which bench?", urgent: false };
     const drop = { agent: "gone", id: 2, kind: "drop", options: [], project: P, question: ask, rank: 4, since_ms: 2, text: ask, urgent: false };
+    const was = store.cards(P);
     store.apply({ ev: "cards", project: P, cards: [q], others: [drop] });
+    expect(store.cards(P)).toBe(was);
+    store.apply({ ev: "projects", projects: store.projects().map((r) => (r.project === P ? { ...r, cards: [drop, q] } : r)) });
     expect(store.cards(P).map((c) => [c.id, c.kind])).toEqual([
       [2, "drop"],
       [3, "question"],
     ]);
-    store.apply({ ev: "cards", project: P, cards: [q] });
-    expect(store.cards(P).map((c) => c.id)).toEqual([3]);
   });
 
   it("diffs are kept per agent and per commit; jobs, merged, worktrees per project", () => {

@@ -112,13 +112,14 @@ export function moreWords(folded: readonly Agent[], now: number): string {
 
 /**
  * A project row's right side: what goes wrong in words (err), else the number of its agents at
- * work ('3', dim: his m_25471, the count lost with '∿ n'), and his pink count. Quiet says nothing:
+ * work ('3', dim: his m_25471, the count lost with '∿ n'), and his pink count (`waiting`: the
+ * inbox's own count of that project, inbox/waiting.ts projectWaiting). Quiet says nothing:
  * its mark does (desktop-delight v2, Marks.tsx). Pure.
  */
-export function projectSide(p: ProjectRow, refused = false): { text: string; err: boolean; count: number } {
+export function projectSide(p: ProjectRow, refused = false, waiting = p.waits): { text: string; err: boolean; count: number } {
   if (p.missing === true) return { text: panel.folder_gone, err: true, count: 0 };
   if (refused) return { text: panel.refused, err: true, count: 0 };
-  return { text: p.working > 0 ? String(p.working) : '', err: false, count: p.waits };
+  return { text: p.working > 0 ? String(p.working) : '', err: false, count: waiting };
 }
 
 /**

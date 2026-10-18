@@ -1,0 +1,148 @@
+// inbox/answer-everywhere · his answer from the inbox screen closes the card in every view and every
+// count (inbox-sync: the card stayed open in the project's thread, its [1] stayed next to the
+// project and next to the inbox). Owner: amb-home.
+// The new app on the REAL core over the throwaway world (../world.ts; tests/checks/real.sh runs it):
+// two projects. He answers shop's gift-ui card on the inbox screen, then opens shop. Passes when the
+// hub closed it and, there and after the window's own 60 s hold on what he answered is past
+// (store/acted.ts ACTED_STALE_MS), no view draws it: not in shop's thread, not on the inbox screen,
+// and the sidebar's counts are the hubs' own (shop's pink count = shop's open cards, the inbox's = every
+// hub's, bise's notifications ask aside).
+import { test, expect, type Session } from '../../harness';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { hubOf, hubState, launchOn, realWorld, worldEnv, type World } from '../world';
+
+type HubCard = { id: number; project?: string; question?: string; text?: string };
+
+/**
+ * A hub's open cards, as the window's row lists them: his cards and bise's own (`others`); a hub
+ * that doesn't run: its last view.json's (what it wrote when it stopped).
+ */
+async function openCards(w: World, project: string): Promise<HubCard[]> {
+  const h = hubOf(w, project);
+  if (!existsSync(h.sock)) {
+    const view = path.join(path.dirname(h.sock), 'view.json');
+    return existsSync(view) ? ((JSON.parse(readFileSync(view, 'utf8')) as { cards?: HubCard[] }).cards ?? []) : [];
+  }
+  const st = await hubState(h.sock);
+  const cards = (st['cards'] as HubCard[] | undefined) ?? [];
+  const others = (st['others'] as HubCard[] | undefined) ?? [];
+  return [...cards, ...others];
+}
+
+/** A sidebar row's pink count (none drawn: 0). */
+async function countOf(s: Session, testId: string): Promise<number> {
+  const el = s.page.locator(`[data-testid="${testId}.count"]`);
+  return (await el.count()) === 0 ? 0 : Number((await el.first().textContent()) ?? '0');
+}
+
+/** What every surface says of the card and the counts, beside the hubs' truth. */
+async function surfaces(s: Session, w: World, name: string, shop: string, key: string, ask: number): Promise<Record<string, unknown>> {
+  const truth = await Promise.all(w.hubs.map(async (h) => (await openCards(w, h.project)).length));
+  const sum = truth.reduce((a, b) => a + b, 0);
+  return {
+    strip: await s.page.locator(`[data-testid="strip.card.${key}"]`).count(),
+    block: await s.page.locator(`[data-testid="inbox.block.card.${key}"]`).count(),
+    shopCount: await countOf(s, `app.sidebar.project.${shop}`),
+    shopTruth: (await openCards(w, name)).length,
+    // bise's ask is listed only beside a real item (inbox/Block.tsx asksNotify)
+    inboxCount: (await countOf(s, 'app.sidebar.inbox')) - (sum > 0 ? ask : 0),
+    inboxTruth: sum,
+  };
+}
+
+/** On a red: the hubs' open cards and the inbox screen's waiting rows, side by side. */
+async function why(s: Session, w: World): Promise<string> {
+  const hubs = await Promise.all(w.hubs.map(async (h) => `${h.project}: ${(await openCards(w, h.project)).map((c) => `#${String(c.id)} ${(c.question ?? c.text ?? '').slice(0, 40)}`).join(' | ')}`));
+  await s.page.locator('[data-testid="app.sidebar.inbox"]').click();
+  await s.page.waitForTimeout(1000);
+  const rows = await s.page.locator('[data-testid^="inbox.row.w:"]').evaluateAll((els) => els.filter((e) => /^inbox\.row\.w:[^.]+$/u.test(e.getAttribute('data-testid') ?? '')).map((e) => `${e.getAttribute('data-testid') ?? ''}: ${e.textContent.slice(0, 80)}`));
+  return `hubs:\n  ${hubs.join('\n  ')}\ninbox screen:\n  ${rows.join('\n  ')}`;
+}
+
+const settled = (r: Record<string, unknown>): boolean =>
+  r['strip'] === 0 && r['block'] === 0 && r['shopCount'] === r['shopTruth'] && r['inboxCount'] === r['inboxTruth'];
+
+/** What the case does before he answers. */
+type Before = 'none' | 'visit' | 'stopped';
+
+/**
+ * He answers `name`'s card asking `question` (its option `n`) on the inbox screen, then opens
+ * `name`'s thread from the sidebar: every surface reads the hubs, at once and 65 s on.
+ * `visit`: he opened that project's thread first; `stopped`: its hub is stopped before the window opens.
+ */
+async function answerThenOpen(name: string, question: string, n: number, before: Before): Promise<void> {
+  const w = realWorld();
+  const sock = hubOf(w, name).sock;
+  const project = path.basename(path.dirname(sock));
+  const card = (await openCards(w, name)).find((c) => (c.question ?? c.text ?? '').includes(question));
+  expect(card, `${name}'s card '${question}' is open in the world`).toBeDefined();
+  const key = `${project}-${String(card?.id ?? 0)}`;
+  // the inbox screen's waiting row (inbox/past.ts waitKey)
+  const wkey = `w:${project}/${String(card?.id ?? 0)}`;
+  if (before === 'stopped') {
+    execFileSync(w.bise, ['switchboard', '--stop'], { cwd: hubOf(w, name).ws, env: { ...process.env, ...worldEnv(w) }, timeout: 30_000, stdio: 'ignore' });
+  }
+
+  const s = await launchOn(w, before === 'visit' ? `project/${project}` : 'inbox/all', before === 'visit' ? '[data-testid="composer.field"]' : '[data-testid="inbox.screen"]');
+  try {
+    const { page } = s;
+    if (before === 'visit') {
+      await expect(page.locator('[data-testid="thread.list"]')).toBeVisible({ timeout: 20_000 });
+      await expect(page.locator(`[data-testid="strip.card.${key}"], [data-testid="inbox.block"]`).first(), 'the card waits in its thread').toBeVisible({ timeout: 20_000 });
+      await page.locator('[data-testid="app.sidebar.inbox"]').click();
+    }
+    // 1. the inbox screen: its row, opened above the composer, his pick n
+    const row = page.locator(`[data-testid="inbox.row.${wkey}"]`);
+    await expect(row, 'the card waits on the inbox screen').toBeVisible({ timeout: 30_000 });
+    // bise's own 'let questions reach you as macOS notifications?' ask is one of the inbox's items
+    // (inbox/waiting.ts): counted beside the hubs' cards
+    const home = (await hubState(hubOf(w, 'bise').sock))['project'] as string;
+    const ask = await page.locator(`[data-testid="inbox.row.w:${home}/-1"]`).count();
+    await row.click();
+    const open = page.locator('[data-testid^="inbox.block.open."]', { hasText: question });
+    await expect(open, 'the card opens to answer').toBeVisible({ timeout: 10_000 });
+    await open.locator(`[data-testid$=".opt.${String(n)}"]`).first().click();
+    const answeredAt = Date.now();
+    await expect.poll(async () => (await openCards(w, name)).some((c) => c.id === card?.id), { message: 'the hub closed it', timeout: 30_000 }).toBe(false);
+    await expect(row, 'gone from the inbox screen').toHaveCount(0, { timeout: 10_000 });
+
+    // 2. the project's thread, from the sidebar
+    await page.locator(`[data-testid="app.sidebar.project.${project}"]`).click();
+    await expect(page.locator('[data-testid="thread.list"]')).toBeVisible({ timeout: 20_000 });
+    let last: Record<string, unknown> = {};
+    const reads = async (): Promise<boolean> => settled((last = await surfaces(s, w, name, project, key, ask)));
+    const ok = await expect.poll(reads, { message: `every surface reads the hubs (in ${name})`, timeout: 20_000 }).toBe(true).then(() => '', (e: unknown) => String(e));
+    if (ok !== '') throw new Error(`${ok}\nlast read: ${JSON.stringify(last)}\n${await why(s, w)}`);
+    await page.screenshot({ path: test.info().outputPath(`${name}-${before}-after.png`) });
+
+    // 3. past the window's own hold on his answer: the rows alone say it
+    const left = answeredAt + 65_000 - Date.now();
+    if (left > 0) await page.waitForTimeout(left);
+    const late = await surfaces(s, w, name, project, key, ask);
+    await page.screenshot({ path: test.info().outputPath(`${name}-${before}-late.png`) });
+    if (!settled(late)) throw new Error(`every surface reads the hubs, 65 s on: ${JSON.stringify(late)}\n${await why(s, w)}`);
+    await page.locator('[data-testid="app.sidebar.inbox"]').click();
+    await expect(page.locator(`[data-testid="inbox.row.${wkey}"]`), 'not back on the inbox screen').toHaveCount(0);
+  } finally {
+    await s.close();
+  }
+}
+
+test.describe.configure({ mode: 'serial' });
+
+test('inbox/answer-everywhere: from the inbox screen, its hub running', async () => {
+  test.setTimeout(300_000);
+  await answerThenOpen('shop', 'gift cards', 2, 'none');
+});
+
+test('inbox/answer-everywhere: from the inbox screen after a visit to its thread', async () => {
+  test.setTimeout(300_000);
+  await answerThenOpen('shop', 'merge checkout into main', 2, 'visit');
+});
+
+test('inbox/answer-everywhere: from the inbox screen, its hub stopped', async () => {
+  test.setTimeout(300_000);
+  await answerThenOpen('telemetry', 'which window for the p99 alert', 1, 'stopped');
+});

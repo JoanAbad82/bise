@@ -94,7 +94,8 @@ export function useAgentPreview(sel: { readonly id: string; readonly project: st
 export function useSpotData(front: SpotFront | null): SpotData {
   const store = useStore();
   const projects = useProjects();
-  const keys = projects.flatMap((p) => [`agents:${p.project}`, `cards:${p.project}`]).join('|');
+  // a project's cards are its row's (store reads.ts cards): 'projects' tells them
+  const keys = ['projects', ...projects.map((p) => `agents:${p.project}`)].join('|');
   const subscribe = useCallback(
     (cb: () => void) => {
       const offs = keys === '' ? [] : keys.split('|').map((k) => store.subscribe(k, cb));

@@ -99,12 +99,18 @@ const answerOf = (cmd) => {
 
 /**
  * answer(cmd): the lines to write back for a command the app sent (a fake core answering a
- * subscribe). rpc: { hubEvs } to speak JSON-RPC (the core stub).
+ * subscribe). rpc: { hubEvs } to speak JSON-RPC (the core stub). follow(line): the lines to send
+ * right after each line that goes out (the core stub: its rows after a hub's cards).
  */
-export function runStub({ start = [], sock, log, quitCmd, answer, rpc }) {
+export function runStub({ start = [], sock, log, quitCmd, answer, rpc, follow }) {
   const write = (line) => process.stdout.write(line + NL);
   const side = rpc ? rpcSide(write, rpc.hubEvs) : null;
-  const out = side ? side.out : write;
+  const sent = side ? side.out : write;
+  // follow(line): the lines a real core sends right after that one (the core stub's rows on a cards event)
+  const out = (line) => {
+    sent(line);
+    for (const l of follow?.(line) ?? []) sent(l);
+  };
   for (const l of start) out(typeof l === 'string' ? l : JSON.stringify(l));
   // a test's {"harness":"exit","code":n} line ends this process with that code (a core that
   // stops: the app restarts it, amb-win's app/keep); any other line goes out as is

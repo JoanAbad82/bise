@@ -103,12 +103,8 @@ export function useSigninWaiting(projects: readonly ProjectRow[]): readonly stri
   const store = useStore();
   const ids = projects.map((p) => p.project).join('\n');
   const joined = useSyncExternalStore(
-    (cb) => {
-      const offs = ids === '' ? [] : ids.split('\n').map((p) => store.subscribe(`cards:${p}`, cb));
-      return () => {
-        for (const off of offs) off();
-      };
-    },
+    // a project's cards are its row's (store reads.ts cards)
+    (cb) => store.subscribe('projects', cb),
     // a string: the same names give the same snapshot (no new array each read)
     () => {
       for (const p of ids === '' ? [] : ids.split('\n')) {

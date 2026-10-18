@@ -29,6 +29,20 @@ export function waitingCount(list: readonly Card[], rows: readonly Pick<ProjectR
   return list.length + rows.reduce((n, r) => n + (r.cards == null ? r.waits : 0), 0);
 }
 
+/**
+ * How many wait in one project: its items in the inbox's own list (its row's cards minus what he
+ * just answered or closed here), or the row's `waits` when it carries no cards. The sidebar's count
+ * next to the project, the same derivation as the inbox's (inbox-sync). Pure.
+ */
+export function projectWaiting(list: readonly Pick<Card, 'project'>[], row: Pick<ProjectRow, 'project' | 'cards' | 'waits'>): number {
+  return row.cards == null ? row.waits : list.reduce((n, c) => n + (c.project === row.project ? 1 : 0), 0);
+}
+
+/** One project's count, from the inbox's own list (projectWaiting). */
+export function useProjectWaiting(row: Pick<ProjectRow, 'project' | 'cards' | 'waits'>): number {
+  return projectWaiting(useInboxItems(), row);
+}
+
 /** The one number (the sidebar's pink count, the title bar's 'N waiting'). */
 export function useWaitingCount(): number {
   return waitingCount(useWaitingList(), useProjects());

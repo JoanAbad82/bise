@@ -15,7 +15,7 @@ import type { ProjectRow } from '@/proto';
 import { panel } from '@/proto/words_panel.gen';
 import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
-import { useWaitingCount } from '@/inbox/waiting';
+import { useProjectWaiting, useWaitingCount } from '@/inbox/waiting';
 import { useNow } from './clock';
 import { menuGroupsOf } from './projmenu';
 import { MAIN, projectOf, type Route } from './route';
@@ -253,7 +253,8 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
 const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: ProjectRow; on: boolean; route: Route; hint: number | undefined }) {
   const router = useRouter();
   const refused = useHubRefused(p.project) !== null;
-  const side = projectSide(p, refused);
+  // his pink count: the inbox's own items of this project (what he just answered left out), never the row's raw count
+  const side = projectSide(p, refused, useProjectWaiting(p));
   const who = whoOf(useAgents(p.project));
   const [menu, setMenu] = useState(false);
   const more = useRef<HTMLButtonElement>(null);

@@ -31,14 +31,6 @@ export function applyTyped(s: Store, ev: Ev): void {
       // the hub's rows (HubFacts), then the cards he acted on that they dropped come back to
       // nothing (machine/cards.ts)
       s.rowsCame(ev);
-      for (const row of ev.projects) {
-        if (
-          row.cards !== undefined &&
-          !s.slices.has(`hubcards:${row.project}`)
-        ) {
-          s.put(`cards:${row.project}`, row.cards);
-        }
-      }
       return;
     case "agents":
       s.put(`agents:${ev.project}`, ev.agents);
@@ -46,16 +38,10 @@ export function applyTyped(s: Store, ev: Ev): void {
       s.put(`places:${ev.project}`, ev.places ?? EMPTY);
       return;
     case "cards":
-      s.slices.set(`hubcards:${ev.project}`, true);
-      // his cards and bise's own (`others`: a drop asking him, a done, a merge...) in one
-      // list by id, as the TUI's inbox (state_rows::cards_of_rows): a drop of an agent
-      // mid-turn is a question for him, and only `others` carries it
-      s.put(
-        `cards:${ev.project}`,
-        (ev.others ?? []).length === 0
-          ? ev.cards
-          : [...ev.cards, ...(ev.others ?? [])].sort((a, b) => a.id - b.id),
-      );
+      // nothing here reads a hub's own cards event: a project's cards are its `projects` row's
+      // (the core's list of the same rows, his and bise's own by id: core/hubs.rs inbox_cards),
+      // the one copy every view and count reads (inbox-sync: a copy of the last event froze once
+      // the core no longer held that hub, the card stayed in its thread)
       return;
     case "thread":
       s.page(ev);

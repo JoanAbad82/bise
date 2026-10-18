@@ -82,7 +82,8 @@ export const useProjects = (): readonly ProjectRow[] => useSlice('projects', (s)
 /** Why this core can start no hub (its runtime is missing); null: it can. */
 export const useBroken = (): string | null => useSlice('broken', (s) => s.broken());
 export const useAgents = (project: string): readonly Agent[] => useSlice(`agents:${project}`, (s) => s.agents(project));
-export const useCards = (project: string): readonly Card[] => useSlice(`cards:${project}`, (s) => s.cards(project));
+/** A project's open cards: its `projects` row's, the one copy every view and count reads. */
+export const useCards = (project: string): readonly Card[] => useSlice('projects', (s) => s.cards(project));
 export const useVoiceAnswer = (): EvOf<'voice_answer'> | null => useSlice('voice_answer', (s) => s.voiceAnswer());
 export const useConfirms = (project: string): readonly Confirm[] => useSlice(`confirms:${project}`, (s) => s.confirms(project));
 export const useNotice = (project: string): HubLine | null => useSlice(`notice:${project}`, (s) => s.notice(project));

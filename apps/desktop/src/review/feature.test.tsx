@@ -110,7 +110,8 @@ describe('the feature screen', () => {
   it('merge answers its card; drop asks once more, keep it goes back, drop it answers 3', () => {
     const { store, cmds, wrap } = setup();
     act(() => {
-      store.apply({ ev: 'cards', project: P, cards: [mergeCard] });
+      // a project's cards are its row's (the one copy, store reads.ts cards)
+      store.apply({ ev: 'projects', projects: store.projects().map((r) => (r.project === P ? { ...r, cards: [mergeCard] } : r)) });
     });
     const v = render(wrap(<FeatureScreen project={P} name="gift-cards" />));
     fireEvent.click(v.getByTestId('feature.drop'));

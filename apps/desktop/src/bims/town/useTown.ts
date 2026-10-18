@@ -50,7 +50,7 @@ export function useTownProjects(): readonly TownProject[] {
   return useSyncExternalStore(
     (cb) => {
       const keys = ['projects', 'prefs', 'index'];
-      for (const p of all(store)) keys.push(`agents:${p.project}`, `cards:${p.project}`, `places:${p.project}`, `growth:${p.project}`);
+      for (const p of all(store)) keys.push(`agents:${p.project}`, `places:${p.project}`, `growth:${p.project}`);
       const offs = keys.map((k) => store.subscribe(k, cb));
       return () => {
         for (const off of offs) off();

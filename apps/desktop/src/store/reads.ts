@@ -43,6 +43,7 @@ import {
   type PagesList,
   type PrsList,
   type QueuedTake,
+  sameJson,
   type TalkShot,
   takeKey,
   EMPTY_ORDER,
@@ -64,10 +65,20 @@ export class StoreReads extends StoreBase {
   agents(project: string): readonly Agent[] {
     return this.slice(`agents:${project}`, EMPTY);
   }
-  /** The hub's cards when it sent them, else the projects row's. */
+  /**
+   * The project's open cards: its `projects` row's (HubFacts.rows, his and bise's own by id), the
+   * one copy the inbox and every count read too (inbox-sync). The same array until they change
+   * (a reader subscribes to 'projects').
+   */
   cards(project: string): readonly Card[] {
-    return this.slice(`cards:${project}`, EMPTY);
+    const now = this.facts.rows.find((r) => r.project === project)?.cards ?? EMPTY;
+    const was = this.cardsOf.get(project);
+    if (was !== undefined && (was === now || sameJson(was, now))) return was;
+    this.cardsOf.set(project, now);
+    return now;
   }
+  /** cards()'s last answer per project, so a new rows event with the same cards keeps the reference */
+  private readonly cardsOf = new Map<string, readonly Card[]>();
   /** the last answer by voice the core heard (bar N14), null: none */
   voiceAnswer(): EvOf<"voice_answer"> | null {
     return this.slice<EvOf<"voice_answer"> | null>("voice_answer", null);

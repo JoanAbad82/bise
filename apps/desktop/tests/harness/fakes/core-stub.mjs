@@ -80,8 +80,47 @@ function answer(cmd) {
     default: return [];
   }
 }
+// The real core lists a held hub's cards in its `projects` rows in the same beat it forwards that
+// hub's `cards` (core/hubs.rs project_ev: emit_projects after 'cards'; his cards and bise's own by
+// id, inbox_cards); the window reads the rows only (inbox-sync). So does the stub: a start row that
+// says nothing of its cards gets its hub's from the start world (a row that lists them keeps what
+// the test wrote), and a `cards` line a test sends later is followed by the rows it changes.
+// One card per id, his first (a hub's ids are its own; the fixtures' hub_ev reuses #11 in `others`).
+const cardsOf = (ev) => {
+  const all = [...ev.cards, ...(ev.others ?? [])];
+  return all.filter((c, i) => all.findIndex((x) => x.id === c.id) === i).sort((a, b) => a.id - b.id);
+};
+const withCards = (list, byProject, onlyUnsaid = false) =>
+  list.map((r) => (byProject.has(r.project) && !(onlyUnsaid && r.cards !== undefined) ? { ...r, cards: byProject.get(r.project), waits: byProject.get(r.project).length } : r));
+const held = new Map(evs.filter((ev) => ev.ev === 'cards' && typeof ev.project === 'string' && Array.isArray(ev.cards)).map((ev) => [ev.project, cardsOf(ev)]));
+const startLines = start
+  .filter((l) => JSON.parse(l).ev !== 'transcript')
+  .map((l) => {
+    const ev = JSON.parse(l);
+    return ev.ev === 'projects' && Array.isArray(ev.projects) && held.size > 0 ? JSON.stringify({ ...ev, projects: withCards(ev.projects, held, true) }) : l;
+  });
+let rows = null;
+let seen = 0;
+function follow(line) {
+  seen += 1;
+  let ev;
+  try { ev = JSON.parse(line); } catch { return []; }
+  if (ev?.ev === 'projects' && Array.isArray(ev.projects)) {
+    rows = ev.projects;
+    return [];
+  }
+  // the start world's own cards are in its rows already
+  if (seen <= startLines.length) return [];
+  if (ev?.ev !== 'cards' || typeof ev.project !== 'string' || !Array.isArray(ev.cards) || rows === null) return [];
+  if (!rows.some((r) => r.project === ev.project)) return [];
+  const next = withCards(rows, new Map([[ev.project, cardsOf(ev)]]));
+  if (JSON.stringify(next) === JSON.stringify(rows)) return [];
+  rows = next;
+  return [JSON.stringify({ ev: 'projects', projects: rows })];
+}
+
 // JSON-RPC like `ambient-core`: the HubEv tags (hub/<tag>) from the generated names
 const NAMES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'src', 'proto', 'app_methods.gen.ts');
 const notes = JSON.parse(/export const NOTIFICATIONS = (\[.*\]) as const;/.exec(readFileSync(NAMES, 'utf8'))[1]);
 const hubEvs = notes.filter((n) => n.startsWith('hub/')).map((n) => n.slice(4));
-runStub({ start: start.filter((l) => JSON.parse(l).ev !== 'transcript'), sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG, answer, rpc: { hubEvs } });
+runStub({ start: startLines, sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG, answer, rpc: { hubEvs }, follow });
