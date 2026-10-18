@@ -7,7 +7,7 @@
 // Today the window is the Store: its port is an outbox (a sink: it answers nothing and holds no
 // state; the hub's answers come in through given()). When state-machine's step lands (fast-try
 // p4), the outbox becomes step's outputs and only this file changes, never a test.
-import { Latest, Store, type AnswerFrom, type Effect, type InboxItem } from './app';
+import { Latest, Store, threadKey, type AnswerFrom, type Effect, type InboxItem, type Pending } from './app';
 import type { Cmd, Gesture, Here, Input } from './inputs';
 
 export interface Feature {
@@ -29,6 +29,8 @@ export interface Feature {
     inbox(): readonly InboxItem[];
     /** A message of his is still on its way (a pending row sending: store.sending, the app's update waits on it). */
     sending(): boolean;
+    /** A thread's rows of his messages not echoed yet, oldest first: sending, or failed with why (the store's pending, ThreadRows' usePending). */
+    pending(project: string, agent: string): readonly Pending[];
   };
 }
 
@@ -76,12 +78,23 @@ export function feature(now = 1_791_100_000_000): Feature {
         store.shown([g.project]);
         store.subscribeThread(g.project, g.agent);
         return;
+      case 'resend':
+        store.retry(threadKey(g.project, g.agent), g.cid);
+        return;
+      case 'dismiss':
+        store.dismiss(threadKey(g.project, g.agent), g.cid);
+        return;
     }
   };
 
   const f: Feature = {
     given(...inputs) {
       for (const i of inputs) {
+        // the core's state comes from main's onState (hooks.ts setCore), never as an event
+        if (i.ev === 'core_state') {
+          store.setCore(i.state);
+          continue;
+        }
         latest.keep(i as unknown as Record<string, unknown>);
         store.apply(i);
       }
@@ -105,6 +118,7 @@ export function feature(now = 1_791_100_000_000): Feature {
     view: {
       inbox: () => store.inboxItems(),
       sending: () => store.sending(),
+      pending: (project, agent) => store.pending(threadKey(project, agent)),
     },
   };
   return f;

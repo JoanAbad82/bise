@@ -5,7 +5,7 @@
 export type { AnswerResult, Card, CoreEv, HubEv, ProjectRow } from '@/proto';
 export type { CoreCmd } from '@/shared/api';
 export { core_ev, hub_ev } from '@/proto/fixtures.gen';
-export { Store, type AnswerFrom } from '@/store';
+export { Store, threadKey, type AnswerFrom, type Pending } from '@/store';
 export { Latest } from '@/shared/latest';
 // the screens' views: the store's own (architect m_29407, m_29221 #2), the ones their components draw from
 export type { InboxItem } from '@/inbox/listed';

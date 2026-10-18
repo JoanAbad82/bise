@@ -92,8 +92,26 @@ export const cardRefused = (project: string, card: number, text: string): CardRe
 export const sent = (project: string, agent: string, cid: number, msgId: number | null = null): SentEv =>
   ({ ev: 'sent', project, agent, cid, msg_id: msgId });
 
-/** Anything given to the window: a core or hub event, or main's window-local answer. */
-export type Input = Ev | LocalEv;
+/** Main says the core's state (CorePort.onState: up, or down after it exited). */
+export interface CoreStateIn {
+  readonly ev: 'core_state';
+  readonly state: 'up' | 'down';
+}
+export const coreDown = (): CoreStateIn => ({ ev: 'core_state', state: 'down' });
+export const coreUp = (): CoreStateIn => ({ ev: 'core_state', state: 'up' });
+
+/** Anything given to the window: a core or hub event, main's window-local answer, or the core's state. */
+export type Input = Ev | LocalEv | CoreStateIn;
+
+/** His own message as the hub writes it in the thread (his echo): `text`, its message id (null: an older transcript). */
+export function said(project: string, agent: string, pos: number, text: string, msgId: number | null, atMs: number): EvOf<'entry'> {
+  return ev('entry', { project, agent, entry: { kind: 'you', pos, at_ms: atMs, text, ...(msgId === null ? {} : { msg_id: msgId }) } });
+}
+
+/** The hub (or the core for it) refused his send: with its cid (G), or none (an older core: the project's oldest). */
+export function sendError(project: string, text: string, cid: number | null, reason?: 'refused' | 'undelivered'): EvOf<'error'> {
+  return ev('error', { project, cmd: 'send', text, ...(cid === null ? {} : { cid }), ...(reason === undefined ? {} : { reason }) });
+}
 
 // ---- his gestures (what he does; run.ts turns each into the app's own call)
 
@@ -106,7 +124,8 @@ export type Gesture =
   | { readonly g: 'retry'; readonly project: string; readonly card: number }
   | { readonly g: 'pick'; readonly project: string; readonly card: number; readonly n: number; readonly from?: Here }
   | { readonly g: 'send'; readonly project: string; readonly agent: string; readonly text: string }
-  | { readonly g: 'open'; readonly project: string; readonly agent: string };
+  | { readonly g: 'open'; readonly project: string; readonly agent: string }
+  | { readonly g: 'resend' | 'dismiss'; readonly project: string; readonly agent: string; readonly cid: number };
 
 export const answer = (project: string, card: number, reply: string, from?: Here): Gesture =>
   ({ g: 'answer', project, card, reply, ...(from === undefined ? {} : { from }) });
@@ -117,6 +136,10 @@ export const pick = (project: string, card: number, n: number, from?: Here): Ges
 export const send = (project: string, agent: string, text: string): Gesture => ({ g: 'send', project, agent, text });
 /** He switches to that project's agent's thread (the sidebar, a link, ⌘1-9). */
 export const open = (project: string, agent = 'main'): Gesture => ({ g: 'open', project, agent });
+/** 'try again' on his failed message (its row's cid, as the row shows it). */
+export const resend = (project: string, agent: string, cid: number): Gesture => ({ g: 'resend', project, agent, cid });
+/** He drops his failed message. */
+export const dismiss = (project: string, agent: string, cid: number): Gesture => ({ g: 'dismiss', project, agent, cid });
 
 /** A command that left the window for the core (bise-proto's AppCmd | HubCmd). */
 export type Cmd = CoreCmd;
