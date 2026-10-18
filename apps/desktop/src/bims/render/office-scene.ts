@@ -71,6 +71,16 @@ export interface OfficeScene {
   dispose(): void;
 }
 
+/** a newcomer's pop in, s */
+export const APPEAR_S = 0.45;
+
+/** the pop's scale at p in [0, 1]: an ease-out a little past 1 (back, ~6%), then settled. Pure. */
+export function appearOut(p: number): number {
+  const c = 1.3;
+  const y = Math.min(1, Math.max(0, p)) - 1;
+  return 1 + (c + 1) * y ** 3 + c * y * y;
+}
+
 /** `ground`: its floating grass block (false in the town: its lawn is the ground) */
 export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } = {}): OfficeScene {
   const ground = o.ground ?? true;
@@ -97,6 +107,12 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
   haloGeo.rotateX(-Math.PI / 2);
   const haloMat = new MeshBasicMaterial({ color: HALO.day, transparent: true, opacity: HALO.alpha, depthWrite: false });
   const halos = new Map<string, Mesh>();
+  // a bim that comes in while the office is open pops in (Gabriel's review, main m_31507: the hero and
+  // the app): from the scale of nothing, a little past its size, settled in APPEAR_S. The ones there
+  // when the office opens are simply there.
+  const shownLast = new Set<string>();
+  const appearing = new Map<string, number>();
+  let primed = false;
 
   /** the office's map's look (the loft before an office) */
   function mapLook(): MapLook {
@@ -287,12 +303,23 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
         const skater = park && !look.reduced ? skateRig(f.name, f.pose, park, b.outfit.phase) : null;
         const rig = eggRig(skater ?? rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced }), f.egg ?? null);
         b.apply(rig);
+        if (primed && !look.reduced && !shownLast.has(f.name) && !appearing.has(f.name)) appearing.set(f.name, t);
+        const since = appearing.get(f.name);
+        if (since !== undefined) {
+          const p = (t - since) / APPEAR_S;
+          b.group.scale.setScalar(p >= 1 ? 1 : Math.max(1e-3, appearOut(p)));
+          if (p >= 1) appearing.delete(f.name);
+        }
         rigs.set(f.name, rig);
         seen.add(f.name);
         motion = louder(motion, rig.motion);
         onRig?.(f, rig, skater !== null);
       }
       for (const [name, b] of bims) if (!seen.has(name)) b.group.visible = false;
+      shownLast.clear();
+      for (const name of seen) shownLast.add(name);
+      if (frames.length > 0) primed = true;
+      if (appearing.size > 0) motion = 'walk';
       drawHalos(frames, look.night);
       for (const [name, d] of world.desks) {
         const rig = rigs.get(name);
