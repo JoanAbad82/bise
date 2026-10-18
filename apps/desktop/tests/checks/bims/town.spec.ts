@@ -397,7 +397,7 @@ async function drawnFaults(s: Session, where: string): Promise<string[]> {
   return out;
 }
 
-// 12 and 20: the check; 3 and 25 (20 drawn, TOWN_MAX): bims' shots too
+// 12 and 20: the check; 3 and 25: bims' shots too
 for (const n of [3, 12, 20, 25]) {
   test(`(town) ${String(n)} projects, a camera path: every office in view drawn whole, on its own ground`, async () => {
     const ps = fakes(n);
@@ -408,7 +408,7 @@ for (const n of [3, 12, 20, 25]) {
       const faults: string[] = [...(await drawnFaults(s, 'fit'))];
       await shot(s, 'app.right.bims.town', `town-${String(n)}-path-fit.png`, `town, ${String(n)} projects, the whole town`, 'every office drawn, the ones nearest the camera (bottom) too');
       const all = await drawnNow(s);
-      expect(all.length, 'the offices drawn (TOWN_MAX at most)').toBeGreaterThan(Math.min(n, 12));
+      expect(all.length, "one office per project, bise's home among them").toBe(n + 1);
       expect(all.filter((d) => !d.inView).map((d) => d.id), 'at the fit every office is in view').toEqual([]);
       const near = Math.min(...all.map((d) => (d.depth ? d.depth.min - d.depth.near : 999)));
       console.log(`town ${String(n)}: nearest office ${near.toFixed(1)} past the near plane`);

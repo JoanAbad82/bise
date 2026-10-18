@@ -7,7 +7,7 @@
 // each door straight to the road, a footbridge where it meets the river; trees in clumps and a few
 // houses go only where nothing else is. `crossings` counts the road and river points inside an
 // office (with their half widths): the plan keeps the first of a few seeds where both are 0
-// (town/plan.test.ts checks 1..20 projects). Pure, no three, no DOM. Owner: maps-e.
+// (town/plan.test.ts checks 1..40 projects). Pure, no three, no DOM. Owner: maps-e.
 import type { Pt } from '../model';
 
 /** a floor rectangle, office units */
@@ -101,8 +101,8 @@ export const BANK = 1.8;
 export const RIVER_GAP = 11;
 /** the spacing of the road's and the river's points */
 export const ROAD_STEP = 0.5;
-/** at most this many offices in the town (page bims-maps v9: past ~20, the active ones) */
-export const TOWN_MAX = 20;
+/** at most this many offices in the town, past it the active ones (page bims-maps v9 said ~20; town-fix, main m_31335: 40, the town grows to hold a new project) */
+export const TOWN_MAX = 40;
 /** the margins `crossings` keeps from an office: the road's and the river's half widths and a little */
 const ROAD_KEEP = ROAD + 0.3;
 const RIVER_KEEP = BANK - 0.2;
