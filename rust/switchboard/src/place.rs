@@ -435,6 +435,7 @@ mod tests {
             dropped: false,
             place: id.map(Into::into),
             feature: None,
+            state: None,
         }
     }
 

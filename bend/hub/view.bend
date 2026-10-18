@@ -218,6 +218,8 @@ def ev_names(e: M.Ev) -> List<&2, String>:
       [name]
     case M.ESnapshot{+name, _}:
       [name]
+    case M.EPlaced{+name, _, _}:
+      [name]
     case M.EDeclared{+name, _, _}:
       [name]
     case M.EReported{+name, _}:

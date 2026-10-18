@@ -1,0 +1,80 @@
+//! The worktrees sb-core asks for, made and removed off the hub's loop
+//! (hub-loop, docs/issues/32). Before, sb-core's `worktree_create` and
+//! `worktree_drop` were git queries the loop answered inside the step:
+//! `git worktree add` (a checkout of the whole tree, 2-10 s on his repo)
+//! and `git worktree remove` held every agent's `sb` meanwhile. Now
+//! sb-core decides and commits first (bend/hub/place.bend), and its fx
+//! (`Effect::Place`) comes here: one worker thread runs the jobs in order
+//! (one git at a time on the repo, as before), with its own `GitEnv`; a
+//! made worktree goes back to the loop as `Msg::Placed`, which steps
+//! sb-core's `placed`.
+//!
+//! Owns: the worker and its queue. Not here: what to make or remove and
+//! what follows (sb-core), how (worktree.rs `GitEnv`).
+
+use super::*;
+use crate::core::{Env, Loss};
+use crate::model::Workspace;
+use crate::place_job::Job;
+
+/// The loop's side: the worker's door.
+pub(super) struct PlaceWork {
+    to_worker: Sender<Job>,
+}
+
+impl PlaceWork {
+    /// The worker, sending what it made on `to_loop`.
+    pub(super) fn start(paths: &Paths, to_loop: Sender<Msg>) -> PlaceWork {
+        let (to_worker, rx) = channel();
+        let paths = paths.clone();
+        std::thread::spawn(move || worker(rx, paths, to_loop));
+        PlaceWork { to_worker }
+    }
+
+    /// One job, after the ones already asked.
+    pub(super) fn run(&self, j: Job) {
+        let _ = self.to_worker.send(j);
+    }
+}
+
+/// The hub's git, for one job (its config read now: a change of
+/// `.switchboard/config.toml` counts from the next worktree).
+fn git_env(paths: &Paths) -> GitEnv {
+    let log_paths = paths.clone();
+    GitEnv {
+        paths: paths.clone(),
+        config: Config::load(paths),
+        log: Box::new(move |s| log_line(&log_paths, s)),
+        merged: BTreeMap::new(),
+        git_memo: None,
+    }
+}
+
+fn worker(rx: Receiver<Job>, paths: Paths, to_loop: Sender<Msg>) {
+    for j in rx {
+        let mut env = git_env(&paths);
+        match j {
+            Job::Create { name, with_changes } => {
+                let t0 = now_ms();
+                let (ws, err) = match env.worktree_create(&name, with_changes) {
+                    Ok(ws) => (serde_json::to_value(ws).unwrap_or(Value::Null), String::new()),
+                    Err(e) => (Value::Null, e),
+                };
+                log_line(&paths, &format!("worktree of {} made off the loop in {} ms{}", name, now_ms().saturating_sub(t0), if err.is_empty() { String::new() } else { format!(": {err}") }));
+                if to_loop.send(Msg::Placed { name, ws, err }).is_err() {
+                    return;
+                }
+            }
+            Job::Drop { name, ws, dirty, unpushed } => {
+                let Ok(ws) = serde_json::from_value::<Workspace>(ws) else {
+                    log_line(&paths, &format!("worktree of {name}: not removed, its workspace does not read"));
+                    continue;
+                };
+                let loss = Loss { dirty: dirty as usize, unpushed: unpushed as usize };
+                if let Err(e) = env.worktree_drop(&name, &ws, &loss) {
+                    log_line(&paths, &format!("worktree of {name} not removed: {e}"));
+                }
+            }
+        }
+    }
+}

@@ -1,6 +1,7 @@
 # bend/proofs/lib/hub-3.bend: helpers the hub proofs share (moved from
 # PROOF.bend), layered: a lib calls only the ones before it.
 import Base
+import ../../vendor/json.bend as J
 import ../../hub/model.bend as HM
 import ../../hub/cx.bend as HX
 import ../../hub/core.bend as HC
@@ -57,6 +58,15 @@ def hub_nok_tr(-x: List<&2, List<&2, String>>, -y: List<&2, List<&2, String>>, e
   %Equal.sym(List<&2, List<&2, String>>, x, y, e) : HI.NamesOK(_)
   d
 
+# hub-loop: a placed task's line keeps the names (its ws, or nothing)
+def hub_prof_placed(c: Bool, +ag: List<&2, HM.Agent>, +x: String, +w: J.Json)
+    -> {HI.profile(Bool.pick(List<&2, HM.Agent>, c, HM.map_agent(ag, x, HM.OWs{w}), ag)) == HI.profile(ag) : List<&2, List<&2, String>>}:
+  match c:
+    case True{}:
+      PL2.hub_prof_map(ag, x, HM.OWs{w}, {==})
+    case False{}:
+      {==}
+
 # every event with its journal invariant (a free name for a new task or a
 # new name) keeps the names of the agents apart
 def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e)) -> HI.NamesApart(HM.apply(s, e)):
@@ -79,6 +89,8 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFile{p})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OFile{p}, {==}), u)
         case HM.ESnapshot{+x, +sn}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OSnap{sn})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OSnap{sn}, {==}), u)
+        case HM.EPlaced{+x, +w, +er}:
+          hub_nok_tr(HI.profile(Bool.pick(List<&2, HM.Agent>, String.is_empty(er), HM.map_agent(ag, x, HM.OWs{w}), ag)), HI.profile(ag), hub_prof_placed(String.is_empty(er), ag, x, w), u)
         case HM.EReported{+x, +rp}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OReport{rp})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OReport{rp}, {==}), u)
         case HM.EMsgSent{m}:

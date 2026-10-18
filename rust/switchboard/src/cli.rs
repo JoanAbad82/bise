@@ -865,11 +865,11 @@ pub fn render(cmd: &str, v: &Value) -> (bool, String) {
             ),
         },
         "spawn" => format!(
-            "agent {} created{}{} — it starts now; its answer will come back as a message",
-            s("name"),
+            "agent {} created{}{} — {}; its answer will come back as a message", s("name"),
             // issue #4: `on gpt-9 · low (profile fast)`, or the fallback's words
             if s("model").is_empty() { String::new() } else { format!(" {}", s("model")) },
-            v.get("branch").and_then(|b| b.as_str()).map(|b| format!(" in worktree {} (branch {})", s("path"), b)).unwrap_or_default()
+            v.get("branch").and_then(|b| b.as_str()).map(|b| format!(" in worktree {} (branch {})", s("path"), b)).unwrap_or_default(),
+            if v.get("placing") == Some(&json!(true)) { "its worktree is being made: it starts once it is ready (hub-loop)" } else { "it starts now" }
         ),
         "switch" => s("text"),
         "drop" => {

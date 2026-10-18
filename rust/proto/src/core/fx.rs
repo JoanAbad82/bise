@@ -21,6 +21,12 @@ core_kinds! {
         /// start an agent's REPL (`crash_note`: a restart after a crash)
         Spawn = "spawn" => FSpawn { agent: Str, resume: Bool, crash_note: OptStr },
         Kill = "kill" => FKill { agent: Str },
+        /// hub-loop: make the worktree of task `name` off the hub's loop,
+        /// then send input `placed` (its REPL starts after it)
+        WorktreeCreate = "worktree_create" => FWorktreeCreate { name: Str, with_changes: Bool },
+        /// hub-loop: save (when `dirty`/`unpushed`) and remove the
+        /// worktree `ws` of task `name`, off the hub's loop
+        WorktreeDrop = "worktree_drop" => FWorktreeDrop { name: Str, ws: Json, dirty: Nat, unpushed: Nat },
         /// a text into an agent's REPL, starting a turn
         Say = "say" => FSay { agent: Str, text: Str },
         Passthrough = "passthrough" => FPassthrough { agent: Str, line: Str },

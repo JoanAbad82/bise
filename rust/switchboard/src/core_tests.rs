@@ -44,6 +44,7 @@ impl Env for FakeEnv {
             dropped: false,
             place: Some(format!("wt:{}", name)),
             feature: None,
+            state: None,
         })
     }
     fn worktree_loss(&mut self, _ws: &Workspace) -> Loss {
@@ -101,11 +102,16 @@ impl T {
     }
 
     fn go(&mut self, input: Input) -> Vec<Effect> {
-        let fx = self.hub.handle(input, &mut self.env);
+        let mut fx = self.hub.handle(input, &mut self.env);
         for e in &fx {
             if let Effect::Journal(ev) = e {
                 self.journal.borrow_mut().push(ev.clone());
             }
+        }
+        // hub-loop: the shell's worktree, made at once here (FakeEnv)
+        let made: Vec<Input> = fx.iter().filter_map(|e| crate::place_job::placed_now(&mut self.env, e)).collect();
+        for i in made {
+            fx.extend(self.go(i));
         }
         fx
     }
@@ -614,7 +620,7 @@ fn dropping_a_worktree_with_work_asks_first() {
     let mut t = T::new();
     let fx = t.user(MAIN, "/new -w fix: corrige le bug");
     assert!(
-        has_line(&fx, MAIN, "new agent @fix (worktree sb/fix)"),
+        has_line(&fx, MAIN, "new agent @fix (worktree being made)") && has_line(&fx, MAIN, "@fix's worktree is ready: sb/fix"),
         "{:?}",
         fx
     );
@@ -884,15 +890,6 @@ fn peers_cannot_reach_an_archived_task_but_the_user_can() {
     assert!(fx
         .iter()
         .any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "b")));
-}
-
-#[test]
-fn worktrees_need_git() {
-    let mut t = T::new();
-    t.env.git = false;
-    let fx = t.user(MAIN, "/new -w x: y");
-    assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { body, .. } if body["text"].as_str().unwrap_or("").contains("not a git repository"))));
-    assert!(!t.hub.st.agents.contains_key("x"));
 }
 
 /// The home workspace (docs/ambient-pages.md §5.1): land, feature and

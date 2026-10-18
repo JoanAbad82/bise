@@ -10,6 +10,7 @@
 //! Pure: no I/O, no hub.
 
 use super::{feed, Effect};
+use crate::place_job::Job;
 use bise_proto::core::link::{ASkipped, Answer, Skipped};
 use bise_proto::core::Feed;
 use bise_proto::core::Fx as CoreFx;
@@ -71,6 +72,8 @@ pub(super) fn plain(f: CoreFx) -> Plain {
         CoreFx::Rt(_) => return Plain::Nothing,
         CoreFx::Spawn(s) => Effect::Spawn { agent: s.agent, resume: s.resume, crash_note: s.crash_note },
         CoreFx::Kill(k) => Effect::Kill { agent: k.agent },
+        CoreFx::WorktreeCreate(w) => Effect::Place(Job::Create { name: w.name, with_changes: w.with_changes }),
+        CoreFx::WorktreeDrop(w) => Effect::Place(Job::Drop { name: w.name, ws: w.ws, dirty: w.dirty, unpushed: w.unpushed }),
         CoreFx::Say(s) => Effect::Say { agent: s.agent, text: s.text },
         CoreFx::Passthrough(p) => Effect::Passthrough { agent: p.agent, line: p.line },
         // a record of an agent's feed, written `sb <kind> :: <json>` (a

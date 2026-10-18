@@ -381,6 +381,8 @@ def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, 
           u
         case HM.ESnapshot{a, b}:
           u
+        case HM.EPlaced{a, b, c}:
+          u
         case HM.EDeclared{a, b, c}:
           u
         case HM.EReported{a, b}:

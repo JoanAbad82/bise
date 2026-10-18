@@ -1,8 +1,14 @@
 # 32 · the hub loop runs slow shell work
 
-Status: chunk 1 measured; chunks 1-2 signed by architect (m_30076), chunk 3's
-shape signed (b: decide, then the effect), its plan with these numbers sent. Label: hub,
-loop. Brief: architect's debt-map v4 (q-go), task hub-loop.
+Status: chunks 1-2 and the agents' read lane on main (822f0a619, 419f82125,
+7333f6bff), signed by architect. Chunk 3 (sb-core decides, git runs as an
+effect; architect m_30076, m_30446): 3a spawn on main (worktree_create is
+an fx, `placed` an input, `worktree_placed` a journal kind). 3b (drop) and
+3c (`sb spawn --feature`, `sb isolate`, deleting the `worktree_create`
+NEED) are parked (main m_30915, Gabriel's no-new-refactors rule): their
+signed plan is the last section. Until 3b, /archive of a worktree task
+still holds the loop 1-3 s (git worktree_drop), so tests/hub_loop_e2e.py
+stays out of run_all. Label: hub, loop.
 
 ## The problem
 
@@ -109,3 +115,55 @@ its step. To take it off the loop, either:
 - (b) **decide first, then the effect**: sb-core places the task as
   "placing", an effect runs the git work, a new input brings the result.
   A new input kind and a law: an sb-core change, not this task's.
+
+## Chunk 3a · spawn (bend/hub/place.bend, daemon/place_work.rs)
+
+- sb-core creates a worktree task with a placing workspace (mode
+  worktree, state placing, no path) and emits fx `worktree_create`; no
+  REPL starts while it is placing (`spawn` skips it: law
+  no_repl_before_placed); its messages wait as for a starting agent.
+- the shell's worker thread (daemon/place_work.rs, its own GitEnv, one job
+  at a time) makes it and sends `Msg::Placed` -> `Input::Placed{name, ws,
+  err}` -> sb-core's `placed`: ok: `worktree_placed` journaled, main's
+  "@x's worktree is ready: sb/x (path)", then its REPL; err: the task
+  fails with git's words, its spawner told once; made for a task gone
+  meanwhile: fx `worktree_drop`, nothing else. Laws in
+  bend/laws/place.bend.
+- main's spawn line says "(worktree being made)"; `sb spawn` says "its
+  worktree is being made: it starts once it is ready".
+- After (hub_loop_e2e, same rig): no hold on `sb spawn` (before: 9.8 s,
+  git worktree_create 9.5 s); sb list median 0.027 s over 48 samples, the
+  one over 1 s left is the /archive's 2.6 s (git worktree_drop 2.2 s,
+  worktree_loss 0.4 s): 3b.
+
+## Parked: 3b drop, 3c feature/isolate (signed shape, architect m_30446, m_30801)
+
+To pick up later, from main with 3a in.
+
+**3b · drop.** worktree_loss stays a need (fast, a read). `drop.now` of a
+task with a worktree: commits the archive (stop_noted), marks its ws
+`state: dropping` (EWorkspace), emits fx `worktree_drop{name, ws, dirty,
+unpushed}`, and drop.finish says " · its worktree is being removed". The
+shell's place worker runs it and sends a new `Input::Unplaced{name,
+snapshot, err}`: ok: `dropped: true` and ESnapshot, drop.left for its
+mates; err: main's feed gets git's words (today's drop.label Fail is
+silent: a bug to fix here) and the ws stops dropping (its worktree stays,
+so a restore reuses it). Journal: architect approved a new kind
+`worktree_dropped{name, snapshot|err}`; EWorkspace + ESnapshot may be
+enough (no new kind, an older core reads them): ask architect first.
+sb-core refuses a restore while dropping: "@x is still being archived:
+restore it in a moment". Laws: drop_fx_after_archive (a Placed for a
+dropped name gives worktree_drop only), no_restore_while_dropping, and a
+restore after a failed backup (open with architect: "no snapshot: <git's
+words>", or reuse the worktree left). core_tests: `T::go`'s
+`placed_now` also answers `Job::Drop` with Unplaced; check messages to a
+placing agent and card answers (architect (a)). Done when
+tests/hub_loop_e2e.py is green: its /archive was the last hold over 1 s.
+
+**3c · feature and isolate.** `sb spawn --feature` (core_feature.rs
+`Env::worktree_feature`, Rust before sb-core) and `sb isolate` (core.bend
+isolate asks the `worktree_create` need) go through fx `worktree_create`
++ `placed`. Then delete the `worktree_create` NEED in sb-core and the
+Rust (rule 7), and put hub_loop_e2e in tests/run_all.sh TESTS (after
+hub_outside_app_e2e) in the sha that turns it green. TUI parity notes:
+the spawn screen and /archive of a worktree task.

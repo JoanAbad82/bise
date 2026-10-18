@@ -123,6 +123,12 @@ law in_isolate_bare:
 def in_isolate_bare():
   {==}
 
+law in_placed_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"placed"})])) == IN.IPlaced{"", J.JNull{}, ""} : IN.In}
+
+def in_placed_bare():
+  {==}
+
 law in_feature_retire_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"feature_retire"})])) == IN.IFeatureRetire{"", "", ""} : IN.In}
 
@@ -508,6 +514,15 @@ law in_IIsolate_round:
   {IN.of(IN.json(IN.IIsolate{name})) == IN.IIsolate{name} : IN.In}
 
 def in_IIsolate_round(name):
+  {==}
+
+law in_IPlaced_round:
+  for name: String
+  for ws: J.Json
+  for err: String
+  {IN.of(IN.json(IN.IPlaced{name, ws, err})) == IN.IPlaced{name, ws, err} : IN.In}
+
+def in_IPlaced_round(name, ws, err):
   {==}
 
 law in_IFeatureRetire_round:
@@ -1094,6 +1109,18 @@ law fx_kill_bare:
 def fx_kill_bare():
   {==}
 
+law fx_worktree_create_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"worktree_create"})])) == FX.FWorktreeCreate{"", False{}} : FX.Fx}
+
+def fx_worktree_create_bare():
+  {==}
+
+law fx_worktree_drop_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"worktree_drop"})])) == FX.FWorktreeDrop{"", J.JNull{}, 0n, 0n} : FX.Fx}
+
+def fx_worktree_drop_bare():
+  {==}
+
 law fx_say_bare:
   {FX.of(J.obj([J.kv("fx", J.JStr{"say"})])) == FX.FSay{"", ""} : FX.Fx}
 
@@ -1254,6 +1281,24 @@ law fx_FKill_round:
   {FX.of(FX.json(FX.FKill{agent})) == FX.FKill{agent} : FX.Fx}
 
 def fx_FKill_round(agent):
+  {==}
+
+law fx_FWorktreeCreate_round:
+  for name: String
+  for with_changes: Bool
+  {FX.of(FX.json(FX.FWorktreeCreate{name, with_changes})) == FX.FWorktreeCreate{name, with_changes} : FX.Fx}
+
+def fx_FWorktreeCreate_round(name, with_changes):
+  {==}
+
+law fx_FWorktreeDrop_round:
+  for name: String
+  for ws: J.Json
+  for dirty: Nat
+  for unpushed: Nat
+  {FX.of(FX.json(FX.FWorktreeDrop{name, ws, dirty, unpushed})) == FX.FWorktreeDrop{name, ws, dirty, unpushed} : FX.Fx}
+
+def fx_FWorktreeDrop_round(name, ws, dirty, unpushed):
   {==}
 
 law fx_FSay_round:

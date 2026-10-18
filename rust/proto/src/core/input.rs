@@ -50,6 +50,10 @@ core_kinds! {
         ConfirmDrop = "confirm_drop" => IConfirmDrop { name: Str },
         Restore = "restore" => IRestore { name: Str },
         Isolate = "isolate" => IIsolate { name: Str },
+        /// hub-loop: the shell made (or failed to make) the worktree of
+        /// task `name` (fx `worktree_create`): `ws` its workspace, null
+        /// when `err` says why not
+        Placed = "placed" => IPlaced { name: Str, ws: Json, err: Str },
         /// `sb feature retire <name>` (main's): the feature's tip is in
         /// the trunk (the hub checked); its live agents land on the trunk
         /// from now on. `kept`: the branch's name after the retire

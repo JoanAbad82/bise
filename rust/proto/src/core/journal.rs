@@ -56,6 +56,9 @@ pub const JOURNAL: Table = Table {
             &[f("name", Str), f("lifecycle", Rec(&LIFE)), f("reason", OptStr)]),
         k("workspace_changed", "Workspace", "M.EWorkspace{name, ws}", &[f("name", Str), f("ws", Json)]),
         k("snapshot", "Snapshot", "M.ESnapshot{name, snapshot_ref}", &[f("name", Str), f("snapshot_ref", OptStr)]),
+        // hub-loop: the worktree the shell made for a placing task (its
+        // `ws`), or why it could not (`err`; `ws` null)
+        k("worktree_placed", "Placed", "M.EPlaced{name, ws, err}", &[f("name", Str), f("ws", Json), f("err", Str)]),
         k("declared", "Declared", "M.EDeclared{name, status, note}",
             &[f("name", Str), f("status", Rec(&DECL)), f("note", Str)]),
         k("reported", "Reported", "M.EReported{name, report}", &[f("name", Str), f("report", Json)]),

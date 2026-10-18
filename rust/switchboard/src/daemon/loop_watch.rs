@@ -123,6 +123,27 @@ impl LoopWatch {
     }
 }
 
+// moved from daemon.rs (hub-loop): the loop's lanes for each message
+impl Msg {
+    /// An input for the loop, boxed.
+    pub(super) fn input(i: crate::core::Input) -> Msg {
+        Msg::In(Box::new(i))
+    }
+
+    /// The inbox's urgent lane (daemon/inbox.rs): a client's own message
+    /// (its hello or `initialize`, a line, its end, a thread's typed answer
+    /// to its request), one lane so its order holds (architect m_14659);
+    /// and a stop (`bise switchboard --stop`, a switch's, idle-exit's),
+    /// which runs at once: in the rest lane, behind the REPLs' lines, a
+    /// stop asked at 22:18:16 ran at 22:19:41 (2026-10-11), after the
+    /// client had said "stopped" and a new `bise` had attached.
+    pub(super) fn is_urgent(m: &Msg) -> bool {
+        // an agent's read too (daemon/accept.rs READS, hub-loop)
+        matches!(m, Msg::OlderHello { .. } | Msg::RpcNew { .. } | Msg::ClientLine { .. } | Msg::ClientGone { .. } | Msg::Typed { .. } | Msg::Shutdown { .. })
+            || matches!(m, Msg::AgentNew { v, .. } if super::accept::is_read(v))
+    }
+}
+
 impl Msg {
     /// The loop watch's words for this message: its kind, and whose.
     pub(super) fn label(&self) -> String {
@@ -150,6 +171,7 @@ impl Msg {
             Msg::RoleLine { dir, .. } => format!("role line {dir}"),
             Msg::Typed { .. } => "typed event".into(),
             Msg::WakeSeen(s) => format!("wake seen {}", s.id),
+            Msg::Placed { name, .. } => format!("placed {name}"),
             _ => "a hub message".into(),
         }
     }
@@ -178,6 +200,7 @@ pub(super) fn fx_part(e: &crate::core::Effect) -> &'static str {
         E::Journal(_) => "fx journal",
         E::Spawn { .. } => "fx spawn",
         E::Kill { .. } => "fx kill",
+        E::Place(_) => "fx place",
         E::Say { .. } => "fx say",
         E::Line { .. } => "fx line",
         E::Land { .. } => "fx land",

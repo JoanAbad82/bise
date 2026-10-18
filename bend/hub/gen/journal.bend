@@ -32,6 +32,9 @@ def Workspace.of(+i: J.Json) -> Maybe<&2, M.Ev>:
 def Snapshot.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.ESnapshot{K.get_s(i, "name"), K.opt_s(J.get(i, "snapshot_ref"))}}
 
+def Placed.of(+i: J.Json) -> Maybe<&2, M.Ev>:
+  Some{M.EPlaced{K.get_s(i, "name"), K.get_j(i, "ws"), K.get_s(i, "err")}}
+
 def Declared.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EDeclared{K.get_s(i, "name"), C.decl_of(K.get_j(i, "status")), K.get_s(i, "note")}}
 
@@ -172,6 +175,15 @@ def of.t3(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case GT{}:
       None{}
 
+def of.t4(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      of.t3(String.order(t, "card_closed"), t, i)
+    case EQ{}:
+      CardOpened.of(i)
+    case GT{}:
+      None{}
+
 def of.t2(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
@@ -179,32 +191,14 @@ def of.t2(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case EQ{}:
       CardAnswerPos.of(i)
     case GT{}:
-      of.t3(String.order(t, "card_closed"), t, i)
-
-def of.t5(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      None{}
-    case EQ{}:
-      Declared.of(i)
-    case GT{}:
-      None{}
+      of.t4(String.order(t, "card_opened"), t, i)
 
 def of.t6(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t5(String.order(t, "declared"), t, i)
+      None{}
     case EQ{}:
       EveryFired.of(i)
-    case GT{}:
-      None{}
-
-def of.t8(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      None{}
-    case EQ{}:
-      EveryRun.of(i)
     case GT{}:
       None{}
 
@@ -215,41 +209,41 @@ def of.t7(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case EQ{}:
       EveryName.of(i)
     case GT{}:
-      of.t8(String.order(t, "every_run"), t, i)
+      None{}
 
-def of.t4(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t9(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      None{}
+    case EQ{}:
+      EverySet.of(i)
+    case GT{}:
+      None{}
+
+def of.t8(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      of.t7(String.order(t, "every_name"), t, i)
+    case EQ{}:
+      EveryRun.of(i)
+    case GT{}:
+      of.t9(String.order(t, "every_set"), t, i)
+
+def of.t5(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
       of.t2(String.order(t, "card_answer_pos"), t, i)
     case EQ{}:
-      CardOpened.of(i)
+      Declared.of(i)
     case GT{}:
-      of.t7(String.order(t, "every_name"), t, i)
-
-def of.t10(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      None{}
-    case EQ{}:
-      EveryStop.of(i)
-    case GT{}:
-      None{}
+      of.t8(String.order(t, "every_run"), t, i)
 
 def of.t11(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t10(String.order(t, "every_stop"), t, i)
+      None{}
     case EQ{}:
       FileTouched.of(i)
-    case GT{}:
-      None{}
-
-def of.t13(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      None{}
-    case EQ{}:
-      JobEnd.of(i)
     case GT{}:
       None{}
 
@@ -260,32 +254,32 @@ def of.t12(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case EQ{}:
       Follow.of(i)
     case GT{}:
-      of.t13(String.order(t, "job_end"), t, i)
+      None{}
 
-def of.t15(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t14(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
       None{}
     case EQ{}:
-      MainNote.of(i)
+      Lifecycle.of(i)
     case GT{}:
       None{}
+
+def of.t13(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      of.t12(String.order(t, "follow"), t, i)
+    case EQ{}:
+      JobEnd.of(i)
+    case GT{}:
+      of.t14(String.order(t, "lifecycle"), t, i)
 
 def of.t16(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t15(String.order(t, "main_note"), t, i)
+      None{}
     case EQ{}:
       NotesFlushed.of(i)
-    case GT{}:
-      None{}
-
-def of.t18(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      None{}
-    case EQ{}:
-      Settled.of(i)
     case GT{}:
       None{}
 
@@ -296,50 +290,50 @@ def of.t17(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case EQ{}:
       MsgSent.of(i)
     case GT{}:
+      None{}
+
+def of.t19(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      None{}
+    case EQ{}:
+      MsgState.of(i)
+    case GT{}:
+      None{}
+
+def of.t18(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      of.t17(String.order(t, "message_sent"), t, i)
+    case EQ{}:
+      Settled.of(i)
+    case GT{}:
+      of.t19(String.order(t, "message_state"), t, i)
+
+def of.t15(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      of.t13(String.order(t, "job_end"), t, i)
+    case EQ{}:
+      MainNote.of(i)
+    case GT{}:
       of.t18(String.order(t, "message_settled"), t, i)
 
-def of.t14(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t10(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t12(String.order(t, "follow"), t, i)
+      of.t5(String.order(t, "declared"), t, i)
     case EQ{}:
-      Lifecycle.of(i)
+      EveryStop.of(i)
     case GT{}:
-      of.t17(String.order(t, "message_sent"), t, i)
-
-def of.t9(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      of.t4(String.order(t, "card_opened"), t, i)
-    case EQ{}:
-      EverySet.of(i)
-    case GT{}:
-      of.t14(String.order(t, "lifecycle"), t, i)
-
-def of.t20(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      None{}
-    case EQ{}:
-      Paused.of(i)
-    case GT{}:
-      None{}
+      of.t15(String.order(t, "main_note"), t, i)
 
 def of.t21(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t20(String.order(t, "paused"), t, i)
+      None{}
     case EQ{}:
       Renamed.of(i)
-    case GT{}:
-      None{}
-
-def of.t23(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      None{}
-    case EQ{}:
-      Resumed.of(i)
     case GT{}:
       None{}
 
@@ -350,32 +344,32 @@ def of.t22(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case EQ{}:
       Reported.of(i)
     case GT{}:
-      of.t23(String.order(t, "resumed"), t, i)
+      None{}
 
-def of.t25(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t24(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
       None{}
     case EQ{}:
-      RouteHeld.of(i)
+      RouteCancelled.of(i)
     case GT{}:
       None{}
+
+def of.t23(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      of.t22(String.order(t, "reported"), t, i)
+    case EQ{}:
+      Resumed.of(i)
+    case GT{}:
+      of.t24(String.order(t, "route_cancelled"), t, i)
 
 def of.t26(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t25(String.order(t, "route_held"), t, i)
+      None{}
     case EQ{}:
       RouteSent.of(i)
-    case GT{}:
-      None{}
-
-def of.t28(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      None{}
-    case EQ{}:
-      Snapshot.of(i)
     case GT{}:
       None{}
 
@@ -386,41 +380,41 @@ def of.t27(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case EQ{}:
       RouteSet.of(i)
     case GT{}:
-      of.t28(String.order(t, "snapshot"), t, i)
+      None{}
 
-def of.t24(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t29(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t22(String.order(t, "reported"), t, i)
+      None{}
     case EQ{}:
-      RouteCancelled.of(i)
+      TaskCreated.of(i)
     case GT{}:
+      None{}
+
+def of.t28(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
       of.t27(String.order(t, "route_set"), t, i)
+    case EQ{}:
+      Snapshot.of(i)
+    case GT{}:
+      of.t29(String.order(t, "task_created"), t, i)
 
-def of.t30(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t25(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      None{}
+      of.t23(String.order(t, "resumed"), t, i)
     case EQ{}:
-      WakeEnd.of(i)
+      RouteHeld.of(i)
     case GT{}:
-      None{}
+      of.t28(String.order(t, "snapshot"), t, i)
 
 def of.t31(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t30(String.order(t, "wake_end"), t, i)
+      None{}
     case EQ{}:
       WakeSet.of(i)
-    case GT{}:
-      None{}
-
-def of.t33(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  match c:
-    case LT{}:
-      None{}
-    case EQ{}:
-      XAcked.of(i)
     case GT{}:
       None{}
 
@@ -431,9 +425,27 @@ def of.t32(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case EQ{}:
       Workspace.of(i)
     case GT{}:
-      of.t33(String.order(t, "x_acked"), t, i)
+      None{}
 
-def of.t35(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t34(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      None{}
+    case EQ{}:
+      XAcked.of(i)
+    case GT{}:
+      None{}
+
+def of.t33(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      of.t32(String.order(t, "workspace_changed"), t, i)
+    case EQ{}:
+      Placed.of(i)
+    case GT{}:
+      of.t34(String.order(t, "x_acked"), t, i)
+
+def of.t36(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
       None{}
@@ -442,16 +454,16 @@ def of.t35(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case GT{}:
       None{}
 
-def of.t36(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t37(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t35(String.order(t, "x_in"), t, i)
+      of.t36(String.order(t, "x_in"), t, i)
     case EQ{}:
       XOut.of(i)
     case GT{}:
       None{}
 
-def of.t38(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t39(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
       None{}
@@ -460,46 +472,46 @@ def of.t38(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case GT{}:
       None{}
 
-def of.t37(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t38(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t36(String.order(t, "x_out"), t, i)
+      of.t37(String.order(t, "x_out"), t, i)
     case EQ{}:
       XReplied.of(i)
     case GT{}:
-      of.t38(String.order(t, "x_settled"), t, i)
+      of.t39(String.order(t, "x_settled"), t, i)
 
-def of.t34(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t35(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t32(String.order(t, "workspace_changed"), t, i)
+      of.t33(String.order(t, "worktree_placed"), t, i)
     case EQ{}:
       XFailed.of(i)
     case GT{}:
-      of.t37(String.order(t, "x_replied"), t, i)
+      of.t38(String.order(t, "x_replied"), t, i)
 
-def of.t29(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t30(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t24(String.order(t, "route_cancelled"), t, i)
+      of.t25(String.order(t, "route_held"), t, i)
     case EQ{}:
-      TaskCreated.of(i)
+      WakeEnd.of(i)
     case GT{}:
-      of.t34(String.order(t, "x_failed"), t, i)
+      of.t35(String.order(t, "x_failed"), t, i)
 
-def of.t19(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t20(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t9(String.order(t, "every_set"), t, i)
+      of.t10(String.order(t, "every_stop"), t, i)
     case EQ{}:
-      MsgState.of(i)
+      Paused.of(i)
     case GT{}:
-      of.t29(String.order(t, "task_created"), t, i)
+      of.t30(String.order(t, "wake_end"), t, i)
 
-# the record of a tag (a binary search over the 39 sorted tags); any
+# the record of a tag (a binary search over the 40 sorted tags); any
 # other tag: None
 def of_tag(+t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
-  of.t19(String.order(t, "message_state"), t, i)
+  of.t20(String.order(t, "paused"), t, i)
 
 # one journal line's event
 def of(+i: J.Json) -> Maybe<&2, M.Ev>:
@@ -517,6 +529,8 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("type", J.JStr{"workspace_changed"}), J.kv("name", J.JStr{name}), J.kv("ws", ws)]
     case M.ESnapshot{+name, +snapshot_ref}:
       [J.kv("type", J.JStr{"snapshot"}), J.kv("name", J.JStr{name}), J.kv("snapshot_ref", K.jmaybe_s(snapshot_ref))]
+    case M.EPlaced{+name, +ws, +err}:
+      [J.kv("type", J.JStr{"worktree_placed"}), J.kv("name", J.JStr{name}), J.kv("ws", ws), J.kv("err", J.JStr{err})]
     case M.EDeclared{+name, +status, +note}:
       [J.kv("type", J.JStr{"declared"}), J.kv("name", J.JStr{name}), J.kv("status", C.decl_json(status)), J.kv("note", J.JStr{note})]
     case M.EReported{+name, +report}:

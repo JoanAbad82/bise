@@ -80,6 +80,8 @@ type Ev is Data:
   ELifecycle{name: String, life: Life, reason: Maybe<&2, String>}
   EWorkspace{name: String, ws: J.Json}
   ESnapshot{name: String, snap: Maybe<&2, String>}
+  # hub-loop: the worktree made for a placing task (`err` "": `ws`)
+  EPlaced{name: String, ws: J.Json, err: String}
   EDeclared{name: String, status: Maybe<&2, Decl>, note: String}
   EReported{name: String, report: J.Json}
   EFileTouched{name: String, path: String}
@@ -710,6 +712,8 @@ def apply(+st: St, e: Ev) -> St:
           St{map_agent(agents, name, OWs{ws}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case ESnapshot{+name, +snap}:
           St{map_agent(agents, name, OSnap{snap}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+        case EPlaced{+name, +ws, +err}:
+          St{Bool.pick(List<&2, Agent>, String.is_empty(err), map_agent(agents, name, OWs{ws}), agents), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case EDeclared{+name, +status, +note}:
           St{map_agent(agents, name, ODeclared{status, note}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
         case EReported{+name, +report}:
@@ -844,6 +848,10 @@ def ws_worktree(+ws: J.Json) -> Bool:
 
 def ws_dropped(+ws: J.Json) -> Bool:
   J.get_bool_or(ws, "dropped", False{})
+
+# hub-loop: a worktree task whose worktree the shell is still making
+def ws_placing(+ws: J.Json) -> Bool:
+  String.eq(J.get_str_or(ws, "state", ""), "placing")
 
 def ws_branch(+ws: J.Json) -> J.Json:
   Maybe.default(&2, J.Json, J.get(ws, "branch"), J.JNull{})
@@ -987,12 +995,3 @@ def Agent.follow_hub(x: Agent) -> String:
   match x:
     case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, +f}:
       Maybe.default(&2, String, f, "")
-
-# dev-flow §3.1: the place of a ws: "shared", or its worktree's id (the
-# Rust Workspace::place_id; an older journal's worktree has none: its
-# agent's own place, wt:<dir>)
-def ws_place(+ws: J.Json, +dir: String) -> String:
-  Bool.pick(String, ws_worktree(ws), J.get_str_or(ws, "place", String.append("wt:", dir)), "shared")
-
-def Agent.place(+a: Agent) -> String:
-  ws_place(Agent.ws(a), Agent.dir(a))

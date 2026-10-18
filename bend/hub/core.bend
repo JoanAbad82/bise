@@ -40,6 +40,7 @@ import ./keyed.bend as KL
 import ./feature.bend as FT
 import ./status.bend as ST
 import ./lazy.bend as LZ
+import ./place.bend as PL
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -396,7 +397,7 @@ def spawn.if(-o: M.St, down: Bool, +cx: X.Cx<o>, +n: String, +resume: Bool) -> X
       cx
 
 def spawn(-o: M.St, +cx: X.Cx<o>, +n: String, +resume: Bool) -> X.Cx<o>:
-  spawn.if(o, has_agent(o, cx, n) && is_down(X.Rt.run(rt(o, cx, n))), cx, n, resume)
+  spawn.if(o, Bool.not(PL.waits(M.get_agent(st(o, cx), n))) && has_agent(o, cx, n) && is_down(X.Rt.run(rt(o, cx, n))), cx, n, resume)
 
 # ---- waiters ----
 
@@ -909,15 +910,23 @@ def fst(-o: M.St, p: X.Cx<o> & SendR) -> X.Cx<o>:
 def notify_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   fst(o, send(o, cx, msg(M.HUB(), M.MAIN(), text, False{}, None{}, False{}, False{})))
 
+# hub-loop (place.bend): a placing task's worktree is made by the shell
+def place.ask(-o: M.St, placing: Bool, +cx: X.Cx<o>, +name: String, +ws: J.Json) -> X.Cx<o>:
+  match placing:
+    case True{}:
+      out(o, cx, F.worktree_create(name, J.get_bool_or(ws, "with_changes", False{})))
+    case False{}:
+      cx
+
 def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_taken(X.d(o, cx), name) == False{} : Bool}) -> X.Cx<o> & TaskR:
   +parent = NewTask.parent(t)
-  +label = NT.branch_label(M.ws_branch(ws))
+  +label = Bool.pick(String, M.ws_placing(ws), " (worktree being made)", NT.branch_label(M.ws_branch(ws)))
   +obj = T.one_line(NewTask.objective(t))
   +cx2 = emit(o, cx, M.ETaskCreated{name, parent, NewTask.brief(t), ws, now(o, cx)}, e, Unit{}, Unit{})
   +who = Bool.pick(String, String.eq(parent, M.USER()), "you", parent)
   +cx3 = feed(o, cx2, M.MAIN(), FD.spawn(cat([who, " → new agent @", name, label, " : ", obj])))
   +cx4 = LZ.pick(X.Cx<o>, String.eq(parent, M.USER()), u => note_main(o, cx3, cat(["the user created the agent @", name, label, ": ", obj])), u => cx3)
-  +cx5 = spawn(o, cx4, name, False{})
+  +cx5 = place.ask(o, M.ws_placing(ws), spawn(o, cx4, name, False{}), name, ws)
   +head = cat(["# Task `", name, "`\n\n"])
   +m = msg(parent, name, String.append(head, NewTask.brief_text(t)), String.eq(parent, M.MAIN()), None{}, String.eq(parent, M.USER()), False{})
   # send-parts: the brief's parts (`sb spawn --attach`), the head in front
@@ -946,20 +955,6 @@ def ans_ok.go(m: Maybe<&2, J.Json>, +j: J.Json) -> Result<&2, &2, String, J.Json
 def ans_ok(+j: J.Json) -> Result<&2, &2, String, J.Json>:
   ans_ok.go(J.get(j, "ok"), j)
 
-def create.ws.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +t: NewTask, +name: String) -> X.Cx<o> & TaskR:
-  match r:
-    case Fail{+e}:
-      (cx, TErr{e})
-    case Done{+ws}:
-      create.go(o, cx, t, name, ws)
-
-def create.ws(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +t: NewTask, +name: String) -> X.Cx<o> & TaskR:
-  match p:
-    case (+cx, None{}):
-      (cx, THalt{})
-    case (+cx, Some{+a}):
-      create.ws.res(o, ans_ok(a), cx, t, name)
-
 def NewTask.with_changes(x: NewTask) -> Bool:
   match x:
     case NewTask{_, _, _, _, _, _, +with_changes, _}:
@@ -970,8 +965,8 @@ def create.git(-o: M.St, git: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) ->
     case False{}:
       (cx, TErr{"the workspace is not a git repository: no worktree possible"})
     case True{}:
-      create.ws(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_create"}), J.kv("name", J.JStr{name}),
-        J.kv("with_changes", J.JBool{NewTask.with_changes(t)})])), t, name)
+      # hub-loop: the shell makes it off its loop (place.bend)
+      create.go(o, cx, t, name, PL.placing_ws(NewTask.with_changes(t)))
 
 def shared_ws(+path: String) -> J.Json:
   J.obj([J.kv("mode", J.JStr{"shared"}), J.kv("path", J.JStr{path}), J.kv("branch", J.JNull{}),
@@ -1410,29 +1405,6 @@ def stop_task(-o: M.St, +cx: X.Cx<o>, +name: String, +life: M.Life, +reason: Str
 def stop_noted(-o: M.St, +cx: X.Cx<o>, +name: String, +life: M.Life, +reason: String) -> X.Cx<o>:
   stop_task(o, undelivered_msgs(o, M.queued_for(st(o, cx), name), cx), name, life, reason)
 
-def plural(+n: Nat) -> String:
-  Bool.pick(String, Nat.is_gt(n, 1n), "s", "")
-
-def loss_text(+dirty: Nat, +unpushed: Nat) -> String:
-  cat([ns(dirty), " changed file", plural(dirty), " and ", ns(unpushed),
-    " unpushed commit", plural(unpushed), " will be saved (/restore)"])
-
-def drop.label(r: Result<&2, &2, String, J.Json>) -> String:
-  match r:
-    case Fail{+e}:
-      String.append(" — worktree NOT deleted: ", e)
-    case Done{J.JStr{_}}:
-      " — work saved (/restore)"
-    case Done{_}:
-      " · its worktree removed"
-
-def drop.snap(j: J.Json) -> Maybe<&2, String>:
-  match j:
-    case J.JStr{+s}:
-      Some{s}
-    case _:
-      None{}
-
 # ---- places (dev-flow §3.1): a worktree shared by agents ----
 
 def is_gone(l: M.Life) -> Bool:
@@ -1451,7 +1423,7 @@ def mate.hit(m: Maybe<&2, M.Agent>, +name: String, +place: String, +live: Bool) 
     case Some{+b}:
       +gone = is_gone(M.Agent.life(b))
       Bool.not(String.eq(M.Agent.name(b), name)) && M.ws_worktree(M.Agent.ws(b)) && Bool.not(M.ws_dropped(M.Agent.ws(b)))
-        && String.eq(M.Agent.place(b), place) && Bool.pick(Bool, live, Bool.not(gone), gone)
+        && String.eq(PL.Agent.place(b), place) && Bool.pick(Bool, live, Bool.not(gone), gone)
 
 def mates(xs: List<&2, String>, +s: M.St, +name: String, +place: String, +live: Bool) -> List<&2, String>:
   match xs:
@@ -1463,7 +1435,7 @@ def mates(xs: List<&2, String>, +s: M.St, +name: String, +place: String, +live: 
 
 # the other agents of a's worktree (none for the shared folder)
 def mates_of(+s: M.St, +a: M.Agent, +live: Bool) -> List<&2, String>:
-  mates(M.St.order(s), s, M.Agent.name(a), M.Agent.place(a), live)
+  mates(M.St.order(s), s, M.Agent.name(a), PL.Agent.place(a), live)
 
 def first_agent(+s: M.St, ns: List<&2, String>) -> Maybe<&2, M.Agent>:
   match ns:
@@ -1502,7 +1474,7 @@ def drop.ws(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: M.Age
       cx
     case Done{+snap}:
       +left = mates_of(st(o, cx), a, False{})
-      +sn = drop.snap(snap)
+      +sn = PL.drop_snap(snap)
       +cx2 = emit(o, cx, M.EWorkspace{M.Agent.name(a), J.set(M.Agent.ws(a), "dropped", J.JBool{True{}})}, Unit{}, Unit{}, Unit{})
       drop.left(o, left, emit(o, cx2, M.ESnapshot{M.Agent.name(a), sn}, Unit{}, Unit{}, Unit{}), sn)
 
@@ -1516,7 +1488,7 @@ def drop.git(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: M.Agent) -> X.Cx<o> &
     case (+cx, None{}):
       (cx, DHalt{})
     case (+cx, Some{+ans}):
-      drop.finish(o, drop.ws(o, ans_ok(ans), cx, a), a, drop.label(ans_ok(ans)))
+      drop.finish(o, drop.ws(o, ans_ok(ans), cx, a), a, PL.drop_label(ans_ok(ans)))
 
 def drop.now(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: M.Agent, +loss: J.Json) -> X.Cx<o> & DropR:
   match has_wt:
@@ -1535,7 +1507,7 @@ def drop.decide(-o: M.St, confirm: Bool, +cx: X.Cx<o>, +a: M.Agent, +has_wt: Boo
       +dirty = J.get_num_or(loss, "dirty", 0n)
       +unpushed = J.get_num_or(loss, "unpushed", 0n)
       +parts = List.append(&2, String, Bool.pick(List<&2, String>, busy, ["the agent is mid-turn"], Nil{}),
-        Bool.pick(List<&2, String>, Nat.is_gt(Nat.add(dirty, unpushed), 0n), [loss_text(dirty, unpushed)], Nil{}))
+        Bool.pick(List<&2, String>, Nat.is_gt(Nat.add(dirty, unpushed), 0n), [PL.loss_text(dirty, unpushed)], Nil{}))
       (cx, DAsk{cat(["archive @", M.Agent.name(a), "? ", String.join(parts, " ; "), ". [y/N]"])})
     case False{}:
       drop.now(o, has_wt, cx, a, loss)
@@ -1567,7 +1539,7 @@ def drop.checks(-o: M.St, is_main: Bool, life: M.Life, +cx: X.Cx<o>, +a: M.Agent
         case _:
           # the folder goes with the place's last agent only
           +last = List.is_empty(&2, String, mates_of(st(o, cx), a, True{}))
-          drop.wt(o, M.ws_worktree(M.Agent.ws(a)) && Bool.not(M.ws_dropped(M.Agent.ws(a))) && last, cx, a, force)
+          drop.wt(o, M.ws_worktree(M.Agent.ws(a)) && Bool.not(M.ws_dropped(M.Agent.ws(a)) || M.ws_placing(M.Agent.ws(a))) && last, cx, a, force)
 
 def drop.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +force: Bool) -> X.Cx<o> & DropR:
   match m:
@@ -1728,7 +1700,7 @@ def move.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +ws
     case Some{+a}:
       +n = M.Agent.name(a)
       +pre = Bool.pick(Maybe<&2, String>, M.Agent.is_main(a), Some{"main works in the shared folder"},
-        Bool.pick(Maybe<&2, String>, String.eq(M.Agent.place(a), M.ws_place(ws, M.Agent.dir(a))), Some{cat(["@", n, " is already there"])},
+        Bool.pick(Maybe<&2, String>, String.eq(PL.Agent.place(a), PL.ws_place(ws, M.Agent.dir(a))), Some{cat(["@", n, " is already there"])},
           Bool.pick(Maybe<&2, String>, Bool.not(List.is_empty(&2, String, M.Agent.files(a))),
             Some{cat(["@", n, " already changed files (", String.join(List.take(&2, String, M.Agent.files(a), 3n), ", "), "): only an agent that changed nothing yet moves"])},
             Bool.pick(Maybe<&2, String>, is_busy(X.Rt.run(rt(o, cx, n))), Some{cat(["@", n, " is mid-turn: wait for the end of its turn"])}, None{}))))
@@ -2930,7 +2902,7 @@ def req_spawn.res(-o: M.St, p: X.Cx<o> & TaskR, +token: Nat) -> X.Cx<o>:
   match p:
     case (+cx, TOk{+n}):
       +ws = req_spawn.ws(M.get_agent(st(o, cx), n))
-      reply(o, cx, token, ok_body([J.kv("name", J.JStr{n}), J.kv("path", J.JStr{M.ws_path(ws)}), J.kv("branch", M.ws_branch(ws))]))
+      reply(o, cx, token, ok_body([J.kv("name", J.JStr{n}), J.kv("path", J.JStr{M.ws_path(ws)}), J.kv("branch", M.ws_branch(ws)), J.kv("placing", J.JBool{M.ws_placing(ws)})]))
     case (+cx, TErr{+e}):
       reply_err(o, cx, token, e)
     case (+cx, THalt{}):
@@ -3291,7 +3263,7 @@ def overlap_hit(m: Maybe<&2, M.Agent>, +agent: String, +path: String, +place: St
       False{}
     case Some{+a}:
       Bool.not(M.Agent.is_main(a)) && Bool.not(String.eq(M.Agent.name(a), agent))
-        && String.eq(M.Agent.place(a), place) && is_active(M.Agent.life(a))
+        && String.eq(PL.Agent.place(a), place) && is_active(M.Agent.life(a))
         && M.str_in(M.Agent.files(a), path)
 
 def overlap_others(xs: List<&2, String>, +s: M.St, +agent: String, +path: String, +place: String) -> List<&2, String>:
@@ -3324,7 +3296,7 @@ def touch.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +
     case Some{+a}:
       # every task, in the shared folder or a worktree: `sb land` commits
       # an agent's own files, two agents may share a worktree
-      touch.task(o, Bool.not(M.Agent.is_main(a)), cx, agent, path, M.str_in(M.Agent.files(a), path), M.Agent.place(a))
+      touch.task(o, Bool.not(M.Agent.is_main(a)), cx, agent, path, M.str_in(M.Agent.files(a), path), PL.Agent.place(a))
 
 def touch(-o: M.St, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
   touch.agent(o, M.get_agent(st(o, cx), agent), cx, agent, path)
@@ -3600,6 +3572,27 @@ def force_run_of(+r: String) -> M.Run:
     Bool.pick(M.Run, String.eq(r, "idle"), M.RIdle{},
       Bool.pick(M.Run, String.eq(r, "busy"), M.RBusy{}, M.RDown{})))
 
+def placed.tell(-o: M.St, user: Bool, +cx: X.Cx<o>, +parent: String, +text: String) -> X.Cx<o>:
+  match user:
+    case True{}:
+      feed(o, cx, M.MAIN(), FD.warn(text))
+    case False{}:
+      fst(o, send(o, cx, msg(M.HUB(), parent, text, False{}, None{}, False{}, False{})))
+
+# the shell's `placed` (place.bend's placed_of decided it)
+def placed(-o: M.St, d: PL.Do, +cx: X.Cx<o>) -> X.Cx<o>:
+  match d:
+    case PL.POk{+n, +ws}:
+      +cx2 = feed(o, emit(o, cx, M.EPlaced{n, ws, ""}, Unit{}, Unit{}, Unit{}), M.MAIN(), FD.info(PL.ready_text(n, ws)))
+      spawn(o, cx2, n, False{})
+    case PL.PErr{+n, +e, +parent}:
+      +cx2 = stop_noted(o, emit(o, cx, M.EPlaced{n, J.JNull{}, e}, Unit{}, Unit{}, Unit{}), n, M.LFailed{}, e)
+      placed.tell(o, String.eq(parent, M.USER()), cx2, parent, PL.err_text(n, e))
+    case PL.POrphan{+n, +ws}:
+      out(o, cx, F.worktree_drop(n, ws, 0n, 0n))
+    case PL.PNone{}:
+      cx
+
 # one input, decoded by the generated codec (gen/in.bend, from
 # bise_proto::core::In): an unknown tag is INone, a missing field its
 # default
@@ -3643,6 +3636,8 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       user_restore.res(o, restore_task(o, cx, name))
     case GI.IIsolate{+name}:
       user_isolate.res(o, isolate_task(o, cx, name))
+    case GI.IPlaced{+name, +ws, +err}:
+      placed(o, PL.placed_of(st(o, cx), name, ws, err), cx)
     case GI.IFeatureRetire{+name, +kept, +main}:
       feature_retire(o, cx, name, kept, main)
     case GI.IRename{+name, +new_name, +valid}:

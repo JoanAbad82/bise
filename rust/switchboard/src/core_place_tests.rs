@@ -80,3 +80,13 @@ fn a_refused_feature_answer_says_why_on_its_item() {
     assert_eq!((c.kind.as_str(), c.place.as_deref()), ("feature_try", Some(place.as_str())));
     assert!(c.id > id && c.text.contains(&why) && c.text.ends_with("3. not yet"), "{}", c.text);
 }
+
+// moved from core_tests.rs (hub-loop: its line count)
+#[test]
+fn worktrees_need_git() {
+    let mut t = T::new();
+    t.env.git = false;
+    let fx = t.user(MAIN, "/new -w x: y");
+    assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { body, .. } if body["text"].as_str().unwrap_or("").contains("not a git repository"))));
+    assert!(!t.hub.st.agents.contains_key("x"));
+}

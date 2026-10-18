@@ -44,6 +44,7 @@ pub mod activity;
 pub mod computer_use;
 pub mod contexts;
 pub mod core;
+pub mod core_proc;
 #[cfg(test)]
 mod core_fresh;
 mod core_turn;
@@ -72,6 +73,7 @@ pub mod paths;
 pub mod peer;
 pub use bise_peer::os as peer_os;
 pub mod place;
+pub mod place_job;
 pub mod procs;
 pub mod proto_view;
 pub mod prompts;

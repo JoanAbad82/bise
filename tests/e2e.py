@@ -644,7 +644,8 @@ def t_escalation_card(E, c):
 def t_worktree_drop_restore(E, c):
     c.wait_idle("main")
     c.say('/new -w t4: {{bash: echo wt > wt.txt && git add wt.txt && git commit -qm wt && echo committed}}')
-    c.wait(lambda: c.agent("t4") is not None, 60, "t4")
+    # hub-loop: its worktree is made off the hub's loop, then its row has it
+    c.wait(lambda: (c.agent("t4") or {}).get("branch") == "sb/t4", 60, "t4 placed")
     a = c.agent("t4")
     check(a["mode"] == "worktree" and a["branch"] == "sb/t4", "worktree mode: %r" % a)
     wt = a["path"]

@@ -1,7 +1,8 @@
 """A version rollback after bise desktop S2 (architect m_8524 c.): an older
 sb-core replays a journal that a newer one wrote, with the cross-hub kinds
 (x_out, x_acked, x_failed, x_settled, x_in, x_replied), the timers'
-acts (act_set, act_done) and S10's follow and job_end in it. It skips each of them (they are reported
+acts (act_set, act_done), S10's follow and job_end, and hub-loop's
+worktree_placed in it. It skips each of them (they are reported
 as skipped, never misread) and rebuilds the rest of the state.
 
     python3 -u tests/old_core_replay.py [<base sha>]   (default: HEAD~1)
@@ -58,6 +59,17 @@ FIXTURE = [
     {"type": "every_set", "id": 2, "agent": "main", "by": "main", "text": "read the log", "next_ms": 9000,
      "at": 1000, "every_ms": 600000, "held": True},
     {"type": "every_name", "id": 2, "name": "log read", "announce": True, "at": 1100},
+    # msg-parts (architect m_17621): his messages with their parts (an
+    # older sb-core ignores the key and keeps the message, its text whole):
+    # a plain one, a queued one, one to another agent (a route; steered or
+    # not is the delivery's, never the journal's). Before msg 7: a base
+    # with St.hot/St.old (d1fe6f8d5) skips an id below next_msg.
+    dict(msg(4, "user", "main"), msg=dict(msg(4, "user", "main")["msg"], plain=True,
+         parts='[{"kind":"quote","from":"main","text":"q"},{"kind":"text","text":"m4"}]')),
+    dict(msg(5, "user", "main"), msg=dict(msg(5, "user", "main")["msg"], plain=True, queued=True,
+         parts='[{"kind":"text","text":"m5"}]')),
+    dict(msg(6, "user", "perf"), msg=dict(msg(6, "user", "perf")["msg"], plain=True,
+         parts='[{"kind":"paste","n":1,"text":"x"},{"kind":"text","text":"m6"}]')),
     # D1 (debt T7): a timer and a message with real ms timestamps (past
     # 2^32: the generated codec's laws can't write them as literals), the
     # timer in the generated writer's key order (`at` after its keys)
@@ -71,22 +83,17 @@ FIXTURE = [
     {"type": "wake_set", "watch": {"id": 2, "agent": "main", "spec": {"kind": "bg", "slot": "/t/bg/0", "cmd": "make"},
                                    "max_text": "", "set_at": 1000, "max_at": 86401000, "quiet": True}},
     {"type": "wake_end", "id": 1, "why": "hit", "at": 1200},
-    # msg-parts (architect m_17621): his messages with their parts (an
-    # older sb-core ignores the key and keeps the message, its text whole):
-    # a plain one, a queued one, one to another agent (a route; steered or
-    # not is the delivery's, never the journal's)
-    dict(msg(4, "user", "main"), msg=dict(msg(4, "user", "main")["msg"], plain=True,
-         parts='[{"kind":"quote","from":"main","text":"q"},{"kind":"text","text":"m4"}]')),
-    dict(msg(5, "user", "main"), msg=dict(msg(5, "user", "main")["msg"], plain=True, queued=True,
-         parts='[{"kind":"text","text":"m5"}]')),
-    dict(msg(6, "user", "perf"), msg=dict(msg(6, "user", "perf")["msg"], plain=True,
-         parts='[{"kind":"paste","n":1,"text":"x"},{"kind":"text","text":"m6"}]')),
+    # hub-loop: the worktree the shell made for a placing task (skipped by
+    # an older sb-core: the task keeps its placing workspace until its
+    # next restart)
+    {"type": "worktree_placed", "name": "perf", "ws": {"mode": "worktree", "path": "/w/wt/perf", "branch": "sb/perf",
+                                                       "base_commit": "abc", "dropped": False}, "err": ""},
 ]
 
 
 def is_new(e):
     """A kind an older sb-core may not know (it skips it, never misreads it)."""
-    return e["type"].startswith(("x_", "act_", "wake_", "route_")) or e["type"] in ("follow", "job_end", "every_name")
+    return e["type"].startswith(("x_", "act_", "wake_", "route_")) or e["type"] in ("follow", "job_end", "every_name", "worktree_placed")
 
 
 NEW = [i for i, e in enumerate(FIXTURE) if is_new(e)]

@@ -344,6 +344,7 @@ impl Env for GitEnv {
             // a new place, named after its first agent (dev-flow §3.1)
             place: Some(crate::place::worktree_id(name)),
             feature: None,
+            state: None,
         })
     }
 
@@ -377,6 +378,7 @@ impl Env for GitEnv {
             dropped: false,
             place: Some(crate::place::worktree_id(name)),
             feature: Some(feature.to_string()),
+            state: None,
         })
     }
 
@@ -521,6 +523,7 @@ impl Env for GitEnv {
             place: Some(ws.place_id(name)),
             // a feature's agent, restored, lands on it again
             feature: ws.feature.clone(),
+            state: None,
         })
     }
 }

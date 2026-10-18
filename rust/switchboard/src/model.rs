@@ -46,9 +46,18 @@ pub struct Workspace {
     /// land` moves the feature, never main. None: not a feature's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feature: Option<String>,
+    /// hub-loop: `placing` while the shell makes its worktree (sb-core's
+    /// hub/place.bend): no path, no branch, no REPL yet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
 }
 
 impl Workspace {
+    /// Its worktree is still being made (no REPL yet).
+    pub fn placing(&self) -> bool {
+        self.state.as_deref() == Some("placing")
+    }
+
     /// The feature an agent with this workspace lands on (a worktree's).
     pub fn feature(&self) -> Option<&str> {
         match self.mode {
@@ -399,6 +408,7 @@ impl State {
                     dropped: false,
                     place: None,
                     feature: None,
+                    state: None,
                 },
                 lifecycle: Lifecycle::Active,
                 failure: None,

@@ -60,6 +60,7 @@ mod state_gate;
 mod tindex;
 mod usage;
 mod wake_look;
+mod place_work;
 mod worktrees;
 mod xhub;
 mod xread;
@@ -211,6 +212,8 @@ enum Msg {
     Notice { kind: String, text: String },
     /// A watch's event, seen off the loop (daemon/wake_look.rs).
     WakeSeen(wake_look::WakeSeen),
+    /// A worktree made off the loop (daemon/place_work.rs).
+    Placed { name: String, ws: Value, err: String },
     /// A role-line call is over (BISE-126).
     RoleLine {
         dir: String,
@@ -261,26 +264,6 @@ enum Msg {
     Shutdown {
         keep: bool,
     },
-}
-
-impl Msg {
-    /// An input for the loop, boxed.
-    fn input(i: Input) -> Msg {
-        Msg::In(Box::new(i))
-    }
-
-    /// The inbox's urgent lane (daemon/inbox.rs): a client's own message
-    /// (its hello or `initialize`, a line, its end, a thread's typed answer
-    /// to its request), one lane so its order holds (architect m_14659);
-    /// and a stop (`bise switchboard --stop`, a switch's, idle-exit's),
-    /// which runs at once: in the rest lane, behind the REPLs' lines, a
-    /// stop asked at 22:18:16 ran at 22:19:41 (2026-10-11), after the
-    /// client had said "stopped" and a new `bise` had attached.
-    fn is_urgent(m: &Msg) -> bool {
-        // an agent's read too (daemon/accept.rs READS, hub-loop)
-        matches!(m, Msg::OlderHello { .. } | Msg::RpcNew { .. } | Msg::ClientLine { .. } | Msg::ClientGone { .. } | Msg::Typed { .. } | Msg::Shutdown { .. })
-            || matches!(m, Msg::AgentNew { v, .. } if accept::is_read(v))
-    }
 }
 
 struct Repl {
@@ -455,6 +438,8 @@ struct Shell {
     art: art::Art,
     /// `sb wake`'s look, on its worker (`daemon/wake_look.rs`)
     wake_look: wake_look::WakeLook,
+    /// sb-core's worktrees, made off the loop (`daemon/place_work.rs`)
+    place_work: place_work::PlaceWork,
 }
 
 /// What an agent whose turn was cut by a restart receives.
@@ -876,6 +861,7 @@ impl Shell {
                 resume,
                 crash_note,
             } => self.spawn_on(&agent, resume, crash_note, None),
+            Effect::Place(j) => self.place_work.run(j),
             Effect::Kill { agent } => {
                 if let Some(dir) = self.dir_of(&agent) {
                     self.gens.remove(&dir);
@@ -1859,6 +1845,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         holds: crate::idle::Holds::default(),
         art: art::Art::default(),
         wake_look: wake_look::WakeLook::start(tx.clone()),
+        place_work: place_work::PlaceWork::start(&paths, tx.clone()),
     };
     sh.answers_replayed(&events);
     sh.start_pages(&paths, &tx);
