@@ -774,6 +774,20 @@ def main():
         # the tick's and the pick's notes reach main as turns: let them end
         settle(c)
 
+        # send-reason: his step answered 'done' as the window sends it
+        # (turn/send): the page ticks its row, no message is made, and the
+        # result says the page took it
+        rp = os.path.join(E.tmp, "renew-plan.html")
+        open(rp, "w").write('<section data-kit="checklist" data-id="renew" data-plan><ol>'
+                            '<li data-id="r1" data-who="yours">pay the renewal</li></ol></section>')
+        c.say('[[bash: sb page publish %s --id renew-plan --title "renew plan"]]' % rp)
+        c.wait(lambda: step_card("r1"), 90, "r1's card")
+        rps = Sse(port, "/p/renew-plan/events")
+        r = c.rpc("turn/send", {"project": c.project(), "agent": "main", "text": "/answer %d done" % step_card("r1")["id"], "mode": "now"})
+        check(r.get("result") == {"reason": "page"}, "turn/send's result says the page took it: %r" % r)
+        c.wait(lambda: rps.seen("ticked", lambda d: d == {"block": "renew", "item": "r1"}), 30, "r1 ticked by his send")
+        settle(c)
+
         # a copied page whose question names a card this hub never had,
         # read at the hub's start (pm's m_5456): the first pick is no 409,
         # the page hears it, the pick goes as a note

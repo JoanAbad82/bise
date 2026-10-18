@@ -113,7 +113,9 @@ def main():
         # his words addressed to shop: held, then sent to shop's main
         c.wait_idle("main")
         cid_said = "@shop the checkout is broken again"
-        answered(req(d, "turn/send", agent="main", text=cid_said, mode="now"), "his addressed words sent")
+        r = answered(req(d, "turn/send", agent="main", text=cid_said, mode="now"), "his addressed words sent")
+        # send-reason: no message here, the result says it was routed (no msg_id)
+        check(r == {"reason": "routed"}, "turn/send's result says routed: %r" % r)
         wait.until(lambda: of_type(hstate, "route_held"), 10, "the route held")
         held = of_type(hstate, "route_held")
         route = held[0]["route"]

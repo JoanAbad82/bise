@@ -4,7 +4,7 @@
 // in src/proto/fixtures.gen.ts (rust/proto/fixtures), never a hand-kept value, so a proto change
 // breaks a builder or a test at typecheck and the compiler shows what to fix. Test-only (never in
 // the bundle): a feature test imports this and run.ts, nothing else of the app (eslint).
-import type { AnswerResult, Card, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow } from './app';
+import type { AnswerResult, Card, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow, SendReason } from './app';
 import { core_ev, hub_ev } from './app';
 
 export type Ev = HubEv | CoreEv;
@@ -76,21 +76,23 @@ export interface CardRefusedEv {
   readonly card: number;
   readonly text: string;
 }
-/** His send's result: the message id the hub gave it (null: none). */
+/** His send's result: the message id the hub gave it, and why none (null both: an older hub). */
 export interface SentEv {
   readonly ev: 'sent';
   readonly project: string;
   readonly agent: string;
   readonly cid: number;
   readonly msg_id: number | null;
+  readonly reason: SendReason | null;
 }
 export type LocalEv = CardAnsweredEv | CardRefusedEv | SentEv;
 
 export const cardAnswered = (project: string, card: number, answer?: AnswerResult['answer']): CardAnsweredEv =>
   ({ ev: 'card_answered', project, card, ...(answer === undefined ? {} : { answer }) });
 export const cardRefused = (project: string, card: number, text: string): CardRefusedEv => ({ ev: 'card_refused', project, card, text });
-export const sent = (project: string, agent: string, cid: number, msgId: number | null = null): SentEv =>
-  ({ ev: 'sent', project, agent, cid, msg_id: msgId });
+/** A send answered: with an id, its message made; without, `reason` says why none (null: an older hub). */
+export const sent = (project: string, agent: string, cid: number, msgId: number | null = null, reason: SendReason | null = msgId === null ? null : 'made'): SentEv =>
+  ({ ev: 'sent', project, agent, cid, msg_id: msgId, reason });
 
 /** Main says the core's state (CorePort.onState: up, or down after it exited). */
 export interface CoreStateIn {

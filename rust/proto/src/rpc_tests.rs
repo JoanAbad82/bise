@@ -231,15 +231,21 @@ fn command_run_results_round_trip() {
     assert_eq!(serde_json::from_value::<CommandsList>(list).unwrap(), CommandsList::now());
 }
 
-/// turn/send's result (A1): its fixtures read back as themselves, and
-/// `{}` (an older hub's, a send that made no message) is no id.
+/// turn/send's result (A1, send-reason): its fixtures (the released `{}`
+/// and `{"msg_id":7}` too) read back as themselves, `{}` (an older hub's)
+/// is no id and no reason, each reason reads as itself and a newer
+/// hub's word as Unknown.
 #[test]
 fn send_results_round_trip() {
     for v in fixture("send_result.jsonl") {
         let r: SendResult = serde_json::from_value(v.clone()).unwrap();
         assert_eq!(serde_json::to_value(&r).unwrap(), v);
     }
-    assert_eq!(serde_json::from_value::<SendResult>(serde_json::json!({})).unwrap().msg_id, None);
+    assert_eq!(serde_json::from_value::<SendResult>(serde_json::json!({})).unwrap(), SendResult::default());
+    let reason = |w: &str| serde_json::from_value::<SendResult>(serde_json::json!({"reason": w})).unwrap().reason;
+    for (w, r) in [("made", SendReason::Made), ("page", SendReason::Page), ("routed", SendReason::Routed), ("command", SendReason::Command), ("held", SendReason::Unknown)] {
+        assert_eq!(reason(w), Some(r), "{w}");
+    }
     assert!(OWN_RESULTS.contains(&("turn/send", "SendResult")));
 }
 

@@ -3,11 +3,25 @@
 //! open steps (steps_hint, read from the page cards). Moved out of
 //! daemon.rs unchanged (architect m_12143). Both go as hidden hint parts
 //! after his own (bise_proto::parts::Part::Hint, ambient-lead m_22706):
-//! the model gets the same text, his bubble never shows them.
+//! the model gets the same text, his bubble never shows them. Its input
+//! handler says what it did with his words ([`Took`]: a page took them,
+//! routed, stepped), which turn/send's result reads (send-reason).
 
 use super::page_cards::Page;
 use super::*;
 use bise_proto::parts::Part;
+
+/// What [`Shell::input`] did with his words (send-reason: turn/send's
+/// result says it, daemon/proto/send.rs).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Took {
+    /// a page's question answered whole there (`Page::Done`)
+    Page,
+    /// words for another project, held for it (`route_input`)
+    Routed,
+    /// stepped by sb-core: a message of his, or a command it ran
+    Stepped,
+}
 
 impl Shell {
     /// His words (turn/send, command/run's non-command line: proto/cmds.rs
@@ -17,7 +31,14 @@ impl Shell {
     /// home hub routes to a project, else an input with its files, the
     /// capsule's hint and his open steps. Moved out of daemon.rs's input
     /// arm unchanged (architect m_12280).
-    pub(super) fn input(&mut self, id: ClientId, v: &Value) {
+    /// What it did ([`Took`]): turn/send's result says it (send-reason).
+    pub(super) fn input(&mut self, id: ClientId, v: &Value) -> Took {
+        let took = self.input_took(id, v);
+        self.page_answers();
+        took
+    }
+
+    fn input_took(&mut self, id: ClientId, v: &Value) -> Took {
         let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
         // an answer to a page's question: its words, for the page
         // from the capsule: a hint main's rule reads (one short line
@@ -25,38 +46,37 @@ impl Shell {
         // a step of his answered on its card (roadmap D): ticked
         // on its page, the page's agent told there
         let page = self.page_first(id, &s("text"));
-        if !matches!(page, Page::Done) {
-            let queued = v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false);
-            let text = match page {
-                Page::Reply(reply) => reply,
-                _ => {
-                    // his attached files are his parts already (proto_input)
-                    let said = s("text");
-                    // bise's home hub: words he addressed to a project (`@<project> …`) go there (daemon/routing.rs)
-                    // his parts (msg-parts) go with his routed words (R41 (6))
-                    if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context"), &s("parts")) {
-                        return self.page_answers();
-                    }
-                    // the capsule's lines for the model, as hidden hint
-                    // parts after his own (ambient-lead m_22706, architect
-                    // m_22715): the model gets the same bytes, his bubble
-                    // none of them
-                    let mut hints: Vec<Part> = Self::capsule_hint(&said, &s("via")).into_iter().collect();
-                    hints.extend(self.steps_hint(&said, &s("via")));
-                    if !hints.is_empty() {
-                        let (text, parts) = hinted(&said, &s("parts"), hints);
-                        let mut v = v.clone();
-                        v["parts"] = json!(parts);
-                        self.step_input(id, &v, s("focus"), text, queued);
-                        return self.page_answers();
-                    }
-                    said
+        let queued = v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false);
+        let text = match page {
+            Page::Done => return Took::Page,
+            Page::Reply(reply) => reply,
+            Page::Not => {
+                // his attached files are his parts already (proto_input)
+                let said = s("text");
+                // bise's home hub: words he addressed to a project (`@<project> …`) go there (daemon/routing.rs)
+                // his parts (msg-parts) go with his routed words (R41 (6))
+                if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context"), &s("parts")) {
+                    return Took::Routed;
                 }
-            };
-            // S9: with its fn context (daemon/fn_context.rs)
-            self.step_input(id, v, s("focus"), text, queued);
-        }
-        self.page_answers();
+                // the capsule's lines for the model, as hidden hint
+                // parts after his own (ambient-lead m_22706, architect
+                // m_22715): the model gets the same bytes, his bubble
+                // none of them
+                let mut hints: Vec<Part> = Self::capsule_hint(&said, &s("via")).into_iter().collect();
+                hints.extend(self.steps_hint(&said, &s("via")));
+                if !hints.is_empty() {
+                    let (text, parts) = hinted(&said, &s("parts"), hints);
+                    let mut v = v.clone();
+                    v["parts"] = json!(parts);
+                    self.step_input(id, &v, s("focus"), text, queued);
+                    return Took::Stepped;
+                }
+                said
+            }
+        };
+        // S9: with its fn context (daemon/fn_context.rs)
+        self.step_input(id, v, s("focus"), text, queued);
+        Took::Stepped
     }
 
     /// An input from bise ambient's capsule (`via: "capsule"`) carries one

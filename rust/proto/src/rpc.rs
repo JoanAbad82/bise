@@ -413,13 +413,38 @@ pub struct CommandRunResult {
 /// `turn/send`'s result (A1, architect m_21450): `msg_id` the id sb-core
 /// gave his message when it arrived (queued too), the `msg_id` of the
 /// 'you' entry it becomes, so the sender matches his pending row by id.
-/// None: no message was made (an answered card, a held route, an older
-/// hub): match by the words, as before.
+/// `reason` (send-reason, architect m_30519): whether a message was made,
+/// and why not; with no message there is no 'you' entry to wait for, so
+/// the sender's row settles on this result. Both absent (`{}`): an older
+/// hub's.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct SendResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub msg_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<SendReason>,
+}
+
+/// What a `turn/send` did with his words ([`SendResult::reason`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum SendReason {
+    /// a message of his (`msg_id` its id): its 'you' entry comes
+    Made,
+    /// a page's question answered whole (a step ticked, a batch card):
+    /// the page took it, no message
+    Page,
+    /// words for another project (`@<project> …` on bise's home hub):
+    /// held for that project's hub, no message here
+    Routed,
+    /// a command line the hub ran (`/help`, a `/model`): its words come
+    /// as notices, no message
+    Command,
+    /// a newer hub's reason
+    #[serde(other)]
+    Unknown,
 }
 
 /// `card/answer`'s result (inbox picks (3), architect m_22636): his answer

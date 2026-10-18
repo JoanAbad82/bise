@@ -448,6 +448,10 @@ export const command_run_result: readonly CommandRunResult[] = [
 export const send_result: readonly SendResult[] = [
   {"msg_id":7},
   {},
+  {"msg_id":7,"reason":"made"},
+  {"reason":"page"},
+  {"reason":"routed"},
+  {"reason":"command"},
 ];
 
 /** rust/proto/fixtures/answer_result.jsonl */

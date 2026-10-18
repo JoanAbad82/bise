@@ -106,13 +106,20 @@ export type CommandsList = { commands: Array<CommandRow>, };
 export type CommandRunResult = { notice?: string | null, };
 
 /**
+ * What a `turn/send` did with his words ([`SendResult::reason`]).
+ */
+export type SendReason = "made" | "page" | "routed" | "command" | "unknown";
+
+/**
  * `turn/send`'s result (A1, architect m_21450): `msg_id` the id sb-core
  * gave his message when it arrived (queued too), the `msg_id` of the
  * 'you' entry it becomes, so the sender matches his pending row by id.
- * None: no message was made (an answered card, a held route, an older
- * hub): match by the words, as before.
+ * `reason` (send-reason, architect m_30519): whether a message was made,
+ * and why not; with no message there is no 'you' entry to wait for, so
+ * the sender's row settles on this result. Both absent (`{}`): an older
+ * hub's.
  */
-export type SendResult = { msg_id?: number | null, };
+export type SendResult = { msg_id?: number | null, reason?: SendReason | null, };
 
 /**
  * His answer to a card, as sb-core wrote its route line ([`AnswerResult`]).

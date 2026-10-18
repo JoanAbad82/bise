@@ -50,14 +50,23 @@ export function applyRoute(holds: readonly Hold[], ev: EvOf<'route'> | EvOf<'rou
   return [...holds, { rid: ev.rid, key: threadKey(ev.project, 'main'), cid: p.cid, home: ev.project, to: ev.to, name: ev.name, why: ev.why, until: ev.correct_until_ms, state: 'held' }];
 }
 
-/** A sent route's answer for his pending send (the window-local 'sent', echo.ts), or null. Pure. */
+/**
+ * A route's end as the answer for his pending send (the window-local 'sent', echo.ts; the send's
+ * own answer said 'routed' and kept the row): sent, his message in bise's main with its id (made);
+ * cancelled, the row goes (sb-core says his words to main as a new message, its 'you' entry shows
+ * them; send-reason sha 2 gives it that message's id). Null: not an end, a route of no row, or a
+ * sent one without its id (an older hub: the row says 'sent to'). Pure.
+ */
 export function settleOf(
   holds: readonly Hold[],
   ev: EvOf<'route'> | EvOf<'route_done'>,
-): { ev: 'sent'; project: string; agent: 'main'; cid: number; msg_id: number } | null {
-  if (ev.ev !== 'route_done' || ev.state !== 'sent' || typeof ev.msg !== 'number') return null;
+): { ev: 'sent'; project: string; agent: 'main'; cid: number; msg_id: number | null; reason: 'made' | null } | null {
+  if (ev.ev !== 'route_done') return null;
   const h = holds.find((x) => x.rid === ev.rid && x.home === ev.project);
-  return h === undefined ? null : { ev: 'sent', project: ev.project, agent: 'main', cid: h.cid, msg_id: ev.msg };
+  if (h === undefined) return null;
+  const at = { ev: 'sent', project: ev.project, agent: 'main', cid: h.cid } as const;
+  if (ev.state !== 'sent') return { ...at, msg_id: null, reason: null };
+  return typeof ev.msg === 'number' ? { ...at, msg_id: ev.msg, reason: 'made' } : null;
 }
 
 interface Tracker {

@@ -3,6 +3,7 @@ import { app_cmd, core_ev, hub_cmd, hub_ev } from "@/proto/fixtures.gen";
 import type { Entry, Part } from "@/proto";
 import type { CoreCmd } from "@/shared/api";
 import { allFixtureEvents, replay } from "./replay";
+import { sentWords } from "./types";
 import {
   Store,
   TAGS,
@@ -329,7 +330,7 @@ describe("store", () => {
     ]);
     const first = store.pending(K)[0]?.cid ?? 0;
     // the hub answers each send with its message id; the entry with that id takes its row
-    store.apply({ ev: "sent", project: P, agent: "perf", cid: first, msg_id: 9 });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: first, msg_id: 9, reason: "made" });
     store.apply({
       ev: "entry",
       project: P,
@@ -347,7 +348,7 @@ describe("store", () => {
     store.setCore("up");
     const you = (pos: number, at_ms: number, text: string, more: Partial<Entry> = {}): Entry => ({ pos, at_ms, kind: "you", text, ...more });
     const ok = store.send({ project: P, agent: "perf", text: "ok" });
-    store.apply({ ev: "sent", project: P, agent: "perf", cid: ok, msg_id: 12 });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: ok, msg_id: 12, reason: "made" });
     // the thread opened after the send: a page with an old 'ok' only, then one with his echo
     store.apply({ ev: "thread", project: P, agent: "perf", entries: [you(3, 20_000, "ok")], before: null, more: false });
     expect(store.pending(K).map((p) => p.text)).toEqual(["ok"]);
@@ -359,7 +360,7 @@ describe("store", () => {
     // a steered one: its echo is an entry, re-sent with its marks (received, then read + steered_at)
     now = 200_000;
     const webp = store.send({ project: P, agent: "perf", text: "also try webp" });
-    store.apply({ ev: "sent", project: P, agent: "perf", cid: webp, msg_id: 13 });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: webp, msg_id: 13, reason: "made" });
     store.apply({ ev: "entry", project: P, agent: "perf", entry: you(11, 200_100, "also try webp", { msg_id: 13, delivery: "sent" }) });
     expect(store.pending(K)).toEqual([]);
     store.apply({ ev: "entry", project: P, agent: "perf", entry: you(11, 200_100, "also try webp", { msg_id: 13, delivery: "read", steered_at: 12 }) });
@@ -367,9 +368,57 @@ describe("store", () => {
     // a queued one: its echo is written when it is said, later, and still takes it
     now = 300_000;
     const log = store.send({ project: P, agent: "perf", text: "and the changelog", mode: "queued" });
-    store.apply({ ev: "sent", project: P, agent: "perf", cid: log, msg_id: 14 });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: log, msg_id: 14, reason: "made" });
     store.apply({ ev: "entry", project: P, agent: "perf", entry: you(20, 360_000, "and the changelog", { msg_id: 14 }) });
     expect(store.pending(K)).toEqual([]);
+  });
+
+  it("a send the core went down before answering goes when its echo lands with the hub's marker before his words (qa-native R41, send-reason)", () => {
+    const { store } = fake();
+    store.setCore("up");
+    store.send({ project: P, agent: "perf", text: "what is in this picture?" });
+    store.send({ project: P, agent: "perf", text: "[Image #1] and this one" });
+    expect(store.pending(K)).toHaveLength(2);
+    // the core died before their answers: lost, only their words and parts can meet their echo
+    store.setCore("down");
+    store.setCore("up");
+    const marker =
+      '<image name="[Image #1]" path="/tmp/shot.png" mime="image/png" b64="/h/images/ab12.b64">';
+    store.apply({
+      ev: "entry",
+      project: P,
+      agent: "perf",
+      entry: entry(
+        9,
+        `${marker}
+what is in this picture?`,
+        "you",
+      ),
+    });
+    expect(store.pending(K).map((p) => p.text)).toEqual([
+      "[Image #1] and this one",
+    ]);
+    store.apply({
+      ev: "entry",
+      project: P,
+      agent: "perf",
+      entry: entry(10, `${marker.replace("shot", "b")} and this one`, "you"),
+    });
+    expect(store.pending(K)).toEqual([]);
+    expect(
+      sentWords(
+        '<image name="[Image #2]" path="a b.png" mime="image/png" b64="x">  hi\n there',
+      ),
+    ).toBe("hi there");
+    // file-chips: a file's marker (missing or not) and its '[File #n]' label go the same way
+    expect(
+      sentWords(
+        'add <image name="[Image #1]" path="/u/a.png" mime="image/png" b64=""> to <file name="[File #2]" path="/u/deck.pptx"> and <file name="[File #3]" path="/u/q3.pdf" missing="true">',
+      ),
+    ).toBe("add to and");
+    expect(sentWords("add [Image #1] to [File #2] and [File #3]")).toBe(
+      "add to and",
+    );
   });
 
   it("a send carries its parts, and a retry sends them again; no parts means no field", () => {

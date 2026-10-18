@@ -86,7 +86,9 @@ def live_round(c, E, project):
     of his words, for the page."""
     t = subscribe(c, "main")
     check(t["agent"] == "main" and t["project"] == project and isinstance(t["entries"], list), "thread: %r" % t)
-    ok(req(c, "turn/send", agent="main", text="proto says hi", mode="now"), "turn/send")
+    said = ok(req(c, "turn/send", agent="main", text="proto says hi", mode="now"), "turn/send")
+    # send-reason: a message made, its id and why
+    check(said.get("reason") == "made" and isinstance(said.get("msg_id"), int), "turn/send's result: made, with its id: %r" % said)
     c.wait_line("main", "proto says hi", 30)
     c.wait(lambda: any("proto says hi" in x["text"] for x in entries(c, "main", "you")), 30, "his words as an entry")
     c.wait(lambda: entries(c, "main", "agent"), 30, "main's reply as an entry")
@@ -169,6 +171,15 @@ def live_round(c, E, project):
     # a page before the live entry: older entries (or none), never an error
     p = ok(req(c, "thread/page", agent="main", before=you["pos"]), "thread/page")
     check(all(x["pos"] < you["pos"] for x in p["entries"]), "the page is before it: %r" % p)
+
+    # send-reason: a command line sent as his words (the capsule's
+    # onAsk): sb-core runs it, no message is made; an /interrupt of a busy
+    # turn says nothing more, so the result says why: a command
+    ok(req(c, "turn/send", agent="main", text="[[bash: sleep 6]] busy for the interrupt", mode="now"), "a long turn")
+    c.wait_status("main", "working", 30)
+    stop = ok(req(c, "turn/send", agent="main", text="/interrupt", mode="now"), "an /interrupt sent as words")
+    check(stop == {"reason": "command"}, "turn/send's result says a command ran: %r" % stop)
+    idle(c, "main")
 
     # unsubscribe: no more entries for main
     unsubscribe(c, "main")

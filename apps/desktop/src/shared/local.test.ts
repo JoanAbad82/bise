@@ -11,9 +11,11 @@ describe("the window-local events main builds from the core's answers (ipc.ts, t
     expect(answeredEv({ cmd: 'answer', project: P, card: 9, reply: '2' }, null)).toEqual({ ev: 'card_answered', project: P, card: 9, answer: null });
   });
 
-  it('a send: sent with its message id, or a null id from an older hub', () => {
-    expect(answeredEv({ cmd: 'send', project: P, agent: 'main', text: 'hi', cid: 3 }, { msg_id: 41 })).toEqual({ ev: 'sent', project: P, agent: 'main', cid: 3, msg_id: 41 });
-    expect(answeredEv({ cmd: 'send', project: P, agent: 'main', text: 'hi', cid: 3 }, {})).toEqual({ ev: 'sent', project: P, agent: 'main', cid: 3, msg_id: null });
+  it('a send: sent with its message id and why none was made, both null from an older hub', () => {
+    const send = { cmd: 'send', project: P, agent: 'main', text: 'hi', cid: 3 };
+    expect(answeredEv(send, { msg_id: 41, reason: 'made' })).toEqual({ ev: 'sent', project: P, agent: 'main', cid: 3, msg_id: 41, reason: 'made' });
+    expect(answeredEv(send, { reason: 'routed' })).toEqual({ ev: 'sent', project: P, agent: 'main', cid: 3, msg_id: null, reason: 'routed' });
+    expect(answeredEv(send, {})).toEqual({ ev: 'sent', project: P, agent: 'main', cid: 3, msg_id: null, reason: null });
   });
 
   it('a close taken, or any other command: no event (the rows say it)', () => {

@@ -116,8 +116,11 @@ export class Store extends StoreVoice {
     this.asked.clear();
     for (const [key, t] of this.threads) {
       if (!t.pending.some((p) => p.state === "sending")) continue;
+      // not answered yet: it may have reached the hub (lost: echo.ts takes it by its words)
       t.pending = t.pending.map((p) =>
-        p.state === "sending" ? { ...p, state: "failed", why: common.not_sent } : p,
+        p.state !== "sending"
+          ? p
+          : { ...p, state: "failed", why: common.not_sent, ...(typeof p.msgId === "number" ? {} : { lost: true as const }) },
       );
       this.emit(`pending:${key}`);
     }

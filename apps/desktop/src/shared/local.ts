@@ -3,11 +3,11 @@
 // send's message id), 'card_refused' (an answer's or a close's error). Not the core's protocol:
 // the store reads them (src/store echo.ts, answered.ts, acted.ts). Pure, so ipc.ts and the nightly
 // invariant check on recorded cores (tests/nightly) build them the same way. Owner: amb-core.
-import type { AnswerResult, CardAnswer, SendResult } from '../proto';
+import type { AnswerResult, CardAnswer, SendReason, SendResult } from '../proto';
 
 export type LocalEv =
   | { readonly ev: 'card_answered'; readonly project: unknown; readonly card: unknown; readonly answer: CardAnswer | null }
-  | { readonly ev: 'sent'; readonly project: unknown; readonly agent: unknown; readonly cid: unknown; readonly msg_id: number | null }
+  | { readonly ev: 'sent'; readonly project: unknown; readonly agent: unknown; readonly cid: unknown; readonly msg_id: number | null; readonly reason: SendReason | null }
   | { readonly ev: 'card_refused'; readonly project: unknown; readonly card: unknown; readonly text: string };
 
 /**
@@ -24,10 +24,10 @@ export function answeredEv(cmd: Readonly<Record<string, unknown>>, result: unkno
     return { ev: 'card_answered', project: cmd['project'], card: cmd['card'], answer };
   }
   if (cmd['cmd'] === 'send') {
-    // turn/send's result (bise-proto rpc SendResult); an older hub answers {}: msg_id null,
-    // the window falls back to the words
-    const id = (result as SendResult | null)?.msg_id ?? null;
-    return { ev: 'sent', project: cmd['project'], agent: cmd['agent'], cid: cmd['cid'], msg_id: id };
+    // turn/send's result (bise-proto rpc SendResult): his message's id and why none was made; an
+    // older hub answers {}: both null, the row goes on it (echo.ts answered)
+    const r = result as SendResult | null;
+    return { ev: 'sent', project: cmd['project'], agent: cmd['agent'], cid: cmd['cid'], msg_id: r?.msg_id ?? null, reason: r?.reason ?? null };
   }
   return null;
 }

@@ -16,7 +16,8 @@
 //! connections, hello, the dispatch and a step's errors. Each command's
 //! arm is in `proto/cmds.rs`, the events the hub sends on its own in
 //! `proto/emit.rs` (architect review 10), the project's growth (cached,
-//! one emit point) in `proto/growth.rs`.
+//! one emit point) in `proto/growth.rs`, `turn/send`'s result (its
+//! message's id, or why none was made) in `proto/send.rs`.
 //!
 //! JSON-RPC (`daemon/rpc.rs`, client-protocol step 1) runs the same arms:
 //! `proto_send` gives a JSON-RPC connection its answer or notification,
@@ -28,6 +29,7 @@ mod find;
 mod growth;
 mod tool_out;
 mod log;
+mod send;
 
 use super::rpc::Typed;
 use super::*;

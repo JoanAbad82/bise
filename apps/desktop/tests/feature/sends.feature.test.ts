@@ -31,6 +31,36 @@ describe('his messages, in his words', () => {
     expect(rows(w)).toEqual([]);
   });
 
+  it('never by its words: an entry with the same words and no id (an older transcript), or before its answer, takes no row (send-reason)', () => {
+    const w = feature(T0).does(send(ACME, 'main', 'hello'));
+    w.given(said(ACME, 'main', 3, 'hello', null, T0 + 100));
+    expect(rows(w)).toEqual(['hello · sending']);
+    w.given(said(ACME, 'main', 4, 'hello', 9, T0 + 150));
+    expect(rows(w)).toEqual(['hello · sending']);
+    // its answer comes: that entry was its own
+    w.given(sent(ACME, 'main', 1, 9));
+    expect(rows(w)).toEqual([]);
+  });
+
+  it('a send that made no message (a page took it, a command ran, an older hub) leaves its row on its answer, no entry needed (send-reason)', () => {
+    for (const reason of ['page', 'command', null] as const) {
+      const w = feature(T0).does(send(ACME, 'main', '/answer 4 1'));
+      w.given(sent(ACME, 'main', 1, null, reason));
+      expect(rows(w), String(reason)).toEqual([]);
+      expect(w.view.sending()).toBe(false);
+    }
+  });
+
+  it("the core dies before his message's answer: the hub made it, so its entry clears the 'not sent' row, never a retry that sends it twice (send-reason, until sha 2's cid)", () => {
+    const w = feature(T0).does(send(ACME, 'main', 'ship it'));
+    w.given(coreDown());
+    expect(rows(w)).toEqual(['ship it · failed: not sent']);
+    w.given(coreUp());
+    // an id this window never heard: the hub made it before the core died
+    w.given(said(ACME, 'main', 5, 'ship it', 42, T0 + 100));
+    expect(rows(w)).toEqual([]);
+  });
+
   it('the hub gives the send its message id: only the entry with that id is its echo, never the same words sent again', () => {
     const w = feature(T0).does(send(ACME, 'main', 'again'), send(ACME, 'main', 'again'));
     w.given(sent(ACME, 'main', 1, 41), sent(ACME, 'main', 2, 42));

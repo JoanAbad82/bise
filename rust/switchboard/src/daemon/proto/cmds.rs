@@ -8,6 +8,7 @@
 //! op's own handler, and `slash` takes any line he typed: his words and
 //! `@route`s go `send`'s path (`proto_input`).
 
+use super::super::capsule::Took;
 use super::super::page_cards::Page;
 use super::*;
 use bise_proto::hub::SendOpts;
@@ -524,13 +525,16 @@ impl Shell {
         // A1: the id sb-core gives his message comes back typed with its
         // step (AStep.msg -> Hub::said), never read from a line; a send
         // answers it as its result (`command/run` answers its words)
+        // send-reason: no message, its reason (proto/send.rs)
         self.hub.said = None;
+        let mut took = Took::Stepped;
         self.stepping(id, tag, cid, |sh| {
             sh.keys_changed();
-            sh.input(id, &op);
+            took = sh.input(id, &op);
         });
-        if let Some(msg_id) = self.hub.said.take().filter(|_| tag == "send") {
-            let r = bise_proto::rpc::SendResult { msg_id: Some(msg_id) };
+        let said = self.hub.said.take();
+        if tag == "send" {
+            let r = super::send::send_result(took, said);
             self.rpc_set_result(serde_json::to_value(r).unwrap_or_default());
         }
     }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Entry } from "@/proto";
 import type { CoreCmd } from "@/shared/api";
-import { answered, echoOf, keepLanded, sentOf } from "./echo";
+import { answered, echoOf, keepLanded, sentOf, ECHO_SLACK_MS } from "./echo";
 import { Store, threadKey, type Pending } from "./store";
 
 const P = "acme-1a2b3c4d";
@@ -39,23 +39,58 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
   it("never by its words: another id, no id, or a send not answered yet takes nothing", () => {
     expect(echoOf([row(1, "ok", { msgId: 10 })], you(4, "ok", 99))).toBe(-1);
     expect(echoOf([row(1, "ok", { msgId: 10 })], you(4, "ok"))).toBe(-1);
-    expect(echoOf([row(1, "ok", { msgId: null })], you(4, "ok", 99))).toBe(-1);
     expect(echoOf([row(1, "ok")], you(4, "ok", 99))).toBe(-1);
     expect(echoOf([row(1, "ok")], you(4, "ok"))).toBe(-1);
+    expect(echoOf([row(1, "ok", { state: "failed" })], you(4, "ok", 99))).toBe(-1);
   });
 
-  it("an answer gives its row the id; when that entry landed first, the row goes", () => {
+  it("but a row the core went down before answering (lost) is taken by its words: it may have reached the hub (restores ff9c5cdd5's match for that case only, until send-reason sha 2's cid)", () => {
+    const lost = { state: "failed", lost: true } as const;
+    expect(echoOf([row(1, "ok", lost)], you(4, "ok", 99))).toBe(0);
+    expect(echoOf([row(1, "ok", lost)], you(4, "no", 99))).toBe(-1);
+    // a lost row answered with an id meets only that id
+    expect(echoOf([row(1, "ok", { ...lost, msgId: 5 })], you(4, "ok", 99))).toBe(-1);
+    // an entry written before the send (less the slack) is an older one, never its echo
+    expect(echoOf([row(1, "ok", { ...lost, at_ms: 2000 + ECHO_SLACK_MS + 1 })], you(4, "ok", 99))).toBe(-1);
+    expect(echoOf([row(1, "ok", { ...lost, at_ms: 2000 + ECHO_SLACK_MS })], you(4, "ok", 99))).toBe(0);
+    // two lost rows with the same words: the oldest
+    expect(echoOf([row(1, "ok", lost), row(2, "ok", lost)], you(4, "ok", 99))).toBe(0);
+  });
+
+  it("the store: one entry clears one of two lost rows with its words; a retry of a lost row is a new send, met by its id only", () => {
+    const store = new Store({ send: () => undefined }, { now: () => 1000 });
+    store.setCore("up");
+    store.send({ project: P, agent: "perf", text: "ok" });
+    store.send({ project: P, agent: "perf", text: "ok" });
+    store.setCore("down");
+    store.setCore("up");
+    expect(store.pending(K).map((p) => p.lost)).toEqual([true, true]);
+    store.apply({ ev: "entry", project: P, agent: "perf", entry: you(4, "ok", 41) });
+    expect(store.pending(K).map((p) => p.cid)).toEqual([2]);
+    store.retry(K, 2);
+    const again = store.pending(K);
+    expect(again.map((p) => [p.cid, p.state, p.lost])).toEqual([[3, "sending", undefined]]);
+    store.apply({ ev: "entry", project: P, agent: "perf", entry: you(5, "ok", 42) });
+    expect(store.pending(K).map((p) => p.cid)).toEqual([3]);
+  });
+
+  it("a message made: its row learns the id; when that entry landed first, the row goes", () => {
     const rows = [row(1, "ok"), row(2, "ok")];
-    const s = { project: P, agent: "perf", cid: 2, msg_id: 11 };
+    const s = { project: P, agent: "perf", cid: 2, msg_id: 11, reason: "made" } as const;
     expect(answered(rows, s, new Set())?.map((p) => p.msgId)).toEqual([
       undefined,
       11,
     ]);
     expect(answered(rows, s, new Set([11]))?.map((p) => p.cid)).toEqual([1]);
     expect(answered(rows, { ...s, cid: 9 }, new Set())).toBeNull();
-    expect(
-      answered(rows, { ...s, msg_id: null }, new Set())?.[1]?.msgId,
-    ).toBeNull();
+  });
+
+  it("send-reason: no message made (a page took it, a command ran, a newer reason, an older hub's {}): the row goes on the answer; routed: it stays for its route", () => {
+    const rows = [row(1, "ok"), row(2, "ok")];
+    const none = { project: P, agent: "perf", cid: 2, msg_id: null };
+    for (const reason of ["page", "command", "unknown", null] as const)
+      expect(answered(rows, { ...none, reason }, new Set())?.map((p) => p.cid), String(reason)).toEqual([1]);
+    expect(answered(rows, { ...none, reason: "routed" }, new Set())).toBe(rows);
   });
 
   it("keeps the last 32 landed ids, an entry without one keeps nothing", () => {
@@ -68,11 +103,11 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
 
   it("reads only a well-formed 'sent'", () => {
     expect(
-      sentOf({ ev: "sent", project: P, agent: "perf", cid: 3, msg_id: 7 }),
-    ).toEqual({ project: P, agent: "perf", cid: 3, msg_id: 7 });
+      sentOf({ ev: "sent", project: P, agent: "perf", cid: 3, msg_id: 7, reason: "made" }),
+    ).toEqual({ project: P, agent: "perf", cid: 3, msg_id: 7, reason: "made" });
     expect(
-      sentOf({ ev: "sent", project: P, agent: "perf", cid: 3 })?.msg_id,
-    ).toBeNull();
+      sentOf({ ev: "sent", project: P, agent: "perf", cid: 3 }),
+    ).toEqual({ project: P, agent: "perf", cid: 3, msg_id: null, reason: null });
     expect(sentOf({ ev: "sent", project: P, agent: "perf" })).toBeNull();
     expect(sentOf({ ev: "entry" })).toBeNull();
   });
@@ -91,9 +126,10 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
         agent: "perf",
         cid: a,
         msg_id: 10,
+        reason: "made",
       }),
     ).toBe(true);
-    store.apply({ ev: "sent", project: P, agent: "perf", cid: b, msg_id: 11 });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: b, msg_id: 11, reason: "made" });
     store.apply({
       ev: "entry",
       project: P,
@@ -116,7 +152,7 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
     store.send({ project: P, agent: "perf", text: "ok" });
     store.send({ project: P, agent: "perf", text: "ok" });
     const [a, b] = store.pending(K).map((p) => p.cid);
-    store.apply({ ev: "sent", project: P, agent: "perf", cid: a, msg_id: 10 });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: a, msg_id: 10, reason: "made" });
     // b is not answered yet: its entry (id 11) takes no row by its words, its id is kept
     store.apply({
       ev: "entry",
@@ -126,7 +162,7 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
     });
     expect(store.pending(K).map((p) => p.cid)).toEqual([a, b]);
     // b's answer: its entry landed already, the row goes
-    store.apply({ ev: "sent", project: P, agent: "perf", cid: b, msg_id: 11 });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: b, msg_id: 11, reason: "made" });
     expect(store.pending(K).map((p) => p.cid)).toEqual([a]);
     // a's answer came first; now its entry: gone
     store.apply({
@@ -143,7 +179,7 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
     store.setCore("up");
     store.send({ project: P, agent: "perf", text: "ok" });
     const [a] = store.pending(K).map((p) => p.cid);
-    store.apply({ ev: "sent", project: P, agent: "perf", cid: a, msg_id: 10 });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: a, msg_id: 10, reason: "made" });
     store.send({ project: P, agent: "perf", text: "go" });
     const b = store.pending(K)[1]?.cid;
     // 'go' answered with 12 later; its entry first, with words that differ from his row (a template)
@@ -154,7 +190,7 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
       entry: you(6, "go (edited)", 12),
     });
     expect(store.pending(K)).toHaveLength(2);
-    store.apply({ ev: "sent", project: P, agent: "perf", cid: b, msg_id: 12 });
+    store.apply({ ev: "sent", project: P, agent: "perf", cid: b, msg_id: 12, reason: "made" });
     expect(store.pending(K).map((p) => p.cid)).toEqual([a]);
   });
 });

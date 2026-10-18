@@ -196,9 +196,12 @@ export interface Pending {
   readonly at_ms: number;
   readonly state: 'sending' | 'failed';
   readonly why?: string;
-  /** A1: the message id the hub answered the send with (echo.ts); null: answered without one (an
-   *  older hub); absent: not answered yet */
-  readonly msgId?: number | null;
+  /** A1: the message id the hub answered the send with (echo.ts); absent: not answered yet (a
+   *  send answered with no message has no row: send-reason) */
+  readonly msgId?: number;
+  /** the core went down before its answer: 'not sent', yet it may have reached the hub (echo.ts
+   *  echoOf takes it by its words; send-reason sha 2: by its cid) */
+  readonly lost?: true;
 }
 
 /**
@@ -296,5 +299,47 @@ export function sameOrder(a: readonly number[], b: readonly number[]): boolean {
 
 export function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * His message as sent, from its typed parts, to match a pending send with its echo: the words
+ * (spaces collapsed), each paste, quote and file by its content, each image by its name (the hub
+ * fills its b64_file and mime on the kept part). Pure.
+ */
+export function sentParts(parts: readonly Part[]): string {
+  return parts
+    .map((p) => {
+      switch (p.kind) {
+        case 'text':
+          return p.text;
+        case 'image':
+          return `\u0000image:${p.name}\u0000`;
+        case 'file':
+          return `\u0000file:${p.path}\u0000`;
+        // a part of an artifact: which one, which version, where (the hub may add its rev)
+        case 'anchor':
+          return `\u0000anchor:${p.artifact}:${String(p.version)}:${JSON.stringify(p.anchor)}\u0000`;
+        default:
+          return `\u0000${p.kind}:${p.text}\u0000`;
+      }
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * His words as sent, to match a pending send with its echo: the hub's image markers
+ * (`<image name="[Image #1]" path=… mime=… b64=…>`, rust/images marker()) and the composer's
+ * '[Image #n]' labels out, and the same for files (`<file name="[File #2]" path=…[ missing="true"]>`,
+ * bise_proto parts, file-chips; '[File #n]'), spaces collapsed. Pure.
+ */
+export function sentWords(text: string): string {
+  return text
+    .replace(/<image name="[^"]*" path="[^"]*" mime="[^"]*" b64="[^"]*">/g, ' ')
+    .replace(/<file name="[^"]*" path="[^"]*"(?: missing="true")?>/g, ' ')
+    .replace(/\[(?:Image|File) #\d+\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
