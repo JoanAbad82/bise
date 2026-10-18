@@ -286,7 +286,7 @@ function wear(w: Wear): void {
 export const haveli: MapLook = {
   id: 'haveli',
   // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
-  cozy: { plant: 'tulsi', small: 'tulsi', coffee: 'chai', bed: 'charpai', shelf: 'brasslamp', poster: 'tapestry', wood: '#8a5a3c', cloth: ['#e9c46a', '#2a9d8f', '#3d6fb6'], art: ['#3d6fb6', '#e9c46a', '#2a9d8f'], pot: '#c98a3e' },
+  cozy: { plant: 'tulsi', small: 'tulsi', coffee: 'chai', bed: 'charpai', shelf: 'brasslamp', poster: 'tapestry', wood: '#8a5a3c', cloth: ['#e9c46a', '#2a9d8f', '#3d6fb6'], art: ['#3d6fb6', '#e9c46a', '#2a9d8f'], pot: '#c98a3e', rug: '#e9c46a' },
   pal,
   shell,
   island,

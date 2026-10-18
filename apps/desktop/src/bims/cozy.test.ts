@@ -21,12 +21,12 @@ describe('the cozy curve', () => {
 
   it('adds one thing at each stage and never takes one away', () => {
     const at = Array.from({ length: LAST_STAGE + 1 }, (_, s) => cozyAt(s));
-    expect(at[0]).toMatchObject({ floorPlants: 1, hanging: false, coffeeOnIsland: false, deskObjects: 1, framed: false, shelfRows: 1, floorLamps: 1, trophy: 'none' });
-    expect(at[1]?.floorPlants).toBe(2);
+    expect(at[0]).toMatchObject({ floorPlants: 2, hanging: false, coffeeOnIsland: false, deskObjects: 1, framed: false, shelfRows: 1, floorLamps: 1, trophy: 'none' });
+    expect(at[1]?.floorPlants).toBe(3);
     expect(at[2]?.coffeeOnIsland).toBe(true);
     expect(at[3]?.cushions).toBe(true);
     expect(at[4]?.deskObjects).toBe(2);
-    expect(at[5]).toMatchObject({ floorPlants: 3, hanging: true });
+    expect(at[5]).toMatchObject({ floorPlants: 4, hanging: true });
     expect(at[6]?.framed).toBe(true);
     expect(at[7]?.throwOn).toBe(true);
     expect(at[8]?.shelfRows).toBe(2);

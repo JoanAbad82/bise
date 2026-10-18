@@ -7,7 +7,7 @@
 // front; a side gallery's chair walks out between two desks to its aisle. Pure. Owner: maps-b.
 import type { Agent } from '@/proto';
 import { bims } from '@/proto/words_bims.gen';
-import type { Box, Leg, Pt, Spot } from '../model';
+import type { Box, Leg, Office, Pt, Spot } from '../model';
 import { type BOffice, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, type Things, boxAt } from './plan';
 
@@ -111,4 +111,15 @@ const THINGS: Things = {
   8: bims.stage_riad_8, 9: bims.stage_riad_9, 10: bims.stage_riad_10, 11: bims.stage_riad_11, 12: bims.stage_riad_12, 13: bims.stage_riad_13, 14: bims.stage_riad_14,
 };
 
-export const riad: Plan<RiadOffice> = { id: 'riad', ready: true, layout: riadLayout, things: THINGS };
+/** the patio's arcades on its sides and the orange trees in its corners (render/maps/riad.ts): nothing cozy along its edges */
+const riadKeep = (o: Office): Box[] => {
+  const p = (o as RiadOffice).patio;
+  return [
+    { x0: p.x0 - 0.5, x1: p.x0 + 1.3, z0: p.z0 - 0.5, z1: p.z1 + 0.5 },
+    { x0: p.x1 - 1.3, x1: p.x1 + 0.5, z0: p.z0 - 0.5, z1: p.z1 + 0.5 },
+    { x0: p.x0 - 0.5, x1: p.x1 + 0.5, z0: p.z0 - 0.5, z1: p.z0 + 1.3 },
+    { x0: p.x0 - 0.5, x1: p.x1 + 0.5, z0: p.z1 - 1.3, z1: p.z1 + 0.5 },
+  ];
+};
+
+export const riad: Plan<RiadOffice> = { id: 'riad', ready: true, layout: riadLayout, things: THINGS, cozy: { keepOut: riadKeep } };

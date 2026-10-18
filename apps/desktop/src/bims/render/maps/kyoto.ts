@@ -262,7 +262,7 @@ function lounge(b: Build): void {
 export const kyoto: MapLook = {
   id: 'kyoto',
   // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
-  cozy: { plant: 'bamboo', small: 'succulent', coffee: 'teaset', bed: 'mat', shelf: 'vase', poster: 'kakemono', wood: '#7a5a3c', cloth: ['#3d4f7a', '#6b8f71', '#e9e2d4'], art: ['#3d4f7a', '#6b8f71', '#c9a24a'], pot: '#4f6d7a' },
+  cozy: { plant: 'bamboo', small: 'succulent', coffee: 'teaset', bed: 'mat', shelf: 'vase', poster: 'kakemono', wood: '#7a5a3c', cloth: ['#3d4f7a', '#6b8f71', '#e9e2d4'], art: ['#3d4f7a', '#6b8f71', '#c9a24a'], pot: '#4f6d7a', rug: '#6b8f71' },
   pal: palettes(
     { floor: '#d6cc95', wall: '#e8dcc0', wallTop: '#5c3d2e', desk: '#5c3d2e', deskTop: '#7a5a3c', island: '#5c3d2e', islandTop: '#7a5a3c', grass: '#7fa35a', dirt: '#6b5a48', terrace: '#9a8f80', rug: '#a8c96a' },
     { desk: '#7a5a3c', deskTop: '#94704e', island: '#7a5a3c', islandTop: '#94704e' },

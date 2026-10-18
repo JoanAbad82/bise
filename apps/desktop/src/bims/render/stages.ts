@@ -13,6 +13,7 @@ import { type Decor, decorOf } from './decor';
 import { type Kit, boxOf, glyph, onFloor } from './kit';
 import { WORLD, hash, rng } from './palette';
 import type { Build } from './maps/look';
+import { frameXs } from './cozy';
 
 
 const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;
@@ -311,12 +312,13 @@ function frames(k: Kit, parent: Object3D, o: Office, g: Grow): void {
   // from stage 11 the arcade cabinet stands at the span's start: the frames hang past it
   const xa = g.stage >= 11 ? arcadeAt(o).x + ARCADE_W / 2 + 0.1 : boardX(o) + 1.1;
   const xb = o.mainDesk.x - 0.5;
-  const cols = Math.max(1, Math.floor((xb - xa) / pitch));
+  // round the cozy posters (render/cozy.ts frameXs)
+  const xs = frameXs(o, xa, xb, pitch);
+  const cols = xs.length;
   const border = k.mat(g.golden ? WORLD.gold : WORLD.crate);
   for (let i = 0; i < g.frames; i++) {
-    const c = i % cols;
     const row = Math.floor(i / cols);
-    const x = xa + pitch / 2 + c * pitch;
+    const x = xs[i % cols] ?? xa;
     const y = 1.45 - row * 0.32;
     if (y < 0.6) break;
     k.add(style.box(0.28, 0.22, 0.02), border, parent, x, y, 0.02 + style.pictureZ);

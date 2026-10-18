@@ -77,7 +77,7 @@ function island(b: Build): void {
 export const greenhouse: MapLook = {
   id: 'greenhouse',
   // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
-  cozy: { plant: 'pothos', small: 'succulent', hang: 'fern', coffee: 'kettle', bed: 'cushion', shelf: 'jars', poster: 'botanic', wood: '#a0704a', cloth: ['#7cc26b', '#e9c46a', '#f3efe4'], art: ['#5fb35a', '#e9c46a', '#6cb4ee'], pot: '#c98a3e' },
+  cozy: { plant: 'pothos', small: 'succulent', hang: 'fern', coffee: 'kettle', bed: 'cushion', shelf: 'jars', poster: 'botanic', wood: '#a0704a', cloth: ['#7cc26b', '#e9c46a', '#f3efe4'], art: ['#5fb35a', '#e9c46a', '#6cb4ee'], pot: '#c98a3e', rug: '#7cc26b' },
   pal: palettes(
     { floor: '#e3b48f', wall: '#cfe8ee', wallTop: '#9cc7d1', desk: '#f3efe6', deskTop: '#ffffff', island: '#c49a6c', islandTop: '#e9d4b4', window: '#cfe8ee', rug: '#7cc26b' },
     { window: '#3b5f7a', desk: '#c9c2b4', deskTop: '#ddd6c8' },

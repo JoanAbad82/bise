@@ -262,7 +262,7 @@ function island(b: Build): void {
 export const riad: MapLook = {
   id: 'riad',
   // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
-  cozy: { plant: 'palm', small: 'aloe', coffee: 'teapot', bed: 'cushion', shelf: 'jars', poster: 'rug', wood: '#a0704a', cloth: ['#3d6fb6', '#e9c46a', '#f1e6d2'], art: ['#2a9d8f', '#e9c46a', '#3d6fb6'], pot: '#2a9d8f' },
+  cozy: { plant: 'palm', small: 'aloe', coffee: 'teapot', bed: 'cushion', shelf: 'jars', poster: 'rug', wood: '#a0704a', cloth: ['#3d6fb6', '#e9c46a', '#f1e6d2'], art: ['#2a9d8f', '#e9c46a', '#3d6fb6'], pot: '#2a9d8f', rug: '#3d6fb6' },
   pal: palettes(
     { floor: '#d9a36f', wall: '#d98e4f', wallTop: '#c47a3e', desk: '#a0704a', deskTop: '#b8875c', island: TEAL, islandTop: '#e9f5f2', grass: '#c9b27a', dirt: '#a8764a', terrace: '#e6c9a0', rug: '#f1e6d2' },
     { desk: '#9a6a48', deskTop: '#b07a52', island: '#1f7a70' },

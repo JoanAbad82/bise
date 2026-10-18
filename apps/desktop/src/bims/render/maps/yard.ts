@@ -24,6 +24,7 @@ import { glyph, type Kit } from '../kit';
 import { HOODIE, WORLD, hash, type Palette } from '../palette';
 import { cones, deckChair, garden } from '../stages';
 import type { Build, DeskHandles } from './look';
+import { frameXs } from '../cozy';
 
 /** a colour as the night sees it (the prototype's NC): darker, so the room reads in the dark theme */
 export const nc = (c: string, night: boolean, k = 0.62): string => (night ? `#${new Color(c).multiplyScalar(k).getHexString()}` : c);
@@ -223,11 +224,13 @@ export function frames(b: Build, wall: FrameWall, draw: (k: Kit, parent: Object3
   const s0 = b.stage(0);
   if (!s0 || grow.frames === 0) return;
   const pitch = 0.36;
-  const cols = Math.max(1, Math.floor((wall.xb - wall.xa) / pitch));
+  // round the cozy posters (render/cozy.ts frameXs)
+  const xs = frameXs(b.o, wall.xa, wall.xb, pitch);
+  const cols = xs.length;
   for (let i = 0; i < grow.frames; i++) {
     const y = wall.y - Math.floor(i / cols) * 0.32;
     if (y < 0.6) break;
-    draw(k, s0, wall.xa + pitch / 2 + (i % cols) * pitch, y, 0.02 + k.style.pictureZ, i, grow.golden);
+    draw(k, s0, xs[i % cols] ?? wall.xa, y, 0.02 + k.style.pictureZ, i, grow.golden);
   }
 }
 

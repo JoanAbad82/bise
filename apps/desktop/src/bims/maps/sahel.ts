@@ -6,6 +6,7 @@
 // the left, the slate, main's desk on the right; the granaries in the corner. Owner: maps-c.
 import type { Agent } from '@/proto';
 import type { Box, Leg, Office, Pt, Spot } from '../model';
+import { backBusy, backFrames, type CozyHints } from '../cozy';
 import { type Plan, boxAt, deskNames } from './plan';
 import { CROSS_BACK, backZone, frontZone, keepSlots, slotsUsed, walksOf } from './yard';
 
@@ -80,4 +81,15 @@ export function sahelLayout(agents: readonly Agent[], prev?: SahelOffice): Sahel
   return { ...base, walks: walksOf(base, trunk), queueMore: back.queueMore, rows, hangar, tree };
 }
 
-export const sahel: Plan<SahelOffice> = { id: 'sahel', ready: true, layout: sahelLayout };
+/** its look's back wall (render/maps/sahel.ts shell): a tower every quarter of it, no poster on one */
+const sahelCozy: CozyHints = {
+  walls: (o) => [
+    { wall: 'back', top: 1.7, busy: [...backBusy(o), ...Array.from({ length: 5 }, (_, i): [number, number] => [o.x0 + (i * o.W) / 4 - 0.45, o.x0 + (i * o.W) / 4 + 0.45])], frames: backFrames(o) },
+    { wall: 'left', top: 1.0 },
+    { wall: 'right', top: 0 },
+  ],
+  // the water jars by the door (render/maps/sahel.ts shell)
+  keepOut: (o) => [{ x0: o.door.x + 0.5, x1: o.door.x + 1.95, z0: o.D - 0.6, z1: o.D }],
+};
+
+export const sahel: Plan<SahelOffice> = { id: 'sahel', ready: true, layout: sahelLayout, cozy: sahelCozy };

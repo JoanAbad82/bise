@@ -279,7 +279,7 @@ function wear(w: Wear): void {
 export const cyclades: MapLook = {
   id: 'cyclades',
   // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
-  cozy: { plant: 'geranium', small: 'succulent', coffee: 'carafe', bed: 'bench', shelf: 'boat', poster: 'sea', wood: '#d8d2c6', cloth: ['#3d6fb6', '#6cb4ee', '#f3efe4'], art: ['#3d6fb6', '#e9c46a', '#6cb4ee'], pot: '#c98a3e' },
+  cozy: { plant: 'geranium', small: 'succulent', coffee: 'carafe', bed: 'bench', shelf: 'boat', poster: 'sea', wood: '#d8d2c6', cloth: ['#3d6fb6', '#6cb4ee', '#f3efe4'], art: ['#3d6fb6', '#e9c46a', '#6cb4ee'], pot: '#c98a3e', rug: '#3d6fb6' },
   pal,
   shell,
   island,

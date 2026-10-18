@@ -8,6 +8,7 @@
 // Owner: maps-b.
 import type { Agent } from '@/proto';
 import type { Box, Leg, Pt, Spot } from '../model';
+import { backBusy, backFrames, type CozyHints } from '../cozy';
 import { type BOffice, LOFT_LIKE, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, boxAt } from './plan';
 
@@ -105,4 +106,13 @@ export function greenhouseLayout(agents: readonly Agent[], prev?: GreenhouseOffi
   };
 }
 
-export const greenhouse: Plan<GreenhouseOffice> = { id: 'greenhouse', ready: true, layout: greenhouseLayout, things: LOFT_LIKE };
+/** its look's back wall (render/maps/greenhouse.ts shell): glass with six pots hanging along it, no poster on one */
+const greenhouseCozy: CozyHints = {
+  walls: (o) => [
+    { wall: 'back', top: 1.9, busy: [...backBusy(o), ...Array.from({ length: 6 }, (_, i): [number, number] => [o.x0 + ((i + 0.5) * o.W) / 6 - 0.35, o.x0 + ((i + 0.5) * o.W) / 6 + 0.35])], frames: backFrames(o) },
+    { wall: 'left', top: 1.9 },
+    { wall: 'right', top: 0 },
+  ],
+};
+
+export const greenhouse: Plan<GreenhouseOffice> = { id: 'greenhouse', ready: true, layout: greenhouseLayout, things: LOFT_LIKE, cozy: greenhouseCozy };

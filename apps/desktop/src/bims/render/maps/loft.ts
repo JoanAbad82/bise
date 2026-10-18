@@ -113,7 +113,7 @@ function desk({ k, root: parent, o }: Build, d: Spot, name: string): DeskHandles
 export const loft: MapLook = {
   id: 'loft',
   // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
-  cozy: { plant: 'monstera', small: 'cactus', coffee: 'espresso', bed: 'pouf', shelf: 'vinyl', poster: 'flat', wood: '#c49a6c', cloth: ['#f39a4c', '#6cb4ee', '#e9e2d4'], art: ['#ffd166', '#6cb4ee', '#7cc26b'], pot: '#f39a4c' },
+  cozy: { plant: 'monstera', small: 'cactus', coffee: 'espresso', bed: 'pouf', shelf: 'vinyl', poster: 'flat', wood: '#c49a6c', cloth: ['#f39a4c', '#6cb4ee', '#e9e2d4'], art: ['#ffd166', '#6cb4ee', '#7cc26b'], pot: '#f39a4c', rug: '#ffd166' },
   pal: paletteOf,
   shell,
   island,

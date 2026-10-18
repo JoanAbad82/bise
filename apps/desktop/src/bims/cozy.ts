@@ -10,7 +10,7 @@ import type { Box, Leg, Office, Pt, Spot } from './model';
 
 /** What the cozy kit draws at a stage (page bims-cozy v2 « la nouvelle courbe »). */
 export interface CozyStage {
-  /** floor plants: 1 at 0 (the shelf's small one besides), 2 from 1, 3 from 5 */
+  /** big floor plants: 2 at 0 (by the door, by main's desk; the shelf's small one besides), 3 from 1, 4 from 5 */
   readonly floorPlants: number;
   /** 5: a hanging plant */
   readonly hanging: boolean;
@@ -47,7 +47,7 @@ export function cozyAt(stage: number): CozyStage {
   const s = Math.max(0, stage);
   const A = COZY_AT;
   return {
-    floorPlants: s >= A.plant3 ? 3 : s >= A.plant2 ? 2 : 1,
+    floorPlants: s >= A.plant3 ? 4 : s >= A.plant2 ? 3 : 2,
     hanging: s >= A.hanging,
     coffeeOnIsland: s >= A.coffeeIsland,
     cushions: s >= A.cushions,
@@ -69,8 +69,10 @@ export type Wall = 'back' | 'left' | 'right';
 export interface WallOf {
   readonly wall: Wall;
   readonly top: number;
-  /** along the wall (x for the back wall, z for a side one) from..to: no poster there */
+  /** along the wall (x for the back wall, z for a side one) from..to: nothing hangs or stands there (a board, a mural, a neon) */
   readonly busy?: readonly (readonly [number, number])[];
+  /** where the artifacts' frames hang, rows down to ~0.5: a poster may hang there (the frames go round it), nothing stands under it */
+  readonly frames?: readonly (readonly [number, number])[];
 }
 
 /**
@@ -122,22 +124,28 @@ export interface Cozy {
   readonly rug: Box | null;
   /** the eating place's top height (stage 2's coffee set), none: it stays in the corner */
   readonly islandTop?: number;
-  /** what stage 5's hanging plant hangs over: the shelf or the cabinet when its wall is tall enough; null: neither */
-  readonly hangOver: 'shelf' | 'coffee' | null;
+  /** what stage 5's hanging plant hangs over: the shelf when its wall is tall enough; null: none */
+  readonly hangOver: 'shelf' | null;
 }
 
 /** the walls most rooms have (the loft's): the tall back one, the low left one, the right one cut away (a piece stands by its edge, nothing hangs on it) */
-export const DEFAULT_WALLS = (o: Office): WallOf[] => [{ wall: 'back', top: 1.7, busy: backBusy(o) }, { wall: 'left', top: 1.0 }, { wall: 'right', top: 0 }];
+export const DEFAULT_WALLS = (o: Office): WallOf[] => [{ wall: 'back', top: 1.7, busy: backBusy(o), frames: backFrames(o) }, { wall: 'left', top: 1.0 }, { wall: 'right', top: 0 }];
 
 const avg = (xs: readonly number[], or: number): number => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : or);
 
-/** the back wall's spans already taken by the loft-like pieces: the board, the frames up to main's neon, the mural over the lounge */
+/** the back wall's spans the loft-like pieces take: the board, main's neon, the mural over the lounge */
 export function backBusy(o: Office): [number, number][] {
   const bx = avg(o.boardSpots.map((s) => s.x), o.x0 + o.W / 2);
   const lx = o.lounge.map((s) => s.x);
-  const out: [number, number][] = [[bx - 1.0, Math.max(bx + 1.0, o.mainDesk.x + 0.5)]];
+  const out: [number, number][] = [[bx - 1.0, bx + 1.0], [o.mainDesk.x - 0.5, o.mainDesk.x + 0.5]];
   if (lx.length) out.push([Math.min(...lx) - 0.6, Math.max(...lx) + 0.6]);
   return out;
+}
+
+/** where the loft-like frames hang on the back wall: from past the board to main's neon */
+export function backFrames(o: Office): [number, number][] {
+  const bx = avg(o.boardSpots.map((s) => s.x), o.x0 + o.W / 2);
+  return bx + 1.0 < o.mainDesk.x - 0.5 ? [[bx + 1.0, o.mainDesk.x - 0.5]] : [];
 }
 
 // ---- placing
@@ -175,17 +183,22 @@ const FURN_CLEAR = 0.08;
 const PIECE_CLEAR = 0.75;
 /** how far off its wall a piece stands or hangs (a wall's face may stand a little into the room) */
 const WALL_GAP = 0.05;
+/** a free-standing piece's grid, and how far from what it belongs by it may stand */
+const FREE_STEP = 0.15;
+const FREE_REACH = 4;
 /** the step pieces slide along a wall by */
 const STEP = 0.1;
 
 /** the sizes of the pieces: along the wall, deep, high */
 export const SIZE = {
-  coffee: { w: 0.8, d: 0.45, h: 1.0 },
-  shelf: { w: 1.1, d: 0.35, h: 0.8 },
-  lamp: { w: 0.36, d: 0.36, h: 1.35 },
-  plant: { w: 0.46, d: 0.46, h: 1.1 },
-  poster: { w: 0.42, h: 0.52 },
+  coffee: { w: 0.85, d: 0.5, h: 1.35 },
+  shelf: { w: 1.1, d: 0.35, h: 0.9 },
+  lamp: { w: 0.44, d: 0.44, h: 1.65 },
+  plant: { w: 0.8, d: 0.8, h: 1.25 },
+  poster: { w: 0.8, h: 1.0 },
 } as const;
+/** the nap corner's rug at least this big (along x, along z): the room's anchor from day one (bims m_32218) */
+export const RUG = { w: 2.5, d: 1.8 } as const;
 /** how far behind its spot a napper's head reaches, and its half width (pose.ts's lying head, with room) */
 const HEAD_BACK = 0.9;
 const HEAD_HALF = 0.3;
@@ -196,18 +209,40 @@ const COFFEE_STAND = 0.42;
 
 const overlap = (a: Box, b: Box, m = 0): boolean => a.x0 < b.x1 + m && a.x1 > b.x0 - m && a.z0 < b.z1 + m && a.z1 > b.z0 - m;
 
+/** the distance from point p to segment a-b */
+function segDist(p: Pt, a: Pt, b: Pt): number {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const l2 = dx * dx + dz * dz;
+  const f = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)) : 0;
+  return Math.hypot(p.x - (a.x + dx * f), p.z - (a.z + dz * f));
+}
+
+/** whether segment a-b crosses the box's inside or edge (Liang-Barsky clip) */
+function segHitsBox(a: Pt, b: Pt, box: Box): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  for (const [p, q] of [[-dx, a.x - box.x0], [dx, box.x1 - a.x], [-dz, a.z - box.z0], [dz, box.z1 - a.z]] as const) {
+    if (Math.abs(p) < 1e-12) {
+      if (q < 0) return false;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+
 /** the distance from a leg to a box (0 when it goes through) */
 export function legToBox([a, b]: Leg, box: Box): number {
-  const n = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.05));
-  let best = Infinity;
-  for (let i = 0; i <= n; i++) {
-    const x = a.x + ((b.x - a.x) * i) / n;
-    const z = a.z + ((b.z - a.z) * i) / n;
-    const dx = Math.max(box.x0 - x, 0, x - box.x1);
-    const dz = Math.max(box.z0 - z, 0, z - box.z1);
-    best = Math.min(best, Math.hypot(dx, dz));
-  }
-  return best;
+  if (segHitsBox(a, b, box)) return 0;
+  const toBox = (p: Pt): number => Math.hypot(Math.max(box.x0 - p.x, 0, p.x - box.x1), Math.max(box.z0 - p.z, 0, p.z - box.z1));
+  const corners: Pt[] = [{ x: box.x0, z: box.z0 }, { x: box.x1, z: box.z0 }, { x: box.x0, z: box.z1 }, { x: box.x1, z: box.z1 }];
+  return Math.min(toBox(a), toBox(b), ...corners.map((c) => segDist(c, a, b)));
 }
 
 /** the floor box of a piece w along the wall, d deep, its middle at `at` along it */
@@ -264,8 +299,9 @@ function spotsFor(r: Room, w: number, d: number, to: Pt): Item[] {
 function freeSpots(r: Room, w: number, d: number, to: Pt): Item[] {
   const { o } = r;
   const out: Item[] = [];
-  for (let x = o.x0 + w / 2 + 0.1; x <= o.x0 + o.W - w / 2 - 0.1; x += STEP) {
-    for (let z = d / 2 + 0.1; z <= o.D - d / 2 - 0.1; z += STEP) {
+  for (let x = o.x0 + w / 2 + 0.1; x <= o.x0 + o.W - w / 2 - 0.1; x += FREE_STEP) {
+    for (let z = d / 2 + 0.1; z <= o.D - d / 2 - 0.1; z += FREE_STEP) {
+      if (Math.abs(x - to.x) > FREE_REACH || Math.abs(z - to.z) > FREE_REACH) continue;
       const cx = Math.round(x * 100) / 100;
       const cz = Math.round(z * 100) / 100;
       out.push({ box: { x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 }, wall: 'free', face: 0, h: 0 });
@@ -275,7 +311,23 @@ function freeSpots(r: Room, w: number, d: number, to: Pt): Item[] {
   return out.sort((p, q) => dist(p) - dist(q));
 }
 
-function place(r: Room, w: number, d: number, h: number, to: Pt, ok: (i: Item) => boolean = () => true): Item | null {
+/**
+ * The nearest place to `to` a piece of w by d may stand: against a wall, else free on the floor;
+ * `free`: wall and free places together, the nearest wins (a piece that belongs by something: the
+ * coffee corner by the eating place, the lamp by the nap corner, a plant by the door).
+ */
+function place(r: Room, w: number, d: number, h: number, to: Pt, free = false, ok: (i: Item) => boolean = () => true): Item | null {
+  if (free) {
+    const dist = (i: Item): number => Math.hypot(centre(i.box).x - to.x, centre(i.box).z - to.z);
+    const all = [...spotsFor(r, w, d, to).filter((i) => !onBusy(r, i)), ...freeSpots(r, w, d, to)].sort((p, q) => dist(p) - dist(q));
+    for (const i of all) {
+      if (!clear(r, i.box) || !ok(i)) continue;
+      const it = { ...i, h };
+      r.taken.push(it.box);
+      return it;
+    }
+    return null;
+  }
   for (const i of spotsFor(r, w, d, to)) {
     if (onBusy(r, i) || !clear(r, i.box) || !ok(i)) continue;
     const it = { ...i, h };
@@ -296,7 +348,7 @@ function place(r: Room, w: number, d: number, h: number, to: Pt, ok: (i: Item) =
 function onBusy(r: Room, i: Item): boolean {
   const wl = r.walls.find((w) => w.wall === i.wall);
   const [lo, hi] = i.wall === 'back' ? [i.box.x0, i.box.x1] : [i.box.z0, i.box.z1];
-  return (wl?.busy ?? []).some(([s, e]) => hi > s - 0.05 && lo < e + 0.05);
+  return [...(wl?.busy ?? []), ...(wl?.frames ?? [])].some(([s, e]) => hi > s - 0.05 && lo < e + 0.05);
 }
 
 /** the coffee corner's spot: in front of the cabinet, facing it, and its leg to the nearest walk it reaches clear */
@@ -324,15 +376,15 @@ function coffeeSpot(r: Room, it: Item): { spot: Spot; leg: Leg } | null {
   return { spot, leg: [p, best.q] };
 }
 
-/** A poster's place on a wall with room for one: over `near` when it can, off its busy spans and the others. */
+/** A poster's place on a wall with room for one: the back wall first, near `near`, off its busy spans and the others (the frames go round it). */
 function hang(r: Room, near: Pt, others: readonly Hung[], floor: readonly Item[]): Hung | null {
   const { o } = r;
   const { w, h } = SIZE.poster;
   const cands: { hg: Hung; d: number }[] = [];
   for (const wl of r.walls) {
     if (wl.top < 0.95) continue;
-    const ph = Math.min(h, wl.top - 0.5);
-    const y = wl.top - 0.14 - ph / 2;
+    const ph = Math.min(h, wl.top - 0.55);
+    const y = wl.top - 0.12 - ph / 2;
     const [a, b] = wl.wall === 'back' ? [o.x0, o.x0 + o.W] : [0, o.D];
     for (let at = a + w / 2 + 0.15; at <= b - w / 2 - 0.15; at += STEP) {
       const lo = at - w / 2;
@@ -348,7 +400,8 @@ function hang(r: Room, near: Pt, others: readonly Hung[], floor: readonly Item[]
       if (r.solid.some((x) => overlap(strip, x))) continue;
       const z = wl.wall === 'back' ? WALL_GAP : at;
       const x = wl.wall === 'back' ? at : wl.wall === 'left' ? o.x0 + WALL_GAP : o.x0 + o.W - WALL_GAP;
-      cands.push({ hg: { x, y, z, w, h: ph, wall: wl.wall, face: faceOf(wl.wall) }, d: Math.hypot(x - near.x, z - near.z) });
+      // the long back wall first, at eye height (bims m_32218)
+      cands.push({ hg: { x, y, z, w, h: ph, wall: wl.wall, face: faceOf(wl.wall) }, d: Math.hypot(x - near.x, z - near.z) + (wl.wall === 'back' ? 0 : 100) });
     }
   }
   cands.sort((p, q) => p.d - q.d);
@@ -365,17 +418,37 @@ export function headRoom(s: Spot): Box {
   return { x0: Math.min(...xs) - HEAD_HALF, x1: Math.max(...xs) + HEAD_HALF, z0: Math.min(...zs) - HEAD_HALF, z1: Math.max(...zs) + HEAD_HALF };
 }
 
-/** the nap corner's rug: under lounge spots 0 and 1's beds, a little past them */
-function rugOf(o: Office): Box | null {
+/**
+ * the nap corner's rug: round lounge spots 0 and 1's beds, at least RUG big, in the room and off
+ * every piece of furniture but the lounge's beds (cut back on the side that loses least)
+ */
+function rugOf(o: Office, keep: readonly Box[]): Box | null {
   const beds = o.lounge.slice(0, 2).map((s) => o.furniture.find((f) => f.of?.x === s.x && f.of.z === s.z)).filter((b): b is Box => b !== undefined);
   if (beds.length === 0) return null;
-  const m = 0.12;
-  return {
-    x0: Math.max(o.x0 + 0.02, Math.min(...beds.map((b) => b.x0)) - m),
-    x1: Math.min(o.x0 + o.W - 0.02, Math.max(...beds.map((b) => b.x1)) + m),
-    z0: Math.max(0.02, Math.min(...beds.map((b) => b.z0)) - m),
-    z1: Math.min(o.D - 0.02, Math.max(...beds.map((b) => b.z1)) + m),
-  };
+  const bx0 = Math.min(...beds.map((b) => b.x0)) - 0.15;
+  const bx1 = Math.max(...beds.map((b) => b.x1)) + 0.15;
+  const bz0 = Math.min(...beds.map((b) => b.z0)) - 0.15;
+  const bz1 = Math.max(...beds.map((b) => b.z1)) + 0.15;
+  const cx = (bx0 + bx1) / 2;
+  const cz = (bz0 + bz1) / 2;
+  const hw = Math.max(bx1 - bx0, RUG.w) / 2;
+  const hd = Math.max(bz1 - bz0, RUG.d) / 2;
+  let r: Box = { x0: Math.max(o.x0 + 0.05, cx - hw), x1: Math.min(o.x0 + o.W - 0.05, cx + hw), z0: Math.max(0.05, cz - hd), z1: Math.min(o.D - 0.05, cz + hd) };
+  const isBed = (f: Box): boolean => f.of !== undefined && o.lounge.some((l) => l.x === f.of?.x && l.z === f.of.z);
+  for (const f of [...o.furniture.filter((x) => !isBed(x)), ...keep]) {
+    if (!overlap(r, f, 0.05)) continue;
+    // cut the side that keeps the most rug, never past the base beds
+    const cuts: Box[] = [
+      { ...r, x1: Math.max(bx1, f.x0 - 0.06) },
+      { ...r, x0: Math.min(bx0, f.x1 + 0.06) },
+      { ...r, z1: Math.max(bz1, f.z0 - 0.06) },
+      { ...r, z0: Math.min(bz0, f.z1 + 0.06) },
+    ].filter((c) => c.x1 > c.x0 && c.z1 > c.z0 && !overlap(c, f, 0.05));
+    const area = (c: Box): number => (c.x1 - c.x0) * (c.z1 - c.z0);
+    const best = cuts.sort((p, q) => area(q) - area(p))[0];
+    if (best) r = best;
+  }
+  return r;
 }
 
 /**
@@ -393,19 +466,27 @@ export function placeCozy(o: Office, hints: CozyHints): Cozy | null {
     pieces: pieces.filter((p) => p.x >= o.x0 - 0.5 && p.x <= o.x0 + o.W + 0.5 && p.z >= -0.5 && p.z <= o.D + 0.5),
     taken: [],
   };
-  const isl = centre(o.island);
+  // the coffee corner on the eating place's camera side (its front, +z: bims m_32218)
+  const isl = { x: (o.island.x0 + o.island.x1) / 2, z: o.island.z1 + 0.7 };
   const l01 = o.lounge.slice(0, 2);
   const nap = { x: avg(l01.map((s) => s.x), o.x0 + 1), z: avg(l01.map((s) => s.z), 1) };
-  const rug = rugOf(o);
-  if (rug) r.solid.push(rug);
+  const rug = rugOf(o, r.solid);
+  // the base beds keep their room round them on the rug
+  for (const s of l01) {
+    const bed = o.furniture.find((f) => f.of?.x === s.x && f.of.z === s.z);
+    if (bed) r.solid.push(bed);
+  }
   // under the back wall's taken spans (its art comes down to ~0.8), not even a side wall's piece in the corner
-  for (const [s, e] of r.walls.find((w) => w.wall === 'back')?.busy ?? []) r.solid.push({ x0: s, x1: e, z0: 0, z1: 0.42 });
+  const back = r.walls.find((w) => w.wall === 'back');
+  for (const [s, e] of [...(back?.busy ?? []), ...(back?.frames ?? [])]) r.solid.push({ x0: s, x1: e, z0: 0, z1: 0.42 });
+  // the door's surround (a frame, a leaf, the jars by it on some maps)
+  r.solid.push({ x0: o.door.x - 0.9, x1: o.door.x + 0.9, z0: o.D - 0.9, z1: o.D + 0.5 });
   // a napper lies with its head past its bed's back (pose.ts): nothing there, on any spot a stage beds
   r.solid.push(...o.lounge.map(headRoom));
   // the coffee corner first (by the eating place, its spot reaching a walk), then the shelf by the nap corner
   const C = SIZE.coffee;
   let cs: { spot: Spot; leg: Leg } | null = null;
-  const coffee = place(r, C.w, C.d, C.h, isl, (i) => {
+  const coffee = place(r, C.w, C.d, C.h, isl, true, (i) => {
     cs = coffeeSpot(r, i);
     return cs !== null;
   });
@@ -418,22 +499,24 @@ export function placeCozy(o: Office, hints: CozyHints): Cozy | null {
   if (!shelf) return null;
   const L = SIZE.lamp;
   const P = SIZE.plant;
-  const lamp0 = place(r, L.w, L.d, L.h, nap);
-  const plant0 = place(r, P.w, P.d, P.h, centre(shelf.box));
-  const plant1 = place(r, P.w, P.d, P.h, centre(coffee.box));
-  const plant2 = place(r, P.w, P.d, P.h, { x: o.mainDesk.x, z: o.mainDesk.z });
+  // the floor lamp by the nap corner, free-standing there when no wall is near (bims m_32218)
+  const lamp0 = place(r, L.w, L.d, L.h, nap, true);
+  // the big plants: by the door and by main's desk (stage 0), by the coffee corner (1), by the shelf (5)
+  const plants = [o.door, { x: o.mainDesk.x, z: o.mainDesk.z }, centre(coffee.box), centre(shelf.box)].map((to) => place(r, P.w, P.d, P.h, to, true));
   const lamp1 = place(r, L.w, L.d, L.h, centre(shelf.box));
-  const floor = [coffee, shelf, ...[lamp0, lamp1, plant0, plant1, plant2].filter((x): x is Item => x !== null)];
+  const floor = [coffee, shelf, ...[lamp0, lamp1, ...plants].filter((x): x is Item => x !== null)];
   const tall = (it: Item): boolean => (r.walls.find((w) => w.wall === it.wall)?.top ?? 0) >= HANG_WALL;
-  const hangOver = tall(shelf) ? 'shelf' : tall(coffee) ? 'coffee' : null;
-  const p0 = hang(r, centre(shelf.box), [], floor);
-  const p1 = hang(r, centre(coffee.box), p0 ? [p0] : [], floor);
+  // over the shelf only: the coffee corner's machine and cups stand where its leaves would hang
+  const hangOver = tall(shelf) ? 'shelf' : null;
+  const mid = { x: o.x0 + o.W / 2, z: 0 };
+  const p0 = hang(r, mid, [], floor);
+  const p1 = hang(r, p0 ? { x: p0.x, z: p0.z } : mid, p0 ? [p0] : [], floor);
   return {
     coffee,
     coffeeSpots: [spot],
     shelf,
     lamps: [lamp0, lamp1].filter((x): x is Item => x !== null),
-    plants: [plant0, plant1, plant2].filter((x): x is Item => x !== null),
+    plants: plants.filter((x): x is Item => x !== null),
     posters: [p0, p1].filter((x): x is Hung => x !== null),
     rug,
     hangOver,

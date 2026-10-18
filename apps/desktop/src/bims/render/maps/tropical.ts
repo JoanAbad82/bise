@@ -294,7 +294,7 @@ function wear(w: Wear): void {
 export const tropical: MapLook = {
   id: 'tropical',
   // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
-  cozy: { plant: 'palm', small: 'pothos', coffee: 'fruit', bed: 'hammock', shelf: 'radio', poster: 'carnival', wood: '#a0673f', cloth: ['#2a9d8f', '#ffd166', '#7cc26b'], art: ['#ffd166', '#2a9d8f', '#f28c28'], pot: '#c98a3e' },
+  cozy: { plant: 'palm', small: 'pothos', coffee: 'fruit', bed: 'hammock', shelf: 'radio', poster: 'carnival', wood: '#a0673f', cloth: ['#2a9d8f', '#ffd166', '#7cc26b'], art: ['#ffd166', '#2a9d8f', '#f28c28'], pot: '#c98a3e', rug: '#f28c28' },
   pal,
   shell,
   island,

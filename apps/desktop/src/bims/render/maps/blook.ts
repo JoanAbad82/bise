@@ -14,6 +14,7 @@ import { decorOf } from '../decor';
 import { DAY, HOODIE, NIGHT, type Palette, WORLD, hash, rng } from '../palette';
 import { bigPlant, boombox, cones, deckChair, fruitBowl, garden, loftTree, mural, whiteboard } from '../stages';
 import type { Build, DeskHandles } from './look';
+import { frameXs } from '../cozy';
 
 // ---- palettes
 
@@ -198,11 +199,13 @@ function frames(k: Kit, parent: Object3D, o: Office, gr: Grow, g: Grower): void 
   const a = gr.stage >= 11 ? g.pieces[11]?.at(o) : undefined;
   const xa = a && a.z < 1 && a.x + ARCADE_W / 2 > span.xa && a.x - ARCADE_W / 2 < xb ? Math.max(span.xa, a.x + ARCADE_W / 2 + 0.1) : span.xa;
   const pitch = 0.36;
-  const cols = Math.max(1, Math.floor((xb - xa) / pitch));
+  // round the cozy posters (render/cozy.ts frameXs)
+  const xs = z < 0.5 ? frameXs(o, xa, xb, pitch) : Array.from({ length: Math.max(1, Math.floor((xb - xa) / pitch)) }, (_, c) => xa + pitch / 2 + c * pitch);
+  const cols = xs.length;
   for (let i = 0; i < gr.frames; i++) {
     const fy = y - Math.floor(i / cols) * 0.32;
     if (fy < 0.6) break;
-    g.frame(k, parent, xa + pitch / 2 + (i % cols) * pitch, fy, z, i, gr.golden);
+    g.frame(k, parent, xs[i % cols] ?? xa, fy, z, i, gr.golden);
   }
 }
 

@@ -10,8 +10,8 @@
 // never a painted face. Nothing here decides. Owner: bims-cozy.
 import { Box3, type BufferGeometry, Group, type Material, Mesh, type Object3D } from 'three';
 import { BASE_BEDS } from '../growth';
-import { cozyAt, type CozyStage, type Hung, type Item } from '../cozy';
-import type { Box, Pt } from '../model';
+import { cozyAt, headRoom, type CozyStage, type Hung, type Item } from '../cozy';
+import type { Box, Office, Pt } from '../model';
 import type { Kit } from './kit';
 import { mergeRoot } from './merge';
 import { WORLD, hash } from './palette';
@@ -36,8 +36,10 @@ export interface CozyLook {
   readonly poster: PosterKind;
   /** the cabinet's, the shelf's and the lamp's wood */
   readonly wood: string;
-  /** the beds, the rug, the cushions, the throw */
+  /** the beds, the cushions, the throw */
   readonly cloth: readonly [string, string, string];
+  /** the nap corner's big rug: a strong colour of the map, the room's anchor from day one (bims m_32218) */
+  readonly rug: string;
   /** the posters' colours */
   readonly art: readonly [string, string, string];
   /** the pots */
@@ -46,8 +48,17 @@ export interface CozyLook {
 
 const LEAF = ['#5fb35a', '#4e9a48', '#3f8a3e'] as const;
 const CUP = '#fffaf0';
+/** the floor lamp's shade by day */
+const WARM = '#ffd9a0';
 const BRASS = '#b08a3c';
 const GREY = '#9a958c';
+/** the corner's machine, bigger than the island's: it reads at the fit (bims m_32218) */
+const MACHINE_SCALE = 1.35;
+/** a floor plant's size: ~1.2 tall, it reads at the fit (bims m_32218) */
+const FLOOR_PLANT = 1.3;
+/** a poster's print, drawn at this size then scaled */
+const POSTER_W = 0.42;
+const POSTER_H = 0.52;
 
 /** a stage's pieces, built loose, merged at the end */
 type Groups = Map<number, Group>;
@@ -174,6 +185,8 @@ export function machine(k: Kit, g: Object3D, x: number, y: number, z: number, ki
   switch (kind) {
     case 'espresso': {
       k.add(style.box(0.28, 0.3, 0.24), k.mat(WORLD.dark), g, x, y + 0.15, z);
+      // a coloured cup on its top, warming
+      k.add(style.cylinder(0.035, 0.06), k.mat(c.art[0]), g, x - 0.06, y + 0.33, z - 0.02);
       k.add(style.box(0.12, 0.04, 0.08), k.mat(WORLD.metal), g, x, y + 0.22, z + 0.14);
       k.add(style.box(0.08, 0.03, 0.02), style.material(WORLD.coffeeLed, { emissive: WORLD.coffeeLed, ei: night ? 0.7 : 0.3 }), g, x, y + 0.26, z + 0.125);
       return;
@@ -246,13 +259,17 @@ function coffeeCorner(k: Kit, g0: Groups, it: Item, c: CozyLook, st: CozyStage, 
   const g = at(need(g0, 0), it);
   const { style } = k;
   const { w, d } = sizeOf(it);
-  const hgt = 0.55;
+  const hgt = 0.9;
   k.add(style.box(w - 0.04, hgt - 0.04, d - 0.04, 0.04), k.mat(c.wood), g, 0, (hgt - 0.04) / 2, 0);
   k.add(style.box(w, 0.04, d, 0.015), k.mat(c.cloth[2]), g, 0, hgt - 0.02, 0);
   for (const dx of [-w / 4, w / 4]) k.add(style.box(0.04, 0.04, 0.03), k.mat(BRASS), g, dx * 0.3, hgt * 0.6, d / 2 - 0.01);
   k.add(style.box(0.012, hgt - 0.12, 0.02), k.mat(c.cloth[1]), g, 0, hgt / 2, d / 2 - 0.01);
   if (!onIsland) {
-    machine(k, g, -w / 4, hgt, -0.04, c.coffee, c, night);
+    const m = new Group();
+    m.position.set(-w / 4 + 0.02, hgt, -0.04);
+    m.scale.setScalar(MACHINE_SCALE);
+    g.add(m);
+    machine(k, m, 0, 0, 0, c.coffee, c, night);
     cups(k, g, w / 4, hgt, 0.05, c.cloth[0]);
     if (st.coffeeOnIsland) {
       // stage 2 where the eating place has no top (a fountain, a tree, its own kettle): the sugar pot and a cup rail join the corner
@@ -307,16 +324,17 @@ export function bed(k: Kit, g: Object3D, box: Box, kind: BedKind, c: CozyLook, i
   const cl = c.cloth[i % 2 === 0 ? 0 : 1];
   switch (kind) {
     case 'pouf': {
-      const p = k.add(style.ball(Math.min(w, d) / 2 - 0.04), k.mat(cl), g, x, 0.17, z);
-      p.scale.set(1, 0.55, 1);
-      k.add(style.cylinder(0.05, 0.02), k.mat(c.cloth[2]), g, x, 0.17 + (Math.min(w, d) / 2 - 0.04) * 0.55, z);
+      // a bean bag's size (stages.ts loftLounge): it reads at the fit
+      const r = Math.min(w, d) / 2 / 1.05 / 0.92;
+      const p = k.add(style.ball(r), k.mat(cl), g, x, 0.2, z);
+      p.scale.set(1.05, 0.62, 1.05);
       return;
     }
     case 'cushion':
     case 'zabuton': {
-      k.add(style.box(w - 0.08, kind === 'zabuton' ? 0.08 : 0.14, d - 0.08, 0.05), k.mat(cl), g, x, kind === 'zabuton' ? 0.05 : 0.08, z);
+      k.add(style.box(w - 0.04, kind === 'zabuton' ? 0.1 : 0.2, d - 0.04, 0.06), k.mat(cl), g, x, kind === 'zabuton' ? 0.06 : 0.11, z);
       // the embroidery's border, a mesh of its own (no painted face)
-      k.add(style.box(w - 0.2, 0.012, 0.03), k.mat(c.cloth[2]), g, x, kind === 'zabuton' ? 0.096 : 0.156, z + (d - 0.08) / 2 - 0.08);
+      k.add(style.box(w - 0.16, 0.012, 0.035), k.mat(c.cloth[2]), g, x, kind === 'zabuton' ? 0.116 : 0.216, z + (d - 0.04) / 2 - 0.08);
       return;
     }
     case 'sofa':
@@ -362,7 +380,9 @@ function napCorner(b: Build, g0: Groups, c: CozyLook, st: CozyStage): void {
   if (cz.rug) {
     const r = cz.rug;
     // between the floor's top and the lounge rugs the stages bring (never coplanar with either)
-    k.add(k.style.box(r.x1 - r.x0, 0.012, r.z1 - r.z0), k.mat(c.cloth[2]), s0, (r.x0 + r.x1) / 2, 0.027, (r.z0 + r.z1) / 2);
+    k.add(k.style.box(r.x1 - r.x0, 0.012, r.z1 - r.z0), k.mat(c.rug), s0, (r.x0 + r.x1) / 2, 0.027, (r.z0 + r.z1) / 2);
+    // its border, a band of its own a hair higher
+    for (const [dz, w] of [[r.z0 + 0.1, r.x1 - r.x0 - 0.12], [r.z1 - 0.1, r.x1 - r.x0 - 0.12]] as const) k.add(k.style.box(w, 0.006, 0.05), k.mat(c.cloth[2]), s0, (r.x0 + r.x1) / 2, 0.036, dz);
   }
   const boxes = o.lounge.slice(0, BASE_BEDS).map((s) => o.furniture.find((f) => f.of?.x === s.x && f.of.z === s.z));
   boxes.forEach((bx, i) => { if (bx) bed(k, s0, bx, c.bed, c, i); });
@@ -371,15 +391,25 @@ function napCorner(b: Build, g0: Groups, c: CozyLook, st: CozyStage): void {
     // two cushions on the rug's front corners, off the beds (a wall's bench may stand at its back)
     const r = cz.rug;
     const g3 = need(g0, 3);
-    for (const [j, x] of [[0, r.x0 + 0.1], [1, r.x1 - 0.1]] as const) {
-      const p = k.add(k.style.box(0.16, 0.08, 0.16, 0.04), k.mat(c.art[j]), g3, x, 0.075, r.z1 - 0.1);
+    // on the rug's corners off every bed a stage brings (and its napper's head)
+    const beds = o.furniture.filter((f) => f.of !== undefined && o.lounge.some((l) => l.x === f.of?.x && l.z === f.of.z));
+    // along its front edge (its back may run under a bench or a stove by the wall), the ends first
+    const n = Math.max(2, Math.floor((r.x1 - r.x0 - 0.28) / 0.2) + 1);
+    const xs = Array.from({ length: n }, (_, i) => r.x0 + 0.14 + (i * (r.x1 - r.x0 - 0.28)) / (n - 1));
+    const corners = [...xs.filter((_, i) => i % 2 === 0), ...xs.filter((_, i) => i % 2 === 1).reverse()].map((x) => [x, r.z1 - 0.14] as const);
+    const free = corners.filter(([x, z]) => !beds.some((f) => x > f.x0 - 0.2 && x < f.x1 + 0.2 && z > f.z0 - 0.2 && z < f.z1 + 0.2) && !o.lounge.some((l) => { const h = headRoom(l); return x > h.x0 && x < h.x1 && z > h.z0 && z < h.z1; }));
+    const two = free.length > 1 ? [free[0], free.reduce((a, b) => (Math.abs(b[0] - (free[0]?.[0] ?? 0)) > Math.abs(a[0] - (free[0]?.[0] ?? 0)) ? b : a))] : free;
+    two.forEach((pt, j) => {
+      if (!pt) return;
+      const [x, z] = pt;
+      const p = k.add(k.style.box(0.18, 0.09, 0.18, 0.04), k.mat(c.art[j] ?? c.art[0]), g3, x, 0.092, z);
       p.rotation.y = 0.4 * (j ? -1 : 1);
-    }
+    });
   }
   if (st.throwOn && first) {
     // a throw over the first bed's foot
     const g7 = need(g0, 7);
-    const top = c.bed === 'mat' ? 0.06 : c.bed === 'zabuton' ? 0.1 : c.bed === 'cushion' ? 0.165 : c.bed === 'pouf' ? 0.32 : 0.26;
+    const top = c.bed === 'mat' ? 0.06 : c.bed === 'zabuton' ? 0.12 : c.bed === 'cushion' ? 0.225 : c.bed === 'pouf' ? 0.42 : 0.26;
     k.add(k.style.box(first.x1 - first.x0 - 0.12, 0.015, 0.16), k.mat(c.art[1]), g7, (first.x0 + first.x1) / 2, top, first.z1 - 0.14);
   }
 }
@@ -502,11 +532,11 @@ function thing(k: Kit, g: Object3D, x: number, y: number, z: number, kind: Shelf
 function lamp(k: Kit, g: Object3D, it: Item, c: CozyLook, night: boolean): void {
   const { style } = k;
   const p = at(g, it);
-  k.add(style.cylinder(0.13, 0.03), k.mat(c.wood), p, 0, 0.015, 0);
-  k.add(style.cylinder(0.018, 1.05), k.mat(WORLD.dark), p, 0, 0.55, 0);
-  const shade = style.material(k.pal.lamp, night ? { emissive: k.pal.lampOn, ei: 0.9 } : {});
-  const s = k.add(style.cylinder(0.14, 0.2), shade, p, 0, 1.13, 0);
-  s.scale.set(1, 1, 1);
+  k.add(style.cylinder(0.16, 0.03), k.mat(c.wood), p, 0, 0.015, 0);
+  k.add(style.cylinder(0.022, 1.3), k.mat(WORLD.dark), p, 0, 0.68, 0);
+  // a warm shade, lit at night
+  const shade = style.material(WARM, night ? { emissive: k.pal.lampOn, ei: 1.0 } : {});
+  k.add(style.cylinder(0.2, 0.3), shade, p, 0, 1.45, 0);
 }
 
 /** a poster on its wall: flat colours of the map, framed from stage 6 (a frame round it, the print kept) */
@@ -515,8 +545,11 @@ function poster(k: Kit, g0: Groups, p: Hung, c: CozyLook, st: CozyStage, i: numb
   const g = new Group();
   g.position.set(p.x, p.y, p.z);
   g.rotation.y = p.face;
+  // its print drawn at 0.42 x 0.52, scaled up to its wall size (~0.8 x 1.0: bims m_32218)
+  g.scale.set(p.w / POSTER_W, p.h / POSTER_H, 1);
   need(g0, 0).add(g);
-  const { w, h } = p;
+  const w = POSTER_W;
+  const h = POSTER_H;
   const a = c.art[i % 3] ?? c.art[0];
   const b = c.art[(i + 1) % 3] ?? c.art[1];
   const z1 = 0.02;
@@ -549,14 +582,15 @@ function poster(k: Kit, g0: Groups, p: Hung, c: CozyLook, st: CozyStage, i: numb
     }
     default: {
       // a flat print: a light ground and the map's shapes on it, each a mesh of its own
-      k.add(style.box(w, h, 0.012), k.mat(c.poster === 'movie' ? WORLD.dark : CUP), g, 0, 0, z1);
+      // a ground of the map's strong colour (the movie's dark), its shapes in the others and cream
+      k.add(style.box(w, h, 0.012), k.mat(c.poster === 'movie' ? WORLD.dark : c.poster === 'botanic' || c.poster === 'map' ? CUP : a), g, 0, 0, z1);
       const shapes: Record<string, readonly [number, number, number, number, string][]> = {
-        flat: [[0, 0.06, w * 0.7, h * 0.5, a], [0.06, -h * 0.28, w * 0.45, h * 0.18, b]],
+        flat: [[0, 0.06, w * 0.6, h * 0.42, b], [0.06, -h * 0.3, w * 0.45, h * 0.14, CUP]],
         botanic: [[0, 0.04, 0.03, h * 0.6, LEAF[1]], [-0.07, 0.08, 0.12, 0.06, LEAF[0]], [0.07, -0.02, 0.12, 0.06, LEAF[0]]],
-        ads: [[0, 0.08, w * 0.5, w * 0.5, a], [0, -h * 0.3, w * 0.7, 0.05, b]],
+        ads: [[0, 0.08, w * 0.5, w * 0.5, b], [0, -h * 0.3, w * 0.7, 0.05, CUP]],
         map: [[-0.06, 0.05, 0.16, 0.14, LEAF[0]], [0.07, -0.08, 0.12, 0.1, LEAF[1]], [0, 0, w * 0.85, 0.02, b]],
-        carnival: [[-0.08, 0.1, 0.12, 0.12, a], [0.08, 0, 0.12, 0.12, b], [-0.02, -0.14, 0.14, 0.1, c.art[2]]],
-        sea: [[0, -0.08, w * 0.85, 0.12, '#3d6fb6'], [0, 0.02, w * 0.85, 0.05, '#6cb4ee'], [0.08, 0.14, 0.08, 0.08, a]],
+        carnival: [[-0.08, 0.1, 0.12, 0.12, CUP], [0.08, 0, 0.12, 0.12, b], [-0.02, -0.14, 0.14, 0.1, c.art[2]]],
+        sea: [[0, -0.08, w * 0.85, 0.12, '#3d6fb6'], [0, 0.02, w * 0.85, 0.05, CUP], [0.08, 0.14, 0.08, 0.08, b]],
         movie: [[0, 0.06, w * 0.7, h * 0.4, a], [0, -h * 0.3, w * 0.6, 0.04, b]],
       };
       for (const [dx, dy, sw, sh, col] of shapes[c.poster] ?? shapes.flat ?? []) k.add(style.box(sw, sh, 0.008), k.mat(col), g, dx, dy, z2);
@@ -568,8 +602,8 @@ function poster(k: Kit, g0: Groups, p: Hung, c: CozyLook, st: CozyStage, i: numb
     g6.position.copy(g.position);
     g6.rotation.y = p.face;
     need(g0, 6).add(g6);
-    const fw = w + 0.06;
-    const fh = h + 0.06;
+    const fw = p.w + 0.06;
+    const fh = p.h + 0.06;
     const m = k.mat(c.wood);
     for (const dy of [-fh / 2, fh / 2]) k.add(style.box(fw + 0.03, 0.03, 0.03), m, g6, 0, dy, 0.022);
     for (const dx of [-fw / 2, fw / 2]) k.add(style.box(0.03, fh - 0.03, 0.03), m, g6, dx, 0, 0.022);
@@ -670,17 +704,30 @@ function desks(b: Build, g0: Groups, handles: ReadonlyMap<string, DeskHandles>, 
 // ---- the whole
 
 /**
+ * The frames' columns on the back wall from xa to xb, `pitch` apart, round the posters hung there
+ * (the cozy posters take their place first: the frames go round them). At least one. Pure.
+ */
+export function frameXs(o: Office, xa: number, xb: number, pitch: number): number[] {
+  const posters = (o.cozy?.posters ?? []).filter((p) => p.wall === 'back');
+  const out: number[] = [];
+  for (let x = xa + pitch / 2; x <= xb - pitch / 2 + 1e-9; x += pitch) {
+    if (!posters.some((p) => Math.abs(p.x - x) < p.w / 2 + 0.2)) out.push(x);
+  }
+  return out.length > 0 ? out : [xa + pitch / 2];
+}
+
+/**
  * Every mesh's box under root, world units: a merged cozy mesh (mergeInto) by its pieces' boxes, so
  * a law sees a cushion, not the office-wide box of everything merged with it.
  */
-export function meshBoxes(root: Object3D): Box3[] {
+export function meshBoxes(root: Object3D, precise = true): Box3[] {
   root.updateMatrixWorld(true);
   const out: Box3[] = [];
   const seen = new Set<unknown>();
   root.traverse((m) => {
     if (!(m instanceof Mesh)) return;
     const parts = m.userData.parts as Box3[] | undefined;
-    if (!parts) out.push(new Box3().setFromObject(m, true));
+    if (!parts) out.push(new Box3().setFromObject(m, precise));
     else if (!seen.has(parts)) {
       seen.add(parts);
       out.push(...parts);
@@ -729,7 +776,8 @@ export function buildCozy(b: Build, c: CozyLook, handles: ReadonlyMap<string, De
   const night = k.pal.pendants;
   const g0: Groups = new Map();
   // the world as the look built it: the desk objects find a free spot on each desk's top
-  const solid = meshBoxes(b.root);
+  // their geometry's boxes moved, not every vertex: cheap enough for a town of offices
+  const solid = meshBoxes(b.root, false);
   const onIsland = st.coffeeOnIsland && cz.islandTop !== undefined;
   coffeeCorner(k, g0, cz.coffee, c, st, night, onIsland);
   if (onIsland) coffeeOnIsland(k, need(g0, 2), o.island, cz.islandTop, c, night);
@@ -737,14 +785,14 @@ export function buildCozy(b: Build, c: CozyLook, handles: ReadonlyMap<string, De
   shelf(k, g0, cz.shelf, c, st);
   cz.lamps.slice(0, st.floorLamps).forEach((it, i) => { lamp(k, need(g0, i === 0 ? 0 : 10), it, c, night); });
   cz.plants.slice(0, st.floorPlants).forEach((it, i) => {
-    const g = at(need(g0, [0, 1, 5][i] ?? 5), it);
-    plant(k, g, 0, 0, 0, c.plant, c.pot, 1);
-    // stage 11: the plants grow big, a second pot of leaves at their foot
-    if (st.bigPlants) plant(k, at(need(g0, 11), it), 0.12, 0, 0.12, c.small, c.pot, 0.5);
+    const g = at(need(g0, [0, 0, 1, 5][i] ?? 5), it);
+    plant(k, g, 0, 0, 0, c.plant, c.pot, FLOOR_PLANT);
+    // stage 11: the plants grow bigger still, a second pot of leaves at their foot
+    if (st.bigPlants) plant(k, at(need(g0, 11), it), 0.14, 0, 0.14, c.small, c.pot, 0.55);
   });
   if (st.hanging && cz.hangOver) {
-    // stage 5: a hanging plant on a bracket over the shelf's (or the cabinet's) right end, on a tall wall
-    const it = cz.hangOver === 'shelf' ? cz.shelf : cz.coffee;
+    // stage 5: a hanging plant on a bracket over the shelf's right end, on a tall wall
+    const it = cz.shelf;
     const { w, d } = sizeOf(it);
     const g = new Group();
     g.position.set(w / 2 - 0.12, 0, -d / 2);

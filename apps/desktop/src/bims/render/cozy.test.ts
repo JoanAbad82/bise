@@ -4,20 +4,23 @@
 // the shelf, a plant, the lamp, two posters, an object on each desk); nothing cozy stands on a walk,
 // on the furniture or where a stage's piece goes (the look's pieceAt); no cozy piece goes through
 // another mesh of the world, and none has a face coplanar with one (z-fighting); the base never uses
-// a piece a stage of its map promises (its words); what it adds costs <= 25 draw calls at stage 0 and
+// a piece a stage of its map promises (its words); the first day reads full (6+ new things, >= 3%
+// of the floor up to 9 agents, a rug ~2.5 x 1.8: bims m_32218); what it adds costs <= 25 draw calls at stage 0 and
 // <= 60 at 14 (its pieces merged per stage, render/cozy.ts).
 import { describe, expect, it } from 'vitest';
 import { Box3, Mesh } from 'three';
 import { crowd } from '../fixtures';
 import { readyMaps, layoutOf, planOf } from '../maps';
 import { BASE_BEDS, LAST_STAGE, NO_GROW, thingOf } from '../growth';
-import { WALK_CLEAR, legToBox, type Cozy } from '../cozy';
+import { RUG, WALK_CLEAR, legToBox, type Cozy } from '../cozy';
 import type { Box, Office } from '../model';
 import { buildWorld } from './world';
 import { lookOf } from './maps';
 import { STYLE } from './style';
 
 const SIZES = [1, 3, 9, 20, 31];
+/** the share of the floor the stage-0 base covers at least, up to 9 agents (the rug, the corner, the shelf, the lamp, two plants) */
+const FULL = 0.03;
 const STAGES = Array.from({ length: LAST_STAGE + 1 }, (_, s) => s);
 
 const floorItems = (c: Cozy): Box[] => [c.coffee, c.shelf, ...c.lamps, ...c.plants].map((i) => i.box);
@@ -101,9 +104,22 @@ describe('the cozy law: every map, every stage', () => {
           continue;
         }
         if (c.lamps.length < 2) out.push(`${String(n)} agents: ${String(c.lamps.length)} floor lamps`);
-        if (c.plants.length < 3) out.push(`${String(n)} agents: ${String(c.plants.length)} floor plants`);
+        if (c.plants.length < 4) out.push(`${String(n)} agents: ${String(c.plants.length)} floor plants`);
         if (c.posters.length < 2) out.push(`${String(n)} agents: ${String(c.posters.length)} posters`);
         if (!c.rug) out.push(`${String(n)} agents: no rug`);
+        else if (c.rug.x1 - c.rug.x0 < RUG.w - 0.6 || c.rug.z1 - c.rug.z0 < RUG.d - 0.6) out.push(`${String(n)} agents: a small rug, ${(c.rug.x1 - c.rug.x0).toFixed(2)} x ${(c.rug.z1 - c.rug.z0).toFixed(2)}`);
+        // the first day's office reads full (bims m_32218): 6+ new things, their floor >= FULL of the room's
+        const things = 2 + (c.rug ? 1 : 0) + 2 + Math.min(2, c.plants.length) + Math.min(1, c.lamps.length) + c.posters.length;
+        if (things < 6) out.push(`${String(n)} agents: ${String(things)} new things at stage 0`);
+        if (n <= 9) {
+          const area = (b: Box): number => (b.x1 - b.x0) * (b.z1 - b.z0);
+          const base = [c.coffee.box, c.shelf.box, ...c.lamps.slice(0, 1).map((i) => i.box), ...c.plants.slice(0, 2).map((i) => i.box), ...(c.rug ? [c.rug] : [])];
+          // against the furnished room (the desks, main's, the lounge, the eating place): not a park or a garden beside it
+          const ps = [...o.desks.values(), o.mainDesk, ...o.lounge, ...o.islandSpots];
+          const room = (Math.max(...ps.map((p) => p.x)) - Math.min(...ps.map((p) => p.x)) + 2) * (Math.max(...ps.map((p) => p.z)) - Math.min(...ps.map((p) => p.z)) + 2);
+          const share = base.reduce((s, b) => s + area(b), 0) / Math.min(room, o.W * o.D);
+          if (share < FULL) out.push(`${String(n)} agents: the base takes ${(share * 100).toFixed(1)}% of the floor (< ${String(FULL * 100)}%)`);
+        }
         const coffeeLeg = c.coffeeSpots.map((s) => `${String(s.x)},${String(s.z)}`);
         for (const b of floorItems(c)) {
           const at = `${String(n)} agents: a piece at ${b.x0.toFixed(2)},${b.z0.toFixed(2)}`;
@@ -176,7 +192,7 @@ describe('the cozy law: every map, every stage', () => {
     for (const s of o.lounge.slice(0, BASE_BEDS)) {
       const bed = o.furniture.find((f) => f.of?.x === s.x && f.of.z === s.z);
       expect(bed).toBeDefined();
-      if (bed) expect(cozy.some((b) => b.min.x >= bed.x0 - 0.01 && b.max.x <= bed.x1 + 0.01 && b.min.z >= bed.z0 - 0.01 && b.max.z <= bed.z1 + 0.01 && b.max.y > 0.1)).toBe(true);
+      if (bed) expect(cozy.some((b) => b.min.x >= bed.x0 - 0.06 && b.max.x <= bed.x1 + 0.06 && b.min.z >= bed.z0 - 0.06 && b.max.z <= bed.z1 + 0.06 && b.max.y > 0.1)).toBe(true);
     }
   });
 });

@@ -590,7 +590,7 @@ function decks(k: Kit, parent: Object3D, o: Office, g: { frames: number; golden:
 export const california: MapLook = {
   id: 'california',
   // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
-  cozy: { plant: 'aloe', small: 'succulent', coffee: 'coldbrew', bed: 'pouf', shelf: 'surf', poster: 'movie', wood: '#c49a6c', cloth: ['#f39a4c', '#6cb4ee', '#e9e2d4'], art: ['#f39a4c', '#6cb4ee', '#ffd166'], pot: '#e9e2d4' },
+  cozy: { plant: 'aloe', small: 'succulent', coffee: 'coldbrew', bed: 'pouf', shelf: 'surf', poster: 'movie', wood: '#c49a6c', cloth: ['#f39a4c', '#6cb4ee', '#e9e2d4'], art: ['#f39a4c', '#6cb4ee', '#ffd166'], pot: '#e9e2d4', rug: '#f39a4c' },
   pal: (n) => (n ? CAL_NIGHT : CAL_DAY),
   shell,
   island,

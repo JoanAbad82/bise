@@ -139,7 +139,17 @@ const workshopCozy: CozyHints = {
     const bx = o.boardSpots.reduce((s, p) => s + p.x, 0) / Math.max(1, o.boardSpots.length);
     return [{ wall: 'back', top: 2.1, busy: [[o.x0, bx + 1.0], [o.mainDesk.x - 0.6, o.mainDesk.x + 0.6]] }, { wall: 'left', top: 1.0 }, { wall: 'right', top: 0 }];
   },
-  keepOut: (o) => [{ x0: o.x0 + o.W - 0.8, x1: o.x0 + o.W, z0: 4.1, z1: o.D }],
+  keepOut: (o) => {
+    const out: Box[] = [{ x0: o.x0 + o.W - 0.8, x1: o.x0 + o.W, z0: 4.1, z1: o.D }];
+    // the old car in the front middle and its tyres (render/maps/workshop.ts shell)
+    const bx = (o.island.x0 + o.island.x1) / 2;
+    const bz = (o.island.z0 + o.island.z1) / 2;
+    const free0 = bx + 1.6;
+    const free1 = o.x0 + o.W - 4.6;
+    const cz = (bz + 0.75 + o.D - 0.5) / 2;
+    if (free1 - free0 > 2.6) out.push({ x0: free0 - 0.2, x1: free1 + 0.3, z0: cz - 0.8, z1: cz + 0.8 });
+    return out;
+  },
 };
 
 export const workshop: Plan<WorkshopOffice> = { id: 'workshop', ready: true, layout: workshopLayout, things: LOFT_LIKE, cozy: workshopCozy };
