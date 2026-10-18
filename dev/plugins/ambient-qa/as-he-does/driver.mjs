@@ -2971,17 +2971,23 @@ async function rows233B(harness, say) {
       }, 60000, 1000);
       await page.mouse.move(1, 300);
       await shot('233b-refused-where');
+      // the cards come back folded, 'not sent' on their rows (inbox/answer-refused.spec: the row
+      // says it, the open card the whole line): open a, its line whole
+      if (back) {
+        const d = await dock(`${R}a`, 5000);
+        back.a_open = d.open ? await refusedOn(`${R}a`) : null;
+      }
       await reload();
       await goOther();
       kept = { a: (await present(`${R}a`)) ? await refusedOn(`${R}a`) : null, b: (await present(`${R}b`)) ? await refusedOn(`${R}b`) : null };
       await shot('233b-refused-after-reload');
     } finally { signal(pids, 'SIGCONT'); }
     const line = /^not sent: .+ · try again$/;
-    // each card: the whole line when it's open, 'not sent' on its row when folded; one of them open
+    // each card: the whole line when it's open, 'not sent' on its row when folded; opened, a's whole line
     const said = (x) => line.test(x ?? '') || /^not sent \(its folded row\)$/.test(x ?? '');
-    const both = (s) => !!s && said(s.a) && said(s.b) && (line.test(s.a ?? '') || line.test(s.b ?? ''));
-    step(`a refused answer (harness hub held past 30 s) from ${other?.name ?? 'bise'}: 'not sent: <words> · try again' on the card that came back, where he answered ('not sent' on a folded one's row)`,
-      both(back), { back });
+    const both = (s) => !!s && said(s.a) && said(s.b);
+    step(`a refused answer (harness hub held past 30 s) from ${other?.name ?? 'bise'}: the cards come back where he answered, 'not sent' on their rows, the opened one 'not sent: <words> · try again'`,
+      both(back) && line.test(back.a_open ?? ''), { back });
     step("the 'not sent' line is kept across a reload", both(kept), { kept });
     // the hub runs again: a late take of a clears its line (the card goes); b: 'try again' sends it once more
     await page.waitForTimeout(8000);
@@ -3881,7 +3887,7 @@ async function rowsC2BA(harness, say) {
     await idle();
     await harness();
     await clear();
-    await page.keyboard.press('Escape');
+    await settle();
     // the stack shows 3 rows; the item can sit past them. Its own row, else the '+ N more · <next>' row
     // once it names it: either click opens it, and his key comes right after that click
     // (cand-3ce7t: its row never showed, the more row's clicks walked past it)
