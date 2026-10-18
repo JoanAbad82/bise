@@ -42,7 +42,7 @@ LINE_EDIT = "Edit files with `edit`, create them with `write_file`."
 LINE_PATCH = "Edit and create files with `apply_patch`."
 MANY = ("Found %d matches of the string to replace, but replace_all is false. To replace all "
         "occurrences, set replace_all to true. To replace only one occurrence, please provide more "
-        "context to uniquely identify the instance.\nString: %s")
+        "context to uniquely identify the instance.\nAt %s.")
 
 
 def vibe_python():
@@ -178,16 +178,18 @@ def main():
         W = work
         cases = [
             ("write_file", {"file_path": "sub/new.txt", "content": "hé\nlo\n"},
-             "file_path: %s/sub/new.txt\nbytes_written: 7\ncontent: hé\nlo\n" % W),
+             "file_path: %s/sub/new.txt\nbytes_written: 7\nlines: 2" % W),
             ("edit", {"file_path": W + "/sub/new.txt", "old_string": "lo", "new_string": "LO"},
-             "file: %s/sub/new.txt\nmessage: The file has been updated successfully.\nold_string: lo\nnew_string: LO" % W),
+             "file: %s/sub/new.txt\nmessage: The file has been updated successfully.\nreplacements: 1\nlines: 2" % W),
             ("edit", {"file_path": "crlf.txt", "old_string": "two\nthree", "new_string": "2\n3"},
-             "file: %s/crlf.txt\nmessage: The file has been updated successfully.\nold_string: two\nthree\nnew_string: 2\n3" % W),
+             "file: %s/crlf.txt\nmessage: The file has been updated successfully.\nreplacements: 1\nlines: 2-3" % W),
             ("edit", {"file_path": "many.txt", "old_string": "a", "new_string": "b", "replace_all": True},
-             "file: %s/many.txt\nmessage: The file has been updated. All occurrences were successfully replaced\nold_string: a\nnew_string: b" % W),
-            ("edit", {"file_path": "many.txt", "old_string": "x", "new_string": "y"}, "ERR " + MANY % (2, "x")),
+             "file: %s/many.txt\nmessage: The file has been updated. All occurrences were successfully replaced\nreplacements: 3\nlines: 1" % W),
+            ("edit", {"file_path": "many.txt", "old_string": "x", "new_string": "y"}, "ERR " + MANY % (2, "line 1")),
             ("edit", {"file_path": "many.txt", "old_string": "zzz", "new_string": "y"},
-             "ERR String to replace not found in file.\nString: zzz"),
+             "ERR String to replace not found in file."),
+            ("edit", {"file_path": "many.txt", "old_string": "b x b x\nnope", "new_string": "y"},
+             "ERR String to replace not found in file.\nIts first line is at line 1."),
             ("edit", {"file_path": "  ", "old_string": "a", "new_string": "b"}, "ERR File path cannot be empty"),
             ("edit", {"file_path": "many.txt", "old_string": "", "new_string": "b"},
              "ERR old_string cannot be empty. Use write_file to create new files."),
@@ -203,6 +205,13 @@ def main():
              "ERR File '%s/exists.txt' already exists. Use edit to modify it." % W),
             ("write_file", {"file_path": " ", "content": "x"}, "ERR Path cannot be empty"),
             ("write_file", {"file_path": "big.txt", "content": "x" * 64001}, "ERR Content exceeds 64000 bytes limit"),
+            # the echo: no result says back what the call carries
+            ("write_file", {"file_path": "echo.txt", "content": "ECHO_CONTENT_1\nECHO_CONTENT_2\n"},
+             "file_path: %s/echo.txt\nbytes_written: 30\nlines: 2" % W),
+            ("edit", {"file_path": "echo.txt", "old_string": "ECHO_CONTENT_2", "new_string": "ECHO_NEW_2"},
+             "file: %s/echo.txt\nmessage: The file has been updated successfully.\nreplacements: 1\nlines: 2" % W),
+            ("edit", {"file_path": "echo.txt", "old_string": "ECHO_CONTENT_1\nECHO_GONE", "new_string": "y"},
+             "ERR String to replace not found in file.\nIts first line is at line 1."),
         ]
         marks = " ".join("[[%s: %s]]" % (n, json.dumps(a, ensure_ascii=False)) for n, a, _ in cases)
         n0 = len(recs())
@@ -224,6 +233,10 @@ def main():
         check(len(results_seen) == len(want), "one result per call: %d of %d" % (len(results_seen), len(want)))
         for (n, a, w), g in zip(cases, results_seen):
             check(g == w, "%s %s: %r" % (n, json.dumps(a)[:60], g[:160]))
+        # the model reads no echo of its own call: no ECHO_ marker of an
+        # old_string, new_string or content comes back in any result
+        echoed = [g for g in results_seen if "ECHO_" in g]
+        check(len(results_seen) == len(want) and not echoed, "no result echoes the call's strings: %r" % echoed[:2])
 
         # C: Vibe itself on the same cases (fresh files), when installed
         vp = vibe_python()
@@ -233,8 +246,13 @@ def main():
             open(os.path.join(vw, "many.txt"), "w").write("a x a x a\n")
             open(os.path.join(vw, "bad.bin"), "wb").write(b"ok\xffno\n")
             open(os.path.join(vw, "exists.txt"), "w").write("here\n")
+            # skipped: bad.bin (Vibe decodes a latin-1 file with
+            # charset_normalizer; bise refuses it), and the two errors where
+            # bise says lines in place of Vibe's "String: <old_string>"
+            # (not found, several matches: no echo of the model's own args)
             errs = [(n, a, w.replace(W, vw)) for n, a, w in cases if w.startswith("ERR ")
-                    and "bad.bin" not in w]  # Vibe decodes a latin-1 file (charset_normalizer); bise refuses it
+                    and "bad.bin" not in w and "String to replace not found" not in w
+                    and "matches of the string to replace" not in w]
             vcases = [(n, dict(a, file_path=a["file_path"] if a["file_path"].strip() == "" or a["file_path"].startswith("/")
                                else a["file_path"])) for n, a, _ in errs]
             out = subprocess.run([vp, "-c", VIBE_RUN, json.dumps(vcases), vw], capture_output=True, text=True, timeout=120)

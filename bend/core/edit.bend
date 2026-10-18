@@ -1,9 +1,17 @@
 # core/edit.bend - the pure core of Vibe's `edit` and `write_file`
 # tools, copied from Vibe 2.25.8 (vibe/core/tools/builtins/edit.py,
 # write_file.py, prompts/edit.md, prompts/write_file.md): the same
-# names, schemas, descriptions, errors and results, byte for byte
-# (design docs/approvals-design.md §2.2). runtime/edit-tool.bend only
-# moves bytes around this module.
+# names, schemas, descriptions and errors, byte for byte (design
+# docs/approvals-design.md §2.2). runtime/edit-tool.bend only moves
+# bytes around this module.
+#
+# Where it leaves Vibe on purpose (tokens, Gabriel's call): no result
+# or error echoes old_string, new_string or content, which the model's
+# own call carries. The results say the file, the replacements and the
+# lines (edit_result, write_result); not found and several matches end
+# with lines in place of Vibe's "String: <old_string>". The clients
+# draw the diff from the call's args (edit_view, write_view), never
+# from the result.
 #
 # One edit toolset per request (the user's decision): the OpenAI
 # provider gets `apply_patch`, every other provider `edit` and
@@ -38,13 +46,8 @@ def err_missing(+path: String) -> String:
 def err_not_file(+path: String) -> String:
   String.append("Path is not a file: ", path)
 
-def err_not_found(+old: String) -> String:
-  String.append("String to replace not found in file.\nString: ", old)
-
-def err_many(+n: Nat, +old: String) -> String:
-  String.concat(["Found ", Nat.show(n),
-    " matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nString: ",
-    old])
+# err_not_found, err_many and edit_result say lines: below, with the
+# match walk (the edit itself)
 
 # Python's UnicodeDecodeError words: the codec and the first bad byte
 def err_not_text(+path: String, +byte: Nat) -> String:
@@ -71,13 +74,6 @@ def ok_msg(all: Bool) -> String:
     case False{}:
       ok_one()
 
-# the model reads a result as Vibe's agent loop writes it: one
-# "key: value" line per field of the result model, in field order
-def edit_result(+path: String, +msg: String, +old: String,
-    +new: String) -> String:
-  String.concat(["file: ", path, "\nmessage: ", msg, "\nold_string: ", old,
-    "\nnew_string: ", new])
-
 def werr_empty_path() -> String:
   "Path cannot be empty"
 
@@ -93,9 +89,10 @@ def werr_exists(+path: String) -> String:
 def werr_write(+path: String, +why: String) -> String:
   String.concat(["Error writing ", path, ": ", why])
 
-def write_result(+path: String, +bytes: Nat, +content: String) -> String:
+# `lines`: text_lines of the content, never the content
+def write_result(+path: String, +bytes: Nat, +lines: Nat) -> String:
   String.concat(["file_path: ", path, "\nbytes_written: ", Nat.show(bytes),
-    "\ncontent: ", content])
+    "\nlines: ", Nat.show(lines)])
 
 # ---- the descriptions (Vibe's prompts/*.md) ----
 
@@ -350,23 +347,201 @@ def has_replacement(+s: String) -> Bool:
 
 # ---- the edit itself, on the normalized text ----
 
+# ---- the line lists of the results and errors ----
+
+# "12" or "12-14": a span of `h` lines from line `a` (h = 0: a deletion,
+# shown at the line it was)
+def span.pick(one: Bool, +a: Nat, +h: Nat) -> String:
+  match one:
+    case True{}:
+      Nat.show(a)
+    case False{}:
+      String.concat([Nat.show(a), "-", Nat.show(Nat.sub(Nat.add(a, h), 1n))])
+
+def span(+a: Nat, +h: Nat) -> String:
+  span.pick(Nat.is_lt(h, 2n), a, h)
+
+def uniq.keep(same: Bool, +x: Nat, +rest: List<&2, Nat>) -> List<&2, Nat>:
+  match same:
+    case True{}:
+      rest
+    case False{}:
+      Con{x, rest}
+
+# the same line twice in a row counts once (two matches on one line);
+# lines start at 1, so `last` = 0 is no line
+def uniq.go(xs: List<&2, Nat>, +last: Nat) -> List<&2, Nat>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+x, rest}:
+      uniq.keep(Nat.is_eq(x, last), x, uniq.go(rest, x))
+
+def uniq(xs: List<&2, Nat>) -> List<&2, Nat>:
+  uniq.go(xs, 0n)
+
+# at most 3 spans, then " (+N more)"
+def spans.more(+n: Nat) -> String:
+  match n:
+    case 0n:
+      ""
+    case 1n+_:
+      String.concat([" (+", Nat.show(n), " more)"])
+
+def spans.go(+i: Nat, xs: List<&2, Nat>, +h: Nat) -> List<&2, String>:
+  match i:
+    case 0n:
+      Nil{}
+    case 1n+k:
+      match xs:
+        case Nil{}:
+          Nil{}
+        case Con{+x, rest}:
+          Con{span(x, h), spans.go(k, rest, h)}
+
+def spans(xs: List<&2, Nat>, +h: Nat) -> String:
+  +u = uniq(xs)
+  String.append(String.join(spans.go(3n, u, h), ", "),
+    spans.more(Nat.sub(List.length(&2, Nat, u), 3n)))
+
+# "<lead>line 4." / "<lead>lines 4, 9."; no line: ""
+def lines_hint.pick(+n: Nat, +lead: String, +at: List<&2, Nat>) -> String:
+  match n:
+    case 0n:
+      ""
+    case 1n+p:
+      String.concat([lead, Bool.pick(String, Nat.is_eq(p, 0n), "line ", "lines "),
+        spans(at, 1n), "."])
+
+def lines_hint(+lead: String, +at: List<&2, Nat>) -> String:
+  lines_hint.pick(List.length(&2, Nat, uniq(at)), lead, at)
+
+# the lines a text takes: "a\nb" 2, "a\n" 1, "" 0
+def text_lines.pick(open: Bool, +text: String) -> Nat:
+  match open:
+    case True{}:
+      Nat.add(count(text, "\n"), 1n)
+    case False{}:
+      count(text, "\n")
+
+def text_lines(+text: String) -> Nat:
+  text_lines.pick(Bool.and(Bool.not(String.is_empty(text)),
+    Bool.not(String.ends_with(text, "\n"))), text)
+
+# The results and errors say only what the model cannot know from its
+# own call (Gabriel's call, tokens): never old_string, new_string or
+# content, which its call carries already. These functions take none
+# of them, so a result cannot depend on them (law
+# edit_result_independent). Vibe's two errors ended with
+# "String: <old_string>": here they say lines instead.
+
+# `starts`: the line of each replacement in the file after the edit;
+# `h`: the lines new_string takes (text_lines)
+def edit_result(+path: String, +msg: String, +starts: List<&2, Nat>,
+    +h: Nat) -> String:
+  String.concat(["file: ", path, "\nmessage: ", msg, "\nreplacements: ",
+    Nat.show(List.length(&2, Nat, starts)), "\nlines: ", spans(starts, h)])
+
+# `at`: the lines where old_string's first line sits (first_line_at),
+# a hint for the retry
+def err_not_found(+at: List<&2, Nat>) -> String:
+  String.append("String to replace not found in file.",
+    lines_hint("\nIts first line is at ", at))
+
+# `at`: the lines of the matches
+def err_many(+n: Nat, +at: List<&2, Nat>) -> String:
+  String.concat(["Found ", Nat.show(n),
+    " matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.",
+    lines_hint("\nAt ", at)])
+
+# ---- where the matches sit: their lines, for the result and errors ----
+
+def nl_of(+c: Char) -> Nat:
+  Bool.pick(Nat, U32.is_eq(Char.to_u32(c), 10), 1n, 0n)
+
+# the line of each match of `pat` in `s`, with replace's walk
+# (non-overlapping, left to right; the first only unless `all`): `line`
+# is where the walk is, and a match moves it by `step` lines, so step =
+# the lines `pat` breaks gives the lines in `s`, and step = new's the
+# lines in the text after the replace
+def spots.go(fuel: Nat, here: Bool, +s: String, +pat: String, +step: Nat,
+    +line: Nat, +all: Bool) -> List<&2, Nat>:
+  match fuel:
+    case 0n:
+      Nil{}
+    case 1n+k:
+      match here:
+        case True{}:
+          match all:
+            case True{}:
+              Con{line, spots.go(k,
+                String.starts_with(String.drop(s, String.length(pat)), pat),
+                String.drop(s, String.length(pat)), pat, step,
+                Nat.add(line, step), True{})}
+            case False{}:
+              Con{line, Nil{}}
+        case False{}:
+          match s:
+            case SNil{}:
+              Nil{}
+            case SCon{h, +t}:
+              spots.go(k, String.starts_with(t, pat), t, pat, step,
+                Nat.add(line, nl_of(h)), all)
+
+def spots(+s: String, +pat: String, +step: Nat, +all: Bool) -> List<&2, Nat>:
+  spots.go(String.length(s),
+    Bool.and(Bool.not(String.is_empty(pat)), String.starts_with(s, pat)),
+    s, pat, step, 1n, all)
+
+# the characters that are not blanks
+def solid.go(s: String, +n: Nat) -> Nat:
+  match s:
+    case SNil{}:
+      n
+    case SCon{h, t}:
+      solid.go(t, Nat.add(n, Bool.pick(Nat, Char.is_space(h), 0n, 1n)))
+
+def solid(s: String) -> Nat:
+  solid.go(s, 0n)
+
+def first_line.of(xs: List<&2, String>) -> String:
+  match xs:
+    case Nil{}:
+      ""
+    case Con{+l, _}:
+      String.trim(l)
+
+def first_line_at.pick(ok: Bool, +text: String, +first: String) -> List<&2, Nat>:
+  match ok:
+    case True{}:
+      spots(text, first, 0n, True{})
+    case False{}:
+      Nil{}
+
+# where old_string's first line sits in the text, for not-found's hint;
+# a first line under 4 non-blank characters ("}", ");") says nothing
+def first_line_at(+text: String, +old: String) -> List<&2, Nat>:
+  +first = first_line.of(String.lines(old))
+  first_line_at.pick(Nat.is_ge(solid(first), 4n), text, first)
+
 type Edited is Data:
   EdFail{msg: String}
-  EdOk{text: String, msg: String}
+  EdOk{text: String, msg: String, starts: List<&2, Nat>}
 
 def apply.many(many: Bool, +n: Nat, +text: String, +old: String,
     +new: String, +all: Bool) -> Edited:
   match many:
     case True{}:
-      EdFail{err_many(n, old)}
+      EdFail{err_many(n, spots(text, old, count(old, "\n"), True{}))}
     case False{}:
-      EdOk{replace(text, old, new, all), ok_msg(all)}
+      EdOk{replace(text, old, new, all), ok_msg(all),
+        spots(text, old, count(new, "\n"), all)}
 
 def apply.found(+n: Nat, +text: String, +old: String, +new: String,
     +all: Bool) -> Edited:
   match n:
     case 0n:
-      EdFail{err_not_found(old)}
+      EdFail{err_not_found(first_line_at(text, old))}
     case 1n+p:
       apply.many(Bool.and(Nat.is_gt(p, 0n), Bool.not(all)), 1n+p, text, old,
         new, all)

@@ -137,14 +137,20 @@ Vibe's `edit`, copied exactly:
   empty"; empty `old_string` → "old_string cannot be empty. Use write_file
   to create new files."; same strings → "No changes to make — old_string
   and new_string are identical"; missing file → "File does not exist:
-  <path>"; not found → "String to replace not found in file.\nString:
-  <old_string>"; several matches without `replace_all` → "Found N matches of
-  the string to replace, but replace_all is false. To replace all
-  occurrences, set replace_all to true. To replace only one occurrence,
-  please provide more context to uniquely identify the instance.\nString:
-  <old_string>"; not text → "Cannot edit <path>: file is not valid text
-  (…)". Success → "The file has been updated successfully." (or "… All
-  occurrences were successfully replaced"). The write is atomic.
+  <path>"; not found → "String to replace not found in file." (+ "Its
+  first line is at line N." when old_string's first line is in the file);
+  several matches without `replace_all` → "Found N matches of the string
+  to replace, but replace_all is false. To replace all occurrences, set
+  replace_all to true. To replace only one occurrence, please provide
+  more context to uniquely identify the instance.\nAt lines 2, 9."; not
+  text → "Cannot edit <path>: file is not valid text (…)". Success →
+  "file / message / replacements / lines", the message Vibe's "The file
+  has been updated successfully." (or "… All occurrences were
+  successfully replaced"). The write is atomic.
+- Where we leave Vibe on purpose (tokens, Gabriel's call): no result or
+  error echoes old_string, new_string or content, which the model's own
+  call carries. Vibe's results do (and its two errors above end with
+  "String: <old_string>"); ours say the lines instead.
 - Ours around it: a pure core in Bend with laws (`bend/core/edit.bend`), the
   TUI shows it as a diff like `apply_patch`, the gate reads `file_path`
   (§4). The hub's activity line reads "edit <file>".

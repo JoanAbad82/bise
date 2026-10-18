@@ -392,11 +392,17 @@ law edit_err_missing:
 law edit_err_not_file:
   {Ed.err_not_file("/w") == "Path is not a file: /w" : String}
 
+# LAW: the two errors that ended with Vibe's "String: <old_string>" say
+# lines instead (the model's call has old_string): not found, where its
+# first line sits, if anywhere; several matches, where they are.
 law edit_err_not_found:
-  {Ed.err_not_found("foo") == "String to replace not found in file.\nString: foo" : String}
+  {(Ed.err_not_found([]), Ed.err_not_found([12n, 40n]))
+    == ("String to replace not found in file.",
+        "String to replace not found in file.\nIts first line is at lines 12, 40.")
+    : String & String}
 
 law edit_err_many:
-  {Ed.err_many(3n, "x") == "Found 3 matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nString: x" : String}
+  {Ed.err_many(3n, [2n, 2n, 9n]) == "Found 3 matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nAt lines 2, 9." : String}
 
 law edit_err_not_text:
   {Ed.err_not_text("/w/b.bin", 2n) == "Cannot edit /w/b.bin: file is not valid text (utf-8, byte 2)" : String}
@@ -408,9 +414,19 @@ law edit_ok_messages:
   {String.join([Ed.ok_msg(False{}), Ed.ok_msg(True{})], "|")
     == "The file has been updated successfully.|The file has been updated. All occurrences were successfully replaced" : String}
 
+# LAW: an edit's result is the file, Vibe's message, the replacements
+# and the lines the new text takes; never old_string or new_string (the
+# model's call has them; edit_result takes neither, so no result can
+# depend on them). Many replacements: 3 spans at most, then
+# "(+N more)"; two on one line count as one span.
 law edit_result_text:
-  {Ed.edit_result("/w/a", Ed.ok_one(), "x", "y")
-    == "file: /w/a\nmessage: The file has been updated successfully.\nold_string: x\nnew_string: y" : String}
+  {(Ed.edit_result("/w/a", Ed.ok_one(), [3n], 2n),
+    (Ed.edit_result("/w/a", Ed.ok_all(), [1n, 1n, 4n, 9n, 12n, 20n], 1n),
+     Ed.edit_result("/w/a", Ed.ok_one(), [7n], 0n)))
+    == ("file: /w/a\nmessage: The file has been updated successfully.\nreplacements: 1\nlines: 3-4",
+        ("file: /w/a\nmessage: The file has been updated. All occurrences were successfully replaced\nreplacements: 6\nlines: 1, 4, 9 (+2 more)",
+         "file: /w/a\nmessage: The file has been updated successfully.\nreplacements: 1\nlines: 7"))
+    : String & (String & String)}
 
 law write_err_empty_path:
   {Ed.werr_empty_path() == "Path cannot be empty" : String}
@@ -421,9 +437,15 @@ law write_err_too_big:
 law write_err_exists:
   {Ed.werr_exists("/w/a") == "File '/w/a' already exists. Use edit to modify it." : String}
 
+# LAW: write_file's result is the path, the bytes and the lines; never
+# the content (write_result does not take it).
 law write_result_text:
-  {Ed.write_result("/w/n.txt", Ed.utf8_len("hé\n"), "hé\n")
-    == "file_path: /w/n.txt\nbytes_written: 4\ncontent: hé\n" : String}
+  {Ed.write_result("/w/n.txt", Ed.utf8_len("hé\n"), Ed.text_lines("hé\n"))
+    == "file_path: /w/n.txt\nbytes_written: 4\nlines: 1" : String}
+
+law text_lines_counts:
+  {(Ed.text_lines(""), (Ed.text_lines("a"), (Ed.text_lines("a\n"), Ed.text_lines("a\nb"))))
+    == (0n, (1n, (1n, 2n))) : Nat & (Nat & (Nat & Nat))}
 
 # LAW: the argument checks run in Vibe's order: the path, an empty
 # old_string, then identical strings; a fine call passes.
@@ -447,11 +469,28 @@ law edit_apply_cases:
     (Ed.apply("a b a", "a", "z", False{}),
      (Ed.apply("a b c", "b", "zz", False{}),
       Ed.apply("aaa b aa", "aa", "x", True{}))))
-    == (Ed.EdFail{"String to replace not found in file.\nString: c"},
-        (Ed.EdFail{"Found 2 matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nString: a"},
-         (Ed.EdOk{"a zz c", "The file has been updated successfully."},
-          Ed.EdOk{"xa b x", "The file has been updated. All occurrences were successfully replaced"})))
+    == (Ed.EdFail{"String to replace not found in file."},
+        (Ed.EdFail{"Found 2 matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nAt line 1."},
+         (Ed.EdOk{"a zz c", "The file has been updated successfully.", [1n]},
+          Ed.EdOk{"xa b x", "The file has been updated. All occurrences were successfully replaced", [1n, 1n]})))
     : Ed.Edited & (Ed.Edited & (Ed.Edited & Ed.Edited))}
+
+# LAW: the lines: a replacement's start in the text after the edit (a
+# multi-line new_string pushes the later ones down); the matches' lines
+# in the text for several matches; not found, the lines of old_string's
+# first line, unless it is under 4 non-blank characters ("}").
+law edit_apply_lines:
+  {(Ed.apply("one\ntwo\nthree\nfour\n", "two\nthree", "2", False{}),
+    (Ed.apply("x\ny\nx\ny\nx\n", "x", "a\nb", True{}),
+     (Ed.apply("a\nb\na\n", "a", "z", False{}),
+      (Ed.apply("fn main() {\n  go();\n}\n", "fn main() {\n  run();", "z", False{}),
+       Ed.apply("}\n}\n", "}\n  x", "z", False{})))))
+    == (Ed.EdOk{"one\n2\nfour\n", "The file has been updated successfully.", [2n]},
+        (Ed.EdOk{"a\nb\ny\na\nb\ny\na\nb\n", "The file has been updated. All occurrences were successfully replaced", [1n, 4n, 7n]},
+         (Ed.EdFail{"Found 2 matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nAt lines 1, 3."},
+          (Ed.EdFail{"String to replace not found in file.\nIts first line is at line 1."},
+           Ed.EdFail{"String to replace not found in file."}))))
+    : Ed.Edited & (Ed.Edited & (Ed.Edited & (Ed.Edited & Ed.Edited)))}
 
 # LAW: a CRLF file is edited as "\n" text and written back in CRLF; an
 # LF file stays LF.

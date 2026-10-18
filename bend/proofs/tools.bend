@@ -374,6 +374,12 @@ def Laws.write_check_order():
 def Laws.edit_apply_cases():
   {==}
 
+def Laws.edit_apply_lines():
+  {==}
+
+def Laws.text_lines_counts():
+  {==}
+
 def Laws.edit_keeps_crlf():
   {==}
 
