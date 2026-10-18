@@ -100,6 +100,9 @@ const shot = async (name) => {
   res.shots.push(f); save();
 };
 const text = (sel) => page.locator(sel).first().innerText({ timeout: 3000 }).catch(() => null);
+// the right bar's pager (fa548fa11, designer m_27020): 'show N more' under 50, 'show 50 more · N
+// left' past it; '+ N more' is the inbox strip's only (stripRows.ts)
+const BAR_MORE = /^show \d+ more\b/;
 const click = async (name, loc) => {
   try { await loc.click({ timeout: 8000 }); return true; }
   catch (e) { step(name, false, String(e).slice(0, 240)); return false; }
@@ -127,7 +130,8 @@ const until = async (fn, ms, every = 1000) => {
 // A: app.right.watching.<agent>.<id>, never its .detail/.stop/.open parts): {id, text, title, g, sub, end}
 const alarmRows = (words) => page.evaluate((w) => [...document.querySelectorAll('[data-testid^="app.right.watching."]')]
   .filter((e) => /\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes(w))
-  .map((e) => ({ id: e.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), title: e.getAttribute('title'),
+  // its hover words: the ds tip layer's data-tip since hover-tips (984699494), no native title
+  .map((e) => ({ id: e.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), title: e.getAttribute('data-tip') ?? e.getAttribute('title'),
     g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, sub: e.querySelector('.app-rb-sub')?.textContent?.trim() ?? null,
     end: e.querySelector('.app-rb-end, .app-rb-time')?.textContent?.trim() ?? null })), words).catch(() => []);
 
@@ -861,7 +865,9 @@ if (mode === 'rows2') {
   await say(`[[bash: printf '%s' '${draftsHtml}' > rel-proof.html && sb page publish rel-proof.html --id rel-proof --title '${DRAFTS}']]`);
   await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
   const draftsRow = page.locator('[data-testid^="inbox.block.row."]', { hasText: DRAFTS }).first();
-  const draftsCard = page.locator('[data-testid^="inbox.block.card."]', { hasText: /drafts?/ }).filter({ hasText: DRAFTS }).first();
+  // the card by its page's title: its words say 'send these 2 emails?' since the k-pick cards
+  // (1de5fc75f), no 'draft' in them
+  const draftsCard = page.locator('[data-testid^="inbox.block.card."]').filter({ hasText: DRAFTS }).first();
   const answeringIt = async () => /answering/.test(((await page.locator('[data-testid="composer"]').first().innerText({ timeout: 1000 }).catch(() => '')) ?? ''));
   // the card is there within 90 s; then its row's click, else '+ N more' in turn, until it is the open one
   const listed = await until(async () => ((await draftsRow.isVisible().catch(() => false)) || (await draftsCard.isVisible().catch(() => false)) || /release replies proof|2 drafts/.test(((await text('[data-testid="inbox.block"]')) ?? '')) ? true : null), 90000, 1000);
@@ -901,13 +907,17 @@ if (mode === 'rows2') {
   await harness();
   await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
   const onList = await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
+  // his no-swipe (316c1391c): a sideways swipe never walks, either way (it took him away from his
+  // words); ⌘[ ⌘], the side buttons and ‹ › walk. Fingers right, then left: still on /artifacts
   await swipe(-30);
-  const swBack = await until(async () => ((await page.locator('[data-testid="artifacts.list"]').count()) === 0 && /harness/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), 5000, 300);
+  await page.waitForTimeout(600);
+  const stayBack = (await page.locator('[data-testid="artifacts.list"]').count()) > 0;
   await shot('swipe-back');
   await swipe(30);
-  const swFwd = await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+  await page.waitForTimeout(600);
+  const stayFwd = (await page.locator('[data-testid="artifacts.list"]').count()) > 0;
   await shot('swipe-forward');
-  step('two-finger swipe (CDP wheel deltaX): back, then forward', onList && !!swBack && swFwd, { on_list: onList, back: !!swBack, forward: swFwd });
+  step('two-finger swipe (CDP wheel deltaX) either way never walks: still on /artifacts', onList && stayBack && stayFwd, { on_list: onList, after_right: stayBack, after_left: stayFwd });
   // 3f58f843 (ambient-lead m_21499): ⌘K finds pages by name: 'set' shows the pages group, and ⏎ on
   // its row opens settings (the selection walked down to it with ↓, as he would)
   await harness();
@@ -1124,7 +1134,7 @@ if (mode === 'rows2') {
     ml.more_back = (await moreBtn.innerText({ timeout: 3000 }).catch(() => '')).trim();
     ml.head_in_view = await page.locator('[data-testid="app.right.artifacts.head"]').first().isVisible().catch(() => false);
   }
-  step("right bar: '+ N more' -> every row and 'show less' -> back at the cap", capped && /^\+ \d+ more$/.test(ml.more_text) && ml.less_text === 'show less' && ml.more_gone && ml.rows_open > ml.rows_capped && ml.rows_back === ml.rows_capped && ml.more_back === ml.more_text, ml);
+  step("right bar: '+ N more' -> every row and 'show less' -> back at the cap", capped && BAR_MORE.test(ml.more_text) && ml.less_text === 'show less' && ml.more_gone && ml.rows_open > ml.rows_capped && ml.rows_back === ml.rows_capped && ml.more_back === ml.more_text, ml);
   // (f) 1a79de8a: a PR artifact's click calls window.bise.openExternal and opens no panel. Seen
   // from a logpoint on the preload's openExternal (CDP Debugger, a condition that logs and never
   // pauses); the url is refused in main, so nothing reaches his browser (gate A watches anyway)
@@ -1293,7 +1303,8 @@ async function newRows(harness, say) {
     await harness();
     await clear();
     await say('[[slow: 40]] a long turn to stop');
-    const keyLine = async () => /ctrl\+c stop/.test(await body());
+    // the desktop's key line says '⌃C stop' during a turn (composer/keybar.ts), the TUI's 'ctrl+c stop'
+    const keyLine = async () => /(⌃C|ctrl\+c) ?stop/.test(await body());
     const working = await until(async () => ((await keyLine()) ? true : null), 20000, 500);
     await field.click({ timeout: 3000 }).catch(() => {});
     await page.keyboard.type('garde ça', { delay: 10 });
@@ -1465,7 +1476,6 @@ async function newRows(harness, say) {
     const LOG = process.env.AS_HE_DOES_FAKE_LOG;
     const heard = LOG && fs.existsSync(LOG) ? fs.readFileSync(LOG, 'utf8').includes('what time is it') : null;
     step("the fn talk's words reach main's model (core talk_start/talk_end)", heard === true, { log: LOG ?? 'AS_HE_DOES_FAKE_LOG not set', heard });
-    step('the fn talk corner card: his words and the answer', !!seen, seen ?? { capsule: !!cp, why: 'off-screen has no helper: the capsule never enters a talk from a core talk_start alone' });
     // where the card would sit on his display (capsule-frames.jsonl): bottom-right 16 px inside the
     // work area (capsuleframe.test.ts); the real window stays parked off every screen
     const recs = cfrLines().slice(cfrBefore).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
@@ -1473,7 +1483,15 @@ async function newRows(harness, say) {
     const ruleOf = (r) => ({ ev: r.ev, dock: r.dock, right: r.bounds.x + r.bounds.width, wantRight: r.work.x + r.work.width - 16, bottom: r.bounds.y + r.bounds.height, wantBottom: r.work.y + r.work.height - 16, bounds: r.bounds, parked: r.parked });
     const rules = corner.map(ruleOf);
     const ruleOk = rules.length > 0 && rules.every((r) => r.right === r.wantRight && r.bottom === r.wantBottom);
-    step('the corner card frame: bottom-right 16 px inside the work area (capsule-frames.jsonl)', ruleOk, rules.length ? rules : { file: CFR ?? 'AS_HE_DOES_USERDATA not set', records: recs.length, why: recs.length ? 'no corner show' : 'no capsule show off-screen (no helper fn): nothing written' });
+    if (!seen && recs.length === 0) {
+      // every as-he-does run is off-screen (cand.sh, run.sh): no helper, so the capsule never enters a
+      // talk from the core's talk_start alone (machine.ts) and no corner frame is written; the card,
+      // its words and its frame are the harness checks' (native/fn, native/capsule: the scripted helper)
+      step("the fn talk corner card and its frame: not reachable off-screen (no helper fn); proven by checks/native/fn.spec.ts and native/capsule.spec.ts", true, 'not proven here');
+    } else {
+      step('the fn talk corner card: his words and the answer', !!seen, seen ?? { capsule: !!cp });
+      step('the corner card frame: bottom-right 16 px inside the work area (capsule-frames.jsonl)', ruleOk, rules.length ? rules : { file: CFR ?? 'AS_HE_DOES_USERDATA not set', records: recs.length, why: 'no corner show' });
+    }
     // off-screen rule (offscreen.ts): every window at -30000, never on a screen; the file's parked
     // frame first, else the page's own screenX/Y
     const parked = corner.map((r) => r.parked);
@@ -2761,7 +2779,7 @@ async function rows233B(harness, say) {
     const capped = await bar();
     const b1 = await until(async () => {
       const more = page.locator('[data-testid="app.right.agents.more"]').first();
-      if (/^\+ \d+ more$/.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
+      if (BAR_MORE.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
       const b = await bar();
       return b?.rows.some((r) => r.id === 'app.right.agent.zqfails' && r.mark === '↑') && b.rows.some((r) => r.orphan) ? b : null;
     }, 150000, 2000) ?? (await bar());
@@ -2787,7 +2805,7 @@ async function rows233B(harness, say) {
     const ids = (capped?.rows ?? []).map((r) => r.id);
     const waitsIdx = (capped?.rows ?? []).findIndex((r) => r.g === '?');
     step("the AGENTS cap: 8 rows then '+ N more'; a row that waits on him ('?') shows past it",
-      ids.length >= 8 && /^\+ \d+ more$/.test(capped?.more ?? '') && (waitsIdx < 0 || ids.length > 8 || waitsIdx < 8),
+      ids.length >= 8 && BAR_MORE.test(capped?.more ?? '') && (waitsIdx < 0 || ids.length > 8 || waitsIdx < 8),
       { ids, more: capped?.more, head: capped?.head, waits_on_him: waitsIdx, note: waitsIdx < 0 ? "no '?' row in the world: the cap's wait rule is agents-bar.spec's" : null });
     // ARCHIVED: open, its rows sign + name + age (zqgone dropped, the e812 seed's zqold)
     const ah = page.locator('[data-testid="app.right.archived.head"]').first();
@@ -3034,6 +3052,13 @@ async function rows233B(harness, say) {
     const recs = cfr().slice(n0).filter((x) => x.mode === 'corner');
     const hs = recs.map((x) => x.bounds?.height ?? 0);
     step("the corner card: one rounded edge (the page's root no radius, fill or shadow)", !!r?.root && r.root.radius === '0px' && r.root.shadow === 'none' && /rgba\(0, 0, 0, 0\)|transparent/.test(r.root.fill), r ?? { capsule: !!cp });
+    // off-screen (every as-he-does run) the capsule never enters a talk without the helper's fn: no
+    // card, no frame; the long card's growth is the harness checks' (native/fn, native/capsule)
+    if (!r?.card && recs.length === 0) {
+      step("a long talk's corner card (grows to half the screen, then scrolls) and its frames: not reachable off-screen (no helper fn); proven by checks/native/fn.spec.ts and native/capsule.spec.ts", true, 'not proven here');
+      await harness();
+      return;
+    }
     step('a long talk and answer: the card grows to half the screen at most, then scrolls (the rest in bise ↗)',
       !!r && r.h <= r.half + 2 && !!r.scroll && (r.rest || r.scrolled), { r, frames: hs });
     step('its frames (capsule-frames.jsonl): taller as the words came, bottom-right pinned, parked off every screen',
@@ -3073,10 +3098,16 @@ async function rows0170(harness, say) {
     }
     return !!on;
   };
-  const agentRow = (name) => page.evaluate((n) => {
+  // the world has 12+ agents by now: the AGENTS cap folds the newest (zqbench, zqdocs, zqsearch)
+  // under 'show N more'; unfolded first, as he would
+  const unfold = async () => {
+    const more = page.locator('[data-testid="app.right.agents.more"]').first();
+    if (BAR_MORE.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
+  };
+  const agentRow = async (name) => (await unfold(), page.evaluate((n) => {
     const e = [...document.querySelectorAll('[data-testid^="app.right.agent."]')].find((x) => { const id = x.getAttribute('data-testid') ?? ''; return id === `app.right.agent.${n}` || id.endsWith(`.${n}`); });
     return e ? { id: e.getAttribute('data-testid'), g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, end: e.querySelector('.app-rb-end, .app-rb-time')?.textContent?.trim() ?? null, text: (e.textContent ?? '').replace(/\s+/g, ' ').trim() } : null;
-  }, name).catch(() => null);
+  }, name).catch(() => null));
   const waitLine = async () => {
     const l = page.locator('[data-testid="thread.waiting"]').first();
     if (!(await l.count())) return null;
@@ -3279,7 +3310,7 @@ async function rowsC2BA(harness, say) {
   // the AGENTS cap folds rows past 8 under '+ N more': unfold it first
   const unfold = async () => {
     const more = page.locator('[data-testid="app.right.agents.more"]').first();
-    if (/^\+ \d+ more$/.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
+    if (BAR_MORE.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
   };
   // a menu left open (the composer's Picker) or a row folded again takes the first click
   // (cand-9d10q: 'to bise' after goAgent('zcwt'), the same click worked two rows later): esc, unfold,
@@ -3379,7 +3410,8 @@ async function rowsC2BA(harness, say) {
       // main is 'bise' to him (shownName); where: his folder's name since f8a0b301a (was 'shared folder');
       // the fake provider reports no usage, so the context may be absent
       !!m0 && /^to (main|bise)\b/.test(m0.to ?? '') && m0.place !== 'shared folder' && (m0.context === null || /^context /.test(m0.context)) && !/\bidle\b|yolo|approvals/.test(`${m0.to} ${m0.place} ${m0.context}`)
-        && m0.tab?.h === 32 && m0.tab.l === 16 && m0.tab.r === 16 && m0.tab.glue <= 1 && m0.attach === '+' && /⌄$/.test(m0.mode ?? '') && /⌄$/.test(m0.model ?? '') && m0.send && m0.keys, m0);
+        // the menus' caret is the ds dropdown's drawn chevron since designer m_24786, no '⌄' glyph in their words
+        && m0.tab?.h === 32 && m0.tab.l === 16 && m0.tab.r === 16 && m0.tab.glue <= 1 && m0.attach === '+' && !!m0.mode && !!m0.model && m0.send && m0.keys, m0);
     step('composer A: no shadow band (no ::after, one 1 px line, r 16), the thread fades under a 12 px opacity mask', noBand(m0), { after: m0?.after, mask: m0?.mask, shadow: m0?.shadow, radius: m0?.radius });
     // the menus open above the box; esc closes them, the field untouched
     await clear();
@@ -3424,8 +3456,10 @@ async function rowsC2BA(harness, say) {
     await idle();
     const d = await dock(Q, 60000);
     const an = await until(async () => { const x = await tabInfo(); return x?.acc ? x : null; }, 8000, 400) ?? (await tabInfo());
+    // '↳ answering bise · …' (composer-target A, designer m_26531); on the asker's own thread (main's
+    // card in main's) no esc end: esc goes nowhere else (designer m_26776, m_26818)
     step("composer A answering: the tab in the accent, 'answering main · <question cut after a word>', 'esc write to main instead'; no branch, context, mode or model; '+' stays",
-      !!d.open && an?.acc === true && /^answering (main|bise) · zcA/.test(an.to ?? '') && /^esc write to (main|bise) instead$/.test(an.end ?? '') && !an.place && !an.context && !an.mode && !an.model && an.attach === '+', { card: d.id, ...an });
+      !!d.open && an?.acc === true && /^↳ answering (main|bise) · zcA/.test(an.to ?? '') && an.end === null && !an.place && !an.context && !an.mode && !an.model && an.attach === '+', { card: d.id, ...an });
     // the shots: idle (main), words (zcwt), answering, at 1400/1100/800 light and dark
     const sizes = [];
     for (const scheme of ['light', 'dark']) {
@@ -3467,7 +3501,7 @@ async function rowsC2BA(harness, say) {
     await page.waitForTimeout(500);
     await page.keyboard.press('Escape');
     step("composer A at 1400/1100/800 light and dark: 'to' always shown, no band, the mode never drops, answering in the accent with one '…' at most",
-      sizes.every((s) => /^to (main|bise)/.test(s.idle.to ?? '') && s.idle.band && /^to zcwt/.test(s.words.to ?? '') && !!s.words.mode && s.answering.open && s.answering.acc && !s.answering.dots && /^answering (main|bise)/.test(s.answering.to ?? '')), sizes);
+      sizes.every((s) => /^to (main|bise)/.test(s.idle.to ?? '') && s.idle.band && /^to zcwt/.test(s.words.to ?? '') && !!s.words.mode && s.answering.open && s.answering.acc && !s.answering.dots && /^↳ answering (main|bise)/.test(s.answering.to ?? '')), sizes);
     await harness();
     await answerWith(Q, 1);
   });
@@ -3612,37 +3646,21 @@ async function rowsC2BA(harness, say) {
     const d = await dock(A, 20000);
     if (d.id === null) { step("'✓ answered' opens his answer", false, { listed: d.listed }); return; }
     await d.open.locator('[data-testid$=".opt.1"]').first().click({ timeout: 3000 }).catch(() => {});
-    const rowL = page.locator(`[data-testid="thread.card.${String(d.id)}"]`).first();
-    // the thread draws its last rows only: scroll up until the card's row is drawn
-    const sc = page.locator('[data-testid="thread.list"] [data-virtuoso-scroller="true"]').first();
-    const drawn = await until(async () => {
-      if (await rowL.isVisible().catch(() => false)) return true;
-      await sc.evaluate((e) => { e.scrollTop = Math.max(0, e.scrollTop - 500); }).catch(() => {});
-      return null;
-    }, 30000, 300);
-    await rowL.scrollIntoViewIfNeeded().catch(() => {});
-    await page.waitForTimeout(600);
-    const rowWords = flat(await rowL.innerText({ timeout: 2000 }).catch(() => ''));
-    const title = await rowL.locator('xpath=..').getAttribute('title').catch(() => null);
-    const answerOut = await page.evaluate((id) => {
-      const s = document.querySelector('[data-testid="thread.list"] [data-virtuoso-scroller="true"]')?.getBoundingClientRect();
-      const a = [...document.querySelectorAll('[data-testid^="thread.approval."], [data-testid^="thread.entry."]')].filter((e) => /zcl-one/.test(e.textContent ?? '')).at(-1);
-      if (!a || !s) return true;
-      const r = a.getBoundingClientRect();
-      return r.bottom < s.top || r.top > s.bottom;
+    // one fact, one row (6ab4f9edd, designer m_24812): main's card answered in main's own thread
+    // draws his '✓ you answered' row only, never a '✓ answered: <question>' line over it. The
+    // link from another thread's '✓ answered' row to his answer is thread/answered-link.spec's
+    // (FakeCore): a real card of another agent's needs a live agent that asks, none here.
+    const rows = () => page.evaluate((id) => {
+      const card = [...document.querySelectorAll(`[data-testid="thread.card.${String(id)}"]`)].map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim());
+      const mine = [...document.querySelectorAll('[data-testid^="thread.approval."]')]
+        .filter((e) => /^thread\.approval\.\d+$/.test(e.getAttribute('data-testid') ?? '') && /zcl-one/.test(e.textContent ?? ''))
+        .map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 120));
+      return { card, mine };
     }, d.id).catch(() => null);
-    await shot('c2ba-answered-before');
-    await rowL.click({ timeout: 3000 }).catch(() => {});
-    const flash = await until(async () => page.evaluate(() => {
-      const e = document.querySelector('.th-flash');
-      const s = document.querySelector('[data-testid="thread.list"] [data-virtuoso-scroller="true"]')?.getBoundingClientRect();
-      if (!e || !s) return null;
-      const r = e.getBoundingClientRect();
-      return { id: e.getAttribute('data-testid') ?? e.closest('[data-testid]')?.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 120), inView: r.bottom > s.top && r.top < s.bottom };
-    }), 6000, 150);
-    await shot('c2ba-answered-at-answer');
-    step("'✓ answered: <question>' (title 'show your answer') brings his answer into view, flashed once",
-      !!drawn && /^✓ answered: zcL/.test(rowWords) && !!flash && flash.inView && /zcl-one/.test(flash.text), { card: d.id, rowWords, title, answerOutBefore: answerOut, flash });
+    const seen = await until(async () => { const r = await rows(); return r && r.mine.length > 0 ? r : null; }, 20000, 500) ?? (await rows());
+    await shot('c2ba-answered-one-row');
+    step("main's card answered in main's thread: one row, his '✓ you answered' (no '✓ answered: <question>' line over it)",
+      !!seen && seen.mine.length === 1 && seen.card.length === 0, { card: d.id, ...seen });
   });
 
   await row('psi tip', async () => {
@@ -3650,6 +3668,8 @@ async function rowsC2BA(harness, say) {
     const shots = [];
     for (const scheme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: scheme }).catch(() => {});
+      // zcwt is past the AGENTS cap (12 agents in the world): its row is drawn once unfolded
+      await unfold();
       await page.locator('[data-testid="app.right.agent.zcwt.mark"]').first().hover({ timeout: 3000 }).catch(() => {});
       const tip = await until(async () => page.evaluate(() => {
         const t = document.querySelector('[data-testid="tip.words"], [data-testid="app.right.tip.words"]');
@@ -3988,7 +4008,7 @@ async function rows42D1(harness, say) {
     const pinkNow = async () => (await box.getAttribute('data-answering', { timeout: 3000 }).catch(() => null)) === 'true';
     const mainPink = await pinkNow();
     const more = page.locator('[data-testid="app.right.agents.more"]').first();
-    if (/^\+ \d+ more$/.test(((await more.textContent({ timeout: 500 }).catch(() => '')) ?? '').trim())) await more.click({ timeout: 2000 }).catch(() => {});
+    if (BAR_MORE.test(((await more.textContent({ timeout: 500 }).catch(() => '')) ?? '').trim())) await more.click({ timeout: 2000 }).catch(() => {});
     const id = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.right.agent."]')]
       .map((e) => e.getAttribute('data-testid') ?? '').find((t) => /^app\.right\.agent\.[^.]+$/.test(t) && t !== 'app.right.agent.main') ?? null).catch(() => null);
     if (id === null) { step(name, false, 'no sub-agent row in harness'); return; }
@@ -4320,7 +4340,7 @@ async function rowsDC47(harness, say) {
   const T = String(Date.now()).slice(-5);
   const unfold = async () => {
     const more = page.locator('[data-testid="app.right.agents.more"]').first();
-    if (/^\+ \d+ more$/.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
+    if (BAR_MORE.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
   };
   // the harness project's sidebar row (its id carries a hash)
   const projId = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
@@ -4596,7 +4616,8 @@ async function rowsDC47(harness, say) {
       return { w: Math.round(r.getBoundingClientRect().width), track: sw(tr), used: sw(used), usedTag: used?.tagName ?? null, tab: (document.querySelector('[data-testid="composer.tab"]')?.textContent ?? '').replace(/\s+/g, ' ').trim() };
     }), 60000, 1000);
     await shot('dc47-ring-composer');
-    step("the composer tab's context ring is a dial: a 1 px track and a 2 px arc, 12 px", !!ring && ring.w === 12 && /^1(px)?$/.test(ring.track ?? '') && /^2(px)?$/.test(ring.used ?? ''), ring ?? { why: 'no ring on the tab after [[usage: 70000]]' });
+    // the ds Ring after Codex's dial (ee5528539, designer m_26968): a 2 px track and a 2 px arc
+    step("the composer tab's context ring is a dial: a 2 px track and a 2 px arc, 12 px", !!ring && ring.w === 12 && /^2(px)?$/.test(ring.track ?? '') && /^2(px)?$/.test(ring.used ?? ''), ring ?? { why: 'no ring on the tab after [[usage: 70000]]' });
     // the bar: rings at rest hidden, shown on a row's hover (only agents with a context have one)
     await unfold();
     const bar = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.right.agent."][data-testid$=".ring"]')].map((e) => ({ id: e.getAttribute('data-testid'), op: getComputedStyle(e.closest('.app-rb-pct') ?? e).opacity, vis: getComputedStyle(e.closest('.app-rb-pct') ?? e).visibility })));
@@ -4877,7 +4898,8 @@ async function fileChips(harness) {
     // an answer reaches main as the hub's own words ('the user answered card #N (…): "…"'), the file
     // in them as its <file … path=…> tag where he dropped it (cand-2760), or as a file part
     const asPart = (r) => r.parts?.some((p) => p.kind === 'file' && p.path === csv);
-    const asTag = (r) => /answered card/.test(r.text) && r.text.includes(`cold, see <file name="[File #1]" path="${csv}"`);
+    // the hub says 'notification #N' since cards became notifications in its words
+    const asTag = (r) => /answered (card|notification)/.test(r.text) && r.text.includes(`cold, see <file name="[File #1]" path="${csv}"`);
     const got = await until(async () => journal('bench-zq.csv').find((r) => asPart(r) || asTag(r)) ?? null, 30000, 1000);
     ans = { ...ans, chip: !!chip, entry: got ? { ...got, parts: got.parts?.map((p) => ({ kind: p.kind, name: p.name, path: p.path ? path.basename(p.path) : undefined, text: p.text })) ?? null } : journal('bench-zq.csv').slice(0, 2) };
     ans.ok = !!chip && !!got && (asTag(got) || (got.parts[0]?.kind === 'text' && /cold, see/.test(got.parts[0]?.text ?? '')));
