@@ -29,7 +29,7 @@ describe("kiln's main", () => {
     const w = buildWorld(o, 'main', STYLE, lookOf(o.map), false, growOf(growthOf(c)));
     w.root.updateMatrixWorld(true);
     const tagged: Object3D[] = [];
-    const meshes: Mesh[] = [];
+    const meshes: Object3D[] = [];
     w.root.traverse((m) => {
       if (m.userData.occludes === true) tagged.push(m);
       else if (m instanceof Mesh) meshes.push(m);
