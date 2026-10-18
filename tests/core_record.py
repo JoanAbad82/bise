@@ -35,6 +35,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 QA_DIR = os.path.join(REPO, "dev", "plugins", "ambient-qa")
 sys.path.insert(0, QA_DIR)
+sys.path.insert(0, HERE)
+import wait  # noqa: E402  (tests/wait.py: the one way a test waits)
 
 # the window's own command counter (store base.ts cid): its sends' cids from 1
 MESSAGE = "hello from the core recording"
@@ -165,7 +167,12 @@ def show(core):
     welcomed = lambda: {e.get("project") for e in core.evs[n0:] if e.get("ev") == "welcome"}
     core.until(lambda: set(names) <= welcomed(), 180, "a welcome from every shown project's hub")
     core.settled(60)
-    time.sleep(3)
+    quiet(core)
+
+
+def quiet(core, seconds=3, timeout=120):
+    """The core said everything it had to say: no new event for `seconds` (tests/wait.py)."""
+    wait.stable(lambda: len(core.evs), timeout, "the core quiet for %d s" % seconds, quiet=seconds)
 
 
 def drive(out, timeout):
@@ -214,7 +221,7 @@ def drive(out, timeout):
                                        for r in rows_of(core) for c in (r.get("cards") or [])), 60, "rows without the cards")
         except SystemExit as e:
             print(str(e), file=sys.stderr)     # an invariant for the check, not the recorder's to judge
-        time.sleep(5)
+        quiet(core, 5)
     finally:
         core.close()
     # a reload: a new window on a new core child, as main restarts it; the window asks again
@@ -226,7 +233,7 @@ def drive(out, timeout):
         for r in rows:
             core.cmd({"cmd": "subscribe", "project": r["project"], "agent": "main"})
         core.settled(60)
-        time.sleep(5)
+        quiet(core, 5)
     finally:
         core.close()
     f.close()
