@@ -32,6 +32,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
+import placing  # noqa: E402
 from tui_tmux import Tui, tui_session, run, MAIN_IDLE  # noqa: E402
 from words import w  # noqa: E402
 
@@ -174,7 +175,7 @@ def wide(t, E):
         # an agent in its own worktree, 2 files committed: its diff
         out = sb(E, "main", E.ws, "spawn", "t1", "--place", "new", "--objective", "make the pricing page")
         assert "t1" in out, out
-        wt, branch = e2e.placed_worktree(E.ws, "t1")
+        wt, branch = placing.placed_worktree(E.ws, "t1")
         os.makedirs(os.path.join(wt, "src"))
         open(os.path.join(wt, "src", "pricing.tsx"), "w").write("".join("line %d\n" % i for i in range(40)))
         with open(os.path.join(wt, "README"), "a") as f:

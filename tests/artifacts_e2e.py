@@ -27,6 +27,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import e2e  # noqa: E402
+import placing  # noqa: E402
 from e2e import EXE, Env, check, sh  # noqa: E402
 
 
@@ -62,7 +63,7 @@ def main():
 
         out = sb("main", E.ws, "spawn", "t1", "--place", "new", "--objective", "hello t1")
         check("t1" in out, out)
-        wt, _ = e2e.placed_worktree(E.ws, "t1")
+        wt, _ = placing.placed_worktree(E.ws, "t1")
         c.wait_idle("t1")
 
         # an agent adds a file
