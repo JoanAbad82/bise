@@ -4,7 +4,7 @@
 // all in one group in the office's own units. No renderer, no camera, no light: the minimap
 // (render/index.ts) draws it through its view, the town places one per project. frame() poses it
 // for time t and says how the loop must run next (Motion); the caller renders. Owner: bims-wire.
-import { Color, Group, Mesh, MeshBasicMaterial, RingGeometry, type ColorRepresentation, type Vector3 } from 'three';
+import { Color, Group, Mesh, MeshBasicMaterial, RingGeometry, type ColorRepresentation, type Object3D, type Vector3 } from 'three';
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, Motion, Office } from '../model';
 import { makeBim, type Bim } from './bim';
@@ -56,6 +56,8 @@ export interface OfficeScene {
   feet(name: string, out: Vector3): Vector3 | null;
   /** every bim's name, shown or not */
   names(): readonly string[];
+  /** a bim's body (the hero's entry pops it in), null: no such bim */
+  body(name: string): Object3D | null;
   desk(name: string): DeskHandles | undefined;
   /** where a stage's piece stands (the map's look), office units */
   pieceAt(stage: number): { readonly x: number; readonly z: number } | null;
@@ -266,6 +268,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       return shown(name)?.feet(out) ?? null;
     },
     names: () => [...bims.keys()],
+    body: (name) => bims.get(name)?.group ?? null,
     desk: (name) => world?.desks.get(name),
     pieceAt(stage) {
       return office ? mapLook().pieceAt(office, stage) : null;

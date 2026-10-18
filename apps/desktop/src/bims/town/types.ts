@@ -2,6 +2,7 @@
 // renderer (render/town.ts, three, loaded with the office's chunk: import('../render')). Pure types.
 // Each office is its project's own office scene (render/office-scene.ts), the minimap's: the town
 // bakes it still from afar and poses it live when you look at it close (page town-live). Owner: maps-e.
+import type { Object3D } from 'three';
 import type { Motion, Office } from '../model';
 import type { Grow } from '../growth';
 import type { Fit } from '../render/camera';
@@ -54,6 +55,8 @@ export interface TownRenderer {
   /** the town as drawn, onto a 2d canvas of the same pixel size */
   copyTo(target: HTMLCanvasElement): void;
   onLost(cb: () => void): void;
+  /** the entry build's handle (TownOpts.entry) */
+  readonly entry: TownEntry;
   dispose(): void;
 }
 
@@ -71,6 +74,41 @@ export interface TownOpts {
   readonly sky?: { readonly day: string; readonly night: string };
   /** at night, the light's strength times this (the hero on a dark page: bims m_31057); absent: 1 */
   readonly nightLift?: number;
+  /**
+   * the hero's entry build (design's hero-entry §2): the town drawn loose, its townscape and its
+   * offices' worlds unmerged (their bakes made at once, hidden) so each thing can be grown in, until
+   * settle(). Absent: merged from the first frame.
+   */
+  readonly entry?: boolean;
+}
+
+/** What the entry build moves (TownOpts.entry): the town's things, loose, as drawn now. */
+export interface TownParts {
+  /** the townscape unmerged (its slab, its roads, its trees...), null once settled */
+  readonly scape: Object3D | null;
+  /** the lawn's middle, town units */
+  readonly centre: { readonly x: number; readonly z: number };
+  readonly offices: readonly {
+    readonly id: string;
+    /** the office's root, where the plan put it */
+    readonly root: Object3D;
+    /** its world (walls, floor, furniture), unmerged while the entry holds; null before one */
+    readonly world: Object3D | null;
+    /** its office's width, office units */
+    readonly width: number;
+    /** its bims' bodies by name */
+    readonly bims: readonly { readonly name: string; readonly body: Object3D }[];
+  }[];
+}
+
+/** The entry build's handle on the renderer (TownOpts.entry). */
+export interface TownEntry {
+  /** the loose things now (null before a town) */
+  parts(): TownParts | null;
+  /** start compiling every shader the town needs, off the frame where the GPU allows it */
+  warm(): void;
+  /** the build is over: the merged townscape and walls drawn from now on, the loose ones dropped */
+  settle(): void;
 }
 
 export type MakeTownRenderer = (canvas: HTMLCanvasElement, opts?: TownOpts) => TownRenderer;

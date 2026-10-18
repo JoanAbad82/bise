@@ -101,31 +101,35 @@ export function mount(el: HTMLElement, opts: MountOpts = {}): HeroTown {
   const ground = typeof opts.ground === 'string' ? { light: opts.ground, dark: opts.ground } : opts.ground;
   const q = new URLSearchParams(location.search);
   const go = (): void => {
-    idle(() => {
-      void import('./film')
-        .then(({ playFilm }) => {
-          if (gone) return;
-          film = playFilm(el, {
-            theme,
-            ...(ground ? { ground } : {}),
-            reduced: opts.reducedMotion ?? reducedNow(),
-            probe: q.has('herotest'),
-            ...(q.has('herot') ? { startT: Number(q.get('herot')) } : {}),
-            on: emit,
-          });
-          for (const f of later.splice(0)) f(film);
-        })
-        .catch(() => { emit('lost'); });
-    });
+    void import('./film')
+      .then(({ playFilm }) => {
+        if (gone) return;
+        film = playFilm(el, {
+          theme,
+          ...(ground ? { ground } : {}),
+          reduced: opts.reducedMotion ?? reducedNow(),
+          probe: q.has('herotest'),
+          ...(q.has('herot') ? { startT: Number(q.get('herot')) } : {}),
+          ...(q.has('herobuild') ? { entryAt: Number(q.get('herobuild')) } : {}),
+          on: emit,
+        });
+        for (const f of later.splice(0)) f(film);
+      })
+      .catch(() => { emit('lost'); });
   };
+  // in view at load (the hero): the film's chunk at once (design's hero-entry §1, the page preloads
+  // it); else when it nears the screen, once the page is idle
+  const r0 = el.getBoundingClientRect();
+  const inView = r0.bottom > 0 && r0.top < innerHeight && r0.right > 0 && r0.left < innerWidth;
   const near = new IntersectionObserver(
     (es) => {
       if (!es.some((e) => e.isIntersecting)) return;
       near.disconnect();
-      go();
+      idle(go);
     },
     { rootMargin: '200px' },
   );
-  near.observe(el);
+  if (inView) go();
+  else near.observe(el);
   return handle;
 }

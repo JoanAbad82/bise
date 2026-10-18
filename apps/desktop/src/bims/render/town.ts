@@ -120,7 +120,9 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   /** where the sun and its shadow's box were aimed last (aimSun): a pan moves them only when it changes */
   let sunKey = '';
   const spots = new Map<string, Spot>();
-  let scape: { sig: string; merged: Merged } | null = null;
+  let scape: { sig: string; merged: Merged; loose: Group | null } | null = null;
+  /** the hero's entry build holds the town loose (TownOpts.entry) until settle() */
+  let held = opts.entry === true;
   const v = new Vector3();
   const probe: Probe | null = testMode() ? { frames: 0, calls: 0, ms: 0, offices: 0, merged: { from: 0, to: 0 }, live: [], recent: [], check: { road: 0, river: 0 }, heads: [] } : null;
   if (probe) (window as unknown as { __biseTown?: Probe }).__biseTown = probe;
@@ -180,7 +182,9 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       // the desks' screens and lamps stay shared: lightDesk lights the walls' copy too (dropped with this world)
       if (m !== merged.baked && m.userData.live !== true) (c as unknown as { material: Material }).material = m.clone();
     }
-    w.visible = false;
+    // the entry build grows the loose world in: its bake waits, hidden, for settle()
+    w.visible = held;
+    merged.group.visible = !held;
     s.scene.root.add(merged.group);
     s.walls = { sig, merged };
   }
@@ -218,6 +222,22 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     shadowsDirty = true;
   }
 
+  function disposeGeometries(root: Object3D): void {
+    root.traverse((o) => {
+      const g = (o as unknown as { geometry?: { dispose(): void } }).geometry;
+      g?.dispose();
+    });
+  }
+
+  /** the entry's loose townscape out of the scene (its merged copy is drawn from now on) */
+  function dropLoose(s: { loose: Group | null; merged: Merged }): void {
+    if (!s.loose) return;
+    scene.remove(s.loose);
+    disposeGeometries(s.loose);
+    s.loose = null;
+    s.merged.group.visible = true;
+  }
+
   function syncScape(isNight: boolean): void {
     if (!plan) return;
     // where an office carves under its floor (California's bowl), in the town's frame: the lawn leaves a hole there
@@ -231,16 +251,21 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     if (scape) {
       scene.remove(scape.merged.group);
       scape.merged.dispose();
+      dropLoose(scape);
     }
     const pal = isNight ? NIGHT : DAY;
     const root = buildTownscape(plan, STYLE, pal, isNight ? TOWN_NIGHT : TOWN_DAY, pits);
     const merged = mergeRoot(root, STYLE, STYLE.shadows);
-    root.traverse((o) => {
-      const g = (o as unknown as { geometry?: { dispose(): void } }).geometry;
-      g?.dispose();
-    });
     scene.add(merged.group);
-    scape = { sig: sSig, merged };
+    if (held) {
+      // the entry build grows the loose things in: the merged copy waits, hidden, for settle()
+      merged.group.visible = false;
+      scene.add(root);
+      scape = { sig: sSig, merged, loose: root };
+    } else {
+      disposeGeometries(root);
+      scape = { sig: sSig, merged, loose: null };
+    }
     lightUp(isNight);
     shadowsDirty = true;
   }
@@ -522,7 +547,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
         shadowsDirty = true;
       }
       const t0 = performance.now();
-      if (shadowsDirty) {
+      // the entry build moves the loose things every frame: their shadow with them
+      if (shadowsDirty || held) {
         renderer.shadowMap.needsUpdate = true;
         shadowsDirty = false;
       }
@@ -596,11 +622,48 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     onLost(cb) {
       v3.onLost(cb);
     },
+    entry: {
+      parts() {
+        if (!plan) return null;
+        const { lawn } = plan;
+        return {
+          scape: scape?.loose ?? null,
+          centre: { x: (lawn.x0 + lawn.x1) / 2, z: (lawn.z0 + lawn.z1) / 2 },
+          offices: [...spots].flatMap(([id, s]) => {
+            const o = s.scene.office();
+            if (!o || !s.live) return [];
+            const world = held ? s.scene.world() : null;
+            const bims = s.scene.names().flatMap((name) => {
+              const body = s.scene.body(name);
+              return body ? [{ name, body }] : [];
+            });
+            return [{ id, root: s.scene.root, world, width: o.W, bims }];
+          }),
+        };
+      },
+      warm() {
+        // every program the town draws, compiled in parallel where the GPU allows (KHR_parallel_shader_compile)
+        void renderer.compileAsync(scene, v3.camera).catch(() => undefined);
+      },
+      settle() {
+        if (!held) return;
+        held = false;
+        if (scape) dropLoose(scape);
+        for (const s of spots.values()) {
+          if (!s.walls) continue;
+          const w = s.scene.world();
+          if (w) w.visible = false;
+          s.walls.merged.group.visible = true;
+        }
+        shadowsDirty = true;
+      },
+    },
     dispose() {
       for (const id of [...spots.keys()]) dropSpot(id);
       if (scape) {
         scene.remove(scape.merged.group);
         scape.merged.dispose();
+        dropLoose(scape);
         scape = null;
       }
       v3.dispose();

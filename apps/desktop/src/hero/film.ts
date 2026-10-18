@@ -17,6 +17,7 @@ import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
 import { CAST, SHOTS, type Shot } from './cast';
 import { aimCam, glideCam, glideOf, holdCam, officeOf, OFFICE_BOX, fitCam, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
+import { ENTRY, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
 import { eggWords, makeOverlay } from './overlay';
 import { advance, makeRuns, stepOf, type Run } from './run';
@@ -31,8 +32,10 @@ export interface FilmOpts {
   readonly reduced?: boolean;
   /** the checks' probe: window.__bimsHero */
   readonly probe?: boolean;
-  /** film time to start at, s (a check's shot) */
+  /** film time to start at, s (a check's shot: no entry build) */
   readonly startT?: number;
+  /** the entry build held at this ms (a check's frame of the build strip) */
+  readonly entryAt?: number;
   /** the visitor took the camera ('control'), the film took it back ('film'); the first frame is drawn ('ready'); no WebGL ('lost') */
   readonly on?: (e: 'control' | 'film' | 'ready' | 'lost') => void;
 }
@@ -65,8 +68,6 @@ const PAPER = { light: '#f2ede2', dark: '#171513' } as const;
 const IDLE_MS = 1000 / 30;
 /** the night's light on a dark page, times the app's (bims m_31057: the town sank into the page) */
 const NIGHT_LIFT = 1.25;
-/** frames drawn before 'ready' (the first ones compile and bake: a poster hides their hitches) */
-const READY_FRAMES = 8;
 /** where a word over a bim may sit, fractions of the box's width (the left fades into the page's text) */
 const SAFE_X = { x0: 0.3, x1: 0.85 } as const;
 /** an egg's words show this long from its start (designer m_30865) */
@@ -85,7 +86,14 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   const canvas = document.createElement('canvas');
   canvas.className = 'bh-canvas';
   box.append(canvas);
-  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT });
+  // the entry build (design's hero-entry §2): the town grows from its middle, then the film; none in
+  // reduced motion (the map is there, the film's still pose) nor for a check's shot at startT
+  let building = !reduced && opts.startT === undefined;
+  const entry = makeEntry();
+  /** the build's clock: the first frame's rAF time ('ready' is t = 0) */
+  let entryFrom = -1;
+  let warmed = false;
+  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: building });
   const overlay = makeOverlay(box);
   const sites: TownSite[] = CAST.map((c) => ({ id: c.id, office: layoutOf(rowsAt(c, 0).agents, c.map), grow: growOf(growthOf(c)) }));
   r.setTown(sites);
@@ -280,34 +288,48 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     const t0 = performance.now();
     const dt = lastMs === 0 ? 0 : Math.min(0.1, Math.max(0, (nowMs - lastMs) / 1000));
     lastMs = nowMs;
-    if (!reduced) t += dt;
+    // the build's ms from 'ready' (the first frame); the film's clock waits for its end
+    if (building && entryFrom < 0) entryFrom = nowMs;
+    const ems = building ? (opts.entryAt ?? nowMs - entryFrom) : ENTRY.done;
+    if (!reduced && ems >= ENTRY.done) t += dt;
     const n = night();
     for (const run of runs) {
       advance(run, t, n, reduced);
       const st = stepOf(run, n, reduced, attentionOf(run));
       if (st) steps.set(run.cast.id, st);
     }
-    if (hands.k === 'film') filmCam(dt);
+    if (building && hands.k === 'film') entryCam(ems);
+    else if (hands.k === 'film') filmCam(dt);
     else visitorCam(dt, wall());
     // the first frame: the film's shot at once, no glide from nowhere
-    if (probe?.frames === 0 || r.shownFit() === null) {
+    if (!building && (probe?.frames === 0 || r.shownFit() === null)) {
       const now = SHOTS[shotAt(SHOTS, filmT(t))];
       const c = hands.k === 'film' && now !== undefined ? shotCam(now, geo) : wide();
       if (c) spring = still(c);
     }
     r.setCam(spring.cam);
     const t1 = performance.now();
-    for (const id of r.liveIds()) {
+    // the build's first frame is the paper and the slab alone ('ready' at once); then one office's
+    // world (its walls' bake, ~100 ms) a frame, while the slab grows and nothing else shows yet
+    const ids = r.liveIds();
+    for (const id of building ? ids.slice(0, drawn) : ids) {
       const st = steps.get(id);
       if (st) r.live(id, st, t);
     }
+    if (building) build(ems, ids.length);
     const t2 = performance.now();
     r.frame(n);
     const t3 = performance.now();
+    if (building) overlay.root.style.opacity = String(wordsAt(ems));
     words();
     const t4 = performance.now();
-    // ready (the page fades its poster out) once the first frames' shaders and bakes are behind
-    if (box.dataset.ready !== 'true' && ++drawn >= READY_FRAMES) {
+    if (building && ems >= ENTRY.done) {
+      building = false;
+      overlay.root.style.opacity = '';
+    }
+    // ready (the page drops its still): the first frame, the build's t = 0
+    drawn++;
+    if (box.dataset.ready !== 'true') {
       box.dataset.ready = 'true';
       emit('ready');
     }
@@ -330,9 +352,39 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     if (!reduced || glide !== null) next();
   }
 
-  /** the next frame: at the display's rate while the camera glides or he just moved it, else 30 fps */
+  /** the build's camera: the wide while the town grows, then an ease to the film's first shot */
+  function entryCam(ems: number): void {
+    const from = wide();
+    if (from === null) return;
+    const T = filmT(t);
+    shotIx = shotAt(SHOTS, T);
+    const shot = SHOTS[shotIx];
+    const to = shot ? shotCam(shot, geo) : null;
+    const f = (ems - ENTRY.cam.from) / (ENTRY.cam.to - ENTRY.cam.from);
+    spring = still(to === null || f <= 0 ? from : glideCam(from, to, Math.min(1, f), null));
+  }
+
+  /** the build's things where they are at ems; the town settled once it's all there */
+  function build(ems: number, offices: number): void {
+    const parts = r.entry.parts();
+    if (parts === null) return;
+    if (!warmed && parts.offices.length >= offices) {
+      warmed = true;
+      r.entry.warm();
+    }
+    if (ems < ENTRY.built) {
+      entry.apply(ems, parts, r.shownFit()?.scale ?? 0.05);
+      return;
+    }
+    if (parts.scape !== null || parts.offices.some((o) => o.world !== null)) {
+      entry.finish(parts);
+      r.entry.settle();
+    }
+  }
+
+  /** the next frame: at the display's rate while the camera glides, the town builds or he just moved it, else 30 fps */
   function next(): void {
-    const busy = glide !== null || wall() - lastTouch < 1;
+    const busy = building || glide !== null || wall() - lastTouch < 1;
     if (busy) {
       raf = requestAnimationFrame(draw);
       return;

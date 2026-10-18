@@ -48,7 +48,8 @@ export default defineConfig({
       preserveEntrySignatures: 'exports-only',
       output: {
         entryFileNames: '[name].js',
-        chunkFileNames: 'film-[hash].js',
+        // a stable name: the page preloads it in its <head> (design's hero-entry §1)
+        chunkFileNames: 'film.js',
         format: 'es',
       },
     },
