@@ -284,7 +284,8 @@ test('(town) zoomed in: a live bim shows its line on hover, a click opens its ag
     await expect(s.page.getByTestId('app.right.bims.town')).toHaveAttribute('data-zoomed', 'true');
     // a bim of a live office, not main (main's thread is the project's), well inside the view
     // and alone where it is hovered: the nearest body wins the pick (render/pick.ts, 14 px), so a
-    // neighbour's body as close would take the hover (an office's bims stand ~5 px apart at this zoom)
+    // neighbour's body as close would take the hover (an office's bims stand ~5 px apart at this zoom):
+    // the bim with the most room round its hover point
     const toSeg = (p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number => {
       const dx = b.x - a.x;
       const dy = b.y - a.y;
@@ -294,11 +295,13 @@ test('(town) zoomed in: a live bim shows its line on hover, a click opens its ag
     };
     const pickOne = async () => {
       const heads = (await probe(s))?.heads ?? [];
-      return heads.find((h) => {
+      const room = (h: (typeof heads)[number]): number => {
         const p = { x: h.x, y: (h.y + h.feet) / 2 };
-        const alone = heads.every((o) => o === h || toSeg(p, { x: o.x, y: o.y }, { x: o.x, y: o.feet }) > 6);
-        return alone && h.name !== 'main' && h.x > 30 && h.x < box.width - 30 && h.y > 40 && h.feet < box.height - 10;
-      });
+        return Math.min(Infinity, ...heads.filter((o) => o !== h).map((o) => toSeg(p, { x: o.x, y: o.y }, { x: o.x, y: o.feet })));
+      };
+      const inView = heads.filter((h) => h.name !== 'main' && h.x > 30 && h.x < box.width - 30 && h.y > 40 && h.feet < box.height - 10);
+      // the one with the most room round it, and some (a body exactly behind another is the front one's)
+      return inView.sort((a, b) => room(b) - room(a)).find((h) => room(h) > 2);
     };
     await expect
       .poll(async () => (await pickOne()) !== undefined, { timeout: 5000, message: `a live bim in view (live ${JSON.stringify((await probe(s))?.live)}, heads ${JSON.stringify((await probe(s))?.heads.map((x) => `${x.name}@${String(Math.round(x.x))},${String(Math.round(x.y))}`))})` })
