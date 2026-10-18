@@ -8,6 +8,7 @@ import ./timers.bend as TM
 import ./wakes.bend as WK
 import ./xhub-model.bend as XH
 import ./lazy.bend as LZ
+import ./gone.bend as G
 
 type Life is Data:
   LActive{}
@@ -71,9 +72,10 @@ type St is Data:
   St{agents: List<&2, Agent>, order: List<&2, String>, hot: List<&2, MRec>,
     cards: List<&2, Card>, notes: List<&2, String>, next_msg: Nat,
     next_card: Nat, tm: TM.Tms, x: XH.Xs, paused: Maybe<&2, Nat>,
-    old: List<&2, MRec>}
+    old: List<&2, MRec>, gone: List<&2, G.Item>}
 # paused: the project's pause (cost-pause, hub/pause.bend), since that
-# ms; None: it runs. hot and old: the messages, split (issue 21, St.hot)
+# ms; None: it runs. hot and old: the messages, split (issue 21, St.hot).
+# gone: the cards main withdrew he may still answer (hub/gone.bend)
 
 type Ev is Data:
   ETaskCreated{name: String, parent: String, brief: J.Json, ws: J.Json, at: Nat}
@@ -96,6 +98,10 @@ type Ev is Data:
   # the asker's thread position of the route line his answer became: a
   # fact the shell knows once written, no state (law answer_pos_once)
   ECardAnswerPos{card: Nat, agent: String, pos: Nat}
+  # withdrawn-answer (architect m_30039): main withdrew card `id` (`text`
+  # its question); his late answer to it delivered (hub/gone.bend)
+  ECardWithdrawn{id: Nat, text: String}
+  ECardLate{id: Nat}
   EMainNote{text: String, at: Nat}
   ENotesFlushed{}
   # the timers of `sb every` (timers.bend): every_set, every_fired (an
@@ -198,12 +204,12 @@ def Card.pr(x: Card) -> Maybe<&2, Nat>:
 
 def St.agents(x: St) -> List<&2, Agent>:
   match x:
-    case St{+agents, _, _, _, _, _, _, _, _, _, _}:
+    case St{+agents, _, _, _, _, _, _, _, _, _, _, _}:
       agents
 
 def St.order(x: St) -> List<&2, String>:
   match x:
-    case St{_, +order, _, _, _, _, _, _, _, _, _}:
+    case St{_, +order, _, _, _, _, _, _, _, _, _, _}:
       order
 
 # the messages a step can still change or must read (MRec.is_hot:
@@ -211,37 +217,37 @@ def St.order(x: St) -> List<&2, String>:
 # walks (queued_for, unanswered_for, the pause's) read these only.
 def St.hot(x: St) -> List<&2, MRec>:
   match x:
-    case St{_, _, +hot, _, _, _, _, _, _, _, _}:
+    case St{_, _, +hot, _, _, _, _, _, _, _, _, _}:
       hot
 
 def St.cards(x: St) -> List<&2, Card>:
   match x:
-    case St{_, _, _, +cards, _, _, _, _, _, _, _}:
+    case St{_, _, _, +cards, _, _, _, _, _, _, _, _}:
       cards
 
 def St.notes(x: St) -> List<&2, String>:
   match x:
-    case St{_, _, _, _, +notes, _, _, _, _, _, _}:
+    case St{_, _, _, _, +notes, _, _, _, _, _, _, _}:
       notes
 
 def St.next_msg(x: St) -> Nat:
   match x:
-    case St{_, _, _, _, _, +next_msg, _, _, _, _, _}:
+    case St{_, _, _, _, _, +next_msg, _, _, _, _, _, _}:
       next_msg
 
 def St.next_card(x: St) -> Nat:
   match x:
-    case St{_, _, _, _, _, _, +next_card, _, _, _, _}:
+    case St{_, _, _, _, _, _, +next_card, _, _, _, _, _}:
       next_card
 
 def St.tm(x: St) -> TM.Tms:
   match x:
-    case St{_, _, _, _, _, _, _, +tm, _, _, _}:
+    case St{_, _, _, _, _, _, _, +tm, _, _, _, _}:
       tm
 
 def St.x(x: St) -> XH.Xs:
   match x:
-    case St{_, _, _, _, _, _, _, _, +xs, _, _}:
+    case St{_, _, _, _, _, _, _, _, +xs, _, _, _}:
       xs
 
 # every other message (cold: delivered, rejected or cancelled, owing
@@ -249,12 +255,18 @@ def St.x(x: St) -> XH.Xs:
 # near the head, and a message that turns cold goes in at the head
 def St.old(x: St) -> List<&2, MRec>:
   match x:
-    case St{_, _, _, _, _, _, _, _, _, _, +old}:
+    case St{_, _, _, _, _, _, _, _, _, _, +old, _}:
       old
+
+# the cards main withdrew he may still answer, newest first (hub/gone.bend)
+def St.gone(x: St) -> List<&2, G.Item>:
+  match x:
+    case St{_, _, _, _, _, _, _, _, _, _, _, +gone}:
+      gone
 
 def St.paused(x: St) -> Maybe<&2, Nat>:
   match x:
-    case St{_, _, _, _, _, _, _, _, _, +pz, _}:
+    case St{_, _, _, _, _, _, _, _, _, +pz, _, _}:
       pz
 
 def Msg.id(x: Msg) -> Nat:
@@ -475,46 +487,6 @@ def drop_card(xs: List<&2, Card>, +id: Nat) -> List<&2, Card>:
 def put_card(xs: List<&2, Card>, +c: Card) -> List<&2, Card>:
   snoc(Card, drop_card(xs, Card.id(c)), c)
 
-# the hub's items with numbered options (opened by the hub's Rust side,
-# `card_open`): the user's digit goes back to Rust (`card_choice`), which
-# acts and closes the item; typed words go to main
-def choice_kind(+k: String) -> Bool:
-  String.eq(k, "merge") || String.eq(k, "feature_try") || String.eq(k, "feature_merge") || String.eq(k, "update") || String.eq(k, "signin")
-
-# a page's own card (plan-ok): a plan an agent proposes, or a page's
-# question or drawn pick (notif-artifact), asked by that agent (core.bend
-# page_card); his answer is the hub's page path
-def page_kind(+k: String) -> Bool:
-  String.eq(k, "plan") || String.eq(k, "question")
-
-# BISE-299: the user's inbox holds only what needs the user, by kind, set
-# at the card's creation: main's escalations (`question`: `sb card`,
-# `drop`: main's drop of a task with attention) and, later, tool-call
-# confirmations (`confirm`), and the hub's own items about a place
-# (`merge`: a PR ready to merge, pr-design §6.3). Only the user answers or
-# closes them. The agents' traffic (reports, blocked, overlap, crashes) is
-# main's, never a card: an older journal's cards of other kinds close at
-# boot.
-def user_kind(+k: String) -> Bool:
-  String.eq(k, "question") || String.eq(k, "drop") || String.eq(k, "confirm") || choice_kind(k) || page_kind(k)
-
-# the ids of the open cards that are not the user's (an older journal's)
-def legacy_cards(xs: List<&2, Card>) -> List<&2, Nat>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      +rest = legacy_cards(t)
-      Bool.pick(List<&2, Nat>, user_kind(Card.kind(h)), rest, Card.id(h) <> rest)
-
-# the open card that holds message `id` (an escalated question)
-def card_holding(xs: List<&2, Card>, +id: Nat) -> Maybe<&2, Nat>:
-  match xs:
-    case Nil{}:
-      None{}
-    case Con{+h, +t}:
-      LZ.pick(Maybe<&2, Nat>, maybe_nat_is(Card.for_msg(h), id), u => Some{Card.id(h)}, u => card_holding(t, id))
-
 def Msg.to(x: Msg) -> String:
   match x:
     case Msg{_, _, _, +to, _, _, _, _, _, _, _, _, _}:
@@ -700,73 +672,77 @@ def settle_in(r: Maybe<&2, Nat>, +hot: List<&2, MRec>, +old: List<&2, MRec>, +fr
 
 def apply(+st: St, e: Ev) -> St:
   match st:
-    case St{+agents, +order, +hot, +cards, +notes, +nm, +nc, +tm, +xs, +pz, +old}:
+    case St{+agents, +order, +hot, +cards, +notes, +nm, +nc, +tm, +xs, +pz, +old, +gone}:
       match e:
         case ETaskCreated{+name, +parent, +brief, +ws, +at}:
           St{put_agent(agents, name, new_agent(name, False{}, Some{parent}, ws, brief, at)),
             Bool.pick(List<&2, String>, str_in(order, name), order, snoc(String, order, name)),
-            hot, cards, notes, nm, nc, tm, xs, pz, old}
+            hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case ELifecycle{+name, +life, +reason}:
-          St{map_agent(agents, name, OLife{life, reason}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{map_agent(agents, name, OLife{life, reason}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case EWorkspace{+name, +ws}:
-          St{map_agent(agents, name, OWs{ws}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{map_agent(agents, name, OWs{ws}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case ESnapshot{+name, +snap}:
-          St{map_agent(agents, name, OSnap{snap}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{map_agent(agents, name, OSnap{snap}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case EPlaced{+name, +ws, +err}:
-          St{Bool.pick(List<&2, Agent>, String.is_empty(err), map_agent(agents, name, OWs{ws}), agents), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{Bool.pick(List<&2, Agent>, String.is_empty(err), map_agent(agents, name, OWs{ws}), agents), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case EDeclared{+name, +status, +note}:
-          St{map_agent(agents, name, ODeclared{status, note}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{map_agent(agents, name, ODeclared{status, note}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case EReported{+name, +report}:
-          St{map_agent(agents, name, OReport{report}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{map_agent(agents, name, OReport{report}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case EFileTouched{+name, +path}:
-          St{map_agent(agents, name, OFile{path}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{map_agent(agents, name, OFile{path}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case ERenamed{+name, +nn}:
-          St{map_agent(agents, name, ORename{nn}), rename_in(order, name, nn), hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{map_agent(agents, name, ORename{nn}), rename_in(order, name, nn), hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         # the three message events, on the split (law cold_is_inert: on
         # every message, the same as one list's snoc, map_msg, settle)
         case EMsgSent{+m}:
           +p = settle_in(Msg.reply_to(m), snoc(MRec, hot, MRec{m, Queued{"new"}, False{}}), old, Msg.from(m))
-          St{agents, order, Ms.hot(p), cards, notes, Nat.max(Nat.max(nm, 1n+Msg.id(m)), 1n+Msg.thread(m)), nc, tm, xs, pz, Ms.old(p)}
+          St{agents, order, Ms.hot(p), cards, notes, Nat.max(Nat.max(nm, 1n+Msg.id(m)), 1n+Msg.thread(m)), nc, tm, xs, pz, Ms.old(p), gone}
         case EMsgState{+id, +s}:
           +p = msg_op(hot, old, id, OSt{s})
-          St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p)}
+          St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p), gone}
         case ESettled{+id}:
           +p = msg_op(hot, old, id, OSettle{})
-          St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p)}
+          St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p), gone}
         case ECardOpened{+c}:
-          St{agents, order, hot, put_card(cards, c), notes, nm, Nat.max(nc, 1n+Card.id(c)), tm, xs, pz, old}
+          St{agents, order, hot, put_card(cards, c), notes, nm, Nat.max(nc, 1n+Card.id(c)), tm, xs, pz, old, gone}
         case ECardClosed{+id, _, _}:
-          St{agents, order, hot, drop_card(cards, id), notes, nm, nc, tm, xs, pz, old}
+          St{agents, order, hot, drop_card(cards, id), notes, nm, nc, tm, xs, pz, old, gone}
         case ECardAnswerPos{_, _, _}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
+        case ECardWithdrawn{+id, +text}:
+          St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old, G.add(gone, id, text)}
+        case ECardLate{+id}:
+          St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old, G.drop(gone, id)}
         case EMainNote{+text, _}:
-          St{agents, order, hot, cards, snoc(String, notes, text), nm, nc, tm, xs, pz, old}
+          St{agents, order, hot, cards, snoc(String, notes, text), nm, nc, tm, xs, pz, old, gone}
         case ENotesFlushed{}:
-          St{agents, order, hot, cards, Nil{}, nm, nc, tm, xs, pz, old}
+          St{agents, order, hot, cards, Nil{}, nm, nc, tm, xs, pz, old, gone}
         case ETimerSet{+t, _}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.set(tm, t), xs, pz, old}
+          St{agents, order, hot, cards, notes, nm, nc, TM.set(tm, t), xs, pz, old, gone}
         case ETimerFired{+id, +fired, +next, +at, +undelivered}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.fired(tm, id, fired, next, at, undelivered), xs, pz, old}
+          St{agents, order, hot, cards, notes, nm, nc, TM.fired(tm, id, fired, next, at, undelivered), xs, pz, old, gone}
         case ETimerRun{+id, +at}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.run(tm, id, at), xs, pz, old}
+          St{agents, order, hot, cards, notes, nm, nc, TM.run(tm, id, at), xs, pz, old, gone}
         case ETimerStop{+id, +why, +at}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.stop(tm, id, why, at), xs, pz, old}
+          St{agents, order, hot, cards, notes, nm, nc, TM.stop(tm, id, why, at), xs, pz, old, gone}
         case ETimerName{+id, +name, _, _}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.named(tm, id, name), xs, pz, old}
+          St{agents, order, hot, cards, notes, nm, nc, TM.named(tm, id, name), xs, pz, old, gone}
         case EX{+xe}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, XH.apply(xs, xe), pz, old}
+          St{agents, order, hot, cards, notes, nm, nc, tm, XH.apply(xs, xe), pz, old, gone}
         case EAct{+ae}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.act_apply(tm, ae), xs, pz, old}
+          St{agents, order, hot, cards, notes, nm, nc, TM.act_apply(tm, ae), xs, pz, old, gone}
         case EFollow{+name, +on, +hub}:
-          St{map_agent(agents, name, OFollow{Bool.pick(Maybe<&2, String>, on, Some{hub}, None{})}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{map_agent(agents, name, OFollow{Bool.pick(Maybe<&2, String>, on, Some{hub}, None{})}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case EJobEnd{+name, _}:
-          St{map_agent(agents, name, OFollow{None{}}), order, hot, cards, notes, nm, nc, tm, xs, pz, old}
+          St{map_agent(agents, name, OFollow{None{}}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case EWake{+we}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.wk_apply(tm, we), xs, pz, old}
+          St{agents, order, hot, cards, notes, nm, nc, TM.wk_apply(tm, we), xs, pz, old, gone}
         case EPaused{+at}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, xs, Some{at}, old}
+          St{agents, order, hot, cards, notes, nm, nc, tm, xs, Some{at}, old, gone}
         case EResumed{_}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, xs, None{}, old}
+          St{agents, order, hot, cards, notes, nm, nc, tm, xs, None{}, old, gone}
 
 # the state after a journal: the replay of a list of events
 def apply_all(evs: List<&2, Ev>, +st: St) -> St:
@@ -864,7 +840,7 @@ def init(+workspace: String) -> St:
     J.kv("branch", J.JNull{}), J.kv("base_commit", J.JNull{}), J.kv("dropped", J.JBool{False{}})])
   +brief = J.obj([J.kv("objective", J.str("")), J.kv("context", J.str("")), J.kv("constraints", J.JArr{Nil{}}),
     J.kv("done_when", J.JNull{}), J.kv("report_format", J.JNull{})])
-  St{[new_agent(MAIN(), True{}, None{}, ws, brief, 0n)], [MAIN()], Nil{}, Nil{}, Nil{}, 1n, 1n, TM.empty(), XH.empty(), None{}, Nil{}}
+  St{[new_agent(MAIN(), True{}, None{}, ws, brief, 0n)], [MAIN()], Nil{}, Nil{}, Nil{}, 1n, 1n, TM.empty(), XH.empty(), None{}, Nil{}, Nil{}}
 
 def Msg.auto(x: Msg) -> Bool:
   match x:

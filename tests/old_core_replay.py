@@ -93,7 +93,8 @@ FIXTURE = [
 
 def is_new(e):
     """A kind an older sb-core may not know (it skips it, never misreads it)."""
-    return e["type"].startswith(("x_", "act_", "wake_", "route_")) or e["type"] in ("follow", "job_end", "every_name", "worktree_placed")
+    return e["type"].startswith(("x_", "act_", "wake_", "route_")) or e["type"] in ("follow", "job_end", "every_name", "worktree_placed",
+                                                                                 "card_withdrawn", "card_late")
 
 
 NEW = [i for i, e in enumerate(FIXTURE) if is_new(e)]
@@ -132,6 +133,11 @@ WRITE = [
     {"t": "every_set", "agent": "main", "by": "user", "text": "check the deploy", "next_ms": 1760000600000, "every_ms": 600000},
     {"t": "wake_set", "agent": "main", "spec": {"kind": "pid", "pid": 4242}, "max_text": "1h", "max_ms": 3600000, "quiet": False},
     {"t": "route_hold", "text": "tell shop to deploy", "via": "spotlight", "to": "shop-1", "name": "shop", "why": "named shop", "context": ""},
+    # withdrawn-answer (architect m_30039): main withdraws its card 2, his
+    # answer comes after: card_withdrawn, then main's message and card_late
+    {"t": "req", "token": 1, "from": "main", "req": {"cmd": "card", "text": "ship v2?", "for": None}},
+    {"t": "req", "token": 2, "from": "main", "req": {"cmd": "withdraw", "card": 2, "why": "moot"}},
+    {"t": "answer", "card": 2, "text": "yes, ship it"},
 ]
 
 
@@ -149,7 +155,8 @@ def written_by_this_tree(path):
     with open(path, "w") as f:
         f.writelines(json.dumps(l) + "\n" for l in lines)
     kinds = [l["type"] for l in lines]
-    assert kinds == ["message_sent", "card_opened", "every_set", "wake_set", "route_held", "act_set"], kinds
+    assert kinds == ["message_sent", "card_opened", "every_set", "wake_set", "route_held", "act_set",
+                     "card_opened", "card_closed", "card_withdrawn", "message_sent", "card_late"], kinds
     return lines
 
 
@@ -191,6 +198,7 @@ def replay_written(core, path):
     view = core.call({"t": "view_all"})
     view = view.get("view", view)
     assert "ship the docs" in json.dumps(view.get("msgs", [])), "the message: %r" % view.get("msgs")
+    assert "he answered #2 after you withdrew it" in json.dumps(view.get("msgs", [])), "his late answer: %r" % view.get("msgs")
     assert [c["id"] for c in view.get("cards", [])] == [1], "the card: %r" % view.get("cards")
     assert [t["id"] for t in view.get("timers", [])] == [1], "the timer: %r" % view.get("timers")
     assert [w["id"] for w in view.get("wakes", [])] == [1] or 3 in skipped, "the watch: %r" % view.get("wakes")

@@ -667,12 +667,12 @@ def hub_d_hout(-o: HM.St, +cx: HX.Cx<o>, +kvs: List<&2, Sigma<&2, &2, String, _ 
 
 def hub_msgs_closed(s: HM.St, +id: Nat, +res: String) -> {HM.every(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.every(s) : List<&2, HM.MRec>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_msgs_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.every(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.every(s) : List<&2, HM.MRec>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_msgs_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.every(HX.d(o, a)) == HM.every(HX.d(o, b)) : List<&2, HM.MRec>}:
@@ -682,17 +682,17 @@ def hub_msgs_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o,
 
 def hub_msgs_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.every(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.every(s) : List<&2, HM.MRec>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_agents_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.St.agents(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_cards_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.St.cards(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.St.cards(s) : List<&2, HM.Card>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_msgs_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
@@ -739,7 +739,7 @@ def hub_cards_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: Str
 
 def hub_cards_wake(s: HM.St, +e: HWK.WkEv) -> {HM.St.cards(HM.apply(s, HM.EWake{e})) == HM.St.cards(s) : List<&2, HM.Card>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 # a drop's watch ends leave the cards as they were
@@ -759,7 +759,7 @@ def hub_cards_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
 
 def hub_msgs_wake(s: HM.St, +e: HWK.WkEv) -> {HM.every(HM.apply(s, HM.EWake{e})) == HM.every(s) : List<&2, HM.MRec>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 # a drop's watch ends leave the messages and the agents as they were
@@ -779,7 +779,7 @@ def hub_msgs_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
 
 def hub_agents_wake(s: HM.St, +e: HWK.WkEv) -> {HM.St.agents(HM.apply(s, HM.EWake{e})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_agents_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)

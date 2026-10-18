@@ -267,22 +267,22 @@ def Laws.resume_idempotent(o, cx, q):
 
 def Laws.paused_line_pauses(s, at):
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def Laws.resumed_line_resumes(s, at):
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def Laws.pause_keeps_order(s, at):
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def Laws.resume_keeps_order(s, at):
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def Laws.stop_leaves_no_timer(o, cx, n, why):

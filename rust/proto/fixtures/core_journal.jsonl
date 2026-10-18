@@ -13,6 +13,8 @@
 {"type":"card_opened","card":{"id":3,"kind":"question","agent":"docs","text":"which theme?","for_msg":7,"created_ms":1000200,"place":null,"pr":null}}
 {"type":"card_closed","id":3,"resolution":"answered"}
 {"type":"card_answer_pos","card":3,"agent":"perf","pos":42}
+{"type":"card_withdrawn","id":3,"text":"v1 ou v2 ?"}
+{"type":"card_late","id":3}
 {"type":"main_note","text":"docs is blocked","at_ms":1000300}
 {"type":"main_notes_flushed"}
 {"type":"every_set","id":2,"agent":"main","by":"user","text":"check the deploy","next_ms":1600000,"every_ms":600000,"until_ms":87400000,"times":5,"page":"deploy","name":"deploy check","held":true,"at":1000400}

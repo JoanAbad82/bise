@@ -78,6 +78,12 @@ pub const JOURNAL: Table = Table {
         // the asker's transcript position of the route line his answer
         // became (the shell knows it once written): a fact, no decision
         k("card_answer_pos", "CardAnswerPos", "M.ECardAnswerPos{card, agent, pos}", &[f("card", Nat), f("agent", Str), f("pos", Nat)]),
+        // withdrawn-answer (architect m_30039): main withdrew card `id`
+        // (`sb card --withdraw`, `text` its question): his answer that
+        // comes after it still reaches main, once; `card_late`: that late
+        // answer delivered (hub/gone.bend)
+        k("card_withdrawn", "CardWithdrawn", "M.ECardWithdrawn{id, text}", &[f("id", Nat), f("text", Str)]),
+        k("card_late", "CardLate", "M.ECardLate{id}", &[f("id", Nat)]),
         k("main_note", "MainNote", "M.EMainNote{text, at_ms}", &[f("text", Str), f("at_ms", Nat)]),
         k("main_notes_flushed", "NotesFlushed", "M.ENotesFlushed{}", &[]),
         // the timers' lines, in the shape every.rs wrote them (old hubs

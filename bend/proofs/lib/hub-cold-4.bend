@@ -158,7 +158,7 @@ def hc_GeEv(+s: HM.St, e: HM.Ev) -> Data:
 
 def hc_apply(+s: HM.St, e: HM.Ev, sp: HI.Split(s), k: hc_GeEv(s, e)) -> hc_StOk(s, e):
   match s:
-    case HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol}:
+    case HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol, gn}:
       match e:
         case HM.ETaskCreated{a, b, c, d, f}:
           HX.Both{{==}, sp}
@@ -189,6 +189,10 @@ def hc_apply(+s: HM.St, e: HM.Ev, sp: HI.Split(s), k: hc_GeEv(s, e)) -> hc_StOk(
         case HM.ECardClosed{a, b, c}:
           HX.Both{{==}, sp}
         case HM.ECardAnswerPos{a, b, c}:
+          HX.Both{{==}, sp}
+        case HM.ECardWithdrawn{a, b}:
+          HX.Both{{==}, sp}
+        case HM.ECardLate{a}:
           HX.Both{{==}, sp}
         case HM.EMainNote{a, b}:
           HX.Both{{==}, sp}
@@ -279,6 +283,10 @@ def hc_fresh_ge(+s: HM.St, e: HM.Ev, k: HX.FreshEv(s, e)) -> hc_GeEv(s, e):
       Unit{}
     case HM.ECardAnswerPos{a, b, c}:
       Unit{}
+    case HM.ECardWithdrawn{a, b}:
+      Unit{}
+    case HM.ECardLate{a}:
+      Unit{}
     case HM.EMainNote{a, b}:
       Unit{}
     case HM.ENotesFlushed{}:
@@ -356,6 +364,10 @@ def hc_replay_ge(+st: HM.St, e: HM.Ev, ok: {CO.replay_fresh(st, e) == True{} : B
     case HM.ECardClosed{a, b, c}:
       Unit{}
     case HM.ECardAnswerPos{a, b, c}:
+      Unit{}
+    case HM.ECardWithdrawn{a, b}:
+      Unit{}
+    case HM.ECardLate{a}:
       Unit{}
     case HM.EMainNote{a, b}:
       Unit{}
@@ -447,6 +459,10 @@ def hc_kept1(+xs: List<&2, HM.MRec>, e: HM.Ev) -> HI.IsPrefix(HI.ids(xs), HI.ids
     case HM.ECardClosed{a, b, c}:
       PL1.hub_prefix_refl(HI.ids(xs))
     case HM.ECardAnswerPos{a, b, c}:
+      PL1.hub_prefix_refl(HI.ids(xs))
+    case HM.ECardWithdrawn{a, b}:
+      PL1.hub_prefix_refl(HI.ids(xs))
+    case HM.ECardLate{a}:
       PL1.hub_prefix_refl(HI.ids(xs))
     case HM.EMainNote{a, b}:
       PL1.hub_prefix_refl(HI.ids(xs))

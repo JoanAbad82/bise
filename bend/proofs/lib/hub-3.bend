@@ -71,14 +71,14 @@ def hub_prof_placed(c: Bool, +ag: List<&2, HM.Agent>, +x: String, +w: J.Json)
 # new name) keeps the names of the agents apart
 def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e)) -> HI.NamesApart(HM.apply(s, e)):
   match s:
-    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs, +pz, +ho}:
+    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs, +pz, +ho, +gn}:
       match e:
         case HM.ETaskCreated{+n, pa, br, ws, at}:
           hub_nok_tr(HI.profile(HM.put_agent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at))), HM.snoc(List<&2, String>, HI.profile(ag), [n]),
-            PL2.hub_put_absent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at), PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}, n, k)),
-            PL2.hub_nok_snoc(HI.profile(ag), [n], u, PL2.hub_allapart_new(HI.profile(ag), n, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}, n, k))))
+            PL2.hub_put_absent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at), PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k)),
+            PL2.hub_nok_snoc(HI.profile(ag), [n], u, PL2.hub_allapart_new(HI.profile(ag), n, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k))))
         case HM.ERenamed{old, +new}:
-          hub_nok_ren(ag, old, new, u, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}, new, k))
+          hub_nok_ren(ag, old, new, u, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, new, k))
         case HM.ELifecycle{+x, +l, +r}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OLife{l, r})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OLife{l, r}, {==}), u)
         case HM.EWorkspace{+x, +w}:
@@ -104,6 +104,10 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
         case HM.ECardClosed{a, b, c}:
           u
         case HM.ECardAnswerPos{a, b, c}:
+          u
+        case HM.ECardWithdrawn{a, b}:
+          u
+        case HM.ECardLate{a}:
           u
         case HM.EMainNote{a, b}:
           u
@@ -241,7 +245,7 @@ def hub_keep_drop(+xs: List<&2, HTM.Timer>, +id: Nat, +rest: List<&2, Nat>)
 def hub_live_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat)
     -> {HTM.Tms.live(HM.St.tm(HM.apply(s, HM.ETimerStop{id, why, at}))) == HTM.drop(HTM.Tms.live(HM.St.tm(s)), id) : List<&2, HTM.Timer>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       match tm:
         case HTM.Tms{l, e, li, ac, na, wk}:
           {==}
@@ -391,7 +395,7 @@ def hub_tnone_tr(-x: List<&2, HTM.Timer>, -y: List<&2, HTM.Timer>, -n: String, e
 def hub_live_wake(s: HM.St, +e: HWK.WkEv)
     -> {HTM.Tms.live(HM.St.tm(HM.apply(s, HM.EWake{e}))) == HTM.Tms.live(HM.St.tm(s)) : List<&2, HTM.Timer>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       match tm:
         case HTM.Tms{l, en, li, ac, na, wk}:
           {==}
@@ -493,7 +497,7 @@ def hub_wk_keep_drop(+xs: List<&2, HWK.Watch>, +id: Nat, +rest: List<&2, Nat>)
 def hub_wk_live_end(s: HM.St, +id: Nat, +why: String, +at: Nat)
     -> {HWK.Wakes.live(HTM.Tms.wk(HM.St.tm(HM.apply(s, HM.EWake{HWK.WEnd{id, why, at}})))) == HWK.drop(HWK.Wakes.live(HTM.Tms.wk(HM.St.tm(s))), id) : List<&2, HWK.Watch>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       match tm:
         case HTM.Tms{l, en, li, ac, na, wk}:
           match wk:
@@ -764,7 +768,7 @@ def hub_hot_tr(-a: HM.St, -b: HM.St, e: {a == b : HM.St}, k: {HM.hot_of(HM.St.ho
 def hub_hot_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HM.MRec>})
     -> {HM.hot_of(HM.St.hot(HM.apply(s, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.every(HM.apply(s, HM.ELifecycle{n, l, r}))) : List<&2, HM.MRec>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       k
 
 # with a right index, queued_for reads every message

@@ -78,7 +78,7 @@ def hub_agents_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(
 
 def hub_agents_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.agents(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
@@ -100,7 +100,7 @@ def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: St
 
 def hub_agents_state(s: HM.St, +id: Nat, +x: HM.MSt) -> {HM.St.agents(HM.apply(s, HM.EMsgState{id, x})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_agents_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
@@ -203,17 +203,17 @@ def hub_cards_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o
 
 def hub_cards_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.cards(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.drop_card(HM.St.cards(s), id) : List<&2, HM.Card>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_cards_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.St.cards(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.St.cards(s) : List<&2, HM.Card>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_cards_state(s: HM.St, +id: Nat, +x: HM.MSt) -> {HM.St.cards(HM.apply(s, HM.EMsgState{id, x})) == HM.St.cards(s) : List<&2, HM.Card>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 # rejecting messages keeps the cards
@@ -365,13 +365,17 @@ def hub_ucards_open(+cs: List<&2, HM.Card>, +c: HM.Card, +nc: Nat, +k: {HM.Card.
 
 def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, e)) -> HI.UniqueCards(HM.apply(s, e)):
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       match e:
         case HM.ECardOpened{c}:
           hub_ucards_open(ca, c, nc, k, u)
         case HM.ECardClosed{id, res, a}:
           hub_ucards_drop(ca, id, nc, u)
         case HM.ECardAnswerPos{a, b, c}:
+          u
+        case HM.ECardWithdrawn{a, b}:
+          u
+        case HM.ECardLate{a}:
           u
         case HM.ETaskCreated{a, b, c, d, f}:
           u

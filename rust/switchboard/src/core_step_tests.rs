@@ -155,6 +155,10 @@ fn a_watch_is_a_pause_or_an_alarm_on_the_agents_row() {
 #[path = "core_ask_tests.rs"]
 mod core_ask_tests;
 
+/// withdrawn-answer's tests, out of core_tests.rs too.
+#[path = "core_late_tests.rs"]
+mod core_late_tests;
+
 /// send-parts' tests, out of core_tests.rs too.
 #[path = "core_attach_tests.rs"]
 mod core_attach_tests;

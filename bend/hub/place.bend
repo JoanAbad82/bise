@@ -141,3 +141,56 @@ def ws_place(+ws: J.Json, +dir: String) -> String:
 
 def Agent.place(+a: M.Agent) -> String:
   ws_place(M.Agent.ws(a), M.Agent.dir(a))
+
+# ---- a place's agents (moved from core.bend, its line limit) ----
+
+def is_gone(l: M.Life) -> Bool:
+  match l:
+    case M.LArchived{}:
+      True{}
+    case _:
+      False{}
+
+# `b` is another agent of `place`'s live folder: still in it (`live`), or
+# archived with its ws still on that folder (it left before the others)
+def mate.hit(m: Maybe<&2, M.Agent>, +name: String, +place: String, +live: Bool) -> Bool:
+  match m:
+    case None{}:
+      False{}
+    case Some{+b}:
+      +gone = is_gone(M.Agent.life(b))
+      Bool.not(String.eq(M.Agent.name(b), name)) && M.ws_worktree(M.Agent.ws(b)) && Bool.not(M.ws_dropped(M.Agent.ws(b)))
+        && String.eq(Agent.place(b), place) && Bool.pick(Bool, live, Bool.not(gone), gone)
+
+def mates(xs: List<&2, String>, +s: M.St, +name: String, +place: String, +live: Bool) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+n, +t}:
+      +rest = mates(t, s, name, place, live)
+      Bool.pick(List<&2, String>, mate.hit(M.get_agent(s, n), name, place, live), n <> rest, rest)
+
+# the other agents of a's worktree (none for the shared folder)
+def mates_of(+s: M.St, +a: M.Agent, +live: Bool) -> List<&2, String>:
+  mates(M.St.order(s), s, M.Agent.name(a), Agent.place(a), live)
+
+def first_agent(+s: M.St, ns: List<&2, String>) -> Maybe<&2, M.Agent>:
+  match ns:
+    case Nil{}:
+      None{}
+    case Con{+n, _}:
+      M.get_agent(s, n)
+
+def drop.stays(ms: List<&2, String>) -> String:
+  match ms:
+    case Nil{}:
+      ""
+    case Con{+h, +t}:
+      String.append(" — its worktree stays with @", String.join({h <> t : List<&2, String>}, ", @"))
+
+def drop.left.ws(m: Maybe<&2, M.Agent>) -> J.Json:
+  match m:
+    case None{}:
+      J.JNull{}
+    case Some{+b}:
+      J.set(M.Agent.ws(b), "dropped", J.JBool{True{}})

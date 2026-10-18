@@ -59,7 +59,7 @@ def Laws.wake_set_keeps_agents(o, ok, cx, agent, spec, max_text, max_ms, quiet, 
           match c:
             case HX.Core{d, fx, p, f, q, v}:
               match d:
-                case HM.St{ag, ord, ms, cs, ns, nm, nc, tm, xs, pz, hot}:
+                case HM.St{ag, ord, ms, cs, ns, nm, nc, tm, xs, pz, hot, gn}:
                   {==}
 
 def Laws.wake_own_stop_quiet(a):

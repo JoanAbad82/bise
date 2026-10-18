@@ -41,6 +41,8 @@ import ./feature.bend as FT
 import ./status.bend as ST
 import ./lazy.bend as LZ
 import ./place.bend as PL
+import ./cardkind.bend as CK
+import ./gone.bend as G
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -338,7 +340,7 @@ def note_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   emit(o, cx, M.EMainNote{text, now(o, cx)}, Unit{}, Unit{}, Unit{})
 
 # opens card number next_card (the caller reads it first when it needs it)
-# in the user's inbox: `kind` is a user kind (M.user_kind), never an
+# in the user's inbox: `kind` is a user kind (CK.user_kind), never an
 # agent's traffic (BISE-299)
 #
 # open_card_at: the same, about a place (and its PR): the hub's own items
@@ -354,7 +356,7 @@ def open_card(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: Stri
 # merge, pr-design §6.3); a kind outside the user's inbox opens nothing
 # (BISE-299)
 def hub_card(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +place: Maybe<&2, String>, +pr: Maybe<&2, Nat>) -> X.Cx<o>:
-  LZ.pick(X.Cx<o>, M.choice_kind(kind),
+  LZ.pick(X.Cx<o>, CK.choice_kind(kind),
     u => open_card_at(o, cx, kind, agent, text, None{}, place, pr),
     u => notice(o, cx, String.append("not a hub item: ", kind)))
 
@@ -1405,58 +1407,8 @@ def stop_task(-o: M.St, +cx: X.Cx<o>, +name: String, +life: M.Life, +reason: Str
 def stop_noted(-o: M.St, +cx: X.Cx<o>, +name: String, +life: M.Life, +reason: String) -> X.Cx<o>:
   stop_task(o, undelivered_msgs(o, M.queued_for(st(o, cx), name), cx), name, life, reason)
 
-# ---- places (dev-flow §3.1): a worktree shared by agents ----
+# ---- places (dev-flow §3.1): a worktree shared by agents (place.bend) ----
 
-def is_gone(l: M.Life) -> Bool:
-  match l:
-    case M.LArchived{}:
-      True{}
-    case _:
-      False{}
-
-# `b` is another agent of `place`'s live folder: still in it (`live`), or
-# archived with its ws still on that folder (it left before the others)
-def mate.hit(m: Maybe<&2, M.Agent>, +name: String, +place: String, +live: Bool) -> Bool:
-  match m:
-    case None{}:
-      False{}
-    case Some{+b}:
-      +gone = is_gone(M.Agent.life(b))
-      Bool.not(String.eq(M.Agent.name(b), name)) && M.ws_worktree(M.Agent.ws(b)) && Bool.not(M.ws_dropped(M.Agent.ws(b)))
-        && String.eq(PL.Agent.place(b), place) && Bool.pick(Bool, live, Bool.not(gone), gone)
-
-def mates(xs: List<&2, String>, +s: M.St, +name: String, +place: String, +live: Bool) -> List<&2, String>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+n, +t}:
-      +rest = mates(t, s, name, place, live)
-      Bool.pick(List<&2, String>, mate.hit(M.get_agent(s, n), name, place, live), n <> rest, rest)
-
-# the other agents of a's worktree (none for the shared folder)
-def mates_of(+s: M.St, +a: M.Agent, +live: Bool) -> List<&2, String>:
-  mates(M.St.order(s), s, M.Agent.name(a), PL.Agent.place(a), live)
-
-def first_agent(+s: M.St, ns: List<&2, String>) -> Maybe<&2, M.Agent>:
-  match ns:
-    case Nil{}:
-      None{}
-    case Con{+n, _}:
-      M.get_agent(s, n)
-
-def drop.stays(ms: List<&2, String>) -> String:
-  match ms:
-    case Nil{}:
-      ""
-    case Con{+h, +t}:
-      cat([" — its worktree stays with @", String.join({h <> t : List<&2, String>}, ", @")])
-
-def drop.left.ws(m: Maybe<&2, M.Agent>) -> J.Json:
-  match m:
-    case None{}:
-      J.JNull{}
-    case Some{+b}:
-      J.set(M.Agent.ws(b), "dropped", J.JBool{True{}})
 
 # the place's folder is gone: so is it for the agents that left it
 # before (archived), with the same saved work (RFC 0002 §5, per place)
@@ -1465,7 +1417,7 @@ def drop.left(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>, +snap: Maybe<&2, Str
     case Nil{}:
       cx
     case Con{+n, +t}:
-      +cx2 = emit(o, cx, M.EWorkspace{n, drop.left.ws(M.get_agent(st(o, cx), n))}, Unit{}, Unit{}, Unit{})
+      +cx2 = emit(o, cx, M.EWorkspace{n, PL.drop.left.ws(M.get_agent(st(o, cx), n))}, Unit{}, Unit{}, Unit{})
       drop.left(o, t, emit(o, cx2, M.ESnapshot{n, snap}, Unit{}, Unit{}, Unit{}), snap)
 
 def drop.ws(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o>:
@@ -1473,7 +1425,7 @@ def drop.ws(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: M.Age
     case Fail{_}:
       cx
     case Done{+snap}:
-      +left = mates_of(st(o, cx), a, False{})
+      +left = PL.mates_of(st(o, cx), a, False{})
       +sn = PL.drop_snap(snap)
       +cx2 = emit(o, cx, M.EWorkspace{M.Agent.name(a), J.set(M.Agent.ws(a), "dropped", J.JBool{True{}})}, Unit{}, Unit{}, Unit{})
       drop.left(o, left, emit(o, cx2, M.ESnapshot{M.Agent.name(a), sn}, Unit{}, Unit{}, Unit{}), sn)
@@ -1494,7 +1446,7 @@ def drop.now(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: M.Agent, +loss: J.Json) -
   match has_wt:
     case False{}:
       # a worktree others still work in stays (it goes with its last agent)
-      +label = drop.stays(mates_of(st(o, cx), a, True{}))
+      +label = PL.drop.stays(PL.mates_of(st(o, cx), a, True{}))
       drop.finish(o, stop_noted(o, cx, M.Agent.name(a), M.LArchived{}, "drop"), a, label)
     case True{}:
       +cx2 = stop_noted(o, cx, M.Agent.name(a), M.LArchived{}, "drop")
@@ -1538,7 +1490,7 @@ def drop.checks(-o: M.St, is_main: Bool, life: M.Life, +cx: X.Cx<o>, +a: M.Agent
           (cx, DErr{cat(["@", M.Agent.name(a), " is already archived"])})
         case _:
           # the folder goes with the place's last agent only
-          +last = List.is_empty(&2, String, mates_of(st(o, cx), a, True{}))
+          +last = List.is_empty(&2, String, PL.mates_of(st(o, cx), a, True{}))
           drop.wt(o, M.ws_worktree(M.Agent.ws(a)) && Bool.not(M.ws_dropped(M.Agent.ws(a)) || M.ws_placing(M.Agent.ws(a))) && last, cx, a, force)
 
 def drop.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +force: Bool) -> X.Cx<o> & DropR:
@@ -1604,7 +1556,7 @@ def restore.join(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +a: M.Agent) -> 
 def restore.dropped(-o: M.St, dropped: Bool, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
   match dropped:
     case True{}:
-      restore.join(o, first_agent(st(o, cx), mates_of(st(o, cx), a, True{})), cx, a)
+      restore.join(o, PL.first_agent(st(o, cx), PL.mates_of(st(o, cx), a, True{})), cx, a)
     case False{}:
       restore.go(o, cx, a)
 
@@ -1863,7 +1815,7 @@ def card_kind(+k: String) -> CardK:
   Bool.pick(CardK, String.eq(k, "question"), KQuestion{},
     Bool.pick(CardK, String.eq(k, "drop"), KDrop{},
       Bool.pick(CardK, String.eq(k, "confirm"), KConfirm{},
-        Bool.pick(CardK, M.choice_kind(k), KChoice{}, KOther{}))))
+        Bool.pick(CardK, CK.choice_kind(k), KChoice{}, KOther{}))))
 
 
 # typed words on an approval card: the card stays open, nothing wakes
@@ -1881,7 +1833,7 @@ def answer.confirm(-o: M.St, ok: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String, 
     case False{}:
       words_refused(o, cx, c, A.confirm_opts())
 
-# a hub item's answer (M.choice_kind): one of its numbers goes to the
+# a hub item's answer (CK.choice_kind): one of its numbers goes to the
 # hub's Rust side (the `card_choice` effect), which acts and closes the
 # item (a merge runs `gh pr merge`: the item stays open meanwhile); typed
 # words don't answer it (the composer rule: the window sends them to the
@@ -1906,10 +1858,38 @@ def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: M.Card, +text: String, +pa
     case KOther{}:
       close_card_ans(o, cx, M.Card.id(c), "vue", A.said_ans(text, via))
 
+# his late answer to the card main withdrew (`it`, hub/gone.bend), as a
+# hub message to main: the question on one line, then his words whole,
+# his parts on the message (law late_answer_keeps_its_parts)
+def late.head(+it: G.Item) -> String:
+  cat(["he answered #", ns(G.Item.id(it)), " after you withdrew it (\"", T.one_line(G.Item.text(it)), "\"):\n"])
+
+def late.snd(+it: G.Item, +text: String, +parts: String) -> Snd:
+  Snd{M.HUB(), M.MAIN(), String.append(late.head(it), text), False{}, None{}, False{}, False{}, False{}, None{}, parts}
+
+# sent: card_late takes the card out of the list (law late_answer_once);
+# not sent: the card stays answerable, he hears why
+def answer.late.sent(-o: M.St, p: X.Cx<o> & SendR, +id: Nat) -> X.Cx<o>:
+  match p:
+    case (+cx, SErr{+e}):
+      notice(o, cx, e)
+    case (+cx, SOk{_}):
+      emit(o, cx, M.ECardLate{id}, Unit{}, Unit{}, Unit{})
+
+# his answer to a card that isn't open (withdrawn-answer, architect
+# m_30039): a card main withdrew while he answered it (`g`, still in
+# St.gone) reaches main, once, never dropped; any other card: refused
+def answer.late(-o: M.St, g: Maybe<&2, G.Item>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
+  match g:
+    case None{}:
+      notice(o, cx, cat(["notification #", ns(id), " isn't open"]))
+    case Some{+it}:
+      answer.late.sent(o, send(o, cx, late.snd(it, text, parts)), id)
+
 def answer.card(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match m:
     case None{}:
-      notice(o, cx, String.append("no open notification #", ns(id)))
+      answer.late(o, G.find(M.St.gone(st(o, cx)), id), cx, id, text, parts)
     case Some{+c}:
       answer.kind(o, card_kind(M.Card.kind(c)), cx, c, text, parts, via)
 
@@ -2662,7 +2642,7 @@ def req_send.hold(+s: M.St, r: Maybe<&2, Nat>) -> Maybe<&2, Nat>:
     case None{}:
       None{}
     case Some{+id}:
-      M.card_holding(M.St.cards(s), id)
+      CK.card_holding(M.St.cards(s), id)
 
 def req_send(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.eq(C.get_s(q, "to"), XB.FROM_BISE()),
@@ -3000,14 +2980,22 @@ def req_close(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +token: Nat, +id: Na
       reply_err(o, cx, token, String.append("no open notification #", ns(id)))
     case Some{+c}:
       +res = Bool.pick(String, String.is_empty(T.one_line(note)), "closed by main", String.append("main: ", T.one_line(note)))
-      LZ.pick(X.Cx<o>, M.user_kind(M.Card.kind(c)),
+      LZ.pick(X.Cx<o>, CK.user_kind(M.Card.kind(c)),
         u => reply_err(o, cx, token, cat(["notification #", ns(id), " is in the user's inbox: only the user answers or closes it (your own question, now moot: sb notify --withdraw ", ns(id), " \"why\")"])),
         u => reply(o, close_card(o, cx, id, res), token, ok_body([J.kv("card", J.JNum{id})])))
 
+# main's withdraw of card `c`: closed without him, and journaled as
+# withdrawn so his answer already on its way still reaches main
+# (answer.late, hub/gone.bend)
+def withdraw(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +why: String) -> X.Cx<o>:
+  +cx2 = close_card(o, cx, M.Card.id(c), String.append("withdrawn by main: ", why))
+  emit(o, cx2, M.ECardWithdrawn{M.Card.id(c), M.Card.text(c)}, Unit{}, Unit{}, Unit{})
+
 # `sb card --withdraw N "why"` (BISE-299): main takes back its own
 # escalation (a question or a drop, never a confirmation) when it is moot;
-# the user sees it withdrawn in main's feed, and the question it held is
-# main's again
+# the card leaves his inbox, and the question it held is main's again;
+# his answer already on its way reaches main as a message (withdraw,
+# answer.late)
 def req_withdraw(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +token: Nat, +id: Nat, +why: String) -> X.Cx<o>:
   match m:
     case None{}:
@@ -3017,7 +3005,7 @@ def req_withdraw(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +token: Nat, +id:
       LZ.pick(X.Cx<o>, String.eq(k, "question") || String.eq(k, "drop"),
         u => LZ.pick(X.Cx<o>, String.is_empty(T.one_line(why)),
           u => reply_err(o, cx, token, "say why: sb notify --withdraw N \"why\" (the user reads it)"),
-          u => reply(o, close_card(o, cx, id, String.append("withdrawn by main: ", T.one_line(why))), token, ok_body([J.kv("card", J.JNum{id})]))),
+          u => reply(o, withdraw(o, cx, c, T.one_line(why)), token, ok_body([J.kv("card", J.JNum{id})]))),
         u => reply_err(o, cx, token, cat(["notification #", ns(id), " is a ", k, ": only the user answers or closes it"])))
 
 # `sb rename <task> <new-name>`: the same rules as the user's /rename
@@ -3377,7 +3365,7 @@ def boot.each(-o: M.St, names: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
 # traffic, main's since BISE-299) close first; their reports and notes
 # are in main's thread already
 def boot(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
-  +cx2 = close_ids(o, M.legacy_cards(M.St.cards(st(o, cx))), cx, "moved to main's inbox")
+  +cx2 = close_ids(o, CK.legacy_cards(M.St.cards(st(o, cx))), cx, "moved to main's inbox")
   boot.each(o, M.St.order(st(o, cx2)), cx2)
 
 # the asked message, still with no reply watch and no reply, of an active
@@ -3563,7 +3551,7 @@ def page_card.open(-o: M.St, +cx: X.Cx<o>, +kind: String, +who: String, +text: S
   card_to_asker(o, open_card(o, cx, kind, who, text, None{}), M.St.next_card(st(o, cx)), who, text)
 
 def page_card(-o: M.St, +cx: X.Cx<o>, +agents: List<&2, String>, +kind: String, +text: String) -> X.Cx<o>:
-  LZ.pick(X.Cx<o>, M.page_kind(kind),
+  LZ.pick(X.Cx<o>, CK.page_kind(kind),
     u => page_card.open(o, cx, kind, R.page_asker(st(o, cx), agents), text),
     u => notice(o, cx, String.append("not a page card: ", kind)))
 

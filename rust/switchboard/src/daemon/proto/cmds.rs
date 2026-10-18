@@ -140,9 +140,10 @@ impl Shell {
                     Page::Reply(l) => l.splitn(3, ' ').nth(2).unwrap_or_default().to_string(),
                     Page::Not => reply,
                 };
-                if !self.hub.st.open_cards().any(|c| c.id == card) {
-                    return self.proto_error(id, &tag, &format!("notification #{card} isn't open"));
-                }
+                // a card that isn't open is sb-core's to decide (withdrawn-
+                // answer, architect m_30039): one main withdrew while he
+                // answered reaches main, any other is refused with
+                // "notification #N isn't open" (core.bend answer.late)
                 // the reply as he wrote it, never read as a command (architect
                 // m_8366): the TUI's /answer handler with its fields
                 let text = reply.trim().to_string();

@@ -37,5 +37,5 @@ def Laws.placed_orphan_drops_only(o, cx, n, ws):
 
 def Laws.placed_replays_as_ws(st, n, ws):
   match st:
-    case HM.St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old}:
+    case HM.St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}:
       {==}
