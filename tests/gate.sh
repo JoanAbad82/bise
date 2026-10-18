@@ -181,7 +181,8 @@ map_paths() {  # <changed path>...
     case "$f" in bend/*) bendw=1 ;; esac
   done
 }
-kit_check() { local f; for f in "$root"/kit/check.mjs "$root"/kit/*.check.mjs; do echo "node ${f#"$root"/}"; node "$f" || return 1; done; }
+# node as the desktop lanes find it (desktop_path): the hub's land queue has no shell setup
+kit_check() { local f; desktop_path; for f in "$root"/kit/check.mjs "$root"/kit/*.check.mjs; do echo "node ${f#"$root"/}"; node "$f" || return 1; done; }
 if [ "$mode" = wait ]; then
   arg="${2:?usage: gate.sh wait <bg .out file | pid>}"
   if [ -f "$arg" ]; then pid="$(cat "${arg%.out}.pid" 2>/dev/null)"; rcf="${arg%.out}.rc"; else pid="$arg"; rcf=; fi
