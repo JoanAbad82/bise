@@ -88,6 +88,10 @@ export interface TownParts {
   readonly scape: Object3D | null;
   /** the lawn's middle, town units */
   readonly centre: { readonly x: number; readonly z: number };
+  /** the lawn (its ground block), town units: the entry cuts it into cubes */
+  readonly lawn: { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number };
+  /** where the lawn has holes (an office's pit: California's bowl), town units: no cube there */
+  readonly pits: readonly { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number }[];
   readonly offices: readonly {
     readonly id: string;
     /** the office's root, where the plan put it */

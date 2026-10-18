@@ -1,25 +1,22 @@
-// The hero's entry build (design's hero-entry §2, from Gabriel 18 oct: « elle se construit en partant
-// du centre en 2 s »): from 'ready', the town grows out of its middle in 2.4 s, then the camera
-// eases from the wide to the film's first shot and the film runs from 2.8 s. One timeline, ms
-// from 'ready': the ground slab grows (0-400), the roads and the river draw outward (200-1400),
-// every thing pops in by its distance from the middle (400-1800, an ease-in-out on the start
-// times), the offices drop in and their furniture pops, the bims pop at their desks 30 ms apart
-// (1800-), the words fade in last. Pure timing up top (tested), then what moves the renderer's
-// loose things (TownParts) each frame. Owner: hero-town.
-import { Box3, type Material, Mesh, type Object3D, Vector3, type WebGLProgramParametersWithUniforms } from 'three';
+// The hero's entry build (design's hero-entry §2; Gabriel's review, main m_31507: « comme une vague
+// ou une goutte de pluie dans une mare »): from 'ready', the town rises out of its middle like a
+// ripple. The lawn is cut into cubes that rise and settle by their distance from the middle, one
+// wave (0-1950 ms); the roads and the river ride their cubes up; each thing (a tree, a house, an
+// office) comes with its cube, a beat after it; the offices' furniture pops, then the bims pop at
+// their desks 30 ms apart (1800-), the words fade in last; the camera eases from the wide to the
+// film's first shot (2400-2800). Pure timing up top (tested), then what moves the renderer's loose
+// things (TownParts) each frame. Owner: hero-town.
+import { Box3, BoxGeometry, InstancedMesh, type Material, Matrix4, Mesh, type Object3D, Quaternion, Vector3, type WebGLProgramParametersWithUniforms } from 'three';
 import type { TownParts } from '@/bims/town/types';
 
 /** the timeline, ms from 'ready' */
 export const ENTRY = {
-  slab: { from: 0, to: 400 },
-  /** the slab's brown edge comes in last of the slab */
-  edge: { from: 200, to: 400 },
-  roads: { from: 200, to: 1400 },
-  /** each thing's start: from + span × easeInOut(d / dmax) ± jitter */
-  things: { from: 400, span: 1400, jitter: 40 },
+  /** the cubes: the middle's starts at `from`, the lawn's corners' `span` later; each rises in `dur` */
+  tiles: { from: 0, span: 1500, dur: 450 },
+  /** a thing (a tree, a house, a road's dash...) comes a beat after its cube, over `dur` */
+  thing: { after: 120, dur: 220 },
   drop: 240,
   furniture: 180,
-  pop: 200,
   bims: { from: 1800, gap: 30, pop: 150 },
   words: { from: 2250, to: 2400 },
   /** the whole map is there: the town settles into its merged draw */
@@ -30,10 +27,12 @@ export const ENTRY = {
   done: 2800,
 } as const;
 
+/** a cube's side, town units (about a tree's shade: the lawn in a few hundred) */
+export const CELL = 2.5;
+/** how far below its place a cube starts its rise, town units */
+const RISE = 1.6;
 /** an office's drop, css px */
 const DROP_PX = 16;
-/** the slab's first size */
-const SLAB_FROM = 0.92;
 /** a thing not in yet: drawn this small, so its shaders compile with the rest */
 const NOT_YET = 1e-4;
 
@@ -65,16 +64,16 @@ export function popOut(x: number): number {
   return 1 + (c + 1) * y ** 3 + c * y * y;
 }
 
-/** a small stable number in [-1, 1] for a place: the same thing jitters the same way every load. Pure. */
-export function jitterOf(x: number, z: number): number {
-  const h = Math.sin(Math.floor(x / 2) * 12.9898 + Math.floor(z / 2) * 78.233) * 43758.5453;
-  return (h - Math.floor(h)) * 2 - 1;
+/** when the cube at distance d of the middle starts to rise, ms: one wave, the middle first. Pure. */
+export function tileStart(d: number, dmax: number): number {
+  return ENTRY.tiles.from + ENTRY.tiles.span * (dmax > 0 ? Math.min(1, d / dmax) : 0);
 }
 
-/** when a thing at distance d of the middle starts to come in, ms. Pure. */
-export function thingStart(d: number, dmax: number, x: number, z: number): number {
-  const { from, span, jitter } = ENTRY.things;
-  return from + span * easeInOut(dmax > 0 ? d / dmax : 0) + jitter * jitterOf(x, z);
+/** a cube at ms: its scale (NOT_YET before it starts) and how far under its place it still is (town units). Pure. */
+export function tileAt(ms: number, start: number): { readonly s: number; readonly y: number } {
+  if (ms < start) return { s: NOT_YET, y: -RISE };
+  const p = clamp01((ms - start) / ENTRY.tiles.dur);
+  return { s: Math.max(NOT_YET, popOut(p)), y: p >= 1 ? 0 : -RISE * (1 - p) ** 3 };
 }
 
 /** a thing's scale at ms: not yet, popping in over `dur`, there. Pure. */
@@ -83,9 +82,21 @@ export function popAt(ms: number, start: number, dur: number): number {
   return Math.max(NOT_YET, popOut((ms - start) / dur));
 }
 
-/** the roads' reveal: how far from the middle they're drawn at ms, fractions of their reach. Pure. */
-export function roadsAt(ms: number): number {
-  return easeInOut((ms - ENTRY.roads.from) / (ENTRY.roads.to - ENTRY.roads.from));
+/** the lawn cut into cubes: as many as fit CELL, each the same size, so they tile it exactly. Pure. */
+export function gridOf(lawn: TownParts['lawn']): { readonly nx: number; readonly nz: number; readonly cw: number; readonly cd: number } {
+  const w = lawn.x1 - lawn.x0;
+  const d = lawn.z1 - lawn.z0;
+  const nx = Math.max(1, Math.round(w / CELL));
+  const nz = Math.max(1, Math.round(d / CELL));
+  return { nx, nz, cw: w / nx, cd: d / nz };
+}
+
+/** the middle of the cube a point of the lawn is on. Pure. */
+export function cellOf(lawn: TownParts['lawn'], x: number, z: number): { readonly x: number; readonly z: number } {
+  const g = gridOf(lawn);
+  const i = Math.min(g.nx - 1, Math.max(0, Math.floor((x - lawn.x0) / g.cw)));
+  const j = Math.min(g.nz - 1, Math.max(0, Math.floor((z - lawn.z0) / g.cd)));
+  return { x: lawn.x0 + (i + 0.5) * g.cw, z: lawn.z0 + (j + 0.5) * g.cd };
 }
 
 // ---- what moves the renderer's loose things
@@ -99,15 +110,12 @@ interface Pop {
 
 /** a townscape's things, sorted once */
 interface ScapeKit {
-  readonly slab: readonly { readonly mesh: Mesh; readonly mat: Material; readonly edge: boolean }[];
+  /** the cubes: the slab's dirt and its grass top, one instance each per cell */
+  readonly tiles: readonly { readonly mesh: InstancedMesh; readonly y: number }[];
+  readonly cells: readonly { readonly x: number; readonly z: number; readonly start: number }[];
   readonly pops: readonly Pop[];
-  /** the flat things' reach from the middle, town units */
-  readonly reach: number;
-}
-
-/** an office's world's things, sorted once */
-interface WorldKit {
-  readonly pops: readonly Pop[];
+  /** the cubes all settled: nothing of theirs to move any more */
+  settled: boolean;
 }
 
 export interface Entry {
@@ -120,79 +128,124 @@ export interface Entry {
 const box = new Box3();
 const size = new Vector3();
 const centre = new Vector3();
+const m4 = new Matrix4();
+const q0 = new Quaternion();
+const p3 = new Vector3();
+const s3 = new Vector3();
 
 export function makeEntry(): Entry {
   const scapes = new WeakMap<Object3D, ScapeKit>();
-  const worlds = new WeakMap<Object3D, WorldKit>();
+  const worlds = new WeakMap<Object3D, readonly Pop[]>();
   const clones: Material[] = [];
-  /** the roads' reveal, shared by every flat thing's material */
-  const reveal = { c: { value: { x: 0, y: 0 } }, r: { value: 0 } };
-  /** each office's first look: where its things start, by distance */
+  /** the wave, shared by every flat thing's material (the roads, the river, the paths ride their cubes) */
+  const wave = {
+    ms: { value: 0 },
+    c: { value: { x: 0, y: 0 } },
+    o: { value: { x: 0, y: 0 } },
+    cell: { value: { x: CELL, y: CELL } },
+    n: { value: { x: 1, y: 1 } },
+    dmax: { value: 1 },
+  };
   let dmax = 0;
   const roots = new Map<Object3D, { y: number; start: number }>();
   const bodies = new Map<Object3D, Vector3>();
 
-  /** a flat thing's material that draws only within reveal.r of the middle */
-  function revealing(m: Material): Material {
+  /** a flat thing's material that rides the wave: each vertex with its cube, unseen before it */
+  function riding(m: Material): Material {
     const c = m.clone();
     c.onBeforeCompile = (sh: WebGLProgramParametersWithUniforms) => {
-      sh.uniforms.uRevealC = reveal.c;
-      sh.uniforms.uRevealR = reveal.r;
-      sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vRevealXZ;')
-        .replace('#include <project_vertex>', '#include <project_vertex>\nvRevealXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
+      sh.uniforms.uWaveMs = wave.ms;
+      sh.uniforms.uWaveC = wave.c;
+      sh.uniforms.uWaveO = wave.o;
+      sh.uniforms.uWaveCell = wave.cell;
+      sh.uniforms.uWaveN = wave.n;
+      sh.uniforms.uWaveDmax = wave.dmax;
+      const head = `uniform float uWaveMs;\nuniform vec2 uWaveC;\nuniform vec2 uWaveO;\nuniform vec2 uWaveCell;\nuniform vec2 uWaveN;\nuniform float uWaveDmax;\nvarying float vWaveP;`;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${head}`).replace(
+        '#include <begin_vertex>',
+        [
+          '#include <begin_vertex>',
+          'vec2 wXZ = (modelMatrix * vec4(transformed, 1.0)).xz;',
+          'vec2 wIJ = clamp(floor((wXZ - uWaveO) / uWaveCell), vec2(0.0), uWaveN - 1.0);',
+          'vec2 wCC = uWaveO + (wIJ + 0.5) * uWaveCell;',
+          `float wSt = ${ENTRY.tiles.from.toFixed(1)} + ${ENTRY.tiles.span.toFixed(1)} * min(1.0, distance(wCC, uWaveC) / uWaveDmax);`,
+          `vWaveP = clamp((uWaveMs - wSt) / ${ENTRY.tiles.dur.toFixed(1)}, 0.0, 1.0);`,
+          `transformed.y -= ${RISE.toFixed(2)} * pow(1.0 - vWaveP, 3.0);`,
+        ].join('\n'),
+      );
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vRevealXZ;\nuniform vec2 uRevealC;\nuniform float uRevealR;')
-        .replace('#include <clipping_planes_fragment>', 'if (distance(vRevealXZ, uRevealC) > uRevealR) discard;\n#include <clipping_planes_fragment>');
+        .replace('#include <common>', '#include <common>\nvarying float vWaveP;')
+        .replace('#include <clipping_planes_fragment>', 'if (vWaveP <= 0.0) discard;\n#include <clipping_planes_fragment>');
     };
-    c.customProgramCacheKey = () => 'bims-hero-reveal';
+    c.customProgramCacheKey = () => 'bims-hero-wave';
     clones.push(c);
     return c;
   }
 
-  function scapeKit(root: Object3D, at: TownParts['centre']): ScapeKit {
+  function scapeKit(root: Object3D, parts: TownParts): ScapeKit {
     const had = scapes.get(root);
     if (had) return had;
-    const slab: { mesh: Mesh; mat: Material; edge: boolean }[] = [];
-    const things: { o: Object3D; d: number; x: number; z: number }[] = [];
-    let reach = 0;
-    let lawnW = 0;
-    root.updateMatrixWorld(true);
-    for (const o of root.children) {
-      box.setFromObject(o);
-      box.getSize(size);
-      lawnW = Math.max(lawnW, size.x);
+    const { lawn, centre: at } = parts;
+    const g = gridOf(lawn);
+    const inPit = (x: number, z: number): boolean => parts.pits.some((p) => x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1);
+    const cells: { x: number; z: number; start: number }[] = [];
+    let far = 0;
+    for (let i = 0; i < g.nx; i++) {
+      for (let j = 0; j < g.nz; j++) {
+        const x = lawn.x0 + (i + 0.5) * g.cw;
+        const z = lawn.z0 + (j + 0.5) * g.cd;
+        far = Math.max(far, Math.hypot(x - at.x, z - at.z));
+        if (!inPit(x, z)) cells.push({ x, z, start: 0 });
+      }
     }
-    for (const o of root.children) {
+    dmax = Math.max(dmax, far);
+    const cellsTimed = cells.map((c) => ({ ...c, start: tileStart(Math.hypot(c.x - at.x, c.z - at.z), dmax) }));
+    wave.c.value = { x: at.x, y: at.z };
+    wave.o.value = { x: lawn.x0, y: lawn.z0 };
+    wave.cell.value = { x: g.cw, y: g.cd };
+    wave.n.value = { x: g.nx, y: g.nz };
+    wave.dmax.value = dmax;
+
+    const lawnW = lawn.x1 - lawn.x0;
+    const slabs: Mesh[] = [];
+    const pops: Pop[] = [];
+    root.updateMatrixWorld(true);
+    for (const o of [...root.children]) {
       box.setFromObject(o);
       box.getSize(size);
       box.getCenter(centre);
       const m: Mesh | null = o instanceof Mesh ? (o as Mesh) : null;
       if (m && size.x >= lawnW * 0.9 && !Array.isArray(m.material)) {
-        // the floating block: its grass top and its dirt under (the taller one, drawn last)
-        const mat = (m.material).clone();
-        mat.transparent = true;
-        clones.push(mat);
-        m.material = mat;
-        slab.push({ mesh: m, mat, edge: size.y > 0.5 });
+        // the floating block: drawn as its cubes while they rise, itself again once settled
+        slabs.push(m);
         continue;
       }
       if (m && size.y < 0.1 && !Array.isArray(m.material)) {
-        // a road, the river, a dash, a path, a paving: drawn outward from the middle
-        m.material = revealing(m.material);
-        reach = Math.max(reach, ...[box.min.x, box.max.x].flatMap((x) => [box.min.z, box.max.z].map((z) => Math.hypot(x - at.x, z - at.z))));
+        // a road, the river, a dash, a path, a paving: each vertex rides its cube up
+        m.material = riding(m.material);
         continue;
       }
-      things.push({ o, d: Math.hypot(centre.x - at.x, centre.z - at.z), x: centre.x, z: centre.z });
+      const cc = cellOf(lawn, centre.x, centre.z);
+      pops.push({ o, base: o.scale.clone(), start: tileStart(Math.hypot(cc.x - at.x, cc.z - at.z), dmax) + ENTRY.thing.after, dur: ENTRY.thing.dur });
     }
-    dmax = Math.max(dmax, ...things.map((t) => t.d));
-    const pops = things.map((t) => ({ o: t.o, base: t.o.scale.clone(), start: thingStart(t.d, dmax, t.x, t.z), dur: ENTRY.pop }));
-    const kit = { slab, pops, reach };
+    const tiles = slabs.map((s) => {
+      box.setFromObject(s);
+      box.getSize(size);
+      box.getCenter(centre);
+      const mesh = new InstancedMesh(new BoxGeometry(g.cw, size.y, g.cd), s.material as Material, cellsTimed.length);
+      mesh.castShadow = s.castShadow;
+      mesh.receiveShadow = s.receiveShadow;
+      mesh.frustumCulled = false;
+      s.visible = false;
+      root.add(mesh);
+      return { mesh, y: centre.y };
+    });
+    const kit: ScapeKit = { tiles, cells: cellsTimed, pops, settled: false };
     scapes.set(root, kit);
     return kit;
   }
 
-  function worldKit(world: Object3D, width: number, start: number): WorldKit {
+  function worldPops(world: Object3D, width: number, start: number): readonly Pop[] {
     const had = worlds.get(world);
     if (had) return had;
     const pops: Pop[] = [];
@@ -207,27 +260,39 @@ export function makeEntry(): Entry {
       if (Math.max(size.x, size.z) >= width * 0.45) continue;
       pops.push({ o, base: o.scale.clone(), start: start + ENTRY.drop + (i++ % 6) * 12, dur: ENTRY.furniture });
     }
-    const kit = { pops };
-    worlds.set(world, kit);
-    return kit;
+    worlds.set(world, pops);
+    return pops;
   }
 
   const scaleTo = (p: Pop, s: number): void => {
     p.o.scale.set(p.base.x * s, p.base.y * s, p.base.z * s);
   };
 
+  function moveTiles(k: ScapeKit, ms: number): void {
+    if (k.settled) return;
+    let all = true;
+    for (const t of k.tiles) {
+      for (let i = 0; i < k.cells.length; i++) {
+        const c = k.cells[i];
+        if (c === undefined) continue;
+        const a = tileAt(ms, c.start);
+        if (a.s < 1 || a.y !== 0) all = false;
+        p3.set(c.x, t.y + a.y, c.z);
+        s3.setScalar(a.s);
+        t.mesh.setMatrixAt(i, m4.compose(p3, q0, s3));
+      }
+      t.mesh.instanceMatrix.needsUpdate = true;
+    }
+    k.settled = all && ms >= ENTRY.tiles.from + ENTRY.tiles.span + ENTRY.tiles.dur;
+  }
+
   return {
     apply(ms, parts, fitScale) {
       const at = parts.centre;
+      wave.ms.value = ms;
       if (parts.scape) {
-        const k = scapeKit(parts.scape, at);
-        const g = easeInOut((ms - ENTRY.slab.from) / (ENTRY.slab.to - ENTRY.slab.from));
-        for (const s of k.slab) {
-          s.mesh.scale.setScalar(SLAB_FROM + (1 - SLAB_FROM) * g);
-          s.mat.opacity = s.edge ? easeInOut((ms - ENTRY.edge.from) / (ENTRY.edge.to - ENTRY.edge.from)) : g;
-        }
-        reveal.c.value = { x: at.x, y: at.z };
-        reveal.r.value = k.reach * roadsAt(ms) + 1e-3;
+        const k = scapeKit(parts.scape, parts);
+        moveTiles(k, ms);
         for (const p of k.pops) scaleTo(p, popAt(ms, p.start, p.dur));
       }
       const drop = DROP_PX * fitScale * 1.25;
@@ -235,14 +300,14 @@ export function makeEntry(): Entry {
       for (const o of parts.offices) {
         let r = roots.get(o.root);
         if (!r) {
-          const d = Math.hypot(o.root.position.x - at.x, o.root.position.z - at.z);
-          r = { y: o.root.position.y, start: thingStart(d, Math.max(dmax, d), o.root.position.x, o.root.position.z) };
+          const cc = cellOf(parts.lawn, o.root.position.x, o.root.position.z);
+          r = { y: o.root.position.y, start: tileStart(Math.hypot(cc.x - at.x, cc.z - at.z), Math.max(dmax, 1)) + ENTRY.thing.after };
           roots.set(o.root, r);
         }
         const f = (ms - r.start) / ENTRY.drop;
         o.root.scale.setScalar(ms < r.start ? NOT_YET : 1);
         o.root.position.y = r.y + drop * (1 - popOut(f));
-        if (o.world) for (const p of worldKit(o.world, o.width, r.start).pops) scaleTo(p, popAt(ms, p.start, p.dur));
+        if (o.world) for (const p of worldPops(o.world, o.width, r.start)) scaleTo(p, popAt(ms, p.start, p.dur));
         const d = Math.hypot(o.root.position.x - at.x, o.root.position.z - at.z);
         for (const b of o.bims) bims.push({ body: b.body, d, name: b.name });
       }
@@ -262,7 +327,7 @@ export function makeEntry(): Entry {
         const r = roots.get(o.root);
         o.root.scale.setScalar(1);
         if (r) o.root.position.y = r.y;
-        if (o.world) for (const p of worlds.get(o.world)?.pops ?? []) scaleTo(p, 1);
+        if (o.world) for (const p of worlds.get(o.world) ?? []) scaleTo(p, 1);
       }
       for (const [body, base] of bodies) body.scale.copy(base);
       bodies.clear();

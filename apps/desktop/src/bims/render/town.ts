@@ -123,6 +123,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   let scape: { sig: string; merged: Merged; loose: Group | null } | null = null;
   /** the hero's entry build holds the town loose (TownOpts.entry) until settle() */
   let held = opts.entry === true;
+  /** the lawn's holes the townscape was built with last (the entry leaves no cube there) */
+  let lastPits: readonly { x0: number; x1: number; z0: number; z1: number }[] = [];
   const v = new Vector3();
   const probe: Probe | null = testMode() ? { frames: 0, calls: 0, ms: 0, offices: 0, merged: { from: 0, to: 0 }, live: [], recent: [], check: { road: 0, river: 0 }, heads: [] } : null;
   if (probe) (window as unknown as { __biseTown?: Probe }).__biseTown = probe;
@@ -246,6 +248,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       const own = lookOf(t.office.map).pits?.(t.office, t.grow.stage) ?? [];
       return p ? own.map((b) => ({ x0: b.x0 + p.x, x1: b.x1 + p.x, z0: b.z0 + p.z, z1: b.z1 + p.z })) : [];
     });
+    lastPits = pits;
     const sSig = `${String(plan.seed)}|${JSON.stringify(plan.lawn)}|${String(plan.road.length)}|${String(plan.trees.length)}|${String(plan.offices.length)}|${isNight ? 'n' : 'd'}|${JSON.stringify(pits)}`;
     if (scape?.sig === sSig) return;
     if (scape) {
@@ -629,6 +632,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
         return {
           scape: scape?.loose ?? null,
           centre: { x: (lawn.x0 + lawn.x1) / 2, z: (lawn.z0 + lawn.z1) / 2 },
+          lawn: { x0: lawn.x0, x1: lawn.x1, z0: lawn.z0, z1: lawn.z1 },
+          pits: lastPits,
           offices: [...spots].flatMap(([id, s]) => {
             const o = s.scene.office();
             if (!o || !s.live) return [];

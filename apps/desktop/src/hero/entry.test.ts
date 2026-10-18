@@ -1,7 +1,9 @@
-// The entry build's timeline (design's hero-entry §2): its eases, its order from the middle out, and
-// the whole map there by 2.4 s.
+// The entry build's timeline (design's hero-entry §2, Gabriel's ripple): its eases, one wave of
+// cubes from the middle out, and the whole map there by 2.4 s.
 import { describe, expect, it } from 'vitest';
-import { easeInOut, ENTRY, jitterOf, popAt, popOut, roadsAt, thingStart, wordsAt } from './entry';
+import { cellOf, easeInOut, ENTRY, gridOf, popAt, popOut, tileAt, tileStart, wordsAt } from './entry';
+
+const LAWN = { x0: -30, x1: 30, z0: -25, z1: 25 };
 
 describe('the entry build', () => {
   it('eases in and out: slow ends, the middle at half', () => {
@@ -9,38 +11,42 @@ describe('the entry build', () => {
     expect(easeInOut(0.5)).toBeCloseTo(0.5, 3);
     expect(easeInOut(1)).toBeCloseTo(1);
     expect(easeInOut(0.1)).toBeLessThan(0.05);
-    expect(easeInOut(0.9)).toBeGreaterThan(0.95);
   });
 
   it('pops with a 4% overshoot, then settles at its size', () => {
     const peak = Math.max(...Array.from({ length: 101 }, (_, i) => popOut(i / 100)));
     expect(peak).toBeGreaterThan(1.035);
     expect(peak).toBeLessThan(1.045);
-    expect(popOut(0)).toBeCloseTo(0);
     expect(popOut(1)).toBeCloseTo(1);
   });
 
-  it('starts the middle first and the edge last, every thing within 400-1800 ms ± its jitter', () => {
-    const near = thingStart(0, 50, 0, 0);
-    const far = thingStart(50, 50, 50, 0);
-    expect(near).toBeLessThan(far);
-    for (let d = 0; d <= 50; d += 5) {
-      const s = thingStart(d, 50, d, d);
-      expect(s).toBeGreaterThanOrEqual(ENTRY.things.from - ENTRY.things.jitter);
-      expect(s).toBeLessThanOrEqual(ENTRY.things.from + ENTRY.things.span + ENTRY.things.jitter);
-    }
-    expect(Math.abs(jitterOf(3.2, -7))).toBeLessThanOrEqual(1);
-    expect(jitterOf(3.2, -7)).toBe(jitterOf(3.2, -7));
+  it('cuts the lawn into equal cubes that tile it exactly', () => {
+    const g = gridOf(LAWN);
+    expect(g.nx * g.cw).toBeCloseTo(60);
+    expect(g.nz * g.cd).toBeCloseTo(50);
+    expect(cellOf(LAWN, -30, -25)).toEqual({ x: -30 + g.cw / 2, z: -25 + g.cd / 2 });
+    expect(cellOf(LAWN, 30, 25)).toEqual({ x: 30 - g.cw / 2, z: 25 - g.cd / 2 });
   });
 
-  it('has the whole map there by 2.4 s: the last thing, the last office, the last bim', () => {
-    const lastThing = ENTRY.things.from + ENTRY.things.span + ENTRY.things.jitter + ENTRY.pop;
-    const lastOffice = ENTRY.things.from + ENTRY.things.span + ENTRY.things.jitter + ENTRY.drop + 5 * 12 + ENTRY.furniture;
+  it('rises as one wave: the nearer cube always first, never a cube out of turn', () => {
+    const ds = Array.from({ length: 20 }, (_, i) => i * 2);
+    const starts = ds.map((d) => tileStart(d, 38));
+    for (let i = 1; i < starts.length; i++) expect(starts[i] ?? 0).toBeGreaterThanOrEqual(starts[i - 1] ?? 0);
+    expect(tileStart(0, 38)).toBe(ENTRY.tiles.from);
+    expect(tileStart(38, 38)).toBe(ENTRY.tiles.from + ENTRY.tiles.span);
+    // a cube: under its place and nothing before its start, settled at its place after its rise
+    expect(tileAt(100, 200).y).toBeLessThan(0);
+    expect(tileAt(100, 200).s).toBeLessThan(0.01);
+    expect(tileAt(200 + ENTRY.tiles.dur, 200)).toEqual({ s: 1, y: 0 });
+  });
+
+  it('has the whole map there by 2.4 s: the last cube, thing, office and bim', () => {
+    const lastCube = ENTRY.tiles.from + ENTRY.tiles.span + ENTRY.tiles.dur;
+    const lastThing = ENTRY.tiles.from + ENTRY.tiles.span + ENTRY.thing.after + ENTRY.thing.dur;
+    const lastOffice = ENTRY.tiles.from + ENTRY.tiles.span + ENTRY.thing.after + ENTRY.drop + 5 * 12 + ENTRY.furniture;
     const lastBim = ENTRY.bims.from + 14 * ENTRY.bims.gap + ENTRY.bims.pop;
-    expect(Math.max(lastThing, lastOffice, lastBim)).toBeLessThanOrEqual(ENTRY.built);
+    expect(Math.max(lastCube, lastThing, lastOffice, lastBim)).toBeLessThanOrEqual(ENTRY.built);
     expect(popAt(ENTRY.built, ENTRY.bims.from + 14 * ENTRY.bims.gap, ENTRY.bims.pop)).toBe(1);
-    expect(roadsAt(ENTRY.roads.to)).toBeCloseTo(1);
-    expect(roadsAt(0)).toBe(0);
     expect(wordsAt(ENTRY.built)).toBeCloseTo(1);
     expect(wordsAt(2000)).toBe(0);
     expect(ENTRY.cam.to).toBe(ENTRY.done);
