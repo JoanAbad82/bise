@@ -445,7 +445,7 @@ fn image_spans(text: &str, style: Style) -> Vec<Span<'static>> {
         let tag = crate::links::add(&crate::open_file::chip_url(&image_file(&m)));
         let st = chip_style();
         let st = Style { add_modifier: crate::links::with_tag(st.add_modifier, tag), ..st };
-        out.push(Span::styled(format!("{G_IMAGE} {}", short_name(&m.path)), st));
+        out.extend(crate::image_gone::chip(format!("{G_IMAGE} {}", short_name(&m.path)), &image_file(&m), st, chip_style()));
         last = m.end;
     }
     let rest = text.get(last..).unwrap_or("");

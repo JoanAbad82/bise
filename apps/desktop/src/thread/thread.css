@@ -1561,6 +1561,22 @@
 .th-attach-missing {
   color: var(--c-err);
 }
+/* an image the store deleted (D14, designer m_31912): 'deleted · images are kept 7 days · settings', text-3;
+   'settings' underlined on hover, opens settings › privacy */
+.th-image-deleted {
+  color: var(--c-text-3);
+}
+.th-image-settings {
+  color: var(--c-text-3);
+  font: inherit;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.th-image-settings:hover {
+  text-decoration: underline;
+}
 /* an image's caption (the talk's still: 'Safari · cold bench'), designer m_22052: 4 px under the
    chip row (--gap-tight), on the chips' left edge, t-12 text-3 (the ' · ' too), one line cut with … */
 .th-part-caption {

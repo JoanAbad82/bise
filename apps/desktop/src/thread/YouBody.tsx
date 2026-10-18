@@ -18,7 +18,8 @@ import { useFold } from './folds';
 import { useFoldHint } from './foldHint';
 import { Markdown, slotMark, slotText } from './Markdown';
 import { AttachChip, FileThumb } from './AttachChip';
-import { fileUrl, Thumb } from './rows-cards';
+import { fileUrl } from './rows-cards';
+import { PartImageChip } from './ImageGone';
 import { anchorMeta, chipName, pageWords, youView, type YouView } from './parts';
 import type { RowCtx } from './rows';
 
@@ -282,9 +283,9 @@ export function PartChips({ view, ctx, id, named = false, link }: { view: YouVie
         ))}
         {/* his images and files (file-chips): a click previews, a right-click shows it in Finder */}
         {view.images.map((img, i) => (
-          <AttachChip key={`${img.path}#${String(i)}`} of="image" path={img.path} missing={false} thumb={<Thumb path={img.path} />} lit={lit(img.n)} {...on(img.n)} testId={`${id}.image.${String(i + 1)}`}>
+          <PartImageChip key={`${img.path}#${String(i)}`} path={img.path} store={img.store} lit={lit(img.n)} on={on(img.n)} testId={`${id}.image.${String(i + 1)}`}>
             {named ? chipName(img.path.split('/').at(-1) ?? img.path) : partImageWords(img.name, img.n ?? i + 1)}
-          </AttachChip>
+          </PartImageChip>
         ))}
         {view.files.map((f, i) =>
           f.name === '' ? (

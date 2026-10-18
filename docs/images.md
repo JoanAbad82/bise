@@ -207,6 +207,15 @@ then deletes it. Every image counts: pasted, dropped, made by an agent
   `keep_days >= 1` a live hub's named image never goes (the law
   `named_by_a_live_hub_never_goes`). A stopped hub's open card can lose
   its image: it is not live.
+- The clients never draw a broken image: an old bubble's image whose
+  store file is gone keeps its chip with the no-file look and says
+  `deleted · images are kept 7 days`, the desktop with `· settings`
+  that opens settings › privacy (`thread/ImageGone.tsx`, the store file
+  beside the part's `b64_file`), the TUI on its chip line
+  `▣ login.png · deleted · images are kept 7 days`, no link
+  (`rust/tui/src/image_gone.rs`). The words state today's rule (his
+  setting now), never the one an image went by: no record is kept per
+  image. Words: `bise_proto::words::thread::image_deleted`.
 - Known: an image older than the setting in a live agent's history (not
   an open message) becomes `<image-unavailable …>` text at its next model
   call, as an image past the 20 most recent already does.

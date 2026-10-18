@@ -92,6 +92,7 @@ mod undo;
 mod clipboard;
 mod attach;
 mod attach_file;
+mod image_gone;
 mod open_file;
 mod quote;
 mod pasted;

@@ -450,4 +450,11 @@ crate::words! { thread:
     wake_tail(n) = "its last {n} lines";
     /// a wake's folded output, one line
     wake_tail_one = "its last line";
+
+    // ---- an image of an old message (D14, designer m_23410, m_31912)
+    /// the image store deleted it, and today's rule (no record of the
+    /// rule it went by): `image 1 · deleted · images are kept 7 days`
+    image_deleted(days) = "deleted · images are kept {days}";
+    /// after it, the act that opens settings › privacy at the kept row
+    image_deleted_settings = "settings";
 }

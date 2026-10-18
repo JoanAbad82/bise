@@ -42,7 +42,7 @@ export interface YouView {
   readonly pastes: readonly { readonly n: number; readonly text: string }[];
   /** his images: their label ('[Image #2]'), where he took them from (the thumbnail) and their
    *  caption, a fact about the image ('Safari · cold bench', the talk's still), '' for none */
-  readonly images: readonly { readonly name: string; readonly path: string; readonly caption: string; readonly n: number | null }[];
+  readonly images: readonly { readonly name: string; readonly path: string; readonly caption: string; readonly n: number | null; readonly store: string }[];
   /** his files (file-chips): each by its absolute path, its chip's label ('[File #2]'; '' a file
    *  of an older files list) and whether the hub found it gone when he sent it */
   readonly files: readonly YouFile[];
@@ -58,10 +58,20 @@ export interface YouFile {
 }
 
 /** The bubble's view of `parts` (the TUI's view_of). Pure. */
+/**
+ * An image's file in bise's image store, beside its `.b64` (bend_images::store_bytes:
+ * `<hash>.<ext>`), '' when the part names none (an older line). D14: the store deletes it after
+ * his setting; its chip then says so. Pure.
+ */
+export function storeImage(b64File: string, mime: string): string {
+  const ext = ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' } as Record<string, string | undefined>)[mime.trim().toLowerCase()];
+  return ext === undefined || !b64File.endsWith('.b64') ? '' : `${b64File.slice(0, -'.b64'.length)}.${ext}`;
+}
+
 export function youView(parts: readonly Part[]): YouView {
   const quotes: PartQuote[] = [];
   const pastes: { n: number; text: string }[] = [];
-  const images: { name: string; path: string; caption: string; n: number | null }[] = [];
+  const images: { name: string; path: string; caption: string; n: number | null; store: string }[] = [];
   const files: YouFile[] = [];
   let words = '';
   for (const p of parts) {
@@ -85,7 +95,7 @@ export function youView(parts: readonly Part[]): YouView {
         pastes.push({ n: p.n, text: p.text });
         break;
       case 'image':
-        images.push({ name: p.name, path: p.source, caption: p.caption ?? '', n: labelN(p.name) });
+        images.push({ name: p.name, path: p.source, caption: p.caption ?? '', n: labelN(p.name), store: storeImage(p.b64_file ?? '', p.mime ?? '') });
         break;
       case 'file':
         files.push({ name: p.name ?? '', path: p.path, missing: p.missing === true, n: labelN(p.name ?? '') });

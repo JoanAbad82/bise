@@ -6,7 +6,7 @@ holds old and new images:
   1. shots_keep_days = 30: the hub's first tick prunes; a 10-day-old image
      stays, a crashed write's leftover (2 days) goes, a file the store did
      not write stays;
-  2. an agent's open message (sb send main --expect-reply) names another
+  2. an open card (t1 asks main, main makes it his card) names another
      10-day-old image;
   3. shots_keep_days = 7 and the hub's stamps cleared (a day later): the
      next tick touches the named image (its mtime is fresh again) and
@@ -50,9 +50,13 @@ def main():
             put(store, h + ".b64", age)
         put(store, "tmp-%s.png" % NEW, 2 * DAY)
         put(store, "notes.txt", 100 * DAY)
-        # the user's prefs.json (bise_home's prefs_file: <root>/prefs.json)
-        root = os.path.join(E.env["HOME"], ".bend-harness")
-        os.makedirs(root, exist_ok=True)
+        # the user's prefs.json (bise_home's prefs_file: <BISE_HOME>/prefs.json);
+        # its own BISE_HOME: on a legacy home the hub's first boot moves
+        # ~/.bend-harness to ~/.bise, and a prefs.json written after it in the
+        # old place is never read
+        root = os.path.join(E.tmp, "bise")
+        os.makedirs(root)
+        E.env["BISE_HOME"] = root
         prefs = os.path.join(root, "prefs.json")
 
         def keep(days):
@@ -73,11 +77,15 @@ def main():
         check(left() == sorted([OLD + ".b64", OLD + ".png", NAMED + ".b64", NAMED + ".png", NEW + ".b64", NEW + ".png", "notes.txt"]),
               "at 30 days the 10-day-old images stay: %r" % left())
 
-        # an agent's open message names NAMED
+        # an open card names NAMED: t1 asks main, main makes it the user's card
         c.wait_idle("main")
-        c.say('/new t1: {{bash: sb send main --expect-reply "look at %s/%s.png"}}' % (store, NAMED))
-        c.wait(lambda: any(r.get("from") == "t1" and NAMED in r.get("body", "") for r in c.feed("main", "msg-in")), 120,
-               "t1's message in main's feed")
+        c.say('/new t1: {{bash: sb send main --expect-reply "which one?"}}')
+        c.wait(lambda: any(r.get("from") == "t1" and r.get("id") for r in c.feed("main", "msg-in")), 120,
+               "t1's question in main's feed")
+        mid = [r["id"] for r in c.feed("main", "msg-in") if r.get("from") == "t1" and r.get("id")][0]
+        c.wait_idle("main")
+        c.say('[[bash: sb card --for m_%d "this one? %s/%s.png"]]' % (mid, store, NAMED))
+        c.wait(lambda: any(NAMED in cd.get("text", "") for cd in c.cards()), 60, "the open card naming the image")
 
         # a day later, at 7 days
         keep(7)
@@ -93,8 +101,7 @@ def main():
     except AssertionError as e:
         print("FAIL", e)
         p = os.path.join(E.state, "hub.log")
-        print("hub.log:", "\n".join((open(p).read().splitlines() if os.path.exists(p) else [])[-60:]))
-        print("state:", sorted(os.listdir(E.state)), time.time())
+        print("hub.log's images lines:", [l for l in (open(p).read().splitlines() if os.path.exists(p) else []) if "images:" in l])
         print("store:", sorted(os.listdir(E.env["BEND_IMAGE_DIR"])) if os.path.isdir(E.env["BEND_IMAGE_DIR"]) else None)
         ok = False
     finally:

@@ -1,7 +1,7 @@
 // A thread's card rows: cards and their answers, approvals, 'you answered' rows,
 // image chips, and one agent's message to another. Owner: amb-win. Split out of
 // rows.tsx (pure move).
-import { useContext, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { useFold } from './folds';
 import { Act, Answered, ArtName, CardLine, Chip, Marker, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
@@ -77,8 +77,11 @@ export function ImageChip({ path, i, testId }: { path?: string; i: number; testI
  * line) or it's gone, the same slot with a faint image glyph, so every chip reads the same
  * (designer m_15943).
  */
-export function Thumb({ path }: { path?: string }) {
+export function Thumb({ path, onGone }: { path?: string; onGone?: () => void }) {
   const [gone, setGone] = useState(false);
+  useEffect(() => {
+    if (gone) onGone?.();
+  }, [gone, onGone]);
   if (path == null || path === '' || gone) {
     return (
       <span className="thumb none" aria-hidden="true">
