@@ -1,4 +1,4 @@
-// The hero film's score (page bims-film v6, bims m_30855, m_30867, m_31057): bise.dev/desktop's town, three offices
+// The hero film's score (page bims-film v8, bims m_30855, m_30867, m_31057): bise.dev/desktop's town, three offices
 // (three-a's: harness loft, bise.dev california, acme-web riad), 15 bims, 5 minutes in a loop. Each
 // bim's life is a list of [time, state] changes; the state at T is the last change at or before T,
 // else the list's last one: the loop closes by construction (an agent that leaves at 4:31 is gone at
@@ -164,10 +164,10 @@ export const CAST: readonly Cast[] = [
       },
       // in at 0:46.6, lands at 2:33 ('1:47' over its head), off down the road at 2:36
       { name: 'og-images', life: [[0, gone], [s(0, 46.6), work], [s(2, 28), { k: 'landing', rank: 1 }], [s(2, 33), done], [s(2, 36), gone]] },
-      // idle: they skate (the app's pastimes, 2 at most). A trip to their desk starts a skate session
-      // at the same film time every loop, so every loop rides the same lines (run.ts PRE_S covers both)
-      { name: 'seo-meta', life: [[0, idle], [s(1, 17), think], [s(1, 23), idle]] },
-      { name: 'i18n', life: [[0, idle], [s(4, 30), think], [s(4, 36), idle]] },
+      // idle: bean bags and the island, never the park (bims-film v8: no skater, run.ts pastimes off)
+      { name: 'seo-meta', life: [[0, idle], [s(2, 50), { k: 'snack', fruit: 2, trip: 1 }], [s(3, 4), idle]] },
+      // up from its bean bag to the island at 3:44, eats at 3:47
+      { name: 'i18n', life: [[0, idle], [s(3, 43), { k: 'snack', fruit: 1, trip: 1 }], [s(3, 58), idle]] },
     ],
   },
   {
@@ -192,10 +192,13 @@ export const NOTES: readonly Note[] = [
   { at: s(0, 14), office: HARNESS, from: 'you', to: 'signup-flow' },
   { at: s(0, 41), office: SITE, from: 'you', to: 'main' },
   { at: s(1, 29), office: ACME, from: 'api-tests', to: 'checkout' },
+  // bims-film v8: api-tests' post-it on checkout's desk (0:32), invoice-pdf taps api-tests' shoulder (2:20)
+  { at: s(0, 28.5), office: ACME, from: 'api-tests', to: 'checkout' },
+  { at: s(2, 15.5), office: ACME, from: 'invoice-pdf', to: 'api-tests' },
   { at: s(2, 2), office: SITE, from: 'you', to: 'pricing-page' },
   { at: s(3, 52), office: ACME, from: 'api-tests', to: 'main' },
   // the town's background life: a plane of his to a working bim about every 20 s
-  { at: s(0, 28), office: ACME, from: 'you', to: 'api-tests' },
+  { at: s(0, 22), office: ACME, from: 'you', to: 'main' },
   { at: s(1, 0), office: HARNESS, from: 'you', to: 'main' },
   { at: s(1, 20), office: ACME, from: 'you', to: 'invoice-pdf' },
   { at: s(1, 40), office: HARNESS, from: 'you', to: 'signup-flow' },
@@ -249,8 +252,8 @@ export const SHOTS: readonly Shot[] = [
   { at: s(0, 23.5), size: 'close', subject: bim(HARNESS, 'dark-mode') },
   { at: s(0, 26), size: 'wide', subject: { k: 'town' } },
   // act 1: the town gets up
-  { at: s(0, 30), size: 'close', subject: bim(SITE, 'i18n') },
-  { at: s(0, 38), size: 'follow', subject: bim(SITE, 'seo-meta') },
+  { at: s(0, 30), size: 'tight', subject: { k: 'office', office: ACME } },
+  { at: s(0, 38), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
   { at: s(0, 44), size: 'office', subject: { k: 'office', office: SITE } },
   { at: s(0, 52), size: 'follow', subject: bim(HARNESS, 'fix-flaky-test') },
   { at: s(1, 0), size: 'office', subject: { k: 'office', office: ACME } },
@@ -265,7 +268,7 @@ export const SHOTS: readonly Shot[] = [
   { at: s(2, 2), size: 'tight', subject: bim(SITE, 'pricing-page') },
   { at: s(2, 10), size: 'wide', subject: { k: 'town' } },
   // act 3: the break
-  { at: s(2, 18), size: 'follow', subject: bim(SITE, 'seo-meta') },
+  { at: s(2, 18), size: 'office', subject: { k: 'office', office: ACME } },
   { at: s(2, 26), size: 'close', subject: bim(SITE, 'og-images') },
   { at: s(2, 36), size: 'follow', subject: bim(SITE, 'og-images') },
   { at: s(2, 40), size: 'wide', subject: { k: 'town' } },
@@ -279,7 +282,7 @@ export const SHOTS: readonly Shot[] = [
   // act 5: the day's end, then again
   { at: s(3, 28), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
   { at: s(3, 36), size: 'office', subject: { k: 'office', office: HARNESS } },
-  { at: s(3, 44), size: 'close', subject: { k: 'spot', office: SITE, spot: 'park' } },
+  { at: s(3, 44), size: 'follow', subject: bim(SITE, 'i18n') },
   { at: s(3, 52), size: 'office', subject: { k: 'office', office: ACME } },
   { at: s(4, 0), size: 'wide', subject: { k: 'town' } },
   { at: s(4, 8), size: 'office', subject: { k: 'office', office: HARNESS } },

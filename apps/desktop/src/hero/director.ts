@@ -173,6 +173,15 @@ export function glideOf(from: Shot | null, to: Shot): { readonly dur: number; re
   return { dur: Math.max(GLIDE_MIN_S, dur), across };
 }
 
+/** a target move past this, fractions of the frame (or log zoom), between two frames: a jump, glided, never cut */
+export const JUMP = 0.06;
+
+/** Whether the camera's target moved by more than a frame's drift: its subject came in or left. Pure. */
+export function jumped(a: Cam, b: Cam): boolean {
+  const z = Math.max(a.zoom, b.zoom);
+  return Math.abs(Math.log(a.zoom / b.zoom)) > JUMP || Math.abs(a.u - b.u) * z > JUMP || Math.abs(a.v - b.v) * z > JUMP;
+}
+
 /** a wide's slow drift (bims-film v7: never still, 2-3 % of the frame a second): its sway, fractions of the frame */
 export const DRIFT = { amp: 0.04, period: 10 } as const;
 
@@ -188,8 +197,11 @@ export function drift(c: Cam, e: number): Cam {
 
 /** ease in and out (smootherstep) */
 export const ease = (x: number): number => {
+  // ease-in-out expo (Gabriel's review, main m_31507: no cut, only fluid moves), its ends pinned to 0 and 1
   const t = clamp(x, 0, 1);
-  return t * t * t * (t * (t * 6 - 15) + 10);
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return t < 0.5 ? 2 ** (20 * t - 10) / 2 : (2 - 2 ** (-20 * t + 10)) / 2;
 };
 
 /**

@@ -21,6 +21,8 @@ export interface DriverParts {
   readonly layoutOf: LayoutFn;
   readonly newTimeline: NewTimelineFn;
   readonly labelsOf: LabelsFn;
+  /** false: its idle bims never take up a pastime (the hero's film: no skater, bims-film v8); absent: the app's */
+  readonly pastimes?: boolean;
 }
 
 /** The clock and the room a frame is drawn in, read by the caller. */
@@ -174,7 +176,8 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
         const acts = parts.activities(snap, t);
         lastActs = JSON.stringify([...acts]);
         // a map with a park: who skates reads the stage, the jobs' high-water mark (never the live count), his day, reduced motion
-        timeline.update(acts, office, t, events, bedsAt(g.stage), { stage: g.stage, jobs: g.jobs, dow: local.dow, day: dayOf(local.y, local.mo, local.d), reduced });
+        const fun = parts.pastimes === false ? undefined : { stage: g.stage, jobs: g.jobs, dow: local.dow, day: dayOf(local.y, local.mo, local.d), reduced };
+        timeline.update(acts, office, t, events, bedsAt(g.stage), fun);
         events = [];
       }
       return office === null ? null : { office, reshaped };

@@ -16,7 +16,7 @@ import { NO_ATTENTION, type Step } from '../bims/office-driver';
 import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
 import { CAST, SHOTS, type Shot } from './cast';
-import { aimCam, drift, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
+import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, jumped, LEAD_S, officeOf, OFFICE_BOX, fitCam, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
 import { ENTRY, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
 import { eggWords, makeOverlay } from './overlay';
@@ -174,6 +174,8 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   let shotIx = -1;
   let glide: { from: Cam; start: number; dur: number; rise: number | null; to: (() => Cam | null) | null } | null = null;
   let spring: Spring = still({ zoom: 1, u: 0.5, v: 0.5 });
+  /** the target the camera went for last frame (a jump starts a glide) */
+  let lastTo: Cam | null = null;
   let hover: { id: string; name: string } | null = null;
   let pointerOn = false;
   /** when his last gesture was (wall s): the loop runs at full rate a while after it */
@@ -211,9 +213,13 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
 
   /** the camera one frame on: along its glide, else the spring towards the target */
   function move(target: Cam, dt: number): void {
+    const to = glide?.to?.() ?? target;
+    // the target jumped (its subject came in by the door, or left): a new glide from where the
+    // camera is, never a cut (Gabriel's review, main m_31507)
+    if (!reduced && lastTo !== null && jumped(lastTo, to)) glide = { from: spring.cam, start: t, dur: GLIDE_IN_S, rise: null, to: glide?.to ?? null };
+    lastTo = to;
     if (glide !== null) {
       const f = reduced ? 1 : (t - glide.start) / glide.dur;
-      const to = glide.to?.() ?? target;
       spring = still(glideCam(glide.from, to, Math.min(1, f), glide.rise));
       if (f >= 1) glide = null;
       return;

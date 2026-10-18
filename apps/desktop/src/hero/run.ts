@@ -50,7 +50,8 @@ function tell(r: Run, t: number, beat = false): void {
 
 /** One office's run, its rows heard at world time t (the film's start). */
 export function makeRun(cast: Cast, t: number): Run {
-  const driver = makeDriver({ activities: activitiesOf(cast, filmT), layoutOf, newTimeline, labelsOf });
+  // no skater: the film never shows the park (bims-film v8, Gabriel's review)
+  const driver = makeDriver({ activities: activitiesOf(cast, filmT), layoutOf, newTimeline, labelsOf, pastimes: false });
   const r: Run = { cast, driver, sig: '', at: t };
   tell(r, t);
   driver.grow(growOf(growthOf(cast)), t);
