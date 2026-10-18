@@ -108,6 +108,8 @@ export function advance(r: Run, t: number, night: boolean, reduced: boolean): vo
 
 /** where his planes leave from, a fraction of the view's width along its bottom edge: under the feed (bims-plane m_31729) */
 export const FEED_X = 0.12;
+/** his planes' least length on screen, css px (designer m_31992: ~40 px wide, never a speck) */
+export const FEED_PLANE_PX = 36;
 
 /**
  * A frame's plane with the score's flight (cast.ts Note.flight: its length, its loops) and the feed's
@@ -120,7 +122,7 @@ export function withFlight(office: string, f: BimFrame, t: number): BimFrame {
   const left = filmT(t - p.since);
   const n = NOTES.find((x) => x.office === office && x.from === 'you' && x.to === f.name && x.flight !== undefined && Math.abs(x.at - left) < 0.05);
   if (n?.flight === undefined) return f;
-  return { ...f, pose: { ...f.pose, plane: { ...p, dur: n.flight.dur, loops: n.flight.loops, startX: FEED_X, glide: true } } };
+  return { ...f, pose: { ...f.pose, plane: { ...p, dur: n.flight.dur, loops: n.flight.loops, startX: FEED_X, glide: true, minPx: FEED_PLANE_PX } } };
 }
 
 /** The office's frame at its time (advance first), its planes flown as the score says. */

@@ -216,8 +216,8 @@ export const ease = (x: number): number => {
  * steady move), the centre eased; `rise` (an across glide): never closer than that zoom at its
  * middle (the drone's rise). Pure.
  */
-export function glideCam(from: Cam, to: Cam, f: number, rise: number | null): Cam {
-  const s = ease(f);
+export function glideCam(from: Cam, to: Cam, f: number, rise: number | null, curve: (x: number) => number = ease): Cam {
+  const s = curve(f);
   const la = Math.log(from.zoom);
   const lb = Math.log(to.zoom);
   let lz = la + (lb - la) * s;

@@ -227,7 +227,12 @@ varying vec2 vWaveXZ;`;
         'vec2 fIJ = clamp(floor((vWaveXZ - uWaveO) / uWaveCell), vec2(0.0), uWaveN - 1.0);',
         'vec2 fCC = uWaveO + (fIJ + 0.5) * uWaveCell;',
         `float fSt = ${ENTRY.tiles.from.toFixed(1)} + ${ENTRY.tiles.span.toFixed(1)} * min(1.0, distance(fCC, uWaveC) / uWaveDmax);`,
-        'if (vWaveP <= 0.0 || uWaveMs <= fSt) discard;',
+        // and only once that cube is near its full size (tileAt's popOut ≥ 0.97): over a cube still
+        // growing from nothing, a road's full width stuck out past it
+        `float fP = clamp((uWaveMs - fSt) / ${ENTRY.tiles.dur.toFixed(1)}, 0.0, 1.0);`,
+        'float fY = fP - 1.0;',
+        'float fS = 1.0 + 2.04 * fY * fY * fY + 1.04 * fY * fY;',
+        'if (vWaveP <= 0.0 || uWaveMs <= fSt || fS < 0.97) discard;',
       ].join('\n');
       sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${head}`).replace(
         '#include <begin_vertex>',

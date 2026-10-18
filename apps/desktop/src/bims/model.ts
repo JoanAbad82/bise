@@ -311,7 +311,7 @@ export interface Pose extends Pt {
    * y1 egg 2) and where it leaves (a fraction of the view's width, unset: 0.5, the middle); `glide`:
    * the film's paper plane (render/plane.ts planGlide: tossed, then gliding), its loops ignored
    */
-  readonly plane?: { readonly since: number; readonly dur?: number; readonly loops?: 0 | 1 | 2; readonly startX?: number; readonly glide?: boolean };
+  readonly plane?: { readonly since: number; readonly dur?: number; readonly loops?: 0 | 1 | 2; readonly startX?: number; readonly glide?: boolean; readonly minPx?: number };
 }
 
 /**

@@ -187,7 +187,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       // in front of it, at its right hand (plane.ts catchPoint): never on its head or its spot
       const hand = catchPoint(rig.x, rig.z, rig.dir);
       // never smaller than PLANE_MIN_PX on screen (designer via bims-qa m_27793: at 320 it was a speck)
-      const size = Math.max(1, (PLANE_MIN_PX * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN);
+      const size = Math.max(1, ((fp?.minPx ?? PLANE_MIN_PX) * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN);
       // one plan per flight, made when it leaves (his pan or zoom mid-flight moves no plane)
       const leftAt = (t - s).toFixed(2);
       let p = planes.get(f.name);

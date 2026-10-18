@@ -19,7 +19,7 @@ import { BUBBLE_S, BUBBLES, CAST, FOLD_S, PAGE, REDUCED_T, SHOTS, STAMP, type Bu
 import { makeFeed } from './feed';
 import { makePage, type KilnLoader } from './page';
 import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
-import { ENTRY, feedOpacity, makeEntry, wordsAt } from './entry';
+import { easeInOut, ENTRY, feedOpacity, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
 import { eggWords, makeOverlay } from './overlay';
 import { advance, makeRuns, stepOf, type Run } from './run';
@@ -438,7 +438,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     const shot = SHOTS[shotIx];
     const to = shot ? shotCam(shot, geo) : null;
     const f = (ems - ENTRY.cam.from) / (ENTRY.cam.to - ENTRY.cam.from);
-    spring = still(to === null || f <= 0 ? from : glideCam(from, to, Math.min(1, f), null));
+    spring = still(to === null || f <= 0 ? from : glideCam(from, to, Math.min(1, f), null, easeInOut));
   }
 
   /**
