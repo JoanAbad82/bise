@@ -64,6 +64,10 @@ pub const JOURNAL: Table = Table {
         k("reported", "Reported", "M.EReported{name, report}", &[f("name", Str), f("report", Json)]),
         k("file_touched", "FileTouched", "M.EFileTouched{name, path}", &[f("name", Str), f("path", Str)]),
         k("renamed", "Renamed", "M.ERenamed{name, new_name}", &[f("name", Str), f("new_name", Str)]),
+        // name-free (architect m_31497): another agent takes the old name
+        // `from` of a live agent `to`; its hot messages to `from` (queued,
+        // owed) are addressed to `to`, same ids (an older core skips it)
+        k("msgs_moved", "MsgsMoved", "M.EMsgsMoved{from, to}", &[f("from", Str), f("to", Str)]),
         k("message_sent", "MsgSent", "M.EMsgSent{msg}", &[f("msg", Rec(&MSG))]),
         k("message_state", "MsgState", "M.EMsgState{id, state}", &[f("id", Nat), f("state", Inline(&MST))]),
         k("message_settled", "Settled", "M.ESettled{id}", &[f("id", Nat)]),

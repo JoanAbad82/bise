@@ -98,6 +98,8 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
           hub_nok_tr(HI.profile(Bool.pick(List<&2, HM.Agent>, String.is_empty(er), HM.map_agent(ag, x, HM.OWs{w}), ag)), HI.profile(ag), hub_prof_placed(String.is_empty(er), ag, x, w), u)
         case HM.EReported{+x, +rp}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OReport{rp})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OReport{rp}, {==}), u)
+        case HM.EMsgsMoved{a, b}:
+          u
         case HM.EMsgSent{m}:
           u
         case HM.EMsgState{a, b}:

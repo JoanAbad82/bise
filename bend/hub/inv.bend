@@ -146,6 +146,8 @@ def apply1(+msgs: List<&2, M.MRec>, e: M.Ev) -> List<&2, M.MRec>:
       M.map_msg(msgs, id, M.OSt{s})
     case M.ESettled{+id}:
       M.map_msg(msgs, id, M.OSettle{})
+    case M.EMsgsMoved{+from, +to}:
+      M.moved(msgs, from, to)
     case _:
       msgs
 

@@ -207,6 +207,25 @@ def touched(evs: List<&2, M.Ev>) -> List<&2, Nat>:
     case Con{+e, +t}:
       List.append(&2, Nat, ev_ids(e), touched(t))
 
+# name-free: msgs_moved names no id; its rows are the hot ones to `to`
+# after the step (a few more rows than moved, never fewer)
+def to_ids(xs: List<&2, M.MRec>, +n: String) -> List<&2, Nat>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+r, +t}:
+      +rest = to_ids(t, n)
+      Bool.pick(List<&2, Nat>, String.eq(M.Msg.to(M.MRec.msg(r)), n), M.MRec.id(r) <> rest, rest)
+
+def moved_ids(evs: List<&2, M.Ev>, +hot: List<&2, M.MRec>) -> List<&2, Nat>:
+  match evs:
+    case Nil{}:
+      Nil{}
+    case Con{M.EMsgsMoved{_, +to}, +t}:
+      List.append(&2, Nat, to_ids(hot, to), moved_ids(t, hot))
+    case Con{_, +t}:
+      moved_ids(t, hot)
+
 # the agents an event changes (a rename: both names)
 def ev_names(e: M.Ev) -> List<&2, String>:
   match e:

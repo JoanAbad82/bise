@@ -43,17 +43,15 @@ type Msg is Data:
 type MRec is Data:
   MRec{msg: Msg, st: MSt, settled: Bool}
 
-# `place` and `pr`: what a card asks about, when it is a place's (the
-# ready-to-merge item: the place's id and the PR's number, pr-design §6.3)
+# `place`, `pr`: a place's card (ready to merge: its id, PR, pr-design §6.3)
 type Card is Data:
   Card{id: Nat, kind: String, agent: String, text: String,
     for_msg: Maybe<&2, Nat>, created: Nat, place: Maybe<&2, String>,
     pr: Maybe<&2, Nat>}
 
-# his answer to a card, as its close journals it (inbox-record): `said`
-# his words, `pick_n`/`pick` the option he picked by its number and its
-# words ("" none), `via` where he answered: "inbox", "thread", "page"
-# ("" none: not answered), `page`/`block` the page's question
+# his answer as a card's close journals it (inbox-record): `said`, the option
+# `pick_n`/`pick` ("" none), `via` inbox|thread|page ("" none), the page's
+# question `page`/`block`
 type Ans is Data:
   Ans{said: String, pick_n: Maybe<&2, Nat>, pick: String, via: String,
     page: String, block: String}
@@ -74,9 +72,8 @@ type St is Data:
     cards: List<&2, Card>, notes: List<&2, String>, next_msg: Nat,
     next_card: Nat, tm: TM.Tms, x: XH.Xs, paused: Maybe<&2, Nat>,
     old: List<&2, MRec>, gone: List<&2, G.Item>}
-# paused: the project's pause (cost-pause, hub/pause.bend), since that
-# ms; None: it runs. hot and old: the messages, split (issue 21, St.hot).
-# gone: the cards main withdrew he may still answer (hub/gone.bend)
+# paused: since that ms (pause.bend; None runs); hot/old: the messages split
+# (issue 21); gone: withdrawn cards he may still answer (gone.bend)
 
 type Ev is Data:
   ETaskCreated{name: String, parent: String, brief: J.Json, ws: J.Json, at: Nat}
@@ -89,26 +86,23 @@ type Ev is Data:
   EReported{name: String, report: J.Json}
   EFileTouched{name: String, path: String}
   ERenamed{name: String, new_name: String}
+  # name-free: a live agent's hot messages to its old name `from` (taken)
+  EMsgsMoved{from: String, to: String}
   EMsgSent{msg: Msg}
   EMsgState{id: Nat, st: MSt}
   ESettled{id: Nat}
   ECardOpened{card: Card}
-  # inbox-record (architect m_24257): `ans` his answer when he gave one
-  # (Ans.via "" when the card closed without him: `resolution` says why)
+  # `ans` his answer (via "": closed without him, `resolution` says why)
   ECardClosed{id: Nat, resolution: String, ans: Ans}
-  # the asker's thread position of the route line his answer became: a
-  # fact the shell knows once written, no state (law answer_pos_once)
+  # his answer's route line position in the asker's thread (answer_pos_once)
   ECardAnswerPos{card: Nat, agent: String, pos: Nat}
-  # withdrawn-answer (architect m_30039): main withdrew card `id` (`text`
-  # its question); his late answer to it delivered (hub/gone.bend)
+  # main withdrew card `id` (`text`), his late answer delivered (gone.bend)
   ECardWithdrawn{id: Nat, text: String}
   ECardLate{id: Nat}
   EMainNote{text: String, at: Nat}
   ENotesFlushed{}
-  # the timers of `sb every` (timers.bend): every_set, every_fired (an
-  # old line may say `undelivered`), every_run, every_stop, every_name
-  # (its name, from the hub's small model or its plain fallback;
-  # `announce`: it writes the ◷ set line its held timer waited for)
+  # `sb every`'s timers (timers.bend): set, fired, run, stop, name (its
+  # name; `announce`: the ◷ set line its held timer waited for)
   ETimerSet{t: TM.Timer, at: Nat}
   ETimerFired{id: Nat, fired: Nat, next: Nat, at: Nat, undelivered: Bool}
   ETimerRun{id: Nat, at: Nat}
@@ -118,19 +112,14 @@ type Ev is Data:
   # the acts' (timers.bend): one constructor each, their kinds inside
   EX{e: XH.XEv}
   EAct{e: TM.ActEv}
-  # bise desktop S10: someone follows the agent (or stops), and the end of
-  # a followed job (done or failed), journaled once: it turns follow off
-  # (one job per follow, law follow_one_shot). `hub`: the hub that asked
-  # (bise's home hub, through `sb follow <p>/<agent>`; "" this hub's own
-  # main or window): its end goes back there (J, law follow_hub_journaled)
+  # S10: a follow (or its stop), a followed job's end: follow off (law
+  # follow_one_shot); `hub` the asker, "" this hub (follow_hub_journaled)
   EFollow{name: String, on: Bool, hub: String}
   EJobEnd{name: String, state: String}
-  # event-wake: the watches of `sb wake` (wakes.bend), wake_set and
-  # wake_end (an older sb-core reads them as unknown: skipped)
+  # event-wake: `sb wake`'s watches (wakes.bend); an older core skips them
   EWake{e: WK.WkEv}
-  # cost-pause (hub/pause.bend): the project paused at `at`, resumed at
-  # `at`. An older sb-core reads them as unknown, skipped: after a
-  # rollback the project comes back unpaused
+  # cost-pause (pause.bend): paused, resumed at `at`; an older core skips
+  # them (after a rollback the project comes back unpaused)
   EPaused{at: Nat}
   EResumed{at: Nat}
 
@@ -213,9 +202,7 @@ def St.order(x: St) -> List<&2, String>:
     case St{_, +order, _, _, _, _, _, _, _, _, _, _}:
       order
 
-# the messages a step can still change or must read (MRec.is_hot:
-# queued, or owing a reply), ids ascending (their send order). The
-# walks (queued_for, unanswered_for, the pause's) read these only.
+# the hot messages (MRec.is_hot), ids ascending: what the walks read
 def St.hot(x: St) -> List<&2, MRec>:
   match x:
     case St{_, _, +hot, _, _, _, _, _, _, _, _, _}:
@@ -251,9 +238,8 @@ def St.x(x: St) -> XH.Xs:
     case St{_, _, _, _, _, _, _, _, +xs, _, _, _}:
       xs
 
-# every other message (cold: delivered, rejected or cancelled, owing
-# nothing), newest first (ids descending): a lookup by a recent id stops
-# near the head, and a message that turns cold goes in at the head
+# the cold messages, newest first (ids descending): a recent id is found
+# near the head, a message that turns cold goes in there
 def St.old(x: St) -> List<&2, MRec>:
   match x:
     case St{_, _, _, _, _, _, _, _, _, _, +old, _}:
@@ -477,10 +463,8 @@ def name_at(xs: List<&2, Agent>, +n: String) -> Bool:
     case Con{+h, _}:
       String.eq(Agent.name(h), n)
 
-# map_agent's walk: it stops at the agent (`hit`: name_at(xs, n)). Not
-# Bool.pick, which computes both branches: the op ran on every agent and
-# the walk went to the end of the list, at each agent event of a step and
-# of the boot's replay.
+# map_agent's walk: it stops at the agent (`hit`: name_at(xs, n)); a match,
+# not Bool.pick (both branches: every agent, at every agent event)
 def map_agent.go(xs: List<&2, Agent>, +hit: Bool, +n: String, +op: AgentOp) -> List<&2, Agent>:
   match xs hit:
     case Nil{} _:
@@ -525,6 +509,11 @@ def Msg.to(x: Msg) -> String:
     case Msg{_, _, _, +to, _, _, _, _, _, _, _, _, _}:
       to
 
+def MRec.to(+r: MRec, +to: String) -> MRec:
+  match r:
+    case MRec{Msg{+i, +th, +f, _, +rp, +e, +a, +tx, +c, +pl, +q, +v, +p}, +st, +se}:
+      MRec{Msg{i, th, f, to, rp, e, a, tx, c, pl, q, v, p}, st, se}
+
 def Msg.reply_to(x: Msg) -> Maybe<&2, Nat>:
   match x:
     case Msg{_, _, _, _, +reply_to, _, _, _, _, _, _, _, _}:
@@ -567,9 +556,7 @@ def Msg.expect(x: Msg) -> Bool:
 # the steps (unanswered_in) and the view (view.bend rec_json) both read it
 def MRec.owes(+r: MRec) -> Bool:
   Msg.expect(MRec.msg(r)) && Bool.not(MRec.settled(r)) && is_delivered(MRec.st(r))
-# a message a step can still change or must read (issue 21): queued, or
-# owing a reply. The one predicate of St.hot; its negation is "cold":
-# delivered, rejected or cancelled, and owing nothing.
+# queued, or owing a reply (issue 21): St.hot's one predicate; "cold" else
 def MRec.is_hot(+r: MRec) -> Bool:
   is_queued(MRec.st(r)) || MRec.owes(r)
 # the hot messages of `xs`, in their order
@@ -703,6 +690,21 @@ def settle_in(r: Maybe<&2, Nat>, +hot: List<&2, MRec>, +old: List<&2, MRec>, +fr
     case Some{+id}:
       settle_in.go(rec_in(hot, old, id), hot, old, id, from)
 
+# name-free (msgs_moved): a hot record to `from` goes to `to`, same id
+def moved.if(hit: Bool, +r: MRec, +to: String) -> MRec:
+  match hit:
+    case True{}:
+      MRec.to(r, to)
+    case False{}:
+      r
+
+def moved(xs: List<&2, MRec>, +from: String, +to: String) -> List<&2, MRec>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+r, +t}:
+      moved.if(MRec.is_hot(r) && String.eq(Msg.to(MRec.msg(r)), from), r, to) <> moved(t, from, to)
+
 def apply(+st: St, e: Ev) -> St:
   match st:
     case St{+agents, +order, +hot, +cards, +notes, +nm, +nc, +tm, +xs, +pz, +old, +gone}:
@@ -727,6 +729,8 @@ def apply(+st: St, e: Ev) -> St:
           St{map_agent(agents, name, OFile{path}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
         case ERenamed{+name, +nn}:
           St{map_agent(strip(agents, nn), name, ORename{nn}), NM.rename_in(order, name, nn), hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
+        case EMsgsMoved{+from, +to}:
+          St{agents, order, moved(hot, from, to), cards, notes, nm, nc, tm, xs, pz, old, gone}
         # the three message events, on the split (law cold_is_inert: on
         # every message, the same as one list's snoc, map_msg, settle)
         case EMsgSent{+m}:
@@ -788,8 +792,7 @@ def apply_all(evs: List<&2, Ev>, +st: St) -> St:
 def card_of(xs: List<&2, Card>, +id: Nat) -> Maybe<&2, Card>:
   find(~Card, ~Nat, ~Card.id, ~(a => b => Nat.is_eq(a, b)), xs, id)
 
-# queued_in's step: `q` (is the message queued) is matched first, most
-# messages are delivered; only a queued one is compared with the names
+# queued_in's step: `q` first (most are delivered), then the names
 def queued_in.keep(q: Bool, +ns: List<&2, String>, +m: Msg, +rest: List<&2, Msg>) -> List<&2, Msg>:
   match q:
     case True{}:
@@ -811,8 +814,7 @@ def names_of.go(m: Maybe<&2, Agent>) -> List<&2, String>:
     case Some{+a}:
       Agent.aliases(a)
 
-# an agent's names: its own and its old ones (a message sent before a
-# rename is still for it)
+# an agent's names: its own and its old ones (until another agent takes one)
 def names_of(+st: St, +n: String) -> List<&2, String>:
   n <> names_of.go(get_agent(st, n))
 
@@ -905,9 +907,8 @@ def Msg.via(x: Msg) -> Maybe<&2, String>:
     case Msg{_, _, _, _, _, _, _, _, _, _, _, +via, _}:
       via
 
-# his message's parts (msg-parts): the clients' JSON (bise_proto::parts),
-# opaque here, "" for none; sb-core never decides on them, it keeps them
-# with the message and writes them at its delivery (deliver.line)
+# his message's parts (msg-parts, bise_proto::parts' JSON, "" none): kept
+# opaque, written at its delivery (deliver.line)
 def Msg.parts(x: Msg) -> String:
   match x:
     case Msg{_, _, _, _, _, _, _, _, _, _, _, _, +parts}:

@@ -12,8 +12,9 @@
 #    name or ends, so nothing that grants or owes passes to the new `n`:
 #    pages' and artifacts' agent (fx retarget, the shell rewrites them),
 #    open cards (closed, opened again for the holder), timers and watches
-#    (stopped, set again for the holder), queued messages (refused: the
-#    user's said undelivered) and replies owed (settled).
+#    (stopped, set again for the holder). Messages: a live holder's queued
+#    ones and replies owed move to it (msgs_moved, same ids); an archived
+#    holder's are refused (the user's said undelivered) and settled.
 # 3. The take's own event (task_created, renamed) strips `n` from the
 #    holder's old names (model.bend apply: law names_apart).
 # Cold messages keep their names: they are history.
@@ -25,6 +26,8 @@ import Base
 import ../vendor/json.bend as J
 
 import ./model.bend as M
+
+import ./lazy.bend as LZ
 
 import ./cx.bend as X
 
@@ -115,6 +118,32 @@ def take.watches(-o: M.St, ws: List<&2, WK.Watch>, +cx: X.Cx<o>, +h: String, +wh
       +id = {1n+WK.Wakes.last_id(TM.Tms.wk(M.St.tm(X.d(o, cx2)))) : Nat}
       take.watches(o, rest, X.emit(o, cx2, M.EWake{WK.WSet{WK.moved(w, h, id)}}, Unit{}, Unit{}, Unit{}), h, why)
 
+# a hot message to `n` (the records model.bend `moved` rewrites)
+def hot_to(xs: List<&2, M.MRec>, +n: String) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case Con{+r, +t}:
+      LZ.or(M.MRec.is_hot(r) && String.eq(M.Msg.to(M.MRec.msg(r)), n), u => hot_to(t, n))
+
+# a live holder's queued messages and owed replies to `n` were meant for it
+# (architect m_31494): msgs_moved, same ids, never an empty one
+def take.moved(-o: M.St, hit: Bool, +cx: X.Cx<o>, +n: String, +h: String) -> X.Cx<o>:
+  match hit:
+    case False{}:
+      cx
+    case True{}:
+      X.emit(o, cx, M.EMsgsMoved{n, h}, Unit{}, Unit{}, Unit{})
+
+# an archived holder's own were closed by the archive: refused, settled
+def take.msgs(-o: M.St, live: Bool, +cx: X.Cx<o>, +n: String, +h: String) -> X.Cx<o>:
+  match live:
+    case True{}:
+      take.moved(o, hot_to(M.St.hot(X.d(o, cx)), n), cx, n, h)
+    case False{}:
+      +hot = M.St.hot(X.d(o, cx))
+      take.owed(o, M.unanswered_in(hot, [n]), take.queued(o, M.queued_in(hot, [n]), cx))
+
 # `h` held `n` as an old name: what still says `n` is h's, or ends
 def take.held(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   match m:
@@ -124,7 +153,7 @@ def take.held(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +n: String) -> X.Cx<
       +s = X.d(o, cx)
       +why = String.concat(["its old name @", n, " went to another agent: now under @", h])
       +cx2 = X.out(o, cx, J.obj(F.retarget(n, h)))
-      +cx3 = take.owed(o, M.unanswered_in(M.St.hot(s), [n]), take.queued(o, M.queued_in(M.St.hot(s), [n]), cx2))
+      +cx3 = take.msgs(o, M.live_agent(M.get_agent(s, h)), cx2, n, h)
       +cx4 = take.cards(o, M.St.cards(s), cx3, n, h)
       +cx5 = take.timers(o, TM.of_name(TM.Tms.live(M.St.tm(s)), n), cx4, h, why)
       take.watches(o, WK.of_name(WK.Wakes.live(TM.Tms.wk(M.St.tm(s))), n), cx5, h, why)

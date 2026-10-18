@@ -395,6 +395,8 @@ def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, 
           u
         case HM.ERenamed{a, b}:
           u
+        case HM.EMsgsMoved{a, b}:
+          u
         case HM.EMsgSent{m}:
           u
         case HM.EMsgState{a, b}:

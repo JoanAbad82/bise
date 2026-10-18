@@ -917,6 +917,37 @@ law cold_is_inert:
   for k: HX.FreshEv(s, e)
   {HM.every(HM.apply(s, e)) == HI.apply1(HM.every(s), e) : List<&2, HM.MRec>}
 
+# LAW (name-free, architect m_31494): a take of `n`, an old name of a live
+# agent `h`, moves its queued messages to `n` to `h` (msgs_moved): queued
+# still, same id, now to `h`...
+law take_moves_live_queued:
+  for +r: HM.MRec
+  for +n: String
+  for +h: String
+  for q: {HM.is_queued(HM.MRec.st(r)) == True{} : Bool}
+  for e: {String.eq(HM.Msg.to(HM.MRec.msg(r)), n) == True{} : Bool}
+  HX.Both<{HM.moved([r], n, h) == [HM.MRec.to(r, h)] : List<&2, HM.MRec>}, HX.Both<{HM.MRec.id(HM.MRec.to(r, h)) == HM.MRec.id(r) : Nat},
+    HX.Both<{HM.is_queued(HM.MRec.st(HM.MRec.to(r, h))) == True{} : Bool}, {HM.Msg.to(HM.MRec.msg(HM.MRec.to(r, h))) == h : String}>>>
+
+# ...and the replies owed to `n`: still owed, same id, now by `h`...
+law take_moves_live_owed:
+  for +r: HM.MRec
+  for +n: String
+  for +h: String
+  for o: {HM.MRec.owes(r) == True{} : Bool}
+  for e: {String.eq(HM.Msg.to(HM.MRec.msg(r)), n) == True{} : Bool}
+  HX.Both<{HM.moved([r], n, h) == [HM.MRec.to(r, h)] : List<&2, HM.MRec>}, HX.Both<{HM.MRec.id(HM.MRec.to(r, h)) == HM.MRec.id(r) : Nat},
+    HX.Both<{HM.MRec.owes(HM.MRec.to(r, h)) == True{} : Bool}, {HM.Msg.to(HM.MRec.msg(HM.MRec.to(r, h))) == h : String}>>>
+
+# ...and msgs_moved replays to the same hot side, on every message too.
+law msgs_moved_replays:
+  for +s: HM.St
+  for +n: String
+  for +h: String
+  for u: HI.Split(s)
+  HX.Both<{HM.St.hot(HM.apply(s, HM.EMsgsMoved{n, h})) == HM.moved(HM.St.hot(s), n, h) : List<&2, HM.MRec>},
+    {HM.every(HM.apply(s, HM.EMsgsMoved{n, h})) == HM.moved(HM.every(s), n, h) : List<&2, HM.MRec>}>
+
 # LAW: on a split state, each walk over the hot side reads what it
 # would read over every message: the cold ones are inert. The queues...
 law hot_queued_for:

@@ -23,6 +23,7 @@ import ./lib/hub-cold.bend as PLC
 import ./lib/hub-cold-2.bend as PLC2
 import ./lib/hub-cold-3.bend as PLC3
 import ./lib/hub-cold-4.bend as PLC4
+import ./lib/hub-cold-5.bend as PLC5
 import ../hub/cold.bend as CO
 import ../laws/hub.bend as Laws
 
@@ -594,6 +595,17 @@ def Laws.ids_ascending(s, u):
 
 def Laws.cold_is_inert(s, e, u, k):
   PLC4.hc_every_apply(s, e, u, PLC4.hc_fresh_ge(s, e, k))
+
+def Laws.take_moves_live_queued(r, n, h, q, e):
+  PLC5.hm_live_queued(r, n, h, q, e)
+
+def Laws.take_moves_live_owed(r, n, h, o, e):
+  PLC5.hm_live_owed(r, n, h, o, e)
+
+def Laws.msgs_moved_replays(s, n, h, u):
+  match s:
+    case HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol, gn}:
+      HX.Both{{==}, PLC4.hc_every_apply(HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol, gn}, HM.EMsgsMoved{n, h}, u, Unit{})}
 
 # a cold message owes no reply (PL3.hub_or_false_l: and is not queued)
 def hub_or_false_r(+x: Bool, -y: Bool, e: {Bool.or(x, y) == False{} : Bool}) -> {y == False{} : Bool}:

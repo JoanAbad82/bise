@@ -14,6 +14,7 @@ import ./hub-1.bend as PL1
 import ./hub-cold.bend as PC1
 import ./hub-cold-2.bend as PC2
 import ./hub-cold-3.bend as PC3
+import ./hub-cold-5.bend as PC5
 
 # ---- every message after an event: the one-list event, and the split kept ----
 
@@ -178,6 +179,8 @@ def hc_apply(+s: HM.St, e: HM.Ev, sp: HI.Split(s), k: hc_GeEv(s, e)) -> hc_StOk(
           HX.Both{{==}, sp}
         case HM.ERenamed{a, b}:
           HX.Both{{==}, sp}
+        case HM.EMsgsMoved{f, t}:
+          PC5.hm_split(ho, ol, nm, f, t, sp)
         case HM.EMsgSent{m}:
           hc_sent(ho, ol, nm, m, sp, k)
         case HM.EMsgState{id, x}:
@@ -273,6 +276,8 @@ def hc_fresh_ge(+s: HM.St, e: HM.Ev, k: HX.FreshEv(s, e)) -> hc_GeEv(s, e):
       Unit{}
     case HM.ERenamed{a, b}:
       Unit{}
+    case HM.EMsgsMoved{a, b}:
+      Unit{}
     case HM.EMsgState{id, x}:
       Unit{}
     case HM.ESettled{id}:
@@ -358,6 +363,8 @@ def hc_replay_ge(+st: HM.St, e: HM.Ev, ok: {CO.replay_fresh(st, e) == True{} : B
     case HM.EFileTouched{a, b}:
       Unit{}
     case HM.ERenamed{a, b}:
+      Unit{}
+    case HM.EMsgsMoved{a, b}:
       Unit{}
     case HM.ECardOpened{c}:
       Unit{}
@@ -453,6 +460,9 @@ def hc_kept1(+xs: List<&2, HM.MRec>, e: HM.Ev) -> HI.IsPrefix(HI.ids(xs), HI.ids
     case HM.EFileTouched{a, b}:
       PL1.hub_prefix_refl(HI.ids(xs))
     case HM.ERenamed{a, b}:
+      PL1.hub_prefix_refl(HI.ids(xs))
+    case HM.EMsgsMoved{+f, +t}:
+      %Equal.sym(List<&2, Nat>, HI.ids(HM.moved(xs, f, t)), HI.ids(xs), PC5.hm_ids(xs, f, t)) : HI.IsPrefix(HI.ids(xs), _)
       PL1.hub_prefix_refl(HI.ids(xs))
     case HM.ECardOpened{c}:
       PL1.hub_prefix_refl(HI.ids(xs))

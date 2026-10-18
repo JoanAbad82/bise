@@ -47,6 +47,9 @@ def FileTouched.of(+i: J.Json) -> Maybe<&2, M.Ev>:
 def Renamed.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.ERenamed{K.get_s(i, "name"), K.get_s(i, "new_name")}}
 
+def MsgsMoved.of(+i: J.Json) -> Maybe<&2, M.Ev>:
+  Some{M.EMsgsMoved{K.get_s(i, "from"), K.get_s(i, "to")}}
+
 def MsgSent.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EMsgSent{C.msg_of(K.get_j(i, "msg"))}}
 
@@ -348,16 +351,16 @@ def of.t22(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case LT{}:
       None{}
     case EQ{}:
-      Paused.of(i)
+      MsgsMoved.of(i)
     case GT{}:
       None{}
 
 def of.t23(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t22(String.order(t, "paused"), t, i)
+      of.t22(String.order(t, "msgs_moved"), t, i)
     case EQ{}:
-      Renamed.of(i)
+      Paused.of(i)
     case GT{}:
       None{}
 
@@ -366,43 +369,43 @@ def of.t25(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case LT{}:
       None{}
     case EQ{}:
-      Resumed.of(i)
+      Reported.of(i)
     case GT{}:
       None{}
 
 def of.t26(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t25(String.order(t, "resumed"), t, i)
+      of.t25(String.order(t, "reported"), t, i)
     case EQ{}:
-      RouteCancelled.of(i)
+      Resumed.of(i)
     case GT{}:
       None{}
 
 def of.t24(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t23(String.order(t, "renamed"), t, i)
+      of.t23(String.order(t, "paused"), t, i)
     case EQ{}:
-      Reported.of(i)
+      Renamed.of(i)
     case GT{}:
-      of.t26(String.order(t, "route_cancelled"), t, i)
+      of.t26(String.order(t, "resumed"), t, i)
 
 def of.t28(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
       None{}
     case EQ{}:
-      RouteSent.of(i)
+      RouteHeld.of(i)
     case GT{}:
       None{}
 
 def of.t29(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t28(String.order(t, "route_sent"), t, i)
+      of.t28(String.order(t, "route_held"), t, i)
     case EQ{}:
-      RouteSet.of(i)
+      RouteSent.of(i)
     case GT{}:
       None{}
 
@@ -411,43 +414,43 @@ def of.t31(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case LT{}:
       None{}
     case EQ{}:
-      TaskCreated.of(i)
+      Snapshot.of(i)
     case GT{}:
       None{}
 
 def of.t30(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t29(String.order(t, "route_set"), t, i)
+      of.t29(String.order(t, "route_sent"), t, i)
     case EQ{}:
-      Snapshot.of(i)
+      RouteSet.of(i)
     case GT{}:
-      of.t31(String.order(t, "task_created"), t, i)
+      of.t31(String.order(t, "snapshot"), t, i)
 
 def of.t27(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t24(String.order(t, "reported"), t, i)
+      of.t24(String.order(t, "renamed"), t, i)
     case EQ{}:
-      RouteHeld.of(i)
+      RouteCancelled.of(i)
     case GT{}:
-      of.t30(String.order(t, "snapshot"), t, i)
+      of.t30(String.order(t, "route_set"), t, i)
 
 def of.t33(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
       None{}
     case EQ{}:
-      WakeSet.of(i)
+      WakeEnd.of(i)
     case GT{}:
       None{}
 
 def of.t34(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t33(String.order(t, "wake_set"), t, i)
+      of.t33(String.order(t, "wake_end"), t, i)
     case EQ{}:
-      Workspace.of(i)
+      WakeSet.of(i)
     case GT{}:
       None{}
 
@@ -456,6 +459,15 @@ def of.t36(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case LT{}:
       None{}
     case EQ{}:
+      Placed.of(i)
+    case GT{}:
+      None{}
+
+def of.t37(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+  match c:
+    case LT{}:
+      of.t36(String.order(t, "worktree_placed"), t, i)
+    case EQ{}:
       XAcked.of(i)
     case GT{}:
       None{}
@@ -463,13 +475,13 @@ def of.t36(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
 def of.t35(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t34(String.order(t, "workspace_changed"), t, i)
+      of.t34(String.order(t, "wake_set"), t, i)
     case EQ{}:
-      Placed.of(i)
+      Workspace.of(i)
     case GT{}:
-      of.t36(String.order(t, "x_acked"), t, i)
+      of.t37(String.order(t, "x_acked"), t, i)
 
-def of.t38(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t39(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
       None{}
@@ -478,16 +490,16 @@ def of.t38(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case GT{}:
       None{}
 
-def of.t39(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t40(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t38(String.order(t, "x_in"), t, i)
+      of.t39(String.order(t, "x_in"), t, i)
     case EQ{}:
       XOut.of(i)
     case GT{}:
       None{}
 
-def of.t41(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t42(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
       None{}
@@ -496,32 +508,32 @@ def of.t41(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case GT{}:
       None{}
 
-def of.t40(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t41(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t39(String.order(t, "x_out"), t, i)
+      of.t40(String.order(t, "x_out"), t, i)
     case EQ{}:
       XReplied.of(i)
     case GT{}:
-      of.t41(String.order(t, "x_settled"), t, i)
+      of.t42(String.order(t, "x_settled"), t, i)
 
-def of.t37(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
+def of.t38(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t35(String.order(t, "worktree_placed"), t, i)
+      of.t35(String.order(t, "workspace_changed"), t, i)
     case EQ{}:
       XFailed.of(i)
     case GT{}:
-      of.t40(String.order(t, "x_replied"), t, i)
+      of.t41(String.order(t, "x_replied"), t, i)
 
 def of.t32(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
     case LT{}:
-      of.t27(String.order(t, "route_held"), t, i)
+      of.t27(String.order(t, "route_cancelled"), t, i)
     case EQ{}:
-      WakeEnd.of(i)
+      TaskCreated.of(i)
     case GT{}:
-      of.t37(String.order(t, "x_failed"), t, i)
+      of.t38(String.order(t, "x_failed"), t, i)
 
 def of.t21(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   match c:
@@ -530,9 +542,9 @@ def of.t21(c: Cmp, +t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
     case EQ{}:
       MsgState.of(i)
     case GT{}:
-      of.t32(String.order(t, "wake_end"), t, i)
+      of.t32(String.order(t, "task_created"), t, i)
 
-# the record of a tag (a binary search over the 42 sorted tags); any
+# the record of a tag (a binary search over the 43 sorted tags); any
 # other tag: None
 def of_tag(+t: String, +i: J.Json) -> Maybe<&2, M.Ev>:
   of.t21(String.order(t, "message_state"), t, i)
@@ -563,6 +575,8 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("type", J.JStr{"file_touched"}), J.kv("name", J.JStr{name}), J.kv("path", J.JStr{path})]
     case M.ERenamed{+name, +new_name}:
       [J.kv("type", J.JStr{"renamed"}), J.kv("name", J.JStr{name}), J.kv("new_name", J.JStr{new_name})]
+    case M.EMsgsMoved{+from, +to}:
+      [J.kv("type", J.JStr{"msgs_moved"}), J.kv("from", J.JStr{from}), J.kv("to", J.JStr{to})]
     case M.EMsgSent{+msg}:
       [J.kv("type", J.JStr{"message_sent"}), J.kv("msg", C.msg_json(msg))]
     case M.EMsgState{+id, +state}:

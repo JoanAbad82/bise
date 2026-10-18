@@ -147,6 +147,8 @@ def Laws.gone_bound_after_apply(s, e, h):
           h
         case HM.ERenamed{a, b}:
           h
+        case HM.EMsgsMoved{a, b}:
+          h
         case HM.EMsgSent{a}:
           h
         case HM.EMsgState{a, b}:

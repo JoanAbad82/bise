@@ -116,6 +116,39 @@ fn a_rename_takes_a_freed_old_name_and_its_holder_keeps_its_things() {
 }
 
 #[test]
+fn a_live_holders_queued_and_owed_messages_move_to_it() {
+    let mut t = T::new();
+    t.spawn_task("marketing");
+    // idle: main's question is delivered, marketing owes the reply...
+    t.go(Input::ReplIdle { agent: "marketing".into(), leftover: false });
+    let send = |t: &mut T, text: &str, expect: bool| {
+        let (tok, fx) = t.req(
+            MAIN,
+            // the second one waits for the turn's end (queued mode)
+            AgentReq::Send { to: "marketing".into(), text: text.into(), expect_reply: expect, reply_to: None, queued: !expect, why: String::new(), switch: None, parts: String::new() },
+        );
+        assert!(reply(&fx, tok).is_some(), "{fx:?}");
+        t.hub.st.msgs().values().find(|m| m.text == text).unwrap().id
+    };
+    let owed = send(&mut t, "status?", true);
+    // ...and busy with it: the next one waits in its queue
+    let queued = send(&mut t, "later", false);
+    assert!(t.hub.st.hot().any(|(m, h)| m.id == queued && h.queued), "queued before the take");
+    ren(&mut t, "marketing", "design");
+    t.spawn_task("launch");
+    let n = t.journal.borrow().len();
+    ren(&mut t, "launch", "marketing");
+    let lines: Vec<_> = t.journal.borrow()[n..].to_vec();
+    assert!(lines.iter().any(|j| j["type"] == "msgs_moved" && j["from"] == "marketing" && j["to"] == "design"), "{lines:?}");
+    let ended = |id: u64| lines.iter().any(|j| j["id"] == id && (j["type"] == "message_settled" || j["type"] == "message_state"));
+    assert!(!ended(owed) && !ended(queued), "neither refused nor settled: {lines:?}");
+    // same ids, now to design, still hot (owed, queued)
+    let hot: Vec<_> = t.hub.st.hot().map(|(m, h)| (m.id, m.to.clone(), h.queued, h.owes)).collect();
+    assert!(hot.contains(&(owed, "design".into(), false, true)), "{hot:?}");
+    assert!(hot.contains(&(queued, "design".into(), true, false)), "{hot:?}");
+}
+
+#[test]
 fn a_card_under_the_old_name_moves_to_its_holder() {
     let mut t = T::new();
     let (_, card) = docs_question_card(&mut t);

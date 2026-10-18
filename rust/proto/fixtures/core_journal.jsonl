@@ -7,6 +7,7 @@
 {"type":"reported","name":"docs","report":{"kind":"done","summary":"the page is up"}}
 {"type":"file_touched","name":"docs","path":"docs/index.md"}
 {"type":"renamed","name":"docs","new_name":"docs-site"}
+{"type":"msgs_moved","from":"marketing","to":"design"}
 {"type":"message_sent","msg":{"id":7,"thread":7,"from":"user","to":"main","reply_to":null,"expect_reply":true,"auto":false,"text":"ship the docs","created_ms":1000100,"plain":false,"queued":true,"via":"desktop","parts":"[]"}}
 {"type":"message_state","id":7,"state":"queued","reason":"main is busy"}
 {"type":"message_settled","id":7}

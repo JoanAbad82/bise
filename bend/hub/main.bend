@@ -77,7 +77,7 @@ def answer.go(need: Maybe<&2, J.Json>, +h: H.Hub, +fx: List<&2, X.Fx>, +before: 
       (h, J.stringify(L.answer_need(q)))
     case None{}:
       (h, J.stringify(L.answer_step(fxs_json(fx), X.R.dirty(H.Hub.r(h)),
-        V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), False{}, V.touched(X.journal(fx)),
+        V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), False{}, List.append(&2, Nat, V.touched(X.journal(fx)), V.moved_ids(X.journal(fx), M.St.hot(H.Hub.d(h)))),
           List.append(&2, String, V.changed(X.journal(fx), before, X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h))), V.fx_names(fx)),
           X.journal(fx)),
         SD.said_id(SD.said(X.journal(fx))),
