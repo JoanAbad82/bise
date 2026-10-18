@@ -76,6 +76,9 @@ interface Probe {
 const PAPER = { light: '#f2ede2', dark: '#171513' } as const;
 /** the frame rate while nothing of his moves and the camera holds (designer: 30 when the page is idle) */
 const IDLE_MS = 1000 / 30;
+/** 'ready' on the first frame after the warm one this cheap, ms, or READY_WAIT frames after it at most */
+const READY_MS = 30;
+const READY_WAIT = 4;
 /** the night's light on a dark page, times the app's (bims m_31057: the town sank into the page) */
 const NIGHT_LIFT = 1.25;
 /** where a word over a bim may sit, fractions of the box's width (the left fades into the page's text) */
@@ -106,6 +109,8 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   /** the film's clock runs: from the frame after 'ready' (a check's startT: at once) */
   let started = reduced || opts.startT !== undefined;
   let warmed = false;
+  /** frames since the warm one (-1: none yet): 'ready' waits for a cheap one */
+  let sinceWarm = -1;
   const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced });
   const overlay = makeOverlay(box);
   const feed = makeFeed(box);
@@ -388,9 +393,13 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     page.draw(T);
     stamped(T);
     const t4 = performance.now();
-    // ready (the page drops its still): the frame after the warm one (the GPU catches up on it
-    // under the still: a 75 ms frame in dark), the build's t = 0 the frame after
-    if (box.dataset.ready !== 'true' && !warmFrame) {
+    // ready (the page drops its still): the first cheap frame after the warm one, at most READY_WAIT
+    // frames on (the GPU catches up on the warm frame under the still: a 56-96 ms frame after it, on
+    // a quiet M1), the clock starts the frame after
+    if (warmFrame) sinceWarm = 0;
+    else if (sinceWarm >= 0) sinceWarm++;
+    const cheap = performance.now() - t0 <= READY_MS;
+    if (box.dataset.ready !== 'true' && !warmFrame && (reduced || sinceWarm < 0 || cheap || sinceWarm >= READY_WAIT)) {
       box.dataset.ready = 'true';
       emit('ready');
     }
