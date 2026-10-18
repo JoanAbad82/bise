@@ -10,6 +10,10 @@ import type { Pastime, Pose, Pt, Segment } from './model';
 import { FEATURE_STAGE, type Feature, clearAt, has, portIn, portOut, route, routerBuilds, stairsEntry, surfaceAt } from './parkpath';
 import { makePath } from './paths';
 import { skateRig } from './render/skate';
+
+/** one event-loop turn: vitest's worker reads its RPC replies only between macrotasks, and a
+ *  file that runs 60 s without one fails with 'Timeout calling onTaskUpdate' (a loaded machine) */
+const turn = (): Promise<void> => new Promise((done) => { setTimeout(done, 0); });
 import { LINE_MAX, LINE_MIN, SESSION_S, lineOf, skateAt } from './skate';
 
 /** the board's half width: its middle stays this far from a piece's side unless over its top */
@@ -95,7 +99,7 @@ describe('the park', () => {
     expect(surfaceAt(park, 9, end.x, end.z)).toBeCloseTo(park.stairs.h, 6);
   });
 
-  it("no board in a piece: every stage's lines, both skaters, the 900 and the pool session", { timeout: 120_000 }, () => {
+  it("no board in a piece: every stage's lines, both skaters, the 900 and the pool session", { timeout: 120_000 }, async () => {
     const bad: string[] = [];
     for (const o of offices) {
       for (let stage = 0; stage <= 14; stage++) {
@@ -103,6 +107,7 @@ describe('the park', () => {
           const p: Pastime = { kind: 'skate', slot, pool: false, nine: false, stage };
           for (let n = 0; n < 6; n++) bad.push(...ride(o, `bim${String(slot)}${String(stage)}`, n, p));
         }
+        await turn();
       }
       for (let n = 0; n < 6; n++) bad.push(...ride(o, 'nine', n * 3, { kind: 'skate', slot: 0, pool: false, nine: true, stage: 14 }));
       for (let slot = 0; slot < o.park.spots.length; slot++) bad.push(...ride(o, `pool${String(slot)}`, 0, { kind: 'skate', slot, pool: true, nine: false, stage: 11 }));

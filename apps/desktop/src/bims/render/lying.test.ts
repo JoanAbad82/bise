@@ -20,6 +20,10 @@ import { STYLE } from './style';
 /** what a head may graze (float noise, a hat's edge) */
 const SLACK = 0.02;
 
+/** one event-loop turn: vitest's worker reads its RPC replies only between macrotasks, and a
+ *  file that runs 60 s without one fails with 'Timeout calling onTaskUpdate' (a loaded machine) */
+const turn = (): Promise<void> => new Promise((done) => { setTimeout(done, 0); });
+
 /** the head's box of a bim posed with `act` at `spot`, world units */
 function headBox(spot: Spot, act: Activity): Box3 {
   const bim = makeBim('agent-1', false, STYLE);
@@ -61,11 +65,14 @@ function hits(o: Office, stage: number): string[] {
 
 describe('lying: no napper lays its head in the furniture', () => {
   for (const id of readyMaps()) {
-    it(`${id}: every bed, stages 0..${String(LAST_STAGE)}, 3 and 20 agents`, () => {
+    it(`${id}: every bed, stages 0..${String(LAST_STAGE)}, 3 and 20 agents`, async () => {
       const out: string[] = [];
       for (const n of [3, 20]) {
         const o = layoutOf(crowd(n).agents, id);
-        for (let stage = 0; stage <= LAST_STAGE; stage++) out.push(...hits(o, stage).map((h) => `${String(n)} agents, ${h}`));
+        for (let stage = 0; stage <= LAST_STAGE; stage++) {
+          out.push(...hits(o, stage).map((h) => `${String(n)} agents, ${h}`));
+          await turn();
+        }
       }
       expect(out).toEqual([]);
       // 30 worlds built per map: seconds alone, more on a loaded machine
