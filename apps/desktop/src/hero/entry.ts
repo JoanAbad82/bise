@@ -214,14 +214,16 @@ export function makeEntry(): Entry {
       box.getSize(size);
       box.getCenter(centre);
       const m: Mesh | null = o instanceof Mesh ? (o as Mesh) : null;
-      if (m && size.x >= lawnW * 0.9 && !Array.isArray(m.material)) {
-        // the floating block: drawn as its cubes while they rise, itself again once settled
-        slabs.push(m);
-        continue;
-      }
+      // flat things first: the road, the river and its banks cross the whole lawn too, and as cubes
+      // they covered the grass (the build's lawn read grey, then jumped to green when it settled)
       if (m && size.y < 0.1 && !Array.isArray(m.material)) {
         // a road, the river, a dash, a path, a paving: each vertex rides its cube up
         m.material = riding(m.material);
+        continue;
+      }
+      if (m && size.x >= lawnW * 0.9 && !Array.isArray(m.material)) {
+        // the floating block (its dirt, its grass): drawn as its cubes while they rise, itself again once settled
+        slabs.push(m);
         continue;
       }
       const cc = cellOf(lawn, centre.x, centre.z);

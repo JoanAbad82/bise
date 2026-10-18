@@ -17,7 +17,7 @@ import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
 import { BUBBLE_S, BUBBLES, CAST, FOLD_S, PAGE, REDUCED_T, SHOTS, STAMP, type Bubble, type Shot } from './cast';
 import { makeFeed } from './feed';
-import { makePage } from './page';
+import { makePage, type KilnLoader } from './page';
 import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
 import { ENTRY, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
@@ -40,6 +40,8 @@ export interface FilmOpts {
   readonly entryAt?: number;
   /** with the probe: no loop, the check draws each frame (probe.step) */
   readonly manual?: boolean;
+  /** kiln's shop, its own chunk, loaded by the entry (hero.ts: both lazy imports there keep the entry whole) */
+  readonly kiln?: KilnLoader;
   /** the visitor took the camera ('control'), the film took it back ('film'); the first frame is drawn ('ready'); no WebGL ('lost') */
   readonly on?: (e: 'control' | 'film' | 'ready' | 'lost') => void;
 }
@@ -115,7 +117,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   const overlay = makeOverlay(box);
   const feed = makeFeed(box);
   // a click in the shop takes the camera, as a drag would (bims-film v13)
-  const page = makePage(overlay.root, dark ? 'dark' : 'light', () => {
+  const page = makePage(overlay.root, dark ? 'dark' : 'light', opts.kiln ?? null, () => {
     lastTouch = wall();
     setHands({ k: 'visitor', last: wall(), follow: null });
   });

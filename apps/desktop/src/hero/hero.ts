@@ -112,6 +112,7 @@ export function mount(el: HTMLElement, opts: MountOpts = {}): HeroTown {
           ...(q.has('herot') ? { startT: Number(q.get('herot')) } : {}),
           ...(q.has('herobuild') ? { entryAt: Number(q.get('herobuild')) } : {}),
           manual: q.has('herostep'),
+          kiln: () => import('./kiln/kiln'),
           on: emit,
         });
         for (const f of later.splice(0)) f(film);

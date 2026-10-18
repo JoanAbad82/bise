@@ -48,8 +48,9 @@ export default defineConfig({
       preserveEntrySignatures: 'exports-only',
       output: {
         entryFileNames: '[name].js',
-        // a stable name: the page preloads it in its <head> (design's hero-entry §1)
-        chunkFileNames: 'film.js',
+        // stable names: the page preloads film.js in its <head> (design's hero-entry §1); kiln.js is
+        // the shop of scenario A's end (kiln-app), loaded by the entry a few seconds before it rises
+        chunkFileNames: (c) => (c.name === 'kiln' ? 'kiln.js' : 'film.js'),
         format: 'es',
       },
     },

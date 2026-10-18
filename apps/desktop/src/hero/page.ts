@@ -7,6 +7,9 @@
 import { FILM_S, PAGE } from './cast';
 import type { Kiln, KilnSize } from './kiln/kiln';
 
+/** kiln's chunk, loaded by the entry (hero.ts): the film never imports it itself, so the entry stays whole */
+export type KilnLoader = () => Promise<typeof import('./kiln/kiln')>;
+
 /** the page's share of the town box's width at most, its centre across and down (designer m_31640) */
 export const PAGE_W_MAX = 0.55;
 const CENTRE = { x: 0.58, y: 0.46 } as const;
@@ -49,8 +52,8 @@ export interface PageView {
   dispose(): void;
 }
 
-/** The page, its shop loaded a while before it rises; `touch`: he clicked it. */
-export function makePage(root: HTMLElement, theme: 'light' | 'dark', touch: () => void): PageView {
+/** The page, its shop loaded a while before it rises (no loader: no page); `touch`: he clicked it. */
+export function makePage(root: HTMLElement, theme: 'light' | 'dark', loader: KilnLoader | null, touch: () => void): PageView {
   const el = document.createElement('div');
   el.className = 'bh-page';
   el.style.visibility = 'hidden';
@@ -62,9 +65,9 @@ export function makePage(root: HTMLElement, theme: 'light' | 'dark', touch: () =
   let dark = theme === 'dark';
 
   const load = (): void => {
-    if (loading) return;
+    if (loading || loader === null) return;
     loading = true;
-    void import('./kiln/kiln').then(({ makeKiln }) => {
+    void loader().then(({ makeKiln }) => {
       const k = makeKiln({ theme: dark ? 'dark' : 'light' });
       k.on('touch', touch);
       el.append(k.el);
