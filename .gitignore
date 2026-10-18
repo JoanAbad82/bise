@@ -46,6 +46,8 @@ auth.json
 *.pem
 *.key
 *.p12
+# a throwaway self-signed localhost certificate for the TLS fake (test-install.sh)
+!tests/fixtures/tls/*.pem
 events.jsonl
 !tests/fixtures/**/events.jsonl
 

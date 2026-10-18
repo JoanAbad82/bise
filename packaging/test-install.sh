@@ -10,7 +10,8 @@
 # login (key file), a single-agent session start (--headless, scripted
 # and live), one headless turn answered by tests/fake_provider.py (the
 # installed REPL calls a provider and answers; needs python3, nothing
-# leaves the machine), the Switchboard hub start / sb list / stop on a
+# leaves the machine), the same turn over HTTPS (the runtime's TLS loads
+# OpenSSL 3: libssl.3 from Homebrew on macOS, libssl.so.3 on Linux), the Switchboard hub start / sb list / stop on a
 # throwaway git workspace, the built-in office plugins (a new agent lists
 # and loads their skills and makes a pptx with `bise office run`:
 # tests/office_fresh_install_e2e.py), a reinstall (idempotent), then uninstall
@@ -126,12 +127,18 @@ NOMODEL_TURN=1 session "live session (no model yet)"
 check "sessions dir created in ~/.bise (BISE-161: a fresh HOME starts there)" test -d "$T/.bise/sessions"
 
 # one turn through the installed REPL: the provider is the tests' fake
-# (openai-chat), which answers "ack: <the message>"
+# (openai-chat), which answers "ack: <the message>". `turn tls`: the same
+# over HTTPS (FAKE_TLS=1, tests/fixtures/tls's self-signed localhost cert,
+# trusted with SSL_CERT_FILE): the runtime's TLS loads OpenSSL 3 at run
+# time, and -41's hardened runtime refused Homebrew's libssl (every real
+# provider call failed while the plain-http turn passed)
 echo "== a headless turn (fake provider)"
 turn() {
-  local d fpid port pid i line got="" msg="hello from test-install"
+  local d fpid port pid i line got="" msg="hello from test-install" tls="${1:-}" url label="" n
+  local certs="$HERE/../tests/fixtures/tls/localhost-cert.pem"
+  [ -n "$tls" ] && { msg="hello over TLS"; label=" (TLS)"; }
   d="$(mktemp -d /tmp/pk-turn.XXXXXX)"
-  FAKE_LOG="$d/fake.log" python3 -u "$HERE/../tests/fake_provider.py" > "$d/fake.out" 2> "$d/fake.err" &
+  FAKE_LOG="$d/fake.log" FAKE_TLS="${tls:+1}" python3 -u "$HERE/../tests/fake_provider.py" > "$d/fake.out" 2> "$d/fake.err" &
   fpid=$!
   # 30 s: a cold runner is slow; it exits early when python dies
   i=0; while [ $i -lt 300 ] && ! grep -q '^PORT ' "$d/fake.out" 2>/dev/null; do
@@ -145,8 +152,9 @@ turn() {
     echo "     stderr:"; sed 's/^/       /' "$d/fake.err"
     kill $fpid 2>/dev/null; wait $fpid 2>/dev/null; rm -rf "$d"; return
   fi
+  if [ -n "$tls" ]; then url="https://localhost:$port/v1/chat/completions"; else url="http://127.0.0.1:$port/v1/chat/completions"; fi
   mkfifo "$d/in"
-  (cd "$WORK" && E BEND_PROVIDER_URL="http://127.0.0.1:$port/v1/chat/completions" \
+  (cd "$WORK" && E BEND_PROVIDER_URL="$url" ${tls:+SSL_CERT_FILE="$certs"} \
      MISTRAL_API_KEY=fake-key "$BIN" --headless --model mistral-small-latest \
      < "$d/in" > "$d/out" 2> "$d/err") &
   pid=$!
@@ -161,10 +169,11 @@ turn() {
       case "$line" in *"ack: $msg"*) got=1 ;; "--- idle"*) break ;; esac
     done
     exec 4<&-
-    [ -n "$got" ] && ok "turn answered: ack: $msg" || { ko "turn: no 'ack: $msg'"; tail -n 8 "$d/turn" 2>/dev/null | sed 's/^/     /'; }
-    [ "$(wc -l < "$d/fake.log" 2>/dev/null | tr -d ' ')" = 1 ] && ok "the fake provider got one request" || ko "the fake provider got $(wc -l < "$d/fake.log" 2>/dev/null | tr -d ' ') requests (want 1)"
+    [ -n "$got" ] && ok "turn$label answered: ack: $msg" || { ko "turn$label: no 'ack: $msg'"; tail -n 8 "$d/turn" 2>/dev/null | sed 's/^/     /'; }
+    n="$(cat "$d/fake.log" 2>/dev/null | wc -l | tr -d ' ')"
+    [ "$n" = 1 ] && ok "the fake provider$label got one request" || ko "the fake provider$label got $n requests (want 1)"
   else
-    ko "turn: no READY"; tail -n 5 "$d/err" | sed 's/^/     /'
+    ko "turn$label: no READY"; tail -n 5 "$d/err" | sed 's/^/     /'
   fi
   exec 3>&-
   i=0; while kill -0 $pid 2>/dev/null && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
@@ -172,6 +181,8 @@ turn() {
   rm -rf "$d"
 }
 turn
+echo "== a headless turn over HTTPS (TLS fake provider)"
+turn tls
 
 echo "== Switchboard hub on a throwaway workspace"
 mkdir -p "$WS" && (cd "$WS" && git init -q && echo x > README.md && git add README.md \
