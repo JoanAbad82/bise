@@ -1234,9 +1234,10 @@ if (mode === 'quick') {
     ? [rowsCF30, rowsDDDE, rowsD3D8, rows42D1, rows4E20, newRows, rows37, rowsE812, rowsF2A7, rows233B, rowsC2BA, rowsDC47]
     : [rowsE812, rowsCF30, rowsDDDE, rowsF2A7, rows233B, rowsC2BA, rowsDC47, rowsD3D8, rows42D1, rows4E20, quickRows, newRows, rows37, rows25, rows0170];
   // the pass limit sized to its groups: GROUP_MS each from here (the stall watchdog still ends a
-  // hang at 600 s with no step); AS_HE_DOES_WATCHDOG_MS set by hand wins. GROUP_MS is PROVISIONAL:
-  // set to at most 2x the measured per-group time (the at_s of the first all-rows quick pass on
-  // AC) so a pass 3x slower is red (review-gates m_29770)
+  // hang at 600 s with no step); AS_HE_DOES_WATCHDOG_MS set by hand wins. Measured (review-gates
+  // m_29770): the first all-rows quick pass on AC (night5, ef6eac813, 15 groups) ended at at_s 4849,
+  // 323 s a group on average, 839 s the longest (rows233B); 15 x 600 s = 9000 s is 1.86x the
+  // pass, so a pass 2x slower is red and a normal one has its margin
   const GROUP_MS = 600000;
   if (process.env.AS_HE_DOES_WATCHDOG_MS === undefined) passLimit(Date.now() - T0 + groups.length * GROUP_MS);
   for (const g of groups) await g(harness, say);
@@ -2525,19 +2526,24 @@ async function rowsF2A7(harness, say) {
     // how the hub closed it, from its journal: 'withdrawn by main: …', never 'answered' (the row
     // passed by accident before only if the words became its answer; architect m_29601)
     const closedAs = closeOf(W, card);
-    // what he sees: main's withdraw on that card in harness' thread (req_withdraw: 'the user sees
-    // it withdrawn in main's feed'). No 'isn't open' words: refused.ts drops a refusal with the
-    // card's rows, a withdrawn card's included (architect m_30024)
+    // a withdrawn card leaves his inbox at once and nothing draws it in the thread (the thread
+    // never showed it: fold.rs' CardClosed marks an existing card entry only, as the TUI):
+    // no 'isn't open' words, no withdraw row (architect m_30358)
+    step(`an answer to card ${String(card)} withdrawn by its asker meanwhile (the candidate's core held ~14 s): hidden at once, no 'you answered', the card not back (the hub dropped it), the hub's journal closed it 'withdrawn', not 'answered'`,
+      hidden === true && asides.length === 0 && after === false && /^withdrawn\b/.test(closedAs ?? ''),
+      { hidden, words, asides, after, closedAs, core: cores[0].slice(0, 160) });
+    // his late answer is not lost: harness' main gets bise's 'he answered #N after you withdrew
+    // it ("…"):' with his words (withdrawn-answer's fix; red with its known_reds line until it lands)
     await harness();
-    const withdrawLine = await until(async () => {
+    const late = await until(async () => {
       const t = flat(await text('[data-testid="thread.list"]'));
-      return t.includes('withdrawn by main: zq the plan changed') ? 'withdrawn by main: zq the plan changed' : null;
-    }, 20000, 1000);
+      const m = new RegExp(`he answered #${String(card)} after you withdrew it[^]{0,200}`).exec(t);
+      return m ? m[0] : null;
+    }, 30000, 1000);
     await page.mouse.move(1, 300);
-    await shot('f2a7-withdrawn-in-harness');
-    step(`an answer to card ${String(card)} withdrawn by its asker meanwhile (the candidate's core held ~14 s): hidden at once, no 'you answered', the card not back (the hub dropped it), the hub's journal closed it 'withdrawn', not 'answered', and harness' thread shows main's withdraw on it`,
-      hidden === true && asides.length === 0 && after === false && /^withdrawn\b/.test(closedAs ?? '') && !!withdrawLine,
-      { hidden, words, asides, after, closedAs, withdrawLine, core: cores[0].slice(0, 160) });
+    await shot('f2a7-withdrawn-late-answer');
+    step(`his late answer to card ${String(card)} withdrawn under him reaches harness' main: bise's 'he answered #${String(card)} after you withdrew it' with his words`,
+      !!late && /zqw-one|\b1\b/.test(late), { late });
   });
 
   await row('a pause counts its seconds, then minutes', async () => {

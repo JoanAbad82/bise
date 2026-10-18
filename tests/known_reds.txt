@@ -43,4 +43,5 @@ as-he-does/full: free words on a docked drafts card: the hub's notice row above 
 as-he-does/full: two-finger swipe (CDP wheel deltaX): back, then forward	ef6eac813	night-reds	night5 full as-he-does, rows2: the swipe back does not walk (forward does)
 as-he-does/full: right bar: '+ N more' -> every row and 'show less' -> back at the cap	ef6eac813	night-reds	night5 full as-he-does, rows2: 'show 4 more' where the row wants '+ N more'
 as-he-does/full: (fN) a csv dropped while answering a card: a file chip, sent as a file part where it was	ef6eac813	night-reds	night5 full as-he-does, rows2: the csv sent in the answer's text, no file part (parts None)
+as-he-does/quick: his late answer to card N withdrawn under him reaches harness' main: bise's 'he answered #N after you withdrew it' with his words	ef6eac813	withdrawn-answer	his answer to a card withdrawn under him is dropped (fix in flight, architect m_30358); remove this line in that fix's sha
 
