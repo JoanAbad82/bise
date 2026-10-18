@@ -113,7 +113,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   let warmed = false;
   /** frames since the warm one (-1: none yet): 'ready' waits for a cheap one */
   let sinceWarm = -1;
-  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced });
+  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced, clearView: true });
   const overlay = makeOverlay(box);
   const feed = makeFeed(box);
   // a click in the shop takes the camera, as a drag would (bims-film v13)

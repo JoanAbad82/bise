@@ -1,4 +1,4 @@
-// The feed plays bims-film v13's lines: typed then sent, folded into the plane, bise's waiting lines
+// The feed plays bims-film v14's lines: typed then sent, folded into the plane, bise's waiting lines
 // with their field or their choices, a ✓ per crate in, empty at the fold; the page sits where designer
 // put it and falls apart from its edge in.
 import { describe, expect, it } from 'vitest';
@@ -18,16 +18,16 @@ describe('the feed', () => {
   });
 
   it("shows bise's question while it waits, the answer's field, then the choice he picks", () => {
-    const q = feedAt(24);
+    const q = feedAt(28);
     expect(q.rows.at(-1)).toMatchObject({ who: 'ask', asks: 'checkout' });
     expect(q.placeholder).toBe('answering checkout');
-    expect(feedAt(47).rows.find((r) => r.choices.length > 0)).toMatchObject({ choices: ['ship it', 'review it for me'], picked: 0 });
-    expect(feedAt(47.5).rows.find((r) => r.who === 'ask' && r.choices.length > 0)?.picked).toBe(2);
+    expect(feedAt(53).rows.find((r) => r.choices.length > 0)).toMatchObject({ choices: ['ship it', 'review it for me'], picked: 0 });
+    expect(feedAt(53.5).rows.find((r) => r.who === 'ask' && r.choices.length > 0)?.picked).toBe(2);
   });
 
   it('keeps the last rows, ticks each line as its crate comes in, and is empty at the fold', () => {
     for (let T = 0; T < FILM_S; T += 0.5) expect(feedAt(T).rows.length).toBeLessThanOrEqual(FEED_ROWS);
-    expect(feedAt(54).rows.at(-1)).toMatchObject({ who: 'bise', ticked: true });
+    expect(feedAt(61).rows.at(-1)).toMatchObject({ who: 'bise', ticked: true });
     expect(feedAt(PAGE.fold + 0.1).rows).toEqual([]);
   });
 });

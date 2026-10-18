@@ -166,6 +166,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   function walls(s: Spot, step: Step): void {
     const w = s.scene.world();
     if (!w) return;
+    // a film keeps its bims in sight: what a map tags as standing between the camera and the room goes (TownOpts.clearView)
+    if (opts.clearView === true) dropOccluders(w);
     // a desk lit or dimmed needs no new bake: its screen and lamp stay the world's own materials (below)
     const sig = `${s.shape}|${growSig(step.look.grow ?? NO_GROW)}|${step.look.night ? 'n' : 'd'}|${String(w.id)}`;
     if (s.walls?.sig === sig) return;
@@ -229,6 +231,15 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       const g = (o as unknown as { geometry?: { dispose(): void } }).geometry;
       g?.dispose();
     });
+  }
+
+  /** a world's pieces a map tagged `occludes` (the workshop's roller door frame before main's desk), out of it */
+  function dropOccluders(w: Object3D): void {
+    const out: Object3D[] = [];
+    w.traverse((o) => {
+      if (o.userData.occludes === true) out.push(o);
+    });
+    for (const o of out) o.removeFromParent();
   }
 
   /** the entry's loose town drawn (held: the build, the fold), else its merged copies; both kept */
@@ -478,6 +489,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       if (s.bake?.sig === sig) return false;
       if (posed(s, step, step.frames[0]?.pose.since ?? 0) === null && !s.scene.office()) return false;
       // baked where it stands in its own units, then placed: a new plan moves the bake, never bakes it again
+      const world = s.scene.world();
+      if (opts.clearView === true && world) dropOccluders(world);
       s.scene.root.position.set(0, 0, 0);
       const merged = mergeRoot(s.scene.root, STYLE, STYLE.shadows);
       for (const c of merged.group.children) {

@@ -120,7 +120,7 @@ export function withFlight(office: string, f: BimFrame, t: number): BimFrame {
   const left = filmT(t - p.since);
   const n = NOTES.find((x) => x.office === office && x.from === 'you' && x.to === f.name && x.flight !== undefined && Math.abs(x.at - left) < 0.05);
   if (n?.flight === undefined) return f;
-  return { ...f, pose: { ...f.pose, plane: { ...p, dur: n.flight.dur, loops: n.flight.loops, startX: FEED_X } } };
+  return { ...f, pose: { ...f.pose, plane: { ...p, dur: n.flight.dur, loops: n.flight.loops, startX: FEED_X, glide: true } } };
 }
 
 /** The office's frame at its time (advance first), its planes flown as the score says. */

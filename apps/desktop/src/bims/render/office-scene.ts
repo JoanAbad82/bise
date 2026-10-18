@@ -10,7 +10,7 @@ import type { BimFrame, Look, Motion, Office } from '../model';
 import { makeBim, type Bim } from './bim';
 import { pillOf } from '../labels';
 import { siteOf, type Fit, type V3 } from './camera';
-import { cameraStart, catchPoint, flightAt, makePlane, planFlight, shadowOf, type FlightPlan, type Plane } from './plane';
+import { cameraStart, catchPoint, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, type FlightPlan, type GlidePlan, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { skateRig } from './skate';
 import { eggRig } from './egg';
@@ -99,7 +99,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
   const bims = new Map<string, Bim>();
   const rigs = new Map<string, Rig>();
   /** his planes in flight, by bim: the mesh, when it left (its key), its plan */
-  const planes = new Map<string, { mesh: Plane; leftAt: string; plan: FlightPlan }>();
+  /** each flight's plan: the app's (zigzag and loop) or the film's paper glide (pose.plane.glide) */
+  const planes = new Map<string, { mesh: Plane; leftAt: string; plan: FlightPlan | GlidePlan; glide: boolean }>();
   const basis = new Matrix4();
   const axis = [new Vector3(), new Vector3(), new Vector3()] as const;
   // the halo under a lit bim (focus.ts): one ring, flat on the floor, shown under each lit bim's feet
@@ -195,11 +196,14 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
         const loops = fp?.loops ?? (f.egg?.kind === 'loop' ? 2 : 1);
         const avoid = pillHeads(frames, f.name);
         const from = cameraStart(fit, fp?.startX);
-        p = { mesh: makePlane(style), leftAt, plan: planFlight({ from, to: hand, seed: hash(`${f.name}@${leftAt}`), loops, unit: size, avoid, dur }) };
+        const seed = hash(`${f.name}@${leftAt}`);
+        const glide = fp?.glide === true;
+        const plan = glide ? planGlide({ from, to: hand, seed, dur, px: fit.scale }) : planFlight({ from, to: hand, seed, loops, unit: size, avoid, dur });
+        p = { mesh: makePlane(style), leftAt, plan, glide };
         planes.set(f.name, p);
         root.add(p.mesh.group, p.mesh.shadow);
       }
-      const fl = flightAt(p.plan, s, hand);
+      const fl = p.glide ? glideAt(p.plan as GlidePlan, s, hand) : flightAt(p.plan as FlightPlan, s, hand);
       const g = p.mesh.group;
       g.visible = true;
       p.mesh.setInk(light);

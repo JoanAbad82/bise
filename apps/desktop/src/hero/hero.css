@@ -15,6 +15,12 @@
   --bh-accent: #e0607a;
   --bh-err: #d24b3e;
   --bh-on: #fff;
+  /* the site's paper (download.html :root): the feed's panel and bubbles (designer m_31887) */
+  --bh-bg: #f2ede2;
+  --bh-soft: #ebe4d6;
+  --bh-win: #fdfbf7;
+  --bh-line: #1d1a1714;
+  --bh-text2: #5a5349;
   /* the app's spacing tokens (src/ds/tokens.css) the page has none of: the tip look's */
   --s-1: 4px;
   --pad-pill: 3px;
@@ -23,6 +29,11 @@ html.pd .bims-hero {
   --bh-text: #ece6da;
   --bh-dim: #b8b0a3;
   --bh-paper: #1f1c19;
+  --bh-bg: #171513;
+  --bh-soft: #1e1b18;
+  --bh-win: #1f1c19;
+  --bh-line: #ece6da1f;
+  --bh-text2: #b8b0a3;
 }
 .bims-hero .bh-canvas {
   position: absolute;
@@ -122,18 +133,28 @@ html.pd .bims-hero {
 @keyframes bh-in {
   from { opacity: 0; }
 }
-/* the feed (feed.ts, designer m_31640): the app's composer, small, bottom-left over the faded edge */
+/* the feed (feed.ts, designer hero-fix-2 §1 + m_31887): one soft panel bottom-left, every line a
+   bubble with its background (his right, bise's left), so the grass never shows behind a word */
 .bims-hero .bh-feed {
   position: absolute;
-  left: 16px;
-  bottom: 16px;
-  width: min(300px, 34%);
+  left: 24px;
+  bottom: 24px;
+  width: 300px;
+  box-sizing: border-box;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: var(--s-1);
+  gap: 6px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bh-bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   pointer-events: none;
-  font: 12px / 1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  font: 13px / 1.4 ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
   color: var(--bh-text);
+}
+@media (max-width: 1199px) {
+  .bims-hero .bh-feed { width: 260px; }
 }
 @media (max-width: 859px) {
   .bims-hero .bh-feed { display: none; }
@@ -141,21 +162,24 @@ html.pd .bims-hero {
 .bims-hero .bh-feed-rows {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
 }
 .bims-hero .bh-feed-row {
   align-self: flex-start;
-  max-width: 92%;
-  padding: 2px 8px;
-  border-radius: 8px;
-  color: var(--bh-dim);
+  max-width: 88%;
+  padding: 6px 10px;
+  border-radius: 12px 12px 12px 4px;
+  color: var(--bh-text2);
+  background: var(--bh-win);
+  box-shadow: 0 0 0 1px var(--bh-line);
   animation: bh-in 0.15s ease-out;
 }
 .bims-hero .bh-feed-row.you {
   align-self: flex-end;
+  border-radius: 12px 12px 4px 12px;
   color: var(--bh-text);
-  background: color-mix(in srgb, var(--bh-paper) 92%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bh-text) 10%, transparent);
+  background: var(--bh-soft);
+  box-shadow: none;
 }
 .bims-hero .bh-feed-row.folding {
   /* his line folds into his plane: it dips toward the bottom-left as the plane leaves under it */
@@ -177,7 +201,7 @@ html.pd .bims-hero {
   display: flex;
   gap: 10px;
   margin-top: 2px;
-  color: var(--bh-dim);
+  color: var(--bh-text2);
 }
 .bims-hero .bh-feed-choice.picked {
   color: var(--bh-text);
@@ -191,8 +215,8 @@ html.pd .bims-hero {
 .bims-hero .bh-feed-field {
   padding: 6px 10px;
   border-radius: 10px;
-  background: var(--bh-paper);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bh-text) 14%, transparent);
+  background: var(--bh-win);
+  box-shadow: 0 0 0 1px var(--bh-line);
   color: var(--bh-text);
   white-space: nowrap;
   overflow: hidden;

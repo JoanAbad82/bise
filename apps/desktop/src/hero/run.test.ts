@@ -31,31 +31,31 @@ describe('the hero film', () => {
     expect(diff).toEqual([]);
   });
 
-  it('lands its beats in the office brains (bims-film v13): planes, pops at the desk, visits, the queue, the stamp', () => {
+  it('lands its beats in the office brains (bims-film v14): paper planes, pops at the desk, visits, the queue, the stamp', () => {
     const runs = makeRuns();
     const at = (T: number, name: string) => {
       for (const r of runs) advance(r, ORIGIN + T, false, false);
       const r = runs.find((x) => x.cast.id === KILN);
       return r ? stepOf(r, false, false)?.played.find((f) => f.name === name) : undefined;
     };
-    // his first plane: 3 s with a loop, from the feed; the next ones 1.6 s, straight
-    expect(at(5, 'main')?.pose.plane).toMatchObject({ dur: 3, loops: 1, startX: FEED_X });
-    expect(at(8.5, 'main')?.pose.plane).toMatchObject({ dur: 1.6, loops: 0 });
+    // paper planes from the feed: 3 s the first, 2.8 s the next, gliding, never a loop
+    expect(at(5, 'main')?.pose.plane).toMatchObject({ dur: 3, loops: 0, startX: FEED_X, glide: true });
+    expect(at(8.5, 'main')?.pose.plane).toMatchObject({ dur: 2.8, loops: 0, glide: true });
     // an agent pops at its desk, never walking in by the door
-    const catalog = at(8.05, 'catalog');
+    const catalog = at(10.75, 'catalog');
     expect(catalog?.pose.moving).toBe(false);
     expect(catalog?.pose.seg.act.at).toBe('desk');
     // the visits: there before their bubbles
-    expect(at(17.6, 'checkout')?.pose.seg.act.k).toBe('visit');
-    expect(at(37.2, 'order-test')?.pose.seg.act.k).toBe('visit');
-    expect(at(39.2, 'order-test')?.egg?.kind).toBe('hop');
-    // checkout's crate at main by 0:46, every other one by 0:50
-    expect(at(46.1, 'checkout')).toMatchObject({ pose: { moving: false, seg: { act: { k: 'landing' } } } });
-    for (const n of ['catalog', 'cart', 'emails', 'theme', 'order-test']) expect(at(50.2, n)).toMatchObject({ pose: { moving: false, seg: { act: { k: 'landing' } } } });
+    expect(at(19.1, 'checkout')?.pose.seg.act.k).toBe('visit');
+    expect(at(43.2, 'order-test')?.pose.seg.act.k).toBe('visit');
+    expect(at(45.7, 'order-test')?.egg?.kind).toBe('hop');
+    // checkout's crate at main by 0:52.1, every other one by 0:56.5
+    expect(at(52.1, 'checkout')).toMatchObject({ pose: { moving: false, seg: { act: { k: 'landing' } } } });
+    for (const n of ['catalog', 'cart', 'emails', 'theme', 'order-test']) expect(at(56.5, n)).toMatchObject({ pose: { moving: false, seg: { act: { k: 'landing' } } } });
     // the reviewer beside the first crate, its stamp; main's crate over its head
-    const review = at(51, REVIEWER);
+    const review = at(58, REVIEWER);
     expect(review?.egg?.kind).toBe('stamp');
     expect(review?.pose.moving).toBe(false);
-    expect(at(53, 'main')?.egg?.kind).toBe('itemget');
+    expect(at(60, 'main')?.egg?.kind).toBe('itemget');
   });
 });

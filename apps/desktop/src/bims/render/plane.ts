@@ -282,6 +282,107 @@ export function flightAt(f: FlightPlan, s: number, to: V3 = f.to): FlightFrame {
   return { p, nose, up, u, grow: 1 + (PLANE_GROW - 1) * (1 - smooth(0, FAR, u)) };
 }
 
+/**
+ * The film's paper plane (the hero, designer's hero-fix-2 §2: « trop vite, pas comme un avion en
+ * papier »): light and slow. Tossed from the feed (it rises TOSS_PX over its first 0.3 s, slowing at
+ * the top), then a glide at a nearly constant speed down one wide curve, rolling into it (never past
+ * GLIDE_BANK) and level again after; a slow pitch wobble; it flares into the hand (nose up, half its
+ * speed over its last 0.25 s). No zigzag, no loop. The app's flight (planFlight) is unchanged.
+ */
+export interface GlidePlan {
+  readonly from: V3;
+  readonly to: V3;
+  /** the curve's side (level, across the way, its sign seeded) and how far it bows, units */
+  readonly side: V3;
+  readonly bow: number;
+  /** the toss's rise, units */
+  readonly toss: number;
+  readonly dur: number;
+  readonly phase: number;
+  /** u (the path's fraction) at time i / N, from the speed profile along the path's length */
+  readonly us: readonly number[];
+}
+
+/** the toss's rise, css px, and its length, s; the flare's length, s, its pitch, rad; the bank at most, rad; the wobble */
+const TOSS_PX = 30;
+const TOSS_S = 0.3;
+const FLARE_S = 0.25;
+const FLARE_PITCH = (10 * Math.PI) / 180;
+export const GLIDE_BANK = (25 * Math.PI) / 180;
+const WOBBLE = { pitch: (4 * Math.PI) / 180, period: 1.2 } as const;
+
+/** the glide's path at u: a cubic from the toss to the hand, bowed to one side, the toss's bump on it */
+function glidePath(g: GlidePlan, u: number, to: V3): V3 {
+  const d = sub(to, g.from);
+  const c1 = add(add(g.from, d, 0.35), g.side, g.bow);
+  const c2 = add(add(g.from, d, 0.72), g.side, g.bow * 0.55);
+  const v = 1 - u;
+  const b = add(add(add(mul(g.from, v * v * v), c1, 3 * v * v * u), c2, 3 * v * u * u), to, u * u * u);
+  const bump = smooth(0, 0.1, u) * (1 - smooth(0.1, 0.45, u));
+  return add(b, Y, g.toss * bump);
+}
+
+/** Plan a glide from `from` (the feed's side of the screen) to `to` (the hand); `px`: units per css px. Pure. */
+export function planGlide(inp: { readonly from: V3; readonly to: V3; readonly seed: number; readonly dur: number; readonly px: number }): GlidePlan {
+  const rand = rng(inp.seed);
+  const d = sub(inp.to, inp.from);
+  const level = Math.hypot(d.x, d.z);
+  const side = level < 1e-9 ? { x: 1, y: 0, z: 0 } : mul({ x: -d.z / level, y: 0, z: d.x / level }, rand() < 0.5 ? 1 : -1);
+  const base = { from: inp.from, to: inp.to, side, bow: 0.22 * level, toss: TOSS_PX * inp.px, dur: inp.dur, phase: rand() * Math.PI * 2, us: [] as number[] };
+  // the path's length table, then the time it takes along it: a little faster out of the hand
+  // (slowing at the toss's top), steady, then half speed in the flare
+  const len: number[] = [0];
+  let prev = glidePath(base, 0, inp.to);
+  for (let i = 1; i <= N; i++) {
+    const p = glidePath(base, i / N, inp.to);
+    len.push((len[i - 1] ?? 0) + Math.hypot(p.x - prev.x, p.y - prev.y, p.z - prev.z));
+    prev = p;
+  }
+  const total = len[N] ?? 1;
+  const tossT = TOSS_S / inp.dur;
+  const flareT = FLARE_S / inp.dur;
+  const speed = (t: number): number => (1 + 0.35 * (1 - smooth(0, tossT, t))) * (1 - 0.5 * smooth(1 - flareT, 1, t));
+  const dist: number[] = [0];
+  for (let j = 1; j <= N; j++) dist.push((dist[j - 1] ?? 0) + speed((j - 0.5) / N));
+  const dmax = dist[N] ?? 1;
+  let i = 0;
+  for (let j = 0; j <= N; j++) {
+    const want = ((dist[j] ?? 0) / dmax) * total;
+    while (i < N && (len[i + 1] ?? total) < want) i++;
+    const a = len[i] ?? 0;
+    const b = len[i + 1] ?? total;
+    base.us.push(Math.min(1, (i + (b > a ? (want - a) / (b - a) : 0)) / N));
+  }
+  return base;
+}
+
+/** The glide s seconds after the toss, to `to` (the hand, which may have moved). Pure. */
+export function glideAt(g: GlidePlan, s: number, to: V3 = g.to): FlightFrame {
+  const t = clamp01(s / g.dur);
+  const k = t * N;
+  const j = Math.min(N - 1, Math.floor(k));
+  const u = (g.us[j] ?? 0) + ((g.us[j + 1] ?? 1) - (g.us[j] ?? 0)) * (k - j);
+  const du = 1 / N;
+  const p = glidePath(g, u, to);
+  const a = glidePath(g, Math.max(0, u - du), to);
+  const b = glidePath(g, Math.min(1, u + du), to);
+  const d1 = sub(b, a);
+  const d2 = add(add(b, a), p, -2);
+  let nose = norm(d1);
+  const flat = Math.hypot(nose.x, nose.z);
+  // the pitch: its slow wobble (gone at both ends), and the flare's nose up over its last FLARE_S
+  const env = smooth(0, 0.15, t) * (1 - smooth(0.85, 1, t));
+  const pitch = WOBBLE.pitch * env * Math.sin((2 * Math.PI * s) / WOBBLE.period + g.phase) + FLARE_PITCH * smooth(1 - FLARE_S / g.dur, 1, t);
+  nose = norm(add(nose, Y, Math.tan(pitch) * flat));
+  // the bank: into the curve, from how fast its level heading turns, never past GLIDE_BANK
+  const lv = Math.hypot(d1.x, d1.z);
+  const turn = lv < 1e-9 ? 0 : (d1.x * d2.z - d1.z * d2.x) / (lv * lv * lv);
+  const bank = Math.max(-GLIDE_BANK, Math.min(GLIDE_BANK, Math.atan(turn * 3)));
+  let up = norm(add(Y, cross(nose, Y), Math.tan(bank)));
+  up = norm(sub(up, mul(nose, dot(up, nose))));
+  return { p, nose, up, u, grow: 1 + (PLANE_GROW - 1) * (1 - smooth(0, FAR, u)) };
+}
+
 /** its ground shadow (bims m_31314: it sells the height, the loop's most): how dark at the floor, gone by FADE_H units up */
 const SHADOW_ALPHA = 0.2;
 const SHADOW_FADE_H = 7;

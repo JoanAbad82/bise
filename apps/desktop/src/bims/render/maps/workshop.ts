@@ -3,7 +3,7 @@
 // workbench (the eating place) with its vise and toolbox, the ping-pong table, the roller door
 // rolled up on the right by the nap place, a scooter inside it, an old car in the front middle, the neon :* over the board; its growth is the loft's (blook.ts
 // loftGrower), the mural in the back left corner. Owner: maps-b.
-import { Group, type Object3D } from 'three';
+import { Group, type Mesh, type Object3D } from 'three';
 import type { WorkshopOffice } from '../../maps/workshop';
 import { decorOf } from '../decor';
 import { boxOf, onFloor } from '../kit';
@@ -49,10 +49,14 @@ function shell(b: Build): void {
   // stood where the nap place's last napper lays its head on a small office: Gabriel, bims-life)
   const rz0 = 4.3;
   const rz1 = D - 0.4;
-  for (const z of [rz0, rz1]) k.add(style.box(0.16, WALL_H, 0.16), k.mat(pal.wallTop), root, x1 + 0.05, WALL_H / 2, z);
-  k.add(style.box(0.36, 0.34, rz1 - rz0 + 0.2), k.mat(pal.wallTop), root, x1 + 0.05, WALL_H - 0.05, (rz0 + rz1) / 2);
-  k.add(style.box(0.06, 0.4, rz1 - rz0 - 0.16), k.mat('#9aa3ab'), root, x1 + 0.05, WALL_H - 0.42, (rz0 + rz1) / 2);
-  for (let i = 0; i < 3; i++) k.add(style.box(0.07, 0.02, rz1 - rz0 - 0.16), k.mat('#77838c'), root, x1 + 0.05, WALL_H - 0.3 - i * 0.12, (rz0 + rz1) / 2);
+  // the door's frame stands between the camera and main's desk: tagged, a film drops it (TownOpts.clearView, Gabriel via main m_31852)
+  const front = (m: Mesh): void => {
+    m.userData.occludes = true;
+  };
+  for (const z of [rz0, rz1]) front(k.add(style.box(0.16, WALL_H, 0.16), k.mat(pal.wallTop), root, x1 + 0.05, WALL_H / 2, z));
+  front(k.add(style.box(0.36, 0.34, rz1 - rz0 + 0.2), k.mat(pal.wallTop), root, x1 + 0.05, WALL_H - 0.05, (rz0 + rz1) / 2));
+  front(k.add(style.box(0.06, 0.4, rz1 - rz0 - 0.16), k.mat('#9aa3ab'), root, x1 + 0.05, WALL_H - 0.42, (rz0 + rz1) / 2));
+  for (let i = 0; i < 3; i++) front(k.add(style.box(0.07, 0.02, rz1 - rz0 - 0.16), k.mat('#77838c'), root, x1 + 0.05, WALL_H - 0.3 - i * 0.12, (rz0 + rz1) / 2));
   const sc = new Group();
   sc.position.set(x1 - 0.35, 0, rz0 + 0.65);
   sc.rotation.y = -Math.PI / 2;

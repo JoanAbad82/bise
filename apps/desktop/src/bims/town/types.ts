@@ -80,6 +80,8 @@ export interface TownOpts {
    * settle(). Absent: merged from the first frame.
    */
   readonly entry?: boolean;
+  /** the hero's: the pieces a map tags as standing between the camera and the room are left out (main hidden behind the workshop's door frame: Gabriel via main m_31852) */
+  readonly clearView?: boolean;
 }
 
 /** What the entry build moves (TownOpts.entry): the town's things, loose, as drawn now. */

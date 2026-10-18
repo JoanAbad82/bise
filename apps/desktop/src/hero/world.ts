@@ -17,12 +17,14 @@ export const ORIGIN = 1_800_000_000;
 
 /** Film time of a world time. Pure. */
 export function filmT(t: number): number {
-  const x = (t - ORIGIN) % FILM_S;
-  return x < 0 ? x + FILM_S : x;
+  return Math.max(0, t - ORIGIN - loopOf(t) * FILM_S);
 }
 
-/** The loop a world time is in (0 the first; the pre-roll is -1). Pure. */
-export const loopOf = (t: number): number => Math.floor((t - ORIGIN) / FILM_S);
+/**
+ * The loop a world time is in (0 the first; the pre-roll is -1). Pure. A µs of slack: world times
+ * near ORIGIN keep few decimals (ORIGIN + 68.6 divides to 0.99999…), and a loop's 0:00 is its own.
+ */
+export const loopOf = (t: number): number => Math.floor((t - ORIGIN + 1e-6) / FILM_S);
 
 /** A bim's mode at film time T: its last change at or before T, else its life's last one (the loop closes). Pure. */
 export function modeAt(b: Bim, T: number): Mode {
