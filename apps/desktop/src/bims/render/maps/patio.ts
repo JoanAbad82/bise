@@ -292,6 +292,8 @@ function wear(w: Wear): void {
 
 export const patio: MapLook = {
   id: 'patio',
+  // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
+  cozy: { plant: 'cactus', small: 'geranium', coffee: 'olla', bed: 'hammock', shelf: 'pottery', poster: 'papel', wood: '#a0673f', cloth: ['#2a9d8f', '#e9c46a', '#7b5fc0'], art: ['#2a9d8f', '#e9c46a', '#7b5fc0'], pot: '#c98a3e' },
   pal,
   shell,
   island,

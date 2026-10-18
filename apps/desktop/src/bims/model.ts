@@ -10,6 +10,7 @@ import type { Agent, Card, Place } from '@/proto';
 import type { Cam } from './zoom';
 import type { BimEgg, OfficeEggs } from './eggs';
 import type { Grow } from './growth';
+import type { Cozy } from './cozy';
 import type { MapId } from './maps/ids';
 
 /** The office's maps (maps/ids.ts MAP_IDS); the project's pick, the loft when he never picked one. */
@@ -73,7 +74,7 @@ export type PokeKind =
 /** what a poke plays: its reaction, or under reduced motion its word alone */
 export type PlayKind = PokeKind | 'word';
 
-export type SpotKind = 'desk' | 'main' | 'lounge' | 'island' | 'board' | 'queue' | 'door' | 'terrace';
+export type SpotKind = 'desk' | 'main' | 'lounge' | 'island' | 'coffee' | 'board' | 'queue' | 'door' | 'terrace';
 
 export interface Activity {
   readonly k: ActivityKind;
@@ -188,6 +189,8 @@ export interface Office {
   readonly furniture: readonly Box[];
   /** a skatepark (the California map): where idle bims skate (skate.ts); absent on a map without one */
   readonly park?: Park;
+  /** its cozy pieces (cozy.ts placeCozy, maps/index.ts layoutOf): the coffee corner's spot is on `walks`; absent: a bare room */
+  readonly cozy?: Cozy;
 }
 
 /** A straight piece to grind or ride across, along x: a curb, a ledge, a rail, a flat lane (h 0). */

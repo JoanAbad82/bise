@@ -8,6 +8,7 @@
 import type { Agent } from '@/proto';
 import { bims } from '@/proto/words_bims.gen';
 import type { Box, Leg, Spot } from '../model';
+import { backBusy, type CozyHints } from '../cozy';
 import { type BOffice, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, type Things, boxAt } from './plan';
 
@@ -86,4 +87,10 @@ const THINGS: Things = {
   8: bims.stage_nordic_8, 9: bims.stage_nordic_9, 10: bims.stage_nordic_10, 11: bims.stage_nordic_11, 12: bims.stage_nordic_12, 13: bims.stage_nordic_13, 14: bims.stage_nordic_14,
 };
 
-export const nordic: Plan<NordicOffice> = { id: 'nordic', ready: true, layout: nordicLayout, things: THINGS };
+/** its look's walls and what stands by them (render/maps/nordic.ts): the stove and its logs at the back left, the skis in the back right corner */
+const nordicCozy: CozyHints = {
+  walls: (o) => [{ wall: 'back', top: 1.9, busy: backBusy(o) }, { wall: 'left', top: 1.3 }, { wall: 'right', top: 0 }],
+  keepOut: (o) => [{ x0: o.x0, x1: o.x0 + 0.95, z0: 0.1, z1: 1.8 }, { x0: o.x0 + o.W - 0.75, x1: o.x0 + o.W, z0: 0, z1: 0.45 }],
+};
+
+export const nordic: Plan<NordicOffice> = { id: 'nordic', ready: true, layout: nordicLayout, things: THINGS, cozy: nordicCozy };

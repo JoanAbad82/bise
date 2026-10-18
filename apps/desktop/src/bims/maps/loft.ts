@@ -121,8 +121,8 @@ export function loftLayout(agents: readonly Agent[], prev?: LoftOffice): LoftOff
   return { ...base, side, rows, crossBack, crossFront, ax, walks, furniture, queueMore };
 }
 
-/** the loft as a map (maps/index.ts) */
-export const loft: Plan<LoftOffice> = { id: 'loft', ready: true, layout: loftLayout };
+/** the loft as a map (maps/index.ts); its island's top takes stage 2's coffee machine (cozy.ts) */
+export const loft: Plan<LoftOffice> = { id: 'loft', ready: true, layout: loftLayout, cozy: { islandTop: 0.695 } };
 
 /**
  * The loft's walk graph: the trunk (the back and front corridors, the two aisles, the door line,

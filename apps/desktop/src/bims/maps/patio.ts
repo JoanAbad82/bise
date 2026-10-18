@@ -105,4 +105,4 @@ export function patioLayout(agents: readonly Agent[], prev?: PatioOffice): Patio
   return { ...base, walks: walksOf(base, trunk), queueMore: back.queueMore, rows, slabs, trough, aisles: AISLES };
 }
 
-export const patio: Plan<PatioOffice> = { id: 'patio', ready: true, layout: patioLayout };
+export const patio: Plan<PatioOffice> = { id: 'patio', ready: true, layout: patioLayout, cozy: { islandTop: 0.56 } };

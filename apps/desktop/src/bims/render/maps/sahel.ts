@@ -285,6 +285,8 @@ function wear(w: Wear): void {
 
 export const sahel: MapLook = {
   id: 'sahel',
+  // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
+  cozy: { plant: 'aloe', small: 'succulent', coffee: 'attaya', bed: 'mat', shelf: 'calabash', poster: 'tapestry', wood: '#8a5a3c', cloth: ['#e9c46a', '#c98a3e', '#2a9d8f'], art: ['#c98a3e', '#2a9d8f', '#e9c46a'], pot: '#a0673f' },
   pal,
   shell,
   island,

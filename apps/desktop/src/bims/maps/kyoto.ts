@@ -7,7 +7,7 @@
 // row walks round behind its cushions to a lane by the left wall. Pure. Owner: maps-b.
 import type { Agent } from '@/proto';
 import { bims } from '@/proto/words_bims.gen';
-import type { Box, Leg, Spot } from '../model';
+import type { Box, Leg, Office, Spot } from '../model';
 import { type BOffice, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, type Things, boxAt } from './plan';
 
@@ -108,4 +108,7 @@ const THINGS: Things = {
   8: bims.stage_kyoto_8, 9: bims.stage_kyoto_9, 10: bims.stage_kyoto_10, 11: bims.stage_kyoto_11, 12: bims.stage_kyoto_12, 13: bims.stage_kyoto_13, 14: bims.stage_kyoto_14,
 };
 
-export const kyoto: Plan<KyotoOffice> = { id: 'kyoto', ready: true, layout: kyotoLayout, things: THINGS };
+/** the inner garden holds its stages' pieces (the lantern, the maple, the go board, the shishi-odoshi): nothing cozy in it */
+const kyotoKeep = (o: Office): Box[] => [(o as KyotoOffice).garden];
+
+export const kyoto: Plan<KyotoOffice> = { id: 'kyoto', ready: true, layout: kyotoLayout, things: THINGS, cozy: { keepOut: kyotoKeep } };

@@ -7,6 +7,7 @@
 import type { Agent } from '@/proto';
 import type { Box, Leg, MapId, Office, Pt, Spot } from '../model';
 import type { Stage, Things } from '../growth';
+import type { CozyHints } from '../cozy';
 
 export type { Stage, Things };
 
@@ -25,6 +26,8 @@ export interface Plan<O extends Office = Office> {
    * piece, the corner tip's next): the words_bims catalog's entries, never text. Absent: the loft's.
    */
   readonly things?: Things;
+  /** where its cozy pieces may stand and what they keep off (cozy.ts placeCozy); absent: the loft's walls */
+  readonly cozy?: CozyHints;
 }
 
 
@@ -48,5 +51,5 @@ export function wayIn(s: Spot): Leg[] {
 
 /** Every place of an office a bim may walk to (the contract: each is on the walk graph), its park's spots too. Pure. */
 export function placesOf(o: Office): Spot[] {
-  return [...o.desks.values(), o.mainDesk, ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, o.door, ...o.terrace, o.exit, ...(o.park?.spots ?? [])];
+  return [...o.desks.values(), o.mainDesk, ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, o.door, ...o.terrace, o.exit, ...(o.park?.spots ?? []), ...(o.cozy?.coffeeSpots ?? [])];
 }

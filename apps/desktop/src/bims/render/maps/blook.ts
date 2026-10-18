@@ -7,7 +7,7 @@
 // red (blook.test.ts reads every palette and piece colour). Owner: maps-b.
 import { Group, type Object3D } from 'three';
 import type { Box, Office, Pt, Spot } from '../../model';
-import { bedsAt, type Grow } from '../../growth';
+import { BASE_BEDS, bedStage, bedsAt, type Grow } from '../../growth';
 import { chair, deskLamp, laptop } from '../furniture';
 import { type Kit, boxOf, glyph, onFloor } from '../kit';
 import { decorOf } from '../decor';
@@ -108,17 +108,17 @@ export const boxHolding = (o: Office, p: Pt): Box | undefined => o.furniture.fin
 const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;
 const at = <T>(xs: readonly T[], i: number): T => xs[Math.min(i, xs.length - 1)] as T;
 
-/** A bed on lounge spot i for i < growth.ts bedsAt(stage) (a napper lies only on one), each in its stage's group (its spot's box: Office.furniture). */
+/** A bed on lounge spot i for BASE_BEDS <= i < growth.ts bedsAt(stage) (a napper lies only on one; the first two: the cozy kit's, render/cozy.ts), each in its stage's group (its spot's box: Office.furniture). */
 export function beds(b: Build, draw: (k: Kit, parent: Object3D, box: Box, i: number) => void): void {
   const { o, grow } = b;
   const s0 = b.stage(0);
   if (!s0) return;
   const n = bedsAt(grow.stage);
   o.lounge.forEach((sp, i) => {
-    if (i >= n) return;
+    if (i < BASE_BEDS || i >= n) return;
     const box = o.furniture.find((f) => f.of && f.of.x === sp.x && f.of.z === sp.z);
     if (!box) return;
-    draw(b.k, b.stage(i < 2 ? 3 : i < 4 ? 5 : 8) ?? s0, box, i);
+    draw(b.k, b.stage(bedStage(i)) ?? s0, box, i);
   });
 }
 

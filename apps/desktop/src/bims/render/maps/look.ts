@@ -12,6 +12,7 @@ import type { Kit } from '../kit';
 import type { Seat } from '../furniture';
 import type { Palette } from '../palette';
 import type { Style } from '../style';
+import type { CozyLook } from '../cozy';
 
 /** A desk's parts the frame drives (lightDesk) */
 export interface DeskHandles {
@@ -66,6 +67,8 @@ export interface MapLook {
   growth(b: Build): void;
   /** where a stage's piece stands (the unlock walk ends there, its label shows over it) */
   pieceAt(o: Office, stage: number): Pt;
+  /** its cozy pieces' kinds and colours (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »): where they stand is the plan's (Office.cozy) */
+  readonly cozy: CozyLook;
   /** a small thing every bim but main wears on this map; absent: nothing */
   wear?(w: Wear): void;
   /** where the map carves under its floor at this stage (California's bowl): the ground block leaves a hole there (render/ground.ts); absent: none */

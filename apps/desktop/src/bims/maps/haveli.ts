@@ -104,4 +104,14 @@ export function haveliLayout(agents: readonly Agent[], prev?: HaveliOffice): Hav
   return { ...base, walks: walksOf(base, trunk), queueMore: back.queueMore, k, yard, columns };
 }
 
-export const haveli: Plan<HaveliOffice> = { id: 'haveli', ready: true, layout: haveliLayout };
+/** stage 8's jhoola hangs along the lounge's side wall, between its two rows (render/maps/haveli.ts lounge): nothing cozy there */
+const jhoola = (o: Office): Box[] => {
+  const xs = o.lounge.map((s) => s.x);
+  const zs = o.lounge.map((s) => s.z);
+  if (!xs.length) return [];
+  const left = Math.min(...xs) - o.x0 < o.x0 + o.W - Math.max(...xs);
+  const sz = (Math.min(...zs) + Math.max(...zs)) / 2;
+  return [left ? { x0: o.x0, x1: o.x0 + 0.75, z0: sz - 1.45, z1: sz + 1.45 } : { x0: o.x0 + o.W - 0.75, x1: o.x0 + o.W, z0: sz - 1.45, z1: sz + 1.45 }];
+};
+
+export const haveli: Plan<HaveliOffice> = { id: 'haveli', ready: true, layout: haveliLayout, cozy: { keepOut: jhoola } };

@@ -10,13 +10,14 @@
 // at any t. On a map with a park, some idle bims skate (skate.ts pastimes, a look over the activity):
 // their segment goes to a park spot and carries the pastime the renderer poses; back, the board in
 // hand (fromSkate). Pure: the same updates give the same poses. Spots shared by several bims (bean
-// bags, island, whiteboard, deck chairs) go first come first served; past the last one, a bim
+// bags, island, the coffee corner, whiteboard, deck chairs) go first come first served; past the last one, a bim
 // stands beside (spec §3). Every walk keeps clear of the other bims' walks (avoid.ts, bims-avoid):
 // it may wait, step aside, go round one standing, stop beside a spot someone stands on, or come in
 // by the door a little later; with no clear way at all it goes on with what it did and tries again
 // at the next update (a walk that ended beside its spot too), never through anyone.
 import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, QUEUE_GAP, type Segment, type Spot, type Timeline } from './model';
 import { pastimes } from './skate';
+import { coffeeAtCorner } from './cozy';
 import { along, makePath, path } from './paths';
 import { type Budget, planOn, progress, trackOf, UPDATE_BUDGET, walkTime, type Track } from './avoid';
 
@@ -31,7 +32,7 @@ export const PLANE_S = 5.0;
 /** the segments kept per bim (a pose asked a bit in the past still answers) */
 const KEEP = 8;
 
-type Shared = 'lounge' | 'island' | 'board' | 'terrace';
+type Shared = 'lounge' | 'island' | 'coffee' | 'board' | 'terrace';
 
 interface Bim {
   segs: Segment[];
@@ -137,7 +138,7 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
 
       for (const [name, row] of acts) {
         let b = bims.get(name);
-        const act = bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, beds);
+        const act = coffeeFor(bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, beds), next, fun?.stage);
         const pt = b?.over ? undefined : fun2.get(name);
         const parkSpot = pt ? next.park?.spots[pt.slot] : undefined;
         // the stage too: a skater rides the park as built now, never one a stage behind (a new piece starts a new line)
@@ -362,9 +363,20 @@ function bedFor(act: Activity, mine: string | null, held: ReadonlyMap<string, st
   return { ...act, at: 'desk' };
 }
 
+/**
+ * A coffee at the coffee corner while its machine stands there (cozy.ts coffeeAtCorner: stages 0-1,
+ * page bims-cozy v2): an idle trip whose drink is coffee (fruit 2) or two bims' coffee; the rest at
+ * the island. Pure.
+ */
+function coffeeFor(act: Activity, o: Office, stage: number | undefined): Activity {
+  if (act.at !== 'island') return act;
+  const coffee = act.k === 'coffee' || (act.k === 'snack' && act.fruit === 2);
+  return coffeeAtCorner(o, stage, coffee) ? { ...act, at: 'coffee' } : act;
+}
+
 /** the first free spot of that kind (its last one if free); all taken: standing beside one; none: null */
 function sharedSpot(o: Office, at: Shared, held: ReadonlyMap<string, string>, pref: ReadonlyMap<Shared, number> | undefined): { spot: Spot; key: string; ix?: number } | null {
-  const list = at === 'lounge' ? o.lounge : at === 'island' ? o.islandSpots : at === 'board' ? o.boardSpots : o.terrace;
+  const list = at === 'lounge' ? o.lounge : at === 'island' ? o.islandSpots : at === 'coffee' ? (o.cozy?.coffeeSpots ?? o.islandSpots) : at === 'board' ? o.boardSpots : o.terrace;
   const free = (i: number) => !held.has(`${at}:${String(i)}`);
   const mine = pref?.get(at);
   const ix = mine !== undefined && mine < list.length && free(mine) ? mine : list.findIndex((_, i) => free(i));

@@ -65,8 +65,8 @@ function mainDesk({ k, root, o }: Build): DeskHandles {
 
 /**
  * the kitchen island: a small coffee counter in a new office, as long as the stage makes it
- * (stages.ts islandLen); its base, its top, the coffee machine, the pendants at night. Its fruit
- * and boombox: stages.ts
+ * (stages.ts islandLen); its base, its top, the pendants at night. Its coffee machine: the cozy kit's
+ * at stage 2 (render/cozy.ts, the corner's before); its fruit and boombox: stages.ts
  */
 function island({ k, root, o, grow }: Build): void {
   const { style, pal } = k;
@@ -77,8 +77,6 @@ function island({ k, root, o, grow }: Build): void {
   const top = { ...full, z1: Math.min(full.z1, full.z0 + islandLen(o, grow.stage) + 0.15) };
   k.add(style.box(top.x1 - top.x0 - 0.2, 0.62, top.z1 - top.z0 - 0.15, 0.2), k.mat(pal.island), root, ix, 0.31, (top.z0 + top.z1) / 2);
   onFloor(k, root, top, 0.07, 0.66, pal.islandTop);
-  k.add(style.box(0.5, 0.5, 0.42), k.mat(WORLD.coffee), root, ix, 0.95, isl.z0 + 0.35);
-  k.add(style.box(0.18, 0.06, 0.04), style.material(WORLD.coffeeLed, { emissive: WORLD.coffeeLed, ei: 0.5 }), root, ix, 1.07, isl.z0 + 0.57);
   if (pal.pendants) {
     for (let z = isl.z0 + 0.9; z < top.z1; z += 1.8) {
       const l = new PointLight('#ffcf8a', 3.2, 4.5, 1.6);
@@ -108,17 +106,14 @@ function desk({ k, root: parent, o }: Build, d: Spot, name: string): DeskHandles
   const screen = laptop(k, g, d.x - cx, LAPTOP.dz);
   const lamp = deskLamp(k, g, w / 2 - 0.18, dd / 2 - 0.17);
   const seat = chair(k, parent, d.x, d.z - 0.05, HOODIE[(h >> 5) % HOODIE.length] ?? pal.desk, d.face);
-  if (h % 3 === 0) k.add(style.cylinder(0.06, 0.12), k.mat(WORLD.paper), g, 0.42, 0.61, -0.2);
-  if (h % 4 === 1) {
-    k.add(style.cylinder(0.08, 0.12), k.mat(WORLD.pot), g, -0.55, 0.61, -0.1);
-    k.add(style.ball(0.12), k.mat(pal.plant), g, -0.55, 0.76, -0.1);
-  }
-  if (h % 5 === 2) k.add(style.ball(0.07), k.mat(WORLD.orange), g, 0.4, 0.62, 0.12);
+  // what stands on it past the laptop and the lamp: the cozy kit's desk objects (render/cozy.ts)
   return { screen, lamp, top: { x: cx, y: 0.55, z: cz }, chair: seat };
 }
 
 export const loft: MapLook = {
   id: 'loft',
+  // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
+  cozy: { plant: 'monstera', small: 'cactus', coffee: 'espresso', bed: 'pouf', shelf: 'vinyl', poster: 'flat', wood: '#c49a6c', cloth: ['#f39a4c', '#6cb4ee', '#e9e2d4'], art: ['#ffd166', '#6cb4ee', '#7cc26b'], pot: '#f39a4c' },
   pal: paletteOf,
   shell,
   island,

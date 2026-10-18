@@ -3,14 +3,16 @@
 // bean bag's napper had its head inside the arcade cabinet). For every ready map, at every growth
 // stage, a small and a big office: the world as world.ts builds it, a napper on each bed that stage
 // has (growth.ts bedsAt), and its head's box (bim.ts's head group, posed by pose.ts) against every
-// mesh of the world but its own bed's (the meshes inside the bed's floor box: a pillow, a hammock).
+// mesh of the world but its own bed's (the meshes inside the bed's floor box: a pillow, a hammock),
+// a merged cozy mesh by its pieces (render/cozy.ts meshBoxes).
 import { describe, expect, it } from 'vitest';
-import { Box3, Mesh, type Object3D } from 'three';
+import { Box3, type Object3D } from 'three';
 import { crowd } from '../fixtures';
 import { readyMaps, layoutOf } from '../maps';
 import { bedsAt, LAST_STAGE, NO_GROW } from '../growth';
 import type { Activity, Box, Office, Pose, Spot } from '../model';
 import { buildWorld } from './world';
+import { meshBoxes } from './cozy';
 import { lookOf } from './maps';
 import { makeBim } from './bim';
 import { HEAD_Y } from './laptop';
@@ -47,9 +49,7 @@ const fmt = (b: Box3): string => `${b.min.toArray().map((v) => v.toFixed(2)).joi
 /** each napper's head that goes through a mesh of the world at this stage */
 function hits(o: Office, stage: number): string[] {
   const w = buildWorld(o, 'main', STYLE, lookOf(o.map), false, { ...NO_GROW, stage });
-  w.root.updateMatrixWorld(true);
-  const meshes: Box3[] = [];
-  w.root.traverse((m) => { if (m instanceof Mesh) meshes.push(new Box3().setFromObject(m, true)); });
+  const meshes = meshBoxes(w.root);
   w.dispose();
   const out: string[] = [];
   o.lounge.slice(0, bedsAt(stage)).forEach((s, i) => {

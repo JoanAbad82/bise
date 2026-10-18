@@ -285,19 +285,19 @@ describe('timeline', () => {
 });
 
 describe('timeline: a napper lies only on a bean bag that is built (his bug, bims-fix)', () => {
-  it('no bean bag at this stage: every napper naps at its desk', () => {
+  it('no bed built: every napper naps at its desk', () => {
     const o = office();
     const tl = newTimeline();
-    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP }), o, 10, [], bedsAt(0));
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP }), o, 10, [], 0);
     for (const n of ['a1', 'a2']) {
       expect(at(tl.poseAt(n, 10))).toEqual({ x: o.desks.get(n)?.x, z: o.desks.get(n)?.z });
       expect(tl.poseAt(n, 10)?.seg.act).toEqual({ k: 'nap', at: 'desk' });
     }
   });
-  it('two bean bags: the first two nappers on them, the third at its desk; staying put on the next update', () => {
+  it('two beds from day one (page bims-cozy v2): the first two nappers on them, the third at its desk; staying put on the next update', () => {
     const o = office();
     const tl = newTimeline();
-    const beds = bedsAt(3);
+    const beds = bedsAt(0);
     expect(beds).toBe(2);
     tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 10, [], beds);
     expect(at(tl.poseAt('a1', 10))).toEqual({ x: must(o.lounge[0]).x, z: must(o.lounge[0]).z });

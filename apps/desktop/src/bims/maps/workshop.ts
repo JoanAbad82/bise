@@ -7,7 +7,8 @@
 // back desks' chairs, the left aisle along the left desks' chairs, the workbench's two sides, the
 // front corridor to the nap place and the door (front left). Pure. Owner: maps-b.
 import type { Agent } from '@/proto';
-import type { Box, Leg, Spot } from '../model';
+import type { Box, Leg, Office, Pt, Spot } from '../model';
+import type { CozyHints } from '../cozy';
 import { type BOffice, LOFT_LIKE, QUEUE_N, type Way, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, boxAt } from './plan';
 
@@ -128,4 +129,17 @@ export function workshopLayout(agents: readonly Agent[], prev?: WorkshopOffice):
   };
 }
 
-export const workshop: Plan<WorkshopOffice> = { id: 'workshop', ready: true, layout: workshopLayout, things: LOFT_LIKE };
+/** where its look puts the loft's pieces past the common ones (render/maps/workshop.ts loftGrower: the arcade by the left wall, the nap place's middle): nothing cozy there */
+const workshopPieces = (o: Office): Pt[] => [{ x: o.x0 + 0.5, z: 1.2 }, { x: o.x0 + o.W - 2.5, z: o.D - 2.5 }];
+
+/** its look's walls (render/maps/workshop.ts): the tall back one, its left part taken (the mural, the frames, the pegboard, the board); the roller door and its scooter along the right one */
+const workshopCozy: CozyHints = {
+  pieces: workshopPieces,
+  walls: (o) => {
+    const bx = o.boardSpots.reduce((s, p) => s + p.x, 0) / Math.max(1, o.boardSpots.length);
+    return [{ wall: 'back', top: 2.1, busy: [[o.x0, bx + 1.0], [o.mainDesk.x - 0.6, o.mainDesk.x + 0.6]] }, { wall: 'left', top: 1.0 }, { wall: 'right', top: 0 }];
+  },
+  keepOut: (o) => [{ x0: o.x0 + o.W - 0.8, x1: o.x0 + o.W, z0: 4.1, z1: o.D }],
+};
+
+export const workshop: Plan<WorkshopOffice> = { id: 'workshop', ready: true, layout: workshopLayout, things: LOFT_LIKE, cozy: workshopCozy };

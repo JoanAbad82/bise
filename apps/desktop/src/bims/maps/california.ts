@@ -13,6 +13,7 @@
 // is as deep as the room. Owner: maps-d.
 import type { Agent } from '@/proto';
 import { type Bar, type Box, type Leg, type Office, type Park, type Pt, QUEUE_GAP, type Spot } from '../model';
+import { backBusy, type CozyHints } from '../cozy';
 import { type Plan, boxAt, deskNames, wayIn } from './plan';
 
 /** California's office: the numbers its look reads past the common ones. */
@@ -123,7 +124,20 @@ export function californiaLayout(agents: readonly Agent[], prev?: CaliforniaOffi
   return { ...base, rows, roomX1, parkX0, crossBack, crossFront, aisle, pathZ, walks, furniture, queueMore };
 }
 
-export const california: Plan<CaliforniaOffice> = { id: 'california', ready: true, layout: californiaLayout };
+/** where its look puts its pieces in the room (render/maps/california.ts pieceAt: the agave, the crate, the cooler): nothing cozy there */
+const californiaPieces = (o: Office): Pt[] => {
+  const c = o as CaliforniaOffice;
+  return [{ x: c.x0 + 0.5, z: c.D - 0.6 }, { x: c.island.x1 + 0.5, z: c.island.z0 + 0.3 }, { x: c.roomX1 - 0.6, z: c.D * 0.5 }];
+};
+
+/** its look's walls (render/maps/california.ts shell): the sunset mural on the back wall's left, the low left wall and its three surfboards near the front */
+const californiaCozy: CozyHints = {
+  pieces: californiaPieces,
+  walls: (o) => [{ wall: 'back', top: 1.7, busy: [...backBusy(o), [o.x0, o.x0 + 4.8]] }, { wall: 'left', top: 1.1 }, { wall: 'right', top: 0 }],
+  keepOut: (o) => [{ x0: o.x0, x1: o.x0 + 0.5, z0: o.D - 4.35, z1: o.D - 2.45 }],
+};
+
+export const california: Plan<CaliforniaOffice> = { id: 'california', ready: true, layout: californiaLayout, cozy: californiaCozy };
 
 /**
  * The park on its slab (x px0..px1, z pz0..pz1), v10's drawing: the mini ramp across the back left

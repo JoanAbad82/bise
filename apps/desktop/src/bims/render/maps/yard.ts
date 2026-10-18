@@ -18,7 +18,7 @@ import {
   TorusGeometry,
 } from 'three';
 import type { Box, Office, Pt, Spot } from '../../model';
-import { bedsAt } from '../../growth';
+import { BASE_BEDS, bedStage, bedsAt } from '../../growth';
 import { boxAhead, chair, deskLamp, laptop } from '../furniture';
 import { glyph, type Kit } from '../kit';
 import { HOODIE, WORLD, hash, type Palette } from '../palette';
@@ -179,15 +179,12 @@ export function mainDeskOf(b: Build, top: string, body: string): DeskHandles {
 const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;
 const at = (xs: readonly number[], i: number): number => xs[Math.min(i, xs.length - 1)] ?? 0;
 
-/** the stage a nap place's i-th bed comes with: two at 3, two more at 5, the rest at 8 */
-export const bedStage = (i: number): number => (i < 2 ? 3 : i < 4 ? 5 : 8);
-
-/** each nap place's bed the stage has reached (growth.ts bedsAt), in its stage's group (a napper past them naps at its desk) */
+/** each nap place's bed the stage has reached (growth.ts bedsAt) past the cozy kit's two base beds (render/cozy.ts), in its stage's group (a napper past them naps at its desk) */
 export function beds(b: Build, draw: (parent: Group, box: Box, i: number) => void): void {
   const { o, grow } = b;
   const own = o.furniture.filter((x) => x.of !== undefined && o.lounge.some((l) => l.x === x.of?.x && l.z === x.of.z));
   own.forEach((box, i) => {
-    if (i >= bedsAt(grow.stage)) return;
+    if (i < BASE_BEDS || i >= bedsAt(grow.stage)) return;
     const g = b.stage(bedStage(i));
     if (g) draw(g, box, i);
   });

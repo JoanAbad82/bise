@@ -8,7 +8,7 @@
 // Owner: bims-grow.
 import { Group, type Object3D } from 'three';
 import type { Box, Office, Pt } from '../model';
-import { bedsAt, type Grow } from '../growth';
+import { BASE_BEDS, bedStage, bedsAt, type Grow } from '../growth';
 import { type Decor, decorOf } from './decor';
 import { type Kit, boxOf, glyph, onFloor } from './kit';
 import { WORLD, hash, rng } from './palette';
@@ -137,7 +137,7 @@ export function islandLen(o: Office, stage: number): number {
   return full;
 }
 
-/** The loft's nap place (its look's lounge): its rug from stage 3, a bean bag per stage count, in its stage's group. */
+/** The loft's nap place (its look's lounge): its rug from stage 3, a bean bag per stage count past the cozy kit's two base beds, in its stage's group. */
 export function loftLounge(b: Build): void {
   const { k, o, grow: g } = b;
   const { style, pal } = k;
@@ -154,8 +154,9 @@ export function loftLounge(b: Build): void {
   const beans = boxes.filter(isBean);
   const nBeans = bedsAt(g.stage);
   beans.forEach((b, i) => {
-    if (i >= nBeans) return;
-    const st = i < 2 ? 3 : i < 4 ? 5 : 8;
+    // the first two: the cozy kit's base beds (render/cozy.ts)
+    if (i < BASE_BEDS || i >= nBeans) return;
+    const st = bedStage(i);
     const bag = k.add(style.ball((b.x1 - b.x0) / 2 / 1.05 / 0.92), k.mat(WORLD.bean[i % WORLD.bean.length] ?? pal.rug), s(st) ?? s0, (b.x0 + b.x1) / 2, 0.2, (b.z0 + b.z1) / 2);
     bag.scale.set(1.05, 0.62, 1.05);
   });

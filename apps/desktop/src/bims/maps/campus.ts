@@ -5,7 +5,7 @@
 // every row of pods (the back one is the back corridor, the last one the front), each chair straight
 // out to the corridor behind it. Pure. Owner: maps-b.
 import type { Agent } from '@/proto';
-import type { Box, Leg, Pt, Spot } from '../model';
+import type { Box, Leg, Office, Pt, Spot } from '../model';
 import { type BOffice, LOFT_LIKE, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
 import { type Plan, boxAt } from './plan';
 
@@ -93,4 +93,10 @@ export function campusLayout(agents: readonly Agent[], prev?: CampusOffice): Cam
   };
 }
 
-export const campus: Plan<CampusOffice> = { id: 'campus', ready: true, layout: campusLayout, things: LOFT_LIKE };
+/** where its look puts the loft's pieces past the common ones (render/maps/campus.ts loftGrower: the arcade, the nap place's middle): nothing cozy there */
+const campusPieces = (o: Office): Pt[] => {
+  const xs = o.lounge.map((s) => s.x);
+  return [{ x: (xs.length ? Math.max(...xs) + 0.4 : o.x0 + 4) + 0.3, z: 0.3 }, { x: (o.lounge[0]?.x ?? o.x0) + 1.0, z: 1.5 }];
+};
+
+export const campus: Plan<CampusOffice> = { id: 'campus', ready: true, layout: campusLayout, things: LOFT_LIKE, cozy: { pieces: campusPieces } };

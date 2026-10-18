@@ -18,6 +18,7 @@ import { makeEggDecor, type EggDecor } from './eggdecor';
 import { MAIN_HOODIE, WORLD, hash, outfitOf, type Outfit, type Palette } from './palette';
 import { buildWorld, castShadows, lightDesk, type DeskHandles, type World } from './world';
 import { NO_GROW, growSig, type Grow } from '../growth';
+import { cozyAt } from '../cozy';
 import { lookOf } from './maps';
 import type { MapLook } from './maps/look';
 import { makeUnlock } from './unlock';
@@ -331,7 +332,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       drawHalos(frames, look.night);
       for (const [name, d] of world.desks) {
         const rig = rigs.get(name);
-        lightDesk(d, pal, rig?.screen ?? 0, rig ? rig.lamp : name !== mainName());
+        // from stage 9 every desk's lamp is lit at night, its bim there or not (cozy.ts cozyAt: the desk lamps); a stopped bim's stays off
+        const allLit = cozyAt(grow.stage).deskLamps && (rig?.grey ?? 0) < 1;
+        lightDesk(d, pal, rig?.screen ?? 0, (rig ? rig.lamp : name !== mainName()) || allLit);
         seatChair(d.chair, rig?.seat);
       }
       if (!look.reduced && drawPlanes(t, frames, fit, !look.night)) motion = 'walk';

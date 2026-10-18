@@ -19,12 +19,24 @@ export const FRAME_EVERY = 10;
 export const FRAMES_MAX = 30;
 export const GOLDEN_AT = 500;
 
-/** the lounge's bean bags built at each stage (the last count holds past it): bean bag i stands on lounge spot i */
-const BEDS = [0, 0, 0, 2, 2, 4, 4, 4, 8] as const;
+/**
+ * the nap place's beds built at each stage (bed i stands on lounge spot i): two from day one, the
+ * map's base beds (page bims-cozy v2: nobody sleeps on a keyboard on the first day, render/cozy.ts),
+ * then the map's own beds one by one, 8 at the top
+ */
+const BEDS = [2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 8] as const;
+/** the base beds (spots 0 and 1): the cozy kit draws them, the map's look the ones past them */
+export const BASE_BEDS = 2;
 
-/** How many of the lounge's spots have a bean bag at this stage: a bim naps only on one (his bug, bims-fix: they lay in the air). Pure. */
+/** How many of the lounge's spots have a bed at this stage: a bim naps only on one (his bug, bims-fix: they lay in the air). Pure. */
 export function bedsAt(stage: number): number {
   return BEDS[Math.max(0, Math.min(stage, BEDS.length - 1))] ?? 0;
+}
+
+/** The stage bed i comes with (its stage's group: the unlock moment brings it in). Pure. */
+export function bedStage(i: number): number {
+  const s = BEDS.findIndex((n) => n > i);
+  return s < 0 ? LAST_STAGE + 1 : s;
 }
 /** the share of the way to the next stage past which its cones stand */
 export const BUILD_AT = 0.7;

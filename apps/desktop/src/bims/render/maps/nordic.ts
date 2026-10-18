@@ -289,6 +289,8 @@ function desk(b: Build, s: { x: number; z: number; face: number; wz: number; ax:
 
 export const nordic: MapLook = {
   id: 'nordic',
+  // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
+  cozy: { plant: 'pothos', small: 'succulent', coffee: 'kettle', bed: 'bench', shelf: 'candles', poster: 'map', wood: '#c9a77c', cloth: ['#4f6d7a', '#e9e2d4', '#9a958c'], art: ['#4f6d7a', '#7cc26b', '#e9c46a'], pot: '#e9e2d4' },
   pal: palettes(
     { floor: '#ead6b4', wall: '#f7f5f0', wallTop: '#d9c7a6', desk: PINE, deskTop: '#ecd2a6', island: '#f7f5f0', islandTop: PINE, grass: '#eef3f7', dirt: '#7a5a3c', terrace: '#e2d2b4', rug: BLUE },
     { grass: '#9fb0c4', wall: '#8c8a84' },

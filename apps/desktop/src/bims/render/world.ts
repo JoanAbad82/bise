@@ -1,6 +1,7 @@
 // The world (three), every map the same way: the floating grass block (as wide as the garden has
 // grown), then the map's look (render/maps/<id>.ts) on the plan's office: its shell, its eating
-// place, its nap place, one desk per agent and main's, and what the project's growth adds, each
+// place, its nap place, one desk per agent and main's, what the project's growth adds, and the cozy
+// kit's pieces (render/cozy.ts: plants, coffee corner, base beds, shelf, posters, lamps), each
 // stage's pieces in a group of its own (the unlock moment hides the newest). Built once per office, map, theme and growth; what changes per frame (a
 // desk's screen and lamp) is handed back as handles. Its light is the view's (render/view.ts,
 // lightOffice here sets it for an office). Never the accent pink or the error red.
@@ -19,6 +20,7 @@ import { NO_GROW, type Grow } from '../growth';
 import { groundOf } from './camera';
 import { slabWithPits } from './ground';
 import { kitOf } from './kit';
+import { buildCozy } from './cozy';
 import type { Palette } from './palette';
 import type { Build, DeskHandles, MapLook } from './maps/look';
 import type { Style } from './style';
@@ -90,6 +92,8 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   const mainDesk = look.mainDesk(b, mainName);
   desks.set(mainName, mainDesk);
   look.growth(b);
+  // what makes it cozy from day one, and cozier at each stage (render/cozy.ts, Office.cozy)
+  buildCozy(b, look.cozy, desks, mainName);
   if (style.shadows) castShadows(root);
 
   return {
