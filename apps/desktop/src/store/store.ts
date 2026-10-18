@@ -224,7 +224,7 @@ export class Store extends StoreVoice {
     if (sends.cid > this.cid) this.cid = sends.cid;
     // a thread whose rows changed is told before its send goes, as the rows show at once
     if (sends.threads !== sendsWas.threads)
-      for (const [key, t] of Object.entries(sends.threads)) if (t.pending !== sendsWas.threads[key]?.pending) this.emit(`pending:${key}`);
+      for (const [key, t] of Object.entries(sends.threads)) if (t.pending !== pendingOf(sendsWas, key)) this.emit(`pending:${key}`);
     const outs = sendOuts.length === 0 ? cardOuts : [...cardOuts, ...sendOuts];
     for (const o of outs) {
       switch (o.out) {
