@@ -43,7 +43,11 @@ describe('the hero film', () => {
     const back = at(2 * 60 + 38, 'acme-web', 'checkout');
     expect(back?.pose.moving).toBe(true);
     expect(back?.egg?.kind).toBe('moonwalk');
-    expect(at(3 * 60 + 9, 'harness', 'dark-mode')?.pose.seg.act.k).toBe('done');
+    // in the queue, its crate over its head; then done
+    const crate = at(3 * 60 + 9, 'harness', 'dark-mode');
+    expect(crate?.pose.seg.act.k).toBe('landing');
+    expect(crate?.egg?.kind).toBe('itemget');
+    expect(at(3 * 60 + 12, 'harness', 'dark-mode')?.pose.seg.act.k).toBe('done');
     expect(at(4 * 60 + 6, 'bise.dev', 'main')?.egg?.kind).toBe('clap');
   });
 });

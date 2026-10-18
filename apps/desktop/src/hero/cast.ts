@@ -117,7 +117,7 @@ export const CAST: readonly Cast[] = [
       },
       {
         name: 'dark-mode',
-        life: [[0, gone], [s(0, 24), work], [s(2, 30), think], [s(2, 50), work], [s(3, 2), { k: 'landing', rank: 1 }], [s(3, 8), done], [s(4, 33), gone]],
+        life: [[0, gone], [s(0, 24), work], [s(2, 30), think], [s(2, 50), work], [s(3, 2), { k: 'landing', rank: 1 }], [s(3, 11), done], [s(4, 33), gone]],
       },
       { name: 'fix-flaky-test', life: [[0, work], [s(1, 16), { k: 'failed' }], [s(1, 40), work]] },
       {
@@ -176,6 +176,7 @@ export const EGGS: readonly Egg[] = [
   { at: s(2, 12.5), dur: 10.5, office: ACME, bim: 'checkout', kind: 'stare' },
   { at: s(2, 31), dur: 0.8, office: ACME, bim: 'checkout', kind: 'tap' },
   { at: s(2, 36), dur: 6, office: ACME, bim: 'checkout', kind: 'moonwalk' },
+  // in the queue with its crate (it gets there at 3:07.6): the crate over its head, then done at 3:11
   { at: s(3, 8), dur: 2.5, office: HARNESS, bim: 'dark-mode', kind: 'itemget' },
   { at: s(3, 16), dur: 4, office: SITE, bim: 'og-images', kind: 'speedrun' },
   { at: s(3, 42), dur: 3, office: HARNESS, bim: 'main', kind: 'tetris' },
