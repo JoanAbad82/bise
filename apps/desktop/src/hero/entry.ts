@@ -28,8 +28,8 @@ export const ENTRY = {
   done: 2800,
 } as const;
 
-/** a cube's side, town units (about a tree's shade: the lawn in a few hundred) */
-export const CELL = 2.5;
+/** a cube's side, town units (the lawn in about two hundred: every one drawn each frame of the build) */
+export const CELL = 4;
 /** how far below its place a cube starts its rise, town units */
 const RISE = 1.6;
 /** an office's drop, css px */
@@ -233,7 +233,8 @@ export function makeEntry(): Entry {
       box.getCenter(centre);
       // the town's own box (its vertex colours, its bevel): a cube reads as a piece of the slab
       const mesh = new InstancedMesh(STYLE.box(g.cw, size.y, g.cd), s.material as Material, cellsTimed.length);
-      mesh.castShadow = s.castShadow;
+      // no shadow of their own while they rise (a few hundred cubes in every shadow pass: the build stalled)
+      mesh.castShadow = false;
       mesh.receiveShadow = s.receiveShadow;
       mesh.frustumCulled = false;
       s.visible = false;
