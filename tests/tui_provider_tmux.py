@@ -75,10 +75,13 @@ def main():
         # /provider: the list and its states
         t.typed("/provider")
         t.keys("Enter")
-        sc = t.wait(w("settings.prov_sub"))
-        assert re.search(r"Anthropic +✓ from ANTHROPIC_API_KEY", sc), sc
+        # wait for the list's last row, not its subtitle: under load the
+        # capture caught the frame half drawn (ChatGPT, Anthropic, OpenAI,
+        # then nothing: 2 full gates on 2026-10-17)
         # BISE-298: the roles it runs, by name
-        assert re.search(r"OpenRouter +not set up +main · agents · small jobs", sc), sc
+        sc = t.wait(re.compile(r"OpenRouter +not set up +main · agents · small jobs"))
+        assert w("settings.prov_sub") in sc, sc
+        assert re.search(r"Anthropic +✓ from ANTHROPIC_API_KEY", sc), sc
         assert w("settings.prov_more") in sc, sc
         for _ in range(12):
             if re.search(r"› OpenRouter ", t.screen()):

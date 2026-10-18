@@ -91,7 +91,10 @@ def part_a(tmp):
         "SB_AGENT": "probe",
         # the memory watchdog's limit, per process (the hogs below: 300 MB)
         "BEND_MEM_LIMIT_MB": "100",
-        # the output limit (the printer below: 2 MB/s, stopped at ~4 s)
+        # the output limit (the printer below: 8 MB/s, past 5 MB at the
+        # watchdog's first 2 s look; at 2 MB/s a full gate at load 3 took
+        # its second look past the 6 s window and the job went to the
+        # background, 'still running', instead of 'stopped')
         "BEND_OUT_LIMIT_MB": "5",
     })
     log, err = os.path.join(tmp, "repl.log"), os.path.join(tmp, "repl.err")
@@ -115,7 +118,7 @@ def part_a(tmp):
                 "dd if=/dev/zero of=%s bs=1048576 count=300 2>/dev/null; echo dd-rc:$? size:$(wc -c < %s | tr -d ' '); rm -f %s"
                 % ((os.path.join(tmp, "big.bin"),) * 3),
                 # an output without end: stopped at 5 MB, its line after the first MiB
-                "while :; do head -c 1048576 /dev/zero | tr '\\0' a; sleep 0.5; done"]
+                "while :; do head -c 4194304 /dev/zero | tr '\\0' a; sleep 0.5; done"]
         sock = socket.create_connection(("127.0.0.1", port), timeout=120)
         sock.sendall(("run " + " ".join("[[bash: %s]]" % c for c in cmds) + "\n").encode())
         f = sock.makefile("rb")
