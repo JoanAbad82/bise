@@ -24,7 +24,7 @@ export type EggKind =
   | 'stare' // p4: two agents that wait on each other: '!' over both (useful: a real deadlock)
   | 'tap' // o2: a tap on the coffee machine (1 coffee in 200)
   | 'golden' // o5: the golden pineapple (1 snack in 500)
-  | 'loop' // y1: his plane loops before it lands (1 in 50)
+  | 'loop' // y1: his plane loops twice on its way, not once (1 in 50; plane.ts)
   | 'clap' // n1: stage clear: every agent done or idle and his inbox empty, main claps
   | 'shades' // t1: friday after 17:00, idle bims in sunglasses
   | 'lookup' // t4: the eclipse: idle and done bims look up

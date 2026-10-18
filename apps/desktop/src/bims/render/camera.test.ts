@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Office, Spot } from '../model';
 import { FIT, zoomAt } from '../zoom';
-import { EL, aboveTop, fitSite, siteOf, toScreen, viewFit } from './camera';
+import { EL, fitSite, siteOf, toScreen, viewFit } from './camera';
 
 /** the prototype's office numbers for n agents (maps/loft.ts owns the real ones; these only size the site) */
 function officeFor(n: number): Office {
@@ -79,12 +79,5 @@ describe('camera fit', () => {
     // and the view never leaves the fit's rectangle
     expect(v.left).toBeGreaterThanOrEqual(f.left - 1e-9);
     expect(v.top).toBeLessThanOrEqual(f.top + 1e-9);
-  });
-
-  it('drops a plane in from above the top edge', () => {
-    const f = fitSite(siteOf(officeFor(14)), 320, 2000);
-    const at = { x: 2, z: 8 };
-    const h = aboveTop(f, at);
-    expect(toScreen(f, { x: at.x, y: h, z: at.z }).y).toBeLessThan(0);
   });
 });

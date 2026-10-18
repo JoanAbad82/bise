@@ -3,7 +3,7 @@
 // whole site (the floating grass block, the office on it, its trees) shows, never cropped. index.ts
 // copies a Fit onto three's OrthographicCamera; headOf and pick use toScreen, the same numbers.
 // His pinch and pan (zoom.ts Cam) are a view inside the fit (viewFit), the canvas's size unchanged.
-import type { Office, Pt } from '../model';
+import type { Office } from '../model';
 import type { Cam } from '../zoom';
 import { WIDE_GARDEN, groundMargin } from '../growth';
 
@@ -136,11 +136,4 @@ export function viewFit(fit: Fit, cam: Cam): Fit {
 export function toScreen(fit: Fit, p: V3): { x: number; y: number } {
   const q = { x: p.x - fit.target.x, y: p.y - fit.target.y, z: p.z - fit.target.z };
   return { x: (dot(q, RIGHT) - fit.left) / fit.scale, y: (fit.top - dot(q, UP)) / fit.scale };
-}
-
-/** the height above the floor point `at` from which a thing drops in from above the canvas's top edge */
-export function aboveTop(fit: Fit, at: Pt, margin = 0.6): number {
-  const q = { x: at.x - fit.target.x, y: -fit.target.y, z: at.z - fit.target.z };
-  const vy = dot(q, UP);
-  return Math.max(2, (fit.top - vy) / Math.cos(EL) + margin);
 }

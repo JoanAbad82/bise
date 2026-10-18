@@ -26,8 +26,8 @@ export const SPEED = { walk: 2.4, hurry: 3.5, skate: 3.4, carry: 1.8 } as const;
 export const MAX_WALK_S = 6;
 /** after a walk (or a change in place), the renderer's transition (spec §5): the loop still runs */
 export const SETTLE_S = 1.5;
-/** his paper plane: the flight from the top edge (~1.5 s), then the catch, read, thumbs up (~2 s) */
-export const PLANE_S = 3.5;
+/** his paper plane: the flight from his side of the screen (pose.ts PLANE_FLIGHT, 3 s), then the catch, read, thumbs up (PLANE_CATCH, 2 s) */
+export const PLANE_S = 5.0;
 /** the segments kept per bim (a pose asked a bit in the past still answers) */
 const KEEP = 8;
 

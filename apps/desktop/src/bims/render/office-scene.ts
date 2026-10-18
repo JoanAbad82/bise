@@ -4,17 +4,17 @@
 // all in one group in the office's own units. No renderer, no camera, no light: the minimap
 // (render/index.ts) draws it through its view, the town places one per project. frame() poses it
 // for time t and says how the loop must run next (Motion); the caller renders. Owner: bims-wire.
-import { Color, Group, Mesh, MeshBasicMaterial, RingGeometry, type ColorRepresentation, type Object3D, type Vector3 } from 'three';
+import { Color, Group, Matrix4, Mesh, MeshBasicMaterial, RingGeometry, Vector3, type ColorRepresentation, type Object3D } from 'three';
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, Motion, Office } from '../model';
 import { makeBim, type Bim } from './bim';
-import { type Fit, aboveTop } from './camera';
-import { flightAt, makePlane, type Plane } from './plane';
+import type { Fit } from './camera';
+import { cameraStart, flightAt, makePlane, planFlight, type FlightPlan, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { skateRig } from './skate';
 import { eggRig } from './egg';
 import { makeEggDecor, type EggDecor } from './eggdecor';
-import { MAIN_HOODIE, WORLD, outfitOf, type Outfit, type Palette } from './palette';
+import { MAIN_HOODIE, WORLD, hash, outfitOf, type Outfit, type Palette } from './palette';
 import { buildWorld, castShadows, lightDesk, type DeskHandles, type World } from './world';
 import { NO_GROW, growSig, type Grow } from '../growth';
 import { lookOf } from './maps';
@@ -84,7 +84,10 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
   const unlock = makeUnlock(root, style);
   const bims = new Map<string, Bim>();
   const rigs = new Map<string, Rig>();
-  const planes = new Map<string, Plane>();
+  /** his planes in flight, by bim: the mesh, when it left (its key), its plan */
+  const planes = new Map<string, { mesh: Plane; leftAt: string; plan: FlightPlan }>();
+  const basis = new Matrix4();
+  const axis = [new Vector3(), new Vector3(), new Vector3()] as const;
   // the halo under a lit bim (focus.ts): one ring, flat on the floor, shown under each lit bim's feet
   const haloGeo = new RingGeometry(HALO.inner, HALO.outer, 40);
   haloGeo.rotateX(-Math.PI / 2);
@@ -149,7 +152,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     return b;
   }
 
-  function drawPlanes(frames: readonly BimFrame[], fit: Fit): boolean {
+  function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit): boolean {
     const flying = new Set<string>();
     for (const f of frames) {
       const s = f.pose.plane?.since;
@@ -157,19 +160,34 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       const rig = rigs.get(f.name);
       if (!rig) continue;
       flying.add(f.name);
-      let p = planes.get(f.name);
-      if (!p) { p = makePlane(style); planes.set(f.name, p); root.add(p.group); }
       const hand = { x: rig.x, y: 1.0, z: rig.z };
-      const fl = flightAt(hand, aboveTop(fit, hand), s, f.egg?.kind === 'loop');
-      p.group.visible = true;
       // never smaller than PLANE_MIN_PX on screen (designer via bims-qa m_27793: at 320 it was a speck)
-      p.group.scale.setScalar(Math.max(1, (PLANE_MIN_PX * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN));
-      p.group.position.set(fl.p.x, fl.p.y, fl.p.z);
-      p.group.lookAt(fl.p.x + fl.heading.x, fl.p.y + fl.heading.y, fl.p.z + fl.heading.z);
-      p.group.rotateZ(fl.roll);
+      const size = Math.max(1, (PLANE_MIN_PX * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN);
+      // one plan per flight, made when it leaves (his pan or zoom mid-flight moves no plane)
+      const leftAt = (t - s).toFixed(2);
+      let p = planes.get(f.name);
+      if (p?.leftAt !== leftAt) {
+        if (p) { root.remove(p.mesh.group); p.mesh.dispose(); }
+        const loops = f.egg?.kind === 'loop' ? 2 : 1;
+        p = { mesh: makePlane(style), leftAt, plan: planFlight({ from: cameraStart(fit), to: hand, seed: hash(`${f.name}@${leftAt}`), loops, unit: size }) };
+        planes.set(f.name, p);
+        root.add(p.mesh.group);
+      }
+      const fl = flightAt(p.plan, s, hand);
+      const g = p.mesh.group;
+      g.visible = true;
+      g.scale.setScalar(size * fl.grow);
+      g.position.set(fl.p.x, fl.p.y, fl.p.z);
+      // its nose along +z, its top +y (plane.ts): upside down over the loop's top, banked in the turns
+      basis.makeBasis(
+        axis[0].set(fl.up.y * fl.nose.z - fl.up.z * fl.nose.y, fl.up.z * fl.nose.x - fl.up.x * fl.nose.z, fl.up.x * fl.nose.y - fl.up.y * fl.nose.x),
+        axis[1].set(fl.up.x, fl.up.y, fl.up.z),
+        axis[2].set(fl.nose.x, fl.nose.y, fl.nose.z),
+      );
+      g.quaternion.setFromRotationMatrix(basis);
     }
     for (const [name, p] of planes) {
-      if (!flying.has(name)) { root.remove(p.group); p.dispose(); planes.delete(name); }
+      if (!flying.has(name)) { root.remove(p.mesh.group); p.mesh.dispose(); planes.delete(name); }
     }
     return flying.size > 0;
   }
@@ -249,7 +267,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
         lightDesk(d, pal, rig?.screen ?? 0, rig ? rig.lamp : name !== mainName());
         seatChair(d.chair, rig?.seat);
       }
-      if (!look.reduced && drawPlanes(frames, fit)) motion = 'walk';
+      if (!look.reduced && drawPlanes(t, frames, fit)) motion = 'walk';
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
       if (eggDecor?.update(look.eggs) === true) motion = 'walk';
       // the unlock moment: two bims bring the new piece in from the door
@@ -282,7 +300,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       unlock.dispose();
       for (const b of bims.values()) b.dispose();
       bims.clear();
-      for (const p of planes.values()) p.dispose();
+      for (const p of planes.values()) p.mesh.dispose();
       planes.clear();
       for (const h of halos.values()) root.remove(h);
       halos.clear();

@@ -358,8 +358,8 @@ export function transitionOf(from: ActivityKind | null, to: ActivityKind): numbe
   return 0.6;
 }
 
-/** his plane: the flight, then the catch / read / thumbs up / sit back */
-export const PLANE_FLIGHT = 1.5;
+/** his plane: the flight (its zigzag and loop, plane.ts), then the catch / read / thumbs up / sit back */
+export const PLANE_FLIGHT = 3.0;
 export const PLANE_CATCH = 2.0;
 
 const ease = (x: number): number => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
