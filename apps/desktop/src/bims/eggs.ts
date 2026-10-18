@@ -10,6 +10,7 @@
 // Owner: bims-follow.
 import type { Agent } from '@/proto';
 import type { ActivityKind, BimFrame, PlayKind, PokeKind } from './model';
+import { walkTime } from './avoid';
 
 export type EggKind =
   | 'salto' // m1: a done bim's back flip before it skates out (1 in 10); the konami code: every bim
@@ -196,7 +197,7 @@ function candidate(f: BimFrame, i: EggIn, rows: ReadonlyMap<string, Agent>, offi
   const k = seg.act.k;
   const key = `${f.name}@${seg.t.toFixed(3)}`;
   const since = t - seg.t;
-  const walkT = seg.path.len > 0.01 && seg.from !== null ? seg.path.len / seg.speed : 0;
+  const walkT = seg.path.len > 0.01 && seg.from !== null ? walkTime(seg) : 0;
   const timed = (kind: EggKind, start: number, dur: number, label = ''): BimEgg | null => (t >= start && t < start + dur ? { kind, since: t - start, dur, label } : null);
   // the konami code: every bim, its salto, '+30' over main
   if (i.konami !== null && t - i.konami < KONAMI_S && t >= i.konami) return { kind: 'salto', since: t - i.konami, dur: KONAMI_S, label: f.main ? '+30' : '' };

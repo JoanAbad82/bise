@@ -9,6 +9,7 @@
 // the stage and his local day are passed in. render/skate.ts poses a skater from a line. Owner: maps-d.
 import { hash } from './activity';
 import type { Activity, BimFrame, FunIn, Office, Park, Pastime, Pose, Pt } from './model';
+import { walkTime } from './avoid';
 import { type Feature, FEATURE_STAGE, enterLen, exitLen, lengthOf, portIn, portOut, route } from './parkpath';
 
 export { FEATURE_STAGE, type Feature };
@@ -240,7 +241,7 @@ export function skateAt(name: string, p: Pastime, u: number, park: Park): SkateN
 /** s since a skater reached its spot (negative: still walking there) */
 export function sinceArrived(pose: Pose): number {
   const s = pose.seg;
-  return pose.since - (s.path.len > 0.01 ? s.path.len / s.speed : 0);
+  return pose.since - (s.path.len > 0.01 ? walkTime(s) : 0);
 }
 
 /** the trick shown over a followed skater at its pose: the first TRICK_LABEL_S of each trick; null else */

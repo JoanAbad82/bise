@@ -5,6 +5,7 @@
 // box). Loops (typing, hot's sweat, the '?' hops, eating at the island) are 'loop' at LOOP_FPS;
 // reduced motion has none.
 import type { Activity, ActivityKind, Doing, Motion, Pose } from '../model';
+import { walkTime } from '../avoid';
 
 /** rotations in radians: [x, y, z] */
 export type Rot = readonly [number, number, number];
@@ -445,7 +446,7 @@ export function rigOf(inp: RigInput): Rig {
   const k: ActivityKind = act.k;
   const lt = loopT(t, reduced);
   const place = placeOf(pose, reduced);
-  const walkT = seg.path.len > 0.01 && seg.from !== null ? seg.path.len / seg.speed : 0;
+  const walkT = seg.path.len > 0.01 && seg.from !== null ? walkTime(seg) : 0;
   const arrived = reduced ? !place.fading : !pose.moving;
   const dur = reduced ? 0 : transitionOf(seg.from, k);
   const u = pose.since - (reduced ? Math.min(FADE, walkT) : walkT);
@@ -454,7 +455,16 @@ export function rigOf(inp: RigInput): Rig {
 
   let b: Body;
   let motion: Motion;
-  if (!arrived && !reduced) {
+  if (pose.waiting === true && !reduced) {
+    // it stops to let another bim pass, or stands beside its spot (avoid.ts): standing still, as it walks
+    b = walking(k, 0);
+    // its head turns to the bim it waits for (head only, bims m_31438)
+    if (pose.look !== undefined) {
+      const turn = Math.atan2(Math.sin(pose.look - pose.dir), Math.cos(pose.look - pose.dir));
+      b = { ...b, head: [b.head[0], Math.max(-1.1, Math.min(1.1, turn)), b.head[2]] };
+    }
+    motion = pose.moving ? 'walk' : 'still';
+  } else if (!arrived && !reduced) {
     b = walking(k, t);
     motion = 'walk';
   } else if (!arrived) {

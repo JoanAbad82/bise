@@ -5,6 +5,6 @@
     "types": ["node"],
     "tsBuildInfoFile": "node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
-  "include": ["electron.vite.config.ts", "hero.vite.config.ts", "vitest.config.ts", "vitest.nightly.config.ts", "src/main/**/*.ts", "src/shared/**/*.ts", "src/proto/**/*.ts", "src/bims/model.ts", "src/bims/maps/ids.ts", "src/bims/zoom.ts", "src/bims/eggs.ts", "src/bims/growth.ts", "src/bims/fixtures.ts", "src/bims/activity.ts", "src/bims/render/pose.ts", "tests/**/*.ts"],
+  "include": ["electron.vite.config.ts", "hero.vite.config.ts", "vitest.config.ts", "vitest.nightly.config.ts", "src/main/**/*.ts", "src/shared/**/*.ts", "src/proto/**/*.ts", "src/bims/model.ts", "src/bims/maps/ids.ts", "src/bims/zoom.ts", "src/bims/eggs.ts", "src/bims/growth.ts", "src/bims/fixtures.ts", "src/bims/activity.ts", "src/bims/render/pose.ts", "src/bims/avoid.ts", "src/bims/paths.ts", "tests/**/*.ts"],
   "exclude": ["tests/feature/**", "tests/nightly/**"]
 }

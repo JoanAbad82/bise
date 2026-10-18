@@ -11,10 +11,14 @@
 // their segment goes to a park spot and carries the pastime the renderer poses; back, the board in
 // hand (fromSkate). Pure: the same updates give the same poses. Spots shared by several bims (bean
 // bags, island, whiteboard, deck chairs) go first come first served; past the last one, a bim
-// stands beside (spec §3).
+// stands beside (spec §3). Every walk keeps clear of the other bims' walks (avoid.ts, bims-avoid):
+// it may wait, step aside, go round one standing, stop beside a spot someone stands on, or come in
+// by the door a little later; with no clear way at all it goes on with what it did and tries again
+// at the next update (a walk that ended beside its spot too), never through anyone.
 import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, QUEUE_GAP, type Segment, type Spot, type Timeline } from './model';
 import { pastimes } from './skate';
 import { along, makePath, path } from './paths';
+import { type Budget, planOn, progress, trackOf, UPDATE_BUDGET, walkTime, type Track } from './avoid';
 
 /** tiles per second (spec §3): walk, hurry (an urgent ask), skate (done, leaving), carrying a box (landing) */
 export const SPEED = { walk: 2.4, hurry: 3.5, skate: 3.4, carry: 1.8 } as const;
@@ -75,12 +79,16 @@ export function newTimeline(): Timeline {
     if (b.leaving && t >= b.outAt) return null;
     const seg = segAt(b, t);
     if (!seg) return null;
-    const d = (t - seg.t) * seg.speed;
-    const walking = d < seg.path.len - 1e-9;
-    const p = walking ? along(seg.path, d) : { x: seg.spot.x, z: seg.spot.z, dir: seg.spot.face };
+    const walking = t - seg.t < walkTime(seg) - 1e-9;
+    const at = walking ? progress(seg, t - seg.t) : null;
+    // arrived: where its walk ended (its spot, or beside it when another bim stood there, avoid.ts)
+    const end = seg.path.pts.at(-1) ?? seg.spot;
+    const p = at ? along(seg.path, at.d) : { x: end.x, z: end.z, dir: seg.spot.face };
     const plane = b.planes.findLast((te) => te <= t && t - te < PLANE_S);
     return {
       x: p.x, z: p.z, dir: p.dir, moving: walking, since: t - seg.t, seg,
+      // it stops on its walk to let one pass, or it stands beside its spot (avoid.ts): standing, not its activity's pose
+      ...(at?.waiting || (!walking && aside(seg)) ? { waiting: true } : {}),
       ...(plane === undefined ? {} : { plane: { since: t - plane } }),
     };
   };
@@ -88,6 +96,16 @@ export function newTimeline(): Timeline {
   const push = (b: Bim, seg: Segment): void => {
     b.segs.push(seg);
     if (b.segs.length > KEEP) b.segs.splice(0, b.segs.length - KEEP);
+  };
+
+  /** every other bim's walk as planned, the one a new walk keeps clear of (avoid.ts) */
+  const tracks = (but: Bim): Track[] => {
+    const out: Track[] = [];
+    for (const b of bims.values()) {
+      const seg = b === but ? undefined : b.segs.at(-1);
+      if (seg) out.push(trackOf(seg, b.leaving ? b.outAt : Infinity));
+    }
+    return out;
   };
 
   return {
@@ -103,6 +121,9 @@ export function newTimeline(): Timeline {
       // a map with a park: some idle bims skate there (skate.ts; a look over the activity, never one played over an event)
       const idleNow = new Map([...acts].filter(([name]) => bims.get(name)?.over == null));
       const fun2 = pastimes(idleNow, next, t, fun);
+      const later: Later[] = [];
+      // what this update's searches may expand, all together (avoid.ts)
+      const budget: Budget = { left: UPDATE_BUDGET };
 
       for (const [name, row] of acts) {
         let b = bims.get(name);
@@ -114,7 +135,8 @@ export function newTimeline(): Timeline {
         const last = b?.segs.at(-1);
         const fixed = parkSpot ?? fixedSpot(next, name, act);
         // a napper at its desk goes to a bean bag built since (bedFor): the same sig, another place
-        if (b && last && !b.leaving && last.sig === sig && (parkSpot !== undefined || last.act.at === act.at) && !rebuilt && (!fixed || near(fixed, last.spot))) continue;
+        // one that stopped beside its spot (another bim stood in its way, avoid.ts) goes on to it; one kept out comes in
+        if (b && last && !b.leaving && last.sig === sig && (parkSpot !== undefined || last.act.at === act.at) && !rebuilt && (!fixed || near(fixed, last.spot)) && !aside(last) && last.t <= t) continue;
         if (b?.key) held.delete(b.key);
         const shared = fixed ? null : sharedSpot(next, act.at as Shared, held, b?.pref);
         const spot = fixed ?? shared?.spot ?? next.door;
@@ -127,10 +149,14 @@ export function newTimeline(): Timeline {
           bims.set(name, b);
           // the office's first look: everyone at their spot; later, a new agent comes in by the door
           const from = first ? spot : next.door;
-          push(b, dress(walk(next, t, act, sig, from, spot, null), pt, undefined));
+          const [seg, ok] = walk(next, t, act, sig, from, spot, null, first ? null : tracks(b), true, undefined, budget);
+          push(b, dress(seg, pt, undefined));
+          if (!ok) later.push({ b, act, sig, from, spot, prev: null, hidden: true, pt, last: undefined, left: null });
           continue;
         }
         b.key = key;
+        // back before it was out of the map (archived, then not): it stays, unless it finds no way below
+        const left = { leaving: b.leaving, outAt: b.outAt };
         b.leaving = false;
         b.outAt = Infinity;
         if (rebuilt && last) {
@@ -138,14 +164,20 @@ export function newTimeline(): Timeline {
           push(b, dress({ ...last, act, sig, spot, path: makePath([spot]), t: last.sig === sig ? last.t : t }, pt, undefined));
           continue;
         }
-        const now = poseOf(b, t);
-        const seg = dress(walk(next, t, act, sig, now ?? spot, spot, last ? last.act.k : null), pt, last);
-        push(b, seg);
-        if (b.over && b.over.act === act) b.over.until = t + seg.path.len / seg.speed + b.over.stay;
+        // still kept out at the door (no clear way in yet, avoid.ts): it tries to come in again
+        const out = last !== undefined && last.t > t;
+        if (out) b.segs.pop();
+        const from = out ? next.door : (poseOf(b, t) ?? spot);
+        const was = out ? undefined : last;
+        const [raw, ok] = walk(next, t, act, sig, from, spot, was ? was.act.k : null, tracks(b), out, was, budget);
+        const seg = dress(raw, pt, was);
+        // no clear way: it goes on as it was (the others keep clear of that) and tries again below
+        if (ok || out) push(b, seg);
+        else Object.assign(b, left);
+        if (ok && b.over && b.over.act === act && b.over.until === Infinity) b.over.until = seg.t + walkTime(seg) + b.over.stay;
+        if (!ok) later.push({ b, act, sig, from, spot, prev: was ? was.act.k : null, hidden: out, pt, last: was, left });
       }
 
-      // an event whose walk wasn't made here (the room was rebuilt, the same stretch went on): it ends anyway
-      for (const b of bims.values()) if (b.over && b.over.until === Infinity) b.over.until = t + MAX_WALK_S + b.over.stay;
 
       // gone from the activities (archived): it skates off the terrace's edge
       for (const [name, b] of bims) {
@@ -156,10 +188,27 @@ export function newTimeline(): Timeline {
         b.leaving = true;
         const act: Activity = { k: 'done', at: 'terrace' };
         const now = rebuilt ? null : poseOf(b, t);
-        const seg = walk(next, t, act, 'gone', now ?? next.exit, next.exit, last?.act.k ?? null);
-        push(b, seg);
-        b.outAt = t + seg.path.len / seg.speed;
+        const [seg, ok] = walk(next, t, act, 'gone', now ?? next.exit, next.exit, last?.act.k ?? null, rebuilt ? null : tracks(b), false, rebuilt ? undefined : last, budget);
+        if (ok) push(b, seg);
+        b.outAt = ok ? seg.t + walkTime(seg) : Infinity;
+        if (!ok) later.push({ b, act, sig: 'gone', from: now ?? next.exit, spot: next.exit, prev: last?.act.k ?? null, hidden: false, pt: undefined, last, left: null });
       }
+      // a walk with no clear way when it was planned: planned again once every other bim's walk of this update is known
+      // still none: one coming in stays out, one leaving stays (it leaves at its next update), the others go on as they were
+      for (const w of later) {
+        if (w.hidden) w.b.segs.pop();
+        const [raw, ok] = walk(next, t, w.act, w.sig, w.from, w.spot, w.prev, tracks(w.b), w.hidden, w.last, budget);
+        const seg = w.sig === 'gone' ? raw : dress(raw, w.pt, w.last);
+        if (ok || w.hidden) push(w.b, seg);
+        if (ok && w.left) Object.assign(w.b, { leaving: false, outAt: Infinity });
+        if (w.sig === 'gone') {
+          w.b.leaving = ok;
+          w.b.outAt = ok ? seg.t + walkTime(seg) : Infinity;
+        }
+        if (ok && w.b.over && w.b.over.act === w.act && w.b.over.until === Infinity) w.b.over.until = seg.t + walkTime(seg) + w.b.over.stay;
+      }
+      // an event whose walk wasn't made here (the room was rebuilt, the same stretch went on, no clear way): it ends anyway
+      for (const b of bims.values()) if (b.over && b.over.until === Infinity) b.over.until = t + MAX_WALK_S + b.over.stay;
       for (const [name, b] of bims) if (b.leaving && b.outAt < t) bims.delete(name);
 
       for (const e of events) {
@@ -175,7 +224,20 @@ export function newTimeline(): Timeline {
 
     poseAt(name: string, t: number): Pose | null {
       const b = bims.get(name);
-      return b ? poseOf(b, t) : null;
+      const pose = b ? poseOf(b, t) : null;
+      if (!pose?.waiting) return pose;
+      // waiting: it looks at the nearest bim (the one it lets pass, or the one on its spot)
+      let near: Pose | null = null;
+      let best = Infinity;
+      for (const o of bims.values()) {
+        const q = o === b ? null : poseOf(o, t);
+        const d = q ? Math.hypot(q.x - pose.x, q.z - pose.z) : Infinity;
+        if (q && d < best) {
+          best = d;
+          near = q;
+        }
+      }
+      return near ? { ...pose, look: Math.atan2(near.x - pose.x, near.z - pose.z) } : pose;
     },
 
     names(t: number): readonly string[] {
@@ -190,7 +252,7 @@ export function newTimeline(): Timeline {
         // an event played (a coffee, a visit, a report): the loop runs until the bim is back
         if (b.over) return true;
         const seg = pose.seg;
-        if (seg.from !== null && t < seg.t + seg.path.len / seg.speed + SETTLE_S) return true;
+        if (seg.from !== null && t < seg.t + walkTime(seg) + SETTLE_S) return true;
       }
       return false;
     },
@@ -199,8 +261,29 @@ export function newTimeline(): Timeline {
 
 /** a segment with its pastime (skate.ts), and whether it walks off the park with its board in hand */
 function dress(seg: Segment, pt: Pastime | undefined, last: Segment | undefined): Segment {
-  const plain: Segment = { t: seg.t, act: seg.act, sig: seg.sig, spot: seg.spot, path: seg.path, speed: seg.speed, from: seg.from };
+  const plain: Segment = { t: seg.t, act: seg.act, sig: seg.sig, spot: seg.spot, path: seg.path, speed: seg.speed, from: seg.from, ...(seg.waits ? { waits: seg.waits } : {}) };
   return { ...plain, ...(pt ? { pastime: pt } : {}), ...(!pt && last?.pastime ? { fromSkate: true } : {}) };
+}
+
+/** a walk to plan again at the end of the update (walk's arguments) */
+interface Later {
+  readonly b: Bim;
+  readonly act: Activity;
+  readonly sig: string;
+  readonly from: { x: number; z: number };
+  readonly spot: Spot;
+  readonly prev: Segment['from'];
+  readonly hidden: boolean;
+  readonly pt: Pastime | undefined;
+  readonly last: Segment | undefined;
+  /** it was leaving when it came back: leaving it stays until a way back is found */
+  readonly left: { readonly leaving: boolean; readonly outAt: number } | null;
+}
+
+/** its walk ended beside its spot, not on it */
+function aside(seg: Segment): boolean {
+  const end = seg.path.pts.at(-1);
+  return end !== undefined && !near(end, seg.spot);
 }
 
 /** what makes two activities the same stretch: its kind, its rank in the queue, its trip, the other bim of a message */
@@ -208,11 +291,23 @@ function sigOf(a: Activity): string {
   return `${a.k}|${a.rank === undefined ? '' : String(a.rank)}|${a.key === undefined ? '' : String(a.key)}|${a.with ?? ''}`;
 }
 
-/** a walk from `from` (where it stands) to `spot`, at its activity's speed, capped at MAX_WALK_S */
-function walk(o: Office, t: number, act: Activity, sig: string, from: { x: number; z: number }, spot: Spot, prev: Segment['from']): Segment {
+/**
+ * A walk from `from` (where it stands) to `spot`, at its activity's speed (capped at MAX_WALK_S on
+ * the shortest walk), clear of the other bims' walks (`others`, avoid.ts: it may wait, step aside
+ * or go round; null: as the crow walks, the world rebuilt or the first look). `hidden`: it comes in
+ * by the door and may come in later.
+ */
+function walk(o: Office, t: number, act: Activity, sig: string, from: { x: number; z: number }, spot: Spot, prev: Segment['from'], others: readonly Track[] | null, hidden: boolean, was: Segment | undefined, budget: Budget): [Segment, boolean] {
   const p = path(o, from, spot);
   const base = sig === 'gone' || act.k === 'done' ? SPEED.skate : act.k === 'landing' ? SPEED.carry : act.urgent ? SPEED.hurry : SPEED.walk;
-  return { t, act, sig, spot, path: p, speed: Math.max(base, p.len / MAX_WALK_S), from: prev };
+  const seg: Segment = { t, act, sig, spot, path: p, speed: Math.max(base, p.len / MAX_WALK_S), from: prev };
+  // a bim standing still where it was needs no plan; one coming in by the door does (someone may stand there)
+  if (others === null || (p.len < 1e-6 && !hidden)) return [seg, true];
+  const clear = planOn(o, from, spot, seg.speed, t, others, hidden, was ? { track: trackOf(was), speed: was.speed } : null, budget);
+  // no clear way: kept out of the door (hidden), else the caller keeps its walk as it was
+  if (clear === null) return [{ ...seg, t: Infinity, path: makePath([from]) }, false];
+  const { plan, speed } = clear;
+  return [{ ...seg, t: plan.t, speed, path: makePath(plan.pts), ...(plan.waits.length > 0 ? { waits: plan.waits } : {}) }, true];
 }
 
 /** a spot that belongs to the bim or to its rank (desk, main's desk, the door, the queue); null for a shared one */

@@ -243,6 +243,12 @@ export interface Path {
   readonly len: number;
 }
 
+/** A stop on a walk (avoid.ts): at `d` tiles along its path, it stands `s` seconds to let another bim pass. */
+export interface Wait {
+  readonly d: number;
+  readonly s: number;
+}
+
 /** One stretch of a bim's life: from `t`, it goes along `path` at `speed` to `spot` and does `act` there. */
 export interface Segment {
   readonly t: number;
@@ -253,6 +259,8 @@ export interface Segment {
   readonly path: Path;
   /** tiles per second (walk 2.4, hurry 3.5, skate 3.4, carrying 1.8) */
   readonly speed: number;
+  /** where it stops on the way to let another bim pass (avoid.ts), in order; absent: none */
+  readonly waits?: readonly Wait[];
   /** the activity before (the transition the renderer plays, spec §5), null for the first */
   readonly from: ActivityKind | null;
   /** how the map draws an idle bim here (skate.ts): skating in the park; absent: the activity's own pose */
@@ -289,6 +297,10 @@ export interface Pose extends Pt {
   /** the way it faces, radians */
   readonly dir: number;
   readonly moving: boolean;
+  /** on its walk, it stands still a moment to let another bim pass (avoid.ts) */
+  readonly waiting?: boolean;
+  /** waiting: the way to the bim it waits for (radians, three's y rotation), its head turns there */
+  readonly look?: number;
   /** seconds since its segment started (the renderer's loops and transitions) */
   readonly since: number;
   readonly seg: Segment;
