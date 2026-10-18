@@ -590,9 +590,9 @@
       list.classList.toggle("bn-on", all.length > 0 || composer.classList.contains("bn-on") || writing());
       list.classList.toggle("bn-writing", writing());
       const who = spaced(meta.agent || "main");
-      barText.textContent = barNote || (state === "updating" ? NW.updating(who) : NW.sendBar(drafts, who));
+      barText.textContent = barNote || (state === "updating" && !drafts ? NW.updating(who) : NW.sendBar(drafts, who));
       bar.classList.toggle("bn-on", drafts > 0 || !!barNote || state === "updating");
-      barSend.disabled = drafts === 0 || state === "updating";
+      barSend.disabled = drafts === 0;
       // the frame's count: nothing at 0 (a lone 0 is a riddle), else `1 note` / `3 notes` (ambient, m_4868)
       const fc = frameCount(); if (fc) fc.textContent = NW.count(drafts);
       const fs = frameSend(); if (fs) fs.disabled = drafts === 0;
@@ -905,8 +905,10 @@
     });
 
     // ---- send: the button, the frame's button, ⌘⏎
+    // updating (his last send not answered by a publish yet) never holds the next one: a long-running
+    // agent's turn may not end for hours, and the server takes a send in any state (notes-send)
     async function send() {
-      if (!M.drafts().length || state === "updating") return;
+      if (!M.drafts().length) return;
       clearTimeout(saveT);
       // start notes go to main, never the page's agent: the page doesn't update for them alone
       const toMain = M.drafts().every((n) => n.kind === "start" || n.kind === "stop");

@@ -93,6 +93,9 @@ export const LAND = [
   // a bise page's frame keeps every control whole from 1400 to 320 px, the words give way first
   // (page-head, his m_26492)
   'checks/artifacts/page-head.spec.ts',
+  // on a page updating (a pick sent, its agent still on it), his typed notes go with ⌘⏎, the send
+  // bar and the frame's send: sent, one message each (notes-send, his « le bouton send »)
+  'checks/artifacts/notes-send.spec.ts',
   // an app from the DMG or Downloads asks once to move to Applications; 'Not now' is kept for its
   // build; settings › update moves it (apple-signing ag-move; the alert and the move stubbed)
   'checks/native/move-apps.spec.ts',
