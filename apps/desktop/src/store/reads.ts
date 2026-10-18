@@ -41,7 +41,6 @@ import {
   type HubLine,
   type InboxList,
   type PagesList,
-  type Pending,
   type PrsList,
   type QueuedTake,
   type TalkShot,
@@ -276,7 +275,7 @@ export class StoreReads extends StoreBase {
     return this.slice<Away | null>("away", null);
   }
   core(): CoreState {
-    return this.coreState;
+    return this.facts.core;
   }
   threadOrder(key: string): ThreadOrder {
     return this.threads.get(key)?.view ?? EMPTY_ORDER;
@@ -291,10 +290,6 @@ export class StoreReads extends StoreBase {
   typing(key: string): string {
     return this.threads.get(key)?.typing ?? "";
   }
-  pending(key: string): readonly Pending[] {
-    return this.threads.get(key)?.pending ?? EMPTY;
-  }
-
   /** Each role's model and effort (V17; set with command({cmd: 'role_set', role, model?, effort?})). */
   roles(): readonly RoleRow[] {
     return this.slice("roles", EMPTY);

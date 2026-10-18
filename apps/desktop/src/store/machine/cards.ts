@@ -75,7 +75,7 @@ export function stepCards(s: CardsState, f: HubFacts, input: Input): Step {
     case "ev":
       return input.ev.ev === "projects" ? rowsCame(s, f, input.at_ms) : [s, NONE];
     case "win":
-      return settled(s, f, input.ev, input.at_ms);
+      return input.ev.ev === "card_answered" || input.ev.ev === "card_refused" ? settled(s, f, input.ev, input.at_ms) : [s, NONE];
     case "do":
       return does(s, f, input.intent, input.at_ms);
   }
@@ -109,7 +109,7 @@ function rowsCame(s: CardsState, f: HubFacts, at: number): Step {
 }
 
 /** Main's answer to this window's own card request. */
-function settled(s: CardsState, f: HubFacts, ev: WinEv, at: number): Step {
+function settled(s: CardsState, f: HubFacts, ev: Extract<WinEv, { ev: "card_answered" | "card_refused" }>, at: number): Step {
   const key = actedKey(ev.project, ev.card);
   const k = cardKeyOf(ev.project, ev.card);
   if (ev.ev === "card_refused") {
@@ -207,6 +207,9 @@ function does(s: CardsState, f: HubFacts, intent: Intent, at: number): Step {
         at,
       );
     }
+    default:
+      // his messages: the sends slice's (machine/sends.ts)
+      return [s, NONE];
   }
 }
 

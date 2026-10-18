@@ -5,9 +5,10 @@
 // a write to his kept asides, as data; the shell (store.ts) runs them at one edge, in order.
 // HubFacts: what the hubs said that several slices read (their last `projects` rows), held once,
 // as it came, owned by no slice. Pure, no state. Owner: amb-core.
-import type { Artifact, Part, ProjectRow } from "@/proto";
+import type { Artifact, Mode, Part, ProjectRow } from "@/proto";
 import type { OptAct } from "@/proto/rows";
-import type { BiseApi, CoreCmd } from "@/shared/api";
+import type { BiseApi, CoreCmd, CoreState } from "@/shared/api";
+import type { Sent } from "../echo";
 import type { Acted } from "../acted";
 import type { AnswerFrom, AnsweredFrom, CardAnswered } from "../answered";
 import type { Refused } from "../refused";
@@ -20,7 +21,11 @@ import type { Ev } from "../types";
  */
 export type WinEv =
   | ({ readonly ev: "card_answered" } & CardAnswered)
-  | { readonly ev: "card_refused"; readonly project: string; readonly card: number; readonly text: string };
+  | { readonly ev: "card_refused"; readonly project: string; readonly card: number; readonly text: string }
+  /** turn/send's result (A1): his send `cid` has its message id (null: the hub made none) */
+  | ({ readonly ev: "sent" } & Sent)
+  /** main's connection to the core changed (CorePort.onState); the facts hold the new state already */
+  | { readonly ev: "core"; readonly state: CoreState };
 
 /** His gestures. */
 export type Intent =
@@ -38,13 +43,31 @@ export type Intent =
   /** his option `n` of a card: its act when the hub's row gives it one (nothing sent), else his answer */
   | { readonly i: "pick"; readonly project: string; readonly card: number; readonly n: number; readonly from?: AnswerFrom }
   /** an act the hub gave (a page's chip, a page answer's jump): open it, nothing sent */
-  | { readonly i: "open"; readonly project: string; readonly act: OptAct };
+  | { readonly i: "open"; readonly project: string; readonly act: OptAct }
+  /** his words to an agent: shown at once as sending, then sent (none while the core is down) */
+  | {
+      readonly i: "send";
+      readonly project: string;
+      readonly agent: string;
+      readonly text: string;
+      readonly mode?: Mode;
+      /** his images and files go as parts (the hub stores each image once) */
+      readonly parts?: readonly Part[];
+    }
+  /** 'try again' on his failed message of thread `key`: the same words, mode and parts, under a new cid */
+  | { readonly i: "resend"; readonly key: string; readonly cid: number }
+  /** he drops his message `cid` of thread `key` (its row shows 'dismiss' when it failed) */
+  | { readonly i: "dismiss"; readonly key: string; readonly cid: number };
 
-/** One input to the machine; `at_ms` is the shell's clock when it came (step never reads one). */
+/**
+ * One input to the machine; `at_ms` is the shell's clock when it came (step never reads one).
+ * A gesture also carries `cid`, the next of the window's one counter of request ids (the shell's,
+ * shared with its /restart and dictation ids): a step that makes a request uses it and says so.
+ */
 export type Input = { readonly at_ms: number } & (
   | { readonly in: "ev"; readonly ev: Ev }
   | { readonly in: "win"; readonly ev: WinEv }
-  | { readonly in: "do"; readonly intent: Intent }
+  | { readonly in: "do"; readonly intent: Intent; readonly cid: number }
 );
 
 /** A write to his kept asides (kept across a reload), typed per key. */
@@ -72,18 +95,31 @@ export type Output =
   | { readonly out: "nav"; readonly to: ArtifactAt }
   | { readonly out: "fx"; readonly fx: Fx };
 
+/**
+ * What store.do(intent) did, read from its step (architect m_30501 (5)), one record for every intent:
+ * `answered`: his answer went to the hub (answer, pick without an act, retry_card of an answer): a
+ * view folds the card only then. `cid`: the request id of the message a send or a resend made
+ * (sent, or failed at once while the core is down); absent for every other intent.
+ */
+export interface Did {
+  readonly answered: boolean;
+  readonly cid?: number;
+}
+
 /** The outputs the app's edge runs (app/edge.ts): the window's moves and window.bise's calls. */
 export type Effect = Extract<Output, { out: "nav" | "fx" }>;
 
-/** What the hubs said that several slices read, as it came. */
+/** What the hubs said that several slices read, as it came, and the window's connection to its core. */
 export interface HubFacts {
   /** every project's row, the last `projects` event's own array */
   readonly rows: readonly ProjectRow[];
   /** each project's artifacts, its last `artifacts` event's own items */
   readonly artifacts: Readonly<Partial<Record<string, readonly Artifact[]>>>;
+  /** main's connection to the core (CorePort.onState), the one copy (architect m_30501): down until it says up */
+  readonly core: CoreState;
 }
 
-export const NO_FACTS: HubFacts = { rows: [], artifacts: {} };
+export const NO_FACTS: HubFacts = { rows: [], artifacts: {}, core: "down" };
 
 /** The facts after one of the core's or a hub's events: the same object when it names none. Pure. */
 export function factsOf(f: HubFacts, ev: Ev): HubFacts {

@@ -308,12 +308,8 @@ export function applyTyped(s: Store, ev: Ev): void {
         }
         return;
       }
-      if (ev.cmd !== "send") return;
-      // G: exactly the row with this cid; with no cid (an older core or
-      // hub) the oldest sending row of that project, as before
-      if (ev.cid !== undefined && ev.cid !== null)
-        s.failCid(ev.cid, ev.reason ?? "refused", ev.text);
-      else s.failOldest(ev.project ?? null, ev.text);
+      // G: his send's error settles its row (machine/sends.ts)
+      if (ev.cmd === "send") s.sendFailed(ev);
       return;
     case "confirm":
       // a question belongs to the connection that asked: only this window gets it

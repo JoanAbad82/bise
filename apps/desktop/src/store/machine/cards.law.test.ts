@@ -145,7 +145,7 @@ function inputsOf(seed: number, n: number): Input[] {
     const k = r.int(100);
     if (burst && i === 3) {
       // the burst: every one of its cards answered, in a row
-      for (const id of BURST) out.push({ at_ms: at, in: "do", intent: { i: "answer", project: BETA, card: id, reply: "1" } });
+      for (const id of BURST) out.push({ at_ms: at, in: "do", cid: 0, intent: { i: "answer", project: BETA, card: id, reply: "1" } });
       continue;
     }
     const [p, id] = anyCard();
@@ -157,15 +157,15 @@ function inputsOf(seed: number, n: number): Input[] {
       out.push(projectsEv());
     } else if (k < 42) {
       const from = fromOf();
-      out.push({ at_ms: at, in: "do", intent: { i: "answer", project: p, card: id, reply: r.pick(["1", "2", "the cold one"]), ...(r.chance(0.2) ? { parts: [{ kind: "image" as const, name: "[Image #1]", source: "/tmp/a.png" }] } : {}), ...(from === undefined ? {} : { from }) } });
+      out.push({ at_ms: at, in: "do", cid: 0, intent: { i: "answer", project: p, card: id, reply: r.pick(["1", "2", "the cold one"]), ...(r.chance(0.2) ? { files: ["/tmp/a.png"] } : {}), ...(from === undefined ? {} : { from }) } });
     } else if (k < 48) {
       // his option n: an act the row gives it opens (nothing sent), else his answer
       const from = fromOf();
-      out.push({ at_ms: at, in: "do", intent: { i: "pick", project: p, card: id, n: r.pick([1, 2, 2]), ...(from === undefined ? {} : { from }) } });
+      out.push({ at_ms: at, in: "do", cid: 0, intent: { i: "pick", project: p, card: id, n: r.pick([1, 2, 2]), ...(from === undefined ? {} : { from }) } });
     } else if (k < 50) {
       out.push({ at_ms: at, in: "ev", ev: { ev: "artifacts", project: p, items: r.pick(ARTS) } });
-    } else if (k < 54) out.push({ at_ms: at, in: "do", intent: { i: "close", project: p, card: id } });
-    else if (k < 62) out.push({ at_ms: at, in: "do", intent: { i: "retry_card", project: p, card: id } });
+    } else if (k < 54) out.push({ at_ms: at, in: "do", cid: 0, intent: { i: "close", project: p, card: id } });
+    else if (k < 62) out.push({ at_ms: at, in: "do", cid: 0, intent: { i: "retry_card", project: p, card: id } });
     else if (k < 82) {
       // the hub took it: sometimes its rows dropped the card first, sometimes it kept it open
       if (r.chance(0.4)) {
@@ -237,7 +237,7 @@ function modelStep(m: Model, f: HubFacts, input: Input): CoreCmd[] {
     for (const k of [...m.attempts.keys()]) if (!m.flight.has(k)) m.attempts.delete(k);
     return cmds;
   }
-  if (input.in === "win") {
+  if (input.in === "win" && (input.ev.ev === "card_answered" || input.ev.ev === "card_refused")) {
     const { project: p, card: c } = input.ev;
     const k = key(p, c);
     const from = m.answering.get(`${p}/${String(c)}`);
@@ -264,6 +264,7 @@ function modelStep(m: Model, f: HubFacts, input: Input): CoreCmd[] {
       m.jumps.push({ project: p, agent: "main", card: c, seq: m.jumps.length + 1 });
     return cmds;
   }
+  if (input.in !== "do") return cmds;
   const it = input.intent;
   if (it.i === "answer") answer(it.project, it.card, it.reply, it.parts, it.from, input.at_ms);
   else if (it.i === "close") close(it.project, it.card, input.at_ms);

@@ -37,10 +37,10 @@ import type {
 import { cardRefusedOf, type Acted } from "./acted";
 import type { Refused } from "./refused";
 import { cardsInit, inboxView, stepCards, type AnswerJump, type CardsState } from "./machine/cards";
+import { pendingOf, sendingNow, sendsInit, stepSends, type SendsState } from "./machine/sends";
 import type { InboxItem } from "@/inbox/listed";
-import { factsOf, type Effect, type Input, type Intent, type Output, type WinEv } from "./machine/types";
+import { factsOf, type Did, type Effect, type Input, type Intent, type Output, type WinEv } from "./machine/types";
 import type { CoreState } from "@/shared/api";
-import { common } from "@/proto/words.gen";
 import {
   type Ev,
   type EvOf,
@@ -58,8 +58,8 @@ import {
 import { applyTyped } from "./apply";
 import { answers, listsLive, merged, planJump, planNewer } from "./window";
 import { trim } from "./trim";
-import { answered, echoOf, keepLanded, sentOf, type Sent } from "./echo";
-import { EMPTY, type Thread } from "./base";
+import { sentOf } from "./echo";
+import type { Thread } from "./base";
 import { cardAnsweredOf, cardKeyOf, type AnsweredFrom } from "./answered";
 import { StoreVoice } from "./voice";
 
@@ -71,6 +71,8 @@ export type { AnswerJump } from "./machine/cards";
 export class Store extends StoreVoice {
   /** the cards slice (machine/cards.ts): his answers and closes in flight, how they settled; his kept lists read back */
   private cardsState: CardsState = cardsInit(this.asideKeep === null ? null : (k) => this.asideKeep?.read(k));
+  /** the sends slice (machine/sends.ts): his messages on their way, how they settled */
+  private sendsState: SendsState = sendsInit();
   /** the inbox's view as last read, and what it was made of (inboxItems()) */
   private inboxMemo: { rows: unknown; acted: unknown; refused: unknown; items: readonly InboxItem[] } | null = null;
   /** the app's edge for the machine's effects (onEffect) */
@@ -80,8 +82,9 @@ export class Store extends StoreVoice {
 
   /** Applies one raw event from the core; false when it isn't one the store knows. */
   apply(raw: unknown): boolean {
+    // A1: the window-local 'sent' (main's ipc.ts): his send `cid` has its message id. Always a known event.
     const sent = sentOf(raw);
-    if (sent !== null) return this.sendAnswered(sent);
+    if (sent !== null) return this.settled({ ev: "sent", ...sent });
     // main's window-local answers to this window's own card requests (machine/types.ts WinEv)
     const done = cardAnsweredOf(raw);
     if (done !== null) return this.settled({ ev: "card_answered", ...done });
@@ -105,8 +108,8 @@ export class Store extends StoreVoice {
 
   /** The core went up or down: down fails every send still on its way ('not sent · retry'). */
   setCore(state: CoreState): void {
-    if (state === this.coreState) return;
-    this.coreState = state;
+    if (state === this.facts.core) return;
+    this.facts = { ...this.facts, core: state };
     this.emit("core");
     // a new core knows nothing of the window: what it shows is said again
     if (state === "up") this.sayAgain();
@@ -114,17 +117,8 @@ export class Store extends StoreVoice {
     this.commandsAsked = false;
     for (const a of this.asked.values()) a.resolve(null);
     this.asked.clear();
-    for (const [key, t] of this.threads) {
-      if (!t.pending.some((p) => p.state === "sending")) continue;
-      // not answered yet: it may have reached the hub by now (lostAt: echo.ts takes it by its words)
-      const now = this.now();
-      t.pending = t.pending.map((p) =>
-        p.state !== "sending"
-          ? p
-          : { ...p, state: "failed", why: common.not_sent, ...(typeof p.msgId === "number" ? {} : { lostAt: now }) },
-      );
-      this.emit(`pending:${key}`);
-    }
+    // every send still on its way fails (machine/sends.ts)
+    this.stepIn({ at_ms: this.now(), in: "win", ev: { ev: "core", state } });
   }
 
   /**
@@ -154,7 +148,7 @@ export class Store extends StoreVoice {
   /** @internal for apply.ts */ thread(key: string): Thread {
     let t = this.threads.get(key);
     if (t === undefined) {
-      t = { view: EMPTY_ORDER, byPos: new Map(), typing: "", pending: EMPTY };
+      t = { view: EMPTY_ORDER, byPos: new Map(), typing: "" };
       this.threads.set(key, t);
     }
     return t;
@@ -164,11 +158,8 @@ export class Store extends StoreVoice {
     const key = threadKey(ev.project, ev.agent);
     const t = this.thread(key);
     for (const e of ev.entries) this.putEntry(key, t, e);
-    // his message can come back in a page, not as an entry event: a thread he opened after
-    // sending (from the bar, the spotlight), or the page a reconnection sends. Its pending row
-    // goes the same way (ambient-lead m_20138: it stayed 'sending…' after main answered)
-    if (t.pending.length > 0)
-      for (const e of ev.entries) if (e.kind === "you") this.landed(key, t, e);
+    // his message can come back in a page, not as an entry event: its row goes the same way (machine/sends.ts)
+    this.stepIn({ at_ms: this.now(), in: "ev", ev });
     // a page of older entries keeps the newer ones; its before/more are the oldest page's; the
     // window's page (a jump's, a newer one's) moves the gap (window.ts)
     const pos = ev.entries.map((e) => e.pos);
@@ -195,7 +186,8 @@ export class Store extends StoreVoice {
       const order = [...t.view.order, ev.entry.pos].sort((a, b) => a - b);
       this.setView(key, t, { ...t.view, order, loaded: true });
     }
-    if (ev.entry.kind === "you") this.landed(key, t, ev.entry);
+    // his message landed: its row goes (machine/sends.ts)
+    if (ev.entry.kind === "you") this.stepIn({ at_ms: this.now(), in: "ev", ev });
   }
 
   private putEntry(key: string, t: Thread, e: Entry): void {
@@ -215,17 +207,6 @@ export class Store extends StoreVoice {
     }
   }
 
-  /** His message landed: its pending send goes, by its id (A1, echo.ts); no row: its id is kept. */
-  private landed(key: string, t: Thread, e: Entry): void {
-    const i = echoOf(t.pending, e);
-    // no row, or a lost row taken by its words: the id is kept, so a send answered with it
-    // later leaves at once (review-refactor m_30778)
-    if (i < 0 || t.pending[i]?.msgId !== e.msg_id) t.landedIds = keepLanded(t.landedIds, e.msg_id);
-    if (i < 0) return;
-    t.pending = t.pending.filter((_, j) => j !== i);
-    this.emit(`pending:${key}`);
-  }
-
   /**
    * One input through the cards slice (machine/cards.ts), then its outputs at the edge, in order:
    * a kept list is put (its listeners told) and written to his asides, a command goes to the core;
@@ -234,8 +215,17 @@ export class Store extends StoreVoice {
    */
   private stepIn(input: Input, rowsCame = false): readonly Output[] {
     const was = this.cardsState;
-    const [next, outs] = stepCards(was, this.facts, input);
+    const [next, cardOuts] = stepCards(was, this.facts, input);
     this.cardsState = next;
+    const sendsWas = this.sendsState;
+    const [sends, sendOuts] = stepSends(sendsWas, this.facts, input);
+    this.sendsState = sends;
+    // the window's one counter of request ids moves past the one a send took (machine/types.ts Input)
+    if (sends.cid > this.cid) this.cid = sends.cid;
+    // a thread whose rows changed is told before its send goes, as the rows show at once
+    if (sends.threads !== sendsWas.threads)
+      for (const [key, t] of Object.entries(sends.threads)) if (t.pending !== sendsWas.threads[key]?.pending) this.emit(`pending:${key}`);
+    const outs = sendOuts.length === 0 ? cardOuts : [...cardOuts, ...sendOuts];
     for (const o of outs) {
       switch (o.out) {
         case "cmd":
@@ -272,10 +262,13 @@ export class Store extends StoreVoice {
     return items;
   }
   /** His gesture (machine/types.ts Intent), through the machine. */
-  do(intent: Intent): { readonly answered: boolean } {
-    const outs = this.stepIn({ at_ms: this.now(), in: "do", intent });
+  do(intent: Intent): Did {
+    const cid = this.cid + 1;
+    const outs = this.stepIn({ at_ms: this.now(), in: "do", intent, cid });
     // what it did, from its outputs: a view folds the card only when his answer went (architect m_29867)
-    return { answered: outs.some((o) => o.out === "cmd" && o.cmd.cmd === "answer") };
+    const answered = outs.some((o) => o.out === "cmd" && o.cmd.cmd === "answer");
+    // a send or a resend made a row under the next request id, sent or failed at once (core down)
+    return this.sendsState.cid === cid ? { answered, cid } : { answered };
   }
   /**
    * The cards he answered or closed in this window that the hub's rows still list (acted.ts):
@@ -330,65 +323,16 @@ export class Store extends StoreVoice {
 
   /** A message of his is on its way (a pending row still sending): the app's update waits for it (update/moment.ts). */
   sending(): boolean {
-    for (const t of this.threads.values()) if (t.pending.some((p) => p.state === "sending")) return true;
-    return false;
+    return sendingNow(this.sendsState);
+  }
+  /** Thread `key`'s rows of his messages not echoed yet (machine/sends.ts), the same array until they change. */
+  pending(key: string): readonly Pending[] {
+    return pendingOf(this.sendsState, key);
   }
 
-  /** A1: the window-local 'sent' (main's ipc.ts): the send `cid` has its message id. Always a known event. */
-  private sendAnswered(s: Sent): true {
-    const key = threadKey(s.project, s.agent);
-    const t = this.threads.get(key);
-    const next = t && answered(t.pending, s, new Set(t.landedIds));
-    if (t === undefined || next == null) return true;
-    t.pending = next;
-    this.emit(`pending:${key}`);
-    return true;
-  }
-
-  /**
-   * G: the send `cid` failed. refused: nothing reached the thread, his row
-   * shows 'not delivered' with retry. undelivered: the hub wrote its
-   * undelivered entry in the thread, which stands in for his row (gone).
-   */
-  /** @internal for apply.ts */ failCid(
-    cid: number,
-    reason: string,
-    why: string,
-  ): void {
-    for (const [key, t] of this.threads) {
-      if (!t.pending.some((p) => p.cid === cid)) continue;
-      t.pending =
-        reason === "undelivered"
-          ? t.pending.filter((p) => p.cid !== cid)
-          : t.pending.map((p) =>
-              p.cid === cid ? { ...p, state: "failed", why } : p,
-            );
-      this.emit(`pending:${key}`);
-      return;
-    }
-  }
-
-  /** @internal for apply.ts */ failOldest(
-    project: string | null,
-    why: string,
-  ): void {
-    let oldest: { key: string; t: Thread; p: Pending } | null = null;
-    for (const [key, t] of this.threads) {
-      for (const p of t.pending) {
-        if (
-          p.state !== "sending" ||
-          (project !== null && p.project !== project)
-        )
-          continue;
-        if (oldest === null || p.cid < oldest.p.cid) oldest = { key, t, p };
-      }
-    }
-    if (oldest === null) return;
-    const { key, t, p } = oldest;
-    t.pending = t.pending.map((x) =>
-      x.cid === p.cid ? { ...x, state: "failed", why } : x,
-    );
-    this.emit(`pending:${key}`);
+  /** @internal for apply.ts: his send's error (G), with its cid or none (machine/sends.ts) */
+  sendFailed(ev: EvOf<"error">): void {
+    this.stepIn({ at_ms: this.now(), in: "ev", ev });
   }
 
   /**
@@ -464,64 +408,18 @@ export class Store extends StoreVoice {
     mode?: Mode;
     parts?: readonly Part[];
   }): number {
-    const key = threadKey(a.project, a.agent);
-    const t = this.thread(key);
-    this.cid += 1;
-    const mode = a.mode ?? "now";
-    // msg-parts: his message typed (quotes, words, pastes); the hub renders the model's text from them
-    const parts =
-      a.parts !== undefined && a.parts.length > 0 ? [...a.parts] : undefined;
-    const p: Pending = {
-      cid: this.cid,
-      project: a.project,
-      agent: a.agent,
-      text: a.text,
-      mode,
-      ...(parts === undefined ? {} : { parts }),
-      at_ms: this.now(),
-      state: "sending",
-    };
-    t.pending = [...t.pending, p];
-    this.emit(`pending:${key}`);
-    if (this.coreState === "down") {
-      this.failOldest(a.project, common.not_sent);
-      return p.cid;
-    }
-    // G: the cid goes along (echoed on its error); with parts, no text: the hub renders it (m_22248)
-    this.command({
-      cmd: "send",
-      project: a.project,
-      agent: a.agent,
-      text: parts === undefined ? a.text : "",
-      mode,
-      ...(parts === undefined ? {} : { parts }),
-      cid: p.cid,
-    });
-    return p.cid;
+    // Sugar over store.do (machine/sends.ts), removed by slice 2's callers' land
+    return this.do({ i: "send", ...a }).cid ?? 0;
   }
 
-  /** A failed send goes again (same words, same mode), as a new pending row. */
+  /** A failed send goes again (same words, same mode), as a new pending row. Sugar over store.do, removed with send. */
   retry(key: string, cid: number): void {
-    const t = this.threads.get(key);
-    const p = t?.pending.find((x) => x.cid === cid && x.state === "failed");
-    if (t === undefined || p === undefined) return;
-    t.pending = t.pending.filter((x) => x.cid !== cid);
-    this.emit(`pending:${key}`);
-    this.send({
-      project: p.project,
-      agent: p.agent,
-      text: p.text,
-      mode: p.mode,
-      ...(p.parts === undefined ? {} : { parts: p.parts }),
-    });
+    this.do({ i: "resend", key, cid });
   }
 
-  /** Drops a failed send (he gave up on it). */
+  /** Drops a failed send (he gave up on it). Sugar over store.do, removed with send. */
   dismiss(key: string, cid: number): void {
-    const t = this.threads.get(key);
-    if (t === undefined || !t.pending.some((x) => x.cid === cid)) return;
-    t.pending = t.pending.filter((x) => x.cid !== cid);
-    this.emit(`pending:${key}`);
+    this.do({ i: "dismiss", key, cid });
   }
 
   /**

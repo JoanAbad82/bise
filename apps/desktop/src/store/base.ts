@@ -2,8 +2,8 @@
 // the core's port, and the one way out to the core (command). Reads in reads.ts, voice in voice.ts,
 // the events and his actions in store.ts.
 import type { Entry } from "@/proto";
-import type { CoreCmd, CorePort, CoreState } from "@/shared/api";
-import type { Ev, FilesAnswer, Pending, ThreadOrder } from "./types";
+import type { CoreCmd, CorePort } from "@/shared/api";
+import type { Ev, FilesAnswer, ThreadOrder } from "./types";
 import type { Ask } from "./window";
 import { NO_FACTS, type HubFacts } from "./machine/types";
 
@@ -13,8 +13,6 @@ export interface Thread {
   view: ThreadOrder;
   byPos: Map<number, Entry>;
   typing: string;
-  pending: readonly Pending[];
-  landedIds?: readonly number[]; // A1: his ids that landed before their send's answer (echo.ts)
   ask?: Ask; // the window's page on its way (window.ts)
 }
 
@@ -42,7 +40,7 @@ export class StoreBase {
   protected readonly evListeners = new Set<(ev: Ev) => void>();
   /** what the hubs said that several slices read (machine/types.ts): one copy, as it came */
   /** @internal for store.ts */ facts: HubFacts = NO_FACTS;
-  protected coreState: CoreState = "down";
+  /** the window's one counter of request ids: a send's cid (machine/sends.ts takes the next), a /restart's, a dictation's */
   protected cid = 0;
   /** R8: when this window last sent a /model (a setup_first after it is his; a replayed one isn't) */
   protected modelSentAt = Number.NEGATIVE_INFINITY;
