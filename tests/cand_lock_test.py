@@ -21,8 +21,16 @@ import tempfile
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "tests"))
+import wait  # noqa: E402  (every wait here is for a state, never a fixed time: tests/sleep_check.py)
+
 CAND = os.path.join(ROOT, "dev", "plugins", "ambient-qa", "as-he-does", "cand.sh")
 FAILS = []
+
+
+def busy(lock):
+    """Whether someone holds `lock` (lockf -t 0 says 75)."""
+    return subprocess.run(["/usr/bin/lockf", "-t", "0", lock, "true"], capture_output=True).returncode == 75
 
 
 def check(ok, what):
@@ -57,11 +65,8 @@ def main():
                 f.write(who + "\n")
             p = subprocess.Popen(["/usr/bin/lockf", base + ".lock", "sleep", str(secs)])
             holders.append(p)
-            for _ in range(50):
-                if subprocess.run(["/usr/bin/lockf", "-t", "0", base + ".lock", "true"], capture_output=True).returncode == 75:
-                    return p
-                time.sleep(0.1)
-            raise AssertionError("the holder never took " + base)
+            wait.until(lambda: busy(base + ".lock"), 10, "the holder takes " + base)
+            return p
 
         past = "no %s/Contents/MacOS/" % app
         app2 = os.path.join(t, "other cand.app")
@@ -73,11 +78,12 @@ def main():
             p = subprocess.Popen(["bash", CAND, os.path.join(t, "out-held"), a], env=e, stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT, text=True, stdin=subprocess.DEVNULL, start_new_session=True)
             holders.append(p)
-            for _ in range(100):
-                if subprocess.run(["/usr/bin/lockf", "-t", "0", os.path.join(world, "locks", "world.lock"), "true"], capture_output=True).returncode == 75:
-                    return p
-                time.sleep(0.1)
-            raise AssertionError("the stand-in run never took the world")
+            # held AND its holder line written (try-smoke m_30184: under load the line came after
+            # the lock, so the test read the last run's pid), up to 30 s
+            hf = os.path.join(world, "locks", "world.holder")
+            wait.until(lambda: busy(os.path.join(world, "locks", "world.lock")) and "out-held" in open(hf).read(), 30,
+                       "the stand-in run holds the world, its holder line written")
+            return p
 
         def inner_pid():
             return open(os.path.join(world, "locks", "world.holder")).read().split()[1]
@@ -103,11 +109,14 @@ def main():
         w = subprocess.Popen(["bash", CAND, os.path.join(t, "out-wait"), app2], env=dict(env, CAND_LOCK_WAIT="20"),
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=True)
         holders.append(w)
-        time.sleep(1.5)
-        ps = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout.splitlines()
-        swept = [l for l in ps if os.path.join(world, "w") in l]
-        waiting = [l for l in ps if "out-wait" in l]
-        check(waiting and not swept, "the sweep's pattern matches a waiting run: %s" % swept)
+        # polled, never a fixed sleep (review-gates m_30166: at load ~22 the run wasn't there yet):
+        # its lockf waiting on the world lock, up to 30 s
+        def seen():
+            ps = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout.splitlines()
+            waiting = [l for l in ps if "out-wait" in l and "lockf" in l and "world.lock" in l]
+            return (waiting, [l for l in ps if os.path.join(world, "w") in l]) if waiting else None
+        _, swept = wait.until(seen, 30, "sweep case: the waiting run's lockf on the world lock")
+        check(not swept, "sweep case: the sweep's pattern matches a waiting run: %s" % swept)
         os.killpg(w.pid, 9)
         w.wait()
 
