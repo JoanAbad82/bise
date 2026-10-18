@@ -155,8 +155,8 @@ export const CAST: readonly Cast[] = [
     map: 'california',
     stage: 11,
     bims: [
-      // his plane at 0:41 starts its day; 'line clear' at 3:12, the clap, then nothing waits here
-      { name: 'main', main: true, life: [[0, { k: 'mainidle' }], [s(0, 44), { k: 'main' }], [s(3, 18), { k: 'mainidle' }]] },
+      // his plane at 0:41 starts its day; 'line clear' at 3:12, then nothing waits here: up from its work for the clap (3:15)
+      { name: 'main', main: true, life: [[0, { k: 'mainidle' }], [s(0, 44), { k: 'main' }], [s(3, 14.5), { k: 'mainidle' }]] },
       {
         // in at 0:46, the second '?' at 1:56 (two loops on its answer's way), the 4th land at 3:12, off at 4:34
         name: 'pricing-page',
