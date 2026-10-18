@@ -98,7 +98,6 @@ test('thread/computer-live: the live line under the head, its acts with the key,
     await expect(line).toHaveCount(0);
     await expect(mark).toHaveCount(0);
 
-    // driving
     await live([other, driving(now)]);
     await expect(words).toHaveText('↖ driving Chrome · amazon.fr · 2 min');
     await expect(page.getByTestId('thread.computer.take')).toHaveText(thread.cu_take);

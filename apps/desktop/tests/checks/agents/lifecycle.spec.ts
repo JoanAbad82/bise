@@ -73,7 +73,6 @@ test('agents/lifecycle: stop, archive and restore from the window act as in the 
     await expect.poll(() => tuiAgents(t?.screen() ?? '').find((a) => a.name === AG)?.glyph, { timeout: 3000, message: "the TUI's panel has it at rest" }).not.toBe('∿');
     await expect(page.locator(T.row(AG)), 'the window has it at rest').not.toHaveAttribute('data-status', 'working', { timeout: 3000 });
     await page.screenshot({ path: test.info().outputPath('stopped.png') });
-    // archive
     await page.locator(T.archive(AG)).click();
     await expect.poll(async () => (await live()).some((a) => a.name === AG), { timeout: 10_000, message: `${AG} leaves the hub's live agents` }).toBe(false);
     await expect.poll(() => tuiAgents(t?.screen() ?? '').some((a) => a.name === AG), { timeout: 5000, message: "it leaves the TUI's panel" }).toBe(false);
@@ -85,7 +84,6 @@ test('agents/lifecycle: stop, archive and restore from the window act as in the 
     await page.screenshot({ path: test.info().outputPath('archived.png') });
     tuiSay(t, '/archived');
     await expect.poll(() => flat(t?.screen() ?? ''), { timeout: 5000, message: "the TUI's /archived lists it" }).toMatch(new RegExp(`\\b${AG}\\b`));
-    // restore
     await page.locator(T.restore(AG)).click();
     await expect.poll(async () => (await live()).some((a) => a.name === AG), { timeout: 10_000, message: `${AG} is back in the hub` }).toBe(true);
     await expect.poll(() => tuiAgents(t?.screen() ?? '').some((a) => a.name === AG), { timeout: 5000, message: "it is back in the TUI's panel" }).toBe(true);

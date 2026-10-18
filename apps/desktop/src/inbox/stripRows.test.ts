@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
 import { cardKey } from './order';
-import { fitRows, rowWords, STRIP_ROWS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
+import { fitRows, rowWords, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
 
 const card = (id: number, rank: number, project = 'acme', question = `q${String(id)}`): Card => ({
   id,
@@ -35,7 +35,6 @@ describe('the inbox strip (W7/K24)', () => {
   it("shows STRIP_ROWS rows numbered from 1, the rest as '+ n more'", () => {
     const list = stripList(cards, 'acme', new Set());
     const v = stripView(list, null);
-    expect(STRIP_ROWS).toBe(3);
     expect(v.rows.map((r) => [r.card.id, r.n])).toEqual([
       [2, 1],
       [4, 2],

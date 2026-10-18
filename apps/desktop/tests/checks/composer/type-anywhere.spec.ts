@@ -275,7 +275,6 @@ test('composer/type-anywhere: with the thread scrolled up, a key and a paste lan
     const was = must(await reading(), 'a row in the middle of the list');
     expect(await top(), 'scrolled up, not at the end').toBeLessThan(end - 300);
 
-    // a click in the composer
     await field(page).click();
     expect(await fieldFocused(page), 'the click focused the composer').toBe(true);
     await stays(was, 'a click in the composer');

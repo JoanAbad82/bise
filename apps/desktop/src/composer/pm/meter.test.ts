@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BARS, flat, push, step, wave } from './meter';
+import { flat, push, step, wave } from './meter';
 
 describe('the dictation meter (the TUI voice chip)', () => {
   it('a level is one of 8 steps, silence the lowest, full scale the highest', () => {
@@ -9,7 +9,6 @@ describe('the dictation meter (the TUI voice chip)', () => {
 
   it('silence: 6 bars at the lowest step, never fewer', () => {
     expect(flat()).toEqual([0, 0, 0, 0, 0, 0]);
-    expect(BARS).toBe(6);
   });
 
   it('each level comes in on the right, the oldest goes left', () => {

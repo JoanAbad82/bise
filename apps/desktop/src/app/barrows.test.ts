@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
-import { agentRows, archivedRows, pageRows, PAGE, roleWords, watchRows, type ProjAgent } from './barrows';
+import { agentRows, archivedRows, pageRows, roleWords, watchRows, type ProjAgent } from './barrows';
 
 const NOW = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): ProjAgent => ({
@@ -86,7 +86,6 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
   it("'show 50 more' opens 50 at a time, 'show less' goes back to the cap (his m_26894): 370 rows, cap 5", () => {
     const rows = agentRows(Array.from({ length: 370 }, (_, i) => ag(`a${String(i + 1)}`, i === 300 ? { waits: 1 } : {})), NOW, false);
     const at = (p: number) => pageRows(rows, 5, p);
-    expect(PAGE).toBe(50);
     expect([at(0).shown.length, at(0).hidden, at(0).more, at(0).less]).toEqual([6, 364, 'show 50 more · 364 left', false]);
     expect([at(1).shown.length, at(1).hidden, at(1).more, at(1).less]).toEqual([56, 314, 'show 50 more · 314 left', true]);
     expect(at(1).shown.at(-1)?.name).toBe('a301');

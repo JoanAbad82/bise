@@ -45,7 +45,6 @@ test('app/reload-line: reloading, then ✓ reloaded that folds; a stale one says
     await core.send(sw('up', { at_ms: Date.now() - 10 * 60_000 }));
     await page.waitForTimeout(500);
     await expect(line, 'a stale switch never shows as new').toHaveCount(0);
-    // reloading
     await core.send(sw('reloading'));
     await expect(line, 'the line under the title bar').toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId('app.reload.text')).toHaveText(`reloading bise on ${TO}`);

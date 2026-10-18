@@ -228,7 +228,6 @@ describe("a diff that answers another view's req (lead m_16528)", () => {
       "card_open",
       "focused",
     ]);
-    // asks
     store.askBranches(P);
     store.askVersions(P);
     expect(sent.slice(-2)).toEqual([
