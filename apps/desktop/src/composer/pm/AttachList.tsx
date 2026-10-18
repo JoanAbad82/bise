@@ -2,7 +2,7 @@
 // his pick A; ambient-lead m_22590): one 28 px row per chip in the draft, in the order added, with
 // the chip's own number (amb-feed m_22597: the number the model reads, never the row's place),
 // its sign or 16 px thumbnail, its name (cut first) and its facts in text-3; ✕ on hover. A row and
-// its chip in the text light each other; a click previews it (Quick Look, or the quote's place in
+// its chips in the text light each other (a chip pasted twice is one row); a click previews it (Quick Look, or the quote's place in
 // the thread). Four rows, then the list scrolls.
 import type { JSX } from "react";
 import { IconButton } from "@/ds";
@@ -23,7 +23,11 @@ export interface AttachListProps {
 }
 
 export function AttachList({ chips, lit, onLit, onRemove, onOpen, home, testId }: AttachListProps): JSX.Element | null {
+  // one row per number: a chip pasted again in the same draft is one more mention of it (chipclip.ts)
+  const seen = new Set<number>();
   const rows = chips.flatMap((c) => {
+    if (seen.has(c.n)) return [];
+    seen.add(c.n);
     const r = attachRow(c, home);
     return r === null ? [] : [{ c, ...r }];
   });

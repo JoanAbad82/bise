@@ -5,7 +5,7 @@
 // per target as editor-neutral entries (entry.ts), the queue sent at the turn's end, and the
 // dictation as one live node in the field (schema.ts) that nothing reads until its last words.
 // Its parts by area: keys.ts (every key), dictation.ts (ctrl+r and the live node), paste.ts
-// (paste, drop, the clipboard's text), Strip.tsx (the chips and queue above the box); this file
+// (paste, drop, copy and cut; chips on the clipboard through chipclip.ts), Strip.tsx (the chips and queue above the box); this file
 // keeps the editor, the drafts, the picker and the actions, and wires the parts to them.
 //
 // The editor is created once per mount on a host element React never renders into: his typing
@@ -88,7 +88,7 @@ import {
 } from "./pmtext";
 import { useDictation } from "./dictation";
 import { fieldKey } from "./keys";
-import { addPaths, clipboardText, dropInto, pasteInto, useDropAnywhere, type PasteCtx } from "./paste";
+import { addPaths, clipboardText, copyFrom, dropInto, pasteInto, useDropAnywhere, type PasteCtx } from "./paste";
 import { Strip } from "./Strip";
 import { AttachList, QUOTE_SOURCE_EVENT } from "./AttachList";
 
@@ -280,6 +280,9 @@ export function PmField(p: PmFieldProps): JSX.Element {
             hadFocus.current = true;
             return false;
           },
+          // the chips go on the clipboard too, so a paste brings them back (chipclip.ts)
+          copy: (v, e) => copyFrom(v, e),
+          cut: (v, e) => copyFrom(v, e),
         },
         clipboardTextSerializer: clipboardText,
       },
@@ -866,14 +869,16 @@ export function PmField(p: PmFieldProps): JSX.Element {
   const removeChip = (n: number): void => {
     const st = state();
     if (st === null) return;
+    // every mention of it (a chip pasted twice in the draft is one row)
     const at: { pos: number; size: number }[] = [];
     st.doc.descendants((node, pos) => {
-      if (at.length === 0 && node.type.name === "chip" && (node.attrs.chip as Chip).n === n) at.push({ pos, size: node.nodeSize });
-      return at.length === 0;
+      if (node.type.name === "chip" && (node.attrs.chip as Chip).n === n) at.unshift({ pos, size: node.nodeSize });
+      return true;
     });
-    const hit = at[0];
-    if (hit === undefined) return;
-    dispatch(st.tr.delete(hit.pos, hit.pos + hit.size));
+    if (at.length === 0) return;
+    const tr = st.tr;
+    for (const hit of at) tr.delete(hit.pos, hit.pos + hit.size);
+    dispatch(tr);
     setHoverN(null);
   };
   const openChip = (c: Chip): void => {

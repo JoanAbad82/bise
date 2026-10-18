@@ -8,7 +8,8 @@
 //   an artifact   `[title](url)` in his words where the chip was (attach.rs insert_artifact);
 //   an image      {kind:'image', name:'[Image #1]', source:<absolute path>} where the chip was
 //                 (the hub stores it, main 18a32ce3).
-// One number sequence per draft for images, pastes and quotes (a number points at one chip).
+// One number sequence per draft for images, pastes and quotes (a number points at one chip; a chip
+// pasted twice goes once as its part, its other mentions as its label).
 
 import type { Part } from '@/proto';
 import { FILE_CHIP_CHARS, NO_SPACE_BEFORE } from '@/proto/chips.gen';
@@ -196,6 +197,7 @@ const wordFollows = (t: string): boolean => t !== '' && !/^\s/u.test(t) && !(NO_
 
 export function buildMessage(segments: readonly Segment[]): Outgoing {
   let quotes = 0;
+  const sent = new Set<number>();
   const bodyParts: Part[] = [];
   const say = (t: string): void => {
     const last = bodyParts.at(-1);
@@ -218,6 +220,16 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
       continue;
     }
     const c = s.chip;
+    if (c.kind !== 'artifact' && sent.has(c.n)) {
+      // a chip pasted again in the draft (pm/chipclip.ts): its part went with its first mention,
+      // this one is its label in his words ('as in [Image #1]')
+      const pad = /\S$/u.test(body) ? ' ' : '';
+      body += pad + chipLabel(c);
+      say(pad + chipLabel(c));
+      spaceNext = true;
+      continue;
+    }
+    sent.add(c.n);
     if (c.kind === 'quote') {
       // his m_22231: a quote sits at its place with its chip's number (`❝ 1`), so 'regarding ❝ 1 …'
       // reads to the model where he put it (bise_proto parts: an `n` quote renders in his words)

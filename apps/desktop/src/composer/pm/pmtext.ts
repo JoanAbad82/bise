@@ -137,17 +137,19 @@ export function insertChip(state: EditorState, chip: Chip): Transaction {
   return tr.setSelection(TextSelection.create(tr.doc, from + 1));
 }
 
-/** The chip numbered `chip.n` given its new data (a picked file's facts, read after it went in),
- *  out of the undo history; null when that chip is gone. The caret stays where it is. */
+/** The chips numbered `chip.n` (each mention of it) given its new data (a picked file's facts,
+ *  read after it went in), out of the undo history; null when that chip is gone. The caret stays
+ *  where it is. */
 export function withChip(state: EditorState, chip: Chip): Transaction | null {
   const found: number[] = [];
   state.doc.descendants((node, pos) => {
-    if (found.length === 0 && node.type.name === 'chip' && (node.attrs.chip as Chip).n === chip.n) found.push(pos);
-    return found.length === 0;
+    if (node.type.name === 'chip' && (node.attrs.chip as Chip).n === chip.n) found.push(pos);
+    return true;
   });
-  const at = found[0];
-  if (at === undefined) return null;
-  return state.tr.setNodeMarkup(at, undefined, { chip }).setMeta('addToHistory', false);
+  if (found.length === 0) return null;
+  const tr = state.tr;
+  for (const at of found) tr.setNodeMarkup(at, undefined, { chip });
+  return tr.setMeta('addToHistory', false);
 }
 
 /** The chips in the field, in order. */

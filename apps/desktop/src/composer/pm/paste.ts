@@ -2,7 +2,8 @@
 // the field or anywhere in the window), any other file on disk as a file chip by its path
 // (file-chips), a long text as a chip after it lands inline (⌘Z puts it
 // back inline), a URL over selected words as a link with those words (linkpaste.ts), any other
-// text as plain text; a copy reads chips as their labels.
+// text as plain text; a copy reads chips as their labels for other apps, and keeps the chips
+// themselves in a private type (chipclip.ts) that a paste in a field turns back into chips.
 import { useEffect, useEffectEvent } from "react";
 import { closeHistory } from "@tiptap/pm/history";
 import {
@@ -16,7 +17,8 @@ import { chipLabel, isLongPaste, nextChipNumber, type Chip } from "../message";
 import { isImagePath, type ComposerSources } from "../sources";
 import { fileIconOf, filePathOf, imageDims, isImageFile, thumbnail } from "../attach";
 import { linkPaste } from "../linkpaste";
-import { insertChip, insertText, nodeType, segmentsOf } from "./pmtext";
+import { chipsOf, inlineOf, insertChip, insertText, nodeType, segmentsOf } from "./pmtext";
+import { CLIP_MIME, placeChips, readClip, segmentsOfSlice, writeClip } from "./chipclip";
 
 /** What paste and drop need of the field: read at each use (the editor and props live in refs). */
 export interface PasteCtx {
@@ -163,10 +165,56 @@ const linkOverSelection = (c: PasteCtx, text: string): boolean => {
   return true;
 };
 
+/** A copy or a cut of the field's selection (ProseMirror's own then stays out): its words with
+ *  the chips' labels as text/plain, and its chips in CLIP_MIME when it holds one. A cut removes
+ *  the selection. False: nothing selected, or no clipboard (ProseMirror's own). */
+export function copyFrom(view: EditorView, e: ClipboardEvent): boolean {
+  const data = e.clipboardData;
+  const st = view.state;
+  if (data === null || st.selection.empty) return false;
+  const slice = st.selection.content();
+  const text = clipboardText(slice);
+  e.preventDefault();
+  data.clearData();
+  data.setData("text/plain", text);
+  const chips = writeClip(segmentsOfSlice(slice), text);
+  if (chips !== null) data.setData(CLIP_MIME, chips);
+  if (e.type === "cut")
+    view.dispatch(st.tr.deleteSelection().scrollIntoView().setMeta("uiEvent", "cut"));
+  return true;
+}
+
+/** A paste of the field's own copy: its words and chips in place of the selection, the chips
+ *  numbered for this field (chipclip.ts placeChips), the caret after them; one undo step. */
+const chipsPaste = (c: PasteCtx, raw: string, plain: string): boolean => {
+  const segs = readClip(raw, plain);
+  const st = c.state();
+  if (segs === null || st === null) return false;
+  // inside the one paragraph (⌘A's selection covers the whole document)
+  const inside = (p: number): number => Math.min(Math.max(p, 1), st.doc.content.size - 1);
+  const at = inside(st.selection.from);
+  const tr = st.tr.delete(at, inside(st.selection.to));
+  const kids = placeChips(segs, chipsOf(tr.doc)).flatMap((s) =>
+    s.kind === "chip"
+      ? [nodeType(st.schema, "chip").create({ chip: s.chip })]
+      : inlineOf(st.schema, s.text),
+  );
+  tr.insert(at, kids);
+  const size = kids.reduce((n, k) => n + k.nodeSize, 0);
+  tr.setSelection(TextSelection.create(tr.doc, at + size));
+  c.dispatch(closeHistory(tr.setMeta("paste", true)));
+  return true;
+};
+
 /** A paste in the field (or anywhere, through grab.ts): true, it was handled. */
 export function pasteInto(c: PasteCtx, e: ClipboardEvent): boolean {
   const data = e.clipboardData;
   if (data === null) return false;
+  // the field's own copy, chips and all (checked before the files: it carries none)
+  if (chipsPaste(c, data.getData(CLIP_MIME), data.getData("text/plain"))) {
+    e.preventDefault();
+    return true;
+  }
   // a pasted image, or files copied in Finder (each by its path: a file chip, an image chip)
   const files = Array.from(data.files).filter(
     (f) => f.type.startsWith("image/") || filePathOf(f) !== "",

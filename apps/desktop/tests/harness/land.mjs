@@ -71,6 +71,8 @@ export const LAND = [
   'checks/thread/file-chips.spec.ts',
   // an @-picked image or code file is a chip at the @, the caret after it, its parts in the send (at-chips)
   'checks/composer/at-chips.spec.ts',
+  // a copy with chips pastes them back with their rows; cut+paste and copy+paste over it change nothing (chip-paste, his m_30833)
+  'checks/composer/chip-paste.spec.ts',
   'checks/spotlight/streaming.spec.ts',
   // the real pages server's CSP in the artifact view (ambient-lead m_20610, architect m_20628)
   'checks/artifacts/frame-csp.spec.ts',
