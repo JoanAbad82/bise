@@ -120,7 +120,13 @@ test('thread/find-walk: ⏎, ⇧⏎ and the arrows go to each match and scroll t
     const at = async (what: string, pos: number): Promise<void> => {
       const i = HITS.length - HITS.indexOf(pos);
       await expect(count, `${what}: the count`).toHaveText(`${String(i)}/${String(HITS.length)}`, { timeout: 5000 });
-      await expect(marked, `${what}: one marked row`).toHaveCount(1, { timeout: 5000 });
+      // red: what the list draws and the last pages asked, in the message (find-walk-red)
+      await expect(marked, `${what}: one marked row`)
+        .toHaveCount(1, { timeout: 5000 })
+        .catch(async (e: unknown) => {
+          const asks = (core.cmds() as unknown as Cmd[]).filter((c) => c.agent === 'perf' && c.cmd.startsWith('page')).slice(-6);
+          throw new Error(`${String(e)}; ${await drawn(page)}; last pages asked: ${asks.map((c) => `${c.cmd} ${String(c.before ?? c.after)}/${String(c.limit)}`).join(', ')}`);
+        });
       await expect(marked, `${what}: the marked row is entry ${String(pos)} (${await drawn(page)})`).toHaveAttribute('data-testid', `thread.entry.${String(pos)}`, { timeout: 5000 });
       await expectShown(marked, `${what}: entry ${String(pos)} scrolled into view (${await drawn(page)})`, 5000);
       await page.screenshot({ path: test.info().outputPath(`${String(pos)}-${what.replace(/\W+/g, '-')}.png`) });

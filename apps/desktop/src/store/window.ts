@@ -4,7 +4,7 @@
 // positions between them are not held: the gap, `{lo, hi}` (the window's newest pos, the tail's
 // oldest), where the list draws its gap row; paging newer from the window (`from`: the transcript
 // lines under it are read) fills it until it meets the tail, then they merge. A new jump replaces
-// the window. Pure: the store keeps the asks and calls these. Owner: inbox-open.
+// the window, once the window's page on its way is in (the store asks one at a time). Pure: the store keeps the asks and calls these. Owner: inbox-open.
 //
 // Why the steps are safe: a page reads the 600 transcript lines before `before` and gives its
 // newest `limit` entries (bise_proto::thread::page), an entry at most one per line. A newer ask

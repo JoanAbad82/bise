@@ -567,14 +567,17 @@ export class Store extends StoreVoice {
    * Bring the entry at `pos` into the view (his answer weeks back, a find's hit): 'held' with the
    * row's pos when the view has it; 'asked' when its page is on its way (the view's window, with a
    * gap row to the tail, window.ts); 'wait' while the thread isn't loaded. Again with the page
-   * there: 'held'.
+   * there: 'held'. One window page on its way at a time: while one is (the window's newer page,
+   * another jump's), 'asked' and nothing sent; ask again when the view changes. Replaced before
+   * its answer, that page would land in the tail without its gap (find-walk-red: ⌘F's ⏎ while the
+   * gap row paged newer, the list jumped to rows no match was in).
    */
   jumpTo(project: string, agent: string, pos: number): { kind: "held"; pos: number } | { kind: "asked" | "wait" } {
     const key = threadKey(project, agent);
     const t = this.thread(key);
     const plan = planJump(t.view, pos);
     if (plan.kind !== "ask") return plan;
-    if (t.ask?.kind === "jump" && t.ask.pos === pos) return { kind: "asked" };
+    if (t.ask !== undefined) return { kind: "asked" };
     t.ask = plan.ask;
     this.setView(key, t, plan.view);
     this.command({ cmd: "page", project, agent, before: plan.ask.before, limit: plan.limit });

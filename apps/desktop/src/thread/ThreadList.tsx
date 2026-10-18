@@ -523,6 +523,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         revealGen.current += 1;
         const gen = revealGen.current;
         let frames = 0;
+        let lastTop: number | undefined;
         moved.current = false;
         revealUntil.current = Date.now() + HOLD_MS;
         settling.current = true;
@@ -542,8 +543,18 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
             if (r !== null) tell();
             return;
           }
-          if (box === null || r === null) virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
-          else {
+          if (box === null || r === null) {
+            // Virtuoso's scrollToIndex can stall (find-walk-red: a window replaced, then a new one
+            // in front, its sizes by index still the old ones: the list stayed at the latest rows,
+            // scrollTop unmoved for all HOLD_FRAMES): then a viewport at a time toward the row
+            const top = box?.scrollTop;
+            if (box !== null && r === null && top === lastTop) {
+              const at = [...box.querySelectorAll<HTMLElement>('[data-item-index]')].map((x) => Number(x.dataset.itemIndex));
+              const step = box.clientHeight * 0.8;
+              if (at.length > 0) box.scrollTop += firstIndex.current + i < Math.min(...at) ? -step : step;
+            } else virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
+            lastTop = top;
+          } else {
             const b = r.getBoundingClientRect();
             const v = box.getBoundingClientRect();
             const d = b.top + b.height / 2 - (v.top + v.height / 2);

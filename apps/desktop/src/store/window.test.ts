@@ -137,4 +137,28 @@ describe("window (store)", () => {
     expect(v.order.includes(120)).toBe(false);
     expect(v.gap).toEqual({ lo: 2023, hi: 5000, from: 2024 });
   });
+
+  it("a jump while the window's newer page is on its way waits for it: that page never lands in the tail without its gap (find-walk-red)", () => {
+    const { store, sent } = fake();
+    page(store, range(5000, 5039), 5000, true);
+    store.jumpTo(P, "perf", 2000);
+    page(store, range(1970, 2024), 1970, true);
+    // the gap row shows under the window: its newer page goes
+    store.newerPage(P, "perf");
+    const newer = sent.at(-1) as { before: number };
+    expect(newer.before).toBe(2174);
+    // ⏎ to a match far above before it came: no page asked yet, the window stays
+    const pages = sent.filter((c) => c.cmd === "page").length;
+    expect(store.jumpTo(P, "perf", 120)).toEqual({ kind: "asked" });
+    expect(sent.filter((c) => c.cmd === "page")).toHaveLength(pages);
+    // the newer page comes, then the jump goes
+    page(store, range(1574, 2173).slice(-NEWER_LIMIT), 1974, true);
+    expect(store.jumpTo(P, "perf", 120)).toEqual({ kind: "asked" });
+    expect(sent.at(-1)).toMatchObject({ cmd: "page", before: 145 });
+    page(store, range(90, 144), 90, true);
+    const v = store.threadOrder(K);
+    // the window around 120, its gap to the tail; nothing of the old window's pages
+    expect(v.order).toEqual([...range(90, 143), ...range(5000, 5039)]);
+    expect(v.gap).toEqual({ lo: 143, hi: 5000, from: 144 });
+  });
 });
