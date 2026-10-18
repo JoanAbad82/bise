@@ -178,6 +178,10 @@
   border-color: var(--acc);
   color: var(--acc);
 }
+/* compact runs down to x0.8 (a 320 window): a 15 px floor reads 12 there (designer m_31743) */
+.kn.compact {
+  font-size: 15px;
+}
 .kn.compact .kn-card {
   display: grid;
   grid-template-columns: var(--k-sidew) 1fr;
