@@ -7,6 +7,7 @@
 // the left. ✕ or esc go back where he was. The route drives it (artifacts/<project>/<id>), so back
 // and forward fit. The artifact itself is task-panel's ArtifactOpen. Owner: amb-win.
 import { takeZoomKey } from '@/artifacts/zoomKeys';
+import { FRAME_KINDS } from '@/artifacts/frameNote';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Button } from '@/ds';
 import { ArtifactOpen, useAboutWords, useAllArtifacts } from '@/artifacts';
@@ -113,7 +114,7 @@ export function useEscClosesArtifact(close: () => void, on: boolean): void {
 
 /** The forwarder's message (main's guard.ts ESC_FORWARD). Pure. */
 export function isFrameEsc(data: unknown): boolean {
-  return typeof data === 'object' && data !== null && (data as { bise?: unknown }).bise === 'esc';
+  return typeof data === 'object' && data !== null && (data as { bise?: unknown }).bise === FRAME_KINDS.esc;
 }
 
 function fromArtifactFrame(source: MessageEventSource | null): boolean {

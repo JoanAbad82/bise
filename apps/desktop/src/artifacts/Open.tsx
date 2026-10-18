@@ -5,8 +5,6 @@
 // a 3% backdrop. A link inside the page goes to his browser (the shell's guard, main's
 // framelink.ts); one that names another artifact opens it here (links.ts). The composer's
 // words come from maker.ts. Owner: amb-kit (the list, the model); task-panel (the open view).
-import { ImageView } from './ImageView';
-import { isImageSrc } from './zoom';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { APP_FRAME_NAME } from './frameNote';
 import { useFrameNote } from './useFrameNote';
@@ -418,12 +416,11 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
         {/* the page follows his theme: opened with ?theme=<his pref>, the kit wears it (kit.js puts
             it on <html data-theme>); with no pref, the system's. A browser-only kind never gets
             here from a list (leave.ts opens his browser): no 'opens in your browser' panel (designer m_21714) */}
-        {/* one image file: drawn here, zoomable (a pinch, two fingers, a double-click; his m_22822) */}
-        {src !== null && isImageSrc(src) && <ImageView src={src} alt={a.title} />}
         {/* the src stays /a/<id>/view while new versions land: the viewer swaps in place, never a
             reload (plan §6). Its name tells the viewer it sits in the app: a selection comes here
-            (useFrameNote) for the maker's composer, not the frame's own note */}
-        {src !== null && !isImageSrc(src) && (
+            (useFrameNote) for the maker's composer, not the frame's own note. An image zooms in
+            the viewer itself (kit/office/image.js; image-pinch), its esc and ⌘0 lent by useFrameNote */}
+        {src !== null && (
           <iframe ref={frame} name={APP_FRAME_NAME} className="art-paper" src={src} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             data-testid="artifact.page" />
         )}

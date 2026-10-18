@@ -3,6 +3,5 @@
 # and test:land say so; any other red is NEW. Remove the line in the commit that fixes it.
 history-perf	12c3d88dc	land-reds	test:land, 1 run in ~4 even at load 3-9: step 4's current match not marked (hitShown 0: rows 49494-49503 drawn around it, count 1/50, no row with data-hit, so the mark (findmark useIsCurrent) isn't 49500 there); never alone (12/12 with logs and without); at load 30+ also the 'zanzibar' jump once in 10 (jump.json on a red run)
 inbox-open	1da997a46	land-reds	test:land, 1 run in ~4 even at load 6: after ⌘⏎ to entry 50 the gap row 'newer messages…' is never drawn as the list scrolls down (thread.gap not found); green alone (5/5); the earlier flash red is fixed
-as-he-does/quick: pinch on an image artifact	cbf4e5f86	image-pinch	product: since cbf4e5f86 the hub frames an image in its viewer (/a/<id>/view), the desktop's zoomable ImageView needs a .png src (zoom.ts isImageSrc): no pinch, fit or ⌘0 in the real app (designer picks, architect signs; main m_30623)
 as-he-does/quick: his late answer to card N withdrawn under him reaches harness' main: bise's 'he answered #N after you withdrew it' with his words	ef6eac813	withdrawn-answer	his answer to a card withdrawn under him is dropped (fix in flight, architect m_30358); remove this line in that fix's sha
 

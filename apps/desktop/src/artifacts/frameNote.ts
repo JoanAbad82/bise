@@ -6,6 +6,9 @@
 // the generated Anchor type (an unknown kind or a wrong field: dropped), and drops anything else.
 // Pure, laws in frameNote.test.ts. Owner: art-desktop.
 import { ANCHOR_KINDS, type Anchor, type Rect } from '@/proto/anchor';
+import { FRAME_KINDS } from '@/shared/frame';
+
+export { FRAME_KINDS };
 
 /** The frame's name the viewers read to know they are in the app (notes.js / select.js). */
 export const APP_FRAME_NAME = 'bise-app';
@@ -105,15 +108,38 @@ export function originOf(src: string | null): string | null {
   return m?.[1]?.toLowerCase() ?? null;
 }
 
+/** From that frame (source) on the pages server (origin): the one check every message passes. Pure. */
+function fromFrame(from: FrameFrom, frame: FrameOf): boolean {
+  if (frame.origin === null || frame.window == null) return false;
+  return from.source === frame.window && from.origin.toLowerCase() === frame.origin;
+}
+
+/** What the frame said: a selection, or an image's zoom (fit or not; image-pinch, architect m_30628). */
+export type FrameMsg = { readonly kind: 'anchor'; readonly note: FrameNote } | { readonly kind: 'zoom'; readonly fit: boolean };
+
+/**
+ * A message from the frame, read once for every kind it may send the window (kit/office/frame.js):
+ * a selection (readFrameNote) or {bise: zoom, fit: boolean}; null for anything else, or not from
+ * that frame on the pages server. Pure.
+ */
+export function readFrame(data: unknown, from: FrameFrom, frame: FrameOf): FrameMsg | null {
+  if (!fromFrame(from, frame) || !isObj(data)) return null;
+  if (data.bise === FRAME_KINDS.zoom) return typeof data.fit === 'boolean' ? { kind: 'zoom', fit: data.fit } : null;
+  const note = readFrameNote(data, from, frame);
+  return note === null ? null : { kind: 'anchor', note };
+}
+
+/** The message that takes the frame's zoomed image back to fit (kit/office/image.js). */
+export const FIT_MESSAGE = { bise: FRAME_KINDS.fit } as const;
+
 /**
  * The selection a message from the frame carries, or null: not from that frame (source), not from
  * the pages server (origin), not a {bise: 'anchor'} message, or a field missing or of the wrong
  * shape. Only artifact, version, anchor and quote are kept. Pure.
  */
 export function readFrameNote(data: unknown, from: FrameFrom, frame: FrameOf): FrameNote | null {
-  if (frame.origin === null || frame.window == null) return null;
-  if (from.source !== frame.window || from.origin.toLowerCase() !== frame.origin) return null;
-  if (!isObj(data) || data.bise !== 'anchor') return null;
+  if (!fromFrame(from, frame)) return null;
+  if (!isObj(data) || data.bise !== FRAME_KINDS.anchor) return null;
   if (!str(data.artifact) || data.artifact === '' || !nat(data.version) || data.version < 1) return null;
   const anchor = readAnchor(data.anchor);
   if (anchor === null) return null;

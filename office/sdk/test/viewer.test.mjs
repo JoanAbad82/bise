@@ -7,14 +7,19 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..");
 
-/** A kit/office module with its bundle imports cut (its helpers need none). */
+/** The kit's own plain modules (no bundle, no DOM at load): imported from their files. */
+const PLAIN = new Set(["frame.js", "zoom.js"]);
+
+/** A kit/office module with its bundle imports cut (its helpers need none); zoom.js and frame.js kept. */
 async function helpers(name) {
-  const src = readFileSync(join(root, "kit", "office", name), "utf8").replace(/^import .* from "\/kit\/office\/[^"]+";$/gm, "");
+  const src = readFileSync(join(root, "kit", "office", name), "utf8").replace(/^import (.*) from "\/kit\/office\/([^"]+)";$/gm, (all, what, file) =>
+    PLAIN.has(file) ? `import ${what} from ${JSON.stringify(pathToFileURL(join(root, "kit", "office", file)).href)};` : "",
+  );
   return import(`data:text/javascript;base64,${Buffer.from(src).toString("base64")}`);
 }
 
@@ -107,6 +112,73 @@ test("a box drawn on an image is a region in % of it", async () => {
   const { boxPct } = await helpers("image.js");
   assert.deepEqual(boxPct({ x: 300, y: 100 }, { x: 100, y: 50 }, 400, 200), { x: 25, y: 25, w: 50, h: 25 });
   assert.deepEqual(boxPct({ x: -10, y: 0 }, { x: 500, y: 300 }, 400, 200), { x: 0, y: 0, w: 100, h: 100 });
+});
+
+// image-pinch (his m_22822; architect m_30628): the zoom's math, moved from the desktop's
+// zoom.test.ts case for case. A 2000×1000 image in a 500×500 box: fit is 25% (500×250), centred
+// with 125 px above and under.
+const D = { bw: 500, bh: 500, nw: 2000, nh: 1000 };
+const zoom = () => import(pathToFileURL(join(root, "kit", "office", "zoom.js")).href);
+
+test("an image fits whole, never above 100%, centred", async () => {
+  const { fitK, fitted } = await zoom();
+  assert.equal(fitK(D), 0.25);
+  assert.deepEqual(fitted(D), { k: 0.25, x: 0, y: 125 });
+  assert.equal(fitK({ bw: 500, bh: 500, nw: 100, nh: 50 }), 1);
+});
+
+test("a zoom keeps the image point under the pointer, held between fit and 8×", async () => {
+  const { fitted, isFit, MAX_K, zoomAt } = await zoom();
+  const z = zoomAt(D, fitted(D), 1, 250, 250);
+  // the point under (250, 250) was image (1000, 500): still under it at 100%
+  assert.ok(Math.abs((250 - z.x) / z.k - 1000) < 1e-6);
+  assert.ok(Math.abs((250 - z.y) / z.k - 500) < 1e-6);
+  assert.equal(zoomAt(D, z, 100, 250, 250).k, MAX_K);
+  assert.ok(isFit(D, zoomAt(D, z, 0.01, 250, 250)));
+});
+
+test("a zoomed image pans, never past an edge; shift+wheel goes sideways", async () => {
+  const { fitted, panBy, wheelPan, zoomAt } = await zoom();
+  const z = zoomAt(D, fitted(D), 1, 0, 0);
+  assert.deepEqual(panBy(D, z, 100, 100), { k: 1, x: 0, y: 0 });
+  assert.deepEqual(panBy(D, z, -5000, -5000), { k: 1, x: -1500, y: -500 });
+  assert.deepEqual(wheelPan(3, 10, 0, false), { dx: -3, dy: -10 });
+  assert.deepEqual(wheelPan(0, 10, 0, true), { dx: -10, dy: -0 });
+  assert.deepEqual(wheelPan(0, 1, 1, false), { dx: -0, dy: -16 });
+});
+
+test("a pinch out zooms in, a pinch in zooms out; lines count as 16 px", async () => {
+  const { pinchFactor } = await zoom();
+  assert.ok(pinchFactor(-10, 0) > 1);
+  assert.ok(pinchFactor(10, 0) < 1);
+  assert.ok(Math.abs(pinchFactor(1, 1) - pinchFactor(16, 0)) < 1e-9);
+});
+
+test("a double-click goes to 100% and back to fit; a small image to 2×", async () => {
+  const { fitted, toggled, zoomWords } = await zoom();
+  const z = toggled(D, fitted(D), 250, 250);
+  assert.equal(z.k, 1);
+  assert.deepEqual(toggled(D, z, 10, 10), fitted(D));
+  const small = { bw: 500, bh: 500, nw: 100, nh: 50 };
+  assert.equal(toggled(small, fitted(small), 250, 250).k, 2);
+  assert.equal(zoomWords(z), "100%");
+});
+
+test("esc and ⌘0 take a zoomed image back to fit; ⌥⌘0 and ⌘esc don't", async () => {
+  const { isFitKey } = await zoom();
+  const key = (o) => ({ key: "", code: "", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...o });
+  assert.ok(isFitKey(key({ key: "Escape" })));
+  assert.ok(isFitKey(key({ code: "Digit0", metaKey: true })));
+  assert.ok(!isFitKey(key({ code: "Digit0", metaKey: true, altKey: true })), "⌥⌘0 stays the panel");
+  assert.ok(!isFitKey(key({ key: "Escape", metaKey: true })));
+  assert.ok(!isFitKey(key({ code: "Digit0" })));
+});
+
+test("image.js loads its zoom and the frame's kinds", async () => {
+  const { boxPct } = await helpers("image.js");
+  assert.equal(typeof boxPct, "function");
+  const { FRAME } = await import(pathToFileURL(join(root, "kit", "office", "frame.js")).href);
+  assert.deepEqual(FRAME, { anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit" });
 });
 
 test("a site's selection is read again before it counts (architect m_24172)", async () => {

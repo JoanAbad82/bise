@@ -1811,44 +1811,58 @@ async function rows25(harness, say) {
   await row('pinch on an image artifact', async () => {
     if (!seeded) throw new Error('no hero-25 row');
     await heroRow.click({ timeout: 5000 });
-    const box = page.locator('[data-testid="artifact.image"]').first();
+    // the hub frames an image in bise's viewer at /a/<id>/view, and the viewer zooms it
+    // (kit/office/image.js; image-pinch): the box and its chip are in that frame
+    const frameEl = page.locator('iframe[data-testid="artifact.page"]').first();
+    const fr = page.frameLocator('iframe[data-testid="artifact.page"]').first();
+    const box = fr.locator('.office-image').first();
     if (!(await box.waitFor({ timeout: 10000 }).then(() => true, () => false))) {
       await shot('pinch-no-image');
-      step('pinch on an image artifact', false, { why: 'no artifact.image 10 s after the hero-25 click', hash: await page.evaluate(() => location.hash).catch(() => null),
+      step('pinch on an image artifact', false, { why: 'no .office-image in the artifact frame 10 s after the hero-25 click', hash: await page.evaluate(() => location.hash).catch(() => null),
+        src: await frameEl.getAttribute('src', { timeout: 1000 }).catch(() => null),
         ids: await page.evaluate(() => [...new Set([...document.querySelectorAll('[data-testid^="artifact"], [data-testid^="app.art"]')].map((e) => e.getAttribute('data-testid')))].slice(0, 30)).catch(() => null) });
       return;
     }
+    const src = await frameEl.getAttribute('src');
     await until(async () => (await box.getAttribute('data-fit')) === 'true', 8000, 250);
-    const img = page.locator('[data-testid="artifact.image.img"]').first();
+    const img = fr.locator('.office-image img').first();
     await until(async () => (await img.evaluate((e) => e.complete && e.naturalWidth > 0)), 10000, 250);
     const point = async (x, y) => { const r = await img.boundingBox(); return r ? { x: ((x - r.x) * NW) / r.width, y: ((y - r.y) * NH) / r.height, top: r.y, w: r.width } : null; };
     const wz = () => page.evaluate(() => [window.devicePixelRatio, window.visualViewport?.scale ?? 1]);
     const fit0 = await box.getAttribute('data-fit');
-    const chip0 = await page.locator('[data-testid="artifact.zoom"]').count();
+    const chip0 = await fr.locator('.office-zoom.on').count();
     const before = await wz();
     const b = await box.boundingBox();
     const px = Math.round(b.x + b.width * 0.4), py = Math.round(b.y + b.height * 0.45);
-    await page.mouse.move(px, py);
-    const pinch = async (t) => { await page.keyboard.down('Control'); for (let i = 0; i < t; i++) { await page.mouse.wheel(0, -40); await page.waitForTimeout(30); } await page.keyboard.up('Control'); await page.waitForTimeout(200); };
+    // the pointer inside the viewer's frame (an OOPIF): the off-screen window never routes it there,
+    // so on the frame's own session, the iframe checked on top at each point (the harness's one
+    // copy, apps/desktop/tests/harness/frameinput.mjs; architect m_30735). esc stays page.keyboard:
+    // the window's key, lent to the zoom through the frame's {bise: zoom}
+    const { frameInput } = await import(path.join(DESKTOP, 'tests', 'harness', 'frameinput.mjs'));
+    const vf = page.frames().find((x) => /\/a\/[^/?#]+\/view(\?|$)/.test(x.url()));
+    if (!vf) throw new Error('no viewer frame');
+    const fi = await frameInput(page, vf);
+    await fi.move(px, py);
+    const pinch = async (t) => { for (let i = 0; i < t; i++) { await fi.wheel(px, py, 0, -40, { ctrl: true }); await page.waitForTimeout(30); } await page.waitForTimeout(200); };
     await pinch(3);
     const fit1 = await box.getAttribute('data-fit');
     const at = await point(px, py);
     await pinch(3);
     const zoomed = await point(px, py);
-    const chip = await text('[data-testid="artifact.zoom"]');
+    const chip = (await fr.locator('.office-zoom').first().textContent({ timeout: 1000 }).catch(() => null))?.trim() ?? null;
     const after = await wz();
-    await page.mouse.move(1, 300);
     await shot('pinch-zoomed');
-    await page.mouse.move(px, py);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
     const fit2 = await box.getAttribute('data-fit');
+    await fi.detach();
     const stillOpen = await page.locator('[data-testid="artifact.open"]').count();
     await shot('pinch-esc-fit');
     const dx = at && zoomed ? Math.abs(zoomed.x - at.x) : null, dy = at && zoomed ? Math.abs(zoomed.y - at.y) : null;
-    step('pinch (ctrl+wheel) on an image artifact: fit at open, no chip; zooms around the pointer (±1 px), a % chip, the window zoom never moves; esc back to fit, the artifact still open',
-      fit0 === 'true' && chip0 === 0 && fit1 === 'false' && dx !== null && dx <= 1 && dy <= 1 && zoomed.w > at.w && /^\d+%$/.test(chip ?? '') && JSON.stringify(before) === JSON.stringify(after) && fit2 === 'true' && stillOpen > 0,
-      { fit0, chip0, fit1, at, zoomed, dx, dy, chip, before, after, fit2, stillOpen });
+    const viewer = /\/a\/[^/?#]+\/view(\?|$)/.test(src ?? '');
+    step('pinch (ctrl+wheel) on an image artifact in the hub\'s viewer (/a/<id>/view): fit at open, no chip; zooms around the pointer (±1 px), a % chip, the window zoom never moves; esc back to fit, the artifact still open',
+      viewer && fit0 === 'true' && chip0 === 0 && fit1 === 'false' && dx !== null && dx <= 1 && dy <= 1 && zoomed.w > at.w && /^\d+%$/.test(chip ?? '') && JSON.stringify(before) === JSON.stringify(after) && fit2 === 'true' && stillOpen > 0,
+      { src, viewer, fit0, chip0, fit1, at, zoomed, dx, dy, chip, before, after, fit2, stillOpen });
     await closeArtifact();
     await page.keyboard.press('Escape').catch(() => {});
   });

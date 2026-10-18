@@ -15,9 +15,22 @@
 .office-rail .thumb[data-mark="done"]::after { left: 0; right: auto; }
 
 /* a box on an image: drawn now (.office-box), or a note's (.office-mark-box) */
-.office-image { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 12px; }
-.office-image .frame { position: relative; max-width: 100%; cursor: crosshair; user-select: none; }
-.office-image img { display: block; max-width: 100%; height: auto; }
+/* the image zooms (kit/office/image.js, zoom.js): the frame is sized k × the image and moved in
+   the box, hidden until the box has its size; space held: a drag pans */
+.office-image { flex: 1; position: relative; overflow: hidden; cursor: crosshair; user-select: none; touch-action: none; }
+.office-image .frame { position: absolute; left: 0; top: 0; }
+.office-image:not([data-fit]) .frame { visibility: hidden; }
+.office-image img { display: block; width: 100%; height: 100%; }
+.office-image.pixels img { image-rendering: pixelated; }
+.office-image.eased .frame { transition: transform 160ms var(--ease-arrive), width 160ms var(--ease-arrive), height 160ms var(--ease-arrive); }
+.office-image.panning { cursor: grab; }
+.office-image.grabbing { cursor: grabbing; }
+/* the zoom's chip: '240%' while he zooms and 1.5 s after, then fades; a click: back to fit (designer m_30627) */
+.office-zoom { position: absolute; right: 8px; bottom: 8px; z-index: 3; font: var(--text-kicker) / 1 var(--font-mono); color: var(--dim); background: var(--surface-card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 120ms ease-out; }
+.office-zoom.on { opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .office-image.eased .frame, .office-zoom { transition: none; }
+}
 .office-box, .office-mark-box { position: absolute; box-sizing: border-box; pointer-events: none; }
 .office-box { outline: 1px solid var(--ink); background: color-mix(in srgb, var(--ink) 9%, transparent); }
 .office-mark-box { outline: 1px solid var(--accent); box-shadow: inset 3px 0 0 var(--accent); }

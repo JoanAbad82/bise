@@ -8,8 +8,18 @@
 //                                   at the focused element; the app's paste handler sees what a
 //                                   ⌘V of a screenshot gives it. The one documented exception to
 //                                   'real input only'; the key itself (⌘V) is a real key.
+//   frameInput(page, frame)         the pointer, the wheel and a few keys inside a cross-origin
+//                                   frame (an artifact's viewer, an OOPIF), on that frame's own CDP
+//                                   session (frameinput.mjs). The second documented exception
+//                                   (architect m_30735): the harness's offscreen windows never route
+//                                   input into an OOPIF, his windows do; so the same Input events
+//                                   skip the browser's hit test, which the helper does itself (the
+//                                   iframe must be on top at each point, else it throws). Refused
+//                                   for a same-origin frame; keys that are the window's stay
+//                                   page.keyboard.
 //   the fake microphone: launch with { micWav } (launch.ts), Chromium's fake capture device plays
 //   the wav; the real mic is never opened.
+export { frameInput, type FrameInput } from './frameinput.mjs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';

@@ -22,6 +22,7 @@
 // happens destroying the window (the last fence).
 import { app, session, webFrameMain, type BrowserWindow, type WebContents, type WebFrameMain } from 'electron';
 import { IPC, TEST_WINDOW_OPEN_HOOK } from '../shared/api';
+import { FRAME_KINDS } from '../shared/frame';
 import { frameLink, isPagesFrame, type FrameLink } from './framelink';
 import { openLink } from './ipc';
 
@@ -63,7 +64,7 @@ export const ESC_FORWARD = `(() => {
   if (window.__biseEsc) return; window.__biseEsc = true;
   addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.repeat || e.isComposing) return;
-    setTimeout(() => { if (!e.defaultPrevented) parent.postMessage({ bise: 'esc' }, '*'); }, 0);
+    setTimeout(() => { if (!e.defaultPrevented) parent.postMessage({ bise: ${JSON.stringify(FRAME_KINDS.esc)} }, '*'); }, 0);
   }, true);
 })();`;
 

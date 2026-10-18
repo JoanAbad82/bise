@@ -4,7 +4,7 @@
 // its notes itself through view.where, re-anchored on the version's text). One store (pages/artifact/notes.rs), two doors:
 //
 // - in the desktop's side panel (the frame's name is `bise-app`, art-desktop m_23900) a
-//   selection's `note` button posts {bise: "anchor", artifact, version, anchor, quote} to the
+//   selection's `note` button posts {bise: FRAME.anchor, artifact, version, anchor, quote} to the
 //   parent, on his click only (architect m_23971): it becomes a chip in the maker's composer, and the hub records the note when
 //   he sends his message;
 // - in a browser the same button opens notes.js's note: the model, the words and the send of a
@@ -18,6 +18,8 @@
 // the artifact's SSE (`notes`); a note whose part is gone is `moved` in the list.
 //
 // Pure helpers (exported for kit/office/check.mjs): inRange, markOf, quoteOf, message.
+
+import { FRAME } from "/kit/office/frame.js";
 
 const A = globalThis.BiseAnchors;
 const N = globalThis.BiseNotes && globalThis.BiseNotes.core;
@@ -74,7 +76,7 @@ export function quoteOf(text) {
  * facts (architect m_23971: no token, no list, no url), whatever window it is in; `key`: his
  * first typed character when typing took it, so "why" never arrives as "hy" (architect m_24155). */
 export function message(info, anchor, quote, key) {
-  return { bise: "anchor", artifact: info.id, version: info.version, anchor, quote, ...(key ? { key } : {}) };
+  return { bise: FRAME.anchor, artifact: info.id, version: info.version, anchor, quote, ...(key ? { key } : {}) };
 }
 
 /** The character a keydown types, when it is exactly one printable grapheme and no shortcut, IME
