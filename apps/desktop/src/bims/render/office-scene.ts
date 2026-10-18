@@ -10,7 +10,7 @@ import type { BimFrame, Look, Motion, Office } from '../model';
 import { makeBim, type Bim } from './bim';
 import { pillOf } from '../labels';
 import { siteOf, type Fit, type V3 } from './camera';
-import { cameraStart, flightAt, makePlane, planFlight, shadowOf, type FlightPlan, type Plane } from './plane';
+import { cameraStart, catchPoint, flightAt, makePlane, planFlight, shadowOf, type FlightPlan, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { skateRig } from './skate';
 import { eggRig } from './egg';
@@ -165,7 +165,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       const rig = rigs.get(f.name);
       if (!rig) continue;
       flying.add(f.name);
-      const hand = { x: rig.x, y: 1.0, z: rig.z };
+      // in front of it, at its right hand (plane.ts catchPoint): never on its head or its spot
+      const hand = catchPoint(rig.x, rig.z, rig.dir);
       // never smaller than PLANE_MIN_PX on screen (designer via bims-qa m_27793: at 320 it was a speck)
       const size = Math.max(1, (PLANE_MIN_PX * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN);
       // one plan per flight, made when it leaves (his pan or zoom mid-flight moves no plane)

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Office, Spot } from '../model';
 import { BACK, RIGHT, UP, fitSite, siteOf, toScreen, type V3 } from './camera';
-import { cameraStart, flightAt, planFlight, shadowOf, type FlightPlan } from './plane';
+import { cameraStart, catchPoint, flightAt, planFlight, shadowOf, type FlightPlan } from './plane';
 import { PLANE_FLIGHT } from './pose';
 
 /** the prototype's office numbers for n agents (maps/loft.ts owns the real ones; these only size the site) */
@@ -126,6 +126,16 @@ describe('his paper plane', () => {
       const inLoop = samples(f).filter((s) => Math.abs(s.u - f.loopAt) < f.loopW / 2);
       expect(Math.min(...inLoop.map((s) => seen(s.p, pill)))).toBeGreaterThan(1.4 * 0.6);
       expect(loopsOf(f)).toBe(1);
+    }
+  });
+
+  it('ends in front of the bim, at its right hand, whichever way it faces', () => {
+    for (const dir of [0, Math.PI / 2, Math.PI, -Math.PI / 3]) {
+      const c = catchPoint(3, 5, dir);
+      const ahead = { x: Math.sin(dir), z: Math.cos(dir) }; // bim.ts: its front is +z, turned by dir
+      expect((c.x - 3) * ahead.x + (c.z - 5) * ahead.z).toBeCloseTo(0.38, 6);
+      expect(Math.hypot(c.x - 3, c.z - 5)).toBeGreaterThan(0.3);
+      expect(c.y).toBeLessThan(1.4); // at the hand, under its head
     }
   });
 

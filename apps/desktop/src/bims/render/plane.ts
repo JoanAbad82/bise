@@ -52,6 +52,19 @@ export function cameraStart(fit: Fit): V3 {
   return add(onScreen, BACK, k);
 }
 
+/** where its right hand catches (bim.ts: armR at +0.24 across, the catch reaches 0.38 forward), office units */
+const CATCH = { across: 0.24, ahead: 0.38, y: 1.0 } as const;
+
+/**
+ * Where the plane ends: in front of the bim at (x, z) facing `dir` (bim.ts rotation.y), at its right
+ * hand as it reaches out (pose.ts caught), never on its head or its spot (Gabriel via hero-town m_31513). Pure.
+ */
+export function catchPoint(x: number, z: number, dir: number): V3 {
+  const c = Math.cos(dir);
+  const s = Math.sin(dir);
+  return { x: x + CATCH.across * c + CATCH.ahead * s, y: CATCH.y, z: z - CATCH.across * s + CATCH.ahead * c };
+}
+
 /** one flight, planned once when it leaves (seeded: the same flight for the same message) */
 export interface FlightPlan {
   readonly from: V3;
