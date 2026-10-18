@@ -1778,16 +1778,7 @@ def main(argv):
         sys.stdout.write(bend_literal(open(argv[1]).read()) + "\n")
         return
     port = int(argv[0]) if argv else 0
-    srv = Server(("127.0.0.1", port), H)
-    # FAKE_TLS=1: HTTPS with tests/fixtures/tls's self-signed localhost certificate (the client
-    # trusts it with SSL_CERT_FILE=<that cert>): test-install.sh's TLS turn, the path every
-    # real provider takes (-41's runtime could not load libssl under the hardened runtime)
-    if os.environ.get("FAKE_TLS") == "1":
-        import ssl
-        d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "tls")
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ctx.load_cert_chain(os.path.join(d, "localhost-cert.pem"), os.path.join(d, "localhost-key.pem"))
-        srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+    srv = __import__("fake_tls").wrap(Server(("127.0.0.1", port), H))  # HTTPS when FAKE_TLS=1
     print("PORT", srv.server_address[1], flush=True)
     srv.serve_forever()
 
