@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """scripts/desktop_tag.py: the one way to cut a desktop tag, on fake data only.
 
-Its pure parts (the green line of desktop-green.tsv for an exact sha, the tag's message, the
-mark's check), the release body without the mark (desktop_feed.notes_from_tag_message), then a
-throwaway repo, a throwaway BISE_HOME and a fake nightly (DESKTOP_TAG_NIGHTLY) run under no heavy
-slot: a green line is taken as it is; without one the fake runs and the tag comes only on green;
-a red or a dirty checkout makes no tag; `check` refuses a lightweight tag, a tag without the mark
-and a mark for another sha, and passes the tag cut here. Never his ~/.bise, no push.
+Its pure parts (a sha's last run in desktop-runs.tsv, the judge of a run against known_reds, the
+mark line, the mark's check), the release body without the mark (desktop_feed), then a throwaway
+repo, a throwaway BISE_HOME and a fake nightly (DESKTOP_TAG_NIGHTLY: writes its run line, reds.txt
+and steps.tsv like nightly_desktop.sh) run under no heavy slot. The cases (review-gates m_30406):
+a green run tags 'green'; a run with only owned reds tags 'owned-reds N (owners: …)' and prints the
+open known-reds count; one red outside tests/known_reds.txt refuses, naming it; a step 'none'
+refuses; known_reds is read AT THE SHA (a line added later in the working tree doesn't count); a
+dirty checkout refuses; `check` refuses a lightweight tag, a tag without the mark and a mark for
+another sha, passes both marks and prints the line. Never his ~/.bise, no push.
 
   python3 -B tests/desktop_tag_test.py
 """
@@ -22,17 +25,22 @@ import desktop_feed as F  # noqa: E402
 import desktop_tag as T  # noqa: E402
 
 FAILS = []
-# a fake nightly: green appends the sha like nightly_desktop.sh, red exits 1
+# a fake nightly: FAKE_REDS (names, '|'-separated) and FAKE_NONE (a step with no result)
 FAKE_NIGHTLY = """#!/usr/bin/env bash
 echo "nightly $*" >> "$FAKE_LOG"
-[ "${FAKE_RED:-}" = 1 ] && exit 1
-mkdir -p "$BISE_HOME/run/nightly"
-printf '%s\\t%s\\n' "$2" "2026-10-18T05:00:00" >> "$BISE_HOME/run/nightly/desktop-green.tsv"
+out=$1 sha=$2; mkdir -p "$out" "$BISE_HOME/run/nightly"
+v=green; : > "$out/reds.txt"
+printf 'candidate\\tgreen\\nquick\\tgreen\\nland\\tgreen\\nfull\\tgreen\\ndmg\\t%s\\n' "${FAKE_NONE:-green}" > "$out/steps.tsv"
+[ -n "${FAKE_NONE:-}" ] && v=none
+if [ -n "${FAKE_REDS:-}" ]; then v=red; echo "$FAKE_REDS" | tr '|' '\\n' > "$out/reds.txt"; fi
+printf '%s\\t%s\\t%s\\t%s\\n' "2026-10-18T05:00:00" "$sha" "$v" "$out" >> "$BISE_HOME/run/nightly/desktop-runs.tsv"
+[ "$v" = green ] && exit 0 || exit 1
 """
 # no signing prompt in a throwaway repo (his global config signs)
 GIT_ENV = {"GIT_CONFIG_COUNT": "3", "GIT_CONFIG_KEY_0": "commit.gpgsign", "GIT_CONFIG_VALUE_0": "false",
            "GIT_CONFIG_KEY_1": "tag.gpgsign", "GIT_CONFIG_VALUE_1": "false",
            "GIT_CONFIG_KEY_2": "user.email", "GIT_CONFIG_VALUE_2": "t@t", "GIT_AUTHOR_NAME": "t", "GIT_COMMITTER_NAME": "t"}
+KNOWN = "# known\nas-he-does/quick: row one\tabc\tnight-reds\tits why\nhistory-perf\tdef\tland-reds\tflaky\n"
 
 
 def check(ok, what):
@@ -40,31 +48,53 @@ def check(ok, what):
         FAILS.append(what)
 
 
+def raises(fn, words):
+    try:
+        fn()
+        return "no error"
+    except T.TagError as e:
+        return None if words in str(e) else str(e)
+
+
 def pure():
-    tsv = "aaa\t2026-10-17T05:00:00\nbbb\t2026-10-17T06:00:00\naaa\t2026-10-18T05:00:00\n"
-    check(T.green_line(tsv, "aaa") == "2026-10-18T05:00:00", "green_line: the last line of that sha")
-    check(T.green_line(tsv, "aa") is None and T.green_line("", "aaa") is None, "green_line: exact sha only")
-    m = T.message("- one\n- two\n", "abc", "2026-10-18T05:00:00")
-    check(m == "- one\n- two\n\nnightly-desktop: green abc 2026-10-18T05:00:00\n", "message: %r" % m)
-    check(T.message("", "abc", "w") == "nightly-desktop: green abc w\n", "message without notes")
-    check(T.marked(m, "abc") and not T.marked(m, "ab") and not T.marked("- one\n", "abc"), "marked: exact sha")
-    check(not T.marked("say nightly-desktop: green abc", "abc"), "marked: a line of its own")
-    check(F.notes_from_tag_message(m, "t") == "- one\n- two\n", "the release body drops the mark")
-    check(F.notes_from_tag_message("nightly-desktop: green abc w\n", "desktop-v2026.10.1") == "bise for Mac, desktop-v2026.10.1.\n",
-          "the mark alone: the stand-in body")
+    tsv = "w1\taaa\tred\t/o1\nw2\tbbb\tgreen\t/o2\nw3\taaa\tgreen\t/o3\nbad line\n"
+    check(T.last_run(tsv, "aaa") == {"when": "w3", "verdict": "green", "out": "/o3"}, "last_run: the last line of that sha")
+    check(T.last_run(tsv, "aa") is None and T.last_run("", "aaa") is None, "last_run: exact sha only")
+    known = {"r1": ("s", "night-reds", "w"), "r2": ("s", "land-reds", "w")}
+    ok = {"candidate": "green", "quick": "red", "dmg": "green"}
+    check(T.judge("green", ok, [], known) == ("green", []), "judge: green")
+    check(T.judge("red", ok, ["r1", "r2"], known) == ("owned-reds", [("r1", "night-reds"), ("r2", "land-reds")]), "judge: owned")
+    check(raises(lambda: T.judge("red", ok, ["r1", "r9"], known), "outside tests/known_reds.txt at that sha: r9") is None, "judge: outside")
+    check(raises(lambda: T.judge("red", dict(ok, dmg="none"), ["r1"], known), "no result: dmg") is None, "judge: a none step")
+    check(raises(lambda: T.judge("none", ok, [], known), "didn't run every step") is None, "judge: verdict none")
+    check(raises(lambda: T.judge("red", ok, [], known), "no red named") is None, "judge: red with no name")
+    g = T.mark_line("green", [], "abc", "w")
+    o = T.mark_line("owned-reds", [("r1", "night-reds"), ("r2", "land-reds"), ("r3", "night-reds")], "abc", "w")
+    check(g == "nightly-desktop: green abc w", g)
+    check(o == "nightly-desktop: owned-reds 3 abc w (owners: land-reds, night-reds)", o)
+    m = T.message("- one\n- two\n", o)
+    check(m == "- one\n- two\n\n" + o + "\n", "message: %r" % m)
+    check(T.marked(m, "abc") == o and T.marked(T.message("", g), "abc") == g, "marked: both kinds")
+    check(T.marked(m, "ab") is None and T.marked("- one\n", "abc") is None, "marked: exact sha")
+    check(T.marked("say nightly-desktop: green abc w", "abc") is None, "marked: a line of its own")
+    check(F.notes_from_tag_message(m, "t") == "- one\n- two\n", "the release body drops the owned-reds mark")
+    check(F.notes_from_tag_message(T.message("- one", g), "t") == "- one\n", "the release body drops the green mark")
+    check(F.notes_from_tag_message(g + "\n", "desktop-v2026.10.1") == "bise for Mac, desktop-v2026.10.1.\n", "the mark alone: the stand-in body")
 
 
 def repo_flow():
     t = os.path.realpath(tempfile.mkdtemp(prefix="desktop-tag-test-", dir=os.environ.get("TMPDIR")))
     saved = {k: os.environ.get(k) for k in GIT_ENV}
     os.environ.update(GIT_ENV)
+    saved_heavy = T.heavy_argv
     try:
         repo, bh, log = os.path.join(t, "repo"), os.path.join(t, "home", ".bise"), os.path.join(t, "log")
         subprocess.run(["git", "init", "-q", "-b", "main", repo], check=True)
         g = lambda *a: subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True, text=True, stdin=subprocess.DEVNULL).stdout.strip()  # noqa: E731
-        with open(os.path.join(repo, "f"), "w") as f:
-            f.write("1\n")
-        g("add", "f")
+        os.makedirs(os.path.join(repo, "tests"))
+        with open(os.path.join(repo, "tests", "known_reds.txt"), "w") as f:
+            f.write(KNOWN)
+        g("add", "tests/known_reds.txt")
         g("commit", "-q", "-m", "one")
         sha = g("rev-parse", "HEAD")
         fake = os.path.join(t, "nightly")
@@ -73,53 +103,76 @@ def repo_flow():
         env = dict(os.environ, BISE_HOME=bh, DESKTOP_TAG_NIGHTLY=fake, FAKE_LOG=log)
         # no heavy slot in the test: the argv as it is
         T.heavy_argv = lambda cmd, lock: [c for c in cmd if c not in ("/usr/bin/caffeinate", "-is")]
+        runs = os.path.join(bh, "run", "nightly", "desktop-runs.tsv")
         calls = lambda: open(log).read().splitlines() if os.path.exists(log) else []  # noqa: E731
 
         def cut(tag, **extra):
+            if os.path.exists(runs):
+                os.remove(runs)
             try:
-                T.cut(tag, None, "- the notes\n", repo=repo, env=dict(env, **extra))
-                return None
+                return T.cut(tag, None, "- the notes\n", repo=repo, env=dict(env, **extra))
             except T.TagError as e:
-                return str(e)
+                return "ERR " + str(e)
 
-        # a bad name, no tag
-        check("desktop-vYYYY.M.N" in (cut("v2026.10.1") or ""), "a bad tag name")
-        # no green line: the nightly runs, red: no tag
-        e = cut("desktop-v2026.10.1", FAKE_RED="1")
-        check(e and "not green" in e and calls() == ["nightly %s %s" % (calls()[0].split()[1], sha)], "red night: %s %s" % (e, calls()))
-        check(not g("tag", "-l"), "red night: no tag")
-        # a dirty checkout: refused before anything runs
-        with open(os.path.join(repo, "f"), "w") as f:
-            f.write("2\n")
+        check("desktop-vYYYY.M.N" in cut("v2026.10.1"), "a bad tag name")
+        # one red outside the file: refused, naming it; no tag
+        r = cut("desktop-v2026.10.1", FAKE_REDS="as-he-does/quick: row one|as-he-does/full: row nine")
+        check(r.startswith("ERR") and "1 red(s) outside" in r and "as-he-does/full: row nine" in r, "outside: %s" % r)
+        check(not g("tag", "-l"), "outside: no tag")
+        # a step with no result: refused
+        r = cut("desktop-v2026.10.1", FAKE_NONE="none")
+        check(r.startswith("ERR") and "no result: dmg" in r, "none: %s" % r)
+        # a line added in the working tree only: the checkout is dirty, refused before any run
+        with open(os.path.join(repo, "tests", "known_reds.txt"), "a") as f:
+            f.write("as-he-does/full: row nine\tx\tnight-reds\tlater\n")
         open(log, "w").close()
-        e = cut("desktop-v2026.10.1")
-        check(e and "clean" in e and calls() == [], "dirty: %s" % e)
-        g("checkout", "-q", "f")
-        # green: the nightly runs, then the annotated tag with the mark
-        e = cut("desktop-v2026.10.1")
-        check(e is None and len(calls()) == 1, "green night: %s %s" % (e, calls()))
-        check(g("cat-file", "-t", "refs/tags/desktop-v2026.10.1") == "tag", "green night: annotated")
+        r = cut("desktop-v2026.10.1", FAKE_REDS="as-he-does/full: row nine")
+        check(r.startswith("ERR") and "clean" in r and calls() == [], "dirty: %s %s" % (r, calls()))
+        # known_reds read AT THE SHA: the line committed in a later sha, that sha's run is owned;
+        # back on the first sha, the same red is outside
+        g("commit", "-q", "-am", "two")
+        sha2 = g("rev-parse", "HEAD")
+        r = cut("desktop-v2026.10.9", FAKE_REDS="as-he-does/full: row nine")
+        check(r == "nightly-desktop: owned-reds 1 %s 2026-10-18T05:00:00 (owners: night-reds)" % sha2, "at sha2: %s" % r)
+        g("tag", "-d", "desktop-v2026.10.9")
+        g("checkout", "-q", sha)
+        r = cut("desktop-v2026.10.1", FAKE_REDS="as-he-does/full: row nine")
+        check(r.startswith("ERR") and "outside" in r, "at sha1, the later line doesn't count: %s" % r)
+        # only owned reds: tagged 'owned-reds 2 (owners: …)', the count printed
+        open(log, "w").close()
+        r = cut("desktop-v2026.10.1", FAKE_REDS="as-he-does/quick: row one|history-perf")
+        check(r == "nightly-desktop: owned-reds 2 %s 2026-10-18T05:00:00 (owners: land-reds, night-reds)" % sha, "owned: %s" % r)
+        check(len(calls()) == 1, "owned: the nightly ran once %s" % calls())
         msg = g("tag", "-l", "--format=%(contents)", "desktop-v2026.10.1")
-        check(msg.startswith("- the notes") and "nightly-desktop: green %s 2026-10-18T05:00:00" % sha in msg, "the message: %r" % msg)
-        # the green line is there now: a second tag takes it, no run
+        check(msg.startswith("- the notes") and msg.endswith(r), "owned: the message %r" % msg)
+        # a run already there for the sha: taken as it is, no new run; a green one tags 'green'
+        os.makedirs(os.path.join(t, "o-green"))
+        open(os.path.join(t, "o-green", "reds.txt"), "w").close()
+        with open(os.path.join(t, "o-green", "steps.tsv"), "w") as f:
+            f.write("candidate\tgreen\nquick\tgreen\nland\tgreen\nfull\tgreen\ndmg\tgreen\n")
+        os.makedirs(os.path.dirname(runs), exist_ok=True)
         open(log, "w").close()
-        check(cut("desktop-v2026.10.2") is None and calls() == [], "a green line: no run")
-        check(cut("desktop-v2026.10.2") and "exists" in cut("desktop-v2026.10.2"), "an existing tag")
-        # check: the tag cut here passes; a lightweight one, one without the mark, one marked for another sha fail
         try:
-            T.check("desktop-v2026.10.1", repo=repo)
+            with open(runs, "w") as f:
+                f.write("2026-10-18T05:00:00\t%s\tgreen\t%s\n" % (sha, os.path.join(t, "o-green")))
+            r = T.cut("desktop-v2026.10.2", None, "", repo=repo, env=env)
         except T.TagError as e:
-            check(False, "check of a cut tag: %s" % e)
+            r = "ERR " + str(e)
+        check(r == "nightly-desktop: green %s 2026-10-18T05:00:00" % sha and calls() == [], "green run taken: %s %s" % (r, calls()))
+        check("exists" in cut("desktop-v2026.10.2"), "an existing tag")
+        # check: both cut tags pass and print their line; lightweight, no mark, another sha fail
+        for tag in ("desktop-v2026.10.1", "desktop-v2026.10.2"):
+            try:
+                T.check(tag, repo=repo)
+            except T.TagError as e:
+                check(False, "check of %s: %s" % (tag, e))
         g("tag", "desktop-v2026.10.3")
         g("tag", "-a", "desktop-v2026.10.4", "-m", "- notes")
         g("tag", "-a", "desktop-v2026.10.5", "-m", "nightly-desktop: green %s w" % ("0" * 40))
         for tag, why in (("desktop-v2026.10.3", "lightweight"), ("desktop-v2026.10.4", "carries no"), ("desktop-v2026.10.5", "carries no")):
-            try:
-                T.check(tag, repo=repo)
-                check(False, "check passed %s" % tag)
-            except T.TagError as e:
-                check(why in str(e) and T.REFUSE in str(e), "check %s: %s" % (tag, e))
+            check(raises(lambda: T.check(tag, repo=repo), why) is None, "check %s" % tag)
     finally:
+        T.heavy_argv = saved_heavy
         for k, v in saved.items():
             if v is None:
                 os.environ.pop(k, None)

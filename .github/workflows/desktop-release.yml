@@ -101,9 +101,11 @@ jobs:
           fetch-depth: 0
 
       # the tag was cut by scripts/desktop_tag.py: annotated, its message
-      # carries 'nightly-desktop: green <its commit>' (the desktop app's full
-      # end-to-end, scripts/nightly_desktop.sh, green on that exact sha on
-      # his Mac; fast-try p7, architect m_29670). A hand 'git tag' stops here.
+      # carries 'nightly-desktop: green|owned-reds N <its commit>' (the
+      # desktop app's full end-to-end, scripts/nightly_desktop.sh, on that
+      # exact sha on his Mac: green, or every red owned in tests/known_reds.txt
+      # at that sha; fast-try p7, architect m_29670, main m_30399). The line
+      # is printed in the log. A hand 'git tag' stops here.
       # The tag object fetched again as pushed: checkout can leave a
       # lightweight copy of the ref it checked out.
       - name: The tag's nightly desktop green

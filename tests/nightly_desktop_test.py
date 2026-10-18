@@ -7,8 +7,9 @@ write what the real ones write (the candidate's json line, cand.sh's step JSONs,
 clock (NIGHTLY_DESKTOP_NOW), and a throwaway BISE_HOME. Checks: the steps' order and their
 green / red / none, the exit (0, 1, 2), a red step of a cand.sh JSON named with its digits as N and
 split by known_reds, a gate breach is red, nothing new after --until (none, never green), on
-battery nothing runs, the green sha in desktop-green.tsv, the candidate it built removed and one
-built before kept. Never his ~/.bise, no real build or app.
+battery nothing runs, each run's line in desktop-runs.tsv (when, sha, verdict, out dir) and what a
+tag reads (reds.txt: each red's name, test:land's by name; steps.tsv: each step's state), the
+candidate it built removed and one built before kept. Never his ~/.bise, no real build or app.
 
   python3 -B tests/nightly_desktop_test.py
 """
@@ -115,7 +116,19 @@ def main():
             calls = open(log).read().splitlines()
             return r.returncode, r.stdout + r.stderr, calls
 
-        green_tsv = os.path.join(home, ".bise", "run", "nightly", "desktop-green.tsv")
+        runs_tsv = os.path.join(home, ".bise", "run", "nightly", "desktop-runs.tsv")
+        out = os.path.join(t, "out")
+
+        def last_run():
+            """the last desktop-runs.tsv line's 4 columns: when, sha, verdict, out dir"""
+            lines = open(runs_tsv).read().splitlines() if os.path.exists(runs_tsv) else []
+            return lines[-1].split("\t") if lines else []
+
+        def facts():
+            """what a tag reads: reds.txt's names, steps.tsv's {step: state}"""
+            reds = open(os.path.join(out, "reds.txt")).read().splitlines()
+            steps = dict(l.split("\t", 1) for l in open(os.path.join(out, "steps.tsv")).read().splitlines())
+            return reds, steps
 
         # all green: the steps by value, every quick row (no QUICK_ROWS) with the first run and the voice
         rc, o, calls = run()
@@ -123,16 +136,20 @@ def main():
         kinds = [c.split()[0] + ("" if not c.startswith("cand") else " " + c.split()[1]) for c in calls]
         check(kinds == ["try", "cand quick", "pnpm", "pnpm", "cand full", "dmg"], "green: the order %s" % kinds)
         check(any(c.startswith("cand quick") and "first=1 voice=1 rows=" in c and c.endswith("rows=") for c in calls), "green: quick args %s" % calls)
-        check(os.path.exists(green_tsv) and open(green_tsv).read().startswith(sha + "\t"), "green: desktop-green.tsv")
+        lr = last_run()
+        check(len(lr) == 4 and lr[1:] == [sha, "green", out], "green: desktop-runs.tsv's line %s" % lr)
+        check(facts() == ([], {"candidate": "green", "quick": "green", "land": "green", "full": "green", "dmg": "green"}), "green: reds.txt, steps.tsv %s" % (facts(),))
+        check(not os.path.exists(os.path.join(home, ".bise", "run", "nightly", "desktop-green.tsv")), "green: no desktop-green.tsv any more")
         check(not os.path.exists(os.path.join(t, "cand", sha[:12])), "green: the candidate it built is removed")
         check("STEP dmg: green" in o and "nightly desktop: green" in o, "green: summary\n" + o)
 
         # a red step in quick's JSON: digits as N, a known red with its owner; still red (exit 1)
-        os.remove(green_tsv)
         rc, o, _ = run(FAKE_RED_MODE="quick")
         check(rc == 1 and "FAIL quick" in o, "red row: rc %s\n%s" % (rc, o))
         check("known reds (tests/known_reds.txt): as-he-does/quick: an answer to card N withdrawn (gate-nightly" in o, "red row: known split\n" + o)
-        check(not os.path.exists(green_tsv), "red row: no green line")
+        check(last_run()[1:3] == [sha, "red"], "red row: its run line %s" % last_run())
+        reds, steps = facts()
+        check(reds == ["as-he-does/quick: an answer to card N withdrawn"] and steps.get("quick") == "red", "red row: reds.txt, steps.tsv %s" % (facts(),))
         rc, o, _ = run(FAKE_RED_MODE="full")
         check(rc == 1 and "NEW reds (not in tests/known_reds.txt): as-he-does/full: an answer to card N withdrawn" in o, "red full: NEW\n" + o)
 
@@ -142,6 +159,7 @@ def main():
 
         # test:land red; the DMG with no signing identity is none, not red
         rc, o, _ = run(FAKE_LAND_RED="1")
+        check(facts()[0] == ["keep"], "land red: its reds by name, not 'desktop/test:land' %s" % (facts(),))
         check(rc == 1 and "FAIL land" in o and "NEW reds" in o, "land red\n" + o)
         rc, o, _ = run(FAKE_NO_SIGN="1")
         check(rc == 2 and "STEP dmg: none (no signing identity" in o, "no sign: none\n" + o)
@@ -155,7 +173,7 @@ def main():
         rc, o, calls = run("--until", "08:00", NOW=at(7, 50), FAKE_TRY_NOW=at(8, 1))
         check(rc == 2 and "STEP quick: none (past 08:00)" in o and "STEP dmg: none (past 08:00)" in o, "until\n" + o)
         check([c.split()[0] for c in calls] == ["try"], "until: nothing after the build %s" % calls)
-        check(not os.path.exists(green_tsv), "until: no green line")
+        check(last_run()[2] == "none" and facts()[1].get("quick") == "none", "until: a none run %s %s" % (last_run(), facts()))
         # a start after the hour ends at tomorrow's: everything runs
         rc, o, _ = run("--until", "08:00", NOW=at(9, 0))
         check(rc == 0, "until tomorrow\n" + o)

@@ -21,9 +21,10 @@
 # The reds: each ok:false step of the cand.sh JSONs, named 'as-he-does/<mode>: <step name>' (digits
 # as N: a card's number changes each run), plus the steps' own reds, split by tests/known_reds.py
 # (known with its owner, else NEW). A known red is still red.
-# Out: <out>/<step>.log, <out>/quick/ and <out>/full/ (cand.sh's dirs), <out>/summary.txt. Exit 0
-# green (the sha appended to <BISE_HOME>/run/nightly/desktop-green.tsv), 1 red ('FAIL <step>'
-# lines), 2 no result; a second run in a row with no result is red (desktop-runs.tsv keeps each
+# Out: <out>/<step>.log, <out>/quick/ and <out>/full/ (cand.sh's dirs), <out>/summary.txt, and
+# what a tag reads (scripts/desktop_tag.py): <out>/reds.txt (each red's exact name) and
+# <out>/steps.tsv (each step's state). Each run's line in <BISE_HOME>/run/nightly/desktop-runs.tsv:
+# <when> <sha> green|red|none <out dir>. Exit 0 green, 1 red ('FAIL <step>' lines), 2 no result; a second run in a row with no result is red (desktop-runs.tsv keeps each
 # run's verdict; the summary names the last green run). The candidate dir it built is removed at the end (disk); one built before
 # (another agent's, desktop_try says "is built") is kept.
 # Tests: tests/nightly_desktop_test.py (fake desktop-try, cand.sh, dmg and pnpm: NIGHTLY_DESKTOP_*).
@@ -89,6 +90,19 @@ for f in sorted(glob.glob(os.path.join(d, "*.json"))):
             print("as-he-does/%s: %s" % (mode, name))
 PY
 }
+# test:land's red checks, from land.mjs' "known reds (tests/known_reds.txt): a (owner, since x), …"
+# and "NEW reds (not in tests/known_reds.txt): b, c" lines: one name per line
+land_reds() { # <land.log>
+  python3 -B - "$1" <<'PY'
+import re, sys
+for line in open(sys.argv[1], errors="replace"):
+    m = re.match(r"^(known reds \(tests/known_reds.txt\)|NEW reds \(not in tests/known_reds.txt\)): (.*)$", line.strip())
+    if m:
+        for part in re.sub(r"\([^)]*\)", "", m.group(2)).split(","):
+            if part.strip():
+                print(part.strip())
+PY
+}
 # cand.sh <mode> <dir> [env...]: its rc, its BREACH, its red steps
 as_he_does() {
   local mode=$1 d="$out/$1"; shift
@@ -138,7 +152,14 @@ for s in "${steps[@]}"; do
     land)
       { deps && ( cd "$here/apps/desktop" && "$pnpm" build && "$pnpm" test:land ); } >"$out/land.log" 2>&1; rc=$?
       if [ $rc = 0 ]; then record land green
-      else reds+=("desktop/test:land"); record land red "exit $rc; $(grep -E '^(known reds|NEW reds)' "$out/land.log" | tr '\n' ' ')$out/land.log"; fi ;;
+      else
+        # its reds by name (land.mjs' known/NEW lines: each a desktop check's spec name), so a tag
+        # can match them to known_reds; no such line (it didn't run its checks): one unknown red
+        n=0
+        while IFS= read -r r; do [ -n "$r" ] && { reds+=("$r"); n=$((n + 1)); }; done < <(land_reds "$out/land.log")
+        [ $n = 0 ] && reds+=("desktop/test:land")
+        record land red "exit $rc; $(grep -E '^(known reds|NEW reds)' "$out/land.log" | tr '\n' ' ')$out/land.log"
+      fi ;;
     dmg)
       if [ -z "$app" ]; then record dmg none "no candidate"; continue; fi
       bash "$dmg_sh" "$sha" >"$out/dmg.log" 2>&1; rc=$?
@@ -155,10 +176,13 @@ if [ -n "$made" ] && [ -d "$made" ]; then
 fi
 
 [ ${#reds[@]} -gt 0 ] && python3 -B "$here/tests/known_reds.py" split "${reds[@]}" | tee -a "$sum"
+# what a tag reads (scripts/desktop_tag.py): each red's exact name, each step's state
+printf '%s\n' "${reds[@]+"${reds[@]}"}" | sed '/^$/d' >"$out/reds.txt"
+printf '%s\n' "${state_of[@]}" | tr '=' '\t' >"$out/steps.tsv"
 verdict
 }
 
-# the run's verdict, kept in desktop-runs.tsv (<date>T<time>, sha, green|red|none): two runs in a
+# the run's verdict, kept in desktop-runs.tsv (<date>T<time>, sha, green|red|none, out dir): two runs in a
 # row with no result (battery, past --until) is a red of its own, owner gate-nightly (review-gates
 # m_29770): the rows must not silently never run. The summary names the last green run.
 verdict() {
@@ -167,7 +191,7 @@ verdict() {
   mkdir -p "$bh/run/nightly"
   prev="$(tail -1 "$hist" 2>/dev/null | cut -f3)"
   last="$(awk -F'\t' '$3 == "green" { l = $1 " on " $2 } END { print l }' "$hist" 2>/dev/null)"
-  printf '%s\t%s\t%s\n' "$(date +%FT%T)" "$sha" "$v" >>"$hist"
+  printf '%s\t%s\t%s\t%s\n' "$(date +%FT%T)" "$sha" "$v" "$out" >>"$hist"
   note "last green run: ${last:-none yet}"
   case $v in
     red) note "nightly desktop: red"; return 1 ;;
@@ -178,7 +202,6 @@ verdict() {
       fi
       note "nightly desktop: no result for some steps"; return 2 ;;
   esac
-  printf '%s\t%s\n' "$sha" "$(date +%FT%T)" >>"$bh/run/nightly/desktop-green.tsv"
   note "nightly desktop: green"
   return 0
 }

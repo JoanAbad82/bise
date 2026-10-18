@@ -161,6 +161,7 @@ def may_publish(new, current, channel, beta=None):
 def notes_from_tag_message(text, tag):
     """The release body: the annotated tag's message (the user-facing notes, '- ' lines), else a
     one-line stand-in he edits on the draft before it goes out. The line scripts/desktop_tag.py
-    adds ('nightly-desktop: green <sha> <when>') is for CI's check, not his readers: dropped. Pure."""
-    body = "\n".join(line for line in (text or "").splitlines() if not line.startswith("nightly-desktop: green ")).strip()
+    adds ('nightly-desktop: green <sha> <when>' or 'nightly-desktop: owned-reds N <sha> <when>
+    (owners: …)') is for CI's check, not his readers: dropped. Pure."""
+    body = "\n".join(line for line in (text or "").splitlines() if not line.startswith("nightly-desktop: ")).strip()
     return body + "\n" if body else "bise for Mac, %s.\n" % tag

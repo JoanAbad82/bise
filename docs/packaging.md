@@ -509,13 +509,17 @@ OFF until the repository variable `DESKTOP_RELEASE` is `on`.
   `stapler validate`, `syspolicy_check distribution`.
 - **The tag**: only from `scripts/desktop_tag.py <desktop-vYYYY.M.N> [<sha>]
   [--notes-file <f>]`, in a clean checkout at that sha: the desktop app's
-  full end-to-end (`scripts/nightly_desktop.sh`, docs/desktop-try.md) green
-  on that exact sha (a night's line in `~/.bise/run/nightly/desktop-green.tsv`,
-  else it runs then, in a heavy slot), then an annotated tag: the notes,
-  then `nightly-desktop: green <sha> <when>`. It never pushes. The build
+  full end-to-end (`scripts/nightly_desktop.sh`, docs/desktop-try.md) run
+  on that exact sha (its last line in `~/.bise/run/nightly/desktop-runs.tsv`,
+  else it runs then, in a heavy slot) with every step run and every red
+  owned: in `tests/known_reds.txt` as it is at that sha, with its owner. A
+  red outside the file refuses the tag, naming it. Then an annotated tag:
+  the notes, then `nightly-desktop: green <sha> <when>` or
+  `nightly-desktop: owned-reds <N> <sha> <when> (owners: …)`. It prints the
+  run's verdict and the open known-reds count, and never pushes. The build
   job's first step (`desktop_tag.py check`) fails a lightweight tag or one
-  without that line for its own commit: 'cut desktop tags with
-  scripts/desktop_tag.py'. The release body drops that line.
+  without one of those lines for its own commit: 'cut desktop tags with
+  scripts/desktop_tag.py'; it prints the line. The release body drops it.
 - **Runs**: a `desktop-vYYYY.M.N` tag (or action `build`): signed + a DRAFT
   release (prerelease, never latest; its body the annotated tag's message).
   Action `dry-run`: ad hoc, no secret, no release, the files as a run

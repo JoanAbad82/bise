@@ -88,12 +88,17 @@ rows2, two restarts, second, the core with no env), the DMG (`scripts/desktop-dm
 read-only and checked). Every tests/checks spec also runs once a night under coverage
 (try-select's step). Nothing new starts after 08:00 (`none`, never green); on battery nothing
 runs. A red as-he-does step is named `as-he-does/<mode>: <step>` (digits as N) and split by
-`tests/known_reds.py`: known with its owner, else NEW. A green sha goes in
-`~/.bise/run/nightly/desktop-green.tsv`.
+`tests/known_reds.py`: known with its owner, else NEW; test:land's reds by their check's name.
+Each run leaves its line in `~/.bise/run/nightly/desktop-runs.tsv` (when, sha,
+green|red|none, its out dir) and, in its out dir, `reds.txt` (each red's name) and `steps.tsv`
+(each step's state).
 
 A desktop release tag comes only from `scripts/desktop_tag.py <desktop-vYYYY.M.N> [<sha>]`: it
-takes that green line, or runs the end-to-end then, and tags only on green (docs/packaging.md
-§12). The driver's watchdogs: no step for 600 s is a hang (`AS_HE_DOES_STALL_MS`); the quick
+takes that sha's last run, or runs the end-to-end then, and tags only when the run ran every
+step (no `none`) and every red of it is in `tests/known_reds.txt` as it is AT THAT SHA, with
+its owner. A red outside the file refuses the tag, naming it. The mark is
+`nightly-desktop: green <sha> <when>` or `nightly-desktop: owned-reds <N> <sha> <when> (owners:
+…)`; it always prints the run's verdict and the open known-reds count (docs/packaging.md §12). The driver's watchdogs: no step for 600 s is a hang (`AS_HE_DOES_STALL_MS`); the quick
 pass's limit is 600 s per row group it runs (`AS_HE_DOES_WATCHDOG_MS` by hand wins); each step
 carries `at_s`, its seconds from the start.
 
