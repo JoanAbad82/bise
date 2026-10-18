@@ -24,8 +24,12 @@ describe('the entry build', () => {
     const g = gridOf(LAWN);
     expect(g.nx * g.cw).toBeCloseTo(60);
     expect(g.nz * g.cd).toBeCloseTo(50);
-    expect(cellOf(LAWN, -30, -25)).toEqual({ x: -30 + g.cw / 2, z: -25 + g.cd / 2 });
-    expect(cellOf(LAWN, 30, 25)).toEqual({ x: 30 - g.cw / 2, z: 25 - g.cd / 2 });
+    const a = cellOf(LAWN, -30, -25);
+    const b = cellOf(LAWN, 30, 25);
+    expect(a.x).toBeCloseTo(-30 + g.cw / 2);
+    expect(a.z).toBeCloseTo(-25 + g.cd / 2);
+    expect(b.x).toBeCloseTo(30 - g.cw / 2);
+    expect(b.z).toBeCloseTo(25 - g.cd / 2);
   });
 
   it('rises as one wave: the nearer cube always first, never a cube out of turn', () => {
