@@ -116,11 +116,12 @@ export class Store extends StoreVoice {
     this.asked.clear();
     for (const [key, t] of this.threads) {
       if (!t.pending.some((p) => p.state === "sending")) continue;
-      // not answered yet: it may have reached the hub (lost: echo.ts takes it by its words)
+      // not answered yet: it may have reached the hub by now (lostAt: echo.ts takes it by its words)
+      const now = this.now();
       t.pending = t.pending.map((p) =>
         p.state !== "sending"
           ? p
-          : { ...p, state: "failed", why: common.not_sent, ...(typeof p.msgId === "number" ? {} : { lost: true as const }) },
+          : { ...p, state: "failed", why: common.not_sent, ...(typeof p.msgId === "number" ? {} : { lostAt: now }) },
       );
       this.emit(`pending:${key}`);
     }
@@ -217,7 +218,9 @@ export class Store extends StoreVoice {
   /** His message landed: its pending send goes, by its id (A1, echo.ts); no row: its id is kept. */
   private landed(key: string, t: Thread, e: Entry): void {
     const i = echoOf(t.pending, e);
-    if (i < 0) t.landedIds = keepLanded(t.landedIds, e.msg_id);
+    // no row, or a lost row taken by its words: the id is kept, so a send answered with it
+    // later leaves at once (review-refactor m_30778)
+    if (i < 0 || t.pending[i]?.msgId !== e.msg_id) t.landedIds = keepLanded(t.landedIds, e.msg_id);
     if (i < 0) return;
     t.pending = t.pending.filter((_, j) => j !== i);
     this.emit(`pending:${key}`);

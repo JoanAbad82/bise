@@ -199,9 +199,10 @@ export interface Pending {
   /** A1: the message id the hub answered the send with (echo.ts); absent: not answered yet (a
    *  send answered with no message has no row: send-reason) */
   readonly msgId?: number;
-  /** the core went down before its answer: 'not sent', yet it may have reached the hub (echo.ts
-   *  echoOf takes it by its words; send-reason sha 2: by its cid) */
-  readonly lost?: true;
+  /** when the core went down before its answer (the window's ms): 'not sent', yet it may have
+   *  reached the hub before that (echo.ts echoOf takes it by its words, from an entry written by
+   *  then; send-reason sha 2: by its cid) */
+  readonly lostAt?: number;
 }
 
 /**

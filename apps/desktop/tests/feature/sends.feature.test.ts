@@ -61,6 +61,23 @@ describe('his messages, in his words', () => {
     expect(rows(w)).toEqual([]);
   });
 
+  it("after the core came back, the same words sent again are a new message: its echo, before its answer, never takes the 'not sent' row, and its own row leaves on its answer (review-refactor m_30778)", () => {
+    const w = feature(T0).does(send(ACME, 'main', 'ok'));
+    w.given(coreDown(), coreUp());
+    w.later(60_000).does(send(ACME, 'main', 'ok'));
+    w.given(said(ACME, 'main', 9, 'ok', 90, T0 + 60_000), sent(ACME, 'main', 2, 90));
+    expect(rows(w)).toEqual(['ok · failed: not sent']);
+  });
+
+  it("the same words sent again within seconds of the core's return: whichever row its echo takes, the new send's answer still takes its own row away, none stays sending", () => {
+    const w = feature(T0).does(send(ACME, 'main', 'ok'));
+    w.given(coreDown(), coreUp());
+    w.later(1_000).does(send(ACME, 'main', 'ok'));
+    w.given(said(ACME, 'main', 9, 'ok', 90, T0 + 1_000), sent(ACME, 'main', 2, 90));
+    expect(w.view.sending()).toBe(false);
+    expect(rows(w).filter((r) => r.endsWith('sending'))).toEqual([]);
+  });
+
   it('the hub gives the send its message id: only the entry with that id is its echo, never the same words sent again', () => {
     const w = feature(T0).does(send(ACME, 'main', 'again'), send(ACME, 'main', 'again'));
     w.given(sent(ACME, 'main', 1, 41), sent(ACME, 'main', 2, 42));

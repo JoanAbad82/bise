@@ -45,9 +45,13 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
   });
 
   it("but a row the core went down before answering (lost) is taken by its words: it may have reached the hub (restores ff9c5cdd5's match for that case only, until send-reason sha 2's cid)", () => {
-    const lost = { state: "failed", lost: true } as const;
+    // sent at 1000, the core died at 1500; the entry was written at 2000
+    const lost = { state: "failed", lostAt: 1500 } as const;
     expect(echoOf([row(1, "ok", lost)], you(4, "ok", 99))).toBe(0);
     expect(echoOf([row(1, "ok", lost)], you(4, "no", 99))).toBe(-1);
+    // an entry written after the core's death (more the slack) is a new send's, never this row's
+    expect(echoOf([row(1, "ok", { ...lost, lostAt: 2000 - ECHO_SLACK_MS - 1 })], you(4, "ok", 99))).toBe(-1);
+    expect(echoOf([row(1, "ok", { ...lost, lostAt: 2000 - ECHO_SLACK_MS })], you(4, "ok", 99))).toBe(0);
     // a lost row answered with an id meets only that id
     expect(echoOf([row(1, "ok", { ...lost, msgId: 5 })], you(4, "ok", 99))).toBe(-1);
     // an entry written before the send (less the slack) is an older one, never its echo
@@ -57,6 +61,14 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
     expect(echoOf([row(1, "ok", lost), row(2, "ok", lost)], you(4, "ok", 99))).toBe(0);
   });
 
+  it("a lost row with parts is taken by its own parts, never by the same words with another paste", () => {
+    const parts = (pasted: string) => [{ kind: "text", text: "look at this" }, { kind: "paste", n: 1, text: pasted }] as const;
+    const lost = row(1, "look at this", { state: "failed", lostAt: 1500, parts: [...parts("trace A")] });
+    const echo = (pasted: string): Entry => ({ ...you(4, "look at this", 99), parts: [...parts(pasted)] });
+    expect(echoOf([lost], echo("trace B"))).toBe(-1);
+    expect(echoOf([lost], echo("trace A"))).toBe(0);
+  });
+
   it("the store: one entry clears one of two lost rows with its words; a retry of a lost row is a new send, met by its id only", () => {
     const store = new Store({ send: () => undefined }, { now: () => 1000 });
     store.setCore("up");
@@ -64,12 +76,12 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
     store.send({ project: P, agent: "perf", text: "ok" });
     store.setCore("down");
     store.setCore("up");
-    expect(store.pending(K).map((p) => p.lost)).toEqual([true, true]);
+    expect(store.pending(K).map((p) => p.lostAt)).toEqual([1000, 1000]);
     store.apply({ ev: "entry", project: P, agent: "perf", entry: you(4, "ok", 41) });
     expect(store.pending(K).map((p) => p.cid)).toEqual([2]);
     store.retry(K, 2);
     const again = store.pending(K);
-    expect(again.map((p) => [p.cid, p.state, p.lost])).toEqual([[3, "sending", undefined]]);
+    expect(again.map((p) => [p.cid, p.state, p.lostAt])).toEqual([[3, "sending", undefined]]);
     store.apply({ ev: "entry", project: P, agent: "perf", entry: you(5, "ok", 42) });
     expect(store.pending(K).map((p) => p.cid)).toEqual([3]);
   });

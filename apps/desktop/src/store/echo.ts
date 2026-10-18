@@ -46,11 +46,12 @@ export function sentOf(raw: unknown): Sent | null {
  * Which pending send `e` is the echo of, or -1: the row its message id was answered for (two
  * sends of the same words never swap). An entry that lands before its send's answer has no row
  * yet: the store keeps its id (`keepLanded`) and `answered` drops the row then. One row has no id
- * and may still have reached the hub: a send the core went down before answering (`lost`, 'not
+ * and may still have reached the hub: a send the core went down before answering (`lostAt`, 'not
  * sent'); an entry whose id no row holds takes it by its words and parts, else a retry would send
  * it twice (architect m_30553). This restores, for that one case only, the words match issue 31
  * (ff9c5cdd5) removed; its end is send-reason sha 2, the request's cid on his entry. Only an entry
- * written after the send (less ECHO_SLACK_MS) can be its echo.
+ * written between the send and the core's death (ECHO_SLACK_MS either side) can be its echo: a
+ * new send of the same words is written after the reconnect (review-refactor m_30778).
  */
 export function echoOf(pending: readonly Pending[], e: Entry): number {
   const id = e.msg_id ?? null;
@@ -63,9 +64,10 @@ export function echoOf(pending: readonly Pending[], e: Entry): number {
   const said = sentWords(e.text);
   return pending.findIndex(
     (p) =>
-      p.lost === true &&
+      p.lostAt !== undefined &&
       typeof p.msgId !== "number" &&
       e.at_ms >= p.at_ms - ECHO_SLACK_MS &&
+      e.at_ms <= p.lostAt + ECHO_SLACK_MS &&
       (typed !== null && p.parts !== undefined
         ? sentParts(p.parts) === typed
         : sentWords(p.text) === said),
