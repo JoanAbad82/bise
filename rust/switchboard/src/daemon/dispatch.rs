@@ -97,8 +97,8 @@ impl Shell {
                     }
                     w.phase("page waits");
                     self.page_waits_check();
-                    w.phase("wakes look");
-                    self.wakes_look();
+                    // the wake worker's copy (daemon/wake_look.rs)
+                    self.wakes_sync();
                     w.phase("starts");
                     self.check_starts(tick_queued.sent_ms.load(Ordering::Acquire));
                     w.phase("plugins");
@@ -239,6 +239,7 @@ impl Shell {
                 }
             }
             Msg::AgentNew { token, stream, v, asker } => self.agent_new(token, stream, v, &asker),
+            Msg::WakeSeen(s) => self.wake_seen(s),
             Msg::XHub { token, stream, v } => self.xhub_op(token, stream, v),
             Msg::Version { mut stream, v, asker } => {
                 let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("");

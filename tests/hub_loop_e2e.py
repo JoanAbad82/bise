@@ -121,11 +121,13 @@ def main():
         wait.until(lambda: len(sampler.took) >= 10, 30, "10 sb list before the spawn")
         # a spawn, a drop, then every watch's event at once
         ts = time.time()
+        marks = {"spawn": round(ts - t0, 1)}
         sb(E, "main", "spawn", "t26", "--objective", "a late task", "--worktree")
         print("sb spawn answered in %.2f s" % (time.time() - ts))
         # his /archive (main's `sb drop` asks him first)
         dropped = names[-1]
         ts = time.time()
+        marks["archive"] = round(ts - t0, 1)
         c.say("/archive %s" % dropped)
         c.wait(lambda: c.agent(dropped)["status"] == "archived" or any(n["kind"] == "confirm" for n in c.notices()), 60,
                "%s archived or a confirmation" % dropped)
@@ -134,6 +136,7 @@ def main():
             c.confirm(conf[-1]["id"], True)
         c.wait_status(dropped, "archived", 60)
         print("/archive done in %.2f s" % (time.time() - ts))
+        marks["burst"] = round(time.time() - t0, 1)
         for p in sleeps:
             p.kill()
             p.wait()  # a zombie is alive to kill(0)
@@ -153,6 +156,7 @@ def main():
         p = lambda q: took[min(len(took) - 1, int(q * len(took)))]  # noqa: E731
         print("sb list: %d samples, median %.3f s, p95 %.3f s, worst %.3f s, %d over %.0f s %s"
               % (len(took), p(0.5), p(0.95), took[-1], len(slow), LIMIT, slow[:10]))
+        print("events at (s):", marks)
         log = hub_log(E)[log0:]
         busy = [l for l in log.splitlines() if "hub loop busy" in l or "hub loop free" in l]
         for l in log.splitlines():

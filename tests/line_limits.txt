@@ -19,7 +19,7 @@
 1655 rust/switchboard/src/approvals/tiers.rs
 2559 rust/switchboard/src/core.rs
 4604 rust/switchboard/src/core_tests.rs
-2070 rust/switchboard/src/daemon.rs
+2069 rust/switchboard/src/daemon.rs
 1187 rust/switchboard/src/daemon/gate.rs
 1207 rust/switchboard/src/daemon/versions.rs
 1301 rust/tui/src/attach.rs

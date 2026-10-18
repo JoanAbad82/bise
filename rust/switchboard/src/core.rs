@@ -588,7 +588,7 @@ pub enum Input {
     },
     /// event-wake: the user stopped watch `id` (the window's wake_stop)
     WakeStop { id: u64 },
-    /// event-wake: the look (daemon/wakes.rs) saw watch `id`'s event;
+    /// event-wake: the look (daemon/wake_look.rs) saw watch `id`'s event;
     /// `text` is the wake (wake.rs `hit_text`); `rc`, `tail` (clipped
     /// once, wake.rs `tail_clip`) and `after_ms` the same facts, typed,
     /// for its thread's `wake` line (wake-ui).

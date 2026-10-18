@@ -59,7 +59,7 @@ mod outbox;
 mod state_gate;
 mod tindex;
 mod usage;
-mod wakes;
+mod wake_look;
 mod worktrees;
 mod xhub;
 mod xread;
@@ -208,10 +208,9 @@ enum Msg {
     /// The end of a `/update` build in bise's source tree (dev-update).
     Update(Value),
     /// A line for main's thread (the version switcher).
-    Notice {
-        kind: String,
-        text: String,
-    },
+    Notice { kind: String, text: String },
+    /// A watch's event, seen off the loop (daemon/wake_look.rs).
+    WakeSeen(wake_look::WakeSeen),
     /// A role-line call is over (BISE-126).
     RoleLine {
         dir: String,
@@ -455,8 +454,8 @@ struct Shell {
     holds: crate::idle::Holds,
     /// artifacts and diffs (`daemon/art.rs`, docs/artifacts.md)
     art: art::Art,
-    /// `sb wake`'s look (`daemon/wakes.rs`): its cadence
-    wake_look: wakes::Look,
+    /// `sb wake`'s look, on its worker (`daemon/wake_look.rs`)
+    wake_look: wake_look::WakeLook,
 }
 
 /// What an agent whose turn was cut by a restart receives.
@@ -1860,7 +1859,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         ),
         holds: crate::idle::Holds::default(),
         art: art::Art::default(),
-        wake_look: wakes::Look::default(),
+        wake_look: wake_look::WakeLook::start(tx.clone()),
     };
     sh.answers_replayed(&events);
     sh.start_pages(&paths, &tx);

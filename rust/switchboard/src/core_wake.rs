@@ -1,7 +1,7 @@
 //! `sb wake` (event-wake) on the link to sb-core: the request's checks
 //! and words (wake.rs), the watch a backgrounded bash command gets at its
 //! handoff (the runtime's `bg_handoff` wire line), and the look's hit
-//! (daemon/wakes.rs), and the thread's `sb wake` line of each watch that
+//! (daemon/wake_look.rs), and the thread's `sb wake` line of each watch that
 //! ended (`wake_lines`, an effect after sb-core's `wake_end`, like the
 //! timers' `scheduled` lines). The watch, its end and the wake are sb-core's
 //! (`wake_set`, `wake_stop`, `wake_hit` inputs; bend/hub/wakes.bend).
@@ -89,7 +89,7 @@ impl Hub {
         self.core(fx, env, None, In::WakeStop(ci::WakeStop { id, why: "stopped by the user".into(), tell }));
     }
 
-    /// The look saw watch `id`'s event (daemon/wakes.rs): sb-core ends it
+    /// The look saw watch `id`'s event (daemon/wake_look.rs): sb-core ends it
     /// and wakes its agent, once.
     pub(super) fn wake_hit(&mut self, fx: &mut Fx, env: &mut dyn Env, id: u64, text: &str, hit: wake::Hit) {
         let k = fx.len();

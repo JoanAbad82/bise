@@ -27,7 +27,7 @@
 //! a watch's name ([`Spec::name`], one for the agents row's `watching`
 //! and the thread), and the typed `sb wake : <json>` line of its end
 //! ([`end_line`], bise-proto's `WakeFold`). The probing itself (files, pids, launchctl) and its
-//! cadence: daemon/wakes.rs.
+//! cadence: daemon/wake_look.rs.
 
 use crate::util::{clip, one_line};
 use bise_proto::rows::WatchKind;
@@ -363,7 +363,7 @@ pub fn parse_job(out: &str) -> JobState {
 }
 
 /// The world a look reads: the shell gives the real one
-/// (daemon/wakes.rs), the tests a fake.
+/// (daemon/wake_look.rs), the tests a fake.
 pub trait Probe {
     fn exists(&self, path: &str) -> bool;
     /// The first bytes of a file (at most a few KB).
@@ -386,7 +386,7 @@ pub enum Seen {
     Ended { rc: Option<String> },
 }
 
-/// How much a look may cost now (daemon/wakes.rs's cadence): `start`:
+/// How much a look may cost now (daemon/wake_look.rs's cadence): `start`:
 /// read a pid's start time (a `ps`), `job`: ask launchctl (a process).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Costly {

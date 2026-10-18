@@ -23,7 +23,7 @@
 //! strictly one request then one answer: sb-core reads the whole line
 //! before it writes, so the two pipes never fill at once), the git
 //! queries sb-core asks for, and a few short processes (`ps`, `launchctl`
-//! in wakes.rs). No peer socket: every write goes through
+//! in daemon/drops.rs, off the loop). No peer socket: every write goes through
 //! daemon/outbox.rs.
 
 use super::{log_line, Msg};
@@ -149,6 +149,7 @@ impl Msg {
             Msg::GateChecked { dir, .. } => format!("gate checked {dir}"),
             Msg::RoleLine { dir, .. } => format!("role line {dir}"),
             Msg::Typed { .. } => "typed event".into(),
+            Msg::WakeSeen(s) => format!("wake seen {}", s.id),
             _ => "a hub message".into(),
         }
     }
