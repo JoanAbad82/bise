@@ -325,7 +325,7 @@ fn ambient_setup() -> bend_tui::ambient::setup::SetupPorts {
 
 #[cfg(test)]
 mod tests {
-    use super::{home_start, said_cause, HomeStart, HOME_SPELL, HOME_STARTS};
+    use super::{home_start, said_cause, HomeStart};
     use std::time::{Duration, Instant};
 
     #[test]
