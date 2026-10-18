@@ -144,6 +144,8 @@ export function shotCam(shot: Shot, g: Geometry): Cam | null {
     const c = at ?? { u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom };
     return aimCam(c, office.zoom * OFFICE_TIGHT);
   }
+  // a whole office closer than its OFFICE shot (the cold open's tight loft): its middle, that much closer
+  if (s.k === 'office') return aimCam({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * CLOSER[shot.size]);
   // a subject gone missing (it left): its office's shot, never an empty frame
   if (at === null) return office;
   return aimCam(at, office.zoom * CLOSER[shot.size]);
