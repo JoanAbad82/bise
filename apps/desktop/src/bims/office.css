@@ -301,22 +301,16 @@
 /* the AGENTS head's cube and 'the bims', left of 'all ›' (his ask, main m_28901; Cube.tsx;
    designer m_28913): one button, the 16 px cube, 4 px, 'the bims' in sans 12 / 500, lowercase, the
    accent at rest, hovered and open; hover the hover tint, open the pressed tint; 16 px before
-   'all ›'. Short of room, the label goes first: it wraps under the cube, clipped by the button's
-   one line, and the cube stays (its min width) */
+   'all ›'. One line, never shrunk. Short of room for every part whole (his bug: the label wrapped
+   under a clip and left an empty pill), the cube alone, its pill hugging it; the words stay in its
+   tip and its aria-label (bims-toggle, designer m_31047) */
 .bims-cube {
   display: inline-flex;
-  flex: 0 1 auto;
+  flex: none;
   /* the head lines its parts up on a baseline; the cube has none: centred on the head's line, as 'all ›' */
   align-self: center;
-  flex-wrap: wrap;
   align-items: center;
-  align-content: flex-start;
-  column-gap: var(--s-1);
-  /* a wrapped label starts 8 px below the line's bottom: wholly out of the clip, no sliver */
-  row-gap: var(--s-2);
-  min-width: calc(16px + 2 * var(--s-1));
-  max-height: var(--s-5);
-  overflow: hidden;
+  gap: var(--s-1);
   margin-right: var(--s-4);
   padding: calc(var(--s-1) / 2) var(--s-1);
   border: 0;
@@ -333,6 +327,18 @@
 }
 .bims-cube-label {
   white-space: nowrap;
+}
+/* no room for the label (Cube.tsx measures, headroom.ts decides): the cube alone, the pill hugging
+   it. The label stays laid out, unseen and out of the flow, so its width is still there to measure;
+   it hangs to the left, over the head's own parts, never past the bar's edge */
+.bims-cube[data-room='cube'] {
+  position: relative;
+}
+.bims-cube[data-room='cube'] .bims-cube-label {
+  position: absolute;
+  top: 0;
+  right: 0;
+  visibility: hidden;
 }
 .bims-cube:hover {
   background: var(--c-hover);

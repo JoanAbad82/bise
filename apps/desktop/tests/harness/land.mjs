@@ -33,6 +33,9 @@ export const LAND = [
   'checks/app/bar-more.spec.ts',
   // main first in AGENTS as 'bise', out of the count, its click opens its thread, its hover lights its bim (bar-main, his m_28881)
   'checks/app/bar-main.spec.ts',
+  // the AGENTS head's cube: 'the bims' whole on its line, or the cube alone when the head lacks room
+  // (measured), never an empty or wrapped pill, 320 to wide (bims-toggle, his m_30939)
+  'checks/bims/toggle.spec.ts',
   // a project's ⋯ menu by priority: active (needs him, then at work), quiet, archived capped (his m_26450)
   'checks/app/proj-menu.spec.ts',
   // what slid over at 800 goes when the window grows past 1000: one bar, no scrim (try-gate dc4770c1)
