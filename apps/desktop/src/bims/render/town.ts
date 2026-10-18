@@ -19,6 +19,7 @@ import { STYLE } from './style';
 import { mergeRoot, type Merged } from './merge';
 import { makeOfficeScene, type OfficeScene } from './office-scene';
 import { makeView } from './view';
+import { pickAt, type Target } from './pick';
 import { TOWN_DAY, TOWN_NIGHT, buildTownscape } from './townscape';
 import { diveFit, townFit } from '../town/camera';
 import { siteOf, townSeed } from '../town/ground';
@@ -44,6 +45,8 @@ interface Probe {
   recent: number[];
   /** the plan's road and river points inside an office: 0 and 0 */
   check: { road: number; river: number };
+  /** the live offices' bims on the canvas at the last frame, css px (a check hovers and clicks one) */
+  heads: { id: string; name: string; x: number; y: number; feet: number }[];
 }
 
 /** one office of the town: its scene, its bake from afar (and the still pose it was baked from) */
@@ -86,10 +89,12 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
   let view: Fit | null = null;
   let cam: Cam = FIT;
   let shadowsDirty = true;
+  /** where the sun and its shadow's box were aimed last (aimSun): a pan moves them only when it changes */
+  let sunKey = '';
   const spots = new Map<string, Spot>();
   let scape: { sig: string; merged: Merged } | null = null;
   const v = new Vector3();
-  const probe: Probe | null = testMode() ? { frames: 0, calls: 0, ms: 0, offices: 0, merged: { from: 0, to: 0 }, live: [], recent: [], check: { road: 0, river: 0 } } : null;
+  const probe: Probe | null = testMode() ? { frames: 0, calls: 0, ms: 0, offices: 0, merged: { from: 0, to: 0 }, live: [], recent: [], check: { road: 0, river: 0 }, heads: [] } : null;
   if (probe) (window as unknown as { __biseTown?: Probe }).__biseTown = probe;
 
   const placedOf = (id: string): Placed | undefined => plan?.offices.find((p) => p.id === id);
@@ -223,18 +228,52 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     const pal = isNight ? NIGHT : DAY;
     v3.tint(pal);
     v3.sky(pal.bg);
-    const { lawn } = plan;
-    const cx = (lawn.x0 + lawn.x1) / 2;
-    const cz = (lawn.z0 + lawn.z1) / 2;
-    // the office's sun: up and a little to the west of the room, as world.ts puts it
-    sun.position.set(cx - 5 * 3, 14 * 3, cz - 1 * 3);
-    sun.target.position.set(cx, 0, cz);
     if (STYLE.shadows) {
       sun.castShadow = true;
       sun.shadow.mapSize.set(2048, 2048);
       sun.shadow.radius = 4;
       sun.shadow.bias = -0.0008;
-      const half = Math.max(lawn.x1 - lawn.x0, lawn.z1 - lawn.z0) * 0.62 + 2;
+    }
+    sunKey = '';
+    aimSun(shownFit());
+  }
+
+  /**
+   * The sun and its shadow over the ground in view (page town-live p4): the whole lawn at the fit,
+   * only what shows when he zooms in, so the shadow's 2048 px land where he looks and stay sharp
+   * close up. Never wider than the lawn's.
+   */
+  function aimSun(f: Fit | null): void {
+    if (!plan) return;
+    const { lawn } = plan;
+    const lawnHalf = Math.max(lawn.x1 - lawn.x0, lawn.z1 - lawn.z0) * 0.62 + 2;
+    let cx = (lawn.x0 + lawn.x1) / 2;
+    let cz = (lawn.z0 + lawn.z1) / 2;
+    let half = lawnHalf;
+    if (f && f !== base && base) {
+      const corners = [groundAt(f, 0, 0, 0), groundAt(f, f.widthPx, 0, 0), groundAt(f, 0, f.heightPx, 0), groundAt(f, f.widthPx, f.heightPx, 0)];
+      const xs = corners.map((c) => c.x);
+      const zs = corners.map((c) => c.z);
+      const x0 = Math.min(...xs);
+      const x1 = Math.max(...xs);
+      const z0 = Math.min(...zs);
+      const z1 = Math.max(...zs);
+      // the offices' walls stand up out of the view's ground: a margin for them and their shadows
+      const near = Math.max(x1 - x0, z1 - z0) * 0.62 + 4;
+      if (near < lawnHalf) {
+        cx = (x0 + x1) / 2;
+        cz = (z0 + z1) / 2;
+        half = near;
+      }
+    }
+    const key = `${cx.toFixed(2)}|${cz.toFixed(2)}|${half.toFixed(2)}`;
+    if (key === sunKey) return;
+    sunKey = key;
+    // the office's sun: up and a little to the west of the room, as world.ts puts it
+    sun.position.set(cx - 5 * 3, 14 * 3, cz - 1 * 3);
+    sun.target.position.set(cx, 0, cz);
+    sun.target.updateMatrixWorld();
+    if (STYLE.shadows) {
       const cam = sun.shadow.camera;
       cam.left = -half;
       cam.right = half;
@@ -243,6 +282,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
       cam.near = 1;
       cam.far = 140;
       cam.updateProjectionMatrix();
+      shadowsDirty = true;
     }
   }
 
@@ -260,6 +300,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     if (!f) return;
     v3.look(f);
     v3.size(f);
+    aimSun(f);
   }
 
   /** the canvas point (css px) seen at height y on the ground (the iso view's ray down) */
@@ -406,6 +447,12 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
         probe.recent = [...probe.recent.slice(-29), probe.ms];
         probe.calls = renderer.info.render.calls;
         probe.live = [...spots].filter(([, s]) => s.live).map(([id]) => id);
+        probe.heads = probe.live.flatMap((id) =>
+          (spots.get(id)?.scene.names() ?? []).flatMap((name) => {
+            const h = api.headOf(id, name);
+            return h ? [{ id, name, ...h }] : [];
+          }),
+        );
       }
     },
     signAt(id) {
@@ -426,6 +473,33 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
         const g = groundAt(f, x, y, h);
         const hit = plan.offices.find((p) => g.x > p.fp.x0 && g.x < p.fp.x1 && g.z > p.fp.z0 && g.z < p.fp.z1);
         if (hit) return hit.id;
+      }
+      return null;
+    },
+    headOf(id, name) {
+      const f = shownFit();
+      const s = spots.get(id);
+      if (!f || !s?.live) return null;
+      const top = s.scene.headTop(name, v);
+      if (!top) return null;
+      const p = toScreen(f, top);
+      if (p.x < 0 || p.y < -20 || p.x > f.widthPx || p.y > f.heightPx) return null;
+      const feet = s.scene.feet(name, v);
+      return { ...p, feet: feet ? toScreen(f, feet).y : p.y };
+    },
+    pickBim(x, y) {
+      const f = shownFit();
+      if (!f) return null;
+      for (const [id, s] of spots) {
+        if (!s.live) continue;
+        const targets: Target[] = s.scene.names().map((name) => {
+          const head = s.scene.headTop(name, v);
+          const headPx = head ? toScreen(f, head) : null;
+          const feet = s.scene.feet(name, v);
+          return { name, head: headPx, feet: feet ? toScreen(f, feet) : null, desk: null };
+        });
+        const name = pickAt(targets, x, y);
+        if (name !== null) return { id, name };
       }
       return null;
     },

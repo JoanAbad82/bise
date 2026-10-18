@@ -44,6 +44,10 @@ export interface TownRenderer {
   signAt(id: string): { readonly x: number; readonly y: number } | null;
   /** the office under a canvas point (css px), its roofs first; null on the lawn */
   pick(x: number, y: number): string | null;
+  /** a live office's bim's head on the canvas (css px; its label goes there) and its feet's y; null off view or not live */
+  headOf(id: string, name: string): { readonly x: number; readonly y: number; readonly feet: number } | null;
+  /** the live office's bim under a canvas point (pick.ts: the nearest body); null: none */
+  pickBim(x: number, y: number): { readonly id: string; readonly name: string } | null;
   /** the town as drawn, onto a 2d canvas of the same pixel size */
   copyTo(target: HTMLCanvasElement): void;
   onLost(cb: () => void): void;

@@ -16,8 +16,9 @@ import { Press, tipAttrs } from '@/ds';
 import { reducedMotion } from '@/ds/hooks';
 import { bims } from '@/proto/words_bims.gen';
 import { keep } from '@/app/keep';
-import type { ActivitiesFn, LayoutFn } from '../model';
-import { Office, type Parts } from '../Office';
+import type { ActivitiesFn, Label, LayoutFn } from '../model';
+import { Office, tagOf, tagRank, type Parts } from '../Office';
+import { placeTags, type TagIn } from '../tags';
 import { growOf } from '../growth';
 import { growHigh } from '../grow-keep';
 import { CHECK_MS, nextAfter } from '../loop';
@@ -56,6 +57,16 @@ const whyFrame = (why: string): void => {
   const w = window as { __biseTownWhy?: { t: number; why: string }[] };
   w.__biseTownWhy = [...(w.__biseTownWhy ?? []).slice(-99), { t: Date.now(), why }];
 };
+
+/** One label over a bim of a live office (the minimap's Label), keyed by both. */
+interface TownLabel {
+  readonly key: string;
+  readonly id: string;
+  readonly label: Label;
+}
+
+const labelKey = (id: string, name: string): string => `${id}\u0000${name}`;
+const labelsKey = (ls: readonly TownLabel[]): string => ls.map((x) => `${x.key}:${x.label.mode}:${x.label.words}:${x.label.title}:${x.label.pill ?? ''}`).join('|');
 
 /** One project's office for the plan: its office on its map, its growth (the office's high-water mark). */
 function siteOf(p: TownProject, parts: TownParts): TownSite {
@@ -101,6 +112,13 @@ export function Town({
   const [pointer, setPointer] = useState(false);
   // the office under his pointer: its sign shows whole first (its name back, bims m_30199)
   const hoverRef = useRef<string | null>(null);
+  // the live offices' labels (page town-live p4), the minimap's own (labels.ts): a walking bim's name,
+  // an event's 3 s, the hovered bim's line, the '?' / '✗' pills; over each head, none over another
+  const [labels, setLabels] = useState<readonly TownLabel[]>([]);
+  const labelEls = useRef(new Map<string, { readonly el: HTMLDivElement; readonly id: string; readonly name: string }>());
+  const ranks = useRef(new Map<string, number>());
+  // the live office's bim under his pointer: its line, as the minimap's hover gives it
+  const bimRef = useRef<{ readonly id: string; readonly name: string } | null>(null);
   // his camera over the town (zoom.ts, the minimap's): pinch to zoom, two fingers or a drag to move,
   // esc or a double-click on the lawn back to the whole town; `fitted` re-renders the box's data-zoomed
   const camRef = useRef<Cam>(FIT);
@@ -222,6 +240,28 @@ export function Town({
     }
   }, []);
 
+  /** each live bim's label over its head (tags.ts placeTags, the minimap's: pills first, none over another) */
+  const placeLabels = useCallback((r: TownRenderer) => {
+    const box = holder.current;
+    if (box === null) return;
+    const ins: TagIn[] = [];
+    for (const [key, { el, id, name }] of labelEls.current) {
+      const h = r.headOf(id, name);
+      el.style.visibility = h === null ? 'hidden' : '';
+      if (h === null) continue;
+      const mode = el.dataset.mode;
+      ins.push({ name: key, x: h.x, y: h.y, w: el.offsetWidth, h: el.offsetHeight, pill: mode === 'pill', rank: mode === 'hover' ? 0 : (ranks.current.get(key) ?? 3) });
+    }
+    const { at } = placeTags(ins, box.clientWidth, box.clientHeight);
+    for (const t of ins) {
+      const el = labelEls.current.get(t.name)?.el;
+      const p = at.get(t.name);
+      if (el === undefined) continue;
+      el.style.visibility = p === undefined ? 'hidden' : '';
+      if (p !== undefined) el.style.transform = `translate(${p.left.toFixed(1)}px, ${p.top.toFixed(1)}px)`;
+    }
+  }, []);
+
   // the renderer: loaded once, fed the town at each change, one frame per kick
   useEffect(() => {
     const cv = canvas.current;
@@ -231,6 +271,7 @@ export function Town({
     let raf = 0;
     let tick: ReturnType<typeof setTimeout> | undefined;
     let r: TownRenderer | null = null;
+    let lastLabels = '';
     const draw = () => {
       raf = 0;
       tick = undefined;
@@ -260,15 +301,30 @@ export function Town({
       const t = Date.now() / 1000;
       const c = clockAt(t);
       let next: number | null = null;
+      // labels only on the town's own view: dived, the Office shows its own
+      const own = phaseRef.current === 'town';
+      const shownLabels: TownLabel[] = [];
+      const hb = bimRef.current;
       for (const id of r.liveIds()) {
-        const step = drivers.current.get(id)?.step(c, NO_ATTENTION);
+        const step = drivers.current.get(id)?.step(c, hb !== null && hb.id === id ? { ...NO_ATTENTION, hover: hb.name } : NO_ATTENTION);
         if (step == null) continue;
         const motion = r.live(id, step, t);
-        const n = nextAfter({ motion, moving: step.moving, labels: new Map(), away: awayNow(), lost: false });
+        if (own) {
+          for (const l of step.labels.values()) shownLabels.push({ key: labelKey(id, l.name), id, label: l });
+          for (const f of step.frames) ranks.current.set(labelKey(id, f.name), tagRank(f.pose.seg.act.k));
+        }
+        // an event's label asks for the frame that takes it off (loop.ts), as the minimap's does
+        const n = nextAfter({ motion, moving: step.moving, labels: own ? step.labels : new Map(), away: awayNow(), lost: false });
         if (n !== null) next = next === null ? n : Math.min(next, n);
       }
       r.frame(nightNow());
       placeSigns(r);
+      const sig = labelsKey(shownLabels);
+      if (sig !== lastLabels) {
+        lastLabels = sig;
+        setLabels(shownLabels);
+      }
+      placeLabels(r);
       if (more || baking || next === 0) {
         whyFrame(more ? 'dive' : baking ? 'baking' : 'live');
         raf = requestAnimationFrame(draw);
@@ -358,7 +414,7 @@ export function Town({
       rRef.current = null;
       r?.dispose();
     };
-  }, [parts, placeSigns, stills, moveCam]);
+  }, [parts, placeSigns, placeLabels, stills, moveCam]);
 
   // a change of the town: its plan again if a ground changed, the offices' rows heard at the next frame
   useEffect(() => {
@@ -449,6 +505,13 @@ export function Town({
     const at = box.getBoundingClientRect();
     return r.pick(e.clientX - at.left, e.clientY - at.top);
   };
+  const pickBimAt = (e: { clientX: number; clientY: number }): { readonly id: string; readonly name: string } | null => {
+    const box = holder.current;
+    const r = rRef.current;
+    if (box === null || r === null || phaseRef.current !== 'town') return null;
+    const at = box.getBoundingClientRect();
+    return r.pickBim(e.clientX - at.left, e.clientY - at.top);
+  };
 
   if (state === 'lost' || shown.length === 0)
     return state === 'lost' ? (
@@ -526,7 +589,13 @@ export function Town({
             return;
           }
           const over = pickAt(e);
-          setPointer(over !== null);
+          const bim = fitted ? null : pickBimAt(e);
+          setPointer(over !== null || bim !== null);
+          const was = bimRef.current;
+          if (bim?.id !== was?.id || bim?.name !== was?.name) {
+            bimRef.current = bim;
+            kickRef.current('hover');
+          }
           if (over !== hoverRef.current) {
             hoverRef.current = over;
             const r = rRef.current;
@@ -535,6 +604,10 @@ export function Town({
         }}
         onPointerLeave={() => {
           setPointer(false);
+          if (bimRef.current !== null) {
+            bimRef.current = null;
+            kickRef.current('hover');
+          }
           if (hoverRef.current !== null) {
             hoverRef.current = null;
             const r = rRef.current;
@@ -544,6 +617,12 @@ export function Town({
         onClick={(e) => {
           if (dragged.current) {
             dragged.current = false;
+            return;
+          }
+          // zoomed in, a live bim: its thread, as a click on it in its minimap
+          const bim = fitted ? null : pickBimAt(e);
+          if (bim !== null) {
+            onOpenAgent(bim.id, bim.name);
             return;
           }
           const id = pickAt(e);
@@ -565,6 +644,48 @@ export function Town({
         }}
       >
         <canvas ref={canvas} className="bims-canvas" data-testid="app.right.bims.town.canvas" />
+        <div className="bims-overlay" data-testid="app.right.bims.town.labels">
+          {labels.map(({ key, id, label: l }) => {
+            const tag = tagOf(l);
+            // the hovered bim: its name and its state's line, the minimap's card in one line
+            const text = l.mode === 'hover' ? (l.words === '' ? tag.text : `${tag.text ?? ''} · ${l.words}`) : tag.text;
+            return (
+              <div
+                key={key}
+                className="bims-tag"
+                data-mode={l.mode}
+                data-testid={`app.right.bims.town.label.${id}.${l.name}`}
+                ref={(el) => {
+                  if (el === null) labelEls.current.delete(key);
+                  else {
+                    labelEls.current.set(key, { el, id, name: l.name });
+                    const r = rRef.current;
+                    if (r !== null) placeLabels(r);
+                  }
+                }}
+              >
+                {text !== null && (
+                  <span className="bims-label" data-mode={l.mode}>
+                    {text}
+                  </span>
+                )}
+                {tag.pill !== null && (
+                  <span
+                    className={`bims-pill ${tag.pill}`}
+                    data-pill={tag.pill}
+                    {...tipAttrs(tag.pill === 'asks' ? bims.pill_asks_tip({ agent: l.name }) : bims.pill_failed_tip({ agent: l.name }))}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenAgent(id, l.name);
+                    }}
+                  >
+                    {tag.pill === 'asks' ? '?' : '✗'}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
         <div className="bims-overlay" data-testid="app.right.bims.town.signs">
           {shown.map((p) => {
             const s = signsOf.get(p.id) ?? signOf(p);

@@ -90,7 +90,7 @@ function townWorld(ps: readonly Fake[], theme: 'light' | 'dark'): Record<string,
   return evs;
 }
 
-type TownProbe = { frames: number; calls: number; ms: number; offices: number; merged: { from: number; to: number }; live: string[]; recent: number[]; check: { road: number; river: number } };
+type TownProbe = { frames: number; calls: number; ms: number; offices: number; merged: { from: number; to: number }; live: string[]; recent: number[]; check: { road: number; river: number }; heads: { id: string; name: string; x: number; y: number; feet: number }[] };
 const probe = (s: Session): Promise<TownProbe | null> =>
   s.page.evaluate(() => (window as unknown as { __biseTown?: TownProbe }).__biseTown ?? null);
 
@@ -263,6 +263,52 @@ test('(town) a pinch zooms in: the offices in view go live, 4 at most; esc: the 
     await sleep(3000);
     const whys = await s.page.evaluate((since) => ((window as unknown as { __biseTownWhy?: { t: number; why: string }[] }).__biseTownWhy ?? []).filter((x) => x.t >= since).map((x) => x.why), w0);
     expect(((await probe(s))?.frames ?? 0) - f0, `back at the whole town, idle: no frame (asked by: ${whys.join(', ')})`).toBe(0);
+  } finally {
+    await s.close();
+  }
+});
+
+test('(town) zoomed in: a live bim shows its line on hover, a click opens its agent; labels never overlap', async () => {
+  const { s } = await openTown(fakes(12), 'light');
+  try {
+    await showTown(s);
+    await settled(s);
+    const box = await s.page.getByTestId('app.right.bims.town').boundingBox();
+    if (box === null) throw new Error('no town');
+    // ~2.2x, past the live zoom (1.6x): bise's home in the middle (main alone) and its neighbours live
+    for (let i = 0; i < 4; i++) await trackpad(s.cdp, box.x + box.width / 2, box.y + box.height / 2, { dy: -20, pinch: true });
+    await expect(s.page.getByTestId('app.right.bims.town')).toHaveAttribute('data-zoomed', 'true');
+    // a bim of a live office, not main (main's thread is the project's), well inside the view
+    const pickOne = async () =>
+      ((await probe(s))?.heads ?? []).find((h) => h.name !== 'main' && h.x > 30 && h.x < box.width - 30 && h.y > 40 && h.feet < box.height - 10);
+    await expect
+      .poll(async () => (await pickOne()) !== undefined, { timeout: 5000, message: `a live bim in view (live ${JSON.stringify((await probe(s))?.live)}, heads ${JSON.stringify((await probe(s))?.heads.map((x) => `${x.name}@${String(Math.round(x.x))},${String(Math.round(x.y))}`))})` })
+      .toBe(true);
+    await settled(s, 800, 4000);
+    const h = await pickOne();
+    if (h === undefined) throw new Error('no live bim');
+    // hover: its line over its head (the minimap's hover, one line)
+    await s.page.mouse.move(box.x + h.x, box.y + (h.y + h.feet) / 2);
+    const label = s.page.getByTestId(`app.right.bims.town.label.${h.id}.${h.name}`);
+    await expect(label, 'the hovered bim has its line').toHaveAttribute('data-mode', 'hover', { timeout: 3000 });
+    await expect(label).toContainText(h.name);
+    // the labels shown, none over another
+    const boxes = await s.page.evaluate(() =>
+      Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="app.right.bims.town.label."]'))
+        .filter((e) => e.style.visibility !== 'hidden')
+        .map((e) => e.getBoundingClientRect())
+        .map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })),
+    );
+    for (const [i, a] of boxes.entries()) {
+      for (const b of boxes.slice(i + 1)) {
+        const over = a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1;
+        expect(over, `two labels overlap at ${String(Math.round(a.x))},${String(Math.round(a.y))}`).toBe(false);
+      }
+    }
+    await shot(s, 'app.right.bims.town', 'town-12-hover-light.png', 'town, zoomed in, a bim hovered', "its line over its head, as in its office; the pills where they wait");
+    // click: that agent's thread
+    await s.page.mouse.click(box.x + h.x, box.y + (h.y + h.feet) / 2);
+    await expect.poll(() => s.page.evaluate(() => sessionStorage.getItem('bise.history') ?? ''), { timeout: 3000 }).toContain(`agent/${h.id}/${h.name}`);
   } finally {
     await s.close();
   }
