@@ -52,8 +52,12 @@ export function cameraStart(fit: Fit): V3 {
   return add(onScreen, BACK, k);
 }
 
-/** where its right hand catches (bim.ts: armR at +0.24 across, the catch reaches 0.38 forward), office units */
-const CATCH = { across: 0.24, ahead: 0.38, y: 1.0 } as const;
+/**
+ * where its right hand catches (bim.ts: armR at +0.24 across, the catch reaches 0.38 forward), office
+ * units; a little high and toward the camera so the laptop or its head never hide it (bims m_31601)
+ */
+const CATCH = { across: 0.24, ahead: 0.38, y: 1.1, toCamera: 0.1 } as const;
+const BACK_LEVEL = Math.hypot(BACK.x, BACK.z);
 
 /**
  * Where the plane ends: in front of the bim at (x, z) facing `dir` (bim.ts rotation.y), at its right
@@ -62,7 +66,12 @@ const CATCH = { across: 0.24, ahead: 0.38, y: 1.0 } as const;
 export function catchPoint(x: number, z: number, dir: number): V3 {
   const c = Math.cos(dir);
   const s = Math.sin(dir);
-  return { x: x + CATCH.across * c + CATCH.ahead * s, y: CATCH.y, z: z - CATCH.across * s + CATCH.ahead * c };
+  const cam = CATCH.toCamera / BACK_LEVEL;
+  return {
+    x: x + CATCH.across * c + CATCH.ahead * s + BACK.x * cam,
+    y: CATCH.y,
+    z: z - CATCH.across * s + CATCH.ahead * c + BACK.z * cam,
+  };
 }
 
 /** one flight, planned once when it leaves (seeded: the same flight for the same message) */

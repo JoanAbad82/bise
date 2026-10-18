@@ -417,7 +417,8 @@ function beat(from: ActivityKind | null, to: ActivityKind, f: number, b: Body): 
 function caught(b: Body, s: number): Body {
   const c = s - PLANE_FLIGHT;
   if (c < 0 || c > PLANE_CATCH) return b;
-  if (c < 0.4) return { ...b, armR: [0, 0, 2.6], eyes: 1, mouth: 'smile', screen: Math.max(b.screen, 0.4) };
+  // the plane in its hand from the catch's first frame: the flight ends there, never a gap (bims m_31601)
+  if (c < 0.4) return { ...b, armR: [0, 0, 2.6], props: { ...b.props, plane: true }, eyes: 1, mouth: 'smile', screen: Math.max(b.screen, 0.4) };
   if (c < 1.3) return { ...b, armR: [-1.4, 0, -0.3], head: [0.35, 0, 0], props: { ...b.props, plane: true }, eyes: 1, mouth: 'smile' };
   if (c < 1.7) return { ...b, armR: [-0.4, 0, 2.2], mouth: 'laugh', eyes: 0.3 }; // thumbs up
   return blend({ ...b, armR: [-0.4, 0, 2.2] }, b, ease((c - 1.7) / 0.3));

@@ -133,7 +133,10 @@ describe('his paper plane', () => {
     for (const dir of [0, Math.PI / 2, Math.PI, -Math.PI / 3]) {
       const c = catchPoint(3, 5, dir);
       const ahead = { x: Math.sin(dir), z: Math.cos(dir) }; // bim.ts: its front is +z, turned by dir
-      expect((c.x - 3) * ahead.x + (c.z - 5) * ahead.z).toBeCloseTo(0.38, 6);
+      // 0.38 ahead, give or take its 0.1 toward the camera (so the laptop never hides it)
+      const fwd = (c.x - 3) * ahead.x + (c.z - 5) * ahead.z;
+      expect(fwd).toBeGreaterThan(0.27);
+      expect(fwd).toBeLessThan(0.49);
       expect(Math.hypot(c.x - 3, c.z - 5)).toBeGreaterThan(0.3);
       expect(c.y).toBeLessThan(1.4); // at the hand, under its head
     }
