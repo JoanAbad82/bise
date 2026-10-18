@@ -91,6 +91,8 @@ export interface Shot {
   readonly subject: Subject;
   /** its glide in, s, past the director's own (the seam's long move back to 0:00's frame) */
   readonly glide?: number;
+  /** how long before `at` its camera leaves, s, short of the director's LEAD_S (0:04's follow runs to 0:08, bims m_31555) */
+  readonly lead?: number;
   /** where its subject sits, fractions of the frame, past the director's safe point (the opening: main at 65%, bims m_31467) */
   readonly frame?: { readonly x: number; readonly y: number };
 }
@@ -245,7 +247,8 @@ export const SHOTS: readonly Shot[] = [
   // the cold open (0:00-0:30): close from the first second, the product in 30 s
   { at: 0, size: 'tight', subject: { k: 'spot', office: HARNESS, spot: 'main' }, frame: OPEN_AT },
   { at: s(0, 4), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
-  { at: s(0, 8), size: 'tight', subject: { k: 'office', office: HARNESS } },
+  // the follow from the door runs to 0:08, then a short glide back to the office (bims m_31555)
+  { at: s(0, 8), size: 'tight', subject: { k: 'office', office: HARNESS }, lead: 0.8, glide: 0.8 },
   { at: s(0, 10), size: 'close', subject: bim(HARNESS, 'signup-flow') },
   { at: s(0, 14), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
   { at: s(0, 20), size: 'follow', subject: bim(HARNESS, 'dark-mode') },

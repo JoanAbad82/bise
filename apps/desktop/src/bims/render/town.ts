@@ -646,6 +646,13 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
           }),
         };
       },
+      warm(on) {
+        // the unseen warm frame draws the merged copies too, so settle() uploads and compiles nothing
+        if (!held) return;
+        if (scape) scape.merged.group.visible = on;
+        for (const s of spots.values()) if (s.walls) s.walls.merged.group.visible = on;
+        shadowsDirty = true;
+      },
       settle() {
         if (!held) return;
         held = false;

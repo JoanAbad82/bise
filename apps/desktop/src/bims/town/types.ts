@@ -109,6 +109,8 @@ export interface TownParts {
 export interface TownEntry {
   /** the loose things now (null before a town) */
   parts(): TownParts | null;
+  /** on: the merged townscape and walls drawn too (for an unseen warm frame), off: hidden again */
+  warm(on: boolean): void;
   /** the build is over: the merged townscape and walls drawn from now on, the loose ones dropped */
   settle(): void;
 }

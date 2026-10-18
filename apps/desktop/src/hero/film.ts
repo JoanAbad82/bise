@@ -66,6 +66,8 @@ interface Probe {
   entry?: number;
   /** FilmOpts.manual: draw one frame, ms after the last */
   step?: (ms: number) => void;
+  /** a check's camera (the pop-in strip): held where it is put, or on a bim at that zoom; the visitor's hands */
+  look?: (at: Cam | { office: string; name: string; zoom: number }) => void;
 }
 
 /** the page's paper (designer m_30837) */
@@ -303,6 +305,17 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       manualMs += ms;
       draw(manualMs);
     };
+    probe.look = (at) => {
+      glide = null;
+      lastTouch = wall();
+      if ('name' in at) {
+        spring = still(holdCam({ ...spring.cam, zoom: at.zoom }));
+        setHands({ k: 'visitor', last: wall(), follow: { office: at.office, name: at.name } });
+        return;
+      }
+      spring = still(holdCam(at));
+      setHands({ k: 'visitor', last: wall(), follow: null });
+    };
   }
 
   function draw(nowMs: number): void {
@@ -313,7 +326,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     lastMs = nowMs;
     // the build's ms from the frame after 'ready' (the first frame bakes and compiles everything,
     // unseen: build()); the film's clock waits for the build's end
-    if (building && entryFrom < 0 && warmed && drawn > 0) entryFrom = nowMs;
+    if (building && entryFrom < 0 && warmed && box.dataset.ready === 'true') entryFrom = nowMs;
     const ems = building ? (opts.entryAt ?? (entryFrom < 0 ? 0 : nowMs - entryFrom)) : ENTRY.done;
     if (!reduced && ems >= ENTRY.done) t += dt;
     const n = night();
@@ -340,7 +353,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       const st = steps.get(id);
       if (st) r.live(id, st, t);
     }
-    if (building) build(ems, ids.length, n);
+    const warmFrame = building && build(ems, ids.length, n);
     const t2 = performance.now();
     r.frame(n);
     const t3 = performance.now();
@@ -351,9 +364,10 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       building = false;
       overlay.root.style.opacity = '';
     }
-    // ready (the page drops its still): the first frame, the build's t = 0
+    // ready (the page drops its still): the frame after the warm one (the GPU catches up on it
+    // under the still: a 75 ms frame in dark), the build's t = 0 the frame after
     drawn++;
-    if (box.dataset.ready !== 'true') {
+    if (box.dataset.ready !== 'true' && !warmFrame) {
       box.dataset.ready = 'true';
       emit('ready');
     }
@@ -390,25 +404,30 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   }
 
   /** the build's things where they are at ems; the town settled once it's all there */
-  function build(ems: number, offices: number, n: boolean): void {
+  function build(ems: number, offices: number, n: boolean): boolean {
     const parts = r.entry.parts();
-    if (parts === null) return;
+    if (parts === null) return false;
+    let warm = false;
     if (!warmed && parts.offices.length >= offices) {
       // before 'ready' (design m_31440: no frame of the build over 50 ms): the whole map drawn once,
-      // unseen (frame 0 draws over it in the same task), so every program (its shadows too) is
-      // compiled and every buffer uploaded before the clock starts
+      // unseen (frame 0 draws over it in the same task), the merged copies settle() shows too, so
+      // every program (its shadows too) is compiled and every buffer uploaded before the clock starts
       warmed = true;
+      warm = true;
       entry.apply(ENTRY.built - 1, parts, r.shownFit()?.scale ?? 0.05);
+      r.entry.warm(true);
       r.frame(n);
+      r.entry.warm(false);
     }
     if (ems < ENTRY.built) {
       entry.apply(ems, parts, r.shownFit()?.scale ?? 0.05);
-      return;
+      return warm;
     }
     if (parts.scape !== null || parts.offices.some((o) => o.world !== null)) {
       entry.finish(parts);
       r.entry.settle();
     }
+    return warm;
   }
 
   /** the next frame: at the display's rate while the camera glides, the town builds or he just moved it, else 30 fps */

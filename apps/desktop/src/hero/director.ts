@@ -35,8 +35,8 @@ export const WIDE_BOX = { x0: 0.27, x1: 0.89, y0: 0.11, y1: 0.89 } as const;
 export const OFFICE_BOX = { x0: 0.3, x1: 0.85, y0: 0.1, y1: 0.9 } as const;
 /** an OFFICE shot this much closer than its box's fit (bims m_31057: the office ~70% of the frame) */
 export const OFFICE_TIGHT = 1.3;
-/** each size past OFFICE: how much closer than that office's own OFFICE shot */
-export const CLOSER: Readonly<Record<Exclude<Size, 'wide' | 'office'>, number>> = { tight: 1.6, follow: 2.2, close: 3.2, closest: 13 };
+/** each size past OFFICE: how much closer than that office's own OFFICE shot (follow: a bim ≥ 22 px at 1440, bims m_31555) */
+export const CLOSER: Readonly<Record<Exclude<Size, 'wide' | 'office'>, number>> = { tight: 1.6, follow: 2.6, close: 3.2, closest: 13 };
 
 /** a rectangle on the fit, fractions (u right, v down) */
 export interface Box {
@@ -159,7 +159,7 @@ export function shotAt(shots: readonly Shot[], T: number): number {
   let i = shots.length - 1;
   for (let k = 0; k < shots.length; k++) {
     const s = shots[k];
-    if (s !== undefined && s.at - LEAD_S <= T) i = k;
+    if (s !== undefined && s.at - (s.lead ?? LEAD_S) <= T) i = k;
   }
   return i;
 }
