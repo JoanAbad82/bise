@@ -1,8 +1,8 @@
 // The film replays: its first loop's every bim (where it stands, what it does, its egg) is its
 // second loop's, frame for frame, and the score's beats land on the poses they were written for.
 import { describe, expect, it } from 'vitest';
-import { FILM_S } from './cast';
-import { advance, makeRuns, stepOf } from './run';
+import { FILM_S, KILN, REVIEWER } from './cast';
+import { advance, FEED_X, makeRuns, stepOf } from './run';
 import { ORIGIN } from './world';
 
 /** every bim of every office at each 0.25 s of film time, from world time `from` for one loop */
@@ -31,26 +31,31 @@ describe('the hero film', () => {
     expect(diff).toEqual([]);
   });
 
-  it('lands its beats: the coffee, the moonwalk back, the lands, the clap', () => {
+  it('lands its beats in the office brains (bims-film v13): planes, pops at the desk, visits, the queue, the stamp', () => {
     const runs = makeRuns();
-    const at = (T: number, office: string, name: string) => {
+    const at = (T: number, name: string) => {
       for (const r of runs) advance(r, ORIGIN + T, false, false);
-      const r = runs.find((x) => x.cast.id === office);
+      const r = runs.find((x) => x.cast.id === KILN);
       return r ? stepOf(r, false, false)?.played.find((f) => f.name === name) : undefined;
     };
-    // the cold open (bims-film v7): your answer's plane, the hop, the first land's crate over its head
-    expect(at(15, 'harness', 'signup-flow')?.pose.plane).toBeDefined();
-    expect(at(17.4, 'harness', 'signup-flow')?.egg?.kind).toBe('hop');
-    const crate = at(24.5, 'harness', 'dark-mode');
-    expect(crate?.pose.seg.act.k).toBe('landing');
-    expect(crate?.egg?.kind).toBe('itemget');
-    expect(at(27, 'harness', 'dark-mode')?.pose.seg.act.k).toBe('done');
-    // the stare, the coffee, the moonwalk back
-    expect(at(60 + 20, 'acme-web', 'checkout')?.egg?.kind).toBe('stare');
-    expect(at(60 + 35.5, 'acme-web', 'checkout')?.pose.seg.act.k).toBe('coffee');
-    const back = at(60 + 43, 'acme-web', 'checkout');
-    expect(back?.pose.moving).toBe(true);
-    expect(back?.egg?.kind).toBe('moonwalk');
-    expect(at(3 * 60 + 16, 'bise.dev', 'main')?.egg?.kind).toBe('clap');
+    // his first plane: 3 s with a loop, from the feed; the next ones 1.6 s, straight
+    expect(at(5, 'main')?.pose.plane).toMatchObject({ dur: 3, loops: 1, startX: FEED_X });
+    expect(at(8.5, 'main')?.pose.plane).toMatchObject({ dur: 1.6, loops: 0 });
+    // an agent pops at its desk, never walking in by the door
+    const catalog = at(8.05, 'catalog');
+    expect(catalog?.pose.moving).toBe(false);
+    expect(catalog?.pose.seg.act.at).toBe('desk');
+    // the visits: there before their bubbles
+    expect(at(17.6, 'checkout')?.pose.seg.act.k).toBe('visit');
+    expect(at(37.2, 'order-test')?.pose.seg.act.k).toBe('visit');
+    expect(at(39.2, 'order-test')?.egg?.kind).toBe('hop');
+    // checkout's crate at main by 0:46, every other one by 0:50
+    expect(at(46.1, 'checkout')).toMatchObject({ pose: { moving: false, seg: { act: { k: 'landing' } } } });
+    for (const n of ['catalog', 'cart', 'emails', 'theme', 'order-test']) expect(at(50.2, n)).toMatchObject({ pose: { moving: false, seg: { act: { k: 'landing' } } } });
+    // the reviewer beside the first crate, its stamp; main's crate over its head
+    const review = at(51, REVIEWER);
+    expect(review?.egg?.kind).toBe('stamp');
+    expect(review?.pose.moving).toBe(false);
+    expect(at(53, 'main')?.egg?.kind).toBe('itemget');
   });
 });

@@ -15,7 +15,7 @@ import { sleepers } from '../bims/zzz';
 import { NO_ATTENTION, type Step } from '../bims/office-driver';
 import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
-import { CAST, SHOTS, type Shot } from './cast';
+import { CAST, FOLD_S, PAGE, SHOTS, type Shot } from './cast';
 import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
 import { ENTRY, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
@@ -94,14 +94,17 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   const canvas = document.createElement('canvas');
   canvas.className = 'bh-canvas';
   box.append(canvas);
-  // the entry build (design's hero-entry §2): the town grows from its middle, then the film; none in
-  // reduced motion (the map is there, the film's still pose) nor for a check's shot at startT
-  let building = !reduced && opts.startT === undefined;
+  // the entry build (design's hero-entry §2) is the film's first 2.8 s, every loop: the town grows
+  // from its middle; the fold (PAGE.fold to FILM_S) is the build backwards, from the edge in (bims-film
+  // v13: the loop's seam). None in reduced motion (the map is there, the film's still pose).
+  let building = !reduced;
+  /** the renderer draws the loose town (the build, the fold), not its merged copies */
+  let held = !reduced;
   const entry = makeEntry();
-  /** the build's clock: the first frame's rAF time ('ready' is t = 0) */
-  let entryFrom = -1;
+  /** the film's clock runs: from the frame after 'ready' (a check's startT: at once) */
+  let started = reduced || opts.startT !== undefined;
   let warmed = false;
-  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: building });
+  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced });
   const overlay = makeOverlay(box);
   const sites: TownSite[] = CAST.map((c) => ({ id: c.id, office: layoutOf(rowsAt(c, 0).agents, c.map), grow: growOf(growthOf(c)) }));
   r.setTown(sites);
@@ -215,7 +218,9 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     subjectIn = here;
     const framed = here ? shotCam(shot, geo) : null;
     // a wide never holds still (bims-film v7): it sways from its camera's leaving on
-    const target = framed === null ? spring.cam : shot.size === 'wide' ? drift(framed, T - (shot.at - LEAD_S)) : framed;
+    // (the fold's wide holds still: the next loop's wave starts from that very frame)
+    const sways = shot.size === 'wide' && shot.at < PAGE.fold;
+    const target = framed === null ? spring.cam : sways ? drift(framed, T - (shot.at - LEAD_S)) : framed;
     move(target, dt);
   }
 
@@ -324,22 +329,27 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     const t0 = performance.now();
     const dt = lastMs === 0 ? 0 : Math.min(0.1, Math.max(0, (nowMs - lastMs) / 1000));
     lastMs = nowMs;
-    // the build's ms from the frame after 'ready' (the first frame bakes and compiles everything,
-    // unseen: build()); the film's clock waits for the build's end
-    if (building && entryFrom < 0 && warmed && box.dataset.ready === 'true') entryFrom = nowMs;
-    const ems = building ? (opts.entryAt ?? (entryFrom < 0 ? 0 : nowMs - entryFrom)) : ENTRY.done;
-    if (!reduced && ems >= ENTRY.done) t += dt;
+    // the clock from the frame after 'ready' (the first frames bake and compile everything, unseen:
+    // build()); a check's entryAt holds the film at that ms of the build
+    if (!started && warmed && box.dataset.ready === 'true') started = true;
+    if (opts.entryAt !== undefined) t = ORIGIN + opts.entryAt / 1000;
+    else if (started && !reduced) t += dt;
+    const T = filmT(t);
+    const ems = reduced ? null : entryMs(T);
+    building = ems !== null;
+    /** the wave at the loop's start (its camera: entryCam), not the fold at its end (the fold's shot) */
+    const waving = ems !== null && T < PAGE.fold;
     const n = night();
     for (const run of runs) {
       advance(run, t, n, reduced);
       const st = stepOf(run, n, reduced, attentionOf(run));
       if (st) steps.set(run.cast.id, st);
     }
-    if (building && hands.k === 'film') entryCam(ems);
+    if (waving && ems !== null && hands.k === 'film') entryCam(ems);
     else if (hands.k === 'film') filmCam(dt);
     else visitorCam(dt, wall());
     // the first frame: the film's shot at once, no glide from nowhere
-    if (!building && (probe?.frames === 0 || r.shownFit() === null)) {
+    if (!waving && (probe?.frames === 0 || r.shownFit() === null)) {
       const now = SHOTS[shotAt(SHOTS, filmT(t))];
       const c = hands.k === 'film' && now !== undefined ? shotCam(now, geo) : wide();
       if (c) spring = still(c);
@@ -353,17 +363,14 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       const st = steps.get(id);
       if (st) r.live(id, st, t);
     }
-    const warmFrame = building && build(ems, ids.length, n);
+    const warmFrame = !reduced && build(ems, ids.length, n);
     const t2 = performance.now();
     r.frame(n);
     const t3 = performance.now();
-    if (building) overlay.root.style.opacity = String(wordsAt(ems));
+    // the words come in last in the build and leave first in the fold
+    overlay.root.style.opacity = ems === null ? '' : String(wordsAt(ems));
     words();
     const t4 = performance.now();
-    if (building && ems >= ENTRY.done) {
-      building = false;
-      overlay.root.style.opacity = '';
-    }
     // ready (the page drops its still): the frame after the warm one (the GPU catches up on it
     // under the still: a 75 ms frame in dark), the build's t = 0 the frame after
     drawn++;
@@ -376,7 +383,8 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       probe.ms = [...probe.ms.slice(-299), performance.now() - t0];
       probe.phases = [...probe.phases.slice(-299), { brain: t1 - t0, pose: t2 - t1, draw: t3 - t2, words: t4 - t3 }];
       probe.T = filmT(t);
-      probe.entry = ems;
+      // the build's ms in the wave, else the film's (≥ ENTRY.done: the checks read the build's frames by it)
+      probe.entry = waving && ems !== null ? ems : T * 1000;
       probe.hands = hands.k;
       probe.shot = shotIx;
       probe.cam = spring.cam;
@@ -403,12 +411,15 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     spring = still(to === null || f <= 0 ? from : glideCam(from, to, Math.min(1, f), null));
   }
 
-  /** the build's things where they are at ems; the town settled once it's all there */
-  function build(ems: number, offices: number, n: boolean): boolean {
+  /**
+   * The build's (or the fold's) things where they are at ems: the town held loose while they move,
+   * settled into its merged copies once it's all there (ems past ENTRY.built, or the film between).
+   */
+  function build(ems: number | null, offices: number, n: boolean): boolean {
     const parts = r.entry.parts();
     if (parts === null) return false;
     let warm = false;
-    if (!warmed && parts.offices.length >= offices) {
+    if (!warmed && held && parts.offices.length >= offices) {
       // before 'ready' (design m_31440: no frame of the build over 50 ms): the whole map drawn once,
       // unseen (frame 0 draws over it in the same task), the merged copies settle() shows too, so
       // every program (its shadows too) is compiled and every buffer uploaded before the clock starts
@@ -419,15 +430,29 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       r.frame(n);
       r.entry.warm(false);
     }
-    if (ems < ENTRY.built) {
+    if (ems !== null && ems < ENTRY.built) {
+      if (!held) {
+        // the fold: the loose town back (kept since the build: nothing to upload or compile)
+        r.entry.hold();
+        held = true;
+        return warm;
+      }
       entry.apply(ems, parts, r.shownFit()?.scale ?? 0.05);
       return warm;
     }
-    if (parts.scape !== null || parts.offices.some((o) => o.world !== null)) {
+    if (held) {
       entry.finish(parts);
       r.entry.settle();
+      held = false;
     }
     return warm;
+  }
+
+  /** where the build is at film time T, ms (the fold: the build backwards, from ENTRY.built to 0), null in the film between. Pure. */
+  function entryMs(T: number): number | null {
+    if (T * 1000 < ENTRY.done) return T * 1000;
+    if (T >= PAGE.fold) return ENTRY.built * Math.max(0, 1 - (T - PAGE.fold) / FOLD_S);
+    return null;
   }
 
   /** the next frame: at the display's rate while the camera glides, the town builds or he just moved it, else 30 fps */

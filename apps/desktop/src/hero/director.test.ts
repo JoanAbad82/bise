@@ -2,28 +2,27 @@
 // leaves before the action, glides never cut, the spring never overshoots, the subject sits in the
 // safe frame, and the visitor keeps the camera until he lets it go.
 import { describe, expect, it } from 'vitest';
-import { FILM_S, SHOTS } from './cast';
+import { FILM_S, KILN, PAGE, SHOTS } from './cast';
 import { aimCam, fitCam, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, LEAD_S, MIN_ZOOM, resumes, RESUME_IDLE_S, SAFE, shotAt, springStep, still } from './director';
 import { panAround, zoomAround } from './gestures';
 import { eggWords } from './overlay';
 
 describe('the shot list', () => {
-  it('moves at least every 10 s (a wide sways meanwhile), never holds less than 2 s, and goes wide about once a minute', () => {
+  it('moves at least every 8 s and holds each shot at least 1 s (bims-film v13)', () => {
     const holds = SHOTS.map((s, i) => ({ s, hold: (SHOTS[i + 1]?.at ?? FILM_S) - s.at }));
-    for (const { s, hold } of holds) {
-      expect(hold).toBeGreaterThanOrEqual(2);
-      if (s.size !== 'wide' && s.at < FILM_S - 10) expect(hold).toBeLessThanOrEqual(10);
+    for (const { hold } of holds) {
+      expect(hold).toBeGreaterThanOrEqual(1);
+      expect(hold).toBeLessThanOrEqual(8);
     }
-    const wides = SHOTS.filter((s) => s.size === 'wide').map((s) => s.at);
-    const gaps = wides.map((w, i) => (wides[i + 1] ?? (wides[0] ?? 0) + FILM_S) - w);
-    for (const g of gaps) expect(g).toBeLessThanOrEqual(70);
   });
 
-  it('opens close (the cold open) and closes the loop on that same frame', () => {
-    expect(SHOTS[0]?.size).toBe('tight');
-    expect(SHOTS.at(-1)?.size).toBe(SHOTS[0]?.size);
-    expect(SHOTS.at(-1)?.subject).toEqual(SHOTS[0]?.subject);
-    expect(shotAt(SHOTS, FILM_S - 0.5)).toBe(0);
+  it('opens on kiln after the wave and closes on the wide the next wave starts from, the fold kept to the end', () => {
+    expect(SHOTS[0]?.subject).toEqual({ k: 'office', office: KILN });
+    const last = SHOTS.at(-1);
+    expect(last?.size).toBe('wide');
+    expect(last?.at).toBe(PAGE.fold);
+    expect(shotAt(SHOTS, FILM_S - 0.05)).toBe(SHOTS.length - 1);
+    expect(shotAt(SHOTS, 0)).toBe(0);
   });
 
   it('leaves LEAD_S before the action', () => {

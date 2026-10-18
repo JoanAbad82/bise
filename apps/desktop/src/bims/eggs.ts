@@ -28,7 +28,8 @@ export type EggKind =
   | 'clap' // n1: stage clear: every agent done or idle and his inbox empty, main claps
   | 'shades' // t1: friday after 17:00, idle bims in sunglasses
   | 'lookup' // t4: the eclipse: idle and done bims look up
-  | 'dance'; // s1: halloween at midnight, idle and done bims dance 10 s
+  | 'dance' // s1: halloween at midnight, idle and done bims dance 10 s
+  | 'stamp'; // the hero film's reviewer (bims-film v9): reads the crate's sheet, then stamps it ✓ (forced only)
 
 export interface BimEgg {
   /** an egg, or his poke (pokes.ts) that beats it while it plays */

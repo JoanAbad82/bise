@@ -1,23 +1,26 @@
-// The hero film's score (page bims-film v8, bims m_30855, m_30867, m_31057): bise.dev/desktop's town, three offices
-// (three-a's: harness loft, bise.dev california, acme-web riad), 15 bims, 5 minutes in a loop. Each
-// bim's life is a list of [time, state] changes; the state at T is the last change at or before T,
-// else the list's last one: the loop closes by construction (an agent that leaves at 4:31 is gone at
-// 0:00 and comes back at 0:20). His messages (paper planes), the agents' messages, the eggs (written
-// here, never rolled) and the director's shots are timed the same way (no captions: Gabriel's pick,
-// bims-film v5; the page draws its first-visit line). Data only;
-// world.ts reads it into the app's rows, director.ts into the camera. Owner: hero-town.
+// The hero film's score (page bims-film v11: Gabriel's scenario A, « de zéro à l'app », the shop):
+// kiln, a pottery studio's empty office in the middle of a calm town (harness and acme-web live
+// quietly around it, no shot goes there). He writes to bise in the feed (bottom-left); each line
+// folds into a plane that dives to kiln's main, and an agent pops per task. checkout visits cart and
+// asks him a question; order-test finds it a bug (no ✗: nobody failed); 'review it for me' and a
+// reviewer stamps ✓. The crates land, the shop rises from the last one on localhost:5173 and a mug
+// is bought; then the page and the town fold into cubes and the entry wave builds it again: the loop's
+// seam is the entry itself, kiln empty again. Each bim's life is a list of [time, state] changes (the
+// state at T is the last change at or before T, else its life's last one); his lines, the agents'
+// visits, the bubbles, the eggs and the director's shots are timed the same way. Data only: world.ts
+// reads it into the app's rows, director.ts into the camera, feed.ts into the feed. Owner: hero-town.
 import type { DoingKind } from '@/proto';
 import type { EggKind } from '../bims/eggs';
 import type { MapId } from '../bims/maps/ids';
 
-/** the loop, s */
-export const FILM_S = 300;
+/** the loop, s: the fold ends at FILM_S and the entry wave is 0:00 */
+export const FILM_S = 62.4;
 
 /** What a bim does from a change on (world.ts turns it into the app's row, or its office life). */
 export type Mode =
   | { readonly k: 'gone' }
   | { readonly k: 'work'; readonly doing?: DoingKind }
-  /** idle: in a bean bag (on a map with a park, the app's pastimes may send it skating) */
+  /** idle: in a bean bag */
   | { readonly k: 'idle' }
   /** idle, a trip to the island: its fruit (0 the pineapple), its trip number */
   | { readonly k: 'snack'; readonly fruit: number; readonly trip: number }
@@ -55,13 +58,21 @@ export interface Cast {
   readonly bims: readonly Bim[];
 }
 
-/** a message: from you (a paper plane to the agent) or from an agent to another */
+/** his plane's flight (bims-plane 382a3ddee): its length, s, and its loops; it leaves from the feed */
+export interface Flight {
+  readonly dur: number;
+  readonly loops: 0 | 1 | 2;
+}
+
+/** a message: from you (a paper plane to the agent, off the feed) or from an agent to another (a visit) */
 export interface Note {
   readonly at: number;
   readonly office: string;
   /** an agent's name, or 'you' (his paper plane) */
   readonly from: string;
   readonly to: string;
+  /** his plane's flight (unset: the app's) */
+  readonly flight?: Flight;
 }
 
 /** an egg forced on a bim from `at` for `dur` s */
@@ -73,7 +84,36 @@ export interface Egg {
   readonly kind: EggKind;
 }
 
-/** the shot sizes (bims-film): the three offices, one office (tight: closer), a bim followed, a close-up, the clap's (×4) */
+/** a bim's words over its head (bims-film v9: one at a time, 2-5 words, the labels' look, BUBBLE_S) */
+export interface Bubble {
+  readonly at: number;
+  readonly office: string;
+  readonly bim: string;
+  readonly words: string;
+}
+
+/**
+ * A line of the feed (the app's composer, bottom-left): his (typed from `at`, folded into a plane at
+ * `plane`), bise's, or bise's waiting line (the app's '? who · words', its choices). `tick`: when it
+ * takes its ✓ (its crate is in). Lines leave the feed at the fold.
+ */
+export type Line =
+  | { readonly at: number; readonly who: 'you'; readonly words: string; readonly plane?: number; readonly tick?: number }
+  | { readonly at: number; readonly who: 'bise'; readonly words: string; readonly tick?: number }
+  | {
+      readonly at: number;
+      readonly who: 'ask';
+      readonly bim: string;
+      readonly words: string;
+      /** the answer's field ('answering checkout'), or numbered choices, the picked one at `picked` */
+      readonly field?: string;
+      readonly choices?: readonly string[];
+      readonly pick?: { readonly at: number; readonly n: number };
+      /** answered: it leaves the feed's waiting look */
+      readonly until: number;
+    };
+
+/** the shot sizes (bims-film): the town, one office (tight: closer), a bim followed, a close-up, closest */
 export type Size = 'wide' | 'office' | 'tight' | 'follow' | 'close' | 'closest';
 
 /** what a shot frames: the town, an office, a spot of an office, a bim (its name shown), two bims (no name) */
@@ -89,87 +129,73 @@ export interface Shot {
   readonly at: number;
   readonly size: Size;
   readonly subject: Subject;
-  /** its glide in, s, past the director's own (the seam's long move back to 0:00's frame) */
+  /** its glide in, s, past the director's own */
   readonly glide?: number;
-  /** how long before `at` its camera leaves, s, short of the director's LEAD_S (0:04's follow runs to 0:08, bims m_31555) */
+  /** how long before `at` its camera leaves, s, past the director's LEAD_S */
   readonly lead?: number;
-  /** where its subject sits, fractions of the frame, past the director's safe point (the opening: main at 65%, bims m_31467) */
+  /** where its subject sits, fractions of the frame, past the director's safe point */
   readonly frame?: { readonly x: number; readonly y: number };
+  /** this much farther than its size (a slight pull back for a plane on its way), 1 none */
+  readonly back?: number;
 }
-
-const s = (m: number, sec: number): number => m * 60 + sec;
 
 const work: Mode = { k: 'work', doing: 'edit' };
 const think: Mode = { k: 'work', doing: 'think' };
 const gone: Mode = { k: 'gone' };
 const idle: Mode = { k: 'idle' };
-const done: Mode = { k: 'done' };
+const landing = (rank: number): Mode => ({ k: 'landing', rank });
 
+export const KILN = 'kiln';
 export const HARNESS = 'harness';
-export const SITE = 'bise.dev';
 export const ACME = 'acme-web';
 
+/** the shop's page (kiln-app): it rises from main's crate, the fold takes it and the town, the wave is 0:00 */
+export const PAGE = { at: 53.5, fold: 61.2 } as const;
+/** the agent that reviews checkout's crate ('review it for me'): it pops beside it in main's queue (run.ts reviewSpot) */
+export const REVIEWER = 'review';
+/** the fold: from the edge to the middle, FOLD_S long, ending at FILM_S */
+export const FOLD_S = FILM_S - PAGE.fold;
+/** a bubble's time over its speaker, s */
+export const BUBBLE_S = 1.8;
+
+/** the first plane: a loop on its way (bims-film v9); the next ones short and straight */
+const FIRST: Flight = { dur: 3, loops: 1 };
+const SHORT: Flight = { dur: 1.6, loops: 0 };
+
 export const CAST: readonly Cast[] = [
+  {
+    id: KILN,
+    name: 'kiln',
+    map: 'workshop',
+    stage: 6,
+    bims: [
+      // alone at 0:00 (it pops with the wave), his first plane in its hands at 0:07.3
+      { name: 'main', main: true, life: [[0, { k: 'mainidle' }], [7.3, { k: 'main' }]] },
+      // one agent per line, popping at its desk 0.3 s after main catches it (bims-film v13); the
+      // crates leave from 0:40 (checkout's), the others from 0:41, 0.6 s apart: the walks overlap
+      { name: 'catalog', life: [[0, gone], [8, work], [41, landing(2)]] },
+      { name: 'cart', life: [[0, gone], [9.6, work], [41.6, landing(3)]] },
+      // visits cart (0:14), asks him (0:22.5), his answer at 0:27.6, its crate first (0:40, there at 0:46)
+      { name: 'checkout', life: [[0, gone], [11.2, work], [22.5, { k: 'asks' }], [27.6, think], [29, work], [40, landing(1)]] },
+      { name: 'emails', life: [[0, gone], [12.8, work], [42.2, landing(4)]] },
+      { name: 'theme', life: [[0, gone], [32.9, work], [42.8, landing(6)]] },
+      // finds checkout a bug (0:35), no ✗; 5th in line (from its desk the 6th place has no clear way: it never left)
+      { name: 'order-test', life: [[0, gone], [34.7, work], [43.4, landing(5)]] },
+      // 'review it for me': pops beside checkout's crate, reads, stamps ✓ (0:51.7)
+      { name: REVIEWER, life: [[0, gone], [49.5, work]] },
+    ],
+  },
   {
     id: HARNESS,
     name: 'harness',
     map: 'loft',
     stage: 13,
     bims: [
-      // the cold open's task: his plane leaves at 0:00.5, main has it at 0:03.5; idle again once its day is over
-      { name: 'main', main: true, life: [[0, { k: 'mainidle' }], [s(0, 3.5), { k: 'main' }], [s(4, 20), { k: 'mainidle' }]] },
-      {
-        // in by the door at 0:04, asks you at 0:10, your answer lands at 0:17 (the hop and the coin),
-        // the 3rd land at 3:02 (combo ×2 with dark-mode), off on its board at 4:18
-        name: 'signup-flow',
-        life: [[0, gone], [s(0, 4), work], [s(0, 10), { k: 'asks' }], [s(0, 17), think], [s(2, 57), { k: 'landing', rank: 1 }], [s(3, 5.5), done], [s(4, 18), gone]],
-      },
-      {
-        // the day's first land: its crate carried to main's queue from 0:18, over its head in the queue, then the deck chairs
-        name: 'dark-mode',
-        life: [[0, gone], [s(0, 4.6), work], [s(0, 18), { k: 'landing', rank: 1 }], [s(0, 26.5), done], [s(4, 21), gone]],
-      },
-      { name: 'fix-flaky-test', life: [[0, work], [s(0, 54), { k: 'failed' }], [s(1, 48), work]] },
-      {
-        // an island trip at the seam (up from its bean bag at 4:57), the golden pineapple at 1:11,
-        // trips through the day (the town's '2 island trips at any time'), then its bean bag from 3:42
-        name: 'docs-sync',
-        life: [
-          [0, { k: 'snack', fruit: 1, trip: 1 }],
-          [s(0, 20), idle],
-          [s(1, 5), { k: 'snack', fruit: 1, trip: 2 }],
-          [s(1, 9), { k: 'snack', fruit: 0, trip: 3 }],
-          [s(1, 20), idle],
-          [s(2, 0), { k: 'snack', fruit: 2, trip: 4 }],
-          [s(2, 14), idle],
-          [s(3, 28), { k: 'snack', fruit: 1, trip: 5 }],
-          [s(3, 42), idle],
-          // on its way to the island at 0:00 (the cold open's first frame)
-          [s(4, 57), { k: 'snack', fruit: 1, trip: 1 }],
-        ],
-      },
-      { name: 'perf-audit', life: [[0, { k: 'sleep' }], [s(3, 38), work], [s(4, 10), { k: 'sleep' }]] },
-    ],
-  },
-  {
-    id: SITE,
-    name: 'bise.dev',
-    map: 'california',
-    stage: 11,
-    bims: [
-      // his plane at 0:41 starts its day; 'line clear' at 3:12, then nothing waits here: up from its work for the clap (3:15)
-      { name: 'main', main: true, life: [[0, { k: 'mainidle' }], [s(0, 44), { k: 'main' }], [s(3, 14.5), { k: 'mainidle' }]] },
-      {
-        // in at 0:46, the second '?' at 1:56 (two loops on its answer's way), the 4th land at 3:12, off at 4:34
-        name: 'pricing-page',
-        life: [[0, gone], [s(0, 46), work], [s(1, 56), { k: 'asks' }], [s(2, 7), work], [s(3, 6), { k: 'landing', rank: 1 }], [s(3, 13), done], [s(4, 34), gone]],
-      },
-      // in at 0:46.6, lands at 2:33 ('1:47' over its head), off down the road at 2:36
-      { name: 'og-images', life: [[0, gone], [s(0, 46.6), work], [s(2, 28), { k: 'landing', rank: 1 }], [s(2, 33), done], [s(2, 36), gone]] },
-      // idle: bean bags and the island, never the park (bims-film v8: no skater, run.ts pastimes off)
-      { name: 'seo-meta', life: [[0, idle], [s(2, 50), { k: 'snack', fruit: 2, trip: 1 }], [s(3, 4), idle]] },
-      // up from its bean bag to the island at 3:44, eats at 3:47
-      { name: 'i18n', life: [[0, idle], [s(3, 43), { k: 'snack', fruit: 1, trip: 1 }], [s(3, 58), idle]] },
+      { name: 'main', main: true, life: [[0, { k: 'main' }]] },
+      { name: 'signup-flow', life: [[0, work]] },
+      { name: 'dark-mode', life: [[0, think]] },
+      { name: 'docs-sync', life: [[0, idle], [24, { k: 'snack', fruit: 1, trip: 1 }], [38, idle]] },
+      { name: 'perf-audit', life: [[0, { k: 'sleep' }]] },
     ],
   },
   {
@@ -179,118 +205,94 @@ export const CAST: readonly Cast[] = [
     stage: 9,
     bims: [
       { name: 'main', main: true, life: [[0, { k: 'main' }]] },
-      // they wait on each other ('…' over both, 1:17-1:28), a message, a coffee (1:36), checkout's moonwalk back (1:41)
-      { name: 'api-tests', life: [[0, work], [s(1, 17), { k: 'wait', on: 'checkout' }], [s(1, 28), work]] },
-      { name: 'checkout', life: [[0, work], [s(1, 17), { k: 'wait', on: 'api-tests' }], [s(1, 28), idle], [s(1, 31), work]] },
-      // in with the hop and the coin at 1:02, the 2nd land at 2:55, off at 4:38
-      { name: 'invoice-pdf', life: [[0, gone], [s(0, 59.5), work], [s(2, 51), { k: 'landing', rank: 1 }], [s(2, 58), done], [s(4, 38), gone]] },
+      { name: 'api-tests', life: [[0, work]] },
+      { name: 'invoice-pdf', life: [[0, think]] },
+      { name: 'search', life: [[0, idle], [16, { k: 'snack', fruit: 2, trip: 1 }], [30, idle]] },
     ],
   },
 ];
 
+/** his lines' planes leave the feed when the line folds (FEED's `plane`), the agents' visits */
 export const NOTES: readonly Note[] = [
-  // the story's (bims-film v7): your task, your two answers, the agents' notes
-  { at: s(0, 0.5), office: HARNESS, from: 'you', to: 'main' },
-  { at: s(0, 14), office: HARNESS, from: 'you', to: 'signup-flow' },
-  { at: s(0, 41), office: SITE, from: 'you', to: 'main' },
-  { at: s(1, 29), office: ACME, from: 'api-tests', to: 'checkout' },
-  // bims-film v8: api-tests' post-it on checkout's desk (0:32), invoice-pdf taps api-tests' shoulder (2:20)
-  { at: s(0, 28.5), office: ACME, from: 'api-tests', to: 'checkout' },
-  { at: s(2, 15.5), office: ACME, from: 'invoice-pdf', to: 'api-tests' },
-  { at: s(2, 2), office: SITE, from: 'you', to: 'pricing-page' },
-  { at: s(3, 52), office: ACME, from: 'api-tests', to: 'main' },
-  // the town's background life: a plane of his to a working bim about every 20 s
-  { at: s(0, 22), office: ACME, from: 'you', to: 'main' },
-  { at: s(1, 0), office: HARNESS, from: 'you', to: 'main' },
-  { at: s(1, 20), office: ACME, from: 'you', to: 'invoice-pdf' },
-  { at: s(1, 40), office: HARNESS, from: 'you', to: 'signup-flow' },
-  { at: s(2, 22), office: ACME, from: 'you', to: 'main' },
-  { at: s(2, 44), office: HARNESS, from: 'you', to: 'fix-flaky-test' },
-  { at: s(3, 24), office: ACME, from: 'you', to: 'api-tests' },
-  { at: s(3, 45), office: HARNESS, from: 'you', to: 'perf-audit' },
-  { at: s(4, 1), office: ACME, from: 'you', to: 'checkout' },
-  { at: s(4, 24), office: ACME, from: 'you', to: 'invoice-pdf' },
-  { at: s(4, 42), office: HARNESS, from: 'you', to: 'fix-flaky-test' },
+  { at: 4.3, office: KILN, from: 'you', to: 'main', flight: FIRST },
+  { at: 7.7, office: KILN, from: 'you', to: 'main', flight: SHORT },
+  { at: 9.3, office: KILN, from: 'you', to: 'main', flight: SHORT },
+  { at: 10.9, office: KILN, from: 'you', to: 'main', flight: SHORT },
+  // checkout goes to cart's desk (the app's visit)
+  { at: 14, office: KILN, from: 'checkout', to: 'cart' },
+  // his answer, into checkout's hands at 0:27.6
+  { at: 26, office: KILN, from: 'you', to: 'checkout', flight: SHORT },
+  { at: 31, office: KILN, from: 'you', to: 'main', flight: SHORT },
+  { at: 32.8, office: KILN, from: 'you', to: 'main', flight: SHORT },
+  { at: 35, office: KILN, from: 'order-test', to: 'checkout' },
+  // 'review it for me'
+  { at: 47.6, office: KILN, from: 'you', to: 'main', flight: SHORT },
+];
+
+/** the feed (bims-film v11), in its order */
+export const FEED: readonly Line[] = [
+  { at: 3, who: 'you', words: 'build a shop for kiln, my pottery studio', plane: 4.3, tick: 53 },
+  // each ✓ when its crate is in main's queue (the office brains' arrivals)
+  { at: 6, who: 'you', words: 'a grid of pots with prices', plane: 7.7, tick: 47.5 },
+  { at: 6.6, who: 'you', words: 'a cart and card payments', plane: 9.3, tick: 48.9 },
+  { at: 7.2, who: 'you', words: 'email the receipt', plane: 10.9, tick: 48.8 },
+  { at: 12.5, who: 'bise', words: 'on it: 4 agents in kiln' },
+  { at: 23, who: 'ask', bim: 'checkout', words: 'ship worldwide or EU only?', field: 'answering checkout', until: 26 },
+  { at: 25, who: 'you', words: 'EU only', plane: 26 },
+  { at: 30, who: 'you', words: 'make it warm, like paper', plane: 31, tick: 49.8 },
+  { at: 30.6, who: 'you', words: 'test the whole checkout before you ship', plane: 32.8, tick: 49.9 },
+  { at: 46, who: 'ask', bim: 'checkout', words: 'checkout is ready', choices: ['ship it', 'review it for me'], pick: { at: 47.4, n: 2 }, until: 47.6 },
+  { at: 53, who: 'bise', words: 'all done. it runs on localhost:5173', tick: 53 },
+];
+
+/** snapped to the visits' arrivals in the office brains (checkout at cart's desk 0:17.5, order-test at checkout's 0:37.0) */
+export const BUBBLES: readonly Bubble[] = [
+  { at: 17.6, office: KILN, bim: 'checkout', words: 'cart line format?' },
+  { at: 19.6, office: KILN, bim: 'cart', words: 'id, qty, price' },
+  { at: 37.2, office: KILN, bim: 'order-test', words: 'a mug sold twice' },
 ];
 
 export const EGGS: readonly Egg[] = [
-  // the cold open: your answer loops before signup-flow catches it, then its hop and coin
-  { at: s(0, 14), dur: 3.5, office: HARNESS, bim: 'signup-flow', kind: 'loop' },
-  { at: s(0, 17.2), dur: 0.6, office: HARNESS, bim: 'signup-flow', kind: 'hop' },
-  // in the queue with its crate: the crate over its head, then the deck chairs at 0:26.5
-  { at: s(0, 23.5), dur: 2.5, office: HARNESS, bim: 'dark-mode', kind: 'itemget' },
-  // invoice-pdf's hop and coin on its way in
-  { at: s(1, 2), dur: 0.6, office: ACME, bim: 'invoice-pdf', kind: 'hop' },
-  { at: s(1, 11), dur: 8, office: HARNESS, bim: 'docs-sync', kind: 'golden' },
-  { at: s(1, 17.5), dur: 10.5, office: ACME, bim: 'api-tests', kind: 'stare' },
-  { at: s(1, 17.5), dur: 10.5, office: ACME, bim: 'checkout', kind: 'stare' },
-  { at: s(1, 36), dur: 0.8, office: ACME, bim: 'checkout', kind: 'tap' },
-  { at: s(1, 41), dur: 6, office: ACME, bim: 'checkout', kind: 'moonwalk' },
-  // pricing-page's answer: two loops (a longer egg), then the hop
-  { at: s(2, 2), dur: 5, office: SITE, bim: 'pricing-page', kind: 'loop' },
-  { at: s(2, 7.5), dur: 0.6, office: SITE, bim: 'pricing-page', kind: 'hop' },
-  { at: s(2, 33), dur: 3, office: SITE, bim: 'og-images', kind: 'speedrun' },
-  { at: s(3, 3), dur: 3, office: HARNESS, bim: 'dark-mode', kind: 'combo' },
-  { at: s(3, 3), dur: 3, office: HARNESS, bim: 'signup-flow', kind: 'combo' },
-  { at: s(3, 12), dur: 3, office: SITE, bim: 'main', kind: 'tetris' },
-  { at: s(3, 15), dur: 3, office: SITE, bim: 'main', kind: 'clap' },
-  { at: s(3, 30), dur: 1.2, office: HARNESS, bim: 'dark-mode', kind: 'kickflip' },
-  { at: s(4, 16), dur: 0.9, office: HARNESS, bim: 'signup-flow', kind: 'salto' },
+  // the first plane loops once on its way (its flight says so; the egg keeps the app's look)
+  { at: 28, dur: 0.6, office: KILN, bim: 'checkout', kind: 'hop' },
+  { at: 39, dur: 0.6, office: KILN, bim: 'order-test', kind: 'hop' },
+  // the reviewer reads the crate's sheet (main's paper) a second, then stamps it: ✓ at 0:51.7
+  { at: 50.3, dur: 1.8, office: KILN, bim: REVIEWER, kind: 'stamp' },
+  // main lifts the last crate over its head, three notes
+  { at: 52.5, dur: 2.5, office: KILN, bim: 'main', kind: 'itemget' },
 ];
 
+/** the ✓ the reviewer stamps on checkout's crate: from then until the fold (bims-film v13) */
+export const STAMP = { at: 51.7, office: KILN, on: 'checkout' } as const;
+
 const bim = (office: string, name: string): Subject => ({ k: 'bim', office, name });
+const pair = (office: string, a: string, b: string): Subject => ({ k: 'pair', office, names: [a, b] });
+const kiln: Subject = { k: 'office', office: KILN };
 
-/** the opening's frame (bims m_31467): main's desk at 65 % across, the door still in frame for 0:04 */
-const OPEN_AT = { x: 0.65, y: 0.5 } as const;
-
+/** no cut: every move a glide (expo in-out); the camera leaves ~1 s before the action (bims-film v9) */
 export const SHOTS: readonly Shot[] = [
-  // the cold open (0:00-0:30): close from the first second, the product in 30 s
-  { at: 0, size: 'tight', subject: { k: 'spot', office: HARNESS, spot: 'main' }, frame: OPEN_AT },
-  { at: s(0, 4), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
-  // the follow from the door runs to 0:08, then a short glide back to the office (bims m_31555)
-  { at: s(0, 8), size: 'tight', subject: { k: 'office', office: HARNESS }, lead: 0.8, glide: 0.8 },
-  { at: s(0, 10), size: 'close', subject: bim(HARNESS, 'signup-flow') },
-  { at: s(0, 14), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
-  { at: s(0, 20), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
-  { at: s(0, 23.5), size: 'close', subject: bim(HARNESS, 'dark-mode') },
-  { at: s(0, 26), size: 'wide', subject: { k: 'town' } },
-  // act 1: the town gets up
-  { at: s(0, 30), size: 'tight', subject: { k: 'office', office: ACME } },
-  { at: s(0, 38), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
-  { at: s(0, 44), size: 'office', subject: { k: 'office', office: SITE } },
-  { at: s(0, 52), size: 'follow', subject: bim(HARNESS, 'fix-flaky-test') },
-  { at: s(1, 0), size: 'office', subject: { k: 'office', office: ACME } },
-  { at: s(1, 8), size: 'close', subject: bim(HARNESS, 'docs-sync') },
-  { at: s(1, 16), size: 'wide', subject: { k: 'town' } },
-  // act 2: the small dramas
-  { at: s(1, 24), size: 'follow', subject: { k: 'pair', office: ACME, names: ['api-tests', 'checkout'] } },
-  { at: s(1, 32), size: 'follow', subject: bim(ACME, 'checkout') },
-  { at: s(1, 40), size: 'close', subject: bim(ACME, 'checkout') },
-  { at: s(1, 46), size: 'office', subject: { k: 'office', office: HARNESS } },
-  { at: s(1, 54), size: 'follow', subject: bim(SITE, 'pricing-page') },
-  { at: s(2, 2), size: 'tight', subject: bim(SITE, 'pricing-page') },
-  { at: s(2, 10), size: 'wide', subject: { k: 'town' } },
-  // act 3: the break
-  { at: s(2, 18), size: 'office', subject: { k: 'office', office: ACME } },
-  { at: s(2, 26), size: 'close', subject: bim(SITE, 'og-images') },
-  { at: s(2, 36), size: 'follow', subject: bim(SITE, 'og-images') },
-  { at: s(2, 40), size: 'wide', subject: { k: 'town' } },
-  // act 4: the lands
-  { at: s(2, 52), size: 'follow', subject: bim(ACME, 'invoice-pdf') },
-  { at: s(3, 0), size: 'office', subject: { k: 'office', office: HARNESS } },
-  { at: s(3, 8), size: 'follow', subject: bim(SITE, 'pricing-page') },
-  // the clap (3:15-3:18) seen closest (bims m_31230)
-  { at: s(3, 14), size: 'closest', subject: bim(SITE, 'main') },
-  { at: s(3, 20), size: 'wide', subject: { k: 'town' } },
-  // act 5: the day's end, then again
-  { at: s(3, 28), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
-  { at: s(3, 36), size: 'office', subject: { k: 'office', office: HARNESS } },
-  { at: s(3, 44), size: 'follow', subject: bim(SITE, 'i18n') },
-  { at: s(3, 52), size: 'office', subject: { k: 'office', office: ACME } },
-  { at: s(4, 0), size: 'wide', subject: { k: 'town' } },
-  { at: s(4, 8), size: 'office', subject: { k: 'office', office: HARNESS } },
-  { at: s(4, 16), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
-  { at: s(4, 24), size: 'wide', subject: { k: 'town' } },
-  // the seam: a long move from the wide down to 0:00's frame, there by 4:57
-  { at: s(4, 50), size: 'tight', subject: { k: 'spot', office: HARNESS, spot: 'main' }, frame: OPEN_AT, glide: 8.5 },
+  // the entry wave (0-2.4) seen wide, then the glide to kiln (film.ts entryCam): there by 0:02.8;
+  // no lead (the fold's wide holds to the loop's end)
+  { at: 0, size: 'office', subject: kiln, lead: 0 },
+  { at: 4.3, size: 'office', subject: kiln, back: 1.15 },
+  { at: 7.5, size: 'office', subject: kiln },
+  { at: 14, size: 'follow', subject: bim(KILN, 'checkout') },
+  { at: 16.5, size: 'follow', subject: pair(KILN, 'checkout', 'cart') },
+  { at: 20.5, size: 'follow', subject: bim(KILN, 'checkout') },
+  { at: 22.5, size: 'close', subject: bim(KILN, 'checkout') },
+  { at: 25, size: 'follow', subject: bim(KILN, 'checkout'), back: 1.3 },
+  { at: 27.6, size: 'follow', subject: bim(KILN, 'checkout') },
+  { at: 30, size: 'office', subject: kiln },
+  { at: 35, size: 'follow', subject: bim(KILN, 'order-test') },
+  { at: 36.6, size: 'follow', subject: pair(KILN, 'order-test', 'checkout') },
+  // checkout lifts its crate, then the parade to main's queue seen whole
+  { at: 40, size: 'follow', subject: bim(KILN, 'checkout') },
+  { at: 41.5, size: 'office', subject: kiln },
+  // checkout at the queue: '? checkout is ready', the reviewer, its stamp
+  { at: 46, size: 'tight', subject: { k: 'spot', office: KILN, spot: 'main' } },
+  { at: 52.5, size: 'follow', subject: bim(KILN, 'main') },
+  // the shop rises from the crate: a little farther, the bims around live on
+  { at: PAGE.at, size: 'follow', subject: bim(KILN, 'main'), back: 1.4 },
+  // the fold: back to the wide the wave starts from
+  { at: PAGE.fold, size: 'wide', subject: { k: 'town' }, lead: 0, glide: FOLD_S },
 ];

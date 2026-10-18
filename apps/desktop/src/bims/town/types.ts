@@ -111,6 +111,8 @@ export interface TownEntry {
   parts(): TownParts | null;
   /** on: the merged townscape and walls drawn too (for an unseen warm frame), off: hidden again */
   warm(on: boolean): void;
+  /** the loose things drawn again, the merged ones hidden (the hero's fold, then its next loop's build) */
+  hold(): void;
   /** the build is over: the merged townscape and walls drawn from now on, the loose ones dropped */
   settle(): void;
 }

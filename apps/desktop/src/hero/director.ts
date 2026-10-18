@@ -112,8 +112,13 @@ export interface Geometry {
 /** The office a subject is in, null for the town. Pure. */
 export const officeOf = (s: Subject): string | null => (s.k === 'town' ? null : s.office);
 
-/** The cam a shot wants now (its subject where it is now). null: its subject is not there. Pure. */
+/** The cam a shot wants now (its subject where it is now), `back` times farther. null: its subject is not there. Pure. */
 export function shotCam(shot: Shot, g: Geometry): Cam | null {
+  const c = sizedCam(shot, g);
+  return c === null || shot.back === undefined ? c : { ...c, zoom: Math.max(MIN_ZOOM, c.zoom / shot.back) };
+}
+
+function sizedCam(shot: Shot, g: Geometry): Cam | null {
   const s = shot.subject;
   if (shot.size === 'wide' || s.k === 'town') {
     const b = g.town();
@@ -155,7 +160,7 @@ export function shotCam(shot: Shot, g: Geometry): Cam | null {
 export function shotAt(shots: readonly Shot[], T: number): number {
   // the first shot's camera leaves at the end of the loop before (0:00's LEAD_S is 4:58.5)
   const first = shots[0];
-  if (first !== undefined && T >= first.at - LEAD_S + FILM_S) return 0;
+  if (first !== undefined && T >= first.at - (first.lead ?? LEAD_S) + FILM_S) return 0;
   let i = shots.length - 1;
   for (let k = 0; k < shots.length; k++) {
     const s = shots[k];

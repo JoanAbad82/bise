@@ -120,7 +120,7 @@ interface ScapeKit {
 export interface Entry {
   /** move everything to where it is at ms (the renderer draws next); the film's world of `fitScale` town units per css px */
   apply(ms: number, parts: TownParts, fitScale: number): void;
-  /** the build is over: every thing at its own size, the clones dropped */
+  /** the build is over: every thing at its own size (the loose town is kept for the fold and the next loop) */
   finish(parts: TownParts | null): void;
 }
 
@@ -330,7 +330,8 @@ export function makeEntry(): Entry {
       for (const [body, base] of bodies) body.scale.copy(base);
       bodies.clear();
       roots.clear();
-      for (const c of clones.splice(0)) c.dispose();
+      // the wave's materials stay: the loose roads and river keep them for the fold and the next
+      // loop's build (disposed, their program would compile again then: a stall)
     },
   };
 }

@@ -231,6 +231,21 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     });
   }
 
+  /** the entry's loose town drawn (held: the build, the fold), else its merged copies; both kept */
+  function loose(on: boolean): void {
+    if (scape?.loose) {
+      scape.loose.visible = on;
+      scape.merged.group.visible = !on;
+    }
+    for (const s of spots.values()) {
+      if (!s.walls) continue;
+      const w = s.scene.world();
+      if (w) w.visible = on;
+      s.walls.merged.group.visible = !on;
+    }
+    shadowsDirty = true;
+  }
+
   /** the entry's loose townscape out of the scene (its merged copy is drawn from now on) */
   function dropLoose(s: { loose: Group | null; merged: Merged }): void {
     if (!s.loose) return;
@@ -260,9 +275,11 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     const root = buildTownscape(plan, STYLE, pal, isNight ? TOWN_NIGHT : TOWN_DAY, pits);
     const merged = mergeRoot(root, STYLE, STYLE.shadows);
     scene.add(merged.group);
-    if (held) {
-      // the entry build grows the loose things in: the merged copy waits, hidden, for settle()
-      merged.group.visible = false;
+    if (opts.entry === true) {
+      // the entry build grows the loose things in: the merged copy waits, hidden, for settle(); the
+      // loose ones stay for the next hold() (the hero's fold and its next loop's wave)
+      merged.group.visible = !held;
+      root.visible = held;
       scene.add(root);
       scape = { sig: sSig, merged, loose: root };
     } else {
@@ -656,14 +673,12 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       settle() {
         if (!held) return;
         held = false;
-        if (scape) dropLoose(scape);
-        for (const s of spots.values()) {
-          if (!s.walls) continue;
-          const w = s.scene.world();
-          if (w) w.visible = false;
-          s.walls.merged.group.visible = true;
-        }
-        shadowsDirty = true;
+        loose(false);
+      },
+      hold() {
+        if (held) return;
+        held = true;
+        loose(true);
       },
     },
     dispose() {

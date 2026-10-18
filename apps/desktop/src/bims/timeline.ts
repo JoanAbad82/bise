@@ -65,7 +65,17 @@ const STALE_S = 10;
 /** the kinds a sender is in when it can get up for a message or a report: busy in its turn, never asking or failed */
 const CAN_GO: ReadonlySet<Activity['k']> = new Set(['work', 'hot', 'nap', 'snack', 'done']);
 
-export function newTimeline(): Timeline {
+/**
+ * A film's timeline (the hero, bims-film v13); the app passes none. `enterAtSpot`: a new agent pops
+ * at its spot instead of coming in by the door; `spotOf`: a bim's own spot for that activity (the
+ * reviewer beside the first crate), null for the office's.
+ */
+export interface TimelineOpts {
+  readonly enterAtSpot?: boolean;
+  readonly spotOf?: (name: string, o: Office, act: Activity) => Spot | null;
+}
+
+export function newTimeline(opts: TimelineOpts = {}): Timeline {
   const bims = new Map<string, Bim>();
   let office: Office | null = null;
   /** the hub events already played (an event passed again is not played twice) */
@@ -133,7 +143,7 @@ export function newTimeline(): Timeline {
         // the stage too: a skater rides the park as built now, never one a stage behind (a new piece starts a new line)
         const sig = pt && parkSpot ? `skate|${String(pt.slot)}|${pt.pool ? 'pool' : ''}|${pt.nine ? '900' : ''}|${String(pt.stage)}` : sigOf(act);
         const last = b?.segs.at(-1);
-        const fixed = parkSpot ?? fixedSpot(next, name, act);
+        const fixed = opts.spotOf?.(name, next, act) ?? parkSpot ?? fixedSpot(next, name, act);
         // a napper at its desk goes to a bean bag built since (bedFor): the same sig, another place
         // one that stopped beside its spot (another bim stood in its way, avoid.ts) goes on to it; one kept out comes in
         if (b && last && !b.leaving && last.sig === sig && (parkSpot !== undefined || last.act.at === act.at) && !rebuilt && (!fixed || near(fixed, last.spot)) && !aside(last) && last.t <= t) continue;
@@ -148,8 +158,10 @@ export function newTimeline(): Timeline {
           if (shared?.ix !== undefined) b.pref.set(act.at as Shared, shared.ix);
           bims.set(name, b);
           // the office's first look: everyone at their spot; later, a new agent comes in by the door
-          const from = first ? spot : next.door;
-          const [seg, ok] = walk(next, t, act, sig, from, spot, null, first ? null : tracks(b), true, undefined, budget);
+          // (a film's may pop at its spot: opts.enterAtSpot)
+          const atSpot = first || opts.enterAtSpot === true;
+          const from = atSpot ? spot : next.door;
+          const [seg, ok] = walk(next, t, act, sig, from, spot, null, atSpot ? null : tracks(b), true, undefined, budget);
           push(b, dress(seg, pt, undefined));
           if (!ok) later.push({ b, act, sig, from, spot, prev: null, hidden: true, pt, last: undefined, left: null });
           continue;

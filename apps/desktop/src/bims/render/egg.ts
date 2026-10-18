@@ -39,6 +39,14 @@ export function eggRig(rig: Rig, egg: BimEgg | null): Rig {
         const c = 0.35 + Math.sin(s * 6.3) * 0.3;
         return { ...rig, y: Math.max(rig.y, 0), legL: 0, legR: 0, armL: [-1.5, 0, c], armR: [-1.5, 0, -c], mouth: 'laugh', props: { ...rig.props, newspaper: false, sheet: false } };
       }
+      case 'stamp': {
+        // the hero's reviewer (bims-film v9): reads the crate's sheet a second (main's paper), then
+        // its right arm comes up and down on the crate, once, and stays a beat
+        if (s < 1) return { ...rig, props: { ...rig.props, newspaper: true } };
+        const k = Math.min(1, (s - 1) / 0.35);
+        const arm = -1.6 * Math.sin(Math.PI * Math.min(1, k * 0.999 + 0.0001)) - 0.6 * k;
+        return { ...rig, armR: [arm, 0, 0], mouth: 'laugh', props: { ...rig.props, newspaper: false, sheet: false } };
+      }
       case 'dance':
         return { ...rig, armL: [-1.5, 0, 0], armR: [-1.5, 0, 0], body: add(rig.body, [0, 0, Math.sin(s * 6) * 0.2]), y: rig.y + Math.abs(Math.sin(s * 6)) * 0.08 };
       case 'lookup':
