@@ -6,8 +6,10 @@
 // LIVE_MAX at most, show their scene itself, posed live each frame. One hemisphere light and one sun
 // with its soft shadow for the whole town (view.ts). It draws only when frame() is called. In test
 // mode it exposes window.__biseTown = { frames, calls, ms, offices, merged, live, check } for the
-// town's check. Owner: maps-e.
-import { Group, type Material, Vector3 } from 'three';
+// town's check, and window.__biseTownDrawn() (each office: in view, drawn, where, inside the camera's
+// planes) for its camera path. The camera's near and far planes wrap the whole town (town/camera.ts
+// townDepth). Owner: maps-e.
+import { Box3, type BufferGeometry, Group, type Material, Mesh, type Object3D, Vector3 } from 'three';
 import type { Motion } from '../model';
 import type { Step } from '../office-driver';
 import { growSig, NO_GROW } from '../growth';
@@ -21,7 +23,7 @@ import { makeOfficeScene, type OfficeScene } from './office-scene';
 import { makeView } from './view';
 import { pickAt, type Target } from './pick';
 import { TOWN_DAY, TOWN_NIGHT, buildTownscape } from './townscape';
-import { diveFit, townFit } from '../town/camera';
+import { diveFit, townDepth, townFit } from '../town/camera';
 import { siteOf, townSeed } from '../town/ground';
 import { crossings, townPlan, type Placed, type TownPlan } from '../town/plan';
 import type { MakeTownRenderer, TownRenderer, TownSite } from '../town/types';
@@ -47,6 +49,32 @@ interface Probe {
   check: { road: number; river: number };
   /** the live offices' bims on the canvas at the last frame, css px (a check hovers and clicks one) */
   heads: { id: string; name: string; x: number; y: number; feet: number }[];
+}
+
+interface Drawn {
+  id: string;
+  inView: boolean;
+  shown: boolean;
+  live: boolean;
+  fp: { x0: number; x1: number; z0: number; z1: number };
+  box: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number } | null;
+  /** the box's depth from the camera, and the camera's clipping planes */
+  depth: { min: number; max: number; near: number; far: number } | null;
+}
+
+/** the world box of what is drawn under `obj`: its visible meshes only (a live office's hidden world left out) */
+function drawnBox(obj: Object3D): Box3 | null {
+  obj.updateMatrixWorld(true);
+  const out = new Box3();
+  const one = new Box3();
+  obj.traverseVisible((o) => {
+    if (!(o instanceof Mesh)) return;
+    const g = o.geometry as BufferGeometry;
+    if (g.boundingBox === null) g.computeBoundingBox();
+    if (g.boundingBox === null) return;
+    out.union(one.copy(g.boundingBox).applyMatrix4(o.matrixWorld));
+  });
+  return out.isEmpty() ? null : out;
 }
 
 /** one office of the town: its scene, its bake from afar (and the still pose it was baked from) */
@@ -137,9 +165,13 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     dropWalls(s);
     const at = s.scene.root.position.clone();
     s.scene.root.position.set(0, 0, 0);
+    // mergeRoot(w) refreshes w's matrices from its parent's: the root's own, at 0 now, first (else a
+    // walls bake made after the office was drawn carries its place twice: the walls off their bims)
+    s.scene.root.updateMatrixWorld(true);
     w.visible = true;
     const merged = mergeRoot(w, STYLE, STYLE.shadows);
     s.scene.root.position.copy(at);
+    s.scene.root.updateMatrixWorld(true);
     for (const c of merged.group.children) {
       const m = (c as unknown as { material: Material }).material;
       if (m !== merged.baked) (c as unknown as { material: Material }).material = m.clone();
@@ -299,6 +331,13 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     const f = shownFit();
     if (!f) return;
     v3.look(f);
+    if (plan) {
+      // the clipping planes round the whole town (town/camera.ts townDepth): view.ts's fixed near plane cut its front offices off
+      const { near, far } = townDepth(plan, f.target);
+      v3.camera.near = near;
+      v3.camera.far = far;
+      v3.camera.updateProjectionMatrix();
+    }
     v3.size(f);
     aimSun(f);
   }
@@ -322,6 +361,43 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
     const y1 = Math.max(...corners.map((c) => c.y));
     return x1 > 0 && x0 < f.widthPx && y1 > 0 && y0 < f.heightPx;
   }
+
+  /**
+   * test mode, asked by the camera-path check (window.__biseTownDrawn, never per frame): each office now,
+   * whether its ground is in view, whether something of it is drawn, where (its visible meshes' world
+   * box) and that box's depth against the camera's near and far
+   */
+  function drawnNow(): Drawn[] {
+    const f = shownFit();
+    if (!f || !plan) return [];
+    const cam = v3.camera;
+    cam.updateMatrixWorld();
+    const q = new Vector3();
+    return plan.offices.map((p): Drawn => {
+      const s = spots.get(p.id);
+      const obj = s?.live === true ? s.scene.root : s?.bake?.holder.visible === true ? s.bake.holder : null;
+      const shown = obj !== null && obj.parent === scene;
+      const b = shown ? drawnBox(obj) : null;
+      let depth: Drawn['depth'] = null;
+      if (b) {
+        let min = Infinity;
+        let max = -Infinity;
+        for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+          const d = -q.set(x, y, z).applyMatrix4(cam.matrixWorldInverse).z;
+          min = Math.min(min, d);
+          max = Math.max(max, d);
+        }
+        depth = { min, max, near: cam.near, far: cam.far };
+      }
+      return {
+        id: p.id, inView: inView(f, p), shown, live: s?.live === true, fp: { ...p.fp },
+        box: b ? { x0: b.min.x, x1: b.max.x, y0: b.min.y, y1: b.max.y, z0: b.min.z, z1: b.max.z } : null,
+        depth,
+      };
+    });
+  }
+
+  if (probe) (window as unknown as { __biseTownDrawn?: () => Drawn[] }).__biseTownDrawn = drawnNow;
 
   const api: TownRenderer = {
     setTown(os) {
@@ -518,6 +594,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas) => {
       }
       v3.dispose();
       if (probe) delete (window as unknown as { __biseTown?: Probe }).__biseTown;
+      if (probe) delete (window as unknown as { __biseTownDrawn?: unknown }).__biseTownDrawn;
     },
   };
   return api;

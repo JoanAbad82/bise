@@ -166,3 +166,39 @@ describe('town plan: bise\'s home at the heart (bims m_29650)', () => {
     expect(home.doorX).toBe(plain.doorX);
   });
 });
+
+describe('town plan: the town grows, offices never meet (town-fix, 1..40 projects)', () => {
+  /** room kept between two offices' grounds, office units */
+  const APART = 1;
+  it('keeps every office apart (a margin between grounds), off the road and the river, inside the lawn, for 1..40 projects of every stage', () => {
+    for (let n = 1; n <= 40; n++) {
+      for (let s = 0; s < 3; s++) {
+        const ss = sites(n, n * 37 + s);
+        const plan = townPlan(ss, townSeed(ss.map((x) => x.id)) + s);
+        const at = `${String(n)} projects, draw ${String(s)}`;
+        expect(plan.offices, at).toHaveLength(n);
+        expect(crossings(plan), at).toEqual({ road: 0, river: 0 });
+        plan.offices.forEach((a, i) => {
+          for (const b of plan.offices.slice(i + 1)) {
+            const meet = a.fp.x0 - APART < b.fp.x1 && b.fp.x0 - APART < a.fp.x1 && a.fp.z0 - APART < b.fp.z1 && b.fp.z0 - APART < a.fp.z1;
+            expect(meet, `${at}: ${a.id} and ${b.id} meet`).toBe(false);
+          }
+          // the town's ground grew to hold it
+          expect(a.fp.x0 > plan.lawn.x0 && a.fp.x1 < plan.lawn.x1 && a.fp.z0 > plan.lawn.z0 && a.fp.z1 < plan.lawn.z1, `${at}: ${a.id} off the lawn`).toBe(true);
+        });
+      }
+    }
+  }, 120_000);
+
+  it('grows its lawn as projects come: a bigger town never smaller than the one before it', () => {
+    const all = sites(40, 4242);
+    let prev = 0;
+    for (let n = 1; n <= 40; n++) {
+      const ss = all.slice(0, n);
+      const { lawn } = townPlan(ss, townSeed(ss.map((x) => x.id)));
+      const area = (lawn.x1 - lawn.x0) * (lawn.z1 - lawn.z0);
+      expect(area, `${String(n)} projects`).toBeGreaterThanOrEqual(prev * 0.8);
+      prev = Math.max(prev, area);
+    }
+  }, 60_000);
+});

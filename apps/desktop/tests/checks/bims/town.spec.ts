@@ -91,6 +91,10 @@ function townWorld(ps: readonly Fake[], theme: 'light' | 'dark'): Record<string,
 }
 
 type TownProbe = { frames: number; calls: number; ms: number; offices: number; merged: { from: number; to: number }; live: string[]; recent: number[]; check: { road: number; river: number }; heads: { id: string; name: string; x: number; y: number; feet: number }[] };
+/** each office now (render/town.ts drawnNow): its ground in view, what of it is drawn, where, its depth against the camera's planes */
+type Drawn = { id: string; inView: boolean; shown: boolean; live: boolean; fp: { x0: number; x1: number; z0: number; z1: number }; box: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number } | null; depth: { min: number; max: number; near: number; far: number } | null };
+const drawnNow = (s: Session): Promise<Drawn[]> =>
+  s.page.evaluate(() => (window as unknown as { __biseTownDrawn?: () => Drawn[] }).__biseTownDrawn?.() ?? []);
 const probe = (s: Session): Promise<TownProbe | null> =>
   s.page.evaluate(() => (window as unknown as { __biseTown?: TownProbe }).__biseTown ?? null);
 
@@ -367,6 +371,80 @@ test('(town) zoomed in, blurred or hidden: no frame; signs never overlap', async
     await s.close();
   }
 });
+
+/** how far an office's drawn box may pass its ground (its plan footprint), world units: a roof's eave, a tree's crown */
+const DRAWN_MARGIN = 1.5;
+
+/** what is wrong with the offices in view at this frame: not drawn, drawn off its ground, or cut by the camera's near or far plane */
+async function drawnFaults(s: Session, where: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const d of await drawnNow(s)) {
+    if (!d.inView) continue;
+    const at = `${where}: ${d.id}${d.live ? ' (live)' : ''}`;
+    if (!d.shown || d.box === null || d.depth === null) {
+      out.push(`${at} in view, not drawn`);
+      continue;
+    }
+    const b = d.box;
+    const m = DRAWN_MARGIN;
+    if (b.x0 < d.fp.x0 - m || b.x1 > d.fp.x1 + m || b.z0 < d.fp.z0 - m || b.z1 > d.fp.z1 + m) {
+      out.push(`${at} drawn off its ground: x ${b.x0.toFixed(1)}..${b.x1.toFixed(1)} z ${b.z0.toFixed(1)}..${b.z1.toFixed(1)}, its ground x ${d.fp.x0.toFixed(1)}..${d.fp.x1.toFixed(1)} z ${d.fp.z0.toFixed(1)}..${d.fp.z1.toFixed(1)}`);
+    }
+    if (d.depth.min < d.depth.near || d.depth.max > d.depth.far) {
+      out.push(`${at} cut by the camera: depth ${d.depth.min.toFixed(1)}..${d.depth.max.toFixed(1)}, near ${d.depth.near.toFixed(1)} far ${d.depth.far.toFixed(1)}`);
+    }
+  }
+  return out;
+}
+
+// 12 and 20: the check; 3 and 25 (20 drawn, TOWN_MAX): bims' shots too
+for (const n of [3, 12, 20, 25]) {
+  test(`(town) ${String(n)} projects, a camera path: every office in view drawn whole, on its own ground`, async () => {
+    const ps = fakes(n);
+    const { s, core } = await openTown(ps, 'light');
+    try {
+      await showTown(s);
+      await settled(s);
+      const faults: string[] = [...(await drawnFaults(s, 'fit'))];
+      await shot(s, 'app.right.bims.town', `town-${String(n)}-path-fit.png`, `town, ${String(n)} projects, the whole town`, 'every office drawn, the ones nearest the camera (bottom) too');
+      const all = await drawnNow(s);
+      expect(all.length, 'the offices drawn (TOWN_MAX at most)').toBeGreaterThan(Math.min(n, 12));
+      expect(all.filter((d) => !d.inView).map((d) => d.id), 'at the fit every office is in view').toEqual([]);
+      const near = Math.min(...all.map((d) => (d.depth ? d.depth.min - d.depth.near : 999)));
+      console.log(`town ${String(n)}: nearest office ${near.toFixed(1)} past the near plane`);
+      const town = s.page.getByTestId('app.right.bims.town');
+      const box = await town.boundingBox();
+      if (box === null) throw new Error('no town');
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      // pinched in past the live zoom, then a tour: the four corners and back through the middle
+      for (let i = 0; i < 6; i++) await trackpad(s.cdp, cx, cy, { dy: -20, pinch: true });
+      await expect(town).toHaveAttribute('data-zoomed', 'true');
+      const path: [string, number, number][] = [['middle', 0, 0], ['top left', -1, -1], ['top right', 1, -1], ['bottom right', 1, 1], ['bottom left', -1, 1], ['bottom', 0, 1]];
+      for (const [name, dx, dy] of path) {
+        // two fingers: many small steps to the edge (the pan stops at the town's)
+        for (let i = 0; i < 12; i++) await trackpad(s.cdp, cx, cy, { dx: dx * 80, dy: dy * 80 });
+        if (dx === 0 && dy === 0) await sleep(300);
+        await settled(s, 600, 6000);
+        faults.push(...(await drawnFaults(s, name)));
+        if (name === 'middle') {
+          // a live office's desks light up and go dark (its agents start and stop): its walls baked again in place
+          const live = (await probe(s))?.live ?? [];
+          for (const status of ['working', 'idle'] as const) {
+            for (const p of ps.filter((x) => live.includes(x.id))) await core.send({ ev: 'agents', project: p.id, agents: p.agents.map((a) => ({ ...a, status })), places: [] } as never);
+            await sleep(400);
+            await settled(s, 600, 6000);
+            faults.push(...(await drawnFaults(s, `middle, ${status}`)));
+          }
+        }
+        if (name === 'middle') await shot(s, 'app.right.bims.town', `town-${String(n)}-path-middle.png`, `town, ${String(n)} projects, pinched in at its middle, desks lit and dark again`, 'the live offices whole, their walls on their own ground under their bims');
+      }
+      expect(faults, 'every office in view drawn whole, on its own ground').toEqual([]);
+    } finally {
+      await s.close();
+    }
+  });
+}
 
 test('(town) a lost WebGL context shows the line', async () => {
   const { s } = await openTown(fakes(3), 'light');
