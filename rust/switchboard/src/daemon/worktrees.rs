@@ -25,7 +25,7 @@ impl Shell {
     /// Scan the worktrees in a thread; `worktrees` goes `to` (an answer,
     /// or a hub-wide notification).
     pub(super) fn worktrees_typed(&mut self, to: Typed) {
-        if to.is_empty() {
+        if self.nobody(&to) {
             return;
         }
         let shared = PathBuf::from(&self.hub.workspace);

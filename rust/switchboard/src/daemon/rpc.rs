@@ -97,16 +97,14 @@ struct Pending {
 }
 
 /// Where a thread's typed event goes: the answer to one connection's
-/// request (or hello), or a hub-wide notification to these connections.
+/// request (or hello), or a hub-wide notification to every typed
+/// connection open when it reaches the loop. Never the ones open when
+/// the thread started: a connection that said `initialize` while the
+/// scan ran would miss a number the watermark moved past (rpc_e2e's
+/// 'no gap' red: 15, 18 after 13, the worktrees and dev_servers scans).
 pub(super) enum Typed {
     Answer(ClientId),
-    All(Vec<ClientId>),
-}
-
-impl Typed {
-    pub(super) fn is_empty(&self) -> bool {
-        matches!(self, Typed::All(ids) if ids.is_empty())
-    }
+    All,
 }
 
 impl Rpcs {
@@ -280,12 +278,11 @@ impl Shell {
                 None => missing.push(*kind),
             }
         }
-        let ids = self.typed_ids();
         for kind in missing {
             match kind {
-                "worktrees" => self.worktrees_typed(Typed::All(ids.clone())),
-                "dev_servers" => self.dev_servers_typed(Typed::All(ids.clone())),
-                _ => self.merged_typed(Typed::All(ids.clone())),
+                "worktrees" => self.worktrees_typed(Typed::All),
+                "dev_servers" => self.dev_servers_typed(Typed::All),
+                _ => self.merged_typed(Typed::All),
             }
         }
         let state = evs.iter().filter_map(|e| rpc::note(e, None)).collect();
@@ -392,7 +389,10 @@ impl Shell {
         let Ok(ev) = HubEv::from_value(v) else { return };
         match to {
             Typed::Answer(id) => self.proto_send(id, &ev),
-            Typed::All(ids) => self.proto_note(&ids, &ev),
+            Typed::All => {
+                let ids = self.typed_ids();
+                self.proto_note(&ids, &ev);
+            }
         }
     }
 

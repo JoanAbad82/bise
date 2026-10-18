@@ -25,12 +25,11 @@ impl Shell {
     /// Today's merged list to every typed connection (a feature merged:
     /// `Effect::MergedChanged`).
     pub(super) fn merged_all(&mut self) {
-        let ids = self.typed_ids();
-        self.merged_typed(Typed::All(ids));
+        self.merged_typed(Typed::All);
     }
 
     pub(super) fn merged_typed(&mut self, to: Typed) {
-        if to.is_empty() {
+        if self.nobody(&to) {
             return;
         }
         let shared = PathBuf::from(&self.hub.workspace);

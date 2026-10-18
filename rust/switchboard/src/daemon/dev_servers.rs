@@ -20,7 +20,7 @@ impl Shell {
     /// Read the jobs and their ports in a thread; `dev_servers` goes to
     /// each of `ids`.
     pub(super) fn dev_servers_typed(&mut self, to: Typed) {
-        if to.is_empty() {
+        if self.nobody(&to) {
             return;
         }
         let bgs: Vec<(String, PathBuf)> = self

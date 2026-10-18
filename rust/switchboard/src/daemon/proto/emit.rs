@@ -256,8 +256,8 @@ impl Shell {
         let key = self.worktrees_key();
         if key != self.proto.worktrees {
             self.proto.worktrees = key;
-            self.worktrees_typed(Typed::All(ids.clone()));
-            self.dev_servers_typed(Typed::All(ids.clone()));
+            self.worktrees_typed(Typed::All);
+            self.dev_servers_typed(Typed::All);
         }
     }
 

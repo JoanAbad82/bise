@@ -283,6 +283,12 @@ impl Shell {
         self.proto.conns.keys().copied().filter(|id| self.clients.contains_key(id)).collect()
     }
 
+    /// A thread's event that nobody would get now: a hub-wide one with
+    /// no typed connection open (its scan is not worth starting).
+    pub(super) fn nobody(&self, to: &super::rpc::Typed) -> bool {
+        matches!(to, super::rpc::Typed::All) && self.typed_ids().is_empty()
+    }
+
     pub(super) fn proto_error(&mut self, id: ClientId, cmd: &str, text: &str) {
         self.proto_error_cid(id, cmd, text, None, None);
     }
