@@ -62,6 +62,17 @@ describe('his messages, in his words', () => {
     expect(rows(w)).toEqual(['deploy · sending']);
   });
 
+  it('try again on a queued message with a file sends it as it was: the same words, queued, the same file', () => {
+    const w = feature(T0).does(send(ACME, 'perf', 'after your turn: read this', { mode: 'queued', files: ['/Users/camille/acme/notes.md'] }));
+    w.given(sendError(ACME, 'the hub is busy', 1, 'refused'));
+    w.does(resend(ACME, 'perf', 1));
+    expect(sends(w)).toEqual([
+      { cmd: 'send', project: ACME, agent: 'perf', text: 'after your turn: read this', mode: 'queued', files: ['/Users/camille/acme/notes.md'], cid: 1 },
+      { cmd: 'send', project: ACME, agent: 'perf', text: 'after your turn: read this', mode: 'queued', files: ['/Users/camille/acme/notes.md'], cid: 2 },
+    ]);
+    expect(rows(w, 'perf')).toEqual(['after your turn: read this · sending']);
+  });
+
   it('a send the hub could not deliver (undelivered, its cid) leaves the thread, nothing to retry', () => {
     const w = feature(T0).does(send(ACME, 'perf', 'are you there?'));
     w.given(sendError(ACME, '@perf is archived: not delivered', 1, 'undelivered'));
