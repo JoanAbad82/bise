@@ -246,7 +246,7 @@ export const FEED: readonly Line[] = [
   { at: 29, who: 'you', words: 'EU only', plane: 30 },
   { at: 34.5, who: 'you', words: 'make it warm, like paper', plane: 36, tick: 56.2 },
   { at: 35.1, who: 'you', words: 'test the whole checkout before you ship', plane: 37.5, tick: 56.3 },
-  { at: 52, who: 'ask', bim: 'checkout', words: 'checkout is ready', choices: ['ship it', 'review it for me'], pick: { at: 53.4, n: 2 }, until: 53.6 },
+  { at: 52, who: 'ask', bim: 'checkout', words: 'ship it, or review it first?', choices: ['ship it', 'review it for me'], pick: { at: 53.4, n: 2 }, until: 53.6 },
   { at: 60.2, who: 'bise', words: 'all done. it runs on localhost:5173', tick: 60.2 },
 ];
 
@@ -272,27 +272,32 @@ export const STAMP = { at: 58.9, office: KILN, on: 'checkout' } as const;
 const bim = (office: string, name: string): Subject => ({ k: 'bim', office, name });
 const pair = (office: string, a: string, b: string): Subject => ({ k: 'pair', office, names: [a, b] });
 const kiln: Subject = { k: 'office', office: KILN };
+/** where the catcher sits while a plane from the feed (bottom left, run.ts FEED_X) flies to it: its path across the frame */
+export const FLIGHT_FRAME = { x: 0.7, y: 0.36 } as const;
 
 /** no cut: every move a glide (expo in-out); the camera leaves ~1 s before the action (bims-film v9) */
 export const SHOTS: readonly Shot[] = [
   // the entry wave (0-2.4) seen wide, then the glide to kiln (film.ts entryCam): there by 0:02.8;
   // no lead (the fold's wide holds to the loop's end)
   { at: 0, size: 'office', subject: kiln, lead: 0 },
-  { at: 4.3, size: 'office', subject: kiln, back: 1.15 },
-  { at: 7.6, size: 'office', subject: kiln },
+  // the first plane: its path held at FOLLOW, main up right, the feed's corner below left, so the
+  // plane crosses the frame at ~30-40 px (bims m_32000, designer m_31992); back to the OFFICE on its catch (0:07.3)
+  { at: 4.3, size: 'follow', subject: bim(KILN, 'main'), frame: FLIGHT_FRAME },
+  { at: 7.6, size: 'office', subject: kiln, lead: 0.3 },
   { at: 15.5, size: 'follow', subject: bim(KILN, 'checkout') },
   { at: 19, size: 'follow', subject: pair(KILN, 'checkout', 'cart') },
   { at: 23, size: 'follow', subject: bim(KILN, 'checkout') },
   { at: 26.8, size: 'close', subject: bim(KILN, 'checkout') },
-  { at: 29, size: 'follow', subject: bim(KILN, 'checkout'), back: 1.3 },
-  { at: 32.8, size: 'follow', subject: bim(KILN, 'checkout') },
+  // his answer's plane: the same framing on checkout, then checkout in the middle once it caught it
+  { at: 29, size: 'follow', subject: bim(KILN, 'checkout'), frame: FLIGHT_FRAME },
+  { at: 32.8, size: 'follow', subject: bim(KILN, 'checkout'), lead: 0 },
   { at: 34.5, size: 'office', subject: kiln },
   { at: 41, size: 'follow', subject: bim(KILN, 'order-test') },
   { at: 43.2, size: 'follow', subject: pair(KILN, 'order-test', 'checkout') },
   // checkout lifts its crate, then the parade to main's queue seen whole
   { at: 46, size: 'follow', subject: bim(KILN, 'checkout') },
   { at: 47.5, size: 'office', subject: kiln },
-  // checkout at the queue: '? checkout is ready', the reviewer, its stamp
+  // checkout at the queue: '? checkout · ship it, or review it first?', the reviewer, its stamp
   { at: 52, size: 'tight', subject: { k: 'spot', office: KILN, spot: 'main' } },
   { at: 59.7, size: 'follow', subject: bim(KILN, 'main') },
   // the shop rises from the crate: a little farther, the bims around live on

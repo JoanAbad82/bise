@@ -20,7 +20,8 @@
   --bh-soft: #ebe4d6;
   --bh-win: #fdfbf7;
   --bh-line: #1d1a1714;
-  --bh-text2: #5a5349;
+  /* bise's words: ink, a step softer than his, never faint (designer m_31992) */
+  --bh-text2: #4a443c;
   /* the app's spacing tokens (src/ds/tokens.css) the page has none of: the tip look's */
   --s-1: 4px;
   --pad-pill: 3px;
@@ -33,7 +34,7 @@ html.pd .bims-hero {
   --bh-soft: #1e1b18;
   --bh-win: #1f1c19;
   --bh-line: #ece6da1f;
-  --bh-text2: #b8b0a3;
+  --bh-text2: #cfc8bc;
 }
 .bims-hero .bh-canvas {
   position: absolute;
