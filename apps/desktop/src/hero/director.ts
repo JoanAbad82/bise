@@ -30,13 +30,13 @@ export const MAX_ZOOM = 14;
 /** where the subject sits, fractions of the frame: the town's middle, past the fade on the left */
 export const SAFE = { x: 0.575, y: 0.5 } as const;
 /** what a whole-town or a whole-office shot fits into, fractions of the frame */
-/** the wide: the offices' bounding box centred at ~58% across, past the box's 22% fade (designer m_31061) */
-export const WIDE_BOX = { x0: 0.27, x1: 0.89, y0: 0.12, y1: 0.9 } as const;
+/** the wide: the offices' bounding box centred at ~58% across, past the box's 22% fade (designer m_31061), the band at mid height (bims m_31230) */
+export const WIDE_BOX = { x0: 0.27, x1: 0.89, y0: 0.11, y1: 0.89 } as const;
 export const OFFICE_BOX = { x0: 0.3, x1: 0.85, y0: 0.1, y1: 0.9 } as const;
 /** an OFFICE shot this much closer than its box's fit (bims m_31057: the office ~70% of the frame) */
 export const OFFICE_TIGHT = 1.3;
 /** each size past OFFICE: how much closer than that office's own OFFICE shot */
-export const CLOSER: Readonly<Record<Exclude<Size, 'wide' | 'office'>, number>> = { tight: 1.4, follow: 2.2, close: 3.2 };
+export const CLOSER: Readonly<Record<Exclude<Size, 'wide' | 'office'>, number>> = { tight: 1.4, follow: 2.2, close: 3.2, closest: 4 };
 
 /** a rectangle on the fit, fractions (u right, v down) */
 export interface Box {
@@ -54,8 +54,11 @@ export interface At {
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
 
-/** the farthest the camera goes: a little past the town's fit, so the wide can centre the offices (the fit shows the whole lawn) */
-export const MIN_ZOOM = 0.75;
+/**
+ * the farthest the camera goes: just past the town's fit. the renderer shows its plain fit for any
+ * zoom ≤ 1 and drops the pan (zoom.ts atFit), so the wide stays above 1 to centre the offices
+ */
+export const MIN_ZOOM = 1.001;
 /** how far past the town's fit the view may slide, fractions of the view (the page's paper shows there) */
 export const PAST = 0.2;
 

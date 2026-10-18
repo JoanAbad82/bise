@@ -73,8 +73,8 @@ export interface Egg {
   readonly kind: EggKind;
 }
 
-/** the shot sizes (bims-film): the three offices, one office (tight: closer), a bim followed, a close-up */
-export type Size = 'wide' | 'office' | 'tight' | 'follow' | 'close';
+/** the shot sizes (bims-film): the three offices, one office (tight: closer), a bim followed, a close-up, the clap's (×4) */
+export type Size = 'wide' | 'office' | 'tight' | 'follow' | 'close' | 'closest';
 
 /** what a shot frames: the town, an office, a spot of an office, a bim (its name shown), two bims (no name) */
 export type Subject =
@@ -213,7 +213,9 @@ export const SHOTS: readonly Shot[] = [
   { at: s(3, 38), size: 'close', subject: bim(HARNESS, 'main') },
   { at: s(3, 52), size: 'follow', subject: bim(SITE, 'og-images') },
   { at: s(3, 56), size: 'wide', subject: { k: 'town' } },
-  { at: s(4, 2), size: 'close', subject: bim(SITE, 'main') },
+  // the clap (4:05-4:08) seen closest, then back to the close-up (bims m_31230)
+  { at: s(4, 2), size: 'closest', subject: bim(SITE, 'main') },
+  { at: s(4, 8), size: 'close', subject: bim(SITE, 'main') },
   { at: s(4, 16), size: 'follow', subject: bim(HARNESS, 'dark-mode') },
   { at: s(4, 30), size: 'follow', subject: bim(HARNESS, 'signup-flow') },
   { at: s(4, 44), size: 'wide', subject: { k: 'town' } },

@@ -3,7 +3,7 @@
 // safe frame, and the visitor keeps the camera until he lets it go.
 import { describe, expect, it } from 'vitest';
 import { FILM_S, SHOTS } from './cast';
-import { aimCam, fitCam, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, LEAD_S, resumes, RESUME_IDLE_S, SAFE, shotAt, springStep, still } from './director';
+import { aimCam, fitCam, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, LEAD_S, MIN_ZOOM, resumes, RESUME_IDLE_S, SAFE, shotAt, springStep, still } from './director';
 import { panAround, zoomAround } from './gestures';
 import { eggWords } from './overlay';
 
@@ -62,7 +62,7 @@ describe('the camera', () => {
 
   it('never leaves the town', () => {
     const c = holdCam({ zoom: 0.2, u: -3, v: 9 });
-    expect(c.zoom).toBe(0.75);
+    expect(c.zoom).toBe(MIN_ZOOM);
     // farther than the fit: the whole fit stays in view
     expect(inFrame(c, { u: 0, v: 0 }).u).toBeGreaterThanOrEqual(-0.2 - 1e-9);
     expect(inFrame(c, { u: 1, v: 1 }).v).toBeLessThanOrEqual(1.2 + 1e-9);

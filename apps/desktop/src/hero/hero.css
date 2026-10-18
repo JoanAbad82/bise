@@ -15,6 +15,9 @@
   --bh-accent: #e0607a;
   --bh-err: #d24b3e;
   --bh-on: #fff;
+  /* the app's spacing tokens (src/ds/tokens.css) the page has none of: the tip look's */
+  --s-1: 4px;
+  --pad-pill: 3px;
 }
 html.pd .bims-hero {
   --bh-text: #ece6da;
@@ -46,8 +49,8 @@ html.pd .bims-hero {
   left: 0;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding-bottom: 4px;
+  gap: var(--s-1);
+  padding-bottom: var(--s-1);
   white-space: nowrap;
   will-change: transform;
   z-index: 1;
@@ -56,7 +59,7 @@ html.pd .bims-hero {
   z-index: 2;
 }
 .bims-hero .bh-label {
-  padding: 0 4px;
+  padding: 0 var(--s-1);
   border-radius: 4px;
   background: color-mix(in srgb, var(--bh-paper) 85%, transparent);
   color: var(--bh-text);
@@ -70,7 +73,7 @@ html.pd .bims-hero {
   place-items: center;
   min-width: 16px;
   height: 16px;
-  padding: 0 3px;
+  padding: 0 var(--pad-pill);
   border-radius: 999px;
   font: 600 11px / 1 ui-monospace, 'SF Mono', Menlo, monospace;
   color: var(--bh-on);

@@ -360,7 +360,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     if (hover !== null) return hover;
     if (hands.k === 'visitor') return hands.follow ? { id: hands.follow.office, name: hands.follow.name } : null;
     const shot = SHOTS[shotIx];
-    if (!shot || shot.subject.k !== 'bim' || (shot.size !== 'follow' && shot.size !== 'close')) return null;
+    if (!shot || shot.subject.k !== 'bim' || (shot.size !== 'follow' && shot.size !== 'close' && shot.size !== 'closest')) return null;
     return { id: shot.subject.office, name: shot.subject.name };
   }
 
