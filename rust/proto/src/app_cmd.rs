@@ -132,8 +132,12 @@ pub enum AppCmd {
     TalkCancel,
     /// the talk's still is dropped (his ✕ on it, ambient-lead m_21912):
     /// the core forgets it, says `shot {file: null}`, and the talk goes on
-    /// with his words only
-    ShotDrop,
+    /// with his words only. `id`: only that still (the spotlight closed
+    /// on it), never a newer one; none: whatever still is pending
+    ShotDrop {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<u64>,
+    },
     /// the composer's mic (bar I): the core opens the mic and dictates
     /// into the window that sent this, never to main, never journaled;
     /// `id`: the window's short-lived id, echoed on each `dictation`. One

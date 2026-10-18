@@ -450,7 +450,7 @@ fn send_goes_to_main_with_the_shot_as_a_captioned_image_part_kept_after_the_turn
     let png = t.dir.join("front.png");
     std::fs::write(&png, b"\x89PNG fake").unwrap();
     t.cmd(Cmd::Shot { path: png, app: "Chrome".into(), title: "localhost:4801/settings".into() });
-    t.cmd(Cmd::ShotDrop);
+    t.cmd(Cmd::ShotDrop { id: None });
     assert!(b64.exists(), "a dropped still never deletes a sent one's file");
 }
 
@@ -474,13 +474,13 @@ fn the_talks_still_is_told_to_the_app_and_his_drop_forgets_it() {
     let first = shot(&mut t, "cold bench");
     assert!(first.exists(), "the still is in the image store");
     // his ✕: forgotten, the app told, nothing of it in the send
-    t.cmd(Cmd::ShotDrop);
+    t.cmd(Cmd::ShotDrop { id: None });
     assert!(t.take().contains(&json!({"ev": "shot", "file": null})));
     assert!(!first.exists(), "a dropped still is forgotten");
     t.cmd(Cmd::Send { text: "why is it slow?".into() });
     assert_eq!(t.hub.next()["text"], "why is it slow?");
     // a drop with no still says nothing
-    t.cmd(Cmd::ShotDrop);
+    t.cmd(Cmd::ShotDrop { id: None });
     assert!(!t.take().iter().any(|v| v["ev"] == "shot"));
     // sent: the app is told it went
     shot(&mut t, "warm bench");

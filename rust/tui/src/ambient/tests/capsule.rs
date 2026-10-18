@@ -346,3 +346,55 @@ fn no_voice_model_keeps_the_text() {
     assert!(has(&out, "error") && has(&out, "main"));
     assert_eq!(t_synths(&t), 0);
 }
+
+/// spot-shot (architect m_31929): the spotlight's send names the still it
+/// showed (`shot: id`): that still is its first image part, his words a
+/// text part after it, the `shot` field never reaches the hub; a stale id
+/// sends his words alone and says so; `shot_drop {id}` drops only that
+/// still and deletes its file.
+#[test]
+fn a_spotlight_send_carries_the_still_it_names_and_only_that_one() {
+    use super::hubs::{typed, world};
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    let shot = |t: &mut T, title: &str| -> (u64, PathBuf) {
+        let png = t.dir.join("front.png");
+        std::fs::write(&png, [b"\x89PNG ".as_slice(), title.as_bytes()].concat()).unwrap();
+        t.cmd(Cmd::Shot { path: png, app: "Safari".into(), title: title.into() });
+        let out = t.take();
+        let ev = out.iter().find(|v| v["ev"] == "shot").cloned().unwrap_or_else(|| panic!("no shot event: {out:?}"));
+        (ev["id"].as_u64().expect("its id"), PathBuf::from(ev["file"].as_str().expect("its file")))
+    };
+    let send = |id: u64| json!({"cmd": "send", "project": "shop", "agent": "main", "text": "why red?", "mode": "now", "via": "capsule", "shot": id});
+    // the still it showed: its image part first, his words after, no `shot`
+    let (id, file) = shot(&mut t, "cold bench");
+    typed(&mut t, send(id));
+    let got = w.end("shop").next();
+    assert!(got.get("shot").is_none(), "the core's field never reaches the hub: {got}");
+    assert_eq!((got["text"].as_str(), got["via"].as_str()), (Some(""), Some("capsule")));
+    let parts: Vec<bise_proto::parts::Part> = serde_json::from_value(got["parts"].clone()).expect("parts");
+    let bise_proto::parts::Part::Image { source, caption, .. } = &parts[0] else { panic!("{parts:?}") };
+    assert_eq!((PathBuf::from(source), caption.as_str()), (file.clone(), "Safari · cold bench"));
+    assert_eq!(parts[1], bise_proto::parts::Part::Text { text: "why red?".into() });
+    assert!(t.take().contains(&json!({"ev": "shot", "file": null})));
+    assert!(file.exists(), "a sent still stays with his message");
+    // a stale id (a newer still replaced it): his words alone, and said
+    let (old, _) = shot(&mut t, "warm bench");
+    let (new, newer) = shot(&mut t, "hot bench");
+    assert_ne!(old, new);
+    typed(&mut t, send(old));
+    let got = w.end("shop").next();
+    assert_eq!((got["text"].as_str(), got.get("parts")), (Some("why red?"), None), "never another still: {got}");
+    assert!(t.take().iter().any(|v| v["ev"] == "notice" && v["text"] == crate::ambient::core::SHOT_GONE));
+    // the spotlight closed on an older still: the newer one stays
+    t.cmd(Cmd::ShotDrop { id: Some(old) });
+    assert!(newer.exists() && !t.take().iter().any(|v| v["ev"] == "shot"));
+    // closed on this one: dropped, its file deleted
+    t.cmd(Cmd::ShotDrop { id: Some(new) });
+    assert!(t.take().contains(&json!({"ev": "shot", "file": null})));
+    assert!(!newer.exists(), "a dropped still leaves no file");
+}

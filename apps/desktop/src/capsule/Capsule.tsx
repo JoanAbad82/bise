@@ -29,7 +29,8 @@ import type { View } from "./machine";
 import { beatOf, presenceOf } from "./presence";
 import type { PreviewLine } from "@/spotlight/preview";
 import type { Part } from "@/proto";
-import { ScreenAsk, ShotRow, type TalkShot } from "./shot";
+import { ScreenAsk, ShotRow, shotName, type TalkShot } from "./shot";
+import { fileUrl } from "@/thread/rows";
 import { TrayMenu } from "./TrayMenu";
 import "./capsule.css";
 
@@ -89,6 +90,8 @@ export interface CapsuleProps {
   readonly shot?: TalkShot | null;
   /** fn ⌫ or the chip's ✕: the still goes, the talk goes on ({cmd:'shot_drop'}). */
   readonly onShotDrop?: () => void;
+  /** The spotlight's 'no screenshot' chip: his switch wants the still, Screen Recording is off (spot-shot). */
+  readonly shotOff?: { readonly onOpen: () => void } | null;
   /** The one-time ask for Screen Recording, under his words (designer m_21903). */
   readonly screenAsk?: { readonly onOpen: () => void; readonly onLater: () => void } | null;
   /** The pointer is over the corner card (its 8 s close waits while it is). */
@@ -193,6 +196,9 @@ export function Capsule(p: CapsuleProps): JSX.Element {
               p.onOpenWindow("bise");
             }}
             onClose={p.onClose}
+            shot={p.shot == null ? null : { thumb: fileUrl(p.shot.file), name: shotName(p.shot), title: `${p.shot.app} · ${p.shot.title}` }}
+            onShotDrop={p.onShotDrop}
+            shotOff={p.shotOff ?? null}
             testId="spot"
           />
         </div>

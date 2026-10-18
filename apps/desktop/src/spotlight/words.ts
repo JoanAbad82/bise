@@ -32,6 +32,11 @@ export const W = {
     return [one(images, 'an image', 'images'), one(others, 'a file', 'files')].filter((s) => s !== '').join(', ');
   },
   answerMore: 'the rest in bise   ⏎ open',
+  // spot-shot: the window he was on rides his ask as a chip (the talk's 'no screenshot' words)
+  shotDrop: "don't send this window",
+  // his switch wants the still but Screen Recording is off: the chip says it and opens the setting
+  shotOff: 'no screenshot · Screen Recording is off',
+  shotOffTitle: 'open System Settings to let bise see the window you ask about',
   // his ask, before bise's first words (R18): it went, the answer comes here
   asked: 'asked bise · the answer shows here',
   // bise sent his ask to another project's thread: its answer is there, not here

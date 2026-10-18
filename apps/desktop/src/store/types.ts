@@ -117,6 +117,8 @@ export const TAGS = {
 /** fn's talk's still (core `shot`, ambient-lead m_21912): its stored file, the front app and window. */
 export interface TalkShot {
   readonly file: string;
+  /** its number: the spotlight's send names it (`shot`), its close drops only it */
+  readonly id: number | null;
   readonly app: string | null;
   readonly title: string | null;
 }

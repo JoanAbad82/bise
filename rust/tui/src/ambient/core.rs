@@ -18,6 +18,7 @@ mod index;
 mod picks;
 mod voice_answer;
 mod setup;
+mod shot;
 mod voice;
 mod voice_mode;
 
@@ -28,6 +29,7 @@ pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
 pub use self::hubs::{not_started, HUB_LACKS, LINGER, START};
 pub use self::dictate::DICTATE_MAX;
+pub use self::shot::SHOT_GONE;
 #[cfg(test)]
 pub use self::home::{MAIN_PAGE, QUIET_PAGE};
 use super::hub::{Hub, HubIn};
@@ -149,6 +151,8 @@ impl Drop for Talk {
 
 /// A front-window shot in the image store.
 struct Shot {
+    /// its number (`shot {id}`): a spotlight send names it, never another
+    id: u64,
     stored: bend_images::Stored,
     app: String,
     title: String,
@@ -265,6 +269,8 @@ pub struct Core {
     next_utt: UttId,
     /// the shot for the next message
     shot: Option<Shot>,
+    /// the last shot's id (core/shot.rs)
+    shot_n: u64,
     /// the fn context for the next message (S9); the shot goes as an
     /// image part, never in it
     fn_ctx: Option<bise_proto::context::FnContext>,
@@ -347,6 +353,7 @@ impl Core {
             speech: None,
             next_utt: 1,
             shot: None,
+            shot_n: 0,
             fn_ctx: None,
             sent_shots: Vec::new(),
             page_titles: Vec::new(),
@@ -423,7 +430,7 @@ impl Core {
             Cmd::PageTalk { page } => self.talk_start(Some(page), now),
             Cmd::TalkEnd => self.talk_end(now),
             Cmd::TalkCancel => self.talk_cancel(now),
-            Cmd::ShotDrop => self.drop_shot(),
+            Cmd::ShotDrop { id } => self.drop_shot_id(id),
             Cmd::DictateStart { id } => self.dictate_start(id, now),
             Cmd::DictateStop { id } => self.dictate_stop(&id, now),
             Cmd::DictateCancel { id } => self.dictate_cancel(&id),
@@ -550,12 +557,8 @@ impl Core {
         // the text is the label and his words for older readers, the hub
         // renders the model's text from the parts
         if let Some(s) = &shot {
-            let mut parts = vec![s.part()];
-            if !words.is_empty() {
-                parts.push(bise_proto::parts::Part::Text { text: words.clone() });
-            }
             input["text"] = json!(format!("{SHOT_NAME} {words}").trim_end());
-            input["parts"] = json!(parts);
+            input["parts"] = json!(shot::with_shot(s.part(), &words, Vec::new()));
         }
         if shot.is_some() {
             // the still leaves the talk either way: sent, or forgotten below

@@ -410,9 +410,14 @@ impl Core {
             return self.reply_ok(app);
         }
         // his typed send while voice mode waits on his typing: its answer is said
-        if cmd == "send" {
-            self.voice_mode_typed(&project, &agent);
-        }
+        // the spotlight's still it names (`shot: id`) as its image part (core/shot.rs)
+        let v = match cmd == "send" {
+            true => {
+                self.voice_mode_typed(&project, &agent);
+                self.send_shot(v)
+            }
+            false => v,
+        };
         let welcomed = self.hubs.conns.get(&project).is_some_and(|c| c.welcomed);
         match (cmd.as_str(), welcomed) {
             // kept: sent at its hub's welcome

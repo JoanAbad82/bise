@@ -190,15 +190,26 @@ describe("store: voice", () => {
     const { sent, store } = fake();
     expect(store.shot()).toBeNull();
     store.apply({ ev: "shot", file: "/x/.bise/images/9f.png", app: "Safari", title: "cold bench · grafana" });
-    expect(store.shot()).toEqual({ file: "/x/.bise/images/9f.png", app: "Safari", title: "cold bench · grafana" });
+    expect(store.shot()).toEqual({ file: "/x/.bise/images/9f.png", id: null, app: "Safari", title: "cold bench · grafana" });
     store.apply({ ev: "shot", file: null });
     expect(store.shot()).toBeNull();
-    store.apply({ ev: "shot", file: "/x/.bise/images/a0.png" });
-    expect(store.shot()).toEqual({ file: "/x/.bise/images/a0.png", app: null, title: null });
+    store.apply({ ev: "shot", file: "/x/.bise/images/a0.png", id: 3 });
+    expect(store.shot()).toEqual({ file: "/x/.bise/images/a0.png", id: 3, app: null, title: null });
     store.command({ cmd: "shot_drop" });
     expect(sent.at(-1)).toEqual({ cmd: "shot_drop" });
+    store.command({ cmd: "shot_drop", id: 3 });
+    expect(sent.at(-1)).toEqual({ cmd: "shot_drop", id: 3 });
     store.command({ cmd: "talk_start" });
     expect(store.shot()).toBeNull();
+  });
+
+  it("spot-shot: the spotlight's ask goes via the capsule and names the still it showed; a plain send names none", () => {
+    const { sent, store } = fake();
+    store.send({ project: "home", agent: "main", text: "why red?", via: "capsule", shot: 3 });
+    expect(sent.at(-1)).toMatchObject({ cmd: "send", project: "home", agent: "main", text: "why red?", via: "capsule", shot: 3 });
+    store.send({ project: "home", agent: "main", text: "and this?" });
+    const plain = sent.at(-1) as Record<string, unknown>;
+    expect("via" in plain || "shot" in plain).toBe(false);
   });
 
   it("level: each voice's loudness, the last value, a repeat changes nothing", () => {

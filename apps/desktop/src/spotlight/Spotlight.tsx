@@ -1,5 +1,6 @@
 // The spotlight (fn space; bar ⛔1s, his bugs 7, 6 and 2): amb-kit's Spot frame, an uncontrolled
-// <Input> the app never writes while he types (only a send clears it), the list under it as
+// <textarea> (it wraps his long words, spot-shot) the app never writes while he types (only a send
+// clears it), the list under it as
 // memo'd rows keyed by id (a keystroke updates the rows that changed, the input and the other rows
 // stay the same nodes), the live pearl mounted once. bise's answer shows under the input at a
 // readable size; the panel grows with it (onHeight tells the window), and past ANSWER_MAX_LINES it
@@ -15,7 +16,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { BiseMark, Input, Press, Spot, SpotGroup, SpotRow } from "@/ds";
+import { BiseMark, Press, Spot, SpotGroup, SpotRow } from "@/ds";
 import { cx } from "@/ds/cx";
 import { LivePearl, type Mood } from "@/pearl";
 import {
@@ -166,7 +167,21 @@ export interface SpotlightProps {
   readonly onClose: () => void;
   /** The content's height in CSS px, each time it changes: the panel follows it. */
   readonly onHeight?: (px: number) => void;
+  /** The front window's still his ask will carry (spot-shot): its chip first on the field's line,
+   *  ✕ or ⌫ at the start of his words drops it. None: no chip. */
+  readonly shot?: SpotShot | null;
+  readonly onShotDrop?: () => void;
+  /** Why no still rides his ask when his switch wants one (Screen Recording off): a dim chip that
+   *  opens System Settings. None: nothing to say. */
+  readonly shotOff?: { readonly onOpen: () => void } | null;
   readonly testId?: string;
+}
+
+/** The still's chip: its thumbnail's URL, its name ('Safari · stripe.com'), its whole title. */
+export interface SpotShot {
+  readonly thumb: string;
+  readonly name: string;
+  readonly title: string;
 }
 
 /** An answer longer than this many lines shows its start and 'the rest in bise'. */
@@ -365,7 +380,7 @@ export function answerLines(text: string): {
 
 export function Spotlight(p: SpotlightProps): JSX.Element {
   const testId = p.testId ?? "spot";
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const box = useRef<HTMLDivElement>(null);
   // his words survive a reload or an update swap until sent or put away with esc (keep.ts, amb-win)
   const [text, setText] = useState(() => keep.text(KEPT));
@@ -488,7 +503,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
     else if (item.kind !== "front") props.current.onOpen(item);
   };
 
-  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.nativeEvent.isComposing) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
@@ -530,6 +545,15 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
       // ⌫ at the start of his words takes the last chip away, as the composer's ⌫ before a chip
       e.preventDefault();
       setFiles((now) => now.slice(0, -1));
+    } else if (
+      e.key === "Backspace" &&
+      p.shot != null &&
+      e.currentTarget.selectionStart === 0 &&
+      e.currentTarget.selectionEnd === 0
+    ) {
+      // the still's chip is the first: ⌫ at the start takes it once the files went
+      e.preventDefault();
+      p.onShotDrop?.();
     } else if (e.metaKey && /^[1-9]$/u.test(e.key)) {
       const env = items.find((x) => x.kind === "env" && x.n === Number(e.key));
       if (env !== undefined) {
@@ -583,6 +607,20 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
         }
         input={
           <span className="b-spot-field">
+            {p.shot != null && (
+              <span className="b-spot-chip" data-kind="shot" title={p.shot.title} data-testid={`${testId}.shot`}>
+                <img className="thumb" src={p.shot.thumb} alt="" />
+                {p.shot.name}
+                <Press look="b-spot-chip-x" title={W.shotDrop} aria-label={W.shotDrop} onClick={p.onShotDrop} data-testid={`${testId}.shot.drop`}>
+                  ✕
+                </Press>
+              </span>
+            )}
+            {p.shot == null && p.shotOff != null && (
+              <Press look="b-spot-chip b-spot-noshot" title={W.shotOffTitle} onClick={p.shotOff.onOpen} data-testid={`${testId}.noshot`}>
+                {W.shotOff}
+              </Press>
+            )}
             {files.length > 0 && (
               <span className="b-spot-files" data-testid={`${testId}.files`}>
                 {files.map((f) => (
@@ -604,9 +642,12 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
                 ))}
               </span>
             )}
-            <Input
+            {/* his words wrap and the field grows to a few lines, then scrolls down: never sideways,
+                the start of a long ask stays in view (spot-shot); ⏎ sends, so no line break of his */}
+            <textarea
               ref={input}
-              type="text"
+              rows={1}
+              className="b-input b-spot-words"
               placeholder={W.ph}
               aria-label={W.ph}
               spellCheck={false}

@@ -1,5 +1,6 @@
 // The fn talk's still (designer m_21901, ambient-lead m_21915): at fn down (a
-// hold or fn fn), one PNG of the front window, asked of the helper
+// hold or fn fn) and when the spotlight shows (fn space: spotShown, spot-shot;
+// it only rode talks before), one PNG of the front window, asked of the helper
 // ({cmd:'shot', id, dir}: Shot.swift, the long side at most 1600 px), handed
 // to the core as {cmd:'shot', path, app, title}. The core stores it in the
 // image store (Core::take_shot, which deletes the PNG) and sends it with the
@@ -50,6 +51,10 @@ export class Shots {
   /** the id of the shot the current talk waits for */
   private pending: string | null = null;
   private n = 0;
+  /** the spotlight is up (fn space: the capsule at the top) */
+  private spot = false;
+  /** the id the spotlight's showing asked for */
+  private spotId: string | null = null;
 
   constructor(private readonly ports: ShotPorts) {}
 
@@ -65,7 +70,7 @@ export class Shots {
         this.screen = ev.screen;
         return;
       case 'fn':
-        if (STARTS.has(ev.act)) this.start();
+        if (STARTS.has(ev.act)) void this.start();
         else if (ev.act === 'cancel') this.pending = null;
         return;
       case 'shot':
@@ -76,15 +81,29 @@ export class Shots {
     }
   }
 
-  private start(): void {
+  /**
+   * The spotlight showed or went (the capsule's state: shown at the top; spot-shot): its showing
+   * asks for a still as a talk does, which its send names; gone, a still it asked for that comes
+   * late goes to no one. A talk's still asked since is left alone.
+   */
+  spotShown(open: boolean): void {
+    if (open === this.spot) return;
+    this.spot = open;
+    if (open) this.spotId = this.start();
+    else if (this.pending !== null && this.pending === this.spotId) this.pending = null;
+  }
+
+  /** Asks the helper for a still when wanted; its id, null when not asked. */
+  private start(): string | null {
     if (!shotWanted(this.prefs, this.screen)) {
       this.pending = null;
-      return;
+      return null;
     }
     this.n += 1;
     const id = `fn-${String(this.n)}`;
     this.pending = id;
     this.ports.helper({ cmd: 'shot', id, dir: this.ports.dir });
+    return id;
   }
 
   private took(id: string, path: string | null, app: string, title: string, skipped: boolean): void {

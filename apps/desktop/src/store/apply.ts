@@ -225,7 +225,7 @@ export function applyTyped(s: Store, ev: Ev): void {
       return;
     case "shot":
       // fn's talk: the still it will send (file: its stored path), null once it went or was dropped
-      s.put("shot", ev.file == null ? null : { file: ev.file, app: ev.app ?? null, title: ev.title ?? null });
+      s.put("shot", ev.file == null ? null : { file: ev.file, id: ev.id ?? null, app: ev.app ?? null, title: ev.title ?? null });
       return;
     case "level":
       // a meter's input (~30 Hz): only who reads that voice re-renders

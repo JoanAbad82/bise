@@ -406,7 +406,8 @@ impl Core {
         let _ = std::fs::remove_file(path);
         match stored {
             Ok(stored) => {
-                if let Some(old) = self.shot.replace(Shot { stored, app, title }) {
+                self.shot_n += 1;
+                if let Some(old) = self.shot.replace(Shot { id: self.shot_n, stored, app, title }) {
                     self.forget(vec![old]);
                 }
                 let ev = shot_ev(self.shot.as_ref());
@@ -425,6 +426,14 @@ impl Core {
             self.emit(shot_ev(None));
         }
     }
+
+    /// `shot_drop {id}`: only that still (the spotlight closed on it, a
+    /// newer one stays); no id: whatever still is pending.
+    pub(super) fn drop_shot_id(&mut self, id: Option<u64>) {
+        if id.is_none_or(|id| self.shot.as_ref().is_some_and(|s| s.id == id)) {
+            self.drop_shot();
+        }
+    }
 }
 
 /// fn's talk's still as the app reads it: bise-proto's CoreEv::Shot
@@ -433,8 +442,8 @@ impl Core {
 pub(super) fn shot_ev(shot: Option<&Shot>) -> Value {
     let some = |s: &str| Some(s.trim().to_string()).filter(|s| !s.is_empty());
     let ev = match shot {
-        Some(s) => bise_proto::core_ev::CoreEv::Shot { file: Some(s.stored.file.display().to_string()), app: some(&s.app), title: some(&s.title) },
-        None => bise_proto::core_ev::CoreEv::Shot { file: None, app: None, title: None },
+        Some(s) => bise_proto::core_ev::CoreEv::Shot { file: Some(s.stored.file.display().to_string()), id: Some(s.id), app: some(&s.app), title: some(&s.title) },
+        None => bise_proto::core_ev::CoreEv::Shot { file: None, id: None, app: None, title: None },
     };
     serde_json::to_value(ev).unwrap_or_default()
 }

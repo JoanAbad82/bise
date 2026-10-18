@@ -126,10 +126,12 @@ void app.whenReady().then(() => {
   // what he typed or opened, on disk for a reload, a relaunch or a crash (src/main/keep.ts)
   installKeepIpc(app.getPath('userData'));
   const helper = startHelper(testMode);
+  // the spotlight's still: the capsule's state tells it when it shows (below)
+  let shots: Shots | null = null;
   // his prefs (excluded apps...) reach the helper now and on every change
   if (helper !== null) {
     // the fn talk's still of the front window, handed to the core (helper/shot.ts)
-    const shots = new Shots({
+    const s = new Shots({
       helper: (c) => {
         helper.send(c);
       },
@@ -139,13 +141,14 @@ void app.whenReady().then(() => {
       },
       dir: join(app.getPath('userData'), 'shots'),
     });
+    shots = s;
     helper.on((ev) => {
-      shots.helperEv(ev);
+      s.helperEv(ev);
     });
     onCoreEvent((ev) => {
       if (ev['ev'] !== 'prefs') return;
       helper.config(configOfPrefs(ev['prefs']));
-      shots.prefsChanged(ev['prefs']);
+      s.prefsChanged(ev['prefs']);
     });
   }
   // his project folders: where quickLook / showInFinder may look (reveal.ts)
@@ -198,6 +201,10 @@ void app.whenReady().then(() => {
   // off-screen: where the capsule would sit, in userData/capsule-frames.jsonl (capsuleframe.ts)
   const capsule = new Capsule(testMode, offscreen, capsuleFramesDir(offscreen, testMode, app.getPath('userData')));
   installCapsuleIpc(capsule);
+  // fn space's spotlight (the capsule at the top) asks for the front window's still (spot-shot)
+  capsule.onState((st) => {
+    shots?.spotShown(st.shown && st.at === 'top');
+  });
   ipcMain.on(IPC.quit, () => {
     app.quit();
   });

@@ -53,6 +53,10 @@ export type Intent =
       readonly mode?: Mode;
       /** his images and files go as parts (the hub stores each image once) */
       readonly parts?: readonly Part[];
+      /** the window it came from, for the hub's hint ('capsule': the spotlight) */
+      readonly via?: string;
+      /** the still the spotlight showed (the core's shot id): the core puts it first, as an image part */
+      readonly shot?: number;
     }
   /** 'try again' on his failed message of thread `key`: the same words, mode and parts, under a new cid */
   | { readonly i: "resend"; readonly key: string; readonly cid: number }

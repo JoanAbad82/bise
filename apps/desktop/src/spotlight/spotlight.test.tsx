@@ -408,3 +408,44 @@ describe("start an agent from the spotlight (bar A.1)", () => {
     expect(ask).toHaveBeenCalledWith("/new profile the hub");
   });
 });
+
+describe("spot-shot: the window he was on, and his long words", () => {
+  it("his words wrap: the field is a growing textarea, never a one-line input that scrolls sideways", async () => {
+    const { readFileSync } = await import("node:fs");
+    // vitest runs in apps/desktop (happy-dom's import.meta.url is not a file URL)
+    const SPOT_CSS = readFileSync(`${process.cwd()}/src/spotlight/spotlight.css`, "utf8");
+    const ui = render(<Spotlight data={D} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} />);
+    const field = ui.getByTestId("spot.input");
+    expect(field.tagName, "a one-line <input> scrolls sideways and hides the start").toBe("TEXTAREA");
+    expect(field.getAttribute("rows")).toBe("1");
+    expect(field.classList.contains("b-spot-words")).toBe(true);
+    // its rule: grows with the words up to a cap, then scrolls down, never sideways
+    const rule = /\.b-spot-field > \.b-spot-words \{([^}]*)\}/u.exec(SPOT_CSS)?.[1] ?? "";
+    for (const d of ["field-sizing: content", "max-height:", "overflow-x: hidden", "overflow-y: auto", "overflow-wrap: anywhere"])
+      expect(rule, d).toContain(d);
+  });
+
+  it("the still's chip comes first; ✕ and ⌫ at the start of his words drop it; no still and Screen Recording off: why", async () => {
+    const drop = vi.fn();
+    const shot = { thumb: "file:///i/a.png", name: "Safari · stripe.com", title: "Safari · stripe.com/pricing" };
+    const ui = render(<Spotlight data={D} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} shot={shot} onShotDrop={drop} />);
+    const chip = ui.getByTestId("spot.shot");
+    expect(chip.textContent).toContain("Safari · stripe.com");
+    expect(chip.getAttribute("title")).toBe("Safari · stripe.com/pricing");
+    fireEvent.click(ui.getByTestId("spot.shot.drop"));
+    expect(drop).toHaveBeenCalledTimes(1);
+    const field = ui.getByTestId("spot.input") as HTMLTextAreaElement;
+    await act(async () => {
+      fireEvent.keyDown(field, { key: "Backspace" });
+      await Promise.resolve();
+    });
+    expect(drop).toHaveBeenCalledTimes(2);
+    expect(ui.queryByTestId("spot.noshot"), "a still: nothing to explain").toBeNull();
+    cleanup();
+    const open = vi.fn();
+    const off = render(<Spotlight data={D} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} shot={null} shotOff={{ onOpen: open }} />);
+    expect(off.getByTestId("spot.noshot").textContent).toBe("no screenshot · Screen Recording is off");
+    fireEvent.click(off.getByTestId("spot.noshot"));
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+});

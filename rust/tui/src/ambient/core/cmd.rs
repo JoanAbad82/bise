@@ -15,8 +15,8 @@ pub enum Cmd {
     TalkEnd,
     TalkCancel,
     /// his ✕ on the talk's still (ambient-lead m_21912): it is forgotten,
-    /// the talk goes on
-    ShotDrop,
+    /// the talk goes on; `id`: only that still (the spotlight closed on it)
+    ShotDrop { id: Option<u64> },
     /// The composer's mic (bar I, core/dictate.rs): `id` is the window's,
     /// echoed on each `dictation`.
     DictateStart { id: String },
@@ -124,7 +124,7 @@ impl Cmd {
             },
             AppCmd::TalkEnd => Cmd::TalkEnd,
             AppCmd::TalkCancel => Cmd::TalkCancel,
-            AppCmd::ShotDrop => Cmd::ShotDrop,
+            AppCmd::ShotDrop { id } => Cmd::ShotDrop { id },
             AppCmd::DictateStart { id } | AppCmd::DictateStop { id } | AppCmd::DictateCancel { id } | AppCmd::DictateRetry { id } if id.trim().is_empty() => return no_id(),
             AppCmd::DictateStart { id } => Cmd::DictateStart { id },
             AppCmd::DictateStop { id } => Cmd::DictateStop { id },

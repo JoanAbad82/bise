@@ -109,10 +109,15 @@ pub enum CoreEv {
     /// the image store, `app` and `title` the front app and window; once
     /// it is stored, then `file: null` when it goes (he dropped it with
     /// `shot_drop`, the talk sent or cancelled it). To every window (the
-    /// capsule's talk view shows it). Never journaled, never in a log
+    /// capsule's talk view shows it). Never journaled, never in a log.
+    /// `id`: this still's number, the one a spotlight send names
+    /// (`send {shot: id}`) and a `shot_drop {id}` drops; none with
+    /// `file: null`
     Shot {
         #[serde(default)]
         file: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<u64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         app: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]

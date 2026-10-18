@@ -26,13 +26,52 @@
    image chip: accent on accent-soft, 16 px thumbnail), the words keep the rest of the line */
 .b-spot-field {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--gap-inline);
   min-width: 0;
 }
-.b-spot-field > input {
+/* spot-shot: his words wrap and the field grows with them (field-sizing), up to 4 lines, then
+   scroll down; never sideways (the start of a long ask stays in view). Chips stay on its first line */
+.b-spot-field > .b-spot-words {
   flex: 1;
   min-width: 4em;
+  field-sizing: content;
+  max-height: calc(1.2em * 4);
+  resize: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  font: inherit;
+  line-height: 1.2;
+  color: inherit;
+}
+.b-spot-field > .b-spot-words::placeholder {
+  color: var(--c-text-3);
+}
+.b-spot-field > .b-spot-chip,
+.b-spot-field > .b-spot-files {
+  margin-top: calc((1.2em - var(--s-6)) / 2);
+}
+/* the still's ✕, inside its chip (the talk's chip ✕) */
+.b-spot-chip-x {
+  margin-left: var(--s-1);
+  color: var(--c-text-3);
+}
+.b-spot-chip-x:hover {
+  color: var(--c-text);
+}
+/* no still and why: dim, a link to the setting */
+.b-spot-noshot {
+  color: var(--c-text-3);
+  border-style: dashed;
+}
+.b-spot-noshot:hover {
+  color: var(--c-text-2);
 }
 .b-spot-files {
   display: flex;

@@ -109,6 +109,29 @@ describe('the fn talk still', () => {
     expect(r.dropped).toEqual(['/u/shots/a.png']);
   });
 
+  it('the spotlight showing asks once; gone, its late still goes to no one, a talk since keeps its own', () => {
+    const r = rig();
+    r.ev(PERMS('allowed'));
+    r.s.spotShown(true);
+    r.s.spotShown(true);
+    expect(r.helper).toEqual([{ cmd: 'shot', id: 'fn-1', dir: '/u/shots' }]);
+    r.ev(SHOT);
+    expect(r.core).toEqual([{ cmd: 'shot', path: '/u/shots/a.png', app: 'Safari', title: 'Stripe pricing' }]);
+    // shown again, closed before its still came: dropped
+    r.s.spotShown(false);
+    r.s.spotShown(true);
+    r.s.spotShown(false);
+    r.ev({ ...SHOT, id: 'fn-2', path: '/u/shots/b.png' });
+    expect(r.core).toHaveLength(1);
+    expect(r.dropped).toEqual(['/u/shots/b.png']);
+    // a hold over the spotlight: the spotlight going leaves the talk's still alone
+    r.s.spotShown(true);
+    r.ev({ ev: 'fn', act: 'talk_start' });
+    r.s.spotShown(false);
+    r.ev({ ...SHOT, id: 'fn-4', path: '/u/shots/d.png' });
+    expect(r.core).toHaveLength(2);
+  });
+
   it('Screen Recording taken back: the next talk asks nothing', () => {
     const r = rig();
     r.ev(PERMS('allowed'));

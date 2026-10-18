@@ -218,8 +218,17 @@ export class Capsule {
     appendCapsuleFrame(this.framesDir, capsuleFrame(Date.now(), w === null ? 'show' : 'move', this.state.at, b, d, this.win.getBounds()));
   }
 
+  /** main's own listeners of its state (the spotlight's still, helper/shot.ts) */
+  private readonly watchers: ((s: CapsuleState) => void)[] = [];
+
+  /** Calls `listener` with each new state (shown, where). */
+  onState(listener: (s: CapsuleState) => void): void {
+    this.watchers.push(listener);
+  }
+
   private tell(): void {
     this.win.webContents.send(IPC.capsuleState, this.state);
+    for (const w of this.watchers) w(this.state);
   }
 }
 

@@ -230,6 +230,8 @@ function send(s: SendsState, f: HubFacts, a: Extract<Intent, { i: "send" }>, at:
           text: parts === undefined ? a.text : "",
           mode,
           ...(parts === undefined ? {} : { parts }),
+          ...(a.via === undefined ? {} : { via: a.via }),
+          ...(a.shot === undefined ? {} : { shot: a.shot }),
           cid,
         },
       },

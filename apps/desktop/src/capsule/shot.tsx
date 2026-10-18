@@ -11,6 +11,8 @@ import type { Grant } from "@/proto";
 /** The talk's still as the core stored it: its file in the image store, the window's app and title. */
 export interface TalkShot {
   readonly file: string;
+  /** the core's number for it: a spotlight send names it, its close drops only it (spot-shot) */
+  readonly id?: number;
   readonly app: string;
   readonly title: string;
 }
@@ -36,8 +38,9 @@ export function shotName(s: Pick<TalkShot, "app" | "title">): string {
 }
 
 /** The core's shot event read: a stored still, or none (dropped, sent, forgotten). Pure. */
-export function shotOf(ev: { readonly file?: string | null; readonly app?: string | null; readonly title?: string | null }): TalkShot | null {
-  return ev.file == null || ev.file === "" ? null : { file: ev.file, app: ev.app ?? "", title: ev.title ?? "" };
+export function shotOf(ev: { readonly file?: string | null; readonly id?: number | null; readonly app?: string | null; readonly title?: string | null }): TalkShot | null {
+  if (ev.file == null || ev.file === "") return null;
+  return { file: ev.file, ...(ev.id == null ? {} : { id: ev.id }), app: ev.app ?? "", title: ev.title ?? "" };
 }
 
 /**

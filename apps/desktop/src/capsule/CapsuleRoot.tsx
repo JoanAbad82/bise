@@ -95,6 +95,20 @@ export function CapsuleRoot(): JSX.Element {
     store.command({ cmd: "shot_drop" });
   }, [store]);
   const shotRef = useRef(shot);
+  // spot-shot: the spotlight going (esc, fn space, a card, a talk) drops the still it showed, only
+  // that one (a talk's newer still stays); its ask took it already when he sent
+  const spotShot = useRef<number | null>(null);
+  useEffect(() => {
+    if (view.kind === "spot") {
+      spotShot.current = shot?.id ?? null;
+      return;
+    }
+    if (spotShot.current === null) return;
+    store.command({ cmd: "shot_drop", id: spotShot.current });
+    spotShot.current = null;
+  }, [view.kind, shot, store]);
+  // his switch wants the still (unset counts as on) but Screen Recording is off: the spot says so
+  const shotOff = shotOn !== false && screen !== undefined && screen !== "allowed";
   // the helper's fn keys read these: fn+n on the tray menu opens its row n (one-inbox 3)
   const viewRef = useRef(view);
   const menuRef = useRef(menuCards(spot));
@@ -510,6 +524,15 @@ export function CapsuleRoot(): JSX.Element {
       route={route}
       shot={shot}
       onShotDrop={dropShot}
+      shotOff={
+        shotOff
+          ? {
+              onOpen: () => {
+                bise?.helper({ cmd: "perm", perm: "screen", action: "open" });
+              },
+            }
+          : null
+      }
       screenAsk={
         ask.on
           ? {
@@ -533,12 +556,17 @@ export function CapsuleRoot(): JSX.Element {
         followAsk(home);
         // R41: the images and files he pasted or dropped ride the send as typed parts (msg-parts);
         // the hub stores each image and renders it once, as a block the model sees
+        // spot-shot: from the capsule (the hub's hint, as a fn talk), with the still it showed
+        const still = shotRef.current?.id;
         store.send({
           project: home,
           agent: "main",
           text,
           ...(parts === undefined ? {} : { parts }),
+          via: "capsule",
+          ...(still === undefined ? {} : { shot: still }),
         });
+        spotShot.current = null;
         // asked: the spot says so at once (∿), its first words take the line's place (R18)
         setLast({ text: "", done: false });
       }}

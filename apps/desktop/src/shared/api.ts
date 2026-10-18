@@ -251,8 +251,14 @@ export interface CoreExit {
   readonly report?: string | null;
 }
 
+/**
+ * The spotlight's send to main naming the still it showed (`shot`: the core's `shot` event id,
+ * spot-shot): the core puts that still first as an image part and strips `shot` before the hub.
+ */
+export type ShotSend = Extract<HubCmd, { cmd: 'send' }> & { readonly shot: number };
+
 /** What the window sends the core: bise-proto's typed commands only (a HubCmd carries its project). */
-export type CoreCmd = AppCmd | HubCmd | DraftHubCmd;
+export type CoreCmd = AppCmd | HubCmd | DraftHubCmd | ShotSend;
 
 /**
  * The core channel (owner: amb-core; main's side src/main/core/ipc.ts, the
