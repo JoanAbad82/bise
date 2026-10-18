@@ -54,7 +54,7 @@ export function applyRoute(holds: readonly Hold[], ev: EvOf<'route'> | EvOf<'rou
  * A route's end as the answer for his pending send (the window-local 'sent', echo.ts; the send's
  * own answer said 'routed' and kept the row): sent, his message in bise's main with its id (made);
  * cancelled, the row goes (sb-core says his words to main as a new message, its 'you' entry shows
- * them; send-reason sha 2 gives it that message's id). Null: not an end, a route of no row, or a
+ * them; docs/issues/33 gives it that message's id). Null: not an end, a route of no row, or a
  * sent one without its id (an older hub: the row says 'sent to'). Pure.
  */
 export function settleOf(

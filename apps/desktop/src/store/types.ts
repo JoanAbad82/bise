@@ -201,7 +201,7 @@ export interface Pending {
   readonly msgId?: number;
   /** when the core went down before its answer (the window's ms): 'not sent', yet it may have
    *  reached the hub before that (echo.ts echoOf takes it by its words, from an entry written by
-   *  then; send-reason sha 2: by its cid) */
+   *  then; by its cid once docs/issues/33 is done) */
   readonly lostAt?: number;
 }
 

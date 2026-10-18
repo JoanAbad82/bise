@@ -51,7 +51,7 @@ describe('his messages, in his words', () => {
     }
   });
 
-  it("the core dies before his message's answer: the hub made it, so its entry clears the 'not sent' row, never a retry that sends it twice (send-reason, until sha 2's cid)", () => {
+  it("the core dies before his message's answer: the hub made it, so its entry clears the 'not sent' row, never a retry that sends it twice (send-reason, until the cid of docs/issues/33)", () => {
     const w = feature(T0).does(send(ACME, 'main', 'ship it'));
     w.given(coreDown());
     expect(rows(w)).toEqual(['ship it · failed: not sent']);

@@ -44,7 +44,7 @@ describe("echo (A1): his send meets its 'you' entry by its message id", () => {
     expect(echoOf([row(1, "ok", { state: "failed" })], you(4, "ok", 99))).toBe(-1);
   });
 
-  it("but a row the core went down before answering (lost) is taken by its words: it may have reached the hub (restores ff9c5cdd5's match for that case only, until send-reason sha 2's cid)", () => {
+  it("but a row the core went down before answering (lost) is taken by its words: it may have reached the hub (restores ff9c5cdd5's match for that case only, until the cid of docs/issues/33)", () => {
     // sent at 1000, the core died at 1500; the entry was written at 2000
     const lost = { state: "failed", lostAt: 1500 } as const;
     expect(echoOf([row(1, "ok", lost)], you(4, "ok", 99))).toBe(0);
