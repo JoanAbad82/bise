@@ -39,3 +39,16 @@ def Laws.placed_replays_as_ws(st, n, ws):
   match st:
     case HM.St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}:
       {==}
+
+def Laws.place_join_no_create(o, cx, n, ws, p, e):
+  %Equal.sym(Maybe<&2, String>, J.get_str(ws, "place"), Some{p}, e) : {HC.place.ask(o, HPL.no_place(_) && HM.ws_placing(ws), cx, n, ws) == cx : HX.Cx<o>}
+  {==}
+
+def Laws.place_join_waits(o, cx, b, r, e):
+  Laws.no_repl_before_placed(o, cx, b, r, e)
+
+def Laws.place_join_shares(a, b, n, ws, err):
+  {==}
+
+def Laws.place_join_err_fails_both(a, b, n, e, p, err, h):
+  Laws.placed_err_fails(a, b, J.JNull{}, e, h)

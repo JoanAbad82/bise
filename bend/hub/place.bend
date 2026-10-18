@@ -20,6 +20,11 @@
 # goes again (fx `worktree_drop`, nothing to lose), nothing else; a
 # `placed` with an error for a task not placing: nothing.
 #
+# A join while placing (`sb spawn B --place A`, A placing; rows233B):
+# the daemon's ws for A's place carries `place`, so B makes no worktree
+# of its own ([`makes`]) and waits; A's `placed` then places its
+# [`joiners`] the same way: A's ws, or A's failure (A gone: theirs too).
+#
 # core.bend's `placed` runs these decisions (it holds emit, spawn, send).
 # Laws in bend/laws/place.bend.
 import Base
@@ -35,6 +40,33 @@ def placing_ws(+with_changes: Bool) -> J.Json:
   J.obj([J.kv("mode", J.JStr{"worktree"}), J.kv("state", J.JStr{"placing"}), J.kv("path", J.JStr{""}),
     J.kv("branch", J.JNull{}), J.kv("base_commit", J.JNull{}), J.kv("dropped", J.JBool{False{}}),
     J.kv("with_changes", J.JBool{with_changes})])
+
+def no_place(m: Maybe<&2, String>) -> Bool:
+  match m:
+    case None{}:
+      True{}
+    case Some{_}:
+      False{}
+
+# the shell makes this ws's worktree: placing, and its own (a ws with a
+# `place` is a join, `sb spawn --place A` while A is placing: A's comes)
+def makes(+ws: J.Json) -> Bool:
+  no_place(J.get_str(ws, "place")) && M.ws_placing(ws)
+
+def shared_ws(+path: String) -> J.Json:
+  J.obj([J.kv("mode", J.JStr{"shared"}), J.kv("path", J.JStr{path}), J.kv("branch", J.JNull{}),
+    J.kv("base_commit", J.JNull{}), J.kv("dropped", J.JBool{False{}})])
+
+# a git answer of the shell (moved from core.bend, its line limit)
+def ans_ok.go(m: Maybe<&2, J.Json>, +j: J.Json) -> Result<&2, &2, String, J.Json>:
+  match m:
+    case Some{+v}:
+      Done{v}
+    case None{}:
+      Fail{J.get_str_or(j, "err", "git error")}
+
+def ans_ok(+j: J.Json) -> Result<&2, &2, String, J.Json>:
+  ans_ok.go(J.get(j, "ok"), j)
 
 # what one `placed` input does
 type Do is Data:
@@ -194,3 +226,49 @@ def drop.left.ws(m: Maybe<&2, M.Agent>) -> J.Json:
       J.JNull{}
     case Some{+b}:
       J.set(M.Agent.ws(b), "dropped", J.JBool{True{}})
+
+# ---- a join while placing (`sb spawn B --place A`, A placing) ----
+# B is created with the daemon's ws for A's place (state placing, place
+# wt:<A's dir>), no worktree of its own (makes: False), no REPL (waits).
+# A's `placed` then places B the same way: A's worktree, or A's failure.
+
+def placing_of(xs: List<&2, String>, +s: M.St) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+n, +t}:
+      +rest = placing_of(t, s)
+      Bool.pick(List<&2, String>, waits(M.get_agent(s, n)), n <> rest, rest)
+
+# the joiners of `name`'s place: exactly the live agents whose ws.place
+# is name's place (wt:<its dir>) and whose state is placing; never any
+# other placing agent (one placing its own worktree has no ws.place)
+def joiners.of(m: Maybe<&2, M.Agent>, +s: M.St) -> List<&2, String>:
+  match m:
+    case None{}:
+      Nil{}
+    case Some{+a}:
+      placing_of(mates_of(s, a, True{}), s)
+
+def joiners(+s: M.St, +name: String) -> List<&2, String>:
+  joiners.of(M.get_agent(s, name), s)
+
+# a joiner's `placed`: the ws its place's got (none when it failed) ...
+def join.ws(d: Do) -> J.Json:
+  match d:
+    case POk{_, +ws}:
+      ws
+    case _:
+      J.JNull{}
+
+# ... and the error: "" when made, else its place's words (`err`, git's)
+def join.err(d: Do, +err: String) -> String:
+  match d:
+    case POk{_, _}:
+      ""
+    case PErr{_, +e, _}:
+      e
+    case POrphan{+n, _}:
+      String.concat(["@", n, " left before its worktree was made"])
+    case PNone{}:
+      err

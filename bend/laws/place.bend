@@ -77,3 +77,49 @@ law placed_replays_as_ws:
   for +n: String
   for +ws: J.Json
   {HM.apply(st, HM.EPlaced{n, ws, ""}) == HM.apply(st, HM.EWorkspace{n, ws}) : HM.St}
+
+# ---- a join while placing (`sb spawn B --place A`, A placing; rows233B) ----
+
+# LAW: a join on a placing agent never makes a worktree of its own: its
+# ws carries A's place, and place.ask emits no worktree_create for it.
+law place_join_no_create:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +n: String
+  for +ws: J.Json
+  for +p: String
+  for e: {J.get_str(ws, "place") == Some{p} : Maybe<&2, String>}
+  {HC.place.ask(o, HPL.makes(ws), cx, n, ws) == cx : HX.Cx<o>}
+
+# LAW: no REPL for the joiner before its place is made: its ws is placing,
+# so spawn changes nothing (no_repl_before_placed, on the joiner).
+law place_join_waits:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +b: String
+  for +r: Bool
+  for e: {HPL.waits(HM.get_agent(HC.st(o, cx), b)) == True{} : Bool}
+  {HC.spawn(o, cx, b, r) == cx : HX.Cx<o>}
+
+# LAW: A's worktree made, a live placing joiner gets that same ws (path,
+# branch, place), then its REPL (POk).
+law place_join_shares:
+  for +a: HM.Agent
+  for +b: String
+  for +n: String
+  for +ws: J.Json
+  for +err: String
+  {HPL.placed_of.live(True{}, a, b, HPL.join.ws(HPL.POk{n, ws}), HPL.join.err(HPL.POk{n, ws}, err)) == HPL.POk{b, ws} : HPL.Do}
+
+# LAW: A's worktree not made, a live placing joiner fails too, with the
+# same words, and its spawner is told (PErr, then placed_err_tells_once).
+law place_join_err_fails_both:
+  for +a: HM.Agent
+  for +b: String
+  for +n: String
+  for +e: String
+  for +p: String
+  for +err: String
+  for h: {String.is_empty(e) == False{} : Bool}
+  {HPL.placed_of.live(True{}, a, b, HPL.join.ws(HPL.PErr{n, e, p}), HPL.join.err(HPL.PErr{n, e, p}, err))
+    == HPL.PErr{b, e, HPL.parent_of(HM.Agent.parent(a))} : HPL.Do}

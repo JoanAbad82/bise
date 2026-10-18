@@ -929,7 +929,7 @@ def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Jso
   +who = Bool.pick(String, String.eq(parent, M.USER()), "you", parent)
   +cx3 = feed(o, cx2, M.MAIN(), FD.spawn(cat([who, " → new agent @", name, label, " : ", obj])))
   +cx4 = LZ.pick(X.Cx<o>, String.eq(parent, M.USER()), u => note_main(o, cx3, cat(["the user created the agent @", name, label, ": ", obj])), u => cx3)
-  +cx5 = place.ask(o, M.ws_placing(ws), spawn(o, cx4, name, False{}), name, ws)
+  +cx5 = place.ask(o, PL.makes(ws), spawn(o, cx4, name, False{}), name, ws)
   +head = cat(["# Task `", name, "`\n\n"])
   +m = msg(parent, name, String.append(head, NewTask.brief_text(t)), String.eq(parent, M.MAIN()), None{}, String.eq(parent, M.USER()), False{})
   # send-parts: the brief's parts (`sb spawn --attach`), the head in front
@@ -949,16 +949,6 @@ def create.go(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json) -
   +cx2 = TK.take(o, cx, name)
   create.go.free(o, M.name_held(st(o, cx2), name), cx2, t, name, ws, {==})
 
-def ans_ok.go(m: Maybe<&2, J.Json>, +j: J.Json) -> Result<&2, &2, String, J.Json>:
-  match m:
-    case Some{+v}:
-      Done{v}
-    case None{}:
-      Fail{J.get_str_or(j, "err", "git error")}
-
-def ans_ok(+j: J.Json) -> Result<&2, &2, String, J.Json>:
-  ans_ok.go(J.get(j, "ok"), j)
-
 def NewTask.with_changes(x: NewTask) -> Bool:
   match x:
     case NewTask{_, _, _, _, _, _, +with_changes, _}:
@@ -972,14 +962,10 @@ def create.git(-o: M.St, git: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) ->
       # hub-loop: the shell makes it off its loop (place.bend)
       create.go(o, cx, t, name, PL.placing_ws(NewTask.with_changes(t)))
 
-def shared_ws(+path: String) -> J.Json:
-  J.obj([J.kv("mode", J.JStr{"shared"}), J.kv("path", J.JStr{path}), J.kv("branch", J.JNull{}),
-    J.kv("base_commit", J.JNull{}), J.kv("dropped", J.JBool{False{}})])
-
 def create.wt(-o: M.St, wt: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) -> X.Cx<o> & TaskR:
   match wt:
     case False{}:
-      create.go(o, cx, t, name, shared_ws(X.R.workspace(rr(o, cx))))
+      create.go(o, cx, t, name, PL.shared_ws(X.R.workspace(rr(o, cx))))
     case True{}:
       create.git(o, X.R.git(rr(o, cx)), cx, t, name)
 
@@ -1442,7 +1428,7 @@ def drop.git(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: M.Agent) -> X.Cx<o> &
     case (+cx, None{}):
       (cx, DHalt{})
     case (+cx, Some{+ans}):
-      drop.finish(o, drop.ws(o, ans_ok(ans), cx, a), a, PL.drop_label(ans_ok(ans)))
+      drop.finish(o, drop.ws(o, PL.ans_ok(ans), cx, a), a, PL.drop_label(PL.ans_ok(ans)))
 
 def drop.now(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: M.Agent, +loss: J.Json) -> X.Cx<o> & DropR:
   match has_wt:
@@ -1535,7 +1521,7 @@ def restore.ans(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: M.Agent) -> X.Cx<o
     case (+cx, None{}):
       (cx, THalt{})
     case (+cx, Some{+ans}):
-      restore.res(o, ans_ok(ans), cx, a)
+      restore.res(o, PL.ans_ok(ans), cx, a)
 
 def restore.wt(-o: M.St, dropped: Bool, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
   match dropped:
@@ -1599,7 +1585,7 @@ def isolate.ans(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +n: String) -> X.Cx<o>
     case (+cx, None{}):
       (cx, THalt{})
     case (+cx, Some{+ans}):
-      isolate.res(o, ans_ok(ans), cx, n)
+      isolate.res(o, PL.ans_ok(ans), cx, n)
 
 def isolate.pre(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +n: String) -> X.Cx<o> & TaskR:
   match pre:
@@ -3568,6 +3554,18 @@ def placed(-o: M.St, d: PL.Do, +cx: X.Cx<o>) -> X.Cx<o>:
     case PL.PNone{}:
       cx
 
+# then its joiners (`sb spawn --place` while it was placing): the same
+def placed.join(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>, +d: PL.Do, +err: String) -> X.Cx<o>:
+  match ns:
+    case Nil{}:
+      cx
+    case Con{+b, +t}:
+      placed.join(o, t, placed(o, PL.placed_of(st(o, cx), b, PL.join.ws(d), PL.join.err(d, err)), cx), d, err)
+
+def placed.in(-o: M.St, +cx: X.Cx<o>, +name: String, +ws: J.Json, +err: String) -> X.Cx<o>:
+  +d = PL.placed_of(st(o, cx), name, ws, err)
+  placed.join(o, PL.joiners(st(o, cx), name), placed(o, d, cx), d, err)
+
 # one input, decoded by the generated codec (gen/in.bend, from
 # bise_proto::core::In): an unknown tag is INone, a missing field its
 # default
@@ -3612,7 +3610,7 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
     case GI.IIsolate{+name}:
       user_isolate.res(o, isolate_task(o, cx, name))
     case GI.IPlaced{+name, +ws, +err}:
-      placed(o, PL.placed_of(st(o, cx), name, ws, err), cx)
+      placed.in(o, cx, name, ws, err)
     case GI.IFeatureRetire{+name, +kept, +main}:
       feature_retire(o, cx, name, kept, main)
     case GI.IRename{+name, +new_name, +valid}:

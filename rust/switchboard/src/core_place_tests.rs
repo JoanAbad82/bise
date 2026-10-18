@@ -90,3 +90,59 @@ fn worktrees_need_git() {
     assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { body, .. } if body["text"].as_str().unwrap_or("").contains("not a git repository"))));
     assert!(!t.hub.st.agents.contains_key("x"));
 }
+
+/// rows233B (desk-cut-15 m_31808): `sb spawn b --place a` while a's
+/// worktree is still being made joins a's place: b gets no worktree of
+/// its own (no `worktree_create` for b), no REPL before a's is made, then
+/// a's path and branch; a's failure fails b too, with git's words.
+#[test]
+fn a_join_while_placing_waits_for_its_place() {
+    for fails in [false, true] {
+        let mut t = T::new();
+        let spawn = |t: &mut T, name: &str, place: &str| {
+            t.token += 1;
+            let req = AgentReq::Spawn {
+                name: name.into(),
+                brief: Brief { objective: format!("objective of {}", name), ..Brief::default() },
+                worktree: place == "new",
+                with_changes: false,
+                place: if place == "new" { String::new() } else { place.into() },
+                feature: String::new(),
+                ask: Default::default(),
+                parts: String::new(),
+            };
+            // the hub alone: the shell's worker has not answered yet
+            t.hub.handle(Input::Agent { token: t.token, from: MAIN.into(), req }, &mut t.env)
+        };
+        let creates = |fx: &[Effect]| fx.iter().filter(|e| matches!(e, Effect::Place(crate::place_job::Job::Create { .. }))).count();
+        let fx = spawn(&mut t, "a", "new");
+        assert_eq!(creates(&fx), 1, "{:?}", fx);
+        assert!(t.hub.st.agents["a"].ws.placing());
+        let fx = spawn(&mut t, "b", "a");
+        assert_eq!(creates(&fx), 0, "b joins a's place, no worktree of its own: {:?}", fx);
+        assert!(!fx.iter().any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "b")), "no REPL before placed: {:?}", fx);
+        assert!(t.hub.st.agents["b"].ws.placing());
+        if fails {
+            let fx = t.go(Input::Placed { name: "a".into(), ws: Value::Null, err: "fatal: no space left".into() });
+            for n in ["a", "b"] {
+                let ag = &t.hub.st.agents[n];
+                assert_eq!(ag.lifecycle, Lifecycle::Failed, "{n}: {:?}", ag.lifecycle);
+                let told = format!("@{n} could not start: its worktree was not made: fatal: no space left");
+                assert!(format!("{:?}", fx).contains(&told), "{told}: {:?}", fx);
+            }
+            assert!(t.env.dropped.is_empty());
+            continue;
+        }
+        let made = crate::place_job::placed_now(&mut t.env, &Effect::Place(crate::place_job::Job::Create { name: "a".into(), with_changes: false })).unwrap();
+        let fx = t.go(made);
+        assert!(t.env.dropped.is_empty());
+        let (wa, wb) = (t.hub.st.agents["a"].ws.clone(), t.hub.st.agents["b"].ws.clone());
+        assert_eq!(wa, wb, "one place, the same ws");
+        assert_eq!((wb.path.as_str(), wb.branch.as_deref(), wb.place.as_deref()), ("/state/worktrees/a", Some("sb/a"), Some("wt:a")));
+        assert!(!wb.placing());
+        for n in ["a", "b"] {
+            assert!(fx.iter().any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == n)), "{n} starts: {:?}", fx);
+        }
+        assert_eq!(t.hub.snapshot(0).places[0].agents, ["a", "b"]);
+    }
+}
