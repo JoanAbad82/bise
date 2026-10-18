@@ -5,7 +5,7 @@
 // pitch wave (phugoid), a little yaw wobble, one looping on its way, and a nose-up flare into the
 // hand. Its speed comes from its height: slower up the climbs and over the loop, faster in the dives.
 // The path is pure and seeded (planFlight, flightAt); the mesh only follows it.
-import { Group, Mesh, type Material } from 'three';
+import { CircleGeometry, EdgesGeometry, Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, type Material } from 'three';
 import { BACK, RIGHT, UP, type Fit, type V3 } from './camera';
 import { WORLD, rng } from './palette';
 import { PLANE_FLIGHT } from './pose';
@@ -85,7 +85,18 @@ export interface PlanInput {
   readonly loops?: number;
   /** the plane's scale on screen (office-scene: never under PLANE_MIN_PX): the loop and zigzag size with it */
   readonly unit?: number;
+  /** the '?' / '✗' pills on the way (the bims' heads): it never loops over one, it sweeps past (bims m_31314) */
+  readonly avoid?: readonly V3[];
 }
+
+/** how far on screen (view-plane units) a point is from another: the iso view's own distance */
+function onScreen(a: V3, b: V3): number {
+  const d = sub(a, b);
+  return Math.hypot(dot(d, RIGHT), dot(d, UP));
+}
+
+/** the loop's places to try, u of its middle (seeded order: the same flight for the same message) */
+const LOOP_AT = [0.42, 0.46, 0.5, 0.54, 0.38, 0.58, 0.34, 0.62] as const;
 
 /** the path's point at u (0: from, 1: to), the plane's own path before time; `to` may have moved since the plan */
 function pathAt(f: FlightPlan, u: number, to: V3): V3 {
@@ -123,7 +134,7 @@ export function planFlight(inp: PlanInput): FlightPlan {
   // zigzag and the loop scale with the way he sees, never under the plane's own size
   const seen = Math.hypot(dot(way, RIGHT), dot(way, UP));
   const r = Math.max(0.95 * unit, 0.13 * seen) * (0.9 + 0.25 * rand());
-  const plan: FlightPlan = {
+  const draft: FlightPlan = {
     from, to, side, sign, loops, r, loopFwd,
     zig: Math.min(Math.max(1.3 * unit, 0.32 * seen) * (0.8 + 0.4 * rand()), 0.3 * Math.max(level, 1)),
     waves: 1.6 + 0.5 * rand(),
@@ -131,10 +142,30 @@ export function planFlight(inp: PlanInput): FlightPlan {
     phug: 0.12 * unit,
     phugWaves: 2.5 + rand(),
     phase: rand() * Math.PI * 2,
-    loopAt: 0.42 + 0.14 * rand(),
+    loopAt: 0.5,
     loopW: 0.2,
     times: [],
   };
+  // where it loops: the first place (from a seeded start) whose circle keeps clear of every pill on
+  // screen; none clear, the one farthest from them
+  const clear = 0.9 * unit;
+  const start = Math.floor(rand() * 4);
+  const avoid = inp.avoid ?? [];
+  let best = { at: 0.5, gap: -Infinity };
+  for (let i = 0; i < LOOP_AT.length; i++) {
+    const at = LOOP_AT[(start + i) % LOOP_AT.length] ?? 0.5;
+    // the loop's own points (24 along its window): the nearest any comes to a pill on screen
+    const cand = { ...draft, loopAt: at };
+    const half = (cand.loopW * loops) / 2;
+    let gap = Infinity;
+    for (let k = 0; k <= 24 && avoid.length > 0; k++) {
+      const p = pathAt(cand, at - half + (2 * half * k) / 24, to);
+      for (const q of avoid) gap = Math.min(gap, onScreen(p, q));
+    }
+    if (gap > clear) { best = { at, gap }; break; }
+    if (gap > best.gap) best = { at, gap };
+  }
+  const plan: FlightPlan = { ...draft, loopAt: best.at };
   // time from speed: a steady glide's speed v0, less up a climb and more down a dive than its glide
   // line (v² = v0² - 2g·Δy), thrown fast from his hand, slowed by the flare into the bim's hand
   const g = 9.8;
@@ -222,8 +253,23 @@ export function flightAt(f: FlightPlan, s: number, to: V3 = f.to): FlightFrame {
   return { p, nose, up, u, grow: 1 + (PLANE_GROW - 1) * (1 - smooth(0, FAR, u)) };
 }
 
+/** its ground shadow (bims m_31314: it sells the height, the loop's most): how dark at the floor, gone by FADE_H units up */
+const SHADOW_ALPHA = 0.2;
+const SHADOW_FADE_H = 7;
+
+/** The shadow under a plane at p over a floor at y=floor: its opacity and size (1: the plane's), 0 high up. Pure. */
+export function shadowOf(p: V3, floor: number): { alpha: number; size: number } {
+  const h = Math.max(0, p.y - floor);
+  return { alpha: SHADOW_ALPHA * (1 - smooth(0, SHADOW_FADE_H, h)), size: 1 + h * 0.12 };
+}
+
 export interface Plane {
+  /** the plane itself, oriented by the caller */
   readonly group: Group;
+  /** its soft shadow, flat on the floor (the caller places it; hidden off the slab) */
+  readonly shadow: Mesh;
+  /** a hairline ink edge (light theme: white paper on the cream page needs one) */
+  setInk(on: boolean): void;
   dispose(): void;
 }
 
@@ -241,13 +287,33 @@ export function makePlane(style: Style): Plane {
   const keel = new Mesh(style.box(0.02, 0.07, 0.38), fold);
   keel.position.set(0, -0.035, -0.01);
   g.add(wingL, wingR, keel);
+  // the ink edge: each part's outline, a hairline at any size (lines are one px)
+  const inkMat = new LineBasicMaterial({ color: WORLD.ink, transparent: true, opacity: 0.55 });
+  const edges = [wingL, wingR, keel].map((m) => {
+    const e = new LineSegments(new EdgesGeometry(m.geometry), inkMat);
+    m.add(e);
+    return e;
+  });
   g.scale.setScalar(1.3);
+  const shadowMat = new MeshBasicMaterial({ color: WORLD.ink, transparent: true, opacity: SHADOW_ALPHA, depthWrite: false });
+  const shadow = new Mesh(new CircleGeometry(0.2, 24), shadowMat);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.scale.set(0.8, 1.4, 1); // longer along the nose (its local y once flat; the caller turns it)
+  shadow.visible = false;
   return {
     group: g,
+    shadow,
+    setInk(on) {
+      for (const e of edges) e.visible = on;
+    },
     dispose() {
       for (const m of [wingL, wingR, keel]) m.geometry.dispose();
+      for (const e of edges) e.geometry.dispose();
+      shadow.geometry.dispose();
       paper.dispose();
       fold.dispose();
+      inkMat.dispose();
+      shadowMat.dispose();
     },
   };
 }

@@ -8,8 +8,9 @@ import { Color, Group, Matrix4, Mesh, MeshBasicMaterial, RingGeometry, Vector3, 
 import type { Agent } from '@/proto';
 import type { BimFrame, Look, Motion, Office } from '../model';
 import { makeBim, type Bim } from './bim';
-import type { Fit } from './camera';
-import { cameraStart, flightAt, makePlane, planFlight, type FlightPlan, type Plane } from './plane';
+import { pillOf } from '../labels';
+import { siteOf, type Fit, type V3 } from './camera';
+import { cameraStart, flightAt, makePlane, planFlight, shadowOf, type FlightPlan, type Plane } from './plane';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { skateRig } from './skate';
 import { eggRig } from './egg';
@@ -26,6 +27,9 @@ import type { Style } from './style';
 /** his plane's length in office units (plane.ts's wings), its least length on screen, and the iso view's shortening of it */
 const PLANE_LEN = 0.42;
 const PLANE_MIN_PX = 12;
+/** a bim's pill, office units up (over its head: its loop keeps clear of it); the plane's shadow just over the floor */
+const PILL_Y = 1.7;
+const FLOOR_LIFT = 0.02;
 const PLANE_FORESHORTEN = 1.25;
 /** how much of the eclipse's violet goes into the backdrop */
 const ECLIPSE_MIX = 0.45;
@@ -152,8 +156,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     return b;
   }
 
-  function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit): boolean {
+  function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit, light: boolean): boolean {
     const flying = new Set<string>();
+    const site = office ? siteOf(office) : null;
     for (const f of frames) {
       const s = f.pose.plane?.since;
       if (s === undefined || s < 0 || s >= PLANE_FLIGHT) continue;
@@ -167,15 +172,27 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       const leftAt = (t - s).toFixed(2);
       let p = planes.get(f.name);
       if (p?.leftAt !== leftAt) {
-        if (p) { root.remove(p.mesh.group); p.mesh.dispose(); }
+        if (p) { root.remove(p.mesh.group, p.mesh.shadow); p.mesh.dispose(); }
         const loops = f.egg?.kind === 'loop' ? 2 : 1;
-        p = { mesh: makePlane(style), leftAt, plan: planFlight({ from: cameraStart(fit), to: hand, seed: hash(`${f.name}@${leftAt}`), loops, unit: size }) };
+        const avoid = pillHeads(frames, f.name);
+        p = { mesh: makePlane(style), leftAt, plan: planFlight({ from: cameraStart(fit), to: hand, seed: hash(`${f.name}@${leftAt}`), loops, unit: size, avoid }) };
         planes.set(f.name, p);
-        root.add(p.mesh.group);
+        root.add(p.mesh.group, p.mesh.shadow);
       }
       const fl = flightAt(p.plan, s, hand);
       const g = p.mesh.group;
       g.visible = true;
+      p.mesh.setInk(light);
+      // its soft shadow on the floor once it is over the slab, fainter and wider as it climbs
+      const sh = shadowOf(fl.p, 0);
+      const over = site !== null && fl.p.x > site.x0 && fl.p.x < site.x1 && fl.p.z > site.z0 && fl.p.z < site.z1;
+      p.mesh.shadow.visible = over && sh.alpha > 0.01;
+      if (p.mesh.shadow.visible) {
+        p.mesh.shadow.position.set(fl.p.x, FLOOR_LIFT, fl.p.z);
+        p.mesh.shadow.rotation.z = Math.atan2(fl.nose.x, fl.nose.z);
+        p.mesh.shadow.scale.set(0.8 * size * sh.size, 1.4 * size * sh.size, 1);
+        (p.mesh.shadow.material as MeshBasicMaterial).opacity = sh.alpha;
+      }
       g.scale.setScalar(size * fl.grow);
       g.position.set(fl.p.x, fl.p.y, fl.p.z);
       // its nose along +z, its top +y (plane.ts): upside down over the loop's top, banked in the turns
@@ -187,9 +204,20 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       g.quaternion.setFromRotationMatrix(basis);
     }
     for (const [name, p] of planes) {
-      if (!flying.has(name)) { root.remove(p.mesh.group); p.mesh.dispose(); planes.delete(name); }
+      if (!flying.has(name)) { root.remove(p.mesh.group, p.mesh.shadow); p.mesh.dispose(); planes.delete(name); }
     }
     return flying.size > 0;
+  }
+
+  /** where the '?' / '✗' pills are (labels.ts pillOf: over the asking and the failed bims' heads), but the target's */
+  function pillHeads(frames: readonly BimFrame[], target: string): V3[] {
+    const out: V3[] = [];
+    for (const f of frames) {
+      if (f.name === target || pillOf(f.pose.seg.act) === null) continue;
+      const rig = rigs.get(f.name);
+      if (rig) out.push({ x: rig.x, y: PILL_Y, z: rig.z });
+    }
+    return out;
   }
 
   function drawHalos(frames: readonly BimFrame[], isNight: boolean): void {
@@ -267,7 +295,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
         lightDesk(d, pal, rig?.screen ?? 0, rig ? rig.lamp : name !== mainName());
         seatChair(d.chair, rig?.seat);
       }
-      if (!look.reduced && drawPlanes(t, frames, fit)) motion = 'walk';
+      if (!look.reduced && drawPlanes(t, frames, fit, !look.night)) motion = 'walk';
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
       if (eggDecor?.update(look.eggs) === true) motion = 'walk';
       // the unlock moment: two bims bring the new piece in from the door

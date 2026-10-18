@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Office, Spot } from '../model';
-import { BACK, RIGHT, fitSite, siteOf, toScreen, type V3 } from './camera';
-import { cameraStart, flightAt, planFlight, type FlightPlan } from './plane';
+import { BACK, RIGHT, UP, fitSite, siteOf, toScreen, type V3 } from './camera';
+import { cameraStart, flightAt, planFlight, shadowOf, type FlightPlan } from './plane';
 import { PLANE_FLIGHT } from './pose';
 
 /** the prototype's office numbers for n agents (maps/loft.ts owns the real ones; these only size the site) */
@@ -111,6 +111,30 @@ describe('his paper plane', () => {
         });
       }
     }
+  });
+
+  it('never loops over a pill: it moves its loop away, and sweeps past', () => {
+    const seen = (a: V3, b: V3): number => Math.hypot(dot({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }, RIGHT), dot({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }, UP));
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const free = plan(seed);
+      const top = samples(free).reduce((a, b) => (b.up.y < a.up.y ? b : a));
+      const pill = top.p; // a pill right where its loop would turn over
+      const f = planFlight({ from: cameraStart(fit), to: hand, seed, unit: 1.4, avoid: [pill] });
+      expect(f.loopAt).not.toBe(free.loopAt);
+      // the worst case (a pill on its very path): its loop, which went through the pill, now keeps
+      // more than half the plane's size (unit 1.4) from it on screen
+      const inLoop = samples(f).filter((s) => Math.abs(s.u - f.loopAt) < f.loopW / 2);
+      expect(Math.min(...inLoop.map((s) => seen(s.p, pill)))).toBeGreaterThan(1.4 * 0.6);
+      expect(loopsOf(f)).toBe(1);
+    }
+  });
+
+  it('casts a soft shadow, fainter as it climbs', () => {
+    const low = shadowOf({ x: 0, y: 0.5, z: 0 }, 0);
+    const high = shadowOf({ x: 0, y: 4, z: 0 }, 0);
+    expect(low.alpha).toBeGreaterThan(high.alpha);
+    expect(high.size).toBeGreaterThan(low.size);
+    expect(shadowOf({ x: 0, y: 20, z: 0 }, 0).alpha).toBe(0);
   });
 
   it('is replayable: the same seed the same flight, another seed another', () => {
