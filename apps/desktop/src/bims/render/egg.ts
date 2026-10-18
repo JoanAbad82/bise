@@ -31,7 +31,8 @@ export function eggRig(rig: Rig, egg: BimEgg | null): Rig {
         return { ...rig, armR: [-1.3 + Math.sin(s * 18) * 0.25, 0, 0] };
       case 'clap': {
         const c = 0.35 + Math.sin(s * 14) * 0.3;
-        return { ...rig, armL: [-1.3, 0, c], armR: [-1.3, 0, -c], mouth: 'laugh' };
+        // the paper down while it claps (main reads one when idle: the clap hid behind it)
+        return { ...rig, armL: [-1.3, 0, c], armR: [-1.3, 0, -c], mouth: 'laugh', props: { ...rig.props, newspaper: false } };
       }
       case 'dance':
         return { ...rig, armL: [-1.5, 0, 0], armR: [-1.5, 0, 0], body: add(rig.body, [0, 0, Math.sin(s * 6) * 0.2]), y: rig.y + Math.abs(Math.sin(s * 6)) * 0.08 };
