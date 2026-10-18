@@ -111,6 +111,7 @@ export function mount(el: HTMLElement, opts: MountOpts = {}): HeroTown {
           probe: q.has('herotest'),
           ...(q.has('herot') ? { startT: Number(q.get('herot')) } : {}),
           ...(q.has('herobuild') ? { entryAt: Number(q.get('herobuild')) } : {}),
+          manual: q.has('herostep'),
           on: emit,
         });
         for (const f of later.splice(0)) f(film);

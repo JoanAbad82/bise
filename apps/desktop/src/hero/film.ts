@@ -36,6 +36,8 @@ export interface FilmOpts {
   readonly startT?: number;
   /** the entry build held at this ms (a check's frame of the build strip) */
   readonly entryAt?: number;
+  /** with the probe: no loop, the check draws each frame (probe.step) */
+  readonly manual?: boolean;
   /** the visitor took the camera ('control'), the film took it back ('film'); the first frame is drawn ('ready'); no WebGL ('lost') */
   readonly on?: (e: 'control' | 'film' | 'ready' | 'lost') => void;
 }
@@ -60,6 +62,10 @@ interface Probe {
   phases: { brain: number; pose: number; draw: number; words: number }[];
   /** each office at the last frame: drawn live, its bims (where the driver poses them, on the canvas or not) */
   offices: { id: string; live: boolean; bims: { name: string; k: string; x: number; z: number; head: boolean }[] }[];
+  /** the entry build's ms at the last frame (≥ 2800: the film runs) */
+  entry?: number;
+  /** FilmOpts.manual: draw one frame, ms after the last */
+  step?: (ms: number) => void;
 }
 
 /** the page's paper (designer m_30837) */
@@ -281,6 +287,15 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   let drawn = 0;
   let gone = false;
   const running = (): boolean => !gone && onScreen && !document.hidden;
+  // a check's film by the frame (the entry strip, its mp4): no loop, each frame drawn by probe.step
+  const manual = probe !== null && opts.manual === true;
+  let manualMs = 1;
+  if (probe && manual) {
+    probe.step = (ms) => {
+      manualMs += ms;
+      draw(manualMs);
+    };
+  }
 
   function draw(nowMs: number): void {
     raf = 0;
@@ -338,6 +353,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       probe.ms = [...probe.ms.slice(-299), performance.now() - t0];
       probe.phases = [...probe.phases.slice(-299), { brain: t1 - t0, pose: t2 - t1, draw: t3 - t2, words: t4 - t3 }];
       probe.T = filmT(t);
+      probe.entry = ems;
       probe.hands = hands.k;
       probe.shot = shotIx;
       probe.cam = spring.cam;
@@ -349,7 +365,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       }));
     }
     // reduced motion: a frame only when something moves (his gesture, a cut); the film never plays
-    if (!reduced || glide !== null) next();
+    if (!manual && (!reduced || glide !== null)) next();
   }
 
   /** the build's camera: the wide while the town grows, then an ease to the film's first shot */
@@ -403,7 +419,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   }
 
   function kick(): void {
-    if (raf !== 0 || !running()) return;
+    if (manual || raf !== 0 || !running()) return;
     raf = requestAnimationFrame(draw);
   }
 
