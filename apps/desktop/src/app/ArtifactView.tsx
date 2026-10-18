@@ -91,7 +91,7 @@ export function useEscClosesArtifact(close: () => void, on: boolean): void {
     if (!on) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.repeat || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-      if (popupOpen() || overOpen() || inFind(document.activeElement)) return;
+      if (popupOpen() || overOpen() || inFind(document.activeElement) || cardOpen()) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       // a zoomed image goes back to fit first; the next esc closes (zoomKeys.ts)
@@ -125,6 +125,11 @@ function fromArtifactFrame(source: MessageEventSource | null): boolean {
 /** A bar slid over the window (the left bar under 1200 px, the maker's thread under 1000): its esc first. */
 function overOpen(): boolean {
   return document.querySelector('[data-testid^="app.over."]') !== null;
+}
+
+/** An item open in the inbox block (its 'esc fold'): its esc folds it first, the next closes (esc-fold, his ask). */
+function cardOpen(): boolean {
+  return document.querySelector('[data-testid="inbox.block"][data-open]') !== null;
 }
 
 /** The thread's find bar (⌘F) with the focus: its esc closes it first. */

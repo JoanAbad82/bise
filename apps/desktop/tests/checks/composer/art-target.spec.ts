@@ -208,6 +208,18 @@ for (const theme of ['light', 'dark'] as const) {
       await page.waitForTimeout(220);
       await plain('the merge open beside it');
       await shot('approval');
+
+      // (5) esc-fold (his ask): the item open beside the artifact takes the first esc (it folds, the
+      // artifact and perf's thread stay); the next esc closes the artifact, main's thread
+      await field.click();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-testid^="inbox.block.open."]')).toHaveCount(0);
+      await page.waitForTimeout(300);
+      await expect(art, 'the fold took the esc: the artifact stays').toHaveCount(1);
+      await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf');
+      await page.keyboard.press('Escape');
+      await expect(art).toHaveCount(0);
+      await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'main');
     } finally {
       await s.close();
       pages.server.close();
