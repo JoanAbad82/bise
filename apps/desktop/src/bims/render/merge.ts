@@ -96,7 +96,7 @@ export function mergeRoot(root: Object3D, style: Style, shadows: boolean): Merge
       // an object merged already (its colours in its vertices, its material white: cozy.ts mergeInto)
       // keeps them, tinted by its material; painted one colour, the town's merge of the office turned
       // the cozy plants and pots white (bims m_32697)
-      const own = m.vertexColors && geo.getAttribute('color') !== undefined;
+      const own = m.vertexColors && geo.hasAttribute('color');
       plain.push(own ? tinted(prepared(geo, obj.matrixWorld, false, true), m.color.r, m.color.g, m.color.b) : painted(prepared(geo, obj.matrixWorld, false), m.color.r, m.color.g, m.color.b));
       return;
     }
