@@ -6,7 +6,7 @@ holds old and new images:
   1. shots_keep_days = 30: the hub's first tick prunes; a 10-day-old image
      stays, a crashed write's leftover (2 days) goes, a file the store did
      not write stays;
-  2. an open card (t1 asks main, main makes it his card) names another
+  2. an open card (main asks the user: sb notify) names another
      10-day-old image;
   3. shots_keep_days = 7 and the hub's stamps cleared (a day later): the
      next tick touches the named image (its mtime is fresh again) and
@@ -77,14 +77,9 @@ def main():
         check(left() == sorted([OLD + ".b64", OLD + ".png", NAMED + ".b64", NAMED + ".png", NEW + ".b64", NEW + ".png", "notes.txt"]),
               "at 30 days the 10-day-old images stay: %r" % left())
 
-        # an open card names NAMED: t1 asks main, main makes it the user's card
+        # an open card names NAMED: main asks the user (sb notify, his inbox)
         c.wait_idle("main")
-        c.say('/new t1: {{bash: sb send main --expect-reply "which one?"}}')
-        c.wait(lambda: any(r.get("from") == "t1" and r.get("id") for r in c.feed("main", "msg-in")), 120,
-               "t1's question in main's feed")
-        mid = [r["id"] for r in c.feed("main", "msg-in") if r.get("from") == "t1" and r.get("id")][0]
-        c.wait_idle("main")
-        c.say('[[bash: sb card --for m_%d "this one? %s/%s.png"]]' % (mid, store, NAMED))
+        c.say('[[bash: sb notify "this one? %s/%s.png"]]' % (store, NAMED))
         # a client's card row says its words in `question` (bise_proto rows::cards::Card)
         c.wait(lambda: any(NAMED in cd.get("question", "") for cd in c.cards()), 60, "the open card naming the image")
 
