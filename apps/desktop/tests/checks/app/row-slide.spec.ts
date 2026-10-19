@@ -56,8 +56,11 @@ const world = [
 /** A recording: its frames, and `s`: when the browser started the transform transition the event
  *  made (its CSSTransition's startTime, ms after the event; null: none started, the line jumped or
  *  never moved). Under load Chrome starts a transition well after the event (270 ms at load 23,
- *  row-slide's runs/mutation.log): the delay and the pace are the transition's, timed from there. */
-interface Rec { xs: { t: number; x: number }[]; s: number | null }
+ *  row-slide's runs/mutation.log): the delay and the pace are the transition's, timed from there.
+ *  `a`: the frame was read once that start was known. A read while the new transition is still
+ *  pending (no startTime yet) gives its end value, not where the line is: the leave's first frame
+ *  read 0, the next -24.6 (runs/p3/mut-home.log), a false 'further left' (rs3.log run 3's red). */
+interface Rec { xs: { t: number; x: number; a: boolean }[]; s: number | null }
 
 async function record(role: Locator, on: 'mouseenter' | 'mouseleave'): Promise<void> {
   await role.evaluate((e, ev) => {
@@ -79,7 +82,7 @@ async function record(role: Locator, on: 'mouseenter' | 'mouseleave'): Promise<v
         const a = inner.getAnimations().find((n) => (n as CSSTransition).transitionProperty === 'transform' && typeof n.startTime === 'number' && n.startTime >= from);
         if (a) rec.s = Math.round((a.startTime as number) - t0);
       }
-      rec.xs.push({ t: Math.round(performance.now() - (t0 ?? start + 1e6)), x });
+      rec.xs.push({ t: Math.round(performance.now() - (t0 ?? start + 1e6)), x, a: rec.s !== null });
       requestAnimationFrame(tick);
     };
     tick();
@@ -95,8 +98,10 @@ async function stop(page: Page): Promise<Rec> {
   });
 }
 
-/** The frames from the transition's start on (t 0 there), or from the event when none started. */
-const fromStart = (r: Rec) => r.xs.filter((f) => f.t >= (r.s ?? 0)).map((f) => ({ t: f.t - (r.s ?? 0), x: f.x }));
+/** The frames read once the transition had started (t 0 at its start), or from the event when
+ *  none started (a line that jumps or never moves keeps every frame). */
+const fromStart = (r: Rec) =>
+  r.xs.filter((f) => f.t >= (r.s ?? 0) && (r.s === null || f.a)).map((f) => ({ t: f.t - (r.s ?? 0), x: f.x }));
 
 const wait = (page: Page, ms: number) => page.evaluate((m) => new Promise<void>((done) => { setTimeout(done, m); }), ms);
 
