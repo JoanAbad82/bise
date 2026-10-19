@@ -30,6 +30,11 @@ describe("readFrame: an image's zoom from the side panel frame (image-pinch)", (
     expect(readFrame({ bise: 'zoom' }, { origin: SRV, source: w }, fr)).toBeNull();
     expect(readFrame({ bise: 'esc' }, { origin: SRV, source: w }, fr), "esc is ArtifactView's, never read here").toBeNull();
   });
+  it("reads a video's {bise: size, h}: a finite height in px, never from elsewhere (video-view)", () => {
+    expect(readFrame({ bise: 'size', h: 467.4 }, { origin: SRV, source: w }, fr)).toEqual({ kind: 'size', h: 467 });
+    for (const h of [0, -5, Number.NaN, Number.POSITIVE_INFINITY, '400', 50_000]) expect(readFrame({ bise: 'size', h }, { origin: SRV, source: w }, fr)).toBeNull();
+    expect(readFrame({ bise: 'size', h: 400 }, { origin: 'https://evil.example', source: w }, fr)).toBeNull();
+  });
   it('the way back to fit is {bise: fit}', () => {
     expect(FIT_MESSAGE).toEqual({ bise: 'fit' });
   });

@@ -90,6 +90,18 @@ for (const theme of ['light', 'dark'] as const) {
         const root = f.locator('.office-video');
         await expect(root).toHaveAttribute('data-state', 'paused', { timeout: 20_000 });
         await expect(root).toHaveAttribute('data-fit', 'true');
+        // the screen at the video's own ratio, the bar right under it (designer m_32678)
+        // (or, when the panel is shorter than that, all the height there is: thin side bars)
+        const scr = await f.locator('.office-video .screen').boundingBox();
+        const vid = await f.locator('.office-video video').boundingBox();
+        const barB = await f.locator('.office-video .bar').boundingBox();
+        const stage = await f.locator('.office-video').boundingBox();
+        if (scr === null || vid === null || barB === null || stage === null) throw new Error('no player');
+        const ratio = (scr.width * 360) / 640;
+        const room = stage.height - barB.height;
+        expect(Math.abs(scr.height - Math.min(ratio, room)), "the screen: the clip's ratio at its width, or the room there is").toBeLessThanOrEqual(2);
+        expect(Math.abs(vid.width * 360 - vid.height * 640) / 640, 'the frame keeps 16:9').toBeLessThanOrEqual(2);
+        expect(Math.abs(barB.y - (scr.y + scr.height)), 'the bar right under the screen').toBeLessThanOrEqual(1);
         await expect(f.locator('.office-video .time')).toHaveText('0:00 / 0:08');
         const frame = page.frames().find((x) => /\/a\/[^/?#]+\/view(\?|$)/u.test(x.url()));
         if (frame === undefined) throw new Error('no viewer frame');
@@ -119,15 +131,25 @@ for (const theme of ['light', 'dark'] as const) {
         const cx = Math.round(sb.x + sb.width / 2);
         const cy = Math.round(sb.y + sb.height / 2);
 
-        await test.step('a click on the frame plays, space pauses; paused, the moment is the note', async () => {
+        await test.step('space plays and pauses, nothing picked; a click on the frame picks it, the next plays', async () => {
+          await fi.click(cx, cy);
+          await expect(f.locator('.office-note-btn'), 'a click on a paused frame picks it').toBeVisible();
           await fi.click(cx, cy);
           await expect(root).toHaveAttribute('data-state', 'playing');
+          await expect(f.locator('.office-note-btn'), 'playing: nothing to ask about').toHaveCount(0);
           await expect.poll(async () => (await player(frame)).t, { timeout: 5000 }).toBeGreaterThan(0.6);
           await shot('playing');
           await fi.press('Space');
           await expect(root).toHaveAttribute('data-state', 'paused');
+          expect((await player(frame)).sel, 'paused by space: nothing picked (designer m_32678)').toBeNull();
+          await expect(f.locator('.office-note-btn')).toHaveCount(0);
+          await fi.press('Space');
+          await expect(root).toHaveAttribute('data-state', 'playing');
+          // a click while it plays pauses on that frame and picks it
+          await fi.click(cx, cy);
+          await expect(root).toHaveAttribute('data-state', 'paused');
           const p = await player(frame);
-          expect(p.sel?.kind, 'paused: a time anchor').toBe('time');
+          expect(p.sel?.kind, 'the frame he clicked: a time anchor').toBe('time');
           expect(Math.abs((p.sel?.t ?? -1) - p.t)).toBeLessThan(0.02);
           await expect(f.locator('.office-note-btn'), 'the note button offers the moment').toBeVisible();
         });
@@ -140,6 +162,7 @@ for (const theme of ['light', 'dark'] as const) {
           await key(frame, '.');
           await expect.poll(async () => (await player(frame)).t - t1).toBeGreaterThan(0.02);
           expect((await player(frame)).paused).toBe(true);
+          await expect(f.locator('.office-note-btn'), 'another moment: the pick goes').toHaveCount(0);
           await tap('.office-video .rate');
           await expect(f.locator('.office-video .rate')).toHaveText('1.5×');
           expect((await player(frame)).rate).toBe(1.5);
@@ -155,6 +178,7 @@ for (const theme of ['light', 'dark'] as const) {
           await expect(f.locator('.office-video .peek')).toBeVisible();
           await expect(f.locator('.office-video .peek .at')).toHaveText('0:02'); // 30% of 8 s: 2.4 s
           await page.waitForTimeout(400);
+          await expect(f.locator('.office-note-btn'), 'nothing picked: no pill over the peek').toHaveCount(0);
           await shot('peek');
           await fi.move(cx, cy);
           await expect(f.locator('.office-video .peek')).toBeHidden();

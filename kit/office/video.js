@@ -4,13 +4,16 @@
 // hands this renderer no bytes, site::STREAMED_KINDS). Our controls, no browser chrome: play,
 // the track (a hover shows that moment's frame, drawn by a second muted player), the time,
 // the speed, loop, sound, fullscreen. Keys: space plays or pauses, ← → 5 s, , . one frame
-// (paused). A note: paused, the moment is the selection (a `time` anchor, bise_proto::anchor);
+// (paused). A note: a frame he clicked is the selection (a `time` anchor, bise_proto::anchor);
 // a box drawn on the frame pauses it and is the selection with its rect (in % of the frame).
+// In the panel the screen takes the video's own ratio, the bar right under it (designer m_32678).
 // The notes layer (select.js) does the rest; its marks are ticks on the track, and a box on
 // the frame around its moment (view.where).
 //
 // Pure helpers (exported for office/sdk/test/viewer.test.mjs): stateOf, keyAction, stepped,
-// seekAt, nextRate, near, timeWords.
+// seekAt, nextRate, near, screenHeight, timeWords.
+
+import { FRAME } from "/kit/office/frame.js";
 
 /** The speeds the speed button goes through, in order. */
 export const RATES = [1, 1.5, 2, 0.5];
@@ -64,6 +67,12 @@ export function nextRate(r) {
 /** A note at `t` is shown on the frame at `now` (its box, if it has one). */
 export function near(now, t) {
   return Math.abs(now - t) <= NEAR_S;
+}
+
+/** The screen's height in the panel: the video's own ratio at the panel's width (the caller
+ * holds it to the room there is). */
+export function screenHeight(w, vw, vh) {
+  return vw > 0 && vh > 0 && w > 0 ? Math.round((w * vh) / vw) : 0;
 }
 
 /** The time line: `0:12 / 1:30` (bise_proto::anchor::clock's words, kit/notes-anchors.js). */
@@ -174,7 +183,23 @@ export async function draw(root, _bytes, info) {
   const dur = () => (Number.isFinite(video.duration) ? video.duration : 0);
 
   // ---- the frame fit in the screen (up or down), centred: boxes in % of what is drawn
+  const inApp = window.name === "bise-app" && window.parent !== window;
+  let told = 0;
   const fit = () => {
+    // in the panel the screen takes the video's own ratio, the bar right under it, the rest the
+    // page's surface; in full screen it takes the whole screen (designer m_32678)
+    const full = document.fullscreenElement === root;
+    const rw = root.clientWidth;
+    const room = root.clientHeight - bar.offsetHeight;
+    const want = screenHeight(rw, vw, vh);
+    screen.style.height = full ? "" : `${Math.max(0, Math.min(room, want))}px`;
+    // in the desktop's panel the card hugs the screen and its bar: the window is told the height
+    // that holds them, from the width only, so its answer never moves it again (designer m_32762)
+    const hug = want + bar.offsetHeight;
+    if (inApp && !full && want > 0 && hug !== told) {
+      told = hug;
+      window.parent.postMessage({ bise: FRAME.size, h: hug }, "*");
+    }
     const bw = screen.clientWidth;
     const bh = screen.clientHeight;
     if (bw <= 0 || bh <= 0) return;
@@ -184,7 +209,7 @@ export async function draw(root, _bytes, info) {
     Object.assign(frame.style, { width: `${w}px`, height: `${h}px`, left: `${Math.round((bw - w) / 2)}px`, top: `${Math.round((bh - h) / 2)}px` });
     root.dataset.fit = "true";
   };
-  new ResizeObserver(() => root.isConnected && fit()).observe(screen);
+  new ResizeObserver(() => root.isConnected && fit()).observe(root);
 
   // ---- what the bar says, from the player's facts
   let frameS = FRAME_S;
@@ -235,8 +260,10 @@ export async function draw(root, _bytes, info) {
     video.requestVideoFrameCallback(onFrame);
   }
 
-  // ---- the selection: paused, the moment; a box drawn on the frame with it
-  let touched = false;
+  // ---- the selection (designer m_32678): only once there is something to ask about, a frame
+  // he clicked (a click while it plays pauses there; paused, a click picks that frame, the
+  // next plays) or a box drawn on it. Playing or moving to another moment drops it.
+  let picked = false;
   let rect = null;
   let box = null;
   // tells the notes layer the selection changed (it offers its button, or takes it away)
@@ -247,16 +274,29 @@ export async function draw(root, _bytes, info) {
     box = null;
   };
   const toggle = () => {
-    touched = true;
+    picked = false;
     if (video.paused || video.ended) {
       clearBox();
       video.play().catch(() => {});
     } else video.pause();
   };
   const seek = (t) => {
-    touched = true;
-    if (Math.abs(t - video.currentTime) > 1e-3) clearBox();
+    if (Math.abs(t - video.currentTime) > 1e-3) {
+      clearBox();
+      picked = false;
+    }
     video.currentTime = t;
+  };
+  // a click on the frame: playing, it pauses on that frame and picks it; paused, the first
+  // click picks the frame it shows, the next plays
+  const clickFrame = () => {
+    if (!video.paused && !video.ended) {
+      video.pause();
+      picked = true;
+    } else if (!picked) {
+      picked = true;
+      said();
+    } else toggle();
   };
   video.addEventListener("play", said);
   video.addEventListener("pause", said);
@@ -282,6 +322,7 @@ export async function draw(root, _bytes, info) {
     setIcon(full, fullNow() ? "exit" : "full");
     full.title = fullNow() ? "leave full screen · esc" : "full screen";
     root.classList.toggle("is-full", fullNow());
+    fit();
   });
 
   // ---- the track: a press seeks, a drag scrubs (a playing video pauses while he scrubs)
@@ -389,13 +430,13 @@ export async function draw(root, _bytes, info) {
     if (!start) return;
     const r = pctBox(start, at(e));
     start = null;
-    // a click, not a box: play or pause
+    // a click, not a box: the frame (clickFrame)
     if (r.w < 1 || r.h < 1) {
       if (box && !rect) clearBox();
-      toggle();
+      clickFrame();
       return;
     }
-    touched = true;
+    picked = true;
     rect = r;
     showBox(r);
   };
@@ -464,11 +505,10 @@ export async function draw(root, _bytes, info) {
       video.muted = !!p.muted;
       setIcon(sound, video.muted ? "muted" : "sound");
       if (p.paused === false) video.play().catch(() => {});
-      touched = true;
     },
-    /** Paused (once he has played or moved it): the moment, with the box drawn on it; else null. */
+    /** A frame he picked (clicked, or drew a box on), paused: its moment, with the box; else null. */
     selection: () => {
-      if (!touched || !video.paused || scrubbing) return null;
+      if (!picked || !video.paused || scrubbing) return null;
       const t = Math.round(video.currentTime * 100) / 100;
       return rect ? { kind: "time", t, rect } : { kind: "time", t };
     },

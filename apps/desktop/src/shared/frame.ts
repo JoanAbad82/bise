@@ -8,4 +8,6 @@
 // - zoom: {fit}, an image's zoom left or reached fit, frame -> window (useFrameNote.ts claims esc
 //   and ⌘0 while fit is false)
 // - fit: back to fit, window -> frame (kit/office/image.js)
-export const FRAME_KINDS = { anchor: 'anchor', esc: 'esc', zoom: 'zoom', fit: 'fit' } as const;
+// - size: {h}, the height that holds the viewer's content, frame -> window (kit/office/video.js;
+//   the card hugs it: useFrameNote.ts, designer m_32762)
+export const FRAME_KINDS = { anchor: 'anchor', esc: 'esc', zoom: 'zoom', fit: 'fit', size: 'size' } as const;

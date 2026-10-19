@@ -121,17 +121,25 @@ function fromFrame(from: FrameFrom, frame: FrameOf): boolean {
   return from.source === frame.window && from.origin.toLowerCase() === frame.origin;
 }
 
-/** What the frame said: a selection, or an image's zoom (fit or not; image-pinch, architect m_30628). */
-export type FrameMsg = { readonly kind: 'anchor'; readonly note: FrameNote } | { readonly kind: 'zoom'; readonly fit: boolean };
+/** What the frame said: a selection, an image's zoom (fit or not; image-pinch, architect m_30628),
+ * or the height that holds a video's player (its card hugs it; video-view, designer m_32762). */
+export type FrameMsg =
+  | { readonly kind: 'anchor'; readonly note: FrameNote }
+  | { readonly kind: 'zoom'; readonly fit: boolean }
+  | { readonly kind: 'size'; readonly h: number };
+
+/** The tallest height a frame may ask for, in CSS px. */
+const MAX_FRAME_H = 20_000;
 
 /**
  * A message from the frame, read once for every kind it may send the window (kit/office/frame.js):
- * a selection (readFrameNote) or {bise: zoom, fit: boolean}; null for anything else, or not from
+ * a selection (readFrameNote), {bise: zoom, fit: boolean} or {bise: size, h}; null for anything else, or not from
  * that frame on the pages server. Pure.
  */
 export function readFrame(data: unknown, from: FrameFrom, frame: FrameOf): FrameMsg | null {
   if (!fromFrame(from, frame) || !isObj(data)) return null;
   if (data.bise === FRAME_KINDS.zoom) return typeof data.fit === 'boolean' ? { kind: 'zoom', fit: data.fit } : null;
+  if (data.bise === FRAME_KINDS.size) return pct(data.h) && data.h > 0 && data.h <= MAX_FRAME_H ? { kind: 'size', h: Math.round(data.h) } : null;
   const note = readFrameNote(data, from, frame);
   return note === null ? null : { kind: 'anchor', note };
 }

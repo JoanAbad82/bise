@@ -316,7 +316,8 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   };
   useMenuAction('save', save);
   const frame = useRef<HTMLIFrameElement>(null);
-  useFrameNote(frame, src, project, id, it?.a.title ?? '');
+  // a video's player asks for the height that holds it: the card hugs the screen and its bar (designer m_32762)
+  const hug = useFrameNote(frame, src, project, id, it?.a.title ?? '');
   const close = () => {
     // ✕ and esc as ‹: back to the place before (designer's desktop-history); opened straight (a link) the list
     if (onClose !== undefined) onClose();
@@ -423,7 +424,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
             A video's player goes full screen from its own button (kit/office/video.js): allow it */}
         {src !== null && (
           <iframe ref={frame} name={APP_FRAME_NAME} className="art-paper" src={src} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            allow="fullscreen"
+            allow="fullscreen" style={hug === null ? undefined : { maxHeight: `${String(hug)}px` }}
             data-testid="artifact.page" />
         )}
 

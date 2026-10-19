@@ -5,7 +5,7 @@
 // focus, so his next keys go there. The composer listens to ANCHOR_EVENT (thread/ThreadComposer.tsx),
 // the one with `about` this artifact. The same listener hears an image's zoom (kit/office/image.js)
 // and lends it the window's esc and ⌘0 while zoomed. Owner: art-desktop.
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { FIT_MESSAGE, originOf, readFrame, type FrameNote } from './frameNote';
 import { claimZoomKeys } from './zoomKeys';
 
@@ -29,9 +29,12 @@ export function sendAnchorAct(a: AnchorAct): void {
  * says (frameNote.ts readFrame): his selections, and an image's zoom (image-pinch, architect
  * m_30628): while the viewer says fit:false, esc and ⌘0 in the window are the zoom's (zoomKeys.ts)
  * and go back to the frame as {bise: fit}; at fit they keep their own job. `file` is the
- * artifact's title for the attachment's row ('q3-forecast.xlsx · v4').
+ * artifact's title for the attachment's row ('q3-forecast.xlsx · v4'). Returns the height a
+ * video's player asked for ({bise: size}, kit/office/video.js): the card hugs it (designer
+ * m_32762); null until one asks, and again for a new src.
  */
-export function useFrameNote(frame: RefObject<HTMLIFrameElement | null>, src: string | null, project: string, id: string, file: string): void {
+export function useFrameNote(frame: RefObject<HTMLIFrameElement | null>, src: string | null, project: string, id: string, file: string): number | null {
+  const [hug, setHug] = useState<{ src: string | null; h: number } | null>(null);
   useEffect(() => {
     const origin = originOf(src);
     let letGo: (() => void) | null = null;
@@ -47,6 +50,10 @@ export function useFrameNote(frame: RefObject<HTMLIFrameElement | null>, src: st
         sendAnchorAct({ project, id, note: m.note, file });
         return;
       }
+      if (m.kind === 'size') {
+        setHug({ src, h: m.h });
+        return;
+      }
       release();
       if (m.fit || win === null || origin === null) return;
       letGo = claimZoomKeys(() => {
@@ -59,4 +66,5 @@ export function useFrameNote(frame: RefObject<HTMLIFrameElement | null>, src: st
       release();
     };
   }, [frame, src, project, id, file]);
+  return hug !== null && hug.src === src ? hug.h : null;
 }

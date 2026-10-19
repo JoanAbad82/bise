@@ -8,5 +8,7 @@
 // - zoom: {fit}, an image's zoom left or reached fit, frame -> window (image.js; the window claims
 //   esc and ⌘0 while fit is false)
 // - fit: back to fit, window -> frame (image.js takes it only from window.parent)
+// - size: {h}, the height that holds the viewer's content, frame -> window (video.js: the screen
+//   at the clip's ratio and its bar; the window's card hugs it, designer m_32762)
 
-export const FRAME = Object.freeze({ anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit" });
+export const FRAME = Object.freeze({ anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit", size: "size" });

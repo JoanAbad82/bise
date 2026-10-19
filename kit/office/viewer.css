@@ -84,12 +84,13 @@ body { font: var(--text-ui) / 1.4 var(--font-ui); }
 .office-changed { outline: 2px solid var(--term-ok) !important; outline-offset: -2px; background-image: linear-gradient(color-mix(in srgb, var(--term-ok) 14%, transparent), color-mix(in srgb, var(--term-ok) 14%, transparent)); transition: outline-color 300ms ease-out; }
 .office-rail .thumb.office-unseen .n::after, .office-tabs button.office-unseen::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 4px; border-radius: 50%; background: var(--term-ok); vertical-align: middle; }
 
-/* a video (kit/office/video.js; video-view): the screen (the frame fit in it, letterboxed in
-   black in both themes, as every player is), then one 40 px bar in the page's colors: play, the
+/* a video (kit/office/video.js; video-view, designer m_32678): the screen at the video's own
+   ratio (its height set by video.js; black only for thin side bars when the panel is wider than
+   the ratio, and in full screen), then one 40 px bar right under it, the rest the page's surface in the page's colors: play, the
    time, the track (buffered, played, the head, the notes' ticks, the hover's frame), speed,
    loop, sound, full screen. In full screen the bar floats over the foot of the frame. */
 .office-video { flex: 1; min-width: 0; display: flex; flex-direction: column; outline: none; background: var(--surface-made); }
-.office-video .screen { flex: 1; min-height: 0; position: relative; overflow: hidden; background: #000; cursor: pointer; user-select: none; touch-action: none; }
+.office-video .screen { flex: none; min-height: 0; position: relative; overflow: hidden; background: #000; cursor: pointer; user-select: none; touch-action: none; }
 .office-video:not([data-fit]) .frame { visibility: hidden; }
 .office-video .frame { position: absolute; }
 .office-video video { display: block; width: 100%; height: 100%; }
@@ -122,6 +123,7 @@ body { font: var(--text-ui) / 1.4 var(--font-ui); }
 .office-video .peek .at { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); padding-bottom: 2px; }
 /* full screen: the frame on black, the bar over its foot */
 .office-video.is-full { background: #000; }
+.office-video.is-full .screen { flex: 1; }
 .office-video.is-full .bar { position: absolute; left: 0; right: 0; bottom: 0; border-top: 0; background: color-mix(in srgb, var(--surface-made) 88%, transparent); backdrop-filter: blur(12px); }
 @media (prefers-reduced-motion: reduce) {
   .office-video .head { transition: none; }

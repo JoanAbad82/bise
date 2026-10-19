@@ -178,7 +178,7 @@ test("image.js loads its zoom and the frame's kinds", async () => {
   const { boxPct } = await helpers("image.js");
   assert.equal(typeof boxPct, "function");
   const { FRAME } = await import(pathToFileURL(join(root, "kit", "office", "frame.js")).href);
-  assert.deepEqual(FRAME, { anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit" });
+  assert.deepEqual(FRAME, { anchor: "anchor", esc: "esc", zoom: "zoom", fit: "fit", size: "size" });
 });
 
 test("a site's selection is read again before it counts (architect m_24172)", async () => {
@@ -270,7 +270,9 @@ test("pdf.js runs a pdf with no eval, no pdf JavaScript, nothing fetched (archit
 test("a video's player: its states, its keys, its moments", async () => {
   const { createRequire } = await import("node:module");
   createRequire(import.meta.url)(join(root, "kit", "notes-anchors.js"));
-  const { stateOf, keyAction, stepped, seekAt, nextRate, near, timeWords, RATES, JUMP_S } = await helpers("video.js");
+  const { stateOf, keyAction, stepped, seekAt, nextRate, near, timeWords, screenHeight, RATES, JUMP_S } = await helpers("video.js");
+  // the screen at the video's own ratio (designer m_32678): 16:9 in 737 px is 415 px tall
+  assert.deepEqual([screenHeight(737, 1920, 1080), screenHeight(400, 1080, 1920), screenHeight(0, 16, 9), screenHeight(500, 0, 0)], [415, 711, 0, 0]);
   const m = (o) => ({ error: null, readyState: 4, ended: false, paused: true, ...o });
   assert.deepEqual(
     [m({ readyState: 0 }), m({}), m({ paused: false }), m({ ended: true, paused: true }), m({ error: { code: 4 }, paused: false })].map(stateOf),
