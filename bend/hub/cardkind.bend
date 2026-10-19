@@ -4,6 +4,7 @@
 # model.bend (its line limit). Pure.
 import Base
 import ./model.bend as M
+import ./gen/state.bend as S
 import ./lazy.bend as LZ
 
 # the hub's items with numbered options (opened by the hub's Rust side,
@@ -30,18 +31,18 @@ def user_kind(+k: String) -> Bool:
   String.eq(k, "question") || String.eq(k, "drop") || String.eq(k, "confirm") || choice_kind(k) || page_kind(k)
 
 # the ids of the open cards that are not the user's (an older journal's)
-def legacy_cards(xs: List<&2, M.Card>) -> List<&2, Nat>:
+def legacy_cards(xs: List<&2, S.Card>) -> List<&2, Nat>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = legacy_cards(t)
-      Bool.pick(List<&2, Nat>, user_kind(M.Card.kind(h)), rest, M.Card.id(h) <> rest)
+      Bool.pick(List<&2, Nat>, user_kind(S.Card.kind(h)), rest, S.Card.id(h) <> rest)
 
 # the open card that holds message `id` (an escalated question)
-def card_holding(xs: List<&2, M.Card>, +id: Nat) -> Maybe<&2, Nat>:
+def card_holding(xs: List<&2, S.Card>, +id: Nat) -> Maybe<&2, Nat>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, Nat>, M.maybe_nat_is(M.Card.for_msg(h), id), u => Some{M.Card.id(h)}, u => card_holding(t, id))
+      LZ.pick(Maybe<&2, Nat>, M.maybe_nat_is(S.Card.for_msg(h), id), u => Some{S.Card.id(h)}, u => card_holding(t, id))

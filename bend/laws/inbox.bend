@@ -5,6 +5,7 @@
 # fails it.
 import Base
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/answers.bend as HA
@@ -17,26 +18,26 @@ law closed_without_him_has_no_answer:
   for +cx: HX.Cx<o>
   for +id: Nat
   for +res: String
-  {HC.close_card(o, cx, id, res) == HC.close_card_ans(o, cx, id, res, HM.no_ans()) : HX.Cx<o>}
+  {HC.close_card(o, cx, id, res) == HC.close_card_ans(o, cx, id, res, HS.Ans.empty()) : HX.Cx<o>}
 
 # LAW: his answer to a question journals his words as he said them, and
 # the option's words when he picked by its number (the pick of the route
 # line, picks.bend): the history never reads the digit alone.
 law answered_close_carries_his_words:
-  for +c: HM.Card
+  for +c: HS.Card
   for +said: String
   for +via: String
-  {HA.his_ans(c, said, via) == HM.Ans{said, HPK.pick_n(HPK.option_pick(HM.Card.text(c), said)), HA.opt_words(HPK.pick_words(HPK.option_pick(HM.Card.text(c), said))), via, "", ""} : HM.Ans}
+  {HA.his_ans(c, said, via) == HA.ans(said, HPK.pick_n(HPK.option_pick(HS.Card.text(c), said)), HA.opt_words(HPK.pick_words(HPK.option_pick(HS.Card.text(c), said))), via, "", "") : HS.Ans}
 
 # LAW: the digit `2` on '2. only at checkout' journals the option's words.
 law a_picked_digit_journals_its_words:
-  {HA.his_ans(HM.Card{7n, "question", "perf", "which one?
+  {HA.his_ans(HM.card(7n, "question", "perf", "which one?
 1. at every step
-2. only at checkout", None{}, 0n, None{}, None{}}, "2", "inbox") == HM.Ans{"2", Some{2n}, "only at checkout", "inbox", "", ""} : HM.Ans}
+2. only at checkout", None{}, 0n, None{}, None{}), "2", "inbox") == HA.ans("2", Some{2n}, "only at checkout", "inbox", "", "") : HS.Ans}
 
 # LAW: an approval's digit journals its words (1 allow, 2 always, 3 no).
 law an_approval_digit_journals_its_words:
-  {HA.confirm_ans(" 2 ", "inbox") == HM.Ans{"2", Some{2n}, "always", "inbox", "", ""} : HM.Ans}
+  {HA.confirm_ans(" 2 ", "inbox") == HA.ans("2", Some{2n}, "always", "inbox", "", "") : HS.Ans}
 
 # LAW: a card not due (closed without him, or its position given
 # already) takes no position: nothing changes.

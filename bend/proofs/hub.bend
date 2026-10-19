@@ -176,25 +176,25 @@ def Laws.stop_leaves_no_card(o, cx, n, life, why, u):
       Equal.trans(HM.St, HX.d(o, cx2), HX.d(o, cx1), HX.d(o, cx), PL1.hub_d_fail_waiters(o, cx1, n, "stopped"),
         PL1.hub_d_hout(o, cx, [J.kv("fx", J.JStr{"kill"}), J.kv("agent", J.JStr{n})]))))
   # the cards of cx6 are those of cx
-  +e6 = Equal.trans(List<&2, HM.Card>, c6, HM.St.cards(HX.d(o, cx5)), HM.St.cards(HX.d(o, cx)),
+  +e6 = Equal.trans(List<&2, HS.Card>, c6, HM.St.cards(HX.d(o, cx5)), HM.St.cards(HX.d(o, cx)),
     PL2.hub_cards_reject(o, ids, cx5),
-    Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, cx5)), HM.St.cards(HM.apply(HX.d(o, cx4), ev)), HM.St.cards(HX.d(o, cx)),
-      Equal.cong(HM.St, List<&2, HM.Card>, s => HM.St.cards(s), HX.d(o, cx5), HM.apply(HX.d(o, cx4), ev), PL1.hub_d_emit(o, cx4, ev, Unit{}, Unit{}, Unit{})),
-      Equal.trans(List<&2, HM.Card>, HM.St.cards(HM.apply(HX.d(o, cx4), ev)), HM.St.cards(HX.d(o, cx4)), HM.St.cards(HX.d(o, cx)),
+    Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, cx5)), HM.St.cards(HM.apply(HX.d(o, cx4), ev)), HM.St.cards(HX.d(o, cx)),
+      Equal.cong(HM.St, List<&2, HS.Card>, s => HM.St.cards(s), HX.d(o, cx5), HM.apply(HX.d(o, cx4), ev), PL1.hub_d_emit(o, cx4, ev, Unit{}, Unit{}, Unit{})),
+      Equal.trans(List<&2, HS.Card>, HM.St.cards(HM.apply(HX.d(o, cx4), ev)), HM.St.cards(HX.d(o, cx4)), HM.St.cards(HX.d(o, cx)),
         PL2.hub_cards_life(HX.d(o, cx4), n, life, Bool.pick(Maybe<&2, String>, String.is_empty(why), None{}, Some{why})),
         PL2.hub_cards_eq(o, cx4, cx, e4))))
   # the cards at the end: those of cx6 without the task's
-  +ef = Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.cards(HX.d(o, g)),
+  +ef = Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.cards(HX.d(o, g)),
     PL2.hub_dropc(HC.card_ids(c6, n, Nil{}), c6),
-    Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.cards(HX.d(o, tg)), HM.St.cards(HX.d(o, g)),
-      Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.cards(HX.d(o, wg)), HM.St.cards(HX.d(o, tg)),
+    Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.cards(HX.d(o, tg)), HM.St.cards(HX.d(o, g)),
+      Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.cards(HX.d(o, wg)), HM.St.cards(HX.d(o, tg)),
         PL2.hub_cards_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
         PL2.hub_cards_wakes(o, life, tg, n)),
       PL2.hub_cards_gone(o, HR.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
     PL2.hub_cards_close_ids(o, HC.card_ids(c6, n, Nil{}), cx6, "agent stopped"))
   PL2.hub_cids_tr(HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL2.hub_dropc(HC.card_ids(c6, n, Nil{}), c6), n, ef,
     PL2.hub_KC(c6, n, PL1.hub_distinct_tr(HI.card_ids(c6), HI.card_ids(HM.St.cards(HX.d(o, cx))),
-      Equal.cong(List<&2, HM.Card>, List<&2, Nat>, cs => HI.card_ids(cs), c6, HM.St.cards(HX.d(o, cx)), e6),
+      Equal.cong(List<&2, HS.Card>, List<&2, Nat>, cs => HI.card_ids(cs), c6, HM.St.cards(HX.d(o, cx)), e6),
       PL1.hub_fst(HI.Distinct(HI.card_ids(HM.St.cards(HX.d(o, cx)))), HI.Below(HI.card_ids(HM.St.cards(HX.d(o, cx))), HM.St.next_card(HX.d(o, cx))), u))))
 
 def Laws.init_cards_unique(w):
@@ -579,7 +579,7 @@ def Laws.card_confirm_no_thanks_is_words():
   {==}
 
 def Laws.card_choice_words_refused(o, cx, c, text, parts, via, e):
-  %Equal.sym(Bool, HC.is_option(HM.Card.text(c), text), False{}, e) : {HC.answer.choice(o, _, cx, c, text) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_option(HS.Card.text(c), text), False{}, e) : {HC.answer.choice(o, _, cx, c, text) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
   {==}
 
 def Laws.xhub_ask_needs_words(text, b, e):

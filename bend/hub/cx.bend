@@ -46,7 +46,7 @@ type R is Data:
   R{rts: List<&2, Rt>, waiters: List<&2, Waiter>, steered: List<&2, Steer>,
     counts: List<&2, Cnt>, last: List<&2, Kv>, crashes: List<&2, Kn>,
     workspace: String, dirty: Bool, now: Nat, git: Bool,
-    ans: List<&2, J.Json>, need: Maybe<&2, J.Json>, answered: Maybe<&2, PK.Ans>,
+    ans: List<&2, J.Json>, need: Maybe<&2, J.Json>, answered: Maybe<&2, PK.Answer>,
     due: List<&2, Nat>}
 # due (inbox-record): the cards closed with his answer whose route line's
 # position the shell has not given yet (answer_pos); runtime only, so a
@@ -312,12 +312,12 @@ def R.with_need(x: R, +v: Maybe<&2, J.Json>) -> R:
 
 # his answer to a card in this step, for the step's answer (inbox picks
 # (3), architect m_22636): set where its route line is written
-def R.answered(x: R) -> Maybe<&2, PK.Ans>:
+def R.answered(x: R) -> Maybe<&2, PK.Answer>:
   match x:
     case R{_, _, _, _, _, _, _, _, _, _, _, _, +answered, _}:
       answered
 
-def R.with_answered(x: R, +v: Maybe<&2, PK.Ans>) -> R:
+def R.with_answered(x: R, +v: Maybe<&2, PK.Answer>) -> R:
   match x:
     case R{+rts, +waiters, +steered, +counts, +last, +crashes, +workspace, +dirty, +now, +git, +ans, +need, _, +due}:
       R{rts, waiters, steered, counts, last, crashes, workspace, dirty, now, git, ans, need, v, due}
@@ -355,7 +355,7 @@ def FreshEv(+s: M.St, e: M.Ev) -> Data:
     case M.EMsgSent{+m}:
       {S.Msg.id(m) == M.St.next_msg(s) : Nat}
     case M.ECardOpened{+c}:
-      {M.Card.id(c) == M.St.next_card(s) : Nat}
+      {S.Card.id(c) == M.St.next_card(s) : Nat}
     case M.ETaskCreated{+name, _, _, _, _}:
       {M.name_held(s, name) == False{} : Bool}
     case M.ERenamed{_, +new}:
@@ -597,7 +597,7 @@ def with_r(-o: M.St, cx: Cx<o>, +r: R) -> Cx<o>:
       Cx{c, r}
 
 # his answer `a` noted for the step's answer (R.answered)
-def answered(-o: M.St, cx: Cx<o>, +a: PK.Ans) -> Cx<o>:
+def answered(-o: M.St, cx: Cx<o>, +a: PK.Answer) -> Cx<o>:
   match cx:
     case Cx{+c, +r}:
       Cx{c, R.with_answered(r, Some{a})}

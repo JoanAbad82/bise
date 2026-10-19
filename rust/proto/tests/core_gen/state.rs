@@ -653,6 +653,7 @@ fn pinned(r: &st::Record, sh: &st::Shape, o: &Jv) -> String {
             (Ty::Bool, Some(Jv::Bool(b))) => if *b { "True{}".into() } else { "False{}".into() },
             (Ty::OptNat, Some(Jv::Num(x))) => format!("Some{{{x}n}}"),
             (Ty::OptStr, Some(Jv::Str(x))) => format!("Some{{\"{x}\"}}"),
+            (Ty::OptNat | Ty::OptStr, Some(Jv::Null)) => "None{}".into(),
             (Ty::Json, Some(v)) => bend_json(v),
             (Ty::Nats | Ty::Strs, Some(Jv::Arr(xs))) if xs.is_empty() => "Nil{}".into(),
             (Ty::Nats, Some(Jv::Arr(xs))) => format!("[{}]", xs.iter().map(|x| match x { Jv::Num(n) => format!("{n}n"), _ => panic!("a number list") }).collect::<Vec<_>>().join(", ")),
@@ -671,7 +672,7 @@ fn pinned_rec(r: &st::Record, sh: &st::Shape, o: &Jv) -> String {
 
 /// The view shapes pinned on fixtures/core_view.jsonl: the view's key and
 /// the record its items are (its view shape, else its journal shape).
-const PINS: &[(&str, &str)] = &[("timers", "Timer"), ("timers_ended", "TimerEnd")];
+const PINS: &[(&str, &str)] = &[("timers", "Timer"), ("timers_ended", "TimerEnd"), ("cards", "Card")];
 
 fn view_pins(s: &mut String) {
     let text = std::fs::read_to_string(root().join("rust/proto/fixtures/core_view.jsonl")).unwrap();

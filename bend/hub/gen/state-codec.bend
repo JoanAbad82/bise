@@ -2571,3 +2571,9 @@ law TimerEnd.view_pinned:
 def TimerEnd.view_pinned():
   {==}
 
+law Card.view_pinned:
+  {Card.journal_json(S.Card{2n, "drop", "fix", "main suggests: archive @fix? 1 changed file and 0 unpushed commit will be saved (/restore). (answer yes or no)", None{}, 1000000n, None{}, None{}}) == J.obj([J.kv("id", J.JNum{2n}), J.kv("kind", J.JStr{"drop"}), J.kv("agent", J.JStr{"fix"}), J.kv("text", J.JStr{"main suggests: archive @fix? 1 changed file and 0 unpushed commit will be saved (/restore). (answer yes or no)"}), J.kv("for_msg", J.JNull{}), J.kv("created_ms", J.JNum{1000000n}), J.kv("place", J.JNull{}), J.kv("pr", J.JNull{})]) : J.Json}
+
+def Card.view_pinned():
+  {==}
+

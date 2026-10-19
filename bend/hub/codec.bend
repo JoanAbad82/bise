@@ -1,5 +1,5 @@
 # hub/codec.bend — the records inside sb-core's journal lines and its
-# messages as JSON (a message, a card, a route, a timer...), in the exact
+# messages as JSON (a route, a timer...; a message, a card: gen/state-codec.bend), in the exact
 # serde format of rust/switchboard/src/model.rs, each with its round law.
 # The lines themselves are generated (gen/journal.bend, from
 # bise_proto::core::journal): a new journal kind is a row there, never a
@@ -57,12 +57,6 @@ def jmaybe_decl(m: Maybe<&2, M.Decl>) -> J.Json:
     case Some{+d}:
       J.JStr{decl_str(d)}
 
-def card_json(+c: M.Card) -> J.Json:
-  J.obj([J.kv("id", J.JNum{M.Card.id(c)}), J.kv("kind", J.JStr{M.Card.kind(c)}),
-    J.kv("agent", J.JStr{M.Card.agent(c)}), J.kv("text", J.JStr{M.Card.text(c)}),
-    J.kv("for_msg", jmaybe_nat(M.Card.for_msg(c))), J.kv("created_ms", J.JNum{M.Card.created(c)}),
-    J.kv("place", jmaybe_str(M.Card.place(c))), J.kv("pr", jmaybe_nat(M.Card.pr(c)))])
-
 # ---- decoding (the journal replayed at boot) ----
 
 def get_nat(+j: J.Json, +k: String) -> Nat:
@@ -103,11 +97,6 @@ def decl.of_s(m: Maybe<&2, String>) -> Maybe<&2, M.Decl>:
     case Some{+s}:
       Some{Bool.pick(M.Decl, String.eq(s, "done"), M.DDone{},
         Bool.pick(M.Decl, String.eq(s, "blocked"), M.DBlocked{}, M.DWorking{}))}
-
-def card_of(+j: J.Json) -> M.Card:
-  M.Card{get_nat(j, "id"), get_s(j, "kind"), get_s(j, "agent"), get_s(j, "text"),
-    opt_nat(J.get(j, "for_msg")), get_nat(j, "created_ms"), opt_str(J.get(j, "place")),
-    opt_nat(J.get(j, "pr"))}
 
 # bise desktop S2's kinds (an older sb-core has none: KUnknown, skipped)
 def out_st_of(+s: String) -> XH.OutSt:
@@ -204,29 +193,6 @@ def watch_json(+w: WK.Watch) -> J.Json:
 
 # ---- each record reads back what it writes (gen/journal-laws.bend's
 # round laws go through these) ----
-
-law card_round:
-  for c: M.Card
-  {card_of(card_json(c)) == c : M.Card}
-
-def card_round(c):
-  match c:
-    case M.Card{id, k, a, tx, None{}, cr, None{}, None{}}:
-      {==}
-    case M.Card{id, k, a, tx, None{}, cr, None{}, Some{p}}:
-      {==}
-    case M.Card{id, k, a, tx, None{}, cr, Some{pl}, None{}}:
-      {==}
-    case M.Card{id, k, a, tx, None{}, cr, Some{pl}, Some{p}}:
-      {==}
-    case M.Card{id, k, a, tx, Some{f}, cr, None{}, None{}}:
-      {==}
-    case M.Card{id, k, a, tx, Some{f}, cr, None{}, Some{p}}:
-      {==}
-    case M.Card{id, k, a, tx, Some{f}, cr, Some{pl}, None{}}:
-      {==}
-    case M.Card{id, k, a, tx, Some{f}, cr, Some{pl}, Some{p}}:
-      {==}
 
 law out_round.k:
   for x: Nat

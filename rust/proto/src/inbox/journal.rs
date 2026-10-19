@@ -2,7 +2,8 @@
 //! "typed Rust reader of journal lines", architect m_24257): `card_opened`,
 //! `card_closed` and `card_answer_pos`, their keys those of their rows in
 //! `core::journal::JOURNAL` (the test `the_card_lines_are_the_tables`
-//! keeps them in step) and of the `card` record of bend/hub/codec.bend.
+//! keeps them in step) and of the declared `Card` and `Ans` journal shapes
+//! (core::state, bend/hub/gen/state-codec.bend).
 //! A line of another kind, or one that doesn't fit, reads as none: a
 //! journal is never refused for one line (a torn last line included).
 

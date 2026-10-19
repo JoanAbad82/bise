@@ -129,16 +129,16 @@ law unknown_agent_is_no_task:
 law main_card_answer_routes_once:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +c: HM.Card
+  for +c: HS.Card
   for +text: String
   for +parts: String
   for +via: String
   {HC.answer.q.main(o, cx, c, text, parts, via)
     == HC.close_card_ans(o,
       HA.due_add(o, HC.answer_line(o,
-        HC.notify_main(o, cx, HC.cat([HC.MAIN_ANSWER_HEAD(), HC.ns(HM.Card.id(c)), " (\"", HT.one_line(HM.Card.text(c)), "\"): \"", HT.one_line(text), "\""])),
-        HM.MAIN(), HM.MAIN(), c, text, parts, None{}), HM.Card.id(c)),
-      HM.Card.id(c), "answered", HA.his_ans(c, text, via)) : HX.Cx<o>}
+        HC.notify_main(o, cx, HC.cat([HC.MAIN_ANSWER_HEAD(), HC.ns(HS.Card.id(c)), " (\"", HT.one_line(HS.Card.text(c)), "\"): \"", HT.one_line(text), "\""])),
+        HM.MAIN(), HM.MAIN(), c, text, parts, None{}), HS.Card.id(c)),
+      HS.Card.id(c), "answered", HA.his_ans(c, text, via)) : HX.Cx<o>}
 
 # LAW: his message's feed line is followed, in the same step, by its id
 # ('sb you-id : m_N'): the clients key his entry by it (nothing else may
@@ -229,44 +229,44 @@ law pick_both_or_neither:
 # rides beside it; said == render(parts) still holds).
 law the_answer_line_keeps_said:
   for +who: String
-  for +c: HM.Card
+  for +c: HS.Card
   for +said: String
   for +msg: Maybe<&2, Nat>
-  {HC.answer_rec(HPK.ans(HM.Card.id(c), HM.Card.text(c), who, said), msg) == HFD.route(who, Some{HM.Card.id(c)}, said, msg, HPK.pick_n(HPK.option_pick(HM.Card.text(c), said)), HPK.pick_words(HPK.option_pick(HM.Card.text(c), said))) : J.Json}
+  {HC.answer_rec(HPK.ans(HS.Card.id(c), HS.Card.text(c), who, said), msg) == HFD.route(who, Some{HS.Card.id(c)}, said, msg, HPK.pick_n(HPK.option_pick(HS.Card.text(c), said)), HPK.pick_words(HPK.option_pick(HS.Card.text(c), said))) : J.Json}
 
 # LAW: the step's answer (inbox picks (3), link.rs AStep ans_*): the card,
 # who asked, what he said and the question are all there or all absent...
 law answer_who_with_its_card:
-  for m: Maybe<&2, HPK.Ans>
+  for m: Maybe<&2, HPK.Answer>
   {Maybe.is_some(&2, Nat, HPK.card_of(m)) == Maybe.is_some(&2, String, HPK.who_of(m)) : Bool}
 
 law answer_said_with_its_card:
-  for m: Maybe<&2, HPK.Ans>
+  for m: Maybe<&2, HPK.Answer>
   {Maybe.is_some(&2, Nat, HPK.card_of(m)) == Maybe.is_some(&2, String, HPK.said_of(m)) : Bool}
 
 law answer_ask_with_its_card:
-  for m: Maybe<&2, HPK.Ans>
+  for m: Maybe<&2, HPK.Answer>
   {Maybe.is_some(&2, Nat, HPK.card_of(m)) == Maybe.is_some(&2, String, HPK.ask_of(m)) : Bool}
 
 # LAW: ...a pick only when they are there...
 law answer_pick_needs_the_card:
-  for m: Maybe<&2, HPK.Ans>
+  for m: Maybe<&2, HPK.Answer>
   {Bool.and(Maybe.is_some(&2, String, HPK.pick_of_ans(m)), Bool.not(Maybe.is_some(&2, Nat, HPK.card_of(m)))) == False{} : Bool}
 
 # LAW: ...and the step's pick is the route line's pick: both come from the
 # one answer that answer_line notes (X.answered) and writes (answer_rec)
 law the_steps_pick_is_the_route_lines:
-  for +c: HM.Card
+  for +c: HS.Card
   for +who: String
   for +said: String
-  {HPK.pick_of_ans(Some{HPK.ans(HM.Card.id(c), HM.Card.text(c), who, said)}) == HPK.pick_words(HPK.option_pick(HM.Card.text(c), said)) : Maybe<&2, String>}
+  {HPK.pick_of_ans(Some{HPK.ans(HS.Card.id(c), HS.Card.text(c), who, said)}) == HPK.pick_words(HPK.option_pick(HS.Card.text(c), said)) : Maybe<&2, String>}
 
 # LAW: the answer noted in a step is the one the step's answer reads
 law the_noted_answer_is_read_back:
   for -o: HM.St
   for cx: HX.Cx<o>
-  for +a: HPK.Ans
-  {HX.R.answered(HX.Cx.r(o, HX.answered(o, cx, a))) == Some{a} : Maybe<&2, HPK.Ans>}
+  for +a: HPK.Answer
+  {HX.R.answered(HX.Cx.r(o, HX.answered(o, cx, a))) == Some{a} : Maybe<&2, HPK.Answer>}
 
 # LAW: an agent's card: his answer's route line goes in the asker's feed
 # too (inbox picks (2); its fold makes the asker's msg-in that row).
@@ -274,7 +274,7 @@ law an_agents_answer_is_in_the_askers_feed:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +asker: String
-  for +c: HM.Card
+  for +c: HS.Card
   for +said: String
   for +parts: String
   for +msg: Maybe<&2, Nat>
@@ -285,7 +285,7 @@ law an_agents_answer_is_in_the_askers_feed:
 law mains_own_answer_is_one_line:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +c: HM.Card
+  for +c: HS.Card
   for +said: String
   for +parts: String
   for +msg: Maybe<&2, Nat>

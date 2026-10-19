@@ -8,9 +8,15 @@
 import Base
 
 import ./model.bend as M
+import ./gen/state.bend as S
 import ./cx.bend as X
 import ./picks.bend as PK
 import ./lazy.bend as LZ
+
+# an answer from its fields, in S.Ans's order (the generated setters)
+def ans(said: String, pick_n: Maybe<&2, Nat>, pick: String, via: String, page: String, block: String) -> S.Ans:
+  a0 = S.Ans.with_pick(S.Ans.with_pick_n(S.Ans.with_said(S.Ans.empty(), said), pick_n), pick)
+  S.Ans.with_block(S.Ans.with_page(S.Ans.with_via(a0, via), page), block)
 
 def opt_words(m: Maybe<&2, String>) -> String:
   match m:
@@ -21,9 +27,9 @@ def opt_words(m: Maybe<&2, String>) -> String:
 
 # his answer to a question card `c`: his words, and the option's words
 # when he picked one by its number (law answered_close_carries_his_words)
-def his_ans(+c: M.Card, +said: String, +via: String) -> M.Ans:
-  +p = PK.option_pick(M.Card.text(c), said)
-  M.Ans{said, PK.pick_n(p), opt_words(PK.pick_words(p)), via, "", ""}
+def his_ans(+c: S.Card, +said: String, +via: String) -> S.Ans:
+  +p = PK.option_pick(S.Card.text(c), said)
+  ans(said, PK.pick_n(p), opt_words(PK.pick_words(p)), via, "", "")
 
 # a deny alias (lead m_10900): `no` or `no: <why>`, any case, on the
 # lowered trimmed answer; it can only refuse (`nope`, `now` are words)
@@ -62,18 +68,18 @@ def confirm_n(+s: String) -> Maybe<&2, Nat>:
     Bool.pick(Maybe<&2, Nat>, String.eq(s, "2"), Some{2n},
       Bool.pick(Maybe<&2, Nat>, String.eq(s, "3"), Some{3n}, None{})))
 
-def confirm_ans(+text: String, +via: String) -> M.Ans:
+def confirm_ans(+text: String, +via: String) -> S.Ans:
   +s = String.trim(text)
-  M.Ans{s, confirm_n(s), confirm_words(s), via, "", ""}
+  ans(s, confirm_n(s), confirm_words(s), via, "", "")
 
 # his plain answer (a drop's yes or no)
-def said_ans(+text: String, +via: String) -> M.Ans:
-  M.Ans{String.trim(text), None{}, "", via, "", ""}
+def said_ans(+text: String, +via: String) -> S.Ans:
+  ans(String.trim(text), None{}, "", via, "", "")
 
 # his answer on page `page`, question `block` (the option's words: the
 # shell already turned a digit into them)
-def page_ans(+text: String, +page: String, +block: String) -> M.Ans:
-  M.Ans{text, None{}, "", "page", page, block}
+def page_ans(+text: String, +page: String, +block: String) -> S.Ans:
+  ans(text, None{}, "", "page", page, block)
 
 def nat_del(xs: List<&2, Nat>, +n: Nat) -> List<&2, Nat>:
   match xs:

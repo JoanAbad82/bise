@@ -29,23 +29,6 @@ type Decl is Data:
   DDone{}
   DBlocked{}
 
-# `place`, `pr`: a place's card (ready to merge: its id, PR, pr-design §6.3)
-type Card is Data:
-  Card{id: Nat, kind: String, agent: String, text: String,
-    for_msg: Maybe<&2, Nat>, created: Nat, place: Maybe<&2, String>,
-    pr: Maybe<&2, Nat>}
-
-# his answer as a card's close journals it (inbox-record): `said`, the option
-# `pick_n`/`pick` ("" none), `via` inbox|thread|page ("" none), the page's
-# question `page`/`block`
-type Ans is Data:
-  Ans{said: String, pick_n: Maybe<&2, Nat>, pick: String, via: String,
-    page: String, block: String}
-
-# a card closed without his answer
-def no_ans() -> Ans:
-  Ans{"", None{}, "", "", "", ""}
-
 type Agent is Data:
   Agent{name: String, is_main: Bool, parent: Maybe<&2, String>, life: Life,
     declared: Maybe<&2, Decl>, aliases: List<&2, String>,
@@ -55,7 +38,7 @@ type Agent is Data:
 
 type St is Data:
   St{agents: List<&2, Agent>, order: List<&2, String>, hot: List<&2, S.MRec>,
-    cards: List<&2, Card>, notes: List<&2, String>, next_msg: Nat,
+    cards: List<&2, S.Card>, notes: List<&2, String>, next_msg: Nat,
     next_card: Nat, tm: TM.Tms, x: XH.Xs, paused: Maybe<&2, Nat>,
     old: List<&2, S.MRec>, gone: List<&2, G.Item>}
 # paused: since that ms (pause.bend; None runs); hot/old: the messages split
@@ -77,9 +60,9 @@ type Ev is Data:
   EMsgSent{msg: S.Msg}
   EMsgState{id: Nat, st: S.MSt}
   ESettled{id: Nat}
-  ECardOpened{card: Card}
+  ECardOpened{card: S.Card}
   # `ans` his answer (via "": closed without him, `resolution` says why)
-  ECardClosed{id: Nat, resolution: String, ans: Ans}
+  ECardClosed{id: Nat, resolution: String, ans: S.Ans}
   # his answer's route line position in the asker's thread (answer_pos_once)
   ECardAnswerPos{card: Nat, agent: String, pos: Nat}
   # main withdrew card `id` (`text`), his late answer delivered (gone.bend)
@@ -123,46 +106,6 @@ type MsgOp is Data:
   OSt{st: S.MSt}
   OSettle{}
 
-def Card.id(x: Card) -> Nat:
-  match x:
-    case Card{+id, _, _, _, _, _, _, _}:
-      id
-
-def Card.kind(x: Card) -> String:
-  match x:
-    case Card{_, +kind, _, _, _, _, _, _}:
-      kind
-
-def Card.agent(x: Card) -> String:
-  match x:
-    case Card{_, _, +agent, _, _, _, _, _}:
-      agent
-
-def Card.text(x: Card) -> String:
-  match x:
-    case Card{_, _, _, +text, _, _, _, _}:
-      text
-
-def Card.for_msg(x: Card) -> Maybe<&2, Nat>:
-  match x:
-    case Card{_, _, _, _, +for_msg, _, _, _}:
-      for_msg
-
-def Card.created(x: Card) -> Nat:
-  match x:
-    case Card{_, _, _, _, _, +created, _, _}:
-      created
-
-def Card.place(x: Card) -> Maybe<&2, String>:
-  match x:
-    case Card{_, _, _, _, _, _, +place, _}:
-      place
-
-def Card.pr(x: Card) -> Maybe<&2, Nat>:
-  match x:
-    case Card{_, _, _, _, _, _, _, +pr}:
-      pr
-
 def St.agents(x: St) -> List<&2, Agent>:
   match x:
     case St{+agents, _, _, _, _, _, _, _, _, _, _, _}:
@@ -179,7 +122,7 @@ def St.hot(x: St) -> List<&2, S.MRec>:
     case St{_, _, +hot, _, _, _, _, _, _, _, _, _}:
       hot
 
-def St.cards(x: St) -> List<&2, Card>:
+def St.cards(x: St) -> List<&2, S.Card>:
   match x:
     case St{_, _, _, +cards, _, _, _, _, _, _, _, _}:
       cards
@@ -458,15 +401,21 @@ def map_msg(xs: List<&2, S.MRec>, +id: Nat, +op: MsgOp) -> List<&2, S.MRec>:
     case Con{+h, +t}:
       LZ.pick(List<&2, S.MRec>, Nat.is_eq(S.Msg.id(S.MRec.msg(h)), id), u => rec_op(h, op) <> t, u => h <> map_msg(t, id, op))
 
-def drop_card(xs: List<&2, Card>, +id: Nat) -> List<&2, Card>:
+def drop_card(xs: List<&2, S.Card>, +id: Nat) -> List<&2, S.Card>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      LZ.pick(List<&2, Card>, Nat.is_eq(Card.id(h), id), u => t, u => h <> drop_card(t, id))
+      LZ.pick(List<&2, S.Card>, Nat.is_eq(S.Card.id(h), id), u => t, u => h <> drop_card(t, id))
 
-def put_card(xs: List<&2, Card>, +c: Card) -> List<&2, Card>:
-  snoc(Card, drop_card(xs, Card.id(c)), c)
+# a card from its fields, in S.Card's order (the generated setters)
+def card(id: Nat, kind: String, agent: String, text: String, for_msg: Maybe<&2, Nat>, created: Nat, place: Maybe<&2, String>, pr: Maybe<&2, Nat>) -> S.Card:
+  c0 = S.Card.with_kind(S.Card.with_id(S.Card.empty(), id), kind)
+  c1 = S.Card.with_for_msg(S.Card.with_text(S.Card.with_agent(c0, agent), text), for_msg)
+  S.Card.with_pr(S.Card.with_place(S.Card.with_created(c1, created), place), pr)
+
+def put_card(xs: List<&2, S.Card>, +c: S.Card) -> List<&2, S.Card>:
+  snoc(S.Card, drop_card(xs, S.Card.id(c)), c)
 
 def is_queued(s: S.MSt) -> Bool:
   match s:
@@ -692,7 +641,7 @@ def apply(+st: St, e: Ev) -> St:
           +p = msg_op(hot, old, id, OSettle{})
           St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p), gone}
         case ECardOpened{+c}:
-          St{agents, order, hot, put_card(cards, c), notes, nm, Nat.max(nc, 1n+Card.id(c)), tm, xs, pz, old, gone}
+          St{agents, order, hot, put_card(cards, c), notes, nm, Nat.max(nc, 1n+S.Card.id(c)), tm, xs, pz, old, gone}
         case ECardClosed{+id, _, _}:
           St{agents, order, hot, drop_card(cards, id), notes, nm, nc, tm, xs, pz, old, gone}
         case ECardAnswerPos{_, _, _}:
@@ -738,8 +687,8 @@ def apply_all(evs: List<&2, Ev>, +st: St) -> St:
     case Con{+e, +rest}:
       apply_all(rest, apply(st, e))
 
-def card_of(xs: List<&2, Card>, +id: Nat) -> Maybe<&2, Card>:
-  find(~Card, ~Nat, ~Card.id, ~(a => b => Nat.is_eq(a, b)), xs, id)
+def card_of(xs: List<&2, S.Card>, +id: Nat) -> Maybe<&2, S.Card>:
+  find(~S.Card, ~Nat, ~S.Card.id, ~(a => b => Nat.is_eq(a, b)), xs, id)
 
 # queued_in's step: `q` first (most are delivered), then the names
 def queued_in.keep(q: Bool, +ns: List<&2, String>, +m: S.Msg, +rest: List<&2, S.Msg>) -> List<&2, S.Msg>:

@@ -102,13 +102,13 @@ def journal_message_settled_bare():
   {==}
 
 law journal_card_opened_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"card_opened"})])) == Some{M.ECardOpened{C.card_of(J.JNull{})}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"card_opened"})])) == Some{M.ECardOpened{SC.Card.journal_of(J.JNull{})}} : Maybe<&2, M.Ev>}
 
 def journal_card_opened_bare():
   {==}
 
 law journal_card_closed_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"card_closed"})])) == Some{M.ECardClosed{0n, "", M.Ans{"", None{}, "", "", "", ""}}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"card_closed"})])) == Some{M.ECardClosed{0n, "", SC.Ans.journal_of(J.obj([J.kv("type", J.JStr{"card_closed"})]))}} : Maybe<&2, M.Ev>}
 
 def journal_card_closed_bare():
   {==}
@@ -439,153 +439,148 @@ def journal_message_settled_round(id):
   {==}
 
 law journal_card_opened_round:
-  for card: M.Card
+  for card: S.Card
   {GJ.of(GJ.json(M.ECardOpened{card})) == Some{M.ECardOpened{card}} : Maybe<&2, M.Ev>}
 
 def journal_card_opened_round(card):
-  %C.card_round(card) : {GJ.of(GJ.json(M.ECardOpened{card})) == Some{M.ECardOpened{_}} : Maybe<&2, M.Ev>}
+  %SC.Card.journal_round(card) : {GJ.of(GJ.json(M.ECardOpened{card})) == Some{M.ECardOpened{_}} : Maybe<&2, M.Ev>}
   {==}
 
 law journal_card_closed_round:
   for id: Nat
   for resolution: String
-  for said: String
-  for pick_n: Maybe<&2, Nat>
-  for pick: String
-  for via: String
-  for page: String
-  for block: String
-  {GJ.of(GJ.json(M.ECardClosed{id, resolution, M.Ans{said, pick_n, pick, via, page, block}})) == Some{M.ECardClosed{id, resolution, M.Ans{said, pick_n, pick, via, page, block}}} : Maybe<&2, M.Ev>}
+  for ans: S.Ans
+  {GJ.of(GJ.json(M.ECardClosed{id, resolution, ans})) == Some{M.ECardClosed{id, resolution, ans}} : Maybe<&2, M.Ev>}
 
-def journal_card_closed_round(id, resolution, said, pick_n, pick, via, page, block):
-  match said pick_n pick via page block:
-    case SNil{} None{} SNil{} SNil{} SNil{} SNil{}:
+def journal_card_closed_round(id, resolution, ans):
+  match ans:
+    case S.Ans{SNil{}, None{}, SNil{}, SNil{}, SNil{}, SNil{}}:
       {==}
-    case SNil{} None{} SNil{} SNil{} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, None{}, SNil{}, SNil{}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} None{} SNil{} SNil{} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SNil{}, None{}, SNil{}, SNil{}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SNil{} None{} SNil{} SNil{} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, None{}, SNil{}, SNil{}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} None{} SNil{} SCon{h_via, t_via} SNil{} SNil{}:
+    case S.Ans{SNil{}, None{}, SNil{}, SCon{h_ans_via, t_ans_via}, SNil{}, SNil{}}:
       {==}
-    case SNil{} None{} SNil{} SCon{h_via, t_via} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, None{}, SNil{}, SCon{h_ans_via, t_ans_via}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} None{} SNil{} SCon{h_via, t_via} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SNil{}, None{}, SNil{}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SNil{} None{} SNil{} SCon{h_via, t_via} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, None{}, SNil{}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} None{} SCon{h_pick, t_pick} SNil{} SNil{} SNil{}:
+    case S.Ans{SNil{}, None{}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SNil{}, SNil{}}:
       {==}
-    case SNil{} None{} SCon{h_pick, t_pick} SNil{} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, None{}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} None{} SCon{h_pick, t_pick} SNil{} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SNil{}, None{}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SNil{} None{} SCon{h_pick, t_pick} SNil{} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, None{}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} None{} SCon{h_pick, t_pick} SCon{h_via, t_via} SNil{} SNil{}:
+    case S.Ans{SNil{}, None{}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SNil{}, SNil{}}:
       {==}
-    case SNil{} None{} SCon{h_pick, t_pick} SCon{h_via, t_via} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, None{}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} None{} SCon{h_pick, t_pick} SCon{h_via, t_via} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SNil{}, None{}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SNil{} None{} SCon{h_pick, t_pick} SCon{h_via, t_via} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, None{}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} Some{x_pick_n} SNil{} SNil{} SNil{} SNil{}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SNil{}, SNil{}, SNil{}, SNil{}}:
       {==}
-    case SNil{} Some{x_pick_n} SNil{} SNil{} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SNil{}, SNil{}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} Some{x_pick_n} SNil{} SNil{} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SNil{}, SNil{}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SNil{} Some{x_pick_n} SNil{} SNil{} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SNil{}, SNil{}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} Some{x_pick_n} SNil{} SCon{h_via, t_via} SNil{} SNil{}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SNil{}, SCon{h_ans_via, t_ans_via}, SNil{}, SNil{}}:
       {==}
-    case SNil{} Some{x_pick_n} SNil{} SCon{h_via, t_via} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SNil{}, SCon{h_ans_via, t_ans_via}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} Some{x_pick_n} SNil{} SCon{h_via, t_via} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SNil{}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SNil{} Some{x_pick_n} SNil{} SCon{h_via, t_via} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SNil{}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} Some{x_pick_n} SCon{h_pick, t_pick} SNil{} SNil{} SNil{}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SNil{}, SNil{}}:
       {==}
-    case SNil{} Some{x_pick_n} SCon{h_pick, t_pick} SNil{} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} Some{x_pick_n} SCon{h_pick, t_pick} SNil{} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SNil{} Some{x_pick_n} SCon{h_pick, t_pick} SNil{} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} Some{x_pick_n} SCon{h_pick, t_pick} SCon{h_via, t_via} SNil{} SNil{}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SNil{}, SNil{}}:
       {==}
-    case SNil{} Some{x_pick_n} SCon{h_pick, t_pick} SCon{h_via, t_via} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SNil{} Some{x_pick_n} SCon{h_pick, t_pick} SCon{h_via, t_via} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SNil{} Some{x_pick_n} SCon{h_pick, t_pick} SCon{h_via, t_via} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SNil{}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} None{} SNil{} SNil{} SNil{} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SNil{}, SNil{}, SNil{}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} None{} SNil{} SNil{} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SNil{}, SNil{}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} None{} SNil{} SNil{} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SNil{}, SNil{}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} None{} SNil{} SNil{} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SNil{}, SNil{}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} None{} SNil{} SCon{h_via, t_via} SNil{} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SNil{}, SCon{h_ans_via, t_ans_via}, SNil{}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} None{} SNil{} SCon{h_via, t_via} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SNil{}, SCon{h_ans_via, t_ans_via}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} None{} SNil{} SCon{h_via, t_via} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SNil{}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} None{} SNil{} SCon{h_via, t_via} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SNil{}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} None{} SCon{h_pick, t_pick} SNil{} SNil{} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SNil{}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} None{} SCon{h_pick, t_pick} SNil{} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} None{} SCon{h_pick, t_pick} SNil{} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} None{} SCon{h_pick, t_pick} SNil{} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} None{} SCon{h_pick, t_pick} SCon{h_via, t_via} SNil{} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SNil{}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} None{} SCon{h_pick, t_pick} SCon{h_via, t_via} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} None{} SCon{h_pick, t_pick} SCon{h_via, t_via} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} None{} SCon{h_pick, t_pick} SCon{h_via, t_via} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, None{}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SNil{} SNil{} SNil{} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SNil{}, SNil{}, SNil{}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SNil{} SNil{} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SNil{}, SNil{}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SNil{} SNil{} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SNil{}, SNil{}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SNil{} SNil{} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SNil{}, SNil{}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SNil{} SCon{h_via, t_via} SNil{} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SNil{}, SCon{h_ans_via, t_ans_via}, SNil{}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SNil{} SCon{h_via, t_via} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SNil{}, SCon{h_ans_via, t_ans_via}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SNil{} SCon{h_via, t_via} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SNil{}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SNil{} SCon{h_via, t_via} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SNil{}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SCon{h_pick, t_pick} SNil{} SNil{} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SNil{}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SCon{h_pick, t_pick} SNil{} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SCon{h_pick, t_pick} SNil{} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SCon{h_pick, t_pick} SNil{} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SNil{}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SCon{h_pick, t_pick} SCon{h_via, t_via} SNil{} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SNil{}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SCon{h_pick, t_pick} SCon{h_via, t_via} SNil{} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SNil{}, SCon{h_ans_block, t_ans_block}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SCon{h_pick, t_pick} SCon{h_via, t_via} SCon{h_page, t_page} SNil{}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SNil{}}:
       {==}
-    case SCon{h_said, t_said} Some{x_pick_n} SCon{h_pick, t_pick} SCon{h_via, t_via} SCon{h_page, t_page} SCon{h_block, t_block}:
+    case S.Ans{SCon{h_ans_said, t_ans_said}, Some{x_ans_pick_n}, SCon{h_ans_pick, t_ans_pick}, SCon{h_ans_via, t_ans_via}, SCon{h_ans_page, t_ans_page}, SCon{h_ans_block, t_ans_block}}:
       {==}
 
 law journal_card_answer_pos_round:

@@ -14,7 +14,7 @@ import ./hub-1.bend as PL1
 import ../../hub/lazy.bend as HLZ
 
 def hub_cards_wakes(-o: HM.St, +life: HM.Life, +cx: HX.Cx<o>, +n: String)
-    -> {HM.St.cards(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.St.cards(HX.d(o, cx)) : List<&2, HM.Card>}:
+    -> {HM.St.cards(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
   match life:
     case HM.LActive{}:
       {==}
@@ -42,7 +42,7 @@ def hub_agents_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2
       PL1.hub_agents_gone_each(o, HTM.ids_in(HC.live(o, cx), ns), cx, HC.cat(["@", n, " is gone"]))
 
 def hub_cards_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
-    -> {HM.St.cards(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.St.cards(HX.d(o, cx)) : List<&2, HM.Card>}:
+    -> {HM.St.cards(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
   match g:
     case False{}:
       {==}
@@ -63,21 +63,21 @@ def hub_msgs_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: Stri
     case Nil{}:
       {==}
     case Con{id, rest}:
-      +cx2 = HC.emit(o, cx, HM.ECardClosed{id, res, HM.no_ans()}, Unit{}, Unit{}, Unit{})
+      +cx2 = HC.emit(o, cx, HM.ECardClosed{id, res, HS.Ans.empty()}, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
       Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.every(HX.d(o, cx3)), HM.every(HX.d(o, cx)),
         hub_msgs_close_ids(o, rest, cx3, res),
         Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, cx3)), HM.every(HX.d(o, cx2)), HM.every(HX.d(o, cx)),
           PL1.hub_msgs_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
-          Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()})), HM.every(HX.d(o, cx)),
-            Equal.cong(HM.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()}),
-              PL1.hub_d_emit(o, cx, HM.ECardClosed{id, res, HM.no_ans()}, Unit{}, Unit{}, Unit{})),
+          Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HS.Ans.empty()})), HM.every(HX.d(o, cx)),
+            Equal.cong(HM.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HS.Ans.empty()}),
+              PL1.hub_d_emit(o, cx, HM.ECardClosed{id, res, HS.Ans.empty()}, Unit{}, Unit{}, Unit{})),
             PL1.hub_msgs_closed(HX.d(o, cx), id, res))))
 
 def hub_agents_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.agents(HX.d(o, a)) == HM.St.agents(HX.d(o, b)) : List<&2, HM.Agent>}:
   Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, a), HX.d(o, b), e)
 
-def hub_agents_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.agents(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.St.agents(s) : List<&2, HM.Agent>}:
+def hub_agents_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.agents(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
@@ -88,7 +88,7 @@ def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: St
     case Nil{}:
       {==}
     case Con{id, rest}:
-      +ev = {HM.ECardClosed{id, res, HM.no_ans()} : HM.Ev}
+      +ev = {HM.ECardClosed{id, res, HS.Ans.empty()} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
       Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx)),
@@ -126,135 +126,135 @@ def hub_names_tr(-a: List<&2, HS.MRec>, -b: List<&2, HS.MRec>, -na: List<&2, Str
   k
 
 # the cards after the closes of stop_task
-def hub_dropc(ids: List<&2, Nat>, +cs: List<&2, HM.Card>) -> List<&2, HM.Card>:
+def hub_dropc(ids: List<&2, Nat>, +cs: List<&2, HS.Card>) -> List<&2, HS.Card>:
   match ids:
     case Nil{}:
       cs
     case Con{+id, +t}:
       hub_dropc(t, HM.drop_card(cs, id))
 
-def hub_dropc_skip.go(+i: Nat, -ns: List<&2, Nat>, +h: HM.Card, +t: List<&2, HM.Card>,
-    ef: {Nat.is_eq(HM.Card.id(h), i) == False{} : Bool},
-    ih: {hub_dropc(ns, h <> HM.drop_card(t, i)) == h <> hub_dropc(ns, HM.drop_card(t, i)) : List<&2, HM.Card>})
-    -> {hub_dropc(i <> ns, h <> t) == h <> hub_dropc(i <> ns, t) : List<&2, HM.Card>}:
-  %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), i), False{}, ef) : {hub_dropc(ns, HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, i))) == h <> hub_dropc(i <> ns, t) : List<&2, HM.Card>}
+def hub_dropc_skip.go(+i: Nat, -ns: List<&2, Nat>, +h: HS.Card, +t: List<&2, HS.Card>,
+    ef: {Nat.is_eq(HS.Card.id(h), i) == False{} : Bool},
+    ih: {hub_dropc(ns, h <> HM.drop_card(t, i)) == h <> hub_dropc(ns, HM.drop_card(t, i)) : List<&2, HS.Card>})
+    -> {hub_dropc(i <> ns, h <> t) == h <> hub_dropc(i <> ns, t) : List<&2, HS.Card>}:
+  %Equal.sym(Bool, Nat.is_eq(HS.Card.id(h), i), False{}, ef) : {hub_dropc(ns, HLZ.pick(List<&2, HS.Card>, _, u => t, u => h <> HM.drop_card(t, i))) == h <> hub_dropc(i <> ns, t) : List<&2, HS.Card>}
   ih
 
-def hub_dropc_skip(+ids: List<&2, Nat>, +h: HM.Card, +t: List<&2, HM.Card>, +nf: {HM.nat_in(ids, HM.Card.id(h)) == False{} : Bool})
-    -> {hub_dropc(ids, h <> t) == h <> hub_dropc(ids, t) : List<&2, HM.Card>}:
+def hub_dropc_skip(+ids: List<&2, Nat>, +h: HS.Card, +t: List<&2, HS.Card>, +nf: {HM.nat_in(ids, HS.Card.id(h)) == False{} : Bool})
+    -> {hub_dropc(ids, h <> t) == h <> hub_dropc(ids, t) : List<&2, HS.Card>}:
   match ids:
     case Nil{}:
       {==}
     case Con{i, ns}:
       hub_dropc_skip.go(i, ns, h, t,
-        Equal.trans(Bool, Nat.is_eq(HM.Card.id(h), i), Nat.is_eq(i, HM.Card.id(h)), False{},
-          PL1.hub_eq_sym(HM.Card.id(h), i),
-          PL1.hub_lor_false_l(Nat.is_eq(i, HM.Card.id(h)), HM.nat_in(ns, HM.Card.id(h)), nf)),
-        hub_dropc_skip(ns, h, HM.drop_card(t, i), PL1.hub_lor_false_r(Nat.is_eq(i, HM.Card.id(h)), HM.nat_in(ns, HM.Card.id(h)), nf)))
+        Equal.trans(Bool, Nat.is_eq(HS.Card.id(h), i), Nat.is_eq(i, HS.Card.id(h)), False{},
+          PL1.hub_eq_sym(HS.Card.id(h), i),
+          PL1.hub_lor_false_l(Nat.is_eq(i, HS.Card.id(h)), HM.nat_in(ns, HS.Card.id(h)), nf)),
+        hub_dropc_skip(ns, h, HM.drop_card(t, i), PL1.hub_lor_false_r(Nat.is_eq(i, HS.Card.id(h)), HM.nat_in(ns, HS.Card.id(h)), nf)))
 
-def hub_c_sub.pick(c: Bool, +h: HM.Card, -t: List<&2, HM.Card>, -n: String, +x: Nat,
-    +e: {Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))) == c : Bool}, e1: {Nat.is_eq(HM.Card.id(h), x) == False{} : Bool},
+def hub_c_sub.pick(c: Bool, +h: HS.Card, -t: List<&2, HS.Card>, -n: String, +x: Nat,
+    +e: {Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))) == c : Bool}, e1: {Nat.is_eq(HS.Card.id(h), x) == False{} : Bool},
     ih: {HM.nat_in(HC.card_ids(t, n, Nil{}), x) == False{} : Bool})
-    -> {HM.nat_in(Bool.pick(List<&2, Nat>, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), x) == False{} : Bool}:
+    -> {HM.nat_in(Bool.pick(List<&2, Nat>, Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), HS.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), x) == False{} : Bool}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), True{}, e) : {HM.nat_in(Bool.pick(List<&2, Nat>, _, HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), x) == False{} : Bool}
-      PL1.hub_lor_false(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HC.card_ids(t, n, Nil{}), x), e1, ih)
+      %Equal.sym(Bool, Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), True{}, e) : {HM.nat_in(Bool.pick(List<&2, Nat>, _, HS.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), x) == False{} : Bool}
+      PL1.hub_lor_false(Nat.is_eq(HS.Card.id(h), x), HM.nat_in(HC.card_ids(t, n, Nil{}), x), e1, ih)
     case False{}:
-      %Equal.sym(Bool, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), False{}, e) : {HM.nat_in(Bool.pick(List<&2, Nat>, _, HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), x) == False{} : Bool}
+      %Equal.sym(Bool, Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), False{}, e) : {HM.nat_in(Bool.pick(List<&2, Nat>, _, HS.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), x) == False{} : Bool}
       ih
 
-def hub_c_sub(+t: List<&2, HM.Card>, +x: Nat, +n: String, +nf: {HM.nat_in(HI.card_ids(t), x) == False{} : Bool})
+def hub_c_sub(+t: List<&2, HS.Card>, +x: Nat, +n: String, +nf: {HM.nat_in(HI.card_ids(t), x) == False{} : Bool})
     -> {HM.nat_in(HC.card_ids(t, n, Nil{}), x) == False{} : Bool}:
   match t:
     case Nil{}:
       {==}
     case Con{h, tt}:
-      hub_c_sub.pick(Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), h, tt, n, x, {==},
-        PL1.hub_lor_false_l(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(tt), x), nf),
-        hub_c_sub(tt, x, n, PL1.hub_lor_false_r(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(tt), x), nf)))
+      hub_c_sub.pick(Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), h, tt, n, x, {==},
+        PL1.hub_lor_false_l(Nat.is_eq(HS.Card.id(h), x), HM.nat_in(HI.card_ids(tt), x), nf),
+        hub_c_sub(tt, x, n, PL1.hub_lor_false_r(Nat.is_eq(HS.Card.id(h), x), HM.nat_in(HI.card_ids(tt), x), nf)))
 
-def hub_KC.pick(c: Bool, +h: HM.Card, +t: List<&2, HM.Card>, +n: String,
-    +e: {Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))) == c : Bool}, +dh: {HM.nat_in(HI.card_ids(t), HM.Card.id(h)) == False{} : Bool},
+def hub_KC.pick(c: Bool, +h: HS.Card, +t: List<&2, HS.Card>, +n: String,
+    +e: {Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))) == c : Bool}, +dh: {HM.nat_in(HI.card_ids(t), HS.Card.id(h)) == False{} : Bool},
     ih: {HC.card_ids(hub_dropc(HC.card_ids(t, n, Nil{}), t), n, Nil{}) == Nil{} : List<&2, Nat>})
-    -> {HC.card_ids(hub_dropc(Bool.pick(List<&2, Nat>, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), h <> t), n, Nil{}) == Nil{} : List<&2, Nat>}:
+    -> {HC.card_ids(hub_dropc(Bool.pick(List<&2, Nat>, Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), HS.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), h <> t), n, Nil{}) == Nil{} : List<&2, Nat>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), True{}, e) : {HC.card_ids(hub_dropc(Bool.pick(List<&2, Nat>, _, HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), h <> t), n, Nil{}) == Nil{} : List<&2, Nat>}
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), HM.Card.id(h)), True{}, PL1.hub_eq_refl(HM.Card.id(h))) : {HC.card_ids(hub_dropc(HC.card_ids(t, n, Nil{}), HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, HM.Card.id(h)))), n, Nil{}) == Nil{} : List<&2, Nat>}
+      %Equal.sym(Bool, Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), True{}, e) : {HC.card_ids(hub_dropc(Bool.pick(List<&2, Nat>, _, HS.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), h <> t), n, Nil{}) == Nil{} : List<&2, Nat>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Card.id(h), HS.Card.id(h)), True{}, PL1.hub_eq_refl(HS.Card.id(h))) : {HC.card_ids(hub_dropc(HC.card_ids(t, n, Nil{}), HLZ.pick(List<&2, HS.Card>, _, u => t, u => h <> HM.drop_card(t, HS.Card.id(h)))), n, Nil{}) == Nil{} : List<&2, Nat>}
       ih
     case False{}:
-      %Equal.sym(Bool, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), False{}, e) : {HC.card_ids(hub_dropc(Bool.pick(List<&2, Nat>, _, HM.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), h <> t), n, Nil{}) == Nil{} : List<&2, Nat>}
-      %Equal.sym(List<&2, HM.Card>, hub_dropc(HC.card_ids(t, n, Nil{}), h <> t), h <> hub_dropc(HC.card_ids(t, n, Nil{}), t), hub_dropc_skip(HC.card_ids(t, n, Nil{}), h, t, hub_c_sub(t, HM.Card.id(h), n, dh))) : {HC.card_ids(_, n, Nil{}) == Nil{} : List<&2, Nat>}
-      %Equal.sym(Bool, Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), False{}, e) : {Bool.pick(List<&2, Nat>, _, HM.Card.id(h) <> HC.card_ids(hub_dropc(HC.card_ids(t, n, Nil{}), t), n, Nil{}), HC.card_ids(hub_dropc(HC.card_ids(t, n, Nil{}), t), n, Nil{})) == Nil{} : List<&2, Nat>}
+      %Equal.sym(Bool, Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), False{}, e) : {HC.card_ids(hub_dropc(Bool.pick(List<&2, Nat>, _, HS.Card.id(h) <> HC.card_ids(t, n, Nil{}), HC.card_ids(t, n, Nil{})), h <> t), n, Nil{}) == Nil{} : List<&2, Nat>}
+      %Equal.sym(List<&2, HS.Card>, hub_dropc(HC.card_ids(t, n, Nil{}), h <> t), h <> hub_dropc(HC.card_ids(t, n, Nil{}), t), hub_dropc_skip(HC.card_ids(t, n, Nil{}), h, t, hub_c_sub(t, HS.Card.id(h), n, dh))) : {HC.card_ids(_, n, Nil{}) == Nil{} : List<&2, Nat>}
+      %Equal.sym(Bool, Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), False{}, e) : {Bool.pick(List<&2, Nat>, _, HS.Card.id(h) <> HC.card_ids(hub_dropc(HC.card_ids(t, n, Nil{}), t), n, Nil{}), HC.card_ids(hub_dropc(HC.card_ids(t, n, Nil{}), t), n, Nil{})) == Nil{} : List<&2, Nat>}
       ih
 
 # closing every card of `n` leaves none of its cards
-def hub_KC(+cs: List<&2, HM.Card>, +n: String, d: HI.Distinct(HI.card_ids(cs))) -> {HC.card_ids(hub_dropc(HC.card_ids(cs, n, Nil{}), cs), n, Nil{}) == Nil{} : List<&2, Nat>}:
+def hub_KC(+cs: List<&2, HS.Card>, +n: String, d: HI.Distinct(HI.card_ids(cs))) -> {HC.card_ids(hub_dropc(HC.card_ids(cs, n, Nil{}), cs), n, Nil{}) == Nil{} : List<&2, Nat>}:
   match cs:
     case Nil{}:
       {==}
     case Con{h, t}:
       match d:
         case HX.Both{dh, dt}:
-          hub_KC.pick(Bool.and(String.eq(HM.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HM.Card.kind(h)))), h, t, n, {==}, dh, hub_KC(t, n, dt))
+          hub_KC.pick(Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), h, t, n, {==}, dh, hub_KC(t, n, dt))
 
-def hub_cards_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.cards(HX.d(o, a)) == HM.St.cards(HX.d(o, b)) : List<&2, HM.Card>}:
-  Equal.cong(HM.St, List<&2, HM.Card>, s => HM.St.cards(s), HX.d(o, a), HX.d(o, b), e)
+def hub_cards_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.cards(HX.d(o, a)) == HM.St.cards(HX.d(o, b)) : List<&2, HS.Card>}:
+  Equal.cong(HM.St, List<&2, HS.Card>, s => HM.St.cards(s), HX.d(o, a), HX.d(o, b), e)
 
-def hub_cards_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.cards(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.drop_card(HM.St.cards(s), id) : List<&2, HM.Card>}:
+def hub_cards_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.cards(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == HM.drop_card(HM.St.cards(s), id) : List<&2, HS.Card>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
-def hub_cards_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.St.cards(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.St.cards(s) : List<&2, HM.Card>}:
+def hub_cards_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.St.cards(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.St.cards(s) : List<&2, HS.Card>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
-def hub_cards_state(s: HM.St, +id: Nat, +x: HS.MSt) -> {HM.St.cards(HM.apply(s, HM.EMsgState{id, x})) == HM.St.cards(s) : List<&2, HM.Card>}:
+def hub_cards_state(s: HM.St, +id: Nat, +x: HS.MSt) -> {HM.St.cards(HM.apply(s, HM.EMsgState{id, x})) == HM.St.cards(s) : List<&2, HS.Card>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 # rejecting messages keeps the cards
 def hub_cards_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HM.St.cards(HX.d(o, HC.reject_ids(o, ids, cx))) == HM.St.cards(HX.d(o, cx)) : List<&2, HM.Card>}:
+    -> {HM.St.cards(HX.d(o, HC.reject_ids(o, ids, cx))) == HM.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, t}:
       +ev = {HM.EMsgState{id, HS.Rejected{"recipient_unavailable"}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.reject_ids(o, t, cx2))), HM.St.cards(HX.d(o, cx2)), HM.St.cards(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, HC.reject_ids(o, t, cx2))), HM.St.cards(HX.d(o, cx2)), HM.St.cards(HX.d(o, cx)),
         hub_cards_reject(o, t, cx2),
-        Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, cx2)), HM.St.cards(HM.apply(HX.d(o, cx), ev)), HM.St.cards(HX.d(o, cx)),
-          Equal.cong(HM.St, List<&2, HM.Card>, s => HM.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+        Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, cx2)), HM.St.cards(HM.apply(HX.d(o, cx), ev)), HM.St.cards(HX.d(o, cx)),
+          Equal.cong(HM.St, List<&2, HS.Card>, s => HM.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_cards_state(HX.d(o, cx), id, HS.Rejected{"recipient_unavailable"})))
 
 # closing cards drops them, one by one
 def hub_cards_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
-    -> {HM.St.cards(HX.d(o, HC.close_ids(o, ids, cx, res))) == hub_dropc(ids, HM.St.cards(HX.d(o, cx))) : List<&2, HM.Card>}:
+    -> {HM.St.cards(HX.d(o, HC.close_ids(o, ids, cx, res))) == hub_dropc(ids, HM.St.cards(HX.d(o, cx))) : List<&2, HS.Card>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, rest}:
-      +ev = {HM.ECardClosed{id, res, HM.no_ans()} : HM.Ev}
+      +ev = {HM.ECardClosed{id, res, HS.Ans.empty()} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
-      Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.close_ids(o, rest, cx3, res))), hub_dropc(rest, HM.St.cards(HX.d(o, cx3))),
+      Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, HC.close_ids(o, rest, cx3, res))), hub_dropc(rest, HM.St.cards(HX.d(o, cx3))),
         hub_dropc(id <> rest, HM.St.cards(HX.d(o, cx))),
         hub_cards_close_ids(o, rest, cx3, res),
-        Equal.cong(List<&2, HM.Card>, List<&2, HM.Card>, cs => hub_dropc(rest, cs), HM.St.cards(HX.d(o, cx3)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
-          Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, cx3)), HM.St.cards(HX.d(o, cx2)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
+        Equal.cong(List<&2, HS.Card>, List<&2, HS.Card>, cs => hub_dropc(rest, cs), HM.St.cards(HX.d(o, cx3)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
+          Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, cx3)), HM.St.cards(HX.d(o, cx2)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
             hub_cards_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
-            Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, cx2)), HM.St.cards(HM.apply(HX.d(o, cx), ev)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
-              Equal.cong(HM.St, List<&2, HM.Card>, s => HM.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+            Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, cx2)), HM.St.cards(HM.apply(HX.d(o, cx), ev)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
+              Equal.cong(HM.St, List<&2, HS.Card>, s => HM.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
               hub_cards_closed(HX.d(o, cx), id, res)))))
 
-def hub_cids_tr(-a: List<&2, HM.Card>, -b: List<&2, HM.Card>, -n: String, e: {a == b : List<&2, HM.Card>},
+def hub_cids_tr(-a: List<&2, HS.Card>, -b: List<&2, HS.Card>, -n: String, e: {a == b : List<&2, HS.Card>},
     k: {HC.card_ids(b, n, Nil{}) == Nil{} : List<&2, Nat>}) -> {HC.card_ids(a, n, Nil{}) == Nil{} : List<&2, Nat>}:
-  %Equal.sym(List<&2, HM.Card>, a, b, e) : {HC.card_ids(_, n, Nil{}) == Nil{} : List<&2, Nat>}
+  %Equal.sym(List<&2, HS.Card>, a, b, e) : {HC.card_ids(_, n, Nil{}) == Nil{} : List<&2, Nat>}
   k
 
 # ---- L12 support: no two open cards share an id (cards_unique) ----
@@ -270,74 +270,74 @@ def hub_below_notin(+ns: List<&2, Nat>, +x: Nat, bl: HI.Below(ns, x)) -> {HM.nat
             Equal.trans(Bool, Nat.is_eq(y, x), Nat.is_eq(x, y), False{}, PL1.hub_eq_sym(y, x), PL1.hub_lt_neq(y, x, ly)),
             hub_below_notin(t, x, bt))
 
-def hub_drop_absent.go(c: Bool, +h: HM.Card, +t: List<&2, HM.Card>, -id: Nat, +e: {Nat.is_eq(HM.Card.id(h), id) == c : Bool},
-    ec: {c == False{} : Bool}, ih: {HM.drop_card(t, id) == t : List<&2, HM.Card>}) -> {HM.drop_card(h <> t, id) == h <> t : List<&2, HM.Card>}:
+def hub_drop_absent.go(c: Bool, +h: HS.Card, +t: List<&2, HS.Card>, -id: Nat, +e: {Nat.is_eq(HS.Card.id(h), id) == c : Bool},
+    ec: {c == False{} : Bool}, ih: {HM.drop_card(t, id) == t : List<&2, HS.Card>}) -> {HM.drop_card(h <> t, id) == h <> t : List<&2, HS.Card>}:
   match c:
     case True{}:
-      PL1.hub_absurd_eq(PL1.hub_tf_absurd(ec), List<&2, HM.Card>, HM.drop_card(h <> t, id), h <> t)
+      PL1.hub_absurd_eq(PL1.hub_tf_absurd(ec), List<&2, HS.Card>, HM.drop_card(h <> t, id), h <> t)
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), False{}, e) : {HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id)) == h <> t : List<&2, HM.Card>}
-      Equal.cong(List<&2, HM.Card>, List<&2, HM.Card>, xs => h <> xs, HM.drop_card(t, id), t, ih)
+      %Equal.sym(Bool, Nat.is_eq(HS.Card.id(h), id), False{}, e) : {HLZ.pick(List<&2, HS.Card>, _, u => t, u => h <> HM.drop_card(t, id)) == h <> t : List<&2, HS.Card>}
+      Equal.cong(List<&2, HS.Card>, List<&2, HS.Card>, xs => h <> xs, HM.drop_card(t, id), t, ih)
 
 # dropping an id no card has changes nothing
-def hub_drop_absent(+cs: List<&2, HM.Card>, +id: Nat, +nf: {HM.nat_in(HI.card_ids(cs), id) == False{} : Bool}) -> {HM.drop_card(cs, id) == cs : List<&2, HM.Card>}:
+def hub_drop_absent(+cs: List<&2, HS.Card>, +id: Nat, +nf: {HM.nat_in(HI.card_ids(cs), id) == False{} : Bool}) -> {HM.drop_card(cs, id) == cs : List<&2, HS.Card>}:
   match cs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      hub_drop_absent.go(Nat.is_eq(HM.Card.id(h), id), h, t, id, {==},
-        PL1.hub_lor_false_l(Nat.is_eq(HM.Card.id(h), id), HM.nat_in(HI.card_ids(t), id), nf),
-        hub_drop_absent(t, id, PL1.hub_lor_false_r(Nat.is_eq(HM.Card.id(h), id), HM.nat_in(HI.card_ids(t), id), nf)))
+      hub_drop_absent.go(Nat.is_eq(HS.Card.id(h), id), h, t, id, {==},
+        PL1.hub_lor_false_l(Nat.is_eq(HS.Card.id(h), id), HM.nat_in(HI.card_ids(t), id), nf),
+        hub_drop_absent(t, id, PL1.hub_lor_false_r(Nat.is_eq(HS.Card.id(h), id), HM.nat_in(HI.card_ids(t), id), nf)))
 
-def hub_cids_snoc(+cs: List<&2, HM.Card>, +c: HM.Card) -> {HI.card_ids(HM.snoc(HM.Card, cs, c)) == HM.snoc(Nat, HI.card_ids(cs), HM.Card.id(c)) : List<&2, Nat>}:
+def hub_cids_snoc(+cs: List<&2, HS.Card>, +c: HS.Card) -> {HI.card_ids(HM.snoc(HS.Card, cs, c)) == HM.snoc(Nat, HI.card_ids(cs), HS.Card.id(c)) : List<&2, Nat>}:
   match cs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      Equal.cong(List<&2, Nat>, List<&2, Nat>, ys => HM.Card.id(h) <> ys, HI.card_ids(HM.snoc(HM.Card, t, c)), HM.snoc(Nat, HI.card_ids(t), HM.Card.id(c)), hub_cids_snoc(t, c))
+      Equal.cong(List<&2, Nat>, List<&2, Nat>, ys => HS.Card.id(h) <> ys, HI.card_ids(HM.snoc(HS.Card, t, c)), HM.snoc(Nat, HI.card_ids(t), HS.Card.id(c)), hub_cids_snoc(t, c))
 
-def hub_drop_notin.go(c: Bool, +h: HM.Card, +t: List<&2, HM.Card>, -id: Nat, +x: Nat, +e: {Nat.is_eq(HM.Card.id(h), id) == c : Bool},
+def hub_drop_notin.go(c: Bool, +h: HS.Card, +t: List<&2, HS.Card>, -id: Nat, +x: Nat, +e: {Nat.is_eq(HS.Card.id(h), id) == c : Bool},
     +nf: {HM.nat_in(HI.card_ids(h <> t), x) == False{} : Bool}, ih: {HM.nat_in(HI.card_ids(HM.drop_card(t, id)), x) == False{} : Bool})
     -> {HM.nat_in(HI.card_ids(HM.drop_card(h <> t, id)), x) == False{} : Bool}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), True{}, e) : {HM.nat_in(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id))), x) == False{} : Bool}
-      PL1.hub_lor_false_r(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf)
+      %Equal.sym(Bool, Nat.is_eq(HS.Card.id(h), id), True{}, e) : {HM.nat_in(HI.card_ids(HLZ.pick(List<&2, HS.Card>, _, u => t, u => h <> HM.drop_card(t, id))), x) == False{} : Bool}
+      PL1.hub_lor_false_r(Nat.is_eq(HS.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf)
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), False{}, e) : {HM.nat_in(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id))), x) == False{} : Bool}
-      PL1.hub_lor_false(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(HM.drop_card(t, id)), x),
-        PL1.hub_lor_false_l(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf), ih)
+      %Equal.sym(Bool, Nat.is_eq(HS.Card.id(h), id), False{}, e) : {HM.nat_in(HI.card_ids(HLZ.pick(List<&2, HS.Card>, _, u => t, u => h <> HM.drop_card(t, id))), x) == False{} : Bool}
+      PL1.hub_lor_false(Nat.is_eq(HS.Card.id(h), x), HM.nat_in(HI.card_ids(HM.drop_card(t, id)), x),
+        PL1.hub_lor_false_l(Nat.is_eq(HS.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf), ih)
 
 # dropping a card never brings back an id
-def hub_drop_notin(+cs: List<&2, HM.Card>, +id: Nat, +x: Nat, +nf: {HM.nat_in(HI.card_ids(cs), x) == False{} : Bool})
+def hub_drop_notin(+cs: List<&2, HS.Card>, +id: Nat, +x: Nat, +nf: {HM.nat_in(HI.card_ids(cs), x) == False{} : Bool})
     -> {HM.nat_in(HI.card_ids(HM.drop_card(cs, id)), x) == False{} : Bool}:
   match cs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      hub_drop_notin.go(Nat.is_eq(HM.Card.id(h), id), h, t, id, x, {==}, nf,
-        hub_drop_notin(t, id, x, PL1.hub_lor_false_r(Nat.is_eq(HM.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf)))
+      hub_drop_notin.go(Nat.is_eq(HS.Card.id(h), id), h, t, id, x, {==}, nf,
+        hub_drop_notin(t, id, x, PL1.hub_lor_false_r(Nat.is_eq(HS.Card.id(h), x), HM.nat_in(HI.card_ids(t), x), nf)))
 
-def hub_ucards_cons(+h: HM.Card, -ys: List<&2, HM.Card>, -n: Nat, nf: {HM.nat_in(HI.card_ids(ys), HM.Card.id(h)) == False{} : Bool},
-    lh: {Nat.is_lt(HM.Card.id(h), n) == True{} : Bool}, u: HX.Both<HI.Distinct(HI.card_ids(ys)), HI.Below(HI.card_ids(ys), n)>)
+def hub_ucards_cons(+h: HS.Card, -ys: List<&2, HS.Card>, -n: Nat, nf: {HM.nat_in(HI.card_ids(ys), HS.Card.id(h)) == False{} : Bool},
+    lh: {Nat.is_lt(HS.Card.id(h), n) == True{} : Bool}, u: HX.Both<HI.Distinct(HI.card_ids(ys)), HI.Below(HI.card_ids(ys), n)>)
     -> HX.Both<HI.Distinct(HI.card_ids(h <> ys)), HI.Below(HI.card_ids(h <> ys), n)>:
   match u:
     case HX.Both{d2, b2}:
       HX.Both{HX.Both{nf, d2}, HX.Both{lh, b2}}
 
-def hub_ucards_drop.go(c: Bool, +h: HM.Card, +t: List<&2, HM.Card>, +id: Nat, -n: Nat, +e: {Nat.is_eq(HM.Card.id(h), id) == c : Bool},
-    +dh: {HM.nat_in(HI.card_ids(t), HM.Card.id(h)) == False{} : Bool}, +lh: {Nat.is_lt(HM.Card.id(h), n) == True{} : Bool},
+def hub_ucards_drop.go(c: Bool, +h: HS.Card, +t: List<&2, HS.Card>, +id: Nat, -n: Nat, +e: {Nat.is_eq(HS.Card.id(h), id) == c : Bool},
+    +dh: {HM.nat_in(HI.card_ids(t), HS.Card.id(h)) == False{} : Bool}, +lh: {Nat.is_lt(HS.Card.id(h), n) == True{} : Bool},
     +ut: HX.Both<HI.Distinct(HI.card_ids(t)), HI.Below(HI.card_ids(t), n)>, ih: HX.Both<HI.Distinct(HI.card_ids(HM.drop_card(t, id))), HI.Below(HI.card_ids(HM.drop_card(t, id)), n)>) -> HX.Both<HI.Distinct(HI.card_ids(HM.drop_card(h <> t, id))), HI.Below(HI.card_ids(HM.drop_card(h <> t, id)), n)>:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), True{}, e) : HX.Both<HI.Distinct(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id)))), HI.Below(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id))), n)>
+      %Equal.sym(Bool, Nat.is_eq(HS.Card.id(h), id), True{}, e) : HX.Both<HI.Distinct(HI.card_ids(HLZ.pick(List<&2, HS.Card>, _, u => t, u => h <> HM.drop_card(t, id)))), HI.Below(HI.card_ids(HLZ.pick(List<&2, HS.Card>, _, u => t, u => h <> HM.drop_card(t, id))), n)>
       ut
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Card.id(h), id), False{}, e) : HX.Both<HI.Distinct(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id)))), HI.Below(HI.card_ids(HLZ.pick(List<&2, HM.Card>, _, u => t, u => h <> HM.drop_card(t, id))), n)>
-      hub_ucards_cons(h, HM.drop_card(t, id), n, hub_drop_notin(t, id, HM.Card.id(h), dh), lh, ih)
+      %Equal.sym(Bool, Nat.is_eq(HS.Card.id(h), id), False{}, e) : HX.Both<HI.Distinct(HI.card_ids(HLZ.pick(List<&2, HS.Card>, _, u => t, u => h <> HM.drop_card(t, id)))), HI.Below(HI.card_ids(HLZ.pick(List<&2, HS.Card>, _, u => t, u => h <> HM.drop_card(t, id))), n)>
+      hub_ucards_cons(h, HM.drop_card(t, id), n, hub_drop_notin(t, id, HS.Card.id(h), dh), lh, ih)
 
 # closing a card keeps the open cards unique
-def hub_ucards_drop(+cs: List<&2, HM.Card>, +id: Nat, +n: Nat, u: HX.Both<HI.Distinct(HI.card_ids(cs)), HI.Below(HI.card_ids(cs), n)>) -> HX.Both<HI.Distinct(HI.card_ids(HM.drop_card(cs, id))), HI.Below(HI.card_ids(HM.drop_card(cs, id)), n)>:
+def hub_ucards_drop(+cs: List<&2, HS.Card>, +id: Nat, +n: Nat, u: HX.Both<HI.Distinct(HI.card_ids(cs)), HI.Below(HI.card_ids(cs), n)>) -> HX.Both<HI.Distinct(HI.card_ids(HM.drop_card(cs, id))), HI.Below(HI.card_ids(HM.drop_card(cs, id)), n)>:
   match cs:
     case Nil{}:
       u
@@ -346,23 +346,23 @@ def hub_ucards_drop(+cs: List<&2, HM.Card>, +id: Nat, +n: Nat, u: HX.Both<HI.Dis
         case HX.Both{d, b}:
           match d b:
             case HX.Both{+dh, +dt} HX.Both{+lh, +bt}:
-              hub_ucards_drop.go(Nat.is_eq(HM.Card.id(h), id), h, t, id, n, {==}, dh, lh, HX.Both{dt, bt}, hub_ucards_drop(t, id, n, HX.Both{dt, bt}))
+              hub_ucards_drop.go(Nat.is_eq(HS.Card.id(h), id), h, t, id, n, {==}, dh, lh, HX.Both{dt, bt}, hub_ucards_drop(t, id, n, HX.Both{dt, bt}))
 
 # opening a card with the next free id keeps the open cards unique
-def hub_ucards_open(+cs: List<&2, HM.Card>, +c: HM.Card, +nc: Nat, +k: {HM.Card.id(c) == nc : Nat}, u: HX.Both<HI.Distinct(HI.card_ids(cs)), HI.Below(HI.card_ids(cs), nc)>)
-    -> HX.Both<HI.Distinct(HI.card_ids(HM.put_card(cs, c))), HI.Below(HI.card_ids(HM.put_card(cs, c)), Nat.max(nc, 1n+HM.Card.id(c)))>:
+def hub_ucards_open(+cs: List<&2, HS.Card>, +c: HS.Card, +nc: Nat, +k: {HS.Card.id(c) == nc : Nat}, u: HX.Both<HI.Distinct(HI.card_ids(cs)), HI.Below(HI.card_ids(cs), nc)>)
+    -> HX.Both<HI.Distinct(HI.card_ids(HM.put_card(cs, c))), HI.Below(HI.card_ids(HM.put_card(cs, c)), Nat.max(nc, 1n+HS.Card.id(c)))>:
   match u:
     case HX.Both{+d, +b}:
-      +top = Nat.max(nc, 1n+HM.Card.id(c))
-      +absent = hub_drop_absent(cs, HM.Card.id(c), hub_below_notin(HI.card_ids(cs), HM.Card.id(c), PL1.hub_below_n(HI.card_ids(cs), HM.Card.id(c), nc, k, b)))
-      +e = Equal.trans(List<&2, Nat>, HI.card_ids(HM.put_card(cs, c)), HI.card_ids(HM.snoc(HM.Card, cs, c)), HM.snoc(Nat, HI.card_ids(cs), HM.Card.id(c)),
-        Equal.cong(List<&2, HM.Card>, List<&2, Nat>, xs => HI.card_ids(HM.snoc(HM.Card, xs, c)), HM.drop_card(cs, HM.Card.id(c)), cs, absent),
+      +top = Nat.max(nc, 1n+HS.Card.id(c))
+      +absent = hub_drop_absent(cs, HS.Card.id(c), hub_below_notin(HI.card_ids(cs), HS.Card.id(c), PL1.hub_below_n(HI.card_ids(cs), HS.Card.id(c), nc, k, b)))
+      +e = Equal.trans(List<&2, Nat>, HI.card_ids(HM.put_card(cs, c)), HI.card_ids(HM.snoc(HS.Card, cs, c)), HM.snoc(Nat, HI.card_ids(cs), HS.Card.id(c)),
+        Equal.cong(List<&2, HS.Card>, List<&2, Nat>, xs => HI.card_ids(HM.snoc(HS.Card, xs, c)), HM.drop_card(cs, HS.Card.id(c)), cs, absent),
         hub_cids_snoc(cs, c))
-      HX.Both{PL1.hub_distinct_tr(HI.card_ids(HM.put_card(cs, c)), HM.snoc(Nat, HI.card_ids(cs), HM.Card.id(c)), e,
-          PL1.hub_distinct_snoc(HI.card_ids(cs), HM.Card.id(c), d, PL1.hub_below_n(HI.card_ids(cs), HM.Card.id(c), nc, k, b))),
-        PL1.hub_below_tr(HI.card_ids(HM.put_card(cs, c)), HM.snoc(Nat, HI.card_ids(cs), HM.Card.id(c)), top, e,
-          PL1.hub_below_snoc(HI.card_ids(cs), HM.Card.id(c), top, PL1.hub_below_mono(HI.card_ids(cs), nc, top, Nat.max_ge_l(nc, 1n+HM.Card.id(c)), b),
-            PL1.hub_lt_ge(HM.Card.id(c), 1n+HM.Card.id(c), top, PL1.hub_lt_succ(HM.Card.id(c)), Nat.max_ge_r(nc, 1n+HM.Card.id(c)))))}
+      HX.Both{PL1.hub_distinct_tr(HI.card_ids(HM.put_card(cs, c)), HM.snoc(Nat, HI.card_ids(cs), HS.Card.id(c)), e,
+          PL1.hub_distinct_snoc(HI.card_ids(cs), HS.Card.id(c), d, PL1.hub_below_n(HI.card_ids(cs), HS.Card.id(c), nc, k, b))),
+        PL1.hub_below_tr(HI.card_ids(HM.put_card(cs, c)), HM.snoc(Nat, HI.card_ids(cs), HS.Card.id(c)), top, e,
+          PL1.hub_below_snoc(HI.card_ids(cs), HS.Card.id(c), top, PL1.hub_below_mono(HI.card_ids(cs), nc, top, Nat.max_ge_l(nc, 1n+HS.Card.id(c)), b),
+            PL1.hub_lt_ge(HS.Card.id(c), 1n+HS.Card.id(c), top, PL1.hub_lt_succ(HS.Card.id(c)), Nat.max_ge_r(nc, 1n+HS.Card.id(c)))))}
 
 def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, e)) -> HI.UniqueCards(HM.apply(s, e)):
   match s:

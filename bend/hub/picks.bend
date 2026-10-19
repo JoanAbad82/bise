@@ -89,67 +89,67 @@ def pick_words(p: Maybe<&2, Pick>) -> Maybe<&2, String>:
 # his answer to card `card` (inbox picks (3), architect m_22636): who
 # asked, what he said, the card's question, his pick. core.bend writes its
 # route line and the step's answer from the same one (answer_line)
-type Ans is Data:
-  Ans{card: Nat, who: String, said: String, ask: String, pick: Maybe<&2, Pick>}
+type Answer is Data:
+  Answer{card: Nat, who: String, said: String, ask: String, pick: Maybe<&2, Pick>}
 
-def ans(+card: Nat, +ask: String, +who: String, +said: String) -> Ans:
-  Ans{card, who, said, ask, option_pick(ask, said)}
+def ans(+card: Nat, +ask: String, +who: String, +said: String) -> Answer:
+  Answer{card, who, said, ask, option_pick(ask, said)}
 
-def ans_card(a: Ans) -> Nat:
+def ans_card(a: Answer) -> Nat:
   match a:
-    case Ans{+card, _, _, _, _}:
+    case Answer{+card, _, _, _, _}:
       card
 
-def ans_who(a: Ans) -> String:
+def ans_who(a: Answer) -> String:
   match a:
-    case Ans{_, +who, _, _, _}:
+    case Answer{_, +who, _, _, _}:
       who
 
-def ans_said(a: Ans) -> String:
+def ans_said(a: Answer) -> String:
   match a:
-    case Ans{_, _, +said, _, _}:
+    case Answer{_, _, +said, _, _}:
       said
 
-def ans_ask(a: Ans) -> String:
+def ans_ask(a: Answer) -> String:
   match a:
-    case Ans{_, _, _, +ask, _}:
+    case Answer{_, _, _, +ask, _}:
       ask
 
-def ans_pick(a: Ans) -> Maybe<&2, Pick>:
+def ans_pick(a: Answer) -> Maybe<&2, Pick>:
   match a:
-    case Ans{_, _, _, _, +pick}:
+    case Answer{_, _, _, _, +pick}:
       pick
 
 # the step's answer fields (link.rs AStep ans_*): all of them, or none
-def card_of(m: Maybe<&2, Ans>) -> Maybe<&2, Nat>:
+def card_of(m: Maybe<&2, Answer>) -> Maybe<&2, Nat>:
   match m:
     case None{}:
       None{}
     case Some{+a}:
       Some{ans_card(a)}
 
-def who_of(m: Maybe<&2, Ans>) -> Maybe<&2, String>:
+def who_of(m: Maybe<&2, Answer>) -> Maybe<&2, String>:
   match m:
     case None{}:
       None{}
     case Some{+a}:
       Some{ans_who(a)}
 
-def said_of(m: Maybe<&2, Ans>) -> Maybe<&2, String>:
+def said_of(m: Maybe<&2, Answer>) -> Maybe<&2, String>:
   match m:
     case None{}:
       None{}
     case Some{+a}:
       Some{ans_said(a)}
 
-def ask_of(m: Maybe<&2, Ans>) -> Maybe<&2, String>:
+def ask_of(m: Maybe<&2, Answer>) -> Maybe<&2, String>:
   match m:
     case None{}:
       None{}
     case Some{+a}:
       Some{ans_ask(a)}
 
-def pick_of_ans(m: Maybe<&2, Ans>) -> Maybe<&2, String>:
+def pick_of_ans(m: Maybe<&2, Answer>) -> Maybe<&2, String>:
   match m:
     case None{}:
       None{}

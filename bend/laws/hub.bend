@@ -325,29 +325,29 @@ law paused_steers_nothing:
 # card's asker is told or not (page_answer_tells_asker below).
 law page_answer_closes:
   for -o: HM.St
-  for +c: HM.Card
+  for +c: HS.Card
   for +cx: HX.Cx<o>
   for +to: String
   for +page: String
   for +text: String
   for +block: String
-  {HC.page_answered(o, Some{c}, cx, to, page, text, block) == HC.page_answered.tell(o, HR.tells_asker(HM.resolve(HX.d(o, HC.close_card_ans(o, cx, HM.Card.id(c), "answered", HA.page_ans(text, page, block))), HM.Card.agent(c)), HM.resolve(HX.d(o, HC.close_card_ans(o, cx, HM.Card.id(c), "answered", HA.page_ans(text, page, block))), to)), HC.close_card_ans(o, cx, HM.Card.id(c), "answered", HA.page_ans(text, page, block)), c, to, page, text) : HX.Cx<o>}
+  {HC.page_answered(o, Some{c}, cx, to, page, text, block) == HC.page_answered.tell(o, HR.tells_asker(HM.resolve(HX.d(o, HC.close_card_ans(o, cx, HS.Card.id(c), "answered", HA.page_ans(text, page, block))), HS.Card.agent(c)), HM.resolve(HX.d(o, HC.close_card_ans(o, cx, HS.Card.id(c), "answered", HA.page_ans(text, page, block))), to)), HC.close_card_ans(o, cx, HS.Card.id(c), "answered", HA.page_ans(text, page, block)), c, to, page, text) : HX.Cx<o>}
 
 # LAW: the asker told: exactly one message from bise to the card's asker,
 # with his answer; not told: nothing more than the close.
 law page_answer_tells_asker:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +c: HM.Card
+  for +c: HS.Card
   for +to: String
   for +page: String
   for +text: String
-  {HC.page_answered.tell(o, True{}, cx, c, to, page, text) == HC.fst(o, HC.send(o, cx, HC.msg(HM.HUB(), HM.Card.agent(c), HR.answer_words(HM.Card.id(c), page, to, text), False{}, None{}, False{}, False{}))) : HX.Cx<o>}
+  {HC.page_answered.tell(o, True{}, cx, c, to, page, text) == HC.fst(o, HC.send(o, cx, HC.msg(HM.HUB(), HS.Card.agent(c), HR.answer_words(HS.Card.id(c), page, to, text), False{}, None{}, False{}, False{}))) : HX.Cx<o>}
 
 law page_answer_quiet:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +c: HM.Card
+  for +c: HS.Card
   for +to: String
   for +page: String
   for +text: String
@@ -531,7 +531,7 @@ law user_queued_said_at_idle:
 law card_confirm_words_refused:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +c: HM.Card
+  for +c: HS.Card
   for +text: String
   for +parts: String
   for +via: String
@@ -544,7 +544,7 @@ law card_confirm_words_refused:
 law card_confirm_no_alias:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +c: HM.Card
+  for +c: HS.Card
   for +text: String
   for +parts: String
   for +via: String
@@ -568,11 +568,11 @@ law card_confirm_no_thanks_is_words:
 law card_choice_words_refused:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +c: HM.Card
+  for +c: HS.Card
   for +text: String
   for +parts: String
   for +via: String
-  for e: {HC.is_option(HM.Card.text(c), text) == False{} : Bool}
+  for e: {HC.is_option(HS.Card.text(c), text) == False{} : Bool}
   {HC.answer.kind(o, HC.KChoice{}, cx, c, text, parts, via) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
 
 # ---- bise's cross-hub messages (desktop S2, hub/xhub.bend) ----

@@ -177,6 +177,19 @@ fn day_heads_at_the_callers_offset() {
     assert_eq!(day_head(late, now, 2 * 3600), "today");
 }
 
+/// A row field's keys in its line: its own, or an inline declared record's
+/// (card_closed's `ans`: `SC Ans.journal`, its keys in the line itself).
+fn line_keys(f: &crate::core::Field) -> Vec<&'static str> {
+    match f.kind {
+        crate::core::FieldKind::Inline(c) if c.module == "SC" => {
+            let (rec, shape) = c.name.split_once('.').expect("<T>.<shape>");
+            let r = crate::core::state::STATE.record(rec).expect("a declared record");
+            r.shape(shape).expect("its shape").keys.iter().map(|k| k.key).collect()
+        }
+        _ => vec![f.name],
+    }
+}
+
 #[test]
 fn the_card_lines_are_the_tables() {
     // the typed reader's keys are the JOURNAL rows' fields
@@ -187,7 +200,7 @@ fn the_card_lines_are_the_tables() {
     ] {
         assert!(TAGS.contains(&tag));
         let row = JOURNAL.kind(tag).unwrap_or_else(|| panic!("{tag} in JOURNAL"));
-        assert_eq!(row.fields.iter().map(|f| f.name).collect::<Vec<_>>(), keys, "{tag}");
+        assert_eq!(row.fields.iter().flat_map(|f| line_keys(f)).collect::<Vec<_>>(), keys, "{tag}");
     }
     // a full line of each reads, every key taken
     let c = CardLine::of(&closed(7, "answered", json!({"said": "s", "pick_n": 1, "pick": "p", "via": "page", "page": "pg", "block": "q"}), 1)).unwrap();

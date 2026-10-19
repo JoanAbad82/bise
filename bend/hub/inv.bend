@@ -153,12 +153,12 @@ def apply1(+msgs: List<&2, S.MRec>, e: M.Ev) -> List<&2, S.MRec>:
       msgs
 
 # the card ids, in the order of the state
-def card_ids(cs: List<&2, M.Card>) -> List<&2, Nat>:
+def card_ids(cs: List<&2, S.Card>) -> List<&2, Nat>:
   match cs:
     case Nil{}:
       Nil{}
     case Con{+c, +t}:
-      M.Card.id(c) <> card_ids(t)
+      S.Card.id(c) <> card_ids(t)
 
 # law cards_unique: no two open cards share an id, every id is below the
 # next free one

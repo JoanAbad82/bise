@@ -194,7 +194,7 @@ def Laws.answer_pick_needs_the_card(m):
       {==}
     case Some{a}:
       match a:
-        case HPK.Ans{c, w, s, q, p}:
+        case HPK.Answer{c, w, s, q, p}:
           match p:
             case None{}:
               {==}

@@ -82,24 +82,24 @@ def take.owed(-o: M.St, ms: List<&2, S.Msg>, +cx: X.Cx<o>) -> X.Cx<o>:
     case Con{+m, +rest}:
       take.owed(o, rest, X.emit(o, cx, M.ESettled{S.Msg.id(m)}, Unit{}, Unit{}, Unit{}))
 
-def take.card(-o: M.St, hit: Bool, +cx: X.Cx<o>, +c: M.Card, +h: String) -> X.Cx<o>:
+def take.card(-o: M.St, hit: Bool, +cx: X.Cx<o>, +c: S.Card, +h: String) -> X.Cx<o>:
   match hit:
     case False{}:
       cx
     case True{}:
       +res = String.append("moved to @", h)
-      +cx2 = X.emit(o, cx, M.ECardClosed{M.Card.id(c), res, M.no_ans()}, Unit{}, Unit{}, Unit{})
-      +cx3 = feed(o, cx2, M.MAIN(), FD.card_closed(M.Card.id(c), res))
+      +cx2 = X.emit(o, cx, M.ECardClosed{S.Card.id(c), res, S.Ans.empty()}, Unit{}, Unit{}, Unit{})
+      +cx3 = feed(o, cx2, M.MAIN(), FD.card_closed(S.Card.id(c), res))
       +id = M.St.next_card(X.d(o, cx3))
-      +cx4 = X.emit(o, cx3, M.ECardOpened{M.Card{id, M.Card.kind(c), h, M.Card.text(c), M.Card.for_msg(c), X.now(o, cx3), M.Card.place(c), M.Card.pr(c)}}, {==}, Unit{}, Unit{})
-      feed(o, cx4, M.MAIN(), FD.card(id, M.Card.kind(c), h, M.Card.text(c)))
+      +cx4 = X.emit(o, cx3, M.ECardOpened{M.card(id, S.Card.kind(c), h, S.Card.text(c), S.Card.for_msg(c), X.now(o, cx3), S.Card.place(c), S.Card.pr(c))}, {==}, Unit{}, Unit{})
+      feed(o, cx4, M.MAIN(), FD.card(id, S.Card.kind(c), h, S.Card.text(c)))
 
-def take.cards(-o: M.St, cs: List<&2, M.Card>, +cx: X.Cx<o>, +n: String, +h: String) -> X.Cx<o>:
+def take.cards(-o: M.St, cs: List<&2, S.Card>, +cx: X.Cx<o>, +n: String, +h: String) -> X.Cx<o>:
   match cs:
     case Nil{}:
       cx
     case Con{+c, +rest}:
-      take.cards(o, rest, take.card(o, String.eq(M.Card.agent(c), n), cx, c, h), n, h)
+      take.cards(o, rest, take.card(o, String.eq(S.Card.agent(c), n), cx, c, h), n, h)
 
 def take.timers(-o: M.St, ts: List<&2, TM.Timer>, +cx: X.Cx<o>, +h: String, +why: String) -> X.Cx<o>:
   match ts:

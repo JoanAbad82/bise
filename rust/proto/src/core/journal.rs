@@ -9,8 +9,10 @@
 //! A row's `bend` is its `M.Ev` pattern, nested, over its fields' names:
 //! `M.EX{XH.XOp{xid, XH.OpAcked{}}}` is the line `{"type": "x_acked",
 //! "xid": …}`. The records inside a line (a message, a card, a route...)
-//! keep their hand codecs in bend/hub/codec.bend ([`Codec`]: one per
-//! record, never one per kind).
+//! are read and written by one codec per record, never one per kind
+//! ([`Codec`]): a declared record's generated one (`SC`,
+//! gen/state-codec.bend: a message, a card, his answer), else its hand
+//! one in bend/hub/codec.bend (`C`) until its family moves.
 //!
 //! A new kind: one row here, `BISE_PROTO_BLESS=1 cargo test -p bise-proto
 //! --test core_gen`, then its `Ev` constructor and what it does.
@@ -30,7 +32,9 @@ pub const DECL: Codec = Codec {
 };
 pub const MST: Codec = Codec { module: "SC", name: "MSt.journal", ty: "S.MSt", cases: &["S.Queued{$r}", "S.Delivered{}", "S.Rejected{$e}", "S.Cancelled{}"] };
 pub const MSG: Codec = Codec { module: "SC", name: "Msg.journal", ty: "S.Msg", cases: &[] };
-pub const CARD: Codec = Codec { module: "C", name: "card", ty: "M.Card", cases: &[] };
+pub const CARD: Codec = Codec { module: "SC", name: "Card.journal", ty: "S.Card", cases: &[] };
+/// his answer on a card's close: its keys sit in the line
+pub const ANS: Codec = Codec { module: "SC", name: "Ans.journal", ty: "S.Ans", cases: &[] };
 pub const TIMER: Codec = Codec { module: "C", name: "timer", ty: "TM.Timer", cases: &[] };
 pub const OUT: Codec = Codec { module: "C", name: "out", ty: "XH.Out", cases: &[] };
 pub const XIN: Codec = Codec { module: "C", name: "xin", ty: "XH.XIn", cases: &[] };
@@ -77,9 +81,7 @@ pub const JOURNAL: Table = Table {
         // (`via` "" = closed without him: `resolution` is the reason);
         // `said` his words, `pick` the option's words when he picked by
         // its number (never the digit alone); `via` inbox|thread|page
-        k("card_closed", "CardClosed", "M.ECardClosed{id, resolution, M.Ans{said, pick_n, pick, via, page, block}}",
-            &[f("id", Nat), f("resolution", Str), f("said", StrOmit), f("pick_n", OptNatOmit), f("pick", StrOmit),
-              f("via", StrOmit), f("page", StrOmit), f("block", StrOmit)]),
+        k("card_closed", "CardClosed", "M.ECardClosed{id, resolution, ans}", &[f("id", Nat), f("resolution", Str), f("ans", Inline(&ANS))]),
         // the asker's transcript position of the route line his answer
         // became (the shell knows it once written): a fact, no decision
         k("card_answer_pos", "CardAnswerPos", "M.ECardAnswerPos{card, agent, pos}", &[f("card", Nat), f("agent", Str), f("pos", Nat)]),

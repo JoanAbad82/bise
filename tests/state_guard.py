@@ -34,8 +34,6 @@ DIRS = ["bend/hub", "bend/laws", "bend/proofs"]
 # its positional patterns stay until that family's land (state-schema
 # chunk 2), which takes its names out of this list
 MIGRATING = {
-    # Card + Ans
-    "Card", "Ans",
     # Agent
     "Agent",
     # St

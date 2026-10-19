@@ -130,12 +130,37 @@ fn journal_cases(f: &Field, v: &str) -> Vec<(String, bool)> {
             c.cases.iter().map(|p| (p.replace('$', &format!("{v}_")), false)).collect()
         }
         FieldKind::Rec(_) => vec![(v.to_string(), true)],
+        FieldKind::Inline(c) if c.module == "SC" => inline_record_cases(c, v).into_iter().map(|p| (p, false)).collect(),
         FieldKind::Inline(c) => panic!("{}: an inline codec needs its cases", c.name),
         k => {
             assert!(cases(k, v).iter().all(|(_, rw)| rw.is_none()), "{}: a list field in the journal", f.name);
             cases(k, v).into_iter().map(|(p, _)| (p, false)).collect()
         }
     }
+}
+
+/// An inline declared record without cases (`SC.<T>.<shape>`: card_closed's
+/// `Ans.journal`): its line's object holds other keys before its own, so
+/// its record law can't close the row's. The proof opens it, `S.<T>{..}`
+/// (gen/ only: the state guard allows it), and splits on each field its
+/// shape writes only sometimes, like a row's own fields.
+fn inline_record_cases(c: &Codec, v: &str) -> Vec<String> {
+    use bise_proto::core::state::{Wire, STATE};
+    let (name, shape) = c.name.split_once('.').unwrap_or_else(|| panic!("{}: SC codecs are <T>.<shape>", c.name));
+    let r = STATE.record(name).unwrap_or_else(|| panic!("{name}: not a declared record"));
+    let sh = r.shape(shape).unwrap_or_else(|| panic!("{name}: no shape {shape}"));
+    let mut pats: Vec<Vec<String>> = vec![vec![]];
+    for f in r.fields {
+        let fv = format!("{v}_{}", f.name);
+        let alts = match sh.keys.iter().find(|k| k.field == f.name).map(|k| k.wire) {
+            Some(Wire::StrOmit) => vec!["SNil{}".to_string(), format!("SCon{{h_{fv}, t_{fv}}}")],
+            Some(Wire::OptStr | Wire::OptStrOmit | Wire::OptNat | Wire::OptNatOmit) => vec!["None{}".to_string(), format!("Some{{x_{fv}}}")],
+            Some(Wire::Flag) => vec!["True{}".to_string(), "False{}".to_string()],
+            _ => vec![fv],
+        };
+        pats = pats.into_iter().flat_map(|p| alts.iter().map(move |a| [p.clone(), vec![a.clone()]].concat())).collect();
+    }
+    pats.into_iter().map(|p| format!("S.{name}{{{}}}", p.join(", "))).collect()
 }
 
 /// A fixture line's JSON, its keys in their order (serde_json's map is

@@ -48,7 +48,7 @@ def hub_nat_in_del(xs: List<&2, Nat>, +n: Nat) -> {HA.nat_in(HA.nat_del(xs, n), 
 
 def hub_pos_once.go(-o: HM.St, +c: HX.Core<o>, +a: List<&2, HX.Rt>, +b: List<&2, HX.Waiter>, +s: List<&2, HX.Steer>,
     +d: List<&2, HX.Cnt>, +e: List<&2, HX.Kv>, +f: List<&2, HX.Kn>, +g: String, +h: Bool, +i: Nat, +j: Bool,
-    +k: List<&2, J.Json>, +l: Maybe<&2, J.Json>, +m: Maybe<&2, HPK.Ans>, +du: List<&2, Nat>,
+    +k: List<&2, J.Json>, +l: Maybe<&2, J.Json>, +m: Maybe<&2, HPK.Answer>, +du: List<&2, Nat>,
     +card: Nat, +agent: String, +pos: Nat, +agent2: String, +pos2: Nat, q: Bool, +eq: {HA.nat_in(du, card) == q : Bool})
     -> {HA.answer_pos(o, HA.answer_pos(o, HX.Cx{c, HX.R{a, b, s, d, e, f, g, h, i, j, k, l, m, du}}, card, agent, pos), card, agent2, pos2)
         == HA.answer_pos(o, HX.Cx{c, HX.R{a, b, s, d, e, f, g, h, i, j, k, l, m, du}}, card, agent, pos) : HX.Cx<o>}:

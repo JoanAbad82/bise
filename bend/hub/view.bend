@@ -176,12 +176,12 @@ def msgs_json(walk: Bool, +xs: List<&2, S.MRec>, +all: Bool, +ids: List<&2, Nat>
     case False{}:
       Nil{}
 
-def cards_json(xs: List<&2, M.Card>) -> List<&2, J.Json>:
+def cards_json(xs: List<&2, S.Card>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+c, +t}:
-      C.card_json(c) <> cards_json(t)
+      SC.Card.journal_json(c) <> cards_json(t)
 
 def opt_list(m: Maybe<&2, Nat>) -> List<&2, Nat>:
   match m:

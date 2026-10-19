@@ -64,10 +64,10 @@ def Settled.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.ESettled{K.get_n(i, "id")}}
 
 def CardOpened.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.ECardOpened{C.card_of(K.get_j(i, "card"))}}
+  Some{M.ECardOpened{SC.Card.journal_of(K.get_j(i, "card"))}}
 
 def CardClosed.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.ECardClosed{K.get_n(i, "id"), K.get_s(i, "resolution"), M.Ans{K.get_s(i, "said"), K.opt_n(J.get(i, "pick_n")), K.get_s(i, "pick"), K.get_s(i, "via"), K.get_s(i, "page"), K.get_s(i, "block")}}}
+  Some{M.ECardClosed{K.get_n(i, "id"), K.get_s(i, "resolution"), SC.Ans.journal_of(i)}}
 
 def CardAnswerPos.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.ECardAnswerPos{K.get_n(i, "card"), K.get_s(i, "agent"), K.get_n(i, "pos")}}
@@ -588,9 +588,9 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.ESettled{+id}:
       [J.kv("type", J.JStr{"message_settled"}), J.kv("id", J.JNum{id})]
     case M.ECardOpened{+card}:
-      [J.kv("type", J.JStr{"card_opened"}), J.kv("card", C.card_json(card))]
-    case M.ECardClosed{+id, +resolution, M.Ans{+said, +pick_n, +pick, +via, +page, +block}}:
-      K.cat([[J.kv("type", J.JStr{"card_closed"}), J.kv("id", J.JNum{id}), J.kv("resolution", J.JStr{resolution})], K.omit_s("said", said), K.omit_mn("pick_n", pick_n), K.omit_s("pick", pick), K.omit_s("via", via), K.omit_s("page", page), K.omit_s("block", block)])
+      [J.kv("type", J.JStr{"card_opened"}), J.kv("card", SC.Card.journal_json(card))]
+    case M.ECardClosed{+id, +resolution, +ans}:
+      K.cat([[J.kv("type", J.JStr{"card_closed"}), J.kv("id", J.JNum{id}), J.kv("resolution", J.JStr{resolution})], SC.Ans.journal_kvs(ans)])
     case M.ECardAnswerPos{+card, +agent, +pos}:
       [J.kv("type", J.JStr{"card_answer_pos"}), J.kv("card", J.JNum{card}), J.kv("agent", J.JStr{agent}), J.kv("pos", J.JNum{pos})]
     case M.ECardWithdrawn{+id, +text}:
