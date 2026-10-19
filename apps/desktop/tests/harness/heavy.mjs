@@ -8,7 +8,12 @@ import path from 'node:path';
 
 const run = path.join(os.homedir(), '.bise', 'run');
 
-/** True when this process runs under a `lockf … heavy.lock|heavy2.lock` of its own ancestry (a
+/** A heavy-run slot's lock file: heavy.lock, heavy2.lock, and on AC power heavy3/heavy4 (since
+ *  2026-10-18; only the first two here made a test:land in slot 3 or 4 take a second slot and
+ *  deadlock against a --alone job, 40 min on 10-19, pr20). */
+const SLOT_LOCK = /\/\.bise\/run\/heavy[234]?\.lock\b/;
+
+/** True when this process runs under a `lockf … heavy[234]?.lock` of its own ancestry (a
  * heavy-run around `pnpm test:land`): taking a slot again would hold both, or wait on itself. */
 export function underHeavySlot() {
   let pid = process.pid;
@@ -18,7 +23,7 @@ export function underHeavySlot() {
     if (!line) return false;
     const [ppid, ...rest] = line.split(/\s+/);
     const cmd = rest.join(' ');
-    if (cmd.split(' ')[0].endsWith('lockf') && ['heavy.lock', 'heavy2.lock'].some((n) => cmd.includes(`/.bise/run/${n}`))) return true;
+    if (cmd.split(' ')[0].endsWith('lockf') && SLOT_LOCK.test(cmd)) return true;
     pid = Number(ppid) || 0;
   }
   return false;
