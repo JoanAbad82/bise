@@ -18,6 +18,7 @@
 import type { Built } from './growth';
 import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, type Pt, QUEUE_GAP, type Segment, type SitAt, type Sits, type Spot, type Timeline } from './model';
 import { pastimes } from './skate';
+import { hash } from './activity';
 import { chairSpots, seatedAct, seatWaits, SIT_S, sitWay, visitAt } from './sit';
 import { coffeeAtCorner } from './cozy';
 import { along, makePath, path } from './paths';
@@ -242,6 +243,7 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
         }
         if (ok && w.b.over && w.b.over.act === w.act && w.b.over.until === Infinity) w.b.over.until = seg.t + walkTime(seg) + w.b.over.stay;
       }
+      chats(bims, next);
       // an event whose walk wasn't made here (the room was rebuilt, the same stretch went on, no clear way): it ends anyway
       for (const b of bims.values()) if (b.over && b.over.until === Infinity) b.over.until = t + MAX_WALK_S + b.over.stay;
       for (const [name, b] of bims) if (b.leaving && b.outAt < t) bims.delete(name);
@@ -469,6 +471,36 @@ export function chairFor(act: Activity, o: Office, spot: Pt | undefined, chairs:
   const chair = i >= 0 && i < (chairs ?? o.terrace.length);
   if (chair) return act.standing ? { k: act.k, at: act.at } : act;
   return act.standing ? act : { ...act, standing: true };
+}
+
+/** how far two standing done bims turn to each other, radians (~35°, bims m_33802) */
+export const CHAT_TURN = 0.6;
+
+/**
+ * The standing done bims' looks, once every bim of an update has its spot (bims m_33802: four in a
+ * row read as a lineup): two on a pair of neighbouring terrace spots (0-1, 2-3: the same row) turn
+ * CHAT_TURN to each other, a chat; a lone one faces the view; one in three sips its mug (its name's
+ * hash). Set on its last segment's activity, its sig kept: no walk, the same spot. Pure on `bims`.
+ */
+function chats(bims: ReadonlyMap<string, Bim>, o: Office): void {
+  const at = (s: Segment): number => (s.act.k === 'done' && s.act.standing ? o.terrace.findIndex((t) => near(t, s.spot)) : -1);
+  const standing = new Set<number>();
+  for (const b of bims.values()) {
+    const s = b.segs.at(-1);
+    if (s && !b.leaving && at(s) >= 0) standing.add(at(s));
+  }
+  for (const [name, b] of bims) {
+    const s = b.segs.at(-1);
+    if (!s || b.leaving || !s.act.standing) continue;
+    const i = at(s);
+    const mate = i >= 0 && standing.has(i ^ 1) ? o.terrace[i ^ 1] : undefined;
+    const me = o.terrace[i];
+    const turn = mate && me ? Math.sign(mate.x - me.x) * CHAT_TURN : 0;
+    const sip = hash(name) % 3 === 0;
+    if ((s.act.turn ?? 0) === turn && (s.act.sip === true) === sip) continue;
+    const act: Activity = { k: s.act.k, at: s.act.at, standing: true, ...(turn !== 0 ? { turn } : {}), ...(sip ? { sip: true as const } : {}) };
+    b.segs[b.segs.length - 1] = { ...s, act };
+  }
 }
 
 /**

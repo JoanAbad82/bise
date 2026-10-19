@@ -98,6 +98,10 @@ export interface Activity {
   readonly mode?: 'steer' | 'queued';
   /** ('done') no deck chair at its terrace spot (timeline.ts chairFor): it stands there, a mug in hand, never reclined in the air */
   readonly standing?: true;
+  /** (standing 'done') how far it turns from its spot's way to a standing neighbour, radians (timeline.ts chats): a chat */
+  readonly turn?: number;
+  /** (standing 'done') it sips its mug, the mug at its mouth */
+  readonly sip?: true;
 }
 
 /** The hub's Agent.doing kinds (architect m_27522, bims-facts m_27638); absent = nothing running. */

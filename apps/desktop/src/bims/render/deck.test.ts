@@ -9,7 +9,7 @@ import { crowd } from '../fixtures';
 import { readyMaps, layoutOf } from '../maps';
 import { builtAt, LAST_STAGE } from '../growth';
 import type { Activity, Office } from '../model';
-import { newTimeline } from '../timeline';
+import { CHAT_TURN, newTimeline } from '../timeline';
 import { rigOf } from './pose';
 import { chairBoxes, seatOf } from './stages';
 
@@ -56,20 +56,32 @@ describe('the deck chair law: a done bim reclines only on a drawn deck chair', (
     }, 60_000);
   }
 
-  it('past the chairs, a done bim stands at its spot with a mug, facing the view', () => {
+  it('past the chairs, a done bim stands at its spot with a mug: neighbours on a pair of spots turn to each other, a lone one faces the view', () => {
     const o = layoutOf(crowd(5).agents, readyMaps()[0]);
     const tl = newTimeline();
     const acts = new Map<string, Activity>([['main', MAIN]]);
     for (let i = 1; i <= 5; i++) acts.set(`agent-${String(i)}`, DONE);
     tl.update(acts, o, 10, [], builtAt(2));
-    const standing = [1, 2, 3, 4, 5].map((i) => tl.poseAt(`agent-${String(i)}`, 60)).filter((p) => p?.seg.act.standing === true);
+    const standing = [1, 2, 3, 4, 5].flatMap((i) => tl.poseAt(`agent-${String(i)}`, 60) ?? []).filter((p) => p.seg.act.standing === true);
     expect(standing).toHaveLength(4);
+    // stage 2: one chair (spot 0); standing on 1 (its mate reclines), 2 and 3 (a pair), 4 (its mate's spot empty)
+    const dirs = new Map<number, number>();
     for (const p of standing) {
-      if (!p) continue;
       const r = rigOf({ pose: p, t: 60, main: false, phase: 1.3, reduced: false });
       expect(r.props.mug).toBe(true);
       expect(r.body[0]).toBe(0);
-      expect(r.dir).toBe(0);
+      dirs.set(o.terrace.findIndex((t) => t.x === p.seg.spot.x && t.z === p.seg.spot.z), r.dir);
     }
+    expect([...dirs.keys()].sort()).toEqual([1, 2, 3, 4]);
+    expect(dirs.get(1)).toBe(0);
+    expect(dirs.get(4)).toBe(0);
+    expect(dirs.get(2)).toBeCloseTo(CHAT_TURN);
+    expect(dirs.get(3)).toBeCloseTo(-CHAT_TURN);
+    // the same rows again: nobody moves (the looks keep their segments)
+    const names = [...acts.keys()];
+    const before = names.map((n) => tl.poseAt(n, 60)?.seg);
+    tl.update(acts, o, 70, [], builtAt(2));
+    names.forEach((n, i) => { expect(tl.poseAt(n, 70)?.seg, n).toBe(before[i]); });
+    expect(tl.moving(70)).toBe(false);
   });
 });

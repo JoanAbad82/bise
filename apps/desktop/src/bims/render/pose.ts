@@ -333,8 +333,13 @@ function rest(act: Activity, lt: number, ph: number, stay = lt): Body {
     case 'landing':
       return { ...STAND, armL: [-1.3, 0, 0], armR: [-1.3, 0, 0], props: { ...NO_PROPS, crate: true } };
     case 'done':
-      // no deck chair at its spot (timeline.ts chairFor): it stands there facing the view, a mug in hand, sunglasses
-      if (act.standing) return { ...STAND, armR: [-1.5, 0, 0], head: [-0.1, 0, 0.06], mouth: 'laugh', eyes: 0.3, props: { ...NO_PROPS, mug: true, glasses: true } };
+      // no deck chair at its spot (timeline.ts chairFor): it stands there, a mug in hand, sunglasses;
+      // facing the view or turned to a neighbour (rigOf: act.turn), sipping (the mug at its mouth) or laughing
+      if (act.standing) {
+        const props = { ...NO_PROPS, mug: true, glasses: true };
+        if (act.sip) return { ...STAND, armR: MOUTH, head: [-0.12, 0, 0], mouth: 'oh', eyes: 0.6, props };
+        return { ...STAND, armR: [-1.5, 0, 0], head: [-0.1, 0, 0.06], mouth: 'laugh', eyes: 0.3, props };
+      }
       // on a deck chair (stages.ts deckChair), sunglasses: its seat under it, its back on the
       // backrest's tilt (DECK.tilt), its legs down along the seat
       return {
@@ -562,7 +567,8 @@ export function rigOf(inp: RigInput): Rig {
     if (pose.plane.since < (pose.plane.dur ?? PLANE_FLIGHT) + BEAT.read) b = { ...b, armR: ARM.read, head: [0.35, 0, 0] };
   }
 
-  const dir = b.face ?? pose.dir;
+  // a standing done bim turned to its neighbour once there (timeline.ts chats)
+  const dir = b.face ?? pose.dir + (arrived && !sat ? (act.turn ?? 0) : 0);
   // its chair: slid as the sit has it; left out while it stands at its desk
   const out = (sitIn?.standing === true && arrived) || seg.sit?.up !== undefined || seg.sit?.still !== undefined;
   const back = sat ? sat.beat.back : out ? SIT.pull : null;
