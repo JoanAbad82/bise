@@ -27,6 +27,7 @@ import ../vendor/json.bend as J
 
 import ./model.bend as M
 import ./gen/state.bend as S
+import ./gen/state-laws.bend as SL
 
 import ./lazy.bend as LZ
 
@@ -91,7 +92,9 @@ def take.card(-o: M.St, hit: Bool, +cx: X.Cx<o>, +c: S.Card, +h: String) -> X.Cx
       +cx2 = X.emit(o, cx, M.ECardClosed{S.Card.id(c), res, S.Ans.empty()}, Unit{}, Unit{}, Unit{})
       +cx3 = feed(o, cx2, M.MAIN(), FD.card_closed(S.Card.id(c), res))
       +id = M.St.next_card(X.d(o, cx3))
-      +cx4 = X.emit(o, cx3, M.ECardOpened{M.card(id, S.Card.kind(c), h, S.Card.text(c), S.Card.for_msg(c), X.now(o, cx3), S.Card.place(c), S.Card.pr(c))}, {==}, Unit{}, Unit{})
+      # the same card, every other field kept: for @h, now, a new id
+      +moved = S.Card.with_created(S.Card.with_agent(c, h), X.now(o, cx3))
+      +cx4 = X.emit(o, cx3, M.ECardOpened{S.Card.with_id(moved, id)}, SL.Card.id.get_with(moved, id), Unit{}, Unit{})
       feed(o, cx4, M.MAIN(), FD.card(id, S.Card.kind(c), h, S.Card.text(c)))
 
 def take.cards(-o: M.St, cs: List<&2, S.Card>, +cx: X.Cx<o>, +n: String, +h: String) -> X.Cx<o>:

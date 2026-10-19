@@ -408,12 +408,6 @@ def drop_card(xs: List<&2, S.Card>, +id: Nat) -> List<&2, S.Card>:
     case Con{+h, +t}:
       LZ.pick(List<&2, S.Card>, Nat.is_eq(S.Card.id(h), id), u => t, u => h <> drop_card(t, id))
 
-# a card from its fields, in S.Card's order (the generated setters)
-def card(id: Nat, kind: String, agent: String, text: String, for_msg: Maybe<&2, Nat>, created: Nat, place: Maybe<&2, String>, pr: Maybe<&2, Nat>) -> S.Card:
-  c0 = S.Card.with_kind(S.Card.with_id(S.Card.empty(), id), kind)
-  c1 = S.Card.with_for_msg(S.Card.with_text(S.Card.with_agent(c0, agent), text), for_msg)
-  S.Card.with_pr(S.Card.with_place(S.Card.with_created(c1, created), place), pr)
-
 def put_card(xs: List<&2, S.Card>, +c: S.Card) -> List<&2, S.Card>:
   snoc(S.Card, drop_card(xs, S.Card.id(c)), c)
 

@@ -27,17 +27,17 @@ law answered_close_carries_his_words:
   for +c: HS.Card
   for +said: String
   for +via: String
-  {HA.his_ans(c, said, via) == HA.ans(said, HPK.pick_n(HPK.option_pick(HS.Card.text(c), said)), HA.opt_words(HPK.pick_words(HPK.option_pick(HS.Card.text(c), said))), via, "", "") : HS.Ans}
+  {HA.his_ans(c, said, via) == HS.Ans.with_via(HS.Ans.with_pick(HS.Ans.with_pick_n(HS.Ans.with_said(HS.Ans.empty(), said), HPK.pick_n(HPK.option_pick(HS.Card.text(c), said))), HA.opt_words(HPK.pick_words(HPK.option_pick(HS.Card.text(c), said)))), via) : HS.Ans}
 
 # LAW: the digit `2` on '2. only at checkout' journals the option's words.
 law a_picked_digit_journals_its_words:
-  {HA.his_ans(HM.card(7n, "question", "perf", "which one?
+  {HA.his_ans(HS.Card.with_text(HS.Card.with_agent(HS.Card.with_kind(HS.Card.with_id(HS.Card.empty(), 7n), "question"), "perf"), "which one?
 1. at every step
-2. only at checkout", None{}, 0n, None{}, None{}), "2", "inbox") == HA.ans("2", Some{2n}, "only at checkout", "inbox", "", "") : HS.Ans}
+2. only at checkout"), "2", "inbox") == HS.Ans.with_via(HS.Ans.with_pick(HS.Ans.with_pick_n(HS.Ans.with_said(HS.Ans.empty(), "2"), Some{2n}), "only at checkout"), "inbox") : HS.Ans}
 
 # LAW: an approval's digit journals its words (1 allow, 2 always, 3 no).
 law an_approval_digit_journals_its_words:
-  {HA.confirm_ans(" 2 ", "inbox") == HA.ans("2", Some{2n}, "always", "inbox", "", "") : HS.Ans}
+  {HA.confirm_ans(" 2 ", "inbox") == HS.Ans.with_via(HS.Ans.with_pick(HS.Ans.with_pick_n(HS.Ans.with_said(HS.Ans.empty(), "2"), Some{2n}), "always"), "inbox") : HS.Ans}
 
 # LAW: a card not due (closed without him, or its position given
 # already) takes no position: nothing changes.

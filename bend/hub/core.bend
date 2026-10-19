@@ -348,7 +348,7 @@ def note_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
 # open_card_at: the same, about a place (and its PR): the hub's own items
 def open_card_at(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>, +place: Maybe<&2, String>, +pr: Maybe<&2, Nat>) -> X.Cx<o>:
   +id = M.St.next_card(st(o, cx))
-  +cx2 = emit(o, cx, M.ECardOpened{M.card(id, kind, agent, text, for_msg, now(o, cx), place, pr)}, {==}, Unit{}, Unit{})
+  +cx2 = emit(o, cx, M.ECardOpened{S.Card.with_pr(S.Card.with_place(S.Card.with_created(S.Card.with_for_msg(S.Card.with_text(S.Card.with_agent(S.Card.with_kind(S.Card.with_id(S.Card.empty(), id), kind), agent), text), for_msg), now(o, cx)), place), pr)}, {==}, Unit{}, Unit{})
   feed(o, cx2, M.MAIN(), FD.card(id, kind, agent, text))
 
 def open_card(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>) -> X.Cx<o>:
