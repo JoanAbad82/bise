@@ -210,7 +210,8 @@ function sizedCam(shot: Shot, g: Geometry): Cam | null {
   // a whole office closer than its OFFICE shot (the cold open's tight loft): its middle, that much closer
   if (s.k === 'office') return aimInMap({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * CLOSER[shot.size], SAFE.x, SAFE.y, g.ground?.() ?? null);
   // a subject gone missing (it left): its office's shot, never an empty frame
-  if (at === null) return office;
+  // (its OFFICE framing, on the lawn: the bare fit showed paper while order-test was not in yet, 0:40.5)
+  if (at === null) return aimInMap({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * OFFICE_TIGHT, SAFE.x, SAFE.y, g.ground?.() ?? null);
   return aimInMap(at, office.zoom * CLOSER[shot.size], shot.frame?.x ?? SAFE.x, shot.frame?.y ?? SAFE.y, g.ground?.() ?? null);
 }
 
