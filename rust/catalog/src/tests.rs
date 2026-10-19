@@ -879,8 +879,8 @@ fn cache_routing_keys_reach_the_handoff() {
         let r = c.resolve(id);
         (r.caps.cache_key, r.caps.cache_header)
     };
-    assert_eq!(key("openai/gpt-5.5"), ("prompt_cache_key".into(), String::new()));
-    assert_eq!(key("mistral/mistral-medium-latest"), ("prompt_cache_key".into(), String::new()));
+    // chatgpt: issue #18, the plan's route is the same Responses API as openai's
+    for id in ["openai/gpt-5.5", "mistral/mistral-medium-latest", "chatgpt/gpt-6.1-sol"] { assert_eq!(key(id), ("prompt_cache_key".into(), String::new()), "{id}") }
     assert_eq!(key("xai/grok-4.7"), (String::new(), "x-grok-conv-id".into()));
     assert_eq!(key("foundry/claude-opus-5-5"), (String::new(), String::new()));
     // config: a model overrides its provider, a bad name is warned

@@ -269,6 +269,11 @@ key_env = ""
 auth = "chatgpt"
 # the plan route's request rules (runtime/provider-pure.bend)
 shape = "chatgpt-plan"
+# the prompt cache's routing key (BISE-268), as on openai: the same
+# Responses API. Without it every bise call starts with the same tools,
+# so every session of every user routes to the same cache machines and
+# misses (issue #18); Codex sends the session's key on every call too
+cache_key = "prompt_cache_key"
 small_model = "gpt-6-luna"
 context = 1050000
 max_output = 128000
