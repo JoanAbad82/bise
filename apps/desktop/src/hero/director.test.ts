@@ -3,7 +3,7 @@
 // safe frame, and the visitor keeps the camera until he lets it go.
 import { describe, expect, it } from 'vitest';
 import { FILM_S, KILN, PAGE, SHOTS } from './cast';
-import { aimCam, fitCam, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, LEAD_S, MIN_ZOOM, resumes, RESUME_IDLE_S, SAFE, shotAt, springStep, still } from './director';
+import { aimCam, aimInMap, FADE_X, fitCam, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, inside, LEAD_S, MIN_ZOOM, resumes, RESUME_IDLE_S, SAFE, shotAt, springStep, still } from './director';
 import { panAround, zoomAround } from './gestures';
 import { eggWords } from './overlay';
 
@@ -114,5 +114,26 @@ describe('the eggs words', () => {
   it('never jokes with bise signs', () => {
     expect(eggWords('!')).toBe('…');
     expect(eggWords('combo ×2')).toBe('combo ×2');
+  });
+});
+
+describe('a film shot near the map’s edge', () => {
+  it('keeps its subject on its frame point and the lawn under the whole frame but the page’s fade (designer m_32505)', () => {
+    const diamond = [
+      { u: 0.5, v: 0 },
+      { u: 1, v: 0.5 },
+      { u: 0.5, v: 1 },
+      { u: 0, v: 0.5 },
+    ];
+    const at = { u: 0.6, v: 0.25 };
+    const c = aimInMap(at, 2, SAFE.x, SAFE.y, diamond);
+    const p = inFrame(c, at);
+    expect(p.u).toBeCloseTo(SAFE.x, 6);
+    expect(p.v).toBeCloseTo(SAFE.y, 6);
+    for (const [x, y] of [[FADE_X, 0], [1, 0], [FADE_X, 1], [1, 1]] as const) {
+      expect(inside(diamond, { u: c.u + (x - 0.5) / c.zoom, v: c.v + (y - 0.5) / c.zoom })).toBe(true);
+    }
+    // in the middle, nothing to give: its own zoom
+    expect(aimInMap({ u: 0.5, v: 0.5 }, 3, SAFE.x, SAFE.y, diamond).zoom).toBe(3);
   });
 });

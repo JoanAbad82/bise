@@ -98,12 +98,55 @@ export function aimCam(at: At, zoom: number, fx: number = SAFE.x, fy: number = S
  * would show the map's edge (kiln near the edge: holdCam slid the view back and left kiln in the
  * frame's bottom fifth, designer m_32291). The subject never moves off its point; the zoom gives. Pure.
  */
-export function aimInMap(at: At, zoom: number, fx: number = SAFE.x, fy: number = SAFE.y): Cam {
+export function aimInMap(at: At, zoom: number, fx: number = SAFE.x, fy: number = SAFE.y, ground: readonly At[] | null = null): Cam {
   const eps = 1e-6;
   const u = clamp(at.u, eps, 1 - eps);
   const v = clamp(at.v, eps, 1 - eps);
   const least = Math.max(fx / u, (1 - fx) / (1 - u), fy / v, (1 - fy) / (1 - v));
-  return aimCam(at, Math.min(MAX_ZOOM, Math.max(zoom, least)), fx, fy);
+  let z = Math.min(MAX_ZOOM, Math.max(zoom, least));
+  // the lawn under the whole frame but the page's left fade (designer m_32505: no paper in a film
+  // shot, its top corners too): closer until every corner of the frame is on the lawn
+  if (ground !== null && ground.length >= 3 && inside(ground, at)) {
+    const covered = (k: number): boolean =>
+      [
+        [FADE_X, 0],
+        [1, 0],
+        [FADE_X, 1],
+        [1, 1],
+      ].every(([cx = 0, cy = 0]) => inside(ground, { u: at.u + (cx - fx) / k, v: at.v + (cy - fy) / k }));
+    if (!covered(z)) {
+      let lo = z;
+      let hi = MAX_ZOOM;
+      if (covered(hi)) {
+        for (let i = 0; i < 24; i++) {
+          const mid = Math.sqrt(lo * hi);
+          if (covered(mid)) hi = mid;
+          else lo = mid;
+        }
+      }
+      z = hi;
+    }
+  }
+  return aimCam(at, z, fx, fy);
+}
+
+/** the frame's left part the page fades into its paper (designer m_30849: its left ~20%) */
+export const FADE_X = 0.22;
+
+/** Whether a point is inside a convex polygon (its corners in order, either way round). Pure. */
+export function inside(poly: readonly At[], p: At): boolean {
+  let sign = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    if (!a || !b) return false;
+    const cross = (b.u - a.u) * (p.v - a.v) - (b.v - a.v) * (p.u - a.u);
+    if (Math.abs(cross) < 1e-12) continue;
+    const s = Math.sign(cross);
+    if (sign === 0) sign = s;
+    else if (s !== sign) return false;
+  }
+  return true;
 }
 
 /** Where a point of the fit shows in a cam's frame, fractions. Pure. */
@@ -120,6 +163,8 @@ export interface Geometry {
   spot(office: string, spot: 'island' | 'lounge' | 'park' | 'main'): At | null;
   /** a bim: its body's middle; null when it is not in the office (gone, not posed yet) */
   bim(office: string, name: string): At | null;
+  /** the lawn's top, its corners on the fit in order round it (a diamond): a film shot shows nothing past it */
+  ground?(): readonly At[] | null;
 }
 
 /** The office a subject is in, null for the town. Pure. */
@@ -160,13 +205,13 @@ function sizedCam(shot: Shot, g: Geometry): Cam | null {
   }
   if (shot.size === 'office') {
     const c = at ?? { u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom };
-    return aimInMap(c, office.zoom * OFFICE_TIGHT);
+    return aimInMap(c, office.zoom * OFFICE_TIGHT, SAFE.x, SAFE.y, g.ground?.() ?? null);
   }
   // a whole office closer than its OFFICE shot (the cold open's tight loft): its middle, that much closer
-  if (s.k === 'office') return aimInMap({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * CLOSER[shot.size]);
+  if (s.k === 'office') return aimInMap({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * CLOSER[shot.size], SAFE.x, SAFE.y, g.ground?.() ?? null);
   // a subject gone missing (it left): its office's shot, never an empty frame
   if (at === null) return office;
-  return aimInMap(at, office.zoom * CLOSER[shot.size], shot.frame?.x ?? SAFE.x, shot.frame?.y ?? SAFE.y);
+  return aimInMap(at, office.zoom * CLOSER[shot.size], shot.frame?.x ?? SAFE.x, shot.frame?.y ?? SAFE.y, g.ground?.() ?? null);
 }
 
 /** The shot playing at film time T: the last one whose camera has left (LEAD_S before its action). Pure. */

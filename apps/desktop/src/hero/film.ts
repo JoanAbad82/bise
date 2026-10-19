@@ -171,6 +171,13 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       return { u0: Math.min(...bs.map((b) => b.u0)), u1: Math.max(...bs.map((b) => b.u1)), v0: Math.min(...bs.map((b) => b.v0)), v1: Math.max(...bs.map((b) => b.v1)) };
     },
     office: officeBox,
+    ground() {
+      const f = fit();
+      const l = r.entry.parts()?.lawn;
+      if (!f || !l) return null;
+      // its top's four corners, round it: on screen, the diamond a film shot keeps under its frame
+      return [frac(f, l.x0, 0, l.z0), frac(f, l.x1, 0, l.z0), frac(f, l.x1, 0, l.z1), frac(f, l.x0, 0, l.z1)];
+    },
     spot(id, kind) {
       const f = fit();
       const p = r.placedOf(id);
