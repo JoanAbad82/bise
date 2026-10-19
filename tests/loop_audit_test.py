@@ -81,6 +81,15 @@ def fake_home(h, now):
     # red before its GATE line (sb-core did not build): its rc line ends it
     own("quick", "debt-t6", now - 1400, "FAIL sb-core build" + NL + "# gate end rc=1 secs=12" + NL, now - 1390)
     own("full", "debt-t4", now - 2400, FULL_T2 + "# gate end rc=0 secs=641" + NL, now - 1700)
+    # quick's vitest-related selection: a full at this repo's HEAD with src/x.test.ts red; two green
+    # quicks before it, at HEAD~1: one ran it (fine), one did not (a suspect miss)
+    head = subprocess.run(["git", "-C", ROOT, "rev-parse", "HEAD", "HEAD~1"], capture_output=True, text=True).stdout.split()
+    write(os.path.join(h, "gate", "logs", "full-%d-2.log" % (now - 1500)),
+          "# gate full agent=t9 sha=%s start=%d root=/x%s FAIL  src/x.test.ts > a law%sFAIL desktop_check%s"
+          "GATE full FAILED%s# gate end rc=1 secs=900%s" % (head[0], now - 1500, NL, NL, NL, NL, NL), now - 600)
+    write(os.path.join(h, "gate", "vitest-related.jsonl"), "".join(json.dumps(
+        {"t": now - 3000, "agent": a, "sha": head[1], "changed": ["src/x.ts"], "ran": ran, "rc": 0}) + NL
+        for a, ran in (("t10", ["src/x.test.ts"]), ("t11", ["src/y.test.ts"]))))
     # a full gate on an agent's scratch tree (bend-check's newer Bend): an experiment, left out
     write(os.path.join(h, "gate", "logs", "full-%d-1.log" % (now - 2000)),
           "# gate full agent=bend-check sha=abc1234 start=%d root=%s/hubs/%s/agents/bend-check/tmp/wt%s"
@@ -111,16 +120,19 @@ def test_audit():
         by = sorted((a, r["mode"], r["green"]) for a, _, _, r in runs)
         check(by == [("bend-check", "full", False), ("debt-t1", "quick", True), ("debt-t3", "quick", False), ("debt-t4", "full", True),
                      ("debt-t5", "quick", False), ("debt-t6", "quick", False), ("nightly", "full", False),
-                     ("release", "full", True), ("release-34", "full", True)],
+                     ("release", "full", True), ("release-34", "full", True), ("t9", "full", False)],
               "one source per run: gate/logs by its agent, run/ only before they start (%s)" % by)
         check(start == now - 3500, "the gate logs start at the oldest one (%s)" % start)
         rep = la.audit(h, hub, since)
         q, f = rep["gates"]["quick"], rep["gates"]["full"]
         check((q["runs"], q["green"], q["secs_p50"]) == (4, 1, 35), "quick: 4 runs, 1 green, p50 35 s (%s)" % q)
-        check((f["runs"], f["green"], f["queue_max"]) == (4, 3, 120), "full: 4 runs, 3 green, queue max 120 s (%s)" % f)
+        check((f["runs"], f["green"], f["queue_max"]) == (5, 3, 120), "full: 5 runs, 3 green, queue max 120 s (%s)" % f)
         check(q["steps_p50"].get("clippy") == 10, "quick's steps from its log (%s)" % q["steps_p50"])
-        check(q["reds"] == {"clippy": 2, "sb-core": 1} and f["reds"] == {"partial_e2e": 1},
+        check(q["reds"] == {"clippy": 2, "sb-core": 1} and f["reds"] == {"partial_e2e": 1, "desktop_check": 1},
               "each mode's red runs by what was red (%s, %s)" % (q["reds"], f["reds"]))
+        rm = rep["related_misses"]
+        check(len(rm) == 1 and rm[0]["test"] == "src/x.test.ts" and [q.split("@")[0] for q in rm[0]["quicks"]] == ["t11"],
+              "a vitest file red in a full that a green related quick before it did not run: a suspect miss (%s)" % rm)
         wa = rep["waits"]
         check([x["agent"] for x in wa["ended_at_max"]] == ["t7"] and [x["agent"] for x in wa["queued_at_max"]] == ["t8"],
               "a --max wake whose job was still queued is not a dead job (%s)" % wa)
@@ -137,7 +149,7 @@ def test_audit():
               "an agent's own loop is left out, a gate's tagged run counts (%s, %s)" % (rep["adhoc"], t.get("every_e2e")))
         out = subprocess.run([sys.executable, "-B", os.path.join(ROOT, "scripts", "loop_audit.py"), "--since", "24h",
                               "--hub", hub], env=dict(os.environ, BISE_HOME=h), capture_output=True, text=True)
-        check(out.returncode == 0 and "- full: 4 runs, 3 green" in out.stdout and "partial_e2e" in out.stdout
+        check(out.returncode == 0 and "- full: 5 runs, 3 green" in out.stdout and "vitest-related misses" in out.stdout and "partial_e2e" in out.stdout
               and "- gate logs start " in out.stdout,
               "the report shows them (rc %d)%s" % (out.returncode, "" if out.returncode == 0 else NL + out.stderr[-800:]))
 

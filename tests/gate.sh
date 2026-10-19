@@ -605,12 +605,19 @@ desktop_check() {
   # shellcheck disable=SC2086
   [ "${1:-}" = strict ] || rel="$(desktop_related $changed)"
   if [ -n "$rel" ]; then
-    local byfile; byfile="$(cd "$root/apps/desktop" && grep -rlE 'readFileSync|readdirSync|import\.meta\.glob' src --include='*.test.ts' --include='*.test.tsx' | tr '\n' ' ')"
+    # by path: fs reads (sync, async, promises), globs, a file URL (review-gates m_33177);
+    # an empty list: vitest run runs them all (safe)
+    local byfile drc ran; byfile="$(cd "$root/apps/desktop" && grep -rlE 'readFile|readdir|import\.meta\.glob|import\.meta\.url' src --include='*.test.ts' --include='*.test.tsx' | tr '\n' ' ')"
     # shellcheck disable=SC2086
-    if (cd "$root/apps/desktop" && python3 ../../tests/conflict_markers.py && pnpm -s typecheck && pnpm -s lint \
-        && pnpm -s exec vitest related --run --passWithNoTests $rel && pnpm -s exec vitest run $byfile && pnpm -s build) >"$log" 2>&1; then
-      echo "ok   desktop_check ($((SECONDS - s))s, vitest: the tests of$rel and $(wc -w <<<"$byfile" | tr -d ' ') that read src/; full runs all)"; return 0
-    fi
+    (cd "$root/apps/desktop" && python3 ../../tests/conflict_markers.py && pnpm -s typecheck && pnpm -s lint \
+        && pnpm -s exec vitest related --run --passWithNoTests $rel && pnpm -s exec vitest run $byfile && pnpm -s build) >"$log" 2>&1
+    drc=$?
+    # what it ran, said and kept (<gate dir>/vitest-related.jsonl: the audit's 'vitest-related miss')
+    ran="$(grep -oE '(✓|❯|×|FAIL) +src/[^ ]+\.test\.tsx?' "$log" | awk '{ print $NF }' | sort -u | tr '\n' ' ')"
+    echo "  vitest related to$rel: $(wc -w <<<"$ran" | tr -d ' ') files ($ran)"
+    python3 -c 'import json, sys, time; print(json.dumps({"t": int(time.time()), "agent": sys.argv[1], "sha": sys.argv[2], "changed": sys.argv[3].split(), "ran": sys.argv[4].split(), "rc": int(sys.argv[5])}))' \
+      "${SB_AGENT:-?}" "$(git -C "$root" rev-parse HEAD 2>/dev/null)" "$rel" "$ran" "$drc" >>"$gdir/vitest-related.jsonl" 2>/dev/null
+    if [ $drc = 0 ]; then echo "ok   desktop_check ($((SECONDS - s))s, vitest: related + by path; full runs all)"; return 0; fi
   elif (cd "$root/apps/desktop" && pnpm -s check) >"$log" 2>&1; then echo "ok   desktop_check ($((SECONDS - s))s)"; return 0; fi
   echo "FAIL desktop_check"
   grep -E "error|Error|FAIL|✗|×" "$log" | head -30

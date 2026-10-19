@@ -197,6 +197,8 @@ STEP_RX = re.compile(r"^ok\s+(test-build|clippy|PROOF|sb-core|proto_ts|test_\S+|
 STEP_FAIL_RX = re.compile(r"^FAIL ([\w-]+)(?=$|:| build$)", re.M)
 GATE_FAIL_RX = re.compile(r"^GATE FAILED: (.*)$", re.M)
 LINE_GATE_RX = re.compile(r"tests/line_limits\.txt")
+VITEST_FAIL_RX = re.compile(r"FAIL\s+(src/\S+\.test\.tsx?)")
+SHA_RX = re.compile(r" sha=(\S+)")
 
 
 def red_names(text, tests):
@@ -226,7 +228,10 @@ def gate_run(text):
     reds = red_names(text, tests)
     return {"mode": m.group(1) if m else "full", "green": bool(m and m.group(2).startswith("GREEN")),
             "secs": int(m.group(3)) if m and m.group(3) else None, "queue": int(q.group(1)) if q else 0,
-            "steps": steps, "tests": tests, "ended": bool(m), "reds": reds}
+            "steps": steps, "tests": tests, "ended": bool(m), "reds": reds,
+            # the desktop's vitest files red in it, and whether its desktop_check ran at all
+            "vitest_reds": sorted(set(VITEST_FAIL_RX.findall(text))),
+            "desktop": bool(re.search(r"^(ok|FAIL)\s+desktop_check\b", text, re.M))}
 
 
 def pct(v, p):
@@ -325,7 +330,45 @@ def own_log_run(text):
         r["reds"] = ["rc %s" % e.group(1) if e else "?"]
     root = ROOT_RX.search(text.split(NL, 1)[0])
     r["scratch"] = bool(root and SCRATCH_RX.search(root.group(1)))
+    sha = SHA_RX.search(text.split(NL, 1)[0])
+    r["sha"] = sha.group(1) if sha else None
     return h.group(2) or "?", r
+
+
+def is_ancestor(a, b):
+    """Whether commit a is in b's history (the repo this script is in); unknown: no."""
+    import subprocess
+    try:
+        return subprocess.run(["git", "-C", os.path.dirname(os.path.abspath(__file__)), "merge-base", "--is-ancestor", a, b],
+                              capture_output=True, timeout=10).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def related_misses(h, gl, since):
+    """quick's vitest-related selection (gate.sh desktop_related, review-gates
+    m_33177): a vitest file red in a full gate or the nightly, and a green
+    related-mode quick since the last full where it was not red (24 h at most)
+    that did not run it although its sha is in that full's history: a suspect
+    miss, named with the quicks (<gate dir>/vitest-related.jsonl)."""
+    path = os.path.join(h, "gate", "vitest-related.jsonl")
+    if not os.path.exists(path):
+        return []
+    quicks = list(read_jsonl(path))
+    fulls = sorted(((mt, r) for _, _, mt, r in gl if r["mode"] == "full" and r.get("desktop") and r.get("sha")),
+                   key=lambda x: x[0])
+    out = []
+    for i, (mt, r) in enumerate(fulls):
+        if mt < since:
+            continue
+        for f in r["vitest_reds"]:
+            t0 = max([m for m, x in fulls[:i] if f not in x["vitest_reds"]] + [mt - 86400])
+            sus = [q for q in quicks if t0 < q.get("t", 0) <= mt and q.get("rc") == 0 and f not in q.get("ran", [])
+                   and q.get("sha") and is_ancestor(q["sha"], r["sha"])]
+            if sus:
+                out.append({"test": f, "full": r["sha"][:9],
+                            "quicks": ["%s@%s" % (q.get("agent", "?"), q["sha"][:9]) for q in sus]})
+    return out
 
 
 def read_small(f, since):
@@ -437,6 +480,7 @@ def audit(h, hub, since):
     # a run on an agent's scratch tree is an experiment: left out, counted
     rep["scratch_runs"] = sum(1 for *_, r in gl if r.get("scratch"))
     gl = [g for g in gl if not g[-1].get("scratch")]
+    rep["related_misses"] = related_misses(h, gl, since)
     for mode in ("quick", "full"):
         runs = [r for *_, r in gl if r["mode"] == mode and r["ended"]]
         green = [r["secs"] for r in runs if r["green"] and r["secs"]]
@@ -527,6 +571,8 @@ def health(rep):
         ("heavy-run slot wait p50", rep["heavy"]["wait_p50"], 300),
         ("full gates red (share)", None if full_green is None else round(1 - full_green, 2), 0.2),
         ("wakes that ran to --max", len(rep["waits"]["ended_at_max"]), 0),
+        # one and quick's desktop_check goes back to the whole pnpm check (review-gates m_33177)
+        ("vitest-related misses", len(rep["related_misses"]), 0),
     ]
     return [(n, v, lim, v is None or v <= lim) for n, v, lim in checks]
 
