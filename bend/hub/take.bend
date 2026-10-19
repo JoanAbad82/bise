@@ -26,6 +26,7 @@ import Base
 import ../vendor/json.bend as J
 
 import ./model.bend as M
+import ./gen/state.bend as S
 
 import ./lazy.bend as LZ
 
@@ -65,21 +66,21 @@ def rename.free(-o: M.St, held: Bool, +cx: X.Cx<o>, +old: String, +new: String, 
 
 # ---- what the old name still holds ----
 
-def take.queued(-o: M.St, ms: List<&2, M.Msg>, +cx: X.Cx<o>) -> X.Cx<o>:
+def take.queued(-o: M.St, ms: List<&2, S.Msg>, +cx: X.Cx<o>) -> X.Cx<o>:
   match ms:
     case Nil{}:
       cx
     case Con{+m, +rest}:
-      +cx2 = X.emit(o, cx, M.EMsgState{M.Msg.id(m), M.Rejected{"recipient_unavailable"}}, Unit{}, Unit{}, Unit{})
-      +cx3 = Bool.pick(X.Cx<o>, String.eq(M.Msg.from(m), M.USER()), feed(o, cx2, M.MAIN(), FD.undelivered(M.Msg.to(m), M.Msg.text(m))), cx2)
+      +cx2 = X.emit(o, cx, M.EMsgState{S.Msg.id(m), S.Rejected{"recipient_unavailable"}}, Unit{}, Unit{}, Unit{})
+      +cx3 = Bool.pick(X.Cx<o>, String.eq(S.Msg.from(m), M.USER()), feed(o, cx2, M.MAIN(), FD.undelivered(S.Msg.to(m), S.Msg.text(m))), cx2)
       take.queued(o, rest, cx3)
 
-def take.owed(-o: M.St, ms: List<&2, M.Msg>, +cx: X.Cx<o>) -> X.Cx<o>:
+def take.owed(-o: M.St, ms: List<&2, S.Msg>, +cx: X.Cx<o>) -> X.Cx<o>:
   match ms:
     case Nil{}:
       cx
     case Con{+m, +rest}:
-      take.owed(o, rest, X.emit(o, cx, M.ESettled{M.Msg.id(m)}, Unit{}, Unit{}, Unit{}))
+      take.owed(o, rest, X.emit(o, cx, M.ESettled{S.Msg.id(m)}, Unit{}, Unit{}, Unit{}))
 
 def take.card(-o: M.St, hit: Bool, +cx: X.Cx<o>, +c: M.Card, +h: String) -> X.Cx<o>:
   match hit:
@@ -119,12 +120,12 @@ def take.watches(-o: M.St, ws: List<&2, WK.Watch>, +cx: X.Cx<o>, +h: String, +wh
       take.watches(o, rest, X.emit(o, cx2, M.EWake{WK.WSet{WK.moved(w, h, id)}}, Unit{}, Unit{}, Unit{}), h, why)
 
 # a hot message to `n` (the records model.bend `moved` rewrites)
-def hot_to(xs: List<&2, M.MRec>, +n: String) -> Bool:
+def hot_to(xs: List<&2, S.MRec>, +n: String) -> Bool:
   match xs:
     case Nil{}:
       False{}
     case Con{+r, +t}:
-      LZ.or(M.MRec.is_hot(r) && String.eq(M.Msg.to(M.MRec.msg(r)), n), u => hot_to(t, n))
+      LZ.or(M.MRec.is_hot(r) && String.eq(S.Msg.to(S.MRec.msg(r)), n), u => hot_to(t, n))
 
 # a live holder's queued messages and owed replies to `n` were meant for it
 # (architect m_31494): msgs_moved, same ids, never an empty one

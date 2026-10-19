@@ -3,6 +3,8 @@
 # checker verifies the equalities.
 import Base
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
+import ../hub/gen/state-laws.bend as HSL
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/picks.bend as HPK
@@ -64,11 +66,11 @@ def Laws.req_interrupt_says_stopped_once(o, cx, token, agent, n, e):
   {==}
 
 def Laws.task_send_says_sent_once(o, cx, m, e):
-  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m), u => cx) == HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m) : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HS.Msg.from(m), HS.Msg.to(m)), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HS.Msg.from(m), HFD.sent(HS.Msg.to(m), HS.Msg.id(m), HS.Msg.expect(m), HS.Msg.text(m))), HS.Msg.from(m), m), u => cx) == HC.sent_parts(o, HC.feed(o, cx, HS.Msg.from(m), HFD.sent(HS.Msg.to(m), HS.Msg.id(m), HS.Msg.expect(m), HS.Msg.text(m))), HS.Msg.from(m), m) : HX.Cx<o>}
   {==}
 
 def Laws.other_send_says_no_sent(o, cx, m, e):
-  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m), u => cx) == cx : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HS.Msg.from(m), HS.Msg.to(m)), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HS.Msg.from(m), HFD.sent(HS.Msg.to(m), HS.Msg.id(m), HS.Msg.expect(m), HS.Msg.text(m))), HS.Msg.from(m), m), u => cx) == cx : HX.Cx<o>}
   {==}
 
 def Laws.task_card_shows_in_its_feed(o, cx, id, agent, text, e):
@@ -91,20 +93,49 @@ def Laws.main_card_answer_routes_once(o, cx, c, text, parts, via):
   {==}
 
 def Laws.you_line_carries_its_id(o, cx, name, m, e):
-  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m)))
-  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m))))) == ln : HX.Cx<o>}
+  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m)))
+  %Equal.sym(Bool, String.is_empty(HS.Msg.parts(m)), True{}, e) : {HLZ.pick(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, HFD.you_parts(HC.parts_json(HS.Msg.parts(m))))) == ln : HX.Cx<o>}
   {==}
 
 def Laws.you_parts_follow_the_id(o, cx, name, m, e):
-  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m)))
-  +rec = HFD.you_parts(HC.parts_json(HM.Msg.parts(m)))
-  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, rec)) == HC.feed(o, ln, name, rec) : HX.Cx<o>}
+  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m)))
+  +rec = HFD.you_parts(HC.parts_json(HS.Msg.parts(m)))
+  %Equal.sym(Bool, String.is_empty(HS.Msg.parts(m)), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, rec)) == HC.feed(o, ln, name, rec) : HX.Cx<o>}
+  {==}
+
+# his line with parts `p`: the getters of with_parts (no record written by position)
+def hub_wp_text(+m: HS.Msg, +p: String) -> {HS.Msg.text(HS.Msg.with_parts(m, p)) == HS.Msg.text(m) : String}:
+  %HSL.Msg.parts.eta(m, p) : {HS.Msg.text(_) == HS.Msg.text(m) : String}
+  {==}
+
+def hub_wp_via(+m: HS.Msg, +p: String) -> {HS.Msg.via(HS.Msg.with_parts(m, p)) == HS.Msg.via(m) : Maybe<&2, String>}:
+  %HSL.Msg.parts.eta(m, p) : {HS.Msg.via(_) == HS.Msg.via(m) : Maybe<&2, String>}
+  {==}
+
+def hub_wp_id(+m: HS.Msg, +p: String) -> {HS.Msg.id(HS.Msg.with_parts(m, p)) == HS.Msg.id(m) : Nat}:
+  %HSL.Msg.parts.eta(m, p) : {HS.Msg.id(_) == HS.Msg.id(m) : Nat}
+  {==}
+
+def hub_wp_line(-o: HM.St, +cx: HX.Cx<o>, +name: String, +m: HS.Msg, +p: String)
+    -> {HC.deliver.line(o, False{}, True{}, cx, name, HS.Msg.with_parts(m, p))
+      == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, p) : HX.Cx<o>}:
+  +w = HS.Msg.with_parts(m, p)
+  %Equal.sym(String, HS.Msg.text(w), HS.Msg.text(m), hub_wp_text(m, p)) : {HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(_, HS.Msg.via(w))), name, HFD.you_id(HS.Msg.id(w))), name, HS.Msg.parts(w))
+    == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, p) : HX.Cx<o>}
+  %Equal.sym(Maybe<&2, String>, HS.Msg.via(w), HS.Msg.via(m), hub_wp_via(m, p)) : {HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), _)), name, HFD.you_id(HS.Msg.id(w))), name, HS.Msg.parts(w))
+    == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, p) : HX.Cx<o>}
+  %Equal.sym(Nat, HS.Msg.id(w), HS.Msg.id(m), hub_wp_id(m, p)) : {HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(_)), name, HS.Msg.parts(w))
+    == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, p) : HX.Cx<o>}
+  %Equal.sym(String, HS.Msg.parts(w), p, HSL.Msg.parts.get_with(m, p)) : {HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, _)
+    == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, p) : HX.Cx<o>}
   {==}
 
 def Laws.parts_never_change_text(o, cx, name, m, p):
-  match m:
-    case HM.Msg{i, th, f, to, r, ex, a, tx, c, pl, q, v, pa}:
-      {==}
+  %Equal.sym(HX.Cx<o>, HC.deliver.line(o, False{}, True{}, cx, name, HS.Msg.with_parts(m, p)), HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, p), hub_wp_line(o, cx, name, m, p))
+    : {_ == HC.you_parts(o, HC.deliver.line(o, False{}, True{}, cx, name, HS.Msg.with_parts(m, "")), name, p) : HX.Cx<o>}
+  %Equal.sym(HX.Cx<o>, HC.deliver.line(o, False{}, True{}, cx, name, HS.Msg.with_parts(m, "")), HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, ""), hub_wp_line(o, cx, name, m, ""))
+    : {HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, p) == HC.you_parts(o, _, name, p) : HX.Cx<o>}
+  {==}
 
 def Laws.no_parts_no_line(o, cx, who, card, said):
   {==}
@@ -289,7 +320,7 @@ def Laws.unqueue_leaves_an_unknown_id(o, cx, id):
   hub_d_notice(o, cx, HC.cat(["no message ", HC.mid(id), " to take back"]))
 
 def Laws.unqueue_never_takes_anothers(o, cx, r, id, e):
-  %Equal.sym(Bool, String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.unqueue.take(o, HM.MRec.st(r), cx, id, HM.Msg.to(HM.MRec.msg(r))), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
+  %Equal.sym(Bool, String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.unqueue.take(o, HS.MRec.st(r), cx, id, HS.Msg.to(HS.MRec.msg(r))), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
   hub_d_notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"]))
 
 def Laws.steer_queued_steers_into_the_turn(o, cx, m, name, im):
@@ -299,25 +330,25 @@ def Laws.steer_queued_starts_a_turn_when_idle(o, cx, m, name, im):
   {==}
 
 def Laws.steer_queued_waits_for_a_down_agent(o, cx, m, name, im):
-  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " stays queued: @", name, " isn't running"]))
+  hub_d_notice(o, cx, HC.cat([HC.mid(HS.Msg.id(m)), " stays queued: @", name, " isn't running"]))
 
 def Laws.steer_queued_waits_for_a_starting_agent(o, cx, m, name, im):
-  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " stays queued: @", name, " isn't running"]))
+  hub_d_notice(o, cx, HC.cat([HC.mid(HS.Msg.id(m)), " stays queued: @", name, " isn't running"]))
 
 def Laws.steer_queued_leaves_it_for_a_gone_agent(o, cx, m):
-  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " stays queued: @", HM.Msg.to(m), " is gone"]))
+  hub_d_notice(o, cx, HC.cat([HC.mid(HS.Msg.id(m)), " stays queued: @", HS.Msg.to(m), " is gone"]))
 
 def Laws.steer_queued_leaves_a_delivered_one(o, cx, m):
-  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " isn't waiting any more"]))
+  hub_d_notice(o, cx, HC.cat([HC.mid(HS.Msg.id(m)), " isn't waiting any more"]))
 
 def Laws.steer_queued_leaves_a_rejected_one(o, cx, m, r):
-  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " isn't waiting any more"]))
+  hub_d_notice(o, cx, HC.cat([HC.mid(HS.Msg.id(m)), " isn't waiting any more"]))
 
 def Laws.steer_queued_leaves_an_unknown_id(o, cx, id):
   hub_d_notice(o, cx, HC.cat(["no message ", HC.mid(id), " to send now"]))
 
 def Laws.steer_queued_never_steers_anothers(o, cx, r, id, e):
-  %Equal.sym(Bool, String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.steer_queued.take(o, HM.MRec.st(r), cx, HM.MRec.msg(r)), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
+  %Equal.sym(Bool, String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.steer_queued.take(o, HS.MRec.st(r), cx, HS.MRec.msg(r)), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
   hub_d_notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"]))
 
 # Nat.is_eq says equal: they are
@@ -332,62 +363,61 @@ def hub_nat_eq_sound(+a: Nat, +b: Nat, e: {Nat.is_eq(a, b) == True{} : Bool}) ->
     case 1n+ap 1n+bp:
       Equal.cong(Nat, Nat, k => 1n+k, ap, bp, hub_nat_eq_sound(ap, bp, e))
 
-def hub_uq_own.pick(c: Bool, +m: HM.Msg, +s: HM.MSt, +se: Bool, +t: List<&2, HM.MRec>, +id: Nat, +x: HM.MSt,
-    +e: {Nat.is_eq(HM.Msg.id(m), id) == c : Bool},
-    ih: {HM.state_of.go(HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), id)) == HC.st_after(HM.rec_of(t, id), x) : Maybe<&2, HM.MSt>})
-    -> {HM.state_of.go(HM.rec_of(HLZ.pick(List<&2, HM.MRec>, Nat.is_eq(HM.Msg.id(m), id), u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), id))
-        == HC.st_after(HM.rec_of(HM.MRec{m, s, se} <> t, id), x) : Maybe<&2, HM.MSt>}:
+def hub_uq_own.pick(c: Bool, +h: HS.MRec, +t: List<&2, HS.MRec>, +id: Nat, +x: HS.MSt,
+    +e: {Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id) == c : Bool},
+    ih: {HM.state_of.go(HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), id)) == HC.st_after(HM.rec_of(t, id), x) : Maybe<&2, HS.MSt>})
+    -> {HM.state_of.go(HM.rec_of(HLZ.pick(List<&2, HS.MRec>, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), u => HS.MRec.with_st(h, x) <> t, u => h <> HM.map_msg(t, id, HM.OSt{x})), id))
+        == HC.st_after(HM.rec_of(h <> t, id), x) : Maybe<&2, HS.MSt>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), True{}, e) : {HM.state_of.go(HM.rec_of(HLZ.pick(List<&2, HM.MRec>, _, u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), id)) == HC.st_after(HM.rec_of(HM.MRec{m, s, se} <> t, id), x) : Maybe<&2, HM.MSt>}
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), True{}, e) : {HM.state_of.go(HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, x, se}}, u => HM.rec_of(t, id))) == HC.st_after(HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, s, se}}, u => HM.rec_of(t, id)), x) : Maybe<&2, HM.MSt>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), True{}, e) : {HM.state_of.go(HM.rec_of(HLZ.pick(List<&2, HS.MRec>, _, u => HS.MRec.with_st(h, x) <> t, u => h <> HM.map_msg(t, id, HM.OSt{x})), id)) == HC.st_after(HM.rec_of(h <> t, id), x) : Maybe<&2, HS.MSt>}
+      %Equal.sym(HS.Msg, HS.MRec.msg(HS.MRec.with_st(h, x)), HS.MRec.msg(h), PL1.hub_msg_with_st(h, x)) : {HM.state_of.go(HLZ.pick(Maybe<&2, HS.MRec>, Nat.is_eq(HS.Msg.id(_), id), u => Some{HS.MRec.with_st(h, x)}, u => HM.rec_of(t, id))) == HC.st_after(HLZ.pick(Maybe<&2, HS.MRec>, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), u => Some{h}, u => HM.rec_of(t, id)), x) : Maybe<&2, HS.MSt>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), True{}, e) : {HM.state_of.go(HLZ.pick(Maybe<&2, HS.MRec>, _, u => Some{HS.MRec.with_st(h, x)}, u => HM.rec_of(t, id))) == HC.st_after(HLZ.pick(Maybe<&2, HS.MRec>, _, u => Some{h}, u => HM.rec_of(t, id)), x) : Maybe<&2, HS.MSt>}
+      %Equal.sym(HS.MSt, HS.MRec.st(HS.MRec.with_st(h, x)), x, HSL.MRec.st.get_with(h, x)) : {Some{_} == Some{x} : Maybe<&2, HS.MSt>}
       {==}
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), False{}, e) : {HM.state_of.go(HM.rec_of(HLZ.pick(List<&2, HM.MRec>, _, u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), id)) == HC.st_after(HM.rec_of(HM.MRec{m, s, se} <> t, id), x) : Maybe<&2, HM.MSt>}
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), False{}, e) : {HM.state_of.go(HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, s, se}}, u => HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), id))) == HC.st_after(HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, s, se}}, u => HM.rec_of(t, id)), x) : Maybe<&2, HM.MSt>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), False{}, e) : {HM.state_of.go(HM.rec_of(HLZ.pick(List<&2, HS.MRec>, _, u => HS.MRec.with_st(h, x) <> t, u => h <> HM.map_msg(t, id, HM.OSt{x})), id)) == HC.st_after(HM.rec_of(h <> t, id), x) : Maybe<&2, HS.MSt>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), False{}, e) : {HM.state_of.go(HLZ.pick(Maybe<&2, HS.MRec>, _, u => Some{h}, u => HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), id))) == HC.st_after(HLZ.pick(Maybe<&2, HS.MRec>, _, u => Some{h}, u => HM.rec_of(t, id)), x) : Maybe<&2, HS.MSt>}
       ih
 
-def hub_uq_own(+xs: List<&2, HM.MRec>, +id: Nat, +x: HM.MSt)
-    -> {HM.state_of.go(HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), id)) == HC.st_after(HM.rec_of(xs, id), x) : Maybe<&2, HM.MSt>}:
+def hub_uq_own(+xs: List<&2, HS.MRec>, +id: Nat, +x: HS.MSt)
+    -> {HM.state_of.go(HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), id)) == HC.st_after(HM.rec_of(xs, id), x) : Maybe<&2, HS.MSt>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      match h:
-        case HM.MRec{m, s, se}:
-          hub_uq_own.pick(Nat.is_eq(HM.Msg.id(m), id), m, s, se, t, id, x, {==}, hub_uq_own(t, id, x))
+      hub_uq_own.pick(Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), h, t, id, x, {==}, hub_uq_own(t, id, x))
 
 def Laws.unqueue_marks_its_own_record(xs, id, x):
   hub_uq_own(xs, id, x)
 
-def hub_uq_other.pick(c: Bool, +m: HM.Msg, +s: HM.MSt, +se: Bool, +t: List<&2, HM.MRec>, +id: Nat, +x: HM.MSt, +y: Nat,
-    +e: {Nat.is_eq(HM.Msg.id(m), id) == c : Bool},
+def hub_uq_other.pick(c: Bool, +h: HS.MRec, +t: List<&2, HS.MRec>, +id: Nat, +x: HS.MSt, +y: Nat,
+    +e: {Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id) == c : Bool},
     eo: {Nat.is_eq(id, y) == False{} : Bool},
-    ih: {HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), y) == HM.rec_of(t, y) : Maybe<&2, HM.MRec>})
-    -> {HM.rec_of(HLZ.pick(List<&2, HM.MRec>, Nat.is_eq(HM.Msg.id(m), id), u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), y)
-        == HM.rec_of(HM.MRec{m, s, se} <> t, y) : Maybe<&2, HM.MRec>}:
+    ih: {HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), y) == HM.rec_of(t, y) : Maybe<&2, HS.MRec>})
+    -> {HM.rec_of(HLZ.pick(List<&2, HS.MRec>, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), u => HS.MRec.with_st(h, x) <> t, u => h <> HM.map_msg(t, id, HM.OSt{x})), y)
+        == HM.rec_of(h <> t, y) : Maybe<&2, HS.MRec>}:
   match c:
     case True{}:
-      +same = hub_nat_eq_sound(HM.Msg.id(m), id, e)
-      +ny = Equal.trans(Bool, Nat.is_eq(HM.Msg.id(m), y), Nat.is_eq(id, y), False{},
-        Equal.cong(Nat, Bool, a => Nat.is_eq(a, y), HM.Msg.id(m), id, same), eo)
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), True{}, e) : {HM.rec_of(HLZ.pick(List<&2, HM.MRec>, _, u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), y) == HM.rec_of(HM.MRec{m, s, se} <> t, y) : Maybe<&2, HM.MRec>}
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), y), False{}, ny) : {HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, x, se}}, u => HM.rec_of(t, y)) == HLZ.pick(Maybe<&2, HM.MRec>, _, u => Some{HM.MRec{m, s, se}}, u => HM.rec_of(t, y)) : Maybe<&2, HM.MRec>}
+      +same = hub_nat_eq_sound(HS.Msg.id(HS.MRec.msg(h)), id, e)
+      +ny = Equal.trans(Bool, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), y), Nat.is_eq(id, y), False{},
+        Equal.cong(Nat, Bool, a => Nat.is_eq(a, y), HS.Msg.id(HS.MRec.msg(h)), id, same), eo)
+      %Equal.sym(Bool, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), True{}, e) : {HM.rec_of(HLZ.pick(List<&2, HS.MRec>, _, u => HS.MRec.with_st(h, x) <> t, u => h <> HM.map_msg(t, id, HM.OSt{x})), y) == HM.rec_of(h <> t, y) : Maybe<&2, HS.MRec>}
+      %Equal.sym(HS.Msg, HS.MRec.msg(HS.MRec.with_st(h, x)), HS.MRec.msg(h), PL1.hub_msg_with_st(h, x)) : {HLZ.pick(Maybe<&2, HS.MRec>, Nat.is_eq(HS.Msg.id(_), y), u => Some{HS.MRec.with_st(h, x)}, u => HM.rec_of(t, y)) == HLZ.pick(Maybe<&2, HS.MRec>, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), y), u => Some{h}, u => HM.rec_of(t, y)) : Maybe<&2, HS.MRec>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), y), False{}, ny) : {HLZ.pick(Maybe<&2, HS.MRec>, _, u => Some{HS.MRec.with_st(h, x)}, u => HM.rec_of(t, y)) == HLZ.pick(Maybe<&2, HS.MRec>, _, u => Some{h}, u => HM.rec_of(t, y)) : Maybe<&2, HS.MRec>}
       {==}
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HM.Msg.id(m), id), False{}, e) : {HM.rec_of(HLZ.pick(List<&2, HM.MRec>, _, u => HM.MRec{m, x, se} <> t, u => HM.MRec{m, s, se} <> HM.map_msg(t, id, HM.OSt{x})), y) == HM.rec_of(HM.MRec{m, s, se} <> t, y) : Maybe<&2, HM.MRec>}
-      Equal.cong(Maybe<&2, HM.MRec>, Maybe<&2, HM.MRec>, z => HLZ.pick(Maybe<&2, HM.MRec>, Nat.is_eq(HM.Msg.id(m), y), u => Some{HM.MRec{m, s, se}}, u => z),
+      %Equal.sym(Bool, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), False{}, e) : {HM.rec_of(HLZ.pick(List<&2, HS.MRec>, _, u => HS.MRec.with_st(h, x) <> t, u => h <> HM.map_msg(t, id, HM.OSt{x})), y) == HM.rec_of(h <> t, y) : Maybe<&2, HS.MRec>}
+      Equal.cong(Maybe<&2, HS.MRec>, Maybe<&2, HS.MRec>, z => HLZ.pick(Maybe<&2, HS.MRec>, Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), y), u => Some{h}, u => z),
         HM.rec_of(HM.map_msg(t, id, HM.OSt{x}), y), HM.rec_of(t, y), ih)
 
-def hub_uq_other(+xs: List<&2, HM.MRec>, +id: Nat, +x: HM.MSt, +y: Nat, +eo: {Nat.is_eq(id, y) == False{} : Bool})
-    -> {HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), y) == HM.rec_of(xs, y) : Maybe<&2, HM.MRec>}:
+def hub_uq_other(+xs: List<&2, HS.MRec>, +id: Nat, +x: HS.MSt, +y: Nat, +eo: {Nat.is_eq(id, y) == False{} : Bool})
+    -> {HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), y) == HM.rec_of(xs, y) : Maybe<&2, HS.MRec>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      match h:
-        case HM.MRec{m, s, se}:
-          hub_uq_other.pick(Nat.is_eq(HM.Msg.id(m), id), m, s, se, t, id, x, y, {==}, eo, hub_uq_other(t, id, x, y, eo))
+      hub_uq_other.pick(Nat.is_eq(HS.Msg.id(HS.MRec.msg(h)), id), h, t, id, x, y, {==}, eo, hub_uq_other(t, id, x, y, eo))
 
 def Laws.unqueue_keeps_every_other_record(xs, id, x, y, e):
   hub_uq_other(xs, id, x, y, e)
@@ -464,7 +494,7 @@ def Laws.live_streamed_text_is_the_reply():
 # ---- his send answered with its message's id (A1) ----
 
 # one more event before the journal keeps what the tail's said is
-def said_weak(-e: HM.Ev, +t: List<&2, HM.Ev>, s: Maybe<&2, HM.Msg>) -> Laws.SaidIn(t, s) -> Laws.SaidIn(e <> t, s):
+def said_weak(-e: HM.Ev, +t: List<&2, HM.Ev>, s: Maybe<&2, HS.Msg>) -> Laws.SaidIn(t, s) -> Laws.SaidIn(e <> t, s):
   match s:
     case None{}:
       p => Unit{}
@@ -472,7 +502,7 @@ def said_weak(-e: HM.Ev, +t: List<&2, HM.Ev>, s: Maybe<&2, HM.Msg>) -> Laws.Said
       p => Inr{p}
 
 # the head's own message (h: what HSD.his_msg says of it), or the tail's
-def said_at(-e: HM.Ev, +t: List<&2, HM.Ev>, h: Maybe<&2, HM.Msg>) -> {HSD.his_msg(e) == h : Maybe<&2, HM.Msg>} -> Laws.SaidIn(t, HSD.said(t)) -> Laws.SaidIn(e <> t, HSD.said.of(h, HSD.said(t))):
+def said_at(-e: HM.Ev, +t: List<&2, HM.Ev>, h: Maybe<&2, HS.Msg>) -> {HSD.his_msg(e) == h : Maybe<&2, HS.Msg>} -> Laws.SaidIn(t, HSD.said(t)) -> Laws.SaidIn(e <> t, HSD.said.of(h, HSD.said(t))):
   match h:
     case None{}:
       q => ih => said_weak(e, t, HSD.said(t))(ih)

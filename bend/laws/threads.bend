@@ -11,6 +11,7 @@ import ../runtime/live-pure.bend as Lp
 import ../vendor/http/encoding/utf8.bend as U8
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/text.bend as HT
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
@@ -66,17 +67,17 @@ law req_interrupt_says_stopped_once:
 law task_send_says_sent_once:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
-  for e: {HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)) == True{} : Bool}
-  {HC.feed_sender(o, cx, m) == HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m) : HX.Cx<o>}
+  for +m: HS.Msg
+  for e: {HC.is_task_send(o, cx, HS.Msg.from(m), HS.Msg.to(m)) == True{} : Bool}
+  {HC.feed_sender(o, cx, m) == HC.sent_parts(o, HC.feed(o, cx, HS.Msg.from(m), HFD.sent(HS.Msg.to(m), HS.Msg.id(m), HS.Msg.expect(m), HS.Msg.text(m))), HS.Msg.from(m), m) : HX.Cx<o>}
 
 # LAW: main's messages, the user's, a message to the user, and a message
 # from a name that isn't an agent of this hub write no 'sent' line.
 law other_send_says_no_sent:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
-  for e: {HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)) == False{} : Bool}
+  for +m: HS.Msg
+  for e: {HC.is_task_send(o, cx, HS.Msg.from(m), HS.Msg.to(m)) == False{} : Bool}
   {HC.feed_sender(o, cx, m) == cx : HX.Cx<o>}
 
 # LAW: a sender this hub has no agent of ('@bise', a cross-hub
@@ -148,10 +149,10 @@ law you_line_carries_its_id:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +name: String
-  for +m: HM.Msg
-  for e: {String.is_empty(HM.Msg.parts(m)) == True{} : Bool}
+  for +m: HS.Msg
+  for e: {String.is_empty(HS.Msg.parts(m)) == True{} : Bool}
   {HC.deliver.line(o, False{}, True{}, cx, name, m)
-    == HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m))) : HX.Cx<o>}
+    == HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))) : HX.Cx<o>}
 
 # ---- his message's parts (msg-parts) ----
 # The clients send his message as typed parts (bise_proto::parts: his
@@ -166,10 +167,10 @@ law you_parts_follow_the_id:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +name: String
-  for +m: HM.Msg
-  for e: {String.is_empty(HM.Msg.parts(m)) == False{} : Bool}
+  for +m: HS.Msg
+  for e: {String.is_empty(HS.Msg.parts(m)) == False{} : Bool}
   {HC.deliver.line(o, False{}, True{}, cx, name, m)
-    == HC.feed(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m))), name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m)))) : HX.Cx<o>}
+    == HC.feed(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, HFD.you_parts(HC.parts_json(HS.Msg.parts(m)))) : HX.Cx<o>}
 
 # LAW: parts never change what he said: the same message with or without
 # parts writes the same lines (his text, its id), the parts only after
@@ -178,10 +179,10 @@ law parts_never_change_text:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +name: String
-  for +m: HM.Msg
+  for +m: HS.Msg
   for +p: String
-  {HC.deliver.line(o, False{}, True{}, cx, name, HM.Msg.with_parts(m, p))
-    == HC.you_parts(o, HC.deliver.line(o, False{}, True{}, cx, name, HM.Msg.with_parts(m, "")), name, p) : HX.Cx<o>}
+  {HC.deliver.line(o, False{}, True{}, cx, name, HS.Msg.with_parts(m, p))
+    == HC.you_parts(o, HC.deliver.line(o, False{}, True{}, cx, name, HS.Msg.with_parts(m, "")), name, p) : HX.Cx<o>}
 
 # LAW: a line with no parts is no line: a route line (an answer to a card,
 # a message to another agent) with none is the route line alone.
@@ -379,7 +380,7 @@ law unqueue_takes_back_a_queued_one:
   for +q: String
   for +id: Nat
   for +to: String
-  {HC.unqueue.take(o, HM.Queued{q}, cx, id, to) == HC.emit(o, cx, HM.EMsgState{id, HM.Rejected{"taken_back"}}, Unit{}, Unit{}, Unit{}) : HX.Cx<o>}
+  {HC.unqueue.take(o, HS.Queued{q}, cx, id, to) == HC.emit(o, cx, HM.EMsgState{id, HS.Rejected{"taken_back"}}, Unit{}, Unit{}, Unit{}) : HX.Cx<o>}
 
 # LAW: a message already delivered is left as it is (a notice, the state
 # unchanged); so are one already rejected, one cancelled, an unknown id, and
@@ -389,7 +390,7 @@ law unqueue_leaves_a_delivered_one:
   for +cx: HX.Cx<o>
   for +id: Nat
   for +to: String
-  {HX.d(o, HC.unqueue.take(o, HM.Delivered{}, cx, id, to)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.unqueue.take(o, HS.Delivered{}, cx, id, to)) == HX.d(o, cx) : HM.St}
 
 law unqueue_leaves_a_rejected_one:
   for -o: HM.St
@@ -397,7 +398,7 @@ law unqueue_leaves_a_rejected_one:
   for +r: String
   for +id: Nat
   for +to: String
-  {HX.d(o, HC.unqueue.take(o, HM.Rejected{r}, cx, id, to)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.unqueue.take(o, HS.Rejected{r}, cx, id, to)) == HX.d(o, cx) : HM.St}
 
 law unqueue_leaves_an_unknown_id:
   for -o: HM.St
@@ -408,9 +409,9 @@ law unqueue_leaves_an_unknown_id:
 law unqueue_never_takes_anothers:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +r: HM.MRec
+  for +r: HS.MRec
   for +id: Nat
-  for e: {String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()) == False{} : Bool}
+  for e: {String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()) == False{} : Bool}
   {HX.d(o, HC.unqueue.go(o, Some{r}, cx, id)) == HX.d(o, cx) : HM.St}
 
 # LAW: the queue after a take-back is the queue before minus that message:
@@ -418,18 +419,18 @@ law unqueue_never_takes_anothers:
 # pump never delivers it: delivered_once), and every other record is the
 # same. Read on the records (the taking back is map_msg with OSt).
 law unqueue_marks_its_own_record:
-  for +xs: List<&2, HM.MRec>
+  for +xs: List<&2, HS.MRec>
   for +id: Nat
-  for +x: HM.MSt
-  {HM.state_of.go(HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), id)) == HC.st_after(HM.rec_of(xs, id), x) : Maybe<&2, HM.MSt>}
+  for +x: HS.MSt
+  {HM.state_of.go(HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), id)) == HC.st_after(HM.rec_of(xs, id), x) : Maybe<&2, HS.MSt>}
 
 law unqueue_keeps_every_other_record:
-  for +xs: List<&2, HM.MRec>
+  for +xs: List<&2, HS.MRec>
   for +id: Nat
-  for +x: HM.MSt
+  for +x: HS.MSt
   for +y: Nat
   for e: {Nat.is_eq(id, y) == False{} : Bool}
-  {HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), y) == HM.rec_of(xs, y) : Maybe<&2, HM.MRec>}
+  {HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), y) == HM.rec_of(xs, y) : Maybe<&2, HS.MRec>}
 
 # LAW (the race, unqueue vs the turn-end pump, both orders): sb-core steps
 # one input at a time. Taken back first: the record is Rejected
@@ -451,7 +452,7 @@ law unqueue_keeps_every_other_record:
 law steer_queued_steers_into_the_turn:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
+  for +m: HS.Msg
   for +name: String
   for +im: Bool
   {HC.steer_queued.run(o, HM.RBusy{}, cx, m, name, im) == HC.pump.batch(o, [m], cx, name, True{}, im) : HX.Cx<o>}
@@ -460,7 +461,7 @@ law steer_queued_steers_into_the_turn:
 law steer_queued_starts_a_turn_when_idle:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
+  for +m: HS.Msg
   for +name: String
   for +im: Bool
   {HC.steer_queued.run(o, HM.RIdle{}, cx, m, name, im) == HC.pump.batch(o, [m], cx, name, False{}, im) : HX.Cx<o>}
@@ -470,7 +471,7 @@ law steer_queued_starts_a_turn_when_idle:
 law steer_queued_waits_for_a_down_agent:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
+  for +m: HS.Msg
   for +name: String
   for +im: Bool
   {HX.d(o, HC.steer_queued.run(o, HM.RDown{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
@@ -478,7 +479,7 @@ law steer_queued_waits_for_a_down_agent:
 law steer_queued_waits_for_a_starting_agent:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
+  for +m: HS.Msg
   for +name: String
   for +im: Bool
   {HX.d(o, HC.steer_queued.run(o, HM.RStarting{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
@@ -486,7 +487,7 @@ law steer_queued_waits_for_a_starting_agent:
 law steer_queued_leaves_it_for_a_gone_agent:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
+  for +m: HS.Msg
   {HX.d(o, HC.steer_queued.agent(o, None{}, cx, m)) == HX.d(o, cx) : HM.St}
 
 # LAW: a message no longer queued (delivered, taken back, rejected,
@@ -495,15 +496,15 @@ law steer_queued_leaves_it_for_a_gone_agent:
 law steer_queued_leaves_a_delivered_one:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
-  {HX.d(o, HC.steer_queued.take(o, HM.Delivered{}, cx, m)) == HX.d(o, cx) : HM.St}
+  for +m: HS.Msg
+  {HX.d(o, HC.steer_queued.take(o, HS.Delivered{}, cx, m)) == HX.d(o, cx) : HM.St}
 
 law steer_queued_leaves_a_rejected_one:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
+  for +m: HS.Msg
   for +r: String
-  {HX.d(o, HC.steer_queued.take(o, HM.Rejected{r}, cx, m)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.take(o, HS.Rejected{r}, cx, m)) == HX.d(o, cx) : HM.St}
 
 law steer_queued_leaves_an_unknown_id:
   for -o: HM.St
@@ -514,9 +515,9 @@ law steer_queued_leaves_an_unknown_id:
 law steer_queued_never_steers_anothers:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +r: HM.MRec
+  for +r: HS.MRec
   for +id: Nat
-  for e: {String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()) == False{} : Bool}
+  for e: {String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()) == False{} : Bool}
   {HX.d(o, HC.steer_queued.go(o, Some{r}, cx, id)) == HX.d(o, cx) : HM.St}
 
 # LAW (the races, sb-core steps one input at a time): steered first, the
@@ -535,14 +536,14 @@ law steer_queued_never_steers_anothers:
 
 # m is a message of his that an event of the journal names (HSD.his_msg:
 # its EMsgSent, sent by the user)
-def HisIn(evs: List<&2, HM.Ev>, +m: HM.Msg) -> Data:
+def HisIn(evs: List<&2, HM.Ev>, +m: HS.Msg) -> Data:
   match evs:
     case Nil{}:
       Empty
     case Con{+e, +t}:
-      Either<&2, &2, {HSD.his_msg(e) == Some{m} : Maybe<&2, HM.Msg>}, HisIn(t, m)>
+      Either<&2, &2, {HSD.his_msg(e) == Some{m} : Maybe<&2, HS.Msg>}, HisIn(t, m)>
 
-def SaidIn(evs: List<&2, HM.Ev>, s: Maybe<&2, HM.Msg>) -> Data:
+def SaidIn(evs: List<&2, HM.Ev>, s: Maybe<&2, HS.Msg>) -> Data:
   match s:
     case None{}:
       Unit
@@ -556,19 +557,19 @@ law said_is_his:
   SaidIn(evs, HSD.said(evs))
 
 # LAW: his delivered message's you-id line carries that message's own id
-# (HM.Msg.id), the id HSD.said_id answered for it: the answered id is the
+# (HS.Msg.id), the id HSD.said_id answered for it: the answered id is the
 # id the you-id line carries later.
 law said_you_id:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +name: String
-  for +m: HM.Msg
+  for +m: HS.Msg
   {HC.deliver.line(o, False{}, True{}, cx, name, m)
-    == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m))), name, HM.Msg.parts(m)) : HX.Cx<o>}
+    == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, HS.Msg.parts(m)) : HX.Cx<o>}
 
 law said_id_is_the_msg_id:
-  for +m: HM.Msg
-  {HSD.said_id(Some{m}) == Some{HM.Msg.id(m)} : Maybe<&2, Nat>}
+  for +m: HS.Msg
+  {HSD.said_id(Some{m}) == Some{HS.Msg.id(m)} : Maybe<&2, Nat>}
 
 # ---- MCP calls that fail (runtime/mcp-pure.bend) ----
 

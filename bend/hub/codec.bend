@@ -57,44 +57,11 @@ def jmaybe_decl(m: Maybe<&2, M.Decl>) -> J.Json:
     case Some{+d}:
       J.JStr{decl_str(d)}
 
-def via_kv(m: Maybe<&2, String>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  match m:
-    case None{}:
-      Nil{}
-    case Some{+v}:
-      [J.kv("via", J.JStr{v})]
-
-# his message's parts (msg-parts): written only when it has some, so a
-# message without parts journals as it always did and an older core reads
-# a message with parts as its text (old_core_replay)
-def parts_kv(+p: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  Bool.pick(List<&2, Sigma<&2, &2, String, _ => J.Json>>, String.is_empty(p), Nil{}, [J.kv("parts", J.JStr{p})])
-
-def msg_json(+m: M.Msg) -> J.Json:
-  J.obj(List.append(&2, Sigma<&2, &2, String, _ => J.Json>, [J.kv("id", J.JNum{M.Msg.id(m)}), J.kv("thread", J.JNum{M.Msg.thread(m)}),
-    J.kv("from", J.JStr{M.Msg.from(m)}), J.kv("to", J.JStr{M.Msg.to(m)}),
-    J.kv("reply_to", jmaybe_nat(M.Msg.reply_to(m))),
-    J.kv("expect_reply", J.JBool{M.Msg.expect(m)}), J.kv("auto", J.JBool{M.Msg.auto(m)}),
-    J.kv("text", J.JStr{M.Msg.text(m)}), J.kv("created_ms", J.JNum{M.Msg.created(m)}),
-    J.kv("plain", J.JBool{M.Msg.plain(m)}), J.kv("queued", J.JBool{M.Msg.queued(m)})],
-    List.append(&2, Sigma<&2, &2, String, _ => J.Json>, via_kv(M.Msg.via(m)), parts_kv(M.Msg.parts(m)))))
-
 def card_json(+c: M.Card) -> J.Json:
   J.obj([J.kv("id", J.JNum{M.Card.id(c)}), J.kv("kind", J.JStr{M.Card.kind(c)}),
     J.kv("agent", J.JStr{M.Card.agent(c)}), J.kv("text", J.JStr{M.Card.text(c)}),
     J.kv("for_msg", jmaybe_nat(M.Card.for_msg(c))), J.kv("created_ms", J.JNum{M.Card.created(c)}),
     J.kv("place", jmaybe_str(M.Card.place(c))), J.kv("pr", jmaybe_nat(M.Card.pr(c)))])
-
-def mst_kvs(s: M.MSt) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  match s:
-    case M.Queued{+r}:
-      [J.kv("state", J.JStr{"queued"}), J.kv("reason", J.JStr{r})]
-    case M.Delivered{}:
-      [J.kv("state", J.JStr{"delivered"})]
-    case M.Rejected{+e}:
-      [J.kv("state", J.JStr{"rejected"}), J.kv("error", J.JStr{e})]
-    case M.Cancelled{}:
-      [J.kv("state", J.JStr{"cancelled"})]
 
 # ---- decoding (the journal replayed at boot) ----
 
@@ -137,21 +104,10 @@ def decl.of_s(m: Maybe<&2, String>) -> Maybe<&2, M.Decl>:
       Some{Bool.pick(M.Decl, String.eq(s, "done"), M.DDone{},
         Bool.pick(M.Decl, String.eq(s, "blocked"), M.DBlocked{}, M.DWorking{}))}
 
-def msg_of(+j: J.Json) -> M.Msg:
-  M.Msg{get_nat(j, "id"), get_nat(j, "thread"), get_s(j, "from"), get_s(j, "to"),
-    opt_nat(J.get(j, "reply_to")), get_b(j, "expect_reply"), get_b(j, "auto"),
-    get_s(j, "text"), get_nat(j, "created_ms"), get_b(j, "plain"), get_b(j, "queued"), opt_str(J.get(j, "via")), get_s(j, "parts")}
-
 def card_of(+j: J.Json) -> M.Card:
   M.Card{get_nat(j, "id"), get_s(j, "kind"), get_s(j, "agent"), get_s(j, "text"),
     opt_nat(J.get(j, "for_msg")), get_nat(j, "created_ms"), opt_str(J.get(j, "place")),
     opt_nat(J.get(j, "pr"))}
-
-def mst_of(+j: J.Json) -> M.MSt:
-  +s = get_s(j, "state")
-  Bool.pick(M.MSt, String.eq(s, "delivered"), M.Delivered{},
-    Bool.pick(M.MSt, String.eq(s, "rejected"), M.Rejected{get_s(j, "error")},
-      Bool.pick(M.MSt, String.eq(s, "cancelled"), M.Cancelled{}, M.Queued{get_s(j, "reason")})))
 
 # bise desktop S2's kinds (an older sb-core has none: KUnknown, skipped)
 def out_st_of(+s: String) -> XH.OutSt:
@@ -248,29 +204,6 @@ def watch_json(+w: WK.Watch) -> J.Json:
 
 # ---- each record reads back what it writes (gen/journal-laws.bend's
 # round laws go through these) ----
-
-law msg_round:
-  for m: M.Msg
-  {msg_of(msg_json(m)) == m : M.Msg}
-
-def msg_round(m):
-  match m:
-    case M.Msg{id, th, fr, to, None{}, ex, au, tx, cr, pl, qu, None{}, SNil{}}:
-      {==}
-    case M.Msg{id, th, fr, to, None{}, ex, au, tx, cr, pl, qu, None{}, SCon{h, t}}:
-      {==}
-    case M.Msg{id, th, fr, to, None{}, ex, au, tx, cr, pl, qu, Some{v}, SNil{}}:
-      {==}
-    case M.Msg{id, th, fr, to, None{}, ex, au, tx, cr, pl, qu, Some{v}, SCon{h, t}}:
-      {==}
-    case M.Msg{id, th, fr, to, Some{r}, ex, au, tx, cr, pl, qu, None{}, SNil{}}:
-      {==}
-    case M.Msg{id, th, fr, to, Some{r}, ex, au, tx, cr, pl, qu, None{}, SCon{h, t}}:
-      {==}
-    case M.Msg{id, th, fr, to, Some{r}, ex, au, tx, cr, pl, qu, Some{v}, SNil{}}:
-      {==}
-    case M.Msg{id, th, fr, to, Some{r}, ex, au, tx, cr, pl, qu, Some{v}, SCon{h, t}}:
-      {==}
 
 law card_round:
   for c: M.Card

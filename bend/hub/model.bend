@@ -10,6 +10,7 @@ import ./xhub-model.bend as XH
 import ./lazy.bend as LZ
 import ./gone.bend as G
 import ./names.bend as NM
+import ./gen/state.bend as S
 
 type Life is Data:
   LActive{}
@@ -27,21 +28,6 @@ type Decl is Data:
   DWorking{}
   DDone{}
   DBlocked{}
-
-type MSt is Data:
-  Queued{reason: String}
-  Delivered{}
-  Rejected{error: String}
-  Cancelled{}
-
-type Msg is Data:
-  Msg{id: Nat, thread: Nat, from: String, to: String, reply_to: Maybe<&2, Nat>,
-    expect: Bool, auto: Bool, text: String, created: Nat, plain: Bool,
-    queued: Bool, via: Maybe<&2, String>, parts: String}
-
-# a message, its delivery state and whether it got its (first) reply
-type MRec is Data:
-  MRec{msg: Msg, st: MSt, settled: Bool}
 
 # `place`, `pr`: a place's card (ready to merge: its id, PR, pr-design §6.3)
 type Card is Data:
@@ -68,10 +54,10 @@ type Agent is Data:
     snap: Maybe<&2, String>, follow: Maybe<&2, String>}
 
 type St is Data:
-  St{agents: List<&2, Agent>, order: List<&2, String>, hot: List<&2, MRec>,
+  St{agents: List<&2, Agent>, order: List<&2, String>, hot: List<&2, S.MRec>,
     cards: List<&2, Card>, notes: List<&2, String>, next_msg: Nat,
     next_card: Nat, tm: TM.Tms, x: XH.Xs, paused: Maybe<&2, Nat>,
-    old: List<&2, MRec>, gone: List<&2, G.Item>}
+    old: List<&2, S.MRec>, gone: List<&2, G.Item>}
 # paused: since that ms (pause.bend; None runs); hot/old: the messages split
 # (issue 21); gone: withdrawn cards he may still answer (gone.bend)
 
@@ -88,8 +74,8 @@ type Ev is Data:
   ERenamed{name: String, new_name: String}
   # name-free: a live agent's hot messages to its old name `from` (taken)
   EMsgsMoved{from: String, to: String}
-  EMsgSent{msg: Msg}
-  EMsgState{id: Nat, st: MSt}
+  EMsgSent{msg: S.Msg}
+  EMsgState{id: Nat, st: S.MSt}
   ESettled{id: Nat}
   ECardOpened{card: Card}
   # `ans` his answer (via "": closed without him, `resolution` says why)
@@ -134,23 +120,8 @@ type AgentOp is Data:
   OFollow{f: Maybe<&2, String>}
 
 type MsgOp is Data:
-  OSt{st: MSt}
+  OSt{st: S.MSt}
   OSettle{}
-
-def MRec.msg(x: MRec) -> Msg:
-  match x:
-    case MRec{+msg, _, _}:
-      msg
-
-def MRec.st(x: MRec) -> MSt:
-  match x:
-    case MRec{_, +st, _}:
-      st
-
-def MRec.settled(x: MRec) -> Bool:
-  match x:
-    case MRec{_, _, +settled}:
-      settled
 
 def Card.id(x: Card) -> Nat:
   match x:
@@ -203,7 +174,7 @@ def St.order(x: St) -> List<&2, String>:
       order
 
 # the hot messages (MRec.is_hot), ids ascending: what the walks read
-def St.hot(x: St) -> List<&2, MRec>:
+def St.hot(x: St) -> List<&2, S.MRec>:
   match x:
     case St{_, _, +hot, _, _, _, _, _, _, _, _, _}:
       hot
@@ -240,7 +211,7 @@ def St.x(x: St) -> XH.Xs:
 
 # the cold messages, newest first (ids descending): a recent id is found
 # near the head, a message that turns cold goes in there
-def St.old(x: St) -> List<&2, MRec>:
+def St.old(x: St) -> List<&2, S.MRec>:
   match x:
     case St{_, _, _, _, _, _, _, _, _, _, +old, _}:
       old
@@ -256,11 +227,6 @@ def St.paused(x: St) -> Maybe<&2, Nat>:
     case St{_, _, _, _, _, _, _, _, _, +pz, _, _}:
       pz
 
-def Msg.id(x: Msg) -> Nat:
-  match x:
-    case Msg{+id, _, _, _, _, _, _, _, _, _, _, _, _}:
-      id
-
 # the first entry whose key is `k`
 def find(~A: Data, ~K: Data, ~key: A -> K, ~eq: K -> K -> Bool, xs: List<&2, A>, +k: K) -> Maybe<&2, A>:
   match xs:
@@ -269,8 +235,8 @@ def find(~A: Data, ~K: Data, ~key: A -> K, ~eq: K -> K -> Bool, xs: List<&2, A>,
     case Con{+h, +t}:
       LZ.pick(Maybe<&2, A>, eq(key(h), k), u => Some{h}, u => find(~A, ~K, ~key, ~eq, t, k))
 
-def rec_of(xs: List<&2, MRec>, +id: Nat) -> Maybe<&2, MRec>:
-  find(~MRec, ~Nat, ~(r => Msg.id(MRec.msg(r))), ~(a => b => Nat.is_eq(a, b)), xs, id)
+def rec_of(xs: List<&2, S.MRec>, +id: Nat) -> Maybe<&2, S.MRec>:
+  find(~S.MRec, ~Nat, ~(r => S.Msg.id(S.MRec.msg(r))), ~(a => b => Nat.is_eq(a, b)), xs, id)
 
 # `dir`: its folder, the stable id of its files (hub/names.bend free_dir)
 def new_agent(+name: String, +dir: String, +is_main: Bool, +parent: Maybe<&2, String>, +ws: J.Json, +brief: J.Json, +created: Nat) -> Agent:
@@ -478,21 +444,19 @@ def map_agent.go(xs: List<&2, Agent>, +hit: Bool, +n: String, +op: AgentOp) -> L
 def map_agent(+xs: List<&2, Agent>, +n: String, +op: AgentOp) -> List<&2, Agent>:
   map_agent.go(xs, name_at(xs, n), n, op)
 
-def rec_op(+r: MRec, op: MsgOp) -> MRec:
-  match r:
-    case MRec{+m, +s, +settled}:
-      match op:
-        case OSt{+ns}:
-          MRec{m, ns, settled}
-        case OSettle{}:
-          MRec{m, s, True{}}
+def rec_op(+r: S.MRec, op: MsgOp) -> S.MRec:
+  match op:
+    case OSt{+ns}:
+      S.MRec.with_st(r, ns)
+    case OSettle{}:
+      S.MRec.with_settled(r, True{})
 
-def map_msg(xs: List<&2, MRec>, +id: Nat, +op: MsgOp) -> List<&2, MRec>:
+def map_msg(xs: List<&2, S.MRec>, +id: Nat, +op: MsgOp) -> List<&2, S.MRec>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      LZ.pick(List<&2, MRec>, Nat.is_eq(Msg.id(MRec.msg(h)), id), u => rec_op(h, op) <> t, u => h <> map_msg(t, id, op))
+      LZ.pick(List<&2, S.MRec>, Nat.is_eq(S.Msg.id(S.MRec.msg(h)), id), u => rec_op(h, op) <> t, u => h <> map_msg(t, id, op))
 
 def drop_card(xs: List<&2, Card>, +id: Nat) -> List<&2, Card>:
   match xs:
@@ -504,89 +468,74 @@ def drop_card(xs: List<&2, Card>, +id: Nat) -> List<&2, Card>:
 def put_card(xs: List<&2, Card>, +c: Card) -> List<&2, Card>:
   snoc(Card, drop_card(xs, Card.id(c)), c)
 
-def Msg.to(x: Msg) -> String:
-  match x:
-    case Msg{_, _, _, +to, _, _, _, _, _, _, _, _, _}:
-      to
-
-def MRec.to(+r: MRec, +to: String) -> MRec:
-  match r:
-    case MRec{Msg{+i, +th, +f, _, +rp, +e, +a, +tx, +c, +pl, +q, +v, +p}, +st, +se}:
-      MRec{Msg{i, th, f, to, rp, e, a, tx, c, pl, q, v, p}, st, se}
-
-def Msg.reply_to(x: Msg) -> Maybe<&2, Nat>:
-  match x:
-    case Msg{_, _, _, _, +reply_to, _, _, _, _, _, _, _, _}:
-      reply_to
-
-def Msg.from(x: Msg) -> String:
-  match x:
-    case Msg{_, _, +from, _, _, _, _, _, _, _, _, _, _}:
-      from
-
-def Msg.thread(x: Msg) -> Nat:
-  match x:
-    case Msg{_, +thread, _, _, _, _, _, _, _, _, _, _, _}:
-      thread
-def is_queued(s: MSt) -> Bool:
+def is_queued(s: S.MSt) -> Bool:
   match s:
-    case Queued{_}:
+    case S.Queued{_}:
       True{}
-    case Delivered{}:
+    case S.Delivered{}:
       False{}
-    case Rejected{_}:
+    case S.Rejected{_}:
       False{}
-    case Cancelled{}:
+    case S.Cancelled{}:
       False{}
-def is_delivered(s: MSt) -> Bool:
+def is_delivered(s: S.MSt) -> Bool:
   match s:
-    case Queued{_}:
+    case S.Queued{_}:
       False{}
-    case Delivered{}:
+    case S.Delivered{}:
       True{}
-    case Rejected{_}:
+    case S.Rejected{_}:
       False{}
-    case Cancelled{}:
+    case S.Cancelled{}:
       False{}
-def Msg.expect(x: Msg) -> Bool:
-  match x:
-    case Msg{_, _, _, _, _, +expect, _, _, _, _, _, _, _}:
-      expect
+# a message from its fields, in their order (the steps' sends)
+def new_msg(+id: Nat, +thread: Nat, +from: String, +to: String, +reply_to: Maybe<&2, Nat>, +expect: Bool, +auto: Bool, +text: String, +created: Nat, +plain: Bool, +queued: Bool, +via: Maybe<&2, String>, +parts: String) -> S.Msg:
+  +m0 = S.Msg.with_thread(S.Msg.with_id(S.Msg.empty(), id), thread)
+  +m1 = S.Msg.with_reply_to(S.Msg.with_to(S.Msg.with_from(m0, from), to), reply_to)
+  +m2 = S.Msg.with_text(S.Msg.with_auto(S.Msg.with_expect(m1, expect), auto), text)
+  +m3 = S.Msg.with_queued(S.Msg.with_plain(S.Msg.with_created(m2, created), plain), queued)
+  S.Msg.with_parts(S.Msg.with_via(m3, via), parts)
+# the record with its message to `to` (msgs_moved)
+def MRec.to(+r: S.MRec, +to: String) -> S.MRec:
+  S.MRec.with_msg(r, S.Msg.with_to(S.MRec.msg(r), to))
+# a sent message's record: queued ("new"), not settled
+def new_rec(+m: S.Msg) -> S.MRec:
+  S.MRec.with_st(S.MRec.with_msg(S.MRec.empty(), m), S.Queued{"new"})
 # a delivered message that expects a reply its recipient has not given:
 # the steps (unanswered_in) and the view (view.bend rec_json) both read it
-def MRec.owes(+r: MRec) -> Bool:
-  Msg.expect(MRec.msg(r)) && Bool.not(MRec.settled(r)) && is_delivered(MRec.st(r))
+def MRec.owes(+r: S.MRec) -> Bool:
+  S.Msg.expect(S.MRec.msg(r)) && Bool.not(S.MRec.settled(r)) && is_delivered(S.MRec.st(r))
 # queued, or owing a reply (issue 21): St.hot's one predicate; "cold" else
-def MRec.is_hot(+r: MRec) -> Bool:
-  is_queued(MRec.st(r)) || MRec.owes(r)
+def MRec.is_hot(+r: S.MRec) -> Bool:
+  is_queued(S.MRec.st(r)) || MRec.owes(r)
 # the hot messages of `xs`, in their order
-def hot_of(xs: List<&2, MRec>) -> List<&2, MRec>:
+def hot_of(xs: List<&2, S.MRec>) -> List<&2, S.MRec>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
       +rest = hot_of(t)
-      Bool.pick(List<&2, MRec>, MRec.is_hot(r), r <> rest, rest)
+      Bool.pick(List<&2, S.MRec>, MRec.is_hot(r), r <> rest, rest)
 # the cold ones, in their order
-def cold_of(xs: List<&2, MRec>) -> List<&2, MRec>:
+def cold_of(xs: List<&2, S.MRec>) -> List<&2, S.MRec>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
       +rest = cold_of(t)
-      Bool.pick(List<&2, MRec>, MRec.is_hot(r), rest, r <> rest)
+      Bool.pick(List<&2, S.MRec>, MRec.is_hot(r), rest, r <> rest)
 # ---- the split (issue 21 steps 3-4): St.hot ascending, St.old descending ----
-def MRec.id(+r: MRec) -> Nat:
-  Msg.id(MRec.msg(r))
+def MRec.id(+r: S.MRec) -> Nat:
+  S.Msg.id(S.MRec.msg(r))
 # the head of `xs` has an id above `n`
-def id_above(xs: List<&2, MRec>, +n: Nat) -> Bool:
+def id_above(xs: List<&2, S.MRec>, +n: Nat) -> Bool:
   match xs:
     case Nil{}:
       False{}
     case Con{+h, _}:
       Nat.is_gt(MRec.id(h), n)
 # `r` into `xs` (ids descending), before the first id not above its own
-def ins_desc.go(xs: List<&2, MRec>, gt: Bool, +r: MRec) -> List<&2, MRec>:
+def ins_desc.go(xs: List<&2, S.MRec>, gt: Bool, +r: S.MRec) -> List<&2, S.MRec>:
   match xs gt:
     case Nil{} _:
       [r]
@@ -594,10 +543,10 @@ def ins_desc.go(xs: List<&2, MRec>, gt: Bool, +r: MRec) -> List<&2, MRec>:
       h <> ins_desc.go(t, id_above(t, MRec.id(r)), r)
     case Con{+h, +t} False{}:
       r <> h <> t
-def ins_desc(+xs: List<&2, MRec>, +r: MRec) -> List<&2, MRec>:
+def ins_desc(+xs: List<&2, S.MRec>, +r: S.MRec) -> List<&2, S.MRec>:
   ins_desc.go(xs, id_above(xs, MRec.id(r)), r)
 # `r` into `xs` (ids ascending), before the first id above its own
-def ins_asc.go(xs: List<&2, MRec>, gt: Bool, +r: MRec) -> List<&2, MRec>:
+def ins_asc.go(xs: List<&2, S.MRec>, gt: Bool, +r: S.MRec) -> List<&2, S.MRec>:
   match xs gt:
     case Nil{} _:
       [r]
@@ -605,85 +554,85 @@ def ins_asc.go(xs: List<&2, MRec>, gt: Bool, +r: MRec) -> List<&2, MRec>:
       r <> h <> t
     case Con{+h, +t} False{}:
       h <> ins_asc.go(t, id_above(t, MRec.id(r)), r)
-def ins_asc(+xs: List<&2, MRec>, +r: MRec) -> List<&2, MRec>:
+def ins_asc(+xs: List<&2, S.MRec>, +r: S.MRec) -> List<&2, S.MRec>:
   ins_asc.go(xs, id_above(xs, MRec.id(r)), r)
 # the messages of `hs` put into `os` (ids descending)
-def ins_all(hs: List<&2, MRec>, +os: List<&2, MRec>) -> List<&2, MRec>:
+def ins_all(hs: List<&2, S.MRec>, +os: List<&2, S.MRec>) -> List<&2, S.MRec>:
   match hs:
     case Nil{}:
       os
     case Con{+r, +t}:
       ins_desc(ins_all(t, os), r)
 # every message in send order (view_all; the laws' HI.Unique, HI.Kept)
-def every(+st: St) -> List<&2, MRec>:
-  List.reverse(&2, MRec, ins_all(St.hot(st), St.old(st)))
-def drop_msg(xs: List<&2, MRec>, +id: Nat) -> List<&2, MRec>:
+def every(+st: St) -> List<&2, S.MRec>:
+  List.reverse(&2, S.MRec, ins_all(St.hot(st), St.old(st)))
+def drop_msg(xs: List<&2, S.MRec>, +id: Nat) -> List<&2, S.MRec>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      LZ.pick(List<&2, MRec>, Nat.is_eq(MRec.id(h), id), u => t, u => h <> drop_msg(t, id))
+      LZ.pick(List<&2, S.MRec>, Nat.is_eq(MRec.id(h), id), u => t, u => h <> drop_msg(t, id))
 # the two sides after a message event
 type Ms is Data:
-  Ms{hot: List<&2, MRec>, old: List<&2, MRec>}
-def Ms.hot(x: Ms) -> List<&2, MRec>:
+  Ms{hot: List<&2, S.MRec>, old: List<&2, S.MRec>}
+def Ms.hot(x: Ms) -> List<&2, S.MRec>:
   match x:
     case Ms{+hot, _}:
       hot
-def Ms.old(x: Ms) -> List<&2, MRec>:
+def Ms.old(x: Ms) -> List<&2, S.MRec>:
   match x:
     case Ms{_, +old}:
       old
 # the op on a cold message: back to the hot side if it made it hot, else in place
-def msg_op.cold.go(back: Bool, +c: MRec, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +op: MsgOp) -> Ms:
+def msg_op.cold.go(back: Bool, +c: S.MRec, +hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat, +op: MsgOp) -> Ms:
   match back:
     case True{}:
       Ms{ins_asc(hot, rec_op(c, op)), drop_msg(old, id)}
     case False{}:
       Ms{hot, map_msg(old, id, op)}
-def msg_op.cold(m: Maybe<&2, MRec>, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +op: MsgOp) -> Ms:
+def msg_op.cold(m: Maybe<&2, S.MRec>, +hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat, +op: MsgOp) -> Ms:
   match m:
     case None{}:
       Ms{hot, old}
     case Some{+c}:
       msg_op.cold.go(MRec.is_hot(rec_op(c, op)), c, hot, old, id, op)
 # the op on a hot message: the one it made cold goes to the old side
-def msg_op.hot(+hs: List<&2, MRec>, +old: List<&2, MRec>) -> Ms:
+def msg_op.hot(+hs: List<&2, S.MRec>, +old: List<&2, S.MRec>) -> Ms:
   Ms{hot_of(hs), ins_all(cold_of(hs), old)}
-def msg_op.in(in_hot: Bool, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +op: MsgOp) -> Ms:
+def msg_op.in(in_hot: Bool, +hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat, +op: MsgOp) -> Ms:
   match in_hot:
     case True{}:
       msg_op.hot(map_msg(hot, id, op), old)
     case False{}:
       msg_op.cold(rec_of(old, id), hot, old, id, op)
 # a message event's op on the message `id`, and its move when it turns cold (or hot)
-def msg_op(+hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +op: MsgOp) -> Ms:
-  msg_op.in(Maybe.is_some(&2, MRec, rec_of(hot, id)), hot, old, id, op)
-def rec_in.go(m: Maybe<&2, MRec>, +old: List<&2, MRec>, +id: Nat) -> Maybe<&2, MRec>:
+def msg_op(+hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat, +op: MsgOp) -> Ms:
+  msg_op.in(Maybe.is_some(&2, S.MRec, rec_of(hot, id)), hot, old, id, op)
+def rec_in.go(m: Maybe<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat) -> Maybe<&2, S.MRec>:
   match m:
     case None{}:
       rec_of(old, id)
     case Some{+r}:
       Some{r}
 # the record of the message `id`, hot or cold
-def rec_in(+hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat) -> Maybe<&2, MRec>:
+def rec_in(+hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat) -> Maybe<&2, S.MRec>:
   rec_in.go(rec_of(hot, id), old, id)
-def rec_at(+st: St, +id: Nat) -> Maybe<&2, MRec>:
+def rec_at(+st: St, +id: Nat) -> Maybe<&2, S.MRec>:
   rec_in(St.hot(st), St.old(st), id)
 # a reply from the recipient (or from the user) settles the question
-def settle_in.if(ok: Bool, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat) -> Ms:
+def settle_in.if(ok: Bool, +hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat) -> Ms:
   match ok:
     case True{}:
       msg_op(hot, old, id, OSettle{})
     case False{}:
       Ms{hot, old}
-def settle_in.go(orig: Maybe<&2, MRec>, +hot: List<&2, MRec>, +old: List<&2, MRec>, +id: Nat, +from: String) -> Ms:
+def settle_in.go(orig: Maybe<&2, S.MRec>, +hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat, +from: String) -> Ms:
   match orig:
     case None{}:
       Ms{hot, old}
     case Some{+o}:
-      settle_in.if(String.eq(Msg.to(MRec.msg(o)), from) || String.eq(from, USER()), hot, old, id)
-def settle_in(r: Maybe<&2, Nat>, +hot: List<&2, MRec>, +old: List<&2, MRec>, +from: String) -> Ms:
+      settle_in.if(String.eq(S.Msg.to(S.MRec.msg(o)), from) || String.eq(from, USER()), hot, old, id)
+def settle_in(r: Maybe<&2, Nat>, +hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +from: String) -> Ms:
   match r:
     case None{}:
       Ms{hot, old}
@@ -691,19 +640,19 @@ def settle_in(r: Maybe<&2, Nat>, +hot: List<&2, MRec>, +old: List<&2, MRec>, +fr
       settle_in.go(rec_in(hot, old, id), hot, old, id, from)
 
 # name-free (msgs_moved): a hot record to `from` goes to `to`, same id
-def moved.if(hit: Bool, +r: MRec, +to: String) -> MRec:
+def moved.if(hit: Bool, +r: S.MRec, +to: String) -> S.MRec:
   match hit:
     case True{}:
       MRec.to(r, to)
     case False{}:
       r
 
-def moved(xs: List<&2, MRec>, +from: String, +to: String) -> List<&2, MRec>:
+def moved(xs: List<&2, S.MRec>, +from: String, +to: String) -> List<&2, S.MRec>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
-      moved.if(MRec.is_hot(r) && String.eq(Msg.to(MRec.msg(r)), from), r, to) <> moved(t, from, to)
+      moved.if(MRec.is_hot(r) && String.eq(S.Msg.to(S.MRec.msg(r)), from), r, to) <> moved(t, from, to)
 
 def apply(+st: St, e: Ev) -> St:
   match st:
@@ -734,8 +683,8 @@ def apply(+st: St, e: Ev) -> St:
         # the three message events, on the split (law cold_is_inert: on
         # every message, the same as one list's snoc, map_msg, settle)
         case EMsgSent{+m}:
-          +p = settle_in(Msg.reply_to(m), snoc(MRec, hot, MRec{m, Queued{"new"}, False{}}), old, Msg.from(m))
-          St{agents, order, Ms.hot(p), cards, notes, Nat.max(Nat.max(nm, 1n+Msg.id(m)), 1n+Msg.thread(m)), nc, tm, xs, pz, Ms.old(p), gone}
+          +p = settle_in(S.Msg.reply_to(m), snoc(S.MRec, hot, new_rec(m)), old, S.Msg.from(m))
+          St{agents, order, Ms.hot(p), cards, notes, Nat.max(Nat.max(nm, 1n+S.Msg.id(m)), 1n+S.Msg.thread(m)), nc, tm, xs, pz, Ms.old(p), gone}
         case EMsgState{+id, +s}:
           +p = msg_op(hot, old, id, OSt{s})
           St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p), gone}
@@ -793,19 +742,19 @@ def card_of(xs: List<&2, Card>, +id: Nat) -> Maybe<&2, Card>:
   find(~Card, ~Nat, ~Card.id, ~(a => b => Nat.is_eq(a, b)), xs, id)
 
 # queued_in's step: `q` first (most are delivered), then the names
-def queued_in.keep(q: Bool, +ns: List<&2, String>, +m: Msg, +rest: List<&2, Msg>) -> List<&2, Msg>:
+def queued_in.keep(q: Bool, +ns: List<&2, String>, +m: S.Msg, +rest: List<&2, S.Msg>) -> List<&2, S.Msg>:
   match q:
     case True{}:
-      Bool.pick(List<&2, Msg>, str_in(ns, Msg.to(m)), m <> rest, rest)
+      Bool.pick(List<&2, S.Msg>, str_in(ns, S.Msg.to(m)), m <> rest, rest)
     case False{}:
       rest
 
-def queued_in(xs: List<&2, MRec>, +ns: List<&2, String>) -> List<&2, Msg>:
+def queued_in(xs: List<&2, S.MRec>, +ns: List<&2, String>) -> List<&2, S.Msg>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
-      queued_in.keep(is_queued(MRec.st(r)), ns, MRec.msg(r), queued_in(t, ns))
+      queued_in.keep(is_queued(S.MRec.st(r)), ns, S.MRec.msg(r), queued_in(t, ns))
 
 def names_of.go(m: Maybe<&2, Agent>) -> List<&2, String>:
   match m:
@@ -819,39 +768,39 @@ def names_of(+st: St, +n: String) -> List<&2, String>:
   n <> names_of.go(get_agent(st, n))
 
 # messages waiting for delivery to `n` (under any of its names), oldest first
-def queued_for(+st: St, +n: String) -> List<&2, Msg>:
+def queued_for(+st: St, +n: String) -> List<&2, S.Msg>:
   queued_in(St.hot(st), names_of(st, n))
 
-def unanswered_in(xs: List<&2, MRec>, +ns: List<&2, String>) -> List<&2, Msg>:
+def unanswered_in(xs: List<&2, S.MRec>, +ns: List<&2, String>) -> List<&2, S.Msg>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
       +rest = unanswered_in(t, ns)
-      Bool.pick(List<&2, Msg>, str_in(ns, Msg.to(MRec.msg(r))) && MRec.owes(r), MRec.msg(r) <> rest, rest)
+      Bool.pick(List<&2, S.Msg>, str_in(ns, S.Msg.to(S.MRec.msg(r))) && MRec.owes(r), S.MRec.msg(r) <> rest, rest)
 
 # delivered messages to `n` that expect a reply it has not given
-def unanswered_for(+st: St, +n: String) -> List<&2, Msg>:
+def unanswered_for(+st: St, +n: String) -> List<&2, S.Msg>:
   unanswered_in(St.hot(st), names_of(st, n))
 
-def msg_of.go(m: Maybe<&2, MRec>) -> Maybe<&2, Msg>:
+def msg_of.go(m: Maybe<&2, S.MRec>) -> Maybe<&2, S.Msg>:
   match m:
     case None{}:
       None{}
     case Some{+r}:
-      Some{MRec.msg(r)}
+      Some{S.MRec.msg(r)}
 
-def msg_of(+st: St, +id: Nat) -> Maybe<&2, Msg>:
+def msg_of(+st: St, +id: Nat) -> Maybe<&2, S.Msg>:
   msg_of.go(rec_at(st, id))
 
-def state_of.go(m: Maybe<&2, MRec>) -> Maybe<&2, MSt>:
+def state_of.go(m: Maybe<&2, S.MRec>) -> Maybe<&2, S.MSt>:
   match m:
     case None{}:
       None{}
     case Some{+r}:
-      Some{MRec.st(r)}
+      Some{S.MRec.st(r)}
 
-def state_of(+st: St, +id: Nat) -> Maybe<&2, MSt>:
+def state_of(+st: St, +id: Nat) -> Maybe<&2, S.MSt>:
   state_of.go(rec_at(st, id))
 
 def ws_worktree(+ws: J.Json) -> Bool:
@@ -876,49 +825,6 @@ def init(+workspace: String) -> St:
   +brief = J.obj([J.kv("objective", J.str("")), J.kv("context", J.str("")), J.kv("constraints", J.JArr{Nil{}}),
     J.kv("done_when", J.JNull{}), J.kv("report_format", J.JNull{})])
   St{[new_agent(MAIN(), MAIN(), True{}, None{}, ws, brief, 0n)], [MAIN()], Nil{}, Nil{}, Nil{}, 1n, 1n, TM.empty(), XH.empty(), None{}, Nil{}, Nil{}}
-
-def Msg.auto(x: Msg) -> Bool:
-  match x:
-    case Msg{_, _, _, _, _, _, +auto, _, _, _, _, _, _}:
-      auto
-
-def Msg.text(x: Msg) -> String:
-  match x:
-    case Msg{_, _, _, _, _, _, _, +text, _, _, _, _, _}:
-      text
-
-def Msg.created(x: Msg) -> Nat:
-  match x:
-    case Msg{_, _, _, _, _, _, _, _, +created, _, _, _, _}:
-      created
-
-def Msg.plain(x: Msg) -> Bool:
-  match x:
-    case Msg{_, _, _, _, _, _, _, _, _, +plain, _, _, _}:
-      plain
-
-def Msg.queued(x: Msg) -> Bool:
-  match x:
-    case Msg{_, _, _, _, _, _, _, _, _, _, +queued, _, _}:
-      queued
-
-def Msg.via(x: Msg) -> Maybe<&2, String>:
-  match x:
-    case Msg{_, _, _, _, _, _, _, _, _, _, _, +via, _}:
-      via
-
-# his message's parts (msg-parts, bise_proto::parts' JSON, "" none): kept
-# opaque, written at its delivery (deliver.line)
-def Msg.parts(x: Msg) -> String:
-  match x:
-    case Msg{_, _, _, _, _, _, _, _, _, _, _, _, +parts}:
-      parts
-
-# the same message with parts `p` (law parts_never_change_text)
-def Msg.with_parts(x: Msg, +p: String) -> Msg:
-  match x:
-    case Msg{+i, +th, +f, +to, +r, +e, +a, +tx, +c, +pl, +q, +v, _}:
-      Msg{i, th, f, to, r, e, a, tx, c, pl, q, v, p}
 
 def Agent.is_main(x: Agent) -> Bool:
   match x:

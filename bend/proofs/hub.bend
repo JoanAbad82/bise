@@ -4,6 +4,7 @@
 import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/keyed.bend as HKL
@@ -129,13 +130,13 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u):
     PLC4.hc_split_apply(HX.d(o, cx4), ev, PLC4.hc_split_tr(HX.d(o, cx4), HX.d(o, cx), e4, u), Unit{}))
   +hq = PL3.hub_hot_qf(HX.d(o, cx5), n, PLC4.hc_hot_index(HX.d(o, cx5), sp5))
   # the messages at the end: those of cx5 with the queued ones rejected
-  +ef = Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.every(HX.d(o, g)), PL1.hub_rej(ids, m5),
-    Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.every(HX.d(o, tg)), HM.every(HX.d(o, g)),
-      Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.every(HX.d(o, wg)), HM.every(HX.d(o, tg)),
+  +ef = Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.every(HX.d(o, g)), PL1.hub_rej(ids, m5),
+    Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.every(HX.d(o, tg)), HM.every(HX.d(o, g)),
+      Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.every(HX.d(o, wg)), HM.every(HX.d(o, tg)),
         PL1.hub_msgs_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
         PL1.hub_msgs_wakes(o, life, tg, n)),
       PL2.hub_msgs_gone(o, HR.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
-    Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, g)), HM.every(HX.d(o, cx6)), PL1.hub_rej(ids, m5),
+    Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, g)), HM.every(HX.d(o, cx6)), PL1.hub_rej(ids, m5),
       PL2.hub_msgs_close_ids(o, HC.card_ids(HM.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
       PLC4.hc_every_reject(o, ids, cx5, sp5)))
   # the names at the end: those of cx5 (no agent changes after it)
@@ -151,8 +152,8 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u):
         PL2.hub_agents_close_ids(o, HC.card_ids(HM.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
         PL2.hub_agents_reject(o, ids, cx5))))
   PL2.hub_names_tr(HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL1.hub_rej(ids, m5), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n), n5, ef, en,
-    Equal.trans(List<&2, HM.Msg>, HM.queued_in(PL1.hub_rej(ids, m5), n5), HM.queued_in(PL1.hub_rej(HC.ids_of(HM.queued_in(m5, n5)), m5), n5), Nil{},
-      Equal.cong(List<&2, HM.Msg>, List<&2, HM.Msg>, x => HM.queued_in(PL1.hub_rej(HC.ids_of(x), m5), n5), HM.queued_in(HM.St.hot(HX.d(o, cx5)), n5), HM.queued_in(m5, n5), hq),
+    Equal.trans(List<&2, HS.Msg>, HM.queued_in(PL1.hub_rej(ids, m5), n5), HM.queued_in(PL1.hub_rej(HC.ids_of(HM.queued_in(m5, n5)), m5), n5), Nil{},
+      Equal.cong(List<&2, HS.Msg>, List<&2, HS.Msg>, x => HM.queued_in(PL1.hub_rej(HC.ids_of(x), m5), n5), HM.queued_in(HM.St.hot(HX.d(o, cx5)), n5), HM.queued_in(m5, n5), hq),
       PL1.hub_K(m5, n5, PL1.hub_fst(HI.Distinct(HI.ids(m5)), HI.Below(HI.ids(m5), HM.St.next_msg(HX.d(o, cx5))), PLC4.hc_unique(HX.d(o, cx5), sp5)))))
 
 def Laws.stop_leaves_no_card(o, cx, n, life, why, u):
@@ -323,7 +324,7 @@ def Laws.wake_steers_busy(a, text):
   {==}
 
 def Laws.busy_steers_now(m, rest, q):
-  %Equal.sym(Bool, HM.Msg.queued(m), False{}, q) : {Bool.pick(List<&2, HM.Msg>, _, HC.not_queued_mode(rest), m <> HC.not_queued_mode(rest)) == m <> HC.not_queued_mode(rest) : List<&2, HM.Msg>}
+  %Equal.sym(Bool, HS.Msg.queued(m), False{}, q) : {Bool.pick(List<&2, HS.Msg>, _, HC.not_queued_mode(rest), m <> HC.not_queued_mode(rest)) == m <> HC.not_queued_mode(rest) : List<&2, HS.Msg>}
   {==}
 
 def Laws.timer_reaches_busy(o, cx, a, p, q):
@@ -406,18 +407,25 @@ def Laws.user_queued_waits_for_turn_end(o, cx, name, q, m):
 def Laws.user_queued_said_at_idle(o, cx, name, q, m):
   {==}
 
+# split on a message's queued flag: its value and its equation
+def hub_bb.pick(q: Bool, +h: HS.Msg, +t: List<&2, HS.Msg>, +e: {HS.Msg.queued(h) == q : Bool},
+    ih: {Laws.any_queued(HC.not_queued_mode(t)) == False{} : Bool})
+    -> {Laws.any_queued(Bool.pick(List<&2, HS.Msg>, HS.Msg.queued(h), HC.not_queued_mode(t), h <> HC.not_queued_mode(t))) == False{} : Bool}:
+  match q:
+    case True{}:
+      %Equal.sym(Bool, HS.Msg.queued(h), True{}, e) : {Laws.any_queued(Bool.pick(List<&2, HS.Msg>, _, HC.not_queued_mode(t), h <> HC.not_queued_mode(t))) == False{} : Bool}
+      ih
+    case False{}:
+      %Equal.sym(Bool, HS.Msg.queued(h), False{}, e) : {Laws.any_queued(Bool.pick(List<&2, HS.Msg>, _, HC.not_queued_mode(t), h <> HC.not_queued_mode(t))) == False{} : Bool}
+      %Equal.sym(Bool, HS.Msg.queued(h), False{}, e) : {_ || Laws.any_queued(HC.not_queued_mode(t)) == False{} : Bool}
+      ih
+
 def Laws.busy_batch_has_no_queued(xs):
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      match h:
-        case HM.Msg{i, th, f, to, r, e, a, tx, c, p, q, v, pa}:
-          match q:
-            case True{}:
-              Laws.busy_batch_has_no_queued(t)
-            case False{}:
-              Laws.busy_batch_has_no_queued(t)
+      hub_bb.pick(HS.Msg.queued(h), h, t, {==}, Laws.busy_batch_has_no_queued(t))
 
 # ---- bise's cross-hub messages (desktop S2, hub/xhub.bend) ----
 
@@ -430,7 +438,7 @@ def Laws.xhub_forward_once(s, id, ob, e):
   {==}
 
 def Laws.xhub_forward_needs_his_message(m, id, e):
-  %Equal.sym(Bool, String.eq(HM.Msg.from(m), HM.USER()), False{}, e) : {Bool.pick(HXB.Fwd, Bool.and(_, String.eq(HM.Msg.to(m), HM.MAIN())), HXB.FwdOk{HM.Msg.text(m)}, HXB.FwdErr{String.append(HXB.mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")}) == HXB.FwdErr{String.append(HXB.mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")} : HXB.Fwd}
+  %Equal.sym(Bool, String.eq(HS.Msg.from(m), HM.USER()), False{}, e) : {Bool.pick(HXB.Fwd, Bool.and(_, String.eq(HS.Msg.to(m), HM.MAIN())), HXB.FwdOk{HS.Msg.text(m)}, HXB.FwdErr{String.append(HXB.mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")}) == HXB.FwdErr{String.append(HXB.mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")} : HXB.Fwd}
   {==}
 
 def Laws.xhub_outbox_settles_once(x, xid):
@@ -616,34 +624,34 @@ def hub_or_false_r(+x: Bool, -y: Bool, e: {Bool.or(x, y) == False{} : Bool}) -> 
       PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Bool, y, False{})
 
 # pause.bend's is_queued is model.bend's
-def hub_pq_false(+s: HM.MSt, e: {HM.is_queued(s) == False{} : Bool}) -> {HP.is_queued(s) == False{} : Bool}:
+def hub_pq_false(+s: HS.MSt, e: {HM.is_queued(s) == False{} : Bool}) -> {HP.is_queued(s) == False{} : Bool}:
   match s:
-    case HM.Queued{w}:
-      PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Bool, HP.is_queued(HM.Queued{w}), False{})
-    case HM.Delivered{}:
+    case HS.Queued{w}:
+      PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Bool, HP.is_queued(HS.Queued{w}), False{})
+    case HS.Delivered{}:
       {==}
-    case HM.Rejected{w}:
+    case HS.Rejected{w}:
       {==}
-    case HM.Cancelled{}:
+    case HS.Cancelled{}:
       {==}
 
 # unanswered_in over every message == over the hot ones
-def hub_ui_hot.pick(c: Bool, +r: HM.MRec, +t: List<&2, HM.MRec>, +ns: List<&2, String>, +e: {HM.MRec.is_hot(r) == c : Bool},
-    ih: {HM.unanswered_in(t, ns) == HM.unanswered_in(HM.hot_of(t), ns) : List<&2, HM.Msg>})
-    -> {HM.unanswered_in(r <> t, ns) == HM.unanswered_in(Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HM.Msg>}:
+def hub_ui_hot.pick(c: Bool, +r: HS.MRec, +t: List<&2, HS.MRec>, +ns: List<&2, String>, +e: {HM.MRec.is_hot(r) == c : Bool},
+    ih: {HM.unanswered_in(t, ns) == HM.unanswered_in(HM.hot_of(t), ns) : List<&2, HS.Msg>})
+    -> {HM.unanswered_in(r <> t, ns) == HM.unanswered_in(Bool.pick(List<&2, HS.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HS.Msg>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HM.unanswered_in(r <> t, ns) == HM.unanswered_in(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HM.Msg>}
-      Equal.cong(List<&2, HM.Msg>, List<&2, HM.Msg>,
-        x => Bool.pick(List<&2, HM.Msg>, Bool.and(HM.str_in(ns, HM.Msg.to(HM.MRec.msg(r))), HM.MRec.owes(r)), HM.MRec.msg(r) <> x, x),
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HM.unanswered_in(r <> t, ns) == HM.unanswered_in(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HS.Msg>}
+      Equal.cong(List<&2, HS.Msg>, List<&2, HS.Msg>,
+        x => Bool.pick(List<&2, HS.Msg>, Bool.and(HM.str_in(ns, HS.Msg.to(HS.MRec.msg(r))), HM.MRec.owes(r)), HS.MRec.msg(r) <> x, x),
         HM.unanswered_in(t, ns), HM.unanswered_in(HM.hot_of(t), ns), ih)
     case False{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HM.unanswered_in(r <> t, ns) == HM.unanswered_in(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HM.Msg>}
-      %Equal.sym(Bool, HM.MRec.owes(r), False{}, hub_or_false_r(HM.is_queued(HM.MRec.st(r)), HM.MRec.owes(r), e)) : {Bool.pick(List<&2, HM.Msg>, Bool.and(HM.str_in(ns, HM.Msg.to(HM.MRec.msg(r))), _), HM.MRec.msg(r) <> HM.unanswered_in(t, ns), HM.unanswered_in(t, ns)) == HM.unanswered_in(HM.hot_of(t), ns) : List<&2, HM.Msg>}
-      %Equal.sym(Bool, Bool.and(HM.str_in(ns, HM.Msg.to(HM.MRec.msg(r))), False{}), False{}, PL3.hub_and_false(HM.str_in(ns, HM.Msg.to(HM.MRec.msg(r))))) : {Bool.pick(List<&2, HM.Msg>, _, HM.MRec.msg(r) <> HM.unanswered_in(t, ns), HM.unanswered_in(t, ns)) == HM.unanswered_in(HM.hot_of(t), ns) : List<&2, HM.Msg>}
+      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HM.unanswered_in(r <> t, ns) == HM.unanswered_in(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HS.Msg>}
+      %Equal.sym(Bool, HM.MRec.owes(r), False{}, hub_or_false_r(HM.is_queued(HS.MRec.st(r)), HM.MRec.owes(r), e)) : {Bool.pick(List<&2, HS.Msg>, Bool.and(HM.str_in(ns, HS.Msg.to(HS.MRec.msg(r))), _), HS.MRec.msg(r) <> HM.unanswered_in(t, ns), HM.unanswered_in(t, ns)) == HM.unanswered_in(HM.hot_of(t), ns) : List<&2, HS.Msg>}
+      %Equal.sym(Bool, Bool.and(HM.str_in(ns, HS.Msg.to(HS.MRec.msg(r))), False{}), False{}, PL3.hub_and_false(HM.str_in(ns, HS.Msg.to(HS.MRec.msg(r))))) : {Bool.pick(List<&2, HS.Msg>, _, HS.MRec.msg(r) <> HM.unanswered_in(t, ns), HM.unanswered_in(t, ns)) == HM.unanswered_in(HM.hot_of(t), ns) : List<&2, HS.Msg>}
       ih
 
-def hub_ui_hot(+xs: List<&2, HM.MRec>, +ns: List<&2, String>) -> {HM.unanswered_in(xs, ns) == HM.unanswered_in(HM.hot_of(xs), ns) : List<&2, HM.Msg>}:
+def hub_ui_hot(+xs: List<&2, HS.MRec>, +ns: List<&2, String>) -> {HM.unanswered_in(xs, ns) == HM.unanswered_in(HM.hot_of(xs), ns) : List<&2, HS.Msg>}:
   match xs:
     case Nil{}:
       {==}
@@ -651,38 +659,38 @@ def hub_ui_hot(+xs: List<&2, HM.MRec>, +ns: List<&2, String>) -> {HM.unanswered_
       hub_ui_hot.pick(HM.MRec.is_hot(r), r, t, ns, {==}, hub_ui_hot(t, ns))
 
 # the pause's walks over every message == over the hot ones
-def hub_held_hot.pick(c: Bool, +r: HM.MRec, +t: List<&2, HM.MRec>, +e: {HM.MRec.is_hot(r) == c : Bool},
+def hub_held_hot.pick(c: Bool, +r: HS.MRec, +t: List<&2, HS.MRec>, +e: {HM.MRec.is_hot(r) == c : Bool},
     ih: {HP.held.go(t) == HP.held.go(HM.hot_of(t)) : Nat})
-    -> {HP.held.go(r <> t) == HP.held.go(Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t))) : Nat}:
+    -> {HP.held.go(r <> t) == HP.held.go(Bool.pick(List<&2, HS.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t))) : Nat}:
   match c:
     case True{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HP.held.go(r <> t) == HP.held.go(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) : Nat}
-      Equal.cong(Nat, Nat, x => Bool.pick(Nat, HP.is_queued(HM.MRec.st(r)), (1n + x : Nat), x), HP.held.go(t), HP.held.go(HM.hot_of(t)), ih)
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HP.held.go(r <> t) == HP.held.go(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) : Nat}
+      Equal.cong(Nat, Nat, x => Bool.pick(Nat, HP.is_queued(HS.MRec.st(r)), (1n + x : Nat), x), HP.held.go(t), HP.held.go(HM.hot_of(t)), ih)
     case False{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HP.held.go(r <> t) == HP.held.go(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) : Nat}
-      %Equal.sym(Bool, HP.is_queued(HM.MRec.st(r)), False{}, hub_pq_false(HM.MRec.st(r), PL3.hub_or_false_l(HM.is_queued(HM.MRec.st(r)), HM.MRec.owes(r), e))) : {Bool.pick(Nat, _, (1n + HP.held.go(t) : Nat), HP.held.go(t)) == HP.held.go(HM.hot_of(t)) : Nat}
+      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HP.held.go(r <> t) == HP.held.go(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) : Nat}
+      %Equal.sym(Bool, HP.is_queued(HS.MRec.st(r)), False{}, hub_pq_false(HS.MRec.st(r), PL3.hub_or_false_l(HM.is_queued(HS.MRec.st(r)), HM.MRec.owes(r), e))) : {Bool.pick(Nat, _, (1n + HP.held.go(t) : Nat), HP.held.go(t)) == HP.held.go(HM.hot_of(t)) : Nat}
       ih
 
-def hub_held_hot(+xs: List<&2, HM.MRec>) -> {HP.held.go(xs) == HP.held.go(HM.hot_of(xs)) : Nat}:
+def hub_held_hot(+xs: List<&2, HS.MRec>) -> {HP.held.go(xs) == HP.held.go(HM.hot_of(xs)) : Nat}:
   match xs:
     case Nil{}:
       {==}
     case Con{r, t}:
       hub_held_hot.pick(HM.MRec.is_hot(r), r, t, {==}, hub_held_hot(t))
 
-def hub_his_hot.pick(c: Bool, +r: HM.MRec, +t: List<&2, HM.MRec>, +e: {HM.MRec.is_hot(r) == c : Bool},
+def hub_his_hot.pick(c: Bool, +r: HS.MRec, +t: List<&2, HS.MRec>, +e: {HM.MRec.is_hot(r) == c : Bool},
     ih: {HP.his.go(t) == HP.his.go(HM.hot_of(t)) : Nat})
-    -> {HP.his.go(r <> t) == HP.his.go(Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t))) : Nat}:
+    -> {HP.his.go(r <> t) == HP.his.go(Bool.pick(List<&2, HS.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t))) : Nat}:
   match c:
     case True{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HP.his.go(r <> t) == HP.his.go(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) : Nat}
-      Equal.cong(Nat, Nat, x => Bool.pick(Nat, Bool.and(HP.is_queued(HM.MRec.st(r)), Bool.not(String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.HUB()))), (1n + x : Nat), x), HP.his.go(t), HP.his.go(HM.hot_of(t)), ih)
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HP.his.go(r <> t) == HP.his.go(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) : Nat}
+      Equal.cong(Nat, Nat, x => Bool.pick(Nat, Bool.and(HP.is_queued(HS.MRec.st(r)), Bool.not(String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.HUB()))), (1n + x : Nat), x), HP.his.go(t), HP.his.go(HM.hot_of(t)), ih)
     case False{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HP.his.go(r <> t) == HP.his.go(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) : Nat}
-      %Equal.sym(Bool, HP.is_queued(HM.MRec.st(r)), False{}, hub_pq_false(HM.MRec.st(r), PL3.hub_or_false_l(HM.is_queued(HM.MRec.st(r)), HM.MRec.owes(r), e))) : {Bool.pick(Nat, Bool.and(_, Bool.not(String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.HUB()))), (1n + HP.his.go(t) : Nat), HP.his.go(t)) == HP.his.go(HM.hot_of(t)) : Nat}
+      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HP.his.go(r <> t) == HP.his.go(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) : Nat}
+      %Equal.sym(Bool, HP.is_queued(HS.MRec.st(r)), False{}, hub_pq_false(HS.MRec.st(r), PL3.hub_or_false_l(HM.is_queued(HS.MRec.st(r)), HM.MRec.owes(r), e))) : {Bool.pick(Nat, Bool.and(_, Bool.not(String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.HUB()))), (1n + HP.his.go(t) : Nat), HP.his.go(t)) == HP.his.go(HM.hot_of(t)) : Nat}
       ih
 
-def hub_his_hot(+xs: List<&2, HM.MRec>) -> {HP.his.go(xs) == HP.his.go(HM.hot_of(xs)) : Nat}:
+def hub_his_hot(+xs: List<&2, HS.MRec>) -> {HP.his.go(xs) == HP.his.go(HM.hot_of(xs)) : Nat}:
   match xs:
     case Nil{}:
       {==}
@@ -690,34 +698,34 @@ def hub_his_hot(+xs: List<&2, HM.MRec>) -> {HP.his.go(xs) == HP.his.go(HM.hot_of
       hub_his_hot.pick(HM.MRec.is_hot(r), r, t, {==}, hub_his_hot(t))
 
 # woken.go, for every accumulator
-def hub_wk_hot.pick(c: Bool, +r: HM.MRec, +t: List<&2, HM.MRec>, +acc: List<&2, String>, +e: {HM.MRec.is_hot(r) == c : Bool},
-    ih1: {HP.woken.go(t, Bool.pick(List<&2, String>, Bool.and(HP.is_queued(HM.MRec.st(r)), Bool.not(HP.str_in(acc, HM.Msg.to(HM.MRec.msg(r))))), HM.Msg.to(HM.MRec.msg(r)) <> acc, acc))
-      == HP.woken.go(HM.hot_of(t), Bool.pick(List<&2, String>, Bool.and(HP.is_queued(HM.MRec.st(r)), Bool.not(HP.str_in(acc, HM.Msg.to(HM.MRec.msg(r))))), HM.Msg.to(HM.MRec.msg(r)) <> acc, acc)) : List<&2, String>},
+def hub_wk_hot.pick(c: Bool, +r: HS.MRec, +t: List<&2, HS.MRec>, +acc: List<&2, String>, +e: {HM.MRec.is_hot(r) == c : Bool},
+    ih1: {HP.woken.go(t, Bool.pick(List<&2, String>, Bool.and(HP.is_queued(HS.MRec.st(r)), Bool.not(HP.str_in(acc, HS.Msg.to(HS.MRec.msg(r))))), HS.Msg.to(HS.MRec.msg(r)) <> acc, acc))
+      == HP.woken.go(HM.hot_of(t), Bool.pick(List<&2, String>, Bool.and(HP.is_queued(HS.MRec.st(r)), Bool.not(HP.str_in(acc, HS.Msg.to(HS.MRec.msg(r))))), HS.Msg.to(HS.MRec.msg(r)) <> acc, acc)) : List<&2, String>},
     ih0: {HP.woken.go(t, acc) == HP.woken.go(HM.hot_of(t), acc) : List<&2, String>})
-    -> {HP.woken.go(r <> t, acc) == HP.woken.go(Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)), acc) : List<&2, String>}:
+    -> {HP.woken.go(r <> t, acc) == HP.woken.go(Bool.pick(List<&2, HS.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)), acc) : List<&2, String>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HP.woken.go(r <> t, acc) == HP.woken.go(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), acc) : List<&2, String>}
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HP.woken.go(r <> t, acc) == HP.woken.go(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), acc) : List<&2, String>}
       ih1
     case False{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HP.woken.go(r <> t, acc) == HP.woken.go(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), acc) : List<&2, String>}
-      %Equal.sym(Bool, HP.is_queued(HM.MRec.st(r)), False{}, hub_pq_false(HM.MRec.st(r), PL3.hub_or_false_l(HM.is_queued(HM.MRec.st(r)), HM.MRec.owes(r), e))) : {HP.woken.go(t, Bool.pick(List<&2, String>, Bool.and(_, Bool.not(HP.str_in(acc, HM.Msg.to(HM.MRec.msg(r))))), HM.Msg.to(HM.MRec.msg(r)) <> acc, acc)) == HP.woken.go(HM.hot_of(t), acc) : List<&2, String>}
+      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HP.woken.go(r <> t, acc) == HP.woken.go(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), acc) : List<&2, String>}
+      %Equal.sym(Bool, HP.is_queued(HS.MRec.st(r)), False{}, hub_pq_false(HS.MRec.st(r), PL3.hub_or_false_l(HM.is_queued(HS.MRec.st(r)), HM.MRec.owes(r), e))) : {HP.woken.go(t, Bool.pick(List<&2, String>, Bool.and(_, Bool.not(HP.str_in(acc, HS.Msg.to(HS.MRec.msg(r))))), HS.Msg.to(HS.MRec.msg(r)) <> acc, acc)) == HP.woken.go(HM.hot_of(t), acc) : List<&2, String>}
       ih0
 
-def hub_wk_hot(+xs: List<&2, HM.MRec>, +acc: List<&2, String>) -> {HP.woken.go(xs, acc) == HP.woken.go(HM.hot_of(xs), acc) : List<&2, String>}:
+def hub_wk_hot(+xs: List<&2, HS.MRec>, +acc: List<&2, String>) -> {HP.woken.go(xs, acc) == HP.woken.go(HM.hot_of(xs), acc) : List<&2, String>}:
   match xs:
     case Nil{}:
       {==}
     case Con{r, t}:
       hub_wk_hot.pick(HM.MRec.is_hot(r), r, t, acc, {==},
-        hub_wk_hot(t, Bool.pick(List<&2, String>, Bool.and(HP.is_queued(HM.MRec.st(r)), Bool.not(HP.str_in(acc, HM.Msg.to(HM.MRec.msg(r))))), HM.Msg.to(HM.MRec.msg(r)) <> acc, acc)),
+        hub_wk_hot(t, Bool.pick(List<&2, String>, Bool.and(HP.is_queued(HS.MRec.st(r)), Bool.not(HP.str_in(acc, HS.Msg.to(HS.MRec.msg(r))))), HS.Msg.to(HS.MRec.msg(r)) <> acc, acc)),
         hub_wk_hot(t, acc))
 
 def Laws.hot_queued_for(s, n, h):
   PL3.hub_hot_qf(s, n, PLC4.hc_hot_index(s, h))
 
 def Laws.hot_unanswered_for(s, n, h):
-  PL3.hub_via_hot(List<&2, HM.Msg>, x => HM.unanswered_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.every(s),
+  PL3.hub_via_hot(List<&2, HS.Msg>, x => HM.unanswered_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.every(s),
     hub_ui_hot(HM.St.hot(s), HM.names_of(s, n)), hub_ui_hot(HM.every(s), HM.names_of(s, n)), PLC4.hc_hot_index(s, h))
 
 def Laws.hot_held(s, h):

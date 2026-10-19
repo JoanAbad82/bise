@@ -21,6 +21,7 @@ import Base
 import ../vendor/json.bend as J
 
 import ./model.bend as M
+import ./gen/state.bend as S
 
 import ./cx.bend as X
 
@@ -56,20 +57,20 @@ def busy(+s: M.St, +rts: List<&2, X.Rt>) -> List<&2, String>:
   busy.go(M.St.order(s), rts)
 
 # the messages held: queued for an agent, not delivered yet
-def is_queued(s: M.MSt) -> Bool:
+def is_queued(s: S.MSt) -> Bool:
   match s:
-    case M.Queued{_}:
+    case S.Queued{_}:
       True{}
     case _:
       False{}
 
-def held.go(xs: List<&2, M.MRec>) -> Nat:
+def held.go(xs: List<&2, S.MRec>) -> Nat:
   match xs:
     case Nil{}:
       0n
     case Con{+r, +t}:
       +rest = held.go(t)
-      Bool.pick(Nat, is_queued(M.MRec.st(r)), (1n + rest : Nat), rest)
+      Bool.pick(Nat, is_queued(S.MRec.st(r)), (1n + rest : Nat), rest)
 
 def held(+s: M.St) -> Nat:
   held.go(M.St.hot(s))
@@ -84,25 +85,25 @@ def str_in(xs: List<&2, String>, +s: String) -> Bool:
     case Con{+h, +t}:
       LZ.or(String.eq(h, s), u => str_in(t, s))
 
-def woken.go(xs: List<&2, M.MRec>, +acc: List<&2, String>) -> List<&2, String>:
+def woken.go(xs: List<&2, S.MRec>, +acc: List<&2, String>) -> List<&2, String>:
   match xs:
     case Nil{}:
       acc
     case Con{+r, +t}:
-      +to = M.Msg.to(M.MRec.msg(r))
-      woken.go(t, Bool.pick(List<&2, String>, is_queued(M.MRec.st(r)) && Bool.not(str_in(acc, to)), to <> acc, acc))
+      +to = S.Msg.to(S.MRec.msg(r))
+      woken.go(t, Bool.pick(List<&2, String>, is_queued(S.MRec.st(r)) && Bool.not(str_in(acc, to)), to <> acc, acc))
 
 def woken(+s: M.St) -> Nat:
   List.length(&2, String, woken.go(M.St.hot(s), Nil{}))
 
 # the held messages that are not bise's own (its go-on notes)
-def his.go(xs: List<&2, M.MRec>) -> Nat:
+def his.go(xs: List<&2, S.MRec>) -> Nat:
   match xs:
     case Nil{}:
       0n
     case Con{+r, +t}:
       +rest = his.go(t)
-      Bool.pick(Nat, is_queued(M.MRec.st(r)) && Bool.not(String.eq(M.Msg.from(M.MRec.msg(r)), M.HUB())), (1n + rest : Nat), rest)
+      Bool.pick(Nat, is_queued(S.MRec.st(r)) && Bool.not(String.eq(S.Msg.from(S.MRec.msg(r)), M.HUB())), (1n + rest : Nat), rest)
 
 def his(+s: M.St) -> Nat:
   his.go(M.St.hot(s))

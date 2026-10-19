@@ -4,6 +4,7 @@
 import Base
 
 import ./model.bend as M
+import ./gen/state.bend as S
 
 import ./cx.bend as X
 
@@ -16,12 +17,12 @@ import ./timers.bend as TM
 import ./wakes.bend as WK
 
 # the message ids, in the order of the state
-def ids(xs: List<&2, M.MRec>) -> List<&2, Nat>:
+def ids(xs: List<&2, S.MRec>) -> List<&2, Nat>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
-      M.Msg.id(M.MRec.msg(r)) <> ids(t)
+      S.Msg.id(S.MRec.msg(r)) <> ids(t)
 
 # no id appears twice
 def Distinct(ns: List<&2, Nat>) -> Data:
@@ -63,7 +64,7 @@ def Kept(+s1: M.St, +s2: M.St) -> Data:
 # ---- the split of the messages (issue 21 steps 3-4; laws split_*) ----
 
 # every id of `xs` is above `n`
-def Above(xs: List<&2, M.MRec>, +n: Nat) -> Data:
+def Above(xs: List<&2, S.MRec>, +n: Nat) -> Data:
   match xs:
     case Nil{}:
       Unit
@@ -71,21 +72,21 @@ def Above(xs: List<&2, M.MRec>, +n: Nat) -> Data:
       X.Both<{Nat.is_gt(M.MRec.id(x), n) == True{} : Bool}, Above(t, n)>
 
 # ids ascending (each below every later one), descending
-def Asc(xs: List<&2, M.MRec>) -> Data:
+def Asc(xs: List<&2, S.MRec>) -> Data:
   match xs:
     case Nil{}:
       Unit
     case Con{+x, +t}:
       X.Both<Above(t, M.MRec.id(x)), Asc(t)>
 
-def Desc(xs: List<&2, M.MRec>) -> Data:
+def Desc(xs: List<&2, S.MRec>) -> Data:
   match xs:
     case Nil{}:
       Unit
     case Con{+x, +t}:
       X.Both<Below(ids(t), M.MRec.id(x)), Desc(t)>
 
-def AllCold(xs: List<&2, M.MRec>) -> Data:
+def AllCold(xs: List<&2, S.MRec>) -> Data:
   match xs:
     case Nil{}:
       Unit
@@ -93,7 +94,7 @@ def AllCold(xs: List<&2, M.MRec>) -> Data:
       X.Both<{M.MRec.is_hot(x) == False{} : Bool}, AllCold(t)>
 
 # no id of `hs` is one of `os`
-def Disjoint(hs: List<&2, M.MRec>, +os: List<&2, M.MRec>) -> Data:
+def Disjoint(hs: List<&2, S.MRec>, +os: List<&2, S.MRec>) -> Data:
   match hs:
     case Nil{}:
       Unit
@@ -102,7 +103,7 @@ def Disjoint(hs: List<&2, M.MRec>, +os: List<&2, M.MRec>) -> Data:
 
 # the two sides: hot ids ascending, old ids descending, every old one
 # cold, no id on both sides, every id below the next free one
-def Parts(+hs: List<&2, M.MRec>, +os: List<&2, M.MRec>, +nm: Nat) -> Data:
+def Parts(+hs: List<&2, S.MRec>, +os: List<&2, S.MRec>, +nm: Nat) -> Data:
   X.Both<Asc(hs), X.Both<Desc(os), X.Both<AllCold(os), X.Both<Disjoint(hs, os), X.Both<Below(ids(hs), nm), Below(ids(os), nm)>>>>>
 
 def Split(+s: M.St) -> Data:
@@ -113,32 +114,32 @@ def Split(+s: M.St) -> Data:
 # apply did them before the split (issue 21 steps 3-4): a new message at
 # the end, settled by a reply from its recipient (or the user); a state
 # or a settle on the record of its id.
-def settle1.if(ok: Bool, +msgs: List<&2, M.MRec>, +id: Nat) -> List<&2, M.MRec>:
+def settle1.if(ok: Bool, +msgs: List<&2, S.MRec>, +id: Nat) -> List<&2, S.MRec>:
   match ok:
     case True{}:
       M.map_msg(msgs, id, M.OSettle{})
     case False{}:
       msgs
 
-def settle1.go(orig: Maybe<&2, M.MRec>, +msgs: List<&2, M.MRec>, +id: Nat, +from: String) -> List<&2, M.MRec>:
+def settle1.go(orig: Maybe<&2, S.MRec>, +msgs: List<&2, S.MRec>, +id: Nat, +from: String) -> List<&2, S.MRec>:
   match orig:
     case None{}:
       msgs
     case Some{+o}:
-      settle1.if(String.eq(M.Msg.to(M.MRec.msg(o)), from) || String.eq(from, M.USER()), msgs, id)
+      settle1.if(String.eq(S.Msg.to(S.MRec.msg(o)), from) || String.eq(from, M.USER()), msgs, id)
 
-def settle1(r: Maybe<&2, Nat>, +msgs: List<&2, M.MRec>, +from: String) -> List<&2, M.MRec>:
+def settle1(r: Maybe<&2, Nat>, +msgs: List<&2, S.MRec>, +from: String) -> List<&2, S.MRec>:
   match r:
     case None{}:
       msgs
     case Some{+id}:
       settle1.go(M.rec_of(msgs, id), msgs, id, from)
 
-def sent1(+msgs: List<&2, M.MRec>, +m: M.Msg) -> List<&2, M.MRec>:
-  settle1(M.Msg.reply_to(m), M.snoc(M.MRec, msgs, M.MRec{m, M.Queued{"new"}, False{}}), M.Msg.from(m))
+def sent1(+msgs: List<&2, S.MRec>, +m: S.Msg) -> List<&2, S.MRec>:
+  settle1(S.Msg.reply_to(m), M.snoc(S.MRec, msgs, M.new_rec(m)), S.Msg.from(m))
 
 # every message after an event, on one list
-def apply1(+msgs: List<&2, M.MRec>, e: M.Ev) -> List<&2, M.MRec>:
+def apply1(+msgs: List<&2, S.MRec>, e: M.Ev) -> List<&2, S.MRec>:
   match e:
     case M.EMsgSent{+m}:
       sent1(msgs, m)
@@ -169,7 +170,7 @@ def stuck.agent(m: Maybe<&2, M.Agent>, +s: M.St, +n: String) -> Bool:
     case None{}:
       False{}
     case Some{+a}:
-      Bool.and(H.is_active(M.Agent.life(a)), Bool.and(Bool.not(List.is_empty(&2, M.Msg, M.queued_for(s, n))), Bool.not(P.is_paused(s))))
+      Bool.and(H.is_active(M.Agent.life(a)), Bool.and(Bool.not(List.is_empty(&2, S.Msg, M.queued_for(s, n))), Bool.not(P.is_paused(s))))
 
 # law L4: agent `n` is idle, active, and has messages queued (a message
 # stuck: nothing would ever deliver it). A paused project holds them on

@@ -4,54 +4,55 @@
 # head of the old side, never every message.
 import Base
 import ./model.bend as M
+import ./gen/state.bend as S
 import ./lazy.bend as LZ
 
 # `m` answers the message `id`: it names it, from its recipient or the user
-def is_reply(+m: M.Msg, +id: Nat, +replier: String) -> Bool:
-  M.maybe_nat_is(M.Msg.reply_to(m), id) && (String.eq(M.Msg.from(m), replier) || String.eq(M.Msg.from(m), M.USER()))
+def is_reply(+m: S.Msg, +id: Nat, +replier: String) -> Bool:
+  M.maybe_nat_is(S.Msg.reply_to(m), id) && (String.eq(S.Msg.from(m), replier) || String.eq(S.Msg.from(m), M.USER()))
 
 # the first reply in `xs` (ids ascending: the earliest of them)
-def reply_of(xs: List<&2, M.MRec>, +id: Nat, +replier: String) -> Maybe<&2, M.Msg>:
+def reply_of(xs: List<&2, S.MRec>, +id: Nat, +replier: String) -> Maybe<&2, S.Msg>:
   match xs:
     case Nil{}:
       None{}
     case Con{+r, +t}:
-      +m = M.MRec.msg(r)
-      LZ.pick(Maybe<&2, M.Msg>, is_reply(m, id, replier), u => Some{m}, u => reply_of(t, id, replier))
+      +m = S.MRec.msg(r)
+      LZ.pick(Maybe<&2, S.Msg>, is_reply(m, id, replier), u => Some{m}, u => reply_of(t, id, replier))
 
-def reply_last.pick(later: Maybe<&2, M.Msg>, here: Bool, +m: M.Msg) -> Maybe<&2, M.Msg>:
+def reply_last.pick(later: Maybe<&2, S.Msg>, here: Bool, +m: S.Msg) -> Maybe<&2, S.Msg>:
   match later:
     case Some{+x}:
       Some{x}
     case None{}:
-      Bool.pick(Maybe<&2, M.Msg>, here, Some{m}, None{})
+      Bool.pick(Maybe<&2, S.Msg>, here, Some{m}, None{})
 
 # the last reply in `xs` (ids descending: the earliest of them). A reply
 # comes after its message, so the walk stops at the first id not above
 # it (`after`: the head's id is above `id`)
-def reply_last(xs: List<&2, M.MRec>, after: Bool, +id: Nat, +replier: String) -> Maybe<&2, M.Msg>:
+def reply_last(xs: List<&2, S.MRec>, after: Bool, +id: Nat, +replier: String) -> Maybe<&2, S.Msg>:
   match xs after:
     case Nil{} _:
       None{}
     case Con{_, _} False{}:
       None{}
     case Con{+r, +t} True{}:
-      +m = M.MRec.msg(r)
+      +m = S.MRec.msg(r)
       reply_last.pick(reply_last(t, M.id_above(t, id), id, replier), is_reply(m, id, replier), m)
 
 # the earlier of two replies
-def reply_min(a: Maybe<&2, M.Msg>, b: Maybe<&2, M.Msg>) -> Maybe<&2, M.Msg>:
+def reply_min(a: Maybe<&2, S.Msg>, b: Maybe<&2, S.Msg>) -> Maybe<&2, S.Msg>:
   match a b:
     case None{} _:
       b
     case Some{+x} None{}:
       Some{x}
     case Some{+x} Some{+y}:
-      Bool.pick(Maybe<&2, M.Msg>, Nat.is_lt(M.Msg.id(y), M.Msg.id(x)), Some{y}, Some{x})
+      Bool.pick(Maybe<&2, S.Msg>, Nat.is_lt(S.Msg.id(y), S.Msg.id(x)), Some{y}, Some{x})
 
 # the first reply to the message `id` among every message (sb wait, the
 # ask's pause): the earliest of the hot side's and of the old side's
-def reply_at(+st: M.St, +id: Nat, +replier: String) -> Maybe<&2, M.Msg>:
+def reply_at(+st: M.St, +id: Nat, +replier: String) -> Maybe<&2, S.Msg>:
   reply_min(reply_of(M.St.hot(st), id, replier), reply_last(M.St.old(st), M.id_above(M.St.old(st), id), id, replier))
 
 # ---- the boot replay (main.bend replay_many) ----
@@ -64,7 +65,7 @@ def reply_at(+st: M.St, +id: Nat, +replier: String) -> Maybe<&2, M.Msg>:
 def replay_fresh(+st: M.St, e: M.Ev) -> Bool:
   match e:
     case M.EMsgSent{+m}:
-      Nat.is_ge(M.Msg.id(m), M.St.next_msg(st))
+      Nat.is_ge(S.Msg.id(m), M.St.next_msg(st))
     case _:
       True{}
 

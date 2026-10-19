@@ -55,10 +55,10 @@ def MsgsMoved.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EMsgsMoved{K.get_s(i, "from"), K.get_s(i, "to")}}
 
 def MsgSent.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EMsgSent{C.msg_of(K.get_j(i, "msg"))}}
+  Some{M.EMsgSent{SC.Msg.journal_of(K.get_j(i, "msg"))}}
 
 def MsgState.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EMsgState{K.get_n(i, "id"), C.mst_of(i)}}
+  Some{M.EMsgState{K.get_n(i, "id"), SC.MSt.journal_of(i)}}
 
 def Settled.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.ESettled{K.get_n(i, "id")}}
@@ -582,9 +582,9 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.EMsgsMoved{+from, +to}:
       [J.kv("type", J.JStr{"msgs_moved"}), J.kv("from", J.JStr{from}), J.kv("to", J.JStr{to})]
     case M.EMsgSent{+msg}:
-      [J.kv("type", J.JStr{"message_sent"}), J.kv("msg", C.msg_json(msg))]
+      [J.kv("type", J.JStr{"message_sent"}), J.kv("msg", SC.Msg.journal_json(msg))]
     case M.EMsgState{+id, +state}:
-      K.cat([[J.kv("type", J.JStr{"message_state"}), J.kv("id", J.JNum{id})], C.mst_kvs(state)])
+      K.cat([[J.kv("type", J.JStr{"message_state"}), J.kv("id", J.JNum{id})], SC.MSt.journal_kvs(state)])
     case M.ESettled{+id}:
       [J.kv("type", J.JStr{"message_settled"}), J.kv("id", J.JNum{id})]
     case M.ECardOpened{+card}:

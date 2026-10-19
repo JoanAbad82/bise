@@ -7,6 +7,7 @@
 import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/codec.bend as HCD
@@ -42,7 +43,7 @@ law agent_no_parts_no_line:
   for +plain: Bool
   for +queued: Bool
   for +via: Maybe<&2, String>
-  {HC.msg_parts(o, cx, agent, HM.Msg{id, thread, from, to, reply_to, expect, auto, text, ms, plain, queued, via, ""}) == cx : HX.Cx<o>}
+  {HC.msg_parts(o, cx, agent, HM.new_msg(id, thread, from, to, reply_to, expect, auto, text, ms, plain, queued, via, "")) == cx : HX.Cx<o>}
 
 law agent_no_parts_no_sent_line:
   for -o: HM.St
@@ -60,7 +61,7 @@ law agent_no_parts_no_sent_line:
   for +plain: Bool
   for +queued: Bool
   for +via: Maybe<&2, String>
-  {HC.sent_parts(o, cx, agent, HM.Msg{id, thread, from, to, reply_to, expect, auto, text, ms, plain, queued, via, ""}) == cx : HX.Cx<o>}
+  {HC.sent_parts(o, cx, agent, HM.new_msg(id, thread, from, to, reply_to, expect, auto, text, ms, plain, queued, via, "")) == cx : HX.Cx<o>}
 
 # LAW: a brief without parts has none (its message is the one it always
 # was); with them, the task's head goes in front as a text part.

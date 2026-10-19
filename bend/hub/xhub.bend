@@ -17,6 +17,7 @@
 import Base
 
 import ./model.bend as M
+import ./gen/state.bend as S
 
 import ./xhub-model.bend as XH
 
@@ -40,13 +41,13 @@ type Fwd is Data:
 def mid(+n: Nat) -> String:
   String.append("m_", Nat.show(n))
 
-def his.go(m: Maybe<&2, M.Msg>, +id: Nat) -> Fwd:
+def his.go(m: Maybe<&2, S.Msg>, +id: Nat) -> Fwd:
   match m:
     case None{}:
       FwdErr{String.append("no message ", mid(id))}
     case Some{+msg}:
-      Bool.pick(Fwd, String.eq(M.Msg.from(msg), M.USER()) && String.eq(M.Msg.to(msg), M.MAIN()),
-        FwdOk{M.Msg.text(msg)},
+      Bool.pick(Fwd, String.eq(S.Msg.from(msg), M.USER()) && String.eq(S.Msg.to(msg), M.MAIN()),
+        FwdOk{S.Msg.text(msg)},
         FwdErr{String.append(mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")})
 
 def forward.done(m: Maybe<&2, XH.Out>, +s: M.St, +id: Nat) -> Fwd:

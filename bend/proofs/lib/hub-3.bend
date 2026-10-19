@@ -3,6 +3,7 @@
 import Base
 import ../../vendor/json.bend as J
 import ../../hub/model.bend as HM
+import ../../hub/gen/state.bend as HS
 import ../../hub/cx.bend as HX
 import ../../hub/core.bend as HC
 import ../../hub/inv.bend as HI
@@ -715,21 +716,21 @@ def hub_and_false(+x: Bool) -> {Bool.and(x, False{}) == False{} : Bool}:
       {==}
 
 # queued_in over every message == over the hot ones
-def hub_qi_hot.pick(c: Bool, +r: HM.MRec, +t: List<&2, HM.MRec>, +ns: List<&2, String>, +e: {HM.MRec.is_hot(r) == c : Bool},
-    ih: {HM.queued_in(t, ns) == HM.queued_in(HM.hot_of(t), ns) : List<&2, HM.Msg>})
-    -> {HM.queued_in(r <> t, ns) == HM.queued_in(Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HM.Msg>}:
+def hub_qi_hot.pick(c: Bool, +r: HS.MRec, +t: List<&2, HS.MRec>, +ns: List<&2, String>, +e: {HM.MRec.is_hot(r) == c : Bool},
+    ih: {HM.queued_in(t, ns) == HM.queued_in(HM.hot_of(t), ns) : List<&2, HS.Msg>})
+    -> {HM.queued_in(r <> t, ns) == HM.queued_in(Bool.pick(List<&2, HS.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HS.Msg>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HM.queued_in(r <> t, ns) == HM.queued_in(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HM.Msg>}
-      Equal.cong(List<&2, HM.Msg>, List<&2, HM.Msg>,
-        x => HM.queued_in.keep(HM.is_queued(HM.MRec.st(r)), ns, HM.MRec.msg(r), x),
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HM.queued_in(r <> t, ns) == HM.queued_in(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HS.Msg>}
+      Equal.cong(List<&2, HS.Msg>, List<&2, HS.Msg>,
+        x => HM.queued_in.keep(HM.is_queued(HS.MRec.st(r)), ns, HS.MRec.msg(r), x),
         HM.queued_in(t, ns), HM.queued_in(HM.hot_of(t), ns), ih)
     case False{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HM.queued_in(r <> t, ns) == HM.queued_in(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HM.Msg>}
-      %Equal.sym(Bool, HM.is_queued(HM.MRec.st(r)), False{}, hub_or_false_l(HM.is_queued(HM.MRec.st(r)), HM.MRec.owes(r), e)) : {HM.queued_in.keep(_, ns, HM.MRec.msg(r), HM.queued_in(t, ns)) == HM.queued_in(HM.hot_of(t), ns) : List<&2, HM.Msg>}
+      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HM.queued_in(r <> t, ns) == HM.queued_in(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HS.Msg>}
+      %Equal.sym(Bool, HM.is_queued(HS.MRec.st(r)), False{}, hub_or_false_l(HM.is_queued(HS.MRec.st(r)), HM.MRec.owes(r), e)) : {HM.queued_in.keep(_, ns, HS.MRec.msg(r), HM.queued_in(t, ns)) == HM.queued_in(HM.hot_of(t), ns) : List<&2, HS.Msg>}
       ih
 
-def hub_qi_hot(+xs: List<&2, HM.MRec>, +ns: List<&2, String>) -> {HM.queued_in(xs, ns) == HM.queued_in(HM.hot_of(xs), ns) : List<&2, HM.Msg>}:
+def hub_qi_hot(+xs: List<&2, HS.MRec>, +ns: List<&2, String>) -> {HM.queued_in(xs, ns) == HM.queued_in(HM.hot_of(xs), ns) : List<&2, HS.Msg>}:
   match xs:
     case Nil{}:
       {==}
@@ -737,19 +738,19 @@ def hub_qi_hot(+xs: List<&2, HM.MRec>, +ns: List<&2, String>) -> {HM.queued_in(x
       hub_qi_hot.pick(HM.MRec.is_hot(r), r, t, ns, {==}, hub_qi_hot(t, ns))
 
 # the hot part of the hot part is the hot part
-def hub_hot_idem.pick(c: Bool, +r: HM.MRec, +t: List<&2, HM.MRec>, +e: {HM.MRec.is_hot(r) == c : Bool},
-    ih: {HM.hot_of(HM.hot_of(t)) == HM.hot_of(t) : List<&2, HM.MRec>})
-    -> {HM.hot_of(Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t))) == Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)) : List<&2, HM.MRec>}:
+def hub_hot_idem.pick(c: Bool, +r: HS.MRec, +t: List<&2, HS.MRec>, +e: {HM.MRec.is_hot(r) == c : Bool},
+    ih: {HM.hot_of(HM.hot_of(t)) == HM.hot_of(t) : List<&2, HS.MRec>})
+    -> {HM.hot_of(Bool.pick(List<&2, HS.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t))) == Bool.pick(List<&2, HS.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)) : List<&2, HS.MRec>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HM.hot_of(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) == Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)) : List<&2, HM.MRec>}
-      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(HM.hot_of(t)), HM.hot_of(HM.hot_of(t))) == r <> HM.hot_of(t) : List<&2, HM.MRec>}
-      Equal.cong(List<&2, HM.MRec>, List<&2, HM.MRec>, x => r <> x, HM.hot_of(HM.hot_of(t)), HM.hot_of(t), ih)
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HM.hot_of(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) == Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)) : List<&2, HS.MRec>}
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(HM.hot_of(t)), HM.hot_of(HM.hot_of(t))) == r <> HM.hot_of(t) : List<&2, HS.MRec>}
+      Equal.cong(List<&2, HS.MRec>, List<&2, HS.MRec>, x => r <> x, HM.hot_of(HM.hot_of(t)), HM.hot_of(t), ih)
     case False{}:
-      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HM.hot_of(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) == Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)) : List<&2, HM.MRec>}
+      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HM.hot_of(Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) == Bool.pick(List<&2, HS.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)) : List<&2, HS.MRec>}
       ih
 
-def hub_hot_idem(+xs: List<&2, HM.MRec>) -> {HM.hot_of(HM.hot_of(xs)) == HM.hot_of(xs) : List<&2, HM.MRec>}:
+def hub_hot_idem(+xs: List<&2, HS.MRec>) -> {HM.hot_of(HM.hot_of(xs)) == HM.hot_of(xs) : List<&2, HS.MRec>}:
   match xs:
     case Nil{}:
       {==}
@@ -758,28 +759,28 @@ def hub_hot_idem(+xs: List<&2, HM.MRec>) -> {HM.hot_of(HM.hot_of(xs)) == HM.hot_
 
 # a walk that reads the same over a list and its hot part reads the same
 # over two lists with one hot part
-def hub_via_hot(-A: Type, -f: List<&2, HM.MRec> -> A, -a: List<&2, HM.MRec>, -b: List<&2, HM.MRec>,
-    wa: {f(a) == f(HM.hot_of(a)) : A}, wb: {f(b) == f(HM.hot_of(b)) : A}, h: {HM.hot_of(a) == HM.hot_of(b) : List<&2, HM.MRec>})
+def hub_via_hot(-A: Type, -f: List<&2, HS.MRec> -> A, -a: List<&2, HS.MRec>, -b: List<&2, HS.MRec>,
+    wa: {f(a) == f(HM.hot_of(a)) : A}, wb: {f(b) == f(HM.hot_of(b)) : A}, h: {HM.hot_of(a) == HM.hot_of(b) : List<&2, HS.MRec>})
     -> {f(a) == f(b) : A}:
   Equal.trans(A, f(a), f(HM.hot_of(a)), f(b), wa,
-    Equal.trans(A, f(HM.hot_of(a)), f(HM.hot_of(b)), f(b), Equal.cong(List<&2, HM.MRec>, A, f, HM.hot_of(a), HM.hot_of(b), h),
+    Equal.trans(A, f(HM.hot_of(a)), f(HM.hot_of(b)), f(b), Equal.cong(List<&2, HS.MRec>, A, f, HM.hot_of(a), HM.hot_of(b), h),
       Equal.sym(A, f(b), f(HM.hot_of(b)), wb)))
 
 # a right index moves along an equality of states
-def hub_hot_tr(-a: HM.St, -b: HM.St, e: {a == b : HM.St}, k: {HM.hot_of(HM.St.hot(b)) == HM.hot_of(HM.every(b)) : List<&2, HM.MRec>})
-    -> {HM.hot_of(HM.St.hot(a)) == HM.hot_of(HM.every(a)) : List<&2, HM.MRec>}:
-  %Equal.sym(HM.St, a, b, e) : {HM.hot_of(HM.St.hot(_)) == HM.hot_of(HM.every(_)) : List<&2, HM.MRec>}
+def hub_hot_tr(-a: HM.St, -b: HM.St, e: {a == b : HM.St}, k: {HM.hot_of(HM.St.hot(b)) == HM.hot_of(HM.every(b)) : List<&2, HS.MRec>})
+    -> {HM.hot_of(HM.St.hot(a)) == HM.hot_of(HM.every(a)) : List<&2, HS.MRec>}:
+  %Equal.sym(HM.St, a, b, e) : {HM.hot_of(HM.St.hot(_)) == HM.hot_of(HM.every(_)) : List<&2, HS.MRec>}
   k
 
 # a lifecycle event keeps a right index right (it touches no message)
-def hub_hot_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HM.MRec>})
-    -> {HM.hot_of(HM.St.hot(HM.apply(s, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.every(HM.apply(s, HM.ELifecycle{n, l, r}))) : List<&2, HM.MRec>}:
+def hub_hot_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>})
+    -> {HM.hot_of(HM.St.hot(HM.apply(s, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.every(HM.apply(s, HM.ELifecycle{n, l, r}))) : List<&2, HS.MRec>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       k
 
 # with a right index, queued_for reads every message
-def hub_hot_qf(+s: HM.St, +n: String, h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HM.MRec>})
-    -> {HM.queued_for(s, n) == HM.queued_in(HM.every(s), HM.names_of(s, n)) : List<&2, HM.Msg>}:
-  hub_via_hot(List<&2, HM.Msg>, x => HM.queued_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.every(s),
+def hub_hot_qf(+s: HM.St, +n: String, h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>})
+    -> {HM.queued_for(s, n) == HM.queued_in(HM.every(s), HM.names_of(s, n)) : List<&2, HS.Msg>}:
+  hub_via_hot(List<&2, HS.Msg>, x => HM.queued_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.every(s),
     hub_qi_hot(HM.St.hot(s), HM.names_of(s, n)), hub_qi_hot(HM.every(s), HM.names_of(s, n)), h)

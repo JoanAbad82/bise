@@ -8,6 +8,7 @@ import Base
 import ../vendor/json.bend as J
 
 import ./model.bend as M
+import ./gen/state.bend as S
 
 import ./picks.bend as PK
 
@@ -352,7 +353,7 @@ def journal(fx: List<&2, Fx>) -> List<&2, M.Ev>:
 def FreshEv(+s: M.St, e: M.Ev) -> Data:
   match e:
     case M.EMsgSent{+m}:
-      {M.Msg.id(m) == M.St.next_msg(s) : Nat}
+      {S.Msg.id(m) == M.St.next_msg(s) : Nat}
     case M.ECardOpened{+c}:
       {M.Card.id(c) == M.St.next_card(s) : Nat}
     case M.ETaskCreated{+name, _, _, _, _}:
@@ -373,7 +374,7 @@ def Fresh(evs: List<&2, M.Ev>, +s: M.St) -> Data:
 def QuietEv(e: M.Ev) -> Data:
   match e:
     case M.EMsgSent{+m}:
-      {Bool.and(M.Msg.auto(m), M.Msg.expect(m)) == False{} : Bool}
+      {Bool.and(S.Msg.auto(m), S.Msg.expect(m)) == False{} : Bool}
     case _:
       Unit
 
@@ -453,9 +454,9 @@ def out_q(+fx: List<&2, Fx>, q: Quiet(journal(fx)), -x: J.Json) -> Quiet(journal
 
 # a message is delivered only while it is queued, and a message goes back
 # to the queue only as a steer_leftover (law delivered_once)
-def queued_at.go(m: Maybe<&2, M.MSt>) -> Bool:
+def queued_at.go(m: Maybe<&2, S.MSt>) -> Bool:
   match m:
-    case Some{M.Queued{_}}:
+    case Some{S.Queued{_}}:
       True{}
     case _:
       False{}
@@ -463,11 +464,11 @@ def queued_at.go(m: Maybe<&2, M.MSt>) -> Bool:
 def queued_at(+s: M.St, +id: Nat) -> Bool:
   queued_at.go(M.state_of(s, id))
 
-def DelivSt(+s: M.St, +id: Nat, x: M.MSt) -> Data:
+def DelivSt(+s: M.St, +id: Nat, x: S.MSt) -> Data:
   match x:
-    case M.Delivered{}:
+    case S.Delivered{}:
       {queued_at(s, id) == True{} : Bool}
-    case M.Queued{+r}:
+    case S.Queued{+r}:
       {String.eq(r, "steer_leftover") == True{} : Bool}
     case _:
       Unit

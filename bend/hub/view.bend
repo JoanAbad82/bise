@@ -9,6 +9,8 @@ import ../vendor/json.bend as J
 import ./gen/view.bend as V
 
 import ./model.bend as M
+import ./gen/state.bend as S
+import ./gen/state-codec.bend as SC
 
 import ./codec.bend as C
 
@@ -28,12 +30,12 @@ def jdecl(d: Maybe<&2, M.Decl>, +note: String) -> J.Json:
       J.obj([J.kv("status", J.JStr{C.decl_str(x)}), J.kv("note", J.JStr{note})])
 
 # the recipient of a message (none: unknown message)
-def waits_to(m: Maybe<&2, M.Msg>) -> Maybe<&2, String>:
+def waits_to(m: Maybe<&2, S.Msg>) -> Maybe<&2, String>:
   match m:
     case None{}:
       None{}
     case Some{+x}:
-      Some{M.Msg.to(x)}
+      Some{S.Msg.to(x)}
 
 # who `n` waits on: the recipient of the message its first `sb wait` (or
 # `sb ask`) waits for the reply to; none when it waits on no one
@@ -81,32 +83,32 @@ def agents_json(xs: List<&2, M.Agent>, +rts: List<&2, X.Rt>, +ws: List<&2, X.Wai
 
 # a message, its state, and what the steps' predicates (model.bend) say
 # of it: queued, or delivered owing a reply (the hub's Waiting reads them)
-def rec_json(+r: M.MRec) -> J.Json:
-  +st = M.MRec.st(r)
-  V.msg(C.msg_json(M.MRec.msg(r)), J.obj(C.mst_kvs(st)), M.MRec.settled(r), M.is_queued(st), M.MRec.owes(r))
+def rec_json(+r: S.MRec) -> J.Json:
+  +st = S.MRec.st(r)
+  V.msg(SC.Msg.journal_json(S.MRec.msg(r)), SC.MSt.journal_json(st), S.MRec.settled(r), M.is_queued(st), M.MRec.owes(r))
 
 # a match, not Bool.pick: pick would encode every message, kept or not
-def recs_json.keep(keep: Bool, +r: M.MRec, +rest: List<&2, J.Json>) -> List<&2, J.Json>:
+def recs_json.keep(keep: Bool, +r: S.MRec, +rest: List<&2, J.Json>) -> List<&2, J.Json>:
   match keep:
     case True{}:
       rec_json(r) <> rest
     case False{}:
       rest
 
-def recs_json(xs: List<&2, M.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2, J.Json>:
+def recs_json(xs: List<&2, S.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
-      recs_json.keep(all || M.nat_in(ids, M.Msg.id(M.MRec.msg(r))), r, recs_json(t, all, ids))
+      recs_json.keep(all || M.nat_in(ids, S.Msg.id(S.MRec.msg(r))), r, recs_json(t, all, ids))
 
 # every id of `ids` is a message of `xs`
-def ids_in(ids: List<&2, Nat>, +xs: List<&2, M.MRec>) -> Bool:
+def ids_in(ids: List<&2, Nat>, +xs: List<&2, S.MRec>) -> Bool:
   match ids:
     case Nil{}:
       True{}
     case Con{+i, +t}:
-      LZ.and(Maybe.is_some(&2, M.MRec, M.rec_of(xs, i)), u => ids_in(t, xs))
+      LZ.and(Maybe.is_some(&2, S.MRec, M.rec_of(xs, i)), u => ids_in(t, xs))
 
 # the lowest id of `ids` (0 when none)
 def ids_lo.go(ids: List<&2, Nat>, +acc: Nat) -> Nat:
@@ -124,7 +126,7 @@ def ids_lo(ids: List<&2, Nat>) -> Nat:
       ids_lo.go(t, i)
 
 # the head of `xs` has an id below `lo`
-def id_below(xs: List<&2, M.MRec>, +lo: Nat) -> Bool:
+def id_below(xs: List<&2, S.MRec>, +lo: Nat) -> Bool:
   match xs:
     case Nil{}:
       False{}
@@ -133,7 +135,7 @@ def id_below(xs: List<&2, M.MRec>, +lo: Nat) -> Bool:
 
 # the cold messages of `ids`, newest first: St.old is newest first, so the
 # walk stops at the first id below the lowest one asked (`below`)
-def old_of(xs: List<&2, M.MRec>, below: Bool, +ids: List<&2, Nat>, +lo: Nat) -> List<&2, M.MRec>:
+def old_of(xs: List<&2, S.MRec>, below: Bool, +ids: List<&2, Nat>, +lo: Nat) -> List<&2, S.MRec>:
   match xs below:
     case Nil{} _:
       Nil{}
@@ -141,33 +143,33 @@ def old_of(xs: List<&2, M.MRec>, below: Bool, +ids: List<&2, Nat>, +lo: Nat) -> 
       Nil{}
     case Con{+r, +t} False{}:
       +rest = old_of(t, id_below(t, lo), ids, lo)
-      Bool.pick(List<&2, M.MRec>, M.nat_in(ids, M.MRec.id(r)), r <> rest, rest)
+      Bool.pick(List<&2, S.MRec>, M.nat_in(ids, M.MRec.id(r)), r <> rest, rest)
 
 # where the view finds the step's messages (issue 21): the hot ones when
 # they are all there (a message sent and still queued, or owing a reply);
 # else the hot ones with the cold ones of `ids` (a message the step just
 # turned cold), in send order; all of them (view_all): M.every
-def view_recs.some(here: Bool, +s: M.St, +ids: List<&2, Nat>) -> List<&2, M.MRec>:
+def view_recs.some(here: Bool, +s: M.St, +ids: List<&2, Nat>) -> List<&2, S.MRec>:
   match here:
     case True{}:
       M.St.hot(s)
     case False{}:
       +lo = ids_lo(ids)
-      List.reverse(&2, M.MRec, M.ins_all(M.St.hot(s), old_of(M.St.old(s), id_below(M.St.old(s), lo), ids, lo)))
+      List.reverse(&2, S.MRec, M.ins_all(M.St.hot(s), old_of(M.St.old(s), id_below(M.St.old(s), lo), ids, lo)))
 
-def view_recs.go(every: Bool, +s: M.St, +ids: List<&2, Nat>) -> List<&2, M.MRec>:
+def view_recs.go(every: Bool, +s: M.St, +ids: List<&2, Nat>) -> List<&2, S.MRec>:
   match every:
     case True{}:
       M.every(s)
     case False{}:
       view_recs.some(ids_in(ids, M.St.hot(s)), s, ids)
 
-def view_recs(+s: M.St, +all: Bool, +ids: List<&2, Nat>) -> List<&2, M.MRec>:
+def view_recs(+s: M.St, +all: Bool, +ids: List<&2, Nat>) -> List<&2, S.MRec>:
   view_recs.go(all, s, ids)
 
 # the messages of the view: no walk of every message when the step
 # touched none (an idle tick)
-def msgs_json(walk: Bool, +xs: List<&2, M.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2, J.Json>:
+def msgs_json(walk: Bool, +xs: List<&2, S.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2, J.Json>:
   match walk:
     case True{}:
       recs_json(xs, all, ids)
@@ -192,7 +194,7 @@ def opt_list(m: Maybe<&2, Nat>) -> List<&2, Nat>:
 def ev_ids(e: M.Ev) -> List<&2, Nat>:
   match e:
     case M.EMsgSent{+m}:
-      M.Msg.id(m) <> opt_list(M.Msg.reply_to(m))
+      S.Msg.id(m) <> opt_list(S.Msg.reply_to(m))
     case M.EMsgState{+id, _}:
       [id]
     case M.ESettled{+id}:
@@ -209,15 +211,15 @@ def touched(evs: List<&2, M.Ev>) -> List<&2, Nat>:
 
 # name-free: msgs_moved names no id; its rows are the hot ones to `to`
 # after the step (a few more rows than moved, never fewer)
-def to_ids(xs: List<&2, M.MRec>, +n: String) -> List<&2, Nat>:
+def to_ids(xs: List<&2, S.MRec>, +n: String) -> List<&2, Nat>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
       +rest = to_ids(t, n)
-      Bool.pick(List<&2, Nat>, String.eq(M.Msg.to(M.MRec.msg(r)), n), M.MRec.id(r) <> rest, rest)
+      Bool.pick(List<&2, Nat>, String.eq(S.Msg.to(S.MRec.msg(r)), n), M.MRec.id(r) <> rest, rest)
 
-def moved_ids(evs: List<&2, M.Ev>, +hot: List<&2, M.MRec>) -> List<&2, Nat>:
+def moved_ids(evs: List<&2, M.Ev>, +hot: List<&2, S.MRec>) -> List<&2, Nat>:
   match evs:
     case Nil{}:
       Nil{}

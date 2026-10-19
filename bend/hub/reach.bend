@@ -21,18 +21,19 @@
 import Base
 
 import ./model.bend as M
+import ./gen/state.bend as S
 import ./text.bend as T
 import ./wakes.bend as WK
 import ./lazy.bend as LZ
 
 # a message from bise in `xs` (a wake not delivered yet: law
 # wake_never_stacked)
-def from_bise(xs: List<&2, M.Msg>) -> Bool:
+def from_bise(xs: List<&2, S.Msg>) -> Bool:
   match xs:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      LZ.or(String.eq(M.Msg.from(h), M.HUB()), u => from_bise(t))
+      LZ.or(String.eq(S.Msg.from(h), M.HUB()), u => from_bise(t))
 
 def agent_of.go(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, M.Agent>:
   match m:

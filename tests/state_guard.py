@@ -36,8 +36,6 @@ DIRS = ["bend/hub", "bend/laws", "bend/proofs"]
 MIGRATING = {
     # Card + Ans
     "Card", "Ans",
-    # Msg + MRec
-    "Msg", "MRec",
     # Agent
     "Agent",
     # St

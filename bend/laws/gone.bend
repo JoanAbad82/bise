@@ -4,6 +4,7 @@
 import Base
 import ../hub/gone.bend as G
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 
@@ -117,7 +118,7 @@ law late_answer_sent:
 law late_answer_once:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +m: HM.Msg
+  for +m: HS.Msg
   for +id: Nat
   {HC.answer.late.sent(o, (cx, HC.SOk{m}), id) == HC.emit(o, cx, HM.ECardLate{id}, Unit{}, Unit{}, Unit{}) : HX.Cx<o>}
 

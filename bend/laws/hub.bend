@@ -5,6 +5,7 @@
 import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/inv.bend as HI
@@ -207,12 +208,12 @@ law resumed_line_resumes:
 law pause_keeps_order:
   for +s: HM.St
   for +at: Nat
-  {HM.every(HM.apply(s, HM.EPaused{at})) == HM.every(s) : List<&2, HM.MRec>}
+  {HM.every(HM.apply(s, HM.EPaused{at})) == HM.every(s) : List<&2, HS.MRec>}
 
 law resume_keeps_order:
   for +s: HM.St
   for +at: Nat
-  {HM.every(HM.apply(s, HM.EResumed{at})) == HM.every(s) : List<&2, HM.MRec>}
+  {HM.every(HM.apply(s, HM.EResumed{at})) == HM.every(s) : List<&2, HS.MRec>}
 
 # ---- the watches of `sb wake` (event-wake, hub/wakes.bend) ----
 # Their lines (wake_set, wake_end) are events like the others: the replay
@@ -282,10 +283,10 @@ law wake_steers_busy:
 # LAW: a busy agent's pump steers every queued message that is not queued
 # mode (a wake, a timer's fire, his message, an agent's): in order, now.
 law busy_steers_now:
-  for +m: HM.Msg
-  for +rest: List<&2, HM.Msg>
-  for q: {HM.Msg.queued(m) == False{} : Bool}
-  {HC.not_queued_mode(m <> rest) == m <> HC.not_queued_mode(rest) : List<&2, HM.Msg>}
+  for +m: HS.Msg
+  for +rest: List<&2, HS.Msg>
+  for q: {HS.Msg.queued(m) == False{} : Bool}
+  {HC.not_queued_mode(m <> rest) == m <> HC.not_queued_mode(rest) : List<&2, HS.Msg>}
 
 # LAW: a timer reaches an active agent that is busy (before: idle only).
 law timer_reaches_busy:
@@ -468,7 +469,7 @@ law stop_leaves_no_queue:
   for +life: HM.Life
   for +why: String
   for u: HI.Split(HX.d(o, cx))
-  {HM.queued_in(HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n)) == Nil{} : List<&2, HM.Msg>}
+  {HM.queued_in(HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n)) == Nil{} : List<&2, HS.Msg>}
 
 # ---- queued user input (the window's "send queued", bise desktop) ----
 # The user's `input {queued: true}` is a queued-mode message (Msg.queued),
@@ -486,12 +487,12 @@ law user_queued_never_answers_a_card:
   for +parts: String
   {HC.user_says(o, cx, to, text, True{}, parts) == HC.says.card(o, None{}, cx, to, text, True{}, parts) : HX.Cx<o>}
 
-def any_queued(xs: List<&2, HM.Msg>) -> Bool:
+def any_queued(xs: List<&2, HS.Msg>) -> Bool:
   match xs:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      HM.Msg.queued(h) || any_queued(t)
+      HS.Msg.queued(h) || any_queued(t)
 
 # LAW: what a busy agent is handed (steered) holds no queued-mode message:
 # a queued input waits for the turn's end. So a plain input sent while
@@ -502,12 +503,12 @@ law user_queued_waits_for_turn_end:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +name: String
-  for +q: List<&2, HM.Msg>
+  for +q: List<&2, HS.Msg>
   for +m: Bool
   {HC.pump.run(o, HM.RBusy{}, cx, name, q, m) == HC.pump.batch(o, HC.not_queued_mode(q), cx, name, True{}, m) : HX.Cx<o>}
 
 law busy_batch_has_no_queued:
-  for +xs: List<&2, HM.Msg>
+  for +xs: List<&2, HS.Msg>
   {any_queued(HC.not_queued_mode(xs)) == False{} : Bool}
 
 # LAW: at idle, everything queued for the agent goes in one say batch, in
@@ -516,7 +517,7 @@ law user_queued_said_at_idle:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +name: String
-  for +q: List<&2, HM.Msg>
+  for +q: List<&2, HS.Msg>
   for +m: Bool
   {HC.pump.run(o, HM.RIdle{}, cx, name, q, m) == HC.pump.batch(o, q, cx, name, False{}, m) : HX.Cx<o>}
 
@@ -599,9 +600,9 @@ law xhub_forward_once:
 # from the user is refused, whatever it says (bise's own question goes by
 # `sb project ask`, from @bise, with no authority).
 law xhub_forward_needs_his_message:
-  for +m: HM.Msg
+  for +m: HS.Msg
   for +id: Nat
-  for e: {String.eq(HM.Msg.from(m), HM.USER()) == False{} : Bool}
+  for e: {String.eq(HS.Msg.from(m), HM.USER()) == False{} : Bool}
   {HXB.his.go(Some{m}, id) == HXB.FwdErr{String.append(HXB.mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")} : HXB.Fwd}
 
 # LAW: bise's own question needs words: a blank one is refused, any other
@@ -915,29 +916,29 @@ law cold_is_inert:
   for +e: HM.Ev
   for u: HI.Split(s)
   for k: HX.FreshEv(s, e)
-  {HM.every(HM.apply(s, e)) == HI.apply1(HM.every(s), e) : List<&2, HM.MRec>}
+  {HM.every(HM.apply(s, e)) == HI.apply1(HM.every(s), e) : List<&2, HS.MRec>}
 
 # LAW (name-free, architect m_31494): a take of `n`, an old name of a live
 # agent `h`, moves its queued messages to `n` to `h` (msgs_moved): queued
 # still, same id, now to `h`...
 law take_moves_live_queued:
-  for +r: HM.MRec
+  for +r: HS.MRec
   for +n: String
   for +h: String
-  for q: {HM.is_queued(HM.MRec.st(r)) == True{} : Bool}
-  for e: {String.eq(HM.Msg.to(HM.MRec.msg(r)), n) == True{} : Bool}
-  HX.Both<{HM.moved([r], n, h) == [HM.MRec.to(r, h)] : List<&2, HM.MRec>}, HX.Both<{HM.MRec.id(HM.MRec.to(r, h)) == HM.MRec.id(r) : Nat},
-    HX.Both<{HM.is_queued(HM.MRec.st(HM.MRec.to(r, h))) == True{} : Bool}, {HM.Msg.to(HM.MRec.msg(HM.MRec.to(r, h))) == h : String}>>>
+  for q: {HM.is_queued(HS.MRec.st(r)) == True{} : Bool}
+  for e: {String.eq(HS.Msg.to(HS.MRec.msg(r)), n) == True{} : Bool}
+  HX.Both<{HM.moved([r], n, h) == [HM.MRec.to(r, h)] : List<&2, HS.MRec>}, HX.Both<{HM.MRec.id(HM.MRec.to(r, h)) == HM.MRec.id(r) : Nat},
+    HX.Both<{HM.is_queued(HS.MRec.st(HM.MRec.to(r, h))) == True{} : Bool}, {HS.Msg.to(HS.MRec.msg(HM.MRec.to(r, h))) == h : String}>>>
 
 # ...and the replies owed to `n`: still owed, same id, now by `h`...
 law take_moves_live_owed:
-  for +r: HM.MRec
+  for +r: HS.MRec
   for +n: String
   for +h: String
   for o: {HM.MRec.owes(r) == True{} : Bool}
-  for e: {String.eq(HM.Msg.to(HM.MRec.msg(r)), n) == True{} : Bool}
-  HX.Both<{HM.moved([r], n, h) == [HM.MRec.to(r, h)] : List<&2, HM.MRec>}, HX.Both<{HM.MRec.id(HM.MRec.to(r, h)) == HM.MRec.id(r) : Nat},
-    HX.Both<{HM.MRec.owes(HM.MRec.to(r, h)) == True{} : Bool}, {HM.Msg.to(HM.MRec.msg(HM.MRec.to(r, h))) == h : String}>>>
+  for e: {String.eq(HS.Msg.to(HS.MRec.msg(r)), n) == True{} : Bool}
+  HX.Both<{HM.moved([r], n, h) == [HM.MRec.to(r, h)] : List<&2, HS.MRec>}, HX.Both<{HM.MRec.id(HM.MRec.to(r, h)) == HM.MRec.id(r) : Nat},
+    HX.Both<{HM.MRec.owes(HM.MRec.to(r, h)) == True{} : Bool}, {HS.Msg.to(HS.MRec.msg(HM.MRec.to(r, h))) == h : String}>>>
 
 # ...and msgs_moved replays to the same hot side, on every message too.
 law msgs_moved_replays:
@@ -945,8 +946,8 @@ law msgs_moved_replays:
   for +n: String
   for +h: String
   for u: HI.Split(s)
-  HX.Both<{HM.St.hot(HM.apply(s, HM.EMsgsMoved{n, h})) == HM.moved(HM.St.hot(s), n, h) : List<&2, HM.MRec>},
-    {HM.every(HM.apply(s, HM.EMsgsMoved{n, h})) == HM.moved(HM.every(s), n, h) : List<&2, HM.MRec>}>
+  HX.Both<{HM.St.hot(HM.apply(s, HM.EMsgsMoved{n, h})) == HM.moved(HM.St.hot(s), n, h) : List<&2, HS.MRec>},
+    {HM.every(HM.apply(s, HM.EMsgsMoved{n, h})) == HM.moved(HM.every(s), n, h) : List<&2, HS.MRec>}>
 
 # LAW: on a split state, each walk over the hot side reads what it
 # would read over every message: the cold ones are inert. The queues...
@@ -954,14 +955,14 @@ law hot_queued_for:
   for +s: HM.St
   for +n: String
   for h: HI.Split(s)
-  {HM.queued_for(s, n) == HM.queued_in(HM.every(s), HM.names_of(s, n)) : List<&2, HM.Msg>}
+  {HM.queued_for(s, n) == HM.queued_in(HM.every(s), HM.names_of(s, n)) : List<&2, HS.Msg>}
 
 # ...the replies owed...
 law hot_unanswered_for:
   for +s: HM.St
   for +n: String
   for h: HI.Split(s)
-  {HM.unanswered_for(s, n) == HM.unanswered_in(HM.every(s), HM.names_of(s, n)) : List<&2, HM.Msg>}
+  {HM.unanswered_for(s, n) == HM.unanswered_in(HM.every(s), HM.names_of(s, n)) : List<&2, HS.Msg>}
 
 # ...and the pause's counts: the messages held, the agents a resume
 # wakes, the held messages that are not bise's own.

@@ -7,6 +7,7 @@
 import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/wakes.bend as HWK
@@ -159,9 +160,9 @@ law ask_once:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +agent: String
-  for +orig: HM.Msg
+  for +orig: HS.Msg
   for +w: HWK.Watch
-  for e: {HWK.reply_for(HWK.Wakes.live(HC.wks(o, cx)), agent, HM.Msg.id(orig)) == Some{w} : Maybe<&2, HWK.Watch>}
+  for e: {HWK.reply_for(HWK.Wakes.live(HC.wks(o, cx)), agent, HS.Msg.id(orig)) == Some{w} : Maybe<&2, HWK.Watch>}
   {HC.reply_pause.orig(o, Some{orig}, cx, agent) == cx : HX.Cx<o>}
 
 # LAW: a reply ends exactly the reply watches it answers, in its step...
@@ -182,7 +183,7 @@ law ask_reply_ends_quiet:
   for +from: String
   for +to: String
   for +r: Maybe<&2, Nat>
-  {HM.every(HX.d(o, HC.reply_answered(o, cx, from, to, r))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}
+  {HM.every(HX.d(o, HC.reply_answered(o, cx, from, to, r))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}
 
 # LAW: the asker moved on (done, failed): its reply watches end, all of
 # them...
@@ -198,7 +199,7 @@ law ask_done_quiet:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +agent: String
-  {HM.every(HX.d(o, HC.replies_end(o, cx, agent))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}
+  {HM.every(HX.d(o, HC.replies_end(o, cx, agent))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}
 
 # LAW: the asked agent gone, a reply watch ends and its active agent hears
 # it once, in the same step (ended, it is never an orphan again).

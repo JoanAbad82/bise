@@ -84,13 +84,13 @@ def journal_msgs_moved_bare():
   {==}
 
 law journal_message_sent_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"message_sent"})])) == Some{M.EMsgSent{C.msg_of(J.JNull{})}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"message_sent"})])) == Some{M.EMsgSent{SC.Msg.journal_of(J.JNull{})}} : Maybe<&2, M.Ev>}
 
 def journal_message_sent_bare():
   {==}
 
 law journal_message_state_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"message_state"})])) == Some{M.EMsgState{0n, C.mst_of(J.obj([J.kv("type", J.JStr{"message_state"})]))}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"message_state"})])) == Some{M.EMsgState{0n, SC.MSt.journal_of(J.obj([J.kv("type", J.JStr{"message_state"})]))}} : Maybe<&2, M.Ev>}
 
 def journal_message_state_bare():
   {==}
@@ -408,27 +408,27 @@ def journal_msgs_moved_round(from, to):
   {==}
 
 law journal_message_sent_round:
-  for msg: M.Msg
+  for msg: S.Msg
   {GJ.of(GJ.json(M.EMsgSent{msg})) == Some{M.EMsgSent{msg}} : Maybe<&2, M.Ev>}
 
 def journal_message_sent_round(msg):
-  %C.msg_round(msg) : {GJ.of(GJ.json(M.EMsgSent{msg})) == Some{M.EMsgSent{_}} : Maybe<&2, M.Ev>}
+  %SC.Msg.journal_round(msg) : {GJ.of(GJ.json(M.EMsgSent{msg})) == Some{M.EMsgSent{_}} : Maybe<&2, M.Ev>}
   {==}
 
 law journal_message_state_round:
   for id: Nat
-  for state: M.MSt
+  for state: S.MSt
   {GJ.of(GJ.json(M.EMsgState{id, state})) == Some{M.EMsgState{id, state}} : Maybe<&2, M.Ev>}
 
 def journal_message_state_round(id, state):
   match state:
-    case M.Queued{state_r}:
+    case S.Queued{state_r}:
       {==}
-    case M.Delivered{}:
+    case S.Delivered{}:
       {==}
-    case M.Rejected{state_e}:
+    case S.Rejected{state_e}:
       {==}
-    case M.Cancelled{}:
+    case S.Cancelled{}:
       {==}
 
 law journal_message_settled_round:

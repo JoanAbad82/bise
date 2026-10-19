@@ -28,8 +28,8 @@ pub const DECL: Codec = Codec {
     ty: "Maybe<&2, M.Decl>",
     cases: &["None{}", "Some{M.DWorking{}}", "Some{M.DDone{}}", "Some{M.DBlocked{}}"],
 };
-pub const MST: Codec = Codec { module: "C", name: "mst", ty: "M.MSt", cases: &["M.Queued{$r}", "M.Delivered{}", "M.Rejected{$e}", "M.Cancelled{}"] };
-pub const MSG: Codec = Codec { module: "C", name: "msg", ty: "M.Msg", cases: &[] };
+pub const MST: Codec = Codec { module: "SC", name: "MSt.journal", ty: "S.MSt", cases: &["S.Queued{$r}", "S.Delivered{}", "S.Rejected{$e}", "S.Cancelled{}"] };
+pub const MSG: Codec = Codec { module: "SC", name: "Msg.journal", ty: "S.Msg", cases: &[] };
 pub const CARD: Codec = Codec { module: "C", name: "card", ty: "M.Card", cases: &[] };
 pub const TIMER: Codec = Codec { module: "C", name: "timer", ty: "TM.Timer", cases: &[] };
 pub const OUT: Codec = Codec { module: "C", name: "out", ty: "XH.Out", cases: &[] };

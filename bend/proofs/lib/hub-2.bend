@@ -3,6 +3,7 @@
 import Base
 import ../../vendor/json.bend as J
 import ../../hub/model.bend as HM
+import ../../hub/gen/state.bend as HS
 import ../../hub/cx.bend as HX
 import ../../hub/core.bend as HC
 import ../../hub/inv.bend as HI
@@ -25,7 +26,7 @@ def hub_cards_wakes(-o: HM.St, +life: HM.Life, +cx: HX.Cx<o>, +n: String)
       PL1.hub_cards_wakes_each(o, HWK.ids_of(HWK.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
 
 def hub_msgs_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
-    -> {HM.every(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}:
+    -> {HM.every(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}:
   match g:
     case False{}:
       {==}
@@ -57,19 +58,19 @@ def hub_d_feed(-o: HM.St, +cx: HX.Cx<o>, +a: String, +rec: J.Json) -> {HX.d(o, H
 
 # closing cards keeps the messages
 def hub_msgs_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
-    -> {HM.every(HX.d(o, HC.close_ids(o, ids, cx, res))) == HM.every(HX.d(o, cx)) : List<&2, HM.MRec>}:
+    -> {HM.every(HX.d(o, HC.close_ids(o, ids, cx, res))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, rest}:
       +cx2 = HC.emit(o, cx, HM.ECardClosed{id, res, HM.no_ans()}, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
-      Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.every(HX.d(o, cx3)), HM.every(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.every(HX.d(o, cx3)), HM.every(HX.d(o, cx)),
         hub_msgs_close_ids(o, rest, cx3, res),
-        Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, cx3)), HM.every(HX.d(o, cx2)), HM.every(HX.d(o, cx)),
+        Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, cx3)), HM.every(HX.d(o, cx2)), HM.every(HX.d(o, cx)),
           PL1.hub_msgs_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
-          Equal.trans(List<&2, HM.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()})), HM.every(HX.d(o, cx)),
-            Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()}),
+          Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()})), HM.every(HX.d(o, cx)),
+            Equal.cong(HM.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()}),
               PL1.hub_d_emit(o, cx, HM.ECardClosed{id, res, HM.no_ans()}, Unit{}, Unit{}, Unit{})),
             PL1.hub_msgs_closed(HX.d(o, cx), id, res))))
 
@@ -98,7 +99,7 @@ def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: St
             Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
             hub_agents_closed(HX.d(o, cx), id, res))))
 
-def hub_agents_state(s: HM.St, +id: Nat, +x: HM.MSt) -> {HM.St.agents(HM.apply(s, HM.EMsgState{id, x})) == HM.St.agents(s) : List<&2, HM.Agent>}:
+def hub_agents_state(s: HM.St, +id: Nat, +x: HS.MSt) -> {HM.St.agents(HM.apply(s, HM.EMsgState{id, x})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
@@ -109,19 +110,19 @@ def hub_agents_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
     case Nil{}:
       {==}
     case Con{id, t}:
-      +ev = {HM.EMsgState{id, HM.Rejected{"recipient_unavailable"}} : HM.Ev}
+      +ev = {HM.EMsgState{id, HS.Rejected{"recipient_unavailable"}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.reject_ids(o, t, cx2))), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
         hub_agents_reject(o, t, cx2),
         Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
           Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
-          hub_agents_state(HX.d(o, cx), id, HM.Rejected{"recipient_unavailable"})))
+          hub_agents_state(HX.d(o, cx), id, HS.Rejected{"recipient_unavailable"})))
 
-def hub_names_tr(-a: List<&2, HM.MRec>, -b: List<&2, HM.MRec>, -na: List<&2, String>, -nb: List<&2, String>,
-    e: {a == b : List<&2, HM.MRec>}, en: {na == nb : List<&2, String>},
-    k: {HM.queued_in(b, nb) == Nil{} : List<&2, HM.Msg>}) -> {HM.queued_in(a, na) == Nil{} : List<&2, HM.Msg>}:
-  %Equal.sym(List<&2, HM.MRec>, a, b, e) : {HM.queued_in(_, na) == Nil{} : List<&2, HM.Msg>}
-  %Equal.sym(List<&2, String>, na, nb, en) : {HM.queued_in(b, _) == Nil{} : List<&2, HM.Msg>}
+def hub_names_tr(-a: List<&2, HS.MRec>, -b: List<&2, HS.MRec>, -na: List<&2, String>, -nb: List<&2, String>,
+    e: {a == b : List<&2, HS.MRec>}, en: {na == nb : List<&2, String>},
+    k: {HM.queued_in(b, nb) == Nil{} : List<&2, HS.Msg>}) -> {HM.queued_in(a, na) == Nil{} : List<&2, HS.Msg>}:
+  %Equal.sym(List<&2, HS.MRec>, a, b, e) : {HM.queued_in(_, na) == Nil{} : List<&2, HS.Msg>}
+  %Equal.sym(List<&2, String>, na, nb, en) : {HM.queued_in(b, _) == Nil{} : List<&2, HS.Msg>}
   k
 
 # the cards after the closes of stop_task
@@ -211,7 +212,7 @@ def hub_cards_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> 
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
-def hub_cards_state(s: HM.St, +id: Nat, +x: HM.MSt) -> {HM.St.cards(HM.apply(s, HM.EMsgState{id, x})) == HM.St.cards(s) : List<&2, HM.Card>}:
+def hub_cards_state(s: HM.St, +id: Nat, +x: HS.MSt) -> {HM.St.cards(HM.apply(s, HM.EMsgState{id, x})) == HM.St.cards(s) : List<&2, HM.Card>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
@@ -223,13 +224,13 @@ def hub_cards_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
     case Nil{}:
       {==}
     case Con{id, t}:
-      +ev = {HM.EMsgState{id, HM.Rejected{"recipient_unavailable"}} : HM.Ev}
+      +ev = {HM.EMsgState{id, HS.Rejected{"recipient_unavailable"}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.reject_ids(o, t, cx2))), HM.St.cards(HX.d(o, cx2)), HM.St.cards(HX.d(o, cx)),
         hub_cards_reject(o, t, cx2),
         Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, cx2)), HM.St.cards(HM.apply(HX.d(o, cx), ev)), HM.St.cards(HX.d(o, cx)),
           Equal.cong(HM.St, List<&2, HM.Card>, s => HM.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
-          hub_cards_state(HX.d(o, cx), id, HM.Rejected{"recipient_unavailable"})))
+          hub_cards_state(HX.d(o, cx), id, HS.Rejected{"recipient_unavailable"})))
 
 # closing cards drops them, one by one
 def hub_cards_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
