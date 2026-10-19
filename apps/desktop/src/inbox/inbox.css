@@ -113,6 +113,8 @@
 .inbox-block .strip-title { align-items: center; min-width: 0; white-space: nowrap; }
 .inbox-block .strip-title .b-act { font-size: var(--t-12); color: var(--c-text-3); }
 .inbox-block .strip-title .b-act:hover { color: var(--c-text-2); }
+/* a project's block: '· 2 in other projects' after the count, dim, a link to the inbox screen (designer m_32874) */
+.inbox-block .strip-title .strip-others .b-act:hover { color: var(--c-text-3); text-decoration: underline; }
 /* folded (no item open): the head is a tight row (28), the box --s-1 above and below (designer's 8) */
 .inbox-block:not([data-open]) { padding: var(--s-1) var(--s-2); gap: 0; }
 .inbox-block:not([data-open]) .strip-title { height: var(--h-row-tight); padding-bottom: 0; }

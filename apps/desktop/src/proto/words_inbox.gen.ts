@@ -114,6 +114,8 @@ export const inbox = {
   title_done: (a: { agent: string | number }): string => String(a.agent) + " is done",
   /** the desktop block's count, items of several projects */
   block_head_projects: (a: { n: string | number; projects: string | number }): string => String(a.n) + " waiting · " + String(a.projects) + " projects",
+  /** the desktop block's head in a project's view: what waits in the other projects (a link to /inbox) */
+  block_head_others: (a: { n: string | number }): string => String(a.n) + " in other projects",
   /** the box's last row: more items under it */
   more_row: (a: { n: string | number; first: string | number }): string => "+ " + String(a.n) + " more · " + String(a.first),
   /** a key's words: open the item (the box's opener, the block's, the screen's ⏎) */

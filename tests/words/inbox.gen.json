@@ -111,6 +111,13 @@
     "one": null,
     "text": "↗ {title} · {kind} · v{v}"
   },
+  "inbox.block_head_others": {
+    "args": [
+      "n"
+    ],
+    "one": null,
+    "text": "{n} in other projects"
+  },
   "inbox.block_head_projects": {
     "args": [
       "n",

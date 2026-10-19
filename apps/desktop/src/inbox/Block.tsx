@@ -1,6 +1,8 @@
 // The inbox block (b2, the user's card #476 'b + the native notification'; designer's mocks on page
 // inbox-native v2): ONE inbox, every project's open items, as the TUI's, mounted once by the shell
-// right above the composer under every screen (amb-win's b1: ThreadScreen, BottomBlock). Folded it is
+// right above the composer under every screen (amb-win's b1: ThreadScreen, BottomBlock); in a
+// project's view only that project's items, on bise's view and the inbox screen every project's
+// (scope.ts, his inbox-scope ask; an explicit open of another project's item widens it). Folded it is
 // 'inbox · 3 waiting  ⌃1–3 open', a line per item up to 3 (fewer in a short window), then '+ N more ·
 // ? who · words' (the TUI's box, card_draw.rs); ⌃n, a click, ⌘I (openInbox) or a notification
 // click (openInbox({project, card})) opens that item IN PLACE (the block grows, nothing floats over
@@ -12,7 +14,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
-import { Dot, Kbd, Row } from '@/ds';
+import { Act, Dot, Kbd, Row } from '@/ds';
 import { actedKeys, useActed, useInboxItems, useProjects, useRefusedList, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
 import { shownName } from '@/agents/model';
 import { inbox } from '@/proto/words_inbox.gen';
@@ -34,6 +36,8 @@ import { answerTip } from '@/app/tipwords';
 import './inbox.css';
 import { CardId } from './CardId';
 import { aboutOf, openAct } from './about';
+import { inboxScope, inScope, othersWaiting } from './scope';
+import { useRouter } from '@/app/router';
 
 /** What the composer under the block does with his words while an item is open. */
 export interface Answering {
@@ -346,10 +350,20 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   const [wide, setWide] = useState(false);
   // the inbox's one view, from the store (machine/cards.ts inboxView): each item with its refusal
   const all = useInboxItems();
-  const real = useMemo(() => (only === undefined || wide ? all : all.filter(only)), [all, only, wide]);
-  const notify = useNotifyRow(real.length);
   const home = rows.find((r) => r.home)?.project ?? '';
-  const asks = notify.show && only === undefined;
+  // a project's view lists that project's items; bise's view and the inbox screen every project's (scope.ts)
+  const scope = inboxScope(here, home, rest);
+  const real = useMemo(
+    () => (wide ? all : all.filter((c) => inScope(scope, c) && (only === undefined || only(c)))),
+    [all, only, wide, scope],
+  );
+  const notify = useNotifyRow(real.length);
+  // bise's own notifications ask is no project's: only where every project's items show
+  const asks = notify.show && only === undefined && (scope === null || wide);
+  // scoped to a project: its rows leave their project out, the head says what waits elsewhere (designer m_32874)
+  const scoped = scope !== null && !wide;
+  const others = scoped ? othersWaiting(all, scope) : 0;
+  const router = useRouter();
   const list = useMemo((): readonly InboxItem[] => (asks ? [...real, { ...notifyCard(home, opened), refused: null }] : real), [real, asks, home, opened]);
   const names = useMemo(() => new Map(rows.map((r) => [r.project, r])), [rows]);
   // Benjamin's lost answer (card-draft-keep): a new card never moves the open one; the open one
@@ -380,7 +394,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
     };
   }, []);
   // inbox zero (desktop-delight TOUCH 3): his answer to the last item, ':* nothing waits for you' for 2 s
-  const zero = useInboxZero(list.length, acted.length);
+  // scoped to a project, 'nothing waits for you' only when nothing waits in any project either
+  const zero = useInboxZero(list.length, acted.length) && all.length === 0;
 
   // a card answered or closed anywhere takes its half answer with it (drafts.ts; 2b); the closed
   // one in view keeps it until he sends it or leaves
@@ -694,6 +709,19 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
     <section ref={section} className="inbox-strip inbox-block" aria-label={inbox.head} data-testid="inbox.block" data-rows={rowsFit} data-open={openCard !== undefined || undefined} data-count={list.length} data-ctrl={ctrl || undefined}>
       <div className="strip-title">
         {inbox.head} <span className="strip-count">{headWords(list)}</span>
+        {others > 0 && (
+          // what waits in his other projects, a link to the inbox screen (designer m_32874)
+          <span className="strip-others">
+            <Act
+              testId="inbox.block.others"
+              onClick={() => {
+                router.go({ screen: 'inbox' });
+              }}
+            >
+              {`· ${inbox.block_head_others({ n: others })}`}
+            </Act>
+          </span>
+        )}
         <span className="strip-keys" data-testid="inbox.block.keys">
           {cmd ? (
             // ⌘ held: the inbox's own ⌘ key on its head (amb-win's held.ts, designer m_21510)
@@ -787,7 +815,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
             }
             end={
               <>
-                {`${projectWord(row, c.project)} · ${age(now - c.since_ms)}`}
+                {scoped ? age(now - c.since_ms) : `${projectWord(row, c.project)} · ${age(now - c.since_ms)}`}
                 <CardId id={c.id} testId={`inbox.block.row.${String(n)}.id`} />
               </>
             }

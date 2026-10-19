@@ -12,6 +12,7 @@ import { StoreEdge } from '@/app/edge';
 import type { Card } from '@/proto';
 import { answeringOf, asksNotify, cutWords, headWords, InboxBlock, openInbox, projectWord, type Answering, type Here } from './Block';
 import { PICKED_MS } from './InboxCard';
+import { inboxScope, inScope, othersWaiting } from './scope';
 
 afterEach(cleanup);
 
@@ -74,15 +75,15 @@ describe('the inbox block (b2)', () => {
     expect(told.filter((a) => a !== null)).toEqual([]);
   });
 
-  it("inbox-stack: 3 items stacked as the TUI's rows (n, sign, who · first line, its note, project · age), then '+ N more · ? who · words'", () => {
+  it("inbox-stack: 3 items stacked as the TUI's rows (n, sign, who · first line, its note, age: acme's own view leaves the project out), then '+ N more · ? who · words'", () => {
     mount({ project: P, agent: 'perf' }, withCards(5, { 9: { note: 'perf heard from main since' }, 12: { kind: 'approval', approval: true, question: 'npm publish\n--tag next\n\nto ship 2.5.0' }, 13: { note: 'not in the more line' } }));
     expect(screen.getByTestId('inbox.block.row.3')).toBeTruthy();
     expect(screen.queryByTestId('inbox.block.row.4')).toBeNull();
     const text = (n: number) => screen.getByTestId(`inbox.block.row.${String(n)}`).textContent;
-    expect(text(1)).toBe('1!perfrun rm -rf target?acme · 1 min · #10');
-    expect(text(2)).toBe('2?perfwhich bench? perf heard from main sinceacme · 1 min · #9');
+    expect(text(1)).toBe('1!perfrun rm -rf target?1 min · #10');
+    expect(text(2)).toBe('2?perfwhich bench? perf heard from main since1 min · #9');
     // an approval's command: '$ ', its first line, how many lines it has (card_draw.rs box_row)
-    expect(text(3)).toBe('3!perf$ npm publish · 2 linesacme · 1 min · #12');
+    expect(text(3)).toBe('3!perf$ npm publish · 2 lines1 min · #12');
     // '+ 2 more · ? perf · which port 13?' (more_row): the first of the hidden ones, its note left to its row
     expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 2 more · ? perf · which port 13?');
     fireEvent.click(screen.getByTestId('inbox.block.more'));
@@ -202,8 +203,8 @@ describe('the inbox block (b2)', () => {
     expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
   });
 
-  it("a row is 'n ? agent question… <project> · <age>'; the open card's head says its project too", () => {
-    mount();
+  it("a row is 'n ? agent question… <project> · <age>' on bise's view; the open card's head says its project too", () => {
+    mount({ project: null, agent: null });
     // folded (H10): one line, the first item (perf's approval)
     const row = screen.getByTestId('inbox.block.row.1');
     expect(row.querySelector('.strip-who')?.textContent).toBe('perf');
@@ -367,7 +368,8 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     const g = globalThis as { bise?: unknown };
     g.bise = { notify: { state: () => Promise.resolve('never'), onState: () => () => undefined, ask: () => { asked += 1; return Promise.resolve('on'); } } };
     try {
-      mount();
+      // bise's view: bise's own ask lists only where every project's items do (inbox-scope)
+      mount({ project: null, agent: null });
       // H10 (designer m_19835): an ordinary item from bise, the last one, never a line of its own
       expect((await screen.findByTestId('inbox.block.row.3')).textContent).toContain('let questions reach you');
       fireEvent.keyDown(window, { key: '3', code: 'Digit3', ctrlKey: true });
@@ -391,11 +393,12 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     const kept = new Map<string, unknown>();
     const asides = { read: (k: string) => kept.get(k), write: (k: string, v: unknown) => kept.set(k, v) };
     const port: CorePort = { send: (c) => sent.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
-    const block = (store: Store, project: string) =>
+    // null: bise's view (every project's items), else that project's main (its items only)
+    const block = (store: Store, project: string | null) =>
       render(
         <StoreProvider store={store}>
-          <RouterContext value={createRouter({ screen: 'thread', project, agent: 'main' })}>
-            <InboxBlock here={{ project, agent: 'main' }} onAnswer={() => undefined} now={NOW} />
+          <RouterContext value={createRouter(project === null ? { screen: 'bise' } : { screen: 'thread', project, agent: 'main' })}>
+            <InboxBlock here={project === null ? { project: null, agent: null } : { project, agent: 'main' }} onAnswer={() => undefined} now={NOW} />
           </RouterContext>
         </StoreProvider>,
       );
@@ -404,7 +407,7 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     sessionStorage.setItem('bise.notify.notnow.launch', '1');
     const store = new Store(port, { asides });
     replay(store, core_ev);
-    block(store, 'other-project');
+    block(store, null);
     fireEvent.click(screen.getByTestId('inbox.block.row.2'));
     fireEvent.keyDown(window, { key: '2' });
     expect(sent.filter((c) => c.cmd === 'answer')).toEqual([{ cmd: 'answer', project: P, card: 9, reply: '2' }]);
@@ -487,7 +490,7 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     const g = globalThis as { bise?: unknown };
     g.bise = { notify: { state: () => Promise.resolve('never'), onState: () => () => undefined, ask: () => Promise.resolve('on') } };
     try {
-      const { hub, told } = mount();
+      const { hub, told } = mount({ project: null, agent: null });
       expect((await screen.findByTestId('inbox.block.row.3')).textContent).toContain('let questions reach you');
       fireEvent.keyDown(window, { key: '3', code: 'Digit3', ctrlKey: true });
       expect(told.at(-1)).toMatchObject({ answer: null });
@@ -651,5 +654,97 @@ describe('the open card closed by the hub mid answer', () => {
     expect(told.at(-1)).toBeNull();
     expect(screen.queryByTestId(`inbox.block.card.${P}-9`)).toBeNull();
     f.remove();
+  });
+});
+
+describe("inbox-scope: a project's view lists its own items; bise's view and the inbox screen every project's", () => {
+  const SHOP = 'shop-5e6f7a8b';
+  const HOME = 'bise-home-00000000';
+  // core_ev with a second project, shop, whose one item is pay's 'which currency?'
+  const withShop: typeof core_ev = core_ev.map((e) =>
+    e.ev !== 'projects'
+      ? e
+      : {
+          ...e,
+          projects: [
+            ...e.projects,
+            { agents: 1, git: true, home: false, name: 'shop', order: 2, path: '/Users/camille/shop', project: SHOP, running: true, waits: 1, working: 0, cards: [{ id: 50, project: SHOP, kind: 'question' as const, agent: 'pay', question: 'which currency?', options: [{ n: 1, label: 'eur' }, { n: 2, label: 'usd' }], urgent: false, since_ms: NOW - 1000, rank: 1 }] },
+          ],
+        },
+  );
+  const block = (here: Here, rest?: 'open-only') => {
+    sessionStorage.setItem('bise.notify.notnow.launch', '1');
+    const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    replay(store, withShop);
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter(rest === undefined ? { screen: 'bise' } : { screen: 'inbox' })}>
+          <InboxBlock here={here} onAnswer={() => undefined} now={NOW} {...(rest === undefined ? {} : { rest })} />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    return () => screen.getByTestId('inbox.block').textContent;
+  };
+
+  it('the scope: the screen\'s project; none on bise\'s view, its home and the inbox screen', () => {
+    expect(inboxScope({ project: P }, HOME)).toBe(P);
+    expect(inboxScope({ project: null }, HOME)).toBeNull();
+    expect(inboxScope({ project: HOME }, HOME)).toBeNull();
+    expect(inboxScope({ project: P }, HOME, 'open-only')).toBeNull();
+    expect(inScope(P, { project: P })).toBe(true);
+    expect(inScope(P, { project: SHOP })).toBe(false);
+    expect(inScope(null, { project: SHOP })).toBe(true);
+    expect(othersWaiting([{ project: P }, { project: SHOP }, { project: HOME }], P)).toBe(2);
+    expect(othersWaiting([{ project: P }, { project: SHOP }], null)).toBe(0);
+  });
+
+  it("acme's view lists acme's items only; shop's view shop's only", () => {
+    const text = block({ project: P, agent: 'main' });
+    expect(text()).toContain('2 waiting');
+    expect(text()).toContain('which bench?');
+    expect(text()).not.toContain('which currency?');
+    expect(screen.getByTestId('inbox.block').getAttribute('data-count')).toBe('2');
+    // designer m_32874: its rows leave the project out; the head says what waits elsewhere, a link to /inbox
+    expect(screen.getByTestId('inbox.block.row.1').querySelector('.end')?.textContent).not.toContain('acme');
+    expect(screen.getByTestId('inbox.block.others').textContent).toBe('· 1 in other projects');
+    cleanup();
+    const shop = block({ project: SHOP, agent: 'pay' });
+    expect(shop()).toContain('1 waiting');
+    expect(screen.getByTestId('inbox.block.others').textContent).toBe('· 2 in other projects');
+    expect(shop()).toContain('which currency?');
+    expect(shop()).not.toContain('which bench?');
+  });
+
+  it("bise's view (global bise) and a home agent's view list every project's items", () => {
+    const text = block({ project: null, agent: null });
+    expect(screen.getByTestId('inbox.block').getAttribute('data-count')).toBe('3');
+    expect(text()).toContain('which bench?');
+    expect(text()).toContain('which currency?');
+    expect(screen.queryByTestId('inbox.block.others')).toBeNull();
+    expect(screen.getByTestId('inbox.block.row.1').querySelector('.end')?.textContent).toMatch(/^acme · /u);
+    cleanup();
+    block({ project: HOME, agent: 'notes' });
+    expect(screen.getByTestId('inbox.block').getAttribute('data-count')).toBe('3');
+  });
+
+  it("the inbox screen's block opens any project's item, whatever its here", () => {
+    block({ project: P, agent: 'main' }, 'open-only');
+    expect(screen.queryByTestId('inbox.block')).toBeNull();
+    act(() => {
+      openInbox({ project: SHOP, card: 50 });
+    });
+    expect(screen.getByTestId('inbox.block').textContent).toContain('which currency?');
+    expect(screen.getByTestId('inbox.block').getAttribute('data-count')).toBe('3');
+  });
+
+  it("a notification's open of another project's item widens a project's block to every project's", () => {
+    block({ project: P, agent: 'main' });
+    expect(screen.getByTestId('inbox.block').getAttribute('data-count')).toBe('2');
+    act(() => {
+      openInbox({ project: SHOP, card: 50 });
+    });
+    expect(screen.getByTestId('inbox.block').getAttribute('data-count')).toBe('3');
+    expect(screen.getByTestId('inbox.block').textContent).toContain('which currency?');
   });
 });

@@ -1,16 +1,16 @@
 // inbox/block-views · b2 (his card #476 'b + la notification native'; designer's inbox-native v2, mock b;
 // ambient-lead m_15241 / m_15246, designer m_15245): the ONE inbox block over every composer, on the real
 // shell with the scripted core (FakeCore, fake data), at 1100 px, light and dark. Passes when:
-//   - on perf's thread, 4 waiting items fold into the head + one line (who, what, project · age), the rest
-//     '+ 3 more' in the head (H10, tui-parity's thread-hierarchy: under 90 px, was ~200);
+//   - on perf's thread, acme's 4 waiting items (its project's only: inbox-scope) fold into the head + 3
+//     lines (who, what, project · age), the rest '+ 1 more' under them (inbox-stack);
 //   - a click opens the question IN PLACE (its options in the block, nothing floats) and the composer says
 //     '↳ answering perf · which bench?', no esc end on perf's own thread; his words + ⏎ answer it (answer {card 9});
 //   - the merge item opened says 'to perf · the merge waits for 1 or 2': his words go as a plain message
 //     (send, never an answer), its 2 picks it (answer {card 10, reply '2'}); esc folds the block;
 //   - on settings (the bottom block), ⌘I (the app menu's CmdOrCtrl+I) opens the first item in place;
 //   - a window opened on 'inbox?card=<project>/<id>' (a notification's click) has that card open in place;
-//   - the permission ask (macOS never asked in a fresh test home) is an ordinary item from bise, the last
-//     one (H10, designer m_19835: '? bise · let questions reach you as macOS notifications?', 1 turn on ·
+//   - on bise's view, the permission ask (macOS never asked in a fresh test home) is an ordinary item from
+//     bise, the last one (H10, designer m_19835: '? bise · let questions reach you as macOS notifications?', 1 turn on ·
 //     2 not now): its 1 asks (the test answers 'on') and it goes;
 //   - H10 at 1400/1100/800 x 820: ≤ 224 px under the thread at rest (composer A); scrolled up, the block stays as it
 //     was, no fold and the same height (designer m_21505: nothing around the composer changes on scroll),
@@ -101,16 +101,16 @@ test("inbox/block-views: on perf's thread the block folds 4 items, opens a quest
     const block = page.getByTestId('inbox.block');
     await expect(block).toBeVisible({ timeout: 10_000 });
 
-    // a fresh test home: macOS never asked, so bise's notifications ask is the 5th item (H10)
-    await test.step("folded (inbox-stack, the TUI's box): the head, 3 lines, '+ 2 more · …' under them, the keys", async () => {
-      await expect(block).toContainText(common.count_waiting({ n: 5 }));
+    // acme's thread lists acme's items only: bise's notifications ask stays on bise's view (inbox-scope)
+    await test.step("folded (inbox-stack, the TUI's box): the head, 3 lines, '+ 1 more · …' under them, the keys", async () => {
+      await expect(block).toContainText(common.count_waiting({ n: 4 }));
       for (const n of [1, 2, 3]) await expect(page.getByTestId(`inbox.block.row.${String(n)}`)).toBeVisible();
       await expect(page.getByTestId('inbox.block.row.4')).toHaveCount(0);
       await expect(page.getByTestId('inbox.block.row.1')).toContainText('which bench?');
-      await expect(page.getByTestId('inbox.block.more')).toContainText('+ 2 more · ');
+      await expect(page.getByTestId('inbox.block.more')).toContainText('+ 1 more · ');
       const h = await block.evaluate((e) => e.getBoundingClientRect().height);
       expect(h, 'folded, the block is five lines high (head, 3 rows, more), not more').toBeLessThan(BLOCK_H);
-      await expect(page.getByTestId('inbox.block.keys')).toContainText('⌃1–5');
+      await expect(page.getByTestId('inbox.block.keys')).toContainText('⌃1–4');
       expect(await page.getByTestId('inbox.block').count(), 'one block, never two').toBe(1);
       await shoot(page, core, 'folded');
     });
@@ -228,7 +228,8 @@ test("inbox/block-views: an open card in the thread is one dim line pointing at 
 
 test("inbox/block-views: the permission row asks macOS once ('turn on'), then goes", async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
-  const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1100x720' });
+  // bise's view: the ask is no project's, it lists where every project's items do (inbox-scope)
+  const s = await launchDesktop({ core, route: 'bise', size: '1100x720' });
   try {
     const { page } = s;
     // H10 (designer m_19835): an ordinary item from bise, the last one ('+ 2 more': 4 cards + the ask, 3 shown)
@@ -338,7 +339,7 @@ for (const size of ['1400x820', '1100x820', '800x820'] as const) {
 
 // one inbox, commit 1 (designer m_19631, page desktop-right-bar): the block's row is the same everywhere,
 // 'n ? agent question… <project> · <age>', bise's own items say 'bise'; the head counts the projects;
-// an item of another project opened from a project's thread names its agent and project in the composer.
+// on bise's view (a project's thread lists its own project's items only: inbox-scope).
 const T = 'telemetry-5e6f7a8b';
 const THREE = [
   { id: 21, project: T, kind: 'question', rank: 0, agent: 'p99', question: 'which percentile goes on the dashboard?', options: two('p95', 'p99'), urgent: true, since_ms: NOW - 300_000 },
@@ -360,9 +361,9 @@ const threeWorld = () => [
   { ev: 'agents', project: T, agents: [ag('main'), ag('p99')] },
 ];
 
-test("inbox/block-views: one inbox, 3 projects: the row says its project, the head counts them, another project's item names it in the composer", async () => {
+test("inbox/block-views: one inbox, 3 projects on bise's view: the row says its project, the head counts them, an item opened names its agent in the composer", async () => {
   const core = new FakeCore(threeWorld() as unknown as ConstructorParameters<typeof FakeCore>[0]);
-  const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1100x820' });
+  const s = await launchDesktop({ core, route: 'bise', size: '1100x820' });
   try {
     const { page } = s;
     const block = page.getByTestId('inbox.block');
@@ -375,12 +376,12 @@ test("inbox/block-views: one inbox, 3 projects: the row says its project, the he
       await expect(row.locator('.end')).toHaveText(/^telemetry · /u);
       await shoot(page, core, 'one-inbox-folded');
     });
-    await test.step("opened from acme's thread: 'answering p99 · telemetry · …', the card's head says its project", async () => {
+    await test.step("opened on bise's view: 'answering p99 · …', the card's head says its project", async () => {
       await page.getByTestId('inbox.block.row.1').click();
       await expect(page.getByTestId(`inbox.block.card.${T}-21`)).toBeVisible({ timeout: 3000 });
       await expect(page.getByTestId(`inbox.block.card.${T}-21.project`)).toHaveText('· telemetry');
-      await expect(composer(page)).toContainText('↳ answering p99 · telemetry · which percentile');
-      await expect(composer(page)).toContainText(inbox.esc_instead({ to: 'perf' }));
+      await expect(composer(page)).toContainText('↳ answering p99 · which percentile');
+      await expect(composer(page)).toContainText(inbox.esc_instead({ to: 'bise' }));
       await shoot(page, core, 'one-inbox-other');
       await field(page).click();
       await page.keyboard.type('p99, with p95 under it');
@@ -413,8 +414,9 @@ for (const [size, want] of [['1100x700', 3], ['1100x630', 2], ['1100x560', 1]] a
       }, [w, h] as const);
       await expect.poll(() => page.evaluate(() => window.innerHeight)).toBe(h);
       await expect(block).toHaveAttribute('data-rows', String(want), { timeout: 3000 });
-      for (let n = 1; n <= 5; n++) await expect(page.getByTestId(`inbox.block.row.${String(n)}`)).toHaveCount(n <= want ? 1 : 0);
-      await expect(page.getByTestId('inbox.block.more')).toContainText(`+ ${String(5 - want)} more · `);
+      // acme's 4 items (perf's thread lists its project's only: inbox-scope)
+      for (let n = 1; n <= 4; n++) await expect(page.getByTestId(`inbox.block.row.${String(n)}`)).toHaveCount(n <= want ? 1 : 0);
+      await expect(page.getByTestId('inbox.block.more')).toContainText(`+ ${String(4 - want)} more · `);
       const m = await page.evaluate(() => {
         const b = document.querySelector('[data-testid="inbox.block"]');
         const l = document.querySelector('[data-testid="thread.list"]');

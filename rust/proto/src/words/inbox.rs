@@ -124,6 +124,8 @@ crate::words! { inbox:
     // ---- the box and the block: heads, rows, keys
     /// the desktop block's count, items of several projects
     block_head_projects(n, projects) = "{n} waiting · {projects} projects";
+    /// the desktop block's head in a project's view: what waits in the other projects (a link to /inbox)
+    block_head_others(n) = "{n} in other projects";
     /// the box's last row: more items under it
     more_row(n, first) = "+ {n} more · {first}";
     /// a key's words: open the item (the box's opener, the block's, the screen's ⏎)
