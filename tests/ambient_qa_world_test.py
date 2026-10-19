@@ -1,7 +1,10 @@
 """dev/plugins/ambient-qa: the throwaway world's fixtures (qa.py world up and world up --rich), offline.
 
-Split out of tests/ambient_qa_test.py with world.py's split (file cap): the
-same two tests, moved as they were.
+Split out of ambient_qa_test.py with world.py's split (file cap): the
+same two tests, moved as they were. What it drives (tests/test_map.py
+picks it on these): dev/plugins/ambient-qa/qa.py,
+dev/plugins/ambient-qa/world.py, dev/plugins/ambient-qa/world_fixtures.py,
+dev/plugins/ambient-qa/world_seed.py, dev/plugins/ambient-qa/fake_gh.py.
 
 Run: python3 -u tests/ambient_qa_world_test.py
 """

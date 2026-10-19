@@ -17,7 +17,16 @@ def placed_worktree(ws, name, timeout=60):
                              capture_output=True, text=True).stdout
         for block in out.split("\n\n"):
             lines = dict(l.split(" ", 1) for l in block.splitlines() if " " in l)
-            if lines.get("branch") == want:
+            if lines.get("branch") == want and checked_out(lines["worktree"]):
                 return lines["worktree"], want[len("refs/heads/"):]
         return None
+    return wait.until(made, timeout, "%s's worktree (%s)" % (name, want))
+
+
+def checked_out(wt):
+    """git lists a worktree before its checkout ends: a file a test writes
+    then can be overwritten by the checkout (tui_artifacts_tmux's README,
+    its diff '1 file' under load). Done = a clean status."""
+    r = subprocess.run(["git", "-C", wt, "status", "--porcelain"], capture_output=True, text=True)
+    return r.returncode == 0 and not r.stdout.strip()
     return wait.until(made, timeout, "%s's worktree (%s)" % (name, want))

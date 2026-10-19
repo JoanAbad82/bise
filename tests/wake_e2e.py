@@ -94,8 +94,11 @@ def main():
         c.wait(lambda: any("watch #" in l and rc in l for l in c.lines("t1")), 60, "the file watch set")
         c.wait_idle("t1")
         c.say("[[bash: sleep 6]]", focus="t1")
-        # t1 is mid-turn (its sleep 6) when the file appears
+        # t1 is mid-turn (its sleep 6 started) when the file appears; under
+        # load 'working' comes before the tool starts, and a wake steered in
+        # then lands before the sleep's line
         c.wait_status("t1", "working", 30)
+        c.wait(lambda: any(l.startswith("tool #") and l.endswith("bash : sleep 6") for l in c.lines("t1")), 30, "t1's sleep 6 started")
         with open(rc, "w") as f:
             f.write("3\n")
         c.wait_idle("t1", timeout=60)

@@ -200,11 +200,15 @@ def main():
         t.keys("Escape")
         t.wait(NORMAL)   # the esc handled alone: the next key is not alt+key
         t.typed("/model ")
-        sc = t.wait("model for main")
+        t.wait("model for main")
+
+        def headers(sc):
+            """grouped: a header row per provider, the ids under it (the
+            popup draws over a few frames: wait for both rows)"""
+            bare = [re.sub(r"[^\w .-]", "", l).strip() for l in sc.splitlines()]
+            return "Anthropic" in bare and "Mistral" in bare
+        sc = t.wait(headers)
         cap("13-model-popup")
-        # grouped: a header row per provider, the ids under it
-        bare = [re.sub(r"[^\w .-]", "", l).strip() for l in sc.splitlines()]
-        assert "Anthropic" in bare and "Mistral" in bare, sc
         # its end: ↑ from the top wraps to the last row
         t.keys("Up")
         sc = t.wait("every role…")
