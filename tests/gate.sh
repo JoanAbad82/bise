@@ -629,7 +629,7 @@ if [ "$mode" = land ]; then
   # only a warning here (its owner gets the red at their quick gate)
   lstep shims bash -c 'python3 tests/shims_check.py --self-test && python3 tests/shims_check.py --land'
   # sb-core's records by position only in bend/hub/gen/ (state-schema)
-  lstep state_guard bash -c 'python3 tests/state_guard.py --self-test && python3 tests/state_guard.py'
+  lstep state_guard env GATE_BASE="$base" bash -c 'python3 tests/state_guard.py --self-test && python3 tests/state_guard.py'
   # quick's clippy, in its warm dir: the workspace, so both share every artifact
   [ -n "$pkgs" ] && lstep clippy bash -c "cd rust && cargo clippy --offline -q --workspace --all-targets --target-dir '$target/clippy' -- -D warnings"
   [ "${proto_ts:-0}" = 1 ] && lstep proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
