@@ -36,9 +36,6 @@ DIRS = ["bend/hub", "bend/laws", "bend/proofs"]
 MIGRATING = {
     # St
     "St",
-    # timers and wakes ("Ended": timers.bend's and wakes.bend's, declared
-    # as TimerEnd and WatchEnd)
-    "Timer", "TimerEnd", "Tms", "Act", "Watch", "WatchEnd", "Wakes", "Ended",
     # xhub and gone
     "Out", "XIn", "Route", "Xs", "Item",
 }

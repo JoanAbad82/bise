@@ -19,51 +19,36 @@ import Base
 
 import ../vendor/json.bend as J
 
+import ./gen/state.bend as S
+
+import ./gen/state-codec.bend as SC
+
 import ./wakes.bend as WK
 
 import ./lazy.bend as LZ
 
-# when a timer fires: every `ms`, or every day at that minute (local time,
-# the hub's next_daily)
-type Sched is Data:
-  Every{ms: Nat}
-  Daily{min: Nat}
-
-# `next`: when it is due; `last`: when it last woke its agent (0: never);
-# `runs`: its last runs (at most RUNS_KEPT, oldest first); `name`: what
-# the lists show ("" until `sb every --name` or the hub's `every_name`);
-# `held`: set without a name, its ◷ set line not written yet (the
-# every_name that names it writes it, once: law named_announces_once;
-# an old line's timer was announced at its set)
-type Timer is Data:
-  Timer{id: Nat, agent: String, by: String, text: String, sched: Sched,
-    next: Nat, until: Maybe<&2, Nat>, times: Maybe<&2, Nat>, fired: Nat,
-    page: Maybe<&2, String>, last: Nat, runs: List<&2, Nat>, name: String,
-    held: Bool}
-
-# a timer that ended: when (0: an old line without it) and why
-type Ended is Data:
-  Ended{t: Timer, at: Nat, why: String}
-
-# the agents' wake sources: the timers (and the acts, on the same clock)
-# and the watches of `sb wake` (`wk`, event-wake: what wakes an agent on
-# an event). The watches are wakes.bend's: WK owns every function over
-# `wk`; this module only holds it and applies its lines (wk_apply).
-type Tms is Data:
-  Tms{live: List<&2, Timer>, ended: List<&2, Ended>, last_id: Nat, acts: List<&2, Act>, next_act: Nat,
-    wk: WK.Wakes}
-
-# an act (bise desktop S2): an internal step sb-core takes at a time, on
-# the same clock and the same due rule as the wake timers (the tick's
-# now): send a held route (RouteSend, the route's id) or try a cross-
-# hub delivery again (Retry, the outbox's xid). Journal: act_set, act_done
-# (laws act_fires_once, act_due_only).
-type What is Data:
-  RouteSend{rid: Nat}
-  Retry{xid: Nat}
-
-type Act is Data:
-  Act{id: Nat, due: Nat, what: What}
+# The records are declared once in bise_proto::core::state (gen/state.bend,
+# read with S.T.f, changed with S.T.with_f):
+# - S.Timer: `next` when it is due; `last` when it last woke its agent (0:
+#   never); `runs` its last runs (at most RUNS_KEPT, oldest first); `name`
+#   what the lists show ("" until `sb every --name` or the hub's
+#   `every_name`); `held` set without a name, its ◷ set line not written
+#   yet (the every_name that names it writes it, once: law
+#   named_announces_once; an old line's timer was announced at its set);
+#   `sched` (S.Sched): every `ms`, or every day at that minute (local
+#   time, the hub's next_daily);
+# - S.TimerEnd: a timer that ended, when (0: an old line without it) and why;
+# - S.Tms: the agents' wake sources: the timers (and the acts, on the
+#   same clock) and the watches of `sb wake` (`wk`, event-wake: what wakes
+#   an agent on an event). The watches are wakes.bend's: WK owns every
+#   function over `wk`; this module only holds it and applies its lines
+#   (wk_apply);
+# - S.Act (S.What): an act (bise desktop S2), an internal step sb-core
+#   takes at a time, on the same clock and the same due rule as the wake
+#   timers (the tick's now): send a held route (RouteSend, the route's id)
+#   or try a cross-hub delivery again (Retry, the outbox's xid). Journal:
+#   act_set, act_done (laws act_fires_once, act_due_only).
+# Their journal and view JSON: gen/state-codec.bend (SC).
 
 def RUNS_KEPT() -> Nat:
   5n
@@ -74,125 +59,8 @@ def ENDED_KEPT() -> Nat:
 def MIN_MS() -> Nat:
   60000n
 
-def empty() -> Tms:
-  Tms{Nil{}, Nil{}, 0n, Nil{}, 1n, WK.empty()}
-
-# ---- fields ----
-
-def Timer.id(x: Timer) -> Nat:
-  match x:
-    case Timer{+id, _, _, _, _, _, _, _, _, _, _, _, _, _}:
-      id
-
-def Timer.agent(x: Timer) -> String:
-  match x:
-    case Timer{_, +agent, _, _, _, _, _, _, _, _, _, _, _, _}:
-      agent
-
-def Timer.by(x: Timer) -> String:
-  match x:
-    case Timer{_, _, +by, _, _, _, _, _, _, _, _, _, _, _}:
-      by
-
-def Timer.text(x: Timer) -> String:
-  match x:
-    case Timer{_, _, _, +text, _, _, _, _, _, _, _, _, _, _}:
-      text
-
-def Timer.sched(x: Timer) -> Sched:
-  match x:
-    case Timer{_, _, _, _, +sched, _, _, _, _, _, _, _, _, _}:
-      sched
-
-def Timer.next(x: Timer) -> Nat:
-  match x:
-    case Timer{_, _, _, _, _, +next, _, _, _, _, _, _, _, _}:
-      next
-
-def Timer.until(x: Timer) -> Maybe<&2, Nat>:
-  match x:
-    case Timer{_, _, _, _, _, _, +until, _, _, _, _, _, _, _}:
-      until
-
-def Timer.times(x: Timer) -> Maybe<&2, Nat>:
-  match x:
-    case Timer{_, _, _, _, _, _, _, +times, _, _, _, _, _, _}:
-      times
-
-def Timer.fired(x: Timer) -> Nat:
-  match x:
-    case Timer{_, _, _, _, _, _, _, _, +fired, _, _, _, _, _}:
-      fired
-
-def Timer.page(x: Timer) -> Maybe<&2, String>:
-  match x:
-    case Timer{_, _, _, _, _, _, _, _, _, +page, _, _, _, _}:
-      page
-
-def Timer.last(x: Timer) -> Nat:
-  match x:
-    case Timer{_, _, _, _, _, _, _, _, _, _, +last, _, _, _}:
-      last
-
-def Timer.runs(x: Timer) -> List<&2, Nat>:
-  match x:
-    case Timer{_, _, _, _, _, _, _, _, _, _, _, +runs, _, _}:
-      runs
-
-def Timer.name(x: Timer) -> String:
-  match x:
-    case Timer{_, _, _, _, _, _, _, _, _, _, _, _, +name, _}:
-      name
-
-def Timer.held(x: Timer) -> Bool:
-  match x:
-    case Timer{_, _, _, _, _, _, _, _, _, _, _, _, _, +held}:
-      held
-
-def Tms.live(x: Tms) -> List<&2, Timer>:
-  match x:
-    case Tms{+live, _, _, _, _, _}:
-      live
-
-def Tms.ended(x: Tms) -> List<&2, Ended>:
-  match x:
-    case Tms{_, +ended, _, _, _, _}:
-      ended
-
-def Tms.last_id(x: Tms) -> Nat:
-  match x:
-    case Tms{_, _, +last_id, _, _, _}:
-      last_id
-
-def Tms.acts(x: Tms) -> List<&2, Act>:
-  match x:
-    case Tms{_, _, _, +acts, _, _}:
-      acts
-
-def Tms.wk(x: Tms) -> WK.Wakes:
-  match x:
-    case Tms{_, _, _, _, _, +wk}:
-      wk
-
-def Tms.next_act(x: Tms) -> Nat:
-  match x:
-    case Tms{_, _, _, _, +n, _}:
-      n
-
-def Act.id(x: Act) -> Nat:
-  match x:
-    case Act{+id, _, _}:
-      id
-
-def Act.due(x: Act) -> Nat:
-  match x:
-    case Act{_, +due, _}:
-      due
-
-def Act.what(x: Act) -> What:
-  match x:
-    case Act{_, _, +w}:
-      w
+def empty() -> S.Tms:
+  S.Tms.empty()
 
 # ---- a timer's runs ----
 
@@ -220,21 +88,17 @@ def runs_unrun(+rs: List<&2, Nat>, +last: Nat) -> List<&2, Nat>:
 # ---- one record, one line ----
 
 # `every_fired`: its count, its next time, when it ran
-def Timer.fire.ran(x: Timer, +fired: Nat, +next: Nat, +at: Nat) -> Timer:
-  match x:
-    case Timer{+id, +agent, +by, +text, +sched, _, +until, +times, _, +page, _, +runs, +name, +held}:
-      Timer{id, agent, by, text, sched, next, until, times, fired, page, at, runs_add(runs, at), name, held}
+def Timer.fire.ran(+x: S.Timer, +fired: Nat, +next: Nat, +at: Nat) -> S.Timer:
+  S.Timer.with_runs(S.Timer.with_last(S.Timer.with_fired(S.Timer.with_next(x, next), fired), at), runs_add(S.Timer.runs(x), at))
 
 # an `undelivered` line: sb-core's (its count unchanged, the wake was
 # refused) only moves the next time; an old hub's (count - 1) took back
 # the run it had counted
-def Timer.fire.lost(x: Timer, +fired: Nat, +next: Nat, +at: Nat) -> Timer:
-  match x:
-    case Timer{+id, +agent, +by, +text, +sched, _, +until, +times, +fd, +page, +last, +runs, +name, +held}:
-      Bool.pick(Timer, Nat.is_eq(fired, fd), Timer{id, agent, by, text, sched, next, until, times, fd, page, last, runs, name, held},
-        Timer{id, agent, by, text, sched, next, until, times, fired, page, at, runs_unrun(runs, at), name, held})
+def Timer.fire.lost(+x: S.Timer, +fired: Nat, +next: Nat, +at: Nat) -> S.Timer:
+  Bool.pick(S.Timer, Nat.is_eq(fired, S.Timer.fired(x)), S.Timer.with_next(x, next),
+    S.Timer.with_runs(S.Timer.with_last(S.Timer.with_fired(S.Timer.with_next(x, next), fired), at), runs_unrun(S.Timer.runs(x), at)))
 
-def Timer.fire(x: Timer, +fired: Nat, +next: Nat, +at: Nat, +undelivered: Bool) -> Timer:
+def Timer.fire(x: S.Timer, +fired: Nat, +next: Nat, +at: Nat, +undelivered: Bool) -> S.Timer:
   match undelivered:
     case False{}:
       Timer.fire.ran(x, fired, next, at)
@@ -242,78 +106,72 @@ def Timer.fire(x: Timer, +fired: Nat, +next: Nat, +at: Nat, +undelivered: Bool) 
       Timer.fire.lost(x, fired, next, at)
 
 # `every_run`: a run now, outside the count, the next wake unchanged
-def Timer.run(x: Timer, +at: Nat) -> Timer:
-  match x:
-    case Timer{+id, +agent, +by, +text, +sched, +next, +until, +times, +fired, +page, _, +runs, +name, +held}:
-      Timer{id, agent, by, text, sched, next, until, times, fired, page, at, runs_add(runs, at), name, held}
+def Timer.run(+x: S.Timer, +at: Nat) -> S.Timer:
+  S.Timer.with_runs(S.Timer.with_last(x, at), runs_add(S.Timer.runs(x), at))
 
 # its name (from `sb every --name` or the hub's small model), every other
 # field kept (law named_keeps_the_rest)
-def Timer.named(x: Timer, +name: String) -> Timer:
-  match x:
-    case Timer{+id, +agent, +by, +text, +sched, +next, +until, +times, +fired, +page, +last, +runs, _, +held}:
-      Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held}
+def Timer.named(x: S.Timer, +name: String) -> S.Timer:
+  S.Timer.with_name(x, name)
 
 # its ◷ set line is written: no longer held (law named_announces_once)
-def Timer.shown(x: Timer) -> Timer:
-  match x:
-    case Timer{+id, +agent, +by, +text, +sched, +next, +until, +times, +fired, +page, +last, +runs, +name, _}:
-      Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, False{}}
+def Timer.shown(x: S.Timer) -> S.Timer:
+  S.Timer.with_held(x, False{})
 
 # `every_name`: its name, and its set line written (the line carries
 # `announce` when it was held, a later one never: the step's own
-# Timer.held decides it, core.bend timer_name)
-def Timer.name_line(x: Timer, +name: String) -> Timer:
+# S.Timer.held decides it, core.bend timer_name)
+def Timer.name_line(x: S.Timer, +name: String) -> S.Timer:
   Timer.shown(Timer.named(x, name))
 
 # ---- the live list (sorted by id, like `sb every` lists them) ----
 
-def find(xs: List<&2, Timer>, +id: Nat) -> Maybe<&2, Timer>:
+def find(xs: List<&2, S.Timer>, +id: Nat) -> Maybe<&2, S.Timer>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, Timer>, Nat.is_eq(Timer.id(h), id), u => Some{h}, u => find(t, id))
+      LZ.pick(Maybe<&2, S.Timer>, Nat.is_eq(S.Timer.id(h), id), u => Some{h}, u => find(t, id))
 
 # replace the timer of the same id, else insert it in id order
-def put(xs: List<&2, Timer>, +x: Timer) -> List<&2, Timer>:
+def put(xs: List<&2, S.Timer>, +x: S.Timer) -> List<&2, S.Timer>:
   match xs:
     case Nil{}:
       [x]
     case Con{+h, +t}:
-      LZ.pick(List<&2, Timer>, Nat.is_eq(Timer.id(h), Timer.id(x)), u => x <> t,
-        u => LZ.pick(List<&2, Timer>, Nat.is_lt(Timer.id(x), Timer.id(h)), v => x <> h <> t, v => h <> put(t, x)))
+      LZ.pick(List<&2, S.Timer>, Nat.is_eq(S.Timer.id(h), S.Timer.id(x)), u => x <> t,
+        u => LZ.pick(List<&2, S.Timer>, Nat.is_lt(S.Timer.id(x), S.Timer.id(h)), v => x <> h <> t, v => h <> put(t, x)))
 
 # every timer but those of id `id`
-def drop(xs: List<&2, Timer>, +id: Nat) -> List<&2, Timer>:
+def drop(xs: List<&2, S.Timer>, +id: Nat) -> List<&2, S.Timer>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = drop(t, id)
-      Bool.pick(List<&2, Timer>, Nat.is_eq(Timer.id(h), id), rest, h <> rest)
+      Bool.pick(List<&2, S.Timer>, Nat.is_eq(S.Timer.id(h), id), rest, h <> rest)
 
-def fire_in(xs: List<&2, Timer>, +id: Nat, +fired: Nat, +next: Nat, +at: Nat, +undelivered: Bool) -> List<&2, Timer>:
+def fire_in(xs: List<&2, S.Timer>, +id: Nat, +fired: Nat, +next: Nat, +at: Nat, +undelivered: Bool) -> List<&2, S.Timer>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(Timer, Nat.is_eq(Timer.id(h), id), Timer.fire(h, fired, next, at, undelivered), h)
+      Bool.pick(S.Timer, Nat.is_eq(S.Timer.id(h), id), Timer.fire(h, fired, next, at, undelivered), h)
         <> fire_in(t, id, fired, next, at, undelivered)
 
-def run_in(xs: List<&2, Timer>, +id: Nat, +at: Nat) -> List<&2, Timer>:
+def run_in(xs: List<&2, S.Timer>, +id: Nat, +at: Nat) -> List<&2, S.Timer>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(Timer, Nat.is_eq(Timer.id(h), id), Timer.run(h, at), h) <> run_in(t, id, at)
+      Bool.pick(S.Timer, Nat.is_eq(S.Timer.id(h), id), Timer.run(h, at), h) <> run_in(t, id, at)
 
-def named_in(xs: List<&2, Timer>, +id: Nat, +name: String) -> List<&2, Timer>:
+def named_in(xs: List<&2, S.Timer>, +id: Nat, +name: String) -> List<&2, S.Timer>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(Timer, Nat.is_eq(Timer.id(h), id), Timer.name_line(h, name), h) <> named_in(t, id, name)
+      Bool.pick(S.Timer, Nat.is_eq(S.Timer.id(h), id), Timer.name_line(h, name), h) <> named_in(t, id, name)
 
 def str_in(xs: List<&2, String>, +s: String) -> Bool:
   match xs:
@@ -324,28 +182,26 @@ def str_in(xs: List<&2, String>, +s: String) -> Bool:
 
 # the ids of the timers whose agent is one of `ns` (an agent's names: its
 # own and its old ones)
-def ids_in(xs: List<&2, Timer>, +ns: List<&2, String>) -> List<&2, Nat>:
+def ids_in(xs: List<&2, S.Timer>, +ns: List<&2, String>) -> List<&2, Nat>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = ids_in(t, ns)
-      Bool.pick(List<&2, Nat>, str_in(ns, Timer.agent(h)), Timer.id(h) <> rest, rest)
+      Bool.pick(List<&2, Nat>, str_in(ns, S.Timer.agent(h)), S.Timer.id(h) <> rest, rest)
 
 # name-free: the live timers set under the old name `n` (another agent
 # takes it), and one moved to its holder's name `agent` under id `id`
-def of_name(xs: List<&2, Timer>, +n: String) -> List<&2, Timer>:
+def of_name(xs: List<&2, S.Timer>, +n: String) -> List<&2, S.Timer>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = of_name(t, n)
-      Bool.pick(List<&2, Timer>, String.eq(Timer.agent(h), n), h <> rest, rest)
+      Bool.pick(List<&2, S.Timer>, String.eq(S.Timer.agent(h), n), h <> rest, rest)
 
-def moved(+t: Timer, +agent: String, +id: Nat) -> Timer:
-  match t:
-    case Timer{_, _, +by, +text, +sched, +next, +until, +times, +fired, +page, +last, +runs, +name, +held}:
-      Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held}
+def moved(t: S.Timer, +agent: String, +id: Nat) -> S.Timer:
+  S.Timer.with_agent(S.Timer.with_id(t, id), agent)
 
 # ---- for the law stop_leaves_no_timer (bend/proofs/hub.bend) ----
 
@@ -357,13 +213,13 @@ def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
       LZ.or(Nat.is_eq(n, h), u => nat_in(t, n))
 
 # the timers whose id is not in `ids`
-def keep_out(xs: List<&2, Timer>, +ids: List<&2, Nat>) -> List<&2, Timer>:
+def keep_out(xs: List<&2, S.Timer>, +ids: List<&2, Nat>) -> List<&2, S.Timer>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = keep_out(t, ids)
-      Bool.pick(List<&2, Timer>, nat_in(ids, Timer.id(h)), rest, h <> rest)
+      Bool.pick(List<&2, S.Timer>, nat_in(ids, S.Timer.id(h)), rest, h <> rest)
 
 # every id of `xs` is in `ys`
 def all_in(xs: List<&2, Nat>, +ys: List<&2, Nat>) -> Bool:
@@ -375,91 +231,75 @@ def all_in(xs: List<&2, Nat>, +ys: List<&2, Nat>) -> Bool:
 
 # ---- the state's changes, one per journal line ----
 
-def set(+tm: Tms, +x: Timer) -> Tms:
-  match tm:
-    case Tms{+live, +ended, +last, +acts, +na, +wk}:
-      Tms{put(live, x), ended, Nat.max(last, Timer.id(x)), acts, na, wk}
+def set(+tm: S.Tms, +x: S.Timer) -> S.Tms:
+  S.Tms.with_last_id(S.Tms.with_live(tm, put(S.Tms.live(tm), x)), Nat.max(S.Tms.last_id(tm), S.Timer.id(x)))
 
-def fired(+tm: Tms, +id: Nat, +fired: Nat, +next: Nat, +at: Nat, +undelivered: Bool) -> Tms:
-  match tm:
-    case Tms{+live, +ended, +last, +acts, +na, +wk}:
-      Tms{fire_in(live, id, fired, next, at, undelivered), ended, last, acts, na, wk}
+def fired(+tm: S.Tms, +id: Nat, +fired: Nat, +next: Nat, +at: Nat, +undelivered: Bool) -> S.Tms:
+  S.Tms.with_live(tm, fire_in(S.Tms.live(tm), id, fired, next, at, undelivered))
 
-def run(+tm: Tms, +id: Nat, +at: Nat) -> Tms:
-  match tm:
-    case Tms{+live, +ended, +last, +acts, +na, +wk}:
-      Tms{run_in(live, id, at), ended, last, acts, na, wk}
+def run(+tm: S.Tms, +id: Nat, +at: Nat) -> S.Tms:
+  S.Tms.with_live(tm, run_in(S.Tms.live(tm), id, at))
 
 # `every_name`: a live timer's name (an ended or unknown id: nothing)
-def named(+tm: Tms, +id: Nat, +name: String) -> Tms:
-  match tm:
-    case Tms{+live, +ended, +last, +acts, +na, +wk}:
-      Tms{named_in(live, id, name), ended, last, acts, na, wk}
+def named(+tm: S.Tms, +id: Nat, +name: String) -> S.Tms:
+  S.Tms.with_live(tm, named_in(S.Tms.live(tm), id, name))
 
-def cap(+xs: List<&2, Ended>) -> List<&2, Ended>:
-  List.drop(&2, Ended, xs, Nat.sub(List.length(&2, Ended, xs), ENDED_KEPT()))
+def cap(+xs: List<&2, S.TimerEnd>) -> List<&2, S.TimerEnd>:
+  List.drop(&2, S.TimerEnd, xs, Nat.sub(List.length(&2, S.TimerEnd, xs), ENDED_KEPT()))
 
-def ended_add(m: Maybe<&2, Timer>, +xs: List<&2, Ended>, +at: Nat, +why: String) -> List<&2, Ended>:
+# a timer that ended at `at`, and why
+def ended_of(+x: S.Timer, +at: Nat, +why: String) -> S.TimerEnd:
+  S.TimerEnd.with_why(S.TimerEnd.with_at(S.TimerEnd.with_t(S.TimerEnd.empty(), x), at), why)
+
+def ended_add(m: Maybe<&2, S.Timer>, +xs: List<&2, S.TimerEnd>, +at: Nat, +why: String) -> List<&2, S.TimerEnd>:
   match m:
     case None{}:
       xs
     case Some{+x}:
-      cap(List.append(&2, Ended, xs, [Ended{x, at, why}]))
+      cap(List.append(&2, S.TimerEnd, xs, [ended_of(x, at, why)]))
 
 # a stop: the timer leaves the live list (whatever was there), and joins
 # the ended ones when it was live
-def stop(+tm: Tms, +id: Nat, +why: String, +at: Nat) -> Tms:
-  match tm:
-    case Tms{+live, +ended, +last, +acts, +na, +wk}:
-      Tms{drop(live, id), ended_add(find(live, id), ended, at, why), last, acts, na, wk}
+def stop(+tm: S.Tms, +id: Nat, +why: String, +at: Nat) -> S.Tms:
+  S.Tms.with_ended(S.Tms.with_live(tm, drop(S.Tms.live(tm), id)), ended_add(find(S.Tms.live(tm), id), S.Tms.ended(tm), at, why))
 
 # ---- the acts (bise desktop S2) ----
 
-def act_drop(xs: List<&2, Act>, +id: Nat) -> List<&2, Act>:
+def act_drop(xs: List<&2, S.Act>, +id: Nat) -> List<&2, S.Act>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = act_drop(t, id)
-      Bool.pick(List<&2, Act>, Nat.is_eq(Act.id(h), id), rest, h <> rest)
+      Bool.pick(List<&2, S.Act>, Nat.is_eq(S.Act.id(h), id), rest, h <> rest)
 
-def act_find(xs: List<&2, Act>, +id: Nat) -> Maybe<&2, Act>:
+def act_find(xs: List<&2, S.Act>, +id: Nat) -> Maybe<&2, S.Act>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, Act>, Nat.is_eq(Act.id(h), id), u => Some{h}, u => act_find(t, id))
+      LZ.pick(Maybe<&2, S.Act>, Nat.is_eq(S.Act.id(h), id), u => Some{h}, u => act_find(t, id))
+
+# an act: `id`, due at `due`, doing `what`
+def act_of(+id: Nat, +due: Nat, +what: S.What) -> S.Act:
+  S.Act.with_what(S.Act.with_due(S.Act.with_id(S.Act.empty(), id), due), what)
 
 # act_set: one more act (its id the next free one)
-def act_set(+tm: Tms, +a: Act) -> Tms:
-  match tm:
-    case Tms{+live, +ended, +last, +acts, +na, +wk}:
-      Tms{live, ended, last, List.append(&2, Act, acts, [a]), Nat.max(na, 1n+Act.id(a)), wk}
+def act_set(+tm: S.Tms, +a: S.Act) -> S.Tms:
+  S.Tms.with_next_act(S.Tms.with_acts(tm, List.append(&2, S.Act, S.Tms.acts(tm), [a])), Nat.max(S.Tms.next_act(tm), 1n+S.Act.id(a)))
 
 # act_done: it fired (or was dropped): gone, whatever it was
-def act_done(+tm: Tms, +id: Nat) -> Tms:
-  match tm:
-    case Tms{+live, +ended, +last, +acts, +na, +wk}:
-      Tms{live, ended, last, act_drop(acts, id), na, wk}
+def act_done(+tm: S.Tms, +id: Nat) -> S.Tms:
+  S.Tms.with_acts(tm, act_drop(S.Tms.acts(tm), id))
 
 # the acts due at `now` (due <= now), in order
-def acts_due(xs: List<&2, Act>, +now: Nat) -> List<&2, Act>:
+def acts_due(xs: List<&2, S.Act>, +now: Nat) -> List<&2, S.Act>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = acts_due(t, now)
-      Bool.pick(List<&2, Act>, Nat.is_le(Act.due(h), now), h <> rest, rest)
-
-def what_json(w: What) -> J.Json:
-  match w:
-    case RouteSend{+m}:
-      J.obj([J.kv("kind", J.JStr{"route_send"}), J.kv("rid", J.JNum{m})])
-    case Retry{+x}:
-      J.obj([J.kv("kind", J.JStr{"retry"}), J.kv("xid", J.JNum{x})])
-
-def act_json(+a: Act) -> J.Json:
-  J.obj([J.kv("id", J.JNum{Act.id(a)}), J.kv("due", J.JNum{Act.due(a)}), J.kv("what", what_json(Act.what(a)))])
+      Bool.pick(List<&2, S.Act>, Nat.is_le(S.Act.due(h), now), h <> rest, rest)
 
 # ---- the pure decisions (core.bend's timers section wires them) ----
 
@@ -471,15 +311,15 @@ def opt_le(m: Maybe<&2, Nat>, +now: Nat) -> Bool:
       Nat.is_le(u, now)
 
 # its end time passed
-def past_until(+x: Timer, +now: Nat) -> Bool:
-  opt_le(Timer.until(x), now)
+def past_until(+x: S.Timer, +now: Nat) -> Bool:
+  opt_le(S.Timer.until(x), now)
 
-def is_due(+x: Timer, +now: Nat) -> Bool:
-  Nat.is_le(Timer.next(x), now)
+def is_due(+x: S.Timer, +now: Nat) -> Bool:
+  Nat.is_le(S.Timer.next(x), now)
 
 # something to look at in a tick: a timer due or past its end. A tick
 # where none is (the common case) does nothing at all (idle-cpu, 51051c52)
-def any_work(xs: List<&2, Timer>, +now: Nat) -> Bool:
+def any_work(xs: List<&2, S.Timer>, +now: Nat) -> Bool:
   match xs:
     case Nil{}:
       False{}
@@ -488,8 +328,8 @@ def any_work(xs: List<&2, Timer>, +now: Nat) -> Bool:
 
 # why a timer ends at a tick (None: it does not): its agent is gone
 # (unknown or archived), or its end time passed
-def end_why(+x: Timer, +gone: Bool, +now: Nat) -> Maybe<&2, String>:
-  Bool.pick(Maybe<&2, String>, gone, Some{String.concat(["@", Timer.agent(x), " is gone"])},
+def end_why(+x: S.Timer, +gone: Bool, +now: Nat) -> Maybe<&2, String>:
+  Bool.pick(Maybe<&2, String>, gone, Some{String.concat(["@", S.Timer.agent(x), " is gone"])},
     Bool.pick(Maybe<&2, String>, past_until(x, now), Some{"its end time passed"}, None{}))
 
 def under.go(m: Maybe<&2, Nat>, +fired: Nat) -> Bool:
@@ -500,8 +340,8 @@ def under.go(m: Maybe<&2, Nat>, +fired: Nat) -> Bool:
       Nat.is_lt(fired, n)
 
 # below its times (no times: always)
-def under(+x: Timer) -> Bool:
-  under.go(Timer.times(x), Timer.fired(x))
+def under(+x: S.Timer) -> Bool:
+  under.go(S.Timer.times(x), S.Timer.fired(x))
 
 def spent.go(m: Maybe<&2, Nat>, +fired: Nat) -> Bool:
   match m:
@@ -511,10 +351,10 @@ def spent.go(m: Maybe<&2, Nat>, +fired: Nat) -> Bool:
       Nat.is_le(n, 1n+fired)
 
 # the fire about to be counted is its last one (it ran its times)
-def spent(+x: Timer) -> Bool:
-  spent.go(Timer.times(x), Timer.fired(x))
+def spent(+x: S.Timer) -> Bool:
+  spent.go(S.Timer.times(x), S.Timer.fired(x))
 
-def may_fire.go(due: Bool, +x: Timer, +ready: Bool, +now: Nat) -> Bool:
+def may_fire.go(due: Bool, +x: S.Timer, +ready: Bool, +now: Nat) -> Bool:
   match due:
     case False{}:
       True{}
@@ -525,7 +365,7 @@ def may_fire.go(due: Bool, +x: Timer, +ready: Bool, +now: Nat) -> Bool:
 # from bise still queued; a due wake also needs the timer due and under
 # its times, and its agent active and reachable (idle: a turn; busy:
 # steered into its turn; core.bend timer_ready, law timer_fires_busy)
-def may_fire(+bise_queued: Bool, +due: Bool, +x: Timer, +ready: Bool, +now: Nat) -> Bool:
+def may_fire(+bise_queued: Bool, +due: Bool, +x: S.Timer, +ready: Bool, +now: Nat) -> Bool:
   Bool.not(bise_queued) && may_fire.go(due, x, ready, now)
 
 # the next time of an every-N timer: a period after the due time, a
@@ -534,108 +374,47 @@ def may_fire(+bise_queued: Bool, +due: Bool, +x: Timer, +ready: Bool, +now: Nat)
 def next_every(+p: Nat, +from: Nat, +now: Nat) -> Nat:
   Bool.pick(Nat, Nat.is_le(Nat.add(from, p), now), Nat.add(now, p), Nat.add(from, p))
 
-def next_of(s: Sched, +from: Nat, +now: Nat, +daily: Nat) -> Nat:
+def next_of(s: S.Sched, +from: Nat, +now: Nat, +daily: Nat) -> Nat:
   match s:
-    case Every{+p}:
+    case S.Every{+p}:
       next_every(p, from, now)
-    case Daily{_}:
+    case S.Daily{_}:
       daily
 
-def is_daily(s: Sched) -> Bool:
+def is_daily(s: S.Sched) -> Bool:
   match s:
-    case Every{_}:
+    case S.Every{_}:
       False{}
-    case Daily{_}:
+    case S.Daily{_}:
       True{}
 
-# ---- JSON (the journal lines' fields, the view) ----
+# ---- the view's lists (each item: gen/state-codec.bend's view shape) ----
 
-def opt_kv(+k: String, m: Maybe<&2, Nat>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  match m:
-    case None{}:
-      Nil{}
-    case Some{+n}:
-      [J.kv(k, J.JNum{n})]
-
-def opt_kv_s(+k: String, m: Maybe<&2, String>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  match m:
-    case None{}:
-      Nil{}
-    case Some{+s}:
-      [J.kv(k, J.JStr{s})]
-
-# its name, only when it has one (an old hub's every_set has none)
-def name_kv(+s: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  Bool.pick(List<&2, Sigma<&2, &2, String, _ => J.Json>>, String.is_empty(s), Nil{}, [J.kv("name", J.JStr{s})])
-
-# a flag, only when true (an old line has none: false)
-def flag_kv(+k: String, +b: Bool) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  Bool.pick(List<&2, Sigma<&2, &2, String, _ => J.Json>>, b, [J.kv(k, J.JBool{True{}})], Nil{})
-
-def sched_kv(s: Sched) -> Sigma<&2, &2, String, _ => J.Json>:
-  match s:
-    case Every{+p}:
-      J.kv("every_ms", J.JNum{p})
-    case Daily{+m}:
-      J.kv("daily_min", J.JNum{m})
-
-# the optional fields of a timer (`every_set` and the view)
-def opt_kvs(+x: Timer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  List.concat(&2, Sigma<&2, &2, String, _ => J.Json>,
-    [opt_kv("until_ms", Timer.until(x)), opt_kv("times", Timer.times(x)), opt_kv_s("page", Timer.page(x)),
-      name_kv(Timer.name(x))])
-
-def nums(xs: List<&2, Nat>) -> List<&2, J.Json>:
+def live_json(xs: List<&2, S.Timer>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      J.JNum{h} <> nums(t)
+      SC.Timer.view_json(h) <> live_json(t)
 
-def timer_kvs(+x: Timer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
-    [J.kv("id", J.JNum{Timer.id(x)}), J.kv("agent", J.JStr{Timer.agent(x)}), J.kv("by", J.JStr{Timer.by(x)}),
-      J.kv("text", J.JStr{Timer.text(x)}), sched_kv(Timer.sched(x)), J.kv("next_ms", J.JNum{Timer.next(x)}),
-      J.kv("fired", J.JNum{Timer.fired(x)}), J.kv("last_ms", J.JNum{Timer.last(x)}),
-      J.kv("runs", J.JArr{nums(Timer.runs(x))})],
-    opt_kvs(x))
-
-def timer_json(+x: Timer) -> J.Json:
-  J.obj(timer_kvs(x))
-
-def ended_json(e: Ended) -> J.Json:
-  match e:
-    case Ended{+x, +at, +why}:
-      J.obj(List.append(&2, Sigma<&2, &2, String, _ => J.Json>, timer_kvs(x),
-        [J.kv("ended_ms", J.JNum{at}), J.kv("why", J.JStr{why})]))
-
-def live_json(xs: List<&2, Timer>) -> List<&2, J.Json>:
+def ended_list_json(xs: List<&2, S.TimerEnd>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      timer_json(h) <> live_json(t)
-
-def ended_list_json(xs: List<&2, Ended>) -> List<&2, J.Json>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      ended_json(h) <> ended_list_json(t)
+      SC.TimerEnd.view_json(h) <> ended_list_json(t)
 
 # the acts' journal kinds (model.bend's Ev EAct)
 type ActEv is Data:
-  ActSet{a: Act}
+  ActSet{a: S.Act}
   ActDone{id: Nat}
 
 # the watches' lines (model.bend's Ev EWake, hub/wakes.bend): they live
 # beside the timers and the acts, the hub's other standing waits
-def wk_apply(+tm: Tms, e: WK.WkEv) -> Tms:
-  match tm:
-    case Tms{+live, +ended, +last, +acts, +na, +wk}:
-      Tms{live, ended, last, acts, na, WK.apply(wk, e)}
+def wk_apply(+tm: S.Tms, e: WK.WkEv) -> S.Tms:
+  S.Tms.with_wk(tm, WK.apply(S.Tms.wk(tm), e))
 
-def act_apply(+tm: Tms, e: ActEv) -> Tms:
+def act_apply(+tm: S.Tms, e: ActEv) -> S.Tms:
   match e:
     case ActSet{+a}:
       act_set(tm, a)

@@ -34,15 +34,22 @@ import Base
 
 import ../vendor/json.bend as J
 
+import ./gen/state.bend as S
+
+import ./gen/state-codec.bend as SC
+
 import ./lazy.bend as LZ
 
-# `spec`: what to look at (Rust's: kind, path, pid, start, label, slot,
-# tail, note); `max_text`: the wake at its max ("" with `quiet`); `quiet`:
-# its max ends it without a wake (a bash slot: a dev server runs for days);
-# `resumes`: a pause (True) or an alarm (False)
-type Watch is Data:
-  Watch{id: Nat, agent: String, spec: J.Json, max_text: String, set_at: Nat,
-    max_at: Nat, quiet: Bool, resumes: Bool}
+# The records are declared once in bise_proto::core::state (gen/state.bend,
+# read with S.T.f, changed with S.T.with_f):
+# - S.Watch: `spec` what to look at (Rust's: kind, path, pid, start,
+#   label, slot, tail, note); `max_text` the wake at its max ("" with
+#   `quiet`); `quiet` its max ends it without a wake (a bash slot: a dev
+#   server runs for days); `resumes` a pause (True) or an alarm (False);
+# - S.WatchEnd: a watch that ended, when and why (hit, max, stop, gone);
+# - S.Wakes: the live watches, the ended ones, the last id.
+# Their journal and view JSON: gen/state-codec.bend (SC; `resumes` of an
+# old line: state-hand.bend watch_resumes).
 
 # what a watch looks at, as its spec's `kind` says (Rust wake.rs `What`);
 # a kind this version doesn't know is KOther
@@ -54,97 +61,33 @@ type WatchKind is Data:
   KReply{}
   KOther{}
 
-# a watch that ended: when and why (hit, max, stop, gone)
-type Ended is Data:
-  Ended{w: Watch, at: Nat, why: String}
-
-type Wakes is Data:
-  Wakes{live: List<&2, Watch>, ended: List<&2, Ended>, last_id: Nat}
-
 # the journal's kinds (model.bend's Ev EWake)
 type WkEv is Data:
-  WSet{w: Watch}
+  WSet{w: S.Watch}
   WEnd{id: Nat, why: String, at: Nat}
 
 def ENDED_KEPT() -> Nat:
   50n
 
-def empty() -> Wakes:
-  Wakes{Nil{}, Nil{}, 0n}
-
-# ---- fields ----
-
-def Watch.id(x: Watch) -> Nat:
-  match x:
-    case Watch{+id, _, _, _, _, _, _, _}:
-      id
-
-def Watch.agent(x: Watch) -> String:
-  match x:
-    case Watch{_, +agent, _, _, _, _, _, _}:
-      agent
-
-def Watch.spec(x: Watch) -> J.Json:
-  match x:
-    case Watch{_, _, +spec, _, _, _, _, _}:
-      spec
-
-def Watch.max_text(x: Watch) -> String:
-  match x:
-    case Watch{_, _, _, +t, _, _, _, _}:
-      t
-
-def Watch.set_at(x: Watch) -> Nat:
-  match x:
-    case Watch{_, _, _, _, +at, _, _, _}:
-      at
-
-def Watch.max_at(x: Watch) -> Nat:
-  match x:
-    case Watch{_, _, _, _, _, +at, _, _}:
-      at
-
-def Watch.quiet(x: Watch) -> Bool:
-  match x:
-    case Watch{_, _, _, _, _, _, +q, _}:
-      q
-
-def Watch.resumes(x: Watch) -> Bool:
-  match x:
-    case Watch{_, _, _, _, _, _, _, +r}:
-      r
-
-def Wakes.live(x: Wakes) -> List<&2, Watch>:
-  match x:
-    case Wakes{+live, _, _}:
-      live
-
-def Wakes.ended(x: Wakes) -> List<&2, Ended>:
-  match x:
-    case Wakes{_, +ended, _}:
-      ended
-
-def Wakes.last_id(x: Wakes) -> Nat:
-  match x:
-    case Wakes{_, _, +last}:
-      last
+def empty() -> S.Wakes:
+  S.Wakes.empty()
 
 # ---- lists ----
 
-def find(xs: List<&2, Watch>, +id: Nat) -> Maybe<&2, Watch>:
+def find(xs: List<&2, S.Watch>, +id: Nat) -> Maybe<&2, S.Watch>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, Watch>, Nat.is_eq(Watch.id(h), id), u => Some{h}, u => find(t, id))
+      LZ.pick(Maybe<&2, S.Watch>, Nat.is_eq(S.Watch.id(h), id), u => Some{h}, u => find(t, id))
 
-def drop(xs: List<&2, Watch>, +id: Nat) -> List<&2, Watch>:
+def drop(xs: List<&2, S.Watch>, +id: Nat) -> List<&2, S.Watch>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = drop(t, id)
-      Bool.pick(List<&2, Watch>, Nat.is_eq(Watch.id(h), id), rest, h <> rest)
+      Bool.pick(List<&2, S.Watch>, Nat.is_eq(S.Watch.id(h), id), rest, h <> rest)
 
 def str_in(xs: List<&2, String>, +s: String) -> Bool:
   match xs:
@@ -153,32 +96,33 @@ def str_in(xs: List<&2, String>, +s: String) -> Bool:
     case Con{+h, +t}:
       LZ.or(String.eq(h, s), u => str_in(t, s))
 
-def cap(+xs: List<&2, Ended>) -> List<&2, Ended>:
-  List.drop(&2, Ended, xs, Nat.sub(List.length(&2, Ended, xs), ENDED_KEPT()))
+def cap(+xs: List<&2, S.WatchEnd>) -> List<&2, S.WatchEnd>:
+  List.drop(&2, S.WatchEnd, xs, Nat.sub(List.length(&2, S.WatchEnd, xs), ENDED_KEPT()))
 
-def ended_add(m: Maybe<&2, Watch>, +xs: List<&2, Ended>, +at: Nat, +why: String) -> List<&2, Ended>:
+# a watch that ended at `at`, and why
+def ended_of(+x: S.Watch, +at: Nat, +why: String) -> S.WatchEnd:
+  S.WatchEnd.with_why(S.WatchEnd.with_at(S.WatchEnd.with_w(S.WatchEnd.empty(), x), at), why)
+
+def ended_add(m: Maybe<&2, S.Watch>, +xs: List<&2, S.WatchEnd>, +at: Nat, +why: String) -> List<&2, S.WatchEnd>:
   match m:
     case None{}:
       xs
     case Some{+x}:
-      cap(List.append(&2, Ended, xs, [Ended{x, at, why}]))
+      cap(List.append(&2, S.WatchEnd, xs, [ended_of(x, at, why)]))
 
 # ---- the state's changes, one per journal line ----
 
 # wake_set: one more live watch (a second line with its id replaces it)
-def set(+ws: Wakes, +x: Watch) -> Wakes:
-  match ws:
-    case Wakes{+live, +ended, +last}:
-      Wakes{List.append(&2, Watch, drop(live, Watch.id(x)), [x]), ended, Nat.max(last, Watch.id(x))}
+def set(+ws: S.Wakes, +x: S.Watch) -> S.Wakes:
+  S.Wakes.with_last_id(S.Wakes.with_live(ws, List.append(&2, S.Watch, drop(S.Wakes.live(ws), S.Watch.id(x)), [x])),
+    Nat.max(S.Wakes.last_id(ws), S.Watch.id(x)))
 
 # wake_end: it leaves the live list (whatever was there) and joins the
 # ended ones when it was live
-def end(+ws: Wakes, +id: Nat, +why: String, +at: Nat) -> Wakes:
-  match ws:
-    case Wakes{+live, +ended, +last}:
-      Wakes{drop(live, id), ended_add(find(live, id), ended, at, why), last}
+def end(+ws: S.Wakes, +id: Nat, +why: String, +at: Nat) -> S.Wakes:
+  S.Wakes.with_ended(S.Wakes.with_live(ws, drop(S.Wakes.live(ws), id)), ended_add(find(S.Wakes.live(ws), id), S.Wakes.ended(ws), at, why))
 
-def apply(+ws: Wakes, e: WkEv) -> Wakes:
+def apply(+ws: S.Wakes, e: WkEv) -> S.Wakes:
   match e:
     case WSet{+x}:
       set(ws, x)
@@ -225,9 +169,10 @@ def resumes_of(+spec: J.Json, then: Maybe<&2, Bool>) -> Bool:
       b
 
 # a new watch (wake_set): its id the next free one, its deadline `max_ms`
-# from now
-def make(+ws: Wakes, +agent: String, +spec: J.Json, +max_text: String, +now: Nat, +max_ms: Nat, +quiet: Bool, then: Maybe<&2, Bool>) -> Watch:
-  Watch{1n+Wakes.last_id(ws), agent, spec, max_text, now, Nat.add(now, max_ms), quiet, resumes_of(spec, then)}
+# from now (built by name: empty() and a setter per field)
+def make(+ws: S.Wakes, +agent: String, +spec: J.Json, +max_text: String, +now: Nat, +max_ms: Nat, +quiet: Bool, then: Maybe<&2, Bool>) -> S.Watch:
+  +w = S.Watch.with_max_text(S.Watch.with_spec(S.Watch.with_agent(S.Watch.with_id(S.Watch.empty(), 1n+S.Wakes.last_id(ws)), agent), spec), max_text)
+  S.Watch.with_resumes(S.Watch.with_quiet(S.Watch.with_max_at(S.Watch.with_set_at(w, now), Nat.add(now, max_ms)), quiet), resumes_of(spec, then))
 
 # ---- a reply still pending (ask-wait) ----
 # An agent's `sb ask` / `sb wait` holds it WAIT_CAP seconds at most
@@ -251,9 +196,9 @@ def reply_max_text(+to: String, +msg: Nat) -> String:
 
 # the reply watch of `agent` on its message `msg` to `to`, asked at
 # `asked_at`
-def make_reply(+ws: Wakes, +agent: String, +to: String, +msg: Nat, +asked_at: Nat, +now: Nat) -> Watch:
-  Watch{1n+Wakes.last_id(ws), agent, reply_spec(to, msg), reply_max_text(to, msg), asked_at,
-    Nat.add(now, REPLY_MAX_MS()), False{}, True{}}
+def make_reply(+ws: S.Wakes, +agent: String, +to: String, +msg: Nat, +asked_at: Nat, +now: Nat) -> S.Watch:
+  +w = S.Watch.with_max_text(S.Watch.with_spec(S.Watch.with_agent(S.Watch.with_id(S.Watch.empty(), 1n+S.Wakes.last_id(ws)), agent), reply_spec(to, msg)), reply_max_text(to, msg))
+  S.Watch.with_resumes(S.Watch.with_quiet(S.Watch.with_max_at(S.Watch.with_set_at(w, asked_at), Nat.add(now, REPLY_MAX_MS())), False{}), True{})
 
 def kind_is_reply(k: WatchKind) -> Bool:
   match k:
@@ -262,25 +207,25 @@ def kind_is_reply(k: WatchKind) -> Bool:
     case _:
       False{}
 
-def is_reply(+x: Watch) -> Bool:
-  kind_is_reply(kind_of(Watch.spec(x)))
+def is_reply(+x: S.Watch) -> Bool:
+  kind_is_reply(kind_of(S.Watch.spec(x)))
 
-def reply_to_of(+x: Watch) -> String:
-  J.get_str_or(Watch.spec(x), "to", "")
+def reply_to_of(+x: S.Watch) -> String:
+  J.get_str_or(S.Watch.spec(x), "to", "")
 
-def reply_msg(+x: Watch) -> Nat:
-  J.get_num_or(Watch.spec(x), "msg", 0n)
+def reply_msg(+x: S.Watch) -> Nat:
+  J.get_num_or(S.Watch.spec(x), "msg", 0n)
 
 # the live reply watch of `agent` on its message `msg`: a walk that stops
 # at it (`hit`: the head is it; not Bool.pick, tests/pick_gate.py)
-def reply_hit(xs: List<&2, Watch>, +agent: String, +msg: Nat) -> Bool:
+def reply_hit(xs: List<&2, S.Watch>, +agent: String, +msg: Nat) -> Bool:
   match xs:
     case Nil{}:
       False{}
     case Con{+h, _}:
-      is_reply(h) && String.eq(Watch.agent(h), agent) && Nat.is_eq(reply_msg(h), msg)
+      is_reply(h) && String.eq(S.Watch.agent(h), agent) && Nat.is_eq(reply_msg(h), msg)
 
-def reply_for.go(xs: List<&2, Watch>, +hit: Bool, +agent: String, +msg: Nat) -> Maybe<&2, Watch>:
+def reply_for.go(xs: List<&2, S.Watch>, +hit: Bool, +agent: String, +msg: Nat) -> Maybe<&2, S.Watch>:
   match xs hit:
     case Nil{} _:
       None{}
@@ -289,40 +234,40 @@ def reply_for.go(xs: List<&2, Watch>, +hit: Bool, +agent: String, +msg: Nat) -> 
     case Con{+h, +t} False{}:
       reply_for.go(t, reply_hit(t, agent, msg), agent, msg)
 
-def reply_for(+xs: List<&2, Watch>, +agent: String, +msg: Nat) -> Maybe<&2, Watch>:
+def reply_for(+xs: List<&2, S.Watch>, +agent: String, +msg: Nat) -> Maybe<&2, S.Watch>:
   reply_for.go(xs, reply_hit(xs, agent, msg), agent, msg)
 
 # the reply watch a message answers: sent to its agent, a reply to its
 # message, by the asked agent (`by`: the sender's names) or the user
-def answered(+x: Watch, +to: String, +reply_to: Nat, +by: List<&2, String>, +user: Bool) -> Bool:
-  is_reply(x) && String.eq(Watch.agent(x), to) && Nat.is_eq(reply_msg(x), reply_to) && (user || str_in(by, reply_to_of(x)))
+def answered(+x: S.Watch, +to: String, +reply_to: Nat, +by: List<&2, String>, +user: Bool) -> Bool:
+  is_reply(x) && String.eq(S.Watch.agent(x), to) && Nat.is_eq(reply_msg(x), reply_to) && (user || str_in(by, reply_to_of(x)))
 
-def answered_of(xs: List<&2, Watch>, +to: String, +reply_to: Nat, +by: List<&2, String>, +user: Bool) -> List<&2, Nat>:
+def answered_of(xs: List<&2, S.Watch>, +to: String, +reply_to: Nat, +by: List<&2, String>, +user: Bool) -> List<&2, Nat>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = answered_of(t, to, reply_to, by, user)
-      Bool.pick(List<&2, Nat>, answered(h, to, reply_to, by, user), Watch.id(h) <> rest, rest)
+      Bool.pick(List<&2, Nat>, answered(h, to, reply_to, by, user), S.Watch.id(h) <> rest, rest)
 
 # the reply watches of an agent (`ns`: its names): it moved on (done, failed)
-def replies_of(xs: List<&2, Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
+def replies_of(xs: List<&2, S.Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = replies_of(t, ns)
-      Bool.pick(List<&2, Nat>, is_reply(h) && str_in(ns, Watch.agent(h)), Watch.id(h) <> rest, rest)
+      Bool.pick(List<&2, Nat>, is_reply(h) && str_in(ns, S.Watch.agent(h)), S.Watch.id(h) <> rest, rest)
 
 # the words its agent hears when the asked agent is dropped
-def reply_gone_text(+x: Watch) -> String:
+def reply_gone_text(+x: S.Watch) -> String:
   String.append(String.append(String.append(String.append("@", reply_to_of(x)), " was dropped: no reply to m_"), Nat.show(reply_msg(x))),
     " will come. continue with an explicit assumption, or ask someone else.")
 
 # a watch past its max says "still running" to its agent, unless quiet (a
 # bash slot's) or its agent is not active (stopped: nothing to wake)
-def max_says(+w: Watch, +active: Bool) -> Bool:
-  Bool.not(Watch.quiet(w)) && active
+def max_says(+w: S.Watch, +active: Bool) -> Bool:
+  Bool.not(S.Watch.quiet(w)) && active
 
 # a stop tells the watch's agent when he stopped it (`tell`: the words,
 # "" for the agent's own `sb wake --stop`) and it is active: a pause it
@@ -331,23 +276,23 @@ def stop_tells(+tell: String, +active: Bool) -> Bool:
   Bool.not(String.is_empty(tell)) && active
 
 # the live watch a hit is for (None: ended or unknown: the hit is nothing)
-def hit(+ws: Wakes, +id: Nat) -> Maybe<&2, Watch>:
-  find(Wakes.live(ws), id)
+def hit(+ws: S.Wakes, +id: Nat) -> Maybe<&2, S.Watch>:
+  find(S.Wakes.live(ws), id)
 
-def is_due(+x: Watch, +now: Nat) -> Bool:
-  Nat.is_le(Watch.max_at(x), now)
+def is_due(+x: S.Watch, +now: Nat) -> Bool:
+  Nat.is_le(S.Watch.max_at(x), now)
 
 # the live watches past their max at `now`, in order
-def due(xs: List<&2, Watch>, +now: Nat) -> List<&2, Watch>:
+def due(xs: List<&2, S.Watch>, +now: Nat) -> List<&2, S.Watch>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = due(t, now)
-      Bool.pick(List<&2, Watch>, is_due(h, now), h <> rest, rest)
+      Bool.pick(List<&2, S.Watch>, is_due(h, now), h <> rest, rest)
 
 # a tick with no watch past its max does nothing (idle-cpu)
-def any_due(xs: List<&2, Watch>, +now: Nat) -> Bool:
+def any_due(xs: List<&2, S.Watch>, +now: Nat) -> Bool:
   match xs:
     case Nil{}:
       False{}
@@ -355,28 +300,26 @@ def any_due(xs: List<&2, Watch>, +now: Nat) -> Bool:
       LZ.or(is_due(h, now), u => any_due(t, now))
 
 # the ids of the live watches of an agent (`ns`: its names, own and old)
-def ids_of(xs: List<&2, Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
+def ids_of(xs: List<&2, S.Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = ids_of(t, ns)
-      Bool.pick(List<&2, Nat>, str_in(ns, Watch.agent(h)), Watch.id(h) <> rest, rest)
+      Bool.pick(List<&2, Nat>, str_in(ns, S.Watch.agent(h)), S.Watch.id(h) <> rest, rest)
 
 # name-free: the live watches set under the old name `n` (another agent
 # takes it), and one moved to its holder's name `agent` under id `id`
-def of_name(xs: List<&2, Watch>, +n: String) -> List<&2, Watch>:
+def of_name(xs: List<&2, S.Watch>, +n: String) -> List<&2, S.Watch>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = of_name(t, n)
-      Bool.pick(List<&2, Watch>, String.eq(Watch.agent(h), n), h <> rest, rest)
+      Bool.pick(List<&2, S.Watch>, String.eq(S.Watch.agent(h), n), h <> rest, rest)
 
-def moved(+w: Watch, +agent: String, +id: Nat) -> Watch:
-  match w:
-    case Watch{_, _, +spec, +max_text, +set_at, +max_at, +quiet, +resumes}:
-      Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes}
+def moved(w: S.Watch, +agent: String, +id: Nat) -> S.Watch:
+  S.Watch.with_agent(S.Watch.with_id(w, id), agent)
 
 # ---- for the law wake_drop_ends (bend/proofs/hub.bend) ----
 
@@ -388,13 +331,13 @@ def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
       LZ.or(Nat.is_eq(n, h), u => nat_in(t, n))
 
 # the watches whose id is not in `ids`
-def keep_out(xs: List<&2, Watch>, +ids: List<&2, Nat>) -> List<&2, Watch>:
+def keep_out(xs: List<&2, S.Watch>, +ids: List<&2, Nat>) -> List<&2, S.Watch>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = keep_out(t, ids)
-      Bool.pick(List<&2, Watch>, nat_in(ids, Watch.id(h)), rest, h <> rest)
+      Bool.pick(List<&2, S.Watch>, nat_in(ids, S.Watch.id(h)), rest, h <> rest)
 
 # every id of `xs` is in `ys`
 def all_in(xs: List<&2, Nat>, +ys: List<&2, Nat>) -> Bool:
@@ -404,77 +347,19 @@ def all_in(xs: List<&2, Nat>, +ys: List<&2, Nat>) -> Bool:
     case Con{+h, +t}:
       LZ.and(nat_in(ys, h), u => all_in(t, ys))
 
-# ---- JSON (the journal and the view) ----
+# ---- the view's lists (a live watch: its journal shape; an ended one:
+# gen/state-codec.bend's WatchEnd view shape) ----
 
-def watch_kvs(+x: Watch) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  [J.kv("id", J.JNum{Watch.id(x)}), J.kv("agent", J.JStr{Watch.agent(x)}), J.kv("spec", Watch.spec(x)),
-    J.kv("max_text", J.JStr{Watch.max_text(x)}), J.kv("set_at", J.JNum{Watch.set_at(x)}),
-    J.kv("max_at", J.JNum{Watch.max_at(x)}), J.kv("quiet", J.JBool{Watch.quiet(x)}),
-    J.kv("resumes", J.JBool{Watch.resumes(x)})]
-
-def watch_json(+x: Watch) -> J.Json:
-  J.obj(watch_kvs(x))
-
-def ended_json(e: Ended) -> J.Json:
-  match e:
-    case Ended{+x, +at, +why}:
-      J.obj(List.append(&2, Sigma<&2, &2, String, _ => J.Json>, watch_kvs(x),
-        [J.kv("ended_at", J.JNum{at}), J.kv("why", J.JStr{why})]))
-
-def live_json(xs: List<&2, Watch>) -> List<&2, J.Json>:
+def live_json(xs: List<&2, S.Watch>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      watch_json(h) <> live_json(t)
+      SC.Watch.journal_json(h) <> live_json(t)
 
-def ended_list_json(xs: List<&2, Ended>) -> List<&2, J.Json>:
+def ended_list_json(xs: List<&2, S.WatchEnd>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      ended_json(h) <> ended_list_json(t)
-
-def num(+j: J.Json, +k: String) -> Nat:
-  J.get_num_or(j, k, 0n)
-
-def str.of(m: Maybe<&2, J.Json>) -> String:
-  match m:
-    case Some{J.JStr{+s}}:
-      s
-    case _:
-      ""
-
-def bool.of(m: Maybe<&2, J.Json>) -> Bool:
-  match m:
-    case Some{J.JBool{+b}}:
-      b
-    case _:
-      False{}
-
-def json.of(m: Maybe<&2, J.Json>) -> J.Json:
-  match m:
-    case Some{+j}:
-      j
-    case None{}:
-      J.JNull{}
-
-# its `resumes`; a line from before the field: its kind's default
-def resumes.of(m: Maybe<&2, J.Json>, +spec: J.Json) -> Bool:
-  match m:
-    case Some{J.JBool{+b}}:
-      b
-    case _:
-      resumes_of(spec, None{})
-
-# a watch from its JSON (wake_set's `watch`)
-def watch_of(+j: J.Json) -> Watch:
-  Watch{num(j, "id"), str.of(J.get(j, "agent")), json.of(J.get(j, "spec")), str.of(J.get(j, "max_text")),
-    num(j, "set_at"), num(j, "max_at"), bool.of(J.get(j, "quiet")), resumes.of(J.get(j, "resumes"), json.of(J.get(j, "spec")))}
-
-def ev_json(e: WkEv) -> J.Json:
-  match e:
-    case WSet{+x}:
-      J.obj([J.kv("type", J.JStr{"wake_set"}), J.kv("watch", watch_json(x))])
-    case WEnd{+id, +why, +at}:
-      J.obj([J.kv("type", J.JStr{"wake_end"}), J.kv("id", J.JNum{id}), J.kv("why", J.JStr{why}), J.kv("at", J.JNum{at})])
+      SC.WatchEnd.view_json(h) <> ended_list_json(t)

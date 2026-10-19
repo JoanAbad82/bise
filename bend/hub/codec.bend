@@ -1,5 +1,5 @@
 # hub/codec.bend — the records inside sb-core's journal lines and its
-# messages as JSON (a route, a timer...; a message, a card: gen/state-codec.bend), in the exact
+# messages as JSON (a route...; a message, a card, a timer, an act, a watch: gen/state-codec.bend), in the exact
 # serde format of rust/switchboard/src/model.rs, each with its round law.
 # The lines themselves are generated (gen/journal.bend, from
 # bise_proto::core::journal): a new journal kind is a row there, never a
@@ -9,10 +9,6 @@ import Base
 import ../vendor/json.bend as J
 
 import ./model.bend as M
-
-import ./timers.bend as TM
-
-import ./wakes.bend as WK
 
 import ./xhub-model.bend as XH
 
@@ -73,45 +69,9 @@ def route_of(+j: J.Json) -> XH.Route:
   XH.Route{get_nat(j, "rid"), get_s(j, "text"), get_s(j, "via"), get_s(j, "to"), get_s(j, "name"), get_nat(j, "due_ms"),
     get_nat(j, "act"), get_s(j, "why"), XH.rst_of(get_s(j, "state")), get_s(j, "context"), get_s(j, "parts")}
 
-def what_of(+j: J.Json) -> TM.What:
-  Bool.pick(TM.What, String.eq(get_s(j, "kind"), "retry"), TM.Retry{get_nat(j, "xid")}, TM.RouteSend{get_nat(j, "rid")})
-
-def act_of(+j: J.Json) -> TM.Act:
-  TM.Act{get_nat(j, "id"), get_nat(j, "due"), what_of(get_j(j, "what"))}
-
-# an every_set's schedule, as every.rs read it: every_ms (at least 1 s),
-# else daily_min (mod a day), else not a timer (the line is skipped)
-def sched_of(e: Maybe<&2, Nat>, d: Maybe<&2, Nat>) -> Maybe<&2, TM.Sched>:
-  match e:
-    case Some{+p}:
-      Some{TM.Every{Nat.max(p, 1000n)}}
-    case None{}:
-      Maybe.map(&2, Nat, TM.Sched, m => TM.Daily{Nat.mod(m, 1440n)}, d)
-
 # ---- the records inside a journal line, for gen/journal.bend (one codec
 # per record; journal.rs's Codec rows name them) ----
 
-
-# an every_set's timer: its keys but `at` (the line's), its schedule as
-# every.rs wrote it; no schedule: no timer (the line is skipped)
-def timer.with(s: Maybe<&2, TM.Sched>, +j: J.Json) -> Maybe<&2, TM.Timer>:
-  match s:
-    case None{}:
-      None{}
-    case Some{+sc}:
-      Some{TM.Timer{get_nat(j, "id"), get_s(j, "agent"), get_s(j, "by"), get_s(j, "text"), sc,
-        get_nat(j, "next_ms"), opt_nat(J.get(j, "until_ms")), opt_nat(J.get(j, "times")), 0n,
-        opt_str(J.get(j, "page")), 0n, Nil{}, get_s(j, "name"), get_b(j, "held")}}
-
-def timer_of(+j: J.Json) -> Maybe<&2, TM.Timer>:
-  timer.with(sched_of(opt_nat(J.get(j, "every_ms")), opt_nat(J.get(j, "daily_min"))), j)
-
-def timer_kvs(+t: TM.Timer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
-    [J.kv("id", J.JNum{TM.Timer.id(t)}), J.kv("agent", J.JStr{TM.Timer.agent(t)}),
-      J.kv("by", J.JStr{TM.Timer.by(t)}), J.kv("text", J.JStr{TM.Timer.text(t)}),
-      J.kv("next_ms", J.JNum{TM.Timer.next(t)}), TM.sched_kv(TM.Timer.sched(t))],
-    List.append(&2, Sigma<&2, &2, String, _ => J.Json>, TM.opt_kvs(t), TM.flag_kv("held", TM.Timer.held(t))))
 
 def out_json(+o: XH.Out) -> J.Json:
   XH.out_json(o)
@@ -122,14 +82,6 @@ def xin_json(+i: XH.XIn) -> J.Json:
 def route_json(+r: XH.Route) -> J.Json:
   XH.route_json(r)
 
-def act_json(+a: TM.Act) -> J.Json:
-  TM.act_json(a)
-
-def watch_of(+j: J.Json) -> WK.Watch:
-  WK.watch_of(j)
-
-def watch_json(+w: WK.Watch) -> J.Json:
-  WK.watch_json(w)
 
 
 # ---- each record reads back what it writes (gen/journal-laws.bend's
@@ -229,22 +181,3 @@ def route_round(r):
     case XH.Route{id, tx, v, to, n, d, a, w, XH.RCancelled{}, cx, SCon{h, t}}:
       {==}
 
-law act_round:
-  for a: TM.Act
-  {act_of(act_json(a)) == a : TM.Act}
-
-def act_round(a):
-  match a:
-    case TM.Act{id, d, TM.RouteSend{r}}:
-      {==}
-    case TM.Act{id, d, TM.Retry{x}}:
-      {==}
-
-law watch_round:
-  for w: WK.Watch
-  {watch_of(watch_json(w)) == w : WK.Watch}
-
-def watch_round(w):
-  match w:
-    case WK.Watch{id, a, sp, mt, sa, ma, q, r}:
-      {==}

@@ -234,7 +234,7 @@ def journal_route_cancelled_bare():
   {==}
 
 law journal_act_set_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"act_set"})])) == Some{M.EAct{TM.ActSet{C.act_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"act_set"})])) == Some{M.EAct{TM.ActSet{SC.Act.journal_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
 
 def journal_act_set_bare():
   {==}
@@ -258,7 +258,7 @@ def journal_job_end_bare():
   {==}
 
 law journal_wake_set_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"wake_set"})])) == Some{M.EWake{WK.WSet{C.watch_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"wake_set"})])) == Some{M.EWake{WK.WSet{SC.Watch.journal_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
 
 def journal_wake_set_bare():
   {==}
@@ -744,11 +744,11 @@ def journal_route_cancelled_round(rid):
   {==}
 
 law journal_act_set_round:
-  for act: TM.Act
+  for act: S.Act
   {GJ.of(GJ.json(M.EAct{TM.ActSet{act}})) == Some{M.EAct{TM.ActSet{act}}} : Maybe<&2, M.Ev>}
 
 def journal_act_set_round(act):
-  %C.act_round(act) : {GJ.of(GJ.json(M.EAct{TM.ActSet{act}})) == Some{M.EAct{TM.ActSet{_}}} : Maybe<&2, M.Ev>}
+  %SC.Act.journal_round(act) : {GJ.of(GJ.json(M.EAct{TM.ActSet{act}})) == Some{M.EAct{TM.ActSet{_}}} : Maybe<&2, M.Ev>}
   {==}
 
 law journal_act_done_round:
@@ -776,11 +776,11 @@ def journal_job_end_round(name, state):
   {==}
 
 law journal_wake_set_round:
-  for watch: WK.Watch
+  for watch: S.Watch
   {GJ.of(GJ.json(M.EWake{WK.WSet{watch}})) == Some{M.EWake{WK.WSet{watch}}} : Maybe<&2, M.Ev>}
 
 def journal_wake_set_round(watch):
-  %C.watch_round(watch) : {GJ.of(GJ.json(M.EWake{WK.WSet{watch}})) == Some{M.EWake{WK.WSet{_}}} : Maybe<&2, M.Ev>}
+  %SC.Watch.journal_round(watch) : {GJ.of(GJ.json(M.EWake{WK.WSet{watch}})) == Some{M.EWake{WK.WSet{_}}} : Maybe<&2, M.Ev>}
   {==}
 
 law journal_wake_end_round:

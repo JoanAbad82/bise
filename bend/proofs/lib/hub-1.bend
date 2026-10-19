@@ -817,7 +817,7 @@ def hub_msgs_wakes(-o: HM.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
     case HS.LFailed{}:
       {==}
     case HS.LArchived{}:
-      hub_msgs_wakes_each(o, HWK.ids_of(HWK.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
+      hub_msgs_wakes_each(o, HWK.ids_of(HS.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
 
 def hub_agents_wakes(-o: HM.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
     -> {HM.St.agents(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
@@ -829,4 +829,4 @@ def hub_agents_wakes(-o: HM.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
     case HS.LFailed{}:
       {==}
     case HS.LArchived{}:
-      hub_agents_wakes_each(o, HWK.ids_of(HWK.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
+      hub_agents_wakes_each(o, HWK.ids_of(HS.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)

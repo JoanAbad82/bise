@@ -178,30 +178,30 @@ def hub_spent_journal(-o: HM.St, +sp: Bool, +cx: HX.Cx<o>, +id: Nat, +at: Nat)
     case False{}:
       {==}
 
-def hub_count_journal(-o: HM.St, +due: Bool, +cx: HX.Cx<o>, +t: HTM.Timer, +next: Nat)
+def hub_count_journal(-o: HM.St, +due: Bool, +cx: HX.Cx<o>, +t: HS.Timer, +next: Nat)
     -> {HX.journal(HX.Core.fx(o, HX.Cx.c(o, HC.timer_count(o, due, cx, t, next)))) == HI.fire_count(due, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), t, next, HC.now(o, cx)) : List<&2, HM.Ev>}:
   match due:
     case False{}:
-      hub_fx_emit(o, cx, HM.ETimerRun{HTM.Timer.id(t), HC.now(o, cx)}, Unit{}, Unit{}, Unit{})
+      hub_fx_emit(o, cx, HM.ETimerRun{HS.Timer.id(t), HC.now(o, cx)}, Unit{}, Unit{}, Unit{})
     case True{}:
-      +ev = {HM.ETimerFired{HTM.Timer.id(t), 1n+HTM.Timer.fired(t), next, HC.now(o, cx), False{}} : HM.Ev}
+      +ev = {HM.ETimerFired{HS.Timer.id(t), 1n+HS.Timer.fired(t), next, HC.now(o, cx), False{}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       Equal.trans(List<&2, HM.Ev>,
-        HX.journal(HX.Core.fx(o, HX.Cx.c(o, HC.timer_spent(o, HTM.spent(t), cx2, HTM.Timer.id(t), HC.now(o, cx))))),
-        HI.fire_spent(HTM.spent(t), HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx2))), HTM.Timer.id(t), HC.now(o, cx)),
-        HI.fire_spent(HTM.spent(t), HM.snoc(HM.Ev, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), ev), HTM.Timer.id(t), HC.now(o, cx)),
-        hub_spent_journal(o, HTM.spent(t), cx2, HTM.Timer.id(t), HC.now(o, cx)),
-        Equal.cong(List<&2, HM.Ev>, List<&2, HM.Ev>, xs => HI.fire_spent(HTM.spent(t), xs, HTM.Timer.id(t), HC.now(o, cx)),
+        HX.journal(HX.Core.fx(o, HX.Cx.c(o, HC.timer_spent(o, HTM.spent(t), cx2, HS.Timer.id(t), HC.now(o, cx))))),
+        HI.fire_spent(HTM.spent(t), HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx2))), HS.Timer.id(t), HC.now(o, cx)),
+        HI.fire_spent(HTM.spent(t), HM.snoc(HM.Ev, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), ev), HS.Timer.id(t), HC.now(o, cx)),
+        hub_spent_journal(o, HTM.spent(t), cx2, HS.Timer.id(t), HC.now(o, cx)),
+        Equal.cong(List<&2, HM.Ev>, List<&2, HM.Ev>, xs => HI.fire_spent(HTM.spent(t), xs, HS.Timer.id(t), HC.now(o, cx)),
           HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx2))), HM.snoc(HM.Ev, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), ev),
           hub_fx_emit(o, cx, ev, Unit{}, Unit{}, Unit{})))
 
-def hub_retry_journal(-o: HM.St, +due: Bool, +cx: HX.Cx<o>, +t: HTM.Timer)
+def hub_retry_journal(-o: HM.St, +due: Bool, +cx: HX.Cx<o>, +t: HS.Timer)
     -> {HX.journal(HX.Core.fx(o, HX.Cx.c(o, HC.timer_retry(o, due, cx, t)))) == HI.fire_retry(due, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), t, HC.now(o, cx)) : List<&2, HM.Ev>}:
   match due:
     case False{}:
       {==}
     case True{}:
-      hub_fx_emit(o, cx, HM.ETimerFired{HTM.Timer.id(t), HTM.Timer.fired(t), Nat.add(HC.now(o, cx), HTM.MIN_MS()), HTM.Timer.last(t), True{}},
+      hub_fx_emit(o, cx, HM.ETimerFired{HS.Timer.id(t), HS.Timer.fired(t), Nat.add(HC.now(o, cx), HTM.MIN_MS()), HS.Timer.last(t), True{}},
         Unit{}, Unit{}, Unit{})
 
 # a < b is not b <= a
@@ -218,65 +218,66 @@ def hub_lt_not_le(+a: Nat, +b: Nat) -> {Nat.is_lt(a, b) == Bool.not(Nat.is_le(b,
 
 # ---- stop_leaves_no_timer: a drop's stops leave no timer of the agent ----
 
-def hub_keep_nil(+xs: List<&2, HTM.Timer>) -> {HTM.keep_out(xs, Nil{}) == xs : List<&2, HTM.Timer>}:
+def hub_keep_nil(+xs: List<&2, HS.Timer>) -> {HTM.keep_out(xs, Nil{}) == xs : List<&2, HS.Timer>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      Equal.cong(List<&2, HTM.Timer>, List<&2, HTM.Timer>, ys => h <> ys, HTM.keep_out(t, Nil{}), t, hub_keep_nil(t))
+      Equal.cong(List<&2, HS.Timer>, List<&2, HS.Timer>, ys => h <> ys, HTM.keep_out(t, Nil{}), t, hub_keep_nil(t))
 
-def hub_keep_drop.pick(c: Bool, +h: HTM.Timer, +t: List<&2, HTM.Timer>, +id: Nat, +rest: List<&2, Nat>,
-    +e: {Nat.is_eq(HTM.Timer.id(h), id) == c : Bool},
-    ih: {HTM.keep_out(HTM.drop(t, id), rest) == HTM.keep_out(t, id <> rest) : List<&2, HTM.Timer>})
-    -> {HTM.keep_out(Bool.pick(List<&2, HTM.Timer>, Nat.is_eq(HTM.Timer.id(h), id), HTM.drop(t, id), h <> HTM.drop(t, id)), rest)
-        == Bool.pick(List<&2, HTM.Timer>, HLZ.or(Nat.is_eq(HTM.Timer.id(h), id), u => HTM.nat_in(rest, HTM.Timer.id(h))), HTM.keep_out(t, id <> rest), h <> HTM.keep_out(t, id <> rest)) : List<&2, HTM.Timer>}:
+def hub_keep_drop.pick(c: Bool, +h: HS.Timer, +t: List<&2, HS.Timer>, +id: Nat, +rest: List<&2, Nat>,
+    +e: {Nat.is_eq(HS.Timer.id(h), id) == c : Bool},
+    ih: {HTM.keep_out(HTM.drop(t, id), rest) == HTM.keep_out(t, id <> rest) : List<&2, HS.Timer>})
+    -> {HTM.keep_out(Bool.pick(List<&2, HS.Timer>, Nat.is_eq(HS.Timer.id(h), id), HTM.drop(t, id), h <> HTM.drop(t, id)), rest)
+        == Bool.pick(List<&2, HS.Timer>, HLZ.or(Nat.is_eq(HS.Timer.id(h), id), u => HTM.nat_in(rest, HS.Timer.id(h))), HTM.keep_out(t, id <> rest), h <> HTM.keep_out(t, id <> rest)) : List<&2, HS.Timer>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HTM.Timer.id(h), id), True{}, e) : {HTM.keep_out(Bool.pick(List<&2, HTM.Timer>, _, HTM.drop(t, id), h <> HTM.drop(t, id)), rest)
-        == Bool.pick(List<&2, HTM.Timer>, HLZ.or(_, u => HTM.nat_in(rest, HTM.Timer.id(h))), HTM.keep_out(t, id <> rest), h <> HTM.keep_out(t, id <> rest)) : List<&2, HTM.Timer>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Timer.id(h), id), True{}, e) : {HTM.keep_out(Bool.pick(List<&2, HS.Timer>, _, HTM.drop(t, id), h <> HTM.drop(t, id)), rest)
+        == Bool.pick(List<&2, HS.Timer>, HLZ.or(_, u => HTM.nat_in(rest, HS.Timer.id(h))), HTM.keep_out(t, id <> rest), h <> HTM.keep_out(t, id <> rest)) : List<&2, HS.Timer>}
       ih
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HTM.Timer.id(h), id), False{}, e) : {HTM.keep_out(Bool.pick(List<&2, HTM.Timer>, _, HTM.drop(t, id), h <> HTM.drop(t, id)), rest)
-        == Bool.pick(List<&2, HTM.Timer>, HLZ.or(_, u => HTM.nat_in(rest, HTM.Timer.id(h))), HTM.keep_out(t, id <> rest), h <> HTM.keep_out(t, id <> rest)) : List<&2, HTM.Timer>}
-      Equal.cong(List<&2, HTM.Timer>, List<&2, HTM.Timer>, ys => Bool.pick(List<&2, HTM.Timer>, HTM.nat_in(rest, HTM.Timer.id(h)), ys, h <> ys),
+      %Equal.sym(Bool, Nat.is_eq(HS.Timer.id(h), id), False{}, e) : {HTM.keep_out(Bool.pick(List<&2, HS.Timer>, _, HTM.drop(t, id), h <> HTM.drop(t, id)), rest)
+        == Bool.pick(List<&2, HS.Timer>, HLZ.or(_, u => HTM.nat_in(rest, HS.Timer.id(h))), HTM.keep_out(t, id <> rest), h <> HTM.keep_out(t, id <> rest)) : List<&2, HS.Timer>}
+      Equal.cong(List<&2, HS.Timer>, List<&2, HS.Timer>, ys => Bool.pick(List<&2, HS.Timer>, HTM.nat_in(rest, HS.Timer.id(h)), ys, h <> ys),
         HTM.keep_out(HTM.drop(t, id), rest), HTM.keep_out(t, id <> rest), ih)
 
 # dropping one id, then the others: the timers of none of them
-def hub_keep_drop(+xs: List<&2, HTM.Timer>, +id: Nat, +rest: List<&2, Nat>)
-    -> {HTM.keep_out(HTM.drop(xs, id), rest) == HTM.keep_out(xs, id <> rest) : List<&2, HTM.Timer>}:
+def hub_keep_drop(+xs: List<&2, HS.Timer>, +id: Nat, +rest: List<&2, Nat>)
+    -> {HTM.keep_out(HTM.drop(xs, id), rest) == HTM.keep_out(xs, id <> rest) : List<&2, HS.Timer>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      hub_keep_drop.pick(Nat.is_eq(HTM.Timer.id(h), id), h, t, id, rest, {==}, hub_keep_drop(t, id, rest))
+      hub_keep_drop.pick(Nat.is_eq(HS.Timer.id(h), id), h, t, id, rest, {==}, hub_keep_drop(t, id, rest))
 
 def hub_live_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat)
-    -> {HTM.Tms.live(HM.St.tm(HM.apply(s, HM.ETimerStop{id, why, at}))) == HTM.drop(HTM.Tms.live(HM.St.tm(s)), id) : List<&2, HTM.Timer>}:
+    -> {HS.Tms.live(HM.St.tm(HM.apply(s, HM.ETimerStop{id, why, at}))) == HTM.drop(HS.Tms.live(HM.St.tm(s)), id) : List<&2, HS.Timer>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      match tm:
-        case HTM.Tms{l, e, li, ac, na, wk}:
-          {==}
+    case HM.St{ag, od, ms, ca, no, nm, nc, +tm, xs, pz, ho, gn}:
+      +d = HTM.drop(HS.Tms.live(tm), id)
+      %HSL.Tms.ended.eta(HS.Tms.with_live(tm, d), HTM.ended_add(HTM.find(HS.Tms.live(tm), id), HS.Tms.ended(tm), at, why))
+        : {HS.Tms.live(_) == d : List<&2, HS.Timer>}
+      HSL.Tms.live.get_with(tm, d)
 
 # the live timers after a drop's stops: those of no stopped id
 def hub_live_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
-    -> {HTM.Tms.live(HM.St.tm(HX.d(o, HC.timers_gone.each(o, ids, cx, why)))) == HTM.keep_out(HTM.Tms.live(HM.St.tm(HX.d(o, cx))), ids) : List<&2, HTM.Timer>}:
+    -> {HS.Tms.live(HM.St.tm(HX.d(o, HC.timers_gone.each(o, ids, cx, why)))) == HTM.keep_out(HS.Tms.live(HM.St.tm(HX.d(o, cx))), ids) : List<&2, HS.Timer>}:
   match ids:
     case Nil{}:
-      Equal.sym(List<&2, HTM.Timer>, HTM.keep_out(HTM.Tms.live(HM.St.tm(HX.d(o, cx))), Nil{}), HTM.Tms.live(HM.St.tm(HX.d(o, cx))),
-        hub_keep_nil(HTM.Tms.live(HM.St.tm(HX.d(o, cx)))))
+      Equal.sym(List<&2, HS.Timer>, HTM.keep_out(HS.Tms.live(HM.St.tm(HX.d(o, cx))), Nil{}), HS.Tms.live(HM.St.tm(HX.d(o, cx))),
+        hub_keep_nil(HS.Tms.live(HM.St.tm(HX.d(o, cx)))))
     case Con{id, rest}:
       +ev = {HM.ETimerStop{id, why, HC.now(o, cx)} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      +l = HTM.Tms.live(HM.St.tm(HX.d(o, cx)))
-      +l2 = HTM.Tms.live(HM.St.tm(HX.d(o, cx2)))
-      +e2 = Equal.trans(List<&2, HTM.Timer>, l2, HTM.Tms.live(HM.St.tm(HM.apply(HX.d(o, cx), ev))), HTM.drop(l, id),
-        Equal.cong(HM.St, List<&2, HTM.Timer>, s => HTM.Tms.live(HM.St.tm(s)), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+      +l = HS.Tms.live(HM.St.tm(HX.d(o, cx)))
+      +l2 = HS.Tms.live(HM.St.tm(HX.d(o, cx2)))
+      +e2 = Equal.trans(List<&2, HS.Timer>, l2, HS.Tms.live(HM.St.tm(HM.apply(HX.d(o, cx), ev))), HTM.drop(l, id),
+        Equal.cong(HM.St, List<&2, HS.Timer>, s => HS.Tms.live(HM.St.tm(s)), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
         hub_live_tstop(HX.d(o, cx), id, why, HC.now(o, cx)))
-      Equal.trans(List<&2, HTM.Timer>, HTM.Tms.live(HM.St.tm(HX.d(o, HC.timers_gone.each(o, rest, cx2, why)))), HTM.keep_out(l2, rest), HTM.keep_out(l, id <> rest),
+      Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HM.St.tm(HX.d(o, HC.timers_gone.each(o, rest, cx2, why)))), HTM.keep_out(l2, rest), HTM.keep_out(l, id <> rest),
         hub_live_gone_each(o, rest, cx2, why),
-        Equal.trans(List<&2, HTM.Timer>, HTM.keep_out(l2, rest), HTM.keep_out(HTM.drop(l, id), rest), HTM.keep_out(l, id <> rest),
-          Equal.cong(List<&2, HTM.Timer>, List<&2, HTM.Timer>, ys => HTM.keep_out(ys, rest), l2, HTM.drop(l, id), e2),
+        Equal.trans(List<&2, HS.Timer>, HTM.keep_out(l2, rest), HTM.keep_out(HTM.drop(l, id), rest), HTM.keep_out(l, id <> rest),
+          Equal.cong(List<&2, HS.Timer>, List<&2, HS.Timer>, ys => HTM.keep_out(ys, rest), l2, HTM.drop(l, id), e2),
           hub_keep_drop(l, id, rest)))
 
 # all_in(x <> r, l) is the lazy and of nat_in(l, x) and all_in(r, l) (hub/lazy.bend)
@@ -322,38 +323,38 @@ def hub_all_self(+xs: List<&2, Nat>) -> {HTM.all_in(xs, xs) == True{} : Bool}:
       hub_all_weak(t, h, t, hub_all_self(t))
 
 # the ids of the agent's timers in the list's tail are in `l` too
-def hub_all_tail(a: Bool, +h: HTM.Timer, +t: List<&2, HTM.Timer>, +ns: List<&2, String>, +l: List<&2, Nat>,
-    +ea: {HTM.str_in(ns, HTM.Timer.agent(h)) == a : Bool}, +hall: {HTM.all_in(HTM.ids_in(h <> t, ns), l) == True{} : Bool})
+def hub_all_tail(a: Bool, +h: HS.Timer, +t: List<&2, HS.Timer>, +ns: List<&2, String>, +l: List<&2, Nat>,
+    +ea: {HTM.str_in(ns, HS.Timer.agent(h)) == a : Bool}, +hall: {HTM.all_in(HTM.ids_in(h <> t, ns), l) == True{} : Bool})
     -> {HTM.all_in(HTM.ids_in(t, ns), l) == True{} : Bool}:
   match a:
     case True{}:
-      +e2 = Equal.cong(Bool, Bool, c => HTM.all_in(Bool.pick(List<&2, Nat>, c, HTM.Timer.id(h) <> HTM.ids_in(t, ns), HTM.ids_in(t, ns)), l),
-        HTM.str_in(ns, HTM.Timer.agent(h)), True{}, ea)
-      hub_and_true_r(HTM.nat_in(l, HTM.Timer.id(h)), HTM.all_in(HTM.ids_in(t, ns), l),
-        Equal.trans(Bool, HTM.all_in(HTM.Timer.id(h) <> HTM.ids_in(t, ns), l), HTM.all_in(HTM.ids_in(h <> t, ns), l), True{},
-          Equal.sym(Bool, HTM.all_in(HTM.ids_in(h <> t, ns), l), HTM.all_in(HTM.Timer.id(h) <> HTM.ids_in(t, ns), l), e2), hall))
+      +e2 = Equal.cong(Bool, Bool, c => HTM.all_in(Bool.pick(List<&2, Nat>, c, HS.Timer.id(h) <> HTM.ids_in(t, ns), HTM.ids_in(t, ns)), l),
+        HTM.str_in(ns, HS.Timer.agent(h)), True{}, ea)
+      hub_and_true_r(HTM.nat_in(l, HS.Timer.id(h)), HTM.all_in(HTM.ids_in(t, ns), l),
+        Equal.trans(Bool, HTM.all_in(HS.Timer.id(h) <> HTM.ids_in(t, ns), l), HTM.all_in(HTM.ids_in(h <> t, ns), l), True{},
+          Equal.sym(Bool, HTM.all_in(HTM.ids_in(h <> t, ns), l), HTM.all_in(HS.Timer.id(h) <> HTM.ids_in(t, ns), l), e2), hall))
     case False{}:
-      +e2 = Equal.cong(Bool, Bool, c => HTM.all_in(Bool.pick(List<&2, Nat>, c, HTM.Timer.id(h) <> HTM.ids_in(t, ns), HTM.ids_in(t, ns)), l),
-        HTM.str_in(ns, HTM.Timer.agent(h)), False{}, ea)
+      +e2 = Equal.cong(Bool, Bool, c => HTM.all_in(Bool.pick(List<&2, Nat>, c, HS.Timer.id(h) <> HTM.ids_in(t, ns), HTM.ids_in(t, ns)), l),
+        HTM.str_in(ns, HS.Timer.agent(h)), False{}, ea)
       Equal.trans(Bool, HTM.all_in(HTM.ids_in(t, ns), l), HTM.all_in(HTM.ids_in(h <> t, ns), l), True{},
         Equal.sym(Bool, HTM.all_in(HTM.ids_in(h <> t, ns), l), HTM.all_in(HTM.ids_in(t, ns), l), e2), hall)
 
 # a timer kept out of nothing (its id is in no stop) is not the agent's
-def hub_str_out(a: Bool, +h: HTM.Timer, +t: List<&2, HTM.Timer>, +ns: List<&2, String>, +l: List<&2, Nat>,
-    +ea: {HTM.str_in(ns, HTM.Timer.agent(h)) == a : Bool}, +eb: {HTM.nat_in(l, HTM.Timer.id(h)) == False{} : Bool},
+def hub_str_out(a: Bool, +h: HS.Timer, +t: List<&2, HS.Timer>, +ns: List<&2, String>, +l: List<&2, Nat>,
+    +ea: {HTM.str_in(ns, HS.Timer.agent(h)) == a : Bool}, +eb: {HTM.nat_in(l, HS.Timer.id(h)) == False{} : Bool},
     +hall: {HTM.all_in(HTM.ids_in(h <> t, ns), l) == True{} : Bool})
-    -> {HTM.str_in(ns, HTM.Timer.agent(h)) == False{} : Bool}:
+    -> {HTM.str_in(ns, HS.Timer.agent(h)) == False{} : Bool}:
   match a:
     case False{}:
       ea
     case True{}:
-      +e2 = Equal.cong(Bool, Bool, c => HTM.all_in(Bool.pick(List<&2, Nat>, c, HTM.Timer.id(h) <> HTM.ids_in(t, ns), HTM.ids_in(t, ns)), l),
-        HTM.str_in(ns, HTM.Timer.agent(h)), True{}, ea)
-      +hin = hub_and_true_l(HTM.nat_in(l, HTM.Timer.id(h)), HTM.all_in(HTM.ids_in(t, ns), l),
-        Equal.trans(Bool, HTM.all_in(HTM.Timer.id(h) <> HTM.ids_in(t, ns), l), HTM.all_in(HTM.ids_in(h <> t, ns), l), True{},
-          Equal.sym(Bool, HTM.all_in(HTM.ids_in(h <> t, ns), l), HTM.all_in(HTM.Timer.id(h) <> HTM.ids_in(t, ns), l), e2), hall))
-      PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.trans(Bool, False{}, HTM.nat_in(l, HTM.Timer.id(h)), True{},
-        Equal.sym(Bool, HTM.nat_in(l, HTM.Timer.id(h)), False{}, eb), hin)), Bool, HTM.str_in(ns, HTM.Timer.agent(h)), False{})
+      +e2 = Equal.cong(Bool, Bool, c => HTM.all_in(Bool.pick(List<&2, Nat>, c, HS.Timer.id(h) <> HTM.ids_in(t, ns), HTM.ids_in(t, ns)), l),
+        HTM.str_in(ns, HS.Timer.agent(h)), True{}, ea)
+      +hin = hub_and_true_l(HTM.nat_in(l, HS.Timer.id(h)), HTM.all_in(HTM.ids_in(t, ns), l),
+        Equal.trans(Bool, HTM.all_in(HS.Timer.id(h) <> HTM.ids_in(t, ns), l), HTM.all_in(HTM.ids_in(h <> t, ns), l), True{},
+          Equal.sym(Bool, HTM.all_in(HTM.ids_in(h <> t, ns), l), HTM.all_in(HS.Timer.id(h) <> HTM.ids_in(t, ns), l), e2), hall))
+      PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.trans(Bool, False{}, HTM.nat_in(l, HS.Timer.id(h)), True{},
+        Equal.sym(Bool, HTM.nat_in(l, HS.Timer.id(h)), False{}, eb), hin)), Bool, HTM.str_in(ns, HS.Timer.agent(h)), False{})
 
 def hub_neq_of(c: Bool, +a: String, +n: String, +ns: List<&2, String>, +ec: {String.eq(a, n) == c : Bool},
     ha: {HTM.str_in(ns, a) == False{} : Bool}, hn: {HTM.str_in(ns, n) == True{} : Bool}) -> {String.eq(a, n) == False{} : Bool}:
@@ -366,171 +367,172 @@ def hub_neq_of(c: Bool, +a: String, +n: String, +ns: List<&2, String>, +ec: {Str
       PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.trans(Bool, False{}, HTM.str_in(ns, a), True{},
         Equal.sym(Bool, HTM.str_in(ns, a), False{}, ha), Equal.trans(Bool, HTM.str_in(ns, a), HTM.str_in(ns, n), True{}, e3, hn))), Bool, String.eq(a, n), False{})
 
-def hub_none_keep.pick(b: Bool, +h: HTM.Timer, +t: List<&2, HTM.Timer>, +l: List<&2, Nat>, +ns: List<&2, String>, +n: String,
-    +eb: {HTM.nat_in(l, HTM.Timer.id(h)) == b : Bool}, +hall: {HTM.all_in(HTM.ids_in(h <> t, ns), l) == True{} : Bool},
+def hub_none_keep.pick(b: Bool, +h: HS.Timer, +t: List<&2, HS.Timer>, +l: List<&2, Nat>, +ns: List<&2, String>, +n: String,
+    +eb: {HTM.nat_in(l, HS.Timer.id(h)) == b : Bool}, +hall: {HTM.all_in(HTM.ids_in(h <> t, ns), l) == True{} : Bool},
     +hn: {HTM.str_in(ns, n) == True{} : Bool}, ih: HI.TimerNoneOf(HTM.keep_out(t, l), n))
-    -> HI.TimerNoneOf(Bool.pick(List<&2, HTM.Timer>, HTM.nat_in(l, HTM.Timer.id(h)), HTM.keep_out(t, l), h <> HTM.keep_out(t, l)), n):
+    -> HI.TimerNoneOf(Bool.pick(List<&2, HS.Timer>, HTM.nat_in(l, HS.Timer.id(h)), HTM.keep_out(t, l), h <> HTM.keep_out(t, l)), n):
   match b:
     case True{}:
-      %Equal.sym(Bool, HTM.nat_in(l, HTM.Timer.id(h)), True{}, eb) : HI.TimerNoneOf(Bool.pick(List<&2, HTM.Timer>, _, HTM.keep_out(t, l), h <> HTM.keep_out(t, l)), n)
+      %Equal.sym(Bool, HTM.nat_in(l, HS.Timer.id(h)), True{}, eb) : HI.TimerNoneOf(Bool.pick(List<&2, HS.Timer>, _, HTM.keep_out(t, l), h <> HTM.keep_out(t, l)), n)
       ih
     case False{}:
-      +ha = hub_str_out(HTM.str_in(ns, HTM.Timer.agent(h)), h, t, ns, l, {==}, eb, hall)
-      %Equal.sym(Bool, HTM.nat_in(l, HTM.Timer.id(h)), False{}, eb) : HI.TimerNoneOf(Bool.pick(List<&2, HTM.Timer>, _, HTM.keep_out(t, l), h <> HTM.keep_out(t, l)), n)
-      HX.Both{hub_neq_of(String.eq(HTM.Timer.agent(h), n), HTM.Timer.agent(h), n, ns, {==}, ha, hn), ih}
+      +ha = hub_str_out(HTM.str_in(ns, HS.Timer.agent(h)), h, t, ns, l, {==}, eb, hall)
+      %Equal.sym(Bool, HTM.nat_in(l, HS.Timer.id(h)), False{}, eb) : HI.TimerNoneOf(Bool.pick(List<&2, HS.Timer>, _, HTM.keep_out(t, l), h <> HTM.keep_out(t, l)), n)
+      HX.Both{hub_neq_of(String.eq(HS.Timer.agent(h), n), HS.Timer.agent(h), n, ns, {==}, ha, hn), ih}
 
 # keeping out every id of the agent's timers (and maybe more) leaves none
-def hub_none_keep(+xs: List<&2, HTM.Timer>, +l: List<&2, Nat>, +ns: List<&2, String>, +n: String,
+def hub_none_keep(+xs: List<&2, HS.Timer>, +l: List<&2, Nat>, +ns: List<&2, String>, +n: String,
     +hall: {HTM.all_in(HTM.ids_in(xs, ns), l) == True{} : Bool}, +hn: {HTM.str_in(ns, n) == True{} : Bool})
     -> HI.TimerNoneOf(HTM.keep_out(xs, l), n):
   match xs:
     case Nil{}:
       Unit{}
     case Con{h, t}:
-      +ht = hub_all_tail(HTM.str_in(ns, HTM.Timer.agent(h)), h, t, ns, l, {==}, hall)
-      hub_none_keep.pick(HTM.nat_in(l, HTM.Timer.id(h)), h, t, l, ns, n, {==}, hall, hn, hub_none_keep(t, l, ns, n, ht, hn))
+      +ht = hub_all_tail(HTM.str_in(ns, HS.Timer.agent(h)), h, t, ns, l, {==}, hall)
+      hub_none_keep.pick(HTM.nat_in(l, HS.Timer.id(h)), h, t, l, ns, n, {==}, hall, hn, hub_none_keep(t, l, ns, n, ht, hn))
 
 def hub_str_in_head(+n: String, +r: List<&2, String>) -> {HTM.str_in(n <> r, n) == True{} : Bool}:
   %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HLZ.or(_, u => HTM.str_in(r, n)) == True{} : Bool}
   {==}
 
-def hub_tnone_tr(-x: List<&2, HTM.Timer>, -y: List<&2, HTM.Timer>, -n: String, e: {x == y : List<&2, HTM.Timer>},
+def hub_tnone_tr(-x: List<&2, HS.Timer>, -y: List<&2, HS.Timer>, -n: String, e: {x == y : List<&2, HS.Timer>},
     l: HI.TimerNoneOf(y, n)) -> HI.TimerNoneOf(x, n):
-  %Equal.sym(List<&2, HTM.Timer>, x, y, e) : HI.TimerNoneOf(_, n)
+  %Equal.sym(List<&2, HS.Timer>, x, y, e) : HI.TimerNoneOf(_, n)
   l
 
 # a watch's line leaves the timers as they were
 def hub_live_wake(s: HM.St, +e: HWK.WkEv)
-    -> {HTM.Tms.live(HM.St.tm(HM.apply(s, HM.EWake{e}))) == HTM.Tms.live(HM.St.tm(s)) : List<&2, HTM.Timer>}:
+    -> {HS.Tms.live(HM.St.tm(HM.apply(s, HM.EWake{e}))) == HS.Tms.live(HM.St.tm(s)) : List<&2, HS.Timer>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      match tm:
-        case HTM.Tms{l, en, li, ac, na, wk}:
-          {==}
+    case HM.St{ag, od, ms, ca, no, nm, nc, +tm, xs, pz, ho, gn}:
+      %HSL.Tms.wk.eta(tm, HWK.apply(HS.Tms.wk(tm), e)) : {HS.Tms.live(_) == HS.Tms.live(tm) : List<&2, HS.Timer>}
+      {==}
 
 # a drop's watch ends leave the timers as they were
 def hub_live_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HTM.Tms.live(HM.St.tm(HX.d(o, HC.wakes_gone.each(o, ids, cx)))) == HTM.Tms.live(HM.St.tm(HX.d(o, cx))) : List<&2, HTM.Timer>}:
+    -> {HS.Tms.live(HM.St.tm(HX.d(o, HC.wakes_gone.each(o, ids, cx)))) == HS.Tms.live(HM.St.tm(HX.d(o, cx))) : List<&2, HS.Timer>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, rest}:
       +ev = {HM.EWake{HWK.WEnd{id, "gone", HC.now(o, cx)}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      +e2 = Equal.trans(List<&2, HTM.Timer>, HTM.Tms.live(HM.St.tm(HX.d(o, cx2))), HTM.Tms.live(HM.St.tm(HM.apply(HX.d(o, cx), ev))), HTM.Tms.live(HM.St.tm(HX.d(o, cx))),
-        Equal.cong(HM.St, List<&2, HTM.Timer>, s => HTM.Tms.live(HM.St.tm(s)), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+      +e2 = Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HM.St.tm(HX.d(o, cx2))), HS.Tms.live(HM.St.tm(HM.apply(HX.d(o, cx), ev))), HS.Tms.live(HM.St.tm(HX.d(o, cx))),
+        Equal.cong(HM.St, List<&2, HS.Timer>, s => HS.Tms.live(HM.St.tm(s)), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
         hub_live_wake(HX.d(o, cx), HWK.WEnd{id, "gone", HC.now(o, cx)}))
-      Equal.trans(List<&2, HTM.Timer>, HTM.Tms.live(HM.St.tm(HX.d(o, HC.wakes_gone.each(o, rest, cx2)))), HTM.Tms.live(HM.St.tm(HX.d(o, cx2))), HTM.Tms.live(HM.St.tm(HX.d(o, cx))),
+      Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HM.St.tm(HX.d(o, HC.wakes_gone.each(o, rest, cx2)))), HS.Tms.live(HM.St.tm(HX.d(o, cx2))), HS.Tms.live(HM.St.tm(HX.d(o, cx))),
         hub_live_wakes_each(o, rest, cx2), e2)
 
 # ---- the watches of `sb wake` (event-wake, hub/wakes.bend) ----
 
-def hub_wk_gone.go(c: Bool, +h: HWK.Watch, +t: List<&2, HWK.Watch>, +id: Nat, +e: {Nat.is_eq(HWK.Watch.id(h), id) == c : Bool},
-    ih: {HWK.find(HWK.drop(t, id), id) == None{} : Maybe<&2, HWK.Watch>})
-    -> {HWK.find(HWK.drop(h <> t, id), id) == None{} : Maybe<&2, HWK.Watch>}:
+def hub_wk_gone.go(c: Bool, +h: HS.Watch, +t: List<&2, HS.Watch>, +id: Nat, +e: {Nat.is_eq(HS.Watch.id(h), id) == c : Bool},
+    ih: {HWK.find(HWK.drop(t, id), id) == None{} : Maybe<&2, HS.Watch>})
+    -> {HWK.find(HWK.drop(h <> t, id), id) == None{} : Maybe<&2, HS.Watch>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HWK.Watch.id(h), id), True{}, e) : {HWK.find(Bool.pick(List<&2, HWK.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), id) == None{} : Maybe<&2, HWK.Watch>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Watch.id(h), id), True{}, e) : {HWK.find(Bool.pick(List<&2, HS.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), id) == None{} : Maybe<&2, HS.Watch>}
       ih
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HWK.Watch.id(h), id), False{}, e) : {HWK.find(Bool.pick(List<&2, HWK.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), id) == None{} : Maybe<&2, HWK.Watch>}
-      %Equal.sym(Bool, Nat.is_eq(HWK.Watch.id(h), id), False{}, e) : {HLZ.pick(Maybe<&2, HWK.Watch>, _, u => Some{h}, u => HWK.find(HWK.drop(t, id), id)) == None{} : Maybe<&2, HWK.Watch>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Watch.id(h), id), False{}, e) : {HWK.find(Bool.pick(List<&2, HS.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), id) == None{} : Maybe<&2, HS.Watch>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Watch.id(h), id), False{}, e) : {HLZ.pick(Maybe<&2, HS.Watch>, _, u => Some{h}, u => HWK.find(HWK.drop(t, id), id)) == None{} : Maybe<&2, HS.Watch>}
       ih
 
 # dropping an id leaves no watch of it
-def hub_wk_gone(+xs: List<&2, HWK.Watch>, +id: Nat) -> {HWK.find(HWK.drop(xs, id), id) == None{} : Maybe<&2, HWK.Watch>}:
+def hub_wk_gone(+xs: List<&2, HS.Watch>, +id: Nat) -> {HWK.find(HWK.drop(xs, id), id) == None{} : Maybe<&2, HS.Watch>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      hub_wk_gone.go(Nat.is_eq(HWK.Watch.id(h), id), h, t, id, {==}, hub_wk_gone(t, id))
+      hub_wk_gone.go(Nat.is_eq(HS.Watch.id(h), id), h, t, id, {==}, hub_wk_gone(t, id))
 
 # a watch kept in the due list is not the dropped id (its id differs)
-def hub_wk_due.keep(d: Bool, +h: HWK.Watch, +r: List<&2, HWK.Watch>, +id: Nat, +now: Nat,
-    +ed: {HWK.is_due(h, now) == d : Bool}, +ei: {Nat.is_eq(HWK.Watch.id(h), id) == False{} : Bool},
-    ih: {HWK.find(HWK.due(r, now), id) == None{} : Maybe<&2, HWK.Watch>})
-    -> {HWK.find(HWK.due(h <> r, now), id) == None{} : Maybe<&2, HWK.Watch>}:
+def hub_wk_due.keep(d: Bool, +h: HS.Watch, +r: List<&2, HS.Watch>, +id: Nat, +now: Nat,
+    +ed: {HWK.is_due(h, now) == d : Bool}, +ei: {Nat.is_eq(HS.Watch.id(h), id) == False{} : Bool},
+    ih: {HWK.find(HWK.due(r, now), id) == None{} : Maybe<&2, HS.Watch>})
+    -> {HWK.find(HWK.due(h <> r, now), id) == None{} : Maybe<&2, HS.Watch>}:
   match d:
     case True{}:
-      %Equal.sym(Bool, HWK.is_due(h, now), True{}, ed) : {HWK.find(Bool.pick(List<&2, HWK.Watch>, _, h <> HWK.due(r, now), HWK.due(r, now)), id) == None{} : Maybe<&2, HWK.Watch>}
-      %Equal.sym(Bool, Nat.is_eq(HWK.Watch.id(h), id), False{}, ei) : {HLZ.pick(Maybe<&2, HWK.Watch>, _, u => Some{h}, u => HWK.find(HWK.due(r, now), id)) == None{} : Maybe<&2, HWK.Watch>}
+      %Equal.sym(Bool, HWK.is_due(h, now), True{}, ed) : {HWK.find(Bool.pick(List<&2, HS.Watch>, _, h <> HWK.due(r, now), HWK.due(r, now)), id) == None{} : Maybe<&2, HS.Watch>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Watch.id(h), id), False{}, ei) : {HLZ.pick(Maybe<&2, HS.Watch>, _, u => Some{h}, u => HWK.find(HWK.due(r, now), id)) == None{} : Maybe<&2, HS.Watch>}
       ih
     case False{}:
-      %Equal.sym(Bool, HWK.is_due(h, now), False{}, ed) : {HWK.find(Bool.pick(List<&2, HWK.Watch>, _, h <> HWK.due(r, now), HWK.due(r, now)), id) == None{} : Maybe<&2, HWK.Watch>}
+      %Equal.sym(Bool, HWK.is_due(h, now), False{}, ed) : {HWK.find(Bool.pick(List<&2, HS.Watch>, _, h <> HWK.due(r, now), HWK.due(r, now)), id) == None{} : Maybe<&2, HS.Watch>}
       ih
 
-def hub_wk_due.go(c: Bool, +h: HWK.Watch, +t: List<&2, HWK.Watch>, +id: Nat, +now: Nat,
-    +e: {Nat.is_eq(HWK.Watch.id(h), id) == c : Bool},
-    ih: {HWK.find(HWK.due(HWK.drop(t, id), now), id) == None{} : Maybe<&2, HWK.Watch>})
-    -> {HWK.find(HWK.due(HWK.drop(h <> t, id), now), id) == None{} : Maybe<&2, HWK.Watch>}:
+def hub_wk_due.go(c: Bool, +h: HS.Watch, +t: List<&2, HS.Watch>, +id: Nat, +now: Nat,
+    +e: {Nat.is_eq(HS.Watch.id(h), id) == c : Bool},
+    ih: {HWK.find(HWK.due(HWK.drop(t, id), now), id) == None{} : Maybe<&2, HS.Watch>})
+    -> {HWK.find(HWK.due(HWK.drop(h <> t, id), now), id) == None{} : Maybe<&2, HS.Watch>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HWK.Watch.id(h), id), True{}, e) : {HWK.find(HWK.due(Bool.pick(List<&2, HWK.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), now), id) == None{} : Maybe<&2, HWK.Watch>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Watch.id(h), id), True{}, e) : {HWK.find(HWK.due(Bool.pick(List<&2, HS.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), now), id) == None{} : Maybe<&2, HS.Watch>}
       ih
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HWK.Watch.id(h), id), False{}, e) : {HWK.find(HWK.due(Bool.pick(List<&2, HWK.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), now), id) == None{} : Maybe<&2, HWK.Watch>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Watch.id(h), id), False{}, e) : {HWK.find(HWK.due(Bool.pick(List<&2, HS.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), now), id) == None{} : Maybe<&2, HS.Watch>}
       hub_wk_due.keep(HWK.is_due(h, now), h, HWK.drop(t, id), id, now, {==}, e, ih)
 
-def hub_wk_keep_nil(+xs: List<&2, HWK.Watch>) -> {HWK.keep_out(xs, Nil{}) == xs : List<&2, HWK.Watch>}:
+def hub_wk_keep_nil(+xs: List<&2, HS.Watch>) -> {HWK.keep_out(xs, Nil{}) == xs : List<&2, HS.Watch>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      Equal.cong(List<&2, HWK.Watch>, List<&2, HWK.Watch>, ys => h <> ys, HWK.keep_out(t, Nil{}), t, hub_wk_keep_nil(t))
+      Equal.cong(List<&2, HS.Watch>, List<&2, HS.Watch>, ys => h <> ys, HWK.keep_out(t, Nil{}), t, hub_wk_keep_nil(t))
 
-def hub_wk_keep_drop.pick(c: Bool, +h: HWK.Watch, +t: List<&2, HWK.Watch>, +id: Nat, +rest: List<&2, Nat>,
-    +e: {Nat.is_eq(HWK.Watch.id(h), id) == c : Bool},
-    ih: {HWK.keep_out(HWK.drop(t, id), rest) == HWK.keep_out(t, id <> rest) : List<&2, HWK.Watch>})
-    -> {HWK.keep_out(Bool.pick(List<&2, HWK.Watch>, Nat.is_eq(HWK.Watch.id(h), id), HWK.drop(t, id), h <> HWK.drop(t, id)), rest)
-        == Bool.pick(List<&2, HWK.Watch>, HLZ.or(Nat.is_eq(HWK.Watch.id(h), id), u => HWK.nat_in(rest, HWK.Watch.id(h))), HWK.keep_out(t, id <> rest), h <> HWK.keep_out(t, id <> rest)) : List<&2, HWK.Watch>}:
+def hub_wk_keep_drop.pick(c: Bool, +h: HS.Watch, +t: List<&2, HS.Watch>, +id: Nat, +rest: List<&2, Nat>,
+    +e: {Nat.is_eq(HS.Watch.id(h), id) == c : Bool},
+    ih: {HWK.keep_out(HWK.drop(t, id), rest) == HWK.keep_out(t, id <> rest) : List<&2, HS.Watch>})
+    -> {HWK.keep_out(Bool.pick(List<&2, HS.Watch>, Nat.is_eq(HS.Watch.id(h), id), HWK.drop(t, id), h <> HWK.drop(t, id)), rest)
+        == Bool.pick(List<&2, HS.Watch>, HLZ.or(Nat.is_eq(HS.Watch.id(h), id), u => HWK.nat_in(rest, HS.Watch.id(h))), HWK.keep_out(t, id <> rest), h <> HWK.keep_out(t, id <> rest)) : List<&2, HS.Watch>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HWK.Watch.id(h), id), True{}, e) : {HWK.keep_out(Bool.pick(List<&2, HWK.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), rest)
-        == Bool.pick(List<&2, HWK.Watch>, HLZ.or(_, u => HWK.nat_in(rest, HWK.Watch.id(h))), HWK.keep_out(t, id <> rest), h <> HWK.keep_out(t, id <> rest)) : List<&2, HWK.Watch>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Watch.id(h), id), True{}, e) : {HWK.keep_out(Bool.pick(List<&2, HS.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), rest)
+        == Bool.pick(List<&2, HS.Watch>, HLZ.or(_, u => HWK.nat_in(rest, HS.Watch.id(h))), HWK.keep_out(t, id <> rest), h <> HWK.keep_out(t, id <> rest)) : List<&2, HS.Watch>}
       ih
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HWK.Watch.id(h), id), False{}, e) : {HWK.keep_out(Bool.pick(List<&2, HWK.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), rest)
-        == Bool.pick(List<&2, HWK.Watch>, HLZ.or(_, u => HWK.nat_in(rest, HWK.Watch.id(h))), HWK.keep_out(t, id <> rest), h <> HWK.keep_out(t, id <> rest)) : List<&2, HWK.Watch>}
-      Equal.cong(List<&2, HWK.Watch>, List<&2, HWK.Watch>, ys => Bool.pick(List<&2, HWK.Watch>, HWK.nat_in(rest, HWK.Watch.id(h)), ys, h <> ys),
+      %Equal.sym(Bool, Nat.is_eq(HS.Watch.id(h), id), False{}, e) : {HWK.keep_out(Bool.pick(List<&2, HS.Watch>, _, HWK.drop(t, id), h <> HWK.drop(t, id)), rest)
+        == Bool.pick(List<&2, HS.Watch>, HLZ.or(_, u => HWK.nat_in(rest, HS.Watch.id(h))), HWK.keep_out(t, id <> rest), h <> HWK.keep_out(t, id <> rest)) : List<&2, HS.Watch>}
+      Equal.cong(List<&2, HS.Watch>, List<&2, HS.Watch>, ys => Bool.pick(List<&2, HS.Watch>, HWK.nat_in(rest, HS.Watch.id(h)), ys, h <> ys),
         HWK.keep_out(HWK.drop(t, id), rest), HWK.keep_out(t, id <> rest), ih)
 
-def hub_wk_keep_drop(+xs: List<&2, HWK.Watch>, +id: Nat, +rest: List<&2, Nat>)
-    -> {HWK.keep_out(HWK.drop(xs, id), rest) == HWK.keep_out(xs, id <> rest) : List<&2, HWK.Watch>}:
+def hub_wk_keep_drop(+xs: List<&2, HS.Watch>, +id: Nat, +rest: List<&2, Nat>)
+    -> {HWK.keep_out(HWK.drop(xs, id), rest) == HWK.keep_out(xs, id <> rest) : List<&2, HS.Watch>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      hub_wk_keep_drop.pick(Nat.is_eq(HWK.Watch.id(h), id), h, t, id, rest, {==}, hub_wk_keep_drop(t, id, rest))
+      hub_wk_keep_drop.pick(Nat.is_eq(HS.Watch.id(h), id), h, t, id, rest, {==}, hub_wk_keep_drop(t, id, rest))
 
 def hub_wk_live_end(s: HM.St, +id: Nat, +why: String, +at: Nat)
-    -> {HWK.Wakes.live(HTM.Tms.wk(HM.St.tm(HM.apply(s, HM.EWake{HWK.WEnd{id, why, at}})))) == HWK.drop(HWK.Wakes.live(HTM.Tms.wk(HM.St.tm(s))), id) : List<&2, HWK.Watch>}:
+    -> {HS.Wakes.live(HS.Tms.wk(HM.St.tm(HM.apply(s, HM.EWake{HWK.WEnd{id, why, at}})))) == HWK.drop(HS.Wakes.live(HS.Tms.wk(HM.St.tm(s))), id) : List<&2, HS.Watch>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      match tm:
-        case HTM.Tms{l, en, li, ac, na, wk}:
-          match wk:
-            case HWK.Wakes{wl, we, wi}:
-              {==}
+    case HM.St{ag, od, ms, ca, no, nm, nc, +tm, xs, pz, ho, gn}:
+      +ws = HS.Tms.wk(tm)
+      +w2 = HWK.end(ws, id, why, at)
+      +d = HWK.drop(HS.Wakes.live(ws), id)
+      %Equal.sym(HS.Wakes, HS.Tms.wk(HS.Tms.with_wk(tm, w2)), w2, HSL.Tms.wk.get_with(tm, w2)) : {HS.Wakes.live(_) == d : List<&2, HS.Watch>}
+      %HSL.Wakes.ended.eta(HS.Wakes.with_live(ws, d), HWK.ended_add(HWK.find(HS.Wakes.live(ws), id), HS.Wakes.ended(ws), at, why))
+        : {HS.Wakes.live(_) == d : List<&2, HS.Watch>}
+      HSL.Wakes.live.get_with(ws, d)
 
 # the live watches after a drop's ends: those of no ended id
 def hub_wk_live_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HWK.Wakes.live(HC.wks(o, HC.wakes_gone.each(o, ids, cx))) == HWK.keep_out(HWK.Wakes.live(HC.wks(o, cx)), ids) : List<&2, HWK.Watch>}:
+    -> {HS.Wakes.live(HC.wks(o, HC.wakes_gone.each(o, ids, cx))) == HWK.keep_out(HS.Wakes.live(HC.wks(o, cx)), ids) : List<&2, HS.Watch>}:
   match ids:
     case Nil{}:
-      Equal.sym(List<&2, HWK.Watch>, HWK.keep_out(HWK.Wakes.live(HC.wks(o, cx)), Nil{}), HWK.Wakes.live(HC.wks(o, cx)),
-        hub_wk_keep_nil(HWK.Wakes.live(HC.wks(o, cx))))
+      Equal.sym(List<&2, HS.Watch>, HWK.keep_out(HS.Wakes.live(HC.wks(o, cx)), Nil{}), HS.Wakes.live(HC.wks(o, cx)),
+        hub_wk_keep_nil(HS.Wakes.live(HC.wks(o, cx))))
     case Con{id, rest}:
       +ev = {HM.EWake{HWK.WEnd{id, "gone", HC.now(o, cx)}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      +l = HWK.Wakes.live(HC.wks(o, cx))
-      +l2 = HWK.Wakes.live(HC.wks(o, cx2))
-      +e2 = Equal.trans(List<&2, HWK.Watch>, l2, HWK.Wakes.live(HTM.Tms.wk(HM.St.tm(HM.apply(HX.d(o, cx), ev)))), HWK.drop(l, id),
-        Equal.cong(HM.St, List<&2, HWK.Watch>, s => HWK.Wakes.live(HTM.Tms.wk(HM.St.tm(s))), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+      +l = HS.Wakes.live(HC.wks(o, cx))
+      +l2 = HS.Wakes.live(HC.wks(o, cx2))
+      +e2 = Equal.trans(List<&2, HS.Watch>, l2, HS.Wakes.live(HS.Tms.wk(HM.St.tm(HM.apply(HX.d(o, cx), ev)))), HWK.drop(l, id),
+        Equal.cong(HM.St, List<&2, HS.Watch>, s => HS.Wakes.live(HS.Tms.wk(HM.St.tm(s))), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
         hub_wk_live_end(HX.d(o, cx), id, "gone", HC.now(o, cx)))
-      Equal.trans(List<&2, HWK.Watch>, HWK.Wakes.live(HC.wks(o, HC.wakes_gone.each(o, rest, cx2))), HWK.keep_out(l2, rest), HWK.keep_out(l, id <> rest),
+      Equal.trans(List<&2, HS.Watch>, HS.Wakes.live(HC.wks(o, HC.wakes_gone.each(o, rest, cx2))), HWK.keep_out(l2, rest), HWK.keep_out(l, id <> rest),
         hub_wk_live_each(o, rest, cx2),
-        Equal.trans(List<&2, HWK.Watch>, HWK.keep_out(l2, rest), HWK.keep_out(HWK.drop(l, id), rest), HWK.keep_out(l, id <> rest),
-          Equal.cong(List<&2, HWK.Watch>, List<&2, HWK.Watch>, ys => HWK.keep_out(ys, rest), l2, HWK.drop(l, id), e2),
+        Equal.trans(List<&2, HS.Watch>, HWK.keep_out(l2, rest), HWK.keep_out(HWK.drop(l, id), rest), HWK.keep_out(l, id <> rest),
+          Equal.cong(List<&2, HS.Watch>, List<&2, HS.Watch>, ys => HWK.keep_out(ys, rest), l2, HWK.drop(l, id), e2),
           hub_wk_keep_drop(l, id, rest)))
 
 def hub_wk_all_weak(+xs: List<&2, Nat>, +h: Nat, +l: List<&2, Nat>, +e: {HWK.all_in(xs, l) == True{} : Bool}) -> {HWK.all_in(xs, h <> l) == True{} : Bool}:
@@ -552,37 +554,37 @@ def hub_wk_all_self(+xs: List<&2, Nat>) -> {HWK.all_in(xs, xs) == True{} : Bool}
       %Equal.sym(Bool, Nat.is_eq(h, h), True{}, PL1.hub_eq_refl(h)) : {HLZ.and(HLZ.or(_, u => HWK.nat_in(t, h)), u => HWK.all_in(t, h <> t)) == True{} : Bool}
       hub_wk_all_weak(t, h, t, hub_wk_all_self(t))
 
-def hub_wk_all_tail(a: Bool, +h: HWK.Watch, +t: List<&2, HWK.Watch>, +ns: List<&2, String>, +l: List<&2, Nat>,
-    +ea: {HWK.str_in(ns, HWK.Watch.agent(h)) == a : Bool}, +hall: {HWK.all_in(HWK.ids_of(h <> t, ns), l) == True{} : Bool})
+def hub_wk_all_tail(a: Bool, +h: HS.Watch, +t: List<&2, HS.Watch>, +ns: List<&2, String>, +l: List<&2, Nat>,
+    +ea: {HWK.str_in(ns, HS.Watch.agent(h)) == a : Bool}, +hall: {HWK.all_in(HWK.ids_of(h <> t, ns), l) == True{} : Bool})
     -> {HWK.all_in(HWK.ids_of(t, ns), l) == True{} : Bool}:
   match a:
     case True{}:
-      +e2 = Equal.cong(Bool, Bool, c => HWK.all_in(Bool.pick(List<&2, Nat>, c, HWK.Watch.id(h) <> HWK.ids_of(t, ns), HWK.ids_of(t, ns)), l),
-        HWK.str_in(ns, HWK.Watch.agent(h)), True{}, ea)
-      hub_and_true_r(HWK.nat_in(l, HWK.Watch.id(h)), HWK.all_in(HWK.ids_of(t, ns), l),
-        Equal.trans(Bool, HWK.all_in(HWK.Watch.id(h) <> HWK.ids_of(t, ns), l), HWK.all_in(HWK.ids_of(h <> t, ns), l), True{},
-          Equal.sym(Bool, HWK.all_in(HWK.ids_of(h <> t, ns), l), HWK.all_in(HWK.Watch.id(h) <> HWK.ids_of(t, ns), l), e2), hall))
+      +e2 = Equal.cong(Bool, Bool, c => HWK.all_in(Bool.pick(List<&2, Nat>, c, HS.Watch.id(h) <> HWK.ids_of(t, ns), HWK.ids_of(t, ns)), l),
+        HWK.str_in(ns, HS.Watch.agent(h)), True{}, ea)
+      hub_and_true_r(HWK.nat_in(l, HS.Watch.id(h)), HWK.all_in(HWK.ids_of(t, ns), l),
+        Equal.trans(Bool, HWK.all_in(HS.Watch.id(h) <> HWK.ids_of(t, ns), l), HWK.all_in(HWK.ids_of(h <> t, ns), l), True{},
+          Equal.sym(Bool, HWK.all_in(HWK.ids_of(h <> t, ns), l), HWK.all_in(HS.Watch.id(h) <> HWK.ids_of(t, ns), l), e2), hall))
     case False{}:
-      +e2 = Equal.cong(Bool, Bool, c => HWK.all_in(Bool.pick(List<&2, Nat>, c, HWK.Watch.id(h) <> HWK.ids_of(t, ns), HWK.ids_of(t, ns)), l),
-        HWK.str_in(ns, HWK.Watch.agent(h)), False{}, ea)
+      +e2 = Equal.cong(Bool, Bool, c => HWK.all_in(Bool.pick(List<&2, Nat>, c, HS.Watch.id(h) <> HWK.ids_of(t, ns), HWK.ids_of(t, ns)), l),
+        HWK.str_in(ns, HS.Watch.agent(h)), False{}, ea)
       Equal.trans(Bool, HWK.all_in(HWK.ids_of(t, ns), l), HWK.all_in(HWK.ids_of(h <> t, ns), l), True{},
         Equal.sym(Bool, HWK.all_in(HWK.ids_of(h <> t, ns), l), HWK.all_in(HWK.ids_of(t, ns), l), e2), hall)
 
-def hub_wk_str_out(a: Bool, +h: HWK.Watch, +t: List<&2, HWK.Watch>, +ns: List<&2, String>, +l: List<&2, Nat>,
-    +ea: {HWK.str_in(ns, HWK.Watch.agent(h)) == a : Bool}, +eb: {HWK.nat_in(l, HWK.Watch.id(h)) == False{} : Bool},
+def hub_wk_str_out(a: Bool, +h: HS.Watch, +t: List<&2, HS.Watch>, +ns: List<&2, String>, +l: List<&2, Nat>,
+    +ea: {HWK.str_in(ns, HS.Watch.agent(h)) == a : Bool}, +eb: {HWK.nat_in(l, HS.Watch.id(h)) == False{} : Bool},
     +hall: {HWK.all_in(HWK.ids_of(h <> t, ns), l) == True{} : Bool})
-    -> {HWK.str_in(ns, HWK.Watch.agent(h)) == False{} : Bool}:
+    -> {HWK.str_in(ns, HS.Watch.agent(h)) == False{} : Bool}:
   match a:
     case False{}:
       ea
     case True{}:
-      +e2 = Equal.cong(Bool, Bool, c => HWK.all_in(Bool.pick(List<&2, Nat>, c, HWK.Watch.id(h) <> HWK.ids_of(t, ns), HWK.ids_of(t, ns)), l),
-        HWK.str_in(ns, HWK.Watch.agent(h)), True{}, ea)
-      +hin = hub_and_true_l(HWK.nat_in(l, HWK.Watch.id(h)), HWK.all_in(HWK.ids_of(t, ns), l),
-        Equal.trans(Bool, HWK.all_in(HWK.Watch.id(h) <> HWK.ids_of(t, ns), l), HWK.all_in(HWK.ids_of(h <> t, ns), l), True{},
-          Equal.sym(Bool, HWK.all_in(HWK.ids_of(h <> t, ns), l), HWK.all_in(HWK.Watch.id(h) <> HWK.ids_of(t, ns), l), e2), hall))
-      PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.trans(Bool, False{}, HWK.nat_in(l, HWK.Watch.id(h)), True{},
-        Equal.sym(Bool, HWK.nat_in(l, HWK.Watch.id(h)), False{}, eb), hin)), Bool, HWK.str_in(ns, HWK.Watch.agent(h)), False{})
+      +e2 = Equal.cong(Bool, Bool, c => HWK.all_in(Bool.pick(List<&2, Nat>, c, HS.Watch.id(h) <> HWK.ids_of(t, ns), HWK.ids_of(t, ns)), l),
+        HWK.str_in(ns, HS.Watch.agent(h)), True{}, ea)
+      +hin = hub_and_true_l(HWK.nat_in(l, HS.Watch.id(h)), HWK.all_in(HWK.ids_of(t, ns), l),
+        Equal.trans(Bool, HWK.all_in(HS.Watch.id(h) <> HWK.ids_of(t, ns), l), HWK.all_in(HWK.ids_of(h <> t, ns), l), True{},
+          Equal.sym(Bool, HWK.all_in(HWK.ids_of(h <> t, ns), l), HWK.all_in(HS.Watch.id(h) <> HWK.ids_of(t, ns), l), e2), hall))
+      PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.trans(Bool, False{}, HWK.nat_in(l, HS.Watch.id(h)), True{},
+        Equal.sym(Bool, HWK.nat_in(l, HS.Watch.id(h)), False{}, eb), hin)), Bool, HWK.str_in(ns, HS.Watch.agent(h)), False{})
 
 def hub_wk_neq_of(c: Bool, +a: String, +n: String, +ns: List<&2, String>, +ec: {String.eq(a, n) == c : Bool},
     ha: {HWK.str_in(ns, a) == False{} : Bool}, hn: {HWK.str_in(ns, n) == True{} : Bool}) -> {String.eq(a, n) == False{} : Bool}:
@@ -595,37 +597,37 @@ def hub_wk_neq_of(c: Bool, +a: String, +n: String, +ns: List<&2, String>, +ec: {
       PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.trans(Bool, False{}, HWK.str_in(ns, a), True{},
         Equal.sym(Bool, HWK.str_in(ns, a), False{}, ha), Equal.trans(Bool, HWK.str_in(ns, a), HWK.str_in(ns, n), True{}, e3, hn))), Bool, String.eq(a, n), False{})
 
-def hub_wk_none_keep.pick(b: Bool, +h: HWK.Watch, +t: List<&2, HWK.Watch>, +l: List<&2, Nat>, +ns: List<&2, String>, +n: String,
-    +eb: {HWK.nat_in(l, HWK.Watch.id(h)) == b : Bool}, +hall: {HWK.all_in(HWK.ids_of(h <> t, ns), l) == True{} : Bool},
+def hub_wk_none_keep.pick(b: Bool, +h: HS.Watch, +t: List<&2, HS.Watch>, +l: List<&2, Nat>, +ns: List<&2, String>, +n: String,
+    +eb: {HWK.nat_in(l, HS.Watch.id(h)) == b : Bool}, +hall: {HWK.all_in(HWK.ids_of(h <> t, ns), l) == True{} : Bool},
     +hn: {HWK.str_in(ns, n) == True{} : Bool}, ih: HI.WatchNoneOf(HWK.keep_out(t, l), n))
-    -> HI.WatchNoneOf(Bool.pick(List<&2, HWK.Watch>, HWK.nat_in(l, HWK.Watch.id(h)), HWK.keep_out(t, l), h <> HWK.keep_out(t, l)), n):
+    -> HI.WatchNoneOf(Bool.pick(List<&2, HS.Watch>, HWK.nat_in(l, HS.Watch.id(h)), HWK.keep_out(t, l), h <> HWK.keep_out(t, l)), n):
   match b:
     case True{}:
-      %Equal.sym(Bool, HWK.nat_in(l, HWK.Watch.id(h)), True{}, eb) : HI.WatchNoneOf(Bool.pick(List<&2, HWK.Watch>, _, HWK.keep_out(t, l), h <> HWK.keep_out(t, l)), n)
+      %Equal.sym(Bool, HWK.nat_in(l, HS.Watch.id(h)), True{}, eb) : HI.WatchNoneOf(Bool.pick(List<&2, HS.Watch>, _, HWK.keep_out(t, l), h <> HWK.keep_out(t, l)), n)
       ih
     case False{}:
-      +ha = hub_wk_str_out(HWK.str_in(ns, HWK.Watch.agent(h)), h, t, ns, l, {==}, eb, hall)
-      %Equal.sym(Bool, HWK.nat_in(l, HWK.Watch.id(h)), False{}, eb) : HI.WatchNoneOf(Bool.pick(List<&2, HWK.Watch>, _, HWK.keep_out(t, l), h <> HWK.keep_out(t, l)), n)
-      HX.Both{hub_wk_neq_of(String.eq(HWK.Watch.agent(h), n), HWK.Watch.agent(h), n, ns, {==}, ha, hn), ih}
+      +ha = hub_wk_str_out(HWK.str_in(ns, HS.Watch.agent(h)), h, t, ns, l, {==}, eb, hall)
+      %Equal.sym(Bool, HWK.nat_in(l, HS.Watch.id(h)), False{}, eb) : HI.WatchNoneOf(Bool.pick(List<&2, HS.Watch>, _, HWK.keep_out(t, l), h <> HWK.keep_out(t, l)), n)
+      HX.Both{hub_wk_neq_of(String.eq(HS.Watch.agent(h), n), HS.Watch.agent(h), n, ns, {==}, ha, hn), ih}
 
 # keeping out every id of the agent's watches leaves none
-def hub_wk_none_keep(+xs: List<&2, HWK.Watch>, +l: List<&2, Nat>, +ns: List<&2, String>, +n: String,
+def hub_wk_none_keep(+xs: List<&2, HS.Watch>, +l: List<&2, Nat>, +ns: List<&2, String>, +n: String,
     +hall: {HWK.all_in(HWK.ids_of(xs, ns), l) == True{} : Bool}, +hn: {HWK.str_in(ns, n) == True{} : Bool})
     -> HI.WatchNoneOf(HWK.keep_out(xs, l), n):
   match xs:
     case Nil{}:
       Unit{}
     case Con{h, t}:
-      +ht = hub_wk_all_tail(HWK.str_in(ns, HWK.Watch.agent(h)), h, t, ns, l, {==}, hall)
-      hub_wk_none_keep.pick(HWK.nat_in(l, HWK.Watch.id(h)), h, t, l, ns, n, {==}, hall, hn, hub_wk_none_keep(t, l, ns, n, ht, hn))
+      +ht = hub_wk_all_tail(HWK.str_in(ns, HS.Watch.agent(h)), h, t, ns, l, {==}, hall)
+      hub_wk_none_keep.pick(HWK.nat_in(l, HS.Watch.id(h)), h, t, l, ns, n, {==}, hall, hn, hub_wk_none_keep(t, l, ns, n, ht, hn))
 
 def hub_wk_str_in_head(+n: String, +r: List<&2, String>) -> {HWK.str_in(n <> r, n) == True{} : Bool}:
   %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {HLZ.or(_, u => HWK.str_in(r, n)) == True{} : Bool}
   {==}
 
-def hub_wnone_tr(-x: List<&2, HWK.Watch>, -y: List<&2, HWK.Watch>, -n: String, e: {x == y : List<&2, HWK.Watch>},
+def hub_wnone_tr(-x: List<&2, HS.Watch>, -y: List<&2, HS.Watch>, -n: String, e: {x == y : List<&2, HS.Watch>},
     l: HI.WatchNoneOf(y, n)) -> HI.WatchNoneOf(x, n):
-  %Equal.sym(List<&2, HWK.Watch>, x, y, e) : HI.WatchNoneOf(_, n)
+  %Equal.sym(List<&2, HS.Watch>, x, y, e) : HI.WatchNoneOf(_, n)
   l
 
 # the settled head is not open
@@ -678,25 +680,25 @@ def hub_x_seen(+xs: List<&2, HXH.XIn>, +i: HXH.XIn) -> {HXB.seen.of(HXH.xin_of(L
     case Con{h, t}:
       hub_x_seen.go(Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))), h, t, i, {==}, hub_x_seen(t, i))
 
-def hub_act_gone.go(c: Bool, +h: HTM.Act, +t: List<&2, HTM.Act>, +id: Nat, +e: {Nat.is_eq(HTM.Act.id(h), id) == c : Bool},
-    ih: {HTM.act_find(HTM.act_drop(t, id), id) == None{} : Maybe<&2, HTM.Act>})
-    -> {HTM.act_find(HTM.act_drop(h <> t, id), id) == None{} : Maybe<&2, HTM.Act>}:
+def hub_act_gone.go(c: Bool, +h: HS.Act, +t: List<&2, HS.Act>, +id: Nat, +e: {Nat.is_eq(HS.Act.id(h), id) == c : Bool},
+    ih: {HTM.act_find(HTM.act_drop(t, id), id) == None{} : Maybe<&2, HS.Act>})
+    -> {HTM.act_find(HTM.act_drop(h <> t, id), id) == None{} : Maybe<&2, HS.Act>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HTM.Act.id(h), id), True{}, e) : {HTM.act_find(Bool.pick(List<&2, HTM.Act>, _, HTM.act_drop(t, id), h <> HTM.act_drop(t, id)), id) == None{} : Maybe<&2, HTM.Act>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Act.id(h), id), True{}, e) : {HTM.act_find(Bool.pick(List<&2, HS.Act>, _, HTM.act_drop(t, id), h <> HTM.act_drop(t, id)), id) == None{} : Maybe<&2, HS.Act>}
       ih
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HTM.Act.id(h), id), False{}, e) : {HTM.act_find(Bool.pick(List<&2, HTM.Act>, _, HTM.act_drop(t, id), h <> HTM.act_drop(t, id)), id) == None{} : Maybe<&2, HTM.Act>}
-      %Equal.sym(Bool, Nat.is_eq(HTM.Act.id(h), id), False{}, e) : {HLZ.pick(Maybe<&2, HTM.Act>, _, u => Some{h}, u => HTM.act_find(HTM.act_drop(t, id), id)) == None{} : Maybe<&2, HTM.Act>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Act.id(h), id), False{}, e) : {HTM.act_find(Bool.pick(List<&2, HS.Act>, _, HTM.act_drop(t, id), h <> HTM.act_drop(t, id)), id) == None{} : Maybe<&2, HS.Act>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Act.id(h), id), False{}, e) : {HLZ.pick(Maybe<&2, HS.Act>, _, u => Some{h}, u => HTM.act_find(HTM.act_drop(t, id), id)) == None{} : Maybe<&2, HS.Act>}
       ih
 
 # dropping an id leaves no act of it
-def hub_act_gone(+xs: List<&2, HTM.Act>, +id: Nat) -> {HTM.act_find(HTM.act_drop(xs, id), id) == None{} : Maybe<&2, HTM.Act>}:
+def hub_act_gone(+xs: List<&2, HS.Act>, +id: Nat) -> {HTM.act_find(HTM.act_drop(xs, id), id) == None{} : Maybe<&2, HS.Act>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      hub_act_gone.go(Nat.is_eq(HTM.Act.id(h), id), h, t, id, {==}, hub_act_gone(t, id))
+      hub_act_gone.go(Nat.is_eq(HS.Act.id(h), id), h, t, id, {==}, hub_act_gone(t, id))
 
 # ---- the hot messages (issue 21): St.hot, the walks' index ----
 

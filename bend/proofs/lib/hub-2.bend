@@ -24,7 +24,7 @@ def hub_cards_wakes(-o: HM.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
     case HS.LFailed{}:
       {==}
     case HS.LArchived{}:
-      PL1.hub_cards_wakes_each(o, HWK.ids_of(HWK.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
+      PL1.hub_cards_wakes_each(o, HWK.ids_of(HS.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
 
 def hub_msgs_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
     -> {HM.every(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}:

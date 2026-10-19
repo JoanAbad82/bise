@@ -438,14 +438,14 @@ def timer_evs(+ended: Bool, evs: List<&2, M.Ev>) -> Bool:
 def timers_live(go: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
   match go:
     case True{}:
-      Some{TM.live_json(TM.Tms.live(M.St.tm(s)))}
+      Some{TM.live_json(S.Tms.live(M.St.tm(s)))}
     case False{}:
       None{}
 
 def timers_ended(go: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
   match go:
     case True{}:
-      Some{TM.ended_list_json(TM.Tms.ended(M.St.tm(s)))}
+      Some{TM.ended_list_json(S.Tms.ended(M.St.tm(s)))}
     case False{}:
       None{}
 
@@ -463,14 +463,14 @@ def wake_evs(evs: List<&2, M.Ev>) -> Bool:
 def wakes_live(go: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
   match go:
     case True{}:
-      Some{WK.live_json(WK.Wakes.live(TM.Tms.wk(M.St.tm(s))))}
+      Some{WK.live_json(S.Wakes.live(S.Tms.wk(M.St.tm(s))))}
     case False{}:
       None{}
 
 def wakes_ended(go: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
   match go:
     case True{}:
-      Some{WK.ended_list_json(WK.Wakes.ended(TM.Tms.wk(M.St.tm(s))))}
+      Some{WK.ended_list_json(S.Wakes.ended(S.Tms.wk(M.St.tm(s))))}
     case False{}:
       None{}
 

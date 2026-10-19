@@ -169,8 +169,8 @@ def reply_due(+x: XH.Xs, +msg: Nat) -> Maybe<&2, XH.XIn>:
 # ---- the acts ----
 
 # the act of a retry of `xid` after `tries` failures, due from `now`
-def retry_act(+tm: TM.Tms, +xid: Nat, +tries: Nat, +now: Nat) -> TM.Act:
-  TM.Act{TM.Tms.next_act(tm), Nat.add(now, backoff(tries)), TM.Retry{xid}}
+def retry_act(+tm: S.Tms, +xid: Nat, +tries: Nat, +now: Nat) -> S.Act:
+  TM.act_of(S.Tms.next_act(tm), Nat.add(now, backoff(tries)), S.Retry{xid})
 
 # ---- the routing hold (home side, step 2) ----
 
@@ -181,13 +181,13 @@ def HOLD_MS() -> Nat:
 
 # a new held route: the next rid, due HOLD_MS from `now`, its act the
 # clock's next one
-def new_route(+x: XH.Xs, +tm: TM.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +now: Nat, +context: String, +parts: String) -> XH.Route:
-  XH.Route{XH.Xs.next_rid(x), text, via, to, name, Nat.add(now, HOLD_MS()), TM.Tms.next_act(tm), why, XH.RHeld{}, context, parts}
+def new_route(+x: XH.Xs, +tm: S.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +now: Nat, +context: String, +parts: String) -> XH.Route:
+  XH.Route{XH.Xs.next_rid(x), text, via, to, name, Nat.add(now, HOLD_MS()), S.Tms.next_act(tm), why, XH.RHeld{}, context, parts}
 
 # the act that sends a held route at its due time (law
 # route_fires_at_due_only: timers.bend's acts_due)
-def route_act(+r: XH.Route) -> TM.Act:
-  TM.Act{XH.Route.act(r), XH.Route.due(r), TM.RouteSend{XH.Route.rid(r)}}
+def route_act(+r: XH.Route) -> S.Act:
+  TM.act_of(XH.Route.act(r), XH.Route.due(r), S.RouteSend{XH.Route.rid(r)})
 
 def is_held(s: XH.RSt) -> Bool:
   match s:

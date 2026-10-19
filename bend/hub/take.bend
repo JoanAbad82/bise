@@ -104,22 +104,22 @@ def take.cards(-o: M.St, cs: List<&2, S.Card>, +cx: X.Cx<o>, +n: String, +h: Str
     case Con{+c, +rest}:
       take.cards(o, rest, take.card(o, String.eq(S.Card.agent(c), n), cx, c, h), n, h)
 
-def take.timers(-o: M.St, ts: List<&2, TM.Timer>, +cx: X.Cx<o>, +h: String, +why: String) -> X.Cx<o>:
+def take.timers(-o: M.St, ts: List<&2, S.Timer>, +cx: X.Cx<o>, +h: String, +why: String) -> X.Cx<o>:
   match ts:
     case Nil{}:
       cx
     case Con{+t, +rest}:
-      +cx2 = X.emit(o, cx, M.ETimerStop{TM.Timer.id(t), why, X.now(o, cx)}, Unit{}, Unit{}, Unit{})
-      +id = {1n+TM.Tms.last_id(M.St.tm(X.d(o, cx2))) : Nat}
+      +cx2 = X.emit(o, cx, M.ETimerStop{S.Timer.id(t), why, X.now(o, cx)}, Unit{}, Unit{}, Unit{})
+      +id = {1n+S.Tms.last_id(M.St.tm(X.d(o, cx2))) : Nat}
       take.timers(o, rest, X.emit(o, cx2, M.ETimerSet{TM.moved(t, h, id), X.now(o, cx2)}, Unit{}, Unit{}, Unit{}), h, why)
 
-def take.watches(-o: M.St, ws: List<&2, WK.Watch>, +cx: X.Cx<o>, +h: String, +why: String) -> X.Cx<o>:
+def take.watches(-o: M.St, ws: List<&2, S.Watch>, +cx: X.Cx<o>, +h: String, +why: String) -> X.Cx<o>:
   match ws:
     case Nil{}:
       cx
     case Con{+w, +rest}:
-      +cx2 = X.emit(o, cx, M.EWake{WK.WEnd{WK.Watch.id(w), why, X.now(o, cx)}}, Unit{}, Unit{}, Unit{})
-      +id = {1n+WK.Wakes.last_id(TM.Tms.wk(M.St.tm(X.d(o, cx2)))) : Nat}
+      +cx2 = X.emit(o, cx, M.EWake{WK.WEnd{S.Watch.id(w), why, X.now(o, cx)}}, Unit{}, Unit{}, Unit{})
+      +id = {1n+S.Wakes.last_id(S.Tms.wk(M.St.tm(X.d(o, cx2)))) : Nat}
       take.watches(o, rest, X.emit(o, cx2, M.EWake{WK.WSet{WK.moved(w, h, id)}}, Unit{}, Unit{}, Unit{}), h, why)
 
 # a hot message to `n` (the records model.bend `moved` rewrites)
@@ -159,8 +159,8 @@ def take.held(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +n: String) -> X.Cx<
       +cx2 = X.out(o, cx, J.obj(F.retarget(n, h)))
       +cx3 = take.msgs(o, M.live_agent(M.get_agent(s, h)), cx2, n, h)
       +cx4 = take.cards(o, M.St.cards(s), cx3, n, h)
-      +cx5 = take.timers(o, TM.of_name(TM.Tms.live(M.St.tm(s)), n), cx4, h, why)
-      take.watches(o, WK.of_name(WK.Wakes.live(TM.Tms.wk(M.St.tm(s))), n), cx5, h, why)
+      +cx5 = take.timers(o, TM.of_name(S.Tms.live(M.St.tm(s)), n), cx4, h, why)
+      take.watches(o, WK.of_name(S.Wakes.live(S.Tms.wk(M.St.tm(s))), n), cx5, h, why)
 
 # an archived agent named `n` moves to the first free `n-<i>`
 def take.archived.life(-o: M.St, l: S.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:

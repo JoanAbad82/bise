@@ -35,12 +35,12 @@ pub const MSG: Codec = Codec { module: "SC", name: "Msg.journal", ty: "S.Msg", c
 pub const CARD: Codec = Codec { module: "SC", name: "Card.journal", ty: "S.Card", cases: &[] };
 /// his answer on a card's close: its keys sit in the line
 pub const ANS: Codec = Codec { module: "SC", name: "Ans.journal", ty: "S.Ans", cases: &[] };
-pub const TIMER: Codec = Codec { module: "C", name: "timer", ty: "TM.Timer", cases: &[] };
+pub const TIMER: Codec = Codec { module: "SC", name: "Timer.journal", ty: "S.Timer", cases: &[] };
 pub const OUT: Codec = Codec { module: "C", name: "out", ty: "XH.Out", cases: &[] };
 pub const XIN: Codec = Codec { module: "C", name: "xin", ty: "XH.XIn", cases: &[] };
 pub const ROUTE: Codec = Codec { module: "C", name: "route", ty: "XH.Route", cases: &[] };
-pub const ACT: Codec = Codec { module: "C", name: "act", ty: "TM.Act", cases: &[] };
-pub const WATCH: Codec = Codec { module: "C", name: "watch", ty: "WK.Watch", cases: &[] };
+pub const ACT: Codec = Codec { module: "SC", name: "Act.journal", ty: "S.Act", cases: &[] };
+pub const WATCH: Codec = Codec { module: "SC", name: "Watch.journal", ty: "S.Watch", cases: &[] };
 
 const fn f(name: &'static str, kind: super::FieldKind) -> Field {
     Field::new(name, kind)

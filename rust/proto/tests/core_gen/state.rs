@@ -672,7 +672,7 @@ fn pinned_rec(r: &st::Record, sh: &st::Shape, o: &Jv) -> String {
 
 /// The view shapes pinned on fixtures/core_view.jsonl: the view's key and
 /// the record its items are (its view shape, else its journal shape).
-const PINS: &[(&str, &str)] = &[("timers", "Timer"), ("timers_ended", "TimerEnd"), ("cards", "Card")];
+const PINS: &[(&str, &str)] = &[("timers", "Timer"), ("timers_ended", "TimerEnd"), ("cards", "Card"), ("wakes", "Watch"), ("wakes_ended", "WatchEnd")];
 
 fn view_pins(s: &mut String) {
     let text = std::fs::read_to_string(root().join("rust/proto/fixtures/core_view.jsonl")).unwrap();

@@ -85,7 +85,7 @@ def NotesFlushed.of(i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.ENotesFlushed{}}
 
 # no timer read: the line is skipped
-def EverySet.with(m: Maybe<&2, TM.Timer>, +i: J.Json) -> Maybe<&2, M.Ev>:
+def EverySet.with(m: Maybe<&2, S.Timer>, +i: J.Json) -> Maybe<&2, M.Ev>:
   match m:
     case None{}:
       None{}
@@ -93,7 +93,7 @@ def EverySet.with(m: Maybe<&2, TM.Timer>, +i: J.Json) -> Maybe<&2, M.Ev>:
       Some{M.ETimerSet{timer, K.get_n(i, "at")}}
 
 def EverySet.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  EverySet.with(C.timer_of(i), i)
+  EverySet.with(SC.Timer.journal_of(i), i)
 
 def EveryFired.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.ETimerFired{K.get_n(i, "id"), K.get_n(i, "fired"), K.get_n(i, "next_ms"), K.get_n(i, "at"), K.get_b(i, "undelivered")}}
@@ -138,7 +138,7 @@ def RouteCancelled.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EX{XH.XRoute{K.get_n(i, "rid"), XH.REnd{XH.RCancelled{}}}}}
 
 def ActSet.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EAct{TM.ActSet{C.act_of(K.get_j(i, "act"))}}}
+  Some{M.EAct{TM.ActSet{SC.Act.journal_of(K.get_j(i, "act"))}}}
 
 def ActDone.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EAct{TM.ActDone{K.get_n(i, "id")}}}
@@ -150,7 +150,7 @@ def JobEnd.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EJobEnd{K.get_s(i, "name"), K.get_s(i, "state")}}
 
 def WakeSet.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EWake{WK.WSet{C.watch_of(K.get_j(i, "watch"))}}}
+  Some{M.EWake{WK.WSet{SC.Watch.journal_of(K.get_j(i, "watch"))}}}
 
 def WakeEnd.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EWake{WK.WEnd{K.get_n(i, "id"), K.get_s(i, "why"), K.get_n(i, "at")}}}
@@ -602,7 +602,7 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.ENotesFlushed{}:
       [J.kv("type", J.JStr{"main_notes_flushed"})]
     case M.ETimerSet{+timer, +at}:
-      K.cat([[J.kv("type", J.JStr{"every_set"})], C.timer_kvs(timer), [J.kv("at", J.JNum{at})]])
+      K.cat([[J.kv("type", J.JStr{"every_set"})], SC.Timer.journal_kvs(timer), [J.kv("at", J.JNum{at})]])
     case M.ETimerFired{+id, +fired, +next_ms, +at, +undelivered}:
       K.cat([[J.kv("type", J.JStr{"every_fired"}), J.kv("id", J.JNum{id}), J.kv("fired", J.JNum{fired}), J.kv("next_ms", J.JNum{next_ms}), J.kv("at", J.JNum{at})], K.flag("undelivered", undelivered)])
     case M.ETimerRun{+id, +at}:
@@ -632,7 +632,7 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.EX{XH.XRoute{+rid, XH.REnd{XH.RCancelled{}}}}:
       [J.kv("type", J.JStr{"route_cancelled"}), J.kv("rid", J.JNum{rid})]
     case M.EAct{TM.ActSet{+act}}:
-      [J.kv("type", J.JStr{"act_set"}), J.kv("act", C.act_json(act))]
+      [J.kv("type", J.JStr{"act_set"}), J.kv("act", SC.Act.journal_json(act))]
     case M.EAct{TM.ActDone{+id}}:
       [J.kv("type", J.JStr{"act_done"}), J.kv("id", J.JNum{id})]
     case M.EFollow{+name, +on, +hub}:
@@ -640,7 +640,7 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.EJobEnd{+name, +state}:
       [J.kv("type", J.JStr{"job_end"}), J.kv("name", J.JStr{name}), J.kv("state", J.JStr{state})]
     case M.EWake{WK.WSet{+watch}}:
-      [J.kv("type", J.JStr{"wake_set"}), J.kv("watch", C.watch_json(watch))]
+      [J.kv("type", J.JStr{"wake_set"}), J.kv("watch", SC.Watch.journal_json(watch))]
     case M.EWake{WK.WEnd{+id, +why, +at}}:
       [J.kv("type", J.JStr{"wake_end"}), J.kv("id", J.JNum{id}), J.kv("why", J.JStr{why}), J.kv("at", J.JNum{at})]
     case M.EPaused{+at}:

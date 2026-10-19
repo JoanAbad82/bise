@@ -15,7 +15,7 @@ import ./gen/state.bend as S
 type St is Data:
   St{agents: List<&2, S.Agent>, order: List<&2, String>, hot: List<&2, S.MRec>,
     cards: List<&2, S.Card>, notes: List<&2, String>, next_msg: Nat,
-    next_card: Nat, tm: TM.Tms, x: XH.Xs, paused: Maybe<&2, Nat>,
+    next_card: Nat, tm: S.Tms, x: XH.Xs, paused: Maybe<&2, Nat>,
     old: List<&2, S.MRec>, gone: List<&2, G.Item>}
 # paused: since that ms (pause.bend; None runs); hot/old: the messages split
 # (issue 21); gone: withdrawn cards he may still answer (gone.bend)
@@ -48,7 +48,7 @@ type Ev is Data:
   ENotesFlushed{}
   # `sb every`'s timers (timers.bend): set, fired, run, stop, name (its
   # name; `announce`: the ◷ set line its held timer waited for)
-  ETimerSet{t: TM.Timer, at: Nat}
+  ETimerSet{t: S.Timer, at: Nat}
   ETimerFired{id: Nat, fired: Nat, next: Nat, at: Nat, undelivered: Bool}
   ETimerRun{id: Nat, at: Nat}
   ETimerStop{id: Nat, why: String, at: Nat}
@@ -118,7 +118,7 @@ def St.next_card(x: St) -> Nat:
     case St{_, _, _, _, _, _, +next_card, _, _, _, _, _}:
       next_card
 
-def St.tm(x: St) -> TM.Tms:
+def St.tm(x: St) -> S.Tms:
   match x:
     case St{_, _, _, _, _, _, _, +tm, _, _, _, _}:
       tm

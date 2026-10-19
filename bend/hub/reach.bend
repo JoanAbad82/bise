@@ -133,10 +133,10 @@ def asked_gone(+s: M.St, +n: String) -> Bool:
   asked_gone.go(agent_of(s, n))
 
 # the reply watches whose asked agent is gone (dropped, or no such agent)
-def replies_orphan(+s: M.St, xs: List<&2, WK.Watch>) -> List<&2, WK.Watch>:
+def replies_orphan(+s: M.St, xs: List<&2, S.Watch>) -> List<&2, S.Watch>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
       +rest = replies_orphan(s, t)
-      Bool.pick(List<&2, WK.Watch>, WK.is_reply(h) && asked_gone(s, WK.reply_to_of(h)), h <> rest, rest)
+      Bool.pick(List<&2, S.Watch>, WK.is_reply(h) && asked_gone(s, WK.reply_to_of(h)), h <> rest, rest)

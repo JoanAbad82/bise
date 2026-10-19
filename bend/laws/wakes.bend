@@ -126,28 +126,28 @@ law wake_reply_pauses:
 
 # LAW: the reply watch counts from the ask, not from the hold's end.
 law ask_timeout_pauses:
-  for +ws: HWK.Wakes
+  for +ws: HS.Wakes
   for +agent: String
   for +to: String
   for +msg: Nat
   for +asked_at: Nat
   for +now: Nat
-  {HWK.Watch.set_at(HWK.make_reply(ws, agent, to, msg, asked_at, now)) == asked_at : Nat}
+  {HS.Watch.set_at(HWK.make_reply(ws, agent, to, msg, asked_at, now)) == asked_at : Nat}
 
 # LAW: the reply watch is a pause: its agent planned to continue on it.
 law ask_pause_resumes:
-  for +ws: HWK.Wakes
+  for +ws: HS.Wakes
   for +agent: String
   for +to: String
   for +msg: Nat
   for +asked_at: Nat
   for +now: Nat
-  {HWK.Watch.resumes(HWK.make_reply(ws, agent, to, msg, asked_at, now)) == True{} : Bool}
+  {HS.Watch.resumes(HWK.make_reply(ws, agent, to, msg, asked_at, now)) == True{} : Bool}
 
 # LAW: a day with no reply tells its active agent once (it is no bash
 # slot: not quiet; wake_max_once: ended, never due again).
 law ask_max_tells:
-  for +ws: HWK.Wakes
+  for +ws: HS.Wakes
   for +agent: String
   for +to: String
   for +msg: Nat
@@ -161,8 +161,8 @@ law ask_once:
   for +cx: HX.Cx<o>
   for +agent: String
   for +orig: HS.Msg
-  for +w: HWK.Watch
-  for e: {HWK.reply_for(HWK.Wakes.live(HC.wks(o, cx)), agent, HS.Msg.id(orig)) == Some{w} : Maybe<&2, HWK.Watch>}
+  for +w: HS.Watch
+  for e: {HWK.reply_for(HS.Wakes.live(HC.wks(o, cx)), agent, HS.Msg.id(orig)) == Some{w} : Maybe<&2, HS.Watch>}
   {HC.reply_pause.orig(o, Some{orig}, cx, agent) == cx : HX.Cx<o>}
 
 # LAW: a reply ends exactly the reply watches it answers, in its step...
@@ -172,9 +172,9 @@ law ask_reply_ends:
   for +from: String
   for +to: String
   for +r: Nat
-  {HWK.Wakes.live(HC.wks(o, HC.reply_answered(o, cx, from, to, Some{r})))
-    == HWK.keep_out(HWK.Wakes.live(HC.wks(o, cx)),
-      HWK.answered_of(HWK.Wakes.live(HC.wks(o, cx)), to, r, HM.names_of(HC.st(o, cx), from), String.eq(from, HM.USER()))) : List<&2, HWK.Watch>}
+  {HS.Wakes.live(HC.wks(o, HC.reply_answered(o, cx, from, to, Some{r})))
+    == HWK.keep_out(HS.Wakes.live(HC.wks(o, cx)),
+      HWK.answered_of(HS.Wakes.live(HC.wks(o, cx)), to, r, HM.names_of(HC.st(o, cx), from), String.eq(from, HM.USER()))) : List<&2, HS.Watch>}
 
 # LAW: ...with no wake: no message from bise (the reply is its own).
 law ask_reply_ends_quiet:
@@ -191,8 +191,8 @@ law ask_done_ends:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +agent: String
-  {HWK.Wakes.live(HC.wks(o, HC.replies_end(o, cx, agent)))
-    == HWK.keep_out(HWK.Wakes.live(HC.wks(o, cx)), HWK.replies_of(HWK.Wakes.live(HC.wks(o, cx)), HM.names_of(HC.st(o, cx), agent))) : List<&2, HWK.Watch>}
+  {HS.Wakes.live(HC.wks(o, HC.replies_end(o, cx, agent)))
+    == HWK.keep_out(HS.Wakes.live(HC.wks(o, cx)), HWK.replies_of(HS.Wakes.live(HC.wks(o, cx)), HM.names_of(HC.st(o, cx), agent))) : List<&2, HS.Watch>}
 
 # LAW: ...quietly: it said it is done, no message.
 law ask_done_quiet:
@@ -206,7 +206,7 @@ law ask_done_quiet:
 law ask_target_gone_tells:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +w: HWK.Watch
-  for e: {HR.agent_active(HC.st(o, HC.wake_end(o, cx, HWK.Watch.id(w), "gone")), HWK.Watch.agent(w)) == True{} : Bool}
+  for +w: HS.Watch
+  for e: {HR.agent_active(HC.st(o, HC.wake_end(o, cx, HS.Watch.id(w), "gone")), HS.Watch.agent(w)) == True{} : Bool}
   {HC.replies_gone.each(o, [w], cx)
-    == HC.wake_say(o, HC.wake_end(o, cx, HWK.Watch.id(w), "gone"), HWK.Watch.agent(w), HWK.reply_gone_text(w)) : HX.Cx<o>}
+    == HC.wake_say(o, HC.wake_end(o, cx, HS.Watch.id(w), "gone"), HS.Watch.agent(w), HWK.reply_gone_text(w)) : HX.Cx<o>}

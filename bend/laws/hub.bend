@@ -9,6 +9,7 @@ import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/inv.bend as HI
+import ../hub/gen/state-codec.bend as HSC
 import ../hub/timers.bend as HTM
 import ../hub/wakes.bend as HWK
 import ../hub/xhub-model.bend as HXH
@@ -93,7 +94,7 @@ law stop_leaves_no_waiter:
 law fire_is_a_message:
   for -o: HM.St
   for p: HX.Cx<o> & HC.SendR
-  for +t: HTM.Timer
+  for +t: HS.Timer
   for +due: Bool
   for +next: Nat
   {HX.journal(HX.Core.fx(o, HX.Cx.c(o, HC.timer_fire.sent(o, p, t, due, next)))) == HI.fire_journal(o, p, t, due, next) : List<&2, HM.Ev>}
@@ -103,11 +104,11 @@ law fire_is_a_message:
 law wake_never_stacked:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +t: HTM.Timer
+  for +t: HS.Timer
   for +text: String
   for +due: Bool
   for +next: Nat
-  for q: {HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)) == True{} : Bool}
+  for q: {HC.bise_queued(HX.d(o, cx), HS.Timer.agent(t)) == True{} : Bool}
   {HC.timer_fire(o, cx, t, text, due, next) == cx : HX.Cx<o>}
 
 # LAW (per event): a counted fire leaves a timer below its times, or it was
@@ -115,33 +116,33 @@ law wake_never_stacked:
 # With the guard (a due wake fires only below its times, HTM.may_fire), a
 # timer with times = n never fires more than n times.
 law times_bound:
-  for +t: HTM.Timer
+  for +t: HS.Timer
   for +next: Nat
   for +at: Nat
-  {HTM.under(HTM.Timer.fire(t, 1n+HTM.Timer.fired(t), next, at, False{})) == Bool.not(HTM.spent(t)) : Bool}
+  {HTM.under(HTM.Timer.fire(t, 1n+HS.Timer.fired(t), next, at, False{})) == Bool.not(HTM.spent(t)) : Bool}
 
 # LAW (sched-names, architect m_14532): a timer's name (`every_name`) is
 # its name and nothing else: naming it back gives the same timer, so its
 # schedule, count, next time, runs and words stay as they were.
 law named_keeps_the_rest:
-  for +t: HTM.Timer
+  for +t: HS.Timer
   for +name: String
-  {HTM.Timer.named(HTM.Timer.named(t, name), HTM.Timer.name(t)) == t : HTM.Timer}
+  {HTM.Timer.named(HTM.Timer.named(t, name), HS.Timer.name(t)) == t : HS.Timer}
 
 # LAW (sched-names): naming a timer gives it that name.
 law named_is_the_name:
-  for +t: HTM.Timer
+  for +t: HS.Timer
   for +name: String
-  {HTM.Timer.name(HTM.Timer.named(t, name)) == name : String}
+  {HS.Timer.name(HTM.Timer.named(t, name)) == name : String}
 
 # LAW (sched-names, architect m_15603): a timer is announced once. The
 # every_name step announces it when it is held (core.bend timer_name:
 # announce = Timer.held), and its line, replayed or live, leaves it not
 # held: a second every_name, after any restart, never announces again.
 law named_announces_once:
-  for +t: HTM.Timer
+  for +t: HS.Timer
   for +name: String
-  {HTM.Timer.held(HTM.Timer.name_line(t, name)) == False{} : Bool}
+  {HS.Timer.held(HTM.Timer.name_line(t, name)) == False{} : Bool}
 
 # LAW: dropping (archiving) a task leaves no live timer of it, in the same
 # step (beside stop_leaves_no_waiter). A stop (`sb stop`) keeps them: they
@@ -151,7 +152,7 @@ law stop_leaves_no_timer:
   for +cx: HX.Cx<o>
   for +n: String
   for +why: String
-  HI.TimerNoneOf(HTM.Tms.live(HM.St.tm(HX.d(o, HC.stop_task(o, cx, n, HS.LArchived{}, why)))), n)
+  HI.TimerNoneOf(HS.Tms.live(HM.St.tm(HX.d(o, HC.stop_task(o, cx, n, HS.LArchived{}, why)))), n)
 
 # ---- the project's pause (cost-pause, hub/pause.bend) ----
 # Its lines (paused, resumed) are events like the others: the replay laws
@@ -174,7 +175,7 @@ law paused_delivers_nothing:
 law timer_held_while_paused:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +t: HTM.Timer
+  for +t: HS.Timer
   for +due: Bool
   for q: {HP.is_paused(HX.d(o, cx)) == True{} : Bool}
   {HC.timer_may(o, cx, t, due) == False{} : Bool}
@@ -225,11 +226,11 @@ law resume_keeps_order:
 # LAW: a watch wakes its agent once. Its hit ends it (wake_end, in the
 # same step as its message): after the end, no hit finds it.
 law wake_hit_once:
-  for +ws: HWK.Wakes
+  for +ws: HS.Wakes
   for +id: Nat
   for +why: String
   for +at: Nat
-  {HWK.hit(HWK.end(ws, id, why, at), id) == None{} : Maybe<&2, HWK.Watch>}
+  {HWK.hit(HWK.end(ws, id, why, at), id) == None{} : Maybe<&2, HS.Watch>}
 
 # LAW: a hit that finds no live watch (ended: hit, max, stop, or its
 # agent dropped) changes nothing at all: no message, no line.
@@ -245,21 +246,21 @@ law wake_drop_ends:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +n: String
-  HI.WatchNoneOf(HWK.Wakes.live(HC.wks(o, HC.wakes_gone(o, HS.LArchived{}, cx, n))), n)
+  HI.WatchNoneOf(HS.Wakes.live(HC.wks(o, HC.wakes_gone(o, HS.LArchived{}, cx, n))), n)
 
 # LAW: a watch past its max wakes once: the tick ends it, and an ended
 # watch is never due again.
 law wake_max_once:
-  for +xs: List<&2, HWK.Watch>
+  for +xs: List<&2, HS.Watch>
   for +id: Nat
   for +now: Nat
-  {HWK.find(HWK.due(HWK.drop(xs, id), now), id) == None{} : Maybe<&2, HWK.Watch>}
+  {HWK.find(HWK.due(HWK.drop(xs, id), now), id) == None{} : Maybe<&2, HS.Watch>}
 
 # LAW: a watch's line read back is the same watch (the journal keeps it
 # across a restart: its spec, words, times and agent).
 law wake_replay_keeps:
-  for +x: HWK.Watch
-  {HWK.watch_of(HWK.watch_json(x)) == x : HWK.Watch}
+  for +x: HS.Watch
+  {HSC.Watch.journal_of(HSC.Watch.journal_json(x)) == x : HS.Watch}
 
 # ---- who a wake reaches, and when (wake-deliver, hub/reach.bend) ----
 # His rule: his message, his card answer, a watch's wake and a timer's
@@ -304,10 +305,10 @@ law timer_reaches_busy:
 law timer_fires_busy:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +t: HTM.Timer
+  for +t: HS.Timer
   for p: {HP.is_paused(HX.d(o, cx)) == False{} : Bool}
-  for q: {HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)) == False{} : Bool}
-  for r: {HC.timer_ready(o, cx, HTM.Timer.agent(t)) == True{} : Bool}
+  for q: {HC.bise_queued(HX.d(o, cx), HS.Timer.agent(t)) == False{} : Bool}
+  for r: {HC.timer_ready(o, cx, HS.Timer.agent(t)) == True{} : Bool}
   {HC.timer_may(o, cx, t, True{}) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
 
 # LAW: a paused project steers nothing into a busy agent's turn either:
@@ -666,7 +667,7 @@ law route_correct_keeps_due:
 # act_due_only it fires at that tick or later, never before.
 law route_fires_at_due_only:
   for +x: HXH.Xs
-  for +tm: HTM.Tms
+  for +tm: HS.Tms
   for +text: String
   for +via: String
   for +to: String
@@ -675,7 +676,7 @@ law route_fires_at_due_only:
   for +now: Nat
   for +context: String
   for +parts: String
-  {HTM.Act.due(HXB.route_act(HXB.new_route(x, tm, text, via, to, name, why, now, context, parts))) == Nat.add(now, 2000n) : Nat}
+  {HS.Act.due(HXB.route_act(HXB.new_route(x, tm, text, via, to, name, why, now, context, parts))) == Nat.add(now, 2000n) : Nat}
 
 # LAW (architect m_8883): a fire makes no turn: his message is journaled
 # (an id for the history and `--input`) by route_said, never by a send
@@ -814,20 +815,20 @@ law follow_end_back_only_to_who_asked:
 
 # LAW (one clock): an act fires once: after its act_done, it is gone.
 law act_fires_once:
-  for +tm: HTM.Tms
+  for +tm: HS.Tms
   for +id: Nat
-  {HTM.act_find(HTM.Tms.acts(HTM.act_done(tm, id)), id) == None{} : Maybe<&2, HTM.Act>}
+  {HTM.act_find(HS.Tms.acts(HTM.act_done(tm, id)), id) == None{} : Maybe<&2, HS.Act>}
 
-def all_due(xs: List<&2, HTM.Act>, +now: Nat) -> Bool:
+def all_due(xs: List<&2, HS.Act>, +now: Nat) -> Bool:
   match xs:
     case Nil{}:
       True{}
     case Con{+h, +t}:
-      Nat.is_le(HTM.Act.due(h), now) && all_due(t, now)
+      Nat.is_le(HS.Act.due(h), now) && all_due(t, now)
 
 # LAW (one clock): a tick fires only acts due by its now.
 law act_due_only:
-  for +xs: List<&2, HTM.Act>
+  for +xs: List<&2, HS.Act>
   for +now: Nat
   {all_due(HTM.acts_due(xs, now), now) == True{} : Bool}
 

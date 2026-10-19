@@ -2577,3 +2577,15 @@ law Card.view_pinned:
 def Card.view_pinned():
   {==}
 
+law Watch.view_pinned:
+  {Watch.journal_json(S.Watch{2n, "t1", J.obj([J.kv("kind", J.JStr{"bg"}), J.kv("slot", J.JStr{"/w/st/agents/t1/tmp/bg/2"}), J.kv("cmd", J.JStr{"sleep 6"}), J.kv("tail", J.JStr{"/w/st/agents/t1/tmp/bg/2.out"})]), "", 1010000n, 87410000n, True{}, True{}}) == J.obj([J.kv("id", J.JNum{2n}), J.kv("agent", J.JStr{"t1"}), J.kv("spec", J.obj([J.kv("kind", J.JStr{"bg"}), J.kv("slot", J.JStr{"/w/st/agents/t1/tmp/bg/2"}), J.kv("cmd", J.JStr{"sleep 6"}), J.kv("tail", J.JStr{"/w/st/agents/t1/tmp/bg/2.out"})])), J.kv("max_text", J.JStr{""}), J.kv("set_at", J.JNum{1010000n}), J.kv("max_at", J.JNum{87410000n}), J.kv("quiet", J.JBool{True{}}), J.kv("resumes", J.JBool{True{}})]) : J.Json}
+
+def Watch.view_pinned():
+  {==}
+
+law WatchEnd.view_pinned:
+  {WatchEnd.view_json(S.WatchEnd{S.Watch{1n, "t1", J.obj([J.kv("kind", J.JStr{"bg"}), J.kv("slot", J.JStr{"/w/st/agents/t1/tmp/bg/1"}), J.kv("cmd", J.JStr{"sleep 6"}), J.kv("tail", J.JStr{"/w/st/agents/t1/tmp/bg/1.out"})]), "", 1000000n, 87400000n, True{}, True{}}, 1006000n, "hit"}) == J.obj([J.kv("id", J.JNum{1n}), J.kv("agent", J.JStr{"t1"}), J.kv("spec", J.obj([J.kv("kind", J.JStr{"bg"}), J.kv("slot", J.JStr{"/w/st/agents/t1/tmp/bg/1"}), J.kv("cmd", J.JStr{"sleep 6"}), J.kv("tail", J.JStr{"/w/st/agents/t1/tmp/bg/1.out"})])), J.kv("max_text", J.JStr{""}), J.kv("set_at", J.JNum{1000000n}), J.kv("max_at", J.JNum{87400000n}), J.kv("quiet", J.JBool{True{}}), J.kv("resumes", J.JBool{True{}}), J.kv("ended_at", J.JNum{1006000n}), J.kv("why", J.JStr{"hit"})]) : J.Json}
+
+def WatchEnd.view_pinned():
+  {==}
+

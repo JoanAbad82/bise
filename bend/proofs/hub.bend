@@ -10,6 +10,7 @@ import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/keyed.bend as HKL
 import ../hub/inv.bend as HI
+import ../hub/gen/state-codec.bend as HSC
 import ../hub/timers.bend as HTM
 import ../hub/wakes.bend as HWK
 import ../hub/xhub-model.bend as HXH
@@ -222,33 +223,41 @@ def Laws.fire_is_a_message(o, p, t, due, next):
       PL3.hub_count_journal(o, due, cx, t, next)
 
 def Laws.wake_never_stacked(o, cx, t, text, due, next, q):
-  %Equal.sym(Bool, HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)), True{}, q) : {HC.timer_fire.go(o, Bool.and(Bool.not(HP.is_paused(HX.d(o, cx))), HTM.may_fire(_, due, t, HC.timer_ready(o, cx, HTM.Timer.agent(t)), HC.now(o, cx))), cx, t, text, due, next) == cx : HX.Cx<o>}
+  %Equal.sym(Bool, HC.bise_queued(HX.d(o, cx), HS.Timer.agent(t)), True{}, q) : {HC.timer_fire.go(o, Bool.and(Bool.not(HP.is_paused(HX.d(o, cx))), HTM.may_fire(_, due, t, HC.timer_ready(o, cx, HS.Timer.agent(t)), HC.now(o, cx))), cx, t, text, due, next) == cx : HX.Cx<o>}
   %Equal.sym(Bool, Bool.and(Bool.not(HP.is_paused(HX.d(o, cx))), False{}), False{}, PL2.hub_and_false_r(Bool.not(HP.is_paused(HX.d(o, cx))))) : {HC.timer_fire.go(o, _, cx, t, text, due, next) == cx : HX.Cx<o>}
   {==}
 
+# times_bound on the timer's times and count (a split on `times`)
+def times_bound.go(m: Maybe<&2, Nat>, +f: Nat) -> {HTM.under.go(m, 1n+f) == Bool.not(HTM.spent.go(m, f)) : Bool}:
+  match m:
+    case None{}:
+      {==}
+    case Some{n}:
+      PL3.hub_lt_not_le(1n+f, n)
+
+# a counted fire's four setters (next, fired, last, runs), each rewritten
+# with its eta: the timer's times are its own, its count the new one
 def Laws.times_bound(t, next, at):
-  match t:
-    case HTM.Timer{id, ag, by, tx, sc, nx, un, tms, fd, pg, ls, rs, nm, hd}:
-      match tms:
-        case None{}:
-          {==}
-        case Some{n}:
-          PL3.hub_lt_not_le(1n+fd, n)
+  +f = {1n+HS.Timer.fired(t) : Nat}
+  +c = HS.Timer.with_next(t, next)
+  +b = HS.Timer.with_fired(c, f)
+  +a = HS.Timer.with_last(b, at)
+  %HSL.Timer.runs.eta(a, HTM.runs_add(HS.Timer.runs(t), at)) : {HTM.under.go(HS.Timer.times(_), HS.Timer.fired(_)) == Bool.not(HTM.spent(t)) : Bool}
+  %HSL.Timer.last.eta(b, at) : {HTM.under.go(HS.Timer.times(_), HS.Timer.fired(_)) == Bool.not(HTM.spent(t)) : Bool}
+  %HSL.Timer.fired.eta(c, f) : {HTM.under.go(HS.Timer.times(_), HS.Timer.fired(_)) == Bool.not(HTM.spent(t)) : Bool}
+  %HSL.Timer.next.eta(t, next) : {HTM.under.go(HS.Timer.times(_), f) == Bool.not(HTM.spent(t)) : Bool}
+  times_bound.go(HS.Timer.times(t), HS.Timer.fired(t))
 
 def Laws.named_keeps_the_rest(t, name):
-  match t:
-    case HTM.Timer{id, ag, by, tx, sc, nx, un, tms, fd, pg, ls, rs, nm, hd}:
-      {==}
+  %Equal.sym(HS.Timer, HS.Timer.with_name(HS.Timer.with_name(t, name), HS.Timer.name(t)), HS.Timer.with_name(t, HS.Timer.name(t)),
+    HSL.Timer.name.set_set(t, name, HS.Timer.name(t))) : {_ == t : HS.Timer}
+  HSL.Timer.name.set_get(t)
 
 def Laws.named_is_the_name(t, name):
-  match t:
-    case HTM.Timer{id, ag, by, tx, sc, nx, un, tms, fd, pg, ls, rs, nm, hd}:
-      {==}
+  HSL.Timer.name.get_with(t, name)
 
 def Laws.named_announces_once(t, name):
-  match t:
-    case HTM.Timer{id, ag, by, tx, sc, nx, un, tms, fd, pg, ls, rs, nm, hd}:
-      {==}
+  HSL.Timer.held.get_with(HS.Timer.with_name(t, name), False{})
 
 # ---- the project's pause (cost-pause) ----
 
@@ -257,7 +266,7 @@ def Laws.paused_delivers_nothing(o, cx, n, q):
   {==}
 
 def Laws.timer_held_while_paused(o, cx, t, due, q):
-  %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), True{}, q) : {Bool.and(Bool.not(_), HTM.may_fire(HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)), due, t, HC.timer_ready(o, cx, HTM.Timer.agent(t)), HC.now(o, cx))) == False{} : Bool}
+  %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), True{}, q) : {Bool.and(Bool.not(_), HTM.may_fire(HC.bise_queued(HX.d(o, cx), HS.Timer.agent(t)), due, t, HC.timer_ready(o, cx, HS.Timer.agent(t)), HC.now(o, cx))) == False{} : Bool}
   {==}
 
 def Laws.pause_idempotent(o, cx, q):
@@ -291,33 +300,35 @@ def Laws.resume_keeps_order(s, at):
 def Laws.stop_leaves_no_timer(o, cx, n, why):
   +g = HC.stop_task.go(o, cx, n, HS.LArchived{}, why)
   +tg = HC.timers_gone(o, HS.LArchived{}, g, n)
-  +wids = HWK.ids_of(HWK.Wakes.live(HC.wks(o, tg)), HM.names_of(HX.d(o, tg), n))
+  +wids = HWK.ids_of(HS.Wakes.live(HC.wks(o, tg)), HM.names_of(HX.d(o, tg), n))
   +wg = HC.wakes_gone(o, HS.LArchived{}, tg, n)
   +st = HC.stop_task(o, cx, n, HS.LArchived{}, why)
   +ns = HM.names_of(HX.d(o, g), n)
-  +xs = HTM.Tms.live(HM.St.tm(HX.d(o, g)))
+  +xs = HS.Tms.live(HM.St.tm(HX.d(o, g)))
   +ids = HTM.ids_in(xs, ns)
-  +e0 = Equal.cong(HM.St, List<&2, HTM.Timer>, s => HTM.Tms.live(HM.St.tm(s)), HX.d(o, st), HX.d(o, wg),
+  +e0 = Equal.cong(HM.St, List<&2, HS.Timer>, s => HS.Tms.live(HM.St.tm(s)), HX.d(o, st), HX.d(o, wg),
     PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n))))
-  +e1 = Equal.trans(List<&2, HTM.Timer>, HTM.Tms.live(HM.St.tm(HX.d(o, st))), HTM.Tms.live(HM.St.tm(HX.d(o, wg))), HTM.Tms.live(HM.St.tm(HX.d(o, tg))),
+  +e1 = Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HM.St.tm(HX.d(o, st))), HS.Tms.live(HM.St.tm(HX.d(o, wg))), HS.Tms.live(HM.St.tm(HX.d(o, tg))),
     e0, PL3.hub_live_wakes_each(o, wids, tg))
   +e2 = PL3.hub_live_gone_each(o, ids, g, HC.cat(["@", n, " is gone"]))
-  PL3.hub_tnone_tr(HTM.Tms.live(HM.St.tm(HX.d(o, st))), HTM.keep_out(xs, ids), n,
-    Equal.trans(List<&2, HTM.Timer>, HTM.Tms.live(HM.St.tm(HX.d(o, st))), HTM.Tms.live(HM.St.tm(HX.d(o, tg))), HTM.keep_out(xs, ids), e1, e2),
+  PL3.hub_tnone_tr(HS.Tms.live(HM.St.tm(HX.d(o, st))), HTM.keep_out(xs, ids), n,
+    Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HM.St.tm(HX.d(o, st))), HS.Tms.live(HM.St.tm(HX.d(o, tg))), HTM.keep_out(xs, ids), e1, e2),
     PL3.hub_none_keep(xs, ids, ns, n, PL3.hub_all_self(ids), PL3.hub_str_in_head(n, HM.names_of.go(HM.get_agent(HX.d(o, g), n)))))
 
+# an end's two setters: its live list is the dropped one (ended's eta,
+# then live's get_with)
 def Laws.wake_hit_once(ws, id, why, at):
-  match ws:
-    case HWK.Wakes{l, e, li}:
-      PL3.hub_wk_gone(l, id)
+  +d = HWK.drop(HS.Wakes.live(ws), id)
+  +l = HS.Wakes.with_live(ws, d)
+  %HSL.Wakes.ended.eta(l, HWK.ended_add(HWK.find(HS.Wakes.live(ws), id), HS.Wakes.ended(ws), at, why)) : {HWK.find(HS.Wakes.live(_), id) == None{} : Maybe<&2, HS.Watch>}
+  %Equal.sym(List<&2, HS.Watch>, HS.Wakes.live(l), d, HSL.Wakes.live.get_with(ws, d)) : {HWK.find(_, id) == None{} : Maybe<&2, HS.Watch>}
+  PL3.hub_wk_gone(HS.Wakes.live(ws), id)
 
 def Laws.wake_gone_never_hits(o, cx, text):
   {==}
 
 def Laws.wake_replay_keeps(x):
-  match x:
-    case HWK.Watch{i, a, s, m, sa, ma, q, r}:
-      {==}
+  HSC.Watch.journal_round(x)
 
 # ---- who a wake reaches (wake-deliver) ----
 
@@ -334,9 +345,9 @@ def Laws.timer_reaches_busy(o, cx, a, p, q):
   {==}
 
 def Laws.timer_fires_busy(o, cx, t, p, q, r):
-  %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), False{}, p) : {Bool.and(Bool.not(_), HTM.may_fire(HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)), True{}, t, HC.timer_ready(o, cx, HTM.Timer.agent(t)), HC.now(o, cx))) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
-  %Equal.sym(Bool, HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)), False{}, q) : {Bool.and(True{}, HTM.may_fire(_, True{}, t, HC.timer_ready(o, cx, HTM.Timer.agent(t)), HC.now(o, cx))) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
-  %Equal.sym(Bool, HC.timer_ready(o, cx, HTM.Timer.agent(t)), True{}, r) : {Bool.and(True{}, HTM.may_fire(False{}, True{}, t, _, HC.now(o, cx))) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
+  %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), False{}, p) : {Bool.and(Bool.not(_), HTM.may_fire(HC.bise_queued(HX.d(o, cx), HS.Timer.agent(t)), True{}, t, HC.timer_ready(o, cx, HS.Timer.agent(t)), HC.now(o, cx))) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
+  %Equal.sym(Bool, HC.bise_queued(HX.d(o, cx), HS.Timer.agent(t)), False{}, q) : {Bool.and(True{}, HTM.may_fire(_, True{}, t, HC.timer_ready(o, cx, HS.Timer.agent(t)), HC.now(o, cx))) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
+  %Equal.sym(Bool, HC.timer_ready(o, cx, HS.Timer.agent(t)), True{}, r) : {Bool.and(True{}, HTM.may_fire(False{}, True{}, t, _, HC.now(o, cx))) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
   {==}
 
 def Laws.paused_steers_nothing(o, cx, n, q, r):
@@ -387,13 +398,13 @@ def Laws.wake_max_once(xs, id, now):
     case Nil{}:
       {==}
     case Con{h, t}:
-      PL3.hub_wk_due.go(Nat.is_eq(HWK.Watch.id(h), id), h, t, id, now, {==}, Laws.wake_max_once(t, id, now))
+      PL3.hub_wk_due.go(Nat.is_eq(HS.Watch.id(h), id), h, t, id, now, {==}, Laws.wake_max_once(t, id, now))
 
 def Laws.wake_drop_ends(o, cx, n):
   +ns = HM.names_of(HX.d(o, cx), n)
-  +xs = HWK.Wakes.live(HC.wks(o, cx))
+  +xs = HS.Wakes.live(HC.wks(o, cx))
   +ids = HWK.ids_of(xs, ns)
-  PL3.hub_wnone_tr(HWK.Wakes.live(HC.wks(o, HC.wakes_gone(o, HS.LArchived{}, cx, n))), HWK.keep_out(xs, ids), n,
+  PL3.hub_wnone_tr(HS.Wakes.live(HC.wks(o, HC.wakes_gone(o, HS.LArchived{}, cx, n))), HWK.keep_out(xs, ids), n,
     PL3.hub_wk_live_each(o, ids, cx),
     PL3.hub_wk_none_keep(xs, ids, ns, n, PL3.hub_wk_all_self(ids), PL3.hub_wk_str_in_head(n, HM.names_of.go(HM.get_agent(HX.d(o, cx), n)))))
 
@@ -534,20 +545,20 @@ def Laws.follow_end_back_only_to_who_asked(o, cx, hub, j):
   {==}
 
 def Laws.act_fires_once(tm, id):
-  match tm:
-    case HTM.Tms{l, e, li, ac, na, wk}:
-      PL3.hub_act_gone(ac, id)
+  +d = HTM.act_drop(HS.Tms.acts(tm), id)
+  %Equal.sym(List<&2, HS.Act>, HS.Tms.acts(HS.Tms.with_acts(tm, d)), d, HSL.Tms.acts.get_with(tm, d)) : {HTM.act_find(_, id) == None{} : Maybe<&2, HS.Act>}
+  PL3.hub_act_gone(HS.Tms.acts(tm), id)
 
-def hub_due_all.go(c: Bool, +h: HTM.Act, +t: List<&2, HTM.Act>, +now: Nat, +e: {Nat.is_le(HTM.Act.due(h), now) == c : Bool},
+def hub_due_all.go(c: Bool, +h: HS.Act, +t: List<&2, HS.Act>, +now: Nat, +e: {Nat.is_le(HS.Act.due(h), now) == c : Bool},
     ih: {Laws.all_due(HTM.acts_due(t, now), now) == True{} : Bool})
     -> {Laws.all_due(HTM.acts_due(h <> t, now), now) == True{} : Bool}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_le(HTM.Act.due(h), now), True{}, e) : {Laws.all_due(Bool.pick(List<&2, HTM.Act>, _, h <> HTM.acts_due(t, now), HTM.acts_due(t, now)), now) == True{} : Bool}
-      %Equal.sym(Bool, Nat.is_le(HTM.Act.due(h), now), True{}, e) : {Bool.and(_, Laws.all_due(HTM.acts_due(t, now), now)) == True{} : Bool}
+      %Equal.sym(Bool, Nat.is_le(HS.Act.due(h), now), True{}, e) : {Laws.all_due(Bool.pick(List<&2, HS.Act>, _, h <> HTM.acts_due(t, now), HTM.acts_due(t, now)), now) == True{} : Bool}
+      %Equal.sym(Bool, Nat.is_le(HS.Act.due(h), now), True{}, e) : {Bool.and(_, Laws.all_due(HTM.acts_due(t, now), now)) == True{} : Bool}
       ih
     case False{}:
-      %Equal.sym(Bool, Nat.is_le(HTM.Act.due(h), now), False{}, e) : {Laws.all_due(Bool.pick(List<&2, HTM.Act>, _, h <> HTM.acts_due(t, now), HTM.acts_due(t, now)), now) == True{} : Bool}
+      %Equal.sym(Bool, Nat.is_le(HS.Act.due(h), now), False{}, e) : {Laws.all_due(Bool.pick(List<&2, HS.Act>, _, h <> HTM.acts_due(t, now), HTM.acts_due(t, now)), now) == True{} : Bool}
       ih
 
 def Laws.act_due_only(xs, now):
@@ -555,7 +566,7 @@ def Laws.act_due_only(xs, now):
     case Nil{}:
       {==}
     case Con{h, t}:
-      hub_due_all.go(Nat.is_le(HTM.Act.due(h), now), h, t, now, {==}, Laws.act_due_only(t, now))
+      hub_due_all.go(Nat.is_le(HS.Act.due(h), now), h, t, now, {==}, Laws.act_due_only(t, now))
 
 # ---- the composer rule ----
 

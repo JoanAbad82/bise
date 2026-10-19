@@ -228,20 +228,20 @@ def NamesApart(+s: M.St) -> Data:
 # ---- the timers (`sb every`, hub/timers.bend) ----
 
 # law wake_drop_ends: no watch of the list belongs to `n`
-def WatchNoneOf(xs: List<&2, WK.Watch>, +n: String) -> Data:
+def WatchNoneOf(xs: List<&2, S.Watch>, +n: String) -> Data:
   match xs:
     case Nil{}:
       Unit
     case Con{+w, +r}:
-      X.Both<{String.eq(WK.Watch.agent(w), n) == False{} : Bool}, WatchNoneOf(r, n)>
+      X.Both<{String.eq(S.Watch.agent(w), n) == False{} : Bool}, WatchNoneOf(r, n)>
 
 # law stop_leaves_no_timer: no timer of the list belongs to `n`
-def TimerNoneOf(xs: List<&2, TM.Timer>, +n: String) -> Data:
+def TimerNoneOf(xs: List<&2, S.Timer>, +n: String) -> Data:
   match xs:
     case Nil{}:
       Unit
     case Con{+t, +r}:
-      X.Both<{String.eq(TM.Timer.agent(t), n) == False{} : Bool}, TimerNoneOf(r, n)>
+      X.Both<{String.eq(S.Timer.agent(t), n) == False{} : Bool}, TimerNoneOf(r, n)>
 
 def fire_spent(sp: Bool, +xs: List<&2, M.Ev>, +id: Nat, +at: Nat) -> List<&2, M.Ev>:
   match sp:
@@ -253,25 +253,25 @@ def fire_spent(sp: Bool, +xs: List<&2, M.Ev>, +id: Nat, +at: Nat) -> List<&2, M.
 # what a fire whose message was queued adds to the journal: a run now is
 # a run; a due wake is counted (fired + 1, its next time), and its last
 # one ends the timer
-def fire_count(due: Bool, +xs: List<&2, M.Ev>, +t: TM.Timer, +next: Nat, +at: Nat) -> List<&2, M.Ev>:
+def fire_count(due: Bool, +xs: List<&2, M.Ev>, +t: S.Timer, +next: Nat, +at: Nat) -> List<&2, M.Ev>:
   match due:
     case False{}:
-      M.snoc(M.Ev, xs, M.ETimerRun{TM.Timer.id(t), at})
+      M.snoc(M.Ev, xs, M.ETimerRun{S.Timer.id(t), at})
     case True{}:
-      fire_spent(TM.spent(t), M.snoc(M.Ev, xs, M.ETimerFired{TM.Timer.id(t), 1n+TM.Timer.fired(t), next, at, False{}}), TM.Timer.id(t), at)
+      fire_spent(TM.spent(t), M.snoc(M.Ev, xs, M.ETimerFired{S.Timer.id(t), 1n+S.Timer.fired(t), next, at, False{}}), S.Timer.id(t), at)
 
 # what a refused wake adds: a due one, only its retry line (fired
 # unchanged, tried again in a minute); a run now, nothing
-def fire_retry(due: Bool, +xs: List<&2, M.Ev>, +t: TM.Timer, +now: Nat) -> List<&2, M.Ev>:
+def fire_retry(due: Bool, +xs: List<&2, M.Ev>, +t: S.Timer, +now: Nat) -> List<&2, M.Ev>:
   match due:
     case False{}:
       xs
     case True{}:
-      M.snoc(M.Ev, xs, M.ETimerFired{TM.Timer.id(t), TM.Timer.fired(t), Nat.add(now, TM.MIN_MS()), TM.Timer.last(t), True{}})
+      M.snoc(M.Ev, xs, M.ETimerFired{S.Timer.id(t), S.Timer.fired(t), Nat.add(now, TM.MIN_MS()), S.Timer.last(t), True{}})
 
 # law fire_is_a_message: the journal after the wake's send `p`: only the
 # retry line when the send was refused, the fire's events when it was queued
-def fire_journal(-o: M.St, p: X.Cx<o> & H.SendR, +t: TM.Timer, +due: Bool, +next: Nat) -> List<&2, M.Ev>:
+def fire_journal(-o: M.St, p: X.Cx<o> & H.SendR, +t: S.Timer, +due: Bool, +next: Nat) -> List<&2, M.Ev>:
   match p:
     case (+cx, H.SErr{_}):
       fire_retry(due, X.journal(X.Core.fx(o, X.Cx.c(o, cx))), t, H.now(o, cx))
