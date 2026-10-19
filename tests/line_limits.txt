@@ -8,7 +8,7 @@
 1268 bend/runtime/provider-pure.bend
 1319 docs/brand/design-system/content.py
 1387 docs/brand/readme/make.py
-1335 rust/catalog/src/auth_cli.rs
+1328 rust/catalog/src/auth_cli.rs
 1118 rust/catalog/src/chatgpt.rs
 1689 rust/catalog/src/lib.rs
 1251 rust/catalog/src/tests.rs

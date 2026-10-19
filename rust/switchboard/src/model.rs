@@ -550,12 +550,6 @@ impl State {
         self.hot().filter(|(m, h)| h.owes && m.to == name).map(|(m, _)| m).collect()
     }
 
-    /// `m` was delivered, expects a reply, and its recipient has not
-    /// given it (sb-core's word, its view's `owes`).
-    pub fn owes_reply(&self, m: &Msg) -> bool {
-        self.hot.get(&m.id).is_some_and(|h| h.owes)
-    }
-
     /// `m` waits for delivery (sb-core's word, its view's `queued`).
     pub fn is_queued(&self, m: &Msg) -> bool {
         self.hot.get(&m.id).is_some_and(|h| h.queued)

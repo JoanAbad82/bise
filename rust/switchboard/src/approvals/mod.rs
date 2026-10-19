@@ -30,7 +30,7 @@ mod tests;
 pub mod tiers;
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub use parse::Part;
 pub use paths::{Fs, LexicalFs, RealFs, Roots};
@@ -554,12 +554,4 @@ fn judge_connector(call: &Call, rules: &Rules, cache: &Cache) -> Verdict {
         parts: vec![],
         keys: vec![key],
     }
-}
-
-/// The rule the card's "always" saves for an edit outside the roots: the
-/// file's folder.
-pub fn edit_rule_path(p: &Path) -> PathBuf {
-    p.parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| p.to_path_buf())
 }

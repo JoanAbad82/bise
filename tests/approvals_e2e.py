@@ -41,10 +41,6 @@ def card_of(c, agent):
     return [cd for cd in confirm_cards(c) if cd["agent"] == agent][0]
 
 
-def user_texts(E, agent):
-    return [r.get("user", "") for r in E.fake_requests() if r.get("agent") == agent]
-
-
 def tool_results(E, agent):
     """every tool result the provider saw for `agent` (its requests' bodies)"""
     out = []

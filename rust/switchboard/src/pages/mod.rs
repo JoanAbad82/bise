@@ -333,12 +333,6 @@ impl Pages {
         })
     }
 
-    /// The pages `agent` is updating (sent notes not answered by a
-    /// publish yet).
-    pub fn updating_of(&self, agent: &str) -> Vec<String> {
-        self.store.list().into_iter().filter(|m| m.state == "updating" && m.agent == agent).map(|m| m.id).collect()
-    }
-
     /// An SSE event to every stream of page `id` (a closed one is dropped).
     pub fn push(&self, id: &str, event: &str, data: &Value) {
         let frame = format!("event: {event}\ndata: {data}\n\n");

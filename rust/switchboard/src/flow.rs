@@ -211,13 +211,6 @@ pub fn land_line(agent: &str, commits: usize, target: &str, sha: &str, pushed: O
     format!("✓ {} landed {} commit{} on {} ({}){}", agent, commits, s, target, sha, push)
 }
 
-/// Main's feed line for a refused land (dev-flow §7): `dark-mode can't
-/// land: login.rs changed on main too. it's rebasing.` (`doing`: what
-/// happens now, without its period).
-pub fn land_refused_line(agent: &str, file: &str, doing: &str) -> String {
-    format!("{} can't land: {} changed on main too. {}.", agent, file, doing)
-}
-
 /// Save the flow the user picked (the one-time question, `/flow`).
 pub fn save_mode(paths: &Paths, mode: FlowMode) -> Result<(), String> {
     let p = paths.config();

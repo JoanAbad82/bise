@@ -101,13 +101,6 @@ pub struct CheckFail {
     pub said: String,
 }
 
-impl CheckKind {
-    /// The key itself works (only the account or the model is the matter).
-    pub fn key_works(&self) -> bool {
-        matches!(self, CheckKind::NoCredit | CheckKind::Model | CheckKind::NoAccess)
-    }
-}
-
 /// A failed check in lines, the key step's words (BISE-282): the verdict
 /// (✗, or ? when the key works), the provider's words dim, and the fix.
 /// `found`: where a key found (not pasted) came from.
