@@ -486,7 +486,10 @@ def Laws.route_correct_keeps_due(r, to, name):
   %HSL.Route.to.eta(r, to) : {HS.Route.due(_) == HS.Route.due(r) : Nat}
   {==}
 
-def Laws.route_fires_at_due_only(x, tm, text, via, to, name, why, now, context, parts):
+# the hold sets the act over the due: the outer setter first
+def Laws.route_fires_at_due_only(x, tm, d, now):
+  %HSL.Route.act.eta(HS.Route.with_due(HS.Route.with_rid(d, HS.Xs.next_rid(x)), Nat.add(now, HXB.HOLD_MS())), HS.Tms.next_act(tm)) : {HS.Act.due(HXB.route_act(_)) == Nat.add(now, 2000n) : Nat}
+  %HSL.Route.due.eta(HS.Route.with_rid(d, HS.Xs.next_rid(x)), Nat.add(now, HXB.HOLD_MS())) : {HS.Route.due(_) == Nat.add(now, 2000n) : Nat}
   {==}
 
 def Laws.route_fire_makes_no_turn(o, cx, r):

@@ -669,15 +669,9 @@ law route_correct_keeps_due:
 law route_fires_at_due_only:
   for +x: HS.Xs
   for +tm: HS.Tms
-  for +text: String
-  for +via: String
-  for +to: String
-  for +name: String
-  for +why: String
+  for +d: HS.Route
   for +now: Nat
-  for +context: String
-  for +parts: String
-  {HS.Act.due(HXB.route_act(HXB.new_route(x, tm, text, via, to, name, why, now, context, parts))) == Nat.add(now, 2000n) : Nat}
+  {HS.Act.due(HXB.route_act(HXB.route_of_hold(x, tm, d, now))) == Nat.add(now, 2000n) : Nat}
 
 # LAW (architect m_8883): a fire makes no turn: his message is journaled
 # (an id for the history and `--input`) by route_said, never by a send
@@ -729,7 +723,7 @@ law route_out_carries_parts:
   for +x: HS.Xs
   for +r: HS.Route
   for +id: Nat
-  {HS.Out.parts(HXB.new_out(x, HS.Route.to(r), HS.KInput{}, id, HS.Route.text(r), HS.Route.context(r), HS.Route.parts(r))) == HS.Route.parts(r) : String}
+  {HS.Out.parts(HXB.out_of_route(x, r, id)) == HS.Route.parts(r) : String}
 
 # LAW: no parts, no key: an out or a route without parts journals and is
 # delivered byte for byte as before (an older core replays it unchanged).

@@ -69,11 +69,16 @@ def forward(+s: M.St, +from: String, +id: Nat) -> Fwd:
 def ask_ok(+text: String) -> Maybe<&2, String>:
   Bool.pick(Maybe<&2, String>, M.trim_is_empty(text), Some{"empty question"}, None{})
 
-# the outbox entry of a new send: the next xid, pending, never tried;
-# `parts` his routed message's (R41 (6)), "" for the rest
-def new_out(+x: S.Xs, +project: String, +k: S.XKind, +msg: Nat, +text: String, +context: String, +parts: String) -> S.Out:
-  +o = S.Out.with_kind(S.Out.with_project(S.Out.with_xid(S.Out.empty(), S.Xs.next_xid(x)), project), k)
-  S.Out.with_parts(S.Out.with_context(S.Out.with_text(S.Out.with_msg(o, msg), text), context), parts)
+# the outbox entry of a new send to `project`: the next xid, pending,
+# never tried; each site sets what its kind carries (msg, text) by name
+def out_to(+x: S.Xs, +project: String, +k: S.XKind) -> S.Out:
+  S.Out.with_kind(S.Out.with_project(S.Out.with_xid(S.Out.empty(), S.Xs.next_xid(x)), project), k)
+
+# a fired route's outbox entry: his words (message `id`), their context
+# and parts (R41 (6)), to the route's project, every field by name
+def out_of_route(+x: S.Xs, +r: S.Route, +id: Nat) -> S.Out:
+  +o = S.Out.with_text(S.Out.with_msg(out_to(x, S.Route.to(r), S.KInput{}), id), S.Route.text(r))
+  S.Out.with_parts(S.Out.with_context(o, S.Route.context(r)), S.Route.parts(r))
 
 # ---- the outbox's steps (home side) ----
 
@@ -180,12 +185,11 @@ def retry_act(+tm: S.Tms, +xid: Nat, +tries: Nat, +now: Nat) -> S.Act:
 def HOLD_MS() -> Nat:
   2000n
 
-# a new held route: the next rid, due HOLD_MS from `now`, its act the
-# clock's next one
-def new_route(+x: S.Xs, +tm: S.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +now: Nat, +context: String, +parts: String) -> S.Route:
-  +r = S.Route.with_to(S.Route.with_via(S.Route.with_text(S.Route.with_rid(S.Route.empty(), S.Xs.next_rid(x)), text), via), to)
-  +r2 = S.Route.with_act(S.Route.with_due(S.Route.with_name(r, name), Nat.add(now, HOLD_MS())), S.Tms.next_act(tm))
-  S.Route.with_parts(S.Route.with_context(S.Route.with_why(r2, why), context), parts)
+# a new held route from his hold `d` (its words, target and parts set by
+# name from route_hold's input): the next rid, due HOLD_MS from `now`,
+# its act the clock's next one
+def route_of_hold(+x: S.Xs, +tm: S.Tms, +d: S.Route, +now: Nat) -> S.Route:
+  S.Route.with_act(S.Route.with_due(S.Route.with_rid(d, S.Xs.next_rid(x)), Nat.add(now, HOLD_MS())), S.Tms.next_act(tm))
 
 # the act that sends a held route at its due time (law
 # route_fires_at_due_only: timers.bend's acts_due)

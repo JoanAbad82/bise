@@ -122,9 +122,10 @@ def out_set(xs: List<&2, S.Out>, +xid: Nat, +op: OutOp) -> List<&2, S.Out>:
     case Con{+h, +t}:
       LZ.pick(List<&2, S.Out>, Nat.is_eq(S.Out.xid(h), xid), u => out_op(op, h) <> t, u => h <> out_set(t, xid, op))
 
-# the inbox record of a delivery from `hub`: its message here `msg`
-def xin_rec(+hub: String, +xid: Nat, +msg: Nat, +k: S.XKind, +replied: Bool) -> S.XIn:
-  S.XIn.with_replied(S.XIn.with_kind(S.XIn.with_msg(S.XIn.with_xid(S.XIn.with_hub(S.XIn.empty(), hub), xid), msg), k), replied)
+# the inbox record of a delivery from `hub` (its origin); each site sets
+# its message here, its kind and whether it was answered, by name
+def xin_from(+hub: String, +xid: Nat) -> S.XIn:
+  S.XIn.with_xid(S.XIn.with_hub(S.XIn.empty(), hub), xid)
 
 def xin_set(xs: List<&2, S.XIn>, +hub: String, +xid: Nat) -> List<&2, S.XIn>:
   match xs:

@@ -2227,7 +2227,7 @@ def xsend.fwd(-o: M.St, f: XB.Fwd, +cx: X.Cx<o>, +token: Nat, +project: String, 
     case XB.FwdErr{+e}:
       reply_err(o, cx, token, e)
     case XB.FwdOk{+text}:
-      xsend.new(o, cx, token, XB.new_out(xst(o, cx), project, S.KInput{}, id, text, "", ""))
+      xsend.new(o, cx, token, S.Out.with_text(S.Out.with_msg(XB.out_to(xst(o, cx), project, S.KInput{}), id), text))
 
 # `sb project send <p> --input m_<n>` (main only, req.main): `pre_err`,
 # the hub's (an unknown project, this hub itself)
@@ -2243,7 +2243,7 @@ def req_xask.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q:
     case Some{+e}:
       reply_err(o, cx, token, e)
     case None{}:
-      xsend.new(o, cx, token, XB.new_out(xst(o, cx), C.get_s(q, "project"), S.KAsk{}, 0n, C.get_s(q, "text"), "", ""))
+      xsend.new(o, cx, token, S.Out.with_text(XB.out_to(xst(o, cx), C.get_s(q, "project"), S.KAsk{}), C.get_s(q, "text")))
 
 # `sb project ask <p> "<question>"` (main only): bise's own words
 def req_xask(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
@@ -2308,8 +2308,8 @@ def route_done(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +
 
 # home: the input route_hold (the shell's route.rs picked `to`, a project
 # hub id, `name` its name): held, its act set, the window told
-def route_hold.to(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String, +name: String, +why: String, +context: String, +parts: String) -> X.Cx<o>:
-  +r = XB.new_route(xst(o, cx), tms(o, cx), text, via, to, name, why, now(o, cx), context, parts)
+def route_hold.to(-o: M.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
+  +r = XB.route_of_hold(xst(o, cx), tms(o, cx), d, now(o, cx))
   +cx2 = xemit(o, cx, XH.XRouteHeld{r})
   route_ev(o, aemit(o, cx2, TM.ActSet{XB.route_act(r)}), r)
 
@@ -2317,10 +2317,10 @@ def route_hold.to(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: Stri
 # words and carried wherever they go (R41 (6): his images reach the
 # project, and bise's main keeps them on his message). No `to` (only an
 # older shell sent one): his words go to bise's main now, never held.
-def route_hold(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String, +name: String, +why: String, +context: String, +parts: String) -> X.Cx<o>:
-  LZ.pick(X.Cx<o>, String.is_empty(to),
-    u => user_says(o, cx, M.MAIN(), text, False{}, parts),
-    u => route_hold.to(o, cx, text, via, to, name, why, context, parts))
+def route_hold(-o: M.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
+  LZ.pick(X.Cx<o>, String.is_empty(S.Route.to(d)),
+    u => user_says(o, cx, M.MAIN(), S.Route.text(d), False{}, S.Route.parts(d)),
+    u => route_hold.to(o, cx, d))
 
 # a held route with no target (left by an older hub's route model in its
 # journal) whose act fired: it ends, and his words reach bise's main as a
@@ -2338,7 +2338,7 @@ def route_fire.lines(-o: M.St, +cx: X.Cx<o>, +r: S.Route, +id: Nat, +xid: Nat) -
 
 def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: S.Route, +id: Nat) -> X.Cx<o>:
   +cx2 = emit(o, mark_delivered(o, cx, id), M.ESettled{id}, Unit{}, Unit{}, Unit{})
-  +ob = XB.new_out(xst(o, cx2), S.Route.to(r), S.KInput{}, id, S.Route.text(r), S.Route.context(r), S.Route.parts(r))
+  +ob = XB.out_of_route(xst(o, cx2), r, id)
   +cx3 = xdeliver(o, xemit(o, route_fire.lines(o, cx2, r, id, S.Out.xid(ob)), XH.XOut{ob}), ob)
   +cx4 = xemit(o, cx3, XH.XRoute{S.Route.rid(r), XH.REnd{S.RSent{}}})
   +cx5 = route_done(o, cx4, S.Route.rid(r), "sent", S.Route.to(r), Some{S.Out.xid(ob)}, Some{id})
@@ -2454,7 +2454,7 @@ def xin.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat,
     case (+cx, SErr{+e}):
       reply_err(o, cx, token, e)
     case (+cx, SOk{+m}):
-      reply(o, xemit(o, cx, XH.XGot{XH.xin_rec(hub, xid, S.Msg.id(m), k, False{})}), token, ok_body(Nil{}))
+      reply(o, xemit(o, cx, XH.XGot{S.XIn.with_kind(S.XIn.with_msg(XH.xin_from(hub, xid), S.Msg.id(m)), k)}), token, ok_body(Nil{}))
 
 # J, bise's home hub: the line a followed task's end says in bise's main,
 # from `@<project>`: the same words as a local task's report to main
@@ -2466,7 +2466,7 @@ def xjob_end.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid:
     case (+cx, SErr{+e}):
       reply_err(o, cx, token, e)
     case (+cx, SOk{+m}):
-      +cx2 = xemit(o, cx, XH.XGot{XH.xin_rec(hub, xid, S.Msg.id(m), S.KJobEnd{}, True{})})
+      +cx2 = xemit(o, cx, XH.XGot{S.XIn.with_replied(S.XIn.with_kind(S.XIn.with_msg(XH.xin_from(hub, xid), S.Msg.id(m)), S.KJobEnd{}), True{})})
       +cx3 = out(o, cx2, F.followed_end(hub, C.get_s(j, "agent"), C.get_nat(j, "key"), C.get_s(j, "state"), C.get_s(j, "label"), C.get_s(j, "summary")))
       reply(o, cx3, token, ok_body(Nil{}))
 
@@ -2705,7 +2705,7 @@ def job_end.back(-o: M.St, local: Bool, +cx: X.Cx<o>, +hub: String, +j: J.Json) 
     case True{}:
       cx
     case False{}:
-      +ob = XB.new_out(xst(o, cx), hub, S.KJobEnd{}, 0n, J.stringify(j), "", "")
+      +ob = S.Out.with_text(XB.out_to(xst(o, cx), hub, S.KJobEnd{}), J.stringify(j))
       xdeliver(o, xemit(o, cx, XH.XOut{ob}), ob)
 
 # `key`: the job's (its end's time on this hub's clock), the same in the
@@ -3663,7 +3663,7 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
     case GI.IXReply{+xid, +name, +text}:
       xanswer(o, XB.open(xst(o, cx), xid), cx, xid, name, text)
     case GI.IRouteHold{+text, +via, +to, +name, +why, +context, +parts}:
-      route_hold(o, cx, text, via, to, name, why, context, parts)
+      route_hold(o, cx, S.Route.with_parts(S.Route.with_context(S.Route.with_why(S.Route.with_name(S.Route.with_to(S.Route.with_via(S.Route.with_text(S.Route.empty(), text), via), to), name), why), context), parts))
     case GI.IRouteCorrect{+rid, +to, +name}:
       route_correct(o, cx, rid, to, name)
     case GI.IRouteCancel{+rid}:
