@@ -191,8 +191,8 @@ interface Key {
 const KEYS: readonly Key[] = [
   { el: -18, key: '#a9b8e8', keyI: 0.7, hemi: '#ffd9a8', ground: '#3a2c22', hemiI: 1.5, air: '#1b2233' },
   { el: -6, key: '#9aa6e0', keyI: 0.75, hemi: '#d9c3c8', ground: '#3d3038', hemiI: 1.45, air: '#2f3352' },
-  { el: 0, key: '#ff9a6b', keyI: 0.9, hemi: '#f2c2b0', ground: '#6a4c45', hemiI: 1.45, air: '#e7a98f' },
-  { el: 6, key: '#ffbf7a', keyI: 1.4, hemi: '#ffe2c4', ground: '#b49478', hemiI: 1.5, air: '#f4caa0' },
+  { el: 0, key: '#ffad62', keyI: 0.9, hemi: '#f2c2b0', ground: '#6a4c45', hemiI: 1.45, air: '#e7a98f' },
+  { el: 6, key: '#ffc77c', keyI: 1.4, hemi: '#ffe2c4', ground: '#b49478', hemiI: 1.5, air: '#f4caa0' },
   { el: 15, key: '#ffe0b0', keyI: 1.7, hemi: '#fff4e6', ground: '#d9c8ad', hemiI: 1.55, air: '#f6e6cf' },
   { el: 35, key: '#fff4e0', keyI: 1.9, hemi: '#ffffff', ground: '#e9dcc4', hemiI: 1.55, air: '#fdfbf7' },
 ];
@@ -381,7 +381,8 @@ const AIR_HAZE = 0.12;
  * The light UI's own sky by the sun's height (bims m_33351): night and dusk read by hue and by the
  * lamps, never by dimming everything into one grey-brown. Night: a cool blue fill strong enough
  * that the floor keeps ~70% of noon and its hue, the moon a pale key; dusk and golden hour: an amber
- * key low across the floor from the sun's side over a blue fill; dawn: a pale-yellow key (morning)
+ * key low across the floor from the sun's side over a blue fill (yellow-amber, never red: white
+ * walls go cream, never salmon, bims m_33424); dawn: a pale-yellow key (morning)
  * over a pale cool fill. Never a pink or mauve cast (the '?' pill's alone).
  */
 interface LightKey {
@@ -395,9 +396,9 @@ interface LightKey {
 const LIGHT_KEYS: readonly LightKey[] = [
   { el: -18, key: '#c4d0f2', keyI: 0.8, hemi: '#cfd6ea', ground: '#d8b98f', hemiI: 2.15 },
   { el: -8, key: '#c4d0f2', keyI: 0.7, hemi: '#d0d7ea', ground: '#d8b98f', hemiI: 2.1 },
-  { el: -4, key: '#ffad5c', keyI: 1.6, hemi: '#d3d9e9', ground: '#dcbf96', hemiI: 1.9 },
-  { el: 0, key: '#ffb466', keyI: 2.6, hemi: '#d8dde9', ground: '#e2c8a2', hemiI: 1.7 },
-  { el: 6, key: '#ffc47a', keyI: 3.0, hemi: '#e2e5ee', ground: '#e6d2b2', hemiI: 1.5 },
+  { el: -4, key: '#ffbe6a', keyI: 1.6, hemi: '#d3d9e9', ground: '#dcbf96', hemiI: 1.9 },
+  { el: 0, key: '#ffc574', keyI: 2.6, hemi: '#d8dde9', ground: '#e2c8a2', hemiI: 1.7 },
+  { el: 6, key: '#ffd186', keyI: 3.0, hemi: '#e2e5ee', ground: '#e6d2b2', hemiI: 1.5 },
   { el: 15, key: '#ffe2ae', keyI: 2.6, hemi: '#f2f2f1', ground: '#e9dcc4', hemiI: 1.3 },
   { el: 35, key: DAY_LIGHT.key, keyI: DAY_LIGHT.keyI, hemi: DAY_LIGHT.hemi, ground: DAY_LIGHT.ground, hemiI: 1.15 },
 ];

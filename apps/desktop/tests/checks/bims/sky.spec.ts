@@ -9,7 +9,7 @@
 //       a dry sky none;
 //   (2) a transition: a slot change draws a blend of ~SKY_FADE_S at 30 fps at most, then 0;
 //   (3) reduced motion: the rain held still (no animation), the blend at the loop's rate;
-//   (4) 320: a rainy night and a dusk, the pills read. (1) is the wide bar (640, docked).
+//   (4) 320: a rainy night and a dusk, the pills read. (1) is the wide bar (640).
 // Shots: .harness-cache/bims-shots/sky-*.png and index.html (bims signs them); the transition's
 // frames in .harness-cache/bims-shots/sky-clip/. Owner: bims-sky.
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -109,9 +109,9 @@ for (const theme of ['light', 'dark'] as const) {
         (window as unknown as { __biseSky?: unknown }).__biseSky = { weather: 'clear' };
       });
       await showOffice(s);
-      // wide: the 640 bar, docked (office.spec's SIZES)
+      // wide: the 640 bar (docked or slid over, as the window has room)
       await s.page.getByTestId('app.right.agents.width.wide').click();
-      await expect(s.page.getByTestId('app.panel')).toHaveAttribute('data-wide', 'docked', { timeout: 3000 });
+      await expect.poll(async () => (await s.page.getByTestId('app.right.bims').boundingBox())?.width ?? 0, { timeout: 3000 }).toBeGreaterThan(600);
       for (const m of [...DAY, ...WEATHER]) {
         await show(s, m);
         const k = await skyNow(s);
