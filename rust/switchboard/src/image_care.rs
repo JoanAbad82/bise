@@ -144,14 +144,15 @@ mod tests {
         // keep_days later (the stamp moved back by 30 days): it prunes
         prune::touch_file(&paths.images_since(), prune::at_ms(now - 30 * DAY_MS));
         let _ = std::fs::remove_file(paths.images_pruned());
+        // a second later (a stamp written after `now` reads as a clock moved back)
         let (tx, rx) = std::sync::mpsc::channel();
-        let care = tick(&paths, &store, &prefs, [text.as_str()].into_iter(), now, move |r| {
+        let care = tick(&paths, &store, &prefs, [text.as_str()].into_iter(), now + 1000, move |r| {
             let _ = tx.send(r.ok());
         });
         assert_eq!(care, Care { touched: None, pruning: Some(30) });
         assert_eq!(rx.recv().expect("done"), Some(0));
         // the next tick: both stamps are fresh, nothing to do
-        let again = tick(&paths, &store, &prefs, [text.as_str()].into_iter(), now + 1000, |_| {});
+        let again = tick(&paths, &store, &prefs, [text.as_str()].into_iter(), now + 2000, |_| {});
         assert_eq!(again, Care::default());
         let _ = std::fs::remove_dir_all(&root);
     }
