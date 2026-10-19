@@ -1,6 +1,6 @@
 // Nordic's look (render/maps/look.ts; its plan: maps/nordic.ts): a wooden house, pale planks, white
 // walls over a wood wainscot, tall windows on the snow, the long common table (a runner, candles lit
-// at night, pendant lamps over it) where each place is a chair and a laptop, the fika counter (the
+// at night, mushroom lamps on it) where each place is a chair and a laptop, the fika counter (the
 // eating place), the wood stove and sheepskins (the nap place), a reading nook at the front right, a
 // small sauna on the terrace, snow on the ground (no aurora: flat slabs read badly, bims m_28835); every bim but main wears a striped scarf.
 // Its growth (page bims-maps « Scandinavie · la maison en bois »): a fern, kanelbullar and the first
@@ -9,7 +9,7 @@
 // wooden hot tub, the sauna's porch, a lake and its jetty, a midsummer pole, a golden Dala horse;
 // light pine frames. Owner: maps-b.
 import { Group, type Object3D } from 'three';
-import type { NordicOffice } from '../../maps/nordic';
+import { PITCH, type NordicOffice } from '../../maps/nordic';
 import type { Office, Pt } from '../../model';
 import { decorOf } from '../decor';
 import { chair, deskLamp, laptop } from '../furniture';
@@ -46,7 +46,7 @@ function nook(k: Kit, root: Object3D, o: NordicOffice): void {
   k.add(style.box(0.75, 0.45, 0.16, 0.08), k.mat('#c9d6e3'), root, x - 0.4, 0.55, z + 0.3);
   k.add(style.box(0.6, 0.1, 0.5), k.mat(SKIN), root, x - 0.4, 0.42, z - 0.05);
   k.add(style.cylinder(0.02, 1.3), k.mat(WORLD.dark), root, x - 1.0, 0.65, z + 0.55);
-  k.add(style.cap(0.18, 0.6), style.material('#fff2d6', pal.pendants ? { emissive: '#ffd166', ei: 0.9 } : {}), root, x - 1.0, 1.35, z + 0.55);
+  k.add(style.cap(0.18, 0.6), style.material('#fff2d6', pal.pendants ? { emissive: '#ffd166', ei: 0.9 } : {}), root, x - 1.0, 1.35, z + 0.55).userData.shade = true;
 }
 const boardX = (o: Office): number => o.boardSpots.reduce((s, p) => s + p.x, 0) / Math.max(1, o.boardSpots.length);
 const counterX = (o: Office): number => (o.island.x0 + o.island.x1) / 2;
@@ -208,7 +208,7 @@ function shell(b: Build): void {
     k.add(style.box(0.06, 0.9, 1.4), k.mat(DARK_WOOD), root, x0 + 0.01, 0.85, z + 0.7);
     k.add(style.box(0.07, 0.78, 1.28), glass, root, x0 + 0.02, 0.85, z + 0.7);
   }
-  // the long table: its top, a runner, candles (lit at night), pendant lamps over it
+  // the long table: its top, a runner, candles (lit at night), its table lamps
   const tz = (t.z0 + t.z1) / 2;
   const tl = t.z1 - t.z0;
   k.add(style.box(t.x1 - t.x0 - 0.1, 0.5, tl - 0.1, 0.06), k.mat(pal.desk), root, 0, 0.25, tz);
@@ -219,12 +219,15 @@ function shell(b: Build): void {
     k.add(style.cylinder(0.04, 0.16), k.mat(WORLD.paper), root, 0, 0.64, z);
     k.add(style.ball(0.035), flame, root, 0, 0.75, z);
   }
-  const shade = k.mat(night ? '#d8d2c6' : WORLD.paper);
-  const bulb = style.material('#ffd166', night ? { emissive: '#ffd166', ei: 0.8 } : {});
-  for (let z = t.z0 + 1.2; z < t.z1; z += 2.4) {
-    k.add(style.cylinder(0.005, 0.6), k.mat(WORLD.dark), root, 0, 2.1, z);
-    k.add(style.cap(0.3, 0.5), shade, root, 0, 1.75, z);
-    k.add(style.ball(0.08), bulb, root, 0, 1.68, z);
+  // 2-3 mushroom table lamps on the table's middle line, between its rows of places (bims m_33464:
+  // the pendants hid the heads on the screen, shade.test.ts); lit at night like the desk lamps
+  const cream = k.mat(night ? '#d8d2c6' : '#f3ead8');
+  const glow = style.material('#ffd166', night ? { emissive: '#ffd166', ei: 0.8 } : {});
+  for (const z of tableLamps(t, PITCH)) {
+    k.add(style.cylinder(0.06, 0.02), cream, root, 0, 0.57, z);
+    k.add(style.cylinder(0.015, 0.2), cream, root, 0, 0.68, z);
+    k.add(style.ball(0.035), glow, root, 0, 0.77, z).userData.shade = true;
+    k.add(style.cap(0.11, 0.5), cream, root, 0, 0.79, z).userData.shade = true;
   }
   // two skis against the back wall, behind main's desk
   for (const [dx, c] of [[0, BLUE], [0.25, OCHRE]] as const) k.add(style.box(0.1, 1.7, 0.04), k.mat(c), root, x0 + W - 0.35 - dx, 0.85, 0.15).rotation.z = 0.08;
@@ -269,6 +272,15 @@ function lounge(b: Build): void {
     const s = kk.add(kk.style.ball(0.4), kk.mat(night ? '#c9c4bb' : SKIN), parent, (box.x0 + box.x1) / 2, 0.05, (box.z0 + box.z1) / 2);
     s.scale.set(1.0, 0.18, 0.9);
   });
+}
+
+/** where the table lamps stand (z): on the lines between rows of places, never beside a laptop; 2 or 3 spread along it */
+export function tableLamps(t: { readonly z0: number; readonly z1: number }, pitch: number): number[] {
+  const rows = Math.round((t.z1 - t.z0) / pitch);
+  const gaps = Array.from({ length: Math.max(0, rows - 1) }, (_, j) => t.z0 + (j + 1) * pitch);
+  const n = Math.min(3, gaps.length);
+  if (gaps.length <= n) return gaps;
+  return Array.from({ length: n }, (_, i) => gaps[Math.round(((i + 1) * (gaps.length + 1)) / (n + 1)) - 1] as number);
 }
 
 /** one place at the long table: its chair, its laptop and lamp on the table's edge */

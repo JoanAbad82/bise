@@ -19,7 +19,8 @@ export interface NordicOffice extends BOffice {
 
 const BACK = 4.05;
 const W = 10;
-const PITCH = 1.6;
+/** the table's rows of places are this far apart (its look's table lamps stand between them) */
+export const PITCH = 1.6;
 const TABLE_W = 1.5;
 const CHAIR_X = 1.05;
 const AISLE = 1.85;
