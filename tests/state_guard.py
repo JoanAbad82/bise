@@ -12,13 +12,16 @@ Red when, outside bend/hub/gen/:
   - a hand record (a type with one constructor of its own name, with fields) is declared in
     bend/hub/ and is in neither HAND nor MIGRATING: a new record needs its declaration in
     bise_proto::core::state.
-Both lists only shrink (a family's land takes its names out of MIGRATING).
+  - a name is added to MIGRATING or HAND: both lists only shrink, vs the base's
+    tests/state_guard.py (GATE_BASE, default HEAD; a base without this file: no check).
+A family's land takes its names out of MIGRATING.
 
   python3 tests/state_guard.py              the tree
   python3 tests/state_guard.py --self-test  planted cases, each red where it must be
 """
 import os
 import re
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -92,6 +95,34 @@ def records_of(text):
     return out
 
 
+def lists_of(text):
+    """MIGRATING and HAND as this file's text declares them (their quoted names)."""
+    out = []
+    for name in ("MIGRATING", "HAND"):
+        m = re.search(r"^%s = \{(.*?)^\}" % name, text, re.S | re.M)
+        body = "\n".join(l.split("#", 1)[0] for l in (m.group(1) if m else "").splitlines())
+        out.append(set(re.findall(r'"([^"]+)"', body)))
+    return out
+
+
+def grown(base_text, text):
+    """The names added to MIGRATING or HAND since the base's text. Pure."""
+    if base_text is None:
+        return []
+    bad = []
+    for name, old, new in zip(("MIGRATING", "HAND"), lists_of(base_text), lists_of(text)):
+        for n in sorted(new - old):
+            bad.append(f"tests/state_guard.py: {name} gains {n}: the lists only shrink (declare it in bise_proto::core::state)")
+    return bad
+
+
+def base_text():
+    """This file at GATE_BASE (default HEAD), None when the base has none."""
+    r = subprocess.run(["git", "-C", ROOT, "show", "%s:tests/state_guard.py" % os.environ.get("GATE_BASE", "HEAD")],
+                       capture_output=True)
+    return r.stdout.decode() if r.returncode == 0 else None
+
+
 def gen_records(root):
     with open(os.path.join(root, GEN)) as f:
         return {n for n, _ in records_of(f.read())}
@@ -153,6 +184,14 @@ def self_test():
         got = check(root, migrating={"Msg"}, hand=set())
         assert sorted((p, n) for p, n, _ in got) == [("bend/hub/a.bend", 4), ("bend/hub/b.bend", 4)], got
         assert check(root, migrating={"Msg"}, hand={"New"}) == [("bend/hub/a.bend", 4, got[0][2])], "self-test: allow-lists"
+    # the lists only shrink
+    base = 'MIGRATING = {\n    "Msg", "Card",\n}\n\nHAND = {\n    # "Old" in a comment\n    "Core",\n}\n'
+    assert grown(None, base) == [], "self-test: no base, no check"
+    assert grown(base, base.replace('"Card",', '')) == [], "self-test: a name removed is fine"
+    got = grown(base, base.replace('"Card",', '"Card", "Agent",').replace('"Core",', '"Core", "New",'))
+    assert [g.split(":")[1] for g in got] == [" MIGRATING gains Agent", " HAND gains New"], got
+    assert lists_of(open(os.path.abspath(__file__)).read())[0] == MIGRATING, "self-test: lists_of reads this file"
+    assert lists_of(open(os.path.abspath(__file__)).read())[1] == HAND, "self-test: lists_of reads this file"
     print("state_guard self-test: ok")
 
 
@@ -166,6 +205,10 @@ def main():
     bad = check(ROOT)
     for p, n, what in bad:
         print(f"{p}:{n}: {what}")
+    with open(os.path.abspath(__file__)) as f:
+        for g in grown(base_text(), f.read()):
+            print(g)
+            bad.append(g)
     if bad:
         print(f"state_guard: {len(bad)} red (bise_proto::core::state, docs/issues/35)")
         return 1
