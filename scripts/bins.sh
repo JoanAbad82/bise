@@ -153,10 +153,25 @@ compile() {  # <src> <name> <out>
   # a tree edited before a worktree was built would look fresh - the local
   # crates are always recompiled (the dependencies are kept)
   local t="$BUILD/target-jsrt"
-  (cd "$src/rust/jsrt" && export CARGO_TARGET_DIR="$t" $JSRT_PROFILE \
-    && { cargo clean -q --release -p bend-jsrt -p bend-images -p bise-home 2>/dev/null \
-         || cargo clean -q --release -p bend-jsrt 2>/dev/null || true; } \
-    && cargo build -q --release) && copy "$t/release/bend-jsrt" "$out"
+  # one clean + build + copy at a time in that shared target: a gate's
+  # `cargo clean -p bend-jsrt` deleted the binary a candidate was about to
+  # copy (10.8's candidate red, review-gates m_33193). lockf (macOS),
+  # flock (Linux CI), else unlocked as before
+  mkdir -p "$BUILD"
+  with_lock "$t.lock" /usr/bin/env CARGO_TARGET_DIR="$t" $JSRT_PROFILE /bin/bash -c '
+    cd "$1/rust/jsrt" \
+      && { cargo clean -q --release -p bend-jsrt -p bend-images -p bise-home 2>/dev/null \
+           || cargo clean -q --release -p bend-jsrt 2>/dev/null || true; } \
+      && cargo build -q --release \
+      && { cp -c "$2/release/bend-jsrt" "$3" 2>/dev/null || cp "$2/release/bend-jsrt" "$3"; }' _ "$src" "$t" "$out"
+}
+
+# run <cmd...> holding <lock file> (kept: the next one waits on the same inode)
+with_lock() {  # <lock file> <cmd...>
+  local l="$1"; shift
+  if [ -x /usr/bin/lockf ]; then /usr/bin/lockf -k "$l" "$@"
+  elif command -v flock >/dev/null 2>&1; then flock "$l" "$@"
+  else "$@"; fi
 }
 
 # keep the 3 newest of <name>, and those used in the last hour (the
