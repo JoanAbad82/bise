@@ -708,20 +708,27 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   return (
     <section ref={section} className="inbox-strip inbox-block" aria-label={inbox.head} data-testid="inbox.block" data-rows={rowsFit} data-open={openCard !== undefined || undefined} data-count={list.length} data-ctrl={ctrl || undefined}>
       <div className="strip-title">
-        {inbox.head} <span className="strip-count">{headWords(list)}</span>
-        {others > 0 && (
-          // what waits in his other projects, a link to the inbox screen (designer m_32874)
-          <span className="strip-others">
-            <Act
-              testId="inbox.block.others"
-              onClick={() => {
-                router.go({ screen: 'inbox' });
-              }}
-            >
-              {`· ${inbox.block_head_others({ n: others })}`}
-            </Act>
-          </span>
-        )}
+        {inbox.head}{' '}
+        <span className="strip-count">
+          {headWords(list)}
+          {others > 0 && (
+            // what waits in his other projects: ' · ' plain, then the link to the inbox screen
+            // (designer m_32874, m_33443: only the words are the link, one space each side of the dot)
+            <>
+              {' · '}
+              <span className="strip-others">
+                <Act
+                  testId="inbox.block.others"
+                  onClick={() => {
+                    router.go({ screen: 'inbox' });
+                  }}
+                >
+                  {inbox.block_head_others({ n: others })}
+                </Act>
+              </span>
+            </>
+          )}
+        </span>
         <span className="strip-keys" data-testid="inbox.block.keys">
           {cmd ? (
             // ⌘ held: the inbox's own ⌘ key on its head (amb-win's held.ts, designer m_21510)

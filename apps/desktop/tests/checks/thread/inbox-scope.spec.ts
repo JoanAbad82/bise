@@ -54,14 +54,14 @@ test("thread/inbox-scope: a project's view lists its own items; global bise and 
     await expect(block).not.toContainText('which currency');
     await expect(page.getByTestId('inbox.block.row.1').locator('.end')).not.toContainText('acme');
     const others = page.getByTestId('inbox.block.others');
-    await expect(others, "designer m_32874: '· 1 in other projects', a link to /inbox").toHaveText('· 1 in other projects');
+    await expect(others, "designer m_33443: '1 in other projects' alone is the link to /inbox").toHaveText('1 in other projects');
     await page.screenshot({ path: test.info().outputPath('1-project-acme.png') });
     await others.hover();
     await block.screenshot({ path: test.info().outputPath('1b-project-acme-head.png') });
     // its link: the inbox screen, whose list holds both
     await others.click();
     const list = page.getByTestId('inbox.list');
-    await expect(list, 'the inbox screen').toBeVisible({ timeout: 5000 });
+    await expect(list, 'inbox/all is up').toBeVisible({ timeout: 5000 });
     await expect(list).toContainText('which bench?');
     await expect(list).toContainText('which currency');
     await page.screenshot({ path: test.info().outputPath('3-inbox-screen.png') });

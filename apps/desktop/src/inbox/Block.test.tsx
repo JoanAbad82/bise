@@ -707,11 +707,11 @@ describe("inbox-scope: a project's view lists its own items; bise's view and the
     expect(screen.getByTestId('inbox.block').getAttribute('data-count')).toBe('2');
     // designer m_32874: its rows leave the project out; the head says what waits elsewhere, a link to /inbox
     expect(screen.getByTestId('inbox.block.row.1').querySelector('.end')?.textContent).not.toContain('acme');
-    expect(screen.getByTestId('inbox.block.others').textContent).toBe('· 1 in other projects');
+    expect(screen.getByTestId('inbox.block.others').textContent).toBe('1 in other projects');
     cleanup();
     const shop = block({ project: SHOP, agent: 'pay' });
     expect(shop()).toContain('1 waiting');
-    expect(screen.getByTestId('inbox.block.others').textContent).toBe('· 2 in other projects');
+    expect(screen.getByTestId('inbox.block.others').textContent).toBe('2 in other projects');
     expect(shop()).toContain('which currency?');
     expect(shop()).not.toContain('which bench?');
   });
