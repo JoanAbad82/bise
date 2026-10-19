@@ -5,7 +5,7 @@
 // the renderer, the iso camera, the office's light) at his camera's zoom (camera.ts viewFit); it
 // answers where heads are and what is under a point (pick.ts). It renders only when frame() is
 // called and says how the loop must run next (Motion). The look is style.ts.
-// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, skate, head, zoom } for
+// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, skate, head, zoom, cam } for
 // the headless checks (bims-qa; skate: each skater's phase per frame, budget.spec (5)).
 import { Vector3 } from 'three';
 import type { BimFrame, Look, MakeRenderer, Motion, OfficeRenderer } from '../model';
@@ -32,6 +32,8 @@ interface Probe {
   head(name: string): { x: number; y: number } | null;
   /** his camera's zoom now (zoom.ts Cam; 1 = the fit): the follow check reads how close it looks */
   zoom(): number;
+  /** his whole camera now (zoom and where it looks): his camera check reads whether a wheel moved it */
+  cam(): Cam;
 }
 const TRACE_MAX = 3000;
 
@@ -53,7 +55,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   const v = new Vector3();
 
   const probe: Probe | null = testMode()
-    ? { frames: 0, trace: [], skate: [], head: (name) => headOf(name), zoom: () => cam.zoom }
+    ? { frames: 0, trace: [], skate: [], head: (name) => headOf(name), zoom: () => cam.zoom, cam: () => cam }
     : null;
   if (probe) (window as unknown as { __biseBims?: Probe }).__biseBims = probe;
 

@@ -297,6 +297,14 @@ for (const { w, win, wide } of SIZES.filter((x) => x.wide !== 'over')) {
         return d.length === 0 ? 0 : d.reduce((x, y) => x + y, 0) / d.length;
       };
       const scroll = () => s.page.evaluate(() => document.querySelector('.app-rb-body')?.scrollTop ?? 0);
+      // his camera itself (zoom.ts Cam, the renderer's probe): at the fit or not. The heads above say
+      // what he sees, but a bim that moves by itself moves them with no camera at all (desk-cut-15)
+      const camNow = () => s.page.evaluate(() => (window as unknown as { __biseBims?: { cam: () => { zoom: number; u: number; v: number } } }).__biseBims?.cam() ?? null);
+      const fitNow = async (): Promise<string> => {
+        const c = await camNow();
+        if (c === null) return 'no camera';
+        return Math.abs(c.zoom - 1) < 1e-6 && Math.abs(c.u - 0.5) < 1e-6 && Math.abs(c.v - 0.5) < 1e-6 ? 'fit' : `zoom ${c.zoom.toFixed(4)} at ${c.u.toFixed(4)},${c.v.toFixed(4)}`;
+      };
       const at = await spread();
       expect(at, `${pair.join(' and ')} on the canvas at the fit`).toBeGreaterThan(0);
       await expect(s.page.getByTestId('app.right.bims.fit'), 'no fit button at the fit').toHaveCount(0);
@@ -339,7 +347,7 @@ for (const { w, win, wide } of SIZES.filter((x) => x.wide !== 'over')) {
 
       // '⤢ fit' brings the whole office back; esc too
       await s.page.getByTestId('app.right.bims.fit').click();
-      await expect.poll(spread, { timeout: 2000 }).toBeCloseTo(at, 0);
+      await expect.poll(fitNow, { timeout: 2000, message: "'⤢ fit' brings the camera back to the fit" }).toBe('fit');
       await expect(s.page.getByTestId('app.right.bims.fit')).toHaveCount(0);
       for (let i = 0; i < 2; i++) await trackpad(s.cdp, cx, cy, { dy: -40, pinch: true });
       await expect(s.page.getByTestId('app.right.bims.fit')).toBeVisible();
@@ -347,11 +355,14 @@ for (const { w, win, wide } of SIZES.filter((x) => x.wide !== 'over')) {
       await s.page.getByTestId('app.right.bims').focus();
       await s.page.keyboard.press('Escape');
       await expect(s.page.getByTestId('app.right.bims.fit')).toHaveCount(0);
-      await expect.poll(spread, { timeout: 2000 }).toBeCloseTo(at, 0);
-      // at the fit the wheel is the bar's again
+      await expect.poll(fitNow, { timeout: 2000, message: 'esc brings the camera back to the fit' }).toBe('fit');
+      // at the fit the wheel is the bar's again: his camera stays where it is (the camera, not two
+      // heads: a bim that moves on its own would move those)
       const pinchAtFit = await scroll();
       await trackpad(s.cdp, cx, cy, { dy: 10 });
-      expect(await spread(), 'a plain wheel at the fit does not move the office').toBeCloseTo(at, 0);
+      await sleep(300);
+      expect(await fitNow(), 'a plain wheel at the fit does not move the office').toBe('fit');
+      await expect(s.page.getByTestId('app.right.bims.fit'), "a plain wheel at the fit shows no '⤢ fit'").toHaveCount(0);
       expect(pinchAtFit, 'the bar can scroll').toBeGreaterThanOrEqual(0);
     } finally {
       await s.close();
