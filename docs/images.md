@@ -194,6 +194,13 @@ privacy › kept: 1, 7 or 30; unset: 7, `bise_home::prefs::keep_days`),
 then deletes it. Every image counts: pasted, dropped, made by an agent
 (`run_typescript`), taken at fn.
 
+The grace (architect m_33081): nothing goes at the update. A hub's first
+tick with the rule writes `images-since` in its folder and deletes
+nothing; it prunes only from `since + keep_days` on
+(`switchboard::image_care::prune_allowed`). The release note says:
+"images older than N days (settings › context and privacy, 7 by default)
+are deleted, starting N days after this update".
+
 - The rule (`bend_images::prune`, pure `doomed`): a hash, its image and
   its `.b64` together, goes when its newest file is older than the
   setting and no live text names it; a write's leftover (`tmp-*`,

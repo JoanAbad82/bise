@@ -137,7 +137,8 @@ pub fn touch(dir: &Path, stems: &BTreeSet<String>) {
     }
 }
 
-pub(crate) fn touch_file(p: &Path, at: SystemTime) {
+/// Sets one file's mtime to `at` (a missing file is skipped).
+pub fn touch_file(p: &Path, at: SystemTime) {
     if let Ok(f) = std::fs::File::options().write(true).open(p) {
         let _ = f.set_modified(at);
     }

@@ -6,12 +6,17 @@
 //!   of the home: the age is what keeps another hub's images);
 //! - prunes the store at most once a day, on a thread, with the user's
 //!   `shots_keep_days` (`bise_home::prefs::keep_days`), its own named
-//!   images kept.
+//!   images kept;
+//! - never before `keep_days` after its first tick with the rule (the
+//!   grace, architect m_33081: the update deletes nothing at once, he
+//!   has the time to read the release note or change the setting;
+//!   [`prune_allowed`]).
 //!
 //! When each was last done is the mtime of a stamp in the hub's folder
-//! (`Paths::images_touched`, `Paths::images_pruned`): one stat each per
-//! tick, and a restart neither prunes twice in a day nor waits an hour
-//! to touch (a hub down for more than an hour finds its stamp old).
+//! (`Paths::images_touched`, `Paths::images_pruned`, and
+//! `Paths::images_since` for the grace's start): one stat each per tick,
+//! and a restart neither prunes twice in a day nor waits an hour to touch
+//! (a hub down for more than an hour finds its stamp old).
 
 use crate::paths::Paths;
 use bend_images::prune::{self, DAY_MS, TOUCH_EVERY_MS};
@@ -25,6 +30,13 @@ pub fn due(stamp_ms: Option<u64>, now_ms: u64, every_ms: u64) -> bool {
         None => true,
         Some(t) => t > now_ms || now_ms - t >= every_ms,
     }
+}
+
+/// The grace: a prune may run only once `keep_days` have passed since the
+/// rule started on this hub (`since_ms`, the `images_since` stamp); no
+/// stamp yet (the first tick after the update): never. Pure.
+pub fn prune_allowed(since_ms: Option<u64>, now_ms: u64, keep_days: u64) -> bool {
+    since_ms.is_some_and(|s| now_ms >= s.saturating_add(keep_days.max(1).saturating_mul(DAY_MS)))
 }
 
 fn stamp_ms(p: &Path) -> Option<u64> {
@@ -58,8 +70,24 @@ pub fn tick<'a>(
     done: impl FnOnce(std::io::Result<usize>) + Send + 'static,
 ) -> Care {
     let touch_due = due(stamp_ms(&paths.images_touched()), now_ms, TOUCH_EVERY_MS);
-    let prune_due = due(stamp_ms(&paths.images_pruned()), now_ms, DAY_MS);
+    let mut prune_due = due(stamp_ms(&paths.images_pruned()), now_ms, DAY_MS);
+    // the grace (architect m_33081): the first tick only writes when the
+    // rule started; nothing goes before keep_days after it
+    let since = stamp_ms(&paths.images_since());
+    if since.is_none() {
+        stamp(&paths.images_since());
+    }
     let mut care = Care::default();
+    if !touch_due && !prune_due {
+        return care;
+    }
+    let days = if prune_due {
+        let p = std::fs::read_to_string(prefs).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+        bise_home::prefs::keep_days(p.as_ref())
+    } else {
+        0
+    };
+    prune_due = prune_due && prune_allowed(since, now_ms, days);
     if !touch_due && !prune_due {
         return care;
     }
@@ -70,8 +98,6 @@ pub fn tick<'a>(
         care.touched = Some(named.len());
     }
     if prune_due {
-        let p = std::fs::read_to_string(prefs).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-        let days = bise_home::prefs::keep_days(p.as_ref());
         // stamped first: a crash mid-prune never makes it run at each tick
         stamp(&paths.images_pruned());
         let store = store.to_path_buf();
@@ -110,15 +136,37 @@ mod tests {
             .expect("clock")
             .as_millis() as u64;
         let text = format!("<image name=\"[Image #1]\" path=\"a.png\" mime=\"image/png\" b64=\"{}/{h}.b64\">", store.display());
+        // the first tick after the update: it touches, writes when the rule
+        // started and deletes nothing (the grace)
+        let first = tick(&paths, &store, &prefs, [text.as_str()].into_iter(), now, |_| panic!("no prune in the grace"));
+        assert_eq!(first, Care { touched: Some(1), pruning: None });
+        assert!(paths.images_since().exists(), "the grace's start is written");
+        // keep_days later (the stamp moved back by 30 days): it prunes
+        prune::touch_file(&paths.images_since(), prune::at_ms(now - 30 * DAY_MS));
+        let _ = std::fs::remove_file(paths.images_pruned());
         let (tx, rx) = std::sync::mpsc::channel();
         let care = tick(&paths, &store, &prefs, [text.as_str()].into_iter(), now, move |r| {
             let _ = tx.send(r.ok());
         });
-        assert_eq!(care, Care { touched: Some(1), pruning: Some(30) });
+        assert_eq!(care, Care { touched: None, pruning: Some(30) });
         assert_eq!(rx.recv().expect("done"), Some(0));
         // the next tick: both stamps are fresh, nothing to do
         let again = tick(&paths, &store, &prefs, [text.as_str()].into_iter(), now + 1000, |_| {});
         assert_eq!(again, Care::default());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The grace's law (architect m_33081): no stamp, never; one ms before
+    /// since + keep_days, never; from since + keep_days on, yes.
+    #[test]
+    fn the_first_prune_waits_keep_days_after_the_update() {
+        for keep in [1u64, 7, 30] {
+            let since = 1_800_000_000_000u64;
+            let at = since + keep * DAY_MS;
+            assert!(!prune_allowed(None, at * 2, keep), "no stamp: never");
+            assert!(!prune_allowed(Some(since), at - 1, keep), "keep {keep}: one ms early");
+            assert!(prune_allowed(Some(since), at, keep), "keep {keep}: on time");
+            assert!(prune_allowed(Some(since), at + DAY_MS, keep));
+        }
     }
 }

@@ -3,9 +3,11 @@
 
 A real hub (bise sbd, scripted model) on a throwaway home whose image store
 holds old and new images:
-  1. shots_keep_days = 30: the hub's first tick prunes; a 10-day-old image
-     stays, a crashed write's leftover (2 days) goes, a file the store did
-     not write stays;
+  0. the grace: the hub's first tick writes images-since and deletes
+     nothing, old as the images are;
+  1. 40 days after that start, shots_keep_days = 30: the hub prunes; a
+     10-day-old image stays, a crashed write's leftover (2 days) goes, a
+     file the store did not write stays;
   2. an open card (main asks the user: sb notify) names another
      10-day-old image;
   3. shots_keep_days = 7 and the hub's stamps cleared (a day later): the
@@ -71,7 +73,22 @@ def main():
             return open(p).read() if os.path.exists(p) else ""
 
         keep(30)
+        everything = left()
         c = E.start_hub()
+        # the grace (architect m_33081): the first tick after the update writes
+        # when the rule started and deletes nothing
+        since = os.path.join(E.state, "images-since")
+        c.wait(lambda: os.path.exists(since) and "images: touched" in log(), 60, "the grace's start written")
+        c.wait(lambda: os.path.exists(os.path.join(E.state, "images-touched")), 30, "the first touch")
+        check(left() == everything and "images: pruning" not in log(),
+              "the update deletes nothing at once: %r" % left())
+
+        # keep_days after the update (its start moved back 40 days), at 30 days
+        t = time.time() - 40 * DAY
+        os.utime(since, (t, t))
+        p = os.path.join(E.state, "images-pruned")
+        if os.path.exists(p):
+            os.remove(p)
         c.wait(lambda: "images: pruned" in log(), 60, "the first prune in hub.log")
         c.wait(lambda: not os.path.exists(os.path.join(store, "tmp-%s.png" % NEW)), 30, "the leftover gone")
         check(left() == sorted([OLD + ".b64", OLD + ".png", NAMED + ".b64", NAMED + ".png", NEW + ".b64", NEW + ".png", "notes.txt"]),

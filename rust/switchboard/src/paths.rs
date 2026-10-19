@@ -117,6 +117,11 @@ impl Paths {
     pub fn images_pruned(&self) -> PathBuf {
         self.state.join("images-pruned")
     }
+    /// When the rule started on this hub (its first tick after the
+    /// update): no prune before keep_days after it (the grace).
+    pub fn images_since(&self) -> PathBuf {
+        self.state.join("images-since")
+    }
     pub fn bin_dir(&self) -> PathBuf {
         self.state.join("bin")
     }
