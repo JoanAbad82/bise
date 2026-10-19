@@ -1672,12 +1672,6 @@
 .th-you[data-state='sending'] .th-bubble {
   opacity: 0.7;
 }
-/* queued: a dashed bubble, dim words, sends when the turn ends */
-.th-you[data-state='queued'] .th-bubble {
-  border-style: dashed;
-  background: transparent;
-  color: var(--c-text-2);
-}
 .th-you-fail {
   display: inline-flex;
   gap: var(--gap-inline);

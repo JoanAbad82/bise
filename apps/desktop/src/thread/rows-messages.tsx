@@ -1,5 +1,5 @@
 // A thread's message rows: his bubbles (their delivery marks; their body, quotes, words, chips and
-// fold, is YouBody.tsx, the same while sending and once sent), his sends not confirmed yet, his queued messages, the route hold and
+// fold, is YouBody.tsx, the same while sending and once sent), his sends not confirmed yet (a queued one is the composer's drawer until it is said), the route hold and
 // the agent's typing line. Owner: amb-win. Split out of rows.tsx (pure move).
 import { memo, useContext, useEffect, useState, type ReactNode } from 'react';
 import { RouterContext } from '@/app/router';
@@ -38,7 +38,7 @@ export function YouBubble({
   under?: ReactNode;
   /** false: the time shows on hover only (a bubble inside a run) */
   timeAlways?: boolean;
-  state?: 'sending' | 'failed' | 'queued';
+  state?: 'sending' | 'failed';
   testId?: string;
 }) {
   return (
@@ -208,7 +208,6 @@ export const PendingRow = memo(function PendingRow({ ctx, cid, after }: { ctx: R
   const state = hold !== undefined && hold.state !== 'cancelled' ? hold.state : p.state;
   // under his bubble, in its time's place (messages-right v1): 'sending…' until it lands, the
   // reason it wasn't sent in --c-err with 'try again' (his words stay in the bubble), where it went
-  const queued = p.mode === 'queued' && !failed && hold === undefined;
   // the store's own 'not sent' (store.ts): no why to add
   const why = p.why !== undefined && p.why !== common.not_sent ? p.why : '';
   const under =
@@ -234,8 +233,6 @@ export const PendingRow = memo(function PendingRow({ ctx, cid, after }: { ctx: R
           {thread.drop}
         </Press>
       </span>
-    ) : queued ? (
-      thread.queued_until({ agent: ctx.agent })
     ) : (
       (connecting ?? thread.sending)
     );
@@ -252,7 +249,7 @@ export const PendingRow = memo(function PendingRow({ ctx, cid, after }: { ctx: R
       </div>
     )}
     <div className={failed ? 'th-row th-pending th-failed' : hold?.state === 'sent' ? 'th-row th-routed' : 'th-row th-pending'} data-testid={`thread.pending.${cid}`} data-state={state} data-side="you" data-head={at.head} data-turn={at.turn || undefined} data-gap={at.gap}>
-      <YouBubble under={under} state={failed ? 'failed' : queued ? 'queued' : 'sending'}>
+      <YouBubble under={under} state={failed ? 'failed' : 'sending'}>
         {/* the same body as once it landed, from the same parts (bubble-parts): nothing moves at its echo */}
         <YouBody parts={drawnParts(p.parts) ?? [{ kind: 'text', text: p.text }]} plain={p.text} ctx={ctx} id={`thread.sending.${String(cid)}`} />
       </YouBubble>

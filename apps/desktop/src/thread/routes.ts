@@ -9,7 +9,7 @@
 // is: the oldest pending send of bise's thread (home project, main) with the
 // same words and no hold yet. View state only: nothing here decides where
 // his words go (the hub does; the row only sends route_cancel/route_correct).
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { threadKey, type Store, type EvOf } from '@/store';
 
 export interface Hold {
@@ -112,6 +112,12 @@ function useHolds(store: Store): readonly Hold[] {
 /** The hold of one pending send, if bise is routing it. */
 export function useHoldOf(store: Store, key: string, cid: number): Hold | undefined {
   return useHolds(store).find((h) => h.key === key && h.cid === cid);
+}
+
+/** Every hold of a thread's sends, cancelled ones too (the tail keeps those rows: sendInThread). */
+export function useHoldsOf(store: Store, key: string): readonly Hold[] {
+  const all = useHolds(store);
+  return useMemo(() => all.filter((h) => h.key === key), [all, key]);
 }
 
 /** The thread's route still held (esc keeps it with bise). */

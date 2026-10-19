@@ -10,9 +10,12 @@
 //   - edit sends queued_take {id}; the hub's queued_taken puts his words back in the field; with a
 //     draft in the field edit waits and its tip says 'empty the composer to edit it';
 //   - delete sends queued_take {id}; once taken the head says 'deleted · undo' and undo queues his
-//     words again (send {mode: queued});
+//     words again (send {mode: queued}), with no bubble in the thread;
+//   - tab queues his words: the drawer has them, the thread never does (no pending bubble, not his
+//     words) until the hub says them at the turn's end; then his bubble lands under the reply it
+//     followed (his « pas dans l'historique avant d'avoir été envoyé », queued-rows);
 //   - shots light + dark at 1400, 1100 and 800 (2 queued, a hovered icon with its tip, 5 queued
-//     scrolling, folded, 'deleted · undo') for designer.
+//     scrolling, folded, 'deleted · undo'; a tab-queued one waiting, then said) for designer.
 // The hub's own side (queued_steer delivers once with its id, a take after it refused) is
 // tests/proto_e2e_threads.py's queued_round, on a real hub. Owner: queue-drawer.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
@@ -203,6 +206,45 @@ test('thread/queue-drawer: 2 queued as drawer rows; send now steers, edit puts i
       await expect(page.getByTestId('composer.queue.undo')).toBeVisible();
       await page.keyboard.press('Meta+z');
       expect(await core.waitCmd(is((c) => c.cmd === 'send' && c.text === 'drop me too'), 3000)).toMatchObject({ mode: 'queued' });
+      // his undone sends go back to the hub's queue: the drawer, never a bubble in the thread
+      await expect(page.locator('[data-testid^="thread.pending."]'), 'no bubble for a queued send').toHaveCount(0);
+    });
+
+    await test.step('tab queues: out of the thread until the hub says it, then his bubble at its place (his « pas dans l\'historique avant d\'être envoyé »)', async () => {
+      const list = page.getByTestId('thread.list');
+      const words = 'and the changelog';
+      await field.click();
+      await page.keyboard.type(words);
+      await page.keyboard.press('Tab');
+      const sent = (await core.waitCmd(is((c) => c.cmd === 'send' && c.text === words), 3000)) as Cmd & { cid?: number };
+      expect(sent).toMatchObject({ project: P, agent: 'main', mode: 'queued' });
+      await core.send({ ev: 'sent', project: P, agent: 'main', cid: sent.cid, msg_id: 40, reason: 'made' } as never);
+      await core.send(agents(now, [q(now, 14, words)]) as never);
+      await expect(rows).toHaveCount(1);
+      await expect(page.getByTestId('composer.queue.1.text')).toHaveText(words);
+      await expect(page.locator('[data-testid^="thread.pending."]'), 'no bubble while it waits').toHaveCount(0);
+      await expect(list, 'his words only in the drawer').not.toContainText(words);
+      await expect(list, 'no queued words in the thread').not.toContainText('queued ·');
+      for (const t of ['light', 'dark'] as const) {
+        await core.send(prefs(t) as never);
+        await shot(`waiting-${t}-1100`);
+      }
+      // the turn ends: the hub says it (its entry, his msg_id), the drawer empties, his bubble lands
+      await core.send(
+        { ev: 'entry', project: P, agent: 'main', entry: { pos: 3, at_ms: Date.now(), kind: 'agent', text: 'done: the lands keep their order.' } } as never,
+        { ev: 'entry', project: P, agent: 'main', entry: { pos: 4, at_ms: Date.now(), kind: 'you', text: words, msg_id: 40, delivery: 'sent' } } as never,
+        { ev: 'agents', project: P, agents: [ag('main', now, { queued: [] }), ag('perf', now)] } as never,
+      );
+      await expect(page.getByTestId('thread.you.4')).toContainText(words);
+      await expect(drawer, 'sent: the drawer closes').toHaveCount(0);
+      await expect(page.locator('[data-testid^="thread.pending."]')).toHaveCount(0);
+      // at its real place: after the agent's reply it came after, the list's last row
+      const [reply, mine] = await Promise.all([page.locator('.th-row', { hasText: 'the lands keep their order' }).last().boundingBox(), page.getByTestId('thread.you.4').boundingBox()]);
+      expect(reply && mine && mine.y >= reply.y + reply.height - 1, 'his bubble under the reply it followed').toBe(true);
+      for (const t of ['light', 'dark'] as const) {
+        await core.send(prefs(t) as never);
+        await shot(`said-${t}-1100`);
+      }
     });
   } finally {
     await s.close();

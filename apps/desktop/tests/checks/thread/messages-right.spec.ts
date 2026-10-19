@@ -27,7 +27,7 @@ const world = () => [
     ],
   },
   { ev: 'welcome', project: P, proto: 1, workspace: '/nowhere/shop', name: 'shop' },
-  // a message the hub holds until main's turn ends (rows::Agent.queued): a dashed bubble at the bottom
+  // a message the hub holds until main's turn ends (rows::Agent.queued): the composer's drawer, no bubble
   { ev: 'agents', project: P, agents: [{ ...ag('main'), queued: [{ id: 1, text: 'then open a PR', created_ms: NOW - MIN }] }, ag('perf')] },
   {
     ev: 'thread',

@@ -264,8 +264,6 @@ crate::words! { thread:
     not_sent_because(why) = "▲ not sent: {why}";
     /// the other act on a failed send
     drop = "drop";
-    /// a queued message
-    queued_until(agent) = "queued · sends when {agent}'s turn ends";
     /// a message on its way
     sending = "sending…";
     /// a message on its way, the hub not there yet

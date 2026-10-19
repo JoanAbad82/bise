@@ -11,7 +11,8 @@ import { LIVE, liveKey, useLive, useStill } from './live';
 import { FirstRun, showsFirstRun } from '@/setup';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, gapOf, type RowCtx } from './rows';
-import { entryKey, namedRows, pendingKey, placeSteered, posOfKey } from './entry';
+import { entryKey, namedRows, pendingKey, placeSteered, posOfKey, sendInThread } from './entry';
+import { useHoldsOf } from './routes';
 import { NoProject } from './NoProject';
 import { landedEchoes, retryRuns } from './tiers';
 import { foldedRuns, runKey, runWords, withRuns } from './runs';
@@ -242,18 +243,20 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   // the row his sends follow: the reply being written, else the list's last entry (rowLayout)
   const lastShown = useEntry(tkey, shown.at(-1) ?? -1);
   const tailPrev = live.entry ?? lastShown;
+  // his messages on their way; a queued one is the composer's drawer (QueueDrawer.tsx) until the
+  // hub says it, never a bubble here: then its entry lands as his normal bubble, at its place
+  const holds = useHoldsOf(store, tkey);
+  const going = useMemo(() => pending.filter((p) => sendInThread(p, holds.some((h) => h.cid === p.cid))), [pending, holds]);
   // his own send goes to the bottom even when he had scrolled up
-  const sent = pending.length;
+  const sent = going.length;
   const last = useRef(sent);
   useEffect(() => {
     if (sent > last.current) listRef.current?.scrollToEnd();
     last.current = sent;
   }, [sent, listRef]);
-  // his messages on their way; the ones the hub holds until the turn ends are the composer's
-  // drawer (QueueDrawer.tsx), never bubbles here: a sent one lands as his normal bubble
-  const tail = pending.length === 0 ? undefined : (
+  const tail = going.length === 0 ? undefined : (
     <div className="th-tail">
-      {pending.map((p, i) => (
+      {going.map((p, i) => (
         <PendingRow key={pendingKey(String(p.cid))} ctx={ctx} cid={p.cid} after={i === 0 ? tailPrev : undefined} />
       ))}
     </div>

@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolSource, jsonStrField, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatedReport, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, sendInThread, handoffOf, stepTime, toolEnd, toolLines, toolSource, jsonStrField, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatedReport, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { hitsIn } from './find';
 import FIND_TEXT from '../../../../rust/proto/fixtures/find_text.json';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
 
 describe('thread rows', () => {
+  it('his sends in the tail: a queued one only once failed or routed, a steer always', () => {
+    expect(sendInThread({ mode: 'now', state: 'sending' }, false)).toBe(true);
+    expect(sendInThread({ mode: 'queued', state: 'sending' }, false)).toBe(false);
+    expect(sendInThread({ mode: 'queued', state: 'failed' }, false)).toBe(true);
+    expect(sendInThread({ mode: 'queued', state: 'sending' }, true)).toBe(true);
+  });
+
   it('keys: entries by pos, sends by cid, never the same', () => {
     expect(entryKey(12)).toBe('e:12');
     expect(posOfKey(entryKey(12))).toBe(12);

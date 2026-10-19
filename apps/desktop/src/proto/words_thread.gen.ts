@@ -240,8 +240,6 @@ export const thread = {
   not_sent_because: (a: { why: string | number }): string => "▲ not sent: " + String(a.why),
   /** the other act on a failed send */
   drop: "drop",
-  /** a queued message */
-  queued_until: (a: { agent: string | number }): string => "queued · sends when " + String(a.agent) + "'s turn ends",
   /** a message on its way */
   sending: "sending…",
   /** a message on its way, the hub not there yet */

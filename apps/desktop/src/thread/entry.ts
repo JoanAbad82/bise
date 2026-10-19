@@ -10,6 +10,16 @@ import { rhythmWords } from '@/scheduled/model';
 export const entryKey = (pos: number) => `e:${pos}`;
 export const pendingKey = (cid: string) => `p:${cid}`;
 
+/**
+ * His send not confirmed yet, drawn in the thread's tail? A queued one waits in the composer's
+ * drawer (the hub's Agent.queued) and has no row until the hub says it: its entry then lands at its
+ * place (his « pas dans l'historique avant d'avoir été envoyé »). Failed, or held by bise's route,
+ * it keeps its row (retry and drop, the route's line). A steer always has its row. Pure.
+ */
+export function sendInThread(p: { readonly mode: string; readonly state: string }, held: boolean): boolean {
+  return p.mode !== 'queued' || p.state === 'failed' || held;
+}
+
 /** The pos of an entry key, else undefined. */
 export function posOfKey(key: string): number | undefined {
   if (!key.startsWith('e:')) return undefined;

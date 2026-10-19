@@ -860,13 +860,6 @@
     "one": null,
     "text": "the project's folder"
   },
-  "thread.queued_until": {
-    "args": [
-      "agent"
-    ],
-    "one": null,
-    "text": "queued · sends when {agent}'s turn ends"
-  },
   "thread.read_it": {
     "args": [
       "who"
