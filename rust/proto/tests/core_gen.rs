@@ -46,6 +46,9 @@ use journal::{journal_codec, journal_laws};
 
 #[path = "core_gen/state.rs"]
 mod state;
+
+#[path = "core_gen/photo.rs"]
+mod photo;
 use state::{state_codec, state_laws, state_types};
 
 const BLESS: &str = "BISE_PROTO_BLESS";

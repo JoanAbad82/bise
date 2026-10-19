@@ -1,0 +1,173 @@
+# 36 · the boot replays all history
+
+Status: step 0 measured (below); architect's call on it (m_34144): plan v4
+chunks 2-4 as signed (keyed photo shapes), chunk 5 becomes "the cold records
+out of the photo" (its own plan first). Chunk 2 in progress.
+Plan v4 signed by state-schema and snap-review (architect's brief, three
+agents: boot-photo chunks 2-5, journal-bugs chunk 1, arch-split chunk 6).
+Gabriel's pick on page debt-map (q-snap, « la photo et sortir le froid »):
+« fais un plan détaillé et demande à un collègue de le review en regardant
+le code. fais quelques itérations pour que le plan soit très bon, puis lance
+l'implémentation ». Label: hub, boot. Nothing on GitHub.
+
+## The problem
+
+A hub boot replays the whole journal into sb-core, so it grows with history,
+not with the live state. His harness hub, main f03183397: journal 59.7 MB,
+134k events (`message_sent` 30.5 MB of it); `journal read` -> `journal
+replayed` over his last 12 boots: 9.2 to 47.2 s. The Rust part (read and
+parse the file, start sb-core) is 0.3-0.8 s; the rest is sb-core folding
+every event over St. A revive (sb-core died) pays it again.
+
+## Step 0 · the measures (2026-10-19, no code)
+
+On a copy of his journal (59.8 MB, 134,537 events), sb-core built from main
+f03183397 (`scripts/bins.sh path sb-core`), one heavy slot. Instructions are
+sb-core's retired instructions (proc_pid_rusage `ri_instructions`), which a
+loaded machine does not change; wall times are under load and only for
+scale. Script: boot-photo's tmp `step0.py` (init, `replay_many` of 250, a
+`view_all`, then a `ping` whose `pad` field is each string: its J.parse).
+
+| what | bytes | sb-core instructions |
+|---|---|---|
+| full replay (`replay_many` x 539) | journal 59.8 MB | 134.8 G |
+| `view_all` after it | 36.2 MB | 17.2 G (its encode) |
+| J.parse of the full view | 36.2 MB | 21.0 G (~580 / byte) |
+| the view, message text and parts emptied | 12.7 MB (35.1 %) | 7.6 G (~600 / byte) |
+| a 20-byte line | 20 B | 0.12 M |
+
+Where the bytes are (the view: 34,106 messages, 857 agents of which 834
+archived):
+
+- message text and parts: 23.3 MB of the 36.2 MB;
+- the textless messages: 9.3 MB (271 B each as keyed JSON; 113 B each as
+  positional arrays);
+- the agents: 3.7 MB, 3.6 MB of it the 834 archived ones; their `brief`
+  (1.6 MB), `files` (0.9 MB), `last_report` (0.8 MB), `ws` (0.15 MB); the
+  archived agents without those four: 0.3 MB;
+- everything else (timers, wakes, order, cards, ended lists): < 0.2 MB.
+
+What it says for the plan:
+
+1. A photo boot is already a large win before chunk 5: parsing the full
+   36 MB photo is 21 G instructions against the replay's 135 G (plus the
+   decode into St, not measured yet: a photo `_of` walk, expected of the
+   same order as the parse).
+2. The textless view is 35 %, not the < 20 % step 0 hoped for: chunk 5 as
+   written (text and parts stripped) gives a ~12.7 MB photo, not < 5 MB.
+3. It does not stay flat: every cold message keeps its record in St
+   (113-271 B), so a journal with 10x his cold messages gives a photo of
+   ~40-95 MB of message records alone. Flat needs the cold records out of
+   the photo, not only their text.
+4. The rest of the 5 MB is the archived agents' brief/report/files/ws
+   (3.3 MB), "later, only if a boot shows it" in v4.
+
+### Architect's call on step 0 (m_34144)
+
+- **A now, then C; not B.** Chunks 2-4 ship as signed, with KEYED photo
+  shapes: a positional shape is what state-schema just removed, and it buys
+  a constant factor, not the bound. A full photo is already ~6x cheaper to
+  read than a replay (21 G parse vs 135 G).
+- Chunk 3 measures the St decode and puts it in its sha.
+- Done-when for chunks 2-4 (A): a boot from the photo costs its parse +
+  decode, measured, and answers byte-identically to a full replay.
+- **Chunk 5 becomes C: the cold RECORDS out of the photo**, not only their
+  text, for St.old and for the archived agents (St.arch, once arch-split
+  lands; their brief/files/report/ws are 3.3 of the 3.6 MB). Its shape, to
+  turn into its own plan (every reader of St.old and of archived agents
+  listed first, and the laws) before code:
+  - at photo time, each cold record is written ONCE to an append-only cold
+    store (`<state>/cold/`, records in their photo shape, encoded by sb-core:
+    one encoder) with a small id -> offset index; the photo keeps only what
+    must stay in memory: next_msg / the cold watermark, and for archived
+    agents the name index (name + aliases) for name_taken / resolve /
+    name-free;
+  - a step that needs a cold record (rec_in, reply_at, msg_of and its
+    callers, msg_op.cold.go when a cold message turns hot, the restore of an
+    archived agent) asks for it through need/ans; the Rust serves the stored
+    bytes and never rebuilds a record itself (no second copy of apply's
+    message rules in Rust);
+  - a cold record that turns hot comes back into St whole; one going cold
+    again is written again (last write wins by id in the index);
+  - apply/replay never asks (a law or a lint); cold_is_inert, inv Parts and
+    their proofs restated over St + store;
+  - the Rust mirror's history and boot view read the store behind one fn in
+    crate::cold.
+- Done-when for C, as v4: the photo < ~5 MB on his copy, flat on a
+  synthetic journal with 10x his cold messages and archived agents.
+
+## The plan (v4, final)
+
+The Rust shell keeps reading the whole journal (0.3-0.8 s: the inbox index,
+PR lines, follow_moves and unreadable-line logging stay as today). Only
+sb-core stops replaying it: it starts from a **photo** of St and replays the
+events after it. To keep the photo small, the text and parts of cold
+messages leave the photo: sb-core asks the Rust shell for a cold message's
+text when a step needs it (its need/ans round trip), and the Rust answers
+from the journal itself (an index id -> line). The journal stays the one
+durable store; nothing new on disk but the photo.
+
+1. **Two journal bugs** (journal-bugs): an invalid UTF-8 byte boots an empty
+   hub (daemon.rs `read_to_string(..).unwrap_or_default()`, at boot and at
+   revive): decode per line. A failed journal write is dropped: a
+   `journal_ok` flag, false on any failed write or flush, one hub.log line;
+   no photo is written while it is false.
+2. **The photo shapes** (core_gen): every record of STATE gets a lossless
+   `photo` shape whose round law is identity (`_of(_json(x)) == x`); a
+   `journal` shape reused only where its round law says `== x` for every
+   field; `Wire::Recs` (a list of the item's shape) with one list lemma per
+   record type; Sched as its own tagged object; WATCH_RESUMES read plainly.
+   A text round trip (J.stringify then J.parse) on a fixture with escapes,
+   newlines and non-ASCII is evidence only.
+3. **sb-core inputs**: `photo {}` -> `{st}` (read-only, refused while a need
+   is pending); `restore_photo {st}` -> `Hub.d := st`, R fresh, a decode
+   failure changes nothing. Laws: restore_photo(photo(h)) keeps `Hub.d`;
+   replay(prefix ++ tail) == replay(tail) after restore_photo(photo(replay(prefix))).
+4. **The Rust side** (crate::photo; daemon.rs gets call lines only): the
+   file `<state>/photo/<sb-core key>.json` = `{v:1, key, events: k, last:
+   <sha of event k's line>, st}`, the last two keys kept. Boot and revive:
+   PR lines of all events to Rust, events[k..] to sb-core when `usable`
+   (same key, k <= events, event k's line hashes to `last`, no
+   `sweep::migrate` move this boot), else a full replay and one hub.log
+   line. Written between two steps with `journal_ok` true: at a clean stop
+   (skipped if the last encode took > 2 s), after a boot that did a full
+   replay, at most once a day after 10 min without input. tmp + fsync +
+   rename. Proof on his copy: photo at 10/50/90/100 % + tail vs full
+   replay, every answer and `view_all` sha byte-identical.
+5. **Cold records out of the photo** (replaces v4's "cold text out", see
+   architect's call above; its own plan to architect before code).
+6. **Archived agents out of the walks** (arch-split, issue 21 sha 2).
+
+Every chunk: its sha to architect before it lands, then the full gate, then
+`sb land`. Bend: ALL PROOFS CHECK, no unsafe; old_core_replay vs the last two
+tags and main; scripts/core_same.py for every no-behaviour-change claim. New
+code in new files (crate::photo, crate::cold); daemon.rs, core.rs and
+core.bend get call lines only.
+
+## Done when
+
+- On his journal copy: a boot from a photo at the last event sends 0 events
+  to sb-core, costs the photo's parse + decode (measured), and answers
+  byte-identically to a full replay; a photo 20k events old replays only
+  that tail.
+- After chunk 5 (C): the photo is < ~5 MB on his copy, and stays flat on a
+  synthetic journal with 10x his cold messages and archived agents (boot
+  within 10 % of his).
+- The two journal bugs fixed with their tests.
+- Every chunk landed on main.
+
+## Slices
+
+(per slice: sha, what moved, proofs and replay)
+- **chunk 2, the photo shapes** (boot-photo): `photo` shapes in
+  bise_proto::core::state for Agent, MRec, Item, Timer, TimerEnd, Watch,
+  WatchEnd, Wakes, Tms, Xs, St (Msg, Card, Ans, Act, XIn, Route, Out reuse
+  their journal shape: its round law is already identity); Wire::Recs (a list
+  of the item's shape) with one list round law per record type
+  (core_gen/photo.rs); Sched's tagged object (tag `kind`, exact; the journal
+  keeps its hand codec); Watch's photo reads `resumes` plainly. A unit test
+  walks St's photo and fails on a field not carried, a hand codec or an
+  inline record. gen/state-codec.bend: ALL PROOFS CHECK, `St.photo_round`
+  identity; its check ~4.4 s -> ~4.8 s (7.0 s once under load). Nothing
+  imports the photo codec yet: no behaviour change. The text round trip
+  (escapes, non-ASCII) moves to chunk 3, where sb-core writes and reads it.

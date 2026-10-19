@@ -99,6 +99,9 @@ pub enum Wire {
     /// an enum written by a hand codec ([`Hand`]); its [`Key`]'s `key`
     /// is the first of the hand's keys
     Hand(&'static Hand),
+    /// a list of records, each as its shape of the same name (else its
+    /// journal shape), read back whole (a photo's lists)
+    Recs,
 }
 
 /// A hand codec of bend/hub/state-hand.bend (imported `SH`), for an enum
@@ -145,8 +148,11 @@ pub const WATCH_RESUMES: HandRead = HandRead { name: "watch_resumes", keys: &["r
 /// One JSON shape of a record, its keys in wire order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Shape {
-    /// `journal` (what a journal line carries, read back at boot) or
-    /// `view` (what sb-core's view writes for the hub's mirror)
+    /// `journal` (what a journal line carries, read back at boot),
+    /// `view` (what sb-core's view writes for the hub's mirror) or
+    /// `photo` (the whole St a boot starts from, issue 36: lossless, its
+    /// round law is identity; a record without one is written in its
+    /// journal shape, whose round law must then be identity too)
     pub name: &'static str,
     /// sb-core reads it back (`_of` and its round law); a write-only
     /// shape gets `_kvs` and a law that it writes exactly its keys
@@ -234,6 +240,11 @@ const fn kn(field: &'static str, key: &'static str, wire: Wire) -> Key {
     Key { field, key, wire, read: None }
 }
 
+/// A record's photo shape (read back, every field).
+const fn photo(keys: &'static [Key]) -> Shape {
+    Shape { name: "photo", read: true, keys }
+}
+
 const fn v(name: &'static str, word: &'static str) -> Variant {
     Variant { name, word, fields: &[] }
 }
@@ -285,7 +296,9 @@ pub const STATE: State = State {
         Enum {
             name: "Sched",
             doc: "when a timer fires: every `ms`, or every day at that minute (local time, the hub's next_daily)",
-            tag_key: "",
+            // its tagged object is the photo's (exact); a journal line
+            // writes it through its hand codec (SCHED, read normalised)
+            tag_key: "kind",
             variants: &[vf("Every", "every", &[f("ms", Nat)]), vf("Daily", "daily", &[f("min", Nat)])],
             fallback: "Every",
         },
@@ -362,7 +375,7 @@ pub const STATE: State = State {
             name: "MRec",
             doc: "a message, its delivery state and whether it got its (first) reply",
             fields: &[f("msg", T("Msg")), fd("st", T("MSt"), "Queued{\"\"}"), f("settled", Bool)],
-            shapes: &[],
+            shapes: &[photo(&[k("msg", W::Obj), k("st", W::Obj), k("settled", W::Bool)])],
         },
         Record {
             name: "Card",
@@ -432,13 +445,30 @@ pub const STATE: State = State {
                 f("snap", OptStr),
                 f("follow", OptStr),
             ],
-            shapes: &[],
+            shapes: &[photo(&[
+                k("name", W::Str),
+                k("is_main", W::Bool),
+                k("parent", W::OptStr),
+                k("life", W::Word),
+                k("declared", W::OptWord),
+                k("aliases", W::Strs),
+                k("files", W::Strs),
+                k("ws", W::Json),
+                k("dir", W::Str),
+                k("brief", W::Json),
+                k("created", W::Nat),
+                k("failure", W::OptStr),
+                k("note", W::Str),
+                k("report", W::Json),
+                k("snap", W::OptStr),
+                k("follow", W::OptStr),
+            ])],
         },
         Record {
             name: "Item",
             doc: "a card main withdrew he may still answer (gone.bend)",
             fields: &[f("id", Nat), f("text", Str)],
-            shapes: &[],
+            shapes: &[photo(&[k("id", W::Nat), k("text", W::Str)])],
         },
         Record {
             name: "Timer",
@@ -498,17 +528,37 @@ pub const STATE: State = State {
                         k("name", W::StrOmit),
                     ],
                 },
+                // exact: its schedule as its tagged object, never normalised
+                photo(&[
+                    k("id", W::Nat),
+                    k("agent", W::Str),
+                    k("by", W::Str),
+                    k("text", W::Str),
+                    k("sched", W::Obj),
+                    k("next", W::Nat),
+                    k("until", W::OptNat),
+                    k("times", W::OptNat),
+                    k("fired", W::Nat),
+                    k("page", W::OptStr),
+                    k("last", W::Nat),
+                    k("runs", W::Nats),
+                    k("name", W::Str),
+                    k("held", W::Bool),
+                ]),
             ],
         },
         Record {
             name: "TimerEnd",
             doc: "a timer that ended: when (0: an old line without it) and why",
             fields: &[f("t", T("Timer")), f("at", Nat), f("why", Str)],
-            shapes: &[Shape {
-                name: "view",
-                read: false,
-                keys: &[k("t", W::Inline), kn("at", "ended_ms", W::Nat), k("why", W::Str)],
-            }],
+            shapes: &[
+                Shape {
+                    name: "view",
+                    read: false,
+                    keys: &[k("t", W::Inline), kn("at", "ended_ms", W::Nat), k("why", W::Str)],
+                },
+                photo(&[k("t", W::Obj), k("at", W::Nat), k("why", W::Str)]),
+            ],
         },
         Record {
             name: "Act",
@@ -548,23 +598,36 @@ pub const STATE: State = State {
                     // watch resumes, wakes.bend resumes_of)
                     Key { field: "resumes", key: "resumes", wire: W::Bool, read: Some(&WATCH_RESUMES) },
                 ],
-            }],
+            }, photo(&[
+                k("id", W::Nat),
+                k("agent", W::Str),
+                k("spec", W::Json),
+                k("max_text", W::Str),
+                k("set_at", W::Nat),
+                k("max_at", W::Nat),
+                k("quiet", W::Bool),
+                // read plainly: a photo always has it
+                k("resumes", W::Bool),
+            ])],
         },
         Record {
             name: "WatchEnd",
             doc: "a watch that ended: when and why (hit, max, stop, gone)",
             fields: &[f("w", T("Watch")), f("at", Nat), f("why", Str)],
-            shapes: &[Shape {
-                name: "view",
-                read: false,
-                keys: &[k("w", W::Inline), kn("at", "ended_at", W::Nat), k("why", W::Str)],
-            }],
+            shapes: &[
+                Shape {
+                    name: "view",
+                    read: false,
+                    keys: &[k("w", W::Inline), kn("at", "ended_at", W::Nat), k("why", W::Str)],
+                },
+                photo(&[k("w", W::Obj), k("at", W::Nat), k("why", W::Str)]),
+            ],
         },
         Record {
             name: "Wakes",
             doc: "the watches of `sb wake`: live, ended (newest first), the last id given",
             fields: &[f("live", Ts("Watch")), f("ended", Ts("WatchEnd")), f("last_id", Nat)],
-            shapes: &[],
+            shapes: &[photo(&[k("live", W::Recs), k("ended", W::Recs), k("last_id", W::Nat)])],
         },
         Record {
             name: "Tms",
@@ -577,7 +640,14 @@ pub const STATE: State = State {
                 fd("next_act", Nat, "1n"),
                 fd("wk", T("Wakes"), "Wakes.empty()"),
             ],
-            shapes: &[],
+            shapes: &[photo(&[
+                k("live", W::Recs),
+                k("ended", W::Recs),
+                k("last_id", W::Nat),
+                k("acts", W::Recs),
+                k("next_act", W::Nat),
+                k("wk", W::Obj),
+            ])],
         },
         Record {
             name: "Out",
@@ -663,7 +733,13 @@ pub const STATE: State = State {
                 f("routes", Ts("Route")),
                 fd("next_rid", Nat, "1n"),
             ],
-            shapes: &[],
+            shapes: &[photo(&[
+                k("outbox", W::Recs),
+                k("next_xid", W::Nat),
+                k("xin", W::Recs),
+                k("routes", W::Recs),
+                k("next_rid", W::Nat),
+            ])],
         },
         Record {
             name: "St",
@@ -682,7 +758,21 @@ pub const STATE: State = State {
                 f("old", Ts("MRec")),
                 f("gone", Ts("Item")),
             ],
-            shapes: &[],
+            // the photo a boot starts from (issue 36): every field
+            shapes: &[photo(&[
+                k("agents", W::Recs),
+                k("order", W::Strs),
+                k("hot", W::Recs),
+                k("cards", W::Recs),
+                k("notes", W::Strs),
+                k("next_msg", W::Nat),
+                k("next_card", W::Nat),
+                k("tm", W::Obj),
+                k("x", W::Obj),
+                k("paused", W::OptNat),
+                k("old", W::Recs),
+                k("gone", W::Recs),
+            ])],
         },
     ],
 };
@@ -727,6 +817,7 @@ mod tests {
                         Wire::OptWord => matches!(fl.ty, OptT(n) if STATE.enum_(n).is_some_and(|e| e.tag_key.is_empty())),
                         Wire::Obj | Wire::Inline => matches!(fl.ty, T(_)),
                         Wire::Hand(_) => matches!(fl.ty, T(_)),
+                        Wire::Recs => matches!(fl.ty, Ts(n) if STATE.record(n).is_some()),
                     };
                     assert!(ok, "{}.{}: {:?} doesn't fit {:?}", r.name, key.field, key.wire, fl.ty);
                 }
@@ -738,5 +829,45 @@ mod tests {
         names.sort();
         names.dedup();
         assert_eq!(names.len(), n, "a name declared twice");
+    }
+
+    /// The record's shape a photo writes it in: its photo shape, else its
+    /// journal shape.
+    fn photo_of(r: &Record) -> Option<&'static Shape> {
+        STATE.record(r.name).and_then(|r| r.shape("photo").or_else(|| r.shape("journal")))
+    }
+
+    /// The photo is lossless (issue 36): St's photo shape and every
+    /// shape it reaches carry every field, read back exactly (no hand
+    /// codec, no inline record, no hand read in a photo shape: each round
+    /// law is identity).
+    #[test]
+    fn the_photo_carries_every_field_exactly() {
+        let mut todo = vec!["St"];
+        let mut done: Vec<&str> = Vec::new();
+        while let Some(name) = todo.pop() {
+            if done.contains(&name) {
+                continue;
+            }
+            done.push(name);
+            let Some(r) = STATE.record(name) else { continue };
+            let sh = photo_of(r).unwrap_or_else(|| panic!("{name}: no photo or journal shape"));
+            assert!(sh.read, "{name}.{}: a photo is read back", sh.name);
+            for fl in r.fields {
+                let key = sh.keys.iter().find(|k| k.field == fl.name);
+                let key = key.unwrap_or_else(|| panic!("{name}.{}: {} doesn't carry it", fl.name, sh.name));
+                // an omitted default reads back as that default (exact); a
+                // hand codec normalises, an inline record is written only
+                let exact = !matches!(key.wire, Wire::Inline | Wire::Hand(_));
+                assert!(exact, "{name}.{}: {:?} is not exact", fl.name, key.wire);
+                if sh.name == "photo" {
+                    assert!(key.read.is_none(), "{name}.{}: a hand read in a photo", fl.name);
+                }
+                if let T(n) | OptT(n) | Ts(n) = fl.ty {
+                    todo.push(n);
+                }
+            }
+        }
+        assert!(done.contains(&"Msg") && done.contains(&"WatchEnd"), "the walk reaches every record");
     }
 }

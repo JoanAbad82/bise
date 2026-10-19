@@ -456,6 +456,36 @@ def MSt.journal_round(e):
     case S.Cancelled{}:
       {==}
 
+# ---- Sched (its word under "kind", its fields beside it) ----
+
+def Sched.journal_kvs(e: S.Sched) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match e:
+    case S.Every{+ms}:
+      [J.kv("kind", J.JStr{"every"}), J.kv("ms", J.JNum{ms})]
+    case S.Daily{+min}:
+      [J.kv("kind", J.JStr{"daily"}), J.kv("min", J.JNum{min})]
+
+def Sched.journal_json(e: S.Sched) -> J.Json:
+  J.obj(Sched.journal_kvs(e))
+
+def Sched.of_word(+w: String, +j: J.Json) -> S.Sched:
+  Bool.pick(S.Sched, String.eq(w, "daily"), S.Daily{rd.n(J.get(j, "min"))}, S.Every{rd.n(J.get(j, "ms"))})
+
+# any other word, or none: every (an inline row reads the line's own object)
+def Sched.journal_of(+j: J.Json) -> S.Sched:
+  Sched.of_word(rd.s(J.get(j, "kind")), j)
+
+law Sched.journal_round:
+  for e: S.Sched
+  {Sched.journal_of(Sched.journal_json(e)) == e : S.Sched}
+
+def Sched.journal_round(e):
+  match e:
+    case S.Every{x_0}:
+      {==}
+    case S.Daily{x_0}:
+      {==}
+
 # ---- What (its word under "kind", its fields beside it) ----
 
 def What.journal_kvs(e: S.What) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
@@ -1064,6 +1094,112 @@ def Msg.journal_round(x):
     case S.Msg{id, thread, from, to, reply_to, expect, auto, text, created, plain, queued, via, parts}:
       Msg.journal_round_by_fields(id, thread, from, to, reply_to, expect, auto, text, created, plain, queued, via, parts)
 
+# ---- MRec, its photo shape: msg, st, settled ----
+
+def MRec.photo_kvs(r: S.MRec) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.MRec{+msg, +st, +settled}:
+      [J.kv("msg", Msg.journal_json(msg)), J.kv("st", MSt.journal_json(st)), J.kv("settled", J.JBool{settled})]
+
+def MRec.photo_json(r: S.MRec) -> J.Json:
+  J.obj(MRec.photo_kvs(r))
+
+def MRec.photo_of(+j: J.Json) -> S.MRec:
+  S.MRec{Msg.journal_of(rd.j(J.get(j, "msg"))), MSt.journal_of(rd.j(J.get(j, "st"))), rd.b(J.get(j, "settled"))}
+
+law MRec.photo.msg:
+  for +msg: S.Msg
+  for +st: S.MSt
+  for +settled: Bool
+  {Msg.journal_of(rd.j(J.get(J.obj(MRec.photo_kvs(S.MRec{msg, st, settled})), "msg"))) == msg : S.Msg}
+
+def MRec.photo.msg(msg, st, settled):
+  Msg.journal_round(msg)
+
+law MRec.photo.st:
+  for +msg: S.Msg
+  for +st: S.MSt
+  for +settled: Bool
+  {MSt.journal_of(rd.j(J.get(J.obj(MRec.photo_kvs(S.MRec{msg, st, settled})), "st"))) == st : S.MSt}
+
+def MRec.photo.st(msg, st, settled):
+  MSt.journal_round(st)
+
+law MRec.photo.settled:
+  for +msg: S.Msg
+  for +st: S.MSt
+  for +settled: Bool
+  {rd.b(J.get(J.obj(MRec.photo_kvs(S.MRec{msg, st, settled})), "settled")) == settled : Bool}
+
+def MRec.photo.settled(msg, st, settled):
+  {==}
+
+# the fields it carries come back (the others at their default)
+law MRec.photo_round_by_fields:
+  for +msg: S.Msg
+  for +st: S.MSt
+  for +settled: Bool
+  {MRec.photo_of(MRec.photo_json(S.MRec{msg, st, settled})) == S.MRec{msg, st, settled} : S.MRec}
+
+def MRec.photo_round_by_fields(msg, st, settled):
+  %Equal.sym(S.Msg, Msg.journal_of(rd.j(J.get(J.obj(MRec.photo_kvs(S.MRec{msg, st, settled})), "msg"))), msg, MRec.photo.msg(msg, st, settled)) : {S.MRec{_, MSt.journal_of(rd.j(J.get(J.obj(MRec.photo_kvs(S.MRec{msg, st, settled})), "st"))), rd.b(J.get(J.obj(MRec.photo_kvs(S.MRec{msg, st, settled})), "settled"))} == S.MRec{msg, st, settled} : S.MRec}
+  %Equal.sym(S.MSt, MSt.journal_of(rd.j(J.get(J.obj(MRec.photo_kvs(S.MRec{msg, st, settled})), "st"))), st, MRec.photo.st(msg, st, settled)) : {S.MRec{msg, _, rd.b(J.get(J.obj(MRec.photo_kvs(S.MRec{msg, st, settled})), "settled"))} == S.MRec{msg, st, settled} : S.MRec}
+  %Equal.sym(Bool, rd.b(J.get(J.obj(MRec.photo_kvs(S.MRec{msg, st, settled})), "settled")), settled, MRec.photo.settled(msg, st, settled)) : {S.MRec{msg, st, _} == S.MRec{msg, st, settled} : S.MRec}
+  {==}
+
+law MRec.photo_round:
+  for x: S.MRec
+  {MRec.photo_of(MRec.photo_json(x)) == x : S.MRec}
+
+def MRec.photo_round(x):
+  match x:
+    case S.MRec{msg, st, settled}:
+      MRec.photo_round_by_fields(msg, st, settled)
+
+# ---- a list of MRec, each in its photo shape ----
+
+def MRec.photo_list(xs: List<&2, S.MRec>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      MRec.photo_json(h) <> MRec.photo_list(t)
+
+def MRec.photo_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.MRec>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      MRec.photo_of(h) <> MRec.photo_list_of.go(t)
+
+# an array's items; anything else: none
+def MRec.photo_list_of(+j: J.Json) -> List<&2, S.MRec>:
+  match j:
+    case J.JArr{+xs}:
+      MRec.photo_list_of.go(xs)
+    case _:
+      Nil{}
+
+law MRec.photo_list_round.go:
+  for xs: List<&2, S.MRec>
+  {MRec.photo_list_of.go(MRec.photo_list(xs)) == xs : List<&2, S.MRec>}
+
+def MRec.photo_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %MRec.photo_round(h) : {MRec.photo_of(MRec.photo_json(h)) <> MRec.photo_list_of.go(MRec.photo_list(t)) == _ <> t : List<&2, S.MRec>}
+      %MRec.photo_list_round.go(t) : {MRec.photo_of(MRec.photo_json(h)) <> MRec.photo_list_of.go(MRec.photo_list(t)) == MRec.photo_of(MRec.photo_json(h)) <> _ : List<&2, S.MRec>}
+      {==}
+
+law MRec.photo_list_round:
+  for xs: List<&2, S.MRec>
+  {MRec.photo_list_of(J.JArr{MRec.photo_list(xs)}) == xs : List<&2, S.MRec>}
+
+def MRec.photo_list_round(xs):
+  MRec.photo_list_round.go(xs)
+
 # ---- Card, its journal shape: id, kind, agent, text, for_msg, created_ms, place, pr ----
 
 def Card.journal_kvs(r: S.Card) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
@@ -1232,6 +1368,50 @@ def Card.journal_round(x):
   match x:
     case S.Card{id, kind, agent, text, for_msg, created, place, pr}:
       Card.journal_round_by_fields(id, kind, agent, text, for_msg, created, place, pr)
+
+# ---- a list of Card, each in its journal shape ----
+
+def Card.journal_list(xs: List<&2, S.Card>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Card.journal_json(h) <> Card.journal_list(t)
+
+def Card.journal_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.Card>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Card.journal_of(h) <> Card.journal_list_of.go(t)
+
+# an array's items; anything else: none
+def Card.journal_list_of(+j: J.Json) -> List<&2, S.Card>:
+  match j:
+    case J.JArr{+xs}:
+      Card.journal_list_of.go(xs)
+    case _:
+      Nil{}
+
+law Card.journal_list_round.go:
+  for xs: List<&2, S.Card>
+  {Card.journal_list_of.go(Card.journal_list(xs)) == xs : List<&2, S.Card>}
+
+def Card.journal_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %Card.journal_round(h) : {Card.journal_of(Card.journal_json(h)) <> Card.journal_list_of.go(Card.journal_list(t)) == _ <> t : List<&2, S.Card>}
+      %Card.journal_list_round.go(t) : {Card.journal_of(Card.journal_json(h)) <> Card.journal_list_of.go(Card.journal_list(t)) == Card.journal_of(Card.journal_json(h)) <> _ : List<&2, S.Card>}
+      {==}
+
+law Card.journal_list_round:
+  for xs: List<&2, S.Card>
+  {Card.journal_list_of(J.JArr{Card.journal_list(xs)}) == xs : List<&2, S.Card>}
+
+def Card.journal_list_round(xs):
+  Card.journal_list_round.go(xs)
 
 # ---- Ans, its journal shape: said, pick_n, pick, via, page, block ----
 
@@ -1414,6 +1594,588 @@ def Ans.journal_round(x):
   match x:
     case S.Ans{said, pick_n, pick, via, page, block}:
       Ans.journal_round_by_fields(said, pick_n, pick, via, page, block)
+
+# ---- Agent, its photo shape: name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow ----
+
+def Agent.photo_kvs(r: S.Agent) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.Agent{+name, +is_main, +parent, +life, +declared, +aliases, +files, +ws, +dir, +brief, +created, +failure, +note, +report, +snap, +follow}:
+      [J.kv("name", J.JStr{name}), J.kv("is_main", J.JBool{is_main}), J.kv("parent", K.jmaybe_s(parent)), J.kv("life", J.JStr{Life.word(life)}), J.kv("declared", Decl.opt_json(declared)), J.kv("aliases", J.JArr{K.jstrs(aliases)}), J.kv("files", J.JArr{K.jstrs(files)}), J.kv("ws", ws), J.kv("dir", J.JStr{dir}), J.kv("brief", brief), J.kv("created", J.JNum{created}), J.kv("failure", K.jmaybe_s(failure)), J.kv("note", J.JStr{note}), J.kv("report", report), J.kv("snap", K.jmaybe_s(snap)), J.kv("follow", K.jmaybe_s(follow))]
+
+def Agent.photo_json(r: S.Agent) -> J.Json:
+  J.obj(Agent.photo_kvs(r))
+
+def Agent.photo_of(+j: J.Json) -> S.Agent:
+  S.Agent{rd.s(J.get(j, "name")), rd.b(J.get(j, "is_main")), K.opt_s(J.get(j, "parent")), Life.of_word(rd.s(J.get(j, "life"))), Decl.opt_of(J.get(j, "declared")), rd.ss(J.get(j, "aliases")), rd.ss(J.get(j, "files")), rd.j(J.get(j, "ws")), rd.s(J.get(j, "dir")), rd.j(J.get(j, "brief")), rd.n(J.get(j, "created")), K.opt_s(J.get(j, "failure")), rd.s(J.get(j, "note")), rd.j(J.get(j, "report")), K.opt_s(J.get(j, "snap")), K.opt_s(J.get(j, "follow"))}
+
+law Agent.photo.name:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "name")) == name : String}
+
+def Agent.photo.name(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  {==}
+
+law Agent.photo.is_main:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.b(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "is_main")) == is_main : Bool}
+
+def Agent.photo.is_main(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  {==}
+
+law Agent.photo.parent:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "parent")) == parent : Maybe<&2, String>}
+
+def Agent.photo.parent(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  match parent:
+    case None{}:
+      {==}
+    case Some{parent_x}:
+      {==}
+
+law Agent.photo.life:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {Life.of_word(rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "life"))) == life : S.Life}
+
+def Agent.photo.life(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  match life:
+    case S.LActive{}:
+      {==}
+    case S.LStopped{}:
+      {==}
+    case S.LArchived{}:
+      {==}
+    case S.LFailed{}:
+      {==}
+
+law Agent.photo.declared:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {Decl.opt_of(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "declared")) == declared : Maybe<&2, S.Decl>}
+
+def Agent.photo.declared(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  match declared:
+    case None{}:
+      {==}
+    case Some{S.DWorking{}}:
+      {==}
+    case Some{S.DDone{}}:
+      {==}
+    case Some{S.DBlocked{}}:
+      {==}
+
+law Agent.photo.aliases:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "aliases")) == aliases : List<&2, String>}
+
+def Agent.photo.aliases(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  K.strs_round(aliases)
+
+law Agent.photo.files:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "files")) == files : List<&2, String>}
+
+def Agent.photo.files(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  K.strs_round(files)
+
+law Agent.photo.ws:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "ws")) == ws : J.Json}
+
+def Agent.photo.ws(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  {==}
+
+law Agent.photo.dir:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")) == dir : String}
+
+def Agent.photo.dir(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  {==}
+
+law Agent.photo.brief:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")) == brief : J.Json}
+
+def Agent.photo.brief(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  {==}
+
+law Agent.photo.created:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")) == created : Nat}
+
+def Agent.photo.created(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  {==}
+
+law Agent.photo.failure:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")) == failure : Maybe<&2, String>}
+
+def Agent.photo.failure(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  match failure:
+    case None{}:
+      {==}
+    case Some{failure_x}:
+      {==}
+
+law Agent.photo.note:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")) == note : String}
+
+def Agent.photo.note(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  {==}
+
+law Agent.photo.report:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")) == report : J.Json}
+
+def Agent.photo.report(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  {==}
+
+law Agent.photo.snap:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")) == snap : Maybe<&2, String>}
+
+def Agent.photo.snap(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  match snap:
+    case None{}:
+      {==}
+    case Some{snap_x}:
+      {==}
+
+law Agent.photo.follow:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow")) == follow : Maybe<&2, String>}
+
+def Agent.photo.follow(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  match follow:
+    case None{}:
+      {==}
+    case Some{follow_x}:
+      {==}
+
+# the fields it carries come back (the others at their default)
+law Agent.photo_round_by_fields:
+  for +name: String
+  for +is_main: Bool
+  for +parent: Maybe<&2, String>
+  for +life: S.Life
+  for +declared: Maybe<&2, S.Decl>
+  for +aliases: List<&2, String>
+  for +files: List<&2, String>
+  for +ws: J.Json
+  for +dir: String
+  for +brief: J.Json
+  for +created: Nat
+  for +failure: Maybe<&2, String>
+  for +note: String
+  for +report: J.Json
+  for +snap: Maybe<&2, String>
+  for +follow: Maybe<&2, String>
+  {Agent.photo_of(Agent.photo_json(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})) == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+
+def Agent.photo_round_by_fields(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow):
+  %Equal.sym(String, rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "name")), name, Agent.photo.name(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{_, rd.b(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "is_main")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "parent")), Life.of_word(rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "life"))), Decl.opt_of(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "declared")), rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "aliases")), rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "files")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "ws")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(Bool, rd.b(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "is_main")), is_main, Agent.photo.is_main(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, _, K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "parent")), Life.of_word(rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "life"))), Decl.opt_of(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "declared")), rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "aliases")), rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "files")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "ws")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(Maybe<&2, String>, K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "parent")), parent, Agent.photo.parent(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, _, Life.of_word(rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "life"))), Decl.opt_of(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "declared")), rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "aliases")), rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "files")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "ws")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(S.Life, Life.of_word(rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "life"))), life, Agent.photo.life(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, _, Decl.opt_of(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "declared")), rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "aliases")), rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "files")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "ws")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(Maybe<&2, S.Decl>, Decl.opt_of(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "declared")), declared, Agent.photo.declared(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, _, rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "aliases")), rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "files")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "ws")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(List<&2, String>, rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "aliases")), aliases, Agent.photo.aliases(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, _, rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "files")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "ws")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(List<&2, String>, rd.ss(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "files")), files, Agent.photo.files(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, _, rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "ws")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(J.Json, rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "ws")), ws, Agent.photo.ws(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, files, _, rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(String, rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "dir")), dir, Agent.photo.dir(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, files, ws, _, rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(J.Json, rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "brief")), brief, Agent.photo.brief(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, _, rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "created")), created, Agent.photo.created(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, _, K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(Maybe<&2, String>, K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "failure")), failure, Agent.photo.failure(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, _, rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(String, rd.s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "note")), note, Agent.photo.note(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, _, rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(J.Json, rd.j(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "report")), report, Agent.photo.report(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, _, K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(Maybe<&2, String>, K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "snap")), snap, Agent.photo.snap(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, _, K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow"))} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  %Equal.sym(Maybe<&2, String>, K.opt_s(J.get(J.obj(Agent.photo_kvs(S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow})), "follow")), follow, Agent.photo.follow(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)) : {S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, _} == S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow} : S.Agent}
+  {==}
+
+law Agent.photo_round:
+  for x: S.Agent
+  {Agent.photo_of(Agent.photo_json(x)) == x : S.Agent}
+
+def Agent.photo_round(x):
+  match x:
+    case S.Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow}:
+      Agent.photo_round_by_fields(name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, follow)
+
+# ---- a list of Agent, each in its photo shape ----
+
+def Agent.photo_list(xs: List<&2, S.Agent>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Agent.photo_json(h) <> Agent.photo_list(t)
+
+def Agent.photo_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.Agent>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Agent.photo_of(h) <> Agent.photo_list_of.go(t)
+
+# an array's items; anything else: none
+def Agent.photo_list_of(+j: J.Json) -> List<&2, S.Agent>:
+  match j:
+    case J.JArr{+xs}:
+      Agent.photo_list_of.go(xs)
+    case _:
+      Nil{}
+
+law Agent.photo_list_round.go:
+  for xs: List<&2, S.Agent>
+  {Agent.photo_list_of.go(Agent.photo_list(xs)) == xs : List<&2, S.Agent>}
+
+def Agent.photo_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %Agent.photo_round(h) : {Agent.photo_of(Agent.photo_json(h)) <> Agent.photo_list_of.go(Agent.photo_list(t)) == _ <> t : List<&2, S.Agent>}
+      %Agent.photo_list_round.go(t) : {Agent.photo_of(Agent.photo_json(h)) <> Agent.photo_list_of.go(Agent.photo_list(t)) == Agent.photo_of(Agent.photo_json(h)) <> _ : List<&2, S.Agent>}
+      {==}
+
+law Agent.photo_list_round:
+  for xs: List<&2, S.Agent>
+  {Agent.photo_list_of(J.JArr{Agent.photo_list(xs)}) == xs : List<&2, S.Agent>}
+
+def Agent.photo_list_round(xs):
+  Agent.photo_list_round.go(xs)
+
+# ---- Item, its photo shape: id, text ----
+
+def Item.photo_kvs(r: S.Item) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.Item{+id, +text}:
+      [J.kv("id", J.JNum{id}), J.kv("text", J.JStr{text})]
+
+def Item.photo_json(r: S.Item) -> J.Json:
+  J.obj(Item.photo_kvs(r))
+
+def Item.photo_of(+j: J.Json) -> S.Item:
+  S.Item{rd.n(J.get(j, "id")), rd.s(J.get(j, "text"))}
+
+law Item.photo.id:
+  for +id: Nat
+  for +text: String
+  {rd.n(J.get(J.obj(Item.photo_kvs(S.Item{id, text})), "id")) == id : Nat}
+
+def Item.photo.id(id, text):
+  {==}
+
+law Item.photo.text:
+  for +id: Nat
+  for +text: String
+  {rd.s(J.get(J.obj(Item.photo_kvs(S.Item{id, text})), "text")) == text : String}
+
+def Item.photo.text(id, text):
+  {==}
+
+# the fields it carries come back (the others at their default)
+law Item.photo_round_by_fields:
+  for +id: Nat
+  for +text: String
+  {Item.photo_of(Item.photo_json(S.Item{id, text})) == S.Item{id, text} : S.Item}
+
+def Item.photo_round_by_fields(id, text):
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Item.photo_kvs(S.Item{id, text})), "id")), id, Item.photo.id(id, text)) : {S.Item{_, rd.s(J.get(J.obj(Item.photo_kvs(S.Item{id, text})), "text"))} == S.Item{id, text} : S.Item}
+  %Equal.sym(String, rd.s(J.get(J.obj(Item.photo_kvs(S.Item{id, text})), "text")), text, Item.photo.text(id, text)) : {S.Item{id, _} == S.Item{id, text} : S.Item}
+  {==}
+
+law Item.photo_round:
+  for x: S.Item
+  {Item.photo_of(Item.photo_json(x)) == x : S.Item}
+
+def Item.photo_round(x):
+  match x:
+    case S.Item{id, text}:
+      Item.photo_round_by_fields(id, text)
+
+# ---- a list of Item, each in its photo shape ----
+
+def Item.photo_list(xs: List<&2, S.Item>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Item.photo_json(h) <> Item.photo_list(t)
+
+def Item.photo_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.Item>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Item.photo_of(h) <> Item.photo_list_of.go(t)
+
+# an array's items; anything else: none
+def Item.photo_list_of(+j: J.Json) -> List<&2, S.Item>:
+  match j:
+    case J.JArr{+xs}:
+      Item.photo_list_of.go(xs)
+    case _:
+      Nil{}
+
+law Item.photo_list_round.go:
+  for xs: List<&2, S.Item>
+  {Item.photo_list_of.go(Item.photo_list(xs)) == xs : List<&2, S.Item>}
+
+def Item.photo_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %Item.photo_round(h) : {Item.photo_of(Item.photo_json(h)) <> Item.photo_list_of.go(Item.photo_list(t)) == _ <> t : List<&2, S.Item>}
+      %Item.photo_list_round.go(t) : {Item.photo_of(Item.photo_json(h)) <> Item.photo_list_of.go(Item.photo_list(t)) == Item.photo_of(Item.photo_json(h)) <> _ : List<&2, S.Item>}
+      {==}
+
+law Item.photo_list_round:
+  for xs: List<&2, S.Item>
+  {Item.photo_list_of(J.JArr{Item.photo_list(xs)}) == xs : List<&2, S.Item>}
+
+def Item.photo_list_round(xs):
+  Item.photo_list_round.go(xs)
 
 # ---- Timer, its journal shape: id, agent, by, text, next_ms, every_ms, until_ms, times, page, name, held ----
 
@@ -1772,6 +2534,399 @@ def Timer.view_kvs(r: S.Timer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
 def Timer.view_json(r: S.Timer) -> J.Json:
   J.obj(Timer.view_kvs(r))
 
+# ---- Timer, its photo shape: id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held ----
+
+def Timer.photo_kvs(r: S.Timer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.Timer{+id, +agent, +by, +text, +sched, +next, +until, +times, +fired, +page, +last, +runs, +name, +held}:
+      [J.kv("id", J.JNum{id}), J.kv("agent", J.JStr{agent}), J.kv("by", J.JStr{by}), J.kv("text", J.JStr{text}), J.kv("sched", Sched.journal_json(sched)), J.kv("next", J.JNum{next}), J.kv("until", K.jmaybe_n(until)), J.kv("times", K.jmaybe_n(times)), J.kv("fired", J.JNum{fired}), J.kv("page", K.jmaybe_s(page)), J.kv("last", J.JNum{last}), J.kv("runs", J.JArr{K.jnats(runs)}), J.kv("name", J.JStr{name}), J.kv("held", J.JBool{held})]
+
+def Timer.photo_json(r: S.Timer) -> J.Json:
+  J.obj(Timer.photo_kvs(r))
+
+def Timer.photo_of(+j: J.Json) -> S.Timer:
+  S.Timer{rd.n(J.get(j, "id")), rd.s(J.get(j, "agent")), rd.s(J.get(j, "by")), rd.s(J.get(j, "text")), Sched.journal_of(rd.j(J.get(j, "sched"))), rd.n(J.get(j, "next")), K.opt_n(J.get(j, "until")), K.opt_n(J.get(j, "times")), rd.n(J.get(j, "fired")), K.opt_s(J.get(j, "page")), rd.n(J.get(j, "last")), rd.ns(J.get(j, "runs")), rd.s(J.get(j, "name")), rd.b(J.get(j, "held"))}
+
+law Timer.photo.id:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "id")) == id : Nat}
+
+def Timer.photo.id(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  {==}
+
+law Timer.photo.agent:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "agent")) == agent : String}
+
+def Timer.photo.agent(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  {==}
+
+law Timer.photo.by:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "by")) == by : String}
+
+def Timer.photo.by(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  {==}
+
+law Timer.photo.text:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "text")) == text : String}
+
+def Timer.photo.text(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  {==}
+
+law Timer.photo.sched:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {Sched.journal_of(rd.j(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "sched"))) == sched : S.Sched}
+
+def Timer.photo.sched(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  Sched.journal_round(sched)
+
+law Timer.photo.next:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "next")) == next : Nat}
+
+def Timer.photo.next(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  {==}
+
+law Timer.photo.until:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "until")) == until : Maybe<&2, Nat>}
+
+def Timer.photo.until(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  match until:
+    case None{}:
+      {==}
+    case Some{until_x}:
+      {==}
+
+law Timer.photo.times:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "times")) == times : Maybe<&2, Nat>}
+
+def Timer.photo.times(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  match times:
+    case None{}:
+      {==}
+    case Some{times_x}:
+      {==}
+
+law Timer.photo.fired:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")) == fired : Nat}
+
+def Timer.photo.fired(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  {==}
+
+law Timer.photo.page:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")) == page : Maybe<&2, String>}
+
+def Timer.photo.page(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  match page:
+    case None{}:
+      {==}
+    case Some{page_x}:
+      {==}
+
+law Timer.photo.last:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")) == last : Nat}
+
+def Timer.photo.last(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  {==}
+
+law Timer.photo.runs:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")) == runs : List<&2, Nat>}
+
+def Timer.photo.runs(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  K.nats_round(runs)
+
+law Timer.photo.name:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")) == name : String}
+
+def Timer.photo.name(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  {==}
+
+law Timer.photo.held:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held")) == held : Bool}
+
+def Timer.photo.held(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  {==}
+
+# the fields it carries come back (the others at their default)
+law Timer.photo_round_by_fields:
+  for +id: Nat
+  for +agent: String
+  for +by: String
+  for +text: String
+  for +sched: S.Sched
+  for +next: Nat
+  for +until: Maybe<&2, Nat>
+  for +times: Maybe<&2, Nat>
+  for +fired: Nat
+  for +page: Maybe<&2, String>
+  for +last: Nat
+  for +runs: List<&2, Nat>
+  for +name: String
+  for +held: Bool
+  {Timer.photo_of(Timer.photo_json(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})) == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+
+def Timer.photo_round_by_fields(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held):
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "id")), id, Timer.photo.id(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{_, rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "agent")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "by")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "text")), Sched.journal_of(rd.j(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "sched"))), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "next")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "until")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "times")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")), K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(String, rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "agent")), agent, Timer.photo.agent(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, _, rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "by")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "text")), Sched.journal_of(rd.j(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "sched"))), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "next")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "until")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "times")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")), K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(String, rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "by")), by, Timer.photo.by(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, _, rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "text")), Sched.journal_of(rd.j(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "sched"))), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "next")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "until")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "times")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")), K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(String, rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "text")), text, Timer.photo.text(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, _, Sched.journal_of(rd.j(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "sched"))), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "next")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "until")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "times")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")), K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(S.Sched, Sched.journal_of(rd.j(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "sched"))), sched, Timer.photo.sched(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, _, rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "next")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "until")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "times")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")), K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "next")), next, Timer.photo.next(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, sched, _, K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "until")), K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "times")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")), K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(Maybe<&2, Nat>, K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "until")), until, Timer.photo.until(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, sched, next, _, K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "times")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")), K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(Maybe<&2, Nat>, K.opt_n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "times")), times, Timer.photo.times(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, sched, next, until, _, rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")), K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "fired")), fired, Timer.photo.fired(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, sched, next, until, times, _, K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(Maybe<&2, String>, K.opt_s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "page")), page, Timer.photo.page(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, sched, next, until, times, fired, _, rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "last")), last, Timer.photo.last(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, sched, next, until, times, fired, page, _, rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(List<&2, Nat>, rd.ns(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "runs")), runs, Timer.photo.runs(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, _, rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(String, rd.s(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "name")), name, Timer.photo.name(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, _, rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held"))} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  %Equal.sym(Bool, rd.b(J.get(J.obj(Timer.photo_kvs(S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held})), "held")), held, Timer.photo.held(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)) : {S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, _} == S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held} : S.Timer}
+  {==}
+
+law Timer.photo_round:
+  for x: S.Timer
+  {Timer.photo_of(Timer.photo_json(x)) == x : S.Timer}
+
+def Timer.photo_round(x):
+  match x:
+    case S.Timer{id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held}:
+      Timer.photo_round_by_fields(id, agent, by, text, sched, next, until, times, fired, page, last, runs, name, held)
+
+# ---- a list of Timer, each in its photo shape ----
+
+def Timer.photo_list(xs: List<&2, S.Timer>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Timer.photo_json(h) <> Timer.photo_list(t)
+
+def Timer.photo_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.Timer>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Timer.photo_of(h) <> Timer.photo_list_of.go(t)
+
+# an array's items; anything else: none
+def Timer.photo_list_of(+j: J.Json) -> List<&2, S.Timer>:
+  match j:
+    case J.JArr{+xs}:
+      Timer.photo_list_of.go(xs)
+    case _:
+      Nil{}
+
+law Timer.photo_list_round.go:
+  for xs: List<&2, S.Timer>
+  {Timer.photo_list_of.go(Timer.photo_list(xs)) == xs : List<&2, S.Timer>}
+
+def Timer.photo_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %Timer.photo_round(h) : {Timer.photo_of(Timer.photo_json(h)) <> Timer.photo_list_of.go(Timer.photo_list(t)) == _ <> t : List<&2, S.Timer>}
+      %Timer.photo_list_round.go(t) : {Timer.photo_of(Timer.photo_json(h)) <> Timer.photo_list_of.go(Timer.photo_list(t)) == Timer.photo_of(Timer.photo_json(h)) <> _ : List<&2, S.Timer>}
+      {==}
+
+law Timer.photo_list_round:
+  for xs: List<&2, S.Timer>
+  {Timer.photo_list_of(J.JArr{Timer.photo_list(xs)}) == xs : List<&2, S.Timer>}
+
+def Timer.photo_list_round(xs):
+  Timer.photo_list_round.go(xs)
+
 # ---- TimerEnd, its view shape: t, ended_ms, why ----
 
 def TimerEnd.view_kvs(r: S.TimerEnd) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
@@ -1781,6 +2936,112 @@ def TimerEnd.view_kvs(r: S.TimerEnd) -> List<&2, Sigma<&2, &2, String, _ => J.Js
 
 def TimerEnd.view_json(r: S.TimerEnd) -> J.Json:
   J.obj(TimerEnd.view_kvs(r))
+
+# ---- TimerEnd, its photo shape: t, at, why ----
+
+def TimerEnd.photo_kvs(r: S.TimerEnd) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.TimerEnd{+t, +at, +why}:
+      [J.kv("t", Timer.photo_json(t)), J.kv("at", J.JNum{at}), J.kv("why", J.JStr{why})]
+
+def TimerEnd.photo_json(r: S.TimerEnd) -> J.Json:
+  J.obj(TimerEnd.photo_kvs(r))
+
+def TimerEnd.photo_of(+j: J.Json) -> S.TimerEnd:
+  S.TimerEnd{Timer.photo_of(rd.j(J.get(j, "t"))), rd.n(J.get(j, "at")), rd.s(J.get(j, "why"))}
+
+law TimerEnd.photo.t:
+  for +t: S.Timer
+  for +at: Nat
+  for +why: String
+  {Timer.photo_of(rd.j(J.get(J.obj(TimerEnd.photo_kvs(S.TimerEnd{t, at, why})), "t"))) == t : S.Timer}
+
+def TimerEnd.photo.t(t, at, why):
+  Timer.photo_round(t)
+
+law TimerEnd.photo.at:
+  for +t: S.Timer
+  for +at: Nat
+  for +why: String
+  {rd.n(J.get(J.obj(TimerEnd.photo_kvs(S.TimerEnd{t, at, why})), "at")) == at : Nat}
+
+def TimerEnd.photo.at(t, at, why):
+  {==}
+
+law TimerEnd.photo.why:
+  for +t: S.Timer
+  for +at: Nat
+  for +why: String
+  {rd.s(J.get(J.obj(TimerEnd.photo_kvs(S.TimerEnd{t, at, why})), "why")) == why : String}
+
+def TimerEnd.photo.why(t, at, why):
+  {==}
+
+# the fields it carries come back (the others at their default)
+law TimerEnd.photo_round_by_fields:
+  for +t: S.Timer
+  for +at: Nat
+  for +why: String
+  {TimerEnd.photo_of(TimerEnd.photo_json(S.TimerEnd{t, at, why})) == S.TimerEnd{t, at, why} : S.TimerEnd}
+
+def TimerEnd.photo_round_by_fields(t, at, why):
+  %Equal.sym(S.Timer, Timer.photo_of(rd.j(J.get(J.obj(TimerEnd.photo_kvs(S.TimerEnd{t, at, why})), "t"))), t, TimerEnd.photo.t(t, at, why)) : {S.TimerEnd{_, rd.n(J.get(J.obj(TimerEnd.photo_kvs(S.TimerEnd{t, at, why})), "at")), rd.s(J.get(J.obj(TimerEnd.photo_kvs(S.TimerEnd{t, at, why})), "why"))} == S.TimerEnd{t, at, why} : S.TimerEnd}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(TimerEnd.photo_kvs(S.TimerEnd{t, at, why})), "at")), at, TimerEnd.photo.at(t, at, why)) : {S.TimerEnd{t, _, rd.s(J.get(J.obj(TimerEnd.photo_kvs(S.TimerEnd{t, at, why})), "why"))} == S.TimerEnd{t, at, why} : S.TimerEnd}
+  %Equal.sym(String, rd.s(J.get(J.obj(TimerEnd.photo_kvs(S.TimerEnd{t, at, why})), "why")), why, TimerEnd.photo.why(t, at, why)) : {S.TimerEnd{t, at, _} == S.TimerEnd{t, at, why} : S.TimerEnd}
+  {==}
+
+law TimerEnd.photo_round:
+  for x: S.TimerEnd
+  {TimerEnd.photo_of(TimerEnd.photo_json(x)) == x : S.TimerEnd}
+
+def TimerEnd.photo_round(x):
+  match x:
+    case S.TimerEnd{t, at, why}:
+      TimerEnd.photo_round_by_fields(t, at, why)
+
+# ---- a list of TimerEnd, each in its photo shape ----
+
+def TimerEnd.photo_list(xs: List<&2, S.TimerEnd>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      TimerEnd.photo_json(h) <> TimerEnd.photo_list(t)
+
+def TimerEnd.photo_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.TimerEnd>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      TimerEnd.photo_of(h) <> TimerEnd.photo_list_of.go(t)
+
+# an array's items; anything else: none
+def TimerEnd.photo_list_of(+j: J.Json) -> List<&2, S.TimerEnd>:
+  match j:
+    case J.JArr{+xs}:
+      TimerEnd.photo_list_of.go(xs)
+    case _:
+      Nil{}
+
+law TimerEnd.photo_list_round.go:
+  for xs: List<&2, S.TimerEnd>
+  {TimerEnd.photo_list_of.go(TimerEnd.photo_list(xs)) == xs : List<&2, S.TimerEnd>}
+
+def TimerEnd.photo_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %TimerEnd.photo_round(h) : {TimerEnd.photo_of(TimerEnd.photo_json(h)) <> TimerEnd.photo_list_of.go(TimerEnd.photo_list(t)) == _ <> t : List<&2, S.TimerEnd>}
+      %TimerEnd.photo_list_round.go(t) : {TimerEnd.photo_of(TimerEnd.photo_json(h)) <> TimerEnd.photo_list_of.go(TimerEnd.photo_list(t)) == TimerEnd.photo_of(TimerEnd.photo_json(h)) <> _ : List<&2, S.TimerEnd>}
+      {==}
+
+law TimerEnd.photo_list_round:
+  for xs: List<&2, S.TimerEnd>
+  {TimerEnd.photo_list_of(J.JArr{TimerEnd.photo_list(xs)}) == xs : List<&2, S.TimerEnd>}
+
+def TimerEnd.photo_list_round(xs):
+  TimerEnd.photo_list_round.go(xs)
 
 # ---- Act, its journal shape: id, due, what ----
 
@@ -1843,6 +3104,50 @@ def Act.journal_round(x):
   match x:
     case S.Act{id, due, what}:
       Act.journal_round_by_fields(id, due, what)
+
+# ---- a list of Act, each in its journal shape ----
+
+def Act.journal_list(xs: List<&2, S.Act>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Act.journal_json(h) <> Act.journal_list(t)
+
+def Act.journal_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.Act>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Act.journal_of(h) <> Act.journal_list_of.go(t)
+
+# an array's items; anything else: none
+def Act.journal_list_of(+j: J.Json) -> List<&2, S.Act>:
+  match j:
+    case J.JArr{+xs}:
+      Act.journal_list_of.go(xs)
+    case _:
+      Nil{}
+
+law Act.journal_list_round.go:
+  for xs: List<&2, S.Act>
+  {Act.journal_list_of.go(Act.journal_list(xs)) == xs : List<&2, S.Act>}
+
+def Act.journal_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %Act.journal_round(h) : {Act.journal_of(Act.journal_json(h)) <> Act.journal_list_of.go(Act.journal_list(t)) == _ <> t : List<&2, S.Act>}
+      %Act.journal_list_round.go(t) : {Act.journal_of(Act.journal_json(h)) <> Act.journal_list_of.go(Act.journal_list(t)) == Act.journal_of(Act.journal_json(h)) <> _ : List<&2, S.Act>}
+      {==}
+
+law Act.journal_list_round:
+  for xs: List<&2, S.Act>
+  {Act.journal_list_of(J.JArr{Act.journal_list(xs)}) == xs : List<&2, S.Act>}
+
+def Act.journal_list_round(xs):
+  Act.journal_list_round.go(xs)
 
 # ---- Watch, its journal shape: id, agent, spec, max_text, set_at, max_at, quiet, resumes ----
 
@@ -2001,6 +3306,207 @@ def Watch.journal_round(x):
     case S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes}:
       Watch.journal_round_by_fields(id, agent, spec, max_text, set_at, max_at, quiet, resumes)
 
+# ---- Watch, its photo shape: id, agent, spec, max_text, set_at, max_at, quiet, resumes ----
+
+def Watch.photo_kvs(r: S.Watch) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.Watch{+id, +agent, +spec, +max_text, +set_at, +max_at, +quiet, +resumes}:
+      [J.kv("id", J.JNum{id}), J.kv("agent", J.JStr{agent}), J.kv("spec", spec), J.kv("max_text", J.JStr{max_text}), J.kv("set_at", J.JNum{set_at}), J.kv("max_at", J.JNum{max_at}), J.kv("quiet", J.JBool{quiet}), J.kv("resumes", J.JBool{resumes})]
+
+def Watch.photo_json(r: S.Watch) -> J.Json:
+  J.obj(Watch.photo_kvs(r))
+
+def Watch.photo_of(+j: J.Json) -> S.Watch:
+  S.Watch{rd.n(J.get(j, "id")), rd.s(J.get(j, "agent")), rd.j(J.get(j, "spec")), rd.s(J.get(j, "max_text")), rd.n(J.get(j, "set_at")), rd.n(J.get(j, "max_at")), rd.b(J.get(j, "quiet")), rd.b(J.get(j, "resumes"))}
+
+law Watch.photo.id:
+  for +id: Nat
+  for +agent: String
+  for +spec: J.Json
+  for +max_text: String
+  for +set_at: Nat
+  for +max_at: Nat
+  for +quiet: Bool
+  for +resumes: Bool
+  {rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "id")) == id : Nat}
+
+def Watch.photo.id(id, agent, spec, max_text, set_at, max_at, quiet, resumes):
+  {==}
+
+law Watch.photo.agent:
+  for +id: Nat
+  for +agent: String
+  for +spec: J.Json
+  for +max_text: String
+  for +set_at: Nat
+  for +max_at: Nat
+  for +quiet: Bool
+  for +resumes: Bool
+  {rd.s(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "agent")) == agent : String}
+
+def Watch.photo.agent(id, agent, spec, max_text, set_at, max_at, quiet, resumes):
+  {==}
+
+law Watch.photo.spec:
+  for +id: Nat
+  for +agent: String
+  for +spec: J.Json
+  for +max_text: String
+  for +set_at: Nat
+  for +max_at: Nat
+  for +quiet: Bool
+  for +resumes: Bool
+  {rd.j(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "spec")) == spec : J.Json}
+
+def Watch.photo.spec(id, agent, spec, max_text, set_at, max_at, quiet, resumes):
+  {==}
+
+law Watch.photo.max_text:
+  for +id: Nat
+  for +agent: String
+  for +spec: J.Json
+  for +max_text: String
+  for +set_at: Nat
+  for +max_at: Nat
+  for +quiet: Bool
+  for +resumes: Bool
+  {rd.s(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_text")) == max_text : String}
+
+def Watch.photo.max_text(id, agent, spec, max_text, set_at, max_at, quiet, resumes):
+  {==}
+
+law Watch.photo.set_at:
+  for +id: Nat
+  for +agent: String
+  for +spec: J.Json
+  for +max_text: String
+  for +set_at: Nat
+  for +max_at: Nat
+  for +quiet: Bool
+  for +resumes: Bool
+  {rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "set_at")) == set_at : Nat}
+
+def Watch.photo.set_at(id, agent, spec, max_text, set_at, max_at, quiet, resumes):
+  {==}
+
+law Watch.photo.max_at:
+  for +id: Nat
+  for +agent: String
+  for +spec: J.Json
+  for +max_text: String
+  for +set_at: Nat
+  for +max_at: Nat
+  for +quiet: Bool
+  for +resumes: Bool
+  {rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_at")) == max_at : Nat}
+
+def Watch.photo.max_at(id, agent, spec, max_text, set_at, max_at, quiet, resumes):
+  {==}
+
+law Watch.photo.quiet:
+  for +id: Nat
+  for +agent: String
+  for +spec: J.Json
+  for +max_text: String
+  for +set_at: Nat
+  for +max_at: Nat
+  for +quiet: Bool
+  for +resumes: Bool
+  {rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "quiet")) == quiet : Bool}
+
+def Watch.photo.quiet(id, agent, spec, max_text, set_at, max_at, quiet, resumes):
+  {==}
+
+law Watch.photo.resumes:
+  for +id: Nat
+  for +agent: String
+  for +spec: J.Json
+  for +max_text: String
+  for +set_at: Nat
+  for +max_at: Nat
+  for +quiet: Bool
+  for +resumes: Bool
+  {rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "resumes")) == resumes : Bool}
+
+def Watch.photo.resumes(id, agent, spec, max_text, set_at, max_at, quiet, resumes):
+  {==}
+
+# the fields it carries come back (the others at their default)
+law Watch.photo_round_by_fields:
+  for +id: Nat
+  for +agent: String
+  for +spec: J.Json
+  for +max_text: String
+  for +set_at: Nat
+  for +max_at: Nat
+  for +quiet: Bool
+  for +resumes: Bool
+  {Watch.photo_of(Watch.photo_json(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})) == S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes} : S.Watch}
+
+def Watch.photo_round_by_fields(id, agent, spec, max_text, set_at, max_at, quiet, resumes):
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "id")), id, Watch.photo.id(id, agent, spec, max_text, set_at, max_at, quiet, resumes)) : {S.Watch{_, rd.s(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "agent")), rd.j(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "spec")), rd.s(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_text")), rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "set_at")), rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_at")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "quiet")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "resumes"))} == S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes} : S.Watch}
+  %Equal.sym(String, rd.s(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "agent")), agent, Watch.photo.agent(id, agent, spec, max_text, set_at, max_at, quiet, resumes)) : {S.Watch{id, _, rd.j(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "spec")), rd.s(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_text")), rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "set_at")), rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_at")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "quiet")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "resumes"))} == S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes} : S.Watch}
+  %Equal.sym(J.Json, rd.j(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "spec")), spec, Watch.photo.spec(id, agent, spec, max_text, set_at, max_at, quiet, resumes)) : {S.Watch{id, agent, _, rd.s(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_text")), rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "set_at")), rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_at")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "quiet")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "resumes"))} == S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes} : S.Watch}
+  %Equal.sym(String, rd.s(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_text")), max_text, Watch.photo.max_text(id, agent, spec, max_text, set_at, max_at, quiet, resumes)) : {S.Watch{id, agent, spec, _, rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "set_at")), rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_at")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "quiet")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "resumes"))} == S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes} : S.Watch}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "set_at")), set_at, Watch.photo.set_at(id, agent, spec, max_text, set_at, max_at, quiet, resumes)) : {S.Watch{id, agent, spec, max_text, _, rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_at")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "quiet")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "resumes"))} == S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes} : S.Watch}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "max_at")), max_at, Watch.photo.max_at(id, agent, spec, max_text, set_at, max_at, quiet, resumes)) : {S.Watch{id, agent, spec, max_text, set_at, _, rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "quiet")), rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "resumes"))} == S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes} : S.Watch}
+  %Equal.sym(Bool, rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "quiet")), quiet, Watch.photo.quiet(id, agent, spec, max_text, set_at, max_at, quiet, resumes)) : {S.Watch{id, agent, spec, max_text, set_at, max_at, _, rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "resumes"))} == S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes} : S.Watch}
+  %Equal.sym(Bool, rd.b(J.get(J.obj(Watch.photo_kvs(S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes})), "resumes")), resumes, Watch.photo.resumes(id, agent, spec, max_text, set_at, max_at, quiet, resumes)) : {S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, _} == S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes} : S.Watch}
+  {==}
+
+law Watch.photo_round:
+  for x: S.Watch
+  {Watch.photo_of(Watch.photo_json(x)) == x : S.Watch}
+
+def Watch.photo_round(x):
+  match x:
+    case S.Watch{id, agent, spec, max_text, set_at, max_at, quiet, resumes}:
+      Watch.photo_round_by_fields(id, agent, spec, max_text, set_at, max_at, quiet, resumes)
+
+# ---- a list of Watch, each in its photo shape ----
+
+def Watch.photo_list(xs: List<&2, S.Watch>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Watch.photo_json(h) <> Watch.photo_list(t)
+
+def Watch.photo_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.Watch>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Watch.photo_of(h) <> Watch.photo_list_of.go(t)
+
+# an array's items; anything else: none
+def Watch.photo_list_of(+j: J.Json) -> List<&2, S.Watch>:
+  match j:
+    case J.JArr{+xs}:
+      Watch.photo_list_of.go(xs)
+    case _:
+      Nil{}
+
+law Watch.photo_list_round.go:
+  for xs: List<&2, S.Watch>
+  {Watch.photo_list_of.go(Watch.photo_list(xs)) == xs : List<&2, S.Watch>}
+
+def Watch.photo_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %Watch.photo_round(h) : {Watch.photo_of(Watch.photo_json(h)) <> Watch.photo_list_of.go(Watch.photo_list(t)) == _ <> t : List<&2, S.Watch>}
+      %Watch.photo_list_round.go(t) : {Watch.photo_of(Watch.photo_json(h)) <> Watch.photo_list_of.go(Watch.photo_list(t)) == Watch.photo_of(Watch.photo_json(h)) <> _ : List<&2, S.Watch>}
+      {==}
+
+law Watch.photo_list_round:
+  for xs: List<&2, S.Watch>
+  {Watch.photo_list_of(J.JArr{Watch.photo_list(xs)}) == xs : List<&2, S.Watch>}
+
+def Watch.photo_list_round(xs):
+  Watch.photo_list_round.go(xs)
+
 # ---- WatchEnd, its view shape: w, ended_at, why ----
 
 def WatchEnd.view_kvs(r: S.WatchEnd) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
@@ -2010,6 +3516,287 @@ def WatchEnd.view_kvs(r: S.WatchEnd) -> List<&2, Sigma<&2, &2, String, _ => J.Js
 
 def WatchEnd.view_json(r: S.WatchEnd) -> J.Json:
   J.obj(WatchEnd.view_kvs(r))
+
+# ---- WatchEnd, its photo shape: w, at, why ----
+
+def WatchEnd.photo_kvs(r: S.WatchEnd) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.WatchEnd{+w, +at, +why}:
+      [J.kv("w", Watch.photo_json(w)), J.kv("at", J.JNum{at}), J.kv("why", J.JStr{why})]
+
+def WatchEnd.photo_json(r: S.WatchEnd) -> J.Json:
+  J.obj(WatchEnd.photo_kvs(r))
+
+def WatchEnd.photo_of(+j: J.Json) -> S.WatchEnd:
+  S.WatchEnd{Watch.photo_of(rd.j(J.get(j, "w"))), rd.n(J.get(j, "at")), rd.s(J.get(j, "why"))}
+
+law WatchEnd.photo.w:
+  for +w: S.Watch
+  for +at: Nat
+  for +why: String
+  {Watch.photo_of(rd.j(J.get(J.obj(WatchEnd.photo_kvs(S.WatchEnd{w, at, why})), "w"))) == w : S.Watch}
+
+def WatchEnd.photo.w(w, at, why):
+  Watch.photo_round(w)
+
+law WatchEnd.photo.at:
+  for +w: S.Watch
+  for +at: Nat
+  for +why: String
+  {rd.n(J.get(J.obj(WatchEnd.photo_kvs(S.WatchEnd{w, at, why})), "at")) == at : Nat}
+
+def WatchEnd.photo.at(w, at, why):
+  {==}
+
+law WatchEnd.photo.why:
+  for +w: S.Watch
+  for +at: Nat
+  for +why: String
+  {rd.s(J.get(J.obj(WatchEnd.photo_kvs(S.WatchEnd{w, at, why})), "why")) == why : String}
+
+def WatchEnd.photo.why(w, at, why):
+  {==}
+
+# the fields it carries come back (the others at their default)
+law WatchEnd.photo_round_by_fields:
+  for +w: S.Watch
+  for +at: Nat
+  for +why: String
+  {WatchEnd.photo_of(WatchEnd.photo_json(S.WatchEnd{w, at, why})) == S.WatchEnd{w, at, why} : S.WatchEnd}
+
+def WatchEnd.photo_round_by_fields(w, at, why):
+  %Equal.sym(S.Watch, Watch.photo_of(rd.j(J.get(J.obj(WatchEnd.photo_kvs(S.WatchEnd{w, at, why})), "w"))), w, WatchEnd.photo.w(w, at, why)) : {S.WatchEnd{_, rd.n(J.get(J.obj(WatchEnd.photo_kvs(S.WatchEnd{w, at, why})), "at")), rd.s(J.get(J.obj(WatchEnd.photo_kvs(S.WatchEnd{w, at, why})), "why"))} == S.WatchEnd{w, at, why} : S.WatchEnd}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(WatchEnd.photo_kvs(S.WatchEnd{w, at, why})), "at")), at, WatchEnd.photo.at(w, at, why)) : {S.WatchEnd{w, _, rd.s(J.get(J.obj(WatchEnd.photo_kvs(S.WatchEnd{w, at, why})), "why"))} == S.WatchEnd{w, at, why} : S.WatchEnd}
+  %Equal.sym(String, rd.s(J.get(J.obj(WatchEnd.photo_kvs(S.WatchEnd{w, at, why})), "why")), why, WatchEnd.photo.why(w, at, why)) : {S.WatchEnd{w, at, _} == S.WatchEnd{w, at, why} : S.WatchEnd}
+  {==}
+
+law WatchEnd.photo_round:
+  for x: S.WatchEnd
+  {WatchEnd.photo_of(WatchEnd.photo_json(x)) == x : S.WatchEnd}
+
+def WatchEnd.photo_round(x):
+  match x:
+    case S.WatchEnd{w, at, why}:
+      WatchEnd.photo_round_by_fields(w, at, why)
+
+# ---- a list of WatchEnd, each in its photo shape ----
+
+def WatchEnd.photo_list(xs: List<&2, S.WatchEnd>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      WatchEnd.photo_json(h) <> WatchEnd.photo_list(t)
+
+def WatchEnd.photo_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.WatchEnd>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      WatchEnd.photo_of(h) <> WatchEnd.photo_list_of.go(t)
+
+# an array's items; anything else: none
+def WatchEnd.photo_list_of(+j: J.Json) -> List<&2, S.WatchEnd>:
+  match j:
+    case J.JArr{+xs}:
+      WatchEnd.photo_list_of.go(xs)
+    case _:
+      Nil{}
+
+law WatchEnd.photo_list_round.go:
+  for xs: List<&2, S.WatchEnd>
+  {WatchEnd.photo_list_of.go(WatchEnd.photo_list(xs)) == xs : List<&2, S.WatchEnd>}
+
+def WatchEnd.photo_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %WatchEnd.photo_round(h) : {WatchEnd.photo_of(WatchEnd.photo_json(h)) <> WatchEnd.photo_list_of.go(WatchEnd.photo_list(t)) == _ <> t : List<&2, S.WatchEnd>}
+      %WatchEnd.photo_list_round.go(t) : {WatchEnd.photo_of(WatchEnd.photo_json(h)) <> WatchEnd.photo_list_of.go(WatchEnd.photo_list(t)) == WatchEnd.photo_of(WatchEnd.photo_json(h)) <> _ : List<&2, S.WatchEnd>}
+      {==}
+
+law WatchEnd.photo_list_round:
+  for xs: List<&2, S.WatchEnd>
+  {WatchEnd.photo_list_of(J.JArr{WatchEnd.photo_list(xs)}) == xs : List<&2, S.WatchEnd>}
+
+def WatchEnd.photo_list_round(xs):
+  WatchEnd.photo_list_round.go(xs)
+
+# ---- Wakes, its photo shape: live, ended, last_id ----
+
+def Wakes.photo_kvs(r: S.Wakes) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.Wakes{+live, +ended, +last_id}:
+      [J.kv("live", J.JArr{Watch.photo_list(live)}), J.kv("ended", J.JArr{WatchEnd.photo_list(ended)}), J.kv("last_id", J.JNum{last_id})]
+
+def Wakes.photo_json(r: S.Wakes) -> J.Json:
+  J.obj(Wakes.photo_kvs(r))
+
+def Wakes.photo_of(+j: J.Json) -> S.Wakes:
+  S.Wakes{Watch.photo_list_of(rd.j(J.get(j, "live"))), WatchEnd.photo_list_of(rd.j(J.get(j, "ended"))), rd.n(J.get(j, "last_id"))}
+
+law Wakes.photo.live:
+  for +live: List<&2, S.Watch>
+  for +ended: List<&2, S.WatchEnd>
+  for +last_id: Nat
+  {Watch.photo_list_of(rd.j(J.get(J.obj(Wakes.photo_kvs(S.Wakes{live, ended, last_id})), "live"))) == live : List<&2, S.Watch>}
+
+def Wakes.photo.live(live, ended, last_id):
+  Watch.photo_list_round(live)
+
+law Wakes.photo.ended:
+  for +live: List<&2, S.Watch>
+  for +ended: List<&2, S.WatchEnd>
+  for +last_id: Nat
+  {WatchEnd.photo_list_of(rd.j(J.get(J.obj(Wakes.photo_kvs(S.Wakes{live, ended, last_id})), "ended"))) == ended : List<&2, S.WatchEnd>}
+
+def Wakes.photo.ended(live, ended, last_id):
+  WatchEnd.photo_list_round(ended)
+
+law Wakes.photo.last_id:
+  for +live: List<&2, S.Watch>
+  for +ended: List<&2, S.WatchEnd>
+  for +last_id: Nat
+  {rd.n(J.get(J.obj(Wakes.photo_kvs(S.Wakes{live, ended, last_id})), "last_id")) == last_id : Nat}
+
+def Wakes.photo.last_id(live, ended, last_id):
+  {==}
+
+# the fields it carries come back (the others at their default)
+law Wakes.photo_round_by_fields:
+  for +live: List<&2, S.Watch>
+  for +ended: List<&2, S.WatchEnd>
+  for +last_id: Nat
+  {Wakes.photo_of(Wakes.photo_json(S.Wakes{live, ended, last_id})) == S.Wakes{live, ended, last_id} : S.Wakes}
+
+def Wakes.photo_round_by_fields(live, ended, last_id):
+  %Equal.sym(List<&2, S.Watch>, Watch.photo_list_of(rd.j(J.get(J.obj(Wakes.photo_kvs(S.Wakes{live, ended, last_id})), "live"))), live, Wakes.photo.live(live, ended, last_id)) : {S.Wakes{_, WatchEnd.photo_list_of(rd.j(J.get(J.obj(Wakes.photo_kvs(S.Wakes{live, ended, last_id})), "ended"))), rd.n(J.get(J.obj(Wakes.photo_kvs(S.Wakes{live, ended, last_id})), "last_id"))} == S.Wakes{live, ended, last_id} : S.Wakes}
+  %Equal.sym(List<&2, S.WatchEnd>, WatchEnd.photo_list_of(rd.j(J.get(J.obj(Wakes.photo_kvs(S.Wakes{live, ended, last_id})), "ended"))), ended, Wakes.photo.ended(live, ended, last_id)) : {S.Wakes{live, _, rd.n(J.get(J.obj(Wakes.photo_kvs(S.Wakes{live, ended, last_id})), "last_id"))} == S.Wakes{live, ended, last_id} : S.Wakes}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Wakes.photo_kvs(S.Wakes{live, ended, last_id})), "last_id")), last_id, Wakes.photo.last_id(live, ended, last_id)) : {S.Wakes{live, ended, _} == S.Wakes{live, ended, last_id} : S.Wakes}
+  {==}
+
+law Wakes.photo_round:
+  for x: S.Wakes
+  {Wakes.photo_of(Wakes.photo_json(x)) == x : S.Wakes}
+
+def Wakes.photo_round(x):
+  match x:
+    case S.Wakes{live, ended, last_id}:
+      Wakes.photo_round_by_fields(live, ended, last_id)
+
+# ---- Tms, its photo shape: live, ended, last_id, acts, next_act, wk ----
+
+def Tms.photo_kvs(r: S.Tms) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.Tms{+live, +ended, +last_id, +acts, +next_act, +wk}:
+      [J.kv("live", J.JArr{Timer.photo_list(live)}), J.kv("ended", J.JArr{TimerEnd.photo_list(ended)}), J.kv("last_id", J.JNum{last_id}), J.kv("acts", J.JArr{Act.journal_list(acts)}), J.kv("next_act", J.JNum{next_act}), J.kv("wk", Wakes.photo_json(wk))]
+
+def Tms.photo_json(r: S.Tms) -> J.Json:
+  J.obj(Tms.photo_kvs(r))
+
+def Tms.photo_of(+j: J.Json) -> S.Tms:
+  S.Tms{Timer.photo_list_of(rd.j(J.get(j, "live"))), TimerEnd.photo_list_of(rd.j(J.get(j, "ended"))), rd.n(J.get(j, "last_id")), Act.journal_list_of(rd.j(J.get(j, "acts"))), rd.n(J.get(j, "next_act")), Wakes.photo_of(rd.j(J.get(j, "wk")))}
+
+law Tms.photo.live:
+  for +live: List<&2, S.Timer>
+  for +ended: List<&2, S.TimerEnd>
+  for +last_id: Nat
+  for +acts: List<&2, S.Act>
+  for +next_act: Nat
+  for +wk: S.Wakes
+  {Timer.photo_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "live"))) == live : List<&2, S.Timer>}
+
+def Tms.photo.live(live, ended, last_id, acts, next_act, wk):
+  Timer.photo_list_round(live)
+
+law Tms.photo.ended:
+  for +live: List<&2, S.Timer>
+  for +ended: List<&2, S.TimerEnd>
+  for +last_id: Nat
+  for +acts: List<&2, S.Act>
+  for +next_act: Nat
+  for +wk: S.Wakes
+  {TimerEnd.photo_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "ended"))) == ended : List<&2, S.TimerEnd>}
+
+def Tms.photo.ended(live, ended, last_id, acts, next_act, wk):
+  TimerEnd.photo_list_round(ended)
+
+law Tms.photo.last_id:
+  for +live: List<&2, S.Timer>
+  for +ended: List<&2, S.TimerEnd>
+  for +last_id: Nat
+  for +acts: List<&2, S.Act>
+  for +next_act: Nat
+  for +wk: S.Wakes
+  {rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "last_id")) == last_id : Nat}
+
+def Tms.photo.last_id(live, ended, last_id, acts, next_act, wk):
+  {==}
+
+law Tms.photo.acts:
+  for +live: List<&2, S.Timer>
+  for +ended: List<&2, S.TimerEnd>
+  for +last_id: Nat
+  for +acts: List<&2, S.Act>
+  for +next_act: Nat
+  for +wk: S.Wakes
+  {Act.journal_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "acts"))) == acts : List<&2, S.Act>}
+
+def Tms.photo.acts(live, ended, last_id, acts, next_act, wk):
+  Act.journal_list_round(acts)
+
+law Tms.photo.next_act:
+  for +live: List<&2, S.Timer>
+  for +ended: List<&2, S.TimerEnd>
+  for +last_id: Nat
+  for +acts: List<&2, S.Act>
+  for +next_act: Nat
+  for +wk: S.Wakes
+  {rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "next_act")) == next_act : Nat}
+
+def Tms.photo.next_act(live, ended, last_id, acts, next_act, wk):
+  {==}
+
+law Tms.photo.wk:
+  for +live: List<&2, S.Timer>
+  for +ended: List<&2, S.TimerEnd>
+  for +last_id: Nat
+  for +acts: List<&2, S.Act>
+  for +next_act: Nat
+  for +wk: S.Wakes
+  {Wakes.photo_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "wk"))) == wk : S.Wakes}
+
+def Tms.photo.wk(live, ended, last_id, acts, next_act, wk):
+  Wakes.photo_round(wk)
+
+# the fields it carries come back (the others at their default)
+law Tms.photo_round_by_fields:
+  for +live: List<&2, S.Timer>
+  for +ended: List<&2, S.TimerEnd>
+  for +last_id: Nat
+  for +acts: List<&2, S.Act>
+  for +next_act: Nat
+  for +wk: S.Wakes
+  {Tms.photo_of(Tms.photo_json(S.Tms{live, ended, last_id, acts, next_act, wk})) == S.Tms{live, ended, last_id, acts, next_act, wk} : S.Tms}
+
+def Tms.photo_round_by_fields(live, ended, last_id, acts, next_act, wk):
+  %Equal.sym(List<&2, S.Timer>, Timer.photo_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "live"))), live, Tms.photo.live(live, ended, last_id, acts, next_act, wk)) : {S.Tms{_, TimerEnd.photo_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "ended"))), rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "last_id")), Act.journal_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "acts"))), rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "next_act")), Wakes.photo_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "wk")))} == S.Tms{live, ended, last_id, acts, next_act, wk} : S.Tms}
+  %Equal.sym(List<&2, S.TimerEnd>, TimerEnd.photo_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "ended"))), ended, Tms.photo.ended(live, ended, last_id, acts, next_act, wk)) : {S.Tms{live, _, rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "last_id")), Act.journal_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "acts"))), rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "next_act")), Wakes.photo_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "wk")))} == S.Tms{live, ended, last_id, acts, next_act, wk} : S.Tms}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "last_id")), last_id, Tms.photo.last_id(live, ended, last_id, acts, next_act, wk)) : {S.Tms{live, ended, _, Act.journal_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "acts"))), rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "next_act")), Wakes.photo_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "wk")))} == S.Tms{live, ended, last_id, acts, next_act, wk} : S.Tms}
+  %Equal.sym(List<&2, S.Act>, Act.journal_list_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "acts"))), acts, Tms.photo.acts(live, ended, last_id, acts, next_act, wk)) : {S.Tms{live, ended, last_id, _, rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "next_act")), Wakes.photo_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "wk")))} == S.Tms{live, ended, last_id, acts, next_act, wk} : S.Tms}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "next_act")), next_act, Tms.photo.next_act(live, ended, last_id, acts, next_act, wk)) : {S.Tms{live, ended, last_id, acts, _, Wakes.photo_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "wk")))} == S.Tms{live, ended, last_id, acts, next_act, wk} : S.Tms}
+  %Equal.sym(S.Wakes, Wakes.photo_of(rd.j(J.get(J.obj(Tms.photo_kvs(S.Tms{live, ended, last_id, acts, next_act, wk})), "wk"))), wk, Tms.photo.wk(live, ended, last_id, acts, next_act, wk)) : {S.Tms{live, ended, last_id, acts, next_act, _} == S.Tms{live, ended, last_id, acts, next_act, wk} : S.Tms}
+  {==}
+
+law Tms.photo_round:
+  for x: S.Tms
+  {Tms.photo_of(Tms.photo_json(x)) == x : S.Tms}
+
+def Tms.photo_round(x):
+  match x:
+    case S.Tms{live, ended, last_id, acts, next_act, wk}:
+      Tms.photo_round_by_fields(live, ended, last_id, acts, next_act, wk)
 
 # ---- Out, its journal shape: xid, project, kind, msg, text, state, tries, context, parts ----
 
@@ -2209,6 +3996,50 @@ def Out.journal_round(x):
     case S.Out{xid, project, kind, msg, text, st, tries, context, parts}:
       Out.journal_round_by_fields(xid, project, kind, msg, text, st, tries, context, parts)
 
+# ---- a list of Out, each in its journal shape ----
+
+def Out.journal_list(xs: List<&2, S.Out>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Out.journal_json(h) <> Out.journal_list(t)
+
+def Out.journal_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.Out>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Out.journal_of(h) <> Out.journal_list_of.go(t)
+
+# an array's items; anything else: none
+def Out.journal_list_of(+j: J.Json) -> List<&2, S.Out>:
+  match j:
+    case J.JArr{+xs}:
+      Out.journal_list_of.go(xs)
+    case _:
+      Nil{}
+
+law Out.journal_list_round.go:
+  for xs: List<&2, S.Out>
+  {Out.journal_list_of.go(Out.journal_list(xs)) == xs : List<&2, S.Out>}
+
+def Out.journal_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %Out.journal_round(h) : {Out.journal_of(Out.journal_json(h)) <> Out.journal_list_of.go(Out.journal_list(t)) == _ <> t : List<&2, S.Out>}
+      %Out.journal_list_round.go(t) : {Out.journal_of(Out.journal_json(h)) <> Out.journal_list_of.go(Out.journal_list(t)) == Out.journal_of(Out.journal_json(h)) <> _ : List<&2, S.Out>}
+      {==}
+
+law Out.journal_list_round:
+  for xs: List<&2, S.Out>
+  {Out.journal_list_of(J.JArr{Out.journal_list(xs)}) == xs : List<&2, S.Out>}
+
+def Out.journal_list_round(xs):
+  Out.journal_list_round.go(xs)
+
 # ---- XIn, its journal shape: hub, xid, msg, kind, replied ----
 
 def XIn.journal_kvs(r: S.XIn) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
@@ -2308,6 +4139,50 @@ def XIn.journal_round(x):
   match x:
     case S.XIn{hub, xid, msg, kind, replied}:
       XIn.journal_round_by_fields(hub, xid, msg, kind, replied)
+
+# ---- a list of XIn, each in its journal shape ----
+
+def XIn.journal_list(xs: List<&2, S.XIn>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      XIn.journal_json(h) <> XIn.journal_list(t)
+
+def XIn.journal_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.XIn>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      XIn.journal_of(h) <> XIn.journal_list_of.go(t)
+
+# an array's items; anything else: none
+def XIn.journal_list_of(+j: J.Json) -> List<&2, S.XIn>:
+  match j:
+    case J.JArr{+xs}:
+      XIn.journal_list_of.go(xs)
+    case _:
+      Nil{}
+
+law XIn.journal_list_round.go:
+  for xs: List<&2, S.XIn>
+  {XIn.journal_list_of.go(XIn.journal_list(xs)) == xs : List<&2, S.XIn>}
+
+def XIn.journal_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %XIn.journal_round(h) : {XIn.journal_of(XIn.journal_json(h)) <> XIn.journal_list_of.go(XIn.journal_list(t)) == _ <> t : List<&2, S.XIn>}
+      %XIn.journal_list_round.go(t) : {XIn.journal_of(XIn.journal_json(h)) <> XIn.journal_list_of.go(XIn.journal_list(t)) == XIn.journal_of(XIn.journal_json(h)) <> _ : List<&2, S.XIn>}
+      {==}
+
+law XIn.journal_list_round:
+  for xs: List<&2, S.XIn>
+  {XIn.journal_list_of(J.JArr{XIn.journal_list(xs)}) == xs : List<&2, S.XIn>}
+
+def XIn.journal_list_round(xs):
+  XIn.journal_list_round.go(xs)
 
 # ---- Route, its journal shape: rid, text, via, to, name, due_ms, act, why, state, context, parts ----
 
@@ -2556,6 +4431,417 @@ def Route.journal_round(x):
   match x:
     case S.Route{rid, text, via, to, name, due, act, why, st, context, parts}:
       Route.journal_round_by_fields(rid, text, via, to, name, due, act, why, st, context, parts)
+
+# ---- a list of Route, each in its journal shape ----
+
+def Route.journal_list(xs: List<&2, S.Route>) -> List<&2, J.Json>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Route.journal_json(h) <> Route.journal_list(t)
+
+def Route.journal_list_of.go(xs: List<&2, J.Json>) -> List<&2, S.Route>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Route.journal_of(h) <> Route.journal_list_of.go(t)
+
+# an array's items; anything else: none
+def Route.journal_list_of(+j: J.Json) -> List<&2, S.Route>:
+  match j:
+    case J.JArr{+xs}:
+      Route.journal_list_of.go(xs)
+    case _:
+      Nil{}
+
+law Route.journal_list_round.go:
+  for xs: List<&2, S.Route>
+  {Route.journal_list_of.go(Route.journal_list(xs)) == xs : List<&2, S.Route>}
+
+def Route.journal_list_round.go(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %Route.journal_round(h) : {Route.journal_of(Route.journal_json(h)) <> Route.journal_list_of.go(Route.journal_list(t)) == _ <> t : List<&2, S.Route>}
+      %Route.journal_list_round.go(t) : {Route.journal_of(Route.journal_json(h)) <> Route.journal_list_of.go(Route.journal_list(t)) == Route.journal_of(Route.journal_json(h)) <> _ : List<&2, S.Route>}
+      {==}
+
+law Route.journal_list_round:
+  for xs: List<&2, S.Route>
+  {Route.journal_list_of(J.JArr{Route.journal_list(xs)}) == xs : List<&2, S.Route>}
+
+def Route.journal_list_round(xs):
+  Route.journal_list_round.go(xs)
+
+# ---- Xs, its photo shape: outbox, next_xid, xin, routes, next_rid ----
+
+def Xs.photo_kvs(r: S.Xs) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.Xs{+outbox, +next_xid, +xin, +routes, +next_rid}:
+      [J.kv("outbox", J.JArr{Out.journal_list(outbox)}), J.kv("next_xid", J.JNum{next_xid}), J.kv("xin", J.JArr{XIn.journal_list(xin)}), J.kv("routes", J.JArr{Route.journal_list(routes)}), J.kv("next_rid", J.JNum{next_rid})]
+
+def Xs.photo_json(r: S.Xs) -> J.Json:
+  J.obj(Xs.photo_kvs(r))
+
+def Xs.photo_of(+j: J.Json) -> S.Xs:
+  S.Xs{Out.journal_list_of(rd.j(J.get(j, "outbox"))), rd.n(J.get(j, "next_xid")), XIn.journal_list_of(rd.j(J.get(j, "xin"))), Route.journal_list_of(rd.j(J.get(j, "routes"))), rd.n(J.get(j, "next_rid"))}
+
+law Xs.photo.outbox:
+  for +outbox: List<&2, S.Out>
+  for +next_xid: Nat
+  for +xin: List<&2, S.XIn>
+  for +routes: List<&2, S.Route>
+  for +next_rid: Nat
+  {Out.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "outbox"))) == outbox : List<&2, S.Out>}
+
+def Xs.photo.outbox(outbox, next_xid, xin, routes, next_rid):
+  Out.journal_list_round(outbox)
+
+law Xs.photo.next_xid:
+  for +outbox: List<&2, S.Out>
+  for +next_xid: Nat
+  for +xin: List<&2, S.XIn>
+  for +routes: List<&2, S.Route>
+  for +next_rid: Nat
+  {rd.n(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "next_xid")) == next_xid : Nat}
+
+def Xs.photo.next_xid(outbox, next_xid, xin, routes, next_rid):
+  {==}
+
+law Xs.photo.xin:
+  for +outbox: List<&2, S.Out>
+  for +next_xid: Nat
+  for +xin: List<&2, S.XIn>
+  for +routes: List<&2, S.Route>
+  for +next_rid: Nat
+  {XIn.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "xin"))) == xin : List<&2, S.XIn>}
+
+def Xs.photo.xin(outbox, next_xid, xin, routes, next_rid):
+  XIn.journal_list_round(xin)
+
+law Xs.photo.routes:
+  for +outbox: List<&2, S.Out>
+  for +next_xid: Nat
+  for +xin: List<&2, S.XIn>
+  for +routes: List<&2, S.Route>
+  for +next_rid: Nat
+  {Route.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "routes"))) == routes : List<&2, S.Route>}
+
+def Xs.photo.routes(outbox, next_xid, xin, routes, next_rid):
+  Route.journal_list_round(routes)
+
+law Xs.photo.next_rid:
+  for +outbox: List<&2, S.Out>
+  for +next_xid: Nat
+  for +xin: List<&2, S.XIn>
+  for +routes: List<&2, S.Route>
+  for +next_rid: Nat
+  {rd.n(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "next_rid")) == next_rid : Nat}
+
+def Xs.photo.next_rid(outbox, next_xid, xin, routes, next_rid):
+  {==}
+
+# the fields it carries come back (the others at their default)
+law Xs.photo_round_by_fields:
+  for +outbox: List<&2, S.Out>
+  for +next_xid: Nat
+  for +xin: List<&2, S.XIn>
+  for +routes: List<&2, S.Route>
+  for +next_rid: Nat
+  {Xs.photo_of(Xs.photo_json(S.Xs{outbox, next_xid, xin, routes, next_rid})) == S.Xs{outbox, next_xid, xin, routes, next_rid} : S.Xs}
+
+def Xs.photo_round_by_fields(outbox, next_xid, xin, routes, next_rid):
+  %Equal.sym(List<&2, S.Out>, Out.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "outbox"))), outbox, Xs.photo.outbox(outbox, next_xid, xin, routes, next_rid)) : {S.Xs{_, rd.n(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "next_xid")), XIn.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "xin"))), Route.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "routes"))), rd.n(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "next_rid"))} == S.Xs{outbox, next_xid, xin, routes, next_rid} : S.Xs}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "next_xid")), next_xid, Xs.photo.next_xid(outbox, next_xid, xin, routes, next_rid)) : {S.Xs{outbox, _, XIn.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "xin"))), Route.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "routes"))), rd.n(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "next_rid"))} == S.Xs{outbox, next_xid, xin, routes, next_rid} : S.Xs}
+  %Equal.sym(List<&2, S.XIn>, XIn.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "xin"))), xin, Xs.photo.xin(outbox, next_xid, xin, routes, next_rid)) : {S.Xs{outbox, next_xid, _, Route.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "routes"))), rd.n(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "next_rid"))} == S.Xs{outbox, next_xid, xin, routes, next_rid} : S.Xs}
+  %Equal.sym(List<&2, S.Route>, Route.journal_list_of(rd.j(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "routes"))), routes, Xs.photo.routes(outbox, next_xid, xin, routes, next_rid)) : {S.Xs{outbox, next_xid, xin, _, rd.n(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "next_rid"))} == S.Xs{outbox, next_xid, xin, routes, next_rid} : S.Xs}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Xs.photo_kvs(S.Xs{outbox, next_xid, xin, routes, next_rid})), "next_rid")), next_rid, Xs.photo.next_rid(outbox, next_xid, xin, routes, next_rid)) : {S.Xs{outbox, next_xid, xin, routes, _} == S.Xs{outbox, next_xid, xin, routes, next_rid} : S.Xs}
+  {==}
+
+law Xs.photo_round:
+  for x: S.Xs
+  {Xs.photo_of(Xs.photo_json(x)) == x : S.Xs}
+
+def Xs.photo_round(x):
+  match x:
+    case S.Xs{outbox, next_xid, xin, routes, next_rid}:
+      Xs.photo_round_by_fields(outbox, next_xid, xin, routes, next_rid)
+
+# ---- St, its photo shape: agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone ----
+
+def St.photo_kvs(r: S.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match r:
+    case S.St{+agents, +order, +hot, +cards, +notes, +next_msg, +next_card, +tm, +x, +paused, +old, +gone}:
+      [J.kv("agents", J.JArr{Agent.photo_list(agents)}), J.kv("order", J.JArr{K.jstrs(order)}), J.kv("hot", J.JArr{MRec.photo_list(hot)}), J.kv("cards", J.JArr{Card.journal_list(cards)}), J.kv("notes", J.JArr{K.jstrs(notes)}), J.kv("next_msg", J.JNum{next_msg}), J.kv("next_card", J.JNum{next_card}), J.kv("tm", Tms.photo_json(tm)), J.kv("x", Xs.photo_json(x)), J.kv("paused", K.jmaybe_n(paused)), J.kv("old", J.JArr{MRec.photo_list(old)}), J.kv("gone", J.JArr{Item.photo_list(gone)})]
+
+def St.photo_json(r: S.St) -> J.Json:
+  J.obj(St.photo_kvs(r))
+
+def St.photo_of(+j: J.Json) -> S.St:
+  S.St{Agent.photo_list_of(rd.j(J.get(j, "agents"))), rd.ss(J.get(j, "order")), MRec.photo_list_of(rd.j(J.get(j, "hot"))), Card.journal_list_of(rd.j(J.get(j, "cards"))), rd.ss(J.get(j, "notes")), rd.n(J.get(j, "next_msg")), rd.n(J.get(j, "next_card")), Tms.photo_of(rd.j(J.get(j, "tm"))), Xs.photo_of(rd.j(J.get(j, "x"))), K.opt_n(J.get(j, "paused")), MRec.photo_list_of(rd.j(J.get(j, "old"))), Item.photo_list_of(rd.j(J.get(j, "gone")))}
+
+law St.photo.agents:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {Agent.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "agents"))) == agents : List<&2, S.Agent>}
+
+def St.photo.agents(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  Agent.photo_list_round(agents)
+
+law St.photo.order:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "order")) == order : List<&2, String>}
+
+def St.photo.order(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  K.strs_round(order)
+
+law St.photo.hot:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "hot"))) == hot : List<&2, S.MRec>}
+
+def St.photo.hot(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  MRec.photo_list_round(hot)
+
+law St.photo.cards:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))) == cards : List<&2, S.Card>}
+
+def St.photo.cards(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  Card.journal_list_round(cards)
+
+law St.photo.notes:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")) == notes : List<&2, String>}
+
+def St.photo.notes(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  K.strs_round(notes)
+
+law St.photo.next_msg:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")) == next_msg : Nat}
+
+def St.photo.next_msg(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  {==}
+
+law St.photo.next_card:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")) == next_card : Nat}
+
+def St.photo.next_card(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  {==}
+
+law St.photo.tm:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))) == tm : S.Tms}
+
+def St.photo.tm(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  Tms.photo_round(tm)
+
+law St.photo.x:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))) == x : S.Xs}
+
+def St.photo.x(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  Xs.photo_round(x)
+
+law St.photo.paused:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")) == paused : Maybe<&2, Nat>}
+
+def St.photo.paused(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  match paused:
+    case None{}:
+      {==}
+    case Some{paused_x}:
+      {==}
+
+law St.photo.old:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))) == old : List<&2, S.MRec>}
+
+def St.photo.old(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  MRec.photo_list_round(old)
+
+law St.photo.gone:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone"))) == gone : List<&2, S.Item>}
+
+def St.photo.gone(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  Item.photo_list_round(gone)
+
+# the fields it carries come back (the others at their default)
+law St.photo_round_by_fields:
+  for +agents: List<&2, S.Agent>
+  for +order: List<&2, String>
+  for +hot: List<&2, S.MRec>
+  for +cards: List<&2, S.Card>
+  for +notes: List<&2, String>
+  for +next_msg: Nat
+  for +next_card: Nat
+  for +tm: S.Tms
+  for +x: S.Xs
+  for +paused: Maybe<&2, Nat>
+  for +old: List<&2, S.MRec>
+  for +gone: List<&2, S.Item>
+  {St.photo_of(St.photo_json(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})) == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+
+def St.photo_round_by_fields(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+  %Equal.sym(List<&2, S.Agent>, Agent.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "agents"))), agents, St.photo.agents(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{_, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "order")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "hot"))), Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))), rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(List<&2, String>, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "order")), order, St.photo.order(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, _, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "hot"))), Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))), rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(List<&2, S.MRec>, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "hot"))), hot, St.photo.hot(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, _, Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))), rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(List<&2, S.Card>, Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))), cards, St.photo.cards(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, _, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(List<&2, String>, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), notes, St.photo.notes(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, _, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), next_msg, St.photo.next_msg(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, _, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), next_card, St.photo.next_card(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, _, Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(S.Tms, Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), tm, St.photo.tm(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, _, Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(S.Xs, Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), x, St.photo.x(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, _, K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(Maybe<&2, Nat>, K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), paused, St.photo.paused(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, _, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(List<&2, S.MRec>, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), old, St.photo.old(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, _, Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  %Equal.sym(List<&2, S.Item>, Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone"))), gone, St.photo.gone(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, _} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  {==}
+
+law St.photo_round:
+  for x: S.St
+  {St.photo_of(St.photo_json(x)) == x : S.St}
+
+def St.photo_round(x):
+  match x:
+    case S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone}:
+      St.photo_round_by_fields(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)
 
 # ---- the view shapes, pinned on fixtures/core_view.jsonl (a key order change is red) ----
 

@@ -23,6 +23,7 @@
 use super::journal::{bend_json, jv, Jv};
 use super::*;
 use bise_proto::core::state as st;
+use super::photo::{list_codec, listed, whole};
 use bise_proto::core::state::{Ty, Wire, STATE};
 
 const S: &str = "S.";
@@ -182,7 +183,7 @@ fn the_enum(n: &str) -> &'static st::Enum {
 }
 
 /// A field's declared type name (an enum or a record).
-fn named(t: Ty) -> &'static str {
+pub(crate) fn named(t: Ty) -> &'static str {
     match t {
         Ty::T(n) | Ty::OptT(n) | Ty::Ts(n) => n,
         t => panic!("{t:?}: not a declared type"),
@@ -286,7 +287,7 @@ fn stuck(w: Wire) -> bool {
 }
 
 /// A record's shape of the same name as `shape`, else its journal's.
-fn inner_shape(r: &st::Record, shape: &str) -> &'static st::Shape {
+pub(crate) fn inner_shape(r: &st::Record, shape: &str) -> &'static st::Shape {
     let r = STATE.record(r.name).unwrap();
     r.shape(shape).or_else(|| r.shape("journal")).unwrap_or_else(|| panic!("{}: no {shape} or journal shape", r.name))
 }
@@ -319,6 +320,10 @@ fn key_kv(k: &st::Key, f: &st::Field, shape: &str, v: &str) -> String {
             Some(r) => format!("{}.{}_kvs({v})", r.name, inner_shape(r, shape).name),
             None => format!("{}.journal_kvs({v})", named(f.ty)),
         },
+        Wire::Recs => {
+            let r = STATE.record(named(f.ty)).expect("a list of records");
+            format!("J.kv(\"{key}\", J.JArr{{{}.{}_list({v})}})", r.name, inner_shape(r, shape).name)
+        }
     }
 }
 
@@ -381,7 +386,7 @@ fn key_read(k: &st::Key, f: &st::Field, shape: &str, look: &dyn Fn(&str) -> Stri
         Wire::Obj => match STATE.record(named(f.ty)) {
             Some(r) => {
                 let sh = inner_shape(r, shape);
-                assert!(sh.read && !hand_of(sh).is_some(), "{}.{}: a nested record read whole", r.name, sh.name);
+                assert!(whole(r, sh), "{}.{}: a nested record read whole", r.name, sh.name);
                 format!("{}.{}_of(rd.j({m}))", r.name, sh.name)
             }
             None => format!("{}.journal_of(rd.j({m}))", named(f.ty)),
@@ -391,11 +396,17 @@ fn key_read(k: &st::Key, f: &st::Field, shape: &str, look: &dyn Fn(&str) -> Stri
             format!("SH.{}_of({})", h.name, ms.join(", "))
         }
         Wire::Inline => panic!("{}: an inline field is written only", f.name),
+        Wire::Recs => {
+            let r = STATE.record(named(f.ty)).expect("a list of records");
+            let sh = inner_shape(r, shape);
+            assert!(whole(r, sh), "{}.{}: a list's records read whole", r.name, sh.name);
+            format!("{}.{}_list_of(rd.j({m}))", r.name, sh.name)
+        }
     }
 }
 
 /// A readable shape's hand-coded key (at most one): its read is a Maybe.
-fn hand_of(sh: &st::Shape) -> Option<(usize, &'static st::Hand)> {
+pub(crate) fn hand_of(sh: &st::Shape) -> Option<(usize, &'static st::Hand)> {
     let hs: Vec<(usize, &'static st::Hand)> = sh.keys.iter().enumerate().filter_map(|(i, k)| match k.wire {
         Wire::Hand(h) => Some((i, h)),
         _ => None,
@@ -541,7 +552,15 @@ fn shape_laws(s: &mut String, r: &st::Record, sh: &st::Shape) {
             }
             match (list_lemma(k.wire, &v), &k.wire) {
                 (Some(l), _) => writeln!(s, "{ind}{l}").unwrap(),
-                (None, Wire::Obj) if STATE.record(named(f.ty)).is_none() => writeln!(s, "{ind}{}.journal_round({v})", named(f.ty)).unwrap(),
+                (None, Wire::Obj) => match STATE.record(named(f.ty)) {
+                    // a nested record: its shape's own round law
+                    Some(inner) => writeln!(s, "{ind}{}.{}_round({v})", inner.name, inner_shape(inner, shn).name).unwrap(),
+                    None => writeln!(s, "{ind}{}.journal_round({v})", named(f.ty)).unwrap(),
+                },
+                (None, Wire::Recs) => {
+                    let inner = STATE.record(named(f.ty)).unwrap();
+                    writeln!(s, "{ind}{}.{}_list_round({v})", inner.name, inner_shape(inner, shn).name).unwrap()
+                }
                 _ => writeln!(s, "{ind}{{==}}").unwrap(),
             }
         }
@@ -923,9 +942,14 @@ pub(crate) fn state_codec() -> String {
     for e in STATE.enums {
         enum_codec(&mut s, e);
     }
+    let lists = listed();
     for r in STATE.records {
         for sh in r.shapes {
             shape_codec(&mut s, r, sh);
+        }
+        // its lists, before a record that holds them (photo shapes)
+        for (n, shn) in lists.iter().filter(|(n, _)| *n == r.name) {
+            list_codec(&mut s, n, shn);
         }
     }
     view_pins(&mut s);
