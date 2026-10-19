@@ -93,6 +93,19 @@ export function aimCam(at: At, zoom: number, fx: number = SAFE.x, fy: number = S
   return holdCam({ zoom, u: at.u - (fx - 0.5) / zoom, v: at.v - (fy - 0.5) / zoom });
 }
 
+/**
+ * A film shot's cam: `at` on the frame's point (fx, fy), at least `zoom`, closer when that point
+ * would show the map's edge (kiln near the edge: holdCam slid the view back and left kiln in the
+ * frame's bottom fifth, designer m_32291). The subject never moves off its point; the zoom gives. Pure.
+ */
+export function aimInMap(at: At, zoom: number, fx: number = SAFE.x, fy: number = SAFE.y): Cam {
+  const eps = 1e-6;
+  const u = clamp(at.u, eps, 1 - eps);
+  const v = clamp(at.v, eps, 1 - eps);
+  const least = Math.max(fx / u, (1 - fx) / (1 - u), fy / v, (1 - fy) / (1 - v));
+  return aimCam(at, Math.min(MAX_ZOOM, Math.max(zoom, least)), fx, fy);
+}
+
 /** Where a point of the fit shows in a cam's frame, fractions. Pure. */
 export function inFrame(c: Cam, at: At): At {
   return { u: 0.5 + (at.u - c.u) * c.zoom, v: 0.5 + (at.v - c.v) * c.zoom };
@@ -147,13 +160,13 @@ function sizedCam(shot: Shot, g: Geometry): Cam | null {
   }
   if (shot.size === 'office') {
     const c = at ?? { u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom };
-    return aimCam(c, office.zoom * OFFICE_TIGHT);
+    return aimInMap(c, office.zoom * OFFICE_TIGHT);
   }
   // a whole office closer than its OFFICE shot (the cold open's tight loft): its middle, that much closer
-  if (s.k === 'office') return aimCam({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * CLOSER[shot.size]);
+  if (s.k === 'office') return aimInMap({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * CLOSER[shot.size]);
   // a subject gone missing (it left): its office's shot, never an empty frame
   if (at === null) return office;
-  return aimCam(at, office.zoom * CLOSER[shot.size], shot.frame?.x ?? SAFE.x, shot.frame?.y ?? SAFE.y);
+  return aimInMap(at, office.zoom * CLOSER[shot.size], shot.frame?.x ?? SAFE.x, shot.frame?.y ?? SAFE.y);
 }
 
 /** The shot playing at film time T: the last one whose camera has left (LEAD_S before its action). Pure. */
