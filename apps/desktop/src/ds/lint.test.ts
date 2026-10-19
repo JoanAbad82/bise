@@ -99,6 +99,9 @@ describe('the spacing law (designer desktop-spacing m_19568, ambient-lead m_1956
     for (const p of files.filter((f) => f.endsWith('.css'))) {
       const r = rel(p);
       if (r === 'ds/tokens.css' || r === 'ds/md-tokens.css') continue;
+      // bise.dev/desktop's hero bundle (src/hero, kiln's mock shop in it): the site's page, not the
+      // app; its lengths are designer's page specs in px (hero-fix-2, kiln-app), outside the app's tokens
+      if (r.startsWith('hero/')) continue;
       const loose = looseSpacing(readFileSync(p, 'utf8'));
       const was = PENDING_SPACING[r] ?? 0;
       if (loose.length > was) grown.push(`${r}: ${String(loose.length)} (was ${String(was)}): ${loose.map((l) => `${String(l.line)} ${l.prop}: ${l.value}`).join(' | ')}`);
