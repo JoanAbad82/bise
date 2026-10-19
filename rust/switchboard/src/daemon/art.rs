@@ -75,13 +75,13 @@ impl Shell {
     /// the stamp of a save, never read from the request (artifacts_turns).
     fn art_turn(&self, agent: &str) -> Option<crate::artifacts_turns::Turn> {
         let a = self.hub.st.agents.get(agent)?;
-        a.turn_started_ms.map(|started_ms| crate::artifacts_turns::Turn { agent: a.name.clone(), started_ms })
+        a.turn_ms.map(|started_ms| crate::artifacts_turns::Turn { agent: a.name.clone(), started_ms })
     }
 
     /// When the turn of the agent that made `v` started, if it runs now.
     fn art_maker_turn(&self, v: &artifacts::Version) -> Option<u64> {
         let t = v.turn.as_ref()?;
-        self.hub.st.agents.get(&t.agent)?.turn_started_ms
+        self.hub.st.agents.get(&t.agent)?.turn_ms
     }
 
     /// Each stored artifact's live words, by id (the rows' `live`).
@@ -133,7 +133,7 @@ impl Shell {
             .art
             .live
             .iter()
-            .filter(|(_, (agent, at))| self.hub.st.agents.get(agent).and_then(|a| a.turn_started_ms) != Some(*at))
+            .filter(|(_, (agent, at))| self.hub.st.agents.get(agent).and_then(|a| a.turn_ms) != Some(*at))
             .map(|(id, _)| id.clone())
             .collect();
         if ended.is_empty() {
@@ -313,7 +313,7 @@ impl Shell {
             },
             _ => Where::Shared {
                 dir: PathBuf::from(&a.ws.path),
-                files: a.files.iter().cloned().collect(),
+                files: a.files.to_vec(),
             },
         }
     }

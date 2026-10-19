@@ -41,9 +41,9 @@ pub fn task_line(a: &Agent, now: u64) -> String {
         clip(&a.description(), 70),
         ws_label(a)
     );
-    if let Some((_, note)) = &a.declared {
-        if !note.is_empty() {
-            s.push_str(&format!("  note: {}", clip(&one_line(note), 80)));
+    if let Some(d) = a.declared() {
+        if !d.note.is_empty() {
+            s.push_str(&format!("  note: {}", clip(&one_line(&d.note), 80)));
         }
     }
     if let Some(r) = &a.last_report {
@@ -324,7 +324,7 @@ pub fn tasks_detail(st: &State, now: u64, models: &Models) -> String {
             clip(&one_line(&a.brief.objective), 300)
         ));
         if let Some(t) = a
-            .turn_started_ms
+            .turn_ms
             .filter(|_| matches!(a.status(), Status::Working | Status::Waiting))
         {
             b.push(format!("current turn: started {} ago", age(t, now)));
@@ -336,14 +336,14 @@ pub fn tasks_detail(st: &State, now: u64, models: &Models) -> String {
                 clip(&one_line(what), 200)
             ));
         }
-        if let Some((d, note)) = &a.declared {
+        if let Some(d) = a.declared() {
             b.push(format!(
                 "declared: {:?}{}",
-                d,
-                if note.is_empty() {
+                d.status,
+                if d.note.is_empty() {
                     String::new()
                 } else {
-                    format!(" — {}", clip(&one_line(note), 200))
+                    format!(" — {}", clip(&one_line(&d.note), 200))
                 }
             ));
         }
@@ -439,10 +439,9 @@ impl<'a> Group<'a> {
             .filter(|a| a.status() != Status::Archived)
             .map(|a| {
                 let note = a
-                    .declared
-                    .as_ref()
-                    .filter(|(_, n)| !n.is_empty())
-                    .map(|(_, n)| format!(" — {}", clip(&one_line(n), 60)))
+                    .declared()
+                    .filter(|d| !d.note.is_empty())
+                    .map(|d| format!(" — {}", clip(&one_line(&d.note), 60)))
                     .unwrap_or_default();
                 // its model's tag, a column of its own (issue #4): as wide as
                 // the longest tag (at most 18), a name never cut mid-word
@@ -644,13 +643,13 @@ mod tests {
 
     #[test]
     fn user_board_lists_live_agents_only() {
-        use crate::model::{Declared, Lifecycle};
+        use crate::model::{Declaration, Declared, Lifecycle};
         let mut st = state();
         st.test_task("old", "Ancienne tâche");
         st.test_task("kid", "Sous-tâche vivante");
         st.agents.get_mut("old").unwrap().lifecycle = Lifecycle::Archived;
         st.agents.get_mut("kid").unwrap().parent = Some("old".into());
-        st.agents.get_mut("docs").unwrap().declared = Some((Declared::Done, String::new()));
+        st.agents.get_mut("docs").unwrap().declared = Some(Declaration { status: Declared::Done, note: String::new() });
         let b = user_board(&st, 60_000);
         assert!(!b.contains("old ") && !b.contains("Ancienne"), "{}", b);
         assert!(b.contains("auth-fix") && b.contains("docs") && b.contains("kid"), "{}", b);

@@ -4,10 +4,11 @@
 //! `bend/hub/gen/view.bend`).
 //!
 //! Untagged records: [`View`], its [`ViewAgent`] rows and [`ViewMsg`]
-//! records. The payloads inside (an agent's brief, ws and report, a
-//! message and its state, the cards, timers and watches) are the journal
-//! codec's shapes: `Json` here, read into the hub's model types by serde
-//! (that codec is the next slice, issue 25).
+//! records. An agent row's opaque JSON is typed here (its brief, ws,
+//! report: core::state's Rust-only records, read leniently, see
+//! [`super::lenient`]); a message and its state, the cards, timers and
+//! watches stay `Json`, read by the hub into core::state's generated
+//! types.
 //!
 //! A step's view carries only what the step changed (view.bend
 //! `changed`, `durable_kvs`, `timers_kvs`, `wakes_kvs`): the agents it
@@ -20,6 +21,8 @@
 //! fixtures/core_view.jsonl, one view per shape).
 
 use super::core_records;
+use super::state::{Brief, Declared, Lifecycle, Report, Run, Workspace};
+use serde::{Deserialize, Serialize};
 
 core_records! {
     /// The records of sb-core's view, for the Bend encoders.
@@ -32,23 +35,23 @@ core_records! {
             is_main: Bool,
             parent: OptStr,
             /// the task's brief (null: none)
-            brief: Json,
+            brief: Json(Brief),
             created_ms: Nat,
             /// its workspace
-            ws: Json,
+            ws: Json(Workspace),
             /// `active`, `archived`, ...
-            lifecycle: Str,
+            lifecycle: Str(Lifecycle),
             failure: OptStr,
             /// `{status, note}` from `sb status`, null when none
-            declared: Json,
+            declared: OptJson(Declaration),
             /// its last `sb report` (null: none)
-            last_report: Json,
+            last_report: OptJson(Report),
             aliases: Strs,
             files: Strs,
             snapshot_ref: OptStr,
             follow: Bool,
             /// `down`, `starting`, `idle`, `busy`
-            run: Str,
+            run: Str(Run),
             waiting: Bool,
             /// the recipient of the message its `sb wait` waits on
             waiting_on: OptStr,
@@ -99,4 +102,13 @@ impl View {
     pub fn to_value(&self) -> serde_json::Value {
         serde_json::to_value(self).expect("a view always serializes")
     }
+}
+
+/// An agent's declared status as its view row writes it (`sb status`:
+/// view.bend's `{status, note}` from its Agent's `declared` and `note`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Declaration {
+    pub status: Declared,
+    #[serde(default)]
+    pub note: String,
 }

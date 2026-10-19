@@ -40,7 +40,22 @@ fn full(k: FieldKind, name: &str) -> Value {
 /// A record of a table with every field set (a `Recs` field: one item).
 fn full_rec(t: &Table, rust: &str) -> Value {
     let k = t.kinds.iter().find(|k| k.rust == rust).unwrap_or_else(|| panic!("{}: no record {rust}", t.name));
-    Value::Object(k.fields.iter().map(|f| (f.name.to_string(), full(f.kind, f.name))).collect())
+    Value::Object(k.fields.iter().map(|f| (f.name.to_string(), full_field(f))).collect())
+}
+
+/// A field with a value that is not its default: a typed one's in its
+/// Rust type's shape ([`Field::rust`]).
+fn full_field(f: &Field) -> Value {
+    match f.rust {
+        None => full(f.kind, f.name),
+        Some("Brief") => json!({"objective": "o", "context": "c", "constraints": ["a"], "done_when": "d", "report_format": "r"}),
+        Some("Workspace") => json!({"mode": "worktree", "path": "/w", "branch": "b", "base_commit": "c", "dropped": true, "place": "wt:a", "feature": "f", "state": "placing"}),
+        Some("Lifecycle") => json!("stopped"),
+        Some("Run") => json!("busy"),
+        Some("Option<Declaration>") => json!({"status": "done", "note": "n"}),
+        Some("Option<Report>") => json!({"at_ms": 1, "kind": "done", "summary": "s", "decisions": ["d"], "auto": true, "step": 1, "of": 2, "result": {"k": 1}}),
+        Some(t) => panic!("{}: no sample for {t}", f.name),
+    }
 }
 
 /// What a missing field writes back: None when absent.
@@ -60,9 +75,14 @@ fn empty(k: FieldKind) -> Option<Value> {
 
 /// What a missing field writes back: its declared default, else its kind's.
 fn empty_field(f: &Field) -> Option<Value> {
-    match f.default {
-        Some(d) => Some(serde_json::from_str(d).expect("a default is JSON")),
-        None => empty(f.kind),
+    match (f.default, f.rust) {
+        (Some(d), _) => Some(serde_json::from_str(d).expect("a default is JSON")),
+        (None, None) => empty(f.kind),
+        (None, Some("Brief")) => Some(json!({"objective": "", "context": "", "constraints": [], "done_when": null, "report_format": null})),
+        (None, Some("Workspace")) => Some(json!({"mode": "shared", "path": "", "branch": null, "base_commit": null, "dropped": false})),
+        (None, Some("Lifecycle")) => Some(json!("active")),
+        (None, Some("Run")) => Some(json!("down")),
+        (None, Some(_)) => Some(Value::Null),
     }
 }
 
@@ -240,14 +260,21 @@ fn the_view_table_is_what_serde_writes() {
 
 /// One real view per shape (fixtures/core_view.jsonl, sb-core's answers
 /// on a throwaway hub with the fake provider): each reads and writes back
-/// equal as a JSON value.
+/// equal as a JSON value, but an agent's report's nulls (an older writer's
+/// `"step":null`: the typed Report reads none and omits it).
 #[test]
 fn every_captured_view_reads_and_writes_back() {
     let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core_view.jsonl")).unwrap();
     let mut n = 0;
     for l in text.lines().filter(|l| !l.starts_with('#') && !l.trim().is_empty()) {
-        let v: Value = serde_json::from_str(l).unwrap();
-        assert_eq!(View::decode(&v).unwrap().to_value(), v, "{l}");
+        let mut v: Value = serde_json::from_str(l).unwrap();
+        let read = View::decode(&v).unwrap().to_value();
+        for a in v["agents"].as_array_mut().into_iter().flatten() {
+            if let Some(r) = a["last_report"].as_object_mut() {
+                r.retain(|_, x| !x.is_null());
+            }
+        }
+        assert_eq!(read, v, "{l}");
         n += 1;
     }
     assert!(n >= 4, "one view per shape: {n}");

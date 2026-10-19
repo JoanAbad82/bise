@@ -1,5 +1,5 @@
 use super::*;
-use crate::model::{Declared, Msg, MsgState, Run, USER};
+use crate::model::{Declaration, Declared, Msg, MsgState, Run, USER};
 
 fn msg(id: u64, from: &str, to: &str, expect_reply: bool, thread: u64) -> Msg {
     Msg {
@@ -97,7 +97,7 @@ fn step(st: &mut State, r: &mut Rng, now: &mut u64, models: &mut Models, n: &mut
             if let Some(a) = pick(r) {
                 let a = st.agents.get_mut(&a).unwrap();
                 a.run = [Run::Down, Run::Starting, Run::Idle, Run::Busy][r.below(4)];
-                a.declared = [None, Some((Declared::Done, "done".into())), Some((Declared::Blocked, String::new()))][r.below(3)].clone();
+                a.declared = [None, Some((Declared::Done, "done")), Some((Declared::Blocked, ""))][r.below(3)].map(|(status, note)| Declaration { status, note: note.into() });
             }
         }
         6 => {

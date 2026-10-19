@@ -50,7 +50,7 @@ pub use fx::Fx;
 pub use input::{In, Step};
 pub use journal::JOURNAL;
 pub use link::{Answer, Link};
-pub use view::{View, ViewAgent, ViewMsg, VIEW};
+pub use view::{Declaration, View, ViewAgent, ViewMsg, VIEW};
 
 use serde::{Deserialize, Serialize};
 
@@ -139,13 +139,32 @@ pub struct Field {
     /// kind's own default (`next_msg: Nat = 1` reads 1); serde reads the
     /// same (core_fields!'s `= 1`, `= true`)
     pub default: Option<&'static str>,
+    /// the Rust type a `Json` or `Str` field is read into, when not its
+    /// kind's own (a view row's `brief`: `Brief`; core_records!'s
+    /// `Json(Brief)`, `OptJson(Report)`, `Str(Lifecycle)`), leniently: a
+    /// value that doesn't fit reads its default ([`lenient`]). Bend sees
+    /// its kind only.
+    pub rust: Option<&'static str>,
 }
 
 impl Field {
     /// A field that reads its kind's own default when missing.
     pub const fn new(name: &'static str, kind: FieldKind) -> Field {
-        Field { name, kind, default: None }
+        Field { name, kind, default: None, rust: None }
     }
+}
+
+/// A typed field of a JSON value sb-core keeps opaque (core_records!'s
+/// `Json(T)`, `OptJson(T)`, `Str(T)`): a value that doesn't fit reads
+/// T's default, as the hub read it before (one odd brief never drops a
+/// whole view).
+pub fn lenient<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned + Default,
+{
+    let v = <serde_json::Value as serde::Deserialize>::deserialize(d)?;
+    Ok(T::deserialize(v).unwrap_or_default())
 }
 
 /// One kind: its tag, its Rust variant, its Bend constructor (two tags
@@ -359,6 +378,15 @@ macro_rules! core_fields {
     (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : Ver $(, $($rest:tt)*)?) => {
         $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default = "crate::core::v1")] pub $f: u32,] $($($rest)*)?);
     };
+    (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : Json($t:ident) $(, $($rest:tt)*)?) => {
+        $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default, deserialize_with = "crate::core::lenient")] pub $f: $t,] $($($rest)*)?);
+    };
+    (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : OptJson($t:ident) $(, $($rest:tt)*)?) => {
+        $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default, deserialize_with = "crate::core::lenient")] pub $f: Option<$t>,] $($($rest)*)?);
+    };
+    (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : Str($t:ident) $(, $($rest:tt)*)?) => {
+        $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default, deserialize_with = "crate::core::lenient")] pub $f: $t,] $($($rest)*)?);
+    };
     (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : Recs($t:ident) $(, $($rest:tt)*)?) => {
         $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default)] pub $f: Vec<$t>,] $($($rest)*)?);
     };
@@ -406,6 +434,15 @@ macro_rules! core_records {
             $crate::core::core_fields! { [$(#[$vm])*] $Var { $( $(#[$fm])* $f : $k $(($a))? $(= $d)? ),* } }
         )*
 
+        $(
+            impl $Var {
+                /// Every field at its default (a missing key's).
+                pub fn empty() -> $Var {
+                    serde_json::from_value(serde_json::json!({})).expect("a record reads from nothing")
+                }
+            }
+        )*
+
         $(#[$tm])*
         pub const $T: $crate::core::Table = $crate::core::Table {
             name: $name,
@@ -419,6 +456,7 @@ macro_rules! core_records {
                         name: stringify!($f),
                         kind: $crate::core::field_kind!($k $(($a))?),
                         default: $crate::core::field_default!($($d)?),
+                        rust: $crate::core::field_rust!($k $(($a))?),
                     } ),*],
                 }
             ),*],
@@ -428,10 +466,20 @@ macro_rules! core_records {
 
 pub(crate) use core_records;
 
-/// A field's [`FieldKind`] from its declaration (`Recs(T)` names T).
+/// A field's [`FieldKind`] from its declaration (`Recs(T)` names T; a
+/// typed `Json(T)`, `OptJson(T)`, `Str(T)` is its kind on the wire).
 macro_rules! field_kind {
     (Recs($a:ident)) => {
         $crate::core::FieldKind::Recs(stringify!($a))
+    };
+    (Json($a:ident)) => {
+        $crate::core::FieldKind::Json
+    };
+    (OptJson($a:ident)) => {
+        $crate::core::FieldKind::Json
+    };
+    (Str($a:ident)) => {
+        $crate::core::FieldKind::Str
     };
     ($k:ident) => {
         $crate::core::FieldKind::$k
@@ -439,6 +487,24 @@ macro_rules! field_kind {
 }
 
 pub(crate) use field_kind;
+
+/// A field's Rust type when typed ([`Field::rust`]).
+macro_rules! field_rust {
+    (Json($a:ident)) => {
+        Some(stringify!($a))
+    };
+    (OptJson($a:ident)) => {
+        Some(concat!("Option<", stringify!($a), ">"))
+    };
+    (Str($a:ident)) => {
+        Some(stringify!($a))
+    };
+    ($k:ident $(($a:ident))?) => {
+        None
+    };
+}
+
+pub(crate) use field_rust;
 
 /// A field's default from its declaration (`= 1`), as JSON text.
 macro_rules! field_default {

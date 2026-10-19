@@ -25,33 +25,9 @@ impl Hub {
     fn load(&mut self, v: View) {
         let mut agents = BTreeMap::new();
         for a in v.agents {
-            let name = a.name;
-            let declared = parse::<ViewDecl>(&a.declared).map(|d| (d.status, d.note));
-            let mut agent = Agent {
-                name: name.clone(),
-                dir: a.dir,
-                is_main: a.is_main,
-                parent: a.parent,
-                brief: parse(&a.brief).unwrap_or_default(),
-                created_ms: a.created_ms,
-                ws: parse(&a.ws).unwrap_or_else(|| panic!("sb-core: bad ws {}", a.ws)),
-                lifecycle: parse_str(&a.lifecycle).unwrap_or(Lifecycle::Active),
-                failure: a.failure,
-                declared,
-                last_report: parse(&a.last_report),
-                aliases: a.aliases,
-                files: a.files.into_iter().collect(),
-                snapshot_ref: a.snapshot_ref,
-                follow: a.follow,
-                run: run_of(&a.run),
-                waiting: a.waiting,
-                waiting_on: a.waiting_on,
-                turn_started_ms: a.turn_ms,
-                turns_ended: a.turns,
-                activity: self.activity.get(&name).cloned(),
-                place: None,
-                place_branch: None,
-            };
+            let name = a.name.clone();
+            let mut agent = Agent::of(a);
+            agent.activity = self.activity.get(&name).cloned();
             agent.place = self.place_of(&agent);
             agent.place_branch = self.place_branch_of(&agent);
             if self.on_you.contains(&agent.name) {
@@ -107,28 +83,5 @@ impl Hub {
         self.st.next_msg = v.next_msg;
         self.st.next_card = v.next_card;
         self.st.paused = v.paused;
-    }
-}
-
-/// A string field of the view as one of the model's enums (`lifecycle`).
-fn parse_str<T: serde::de::DeserializeOwned>(s: &str) -> Option<T> {
-    use serde::de::IntoDeserializer;
-    T::deserialize(IntoDeserializer::<serde::de::value::Error>::into_deserializer(s)).ok()
-}
-
-/// A view row's `declared` (`sb status`): null when none.
-#[derive(serde::Deserialize)]
-struct ViewDecl {
-    status: Declared,
-    #[serde(default)]
-    note: String,
-}
-
-fn run_of(s: &str) -> Run {
-    match s {
-        "starting" => Run::Starting,
-        "idle" => Run::Idle,
-        "busy" => Run::Busy,
-        _ => Run::Down,
     }
 }

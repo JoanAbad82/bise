@@ -15,15 +15,18 @@ pub fn worktree_id(dir: &str) -> String {
     format!("wt:{}", dir)
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
+    #[default]
     Shared,
     Worktree,
 }
 
 /// Where a task works (RFC 0002). `path` is the workspace for `shared`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Its default: the shared folder at "" (a view row whose ws doesn't
+/// read).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Workspace {
     pub mode: Mode,
     pub path: String,

@@ -66,7 +66,7 @@ fn the_kept_rows_equal_fresh_rows_at_every_step() {
             match r.below(10) {
                 0 => st.agents.get_mut(&a).unwrap().lifecycle = [Lifecycle::Archived, Lifecycle::Active, Lifecycle::Stopped][r.below(3)],
                 1 => st.agents.get_mut(&a).unwrap().run = [Run::Idle, Run::Busy, Run::Down][r.below(3)],
-                2 => st.agents.get_mut(&a).unwrap().turn_started_ms = [None, Some(now)][r.below(2)],
+                2 => st.agents.get_mut(&a).unwrap().turn_ms = [None, Some(now)][r.below(2)],
                 3 => {
                     roles.insert(st.agents[&a].dir.clone(), format!("role {}", r.below(5)));
                 }
@@ -92,7 +92,7 @@ fn the_kept_rows_equal_fresh_rows_at_every_step() {
                         *o = new.clone();
                     }
                 }
-                7 => st.agents.get_mut(&a).unwrap().declared = Some((crate::model::Declared::Done, format!("note {}", r.below(3)))),
+                7 => st.agents.get_mut(&a).unwrap().declared = Some(crate::model::Declaration { status: crate::model::Declared::Done, note: format!("note {}", r.below(3)) }),
                 8 => {
                     n += 1;
                     st.test_task(&format!("n{n}"), "a new one");

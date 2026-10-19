@@ -101,3 +101,28 @@ fn every_fixture_view_loads_into_the_mirror() {
         assert_eq!(h.st.next_msg, v["next_msg"].as_u64().unwrap());
     }
 }
+
+/// debt-audit #1 (issue 35): the hub's State copies these view keys by
+/// hand, one load line each in core_view.rs (`self.st.<field> = ...`);
+/// everything else of sb-core's view comes in as a generated type
+/// (agents: ViewAgent whole; cards, messages: core::state's). The list
+/// only shrinks: a new hand copy is red (state-schema's follow-up takes
+/// these to zero with the view's scalars as one record).
+const HAND_MIRRORS: &[&str] = &["order", "main_notes", "next_msg", "next_card", "paused"];
+
+#[test]
+fn the_hand_mirrors_of_the_view_only_shrink() {
+    let src = include_str!("core_view.rs");
+    let typed = ["agents", "cards"];
+    let mut copied: Vec<&str> = src
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("self.st."))
+        .filter_map(|l| l.split_once(" = ").map(|(f, _)| f))
+        .filter(|f| !typed.contains(f))
+        .collect();
+    copied.sort();
+    copied.dedup();
+    let mut want = HAND_MIRRORS.to_vec();
+    want.sort();
+    assert_eq!(copied, want, "State's hand copies of sb-core's view (HAND_MIRRORS may only shrink)");
+}

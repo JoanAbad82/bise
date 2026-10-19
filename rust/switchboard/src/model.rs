@@ -8,7 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// sb-core's records, declared once in bise_proto (core::state: the
 /// generated ones, and the Rust-only ones sb-core keeps as opaque JSON).
-pub use bise_proto::core::state::{Brief, Card, Declared, Lifecycle, Mode, Msg, MsgState, Report, Workspace};
+pub use bise_proto::core::state::{Brief, Card, Declared, Lifecycle, Mode, Msg, MsgState, Report, Run, Workspace};
+pub use bise_proto::core::{Declaration, ViewAgent};
 
 /// The name of the orchestrator agent. Never a task name.
 pub const MAIN: &str = "main";
@@ -17,18 +18,6 @@ pub const USER: &str = "user";
 /// The hub itself, as the sender of notifications (a task crashed...).
 /// Never an agent name.
 pub const HUB: &str = "switchboard";
-
-/// What the agent's REPL is doing right now (runtime only).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Run {
-    /// No REPL process (not spawned yet, or stopped).
-    Down,
-    /// Spawned, not connected yet.
-    Starting,
-    Idle,
-    /// A turn is running.
-    Busy,
-}
 
 /// The status every view shows (RFC 0001 §9.1, RFC 0003 `ListedAgent`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,42 +50,13 @@ impl Status {
 
 }
 
+/// An agent as the hub knows it: sb-core's row of it (bise_proto's
+/// generated [`ViewAgent`]: its durable record and its runtime, `run`,
+/// `waiting`, `waiting_on`, `turn_ms`, `turns`), read through Deref, never
+/// copied field by field; and what only the hub's Rust side knows.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Agent {
-    pub name: String,
-    /// The name at creation: its directories never move on a rename.
-    pub dir: String,
-    pub is_main: bool,
-    /// The agent that created it: `main`, or `user` for a `/new`.
-    pub parent: Option<String>,
-    pub brief: Brief,
-    pub created_ms: u64,
-    pub ws: Workspace,
-    pub lifecycle: Lifecycle,
-    pub failure: Option<String>,
-    pub declared: Option<(Declared, String)>,
-    /// The last report: explicit (`sb report`) or the end of a turn.
-    pub last_report: Option<Report>,
-    pub aliases: Vec<String>,
-    /// Files this task changed in the shared workspace (RFC 0001 §10.3).
-    pub files: BTreeSet<String>,
-    /// A drop saved work here (RFC 0002 §5.2).
-    pub snapshot_ref: Option<String>,
-    /// bise desktop S10: someone follows it (one job: off at its job_end)
-    pub follow: bool,
-    // ---- runtime only ----
-    pub run: Run,
-    /// Inside `sb wait` (its bash call is blocked on the hub).
-    pub waiting: bool,
-    /// Who it waits on: the recipient of the message its `sb wait` /
-    /// `sb ask` waits for the reply to (sb-core's view).
-    pub waiting_on: Option<String>,
-    pub turn_started_ms: Option<u64>,
-    /// Its turns ended since sb-core started (issue 22): sb-core's
-    /// runtime count, +1 each time its run leaves busy (set_rt), so the
-    /// agents row's working and turns come from the same view. Back to 0
-    /// when sb-core restarts.
-    pub turns_ended: u64,
+    pub core: ViewAgent,
     /// The last thing it did: (time, "bash `cargo test`", "wrote: ...").
     pub activity: Option<(u64, String)>,
     /// BISE-136: the private git worktree it works in (`gate.sh new`,
@@ -107,7 +67,30 @@ pub struct Agent {
     pub place_branch: Option<String>,
 }
 
+impl std::ops::Deref for Agent {
+    type Target = ViewAgent;
+    fn deref(&self) -> &ViewAgent {
+        &self.core
+    }
+}
+
+impl std::ops::DerefMut for Agent {
+    fn deref_mut(&mut self) -> &mut ViewAgent {
+        &mut self.core
+    }
+}
+
 impl Agent {
+    /// An agent with only sb-core's row (the hub's own facts unknown yet).
+    pub fn of(core: ViewAgent) -> Agent {
+        Agent { core, activity: None, place: None, place_branch: None }
+    }
+
+    /// Its declared status and note (`sb status`), when it said one.
+    pub fn declared(&self) -> Option<&Declaration> {
+        self.core.declared.as_ref()
+    }
+
     pub fn status(&self) -> Status {
         match self.lifecycle {
             Lifecycle::Archived => return Status::Archived,
@@ -119,9 +102,9 @@ impl Agent {
             Run::Down | Run::Starting => Status::Starting,
             Run::Busy if self.waiting => Status::Waiting,
             Run::Busy => Status::Working,
-            Run::Idle => match self.declared {
-                Some((Declared::Done, _)) => Status::Done,
-                Some((Declared::Blocked, _)) => Status::Blocked,
+            Run::Idle => match self.declared().map(|d| d.status) {
+                Some(Declared::Done) => Status::Done,
+                Some(Declared::Blocked) => Status::Blocked,
                 _ => Status::Idle,
             },
         }
@@ -205,31 +188,13 @@ impl State {
         };
         st.agents.insert(
             MAIN.to_string(),
-            Agent {
+            Agent::of(ViewAgent {
                 name: MAIN.to_string(),
                 dir: MAIN.to_string(),
                 is_main: true,
-                parent: None,
-                brief: Brief::default(),
-                created_ms: 0,
                 ws: Workspace::shared(workspace),
-                lifecycle: Lifecycle::Active,
-                failure: None,
-                declared: None,
-                last_report: None,
-                aliases: Vec::new(),
-                files: BTreeSet::new(),
-                follow: false,
-                snapshot_ref: None,
-                run: Run::Down,
-                waiting: false,
-                waiting_on: None,
-                turn_started_ms: None,
-                turns_ended: 0,
-                activity: None,
-                place: None,
-                place_branch: None,
-            },
+                ..ViewAgent::empty()
+            }),
         );
         st.order.push(MAIN.to_string());
         st
@@ -385,7 +350,7 @@ mod tests {
         assert_eq!(a.status(), Status::Waiting);
         a.waiting = false;
         a.run = Run::Idle;
-        a.declared = Some((Declared::Done, String::new()));
+        a.declared = Some(Declaration { status: Declared::Done, note: String::new() });
         assert_eq!(a.status(), Status::Done);
         a.lifecycle = Lifecycle::Archived;
         assert_eq!(a.status(), Status::Archived);

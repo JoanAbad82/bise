@@ -785,7 +785,7 @@ pub const STATE: State = State {
 /// reads the field's default; an enum's other word reads its fallback.
 /// The others get a Rust name when a Rust reader needs one.
 pub const RUST: &[(&str, &str)] =
-    &[("Life", "Lifecycle"), ("Decl", "Declared"), ("MSt", "MsgState"), ("Msg", "Msg"), ("Card", "Card")];
+    &[("Life", "Lifecycle"), ("Run", "Run"), ("Decl", "Declared"), ("MSt", "MsgState"), ("Msg", "Msg"), ("Card", "Card")];
 
 mod generated;
 mod opaque;

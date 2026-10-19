@@ -473,9 +473,8 @@ impl Shell {
             Status::Failed => "failed",
         };
         let note = a
-            .declared
-            .as_ref()
-            .map(|(_, n)| n.trim().to_string())
+            .declared()
+            .map(|d| d.note.trim().to_string())
             .filter(|n| !n.is_empty())
             .or_else(|| self.pg.last_intent.get(&a.name).cloned());
         let mut f = json!({"name": name, "status": status});

@@ -1452,7 +1452,7 @@ impl Hub {
             .values()
             .filter(|b| b.name != name && b.lifecycle != Lifecycle::Archived)
             .filter(|b| b.ws.place_id(&b.dir) == place)
-            .map(|b| (b.name.clone(), b.files.iter().cloned().collect()))
+            .map(|b| (b.name.clone(), b.files.to_vec()))
             .collect();
         Ok(crate::land::Job {
             agent: name.clone(),
@@ -1462,7 +1462,7 @@ impl Hub {
             place,
             dir: std::path::PathBuf::from(&a.ws.path),
             shared: std::path::PathBuf::from(&self.workspace),
-            files: a.files.iter().cloned().collect(),
+            files: a.files.to_vec(),
             others,
             add,
             since_ms: a.created_ms,
@@ -1871,7 +1871,7 @@ impl Hub {
             return;
         }
         let report = a.last_report.as_ref().map(|r| r.summary.clone()).unwrap_or_default();
-        let note = a.declared.as_ref().map(|(_, n)| n.clone()).unwrap_or_default();
+        let note = a.declared().map(|d| d.note.clone()).unwrap_or_default();
         let key = role::key(&a.brief.objective, &report, &note);
         let current = self.role_line(a);
         let (objective, dir) = (a.brief.objective.clone(), a.dir.clone());

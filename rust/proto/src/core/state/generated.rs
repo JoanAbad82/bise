@@ -55,6 +55,51 @@ impl<'de> Deserialize<'de> for Lifecycle {
     }
 }
 
+/// what an agent's REPL is doing (runtime only)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Run {
+    #[default]
+    Down,
+    Starting,
+    Idle,
+    Busy,
+}
+
+impl Run {
+    /// Its word.
+    pub fn word(self) -> &'static str {
+        match self {
+            Run::Down => "down",
+            Run::Starting => "starting",
+            Run::Idle => "idle",
+            Run::Busy => "busy",
+        }
+    }
+
+    /// A word as sb-core reads it: any other reads `down`.
+    pub fn of_word(w: &str) -> Run {
+        match w {
+            "starting" => Run::Starting,
+            "idle" => Run::Idle,
+            "busy" => Run::Busy,
+            _ => Run::Down,
+        }
+    }
+}
+
+impl Serialize for Run {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(self.word())
+    }
+}
+
+/// Not a string: an error (its field then reads its default).
+impl<'de> Deserialize<'de> for Run {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(Run::of_word(&String::deserialize(d)?))
+    }
+}
+
 /// the status an agent declares (`sb status`)
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Declared {
