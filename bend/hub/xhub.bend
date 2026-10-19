@@ -219,6 +219,13 @@ def held(+x: XH.Xs, +rid: Nat) -> Maybe<&2, XH.Route>:
 def via_of(+v: String) -> Maybe<&2, String>:
   Bool.pick(Maybe<&2, String>, String.is_empty(v), None{}, Some{v})
 
+# his routed words as his plain message to main: id `id` (its own thread),
+# its text, via and parts from the route (core.bend route_said)
+def msg_of_route(+r: XH.Route, +id: Nat, +now: Nat) -> S.Msg:
+  +m = S.Msg.with_to(S.Msg.with_from(S.Msg.with_thread(S.Msg.with_id(S.Msg.empty(), id), id), M.USER()), M.MAIN())
+  +m2 = S.Msg.with_plain(S.Msg.with_created(S.Msg.with_text(m, XH.Route.text(r)), now), True{})
+  S.Msg.with_parts(S.Msg.with_via(m2, via_of(XH.Route.via(r))), XH.Route.parts(r))
+
 # ---- a held route with no target ----
 # Only an older hub's route model held one (S2 step 5, gone: only his
 # explicit `@<project>` routes now); one left in a journal fires plain to

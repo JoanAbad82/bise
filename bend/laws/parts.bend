@@ -31,37 +31,15 @@ law agent_no_parts_no_line:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +agent: String
-  for +id: Nat
-  for +thread: Nat
-  for +from: String
-  for +to: String
-  for +reply_to: Maybe<&2, Nat>
-  for +expect: Bool
-  for +auto: Bool
-  for +text: String
-  for +ms: Nat
-  for +plain: Bool
-  for +queued: Bool
-  for +via: Maybe<&2, String>
-  {HC.msg_parts(o, cx, agent, HM.new_msg(id, thread, from, to, reply_to, expect, auto, text, ms, plain, queued, via, "")) == cx : HX.Cx<o>}
+  for +m: HS.Msg
+  {HC.msg_parts(o, cx, agent, HS.Msg.with_parts(m, "")) == cx : HX.Cx<o>}
 
 law agent_no_parts_no_sent_line:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +agent: String
-  for +id: Nat
-  for +thread: Nat
-  for +from: String
-  for +to: String
-  for +reply_to: Maybe<&2, Nat>
-  for +expect: Bool
-  for +auto: Bool
-  for +text: String
-  for +ms: Nat
-  for +plain: Bool
-  for +queued: Bool
-  for +via: Maybe<&2, String>
-  {HC.sent_parts(o, cx, agent, HM.new_msg(id, thread, from, to, reply_to, expect, auto, text, ms, plain, queued, via, "")) == cx : HX.Cx<o>}
+  for +m: HS.Msg
+  {HC.sent_parts(o, cx, agent, HS.Msg.with_parts(m, "")) == cx : HX.Cx<o>}
 
 # LAW: a brief without parts has none (its message is the one it always
 # was); with them, the task's head goes in front as a text part.

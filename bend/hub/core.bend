@@ -457,13 +457,6 @@ def not_queued_mode(xs: List<&2, S.Msg>) -> List<&2, S.Msg>:
       +rest = not_queued_mode(t)
       Bool.pick(List<&2, S.Msg>, S.Msg.queued(h), rest, h <> rest)
 
-def any_from_user(xs: List<&2, S.Msg>) -> Bool:
-  match xs:
-    case Nil{}:
-      False{}
-    case Con{+h, +t}:
-      LZ.pick(Bool, String.eq(S.Msg.from(h), M.USER()), u => True{}, u => any_from_user(t))
-
 def leftover_at.go(m: Maybe<&2, S.MSt>) -> Bool:
   match m:
     case Some{S.Queued{+r}}:
@@ -541,7 +534,7 @@ def pump.batch(-o: M.St, batch: List<&2, S.Msg>, +cx: X.Cx<o>, +name: String, +b
       +b = {h <> t : List<&2, S.Msg>}
       +notes = Bool.pick(List<&2, String>, is_main, M.St.notes(st(o, cx)), Nil{})
       +cx2 = pump.flush(o, Bool.not(List.is_empty(&2, String, notes)), cx)
-      +status = is_main && any_from_user(b)
+      +status = is_main && M.any_from_user(b)
       pump.send(o, busy, deliver_each(o, b, cx2, name, Nil{}), name, ids_of(b), notes, status)
 
 def pump.run(-o: M.St, run: M.Run, +cx: X.Cx<o>, +name: String, +queued: List<&2, S.Msg>, +is_main: Bool) -> X.Cx<o>:
@@ -633,12 +626,19 @@ def quiet_ok(a: Bool, e: Bool) -> {Bool.and(a, Bool.and(e, Bool.not(a))) == Fals
     case False{} _:
       {==}
 
+# a send's message, by name from its Snd: an automatic reply never asks (law auto_never_asks);
+# the id is the next free one (law msg_ids_fresh); his parts kept as sent (parts_never_change_text)
+def msg_of_snd(+s: Snd, +id: Nat, +thread: Nat, +now: Nat) -> S.Msg:
+  match s:
+    case Snd{+from, +to, +text, +expect, +reply_to, +plain, +auto, +queued, +via, +parts}:
+      +m = S.Msg.with_reply_to(S.Msg.with_to(S.Msg.with_from(S.Msg.with_thread(S.Msg.with_id(S.Msg.empty(), id), thread), from), to), reply_to)
+      +m2 = S.Msg.with_created(S.Msg.with_text(S.Msg.with_auto(S.Msg.with_expect(m, Bool.and(expect, Bool.not(auto))), auto), text), now)
+      S.Msg.with_parts(S.Msg.with_via(S.Msg.with_queued(S.Msg.with_plain(m2, plain), queued), via), parts)
+
 def send.emit(-o: M.St, +cx: X.Cx<o>, +s: Snd, +thread: Nat) -> X.Cx<o> & SendR:
   match s:
     case Snd{+from, +to, +text, +expect, +reply_to, +plain, +auto, +queued, +via, +parts}:
-      # an automatic reply never asks (law auto_never_asks); the id is the next free one (law
-      # msg_ids_fresh); his parts kept as sent (law parts_never_change_text: same text without)
-      +m = M.new_msg(M.St.next_msg(st(o, cx)), thread, from, to, reply_to, Bool.and(expect, Bool.not(auto)), auto, text, now(o, cx), plain, queued, via, parts)
+      +m = msg_of_snd(s, M.St.next_msg(st(o, cx)), thread, now(o, cx))
       # a card is closed by the user's answer only (answer_card): no reply
       # here touches the user's inbox (BISE-299)
       +cx1 = emit(o, cx, M.EMsgSent{m}, {==}, quiet_ok(auto, expect), Unit{})
@@ -2354,7 +2354,7 @@ def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat) -> X.Cx<o>:
 # send would pump main, a turn), no waiter, no card (law
 # route_fire_makes_no_turn)
 def route_said(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
-  +msg = M.new_msg(M.St.next_msg(st(o, cx)), M.St.next_msg(st(o, cx)), M.USER(), M.MAIN(), None{}, False{}, False{}, XH.Route.text(r), now(o, cx), True{}, False{}, XB.via_of(XH.Route.via(r)), XH.Route.parts(r))
+  +msg = XB.msg_of_route(r, M.St.next_msg(st(o, cx)), now(o, cx))
   emit(o, cx, M.EMsgSent{msg}, {==}, quiet_ok(False{}, False{}), Unit{})
 
 # home: a held route's act fired: his message to main is created now (an

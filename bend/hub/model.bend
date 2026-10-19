@@ -488,13 +488,13 @@ def is_delivered(s: S.MSt) -> Bool:
       False{}
     case S.Cancelled{}:
       False{}
-# a message from its fields, in their order (the steps' sends)
-def new_msg(+id: Nat, +thread: Nat, +from: String, +to: String, +reply_to: Maybe<&2, Nat>, +expect: Bool, +auto: Bool, +text: String, +created: Nat, +plain: Bool, +queued: Bool, +via: Maybe<&2, String>, +parts: String) -> S.Msg:
-  +m0 = S.Msg.with_thread(S.Msg.with_id(S.Msg.empty(), id), thread)
-  +m1 = S.Msg.with_reply_to(S.Msg.with_to(S.Msg.with_from(m0, from), to), reply_to)
-  +m2 = S.Msg.with_text(S.Msg.with_auto(S.Msg.with_expect(m1, expect), auto), text)
-  +m3 = S.Msg.with_queued(S.Msg.with_plain(S.Msg.with_created(m2, created), plain), queued)
-  S.Msg.with_parts(S.Msg.with_via(m3, via), parts)
+# one of the messages is from the user
+def any_from_user(xs: List<&2, S.Msg>) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case Con{+h, +t}:
+      LZ.pick(Bool, String.eq(S.Msg.from(h), USER()), u => True{}, u => any_from_user(t))
 # the record with its message to `to` (msgs_moved)
 def MRec.to(+r: S.MRec, +to: String) -> S.MRec:
   S.MRec.with_msg(r, S.Msg.with_to(S.MRec.msg(r), to))
