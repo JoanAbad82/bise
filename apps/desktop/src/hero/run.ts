@@ -11,7 +11,8 @@ import { layoutOf } from '../bims/maps';
 import { makeDriver, NO_ATTENTION, type Attention, type Clock, type OfficeDriver, type Step } from '../bims/office-driver';
 import type { Activity, BimFrame, Office, PlaneFlight, Spot } from '../bims/model';
 import { newTimeline } from '../bims/timeline';
-import { CAST, FILM_S, NOTES, REVIEWER, type Cast } from './cast';
+import { PLANE_CATCH } from '../bims/render/catch';
+import { CAST, EGGS, FILM_S, NOTES, REVIEWER, type Cast } from './cast';
 import { activitiesOf, changesIn, eggsAt, eventsIn, filmT, growthOf, loopOf, ORIGIN, rowsAt, rowsSig } from './world';
 
 /**
@@ -119,7 +120,11 @@ export function withFlight(office: string, f: BimFrame, t: number): BimFrame {
   const fly = (p: PlaneFlight): PlaneFlight => {
     const left = filmT(t - p.since);
     const n = NOTES.find((x) => x.office === office && x.from === 'you' && x.to === f.name && x.flight !== undefined && Math.abs(x.at - left) < 0.05);
-    return n?.flight === undefined ? p : { ...p, dur: n.flight.dur, loops: n.flight.loops, startX: FEED_X, glide: true };
+    if (n?.flight === undefined) return p;
+    // an egg of its bim's right after the catch takes the thumbs up's place (bims-film v16: checkout's hop)
+    const caughtAt = left + n.flight.dur;
+    const egg = EGGS.some((e) => e.office === office && e.bim === f.name && e.at >= caughtAt && e.at <= caughtAt + PLANE_CATCH);
+    return { ...p, dur: n.flight.dur, loops: n.flight.loops, startX: FEED_X, glide: true, ...(egg ? { thumbs: false } : {}) };
   };
   const { plane, aloft } = f.pose;
   if (plane === undefined && aloft === undefined) return f;

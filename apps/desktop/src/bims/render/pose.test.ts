@@ -195,6 +195,14 @@ describe('pose: his paper plane', () => {
     }
   });
 
+  it('gives its thumbs up after putting it away, none when an egg follows (thumbs: false)', () => {
+    const at = (c: number, thumbs?: boolean) => rig({ ...poseOf('work', { plane: PLANE_FLIGHT + c }), plane: { since: PLANE_FLIGHT + c, ...(thumbs === undefined ? {} : { thumbs }) } }, 5);
+    const mid = (BEAT.away + BEAT.thumbs) / 2;
+    expect(at(mid).armR[2]).toBeGreaterThan(1.5);
+    expect(at(mid).mouth).toBe('laugh');
+    expect(at(mid, false).armR[2]).toBeLessThan(0.5);
+  });
+
   it('runs the whole catch inside the timeline\'s plane window', () => {
     expect(PLANE_S).toBeGreaterThanOrEqual(PLANE_FLIGHT + PLANE_CATCH - 1e-9);
   });

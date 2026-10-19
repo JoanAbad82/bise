@@ -357,6 +357,8 @@ export interface PlaneFlight {
   readonly loops?: 0 | 1 | 2;
   readonly startX?: number;
   readonly glide?: boolean;
+  /** false: no thumbs up after the catch (an egg follows it: the hero's hop) */
+  readonly thumbs?: boolean;
 }
 
 /**

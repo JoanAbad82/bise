@@ -431,7 +431,7 @@ const ARM = {
  * impact, brings it in, it reads (head down), puts it away (the desk when it sits at one, else its
  * pocket), a short thumbs up. The plane itself is office-scene's, at the hand: never a prop here.
  */
-function caught(b: Body, s: number, dur: number, desk: boolean): Body {
+function caught(b: Body, s: number, dur: number, desk: boolean, thumbs: boolean): Body {
   const c = s - dur;
   if (c < -REACH_S || c > PLANE_CATCH) return b;
   if (c < 0) {
@@ -453,6 +453,8 @@ function caught(b: Body, s: number, dur: number, desk: boolean): Body {
     const f = ease((c - BEAT.read) / (BEAT.away - BEAT.read));
     return { ...look, armR: mixR(ARM.read, away, f), head: mixR([0.35, 0, 0], b.head, f) };
   }
+  // an egg follows (the hero's hop): no thumbs up, straight back to its pose
+  if (!thumbs) return blend({ ...b, armR: away }, b, ease((c - BEAT.away) / (PLANE_CATCH - BEAT.away)));
   // the thumbs up, short, then back to its pose
   if (c < BEAT.thumbs) return { ...b, armR: mixR(away, ARM.thumbs, ease((c - BEAT.away) / 0.12)), mouth: 'laugh', eyes: 0.3 };
   return blend({ ...b, armR: ARM.thumbs }, b, ease((c - BEAT.thumbs) / (PLANE_CATCH - BEAT.thumbs)));
@@ -536,7 +538,7 @@ export function rigOf(inp: RigInput): Rig {
     const s = pose.plane.since;
     const dur = pose.plane.dur ?? PLANE_FLIGHT;
     if (s < dur + PLANE_CATCH) motion = 'walk';
-    if (arrived) b = caught(b, s, dur, awayOf(act) === 'desk');
+    if (arrived) b = caught(b, s, dur, awayOf(act) === 'desk', pose.plane.thumbs !== false);
   } else if (pose.plane && arrived) {
     // reduced motion: no flight, the open sheet read in its hand (catch.ts heldAt), then put away
     if (pose.plane.since < (pose.plane.dur ?? PLANE_FLIGHT) + BEAT.read) b = { ...b, armR: ARM.read, head: [0.35, 0, 0] };

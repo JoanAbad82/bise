@@ -178,8 +178,9 @@ export const CAST: readonly Cast[] = [
       // ~0.6 s apart: the walks overlap (bims-film v15: each gets up round its chair first, bims-sit)
       { name: 'catalog', life: [[0, gone], [10.7, work], [45, landing(2)]] },
       { name: 'cart', life: [[0, gone], [12.2, work], [45.7, landing(3)]] },
-      // visits cart (0:15.5), asks him (0:26.8), his answer at 0:32.8, its crate first (0:44.6, there at 0:52)
-      { name: 'checkout', life: [[0, gone], [12.5, work], [26.8, { k: 'asks' }], [32.8, think], [34, work], [44.6, landing(1)]] },
+      // visits cart (0:15.5), asks him (0:26.8), his answer at 0:32.8: it reads it and puts it away
+      // (to 0:34.55), hops, types fast from 0:35.3 (bims-film v16); its crate first (0:44.6, there at 0:52)
+      { name: 'checkout', life: [[0, gone], [12.5, work], [26.8, { k: 'asks' }], [32.8, think], [35.3, work], [44.6, landing(1)]] },
       { name: 'emails', life: [[0, gone], [13.7, work], [46, landing(4)]] },
       { name: 'theme', life: [[0, gone], [39.1, work], [47.2, landing(6)]] },
       // finds checkout a bug (0:38.5, there 0:41.2, its visit over by 0:44.6), no ✗; 5th in line (from its desk the 6th place has no clear way: it never left)
@@ -258,7 +259,8 @@ export const BUBBLES: readonly Bubble[] = [
 ];
 
 export const EGGS: readonly Egg[] = [
-  { at: 33.1, dur: 0.6, office: KILN, bim: 'checkout', kind: 'hop' },
+  // after his answer's catch and read, its plane put away (render/catch.ts: 1.75 s on): no thumbs up, this hop
+  { at: 34.55, dur: 0.6, office: KILN, bim: 'checkout', kind: 'hop' },
   { at: 44.2, dur: 0.6, office: KILN, bim: 'order-test', kind: 'hop' },
   // the reviewer reads the crate's sheet (main's paper) a second, then stamps it: ✓ at 0:58.9
   { at: 57.5, dur: 1.8, office: KILN, bim: REVIEWER, kind: 'stamp' },
@@ -291,7 +293,7 @@ export const SHOTS: readonly Shot[] = [
   // his answer's plane: the same framing on checkout, then checkout in the middle once it caught it
   { at: 29, size: 'follow', subject: bim(KILN, 'checkout'), frame: FLIGHT_FRAME },
   { at: 32.8, size: 'follow', subject: bim(KILN, 'checkout'), lead: 0 },
-  { at: 34.5, size: 'office', subject: kiln },
+  { at: 35.5, size: 'office', subject: kiln },
   { at: 38.2, size: 'follow', subject: bim(KILN, 'order-test') },
   { at: 41.6, size: 'follow', subject: pair(KILN, 'order-test', 'checkout') },
   // checkout lifts its crate, then the parade to main's queue seen whole
