@@ -19,12 +19,12 @@ function bakeable(m: Material): m is MeshStandardMaterial | MeshLambertMaterial 
   return m.emissiveIntensity === 0 || (m.emissive.r === 0 && m.emissive.g === 0 && m.emissive.b === 0);
 }
 
-/** a mesh's geometry in the root's frame, unindexed, with only position and normal (and uv when kept) */
-function prepared(src: BufferGeometry, at: Matrix4, uv: boolean): BufferGeometry {
+/** a mesh's geometry in the root's frame, unindexed, with only position and normal (and uv, colour when kept) */
+function prepared(src: BufferGeometry, at: Matrix4, uv: boolean, color = false): BufferGeometry {
   const g = src.index !== null ? src.toNonIndexed() : src.clone();
   g.applyMatrix4(at);
   for (const name of Object.keys(g.attributes)) {
-    if (name !== 'position' && name !== 'normal' && !(uv && name === 'uv')) g.deleteAttribute(name);
+    if (name !== 'position' && name !== 'normal' && !(uv && name === 'uv') && !(color && name === 'color')) g.deleteAttribute(name);
   }
   if (!g.hasAttribute('normal')) g.computeVertexNormals();
   if (uv && !g.hasAttribute('uv')) g.setAttribute('uv', new BufferAttribute(new Float32Array((g.getAttribute('position').count) * 2), 2));
@@ -40,6 +40,20 @@ function painted(g: BufferGeometry, r: number, gg: number, b: number): BufferGeo
     c[i * 3] = r;
     c[i * 3 + 1] = gg;
     c[i * 3 + 2] = b;
+  }
+  g.setAttribute('color', new BufferAttribute(c, 3));
+  return g;
+}
+
+/** a geometry's own vertex colours times a colour (rgb, whatever its colour's item size was) */
+function tinted(g: BufferGeometry, r: number, gg: number, b: number): BufferGeometry {
+  const src = g.getAttribute('color');
+  const n = g.getAttribute('position').count;
+  const c = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    c[i * 3] = src.getX(i) * r;
+    c[i * 3 + 1] = src.getY(i) * gg;
+    c[i * 3 + 2] = src.getZ(i) * b;
   }
   g.setAttribute('color', new BufferAttribute(c, 3));
   return g;
@@ -79,7 +93,11 @@ export function mergeRoot(root: Object3D, style: Style, shadows: boolean): Merge
     if (Array.isArray(m)) return;
     from++;
     if (bakeable(m)) {
-      plain.push(painted(prepared(geo, obj.matrixWorld, false), m.color.r, m.color.g, m.color.b));
+      // an object merged already (its colours in its vertices, its material white: cozy.ts mergeInto)
+      // keeps them, tinted by its material; painted one colour, the town's merge of the office turned
+      // the cozy plants and pots white (bims m_32697)
+      const own = m.vertexColors && geo.getAttribute('color') !== undefined;
+      plain.push(own ? tinted(prepared(geo, obj.matrixWorld, false, true), m.color.r, m.color.g, m.color.b) : painted(prepared(geo, obj.matrixWorld, false), m.color.r, m.color.g, m.color.b));
       return;
     }
     const uv = 'map' in m && m.map !== null && m.map !== undefined;
