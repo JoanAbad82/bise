@@ -1,4 +1,6 @@
-//! The one writer of `<cache>/efforts.json` (effort-table step 2): the
+//! The one writer of `<cache>/efforts.json` (effort-table step 2) and of
+//! `<cache>/voice-models.json` (what Mistral transcribes now:
+//! [`voice_live`], fetched the same way, `refresh_voice`): the
 //! hub calls [`refresh`] in a thread at its start, then at most once a
 //! day per provider. It fetches only the providers he uses (a key found,
 //! or signed in): Anthropic and OpenRouter here, ChatGPT through
@@ -16,7 +18,7 @@ use serde_json::Value;
 
 use crate::auth::Keys;
 use crate::live_efforts::{self, Store, FETCHED};
-use crate::{auth_cli::Paths, chatgpt, Provider, Setup};
+use crate::{auth_cli::Paths, chatgpt, voice_live, Provider, Setup};
 
 /// The longest a fetch may wait, connect and each read.
 pub const TIMEOUT: Duration = Duration::from_secs(5);
@@ -49,6 +51,16 @@ pub fn read(cache_dir: &Path) -> Vec<(String, Vec<String>)> {
 
 /// One provider's lists from its API, or why not.
 fn fetch(p: &Provider, key: &str) -> Result<Vec<(String, Vec<String>)>, String> {
+    let v = get_models(p, key)?;
+    let lists = if p.api == "anthropic" { live_efforts::parse_anthropic(&v) } else { live_efforts::parse_openrouter(&v) };
+    if lists.is_empty() {
+        return Err(format!("{}'s model list has no effort list", p.name));
+    }
+    Ok(lists)
+}
+
+/// A provider's `/models` answer, or why not.
+fn get_models(p: &Provider, key: &str) -> Result<Value, String> {
     let url = Url::parse(&format!("{}/models", p.base_url.trim_end_matches('/')))?;
     let h: Vec<(String, String)> = match p.api.as_str() {
         "anthropic" => vec![("x-api-key".into(), key.into()), ("anthropic-version".into(), "2023-06-01".into())],
@@ -60,12 +72,37 @@ fn fetch(p: &Provider, key: &str) -> Result<Vec<(String, Vec<String>)>, String> 
     if !(200..300).contains(&status) {
         return Err(format!("{} answered {status} to the model list", p.name));
     }
-    let v: Value = serde_json::from_slice(&body).map_err(|_| format!("{}'s model list is not JSON", p.name))?;
-    let lists = if p.api == "anthropic" { live_efforts::parse_anthropic(&v) } else { live_efforts::parse_openrouter(&v) };
-    if lists.is_empty() {
-        return Err(format!("{}'s model list has no effort list", p.name));
+    serde_json::from_slice(&body).map_err(|_| format!("{}'s model list is not JSON", p.name))
+}
+
+/// The voice lists that are due ([`voice_live`]): one line per provider
+/// tried. A failure, or a list with no voice model, keeps the old one.
+fn refresh_voice(cache_dir: &Path, setup: &Setup, keys: &Keys, now_ms: u64) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut store = voice_live::read_store(cache_dir);
+    let mut changed = false;
+    for id in voice_live::LISTED {
+        let Some(p) = setup.catalog.provider(id) else { continue };
+        let Some(key) = keys.for_provider(p).map(|f| f.key) else { continue };
+        if p.base_url.is_empty() || !store.due(id, now_ms) {
+            continue;
+        }
+        match get_models(p, &key).map(|v| voice_live::parse(&v)) {
+            Ok(ids) if !ids.is_empty() => {
+                out.push(format!("voice: {} transcription models from {}", ids.len(), id));
+                store = store.with(id, now_ms, ids);
+                changed = true;
+            }
+            Ok(_) => out.push(format!("voice: {id} kept its old list: its model list has no transcription model")),
+            Err(e) => out.push(format!("voice: {id} kept its old list: {e}")),
+        }
     }
-    Ok(lists)
+    if changed {
+        if let Err(e) = write_file(&voice_live::store_path(cache_dir), &store.to_json()) {
+            out.push(format!("voice: cannot write {}: {e}", voice_live::store_path(cache_dir).display()));
+        }
+    }
+    out
 }
 
 /// Fetch the lists that are due (`now_ms`) and write them; one line per
@@ -101,6 +138,7 @@ pub fn refresh(paths: &Paths, cache_dir: &Path, setup: &Setup, keys: &Keys, now_
             Err(e) => out.push(format!("efforts: chatgpt kept its old list: {e}")),
         }
     }
+    out.extend(refresh_voice(cache_dir, setup, keys, now_ms));
     out
 }
 
@@ -125,21 +163,29 @@ pub fn spawn_refresher(paths: Paths, cache_dir: std::path::PathBuf, log: fn(&str
 }
 
 /// What a [`Setup::load`] reads changed since: the latest change of
-/// `config` and of the API lists (efforts.json, chatgpt-models.json).
+/// `config` and of the API lists (efforts.json, chatgpt-models.json,
+/// voice-models.json).
 pub fn stamp(config: &Path, cache_dir: &Path) -> Option<std::time::SystemTime> {
     let at = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
-    [at(config), at(&store_path(cache_dir)), at(&cache_dir.join("chatgpt-models.json"))].into_iter().flatten().max()
+    let lists = [store_path(cache_dir), cache_dir.join("chatgpt-models.json"), voice_live::store_path(cache_dir)];
+    std::iter::once(at(config)).chain(lists.iter().map(|p| at(p))).flatten().max()
+}
+
+/// efforts.json, atomically.
+fn write(cache_dir: &Path, store: &Store) -> std::io::Result<()> {
+    write_file(&store_path(cache_dir), &store.to_json())
 }
 
 /// Atomically: a temp file of this write, then a rename.
-fn write(cache_dir: &Path, store: &Store) -> std::io::Result<()> {
-    std::fs::create_dir_all(cache_dir)?;
-    let path = store_path(cache_dir);
+fn write_file(path: &Path, text: &str) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
     static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let tmp = path.with_extension(format!("json.{}.{}.tmp", std::process::id(), n));
-    std::fs::write(&tmp, store.to_json())?;
-    std::fs::rename(&tmp, &path).inspect_err(|_| {
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(&tmp, path).inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp);
     })
 }

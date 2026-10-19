@@ -190,6 +190,66 @@ fn another_voice_provider_has_no_realtime_and_no_voice_by_default() {
     assert!(s.tts_call(&k, &keys).unwrap_err().contains("can't speak yet"));
 }
 
+/// Mistral's /v1/models on 2026-10-19, cut down: the ids that say they
+/// transcribe, in its order.
+#[test]
+fn the_live_list_keeps_the_ids_that_transcribe() {
+    let v: serde_json::Value = serde_json::from_str(
+        r#"{"data": [
+        {"id": "mistral-small-latest", "capabilities": {"audio_transcription": false}},
+        {"id": "voxtral-mini-transcribe-3", "capabilities": {"audio_transcription": true}},
+        {"id": "voxtral-mini-transcribe-realtime-3", "capabilities": {}},
+        {"id": "voxtral-small-transcribe-3", "capabilities": {"audio_transcription": true}},
+        {"id": "voxtral-mini-transcribe-3", "capabilities": {"audio_transcription": true}}
+    ]}"#,
+    )
+    .unwrap();
+    assert_eq!(crate::voice_live::parse(&v), vec!["voxtral-mini-transcribe-3", "voxtral-small-transcribe-3"]);
+    assert!(crate::voice_live::parse(&serde_json::json!({"error": 1})).is_empty());
+    // the store: a day, then due again; a new fetch replaces the list
+    use crate::voice_live::Store as Lists;
+    let s = Lists::default().with("mistral", 1_000, vec!["a".into()]);
+    assert!(!s.due("mistral", 2_000) && s.due("mistral", 1_000 + crate::live_efforts::TTL_MS) && s.due("openai", 2_000));
+    let back = Lists::parse(&s.to_json()).unwrap();
+    assert_eq!(back, s);
+    assert_eq!(back.with("mistral", 5, vec!["b".into()]).lists(), vec![("mistral".to_string(), vec!["b".to_string()])]);
+}
+
+/// Every user, not only today's rename: a provider whose list lacks the
+/// catalog's default gets a default it lists, the pickers lose what it
+/// dropped, a model he wrote stays as written.
+#[test]
+fn the_default_voice_model_is_one_the_provider_lists_now() {
+    let lists = |ids: &[&str]| vec![("mistral".to_string(), ids.iter().map(|s| s.to_string()).collect::<Vec<_>>())];
+    // the default gone, the small one left
+    let s = setup("").with_live_stt(&lists(&["voxtral-small-transcribe-3", "voxtral-14b-offline-arabic-2610"]));
+    assert_eq!((s.voice.model.as_str(), s.voice.from), ("mistral/voxtral-small-transcribe-3", "default"));
+    assert_eq!(s.catalog.default_voice_model, "mistral/voxtral-small-transcribe-3");
+    assert_eq!(s.catalog.provider("mistral").unwrap().voice_model, "voxtral-small-transcribe-3");
+    let stt: Vec<String> = s.catalog.models.iter().filter(|m| m.stt && m.provider == "mistral").map(|m| m.name()).collect();
+    assert_eq!(stt, vec!["mistral/voxtral-small-transcribe-3"]);
+    // none of the table's left: the list's first, offered
+    let s = setup("").with_live_stt(&lists(&["voxtral-transcribe-4", "voxtral-transcribe-4-fast"]));
+    assert_eq!(s.voice.model, "mistral/voxtral-transcribe-4");
+    assert_eq!(s.catalog.resolve_stt("mistral/voxtral-transcribe-4").known, Known::Listed);
+    assert_eq!(s.catalog.stt_fallback("mistral", "voxtral-transcribe-3").as_deref(), Some("voxtral-transcribe-4"));
+    // the one key, every role path follows it too
+    let store = Store::default();
+    let keys = Keys { env: &mistral_key, store: &store, files: &[] };
+    assert_eq!(setup("").with_live_stt(&lists(&["voxtral-transcribe-4"])).with_keys(&keys).voice.model, "mistral/voxtral-transcribe-4");
+    // the default still listed: as it was; no list or an empty one: the table
+    assert_eq!(setup("").with_live_stt(&lists(&["voxtral-mini-transcribe-3"])).voice.model, TRANSCRIBE_3);
+    assert_eq!(setup("").with_live_stt(&[]), setup(""));
+    assert_eq!(setup("").with_live_stt(&lists(&[])), setup(""));
+    // his written choice stays, even unlisted (a failed take falls back)
+    let s = setup("[roles]\nvoice = \"mistral/voxtral-mini-latest\"\n").with_live_stt(&lists(&["voxtral-small-transcribe-3"]));
+    assert_eq!((s.voice.model.as_str(), s.voice.from), ("mistral/voxtral-mini-latest", "config"));
+    assert_eq!(s.voice_job(&keys).unwrap().fallback.as_deref(), Some("voxtral-small-transcribe-3"));
+    // another provider's list never moves Mistral's
+    let other = vec![("openai".to_string(), vec!["gpt-transcribe".to_string()])];
+    assert_eq!(setup("").with_live_stt(&other).voice.model, TRANSCRIBE_3);
+}
+
 #[test]
 fn the_small_jobs_call_has_its_family() {
     let store = Store::default();

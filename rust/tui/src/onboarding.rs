@@ -57,6 +57,7 @@ pub(crate) use signin::{Flow, Kind, Logins, Poll, DENIED, UNFINISHED};
 use signin::{Account, PlanState};
 pub(crate) use provider::{request as provider_request, take_line as provider_line, Ask};
 pub(crate) use roles::{take_voice_out, Open, VoiceOut};
+pub(crate) use models::setup_of;
 
 /// The env var: `off` never shows the onboarding, `on` always does.
 pub(crate) const ENV: &str = "SB_ONBOARDING";
@@ -188,21 +189,6 @@ impl Provider {
 /// The coding plans' providers (subscriptions design: API keys with their
 /// own coding base URLs), the key step's `a coding plan key` row.
 pub(crate) const CODING_PLANS: [&str; 3] = ["zai-coding", "kimi-code", "minimax"];
-
-/// The catalog and the model choice (`Setup`: `BISE_MODEL` >
-/// `BEND_MODEL` > `model` in config.toml > the default).
-/// The base URLs' variables (foundry's ANTHROPIC_FOUNDRY_BASE_URL) are
-/// also read from the .env files, like its key (~/.vibe/.env).
-pub(crate) fn setup_of(env: Env, home: &bise_home::Home) -> bise_catalog::Setup {
-    let text = std::fs::read_to_string(home.config_file()).ok();
-    let files = bise_catalog::auth::EnvFile::read_all(&home.env_files());
-    let store = bise_catalog::auth::Store::read(&home.auth_file()).unwrap_or_default();
-    // one key, every role: the checker and voice follow the keys found
-    bise_catalog::Setup::from_parts(text.as_deref(), &[], env, &|k| bise_catalog::with_files(env, &files, k))
-        .with_keys(&bise_catalog::auth::Keys { env, store: &store, files: &files })
-        // a plan's own list first (plan_list): its pick, its swaps
-        .with_plan_lists(bise_catalog::plan_list::read(&home.cache_dir()))
-}
 
 /// Every provider a key can be pasted for, in catalog order.
 pub(crate) fn key_providers(setup: &bise_catalog::Setup) -> Vec<Provider> {

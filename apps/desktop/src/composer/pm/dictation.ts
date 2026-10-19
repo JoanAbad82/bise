@@ -161,6 +161,8 @@ export function useDictation(c: DictationCtx): Dictation {
       if (words !== "") c.dispatch(closeHistory(st.tr.insertText(words, from)));
     }
     if (s.error !== null) c.say(s.error);
+    // the words came from another model of his provider (his is gone): one line, they landed
+    else if (s.note !== undefined && !s.cancelled) c.say(s.note);
   };
   const start = (downAt = Number.POSITIVE_INFINITY): void => {
     const port = c.sources().dictate;

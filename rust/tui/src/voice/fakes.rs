@@ -165,3 +165,50 @@ pub(crate) fn serve_once(status: u16, body: &str) -> (String, Receiver<Vec<u8>>)
     });
     (url, rx)
 }
+
+/// A local fake provider for many requests: `answer` gives each one's
+/// (status, body) from its body (lossy text); every request comes out
+/// whole on the receiver. It lives as long as the test.
+pub(crate) fn serve_until(answer: impl Fn(&str) -> (u16, String) + Send + 'static) -> (String, Receiver<Vec<u8>>) {
+    use std::io::{Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/v1", listener.local_addr().unwrap());
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        for s in listener.incoming() {
+            let Ok(mut s) = s else { return };
+            let mut req = Vec::new();
+            let mut buf = [0u8; 8192];
+            loop {
+                let n = s.read(&mut buf).unwrap_or(0);
+                req.extend_from_slice(&buf[..n]);
+                let Some(end) = req.windows(4).position(|w| w == b"\r\n\r\n") else {
+                    if n == 0 {
+                        break;
+                    }
+                    continue;
+                };
+                let head = String::from_utf8_lossy(&req[..end]).to_lowercase();
+                let len = head
+                    .lines()
+                    .find_map(|l| l.strip_prefix("content-length:").map(|v| v.trim().parse::<usize>().unwrap_or(0)))
+                    .unwrap_or(0);
+                if req.len() >= end + 4 + len || n == 0 {
+                    break;
+                }
+            }
+            let (status, body) = answer(&String::from_utf8_lossy(&req));
+            let reply = format!(
+                "HTTP/1.1 {} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                status,
+                body.len(),
+                body
+            );
+            let _ = s.write_all(reply.as_bytes());
+            if tx.send(req).is_err() {
+                return;
+            }
+        }
+    });
+    (url, rx)
+}

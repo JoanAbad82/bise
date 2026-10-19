@@ -252,6 +252,7 @@ export function applyTyped(s: Store, ev: Ev): void {
         cancelled: ev.cancelled ?? false,
         error: ev.error ?? null,
         ...(ev.final && ev.kept === true ? { kept: true } : {}),
+        ...(ev.final && typeof ev.note === "string" && ev.note !== "" ? { note: ev.note } : {}),
       } satisfies Dictation);
       return;
     case "error":

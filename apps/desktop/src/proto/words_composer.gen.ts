@@ -280,6 +280,8 @@ export const composer = {
   voice_no_credit_url: (a: { provider: string | number; url: string | number }): string => "your " + String(a.provider) + " account has no credit yet. add some here: " + String(a.url),
   /** transcription: the model can't */
   voice_bad_model: (a: { provider: string | number; model: string | number }): string => String(a.provider) + " can't transcribe with " + String(a.model) + ". /voice picks another model.",
+  /** transcription: the model is gone, another of the provider's heard it (once a session per model; designer m_33749) */
+  voice_fell_back: (a: { provider: string | number; model: string | number; used: string | number }): string => String(a.model) + " is gone from " + String(a.provider) + ": " + String(a.used) + " heard this one · /voice to pick another",
   /** transcription: the provider is down */
   voice_down: (a: { provider: string | number }): string => "i couldn't reach " + String(a.provider) + " to transcribe. try again, or /voice for another provider.",
   /** transcription: an answer it can't read */

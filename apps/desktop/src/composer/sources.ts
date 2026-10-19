@@ -118,6 +118,9 @@ export interface DictateState {
   readonly error: string | null;
   /** a final with no words or an error whose take the core kept: `retry` transcribes it again */
   readonly kept?: boolean;
+  /** a final's one line about its words (his voice model is gone, another of its provider's
+   *  heard them): said like an error, the words land */
+  readonly note?: string;
 }
 
 /** The mic, as the composer sees it (the store's dictateStart/Stop/Cancel and its dictation slice). */

@@ -176,6 +176,7 @@ fn live_transcribe_3_hears_a_spoken_sentence() {
             Heard::Text(t) => text.push_str(&t),
             Heard::Flushed => break,
             Heard::Failed(l) => panic!("{}", l),
+            Heard::Note(l) => eprintln!("note: {l}"),
         }
     }
     eprintln!("heard {:?} in {:?}", text, t.elapsed());

@@ -201,6 +201,11 @@ pub enum CoreEv {
         /// each) and `dictate_retry {id}` transcribes it again
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         kept: bool,
+        /// on a final with words: one line about them (the voice model
+        /// is gone, another of its provider's heard them), said like an
+        /// error but the words land
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
     },
     /// bar S.6: a newer desktop app on bise's release channel than the one
     /// running (`app_version`), read from `latest.json` by

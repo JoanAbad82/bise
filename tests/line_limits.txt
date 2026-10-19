@@ -10,7 +10,7 @@
 1387 docs/brand/readme/make.py
 1327 rust/catalog/src/auth_cli.rs
 1118 rust/catalog/src/chatgpt.rs
-1677 rust/catalog/src/lib.rs
+1675 rust/catalog/src/lib.rs
 1251 rust/catalog/src/tests.rs
 1112 rust/harness/src/doctor.rs
 1230 rust/harness/src/main.rs
@@ -28,7 +28,7 @@
 1597 rust/tui/src/editor.rs
 1625 rust/tui/src/feed.rs
 1204 rust/tui/src/logview.rs
-2917 rust/tui/src/onboarding.rs
+2903 rust/tui/src/onboarding.rs
 1103 rust/tui/src/onboarding/roles.rs
 2163 rust/tui/src/render.rs
 1017 rust/tui/src/run.rs
@@ -38,5 +38,5 @@
 1035 rust/tui/src/term.rs
 1031 rust/tui/src/ui.rs
 1153 rust/tui/src/voicemode/speak.rs
-1232 rust/tui/src/voicemode/turn.rs
+1198 rust/tui/src/voicemode/turn.rs
 1780 tests/fake_provider.py

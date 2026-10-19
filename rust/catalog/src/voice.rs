@@ -46,6 +46,16 @@ pub struct VoiceConfig {
 }
 
 impl VoiceConfig {
+    /// `[roles.voice]` over `[voice]`: its keys win; an empty vocabulary
+    /// keeps `[voice]`'s.
+    pub fn over(self, base: VoiceConfig) -> VoiceConfig {
+        VoiceConfig {
+            model: self.model.or(base.model),
+            language: self.language.or(base.language),
+            vocabulary: if self.vocabulary.is_empty() { base.vocabulary } else { self.vocabulary },
+        }
+    }
+
     /// Read `[voice]`; what is wrong becomes a warning.
     pub fn read(t: &toml::Table, warnings: &mut Vec<String>) -> VoiceConfig {
         let mut c = VoiceConfig::default();
@@ -485,6 +495,39 @@ impl Catalog {
         std::iter::once(pick).chain(listed).find(|m| !m.is_empty() && m != id)
     }
 
+    /// The providers' lists of what they transcribe now
+    /// ([`crate::voice_live`]) over the table: a provider's voice models
+    /// it no longer lists leave (pickers, fallback), its voice pick and
+    /// the default voice model move to one it lists (the table's first
+    /// still listed, else its list's first, added as a voice model). No
+    /// list, or an empty one: the table as it is.
+    pub fn with_live_stt(mut self, lists: &[(String, Vec<String>)]) -> Catalog {
+        for (pid, ids) in lists.iter().filter(|(_, ids)| !ids.is_empty()) {
+            let Some(p) = self.providers.iter().position(|p| p.id == *pid && !p.stt.is_empty()) else { continue };
+            self.models.retain(|m| !(m.stt && m.provider == *pid && !ids.contains(&m.id)));
+            let first = self.models.iter().find(|m| m.stt && m.provider == *pid).map(|m| m.id.clone());
+            let first = first.unwrap_or_else(|| {
+                self.models.push(crate::Model {
+                    provider: pid.clone(),
+                    id: ids[0].clone(),
+                    api: None,
+                    stt: true,
+                    caps: Default::default(),
+                    source: crate::Source::Builtin,
+                });
+                ids[0].clone()
+            });
+            if !ids.contains(&self.providers[p].voice_model) {
+                self.providers[p].voice_model = first;
+            }
+            let pick = format!("{}/{}", pid, self.providers[p].voice_model);
+            if split_name(&self.default_voice_model).is_some_and(|(dp, id)| dp == pid && !ids.iter().any(|x| x == id)) {
+                self.default_voice_model = pick;
+            }
+        }
+        self
+    }
+
     pub fn resolve_stt(&self, name: &str) -> SttResolved {
         let full = self.canonical_stt(name);
         let (pid, mid) = split_name(&full).unwrap_or(("", full.as_str()));
@@ -560,6 +603,17 @@ impl std::fmt::Debug for VoiceJob {
 }
 
 impl Setup {
+    /// [`Catalog::with_live_stt`], before [`Setup::with_keys`]: a voice
+    /// model left to the default follows it; one he wrote stays as
+    /// written (a failed take falls back: [`VoiceJob::fallback`]).
+    pub fn with_live_stt(mut self, lists: &[(String, Vec<String>)]) -> Setup {
+        self.catalog = std::mem::replace(&mut self.catalog, Catalog::empty()).with_live_stt(lists);
+        if self.voice.from == "default" {
+            self.voice.model = self.catalog.canonical_stt(&self.catalog.default_voice_model);
+        }
+        self
+    }
+
     /// The voice model's call, with its key (the chat keys' resolution:
     /// env > auth.json > the old .env files). Err: one line saying what
     /// to do.

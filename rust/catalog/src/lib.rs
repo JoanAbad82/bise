@@ -38,6 +38,7 @@ pub mod spawn;
 mod threshold;
 pub use threshold::*;
 pub mod voice;
+pub mod voice_live;
 
 /// The command's name in messages and usages (BISE-165: was `bend-harness`).
 pub const CLI: &str = "bise";
@@ -1147,11 +1148,7 @@ impl Setup {
                     threshold_cfg = read_threshold(&t, &mut catalog.warnings);
                     profiles = spawn::read_profiles(&t, &mut catalog.warnings);
                     if let Some(v) = r.voice {
-                        voice_cfg = voice::VoiceConfig {
-                            model: v.model.or(voice_cfg.model),
-                            language: v.language.or(voice_cfg.language),
-                            vocabulary: if v.vocabulary.is_empty() { voice_cfg.vocabulary } else { v.vocabulary },
-                        };
+                        voice_cfg = v.over(voice_cfg);
                     }
                 }
                 Err(e) => {
@@ -1289,6 +1286,7 @@ impl Setup {
         let real = |k: &str| std::env::var(k).ok();
         let store = auth::Store::read(&home.auth_file()).unwrap_or_default();
         Setup::from_parts(text.as_deref(), &live_fetch::read(&home.cache_dir()), &real, &|k| with_files(&real, &files, k))
+            .with_live_stt(&voice_live::read(&home.cache_dir()))
             .with_keys(&auth::Keys { env: &real, store: &store, files: &files })
             .with_plan_lists(plan_list::read(&home.cache_dir()))
     }

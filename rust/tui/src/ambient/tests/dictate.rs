@@ -296,6 +296,27 @@ fn a_failed_take_keeps_its_sound_and_a_retry_gives_one_final() {
     hub_quiet(&mut t);
 }
 
+/// His voice model gone, the listener's fallback heard the take: the
+/// final has the words and the listener's one line as `note`, nothing
+/// kept (the desktop says the line, the words land).
+#[test]
+fn a_take_heard_by_the_fallback_model_says_so_in_its_final() {
+    let mut t = T::new();
+    t.ready();
+    let heard = start(&mut t, "d1");
+    sound(&mut t, 4000);
+    t.cmd(Cmd::DictateStop { id: "d1".into() });
+    heard.send(Heard::Text(" bonjour".into())).unwrap();
+    heard.send(Heard::Note("Mistral no longer has voxtral-transcribe-3: voxtral-mini-transcribe-3 heard this one. /voice picks your model.".into())).unwrap();
+    heard.send(Heard::Flushed).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(
+        dictations(&t.take()),
+        vec![json!({"ev": "dictation", "id": "d1", "text": "bonjour", "final": true, "note": "Mistral no longer has voxtral-transcribe-3: voxtral-mini-transcribe-3 heard this one. /voice picks your model."})]
+    );
+    hub_quiet(&mut t);
+}
+
 /// An empty final keeps the sound too, a retry that fails keeps it again,
 /// and his cancel drops it. An id never kept: 'nothing to try again.'.
 #[test]

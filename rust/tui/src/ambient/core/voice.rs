@@ -152,6 +152,8 @@ impl Core {
                     flushed = true;
                     break;
                 }
+                // fn's talk: the line goes to core.log, the words go on
+                Ok(Heard::Note(line)) => eprintln!("ambient-core: talk: {line}"),
                 Ok(Heard::Failed(e)) => {
                     failed = Some(e);
                     break;

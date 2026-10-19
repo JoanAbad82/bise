@@ -79,6 +79,9 @@ pub(super) struct Dictation {
     ending: Option<Instant>,
     /// the sound sent to the listener, kept if the final has no words
     pcm: VecDeque<i16>,
+    /// the listener's line about the words (the model fell back): the
+    /// final's `note`
+    note: Option<String>,
 }
 
 impl Drop for Dictation {
@@ -121,6 +124,7 @@ impl Dictation {
                 Ok(Heard::Flushed) if self.ending.is_some() => return Step::Over(None),
                 Ok(Heard::Flushed) => {}
                 Ok(Heard::Failed(e)) => return Step::Over(Some(e)),
+                Ok(Heard::Note(line)) => self.note = Some(line),
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) if self.ending.is_some() => return Step::Over(None),
                 Err(TryRecvError::Disconnected) => break,
@@ -195,7 +199,7 @@ impl Core {
         let (htx, heard) = mpsc::channel();
         let cancel = Arc::new(AtomicBool::new(false));
         (self.ports.listener)(&job).start(job, arx, htx, cancel.clone());
-        self.dictation = Some(Dictation { id, stream: Some(stream), blocks, audio, heard, cancel, text: String::new(), started: now, ending: None, pcm: VecDeque::new() });
+        self.dictation = Some(Dictation { id, stream: Some(stream), blocks, audio, heard, cancel, text: String::new(), started: now, ending: None, pcm: VecDeque::new(), note: None });
     }
 
     /// The mic off now, free for the next take; this take's final comes
@@ -250,22 +254,32 @@ impl Core {
     /// A take's one final, and its line in core.log (length, time after
     /// the stop, error: never its words).
     fn dictate_final(&mut self, mut d: Dictation, error: Option<String>, now: Instant) {
-        let (id, text, pcm) = (d.id.clone(), d.text.clone(), std::mem::take(&mut d.pcm));
+        let (id, text, pcm, note) = (d.id.clone(), d.text.clone(), std::mem::take(&mut d.pcm), d.note.take());
         let after = d.ending.map(|e| format!(", {} ms after the stop", now.duration_since(e).as_millis())).unwrap_or_default();
         drop(d);
         let n = text.trim().chars().count();
         let err = error.as_deref().map(|e| format!(", error: {e}")).unwrap_or_default();
-        eprintln!("ambient-core: dictate {id}: final with {n} chars{after}{err}");
-        self.dictation_final_ev(&id, &text, error.as_deref(), pcm);
+        let said = note.as_deref().map(|l| format!(", note: {l}")).unwrap_or_default();
+        eprintln!("ambient-core: dictate {id}: final with {n} chars{after}{err}{said}");
+        self.dictation_final_note(&id, &text, error.as_deref(), pcm, note.as_deref());
     }
 
     /// The final `dictation`: with no words (an error, or nothing heard)
     /// the take's sound is kept for a retry and the final says `kept`.
     fn dictation_final_ev(&mut self, id: &str, text: &str, error: Option<&str>, pcm: VecDeque<i16>) {
+        self.dictation_final_note(id, text, error, pcm, None)
+    }
+
+    /// [`Self::dictation_final_ev`] with the listener's `note`: the one
+    /// line the window shows with the words (their model fell back).
+    fn dictation_final_note(&mut self, id: &str, text: &str, error: Option<&str>, pcm: VecDeque<i16>, note: Option<&str>) {
         let kept = (error.is_some() || text.trim().is_empty()) && self.dictate_keep(id, pcm);
         let mut v = json!({"ev": "dictation", "id": id, "text": text.trim(), "final": true});
         if let Some(e) = error {
             v["error"] = json!(e);
+        }
+        if let Some(n) = note {
+            v["note"] = json!(n);
         }
         if kept {
             v["kept"] = json!(true);
@@ -317,7 +331,7 @@ impl Core {
         let _ = audio.send(ListenMsg::Flush);
         // no mic: an empty, closed block channel
         let (_, blocks) = mpsc::channel();
-        self.dictations_ending.push(Dictation { id, stream: None, blocks, audio, heard, cancel, text: String::new(), started: now, ending: Some(now), pcm });
+        self.dictations_ending.push(Dictation { id, stream: None, blocks, audio, heard, cancel, text: String::new(), started: now, ending: Some(now), pcm, note: None });
     }
 
     /// The clock: the mic to the listener, its words to the window, the

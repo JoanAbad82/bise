@@ -6,6 +6,23 @@
 use super::*;
 use bise_catalog::roles;
 
+/// The catalog and the model choice (`Setup`: `BISE_MODEL` >
+/// `BEND_MODEL` > `model` in config.toml > the default).
+/// The base URLs' variables (foundry's ANTHROPIC_FOUNDRY_BASE_URL) are
+/// also read from the .env files, like its key (~/.vibe/.env). The voice
+/// models the providers list now (voice_live) over the catalog's.
+pub(crate) fn setup_of(env: Env, home: &bise_home::Home) -> bise_catalog::Setup {
+    let text = std::fs::read_to_string(home.config_file()).ok();
+    let files = bise_catalog::auth::EnvFile::read_all(&home.env_files());
+    let store = bise_catalog::auth::Store::read(&home.auth_file()).unwrap_or_default();
+    // one key, every role: the checker and voice follow the keys found
+    bise_catalog::Setup::from_parts(text.as_deref(), &[], env, &|k| bise_catalog::with_files(env, &files, k))
+        .with_live_stt(&bise_catalog::voice_live::read(&home.cache_dir()))
+        .with_keys(&bise_catalog::auth::Keys { env, store: &store, files: &files })
+        // a plan's own list first (plan_list): its pick, its swaps
+        .with_plan_lists(bise_catalog::plan_list::read(&home.cache_dir()))
+}
+
 impl Onb {
     /// The models offered for `p`: its pick first, then the catalog's chat
     /// models of that provider.

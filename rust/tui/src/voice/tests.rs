@@ -426,6 +426,44 @@ fn a_model_the_provider_took_away_falls_back_to_its_voice_pick_once() {
     assert_eq!(transcribe_clip(&job, &speech(), &no, &fail).map_err(|f| f.kind), Err(FailKind::WrongKey));
 }
 
+/// Every user, off-screen: a fake provider whose model list lacks the
+/// catalog's default. Left to the default, dictation takes one it lists
+/// (one request); a model he wrote and it took away falls back once and
+/// the take says so in one line (the BatchTranscriber, as ctrl+r runs it).
+#[test]
+fn dictation_works_when_the_providers_list_lacks_the_default() {
+    let (url, got) = fakes::serve_until(|body: &str| {
+        if body.contains("\r\n\r\nvoxtral-next\r\n") {
+            (200, r#"{"text":"hello"}"#.to_string())
+        } else {
+            (404, r#"{"message":"Invalid model","type":"invalid_model"}"#.to_string())
+        }
+    });
+    let lists = vec![("mistral".to_string(), vec!["voxtral-next".to_string()])];
+    let env = |k: &str| (k == "MISTRAL_API_KEY").then(|| "sk-fake".to_string());
+    let store = bise_catalog::auth::Store::default();
+    let keys = bise_catalog::auth::Keys { env: &env, store: &store, files: &[] };
+    let no_env = |_: &str| None;
+    let job_of = |cfg: &str| VoiceJob { base_url: url.clone(), ..bise_catalog::Setup::from_text(Some(cfg), &no_env).with_live_stt(&lists).voice_job(&keys).unwrap() };
+    let t = Duration::from_secs(10);
+    for (cfg, requests, note) in [("", 1, false), ("[roles]\nvoice = \"mistral/voxtral-transcribe-3\"\n", 2, true)] {
+        let (atx, arx) = mpsc::channel();
+        let (etx, erx) = mpsc::channel();
+        BatchTranscriber.start(job_of(cfg), arx, etx, Arc::new(AtomicBool::new(false)));
+        atx.send(AudioMsg::Chunk(speech())).unwrap();
+        atx.send(AudioMsg::End).unwrap();
+        assert_eq!(erx.recv_timeout(t), Ok(TranscribeEvent::Delta("hello".into())), "config {cfg:?}");
+        if note {
+            assert_eq!(
+                erx.recv_timeout(t),
+                Ok(TranscribeEvent::Note("voxtral-transcribe-3 is gone from Mistral: voxtral-next heard this one · /voice to pick another".into()))
+            );
+        }
+        assert_eq!(erx.recv_timeout(t), Ok(TranscribeEvent::Done), "config {cfg:?}");
+        assert_eq!((0..requests).filter_map(|_| got.recv_timeout(t).ok()).count(), requests, "config {cfg:?}");
+    }
+}
+
 /// Gabriel's dictation on 2026-10-19, off-screen: Mistral answers 404 to
 /// voxtral-transcribe-3 and knows the Transcribe 3 ids it has now. His
 /// config (it names the old id) and the default both get their words.

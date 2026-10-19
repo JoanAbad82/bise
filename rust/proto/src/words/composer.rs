@@ -309,6 +309,9 @@ crate::words! { composer:
     voice_no_credit_url(provider, url) = "your {provider} account has no credit yet. add some here: {url}";
     /// transcription: the model can't
     voice_bad_model(provider, model) = "{provider} can't transcribe with {model}. /voice picks another model.";
+    /// transcription: the model is gone, another of the provider's heard
+    /// it (once a session per model; designer m_33749)
+    voice_fell_back(provider, model, used) = "{model} is gone from {provider}: {used} heard this one · /voice to pick another";
     /// transcription: the provider is down
     voice_down(provider) = "i couldn't reach {provider} to transcribe. try again, or /voice for another provider.";
     /// transcription: an answer it can't read
