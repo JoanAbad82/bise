@@ -103,17 +103,35 @@ def def_names(tools: List<&2, T.ToolDef>) -> List<&2, String>:
     case Con{T.ToolDef{+n, _}, rest}:
       Con{n, def_names(rest)}
 
-# every top-level tool this runtime runs: the catalog, both toolsets
-def own_names() -> List<&2, String>:
-  List.append(&2, String, def_names(catalog_live("", "", "", "", "", True{})),
-    def_names(edit_tools(False{}, "")))
-
 def name_in(+s: String, ws: List<&2, String>) -> Bool:
   match ws:
     case Nil{}:
       False{}
     case Con{+w, rest}:
       Bool.or(String.eq(s, w), name_in(s, rest))
+
+def add_new.put(seen: Bool, +acc: List<&2, String>, +n: String) -> List<&2, String>:
+  match seen:
+    case True{}:
+      acc
+    case False{}:
+      List.append(&2, String, acc, Con{n, Nil{}})
+
+# acc, then the names of ns not in it yet (in their order)
+def add_new(ns: List<&2, String>, +acc: List<&2, String>) -> List<&2, String>:
+  match ns:
+    case Nil{}:
+      acc
+    case Con{+n, rest}:
+      add_new(rest, add_new.put(name_in(n, acc), acc, n))
+
+# every top-level tool any session is offered: the union of every tool
+# list the runtime builds (the live catalog with apply_patch, with edit
+# and write_file; the scripted catalog_short, catalog_pure's names)
+def own_names() -> List<&2, String>:
+  add_new(def_names(catalog_pure("", "", "")),
+    add_new(def_names(catalog_live("", "", "", "", "", False{})),
+      def_names(catalog_live("", "", "", "", "", True{}))))
 
 def is_unknown_bare(+name: String) -> Bool:
   Bool.and(Bool.not(String.contains(name, ".")), Bool.not(name_in(name, own_names())))

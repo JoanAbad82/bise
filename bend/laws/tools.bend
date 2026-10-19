@@ -551,6 +551,19 @@ law own_names_are_never_unknown:
     Xt.is_unknown_bare("open_document"))
     == (False{}, False{}, False{}, True{}) : Bool & Bool & Bool & Bool}
 
+# LAW: every tool list the runtime builds offers no bare name that would
+# get that answer: the live catalog with apply_patch, with edit and
+# write_file, and the scripted catalog_short (catalog_pure), whatever
+# their descriptions.
+law every_offered_tool_is_ours:
+  {(List.any(&2, String, n => Xt.is_unknown_bare(n),
+      Xt.def_names(Xt.catalog_live("s", "r", "b", "k", "p", True{}))),
+    List.any(&2, String, n => Xt.is_unknown_bare(n),
+      Xt.def_names(Xt.catalog_live("s", "r", "b", "k", "p", False{}))),
+    List.any(&2, String, n => Xt.is_unknown_bare(n),
+      Xt.def_names(Xt.catalog_pure("s", "r", "b"))))
+    == (False{}, False{}, False{}) : Bool & Bool & Bool}
+
 # LAW: only `auto` in the mode file asks; `yolo`, no file (no hub) or
 # anything else never does (yolo costs no round trip).
 law gate_only_auto_asks:
