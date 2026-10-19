@@ -146,11 +146,11 @@ export const settings = {
   privacy_window_text_sub: "mails, docs, tickets: bise sees what you see",
   /** privacy: the second group's title */
   privacy_kept: "kept",
-  /** privacy: the screenshots row */
-  privacy_shots: "screenshots",
-  /** privacy: the screenshots row's line */
-  privacy_shots_sub: "in the thread, then deleted",
-  /** privacy: how long screenshots are kept */
+  /** privacy: the images row (D14: every image of the store, designer m_23410) */
+  privacy_shots: "images",
+  /** privacy: the images row's line */
+  privacy_shots_sub: "pasted, made by agents or taken with fn · deleted after",
+  /** privacy: how long images are kept */
   days: (a: { n: number }): string => a.n === 1 ? String(a.n) + " day" : String(a.n) + " days",
   /** privacy: the excluded apps' group */
   privacy_apps: "never sent to an agent",

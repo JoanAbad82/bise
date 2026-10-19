@@ -607,6 +607,18 @@
     "one": null,
     "text": "→ bise · {name} · {left} s to change"
   },
+  "thread.image_deleted": {
+    "args": [
+      "days"
+    ],
+    "one": null,
+    "text": "deleted · images are kept {days}"
+  },
+  "thread.image_deleted_settings": {
+    "args": [],
+    "one": null,
+    "text": "settings"
+  },
   "thread.image_n": {
     "args": [
       "n"

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import { deletedWords, keepDays, PartImageChip } from './ImageGone';
 import { storeImage, youView } from './parts';
+import { thread } from '@/proto/words.gen';
 
 describe('an image the store deleted (D14, designer m_23410)', () => {
   it('its store file sits beside its .b64', () => {
@@ -36,6 +37,6 @@ describe('an image the store deleted (D14, designer m_23410)', () => {
     if (img !== null) fireEvent.error(img);
     expect(r.container.querySelector('img')).toBeNull();
     expect(r.getByTestId('t.image.1.deleted').textContent).toBe('deleted · images are kept 7 days');
-    expect(r.getByTestId('t.image.1.settings').textContent).toBe('settings');
+    expect(r.getByTestId('t.image.1.settings').textContent).toBe(thread.image_deleted_settings);
   });
 });

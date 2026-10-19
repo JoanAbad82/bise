@@ -412,4 +412,8 @@ export const thread = {
   wake_tail: (a: { n: string | number }): string => "its last " + String(a.n) + " lines",
   /** a wake's folded output, one line */
   wake_tail_one: "its last line",
+  /** the image store deleted it, and today's rule (no record of the rule it went by): `image 1 · deleted · images are kept 7 days` */
+  image_deleted: (a: { days: string | number }): string => "deleted · images are kept " + String(a.days),
+  /** after it, the act that opens settings › privacy at the kept row */
+  image_deleted_settings: "settings",
 } as const;

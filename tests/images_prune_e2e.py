@@ -85,7 +85,8 @@ def main():
         mid = [r["id"] for r in c.feed("main", "msg-in") if r.get("from") == "t1" and r.get("id")][0]
         c.wait_idle("main")
         c.say('[[bash: sb card --for m_%d "this one? %s/%s.png"]]' % (mid, store, NAMED))
-        c.wait(lambda: any(NAMED in cd.get("text", "") for cd in c.cards()), 60, "the open card naming the image")
+        # a client's card row says its words in `question` (bise_proto rows::cards::Card)
+        c.wait(lambda: any(NAMED in cd.get("question", "") for cd in c.cards()), 60, "the open card naming the image")
 
         # a day later, at 7 days
         keep(7)

@@ -2240,12 +2240,12 @@
   "settings.privacy_shots": {
     "args": [],
     "one": null,
-    "text": "screenshots"
+    "text": "images"
   },
   "settings.privacy_shots_sub": {
     "args": [],
     "one": null,
-    "text": "in the thread, then deleted"
+    "text": "pasted, made by agents or taken with fn · deleted after"
   },
   "settings.privacy_url": {
     "args": [],
