@@ -1,7 +1,7 @@
 // thread/image-deleted · D14 (the image store keeps an image his shots_keep_days, then deletes it;
 // docs/images.md "Retention", designer m_23410, m_31912): an old bubble whose image the store
-// deleted keeps its chip with the no-file look and says 'deleted · images are kept 7 days ·
-// settings', never a broken image; 'settings' opens settings › privacy, whose kept row reads
+// deleted keeps its chip with the no-file look and says 'deleted · kept 7 days · settings'
+// (designer m_32911), never a broken image; 'settings' opens settings › privacy, whose kept row reads
 // 'images · pasted, made by agents or taken with fn · deleted after'. The scripted core
 // (FakeCore). Shots at 1100, light then dark: the bubble, the row. Owner: debt-t9.
 import type { Page } from '@playwright/test';

@@ -24,8 +24,8 @@ describe('an image the store deleted (D14, designer m_23410)', () => {
     expect(keepDays({ shots_keep_days: '30' })).toBe(7);
   });
   it('the words', () => {
-    expect(deletedWords(7)).toBe('deleted · images are kept 7 days');
-    expect(deletedWords(1)).toBe('deleted · images are kept 1 day');
+    expect(deletedWords(7)).toBe('deleted · kept 7 days');
+    expect(deletedWords(1)).toBe('deleted · kept 1 day');
   });
   it('a store image that does not load draws the no-file chip and its words, never a broken image', () => {
     const r = render(
@@ -37,7 +37,7 @@ describe('an image the store deleted (D14, designer m_23410)', () => {
     expect(img).not.toBeNull();
     if (img !== null) fireEvent.error(img);
     expect(r.container.querySelector('img')).toBeNull();
-    expect(r.getByTestId('t.image.1.deleted').textContent).toBe('deleted · images are kept 7 days');
+    expect(r.getByTestId('t.image.1.deleted').textContent).toBe('deleted · kept 7 days');
     expect(r.getByTestId('t.image.1.settings').textContent).toBe(thread.image_deleted_settings);
   });
 });

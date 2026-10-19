@@ -1,8 +1,8 @@
 // An image of his old message that bise's image store deleted (D14, docs/images.md "Retention",
-// designer m_23410, m_31912): its chip keeps the no-file look (1 px --c-line, r 9, the faint
-// no-file glyph in place of the 16 px thumb), then 'image 1 · deleted · images are kept 7 days' in
-// text-3 and ' · settings', text-3, underlined on hover, which opens settings › privacy (the kept
-// row). Never a broken image or an empty box of the old size. The check is the store file's load
+// designer m_23410, m_32899, m_32911): its chip keeps the no-file look (1 px --c-line, r 9, the
+// faint no-file glyph in place of the 16 px thumb), then 'image 1 · deleted · kept 7 days' in
+// text-3 and ' · settings', a link (text-2, underlined on hover, pointer, its tip 'settings ›
+// context and privacy') that opens settings › privacy (the kept row). Never a broken image or an empty box of the old size. The check is the store file's load
 // (its thumbnail): a store image that doesn't load is deleted. The words state today's rule, never
 // the one it went by (no record per image, architect m_31909): his setting now
 // (bise_home::prefs::keep_days, 7 when unset, what settings › privacy shows).
@@ -20,7 +20,7 @@ export function keepDays(prefs: unknown): number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 1 ? v : 7;
 }
 
-/** 'deleted · images are kept 7 days' (bise-proto's words). Pure. */
+/** 'deleted · kept 7 days' (bise-proto's words). Pure. */
 export function deletedWords(days: number): string {
   return thread.image_deleted({ days: settings.days({ n: days }) });
 }
@@ -48,6 +48,7 @@ export function PartImageChip({ path, store, lit, on, testId, children }: { path
         <span className="th-attach-sep"> · </span>
         <Press
           look="th-image-settings"
+          title={`${thread.image_deleted_settings} › ${settings.page_privacy}`}
           onClick={() => {
             router?.go({ screen: 'settings', page: 'privacy' });
           }}

@@ -209,10 +209,11 @@ then deletes it. Every image counts: pasted, dropped, made by an agent
   its image: it is not live.
 - The clients never draw a broken image: an old bubble's image whose
   store file is gone keeps its chip with the no-file look and says
-  `deleted · images are kept 7 days`, the desktop with `· settings`
-  that opens settings › privacy (`thread/ImageGone.tsx`, the store file
-  beside the part's `b64_file`), the TUI on its chip line
-  `▣ login.png · deleted · images are kept 7 days`, no link
+  `deleted · kept 7 days`, the desktop with `· settings` (a link,
+  tip `settings › context and privacy`) that opens settings › privacy
+  (`thread/ImageGone.tsx`, the store file beside the part's
+  `b64_file`), the TUI on its chip line
+  `▣ login.png · deleted · kept 7 days`, no link
   (`rust/tui/src/image_gone.rs`). The words state today's rule (his
   setting now), never the one an image went by: no record is kept per
   image. Words: `bise_proto::words::thread::image_deleted`.

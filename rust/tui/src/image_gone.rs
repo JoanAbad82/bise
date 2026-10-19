@@ -1,6 +1,6 @@
 //! An image of an old message that the image store deleted (D14,
 //! docs/images.md "Retention", designer m_31912): its chip says so,
-//! `▣ login.png · deleted · images are kept 7 days`, never a link to a
+//! `▣ login.png · deleted · kept 7 days` (designer m_32911), never a link to a
 //! file that is not there. The check is the store file's existence, where
 //! the chip resolves its path (attach.rs `image_spans`). The words state
 //! today's rule, never the one it went by (no record per image, architect
@@ -16,7 +16,7 @@ pub(crate) fn gone(file: &str) -> bool {
     !file.is_empty() && !std::path::Path::new(file).exists()
 }
 
-/// ` · deleted · images are kept 7 days`. Pure.
+/// ` · deleted · kept 7 days`. Pure.
 pub(crate) fn words(days: u64) -> String {
     format!(" · {}", thread::image_deleted(settings::days(days)))
 }
@@ -44,8 +44,8 @@ mod tests {
 
     #[test]
     fn a_deleted_image_says_after_how_long() {
-        assert_eq!(words(7), " · deleted · images are kept 7 days");
-        assert_eq!(words(1), " · deleted · images are kept 1 day");
+        assert_eq!(words(7), " · deleted · kept 7 days");
+        assert_eq!(words(1), " · deleted · kept 1 day");
         assert!(!gone(""), "no file named: nothing to say");
         assert!(gone("/nowhere/0123456789abcdef0123456789abcdef.png"));
         let here = std::env::temp_dir().join(format!("tui-image-gone-{}.png", std::process::id()));

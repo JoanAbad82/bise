@@ -1561,13 +1561,13 @@
 .th-attach-missing {
   color: var(--c-err);
 }
-/* an image the store deleted (D14, designer m_31912): 'deleted · images are kept 7 days · settings', text-3;
-   'settings' underlined on hover, opens settings › privacy */
+/* an image the store deleted (D14, designer m_32899, m_32911): 'deleted · kept 7 days'
+   text-3; 'settings' a link: text-2, underlined on hover, pointer, opens settings › privacy */
 .th-image-deleted {
   color: var(--c-text-3);
 }
 .th-image-settings {
-  color: var(--c-text-3);
+  color: var(--c-text-2);
   font: inherit;
   padding: 0;
   background: none;
