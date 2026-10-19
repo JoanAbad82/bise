@@ -57,24 +57,24 @@ class TL:
 
 # ---------- hero ----------
 def hero(c):
-    """a sheet of paper: the name in Newsreader, the kiss in Caveat (its * sits level with the colon:
-    a mouth), the north wind blowing next to it, a highlighter and a pen underline that draw themselves,
+    """a sheet of paper: the name in Newsreader, the kiss in JetBrains Mono (the :* is always mono),
+    the north wind blowing next to it, a highlighter and a pen underline that draw themselves,
     seeds drifting by."""
     m = c["mode"]; t = ink.PAPER[m]
     W, H = 960, 340
     tp = ink.text_path
     css = []
-    # the name: 'bise ' in Newsreader 600, tight; ':' and '*' in Caveat 700, the * lowered
-    NS, KS = 104, 96
+    # the name: 'bise ' in Newsreader 600, tight; ':*' in JetBrains Mono 700, on the baseline
+    NS, KS = 104, 80
     d_bise, w_bise = tp("bise", "serif", NS, track=-.045, wght=600, opsz=72)
     w_sp = ink.measure(" ", "serif", NS, wght=600, opsz=72) * .45
-    _, w_col = tp(":", "hand", KS, wght=700); _, w_star = tp("*", "hand", KS, wght=700)
-    w_name = w_bise + w_sp + w_col + w_star - KS * .02
+    _, w_col = tp(":", "mono", KS, wght=700); _, w_star = tp("*", "mono", KS, wght=700)
+    w_name = w_bise + w_sp + w_col + w_star - KS * .12
     x0, yb = (W - w_name) / 2 - 40, 150
     d_bise, _ = tp("bise", "serif", NS, x=x0, y=yb, track=-.045, wght=600, opsz=72)
     xk = x0 + w_bise + w_sp
-    d_col, _ = tp(":", "hand", KS, x=xk, y=yb, wght=700)
-    d_star, _ = tp("*", "hand", KS, x=xk + w_col - KS * .02, y=yb + KS * .3, wght=700)
+    d_col, _ = tp(":", "mono", KS, x=xk, y=yb, wght=700)
+    d_star, _ = tp("*", "mono", KS, x=xk + w_col - KS * .12, y=yb, wght=700)
     # the tagline, with a highlighter on 'made for humans'
     TS, ty = 34, 220
     a, b, e = "a multi-agent harness, ", "made for humans", "."
