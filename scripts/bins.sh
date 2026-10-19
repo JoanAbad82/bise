@@ -47,7 +47,9 @@ CACHE="$BUILD/cache"
 # same sources differed from a shell's (bins-key)
 u="$(id -un)"; case "$u" in *[!A-Za-z0-9._-]*|"") TOOLS="$HOME" ;; *) eval "TOOLS=~$u" ;; esac
 export PATH="$TOOLS/.cargo/bin:$PATH"
-export PATH="$TOOLS/.bend/bin:$PATH"
+# bend: the one <src> pins (bend/VERSION, scripts/bend-pin.sh), put on
+# PATH below once <src> is known
+. "$REPO/scripts/bend-pin.sh"
 
 say() { echo "bins: $*" >&2; }
 
@@ -256,6 +258,8 @@ case "${1:-}" in path|key|prefetch) cmd="$1"; shift ;; ""|-h|--help) sed -n '2,3
 src="$REPO"
 if [ "${1:-}" = --src ]; then src="$(cd "$2" && pwd)"; shift 2; fi
 [ $# -gt 0 ] || { say "which binary? (repl-live repl-scripted sb-core harness-demo)"; exit 2; }
+bend_dir_of_src="$(bend_bin_dir "$src" "$TOOLS")" || exit 1
+export PATH="$bend_dir_of_src:$PATH"
 case "$cmd" in
   key) key "$src" "$1" ;;
   path) cached "$src" "$1" ;;

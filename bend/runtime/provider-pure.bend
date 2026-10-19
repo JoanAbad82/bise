@@ -1164,8 +1164,8 @@ def attempt_err(+host: String, +e: NetErr) -> Attempt:
 # gateway can hold the head while it queues. Unset, 0 or not a number:
 # stream_step_ms (90 s), as before. Capped at a day (the ms fit a U32).
 # The wait carries the provider id: the timeout text names the key.
-type Wait is Data:
-  Wait{prov: String, ms: U32}
+type ProvWait is Data:
+  ProvWait{prov: String, ms: U32}
 
 def idle_max_secs() -> U32:
   86400
@@ -1181,13 +1181,13 @@ def idle_ms(+secs: U32) -> U32:
   idle_ms.pick(U32.is_eq(secs, 0), secs)
 
 # `id` is the full "provider/model"
-def stream_wait(+file: String, +prov: String, +id: String) -> Wait:
-  Wait{prov, idle_ms(u32_or(model_key(registry(file), prov, id,
+def stream_wait(+file: String, +prov: String, +id: String) -> ProvWait:
+  ProvWait{prov, idle_ms(u32_or(model_key(registry(file), prov, id,
     "idle_timeout_sec")))}
 
-def wait_ms(+w: Wait) -> U32:
+def wait_ms(+w: ProvWait) -> U32:
   match w:
-    case Wait{_, +ms}:
+    case ProvWait{_, +ms}:
       ms
 
 # "90 s"; under a second (never from the catalog): "0 s"
@@ -1197,9 +1197,9 @@ def wait_secs(+ms: U32) -> String:
 # a read that waited the whole limit: the host, the limit, and the key
 # that raises it (the user can't tell a slow model from a dead link;
 # the text says what to change when it is the model)
-def timeout_cause(+host: String, +w: Wait) -> String:
+def timeout_cause(+host: String, +w: ProvWait) -> String:
   match w:
-    case Wait{+prov, +ms}:
+    case ProvWait{+prov, +ms}:
       String.concat(["no answer from ", host, " in ", wait_secs(ms),
         " (timeout) — a slow model or gateway? raise idle_timeout_sec under [providers.",
         prov, "] in ~/.bise/config.toml"])
@@ -1211,7 +1211,7 @@ def is_timeout(e: NetErr) -> Bool:
     case _:
       False{}
 
-def attempt_err_in.pick(timeout: Bool, +host: String, +w: Wait, +e: NetErr)
+def attempt_err_in.pick(timeout: Bool, +host: String, +w: ProvWait, +e: NetErr)
     -> Attempt:
   match timeout:
     case True{}:
@@ -1221,7 +1221,7 @@ def attempt_err_in.pick(timeout: Bool, +host: String, +w: Wait, +e: NetErr)
 
 # a transport failure of a streamed call: a timeout names its limit and
 # idle_timeout_sec (still a retry, as before); the others as attempt_err
-def attempt_err_in(+host: String, +w: Wait, +e: NetErr) -> Attempt:
+def attempt_err_in(+host: String, +w: ProvWait, +e: NetErr) -> Attempt:
   attempt_err_in.pick(is_timeout(e), host, w, e)
 
 # the line the client shows while the call waits (the TUI renders it

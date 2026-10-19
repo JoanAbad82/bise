@@ -50,8 +50,8 @@ def ticker.next(-A: Type, go: Bool, +c: Chan(Step<A>)) -> IO(Unit):
 def ticker(-A: Type, +c: Chan(Step<A>)) -> IO(Unit):
   do IO<Unit>:
     s : Unit <- IO.sleep(Rp.tick_ms())
-    sent : Bool <- Chan.send(Step<A>, c, STick{})
-    ticker.next(A, Rp.tick_again(sent), c)
+    sent : Result<&1, &1, Step<A>, Unit> <- Chan.send(Step<A>, c, STick{})
+    ticker.next(A, Rp.tick_again(Rp.sent_ok(Step<A>, sent)), c)
 
 def wait.close(-A: Type, +c: Chan(Step<A>), r: Raced<A>) -> IO(Next<A>):
   do IO<Next<A>>:
@@ -93,7 +93,9 @@ def next(-A: Type, +c: Chan(Step<A>), +ipath: String) -> IO(Next<A>):
     wait.got(A, m, c, ipath)
 
 def worker(-A: Type, +c: Chan(Step<A>), x: A) -> IO(Bool):
-  Chan.send(Step<A>, c, SWon{x})
+  do IO<Bool>:
+    sent : Result<&1, &1, Step<A>, Unit> <- Chan.send(Step<A>, c, SWon{x})
+    IO.pure(Bool, Rp.sent_ok(Step<A>, sent))
 
 # forks the call (it gets the channel, to send its parts) and the
 # ticker; the caller then reads with next

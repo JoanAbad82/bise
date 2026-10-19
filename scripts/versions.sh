@@ -47,7 +47,9 @@ else STATE="$HOME/.local/state/switchboard"; fi
 VERSIONS="${SB_VERSIONS_DIR:-$STATE/versions}"
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
 BINS_ALSO=""
-export PATH="$HOME/.cargo/bin:$HOME/.bend/bin:$PATH"
+# bend: no direct call here; bins.sh runs the one each --src pins
+# (bend/VERSION, scripts/bend-pin.sh)
+export PATH="$HOME/.cargo/bin:$PATH"
 # the oldest macOS the binaries run on (BISE-164), this repo's value
 # (rust/.cargo/config.toml) for every commit: an old one has no
 # rust/.cargo/config.toml, cargo takes it from the environment

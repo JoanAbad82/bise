@@ -503,13 +503,13 @@ law provider_idle_timeout_set:
 # LAW: a streamed call that times out still retries, and its text names
 # the host, the limit and the key to raise, under its provider's table.
 law attempt_timeout_names_the_key:
-  {Pv.attempt_err_in("127.0.0.1:8080", Pv.Wait{"ollama", 5000}, Pv.NTimeout{})
+  {Pv.attempt_err_in("127.0.0.1:8080", Pv.ProvWait{"ollama", 5000}, Pv.NTimeout{})
     == Pv.ARetry{0, "no answer from 127.0.0.1:8080 in 5 s (timeout) — a slow model or gateway? raise idle_timeout_sec under [providers.ollama] in ~/.bise/config.toml"}
     : Pv.Attempt}
 
 # LAW: the other transport failures of a streamed call read as before.
 law attempt_err_in_others:
-  {Pv.attempt_err_in("api.example.com", Pv.Wait{"x", 5000}, Pv.NDns{})
+  {Pv.attempt_err_in("api.example.com", Pv.ProvWait{"x", 5000}, Pv.NDns{})
     == Pv.attempt_err("api.example.com", Pv.NDns{}) : Pv.Attempt}
 
 # LAW: a debug event is one JSON object on one line: ts, src, kind, then

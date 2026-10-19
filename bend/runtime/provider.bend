@@ -153,7 +153,7 @@ type Out is Type:
   OStd{}
   ONet{sock: Socket}
 
-def out.pair(sm: Socket & Result<&1, &1, U32 & String, Unit>) -> Socket:
+def out.pair(sm: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> Socket:
   match sm:
     case (s2, _):
       s2
@@ -189,7 +189,7 @@ def note(n: Out, +line: String) -> IO(Out):
     case ONet{sock}:
       do IO<Out>:
         wire_log(String.append(line, "\n"))
-        sm : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(sock,
+        sm : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(sock,
           String.append(line, "\n"))
         s2 : Socket <- IO.pure(Socket, out.pair(sm))
         IO.pure(Out, ONet{s2})
@@ -317,7 +317,7 @@ def sse.body(+status: U32, +retry_after: String, +text: String,
 # a stream cut short keeps what it had received (the debug log shows
 # how far the reply got)
 def sse.done(rd: Sr.Rd, +status: U32, +retry_after: String, +ck: Sr.Ck,
-    +host: String, +w: Pvp.Wait, fam: Api.Style) -> IO(Got):
+    +host: String, +w: Pvp.ProvWait, fam: Api.Style) -> IO(Got):
   match rd:
     case Sr.RdEnd{st, +parts}:
       do IO<Got>:
@@ -341,7 +341,7 @@ def sse.done(rd: Sr.Rd, +status: U32, +retry_after: String, +ck: Sr.Ck,
 
 @unsafe
 def sse.head(sr: Http.Stream & Http.Res, +c: Chan(Race.Step<Got>), +lv: Lp.Lv,
-    +ck: Sr.Ck, +host: String, +w: Pvp.Wait, fam: Api.Style) -> IO(Got):
+    +ck: Sr.Ck, +host: String, +w: Pvp.ProvWait, fam: Api.Style) -> IO(Got):
   match sr:
     case (st, res):
       match res:
@@ -354,7 +354,7 @@ def sse.head(sr: Http.Stream & Http.Res, +c: Chan(Race.Step<Got>), +lv: Lp.Lv,
 @unsafe
 def sse.opened(r: Result<&1, &1, Http.Err, Http.Stream>,
     +c: Chan(Race.Step<Got>), +lv: Lp.Lv, +ck: Sr.Ck, +host: String,
-    +w: Pvp.Wait, fam: Api.Style) -> IO(Got):
+    +w: Pvp.ProvWait, fam: Api.Style) -> IO(Got):
   match r:
     case Fail{+e}:
       IO.pure(Got, Got{Pvp.attempt_err_in(host, w, net_of(e)), 0, ""})
@@ -367,7 +367,7 @@ def sse.opened(r: Result<&1, &1, Http.Err, Http.Stream>,
 @unsafe
 def sse.call(+c: Chan(Race.Step<Got>), +lv: Lp.Lv, +tok: String,
     +cpath: String, +url: String, hdrs: Map<&2, List<&2, String>>,
-    +body: String, +w: Pvp.Wait, fam: Api.Style) -> IO(Got):
+    +body: String, +w: Pvp.ProvWait, fam: Api.Style) -> IO(Got):
   do IO<Got>:
     r : Result<&1, &1, Http.Err, Http.Stream> <- Http.open.with("POST", url,
       hdrs, body, Pvp.wait_ms(w))
@@ -385,7 +385,7 @@ def whole.call(+url: String, hdrs: Map<&2, List<&2, String>>, +body: String,
 @unsafe
 def call.by_style.pick(streams: Bool, +c: Chan(Race.Step<Got>), +lv: Lp.Lv,
     +tok: String, +cpath: String, st: Api.Style, +url: String,
-    hdrs: Map<&2, List<&2, String>>, +body: String, +w: Pvp.Wait) -> IO(Got):
+    hdrs: Map<&2, List<&2, String>>, +body: String, +w: Pvp.ProvWait) -> IO(Got):
   match streams:
     case True{}:
       sse.call(c, lv, tok, cpath, url, hdrs, body, w, st)
@@ -396,7 +396,7 @@ def call.by_style.pick(streams: Bool, +c: Chan(Race.Step<Got>), +lv: Lp.Lv,
 @unsafe
 def call.by_style(+c: Chan(Race.Step<Got>), +lv: Lp.Lv, +tok: String,
     +cpath: String, +st: Api.Style, +url: String,
-    hdrs: Map<&2, List<&2, String>>, +body: String, +w: Pvp.Wait) -> IO(Got):
+    hdrs: Map<&2, List<&2, String>>, +body: String, +w: Pvp.ProvWait) -> IO(Got):
   call.by_style.pick(Api.streams(st), c, lv, tok, cpath, st, url, hdrs, body,
     w)
 
@@ -460,7 +460,7 @@ def call.raced.read(x: Race.Next<Got>, n: Out, +c: Chan(Race.Step<Got>),
 @unsafe
 def call.raced(n: Out, +tok: String, +id: String, live: Bool,
     +st: Api.Style, +url: String, hdrs: Map<&2, List<&2, String>>,
-    +body: String, +w: Pvp.Wait) -> IO(Out & Got):
+    +body: String, +w: Pvp.ProvWait) -> IO(Out & Got):
   do IO<Out & Got>:
     +ipath : String <- interrupt_path()
     +cpath : String <- cancel_path()

@@ -8,6 +8,15 @@ import ../core/types.bend as T
 import ../core/text.bend as Tx
 import ../vendor/json.bend as J
 
+# TCP.recv's None (bend 2.0.37: the peer sent everything) is the closed
+# connection the empty text was before
+def recv_text(m: Maybe<&1, String>) -> String:
+  match m:
+    case None{}:
+      ""
+    case Some{+d}:
+      d
+
 # ---- what one input line asks for ----
 
 type Plan is Data:

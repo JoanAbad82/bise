@@ -52,7 +52,7 @@ def live.send(-A: Type, +c: Chan(Race.Step<A>), e: Lp.Emit) -> IO(Lp.Lv):
   match e:
     case Lp.Em{+line, +lv}:
       do IO<Lp.Lv>:
-        sent : Bool <- Chan.send(Race.Step<A>, c, Race.SPart{line})
+        sent : Result<&1, &1, Race.Step<A>, Unit> <- Chan.send(Race.Step<A>, c, Race.SPart{line})
         IO.pure(Lp.Lv, lv)
 
 def live.due(due: Bool, -A: Type, +c: Chan(Race.Step<A>), +lv: Lp.Lv,

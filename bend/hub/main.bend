@@ -146,7 +146,9 @@ def handle(+h: H.Hub, +line: String) -> H.Hub & String:
 
 # ---- the line server ----
 
-def send_line.after(r: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Socket):
+# a failed send's error carries the text the kernel did not take (bend
+# 2.0.37): dropped, as the failed send itself always was
+def send_line.after(r: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(Socket):
   match r:
     case (s, _):
       IO.pure(Socket, s)
@@ -155,9 +157,9 @@ def send_line.after(r: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Socket
 # the whole answer to add one char (view_all: 30 MB, ~0.2 s)
 def send_line(s: Socket, +text: String) -> IO(Socket):
   do IO<Socket>:
-    r0 : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(s, text)
+    r0 : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s, text)
     s2 : Socket <- send_line.after(r0)
-    r : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(s2, "\n")
+    r : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s2, "\n")
     send_line.after(r)
 
 # the received `data` after `part` (the line so far, newest first): the
@@ -197,19 +199,32 @@ def lines.split(m: Cut, s: Socket, +h: H.Hub) -> IO(Got):
       lines.answer(handle(h, l), s, rest)
 
 @unsafe
-def conn.after(rm: Socket & Result<&1, &1, U32 & String, String>, +h: H.Hub, +part: String) -> IO(H.Hub):
+def conn.after(rm: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>, +h: H.Hub, +part: String) -> IO(H.Hub):
   match rm:
     case (s, Fail{_}):
       do IO<H.Hub>:
         Socket.close(s)
         IO.pure(H.Hub, h)
-    case (s, Done{+data}):
-      conn.data(String.is_empty(data), s, h, part, data)
+    case (s, Done{m}):
+      conn.got(s, h, part, recv_text(m))
+
+# TCP.recv's None (bend 2.0.37: the peer sent everything) is the closed
+# connection the empty text was before
+def recv_text(m: Maybe<&1, String>) -> String:
+  match m:
+    case None{}:
+      ""
+    case Some{+d}:
+      d
+
+@unsafe
+def conn.got(s: Socket, +h: H.Hub, +part: String, +data: String) -> IO(H.Hub):
+  conn.data(String.is_empty(data), s, h, part, data)
 
 @unsafe
 def conn(s: Socket, +h: H.Hub, +part: String) -> IO(H.Hub):
   do IO<H.Hub>:
-    rm : Socket & Result<&1, &1, U32 & String, String> <- TCP.recv(s, 65536)
+    rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(s, 65536)
     conn.after(rm, h, part)
 
 @unsafe

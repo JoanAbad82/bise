@@ -134,7 +134,7 @@ Term wire_recv_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_recv_use(void) {
-  io_eff(CID(recv), wire_recv_run, 0);
+  io_eff(CID(recv), wire_recv_run);
 }
 
 #endif
@@ -151,7 +151,7 @@ Term wire_recv_words_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_recv_words_use(void) {
-  io_eff(CID(recv.words), wire_recv_words_run, 0);
+  io_eff(CID(recv.words), wire_recv_words_run);
 }
 
 #endif
@@ -187,7 +187,7 @@ Term wire_send_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_send_use(void) {
-  io_eff(CID(send), wire_send_run, 0);
+  io_eff(CID(send), wire_send_run);
 }
 
 #endif
@@ -204,7 +204,7 @@ Term wire_send_words_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_send_words_use(void) {
-  io_eff(CID(send.words), wire_send_words_run, 0);
+  io_eff(CID(send.words), wire_send_words_run);
 }
 
 #endif
@@ -254,7 +254,7 @@ Term wire_send_file_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_send_file_use(void) {
-  io_eff(CID(send.file), wire_send_file_run, 0);
+  io_eff(CID(send.file), wire_send_file_run);
 }
 
 #endif
@@ -291,7 +291,7 @@ Term wire_recv_from_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_recv_from_use(void) {
-  io_eff(CID(recv_from), wire_recv_from_run, 0);
+  io_eff(CID(recv_from), wire_recv_from_run);
 }
 
 #endif
@@ -329,7 +329,7 @@ Term wire_send_to_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_send_to_use(void) {
-  io_eff(CID(send_to), wire_send_to_run, 0);
+  io_eff(CID(send_to), wire_send_to_run);
 }
 
 #endif
@@ -394,7 +394,7 @@ Term connect_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) connect_use(void) {
-  io_eff(CID(connect), connect_run, 0);
+  io_eff(CID(connect), connect_run);
 }
 
 #endif
@@ -561,7 +561,7 @@ Term tls_connect_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_connect_use(void) {
-  io_eff(CID(tls.connect), tls_connect_run, 0);
+  io_eff(CID(tls.connect), tls_connect_run);
 }
 
 #endif
@@ -609,7 +609,7 @@ Term tls_send_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_send_use(void) {
-  io_eff(CID(tls.send), tls_send_run, 0);
+  io_eff(CID(tls.send), tls_send_run);
 }
 
 #endif
@@ -626,7 +626,7 @@ Term tls_send_words_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_send_words_use(void) {
-  io_eff(CID(tls.send.words), tls_send_words_run, 0);
+  io_eff(CID(tls.send.words), tls_send_words_run);
 }
 
 #endif
@@ -643,7 +643,7 @@ Term tls_send_file_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_send_file_use(void) {
-  io_eff(CID(tls.send.file), tls_send_file_run, 0);
+  io_eff(CID(tls.send.file), tls_send_file_run);
 }
 
 #endif
@@ -695,7 +695,7 @@ Term tls_recv_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_recv_use(void) {
-  io_eff(CID(tls.recv), tls_recv_run, 0);
+  io_eff(CID(tls.recv), tls_recv_run);
 }
 
 #endif
@@ -712,7 +712,7 @@ Term tls_recv_words_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_recv_words_use(void) {
-  io_eff(CID(tls.recv.words), tls_recv_words_run, 0);
+  io_eff(CID(tls.recv.words), tls_recv_words_run);
 }
 
 #endif
@@ -732,7 +732,7 @@ Term tls_close_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_close_use(void) {
-  io_eff(CID(tls.close), tls_close_run, 0);
+  io_eff(CID(tls.close), tls_close_run);
 }
 
 #endif

@@ -11,7 +11,11 @@
 # (FLAKY lines, flaky.tsv next to timings.tsv).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export PATH="$HOME/.bend/bin:$HOME/.cargo/bin:$PATH"
+# bend: the one this tree pins (bend/VERSION, scripts/bend-pin.sh); the
+# mcp_* probes compile with the bend on PATH
+. scripts/bend-pin.sh
+run_all_bend_dir="$(bend_bin_dir "$PWD" "$(bend_tools_home)")" || exit 1
+export PATH="$run_all_bend_dir:$HOME/.cargo/bin:$PATH"
 live=0 jobs="${SB_TEST_JOBS:-4}" only="" picked=0 pick=""
 while [ $# -gt 0 ]; do
   case "$1" in

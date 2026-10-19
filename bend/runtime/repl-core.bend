@@ -345,7 +345,11 @@ def repl_data(+live: Bool, closed: Bool, s: Socket, +data: String, +sess: T.Sess
       repl_lines.go(live, Rcp.cmd_whole(data), s, sess,
         s2 => sess2 => next(Rcp.cmd_tail(data))(s2)(sess2))
 
-def repl_after(+live: Bool, rm: Socket & Result<&1, &1, U32 & String, String>,
+def repl_got(+live: Bool, s: Socket, +data: String, +carry: String, +sess: T.Session,
+    next: String -> Socket -> T.Session -> IO(Flow)) -> IO(Flow):
+  repl_data(live, String.is_empty(data), s, String.append(carry, data), sess, next)
+
+def repl_after(+live: Bool, rm: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>,
     +carry: String, +sess: T.Session, next: String -> Socket -> T.Session -> IO(Flow))
     -> IO(Flow):
   match rm:
@@ -353,13 +357,13 @@ def repl_after(+live: Bool, rm: Socket & Result<&1, &1, U32 & String, String>,
       do IO<Flow>:
         Socket.close(s)
         IO.pure(Flow, Go{sess})
-    case (s, Done{+data}):
-      repl_data(live, String.is_empty(data), s, String.append(carry, data), sess, next)
+    case (s, Done{m}):
+      repl_got(live, s, Rcp.recv_text(m), carry, sess, next)
 
 @unsafe
 def repl_conn(+live: Bool, sock: Socket, +carry: String, sess: T.Session) -> IO(Flow):
   do IO<Flow>:
-    rm : Socket & Result<&1, &1, U32 & String, String> <- TCP.recv(sock, 4096)
+    rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(sock, 4096)
     repl_after(live, rm, carry, sess, c => s2 => sess2 => repl_conn(live, s2, c, sess2))
 
 # ---- the accept loop: one connection at a time, session survives ----

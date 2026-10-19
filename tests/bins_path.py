@@ -110,9 +110,56 @@ def main():
         k2 = run(e2, "key", "--src", hub, "sb-core")
         check(k2.returncode == 0 and k2.stdout.strip() == k,
               f"the key on a temp HOME is the shell's: {k2.stdout.strip()!r} vs {k!r} {k2.stderr[-200:]!r}")
+        pin_cases(tmp)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("bins_path: all ok", flush=True)
+
+
+def fake_bend(d, version):
+    os.makedirs(d, exist_ok=True)
+    f = os.path.join(d, "bend")
+    with open(f, "w") as fh:
+        fh.write(f'#!/bin/sh\necho "bend {version}"\n')
+    os.chmod(f, 0o755)
+
+
+def pin(src, home):
+    sh = f'. "{ROOT}/scripts/bend-pin.sh"; bend_bin_dir "$1" "$2"'
+    return subprocess.run(["bash", "-c", sh, "pin", src, home],
+                          capture_output=True, text=True, timeout=30)
+
+
+# the bend a tree pins (bend/VERSION, scripts/bend-pin.sh), one case per
+# branch, on a fake home with fake bends
+def pin_cases(tmp):
+    home = os.path.join(tmp, "pinhome")
+    tree = os.path.join(tmp, "pintree")
+    os.makedirs(os.path.join(tree, "bend"))
+    fake_bend(os.path.join(home, ".bend", "bin"), "2.0.35")
+    # no bend/VERSION (a commit from before the pin): ~/.bend/bin as it is
+    r = pin(tree, home)
+    check(r.returncode == 0 and r.stdout.strip() == os.path.join(home, ".bend", "bin"),
+          f"pin: no bend/VERSION takes ~/.bend/bin: {r.stdout!r} {r.stderr!r}")
+    with open(os.path.join(tree, "bend", "VERSION"), "w") as fh:
+        fh.write("2.0.37\n")
+    # ~/.bend/bin is another version, none apart: a clear error
+    r = pin(tree, home)
+    check(r.returncode == 1 and r.stdout == "" and "bend 2.0.37 (bend/VERSION) is not installed" in r.stderr
+          and "bend 2.0.35" in r.stderr and "releases/download/v2.0.37/" in r.stderr,
+          f"pin: a mismatch fails with the install line: rc {r.returncode} {r.stderr!r}")
+    # ~/.bend/bin is the pinned version: it is taken
+    fake_bend(os.path.join(home, ".bend", "bin"), "2.0.37")
+    r = pin(tree, home)
+    check(r.returncode == 0 and r.stdout.strip() == os.path.join(home, ".bend", "bin"),
+          f"pin: a matching ~/.bend/bin is taken: {r.stdout!r} {r.stderr!r}")
+    # installed apart: ~/.bend/versions/<v>/bin wins over ~/.bend/bin
+    fake_bend(os.path.join(home, ".bend", "bin"), "2.0.35")
+    fake_bend(os.path.join(home, ".bend", "versions", "2.0.37", "bin"), "2.0.37")
+    r = pin(tree, home)
+    check(r.returncode == 0
+          and r.stdout.strip() == os.path.join(home, ".bend", "versions", "2.0.37", "bin"),
+          f"pin: the versioned dir is taken: {r.stdout!r} {r.stderr!r}")
 
 
 if __name__ == "__main__":

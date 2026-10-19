@@ -520,7 +520,10 @@ if [ "$mode" = full ] && [ "${GATE_FORCE:-}" != 1 ] && clean_tree \
   exit 0
 fi
 case "$mode" in full|rerun) gate_lock ;; esac
-export PATH="$HOME/.bend/bin:$HOME/.cargo/bin:$PATH"
+# bend: the one this tree pins (bend/VERSION, scripts/bend-pin.sh)
+. scripts/bend-pin.sh
+gate_bend_dir="$(bend_bin_dir "$PWD" "$(bend_tools_home)")" || { echo "GATE FAILED: no bend for bend/VERSION"; exit 1; }
+export PATH="$gate_bend_dir:$HOME/.cargo/bin:$PATH"
 # the oldest macOS the binaries run on (rust/.cargo/config.toml, BISE-164):
 # for the quick sb-core's cc too
 export MACOSX_DEPLOYMENT_TARGET; MACOSX_DEPLOYMENT_TARGET="$(scripts/bins.sh macos-target)"

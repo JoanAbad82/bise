@@ -45,9 +45,17 @@ def decide(won: Bool, f: Maybe<&2, String>) -> Verdict:
       decide.tick(f)
 
 # the ticker goes on only while its tick was taken (Chan.send answers
-# False on a closed channel)
+# Fail{value} on a closed channel, bend 2.0.37)
 def tick_again(sent: Bool) -> Bool:
   sent
+
+# Chan.send's answer as the Bool it was before bend 2.0.37: taken or not
+def sent_ok(-A: Type, r: Result<&1, &1, A, Unit>) -> Bool:
+  match r:
+    case Done{_}:
+      True{}
+    case Fail{_}:
+      False{}
 
 # ---- the abandoned model attempt's cancel file ----
 # A stopped attempt is left running; it must stop costing tokens. The

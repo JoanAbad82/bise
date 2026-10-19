@@ -25,7 +25,10 @@ REPO="$PWD"
 ROOT="${SB_DEV_ROOT:-/tmp/sb-dev}"
 WS="${SB_DEV_WS:-$ROOT/ws}"
 export SB_STATE_DIR="$ROOT/state"
-export PATH="$HOME/.cargo/bin:$HOME/.bend/bin:$PATH"
+# bend: the one this tree pins (bend/VERSION, scripts/bend-pin.sh)
+. "$REPO/scripts/bend-pin.sh"
+bend_dir="$(bend_bin_dir "$REPO" "$(bend_tools_home)")" || exit 1
+export PATH="$HOME/.cargo/bin:$bend_dir:$PATH"
 
 action=run
 tui=1
