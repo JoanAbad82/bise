@@ -75,6 +75,9 @@ async function record(role: Locator, on: 'mouseenter' | 'mouseleave'): Promise<v
     row.addEventListener(ev, () => { t0 = performance.now(); }, { once: true });
     const tick = () => {
       if (!rec.on) return;
+      // known before this frame: the frame where the start resolves still read the pending value
+      // (load 53: x 0 at t 6 in that frame, -52.7 at t 7, home after; runs/p4/alone-1.log)
+      const known = rec.s !== null;
       const x = new DOMMatrix(getComputedStyle(inner).transform).m41;
       if (t0 !== null && rec.s === null) {
         // the transition this event made: started after it (the one before, if still running, began >= 1 s earlier)
@@ -82,7 +85,7 @@ async function record(role: Locator, on: 'mouseenter' | 'mouseleave'): Promise<v
         const a = inner.getAnimations().find((n) => (n as CSSTransition).transitionProperty === 'transform' && typeof n.startTime === 'number' && n.startTime >= from);
         if (a) rec.s = Math.round((a.startTime as number) - t0);
       }
-      rec.xs.push({ t: Math.round(performance.now() - (t0 ?? start + 1e6)), x, a: rec.s !== null });
+      rec.xs.push({ t: Math.round(performance.now() - (t0 ?? start + 1e6)), x, a: known });
       requestAnimationFrame(tick);
     };
     tick();
