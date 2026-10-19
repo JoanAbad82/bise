@@ -10,7 +10,7 @@ Netlify, Cloudflare Pages, `python3 -m http.server`).
 | `book/screens.html` | every screen of the product |
 | `book/live.html` | the live simulation (`?t=45&paused` to jump) |
 | `book/onboarding.html` | the first launch |
-| `download.html` | `bise.dev/download`: bise for Mac. `download.js` reads the rolling releases `desktop-latest` / `desktop-beta` through the GitHub API; `/download/mac` and `/download/mac-beta` (vercel.json) redirect to their DMG. Unlinked (not in the sitemap or the landing) until the first desktop release. Test: `tests/site_download_test.py` |
+| `desktop.html` | `bise.dev/desktop` (`/download` redirects here): bise for Mac. `download.js` reads the rolling releases `desktop-latest` / `desktop-beta` through the GitHub API; `/download/mac` and `/download/mac-beta` (vercel.json) redirect to their DMG. Unlinked (not in the sitemap or the landing) until the first desktop release. Test: `tests/site_download_test.py` |
 | `install.sh` | `bise.dev/install`: the installer, a copy of the one the latest release carries (`packaging/publish-release.sh` says when it is stale) |
 
 Old paths (`brand/tui-screens.html`, `brand/tui-live.html`,

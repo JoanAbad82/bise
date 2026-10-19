@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""bise.dev/download reads the desktop feed and says what it found.
+"""bise.dev/desktop (/download redirects there) reads the desktop feed and says what it found.
 
 Two parts:
 1. site/download.js, the pure part, under node: a rolling release from the
    GitHub API becomes {version, size, date, notes}; the beta shows only when
    it is newer than stable; a 404 is "soon" (no desktop release yet), a failed
    call is "unknown" (the button stays); the notes are escaped.
-2. site/download.html (designer's page) rendered by headless Chrome against
+2. site/desktop.html (designer's page) rendered by headless Chrome against
    the fake feeds in tests/fixtures/site-download/ (ready: stable + a newer
    beta; soon: both tags 404; down: GitHub answers 503), served next to site/
    by a local server: its data-slot spots filled, the beta column off unless
@@ -128,8 +128,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         path = path.split("?", 1)[0]
         if path.startswith("/__fixtures/"):
             return os.path.join(FIXTURES, path[len("/__fixtures/"):])
-        if path == "/download":
-            path = "/download.html"
+        if path == "/desktop":
+            path = "/desktop.html"
         return os.path.join(SITE, path.lstrip("/"))
 
     def log_message(self, *a):
@@ -151,7 +151,7 @@ def chrome(profile, *args, size="1280,1600"):
 
 
 def page(port, scenario):
-    return f"http://127.0.0.1:{port}/download?api=/__fixtures/{scenario}&still"
+    return f"http://127.0.0.1:{port}/desktop?api=/__fixtures/{scenario}&still"
 
 
 def check(dom, scenario, want, absent):

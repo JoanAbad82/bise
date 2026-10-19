@@ -71,6 +71,11 @@
       "permanent": false
     },
     {
+      "source": "/download",
+      "destination": "/desktop",
+      "permanent": false
+    },
+    {
       "source": "/download/mac",
       "destination": "https://github.com/gvergnaud/bise/releases/download/desktop-latest/bise-mac-arm64.dmg",
       "permanent": false

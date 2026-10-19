@@ -2,7 +2,7 @@
 """desktop-feed: the desktop app's release feed, desktop.json, and the rules of its two channels. Pure.
 
 The shape (agreed with dist-updater, who owns its reader bise_home::release::parse_desktop, and
-dist-site, who shows it on bise.dev/download):
+dist-site, who shows it on bise.dev/desktop):
 
   {"kind": "desktop", "channel": "stable" | "beta", "version": "desktop-v2026.10.1",
    "runtime_id": "<the terminal release's VERSION id it carries>", "paused": false,

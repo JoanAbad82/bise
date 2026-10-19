@@ -1,6 +1,6 @@
-// bise.dev/download: the pure part. It turns the GitHub API's view of the two
+// bise.dev/desktop: the pure part. It turns the GitHub API's view of the two
 // rolling desktop releases into what the page shows. No DOM, no fetch: the page
-// (download.html) fetches and paints; tests/site_download_test.mjs runs this.
+// (desktop.html) fetches and paints; tests/site_download_test.mjs runs this.
 //
 // The feed (dist-ci + dist-updater, m_25185/m_25204): two rolling tags,
 // desktop-latest (stable) and desktop-beta. When CI moves one, it sets that

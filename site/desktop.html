@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bise for Mac · a team that works for you</title>
+<meta name="description" content="bise for Mac: a multi-agent harness made for humans. talk to one team lead, it runs a team of agents and only comes to you when something needs you.">
+<link rel="canonical" href="https://bise.dev/desktop">
+<meta property="og:title" content="bise for Mac · a team that works for you">
+<meta property="og:description" content="a multi-agent harness made for humans. talk to one team lead, it runs the team.">
+<meta property="og:url" content="https://bise.dev/desktop">
+<meta property="og:image" content="https://bise.dev/og.png">
+<meta name="theme-color" content="#f2ede2">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<!-- the hero town starts at once: fetch its bundle with the page (stable names) -->
+<link rel="modulepreload" href="/desktop/hero/hero.js">
+<link rel="modulepreload" href="/desktop/hero/film.js">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<script>{ const r = document.documentElement; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} const q = new URLSearchParams(location.search); if (q.has('dark') || (!q.has('light') && d === '1')) r.classList.add('pd'); }</script>
+<style>
+  /* the landing's paper (landing-b) and dark paper (.pd) */
+  :root { --bg:#f2ede2; --soft:#ebe4d6; --text:#1d1a17; --dim:#5a5349; --faint:#cfc5b4; --kick:#8a8174; --rule:#b8ad9a; --pen:#c8264a; --hl:#f4a6b099; --ink-btn:#1d1a17; --on-btn:#f7f2e8; --win:#fdfbf7; }
+  html.pd { --bg:#171513; --soft:#1e1b18; --text:#ece6da; --dim:#b8b0a3; --faint:#3d3935; --kick:#8a8276; --rule:#4a4540; --pen:#f4a6b0; --hl:#f4a6b047; --ink-btn:#ece6da; --on-btn:#171513; --win:#1f1c19; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { -webkit-font-smoothing:antialiased; scroll-behavior:smooth; }
+  body { color:var(--text); font-family:Newsreader, Georgia, serif; font-size:20px; line-height:1.6; overflow-x:hidden;
+    background:#f2ede2 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence baseFrequency='.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .25 0 0 0 .08 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>"); }
+  html.pd body { background:#171513 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence baseFrequency='.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 .95 0 0 0 0 .9 0 0 0 .05 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>"); }
+  a { color:inherit; text-decoration:none; }
+  code, .mono { font-family:"JetBrains Mono", ui-monospace, monospace; }
+  .kiss { font-family:Caveat, cursive; font-weight:700; color:var(--pen); }
+  .hl { background:linear-gradient(100deg, transparent 0, var(--hl) 4px, var(--hl) calc(100% - 6px), transparent 100%) no-repeat 0 75% / 0 72%; transition:background-size 1.1s .7s ease; padding:0 4px; margin:0 -4px; }
+  .ready .hl, .in .hl { background-size:100% 72%; }
+  .soft { color:var(--dim); }
+
+  header { position:fixed; top:0; left:0; right:0; z-index:5; display:flex; justify-content:space-between; align-items:center; padding:22px 5vw; font-size:16px; font-style:italic; color:var(--dim); }
+  header .logo { font-style:normal; font-weight:600; color:var(--text); } header .logo .kiss { font-size:1.25em; }
+  header nav { display:flex; gap:28px; align-items:center; }
+  header nav a:hover, header button:hover { color:var(--text); }
+  header button { font:inherit; font-style:normal; background:none; border:0; color:inherit; cursor:pointer; }
+
+  section { padding:14vh 6vw; }
+  .inner { max-width:36em; margin:0 auto; }
+  .kicker { font-variant:small-caps; letter-spacing:.14em; font-size:16px; color:var(--kick); margin-bottom:14px; }
+  h1 { font-weight:600; font-size:clamp(52px, 8vw, 104px); line-height:1; letter-spacing:-.045em; }
+  h2 { font-weight:600; font-size:clamp(32px, 4vw, 50px); line-height:1.08; letter-spacing:-.025em; margin-bottom:24px; }
+  h3 { font-weight:600; font-size:26px; line-height:1.2; letter-spacing:-.01em; margin-bottom:10px; }
+
+  /* the reveal, like the landing: text arrives like a breeze */
+  .blow { opacity:0; transform:translateY(18px); transition:opacity .9s ease, transform 1.1s cubic-bezier(.2,.7,.2,1); }
+  .blow.in { opacity:1; transform:none; }
+
+  /* ===== hero ===== */
+  .hero .t2 { font-style:italic; font-size:clamp(20px, 2vw, 24px); color:var(--dim); margin:26px auto 0; max-width:30em; }
+  .cta { margin-top:40px; display:flex; flex-direction:column; align-items:center; gap:14px; min-height:150px; }
+  .btn { display:inline-flex; align-items:center; gap:12px; background:var(--ink-btn); color:var(--on-btn); border-radius:999px; padding:14px 30px 14px 26px; font-size:21px; font-weight:600; letter-spacing:-.005em;
+    box-shadow:0 1px 0 #00000014, 0 14px 30px -16px #4a3a2a99; transition:transform .3s cubic-bezier(.3,1.6,.5,1), box-shadow .3s; }
+  .btn:hover { transform:translateY(-2px); box-shadow:0 1px 0 #00000014, 0 18px 34px -16px #4a3a2aaa; }
+  .btn:focus-visible { outline:2px solid var(--text); outline-offset:4px; }
+  .btn svg { width:20px; height:20px; }
+  .meta { font-style:italic; font-size:16px; color:var(--dim); }
+  .meta .sep { color:var(--kick); margin:0 .15em; } .meta .nw { white-space:nowrap; }
+  .alt { font-style:italic; font-size:16px; color:var(--dim); }
+  .alt a { text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:3px; } .alt a:hover { color:var(--text); text-decoration-color:var(--pen); }
+  .intel { font-style:italic; font-size:16px; color:var(--dim); max-width:30em; display:none; }
+  body.intel-guess .intel { display:block; }
+
+  /* the stage: the real app, laid on the paper like a print */
+  .stage { position:relative; width:min(1180px, 100%); margin:64px auto 0; }
+  .shot { position:relative; display:block; width:100%; border-radius:12px; overflow:hidden; background:var(--win);
+    box-shadow:0 0 0 1px #1d1a1712, 0 1px 3px #4a3a2a12, 0 24px 48px -28px #4a3a2a3d; }
+  html.pd .shot { box-shadow:0 0 0 1px #ece6da1a, 0 24px 48px -28px #00000080; }
+  .shot img { display:block; width:100%; height:auto; }
+  .shot .d { display:none; } html.pd .shot .l { display:none; } html.pd .shot .d { display:block; }
+  /* a macOS banner, the one he gets when something needs him */
+  .banner { position:absolute; z-index:2; right:-64px; top:-48px; width:340px; display:grid; grid-template-columns:38px 1fr auto; gap:0 12px; align-items:start; text-align:left;
+    padding:12px 14px; border-radius:18px; background:color-mix(in srgb, var(--win) 97%, transparent); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+    box-shadow:0 0 0 1px #1d1a1714, 0 12px 30px -18px #4a3a2a40; font-family:Geist, -apple-system, system-ui, sans-serif; font-size:13px; line-height:1.35;
+    opacity:0; transform:translateX(30px); transition:opacity .5s, transform .7s cubic-bezier(.2,.9,.3,1.2); }
+  html.pd .banner { box-shadow:0 0 0 1px #ece6da1c, 0 12px 30px -18px #00000099; }
+  .banner.on { opacity:1; transform:none; }
+  .banner img { width:38px; height:38px; }
+  .banner b { display:block; font-weight:600; } .banner span { color:var(--dim); } .banner time { color:var(--kick); font-size:12px; }
+
+  /* ===== after the click: the download flow takes the CTA's place ===== */
+  .got { display:none; }
+  body.downloading .cta .go { display:none; }
+  body.downloading .got { display:grid; }
+  .got { grid-template-columns:minmax(0, 1fr) minmax(0, 400px); gap:40px; align-items:center; text-align:left; width:min(860px, 100%); margin:0 auto;
+    padding:28px 32px; border-top:1px solid var(--text); border-bottom:1px solid var(--text); animation:gotin .6s cubic-bezier(.2,.7,.2,1); }
+  @keyframes gotin { from { opacity:0; transform:translateY(10px); } }
+  .got .head { font-style:italic; font-size:17px; color:var(--dim); margin-bottom:14px; }
+  .got .head code { font-size:.82em; font-style:normal; color:var(--text); }
+  .got ol { list-style:none; }
+  .got li { display:grid; grid-template-columns:34px 1fr; margin-bottom:14px; font-size:19px; line-height:1.45; }
+  .got li .n { font-family:Caveat, cursive; font-weight:700; font-size:28px; line-height:1; color:var(--pen); }
+  .got li small { display:block; font-style:italic; font-size:16px; color:var(--dim); margin-top:2px; }
+  .got li.now { }
+  .got .again { font-style:italic; font-size:15px; color:var(--dim); margin-top:4px; }
+  .got .again a { text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:3px; }
+
+  /* the DMG window, drawn: bise.app glides along the wave into Applications */
+  .dmg { position:relative; border-radius:10px; overflow:hidden; background:#fdfbf7; box-shadow:0 0 0 1px #1d1a1718, 0 14px 30px -20px #4a3a2a40; font-family:Geist, -apple-system, system-ui, sans-serif; }
+  html.pd .dmg { box-shadow:0 0 0 1px #ece6da1f, 0 14px 30px -20px #00000099; }
+  .dmg .tb { height:26px; display:flex; align-items:center; gap:6px; padding:0 10px; border-bottom:1px solid #1d1a1714; background:#f4f0e8; font-size:11px; color:#6b645a; }
+  .dmg .tb i { width:9px; height:9px; border-radius:50%; background:#d9d2c6; } .dmg .tb span { flex:1; text-align:center; margin-right:34px; font-weight:600; color:#1b1917; }
+  .dmg svg { display:block; width:100%; height:auto; }
+  .dmg .app { position:absolute; width:19.4%; left:17.6%; top:calc(26px + 11.5%); }
+  .dmg .ghost { position:absolute; width:19.4%; left:17.6%; top:calc(26px + 11.5%); opacity:0; animation:glide 3.2s 1s cubic-bezier(.45,.05,.3,1) infinite; }
+  @keyframes glide { 0% { opacity:0; transform:translate(0,0) scale(1); } 10% { opacity:.85; } 62% { opacity:.85; transform:translate(272%,0) scale(.92); } 72%,100% { opacity:0; transform:translate(272%,0) scale(.6); } }
+
+  /* ===== what it is ===== */
+  .what { padding-top:16vh; }
+  .rows { display:flex; flex-direction:column; gap:clamp(72px, 14vh, 160px); width:min(1180px, 100%); margin:0 auto; }
+  .row { display:grid; grid-template-columns:minmax(0, 7fr) minmax(0, 4fr); gap:56px; align-items:center; }
+  .row.flip { grid-template-columns:minmax(0, 4fr) minmax(0, 7fr); } .row.flip .txt { order:-1; }
+  .row .txt p { color:var(--dim); font-size:19px; line-height:1.55; }
+  .row .txt .n { font-family:Caveat, cursive; font-weight:700; font-size:30px; color:var(--pen); line-height:1; display:block; margin-bottom:6px; }
+
+  /* ===== three ways in ===== */
+  .ways { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:0; width:min(1080px, 100%); margin:0 auto; border-top:1px solid var(--text); }
+  .way { padding:28px 28px 8px; border-right:1px solid var(--faint); }
+  .way:last-child { border-right:0; }
+  .way h3 { font-size:24px; margin-bottom:6px; }
+  .way .who { font-style:italic; font-size:16px; color:var(--kick); margin-bottom:14px; }
+  .way p { font-size:17.5px; line-height:1.55; color:var(--dim); margin-bottom:16px; }
+  .way .link { font-size:18px; font-weight:600; text-decoration:underline; text-decoration-color:var(--pen); text-decoration-thickness:2px; text-underline-offset:5px; }
+  .way .link:hover { color:var(--pen); }
+  .way .small { font-style:italic; font-size:15px; color:var(--kick); margin-top:10px; }
+  .way.off { opacity:.55; }
+  .install { display:flex; justify-content:space-between; align-items:center; gap:12px; cursor:pointer; font-family:"JetBrains Mono", ui-monospace, monospace; font-size:13px;
+    border-top:1px solid var(--text); border-bottom:1px solid var(--text); padding:10px 4px; max-width:100%; }
+  .install .p { color:var(--pen); } .install .c { font-family:Newsreader, serif; font-style:italic; font-size:15px; color:var(--dim); }
+  .install:hover { border-color:var(--pen); } .install.done .c { color:var(--pen); }
+  .install > span:first-child { overflow-x:auto; white-space:nowrap; }
+
+  /* ===== what's new ===== */
+  .new ul { list-style:none; }
+  .new li { position:relative; padding-left:26px; font-size:19px; line-height:1.5; margin-bottom:12px; }
+  .new li::before { content:"·"; color:var(--kick); position:absolute; left:4px; }
+  .new li code { font-size:.8em; border-bottom:1px dashed var(--rule); }
+  .new .more { font-style:italic; font-size:16px; color:var(--dim); text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:3px; }
+  .new h2 .v { font-style:italic; font-weight:400; color:var(--kick); font-size:.5em; letter-spacing:0; margin-left:.4em; }
+
+  /* ===== fine print ===== */
+  .fine { border-top:1px solid var(--faint); padding-top:28px; color:var(--dim); font-size:17px; line-height:1.6; }
+  .fine p { margin-bottom:14px; } .fine b { color:var(--text); font-weight:600; }
+  .fine code { font-size:.82em; border-bottom:1px dashed var(--rule); }
+  .fine a { text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:3px; }
+
+  footer { display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:40px 5vw 48px; font-style:italic; font-size:15px; color:var(--kick); }
+  footer a:hover { color:var(--text); }
+
+  /* ===== the hero: text left, the live town right, bleeding to the edge ===== */
+  .hero { display:grid; grid-template-columns:minmax(0, 40fr) minmax(0, 60fr); align-items:center; min-height:clamp(640px, 100vh, 960px); padding:0; text-align:left; }
+  .htext { padding:96px 0 48px 6vw; position:relative; z-index:2; }
+  .htext h1 { font-size:clamp(44px, 5.2vw, 78px); }
+  .htext .t2 { margin:24px 0 0; max-width:24em; }
+  .htext .cta { align-items:flex-start; min-height:0; }
+  .htext .meta, .htext .alt, .htext .intel { text-align:left; }
+  .htext .got { grid-template-columns:1fr; width:100%; padding:20px 0; }
+  .htext .got .dmg { max-width:360px; }
+  .hbox { position:relative; align-self:stretch; min-height:inherit; overflow:hidden; }
+  /* the fade into the text column is on the town's canvas only: the feed panel and the controls over it stay whole */
+  .hbox canvas, .hbox .poster { --fade:linear-gradient(to right, transparent 0, rgba(0,0,0,.06) 6%, rgba(0,0,0,.2) 12%, rgba(0,0,0,.42) 18%, rgba(0,0,0,.66) 24%, rgba(0,0,0,.86) 30%, rgba(0,0,0,.96) 35%, #000 40%);
+    -webkit-mask-image:var(--fade); mask-image:var(--fade); }
+  .hbox .hstage { position:absolute; inset:0; }
+  .hbox .poster { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:58% 60%; transition:opacity .6s ease; pointer-events:none; }
+  .hbox .poster.l { mix-blend-mode:multiply; } .hbox .poster.d { mix-blend-mode:lighten; display:none; }
+  html.pd .hbox .poster.l { display:none; } html.pd .hbox .poster.d { display:block; }
+  /* the town builds itself from the centre: no still over it. the still shows only without WebGL, or if the town is slow to come */
+  .hbox .poster { opacity:0; } .hbox.lost .poster, .hbox.slow:not(.ready) .poster { opacity:1; }
+  /* the feed card owns the town's bottom-right, so the controls sit top-right, the caption on their row (under 860 no feed: bottom-right) */
+  .hctl { position:absolute; right:24px; top:24px; display:flex; gap:8px; z-index:3; }
+  .hctl button, .hcap { font-family:Geist, -apple-system, system-ui, sans-serif; font-size:13px; }
+  .hctl button { min-width:32px; height:32px; padding:0 10px; border-radius:8px; border:1px solid var(--faint); background:color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:var(--dim); cursor:pointer; }
+  .hctl button:hover { color:var(--text); border-color:var(--rule); }
+  .hctl button:focus-visible { outline:2px solid var(--text); outline-offset:2px; }
+  .hcap { text-wrap:balance; position:absolute; right:104px; top:24px; max-width:300px; text-align:right; margin:0; color:var(--dim); font-style:normal; transition:opacity .4s ease; z-index:3; }
+  .hcap { padding:4px 12px; line-height:24px; border-radius:8px; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+  .hcap.gone { opacity:0; }
+  .app-sec { padding:6vh 6vw 0; }
+  .app-sec .stage { margin-top:0; }
+  @media (max-width:1000px) {
+    .hero { grid-template-columns:1fr; min-height:0; }
+    .hbox { order:-1; height:58vh; min-height:360px; }
+    .hbox canvas, .hbox .poster { --fade:linear-gradient(to bottom, #000 66%, rgba(0,0,0,.86) 74%, rgba(0,0,0,.5) 85%, rgba(0,0,0,.16) 94%, transparent); }
+    .htext { padding:12px 6vw 24px; }
+  }
+  @media (max-width:859px) {
+    .hctl { top:auto; bottom:20px; right:20px; }
+    .hcap { top:auto; bottom:64px; right:20px; line-height:inherit; }
+  }
+  /* ===== why: the three problems ===== */
+  /* the problem as one story: three beats, each led by its sentence, linked by 'but' and 'and' */
+  .beat { margin-top:clamp(44px, 7vh, 72px); }
+  .beat .say { font-weight:600; font-size:clamp(24px, 2.6vw, 32px); line-height:1.2; letter-spacing:-.015em; margin-bottom:12px; }
+  .beat p:not(.say) { color:var(--dim); font-size:19px; line-height:1.6; }
+  .detail p { color:var(--dim); font-size:18px; line-height:1.55; }
+  .turn { font-style:italic; font-size:clamp(24px, 2.6vw, 32px); margin-top:clamp(56px, 9vh, 96px); }
+  /* ===== the answer ===== */
+  .lead p, .arts p { color:var(--dim); font-size:19px; line-height:1.6; margin-bottom:14px; }
+  .lead p b { color:var(--text); font-weight:600; }
+  /* ===== the details, handled ===== */
+  .fold > summary { list-style:none; cursor:pointer; } .fold > summary::-webkit-details-marker { display:none; }
+  .fold > summary h2 { display:inline; } .fold > summary::after { content:'+'; margin-left:12px; font-size:24px; color:var(--kick); } .fold[open] > summary::after { content:'−'; }
+  .fold[open] > summary { margin-bottom:16px; }
+  .details { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:48px 40px; width:min(1080px, 100%); margin:40px auto 0; border-top:1px solid var(--text); padding-top:32px; }
+  .detail h3 { font-size:22px; line-height:1.25; margin-bottom:8px; }
+  .detail p { font-size:17px; margin-bottom:16px; }
+  .scr { font-family:"JetBrains Mono", ui-monospace, monospace; font-size:12.5px; line-height:1.75; white-space:pre; overflow:hidden; background:var(--win); color:var(--text);
+    border-radius:10px; padding:12px 16px; box-shadow:0 0 0 1px #1d1a1714, 0 8px 20px -16px #4a3a2a33; }
+  html.pd .scr { box-shadow:0 0 0 1px #ece6da1a; }
+  .scr div { overflow:hidden; text-overflow:ellipsis; }
+  .scr .d { color:var(--dim); } .scr .f { color:var(--kick); } .scr .a { color:var(--pen); } .scr .ok { color:#3f7a3a; } .scr .er { color:#b3402e; }
+  html.pd .scr .ok { color:#9fcf8f; } html.pd .scr .er { color:#f0927e; }
+  .scr .chip { border:1px solid var(--faint); border-radius:6px; padding:0 4px; color:var(--dim); }
+  @media (max-width:1100px) { .details { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+  /* ===== plans, solo ===== */
+  .pair { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:56px; width:min(1080px, 100%); margin:0 auto; }
+  .pair p { color:var(--dim); font-size:19px; line-height:1.6; margin-bottom:12px; }
+  .pair .small { font-style:italic; font-size:16px; color:var(--kick); }
+  .pair a { text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:3px; }
+  /* ===== made by a human ===== */
+  .me h2 { display:flex; align-items:center; gap:22px; }
+  .me .face { width:96px; height:96px; border-radius:50%; object-fit:cover; box-shadow:0 0 0 1px #1d1a1712, 0 8px 20px -12px #4a3a2a44; }
+  .me p { font-size:20px; line-height:1.6; margin-bottom:14px; }
+  .me p.soft { color:var(--dim); }
+  .me .sig { font-family:Caveat, cursive; font-weight:700; font-size:40px; line-height:1; margin:22px 0 6px; }
+  .me .sig span { color:var(--pen); }
+  .me .by { font-style:italic; font-size:16px; color:var(--kick); }
+  .me .by a { text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:3px; }
+  @media (max-width:860px) { .probs, .details, .pair { grid-template-columns:1fr; gap:32px; } }
+  /* ===== states ===== */
+  .soon-only { display:none; }
+  body[data-state="soon"] .soon-only { display:block; }
+  body[data-state="soon"] .ready-only { display:none !important; }
+  body[data-state="unknown"] .numbers { display:none; }
+  body[data-state="unknown"] .new { display:none; }
+  [data-slot="beta"][hidden] { display:block; }
+  .way.beta[data-off] { display:none; }
+
+  /* a phone can't run a Mac app: say where to go instead */
+  .phone { display:none; }
+  @media (hover:none) and (pointer:coarse) and (max-width:900px) {
+    .cta .go .btn { display:none; } .phone { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  }
+  .phone p { font-style:italic; font-size:18px; color:var(--dim); max-width:22em; }
+  .phone button { font:inherit; font-size:17px; background:none; border:0; border-bottom:2px solid var(--pen); color:var(--text); cursor:pointer; padding:0 2px; }
+
+  @media (max-width:1320px) { .banner { right:-12px; top:-52px; } } @media (max-width:980px) { .banner { right:8px; width:290px; } }
+  @media (max-width:860px) {
+    .row, .row.flip { grid-template-columns:1fr; gap:28px; } .row.flip .txt { order:0; }
+    .ways { grid-template-columns:1fr; } .way { border-right:0; border-bottom:1px solid var(--faint); padding:24px 4px; }
+    .got { grid-template-columns:1fr; padding:24px 4px; }
+  }
+  @media (max-width:560px) {
+    body { font-size:18px; } header { padding:18px 5vw; } header nav { gap:18px; }
+    .banner { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .blow { opacity:1; transform:none; transition:none; } .hl { transition:none; background-size:100% 72%; }
+    .banner { transition:none; } .dmg .ghost { animation:none; opacity:0; } .got { animation:none; }
+  }
+
+  /* ===== A2 (desk-landing-voice v3): light by default, a serious harness, life in a few places ===== */
+  :root { --bg:#f7f2e9; --win:#fffdf9; --ok:#3f7a3a; }
+  body { background-color:#f7f2e9; }
+  html.pd { --bg:#24201c; --win:#2d2823; --ok:#9fcf8f; } html.pd body { background-color:#24201c; }
+  .details { border-top:0; gap:24px; }
+  .detail { background:var(--win); border-radius:14px; padding:20px 20px 18px; box-shadow:0 0 0 1px #1d1a1712, 0 8px 20px -18px #4a3a2a30; transition:transform .25s ease, box-shadow .25s ease; }
+  html.pd .detail { box-shadow:0 0 0 1px #ece6da1a; }
+  .detail:hover { transform:translateY(-2px); box-shadow:0 0 0 1px #1d1a1718, 0 12px 26px -18px #4a3a2a44; }
+  .detail .scr { box-shadow:0 0 0 1px #1d1a1714; background:var(--bg); }
+  /* the little screens are tiny scenes, like bise.dev's: they play in a loop while in view */
+  .detail .scr { height:calc(12.5px * 1.75 * 5 + 24px); }
+  .detail .scr.live > div { animation:line .35s ease both; }
+  .detail .scr .cur { display:inline-block; width:.55em; height:1.05em; vertical-align:-.15em; background:var(--text); opacity:.6; animation:blink 1s steps(2) infinite; }
+  @keyframes line { from { opacity:0; transform:translateY(4px); } }
+  @keyframes blink { 50% { opacity:0; } }
+  /* the lead, live: a little thread that plays one request start to finish */
+  .lead { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 440px); gap:64px; align-items:center; width:min(1080px, 100% - 12vw); margin:0 auto; padding-left:6vw; padding-right:6vw; box-sizing:content-box; }
+  .lead .inner { margin:0; }
+  .demo { background:var(--win); border-radius:14px; box-shadow:0 0 0 1px #1d1a1712, 0 18px 40px -26px #4a3a2a38; font-family:Geist, -apple-system, system-ui, sans-serif; font-size:14px; line-height:1.45; overflow:hidden; }
+  html.pd .demo { box-shadow:0 0 0 1px #ece6da1a, 0 18px 40px -26px #00000099; }
+  .demo .bar { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--faint); color:var(--dim); font-size:13px; }
+  .demo .bar b { color:var(--text); font-weight:600; } .demo .bar .kiss { font-size:18px; }
+  .demo .feed { padding:14px; min-height:300px; display:flex; flex-direction:column; gap:8px; }
+  .demo .m { opacity:0; transform:translateY(6px); transition:opacity .35s ease, transform .35s ease; }
+  .demo .m.on { opacity:1; transform:none; }
+  .demo .you { align-self:flex-end; background:var(--soft); border-radius:12px 12px 4px 12px; padding:8px 12px; max-width:80%; }
+  .demo .bise { color:var(--text); } .demo .bise i { font-style:normal; color:var(--dim); font-size:12px; display:block; }
+  .demo .ag { display:flex; justify-content:space-between; gap:12px; padding:6px 10px; border-radius:8px; background:var(--bg); font-size:13px; }
+  .demo .ag .st { color:var(--dim); white-space:nowrap; } .demo .ag .st.w::before { content:"∿ "; }
+  .demo .ag .st.q { color:var(--pen); } .demo .ag .st.ok { color:var(--ok); }
+  .demo .next { margin:0 14px 14px; font:inherit; font-size:13px; color:var(--dim); background:none; border:1px solid var(--faint); border-radius:8px; padding:6px 10px; cursor:pointer; }
+  .demo .next:hover { color:var(--text); border-color:var(--rule); }
+  @media (max-width:980px) { .lead { grid-template-columns:1fr; gap:40px; } }
+  @media (prefers-reduced-motion: reduce) { .detail .scr > div, .demo .m { opacity:1; transform:none; animation:none !important; transition:none; } .detail .scr .cur { animation:none; } .detail { transition:none; } }
+</style>
+</head>
+<!-- the state and the numbers come from download.js (wired below): until it answers, or without JS,
+     the page is "unknown": the button and the plain links, no numbers, no beta, no notes. -->
+<body data-state="unknown">
+
+<header>
+  <a class="logo" href="/">bise <span class="kiss">:*</span></a>
+  <nav>
+    <a href="/docs/">docs</a>
+    <button id="theme" title="light / dark" aria-label="light or dark">◐</button>
+    <a href="https://github.com/gvergnaud/bise">GitHub</a>
+  </nav>
+</header>
+
+<!-- hero: what it is, and the one button -->
+<section class="hero">
+ <div class="htext">
+  <div class="kicker">bise for Mac</div>
+  <h1>a team that<br>works <span class="hl">for you</span>.</h1>
+  <p class="t2">bise runs a team of AI agents on your Mac. you chat with one of them, the lead, and it sorts out the rest.</p>
+
+  <div class="cta">
+    <div class="go ready-only">
+      <a class="btn" id="dl" href="/download/mac">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10M5.5 8.8 10 13.2l4.5-4.4M4 16.5h12"/></svg>
+        download for Mac
+      </a>
+      <div class="phone">
+        <p>bise for Mac runs on a Mac. open bise.dev/desktop there, or send yourself the link.</p>
+        <button id="share">send me the link</button>
+      </div>
+      <p class="meta" style="margin-top:16px">
+        <span class="numbers"><span class="nw" data-slot="version">2026.10.1</span> <span class="sep">·</span> <span class="nw" data-slot="size">205 MB</span> <span class="sep">·</span> </span><span class="nw">Apple silicon</span> <span class="sep">·</span> <span class="nw">macOS 14 or later</span>
+      </p>
+      <p class="alt">signed and notarized by Apple · or <a href="#ways">the beta, or the terminal app</a></p>
+      <p class="intel">this Mac may have an Intel chip: bise for Mac needs Apple silicon. <a href="#ways">the terminal app</a> runs on both.</p>
+    </div>
+
+    <div class="soon-only">
+      <p class="t2" style="margin-top:0">bise for Mac isn't out yet. the terminal app is, and it's the same bise: same agents, same pages.</p>
+      <div class="install" style="width:min(420px, 100%); margin:22px auto 0" data-copy="curl -fsSL bise.dev/install | sh" role="button" tabindex="0"><span><span class="p">$</span> curl -fsSL bise.dev/install | sh</span><span class="c">copy</span></div>
+    </div>
+
+    <!-- after his click: the download started, here is what to do next -->
+    <div class="got" aria-live="polite">
+      <div>
+        <p class="head">bise is coming down as <code>bise-mac-arm64.dmg</code>. then:</p>
+        <ol>
+          <li><span class="n">1</span><span>open it from your Downloads.</span></li>
+          <li class="now"><span class="n">2</span><span>drag bise to Applications.</span></li>
+          <li><span class="n">3</span><span>open bise from Applications.<small>macOS asks once if you want to open an app from the internet: Open. then say what's on your mind.</small></span></li>
+        </ol>
+        <p class="again">nothing came down? <a href="/download/mac">download it again</a></p>
+      </div>
+      <div class="dmg" aria-label="the disk image's window: drag bise onto Applications">
+        <div class="tb"><i></i><i></i><i></i><span>bise</span></div>
+        <svg viewBox="0 0 660 300" aria-hidden="true">
+          <rect width="660" height="300" fill="#fdfbf7"/>
+          <path d="M262 165 C 296 155, 330 177, 364 167 S 380 163, 396 165" fill="none" stroke="#7d766c" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M386 157 L396 165 L386 173" fill="none" stroke="#7d766c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <g transform="translate(416 101)" fill="none" stroke="#1b1917" stroke-width="2.2" stroke-linejoin="round">
+            <path d="M6 22 Q6 12 16 12 H44 L52 22 H112 Q122 22 122 32 V110 Q122 120 112 120 H16 Q6 120 6 110 Z" fill="#efeae0"/>
+            <path d="M6 36 H122" stroke-width="1.4" opacity=".5"/>
+            <path d="M50 96 L64 56 L78 96 M55 83 H73" stroke-width="2.6" stroke-linecap="round"/>
+          </g>
+          <text x="180" y="262" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" fill="#1b1917">bise</text>
+          <text x="480" y="262" text-anchor="middle" font-family="Geist, -apple-system, system-ui, sans-serif" font-size="15" fill="#1b1917">Applications</text>
+        </svg>
+        <img class="app" src="download/icon.png" alt="">
+        <img class="ghost" src="download/icon.png" alt="">
+      </div>
+    </div>
+  </div>
+ </div>
+
+ <!-- the bims' town, live: a ~5 min film the camera directs; drag or pinch and it's yours -->
+ <div class="hbox" id="town" aria-label="the bims' town: every agent is a little character at work in its project's office">
+   <img class="poster l" src="desktop/town-day.jpg" width="2400" height="1250" alt="">
+   <img class="poster d" src="desktop/town-night.jpg" width="2400" height="1250" alt="">
+   <div class="hstage"></div>
+   <p class="hcap" id="hcap" hidden>drag to look around · the camera follows the action until&nbsp;you&nbsp;do</p>
+   <div class="hctl">
+     <button type="button" id="hback" hidden>▶ back to the film</button>
+     <button type="button" id="hin" aria-label="zoom in" title="zoom in">+</button>
+     <button type="button" id="hout" aria-label="zoom out" title="zoom out">−</button>
+   </div>
+ </div>
+</section>
+
+<!-- the app itself, under the town -->
+<section class="app-sec">
+  <div class="stage blow">
+    <div class="shot">
+      <img class="l" src="download/1-main-light.png" width="2880" height="1800" alt="bise for Mac: storefront's thread. you asked about checkout errors, bise found the cause, checkout fixed it, and search asks you a question in the inbox. the agents are on the right.">
+      <img class="d" src="download/1-main-dark.png" width="2880" height="1800" alt="">
+    </div>
+    <div class="banner" id="banner" role="img" aria-label="a macOS notification: search needs you">
+      <img src="download/icon.png" alt="">
+      <div><b>search needs you</b><span>which size system should the filter use: EU, or US too?</span></div>
+      <time>now</time>
+    </div>
+  </div>
+</section>
+
+<!-- why: the three problems, like the terminal landing's frame -->
+<section class="why" id="why">
+  <div class="inner">
+    <div class="blow">
+      <div class="kicker">why</div>
+      <h2>you didn't become an engineer to <span class="hl">babysit robots</span>.</h2>
+    </div>
+    <div class="beat blow">
+      <p class="say">you’ve got more agents than you can keep track of.</p>
+      <p>five, ten of them at once. you hop from tab to tab all day, and by the evening your brain is soup.</p>
+    </div>
+    <div class="beat blow">
+      <p class="say">you’d love to hand off more. but letting go is scary.</p>
+      <p>nobody tells you how to set up agents that run on their own. and when you try, you worry they’ll go off and do the wrong thing, with a token bill to match.</p>
+    </div>
+    <div class="beat blow">
+      <p class="say">and none of it is fun!</p>
+      <p>it feels like working the counter at the post office.</p>
+    </div>
+    <p class="turn blow">what if your team looked like a video game?</p>
+  </div>
+</section>
+
+<!-- the answer: a team lead, and a team -->
+<section class="lead" style="padding-bottom:6vh">
+  <div class="inner blow">
+    <div class="kicker">bise</div>
+    <h2>so here’s how bise does it.</h2>
+    <p>you talk to one agent, bise. it starts an agent for each job, and only bothers you when something actually needs you.</p>
+    <p><b>it’s a simple setup.</b> one lead, one agent per task. the lead figures out who does what, and in which order.</p>
+    <p><b>you’re still the boss.</b> you choose the work, and what you want to look at yourself.</p>
+    <p><b>and it doesn’t cost more.</b> they’re the same agents you’d run by hand. the lead just keeps them in sync.</p>
+  </div>
+  <div class="demo blow" id="demo" aria-label="a request to bise, played start to finish">
+    <div class="bar"><span class="kiss">:*</span><b>bise</b> · every project</div>
+    <div class="feed" id="feed"></div>
+    <button class="next" id="next" type="button">another one ↻</button>
+  </div>
+</section>
+
+<!-- what it is: four things, each with the real screen -->
+<section class="what" style="padding-top:6vh">
+  <div class="rows">
+    <div class="row blow">
+      <div class="shot"><img class="l" src="download/4-bise-light.png" width="2880" height="1800" loading="lazy" alt="bise's own thread, across every project: what happened while you were out, and two things that wait for you"><img class="d" src="download/4-bise-dark.png" width="2880" height="1800" loading="lazy" alt=""></div>
+      <div class="txt"><h3>one agent to talk to.</h3><p>bise sees all your projects. you say what’s on your mind and it passes the work to the right one. back from lunch? it’ll tell you what happened.</p></div>
+    </div>
+    <div class="row flip blow">
+      <div class="shot"><img class="l" src="desktop/5-bims-light.png" width="2880" height="1800" loading="lazy" alt="storefront's office open in the right bar: perf and stock at their desks, checkout done, a question mark over search, which waits for you"><img class="d" src="desktop/5-bims-dark.png" width="2880" height="1800" loading="lazy" alt=""></div>
+      <div class="txt"><h3>it feels a bit like playing the Sims.</h3><p>each agent is a bim, a little character in its project’s office. you can see who’s typing, who’s stuck and who’s waiting on you. click one and you’re in its thread.</p></div>
+    </div>
+    <div class="row blow">
+      <div class="shot"><img class="l" src="download/2-inbox-light.png" width="2880" height="1800" loading="lazy" alt="the inbox: two questions wait for you, then what you answered today and yesterday"><img class="d" src="download/2-inbox-dark.png" width="2880" height="1800" loading="lazy" alt=""></div>
+      <div class="txt"><h3>it only knocks when it needs you.</h3><p>questions from every project land in one inbox, with one banner, once. you answer from wherever you are, and your answer stays next to the thread it came from.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- artifacts: questions you can actually answer -->
+<section class="arts">
+  <div class="inner blow">
+    <div class="kicker">artifacts</div>
+    <h2>questions you can actually answer.</h2>
+    <p>when ten agents are running, a question like « v1 or v2 for the examples? » shows up with no context. you end up scrolling back through the thread to remember what v1 even was.</p>
+    <p>so when a decision needs you, the agent writes you a page. it shows what it did and the options side by side. you leave notes right on it, pick one, and send it all back in one go.</p>
+  </div>
+  <div class="stage blow" style="margin-top:48px">
+    <div class="shot"><img class="l" src="desktop/6-notes-light.png" width="2880" height="1800" loading="lazy" alt="perf's before / after page open beside its thread: three notes on it, one on a number, one on its question, one on the table, sent together with one click"><img class="d" src="desktop/6-notes-dark.png" width="2880" height="1800" loading="lazy" alt=""></div>
+  </div>
+</section>
+
+<!-- the details, handled -->
+<section style="padding-bottom:8vh">
+  <div class="inner blow" style="max-width:1080px">
+    <div class="kicker">under the hood</div>
+    <h2>the hard parts, done right.</h2>
+    <p class="soft" style="font-size:19px">nothing falls through the cracks.</p>
+  </div>
+  <div class="details blow">
+    <div class="detail"><h3>code mode for every app.</h3><p>plug in any MCP server. agents write a little script to use your tools, one run instead of forty calls.</p>
+      <div class="scr" aria-hidden="true"><div>ƒ <span class="d">file new Sentry errors in Linear</span></div><div class="f">  ↳ sentry.list_issues ✓</div><div class="f">  ↳ linear.create_issue ✓ ×3   ✓ 2.1 s</div></div></div>
+    <div class="detail"><h3>nothing gets lost.</h3><p>quit it, restart it, crash it: bise picks up where it left off.</p>
+      <div class="scr" aria-hidden="true"><div class="d">bise stopped. starting it again…</div><div class="d">bise is back. nothing is lost.</div><div>perf <span class="d">∿ working · 14 min</span></div></div></div>
+    <div class="detail"><h3>they work as a team.</h3><p>they talk and give each other a heads-up. the messaging is proven correct, so nothing goes missing.</p>
+      <div class="scr" aria-hidden="true"><div class="d">✉ perf → checkout</div><div>heads-up: i'm changing the</div><div>prices api. <span class="chip">image 1</span></div></div></div>
+    <div class="detail"><h3>the lead cleans up.</h3><p>when an agent falls over, the lead picks it back up. you only hear about it if it needs you.</p>
+      <div class="scr" aria-hidden="true"><div><span class="er">✗</span> <span class="d">search failed · model call</span></div><div><span class="a">:*</span> restarted search on its</div><div>branch. nothing lost.</div></div></div>
+    <div class="detail"><h3>automatic worktrees.</h3><p>each agent gets its own, set up and tidied away for you.</p>
+      <div class="scr" aria-hidden="true"><div>ψ <span class="d">sb/perf · its own worktree</span></div><div><span class="ok">✓</span> <span class="d">perf landed 3 commits on main</span></div><div class="d">perf archived · its worktree removed</div></div></div>
+    <div class="detail"><h3>they can use your computer.</h3><p>they use your browser in their own tabs, with your logins. your tabs stay yours.</p>
+      <div class="scr" aria-hidden="true"><div>qa <span class="d">∿ driving Chrome · 2 min</span></div><div class="d">opened /pricing in its own tab</div><div class="d">your tab was never touched.</div></div></div>
+    <div class="detail"><h3>it works while you don't.</h3><p>a check every morning, a two-hour test suite: the agent naps and wakes up when it’s done.</p>
+      <div class="scr" aria-hidden="true"><div>◷ <span class="d">nightly · every day 07:30</span></div><div>… <span class="d">waiting for cargo test · 4m</span></div><div class="d">cargo test ended · rc 0 · after 2h</div></div></div>
+    <div class="detail"><h3>it asks before anything risky.</h3><p>a small model reads every call. the risky ones wait for your ok.</p>
+      <div class="scr" aria-hidden="true"><div><span class="a">!</span> push --force to main?</div><div class="d">rewrites 2 commits others have</div><div class="d">1 allow   2 refuse</div></div></div>
+    <div class="detail"><h3>the little things are nice.</h3><p>talk, dictate, paste a screenshot, quote a diff. it all goes in one box.</p>
+      <div class="scr" aria-hidden="true"><div><span class="chip">❝ 1 cart.rs:12-14</span> <span class="chip">image 1</span></div><div>fix this, like the mock</div><div class="d">^R dictate   ^R^R voice</div></div></div>
+  </div>
+</section>
+
+<!-- plans and keys, and who it's for -->
+<section style="padding-top:8vh">
+  <div class="pair blow">
+    <div>
+      <div class="kicker">your plan or your keys</div>
+      <h3>it works with what you already pay for.</h3>
+      <p>your ChatGPT plan, OpenRouter, a coding plan, or any API key.</p>
+      <p class="small">Claude plans only work in Anthropic's apps: for Claude, use an API key. <a href="/docs/subscriptions">the plans bise can use</a></p>
+    </div>
+    <div>
+      <div class="kicker">who it's for</div>
+      <h3>for people with more ideas than hands.</h3>
+      <p>solo founders, indie makers, anyone with a long list of ideas and nobody to build them with. that’s who i made it for.</p>
+    </div>
+  </div>
+</section>
+
+<!-- made by a human -->
+<section id="me">
+  <div class="inner blow me">
+    <div class="kicker">made by a human</div>
+    <h2><span>hi, i'm Gabriel</span><img class="face" src="/gabriel.jpg" width="96" height="96" alt="Gabriel Vergnaud, smiling, by the water at sunset"></h2>
+    <p>i work at Mistral, and bise is the multi-agent harness i always wanted.</p>
+    <p class="soft">i wanted one team lead to talk to, a team that does the work, and me staying in flow instead of babysitting tabs. so i built it. most of bise was built with bise.</p>
+    <p>i think it's the best multi-agent harness out there today. try it, and tell me what you think: i read every issue.</p>
+    <div class="sig">Gabriel <span>:*</span></div>
+    <p class="by">Gabriel Vergnaud · <a href="https://github.com/gvergnaud">@gvergnaud</a> on GitHub · <a href="https://x.com/GabrielVergnaud">@GabrielVergnaud</a> on X</p>
+  </div>
+</section>
+
+<!-- three ways in -->
+<section id="ways">
+  <div class="inner blow" style="max-width:1080px">
+    <div class="kicker">three ways in</div>
+    <h2>three ways to get it.</h2>
+  </div>
+  <div class="ways blow">
+    <div class="way">
+      <h3>bise for Mac</h3>
+      <p class="who">for every day</p>
+      <p>the window, the banners, the menu bar. it updates itself when you quit it or step away, and your agents keep running through it.</p>
+      <a class="link ready-only" href="/download/mac" data-dl>download</a>
+      <p class="small ready-only"><span class="numbers"><span data-slot="version">2026.10.1</span> · <span data-slot="date">Oct 12, 2026</span> · </span>Apple silicon</p>
+      <p class="small soon-only">not out yet</p>
+    </div>
+    <div class="way beta" data-slot="beta" data-off>
+      <h3>the beta</h3>
+      <p class="who">a few days early</p>
+      <p>the next bise for Mac, newer and less tested. or turn on <i>beta builds</i> in bise's Settings › General; turning it off keeps your build until stable passes it.</p>
+      <a class="link" href="/download/mac-beta" data-dl>download the beta</a>
+      <p class="small"><span data-slot="beta-version">2026.10.3</span> · <span data-slot="beta-size">206 MB</span></p>
+    </div>
+    <div class="way">
+      <h3>the terminal app</h3>
+      <p class="who">macOS and Linux</p>
+      <p>the same bise in your terminal: same hubs, same agents, same pages. use both at once if you like.</p>
+      <div class="install" data-copy="curl -fsSL bise.dev/install | sh" role="button" tabindex="0" title="click to copy"><span><span class="p">$</span> curl -fsSL bise.dev/install | sh</span><span class="c">copy</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- what's new in the build he'd get -->
+<section class="new ready-only">
+  <details class="inner blow fold">
+    <summary><h2>what's new<span class="v" data-slot="version">2026.10.1</span></h2></summary>
+    <ul data-slot="notes">
+      <li>the first signed build: open it like any Mac app, no Terminal step</li>
+      <li>bise updates itself when you quit it, or while you're away</li>
+      <li>the inbox has its own page: what waits for you, then what you answered</li>
+      <li>drop an image or a PDF on the composer, agents read it</li>
+      <li><code>⌘K</code> opens any agent, live or archived</li>
+      <li>the right bar shows the artifacts and timers of the agent in view</li>
+    </ul>
+    <a class="more" data-slot="more" href="https://github.com/gvergnaud/bise/releases">and 2 more in the release notes</a>
+  </details>
+</section>
+
+<!-- the fine print -->
+<section style="padding-top:0">
+  <details class="inner fine blow fold">
+    <summary><h2>the fine print</h2></summary>
+    <p><b>runs on</b> Macs with Apple silicon (M1 and later), macOS 14 or later. an Intel Mac: the terminal app.</p>
+    <p><b>you need</b> git, and a way to pay for the models: your ChatGPT Plus or Pro plan, OpenRouter, a coding plan, or an API key from Anthropic, OpenAI, Google, Mistral and more. <a href="/docs/subscriptions">the plans bise can use</a>.</p>
+    <p><b>safe to open</b> signed with a Developer ID and notarized by Apple. nothing to run in a terminal first.</p>
+    <p><b>had a test build?</b> download it once more from here. after that, updates come by themselves.</p>
+    <p><b>to leave</b> quit bise and drag it to the Bin. your hubs and threads stay in <code>~/.bise</code> until you remove them.</p>
+  </details>
+</section>
+
+
+<script>
+(() => {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* under the hood: each card's little screen plays its scene in a loop while it's in view (the static lines stay for no-JS and reduced motion) */
+  const D = (t) => '<span class="d">' + t + '</span>', F = (t) => '<span class="f">' + t + '</span>', A = (t) => '<span class="a">' + t + '</span>', OK = (t) => '<span class="ok">' + t + '</span>', ER = (t) => '<span class="er">' + t + '</span>', C = (t) => '<span class="chip">' + t + '</span>';
+  const scenes = [
+    [['type', 'you  ', 'file new Sentry errors in Linear'], ['w', 500], ['add', 'ƒ ' + D('file new Sentry errors…') + '  ' + D('∿')], ['w', 700], ['add', F('  ↳ sentry.list_issues ✓')], ['w', 600], ['add', F('  ↳ linear.create_issue ✓ ×3')], ['w', 500], ['set', 1, 'ƒ ' + D('file new Sentry errors…') + '  ' + OK('✓') + ' ' + D('2.1 s')], ['w', 500], ['add', '3 issues filed, in one run.']],
+    [['add', 'perf ' + D('∿ working · 14 min')], ['w', 1200], ['add', D('bise stopped. starting it again…')], ['w', 1400], ['add', D('bise is back. nothing is lost.')], ['w', 900], ['set', 0, 'perf ' + D('∿ working · 15 min')], ['w', 600], ['add', 'perf ' + D('picks up where it was.')]],
+    [['add', D('✉ perf → checkout')], ['w', 400], ['add', "heads-up: i'm changing the prices api."], ['w', 1200], ['add', D('✉ checkout → perf')], ['w', 400], ['add', "thanks, i'll wait for it."], ['w', 1400], ['add', OK('✓') + D(' perf landed · checkout goes on')]],
+    [['add', 'search ' + D('∿ working · 3 min')], ['w', 1200], ['set', 0, ER('✗') + ' ' + D('search failed · model call')], ['w', 1000], ['add', A(':*') + ' restarted search on its branch.'], ['w', 900], ['add', 'search ' + D('∿ working')], ['w', 1500], ['set', 2, OK('✓') + ' ' + D('search landed 2 commits')]],
+    [['add', 'ψ ' + D('perf · its own worktree')], ['w', 500], ['add', 'ψ ' + D('search · its own worktree')], ['w', 1300], ['add', OK('✓') + ' ' + D('perf landed 3 commits on main')], ['w', 900], ['set', 0, D('perf archived · worktree removed')], ['w', 900], ['add', D('your folder: untouched.')]],
+    [['add', 'qa ' + D('∿ driving Chrome · 0 min')], ['w', 900], ['add', D('opened /pricing in its own tab')], ['w', 900], ['add', D('read it · took a screenshot ') + C('▣ 1')], ['w', 900], ['set', 0, 'qa ' + OK('✓') + D(' buy shows on all 3 plans')], ['w', 700], ['add', D('your tab was never touched.')]],
+    [['add', '◷ ' + D('nightly · every day 07:30')], ['w', 700], ['add', '… ' + D('waiting for cargo test · 4m')], ['w', 900], ['set', 1, '… ' + D('waiting for cargo test · 38m')], ['w', 900], ['set', 1, '… ' + D('waiting for cargo test · 1h 52m')], ['w', 900], ['add', D('cargo test ended · rc 0 · after 2h')], ['w', 600], ['add', OK('✓') + ' nightly: all green.']],
+    [['add', '$ ' + D('cargo test') + '  ' + OK('✓')], ['w', 500], ['add', '± ' + D('src/cart.rs +18 −6') + '  ' + OK('✓')], ['w', 900], ['add', A('!') + ' push --force to main?'], ['w', 300], ['add', D('rewrites 2 commits others have')], ['w', 400], ['add', D('1 allow   2 refuse')], ['w', 1500], ['set', 4, D('refused. main is safe.')]],
+    [['add', C('❝ 1 cart.rs:12-14')], ['w', 700], ['set', 0, C('❝ 1 cart.rs:12-14') + ' ' + C('image 1')], ['w', 600], ['type', '', 'fix this, like the mock'], ['w', 900], ['add', D('● listening…')], ['w', 1300], ['set', 2, D('^R dictate   ^R^R voice')]],
+  ];
+  const cards = [...document.querySelectorAll('.details .detail .scr')];
+  if (!reduced) cards.forEach((scr, k) => {
+    const steps = scenes[k]; if (!steps) return;
+    let on = false, run = 0;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const loop = async () => {
+      const me = ++run;
+      while (on && me === run) {
+        scr.classList.add('live'); scr.textContent = '';
+        for (const st of steps) {
+          if (!on || me !== run) return;
+          if (st[0] === 'w') await sleep(st[1]);
+          else if (st[0] === 'add') { const el = document.createElement('div'); el.innerHTML = st[1]; scr.appendChild(el); while (scr.children.length > 5) scr.firstChild.remove(); }
+          else if (st[0] === 'set') { const el = scr.children[st[1]]; if (el) { el.innerHTML = st[2]; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; } }
+          else if (st[0] === 'type') { const el = document.createElement('div'); scr.appendChild(el); for (let i = 0; i <= st[2].length; i++) { if (!on || me !== run) return; el.innerHTML = (st[1] ? D(st[1]) : '') + st[2].slice(0, i) + '<span class="cur"></span>'; await sleep(38); } el.innerHTML = (st[1] ? D(st[1]) : '') + st[2]; }
+        }
+        await sleep(2600);
+      }
+    };
+    new IntersectionObserver((es) => es.forEach((e) => { const was = on; on = e.isIntersecting; if (on && !was) setTimeout(loop, 250 * (k % 3)); })).observe(scr);
+  });
+  /* the lead, live */
+  const ideas = [
+    { ask: 'add gift cards to the shop', proj: 'storefront', ag: ['cards-ui', 'checkout', 'tests'], q: ['checkout', 'one gift card per order?'], ans: 'yes, one', end: 'all three landed. want to see it?' },
+    { ask: 'the p99 alert keeps firing at night', proj: 'telemetry', ag: ['p99', 'dashboards'], q: ['p99', 'page someone, or just a mail?'], ans: 'a mail is fine', end: 'fixed: it averaged the slowest 10%. both landed.' },
+    { ask: 'make the docs search find typos', proj: 'docs', ag: ['search', 'index'], q: null, end: 'done, both landed. "pyhton" finds python now.' },
+  ];
+  const feed = document.getElementById('feed'), next = document.getElementById('next');
+  if (!feed) return;
+  let i = 0, timers = [];
+  const add = (cls, html) => { const el = document.createElement('div'); el.className = 'm ' + cls; el.innerHTML = html; feed.appendChild(el); requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on'))); return el; };
+  const at = (ms, fn) => timers.push(setTimeout(fn, reduced ? 0 : ms));
+  const play = () => {
+    timers.forEach(clearTimeout); timers = []; feed.textContent = '';
+    const x = ideas[i % ideas.length]; i++;
+    at(200, () => add('you', x.ask));
+    at(1200, () => add('bise', 'on it. ' + x.ag.length + ' agents in ' + x.proj + '.<i>bise · the lead</i>'));
+    const rows = [];
+    x.ag.forEach((a, k) => at(1900 + k * 350, () => rows[k] = add('ag', '<span>' + a + '</span><span class="st w">working</span>')));
+    let t = 1900 + x.ag.length * 350 + 1600;
+    if (x.q) {
+      const k = x.ag.indexOf(x.q[0]);
+      at(t, () => { rows[k].querySelector('.st').className = 'st q'; rows[k].querySelector('.st').textContent = '? waits for you'; add('bise', x.q[0] + ' asks: ' + x.q[1]); });
+      t += 2200; at(t, () => add('you', x.ans));
+      t += 900; at(t, () => { rows[k].querySelector('.st').className = 'st w'; rows[k].querySelector('.st').textContent = 'working'; });
+      t += 1200;
+    }
+    x.ag.forEach((a, k) => at(t + k * 500, () => { const st = rows[k].querySelector('.st'); st.className = 'st ok'; st.textContent = '✓ landed'; }));
+    t += x.ag.length * 500 + 500;
+    at(t, () => add('bise', x.end));
+    if (!reduced) at(t + 4000, play);
+  };
+  next.onclick = play;
+  const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); play(); } }, { threshold:.3 });
+  io.observe(document.getElementById('demo'));
+})();
+</script>
+<footer>
+  <span>bise <span class="kiss">:*</span> · open source under <a href="https://github.com/gvergnaud/bise/blob/main/LICENSE">Apache-2.0</a></span>
+  <span><a href="/">bise.dev</a> · <a href="https://github.com/gvergnaud/bise/releases">releases</a> · <a href="/docs/">docs</a></span>
+</footer>
+
+<script>
+(() => {
+  const r = document.documentElement, body = document.body;
+  const q = new URLSearchParams(location.search);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* theme: the landing's key, so both pages agree */
+  const dark = (on, keep) => { r.classList.toggle('pd', on); if (keep) try { localStorage.setItem('bise-theme', on ? '1' : '0'); } catch {} document.querySelector('meta[name=theme-color]').content = on ? '#171513' : '#f2ede2'; };
+  dark(r.classList.contains('pd'));
+  document.getElementById('theme').onclick = () => dark(!r.classList.contains('pd'), true);
+  /* preview states without the feed: ?state=soon|unknown, ?got */
+  if (q.get('state')) body.dataset.state = q.get('state');
+  /* the reveal */
+  requestAnimationFrame(() => body.classList.add('ready'));
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold:.15 });
+  document.querySelectorAll('.blow').forEach((el) => io.observe(el));
+  if (q.has('shot')) document.querySelectorAll('.blow').forEach((el) => el.classList.add('in'));
+  if (q.has('still')) document.querySelectorAll('.blow').forEach((el) => el.classList.add('in'));
+  /* the banner comes in once the window is on screen */
+  setTimeout(() => document.getElementById('banner').classList.add('on'), reduced ? 0 : 1800);
+  /* the click: the link downloads (no preventDefault), the page shows what comes next */
+  const got = () => { body.classList.add('downloading'); };
+  document.getElementById('dl').addEventListener('click', got);
+  document.querySelectorAll('[data-dl]').forEach((a) => a.addEventListener('click', () => { got(); scrollTo({ top:0, behavior: reduced ? 'auto' : 'smooth' }); }));
+  if (q.has('got')) got();
+  /* copy the one-liner */
+  document.querySelectorAll('[data-copy]').forEach((el) => {
+    const go = () => navigator.clipboard?.writeText(el.dataset.copy).then(() => { el.classList.add('done'); el.querySelector('.c').textContent = 'copied'; setTimeout(() => { el.classList.remove('done'); el.querySelector('.c').textContent = 'copy'; }, 1600); });
+    el.addEventListener('click', go); el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  /* phone: share the link to open on the Mac */
+  document.getElementById('share').onclick = () => { const u = 'https://bise.dev/desktop'; if (navigator.share) navigator.share({ title:'bise for Mac', url:u }).catch(() => {}); else navigator.clipboard?.writeText(u); };
+})();
+</script>
+<script type="module">
+/* the bims' town, live (hero-town's bundle): mounted after first paint over the poster still.
+   the page draws the controls and the first-visit caption; the bundle draws the town. */
+const box = document.getElementById('town');
+const root = document.documentElement;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const theme = () => root.classList.contains('pd') ? 'dark' : 'light';
+const back = document.getElementById('hback'), cap = document.getElementById('hcap');
+let seen = false; try { seen = localStorage.getItem('bise-town-seen') === '1'; } catch {}
+const hideCap = () => { cap.classList.add('gone'); setTimeout(() => { cap.hidden = true; }, 400); try { localStorage.setItem('bise-town-seen', '1'); } catch {} };
+const slow = setTimeout(() => box.classList.add('slow'), 8000); /* the entry builds from empty paper: the still is only for a town that can't come (no WebGL) or a very slow load */
+(async () => {
+  try {
+    const { mount } = await import('/desktop/hero/hero.js');
+    const town = mount(box.querySelector('.hstage'), { theme: theme(), ground: { light: '#f7f2e9', dark: '#24201c' }, reducedMotion });
+    town.on('lost', () => box.classList.add('lost'));
+    town.on('ready', () => { clearTimeout(slow); box.classList.add('ready'); if (!seen) { cap.hidden = false; setTimeout(hideCap, 7000); } });
+    town.on('control', () => { back.hidden = false; if (!cap.hidden) hideCap(); });
+    town.on('film', () => { back.hidden = true; });
+    back.onclick = () => town.resumeFilm();
+    document.getElementById('hin').onclick = () => town.zoom(1);
+    document.getElementById('hout').onclick = () => town.zoom(-1);
+    new MutationObserver(() => town.setTheme(theme())).observe(root, { attributes: true, attributeFilter: ['class'] });
+  } catch { box.classList.add('lost'); /* no bundle or no WebGL: the still */ }
+})();
+</script>
+<script type="module">
+/* the feed (dist-site): download.js reads the rolling releases desktop-latest and
+   desktop-beta through the GitHub API and fills the data-slot spots. ?state= (a
+   preview) skips it; ?api=<base> on localhost reads <base>/<tag>.json instead
+   (tests/fixtures/site-download/). */
+import { TAGS, apiUrl, view, formatSize, formatDate, shortVersion, notesItems } from "/download.js";
+const body = document.body, q = new URLSearchParams(location.search);
+const slots = (name) => document.querySelectorAll(`[data-slot="${name}"]`);
+const fill = (name, text) => slots(name).forEach((el) => { el.textContent = text; });
+/* an Intel Mac: the WebGL renderer names no Apple GPU. it only adds a line */
+try {
+  const gl = document.createElement("canvas").getContext("webgl");
+  const ext = gl && gl.getExtension("WEBGL_debug_renderer_info");
+  const gpu = ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+  if (/Mac/.test(navigator.platform) && gpu && !/Apple/.test(gpu)) body.classList.add("intel-guess");
+} catch {}
+if (!q.get("state")) {
+  const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  const base = local && q.get("api");
+  const url = (tag) => base ? `${base.replace(/\/$/, "")}/${tag}.json` : apiUrl(tag);
+  /* an object, null (404: no such release yet), undefined (couldn't ask) */
+  const get = (tag) => fetch(url(tag), { headers: { Accept: "application/vnd.github+json" } })
+    .then((res) => res.ok ? res.json() : res.status === 404 ? null : undefined, () => undefined);
+  const [stableRel, betaRel] = await Promise.all([get(TAGS.stable), get(TAGS.beta)]);
+  const v = view(stableRel, betaRel);
+  if (v.stable) {
+    const s = v.stable;
+    fill("version", shortVersion(s.version));
+    fill("size", formatSize(s.size));
+    fill("date", formatDate(s.date));
+    const n = notesItems(s.notes);
+    slots("notes").forEach((ul) => { ul.innerHTML = n.items.map((h) => `<li>${h}</li>`).join(""); });
+    slots("more").forEach((a) => { a.href = s.notesUrl; a.textContent = n.more ? `and ${n.more} more in the release notes` : "the full release notes"; });
+  }
+  if (v.beta) {
+    fill("beta-version", shortVersion(v.beta.version));
+    fill("beta-size", formatSize(v.beta.size));
+  }
+  slots("beta").forEach((el) => el.toggleAttribute("data-off", !v.beta));
+  /* ready without notes: no what's new */
+  if (v.stable && !notesItems(v.stable.notes).items.length) document.querySelector("section.new")?.setAttribute("hidden", "");
+  body.dataset.state = v.state;
+}
+body.dataset.fed = "1";  /* the tests wait on it */
+</script>
+</body>
+</html>
