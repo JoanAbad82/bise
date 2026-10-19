@@ -5,6 +5,7 @@
 // view (global bise) lists both. The scripted core (FakeCore); a shot of each for the
 // designer. Owner: amb-home (src/inbox/scope.ts).
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { inbox } from '../../../src/proto/words_inbox.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -54,7 +55,8 @@ test("thread/inbox-scope: a project's view lists its own items; global bise and 
     await expect(block).not.toContainText('which currency');
     await expect(page.getByTestId('inbox.block.row.1').locator('.end')).not.toContainText('acme');
     const others = page.getByTestId('inbox.block.others');
-    await expect(others, "designer m_33443: '1 in other projects' alone is the link to /inbox").toHaveText('1 in other projects');
+    // designer m_33443: the words alone are the link to /inbox, the dot before them plain
+    await expect(others).toHaveText(inbox.block_head_others({ n: 1 }));
     await page.screenshot({ path: test.info().outputPath('1-project-acme.png') });
     await others.hover();
     await block.screenshot({ path: test.info().outputPath('1b-project-acme-head.png') });
