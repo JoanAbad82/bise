@@ -8,7 +8,7 @@ microphone (SB_VOICE_FAKE_MIC):
   key step: a wrong key (the provider's words), a key with no credit
   (saved, then credit added: enter tries again), then its voice models;
   the one just checked is taken with no second call: `✓ voice is on:
-  mistral/voxtral-transcribe-3.` and config.toml's `[roles] voice`;
+  mistral/voxtral-mini-transcribe-3.` and config.toml's `[roles] voice`;
 - /models: provider then model; main moves to Mistral too (ready: the
   key voice uses), a typed id, the effort; Mistral shows on both rows;
   agents' `same as main` first; /model grouped by provider, its last row
@@ -132,7 +132,7 @@ def main():
         sc = t.wait(w("settings.roles_which_model", role="voice", dot="·", provider="Mistral"), 30)
         cap("05-voice-models")
         assert "voxtral-small-transcribe-3" in sc and "mistral-large-4" not in sc, sc
-        assert re.search(r"› voxtral-transcribe-3 +recommended", sc), sc
+        assert re.search(r"› voxtral-mini-transcribe-3 +recommended", sc), sc
         # the model just checked: no second call
         n = len([r for r in E.fake_requests() if r.get("family") == "stt"])
         t.keys("Enter")
@@ -141,20 +141,20 @@ def main():
         sc = t.wait_re(r"› dictation +on", 30)
         assert re.search(r"speech to text +Mistral · Voxtral Transcribe 3", sc), sc
         t.keys("Escape")
-        sc = t.wait(w("composer.voice_enabled", model="mistral/voxtral-transcribe-3."), 30)
+        sc = t.wait(w("composer.voice_enabled", model="mistral/voxtral-mini-transcribe-3."), 30)
         assert w("composer.voice_on_how") in sc, sc
         assert len([r for r in E.fake_requests() if r.get("family") == "stt"]) == n, "checked once"
         cfg = open(os.path.join(root, "config.toml")).read()
-        assert 'voice = "mistral/voxtral-transcribe-3"' in cfg, cfg
+        assert 'voice = "mistral/voxtral-mini-transcribe-3"' in cfg, cfg
         stt = [r for r in E.fake_requests() if r.get("family") == "stt"]
-        assert stt and all(r["model"] == "voxtral-transcribe-3" for r in stt), stt
+        assert stt and all(r["model"] == "voxtral-mini-transcribe-3" for r in stt), stt
         # /models: provider then model, one column
         t.typed("/models")
         t.keys("Enter")
         sc = t.wait(ROLES)
         cap("06-models")
         assert w("settings.roles_screen_sub") in sc, sc
-        assert re.search(r"voice +Mistral +voxtral-transcribe-3", sc), sc
+        assert re.search(r"voice +Mistral +voxtral-mini-transcribe-3", sc), sc
         assert re.search(r"main +Anthropic +claude-opus-5-5", sc), sc
         assert re.search(r"agents +same as main · Anthropic · claude-opus-5-5", sc), sc
         # main on Mistral too: the key voice uses, ready
@@ -183,7 +183,7 @@ def main():
         t.keys("Enter")
         sc = t.wait_re(r"main +Mistral +mistral-large-4")
         cap("11-models-mistral-twice")
-        assert re.search(r"voice +Mistral +voxtral-transcribe-3", sc), sc
+        assert re.search(r"voice +Mistral +voxtral-mini-transcribe-3", sc), sc
         assert re.search(r"agents +same as main · Mistral · mistral-large-4", sc), sc
         cfg = open(os.path.join(root, "config.toml")).read()
         assert 'main = "mistral/mistral-large-4"' in cfg, cfg
