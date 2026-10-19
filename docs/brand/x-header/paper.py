@@ -3,7 +3,7 @@
 # dependencies = ["uharfbuzz>=0.40", "websocket-client"]
 # ///
 """The X header (1500x500) in the paper art direction: light paper, the north-wind cloud blowing,
-'bise :*' (Newsreader + the Caveat kiss, its * level with the colon), a few seeds in the wind.
+'bise :*' (Newsreader + the kiss in JetBrains Mono: the :* is always mono), a few seeds in the wind.
 Run: uv run docs/brand/x-header/paper.py -> header-paper.svg, header-paper.png, header-paper@2x.png
 (the PNGs are rendered by headless Chrome, so the pencil filter looks like it does on the site).
 X covers the bottom-left with the avatar and crops the top and bottom on phones: the name and the
@@ -18,16 +18,16 @@ t = ink.PAPER[M]
 tp = ink.text_path
 
 # the name, centered a little right of the middle
-NS, KS = 150, 138
+NS, KS = 150, 115  # the :* is always mono, never the hand font
 _, w_bise = tp("bise", "serif", NS, track=-.045, wght=600, opsz=72)
 w_sp = ink.measure(" ", "serif", NS, wght=600, opsz=72) * .45
-_, w_col = tp(":", "hand", KS, wght=700); _, w_star = tp("*", "hand", KS, wght=700)
-w_name = w_bise + w_sp + w_col + w_star
+_, w_col = tp(":", "mono", KS, wght=700); _, w_star = tp("*", "mono", KS, wght=700)
+w_name = w_bise + w_sp + w_col + w_star - KS * .12
 x0, yb = 560 - w_name / 2, 300
 d_bise, _ = tp("bise", "serif", NS, x=x0, y=yb, track=-.045, wght=600, opsz=72)
 xk = x0 + w_bise + w_sp
-d_col, _ = tp(":", "hand", KS, x=xk, y=yb, wght=700)
-d_star, _ = tp("*", "hand", KS, x=xk + w_col - KS * .02, y=yb + KS * .3, wght=700)
+d_col, _ = tp(":", "mono", KS, x=xk, y=yb, wght=700)
+d_star, _ = tp("*", "mono", KS, x=xk + w_col - KS * .12, y=yb, wght=700)
 
 # the cloud, right of the name, blowing outward (viewBox 0 0 260 120)
 cs = 1.55
@@ -49,7 +49,10 @@ svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBo
 out = os.path.join(HERE, "header-paper.svg")
 open(out, "w").write(svg)
 
-chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+# never the user's own Chrome in /Applications: a headless shell from Playwright's cache (or $BISE_CHROME)
+import glob
+chrome = os.environ.get("BISE_CHROME") or (sorted(glob.glob(os.path.expanduser(
+    "~/Library/Caches/ms-playwright/chromium_headless_shell-*/*/chrome-headless-shell"))) or [""])[-1]
 def render(page, scale, out, tmp):
     """one screenshot through Chrome DevTools (the --screenshot flag hangs at device scale 2 on the pencil filter)."""
     import base64, json, time, urllib.request, websocket

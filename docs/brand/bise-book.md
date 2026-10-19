@@ -126,10 +126,12 @@ keeps its own look, below, unchanged.
   is for doodles and tallies (no blue, user). Dark paper: `#171513`, ink
   `#ece6da`, pen `#f4a6b0`, graphite `#b8b0a3`. Highlighter: `#f4a6b0` at 60% (dark 28%).
 - Type: Newsreader for text and titles (600, tight tracking); Caveat for
-  the pen only (the `:*`, group labels, short notes in the margin);
-  JetBrains Mono only inside screens, for code and commands. Where no web
+  the pen only (group labels, short notes in the margin); JetBrains Mono
+  inside screens, for code and commands, and for the `:*`. Where no web
   font loads (GitHub SVGs, og.png), the display words are outlined to paths.
-- The kiss in Caveat: the `*` comes down level with the colon (a mouth).
+- The kiss `:*` is always set in JetBrains Mono (700, the pen's colour),
+  never in Caveat or any hand font, wherever it shows: logos, headings,
+  the app, the docs, images.
 - Pen marks drawn in SVG that draw themselves once: underline, ring, arrow,
   tally, highlighter. One or two per screen.
 - The doodle: the north wind as a pencil cloud (graphite: stroke

@@ -430,10 +430,12 @@
   pre.rail .a, pre.rail .a2, pre.rail .a3 { color:var(--pen); }
 
   header { font-size:16px; font-style:italic; } header .logo { font-style:normal; font-weight:600; }
-  header .logo .acc { font-family:Caveat; font-weight:700; font-size:1.25em; }
+  /* the :* mark is always mono, never the hand font */
+  header .logo .acc { font-family:"JetBrains Mono", ui-monospace, Menlo, monospace; font-weight:700; font-size:.9em; }
   .big { font-family:Newsreader, serif; font-weight:600; letter-spacing:-.045em; }
-  .big .kiss, .last .big { font-family:Caveat, cursive; font-weight:700; letter-spacing:0; color:var(--pen); }
-  .big .kiss { font-size:.9em; transform-origin:30% 60%; }
+  .big .kiss { font-family:"JetBrains Mono", ui-monospace, Menlo, monospace; font-weight:700; letter-spacing:-.06em; color:var(--pen); }
+  .last .big { font-family:Caveat, cursive; font-weight:700; letter-spacing:0; color:var(--pen); }
+  .big .kiss { font-size:.78em; transform-origin:30% 60%; }
   .t1 { font-family:Newsreader, serif; font-weight:400; font-size:clamp(26px, 3.2vw, 40px); letter-spacing:-.015em; }
   .t2 { font-style:italic; font-size:clamp(19px, 1.8vw, 23px); color:var(--dim); }
   h2 { font-family:Newsreader, serif; font-weight:600; font-size:clamp(32px, 4vw, 50px); line-height:1.08; letter-spacing:-.025em; }
@@ -454,7 +456,7 @@
   .how .line { font-family:Caveat, cursive; font-size:25px; color:var(--pen); line-height:1.2; }
   .how .n { color:var(--pen); font-family:Caveat; font-size:30px; line-height:1; }
   .org { font-size:16px; } .org .msg { background:var(--raised); } .org .boss, .org .agent { background:transparent; border-color:#b8ad9a; }
-  .org .boss .acc { font-family:Caveat; font-weight:700; font-size:1.2em; margin-right:.25em; }
+  .org .boss .acc { font-family:"JetBrains Mono", ui-monospace, Menlo, monospace; font-weight:700; font-size:.9em; margin-right:.25em; }
   .org .agent .st { width:auto; margin-right:.4em; }
   .word .def { font-size:21px; color:var(--dim); } .word .def b { font-size:30px; font-weight:600; }
   .word .three { font-weight:600; font-size:22px; position:relative; }
@@ -498,7 +500,7 @@
   .in .pnote.n1 { opacity:1; transform:rotate(-4deg); } .in .pnote.n2 { opacity:1; transform:rotate(3deg); }
   .tally { position:absolute; left:calc(100% + 150px); top:62px; width:150px; height:40px; overflow:visible; }
   .sig { font-family:Caveat, cursive; font-size:62px; line-height:1; margin:10px 0 6px; color:var(--text); transform:rotate(-2deg); transform-origin:left; }
-  .sig span { color:var(--pen); font-weight:700; }
+  .sig span { color:var(--pen); font-weight:700; font-family:"JetBrains Mono", ui-monospace, Menlo, monospace; font-size:.6em; }
   @media (max-width: 1180px) { .pnote, .tally, .side, .hcloud { display:none; } }
 
   /* ===== variants: how the screens sit on the paper. ?v=0..4, keys 0-4 ===== */
@@ -1781,9 +1783,6 @@ document.querySelectorAll(".feat p, .facts, .mv").forEach(cellify);
 </script>
 
 <script>{
-  // the kiss: split ':*' where it's drawn in Caveat, so the * can sit level with the colon
-  for (const el of document.querySelectorAll('.big .kiss, .last .big, header .logo .acc, .sig span, .org .boss .acc'))
-    if (el.textContent.trim() === ':*') el.innerHTML = '<span class="kc">:</span><span class="ks">*</span>';
   // quiet backgrounds
   document.querySelectorAll('pre.bgw').forEach((p) => wind(p, .66));
   document.querySelectorAll('.seeds').forEach((box) => {

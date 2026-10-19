@@ -11,6 +11,8 @@ FONTS = {
     "serif": "ofl/newsreader/Newsreader%5Bopsz,wght%5D.ttf",
     "serif-italic": "ofl/newsreader/Newsreader-Italic%5Bopsz,wght%5D.ttf",
     "hand": "ofl/caveat/Caveat%5Bwght%5D.ttf",
+    # the :* is always mono, never the hand font (Gabriel)
+    "mono": "ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf",
 }
 
 # the paper tokens (site/content/landing-paper.html). 'in_*' are the screens' own colors on that paper.

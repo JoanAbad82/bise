@@ -45,9 +45,9 @@ nav.side a.on::before { content:"› "; color:var(--pen); }
 .toggle button { font-family:Newsreader, Georgia, serif; font-style:italic; font-size:15px; border-radius:2px; }
 .toggle button.on { color:var(--text); border-color:transparent; background:linear-gradient(100deg, transparent 0, var(--hl) 4px, var(--hl) calc(100% - 6px), transparent 100%); }
 
-/* the kiss in Caveat: the * comes down level with the colon, it's a mouth (paper.js splits it) */
-.kiss-c { font-family:Caveat, cursive; font-weight:700; letter-spacing:0; color:var(--pen); }
-.kiss-c .kc, .kiss-c .ks { display:inline-block; } .kiss-c .ks { position:relative; top:.3em; margin-left:-.02em; }
+/* the kiss is always mono, never the hand font (paper.js marks it .kiss-c) */
+.kiss-c { font-family:"JetBrains Mono", ui-monospace, Menlo, monospace; font-weight:700; letter-spacing:-.04em; color:var(--pen); font-size:.85em; }
+.kiss-c .kc, .kiss-c .ks { display:inline; }
 
 /* hero */
 .hero .big { letter-spacing:-.045em; }
