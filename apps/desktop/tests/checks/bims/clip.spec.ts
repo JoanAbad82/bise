@@ -20,7 +20,8 @@ test.afterAll(() => {
   if (shots.length > 0) writeIndex(shots);
 });
 
-interface G { jobs_done: number; days_used: number; artifacts_made: number }
+/** the project's counters (a mapped type: open()'s growth is a record) */
+type G = Record<'jobs_done' | 'days_used' | 'artifacts_made', number>;
 
 const MAPS = ['patio', 'tropical'] as const;
 const OTHERS = ['loft', 'greenhouse', 'campus', 'workshop', 'kyoto', 'riad', 'nordic', 'haveli', 'cyclades', 'sahel', 'california'] as const;

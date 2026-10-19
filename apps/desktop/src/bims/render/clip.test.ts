@@ -12,7 +12,8 @@
 //   a post, a frame or a backrest 0.5 tall); through a bim at its desk nothing but its desk and its
 //   chair. A merged cozy mesh counts by its pieces (render/cozy.ts meshBoxes); flat things on the
 //   floor (a rug, a mat's cloth) never count;
-// - and at the office's camera (camera.ts: 320 and 640 docked), no string strung across the room
+// - and at the office's camera (camera.ts: 320 and 640 docked), every room size of 0..31 agents,
+//   no string strung across the room
 //   (a look tags it: userData.string; the patio's papel picado) drawn over a napper's head nearer
 //   the camera than it (bims m_34171: the flags' line crossed three faces), as shade.test.ts does
 //   for lamp shades over desk heads.
@@ -137,9 +138,6 @@ function planReds(o: Office): string[] {
 function worldReds(o: Office, stage: number, seated: ReadonlyMap<string, Box3[]>): string[] {
   const w = buildWorld(o, 'main', STYLE, lookOf(o.map), false, { ...NO_GROW, stage });
   const meshes = meshBoxes(w.root).filter((b) => !b.isEmpty() && b.max.y >= FLAT);
-  const strings: Box3[] = [];
-  // a long string in short pieces along it: its whole box on the screen is a wide rectangle its line only crosses
-  w.root.traverse((m) => { if (m.userData.string === true) strings.push(...pieces(new Box3().setFromObject(m, true))); });
   w.dispose();
   const out: string[] = [];
   // under a desk's top: the desk alone (its body and top cover most of its floor box)
@@ -171,15 +169,6 @@ function worldReds(o: Office, stage: number, seated: ReadonlyMap<string, Box3[]>
       if (body.some((p) => p.intersectsBox(m))) out.push(`napper ${String(i)}: ${fmt(m)} through it`);
     }
   });
-  // a string over a napper's head on the screen, at the office's fits (index.ts applyFit)
-  const fits: readonly [string, Fit][] = [['320', fitSite(siteOf(o), 320, 0)], ['640', fitSite(wideSiteOf(o), 640, 0)]];
-  o.lounge.slice(0, bedsAt(stage)).forEach((s, i) => {
-    const head = bimBoxes(napName(i), s, NAP, true).reduce((a, b) => a.union(b), new Box3());
-    for (const [px, fit] of fits) {
-      const r = onScreen(fit, head);
-      for (const b of strings) if (depth(b) > depth(head) && meets(r, onScreen(fit, b))) out.push(`${px}: napper ${String(i)}'s head under a string ${fmt(b)}`);
-    }
-  });
   // a bim at its desk: its desk and its chair only
   for (const [name, d] of o.desks) {
     const f = deskBox(o, d);
@@ -193,6 +182,44 @@ function worldReds(o: Office, stage: number, seated: ReadonlyMap<string, Box3[]>
   }
   return out;
 }
+
+/** a string over a napper's head on the screen, at the office's fits (index.ts applyFit): the last stage, every bed */
+function stringReds(o: Office): string[] {
+  const w = buildWorld(o, 'main', STYLE, lookOf(o.map), false, { ...NO_GROW, stage: LAST_STAGE });
+  w.root.updateMatrixWorld(true);
+  const strings: Box3[] = [];
+  // a long string in short pieces along it: its whole box on the screen is a wide rectangle its line only crosses
+  w.root.traverse((m) => { if (m.userData.string === true) strings.push(...pieces(new Box3().setFromObject(m, true))); });
+  w.dispose();
+  if (strings.length === 0) return [];
+  const out: string[] = [];
+  const fits: readonly [string, Fit][] = [['320', fitSite(siteOf(o), 320, 0)], ['640', fitSite(wideSiteOf(o), 640, 0)]];
+  o.lounge.slice(0, bedsAt(LAST_STAGE)).forEach((s, i) => {
+    const head = bimBoxes(napName(i), s, NAP, true).reduce((a, b) => a.union(b), new Box3());
+    for (const [px, fit] of fits) {
+      const r = onScreen(fit, head);
+      for (const b of strings) if (depth(b) > depth(head) && meets(r, onScreen(fit, b))) out.push(`${px}: napper ${String(i)}'s head under a string ${fmt(b)}`);
+    }
+  });
+  return out;
+}
+
+describe('clip: no string over a napper\'s head on the screen', () => {
+  for (const id of readyMaps()) {
+    it(`${id}: every bed, 320 and 640, 0..31 agents (each room size once)`, async () => {
+      const out: string[] = [];
+      const seen = new Set<string>();
+      for (let n = 0; n <= 31; n++) {
+        const o = layoutOf(crowd(n).agents, id);
+        if (seen.has(o.size)) continue;
+        seen.add(o.size);
+        out.push(...stringReds(o).map((r) => `${String(n)} agents, ${r}`));
+        await turn();
+      }
+      expect([...new Set(out)]).toEqual([]);
+    }, 120_000);
+  }
+});
 
 describe('clip: the nap beds hold their nappers', () => {
   for (const id of readyMaps()) {
