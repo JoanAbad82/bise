@@ -103,6 +103,16 @@ async function stop(page: Page): Promise<Rec> {
 const fromStart = (r: Rec) =>
   r.xs.filter((f) => f.t >= (r.s ?? 0) && (r.s === null || f.a)).map((f) => ({ t: f.t - (r.s ?? 0), x: f.x }));
 
+/** What fromStart drops as pending: the frames after the event read before the start was known,
+ *  and the ms from the event's first frame to the first kept one (all of them when it never came). */
+function pending(r: Rec): { frames: number; ms: number } {
+  const after = r.xs.filter((f) => f.t >= 0);
+  if (r.s === null || after.length === 0) return { frames: 0, ms: 0 };
+  const kept = after.findIndex((f) => f.a);
+  const last = after.at(-1)?.t ?? 0;
+  return { frames: kept === -1 ? after.length : kept, ms: (kept === -1 ? last : (after[kept]?.t ?? last)) - (after[0]?.t ?? 0) };
+}
+
 const wait = (page: Page, ms: number) => page.evaluate((m) => new Promise<void>((done) => { setTimeout(done, m); }), ms);
 
 async function launch(reduced: boolean) {
@@ -139,6 +149,13 @@ test('app/row-slide: the hovered row slides its now line left over time; on leav
     // 1000 ms: well above the browser's own start under load (~270 ms at load 23, review-gates m_33500)
     test.info().annotations.push({ type: 'hover start', description: `${String(h.s)} ms after the mouseenter` });
     expect(h.s ?? Infinity, `the hover's transition starts within 1000 ms of the mouseenter: ${say}`).toBeLessThan(1000);
+    // the frames dropped as pending stay a short window: a startTime that never resolves would
+    // otherwise leave nothing to judge (~300 ms, review-gates m_33541)
+    for (const [name, r] of [['hover', h], ['leave', l]] as const) {
+      const p = pending(r);
+      test.info().annotations.push({ type: `${name} pending`, description: `${String(p.frames)} frames over ${String(p.ms)} ms` });
+      expect(p.ms, `the ${name}'s frames read before its transition started span <= 300 ms (${String(p.frames)} frames): ${say}`).toBeLessThanOrEqual(300);
+    }
     // hovered: still at first (the 250 ms delay), then left at ~44 px/s, more and more, never back right
     expect(hovered.length, 'frames while hovered').toBeGreaterThan(10);
     expect(hovered.filter((f) => f.t < 200).every((f) => f.x === 0), `still for the delay: ${say}`).toBe(true);
