@@ -100,7 +100,8 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: -96px;
+  /* one tile (96px) above, so the slide down never shows an edge */
+  top: calc(-2 * var(--s-12));
   bottom: 0;
   will-change: transform;
   mask-repeat: repeat;
