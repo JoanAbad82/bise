@@ -619,7 +619,17 @@ if [ "$mode" = land ]; then
   desktop_land() {
     local miss; desktop_path; miss="$(desktop_deps strict)"
     [ -z "$miss" ] || { echo "error: $miss"; return 1; }
-    cd "$root/apps/desktop" && pnpm -s typecheck && pnpm -s build || return 1
+    # + pnpm check's other half, which only quick (with node_modules), full and the nightly
+    # ran, so its reds reached main through lands (gate-reds: hero.css's spacing, two eslint
+    # errors in bims/render on 10-19): the ds laws (src/ds/lint.test.ts: bare controls, class
+    # rules, the spacing ratchet; ~4 s) and eslint on the land's own .ts/.tsx (~30 s at load 28)
+    local lint; lint="$(printf '%s\n' $changed | sed -n 's#^apps/desktop/\(.*\.tsx\{0,1\}\)$#\1#p' \
+      | while read -r f; do [ -f "$root/apps/desktop/$f" ] && echo "$f"; done)"
+    cd "$root/apps/desktop" && pnpm -s typecheck && pnpm -s exec vitest run src/ds/lint.test.ts || return 1
+    # shellcheck disable=SC2086
+    # (--no-warn-ignored: a file eslint.config ignores, src/proto/*.gen.ts, is no warning)
+    if [ -n "$lint" ]; then pnpm -s exec eslint --max-warnings 0 --no-warn-ignored $lint || return 1; fi
+    pnpm -s build || return 1
     # pnpm build and a release ship no source map (only the nightly's coverage-map build has them)
     local maps; maps="$(find out -name '*.map' 2>/dev/null | head -3)"
     [ -z "$maps" ] || { echo "error: source maps in out/ ($maps): BISE_DESKTOP_SOURCEMAP is set?"; return 1; }
