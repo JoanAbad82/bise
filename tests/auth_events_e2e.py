@@ -46,7 +46,7 @@ def main():
                BISE_DETECT_KEYCHAIN="0", BISE_BROWSER="true", BISE_SANDBOX="0")
     p = subprocess.Popen([EXE, "auth", "login", "chatgpt", "--events"], cwd=E.ws, env=env,
                          stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                         text=True, process_group=0)
+                         text=True, start_new_session=True)
     try:
         line = p.stdout.readline()
         ev = json.loads(line)

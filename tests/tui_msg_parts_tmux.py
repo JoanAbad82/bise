@@ -130,7 +130,7 @@ def main():
         paste(PASTE)
         t.wait_re(r"▤ \d")
         t.keys("Tab")
-        t.wait("queued · sent when this turn ends")
+        t.wait("queued · sent when main's turn ends")
         t.typed("steered words ")
         paste(PASTE)
         t.wait_re(r"▤ \d")
@@ -145,8 +145,8 @@ def main():
         shot("queued-steered")
         rows = mine(sc)
         no_tag(rows, "queued and steered")
-        for w in ("queued words", "steered words"):
-            expect(any(w in r and "▤" in r for r in rows), "%s with its chip: %r" % (w, rows))
+        for said in ("queued words", "steered words"):
+            expect(any(said in r and "▤" in r for r in rows), "%s with its chip: %r" % (said, rows))
         expect(sum(w("composer.lines", n=14) in r for r in rows) >= 2, "a paste row each: %r" % rows)
         print("ok: queued and steered messages draw their chips")
 
