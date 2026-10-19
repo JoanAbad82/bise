@@ -275,8 +275,13 @@ shape = "chatgpt-plan"
 # the prompt cache's routing key (BISE-268), as on openai: the same
 # Responses API. Without it every bise call starts with the same tools,
 # so every session of every user routes to the same cache machines and
-# misses (issue #18); Codex sends the session's key on every call too
+# misses (issue #18); Codex sends the session's key on every call too.
+# The plan routes by the session-id header (Codex: "ChatGPT derives cache
+# affinity from the Responses session-id header"): on his plan, one run
+# each, 3.1% of input cached with neither, 15.4% with the field alone,
+# 81.3% with both (page token-audit)
 cache_key = "prompt_cache_key"
+cache_header = "session-id"
 small_model = "gpt-6-luna"
 context = 1050000
 max_output = 128000

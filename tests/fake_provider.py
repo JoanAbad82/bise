@@ -1276,7 +1276,7 @@ class H(http.server.BaseHTTPRequestHandler):
         u = conv[idx] if idx is not None else msg("user")
         last = [m for m in conv if m["role"] == "user"]
         with open(LOG, "a") as f:
-            f.write(json.dumps({"agent": agent, "last_user": (last[-1]["text"] if last else "")[:3000],
+            f.write(json.dumps({"agent": agent, "session_id": self.headers.get("session-id"), "last_user": (last[-1]["text"] if last else "")[:3000],
                                 # the model asked (issue #4: a task's own model)
                                 "model": model, "status": status,
                                 "user": u["text"][:3000], "reply": openai_view(turn),

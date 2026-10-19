@@ -9,7 +9,10 @@ model chatgpt/gpt-6.1-sol (its key_command and base_url in the test's
 config.toml, the built-in catalog for the rest): main spawns t1, and
 - every agent call of main and t1 carries a `prompt_cache_key`;
 - each agent keeps one key for its session, and the two keys differ
-  (one key per session, never one shared by every agent).
+  (one key per session, never one shared by every agent);
+- every call also carries the same key as its `session-id` header (the
+  plan routes its cache by that header: on his plan, one run each, 15.4%
+  of input cached with the field alone, 81.3% with the header too).
 """
 import json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -64,6 +67,14 @@ try:
               "%s: every call carries a prompt_cache_key (%d calls)" % (a, len(ks)))
         check(len(set(ks)) == 1, "%s: one key for its whole session" % a)
     check(set(keys.get("main", [])).isdisjoint(keys.get("t1", [])), "main and t1 send different keys")
+    heads = {}
+    for r in E.fake_requests():
+        if r.get("agent") in ("main", "t1"):
+            heads.setdefault(r["agent"], set()).add(r.get("session_id"))
+    print("session-id headers:", {a: sorted(map(str, h)) for a, h in heads.items()})
+    for a in ("main", "t1"):
+        check(heads.get(a) == set(keys.get(a, [])) and None not in heads.get(a, {None}),
+              "%s: every call's session-id header is its body key" % a)
 finally:
     if E:
         E.close()
