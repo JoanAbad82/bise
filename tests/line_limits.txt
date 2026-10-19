@@ -32,7 +32,7 @@
 1103 rust/tui/src/onboarding/roles.rs
 2163 rust/tui/src/render.rs
 1017 rust/tui/src/run.rs
-1711 rust/tui/src/sb.rs
+1698 rust/tui/src/sb.rs
 1383 rust/tui/src/sb/cards.rs
 1959 rust/tui/src/sb/panel.rs
 1035 rust/tui/src/term.rs
