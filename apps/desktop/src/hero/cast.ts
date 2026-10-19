@@ -174,16 +174,16 @@ export const CAST: readonly Cast[] = [
       // alone at 0:00 (it pops with the wave), his first plane in its hands at 0:07.3
       { name: 'main', main: true, life: [[0, { k: 'mainidle' }], [7.3, { k: 'main' }]] },
       // one agent per line, popping at its desk 0.3 s after main catches it (bims-film v14: cart and
-      // checkout from the same line); the crates leave from 0:46 (checkout's), the others from 0:47,
-      // 0.6 s apart: the walks overlap
-      { name: 'catalog', life: [[0, gone], [10.7, work], [47, landing(2)]] },
-      { name: 'cart', life: [[0, gone], [12.2, work], [47.6, landing(3)]] },
-      // visits cart (0:15.5), asks him (0:26.8), his answer at 0:32.8, its crate first (0:46, there at 0:52)
-      { name: 'checkout', life: [[0, gone], [12.5, work], [26.8, { k: 'asks' }], [32.8, think], [34, work], [46, landing(1)]] },
-      { name: 'emails', life: [[0, gone], [13.7, work], [48.2, landing(4)]] },
-      { name: 'theme', life: [[0, gone], [39.1, work], [48.8, landing(6)]] },
-      // finds checkout a bug (0:41), no ✗; 5th in line (from its desk the 6th place has no clear way: it never left)
-      { name: 'order-test', life: [[0, gone], [40.6, work], [49.4, landing(5)]] },
+      // checkout from the same line); the crates leave from 0:44.6 (checkout's), the others from 0:45,
+      // ~0.6 s apart: the walks overlap (bims-film v15: each gets up round its chair first, bims-sit)
+      { name: 'catalog', life: [[0, gone], [10.7, work], [45, landing(2)]] },
+      { name: 'cart', life: [[0, gone], [12.2, work], [45.7, landing(3)]] },
+      // visits cart (0:15.5), asks him (0:26.8), his answer at 0:32.8, its crate first (0:44.6, there at 0:52)
+      { name: 'checkout', life: [[0, gone], [12.5, work], [26.8, { k: 'asks' }], [32.8, think], [34, work], [44.6, landing(1)]] },
+      { name: 'emails', life: [[0, gone], [13.7, work], [46, landing(4)]] },
+      { name: 'theme', life: [[0, gone], [39.1, work], [47.2, landing(6)]] },
+      // finds checkout a bug (0:38.5, there 0:41.2, its visit over by 0:44.6), no ✗; 5th in line (from its desk the 6th place has no clear way: it never left)
+      { name: 'order-test', life: [[0, gone], [37.6, work], [47.8, landing(5)]] },
       // 'review it for me': pops beside checkout's crate, reads, stamps ✓ (0:58.9)
       { name: REVIEWER, life: [[0, gone], [56.7, work]] },
     ],
@@ -229,7 +229,7 @@ export const NOTES: readonly Note[] = [
   { at: 36, office: KILN, from: 'you', to: 'main', flight: SHORT },
   { at: 37.5, office: KILN, from: 'you', to: 'main', flight: SHORT },
   // 0.9 s after it pops: a message in the step that makes the bim is played before it exists, and lost
-  { at: 41.5, office: KILN, from: 'order-test', to: 'checkout' },
+  { at: 38.5, office: KILN, from: 'order-test', to: 'checkout' },
   // 'review it for me'
   { at: 53.6, office: KILN, from: 'you', to: 'main', flight: SHORT },
 ];
@@ -254,12 +254,12 @@ export const FEED: readonly Line[] = [
 export const BUBBLES: readonly Bubble[] = [
   { at: 19.1, office: KILN, bim: 'checkout', words: 'cart line format?' },
   { at: 21.1, office: KILN, bim: 'cart', words: 'id, qty, price' },
-  { at: 43.2, office: KILN, bim: 'order-test', words: 'a mug sold twice' },
+  { at: 42.6, office: KILN, bim: 'order-test', words: 'a mug sold twice' },
 ];
 
 export const EGGS: readonly Egg[] = [
   { at: 33.1, dur: 0.6, office: KILN, bim: 'checkout', kind: 'hop' },
-  { at: 45.5, dur: 0.6, office: KILN, bim: 'order-test', kind: 'hop' },
+  { at: 44.2, dur: 0.6, office: KILN, bim: 'order-test', kind: 'hop' },
   // the reviewer reads the crate's sheet (main's paper) a second, then stamps it: ✓ at 0:58.9
   { at: 57.5, dur: 1.8, office: KILN, bim: REVIEWER, kind: 'stamp' },
   // main lifts the last crate over its head, three notes
@@ -292,11 +292,11 @@ export const SHOTS: readonly Shot[] = [
   { at: 29, size: 'follow', subject: bim(KILN, 'checkout'), frame: FLIGHT_FRAME },
   { at: 32.8, size: 'follow', subject: bim(KILN, 'checkout'), lead: 0 },
   { at: 34.5, size: 'office', subject: kiln },
-  { at: 41, size: 'follow', subject: bim(KILN, 'order-test') },
-  { at: 43.2, size: 'follow', subject: pair(KILN, 'order-test', 'checkout') },
+  { at: 38.2, size: 'follow', subject: bim(KILN, 'order-test') },
+  { at: 41.6, size: 'follow', subject: pair(KILN, 'order-test', 'checkout') },
   // checkout lifts its crate, then the parade to main's queue seen whole
-  { at: 46, size: 'follow', subject: bim(KILN, 'checkout') },
-  { at: 47.5, size: 'office', subject: kiln },
+  { at: 44.6, size: 'follow', subject: bim(KILN, 'checkout') },
+  { at: 47, size: 'office', subject: kiln },
   // checkout at the queue: '? checkout · ship it, or review it first?', the reviewer, its stamp
   { at: 52, size: 'tight', subject: { k: 'spot', office: KILN, spot: 'main' } },
   { at: 59.7, size: 'follow', subject: bim(KILN, 'main') },

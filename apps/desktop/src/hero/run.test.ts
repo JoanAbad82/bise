@@ -50,7 +50,7 @@ describe('the hero film', () => {
     expect(missing).toEqual([]);
   });
 
-  it('lands its beats in the office brains (bims-film v14): paper planes, pops at the desk, visits, the queue, the stamp', () => {
+  it('lands its beats in the office brains (bims-film v15): paper planes, pops at the desk, visits, the queue, the stamp', () => {
     const runs = makeRuns();
     const at = (T: number, name: string) => {
       for (const r of runs) advance(r, ORIGIN + T, false, false);
@@ -67,7 +67,7 @@ describe('the hero film', () => {
     // the visits: there before their bubbles
     expect(at(19.1, 'checkout')?.pose.seg.act.k).toBe('visit');
     expect(at(43.2, 'order-test')?.pose.seg.act.k).toBe('visit');
-    expect(at(45.7, 'order-test')?.egg?.kind).toBe('hop');
+    expect(at(44.5, 'order-test')?.egg?.kind).toBe('hop');
     // checkout's crate at main by 0:52.1, every other one by 0:56.5
     expect(at(52.1, 'checkout')).toMatchObject({ pose: { moving: false, seg: { act: { k: 'landing' } } } });
     for (const n of ['catalog', 'cart', 'emails', 'theme', 'order-test']) expect(at(56.5, n)).toMatchObject({ pose: { moving: false, seg: { act: { k: 'landing' } } } });

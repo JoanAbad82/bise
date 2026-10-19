@@ -15,11 +15,12 @@
 // it may wait, step aside, go round one standing, stop beside a spot someone stands on, or come in
 // by the door a little later; with no clear way at all it goes on with what it did and tries again
 // at the next update (a walk that ended beside its spot too), never through anyone.
-import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, QUEUE_GAP, type Segment, type Spot, type Timeline } from './model';
+import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, QUEUE_GAP, type Segment, type SitAt, type Sits, type Spot, type Timeline } from './model';
 import { pastimes } from './skate';
+import { chairSpots, seatedAct, seatWaits, SIT_S, sitWay, visitAt } from './sit';
 import { coffeeAtCorner } from './cozy';
 import { along, makePath, path } from './paths';
-import { type Budget, planOn, progress, trackOf, UPDATE_BUDGET, walkTime, type Track } from './avoid';
+import { BODY_R, type Budget, planOn, posAt, progress, trackOf, UPDATE_BUDGET, walkTime, type Track } from './avoid';
 
 /** tiles per second (spec §3): walk, hurry (an urgent ask), skate (done, leaving), carrying a box (landing) */
 export const SPEED = { walk: 2.4, hurry: 3.5, skate: 3.4, carry: 1.8 } as const;
@@ -277,8 +278,17 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
 
 /** a segment with its pastime (skate.ts), and whether it walks off the park with its board in hand */
 function dress(seg: Segment, pt: Pastime | undefined, last: Segment | undefined): Segment {
-  const plain: Segment = { t: seg.t, act: seg.act, sig: seg.sig, spot: seg.spot, path: seg.path, speed: seg.speed, from: seg.from, ...(seg.waits ? { waits: seg.waits } : {}) };
+  const sit = seg.sit ? keptSit(seg.sit, seg.path.len) : {};
+  const plain: Segment = { t: seg.t, act: seg.act, sig: seg.sig, spot: seg.spot, path: seg.path, speed: seg.speed, from: seg.from, ...(seg.waits ? { waits: seg.waits } : {}), ...sit };
   return { ...plain, ...(pt ? { pastime: pt } : {}), ...(!pt && last?.pastime ? { fromSkate: true } : {}) };
+}
+
+/** a sit's walk beats belong to its walk: a bim put at its spot (the world rebuilt) is there at once, standing with its chair out or seated */
+function keptSit(sit: Sits, len: number): { sit?: Sits } {
+  if (len > 1e-6) return { sit };
+  const still = sit.in?.standing === true ? sit.in : sit.still;
+  const kept: Sits = { ...(sit.up ? { up: sit.up } : {}), ...(sit.down ? { down: sit.down } : {}), ...(still ? { still } : {}) };
+  return Object.keys(kept).length > 0 ? { sit: kept } : {};
 }
 
 /** a walk to plan again at the end of the update (walk's arguments) */
@@ -318,22 +328,86 @@ function walk(o: Office, t: number, act: Activity, sig: string, from: { x: numbe
   const base = sig === 'gone' || act.k === 'done' ? SPEED.skate : act.k === 'landing' ? SPEED.carry : act.urgent ? SPEED.hurry : SPEED.walk;
   const seg: Segment = { t, act, sig, spot, path: p, speed: Math.max(base, p.len / MAX_WALK_S), from: prev };
   // a bim standing still where it was needs no plan; one coming in by the door does (someone may stand there)
-  if (others === null || (p.len < 1e-6 && !hidden)) return [seg, true];
-  const clear = planOn(o, from, spot, seg.speed, t, others, hidden, was ? { track: trackOf(was), speed: was.speed } : null, budget);
+  if (others === null || (p.len < 1e-6 && !hidden)) return [seated(o, seg, was), true];
+  // its sit's beats are part of the walk the others keep clear of: the get-up before the plan (it
+  // plans from beside its chair, once there), the sit-down after it (it plans to beside its chair)
+  const sit = seatsOf(o, seg, was);
+  const head = sit.out ? p.pts.slice(0, 3) : [];
+  const tail = sit.in ? p.pts.slice(-2) : [];
+  const headLen = makePath(head).len;
+  const headT = sit.out ? (sit.out.standing ? 0 : SIT_S.hop) + headLen / seg.speed + SIT_S.back : 0;
+  const start = head.at(-1) ?? from;
+  const end = sit.in ? (p.pts.at(-3) ?? spot) : spot;
+  // beside its chair taken (a visitor stands there): it stays seated and tries again
+  if (sit.out && others.some((k) => standsNear(k, start, t, t + headT + 0.5))) return [{ ...seg, t: Infinity, path: makePath([from]) }, false];
+  const clear = planOn(o, start, end, seg.speed, t + headT, others, hidden, was && !sit.out ? { track: trackOf(was), speed: was.speed } : null, budget);
   // no clear way: kept out of the door (hidden), else the caller keeps its walk as it was
   if (clear === null) return [{ ...seg, t: Infinity, path: makePath([from]) }, false];
   const { plan, speed } = clear;
-  return [{ ...seg, t: plan.t, speed, path: makePath(plan.pts), ...(plan.waits.length > 0 ? { waits: plan.waits } : {}) }, true];
+  // its way to beside its chair ended beside that (someone stands there): it stands aside, no sit
+  const there = plan.t + makePath(plan.pts).len / speed + plan.waits.reduce((n, w) => n + w.s, 0);
+  const tailFree = !sit.in || !others.some((k) => tail.some((q) => standsNear(k, q, there, there + SIT_S.pull + SIT_S.hop + 1)));
+  const reached = !sit.in || (plan.pts.at(-1) !== undefined && near(plan.pts.at(-1) as Spot, end) && tailFree);
+  const pts = [...head, ...plan.pts.slice(head.length > 0 ? 1 : 0), ...(reached ? tail : [])];
+  const walked = makePath(pts);
+  const waits = plan.waits.map((w) => ({ d: w.d + headLen, s: w.s }));
+  const planned: Segment = { ...seg, t: sit.out ? t : plan.t, speed, path: walked, ...(waits.length > 0 ? { waits } : {}) };
+  const sat = sitWay(walked, sit.in && reached ? { spot, act } : null, sit.out && was ? { spot: was.spot, act: was.act } : null);
+  return [sat.in || sat.out ? { ...planned, sit: sat, waits: seatWaits(walked, sat, waits) } : planned, true];
+}
+
+/** a track within two bodies of p at some time from t0 to t1 */
+function standsNear(k: Track, p: { x: number; z: number }, t0: number, t1: number): boolean {
+  for (let u = t0; u <= t1 + 1e-9; u += 0.1) {
+    const q = posAt(k, u);
+    if (q && Math.hypot(q.x - p.x, q.z - p.z) < 2 * BODY_R) return true;
+  }
+  return false;
+}
+
+/** the sit a walk would play on its plain way (sit.ts): in at a chair spot, out of the chair it sits at */
+function seatsOf(o: Office, seg: Segment, was: Segment | undefined): Sits {
+  const chairs = chairSpots(o);
+  const isChair = (s: Spot): boolean => chairs.some((c) => near(c, s));
+  const start = seg.path.pts[0];
+  const to = isChair(seg.spot) && atOwnDesk(seg.act) ? { spot: seg.spot, act: seg.act } : null;
+  const from = was && start && near(start, was.spot) && isChair(was.spot) && atOwnDesk(was.act) ? { spot: was.spot, act: was.act } : null;
+  return to || from ? sitWay(seg.path, to, from) : {};
+}
+
+/** at its own desk (or main at its): a visitor or a reporter stands at another's, where a map may put it on the chair's spot (behind: its walkway is the spot) */
+const atOwnDesk = (a: Activity): boolean => (a.at === 'desk' || a.at === 'main') && a.k !== 'visit' && a.k !== 'report';
+
+/**
+ * A walk planned as the crow walks (the world rebuilt, the first look) or no walk at all, with its
+ * chair (sit.ts): at its desk without a walk it gets up (its chair slides out), sits down, or stands
+ * there, its chair out; a plain walk plays its sit as waits.
+ */
+function seated(o: Office, seg: Segment, was: Segment | undefined): Segment {
+  const chairs = chairSpots(o);
+  const isChair = (s: Spot): boolean => chairs.some((c) => near(c, s));
+  const start = seg.path.pts[0];
+  if (seg.path.len < 1e-6) {
+    if (!isChair(seg.spot) || !atOwnDesk(seg.act) || !start || !near(start, seg.spot)) return seg;
+    const at: SitAt = { spot: seg.spot, side: 1, standing: !seatedAct(seg.act) };
+    const end = was?.path.pts.at(-1);
+    const sat = was && atOwnDesk(was.act) && near(was.spot, seg.spot) && (end === undefined || near(end, seg.spot)) ? seatedAct(was.act) : null;
+    if (at.standing) return { ...seg, sit: sat === true ? { up: at } : { still: at } };
+    return sat === false ? { ...seg, sit: { down: at } } : seg;
+  }
+  const sit = seatsOf(o, seg, was);
+  if (!sit.in && !sit.out) return seg;
+  return { ...seg, sit, waits: seatWaits(seg.path, sit, seg.waits) };
 }
 
 /** a spot that belongs to the bim or to its rank (desk, main's desk, the door, the queue); null for a shared one */
 function fixedSpot(o: Office, name: string, act: Activity): Spot | null {
   switch (act.at) {
     case 'desk':
-      if (act.k === 'visit' && act.with !== undefined) return behind(o.desks.get(act.with) ?? o.mainDesk);
+      if (act.k === 'visit' && act.with !== undefined) return visitAt(o, o.desks.get(act.with) ?? o.mainDesk);
       return o.desks.get(name) ?? o.door;
     case 'main':
-      return act.k === 'report' ? behind(o.mainDesk) : o.mainDesk;
+      return act.k === 'report' ? visitAt(o, o.mainDesk) : o.mainDesk;
     case 'door':
       return o.door;
     case 'queue': {
@@ -392,8 +466,6 @@ function sharedSpot(o: Office, at: Shared, held: ReadonlyMap<string, string>, pr
   return { spot: { x: s.ax, z: s.wz, wz: s.wz, ax: s.ax, face: s.face }, key: `${at}:+${String(k)}` };
 }
 
-/** where a visitor stands at someone's desk: on its walkway, facing the desk */
-const behind = (d: Spot): Spot => ({ x: d.x, z: d.wz, wz: d.wz, ax: d.ax, face: d.face });
 
 /**
  * The hub's events (BimEvent, spec §6), each played once: an agent's message to an idle bim = both

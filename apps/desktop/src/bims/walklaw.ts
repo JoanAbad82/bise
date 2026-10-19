@@ -2,7 +2,7 @@
 // office on one map with n bims for a stretch of time (random activities, messages, reports,
 // leaves and returns, skaters on a park), fed to the real timeline, sampled every 50 ms. It counts
 // two bims closer than two body radii while one of them walks, and a walking bim whose middle is
-// inside a piece of furniture (but the bed or deck chair it walks into or out of). Pure: the same
+// inside a piece of furniture (but the bed, deck chair or desk it walks into or out of). Pure: the same
 // seed gives the same counts.
 import { agent, mainAgent } from './fixtures';
 import { layoutOf } from './maps';
@@ -120,8 +120,9 @@ export function walkLaw(map: MapId, n: number, seconds: number, seed: number, sp
 /** a walking bim's middle inside a piece of furniture that is not the bed it walks into or out of */
 function inBox(o: Office, p: Pose): boolean {
   const start = p.seg.path.pts[0];
-  // its bed or deck chair: the one it walks to, or the one it walks out of (it starts inside it)
-  const mine = (b: Box): boolean => b.of !== undefined && (near(b.of, p.seg.spot) || (start !== undefined && start.x > b.x0 && start.x < b.x1 && start.z > b.z0 && start.z < b.z1));
+  // its bed, deck chair or desk (a plan may give a desk's box its spot: the greenhouse): the one it
+  // walks to, or the one it walks out of (it starts inside it, or at its spot: sit.ts's side step)
+  const mine = (b: Box): boolean => b.of !== undefined && (near(b.of, p.seg.spot) || (start !== undefined && (near(b.of, start) || (start.x > b.x0 && start.x < b.x1 && start.z > b.z0 && start.z < b.z1))));
   return o.furniture.some((b) => !mine(b) && p.x > b.x0 + 0.02 && p.x < b.x1 - 0.02 && p.z > b.z0 + 0.02 && p.z < b.z1 - 0.02);
 }
 

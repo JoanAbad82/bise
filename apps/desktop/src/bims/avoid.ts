@@ -579,7 +579,7 @@ function restOf(k: Track): Pt | null {
 }
 
 /** where a track is at t (null: not on the map) */
-function posAt(k: Track, t: number): Pt | null {
+export function posAt(k: Track, t: number): Pt | null {
   const first = k.keys[0];
   if (!first || t < first.t || t > k.end) return null;
   for (let i = 1; i < k.keys.length; i++) {

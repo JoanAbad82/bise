@@ -6,6 +6,7 @@
 // reduced motion has none.
 import type { Activity, ActivityKind, Doing, Motion, Pose } from '../model';
 import { walkTime } from '../avoid';
+import { SIT, SIT_S, sitBeat, toWorld } from '../sit';
 
 /** rotations in radians: [x, y, z] */
 export type Rot = readonly [number, number, number];
@@ -133,6 +134,8 @@ const STAND: Body = {
 };
 
 const SEATED = { y: -0.05, legL: -1.45, legR: -1.45 } as const;
+/** just sat down (sit.ts): seated, its hands on its lap, before its activity's pose */
+const SITTING: Body = { ...STAND, ...SEATED };
 
 /** the kinds that type at a lit screen (a loop) */
 const TYPING: ReadonlySet<ActivityKind> = new Set(['work', 'hot', 'main']);
@@ -450,13 +453,29 @@ export function rigOf(inp: RigInput): Rig {
   const walkT = seg.path.len > 0.01 && seg.from !== null ? walkTime(seg) : 0;
   const arrived = reduced ? !place.fading : !pose.moving;
   const dur = reduced ? 0 : transitionOf(seg.from, k);
-  const u = pose.since - (reduced ? Math.min(FADE, walkT) : walkT);
+  // at its desk without a walk: its activity's pose after the hop
+  const hopT = !reduced && (seg.sit?.up || seg.sit?.down) ? SIT_S.hop : 0;
+  const u = pose.since - (reduced ? Math.min(FADE, walkT) : walkT) - hopT;
   // a loop of its own from its arrival (eating); reduced motion holds it chewing, a fruit in hand
   const target = rest(act, lt, phase, reduced ? PICK_S + BITE_S - 0.2 : Math.max(0, u - dur));
 
+  // its sit at its desk or its get-up (sit.ts): beside its chair, the chair out, a side step, the hop; never through it
+  const sat = !reduced ? sitBeat(seg, pose.since) : null;
+  const sitIn = seg.sit?.in;
+
   let b: Body;
   let motion: Motion;
-  if (pose.waiting === true && !reduced) {
+  if (sat) {
+    const { beat } = sat;
+    const step = beat.step ? walking(k, t) : STAND;
+    const legs = SEATED.legL * beat.legs;
+    b = {
+      ...step, y: beat.y + SEATED.y * beat.legs + (beat.step ? step.y : 0),
+      legL: beat.step ? step.legL : legs, legR: beat.step ? step.legR : legs,
+      face: beat.facing ? sat.at.spot.face : null,
+    };
+    motion = 'walk';
+  } else if (pose.waiting === true && !reduced) {
     // it stops to let another bim pass, or stands beside its spot (avoid.ts): standing still, as it walks
     b = walking(k, 0);
     // its head turns to the bim it waits for (head only, bims m_31438)
@@ -472,7 +491,8 @@ export function rigOf(inp: RigInput): Rig {
     b = target; // reduced: the end pose, fading in or out
     motion = 'walk';
   } else if (u < dur) {
-    const from = walkT > 0 ? STAND : seg.from === null ? target : rest({ k: seg.from, at: act.at }, lt, phase);
+    // sat down on its walk's end (sit.ts): from seated
+    const from = hopT > 0 ? (seg.sit?.down ? SITTING : STAND) : walkT > 0 ? (sitIn && !sitIn.standing && !reduced ? SITTING : STAND) : seg.from === null ? target : rest({ k: seg.from, at: act.at }, lt, phase);
     const f = ease(u / dur);
     b = beat(seg.from, k, u / dur, blend(from, target, f));
     motion = 'walk';
@@ -489,15 +509,21 @@ export function rigOf(inp: RigInput): Rig {
   }
 
   const dir = b.face ?? pose.dir;
-  const c = Math.cos(dir);
-  const sn = Math.sin(dir);
-  // the offset is in the bim's frame: z ahead along its way, x to its side
-  const x = place.x + b.dx * c + b.dz * sn;
-  const z = place.z - b.dx * sn + b.dz * c;
+  // its chair: slid as the sit has it; left out while it stands at its desk
+  const out = (sitIn?.standing === true && arrived) || seg.sit?.up !== undefined || seg.sit?.still !== undefined;
+  const back = sat ? sat.beat.back : out ? SIT.pull : null;
+  // the offset is in the bim's frame: z ahead along its way, x to its side; standing by its desk
+  // (asks, the big screen), in its desk's: beside it on a turned desk too, never in its chair (sit.test.ts)
+  const frame = out && !sat ? seg.spot.face : dir;
+  const c = Math.cos(frame);
+  const sn = Math.sin(frame);
+  const here = sat ? toWorld(sat.at.spot, sat.beat.u, sat.beat.v) : place;
+  const x = here.x + b.dx * c + b.dz * sn;
+  const z = here.z - b.dx * sn + b.dz * c;
   const rig: Rig = {
     x, z, dir, y: b.y, body: b.body, head: b.head, armL: b.armL, armR: b.armR, legL: b.legL, legR: b.legR,
     eyes: b.eyes, mouth: b.mouth, props: b.props, screen: b.screen, lamp: b.lamp, grey: b.grey,
-    opacity: place.opacity, motion,
+    opacity: place.opacity, motion, ...(back !== null && back > 1e-4 ? { seat: { back, turn: 0 } } : {}),
   };
   // to the park or back from it (skate.ts): its board in its hand; back, it kicks it up first
   const carry = !arrived && !reduced && (seg.pastime !== undefined || seg.fromSkate === true);

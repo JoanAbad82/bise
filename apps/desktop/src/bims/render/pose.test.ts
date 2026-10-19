@@ -4,6 +4,7 @@ import { BITE_S, BITES, FADE, FRUIT_S, PICK_S, PLANE_CATCH, PLANE_FLIGHT, louder
 import type { BimEgg } from '../eggs';
 import { eggRig } from './egg';
 import { headClearance } from './laptop';
+import { seatedAct } from '../sit';
 
 const desk: Spot = { x: 3, z: 6, wz: 5.35, ax: 1.2, face: 0 };
 const lounge: Spot = { x: -4, z: 1, wz: 4, ax: -4, face: 0 };
@@ -247,6 +248,18 @@ describe('pose: asleep at its desk, the head clear of the laptop (his bug, bims-
         expect(headClearance(rig(poseOf(k, { from: 'work', since: s, ...at }), 10 + s)), `${k} from work at +${s.toFixed(2)} s`).toBeGreaterThan(0.02);
         expect(headClearance(rig(poseOf('work', { from: k, since: s }), 10 + s)), `work from ${k} at +${s.toFixed(2)} s`).toBeGreaterThan(0.02);
       }
+    }
+  });
+});
+
+describe('sitting (sit.ts seatedAct, bims-sit)', () => {
+  const DOINGS: readonly (Doing | undefined)[] = [undefined, 'think', 'tool', 'edit', 'search', 'computer', 'image', 'publish', 'compact', 'build', 'unknown'];
+  it('the timeline sits a bim on its chair exactly when its pose at rest is seated', () => {
+    for (const k of KINDS) for (const doing of DOINGS) {
+      const act: Activity = { k, at: 'desk', ...(doing ? { doing } : {}) };
+      const r = rigOf({ pose: poseOf(k, { act: doing ? { doing } : {} }), t: 20, main: false, phase: 0, reduced: false });
+      const seated = r.legL < -1.2 && Math.hypot(r.x - desk.x, r.z - desk.z) < 1e-6;
+      expect(seatedAct(act), `${k} ${String(doing)}`).toBe(seated);
     }
   });
 });

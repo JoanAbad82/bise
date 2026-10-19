@@ -8,6 +8,7 @@ import { COZY_AT, coffeeAtCorner, cozyAt, placeCozy } from './cozy';
 import { PLANS, layoutOf } from './maps';
 import { placesOf } from './maps/plan';
 import { network } from './paths';
+import { withSeats } from './sit';
 
 describe('the cozy curve', () => {
   it('beds: 2 from day one, then 3, 4, 5, 6 and 8 (page bims-cozy v2)', () => {
@@ -45,7 +46,8 @@ describe('the cozy curve', () => {
 describe('the cozy places', () => {
   it('the same office gives the same places; a new agent count may move them, a stage never does', () => {
     const o = layoutOf(crowd(5).agents, 'riad');
-    expect(placeCozy(PLANS.riad.layout(crowd(5).agents), PLANS.riad.cozy ?? {})).toEqual(o.cozy);
+    // layoutOf places them on the office with its chairs' ways in (sit.ts withSeats)
+    expect(placeCozy(withSeats(PLANS.riad.layout(crowd(5).agents)), PLANS.riad.cozy ?? {})).toEqual(o.cozy);
     expect(JSON.stringify(layoutOf(crowd(5).agents, 'riad').cozy)).toBe(JSON.stringify(o.cozy));
   });
 

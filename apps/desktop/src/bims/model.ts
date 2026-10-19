@@ -270,6 +270,28 @@ export interface Segment {
   readonly pastime?: Pastime;
   /** it skated just before: it walks off with its board kicked up into its hand */
   readonly fromSkate?: boolean;
+  /**
+   * its desk's chair (sit.ts, never through it): it sits down at the walk's end (in) or gets up at
+   * its start (out); at its desk without a walk, it gets up to stand (up), sits down (down), or
+   * stands there, its chair out (still)
+   */
+  readonly sit?: Sits;
+}
+
+/** What a segment does with its desk's chair (Segment.sit). */
+export interface Sits {
+  readonly in?: SitAt;
+  readonly out?: SitAt;
+  readonly up?: SitAt;
+  readonly down?: SitAt;
+  readonly still?: SitAt;
+}
+
+/** A chair a walk sits at or gets up from (sit.ts): its spot, the side the bim steps in from (1 the chair's right), whether it stays standing there. */
+export interface SitAt {
+  readonly spot: Spot;
+  readonly side: 1 | -1;
+  readonly standing: boolean;
 }
 
 /**
