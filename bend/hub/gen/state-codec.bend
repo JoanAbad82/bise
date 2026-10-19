@@ -208,6 +208,36 @@ def Life.opt_round(m):
     case Some{S.LFailed{}}:
       {==}
 
+def Life.journal_of(j: J.Json) -> S.Life:
+  match j:
+    case J.JStr{+w}:
+      Life.of_word(w)
+    case _:
+      S.LActive{}
+
+def Life.journal_json(e: S.Life) -> J.Json:
+  J.JStr{Life.word(e)}
+
+law Life.journal_round:
+  for e: S.Life
+  {Life.journal_of(Life.journal_json(e)) == e : S.Life}
+
+def Life.journal_round(e):
+  Life.round(e)
+
+def Life.opt_journal_of(+j: J.Json) -> Maybe<&2, S.Life>:
+  Life.opt_of(Some{j})
+
+def Life.opt_journal_json(m: Maybe<&2, S.Life>) -> J.Json:
+  Life.opt_json(m)
+
+law Life.opt_journal_round:
+  for m: Maybe<&2, S.Life>
+  {Life.opt_journal_of(Life.opt_journal_json(m)) == m : Maybe<&2, S.Life>}
+
+def Life.opt_journal_round(m):
+  Life.opt_round(m)
+
 # ---- Run (its word) ----
 
 def Run.word(e: S.Run) -> String:
@@ -271,6 +301,36 @@ def Run.opt_round(m):
     case Some{S.RBusy{}}:
       {==}
 
+def Run.journal_of(j: J.Json) -> S.Run:
+  match j:
+    case J.JStr{+w}:
+      Run.of_word(w)
+    case _:
+      S.RDown{}
+
+def Run.journal_json(e: S.Run) -> J.Json:
+  J.JStr{Run.word(e)}
+
+law Run.journal_round:
+  for e: S.Run
+  {Run.journal_of(Run.journal_json(e)) == e : S.Run}
+
+def Run.journal_round(e):
+  Run.round(e)
+
+def Run.opt_journal_of(+j: J.Json) -> Maybe<&2, S.Run>:
+  Run.opt_of(Some{j})
+
+def Run.opt_journal_json(m: Maybe<&2, S.Run>) -> J.Json:
+  Run.opt_json(m)
+
+law Run.opt_journal_round:
+  for m: Maybe<&2, S.Run>
+  {Run.opt_journal_of(Run.opt_journal_json(m)) == m : Maybe<&2, S.Run>}
+
+def Run.opt_journal_round(m):
+  Run.opt_round(m)
+
 # ---- Decl (its word) ----
 
 def Decl.word(e: S.Decl) -> String:
@@ -328,9 +388,39 @@ def Decl.opt_round(m):
     case Some{S.DBlocked{}}:
       {==}
 
+def Decl.journal_of(j: J.Json) -> S.Decl:
+  match j:
+    case J.JStr{+w}:
+      Decl.of_word(w)
+    case _:
+      S.DWorking{}
+
+def Decl.journal_json(e: S.Decl) -> J.Json:
+  J.JStr{Decl.word(e)}
+
+law Decl.journal_round:
+  for e: S.Decl
+  {Decl.journal_of(Decl.journal_json(e)) == e : S.Decl}
+
+def Decl.journal_round(e):
+  Decl.round(e)
+
+def Decl.opt_journal_of(+j: J.Json) -> Maybe<&2, S.Decl>:
+  Decl.opt_of(Some{j})
+
+def Decl.opt_journal_json(m: Maybe<&2, S.Decl>) -> J.Json:
+  Decl.opt_json(m)
+
+law Decl.opt_journal_round:
+  for m: Maybe<&2, S.Decl>
+  {Decl.opt_journal_of(Decl.opt_journal_json(m)) == m : Maybe<&2, S.Decl>}
+
+def Decl.opt_journal_round(m):
+  Decl.opt_round(m)
+
 # ---- MSt (its word under "state", its fields beside it) ----
 
-def MSt.kvs(e: S.MSt) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+def MSt.journal_kvs(e: S.MSt) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match e:
     case S.Queued{+reason}:
       [J.kv("state", J.JStr{"queued"}), J.kv("reason", J.JStr{reason})]
@@ -341,21 +431,21 @@ def MSt.kvs(e: S.MSt) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case S.Cancelled{}:
       [J.kv("state", J.JStr{"cancelled"})]
 
-def MSt.json(e: S.MSt) -> J.Json:
-  J.obj(MSt.kvs(e))
+def MSt.journal_json(e: S.MSt) -> J.Json:
+  J.obj(MSt.journal_kvs(e))
 
 def MSt.of_word(+w: String, +j: J.Json) -> S.MSt:
   Bool.pick(S.MSt, String.eq(w, "delivered"), S.Delivered{}, Bool.pick(S.MSt, String.eq(w, "rejected"), S.Rejected{rd.s(J.get(j, "error"))}, Bool.pick(S.MSt, String.eq(w, "cancelled"), S.Cancelled{}, S.Queued{rd.s(J.get(j, "reason"))})))
 
-# any other word, or none: queued
-def MSt.of(+j: J.Json) -> S.MSt:
+# any other word, or none: queued (an inline row reads the line's own object)
+def MSt.journal_of(+j: J.Json) -> S.MSt:
   MSt.of_word(rd.s(J.get(j, "state")), j)
 
-law MSt.round:
+law MSt.journal_round:
   for e: S.MSt
-  {MSt.of(MSt.json(e)) == e : S.MSt}
+  {MSt.journal_of(MSt.journal_json(e)) == e : S.MSt}
 
-def MSt.round(e):
+def MSt.journal_round(e):
   match e:
     case S.Queued{x_0}:
       {==}
@@ -368,28 +458,28 @@ def MSt.round(e):
 
 # ---- What (its word under "kind", its fields beside it) ----
 
-def What.kvs(e: S.What) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+def What.journal_kvs(e: S.What) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match e:
     case S.RouteSend{+rid}:
       [J.kv("kind", J.JStr{"route_send"}), J.kv("rid", J.JNum{rid})]
     case S.Retry{+xid}:
       [J.kv("kind", J.JStr{"retry"}), J.kv("xid", J.JNum{xid})]
 
-def What.json(e: S.What) -> J.Json:
-  J.obj(What.kvs(e))
+def What.journal_json(e: S.What) -> J.Json:
+  J.obj(What.journal_kvs(e))
 
 def What.of_word(+w: String, +j: J.Json) -> S.What:
   Bool.pick(S.What, String.eq(w, "retry"), S.Retry{rd.n(J.get(j, "xid"))}, S.RouteSend{rd.n(J.get(j, "rid"))})
 
-# any other word, or none: route_send
-def What.of(+j: J.Json) -> S.What:
+# any other word, or none: route_send (an inline row reads the line's own object)
+def What.journal_of(+j: J.Json) -> S.What:
   What.of_word(rd.s(J.get(j, "kind")), j)
 
-law What.round:
+law What.journal_round:
   for e: S.What
-  {What.of(What.json(e)) == e : S.What}
+  {What.journal_of(What.journal_json(e)) == e : S.What}
 
-def What.round(e):
+def What.journal_round(e):
   match e:
     case S.RouteSend{x_0}:
       {==}
@@ -453,6 +543,36 @@ def XKind.opt_round(m):
     case Some{S.KJobEnd{}}:
       {==}
 
+def XKind.journal_of(j: J.Json) -> S.XKind:
+  match j:
+    case J.JStr{+w}:
+      XKind.of_word(w)
+    case _:
+      S.KInput{}
+
+def XKind.journal_json(e: S.XKind) -> J.Json:
+  J.JStr{XKind.word(e)}
+
+law XKind.journal_round:
+  for e: S.XKind
+  {XKind.journal_of(XKind.journal_json(e)) == e : S.XKind}
+
+def XKind.journal_round(e):
+  XKind.round(e)
+
+def XKind.opt_journal_of(+j: J.Json) -> Maybe<&2, S.XKind>:
+  XKind.opt_of(Some{j})
+
+def XKind.opt_journal_json(m: Maybe<&2, S.XKind>) -> J.Json:
+  XKind.opt_json(m)
+
+law XKind.opt_journal_round:
+  for m: Maybe<&2, S.XKind>
+  {XKind.opt_journal_of(XKind.opt_journal_json(m)) == m : Maybe<&2, S.XKind>}
+
+def XKind.opt_journal_round(m):
+  XKind.opt_round(m)
+
 # ---- OutSt (its word) ----
 
 def OutSt.word(e: S.OutSt) -> String:
@@ -510,6 +630,36 @@ def OutSt.opt_round(m):
     case Some{S.OSettled{}}:
       {==}
 
+def OutSt.journal_of(j: J.Json) -> S.OutSt:
+  match j:
+    case J.JStr{+w}:
+      OutSt.of_word(w)
+    case _:
+      S.OPending{}
+
+def OutSt.journal_json(e: S.OutSt) -> J.Json:
+  J.JStr{OutSt.word(e)}
+
+law OutSt.journal_round:
+  for e: S.OutSt
+  {OutSt.journal_of(OutSt.journal_json(e)) == e : S.OutSt}
+
+def OutSt.journal_round(e):
+  OutSt.round(e)
+
+def OutSt.opt_journal_of(+j: J.Json) -> Maybe<&2, S.OutSt>:
+  OutSt.opt_of(Some{j})
+
+def OutSt.opt_journal_json(m: Maybe<&2, S.OutSt>) -> J.Json:
+  OutSt.opt_json(m)
+
+law OutSt.opt_journal_round:
+  for m: Maybe<&2, S.OutSt>
+  {OutSt.opt_journal_of(OutSt.opt_journal_json(m)) == m : Maybe<&2, S.OutSt>}
+
+def OutSt.opt_journal_round(m):
+  OutSt.opt_round(m)
+
 # ---- RSt (its word) ----
 
 def RSt.word(e: S.RSt) -> String:
@@ -566,6 +716,36 @@ def RSt.opt_round(m):
       {==}
     case Some{S.RCancelled{}}:
       {==}
+
+def RSt.journal_of(j: J.Json) -> S.RSt:
+  match j:
+    case J.JStr{+w}:
+      RSt.of_word(w)
+    case _:
+      S.RHeld{}
+
+def RSt.journal_json(e: S.RSt) -> J.Json:
+  J.JStr{RSt.word(e)}
+
+law RSt.journal_round:
+  for e: S.RSt
+  {RSt.journal_of(RSt.journal_json(e)) == e : S.RSt}
+
+def RSt.journal_round(e):
+  RSt.round(e)
+
+def RSt.opt_journal_of(+j: J.Json) -> Maybe<&2, S.RSt>:
+  RSt.opt_of(Some{j})
+
+def RSt.opt_journal_json(m: Maybe<&2, S.RSt>) -> J.Json:
+  RSt.opt_json(m)
+
+law RSt.opt_journal_round:
+  for m: Maybe<&2, S.RSt>
+  {RSt.opt_journal_of(RSt.opt_journal_json(m)) == m : Maybe<&2, S.RSt>}
+
+def RSt.opt_journal_round(m):
+  RSt.opt_round(m)
 
 # ---- Msg, its journal shape: id, thread, from, to, reply_to, expect_reply, auto, text, created_ms, plain, queued, via, parts ----
 
@@ -1607,13 +1787,13 @@ def TimerEnd.view_json(r: S.TimerEnd) -> J.Json:
 def Act.journal_kvs(r: S.Act) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match r:
     case S.Act{+id, +due, +what}:
-      [J.kv("id", J.JNum{id}), J.kv("due", J.JNum{due}), J.kv("what", What.json(what))]
+      [J.kv("id", J.JNum{id}), J.kv("due", J.JNum{due}), J.kv("what", What.journal_json(what))]
 
 def Act.journal_json(r: S.Act) -> J.Json:
   J.obj(Act.journal_kvs(r))
 
 def Act.journal_of(+j: J.Json) -> S.Act:
-  S.Act{rd.n(J.get(j, "id")), rd.n(J.get(j, "due")), What.of(rd.j(J.get(j, "what")))}
+  S.Act{rd.n(J.get(j, "id")), rd.n(J.get(j, "due")), What.journal_of(rd.j(J.get(j, "what")))}
 
 law Act.journal.id:
   for +id: Nat
@@ -1637,10 +1817,10 @@ law Act.journal.what:
   for +id: Nat
   for +due: Nat
   for +what: S.What
-  {What.of(rd.j(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "what"))) == what : S.What}
+  {What.journal_of(rd.j(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "what"))) == what : S.What}
 
 def Act.journal.what(id, due, what):
-  What.round(what)
+  What.journal_round(what)
 
 # the fields it carries come back (the others at their default)
 law Act.journal_round_by_fields:
@@ -1650,9 +1830,9 @@ law Act.journal_round_by_fields:
   {Act.journal_of(Act.journal_json(S.Act{id, due, what})) == S.Act{id, due, what} : S.Act}
 
 def Act.journal_round_by_fields(id, due, what):
-  %Equal.sym(Nat, rd.n(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "id")), id, Act.journal.id(id, due, what)) : {S.Act{_, rd.n(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "due")), What.of(rd.j(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "what")))} == S.Act{id, due, what} : S.Act}
-  %Equal.sym(Nat, rd.n(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "due")), due, Act.journal.due(id, due, what)) : {S.Act{id, _, What.of(rd.j(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "what")))} == S.Act{id, due, what} : S.Act}
-  %Equal.sym(S.What, What.of(rd.j(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "what"))), what, Act.journal.what(id, due, what)) : {S.Act{id, due, _} == S.Act{id, due, what} : S.Act}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "id")), id, Act.journal.id(id, due, what)) : {S.Act{_, rd.n(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "due")), What.journal_of(rd.j(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "what")))} == S.Act{id, due, what} : S.Act}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "due")), due, Act.journal.due(id, due, what)) : {S.Act{id, _, What.journal_of(rd.j(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "what")))} == S.Act{id, due, what} : S.Act}
+  %Equal.sym(S.What, What.journal_of(rd.j(J.get(J.obj(Act.journal_kvs(S.Act{id, due, what})), "what"))), what, Act.journal.what(id, due, what)) : {S.Act{id, due, _} == S.Act{id, due, what} : S.Act}
   {==}
 
 law Act.journal_round:

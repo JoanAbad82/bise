@@ -6,10 +6,12 @@
 //! - state.bend: the types; per record `T.empty()`, per field `T.f` and
 //!   `T.with_f`. The only file where a record is built or opened by
 //!   position (the gate's state guard checks it).
-//! - state-laws.bend: per field `T.f.get_with` and `T.f.eta`.
+//! - state-laws.bend: per field `T.f.get_with` and `T.f.eta` (stated
+//!   rebuilt == setter, so a proof rewrites with it as is).
 //! - state-codec.bend: per word enum its words both ways (`E.word`,
-//!   `E.of_word`, `E.opt_json`, `E.opt_of`) and `E.round`; per tagged
-//!   enum `E.kvs`, `E.json`, `E.of` and `E.round`; per record shape
+//!   `E.of_word`, `E.opt_json`, `E.opt_of`) and `E.round`, and as a journal
+//!   row's value `E.journal_of/_json/_round` and `E.opt_journal_*`; per
+//!   tagged enum `E.journal_kvs`, `_json`, `_of` and `_round`; per record shape
 //!   `T.<shape>_kvs`, `_json`, and when sb-core reads it `_of`, one law
 //!   per field it carries (`T.<shape>.<field>`: its read of the written
 //!   object is its value) and the record's (`T.<shape>_round`), which
@@ -122,7 +124,7 @@ pub(crate) fn state_types() -> String {
 
 pub(crate) fn state_laws() -> String {
     let mut s = String::new();
-    header(&mut s, "state laws: per field, a setter then its getter gives the value (get_with), a setter is the record rebuilt from its getters (eta: rewrite with it, then any other getter computes).");
+    header(&mut s, "state laws: per field, a setter then its getter gives the value (get_with); the record rebuilt from its getters is the setter (eta, stated for a rewrite: `%T.f.eta(r, v) : {<goal with _ at the setter>}`, then any other getter computes, with no record written by position).");
     writeln!(s, "\nimport ./state.bend as S\n").unwrap();
     for r in STATE.records {
         let n = r.name;
@@ -137,7 +139,7 @@ pub(crate) fn state_laws() -> String {
             writeln!(s, "def {n}.{fname}.get_with(r, v):\n{open}").unwrap();
             let gets: Vec<String> = r.fields.iter().enumerate().map(|(j, g)| if j == i { "v".into() } else { format!("S.{n}.{}(r)", g.name) }).collect();
             writeln!(s, "law {n}.{fname}.eta:\n  for r: S.{n}\n  for v: {t}").unwrap();
-            writeln!(s, "  {{S.{n}.with_{fname}(r, v) == {} : S.{n}}}\n", rec(S, n, &gets)).unwrap();
+            writeln!(s, "  {{{} == S.{n}.with_{fname}(r, v) : S.{n}}}\n", rec(S, n, &gets)).unwrap();
             writeln!(s, "def {n}.{fname}.eta(r, v):\n{open}").unwrap();
         }
     }
@@ -206,6 +208,16 @@ fn enum_codec(s: &mut String, e: &st::Enum) {
             writeln!(s, "    case Some{{S.{}{{}}}}:\n      {{==}}", v.name).unwrap();
         }
         writeln!(s).unwrap();
+        // as a journal row's value (a Rec codec row: `SC.<E>.journal`, and
+        // `SC.<E>.opt_journal` for a Maybe of it): a string, else the fallback / none
+        writeln!(s, "def {n}.journal_of(j: J.Json) -> S.{n}:\n  match j:\n    case J.JStr{{+w}}:\n      {n}.of_word(w)\n    case _:\n      S.{}{{}}\n", fallback.name).unwrap();
+        writeln!(s, "def {n}.journal_json(e: S.{n}) -> J.Json:\n  J.JStr{{{n}.word(e)}}\n").unwrap();
+        writeln!(s, "law {n}.journal_round:\n  for e: S.{n}\n  {{{n}.journal_of({n}.journal_json(e)) == e : S.{n}}}\n").unwrap();
+        writeln!(s, "def {n}.journal_round(e):\n  {n}.round(e)\n").unwrap();
+        writeln!(s, "def {n}.opt_journal_of(+j: J.Json) -> Maybe<&2, S.{n}>:\n  {n}.opt_of(Some{{j}})\n").unwrap();
+        writeln!(s, "def {n}.opt_journal_json(m: Maybe<&2, S.{n}>) -> J.Json:\n  {n}.opt_json(m)\n").unwrap();
+        writeln!(s, "law {n}.opt_journal_round:\n  for m: Maybe<&2, S.{n}>\n  {{{n}.opt_journal_of({n}.opt_journal_json(m)) == m : Maybe<&2, S.{n}>}}\n").unwrap();
+        writeln!(s, "def {n}.opt_journal_round(m):\n  {n}.opt_round(m)\n").unwrap();
         return;
     }
     if e.tag_key.is_empty() {
@@ -214,7 +226,7 @@ fn enum_codec(s: &mut String, e: &st::Enum) {
     }
     let tk = e.tag_key;
     writeln!(s, "# ---- {n} (its word under \"{tk}\", its fields beside it) ----\n").unwrap();
-    writeln!(s, "def {n}.kvs(e: S.{n}) -> List<&2, {KV}>:\n  match e:").unwrap();
+    writeln!(s, "def {n}.journal_kvs(e: S.{n}) -> List<&2, {KV}>:\n  match e:").unwrap();
     for v in e.variants {
         let pats: Vec<String> = v.fields.iter().map(|f| format!("+{}", var(f.name))).collect();
         let mut kvs = vec![format!("J.kv(\"{tk}\", J.JStr{{\"{}\"}})", v.word)];
@@ -223,7 +235,7 @@ fn enum_codec(s: &mut String, e: &st::Enum) {
         }
         writeln!(s, "    case {}:\n      [{}]", rec(S, v.name, &pats), kvs.join(", ")).unwrap();
     }
-    writeln!(s, "\ndef {n}.json(e: S.{n}) -> J.Json:\n  J.obj({n}.kvs(e))\n").unwrap();
+    writeln!(s, "\ndef {n}.journal_json(e: S.{n}) -> J.Json:\n  J.obj({n}.journal_kvs(e))\n").unwrap();
     let read = |v: &st::Variant| {
         let rs: Vec<String> = v.fields.iter().map(|f| format!("{}(J.get(j, \"{}\"))", scalar(f.ty, "").1, f.name)).collect();
         rec(S, v.name, &rs)
@@ -234,9 +246,9 @@ fn enum_codec(s: &mut String, e: &st::Enum) {
     }
     let j = if e.variants.iter().any(|v| !v.fields.is_empty()) { "+j" } else { "j" };
     writeln!(s, "def {n}.of_word(+w: String, {j}: J.Json) -> S.{n}:\n  {chain}\n").unwrap();
-    writeln!(s, "# any other word, or none: {}\ndef {n}.of(+j: J.Json) -> S.{n}:\n  {n}.of_word(rd.s(J.get(j, \"{tk}\")), j)\n", fallback.word).unwrap();
-    writeln!(s, "law {n}.round:\n  for e: S.{n}\n  {{{n}.of({n}.json(e)) == e : S.{n}}}\n").unwrap();
-    writeln!(s, "def {n}.round(e):\n  match e:").unwrap();
+    writeln!(s, "# any other word, or none: {} (an inline row reads the line's own object)\ndef {n}.journal_of(+j: J.Json) -> S.{n}:\n  {n}.of_word(rd.s(J.get(j, \"{tk}\")), j)\n", fallback.word).unwrap();
+    writeln!(s, "law {n}.journal_round:\n  for e: S.{n}\n  {{{n}.journal_of({n}.journal_json(e)) == e : S.{n}}}\n").unwrap();
+    writeln!(s, "def {n}.journal_round(e):\n  match e:").unwrap();
     for v in e.variants {
         writeln!(s, "    case {}:\n      {{==}}", variant_pat(v, "x")).unwrap();
     }
@@ -272,7 +284,7 @@ fn key_kv(k: &st::Key, f: &st::Field, shape: &str, v: &str) -> String {
         Wire::OptWord => format!("J.kv(\"{key}\", {}.opt_json({v}))", named(f.ty)),
         Wire::Obj => match STATE.record(named(f.ty)) {
             Some(r) => format!("J.kv(\"{key}\", {}.{}_json({v}))", r.name, inner_shape(r, shape).name),
-            None => format!("J.kv(\"{key}\", {}.json({v}))", named(f.ty)),
+            None => format!("J.kv(\"{key}\", {}.journal_json({v}))", named(f.ty)),
         },
         Wire::StrOmit => format!("K.omit_s(\"{key}\", {v})"),
         Wire::OptStrOmit => format!("K.omit_ms(\"{key}\", {v})"),
@@ -281,7 +293,7 @@ fn key_kv(k: &st::Key, f: &st::Field, shape: &str, v: &str) -> String {
         Wire::Hand(h) => format!("[SH.{}_kv({v})]", h.name),
         Wire::Inline => match STATE.record(named(f.ty)) {
             Some(r) => format!("{}.{}_kvs({v})", r.name, inner_shape(r, shape).name),
-            None => format!("{}.kvs({v})", named(f.ty)),
+            None => format!("{}.journal_kvs({v})", named(f.ty)),
         },
     }
 }
@@ -348,7 +360,7 @@ fn key_read(k: &st::Key, f: &st::Field, shape: &str, look: &dyn Fn(&str) -> Stri
                 assert!(sh.read && !hand_of(sh).is_some(), "{}.{}: a nested record read whole", r.name, sh.name);
                 format!("{}.{}_of(rd.j({m}))", r.name, sh.name)
             }
-            None => format!("{}.of(rd.j({m}))", named(f.ty)),
+            None => format!("{}.journal_of(rd.j({m}))", named(f.ty)),
         },
         Wire::Hand(h) => {
             let ms: Vec<String> = h.keys.iter().map(|(_, x)| look(x)).collect();
@@ -505,7 +517,7 @@ fn shape_laws(s: &mut String, r: &st::Record, sh: &st::Shape) {
             }
             match (list_lemma(k.wire, &v), &k.wire) {
                 (Some(l), _) => writeln!(s, "{ind}{l}").unwrap(),
-                (None, Wire::Obj) if STATE.record(named(f.ty)).is_none() => writeln!(s, "{ind}{}.round({v})", named(f.ty)).unwrap(),
+                (None, Wire::Obj) if STATE.record(named(f.ty)).is_none() => writeln!(s, "{ind}{}.journal_round({v})", named(f.ty)).unwrap(),
                 _ => writeln!(s, "{ind}{{==}}").unwrap(),
             }
         }
@@ -651,7 +663,7 @@ fn pinned_rec(r: &st::Record, sh: &st::Shape, o: &Jv) -> String {
 }
 
 /// The view shapes pinned on fixtures/core_view.jsonl: the view's key and
-/// the record and shape its items are.
+/// the record its items are (its view shape, else its journal shape).
 const PINS: &[(&str, &str)] = &[("timers", "Timer"), ("timers_ended", "TimerEnd")];
 
 fn view_pins(s: &mut String) {
@@ -659,7 +671,8 @@ fn view_pins(s: &mut String) {
     writeln!(s, "# ---- the view shapes, pinned on fixtures/core_view.jsonl (a key order change is red) ----\n").unwrap();
     for (key, rname) in PINS {
         let r = STATE.record(rname).unwrap();
-        let sh = r.shape("view").unwrap();
+        // a record whose view is its journal shape (a watch) is pinned on that
+        let sh = inner_shape(r, "view");
         // the first item whose numbers are Bend Nat literals
         let item = text
             .lines()
@@ -670,7 +683,7 @@ fn view_pins(s: &mut String) {
             .unwrap_or_else(|| panic!("core_view.jsonl: no {key} item to pin {rname}'s view on"));
         let o = jv(&ordered(&text, key, &item));
         let law = format!("{rname}.view_pinned");
-        writeln!(s, "law {law}:\n  {{{rname}.view_json({}) == {} : J.Json}}\n", pinned(r, sh, &o), bend_json(&o)).unwrap();
+        writeln!(s, "law {law}:\n  {{{rname}.{}_json({}) == {} : J.Json}}\n", sh.name, pinned(r, sh, &o), bend_json(&o)).unwrap();
         writeln!(s, "def {law}():\n  {{==}}\n").unwrap();
     }
 }

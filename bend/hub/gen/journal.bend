@@ -17,6 +17,10 @@ import ../xhub-model.bend as XH
 
 import ../codec.bend as C
 
+import ./state.bend as S
+
+import ./state-codec.bend as SC
+
 # ---- read: each field with sb-core's default when missing; a line of a
 # kind this core doesn't know is skipped (None) ----
 

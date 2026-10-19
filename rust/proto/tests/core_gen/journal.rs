@@ -64,6 +64,10 @@ import ../wakes.bend as WK
 import ../xhub-model.bend as XH
 
 import ../codec.bend as C
+
+import ./state.bend as S
+
+import ./state-codec.bend as SC
 ";
 
 const EV: &str = "Maybe<&2, M.Ev>";
