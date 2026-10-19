@@ -1,38 +1,54 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BUSY_MAX_MS, busyFault, busyWatch } from './test-busy';
+import { BUSY_CPU_MAX_MS, busyFault, busyWatch } from './test-busy';
 
-describe('the busy-loop guard (src/test-busy.ts)', () => {
-  it('passes a test under the limit and names one over it, with the fix', () => {
-    expect(busyFault('a quick one', BUSY_MAX_MS)).toBeNull();
-    const f = busyFault('cozy: nothing through the world', 61_000);
-    expect(f).toContain("'cozy: nothing through the world' kept the event loop busy 61.0 s");
+/** the process's CPU, user + sys, ms (the guard's clock) */
+const cpu = (): number => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; };
+/** burn `n` ms of CPU on this thread, however loaded the machine (its wall time may be longer) */
+const burn = (n: number): void => { const end = cpu() + n; while (cpu() < end) { /* busy */ } };
+/** block this thread `n` ms of wall time with no CPU: a stretch that is only slow */
+const sleep = (n: number): void => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, n); };
+
+describe('the busy-loop guard (src/test-busy.ts), in CPU time (review-gates m_33544)', () => {
+  it('fails a stretch of 12 s of CPU by its name and keeps its wall time; passes one at the limit', () => {
+    const f = busyFault('cozy: nothing through the world', { cpuMs: 12_000, wallMs: 41_500 });
+    expect(f).toContain("'cozy: nothing through the world' burnt 12.0 s of CPU without a macrotask (41.5 s of wall time");
     expect(f).toContain('setTimeout(done, 0)');
+    expect(busyFault('at the limit', { cpuMs: BUSY_CPU_MAX_MS, wallMs: 60_000 })).toBeNull();
   });
 
-  it('measures a busy stretch with no macrotask, and a yield ends it', async () => {
+  it('passes a long wall gap with little CPU: a test slowed by a loaded machine is not busy', () => {
+    expect(busyFault('slow, not busy', { cpuMs: 2_000, wallMs: 45_000 })).toBeNull();
     const w = busyWatch();
-    // the guard's own clock: Date.now's whole milliseconds made a 400 ms spin read 399.x (bims-sit m_33518)
-    const ms = (): number => Number(process.hrtime.bigint()) / 1e6;
-    const spin = (n: number): void => { const end = ms() + n; while (ms() < end) { /* busy */ } };
     w.reset();
-    spin(800);
-    expect(w.worst()).toBeGreaterThanOrEqual(800);
-    // the same 800 ms cut by a macrotask every 100: no stretch near 800, even late timers on a loaded machine
+    sleep(1_500);
+    const s = w.worst();
+    expect(s.wallMs).toBeGreaterThanOrEqual(1_400);
+    expect(s.cpuMs).toBeLessThan(300);
+  });
+
+  it('measures the CPU of a stretch with no macrotask, and a yield ends it', async () => {
+    const w = busyWatch();
+    w.reset();
+    burn(800);
+    expect(w.worst().cpuMs).toBeGreaterThanOrEqual(800);
+    // the same 800 ms of CPU cut by a macrotask every 100: no stretch near 800
     w.reset();
     for (let i = 0; i < 8; i++) {
-      spin(100);
+      burn(100);
       await new Promise((done) => { setTimeout(done, 0); });
     }
-    expect(w.worst()).toBeLessThan(700);
+    expect(w.worst().cpuMs).toBeLessThan(700);
   });
 
-  it("keeps the real clock under a test's fake timers", () => {
+  it("keeps the real clocks under a test's fake timers", () => {
     const w = busyWatch();
     vi.useFakeTimers();
     try {
       w.reset();
       vi.advanceTimersByTime(3_600_000);
-      expect(w.worst()).toBeLessThan(1_000);
+      const s = w.worst();
+      expect(s.wallMs).toBeLessThan(1_000);
+      expect(s.cpuMs).toBeLessThan(1_000);
     } finally {
       vi.useRealTimers();
     }
