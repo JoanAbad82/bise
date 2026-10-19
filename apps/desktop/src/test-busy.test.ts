@@ -11,16 +11,19 @@ describe('the busy-loop guard (src/test-busy.ts)', () => {
 
   it('measures a busy stretch with no macrotask, and a yield ends it', async () => {
     const w = busyWatch();
-    const spin = (ms: number): void => { const end = Date.now() + ms; while (Date.now() < end) { /* busy */ } };
+    // the guard's own clock: Date.now's whole milliseconds made a 400 ms spin read 399.x (bims-sit m_33518)
+    const ms = (): number => Number(process.hrtime.bigint()) / 1e6;
+    const spin = (n: number): void => { const end = ms() + n; while (ms() < end) { /* busy */ } };
     w.reset();
-    spin(400);
-    expect(w.worst()).toBeGreaterThanOrEqual(400);
+    spin(800);
+    expect(w.worst()).toBeGreaterThanOrEqual(800);
+    // the same 800 ms cut by a macrotask every 100: no stretch near 800, even late timers on a loaded machine
     w.reset();
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 8; i++) {
       spin(100);
-      await new Promise((done) => { setTimeout(done, 300); });
+      await new Promise((done) => { setTimeout(done, 0); });
     }
-    expect(w.worst()).toBeLessThan(400);
+    expect(w.worst()).toBeLessThan(700);
   });
 
   it("keeps the real clock under a test's fake timers", () => {
