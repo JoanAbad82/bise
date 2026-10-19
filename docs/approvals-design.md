@@ -131,8 +131,11 @@ Vibe's `edit`, copied exactly:
     different from old_string)"
   - `replace_all` (boolean, default false): "Replace all occurrences of
     old_string (default false)"
-- Description (verbatim): "Exact string replacement in a file. You must
-  `read_file` first. When editing text from `read_file` output, never
+- Description (verbatim, but for Vibe's `read_file`, which is bash here:
+  bise has no read_file tool, issue 21): "Exact string replacement in a
+  file. Read the file with `bash` first (`cat -n <path>`, `sed -n '1,200p'
+  <path>`): there is no read_file tool. When editing text from `cat -n`
+  output, never
 - Behavior and errors (Vibe's words): an empty path → "File path cannot be
   empty"; empty `old_string` → "old_string cannot be empty. Use write_file
   to create new files."; same strings → "No changes to make — old_string

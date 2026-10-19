@@ -61,9 +61,19 @@ PROGRAMS = [
     ("return 6 * 7", "tool run_typescript ok: 42"),
     ('const r: string = await search_tool_functions({query: "bash"}); return typeof r',
      "tool run_typescript ok: string"),
-    ("return await no_such_tool({})",
-     "tool run_typescript failed: program call failed: unknown tool: no_such_tool"),
     ('throw new Error("boom")', "tool run_typescript failed: boom"),
+]
+
+# a bare name that is not one of ours (issue 21): named, our tools, how to
+# read a file. One session each: the answer is long (the scripted session
+# compacts past ~400 tokens and drops the earlier results)
+UNKNOWN_PROGRAMS = [
+    ("return await no_such_tool({})",
+     "tool run_typescript failed: program call failed: unknown tool: no_such_tool — the tools here are "),
+    ('return await read_file({path: "a.txt"})',
+     "tool run_typescript failed: program call failed: unknown tool: read_file — the tools here are "
+     "search_tool_functions, bash, run_typescript, skill, apply_patch, write_file, edit; read a file with "
+     "bash (`cat -n <path>`, `sed -n '1,200p' <path>`)"),
 ]
 
 # a failed call rejects its promise (the user's case: allSettled over
@@ -72,7 +82,10 @@ PROGRAMS = [
 REJECT_PROGRAMS = [
     ('const rs = await Promise.allSettled([no_such_tool({}), search_tool_functions({query: "bash"})]); '
      'return rs.map((r) => r.status === "fulfilled" ? "ok " + typeof r.value : r.reason.name + " " + r.reason.message).join(" | ")',
-     "tool run_typescript ok: ToolError unknown tool: no_such_tool — remote MCP tools need a live session | ok string"),
+     "tool run_typescript ok: ToolError unknown tool: no_such_tool — the tools here are search_tool_functions, "
+     "bash, run_typescript, skill, apply_patch, write_file, edit; read a file with bash (`cat -n <path>`, "
+     "`sed -n '1,200p' <path>`); connector tools run from run_typescript (find them with search_tool_functions) "
+     "| ok string"),
     ('try { await no_such_tool({}); return "not caught" } catch (e) { return "caught " + e.tool + ": " + e.message }',
      "tool run_typescript ok: caught no_such_tool: unknown tool: no_such_tool"),
 ]
@@ -110,6 +123,10 @@ def main():
     home = tempfile.mkdtemp(prefix="sb-scripted-ts-")
     session = check_programs(home, PROGRAMS)
     print("scripted run_typescript: %d programs on V8 (bend-jsrt)" % len(PROGRAMS))
+    unknown_home = tempfile.mkdtemp(prefix="sb-scripted-ts-unknown-")
+    for i, program in enumerate(UNKNOWN_PROGRAMS):
+        check_programs(os.path.join(unknown_home, str(i)), [program])
+    print("an unknown bare name: named, with our tools and how to read a file")
     reject_home = tempfile.mkdtemp(prefix="sb-scripted-ts-reject-")
     for i, program in enumerate(REJECT_PROGRAMS):
         check_programs(os.path.join(reject_home, str(i)), [program])

@@ -8,6 +8,7 @@
 import Base
 import ../vendor/json.bend as J
 import ./provider-pure.bend as Pvp
+import ./tools-pure.bend as Xp
 
 type Verdict is Data:
   # flags: what follows `allow` (`net`: the sandbox opens the network,
@@ -19,10 +20,12 @@ type Verdict is Data:
   VStop{who: String}
 
 # never gated (design §3): the run_typescript wrapper (its calls are gated
-# one by one), search_tool_functions, skill, self.*
+# one by one), search_tool_functions, skill, self.*, and a bare name that
+# is not one of ours (read_file, cat: it runs nothing; issue 21)
 def gated(+name: String) -> Bool:
   Bool.not(String.eq(name, "run_typescript") || String.eq(name, "search_tool_functions")
-    || String.eq(name, "skill") || String.starts_with(name, "self."))
+    || String.eq(name, "skill") || String.starts_with(name, "self.")
+    || Xp.is_unknown_bare(name))
 
 # the mode file's text asks the hub only when it says `auto`
 def asks(+mode: String) -> Bool:

@@ -149,7 +149,7 @@ def main():
               "anthropic: bash says use `edit`, no heredoc invitation")
         check(LINE_EDIT in r["system"] and LINE_PATCH not in r["system"], "anthropic: the prompt names edit")
         tools = dict((t[0], t[1]) for t in r["tools"])
-        check(tools.get("edit", "").startswith("Exact string replacement in a file. You must `read_file` first.")
+        check(tools.get("edit", "").startswith("Exact string replacement in a file. Read the file with `bash` first")
               and tools.get("write_file", "").startswith("Create a new file. Errors if the file already exists"),
               "anthropic: Vibe's descriptions")
         turn("mistral/devstral", "hello again")

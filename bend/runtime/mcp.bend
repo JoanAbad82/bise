@@ -697,16 +697,18 @@ def mcp_call.mt(mt: McpTool, +name: String, +args: String, +key: String)
     case MT{+cid, +tool, +schema}:
       mcp_call.found(name, cid, tool, schema, call_args(args), key)
 
-def index_missing() -> MR:
-  MR{False{}, "tool index not found — remote MCP tools are unavailable in this session"}
+# no index: the call is still named (issue 21: a nameless answer read
+# like an empty result)
+def index_missing(+name: String) -> MR:
+  MR{False{}, Xp.unknown_text(name,
+    "the tool index is missing: remote MCP tools are unavailable in this session")}
 
 def mcp_call.resolved(m: Maybe<&2, McpTool>, +name: String, +args: String,
     +key: String) -> IO(MR):
   match m:
     case None{}:
-      IO.pure(MR, MR{False{},
-        String.append("unknown tool: ", String.append(name,
-          " — discover tools with search_tool_functions"))})
+      IO.pure(MR, MR{False{}, Xp.unknown_text(name,
+        "discover tools with search_tool_functions")})
     case Some{+mt}:
       mcp_call.mt(mt, name, args, key)
 
@@ -714,7 +716,7 @@ def mcp_call.read(m: Maybe<&2, String>, +name: String, +args: String,
     +key: String) -> IO(MR):
   match m:
     case None{}:
-      IO.pure(MR, index_missing())
+      IO.pure(MR, index_missing(name))
     case Some{+content}:
       mcp_call.resolved(find_line(content, name), name, args, key)
 

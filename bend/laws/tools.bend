@@ -322,12 +322,14 @@ law apply_patch_desc_names_the_format:
        String.contains(Xt.patch_desc.read(None{}),
          "validated before anything is written"))) == True{} : Bool}
 
-# LAW: edit and write_file carry Vibe 2.25.8's descriptions verbatim
-# (prompts/edit.md, prompts/write_file.md).
+# LAW: edit and write_file carry Vibe 2.25.8's descriptions
+# (prompts/edit.md, prompts/write_file.md), verbatim but for Vibe's
+# read_file, which is bash here: bise has no read_file (issue 21, the
+# user's yes on m_34252).
 law edit_tools_carry_vibe_descriptions:
   {String.join([Xt.tool_desc_at(5n, Xt.catalog_live("s", "r", "b", "k", "p", False{})),
      Xt.tool_desc_at(4n, Xt.catalog_live("s", "r", "b", "k", "p", False{}))], "|")
-    == "Exact string replacement in a file. You must `read_file` first. When editing text from `read_file` output, never include any part of the line-number prefix in `old_string` or `new_string`. If `old_string` is not found or matches multiple locations, provide more context to make it unique, or use `replace_all`. If an edit fails, re-read the file before retrying.|Create a new file. Errors if the file already exists — use `edit` to modify existing files. Prefer editing existing files over creating new ones. Do not proactively create documentation or README files." : String}
+    == "Exact string replacement in a file. Read the file with `bash` first (`cat -n <path>`, `sed -n '1,200p' <path>`): there is no read_file tool. When editing text from `cat -n` output, never include any part of the line-number prefix in `old_string` or `new_string`. If `old_string` is not found or matches multiple locations, provide more context to make it unique, or use `replace_all`. If an edit fails, re-read the file before retrying.|Create a new file. Errors if the file already exists — use `edit` to modify existing files. Prefer editing existing files over creating new ones. Do not proactively create documentation or README files." : String}
 
 # LAW: bash's description names the edit tool that is on, in place of
 # its {edit_line} marker (and nothing when the text has none).
@@ -521,6 +523,33 @@ law gate_what_is_gated:
     Gt.gated("self.sleep"), Gt.gated("bash"), Gt.gated("edit"), Gt.gated("gmail.send_email"))
     == (False{}, False{}, False{}, False{}, True{}, True{}, True{})
     : Bool & Bool & Bool & Bool & Bool & Bool & Bool}
+
+# LAW: a bare name that is not one of ours (issue 21: read_file, or any
+# name a model invents) asks nobody: it runs nothing. A connector's
+# group.tool, even an unknown one, is gated as before.
+law gate_skips_unknown_bare_names:
+  {(Gt.gated("read_file"), Gt.gated("open_document"), Gt.gated("write_file"),
+    Gt.gated("gmail.read_file"))
+    == (False{}, False{}, True{}, True{})
+    : Bool & Bool & Bool & Bool}
+
+# LAW: a bare name that is not one of ours is answered with its name,
+# our tools (from the catalog's table, both edit toolsets) and how to
+# read a file here; never an empty result (issue 21).
+law unknown_bare_answer:
+  {(Xt.unknown_bare("read_file"), Xt.unknown_bare("bash"), Xt.unknown_bare("gmail.nope"))
+    == (Some{"unknown tool: read_file — the tools here are search_tool_functions, bash, run_typescript, skill, apply_patch, write_file, edit; read a file with bash (`cat -n <path>`, `sed -n '1,200p' <path>`); connector tools run from run_typescript (find them with search_tool_functions)"},
+        (None{}, None{}))
+    : Maybe<&2, String> & (Maybe<&2, String> & Maybe<&2, String>)}
+
+# LAW: every name of the table, and every group.tool, is never that
+# unknown answer: they run (a connector's unknown tool keeps its own
+# "not found").
+law own_names_are_never_unknown:
+  {(List.any(&2, String, n => Xt.is_unknown_bare(n), Xt.own_names()),
+    Xt.is_unknown_bare("gmail.read_file"), Xt.is_unknown_bare("self.sleep"),
+    Xt.is_unknown_bare("open_document"))
+    == (False{}, False{}, False{}, True{}) : Bool & Bool & Bool & Bool}
 
 # LAW: only `auto` in the mode file asks; `yolo`, no file (no hub) or
 # anything else never does (yolo costs no round trip).

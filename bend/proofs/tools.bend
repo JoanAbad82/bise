@@ -392,6 +392,15 @@ def Laws.edit_path_resolves():
 def Laws.gate_what_is_gated():
   {==}
 
+def Laws.gate_skips_unknown_bare_names():
+  {==}
+
+def Laws.unknown_bare_answer():
+  {==}
+
+def Laws.own_names_are_never_unknown():
+  {==}
+
 def Laws.gate_only_auto_asks():
   {==}
 

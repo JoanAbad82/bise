@@ -96,8 +96,10 @@ def write_result(+path: String, +bytes: Nat, +lines: Nat) -> String:
 
 # ---- the descriptions (Vibe's prompts/*.md) ----
 
+# edit's: Vibe's text, but its read_file is bash here (issue 21: models
+# called the read_file it named, a tool bise does not have)
 def edit_desc() -> String:
-  "Exact string replacement in a file. You must `read_file` first. When editing text from `read_file` output, never include any part of the line-number prefix in `old_string` or `new_string`. If `old_string` is not found or matches multiple locations, provide more context to make it unique, or use `replace_all`. If an edit fails, re-read the file before retrying."
+  "Exact string replacement in a file. Read the file with `bash` first (`cat -n <path>`, `sed -n '1,200p' <path>`): there is no read_file tool. When editing text from `cat -n` output, never include any part of the line-number prefix in `old_string` or `new_string`. If `old_string` is not found or matches multiple locations, provide more context to make it unique, or use `replace_all`. If an edit fails, re-read the file before retrying."
 
 def write_desc() -> String:
   "Create a new file. Errors if the file already exists — use `edit` to modify existing files. Prefer editing existing files over creating new ones. Do not proactively create documentation or README files."

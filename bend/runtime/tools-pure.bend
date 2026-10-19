@@ -88,6 +88,57 @@ def catalog_live(+sd: String, +rd: String, +bd: String, +kd: String,
   List.append(&2, T.ToolDef, catalog_pure(sd, rd, bash_for(bd, patch)),
     Con{T.ToolDef{"skill", kd}, edit_tools(patch, pd)})
 
+# ---- a name that is not one of ours (issue 21) ----
+# Models call tools they were never given (Vibe's read_file, a bare
+# cat). The rule is "not one of ours", never a list of their names: a
+# bare name (no "group.": every connector and plugin tool has one) that
+# is no name of the catalog (either edit toolset) runs nothing, asks
+# nobody (Gt.gated), and its answer names it, lists ours from the same
+# table and says how to read a file here.
+
+def def_names(tools: List<&2, T.ToolDef>) -> List<&2, String>:
+  match tools:
+    case Nil{}:
+      Nil{}
+    case Con{T.ToolDef{+n, _}, rest}:
+      Con{n, def_names(rest)}
+
+# every top-level tool this runtime runs: the catalog, both toolsets
+def own_names() -> List<&2, String>:
+  List.append(&2, String, def_names(catalog_live("", "", "", "", "", True{})),
+    def_names(edit_tools(False{}, "")))
+
+def name_in(+s: String, ws: List<&2, String>) -> Bool:
+  match ws:
+    case Nil{}:
+      False{}
+    case Con{+w, rest}:
+      Bool.or(String.eq(s, w), name_in(s, rest))
+
+def is_unknown_bare(+name: String) -> Bool:
+  Bool.and(Bool.not(String.contains(name, ".")), Bool.not(name_in(name, own_names())))
+
+# every unknown-tool answer starts "unknown tool: <name> — " (a
+# program's ToolError text; the MCP error kinds read those words)
+def unknown_text(+name: String, +how: String) -> String:
+  String.concat(["unknown tool: ", name, " — ", how])
+
+def unknown_bare_text(+name: String) -> String:
+  unknown_text(name, String.concat(["the tools here are ",
+    String.join(own_names(), ", "),
+    "; read a file with bash (`cat -n <path>`, `sed -n '1,200p' <path>`); connector tools run from run_typescript (find them with search_tool_functions)"]))
+
+def unknown_bare.pick(unknown: Bool, +name: String) -> Maybe<&2, String>:
+  match unknown:
+    case True{}:
+      Some{unknown_bare_text(name)}
+    case False{}:
+      None{}
+
+# the answer to a bare name that is not one of ours, else None
+def unknown_bare(+name: String) -> Maybe<&2, String>:
+  unknown_bare.pick(is_unknown_bare(name), name)
+
 # which edit toolset a catalog carries: Some(True) apply_patch,
 # Some(False) edit + write_file, None: none (the scripted catalog)
 def has_tool(tools: List<&2, T.ToolDef>, +name: String) -> Bool:

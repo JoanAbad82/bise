@@ -138,8 +138,7 @@ def exec_mcp.key(+name: String, +args: String, +key: String)
 
 def exec_mcp.scripted(+name: String) -> Xp.ExecRes:
   Xp.Ex{False{},
-    String.append("unknown tool: ", String.append(name,
-      " — remote MCP tools need a live session"))}
+    Xp.unknown_text(name, "remote MCP tools need a live session")}
 
 def exec_mcp.live(+name: String, +args: String) -> IO(Xp.ExecRes):
   do IO<Xp.ExecRes>:
@@ -147,9 +146,24 @@ def exec_mcp.live(+name: String, +args: String) -> IO(Xp.ExecRes):
     +key : String <- IO.pure(String, P.env_or(kr, ""))
     exec_mcp.key(name, args, key)
 
-def exec_mcp(+name: String, +args: String, live: Bool) -> IO(Xp.ExecRes):
+def exec_mcp.lookup(+name: String, +args: String, live: Bool)
+    -> IO(Xp.ExecRes):
   match live:
     case True{}:
       exec_mcp.live(name, args)
     case False{}:
       IO.pure(Xp.ExecRes, exec_mcp.scripted(name))
+
+# a bare name that is not one of ours (read_file, cat...) is answered at
+# once, live or scripted, with our tools and how to read a file (issue
+# 21); a group.tool goes to the connectors
+def exec_mcp.bare(m: Maybe<&2, String>, +name: String, +args: String,
+    live: Bool) -> IO(Xp.ExecRes):
+  match m:
+    case Some{+why}:
+      IO.pure(Xp.ExecRes, Xp.Ex{False{}, why})
+    case None{}:
+      exec_mcp.lookup(name, args, live)
+
+def exec_mcp(+name: String, +args: String, live: Bool) -> IO(Xp.ExecRes):
+  exec_mcp.bare(Xp.unknown_bare(name), name, args, live)
