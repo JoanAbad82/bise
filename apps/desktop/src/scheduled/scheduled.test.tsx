@@ -108,4 +108,11 @@ describe('how often', () => {
     expect(howOften(task(1, { every: 'every day 07:30' }))).toBe('every day 07:30');
     expect(howOften(task(1, { every: 'Every 10m' }))).toBe('Every 10 min');
   });
+
+  it("a one-shot says 'once', never 'every once' (the hub's every_words rule)", () => {
+    expect(howOften(task(1, { every: scheduled.once, times: 1 }))).toBe(scheduled.once);
+    expect(howOften(task(1, { every: 'every 20m', times: 1 }))).toBe(scheduled.once);
+    expect(howOften(task(1, { every: scheduled.once, times: null }))).toBe(scheduled.once);
+    expect(howOften(task(1, { every: '20m', times: 3 }))).toBe(scheduled.every({ when: '20 min' }));
+  });
 });

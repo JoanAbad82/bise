@@ -6,6 +6,7 @@
 // the index row's scheduled (26b2400b, its live timers as of written_ms) for the others.
 import type { Agent, Artifact, Card, IndexRow, ProjectRow, ScheduledTask } from '@/proto';
 import { leaves, LEAVES } from '@/artifacts/model';
+import { howOften } from '@/scheduled/model';
 import type { SearchData, SearchScheduled } from './rank';
 
 export interface StoreView {
@@ -28,7 +29,7 @@ const scheduledOf = (project: string, t: ScheduledTask): SearchScheduled => ({
   agent: t.agent,
   ...(t.name ? { name: t.name } : {}),
   words: t.words,
-  every: t.every.replace(/^every /u, ''),
+  every: howOften(t),
   ...(t.next_ms == null ? {} : { next_ms: t.next_ms }),
 });
 

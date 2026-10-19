@@ -61,7 +61,7 @@ export interface SearchScheduled {
   /** the hub's short name (sched-names); absent from an older hub: the words' first line shows */
   readonly name?: string;
   readonly words: string;
-  /** '30 min', 'day 07:30' */
+  /** how often, whole (scheduled/model howOften): 'every 30 min', 'every day 07:30', 'once' */
   readonly every: string;
   readonly next_ms?: number;
   /** when it was set or last ran (its place in 'recent') */
@@ -350,7 +350,7 @@ function scheduledHit(s: SearchScheduled, pname: string, tz?: string): Hit {
     name: one(s.name?.trim() || s.words),
     detail: '',
     where: `${s.agent} · ${pname}`,
-    when: s.next_ms !== undefined && s.next_ms > 0 ? `next ${clock(s.next_ms, tz)}` : `every ${s.every}`,
+    when: s.next_ms !== undefined && s.next_ms > 0 ? `next ${clock(s.next_ms, tz)}` : s.every,
     archived: false,
     waiting: false,
     at_ms: s.at_ms ?? 0,

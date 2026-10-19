@@ -36,7 +36,7 @@ describe('search data: held projects live, the others from amb-core index', () =
       cards: () => [],
       scheduled: (p) => (p === 'sf' ? [task] : []),
     });
-    expect(d.scheduled).toEqual([{ project: 'sf', id: 48, agent: 'checkout', words: 're-run the flaky checkout test', every: '30m', next_ms: 1_000 }]);
+    expect(d.scheduled).toEqual([{ project: 'sf', id: 48, agent: 'checkout', words: 're-run the flaky checkout test', every: 'every 30 min', next_ms: 1_000 }]);
     // sched-names: the hub's short name rides along (absent from an older hub, as above)
     const named = searchDataOf({
       projects: [project('sf', 1)],
@@ -61,6 +61,6 @@ describe('search data: held projects live, the others from amb-core index', () =
         { project: 'docs', up: false, written_ms: 5, agents: [], artifacts: [], scheduled: [task(48, 'refresh the Q3 notes')] },
       ],
     });
-    expect(d.scheduled.map((t) => `${t.project}#${String(t.id)} ${t.words} · ${t.every}`)).toEqual(['acme#1 live check · day 07:30', 'docs#48 refresh the Q3 notes · day 07:30']);
+    expect(d.scheduled.map((t) => `${t.project}#${String(t.id)} ${t.words} · ${t.every}`)).toEqual(['acme#1 live check · every day 07:30', 'docs#48 refresh the Q3 notes · every day 07:30']);
   });
 });

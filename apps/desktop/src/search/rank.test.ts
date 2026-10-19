@@ -22,7 +22,7 @@ const D: SearchData = {
     { project: 'sf', id: 'shots', title: 'checkout on mobile', kind: 'image', what: '2 shots', agent: 'checkout', at_ms: NOW - 200 * MIN },
     { project: 'sf', id: 'pp', title: 'product page, before / after', kind: 'page', what: 'page · v2', agent: 'perf', at_ms: NOW - 28 * MIN },
   ],
-  scheduled: [{ project: 'sf', id: 48, agent: 'checkout', words: 're-run the flaky checkout test', every: '30 min', at_ms: NOW - 60 * MIN }],
+  scheduled: [{ project: 'sf', id: 48, agent: 'checkout', words: 're-run the flaky checkout test', every: 'every 30 min', at_ms: NOW - 60 * MIN }],
 };
 
 describe('search: one ranking for ⌘K and the spotlight', () => {
