@@ -6,8 +6,10 @@
 //! - state.bend: the types; per record `T.empty()`, per field `T.f` and
 //!   `T.with_f`. The only file where a record is built or opened by
 //!   position (the gate's state guard checks it).
-//! - state-laws.bend: per field `T.f.get_with` and `T.f.eta` (stated
-//!   rebuilt == setter, so a proof rewrites with it as is).
+//! - state-laws.bend: per field `T.f.get_with`, `T.f.eta` (stated
+//!   rebuilt == setter, so a proof rewrites with it as is), `T.f.set_get`
+//!   (setting a field to its own value) and `T.f.set_set` (the last set
+//!   wins; state-timers m_32709).
 //! - state-codec.bend: per word enum its words both ways (`E.word`,
 //!   `E.of_word`, `E.opt_json`, `E.opt_of`) and `E.round`, and as a journal
 //!   row's value `E.journal_of/_json/_round` and `E.opt_journal_*`; per
@@ -124,7 +126,7 @@ pub(crate) fn state_types() -> String {
 
 pub(crate) fn state_laws() -> String {
     let mut s = String::new();
-    header(&mut s, "state laws: per field, a setter then its getter gives the value (get_with); the record rebuilt from its getters is the setter (eta, stated for a rewrite: `%T.f.eta(r, v) : {<goal with _ at the setter>}`, then any other getter computes, with no record written by position).");
+    header(&mut s, "state laws: per field, a setter then its getter gives the value (get_with); the record rebuilt from its getters is the setter (eta, stated for a rewrite: `%T.f.eta(r, v) : {<goal with _ at the setter>}`, then any other getter computes, with no record written by position); setting a field to its own value is the record (set_get); of two sets the last wins (set_set).");
     writeln!(s, "\nimport ./state.bend as S\n").unwrap();
     for r in STATE.records {
         let n = r.name;
@@ -141,6 +143,11 @@ pub(crate) fn state_laws() -> String {
             writeln!(s, "law {n}.{fname}.eta:\n  for r: S.{n}\n  for v: {t}").unwrap();
             writeln!(s, "  {{{} == S.{n}.with_{fname}(r, v) : S.{n}}}\n", rec(S, n, &gets)).unwrap();
             writeln!(s, "def {n}.{fname}.eta(r, v):\n{open}").unwrap();
+            writeln!(s, "law {n}.{fname}.set_get:\n  for r: S.{n}\n  {{S.{n}.with_{fname}(r, S.{n}.{fname}(r)) == r : S.{n}}}\n").unwrap();
+            writeln!(s, "def {n}.{fname}.set_get(r):\n{open}").unwrap();
+            writeln!(s, "law {n}.{fname}.set_set:\n  for r: S.{n}\n  for a: {t}\n  for b: {t}").unwrap();
+            writeln!(s, "  {{S.{n}.with_{fname}(S.{n}.with_{fname}(r, a), b) == S.{n}.with_{fname}(r, b) : S.{n}}}\n").unwrap();
+            writeln!(s, "def {n}.{fname}.set_set(r, a, b):\n{open}").unwrap();
         }
     }
     s
