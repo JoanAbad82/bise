@@ -30,7 +30,8 @@ for (const theme of ['light', 'dark'] as const) {
     const zoom = 'zoom' in size && size.zoom;
     const tag = `${wide === null ? String(w) : `${String(w)}-${wide}`}${to === 'login-test' ? '' : `-${to}`}-${theme}`;
     test(`his plane's flight, ${tag}`, async () => {
-      const { s, core } = await open(office, { theme });
+      // the pocket case's terrace grown full: every deck chair there (bims m_33641: nothing floats in a shot)
+      const { s, core } = await open(office, { theme, ...(zoom ? { growth: { jobs_done: 2000, days_used: 400, artifacts_made: 4000 } } : {}) });
       try {
         await s.app.evaluate(({ BrowserWindow }, v) => {
           const b = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().includes('index.html'));

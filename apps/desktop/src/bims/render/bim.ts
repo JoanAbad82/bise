@@ -187,6 +187,8 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   add(style.box(0.06, 0.12, 0.06), mat(WORLD.pineLeaf), pine, 0, 0.16, 0.03);
   const sheet = add(style.box(0.3, 0.38, 0.015), mat(WORLD.paper), body, 0, 0.58, 0.32);
   sheet.rotation.x = -0.35;
+  // the catch's thumbs up: a thumb up on the right fist (the arm ahead, its hand's +z is up)
+  const thumb = add(style.box(0.035, 0.035, 0.08), mat(o.skin), hand, 0, 0, 0.075);
   const skate = new Group();
   g.add(skate);
   // the deck, its two trucks under it, four wheels out past its sides so they show from above (Gabriel: « les skateboards n'ont pas de roues! »)
@@ -298,7 +300,16 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       const left = Math.max(0.15, 1 - p.eaten * 0.85);
       orange.scale.setScalar(left);
       pine.scale.setScalar(left);
-      sheet.visible = p.sheet;
+      sheet.visible = p.sheet || p.sheetDown === true;
+      // laid flat on the desk before it, on its left (its right hand catches), else held up in both hands
+      if (p.sheetDown === true) {
+        sheet.position.set(-0.22, 0.52, 0.36);
+        sheet.rotation.set(-Math.PI / 2, 0, 0.2);
+      } else {
+        sheet.position.set(0, 0.58, 0.32);
+        sheet.rotation.set(-0.35, 0, 0);
+      }
+      thumb.visible = p.thumb === true;
       skate.visible = p.skate;
       glasses.visible = p.glasses;
       marker.visible = p.marker;

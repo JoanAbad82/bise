@@ -198,9 +198,22 @@ describe('pose: his paper plane', () => {
   it('gives its thumbs up after putting it away, none when an egg follows (thumbs: false)', () => {
     const at = (c: number, thumbs?: boolean) => rig({ ...poseOf('work', { plane: PLANE_FLIGHT + c }), plane: { since: PLANE_FLIGHT + c, ...(thumbs === undefined ? {} : { thumbs }) } }, 5);
     const mid = (BEAT.away + BEAT.thumbs) / 2;
-    expect(at(mid).armR[2]).toBeGreaterThan(1.5);
+    // the fist up ahead at shoulder height, its thumb up: never an arm pointing sideways
+    expect(at(mid).props.thumb).toBe(true);
+    expect(at(mid).armR[0]).toBeLessThan(-1.4);
+    expect(Math.abs(at(mid).armR[2])).toBeLessThan(0.5);
     expect(at(mid).mouth).toBe('laugh');
-    expect(at(mid, false).armR[2]).toBeLessThan(0.5);
+    expect(at(mid, false).props.thumb).toBeUndefined();
+  });
+
+  it("lays a sheet it holds (main's paper) on the desk as its arm rises, and takes it back after", () => {
+    const at = (c: number) => rig(poseOf('mainidle', { plane: PLANE_FLIGHT + c }), 5);
+    expect(at(-REACH_S - 0.2).props.sheet).toBe(true);
+    for (const c of [-REACH_S, 0, BEAT.read, BEAT.away]) {
+      expect(at(c).props.sheet).toBe(false);
+      expect(at(c).props.sheetDown).toBe(true);
+    }
+    expect(at(PLANE_CATCH + 0.1).props.sheet).toBe(true);
   });
 
   it('runs the whole catch inside the timeline\'s plane window', () => {

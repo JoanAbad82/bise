@@ -71,7 +71,7 @@ interface Probe {
   /** FilmOpts.manual: draw one frame, ms after the last */
   step?: (ms: number) => void;
   /** a check's camera (the pop-in strip): held where it is put, or on a bim at that zoom; the visitor's hands */
-  look?: (at: Cam | { office: string; name: string; zoom: number }) => void;
+  look?: (at: Cam | { office: string; name: string; zoom: number; lock?: boolean }) => void;
 }
 
 /** the page's paper (designer m_30837) */
@@ -274,7 +274,9 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     const fl = hands.follow;
     if (fl !== null) {
       const at = geo.bim(fl.office, fl.name);
-      if (at !== null) move(aimCam(at, spring.cam.zoom, 0.5, 0.5), dt);
+      // a check's strip (probe.look lock): on the bim every frame, no spring lag (bims m_33641)
+      if (at !== null && locked) spring = still(holdCam(aimCam(at, spring.cam.zoom, 0.5, 0.5)));
+      else if (at !== null) move(aimCam(at, spring.cam.zoom, 0.5, 0.5), dt);
       return;
     }
     if (glide !== null) move(spring.cam, dt);
@@ -332,6 +334,8 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   const running = (): boolean => !gone && onScreen && !document.hidden;
   // a check's film by the frame (the entry strip, its mp4): no loop, each frame drawn by probe.step
   const manual = probe !== null && opts.manual === true;
+  /** probe.look's lock: the camera held on its bim with no spring (a check's strip) */
+  let locked = false;
   let manualMs = 1;
   if (probe && manual) {
     probe.step = (ms) => {
@@ -342,6 +346,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       glide = null;
       lastTouch = wall();
       if ('name' in at) {
+        locked = at.lock === true;
         spring = still(holdCam({ ...spring.cam, zoom: at.zoom }));
         setHands({ k: 'visitor', last: wall(), follow: { office: at.office, name: at.name } });
         return;

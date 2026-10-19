@@ -19,6 +19,10 @@ export interface Props {
   readonly pine: boolean;
   /** a sheet held in both hands: main's paper, an urgent ask's form to sign */
   readonly sheet: boolean;
+  /** that sheet laid flat on the desk before it (main's paper while it catches his plane) */
+  readonly sheetDown?: boolean;
+  /** the thumb up on its right fist (the catch's thumbs up) */
+  readonly thumb?: boolean;
   readonly skate: boolean;
   readonly glasses: boolean;
   /** the grey cloud over the laptop (failed), 0..1 */
@@ -422,7 +426,7 @@ const ARM = {
   read: [-1.35, 0, -0.35] as Rot,
   pocket: [-0.2, 0, 0] as Rot,
   desk: [-1.0, 0, 0.3] as Rot,
-  thumbs: [-0.4, 0, 2.2] as Rot,
+  thumbs: [-1.75, 0, -0.15] as Rot,
 } as const;
 
 /**
@@ -433,7 +437,18 @@ const ARM = {
  */
 function caught(b: Body, s: number, dur: number, desk: boolean, thumbs: boolean): Body {
   const c = s - dur;
-  if (c < -REACH_S || c > PLANE_CATCH) return b;
+  // a sheet already in its hands (main's idle paper): laid on the desk as the arm rises, back after the catch (designer m_33640, bims m_33641)
+  const paper = b.props.sheet;
+  if (c < -REACH_S - (paper ? PAPER_S : 0) || c > PLANE_CATCH) return b;
+  const r = catchBody(b, c, desk, thumbs);
+  return paper && c < PLANE_CATCH - 0.05 ? { ...r, props: { ...r.props, sheet: false, sheetDown: true } } : r;
+}
+
+/** the paper's laying down, before the reach, s */
+const PAPER_S = 0.1;
+
+function catchBody(b: Body, c: number, desk: boolean, thumbs: boolean): Body {
+  if (c < -REACH_S) return b;
   if (c < 0) {
     const f = ease((c + REACH_S) / REACH_S);
     return { ...blend(b, { ...b, armR: ARM.reach, head: [-0.35, 0, 0] }, f), eyes: 1, mouth: 'oh' };
@@ -455,8 +470,8 @@ function caught(b: Body, s: number, dur: number, desk: boolean, thumbs: boolean)
   }
   // an egg follows (the hero's hop): no thumbs up, straight back to its pose
   if (!thumbs) return blend({ ...b, armR: away }, b, ease((c - BEAT.away) / (PLANE_CATCH - BEAT.away)));
-  // the thumbs up, short, then back to its pose
-  if (c < BEAT.thumbs) return { ...b, armR: mixR(away, ARM.thumbs, ease((c - BEAT.away) / 0.12)), mouth: 'laugh', eyes: 0.3 };
+  // the thumbs up, short: the fist up in front at shoulder height, its thumb up (bims m_33641: never an arm pointing sideways), then back to its pose
+  if (c < BEAT.thumbs) return { ...b, armR: mixR(away, ARM.thumbs, ease((c - BEAT.away) / 0.12)), mouth: 'laugh', eyes: 0.3, props: { ...b.props, thumb: true } };
   return blend({ ...b, armR: ARM.thumbs }, b, ease((c - BEAT.thumbs) / (PLANE_CATCH - BEAT.thumbs)));
 }
 
