@@ -55,6 +55,7 @@ if (mode === 'checks') {
     const d = flag('--gate-dir') + '/desktop-cov-run';
     fs.mkdirSync(d, { recursive: true });
     fs.writeFileSync(d + '/cut.txt', 'checks/a.spec.ts\\nchecks/b.spec.ts\\n');
+    fs.writeFileSync(d + '/report.json', '{}');
     fs.writeFileSync(e.NIGHTLY_NOW, String(Number(flag('--until')) + 300));
     console.log('covmap checks: 1/1 green; 2 not run: cut by the night end'); process.exit(3);
   }
@@ -242,11 +243,15 @@ def main():
         c = calls()
         check(rc == 0 and red is None and "STEP desktop-checks: none (cut by the night's end 06:00)" in log,
               "a night cut at 06:00: none, not red: rc %s, red %r, log %r" % (rc, red, log))
-        check("desktop-map" not in log and "core-record" not in c and "STEP core-record: none (past the night's end 06:00, not started)" in log,
-              "cut: no map from a cut run, core-record never starts: %r %r" % (c, log))
-        check("STEP desktop-full: none (cut by the night's end 06:00)" in log and "green" not in log.split("STEP desktop-checks: none")[1],
+        check("STEP desktop-map: start" in log and any(x.startswith("covmap map ") for x in c)
+              and "STEP desktop-pick-audit: none (past the night's end 06:00, not started)" in log,
+              "cut: the map of the specs that ran still made, past the end; the audit not: %r %r" % (c, log))
+        check("core-record" not in c and "STEP core-record: none (past the night's end 06:00, not started)" in log,
+              "cut: core-record never starts: %r %r" % (c, log))
+        check("STEP desktop-full: none (cut by the night's end 06:00)" in log
+              and [l for l in log.split("STEP desktop-checks: none")[1].splitlines() if l.endswith(": green")] == ["STEP desktop-map: green"],
               "cut: desktop-full none, nothing green after the end: %r" % log)
-        check(last.split()[2] == "green" and last.split()[4] == "cut:core-record,desktop-checks,desktop-full",
+        check(last.split()[2] == "green" and last.split()[4] == "cut:core-record,desktop-checks,desktop-full,desktop-pick-audit",
               "cut: last names what the end cut: %r" % last)
         hist = os.path.join(out, "checks-runs.tsv")
         check(open(hist).read().splitlines()[-1].split("\t")[2:] == ["cut", "2"], "cut: checks-runs.tsv %r" % open(hist).read())

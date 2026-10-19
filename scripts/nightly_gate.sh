@@ -166,14 +166,16 @@ if [ "${1:-}" = --in-slot ]; then
   # "FAIL <name>: cannot run": a product step that never ran proves nothing (desktop-checks is the
   # one nightly run of the harness checks); 3 cut by the night's end: none; else no result.
   # --own: a tool of the gate, not the product: its red is a "STEP <name>: red (owner <owner>)"
-  # line, its 126/127 no result, the night keeps the gate's verdict (review-gates m_29697 #1)
+  # line, its 126/127 no result, the night keeps the gate's verdict (review-gates m_29697 #1).
+  # --past-end (after --own): it starts even past the night's end (the map of a cut run: minutes)
   end_at="${NIGHTLY_END:+$(date -r "$NIGHTLY_END" +%H:%M)}"
   night_step() {
-    local own=""
+    local own="" past=""
     [ "$1" = --own ] && { own=$2; shift 2; }
+    [ "$1" = --past-end ] && { past=1; shift; }
     local n=$1 f=$2; shift 2
     [ -f "$f" ] || { echo "STEP $n: not in this tree, skipped"; return 0; }
-    if late; then echo "STEP $n: none (past the night's end $end_at, not started)"; return 3; fi
+    if [ -z "$past" ] && late; then echo "STEP $n: none (past the night's end $end_at, not started)"; return 3; fi
     echo "STEP $n: start $(date +%T)"
     /usr/bin/caffeinate -is "$@"; local r=$?
     case $r in
@@ -213,7 +215,13 @@ if [ "${1:-}" = --in-slot ]; then
       rc=1
     fi
   fi
-  if [ $cr != 3 ] && night_step --own try-select desktop-map "$covmap" node "$covmap" map --gate-dir "$gate_dir" --day "$day"; then
+  # a run the end cut still makes its map (review-gates m_32540): the specs that ran, the cut ones
+  # complete:false; past the end too (no build, no app: minutes); none when no spec ran
+  mapped=""
+  if [ $cr = 3 ]; then
+    [ -f "$gate_dir/desktop-cov-run/report.json" ] && mapped=--past-end
+  else mapped=now; fi
+  if [ -n "$mapped" ] && night_step --own try-select ${mapped#now} desktop-map "$covmap" node "$covmap" map --gate-dir "$gate_dir" --day "$day"; then
     night_step --own try-select desktop-pick-audit tests/desktop_pick_audit.py python3 -B tests/desktop_pick_audit.py --gate-dir "$gate_dir" --day "$day"
   fi
   # the desktop app's full end-to-end (fast-try p7): the packed candidate of this tip, every quick
