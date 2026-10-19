@@ -11,6 +11,29 @@
 # (FLAKY lines, flaky.tsv next to timings.tsv).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# A test's git never reaches this repo (keep-current m_34361): `git bisect
+# run` exports GIT_DIR, and e2e.py's `git init && git config user.email t@t`
+# in its throwaway ws wrote core.bare=true and user t into the real
+# .git/config, so every sb land said 'not in a repo'. The repo variables go
+# (e2e.py drops them too, for a test run alone), and a run that changes this
+# repo's core.bare, core.worktree or user.* fails, the diff shown: those keys
+# only, as an agent's own git (a branch's upstream, a remote) may write the
+# rest of that file during a run.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE GIT_PREFIX
+repo_config="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/config"
+repo_keys() { git config --file "$repo_config" --get-regexp '^(core\.(bare|worktree)|user\.)' 2>/dev/null || :; }
+repo_keys_before="$(repo_keys)"
+repo_config_guard() {
+  local rc=$? now
+  now="$(repo_keys)"
+  if [ "$now" != "$repo_keys_before" ]; then
+    echo "FAILED: this run changed $repo_config (a test's git left its throwaway repo):"
+    diff <(echo "$repo_keys_before") <(echo "$now") || :
+    exit 1
+  fi
+  exit $rc
+}
+trap repo_config_guard EXIT
 # bend: the one this tree pins (bend/VERSION, scripts/bend-pin.sh); the
 # mcp_* probes compile with the bend on PATH
 . scripts/bend-pin.sh

@@ -22,6 +22,17 @@ from bise_env import clean_env, refuse_real_home, refuse_real_keys, refuse_real_
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
+
+# A test's git works in its own throwaway repo, never in a repo the caller's
+# environment points to: `git bisect run` (and a git hook or alias) exports
+# GIT_DIR, and Env's `git init && git config user.email t@t` in its ws then
+# wrote core.bare=true and user t into the real repo's .git/config (every sb
+# land failed, keep-current m_34361). tests/run_all.sh fails a run that
+# changes that file anyway.
+GIT_REPO_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+                 "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX")
+for _v in GIT_REPO_VARS:
+    os.environ.pop(_v, None)
 # the binary cargo built: $CARGO_TARGET_DIR (a gate's own target) or rust/target
 EXE = os.path.join(os.path.abspath(os.environ.get("CARGO_TARGET_DIR") or os.path.join(ROOT, "rust", "target")),
                    "debug", "bise")
