@@ -30,33 +30,6 @@ def jmaybe_str(m: Maybe<&2, String>) -> J.Json:
     case Some{+s}:
       J.JStr{s}
 
-def life_str(l: M.Life) -> String:
-  match l:
-    case M.LActive{}:
-      "active"
-    case M.LStopped{}:
-      "stopped"
-    case M.LArchived{}:
-      "archived"
-    case M.LFailed{}:
-      "failed"
-
-def decl_str(d: M.Decl) -> String:
-  match d:
-    case M.DWorking{}:
-      "working"
-    case M.DDone{}:
-      "done"
-    case M.DBlocked{}:
-      "blocked"
-
-def jmaybe_decl(m: Maybe<&2, M.Decl>) -> J.Json:
-  match m:
-    case None{}:
-      J.JNull{}
-    case Some{+d}:
-      J.JStr{decl_str(d)}
-
 # ---- decoding (the journal replayed at boot) ----
 
 def get_nat(+j: J.Json, +k: String) -> Nat:
@@ -84,19 +57,6 @@ def opt_str(m: Maybe<&2, J.Json>) -> Maybe<&2, String>:
       Some{s}
     case _:
       None{}
-
-def life.of_s(+s: String) -> M.Life:
-  Bool.pick(M.Life, String.eq(s, "stopped"), M.LStopped{},
-    Bool.pick(M.Life, String.eq(s, "archived"), M.LArchived{},
-      Bool.pick(M.Life, String.eq(s, "failed"), M.LFailed{}, M.LActive{})))
-
-def decl.of_s(m: Maybe<&2, String>) -> Maybe<&2, M.Decl>:
-  match m:
-    case None{}:
-      None{}
-    case Some{+s}:
-      Some{Bool.pick(M.Decl, String.eq(s, "done"), M.DDone{},
-        Bool.pick(M.Decl, String.eq(s, "blocked"), M.DBlocked{}, M.DWorking{}))}
 
 # bise desktop S2's kinds (an older sb-core has none: KUnknown, skipped)
 def out_st_of(+s: String) -> XH.OutSt:
@@ -131,25 +91,6 @@ def sched_of(e: Maybe<&2, Nat>, d: Maybe<&2, Nat>) -> Maybe<&2, TM.Sched>:
 # ---- the records inside a journal line, for gen/journal.bend (one codec
 # per record; journal.rs's Codec rows name them) ----
 
-def life_of(j: J.Json) -> M.Life:
-  match j:
-    case J.JStr{+s}:
-      life.of_s(s)
-    case _:
-      M.LActive{}
-
-def life_json(l: M.Life) -> J.Json:
-  J.JStr{life_str(l)}
-
-def decl_of(j: J.Json) -> Maybe<&2, M.Decl>:
-  match j:
-    case J.JStr{+s}:
-      decl.of_s(Some{s})
-    case _:
-      None{}
-
-def decl_json(m: Maybe<&2, M.Decl>) -> J.Json:
-  jmaybe_decl(m)
 
 # an every_set's timer: its keys but `at` (the line's), its schedule as
 # every.rs wrote it; no schedule: no timer (the line is skipped)

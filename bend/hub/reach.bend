@@ -35,7 +35,7 @@ def from_bise(xs: List<&2, S.Msg>) -> Bool:
     case Con{+h, +t}:
       LZ.or(String.eq(S.Msg.from(h), M.HUB()), u => from_bise(t))
 
-def agent_of.go(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, M.Agent>:
+def agent_of.go(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, S.Agent>:
   match m:
     case None{}:
       None{}
@@ -43,22 +43,22 @@ def agent_of.go(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, M.Agent>:
       M.get_agent(s, n)
 
 # the agent named `n` (its name or an old one)
-def agent_of(+s: M.St, +n: String) -> Maybe<&2, M.Agent>:
+def agent_of(+s: M.St, +n: String) -> Maybe<&2, S.Agent>:
   agent_of.go(s, M.resolve(s, n))
 
-def life_active(l: M.Life) -> Bool:
+def life_active(l: S.Life) -> Bool:
   match l:
-    case M.LActive{}:
+    case S.LActive{}:
       True{}
     case _:
       False{}
 
-def agent_active.go(m: Maybe<&2, M.Agent>) -> Bool:
+def agent_active.go(m: Maybe<&2, S.Agent>) -> Bool:
   match m:
     case None{}:
       False{}
     case Some{+a}:
-      life_active(M.Agent.life(a))
+      life_active(S.Agent.life(a))
 
 # known (by its name or an old one) and active
 def agent_active(+s: M.St, +n: String) -> Bool:
@@ -82,11 +82,11 @@ def page_asker(+s: M.St, agents: List<&2, String>) -> String:
       page_asker.pick(agent_active(s, h), h, page_asker(s, t))
 
 # a wake reaches this run now: idle (a turn starts) or busy (steered in)
-def reachable(r: M.Run) -> Bool:
+def reachable(r: S.Run) -> Bool:
   match r:
-    case M.RIdle{}:
+    case S.RIdle{}:
       True{}
-    case M.RBusy{}:
+    case S.RBusy{}:
       True{}
     case _:
       False{}
@@ -114,20 +114,20 @@ def answer_words(+card: Nat, +page: String, +to: String, +text: String) -> Strin
 
 # ---- a reply still pending (ask-wait, core.bend replies_tick) ----
 
-def life_gone(l: M.Life) -> Bool:
+def life_gone(l: S.Life) -> Bool:
   match l:
-    case M.LArchived{}:
+    case S.LArchived{}:
       True{}
     case _:
       False{}
 
 # the asked agent is gone: dropped (archived), or no agent of that name
-def asked_gone.go(m: Maybe<&2, M.Agent>) -> Bool:
+def asked_gone.go(m: Maybe<&2, S.Agent>) -> Bool:
   match m:
     case None{}:
       True{}
     case Some{+a}:
-      life_gone(M.Agent.life(a))
+      life_gone(S.Agent.life(a))
 
 def asked_gone(+s: M.St, +n: String) -> Bool:
   asked_gone.go(agent_of(s, n))

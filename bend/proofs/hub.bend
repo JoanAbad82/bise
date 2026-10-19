@@ -5,6 +5,7 @@ import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
 import ../hub/gen/state.bend as HS
+import ../hub/gen/state-laws.bend as HSL
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/keyed.bend as HKL
@@ -108,7 +109,7 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u):
   +cx2 = HC.fail_waiters(o, cx1, n, "stopped")
   +r = HC.rr(o, cx2)
   +cx3 = HC.set_r(o, cx2, HX.R.with_steered(r, HKL.steer_del(HX.R.steered(r), n)))
-  +x4 = HX.Rt.with_turn(HX.Rt.with_run(HC.rt(o, cx3, n), HM.RDown{}), None{})
+  +x4 = HX.Rt.with_turn(HX.Rt.with_run(HC.rt(o, cx3, n), HS.RDown{}), None{})
   +cx4 = HC.upd_rt(o, cx3, x4)
   +ev = {HM.ELifecycle{n, life, Bool.pick(Maybe<&2, String>, String.is_empty(why), None{}, Some{why})} : HM.Ev}
   +cx5 = HC.emit(o, cx4, ev, Unit{}, Unit{}, Unit{})
@@ -140,15 +141,15 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u):
       PL2.hub_msgs_close_ids(o, HC.card_ids(HM.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
       PLC4.hc_every_reject(o, ids, cx5, sp5)))
   # the names at the end: those of cx5 (no agent changes after it)
-  +en = Equal.cong(List<&2, HM.Agent>, List<&2, String>, xs => n <> HM.names_of.go(HM.agent_named(xs, n)),
+  +en = Equal.cong(List<&2, HS.Agent>, List<&2, String>, xs => n <> HM.names_of.go(HM.agent_named(xs, n)),
     HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, cx5)),
-    Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, g)), HM.St.agents(HX.d(o, cx5)),
-      Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, tg)), HM.St.agents(HX.d(o, g)),
-        Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, wg)), HM.St.agents(HX.d(o, tg)),
+    Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, g)), HM.St.agents(HX.d(o, cx5)),
+      Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, tg)), HM.St.agents(HX.d(o, g)),
+        Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, wg)), HM.St.agents(HX.d(o, tg)),
           PL2.hub_agents_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
           PL1.hub_agents_wakes(o, life, tg, n)),
         PL2.hub_agents_gone(o, HR.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
-      Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, g)), HM.St.agents(HX.d(o, cx6)), HM.St.agents(HX.d(o, cx5)),
+      Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, g)), HM.St.agents(HX.d(o, cx6)), HM.St.agents(HX.d(o, cx5)),
         PL2.hub_agents_close_ids(o, HC.card_ids(HM.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
         PL2.hub_agents_reject(o, ids, cx5))))
   PL2.hub_names_tr(HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL1.hub_rej(ids, m5), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n), n5, ef, en,
@@ -161,7 +162,7 @@ def Laws.stop_leaves_no_card(o, cx, n, life, why, u):
   +cx2 = HC.fail_waiters(o, cx1, n, "stopped")
   +r = HC.rr(o, cx2)
   +cx3 = HC.set_r(o, cx2, HX.R.with_steered(r, HKL.steer_del(HX.R.steered(r), n)))
-  +x4 = HX.Rt.with_turn(HX.Rt.with_run(HC.rt(o, cx3, n), HM.RDown{}), None{})
+  +x4 = HX.Rt.with_turn(HX.Rt.with_run(HC.rt(o, cx3, n), HS.RDown{}), None{})
   +cx4 = HC.upd_rt(o, cx3, x4)
   +ev = {HM.ELifecycle{n, life, Bool.pick(Maybe<&2, String>, String.is_empty(why), None{}, Some{why})} : HM.Ev}
   +cx5 = HC.emit(o, cx4, ev, Unit{}, Unit{}, Unit{})
@@ -288,11 +289,11 @@ def Laws.resume_keeps_order(s, at):
       {==}
 
 def Laws.stop_leaves_no_timer(o, cx, n, why):
-  +g = HC.stop_task.go(o, cx, n, HM.LArchived{}, why)
-  +tg = HC.timers_gone(o, HM.LArchived{}, g, n)
+  +g = HC.stop_task.go(o, cx, n, HS.LArchived{}, why)
+  +tg = HC.timers_gone(o, HS.LArchived{}, g, n)
   +wids = HWK.ids_of(HWK.Wakes.live(HC.wks(o, tg)), HM.names_of(HX.d(o, tg), n))
-  +wg = HC.wakes_gone(o, HM.LArchived{}, tg, n)
-  +st = HC.stop_task(o, cx, n, HM.LArchived{}, why)
+  +wg = HC.wakes_gone(o, HS.LArchived{}, tg, n)
+  +st = HC.stop_task(o, cx, n, HS.LArchived{}, why)
   +ns = HM.names_of(HX.d(o, g), n)
   +xs = HTM.Tms.live(HM.St.tm(HX.d(o, g)))
   +ids = HTM.ids_in(xs, ns)
@@ -328,8 +329,8 @@ def Laws.busy_steers_now(m, rest, q):
   {==}
 
 def Laws.timer_reaches_busy(o, cx, a, p, q):
-  %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), True{}, p) : {Bool.and(_, HR.reachable(HX.Rt.run(HC.rt(o, cx, HM.Agent.name(a))))) == True{} : Bool}
-  %Equal.sym(HM.Run, HX.Rt.run(HC.rt(o, cx, HM.Agent.name(a))), HM.RBusy{}, q) : {Bool.and(True{}, HR.reachable(_)) == True{} : Bool}
+  %Equal.sym(Bool, HC.is_active(HS.Agent.life(a)), True{}, p) : {Bool.and(_, HR.reachable(HX.Rt.run(HC.rt(o, cx, HS.Agent.name(a))))) == True{} : Bool}
+  %Equal.sym(HS.Run, HX.Rt.run(HC.rt(o, cx, HS.Agent.name(a))), HS.RBusy{}, q) : {Bool.and(True{}, HR.reachable(_)) == True{} : Bool}
   {==}
 
 def Laws.timer_fires_busy(o, cx, t, p, q, r):
@@ -392,7 +393,7 @@ def Laws.wake_drop_ends(o, cx, n):
   +ns = HM.names_of(HX.d(o, cx), n)
   +xs = HWK.Wakes.live(HC.wks(o, cx))
   +ids = HWK.ids_of(xs, ns)
-  PL3.hub_wnone_tr(HWK.Wakes.live(HC.wks(o, HC.wakes_gone(o, HM.LArchived{}, cx, n))), HWK.keep_out(xs, ids), n,
+  PL3.hub_wnone_tr(HWK.Wakes.live(HC.wks(o, HC.wakes_gone(o, HS.LArchived{}, cx, n))), HWK.keep_out(xs, ids), n,
     PL3.hub_wk_live_each(o, ids, cx),
     PL3.hub_wk_none_keep(xs, ids, ns, n, PL3.hub_wk_all_self(ids), PL3.hub_wk_str_in_head(n, HM.names_of.go(HM.get_agent(HX.d(o, cx), n)))))
 
@@ -518,19 +519,16 @@ def Laws.follow_done_once(o, cx, name, state, summary, label, hub):
   {==}
 
 def Laws.follow_one_shot(a):
-  match a:
-    case HM.Agent{n, im, pa, li, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
-      {==}
+  %HSL.Agent.follow.eta(a, None{}) : {HM.follows(_) == False{} : Bool}
+  {==}
 
 def Laws.follow_hub_journaled(a, hub):
-  match a:
-    case HM.Agent{n, im, pa, li, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
-      {==}
+  %HSL.Agent.follow.eta(a, Some{hub}) : {HM.follow_hub(_) == hub : String}
+  {==}
 
 def Laws.follow_hub_cleared(a):
-  match a:
-    case HM.Agent{n, im, pa, li, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
-      {==}
+  %HSL.Agent.follow.eta(a, None{}) : {HM.follow_hub(_) == "" : String}
+  {==}
 
 def Laws.follow_end_back_only_to_who_asked(o, cx, hub, j):
   {==}

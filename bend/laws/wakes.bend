@@ -83,7 +83,7 @@ law wake_set_keeps_agents:
   for +max_ms: Nat
   for +quiet: Bool
   for +then: Maybe<&2, Bool>
-  {HM.St.agents(HC.st(o, HC.wake_set.agent(o, ok, cx, agent, spec, max_text, max_ms, quiet, then))) == HM.St.agents(HC.st(o, cx)) : List<&2, HM.Agent>}
+  {HM.St.agents(HC.st(o, HC.wake_set.agent(o, ok, cx, agent, spec, max_text, max_ms, quiet, then))) == HM.St.agents(HC.st(o, cx)) : List<&2, HS.Agent>}
 
 # ---- his stop (the window's wake_stop) ----
 # His stop of a watch tells its agent once (`tell`: the words, Rust's

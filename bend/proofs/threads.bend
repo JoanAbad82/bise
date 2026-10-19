@@ -18,7 +18,7 @@ import ../laws/threads.bend as Laws
 
 # ---- L4 support: a delivery attempt never leaves its agent stuck ----
 
-def hub_rt_put_find.pick(c: Bool, +h: HX.Rt, +t: List<&2, HX.Rt>, +n: String, +run: HM.Run, +w: Bool, +tm: Maybe<&2, Nat>, +k: Nat,
+def hub_rt_put_find.pick(c: Bool, +h: HX.Rt, +t: List<&2, HX.Rt>, +n: String, +run: HS.Run, +w: Bool, +tm: Maybe<&2, Nat>, +k: Nat,
     +e: {String.eq(HX.Rt.name(h), n) == c : Bool}, ih: {HC.rt_find(HC.rt_put(t, HX.Rt{n, run, w, tm, k}), n) == HX.Rt{n, run, w, tm, k} : HX.Rt})
     -> {HC.rt_find(HLZ.pick(List<&2, HX.Rt>, String.eq(HX.Rt.name(h), n), u => HX.Rt{n, run, w, tm, k} <> t, u => h <> HC.rt_put(t, HX.Rt{n, run, w, tm, k})), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}:
   match c:
@@ -32,7 +32,7 @@ def hub_rt_put_find.pick(c: Bool, +h: HX.Rt, +t: List<&2, HX.Rt>, +n: String, +r
       ih
 
 # putting an agent's runtime state and reading it back gives it
-def hub_rt_put_find(+xs: List<&2, HX.Rt>, +n: String, +run: HM.Run, +w: Bool, +tm: Maybe<&2, Nat>, +k: Nat)
+def hub_rt_put_find(+xs: List<&2, HX.Rt>, +n: String, +run: HS.Run, +w: Bool, +tm: Maybe<&2, Nat>, +k: Nat)
     -> {HC.rt_find(HC.rt_put(xs, HX.Rt{n, run, w, tm, k}), n) == HX.Rt{n, run, w, tm, k} : HX.Rt}:
   match xs:
     case Nil{}:
@@ -432,32 +432,32 @@ def Laws.mcp_fail_text_says_why_and_safety():
 
 def Laws.hub_turns_counts_every_busy_exit(now, n, e):
   match now:
-    case HM.RBusy{}:
-      PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Nat, HC.turns_after(HM.RBusy{}, HM.RBusy{}, n), 1n+n)
-    case HM.RIdle{}:
+    case HS.RBusy{}:
+      PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Nat, HC.turns_after(HS.RBusy{}, HS.RBusy{}, n), 1n+n)
+    case HS.RIdle{}:
       {==}
-    case HM.RDown{}:
+    case HS.RDown{}:
       {==}
-    case HM.RStarting{}:
+    case HS.RStarting{}:
       {==}
 
 def Laws.hub_turns_never_moves_otherwise(was, now, n, e):
   match was:
-    case HM.RBusy{}:
+    case HS.RBusy{}:
       match now:
-        case HM.RBusy{}:
+        case HS.RBusy{}:
           {==}
-        case HM.RIdle{}:
-          PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Nat, HC.turns_after(HM.RBusy{}, HM.RIdle{}, n), n)
-        case HM.RDown{}:
-          PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Nat, HC.turns_after(HM.RBusy{}, HM.RDown{}, n), n)
-        case HM.RStarting{}:
-          PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Nat, HC.turns_after(HM.RBusy{}, HM.RStarting{}, n), n)
-    case HM.RIdle{}:
+        case HS.RIdle{}:
+          PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Nat, HC.turns_after(HS.RBusy{}, HS.RIdle{}, n), n)
+        case HS.RDown{}:
+          PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Nat, HC.turns_after(HS.RBusy{}, HS.RDown{}, n), n)
+        case HS.RStarting{}:
+          PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Nat, HC.turns_after(HS.RBusy{}, HS.RStarting{}, n), n)
+    case HS.RIdle{}:
       {==}
-    case HM.RDown{}:
+    case HS.RDown{}:
       {==}
-    case HM.RStarting{}:
+    case HS.RStarting{}:
       {==}
 
 def Laws.hub_set_rt_counts_turns(o, cx, x):

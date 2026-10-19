@@ -22,12 +22,12 @@ import ./timers.bend as TM
 import ./wakes.bend as WK
 import ./lazy.bend as LZ
 
-def jdecl(d: Maybe<&2, M.Decl>, +note: String) -> J.Json:
+def jdecl(d: Maybe<&2, S.Decl>, +note: String) -> J.Json:
   match d:
     case None{}:
       J.JNull{}
     case Some{+x}:
-      J.obj([J.kv("status", J.JStr{C.decl_str(x)}), J.kv("note", J.JStr{note})])
+      J.obj([J.kv("status", J.JStr{SC.Decl.word(x)}), J.kv("note", J.JStr{note})])
 
 # the recipient of a message (none: unknown message)
 def waits_to(m: Maybe<&2, S.Msg>) -> Maybe<&2, String>:
@@ -47,25 +47,25 @@ def waits_on(+ws: List<&2, X.Waiter>, +s: M.St, +n: String) -> Maybe<&2, String>
       LZ.pick(Maybe<&2, String>, String.eq(X.Waiter.agent(w), n),
         u => waits_to(M.msg_of(s, X.Waiter.msg(w))), u => waits_on(t, s, n))
 
-def agent_json(+a: M.Agent, +x: X.Rt, +wo: Maybe<&2, String>) -> J.Json:
-  V.agent(M.Agent.name(a), M.Agent.dir(a), M.Agent.is_main(a), M.Agent.parent(a),
-    M.Agent.brief(a), M.Agent.created(a), M.Agent.ws(a), C.life_str(M.Agent.life(a)),
-    M.Agent.failure(a), jdecl(M.Agent.declared(a), M.Agent.note(a)), M.Agent.report(a),
-    M.Agent.aliases(a), M.Agent.files(a), M.Agent.snap(a), M.Agent.follow(a),
+def agent_json(+a: S.Agent, +x: X.Rt, +wo: Maybe<&2, String>) -> J.Json:
+  V.agent(S.Agent.name(a), S.Agent.dir(a), S.Agent.is_main(a), S.Agent.parent(a),
+    S.Agent.brief(a), S.Agent.created(a), S.Agent.ws(a), SC.Life.word(S.Agent.life(a)),
+    S.Agent.failure(a), jdecl(S.Agent.declared(a), S.Agent.note(a)), S.Agent.report(a),
+    S.Agent.aliases(a), S.Agent.files(a), S.Agent.snap(a), M.follows(a),
     H.run_str(X.Rt.run(x)), X.Rt.waiting(x), wo, X.Rt.turn(x), X.Rt.turns(x))
 
-def is_archived(l: M.Life) -> Bool:
+def is_archived(l: S.Life) -> Bool:
   match l:
-    case M.LArchived{}:
+    case S.LArchived{}:
       True{}
     case _:
       False{}
 
 # a match, not Bool.pick: pick would encode every agent, kept or not
-def agents_json.keep(keep: Bool, +a: M.Agent, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +s: M.St, +rest: List<&2, J.Json>) -> List<&2, J.Json>:
+def agents_json.keep(keep: Bool, +a: S.Agent, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +s: M.St, +rest: List<&2, J.Json>) -> List<&2, J.Json>:
   match keep:
     case True{}:
-      agent_json(a, H.rt_find(rts, M.Agent.name(a)), waits_on(ws, s, M.Agent.name(a))) <> rest
+      agent_json(a, H.rt_find(rts, S.Agent.name(a)), waits_on(ws, s, S.Agent.name(a))) <> rest
     case False{}:
       rest
 
@@ -73,12 +73,12 @@ def agents_json.keep(keep: Bool, +a: M.Agent, +rts: List<&2, X.Rt>, +ws: List<&2
 # can change, see `changed`). idle-cpu: a step's view sent every agent
 # not archived, changed or not, and the hub ticks every 500 ms: ~127 KB
 # per idle tick for 20 agents, re-encoded and re-parsed twice a second.
-def agents_json(xs: List<&2, M.Agent>, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +s: M.St, +all: Bool, +names: List<&2, String>) -> List<&2, J.Json>:
+def agents_json(xs: List<&2, S.Agent>, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +s: M.St, +all: Bool, +names: List<&2, String>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+a, +t}:
-      agents_json.keep(all || M.str_in(names, M.Agent.name(a)),
+      agents_json.keep(all || M.str_in(names, S.Agent.name(a)),
         a, rts, ws, s, agents_json(t, rts, ws, s, all, names))
 
 # a message, its state, and what the steps' predicates (model.bend) say

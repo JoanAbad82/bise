@@ -455,7 +455,7 @@ law steer_queued_steers_into_the_turn:
   for +m: HS.Msg
   for +name: String
   for +im: Bool
-  {HC.steer_queued.run(o, HM.RBusy{}, cx, m, name, im) == HC.pump.batch(o, [m], cx, name, True{}, im) : HX.Cx<o>}
+  {HC.steer_queued.run(o, HS.RBusy{}, cx, m, name, im) == HC.pump.batch(o, [m], cx, name, True{}, im) : HX.Cx<o>}
 
 # LAW: to an idle agent, it is a turn of its own: the pump's idle delivery.
 law steer_queued_starts_a_turn_when_idle:
@@ -464,7 +464,7 @@ law steer_queued_starts_a_turn_when_idle:
   for +m: HS.Msg
   for +name: String
   for +im: Bool
-  {HC.steer_queued.run(o, HM.RIdle{}, cx, m, name, im) == HC.pump.batch(o, [m], cx, name, False{}, im) : HX.Cx<o>}
+  {HC.steer_queued.run(o, HS.RIdle{}, cx, m, name, im) == HC.pump.batch(o, [m], cx, name, False{}, im) : HX.Cx<o>}
 
 # LAW: an agent that can't take it (down, starting) leaves it queued: a
 # notice, the state unchanged; so does an agent that is gone.
@@ -474,7 +474,7 @@ law steer_queued_waits_for_a_down_agent:
   for +m: HS.Msg
   for +name: String
   for +im: Bool
-  {HX.d(o, HC.steer_queued.run(o, HM.RDown{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.run(o, HS.RDown{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
 
 law steer_queued_waits_for_a_starting_agent:
   for -o: HM.St
@@ -482,7 +482,7 @@ law steer_queued_waits_for_a_starting_agent:
   for +m: HS.Msg
   for +name: String
   for +im: Bool
-  {HX.d(o, HC.steer_queued.run(o, HM.RStarting{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.run(o, HS.RStarting{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
 
 law steer_queued_leaves_it_for_a_gone_agent:
   for -o: HM.St
@@ -607,16 +607,16 @@ law mcp_fail_text_says_why_and_safety:
 # LAW: a run that leaves RBusy (to idle, down or starting) counts one
 # more ended turn.
 law hub_turns_counts_every_busy_exit:
-  for now: HM.Run
+  for now: HS.Run
   for +n: Nat
   for e: {HC.is_busy(now) == False{} : Bool}
-  {HC.turns_after(HM.RBusy{}, now, n) == 1n+n : Nat}
+  {HC.turns_after(HS.RBusy{}, now, n) == 1n+n : Nat}
 
 # LAW: any other run change (busy to busy, or from a run that was not
 # busy) leaves the count as it was.
 law hub_turns_never_moves_otherwise:
-  for was: HM.Run
-  for now: HM.Run
+  for was: HS.Run
+  for now: HS.Run
   for +n: Nat
   for e: {Bool.and(HC.is_busy(was), Bool.not(HC.is_busy(now))) == False{} : Bool}
   {HC.turns_after(was, now, n) == n : Nat}

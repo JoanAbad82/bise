@@ -28,7 +28,7 @@ def TaskCreated.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.ETaskCreated{K.get_s(i, "name"), K.get_s(i, "parent"), K.get_j(i, "brief"), K.get_j(i, "ws"), K.get_n(i, "at_ms")}}
 
 def Lifecycle.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.ELifecycle{K.get_s(i, "name"), C.life_of(K.get_j(i, "lifecycle")), K.opt_s(J.get(i, "reason"))}}
+  Some{M.ELifecycle{K.get_s(i, "name"), SC.Life.journal_of(K.get_j(i, "lifecycle")), K.opt_s(J.get(i, "reason"))}}
 
 def Workspace.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EWorkspace{K.get_s(i, "name"), K.get_j(i, "ws")}}
@@ -40,7 +40,7 @@ def Placed.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EPlaced{K.get_s(i, "name"), K.get_j(i, "ws"), K.get_s(i, "err")}}
 
 def Declared.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EDeclared{K.get_s(i, "name"), C.decl_of(K.get_j(i, "status")), K.get_s(i, "note")}}
+  Some{M.EDeclared{K.get_s(i, "name"), SC.Decl.opt_journal_of(K.get_j(i, "status")), K.get_s(i, "note")}}
 
 def Reported.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EReported{K.get_s(i, "name"), K.get_j(i, "report")}}
@@ -564,7 +564,7 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.ETaskCreated{+name, +parent, +brief, +ws, +at_ms}:
       [J.kv("type", J.JStr{"task_created"}), J.kv("name", J.JStr{name}), J.kv("parent", J.JStr{parent}), J.kv("brief", brief), J.kv("ws", ws), J.kv("at_ms", J.JNum{at_ms})]
     case M.ELifecycle{+name, +lifecycle, +reason}:
-      [J.kv("type", J.JStr{"lifecycle"}), J.kv("name", J.JStr{name}), J.kv("lifecycle", C.life_json(lifecycle)), J.kv("reason", K.jmaybe_s(reason))]
+      [J.kv("type", J.JStr{"lifecycle"}), J.kv("name", J.JStr{name}), J.kv("lifecycle", SC.Life.journal_json(lifecycle)), J.kv("reason", K.jmaybe_s(reason))]
     case M.EWorkspace{+name, +ws}:
       [J.kv("type", J.JStr{"workspace_changed"}), J.kv("name", J.JStr{name}), J.kv("ws", ws)]
     case M.ESnapshot{+name, +snapshot_ref}:
@@ -572,7 +572,7 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.EPlaced{+name, +ws, +err}:
       [J.kv("type", J.JStr{"worktree_placed"}), J.kv("name", J.JStr{name}), J.kv("ws", ws), J.kv("err", J.JStr{err})]
     case M.EDeclared{+name, +status, +note}:
-      [J.kv("type", J.JStr{"declared"}), J.kv("name", J.JStr{name}), J.kv("status", C.decl_json(status)), J.kv("note", J.JStr{note})]
+      [J.kv("type", J.JStr{"declared"}), J.kv("name", J.JStr{name}), J.kv("status", SC.Decl.opt_journal_json(status)), J.kv("note", J.JStr{note})]
     case M.EReported{+name, +report}:
       [J.kv("type", J.JStr{"reported"}), J.kv("name", J.JStr{name}), J.kv("report", report)]
     case M.EFileTouched{+name, +path}:

@@ -5,6 +5,7 @@
 import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/feature.bend as HFT
@@ -39,15 +40,15 @@ law feature_retire_keeps_ws:
 law feature_retire_archives_none:
   for +ws: J.Json
   for +name: String
-  {HFT.retiree.life(HM.LArchived{}, ws, name) == False{} : Bool}
+  {HFT.retiree.life(HS.LArchived{}, ws, name) == False{} : Bool}
 
 law feature_retire_one:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +a: HM.Agent
+  for +a: HS.Agent
   for +text: String
   {HC.feature_retire.one(o, cx, a, text)
-    == HC.feature_retire.tell(o, HM.Agent.life(a), HC.emit(o, cx, HM.EWorkspace{HM.Agent.name(a), HFT.unfeature(HM.Agent.ws(a))}, Unit{}, Unit{}, Unit{}), HM.Agent.name(a), text) : HX.Cx<o>}
+    == HC.feature_retire.tell(o, HS.Agent.life(a), HC.emit(o, cx, HM.EWorkspace{HS.Agent.name(a), HFT.unfeature(HS.Agent.ws(a))}, Unit{}, Unit{}, Unit{}), HS.Agent.name(a), text) : HX.Cx<o>}
 
 # LAW: the retire stops nothing: an agent that is not active (stopped,
 # failed) gets its workspace only, never a message that would revive it
@@ -55,7 +56,7 @@ law feature_retire_one:
 law feature_retire_stops_nothing:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +life: HM.Life
+  for +life: HS.Life
   for +n: String
   for +text: String
   for e: {HC.is_active(life) == False{} : Bool}
@@ -70,5 +71,5 @@ law feature_retire_tells_once:
   for +cx: HX.Cx<o>
   for +n: String
   for +text: String
-  {HC.feature_retire.tell(o, HM.LActive{}, cx, n, text)
+  {HC.feature_retire.tell(o, HS.LActive{}, cx, n, text)
     == HC.fst(o, HC.send.thread(o, None{}, cx, HC.Snd{HM.HUB(), n, text, False{}, None{}, True{}, False{}, True{}, None{}, ""})) : HX.Cx<o>}

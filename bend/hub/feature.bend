@@ -18,6 +18,8 @@ import ../vendor/json.bend as J
 
 import ./model.bend as M
 
+import ./gen/state.bend as S
+
 def feature_is(m: Maybe<&2, J.Json>, +name: String) -> Bool:
   match m:
     case Some{J.JStr{+s}}:
@@ -48,24 +50,24 @@ def unfeature(+ws: J.Json) -> J.Json:
       ws
 
 # an archived agent is never retired (it stays as it is)
-def retiree.life(l: M.Life, +ws: J.Json, +name: String) -> Bool:
+def retiree.life(l: S.Life, +ws: J.Json, +name: String) -> Bool:
   match l:
-    case M.LArchived{}:
+    case S.LArchived{}:
       False{}
     case _:
       lands_on(ws, name)
 
-def retiree(+a: M.Agent, +name: String) -> Bool:
-  retiree.life(M.Agent.life(a), M.Agent.ws(a), name)
+def retiree(+a: S.Agent, +name: String) -> Bool:
+  retiree.life(S.Agent.life(a), S.Agent.ws(a), name)
 
-def retirees.add(m: Maybe<&2, M.Agent>, +name: String, +rest: List<&2, M.Agent>) -> List<&2, M.Agent>:
+def retirees.add(m: Maybe<&2, S.Agent>, +name: String, +rest: List<&2, S.Agent>) -> List<&2, S.Agent>:
   match m:
     case Some{+a}:
-      Bool.pick(List<&2, M.Agent>, retiree(a, name), a <> rest, rest)
+      Bool.pick(List<&2, S.Agent>, retiree(a, name), a <> rest, rest)
     case None{}:
       rest
 
-def retirees.go(ns: List<&2, String>, +st: M.St, +name: String) -> List<&2, M.Agent>:
+def retirees.go(ns: List<&2, String>, +st: M.St, +name: String) -> List<&2, S.Agent>:
   match ns:
     case Nil{}:
       Nil{}
@@ -73,7 +75,7 @@ def retirees.go(ns: List<&2, String>, +st: M.St, +name: String) -> List<&2, M.Ag
       retirees.add(M.get_agent(st, n), name, retirees.go(t, st, name))
 
 # the agents the retire moves, in the hub's order
-def retirees(+st: M.St, +name: String) -> List<&2, M.Agent>:
+def retirees(+st: M.St, +name: String) -> List<&2, S.Agent>:
   retirees.go(M.St.order(st), st, name)
 
 def cat(+xs: List<&2, String>) -> String:
@@ -85,14 +87,14 @@ def note(+name: String, +kept: String, +main: String) -> String:
     "` (rebased on its tip), never on `", name, "`. Your worktree and your branch stay: rebase your branch on `", main,
     "` before your next change. The old branch is kept as `", kept, "`."])
 
-def names(xs: List<&2, M.Agent>) -> List<&2, String>:
+def names(xs: List<&2, S.Agent>) -> List<&2, String>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+a, +t}:
-      String.append("@", M.Agent.name(a)) <> names(t)
+      String.append("@", S.Agent.name(a)) <> names(t)
 
-def who(xs: List<&2, M.Agent>, +main: String) -> String:
+def who(xs: List<&2, S.Agent>, +main: String) -> String:
   match xs:
     case Nil{}:
       " · no live agent"
@@ -100,5 +102,5 @@ def who(xs: List<&2, M.Agent>, +main: String) -> String:
       cat([" · ", String.join(names(a <> t), ", "), " land on ", main, " now"])
 
 # main's info line
-def line(+name: String, +kept: String, +main: String, xs: List<&2, M.Agent>) -> String:
+def line(+name: String, +kept: String, +main: String, xs: List<&2, S.Agent>) -> String:
   cat([name, " retired: its tip is in ", main, who(xs, main), " · the branch kept as ", kept])

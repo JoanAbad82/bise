@@ -23,12 +23,12 @@
 
 use super::{Codec, Field, FieldKind::*, Kind, Table};
 
-pub const LIFE: Codec = Codec { module: "C", name: "life", ty: "M.Life", cases: &["M.LActive{}", "M.LStopped{}", "M.LArchived{}", "M.LFailed{}"] };
+pub const LIFE: Codec = Codec { module: "SC", name: "Life.journal", ty: "S.Life", cases: &["S.LActive{}", "S.LStopped{}", "S.LArchived{}", "S.LFailed{}"] };
 pub const DECL: Codec = Codec {
-    module: "C",
-    name: "decl",
-    ty: "Maybe<&2, M.Decl>",
-    cases: &["None{}", "Some{M.DWorking{}}", "Some{M.DDone{}}", "Some{M.DBlocked{}}"],
+    module: "SC",
+    name: "Decl.opt_journal",
+    ty: "Maybe<&2, S.Decl>",
+    cases: &["None{}", "Some{S.DWorking{}}", "Some{S.DDone{}}", "Some{S.DBlocked{}}"],
 };
 pub const MST: Codec = Codec { module: "SC", name: "MSt.journal", ty: "S.MSt", cases: &["S.Queued{$r}", "S.Delivered{}", "S.Rejected{$e}", "S.Cancelled{}"] };
 pub const MSG: Codec = Codec { module: "SC", name: "Msg.journal", ty: "S.Msg", cases: &[] };

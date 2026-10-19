@@ -11,6 +11,7 @@
 import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/place.bend as HPL
@@ -30,22 +31,22 @@ law no_repl_before_placed:
 # LAW: a task is placed once: a `placed` for a task no longer placing
 # (placed already, or never) never starts it again, whatever it says.
 law placed_create_once:
-  for +a: HM.Agent
+  for +a: HS.Agent
   for +n: String
   for +ws: J.Json
   for +err: String
-  for e: {HM.ws_placing(HM.Agent.ws(a)) == False{} : Bool}
+  for e: {HM.ws_placing(HS.Agent.ws(a)) == False{} : Bool}
   {HPL.is_ok(HPL.placed_of.agent(Some{a}, n, ws, err)) == False{} : Bool}
 
 # LAW: a worktree that could not be made fails its live placing task,
 # with git's words, and names its spawner.
 law placed_err_fails:
-  for +a: HM.Agent
+  for +a: HS.Agent
   for +n: String
   for +ws: J.Json
   for +err: String
   for e: {String.is_empty(err) == False{} : Bool}
-  {HPL.placed_of.live(True{}, a, n, ws, err) == HPL.PErr{n, err, HPL.parent_of(HM.Agent.parent(a))} : HPL.Do}
+  {HPL.placed_of.live(True{}, a, n, ws, err) == HPL.PErr{n, err, HPL.parent_of(HS.Agent.parent(a))} : HPL.Do}
 
 # LAW: that failure is one stop (as failed, with git's words) and one
 # word to the spawner (placed.tell: a message, or main's feed for his
@@ -58,7 +59,7 @@ law placed_err_tells_once:
   for +parent: String
   {HC.placed(o, HPL.PErr{n, err, parent}, cx)
     == HC.placed.tell(o, String.eq(parent, HM.USER()),
-      HC.stop_noted(o, HC.emit(o, cx, HM.EPlaced{n, J.JNull{}, err}, Unit{}, Unit{}, Unit{}), n, HM.LFailed{}, err),
+      HC.stop_noted(o, HC.emit(o, cx, HM.EPlaced{n, J.JNull{}, err}, Unit{}, Unit{}, Unit{}), n, HS.LFailed{}, err),
       parent, HPL.err_text(n, err)) : HX.Cx<o>}
 
 # LAW: a worktree made for a task gone meanwhile (dropped while placing)
@@ -104,7 +105,7 @@ law place_join_waits:
 # LAW: A's worktree made, a live placing joiner gets that same ws (path,
 # branch, place), then its REPL (POk).
 law place_join_shares:
-  for +a: HM.Agent
+  for +a: HS.Agent
   for +b: String
   for +n: String
   for +ws: J.Json
@@ -114,7 +115,7 @@ law place_join_shares:
 # LAW: A's worktree not made, a live placing joiner fails too, with the
 # same words, and its spawner is told (PErr, then placed_err_tells_once).
 law place_join_err_fails_both:
-  for +a: HM.Agent
+  for +a: HS.Agent
   for +b: String
   for +n: String
   for +e: String
@@ -122,4 +123,4 @@ law place_join_err_fails_both:
   for +err: String
   for h: {String.is_empty(e) == False{} : Bool}
   {HPL.placed_of.live(True{}, a, b, HPL.join.ws(HPL.PErr{n, e, p}), HPL.join.err(HPL.PErr{n, e, p}, err))
-    == HPL.PErr{b, e, HPL.parent_of(HM.Agent.parent(a))} : HPL.Do}
+    == HPL.PErr{b, e, HPL.parent_of(HS.Agent.parent(a))} : HPL.Do}

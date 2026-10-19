@@ -4,6 +4,7 @@ import Base
 import ../../vendor/json.bend as J
 import ../../hub/model.bend as HM
 import ../../hub/gen/state.bend as HS
+import ../../hub/gen/state-laws.bend as HSL
 import ../../hub/cx.bend as HX
 import ../../hub/core.bend as HC
 import ../../hub/inv.bend as HI
@@ -13,16 +14,16 @@ import ../../hub/gen/feed.bend as HFD
 import ./hub-1.bend as PL1
 import ../../hub/lazy.bend as HLZ
 
-def hub_cards_wakes(-o: HM.St, +life: HM.Life, +cx: HX.Cx<o>, +n: String)
+def hub_cards_wakes(-o: HM.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
     -> {HM.St.cards(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
   match life:
-    case HM.LActive{}:
+    case HS.LActive{}:
       {==}
-    case HM.LStopped{}:
+    case HS.LStopped{}:
       {==}
-    case HM.LFailed{}:
+    case HS.LFailed{}:
       {==}
-    case HM.LArchived{}:
+    case HS.LArchived{}:
       PL1.hub_cards_wakes_each(o, HWK.ids_of(HWK.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
 
 def hub_msgs_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
@@ -34,7 +35,7 @@ def hub_msgs_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, 
       PL1.hub_msgs_gone_each(o, HTM.ids_in(HC.live(o, cx), ns), cx, HC.cat(["@", n, " is gone"]))
 
 def hub_agents_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
-    -> {HM.St.agents(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.St.agents(HX.d(o, cx)) : List<&2, HM.Agent>}:
+    -> {HM.St.agents(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match g:
     case False{}:
       {==}
@@ -74,16 +75,16 @@ def hub_msgs_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: Stri
               PL1.hub_d_emit(o, cx, HM.ECardClosed{id, res, HS.Ans.empty()}, Unit{}, Unit{}, Unit{})),
             PL1.hub_msgs_closed(HX.d(o, cx), id, res))))
 
-def hub_agents_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.agents(HX.d(o, a)) == HM.St.agents(HX.d(o, b)) : List<&2, HM.Agent>}:
-  Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, a), HX.d(o, b), e)
+def hub_agents_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.agents(HX.d(o, a)) == HM.St.agents(HX.d(o, b)) : List<&2, HS.Agent>}:
+  Equal.cong(HM.St, List<&2, HS.Agent>, s => HM.St.agents(s), HX.d(o, a), HX.d(o, b), e)
 
-def hub_agents_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.agents(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == HM.St.agents(s) : List<&2, HM.Agent>}:
+def hub_agents_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.agents(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == HM.St.agents(s) : List<&2, HS.Agent>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
-    -> {HM.St.agents(HX.d(o, HC.close_ids(o, ids, cx, res))) == HM.St.agents(HX.d(o, cx)) : List<&2, HM.Agent>}:
+    -> {HM.St.agents(HX.d(o, HC.close_ids(o, ids, cx, res))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match ids:
     case Nil{}:
       {==}
@@ -91,31 +92,31 @@ def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: St
       +ev = {HM.ECardClosed{id, res, HS.Ans.empty()} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
-      Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx)),
         hub_agents_close_ids(o, rest, cx3, res),
-        Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
+        Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
           hub_agents_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
-          Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
-            Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+          Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
+            Equal.cong(HM.St, List<&2, HS.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
             hub_agents_closed(HX.d(o, cx), id, res))))
 
-def hub_agents_state(s: HM.St, +id: Nat, +x: HS.MSt) -> {HM.St.agents(HM.apply(s, HM.EMsgState{id, x})) == HM.St.agents(s) : List<&2, HM.Agent>}:
+def hub_agents_state(s: HM.St, +id: Nat, +x: HS.MSt) -> {HM.St.agents(HM.apply(s, HM.EMsgState{id, x})) == HM.St.agents(s) : List<&2, HS.Agent>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_agents_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HM.St.agents(HX.d(o, HC.reject_ids(o, ids, cx))) == HM.St.agents(HX.d(o, cx)) : List<&2, HM.Agent>}:
+    -> {HM.St.agents(HX.d(o, HC.reject_ids(o, ids, cx))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, t}:
       +ev = {HM.EMsgState{id, HS.Rejected{"recipient_unavailable"}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.reject_ids(o, t, cx2))), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, HC.reject_ids(o, t, cx2))), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
         hub_agents_reject(o, t, cx2),
-        Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
-          Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+        Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
+          Equal.cong(HM.St, List<&2, HS.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_agents_state(HX.d(o, cx), id, HS.Rejected{"recipient_unavailable"})))
 
 def hub_names_tr(-a: List<&2, HS.MRec>, -b: List<&2, HS.MRec>, -na: List<&2, String>, -nb: List<&2, String>,
@@ -207,7 +208,7 @@ def hub_cards_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.cards(HM.apply(
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
-def hub_cards_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.St.cards(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.St.cards(s) : List<&2, HS.Card>}:
+def hub_cards_life(s: HM.St, +n: String, +l: HS.Life, +r: Maybe<&2, String>) -> {HM.St.cards(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.St.cards(s) : List<&2, HS.Card>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
@@ -679,46 +680,51 @@ def hub_is_rename(op: HM.AgentOp) -> Bool:
     case _:
       False{}
 
-def hub_names_op(h: HM.Agent, op: HM.AgentOp, nr: {hub_is_rename(op) == False{} : Bool}) -> {HI.names(HM.agent_op(h, op)) == HI.names(h) : List<&2, String>}:
-  match h:
-    case HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
-      match op:
-        case HM.OLife{l, why}:
-          {==}
-        case HM.OWs{w}:
-          {==}
-        case HM.ODeclared{d, n}:
-          {==}
-        case HM.OFile{p}:
-          {==}
-        case HM.ORename{nn}:
-          PL1.hub_absurd_eq(PL1.hub_tf_absurd(nr), List<&2, String>, HI.names(HM.agent_op(HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}, HM.ORename{nn})), HI.names(HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}))
-        case HM.OSnap{x}:
-          {==}
-        case HM.OReport{x}:
-          {==}
-        case HM.OFollow{x}:
-          {==}
+def hub_names_op(+h: HS.Agent, op: HM.AgentOp, nr: {hub_is_rename(op) == False{} : Bool}) -> {HI.names(HM.agent_op(h, op)) == HI.names(h) : List<&2, String>}:
+  match op:
+    case HM.OLife{l, why}:
+      %HSL.Agent.life.eta(h, l) : {HI.names(HS.Agent.with_failure(HS.Agent.with_declared(_, HM.agent_op.decl(l, HS.Agent.declared(h))), why)) == HI.names(h) : List<&2, String>}
+      {==}
+    case HM.OWs{w}:
+      %HSL.Agent.ws.eta(h, w) : {HI.names(_) == HI.names(h) : List<&2, String>}
+      {==}
+    case HM.ODeclared{d, n}:
+      %HSL.Agent.declared.eta(h, d) : {HI.names(HS.Agent.with_note(_, n)) == HI.names(h) : List<&2, String>}
+      {==}
+    case HM.OFile{+p}:
+      %HSL.Agent.files.eta(h, HM.agent_op.file(HM.str_in(HS.Agent.files(h), p), HS.Agent.files(h), p)) : {HI.names(_) == HI.names(h) : List<&2, String>}
+      {==}
+    case HM.ORename{nn}:
+      PL1.hub_absurd_eq(PL1.hub_tf_absurd(nr), List<&2, String>, HI.names(HM.agent_op(h, HM.ORename{nn})), HI.names(h))
+    case HM.OSnap{x}:
+      %HSL.Agent.snap.eta(h, x) : {HI.names(_) == HI.names(h) : List<&2, String>}
+      {==}
+    case HM.OReport{x}:
+      %HSL.Agent.report.eta(h, x) : {HI.names(_) == HI.names(h) : List<&2, String>}
+      {==}
+    case HM.OFollow{x}:
+      %HSL.Agent.follow.eta(h, x) : {HI.names(_) == HI.names(h) : List<&2, String>}
+      {==}
 
-def hub_prof_map.pick(c: Bool, +h: HM.Agent, +t: List<&2, HM.Agent>, +n: String, +op: HM.AgentOp, +e: {String.eq(HM.Agent.name(h), n) == c : Bool},
+def hub_prof_map.pick(c: Bool, +h: HS.Agent, +t: List<&2, HS.Agent>, +n: String, +op: HM.AgentOp, +e: {String.eq(HS.Agent.name(h), n) == c : Bool},
     +nr: {hub_is_rename(op) == False{} : Bool}, ih: {HI.profile(HM.map_agent(t, n, op)) == HI.profile(t) : List<&2, List<&2, String>>})
-    -> {HI.profile(HM.map_agent.go(h <> t, String.eq(HM.Agent.name(h), n), n, op)) == HI.profile(h <> t) : List<&2, List<&2, String>>}:
+    -> {HI.profile(HM.map_agent.go(h <> t, String.eq(HS.Agent.name(h), n), n, op)) == HI.profile(h <> t) : List<&2, List<&2, String>>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), n), True{}, e) : {HI.profile(HM.map_agent.go(h <> t, _, n, op)) == HI.profile(h <> t) : List<&2, List<&2, String>>}
+      %Equal.sym(Bool, String.eq(HS.Agent.name(h), n), True{}, e) : {HI.profile(HM.map_agent.go(h <> t, _, n, op)) == HI.profile(h <> t) : List<&2, List<&2, String>>}
       Equal.cong(List<&2, String>, List<&2, List<&2, String>>, x => x <> HI.profile(t), HI.names(HM.agent_op(h, op)), HI.names(h), hub_names_op(h, op, nr))
     case False{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), n), False{}, e) : {HI.profile(HM.map_agent.go(h <> t, _, n, op)) == HI.profile(h <> t) : List<&2, List<&2, String>>}
+      %Equal.sym(Bool, String.eq(HS.Agent.name(h), n), False{}, e) : {HI.profile(HM.map_agent.go(h <> t, _, n, op)) == HI.profile(h <> t) : List<&2, List<&2, String>>}
       Equal.cong(List<&2, List<&2, String>>, List<&2, List<&2, String>>, x => HI.names(h) <> x, HI.profile(HM.map_agent(t, n, op)), HI.profile(t), ih)
 
 # an operation that is not a rename keeps every agent's names
-def hub_prof_map(+xs: List<&2, HM.Agent>, +n: String, +op: HM.AgentOp, +nr: {hub_is_rename(op) == False{} : Bool})
+def hub_prof_map(+xs: List<&2, HS.Agent>, +n: String, +op: HM.AgentOp, +nr: {hub_is_rename(op) == False{} : Bool})
     -> {HI.profile(HM.map_agent(xs, n, op)) == HI.profile(xs) : List<&2, List<&2, String>>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      hub_prof_map.pick(String.eq(HM.Agent.name(h), n), h, t, n, op, {==}, nr, hub_prof_map(t, n, op, nr))
+      hub_prof_map.pick(String.eq(HS.Agent.name(h), n), h, t, n, op, {==}, nr, hub_prof_map(t, n, op, nr))
 
 # ---- L4 support: names apart — a free name ----
 
@@ -748,15 +754,15 @@ def hub_free(ps: List<&2, List<&2, String>>, +n: String) -> Data:
     case Con{+p, +r}:
       HX.Both<{HM.str_in(p, n) == False{} : Bool}, hub_free(r, n)>
 
-def hub_mdisc(m: Maybe<&2, HM.Agent>) -> Type:
+def hub_mdisc(m: Maybe<&2, HS.Agent>) -> Type:
   match m:
     case None{}:
       Unit
     case Some{x}:
       Empty
 
-def hub_some_none(-a: HM.Agent, e: {Some{a} == None{} : Maybe<&2, HM.Agent>}) -> Empty:
-  %Equal.sym(Maybe<&2, HM.Agent>, Some{a}, None{}, e) : hub_mdisc(_)
+def hub_some_none(-a: HS.Agent, e: {Some{a} == None{} : Maybe<&2, HS.Agent>}) -> Empty:
+  %Equal.sym(Maybe<&2, HS.Agent>, Some{a}, None{}, e) : hub_mdisc(_)
   Unit{}
 
 # name-free: a name no agent has is free among the agents' names once
@@ -806,18 +812,18 @@ def hub_allapart_new(+ps: List<&2, List<&2, String>>, +n: String, f: hub_free(ps
         case HX.Both{f1, f2}:
           HX.Both{hub_apart_new(p, n, f1), hub_allapart_new(r, n, f2)}
 
-def hub_put_absent.pick(c: Bool, +h: HM.Agent, +t: List<&2, HM.Agent>, +n: String, +a: HM.Agent, +e: {String.eq(HM.Agent.name(h), n) == c : Bool},
+def hub_put_absent.pick(c: Bool, +h: HS.Agent, +t: List<&2, HS.Agent>, +n: String, +a: HS.Agent, +e: {String.eq(HS.Agent.name(h), n) == c : Bool},
     ec: {c == False{} : Bool}, ih: {HI.profile(HM.put_agent(t, n, a)) == HM.snoc(List<&2, String>, HI.profile(t), HI.names(a)) : List<&2, List<&2, String>>})
-    -> {HI.profile(HLZ.pick(List<&2, HM.Agent>, String.eq(HM.Agent.name(h), n), u => a <> t, u => h <> HM.put_agent(t, n, a))) == HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)) : List<&2, List<&2, String>>}:
+    -> {HI.profile(HLZ.pick(List<&2, HS.Agent>, String.eq(HS.Agent.name(h), n), u => a <> t, u => h <> HM.put_agent(t, n, a))) == HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)) : List<&2, List<&2, String>>}:
   match c:
     case True{}:
-      PL1.hub_absurd_eq(PL1.hub_tf_absurd(ec), List<&2, List<&2, String>>, HI.profile(HLZ.pick(List<&2, HM.Agent>, String.eq(HM.Agent.name(h), n), u => a <> t, u => h <> HM.put_agent(t, n, a))), HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)))
+      PL1.hub_absurd_eq(PL1.hub_tf_absurd(ec), List<&2, List<&2, String>>, HI.profile(HLZ.pick(List<&2, HS.Agent>, String.eq(HS.Agent.name(h), n), u => a <> t, u => h <> HM.put_agent(t, n, a))), HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)))
     case False{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), n), False{}, e) : {HI.profile(HLZ.pick(List<&2, HM.Agent>, _, u => a <> t, u => h <> HM.put_agent(t, n, a))) == HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)) : List<&2, List<&2, String>>}
+      %Equal.sym(Bool, String.eq(HS.Agent.name(h), n), False{}, e) : {HI.profile(HLZ.pick(List<&2, HS.Agent>, _, u => a <> t, u => h <> HM.put_agent(t, n, a))) == HM.snoc(List<&2, String>, HI.profile(h <> t), HI.names(a)) : List<&2, List<&2, String>>}
       Equal.cong(List<&2, List<&2, String>>, List<&2, List<&2, String>>, x => HI.names(h) <> x, HI.profile(HM.put_agent(t, n, a)), HM.snoc(List<&2, String>, HI.profile(t), HI.names(a)), ih)
 
 # a new agent under a free name goes last
-def hub_put_absent(+xs: List<&2, HM.Agent>, +n: String, +a: HM.Agent, f: hub_free(HI.profile(xs), n))
+def hub_put_absent(+xs: List<&2, HS.Agent>, +n: String, +a: HS.Agent, f: hub_free(HI.profile(xs), n))
     -> {HI.profile(HM.put_agent(xs, n, a)) == HM.snoc(List<&2, String>, HI.profile(xs), HI.names(a)) : List<&2, List<&2, String>>}:
   match xs:
     case Nil{}:
@@ -825,8 +831,8 @@ def hub_put_absent(+xs: List<&2, HM.Agent>, +n: String, +a: HM.Agent, f: hub_fre
     case Con{h, t}:
       match f:
         case HX.Both{f1, f2}:
-          hub_put_absent.pick(String.eq(HM.Agent.name(h), n), h, t, n, a, {==},
-            PL1.hub_lor_false_l(String.eq(HM.Agent.name(h), n), HM.str_in(HM.Agent.aliases(h), n), f1), hub_put_absent(t, n, a, f2))
+          hub_put_absent.pick(String.eq(HS.Agent.name(h), n), h, t, n, a, {==},
+            PL1.hub_lor_false_l(String.eq(HS.Agent.name(h), n), HM.str_in(HS.Agent.aliases(h), n), f1), hub_put_absent(t, n, a, f2))
 
 # ---- L4 support: names apart — a rename ----
 
@@ -874,20 +880,19 @@ def hub_apart_ren_before(+x: List<&2, String>, +m: String, +al: List<&2, String>
               hub_str_in_snoc_false(al, m, xn, PL1.hub_lor_false_r(String.eq(m, xn), HM.str_in(al, xn), b1), PL1.hub_lor_false_l(String.eq(m, xn), HM.str_in(al, xn), b1))),
             PL1.hub_lor_false_r(String.eq(xn, new), HM.str_in(xa, new), fx)}
 
-def hub_aa_map_ren.top(+x: List<&2, String>, h: HM.Agent, +t: List<&2, HM.Agent>, +new: String, ah: HI.Apart(x, HI.names(h)), +fx: {HM.str_in(x, new) == False{} : Bool},
+def hub_aa_map_ren.top(+x: List<&2, String>, +h: HS.Agent, +t: List<&2, HS.Agent>, +new: String, ah: HI.Apart(x, HI.names(h)), +fx: {HM.str_in(x, new) == False{} : Bool},
     at: HI.ApartAll(x, HI.profile(t))) -> HI.ApartAll(x, HI.profile(HM.agent_op(h, HM.ORename{new}) <> t)):
-  match h:
-    case HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
-      HX.Both{hub_apart_ren_before(x, name, al, new, ah, fx), at}
+  %HSL.Agent.name.eta(h, new) : HI.ApartAll(x, HI.profile(HS.Agent.with_aliases(_, HM.snoc(String, HS.Agent.aliases(h), HS.Agent.name(h))) <> t))
+  HX.Both{hub_apart_ren_before(x, HS.Agent.name(h), HS.Agent.aliases(h), new, ah, fx), at}
 
-def hub_aa_map_ren.pick(c: Bool, +x: List<&2, String>, +h: HM.Agent, +t: List<&2, HM.Agent>, +old: String, +new: String, +e: {String.eq(HM.Agent.name(h), old) == c : Bool},
+def hub_aa_map_ren.pick(c: Bool, +x: List<&2, String>, +h: HS.Agent, +t: List<&2, HS.Agent>, +old: String, +new: String, +e: {String.eq(HS.Agent.name(h), old) == c : Bool},
     ah: HI.Apart(x, HI.names(h)), +fx: {HM.str_in(x, new) == False{} : Bool},
     at: HI.ApartAll(x, HI.profile(t)), ih: HI.ApartAll(x, HI.profile(HM.map_agent(t, old, HM.ORename{new}))))
-    -> HI.ApartAll(x, HI.profile(HM.map_agent.go(h <> t, String.eq(HM.Agent.name(h), old), old, HM.ORename{new}))):
+    -> HI.ApartAll(x, HI.profile(HM.map_agent.go(h <> t, String.eq(HS.Agent.name(h), old), old, HM.ORename{new}))):
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), True{}, e) : HI.ApartAll(x, HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
+      %Equal.sym(Bool, String.eq(HS.Agent.name(h), old), True{}, e) : HI.ApartAll(x, HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
       hub_aa_map_ren.top(x, h, t, new, ah, fx, at)
     case False{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), False{}, e) : HI.ApartAll(x, HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
+      %Equal.sym(Bool, String.eq(HS.Agent.name(h), old), False{}, e) : HI.ApartAll(x, HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
       HX.Both{ah, ih}

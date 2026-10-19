@@ -70,7 +70,7 @@ law stop_leaves_no_waiter:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +n: String
-  for +life: HM.Life
+  for +life: HS.Life
   for +why: String
   HC.NoneOf(HC.waiters_of_cx(o, HC.stop_task(o, cx, n, life, why)), n)
 
@@ -151,7 +151,7 @@ law stop_leaves_no_timer:
   for +cx: HX.Cx<o>
   for +n: String
   for +why: String
-  HI.TimerNoneOf(HTM.Tms.live(HM.St.tm(HX.d(o, HC.stop_task(o, cx, n, HM.LArchived{}, why)))), n)
+  HI.TimerNoneOf(HTM.Tms.live(HM.St.tm(HX.d(o, HC.stop_task(o, cx, n, HS.LArchived{}, why)))), n)
 
 # ---- the project's pause (cost-pause, hub/pause.bend) ----
 # Its lines (paused, resumed) are events like the others: the replay laws
@@ -245,7 +245,7 @@ law wake_drop_ends:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +n: String
-  HI.WatchNoneOf(HWK.Wakes.live(HC.wks(o, HC.wakes_gone(o, HM.LArchived{}, cx, n))), n)
+  HI.WatchNoneOf(HWK.Wakes.live(HC.wks(o, HC.wakes_gone(o, HS.LArchived{}, cx, n))), n)
 
 # LAW: a watch past its max wakes once: the tick ends it, and an ended
 # watch is never due again.
@@ -292,9 +292,9 @@ law busy_steers_now:
 law timer_reaches_busy:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +a: HM.Agent
-  for p: {HC.is_active(HM.Agent.life(a)) == True{} : Bool}
-  for q: {HX.Rt.run(HC.rt(o, cx, HM.Agent.name(a))) == HM.RBusy{} : HM.Run}
+  for +a: HS.Agent
+  for p: {HC.is_active(HS.Agent.life(a)) == True{} : Bool}
+  for q: {HX.Rt.run(HC.rt(o, cx, HS.Agent.name(a))) == HS.RBusy{} : HS.Run}
   {HC.ready.go(o, Some{a}, cx) == True{} : Bool}
 
 # LAW: a due wake of a timer whose agent it reaches (idle or busy:
@@ -318,7 +318,7 @@ law paused_steers_nothing:
   for +cx: HX.Cx<o>
   for +n: String
   for q: {HP.is_paused(HX.d(o, cx)) == True{} : Bool}
-  for r: {HX.Rt.run(HC.rt(o, cx, n)) == HM.RBusy{} : HM.Run}
+  for r: {HX.Rt.run(HC.rt(o, cx, n)) == HS.RBusy{} : HS.Run}
   {HC.pump(o, cx, n) == cx : HX.Cx<o>}
 
 # LAW: a page question answered on its page: its card closes, then the
@@ -466,7 +466,7 @@ law stop_leaves_no_queue:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +n: String
-  for +life: HM.Life
+  for +life: HS.Life
   for +why: String
   for u: HI.Split(HX.d(o, cx))
   {HM.queued_in(HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n)) == Nil{} : List<&2, HS.Msg>}
@@ -505,7 +505,7 @@ law user_queued_waits_for_turn_end:
   for +name: String
   for +q: List<&2, HS.Msg>
   for +m: Bool
-  {HC.pump.run(o, HM.RBusy{}, cx, name, q, m) == HC.pump.batch(o, HC.not_queued_mode(q), cx, name, True{}, m) : HX.Cx<o>}
+  {HC.pump.run(o, HS.RBusy{}, cx, name, q, m) == HC.pump.batch(o, HC.not_queued_mode(q), cx, name, True{}, m) : HX.Cx<o>}
 
 law busy_batch_has_no_queued:
   for +xs: List<&2, HS.Msg>
@@ -519,7 +519,7 @@ law user_queued_said_at_idle:
   for +name: String
   for +q: List<&2, HS.Msg>
   for +m: Bool
-  {HC.pump.run(o, HM.RIdle{}, cx, name, q, m) == HC.pump.batch(o, q, cx, name, False{}, m) : HX.Cx<o>}
+  {HC.pump.run(o, HS.RIdle{}, cx, name, q, m) == HC.pump.batch(o, q, cx, name, False{}, m) : HX.Cx<o>}
 
 # ---- the composer rule (lead m_8777, architect m_8801) ----
 # An approval card takes one of its options, never typed words: the TUI's
@@ -787,21 +787,21 @@ law follow_done_once:
 
 # LAW (architect m_9154): one job per follow: job_end turns follow off.
 law follow_one_shot:
-  for +a: HM.Agent
-  {HM.Agent.follow(HM.agent_op(a, HM.OFollow{None{}})) == False{} : Bool}
+  for +a: HS.Agent
+  {HM.follows(HM.agent_op(a, HM.OFollow{None{}})) == False{} : Bool}
 
 # LAW (J, architect m_10223): the hub that asked for a follow is kept
 # with it (journaled by EFollow), so its end can go back there.
 law follow_hub_journaled:
-  for +a: HM.Agent
+  for +a: HS.Agent
   for +hub: String
-  {HM.Agent.follow_hub(HM.agent_op(a, HM.OFollow{Some{hub}})) == hub : String}
+  {HM.follow_hub(HM.agent_op(a, HM.OFollow{Some{hub}})) == hub : String}
 
 # LAW (J): the job's end clears it with the follow: a later end of the
 # same agent goes back nowhere.
 law follow_hub_cleared:
-  for +a: HM.Agent
-  {HM.Agent.follow_hub(HM.agent_op(a, HM.OFollow{None{}})) == "" : String}
+  for +a: HS.Agent
+  {HM.follow_hub(HM.agent_op(a, HM.OFollow{None{}})) == "" : String}
 
 # LAW (J): an end goes back only to a hub that asked: a follow of this
 # hub's own main or window ("") puts nothing in the outbox.
@@ -838,7 +838,7 @@ law stop_leaves_no_card:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +n: String
-  for +life: HM.Life
+  for +life: HS.Life
   for +why: String
   for u: HI.UniqueCards(HX.d(o, cx))
   {HC.card_ids(HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), n, Nil{}) == Nil{} : List<&2, Nat>}

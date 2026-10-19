@@ -30,9 +30,9 @@ import ./lazy.bend as LZ
 def is_paused(+s: M.St) -> Bool:
   Maybe.is_some(&2, Nat, M.St.paused(s))
 
-def run_busy(r: M.Run) -> Bool:
+def run_busy(r: S.Run) -> Bool:
   match r:
-    case M.RBusy{}:
+    case S.RBusy{}:
       True{}
     case _:
       False{}
@@ -40,7 +40,7 @@ def run_busy(r: M.Run) -> Bool:
 def rt_of(xs: List<&2, X.Rt>, +n: String) -> X.Rt:
   match xs:
     case Nil{}:
-      X.Rt{n, M.RDown{}, False{}, None{}, 0n}
+      X.Rt{n, S.RDown{}, False{}, None{}, 0n}
     case Con{+h, +t}:
       LZ.pick(X.Rt, String.eq(X.Rt.name(h), n), u => h, u => rt_of(t, n))
 

@@ -3,6 +3,7 @@
 import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/place.bend as HPL
@@ -22,11 +23,11 @@ def place_pick_not_ok(c: Bool, +n: String, +ws: J.Json) -> {HPL.is_ok(Bool.pick(
       {==}
 
 def Laws.placed_create_once(a, n, ws, err, e):
-  %Equal.sym(Bool, HM.ws_placing(HM.Agent.ws(a)), False{}, e) : {HPL.is_ok(HPL.placed_of.live(_ && Bool.not(HPL.is_archived(HM.Agent.life(a))), a, n, ws, err)) == False{} : Bool}
+  %Equal.sym(Bool, HM.ws_placing(HS.Agent.ws(a)), False{}, e) : {HPL.is_ok(HPL.placed_of.live(_ && Bool.not(HPL.is_archived(HS.Agent.life(a))), a, n, ws, err)) == False{} : Bool}
   place_pick_not_ok(String.is_empty(err), n, ws)
 
 def Laws.placed_err_fails(a, n, ws, err, e):
-  %Equal.sym(Bool, String.is_empty(err), False{}, e) : {Bool.pick(HPL.Do, _, HPL.POk{n, ws}, HPL.PErr{n, err, HPL.parent_of(HM.Agent.parent(a))}) == HPL.PErr{n, err, HPL.parent_of(HM.Agent.parent(a))} : HPL.Do}
+  %Equal.sym(Bool, String.is_empty(err), False{}, e) : {Bool.pick(HPL.Do, _, HPL.POk{n, ws}, HPL.PErr{n, err, HPL.parent_of(HS.Agent.parent(a))}) == HPL.PErr{n, err, HPL.parent_of(HS.Agent.parent(a))} : HPL.Do}
   {==}
 
 def Laws.placed_err_tells_once(o, cx, n, err, parent):

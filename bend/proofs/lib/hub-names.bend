@@ -7,6 +7,8 @@
 import Base
 import ../../vendor/json.bend as J
 import ../../hub/model.bend as HM
+import ../../hub/gen/state.bend as HS
+import ../../hub/gen/state-laws.bend as HSL
 import ../../hub/cx.bend as HX
 import ../../hub/inv.bend as HI
 import ../../hub/names.bend as HN
@@ -59,13 +61,13 @@ def nm_apart(+nm: String, +al: List<&2, String>, +m: String, +bl: List<&2, Strin
           nm_out(bl, n, nm, PL1.hub_lor_false_r(String.eq(m, nm), HM.str_in(bl, nm), a1))),
         nm_out(al, n, m, a2)}
 
-def nm_apart_ag(+a: HM.Agent, +b: HM.Agent, +n: String, ap: HI.Apart(HI.names(a), HI.names(b)))
+def nm_apart_ag(+a: HS.Agent, +b: HS.Agent, +n: String, ap: HI.Apart(HI.names(a), HI.names(b)))
     -> HI.Apart(HI.names(HM.Agent.strip(a, n)), HI.names(HM.Agent.strip(b, n))):
-  match a b:
-    case HM.Agent{nm, im, pa, li, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo} HM.Agent{m, im2, pa2, li2, de2, bl, fi2, ws2, di2, br2, cr2, fa2, no2, rp2, sn2, fo2}:
-      nm_apart(nm, al, m, bl, n, ap)
+  %HSL.Agent.aliases.eta(a, HN.drop_str(HS.Agent.aliases(a), n)) : HI.Apart(HI.names(_), HI.names(HM.Agent.strip(b, n)))
+  %HSL.Agent.aliases.eta(b, HN.drop_str(HS.Agent.aliases(b), n)) : HI.Apart(HS.Agent.name(a) <> HN.drop_str(HS.Agent.aliases(a), n), HI.names(_))
+  nm_apart(HS.Agent.name(a), HS.Agent.aliases(a), HS.Agent.name(b), HS.Agent.aliases(b), n, ap)
 
-def nm_aa(+a: HM.Agent, +t: List<&2, HM.Agent>, +n: String, aa: HI.ApartAll(HI.names(a), HI.profile(t)))
+def nm_aa(+a: HS.Agent, +t: List<&2, HS.Agent>, +n: String, aa: HI.ApartAll(HI.names(a), HI.profile(t)))
     -> HI.ApartAll(HI.names(HM.Agent.strip(a, n)), HI.profile(HM.strip(t, n))):
   match t:
     case Nil{}:
@@ -76,7 +78,7 @@ def nm_aa(+a: HM.Agent, +t: List<&2, HM.Agent>, +n: String, aa: HI.ApartAll(HI.n
           HX.Both{nm_apart_ag(a, b, n, a1), nm_aa(a, r, n, a2)}
 
 # the agents' names stay apart once an old name is stripped
-def nm_ok(+xs: List<&2, HM.Agent>, +n: String, ok: HI.NamesOK(HI.profile(xs))) -> HI.NamesOK(HI.profile(HM.strip(xs, n))):
+def nm_ok(+xs: List<&2, HS.Agent>, +n: String, ok: HI.NamesOK(HI.profile(xs))) -> HI.NamesOK(HI.profile(HM.strip(xs, n))):
   match xs:
     case Nil{}:
       Unit{}
@@ -87,18 +89,17 @@ def nm_ok(+xs: List<&2, HM.Agent>, +n: String, ok: HI.NamesOK(HI.profile(xs))) -
 
 # ---- the name is free once stripped ----
 
-def nm_free_head(+a: HM.Agent, +n: String, e: {String.eq(HM.Agent.name(a), n) == False{} : Bool})
+def nm_free_head(+a: HS.Agent, +n: String, e: {String.eq(HS.Agent.name(a), n) == False{} : Bool})
     -> {HM.str_in(HI.names(HM.Agent.strip(a, n)), n) == False{} : Bool}:
-  match a:
-    case HM.Agent{nm, im, pa, li, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
-      PL1.hub_lor_false(String.eq(nm, n), HM.str_in(HN.drop_str(al, n), n), e, nm_gone(al, n))
+  %HSL.Agent.aliases.eta(a, HN.drop_str(HS.Agent.aliases(a), n)) : {HM.str_in(HI.names(_), n) == False{} : Bool}
+  PL1.hub_lor_false(String.eq(HS.Agent.name(a), n), HM.str_in(HN.drop_str(HS.Agent.aliases(a), n), n), e, nm_gone(HS.Agent.aliases(a), n))
 
-def nm_free.absurd(-a: HM.Agent, -t: List<&2, HM.Agent>, -n: String, x: Empty) -> PL2.hub_free(HI.profile(HM.strip(a <> t, n)), n):
+def nm_free.absurd(-a: HS.Agent, -t: List<&2, HS.Agent>, -n: String, x: Empty) -> PL2.hub_free(HI.profile(HM.strip(a <> t, n)), n):
   match x:
 
-def nm_free.pick(c: Bool, +a: HM.Agent, +t: List<&2, HM.Agent>, +n: String, +e: {String.eq(HM.Agent.name(a), n) == c : Bool},
-    hn: {HLZ.pick(Maybe<&2, HM.Agent>, c, u => Some{a}, u => HM.agent_named(t, n)) == None{} : Maybe<&2, HM.Agent>},
-    k: @p: {HM.agent_named(t, n) == None{} : Maybe<&2, HM.Agent>} -> PL2.hub_free(HI.profile(HM.strip(t, n)), n))
+def nm_free.pick(c: Bool, +a: HS.Agent, +t: List<&2, HS.Agent>, +n: String, +e: {String.eq(HS.Agent.name(a), n) == c : Bool},
+    hn: {HLZ.pick(Maybe<&2, HS.Agent>, c, u => Some{a}, u => HM.agent_named(t, n)) == None{} : Maybe<&2, HS.Agent>},
+    k: @p: {HM.agent_named(t, n) == None{} : Maybe<&2, HS.Agent>} -> PL2.hub_free(HI.profile(HM.strip(t, n)), n))
     -> PL2.hub_free(HI.profile(HM.strip(a <> t, n)), n):
   match c:
     case True{}:
@@ -107,22 +108,22 @@ def nm_free.pick(c: Bool, +a: HM.Agent, +t: List<&2, HM.Agent>, +n: String, +e: 
       HX.Both{nm_free_head(a, n, e), k(hn)}
 
 # a name no agent has as its name is free among the stripped agents' names
-def nm_free(+xs: List<&2, HM.Agent>, +n: String, hn: {HM.agent_named(xs, n) == None{} : Maybe<&2, HM.Agent>})
+def nm_free(+xs: List<&2, HS.Agent>, +n: String, hn: {HM.agent_named(xs, n) == None{} : Maybe<&2, HS.Agent>})
     -> PL2.hub_free(HI.profile(HM.strip(xs, n)), n):
   match xs:
     case Nil{}:
       Unit{}
     case Con{a, t}:
-      nm_free.pick(String.eq(HM.Agent.name(a), n), a, t, n, {==}, hn, p => nm_free(t, n, p))
+      nm_free.pick(String.eq(HS.Agent.name(a), n), a, t, n, {==}, hn, p => nm_free(t, n, p))
 
-def nm_none(m: Maybe<&2, HM.Agent>, e: {Maybe.is_some(&2, HM.Agent, m) == False{} : Bool}) -> {m == None{} : Maybe<&2, HM.Agent>}:
+def nm_none(m: Maybe<&2, HS.Agent>, e: {Maybe.is_some(&2, HS.Agent, m) == False{} : Bool}) -> {m == None{} : Maybe<&2, HS.Agent>}:
   match m:
     case None{}:
       {==}
     case Some{x}:
-      PL1.hub_absurd_eq(PL1.hub_tf_absurd(e), Maybe<&2, HM.Agent>, Some{x}, None{})
+      PL1.hub_absurd_eq(PL1.hub_tf_absurd(e), Maybe<&2, HS.Agent>, Some{x}, None{})
 
 # a name no agent holds (FreshEv): no agent has it as its name
-def nm_held(+s: HM.St, +n: String, k: {HM.name_held(s, n) == False{} : Bool}) -> {HM.agent_named(HM.St.agents(s), n) == None{} : Maybe<&2, HM.Agent>}:
+def nm_held(+s: HM.St, +n: String, k: {HM.name_held(s, n) == False{} : Bool}) -> {HM.agent_named(HM.St.agents(s), n) == None{} : Maybe<&2, HS.Agent>}:
   nm_none(HM.agent_named(HM.St.agents(s), n),
-    PL1.hub_or_false_r(HM.reserved(n), Maybe.is_some(&2, HM.Agent, HM.agent_named(HM.St.agents(s), n)), k))
+    PL1.hub_or_false_r(HM.reserved(n), Maybe.is_some(&2, HS.Agent, HM.agent_named(HM.St.agents(s), n)), k))

@@ -165,12 +165,12 @@ def card_ids(cs: List<&2, S.Card>) -> List<&2, Nat>:
 def UniqueCards(+s: M.St) -> Data:
   X.Both<Distinct(card_ids(M.St.cards(s))), Below(card_ids(M.St.cards(s)), M.St.next_card(s))>
 
-def stuck.agent(m: Maybe<&2, M.Agent>, +s: M.St, +n: String) -> Bool:
+def stuck.agent(m: Maybe<&2, S.Agent>, +s: M.St, +n: String) -> Bool:
   match m:
     case None{}:
       False{}
     case Some{+a}:
-      Bool.and(H.is_active(M.Agent.life(a)), Bool.and(Bool.not(List.is_empty(&2, S.Msg, M.queued_for(s, n))), Bool.not(P.is_paused(s))))
+      Bool.and(H.is_active(S.Agent.life(a)), Bool.and(Bool.not(List.is_empty(&2, S.Msg, M.queued_for(s, n))), Bool.not(P.is_paused(s))))
 
 # law L4: agent `n` is idle, active, and has messages queued (a message
 # stuck: nothing would ever deliver it). A paused project holds them on
@@ -181,10 +181,10 @@ def stuck(+s: M.St, +rts: List<&2, X.Rt>, +n: String) -> Bool:
 # ---- law L4 support: the names of two agents never meet ----
 
 # an agent's names: its name, then its old ones
-def names(+a: M.Agent) -> List<&2, String>:
-  M.Agent.name(a) <> M.Agent.aliases(a)
+def names(+a: S.Agent) -> List<&2, String>:
+  S.Agent.name(a) <> S.Agent.aliases(a)
 
-def profile(xs: List<&2, M.Agent>) -> List<&2, List<&2, String>>:
+def profile(xs: List<&2, S.Agent>) -> List<&2, List<&2, String>>:
   match xs:
     case Nil{}:
       Nil{}

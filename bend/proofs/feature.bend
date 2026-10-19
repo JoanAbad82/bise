@@ -4,6 +4,7 @@
 import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/feature.bend as HFT
@@ -96,13 +97,13 @@ def Laws.feature_retire_one(o, cx, a, text):
 
 def Laws.feature_retire_stops_nothing(o, cx, life, n, text, e):
   match life:
-    case HM.LActive{}:
-      PL1.hub_absurd_eq(PL1.hub_tf_absurd(e), HX.Cx<o>, HC.feature_retire.tell(o, HM.LActive{}, cx, n, text), cx)
-    case HM.LStopped{}:
+    case HS.LActive{}:
+      PL1.hub_absurd_eq(PL1.hub_tf_absurd(e), HX.Cx<o>, HC.feature_retire.tell(o, HS.LActive{}, cx, n, text), cx)
+    case HS.LStopped{}:
       {==}
-    case HM.LArchived{}:
+    case HS.LArchived{}:
       {==}
-    case HM.LFailed{}:
+    case HS.LFailed{}:
       {==}
 
 def Laws.feature_retire_tells_once(o, cx, n, text):

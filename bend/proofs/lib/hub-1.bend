@@ -681,7 +681,7 @@ def hub_msgs_closed(s: HM.St, +id: Nat, +res: String) -> {HM.every(HM.apply(s, H
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
-def hub_msgs_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.every(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.every(s) : List<&2, HS.MRec>}:
+def hub_msgs_life(s: HM.St, +n: String, +l: HS.Life, +r: Maybe<&2, String>) -> {HM.every(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.every(s) : List<&2, HS.MRec>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
@@ -696,7 +696,7 @@ def hub_msgs_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.every(HM.a
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
-def hub_agents_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.St.agents(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.St.agents(s) : List<&2, HM.Agent>}:
+def hub_agents_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.St.agents(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.St.agents(s) : List<&2, HS.Agent>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
@@ -721,17 +721,17 @@ def hub_msgs_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: Stri
           hub_msgs_tstop(HX.d(o, cx), id, why, HC.now(o, cx))))
 
 def hub_agents_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
-    -> {HM.St.agents(HX.d(o, HC.timers_gone.each(o, ids, cx, why))) == HM.St.agents(HX.d(o, cx)) : List<&2, HM.Agent>}:
+    -> {HM.St.agents(HX.d(o, HC.timers_gone.each(o, ids, cx, why))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, t}:
       +ev = {HM.ETimerStop{id, why, HC.now(o, cx)} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.timers_gone.each(o, t, cx2, why))), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, HC.timers_gone.each(o, t, cx2, why))), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
         hub_agents_gone_each(o, t, cx2, why),
-        Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
-          Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+        Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
+          Equal.cong(HM.St, List<&2, HS.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_agents_tstop(HX.d(o, cx), id, why, HC.now(o, cx))))
 
 def hub_cards_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
@@ -788,45 +788,45 @@ def hub_msgs_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
           Equal.cong(HM.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_msgs_wake(HX.d(o, cx), HWK.WEnd{id, "gone", HC.now(o, cx)})))
 
-def hub_agents_wake(s: HM.St, +e: HWK.WkEv) -> {HM.St.agents(HM.apply(s, HM.EWake{e})) == HM.St.agents(s) : List<&2, HM.Agent>}:
+def hub_agents_wake(s: HM.St, +e: HWK.WkEv) -> {HM.St.agents(HM.apply(s, HM.EWake{e})) == HM.St.agents(s) : List<&2, HS.Agent>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
       {==}
 
 def hub_agents_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HM.St.agents(HX.d(o, HC.wakes_gone.each(o, ids, cx))) == HM.St.agents(HX.d(o, cx)) : List<&2, HM.Agent>}:
+    -> {HM.St.agents(HX.d(o, HC.wakes_gone.each(o, ids, cx))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, t}:
       +ev = {HM.EWake{HWK.WEnd{id, "gone", HC.now(o, cx)}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.wakes_gone.each(o, t, cx2))), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, HC.wakes_gone.each(o, t, cx2))), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
         hub_agents_wakes_each(o, t, cx2),
-        Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
-          Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+        Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
+          Equal.cong(HM.St, List<&2, HS.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_agents_wake(HX.d(o, cx), HWK.WEnd{id, "gone", HC.now(o, cx)})))
 
-def hub_msgs_wakes(-o: HM.St, +life: HM.Life, +cx: HX.Cx<o>, +n: String)
+def hub_msgs_wakes(-o: HM.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
     -> {HM.every(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}:
   match life:
-    case HM.LActive{}:
+    case HS.LActive{}:
       {==}
-    case HM.LStopped{}:
+    case HS.LStopped{}:
       {==}
-    case HM.LFailed{}:
+    case HS.LFailed{}:
       {==}
-    case HM.LArchived{}:
+    case HS.LArchived{}:
       hub_msgs_wakes_each(o, HWK.ids_of(HWK.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
 
-def hub_agents_wakes(-o: HM.St, +life: HM.Life, +cx: HX.Cx<o>, +n: String)
-    -> {HM.St.agents(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.St.agents(HX.d(o, cx)) : List<&2, HM.Agent>}:
+def hub_agents_wakes(-o: HM.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
+    -> {HM.St.agents(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match life:
-    case HM.LActive{}:
+    case HS.LActive{}:
       {==}
-    case HM.LStopped{}:
+    case HS.LStopped{}:
       {==}
-    case HM.LFailed{}:
+    case HS.LFailed{}:
       {==}
-    case HM.LArchived{}:
+    case HS.LArchived{}:
       hub_agents_wakes_each(o, HWK.ids_of(HWK.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)

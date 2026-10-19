@@ -30,7 +30,7 @@ def journal_task_created_bare():
   {==}
 
 law journal_lifecycle_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"lifecycle"})])) == Some{M.ELifecycle{"", C.life_of(J.JNull{}), None{}}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"lifecycle"})])) == Some{M.ELifecycle{"", SC.Life.journal_of(J.JNull{}), None{}}} : Maybe<&2, M.Ev>}
 
 def journal_lifecycle_bare():
   {==}
@@ -54,7 +54,7 @@ def journal_worktree_placed_bare():
   {==}
 
 law journal_declared_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"declared"})])) == Some{M.EDeclared{"", C.decl_of(J.JNull{}), ""}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"declared"})])) == Some{M.EDeclared{"", SC.Decl.opt_journal_of(J.JNull{}), ""}} : Maybe<&2, M.Ev>}
 
 def journal_declared_bare():
   {==}
@@ -306,27 +306,27 @@ def journal_task_created_round(name, parent, brief, ws, at_ms):
 
 law journal_lifecycle_round:
   for name: String
-  for lifecycle: M.Life
+  for lifecycle: S.Life
   for reason: Maybe<&2, String>
   {GJ.of(GJ.json(M.ELifecycle{name, lifecycle, reason})) == Some{M.ELifecycle{name, lifecycle, reason}} : Maybe<&2, M.Ev>}
 
 def journal_lifecycle_round(name, lifecycle, reason):
   match lifecycle reason:
-    case M.LActive{} None{}:
+    case S.LActive{} None{}:
       {==}
-    case M.LActive{} Some{x_reason}:
+    case S.LActive{} Some{x_reason}:
       {==}
-    case M.LStopped{} None{}:
+    case S.LStopped{} None{}:
       {==}
-    case M.LStopped{} Some{x_reason}:
+    case S.LStopped{} Some{x_reason}:
       {==}
-    case M.LArchived{} None{}:
+    case S.LArchived{} None{}:
       {==}
-    case M.LArchived{} Some{x_reason}:
+    case S.LArchived{} Some{x_reason}:
       {==}
-    case M.LFailed{} None{}:
+    case S.LFailed{} None{}:
       {==}
-    case M.LFailed{} Some{x_reason}:
+    case S.LFailed{} Some{x_reason}:
       {==}
 
 law journal_workspace_changed_round:
@@ -360,7 +360,7 @@ def journal_worktree_placed_round(name, ws, err):
 
 law journal_declared_round:
   for name: String
-  for status: Maybe<&2, M.Decl>
+  for status: Maybe<&2, S.Decl>
   for note: String
   {GJ.of(GJ.json(M.EDeclared{name, status, note})) == Some{M.EDeclared{name, status, note}} : Maybe<&2, M.Ev>}
 
@@ -368,11 +368,11 @@ def journal_declared_round(name, status, note):
   match status:
     case None{}:
       {==}
-    case Some{M.DWorking{}}:
+    case Some{S.DWorking{}}:
       {==}
-    case Some{M.DDone{}}:
+    case Some{S.DDone{}}:
       {==}
-    case Some{M.DBlocked{}}:
+    case Some{S.DBlocked{}}:
       {==}
 
 law journal_reported_round:

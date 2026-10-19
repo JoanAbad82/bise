@@ -20,7 +20,6 @@ import ./timers.bend as TM
 import ./wakes.bend as WK
 
 import ./xhub-model.bend as XH
-
 import ./xhub.bend as XB
 
 import ./picks.bend as PK
@@ -133,34 +132,34 @@ def mid(+n: Nat) -> String:
 def cat(+xs: List<&2, String>) -> String:
   String.concat(xs)
 
-def run_str(r: M.Run) -> String:
+def run_str(r: S.Run) -> String:
   match r:
-    case M.RDown{}:
+    case S.RDown{}:
       "down"
-    case M.RStarting{}:
+    case S.RStarting{}:
       "starting"
-    case M.RIdle{}:
+    case S.RIdle{}:
       "idle"
-    case M.RBusy{}:
+    case S.RBusy{}:
       "busy"
 
-def is_busy(r: M.Run) -> Bool:
+def is_busy(r: S.Run) -> Bool:
   match r:
-    case M.RBusy{}:
+    case S.RBusy{}:
       True{}
     case _:
       False{}
 
-def is_idle(r: M.Run) -> Bool:
+def is_idle(r: S.Run) -> Bool:
   match r:
-    case M.RIdle{}:
+    case S.RIdle{}:
       True{}
     case _:
       False{}
 
-def is_down(r: M.Run) -> Bool:
+def is_down(r: S.Run) -> Bool:
   match r:
-    case M.RDown{}:
+    case S.RDown{}:
       True{}
     case _:
       False{}
@@ -170,20 +169,20 @@ def is_down(r: M.Run) -> Bool:
 # same otherwise. set_rt, the one writer of a runtime state, applies it,
 # so a turn that ends and a next one that starts in the same step (the
 # idle's pump) still counts.
-def turns_after(was: M.Run, now: M.Run, +n: Nat) -> Nat:
+def turns_after(was: S.Run, now: S.Run, +n: Nat) -> Nat:
   match was:
-    case M.RBusy{}:
+    case S.RBusy{}:
       match now:
-        case M.RBusy{}:
+        case S.RBusy{}:
           n
         case _:
           1n+n
     case _:
       n
 
-def is_active(l: M.Life) -> Bool:
+def is_active(l: S.Life) -> Bool:
   match l:
-    case M.LActive{}:
+    case S.LActive{}:
       True{}
     case _:
       False{}
@@ -193,7 +192,7 @@ def is_active(l: M.Life) -> Bool:
 def rt_find(xs: List<&2, X.Rt>, +n: String) -> X.Rt:
   match xs:
     case Nil{}:
-      X.Rt{n, M.RDown{}, False{}, None{}, 0n}
+      X.Rt{n, S.RDown{}, False{}, None{}, 0n}
     case Con{+h, +t}:
       LZ.pick(X.Rt, String.eq(X.Rt.name(h), n), u => h, u => rt_find(t, n))
 
@@ -293,11 +292,11 @@ def set_rt(-o: M.St, +cx: X.Cx<o>, +x0: X.Rt) -> X.Cx<o>:
   +cx2 = set_r(o, cx, X.R.with_rts(rr(o, cx), rt_put(X.R.rts(rr(o, cx)), x)))
   out(o, cx2, F.rt(X.Rt.name(x), run_str(X.Rt.run(x)), X.Rt.waiting(x), X.Rt.turn(x), X.Rt.turns(x)))
 
-def set_run(-o: M.St, +cx: X.Cx<o>, +n: String, +run: M.Run) -> X.Cx<o>:
+def set_run(-o: M.St, +cx: X.Cx<o>, +n: String, +run: S.Run) -> X.Cx<o>:
   set_rt(o, cx, X.Rt.with_run(rt(o, cx, n), run))
 
 def has_agent(-o: M.St, +cx: X.Cx<o>, +n: String) -> Bool:
-  Maybe.is_some(&2, M.Agent, M.get_agent(st(o, cx), n))
+  Maybe.is_some(&2, S.Agent, M.get_agent(st(o, cx), n))
 
 # the runtime change applies only to a known agent (like the Rust
 # `if let Some(a) = self.st.agents.get_mut(..)`)
@@ -395,7 +394,7 @@ def close_cards(-o: M.St, +cx: X.Cx<o>, +agent: String, +kinds: List<&2, String>
 def spawn.if(-o: M.St, down: Bool, +cx: X.Cx<o>, +n: String, +resume: Bool) -> X.Cx<o>:
   match down:
     case True{}:
-      +cx2 = set_run(o, cx, n, M.RStarting{})
+      +cx2 = set_run(o, cx, n, S.RStarting{})
       dirty(o, out(o, cx2, F.spawn(n, resume, None{})))
     case False{}:
       cx
@@ -511,7 +510,7 @@ def pump.send.go(-o: M.St, busy: Bool, +cx: X.Cx<o>, +name: String, +ids: List<&
       dirty(o, out(o, cx2, F.deliver("steer", name, notes, status, msgs)))
     case False{}:
       # the turn starts now: nothing else may `say` meanwhile
-      +cx2 = upd_rt(o, cx, X.Rt{name, M.RBusy{}, X.Rt.waiting(rt(o, cx, name)), Some{now(o, cx)}, 0n})
+      +cx2 = upd_rt(o, cx, X.Rt{name, S.RBusy{}, X.Rt.waiting(rt(o, cx, name)), Some{now(o, cx)}, 0n})
       dirty(o, out(o, cx2, F.deliver("say", name, notes, status, msgs)))
 
 def pump.send(-o: M.St, busy: Bool, p: X.Cx<o> & List<&2, K.Delivered>, +name: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool) -> X.Cx<o>:
@@ -537,16 +536,16 @@ def pump.batch(-o: M.St, batch: List<&2, S.Msg>, +cx: X.Cx<o>, +name: String, +b
       +status = is_main && M.any_from_user(b)
       pump.send(o, busy, deliver_each(o, b, cx2, name, Nil{}), name, ids_of(b), notes, status)
 
-def pump.run(-o: M.St, run: M.Run, +cx: X.Cx<o>, +name: String, +queued: List<&2, S.Msg>, +is_main: Bool) -> X.Cx<o>:
+def pump.run(-o: M.St, run: S.Run, +cx: X.Cx<o>, +name: String, +queued: List<&2, S.Msg>, +is_main: Bool) -> X.Cx<o>:
   match run:
-    case M.RDown{}:
+    case S.RDown{}:
       cx
-    case M.RStarting{}:
+    case S.RStarting{}:
       cx
-    case M.RBusy{}:
+    case S.RBusy{}:
       # a queued-mode message waits for the end of the turn
       pump.batch(o, not_queued_mode(queued), cx, name, True{}, is_main)
-    case M.RIdle{}:
+    case S.RIdle{}:
       pump.batch(o, queued, cx, name, False{}, is_main)
 
 def pump.active(-o: M.St, active: Bool, +cx: X.Cx<o>, +name: String, +is_main: Bool) -> X.Cx<o>:
@@ -556,12 +555,12 @@ def pump.active(-o: M.St, active: Bool, +cx: X.Cx<o>, +name: String, +is_main: B
     case False{}:
       cx
 
-def pump.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
+def pump.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
-      pump.active(o, is_active(M.Agent.life(a)), cx, name, M.Agent.is_main(a))
+      pump.active(o, is_active(S.Agent.life(a)), cx, name, S.Agent.is_main(a))
 
 def pump.paused(-o: M.St, paused: Bool, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
   match paused:
@@ -679,15 +678,15 @@ def send.revive(-o: M.St, ok: Bool, +cx: X.Cx<o>, +s: Snd, +why: String) -> X.Cx
       serr(o, cx, why)
     case True{}:
       +to = Snd.to(s)
-      +cx2 = emit(o, cx, M.ELifecycle{to, M.LActive{}, None{}}, Unit{}, Unit{}, Unit{})
+      +cx2 = emit(o, cx, M.ELifecycle{to, S.LActive{}, None{}}, Unit{}, Unit{}, Unit{})
       +r = rr(o, cx2)
       +cx3 = set_r(o, cx2, X.R.with_crashes(r, KL.kn_del(X.R.crashes(r), to)))
       send.thread(o, Snd.reply_to(s), spawn(o, cx3, to, True{}), s)
 
-def dropped_wt(+a: M.Agent) -> Bool:
-  M.ws_worktree(M.Agent.ws(a)) && M.ws_dropped(M.Agent.ws(a))
+def dropped_wt(+a: S.Agent) -> Bool:
+  M.ws_worktree(S.Agent.ws(a)) && M.ws_dropped(S.Agent.ws(a))
 
-def unavailable(-o: M.St, +cx: X.Cx<o>, +s: Snd, +a: M.Agent) -> String:
+def unavailable(-o: M.St, +cx: X.Cx<o>, +s: Snd, +a: S.Agent) -> String:
   cat(["recipient_unavailable: @", Snd.to(s), " is ", ST.status_str(a, rt(o, cx, Snd.to(s))),
     Bool.pick(String, dropped_wt(a), " (its worktree was deleted: /restore)", "")])
 
@@ -728,23 +727,23 @@ def Snd.from(x: Snd) -> String:
     case Snd{+from, _, _, _, _, _, _, _, _, _}:
       from
 
-def send.life(-o: M.St, life: M.Life, +cx: X.Cx<o>, +s: Snd, +a: M.Agent) -> X.Cx<o> & SendR:
+def send.life(-o: M.St, life: S.Life, +cx: X.Cx<o>, +s: Snd, +a: S.Agent) -> X.Cx<o> & SendR:
   match life:
-    case M.LActive{}:
+    case S.LActive{}:
       send.thread(o, Snd.reply_to(s), cx, s)
-    case M.LFailed{}:
-      send.revive(o, String.eq(Snd.from(s), M.USER()) || M.maybe_str_is(M.Agent.parent(a), Snd.from(s)), cx, s, unavailable(o, cx, s, a))
-    case M.LStopped{}:
+    case S.LFailed{}:
+      send.revive(o, String.eq(Snd.from(s), M.USER()) || M.maybe_str_is(S.Agent.parent(a), Snd.from(s)), cx, s, unavailable(o, cx, s, a))
+    case S.LStopped{}:
       send.revive(o, String.eq(Snd.from(s), M.USER()) && Bool.not(dropped_wt(a)), cx, s, unavailable(o, cx, s, a))
-    case M.LArchived{}:
+    case S.LArchived{}:
       send.revive(o, String.eq(Snd.from(s), M.USER()) && Bool.not(dropped_wt(a)), cx, s, unavailable(o, cx, s, a))
 
-def send.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
+def send.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   match m:
     case None{}:
       serr(o, cx, String.append("recipient_unknown: no agent named ", Snd.to(s)))
     case Some{+a}:
-      send.life(o, M.Agent.life(a), cx, s, a)
+      send.life(o, S.Agent.life(a), cx, s, a)
 
 def send.checked(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   match pre:
@@ -1005,12 +1004,12 @@ def live(-o: M.St, +cx: X.Cx<o>) -> List<&2, TM.Timer>:
 def bise_queued(+s: M.St, +n: String) -> Bool:
   R.from_bise(M.queued_for(s, n))
 
-def ready.go(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>) -> Bool:
+def ready.go(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>) -> Bool:
   match m:
     case None{}:
       False{}
     case Some{+a}:
-      is_active(M.Agent.life(a)) && R.reachable(X.Rt.run(rt(o, cx, M.Agent.name(a))))
+      is_active(S.Agent.life(a)) && R.reachable(X.Rt.run(rt(o, cx, S.Agent.name(a))))
 
 # active, idle or busy: a wake reaches it now (a turn, or steered into its
 # turn: law timer_reaches_busy); starting or down: it waits
@@ -1096,12 +1095,12 @@ def timer_set.active(-o: M.St, ok: Bool, +cx: X.Cx<o>, +agent: String, +sc: Mayb
     case True{}:
       timer_set.new(o, sc, cx, agent, i)
 
-def timer_set.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +sc: Maybe<&2, TM.Sched>, +i: GI.In) -> X.Cx<o>:
+def timer_set.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +sc: Maybe<&2, TM.Sched>, +i: GI.In) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
-      timer_set.active(o, is_active(M.Agent.life(a)), cx, M.Agent.name(a), sc, i)
+      timer_set.active(o, is_active(S.Agent.life(a)), cx, S.Agent.name(a), sc, i)
 
 # `i`: the input, its IEverySet record
 def timer_set(-o: M.St, +cx: X.Cx<o>, +agent: String, +every_ms: Maybe<&2, Nat>, +daily_min: Maybe<&2, Nat>, +i: GI.In) -> X.Cx<o>:
@@ -1158,7 +1157,7 @@ def timers_gone.if(-o: M.St, archived: Bool, +cx: X.Cx<o>, +n: String, +ns: List
 
 # an archived (dropped) agent's timers end with it, in the same step (law
 # stop_leaves_no_timer); a stopped one's wait for it, as before
-def timers_gone(-o: M.St, +life: M.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+def timers_gone(-o: M.St, +life: S.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   timers_gone.if(o, R.life_gone(life), cx, n, M.names_of(st(o, cx), n))
 
 # ---- the timers at a tick ----
@@ -1361,7 +1360,7 @@ def replies_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
 # an archived (dropped) agent's watches end with it, in the same step
 # (law wake_drop_ends); a stopped one's wait, as its timers do. The reply
 # watches waiting on it end at the next tick (replies_tick)
-def wakes_gone(-o: M.St, +life: M.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+def wakes_gone(-o: M.St, +life: S.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, R.life_gone(life),
     u => wakes_gone.each(o, WK.ids_of(WK.Wakes.live(wks(o, cx)), M.names_of(st(o, cx), n)), cx),
     u => cx)
@@ -1376,23 +1375,23 @@ def reject_ids(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
 def set_waiters(-o: M.St, +cx: X.Cx<o>, +ws: List<&2, X.Waiter>) -> X.Cx<o>:
   set_r(o, cx, X.R.with_waiters(rr(o, cx), ws))
 
-def stop_task.go(-o: M.St, +cx: X.Cx<o>, +name: String, +life: M.Life, +reason: String) -> X.Cx<o>:
+def stop_task.go(-o: M.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: String) -> X.Cx<o>:
   +cx1 = out(o, cx, F.kill(name))
   +cx2 = fail_waiters(o, cx1, name, "stopped")
   +r = rr(o, cx2)
   +cx3 = set_r(o, cx2, X.R.with_steered(r, KL.steer_del(X.R.steered(r), name)))
-  +cx4 = upd_rt(o, cx3, X.Rt.with_turn(X.Rt.with_run(rt(o, cx3, name), M.RDown{}), None{}))
+  +cx4 = upd_rt(o, cx3, X.Rt.with_turn(X.Rt.with_run(rt(o, cx3, name), S.RDown{}), None{}))
   +cx5 = emit(o, cx4, M.ELifecycle{name, life, Bool.pick(Maybe<&2, String>, String.is_empty(reason), None{}, Some{reason})}, Unit{}, Unit{}, Unit{})
   +cx6 = reject_ids(o, ids_of(M.queued_for(st(o, cx5), name)), cx5)
   close_cards(o, cx6, name, Nil{}, "agent stopped")
 
 # no wait of the stopped task survives (law stop_leaves_no_waiter)
-def stop_task(-o: M.St, +cx: X.Cx<o>, +name: String, +life: M.Life, +reason: String) -> X.Cx<o>:
+def stop_task(-o: M.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: String) -> X.Cx<o>:
   set_waiters(o, wakes_gone(o, life, timers_gone(o, life, stop_task.go(o, cx, name, life, reason), name), name), X.waiters_not(X.R.waiters(rr(o, cx)), name))
 
 # stop_task, after saying which of the user's queued messages will never
 # arrive (BISE-86)
-def stop_noted(-o: M.St, +cx: X.Cx<o>, +name: String, +life: M.Life, +reason: String) -> X.Cx<o>:
+def stop_noted(-o: M.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: String) -> X.Cx<o>:
   stop_task(o, undelivered_msgs(o, M.queued_for(st(o, cx), name), cx), name, life, reason)
 
 # ---- places (dev-flow §3.1): a worktree shared by agents (place.bend) ----
@@ -1408,87 +1407,87 @@ def drop.left(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>, +snap: Maybe<&2, Str
       +cx2 = emit(o, cx, M.EWorkspace{n, PL.drop.left.ws(M.get_agent(st(o, cx), n))}, Unit{}, Unit{}, Unit{})
       drop.left(o, t, emit(o, cx2, M.ESnapshot{n, snap}, Unit{}, Unit{}, Unit{}), snap)
 
-def drop.ws(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o>:
+def drop.ws(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o>:
   match r:
     case Fail{_}:
       cx
     case Done{+snap}:
       +left = PL.mates_of(st(o, cx), a, False{})
       +sn = PL.drop_snap(snap)
-      +cx2 = emit(o, cx, M.EWorkspace{M.Agent.name(a), J.set(M.Agent.ws(a), "dropped", J.JBool{True{}})}, Unit{}, Unit{}, Unit{})
-      drop.left(o, left, emit(o, cx2, M.ESnapshot{M.Agent.name(a), sn}, Unit{}, Unit{}, Unit{}), sn)
+      +cx2 = emit(o, cx, M.EWorkspace{S.Agent.name(a), J.set(S.Agent.ws(a), "dropped", J.JBool{True{}})}, Unit{}, Unit{}, Unit{})
+      drop.left(o, left, emit(o, cx2, M.ESnapshot{S.Agent.name(a), sn}, Unit{}, Unit{}, Unit{}), sn)
 
-def drop.finish(-o: M.St, +cx: X.Cx<o>, +a: M.Agent, +label: String) -> X.Cx<o> & DropR:
-  +cx2 = feed(o, cx, M.MAIN(), FD.info(cat(["@", M.Agent.name(a), " archived", label])))
+def drop.finish(-o: M.St, +cx: X.Cx<o>, +a: S.Agent, +label: String) -> X.Cx<o> & DropR:
+  +cx2 = feed(o, cx, M.MAIN(), FD.info(cat(["@", S.Agent.name(a), " archived", label])))
   # a client looking at it goes back to main
-  (out(o, cx2, F.focus_main(M.Agent.name(a))), DDone{})
+  (out(o, cx2, F.focus_main(S.Agent.name(a))), DDone{})
 
-def drop.git(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: M.Agent) -> X.Cx<o> & DropR:
+def drop.git(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent) -> X.Cx<o> & DropR:
   match p:
     case (+cx, None{}):
       (cx, DHalt{})
     case (+cx, Some{+ans}):
       drop.finish(o, drop.ws(o, PL.ans_ok(ans), cx, a), a, PL.drop_label(PL.ans_ok(ans)))
 
-def drop.now(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: M.Agent, +loss: J.Json) -> X.Cx<o> & DropR:
+def drop.now(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: S.Agent, +loss: J.Json) -> X.Cx<o> & DropR:
   match has_wt:
     case False{}:
       # a worktree others still work in stays (it goes with its last agent)
       +label = PL.drop.stays(PL.mates_of(st(o, cx), a, True{}))
-      drop.finish(o, stop_noted(o, cx, M.Agent.name(a), M.LArchived{}, "drop"), a, label)
+      drop.finish(o, stop_noted(o, cx, S.Agent.name(a), S.LArchived{}, "drop"), a, label)
     case True{}:
-      +cx2 = stop_noted(o, cx, M.Agent.name(a), M.LArchived{}, "drop")
-      drop.git(o, ask(o, cx2, J.obj([J.kv("q", J.JStr{"worktree_drop"}), J.kv("name", J.JStr{M.Agent.name(a)}), J.kv("ws", M.Agent.ws(a)),
+      +cx2 = stop_noted(o, cx, S.Agent.name(a), S.LArchived{}, "drop")
+      drop.git(o, ask(o, cx2, J.obj([J.kv("q", J.JStr{"worktree_drop"}), J.kv("name", J.JStr{S.Agent.name(a)}), J.kv("ws", S.Agent.ws(a)),
         J.kv("dirty", J.JNum{J.get_num_or(loss, "dirty", 0n)}), J.kv("unpushed", J.JNum{J.get_num_or(loss, "unpushed", 0n)})])), a)
 
-def drop.decide(-o: M.St, confirm: Bool, +cx: X.Cx<o>, +a: M.Agent, +has_wt: Bool, +loss: J.Json, +busy: Bool) -> X.Cx<o> & DropR:
+def drop.decide(-o: M.St, confirm: Bool, +cx: X.Cx<o>, +a: S.Agent, +has_wt: Bool, +loss: J.Json, +busy: Bool) -> X.Cx<o> & DropR:
   match confirm:
     case True{}:
       +dirty = J.get_num_or(loss, "dirty", 0n)
       +unpushed = J.get_num_or(loss, "unpushed", 0n)
       +parts = List.append(&2, String, Bool.pick(List<&2, String>, busy, ["the agent is mid-turn"], Nil{}),
         Bool.pick(List<&2, String>, Nat.is_gt(Nat.add(dirty, unpushed), 0n), [PL.loss_text(dirty, unpushed)], Nil{}))
-      (cx, DAsk{cat(["archive @", M.Agent.name(a), "? ", String.join(parts, " ; "), ". [y/N]"])})
+      (cx, DAsk{cat(["archive @", S.Agent.name(a), "? ", String.join(parts, " ; "), ". [y/N]"])})
     case False{}:
       drop.now(o, has_wt, cx, a, loss)
 
-def drop.loss(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: M.Agent, +force: Bool, +has_wt: Bool) -> X.Cx<o> & DropR:
+def drop.loss(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent, +force: Bool, +has_wt: Bool) -> X.Cx<o> & DropR:
   match p:
     case (+cx, None{}):
       (cx, DHalt{})
     case (+cx, Some{+loss}):
-      +busy = is_busy(X.Rt.run(rt(o, cx, M.Agent.name(a))))
+      +busy = is_busy(X.Rt.run(rt(o, cx, S.Agent.name(a))))
       +any = Nat.is_gt(Nat.add(J.get_num_or(loss, "dirty", 0n), J.get_num_or(loss, "unpushed", 0n)), 0n)
       drop.decide(o, Bool.not(force) && (busy || any), cx, a, has_wt, loss, busy)
 
-def drop.wt(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: M.Agent, +force: Bool) -> X.Cx<o> & DropR:
+def drop.wt(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: S.Agent, +force: Bool) -> X.Cx<o> & DropR:
   match has_wt:
     case True{}:
-      drop.loss(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_loss"}), J.kv("name", J.JStr{M.Agent.name(a)}), J.kv("ws", M.Agent.ws(a))])), a, force, True{})
+      drop.loss(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_loss"}), J.kv("name", J.JStr{S.Agent.name(a)}), J.kv("ws", S.Agent.ws(a))])), a, force, True{})
     case False{}:
       drop.loss(o, (cx, Some{J.obj([J.kv("dirty", J.JNum{0n}), J.kv("unpushed", J.JNum{0n})])}), a, force, False{})
 
-def drop.checks(-o: M.St, is_main: Bool, life: M.Life, +cx: X.Cx<o>, +a: M.Agent, +force: Bool) -> X.Cx<o> & DropR:
+def drop.checks(-o: M.St, is_main: Bool, life: S.Life, +cx: X.Cx<o>, +a: S.Agent, +force: Bool) -> X.Cx<o> & DropR:
   match is_main:
     case True{}:
       (cx, DErr{"main cannot be dropped"})
     case False{}:
       match life:
-        case M.LArchived{}:
-          (cx, DErr{cat(["@", M.Agent.name(a), " is already archived"])})
+        case S.LArchived{}:
+          (cx, DErr{cat(["@", S.Agent.name(a), " is already archived"])})
         case _:
           # the folder goes with the place's last agent only
           +last = List.is_empty(&2, String, PL.mates_of(st(o, cx), a, True{}))
-          drop.wt(o, M.ws_worktree(M.Agent.ws(a)) && Bool.not(M.ws_dropped(M.Agent.ws(a)) || M.ws_placing(M.Agent.ws(a))) && last, cx, a, force)
+          drop.wt(o, M.ws_worktree(S.Agent.ws(a)) && Bool.not(M.ws_dropped(S.Agent.ws(a)) || M.ws_placing(S.Agent.ws(a))) && last, cx, a, force)
 
-def drop.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +force: Bool) -> X.Cx<o> & DropR:
+def drop.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +force: Bool) -> X.Cx<o> & DropR:
   match m:
     case None{}:
       (cx, DErr{String.append("no agent named ", name)})
     case Some{+a}:
-      drop.checks(o, M.Agent.is_main(a), M.Agent.life(a), cx, a, force)
+      drop.checks(o, S.Agent.is_main(a), S.Agent.life(a), cx, a, force)
 
-def agent_of(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, M.Agent>:
+def agent_of(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, S.Agent>:
   match m:
     case None{}:
       None{}
@@ -1499,62 +1498,62 @@ def agent_of(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, M.Agent>:
 def drop_task(-o: M.St, +cx: X.Cx<o>, +name: String, +force: Bool) -> X.Cx<o> & DropR:
   drop.agent(o, agent_of(st(o, cx), M.resolve(st(o, cx), name)), cx, name, force)
 
-def restore.go(-o: M.St, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
-  +n = M.Agent.name(a)
-  +cx2 = emit(o, cx, M.ELifecycle{n, M.LActive{}, None{}}, Unit{}, Unit{}, Unit{})
+def restore.go(-o: M.St, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
+  +n = S.Agent.name(a)
+  +cx2 = emit(o, cx, M.ELifecycle{n, S.LActive{}, None{}}, Unit{}, Unit{}, Unit{})
   +r = rr(o, cx2)
   +cx3 = set_r(o, cx2, X.R.with_crashes(r, KL.kn_del(X.R.crashes(r), n)))
   +cx4 = spawn(o, cx3, n, True{})
   # an idle task back from failed gets the mail it kept (law L4)
   (feed(o, pump(o, cx4, n), M.MAIN(), FD.info(cat(["@", n, " restored"]))), TOk{n})
 
-def restore.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
+def restore.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match r:
     case Fail{+e}:
       (cx, TErr{e})
     case Done{+ws}:
-      +cx2 = emit(o, cx, M.EWorkspace{M.Agent.name(a), ws}, Unit{}, Unit{}, Unit{})
-      restore.go(o, emit(o, cx2, M.ESnapshot{M.Agent.name(a), None{}}, Unit{}, Unit{}, Unit{}), a)
+      +cx2 = emit(o, cx, M.EWorkspace{S.Agent.name(a), ws}, Unit{}, Unit{}, Unit{})
+      restore.go(o, emit(o, cx2, M.ESnapshot{S.Agent.name(a), None{}}, Unit{}, Unit{}, Unit{}), a)
 
-def restore.ans(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: M.Agent) -> X.Cx<o> & TaskR:
+def restore.ans(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match p:
     case (+cx, None{}):
       (cx, THalt{})
     case (+cx, Some{+ans}):
       restore.res(o, PL.ans_ok(ans), cx, a)
 
-def restore.wt(-o: M.St, dropped: Bool, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
+def restore.wt(-o: M.St, dropped: Bool, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match dropped:
     case True{}:
-      restore.ans(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_restore"}), J.kv("name", J.JStr{M.Agent.name(a)}), J.kv("ws", M.Agent.ws(a)),
-        J.kv("snapshot_ref", C.jmaybe_str(M.Agent.snap(a)))])), a)
+      restore.ans(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_restore"}), J.kv("name", J.JStr{S.Agent.name(a)}), J.kv("ws", S.Agent.ws(a)),
+        J.kv("snapshot_ref", C.jmaybe_str(S.Agent.snap(a)))])), a)
     case False{}:
       restore.go(o, cx, a)
 
 # its place is live again (a mate restored it): it rejoins the folder
-def restore.join(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
+def restore.join(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match m:
     case None{}:
       restore.wt(o, True{}, cx, a)
     case Some{+b}:
-      +n = M.Agent.name(a)
-      +cx2 = emit(o, cx, M.EWorkspace{n, M.Agent.ws(b)}, Unit{}, Unit{}, Unit{})
+      +n = S.Agent.name(a)
+      +cx2 = emit(o, cx, M.EWorkspace{n, S.Agent.ws(b)}, Unit{}, Unit{}, Unit{})
       restore.go(o, emit(o, cx2, M.ESnapshot{n, None{}}, Unit{}, Unit{}, Unit{}), a)
 
-def restore.dropped(-o: M.St, dropped: Bool, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
+def restore.dropped(-o: M.St, dropped: Bool, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match dropped:
     case True{}:
       restore.join(o, PL.first_agent(st(o, cx), PL.mates_of(st(o, cx), a, True{})), cx, a)
     case False{}:
       restore.go(o, cx, a)
 
-def restore.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
+def restore.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
   match m:
     case None{}:
       (cx, TErr{String.append("no agent named ", name)})
     case Some{+a}:
-      LZ.pick(X.Cx<o> & TaskR, is_active(M.Agent.life(a)), u => (cx, TErr{cat(["@", M.Agent.name(a), " is active"])}),
-        u => restore.dropped(o, M.ws_worktree(M.Agent.ws(a)) && M.ws_dropped(M.Agent.ws(a)), cx, a))
+      LZ.pick(X.Cx<o> & TaskR, is_active(S.Agent.life(a)), u => (cx, TErr{cat(["@", S.Agent.name(a), " is active"])}),
+        u => restore.dropped(o, M.ws_worktree(S.Agent.ws(a)) && M.ws_dropped(S.Agent.ws(a)), cx, a))
 
 def restore_task(-o: M.St, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
   restore.agent(o, agent_of(st(o, cx), M.resolve(st(o, cx), name)), cx, name)
@@ -1576,7 +1575,7 @@ def isolate.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +n: S
       +cx2 = emit(o, cx, M.EWorkspace{n, ws}, Unit{}, Unit{}, Unit{})
       # the REPL takes its new BEND_WORKDIR at the next spawn
       +cx3 = out(o, cx2, F.kill(n))
-      +cx4 = spawn(o, upd_rt(o, cx3, X.Rt.with_run(rt(o, cx3, n), M.RDown{})), n, True{})
+      +cx4 = spawn(o, upd_rt(o, cx3, X.Rt.with_run(rt(o, cx3, n), S.RDown{})), n, True{})
       +text = cat(["[bise] Your working directory is now the isolated git worktree `", path, "` (branch `", branch, "`). Work only there from now on."])
       isolate.sent(o, send(o, cx4, msg(M.USER(), n, text, False{}, None{}, True{}, False{})), n, branch)
 
@@ -1594,15 +1593,15 @@ def isolate.pre(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +n: String) -> X
     case None{}:
       isolate.ans(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_create"}), J.kv("name", J.JStr{n}), J.kv("with_changes", J.JBool{False{}})])), n)
 
-def isolate.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
+def isolate.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
   match m:
     case None{}:
       (cx, TErr{String.append("no agent named ", name)})
     case Some{+a}:
-      +n = M.Agent.name(a)
-      +pre = Bool.pick(Maybe<&2, String>, M.Agent.is_main(a) || M.ws_worktree(M.Agent.ws(a)), Some{cat(["@", n, " already has its own folder"])},
-        Bool.pick(Maybe<&2, String>, Bool.not(List.is_empty(&2, String, M.Agent.files(a))),
-          Some{cat(["@", n, " already changed files of the workspace (", String.join(List.take(&2, String, M.Agent.files(a), 3n), ", "), "): its work cannot be separated from yours"])},
+      +n = S.Agent.name(a)
+      +pre = Bool.pick(Maybe<&2, String>, S.Agent.is_main(a) || M.ws_worktree(S.Agent.ws(a)), Some{cat(["@", n, " already has its own folder"])},
+        Bool.pick(Maybe<&2, String>, Bool.not(List.is_empty(&2, String, S.Agent.files(a))),
+          Some{cat(["@", n, " already changed files of the workspace (", String.join(List.take(&2, String, S.Agent.files(a), 3n), ", "), "): its work cannot be separated from yours"])},
           Bool.pick(Maybe<&2, String>, is_busy(X.Rt.run(rt(o, cx, n))), Some{cat(["@", n, " is mid-turn: wait for the end of its turn"])},
             Bool.pick(Maybe<&2, String>, X.R.git(rr(o, cx)), None{}, Some{"the workspace is not a git repository"}))))
       isolate.pre(o, pre, cx, n)
@@ -1626,23 +1625,23 @@ def move.res(-o: M.St, +cx: X.Cx<o>, +n: String, +ws: J.Json) -> X.Cx<o> & TaskR
   +cx2 = emit(o, cx, M.EWorkspace{n, ws}, Unit{}, Unit{}, Unit{})
   # the REPL takes its new BEND_WORKDIR at the next spawn
   +cx3 = out(o, cx2, F.kill(n))
-  +cx4 = spawn(o, upd_rt(o, cx3, X.Rt.with_run(rt(o, cx3, n), M.RDown{})), n, True{})
+  +cx4 = spawn(o, upd_rt(o, cx3, X.Rt.with_run(rt(o, cx3, n), S.RDown{})), n, True{})
   +text = Bool.pick(String, wt,
     cat(["[bise] Your working directory is now the git worktree `", path, "` (branch `", branch, "`), shared with other agents: change and commit only your own files there (`sb land --here`). Work only there from now on."]),
     cat(["[bise] Your working directory is now the shared folder `", path, "`. Work only there from now on; do not revert changes you did not make."]))
   +dest = Bool.pick(String, wt, cat(["the worktree ", branch]), "the shared folder")
   move.sent(o, send(o, cx4, msg(M.USER(), n, text, False{}, None{}, True{}, False{})), n, dest)
 
-def move.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +ws: J.Json) -> X.Cx<o> & TaskR:
+def move.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +ws: J.Json) -> X.Cx<o> & TaskR:
   match m:
     case None{}:
       (cx, TErr{String.append("no agent named ", name)})
     case Some{+a}:
-      +n = M.Agent.name(a)
-      +pre = Bool.pick(Maybe<&2, String>, M.Agent.is_main(a), Some{"main works in the shared folder"},
-        Bool.pick(Maybe<&2, String>, String.eq(PL.Agent.place(a), PL.ws_place(ws, M.Agent.dir(a))), Some{cat(["@", n, " is already there"])},
-          Bool.pick(Maybe<&2, String>, Bool.not(List.is_empty(&2, String, M.Agent.files(a))),
-            Some{cat(["@", n, " already changed files (", String.join(List.take(&2, String, M.Agent.files(a), 3n), ", "), "): only an agent that changed nothing yet moves"])},
+      +n = S.Agent.name(a)
+      +pre = Bool.pick(Maybe<&2, String>, S.Agent.is_main(a), Some{"main works in the shared folder"},
+        Bool.pick(Maybe<&2, String>, String.eq(PL.Agent.place(a), PL.ws_place(ws, S.Agent.dir(a))), Some{cat(["@", n, " is already there"])},
+          Bool.pick(Maybe<&2, String>, Bool.not(List.is_empty(&2, String, S.Agent.files(a))),
+            Some{cat(["@", n, " already changed files (", String.join(List.take(&2, String, S.Agent.files(a), 3n), ", "), "): only an agent that changed nothing yet moves"])},
             Bool.pick(Maybe<&2, String>, is_busy(X.Rt.run(rt(o, cx, n))), Some{cat(["@", n, " is mid-turn: wait for the end of its turn"])}, None{}))))
       LZ.pick(X.Cx<o> & TaskR, Maybe.is_some(&2, String, pre), u => (cx, TErr{Maybe.default(&2, String, pre, "")}), u => move.res(o, cx, n, ws))
 
@@ -1667,18 +1666,18 @@ def move_task(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +j:
 # an active agent gets the note from the hub, queued (a busy one reads it
 # after its turn, never a steer); a stopped or failed one only its new
 # workspace: never a revive (law feature_retire_stops_nothing)
-def feature_retire.tell(-o: M.St, life: M.Life, +cx: X.Cx<o>, +n: String, +text: String) -> X.Cx<o>:
+def feature_retire.tell(-o: M.St, life: S.Life, +cx: X.Cx<o>, +n: String, +text: String) -> X.Cx<o>:
   match life:
-    case M.LActive{}:
+    case S.LActive{}:
       fst(o, send.thread(o, None{}, cx, Snd{M.HUB(), n, text, False{}, None{}, True{}, False{}, True{}, None{}, ""}))
     case _:
       cx
 
-def feature_retire.one(-o: M.St, +cx: X.Cx<o>, +a: M.Agent, +text: String) -> X.Cx<o>:
-  +n = M.Agent.name(a)
-  feature_retire.tell(o, M.Agent.life(a), emit(o, cx, M.EWorkspace{n, FT.unfeature(M.Agent.ws(a))}, Unit{}, Unit{}, Unit{}), n, text)
+def feature_retire.one(-o: M.St, +cx: X.Cx<o>, +a: S.Agent, +text: String) -> X.Cx<o>:
+  +n = S.Agent.name(a)
+  feature_retire.tell(o, S.Agent.life(a), emit(o, cx, M.EWorkspace{n, FT.unfeature(S.Agent.ws(a))}, Unit{}, Unit{}, Unit{}), n, text)
 
-def feature_retire.all(-o: M.St, xs: List<&2, M.Agent>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
+def feature_retire.all(-o: M.St, xs: List<&2, S.Agent>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   match xs:
     case Nil{}:
       cx
@@ -2142,23 +2141,23 @@ def unqueue(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
 # kept, steered into the running turn or a turn of its own (laws
 # steer_queued_*); the agent can't take it (down, starting, gone, the
 # project paused): a notice, and it stays queued
-def steer_queued.run(-o: M.St, run: M.Run, +cx: X.Cx<o>, +m: S.Msg, +name: String, +is_main: Bool) -> X.Cx<o>:
+def steer_queued.run(-o: M.St, run: S.Run, +cx: X.Cx<o>, +m: S.Msg, +name: String, +is_main: Bool) -> X.Cx<o>:
   match run:
-    case M.RBusy{}:
+    case S.RBusy{}:
       pump.batch(o, [m], cx, name, True{}, is_main)
-    case M.RIdle{}:
+    case S.RIdle{}:
       pump.batch(o, [m], cx, name, False{}, is_main)
     case _:
       notice(o, cx, cat([mid(S.Msg.id(m)), " stays queued: @", name, " isn't running"]))
 
-def steer_queued.agent(-o: M.St, a: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
+def steer_queued.agent(-o: M.St, a: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
   match a:
     case None{}:
       notice(o, cx, cat([mid(S.Msg.id(m)), " stays queued: @", S.Msg.to(m), " is gone"]))
     case Some{+g}:
-      LZ.pick(X.Cx<o>, is_active(M.Agent.life(g)) && Bool.not(P.is_paused(st(o, cx))),
-        u => steer_queued.run(o, X.Rt.run(rt(o, cx, M.Agent.name(g))), cx, m, M.Agent.name(g), M.Agent.is_main(g)),
-        u => notice(o, cx, cat([mid(S.Msg.id(m)), " stays queued: @", M.Agent.name(g), " can't take it now"])))
+      LZ.pick(X.Cx<o>, is_active(S.Agent.life(g)) && Bool.not(P.is_paused(st(o, cx))),
+        u => steer_queued.run(o, X.Rt.run(rt(o, cx, S.Agent.name(g))), cx, m, S.Agent.name(g), S.Agent.is_main(g)),
+        u => notice(o, cx, cat([mid(S.Msg.id(m)), " stays queued: @", S.Agent.name(g), " can't take it now"])))
 
 def steer_queued.take(-o: M.St, s: S.MSt, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
   match s:
@@ -2182,7 +2181,7 @@ def steer_queued(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
 
 def passthrough(-o: M.St, +cx: X.Cx<o>, +focus: String, +l: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, has_agent(o, cx, focus) && is_idle(X.Rt.run(rt(o, cx, focus))),
-    u => out(o, dirty(o, set_run(o, cx, focus, M.RBusy{})), F.passthrough(focus, l)),
+    u => out(o, dirty(o, set_run(o, cx, focus, S.RBusy{})), F.passthrough(focus, l)),
     u => notice(o, cx, "the agent is not idle: retry at the end of its turn"))
 
 # the daemon computed what main learns about a direct exchange (RFC
@@ -2674,8 +2673,8 @@ def req_ask.res(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +from: String, +timeo
 
 # ---- the REPLs ----
 
-def decl_of(+s: String) -> M.Decl:
-  Bool.pick(M.Decl, String.eq(s, "done"), M.DDone{}, Bool.pick(M.Decl, String.eq(s, "blocked"), M.DBlocked{}, M.DWorking{}))
+def decl_of(+s: String) -> S.Decl:
+  Bool.pick(S.Decl, String.eq(s, "done"), S.DDone{}, Bool.pick(S.Decl, String.eq(s, "blocked"), S.DBlocked{}, S.DWorking{}))
 
 def req_status(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +is_main: Bool, +q: J.Json) -> X.Cx<o>:
   +status = C.get_s(q, "status")
@@ -2698,8 +2697,8 @@ def req_status(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +is_main: Boo
 # only moves the `jobs` rows.
 
 # the job's name: the task's objective, one line
-def job_label(+a: M.Agent) -> String:
-  T.clip(T.one_line(J.get_str_or(M.Agent.brief(a), "objective", "")), 120n)
+def job_label(+a: S.Agent) -> String:
+  T.clip(T.one_line(J.get_str_or(S.Agent.brief(a), "objective", "")), 120n)
 
 # J: the end of a job followed for another hub (bise's home hub): to its
 # outbox, journaled, delivered until that hub has it (a restart of either
@@ -2727,32 +2726,32 @@ def job_end.go(-o: M.St, f: Bool, +cx: X.Cx<o>, +name: String, +state: String, +
     case False{}:
       cx
 
-def job_end.of(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +state: String, +summary: String) -> X.Cx<o>:
+def job_end.of(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +state: String, +summary: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
-      job_end.go(o, M.Agent.follow(a), cx, name, state, summary, job_label(a), M.Agent.follow_hub(a))
+      job_end.go(o, M.follows(a), cx, name, state, summary, job_label(a), M.follow_hub(a))
 
 # a task's end (done, failed): its job_end when followed, once (laws
 # follow_done_once, follow_failed_at_once)
 def job_end(-o: M.St, +cx: X.Cx<o>, +name: String, +state: String, +summary: String) -> X.Cx<o>:
   job_end.of(o, M.get_agent(st(o, cx), name), cx, name, state, summary)
 
-def is_archived_life(l: M.Life) -> Bool:
+def is_archived_life(l: S.Life) -> Bool:
   match l:
-    case M.LArchived{}:
+    case S.LArchived{}:
       True{}
     case _:
       False{}
 
-def follow_err.of(m: Maybe<&2, M.Agent>, +name: String) -> Maybe<&2, String>:
+def follow_err.of(m: Maybe<&2, S.Agent>, +name: String) -> Maybe<&2, String>:
   match m:
     case None{}:
       Some{cat(["no agent named @", name])}
     case Some{+a}:
-      Bool.pick(Maybe<&2, String>, M.Agent.is_main(a), Some{"main isn't a job: follow one of its tasks"},
-        Bool.pick(Maybe<&2, String>, is_archived_life(M.Agent.life(a)), Some{cat(["@", name, " is archived"])}, None{}))
+      Bool.pick(Maybe<&2, String>, S.Agent.is_main(a), Some{"main isn't a job: follow one of its tasks"},
+        Bool.pick(Maybe<&2, String>, is_archived_life(S.Agent.life(a)), Some{cat(["@", name, " is archived"])}, None{}))
 
 # who can be followed: a task of this hub, not main, not archived
 def follow_err(+s: M.St, +name: String) -> Maybe<&2, String>:
@@ -2789,10 +2788,10 @@ def req_follow(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -
 # the report's done and failed: their state change, then the job's end
 # (ask-wait: it moved on, its reply watches end)
 def report_done(-o: M.St, +cx: X.Cx<o>, +from: String) -> X.Cx<o>:
-  replies_end(o, emit(o, cx, M.EDeclared{from, Some{M.DDone{}}, ""}, Unit{}, Unit{}, Unit{}), from)
+  replies_end(o, emit(o, cx, M.EDeclared{from, Some{S.DDone{}}, ""}, Unit{}, Unit{}, Unit{}), from)
 
 def report_failed(-o: M.St, +cx: X.Cx<o>, +from: String, +summary: String) -> X.Cx<o>:
-  replies_end(o, emit(o, cx, M.ELifecycle{from, M.LFailed{}, Some{summary}}, Unit{}, Unit{}, Unit{}), from)
+  replies_end(o, emit(o, cx, M.ELifecycle{from, S.LFailed{}, Some{summary}}, Unit{}, Unit{}, Unit{}), from)
 
 def report_lines(xs: List<&2, String>) -> List<&2, String>:
   match xs:
@@ -2817,7 +2816,7 @@ def req_report.kind(-o: M.St, +cx: X.Cx<o>, +from: String, +kind: String, +summa
   LZ.pick(X.Cx<o>, String.eq(kind, "done"),
     u => job_end(o, report_done(o, cx, from), from, "done", summary),
     u => LZ.pick(X.Cx<o>, String.eq(kind, "blocked"),
-      u => emit(o, cx, M.EDeclared{from, Some{M.DBlocked{}}, summary}, Unit{}, Unit{}, Unit{}),
+      u => emit(o, cx, M.EDeclared{from, Some{S.DBlocked{}}, summary}, Unit{}, Unit{}, Unit{}),
       u => LZ.pick(X.Cx<o>, String.eq(kind, "failed"),
         u => job_end(o, report_failed(o, cx, from, summary), from, "failed", summary),
         u => cx)))
@@ -2844,12 +2843,12 @@ def req_report.go(-o: M.St, is_main: Bool, +cx: X.Cx<o>, +token: Nat, +from: Str
       +reply_to = open_question(st(o, cx3), to, from)
       req_report.sent(o, send(o, cx3, msg(from, to, report_text(kind, summary, decisions), False{}, reply_to, False{}, False{})), token)
 
-def req_spawn.ws(m: Maybe<&2, M.Agent>) -> J.Json:
+def req_spawn.ws(m: Maybe<&2, S.Agent>) -> J.Json:
   match m:
     case None{}:
       J.JNull{}
     case Some{+a}:
-      M.Agent.ws(a)
+      S.Agent.ws(a)
 
 def req_spawn.res(-o: M.St, p: X.Cx<o> & TaskR, +token: Nat) -> X.Cx<o>:
   match p:
@@ -2887,7 +2886,7 @@ def req_stop(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +agent: 
       reply_err(o, cx, token, String.append("no agent named ", agent))
     case Some{+n}:
       LZ.pick(X.Cx<o>, String.eq(n, M.MAIN()), u => reply_err(o, cx, token, String.append("no agent named ", agent)),
-        u => reply(o, feed(o, stop_noted(o, cx, n, M.LStopped{}, reason), M.MAIN(), FD.info(cat(["main → @", n, " stopped: ", reason]))), token, ok_body(Nil{})))
+        u => reply(o, feed(o, stop_noted(o, cx, n, S.LStopped{}, reason), M.MAIN(), FD.info(cat(["main → @", n, " stopped: ", reason]))), token, ok_body(Nil{})))
 
 def req_drop.res(-o: M.St, p: X.Cx<o> & DropR, +token: Nat, +agent: String) -> X.Cx<o>:
   match p:
@@ -3113,12 +3112,12 @@ def start(+h: Hub, +i: J.Json) -> X.Cx<Hub.d(h)>:
     Maybe.default(&2, List<&2, J.Json>, J.get_arr(i, "ans"), Nil{})), None{}), None{})
   X.Cx{X.core_start(Hub.d(h)), r2}
 
-def agent_decl(m: Maybe<&2, M.Agent>) -> Maybe<&2, M.Decl>:
+def agent_decl(m: Maybe<&2, S.Agent>) -> Maybe<&2, S.Decl>:
   match m:
     case None{}:
       None{}
     case Some{+a}:
-      M.Agent.declared(a)
+      S.Agent.declared(a)
 
 def turn.resume(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   match go:
@@ -3127,18 +3126,18 @@ def turn.resume(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
     case False{}:
       cx
 
-def decl_resumes(d: Maybe<&2, M.Decl>) -> Bool:
+def decl_resumes(d: Maybe<&2, S.Decl>) -> Bool:
   match d:
-    case Some{M.DDone{}}:
+    case Some{S.DDone{}}:
       True{}
-    case Some{M.DBlocked{}}:
+    case Some{S.DBlocked{}}:
       True{}
     case _:
       False{}
 
 def turn_started(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   +decl = agent_decl(M.get_agent(st(o, cx), agent))
-  +cx2 = dirty(o, upd_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), M.RBusy{}), Some{now(o, cx)})))
+  +cx2 = dirty(o, upd_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), S.RBusy{}), Some{now(o, cx)})))
   turn.resume(o, decl_resumes(decl), cx2, agent)
 
 def steer_count(-o: M.St, +cx: X.Cx<o>, +agent: String, +injected: Bool) -> X.Cx<o>:
@@ -3218,14 +3217,14 @@ def touch.others(-o: M.St, others: List<&2, String>, +cx: X.Cx<o>, +agent: Strin
 
 # an overlap is within one place (dev-flow §3.1): the shared folder, or
 # one worktree its agents share
-def overlap_hit(m: Maybe<&2, M.Agent>, +agent: String, +path: String, +place: String) -> Bool:
+def overlap_hit(m: Maybe<&2, S.Agent>, +agent: String, +path: String, +place: String) -> Bool:
   match m:
     case None{}:
       False{}
     case Some{+a}:
-      Bool.not(M.Agent.is_main(a)) && Bool.not(String.eq(M.Agent.name(a), agent))
-        && String.eq(PL.Agent.place(a), place) && is_active(M.Agent.life(a))
-        && M.str_in(M.Agent.files(a), path)
+      Bool.not(S.Agent.is_main(a)) && Bool.not(String.eq(S.Agent.name(a), agent))
+        && String.eq(PL.Agent.place(a), place) && is_active(S.Agent.life(a))
+        && M.str_in(S.Agent.files(a), path)
 
 def overlap_others(xs: List<&2, String>, +s: M.St, +agent: String, +path: String, +place: String) -> List<&2, String>:
   match xs:
@@ -3250,24 +3249,24 @@ def touch.task(-o: M.St, task: Bool, +cx: X.Cx<o>, +agent: String, +path: String
     case False{}:
       cx
 
-def touch.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
+def touch.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
       # every task, in the shared folder or a worktree: `sb land` commits
       # an agent's own files, two agents may share a worktree
-      touch.task(o, Bool.not(M.Agent.is_main(a)), cx, agent, path, M.str_in(M.Agent.files(a), path), PL.Agent.place(a))
+      touch.task(o, Bool.not(S.Agent.is_main(a)), cx, agent, path, M.str_in(S.Agent.files(a), path), PL.Agent.place(a))
 
 def touch(-o: M.St, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
   touch.agent(o, M.get_agent(st(o, cx), agent), cx, agent, path)
 
 def repl_ready(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
-  +cx2 = upd_rt(o, cx, X.Rt.with_waiting(X.Rt.with_run(rt(o, cx, agent), M.RIdle{}), False{}))
+  +cx2 = upd_rt(o, cx, X.Rt.with_waiting(X.Rt.with_run(rt(o, cx, agent), S.RIdle{}), False{}))
   pump(o, dirty(o, cx2), agent)
 
 def crash.restart(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
-  +cx2 = set_run(o, cx, agent, M.RStarting{})
+  +cx2 = set_run(o, cx, agent, S.RStarting{})
   +cx3 = out(o, cx2, F.spawn(agent, True{}, Some{reason}))
   +cx4 = feed(o, cx3, M.MAIN(), FD.warn(cat(["the session of @", agent, " crashed (", reason, ") — restart ", ns(n), "/", ns(MAX_CRASHES())])))
   LZ.pick(X.Cx<o>, String.eq(agent, M.MAIN()), u => cx4,
@@ -3275,7 +3274,7 @@ def crash.restart(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: Stri
 
 def crash.fail(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
   +why = cat(["the REPL crashed ", ns(n), " times: ", reason])
-  +cx2 = job_end(o, emit(o, cx, M.ELifecycle{agent, M.LFailed{}, Some{why}}, Unit{}, Unit{}, Unit{}), agent, "failed", why)
+  +cx2 = job_end(o, emit(o, cx, M.ELifecycle{agent, S.LFailed{}, Some{why}}, Unit{}, Unit{}, Unit{}), agent, "failed", why)
   +cx3 = feed(o, cx2, M.MAIN(), FD.warn(cat(["@", agent, " failed: ", why])))
   LZ.pick(X.Cx<o>, String.eq(agent, M.MAIN()), u => cx3,
     u => notify_main(o, cx3, cat(["agent @", agent, " failed: ", why, ". It is not restarted anymore. A new message from you or the user restarts it; otherwise tell the user."])))
@@ -3297,13 +3296,13 @@ def crash.count(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String, +reason: Strin
       +cx2 = set_r(o, cx, X.R.with_crashes(r, M.snoc(X.Kn, KL.kn_del(X.R.crashes(r), agent), X.Kn{agent, n})))
       crash.pick(o, Nat.is_le(n, MAX_CRASHES()), cx2, agent, n, reason)
 
-def exited.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
+def exited.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
-      +cx2 = set_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), M.RDown{}), None{}))
-      crash.count(o, crashed && is_active(M.Agent.life(a)), dirty(o, cx2), agent, reason)
+      +cx2 = set_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), S.RDown{}), None{}))
+      crash.count(o, crashed && is_active(S.Agent.life(a)), dirty(o, cx2), agent, reason)
 
 def repl_exited(-o: M.St, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
   +cx2 = fail_waiters(o, cx, agent, "interrupted_by_restart")
@@ -3314,17 +3313,17 @@ def repl_exited(-o: M.St, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason:
 def boot.live(-o: M.St, live: Bool, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   match live:
     case True{}:
-      +cx2 = set_run(o, cx, n, M.RStarting{})
+      +cx2 = set_run(o, cx, n, S.RStarting{})
       out(o, cx2, F.spawn(n, True{}, None{}))
     case False{}:
       cx
 
-def boot.one(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+def boot.one(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
-      boot.live(o, is_active(M.Agent.life(a)), cx, n)
+      boot.live(o, is_active(S.Agent.life(a)), cx, n)
 
 def boot.each(-o: M.St, names: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
   match names:
@@ -3445,7 +3444,7 @@ def idle.report(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String, +text: String)
 def idle.nudge(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   match go:
     case True{}:
-      +cx2 = upd_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), M.RBusy{}), Some{now(o, cx)}))
+      +cx2 = upd_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), S.RBusy{}), Some{now(o, cx)}))
       out(o, cx2, F.say(agent, "[bise] The message(s) just above arrived while you were writing your last answer: you have not answered them yet. Answer them now."))
     case False{}:
       cx
@@ -3454,12 +3453,12 @@ def idle.nudge(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
 # goes on once the user signs in again: no automatic reply nor report (a
 # `(no written reply…)` woke the parent, on the same plan, into a turn
 # that failed too); the questions stay unanswered for the turn to come
-def idle.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +unread: Bool, +steered: List<&2, Nat>, +held: Bool) -> X.Cx<o>:
+def idle.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +unread: Bool, +steered: List<&2, Nat>, +held: Bool) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
-      +cx2 = dirty(o, set_rt(o, cx, X.Rt{agent, M.RIdle{}, False{}, None{}, 0n}))
+      +cx2 = dirty(o, set_rt(o, cx, X.Rt{agent, S.RIdle{}, False{}, None{}, 0n}))
       +r = rr(o, cx2)
       +text = KL.kv_get(X.R.last(r), agent)
       +cx3 = set_r(o, cx2, X.R.with_last(r, KL.kv_del(X.R.last(r), agent)))
@@ -3467,7 +3466,7 @@ def idle.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +l
       +body = Bool.pick(String, M.trim_is_empty(text), "(no written reply at the end of the turn)", text)
       +cx4 = LZ.pick(X.Cx<o>, held, u => cx3, u => auto_replies(o, qs, cx3, agent, body))
       # RFC 0001 §7.2: the automatic report (board only)
-      +cx5 = idle.report(o, Bool.not(M.Agent.is_main(a)) && Bool.not(M.trim_is_empty(text)) && Bool.not(held), cx4, agent, text)
+      +cx5 = idle.report(o, Bool.not(S.Agent.is_main(a)) && Bool.not(M.trim_is_empty(text)) && Bool.not(held), cx4, agent, text)
       +cx6 = idle.nudge(o, unread && List.is_empty(&2, S.Msg, M.queued_for(st(o, cx5), agent)) && Bool.not(P.is_paused(st(o, cx5))), cx5, agent)
       pump(o, cx6, agent)
 
@@ -3528,10 +3527,10 @@ def page_card(-o: M.St, +cx: X.Cx<o>, +agents: List<&2, String>, +kind: String, 
     u => page_card.open(o, cx, kind, R.page_asker(st(o, cx), agents), text),
     u => notice(o, cx, String.append("not a page card: ", kind)))
 
-def force_run_of(+r: String) -> M.Run:
-  Bool.pick(M.Run, String.eq(r, "starting"), M.RStarting{},
-    Bool.pick(M.Run, String.eq(r, "idle"), M.RIdle{},
-      Bool.pick(M.Run, String.eq(r, "busy"), M.RBusy{}, M.RDown{})))
+def force_run_of(+r: String) -> S.Run:
+  Bool.pick(S.Run, String.eq(r, "starting"), S.RStarting{},
+    Bool.pick(S.Run, String.eq(r, "idle"), S.RIdle{},
+      Bool.pick(S.Run, String.eq(r, "busy"), S.RBusy{}, S.RDown{})))
 
 def placed.tell(-o: M.St, user: Bool, +cx: X.Cx<o>, +parent: String, +text: String) -> X.Cx<o>:
   match user:
@@ -3547,7 +3546,7 @@ def placed(-o: M.St, d: PL.Do, +cx: X.Cx<o>) -> X.Cx<o>:
       +cx2 = feed(o, emit(o, cx, M.EPlaced{n, ws, ""}, Unit{}, Unit{}, Unit{}), M.MAIN(), FD.info(PL.ready_text(n, ws)))
       spawn(o, cx2, n, False{})
     case PL.PErr{+n, +e, +parent}:
-      +cx2 = stop_noted(o, emit(o, cx, M.EPlaced{n, J.JNull{}, e}, Unit{}, Unit{}, Unit{}), n, M.LFailed{}, e)
+      +cx2 = stop_noted(o, emit(o, cx, M.EPlaced{n, J.JNull{}, e}, Unit{}, Unit{}, Unit{}), n, S.LFailed{}, e)
       placed.tell(o, String.eq(parent, M.USER()), cx2, parent, PL.err_text(n, e))
     case PL.POrphan{+n, +ws}:
       out(o, cx, F.worktree_drop(n, ws, 0n, 0n))

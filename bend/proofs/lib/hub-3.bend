@@ -4,6 +4,7 @@ import Base
 import ../../vendor/json.bend as J
 import ../../hub/model.bend as HM
 import ../../hub/gen/state.bend as HS
+import ../../hub/gen/state-laws.bend as HSL
 import ../../hub/cx.bend as HX
 import ../../hub/core.bend as HC
 import ../../hub/inv.bend as HI
@@ -18,7 +19,7 @@ import ../../hub/names.bend as HN
 import ../../hub/lazy.bend as HLZ
 
 # entries listed before a renamed one stay apart from the renamed list
-def hub_aa_map_ren(+x: List<&2, String>, +t: List<&2, HM.Agent>, +old: String, +new: String, a: HI.ApartAll(x, HI.profile(t)), +fx: {HM.str_in(x, new) == False{} : Bool})
+def hub_aa_map_ren(+x: List<&2, String>, +t: List<&2, HS.Agent>, +old: String, +new: String, a: HI.ApartAll(x, HI.profile(t)), +fx: {HM.str_in(x, new) == False{} : Bool})
     -> HI.ApartAll(x, HI.profile(HM.map_agent(t, old, HM.ORename{new}))):
   match t:
     case Nil{}:
@@ -26,28 +27,27 @@ def hub_aa_map_ren(+x: List<&2, String>, +t: List<&2, HM.Agent>, +old: String, +
     case Con{h, r}:
       match a:
         case HX.Both{+a1, +a2}:
-          PL2.hub_aa_map_ren.pick(String.eq(HM.Agent.name(h), old), x, h, r, old, new, {==}, a1, fx, a2, hub_aa_map_ren(x, r, old, new, a2, fx))
+          PL2.hub_aa_map_ren.pick(String.eq(HS.Agent.name(h), old), x, h, r, old, new, {==}, a1, fx, a2, hub_aa_map_ren(x, r, old, new, a2, fx))
 
-def hub_nok_ren.top(h: HM.Agent, +t: List<&2, HM.Agent>, +new: String, a1: HI.ApartAll(HI.names(h), HI.profile(t)), ft: PL2.hub_free(HI.profile(t), new),
+def hub_nok_ren.top(+h: HS.Agent, +t: List<&2, HS.Agent>, +new: String, a1: HI.ApartAll(HI.names(h), HI.profile(t)), ft: PL2.hub_free(HI.profile(t), new),
     nt: HI.NamesOK(HI.profile(t))) -> HI.NamesOK(HI.profile(HM.agent_op(h, HM.ORename{new}) <> t)):
-  match h:
-    case HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
-      HX.Both{PL2.hub_aa_ren(name, al, new, HI.profile(t), a1, ft), nt}
+  %HSL.Agent.name.eta(h, new) : HI.NamesOK(HI.profile(HS.Agent.with_aliases(_, HM.snoc(String, HS.Agent.aliases(h), HS.Agent.name(h))) <> t))
+  HX.Both{PL2.hub_aa_ren(HS.Agent.name(h), HS.Agent.aliases(h), new, HI.profile(t), a1, ft), nt}
 
-def hub_nok_ren.pick(c: Bool, +h: HM.Agent, +t: List<&2, HM.Agent>, +old: String, +new: String, +e: {String.eq(HM.Agent.name(h), old) == c : Bool},
+def hub_nok_ren.pick(c: Bool, +h: HS.Agent, +t: List<&2, HS.Agent>, +old: String, +new: String, +e: {String.eq(HS.Agent.name(h), old) == c : Bool},
     a1: HI.ApartAll(HI.names(h), HI.profile(t)), nt: HI.NamesOK(HI.profile(t)), +fh: {HM.str_in(HI.names(h), new) == False{} : Bool},
     ft: PL2.hub_free(HI.profile(t), new), ih: HI.NamesOK(HI.profile(HM.map_agent(t, old, HM.ORename{new}))))
-    -> HI.NamesOK(HI.profile(HM.map_agent.go(h <> t, String.eq(HM.Agent.name(h), old), old, HM.ORename{new}))):
+    -> HI.NamesOK(HI.profile(HM.map_agent.go(h <> t, String.eq(HS.Agent.name(h), old), old, HM.ORename{new}))):
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), True{}, e) : HI.NamesOK(HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
+      %Equal.sym(Bool, String.eq(HS.Agent.name(h), old), True{}, e) : HI.NamesOK(HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
       hub_nok_ren.top(h, t, new, a1, ft, nt)
     case False{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), False{}, e) : HI.NamesOK(HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
+      %Equal.sym(Bool, String.eq(HS.Agent.name(h), old), False{}, e) : HI.NamesOK(HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
       HX.Both{hub_aa_map_ren(HI.names(h), t, old, new, a1, fh), ih}
 
 # a rename to a free name keeps every agent's names apart
-def hub_nok_ren(+xs: List<&2, HM.Agent>, +old: String, +new: String, nok: HI.NamesOK(HI.profile(xs)), f: PL2.hub_free(HI.profile(xs), new))
+def hub_nok_ren(+xs: List<&2, HS.Agent>, +old: String, +new: String, nok: HI.NamesOK(HI.profile(xs)), f: PL2.hub_free(HI.profile(xs), new))
     -> HI.NamesOK(HI.profile(HM.map_agent(xs, old, HM.ORename{new}))):
   match xs:
     case Nil{}:
@@ -55,15 +55,15 @@ def hub_nok_ren(+xs: List<&2, HM.Agent>, +old: String, +new: String, nok: HI.Nam
     case Con{h, t}:
       match nok f:
         case HX.Both{+a1, +nt} HX.Both{+fh, +ft}:
-          hub_nok_ren.pick(String.eq(HM.Agent.name(h), old), h, t, old, new, {==}, a1, nt, fh, ft, hub_nok_ren(t, old, new, nt, ft))
+          hub_nok_ren.pick(String.eq(HS.Agent.name(h), old), h, t, old, new, {==}, a1, nt, fh, ft, hub_nok_ren(t, old, new, nt, ft))
 
 def hub_nok_tr(-x: List<&2, List<&2, String>>, -y: List<&2, List<&2, String>>, e: {x == y : List<&2, List<&2, String>>}, d: HI.NamesOK(y)) -> HI.NamesOK(x):
   %Equal.sym(List<&2, List<&2, String>>, x, y, e) : HI.NamesOK(_)
   d
 
 # hub-loop: a placed task's line keeps the names (its ws, or nothing)
-def hub_prof_placed(c: Bool, +ag: List<&2, HM.Agent>, +x: String, +w: J.Json)
-    -> {HI.profile(Bool.pick(List<&2, HM.Agent>, c, HM.map_agent(ag, x, HM.OWs{w}), ag)) == HI.profile(ag) : List<&2, List<&2, String>>}:
+def hub_prof_placed(c: Bool, +ag: List<&2, HS.Agent>, +x: String, +w: J.Json)
+    -> {HI.profile(Bool.pick(List<&2, HS.Agent>, c, HM.map_agent(ag, x, HM.OWs{w}), ag)) == HI.profile(ag) : List<&2, List<&2, String>>}:
   match c:
     case True{}:
       PL2.hub_prof_map(ag, x, HM.OWs{w}, {==})
@@ -77,9 +77,9 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
     case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs, +pz, +ho, +gn}:
       match e:
         case HM.ETaskCreated{+n, pa, br, ws, at}:
-          hub_nok_tr(HI.profile(HM.put_agent(HM.strip(ag, n), n, HM.new_agent(n, HN.free_dir(HM.dirs_of(ag), n), False{}, Some{pa}, ws, br, at))),
+          hub_nok_tr(HI.profile(HM.put_agent(HM.strip(ag, n), n, HM.agent_of_new(HM.ETaskCreated{n, pa, br, ws, at}, HN.free_dir(HM.dirs_of(ag), n)))),
             HM.snoc(List<&2, String>, HI.profile(HM.strip(ag, n)), [n]),
-            PL2.hub_put_absent(HM.strip(ag, n), n, HM.new_agent(n, HN.free_dir(HM.dirs_of(ag), n), False{}, Some{pa}, ws, br, at),
+            PL2.hub_put_absent(HM.strip(ag, n), n, HM.agent_of_new(HM.ETaskCreated{n, pa, br, ws, at}, HN.free_dir(HM.dirs_of(ag), n)),
               PLN.nm_free(ag, n, PLN.nm_held(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k))),
             PL2.hub_nok_snoc(HI.profile(HM.strip(ag, n)), [n], PLN.nm_ok(ag, n, u),
               PL2.hub_allapart_new(HI.profile(HM.strip(ag, n)), n, PLN.nm_free(ag, n, PLN.nm_held(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k)))))
@@ -96,7 +96,7 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
         case HM.ESnapshot{+x, +sn}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OSnap{sn})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OSnap{sn}, {==}), u)
         case HM.EPlaced{+x, +w, +er}:
-          hub_nok_tr(HI.profile(Bool.pick(List<&2, HM.Agent>, String.is_empty(er), HM.map_agent(ag, x, HM.OWs{w}), ag)), HI.profile(ag), hub_prof_placed(String.is_empty(er), ag, x, w), u)
+          hub_nok_tr(HI.profile(Bool.pick(List<&2, HS.Agent>, String.is_empty(er), HM.map_agent(ag, x, HM.OWs{w}), ag)), HI.profile(ag), hub_prof_placed(String.is_empty(er), ag, x, w), u)
         case HM.EReported{+x, +rp}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OReport{rp})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OReport{rp}, {==}), u)
         case HM.EMsgsMoved{a, b}:
@@ -773,7 +773,7 @@ def hub_hot_tr(-a: HM.St, -b: HM.St, e: {a == b : HM.St}, k: {HM.hot_of(HM.St.ho
   k
 
 # a lifecycle event keeps a right index right (it touches no message)
-def hub_hot_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>})
+def hub_hot_life(s: HM.St, +n: String, +l: HS.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>})
     -> {HM.hot_of(HM.St.hot(HM.apply(s, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.every(HM.apply(s, HM.ELifecycle{n, l, r}))) : List<&2, HS.MRec>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:

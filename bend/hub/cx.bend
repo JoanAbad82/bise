@@ -19,7 +19,7 @@ type Fx is Data:
   FO{o: J.Json}
 
 type Rt is Data:
-  Rt{name: String, run: M.Run, waiting: Bool, turn: Maybe<&2, Nat>, turns: Nat}
+  Rt{name: String, run: S.Run, waiting: Bool, turn: Maybe<&2, Nat>, turns: Nat}
 
 type Waiter is Data:
   Waiter{token: Nat, agent: String, msg: Nat, deadline: Nat}
@@ -72,12 +72,12 @@ def Rt.with_name(x: Rt, +v: String) -> Rt:
     case Rt{_, +run, +waiting, +turn, +turns}:
       Rt{v, run, waiting, turn, turns}
 
-def Rt.run(x: Rt) -> M.Run:
+def Rt.run(x: Rt) -> S.Run:
   match x:
     case Rt{_, +run, _, _, _}:
       run
 
-def Rt.with_run(x: Rt, +v: M.Run) -> Rt:
+def Rt.with_run(x: Rt, +v: S.Run) -> Rt:
   match x:
     case Rt{+name, _, +waiting, +turn, +turns}:
       Rt{name, v, waiting, turn, turns}

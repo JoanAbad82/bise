@@ -33,6 +33,8 @@ import ../vendor/json.bend as J
 
 import ./model.bend as M
 
+import ./gen/state.bend as S
+
 # the workspace of a task whose worktree the shell is making: no path, no
 # branch yet (the shell picks them); `with_changes`: the shared folder's
 # changes go into it (`sb spawn --with-changes`)
@@ -87,36 +89,36 @@ def parent_of(m: Maybe<&2, String>) -> String:
       M.MAIN()
 
 # the task found, `live`: placing and not archived
-def placed_of.live(live: Bool, +a: M.Agent, +name: String, +ws: J.Json, +err: String) -> Do:
+def placed_of.live(live: Bool, +a: S.Agent, +name: String, +ws: J.Json, +err: String) -> Do:
   match live:
     case True{}:
-      Bool.pick(Do, String.is_empty(err), POk{name, ws}, PErr{name, err, parent_of(M.Agent.parent(a))})
+      Bool.pick(Do, String.is_empty(err), POk{name, ws}, PErr{name, err, parent_of(S.Agent.parent(a))})
     case False{}:
       Bool.pick(Do, String.is_empty(err), POrphan{name, ws}, PNone{})
 
-def is_archived(l: M.Life) -> Bool:
+def is_archived(l: S.Life) -> Bool:
   match l:
-    case M.LArchived{}:
+    case S.LArchived{}:
       True{}
     case _:
       False{}
 
-def placed_of.agent(m: Maybe<&2, M.Agent>, +name: String, +ws: J.Json, +err: String) -> Do:
+def placed_of.agent(m: Maybe<&2, S.Agent>, +name: String, +ws: J.Json, +err: String) -> Do:
   match m:
     case None{}:
       Bool.pick(Do, String.is_empty(err), POrphan{name, ws}, PNone{})
     case Some{+a}:
-      placed_of.live(M.ws_placing(M.Agent.ws(a)) && Bool.not(is_archived(M.Agent.life(a))), a, name, ws, err)
+      placed_of.live(M.ws_placing(S.Agent.ws(a)) && Bool.not(is_archived(S.Agent.life(a))), a, name, ws, err)
 
 # the decision of `placed` for task `name` (`err` "": `ws` is made)
 def placed_of(+st: M.St, +name: String, +ws: J.Json, +err: String) -> Do:
   placed_of.agent(M.get_agent(st, name), name, ws, err)
 
 # a placing task gets no REPL yet (core.bend's `spawn`)
-def waits(m: Maybe<&2, M.Agent>) -> Bool:
+def waits(m: Maybe<&2, S.Agent>) -> Bool:
   match m:
     case Some{+a}:
-      M.ws_placing(M.Agent.ws(a))
+      M.ws_placing(S.Agent.ws(a))
     case None{}:
       False{}
 
@@ -171,27 +173,27 @@ def is_ok(d: Do) -> Bool:
 def ws_place(+ws: J.Json, +dir: String) -> String:
   Bool.pick(String, M.ws_worktree(ws), J.get_str_or(ws, "place", String.append("wt:", dir)), "shared")
 
-def Agent.place(+a: M.Agent) -> String:
-  ws_place(M.Agent.ws(a), M.Agent.dir(a))
+def Agent.place(+a: S.Agent) -> String:
+  ws_place(S.Agent.ws(a), S.Agent.dir(a))
 
 # ---- a place's agents (moved from core.bend, its line limit) ----
 
-def is_gone(l: M.Life) -> Bool:
+def is_gone(l: S.Life) -> Bool:
   match l:
-    case M.LArchived{}:
+    case S.LArchived{}:
       True{}
     case _:
       False{}
 
 # `b` is another agent of `place`'s live folder: still in it (`live`), or
 # archived with its ws still on that folder (it left before the others)
-def mate.hit(m: Maybe<&2, M.Agent>, +name: String, +place: String, +live: Bool) -> Bool:
+def mate.hit(m: Maybe<&2, S.Agent>, +name: String, +place: String, +live: Bool) -> Bool:
   match m:
     case None{}:
       False{}
     case Some{+b}:
-      +gone = is_gone(M.Agent.life(b))
-      Bool.not(String.eq(M.Agent.name(b), name)) && M.ws_worktree(M.Agent.ws(b)) && Bool.not(M.ws_dropped(M.Agent.ws(b)))
+      +gone = is_gone(S.Agent.life(b))
+      Bool.not(String.eq(S.Agent.name(b), name)) && M.ws_worktree(S.Agent.ws(b)) && Bool.not(M.ws_dropped(S.Agent.ws(b)))
         && String.eq(Agent.place(b), place) && Bool.pick(Bool, live, Bool.not(gone), gone)
 
 def mates(xs: List<&2, String>, +s: M.St, +name: String, +place: String, +live: Bool) -> List<&2, String>:
@@ -203,10 +205,10 @@ def mates(xs: List<&2, String>, +s: M.St, +name: String, +place: String, +live: 
       Bool.pick(List<&2, String>, mate.hit(M.get_agent(s, n), name, place, live), n <> rest, rest)
 
 # the other agents of a's worktree (none for the shared folder)
-def mates_of(+s: M.St, +a: M.Agent, +live: Bool) -> List<&2, String>:
-  mates(M.St.order(s), s, M.Agent.name(a), Agent.place(a), live)
+def mates_of(+s: M.St, +a: S.Agent, +live: Bool) -> List<&2, String>:
+  mates(M.St.order(s), s, S.Agent.name(a), Agent.place(a), live)
 
-def first_agent(+s: M.St, ns: List<&2, String>) -> Maybe<&2, M.Agent>:
+def first_agent(+s: M.St, ns: List<&2, String>) -> Maybe<&2, S.Agent>:
   match ns:
     case Nil{}:
       None{}
@@ -220,12 +222,12 @@ def drop.stays(ms: List<&2, String>) -> String:
     case Con{+h, +t}:
       String.append(" — its worktree stays with @", String.join({h <> t : List<&2, String>}, ", @"))
 
-def drop.left.ws(m: Maybe<&2, M.Agent>) -> J.Json:
+def drop.left.ws(m: Maybe<&2, S.Agent>) -> J.Json:
   match m:
     case None{}:
       J.JNull{}
     case Some{+b}:
-      J.set(M.Agent.ws(b), "dropped", J.JBool{True{}})
+      J.set(S.Agent.ws(b), "dropped", J.JBool{True{}})
 
 # ---- a join while placing (`sb spawn B --place A`, A placing) ----
 # B is created with the daemon's ws for A's place (state placing, place
@@ -243,7 +245,7 @@ def placing_of(xs: List<&2, String>, +s: M.St) -> List<&2, String>:
 # the joiners of `name`'s place: exactly the live agents whose ws.place
 # is name's place (wt:<its dir>) and whose state is placing; never any
 # other placing agent (one placing its own worktree has no ws.place)
-def joiners.of(m: Maybe<&2, M.Agent>, +s: M.St) -> List<&2, String>:
+def joiners.of(m: Maybe<&2, S.Agent>, +s: M.St) -> List<&2, String>:
   match m:
     case None{}:
       Nil{}

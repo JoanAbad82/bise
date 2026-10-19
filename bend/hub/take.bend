@@ -163,13 +163,20 @@ def take.held(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +n: String) -> X.Cx<
       take.watches(o, WK.of_name(WK.Wakes.live(TM.Tms.wk(M.St.tm(s))), n), cx5, h, why)
 
 # an archived agent named `n` moves to the first free `n-<i>`
-def take.archived(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
-  match m:
-    case Some{M.Agent{_, _, _, M.LArchived{}, _, _, _, _, _, _, _, _, _, _, _, _}}:
+def take.archived.life(-o: M.St, l: S.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+  match l:
+    case S.LArchived{}:
       +nn = NT.unique_free(X.d(o, cx), n)
       +line = String.concat(["@", n, " (archived) is now @", nn, ": its name went to the new @", n])
       rename.free(o, M.name_held(X.d(o, cx), nn), cx, n, nn, line, {==})
     case _:
+      cx
+
+def take.archived(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+  match m:
+    case Some{+a}:
+      take.archived.life(o, S.Agent.life(a), cx, n)
+    case None{}:
       cx
 
 # a take of `n` frees it: after it, no agent has `n` as its name unless a
