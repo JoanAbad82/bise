@@ -36,7 +36,7 @@ const prefs = (theme: 'light' | 'dark') => ({
 });
 const perms = (screen: 'allowed' | 'denied') => ({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen });
 type Cmd = Record<string, unknown>;
-const cmds = (w: World, cmd: string): Cmd[] => w.core.cmds().filter((c) => (c as Cmd)['cmd'] === cmd) as Cmd[];
+const cmds = (w: World, cmd: string): Cmd[] => w.core.cmds().filter((c) => c['cmd'] === cmd);
 
 async function spot(w: World): Promise<Page> {
   const had = w.out.of(CAPSULE).filter((l) => l.startsWith('show top')).length;
