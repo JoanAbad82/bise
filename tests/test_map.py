@@ -431,6 +431,9 @@ def self_test():
               "tests/desktop_try_test.py", "tests/ambient_qa_test.py"):
         assert select([p], tests, txt)[0] == set(), p
         assert desktop([p]), p
+    # a desktop script's own test, by the path it names (trim-2: in run_all.sh, picked on its source)
+    assert select(["scripts/desktop_app.py"], tests, txt)[0] == {"desktop_app_test"}
+    assert select(["dev/plugins/ambient-qa/world.py"], tests, txt)[0] == {"ambient_qa_world_test"}
     for p in ("rust/proto/src/draft.rs", "rust/home/src/env.rs", "rust/harness/src/update.rs"):
         assert select([p], tests, txt)[0] is None and desktop([p]), p
     sel, _ = select(["rust/tui/src/ambient/core/hubs.rs"], tests, txt)
