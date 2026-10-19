@@ -72,13 +72,25 @@ export function sizeAt(u: number, big: number): number {
  * in front of everything), and START_Y above the floor at least. Pure.
  */
 export function cameraStart(fit: Fit, startX = 0.5, below = START_PX + startPx(fit) / 2): V3 {
-  // startX: where along the bottom edge, a fraction of the view's width (a film's feed sits bottom left)
-  const vx = fit.left + (fit.right - fit.left) * clamp01(startX);
-  const vy = fit.bottom - below * fit.scale;
+  // startX: where along the bottom edge, a fraction of the view's width
+  return viewStart(fit, clamp01(startX), fit.bottom - below * fit.scale);
+}
+
+/** A point of the view (x: a fraction of its width; vy: view units up), toward the camera, START_Y above the floor at least. Pure. */
+function viewStart(fit: Fit, x: number, vy: number): V3 {
+  const vx = fit.left + (fit.right - fit.left) * x;
   const onScreen = add(add(fit.target, RIGHT, vx), UP, vy);
   // along BACK the screen spot stays; far enough toward him to be above the floor and in front of the office
   const k = Math.max(8, (START_Y - onScreen.y) / BACK.y);
   return add(onScreen, BACK, k);
+}
+
+/**
+ * Where his plane leaves from when the view says (Look.planeFrom: the hero's sent bubble): that point
+ * of the view, fractions from its top left, big there already. Pure.
+ */
+export function viewPoint(fit: Fit, at: { readonly x: number; readonly y: number }): V3 {
+  return viewStart(fit, clamp01(at.x), fit.top - (fit.top - fit.bottom) * clamp01(at.y));
 }
 
 /**
@@ -383,8 +395,10 @@ export function planGlide(inp: { readonly from: V3; readonly to: V3; readonly se
   return base;
 }
 
-/** The glide s seconds after the toss, to `to` (the hand, which may have moved). Pure. */
-export function glideAt(g: GlidePlan, s: number, to: V3 = g.to): FlightFrame {
+/** The glide s seconds after the toss, from `from` to `to` (the hand, which may have moved). Pure. */
+export function glideAt(g0: GlidePlan, s: number, to: V3 = g0.to, from: V3 = g0.from): FlightFrame {
+  // `from`: where it left, held on the view as the camera moves (the hero's sent bubble)
+  const g = from === g0.from ? g0 : { ...g0, from };
   const t = clamp01(s / g.dur);
   const k = t * N;
   const j = Math.min(N - 1, Math.floor(k));

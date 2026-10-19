@@ -11,7 +11,7 @@ import type { BimFrame, Look, Motion, Office } from '../model';
 import { makeBim, type Bim } from './bim';
 import { pillOf } from '../labels';
 import { siteOf, type Fit, type V3 } from './camera';
-import { cameraStart, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, sizeAt, startSize, type FlightFrame, type FlightPlan, type GlidePlan, type Plane } from './plane';
+import { cameraStart, viewPoint, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, sizeAt, startSize, type FlightFrame, type FlightPlan, type GlidePlan, type Plane } from './plane';
 import { DESK_SPOT, HELD_LEN, ON_DESK, PLANE_CATCH, POCKET_SINK, REACH_S, awayOf, heldAt } from './catch';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { skateRig } from './skate';
@@ -233,7 +233,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
    * sheets left on desks (Pose.letter). Reduced motion: no flight, the open sheet in its hand, then on
    * its desk. True while one moves.
    */
-  function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit, light: boolean, reduced: boolean): boolean {
+  function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit, light: boolean, reduced: boolean, planeFrom?: Look['planeFrom']): boolean {
     const flying = new Set<string>();
     const site = office ? siteOf(office) : null;
     let moving = false;
@@ -272,7 +272,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
         // the newest is the one the egg may loop (eggs.ts reads pose.plane)
         const loops = fp.loops ?? (fp === f.pose.plane && f.egg?.kind === 'loop' ? 2 : 1);
         const avoid = pillHeads(frames, f.name);
-        const from = cameraStart(fit, fp.startX);
+        const from = planeFrom ? viewPoint(fit, planeFrom) : cameraStart(fit, fp.startX);
         const seed = hash(key);
         const glide = fp.glide === true;
         const plan = glide ? planGlide({ from, to: hand, seed, dur, px: fit.scale }) : planFlight({ from, to: hand, seed, loops, unit, avoid, dur });
@@ -281,7 +281,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
         root.add(p.mesh.group, p.mesh.shadow);
       }
       p.mesh.setInk(light);
-      const at = (x: number): FlightFrame => (p.glide ? glideAt(p.plan as GlidePlan, x, hand) : flightAt(p.plan as FlightPlan, x, hand));
+      // a glide from the view's point (the hero's sent bubble) leaves from it as the camera moves
+      const from = p.glide && planeFrom ? viewPoint(fit, planeFrom) : undefined;
+      const at = (x: number): FlightFrame => (p.glide ? glideAt(p.plan as GlidePlan, x, hand, from) : flightAt(p.plan as FlightPlan, x, hand));
       if (held === null) {
         // flying: to the hand's real point, from big near his eye to the bim's own size
         moving = true;
@@ -469,7 +471,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
         lightDesk(d, pal, rig?.screen ?? 0, (rig ? rig.lamp : name !== mainName()) || allLit, lamps ?? undefined);
         seatChair(d.chair, rig?.seat);
       }
-      if (drawPlanes(t, frames, fit, !look.night, look.reduced)) motion = 'walk';
+      if (drawPlanes(t, frames, fit, !look.night, look.reduced, look.planeFrom)) motion = 'walk';
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
       if (eggDecor?.update(look.eggs) === true) motion = 'walk';
       // the unlock moment: two bims bring the new piece in from the door

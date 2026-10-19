@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Office, Spot } from '../model';
 import { BACK, RIGHT, UP, fitSite, siteOf, toScreen, type V3 } from './camera';
-import { DART, cameraStart, catchPoint, dartAt, flightAt, glideAt, planFlight, planGlide, shadowOf, sizeAt, startPx, startSize, type FlightPlan } from './plane';
+import { DART, cameraStart, viewPoint, catchPoint, dartAt, flightAt, glideAt, planFlight, planGlide, shadowOf, sizeAt, startPx, startSize, type FlightPlan } from './plane';
 import { BEAT, HELD_LEN, PLANE_CATCH, heldAt } from './catch';
 import { PLANE_FLIGHT } from './pose';
 
@@ -258,5 +258,17 @@ describe('his paper plane', () => {
     }
     expect(heldAt(cut + 0.5, 'desk', false, cut)?.shown).toBe(true);
     expect(heldAt(cut + 0.5, 'pocket', false, cut)?.shown).toBe(false);
+  });
+
+  it("leaves from the view's point when the view gives one (the hero's sent bubble), and the glide holds it there", () => {
+    const at = { x: 0.7, y: 0.75 };
+    const p = toScreen(fit, viewPoint(fit, at));
+    expect(p.x).toBeCloseTo(fit.widthPx * 0.7, 3);
+    expect(p.y).toBeCloseTo(fit.heightPx * 0.75, 3);
+    const g = planGlide({ from: viewPoint(fit, at), to: hand, seed: 2, dur: 2.8, px: fit.scale });
+    const moved = viewPoint(fit, { x: 0.6, y: 0.7 });
+    const s0 = glideAt(g, 0, hand, moved);
+    expect(Math.hypot(s0.p.x - moved.x, s0.p.y - moved.y, s0.p.z - moved.z)).toBeLessThan(1e-9);
+    expect(glideAt(g, 2.8, hand, moved).p.x).toBeCloseTo(hand.x, 6);
   });
 });

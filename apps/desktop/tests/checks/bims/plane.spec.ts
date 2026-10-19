@@ -10,14 +10,14 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test, expect } from '../../harness';
 import { office } from '../../../src/bims/fixtures';
-import { P, SHOTS, open, probe, settle, showOffice, sleep } from './world';
+import { P, SHOTS, headOf, open, probe, settle, showOffice, sleep, trackpad } from './world';
 
 /** the renderer's clock, slowed: 3 s of flight over 3 / SLOW s of frames */
 const SLOW = 0.25;
 const SIZES = [
   { w: 320, win: 1400, wide: null, to: 'login-test' },
   { w: 640, win: 1600, wide: 'docked', to: 'login-test' },
-  { w: 640, win: 1600, wide: 'docked', to: 'copy-fix' },
+  { w: 640, win: 1600, wide: 'docked', to: 'copy-fix', zoom: true },
 ] as const;
 /** the flight (3 s), the catch (2.2 s) and a beat after, office seconds */
 const WATCH_S = 5.8;
@@ -25,7 +25,9 @@ const WATCH_S = 5.8;
 test.describe.configure({ timeout: 150_000 });
 
 for (const theme of ['light', 'dark'] as const) {
-  for (const { w, win, wide, to } of SIZES) {
+  for (const size of SIZES) {
+    const { w, win, wide, to } = size;
+    const zoom = 'zoom' in size && size.zoom;
     const tag = `${wide === null ? String(w) : `${String(w)}-${wide}`}${to === 'login-test' ? '' : `-${to}`}-${theme}`;
     test(`his plane's flight, ${tag}`, async () => {
       const { s, core } = await open(office, { theme });
@@ -40,6 +42,13 @@ for (const theme of ['light', 'dark'] as const) {
           await expect(s.page.getByTestId('app.panel')).toHaveAttribute('data-wide', wide, { timeout: 3000 });
         }
         await settle(s);
+        if (zoom) {
+          // close on its catcher (the pocket at its hip reads at the zoom's most): the clip bims signs the catch from
+          const h = await headOf(s.page, to);
+          if (h === null) throw new Error(`no ${to}`);
+          for (let i = 0; i < 8; i++) await trackpad(s.cdp, h.x, h.y, { dy: -60, pinch: true });
+          await settle(s);
+        }
         const box = await s.page.getByTestId('app.right.bims').boundingBox();
         if (box === null) throw new Error('no office');
         // the office's clock slowed from now on; his message stamped on that clock

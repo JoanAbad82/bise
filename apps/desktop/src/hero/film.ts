@@ -351,6 +351,21 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     };
   }
 
+  /**
+   * Where his planes leave from: the top left corner of his line folding into one (else his last sent
+   * line), fractions of the canvas from its top left (designer m_33582: from the feed's corner, never
+   * the page's left fade); null: no line of his shown.
+   */
+  function sentBubble(): { x: number; y: number } | null {
+    const rows = feed.root.querySelectorAll<HTMLElement>('.bh-feed-row.you');
+    const el = feed.root.querySelector<HTMLElement>('.bh-feed-row.you.folding') ?? rows[rows.length - 1];
+    if (!el) return null;
+    const c = canvas.getBoundingClientRect();
+    const b = el.getBoundingClientRect();
+    if (c.width <= 0 || c.height <= 0 || b.width <= 0) return null;
+    return { x: (b.left - c.left) / c.width, y: (b.top - c.top) / c.height };
+  }
+
   function draw(nowMs: number): void {
     raf = 0;
     if (!running()) return;
@@ -368,10 +383,11 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     /** the wave at the loop's start (its camera: entryCam), not the fold at its end (the fold's shot) */
     const waving = ems !== null && T < PAGE.fold;
     const n = night();
+    const planeFrom = sentBubble();
     for (const run of runs) {
       advance(run, t, n, reduced);
       const st = stepOf(run, n, reduced, attentionOf(run));
-      if (st) steps.set(run.cast.id, st);
+      if (st) steps.set(run.cast.id, planeFrom === null ? st : { ...st, look: { ...st.look, planeFrom } });
     }
     if (waving && hands.k === 'film') entryCam(ems);
     else if (hands.k === 'film') filmCam(dt);
