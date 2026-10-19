@@ -12,7 +12,6 @@ import ../../hub/timers.bend as HTM
 import ../../hub/wakes.bend as HWK
 import ../../hub/xhub-model.bend as HXH
 import ../../hub/xhub.bend as HXB
-import ../../hub/gen/state-laws.bend as HSL
 import ./hub-1.bend as PL1
 import ./hub-2.bend as PL2
 import ./hub-names.bend as PLN
