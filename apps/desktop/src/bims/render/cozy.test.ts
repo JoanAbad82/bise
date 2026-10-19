@@ -19,6 +19,10 @@ import { lookOf } from './maps';
 import { STYLE } from './style';
 
 const SIZES = [1, 3, 9, 20, 31];
+/** one event-loop turn: vitest's worker reads its RPC replies only between macrotasks; these laws
+ *  build ~30 worlds a test (11-21 s alone, 45 s for the draw calls at load 25) and, run whole,
+ *  failed -44's gate with 'Timeout calling onTaskUpdate' (gate-reds; lying.test.ts's fix, 8f7d3842a) */
+const turn = (): Promise<void> => new Promise((done) => { setTimeout(done, 0); });
 /** the share of the floor the stage-0 base covers at least, up to 9 agents (the rug, the corner, the shelf, the lamp, two plants) */
 const FULL = 0.03;
 const STAGES = Array.from({ length: LAST_STAGE + 1 }, (_, s) => s);
@@ -137,7 +141,7 @@ describe('the cozy law: every map, every stage', () => {
       expect(out).toEqual([]);
     });
 
-    it(`${id}: nothing through the world, nothing coplanar, the base at 0, stages 0..14, 3 and 20 agents`, () => {
+    it(`${id}: nothing through the world, nothing coplanar, the base at 0, stages 0..14, 3 and 20 agents`, async () => {
       // each fault once, at the first office and stage it shows
       const faults = new Map<string, string>();
       const fault = (at: string, what: string): void => { if (!faults.has(what)) faults.set(what, at); };
@@ -153,6 +157,7 @@ describe('the cozy law: every map, every stage', () => {
               else if (coplanar(a, b)) fault(at, `${fmt(a)} coplanar with ${fmt(b)}`);
             }
           }
+          await turn();
         }
       }
       expect([...faults].map(([what, at]) => `${at}: ${what}`).slice(0, 40)).toEqual([]);
@@ -171,7 +176,7 @@ describe('the cozy law: every map, every stage', () => {
     expect(out).toEqual([]);
   });
 
-  it('costs <= 25 draw calls at stage 0, <= 60 at 14 (merged per stage)', () => {
+  it('costs <= 25 draw calls at stage 0, <= 60 at 14 (merged per stage)', async () => {
     const out: string[] = [];
     for (const id of readyMaps()) {
       const o = layoutOf(crowd(20).agents, id);
@@ -180,6 +185,7 @@ describe('the cozy law: every map, every stage', () => {
         for (const night of [false, true]) {
           const more = worldAt(o, stage, night).calls - worldAt(bare, stage, night).calls;
           if (more > max) out.push(`${id} stage ${String(stage)}${night ? ' night' : ''}: +${String(more)} draw calls`);
+          await turn();
         }
       }
     }
