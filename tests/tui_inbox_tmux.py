@@ -85,6 +85,9 @@ def main():
         assert all(len(r.rstrip()) <= 80 for r in sc.splitlines()), sc
         shot(t, "inbox-80")
         tmux("resize-window", "-t", t.name, "-x", str(COLS))
+        # the wide frame drawn before the next key: a Down read before the
+        # resize was lost to it (the cursor stayed on top, load x2.8)
+        t.wait(lambda sc: any(len(r.rstrip()) > 100 for r in sc.splitlines()))
         # ⏎ on the answered one: main's thread at his answer; esc: back
         # newest first: the withdrawn one (#2), then the answered one (#1)
         t.keys("Down")

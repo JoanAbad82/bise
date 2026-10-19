@@ -55,7 +55,17 @@ class Tui:
         tmux("send-keys", "-t", self.name, *k)
 
     def typed(self, text):
-        tmux("send-keys", "-t", self.name, "-l", text)
+        """`text` into the pane. One with an escape sequence (a mouse
+        report, a kitty key) goes in one write, as a terminal sends it:
+        send-keys -l writes it a key at a time, and under load the TUI
+        read its ESC alone (a lone esc) and typed the rest (`[<0;71;8M`
+        in the composer, tui_artifacts_tmux)."""
+        if "\x1b" not in text:
+            tmux("send-keys", "-t", self.name, "-l", text)
+            return
+        buf = "raw-%s" % self.name
+        subprocess.run(["tmux", "load-buffer", "-b", buf, "-"], input=text, text=True, check=True)
+        tmux("paste-buffer", "-d", "-r", "-b", buf, "-t", self.name)
 
     def wait_any(self, conds, timeout=40, poll=0.2, colors=False):
         """Poll the screen (with its SGR escapes if `colors`) until one of
