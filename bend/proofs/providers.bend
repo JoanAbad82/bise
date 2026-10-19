@@ -56,7 +56,19 @@ def Laws.provider_roles_agents_table():
 def Laws.effort_of_the_roles():
   {==}
 
-def Laws.threshold_is_80_percent_of_the_window():
+def Laws.threshold_cap_is_85_percent_of_the_window():
+  {==}
+
+def Laws.threshold_rows():
+  {==}
+
+def Laws.default_caps_at_450k_from_1m():
+  {==}
+
+def Laws.written_value_not_capped_by_450k():
+  {==}
+
+def Laws.default_never_past_85():
   {==}
 
 def Laws.window_builtin_setups():
@@ -80,7 +92,7 @@ def Laws.threshold_in_core_units():
 def Laws.threshold_tokens_or_percent():
   {==}
 
-def Laws.threshold_capped_at_80_percent():
+def Laws.threshold_capped_at_85_percent():
   {==}
 
 def Laws.threshold_bad_values_default():

@@ -578,9 +578,8 @@ def shown_effort(r: Resolved) -> String:
 # ---- the context window and the compaction threshold (BISE-150) ----
 # The window of the model a REPL starts with: its `context` in the
 # models file, else its provider's; a model nothing describes gets
-# DEFAULT_CONTEXT (rust/catalog's DEFAULT_CAPS). The compaction starts
-# at 80 % of it unless BEND_THRESHOLD or config `compaction_threshold`
-# says, and never later (BISE-300).
+# DEFAULT_CONTEXT (rust/catalog's DEFAULT_CAPS). The compaction
+# threshold it gives: runtime/threshold-pure.bend.
 
 def DEFAULT_CONTEXT() -> U32:
   128000
@@ -626,77 +625,6 @@ def window_chosen(+choice: String, +bise: String, +bend: String,
 def window(+bise: String, +bend: String, +agent: String, +role: String,
     +cfg: String, +file: String) -> U32:
   window_chosen("", bise, bend, agent, role, cfg, file)
-
-# 80 % of a window, rounded down (no overflow: n / 5 first)
-def threshold_of(+n: U32) -> U32:
-  ((n / 5) * 4 + ((n % 5) * 4) / 5 : U32)
-
-# ---- the threshold as written (BISE-300) ----
-# a number of tokens ("450000") or a share of the window ("45%"); 0,
-# empty or anything else: None (the default applies)
-def thr_value.some(zero: Bool, +n: U32) -> Maybe<&2, U32>:
-  match zero:
-    case True{}:
-      None{}
-    case False{}:
-      Some{n}
-
-def thr_value.num(m: Maybe<&2, U32>) -> Maybe<&2, U32>:
-  match m:
-    case Some{+n}:
-      thr_value.some(U32.is_eq(n, 0), n)
-    case None{}:
-      None{}
-
-# p % of a window, rounded down; p above 100 counts as 100 (no
-# overflow: window / 100 first)
-def pct_of(+p: U32, +window: U32) -> U32:
-  +q = U32.min(p, 100)
-  ((window / 100) * q + ((window % 100) * q) / 100 : U32)
-
-def thr_value.pct(m: Maybe<&2, U32>, +window: U32) -> Maybe<&2, U32>:
-  match m:
-    case Some{+p}:
-      thr_value.num(Some{pct_of(p, window)})
-    case None{}:
-      None{}
-
-def thr_value.split(pct: Bool, +t: String, +window: U32) -> Maybe<&2, U32>:
-  match pct:
-    case True{}:
-      thr_value.pct(U32.read(String.trim(String.take(t,
-        Nat.sub(String.length(t), 1n)))), window)
-    case False{}:
-      thr_value.num(U32.read(t))
-
-def thr_value(+s: String, +window: U32) -> Maybe<&2, U32>:
-  +t = String.trim(s)
-  thr_value.split(String.ends_with(t, "%"), t, window)
-
-# a value, capped at 80 % of the window; none: that 80 %. A number
-# written for a 1M model never overflows a 200k one (an agent on a
-# smaller model, BISE-298's roles).
-def thr_capped(m: Maybe<&2, U32>, +cap: U32) -> U32:
-  match m:
-    case Some{+n}:
-      U32.min(n, cap)
-    case None{}:
-      cap
-
-def threshold.pick(empty: Bool, +envv: String, +cfgt: String,
-    +window: U32) -> U32:
-  match empty:
-    case True{}:
-      thr_capped(thr_value(Cf.cfg_or(Cf.cfg_get(cfgt,
-        "compaction_threshold"), ""), window), threshold_of(window))
-    case False{}:
-      thr_capped(thr_value(envv, window), threshold_of(window))
-
-# the compaction threshold: BEND_THRESHOLD (envv) > config.toml
-# `compaction_threshold` > 80 % of the model's window; either a number
-# of tokens or "45%" of the window, and never above 80 % of it
-def threshold(+envv: String, +cfgt: String, +window: U32) -> U32:
-  threshold.pick(String.is_empty(envv), envv, cfgt, window)
 
 # ---- the threshold in the Core's units ----
 # The threshold the user writes (and the 80 % cap) counts the

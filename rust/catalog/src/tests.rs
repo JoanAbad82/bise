@@ -574,18 +574,18 @@ fn prices_come_from_the_model_then_its_provider() {
 }
 
 #[test]
-fn the_default_threshold_is_80_percent_of_the_window() {
+fn the_default_threshold_is_450k_from_1m_else_85_percent() {
     let c = Catalog::builtin();
-    assert_eq!(c.default_threshold("foundry/claude-opus-5-5"), 800_000);
-    assert_eq!(c.default_threshold("anthropic/claude-haiku-4-5"), 160_000);
-    assert_eq!(c.default_threshold("nowhere/m"), 102_400);
-    // the same rounding as runtime/provider-pure.bend threshold_of
-    assert_eq!(threshold_of(131_072), 104_857);
+    assert_eq!(c.default_threshold("foundry/claude-opus-5-5"), 450_000);
+    assert_eq!(c.default_threshold("anthropic/claude-haiku-4-5"), 170_000);
+    assert_eq!(c.default_threshold("nowhere/m"), 108_800);
+    // the same rounding as runtime/threshold-pure.bend threshold_of
+    assert_eq!(threshold_of(131_072), 111_411);
     assert_eq!(threshold_of(0), 0);
 }
 
 /// BISE-300: config `compaction_threshold` is tokens or a share of the
-/// window, never above 80 % of it; the old `threshold` key is not read
+/// window, never above 85 % of it; the old `threshold` key is not read
 /// (a warning says to rename it). The same cases as the Bend laws
 /// `threshold_tokens_or_percent` / `threshold_capped_at_80_percent` /
 /// `threshold_bad_values_default`.
@@ -595,16 +595,16 @@ fn the_compaction_threshold_is_tokens_or_a_share_capped_at_80_percent() {
     assert_eq!(compaction_threshold(Some("45%"), 1_000_000), 450_000);
     assert_eq!(compaction_threshold(Some("45%"), 200_000), 90_000);
     assert_eq!(compaction_threshold(Some(" 45 % "), 128_000), 57_600);
-    // the cap: a 1M number on a 200k model, a share above 80 %
-    assert_eq!(compaction_threshold(Some("450000"), 200_000), 160_000);
-    assert_eq!(compaction_threshold(Some("95%"), 1_000_000), 800_000);
-    assert_eq!(compaction_threshold(Some("250%"), 200_000), 160_000);
-    assert_eq!(compaction_threshold(Some("99999999999999999999"), 200_000), 160_000);
+    // the cap: a 1M number on a 200k model, a share above 85 %
+    assert_eq!(compaction_threshold(Some("450000"), 200_000), 170_000);
+    assert_eq!(compaction_threshold(Some("95%"), 1_000_000), 850_000);
+    assert_eq!(compaction_threshold(Some("250%"), 200_000), 170_000);
+    assert_eq!(compaction_threshold(Some("99999999999999999999"), 200_000), 170_000);
     // no threshold: the default
     for bad in ["0", "0%", "lots", "4.5%", "%", "", "-5", "+5"] {
-        assert_eq!(compaction_threshold(Some(bad), 200_000), 160_000, "{bad}");
+        assert_eq!(compaction_threshold(Some(bad), 200_000), 170_000, "{bad}");
     }
-    assert_eq!(compaction_threshold(None, 200_000), 160_000);
+    assert_eq!(compaction_threshold(None, 200_000), 170_000);
 
     let s = Setup::from_text(Some("compaction_threshold = 450000\n"), &|_| None);
     assert_eq!(s.compaction_threshold.as_deref(), Some("450000"));

@@ -18,7 +18,7 @@ pub const KEYS: [(&str, &str); 7] = [
     ("project_doc_fallback_filenames", "files read when a folder has no AGENTS.md, comma-separated (e.g. CLAUDE.md)"),
     (
         "compaction_threshold",
-        "when a conversation compacts: tokens (450000) or a share of the model's window (45%). at most 80% of the window. unset: 80%",
+        "when a conversation compacts: tokens (450000) or a share of the model's window (45%). at most 85% of the window. unset: 450000 from a 1M window, else 85%",
     ),
     // approvals-design.md §8: the global mode, shift+tab writes it too
     ("approvals", "yolo: every call runs, nothing asks. auto: safe calls run, risky ones ask you. unset: yolo"),
@@ -102,7 +102,7 @@ pub fn value_of(setup: &Setup, key: &str, value: &str) -> Result<(String, Vec<St
             let t = crate::compaction_threshold(Some(&v), w);
             let notes = match crate::threshold_written(&v, w) {
                 Some(n) if n > t && !setup.model.is_empty() => {
-                    vec![format!("{} compacts at {} tokens: at most 80% of its {} window", setup.model, t, w)]
+                    vec![format!("{} compacts at {} tokens: at most 85% of its {} window", setup.model, t, w)]
                 }
                 _ => Vec::new(),
             };
@@ -316,7 +316,7 @@ mod tests {
         assert_eq!(value_of(&s, "compaction_threshold", "450000").unwrap().0, "450000");
         assert_eq!(value_of(&s, "compaction_threshold", " 45 % ").unwrap().0, "\"45%\"");
         let (_, notes) = value_of(&s, "compaction_threshold", "450000").unwrap();
-        assert_eq!(notes, ["anthropic/claude-haiku-4-5 compacts at 160000 tokens: at most 80% of its 200000 window"]);
+        assert_eq!(notes, ["anthropic/claude-haiku-4-5 compacts at 170000 tokens: at most 85% of its 200000 window"]);
         assert!(value_of(&s, "compaction_threshold", "70%").unwrap().1.is_empty());
         for bad in ["0", "lots", "4.5%", "%", "-1"] {
             assert!(value_of(&s, "compaction_threshold", bad).unwrap_err().contains("not a threshold"), "{bad}");

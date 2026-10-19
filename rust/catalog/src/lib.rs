@@ -34,6 +34,8 @@ pub mod picks;
 pub mod roles;
 pub mod secrets_cli;
 pub mod spawn;
+mod threshold;
+pub use threshold::*;
 pub mod voice;
 
 /// The command's name in messages and usages (BISE-165: was `bend-harness`).
@@ -598,11 +600,12 @@ impl Catalog {
 
     /// The compaction threshold a model gets when neither
     /// BEND_THRESHOLD nor config `compaction_threshold` says (BISE-150):
-    /// 80 % of its context window, also the most any value gets
+    /// 450k from a 1M window, else 85 % of it (issue #18; the most any
+    /// value gets: 85 %)
     /// (BISE-300, [`compaction_threshold`]). The Bend runtime computes
-    /// the same (runtime/provider-pure.bend, `threshold_of`).
+    /// the same (runtime/threshold-pure.bend, `thr_default`).
     pub fn default_threshold(&self, name: &str) -> u64 {
-        threshold_of(self.context_window(name))
+        default_threshold_of(self.context_window(name))
     }
 
     /// Merge one TOML layer (the built-in list, then the config).
@@ -850,42 +853,6 @@ fn kind_of(v: &toml::Value) -> Option<Kind> {
     }
 }
 
-/// 80 % of a context window, in tokens.
-pub fn threshold_of(context: u64) -> u64 {
-    context / 5 * 4 + context % 5 * 4 / 5
-}
-
-/// A compaction threshold as written (BISE-300), in tokens for a model
-/// with this window: a number of tokens ("450000") or a share of the
-/// window ("45%", above 100 counts as 100). None when it is no threshold
-/// (0, empty, a word, a decimal share): the default applies. The Bend
-/// runtime reads the same (runtime/provider-pure.bend `thr_value`).
-pub fn threshold_written(v: &str, context: u64) -> Option<u64> {
-    fn digits(s: &str) -> Option<u64> {
-        if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) {
-            return None;
-        }
-        Some(s.parse::<u64>().unwrap_or(u64::MAX))
-    }
-    let v = v.trim();
-    let n = match v.strip_suffix('%') {
-        Some(p) => {
-            let p = digits(p.trim())?.min(100);
-            context / 100 * p + context % 100 * p / 100
-        }
-        None => digits(v)?,
-    };
-    (n > 0).then_some(n)
-}
-
-/// The compaction threshold of a model with this window (BISE-300): the
-/// value written (BEND_THRESHOLD, else config `compaction_threshold`),
-/// never above 80 % of the window; none or no threshold: that 80 %. A
-/// number written for a 1M model stays safe on a 200k one.
-pub fn compaction_threshold(written: Option<&str>, context: u64) -> u64 {
-    let cap = threshold_of(context);
-    written.and_then(|v| threshold_written(v, context)).map_or(cap, |n| n.min(cap))
-}
 
 fn set_str(slot: &mut String, v: Option<String>, where_: &str, k: &str, warn: &mut dyn FnMut(String)) {
     match v {
@@ -1098,7 +1065,7 @@ fn read_threshold(t: &toml::Table, warnings: &mut Vec<String>) -> Option<String>
         }
     };
     if threshold_written(&v, 1_000_000).is_none() {
-        warnings.push(format!("config.toml: compaction_threshold: {} (80% of the window applies)", WHAT));
+        warnings.push(format!("config.toml: compaction_threshold: {} (the default applies)", WHAT));
     }
     Some(v)
 }

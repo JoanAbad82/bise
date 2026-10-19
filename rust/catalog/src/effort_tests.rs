@@ -253,3 +253,19 @@ fn no_network_no_file_the_table_and_the_family() {
     assert_eq!(s.catalog.resolve("anthropic/claude-opus-5-5").efforts(), ["none", "low", "medium", "high", "xhigh", "max"]);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn openai_models_default_to_medium() {
+    // issue #18 (page token-audit, Gabriel's pick): OpenAI's models default
+    // to medium on both routes, as Codex; the other providers keep theirs
+    let s = Setup::from_text(Some(""), &no_env);
+    for p in ["openai", "chatgpt"] {
+        for m in ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna"] {
+            assert_eq!(s.catalog.resolve(&format!("{p}/{m}")).caps.effort, "medium", "{p}/{m}");
+        }
+        let h = s.handoff_toml();
+        let t = &h[h.find(&format!("[providers.{p}]")).unwrap()..];
+        assert!(t[..t[1..].find("\n[").unwrap()].contains("effort = \"medium\""), "{p}: {t}");
+    }
+    assert_eq!(s.catalog.resolve("anthropic/claude-opus-5-5").caps.effort, "");
+}

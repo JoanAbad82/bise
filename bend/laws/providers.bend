@@ -9,6 +9,7 @@ import ../core/wire.bend as W
 import ../core/oai-chat.bend as Oai
 import ../core/oai-resp.bend as Rs
 import ../runtime/provider-pure.bend as Pv
+import ../runtime/threshold-pure.bend as Th
 import ../runtime/settings-pure.bend as St
 import ../vendor/json.bend as J
 
@@ -162,16 +163,54 @@ base_url = \"https://foundry.example.net/anthropic/v1\"
 efforts = \"none,low,medium,high,xhigh,max\"", "")))
     == ("medium", "low") : String & String}
 
-# LAW (BISE-150): the compaction threshold defaults to 80 % of the
+# LAW (BISE-150, issue #18): no threshold ever goes past 85 % of the
 # model's context window: its `context` in the models file, else its
 # provider's; nothing says (an unknown provider, no models file for a
 # provider the built-in table lacks): 128000, as rust/catalog's
-# DEFAULT_CAPS. BEND_THRESHOLD > config compaction_threshold > that
-# default (BISE-300: never above it either).
-law threshold_is_80_percent_of_the_window:
-  {(Pv.threshold_of(1000000), Pv.threshold_of(200000), Pv.threshold_of(128000),
-      Pv.threshold_of(131072), Pv.threshold_of(0))
-    == (800000, 160000, 102400, 104857, 0) : U32 & U32 & U32 & U32 & U32}
+# DEFAULT_CAPS. BEND_THRESHOLD > config compaction_threshold > the
+# default (450k from a 1M window, else that 85 %).
+law threshold_cap_is_85_percent_of_the_window:
+  {(Th.threshold_of(1000000), Th.threshold_of(200000), Th.threshold_of(128000),
+      Th.threshold_of(131072), Th.threshold_of(0))
+    == (850000, 170000, 108800, 111411, 0) : U32 & U32 & U32 & U32 & U32}
+
+# LAW (issue #18, Gabriel on page token-audit): the rows of
+# rust/catalog/testdata/compaction_threshold.tsv, which rust/catalog's
+# compaction_threshold holds too (its test reads this law's rows)
+law threshold_rows:
+  {(Th.threshold("", "", 1050000),
+      Th.threshold("", "", 1000000),
+      Th.threshold("", "", 999999),
+      Th.threshold("", "", 200000),
+      Th.threshold("", "", 128000),
+      Th.threshold("", "compaction_threshold = 600000", 1050000),
+      Th.threshold("", "compaction_threshold = \"45%\"", 1050000),
+      Th.threshold("", "compaction_threshold = \"95%\"", 1050000),
+      Th.threshold("", "compaction_threshold = 450000", 200000))
+    == (450000, 450000, 849999, 170000, 108800, 600000, 472500, 892500, 170000)
+    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# LAW (issue #18): nothing written, a window of 1M or more compacts at
+# 450k (the Core gets 337500), whatever the model
+law default_caps_at_450k_from_1m:
+  {(Th.threshold("", "", 1000000), Th.threshold("", "", 2000000),
+      Pv.est_units(Th.threshold("", "", 1050000)))
+    == (450000, 450000, 337500) : U32 & U32 & U32}
+
+# LAW (issue #18): a value written wins over the 450k default, from the
+# config or the environment, up to 85 % of the window
+law written_value_not_capped_by_450k:
+  {(Th.threshold("", "compaction_threshold = 600000", 1000000),
+      Th.threshold("700000", "", 1000000),
+      Th.threshold("", "compaction_threshold = 900000", 1000000))
+    == (600000, 700000, 850000) : U32 & U32 & U32}
+
+# LAW (issue #18): the default never goes past 85 % of the window
+law default_never_past_85:
+  {(U32.is_lt(Th.threshold_of(1000000), Th.threshold("", "", 1000000)),
+      U32.is_lt(Th.threshold_of(999999), Th.threshold("", "", 999999)),
+      U32.is_lt(Th.threshold_of(500), Th.threshold("", "", 500)))
+    == (False{}, False{}, False{}) : Bool & Bool & Bool}
 
 law window_builtin_setups:
   {(Pv.window("", "", "", "", "model = \"opus-5.5\"", ""),
@@ -197,11 +236,11 @@ law window_unknown_model_default:
     == (128000, 128000) : U32 & U32}
 
 law threshold_precedence:
-  {(Pv.threshold("5000", "compaction_threshold = 7000", 1000000),
-      Pv.threshold("", "compaction_threshold = 7000", 1000000),
-      Pv.threshold("", "model = \"x\"", 200000),
-      Pv.threshold("oops", "compaction_threshold = 7000", 200000))
-    == (5000, 7000, 160000, 160000) : U32 & U32 & U32 & U32}
+  {(Th.threshold("5000", "compaction_threshold = 7000", 1000000),
+      Th.threshold("", "compaction_threshold = 7000", 1000000),
+      Th.threshold("", "model = \"x\"", 200000),
+      Th.threshold("oops", "compaction_threshold = 7000", 200000))
+    == (5000, 7000, 170000, 170000) : U32 & U32 & U32 & U32}
 
 # LAW: the Core gets the threshold in its own units, three quarters of
 # the provider's tokens (Pv.est_units). Main's 450000 becomes 337500:
@@ -220,37 +259,37 @@ law threshold_in_core_units:
 # a share of the model's window ("45%", spaces allowed around it);
 # BEND_THRESHOLD reads the same way.
 law threshold_tokens_or_percent:
-  {(Pv.threshold("", "compaction_threshold = 450000", 1000000),
-      Pv.threshold("", "compaction_threshold = \"45%\"", 1000000),
-      Pv.threshold("", "compaction_threshold = \"45%\"", 200000),
-      Pv.threshold("", "compaction_threshold = \" 45 % \"", 128000),
-      Pv.threshold("10%", "compaction_threshold = 7000", 200000))
+  {(Th.threshold("", "compaction_threshold = 450000", 1000000),
+      Th.threshold("", "compaction_threshold = \"45%\"", 1000000),
+      Th.threshold("", "compaction_threshold = \"45%\"", 200000),
+      Th.threshold("", "compaction_threshold = \" 45 % \"", 128000),
+      Th.threshold("10%", "compaction_threshold = 7000", 200000))
     == (450000, 450000, 90000, 57600, 20000)
     : U32 & U32 & U32 & U32 & U32}
 
-# LAW (BISE-300): the threshold never goes above 80 % of the model's
-# window, whoever sets it: a number written for a 1M model on a 200k
-# one, a share above 80 %, the environment.
-law threshold_capped_at_80_percent:
-  {(Pv.threshold("", "compaction_threshold = 450000", 200000),
-      Pv.threshold("", "compaction_threshold = \"95%\"", 1000000),
-      Pv.threshold("", "compaction_threshold = \"250%\"", 200000),
-      Pv.threshold("900000", "", 200000),
-      Pv.threshold("", "compaction_threshold = 160000", 200000))
-    == (160000, 800000, 160000, 160000, 160000)
+# LAW (BISE-300, issue #18): the threshold never goes above 85 % of the
+# model's window, whoever sets it: a number written for a 1M model on a
+# 200k one, a share above 85 %, the environment.
+law threshold_capped_at_85_percent:
+  {(Th.threshold("", "compaction_threshold = 450000", 200000),
+      Th.threshold("", "compaction_threshold = \"95%\"", 1000000),
+      Th.threshold("", "compaction_threshold = \"250%\"", 200000),
+      Th.threshold("900000", "", 200000),
+      Th.threshold("", "compaction_threshold = 160000", 200000))
+    == (170000, 850000, 170000, 170000, 160000)
     : U32 & U32 & U32 & U32 & U32}
 
 # LAW (BISE-300): a value that is no threshold (0, 0 %, a word, a
 # decimal share, a lone %) leaves the default; the old key `threshold`
 # is not read any more.
 law threshold_bad_values_default:
-  {(Pv.threshold("", "compaction_threshold = 0", 200000),
-      Pv.threshold("", "compaction_threshold = \"0%\"", 200000),
-      Pv.threshold("", "compaction_threshold = \"lots\"", 200000),
-      Pv.threshold("", "compaction_threshold = \"4.5%\"", 200000),
-      Pv.threshold("", "compaction_threshold = \"%\"", 200000),
-      Pv.threshold("", "threshold = 7000", 200000))
-    == (160000, 160000, 160000, 160000, 160000, 160000)
+  {(Th.threshold("", "compaction_threshold = 0", 200000),
+      Th.threshold("", "compaction_threshold = \"0%\"", 200000),
+      Th.threshold("", "compaction_threshold = \"lots\"", 200000),
+      Th.threshold("", "compaction_threshold = \"4.5%\"", 200000),
+      Th.threshold("", "compaction_threshold = \"%\"", 200000),
+      Th.threshold("", "threshold = 7000", 200000))
+    == (170000, 170000, 170000, 170000, 170000, 170000)
     : U32 & U32 & U32 & U32 & U32 & U32}
 
 # LAW (BISE-150): the config template leaves the threshold to the model

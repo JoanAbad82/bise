@@ -5,12 +5,12 @@
 # the file instead.
 1200 bend/core/wire.bend
 3765 bend/hub/core.bend
-1340 bend/runtime/provider-pure.bend
+1268 bend/runtime/provider-pure.bend
 1319 docs/brand/design-system/content.py
 1387 docs/brand/readme/make.py
 1335 rust/catalog/src/auth_cli.rs
 1118 rust/catalog/src/chatgpt.rs
-1722 rust/catalog/src/lib.rs
+1689 rust/catalog/src/lib.rs
 1251 rust/catalog/src/tests.rs
 1112 rust/harness/src/doctor.rs
 1230 rust/harness/src/main.rs

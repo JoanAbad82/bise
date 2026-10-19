@@ -227,6 +227,9 @@ max_output = 128000
 vision = true
 reasoning = true
 efforts = "low,medium,high,xhigh,max"
+# Codex's default for OpenAI's models (issue #18: high spent a plan's
+# 5 hours on one issue; Gabriel's pick, page token-audit)
+effort = "medium"
 
 # the flagship, for complex reasoning and coding
 [models."openai/gpt-6-astra"]
@@ -280,6 +283,8 @@ max_output = 128000
 vision = true
 reasoning = true
 efforts = "low,medium,high,xhigh,max"
+# as openai's: Codex's default (issue #18)
+effort = "medium"
 
 [models."chatgpt/gpt-6.1-sol"]
 

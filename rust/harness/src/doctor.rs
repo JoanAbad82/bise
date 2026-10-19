@@ -699,8 +699,8 @@ fn keys_and_model(home: &bise_home::Home) -> (Check, Vec<Check>, Check) {
 }
 
 /// When the conversations compact (BISE-300): BEND_THRESHOLD (`env`),
-/// else config `compaction_threshold`, else 80 % of the window; tokens
-/// or a share of the window, never above 80 % of it. One figure per
+/// else config `compaction_threshold`, else 450k from a 1M window, else 85 %
+/// of it; tokens or a share of the window, never above 85 %. One figure per
 /// model that runs (main, the agents when theirs differs).
 pub(crate) fn compaction_check(setup: &bise_catalog::Setup, env: Option<&str>) -> Check {
     let env = env.map(str::trim).filter(|v| !v.is_empty());
@@ -728,16 +728,16 @@ pub(crate) fn compaction_check(setup: &bise_catalog::Setup, env: Option<&str>) -
             let w = setup.catalog.context_window(m);
             let t = bise_catalog::compaction_threshold(written, w);
             let capped = written.and_then(|v| bise_catalog::threshold_written(v, w)).is_some_and(|n| n > t);
-            let note = if capped { format!(" (capped: 80% of its {} window)", short(w)) } else { String::new() };
+            let note = if capped { format!(" (capped: 85% of its {} window)", short(w)) } else { String::new() };
             format!("{} {} tokens{}", name, t, note)
         })
         .collect();
     let figures = if figures.is_empty() { String::new() } else { format!(" · {}", figures.join(" · ")) };
     match written {
-        None => ok("compaction", format!("at 80% of the model's window{}", figures)),
+        None => ok("compaction", format!("450k from a 1M window, else 85% of it{}", figures)),
         Some(v) if bise_catalog::threshold_written(v, 1_000_000).is_none() => warn(
             "compaction",
-            format!("{} = {} is not a threshold: 80% of the window applies{}", from, v, figures),
+            format!("{} = {} is not a threshold: the default applies{}", from, v, figures),
             "set compaction_threshold = 450000 (tokens) or \"45%\" (of the window) in config.toml",
         ),
         Some(v) => ok("compaction", format!("{} = {}{}", from, v, figures)),
@@ -1021,9 +1021,9 @@ mod tests {
         };
         let c = compaction_check(&cfg(""), None);
         assert_eq!(c.mark, Mark::Ok);
-        assert_eq!(c.detail, "at 80% of the model's window · main 800000 tokens · agents 160000 tokens");
+        assert_eq!(c.detail, "450k from a 1M window, else 85% of it · main 450000 tokens · agents 170000 tokens");
         let c = compaction_check(&cfg("compaction_threshold = 450000\n"), None);
-        assert_eq!(c.detail, "compaction_threshold = 450000 · main 450000 tokens · agents 160000 tokens (capped: 80% of its 200k window)");
+        assert_eq!(c.detail, "compaction_threshold = 450000 · main 450000 tokens · agents 170000 tokens (capped: 85% of its 200k window)");
         let c = compaction_check(&cfg("compaction_threshold = \"45%\"\n"), None);
         assert_eq!(c.detail, "compaction_threshold = 45% · main 450000 tokens · agents 90000 tokens");
         let c = compaction_check(&cfg("compaction_threshold = \"lots\"\n"), None);
@@ -1033,7 +1033,7 @@ mod tests {
         assert_eq!(c.detail, "BEND_THRESHOLD = 10% · main 100000 tokens · agents 20000 tokens");
         // the old key: not read, the config line says so
         let s = cfg("threshold = 450000\n");
-        assert_eq!(compaction_check(&s, None).detail, "at 80% of the model's window · main 800000 tokens · agents 160000 tokens");
+        assert_eq!(compaction_check(&s, None).detail, "450k from a 1M window, else 85% of it · main 450000 tokens · agents 170000 tokens");
         assert!(s.catalog.warnings.iter().any(|w| w.contains("rename it compaction_threshold")), "{:?}", s.catalog.warnings);
     }
 
