@@ -23,8 +23,8 @@ export interface TownSite {
   readonly id: string;
   /** its whole ground (the grass block): nothing of the town comes inside */
   readonly fp: Rect;
-  /** its door's x: the dirt path leaves the ground's front edge there */
-  readonly doorX: number;
+  /** where its dirt path meets it (render/decor.ts pathEnd: the terrace's or the floor's front edge at the door's x): the path runs +z from there */
+  readonly door: Pt;
   /** bise's own home (bims m_29650): at the heart of the town, on its own square, the middle row split round it */
   readonly home?: boolean;
 }
@@ -36,7 +36,7 @@ export interface Placed {
   readonly z: number;
   /** its ground, town units */
   readonly fp: Rect;
-  /** the path's start: the door's x on the ground's front edge, town units */
+  /** the path's start: its site's door, town units */
   readonly door: Pt;
 }
 
@@ -45,7 +45,7 @@ export interface Bridge extends Pt {
   readonly ang: number;
 }
 
-/** a dirt path, straight along +z from the door to the road */
+/** a dirt path, straight along +z from the office (its site's door: the terrace's or the floor's front edge) to the road's middle line */
 export interface Path {
   readonly x: number;
   readonly z0: number;
@@ -296,7 +296,7 @@ function layOut(sites: readonly TownSite[], seed: number): TownPlan {
       return {
         id: s.id, x, z,
         fp: { x0: x + s.fp.x0, x1: x + s.fp.x1, z0: z + s.fp.z0, z1: z + s.fp.z1 },
-        door: { x: x + s.doorX, z: z + s.fp.z1 },
+        door: { x: x + s.door.x, z: z + s.door.z },
       };
     });
     const front = Math.max(...offices.map((p) => p.fp.z1));

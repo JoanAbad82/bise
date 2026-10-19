@@ -60,6 +60,8 @@ interface Drawn {
   box: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number } | null;
   /** the box's depth from the camera, and the camera's clipping planes */
   depth: { min: number; max: number; near: number; far: number } | null;
+  /** where its dirt path meets it (town/plan.ts Placed.door), css px in the canvas: the path check pinches in there */
+  door: { x: number; y: number };
 }
 
 /** the world box of what is drawn under `obj`: its visible meshes only (a live office's hidden world left out) */
@@ -457,6 +459,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
         id: p.id, inView: inView(f, p), shown, live: s?.live === true, fp: { ...p.fp },
         box: b ? { x0: b.min.x, x1: b.max.x, y0: b.min.y, y1: b.max.y, z0: b.min.z, z1: b.max.z } : null,
         depth,
+        door: toScreen(f, { x: p.door.x, y: 0, z: p.door.z }),
       };
     });
   }

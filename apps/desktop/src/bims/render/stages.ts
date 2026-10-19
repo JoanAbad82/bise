@@ -9,7 +9,7 @@
 import { Group, type Object3D } from 'three';
 import type { Box, Office, Pt } from '../model';
 import { BASE_BEDS, bedStage, bedsAt, type Grow } from '../growth';
-import { type Decor, decorOf } from './decor';
+import { type Decor, decorOf, terraceSlab } from './decor';
 import { type Kit, boxOf, glyph, onFloor } from './kit';
 import { WORLD, hash, rng } from './palette';
 import type { Build } from './maps/look';
@@ -181,7 +181,7 @@ export function buildStages(b: Build): void {
   // the terrace: grass in a new office; the first done bim makes it, with its first deck chair
   // (bims m_28178). Its deck chairs come with the stages
   const s1t = s(1);
-  if (s1t) onFloor(k, s1t, boxOf(d.terrace), 0.08, 0, pal.terrace);
+  if (s1t) onFloor(k, s1t, terraceSlab(o), 0.08, 0, pal.terrace);
   const isChair = (b: Box): boolean => b.of !== undefined && o.terrace.some((t) => t.x === b.of?.x && t.z === b.of.z);
   const chairs = boxes.filter(isChair);
   const nChairs = at(CHAIRS, g.stage);

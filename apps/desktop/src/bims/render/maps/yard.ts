@@ -20,7 +20,8 @@ import {
 import type { Box, Office, Pt, Spot } from '../../model';
 import { BASE_BEDS, bedStage, bedsAt } from '../../growth';
 import { boxAhead, chair, deskLamp, laptop } from '../furniture';
-import { glyph, type Kit } from '../kit';
+import { glyph, onFloor, type Kit } from '../kit';
+import { PATH_HALF, terraceSlab } from '../decor';
 import { HOODIE, WORLD, hash, type Palette } from '../palette';
 import { cones, deckChair, garden } from '../stages';
 import type { Build, DeskHandles } from './look';
@@ -62,10 +63,26 @@ export function pieceSpots(o: Office): Pt[] {
   const tx = o.terrace.map((t) => t.x);
   const left = tx.length ? Math.min(...tx) < o.x0 + o.W / 2 : true;
   const free = left ? x1 - 1.6 : o.x0 + 1.6;
-  const isl = o.island;
   const bx = o.boardSpots.length ? o.boardSpots.reduce((s, p) => s + p.x, 0) / o.boardSpots.length : o.x0 + o.W / 2;
+  // a piece out front stays off the town's dirt path at the door (render/decor.ts pathEnd): pushed
+  // past it, away from the terrace (its deck chairs are on the other side)
+  const clear = PATH_HALF + PIECE_REACH;
+  const offPath = (p: Pt): Pt => (p.z > o.D && Math.abs(p.x - o.door.x) < clear ? { x: o.door.x + (left ? clear : -clear), z: p.z } : p);
   return [
     o.door,
+    ...pieceSpotsFrom(o, left, free, lc, bx).map(offPath),
+  ];
+}
+
+/** what a stage's piece may reach from its spot (the patio's palapa's thatched roof, a game table) */
+const PIECE_REACH = 1.3;
+
+/** pieceSpots past the door, before they keep off the path */
+function pieceSpotsFrom(o: Office, left: boolean, free: number, lc: number, bx: number): Pt[] {
+  const x1 = o.x0 + o.W;
+  const tx = o.terrace.map((t) => t.x);
+  const isl = o.island;
+  return [
     { x: left ? o.x0 + 0.3 : x1 - 0.3, z: o.D - 0.25 },
     { x: (isl.x0 + isl.x1) / 2, z: (isl.z0 + isl.z1) / 2 },
     { x: lc, z: 1.6 },
@@ -196,13 +213,7 @@ export function terrace(b: Build, slab: string, cloth: readonly string[]): void 
   const { k, o, grow } = b;
   const s1 = b.stage(1);
   if (!s1) return;
-  const xs = o.terrace.map((t) => t.x);
-  const zs = o.terrace.map((t) => t.z);
-  const x0 = Math.min(...xs) - 0.8;
-  const x1 = Math.max(...xs) + 0.8;
-  const z0 = o.D + 0.15;
-  const z1 = Math.max(...zs) + 0.8;
-  k.add(k.style.box(x1 - x0, 0.08, z1 - z0), k.mat(slab), s1, (x0 + x1) / 2, 0, (z0 + z1) / 2);
+  onFloor(k, s1, terraceSlab(o), 0.08, 0, slab);
   const own = o.furniture.filter((x) => x.of !== undefined && o.terrace.some((t) => t.x === x.of?.x && t.z === x.of.z));
   own.forEach((box, i) => {
     if (i >= at(CHAIRS, grow.stage)) return;

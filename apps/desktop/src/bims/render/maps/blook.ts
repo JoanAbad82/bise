@@ -10,7 +10,7 @@ import type { Box, Office, Pt, Spot } from '../../model';
 import { BASE_BEDS, bedStage, bedsAt, type Grow } from '../../growth';
 import { chair, deskLamp, laptop } from '../furniture';
 import { type Kit, boxOf, glyph, onFloor } from '../kit';
-import { decorOf } from '../decor';
+import { decorOf, terraceSlab } from '../decor';
 import { DAY, HOODIE, NIGHT, type Palette, WORLD, hash, rng } from '../palette';
 import { bigPlant, boombox, cones, deckChair, fruitBowl, garden, loftTree, mural, whiteboard } from '../stages';
 import type { Build, DeskHandles } from './look';
@@ -157,7 +157,7 @@ export function grow(b: Build, g: Grower): void {
   const d = decorOf(o);
   // the terrace: grass in a new office; its deck chairs come with the stages (the loft's)
   const s1 = b.stage(1);
-  if (s1) onFloor(k, s1, boxOf(d.terrace), 0.08, 0, k.pal.terrace);
+  if (s1) onFloor(k, s1, terraceSlab(o), 0.08, 0, k.pal.terrace);
   const chairs = o.furniture.filter((f) => f.of !== undefined && o.terrace.some((t) => t.x === f.of?.x && t.z === f.of.z));
   const nChairs = at(CHAIRS, gr.stage);
   chairs.forEach((f, i) => {

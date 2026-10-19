@@ -7,6 +7,7 @@ import { BufferAttribute, BufferGeometry, ConeGeometry, Group, Mesh } from 'thre
 import type { Box, Pt } from '../model';
 import { slabWithPits } from './ground';
 import { ROAD, RIVER, BANK, type TownPlan } from '../town/plan';
+import { APRON_D, APRON_HALF, PATH_HALF } from './decor';
 import { kitOf } from './kit';
 import type { Palette } from './palette';
 import type { Style } from './style';
@@ -42,6 +43,10 @@ export const TOWN_NIGHT: TownColours = {
 
 /** the lawn's top: the offices' own grass blocks stand a little over it */
 export const LAWN_TOP = -0.06;
+/** a dirt path's thickness: its top 0.01 over the lawn, under the road (LAWN_TOP + 0.02) and the river's banks */
+export const PATH_H = 0.02;
+/** a dirt path's top */
+export const PATH_TOP = LAWN_TOP + 0.01;
 
 /** A flat ribbon along a line, `half` each side, at height y; only its stretches inside the lawn. */
 function ribbon(pts: readonly Pt[], half: number, y: number, inLawn: (p: Pt) => boolean): BufferGeometry {
@@ -108,10 +113,15 @@ export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: To
   }
   for (const d of dashes) flat(ribbon(d, 0.06, LAWN_TOP + 0.03, inLawn), c.dash);
 
-  // the dirt paths, from the door to the road
+  // the dirt paths, from the terrace's (or the floor's) front edge to the road's middle line, an apron
+  // where they arrive (bims m_32735). Their top a little over the grass, under the road's and the
+  // river's ribbons and every slab: they end under the road, never coplanar with it
   for (const p of plan.paths) {
     const len = p.z1 - p.z0;
-    if (len > 0) k.add(style.box(1.0, 0.04, len, 0.01), k.mat(c.path), root, p.x, LAWN_TOP + 0.0, p.z0 + len / 2);
+    if (len <= 0) continue;
+    k.add(style.box(PATH_HALF * 2, PATH_H, len, 0.005), k.mat(c.path), root, p.x, PATH_TOP - PATH_H / 2, p.z0 + len / 2);
+    const ad = Math.min(APRON_D, len);
+    k.add(style.box(APRON_HALF * 2, PATH_H, ad, 0.005), k.mat(c.path), root, p.x, PATH_TOP - PATH_H / 2, p.z0 + ad / 2);
   }
 
   // the bridges: a wooden deck with low rails, along the road

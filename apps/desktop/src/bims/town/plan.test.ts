@@ -7,6 +7,7 @@ import { layoutOf } from '../maps';
 import { growOf } from '../growth';
 import { BANK, ROAD, crossings, perRow, rngOf, rowSizes, seedOf, smooth, townPlan, type TownPlan, type TownSite } from './plan';
 import { siteOf, townSeed } from './ground';
+import { PATH_HALF } from '../render/decor';
 
 /** a project's site: n agents, that many jobs done (its stage) and days used (its garden) */
 function site(id: string, n: number, jobs: number, days: number): TownSite {
@@ -63,6 +64,40 @@ describe('town plan', () => {
           const others = plan.offices.filter((p) => !(Math.abs(p.door.x - pa.x) < 1e-9 && Math.abs(p.door.z - pa.z0) < 1e-9));
           expect(inOffice({ ...plan, offices: others }, pa.x, z, 0), `a path through an office at ${pa.x.toFixed(1)}, ${z.toFixed(1)}`).toBe(false);
         }
+      }
+    }
+  });
+
+  it('runs every path from its office\'s door (the terrace\'s or the floor\'s front edge) into the road: both its end corners on the road ribbon (town-paths)', () => {
+    const toSeg = (x: number, z: number, a: { x: number; z: number }, b: { x: number; z: number }): number => {
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1)));
+      return Math.hypot(x - a.x - t * dx, z - a.z - t * dz);
+    };
+    const toRoad = (plan: TownPlan, x: number, z: number): number => {
+      let d = Infinity;
+      for (let i = 0; i + 1 < plan.road.length; i++) {
+        const a = plan.road[i];
+        const b = plan.road[i + 1];
+        if (a !== undefined && b !== undefined) d = Math.min(d, toSeg(x, z, a, b));
+      }
+      return d;
+    };
+    for (let n = 1; n <= 24; n++) {
+      for (let s = 0; s < 3; s++) {
+        const ss = sites(n, n * 31 + s);
+        const plan = townPlan(ss, townSeed(ss.map((x) => x.id)) + s);
+        expect(plan.paths, `${String(n)} projects: one path per door`).toHaveLength(n);
+        plan.offices.forEach((p) => {
+          const pa = plan.paths.find((q) => Math.abs(q.x - p.door.x) < 1e-9 && Math.abs(q.z0 - p.door.z) < 1e-9);
+          expect(pa, `${p.id}: a path from its door`).toBeDefined();
+          if (pa === undefined) return;
+          for (const dx of [-PATH_HALF, 0, PATH_HALF]) {
+            const d = toRoad(plan, pa.x + dx, pa.z1);
+            expect(d, `${p.id} (${String(n)} projects, draw ${String(s)}): its end ${dx.toFixed(1)} across is ${d.toFixed(2)} from the road's middle`).toBeLessThan(ROAD - 0.05);
+          }
+        });
       }
     }
   });
@@ -163,7 +198,7 @@ describe('town plan: bise\'s home at the heart (bims m_29650)', () => {
     const plain = siteOf('x', o, g);
     const home = siteOf('x', o, g, true);
     expect(home.fp.x1 - home.fp.x0).toBeCloseTo((plain.fp.x1 - plain.fp.x0) * 1.15, 6);
-    expect(home.doorX).toBe(plain.doorX);
+    expect(home.door).toEqual(plain.door);
   });
 });
 
