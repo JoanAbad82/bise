@@ -107,7 +107,7 @@ export function advance(r: Run, t: number, night: boolean, reduced: boolean): vo
 }
 
 /** where his planes leave from, a fraction of the view's width along its bottom edge: under the feed (bims-plane m_31729) */
-export const FEED_X = 0.12;
+export const FEED_X = 0.82;
 /** his planes' least length on screen, css px (designer m_31992: ~40 px wide, never a speck) */
 export const FEED_PLANE_PX = 36;
 

@@ -272,8 +272,8 @@ export const STAMP = { at: 58.9, office: KILN, on: 'checkout' } as const;
 const bim = (office: string, name: string): Subject => ({ k: 'bim', office, name });
 const pair = (office: string, a: string, b: string): Subject => ({ k: 'pair', office, names: [a, b] });
 const kiln: Subject = { k: 'office', office: KILN };
-/** where the catcher sits while a plane from the feed (bottom left, run.ts FEED_X) flies to it: its path across the frame */
-export const FLIGHT_FRAME = { x: 0.7, y: 0.36 } as const;
+/** where the catcher sits while a plane from the feed (bottom right, run.ts FEED_X) flies to it, up left of it (designer m_32742): its path across the frame */
+export const FLIGHT_FRAME = { x: 0.52, y: 0.3 } as const;
 
 /** no cut: every move a glide (expo in-out); the camera leaves ~1 s before the action (bims-film v9) */
 export const SHOTS: readonly Shot[] = [

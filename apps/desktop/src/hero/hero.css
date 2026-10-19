@@ -134,11 +134,11 @@ html.pd .bims-hero {
 @keyframes bh-in {
   from { opacity: 0; }
 }
-/* the feed (feed.ts, designer hero-fix-2 §1 + m_31887): one soft panel bottom-left, every line a
+/* the feed (feed.ts, designer hero-fix-2 §1 + m_31887): one soft panel bottom-right (out of the page's fade, designer m_32742), every line a
    bubble with its background (his right, bise's left), so the grass never shows behind a word */
 .bims-hero .bh-feed {
   position: absolute;
-  left: 24px;
+  right: 24px;
   bottom: 24px;
   width: 300px;
   box-sizing: border-box;

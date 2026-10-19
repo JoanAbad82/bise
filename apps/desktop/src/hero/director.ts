@@ -27,8 +27,8 @@ export const RESUME_S = 2.4;
 /** the closest the visitor (or a close-up) gets, over the town's fit */
 export const MAX_ZOOM = 28;
 
-/** where the subject sits, fractions of the frame: the town's middle, past the fade on the left */
-export const SAFE = { x: 0.575, y: 0.5 } as const;
+/** where the subject sits, fractions of the frame: past the page's fade (its left 40%), above the feed (bottom right), under the controls (top right): designer m_32742 */
+export const SAFE = { x: 0.55, y: 0.36 } as const;
 /** what a whole-town or a whole-office shot fits into, fractions of the frame */
 /** the wide: the offices' bounding box centred at ~58% across, past the box's 22% fade (designer m_31061), the band at mid height (bims m_31230) */
 export const WIDE_BOX = { x0: 0.27, x1: 0.89, y0: 0.11, y1: 0.89 } as const;
@@ -130,8 +130,8 @@ export function aimInMap(at: At, zoom: number, fx: number = SAFE.x, fy: number =
   return aimCam(at, z, fx, fy);
 }
 
-/** the frame's left part the page fades into its paper (designer m_30849: its left ~20%) */
-export const FADE_X = 0.22;
+/** the frame's left part the page fades into its paper (designer m_30849: its left 40% since designer m_32728) */
+export const FADE_X = 0.4;
 
 /** Whether a point is inside a convex polygon (its corners in order, either way round). Pure. */
 export function inside(poly: readonly At[], p: At): boolean {

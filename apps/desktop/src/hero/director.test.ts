@@ -2,7 +2,7 @@
 // leaves before the action, glides never cut, the spring never overshoots, the subject sits in the
 // safe frame, and the visitor keeps the camera until he lets it go.
 import { describe, expect, it } from 'vitest';
-import { FILM_S, KILN, PAGE, SHOTS } from './cast';
+import { FILM_S, FLIGHT_FRAME, KILN, PAGE, SHOTS } from './cast';
 import { aimCam, aimInMap, FADE_X, fitCam, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, inside, LEAD_S, MIN_ZOOM, resumes, RESUME_IDLE_S, SAFE, shotAt, springStep, still } from './director';
 import { panAround, zoomAround } from './gestures';
 import { eggWords } from './overlay';
@@ -135,5 +135,20 @@ describe('a film shot near the map’s edge', () => {
     }
     // in the middle, nothing to give: its own zoom
     expect(aimInMap({ u: 0.5, v: 0.5 }, 3, SAFE.x, SAFE.y, diamond).zoom).toBe(3);
+  });
+});
+
+describe("where a film shot puts its subject (designer m_32742: the chat bottom right, the controls top right, the fade 40%)", () => {
+  it('is never in the fade, under the feed or under the controls, at any box from 860 px up', () => {
+    const points = [SAFE, FLIGHT_FRAME, ...SHOTS.flatMap((s) => (s.frame ? [s.frame] : []))];
+    for (const [w, h] of [[860, 640], [1000, 700], [1100, 800], [1440 * 0.6, 900]] as const) {
+      const feed = { x0: 1 - (24 + (w * (1 / 0.6) < 1200 ? 260 : 300)) / w, y0: 1 - (24 + 230) / h };
+      const controls = { x0: 1 - 200 / w, y1: 64 / h };
+      for (const p of points) {
+        expect(p.x, `${String(w)}: out of the fade`).toBeGreaterThan(FADE_X);
+        expect(p.x >= feed.x0 && p.y >= feed.y0, `${String(w)}x${String(h)}: (${String(p.x)}, ${String(p.y)}) under the feed`).toBe(false);
+        expect(p.x >= controls.x0 && p.y <= controls.y1, `${String(w)}: under the controls`).toBe(false);
+      }
+    }
   });
 });

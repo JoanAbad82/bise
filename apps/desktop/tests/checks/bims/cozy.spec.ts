@@ -59,6 +59,26 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
+// the floor plants green on every map (bims m_32697: the town's merge painted them white), stage 7, 640 docked
+const ALL = ['loft', 'greenhouse', 'campus', 'workshop', 'kyoto', 'riad', 'nordic', 'patio', 'haveli', 'tropical', 'cyclades', 'sahel', 'california'] as const;
+test('(cozy) the floor plants on every map, stage 7, 640 docked, light', async () => {
+  test.setTimeout(600_000);
+  const { s, core } = await open(office, { theme: 'light', width: 1600 });
+  try {
+    await showOffice(s);
+    await s.page.getByTestId('app.right.agents.width.wide').click();
+    await grow(s, core, STAGES[1]?.g ?? { jobs_done: 45, days_used: 10, artifacts_made: 80 });
+    for (const map of ALL) {
+      await pick(s, core, 'light', map);
+      await settle(s, 800, 6000);
+      await shot(s, `cozy-${TAG}-plants-${map}.png`, `${TAG}: ${map}'s floor plants, stage 7, 640 docked, day`, `${map}: its floor plants green, never white (${TAG})`);
+    }
+  } finally {
+    await s.close().catch(() => undefined);
+    core.dispose();
+  }
+});
+
 for (const map of MAPS) {
   for (const theme of ['light', 'dark'] as const) {
     test(`(cozy) ${map} at stages 0, 7, 14, 640 docked, ${theme}`, async () => {
