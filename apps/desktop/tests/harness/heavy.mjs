@@ -15,9 +15,14 @@ const SLOT_LOCK = /\/\.bise\/run\/heavy[234]?\.lock\b/;
 
 /** True when this process runs under a `lockf … heavy[234]?.lock` of its own ancestry (a
  * heavy-run around `pnpm test:land`): taking a slot again would hold both, or wait on itself. */
-export function underHeavySlot() {
+export function underHeavySlot(env = process.env) {
+  // heavy-run's own rule (it refuses a nested call): the job pid of its HEAVY_SLOT="<slot> <pid>"
+  // among this process's ancestors
+  const tail = (env.HEAVY_SLOT ?? '').split(' ').pop() ?? '';
+  const job = /^\d+$/.test(tail) ? Number(tail) : null;
   let pid = process.pid;
   for (let i = 0; i < 32 && pid > 1; i++) {
+    if (pid === job) return true;
     const r = spawnSync('ps', ['-o', 'ppid=,command=', '-p', String(pid)], { encoding: 'utf8' });
     const line = (r.stdout || '').trim();
     if (!line) return false;

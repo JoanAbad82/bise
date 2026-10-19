@@ -53,7 +53,29 @@ def pure():
     check(T.heavy_argv(cmd, lock, under=False, heavy_run=hr) == [hr] + cmd, "through heavy-run")
     check(T.heavy_argv(cmd, lock, under=False, heavy_run=hr + "-none") == ["/usr/bin/lockf", "-k", lock, "nice", "-n", "10"] + cmd, "the old lock")
     check(T.heavy_argv(cmd, lock, under=True, heavy_run=hr) == ["nice", "-n", "10"] + cmd, "in a slot already: no second one")
-    check(T.under_heavy_slot() is False, "this test runs in no slot")
+    check(T.under_heavy_slot(env={}) is False, "this test runs in no slot")
+    # heavy-run's 4 slots and its HEAVY_SLOT job (gate-reds, review-gates m_33477): a job in slot 3
+    # or 4 runs in place (heavy-run refuses a nested call); the python and the node detectors agree
+    import heavy_slot as HS
+    check(HS.under_heavy_slot(env={"HEAVY_SLOT": "heavy3.lock %d" % os.getpid()}), "HEAVY_SLOT's job is this process: in a slot")
+    check(not HS.under_heavy_slot(env={"HEAVY_SLOT": "heavy3.lock 1"}) and not HS.under_heavy_slot(env={"HEAVY_SLOT": "x"}),
+          "a HEAVY_SLOT of no ancestor (a daemon that outlived its job), or no pid: not in a slot")
+    run3 = os.path.join(tempfile.mkdtemp(prefix="dt-slot-"), ".bise", "run")
+    os.makedirs(run3)
+    mjs = os.path.join(ROOT, "apps", "desktop", "tests", "harness", "heavy.mjs")
+    probe = {"py": [sys.executable, "-c", "import sys; sys.path.insert(0, %r); import heavy_slot; print(heavy_slot.under_heavy_slot())"
+                    % os.path.join(ROOT, "scripts")],
+             "node": ["node", "--input-type=module", "-e", "import(%r).then((m) => console.log(m.underHeavySlot() ? 'True' : 'False'))" % mjs]}
+    env0 = {k: v for k, v in os.environ.items() if k != "HEAVY_SLOT"}
+    for n in ("heavy.lock", "heavy3.lock", "heavy4.lock"):
+        for lang, argv in probe.items():
+            r = subprocess.run(["/usr/bin/lockf", "-k", os.path.join(run3, n)] + argv, capture_output=True, text=True, env=env0)
+            check(r.stdout.strip() == "True", "%s: under a lockf of %s: in a slot (%r %r)" % (lang, n, r.stdout, r.stderr[-200:]))
+    for lang, argv in probe.items():
+        r = subprocess.run(argv, capture_output=True, text=True, env=env0)
+        check(r.stdout.strip() == "False", "%s: no lockf, no HEAVY_SLOT: no slot (%r)" % (lang, r.stdout))
+        r = subprocess.run(["/bin/bash", "-c", 'export HEAVY_SLOT="heavy4.lock $$"; "$@"', "_"] + argv, capture_output=True, text=True, env=env0)
+        check(r.stdout.strip() == "True", "%s: HEAVY_SLOT's job is an ancestor: in a slot (%r)" % (lang, r.stdout))
     real = os.path.expanduser("~/.bise")
     tryh = os.path.join(real, "try", "desktop")
     base = {"HOME": "/Users/x", "PATH": "/usr/bin", "BEND_RUN_DIR": real + "/run", "SB_SOCKET": "/s", "BISE_ROLE": "task",

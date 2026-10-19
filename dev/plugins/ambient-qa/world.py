@@ -338,12 +338,20 @@ def register(bise, home, workspaces):
 
 # ---------------------------------------------------------------- the commands
 
-SLOTS = (LOCK, os.path.join(os.path.dirname(LOCK), "heavy2.lock"))
+# heavy-run's slots: heavy.lock, heavy2.lock, and heavy3/heavy4.lock on AC power (since 2026-10-18)
+SLOTS = (LOCK,) + tuple(os.path.join(os.path.dirname(LOCK), "heavy%d.lock" % n) for n in (2, 3, 4))
+
+
+def slot_pid(env=None):
+    """The pid of the heavy job heavy-run says this process inherits (HEAVY_SLOT="<slot> <pid>",
+    exported in each job since gate-reds), or None. Pure."""
+    tail = (env if env is not None else os.environ).get("HEAVY_SLOT", "").rsplit(" ", 1)[-1]
+    return int(tail) if tail.isdigit() else None
 
 
 def holds_a_slot(cmd):
     """True when this command line holds one of the heavy slots: a `lockf ... heavy.lock` or
-    `lockf ... heavy2.lock` (~/.bise/run/heavy-run takes either, slot 2 when slot 1 is busy), or the
+    `lockf ... heavy2|3|4.lock` (~/.bise/run/heavy-run takes the first free one), or the
     heavy-run script itself (`/bin/bash .../heavy-run ...`), which holds a slot for all it runs.
     Pure."""
     argv = cmd.split()
@@ -360,13 +368,17 @@ def _ps(pid):
     return (int(ppid.strip() or 0), cmd.strip()) if r.stdout.strip() else None
 
 
-def under_heavy_lock(pid=None, ps=_ps):
+def under_heavy_lock(pid=None, ps=_ps, env=None):
     """True when this process (or the given one) runs under a heavy slot of its own ancestry (either
     slot, or heavy-run around it): taking the lock again would wait on itself, or on the other slot's
     job while this one already holds a slot (qa-flows 82b584d6: a world up under heavy-run around
     real.sh, 'not seeded in time: shop.gift-ui'). ps(pid) -> (ppid, command) or None."""
     pid = pid or os.getpid()
+    job = slot_pid(env)
     for _ in range(64):
+        # heavy-run's own rule (it refuses a nested call): its HEAVY_SLOT job among the ancestors
+        if job is not None and pid == job:
+            return True
         got = ps(pid)
         if not got:
             return False

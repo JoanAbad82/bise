@@ -186,6 +186,13 @@ def rich_world_fixtures():
     check(world.holds_a_slot("/usr/bin/lockf -k -t 0 %s/heavy.lock nice -n 10 bash real.sh" % run_), "slot 1")
     check(world.holds_a_slot("/usr/bin/lockf -k -t 0 %s/heavy2.lock nice -n 10 bash real.sh" % run_), "slot 2")
     check(world.holds_a_slot("/bin/bash %s/heavy-run bash tests/checks/real.sh" % run_), "heavy-run itself")
+    # heavy-run's slots 3 and 4 on AC power, and its HEAVY_SLOT job (gate-reds, review-gates m_33477)
+    check(world.holds_a_slot("/usr/bin/lockf -k -t 0 %s/heavy3.lock nice -n 10 bash real.sh" % run_)
+          and world.holds_a_slot("/usr/bin/lockf -k -t 0 %s/heavy4.lock nice -n 10 bash real.sh" % run_), "slots 3 and 4")
+    plain = {50: (40, "python3 qa.py world up"), 40: (30, "node playwright test"), 30: (1, "bash tests/checks/real.sh")}
+    check(world.under_heavy_lock(50, ps=plain.get, env={"HEAVY_SLOT": "heavy3.lock 30"}), "HEAVY_SLOT's job among the ancestors")
+    check(not world.under_heavy_lock(50, ps=plain.get, env={"HEAVY_SLOT": "heavy3.lock 77"})
+          and not world.under_heavy_lock(50, ps=plain.get, env={}), "a HEAVY_SLOT of no ancestor, or none: no slot")
     check(not world.holds_a_slot("/usr/bin/lockf -k /tmp/other.lock make") and not world.holds_a_slot("bash real.sh heavy.lock")
           and not world.holds_a_slot(""), "other locks and words")
     tree = {50: (40, "python3 qa.py world up"), 40: (30, "node playwright test"), 30: (20, "bash tests/checks/real.sh"),
