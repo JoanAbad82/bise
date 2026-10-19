@@ -53,34 +53,50 @@ const world = [
  *  started never writes into it (with one shared array and flag, under load the hover's loop lived
  *  on into the leave's frames, its t counted from the mouseenter: x -44 at 't 1276', a red
  *  'home within 200 ms' in 2 nightlies and on 10.7/10.8's land step; release-43's rs3.log). */
+/** A recording: its frames, and `s`: when the browser started the transform transition the event
+ *  made (its CSSTransition's startTime, ms after the event; null: none started, the line jumped or
+ *  never moved). Under load Chrome starts a transition well after the event (270 ms at load 23,
+ *  row-slide's runs/mutation.log): the delay and the pace are the transition's, timed from there. */
+interface Rec { xs: { t: number; x: number }[]; s: number | null }
+
 async function record(role: Locator, on: 'mouseenter' | 'mouseleave'): Promise<void> {
   await role.evaluate((e, ev) => {
-    const w = window as unknown as { slideRec?: { xs: { t: number; x: number }[]; on: boolean } };
+    const w = window as unknown as { slideRec?: Rec & { on: boolean } };
     const inner = e.querySelector('.b-slide-in') as HTMLElement;
     const row = e.closest('[data-slide-row]') ?? e;
     if (w.slideRec) w.slideRec.on = false;
-    const rec = { xs: [] as { t: number; x: number }[], on: true };
+    const rec = { xs: [] as Rec['xs'], s: null as number | null, on: true };
     w.slideRec = rec;
     const start = performance.now();
     let t0: number | null = null;
     row.addEventListener(ev, () => { t0 = performance.now(); }, { once: true });
     const tick = () => {
       if (!rec.on) return;
-      rec.xs.push({ t: Math.round(performance.now() - (t0 ?? start + 1e6)), x: new DOMMatrix(getComputedStyle(inner).transform).m41 });
+      const x = new DOMMatrix(getComputedStyle(inner).transform).m41;
+      if (t0 !== null && rec.s === null) {
+        // the transition this event made: started after it (the one before, if still running, began >= 1 s earlier)
+        const from = t0 - 100;
+        const a = inner.getAnimations().find((n) => (n as CSSTransition).transitionProperty === 'transform' && typeof n.startTime === 'number' && n.startTime >= from);
+        if (a) rec.s = Math.round((a.startTime as number) - t0);
+      }
+      rec.xs.push({ t: Math.round(performance.now() - (t0 ?? start + 1e6)), x });
       requestAnimationFrame(tick);
     };
     tick();
   }, on);
 }
 
-async function stop(page: Page): Promise<{ t: number; x: number }[]> {
+async function stop(page: Page): Promise<Rec> {
   return page.evaluate(() => {
-    const w = window as unknown as { slideRec?: { xs: { t: number; x: number }[]; on: boolean } };
-    if (!w.slideRec) return [];
+    const w = window as unknown as { slideRec?: Rec & { on: boolean } };
+    if (!w.slideRec) return { xs: [], s: null };
     w.slideRec.on = false;
-    return w.slideRec.xs;
+    return { xs: w.slideRec.xs, s: w.slideRec.s };
   });
 }
+
+/** The frames from the transition's start on (t 0 there), or from the event when none started. */
+const fromStart = (r: Rec) => r.xs.filter((f) => f.t >= (r.s ?? 0)).map((f) => ({ t: f.t - (r.s ?? 0), x: f.x }));
 
 const wait = (page: Page, ms: number) => page.evaluate((m) => new Promise<void>((done) => { setTimeout(done, m); }), ms);
 
@@ -103,13 +119,17 @@ test('app/row-slide: the hovered row slides its now line left over time; on leav
     await record(role, 'mouseenter');
     await row.hover();
     await wait(page, 1200);
-    const hovered = (await stop(page)).filter((f) => f.t >= 0);
+    const h = await stop(page);
     await record(role, 'mouseleave');
     await page.mouse.move(1, 450);
     await wait(page, 800);
-    const left = (await stop(page)).filter((f) => f.t >= 0);
+    const l = await stop(page);
     await page.screenshot({ path: test.info().outputPath('row-slide-after.png') });
-    const say = JSON.stringify({ hovered: hovered.filter((_, i) => i % 4 === 0), left: left.filter((_, i) => i % 4 === 0) });
+    // t from the start of the transition the enter (the leave) made, not from the event
+    const hovered = fromStart(h);
+    const left = fromStart(l);
+    const say = JSON.stringify({ started: { hovered: h.s, left: l.s }, hovered: hovered.filter((_, i) => i % 4 === 0), left: left.filter((_, i) => i % 4 === 0) });
+    expect(h.s, `the hover starts a transform transition: ${say}`).not.toBeNull();
     // hovered: still at first (the 250 ms delay), then left at ~44 px/s, more and more, never back right
     expect(hovered.length, 'frames while hovered').toBeGreaterThan(10);
     expect(hovered.filter((f) => f.t < 200).every((f) => f.x === 0), `still for the delay: ${say}`).toBe(true);
@@ -141,7 +161,7 @@ test('app/row-slide: under reduced motion the now line never moves', async () =>
     await wait(page, 700);
     await page.mouse.move(1, 450);
     await wait(page, 400);
-    const xs = await stop(page);
+    const { xs } = await stop(page);
     expect(xs.length).toBeGreaterThan(10);
     expect(xs.every((f) => f.x === 0), JSON.stringify(xs.filter((_, i) => i % 6 === 0))).toBe(true);
     await expect(role, "its '…' stays").not.toHaveText(WORDS);
