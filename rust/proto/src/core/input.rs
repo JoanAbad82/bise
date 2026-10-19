@@ -40,8 +40,10 @@ core_kinds! {
         /// the hub started: sb-core's state is the replayed journal
         Boot = "boot" => IBoot {},
         /// his message to the agent in view (`parts`: msg-parts JSON, only
-        /// when he sent typed parts)
-        Say = "say" => ISay { focus: Str, text: Str, queued: Bool, parts: StrOmit },
+        /// when he sent typed parts). `from`: the thread he typed it in when
+        /// not `focus`'s (at-start: his `@agent …` from another thread), ""
+        /// none: sb-core leaves one route row there
+        Say = "say" => ISay { focus: Str, text: Str, queued: Bool, parts: StrOmit, from: StrOmit },
         /// his `@agent` message
         Route = "route" => IRoute { target: Str, text: Str, focus: Str, queued: Bool, parts: StrOmit },
         /// `/new`: `brief` is the Brief as JSON, `brief_text` its body

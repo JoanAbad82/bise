@@ -171,7 +171,13 @@ export type Mode = "now" | "queued";
  * `files` is ignored); `voice` said in voice mode; `via` the client part that sent it (`capsule`,
  * `capsule-start`, `ambient`: the capsule's hint for main).
  */
-export type SendOpts = { mode?: Mode | null, context?: FnContext | null, voice?: boolean, via?: string | null, };
+export type SendOpts = { mode?: Mode | null, context?: FnContext | null, voice?: boolean, via?: string | null, 
+/**
+ * the thread he typed it in, when not the send's agent's (at-start:
+ * his `@agent …` from another thread): the hub leaves one route row
+ * there. Only a trace: an unknown or archived one writes none
+ */
+from?: string | null, };
 
 /**
  * What a client asks a hub.
@@ -190,7 +196,13 @@ cid?: number | null,
  * alone. A part this hub doesn't know is refused (it would drop
  * words)
  */
-parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, voice?: boolean, via?: string | null, } | { "cmd": "answer", project: string, card: number, reply: string, 
+parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, voice?: boolean, via?: string | null, 
+/**
+ * the thread he typed it in, when not the send's agent's (at-start:
+ * his `@agent …` from another thread): the hub leaves one route row
+ * there. Only a trace: an unknown or archived one writes none
+ */
+from?: string | null, } | { "cmd": "answer", project: string, card: number, reply: string, 
 /**
  * his answer as typed parts, as `Send.parts` (`reply` then ignored)
  */
@@ -208,7 +220,13 @@ limit?: number | null, } | { "cmd": "scheduled", project: string, } | { "cmd": "
  * that isn't a command takes `send`'s path with them (`line` is
  * then ignored); a command never has any
  */
-parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, voice?: boolean, via?: string | null, } | { "cmd": "scheduled_run", project: string, id: number, } | { "cmd": "artifacts_add", project: string, agent: string, target: string, title?: string | null, } | { "cmd": "focus", project: string, focus: string, } | { "cmd": "versions", project: string, } | { "cmd": "version_info", project: string, } | { "cmd": "version_switch", project: string, to: string, } | { "cmd": "version_rollback", project: string, } | { "cmd": "version_restart", project: string, to?: string | null, } | { "cmd": "version_update", project: string, } | { "cmd": "release_plan", project: string, dry?: boolean, } | { "cmd": "release_run", project: string, tag: string, commit: string, dry?: boolean, } | { "cmd": "stop_hub", project: string, keep_agents?: boolean, } | { "cmd": "page_voice", project: string, page: string, phase: string, text?: string, };
+parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, voice?: boolean, via?: string | null, 
+/**
+ * the thread he typed it in, when not the send's agent's (at-start:
+ * his `@agent …` from another thread): the hub leaves one route row
+ * there. Only a trace: an unknown or archived one writes none
+ */
+from?: string | null, } | { "cmd": "scheduled_run", project: string, id: number, } | { "cmd": "artifacts_add", project: string, agent: string, target: string, title?: string | null, } | { "cmd": "focus", project: string, focus: string, } | { "cmd": "versions", project: string, } | { "cmd": "version_info", project: string, } | { "cmd": "version_switch", project: string, to: string, } | { "cmd": "version_rollback", project: string, } | { "cmd": "version_restart", project: string, to?: string | null, } | { "cmd": "version_update", project: string, } | { "cmd": "release_plan", project: string, dry?: boolean, } | { "cmd": "release_run", project: string, tag: string, commit: string, dry?: boolean, } | { "cmd": "stop_hub", project: string, keep_agents?: boolean, } | { "cmd": "page_voice", project: string, page: string, phase: string, text?: string, };
 
 /**
  * draft: the kind of an [`HubEv::Error`], one enum for every typed

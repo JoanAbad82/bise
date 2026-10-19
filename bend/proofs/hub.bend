@@ -19,6 +19,7 @@ import ../hub/pause.bend as HP
 import ../hub/reach.bend as HR
 import ../hub/answers.bend as HA
 import ../hub/lazy.bend as HLZ
+import ../hub/gen/feed.bend as HFD
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
 import ./lib/hub-3.bend as PL3
@@ -406,7 +407,18 @@ def Laws.wake_drop_ends(o, cx, n):
 
 # ---- queued user input (the window's "send queued") ----
 
-def Laws.user_queued_never_answers_a_card(o, cx, to, text, parts):
+def Laws.user_queued_never_answers_a_card(o, cx, to, text, parts, from):
+  {==}
+
+def Laws.say_from_none_no_row(o, cx, to, id, text, parts):
+  {==}
+
+def Laws.say_from_leaves_one_route_row(o, cx, from, to, id, text, parts, e):
+  +row = HC.route_parts.at(o, HC.feed(o, cx, from, HFD.route(to, None{}, text, Some{id}, None{}, None{})), from, parts)
+  %Equal.sym(Bool, String.is_empty(from) || String.eq(from, to) || Bool.not(HM.live_agent(HM.get_agent(HC.st(o, cx), from))), False{}, e) : {HLZ.pick(HX.Cx<o>, _, u => cx, u => row) == row : HX.Cx<o>}
+  {==}
+
+def Laws.say_from_changes_nothing_else(o, cx, m, to, text, from, parts):
   {==}
 
 def Laws.user_queued_waits_for_turn_end(o, cx, name, q, m):

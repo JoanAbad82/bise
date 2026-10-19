@@ -195,6 +195,8 @@ export interface Pending {
   readonly mode: Mode;
   /** msg-parts: his message typed, sent with it (a retry sends them again) */
   readonly parts?: readonly Part[];
+  /** the thread he typed it in when not `agent`'s (at-start): a retry leaves its trace there too */
+  readonly from?: string;
   readonly at_ms: number;
   readonly state: 'sending' | 'failed';
   readonly why?: string;

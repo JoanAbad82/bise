@@ -519,9 +519,19 @@ impl Fold<'_> {
             // delivery mark, main never got them
             Hub::Routed { to, name, msg, .. } => {
                 if let Some(e) = self.out.iter_mut().rev().find(|e| e.kind == EntryKind::You && e.msg_id == Some(msg)) {
-                    e.went = Some(crate::thread::Went { to, name });
+                    e.went = Some(crate::thread::Went { to, name, agent: false });
                     e.delivery = None;
                 }
+            }
+            // at-start: his words typed here went to the agent `to`: his
+            // entry with that message's id, 'sent to <to>' (went), its
+            // parts from the route-parts line right after it
+            Hub::Went { to, said, msg } => {
+                let mut e = Entry::new(pos, ms, EntryKind::You, said);
+                e.msg_id = Some(msg);
+                e.went = Some(crate::thread::Went { name: to.clone(), to, agent: true });
+                let i = self.push(e);
+                self.route = Some(i);
             }
             Hub::RouteParts(raw) => {
                 if let (Some(i), Ok(p)) = (route, serde_json::from_str::<Vec<Part>>(&raw)) {

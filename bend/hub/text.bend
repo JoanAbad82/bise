@@ -59,3 +59,16 @@ def clip_tail.pick(fits: Bool, +s: String, +max: Nat) -> String:
 
 def clip_tail(+s: String, +max: Nat) -> String:
   clip_tail.pick(Nat.is_le(String.length(s), max), s, max)
+
+# the agents whose names are close to `target` (its first letter, or it
+# inside them), main aside, as `@name`s: the 'did you mean' of an unknown
+# `@target` (moved out of core.bend unchanged: its line limit)
+def close_names(xs: List<&2, String>, +target: String) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+n, +t}:
+      +rest = close_names(t, target)
+      +first = String.take(target, 1n)
+      Bool.pick(List<&2, String>, Bool.not(String.eq(n, M.MAIN())) && (String.starts_with(n, Bool.pick(String, String.is_empty(first), "?", first)) || String.contains(n, target)),
+        String.append("@", n) <> rest, rest)

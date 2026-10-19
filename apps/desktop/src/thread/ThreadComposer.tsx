@@ -242,7 +242,8 @@ export const ThreadComposer = memo(function ThreadComposer({
         if (msg !== null) {
           const cu = computerRowOf(store.computerLive(), project, to);
           if (cu !== undefined && computerState(cu) === 'stopped') store.computer('hand_back', cu.key);
-          store.send({ project, agent: to, text: msg.text, mode: 'now', ...(msg.parts === undefined ? {} : { parts: msg.parts }) });
+          // from: the hub leaves '→ sent to <to>' where he typed it (the trace, at-start sha 2)
+          store.send({ project, agent: to, text: msg.text, mode: 'now', from: agent, ...(msg.parts === undefined ? {} : { parts: msg.parts }) });
         }
         setLeadTo(null);
         router.go({ screen: 'thread', project, agent: to });

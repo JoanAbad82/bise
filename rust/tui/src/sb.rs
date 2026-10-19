@@ -1068,8 +1068,8 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
     Some(match h {
         Hub::You(text, via) => Ev::You(crate::said::Said::via(text, via.as_deref()), Mark::Sent, false, None),
         Hub::Routed { name, msg, .. } => Ev::YouWent { msg, name },
-        // S9: the fn context of the 'you' line before it (the window's
-        // thread shows it on his message; the TUI doesn't)
+        Hub::Went { to, said, msg } => Ev::You(crate::said::Said::went(said, to), Mark::Sent, false, Some(msg)),
+        // S9: the fn context of the 'you' line before it (the window's thread shows it; the TUI doesn't)
         Hub::Context(_) => return None,
         // his parts (msg-parts): on his entry by the hub's fold, no row
         Hub::YouParts(_) | Hub::RouteParts(_) | Hub::MsgParts { .. } | Hub::SentParts { .. } => return None,

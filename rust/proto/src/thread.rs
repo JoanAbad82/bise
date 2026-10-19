@@ -672,12 +672,15 @@ pub struct Entry {
 }
 
 /// Where bise sent his words (a `you` entry's `went`): the project's hub
-/// id and its name.
+/// id and its name; with `agent`, an agent of this project instead (his
+/// `@agent …` typed in this thread, at-start), `to` and `name` its name.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Went {
     pub to: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub agent: bool,
 }
 
 impl Entry {

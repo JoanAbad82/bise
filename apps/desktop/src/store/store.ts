@@ -411,6 +411,8 @@ export class Store extends StoreVoice {
     via?: string;
     /** the still the spotlight showed (the core's shot id): the core puts it first */
     shot?: number;
+    /** the thread he typed it in when not `agent`'s (at-start): the hub leaves one route row there */
+    from?: string;
   }): number {
     // Sugar over store.do (machine/sends.ts): its 8 callers move to store.do and it goes when
     // fast-try's p4 resumes (paused after slice 2 by Gabriel's word: no new refactors)

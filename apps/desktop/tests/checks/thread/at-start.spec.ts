@@ -77,6 +77,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.keyboard.press('Enter');
       const c = (await core.waitCmd((x) => (x as Cmd)['cmd'] === 'send' && (x as Cmd)['agent'] === 'architect')) as Cmd;
       expect(c['text'], 'his words without the @architect').toBe(words);
+      expect(c['from'], 'the thread he typed it in: the hub leaves its trace there').toBe('main');
       await expect(screen, "architect's thread opens").toHaveAttribute('data-agent', 'architect', { timeout: 3000 });
       await expect(page.locator(T.pending, { hasText: words }), 'his row, in its thread').toHaveCount(1, { timeout: 2000 });
       // its own thread's state: 'to architect', no '↳' (an agent that is not main keeps its quiet pink)
@@ -84,12 +85,21 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(tab).toContainText(TO);
       await page.screenshot({ path: test.info().outputPath(`architect-${theme}.png`) });
 
-      // main's thread has no row of it
+      // where he typed it: no 'sending…' row, one quiet trace row (the hub's route row with the
+      // message's id, folded as a 'you' entry that went to an agent), its name a link back
       await page.getByTestId('app.sidebar.bise').click();
       await core.send({ ev: 'entry', project: HOME, agent: 'architect', entry: { pos: 2, at_ms: Date.now(), kind: 'you', text: words, msg_id: 77, delivery: 'read' } });
+      await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: { pos: 2, at_ms: Date.now(), kind: 'you', text: words, msg_id: 77, went: { to: 'architect', name: 'architect', agent: true } } });
       await expect(screen).toHaveAttribute('data-agent', 'main', { timeout: 3000 });
       await expect(page.locator(T.pending), 'no row left where he typed').toHaveCount(0);
-      await expect(page.getByText(words), 'his words are not where he typed').toHaveCount(0);
+      const trace = page.locator('[data-went="agent"]');
+      await expect(trace, 'one trace row where he typed').toHaveCount(1, { timeout: 2000 });
+      await expect(trace).toContainText(words);
+      await expect(page.locator('.th-bubble', { hasText: words }), 'no bubble of it here').toHaveCount(0);
+      await trace.screenshot({ path: test.info().outputPath(`trace-${theme}.png`) });
+      await page.screenshot({ path: test.info().outputPath(`main-${theme}.png`) });
+      await page.getByTestId('thread.you.2.went').click();
+      await expect(screen, 'its name opens its thread').toHaveAttribute('data-agent', 'architect', { timeout: 3000 });
     } finally {
       await s.close();
     }

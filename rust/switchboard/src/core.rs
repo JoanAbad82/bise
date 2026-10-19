@@ -536,6 +536,10 @@ pub enum Input {
         /// his message's parts as JSON (msg-parts, `parts_in::said`; ""
         /// none): kept on sb-core's message, written at its delivery
         parts: String,
+        /// the thread he typed it in when not `focus`'s (at-start: his
+        /// `@agent …` from another thread; "" none): sb-core leaves one
+        /// route row there (says.trace)
+        from: String,
     },
     ClientFocus {
         client: ClientId,
@@ -1968,10 +1972,11 @@ impl Hub {
                 text,
                 queued,
                 parts,
-            } => self.user_input(&mut fx, env, client, &focus, &text, queued, &parts),
+                from,
+            } => self.user_input(&mut fx, env, client, &focus, &text, queued, &parts, &from),
             Input::UserCmd { client, focus, cmd } => {
                 let focus = self.focus_of(client, &focus);
-                self.user_cmd(&mut fx, env, client, focus, cmd, false, "")
+                self.user_cmd(&mut fx, env, client, focus, cmd, false, "", "")
             }
             Input::ClientFocus { client, focus } => self.set_focus(&mut fx, env, client, &focus),
             Input::ClientGone { client } => {

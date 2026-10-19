@@ -36,6 +36,7 @@ impl Hub {
         text: &str,
         queued: bool,
         parts: &str,
+        from: &str,
     ) {
         let focus = self.focus_of(client, focus);
         // only words wait for the turn's end: a command runs now
@@ -43,7 +44,7 @@ impl Hub {
         if queued && !matches!(cmd, UserCmd::Say(_) | UserCmd::To { .. }) {
             fx.push(notice(client, "commands run now, not queued"));
         }
-        self.user_cmd(fx, env, client, focus, cmd, queued, parts);
+        self.user_cmd(fx, env, client, focus, cmd, queued, parts, from);
     }
 
     /// The agent `focus` names (main when none), now `client`'s focus.
@@ -59,14 +60,15 @@ impl Hub {
 
     /// One command of `client`, for the agent `focus` (resolved).
     /// `parts`: the parts' JSON of his words (msg-parts, "" none): on a
-    /// say or a route, sb-core keeps them on the message.
+    /// say or a route, sb-core keeps them on the message. `from`: the
+    /// thread a say was typed in when not `focus`'s ("" none, at-start).
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn user_cmd(&mut self, fx: &mut Fx, env: &mut dyn Env, client: ClientId, focus: String, cmd: UserCmd, queued: bool, parts: &str) {
+    pub(super) fn user_cmd(&mut self, fx: &mut Fx, env: &mut dyn Env, client: ClientId, focus: String, cmd: UserCmd, queued: bool, parts: &str, from: &str) {
         let c = Some(client);
         match cmd {
             UserCmd::Say(t) => {
                 if !t.is_empty() {
-                    self.core(fx, env, c, In::Say(ci::Say { focus, text: t, queued, parts: parts.into() }));
+                    self.core(fx, env, c, In::Say(ci::Say { focus, text: t, queued, parts: parts.into(), from: from.into() }));
                 }
             }
             UserCmd::To { target, text } => {

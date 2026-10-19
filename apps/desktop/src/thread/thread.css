@@ -2083,3 +2083,24 @@
 @media (prefers-reduced-motion: reduce) {
   .th-flash { animation: none; outline: 1px solid var(--c-line-strong); }
 }
+
+/* his words typed here that went to another agent (at-start, designer m_34049): one quiet row on
+   his side, '→ sent to architect · <his words>', text-3, the name a link to its thread */
+.th-went {
+  align-self: flex-end;
+  max-width: 75%;
+  margin: 0 var(--th-row-end);
+  font: var(--t-12) var(--font-ui);
+  color: var(--c-text-3);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* its agent's name one step brighter, underlined on hover: the clickable word reads as one (designer m_34323) */
+.th-went .th-answer-link {
+  color: var(--c-text-2);
+}
+.th-went .th-answer-link:hover {
+  text-decoration: underline;
+}

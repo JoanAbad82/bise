@@ -128,12 +128,18 @@ impl T {
     }
 
     fn user(&mut self, focus: &str, text: &str) -> Vec<Effect> {
+        self.user_from(focus, text, "")
+    }
+
+    /// His words for `focus` typed in `from`'s thread (at-start's trace).
+    fn user_from(&mut self, focus: &str, text: &str, from: &str) -> Vec<Effect> {
         self.go(Input::ClientInput {
             client: 1,
             focus: focus.into(),
             text: text.into(),
             queued: false,
             parts: String::new(),
+            from: from.into(),
         })
     }
 
@@ -145,6 +151,7 @@ impl T {
             text: text.into(),
             queued: true,
             parts: String::new(),
+            from: String::new(),
         })
     }
 
@@ -157,6 +164,7 @@ impl T {
             text: text.into(),
             queued,
             parts: parts.into(),
+            from: String::new(),
         })
     }
 
@@ -594,6 +602,27 @@ fn at_task_to_a_busy_task_steers_and_answers_at_turn_end() {
     assert!(has_rec(&fx, MAIN, json!({"sb": "msg-you", "from": "docs", "body": "à mi-chemin"})), "{:?}", fx);
     // main still gets its own automatic reply to the brief
     assert!(t.hub.st.unanswered_for("docs").is_empty());
+}
+
+/// at-start: his words for docs typed in main's thread leave one route row
+/// there with the message's id (the window's '→ sent to docs'); none from
+/// docs's own thread, an unknown thread, or no `from`; the message is the
+/// same either way (laws say_from_*).
+#[test]
+fn a_say_typed_in_another_thread_leaves_one_route_row_there() {
+    let mut t = T::new();
+    t.spawn_task("docs");
+    let fx = t.user_from("docs", "fais une map", MAIN);
+    let rows = recs_of(&fx, MAIN, "route");
+    assert_eq!(rows.len(), 1, "{fx:?}");
+    assert_eq!((&rows[0]["who"], &rows[0]["said"], rows[0].get("card")), (&json!("docs"), &json!("fais une map"), None));
+    let id = rows[0]["msg"].as_u64().expect("the message's id");
+    assert!(t.hub.st.msgs().values().any(|m| m.id == id && m.to == "docs" && m.text == "fais une map"), "the message itself went to docs");
+    assert!(recs_of(&fx, "docs", "route").is_empty(), "never in docs's own feed");
+    for from in ["", "docs", "nobody"] {
+        let fx = t.user_from("docs", "encore", from);
+        assert!(recs_of(&fx, MAIN, "route").is_empty() && recs_of(&fx, "docs", "route").is_empty(), "from {from:?}: {fx:?}");
+    }
 }
 
 #[test]
@@ -2693,6 +2722,7 @@ fn bench_step() {
         text: "hello".into(),
         queued: false,
         parts: String::new(),
+        from: String::new(),
     });
     // every context from nothing (before contexts.rs, at each input)
     let t0 = std::time::Instant::now();
@@ -2819,7 +2849,7 @@ fn bench_byte_equal() {
     h.handle(Input::ClientHello { client: 1 }, &mut env);
     seen("hello", &mut h, env.now);
     env.now += 500;
-    let user = |text: &str| Input::ClientInput { client: 1, focus: MAIN.into(), text: text.into(), queued: false, parts: String::new() };
+    let user = |text: &str| Input::ClientInput { client: 1, focus: MAIN.into(), text: text.into(), queued: false, parts: String::new(), from: String::new() };
     h.handle(user("hello"), &mut env);
     seen("user line", &mut h, env.now);
     let task = (h.st.order.iter())

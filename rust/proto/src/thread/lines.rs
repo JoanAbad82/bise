@@ -284,6 +284,10 @@ pub enum Hub {
     /// bise's home hub: his message `msg` went to the project `to`
     /// (`name` its name) as out `xid`, not to main
     Routed { to: String, name: String, xid: u64, msg: u64 },
+    /// at-start: his message `msg` (`said` his words), typed in this
+    /// thread, went to the agent `to`: a route line with the message's
+    /// id and no card (sb-core's trace), its parts right after it
+    Went { to: String, said: String, msg: u64 },
     /// `msg-parts`: the parts of message `id` the feed's owner received
     /// (send-parts: `sb send --attach`), the raw JSON of a
     /// `Vec<parts::Part>`; on the entry of that id, never by position
@@ -775,10 +779,12 @@ pub fn view(f: Feed) -> Hub {
         }),
         Feed::Approval(r) => Hub::Approval { how: r.how, who: r.who, what: r.what, note: r.note },
         Feed::CardClosed(r) => Hub::CardClosed { id: r.id, res: r.res },
-        Feed::Route(r) => match r.card {
-            Some(card) => Hub::Route { who: r.who, card, said: r.said, msg: r.msg, pick: r.pick },
-            // his words to an agent: the line's text, as before
-            None => other("route", format!("you → @{} : {}", r.who, r.said)),
+        Feed::Route(r) => match (r.card, r.msg) {
+            (Some(card), _) => Hub::Route { who: r.who, card, said: r.said, msg: r.msg, pick: r.pick },
+            // at-start: his words typed here went to `who`, as message `msg`
+            (None, Some(msg)) => Hub::Went { to: r.who, said: r.said, msg },
+            // his words to an agent (an older line, no id): its text, as before
+            (None, None) => other("route", format!("you → @{} : {}", r.who, r.said)),
         },
         Feed::Pr(r) => {
             let state = serde_json::from_value(serde_json::Value::String(r.state)).unwrap_or(PrNewsState::Unknown);

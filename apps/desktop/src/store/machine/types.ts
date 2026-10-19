@@ -55,6 +55,8 @@ export type Intent =
       readonly parts?: readonly Part[];
       /** the window it came from, for the hub's hint ('capsule': the spotlight) */
       readonly via?: string;
+      /** the thread he typed it in when not `agent`'s (at-start: his leading `@agent`): the hub leaves one route row there */
+      readonly from?: string;
       /** the still the spotlight showed (the core's shot id): the core puts it first, as an image part */
       readonly shot?: number;
     }

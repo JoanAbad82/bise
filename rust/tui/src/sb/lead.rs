@@ -36,8 +36,10 @@ pub(crate) fn drop_lead(text: &str, name: &str) -> String {
 /// agent without the `@name`: that agent (the caller opens its view).
 pub(super) fn send(sb: &mut Sb, typed: String) -> Option<String> {
     let to = lead_agent(&typed, &sb.agents, &sb.focus).map(str::to_string);
+    // the hub leaves its route row in the view he typed it in (says.trace)
+    let here = sb.focus.clone();
     match &to {
-        Some(name) => sb.send_input_to(name, drop_lead(&typed, name)),
+        Some(name) => sb.send_input_from(name, drop_lead(&typed, name), Some(&here)),
         None => sb.send_input(typed),
     }
     to
@@ -116,6 +118,14 @@ mod tests {
             assert_eq!(lead_agent(t, &a, "main"), None, "{t:?}");
         }
         assert_eq!(lead_agent("@architect fais", &a, "architect"), None, "the agent in view");
+    }
+
+    /// the hub's trace where he typed it: his words, `· sent to docs`, its id
+    #[test]
+    fn the_hubs_trace_is_his_message_that_went_there() {
+        let ev = super::super::hub_ev(bise_proto::thread::lines::Hub::Went { to: "docs".into(), said: "fais".into(), msg: 7 });
+        let Some(Ev::You(said, _, _, Some(7))) = ev else { panic!("not his message with its id") };
+        assert_eq!((said.text.as_str(), said.tag), ("fais", Some(crate::said::Tag::Went("docs".into()))));
     }
 
     #[test]

@@ -82,7 +82,7 @@ def in_boot_bare():
   {==}
 
 law in_say_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"say"})])) == IN.ISay{"", "", False{}, ""} : IN.In}
+  {IN.of(J.obj([J.kv("t", J.JStr{"say"})])) == IN.ISay{"", "", False{}, "", ""} : IN.In}
 
 def in_say_bare():
   {==}
@@ -451,13 +451,18 @@ law in_ISay_round:
   for text: String
   for queued: Bool
   for parts: String
-  {IN.of(IN.json(IN.ISay{focus, text, queued, parts})) == IN.ISay{focus, text, queued, parts} : IN.In}
+  for from: String
+  {IN.of(IN.json(IN.ISay{focus, text, queued, parts, from})) == IN.ISay{focus, text, queued, parts, from} : IN.In}
 
-def in_ISay_round(focus, text, queued, parts):
-  match parts:
-    case SNil{}:
+def in_ISay_round(focus, text, queued, parts, from):
+  match parts from:
+    case SNil{} SNil{}:
       {==}
-    case SCon{h_parts, t_parts}:
+    case SNil{} SCon{h_from, t_from}:
+      {==}
+    case SCon{h_parts, t_parts} SNil{}:
+      {==}
+    case SCon{h_parts, t_parts} SCon{h_from, t_from}:
       {==}
 
 law in_IRoute_round:

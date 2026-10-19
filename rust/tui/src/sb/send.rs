@@ -13,6 +13,12 @@ impl Sb {
 
     /// What the user typed, for `agent` (in view or not).
     pub(super) fn send_input_to(&mut self, agent: &str, text: String) {
+        self.send_input_from(agent, text, None);
+    }
+
+    /// What the user typed in `from`'s view for `agent` (at-start: his
+    /// `@agent …`, sb/lead.rs): the hub leaves its route row in `from`'s.
+    pub(super) fn send_input_from(&mut self, agent: &str, text: String, from: Option<&str>) {
         // computer use: the hub resumes a stopped or paused agent before
         // his words reach it (Shell::resume_computer_use)
         // msg-parts: his parts ride with the line that is their text (the
@@ -21,6 +27,9 @@ impl Sb {
         let mut params = json!({"agent": agent, "line": text});
         if !parts.is_empty() && text.ends_with(&bise_proto::parts::render(&parts)) {
             params["parts"] = json!(parts);
+        }
+        if let Some(from) = from {
+            params["from"] = json!(from);
         }
         self.call("command/run", params, rpc::Then::Line);
     }

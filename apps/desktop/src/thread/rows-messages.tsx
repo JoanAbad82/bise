@@ -58,7 +58,43 @@ export function YouBubble({
   );
 }
 
+/**
+ * His words typed in this thread that went to another agent (at-start, designer m_34049): one quiet
+ * row where he sent them, '→ sent to architect · <his words>', the name a link to its thread. The
+ * message itself is in that agent's thread.
+ */
+function WentRow({ e, ctx, name }: { e: Entry; ctx: RowCtx; name: string }) {
+  const router = useContext(RouterContext);
+  const drawn = drawnParts(e.parts);
+  const text = drawn !== null ? youView(drawn).words : stripContext(e.text);
+  const pos = String(e.pos);
+  return (
+    <div className="th-went" title={thread.went_agent_tip({ name: shownName(name) })} data-testid={`thread.you.${pos}`} data-went="agent">
+      {'→ '}
+      {thread.sent_to({ name: '' })}
+      <span
+        className="th-answer-link"
+        role="link"
+        onClick={(ev) => {
+          if (!(window.getSelection()?.isCollapsed ?? true)) return;
+          ev.stopPropagation();
+          router?.go({ screen: 'thread', project: ctx.project, agent: name });
+        }}
+        data-testid={`thread.you.${pos}.went`}
+      >
+        {shownName(name)}
+      </span>
+      <span className="th-went-words">{` · ${text}`}</span>
+    </div>
+  );
+}
+
 export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefined }) {
+  if (e.went?.agent === true) return <WentRow e={e} ctx={ctx} name={e.went.name} />;
+  return <YouMessage e={e} ctx={ctx} next={next} />;
+}
+
+function YouMessage({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefined }) {
   // msg-parts: his message comes from its typed parts, never from Entry.text (the model's templated
   // text; the fold gives every 'you' entry its parts since msg-parts sha c). No parts (an older
   // hub): the text drawn plain, never parsed for tags (architect's delta review D1); a part of a

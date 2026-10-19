@@ -498,6 +498,11 @@ pub struct SendOpts {
     pub voice: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
+    /// the thread he typed it in, when not the send's agent's (at-start:
+    /// his `@agent …` from another thread): the hub leaves one route row
+    /// there. Only a trace: an unknown or archived one writes none
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
 }
 
 impl SendOpts {

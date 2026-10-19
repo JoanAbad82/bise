@@ -1256,6 +1256,13 @@
     "one": null,
     "text": "its last line"
   },
+  "thread.went_agent_tip": {
+    "args": [
+      "name"
+    ],
+    "one": null,
+    "text": "you wrote this here; it went to {name}'s thread · click opens it"
+  },
   "thread.went_tip": {
     "args": [
       "name"

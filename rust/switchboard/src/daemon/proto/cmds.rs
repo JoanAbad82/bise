@@ -516,6 +516,10 @@ impl Shell {
         if let Some(via) = opts.via {
             op["via"] = json!(via);
         }
+        // at-start: the thread he typed it in (sb-core's trace there)
+        if let Some(from) = opts.from.filter(|f| *f != agent) {
+            op["from"] = json!(from);
+        }
         if !parts.is_empty() {
             op["parts"] = json!(parts);
         }

@@ -224,6 +224,8 @@ export const thread = {
   via_bise: "via bise",
   /** the hover of a message bise sent on */
   went_tip: (a: { name: string | number }): string => "bise sent your words to " + String(a.name) + "'s main · click opens it there",
+  /** the hover of his words typed here that went to another agent (at-start) */
+  went_agent_tip: (a: { name: string | number }): string => "you wrote this here; it went to " + String(a.name) + "'s thread · click opens it",
   /** the hover of his words bise brought here */
   via_bise_tip: "your words, sent to bise and brought here",
   /** typed with fn space */

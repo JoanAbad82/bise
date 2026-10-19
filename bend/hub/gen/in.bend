@@ -31,7 +31,7 @@ type In is Data:
   # boot
   IBoot{}
   # say
-  ISay{focus: String, text: String, queued: Bool, parts: String}
+  ISay{focus: String, text: String, queued: Bool, parts: String, from: String}
   # route
   IRoute{target: String, text: String, focus: String, queued: Bool, parts: String}
   # new
@@ -164,7 +164,7 @@ def IBoot.of(i: J.Json) -> In:
   IBoot{}
 
 def ISay.of(+i: J.Json) -> In:
-  ISay{K.get_s(i, "focus"), K.get_s(i, "text"), K.get_b(i, "queued"), K.get_s(i, "parts")}
+  ISay{K.get_s(i, "focus"), K.get_s(i, "text"), K.get_b(i, "queued"), K.get_s(i, "parts"), K.get_s(i, "from")}
 
 def IRoute.of(+i: J.Json) -> In:
   IRoute{K.get_s(i, "target"), K.get_s(i, "text"), K.get_s(i, "focus"), K.get_b(i, "queued"), K.get_s(i, "parts")}
@@ -834,8 +834,8 @@ def kvs(x: In) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("t", J.JStr{"exited"}), J.kv("agent", J.JStr{agent}), J.kv("crashed", J.JBool{crashed}), J.kv("reason", J.JStr{reason})]
     case IBoot{}:
       [J.kv("t", J.JStr{"boot"})]
-    case ISay{+focus, +text, +queued, +parts}:
-      K.cat([[J.kv("t", J.JStr{"say"}), J.kv("focus", J.JStr{focus}), J.kv("text", J.JStr{text}), J.kv("queued", J.JBool{queued})], K.omit_s("parts", parts)])
+    case ISay{+focus, +text, +queued, +parts, +from}:
+      K.cat([[J.kv("t", J.JStr{"say"}), J.kv("focus", J.JStr{focus}), J.kv("text", J.JStr{text}), J.kv("queued", J.JBool{queued})], K.omit_s("parts", parts), K.omit_s("from", from)])
     case IRoute{+target, +text, +focus, +queued, +parts}:
       K.cat([[J.kv("t", J.JStr{"route"}), J.kv("target", J.JStr{target}), J.kv("text", J.JStr{text}), J.kv("focus", J.JStr{focus}), J.kv("queued", J.JBool{queued})], K.omit_s("parts", parts)])
     case INew{+base, +brief, +brief_text, +objective, +worktree, +with_changes}:

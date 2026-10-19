@@ -290,9 +290,10 @@ agent?: string, };
 
 /**
  * Where bise sent his words (a `you` entry's `went`): the project's hub
- * id and its name.
+ * id and its name; with `agent`, an agent of this project instead (his
+ * `@agent …` typed in this thread, at-start), `to` and `name` its name.
  */
-export type Went = { to: string, name: string, };
+export type Went = { to: string, name: string, agent?: boolean, };
 
 /**
  * One entry of a thread.

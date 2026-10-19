@@ -351,7 +351,7 @@ impl Shell {
                 if !text.is_empty() {
                     let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
                     let parts = crate::pages::artifact::notes::parts_json(&pages, &id, &notes);
-                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false, parts });
+                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false, parts, from: String::new() });
                 }
                 self.state_now();
             }
@@ -376,7 +376,7 @@ impl Shell {
                     let msg = crate::pages::store::start_message(&meta, &pages.url(&id), &starts);
                     let msg = Self::page_hint(MAIN, msg);
                     let parts = Self::page_parts(&pages, &meta, &starts, MAIN, &msg);
-                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg, queued: false, parts });
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg, queued: false, parts, from: String::new() });
                     pages.push(&id, "notes", &json!({"notes": pages.store.notes(&id)}));
                 }
                 // the other notes: the page's agent, main when it is gone
@@ -394,7 +394,7 @@ impl Shell {
                     let text = Self::page_hint(&to, text);
                     let sent: Vec<_> = notes.into_iter().filter(|n| n.kind != "start" && n.kind != "stop").collect();
                     let parts = pages.store.meta(&id).map(|m| Self::page_parts(&pages, &m, &sent, &to, &text)).unwrap_or_default();
-                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false, parts });
+                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false, parts, from: String::new() });
                 }
                 self.state_now();
             }
@@ -611,7 +611,7 @@ impl Shell {
                     let w = self.pg.page_waits.entry(MAIN.to_string()).or_insert_with(|| (now, Vec::new()));
                     w.1.extend(pages.iter().map(|p| (p.clone(), String::new())));
                     let text = Self::page_hint(MAIN, text);
-                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text, queued: false, parts: String::new() });
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text, queued: false, parts: String::new(), from: String::new() });
                 }
                 Untaken::Warn => {
                     let text = format!("his notes on the page {} reached no one: main took no turn on them", pages.join(", "));

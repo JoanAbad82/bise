@@ -248,6 +248,8 @@ crate::words! { thread:
     via_bise = "via bise";
     /// the hover of a message bise sent on
     went_tip(name) = "bise sent your words to {name}'s main · click opens it there";
+    /// the hover of his words typed here that went to another agent (at-start)
+    went_agent_tip(name) = "you wrote this here; it went to {name}'s thread · click opens it";
     /// the hover of his words bise brought here
     via_bise_tip = "your words, sent to bise and brought here";
     /// typed with fn space

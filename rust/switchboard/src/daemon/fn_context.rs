@@ -54,7 +54,9 @@ impl Shell {
         if self.hub.st.resolve(&focus).unwrap_or_else(|| MAIN.to_string()) == MAIN {
             self.recycle.his_line_to_main(now_ms());
         }
-        self.step(Input::ClientInput { client, focus, text, queued, parts });
+        // at-start: the thread he typed it in, when not focus's (a trace there)
+        let from = v.get("from").and_then(Value::as_str).filter(|_| !slash).unwrap_or_default().to_string();
+        self.step(Input::ClientInput { client, focus, text, queued, parts, from });
         self.fn_ctx = None;
     }
 

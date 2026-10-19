@@ -83,6 +83,12 @@ impl Said {
     pub(crate) fn via(text: String, via: Option<&str>) -> Said {
         Said { tag: Tag::of(via, None), ..Said::from(text) }
     }
+
+    /// His words typed in this feed that went to the agent `to` (at-start:
+    /// the hub's route row with its id): `· sent to <to>`, no mark.
+    pub(crate) fn went(text: String, to: String) -> Said {
+        Said { tag: Some(Tag::Went(to)), ..Said::from(text) }
+    }
 }
 
 /// The end of his message's last row: its mark, then where bise took it

@@ -258,8 +258,11 @@ def sent_parts(-o: S.St, +cx: X.Cx<o>, +agent: String, +m: S.Msg) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.is_empty(S.Msg.parts(m)), u => cx, u => feed(o, cx, agent, FD.sent_parts(S.Msg.id(m), parts_json(S.Msg.parts(m)))))
 
 # a route's parts after it, likewise
+def route_parts.at(-o: S.St, +cx: X.Cx<o>, +at: String, +parts: String) -> X.Cx<o>:
+  LZ.pick(X.Cx<o>, String.is_empty(parts), u => cx, u => feed(o, cx, at, FD.route_parts(parts_json(parts))))
+
 def route_parts(-o: S.St, +cx: X.Cx<o>, +parts: String) -> X.Cx<o>:
-  LZ.pick(X.Cx<o>, String.is_empty(parts), u => cx, u => feed(o, cx, M.MAIN(), FD.route_parts(parts_json(parts))))
+  route_parts.at(o, cx, M.MAIN(), parts)
 
 # his route in main's feed (his answer to `who`'s card, or his words to
 # `who`), then its parts
@@ -1903,37 +1906,34 @@ def question_card(cs: List<&2, S.Card>, +s: S.St, +to: String) -> Maybe<&2, Nat>
       LZ.pick(Maybe<&2, Nat>, String.eq(S.Card.kind(c), "question") && asked_by(for_msg_of(s, S.Card.for_msg(c)), to),
         u => Some{S.Card.id(c)}, u => question_card(t, s, to))
 
-def says.sent(-o: S.St, p: X.Cx<o> & SendR, +to: String, +text: String) -> X.Cx<o>:
+# at-start: his words typed in live agent `from`'s thread went to `to` as `id`: one route
+# row there with that id and his parts (laws say_from_*); none from to's own thread
+def says.trace(-o: S.St, +cx: X.Cx<o>, +from: String, +to: String, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
+  LZ.pick(X.Cx<o>, String.is_empty(from) || String.eq(from, to) || Bool.not(M.live_agent(M.get_agent(st(o, cx), from))), u => cx,
+    u => route_parts.at(o, feed(o, cx, from, FD.route(to, None{}, text, Some{id}, None{}, None{})), from, parts))
+
+def says.sent(-o: S.St, p: X.Cx<o> & SendR, +to: String, +text: String, +from: String, +parts: String) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       undelivered.if(o, unavailable_err(e), notice(o, cx, e), to, to, text)
-    case (+cx, SOk{_}):
-      LZ.pick(X.Cx<o>, String.eq(to, M.MAIN()), u => cx, u => user_sent(o, cx, text))
+    case (+cx, SOk{+m}):
+      +cx2 = says.trace(o, cx, from, to, S.Msg.id(m), text, parts)
+      LZ.pick(X.Cx<o>, String.eq(to, M.MAIN()), u => cx2, u => user_sent(o, cx2, text))
 
-def says.card(-o: S.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
+def says.card(-o: S.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String, +from: String) -> X.Cx<o>:
   match card:
     case Some{+id}:
       answer_card(o, user_sent(o, cx, text), id, text, parts, "thread")
     case None{}:
-      says.sent(o, send(o, cx, Snd{M.USER(), to, text, False{}, None{}, True{}, False{}, queued, None{}, parts}), to, text)
+      says.sent(o, send(o, cx, Snd{M.USER(), to, text, False{}, None{}, True{}, False{}, queued, None{}, parts}), to, text, from, parts)
 
 # plain text from the user to the agent in focus. `queued` (the window's
 # "send queued"): a queued-mode message, held while the agent is busy and
 # said at its turn's end (law user_queued_waits_for_turn_end); it never
 # answers a question card (law user_queued_never_answers_a_card).
-# `parts`: his message's parts (msg-parts, "" none), kept on the message
-def user_says(-o: S.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
-  says.card(o, Bool.pick(Maybe<&2, Nat>, queued || String.eq(to, M.MAIN()), None{}, question_card(S.St.cards(st(o, cx)), st(o, cx), to)), cx, to, text, queued, parts)
-
-def close_names(xs: List<&2, String>, +target: String) -> List<&2, String>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+n, +t}:
-      +rest = close_names(t, target)
-      +first = String.take(target, 1n)
-      Bool.pick(List<&2, String>, Bool.not(String.eq(n, M.MAIN())) && (String.starts_with(n, Bool.pick(String, String.is_empty(first), "?", first)) || String.contains(n, target)),
-        String.append("@", n) <> rest, rest)
+# `parts`: his message's parts (msg-parts, "" none), kept on it; `from`: says.trace
+def user_says(-o: S.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String, +from: String) -> X.Cx<o>:
+  says.card(o, Bool.pick(Maybe<&2, Nat>, queued || String.eq(to, M.MAIN()), None{}, question_card(S.St.cards(st(o, cx)), st(o, cx), to)), cx, to, text, queued, parts, from)
 
 def route.sent(-o: S.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focus: String, +parts: String) -> X.Cx<o>:
   match p:
@@ -1948,7 +1948,7 @@ def route.sent(-o: S.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focu
 def route.target(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool, +parts: String) -> X.Cx<o>:
   match m:
     case None{}:
-      +close = close_names(S.St.order(st(o, cx)), target)
+      +close = T.close_names(S.St.order(st(o, cx)), target)
       +hint = Bool.pick(String, List.is_empty(&2, String, close), "", cat([" — did you mean ", String.join(close, ", "), "?"]))
       notice(o, cx, cat(["no agent named @", target, hint]))
     case Some{+name}:
@@ -1961,7 +1961,7 @@ def route.target(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, 
 # `@task text`: a direct message, without main; `queued` and `parts` as
 # user_says
 def route(-o: S.St, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool, +parts: String) -> X.Cx<o>:
-  LZ.pick(X.Cx<o>, String.eq(target, M.MAIN()), u => user_says(o, cx, M.MAIN(), text, queued, parts),
+  LZ.pick(X.Cx<o>, String.eq(target, M.MAIN()), u => user_says(o, cx, M.MAIN(), text, queued, parts, ""),
     u => route.target(o, M.resolve(st(o, cx), target), cx, target, text, focus, queued, parts))
 
 def user_new.res(-o: S.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
@@ -2318,7 +2318,7 @@ def route_hold.to(-o: S.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
 # older shell sent one): his words go to bise's main now, never held.
 def route_hold(-o: S.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.is_empty(S.Route.to(d)),
-    u => user_says(o, cx, M.MAIN(), S.Route.text(d), False{}, S.Route.parts(d)),
+    u => user_says(o, cx, M.MAIN(), S.Route.text(d), False{}, S.Route.parts(d), ""),
     u => route_hold.to(o, cx, d))
 
 # a held route with no target (left by an older hub's route model in its
@@ -2326,7 +2326,7 @@ def route_hold(-o: S.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
 # plain message (the cancel path, no route_done: the window never saw it)
 def route_plain(-o: S.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
   +cx2 = xemit(o, cx, XH.XRoute{S.Route.rid(r), XH.REnd{S.RCancelled{}}})
-  says.sent(o, send(o, cx2, Snd{M.USER(), M.MAIN(), S.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(S.Route.via(r)), S.Route.parts(r)}), M.MAIN(), S.Route.text(r))
+  says.sent(o, send(o, cx2, Snd{M.USER(), M.MAIN(), S.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(S.Route.via(r)), S.Route.parts(r)}), M.MAIN(), S.Route.text(r), "", "")
 
 # his routed words in bise's main thread, where he wrote them: his line,
 # its id, his parts, then where they went (the window and the TUI fold
@@ -2374,7 +2374,7 @@ def route_cancel.go(-o: S.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>, +rid: Nat) ->
       +cx2 = aemit(o, cx, TM.ActDone{S.Route.act(r)})
       +cx3 = xemit(o, cx2, XH.XRoute{rid, XH.REnd{S.RCancelled{}}})
       +cx4 = route_done(o, cx3, rid, "cancelled", S.Route.to(r), None{}, None{})
-      says.sent(o, send(o, cx4, Snd{M.USER(), M.MAIN(), S.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(S.Route.via(r)), S.Route.parts(r)}), M.MAIN(), S.Route.text(r))
+      says.sent(o, send(o, cx4, Snd{M.USER(), M.MAIN(), S.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(S.Route.via(r)), S.Route.parts(r)}), M.MAIN(), S.Route.text(r), "", "")
 
 def route_cancel(-o: S.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
   route_cancel.go(o, XB.held(xst(o, cx), rid), cx, rid)
@@ -3587,11 +3587,11 @@ def dispatch(-o: S.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       repl_exited(o, cx, agent, crashed, reason)
     case GI.IBoot{}:
       xboot(o, boot(o, cx))
-    case GI.ISay{+focus, +text, +queued, +parts}:
-      user_says(o, cx, focus, text, queued, parts)
+    case GI.ISay{+focus, +text, +queued, +parts, +from}:
+      user_says(o, cx, focus, text, queued, parts, from)
     case GI.IRoute{+target, +text, +focus, +queued, +parts}:
       LZ.pick(X.Cx<o>, String.eq(target, M.MAIN()),
-        u => user_says(o, cx, M.MAIN(), text, queued, parts),
+        u => user_says(o, cx, M.MAIN(), text, queued, parts, ""),
         u => route(o, cx, target, text, focus, queued, parts))
     case GI.INew{+base, +brief, +brief_text, +objective, +worktree, +with_changes}:
       user_new.res(o, create_task(o, cx, NewTask{M.USER(), base, brief, brief_text, objective, worktree, with_changes, ""}))
