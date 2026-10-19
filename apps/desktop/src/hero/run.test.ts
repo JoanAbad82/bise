@@ -1,7 +1,7 @@
 // The film replays: its first loop's every bim (where it stands, what it does, its egg) is its
 // second loop's, frame for frame, and the score's beats land on the poses they were written for.
 import { describe, expect, it } from 'vitest';
-import { FILM_S, KILN, REVIEWER } from './cast';
+import { FILM_S, KILN, NOTES, REVIEWER } from './cast';
 import { advance, FEED_X, makeRuns, stepOf } from './run';
 import { ORIGIN } from './world';
 
@@ -29,6 +29,25 @@ describe('the hero film', () => {
     const two = play(ORIGIN + FILM_S, runs);
     const diff = [...one].filter(([k, v]) => two.get(k) !== v).map(([k]) => k / 4);
     expect(diff).toEqual([]);
+  });
+
+  it('flies every plane of his to its catch: a newer one never removes it (designer m_32877)', () => {
+    const runs = makeRuns();
+    const missing: string[] = [];
+    // every 0.25 s of each flight, in film order (a run only goes forward)
+    const checks = NOTES.flatMap((n) => {
+      const fl = n.flight;
+      if (n.from !== 'you' || fl === undefined) return [];
+      return Array.from({ length: Math.ceil((fl.dur - 0.05) / 0.25) }, (_, k) => ({ n, dur: fl.dur, s: 0.05 + k * 0.25 }));
+    }).sort((a, b) => a.n.at + a.s - (b.n.at + b.s));
+    for (const { n, dur, s } of checks) {
+      for (const r of runs) advance(r, ORIGIN + n.at + s, false, false);
+      const r = runs.find((x) => x.cast.id === n.office);
+      const f = r ? stepOf(r, false, false)?.played.find((x) => x.name === n.to) : undefined;
+      const all = [...(f?.pose.aloft ?? []), ...(f?.pose.plane ? [f.pose.plane] : [])];
+      if (!all.some((p) => Math.abs(p.since - s) < 0.06 && p.dur === dur && p.glide === true)) missing.push(`${n.to}'s plane of ${String(n.at)} at +${s.toFixed(2)} s`);
+    }
+    expect(missing).toEqual([]);
   });
 
   it('lands its beats in the office brains (bims-film v14): paper planes, pops at the desk, visits, the queue, the stamp', () => {

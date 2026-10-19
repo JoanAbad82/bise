@@ -314,7 +314,22 @@ export interface Pose extends Pt {
    * y1 egg 2) and where it leaves (a fraction of the view's width, unset: 0.5, the middle); `glide`:
    * the film's paper plane (render/plane.ts planGlide: tossed, then gliding), its loops ignored
    */
-  readonly plane?: { readonly since: number; readonly dur?: number; readonly loops?: 0 | 1 | 2; readonly startX?: number; readonly glide?: boolean; readonly minPx?: number };
+  readonly plane?: PlaneFlight;
+  /**
+   * his earlier planes to it still on their way when a newer one left (the newest is `plane`): each
+   * flies its own flight to its catch, never cut by the next (Gabriel via designer m_32877), oldest first
+   */
+  readonly aloft?: readonly PlaneFlight[];
+}
+
+/** one of his paper planes to a bim (Pose.plane) */
+export interface PlaneFlight {
+  readonly since: number;
+  readonly dur?: number;
+  readonly loops?: 0 | 1 | 2;
+  readonly startX?: number;
+  readonly glide?: boolean;
+  readonly minPx?: number;
 }
 
 /**

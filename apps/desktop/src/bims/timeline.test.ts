@@ -187,6 +187,20 @@ describe('timeline', () => {
     expect(tl.moving(4 + PLANE_S)).toBe(false);
   });
 
+  it('keeps an earlier plane on its way when a newer one leaves for the same agent (designer m_32877)', () => {
+    const o = office();
+    const tl = newTimeline();
+    const sent = (t: number): BimEvent => ({ kind: 'message', from: { who: 'you' }, to: { who: 'agent', name: 'a1' }, mode: 'queued', expectsReply: false, t });
+    const a = acts({ main: MAIN, a1: { k: 'sleep', at: 'desk' } });
+    tl.update(a, o, 0, []);
+    tl.update(a, o, 4, [sent(4)]);
+    tl.update(a, o, 5, [sent(5)]);
+    tl.update(a, o, 5.5, [sent(5.5)]);
+    expect(tl.poseAt('a1', 5.6)?.plane).toEqual({ since: expect.closeTo(0.1, 6) as number });
+    expect(tl.poseAt('a1', 5.6)?.aloft?.map((p) => p.since.toFixed(1))).toEqual(['1.6', '0.6']);
+    expect(tl.poseAt('a1', 4 + PLANE_S + 0.1)?.aloft?.map((p) => p.since.toFixed(1))).toEqual(['4.1']);
+  });
+
   it('rebuilds the room when it grows: every bim at its spot in the new one', () => {
     const small = layoutOf(crowd(12).agents);
     const tl = newTimeline();

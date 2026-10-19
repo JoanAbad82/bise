@@ -101,7 +101,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
   const unlock = makeUnlock(root, style);
   const bims = new Map<string, Bim>();
   const rigs = new Map<string, Rig>();
-  /** his planes in flight, by bim: the mesh, when it left (its key), its plan */
+  /** his planes in flight, by bim and when it left ('name@12.30'): the mesh, its plan; each ends on its own catch */
   /** each flight's plan: the app's (zigzag and loop) or the film's paper glide (pose.plane.glide) */
   const planes = new Map<string, { mesh: Plane; leftAt: string; plan: FlightPlan | GlidePlan; glide: boolean }>();
   const basis = new Matrix4();
@@ -179,31 +179,34 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
   function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit, light: boolean): boolean {
     const flying = new Set<string>();
     const site = office ? siteOf(office) : null;
-    for (const f of frames) {
-      const fp = f.pose.plane;
-      const s = fp?.since;
-      const dur = fp?.dur ?? PLANE_FLIGHT;
-      if (s === undefined || s < 0 || s >= dur) continue;
+    // every plane on its way, each its own flight: a newer one never cuts an older (designer m_32877)
+    const flights = frames.flatMap((f) => [...(f.pose.aloft ?? []), ...(f.pose.plane ? [f.pose.plane] : [])].map((fp) => ({ f, fp })));
+    for (const { f, fp } of flights) {
+      const s = fp.since;
+      const dur = fp.dur ?? PLANE_FLIGHT;
+      if (s < 0 || s >= dur) continue;
       const rig = rigs.get(f.name);
       if (!rig) continue;
-      flying.add(f.name);
       // in front of it, at its right hand (plane.ts catchPoint): never on its head or its spot
       const hand = catchPoint(rig.x, rig.z, rig.dir);
       // never smaller than PLANE_MIN_PX on screen (designer via bims-qa m_27793: at 320 it was a speck)
-      const size = Math.max(1, ((fp?.minPx ?? PLANE_MIN_PX) * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN);
-      // one plan per flight, made when it leaves (his pan or zoom mid-flight moves no plane)
+      const size = Math.max(1, ((fp.minPx ?? PLANE_MIN_PX) * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN);
+      // one plan per flight, made when it leaves (his pan or zoom mid-flight moves no plane); keyed by
+      // its bim and when it left, so two to one bim fly side by side
       const leftAt = (t - s).toFixed(2);
-      let p = planes.get(f.name);
-      if (p?.leftAt !== leftAt) {
-        if (p) { root.remove(p.mesh.group, p.mesh.shadow); p.mesh.dispose(); }
-        const loops = fp?.loops ?? (f.egg?.kind === 'loop' ? 2 : 1);
+      const key = `${f.name}@${leftAt}`;
+      flying.add(key);
+      let p = planes.get(key);
+      if (!p) {
+        // the newest is the one the egg may loop (eggs.ts reads pose.plane)
+        const loops = fp.loops ?? (fp === f.pose.plane && f.egg?.kind === 'loop' ? 2 : 1);
         const avoid = pillHeads(frames, f.name);
-        const from = cameraStart(fit, fp?.startX);
-        const seed = hash(`${f.name}@${leftAt}`);
-        const glide = fp?.glide === true;
+        const from = cameraStart(fit, fp.startX);
+        const seed = hash(key);
+        const glide = fp.glide === true;
         const plan = glide ? planGlide({ from, to: hand, seed, dur, px: fit.scale }) : planFlight({ from, to: hand, seed, loops, unit: size, avoid, dur });
         p = { mesh: makePlane(style), leftAt, plan, glide };
-        planes.set(f.name, p);
+        planes.set(key, p);
         root.add(p.mesh.group, p.mesh.shadow);
       }
       const fl = p.glide ? glideAt(p.plan as GlidePlan, s, hand) : flightAt(p.plan as FlightPlan, s, hand);
@@ -232,8 +235,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       );
       g.quaternion.setFromRotationMatrix(basis);
     }
-    for (const [name, p] of planes) {
-      if (!flying.has(name)) { root.remove(p.mesh.group, p.mesh.shadow); p.mesh.dispose(); planes.delete(name); }
+    for (const [key, p] of planes) {
+      if (!flying.has(key)) { root.remove(p.mesh.group, p.mesh.shadow); p.mesh.dispose(); planes.delete(key); }
     }
     return flying.size > 0;
   }

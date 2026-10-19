@@ -96,11 +96,14 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
     const end = seg.path.pts.at(-1) ?? seg.spot;
     const p = at ? along(seg.path, at.d) : { x: end.x, z: end.z, dir: seg.spot.face };
     const plane = b.planes.findLast((te) => te <= t && t - te < PLANE_S);
+    // the ones before it still on their way (the renderer ends each on its own catch)
+    const aloft = plane === undefined ? [] : b.planes.filter((te) => te < plane && t - te < PLANE_S).map((te) => ({ since: t - te }));
     return {
       x: p.x, z: p.z, dir: p.dir, moving: walking, since: t - seg.t, seg,
       // it stops on its walk to let one pass, or it stands beside its spot (avoid.ts): standing, not its activity's pose
       ...(at?.waiting || (!walking && aside(seg)) ? { waiting: true } : {}),
       ...(plane === undefined ? {} : { plane: { since: t - plane } }),
+      ...(aloft.length === 0 ? {} : { aloft }),
     };
   };
 

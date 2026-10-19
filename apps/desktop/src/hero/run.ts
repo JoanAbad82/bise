@@ -9,7 +9,7 @@ import { growOf } from '../bims/growth';
 import { labelsOf } from '../bims/labels';
 import { layoutOf } from '../bims/maps';
 import { makeDriver, NO_ATTENTION, type Attention, type Clock, type OfficeDriver, type Step } from '../bims/office-driver';
-import type { Activity, BimFrame, Office, Spot } from '../bims/model';
+import type { Activity, BimFrame, Office, PlaneFlight, Spot } from '../bims/model';
 import { newTimeline } from '../bims/timeline';
 import { CAST, FILM_S, NOTES, REVIEWER, type Cast } from './cast';
 import { activitiesOf, changesIn, eggsAt, eventsIn, filmT, growthOf, loopOf, ORIGIN, rowsAt, rowsSig } from './world';
@@ -117,18 +117,21 @@ export const FEED_PLANE_PX = 36;
  * Pure.
  */
 export function withFlight(office: string, f: BimFrame, t: number): BimFrame {
-  const p = f.pose.plane;
-  if (p === undefined) return f;
-  const left = filmT(t - p.since);
-  const n = NOTES.find((x) => x.office === office && x.from === 'you' && x.to === f.name && x.flight !== undefined && Math.abs(x.at - left) < 0.05);
-  if (n?.flight === undefined) return f;
-  return { ...f, pose: { ...f.pose, plane: { ...p, dur: n.flight.dur, loops: n.flight.loops, startX: FEED_X, glide: true, minPx: FEED_PLANE_PX } } };
+  const fly = (p: PlaneFlight): PlaneFlight => {
+    const left = filmT(t - p.since);
+    const n = NOTES.find((x) => x.office === office && x.from === 'you' && x.to === f.name && x.flight !== undefined && Math.abs(x.at - left) < 0.05);
+    return n?.flight === undefined ? p : { ...p, dur: n.flight.dur, loops: n.flight.loops, startX: FEED_X, glide: true, minPx: FEED_PLANE_PX };
+  };
+  const { plane, aloft } = f.pose;
+  if (plane === undefined && aloft === undefined) return f;
+  // the earlier ones still on their way fly theirs too (designer m_32877: a new plane never cuts one)
+  return { ...f, pose: { ...f.pose, ...(plane === undefined ? {} : { plane: fly(plane) }), ...(aloft === undefined ? {} : { aloft: aloft.map(fly) }) } };
 }
 
 /** The office's frame at its time (advance first), its planes flown as the score says. */
 export function stepOf(r: Run, night: boolean, reduced: boolean, a: Attention = NO_ATTENTION): Step | null {
   const st = r.driver.step(clockOf(r.cast.id, r.at, night, reduced), a);
-  if (st === null || !st.played.some((f) => f.pose.plane !== undefined)) return st;
+  if (st === null || !st.played.some((f) => f.pose.plane !== undefined || f.pose.aloft !== undefined)) return st;
   const fly = (fs: readonly BimFrame[]): BimFrame[] => fs.map((f) => withFlight(r.cast.id, f, r.at));
   return { ...st, frames: fly(st.frames), played: fly(st.played) };
 }
