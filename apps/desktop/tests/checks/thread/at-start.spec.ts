@@ -10,6 +10,10 @@
 // Shots (light and dark) of the pink composer and of architect's thread after, for designer.
 // Owner: at-start (amb-win's composer).
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common } from '../../../src/proto/words.gen';
+import { composer } from '../../../src/proto/words_composer.gen';
+
+const TO = common.to_agent({ agent: 'architect' });
 
 const HOME = 'bise-home-00000000';
 const T = { field: '[data-testid="composer.field"]', pending: '[data-testid^="thread.pending."]' };
@@ -39,7 +43,7 @@ for (const theme of ['light', 'dark'] as const) {
       const field = page.locator(T.field).first();
       const box = page.getByTestId('composer.box');
       const tab = page.getByTestId('composer.tab');
-      await expect(screen, "main's thread").toHaveAttribute('data-agent', 'main', { timeout: 10_000 });
+      await expect(screen, 'the start: main').toHaveAttribute('data-agent', 'main', { timeout: 10_000 });
       await expect(field).toBeVisible();
 
       // the name in the middle, then no such agent: plain, to main
@@ -59,8 +63,8 @@ for (const theme of ['light', 'dark'] as const) {
       await field.click();
       await page.keyboard.type(`  @architect ${words}`);
       await expect(box, 'the pink').toHaveAttribute('data-answering', 'true', { timeout: 2000 });
-      await expect(tab).toContainText('↳ to architect');
-      await expect(tab).toContainText('erase the @ to stay with bise');
+      await expect(tab).toContainText(`↳ ${TO}`);
+      await expect(tab).toContainText(composer.lead_end({ here: 'bise' }));
       // the address itself in the accent, 600 (designer m_34049)
       const mark = field.locator('[data-lead="true"]');
       await expect(mark, 'the @architect in the accent').toHaveText('@architect');
@@ -77,15 +81,15 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.locator(T.pending, { hasText: words }), 'his row, in its thread').toHaveCount(1, { timeout: 2000 });
       // its own thread's state: 'to architect', no '↳' (an agent that is not main keeps its quiet pink)
       await expect(tab, "back to the thread's own tab").not.toContainText('↳');
-      await expect(tab).toContainText('to architect');
+      await expect(tab).toContainText(TO);
       await page.screenshot({ path: test.info().outputPath(`architect-${theme}.png`) });
 
       // main's thread has no row of it
       await page.getByTestId('app.sidebar.bise').click();
       await core.send({ ev: 'entry', project: HOME, agent: 'architect', entry: { pos: 2, at_ms: Date.now(), kind: 'you', text: words, msg_id: 77, delivery: 'read' } });
       await expect(screen).toHaveAttribute('data-agent', 'main', { timeout: 3000 });
-      await expect(page.locator(T.pending), "no row left in main's thread").toHaveCount(0);
-      await expect(page.getByText(words), "his words aren't in main's thread").toHaveCount(0);
+      await expect(page.locator(T.pending), 'no row left where he typed').toHaveCount(0);
+      await expect(page.getByText(words), 'his words are not where he typed').toHaveCount(0);
     } finally {
       await s.close();
     }
