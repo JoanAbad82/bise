@@ -43,7 +43,15 @@ PAUSED = w("thread.pause_state")
 
 SHOTS = os.environ.get("WAKE_SHOTS")
 SECS = int(os.environ.get("WAKE_TUI_SECS", "25"))
-WAITING = re.compile(r"… continues when cargo test ends · \d+[sm]")
+# the command's name as drawn: `cargo test`, cut on the way (`cargo te…`)
+# when the top edge is short of room (the full gate's long workspace path)
+CARGO = r"cargo t\S*"
+WAITING = re.compile(r"… continues when %s ends · \d+[sm]" % CARGO)
+
+
+def ended(*parts):
+    """`cargo test ended · …` as a pattern, the name as CARGO draws it."""
+    return re.escape(" · ".join(parts)).replace("QCARGOQ", CARGO)
 
 
 def shot(t, name):
@@ -138,13 +146,13 @@ def wide(t, E, bin_dir):
     shot(t, "150-waiting")
     open(go_file(E), "w").close()
     # the command ends: the hub's line, the live line gone
-    sc = t.wait(" · ".join([w("thread.wake_ended", what="cargo test"), w("thread.wake_rc", rc=0), w("thread.wake_after", dur="")]), SECS + 60)
+    sc = t.wait_re(ended(w("thread.wake_ended", what="QCARGOQ"), w("thread.wake_rc", rc=0), w("thread.wake_after", dur="")), SECS + 60)
     assert w("thread.wake_tail", n=3) in sc, sc
     # bise's wake is no message row of its own (the fake model's reply
     # echoes its words, `ack: <agent_message …> background 0 ended`)
     assert "✉︎ bise" not in sc and "✉ bise" not in sc, "bise's wake folds into the line: " + sc
     assert not any(r.strip("│ ").startswith(w("thread.wake_ended", what="background 0")) for r in sc.splitlines()), sc
-    t.wait_gone("continues when cargo test", 20)
+    t.wait_gone("continues when cargo t", 20)
     shot(t, "150-ended")
     # a file with a note: an alarm. perf is free (○, no live line); the
     # panel's `watching` has it with its end
@@ -184,7 +192,7 @@ def narrow(t, E):
     t.start(80, 30)
     t.wait("bise :*")
     view(t, "perf")
-    t.wait(" · ".join([w("thread.wake_ended", what="cargo test"), w("thread.wake_rc", rc=0)]))
+    t.wait_re(ended(w("thread.wake_ended", what="QCARGOQ"), w("thread.wake_rc", rc=0)))
     sb(E, "perf", "wake", "--on-file", os.path.join(E.tmp, "x.rc"), "--note", "the reindex")
     sc = t.wait_re(r"you → perf .*◌ 1 watching", 30)
     for line in sc.splitlines():
