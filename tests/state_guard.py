@@ -56,8 +56,10 @@ HAND = {
     # cx.bend: the proof spine and the runtime (its own chunk)
     "Core", "Cx", "Both", "R", "Rt", "Waiter", "Steer", "Cnt", "Kv", "Kn",
     # a step's local records: core.bend's Snd, NewTask, Hub, RunR; main.bend's
-    # Got; model.bend's Ms; picks.bend's Pick (inside R's answered); view.bend's Mark
-    "Snd", "NewTask", "Hub", "RunR", "Got", "Ms", "Pick", "Mark",
+    # Got; model.bend's Ms; picks.bend's Pick and Answer (R's answered: his
+    # answer a step routes; picks.bend's Ans before state-card renamed it, a
+    # name the generated Ans took); view.bend's Mark
+    "Snd", "NewTask", "Hub", "RunR", "Got", "Ms", "Pick", "Answer", "Mark",
 }
 
 TYPE = re.compile(r"^type\s+([A-Za-z_][\w.]*)(?:<[^>]*>)?\s+is\s+\w+")
