@@ -218,13 +218,13 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     return { x: tmp.x, y: tmp.y, z: tmp.z };
   }
 
-  /** where a sheet lies on its bim's desk (catch.ts DESK_SPOT), office units; null: no desk */
-  function deskSpot(name: string, rig: Rig): V3 | null {
+  /** where a sheet lies on its bim's desk (catch.ts DESK_SPOT, from its desk spot, standing or sitting), office units; null: no desk */
+  function deskSpot(name: string, spot: { x: number; z: number; face: number }): V3 | null {
     const d = world?.desks.get(name);
     if (!d) return null;
-    const c = Math.cos(rig.dir);
-    const sn = Math.sin(rig.dir);
-    return { x: rig.x + DESK_SPOT.x * c + DESK_SPOT.z * sn, y: d.top.y + 0.004, z: rig.z - DESK_SPOT.x * sn + DESK_SPOT.z * c };
+    const c = Math.cos(spot.face);
+    const sn = Math.sin(spot.face);
+    return { x: spot.x + DESK_SPOT.x * c + DESK_SPOT.z * sn, y: d.top.y + 0.004, z: spot.z - DESK_SPOT.x * sn + DESK_SPOT.z * c };
   }
 
   /**
@@ -256,7 +256,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       const rig = rigs.get(f.name);
       const hand = handOf(f.name);
       if (!rig || !hand) continue;
-      const desk = deskSpot(f.name, rig);
+      const desk = deskSpot(f.name, f.pose.seg.spot);
       const away = desk !== null ? awayOf(f.pose.seg.act) : 'pocket';
       const held = heldAt(s - dur, away, reduced, cut);
       if (reduced && held === null) continue;
@@ -315,7 +315,14 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       const end = reduced ? null : at(dur);
       const nose = toOffice(held.nose);
       const up = toOffice(held.up);
-      const o = end === null ? { nose, up } : blendTurn(end, { nose, up }, held.hold);
+      let o = end === null ? { nose, up } : blendTurn(end, { nose, up }, held.hold);
+      if (away === 'desk' && held.put > 0) {
+        // laid as its desk lies (the letter after it: never a turn at the handoff)
+        const fc = Math.cos(f.pose.seg.spot.face);
+        const fs = Math.sin(f.pose.seg.spot.face);
+        const byDesk = (v: V3): V3 => ({ x: v.x * fc + v.z * fs, y: v.y, z: -v.x * fs + v.z * fc });
+        o = blendTurn(o, { nose: byDesk(ON_DESK.nose), up: byDesk(ON_DESK.up) }, held.put);
+      }
       const side = HELD_LEN * (1 - 0.5 * held.quarter);
       // the hand grips it at `grip` along its length
       let c = { x: hand.x - o.nose.x * held.grip * side, y: hand.y - o.nose.y * held.grip * side, z: hand.z - o.nose.z * held.grip * side };
@@ -333,9 +340,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     for (const f of frames) {
       if (f.pose.letter === undefined || laid.has(f.name) || awayOf(f.pose.seg.act) !== 'desk') continue;
       // its own catch still going (that plane's sheet is in its hand): none yet
-      const rig = rigs.get(f.name);
-      const spot = rig ? deskSpot(f.name, rig) : null;
-      if (!rig || !spot) continue;
+      const spot = deskSpot(f.name, f.pose.seg.spot);
+      if (!spot) continue;
       let m = letters.get(f.name);
       if (!m) {
         m = makePlane(style);
@@ -345,8 +351,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       }
       m.setInk(light);
       kept.add(f.name);
-      const c = Math.cos(rig.dir);
-      const sn = Math.sin(rig.dir);
+      const c = Math.cos(f.pose.seg.spot.face);
+      const sn = Math.sin(f.pose.seg.spot.face);
       const turn = (v: V3): V3 => ({ x: v.x * c + v.z * sn, y: v.y, z: -v.x * sn + v.z * c });
       place(m, spot, turn(ON_DESK.nose), turn(ON_DESK.up), HELD_LEN, HELD_LEN);
     }
