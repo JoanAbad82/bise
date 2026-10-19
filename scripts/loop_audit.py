@@ -193,6 +193,19 @@ GATE_RX = re.compile(r"GATE (quick|full|rerun) (GREEN \((\d+)s\)|FAILED)")
 TEST_RX = re.compile(r"^(ok|FAIL)\s+(\w+) \((\d+)s(?:, cpu (\d+)s)?\)", re.M)
 QUEUE_RX = re.compile(r"got the gate after (\d+)s")
 STEP_RX = re.compile(r"^ok\s+(test-build|clippy|PROOF|sb-core|proto_ts|test_\S+|desktop_check) \((\d+)s", re.M)
+# a red step: "FAIL desktop_check", "FAIL sb-core build", "FAIL pick_gate: ..." (a test's line has its time)
+STEP_FAIL_RX = re.compile(r"^FAIL ([\w-]+)(?=$|:| build$)", re.M)
+GATE_FAIL_RX = re.compile(r"^GATE FAILED: (.*)$", re.M)
+LINE_GATE_RX = re.compile(r"tests/line_limits\.txt")
+
+
+def red_names(text, tests):
+    """What made a gate run red: its tests red even alone (a FLAKY one ends
+    ok), its red steps, line_gate's lines, a setup that failed."""
+    return sorted({t for t, (ok, _, _) in tests.items() if not ok}
+                  | {"tests" if s.startswith("test_") else s for s in STEP_FAIL_RX.findall(text)}
+                  | ({"line_gate"} if LINE_GATE_RX.search(text) else set())
+                  | {"setup: " + g[:40] for g in GATE_FAIL_RX.findall(text)})
 
 
 def gate_run(text):
@@ -210,9 +223,10 @@ def gate_run(text):
     for s, w in STEP_RX.findall(text):
         steps.setdefault(s if not s.startswith("test_") else "tests", int(w))
     q = QUEUE_RX.search(text)
+    reds = red_names(text, tests)
     return {"mode": m.group(1) if m else "full", "green": bool(m and m.group(2).startswith("GREEN")),
             "secs": int(m.group(3)) if m and m.group(3) else None, "queue": int(q.group(1)) if q else 0,
-            "steps": steps, "tests": tests, "ended": bool(m)}
+            "steps": steps, "tests": tests, "ended": bool(m), "reds": reds}
 
 
 def pct(v, p):
@@ -285,6 +299,10 @@ def wakes(h, hub, since):
 
 
 HEAD_RX = re.compile(r"# gate (quick|full|rerun) agent=(\S*)")
+ROOT_RX = re.compile(r" root=(\S+)")
+# a tree in an agent's scratch folder (hubs/<hub>/agents/<a>/tmp/...): an
+# experiment (bend-check's newer Bend), not a repo worktree, the nightly or a release
+SCRATCH_RX = re.compile(r"/agents/[^/]+/tmp/")
 END_RX = re.compile(r"^# gate end rc=(\d+) secs=(\d+)", re.M)
 
 
@@ -300,9 +318,13 @@ def own_log_run(text):
     if r is None or not r["ended"]:
         if not e:
             return h.group(2) or "?", r
-        r = r or {"steps": {}, "tests": {}, "queue": 0}
+        r = r or {"steps": {}, "tests": {}, "queue": 0, "reds": red_names(text, {})}
         r.update({"mode": h.group(1), "green": e.group(1) == "0", "ended": True,
                   "secs": int(e.group(2)) if e.group(1) == "0" else None})
+    if r and r["ended"] and not r["green"] and not r["reds"]:
+        r["reds"] = ["rc %s" % e.group(1) if e else "?"]
+    root = ROOT_RX.search(text.split(NL, 1)[0])
+    r["scratch"] = bool(root and SCRATCH_RX.search(root.group(1)))
     return h.group(2) or "?", r
 
 
@@ -351,7 +373,9 @@ def timings(h, since):
             f = line.rstrip().split("	")
             if len(f) >= 6 and f[0].isdigit() and int(f[0]) >= since:
                 rows.append({"t": int(f[0]), "rev": f[1], "test": f[2], "rc": f[3], "wall": float(f[4]),
-                             "cpu": float(f[5]) if f[1] != "import" else None})
+                             "cpu": float(f[5]) if f[1] != "import" else None,
+                             # who ran it (run_all.sh's 8th field): gate-<mode>, adhoc; none before it
+                             "kind": f[7] if len(f) >= 8 else None})
     return rows
 
 
@@ -398,19 +422,32 @@ def audit(h, hub, since):
             tot[k] = tot.get(k, 0) + x
     rep["total"] = tot
     # gates
+    # a run on an agent's scratch tree is an experiment: left out, counted
+    rep["scratch_runs"] = sum(1 for *_, r in gl if r.get("scratch"))
+    gl = [g for g in gl if not g[-1].get("scratch")]
     for mode in ("quick", "full"):
         runs = [r for *_, r in gl if r["mode"] == mode and r["ended"]]
         green = [r["secs"] for r in runs if r["green"] and r["secs"]]
-        rep["gates"][mode] = {"runs": len(runs), "green": sum(r["green"] for r in runs),
+        why = {}
+        for r in runs:
+            for x in ([] if r["green"] else r.get("reds") or ["?"]):
+                why[x] = why.get(x, 0) + 1
+        rep["gates"][mode] = {"runs": len(runs), "green": sum(r["green"] for r in runs), "reds": why,
                               "secs_p50": med(green), "secs_p90": pct(green, 0.9),
                               "queue_p50": med([r["queue"] for r in runs]), "queue_max": max([r["queue"] for r in runs] or [0]),
                               "steps_p50": {s: med([r["steps"][s] for r in runs if s in r["steps"]])
                                             for s in sorted({s for r in runs for s in r["steps"]})}}
     # tests: run_all.sh's timings.tsv (every e2e/tmux run, wherever its
     # log went), the gate logs' lines for the others (quick's steps, PROOF)
-    per = {}
+    # An agent's own loop (run_all.sh outside gate.sh: adhoc) is left out:
+    # 5 runs of a test with its binaries missing are not 5 reds of the test
+    per, adhoc = {}, {"runs": 0, "fails": 0}
     for row in tm:
         if row["rev"] == "import":
+            continue
+        if row["kind"] == "adhoc":
+            adhoc["runs"] += 1
+            adhoc["fails"] += 0 if row["rc"] == "0" else 1
             continue
         p = per.setdefault(row["test"], {"wall": [], "cpu": [], "runs": 0, "fails": 0})
         p["wall"].append(row["wall"])
@@ -446,6 +483,7 @@ def audit(h, hub, since):
     starts = [x["start"] - x["submit"] for x in hv if x["start"]]
     rep["heavy"] = {"jobs": len(hv), "wait_p50": med(starts), "wait_p90": pct(starts, 0.9), "wait_max": max(starts or [0])}
     rep["reds"] = reds
+    rep["adhoc"] = adhoc
     return rep
 
 
@@ -515,6 +553,11 @@ def report(rep):
         w("- %s: %d runs, %d green; green p50 %s, p90 %s; queue p50 %s, max %s; steps p50 %s" % (
             mode, g["runs"], g["green"], fmt_s(g["secs_p50"]), fmt_s(g["secs_p90"]), fmt_s(g["queue_p50"]),
             fmt_s(g["queue_max"]), ", ".join("%s %s" % (s, fmt_s(v)) for s, v in g["steps_p50"].items())))
+        if g["reds"]:
+            w("  - its red runs, by what was red: %s" % ", ".join(
+                "%s %d" % kv for kv in sorted(g["reds"].items(), key=lambda kv: -kv[1])))
+    if rep["scratch_runs"]:
+        w("- left out: %d runs on an agent's scratch tree (an experiment, not a worktree)" % rep["scratch_runs"])
     w("")
     w("## slowest tests (wall p50: timings.tsv, else the gate logs)")
     tests = sorted(rep["tests"].items(), key=lambda kv: -(kv[1]["wall_p50"] or 0))
@@ -525,6 +568,8 @@ def report(rep):
     w("## failing tests (timings.tsv, else the gate logs)")
     for name, n in sorted(rep["reds"].items(), key=lambda kv: -kv[1])[:12]:
         w("- %-28s %d of %d runs" % (name, n, rep["tests"].get(name, {}).get("runs", 0)))
+    if rep["adhoc"]["runs"]:
+        w("- left out: %d runs outside a gate (agents' own loops), %d red" % (rep["adhoc"]["runs"], rep["adhoc"]["fails"]))
     w("")
     w("## waits (sb wake)")
     for k, v in rep["waits"]["by_kind"].items():

@@ -95,6 +95,9 @@
 # a dead run left.
 set -uo pipefail
 mode="${1:-quick}"
+# run_all.sh tags each timings.tsv line with it: the audit counts a test's
+# reds in gate runs only, not in an agent's own loops (gate-reds)
+export SB_RUN_KIND="gate-$mode"
 # BISE-136: inside an agent, tell the hub where it works (the TUI's ψ):
 # new/quick/full in a private worktree say its path, done says none.
 # Best effort and silent (outside an agent, or an older hub).

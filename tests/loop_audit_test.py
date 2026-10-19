@@ -74,6 +74,10 @@ def fake_home(h, now):
     # red before its GATE line (sb-core did not build): its rc line ends it
     own("quick", "debt-t6", now - 1400, "FAIL sb-core build" + NL + "# gate end rc=1 secs=12" + NL, now - 1390)
     own("full", "debt-t4", now - 2400, FULL_T2 + "# gate end rc=0 secs=641" + NL, now - 1700)
+    # a full gate on an agent's scratch tree (bend-check's newer Bend): an experiment, left out
+    write(os.path.join(h, "gate", "logs", "full-%d-1.log" % (now - 2000)),
+          "# gate full agent=bend-check sha=abc1234 start=%d root=%s/hubs/%s/agents/bend-check/tmp/wt%s"
+          "GATE FAILED: no bend for bend/VERSION%s# gate end rc=1 secs=38%s" % (now - 2000, h, hub, NL, NL, NL), now - 1960)
     # a release's log since then: its gate.sh run has its own log already
     write(os.path.join(h, "run", "release-34-gate.log"), RELEASE, now - 1000)
     own("full", "release-34", now - 1700, RELEASE + "# gate end rc=0 secs=701" + NL, now - 1001)
@@ -83,7 +87,10 @@ def fake_home(h, now):
             (now - 1800, "e2e", 0, 49, 20), (now - 1800, "every_e2e", 0, 93, 8),
             (now - 300000, "ancient_e2e", 0, 999, 9)]
     write(os.path.join(h, "gate", "timings.tsv"),
-          "".join("%d\tabc1234\t%s\t%d\t%d\t%d\t3.1%s" % (t, n, rc, w, c, NL) for t, n, rc, w, c in rows))
+          "".join("%d\tabc1234\t%s\t%d\t%d\t%d\t3.1%s" % (t, n, rc, w, c, NL) for t, n, rc, w, c in rows)
+          # since gate-reds, an 8th field says who ran it: an agent's own loop (adhoc) is left out
+          + "%d\tabc1234\tevery_e2e\t0\t90\t8\t3.1\tgate-full%s" % (now - 1200, NL)
+          + "".join("%d\tabc1234\trpc_e2e\t1\t1\t0\t3.1\tadhoc%s" % (now - 1000 + i, NL) for i in range(5)))
     return hub
 
 
@@ -95,7 +102,7 @@ def test_audit():
         since = now - 86400
         runs, start = la.gate_logs(h, since)
         by = sorted((a, r["mode"], r["green"]) for a, _, _, r in runs)
-        check(by == [("debt-t1", "quick", True), ("debt-t3", "quick", False), ("debt-t4", "full", True),
+        check(by == [("bend-check", "full", False), ("debt-t1", "quick", True), ("debt-t3", "quick", False), ("debt-t4", "full", True),
                      ("debt-t5", "quick", False), ("debt-t6", "quick", False), ("nightly", "full", False),
                      ("release", "full", True), ("release-34", "full", True)],
               "one source per run: gate/logs by its agent, run/ only before they start (%s)" % by)
@@ -105,6 +112,9 @@ def test_audit():
         check((q["runs"], q["green"], q["secs_p50"]) == (4, 1, 35), "quick: 4 runs, 1 green, p50 35 s (%s)" % q)
         check((f["runs"], f["green"], f["queue_max"]) == (4, 3, 120), "full: 4 runs, 3 green, queue max 120 s (%s)" % f)
         check(q["steps_p50"].get("clippy") == 10, "quick's steps from its log (%s)" % q["steps_p50"])
+        check(q["reds"] == {"clippy": 2, "sb-core": 1} and f["reds"] == {"partial_e2e": 1},
+              "each mode's red runs by what was red (%s, %s)" % (q["reds"], f["reds"]))
+        check(rep["scratch_runs"] == 1, "a run on an agent's scratch tree is left out (%s)" % rep["scratch_runs"])
         t = rep["tests"]
         check(t.get("partial_e2e", {}).get("runs") == 2 and t["partial_e2e"]["fails"] == 1
               and t["partial_e2e"]["wall_p50"] == 93,
@@ -113,6 +123,8 @@ def test_audit():
         check(t.get("PROOF", {}).get("wall_p50") == 40, "an untimed test from the gate logs (%s)" % t.get("PROOF"))
         check("ancient_e2e" not in t, "timings out of the window left out")
         check(rep["reds"] == {"partial_e2e": 1}, "failing tests (%s)" % rep["reds"])
+        check(rep["adhoc"] == {"runs": 5, "fails": 5} and "rpc_e2e" not in t and t["every_e2e"]["runs"] == 2,
+              "an agent's own loop is left out, a gate's tagged run counts (%s, %s)" % (rep["adhoc"], t.get("every_e2e")))
         out = subprocess.run([sys.executable, "-B", os.path.join(ROOT, "scripts", "loop_audit.py"), "--since", "24h",
                               "--hub", hub], env=dict(os.environ, BISE_HOME=h), capture_output=True, text=True)
         check(out.returncode == 0 and "- full: 4 runs, 3 green" in out.stdout and "partial_e2e" in out.stdout

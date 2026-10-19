@@ -25,7 +25,7 @@ parsing on synthetic traces.
 | `~/.bise/hubs/<hub>/journal.jsonl` | the wakes: `wake_set` (kind job, file, bg, pid), `wake_end` (hit, max, stopped) |
 | `~/.bise/gate/logs/*.log` | the gate runs: gate.sh's own log of each quick/full/rerun, kept 7 days. First line `# gate <mode> agent=<a> sha=<HEAD> start=<epoch> root=<repo>`, last `# gate end rc=<n> secs=<n>`; between, `GATE quick/full/rerun GREEN (Ns)` or `FAILED`, each step and test line, `got the gate after Ns`. A run red before its GATE line counts by its rc |
 | `~/.bise/run/**/*.log` | the nightly's (`run/nightly/<date>.log`) and the release gates' logs, same lines: only those older than the first gate log (since then their gate.sh run has its own) |
-| `~/.bise/gate/timings.tsv` | the tests: run_all.sh's history, one line per e2e/tmux test run (time, commit, test, rc, wall s, CPU s, load). A gate log's test lines only for a test it lacks (quick's steps, PROOF) |
+| `~/.bise/gate/timings.tsv` | the tests: run_all.sh's history, one line per e2e/tmux test run (time, commit, test, rc, wall s, CPU s, load, who ran it: `gate-<mode>` from gate.sh, else `adhoc`). A gate log's test lines only for a test it lacks (quick's steps, PROOF) |
 
 One source per fact: the agents' own copies of a gate's output (their
 `$TMPDIR`, deleted at the task's drop) are not read. Runs before the first
@@ -43,8 +43,13 @@ gate log are lost; the report says so (`gate logs start <date>`).
   `wait:timer` (an `sb every` timer), `wait:agent` (another agent's
   message), `wait:user`.
 - **gates**: runs, green share, green time p50/p90, the wait for the
-  full-gate lock, each quick step's p50.
-- **tests**: wall p50/p90 and CPU p50 per test, how many runs it was red in.
+  full-gate lock, each quick step's p50, and the red runs by what was red
+  (a test red even alone, a step, line_gate, a setup; else the rc). A run
+  on an agent's scratch tree (`agents/<a>/tmp/`, an experiment such as a
+  newer Bend) is left out and counted on its own line.
+- **tests**: wall p50/p90 and CPU p50 per test, how many runs it was red
+  in. Runs outside a gate (`adhoc`: an agent's own loop, often without its
+  binaries) are left out and counted on their own line.
 - **waits**: sb wake watches by kind, the ones that ran to `--max` (a job
   that died without writing its file), heavy-run's slot waits.
 

@@ -29,7 +29,9 @@ done
 # selection, tests/test_map.py; "" = none of them)
 # every test's wall and CPU time (user + sys of it and what it waited for)
 # go to a history shared by every worktree (loop-speed.md §10): the slow
-# tests are found from it, and the next run starts the longest ones first
+# tests are found from it, and the next run starts the longest ones first.
+# Its 8th field is who ran it: gate-<mode> from gate.sh, else adhoc (an
+# agent's own loop; loop_audit.py leaves those out of the failing tests)
 timings="${SB_TIMINGS:-${BISE_HOME:-$HOME/.bise}/gate/timings.tsv}"
 mkdir -p "$(dirname "$timings")" 2>/dev/null || timings=/dev/null
 rev="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
@@ -149,7 +151,7 @@ one() {  # <test>: its last line; its whole output kept on failure
   cpu="$(awk '$1 == "user" || $1 == "sys" { c += $2 } END { printf "%d", c }' "$out/$1.time" 2>/dev/null)"
   local load; load="$(sysctl -n vm.loadavg 2>/dev/null | awk '{ print $2 }')"
   # one line, one write: the parallel jobs' appends never mix
-  echo "$(date +%s)	$rev	$1	$rc	$((SECONDS - s))	${cpu:-0}	${load:-?}" >>"$timings"
+  echo "$(date +%s)	$rev	$1	$rc	$((SECONDS - s))	${cpu:-0}	${load:-?}	${SB_RUN_KIND:-adhoc}" >>"$timings"
   [ $rc = 0 ] && [ "$1" = PROOF ] && touch "$proof_cache/$proof_key"
   [ $rc = 0 ] || echo "$1" >>"$out/failed"
   if [ $rc = 0 ]; then echo "ok   $1 ($((SECONDS - s))s, cpu ${cpu:-?}s): $(tail -1 "$out/$1.log")"
