@@ -29,6 +29,7 @@ pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
 pub use self::hubs::{not_started, HUB_LACKS, LINGER, START};
 pub use self::dictate::DICTATE_MAX;
+#[cfg(test)]
 pub use self::shot::SHOT_GONE;
 #[cfg(test)]
 pub use self::home::{MAIN_PAGE, QUIET_PAGE};
