@@ -14,6 +14,7 @@ import ../hub/timers.bend as HTM
 import ../hub/wakes.bend as HWK
 import ../hub/xhub-model.bend as HXH
 import ../hub/xhub.bend as HXB
+import ../hub/gen/kit.bend as HK
 import ../hub/gen/feed.bend as HFD
 import ../hub/pause.bend as HP
 import ../hub/reach.bend as HR
@@ -593,9 +594,9 @@ law xhub_only_main_forwards:
 law xhub_forward_once:
   for +s: HM.St
   for +id: Nat
-  for +ob: HXH.Out
-  for e: {HXH.out_by_msg(HXH.Xs.outbox(HM.St.x(s)), id) == Some{ob} : Maybe<&2, HXH.Out>}
-  {HXB.forward(s, HM.MAIN(), id) == HXB.FwdErr{String.append(String.append(HXB.mid(id), " was already forwarded to "), HXH.Out.project(ob))} : HXB.Fwd}
+  for +ob: HS.Out
+  for e: {HXH.out_by_msg(HS.Xs.outbox(HM.St.x(s)), id) == Some{ob} : Maybe<&2, HS.Out>}
+  {HXB.forward(s, HM.MAIN(), id) == HXB.FwdErr{String.append(String.append(HXB.mid(id), " was already forwarded to "), HS.Out.project(ob))} : HXB.Fwd}
 
 # LAW: only his own words go by reference (architect's B): a message not
 # from the user is refused, whatever it says (bise's own question goes by
@@ -617,22 +618,22 @@ law xhub_ask_needs_words:
 # LAW: a send settles once: after its settle, no answer opens it again
 # (a second x_reply for it changes nothing: core's xanswer on None).
 law xhub_outbox_settles_once:
-  for +x: HXH.Xs
+  for +x: HS.Xs
   for +xid: Nat
-  {HXB.open(HXH.x_op(x, xid, HXH.OpSettled{}), xid) == None{} : Maybe<&2, HXH.Out>}
+  {HXB.open(HXH.x_op(x, xid, HXH.OpSettled{}), xid) == None{} : Maybe<&2, HS.Out>}
 
 # LAW: a delivery is said once: once received, the same origin (hub, xid)
 # is seen (core's xin acks it and says nothing).
 law xhub_xin_delivered_once:
-  for +x: HXH.Xs
-  for +i: HXH.XIn
-  {HXB.seen(HXH.x_in(x, i), HXH.XIn.hub(i), HXH.XIn.xid(i)) == True{} : Bool}
+  for +x: HS.Xs
+  for +i: HS.XIn
+  {HXB.seen(HXH.x_in(x, i), HS.XIn.hub(i), HS.XIn.xid(i)) == True{} : Bool}
 
 # LAW: an answered record is never due again (core's xreplied journals
 # x_replied with each answer it sends back).
 law xhub_xin_replied_once:
-  for +i: HXH.XIn
-  {HXB.reply.of(Some{HXH.XIn.done(i)}) == None{} : Maybe<&2, HXH.XIn>}
+  for +i: HS.XIn
+  {HXB.reply.of(Some{HS.XIn.with_replied(i, True{})}) == None{} : Maybe<&2, HS.XIn>}
 
 # ---- the routing hold (desktop S2 step 2, xhub.bend + core's `routing
 # hold` section) ----
@@ -640,10 +641,10 @@ law xhub_xin_replied_once:
 # LAW: a route has one outcome: once it ended (sent or cancelled), it is
 # never held again, so no fire, correction or cancel acts on it twice.
 law route_one_outcome:
-  for +r: HXH.Route
-  for s: HXH.RSt
+  for +r: HS.Route
+  for s: HS.RSt
   for e: {HXB.is_held(s) == False{} : Bool}
-  {HXB.held.of(Some{HXH.route_op(HXH.REnd{s}, r)}) == None{} : Maybe<&2, HXH.Route>}
+  {HXB.held.of(Some{HXH.route_op(HXH.REnd{s}, r)}) == None{} : Maybe<&2, HS.Route>}
 
 # LAW: a correction acts only on a held route: one that went or was
 # cancelled gets a notice, nothing else.
@@ -658,15 +659,15 @@ law route_correct_only_held:
 # LAW: a correction changes the project only: its due time stays (his 2 s
 # don't start again).
 law route_correct_keeps_due:
-  for +r: HXH.Route
+  for +r: HS.Route
   for +to: String
   for +name: String
-  {HXH.Route.due(HXH.route_op(HXH.RTo{to, name}, r)) == HXH.Route.due(r) : Nat}
+  {HS.Route.due(HXH.route_op(HXH.RTo{to, name}, r)) == HS.Route.due(r) : Nat}
 
 # LAW: a held route's act is due HOLD_MS (2 s) after the hold, so with
 # act_due_only it fires at that tick or later, never before.
 law route_fires_at_due_only:
-  for +x: HXH.Xs
+  for +x: HS.Xs
   for +tm: HS.Tms
   for +text: String
   for +via: String
@@ -685,7 +686,7 @@ law route_fires_at_due_only:
 law route_fire_makes_no_turn:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +r: HXH.Route
+  for +r: HS.Route
   {HC.route_fire(o, Some{r}, cx) == HC.route_fire.sent(o, HC.route_said(o, cx, r), r, HM.St.next_msg(HC.st(o, cx))) : HX.Cx<o>}
 
 # ---- a held route with no target (an older hub's route model left it
@@ -696,7 +697,7 @@ law route_fire_makes_no_turn:
 law route_unclear_goes_plain:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +r: HXH.Route
+  for +r: HS.Route
   for e: {HXB.is_unclear(r) == True{} : Bool}
   {HC.route_go(o, Some{r}, cx) == HC.route_plain(o, cx, r) : HX.Cx<o>}
 
@@ -707,45 +708,45 @@ law route_unclear_goes_plain:
 law route_fire_says_where:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +r: HXH.Route
+  for +r: HS.Route
   for +id: Nat
   for +xid: Nat
-  {HC.route_fire.lines(o, cx, r, id, xid) == HC.feed(o, HC.you_parts(o, HC.feed(o, HC.feed(o, cx, HM.MAIN(), HFD.you(HXH.Route.text(r), HXB.via_of(HXH.Route.via(r)))), HM.MAIN(), HFD.you_id(id)), HM.MAIN(), HXH.Route.parts(r)), HM.MAIN(), HFD.routed(HXH.Route.to(r), HXH.Route.name(r), xid, id)) : HX.Cx<o>}
+  {HC.route_fire.lines(o, cx, r, id, xid) == HC.feed(o, HC.you_parts(o, HC.feed(o, HC.feed(o, cx, HM.MAIN(), HFD.you(HS.Route.text(r), HXB.via_of(HS.Route.via(r)))), HM.MAIN(), HFD.you_id(id)), HM.MAIN(), HS.Route.parts(r)), HM.MAIN(), HFD.routed(HS.Route.to(r), HS.Route.name(r), xid, id)) : HX.Cx<o>}
 
 # ---- his parts go with his routed words (R41 (6), architect m_18164) ----
 
 # LAW: a route's correction or pick keeps his parts (only its target
 # changes), so what fires carries what he sent.
 law route_to_keeps_parts:
-  for +r: HXH.Route
+  for +r: HS.Route
   for +to: String
   for +name: String
-  {HXH.Route.parts(HXH.route_op(HXH.RTo{to, name}, r)) == HXH.Route.parts(r) : String}
+  {HS.Route.parts(HXH.route_op(HXH.RTo{to, name}, r)) == HS.Route.parts(r) : String}
 
 # LAW: the outbox entry a fired route makes carries its parts to the
 # project (route_fire.sent's new_out).
 law route_out_carries_parts:
-  for +x: HXH.Xs
-  for +r: HXH.Route
+  for +x: HS.Xs
+  for +r: HS.Route
   for +id: Nat
-  {HXH.Out.parts(HXB.new_out(x, HXH.Route.to(r), HXH.KInput{}, id, HXH.Route.text(r), HXH.Route.context(r), HXH.Route.parts(r))) == HXH.Route.parts(r) : String}
+  {HS.Out.parts(HXB.new_out(x, HS.Route.to(r), HS.KInput{}, id, HS.Route.text(r), HS.Route.context(r), HS.Route.parts(r))) == HS.Route.parts(r) : String}
 
 # LAW: no parts, no key: an out or a route without parts journals and is
 # delivered byte for byte as before (an older core replays it unchanged).
 law route_no_parts_no_key:
-  {HXH.parts_kv("") == Nil{} : List<&2, Sigma<&2, &2, String, _ => J.Json>>}
+  {HK.omit_s("parts", "") == Nil{} : List<&2, Sigma<&2, &2, String, _ => J.Json>>}
 
 # LAW: on the project, his forwarded message keeps its parts (the
 # you-parts path of a direct input); bise's own question has none.
 law xin_input_keeps_parts:
   for +text: String
   for +parts: String
-  {HC.xin.snd(HXH.KInput{}, text, parts) == HC.Snd{HM.USER(), HM.MAIN(), text, True{}, None{}, False{}, False{}, False{}, Some{HXB.VIA_BISE()}, parts} : HC.Snd}
+  {HC.xin.snd(HS.KInput{}, text, parts) == HC.Snd{HM.USER(), HM.MAIN(), text, True{}, None{}, False{}, False{}, False{}, Some{HXB.VIA_BISE()}, parts} : HC.Snd}
 
 law xin_ask_has_no_parts:
   for +text: String
   for +parts: String
-  {HC.xin.snd(HXH.KAsk{}, text, parts) == HC.Snd{HXB.FROM_BISE(), HM.MAIN(), text, True{}, None{}, False{}, False{}, False{}, None{}, ""} : HC.Snd}
+  {HC.xin.snd(HS.KAsk{}, text, parts) == HC.Snd{HXB.FROM_BISE(), HM.MAIN(), text, True{}, None{}, False{}, False{}, False{}, None{}, ""} : HC.Snd}
 
 # ---- followed jobs (desktop S10, core.bend's `followed jobs`) ----
 

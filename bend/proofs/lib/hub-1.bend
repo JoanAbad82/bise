@@ -28,8 +28,8 @@ def hub_append(+a: List<&2, HM.Ev>, -b: List<&2, HM.Ev>, -s: HM.St)
       hub_append(t, b, HM.apply(s, e))
 
 def hub_commit_go(+h: HC.Hub, need: Maybe<&2, J.Json>, c: HX.Core<HC.Hub.d(h)>, +r: HX.R)
-    -> {HC.Hub.d(HC.Out.hub(HC.commit.go(HC.Hub.d(h), need, c, r, h)))
-        == HM.apply_all(HX.journal(HC.Out.fx(HC.commit.go(HC.Hub.d(h), need, c, r, h))), HC.Hub.d(h)) : HM.St}:
+    -> {HC.Hub.d(HC.Turn.hub(HC.commit.go(HC.Hub.d(h), need, c, r, h)))
+        == HM.apply_all(HX.journal(HC.Turn.fx(HC.commit.go(HC.Hub.d(h), need, c, r, h))), HC.Hub.d(h)) : HM.St}:
   match need:
     case Some{q}:
       {==}
@@ -37,15 +37,15 @@ def hub_commit_go(+h: HC.Hub, need: Maybe<&2, J.Json>, c: HX.Core<HC.Hub.d(h)>, 
       hub_core_ok(HC.Hub.d(h), c)
 
 def hub_commit_cx(+h: HC.Hub, cx: HX.Cx<HC.Hub.d(h)>)
-    -> {HC.Hub.d(HC.Out.hub(HC.commit.cx(HC.Hub.d(h), cx, h)))
-        == HM.apply_all(HX.journal(HC.Out.fx(HC.commit.cx(HC.Hub.d(h), cx, h))), HC.Hub.d(h)) : HM.St}:
+    -> {HC.Hub.d(HC.Turn.hub(HC.commit.cx(HC.Hub.d(h), cx, h)))
+        == HM.apply_all(HX.journal(HC.Turn.fx(HC.commit.cx(HC.Hub.d(h), cx, h))), HC.Hub.d(h)) : HM.St}:
   match cx:
     case HX.Cx{c, +r}:
       hub_commit_go(h, HX.R.need(r), c, r)
 
 # what sb-core keeps of an input is the replay of its journal
 def hub_commit_ok(+h: HC.Hub, +i: J.Json)
-    -> {HC.Hub.d(HC.Out.hub(HC.commit(h, i))) == HM.apply_all(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.Hub.d(h)) : HM.St}:
+    -> {HC.Hub.d(HC.Turn.hub(HC.commit(h, i))) == HM.apply_all(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h)) : HM.St}:
   hub_commit_cx(h, HC.step(h, i))
 
 def hub_fresh_append(+a: List<&2, HM.Ev>, -b: List<&2, HM.Ev>, -s: HM.St, fa: HX.Fresh(a, s),
@@ -73,8 +73,8 @@ def hub_fresh_tr(-evs: List<&2, HM.Ev>, -x: HM.St, -y: HM.St, e: {x == y : HM.St
   f
 
 def hub_commit_go_f(+h: HC.Hub, need: Maybe<&2, J.Json>, c: HX.Core<HC.Hub.d(h)>, +r: HX.R)
-    -> HX.Both<HX.Fresh(HX.journal(HC.Out.fx(HC.commit.go(HC.Hub.d(h), need, c, r, h))), HC.Hub.d(h)),
-               HX.Quiet(HX.journal(HC.Out.fx(HC.commit.go(HC.Hub.d(h), need, c, r, h))))>:
+    -> HX.Both<HX.Fresh(HX.journal(HC.Turn.fx(HC.commit.go(HC.Hub.d(h), need, c, r, h))), HC.Hub.d(h)),
+               HX.Quiet(HX.journal(HC.Turn.fx(HC.commit.go(HC.Hub.d(h), need, c, r, h))))>:
   match need:
     case Some{q}:
       HX.Both{Unit{}, Unit{}}
@@ -84,14 +84,14 @@ def hub_commit_go_f(+h: HC.Hub, need: Maybe<&2, J.Json>, c: HX.Core<HC.Hub.d(h)>
           HX.Both{f, q}
 
 def hub_commit_f.cx(+h: HC.Hub, cx: HX.Cx<HC.Hub.d(h)>)
-    -> HX.Both<HX.Fresh(HX.journal(HC.Out.fx(HC.commit.cx(HC.Hub.d(h), cx, h))), HC.Hub.d(h)),
-               HX.Quiet(HX.journal(HC.Out.fx(HC.commit.cx(HC.Hub.d(h), cx, h))))>:
+    -> HX.Both<HX.Fresh(HX.journal(HC.Turn.fx(HC.commit.cx(HC.Hub.d(h), cx, h))), HC.Hub.d(h)),
+               HX.Quiet(HX.journal(HC.Turn.fx(HC.commit.cx(HC.Hub.d(h), cx, h))))>:
   match cx:
     case HX.Cx{c, +r}:
       hub_commit_go_f(h, HX.R.need(r), c, r)
 
 def hub_commit_f(+h: HC.Hub, +i: J.Json)
-    -> HX.Both<HX.Fresh(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.Hub.d(h)), HX.Quiet(HX.journal(HC.Out.fx(HC.commit(h, i))))>:
+    -> HX.Both<HX.Fresh(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h)), HX.Quiet(HX.journal(HC.Turn.fx(HC.commit(h, i))))>:
   hub_commit_f.cx(h, HC.step(h, i))
 
 def hub_fst(-A: Data, -B: Data, x: HX.Both<A, B>) -> A:
@@ -463,7 +463,7 @@ def hub_deliv_tr(-evs: List<&2, HM.Ev>, -x: HM.St, -y: HM.St, e: {x == y : HM.St
   f
 
 def hub_commit_go_v(+h: HC.Hub, need: Maybe<&2, J.Json>, c: HX.Core<HC.Hub.d(h)>, +r: HX.R)
-    -> HX.Deliv(HX.journal(HC.Out.fx(HC.commit.go(HC.Hub.d(h), need, c, r, h))), HC.Hub.d(h)):
+    -> HX.Deliv(HX.journal(HC.Turn.fx(HC.commit.go(HC.Hub.d(h), need, c, r, h))), HC.Hub.d(h)):
   match need:
     case Some{q}:
       Unit{}
@@ -473,7 +473,7 @@ def hub_commit_go_v(+h: HC.Hub, need: Maybe<&2, J.Json>, c: HX.Core<HC.Hub.d(h)>
           v
 
 def hub_commit_v.cx(+h: HC.Hub, cx: HX.Cx<HC.Hub.d(h)>)
-    -> HX.Deliv(HX.journal(HC.Out.fx(HC.commit.cx(HC.Hub.d(h), cx, h))), HC.Hub.d(h)):
+    -> HX.Deliv(HX.journal(HC.Turn.fx(HC.commit.cx(HC.Hub.d(h), cx, h))), HC.Hub.d(h)):
   match cx:
     case HX.Cx{c, +r}:
       hub_commit_go_v(h, HX.R.need(r), c, r)

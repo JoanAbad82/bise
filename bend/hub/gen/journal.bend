@@ -108,7 +108,7 @@ def EveryName.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.ETimerName{K.get_n(i, "id"), K.get_s(i, "name"), K.get_b(i, "announce"), K.get_n(i, "at")}}
 
 def XOut.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EX{XH.XOut{C.out_of(K.get_j(i, "out"))}}}
+  Some{M.EX{XH.XOut{SC.Out.journal_of(K.get_j(i, "out"))}}}
 
 def XAcked.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EX{XH.XOp{K.get_n(i, "xid"), XH.OpAcked{}}}}
@@ -120,22 +120,22 @@ def XSettled.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EX{XH.XOp{K.get_n(i, "xid"), XH.OpSettled{}}}}
 
 def XIn.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EX{XH.XGot{C.xin_of(K.get_j(i, "in"))}}}
+  Some{M.EX{XH.XGot{SC.XIn.journal_of(K.get_j(i, "in"))}}}
 
 def XReplied.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EX{XH.XReplied{K.get_s(i, "hub"), K.get_n(i, "xid")}}}
 
 def RouteHeld.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EX{XH.XRouteHeld{C.route_of(K.get_j(i, "route"))}}}
+  Some{M.EX{XH.XRouteHeld{SC.Route.journal_of(K.get_j(i, "route"))}}}
 
 def RouteSet.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EX{XH.XRoute{K.get_n(i, "rid"), XH.RTo{K.get_s(i, "to"), K.get_s(i, "name")}}}}
 
 def RouteSent.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EX{XH.XRoute{K.get_n(i, "rid"), XH.REnd{XH.RSent{}}}}}
+  Some{M.EX{XH.XRoute{K.get_n(i, "rid"), XH.REnd{S.RSent{}}}}}
 
 def RouteCancelled.of(+i: J.Json) -> Maybe<&2, M.Ev>:
-  Some{M.EX{XH.XRoute{K.get_n(i, "rid"), XH.REnd{XH.RCancelled{}}}}}
+  Some{M.EX{XH.XRoute{K.get_n(i, "rid"), XH.REnd{S.RCancelled{}}}}}
 
 def ActSet.of(+i: J.Json) -> Maybe<&2, M.Ev>:
   Some{M.EAct{TM.ActSet{SC.Act.journal_of(K.get_j(i, "act"))}}}
@@ -612,7 +612,7 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.ETimerName{+id, +name, +announce, +at}:
       K.cat([[J.kv("type", J.JStr{"every_name"}), J.kv("id", J.JNum{id}), J.kv("name", J.JStr{name}), J.kv("at", J.JNum{at})], K.flag("announce", announce)])
     case M.EX{XH.XOut{+out}}:
-      [J.kv("type", J.JStr{"x_out"}), J.kv("out", C.out_json(out))]
+      [J.kv("type", J.JStr{"x_out"}), J.kv("out", SC.Out.journal_json(out))]
     case M.EX{XH.XOp{+xid, XH.OpAcked{}}}:
       [J.kv("type", J.JStr{"x_acked"}), J.kv("xid", J.JNum{xid})]
     case M.EX{XH.XOp{+xid, XH.OpTried{}}}:
@@ -620,16 +620,16 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.EX{XH.XOp{+xid, XH.OpSettled{}}}:
       [J.kv("type", J.JStr{"x_settled"}), J.kv("xid", J.JNum{xid})]
     case M.EX{XH.XGot{+in}}:
-      [J.kv("type", J.JStr{"x_in"}), J.kv("in", C.xin_json(in))]
+      [J.kv("type", J.JStr{"x_in"}), J.kv("in", SC.XIn.journal_json(in))]
     case M.EX{XH.XReplied{+hub, +xid}}:
       [J.kv("type", J.JStr{"x_replied"}), J.kv("hub", J.JStr{hub}), J.kv("xid", J.JNum{xid})]
     case M.EX{XH.XRouteHeld{+route}}:
-      [J.kv("type", J.JStr{"route_held"}), J.kv("route", C.route_json(route))]
+      [J.kv("type", J.JStr{"route_held"}), J.kv("route", SC.Route.journal_json(route))]
     case M.EX{XH.XRoute{+rid, XH.RTo{+to, +name}}}:
       [J.kv("type", J.JStr{"route_set"}), J.kv("rid", J.JNum{rid}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name})]
-    case M.EX{XH.XRoute{+rid, XH.REnd{XH.RSent{}}}}:
+    case M.EX{XH.XRoute{+rid, XH.REnd{S.RSent{}}}}:
       [J.kv("type", J.JStr{"route_sent"}), J.kv("rid", J.JNum{rid})]
-    case M.EX{XH.XRoute{+rid, XH.REnd{XH.RCancelled{}}}}:
+    case M.EX{XH.XRoute{+rid, XH.REnd{S.RCancelled{}}}}:
       [J.kv("type", J.JStr{"route_cancelled"}), J.kv("rid", J.JNum{rid})]
     case M.EAct{TM.ActSet{+act}}:
       [J.kv("type", J.JStr{"act_set"}), J.kv("act", SC.Act.journal_json(act))]
@@ -648,7 +648,7 @@ def kvs(e: M.Ev) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.EResumed{+at}:
       [J.kv("type", J.JStr{"resumed"}), J.kv("at", J.JNum{at})]
     # never journaled (journal.rs NEVER): written as it always was
-    case M.EX{XH.XRoute{+rid, XH.REnd{XH.RHeld{}}}}:
+    case M.EX{XH.XRoute{+rid, XH.REnd{S.RHeld{}}}}:
       [J.kv("type", J.JStr{"route_held"}), J.kv("rid", J.JNum{rid})]
 
 # one event's journal line

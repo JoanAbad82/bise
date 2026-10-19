@@ -432,7 +432,7 @@ fn no_step_journals_a_held_end() {
         let p = e.unwrap().path();
         if p.extension().is_some_and(|x| x == "bend") {
             let text = std::fs::read_to_string(&p).unwrap();
-            for bad in ["REnd{XH.RHeld{}}", "REnd{RHeld{}}"] {
+            for bad in ["REnd{S.RHeld{}}", "REnd{RHeld{}}"] {
                 assert!(!text.contains(bad), "{}: builds {bad}, which journal.rs NEVER writes back as a route_held", p.display());
             }
         }

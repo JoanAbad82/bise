@@ -174,7 +174,7 @@ def journal_every_name_bare():
   {==}
 
 law journal_x_out_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"x_out"})])) == Some{M.EX{XH.XOut{C.out_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"x_out"})])) == Some{M.EX{XH.XOut{SC.Out.journal_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
 
 def journal_x_out_bare():
   {==}
@@ -198,7 +198,7 @@ def journal_x_settled_bare():
   {==}
 
 law journal_x_in_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"x_in"})])) == Some{M.EX{XH.XGot{C.xin_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"x_in"})])) == Some{M.EX{XH.XGot{SC.XIn.journal_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
 
 def journal_x_in_bare():
   {==}
@@ -210,7 +210,7 @@ def journal_x_replied_bare():
   {==}
 
 law journal_route_held_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"route_held"})])) == Some{M.EX{XH.XRouteHeld{C.route_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"route_held"})])) == Some{M.EX{XH.XRouteHeld{SC.Route.journal_of(J.JNull{})}}} : Maybe<&2, M.Ev>}
 
 def journal_route_held_bare():
   {==}
@@ -222,13 +222,13 @@ def journal_route_set_bare():
   {==}
 
 law journal_route_sent_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"route_sent"})])) == Some{M.EX{XH.XRoute{0n, XH.REnd{XH.RSent{}}}}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"route_sent"})])) == Some{M.EX{XH.XRoute{0n, XH.REnd{S.RSent{}}}}} : Maybe<&2, M.Ev>}
 
 def journal_route_sent_bare():
   {==}
 
 law journal_route_cancelled_bare:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"route_cancelled"})])) == Some{M.EX{XH.XRoute{0n, XH.REnd{XH.RCancelled{}}}}} : Maybe<&2, M.Ev>}
+  {GJ.of(J.obj([J.kv("type", J.JStr{"route_cancelled"})])) == Some{M.EX{XH.XRoute{0n, XH.REnd{S.RCancelled{}}}}} : Maybe<&2, M.Ev>}
 
 def journal_route_cancelled_bare():
   {==}
@@ -668,11 +668,11 @@ def journal_every_name_round(id, name, at, announce):
       {==}
 
 law journal_x_out_round:
-  for out: XH.Out
+  for out: S.Out
   {GJ.of(GJ.json(M.EX{XH.XOut{out}})) == Some{M.EX{XH.XOut{out}}} : Maybe<&2, M.Ev>}
 
 def journal_x_out_round(out):
-  %C.out_round(out) : {GJ.of(GJ.json(M.EX{XH.XOut{out}})) == Some{M.EX{XH.XOut{_}}} : Maybe<&2, M.Ev>}
+  %SC.Out.journal_round(out) : {GJ.of(GJ.json(M.EX{XH.XOut{out}})) == Some{M.EX{XH.XOut{_}}} : Maybe<&2, M.Ev>}
   {==}
 
 law journal_x_acked_round:
@@ -697,11 +697,11 @@ def journal_x_settled_round(xid):
   {==}
 
 law journal_x_in_round:
-  for in: XH.XIn
+  for in: S.XIn
   {GJ.of(GJ.json(M.EX{XH.XGot{in}})) == Some{M.EX{XH.XGot{in}}} : Maybe<&2, M.Ev>}
 
 def journal_x_in_round(in):
-  %C.xin_round(in) : {GJ.of(GJ.json(M.EX{XH.XGot{in}})) == Some{M.EX{XH.XGot{_}}} : Maybe<&2, M.Ev>}
+  %SC.XIn.journal_round(in) : {GJ.of(GJ.json(M.EX{XH.XGot{in}})) == Some{M.EX{XH.XGot{_}}} : Maybe<&2, M.Ev>}
   {==}
 
 law journal_x_replied_round:
@@ -713,11 +713,11 @@ def journal_x_replied_round(hub, xid):
   {==}
 
 law journal_route_held_round:
-  for route: XH.Route
+  for route: S.Route
   {GJ.of(GJ.json(M.EX{XH.XRouteHeld{route}})) == Some{M.EX{XH.XRouteHeld{route}}} : Maybe<&2, M.Ev>}
 
 def journal_route_held_round(route):
-  %C.route_round(route) : {GJ.of(GJ.json(M.EX{XH.XRouteHeld{route}})) == Some{M.EX{XH.XRouteHeld{_}}} : Maybe<&2, M.Ev>}
+  %SC.Route.journal_round(route) : {GJ.of(GJ.json(M.EX{XH.XRouteHeld{route}})) == Some{M.EX{XH.XRouteHeld{_}}} : Maybe<&2, M.Ev>}
   {==}
 
 law journal_route_set_round:
@@ -731,14 +731,14 @@ def journal_route_set_round(rid, to, name):
 
 law journal_route_sent_round:
   for rid: Nat
-  {GJ.of(GJ.json(M.EX{XH.XRoute{rid, XH.REnd{XH.RSent{}}}})) == Some{M.EX{XH.XRoute{rid, XH.REnd{XH.RSent{}}}}} : Maybe<&2, M.Ev>}
+  {GJ.of(GJ.json(M.EX{XH.XRoute{rid, XH.REnd{S.RSent{}}}})) == Some{M.EX{XH.XRoute{rid, XH.REnd{S.RSent{}}}}} : Maybe<&2, M.Ev>}
 
 def journal_route_sent_round(rid):
   {==}
 
 law journal_route_cancelled_round:
   for rid: Nat
-  {GJ.of(GJ.json(M.EX{XH.XRoute{rid, XH.REnd{XH.RCancelled{}}}})) == Some{M.EX{XH.XRoute{rid, XH.REnd{XH.RCancelled{}}}}} : Maybe<&2, M.Ev>}
+  {GJ.of(GJ.json(M.EX{XH.XRoute{rid, XH.REnd{S.RCancelled{}}}})) == Some{M.EX{XH.XRoute{rid, XH.REnd{S.RCancelled{}}}}} : Maybe<&2, M.Ev>}
 
 def journal_route_cancelled_round(rid):
   {==}

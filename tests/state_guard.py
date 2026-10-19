@@ -36,8 +36,6 @@ DIRS = ["bend/hub", "bend/laws", "bend/proofs"]
 MIGRATING = {
     # St
     "St",
-    # xhub and gone
-    "Out", "XIn", "Route", "Xs", "Item",
 }
 
 # the hand records that are not sb-core's durable state (yet): the proof

@@ -12,6 +12,7 @@ import ../../hub/timers.bend as HTM
 import ../../hub/wakes.bend as HWK
 import ../../hub/xhub-model.bend as HXH
 import ../../hub/xhub.bend as HXB
+import ../../hub/gen/state-laws.bend as HSL
 import ./hub-1.bend as PL1
 import ./hub-2.bend as PL2
 import ./hub-names.bend as PLN
@@ -630,55 +631,61 @@ def hub_wnone_tr(-x: List<&2, HS.Watch>, -y: List<&2, HS.Watch>, -n: String, e: 
   %Equal.sym(List<&2, HS.Watch>, x, y, e) : HI.WatchNoneOf(_, n)
   l
 
-# the settled head is not open
-def hub_x_settled.head(+h: HXH.Out, +t: List<&2, HXH.Out>, +xid: Nat, +e: {Nat.is_eq(HXH.Out.xid(h), xid) == True{} : Bool})
-    -> {HXB.open.of(HXH.out_of(HXH.out_op(HXH.OpSettled{}, h) <> t, xid)) == None{} : Maybe<&2, HXH.Out>}:
-  match h:
-    case HXH.Out{xi, p, k, m, tx, s, n, cx, ps}:
-      %Equal.sym(Bool, Nat.is_eq(xi, xid), True{}, e) : {HXB.open.of(HLZ.pick(Maybe<&2, HXH.Out>, _, u => Some{HXH.Out{xi, p, k, m, tx, HXH.OSettled{}, n, cx, ps}}, u => HXH.out_of(t, xid))) == None{} : Maybe<&2, HXH.Out>}
-      {==}
+# a state change keeps the entry's xid, so its match on `xid` stays
+def hub_x_st_xid(+h: HS.Out, +v: HS.OutSt, +xid: Nat, -c: Bool, e: {Nat.is_eq(HS.Out.xid(h), xid) == c : Bool})
+    -> {Nat.is_eq(HS.Out.xid(HS.Out.with_st(h, v)), xid) == c : Bool}:
+  %HSL.Out.st.eta(h, v) : {Nat.is_eq(HS.Out.xid(_), xid) == c : Bool}
+  e
 
-def hub_x_settled.go(c: Bool, +h: HXH.Out, +t: List<&2, HXH.Out>, +xid: Nat, +e: {Nat.is_eq(HXH.Out.xid(h), xid) == c : Bool},
-    ih: {HXB.open.of(HXH.out_of(HXH.out_set(t, xid, HXH.OpSettled{}), xid)) == None{} : Maybe<&2, HXH.Out>})
-    -> {HXB.open.of(HXH.out_of(HXH.out_set(h <> t, xid, HXH.OpSettled{}), xid)) == None{} : Maybe<&2, HXH.Out>}:
+# the settled head is not open
+def hub_x_settled.head(+h: HS.Out, +t: List<&2, HS.Out>, +xid: Nat, +e: {Nat.is_eq(HS.Out.xid(h), xid) == True{} : Bool})
+    -> {HXB.open.of(HXH.out_of(HXH.out_op(HXH.OpSettled{}, h) <> t, xid)) == None{} : Maybe<&2, HS.Out>}:
+  +s = HS.Out.with_st(h, HS.OSettled{})
+  %Equal.sym(Bool, Nat.is_eq(HS.Out.xid(s), xid), True{}, hub_x_st_xid(h, HS.OSettled{}, xid, True{}, e)) : {HXB.open.of(HLZ.pick(Maybe<&2, HS.Out>, _, u => Some{s}, u => HXH.out_of(t, xid))) == None{} : Maybe<&2, HS.Out>}
+  %HSL.Out.st.eta(h, HS.OSettled{}) : {HXB.open.of(Some{_}) == None{} : Maybe<&2, HS.Out>}
+  {==}
+
+def hub_x_settled.go(c: Bool, +h: HS.Out, +t: List<&2, HS.Out>, +xid: Nat, +e: {Nat.is_eq(HS.Out.xid(h), xid) == c : Bool},
+    ih: {HXB.open.of(HXH.out_of(HXH.out_set(t, xid, HXH.OpSettled{}), xid)) == None{} : Maybe<&2, HS.Out>})
+    -> {HXB.open.of(HXH.out_of(HXH.out_set(h <> t, xid, HXH.OpSettled{}), xid)) == None{} : Maybe<&2, HS.Out>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(HXH.Out.xid(h), xid), True{}, e) : {HXB.open.of(HXH.out_of(HLZ.pick(List<&2, HXH.Out>, _, u => HXH.out_op(HXH.OpSettled{}, h) <> t, u => h <> HXH.out_set(t, xid, HXH.OpSettled{})), xid)) == None{} : Maybe<&2, HXH.Out>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Out.xid(h), xid), True{}, e) : {HXB.open.of(HXH.out_of(HLZ.pick(List<&2, HS.Out>, _, u => HXH.out_op(HXH.OpSettled{}, h) <> t, u => h <> HXH.out_set(t, xid, HXH.OpSettled{})), xid)) == None{} : Maybe<&2, HS.Out>}
       hub_x_settled.head(h, t, xid, e)
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(HXH.Out.xid(h), xid), False{}, e) : {HXB.open.of(HXH.out_of(HLZ.pick(List<&2, HXH.Out>, _, u => HXH.out_op(HXH.OpSettled{}, h) <> t, u => h <> HXH.out_set(t, xid, HXH.OpSettled{})), xid)) == None{} : Maybe<&2, HXH.Out>}
-      %Equal.sym(Bool, Nat.is_eq(HXH.Out.xid(h), xid), False{}, e) : {HXB.open.of(HLZ.pick(Maybe<&2, HXH.Out>, _, u => Some{h}, u => HXH.out_of(HXH.out_set(t, xid, HXH.OpSettled{}), xid))) == None{} : Maybe<&2, HXH.Out>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Out.xid(h), xid), False{}, e) : {HXB.open.of(HXH.out_of(HLZ.pick(List<&2, HS.Out>, _, u => HXH.out_op(HXH.OpSettled{}, h) <> t, u => h <> HXH.out_set(t, xid, HXH.OpSettled{})), xid)) == None{} : Maybe<&2, HS.Out>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Out.xid(h), xid), False{}, e) : {HXB.open.of(HLZ.pick(Maybe<&2, HS.Out>, _, u => Some{h}, u => HXH.out_of(HXH.out_set(t, xid, HXH.OpSettled{}), xid))) == None{} : Maybe<&2, HS.Out>}
       ih
 
 # after a settle of `xid`, no entry of it is open
-def hub_x_settled(+xs: List<&2, HXH.Out>, +xid: Nat) -> {HXB.open.of(HXH.out_of(HXH.out_set(xs, xid, HXH.OpSettled{}), xid)) == None{} : Maybe<&2, HXH.Out>}:
+def hub_x_settled(+xs: List<&2, HS.Out>, +xid: Nat) -> {HXB.open.of(HXH.out_of(HXH.out_set(xs, xid, HXH.OpSettled{}), xid)) == None{} : Maybe<&2, HS.Out>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      hub_x_settled.go(Nat.is_eq(HXH.Out.xid(h), xid), h, t, xid, {==}, hub_x_settled(t, xid))
+      hub_x_settled.go(Nat.is_eq(HS.Out.xid(h), xid), h, t, xid, {==}, hub_x_settled(t, xid))
 
-def hub_x_seen.go(c: Bool, +h: HXH.XIn, +t: List<&2, HXH.XIn>, +i: HXH.XIn,
-    +e: {Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))) == c : Bool},
-    ih: {HXB.seen.of(HXH.xin_of(List.append(&2, HXH.XIn, t, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i))) == True{} : Bool})
-    -> {HXB.seen.of(HXH.xin_of(List.append(&2, HXH.XIn, h <> t, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i))) == True{} : Bool}:
+def hub_x_seen.go(c: Bool, +h: HS.XIn, +t: List<&2, HS.XIn>, +i: HS.XIn,
+    +e: {Bool.and(String.eq(HS.XIn.hub(h), HS.XIn.hub(i)), Nat.is_eq(HS.XIn.xid(h), HS.XIn.xid(i))) == c : Bool},
+    ih: {HXB.seen.of(HXH.xin_of(List.append(&2, HS.XIn, t, [i]), HS.XIn.hub(i), HS.XIn.xid(i))) == True{} : Bool})
+    -> {HXB.seen.of(HXH.xin_of(List.append(&2, HS.XIn, h <> t, [i]), HS.XIn.hub(i), HS.XIn.xid(i))) == True{} : Bool}:
   match c:
     case True{}:
-      %Equal.sym(Bool, Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))), True{}, e) : {HXB.seen.of(HLZ.pick(Maybe<&2, HXH.XIn>, _, u => Some{h}, u => HXH.xin_of(List.append(&2, HXH.XIn, t, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i)))) == True{} : Bool}
+      %Equal.sym(Bool, Bool.and(String.eq(HS.XIn.hub(h), HS.XIn.hub(i)), Nat.is_eq(HS.XIn.xid(h), HS.XIn.xid(i))), True{}, e) : {HXB.seen.of(HLZ.pick(Maybe<&2, HS.XIn>, _, u => Some{h}, u => HXH.xin_of(List.append(&2, HS.XIn, t, [i]), HS.XIn.hub(i), HS.XIn.xid(i)))) == True{} : Bool}
       {==}
     case False{}:
-      %Equal.sym(Bool, Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))), False{}, e) : {HXB.seen.of(HLZ.pick(Maybe<&2, HXH.XIn>, _, u => Some{h}, u => HXH.xin_of(List.append(&2, HXH.XIn, t, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i)))) == True{} : Bool}
+      %Equal.sym(Bool, Bool.and(String.eq(HS.XIn.hub(h), HS.XIn.hub(i)), Nat.is_eq(HS.XIn.xid(h), HS.XIn.xid(i))), False{}, e) : {HXB.seen.of(HLZ.pick(Maybe<&2, HS.XIn>, _, u => Some{h}, u => HXH.xin_of(List.append(&2, HS.XIn, t, [i]), HS.XIn.hub(i), HS.XIn.xid(i)))) == True{} : Bool}
       ih
 
 # a record added last is found by its origin
-def hub_x_seen(+xs: List<&2, HXH.XIn>, +i: HXH.XIn) -> {HXB.seen.of(HXH.xin_of(List.append(&2, HXH.XIn, xs, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i))) == True{} : Bool}:
+def hub_x_seen(+xs: List<&2, HS.XIn>, +i: HS.XIn) -> {HXB.seen.of(HXH.xin_of(List.append(&2, HS.XIn, xs, [i]), HS.XIn.hub(i), HS.XIn.xid(i))) == True{} : Bool}:
   match xs:
     case Nil{}:
-      %Equal.sym(Bool, String.eq(HXH.XIn.hub(i), HXH.XIn.hub(i)), True{}, PL2.hub_str_eq_refl(HXH.XIn.hub(i))) : {HXB.seen.of(HLZ.pick(Maybe<&2, HXH.XIn>, Bool.and(_, Nat.is_eq(HXH.XIn.xid(i), HXH.XIn.xid(i))), u => Some{i}, u => None{})) == True{} : Bool}
-      %Equal.sym(Bool, Nat.is_eq(HXH.XIn.xid(i), HXH.XIn.xid(i)), True{}, PL1.hub_eq_refl(HXH.XIn.xid(i))) : {HXB.seen.of(HLZ.pick(Maybe<&2, HXH.XIn>, _, u => Some{i}, u => None{})) == True{} : Bool}
+      %Equal.sym(Bool, String.eq(HS.XIn.hub(i), HS.XIn.hub(i)), True{}, PL2.hub_str_eq_refl(HS.XIn.hub(i))) : {HXB.seen.of(HLZ.pick(Maybe<&2, HS.XIn>, Bool.and(_, Nat.is_eq(HS.XIn.xid(i), HS.XIn.xid(i))), u => Some{i}, u => None{})) == True{} : Bool}
+      %Equal.sym(Bool, Nat.is_eq(HS.XIn.xid(i), HS.XIn.xid(i)), True{}, PL1.hub_eq_refl(HS.XIn.xid(i))) : {HXB.seen.of(HLZ.pick(Maybe<&2, HS.XIn>, _, u => Some{i}, u => None{})) == True{} : Bool}
       {==}
     case Con{h, t}:
-      hub_x_seen.go(Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))), h, t, i, {==}, hub_x_seen(t, i))
+      hub_x_seen.go(Bool.and(String.eq(HS.XIn.hub(h), HS.XIn.hub(i)), Nat.is_eq(HS.XIn.xid(h), HS.XIn.xid(i))), h, t, i, {==}, hub_x_seen(t, i))
 
 def hub_act_gone.go(c: Bool, +h: HS.Act, +t: List<&2, HS.Act>, +id: Nat, +e: {Nat.is_eq(HS.Act.id(h), id) == c : Bool},
     ih: {HTM.act_find(HTM.act_drop(t, id), id) == None{} : Maybe<&2, HS.Act>})

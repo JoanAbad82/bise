@@ -21,6 +21,7 @@ import ./wakes.bend as WK
 
 import ./xhub-model.bend as XH
 import ./xhub.bend as XB
+import ./gen/state-codec.bend as SC
 
 import ./picks.bend as PK
 import ./answers.bend as A
@@ -103,8 +104,8 @@ type Cmd is Data:
 # the hub after an input: the new state and its effects, or, when a git
 # answer is missing, the hub unchanged and the query (the daemon replays
 # the input with the answer)
-type Out is Data:
-  Out{hub: Hub, fx: List<&2, X.Fx>, need: Maybe<&2, J.Json>}
+type Turn is Data:
+  Turn{hub: Hub, fx: List<&2, X.Fx>, need: Maybe<&2, J.Json>}
 
 # a sequence of inputs: the hub at the end and every journal event, in
 # order (the model of sb-core's loop, for the law run_replays)
@@ -1847,10 +1848,10 @@ def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: S.Card, +text: String, +pa
 # his late answer to the card main withdrew (`it`, hub/gone.bend), as a
 # hub message to main: the question on one line, then his words whole,
 # his parts on the message (law late_answer_keeps_its_parts)
-def late.head(+it: G.Item) -> String:
-  cat(["he answered #", ns(G.Item.id(it)), " after you withdrew it (\"", T.one_line(G.Item.text(it)), "\"):\n"])
+def late.head(+it: S.Item) -> String:
+  cat(["he answered #", ns(S.Item.id(it)), " after you withdrew it (\"", T.one_line(S.Item.text(it)), "\"):\n"])
 
-def late.snd(+it: G.Item, +text: String, +parts: String) -> Snd:
+def late.snd(+it: S.Item, +text: String, +parts: String) -> Snd:
   Snd{M.HUB(), M.MAIN(), String.append(late.head(it), text), False{}, None{}, False{}, False{}, False{}, None{}, parts}
 
 # sent: card_late takes the card out of the list (law late_answer_once);
@@ -1865,7 +1866,7 @@ def answer.late.sent(-o: M.St, p: X.Cx<o> & SendR, +id: Nat) -> X.Cx<o>:
 # his answer to a card that isn't open (withdrawn-answer, architect
 # m_30039): a card main withdrew while he answered it (`g`, still in
 # St.gone) reaches main, once, never dropped; any other card: refused
-def answer.late(-o: M.St, g: Maybe<&2, G.Item>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
+def answer.late(-o: M.St, g: Maybe<&2, S.Item>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
   match g:
     case None{}:
       notice(o, cx, cat(["notification #", ns(id), " isn't open"]))
@@ -2204,7 +2205,7 @@ def focus(-o: M.St, +cx: X.Cx<o>, +f: String, note: Maybe<&2, String>, +direct: 
 # or as `@bise`'s question; main's answer (the end of its turn, or
 # `sb send @bise --reply-to`) goes back once, as an `xreply`.
 
-def xst(-o: M.St, +cx: X.Cx<o>) -> XH.Xs:
+def xst(-o: M.St, +cx: X.Cx<o>) -> S.Xs:
   M.St.x(st(o, cx))
 
 def xemit(-o: M.St, +cx: X.Cx<o>, +e: XH.XEv) -> X.Cx<o>:
@@ -2213,21 +2214,20 @@ def xemit(-o: M.St, +cx: X.Cx<o>, +e: XH.XEv) -> X.Cx<o>:
 def aemit(-o: M.St, +cx: X.Cx<o>, +e: TM.ActEv) -> X.Cx<o>:
   emit(o, cx, M.EAct{e}, Unit{}, Unit{}, Unit{})
 
-def xdeliver(-o: M.St, +cx: X.Cx<o>, +ob: XH.Out) -> X.Cx<o>:
-  out(o, cx, F.xdeliver(XH.Out.xid(ob), XH.Out.project(ob), XH.kind_str(XH.Out.kind(ob)), XH.Out.msg(ob),
-    XH.Out.text(ob), XH.Out.context(ob), XH.Out.parts(ob)))
+def xdeliver(-o: M.St, +cx: X.Cx<o>, +ob: S.Out) -> X.Cx<o>:
+  out(o, cx, F.xdeliver(S.Out.xid(ob), S.Out.project(ob), SC.XKind.word(S.Out.kind(ob)), S.Out.msg(ob), S.Out.text(ob), S.Out.context(ob), S.Out.parts(ob)))
 
 # home: a new outbox entry, journaled, then its first delivery
-def xsend.new(-o: M.St, +cx: X.Cx<o>, +token: Nat, +ob: XH.Out) -> X.Cx<o>:
+def xsend.new(-o: M.St, +cx: X.Cx<o>, +token: Nat, +ob: S.Out) -> X.Cx<o>:
   +cx2 = xdeliver(o, xemit(o, cx, XH.XOut{ob}), ob)
-  reply(o, cx2, token, ok_body([J.kv("xid", J.JNum{XH.Out.xid(ob)}), J.kv("project", J.JStr{XH.Out.project(ob)})]))
+  reply(o, cx2, token, ok_body([J.kv("xid", J.JNum{S.Out.xid(ob)}), J.kv("project", J.JStr{S.Out.project(ob)})]))
 
 def xsend.fwd(-o: M.St, f: XB.Fwd, +cx: X.Cx<o>, +token: Nat, +project: String, +id: Nat) -> X.Cx<o>:
   match f:
     case XB.FwdErr{+e}:
       reply_err(o, cx, token, e)
     case XB.FwdOk{+text}:
-      xsend.new(o, cx, token, XB.new_out(xst(o, cx), project, XH.KInput{}, id, text, "", ""))
+      xsend.new(o, cx, token, XB.new_out(xst(o, cx), project, S.KInput{}, id, text, "", ""))
 
 # `sb project send <p> --input m_<n>` (main only, req.main): `pre_err`,
 # the hub's (an unknown project, this hub itself)
@@ -2243,14 +2243,14 @@ def req_xask.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q:
     case Some{+e}:
       reply_err(o, cx, token, e)
     case None{}:
-      xsend.new(o, cx, token, XB.new_out(xst(o, cx), C.get_s(q, "project"), XH.KAsk{}, 0n, C.get_s(q, "text"), "", ""))
+      xsend.new(o, cx, token, XB.new_out(xst(o, cx), C.get_s(q, "project"), S.KAsk{}, 0n, C.get_s(q, "text"), "", ""))
 
 # `sb project ask <p> "<question>"` (main only): bise's own words
 def req_xask(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   req_xask.go(o, Maybe.or(&2, String, pre, XB.ask_ok(C.get_s(q, "text"))), cx, token, q)
 
 # home: the project hub has it (a late ack of a settled send: nothing)
-def xack(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
+def xack(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2258,37 +2258,34 @@ def xack(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
       xemit(o, cx, XH.XOp{xid, XH.OpAcked{}})
 
 # home: a delivery failed: one more try, and the next one's act
-def xfail(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
+def xfail(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+ob}:
       +cx2 = xemit(o, cx, XH.XOp{xid, XH.OpTried{}})
-      aemit(o, cx2, TM.ActSet{XB.retry_act(tms(o, cx2), xid, XH.Out.tries(ob), now(o, cx2))})
+      aemit(o, cx2, TM.ActSet{XB.retry_act(tms(o, cx2), xid, S.Out.tries(ob), now(o, cx2))})
 
-def xanswer.kind(k: XH.XKind, +ob: XH.Out, +text: String) -> String:
+def xanswer.kind(k: S.XKind, +ob: S.Out, +text: String) -> String:
   match k:
-    case XH.KInput{}:
-      cat(["(answer to the user's ", mid(XH.Out.msg(ob)), " you forwarded) ", text])
-    case XH.KAsk{}:
-      cat(["(answer to your question \"", T.clip(T.one_line(XH.Out.text(ob)), 200n), "\") ", text])
-    case XH.KJobEnd{}:
+    case S.KInput{}:
+      cat(["(answer to the user's ", mid(S.Out.msg(ob)), " you forwarded) ", text])
+    case S.KAsk{}:
+      cat(["(answer to your question \"", T.clip(T.one_line(S.Out.text(ob)), 200n), "\") ", text])
+    case S.KJobEnd{}:
       text
-
-def xanswer.text(+ob: XH.Out, +text: String) -> String:
-  xanswer.kind(XH.Out.kind(ob), ob, text)
 
 # home: the project's answer settles its send, once (law
 # xhub_outbox_settles_once) and reaches main from `@<project>`
-def xanswer(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>, +xid: Nat, +name: String, +text: String) -> X.Cx<o>:
+def xanswer(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat, +name: String, +text: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+ob}:
       +cx2 = xemit(o, cx, XH.XOp{xid, XH.OpSettled{}})
-      fst(o, send(o, cx2, msg(String.append("@", name), M.MAIN(), xanswer.text(ob, text), False{}, None{}, False{}, False{})))
+      fst(o, send(o, cx2, msg(String.append("@", name), M.MAIN(), xanswer.kind(S.Out.kind(ob), ob, text), False{}, None{}, False{}, False{})))
 
-def xretry(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
+def xretry(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2303,8 +2300,8 @@ def xretry(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
 # turn: law route_fire_makes_no_turn) forwarded by the outbox, and main
 # gets a note with the id. A cancel says them to main as today.
 
-def route_ev(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
-  out(o, cx, F.route(XH.Route.rid(r), XH.Route.to(r), XH.Route.name(r), XH.Route.text(r), XH.Route.due(r), XH.Route.why(r)))
+def route_ev(-o: M.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
+  out(o, cx, F.route(S.Route.rid(r), S.Route.to(r), S.Route.name(r), S.Route.text(r), S.Route.due(r), S.Route.why(r)))
 
 def route_done(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +xid: Maybe<&2, Nat>, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
   out(o, cx, F.route_done(rid, state, to, xid, msg))
@@ -2328,37 +2325,37 @@ def route_hold(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String,
 # a held route with no target (left by an older hub's route model in its
 # journal) whose act fired: it ends, and his words reach bise's main as a
 # plain message (the cancel path, no route_done: the window never saw it)
-def route_plain(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
-  +cx2 = xemit(o, cx, XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RCancelled{}}})
-  says.sent(o, send(o, cx2, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r)), XH.Route.parts(r)}), M.MAIN(), XH.Route.text(r))
+def route_plain(-o: M.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
+  +cx2 = xemit(o, cx, XH.XRoute{S.Route.rid(r), XH.REnd{S.RCancelled{}}})
+  says.sent(o, send(o, cx2, Snd{M.USER(), M.MAIN(), S.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(S.Route.via(r)), S.Route.parts(r)}), M.MAIN(), S.Route.text(r))
 
 # his routed words in bise's main thread, where he wrote them: his line,
 # its id, his parts, then where they went (the window and the TUI fold
 # the `routed` record onto his entry by the id; law route_fire_says_where)
-def route_fire.lines(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat, +xid: Nat) -> X.Cx<o>:
-  +cx2 = feed(o, feed(o, cx, M.MAIN(), FD.you(XH.Route.text(r), XB.via_of(XH.Route.via(r)))), M.MAIN(), FD.you_id(id))
-  feed(o, you_parts(o, cx2, M.MAIN(), XH.Route.parts(r)), M.MAIN(), FD.routed(XH.Route.to(r), XH.Route.name(r), xid, id))
+def route_fire.lines(-o: M.St, +cx: X.Cx<o>, +r: S.Route, +id: Nat, +xid: Nat) -> X.Cx<o>:
+  +cx2 = feed(o, feed(o, cx, M.MAIN(), FD.you(S.Route.text(r), XB.via_of(S.Route.via(r)))), M.MAIN(), FD.you_id(id))
+  feed(o, you_parts(o, cx2, M.MAIN(), S.Route.parts(r)), M.MAIN(), FD.routed(S.Route.to(r), S.Route.name(r), xid, id))
 
-def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat) -> X.Cx<o>:
+def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: S.Route, +id: Nat) -> X.Cx<o>:
   +cx2 = emit(o, mark_delivered(o, cx, id), M.ESettled{id}, Unit{}, Unit{}, Unit{})
-  +ob = XB.new_out(xst(o, cx2), XH.Route.to(r), XH.KInput{}, id, XH.Route.text(r), XH.Route.context(r), XH.Route.parts(r))
-  +cx3 = xdeliver(o, xemit(o, route_fire.lines(o, cx2, r, id, XH.Out.xid(ob)), XH.XOut{ob}), ob)
-  +cx4 = xemit(o, cx3, XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RSent{}}})
-  +cx5 = route_done(o, cx4, XH.Route.rid(r), "sent", XH.Route.to(r), Some{XH.Out.xid(ob)}, Some{id})
-  note_main(o, cx5, cat(["the user's words went to the project ", XH.Route.name(r), " (", mid(id), ", routed by bise): \"",
-    T.clip(T.one_line(XH.Route.text(r)), 300n), "\"; its answer comes back to you from @", XH.Route.name(r)]))
+  +ob = XB.new_out(xst(o, cx2), S.Route.to(r), S.KInput{}, id, S.Route.text(r), S.Route.context(r), S.Route.parts(r))
+  +cx3 = xdeliver(o, xemit(o, route_fire.lines(o, cx2, r, id, S.Out.xid(ob)), XH.XOut{ob}), ob)
+  +cx4 = xemit(o, cx3, XH.XRoute{S.Route.rid(r), XH.REnd{S.RSent{}}})
+  +cx5 = route_done(o, cx4, S.Route.rid(r), "sent", S.Route.to(r), Some{S.Out.xid(ob)}, Some{id})
+  note_main(o, cx5, cat(["the user's words went to the project ", S.Route.name(r), " (", mid(id), ", routed by bise): \"",
+    T.clip(T.one_line(S.Route.text(r)), 300n), "\"; its answer comes back to you from @", S.Route.name(r)]))
 
 # his routed words as his message to main, journaled only: no send (a
 # send would pump main, a turn), no waiter, no card (law
 # route_fire_makes_no_turn)
-def route_said(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
+def route_said(-o: M.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
   +msg = XB.msg_of_route(r, M.St.next_msg(st(o, cx)), now(o, cx))
   emit(o, cx, M.EMsgSent{msg}, {==}, quiet_ok(False{}, False{}), Unit{})
 
 # home: a held route's act fired: his message to main is created now (an
 # id for the history and `--input`), delivered and settled at once with
 # no turn (law route_fire_makes_no_turn), then forwarded once
-def route_fire(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
+def route_fire(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2370,25 +2367,25 @@ def route_gone(-o: M.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
 
 # home: the input route_cancel: a held route ends, its act with it, and
 # his words reach main as a plain message (today's path)
-def route_cancel.go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
+def route_cancel.go(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
   match m:
     case None{}:
       route_gone(o, cx, rid)
     case Some{+r}:
-      +cx2 = aemit(o, cx, TM.ActDone{XH.Route.act(r)})
-      +cx3 = xemit(o, cx2, XH.XRoute{rid, XH.REnd{XH.RCancelled{}}})
-      +cx4 = route_done(o, cx3, rid, "cancelled", XH.Route.to(r), None{}, None{})
-      says.sent(o, send(o, cx4, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r)), XH.Route.parts(r)}), M.MAIN(), XH.Route.text(r))
+      +cx2 = aemit(o, cx, TM.ActDone{S.Route.act(r)})
+      +cx3 = xemit(o, cx2, XH.XRoute{rid, XH.REnd{S.RCancelled{}}})
+      +cx4 = route_done(o, cx3, rid, "cancelled", S.Route.to(r), None{}, None{})
+      says.sent(o, send(o, cx4, Snd{M.USER(), M.MAIN(), S.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(S.Route.via(r)), S.Route.parts(r)}), M.MAIN(), S.Route.text(r))
 
 def route_cancel(-o: M.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
   route_cancel.go(o, XB.held(xst(o, cx), rid), cx, rid)
 
-def route_correct.go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String) -> X.Cx<o>:
+def route_correct.go(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String) -> X.Cx<o>:
   match m:
     case None{}:
       route_gone(o, cx, rid)
     case Some{+r}:
-      route_ev(o, xemit(o, cx, XH.XRoute{rid, XH.RTo{to, name}}), XH.Route.with_to(r, to, name))
+      route_ev(o, xemit(o, cx, XH.XRoute{rid, XH.RTo{to, name}}), XH.route_to(r, to, name))
 
 # home: the input route_correct (the shell checked `to` in the registry):
 # a held route gets its new project, same due time; `bise` keeps his
@@ -2401,7 +2398,7 @@ def route_correct(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String)
 
 # a held route's act fired: with no target (an older hub's), plain to
 # main (law route_unclear_goes_plain); else forwarded (route_fire)
-def route_go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
+def route_go(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2429,7 +2426,7 @@ def acts_tick.each(-o: M.St, xs: List<&2, S.Act>, +cx: X.Cx<o>) -> X.Cx<o>:
 def acts_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
   acts_tick.each(o, TM.acts_due(S.Tms.acts(tms(o, cx)), now(o, cx)), cx)
 
-def xboot.each(-o: M.St, xs: List<&2, XH.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
+def xboot.each(-o: M.St, xs: List<&2, S.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
   match xs:
     case Nil{}:
       cx
@@ -2439,25 +2436,25 @@ def xboot.each(-o: M.St, xs: List<&2, XH.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
 # home: at boot the pending sends go again (the project drops a second
 # copy: law xhub_xin_delivered_once)
 def xboot(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
-  xboot.each(o, XB.pendings(XH.Xs.outbox(xst(o, cx))), cx)
+  xboot.each(o, XB.pendings(S.Xs.outbox(xst(o, cx))), cx)
 
 # `parts`: his routed message's (R41 (6), "" none), kept on his message
 # here like a direct input's; bise's own question and a job's end: none
-def xin.snd(k: XH.XKind, +text: String, +parts: String) -> Snd:
+def xin.snd(k: S.XKind, +text: String, +parts: String) -> Snd:
   match k:
-    case XH.KInput{}:
+    case S.KInput{}:
       Snd{M.USER(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, Some{XB.VIA_BISE()}, parts}
-    case XH.KAsk{}:
+    case S.KAsk{}:
       Snd{XB.FROM_BISE(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, None{}, ""}
-    case XH.KJobEnd{}:
+    case S.KJobEnd{}:
       Snd{XB.FROM_BISE(), M.MAIN(), text, False{}, None{}, False{}, False{}, False{}, None{}, ""}
 
-def xin.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +k: XH.XKind) -> X.Cx<o>:
+def xin.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +k: S.XKind) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       reply_err(o, cx, token, e)
     case (+cx, SOk{+m}):
-      reply(o, xemit(o, cx, XH.XGot{XH.XIn{hub, xid, S.Msg.id(m), k, False{}}}), token, ok_body(Nil{}))
+      reply(o, xemit(o, cx, XH.XGot{XH.xin_rec(hub, xid, S.Msg.id(m), k, False{})}), token, ok_body(Nil{}))
 
 # J, bise's home hub: the line a followed task's end says in bise's main,
 # from `@<project>`: the same words as a local task's report to main
@@ -2469,7 +2466,7 @@ def xjob_end.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid:
     case (+cx, SErr{+e}):
       reply_err(o, cx, token, e)
     case (+cx, SOk{+m}):
-      +cx2 = xemit(o, cx, XH.XGot{XH.XIn{hub, xid, S.Msg.id(m), XH.KJobEnd{}, True{}}})
+      +cx2 = xemit(o, cx, XH.XGot{XH.xin_rec(hub, xid, S.Msg.id(m), S.KJobEnd{}, True{})})
       +cx3 = out(o, cx2, F.followed_end(hub, C.get_s(j, "agent"), C.get_nat(j, "key"), C.get_s(j, "state"), C.get_s(j, "label"), C.get_s(j, "summary")))
       reply(o, cx3, token, ok_body(Nil{}))
 
@@ -2485,18 +2482,18 @@ def xjob_end(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +token: 
     case Done{+j}:
       xjob_end.sent(o, send(o, cx, msg(String.append("@", name), M.MAIN(), xjob_end.line(j), False{}, None{}, False{}, False{})), token, hub, xid, j)
 
-def xin.kind(-o: M.St, k: XH.XKind, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +text: String, +name: String, +parts: String) -> X.Cx<o>:
+def xin.kind(-o: M.St, k: S.XKind, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +text: String, +name: String, +parts: String) -> X.Cx<o>:
   match k:
-    case XH.KJobEnd{}:
+    case S.KJobEnd{}:
       xjob_end(o, J.parse(text), cx, token, hub, xid, name)
-    case XH.KInput{}:
-      xin.sent(o, send(o, cx, xin.snd(XH.KInput{}, text, parts)), token, hub, xid, XH.KInput{})
-    case XH.KAsk{}:
-      xin.sent(o, send(o, cx, xin.snd(XH.KAsk{}, text, "")), token, hub, xid, XH.KAsk{})
+    case S.KInput{}:
+      xin.sent(o, send(o, cx, xin.snd(S.KInput{}, text, parts)), token, hub, xid, S.KInput{})
+    case S.KAsk{}:
+      xin.sent(o, send(o, cx, xin.snd(S.KAsk{}, text, "")), token, hub, xid, S.KAsk{})
 
 # project: bise's message, said to main once per origin (hub, xid); bise's
 # home hub: a followed task's end (kind job_end, `name` the project's)
-def xin(-o: M.St, seen: Bool, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +k: XH.XKind, +text: String, +name: String, +parts: String) -> X.Cx<o>:
+def xin(-o: M.St, seen: Bool, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +k: S.XKind, +text: String, +name: String, +parts: String) -> X.Cx<o>:
   match seen:
     case True{}:
       reply(o, cx, token, ok_body([J.kv("seen", J.JBool{True{}})]))
@@ -2505,21 +2502,21 @@ def xin(-o: M.St, seen: Bool, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat
 
 # project: main answered bise's message: settled here, sent back once
 # (law xhub_xin_replied_once)
-def xreplied(-o: M.St, +cx: X.Cx<o>, +i: XH.XIn, +text: String) -> X.Cx<o>:
-  +cx2 = emit(o, cx, M.ESettled{XH.XIn.msg(i)}, Unit{}, Unit{}, Unit{})
-  +cx3 = xemit(o, cx2, XH.XReplied{XH.XIn.hub(i), XH.XIn.xid(i)})
-  out(o, cx3, F.xreply(XH.XIn.hub(i), XH.XIn.xid(i), text))
+def xreplied(-o: M.St, +cx: X.Cx<o>, +i: S.XIn, +text: String) -> X.Cx<o>:
+  +cx2 = emit(o, cx, M.ESettled{S.XIn.msg(i)}, Unit{}, Unit{}, Unit{})
+  +cx3 = xemit(o, cx2, XH.XReplied{S.XIn.hub(i), S.XIn.xid(i)})
+  out(o, cx3, F.xreply(S.XIn.hub(i), S.XIn.xid(i), text))
 
-def xreply_due(+s: M.St, +from: String, r: Maybe<&2, Nat>) -> Maybe<&2, XH.XIn>:
+def xreply_due(+s: M.St, +from: String, r: Maybe<&2, Nat>) -> Maybe<&2, S.XIn>:
   match r:
     case None{}:
       None{}
     case Some{+id}:
-      Bool.pick(Maybe<&2, XH.XIn>, String.eq(from, M.MAIN()), XB.reply_due(M.St.x(s), id), None{})
+      Bool.pick(Maybe<&2, S.XIn>, String.eq(from, M.MAIN()), XB.reply_due(M.St.x(s), id), None{})
 
 # project: `sb send @bise --reply-to m_<n> "..."`: main's answer to an
 # open message of bise's, before its turn ends
-def req_xreply(-o: M.St, r: Maybe<&2, XH.XIn>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+def req_xreply(-o: M.St, r: Maybe<&2, S.XIn>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match r:
     case None{}:
       reply_err(o, cx, token, "@bise takes only main's answer to an open message from bise: sb send @bise --reply-to m_<n> \"...\"")
@@ -2708,7 +2705,7 @@ def job_end.back(-o: M.St, local: Bool, +cx: X.Cx<o>, +hub: String, +j: J.Json) 
     case True{}:
       cx
     case False{}:
-      +ob = XB.new_out(xst(o, cx), hub, XH.KJobEnd{}, 0n, J.stringify(j), "", "")
+      +ob = XB.new_out(xst(o, cx), hub, S.KJobEnd{}, 0n, J.stringify(j), "", "")
       xdeliver(o, xemit(o, cx, XH.XOut{ob}), ob)
 
 # `key`: the job's (its end's time on this hub's clock), the same in the
@@ -3414,7 +3411,7 @@ def auto_reply.local(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: Str
         "\"): \"", T.clip_tail(T.one_line(body), 2000n), "\""]))
 
 # a message bise sent this hub (S2) is answered back to bise's hub
-def auto_reply.x(-o: M.St, r: Maybe<&2, XH.XIn>, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: S.Msg, +body: String) -> X.Cx<o>:
+def auto_reply.x(-o: M.St, r: Maybe<&2, S.XIn>, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: S.Msg, +body: String) -> X.Cx<o>:
   match r:
     case Some{+i}:
       xreplied(o, cx, i, body)
@@ -3658,7 +3655,7 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
     case GI.IEveryName{+id, +name}:
       timer_name.found(o, TM.find(live(o, cx), id), cx, id, name)
     case GI.IXIn{+token, +hub, +xid, +kind, +text, +name, +parts}:
-      xin(o, XB.seen(xst(o, cx), hub, xid), cx, token, hub, xid, XH.kind_of(kind), text, name, parts)
+      xin(o, XB.seen(xst(o, cx), hub, xid), cx, token, hub, xid, SC.XKind.of_word(kind), text, name, parts)
     case GI.IXAck{+xid}:
       xack(o, XB.pending(xst(o, cx), xid), cx, xid)
     case GI.IXFail{+xid}:
@@ -3693,19 +3690,19 @@ def step(+h: Hub, +i: J.Json) -> X.Cx<Hub.d(h)>:
 
 # ---- committing a step (what sb-core keeps) ----
 
-def commit.go(-o: M.St, need: Maybe<&2, J.Json>, +c: X.Core<o>, +r: X.R, +h: Hub) -> Out:
+def commit.go(-o: M.St, need: Maybe<&2, J.Json>, +c: X.Core<o>, +r: X.R, +h: Hub) -> Turn:
   match need:
     case Some{+q}:
-      Out{h, Nil{}, Some{q}}
+      Turn{h, Nil{}, Some{q}}
     case None{}:
-      Out{Hub{X.Core.d(o, c), X.R.with_ans(r, Nil{})}, X.Core.fx(o, c), None{}}
+      Turn{Hub{X.Core.d(o, c), X.R.with_ans(r, Nil{})}, X.Core.fx(o, c), None{}}
 
-def commit.cx(-o: M.St, cx: X.Cx<o>, +h: Hub) -> Out:
+def commit.cx(-o: M.St, cx: X.Cx<o>, +h: Hub) -> Turn:
   match cx:
     case X.Cx{+c, +r}:
       commit.go(o, X.R.need(r), c, r, h)
 
-def commit(+h: Hub, +i: J.Json) -> Out:
+def commit(+h: Hub, +i: J.Json) -> Turn:
   commit.cx(Hub.d(h), step(h, i), h)
 
 def RunR.hub(x: RunR) -> Hub:
@@ -3713,9 +3710,9 @@ def RunR.hub(x: RunR) -> Hub:
     case RunR{+hub, _}:
       hub
 
-def Out.fx(x: Out) -> List<&2, X.Fx>:
+def Turn.fx(x: Turn) -> List<&2, X.Fx>:
   match x:
-    case Out{_, +fx, _}:
+    case Turn{_, +fx, _}:
       fx
 
 def RunR.journal(x: RunR) -> List<&2, M.Ev>:
@@ -3723,12 +3720,12 @@ def RunR.journal(x: RunR) -> List<&2, M.Ev>:
     case RunR{_, +journal}:
       journal
 
-def run.cat(+o1: Out, +rr: RunR) -> RunR:
-  RunR{RunR.hub(rr), List.append(&2, M.Ev, X.journal(Out.fx(o1)), RunR.journal(rr))}
+def run.cat(+o1: Turn, +rr: RunR) -> RunR:
+  RunR{RunR.hub(rr), List.append(&2, M.Ev, X.journal(Turn.fx(o1)), RunR.journal(rr))}
 
-def Out.hub(x: Out) -> Hub:
+def Turn.hub(x: Turn) -> Hub:
   match x:
-    case Out{+hub, _, _}:
+    case Turn{+hub, _, _}:
       hub
 
 def run(ins: List<&2, J.Json>, +h: Hub) -> RunR:
@@ -3736,11 +3733,11 @@ def run(ins: List<&2, J.Json>, +h: Hub) -> RunR:
     case Nil{}:
       RunR{h, Nil{}}
     case Con{+i, +rest}:
-      run.cat(commit(h, i), run(rest, Out.hub(commit(h, i))))
+      run.cat(commit(h, i), run(rest, Turn.hub(commit(h, i))))
 
-def Out.need(x: Out) -> Maybe<&2, J.Json>:
+def Turn.need(x: Turn) -> Maybe<&2, J.Json>:
   match x:
-    case Out{_, _, +need}:
+    case Turn{_, _, +need}:
       need
 
 # every waiter's deadline is after `now`

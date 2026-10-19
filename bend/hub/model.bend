@@ -15,8 +15,8 @@ import ./gen/state.bend as S
 type St is Data:
   St{agents: List<&2, S.Agent>, order: List<&2, String>, hot: List<&2, S.MRec>,
     cards: List<&2, S.Card>, notes: List<&2, String>, next_msg: Nat,
-    next_card: Nat, tm: S.Tms, x: XH.Xs, paused: Maybe<&2, Nat>,
-    old: List<&2, S.MRec>, gone: List<&2, G.Item>}
+    next_card: Nat, tm: S.Tms, x: S.Xs, paused: Maybe<&2, Nat>,
+    old: List<&2, S.MRec>, gone: List<&2, S.Item>}
 # paused: since that ms (pause.bend; None runs); hot/old: the messages split
 # (issue 21); gone: withdrawn cards he may still answer (gone.bend)
 
@@ -123,7 +123,7 @@ def St.tm(x: St) -> S.Tms:
     case St{_, _, _, _, _, _, _, +tm, _, _, _, _}:
       tm
 
-def St.x(x: St) -> XH.Xs:
+def St.x(x: St) -> S.Xs:
   match x:
     case St{_, _, _, _, _, _, _, _, +xs, _, _, _}:
       xs
@@ -136,7 +136,7 @@ def St.old(x: St) -> List<&2, S.MRec>:
       old
 
 # the cards main withdrew he may still answer, newest first (hub/gone.bend)
-def St.gone(x: St) -> List<&2, G.Item>:
+def St.gone(x: St) -> List<&2, S.Item>:
   match x:
     case St{_, _, _, _, _, _, _, _, _, _, _, +gone}:
       gone
@@ -741,7 +741,7 @@ def init(+workspace: String) -> St:
   +brief = J.obj([J.kv("objective", J.str("")), J.kv("context", J.str("")), J.kv("constraints", J.JArr{Nil{}}),
     J.kv("done_when", J.JNull{}), J.kv("report_format", J.JNull{})])
   +main = S.Agent.with_parent(S.Agent.with_is_main(agent_of_new(ETaskCreated{MAIN(), "", brief, ws, 0n}, MAIN()), True{}), None{})
-  St{[main], [MAIN()], Nil{}, Nil{}, Nil{}, 1n, 1n, TM.empty(), XH.empty(), None{}, Nil{}, Nil{}}
+  St{[main], [MAIN()], Nil{}, Nil{}, Nil{}, 1n, 1n, TM.empty(), S.Xs.empty(), None{}, Nil{}, Nil{}}
 
 # bise desktop S10: someone asked to hear when it ends (one job: off again
 # at its job_end)

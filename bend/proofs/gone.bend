@@ -6,6 +6,7 @@ import ../hub/gone.bend as G
 import ../hub/lazy.bend as GLZ
 import ../hub/model.bend as HM
 import ../laws/gone.bend as Laws
+import ../hub/gen/state.bend as HS
 
 # n equals itself
 def eq_refl(n: Nat) -> {Nat.is_eq(n, n) == True{} : Bool}:
@@ -24,7 +25,7 @@ def zero_le(n: Nat) -> {Nat.is_le(0n, n) == True{} : Bool}:
       {==}
 
 # a take of n holds n at most
-def take_len(xs: List<&2, G.Item>, n: Nat) -> {Nat.is_le(List.length(&2, G.Item, List.take(&2, G.Item, xs, n)), n) == True{} : Bool}:
+def take_len(xs: List<&2, HS.Item>, n: Nat) -> {Nat.is_le(List.length(&2, HS.Item, List.take(&2, HS.Item, xs, n)), n) == True{} : Bool}:
   match xs n:
     case Nil{} n:
       zero_le(n)
@@ -34,44 +35,44 @@ def take_len(xs: List<&2, G.Item>, n: Nat) -> {Nat.is_le(List.length(&2, G.Item,
       take_len(t, p)
 
 def Laws.gone_add_bound(xs, id, text):
-  take_len(G.Item{id, text} <> G.del(xs, id), G.MAX())
+  take_len(G.item(id, text) <> G.del(xs, id), G.MAX())
 
 def Laws.gone_drop_bound(xs, id):
   take_len(G.del(xs, id), G.MAX())
 
 def Laws.gone_add_finds(xs, id, text):
-  %Equal.sym(Bool, Nat.is_eq(G.Item.id(G.Item{id, text}), id), True{}, eq_refl(id)) : {GLZ.pick(Maybe<&2, G.Item>, _, u => Some{G.Item{id, text}}, u => G.find(List.take(&2, G.Item, G.del(xs, id), 63n), id)) == Some{G.Item{id, text}} : Maybe<&2, G.Item>}
+  %Equal.sym(Bool, Nat.is_eq(HS.Item.id(G.item(id, text)), id), True{}, eq_refl(id)) : {GLZ.pick(Maybe<&2, HS.Item>, _, u => Some{G.item(id, text)}, u => G.find(List.take(&2, HS.Item, G.del(xs, id), 63n), id)) == Some{G.item(id, text)} : Maybe<&2, HS.Item>}
   {==}
 
 # del's step: h dropped or kept in front of the rest, id still not found
-def del_none.step(b: Bool, -h: G.Item, -t: List<&2, G.Item>, -id: Nat, +e: {Nat.is_eq(G.Item.id(h), id) == b : Bool}, ih: {G.find(G.del(t, id), id) == None{} : Maybe<&2, G.Item>})
-    -> {G.find(Bool.pick(List<&2, G.Item>, Nat.is_eq(G.Item.id(h), id), G.del(t, id), h <> G.del(t, id)), id) == None{} : Maybe<&2, G.Item>}:
+def del_none.step(b: Bool, -h: HS.Item, -t: List<&2, HS.Item>, -id: Nat, +e: {Nat.is_eq(HS.Item.id(h), id) == b : Bool}, ih: {G.find(G.del(t, id), id) == None{} : Maybe<&2, HS.Item>})
+    -> {G.find(Bool.pick(List<&2, HS.Item>, Nat.is_eq(HS.Item.id(h), id), G.del(t, id), h <> G.del(t, id)), id) == None{} : Maybe<&2, HS.Item>}:
   match b:
     case True{}:
-      %Equal.sym(Bool, Nat.is_eq(G.Item.id(h), id), True{}, e) : {G.find(Bool.pick(List<&2, G.Item>, _, G.del(t, id), h <> G.del(t, id)), id) == None{} : Maybe<&2, G.Item>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Item.id(h), id), True{}, e) : {G.find(Bool.pick(List<&2, HS.Item>, _, G.del(t, id), h <> G.del(t, id)), id) == None{} : Maybe<&2, HS.Item>}
       ih
     case False{}:
-      %Equal.sym(Bool, Nat.is_eq(G.Item.id(h), id), False{}, e) : {G.find(Bool.pick(List<&2, G.Item>, _, G.del(t, id), h <> G.del(t, id)), id) == None{} : Maybe<&2, G.Item>}
-      %Equal.sym(Bool, Nat.is_eq(G.Item.id(h), id), False{}, e) : {GLZ.pick(Maybe<&2, G.Item>, _, u => Some{h}, u => G.find(G.del(t, id), id)) == None{} : Maybe<&2, G.Item>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Item.id(h), id), False{}, e) : {G.find(Bool.pick(List<&2, HS.Item>, _, G.del(t, id), h <> G.del(t, id)), id) == None{} : Maybe<&2, HS.Item>}
+      %Equal.sym(Bool, Nat.is_eq(HS.Item.id(h), id), False{}, e) : {GLZ.pick(Maybe<&2, HS.Item>, _, u => Some{h}, u => G.find(G.del(t, id), id)) == None{} : Maybe<&2, HS.Item>}
       ih
 
 # id is not found in the list del leaves
-def del_none(xs: List<&2, G.Item>, +id: Nat) -> {G.find(G.del(xs, id), id) == None{} : Maybe<&2, G.Item>}:
+def del_none(xs: List<&2, HS.Item>, +id: Nat) -> {G.find(G.del(xs, id), id) == None{} : Maybe<&2, HS.Item>}:
   match xs:
     case Nil{}:
       {==}
     case Con{h, t}:
-      del_none.step(Nat.is_eq(G.Item.id(h), id), h, t, id, {==}, del_none(t, id))
+      del_none.step(Nat.is_eq(HS.Item.id(h), id), h, t, id, {==}, del_none(t, id))
 
 # Some is not None
-def sdisc(m: Maybe<&2, G.Item>) -> Type:
+def sdisc(m: Maybe<&2, HS.Item>) -> Type:
   match m:
     case Some{x}:
       Unit
     case None{}:
       Empty
 
-def some_not_none(-x: G.Item, +e: {Some{x} == None{} : Maybe<&2, G.Item>}) -> Empty:
+def some_not_none(-x: HS.Item, +e: {Some{x} == None{} : Maybe<&2, HS.Item>}) -> Empty:
   %e : sdisc(_)
   Unit{}
 
@@ -79,28 +80,28 @@ def from_empty(-T: Type, x: Empty) -> T:
   match x:
 
 # take's step: h's id is not id (b False) when the whole list has no id
-def take_none.step(b: Bool, +h: G.Item, +t: List<&2, G.Item>, -p: Nat, +id: Nat, +eb: {Nat.is_eq(G.Item.id(h), id) == b : Bool},
-    +e: {G.find(h <> t, id) == None{} : Maybe<&2, G.Item>},
-    ih: {G.find(t, id) == None{} : Maybe<&2, G.Item>} -> {G.find(List.take(&2, G.Item, t, p), id) == None{} : Maybe<&2, G.Item>})
-    -> {G.find(List.take(&2, G.Item, h <> t, 1n+p), id) == None{} : Maybe<&2, G.Item>}:
+def take_none.step(b: Bool, +h: HS.Item, +t: List<&2, HS.Item>, -p: Nat, +id: Nat, +eb: {Nat.is_eq(HS.Item.id(h), id) == b : Bool},
+    +e: {G.find(h <> t, id) == None{} : Maybe<&2, HS.Item>},
+    ih: {G.find(t, id) == None{} : Maybe<&2, HS.Item>} -> {G.find(List.take(&2, HS.Item, t, p), id) == None{} : Maybe<&2, HS.Item>})
+    -> {G.find(List.take(&2, HS.Item, h <> t, 1n+p), id) == None{} : Maybe<&2, HS.Item>}:
   match b:
     case True{}:
-      +e2 = {%eb : {GLZ.pick(Maybe<&2, G.Item>, _, u => Some{h}, u => G.find(t, id)) == None{} : Maybe<&2, G.Item>}; e : {GLZ.pick(Maybe<&2, G.Item>, True{}, u => Some{h}, u => G.find(t, id)) == None{} : Maybe<&2, G.Item>}}
-      from_empty({G.find(List.take(&2, G.Item, h <> t, 1n+p), id) == None{} : Maybe<&2, G.Item>}, some_not_none(h, e2))
+      +e2 = {%eb : {GLZ.pick(Maybe<&2, HS.Item>, _, u => Some{h}, u => G.find(t, id)) == None{} : Maybe<&2, HS.Item>}; e : {GLZ.pick(Maybe<&2, HS.Item>, True{}, u => Some{h}, u => G.find(t, id)) == None{} : Maybe<&2, HS.Item>}}
+      from_empty({G.find(List.take(&2, HS.Item, h <> t, 1n+p), id) == None{} : Maybe<&2, HS.Item>}, some_not_none(h, e2))
     case False{}:
-      +e2 = {%eb : {GLZ.pick(Maybe<&2, G.Item>, _, u => Some{h}, u => G.find(t, id)) == None{} : Maybe<&2, G.Item>}; e : {GLZ.pick(Maybe<&2, G.Item>, False{}, u => Some{h}, u => G.find(t, id)) == None{} : Maybe<&2, G.Item>}}
-      %Equal.sym(Bool, Nat.is_eq(G.Item.id(h), id), False{}, eb) : {GLZ.pick(Maybe<&2, G.Item>, _, u => Some{h}, u => G.find(List.take(&2, G.Item, t, p), id)) == None{} : Maybe<&2, G.Item>}
+      +e2 = {%eb : {GLZ.pick(Maybe<&2, HS.Item>, _, u => Some{h}, u => G.find(t, id)) == None{} : Maybe<&2, HS.Item>}; e : {GLZ.pick(Maybe<&2, HS.Item>, False{}, u => Some{h}, u => G.find(t, id)) == None{} : Maybe<&2, HS.Item>}}
+      %Equal.sym(Bool, Nat.is_eq(HS.Item.id(h), id), False{}, eb) : {GLZ.pick(Maybe<&2, HS.Item>, _, u => Some{h}, u => G.find(List.take(&2, HS.Item, t, p), id)) == None{} : Maybe<&2, HS.Item>}
       ih(e2)
 
 # no prefix of a list holds an id the list does not
-def take_none(xs: List<&2, G.Item>, n: Nat, +id: Nat) -> {G.find(xs, id) == None{} : Maybe<&2, G.Item>} -> {G.find(List.take(&2, G.Item, xs, n), id) == None{} : Maybe<&2, G.Item>}:
+def take_none(xs: List<&2, HS.Item>, n: Nat, +id: Nat) -> {G.find(xs, id) == None{} : Maybe<&2, HS.Item>} -> {G.find(List.take(&2, HS.Item, xs, n), id) == None{} : Maybe<&2, HS.Item>}:
   match xs n:
     case Nil{} n:
       e => {==}
     case Con{+h, +t} 0n:
       e => {==}
     case Con{+h, +t} 1n+p:
-      e => take_none.step(Nat.is_eq(G.Item.id(h), id), h, t, p, id, {==}, e, take_none(t, p, id))
+      e => take_none.step(Nat.is_eq(HS.Item.id(h), id), h, t, p, id, {==}, e, take_none(t, p, id))
 
 def Laws.gone_drop_once(xs, id):
   take_none(G.del(xs, id), G.MAX(), id)(del_none(xs, id))

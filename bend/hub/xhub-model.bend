@@ -3,452 +3,165 @@
 # what it received from the home hub. A field of model.bend's St (`x`),
 # owned by sb-core and rebuilt from the journal like the rest.
 #
-# Empty for now: S2's step 1 fills it (outbox, inbox) with its journal
-# kinds and laws. Imported by model.bend, so it imports neither model nor
-# core (Bend has no import cycles), like timers.bend.
+# Its records (Xs, Out, XIn, Route) and their enums (XKind, OutSt, RSt),
+# their getters, setters and journal codec are declared once in
+# bise_proto::core::state and generated (gen/state.bend,
+# gen/state-codec.bend: issue 35). Here: the lookups, the journal's
+# changes and kinds (XEv), all written with the getters and setters.
+# Imported by model.bend, so it imports neither model nor core (Bend has
+# no import cycles), like timers.bend.
+#
+# The fields' meaning: an Out's `msg` is the home hub's message it
+# forwards (kind input) or 0, `text` the words sent (copied by sb-core
+# from that message, or the question), `parts` his routed message's parts
+# (msg-parts JSON, "" none, R41 (6)); an XIn's `msg` the message the
+# project hub made of it (its id there); a Route holds his words on their
+# way to a project (step 2's hold) until `due` (its act `act` on
+# timers.bend's clock), then sent or cancelled: `to` the project's hub id,
+# `name` its name, `via` the view he typed in ("" none). XKind KJobEnd: a
+# task this project's hub follows for bise ended (project -> bise's home
+# hub), `text` its JSON {agent, key, state, label, summary, name}.
 import Base
-
-import ../vendor/json.bend as J
 
 import ./lazy.bend as LZ
 
-# his own words forwarded by reference (his authority), or bise's own
-# question (none)
-type XKind is Data:
-  KInput{}
-  KAsk{}
-  # J: a task this project's hub follows for bise ended (project -> bise's
-  # home hub): `text` is its JSON {agent, key, state, label, summary, name}
-  KJobEnd{}
+import ./gen/state.bend as S
 
-type OutSt is Data:
-  OPending{}
-  OAcked{}
-  OSettled{}
+# ---- routes ----
 
-# `msg`: the home hub's message it forwards (kind input) or 0; `text`: the
-# words sent (copied by sb-core from that message, or the question);
-# `parts`: his routed message's parts (msg-parts JSON, "" none, R41 (6))
-type Out is Data:
-  Out{xid: Nat, project: String, kind: XKind, msg: Nat, text: String, st: OutSt, tries: Nat, context: String, parts: String}
-
-# `msg`: the message the project hub made of it (its id there)
-type XIn is Data:
-  XIn{hub: String, xid: Nat, msg: Nat, kind: XKind, replied: Bool}
-
-type RSt is Data:
-  RHeld{}
-  RSent{}
-  RCancelled{}
-
-# his words on their way to a project (step 2's hold): held until `due`
-# (its act `act` on timers.bend's clock), then sent or cancelled. `to`:
-# the project's hub id, `name` its name (the note and the event), `via`
-# the view he typed in ("" none), `parts` his message's parts (msg-parts
-# JSON, "" none: R41 (6), his images go with his words)
-type Route is Data:
-  Route{rid: Nat, text: String, via: String, to: String, name: String, due: Nat, act: Nat, why: String, st: RSt, context: String, parts: String}
-
-type Xs is Data:
-  Xs{outbox: List<&2, Out>, next_xid: Nat, xin: List<&2, XIn>, routes: List<&2, Route>, next_rid: Nat}
-
-def empty() -> Xs:
-  Xs{Nil{}, 1n, Nil{}, Nil{}, 1n}
-
-# ---- fields ----
-
-def Out.xid(x: Out) -> Nat:
-  match x:
-    case Out{+xid, _, _, _, _, _, _, _, _}:
-      xid
-
-def Out.project(x: Out) -> String:
-  match x:
-    case Out{_, +p, _, _, _, _, _, _, _}:
-      p
-
-def Out.kind(x: Out) -> XKind:
-  match x:
-    case Out{_, _, +k, _, _, _, _, _, _}:
-      k
-
-def Out.msg(x: Out) -> Nat:
-  match x:
-    case Out{_, _, _, +m, _, _, _, _, _}:
-      m
-
-def Out.text(x: Out) -> String:
-  match x:
-    case Out{_, _, _, _, +t, _, _, _, _}:
-      t
-
-def Out.st(x: Out) -> OutSt:
-  match x:
-    case Out{_, _, _, _, _, +s, _, _, _}:
-      s
-
-def Out.tries(x: Out) -> Nat:
-  match x:
-    case Out{_, _, _, _, _, _, +n, _, _}:
-      n
-
-# the context of his routed words (Route.context), "" for the rest
-def Out.context(x: Out) -> String:
-  match x:
-    case Out{_, _, _, _, _, _, _, +v, _}:
-      v
-
-# his routed message's parts (Route.parts), "" for the rest
-def Out.parts(x: Out) -> String:
-  match x:
-    case Out{_, _, _, _, _, _, _, _, +v}:
-      v
-
-def XIn.hub(x: XIn) -> String:
-  match x:
-    case XIn{+h, _, _, _, _}:
-      h
-
-def XIn.xid(x: XIn) -> Nat:
-  match x:
-    case XIn{_, +xid, _, _, _}:
-      xid
-
-def XIn.msg(x: XIn) -> Nat:
-  match x:
-    case XIn{_, _, +m, _, _}:
-      m
-
-def XIn.kind(x: XIn) -> XKind:
-  match x:
-    case XIn{_, _, _, +k, _}:
-      k
-
-def XIn.replied(x: XIn) -> Bool:
-  match x:
-    case XIn{_, _, _, _, +r}:
-      r
-
-def Xs.outbox(x: Xs) -> List<&2, Out>:
-  match x:
-    case Xs{+o, _, _, _, _}:
-      o
-
-def Xs.next_xid(x: Xs) -> Nat:
-  match x:
-    case Xs{_, +n, _, _, _}:
-      n
-
-def Xs.xin(x: Xs) -> List<&2, XIn>:
-  match x:
-    case Xs{_, _, +i, _, _}:
-      i
-
-def Xs.routes(x: Xs) -> List<&2, Route>:
-  match x:
-    case Xs{_, _, _, +r, _}:
-      r
-
-def Xs.next_rid(x: Xs) -> Nat:
-  match x:
-    case Xs{_, _, _, _, +n}:
-      n
-
-def Route.rid(x: Route) -> Nat:
-  match x:
-    case Route{+v, _, _, _, _, _, _, _, _, _, _}:
-      v
-
-def Route.text(x: Route) -> String:
-  match x:
-    case Route{_, +v, _, _, _, _, _, _, _, _, _}:
-      v
-
-def Route.via(x: Route) -> String:
-  match x:
-    case Route{_, _, +v, _, _, _, _, _, _, _, _}:
-      v
-
-def Route.to(x: Route) -> String:
-  match x:
-    case Route{_, _, _, +v, _, _, _, _, _, _, _}:
-      v
-
-def Route.name(x: Route) -> String:
-  match x:
-    case Route{_, _, _, _, +v, _, _, _, _, _, _}:
-      v
-
-def Route.due(x: Route) -> Nat:
-  match x:
-    case Route{_, _, _, _, _, +v, _, _, _, _, _}:
-      v
-
-def Route.act(x: Route) -> Nat:
-  match x:
-    case Route{_, _, _, _, _, _, +v, _, _, _, _}:
-      v
-
-def Route.why(x: Route) -> String:
-  match x:
-    case Route{_, _, _, _, _, _, _, +v, _, _, _}:
-      v
-
-def Route.st(x: Route) -> RSt:
-  match x:
-    case Route{_, _, _, _, _, _, _, _, +v, _, _}:
-      v
-
-# his fn context (FnContext JSON text, "" none): carried to the project,
-# rendered there like a direct input's (fn_context::with_context), never
-# on the home hub
-def Route.context(x: Route) -> String:
-  match x:
-    case Route{_, _, _, _, _, _, _, _, _, +v, _}:
-      v
-
-# his message's parts (msg-parts JSON, "" none): kept on his message at
-# home (route_said, a cancel) and carried to the project (R41 (6))
-def Route.parts(x: Route) -> String:
-  match x:
-    case Route{_, _, _, _, _, _, _, _, _, _, +v}:
-      v
-
-def rst_str(s: RSt) -> String:
-  match s:
-    case RHeld{}:
-      "held"
-    case RSent{}:
-      "sent"
-    case RCancelled{}:
-      "cancelled"
-
-def rst_of(+s: String) -> RSt:
-  Bool.pick(RSt, String.eq(s, "sent"), RSent{}, Bool.pick(RSt, String.eq(s, "cancelled"), RCancelled{}, RHeld{}))
-
-def route_of(xs: List<&2, Route>, +rid: Nat) -> Maybe<&2, Route>:
+def route_of(xs: List<&2, S.Route>, +rid: Nat) -> Maybe<&2, S.Route>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, Route>, Nat.is_eq(Route.rid(h), rid), u => Some{h}, u => route_of(t, rid))
+      LZ.pick(Maybe<&2, S.Route>, Nat.is_eq(S.Route.rid(h), rid), u => Some{h}, u => route_of(t, rid))
 
-def Route.with_to(x: Route, +to: String, +name: String) -> Route:
-  match x:
-    case Route{+r, +tx, +v, _, _, +d, +a, +w, +s, +c, +p}:
-      Route{r, tx, v, to, name, d, a, w, s, c, p}
-
-def Route.with_st(x: Route, +s: RSt) -> Route:
-  match x:
-    case Route{+r, +tx, +v, +to, +n, +d, +a, +w, _, +c, +p}:
-      Route{r, tx, v, to, n, d, a, w, s, c, p}
+# a route's new target (his correction or pick): the project's hub id
+# and its name; the rest stays (its due, his parts)
+def route_to(+r: S.Route, +to: String, +name: String) -> S.Route:
+  S.Route.with_name(S.Route.with_to(r, to), name)
 
 type RouteOp is Data:
   RTo{to: String, name: String}
-  REnd{st: RSt}
+  REnd{st: S.RSt}
 
-def route_op(op: RouteOp, +r: Route) -> Route:
+def route_op(op: RouteOp, +r: S.Route) -> S.Route:
   match op:
     case RTo{+to, +name}:
-      Route.with_to(r, to, name)
+      route_to(r, to, name)
     case REnd{+s}:
-      Route.with_st(r, s)
+      S.Route.with_st(r, s)
 
-def route_set(xs: List<&2, Route>, +rid: Nat, +op: RouteOp) -> List<&2, Route>:
+def route_set(xs: List<&2, S.Route>, +rid: Nat, +op: RouteOp) -> List<&2, S.Route>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      LZ.pick(List<&2, Route>, Nat.is_eq(Route.rid(h), rid), u => route_op(op, h) <> t, u => h <> route_set(t, rid, op))
-
-def kind_str(k: XKind) -> String:
-  match k:
-    case KInput{}:
-      "input"
-    case KAsk{}:
-      "ask"
-    case KJobEnd{}:
-      "job_end"
-
-def kind_of(+s: String) -> XKind:
-  Bool.pick(XKind, String.eq(s, "ask"), KAsk{}, Bool.pick(XKind, String.eq(s, "job_end"), KJobEnd{}, KInput{}))
-
-def st_str(s: OutSt) -> String:
-  match s:
-    case OPending{}:
-      "pending"
-    case OAcked{}:
-      "acked"
-    case OSettled{}:
-      "settled"
-
-def is_settled(s: OutSt) -> Bool:
-  match s:
-    case OSettled{}:
-      True{}
-    case _:
-      False{}
+      LZ.pick(List<&2, S.Route>, Nat.is_eq(S.Route.rid(h), rid), u => route_op(op, h) <> t, u => h <> route_set(t, rid, op))
 
 # ---- lookups ----
 
-def out_of(xs: List<&2, Out>, +xid: Nat) -> Maybe<&2, Out>:
+def out_of(xs: List<&2, S.Out>, +xid: Nat) -> Maybe<&2, S.Out>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, Out>, Nat.is_eq(Out.xid(h), xid), u => Some{h}, u => out_of(t, xid))
+      LZ.pick(Maybe<&2, S.Out>, Nat.is_eq(S.Out.xid(h), xid), u => Some{h}, u => out_of(t, xid))
 
-def xin_of(xs: List<&2, XIn>, +hub: String, +xid: Nat) -> Maybe<&2, XIn>:
+def xin_of(xs: List<&2, S.XIn>, +hub: String, +xid: Nat) -> Maybe<&2, S.XIn>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, XIn>, String.eq(XIn.hub(h), hub) && Nat.is_eq(XIn.xid(h), xid), u => Some{h}, u => xin_of(t, hub, xid))
+      LZ.pick(Maybe<&2, S.XIn>, String.eq(S.XIn.hub(h), hub) && Nat.is_eq(S.XIn.xid(h), xid), u => Some{h}, u => xin_of(t, hub, xid))
 
 # the inbox record whose message is `msg` (its answer goes back)
-def xin_by_msg(xs: List<&2, XIn>, +msg: Nat) -> Maybe<&2, XIn>:
+def xin_by_msg(xs: List<&2, S.XIn>, +msg: Nat) -> Maybe<&2, S.XIn>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, XIn>, Nat.is_eq(XIn.msg(h), msg), u => Some{h}, u => xin_by_msg(t, msg))
+      LZ.pick(Maybe<&2, S.XIn>, Nat.is_eq(S.XIn.msg(h), msg), u => Some{h}, u => xin_by_msg(t, msg))
 
 # the forward of his message `msg` (one per message)
-def out_by_msg(xs: List<&2, Out>, +msg: Nat) -> Maybe<&2, Out>:
+def out_by_msg(xs: List<&2, S.Out>, +msg: Nat) -> Maybe<&2, S.Out>:
   match xs:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, Out>, Nat.is_eq(Out.msg(h), msg), u => Some{h}, u => out_by_msg(t, msg))
+      LZ.pick(Maybe<&2, S.Out>, Nat.is_eq(S.Out.msg(h), msg), u => Some{h}, u => out_by_msg(t, msg))
 
 # ---- the journal's changes ----
 
-def Out.with_st(x: Out, +s: OutSt) -> Out:
-  match x:
-    case Out{+xid, +p, +k, +m, +t, _, +n, +c, +ps}:
-      Out{xid, p, k, m, t, s, n, c, ps}
-
 # acked only from pending (a late ack never reopens a settled send)
-def acked_st(s: OutSt) -> OutSt:
+def acked_st(s: S.OutSt) -> S.OutSt:
   match s:
-    case OPending{}:
-      OAcked{}
+    case S.OPending{}:
+      S.OAcked{}
     case other:
       other
-
-def Out.acked(x: Out) -> Out:
-  match x:
-    case Out{+xid, +p, +k, +m, +t, +s, +n, +c, +ps}:
-      Out{xid, p, k, m, t, acked_st(s), n, c, ps}
-
-def Out.tried(x: Out) -> Out:
-  match x:
-    case Out{+xid, +p, +k, +m, +t, +s, +n, +c, +ps}:
-      Out{xid, p, k, m, t, s, 1n+n, c, ps}
-
-def Out.settled(x: Out) -> Out:
-  Out.with_st(x, OSettled{})
 
 type OutOp is Data:
   OpAcked{}
   OpTried{}
   OpSettled{}
 
-def out_op(op: OutOp, +x: Out) -> Out:
+def out_op(op: OutOp, +x: S.Out) -> S.Out:
   match op:
     case OpAcked{}:
-      Out.acked(x)
+      S.Out.with_st(x, acked_st(S.Out.st(x)))
     case OpTried{}:
-      Out.tried(x)
+      S.Out.with_tries(x, 1n+S.Out.tries(x))
     case OpSettled{}:
-      Out.settled(x)
+      S.Out.with_st(x, S.OSettled{})
 
-def out_set(xs: List<&2, Out>, +xid: Nat, +op: OutOp) -> List<&2, Out>:
+def out_set(xs: List<&2, S.Out>, +xid: Nat, +op: OutOp) -> List<&2, S.Out>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      LZ.pick(List<&2, Out>, Nat.is_eq(Out.xid(h), xid), u => out_op(op, h) <> t, u => h <> out_set(t, xid, op))
+      LZ.pick(List<&2, S.Out>, Nat.is_eq(S.Out.xid(h), xid), u => out_op(op, h) <> t, u => h <> out_set(t, xid, op))
 
-def XIn.done(x: XIn) -> XIn:
-  match x:
-    case XIn{+h, +xid, +m, +k, _}:
-      XIn{h, xid, m, k, True{}}
+# the inbox record of a delivery from `hub`: its message here `msg`
+def xin_rec(+hub: String, +xid: Nat, +msg: Nat, +k: S.XKind, +replied: Bool) -> S.XIn:
+  S.XIn.with_replied(S.XIn.with_kind(S.XIn.with_msg(S.XIn.with_xid(S.XIn.with_hub(S.XIn.empty(), hub), xid), msg), k), replied)
 
-def xin_set(xs: List<&2, XIn>, +hub: String, +xid: Nat) -> List<&2, XIn>:
+def xin_set(xs: List<&2, S.XIn>, +hub: String, +xid: Nat) -> List<&2, S.XIn>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      LZ.pick(List<&2, XIn>, String.eq(XIn.hub(h), hub) && Nat.is_eq(XIn.xid(h), xid), u => XIn.done(h) <> t, u => h <> xin_set(t, hub, xid))
+      LZ.pick(List<&2, S.XIn>, String.eq(S.XIn.hub(h), hub) && Nat.is_eq(S.XIn.xid(h), xid), u => S.XIn.with_replied(h, True{}) <> t, u => h <> xin_set(t, hub, xid))
 
-def x_out(+x: Xs, +o: Out) -> Xs:
-  match x:
-    case Xs{+ob, +n, +xi, +rs, +nr}:
-      Xs{List.append(&2, Out, ob, [o]), Nat.max(n, 1n+Out.xid(o)), xi, rs, nr}
+def x_out(+x: S.Xs, +o: S.Out) -> S.Xs:
+  S.Xs.with_next_xid(S.Xs.with_outbox(x, List.append(&2, S.Out, S.Xs.outbox(x), [o])), Nat.max(S.Xs.next_xid(x), 1n+S.Out.xid(o)))
 
-def x_op(+x: Xs, +xid: Nat, +op: OutOp) -> Xs:
-  match x:
-    case Xs{+ob, +n, +xi, +rs, +nr}:
-      Xs{out_set(ob, xid, op), n, xi, rs, nr}
+def x_op(+x: S.Xs, +xid: Nat, +op: OutOp) -> S.Xs:
+  S.Xs.with_outbox(x, out_set(S.Xs.outbox(x), xid, op))
 
-def x_in(+x: Xs, +i: XIn) -> Xs:
-  match x:
-    case Xs{+ob, +n, +xi, +rs, +nr}:
-      Xs{ob, n, List.append(&2, XIn, xi, [i]), rs, nr}
+def x_in(+x: S.Xs, +i: S.XIn) -> S.Xs:
+  S.Xs.with_xin(x, List.append(&2, S.XIn, S.Xs.xin(x), [i]))
 
-def x_replied(+x: Xs, +hub: String, +xid: Nat) -> Xs:
-  match x:
-    case Xs{+ob, +n, +xi, +rs, +nr}:
-      Xs{ob, n, xin_set(xi, hub, xid), rs, nr}
+def x_replied(+x: S.Xs, +hub: String, +xid: Nat) -> S.Xs:
+  S.Xs.with_xin(x, xin_set(S.Xs.xin(x), hub, xid))
 
-def x_route_held(+x: Xs, +r: Route) -> Xs:
-  match x:
-    case Xs{+ob, +n, +xi, +rs, +nr}:
-      Xs{ob, n, xi, List.append(&2, Route, rs, [r]), Nat.max(nr, 1n+Route.rid(r))}
+def x_route_held(+x: S.Xs, +r: S.Route) -> S.Xs:
+  S.Xs.with_next_rid(S.Xs.with_routes(x, List.append(&2, S.Route, S.Xs.routes(x), [r])), Nat.max(S.Xs.next_rid(x), 1n+S.Route.rid(r)))
 
-def x_route(+x: Xs, +rid: Nat, +op: RouteOp) -> Xs:
-  match x:
-    case Xs{+ob, +n, +xi, +rs, +nr}:
-      Xs{ob, n, xi, route_set(rs, rid, op), nr}
-
-# ---- JSON (the journal lines' parts, the snapshot) ----
-
-# his parts, written only when he sent some: an out or a route without
-# parts journals byte for byte as before, and an older core reads one
-# with parts as its text (old_core_replay)
-def parts_kv(+p: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  Bool.pick(List<&2, Sigma<&2, &2, String, _ => J.Json>>, String.is_empty(p), Nil{}, [J.kv("parts", J.JStr{p})])
-
-def out_json(+o: Out) -> J.Json:
-  J.obj(List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
-    [J.kv("xid", J.JNum{Out.xid(o)}), J.kv("project", J.JStr{Out.project(o)}),
-    J.kv("kind", J.JStr{kind_str(Out.kind(o))}), J.kv("msg", J.JNum{Out.msg(o)}),
-    J.kv("text", J.JStr{Out.text(o)}), J.kv("state", J.JStr{st_str(Out.st(o))}), J.kv("tries", J.JNum{Out.tries(o)}),
-    J.kv("context", J.JStr{Out.context(o)})], parts_kv(Out.parts(o))))
-
-def xin_json(+i: XIn) -> J.Json:
-  J.obj([J.kv("hub", J.JStr{XIn.hub(i)}), J.kv("xid", J.JNum{XIn.xid(i)}), J.kv("msg", J.JNum{XIn.msg(i)}),
-    J.kv("kind", J.JStr{kind_str(XIn.kind(i))}), J.kv("replied", J.JBool{XIn.replied(i)})])
-
-def route_json(+r: Route) -> J.Json:
-  J.obj(List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
-    [J.kv("rid", J.JNum{Route.rid(r)}), J.kv("text", J.JStr{Route.text(r)}), J.kv("via", J.JStr{Route.via(r)}),
-    J.kv("to", J.JStr{Route.to(r)}), J.kv("name", J.JStr{Route.name(r)}), J.kv("due_ms", J.JNum{Route.due(r)}),
-    J.kv("act", J.JNum{Route.act(r)}), J.kv("why", J.JStr{Route.why(r)}), J.kv("state", J.JStr{rst_str(Route.st(r))}),
-    J.kv("context", J.JStr{Route.context(r)})], parts_kv(Route.parts(r))))
+def x_route(+x: S.Xs, +rid: Nat, +op: RouteOp) -> S.Xs:
+  S.Xs.with_routes(x, route_set(S.Xs.routes(x), rid, op))
 
 # ---- the journal's kinds of this state (model.bend's Ev EX) ----
 
 type XEv is Data:
-  XOut{o: Out}
+  XOut{o: S.Out}
   XOp{xid: Nat, op: OutOp}
-  XGot{i: XIn}
+  XGot{i: S.XIn}
   XReplied{hub: String, xid: Nat}
-  XRouteHeld{r: Route}
+  XRouteHeld{r: S.Route}
   XRoute{rid: Nat, op: RouteOp}
 
-def apply(+x: Xs, e: XEv) -> Xs:
+def apply(+x: S.Xs, e: XEv) -> S.Xs:
   match e:
     case XOut{+o}:
       x_out(x, o)

@@ -36,9 +36,9 @@ pub const CARD: Codec = Codec { module: "SC", name: "Card.journal", ty: "S.Card"
 /// his answer on a card's close: its keys sit in the line
 pub const ANS: Codec = Codec { module: "SC", name: "Ans.journal", ty: "S.Ans", cases: &[] };
 pub const TIMER: Codec = Codec { module: "SC", name: "Timer.journal", ty: "S.Timer", cases: &[] };
-pub const OUT: Codec = Codec { module: "C", name: "out", ty: "XH.Out", cases: &[] };
-pub const XIN: Codec = Codec { module: "C", name: "xin", ty: "XH.XIn", cases: &[] };
-pub const ROUTE: Codec = Codec { module: "C", name: "route", ty: "XH.Route", cases: &[] };
+pub const OUT: Codec = Codec { module: "SC", name: "Out.journal", ty: "S.Out", cases: &[] };
+pub const XIN: Codec = Codec { module: "SC", name: "XIn.journal", ty: "S.XIn", cases: &[] };
+pub const ROUTE: Codec = Codec { module: "SC", name: "Route.journal", ty: "S.Route", cases: &[] };
 pub const ACT: Codec = Codec { module: "SC", name: "Act.journal", ty: "S.Act", cases: &[] };
 pub const WATCH: Codec = Codec { module: "SC", name: "Watch.journal", ty: "S.Watch", cases: &[] };
 
@@ -111,8 +111,8 @@ pub const JOURNAL: Table = Table {
         k("x_replied", "XReplied", "M.EX{XH.XReplied{hub, xid}}", &[f("hub", Str), f("xid", Nat)]),
         k("route_held", "RouteHeld", "M.EX{XH.XRouteHeld{route}}", &[f("route", Rec(&ROUTE))]),
         k("route_set", "RouteSet", "M.EX{XH.XRoute{rid, XH.RTo{to, name}}}", &[f("rid", Nat), f("to", Str), f("name", Str)]),
-        k("route_sent", "RouteSent", "M.EX{XH.XRoute{rid, XH.REnd{XH.RSent{}}}}", &[f("rid", Nat)]),
-        k("route_cancelled", "RouteCancelled", "M.EX{XH.XRoute{rid, XH.REnd{XH.RCancelled{}}}}", &[f("rid", Nat)]),
+        k("route_sent", "RouteSent", "M.EX{XH.XRoute{rid, XH.REnd{S.RSent{}}}}", &[f("rid", Nat)]),
+        k("route_cancelled", "RouteCancelled", "M.EX{XH.XRoute{rid, XH.REnd{S.RCancelled{}}}}", &[f("rid", Nat)]),
         k("act_set", "ActSet", "M.EAct{TM.ActSet{act}}", &[f("act", Rec(&ACT))]),
         k("act_done", "ActDone", "M.EAct{TM.ActDone{id}}", &[f("id", Nat)]),
         // bise desktop S10: `hub` "" in an older journal (this hub's own)
@@ -132,4 +132,4 @@ pub const JOURNAL: Table = Table {
 /// held again (`REnd{RHeld}` writes `route_held` with only its `rid`,
 /// which reads as a `route_held` without its route). The law
 /// `no_step_journals_a_held_end` (bend/laws/hub.bend) keeps it unwritten.
-pub const NEVER: &[Kind] = &[k("route_held", "RouteEndHeld", "M.EX{XH.XRoute{rid, XH.REnd{XH.RHeld{}}}}", &[f("rid", Nat)])];
+pub const NEVER: &[Kind] = &[k("route_held", "RouteEndHeld", "M.EX{XH.XRoute{rid, XH.REnd{S.RHeld{}}}}", &[f("rid", Nat)])];

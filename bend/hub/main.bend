@@ -85,8 +85,8 @@ def answer.go(need: Maybe<&2, J.Json>, +h: H.Hub, +fx: List<&2, X.Fx>, +before: 
         PK.ask_of(X.R.answered(H.Hub.r(h))), PK.pick_of_ans(X.R.answered(H.Hub.r(h))))))
 
 # the answer line of a committed step (H.commit, the law run_replays)
-def answer(+before: List<&2, V.Mark>, +o: H.Out) -> H.Hub & String:
-  answer.go(H.Out.need(o), H.Out.hub(o), H.Out.fx(o), before)
+def answer(+before: List<&2, V.Mark>, +o: H.Turn) -> H.Hub & String:
+  answer.go(H.Turn.need(o), H.Turn.hub(o), H.Turn.fx(o), before)
 
 # an event this hub does not know (written by a newer hub, before a
 # /version rollback), or a message_sent with a reused or older id, is

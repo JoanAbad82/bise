@@ -10,30 +10,30 @@ import ../hub/core.bend as HC
 
 # LAW: a withdraw keeps the list at MAX cards at most, whatever it held.
 law gone_add_bound:
-  for +xs: List<&2, G.Item>
+  for +xs: List<&2, HS.Item>
   for +id: Nat
   for +text: String
-  {Nat.is_le(List.length(&2, G.Item, G.add(xs, id, text)), G.MAX()) == True{} : Bool}
+  {Nat.is_le(List.length(&2, HS.Item, G.add(xs, id, text)), G.MAX()) == True{} : Bool}
 
 # LAW: his late answer delivered keeps it at MAX cards at most too.
 law gone_drop_bound:
-  for +xs: List<&2, G.Item>
+  for +xs: List<&2, HS.Item>
   for +id: Nat
-  {Nat.is_le(List.length(&2, G.Item, G.drop(xs, id)), G.MAX()) == True{} : Bool}
+  {Nat.is_le(List.length(&2, HS.Item, G.drop(xs, id)), G.MAX()) == True{} : Bool}
 
 # LAW: a card just withdrawn is answerable, with its question.
 law gone_add_finds:
-  for +xs: List<&2, G.Item>
+  for +xs: List<&2, HS.Item>
   for +id: Nat
   for +text: String
-  {G.find(G.add(xs, id, text), id) == Some{G.Item{id, text}} : Maybe<&2, G.Item>}
+  {G.find(G.add(xs, id, text), id) == Some{G.item(id, text)} : Maybe<&2, HS.Item>}
 
 # LAW: once his late answer is delivered, the card is no longer
 # answerable: a second answer is today's refusal (the "once").
 law gone_drop_once:
-  for +xs: List<&2, G.Item>
+  for +xs: List<&2, HS.Item>
   for +id: Nat
-  {G.find(G.drop(xs, id), id) == None{} : Maybe<&2, G.Item>}
+  {G.find(G.drop(xs, id), id) == None{} : Maybe<&2, HS.Item>}
 
 # ---- the list in sb-core's state (St.gone, hub/model.bend's apply) ----
 
@@ -42,13 +42,13 @@ law gone_withdrawn_adds:
   for +s: HM.St
   for +id: Nat
   for +text: String
-  {HM.St.gone(HM.apply(s, HM.ECardWithdrawn{id, text})) == G.add(HM.St.gone(s), id, text) : List<&2, G.Item>}
+  {HM.St.gone(HM.apply(s, HM.ECardWithdrawn{id, text})) == G.add(HM.St.gone(s), id, text) : List<&2, HS.Item>}
 
 # ...his late answer delivered (card_late) takes it out...
 law gone_late_drops:
   for +s: HM.St
   for +id: Nat
-  {HM.St.gone(HM.apply(s, HM.ECardLate{id})) == G.drop(HM.St.gone(s), id) : List<&2, G.Item>}
+  {HM.St.gone(HM.apply(s, HM.ECardLate{id})) == G.drop(HM.St.gone(s), id) : List<&2, HS.Item>}
 
 # ...so a replay of both lines leaves it unanswerable, and of the
 # withdraw alone answerable with its question.
@@ -56,25 +56,25 @@ law gone_replay_withdrawn:
   for +s: HM.St
   for +id: Nat
   for +text: String
-  {G.find(HM.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}], s)), id) == Some{G.Item{id, text}} : Maybe<&2, G.Item>}
+  {G.find(HM.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}], s)), id) == Some{G.item(id, text)} : Maybe<&2, HS.Item>}
 
 law gone_replay_late:
   for +s: HM.St
   for +id: Nat
   for +text: String
-  {G.find(HM.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}, HM.ECardLate{id}], s)), id) == None{} : Maybe<&2, G.Item>}
+  {G.find(HM.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}, HM.ECardLate{id}], s)), id) == None{} : Maybe<&2, HS.Item>}
 
 # LAW: no journal line grows the list past MAX.
 law gone_bound_after_apply:
   for +s: HM.St
   for +e: HM.Ev
-  for h: {Nat.is_le(List.length(&2, G.Item, HM.St.gone(s)), G.MAX()) == True{} : Bool}
-  {Nat.is_le(List.length(&2, G.Item, HM.St.gone(HM.apply(s, e))), G.MAX()) == True{} : Bool}
+  for h: {Nat.is_le(List.length(&2, HS.Item, HM.St.gone(s)), G.MAX()) == True{} : Bool}
+  {Nat.is_le(List.length(&2, HS.Item, HM.St.gone(HM.apply(s, e))), G.MAX()) == True{} : Bool}
 
 # LAW: a new hub's list is empty.
 law gone_init_empty:
   for +workspace: String
-  {HM.St.gone(HM.init(workspace)) == Nil{} : List<&2, G.Item>}
+  {HM.St.gone(HM.init(workspace)) == Nil{} : List<&2, HS.Item>}
 
 # ---- his answer to a withdrawn card (withdrawn-answer, architect m_30039) ----
 # Main withdraws a card while he answers it: his answer reaches the hub
@@ -107,7 +107,7 @@ law late_answer_refused:
 law late_answer_sent:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +it: G.Item
+  for +it: HS.Item
   for +id: Nat
   for +text: String
   for +parts: String
@@ -125,19 +125,19 @@ law late_answer_once:
 # ...to main, his words whole after the question's line, his parts
 # (images, quotes) on the message.
 law late_answer_keeps_its_parts:
-  for +it: G.Item
+  for +it: HS.Item
   for +text: String
   for +parts: String
   {HC.Snd.parts(HC.late.snd(it, text, parts)) == parts : String}
 
 law late_answer_to_main:
-  for +it: G.Item
+  for +it: HS.Item
   for +text: String
   for +parts: String
   {HC.Snd.to(HC.late.snd(it, text, parts)) == HM.MAIN() : String}
 
 law late_answer_keeps_his_words:
-  for +it: G.Item
+  for +it: HS.Item
   for +text: String
   for +parts: String
   {HC.Snd.text(HC.late.snd(it, text, parts)) == String.append(HC.late.head(it), text) : String}

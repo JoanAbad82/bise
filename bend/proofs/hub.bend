@@ -15,6 +15,7 @@ import ../hub/timers.bend as HTM
 import ../hub/wakes.bend as HWK
 import ../hub/xhub-model.bend as HXH
 import ../hub/xhub.bend as HXB
+import ../hub/gen/state-laws.bend as HSL
 import ../hub/pause.bend as HP
 import ../hub/reach.bend as HR
 import ../hub/answers.bend as HA
@@ -39,38 +40,38 @@ def Laws.hub_run_replays(ins, h):
       {==}
     case Con{i, rest}:
       Equal.trans(HM.St,
-        HC.Hub.d(HC.RunR.hub(HC.run(rest, HC.Out.hub(HC.commit(h, i))))),
-        HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))), HC.Hub.d(HC.Out.hub(HC.commit(h, i)))),
-        HM.apply_all(List.append(&2, HM.Ev, HX.journal(HC.Out.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i))))), HC.Hub.d(h)),
-        Laws.hub_run_replays(rest, HC.Out.hub(HC.commit(h, i))),
+        HC.Hub.d(HC.RunR.hub(HC.run(rest, HC.Turn.hub(HC.commit(h, i))))),
+        HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HC.Hub.d(HC.Turn.hub(HC.commit(h, i)))),
+        HM.apply_all(List.append(&2, HM.Ev, HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i))))), HC.Hub.d(h)),
+        Laws.hub_run_replays(rest, HC.Turn.hub(HC.commit(h, i))),
         Equal.trans(HM.St,
-          HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))), HC.Hub.d(HC.Out.hub(HC.commit(h, i)))),
-          HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))), HM.apply_all(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.Hub.d(h))),
-          HM.apply_all(List.append(&2, HM.Ev, HX.journal(HC.Out.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i))))), HC.Hub.d(h)),
-          Equal.cong(HM.St, HM.St, x => HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))), x),
-            HC.Hub.d(HC.Out.hub(HC.commit(h, i))), HM.apply_all(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.Hub.d(h)),
+          HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HC.Hub.d(HC.Turn.hub(HC.commit(h, i)))),
+          HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HM.apply_all(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h))),
+          HM.apply_all(List.append(&2, HM.Ev, HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i))))), HC.Hub.d(h)),
+          Equal.cong(HM.St, HM.St, x => HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), x),
+            HC.Hub.d(HC.Turn.hub(HC.commit(h, i))), HM.apply_all(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h)),
             PL1.hub_commit_ok(h, i)),
-          PL1.hub_append(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))), HC.Hub.d(h))))
+          PL1.hub_append(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HC.Hub.d(h))))
 
 def Laws.msg_ids_fresh(ins, h):
   match ins:
     case Nil{}:
       Unit{}
     case Con{i, rest}:
-      PL1.hub_fresh_append(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))), HC.Hub.d(h),
-        PL1.hub_fst(HX.Fresh(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.Hub.d(h)), HX.Quiet(HX.journal(HC.Out.fx(HC.commit(h, i)))), PL1.hub_commit_f(h, i)),
-        PL1.hub_fresh_tr(HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))),
-          HC.Hub.d(HC.Out.hub(HC.commit(h, i))), HM.apply_all(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.Hub.d(h)),
-          PL1.hub_commit_ok(h, i), Laws.msg_ids_fresh(rest, HC.Out.hub(HC.commit(h, i)))))
+      PL1.hub_fresh_append(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HC.Hub.d(h),
+        PL1.hub_fst(HX.Fresh(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h)), HX.Quiet(HX.journal(HC.Turn.fx(HC.commit(h, i)))), PL1.hub_commit_f(h, i)),
+        PL1.hub_fresh_tr(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))),
+          HC.Hub.d(HC.Turn.hub(HC.commit(h, i))), HM.apply_all(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h)),
+          PL1.hub_commit_ok(h, i), Laws.msg_ids_fresh(rest, HC.Turn.hub(HC.commit(h, i)))))
 
 def Laws.auto_never_asks(ins, h):
   match ins:
     case Nil{}:
       Unit{}
     case Con{i, rest}:
-      PL1.hub_quiet_append(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))),
-        PL1.hub_snd(HX.Fresh(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.Hub.d(h)), HX.Quiet(HX.journal(HC.Out.fx(HC.commit(h, i)))), PL1.hub_commit_f(h, i)),
-        Laws.auto_never_asks(rest, HC.Out.hub(HC.commit(h, i))))
+      PL1.hub_quiet_append(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))),
+        PL1.hub_snd(HX.Fresh(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h)), HX.Quiet(HX.journal(HC.Turn.fx(HC.commit(h, i)))), PL1.hub_commit_f(h, i)),
+        Laws.auto_never_asks(rest, HC.Turn.hub(HC.commit(h, i))))
 
 def Laws.tick_clears_late_waiters(o, cx):
   PL1.hub_later_tr(HC.waiters_of_cx(o, HC.tick(o, cx)), HC.tick.keep(o, cx), HX.R.now(HX.Cx.r(o, cx)),
@@ -99,11 +100,11 @@ def Laws.delivered_once(ins, h):
     case Nil{}:
       Unit{}
     case Con{i, rest}:
-      PL1.hub_deliv_append(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))), HC.Hub.d(h),
+      PL1.hub_deliv_append(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HC.Hub.d(h),
         PL1.hub_commit_v.cx(h, HC.step(h, i)),
-        PL1.hub_deliv_tr(HC.RunR.journal(HC.run(rest, HC.Out.hub(HC.commit(h, i)))),
-          HC.Hub.d(HC.Out.hub(HC.commit(h, i))), HM.apply_all(HX.journal(HC.Out.fx(HC.commit(h, i))), HC.Hub.d(h)),
-          PL1.hub_commit_ok(h, i), Laws.delivered_once(rest, HC.Out.hub(HC.commit(h, i)))))
+        PL1.hub_deliv_tr(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))),
+          HC.Hub.d(HC.Turn.hub(HC.commit(h, i))), HM.apply_all(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h)),
+          PL1.hub_commit_ok(h, i), Laws.delivered_once(rest, HC.Turn.hub(HC.commit(h, i)))))
 
 def Laws.stop_leaves_no_queue(o, cx, n, life, why, u):
   +cx1 = HC.out(o, cx, [J.kv("fx", J.JStr{"kill"}), J.kv("agent", J.JStr{n})])
@@ -442,11 +443,11 @@ def Laws.busy_batch_has_no_queued(xs):
 # ---- bise's cross-hub messages (desktop S2, hub/xhub.bend) ----
 
 def Laws.xhub_only_main_forwards(s, from, id, e):
-  %Equal.sym(Bool, String.eq(from, HM.MAIN()), False{}, e) : {Bool.pick(HXB.Fwd, _, HXB.forward.done(HXH.out_by_msg(HXH.Xs.outbox(HM.St.x(s)), id), s, id), HXB.FwdErr{"only main forwards to the projects"}) == HXB.FwdErr{"only main forwards to the projects"} : HXB.Fwd}
+  %Equal.sym(Bool, String.eq(from, HM.MAIN()), False{}, e) : {Bool.pick(HXB.Fwd, _, HXB.forward.done(HXH.out_by_msg(HS.Xs.outbox(HM.St.x(s)), id), s, id), HXB.FwdErr{"only main forwards to the projects"}) == HXB.FwdErr{"only main forwards to the projects"} : HXB.Fwd}
   {==}
 
 def Laws.xhub_forward_once(s, id, ob, e):
-  %Equal.sym(Maybe<&2, HXH.Out>, HXH.out_by_msg(HXH.Xs.outbox(HM.St.x(s)), id), Some{ob}, e) : {HXB.forward.done(_, s, id) == HXB.FwdErr{String.append(String.append(HXB.mid(id), " was already forwarded to "), HXH.Out.project(ob))} : HXB.Fwd}
+  %Equal.sym(Maybe<&2, HS.Out>, HXH.out_by_msg(HS.Xs.outbox(HM.St.x(s)), id), Some{ob}, e) : {HXB.forward.done(_, s, id) == HXB.FwdErr{String.append(String.append(HXB.mid(id), " was already forwarded to "), HS.Out.project(ob))} : HXB.Fwd}
   {==}
 
 def Laws.xhub_forward_needs_his_message(m, id, e):
@@ -454,38 +455,36 @@ def Laws.xhub_forward_needs_his_message(m, id, e):
   {==}
 
 def Laws.xhub_outbox_settles_once(x, xid):
-  match x:
-    case HXH.Xs{ob, n, xi, rs, nr}:
-      PL3.hub_x_settled(ob, xid)
+  %HSL.Xs.outbox.eta(x, HXH.out_set(HS.Xs.outbox(x), xid, HXH.OpSettled{})) : {HXB.open.of(HXH.out_of(HS.Xs.outbox(_), xid)) == None{} : Maybe<&2, HS.Out>}
+  PL3.hub_x_settled(HS.Xs.outbox(x), xid)
 
 def Laws.xhub_xin_delivered_once(x, i):
-  match x:
-    case HXH.Xs{ob, n, xi, rs, nr}:
-      PL3.hub_x_seen(xi, i)
+  %HSL.Xs.xin.eta(x, List.append(&2, HS.XIn, HS.Xs.xin(x), [i])) : {HXB.seen.of(HXH.xin_of(HS.Xs.xin(_), HS.XIn.hub(i), HS.XIn.xid(i))) == True{} : Bool}
+  PL3.hub_x_seen(HS.Xs.xin(x), i)
 
 def Laws.xhub_xin_replied_once(i):
-  match i:
-    case HXH.XIn{h, x, m, k, r}:
-      {==}
+  %HSL.XIn.replied.eta(i, True{}) : {HXB.reply.of(Some{_}) == None{} : Maybe<&2, HS.XIn>}
+  {==}
 
 def Laws.route_one_outcome(r, s, e):
-  match r:
-    case HXH.Route{a, b, c, d, f, g, h, i, j, k, l}:
-      match s:
-        case HXH.RHeld{}:
-          PL1.hub_absurd_eq(PL1.hub_tf_absurd(e), Maybe<&2, HXH.Route>, Some{HXH.Route{a, b, c, d, f, g, h, i, HXH.RHeld{}, k, l}}, None{})
-        case HXH.RSent{}:
-          {==}
-        case HXH.RCancelled{}:
-          {==}
+  match s:
+    case HS.RHeld{}:
+      PL1.hub_absurd_eq(PL1.hub_tf_absurd(e), Maybe<&2, HS.Route>, HXB.held.of(Some{HXH.route_op(HXH.REnd{HS.RHeld{}}, r)}), None{})
+    case HS.RSent{}:
+      %HSL.Route.st.eta(r, HS.RSent{}) : {HXB.held.of(Some{_}) == None{} : Maybe<&2, HS.Route>}
+      {==}
+    case HS.RCancelled{}:
+      %HSL.Route.st.eta(r, HS.RCancelled{}) : {HXB.held.of(Some{_}) == None{} : Maybe<&2, HS.Route>}
+      {==}
 
 def Laws.route_correct_only_held(o, cx, rid, to, name):
   {==}
 
+# a correction sets the name over the target: the outer setter first
 def Laws.route_correct_keeps_due(r, to, name):
-  match r:
-    case HXH.Route{a, b, c, d, f, g, h, i, j, k, l}:
-      {==}
+  %HSL.Route.name.eta(HS.Route.with_to(r, to), name) : {HS.Route.due(_) == HS.Route.due(r) : Nat}
+  %HSL.Route.to.eta(r, to) : {HS.Route.due(_) == HS.Route.due(r) : Nat}
+  {==}
 
 def Laws.route_fires_at_due_only(x, tm, text, via, to, name, why, now, context, parts):
   {==}
@@ -501,9 +500,9 @@ def Laws.route_fire_says_where(o, cx, r, id, xid):
   {==}
 
 def Laws.route_to_keeps_parts(r, to, name):
-  match r:
-    case HXH.Route{a, b, c, d, f, g, h, i, j, k, l}:
-      {==}
+  %HSL.Route.name.eta(HS.Route.with_to(r, to), name) : {HS.Route.parts(_) == HS.Route.parts(r) : String}
+  %HSL.Route.to.eta(r, to) : {HS.Route.parts(_) == HS.Route.parts(r) : String}
+  {==}
 
 def Laws.route_out_carries_parts(x, r, id):
   {==}
