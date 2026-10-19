@@ -43,7 +43,7 @@ describe('the walls', () => {
         const s = b.getSize(new Vector3());
         if (b.min.y <= 0.8 || Math.min(s.x, s.z) >= 0.08 || s.y <= 0.04) return;
         const c = new Mesh((m.geometry as Mesh['geometry']).clone().applyMatrix4(m.matrixWorld), m.material);
-        c.name = `#${hex(m)} at ${b.getCenter(new Vector3()).toArray().map((v) => v.toFixed(2)).join(',')}`;
+        c.name = `#${hex(m as Mesh)} at ${b.getCenter(new Vector3()).toArray().map((v) => v.toFixed(2)).join(',')}`;
         hung.add(c);
       });
       // one colour over itself draws the same: only two colours fight
