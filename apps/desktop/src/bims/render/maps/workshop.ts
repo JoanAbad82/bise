@@ -79,14 +79,19 @@ function shell(b: Build): void {
 
 /** the Vespa's tilt on its side stand, towards its +z (the stand's side) */
 const LEAN = 0.1;
-/** its turn: the nose (+x before it) to the camera's right-front, so its shield and headlight face it (bims) */
-const YAW = -Math.PI / 3;
+/**
+ * its turn, 3/4 front: the nose (+x before it) to the camera's right-front, shield and headlight
+ * facing it, its round side and two-tone seat on view (-60° hid them behind the shield: bims)
+ */
+const YAW = (-40 * Math.PI) / 180;
+/** its wheels along its length, back and front: ~1.4 long, so it reads as a vehicle by the bims (designer) */
+const WHEELS = [-0.47, 0.49] as const;
 /** the top of the workshop's concrete (style.box(W, 0.14, D) at -0.05): the wheels stand on it */
 const FLOOR_TOP = 0.012;
 
 /**
  * a mint Vespa on its side stand, its nose turned to the camera: round body, front shield, a round
- * headlight, a two-tone seat a bim can ride (~0.45 up, ~1.1 long), a soft contact shadow under each
+ * headlight, a two-tone seat a bim can ride (~0.45 up), ~1.4 long, a soft contact shadow under each
  * wheel (designer). Every part stands off the others (no two faces in one plane: the old car's
  * z-fight, coplanar.test.ts).
  */
@@ -101,7 +106,7 @@ export function vespa(k: Build['k'], root: Object3D, x: number, z: number): Grou
   lean.rotation.x = LEAN;
   g.add(lean);
   const shade = style.material('#000000', { opacity: 0.28 });
-  for (const wx of [-0.36, 0.38]) {
+  for (const wx of WHEELS) {
     const s = k.add(style.cylinder(0.11, 0.002), shade, g, wx, 0.006, 0.01);
     s.name = 'wheel shadow';
     s.scale.z = 0.5;
@@ -114,28 +119,28 @@ export function vespa(k: Build['k'], root: Object3D, x: number, z: number): Grou
   const mint = '#9ed8c4';
   const cream = '#f3ead8';
   // two small solid wheels, each one mesh, and a hub cap through it that stands 0.02 out each side
-  for (const [name, wx] of [['back', -0.36], ['front', 0.38]] as const) {
+  for (const [name, wx] of [['back', WHEELS[0]], ['front', WHEELS[1]]] as const) {
     put(`${name} wheel`, style.cylinder(0.13, 0.09), WORLD.dark, wx, 0.13, 0).rotation.x = Math.PI / 2;
     put(`${name} hub`, style.cylinder(0.06, 0.13), cream, wx, 0.13, 0).rotation.x = Math.PI / 2;
   }
-  // the round back over the engine, the floorboard, the front shield leaning back, the mudguard
-  put('body', style.ball(0.2), mint, -0.3, 0.3, 0).scale.set(1.55, 0.85, 1);
-  put('floorboard', style.box(0.42, 0.05, 0.26), mint, 0.02, 0.2, 0);
-  put('shield', style.box(0.05, 0.44, 0.3), mint, 0.25, 0.42, 0).rotation.z = 0.18;
-  put('mudguard', style.cap(0.15, 0.5), mint, 0.38, 0.15, 0).scale.z = 0.55;
+  // the long round back over the engine, the floorboard, the front shield leaning back, the mudguard
+  put('body', style.ball(0.2), mint, -0.39, 0.28, 0).scale.set(2.0, 0.78, 1);
+  put('floorboard', style.box(0.6, 0.05, 0.26), mint, 0.03, 0.19, 0);
+  put('shield', style.box(0.05, 0.4, 0.3), mint, 0.33, 0.4, 0).rotation.z = 0.18;
+  put('mudguard', style.cap(0.15, 0.5), mint, WHEELS[1], 0.15, 0).scale.z = 0.55;
   // the two-tone seat: a cream band under a brown top
-  put('seat band', style.capsule(0.07, 0.34), cream, -0.3, 0.455, 0).rotation.z = Math.PI / 2;
-  put('seat', style.capsule(0.064, 0.3), '#8a6248', -0.3, 0.495, 0).rotation.z = Math.PI / 2;
+  put('seat band', style.capsule(0.07, 0.46), cream, -0.39, 0.43, 0).rotation.z = Math.PI / 2;
+  put('seat', style.capsule(0.064, 0.42), '#8a6248', -0.39, 0.48, 0).rotation.z = Math.PI / 2;
   // the steering column, the headset with its round headlight, the handlebar
-  put('column', style.cylinder(0.03, 0.34), cream, 0.3, 0.62, 0).rotation.z = 0.18;
-  put('headset', style.box(0.12, 0.08, 0.14), mint, 0.26, 0.8, 0);
-  put('handlebar', style.capsule(0.022, 0.42), WORLD.dark, 0.25, 0.83, 0).rotation.x = Math.PI / 2;
-  put('headlight rim', style.cylinder(0.05, 0.04), cream, 0.34, 0.8, 0).rotation.z = Math.PI / 2;
-  put('headlight', style.ball(0.042), WORLD.paper, 0.355, 0.8, 0);
-  put('taillight', style.ball(0.03), '#f39a4c', -0.61, 0.36, 0);
+  put('column', style.cylinder(0.03, 0.3), cream, 0.38, 0.58, 0).rotation.z = 0.18;
+  put('headset', style.box(0.12, 0.08, 0.14), mint, 0.345, 0.75, 0);
+  put('handlebar', style.capsule(0.022, 0.42), WORLD.dark, 0.335, 0.78, 0).rotation.x = Math.PI / 2;
+  put('headlight rim', style.cylinder(0.05, 0.04), cream, 0.425, 0.75, 0).rotation.z = Math.PI / 2;
+  put('headlight', style.ball(0.042), WORLD.paper, 0.44, 0.75, 0);
+  put('taillight', style.ball(0.03), '#f39a4c', -0.79, 0.33, 0);
   // the side stand, from under the floorboard down to the floor on the side it leans to
-  const [ty, tz, fy, fz] = [0.22, 0.06, 0.2 * Math.tan(LEAN), 0.2];
-  const stand = put('stand', style.cylinder(0.014, Math.hypot(ty - fy, tz - fz)), WORLD.dark, -0.08, (ty + fy) / 2, (tz + fz) / 2);
+  const [ty, tz, fy, fz] = [0.21, 0.06, 0.2 * Math.tan(LEAN), 0.2];
+  const stand = put('stand', style.cylinder(0.014, Math.hypot(ty - fy, tz - fz)), WORLD.dark, -0.1, (ty + fy) / 2, (tz + fz) / 2);
   stand.rotation.x = Math.atan2(tz - fz, ty - fy);
   return g;
 }
