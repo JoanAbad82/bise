@@ -149,7 +149,7 @@ const workshopCozy: CozyHints = {
     const free0 = bx + 1.6;
     const free1 = o.x0 + o.W - 4.6;
     const cz = (bz + 0.75 + o.D - 0.5) / 2;
-    if (free1 - free0 > 2.6) out.push({ x0: free0 - 0.2, x1: free1 + 0.3, z0: cz - 0.8, z1: cz + 0.8 });
+    if (free1 - free0 > 2.6) out.push({ x0: free0 - 0.2, x1: free1 + 0.3, z0: cz - 0.95, z1: cz + 0.95 });
     return out;
   },
 };

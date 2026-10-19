@@ -7,6 +7,7 @@ import { Group, type Mesh, type Object3D } from 'three';
 import type { WorkshopOffice } from '../../maps/workshop';
 import { decorOf } from '../decor';
 import { boxOf, onFloor } from '../kit';
+import { AZ } from '../camera';
 import { WORLD } from '../palette';
 import { loftLounge, loftTree } from '../stages';
 import { bigDesk, boxHolding, grow, loftGrower, palettes, pieceAtOf, turnedDesk } from './blook';
@@ -62,7 +63,7 @@ function shell(b: Build): void {
   sc.rotation.y = -Math.PI / 2;
   root.add(sc);
   scooter(k, sc, 0, 0);
-  // a Vespa in the front middle, on its side stand, its nose to the roller door (where the old car
+  // a Vespa in the front middle, on its side stand, side on to the camera (where the old car
   // stood: its wheels z-fought, bims-vespa)
   const bench = benchOf(o);
   const free0 = bench.x + 1.6;
@@ -80,18 +81,21 @@ function shell(b: Build): void {
 /** the Vespa's tilt on its side stand, towards its +z (the stand's side) */
 const LEAN = 0.1;
 /**
- * its turn, 3/4 front: the nose (+x before it) to the camera's right-front, shield and headlight
- * facing it, its round side and two-tone seat on view (-60° hid them behind the shield: bims)
+ * its turn: its long axis along the screen's horizontal (camera.ts RIGHT), the nose (+x before it)
+ * and headlight to the screen's left (-RIGHT), its whole side and two-tone seat on view. Its axis at
+ * the camera read as an upright mint figure (designer m_32508, bims m_32510)
  */
-const YAW = (-40 * Math.PI) / 180;
-/** its wheels along its length, back and front: ~1.4 long, so it reads as a vehicle by the bims (designer) */
+const YAW = AZ + Math.PI;
+/** a touch bigger than its first cut, so it reads as a vehicle by the bims (designer m_32508) */
+const SCALE = 1.2;
+/** its wheels along its length, back and front: ~1.4 long before its SCALE, so it reads as a vehicle by the bims (designer) */
 const WHEELS = [-0.47, 0.49] as const;
 /** the top of the workshop's concrete (style.box(W, 0.14, D) at -0.05): the wheels stand on it */
 const FLOOR_TOP = 0.012;
 
 /**
- * a mint Vespa on its side stand, its nose turned to the camera: round body, front shield, a round
- * headlight, a two-tone seat a bim can ride (~0.45 up), ~1.4 long, a soft contact shadow under each
+ * a mint Vespa on its side stand, side on to the camera, its nose to the screen's left: round body,
+ * front shield, a round headlight, a two-tone seat a bim can ride (~0.55 up), ~1.7 long, a soft contact shadow under each
  * wheel (designer). Every part stands off the others (no two faces in one plane: the old car's
  * z-fight, coplanar.test.ts).
  */
@@ -101,6 +105,7 @@ export function vespa(k: Build['k'], root: Object3D, x: number, z: number): Grou
   g.name = 'vespa';
   g.position.set(x, FLOOR_TOP, z);
   g.rotation.y = YAW;
+  g.scale.setScalar(SCALE);
   root.add(g);
   const lean = new Group();
   lean.rotation.x = LEAN;

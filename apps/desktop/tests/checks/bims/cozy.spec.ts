@@ -41,6 +41,24 @@ async function pick(s: Session, core: FakeCore, theme: 'light' | 'dark', map: st
   await expect(s.page.getByTestId('app.right.bims'), `his pick draws ${map}`).toHaveAttribute('data-map', map, { timeout: 10_000 });
 }
 
+// the workshop's Vespa, side on (designer m_32508, bims m_32510): the office at 640 docked, the crop made from it
+for (const theme of ['light', 'dark'] as const) {
+  test(`(cozy) the workshop's Vespa, 640 docked, ${theme}`, async () => {
+    const { s, core } = await open(office, { theme, width: 1600 });
+    try {
+      await showOffice(s);
+      await pick(s, core, theme, 'workshop');
+      await s.page.getByTestId('app.right.agents.width.wide').click();
+      await grow(s, core, STAGES[1]?.g ?? { jobs_done: 45, days_used: 10, artifacts_made: 80 });
+      await settle(s, 800, 6000);
+      await shot(s, `cozy-${TAG}-workshop-vespa-${theme}.png`, `${TAG}: the workshop, stage 7, 640 docked, ${theme === 'dark' ? 'night' : 'day'}`, 'the mint Vespa in the front middle, side on, its nose to the left');
+    } finally {
+      await s.close().catch(() => undefined);
+      core.dispose();
+    }
+  });
+}
+
 for (const map of MAPS) {
   for (const theme of ['light', 'dark'] as const) {
     test(`(cozy) ${map} at stages 0, 7, 14, 640 docked, ${theme}`, async () => {
