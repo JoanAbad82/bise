@@ -372,6 +372,10 @@ export const composer = {
   answer_tip: (a: { agent: string | number; esc_to: string | number }): string => "your words answer " + String(a.agent) + "'s question · esc writes to " + String(a.esc_to),
   /** the pink border's tip on an open artifact (then what esc does) */
   about_tip: (a: { agent: string | number; esc: string | number }): string => "your words go to " + String(a.agent) + ", not bise · " + String(a.esc),
+  /** the pink border's tip while his words open with another agent's @name (at-start) */
+  lead_tip: (a: { agent: string | number; here: string | number }): string => "your words go to " + String(a.agent) + ", not " + String(a.here) + " · ⏎ opens its thread",
+  /** the pink tab's right while his words open with another agent's @name: how to stay */
+  lead_end: (a: { here: string | number }): string => "erase the @ to stay with " + String(a.here),
   /** what esc does on an open artifact with no thread behind */
   esc_closes: "esc closes it",
   /** what esc does on an open artifact: back to that thread */

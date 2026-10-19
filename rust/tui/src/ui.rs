@@ -303,6 +303,8 @@ fn draw_bise(app: &mut App, frame: &mut Frame, area: Rect, cols: crate::layout::
     let voice_label = voice.as_ref().map(|(v, _)| crate::voicemode::pane::divider(v));
     let (state_rect, label_rect) = match card_label.or_else(|| sb::palette::divider_label(app)).or(voice_label) {
         Some(label) => chrome::draw_divider_label(frame.buffer_mut(), area, cols, divider_y, label, |room| sb::answer_target::divider(app, room, fresh_note(&app.flash))),
+        // his draft opens with `@<agent>`: ` ↳ to architect ` in the accent (sb/lead.rs)
+        None if sb::lead::leading(app).is_some() => chrome::draw_divider_label(frame.buffer_mut(), area, cols, divider_y, Vec::new(), |room| sb::lead::divider(app, room)),
         None => chrome::draw_divider(frame.buffer_mut(), area, cols, divider_y, &name, &who, working.as_ref(), state),
     };
     // BISE-290: the divider's words (who, the notes) select and copy
@@ -912,7 +914,8 @@ fn draw_composer(app: &mut App, frame: &mut Frame, area: Rect, inner: usize, lea
         typed_lines(app, text_w, text_rows)
     };
     // answering the open item: its heavy accent ┃ runs on into what you type (sb/answer_target.rs)
-    let bar = sb::answer_target::bar(app, lead).unwrap_or_else(|| Span::styled(format!("│{}", " ".repeat(lead.saturating_sub(1) as usize)), Style::default().fg(composer_bar_color(app))));
+    // (his draft opening with `@<agent>` the same: sb/lead.rs)
+    let bar = sb::answer_target::bar(app, lead).or_else(|| sb::lead::bar(app, lead)).unwrap_or_else(|| Span::styled(format!("│{}", " ".repeat(lead.saturating_sub(1) as usize)), Style::default().fg(composer_bar_color(app))));
     // a text taller than the box (designer): `↑ 4 lines above` /
     // `↓ 2 lines below`, dim, in the blank bar rows; without them (under
     // 20 rows) a dim ↑ / ↓ right of the first / last text row

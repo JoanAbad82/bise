@@ -81,6 +81,10 @@ export interface ComposerProps {
   /** Text is selected in the thread: typing asks about it (the key bar says so). */
   readonly quoting?: boolean;
   readonly onSend: (out: Outgoing) => void;
+  /** His words' start at each change (their first text, '' when a chip opens them): the screen reads a leading `@name` (thread/lead.ts). */
+  readonly onLead?: (text: string) => void;
+  /** The agent his words go to by their leading `@name`: the field draws that address in the accent (pm/leadmark.ts). */
+  readonly leadName?: string | null;
   /** Tab during a turn: his message to the hub's queue (issue 23); unset: tab doesn't queue. */
   readonly onQueue?: (out: Outgoing) => void;
   /** ↑ in the empty field: the screen takes its newest queued message back into it; false: none. */
@@ -321,6 +325,10 @@ export const Composer = memo(function Composer(
           cb.current.onCommand?.(name, args);
         }}
         onCanSend={setCanSend}
+        onLead={(t) => {
+          cb.current.onLead?.(t);
+        }}
+        leadName={props.leadName ?? null}
         onStrip={setStrip}
         onBar={setField}
         onActions={(a) => {

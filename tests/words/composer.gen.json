@@ -635,6 +635,21 @@
     "one": null,
     "text": "→ resized to fit {max}"
   },
+  "composer.lead_end": {
+    "args": [
+      "here"
+    ],
+    "one": null,
+    "text": "erase the @ to stay with {here}"
+  },
+  "composer.lead_tip": {
+    "args": [
+      "agent",
+      "here"
+    ],
+    "one": null,
+    "text": "your words go to {agent}, not {here} · ⏎ opens its thread"
+  },
   "composer.lines": {
     "args": [
       "n"

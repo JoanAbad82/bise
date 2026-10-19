@@ -411,6 +411,10 @@ crate::words! { composer:
     answer_tip(agent, esc_to) = "your words answer {agent}'s question · esc writes to {esc_to}";
     /// the pink border's tip on an open artifact (then what esc does)
     about_tip(agent, esc) = "your words go to {agent}, not bise · {esc}";
+    /// the pink border's tip while his words open with another agent's @name (at-start)
+    lead_tip(agent, here) = "your words go to {agent}, not {here} · ⏎ opens its thread";
+    /// the pink tab's right while his words open with another agent's @name: how to stay
+    lead_end(here) = "erase the @ to stay with {here}";
     /// what esc does on an open artifact with no thread behind
     esc_closes = "esc closes it";
     /// what esc does on an open artifact: back to that thread

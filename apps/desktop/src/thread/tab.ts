@@ -4,7 +4,8 @@
 // drops whole items: the project, then the context, then the place; the label always stays.
 // Answering a card: '↳ answering search · <question>' and 'esc to bise instead' on the right; short,
 // the question goes first, then that end; '↳ answering search' never goes (answerFit). Which of
-// these states makes it pink (an item, an open artifact, an agent that is not main): pinkState.
+// these states makes it pink (an item, words opening with another agent's @name, an open artifact,
+// an agent that is not main): pinkState.
 // Pure: ComposerTab.tsx draws and measures it. Owner: amb-win.
 import { composer } from '../proto/words.gen';
 import { MAIN } from '../app/route';
@@ -156,10 +157,13 @@ export interface PinkState {
  * plain. Then a thread or a bottom block whose words go to an agent that is not main (agent-target,
  * his ask: he wrote to the wrong agent without seeing it): pink in lines only (`quiet`: no fill,
  * designer m_28208), its place and context kept. Voice
- * typing stays plain, as art-target. Pure.
+ * typing stays plain, as art-target. His words opening with `@<agent>` (at-start, thread/lead.ts),
+ * read only with no item and no artifact open: that agent's pink, bare, with `leadTip`. Pure.
  */
 export function pinkState(o: {
   answer: { closed?: boolean; message?: boolean; tip?: string } | null;
+  /** the border's tip while his words open with another agent's `@name` (lead.ts); undefined: they don't */
+  leadTip?: string | undefined;
   aboutPink: string | undefined;
   about: boolean;
   agent: string;
@@ -170,6 +174,7 @@ export function pinkState(o: {
     const pink = o.answer.closed !== true && o.answer.message !== true;
     return { pink, tip: o.answer.tip, bare: true, whole: false, quiet: false };
   }
+  if (o.leadTip !== undefined) return { pink: true, tip: o.leadTip, bare: true, whole: false, quiet: false };
   if (o.aboutPink !== undefined) return { pink: true, tip: o.aboutPink, bare: true, whole: true, quiet: false };
   if (o.about || o.voiceTyping || o.agent === MAIN) return { pink: false, tip: undefined, bare: false, whole: false, quiet: false };
   return { pink: true, tip: o.otherTip(o.agent), bare: false, whole: false, quiet: true };

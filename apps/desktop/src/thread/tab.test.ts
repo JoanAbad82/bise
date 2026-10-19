@@ -19,6 +19,10 @@ describe("the composer's one pink state (composer-target A, art-target, agent-ta
     expect(pinkState({ ...base, answer: { message: true } })).toMatchObject({ pink: false, bare: true });
     expect(pinkState({ ...base, answer: { closed: true }, agent: 'main' })).toMatchObject({ pink: false, bare: true });
   });
+  it("his words opening with another agent's @name (at-start): its pink, bare, from main's thread too", () => {
+    expect(pinkState({ ...base, agent: 'main', leadTip: 'lead' })).toEqual({ pink: true, tip: 'lead', bare: true, whole: false, quiet: false });
+    expect(pinkState({ ...base, leadTip: 'lead' })).toEqual({ pink: true, tip: 'lead', bare: true, whole: false, quiet: false });
+  });
 });
 
 describe("the composer's tab (designer's composer-strip A)", () => {

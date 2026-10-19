@@ -23,6 +23,9 @@ import { ComposerTab } from './ComposerTab';
 import { useThreadQueue } from './ThreadQueue';
 import { AttachTool, ModelTool, ModeTool } from './ComposerTools';
 import { pinkState, type TabWords } from './tab';
+import { leadAgent, leadMessage } from './lead';
+import { composerWords } from './head';
+import { ABOUT_HEAD } from '@/artifacts/maker';
 import { otherTip } from '@/app/tipwords';
 import { useComposerHeld } from './foldHint';
 import { composer } from '../proto/words.gen';
@@ -126,6 +129,18 @@ export const ThreadComposer = memo(function ThreadComposer({
     [core, skills, store, project, agent, filesSettled],
   );
   const sources = useComposerSources(project, extra, agent);
+  // his words opening with `@<a live agent>` (at-start, lead.ts): that agent's pink while he types,
+  // the send goes to its thread and the window opens it; never on an item, an artifact or voice
+  const leads = answer === null && about === undefined && keys === undefined;
+  const live = useMemo(() => sources.agents.map((a) => a.name), [sources.agents]);
+  const [leadTo, setLeadTo] = useState<string | null>(null);
+  const onLead = useCallback(
+    (t: string) => {
+      setLeadTo(leadAgent(t, live, agent));
+    },
+    [live, agent],
+  );
+  const atTo = leads ? leadTo : null;
   // the hub's word on his answer, where he typed it (main m_21514, amb-core m_21541): a drafts card
   // says where his words went; a refusal says why and gives his words back (never a field that just
   // empties, whichever project's card it was)
@@ -219,6 +234,21 @@ export const ThreadComposer = memo(function ThreadComposer({
         onCommand(sl.name, sl.args);
         return;
       }
+      // his words open with `@<a live agent>` (at-start): they go to its thread, without the
+      // `@name`, as if he typed them there (its row there, never one left here), and it opens
+      const to = leads ? leadAgent(out.text, live, agent) : null;
+      if (to !== null) {
+        const msg = leadMessage(out, to);
+        if (msg !== null) {
+          const cu = computerRowOf(store.computerLive(), project, to);
+          if (cu !== undefined && computerState(cu) === 'stopped') store.computer('hand_back', cu.key);
+          store.send({ project, agent: to, text: msg.text, mode: 'now', ...(msg.parts === undefined ? {} : { parts: msg.parts }) });
+        }
+        setLeadTo(null);
+        router.go({ screen: 'thread', project, agent: to });
+        onSent();
+        return;
+      }
       // the open card's answer (any project's: the block lists them all): his words and the images
       // he attached, the hub's one /answer path (R41)
       // the card he answered was closed by the hub while he typed (card-draft-keep): his words go
@@ -262,7 +292,7 @@ export const ThreadComposer = memo(function ThreadComposer({
       store.send({ project, agent, text, mode: 'now', ...(parts === undefined ? {} : { parts }) });
       onSent();
     },
-    [store, project, agent, onSent, onCommand, answer, about],
+    [store, router, project, agent, onSent, onCommand, answer, about, leads, live],
   );
   // his drafts, history and queue in the keep's file, never lost by a quit (keep.ts)
   // K2: ⏎ on an empty field does the TUI's act, if one waits (sign in again after expiry)
@@ -317,7 +347,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   const answering = answer !== null;
   // the one pink state (tab.ts pinkState): an open question, an open artifact's live maker, or an
   // agent that is not main (agent-target); an item open wins (an approval's plain line)
-  const ps = pinkState({ answer, aboutPink, about: about !== undefined, agent, voiceTyping: keys !== undefined, otherTip: (a) => otherTip(shownName(a)) });
+  const leadTip = atTo === null ? undefined : composer.lead_tip({ agent: shownName(atTo), here: shownName(agent) });
+  const ps = pinkState({ answer, leadTip, aboutPink, about: about !== undefined, agent, voiceTyping: keys !== undefined, otherTip: (a) => otherTip(shownName(a)) });
   const pink = ps.pink;
   const pinkTip = ps.tip;
   const attach = useCallback((paths: readonly string[]) => {
@@ -339,8 +370,11 @@ export const ThreadComposer = memo(function ThreadComposer({
   // (its '· about “…”' shows whole or not at all, designer m_27021)
   // (an agent that is not main keeps its place and context: it is its own thread)
   const { bare, whole } = ps;
-  const tabWords = useMemo(() => (bare ? { label: tab.label, ...(whole ? { whole } : {}) } : tab), [bare, whole, tab]);
-  const tabEl = <ComposerTab words={tabWords} mark={mark} end={end ?? undefined} testId="composer.tab" />;
+  // his words open with `@<agent>`: '↳ to architect' alone, and how to stay here on the right
+  const label = atTo === null ? tab.label : `${ABOUT_HEAD}${composerWords(shownName(atTo)).label}`;
+  const tabWords = useMemo(() => (bare ? { label, ...(whole ? { whole } : {}) } : tab), [bare, whole, tab, label]);
+  const endWords = atTo === null || flash !== null ? end : composer.lead_end({ here: shownName(agent) });
+  const tabEl = <ComposerTab words={tabWords} mark={atTo === null ? mark : undefined} end={endWords ?? undefined} testId="composer.tab" />;
   // a modifier held alone: the key line lists its keys (the TUI's ctrlhint.rs key bar)
   const held = useComposerHeld();
   // the one line on the key line's place (keyLineOf): it goes at his first key in the frame (esc
@@ -364,7 +398,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   useEffect(() => {
     doneRef.current = lineDone;
   });
-  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
+  const field = <Composer line={shown?.line ?? null} onLineDone={lineDone} target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={pinkTip} {...(ps.quiet ? { quiet: true } : {})} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onLead={onLead} leadName={atTo} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
   return field;
 });
 

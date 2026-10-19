@@ -60,6 +60,7 @@ pub(crate) mod hub_reads;
 mod state_rows;
 mod reads;
 pub(crate) mod queued;
+pub(crate) mod lead;
 mod send;
 pub(crate) use reads::ask_answer;
 #[cfg(test)]
@@ -984,10 +985,14 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
             if sb.paused.is_some() && !typed.starts_with('/') {
                 out.push(Ev::Held(typed.clone().into()));
             }
-            sb.send_input(typed);
+            // his words opening with `@<agent>` go there, its view opens (sb/lead.rs)
+            let to = lead::send(sb, typed);
             // BISE-61: a hint goes away after the next user message
             crate::hints::user_message();
             crate::tour::on_sent(app);
+            if let Some(name) = to {
+                focus(app, &name);
+            }
         }
     }
     if recolor {

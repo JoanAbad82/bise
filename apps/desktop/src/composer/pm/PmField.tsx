@@ -72,6 +72,7 @@ import { typed } from "@/working/clock";
 import { Picker } from "../Picker";
 import { fieldNodes, fitFailedIn } from "./schema";
 import { Colors } from "./colors";
+import { LeadMark, setLead } from "./leadmark";
 import {
   applyOp,
   beforeCaret,
@@ -112,6 +113,10 @@ export interface PmFieldProps {
   readonly editNewest: () => boolean;
   readonly command: (name: string, args: string) => void;
   readonly onCanSend: (on: boolean) => void;
+  /** his words' start, at each change (its first text, '' when a chip opens it): a leading `@name` */
+  readonly onLead?: ((text: string) => void) | undefined;
+  /** the agent his words go to by their leading `@name` (thread/lead.ts): its address in the accent; null none */
+  readonly leadName?: string | null | undefined;
   readonly onStrip: (strip: JSX.Element | null) => void;
   readonly onBar: (bar: FieldBar) => void;
   readonly onActions: (a: ComposerActions) => void;
@@ -186,6 +191,12 @@ export function PmField(p: PmFieldProps): JSX.Element {
     v.dispatch(tr);
     return true;
   };
+  // his words' leading `@name` in the accent while they go to that agent (leadmark.ts)
+  const leadName = p.leadName ?? null;
+  useEffect(() => {
+    const st = ed.current?.state;
+    if (st !== undefined) dispatch(setLead(st, leadName));
+  });
 
   // ---- the target's saved composer (drafts.ts), loaded when the target changes ----
   const saved = useRef<Saved>(load(p.store, p.target));
@@ -253,6 +264,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
         // the dictation's meter reads his voice level from the sources of the moment
         ...fieldNodes(() => props.current.sources.dictate?.level),
         Colors,
+        LeadMark,
         UndoRedo.configure({ depth: 100, newGroupDelay: 500 }),
       ],
       injectCSS: false,
@@ -791,6 +803,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
     }
     setBlank(b);
     props.current.onCanSend(!b);
+    const head = segs[0];
+    props.current.onLead?.(head?.kind === "text" ? head.text.slice(0, 120) : "");
     pushBar({
       selected: !st.selection.empty,
       typing: !b,
