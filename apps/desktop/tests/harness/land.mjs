@@ -96,6 +96,9 @@ export const LAND = [
   // on a page updating (a pick sent, its agent still on it), his typed notes go with ⌘⏎, the send
   // bar and the frame's send: sent, one message each (notes-send, his « le bouton send »)
   'checks/artifacts/notes-send.spec.ts',
+  // a video artifact plays in bise's viewer by its byte ranges: click, space, → , . speed loop, the
+  // hover's frame; paused or boxed it is a note in his message (video-view, his main m_32004)
+  'checks/artifacts/video-play.spec.ts',
   // an app from the DMG or Downloads asks once to move to Applications; 'Not now' is kept for its
   // build; settings › update moves it (apple-signing ag-move; the alert and the move stubbed)
   'checks/native/move-apps.spec.ts',

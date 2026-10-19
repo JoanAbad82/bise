@@ -1,7 +1,8 @@
 // bise kit · notes on an artifact in its viewer (office-artifacts plan §5, §9b; architect m_23874):
 // the selection layer and the marks, over every renderer (sheet.js, slides.js, docx.js,
 // image.js, site.js: a site draws its marks in its own frame through view.marks; pdf.js places
-// its notes itself through view.where, re-anchored on the version's text). One store (pages/artifact/notes.rs), two doors:
+// its notes itself through view.where, re-anchored on the version's text; video.js too, ticks on
+// its track, and it says `bise:office-selection` when its selection moves with no mouseup). One store (pages/artifact/notes.rs), two doors:
 //
 // - in the desktop's side panel (the frame's name is `bise-app`, art-desktop m_23900) a
 //   selection's `note` button posts {bise: FRAME.anchor, artifact, version, anchor, quote} to the
@@ -39,6 +40,7 @@ const W = {
     image: "no notes yet. draw a box, then note.",
     site: "no notes yet. select some text, then note.",
     pdf: "no notes yet. select some text or draw a box, then note.",
+    video: "no notes yet. pause it or draw a box on it, then note.",
   },
 };
 
@@ -283,6 +285,8 @@ function mount() {
     }, 0);
   }
   main.addEventListener("mouseup", offer);
+  // a renderer whose selection changes with no mouseup (video.js: paused, a frame stepped)
+  main.addEventListener("bise:office-selection", offer);
   main.addEventListener("keyup", (e) => {
     if (e.key === "Escape") {
       btn.remove();

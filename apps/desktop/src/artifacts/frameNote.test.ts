@@ -98,6 +98,8 @@ describe('readAnchor: each kind through the generated Anchor type', () => {
       { kind: 'region', rect },
       { kind: 'region', page: 1, rect },
       { kind: 'text', line: 12, quote: 'fn main' },
+      { kind: 'time', t: 12.5 },
+      { kind: 'time', t: 0, rect },
     ];
     for (const a of ok) expect(readAnchor(a)).toEqual(a);
   });
@@ -110,6 +112,11 @@ describe('readAnchor: each kind through the generated Anchor type', () => {
     expect(readAnchor({ kind: 'region', rect: { x: 1, y: 2, w: 3 } })).toBeNull();
     expect(readAnchor({ kind: 'region', rect: { x: 1, y: 2, w: 3, h: Number.NaN } })).toBeNull();
     expect(readAnchor({ kind: 'shape', slide: 1, shape: '' })).toBeNull();
+    // a video's moment: seconds, finite and never negative (bise_proto::anchor)
+    expect(readAnchor({ kind: 'time', t: -1 })).toBeNull();
+    expect(readAnchor({ kind: 'time', t: '0:12' })).toBeNull();
+    expect(readAnchor({ kind: 'time', t: Number.POSITIVE_INFINITY })).toBeNull();
+    expect(readAnchor({ kind: 'time', t: 3, rect: { x: 1 } })).toBeNull();
     expect(readAnchor({ kind: 'Unknown' })).toBeNull();
     expect(readAnchor(null)).toBeNull();
     expect(readAnchor([{ kind: 'cell' }])).toBeNull();

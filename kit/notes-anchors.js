@@ -125,7 +125,7 @@
   }
 
   // ---- the chip's words (bise_proto::anchor::label; designer signs them)
-  const KINDS = ["block", "cell", "slide", "shape", "para", "region", "text"];
+  const KINDS = ["block", "cell", "slide", "shape", "para", "region", "text", "time"];
   // one line, at most `max` characters, `…` when cut
   function short(s, max) {
     const one = norm(s);
@@ -133,6 +133,13 @@
   }
   // a sheet's name as a reference says it (Excel's rule): `Q3`, `'My sheet'`, `'Bob''s'`
   const sheetRef = (s) => (s && !/^[0-9]/.test(s) && /^[\p{L}\p{N}_.]+$/u.test(s) ? s : `'${String(s || "").replace(/'/g, "''")}'`);
+  // a video's moment as a player says it: `0:12`, `12:05`, `1:02:05` (bise_proto::anchor::clock)
+  function clock(t) {
+    const s = Number.isFinite(t) && t > 0 ? Math.floor(t) : 0;
+    const two = (n) => String(n).padStart(2, "0");
+    const h = Math.floor(s / 3600);
+    return h ? `${h}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}` : `${Math.floor(s / 60)}:${two(s % 60)}`;
+  }
   function label(a) {
     const q = (s) => `"${short(s, 40)}"`;
     const has = (s) => !!norm(s);
@@ -147,13 +154,14 @@
         if (has(a.quote)) return a.page != null ? `page ${a.page} · ${q(a.quote)}` : q(a.quote);
         return a.page != null ? `page ${a.page} · a box` : "a box";
       case "text": return `line ${a.line}`;
+      case "time": return a.rect ? `${clock(a.t)} · a box` : clock(a.t);
       default: return "a part";
     }
   }
   // the same place (a quote, a rect's exact numbers: the same selection)
   const same = (a, b) => !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
 
-  const api = { KINDS, label, same, short, block: { norm, locate, anchorOf, reanchor, keptEdit, nearestQuote }, pdf: { pageText, itemsIn, place } };
+  const api = { KINDS, label, clock, same, short, block: { norm, locate, anchorOf, reanchor, keptEdit, nearestQuote }, pdf: { pageText, itemsIn, place } };
   root.BiseAnchors = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

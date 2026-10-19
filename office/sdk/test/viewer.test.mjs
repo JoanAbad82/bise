@@ -265,3 +265,36 @@ test("pdf.js runs a pdf with no eval, no pdf JavaScript, nothing fetched (archit
   assert.ok(pdf.length < 1024 * 1024 && worker.length < 1.5 * 1024 * 1024);
   assert.ok(!readFileSync(join(root, "office", "dist", "office.js"), "utf8").includes("pdfjs"), "pdf.js stays out of office.js");
 });
+
+// video-view: the player's states, keys and moments (kit/office/video.js), the words of its time
+test("a video's player: its states, its keys, its moments", async () => {
+  const { createRequire } = await import("node:module");
+  createRequire(import.meta.url)(join(root, "kit", "notes-anchors.js"));
+  const { stateOf, keyAction, stepped, seekAt, nextRate, near, timeWords, RATES, JUMP_S } = await helpers("video.js");
+  const m = (o) => ({ error: null, readyState: 4, ended: false, paused: true, ...o });
+  assert.deepEqual(
+    [m({ readyState: 0 }), m({}), m({ paused: false }), m({ ended: true, paused: true }), m({ error: { code: 4 }, paused: false })].map(stateOf),
+    ["loading", "paused", "playing", "ended", "failed"],
+  );
+  const k = (key, o = {}) => keyAction({ key, ...o });
+  assert.deepEqual(k(" "), { do: "toggle" });
+  assert.deepEqual(keyAction({ key: "", code: "Space" }), { do: "toggle" });
+  assert.deepEqual([k("ArrowLeft"), k("ArrowRight")], [{ do: "jump", by: -JUMP_S }, { do: "jump", by: JUMP_S }]);
+  assert.deepEqual([k(","), k(".")], [{ do: "step", by: -1 }, { do: "step", by: 1 }]);
+  // his: a shortcut, a field he types in, a composition, any other key
+  for (const e of [k(" ", { metaKey: true }), k("ArrowLeft", { altKey: true }), k(".", { ctrlKey: true }), k(" ", { typing: true }), k(",", { isComposing: true }), k("f"), k("Escape")]) assert.equal(e, null);
+  // moves held in the file
+  assert.equal(stepped(3, -JUMP_S, 90), 0);
+  assert.equal(stepped(88, JUMP_S, 90), 90);
+  assert.equal(stepped(10, 1, 90, 1 / 25), 10.04, "one frame of a 25 fps file");
+  assert.equal(stepped(0, -1, 90, 1 / 30), 0);
+  assert.equal(stepped(4, 5, NaN), 9, "no duration yet: never below 0, no end");
+  assert.equal(seekAt(50, 200, 80), 20);
+  assert.deepEqual([seekAt(-5, 200, 80), seekAt(300, 200, 80), seekAt(10, 0, 80), seekAt(10, 200, NaN)], [0, 80, 0, 0]);
+  assert.deepEqual(RATES.map(nextRate), [1.5, 2, 0.5, 1], "1 → 1.5 → 2 → 0.5 → 1");
+  assert.equal(nextRate(3), 1);
+  assert.ok(near(12.3, 12) && !near(13, 12));
+  assert.equal(timeWords(12.6, 90), "0:12 / 1:30");
+  assert.equal(timeWords(3725, 7200), "1:02:05 / 2:00:00");
+  assert.equal(timeWords(4, NaN), "0:04");
+});

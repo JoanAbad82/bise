@@ -86,6 +86,13 @@ export function readAnchor(v: unknown): Anchor | null {
       const q = optStr(v, 'quote');
       return nat(v.line) && q !== null ? { kind, line: v.line, ...q } : null;
     }
+    case 'time': {
+      // a video's moment: seconds, finite and never negative (bise_proto::anchor's `moment`)
+      if (!pct(v.t) || v.t < 0) return null;
+      if (v.rect === undefined) return { kind, t: v.t };
+      const rect = readRect(v.rect);
+      return rect === null ? null : { kind, t: v.t, rect };
+    }
   }
 }
 

@@ -13,6 +13,7 @@ pub mod drafts;
 pub mod export;
 pub mod lint;
 pub mod artifact;
+pub mod media;
 pub mod mirror;
 pub mod notelines;
 pub mod plan;

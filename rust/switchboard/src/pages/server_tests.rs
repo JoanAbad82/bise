@@ -481,3 +481,57 @@ fn a_page_is_served_whole_while_it_is_republished() {
     assert_eq!(p.store.meta("launch-watch").unwrap().version(), 21);
     let _ = std::fs::remove_dir_all(d);
 }
+
+/// video-view (architect m_32064): a video artifact opens in the viewer
+/// (data-stream: the player reads its url, never the bytes whole), and its
+/// copy is served by its byte ranges through the real socket: 206 with the
+/// part asked, 416 past the end, a HEAD with no body, 200 whole with
+/// `Accept-Ranges` when no range is asked; a foreign Host still refused.
+#[test]
+fn a_video_copy_is_served_by_its_byte_ranges() {
+    use std::io::Read;
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let d = std::env::temp_dir().join(format!("sb-srv-video-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(d.join("kit")).unwrap();
+    std::fs::create_dir_all(d.join("work")).unwrap();
+    let bytes: Vec<u8> = (0..1000u32).map(|i| (i % 251) as u8).collect();
+    std::fs::write(d.join("work/clip.mp4"), &bytes).unwrap();
+    let arts = crate::artifacts::Store::new(&d);
+    let add = crate::artifacts::Add { target: "clip.mp4".into(), agent: "film".into(), by: "film".into(), cwd: d.join("work").to_string_lossy().to_string(), ..Default::default() };
+    let id = arts.add(&add, 10).unwrap().meta.id;
+    let p = std::sync::Arc::new(Pages::new(&d, port, &d));
+    let view = get(&p, &format!("/a/{id}/view"));
+    assert_eq!(view.status, 200);
+    assert!(text(&view).contains("data-kind=\"video\"") && text(&view).contains(" data-stream "), "{}", text(&view));
+    serve(listener, p.clone());
+    let ask = |method: &str, host: &str, range: Option<&str>| {
+        let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let range = range.map(|r| format!("Range: {r}\r\n")).unwrap_or_default();
+        s.write_all(format!("{method} /a/{id}/1/clip.mp4 HTTP/1.1\r\nHost: {host}\r\n{range}\r\n").as_bytes()).unwrap();
+        let mut out = Vec::new();
+        s.read_to_end(&mut out).unwrap();
+        let at = out.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+        (String::from_utf8_lossy(&out[..at]).to_string(), out[at..].to_vec())
+    };
+    let host = format!("127.0.0.1:{port}");
+    let (h, body) = ask("GET", &host, Some("bytes=100-199"));
+    assert!(h.starts_with("HTTP/1.1 206 ") && h.contains("Content-Type: video/mp4\r\n") && h.contains("Content-Range: bytes 100-199/1000\r\n"), "{h}");
+    assert_eq!(body, bytes[100..200]);
+    let (h, body) = ask("GET", &host, Some("bytes=-10"));
+    assert!(h.contains("Content-Range: bytes 990-999/1000"), "{h}");
+    assert_eq!(body, bytes[990..]);
+    let (h, body) = ask("GET", &host, Some("bytes=1000-"));
+    assert!(h.starts_with("HTTP/1.1 416 ") && h.contains("Content-Range: bytes */1000"), "{h}");
+    assert!(body.is_empty());
+    let (h, body) = ask("GET", &host, None);
+    assert!(h.starts_with("HTTP/1.1 200 ") && h.contains("Accept-Ranges: bytes") && h.contains(super::super::site::ARTIFACT_CSP), "{h}");
+    assert_eq!(body, bytes);
+    let (h, body) = ask("HEAD", &host, Some("bytes=0-"));
+    assert!(h.starts_with("HTTP/1.1 206 ") && h.contains("Content-Length: 1000"), "{h}");
+    assert!(body.is_empty(), "a HEAD: no body");
+    let (h, _) = ask("GET", "evil.test", Some("bytes=0-"));
+    assert!(h.starts_with("HTTP/1.1 403 "), "another Host: refused as any route: {h}");
+    let _ = std::fs::remove_dir_all(d);
+}

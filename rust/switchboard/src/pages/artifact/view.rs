@@ -14,7 +14,9 @@
 //! kit/office/select.js: the selection, the marks, the browser's list;
 //! pages/artifact/notes.rs is its api). An image gets the same frame
 //! (`site::viewer_kind`), drawn by kit/office/image.js; a pdf too, drawn
-//! by kit/office/pdf.js (pdf.js, `office-pdf.js` and `pdf.worker.js`).
+//! by kit/office/pdf.js (pdf.js, `office-pdf.js` and `pdf.worker.js`); a
+//! video too, played by kit/office/video.js from the copy's url (the shell
+//! says `data-stream`: no bytes fetched whole; its ranges: pages/media.rs).
 //!
 //! [`shell`] is pure; [`serve`] reads the artifact store.
 
@@ -38,7 +40,7 @@ pub struct Shown<'a> {
     pub id: &'a str,
     pub title: &'a str,
     pub agent: &'a str,
-    /// `xlsx`, `pptx`, `docx`, `image`, `site`, `pdf` (site::viewer_kind)
+    /// `xlsx`, `pptx`, `docx`, `image`, `site`, `pdf`, `video` (site::viewer_kind)
     pub kind: &'static str,
     /// the version drawn, and the artifact's newest
     pub v: u64,
@@ -57,6 +59,8 @@ pub struct Shown<'a> {
 /// the file's facts as `data-` attributes on `main#bise-office`.
 pub fn shell(s: &Shown) -> String {
     let follows = if s.follows { " data-follows" } else { "" };
+    // a video: the player reads the copy's url by ranges, never the bytes whole (site::STREAMED_KINDS)
+    let stream = if site::STREAMED_KINDS.contains(&s.kind) { " data-stream" } else { "" };
     format!(
         "<!doctype html>
 <html lang=\"en\">
@@ -75,7 +79,7 @@ pub fn shell(s: &Shown) -> String {
 <script type=\"module\" src=\"/kit/office/swap.js\"></script>
 </head>
 <body>
-<main id=\"bise-office\" data-artifact=\"{id}\" data-kind=\"{kind}\" data-version=\"{v}\" data-latest=\"{latest}\"{follows} data-file=\"{file}\" data-name=\"{name}\" data-agent=\"{agent}\" data-title=\"{title}\">
+<main id=\"bise-office\" data-artifact=\"{id}\" data-kind=\"{kind}\" data-version=\"{v}\" data-latest=\"{latest}\"{follows}{stream} data-file=\"{file}\" data-name=\"{name}\" data-agent=\"{agent}\" data-title=\"{title}\">
 <p class=\"office-state\" data-state=\"opening\">opening {name}…</p>
 </main>
 </body>
@@ -178,6 +182,9 @@ mod tests {
         // art-live: the swap in place, after the viewer (window.biseOffice)
         assert!(html.contains("<script type=\"module\" src=\"/kit/office/swap.js\"></script>"));
         assert!(!html.contains("<script>"), "no inline script: the CSP would refuse it");
+        assert!(!html.contains("data-stream"), "an office file's bytes are fetched whole");
         assert!(shell(&Shown { follows: true, ..s }).contains("data-follows"));
+        // video-view: a video is streamed, its player reads the copy's url by ranges (site::STREAMED_KINDS)
+        assert!(shell(&Shown { kind: "video", file: "/a/q3/2/film.mp4".into(), name: "film.mp4".into(), ..s }).contains(" data-stream "));
     }
 }

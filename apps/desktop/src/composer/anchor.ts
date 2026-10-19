@@ -18,12 +18,20 @@ function short(s: string, max: number): string {
   return cs.length <= max ? one : `${cs.slice(0, max - 1).join('').trimEnd()}…`;
 }
 
+/** A video's moment as a player says it: `0:12`, `12:05`, `1:02:05` (bise_proto::anchor::clock). Pure. */
+export function clock(t: number): string {
+  const s = Number.isFinite(t) && t > 0 ? Math.floor(t) : 0;
+  const two = (n: number): string => String(n).padStart(2, '0');
+  const h = Math.floor(s / 3600);
+  return h > 0 ? `${String(h)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}` : `${String(Math.floor(s / 60))}:${two(s % 60)}`;
+}
+
 const quoted = (q: string): string => `"${short(q, 40)}"`;
 const has = (q: string | undefined): q is string => q !== undefined && q.trim() !== '';
 
 /**
  * Where in the artifact: `Q3!B4:D9`, `slide 2`, `slide 2 · a box`, `slide 2 · a shape`,
- * `"net revenue…"`, `page 1 · a box`, `page 1 · "net revenue…"`, `line 40`; a kind this window
+ * `"net revenue…"`, `page 1 · a box`, `page 1 · "net revenue…"`, `line 40`, `0:12`, `0:12 · a box`; a kind this window
  * doesn't know: `a part`. Pure.
  */
 export function anchorLabel(a: Anchor): string {
@@ -45,6 +53,9 @@ export function anchorLabel(a: Anchor): string {
       return a.page === undefined ? 'a box' : `page ${String(a.page)} · a box`;
     case 'text':
       return `line ${String(a.line)}`;
+    case 'time':
+      // a video's moment, or a box on its frame there (video-view)
+      return a.rect === undefined ? clock(a.t) : `${clock(a.t)} · a box`;
     default:
       return 'a part';
   }

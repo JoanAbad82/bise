@@ -2,7 +2,8 @@
 // the frame that follows the newest version (/a/<id>/view, data-follows) listens on
 // /a/<id>/events (rust/switchboard/src/pages/artifact/events.rs) and, at each save:
 //
-// - fetches the new bytes (`?rev=<r>`: a save in the same turn keeps the copy's path) and
+// - fetches the new bytes (`?rev=<r>`: a save in the same turn keeps the copy's path; a streamed
+//   kind, a video, is given the new url instead: its player reads it by ranges) and
 //   draws them through viewer.js's show(), which keeps his place (the slide, the sheet with
 //   its scroll and cell, the doc's scroll);
 // - outlines what this save changed (`rev_changed`) in --term-ok for 2 s;
@@ -128,9 +129,15 @@ function start() {
 
   async function take(ev) {
     if (ev.n === info.version && ev.rev === info.rev) return;
-    const r = await fetch(fileUrl(info.id, ev.n, info.name, ev.rev), { cache: "no-store" });
-    if (!r.ok) return;
-    const bytes = new Uint8Array(await r.arrayBuffer());
+    const url = fileUrl(info.id, ev.n, info.name, ev.rev);
+    // a streamed kind (a video): the player reads the new url by its ranges, no bytes fetched here
+    let bytes = null;
+    if (info.stream) info.file = url;
+    else {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) return;
+      bytes = new Uint8Array(await r.arrayBuffer());
+    }
     info.version = ev.n;
     info.latest = ev.n;
     info.rev = ev.rev;

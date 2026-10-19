@@ -419,9 +419,11 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
         {/* the src stays /a/<id>/view while new versions land: the viewer swaps in place, never a
             reload (plan §6). Its name tells the viewer it sits in the app: a selection comes here
             (useFrameNote) for the maker's composer, not the frame's own note. An image zooms in
-            the viewer itself (kit/office/image.js; image-pinch), its esc and ⌘0 lent by useFrameNote */}
+            the viewer itself (kit/office/image.js; image-pinch), its esc and ⌘0 lent by useFrameNote.
+            A video's player goes full screen from its own button (kit/office/video.js): allow it */}
         {src !== null && (
           <iframe ref={frame} name={APP_FRAME_NAME} className="art-paper" src={src} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            allow="fullscreen"
             data-testid="artifact.page" />
         )}
 

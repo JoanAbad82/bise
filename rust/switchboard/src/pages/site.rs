@@ -190,6 +190,14 @@ pub fn frame_href(id: &str, v: u64, copy: &str, newest: bool) -> String {
 /// file, still served sandboxed at [`copy_href`], framed inside the viewer
 /// so notes can sit on its blocks; art-notes) or a pdf (`pdf`: drawn by
 /// pdf.js, a note on a passage or a box; pdf-notes). None: framed as itself.
+/// The videos bise's viewer plays (the browser's: an mkv is framed as itself).
+pub const VIDEO_EXTS: &[&str] = &["mp4", "mov", "webm", "m4v"];
+
+/// The viewer kinds whose bytes the viewer never fetches whole: the player
+/// reads them by their byte ranges from the copy's url (media.rs); the
+/// shell says it (`data-stream`, pages/artifact/view.rs) to viewer.js and swap.js.
+pub const STREAMED_KINDS: &[&str] = &["video"];
+
 pub fn viewer_kind(copy: &str) -> Option<&'static str> {
     let file = file_of(copy);
     let ext = file.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
@@ -202,6 +210,9 @@ pub fn viewer_kind(copy: &str) -> Option<&'static str> {
         _ if bise_proto::parts::IMAGE_EXTS.contains(&ext.as_str()) => Some("image"),
         // a pdf: drawn by pdf.js (kit/office/pdf.js), notes on a passage or a box (pdf-notes)
         _ if ext == "pdf" => Some("pdf"),
+        // a video: played by kit/office/video.js from its byte ranges (media.rs), a
+        // note on a moment or a box on its frame (video-view)
+        _ if VIDEO_EXTS.contains(&ext.as_str()) => Some("video"),
         _ => None,
     }
 }
@@ -311,6 +322,10 @@ pub fn ctype(path: &str) -> Option<&'static str> {
         "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         // drawn by pdf.js in bise's viewer (pdf-notes)
         "pdf" => "application/pdf",
+        // played in bise's viewer, streamed by their byte ranges (media.rs)
+        "mp4" | "m4v" => "video/mp4",
+        "mov" => "video/quicktime",
+        "webm" => "video/webm",
         _ => return None,
     })
 }
@@ -419,6 +434,13 @@ mod tests {
         // an image too (art-notes: a note is a box drawn on it)
         assert_eq!((viewer_kind("v1/shot.PNG"), viewer_kind("v1/q3.xlsx"), viewer_kind("v1/a.csv")), (Some("image"), Some("xlsx"), None));
         assert_eq!((viewer_kind("v2/report.pdf"), viewer_kind("v2/R.PDF")), (Some("pdf"), Some("pdf")));
+        // video-view: the browser's videos played in the viewer, served by ranges; a gif stays an image, an mkv is framed as itself
+        for f in ["v1/film.mp4", "v1/a.MOV", "v1/b.webm", "v1/c.m4v"] {
+            assert_eq!(viewer_kind(f), Some("video"), "{f}");
+            assert!(ctype(f).is_some_and(|c| c.starts_with("video/")), "{f}");
+        }
+        assert_eq!((viewer_kind("v1/loop.gif"), viewer_kind("v1/x.mkv")), (Some("image"), None));
+        assert!(STREAMED_KINDS.iter().all(|k| *k == "video"), "only a video is streamed");
         assert_eq!(frame_href("s", 1, "v1/shot.png", true), "/a/s/view");
         assert!(!serves_copy("page", "v1/q3.xlsx"), "a bise page is served at /p/");
         assert!(!serves_copy("x", "v1/a.xls"), "an old binary format is not sent");

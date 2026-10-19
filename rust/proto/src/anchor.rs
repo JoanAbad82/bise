@@ -11,7 +11,9 @@
 //! - `para`: a paragraph of a document, `{para, quote?}` (its `w14:paraId`);
 //! - `region`: a box on an image or a pdf page, `{page?, rect, quote?}`
 //!   (a pdf passage: its words' box and its words);
-//! - `text`: a line of any text file, `{line, quote?}`.
+//! - `text`: a line of any text file, `{line, quote?}`;
+//! - `time`: a moment of a video, or a box on its frame there, `{t, rect?}`
+//!   (`t` in seconds from its start, finite and never negative; video-view).
 //!
 //! Slides, pages and lines count from 1. A [`Rect`] is in % of the
 //! frame (the slide, the image, the page): `0..=100` each.
@@ -86,11 +88,39 @@ pub enum Anchor {
         #[serde(default, skip_serializing_if = "String::is_empty")]
         quote: String,
     },
+    /// a moment of a video (`t` seconds from its start), or a box drawn on
+    /// its frame there
+    Time {
+        #[serde(deserialize_with = "moment")]
+        t: f64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        rect: Option<Rect>,
+    },
     /// a kind this version doesn't know (or a known one with bad fields):
     /// the whole object, written back as it came
     #[serde(untagged)]
     #[cfg_attr(feature = "ts", ts(skip))]
     Unknown(Value),
+}
+
+/// A video's moment: seconds, finite and never negative (architect m_32064);
+/// anything else makes the anchor `Unknown`, kept as it came.
+fn moment<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+    let t = f64::deserialize(d)?;
+    match t.is_finite() && t >= 0.0 {
+        true => Ok(t),
+        false => Err(serde::de::Error::custom("a moment is seconds, 0 or more")),
+    }
+}
+
+/// A moment as a player says it: `0:12`, `12:05`, `1:02:05` (whole seconds).
+pub fn clock(t: f64) -> String {
+    let s = if t.is_finite() && t > 0.0 { t.floor() as u64 } else { 0 };
+    match s / 3600 {
+        0 => format!("{}:{:02}", s / 60, s % 60),
+        h => format!("{h}:{:02}:{:02}", (s / 60) % 60, s % 60),
+    }
 }
 
 impl Rect {
@@ -113,7 +143,7 @@ impl Eq for Anchor {}
 /// words, designer m_24098: never a machine id): `Q3!B4:D9`, `slide 2`,
 /// `slide 2 · a box`, `slide 2 · "Revenue"`, `slide 2 · a shape`,
 /// `"net revenue…"` (a paragraph by its words), `page 1 · a box`,
-/// `page 1 · "net revenue…"` (a pdf passage), `line 40`. Both apps draw it from this rule (fixture anchor_label.json).
+/// `page 1 · "net revenue…"` (a pdf passage), `line 40`, `0:12`, `0:12 · a box`. Both apps draw it from this rule (fixture anchor_label.json).
 pub fn label(a: &Anchor) -> String {
     let quoted = |q: &str| format!("\"{}\"", short(q, 40));
     match a {
@@ -131,6 +161,8 @@ pub fn label(a: &Anchor) -> String {
         Anchor::Region { page: Some(p), .. } => format!("page {p} · a box"),
         Anchor::Region { page: None, .. } => "a box".into(),
         Anchor::Text { line, .. } => format!("line {line}"),
+        Anchor::Time { t, rect: None } => clock(*t),
+        Anchor::Time { t, rect: Some(_) } => format!("{} · a box", clock(*t)),
         Anchor::Unknown(_) => "a part".into(),
     }
 }
@@ -157,7 +189,7 @@ fn short(s: &str, max: usize) -> String {
 
 impl Anchor {
     /// The kinds this version knows, as on the wire.
-    pub const KINDS: &'static [&'static str] = &["block", "cell", "slide", "shape", "para", "region", "text"];
+    pub const KINDS: &'static [&'static str] = &["block", "cell", "slide", "shape", "para", "region", "text", "time"];
 
     /// The kind as on the wire (an unknown one's own, `""` when it has none).
     pub fn kind(&self) -> &str {
@@ -169,6 +201,7 @@ impl Anchor {
             Anchor::Para { .. } => "para",
             Anchor::Region { .. } => "region",
             Anchor::Text { .. } => "text",
+            Anchor::Time { .. } => "time",
             Anchor::Unknown(v) => v.get("kind").and_then(Value::as_str).unwrap_or(""),
         }
     }
@@ -194,6 +227,8 @@ mod tests {
             json!({"kind": "region", "page": 1, "rect": {"x": 0.0, "y": 0.0, "w": 50.0, "h": 50.0}}),
             json!({"kind": "region", "page": 2, "rect": {"x": 10.0, "y": 30.0, "w": 60.0, "h": 4.0}, "quote": "net revenue grew"}),
             json!({"kind": "text", "line": 40}),
+            json!({"kind": "time", "t": 12.5}),
+            json!({"kind": "time", "t": 3725.0, "rect": {"x": 10.0, "y": 20.0, "w": 30.0, "h": 5.5}}),
         ];
         let mut seen = std::collections::BTreeSet::new();
         for l in lines {
@@ -223,12 +258,17 @@ mod tests {
     /// line comes back byte for byte (art-notes says "bad cell anchor" for it).
     #[test]
     fn a_known_kind_with_bad_fields_writes_back_byte_equal() {
-        for line in [r#"{"kind":"cell","range":"B4","sheet":7}"#, r#"{"kind":"slide","slide":"two"}"#, r#"{"kind":"region","page":1}"#] {
+        for line in [r#"{"kind":"cell","range":"B4","sheet":7}"#, r#"{"kind":"slide","slide":"two"}"#, r#"{"kind":"region","page":1}"#, r#"{"kind":"time","t":-1.0}"#, r#"{"kind":"time","t":"0:12"}"#, r#"{"kind":"time"}"#] {
             let a: Anchor = serde_json::from_str(line).unwrap();
             assert!(matches!(a, Anchor::Unknown(_)), "{line}");
             assert!(Anchor::KINDS.contains(&a.kind()), "{line}");
             assert_eq!(serde_json::to_string(&a).unwrap(), line);
         }
+    }
+
+    #[test]
+    fn a_moment_says_its_clock() {
+        assert_eq!([clock(0.0), clock(12.9), clock(725.0), clock(3725.4), clock(-3.0), clock(f64::NAN)], ["0:00", "0:12", "12:05", "1:02:05", "0:00", "0:00"]);
     }
 
     #[test]

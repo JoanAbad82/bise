@@ -157,6 +157,14 @@ fn handle(stream: TcpStream, pages: &Pages) {
             return events(&mut w, pages, &id);
         }
     }
+    // a video's copy: its byte ranges, read from disk as they are asked (media.rs)
+    if let Some((path, ctype)) = media(pages, &req) {
+        // a player that stops reading frees its thread
+        let _ = w.set_write_timeout(Some(Duration::from_secs(30)));
+        if super::media::send(&mut w, &path, ctype, super::site::ARTIFACT_CSP, req.header("range"), req.method == "HEAD") {
+            return;
+        }
+    }
     let resp = route(pages, &req);
     let _ = w.write_all(&resp.bytes());
 }
@@ -325,26 +333,53 @@ fn home(pages: &Pages) -> String {
     shell(pages, "for you", head, "id=\"bise-home\" data-home", &format!("{aside}{inner}"))
 }
 
-/// An artifact's file, from bise's copy (`/a/<id>/<v>/<path>`), in its
-/// sandbox (site.rs): a site folder, or a copied file the server sends
-/// (site::serves_copy, the same rule as the typed row's frame_url) and
-/// the files an html file links kept beside it (site::copy_file).
-fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
+/// The file `/a/<id>/<v>/<rest>` names in bise's copy, its content type and
+/// whether it is the viewer's frame of a site (site::framed); Err: the 404
+/// in words. One rule for [`artifact_file`] and a video's ranges (media.rs).
+fn artifact_target(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Result<(std::path::PathBuf, &'static str, bool), Response> {
     let state = pages.store.dir.parent().unwrap_or(&pages.store.dir);
     let store = crate::artifacts::Store::new(state);
     // what is missing, by its place under /a/ (never a path on his machine)
     let at = format!("a/{id}/{v}/{}", rest.join("/"));
-    let Some(m) = store.get(id).filter(|m| m.by != "page") else { return Response::missing(&format!("no such artifact: {at}")) };
-    let Some(ver) = v.parse::<u64>().ok().and_then(|n| m.versions.iter().find(|x| x.v == n)) else { return Response::missing(&format!("no such version: {at}")) };
-    let Some(copy) = ver.copy.as_ref().filter(|c| super::site::serves_copy(&m.by, c)) else { return Response::missing(&format!("no copy of it: {at}")) };
+    let Some(m) = store.get(id).filter(|m| m.by != "page") else { return Err(Response::missing(&format!("no such artifact: {at}"))) };
+    let Some(ver) = v.parse::<u64>().ok().and_then(|n| m.versions.iter().find(|x| x.v == n)) else { return Err(Response::missing(&format!("no such version: {at}"))) };
+    let Some(copy) = ver.copy.as_ref().filter(|c| super::site::serves_copy(&m.by, c)) else { return Err(Response::missing(&format!("no copy of it: {at}"))) };
     let base = state.join("artifacts").join(&m.id).join(copy);
     // the viewer's frame of a site (and its own links): the selection
     // script in its html (site::framed, architect m_24172)
     let (select, rest) = super::site::framed(rest);
     let rest: Vec<&str> = rest.iter().copied().filter(|s| !s.is_empty()).collect();
     // a folder's file, or a copied file and the files it links beside it
-    let Some(path) = super::site::copy_file(&base, &rest) else { return Response::missing(&format!("no such file: {at}")) };
-    let Some(ctype) = super::site::ctype(&path.to_string_lossy()) else { return Response::missing(&format!("not served: {at}")) };
+    let Some(path) = super::site::copy_file(&base, &rest) else { return Err(Response::missing(&format!("no such file: {at}"))) };
+    let Some(ctype) = super::site::ctype(&path.to_string_lossy()) else { return Err(Response::missing(&format!("not served: {at}"))) };
+    Ok((path, ctype, select))
+}
+
+/// A video copy (`GET` or `HEAD /a/<id>/<v>/<file>`, a `video/` type),
+/// streamed by its byte ranges (media.rs); None: not one, `route` answers it.
+fn media(pages: &Pages, req: &Request) -> Option<(std::path::PathBuf, &'static str)> {
+    if !matches!(req.method.as_str(), "GET" | "HEAD") || !host_ok(pages, req) {
+        return None;
+    }
+    let segs: Vec<&str> = req.path.trim_start_matches('/').split('/').collect();
+    let ["a", id, v, rest @ ..] = segs.as_slice() else { return None };
+    if !valid_id(id) {
+        return None;
+    }
+    let (path, ctype, _) = artifact_target(pages, id, v, rest).ok()?;
+    ctype.starts_with("video/").then_some((path, ctype))
+}
+
+/// An artifact's file, from bise's copy (`/a/<id>/<v>/<path>`), in its
+/// sandbox (site.rs): a site folder, or a copied file the server sends
+/// (site::serves_copy, the same rule as the typed row's frame_url) and
+/// the files an html file links kept beside it (site::copy_file).
+fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
+    let (path, ctype, select) = match artifact_target(pages, id, v, rest) {
+        Ok(t) => t,
+        Err(r) => return r,
+    };
+    let at = format!("a/{id}/{v}/{}", rest.join("/"));
     match std::fs::read(&path) {
         Ok(body) if ctype.starts_with("text/html") => Response { status: 200, ctype, body: super::site::tagged(&body, select), csp: super::site::ARTIFACT_CSP },
         Ok(body) => Response { status: 200, ctype, body, csp: super::site::ARTIFACT_CSP },
