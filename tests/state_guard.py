@@ -13,7 +13,8 @@ Red when, outside bend/hub/gen/:
     bend/hub/ and is in neither HAND nor MIGRATING: a new record needs its declaration in
     bise_proto::core::state.
   - a name is added to MIGRATING or HAND: both lists only shrink, vs the base's
-    tests/state_guard.py (GATE_BASE, default HEAD; a base without this file: no check).
+    tests/state_guard.py (GATE_BASE, default HEAD; a base without this file: no check),
+    but a RENAMES row: a hand record that shared a generated name, renamed, enters HAND.
 A family's land takes its names out of MIGRATING.
 
   python3 tests/state_guard.py              the tree
@@ -58,8 +59,17 @@ HAND = {
     # a step's local records: core.bend's Snd, NewTask, Hub, RunR; main.bend's
     # Got; model.bend's Ms; picks.bend's Pick and Answer (R's answered: his
     # answer a step routes; picks.bend's Ans before state-card renamed it, a
-    # name the generated Ans took); view.bend's Mark
-    "Snd", "NewTask", "Hub", "RunR", "Got", "Ms", "Pick", "Answer", "Mark",
+    # name the generated Ans took); view.bend's Mark; core.bend's Turn (a
+    # step's commit: hub, fx, need; its Out before state-xhub renamed it)
+    "Snd", "NewTask", "Hub", "RunR", "Got", "Ms", "Pick", "Answer", "Mark", "Turn",
+}
+
+# a hand record that shared a generated record's name (so MIGRATING hid it)
+# and was renamed to keep it: its new name may enter HAND, once, only when
+# its old name is in the base's MIGRATING. A scan of bend/hub found these two.
+RENAMES = {
+    "Answer": "Ans",  # picks.bend: his answer a step routes (state-card)
+    "Turn": "Out",  # core.bend: a step's commit, hub fx need (state-xhub)
 }
 
 TYPE = re.compile(r"^type\s+([A-Za-z_][\w.]*)(?:<[^>]*>)?\s+is\s+\w+")
@@ -112,8 +122,11 @@ def grown(base_text, text):
     if base_text is None:
         return []
     bad = []
+    base_migrating = lists_of(base_text)[0]
     for name, old, new in zip(("MIGRATING", "HAND"), lists_of(base_text), lists_of(text)):
         for n in sorted(new - old):
+            if name == "HAND" and RENAMES.get(n) in base_migrating:
+                continue
             bad.append(f"tests/state_guard.py: {name} gains {n}: the lists only shrink (declare it in bise_proto::core::state)")
     return bad
 
@@ -192,6 +205,9 @@ def self_test():
     assert grown(base, base.replace('"Card",', '')) == [], "self-test: a name removed is fine"
     got = grown(base, base.replace('"Card",', '"Card", "Agent",').replace('"Core",', '"Core", "New",'))
     assert [g.split(":")[1] for g in got] == [" MIGRATING gains Agent", " HAND gains New"], got
+    # a renamed collision enters HAND while its old name is still in the base's MIGRATING
+    assert grown(base.replace('"Card",', '"Card", "Out",'), base.replace('"Core",', '"Core", "Turn",')) == [], "self-test: a rename"
+    assert grown(base, base.replace('"Core",', '"Core", "Turn",')) != [], "self-test: a rename whose old name already left"
     assert lists_of(open(os.path.abspath(__file__)).read())[0] == MIGRATING, "self-test: lists_of reads this file"
     assert lists_of(open(os.path.abspath(__file__)).read())[1] == HAND, "self-test: lists_of reads this file"
     print("state_guard self-test: ok")
