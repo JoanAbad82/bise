@@ -1,5 +1,5 @@
 // The spotlight (fn space; bar ⛔1s, his bugs 7, 6 and 2): amb-kit's Spot frame, an uncontrolled
-// <textarea> (it wraps his long words, spot-shot) the app never writes while he types (only a send
+// <InputArea> (it wraps his long words, spot-shot) the app never writes while he types (only a send
 // clears it), the list under it as
 // memo'd rows keyed by id (a keystroke updates the rows that changed, the input and the other rows
 // stay the same nodes), the live pearl mounted once. bise's answer shows under the input at a
@@ -16,7 +16,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { BiseMark, Press, Spot, SpotGroup, SpotRow } from "@/ds";
+import { BiseMark, InputArea, Press, Spot, SpotGroup, SpotRow } from "@/ds";
 import { cx } from "@/ds/cx";
 import { LivePearl, type Mood } from "@/pearl";
 import {
@@ -661,10 +661,10 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
             )}
             {/* his words wrap and the field grows to a few lines, then scrolls down: never sideways,
                 the start of a long ask stays in view (spot-shot); ⏎ sends, so no line break of his */}
-            <textarea
+            <InputArea
               ref={input}
               rows={1}
-              className="b-input b-spot-words"
+              look="b-spot-words"
               placeholder={W.ph}
               aria-label={W.ph}
               spellCheck={false}

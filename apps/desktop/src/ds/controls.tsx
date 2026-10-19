@@ -44,6 +44,20 @@ export function Input({ look, ref, ...input }: InputProps) {
   return <input ref={ref} className={cx("b-input", look)} {...input} />;
 }
 
+export interface InputAreaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "className" | "children"> {
+  /** the field's own signed look (the spotlight's words, spot-shot): its wrap and its cap are there */
+  look?: string;
+  ref?: Ref<HTMLTextAreaElement>;
+}
+/**
+ * Input's twin for words that wrap: a <textarea> inside a frame a screen drew and designer signed
+ * (the spotlight's line, which grows with his words: spot-shot, designer m_32542). Anywhere else,
+ * use TextArea.
+ */
+export function InputArea({ look, ref, ...area }: InputAreaProps) {
+  return <textarea ref={ref} className={cx("b-input", look)} {...area} />;
+}
+
 export interface IconButtonProps {
   /** what it does, in words: its aria-label and its tooltip (with `keys` after it) */
   label: string;
