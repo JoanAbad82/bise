@@ -577,6 +577,23 @@ desktop_deps() {  # [strict]: node_modules (installed when strict); what is miss
   fi
   echo "$miss"
 }
+# quick's vitest share (gate-reds, main m_33154): when every changed path the
+# desktop counts is under apps/desktop/src/, the tests that import them
+# (vitest related) and the ones that read src/ by path (the ds laws, the CSP,
+# the words...: grep) rather than all ~250 files (157-182 s at load 30, and its
+# worker RPC times out there). Prints those two lists, or nothing: all of them
+# (a config, a fixture, a seam outside the app, a deleted file). Full: all.
+desktop_related() {  # <changed path>...
+  local f src="" n=0
+  for f in "$@"; do
+    [ "$(desktop_why "$f")" ] || continue
+    case "$f" in apps/desktop/src/*) ;; *) return 0 ;; esac
+    [ -f "$root/$f" ] || return 0
+    src="$src ${f#apps/desktop/}"; n=$((n + 1))
+  done
+  [ $n -gt 0 ] || return 0
+  echo "$src"
+}
 desktop_check() {
   [ -d "$root/apps/desktop" ] || return 0
   local miss; desktop_path; miss="$(desktop_deps "${1:-}")"
@@ -584,8 +601,17 @@ desktop_check() {
     if [ "${1:-}" = strict ]; then echo "FAIL desktop_check: $miss"; return 1; fi
     echo "skipped desktop_check: $miss"; return 0
   fi
-  local s=$SECONDS log="$run/desktop_check.log"
-  if (cd "$root/apps/desktop" && pnpm -s check) >"$log" 2>&1; then echo "ok   desktop_check ($((SECONDS - s))s)"; return 0; fi
+  local s=$SECONDS log="$run/desktop_check.log" rel=""
+  # shellcheck disable=SC2086
+  [ "${1:-}" = strict ] || rel="$(desktop_related $changed)"
+  if [ -n "$rel" ]; then
+    local byfile; byfile="$(cd "$root/apps/desktop" && grep -rlE 'readFileSync|readdirSync|import\.meta\.glob' src --include='*.test.ts' --include='*.test.tsx' | tr '\n' ' ')"
+    # shellcheck disable=SC2086
+    if (cd "$root/apps/desktop" && python3 ../../tests/conflict_markers.py && pnpm -s typecheck && pnpm -s lint \
+        && pnpm -s exec vitest related --run --passWithNoTests $rel && pnpm -s exec vitest run $byfile && pnpm -s build) >"$log" 2>&1; then
+      echo "ok   desktop_check ($((SECONDS - s))s, vitest: the tests of$rel and $(wc -w <<<"$byfile" | tr -d ' ') that read src/; full runs all)"; return 0
+    fi
+  elif (cd "$root/apps/desktop" && pnpm -s check) >"$log" 2>&1; then echo "ok   desktop_check ($((SECONDS - s))s)"; return 0; fi
   echo "FAIL desktop_check"
   grep -E "error|Error|FAIL|✗|×" "$log" | head -30
   cp "$log" "$gdir/sb-gate-desktop_check.log"; echo "log: $gdir/sb-gate-desktop_check.log"
