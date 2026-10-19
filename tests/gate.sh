@@ -628,6 +628,8 @@ if [ "$mode" = land ]; then
   # every shim registered with its end date (issue 31); an overdue one is
   # only a warning here (its owner gets the red at their quick gate)
   lstep shims bash -c 'python3 tests/shims_check.py --self-test && python3 tests/shims_check.py --land'
+  # sb-core's records by position only in bend/hub/gen/ (state-schema)
+  lstep state_guard bash -c 'python3 tests/state_guard.py --self-test && python3 tests/state_guard.py'
   # quick's clippy, in its warm dir: the workspace, so both share every artifact
   [ -n "$pkgs" ] && lstep clippy bash -c "cd rust && cargo clippy --offline -q --workspace --all-targets --target-dir '$target/clippy' -- -D warnings"
   [ "${proto_ts:-0}" = 1 ] && lstep proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
@@ -670,6 +672,8 @@ if [ "$mode" = full ]; then
   python3 tests/word_lint.py --all || { echo "GATE full FAILED"; exit 1; }
   # every shim registered, none past its removal release (issue 31, ~0.1 s)
   python3 tests/shims_check.py || { echo "GATE full FAILED"; exit 1; }
+  # sb-core's records by position only in bend/hub/gen/ (state-schema, ~0.1 s)
+  python3 tests/state_guard.py || { echo "GATE full FAILED"; exit 1; }
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
   rm -f "$red"; export SB_RED_FILE="$red"
   # the e2e/tmux tests this change can break (tests/test_map.py; the user's
@@ -746,6 +750,9 @@ python3 "$root/tests/known_reds.py" --self-test >/dev/null || { python3 "$root/t
 # past it (tests/shims_check.py, issue 31; always: the release moves with tags)
 python3 "$root/tests/shims_check.py" --self-test >/dev/null || { python3 "$root/tests/shims_check.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 python3 "$root/tests/shims_check.py" || { echo "GATE quick FAILED"; exit 1; }
+# sb-core's records built or opened only in bend/hub/gen/ (tests/state_guard.py, state-schema)
+python3 "$root/tests/state_guard.py" --self-test >/dev/null || { python3 "$root/tests/state_guard.py" --self-test; echo "GATE quick FAILED"; exit 1; }
+python3 "$root/tests/state_guard.py" || { echo "GATE quick FAILED"; exit 1; }
 # the full gate's test map knows every test and every top-level path (tests/test_map.py)
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # the desktop checks' selection: its shadow never fails a land, its audit, the coverage map's rules
@@ -828,10 +835,11 @@ step() {  # <name> <cmd...>: one line when green, the failures and the log when 
 }
 # sb-core's side of bise_proto::core is generated too (issue 25): a change to
 # the schema, its generator or bend/hub/gen/ runs bise-proto's tests (core_gen:
-# a stale or hand-edited gen file is red) and gen/laws.bend and
-# gen/journal-laws.bend (decode∘encode, the tag table, the journal fixture)
-# must check; a bend/ change still runs PROOF above
-if printf '%s\n' "$changed" | grep -qE '^(rust/proto/src/core/|rust/proto/tests/core_gen\.rs|bend/hub/gen/)'; then
+# a stale or hand-edited gen file is red) and gen/laws.bend,
+# gen/journal-laws.bend (decode∘encode, the tag table, the journal fixture),
+# gen/state.bend, state-laws.bend and state-codec.bend (sb-core's records,
+# state-schema) must check; a bend/ change still runs PROOF above
+if printf '%s\n' "$changed" | grep -qE '^(rust/proto/src/core/|rust/proto/tests/core_gen(\.rs|/)|bend/hub/gen/|bend/hub/state-hand\.bend)'; then
   add bise-proto; core_gen=1
 fi
 # no `cargo build`: clippy checks every target, the tests compile and link
@@ -859,7 +867,7 @@ else
   echo "no Rust or hub change vs $base: no Rust tests run"
 fi
 # the generated codecs' laws (issue 25, mapped above)
-[ "${core_gen:-0}" = 1 ] && step core_gen_laws bash -c 'for f in laws journal-laws; do r=$(BEND_NO_TELEMETRY=1 bend bend/hub/gen/$f.bend 2>&1); echo "$f: $r"; grep -q "ALL PROOFS CHECK" <<<"$r" || exit 1; done'
+[ "${core_gen:-0}" = 1 ] && step core_gen_laws bash -c 'for f in laws journal-laws state state-laws state-codec; do r=$(BEND_NO_TELEMETRY=1 bend bend/hub/gen/$f.bend 2>&1); echo "$f: $r"; grep -q "ALL PROOFS CHECK" <<<"$r" || exit 1; done'
 # bise desktop's TS types (apps/desktop/src/proto) are bise-proto's, generated:
 # a stale or hand-edited file is red (BISE_PROTO_BLESS=1 on that test rewrites them)
 [ "${proto_ts:-0}" = 1 ] && step proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"

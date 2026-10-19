@@ -92,7 +92,7 @@ pub(crate) fn journal_codec() -> String {
                 writeln!(s, "# no {} read: the line is skipped", o.name).unwrap();
                 writeln!(s, "def {}.with(m: Maybe<&2, {}>, +i: J.Json) -> {EV}:", k.rust, c.ty).unwrap();
                 writeln!(s, "  match m:\n    case None{{}}:\n      None{{}}\n    case Some{{+{v}}}:\n      Some{{{e}}}\n").unwrap();
-                writeln!(s, "def {}.of(+i: J.Json) -> {EV}:\n  {}.with(C.{}_of(i), i)\n", k.rust, k.rust, c.name).unwrap();
+                writeln!(s, "def {}.of(+i: J.Json) -> {EV}:\n  {}.with({}.{}_of(i), i)\n", k.rust, k.rust, c.module, c.name).unwrap();
             }
         }
     }
@@ -137,7 +137,7 @@ fn journal_cases(f: &Field, v: &str) -> Vec<(String, bool)> {
 /// A fixture line's JSON, its keys in their order (serde_json's map is
 /// sorted; the laws compare objects key by key).
 #[derive(Clone, Debug, PartialEq)]
-enum Jv {
+pub(crate) enum Jv {
     Null,
     Bool(bool),
     Num(u64),
@@ -147,7 +147,7 @@ enum Jv {
 }
 
 impl Jv {
-    fn get(&self, k: &str) -> Option<&Jv> {
+    pub(crate) fn get(&self, k: &str) -> Option<&Jv> {
         match self {
             Jv::Obj(kvs) => kvs.iter().find(|(x, _)| x == k).map(|(_, v)| v),
             _ => None,
@@ -163,7 +163,7 @@ impl Jv {
 }
 
 /// Reads one fixture line: plain strings (no escapes), Nat numbers.
-fn jv(text: &str) -> Jv {
+pub(crate) fn jv(text: &str) -> Jv {
     fn ws(b: &[u8], i: &mut usize) {
         while *i < b.len() && (b[*i] as char).is_ascii_whitespace() {
             *i += 1;
@@ -248,7 +248,7 @@ fn jv(text: &str) -> Jv {
 }
 
 /// A fixture value as a Bend `J.Json` term.
-fn bend_json(v: &Jv) -> String {
+pub(crate) fn bend_json(v: &Jv) -> String {
     match v {
         Jv::Null => "J.JNull{}".into(),
         Jv::Bool(b) => format!("J.JBool{{{}}}", if *b { "True{}" } else { "False{}" }),
@@ -299,8 +299,8 @@ pub(crate) fn journal_laws() -> String {
             "None{}".to_string()
         } else {
             let e = fill(k, &|n| match field(k, n).kind {
-                FieldKind::Rec(c) => format!("C.{}_of(J.JNull{{}})", c.name),
-                FieldKind::Inline(c) => format!("C.{}_of({b})", c.name),
+                FieldKind::Rec(c) => format!("{}.{}_of(J.JNull{{}})", c.module, c.name),
+                FieldKind::Inline(c) => format!("{}.{}_of({b})", c.module, c.name),
                 kd => default(kd).to_string(),
             });
             format!("Some{{{e}}}")
@@ -378,8 +378,8 @@ fn journal_round(s: &mut String, k: &Kind) {
                 let c = codec_of(f.kind).unwrap();
                 let mut hole = rhs.clone();
                 hole[i] = "_".into();
-                writeln!(s, "{ind}%C.{}_round({}) : {{{lhs} == Some{{{}}} : {EV}}}", c.name, vars[i], ev(&hole)).unwrap();
-                rhs[i] = format!("C.{}_of(C.{}_json({}))", c.name, c.name, vars[i]);
+                writeln!(s, "{ind}%{}.{}_round({}) : {{{lhs} == Some{{{}}} : {EV}}}", c.module, c.name, vars[i], ev(&hole)).unwrap();
+                rhs[i] = format!("{m}.{}_of({m}.{}_json({}))", c.name, c.name, vars[i], m = c.module);
             }
         }
         writeln!(s, "{ind}{{==}}").unwrap();

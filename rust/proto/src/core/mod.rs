@@ -15,6 +15,9 @@
 //!   transcript, the hub's `sb <kind> : …` lines.
 //! - [`JOURNAL`] (tag `"type"`): sb-core's journal lines, a table only
 //!   (journal.rs: each row's Bend `M.Ev` pattern; no Rust type yet).
+//! - [`state::STATE`]: the records of sb-core's own state and their JSON
+//!   shapes (state.rs: its Bend types, accessors, laws and codecs are
+//!   generated, state-schema).
 //!
 //! Each field is today's JSON exactly: its name, whether it is written
 //! when empty or none, null or absent. Each enum has `Unknown { tag, raw }`:
@@ -39,6 +42,7 @@ pub mod fx;
 pub mod input;
 pub mod journal;
 pub mod link;
+pub mod state;
 pub mod view;
 
 pub use feed::Feed;
@@ -111,13 +115,16 @@ pub enum FieldKind {
     InlineOpt(&'static Codec),
 }
 
-/// A hand codec of sb-core (bend/hub/codec.bend, imported as `C`): its
-/// Bend type, `C.<name>_of` and `C.<name>_json` (a [`FieldKind::Rec`]:
-/// the value under its key) or `C.<name>_kvs` (inline: its keys). `cases`:
-/// the value's constructors, when a decode∘encode proof splits on them
-/// instead of using the codec's own law `C.<name>_round`.
+/// A codec of one of sb-core's records: its module's alias in the
+/// journal's generated files (`C` the hand codec.bend; `SC`
+/// gen/state-codec.bend, the declared records' shapes), its Bend type,
+/// `<module>.<name>_of` and `_json` (a [`FieldKind::Rec`]: the value
+/// under its key) or `_kvs` (inline: its keys). `cases`: the value's
+/// constructors, when a decode∘encode proof splits on them instead of
+/// using the codec's own law `<module>.<name>_round`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Codec {
+    pub module: &'static str,
     pub name: &'static str,
     pub ty: &'static str,
     pub cases: &'static [&'static str],

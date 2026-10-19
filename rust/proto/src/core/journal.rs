@@ -21,21 +21,22 @@
 
 use super::{Codec, Field, FieldKind::*, Kind, Table};
 
-pub const LIFE: Codec = Codec { name: "life", ty: "M.Life", cases: &["M.LActive{}", "M.LStopped{}", "M.LArchived{}", "M.LFailed{}"] };
+pub const LIFE: Codec = Codec { module: "C", name: "life", ty: "M.Life", cases: &["M.LActive{}", "M.LStopped{}", "M.LArchived{}", "M.LFailed{}"] };
 pub const DECL: Codec = Codec {
+    module: "C",
     name: "decl",
     ty: "Maybe<&2, M.Decl>",
     cases: &["None{}", "Some{M.DWorking{}}", "Some{M.DDone{}}", "Some{M.DBlocked{}}"],
 };
-pub const MST: Codec = Codec { name: "mst", ty: "M.MSt", cases: &["M.Queued{$r}", "M.Delivered{}", "M.Rejected{$e}", "M.Cancelled{}"] };
-pub const MSG: Codec = Codec { name: "msg", ty: "M.Msg", cases: &[] };
-pub const CARD: Codec = Codec { name: "card", ty: "M.Card", cases: &[] };
-pub const TIMER: Codec = Codec { name: "timer", ty: "TM.Timer", cases: &[] };
-pub const OUT: Codec = Codec { name: "out", ty: "XH.Out", cases: &[] };
-pub const XIN: Codec = Codec { name: "xin", ty: "XH.XIn", cases: &[] };
-pub const ROUTE: Codec = Codec { name: "route", ty: "XH.Route", cases: &[] };
-pub const ACT: Codec = Codec { name: "act", ty: "TM.Act", cases: &[] };
-pub const WATCH: Codec = Codec { name: "watch", ty: "WK.Watch", cases: &[] };
+pub const MST: Codec = Codec { module: "C", name: "mst", ty: "M.MSt", cases: &["M.Queued{$r}", "M.Delivered{}", "M.Rejected{$e}", "M.Cancelled{}"] };
+pub const MSG: Codec = Codec { module: "C", name: "msg", ty: "M.Msg", cases: &[] };
+pub const CARD: Codec = Codec { module: "C", name: "card", ty: "M.Card", cases: &[] };
+pub const TIMER: Codec = Codec { module: "C", name: "timer", ty: "TM.Timer", cases: &[] };
+pub const OUT: Codec = Codec { module: "C", name: "out", ty: "XH.Out", cases: &[] };
+pub const XIN: Codec = Codec { module: "C", name: "xin", ty: "XH.XIn", cases: &[] };
+pub const ROUTE: Codec = Codec { module: "C", name: "route", ty: "XH.Route", cases: &[] };
+pub const ACT: Codec = Codec { module: "C", name: "act", ty: "TM.Act", cases: &[] };
+pub const WATCH: Codec = Codec { module: "C", name: "watch", ty: "WK.Watch", cases: &[] };
 
 const fn f(name: &'static str, kind: super::FieldKind) -> Field {
     Field::new(name, kind)

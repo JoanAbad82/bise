@@ -28,6 +28,10 @@
 //!   fallback. Proven in the same file: `bend bend/hub/gen/laws.bend`
 //!   prints ALL PROOFS CHECK.
 //!
+//! - `state.bend`, `state-laws.bend`, `state-codec.bend`: sb-core's own
+//!   records (`core::state::STATE`): types, getters and setters, their
+//!   laws, their JSON shapes with their round laws (core_gen/state.rs).
+//!
 //! `cargo test -p bise-proto --test core_gen` fails when a file is stale;
 //! `BISE_PROTO_BLESS=1` writes them.
 
@@ -39,6 +43,10 @@ use std::path::{Path, PathBuf};
 #[path = "core_gen/journal.rs"]
 mod journal;
 use journal::{journal_codec, journal_laws};
+
+#[path = "core_gen/state.rs"]
+mod state;
+use state::{state_codec, state_laws, state_types};
 
 const BLESS: &str = "BISE_PROTO_BLESS";
 const KV: &str = "Sigma<&2, &2, String, _ => J.Json>";
@@ -155,8 +163,8 @@ fn decode(k: FieldKind, name: &str) -> String {
         Msgs => format!("K.get_ms(i, \"{name}\")"),
         Recs(_) | OptJsonsOmit => unreachable!("{name}: a view field, never decoded (decodable)"),
         Flag => format!("K.get_b(i, \"{name}\")"),
-        Rec(c) => format!("C.{}_of(K.get_j(i, \"{name}\"))", c.name),
-        Inline(c) => format!("C.{}_of(i)", c.name),
+        Rec(c) => format!("{}.{}_of(K.get_j(i, \"{name}\"))", c.module, c.name),
+        Inline(c) => format!("{}.{}_of(i)", c.module, c.name),
         InlineOpt(_) => unreachable!("{name}: read by its row's own def (journal_codec)"),
     }
 }
@@ -200,8 +208,8 @@ fn encode(k: FieldKind, name: &str, v: &str) -> Result<String, String> {
         Msgs => Ok(format!("J.kv(\"{name}\", J.JArr{{K.jmsgs({v})}})")),
         OptJsonsOmit => Err(format!("K.omit_mjs(\"{name}\", {v})")),
         Flag => Err(format!("K.flag(\"{name}\", {v})")),
-        Rec(c) => Ok(format!("J.kv(\"{name}\", C.{}_json({v}))", c.name)),
-        Inline(c) | InlineOpt(c) => Err(format!("C.{}_kvs({v})", c.name)),
+        Rec(c) => Ok(format!("J.kv(\"{name}\", {}.{}_json({v}))", c.module, c.name)),
+        Inline(c) | InlineOpt(c) => Err(format!("{}.{}_kvs({v})", c.module, c.name)),
     }
 }
 
@@ -844,6 +852,9 @@ fn files() -> BTreeMap<String, String> {
     out.insert("bend/hub/gen/laws.bend".into(), laws());
     out.insert("bend/hub/gen/journal.bend".into(), journal_codec());
     out.insert("bend/hub/gen/journal-laws.bend".into(), journal_laws());
+    out.insert("bend/hub/gen/state.bend".into(), state_types());
+    out.insert("bend/hub/gen/state-laws.bend".into(), state_laws());
+    out.insert("bend/hub/gen/state-codec.bend".into(), state_codec());
     out
 }
 
