@@ -62,13 +62,22 @@ def sb(E, agent, *args):
     return r.stdout.strip()
 
 
+def go_file(E):
+    """The fake cargo runs until this file appears: the test ends it once
+    it has read the waiting line (a fixed sleep ended first under the full
+    gate's load, before the line was read)."""
+    return os.path.join(E.tmp, "cargo.go")
+
+
 def fake_cargo(E):
-    """A `cargo` that sleeps, then prints 3 lines (the real one never runs)."""
+    """A `cargo` that runs until go_file(E) appears (SECS at least, at most
+    10 min), then prints 3 lines (the real one never runs)."""
     d = os.path.join(E.tmp, "bin")
     os.makedirs(d, exist_ok=True)
     p = os.path.join(d, "cargo")
     with open(p, "w") as f:
-        f.write("#!/bin/sh\nsleep %d\necho 'running 212 tests'\necho 'test result: ok. 212 passed'\necho 'finished'\n" % SECS)
+        f.write("#!/bin/sh\nsleep %d\nn=0\nwhile [ ! -f '%s' ] && [ $n -lt 6000 ]; do sleep 0.1; n=$((n + 1)); done\n"
+                "echo 'running 212 tests'\necho 'test result: ok. 212 passed'\necho 'finished'\n" % (SECS, go_file(E)))
     os.chmod(p, 0o755)
     return d
 
@@ -127,6 +136,7 @@ def wide(t, E, bin_dir):
     col = rows[k].index("…")
     assert rows[k - 1][1:col + 20].strip("│ ") == "", rows[k - 1]
     shot(t, "150-waiting")
+    open(go_file(E), "w").close()
     # the command ends: the hub's line, the live line gone
     sc = t.wait(" · ".join([w("thread.wake_ended", what="cargo test"), w("thread.wake_rc", rc=0), w("thread.wake_after", dur="")]), SECS + 60)
     assert w("thread.wake_tail", n=3) in sc, sc
