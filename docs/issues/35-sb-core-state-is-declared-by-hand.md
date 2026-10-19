@@ -89,3 +89,38 @@ PROOFS CHECK, core_profile before/after (over 5%: architect's word).
   digests equal; old_core_replay -28, -29, -43, main ok; instructions within
   ±1% (replay 127.0G -> 126.6G, tick 30.6M, say 22.9M -> 23.0M, view_all
   15.9G); model.bend 1000 -> 906.
+- **Card + Ans, 7d34bc2ce** (state-card, signed + architect's builders
+  d57d581b2): hand Card/Ans/no_ans/getters and C.card_* deleted; 15 bend files
+  on S.Card/S.Ans; card row on SC Card.journal, card_closed on Inline SC
+  Ans.journal (generator: inline_record_cases); Card's view pinned on
+  core_view.jsonl (pinned() reads null as None); picks.bend's Ans renamed
+  Answer. PROOF 15 + gen laws green; core_same 260 steps 0 differing;
+  bench_byte_equal 5 digests equal; old_core_replay -28, -29, -43, main ok;
+  instructions within 0.25%.
+- **Agent, 240586af4** (state-agent, signed + builders): hand
+  Agent/Life/Decl/Run, 16 getters, every positional pattern deleted (12 hub,
+  5 laws, 8 proofs files); new_agent -> agent_of_new(e, dir) by name; life/decl
+  codecs deleted, rows on SC Life.journal / Decl.opt_journal. Eta rewrites only,
+  no pairwise lemma. Gate quick + PROOF green; core_same 0 differing, view_all
+  sha equal; bench_byte_equal 5/5; old_core_replay ok; instructions within
+  +0.6%.
+- **timers + wakes, d074f38c5** (state-timers, signed m_33484 + builders):
+  Timer/TimerEnd/Tms/Act/Watch/WatchEnd/Wakes, Sched, What; hand types, 34
+  getters, every hand codec (timers.bend/wakes.bend JSON, codec.bend
+  timer/act/watch) deleted; TIMER/ACT/WATCH rows on SC; core_view.jsonl's
+  wakes refreshed (resumes) and pinned (Watch, WatchEnd). Lemmas: Timer.name
+  set_get/set_set, no pairwise. PROOF 15 green; core_same 260 steps 0
+  differing; bench_byte_equal equal; old_core_replay ok; instructions replay
+  +0.16%, ticks -0.6%, says -8%, view_all -0.4%; core.bend 3765 -> 3763.
+- **xhub + gone, 187b2631f + cdcebac69 + 42e5b9452** (state-xhub, signed
+  m_33495 + builders): Out/XIn/Route/Xs/Item, XKind/OutSt/RSt; xhub-model.bend
+  464 -> ~175 lines (7 hand types, 30 getters, the codecs gone); gone.bend's
+  Item; builders by name (route_of_hold, out_to, out_of_route, xin_from);
+  core.bend's commit record Out renamed Turn; ~60 positional sites -> 0. Eta
+  rewrites only, no pairwise. PROOF 15/15, gate quick green; core_same 0
+  differing, view_all sha equal; bench_byte_equal equal; old_core_replay ok;
+  instructions replay -0.7%, ticks -0.8%, view_all -0.5%; core.bend 3760.
+
+After the five families: MIGRATING = {St}; codec.bend is 68 lines of readers
+core.bend still calls. Next: St (and codec.bend whole), then the probe, then
+the Rust chunk.
