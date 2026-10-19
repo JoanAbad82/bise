@@ -271,4 +271,21 @@ describe('his paper plane', () => {
     expect(Math.hypot(s0.p.x - moved.x, s0.p.y - moved.y, s0.p.z - moved.z)).toBeLessThan(1e-9);
     expect(glideAt(g, 2.8, hand, moved).p.x).toBeCloseTo(hand.x, 6);
   });
+
+  it("glides on a curve the size of the way he sees, never swung off by the way toward the camera", () => {
+    const from = viewPoint(fit, { x: 0.8, y: 0.85 });
+    const seenOf = (a: V3, b: V3): number => Math.hypot(dot({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }, RIGHT), dot({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }, UP));
+    const way = seenOf(hand, from);
+    for (const seed of [1, 2, 3, 4]) {
+      const g = planGlide({ from, to: hand, seed, dur: 2.8, px: fit.scale });
+      for (let i = 0; i <= 100; i++) {
+        const p = glideAt(g, (i / 100) * 2.8).p;
+        // on screen it stays near its straight way: never farther off it than a third of it
+        const a = { x: dot({ x: p.x - from.x, y: p.y - from.y, z: p.z - from.z }, RIGHT), y: dot({ x: p.x - from.x, y: p.y - from.y, z: p.z - from.z }, UP) };
+        const w = { x: dot({ x: hand.x - from.x, y: hand.y - from.y, z: hand.z - from.z }, RIGHT), y: dot({ x: hand.x - from.x, y: hand.y - from.y, z: hand.z - from.z }, UP) };
+        const off = Math.abs(a.x * w.y - a.y * w.x) / way;
+        expect(off).toBeLessThan(way / 3);
+      }
+    }
+  });
 });

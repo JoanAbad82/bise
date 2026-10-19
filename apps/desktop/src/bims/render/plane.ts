@@ -331,7 +331,7 @@ export function flightAt(f: FlightPlan, s: number, to: V3 = f.to): FlightFrame {
 export interface GlidePlan {
   readonly from: V3;
   readonly to: V3;
-  /** the curve's side (level, across the way, its sign seeded) and how far it bows, units */
+  /** the curve's side (on the screen, across the way he sees, its sign seeded) and how far it bows, units */
   readonly side: V3;
   readonly bow: number;
   /** the toss's rise, units */
@@ -365,9 +365,14 @@ function glidePath(g: GlidePlan, u: number, to: V3): V3 {
 export function planGlide(inp: { readonly from: V3; readonly to: V3; readonly seed: number; readonly dur: number; readonly px: number }): GlidePlan {
   const rand = rng(inp.seed);
   const d = sub(inp.to, inp.from);
-  const level = Math.hypot(d.x, d.z);
-  const side = level < 1e-9 ? { x: 1, y: 0, z: 0 } : mul({ x: -d.z / level, y: 0, z: d.x / level }, rand() < 0.5 ? 1 : -1);
-  const base = { from: inp.from, to: inp.to, side, bow: 0.22 * level, toss: TOSS_PX * inp.px, dur: inp.dur, phase: rand() * Math.PI * 2, us: [] as number[] };
+  // its curve on the screen: across the way he sees (the way toward the camera shows no length in the
+  // iso view, so a bow sized on it swung the plane far off the feed's corner: designer m_33582)
+  const wx = dot(d, RIGHT);
+  const wy = dot(d, UP);
+  const seen = Math.hypot(wx, wy);
+  const sign = rand() < 0.5 ? 1 : -1;
+  const side = seen < 1e-9 ? RIGHT : add(mul(RIGHT, (-wy / seen) * sign), UP, (wx / seen) * sign);
+  const base = { from: inp.from, to: inp.to, side, bow: 0.22 * seen, toss: TOSS_PX * inp.px, dur: inp.dur, phase: rand() * Math.PI * 2, us: [] as number[] };
   // the path's length table, then the time it takes along it: a little faster out of the hand
   // (slowing at the toss's top), steady, then half speed in the flare
   const len: number[] = [0];
