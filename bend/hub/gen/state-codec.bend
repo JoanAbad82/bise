@@ -4875,3 +4875,17 @@ law WatchEnd.view_pinned:
 def WatchEnd.view_pinned():
   {==}
 
+# ---- missing keys read their defaults, pinned on fixtures/core_state_defaults.jsonl (Rust reads the same lines) ----
+
+law Msg.defaults_pinned_0:
+  {Msg.journal_json(Msg.journal_of(J.obj([J.kv("id", J.JNum{9n}), J.kv("thread", J.JNum{9n}), J.kv("from", J.JStr{"user"}), J.kv("to", J.JStr{"main"}), J.kv("queued", J.JNum{1n})]))) == J.obj([J.kv("id", J.JNum{9n}), J.kv("thread", J.JNum{9n}), J.kv("from", J.JStr{"user"}), J.kv("to", J.JStr{"main"}), J.kv("reply_to", J.JNull{}), J.kv("expect_reply", J.JBool{False{}}), J.kv("auto", J.JBool{False{}}), J.kv("text", J.JStr{""}), J.kv("created_ms", J.JNum{0n}), J.kv("plain", J.JBool{False{}}), J.kv("queued", J.JBool{False{}})]) : J.Json}
+
+def Msg.defaults_pinned_0():
+  {==}
+
+law Card.defaults_pinned_1:
+  {Card.journal_json(Card.journal_of(J.obj([J.kv("id", J.JNum{4n}), J.kv("kind", J.JStr{"question"}), J.kv("agent", J.JStr{"docs"}), J.kv("pr", J.JStr{"12"})]))) == J.obj([J.kv("id", J.JNum{4n}), J.kv("kind", J.JStr{"question"}), J.kv("agent", J.JStr{"docs"}), J.kv("text", J.JStr{""}), J.kv("for_msg", J.JNull{}), J.kv("created_ms", J.JNum{0n}), J.kv("place", J.JNull{}), J.kv("pr", J.JNull{})]) : J.Json}
+
+def Card.defaults_pinned_1():
+  {==}
+

@@ -777,6 +777,23 @@ pub const STATE: State = State {
     ],
 };
 
+/// The records and enums of [`STATE`] a Rust reader parses (switchboard's
+/// mirror of sb-core's view), with their Rust names. core_gen writes
+/// their types in `state/generated.rs` from their journal shape (a field
+/// is named as its key; a variant as its word, in CamelCase), read the
+/// way sb-core reads them: a missing key, or a value of another type,
+/// reads the field's default; an enum's other word reads its fallback.
+/// The others get a Rust name when a Rust reader needs one.
+pub const RUST: &[(&str, &str)] =
+    &[("Life", "Lifecycle"), ("Decl", "Declared"), ("MSt", "MsgState"), ("Msg", "Msg"), ("Card", "Card")];
+
+mod generated;
+mod opaque;
+mod read;
+
+pub use generated::*;
+pub use opaque::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;

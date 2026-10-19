@@ -252,3 +252,143 @@ fn every_captured_view_reads_and_writes_back() {
     }
     assert!(n >= 4, "one view per shape: {n}");
 }
+
+/// The raw text of each object under `key` in a fixture line (the key's
+/// value, or each item of its array): serde_json's map sorts its keys,
+/// the pin is on the line's own bytes.
+fn raw_items<'a>(l: &'a str, key: &str) -> Vec<&'a str> {
+    let pat = format!("\"{key}\":");
+    let mut out = Vec::new();
+    for (at, _) in l.match_indices(&pat) {
+        let start = at + pat.len();
+        let array = l[start..].starts_with('[');
+        if !array && !l[start..].starts_with('{') {
+            continue;
+        }
+        let (mut depth, mut open, mut in_str, mut esc) = (0, 0, false, false);
+        for (i, c) in l[start..].char_indices() {
+            let i = start + i;
+            match c {
+                _ if esc => esc = false,
+                '\\' if in_str => esc = true,
+                '"' => in_str = !in_str,
+                _ if in_str => {}
+                '{' => {
+                    if depth == 0 {
+                        open = i;
+                    }
+                    depth += 1;
+                }
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        out.push(&l[open..=i]);
+                        if !array {
+                            break;
+                        }
+                    }
+                }
+                ']' if depth == 0 => break,
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
+/// Each item reads into `T` and writes back the same bytes.
+fn pin<T: serde::de::DeserializeOwned + serde::Serialize>(l: &str, key: &str) -> usize {
+    let items = raw_items(l, key);
+    for raw in &items {
+        let t: T = serde_json::from_str(raw).unwrap_or_else(|e| panic!("{key}: {e}: {raw}"));
+        assert_eq!(serde_json::to_string(&t).unwrap(), *raw, "{key} doesn't write back its bytes");
+    }
+    items.len()
+}
+
+/// Each item reads into `T` and writes back the same keys and values,
+/// but a null it omits (an older writer's `"step":null`, read as none).
+fn same<T: serde::de::DeserializeOwned + serde::Serialize>(l: &str, key: &str) -> usize {
+    let items = raw_items(l, key);
+    for raw in &items {
+        let v: Value = serde_json::from_str(raw).unwrap();
+        let t: T = serde_json::from_value(v.clone()).unwrap_or_else(|e| panic!("{key}: {e}: {raw}"));
+        let w = serde_json::to_value(&t).unwrap();
+        let (vo, wo) = (v.as_object().unwrap(), w.as_object().unwrap());
+        for (k, x) in vo {
+            assert!(wo.get(k) == Some(x) || (x.is_null() && !wo.contains_key(k)), "{key}.{k} doesn't write back: {raw}");
+        }
+        assert!(wo.keys().all(|k| vo.contains_key(k)), "{key} writes a key it didn't read: {w}");
+    }
+    items.len()
+}
+
+/// sb-core's records Rust reads (state::RUST, generated, and the
+/// Rust-only ones in its agents' JSON), on every captured view and
+/// journal line that carries one: read, then written back byte for byte.
+#[test]
+fn the_state_types_read_and_write_back_the_fixtures() {
+    use state::{Brief, Card, Msg, MsgState, Report, Workspace};
+    let read = |f: &str| std::fs::read_to_string(format!("{}/fixtures/{f}", env!("CARGO_MANIFEST_DIR"))).unwrap();
+    let (view, journal) = (read("core_view.jsonl"), read("core_journal.jsonl"));
+    let mut n = std::collections::BTreeMap::new();
+    for l in view.lines().chain(journal.lines()).filter(|l| l.starts_with('{')) {
+        *n.entry("msg").or_insert(0) += pin::<Msg>(l, "msg");
+        *n.entry("card").or_insert(0) += pin::<Card>(l, "card") + pin::<Card>(l, "cards");
+        // a view row's message state (the journal's message_state is flat)
+        if l.contains("\"msgs\":[{") {
+            *n.entry("state").or_insert(0) += pin::<MsgState>(l, "state");
+        }
+    }
+    for (k, c) in &n {
+        assert!(*c > 0, "no {k} pinned");
+    }
+    // the Rust-only ones as the view writes them, equal as JSON: sb-core
+    // keeps them opaque, in whatever key order they came (a journal line
+    // keeps an older shape: the hub's own readers take it, core_link.rs)
+    for l in view.lines().filter(|l| l.starts_with('{')) {
+        *n.entry("ws").or_insert(0) += same::<Workspace>(l, "ws");
+        *n.entry("brief").or_insert(0) += same::<Brief>(l, "brief");
+        *n.entry("last_report").or_insert(0) += same::<Report>(l, "last_report");
+    }
+    for (k, c) in &n {
+        assert!(*c > 0, "no {k} pinned");
+    }
+    for l in view.lines().filter(|l| l.starts_with('{')) {
+        let v: Value = serde_json::from_str(l).unwrap();
+        for a in v["agents"].as_array().into_iter().flatten() {
+            let w = &a["lifecycle"];
+            assert_eq!(serde_json::to_value(serde_json::from_value::<state::Lifecycle>(w.clone()).unwrap()).unwrap(), *w);
+            if !a["declared"].is_null() {
+                let d = &a["declared"]["status"];
+                assert_eq!(serde_json::to_value(serde_json::from_value::<state::Declared>(d.clone()).unwrap()).unwrap(), *d);
+            }
+        }
+    }
+}
+
+/// fixtures/core_state_defaults.jsonl: a missing key (or one of another
+/// type) reads its default, as sb-core reads it (the same lines are
+/// gen/state-codec.bend's `T.defaults_pinned_<n>` laws).
+#[test]
+fn a_missing_key_reads_as_sb_core_reads_it() {
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core_state_defaults.jsonl")).unwrap();
+    let mut n = 0;
+    for l in text.lines().filter(|l| l.starts_with('{')) {
+        let v: Value = serde_json::from_str(l).unwrap();
+        let reads = &l[l.find("\"reads\":").unwrap() + 8..l.len() - 1];
+        let wrote = match v["record"].as_str().unwrap() {
+            "Msg" => serde_json::to_string(&serde_json::from_value::<state::Msg>(v["json"].clone()).unwrap()),
+            "Card" => serde_json::to_string(&serde_json::from_value::<state::Card>(v["json"].clone()).unwrap()),
+            r => panic!("{r}: no Rust type"),
+        };
+        assert_eq!(wrote.unwrap(), reads, "{l}");
+        n += 1;
+    }
+    assert!(n >= 2);
+    // an enum's other word reads its fallback; not a string: an error
+    assert_eq!(serde_json::from_value::<state::Lifecycle>(json!("gone")).unwrap(), state::Lifecycle::Active);
+    assert!(serde_json::from_value::<state::Lifecycle>(json!(3)).is_err());
+    let none: state::MsgState = serde_json::from_value(json!({"reason": "busy"})).unwrap();
+    assert_eq!(none, state::MsgState::Queued { reason: "busy".into() });
+}

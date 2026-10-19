@@ -64,7 +64,7 @@ fn the_kept_rows_equal_fresh_rows_at_every_step() {
             let names: Vec<String> = st.order.iter().filter(|x| x.as_str() != MAIN).cloned().collect();
             let a = names[r.below(names.len())].clone();
             match r.below(10) {
-                0 => st.agents.get_mut(&a).unwrap().lifecycle = [Lifecycle::Archived, Lifecycle::Active, Lifecycle::Stopped][r.below(3)].clone(),
+                0 => st.agents.get_mut(&a).unwrap().lifecycle = [Lifecycle::Archived, Lifecycle::Active, Lifecycle::Stopped][r.below(3)],
                 1 => st.agents.get_mut(&a).unwrap().run = [Run::Idle, Run::Busy, Run::Down][r.below(3)],
                 2 => st.agents.get_mut(&a).unwrap().turn_started_ms = [None, Some(now)][r.below(2)],
                 3 => {

@@ -4,9 +4,11 @@
 //! the runtime-only fields (`Agent::run`, `Agent::waiting`) are set by
 //! the core from REPL activity and are never journaled.
 
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+
+/// sb-core's records, declared once in bise_proto (core::state: the
+/// generated ones, and the Rust-only ones sb-core keeps as opaque JSON).
+pub use bise_proto::core::state::{Brief, Card, Declared, Lifecycle, Mode, Msg, MsgState, Report, Workspace};
 
 /// The name of the orchestrator agent. Never a task name.
 pub const MAIN: &str = "main";
@@ -15,90 +17,6 @@ pub const USER: &str = "user";
 /// The hub itself, as the sender of notifications (a task crashed...).
 /// Never an agent name.
 pub const HUB: &str = "switchboard";
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Mode {
-    Shared,
-    Worktree,
-}
-
-/// Where a task works (RFC 0002). `path` is the workspace for `shared`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Workspace {
-    pub mode: Mode,
-    pub path: String,
-    #[serde(default)]
-    pub branch: Option<String>,
-    #[serde(default)]
-    pub base_commit: Option<String>,
-    /// The worktree was removed by a drop (restore can bring it back).
-    #[serde(default)]
-    pub dropped: bool,
-    /// The place this workspace is (dev-flow §3.1, `crate::place`): a
-    /// worktree's id, `wt:<its first agent's dir>`, the same in every
-    /// agent that shares it. None: the shared folder, or an older
-    /// journal's worktree (its agent's own place, [`Workspace::place_id`]).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub place: Option<String>,
-    /// dev-flow §5.1: the feature this worktree lands on (`sb spawn
-    /// --feature`): its branch is made from the feature's tip and `sb
-    /// land` moves the feature, never main. None: not a feature's.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub feature: Option<String>,
-    /// hub-loop: `placing` while the shell makes its worktree (sb-core's
-    /// hub/place.bend): no path, no branch, no REPL yet.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub state: Option<String>,
-}
-
-impl Workspace {
-    /// Its worktree is still being made (no REPL yet).
-    pub fn placing(&self) -> bool {
-        self.state.as_deref() == Some("placing")
-    }
-
-    /// The feature an agent with this workspace lands on (a worktree's).
-    pub fn feature(&self) -> Option<&str> {
-        match self.mode {
-            Mode::Worktree if !self.dropped => self.feature.as_deref(),
-            _ => None,
-        }
-    }
-
-    /// The id of the place an agent with this workspace (and this dir)
-    /// is in: `shared`, or its worktree's id.
-    pub fn place_id(&self, dir: &str) -> String {
-        match self.mode {
-            Mode::Shared => crate::place::SHARED.to_string(),
-            Mode::Worktree => self.place.clone().unwrap_or_else(|| crate::place::worktree_id(dir)),
-        }
-    }
-}
-
-/// The task brief (RFC 0001 §7.1).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Brief {
-    pub objective: String,
-    #[serde(default)]
-    pub context: String,
-    #[serde(default)]
-    pub constraints: Vec<String>,
-    #[serde(default)]
-    pub done_when: Option<String>,
-    #[serde(default)]
-    pub report_format: Option<String>,
-}
-
-/// What the owner of a task decided (never automatic, RFC 0001 §9.2).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Lifecycle {
-    Active,
-    Stopped,
-    Archived,
-    Failed,
-}
 
 /// What the agent's REPL is doing right now (runtime only).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,15 +28,6 @@ pub enum Run {
     Idle,
     /// A turn is running.
     Busy,
-}
-
-/// The status an agent declares about itself (RFC 0003 `setStatus`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Declared {
-    Working,
-    Done,
-    Blocked,
 }
 
 /// The status every view shows (RFC 0001 §9.1, RFC 0003 `ListedAgent`).
@@ -228,103 +137,6 @@ impl Agent {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Report {
-    pub at_ms: u64,
-    pub kind: String,
-    pub summary: String,
-    #[serde(default)]
-    pub decisions: Vec<String>,
-    /// Built by the hub at the end of a turn, not sent by the agent.
-    #[serde(default)]
-    pub auto: bool,
-    /// S10: `sb report progress --step n/m`
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub step: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub of: Option<u32>,
-    /// emitter 5: `--result`, proto's DiffResult as JSON
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub result: Option<Value>,
-}
-
-/// A message between two parties of the group (RFC 0003). The sender or
-/// the recipient may be `user`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Msg {
-    pub id: u64,
-    pub thread: u64,
-    pub from: String,
-    pub to: String,
-    #[serde(default)]
-    pub reply_to: Option<u64>,
-    #[serde(default)]
-    pub expect_reply: bool,
-    #[serde(default)]
-    pub auto: bool,
-    pub text: String,
-    pub created_ms: u64,
-    /// A user message typed to the task (checkout or `@name`): delivered
-    /// as a plain user message, without the agent_message tag.
-    #[serde(default)]
-    pub plain: bool,
-    /// `sb send --mode queued`: never steered into a running turn,
-    /// delivered only as a new turn (RFC 0003 §6.1).
-    #[serde(default)]
-    pub queued: bool,
-    /// `@task message` typed in another agent's view: that view. The
-    /// task reads it tagged, its end-of-turn answer is shown back there
-    /// (RFC 0003 §5.1).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub via: Option<String>,
-    /// his message's parts as JSON (msg-parts, sb-core's opaque
-    /// `Msg.parts`; "" none): written after its 'you' line at delivery
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub parts: String,
-}
-
-impl Msg {
-    /// His parts (msg-parts), read from their JSON; none for a message
-    /// without (or an unreadable line, as the fold reads it).
-    pub fn parts_list(&self) -> Vec<bise_proto::parts::Part> {
-        match self.parts.is_empty() {
-            true => Vec::new(),
-            false => serde_json::from_str(&self.parts).unwrap_or_default(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "state")]
-pub enum MsgState {
-    Queued { reason: String },
-    Delivered,
-    Rejected { error: String },
-    Cancelled,
-}
-
-/// A card of the user's inbox (RFC 0001 §11; BISE-299: only what needs
-/// the user, only the user resolves it).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Card {
-    pub id: u64,
-    /// question | drop | confirm (the user's kinds, [`user_kind`]); an
-    /// older journal also has failed | blocked | overlap | done | restart,
-    /// closed at the hub's boot
-    pub kind: String,
-    pub agent: String,
-    pub text: String,
-    /// A question card: the user's answer replies to this message.
-    #[serde(default)]
-    pub for_msg: Option<u64>,
-    pub created_ms: u64,
-    /// What the card asks about, when it is a place's (the hub's items,
-    /// [`choice_kind`]): the place's id, and its PR's number.
-    #[serde(default)]
-    pub place: Option<String>,
-    #[serde(default)]
-    pub pr: Option<u64>,
-}
 
 /// BISE-299: the kinds of the user's inbox, set at the card's creation
 /// (hub/model.bend `user_kind`): main's escalations, the tool-call
@@ -400,16 +212,7 @@ impl State {
                 parent: None,
                 brief: Brief::default(),
                 created_ms: 0,
-                ws: Workspace {
-                    mode: Mode::Shared,
-                    path: workspace.to_string(),
-                    branch: None,
-                    base_commit: None,
-                    dropped: false,
-                    place: None,
-                    feature: None,
-                    state: None,
-                },
+                ws: Workspace::shared(workspace),
                 lifecycle: Lifecycle::Active,
                 failure: None,
                 declared: None,

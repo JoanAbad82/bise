@@ -24,13 +24,10 @@ use crate::model::{Lifecycle, Mode, State};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// The id of the shared folder's place.
-pub const SHARED: &str = "shared";
-
-/// The id of the worktree first made for the agent of dir `dir`.
-pub fn worktree_id(dir: &str) -> String {
-    format!("wt:{}", dir)
-}
+/// The id of the shared folder's place, and of the worktree first made
+/// for the agent of a dir (bise_proto's, with the Workspace that reads
+/// them).
+pub use bise_proto::core::state::{worktree_id, SHARED};
 
 /// BISE-136, designer's call 8: the id of a private worktree an agent
 /// told the hub about (`gate.sh new`, `sb worktree <path>`): `pt:<path>`.

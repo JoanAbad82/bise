@@ -49,7 +49,7 @@ mod state;
 
 #[path = "core_gen/photo.rs"]
 mod photo;
-use state::{state_codec, state_laws, state_types};
+use state::{rust_types, state_codec, state_laws, state_types};
 
 const BLESS: &str = "BISE_PROTO_BLESS";
 const KV: &str = "Sigma<&2, &2, String, _ => J.Json>";
@@ -858,6 +858,7 @@ fn files() -> BTreeMap<String, String> {
     out.insert("bend/hub/gen/state.bend".into(), state_types());
     out.insert("bend/hub/gen/state-laws.bend".into(), state_laws());
     out.insert("bend/hub/gen/state-codec.bend".into(), state_codec());
+    out.insert("rust/proto/src/core/state/generated.rs".into(), rust_types());
     out
 }
 
