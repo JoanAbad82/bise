@@ -2117,7 +2117,9 @@ async function rowsE812(harness, say) {
     await page.keyboard.type(`[[bash: sb notify '${T} which size?`, { delay: 5 });
     for (const l of ['1. zqsmall', "2. zqlarge']]"]) { await page.keyboard.press('Shift+Enter'); await page.keyboard.type(l, { delay: 5 }); }
     await page.keyboard.press('Enter');
-    if (other) await openProject(other.id); else await bise();
+    // inbox-scope (e76af4925): a project's block lists that project's items only; another
+    // project's card is answered from bise's view (or the inbox screen), every project's
+    await bise();
     const d = await dock(T, 90000);
     if (d.open) await d.open.locator('[data-testid$=".opt.1"]').first().click({ timeout: 3000 }).catch(() => {});
     const gone = d.open ? await until(async () => (!(await cardShown(T)) ? true : null), 10000, 250) : null;
@@ -2129,7 +2131,7 @@ async function rowsE812(harness, say) {
       const t0 = Date.now();
       while (Date.now() - t0 < ms) { if (await cardShown(T)) seen.push({ where, at_ms: Date.now() - t0 }); await page.waitForTimeout(250); }
     };
-    await watch(other ? other.name : 'bise', 3000);
+    await watch('bise', 3000);
     await harness();
     await watch('harness (a project switch)', 6000);
     await bise();
@@ -2142,7 +2144,7 @@ async function rowsE812(harness, say) {
     await watch('harness after the reload', 4000);
     await page.mouse.move(1, 300);
     await shot('card-never-back');
-    step(`a card answered from another project's thread (${other ? other.name : 'none: bise'}): gone, never back through a project switch and a reload (sampled every 250 ms, ~30 s)`,
+    step(`a card of harness answered from bise's view: gone, never back through a project switch (${other ? other.name : 'no other project'}, harness, bise) and a reload (sampled every 250 ms, ~30 s)`,
       d.listed && !!d.open && !!gone && seen.length === 0, { other: other ?? null, listed: d.listed, opened: !!d.open, gone: !!gone, seen: seen.slice(0, 10), asides: await answeredAsides('zqsmall') });
   });
 
@@ -2387,11 +2389,12 @@ async function rowsF2A7(harness, say) {
     .find((p) => p.id && !p.id.includes('.') && /^\W*harness\b/.test(p.t))?.id ?? null).catch(() => null);
   const HID = await harnessPid();
   const inHarness = () => page.locator('[data-testid="thread.screen"]').first().getAttribute('data-project', { timeout: 1000 }).then((x) => x === HID, () => false);
-  const shownOther = otherName.replace(/^\W+|\W+$/g, '');
   const hubRows = async (w) => (await rowsWith(w)).filter((x) => x.id.startsWith('thread.approval.'));
   const asideRows = async (w) => (await rowsWith(w)).filter((x) => x.id.startsWith('thread.aside.'));
-  await row('answer by a digit from another project', async () => {
-    await goOther();
+  // inbox-scope (e76af4925): a project's block lists that project's items only; another project's
+  // card is answered from bise's view (every project's), here by its digit
+  await row('answer by a digit from bise', async () => {
+    await bise();
     await clear();
     await page.mouse.move(1, 300);
     const d = await dock(`zqAdigit${T}`, 60000);
@@ -2400,11 +2403,11 @@ async function rowsF2A7(harness, say) {
     const rows = moved ? await until(async () => { const r = await hubRows('zqdigit-two'); return r.length ? r : null; }, 20000, 500) : null;
     const gone = !(await present(`zqAdigit${T}`));
     await page.mouse.move(1, 300);
-    await shot('f2a7-digit-other-project');
+    await shot('f2a7-digit-bise');
     took.digit = rows?.[0] ?? null;
-    step(`a digit ('2') on main's card from ${shownOther}'s thread: the window goes to harness' thread at his answer, 'zqdigit-two' there once with 'answered from ${shownOther}'; the card gone`,
-      !!other && !!moved && !!rows && rows.length === 1 && new RegExp(`answered from ${shownOther}`).test(rows[0].text) && gone,
-      { other: shownOther, listed: d.listed, opened: !!d.open, card: d.id, moved: !!moved, rows, gone });
+    step("a digit ('2') on main's card from bise's view: the window goes to harness' thread at his answer, 'zqdigit-two' there once with 'answered from bise'; the card gone",
+      !!moved && !!rows && rows.length === 1 && /answered from bise/.test(rows[0].text) && gone,
+      { listed: d.listed, opened: !!d.open, card: d.id, moved: !!moved, rows, gone });
   });
 
   const SAID = `zqwords-said ${T} the small one please`;
@@ -2494,7 +2497,8 @@ async function rowsF2A7(harness, say) {
     await clear();
     await say(`[[bash: sleep 30 && sb notify --withdraw ${card} "zq the plan changed"]] withdrawing`);
     const t0 = Date.now();
-    await goOther();
+    // from bise's view: a project's block lists that project's items only (inbox-scope e76af4925)
+    await bise();
     await clear();
     const d = await dock(W, 20000);
     const cores = coreLines();
@@ -2637,11 +2641,6 @@ async function rows233B(harness, say) {
   const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
     .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
     .filter((p) => p.id && !p.id.includes('.') && !/^\W*harness\b/.test(p.name))).catch(() => []);
-  const other = (await others())[0] ?? null;
-  const goOther = async () => {
-    if (other) { await page.locator(`[data-testid="app.sidebar.project.${other.id}"]`).first().click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(800); }
-    else await bise();
-  };
   const T = String(Date.now()).slice(-5);
   const NL = String.fromCharCode(92) + 'n';
   const cards = async (list, tail) => {
@@ -2965,7 +2964,8 @@ async function rows233B(harness, say) {
     await cards([{ q: `${R}a answer me?`, opts: ['1. zqwa-one', '2. zqwa-two'] }, { q: `${R}b then retry me?`, opts: ['1. zqwb-one', '2. zqwb-two'] }], 'seeded refusal-where');
     const listed = await until(async () => ((await present(`${R}a`)) && (await present(`${R}b`)) ? true : null), 90000, 1000);
     await idle();
-    await goOther();
+    // from bise's view: a project's block lists that project's items only (inbox-scope e76af4925)
+    await bise();
     await clear();
     const pids = hubPids();
     if (!listed || pids.length !== 1) { step("refusal-where: 'not sent: … · try again' on the card that came back", false, { listed: !!listed, pids }); return; }
@@ -2992,7 +2992,7 @@ async function rows233B(harness, say) {
         back.a_open = d.open ? await refusedOn(`${R}a`) : null;
       }
       await reload();
-      await goOther();
+      await bise();
       kept = { a: (await present(`${R}a`)) ? await refusedOn(`${R}a`) : null, b: (await present(`${R}b`)) ? await refusedOn(`${R}b`) : null };
       await shot('233b-refused-after-reload');
     } finally { signal(pids, 'SIGCONT'); }
@@ -3000,7 +3000,7 @@ async function rows233B(harness, say) {
     // each card: the whole line when it's open, 'not sent' on its row when folded; opened, a's whole line
     const said = (x) => line.test(x ?? '') || /^not sent \(its folded row\)$/.test(x ?? '');
     const both = (s) => !!s && said(s.a) && said(s.b);
-    step(`a refused answer (harness hub held past 30 s) from ${other?.name ?? 'bise'}: the cards come back where he answered, 'not sent' on their rows, the opened one 'not sent: <words> · try again'`,
+    step("a refused answer (harness hub held past 30 s) from bise's view: the cards come back where he answered, 'not sent' on their rows, the opened one 'not sent: <words> · try again'",
       both(back) && line.test(back.a_open ?? ''), { back });
     step("the 'not sent' line is kept across a reload", both(kept), { kept });
     // the hub runs again: a late take of a clears its line (the card goes); b: 'try again' sends it once more
@@ -3580,8 +3580,18 @@ async function rowsC2BA(harness, say) {
     }).catch((e) => ({ error: String(e) }));
     const still = await page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox.block"]')].some((e) => (e.textContent ?? '').includes(t)), G).catch(() => null);
     await shot('c2ba-ghost-after-answer');
-    step("no ghost count: after his words on a card, every count in the sidebar is an item the block lists (sum of the counts = 'N waiting'); a card the hub kept is in the block",
-      !!counts && !counts.error && counts.sum === counts.block, { ...counts, zcG_still_listed: still });
+    // bise's own items (its home's cards, its notifications ask) are in bise's block but on no project
+    // row: bise's row never shows a count (designer). The inbox screen's waiting rows name each item's
+    // project (inbox.row.w:<project>/<id>): those of no sidebar project are bise's own
+    await click('inbox', page.locator('[data-testid="app.sidebar.inbox"]').first());
+    await page.waitForTimeout(1500);
+    const own = await page.evaluate((ids) => [...document.querySelectorAll('[data-testid^="inbox.row.w:"]')]
+      .map((e) => /^inbox\.row\.w:([^/]+)\/-?\d+$/.exec(e.getAttribute('data-testid') ?? '')?.[1] ?? null)
+      .filter((p) => p !== null && !ids.includes(p)).length, (counts?.side ?? []).map((p) => p.id)).catch(() => null);
+    const inboxN = await page.evaluate(() => Number(document.querySelector('[data-testid="app.sidebar.inbox.count"]')?.textContent ?? '0') || 0).catch(() => null);
+    await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+    step("no ghost count: after his words on a card, every count in the sidebar is an item the block lists (the projects' counts + bise's own items = 'N waiting' = the inbox's count); a card the hub kept is in the block",
+      !!counts && !counts.error && own !== null && counts.sum + own === counts.block && inboxN === counts.block, { ...counts, bise_own: own, inbox: inboxN, zcG_still_listed: still });
     // '/inbox' in the composer opens the block's first item in place
     await harness();
     await page.keyboard.press('Escape');
