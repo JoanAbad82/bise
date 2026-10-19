@@ -541,10 +541,11 @@ function carrying(r: Rig, since: number): Rig {
   return { ...r, armR: [-0.4, 0, 0.35], props: { ...r.props, skate: true }, board };
 }
 
-/** the loudest of several motions: 'walk' over 'skate' over 'loop' over 'still' */
+/** the loudest of several motions: 'walk' over 'skate' over 'blend' over 'loop' over 'still' */
 export function louder(a: Motion, b: Motion): Motion {
   if (a === 'walk' || b === 'walk') return 'walk';
   if (a === 'skate' || b === 'skate') return 'skate';
+  if (a === 'blend' || b === 'blend') return 'blend';
   if (a === 'loop' || b === 'loop') return 'loop';
   return 'still';
 }

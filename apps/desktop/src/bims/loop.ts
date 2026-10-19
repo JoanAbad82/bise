@@ -2,7 +2,7 @@
 // loop follows. A frame runs on a kick (a snapshot, a hover, ctrl held, a size or theme change, his
 // message) and asks for the next one only while something moves: the renderer's Motion, its frame
 // wait in one table (FRAME_MS: 'walk' at the display's rate, 'skate' at 30 fps while a skater rides
-// its line, 'loop' at LOOP_FPS for the ambient loops, 'still' none), the timeline's walks, an event
+// its line, 'blend' at 30 fps while the sky changes (sky.ts), 'loop' at LOOP_FPS for the ambient loops, 'still' none), the timeline's walks, an event
 // label's 3 s, and one timer for a resting skater's next line (skate.ts wakeIn). Never while the
 // window is away (hidden, or not in front outside the test harness, as App.tsx's useStill) or the
 // WebGL context is lost. No three, no DOM. Owner: bims-wire.
@@ -33,6 +33,7 @@ export const SKATE_FPS = 30;
 export const FRAME_MS: Readonly<Record<Motion, number | null>> = {
   walk: 0,
   skate: Math.round(1000 / SKATE_FPS),
+  blend: Math.round(1000 / SKATE_FPS),
   loop: TICK_MS,
   still: null,
 };

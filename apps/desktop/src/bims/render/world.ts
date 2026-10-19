@@ -4,9 +4,11 @@
 // kit's pieces (render/cozy.ts: plants, coffee corner, base beds, shelf, posters, lamps), each
 // stage's pieces in a group of its own (the unlock moment hides the newest). Built once per office, map, theme and growth; what changes per frame (a
 // desk's screen and lamp) is handed back as handles. Its light is the view's (render/view.ts,
-// lightOffice here sets it for an office). Never the accent pink or the error red.
+// lightOffice here sets it for an office; the sky's on top: render/sky-light.ts), and the snow on the
+// lawn and the terrace (cover). Never the accent pink or the error red.
 import {
   type BufferGeometry,
+  Color,
   Group,
   type HemisphereLight,
   type DirectionalLight,
@@ -38,10 +40,17 @@ export interface World {
   readonly pal: Palette;
   /** each stage's pieces: the unlock moment hides the newest until it is brought in */
   readonly pieces: Pieces;
+  /** the snow on the lawn and the terrace only (never desks or floors, bims m_33030): 0 none .. 1 white */
+  cover(level: number): void;
   dispose(): void;
 }
 
-const LAMP_ON_EI = (pal: Palette): number => (pal.pendants ? 1.1 : 0.55);
+/** the snow's white, and the most it covers (a little of the ground's colour shows through) */
+const SNOW = new Color('#f4f6fa');
+const SNOW_MAX = 0.85;
+
+/** a lit desk lamp's glow */
+const LAMP_ON_EI_LIT = 1.1;
 
 /** every mesh under `root` casts and takes the sun's shadow (a style with shadows: clay) */
 export function castShadows(root: Object3D): void {
@@ -96,12 +105,28 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   buildCozy(b, look.cozy, desks, mainName);
   if (style.shadows) castShadows(root);
 
+  // the lawn's and the terrace's materials (kit.mat shares one per colour): what snow covers
+  const ground0 = new Map<MeshLambertMaterial, Color>();
+  const snowy = new Set([new Color(pal.grass).getHex(), new Color(pal.terrace).getHex()]);
+  root.traverse((obj) => {
+    if (!(obj instanceof Mesh)) return;
+    for (const m of (Array.isArray(obj.material) ? obj.material : [obj.material]) as MeshLambertMaterial[]) {
+      if (!m.map && snowy.has(m.color.getHex()) && !ground0.has(m)) ground0.set(m, m.color.clone());
+    }
+  });
+  let covered = 0;
+
   return {
     root,
     desks,
     mainDesk,
     pal,
     pieces,
+    cover(level) {
+      if (level === covered) return;
+      covered = level;
+      for (const [m, c] of ground0) m.color.copy(c).lerp(SNOW, level * SNOW_MAX);
+    },
     dispose() {
       root.traverse((obj) => {
         if (obj instanceof Mesh) {
@@ -150,12 +175,16 @@ export function lightOffice(hemi: HemisphereLight, sun: DirectionalLight, pal: P
   }
 }
 
-/** a desk's screen and lamp for this frame */
-export function lightDesk(h: DeskHandles, pal: Palette, screen: number, lamp: boolean): void {
+/**
+ * A desk's screen and lamp for this frame. A desk lamp lights at night only (bims m_27836); by day it
+ * is a cream shade. `level`: the sky's lamps (sky.ts lightOf, 0..1: they fade in over a blend, never
+ * pop); absent: the theme's (on in the dark one).
+ */
+export function lightDesk(h: DeskHandles, pal: Palette, screen: number, lamp: boolean, level?: number): void {
   h.screen.emissiveIntensity = screen;
   h.screen.color.set(screen > 0.05 ? pal.screenOn : pal.screenOff);
-  // a desk lamp lights at night only (bims m_27836); by day it is a cream shade
-  const lit = lamp && pal.pendants;
-  h.lamp.emissiveIntensity = lit ? LAMP_ON_EI(pal) : 0;
-  h.lamp.color.set(lit ? pal.lampOn : pal.lamp);
+  const on = lamp ? (level ?? (pal.pendants ? 1 : 0)) : 0;
+  h.lamp.emissiveIntensity = on * LAMP_ON_EI_LIT;
+  h.lamp.color.set(pal.lamp).lerp(LAMP_ON.set(pal.lampOn), on);
 }
+const LAMP_ON = new Color();

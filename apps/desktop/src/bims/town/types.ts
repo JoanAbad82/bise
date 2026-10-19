@@ -9,6 +9,7 @@ import type { Fit } from '../render/camera';
 import type { Cam } from '../zoom';
 import type { Step } from '../office-driver';
 import type { Placed } from './plan';
+import type { Sky } from '../sky';
 
 /** One office's ground for the plan: its office (its map, its desks), its growth. */
 export interface TownSite {
@@ -40,8 +41,11 @@ export interface TownRenderer {
   setView(fit: Fit | null): void;
   /** his pinch and pan (zoom.ts): the town's fit seen closer, the canvas's size unchanged; FIT the whole town */
   setCam(cam: Cam): void;
-  /** draw now */
-  frame(night: boolean): void;
+  /**
+   * Draw now. `sky`: his local time's (sky.ts), blended from the drawn one; absent: the theme's
+   * fixed light (the hero's film). True while a sky blend runs (the caller's next frame at 30 fps).
+   */
+  frame(night: boolean, sky?: TownSky): boolean;
   /** a sign's foot on the canvas (css px), over its office's back wall; null off view */
   signAt(id: string): { readonly x: number; readonly y: number } | null;
   /** the office under a canvas point (css px), its roofs first; null on the lawn */
@@ -82,6 +86,13 @@ export interface TownOpts {
   readonly entry?: boolean;
   /** the hero's: the pieces a map tags as standing between the camera and the room are left out (main hidden behind the workshop's door frame: Gabriel via main m_31852) */
   readonly clearView?: boolean;
+}
+
+/** the sky a town frame is drawn under (sky.ts): its target, the time, reduced motion (a slower fade) */
+export interface TownSky {
+  readonly sky: Sky;
+  readonly t: number;
+  readonly reduced: boolean;
 }
 
 /** What the entry build moves (TownOpts.entry): the town's things, loose, as drawn now. */

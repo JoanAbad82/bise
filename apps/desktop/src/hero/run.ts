@@ -36,9 +36,10 @@ export interface Run {
   at: number;
 }
 
-/** The clock of a frame at world time t: the film's one day, its eggs forced (never rolled). Pure. */
+/** The clock of a frame at world time t: the film's one day, its eggs forced (never rolled), no sky. Pure. */
 export function clockOf(office: string, t: number, night: boolean, reduced: boolean): Clock {
-  return { t, local: LOCAL, night, reduced, forced: reduced ? { bims: {} } : eggsAt(office, filmT(t)) };
+  // the film's own fixed light (its theme's), never his clock's sky: the film stays deterministic
+  return { t, local: LOCAL, night, reduced, forced: reduced ? { bims: {} } : eggsAt(office, filmT(t)), sky: false };
 }
 
 /** its rows at t told to its driver: when they changed, or always (`beat`: the timeline hears them again) */

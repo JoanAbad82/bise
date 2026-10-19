@@ -4,8 +4,11 @@
 // posed by pose.ts, his paper planes, the eggs, the unlock moment) drawn through one view (view.ts:
 // the renderer, the iso camera, the office's light) at his camera's zoom (camera.ts viewFit); it
 // answers where heads are and what is under a point (pick.ts). It renders only when frame() is
-// called and says how the loop must run next (Motion). The look is style.ts.
-// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, skate, head, zoom, cam } for
+// called and says how the loop must run next (Motion). The look is style.ts. The sky (sky.ts): each
+// frame blends the drawn sky to Look.sky (its few seconds at 30 fps: Motion 'blend', then rest) and
+// puts it on the lights (sky-light.ts), the desk lamps and the snow (office-scene weather); falling()
+// says what falls and the building's outline for the CSS rain.
+// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, skate, head, zoom, cam, sky } for
 // the headless checks (bims-qa; skate: each skater's phase per frame, budget.spec (5)).
 import { Vector3 } from 'three';
 import type { BimFrame, Look, MakeRenderer, Motion, OfficeRenderer } from '../model';
@@ -16,8 +19,33 @@ import type { Rig } from './pose';
 import { sinceArrived, skateAt } from '../skate';
 import { STYLE } from './style';
 import { lightOffice } from './world';
+import { applyLight, backdropOf } from './sky-light';
+import { blendAt, blending, lightOf, retarget, sameSky, type Blend, type Light } from '../sky';
+import { louder } from './pose';
 import { makeOfficeScene } from './office-scene';
 import { makeView } from './view';
+
+/** the building's box for the rain's outline: past its walls, up to their tops (the tallest map's) */
+const HULL_PAD = 0.3;
+const HULL_H = 2.4;
+
+/** the convex hull of points (monotone chain), counter-clockwise */
+function hullOf(ps: { x: number; y: number }[]): { x: number; y: number }[] {
+  const p = [...ps].sort((a, b) => a.x - b.x || a.y - b.y);
+  if (p.length < 3) return p;
+  const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower: { x: number; y: number }[] = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2] as { x: number; y: number }, lower[lower.length - 1] as { x: number; y: number }, q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  const upper: { x: number; y: number }[] = [];
+  for (const q of p.reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2] as { x: number; y: number }, upper[upper.length - 1] as { x: number; y: number }, q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
 
 /** from this width (css px) the camera fits the building and a little ground (wideSiteOf); under it the building */
 const WIDE_FIT_PX = 480;
@@ -34,6 +62,8 @@ interface Probe {
   zoom(): number;
   /** his whole camera now (zoom and where it looks): his camera check reads whether a wheel moved it */
   cam(): Cam;
+  /** the sky drawn at the last frame (sky.ts lightOf) and whether its blend still runs; null: the theme's fixed light */
+  sky(): { light: Light; blending: boolean } | null;
 }
 const TRACE_MAX = 3000;
 
@@ -53,20 +83,43 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   let cam: Cam = FIT;
   let size = { w: 0, maxH: 0 };
   const v = new Vector3();
+  /** the sky's blend (sky.ts): from the drawn sky to the slot's, then rest; null: no sky (the theme's light) */
+  let blend: Blend | null = null;
+  let lastT = 0;
+  let lastLook: Look | null = null;
+  let drawnSky: Light | null = null;
+  let skyMoving = false;
 
   const probe: Probe | null = testMode()
-    ? { frames: 0, trace: [], skate: [], head: (name) => headOf(name), zoom: () => cam.zoom, cam: () => cam }
+    ? { frames: 0, trace: [], skate: [], head: (name) => headOf(name), zoom: () => cam.zoom, cam: () => cam, sky: () => (drawnSky ? { light: drawnSky, blending: skyMoving } : null) }
     : null;
   if (probe) (window as unknown as { __biseBims?: Probe }).__biseBims = probe;
 
-  /** the office's light and backdrop, after its world was built */
-  function lightUp(): void {
+  /** the office's light and backdrop, after its world was built: the theme's, and the sky's on top at t */
+  function lightUp(t: number, look: Look | null): void {
     const o = office.office();
     const pal = office.pal();
     if (!o || !pal) return;
     lightOffice(view.hemi, view.sun, pal, o, STYLE);
-    const sky = office.sky();
-    if (sky !== null) view.sky(sky);
+    const paper = office.sky();
+    skyMoving = false;
+    if (look?.sky === undefined) {
+      blend = null;
+      drawnSky = null;
+      office.weather(null, 0);
+      if (paper !== null) view.sky(paper);
+      return;
+    }
+    // his drag or pinch holds a new blend until he lets go (bims m_33030)
+    blend = retarget(blend, look.sky, t, look.reduced, look.hold === true);
+    const sky = blendAt(blend, t);
+    const l = lightOf(sky, look.night ? 'dark' : 'light');
+    applyLight(view.hemi, view.sun, l, { x: o.x0 + o.W / 2, y: 0, z: o.D / 2 });
+    office.weather(l.lamps, sky.cover);
+    if (paper !== null) view.sky('#' + backdropOf(paper, l).getHexString());
+    drawnSky = l;
+    // a blend his gesture holds: the loop's rate until he lets go, then it starts
+    skyMoving = blending(blend, t) || (look.hold === true && !sameSky(blend.to, look.sky));
   }
 
   function applyFit(): void {
@@ -113,7 +166,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   const api: OfficeRenderer = {
     setOffice(o, as) {
       office.setOffice(o, as);
-      lightUp();
+      lightUp(lastT, lastLook);
       applyFit();
     },
     setSize(widthPx, maxHeightPx) {
@@ -129,11 +182,15 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       if (view.lost() || !office.office()) return 'still';
       // the growth moved: the world again, the ground may be wider; the theme: the world and its light again
       const grew = office.prepare(look);
-      lightUp();
+      lastT = t;
+      lastLook = look;
+      lightUp(t, look);
       if (grew) applyFit();
       if (!fit) return 'still';
-      const motion = office.frame(t, frames, look, fit, probe ? traced(t) : undefined);
-      if (motion === null) return 'still';
+      const posed = office.frame(t, frames, look, fit, probe ? traced(t) : undefined);
+      if (posed === null) return 'still';
+      // the sky's blend: 30 fps for its few seconds (reduced motion: the loop's rate), then rest
+      const motion = skyMoving ? louder(posed, look.reduced ? 'loop' : 'blend') : posed;
       view.render();
       if (probe) probe.frames++;
       return motion;
@@ -178,6 +235,16 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     },
     copyTo(target) {
       view.copyTo(target);
+    },
+    falling() {
+      const o = office.office();
+      if (!fit || !o || !blend || !lastLook?.sky) return null;
+      const s = blendAt(blend, lastT);
+      const pts: { x: number; y: number }[] = [];
+      for (const x of [o.x0 - HULL_PAD, o.x0 + o.W + HULL_PAD])
+        for (const z of [-HULL_PAD, o.D + HULL_PAD])
+          for (const y of [-0.2, HULL_H]) pts.push(toScreen(fit, { x, y, z }));
+      return { rain: s.rain, snow: s.snow, hull: hullOf(pts) };
     },
     onLost(cb) {
       view.onLost(cb);

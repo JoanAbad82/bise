@@ -5,7 +5,7 @@
 // the unlock moment) and the labels; plus what the still office's clock check compares. It keeps
 // the timeline, today's lands, his konami time, his pokes and the unlock moment. No React, no three, no DOM:
 // the caller hands it the clock (t, his local time, night, reduced motion) and the forced eggs of
-// a check. Owner: bims-wire.
+// a check; the look carries his local time's sky (sky.ts skyAt; none for the hero's film). Owner: bims-wire.
 import type { Agent } from '@/proto';
 import type { BimEvent, BimFrame, Label, Look, NewTimelineFn, ActivitiesFn, LabelsFn, LayoutFn, Office, Snapshot, Timeline } from './model';
 import { clockSig, eggLabels, eggsAt, NO_EGGS, noteLands, withForced, type Forced, type Land, type Local } from './eggs';
@@ -13,6 +13,7 @@ import { bedsAt, NO_GROW, UNLOCK_LABEL, UNLOCK_WALK, unlockOf, type Grow } from 
 import { dayOf } from './skate';
 import { MAX_WALK_S, SETTLE_S } from './timeline';
 import type { MapId } from './maps/ids';
+import { skyAt, skyOf, type Sky, type Weather } from './sky';
 import { forcedPokes, notePokes, NO_POKES, pokesAt, pokeWake, roomOf, type Click, type PokeLog } from './pokes';
 
 /** The pure modules a driver runs on: feed.ts's, or fakes in a test. */
@@ -34,6 +35,10 @@ export interface Clock {
   readonly reduced: boolean;
   /** a check's frozen eggs (test mode, window.__biseEggs): only these, never a roll; absent: the scheduler's */
   readonly forced?: Forced | null;
+  /** a check's pinned weather (test mode, window.__biseSky); absent: the slot's spell (sky.ts) */
+  readonly weather?: Weather;
+  /** false: no sky (the theme's fixed light, the hero's film); absent: his local time's */
+  readonly sky?: boolean;
 }
 
 /** What he points at in this office: the hovered bim, ctrl held, the row under his pointer, the bim the camera follows. */
@@ -89,6 +94,14 @@ export interface OfficeDriver {
   stale(c: Clock): boolean;
 }
 
+/** the sky of a clock (sky.ts): its slot's, a check's pinned weather on its sun; none when the clock says so */
+function skyOfClock(c: Clock): Sky | null {
+  if (c.sky === false) return null;
+  const m = skyAt(c.local);
+  return c.weather === undefined ? m.sky : skyOf(m.sun, c.weather);
+}
+const skyKey = (c: Clock): string => (c.sky === false ? '' : `${String(skyAt(c.local).slot)}|${c.weather ?? ''}`);
+
 /** The office's agents in a stable shape (the live rows: archived ones have left). Pure. */
 export const officeKey = (agents: readonly Agent[], map: MapId): string => `${map}|${agents.map((a) => `${a.name}${a.main ? '*' : ''}`).join(',')}`;
 
@@ -113,6 +126,8 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
   let pokes: PokeLog = NO_POKES;
   let lastActs = '';
   let lastClock = '';
+  /** the sky's slot and pin the last step drew (skyKey): a new slot is a frame (its blend) */
+  let lastSky = '';
 
   return {
     rows(s, as, m) {
@@ -153,7 +168,8 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
     stale(c) {
       if (snap === null) return false;
       // the clock's eggs (the eclipse, friday 17:00, midnight) start and end without a row change
-      const changed = clockSig(c.local, c.night, agents) !== lastClock || JSON.stringify([...parts.activities(snap, c.t)]) !== lastActs;
+      // a new sky slot (sky.ts: every 5 min at most) is a frame too: its blend
+      const changed = clockSig(c.local, c.night, agents) !== lastClock || skyKey(c) !== lastSky || JSON.stringify([...parts.activities(snap, c.t)]) !== lastActs;
       // the next step hears the rows again: the timeline walks the bims to their new activities
       if (changed) fresh = true;
       return changed;
@@ -196,6 +212,7 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       lands = noteLands(lands, frames, local);
       const eg = c.forced !== undefined ? withForced(NO_EGGS, c.forced) : eggsAt({ t, frames, agents, cards: snap?.cards.length ?? 0, local, night, reduced, lands: lands.lands, konami: konamiAt, stage: g.stage });
       lastClock = clockSig(local, night, agents);
+      lastSky = skyKey(c);
       // his pokes (pokes.ts): a click heard against the bim's state now; a poke beats its egg while it plays
       pokes = notePokes(pokes, clicks, frames, roomOf(office));
       clicks = [];
@@ -207,7 +224,8 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
       });
       // the office grows: what it draws, and the unlock moment while it lasts
       const u = still ? undefined : unlock;
-      const look: Look = { night, reduced, eggs: eg.office, grow: g, ...(u ? { unlock: u } : {}) };
+      const sky = skyOfClock(c);
+      const look: Look = { night, reduced, eggs: eg.office, grow: g, ...(u ? { unlock: u } : {}), ...(sky ? { sky } : {}) };
       if (u && t - u.at > UNLOCK_WALK + UNLOCK_LABEL) unlock = undefined;
       const words = new Map([...pk].map(([n, x]) => [n, x.label]));
       const labels = parts.labelsOf(played, { t, hover: a.hover, held: a.held, agents, eggs: eggLabels(eg), pokes: words, follow: a.follow, park: office.park });

@@ -12,11 +12,14 @@
 //       or hidden. (5b) reduced motion: nobody skates;
 //   (6) an idle bim eating at the island (bims-life): the loop's ~8 fps (LOOP_FPS) while it eats,
 //       0 blurred or hidden, 0 once it naps again (the office's clock set: page.clock);
-//   (4) a lost WebGL context shows the list right under its one line (no office-high hole).
+//   (4) a lost WebGL context shows the list right under its one line (no office-high hole);
+//   (7) the sky (sky.ts, bims-sky): a new slot's blend draws ~SKY_FADE_S at 30 fps at most, then 0;
+//       0 while it rains (its CSS layer, never WebGL); hidden: no blend, no frame.
 // The sizes, labels, night, planes and reduced motion: office.spec.ts. Owner: bims-qa.
 import { test, expect } from '../../harness';
 import { agent, office, snap, watch } from '../../../src/bims/fixtures';
 import { idleLife } from '../../../src/bims/activity';
+import { SKY_FADE_S } from '../../../src/bims/sky';
 import {
   NAMES, P, drawnIn, loseContext, open, rowsOf, setHidden, settle, shotOf, showOffice, sleep, threeChunks, watchScripts,
   withRows, writeIndex,
@@ -260,6 +263,36 @@ test('(4) a lost WebGL context shows the list with its line', async () => {
     const box = await s.page.getByTestId('app.right.agents').boundingBox();
     if (box !== null) await shotOf(s.cdp, s.page, box, 'lost.png');
     writeIndex([{ file: 'lost.png', title: 'WebGL lost', says: 'the list again, right under its one line' }]);
+  } finally {
+    await s.close();
+  }
+});
+
+test('(7) the sky: a blend of a few seconds at 30 fps at most, then 0, rain included', async () => {
+  const { s } = await open(STILL);
+  /** a moment of his (window.__biseLocal) and its weather pinned, the office woken (its focus handler) */
+  const pin = (h: number, weather: string): Promise<void> =>
+    s.page.evaluate(([hh, w]) => {
+      const x = window as unknown as { __biseLocal?: unknown; __biseSky?: unknown };
+      x.__biseLocal = { y: 2026, mo: 6, d: 21, s: Number(hh) * 3600 };
+      x.__biseSky = { weather: w };
+      window.dispatchEvent(new Event('focus'));
+    }, [String(h), weather]);
+  try {
+    await pin(13, 'clear');
+    await showOffice(s);
+    await settle(s);
+    expect((await drawnIn(s, 2000)).frames, 'a clear noon at rest draws nothing').toBe(0);
+    await pin(21, 'rain');
+    const blend = await drawnIn(s, (SKY_FADE_S + 1.5) * 1000);
+    expect(blend.frames, 'the blend draws').toBeGreaterThan(SKY_FADE_S * 8);
+    expect(blend.frames, '30 fps at most, never the display rate').toBeLessThan(SKY_FADE_S * 30 + 12);
+    await expect(s.page.getByTestId('app.right.bims.falling'), 'it rains: the CSS layer').toHaveAttribute('data-kind', 'rain');
+    expect((await drawnIn(s, 2000)).frames, 'rain at rest: 0 WebGL frames').toBe(0);
+    await setHidden(s.page, true);
+    await pin(2, 'clear');
+    await sleep(300);
+    expect((await drawnIn(s, 2000)).frames, 'hidden: no blend').toBe(0);
   } finally {
     await s.close();
   }

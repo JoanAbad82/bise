@@ -40,6 +40,7 @@ function fakeRenderer() {
     headOf: vi.fn(() => ({ x: 10, y: 20, feet: 40 })),
     pick: vi.fn((x: number): string | null => (x < 50 ? 'perf' : null)),
     copyTo: vi.fn(),
+    falling: () => null,
     onLost: (cb: () => void) => {
       lostCb = cb;
     },

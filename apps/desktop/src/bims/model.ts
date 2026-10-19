@@ -12,6 +12,7 @@ import type { BimEgg, OfficeEggs } from './eggs';
 import type { Grow } from './growth';
 import type { Cozy } from './cozy';
 import type { MapId } from './maps/ids';
+import type { Sky } from './sky';
 
 /** The office's maps (maps/ids.ts MAP_IDS); the project's pick, the loft when he never picked one. */
 export type { MapId };
@@ -357,10 +358,11 @@ export interface PlaneFlight {
 /**
  * How the loop runs after a frame (battery, architect m_27495): 'walk' at the display's rate (a walk,
  * a transition, a plane, a fade), 'loop' at LOOP_FPS (only ambient loops: typing, the '?' jumps),
+ * 'blend' at 30 fps while the sky changes (sky.ts, a few seconds every 5 min at most),
  * 'still' stopped until the next snapshot, hover, size or theme change. Asleep, napping, on the
  * terrace, failed, blocked, stopped or in line are still poses: no breathing loop in v1.
  */
-export type Motion = 'walk' | 'skate' | 'loop' | 'still';
+export type Motion = 'walk' | 'skate' | 'blend' | 'loop' | 'still';
 export const LOOP_FPS = 8;
 
 // ---- the pure modules' entry points (each module exports a function of this type under that name)
@@ -428,6 +430,10 @@ export interface Look {
   readonly grow?: Grow;
   /** the unlock moment (growth.ts unlockOf): the stage whose piece two bims bring in, and when it began (t) */
   readonly unlock?: { readonly stage: number; readonly at: number };
+  /** the sky of his local time and the slot's weather (sky.ts skyAt): the renderer blends to it; absent: the theme's fixed light */
+  readonly sky?: Sky;
+  /** his drag or pinch is on: a sky blend due now waits until he lets go */
+  readonly hold?: boolean;
 }
 
 /**
@@ -453,6 +459,12 @@ export interface OfficeRenderer {
   pick(x: number, y: number): string | null;
   /** the office as drawn now, copied onto a 2d canvas of the same pixel size (the map's crossfade, /bims) */
   copyTo(target: HTMLCanvasElement): void;
+  /**
+   * What falls now (sky.ts: rain, snow, 0..1, as drawn at the last frame) and the building's
+   * outline on the canvas (css px, convex): the CSS rain falls outside it only (bims m_33030: never
+   * inside the room). null: no sky.
+   */
+  falling(): { readonly rain: number; readonly snow: number; readonly hull: readonly { readonly x: number; readonly y: number }[] } | null;
   /** WebGL lost: the shell falls back to the list with one line */
   onLost(cb: () => void): void;
   dispose(): void;

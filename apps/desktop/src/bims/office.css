@@ -68,6 +68,84 @@
   width: 100%;
   height: 100%;
 }
+/* the rain or snow (falling.ts): outside the building only (its clip-path, set by Office.tsx), a
+   CSS loop on the compositor, never a WebGL frame; paused when away, none under reduced motion.
+   Two layers of drops (::before near, ::after far), each a tiled mask sliding one tile down. */
+.bims-falling {
+  --fall-rain: #c8d4e6;
+  --fall-snow: #f3f1ec;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: none;
+  transition: opacity 600ms linear;
+}
+[data-theme='light'] .bims-falling {
+  --fall-rain: #7d8ea8;
+  --fall-snow: #aebbd0;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .bims-falling {
+    --fall-rain: #7d8ea8;
+    --fall-snow: #aebbd0;
+  }
+}
+.bims-falling[data-kind] {
+  display: block;
+}
+.bims-falling::before,
+.bims-falling::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -96px;
+  bottom: 0;
+  will-change: transform;
+  mask-repeat: repeat;
+  animation: bims-fall 0.42s linear infinite;
+}
+.bims-falling[data-kind='rain']::before,
+.bims-falling[data-kind='rain']::after {
+  background: var(--fall-rain);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg stroke='%23000' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M12 4l-2 9M44 30l-2 9M78 12l-2 9M28 62l-2 9M62 70l-2 9M90 50l-2 9M8 84l-2 9'/%3E%3C/g%3E%3C/svg%3E");
+  mask-size: 96px 96px;
+  opacity: 0.55;
+}
+.bims-falling[data-kind='rain']::after {
+  mask-size: 64px 64px;
+  opacity: 0.3;
+  animation-duration: 0.6s;
+}
+.bims-falling[data-kind='snow']::before,
+.bims-falling[data-kind='snow']::after {
+  background: var(--fall-snow);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='%23000'%3E%3Ccircle cx='12' cy='8' r='1.6'/%3E%3Ccircle cx='50' cy='30' r='1.3'/%3E%3Ccircle cx='80' cy='14' r='1.8'/%3E%3Ccircle cx='30' cy='60' r='1.4'/%3E%3Ccircle cx='66' cy='72' r='1.7'/%3E%3Ccircle cx='90' cy='50' r='1.2'/%3E%3Ccircle cx='8' cy='86' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
+  mask-size: 96px 96px;
+  opacity: 0.9;
+  animation: bims-snow 7s linear infinite;
+}
+.bims-falling[data-kind='snow']::after {
+  mask-size: 60px 60px;
+  opacity: 0.55;
+  animation-duration: 11s;
+}
+.bims-office[data-away] .bims-falling::before,
+.bims-office[data-away] .bims-falling::after {
+  animation-play-state: paused;
+}
+@keyframes bims-fall {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-21px, 96px); }
+}
+@keyframes bims-snow {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-12px, 96px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-falling { display: none !important; }
+}
 /* nothing takes the pointer but the pills (spec §1 rule 6): hover and click go to the canvas */
 .bims-overlay {
   position: absolute;

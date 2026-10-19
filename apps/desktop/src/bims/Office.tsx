@@ -10,7 +10,9 @@
 // line over the rows, never a blank section. Hover: the bim under the pointer (renderer.pick) shows
 // its card after the tip's 400 ms (at once for 1 s after one closed, the ds tips' warmth); a click
 // opens it as its row's click does, and pokes it (pokes.ts: it reacts; the first click's poke
-// lands as the camera arrives). Owner: bims-wire.
+// lands as the camera arrives). The sky (sky.ts, bims-sky): the clock's sky blends in the renderer, a
+// blend due mid-drag or pinch waits until he lets go (Look.hold); the rain or snow is a CSS layer
+// outside the building (falling.ts). Owner: bims-wire.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Press, tipAttrs } from '@/ds';
 import { reducedMotion, textWidth } from '@/ds/hooks';
@@ -33,11 +35,41 @@ import { makeDriver, type Clock } from './office-driver';
 import { growHigh } from './grow-keep';
 import { FOLD_MS } from './Fold';
 import { placeZzz, sleepers } from './zzz';
+import { fallingLook, fallingSig, type FallingLook } from './falling';
+import { WEATHERS, type Weather } from './sky';
 import { aimAt, bimsLit, easeCam, edgeOf, useBimsLit } from './focus';
 import type { Growth } from '@/proto';
 import { DEFAULT_MAP, type MapId, mapOf } from './maps/ids';
 import { planOf } from './maps';
 import './office.css';
+
+/** a sky blend waits this long after his last wheel (a pinch, a pan) */
+const HOLD_MS = 400;
+
+/**
+ * A check's sky (test mode): none unless it sets window.__biseSky (the other checks keep the theme's
+ * fixed light: a slot's blend never lands in their frame counts); { weather } pins the weather, its
+ * time is window.__biseLocal's.
+ */
+function pinnedSky(): { sky?: false; weather?: Weather } {
+  const pin = (window as { __biseSky?: { weather?: string } }).__biseSky;
+  if (pin === undefined) return { sky: false };
+  const w = WEATHERS.find((x) => x === pin.weather);
+  return w === undefined ? {} : { weather: w };
+}
+
+/** the rain or snow layer (falling.ts): its kind, its density, the building cut out */
+function placeFalling(el: HTMLElement, l: FallingLook): void {
+  if (l.kind === null) {
+    delete el.dataset.kind;
+    el.style.opacity = '';
+    el.style.clipPath = '';
+    return;
+  }
+  el.dataset.kind = l.kind;
+  el.style.opacity = String(l.opacity);
+  el.style.clipPath = l.clip;
+}
 
 /** The pure modules and the renderer's loader: feed.ts's, or fakes in a test. */
 export interface Parts {
@@ -199,6 +231,7 @@ export function Office({
   const moreRef = useRef<HTMLDivElement>(null);
   // the sleepers' z's (zzz.ts): placed by hand at each draw, a CSS loop between draws
   const zzzRef = useRef<HTMLDivElement>(null);
+  const fallRef = useRef<HTMLDivElement>(null);
   // each bim's place in line for a label's room this frame (tagRank)
   const ranks = useRef(new Map<string, number>());
   // the office's width, for the cut of a long line (whole words, a glued '…')
@@ -329,6 +362,9 @@ export function Office({
     let lastNew = 'null';
     let reduced = reducedMotion();
     let firstDrawn = false;
+    /** his last wheel (a pinch, a two-finger pan), ms: a sky blend waits HOLD_MS past it */
+    let lastWheel = 0;
+    let lastFall = '';
 
     const cancel = () => {
       if (raf !== 0) cancelAnimationFrame(raf);
@@ -358,7 +394,7 @@ export function Office({
       local: { ...localOf(new Date()), ...(testMode() ? (window as { __biseLocal?: Partial<Local> }).__biseLocal : undefined) },
       night: nightNow(),
       reduced,
-      ...(testMode() ? { forced: (window as { __biseEggs?: Forced }).__biseEggs ?? null } : {}),
+      ...(testMode() ? { forced: (window as { __biseEggs?: Forced }).__biseEggs ?? null, ...pinnedSky() } : {}),
     });
     const draw = () => {
       raf = 0;
@@ -381,7 +417,18 @@ export function Office({
         r.setOffice(office, step.agents);
         resize();
       }
-      const motion = r.frame(t, played, look);
+      // his drag or pinch: a sky blend due now waits until he lets go (bims m_33030)
+      const hold = holder.current?.hasAttribute('data-drag') === true || Date.now() - lastWheel < HOLD_MS;
+      const motion = r.frame(t, played, hold ? { ...look, hold } : look);
+      if (fallRef.current !== null) {
+        const fh = holder.current;
+        const fl = fallingLook(r.falling(), fh?.clientWidth ?? 0, fh?.clientHeight ?? 0, reduced);
+        const sig = fallingSig(fl);
+        if (sig !== lastFall) {
+          lastFall = sig;
+          placeFalling(fallRef.current, fl);
+        }
+      }
       if (!firstDrawn) {
         firstDrawn = true;
         setDrawn(true);
@@ -465,6 +512,7 @@ export function Office({
     // a pinch (Chromium: a wheel with ctrlKey) zooms around the pointer; two fingers move the view
     // while zoomed, and scroll the bar at the fit (nothing to move there)
     const onWheel = (e: WheelEvent) => {
+      lastWheel = Date.now();
       const at = box.getBoundingClientRect();
       const c = wheelCam(camRef.current, { dx: e.deltaX, dy: e.deltaY, mode: e.deltaMode, ctrl: e.ctrlKey }, e.clientX - at.left, e.clientY - at.top, at.width, at.height, box.clientHeight);
       if (c === null) return;
@@ -706,6 +754,8 @@ export function Office({
         data-testid="app.right.bims.canvas"
       />
       <canvas ref={xfade} className="bims-xfade" aria-hidden="true" data-testid="app.right.bims.xfade" />
+      {/* the rain or snow outside the building (falling.ts): a CSS loop, never a WebGL frame */}
+      <div ref={fallRef} className="bims-falling" aria-hidden="true" data-testid="app.right.bims.falling" />
       <div className="bims-overlay">
         <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
         <div ref={zzzRef} className="bims-zzzs" data-testid="app.right.bims.zzzs" />

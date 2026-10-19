@@ -4,7 +4,9 @@
 // office is a bake of its scene posed still (merge.ts: a handful of draw calls), baked again only
 // when its still pose changes; close up (his pinch past LIVE_ZOOM, or the dive) the offices in view,
 // LIVE_MAX at most, show their scene itself, posed live each frame. One hemisphere light and one sun
-// with its soft shadow for the whole town (view.ts). It draws only when frame() is called. In test
+// with its soft shadow for the whole town (view.ts), under his clock's sky when frame() gets one
+// (sky.ts, sky-light.ts: a blend, then rest; the hero passes none: its fixed light). It draws only
+// when frame() is called. In test
 // mode it exposes window.__biseTown = { frames, calls, ms, offices, merged, live, check } for the
 // town's check, and window.__biseTownDrawn() (each office: in view, drawn, where, inside the camera's
 // planes) for its camera path. The camera's near and far planes wrap the whole town (town/camera.ts
@@ -21,12 +23,17 @@ import { STYLE } from './style';
 import { mergeRoot, type Merged } from './merge';
 import { makeOfficeScene, type OfficeScene } from './office-scene';
 import { makeView } from './view';
+import { applyLight, backdropOf } from './sky-light';
+import { blendAt, blending, lightOf, retarget, type Blend, type Light } from '../sky';
 import { pickAt, type Target } from './pick';
 import { TOWN_DAY, TOWN_NIGHT, buildTownscape } from './townscape';
 import { diveFit, townDepth, townFit } from '../town/camera';
 import { siteOf, townSeed } from '../town/ground';
 import { crossings, townPlan, type Placed, type TownPlan } from '../town/plan';
 import type { MakeTownRenderer, TownRenderer, TownSite } from '../town/types';
+
+/** the town's key light's distance from what it lights (its sun stands 3x the office's) */
+const TOWN_KEY_DIST = 48;
 
 /** a sign's anchor: over the back wall's middle, this high */
 const SIGN_Y = 2.6;
@@ -121,6 +128,9 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   let shadowsDirty = true;
   /** where the sun and its shadow's box were aimed last (aimSun): a pan moves them only when it changes */
   let sunKey = '';
+  /** the sky's blend and the light drawn (sky.ts); null: the theme's fixed sun (the hero) */
+  let blend: Blend | null = null;
+  let skyLight: Light | null = null;
   const spots = new Map<string, Spot>();
   let scape: { sig: string; merged: Merged; loose: Group | null } | null = null;
   /** the hero's entry build holds the town loose (TownOpts.entry) until settle() */
@@ -325,7 +335,15 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       v3.hemi.intensity *= opts.nightLift;
       sun.intensity *= opts.nightLift;
     }
-    v3.sky(opts.sky ? (isNight ? opts.sky.night : opts.sky.day) : pal.bg);
+    const paper = opts.sky ? (isNight ? opts.sky.night : opts.sky.day) : pal.bg;
+    v3.sky(skyLight ? '#' + backdropOf(paper, skyLight).getHexString() : paper);
+    if (skyLight) {
+      v3.hemi.color.set(skyLight.hemi);
+      v3.hemi.groundColor.set(skyLight.ground);
+      v3.hemi.intensity = skyLight.hemiI;
+      sun.color.set(skyLight.key);
+      sun.intensity = skyLight.keyI;
+    }
     if (STYLE.shadows) {
       sun.castShadow = true;
       sun.shadow.mapSize.set(2048, 2048);
@@ -367,10 +385,14 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     const key = `${cx.toFixed(2)}|${cz.toFixed(2)}|${half.toFixed(2)}`;
     if (key === sunKey) return;
     sunKey = key;
-    // the office's sun: up and a little to the west of the room, as world.ts puts it
-    sun.position.set(cx - 5 * 3, 14 * 3, cz - 1 * 3);
-    sun.target.position.set(cx, 0, cz);
-    sun.target.updateMatrixWorld();
+    // the office's sun: up and a little to the west of the room, as world.ts puts it; under a sky,
+    // from the sun's or the moon's side (sky-light.ts), as far
+    if (skyLight) applyLight(v3.hemi, sun, skyLight, { x: cx, y: 0, z: cz }, TOWN_KEY_DIST);
+    else {
+      sun.position.set(cx - 5 * 3, 14 * 3, cz - 1 * 3);
+      sun.target.position.set(cx, 0, cz);
+      sun.target.updateMatrixWorld();
+    }
     if (STYLE.shadows) {
       const cam = sun.shadow.camera;
       cam.left = -half;
@@ -561,13 +583,35 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       cam = c;
       applyView();
     },
-    frame(isNight) {
-      if (v3.lost() || !plan) return;
+    frame(isNight, sky) {
+      if (v3.lost() || !plan) return false;
+      // the sky (sky.ts): a new target blends from the drawn light; each blend frame lights again
+      let moving = false;
+      let relit = false;
+      if (sky) {
+        const was = blend;
+        blend = retarget(blend, sky.sky, sky.t, sky.reduced);
+        moving = blending(blend, sky.t);
+        if (moving || blend !== was) {
+          skyLight = lightOf(blendAt(blend, sky.t), isNight ? 'dark' : 'light');
+          relit = true;
+        }
+      } else if (blend !== null) {
+        blend = null;
+        skyLight = null;
+        relit = true;
+      }
       if (night !== isNight) {
         night = isNight;
+        if (skyLight && blend) skyLight = lightOf(blendAt(blend, sky?.t ?? 0), isNight ? 'dark' : 'light');
         syncScape(isNight);
         lightUp(isNight);
+      } else if (relit) {
+        lightUp(isNight);
+        shadowsDirty = true;
       }
+      // the live offices' desk lamps fade with the sky (never pop); no snow in the town yet (its lawn)
+      for (const s of spots.values()) s.scene.weather(skyLight ? skyLight.lamps : null, 0);
       // the live offices' scenes in the town, the others' bakes
       const live = new Set(api.liveIds());
       for (const [id, s] of spots) {
@@ -602,6 +646,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
           }),
         );
       }
+      return moving;
     },
     signAt(id) {
       const f = shownFit();

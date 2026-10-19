@@ -21,9 +21,10 @@ import { Office, tagOf, tagRank, type Parts } from '../Office';
 import { placeTags, TAG_INSET, type TagIn } from '../tags';
 import { growOf } from '../growth';
 import { growHigh } from '../grow-keep';
-import { CHECK_MS, nextAfter } from '../loop';
+import { CHECK_MS, FRAME_MS, nextAfter } from '../loop';
+import { skyAt, skyOf, WEATHERS, type Sky } from '../sky';
 import { awayNow, nightNow, testMode } from '../room';
-import { localOf } from '../eggs';
+import { localOf, type Local } from '../eggs';
 import { makeDriver, NO_ATTENTION, type Clock, type OfficeDriver } from '../office-driver';
 import type { Fit } from '../render/camera';
 import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from '../zoom';
@@ -94,6 +95,19 @@ function siteOf(p: TownProject, parts: TownParts): TownSite {
 
 /** the clock a town frame is drawn at (office-driver.ts Clock); a check's town rolls no egg */
 const clockAt = (t: number): Clock => ({ t, local: localOf(new Date(t * 1000)), night: nightNow(), reduced: reducedMotion(), ...(testMode() ? { forced: null } : {}) });
+
+/**
+ * The town's sky at a clock (sky.ts): his local time's slot. A check (test mode): none unless it sets
+ * window.__biseSky ({ weather } pins it; its time is window.__biseLocal's), as the office's.
+ */
+function townSky(c: Clock): { sky: Sky; slot: string } | null {
+  const pin = testMode() ? (window as { __biseSky?: { weather?: string } }).__biseSky : undefined;
+  if (testMode() && pin === undefined) return null;
+  const local = testMode() ? { ...c.local, ...(window as { __biseLocal?: Partial<Local> }).__biseLocal } : c.local;
+  const m = skyAt(local);
+  const w = WEATHERS.find((x) => x === pin?.weather);
+  return { sky: w === undefined ? m.sky : skyOf(m.sun, w), slot: `${String(m.slot)}|${w ?? ''}` };
+}
 
 export function Town({
   projects,
@@ -203,10 +217,17 @@ export function Town({
   // a still town looks at its rows' clock now and then (a long turn, a trip): a frame only when an
   // office was baked again (an agent's state changed), never for office life
   useEffect(() => {
+    let skySlot = '';
     const id = setInterval(() => {
       const r = rRef.current;
       if (awayNow() || r === null) return;
       const c = clockAt(Date.now() / 1000);
+      // a new sky slot (every 5 min at most): a frame, its blend
+      const slot = townSky(c)?.slot ?? '';
+      if (slot !== skySlot) {
+        skySlot = slot;
+        kickRef.current('sky');
+      }
       const stale = [...drivers.current.values()].map((d) => d.stale(c)).some(Boolean);
       if (!stale) return;
       if (r.liveIds().length > 0) {
@@ -358,7 +379,12 @@ export function Town({
         const n = nextAfter({ motion, moving: step.moving, labels: own ? step.labels : new Map(), away: awayNow(), lost: false });
         if (n !== null) next = next === null ? n : Math.min(next, n);
       }
-      r.frame(nightNow());
+      // the sky's blend: its few seconds at 30 fps, then rest (sky.ts)
+      const sky = townSky(c);
+      if (r.frame(nightNow(), sky === null ? undefined : { sky: sky.sky, t, reduced: c.reduced })) {
+        const n = FRAME_MS.blend ?? 0;
+        next = next === null ? n : Math.min(next, n);
+      }
       const sig = labelsKey(shownLabels);
       if (sig !== lastLabels) {
         lastLabels = sig;
