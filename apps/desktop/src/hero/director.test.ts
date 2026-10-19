@@ -3,7 +3,7 @@
 // safe frame, and the visitor keeps the camera until he lets it go.
 import { describe, expect, it } from 'vitest';
 import { FILM_S, FLIGHT_FRAME, KILN, PAGE, SHOTS } from './cast';
-import { aimCam, aimInMap, FADE_X, fitCam, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, inside, LEAD_S, MIN_ZOOM, resumes, RESUME_IDLE_S, SAFE, shotAt, springStep, still } from './director';
+import { aimCam, aimInMap, FADE_X, fitCam, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, inside, LEAD_S, MIN_ZOOM, OFFICE_AIM, resumes, RESUME_IDLE_S, SAFE, shotAt, shotCam, springStep, still } from './director';
 import { panAround, zoomAround } from './gestures';
 import { eggWords } from './overlay';
 
@@ -135,6 +135,25 @@ describe('a film shot near the map’s edge', () => {
     }
     // in the middle, nothing to give: its own zoom
     expect(aimInMap({ u: 0.5, v: 0.5 }, 3, SAFE.x, SAFE.y, diamond).zoom).toBe(3);
+  });
+});
+
+describe('a whole-office shot', () => {
+  it('puts its office’s middle at OFFICE_AIM, near the map’s edge too: the zoom gives, never the aim (designer m_32834)', () => {
+    const diamond = [
+      { u: 0.5, v: 0 },
+      { u: 1, v: 0.5 },
+      { u: 0.5, v: 1 },
+      { u: 0, v: 0.5 },
+    ];
+    for (const box of [{ u0: 0.4, u1: 0.6, v0: 0.4, v1: 0.6 }, { u0: 0.5, u1: 0.7, v0: 0.62, v1: 0.8 }]) {
+      const g = { town: () => box, office: () => box, spot: () => null, bim: () => null, ground: () => diamond };
+      const c = shotCam({ at: 0, size: 'office', subject: { k: 'office', office: KILN } }, g);
+      expect(c).not.toBeNull();
+      const p = inFrame(c ?? { zoom: 1, u: 0.5, v: 0.5 }, { u: (box.u0 + box.u1) / 2, v: (box.v0 + box.v1) / 2 });
+      expect(p.u).toBeCloseTo(OFFICE_AIM.x, 4);
+      expect(p.v).toBeCloseTo(OFFICE_AIM.y, 4);
+    }
   });
 });
 

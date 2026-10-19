@@ -33,6 +33,12 @@ export const SAFE = { x: 0.55, y: 0.36 } as const;
 /** the wide: the offices' bounding box centred at ~58% across, past the box's 22% fade (designer m_31061), the band at mid height (bims m_31230) */
 export const WIDE_BOX = { x0: 0.27, x1: 0.89, y0: 0.11, y1: 0.89 } as const;
 export const OFFICE_BOX = { x0: 0.3, x1: 0.85, y0: 0.1, y1: 0.9 } as const;
+/**
+ * where a whole-office shot puts its office's middle (its box's centre), fractions of the frame: high
+ * enough that its bims sit near SAFE (designer m_32834: aimed off the fit, it sat at ~65% / 65%, the
+ * top a lawn and the far desks under the feed); the map's edge closes the zoom, never slides it
+ */
+export const OFFICE_AIM = { x: SAFE.x, y: 0.4 } as const;
 /** an OFFICE shot this much closer than its box's fit (bims m_31057: the office ~70% of the frame) */
 export const OFFICE_TIGHT = 1.3;
 /** each size past OFFICE: how much closer than that office's own OFFICE shot (follow: a bim ≥ 22 px at 1440, bims m_31555) */
@@ -203,16 +209,17 @@ function sizedCam(shot: Shot, g: Geometry): Cam | null {
       break;
     }
   }
+  const middle = { u: (ob.u0 + ob.u1) / 2, v: (ob.v0 + ob.v1) / 2 };
+  const ground = g.ground?.() ?? null;
   if (shot.size === 'office') {
-    const c = at ?? { u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom };
-    return aimInMap(c, office.zoom * OFFICE_TIGHT, SAFE.x, SAFE.y, g.ground?.() ?? null);
+    return at === null ? aimInMap(middle, office.zoom * OFFICE_TIGHT, OFFICE_AIM.x, OFFICE_AIM.y, ground) : aimInMap(at, office.zoom * OFFICE_TIGHT, SAFE.x, SAFE.y, ground);
   }
   // a whole office closer than its OFFICE shot (the cold open's tight loft): its middle, that much closer
-  if (s.k === 'office') return aimInMap({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * CLOSER[shot.size], SAFE.x, SAFE.y, g.ground?.() ?? null);
+  if (s.k === 'office') return aimInMap(middle, office.zoom * CLOSER[shot.size], OFFICE_AIM.x, OFFICE_AIM.y, ground);
   // a subject gone missing (it left): its office's shot, never an empty frame
   // (its OFFICE framing, on the lawn: the bare fit showed paper while order-test was not in yet, 0:40.5)
-  if (at === null) return aimInMap({ u: office.u + (SAFE.x - 0.5) / office.zoom, v: office.v + (SAFE.y - 0.5) / office.zoom }, office.zoom * OFFICE_TIGHT, SAFE.x, SAFE.y, g.ground?.() ?? null);
-  return aimInMap(at, office.zoom * CLOSER[shot.size], shot.frame?.x ?? SAFE.x, shot.frame?.y ?? SAFE.y, g.ground?.() ?? null);
+  if (at === null) return aimInMap(middle, office.zoom * OFFICE_TIGHT, OFFICE_AIM.x, OFFICE_AIM.y, ground);
+  return aimInMap(at, office.zoom * CLOSER[shot.size], shot.frame?.x ?? SAFE.x, shot.frame?.y ?? SAFE.y, ground);
 }
 
 /** The shot playing at film time T: the last one whose camera has left (LEAD_S before its action). Pure. */
