@@ -1390,10 +1390,15 @@ async function newRows(harness, say) {
     const LOG = process.env.AS_HE_DOES_FAKE_LOG;
     const req = await until(async () => {
       if (!LOG || !fs.existsSync(LOG)) return null;
-      const lines = fs.readFileSync(LOG, 'utf8').split('\n').filter((l) => l.includes('before') && l.includes('after') && (!src || l.includes(src)));
-      if (lines.length === 0) return null;
-      const j = JSON.parse(lines.at(-1));
-      const u = typeof j.user === 'string' ? j.user : JSON.stringify(j.user ?? j.last_user ?? j);
+      const lines = fs.readFileSync(LOG, 'utf8').split('\n').filter((l) => l.includes('before') && l.includes('after'));
+      // the request whose user message holds his words: a later request (main's <task_status>, a
+      // wake) carries 'before'/'after' elsewhere in its line (history, agents' last words), so the
+      // match is on the user message itself, never the raw line (desk-cut-16's quick on 2d0fa4a97)
+      const userOf = (j) => (typeof j.user === 'string' ? j.user : JSON.stringify(j.user ?? j.last_user ?? j));
+      const users = lines.map((l) => { try { return userOf(JSON.parse(l)); } catch { return ''; } })
+        .filter((u) => u.includes('before') && u.includes('after') && (!src || u.includes(src)));
+      if (users.length === 0) return null;
+      const u = users.at(-1);
       return { user: u.slice(0, 400), order: [u.indexOf('before'), src ? u.indexOf(src) : -1, u.indexOf('after')] };
     }, 30000, 1000);
     step("the quote sits at its place in the model's request too (before, the quote, after)", !!req && inPlace(req.order), req ?? { log: LOG ?? 'AS_HE_DOES_FAKE_LOG not set' });
