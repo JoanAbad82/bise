@@ -62,6 +62,12 @@ fn shown(name: &str) -> &str {
     }
 }
 
+/// The divider's own label while his draft opens with `@<agent>` (empty:
+/// [`divider`] gives its two sides); None: the usual divider.
+pub(crate) fn label(app: &App) -> Option<Vec<Span<'static>>> {
+    leading(app).map(|_| Vec::new())
+}
+
 /// The divider's two sides while his draft opens with `@<agent>`: the
 /// label ` ↳ to architect ` in the accent, the end ` no @ to stay with
 /// main ` dim when it fits in `room`.
