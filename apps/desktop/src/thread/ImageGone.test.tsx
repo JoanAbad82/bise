@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import { deletedWords, keepDays, PartImageChip } from './ImageGone';
