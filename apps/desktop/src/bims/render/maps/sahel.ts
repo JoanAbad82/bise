@@ -16,7 +16,7 @@ import { DAY, NIGHT, WORLD, hash } from '../palette';
 import type { Build, MapLook, Wear } from './look';
 import {
   beds, cone, deskOf, floorOf, frames, gameTable, glow, grow, mainDeskOf, nc, palOf, patterned,
-  pieceSpots, plinth, terrace, treeSpots, type Piece,
+  pieceSpots, plinth, terrace, treeSpots, type Piece, pastNap,
 } from './yard';
 
 const STRAW = '#d9b86a';
@@ -174,11 +174,11 @@ const PIECES: Record<number, Piece> = {
     k.add(k.style.box(1.5, 0.06, 0.08), k.mat(WOOD), g, p.x, 0.03, 0.36);
   },
   // a big bogolan on the wall, a kora leaning on it
-  5: (k, g, p) => {
+  5: (k, g, p, b) => {
     const z = 0.03 + k.style.pictureZ;
     k.add(k.style.box(2.6, 1.0, 0.02), k.mat('#6b4a32'), g, p.x, 1.0, z);
     for (let i = 0; i < 12; i++) k.add(k.style.box(0.14, 0.14, 0.01), k.mat('#e8d6b0'), g, p.x - 1.1 + (i % 6) * 0.44, 0.75 + Math.floor(i / 6) * 0.5, z + 0.015);
-    const kx = p.x + 2.4;
+    const kx = pastNap(b.o);
     k.add(k.style.ball(0.22), k.mat('#c98a3e'), g, kx, 0.25, 0.4).scale.z = 0.6;
     k.add(k.style.cylinder(0.025, 1.1), k.mat(WOOD), g, kx, 0.8, 0.35).rotation.x = -0.2;
   },

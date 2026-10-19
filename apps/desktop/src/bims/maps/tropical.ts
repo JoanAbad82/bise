@@ -68,7 +68,7 @@ export function tropicalLayout(agents: readonly Agent[], prev?: TropicalOffice):
 
   const crossFront = Math.max(Z0 + (curves - 1) * ROW + AMP + 0.88 + 1.2, bz + 2.4);
   const D = crossFront + 0.5;
-  const back = backZone({ x0: X0, W, main: 'left', bed: [0.6, 0.9], reach: AISLES });
+  const back = backZone({ x0: X0, W, main: 'left', reach: AISLES });
   const front = frontZone({ x0: X0, W, D, doorX: aR, terraceU: W - 4.6, out: 'right' });
   furniture.push(...back.furniture, ...front.furniture);
 

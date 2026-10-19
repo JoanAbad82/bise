@@ -136,12 +136,15 @@ export function block(k: Kit, parent: Object3D, b: Box, h: number, color: string
   return k.add(k.style.box(b.x1 - b.x0, h, b.z1 - b.z0), k.mat(color), parent, (b.x0 + b.x1) / 2, y + h / 2, (b.z0 + b.z1) / 2);
 }
 
+/** a desk's top, its height (deskOf) */
+const DESK_TOP = 0.55;
+
 export interface DeskDress {
   /** the chair's colour (else the bim's) */
   readonly chair?: string;
   /** a mat under the desk and its chair */
   readonly mat?: string;
-  /** a small thing on the desk's corner, by the desk's hash */
+  /** a small thing on the desk's corner, by the desk's hash: on its top (onTop), never in its body */
   readonly thing?: (k: Kit, g: Group, h: number) => void;
 }
 
@@ -161,7 +164,7 @@ export function deskOf(b: Build, d: Spot, name: string, dress: DeskDress = {}): 
   const dd = 0.72;
   if (dress.mat) k.add(style.box(1.5, 0.02, 1.5), k.mat(dress.mat), g, 0, 0.03, 0.3);
   k.add(style.box(w - 0.1, 0.5, dd - 0.08, 0.12), k.mat(pal.desk), g, 0, 0.25, 0.5);
-  k.add(style.box(w, 0.06, dd, 0.03), k.mat(pal.deskTop), g, 0, 0.52, 0.5);
+  k.add(style.box(w, 0.06, dd, 0.03), k.mat(pal.deskTop), g, 0, DESK_TOP - 0.03, 0.5);
   k.add(style.box(0.22, 0.08, 0.02), k.mat(HOODIE[h % HOODIE.length] ?? pal.desk), g, -w / 3, 0.4, 0.5 + dd / 2 - 0.03);
   const screen = laptop(k, g, 0, 0.47);
   const lamp = deskLamp(k, g, w / 2 - 0.18, 0.5 + dd / 2 - 0.17);
@@ -260,6 +263,28 @@ export function grow(b: Build, pieces: Readonly<Record<number, Piece>>, spot: (o
 export function plinth(k: Kit, g: Group, p: Pt, top: (gold: Material, y: number) => void): void {
   k.add(k.style.box(0.7, 0.4, 0.7), k.mat('#d8d2c6'), g, p.x, 0.2, p.z);
   top(k.style.material(WORLD.gold, { emissive: WORLD.gold, ei: 0.15 }), 0.4);
+}
+
+/**
+ * the x just past the nap place's inner end (towards the room's middle), `gap` from its last bed's
+ * box: where a thing leaning on the back wall beside the nap place stands (an instrument); at the
+ * lounge's middle + 2.4 it stood in the last bed (Gabriel, bims-clip; render/clip.test.ts)
+ */
+export function pastNap(o: Office, gap = 0.4): number {
+  const beds = o.furniture.filter((f) => f.of !== undefined && o.lounge.some((l) => l.x === f.of?.x && l.z === f.of.z));
+  if (beds.length === 0) return o.x0 + o.W / 2;
+  const x0 = Math.min(...beds.map((b) => b.x0));
+  const x1 = Math.max(...beds.map((b) => b.x1));
+  return (x0 + x1) / 2 < o.x0 + o.W / 2 ? x1 + gap : x0 - gap;
+}
+
+/** a group standing on a desk's top at (x, z) in the desk's own frame, scaled by s: a floor piece drawn in it sits on the top */
+export function onTop(desk: Group, x: number, z: number, s: number): Group {
+  const g = new Group();
+  g.position.set(x, DESK_TOP, z);
+  g.scale.setScalar(s);
+  desk.add(g);
+  return g;
 }
 
 /** a potted plant: a pot and a few leaves (stage 1 everywhere, in the map's own plant) */

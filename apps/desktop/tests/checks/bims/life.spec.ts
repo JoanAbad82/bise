@@ -4,7 +4,7 @@
 //   (a) on each map where a napper's head went into a piece (the loft's and the greenhouse's arcade
 //       cabinet at stage 11, the haveli's jhoola at 8, the Sahel's buttress, the riad's banquette
 //       cushions, the workshop's scooter), every idle bim asleep on its bed draws, the nap place
-//       full, its piece moved off the heads (render/lying.test.ts checks every map x stage);
+//       full, its piece moved off the heads (render/clip.test.ts checks every map x stage);
 //   (b) an idle bim at the island eats: picks a fruit from the bowl, bites it, chews (a frame strip).
 // Shots: .harness-cache/bims-shots (life-*.png), for bims to sign. Owner: bims-life.
 import { test, expect, type Session } from '../../harness';

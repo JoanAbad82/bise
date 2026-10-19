@@ -411,7 +411,7 @@ function hang(r: Room, near: Pt, others: readonly Hung[], floor: readonly Item[]
   return cands[0]?.hg ?? null;
 }
 
-/** where a napper's head lies on that lounge spot: behind it, the way it faces (render/lying.test.ts checks the real pose) */
+/** where a napper's head lies on that lounge spot: behind it, the way it faces (render/clip.test.ts checks the real pose) */
 export function headRoom(s: Spot): Box {
   const bx = -Math.sin(s.face);
   const bz = -Math.cos(s.face);

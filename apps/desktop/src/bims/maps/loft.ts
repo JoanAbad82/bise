@@ -8,7 +8,7 @@
 // deck chair (`furniture`). The office is the same at 320 px and wide: the camera fits it.
 import type { Agent } from '@/proto';
 import { type Box, type Leg, type Office, type Pt, QUEUE_GAP, type Spot } from '../model';
-import { type Plan, boxAt, deskNames, wayIn } from './plan';
+import { NAP_ROW, NAP_Z0, type Plan, boxAt, deskNames, napBedAt, wayIn } from './plan';
 
 /** The loft's office: the numbers its look and its tests read past the common ones. */
 export interface LoftOffice extends Office {
@@ -29,7 +29,7 @@ const AISLE = 1.0;
 const BACK_D = 4.3;
 /** past this many agents (main aside), 3 desk columns each side of the island */
 export const WIDE_PAST = 16;
-const LOUNGE_N = 10;
+const LOUNGE_N = 8;
 const QUEUE_N = 6;
 const TERRACE_N = 12;
 const TERRACE_GAP = 1.15;
@@ -82,7 +82,7 @@ export function loftLayout(agents: readonly Agent[], prev?: LoftOffice): LoftOff
   for (let i = 0; i < LOUNGE_N; i++) {
     const j = i % 4;
     const x = x0 + 0.65 + j * step;
-    const z = 1.0 + Math.floor(i / 4) * 1.05;
+    const z = NAP_Z0 + Math.floor(i / 4) * NAP_ROW;
     lounge.push({ x, z, wz: z, ax: j < 3 ? x + step / 2 : x - step / 2, face: 0 });
   }
 
@@ -171,7 +171,7 @@ function furnitureOf(o: Pick<Office, 'desks' | 'mainDesk' | 'island' | 'lounge' 
   out.push(box(o.mainDesk.x, o.mainDesk.z + 0.6, 2.3, 1.0));
   const iz = (o.island.z0 + o.island.z1) / 2;
   out.push(box((o.island.x0 + o.island.x1) / 2, iz, o.island.x1 - o.island.x0 + 0.1, o.island.z1 - o.island.z0 + 0.15));
-  for (const l of o.lounge) out.push(box(l.x, l.z - 0.05, 0.72, 0.72, l));
+  for (const l of o.lounge) out.push(napBedAt(l));
   for (const t of o.terrace) out.push(box(t.x, t.z + 0.05, 0.5, 0.95, t));
   return out;
 }

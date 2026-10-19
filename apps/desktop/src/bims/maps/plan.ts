@@ -40,6 +40,23 @@ export function boxAt(x: number, z: number, w: number, d: number, of?: Pt): Box 
 }
 
 /**
+ * A nap bed's floor box (w across, d from back to front) and how far its middle sits behind the
+ * napper's spot. The napper (pose.ts napping: reclined, hands folded on its belly, always facing the
+ * room, +z) spans 0.54 across, from 0.83 behind its spot to 0.26 ahead: the box holds it with a
+ * margin all round, its head inside (Gabriel, bims-clip: nappers lay across each other and off
+ * their beds; render/clip.test.ts). Every map's beds are this box, its look draws the bed to it.
+ */
+export const NAP_BED = { w: 0.76, d: 1.35, back: 0.35 } as const;
+/** a row of beds' spots from the back wall: the first row's z (its bed a step off the wall and what hangs on it), the next row's step (a bed and a lane) */
+export const NAP_Z0 = 1.2;
+export const NAP_ROW = 1.8;
+
+/** The bed of a nap spot (NAP_BED, behind it: its napper faces the room whichever way the spot does), with its spot. Pure. */
+export function napBedAt(s: Spot): Box {
+  return boxAt(s.x, s.z - NAP_BED.back, NAP_BED.w, NAP_BED.d, s);
+}
+
+/**
  * A place's way in, as the loft does it: from the spot to its walkway (`wz`), then along it to its
  * aisle or lane (`ax`). Two legs (fewer when they are points); the plan joins (ax, wz) to its trunk.
  */

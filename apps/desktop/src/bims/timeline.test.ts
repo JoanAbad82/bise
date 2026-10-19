@@ -151,20 +151,21 @@ describe('timeline', () => {
   it('gives each napper its own bean bag, back to it after a snack; past the last, at its desk (never lying beside one in the air)', () => {
     const o = office(12);
     const tl = newTimeline();
-    const nappers = Array.from({ length: 11 }, (_, i) => `a${String(i + 1)}`);
+    const nappers = Array.from({ length: 9 }, (_, i) => `a${String(i + 1)}`);
     tl.update(new Map(nappers.map((n) => [n, NAP])), o, 0, []);
     const spots = nappers.map((n) => `${String(tl.poseAt(n, 0)?.x)},${String(tl.poseAt(n, 0)?.z)}`);
-    expect(new Set(spots).size).toBe(11);
-    expect(o.lounge).toHaveLength(10);
-    expect(at(tl.poseAt('a11', 0))).toEqual({ x: o.desks.get('a11')?.x, z: o.desks.get('a11')?.z });
-    // a3 off for a snack: a11, at its desk, takes the bean bag it left; a3 back naps at its own desk
+    expect(new Set(spots).size).toBe(9);
+    // 8 beds a nap place at most (maps/plan.ts napBedAt: each holds its napper, 2 rows of 4)
+    expect(o.lounge).toHaveLength(8);
+    expect(at(tl.poseAt('a9', 0))).toEqual({ x: o.desks.get('a9')?.x, z: o.desks.get('a9')?.z });
+    // a3 off for a snack: a9, at its desk, takes the bean bag it left; a3 back naps at its own desk
     const home = at(tl.poseAt('a3', 0));
     tl.update(new Map(nappers.map((n) => [n, n === 'a3' ? { k: 'snack', at: 'island', key: 1, fruit: 0 } : NAP])), o, 10, []);
     tl.update(new Map(nappers.map((n) => [n, NAP])), o, 20, []);
-    expect(at(tl.poseAt('a11', 30))).toEqual(home);
+    expect(at(tl.poseAt('a9', 30))).toEqual(home);
     expect(at(tl.poseAt('a3', 30))).toEqual({ x: o.desks.get('a3')?.x, z: o.desks.get('a3')?.z });
     // with nobody waiting for one, a napper back from its snack gets its own bean bag again
-    const few = nappers.slice(0, 10);
+    const few = nappers.slice(0, 8);
     const tl2 = newTimeline();
     tl2.update(new Map(few.map((n) => [n, NAP])), o, 0, []);
     const home2 = at(tl2.poseAt('a3', 0));

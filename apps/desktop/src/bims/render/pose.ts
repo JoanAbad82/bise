@@ -218,9 +218,12 @@ export function workLoops(act: Activity): boolean {
   return act.doing === undefined || DOING_LOOPS.has(act.doing) || act.k === 'hot';
 }
 
-/** napping: sunk in a bean bag, facing the room */
+/**
+ * napping: sunk in its bed, facing the room, hands folded on its belly (arms out read fallen, and
+ * stuck out of the bed: Gabriel, bims-clip; bims m_33943). Its footprint is maps/plan.ts NAP_BED's.
+ */
 const napping: Body = {
-  ...STAND, y: 0.22, dz: 0.15, body: [-0.9, 0, 0], legL: -0.4, legR: -0.4, armL: [0, 0, -0.5], armR: [0, 0, 0.5],
+  ...STAND, y: 0.22, dz: 0.15, body: [-0.9, 0, 0], legL: -0.4, legR: -0.4, armL: [-0.7, 0, 0.75], armR: [-0.7, 0, -0.75],
   eyes: 0.15, mouth: 'oh', face: 0,
 };
 

@@ -1,7 +1,7 @@
 // The patio's look (Mexico; render/maps/look.ts; its plan: maps/patio.ts): terracotta tiles, an
 // ochre back wall and a cobalt side wall (Barragán), the free-standing colour walls behind each
 // team, papel picado strung across, the violet water trough; the long sobremesa table and its
-// stools; equipal chairs then hammocks to nap in; saguaros, agaves and jacarandas in the garden;
+// stools and two equipales at its ends; hammocks to nap in; saguaros, agaves and jacarandas in the garden;
 // a striped sarape on every bim. Its growth (page bims-maps, Mexique · la maison à patio): a
 // cactus, pan dulce and the first agave, two equipales, a painted slate, a mural and a guitar,
 // café de olla and marigolds, a palapa, jacarandas and hammocks, a lotería table, a talavera
@@ -11,11 +11,12 @@ import { Group, type Object3D, TorusGeometry } from 'three';
 import type { Pt } from '../../model';
 import type { PatioOffice } from '../../maps/patio';
 import type { Kit } from '../kit';
+import { hammock } from '../cozy';
 import { DAY, NIGHT, WORLD, hash, rng } from '../palette';
 import type { Build, MapLook, Wear } from './look';
 import {
   balloon, beds, block, cone, deskOf, floorOf, frames, gameTable, grow, mainDeskOf, nc,
-  palOf, patterned, pieceSpots, plinth, pond, terrace, treeSpots, type Piece,
+  onTop, palOf, patterned, pieceSpots, plinth, pond, terrace, treeSpots, type Piece, pastNap,
 } from './yard';
 
 const SLABS = ['#2f5fa7', '#7b5fc0', '#f39a4c', '#2a9d8f', '#e9c46a'] as const;
@@ -64,12 +65,17 @@ function shell(b: Build): void {
     k.add(k.style.box(s.w, 1.2, 0.22), k.mat(nc(SLABS[s.c] ?? COBALT, night, 0.75)), root, s.x, 0.6, s.z);
     for (let i = 0; i < 5; i++) k.add(k.style.box(0.3, 0.16, 0.02), k.mat(i % 2 ? '#fffaf0' : TALAVERA), root, s.x - 1.6 + i * 0.8, 0.95, s.z + 0.12);
   }
-  // papel picado over the back corridor and over the long table
-  for (const pz of [4.25, o.island.z0 - 0.35]) {
-    const line = k.add(k.style.cylinder(0.006, W - 0.6), k.mat(WORLD.ink), root, x0 + W / 2, 2.0, pz);
+  // papel picado over the back corridor from the board on (over the nap place's side the line
+  // crossed the nappers' faces on the screen, bims m_34171) and over the long table; each a string
+  // (userData.string: never over a napper's head on the screen, render/clip.test.ts)
+  const board = Math.max(...o.boardSpots.map((s) => s.x), x0 + W / 2) + 0.5;
+  for (const [xa, pz] of [[board, 4.25], [x0 + 0.3, o.island.z0 - 0.35]] as const) {
+    const xb = x0 + W - 0.3;
+    const line = k.add(k.style.cylinder(0.006, xb - xa), k.mat(WORLD.ink), root, (xa + xb) / 2, 2.0, pz);
     line.rotation.z = Math.PI / 2;
-    for (let x = x0 + 0.6, i = 0; x < x0 + W - 0.5; x += 0.42, i++) {
-      k.add(k.style.box(0.28, 0.3, 0.01), k.mat(PICADO[i % PICADO.length] ?? MARIGOLD), root, x, 1.82 - Math.sin(((x - x0) / W) * Math.PI) * 0.12, pz);
+    line.userData.string = true;
+    for (let x = xa + 0.3, i = 0; x < xb - 0.2; x += 0.42, i++) {
+      k.add(k.style.box(0.28, 0.3, 0.01), k.mat(PICADO[i % PICADO.length] ?? MARIGOLD), root, x, 1.82 - Math.sin(((x - xa) / (xb - xa)) * Math.PI) * 0.12, pz).userData.string = true;
     }
   }
   // the water trough: violet, its spout wall, the water falling in; an alebrije on its rim
@@ -108,26 +114,27 @@ function island(b: Build): void {
   for (const s of o.islandSpots) k.add(k.style.box(0.36, 0.3, 0.36), k.mat('#c98a5a'), root, s.x, 0.15, s.z + (s.face === 0 ? -0.1 : 0.1));
 }
 
-/** an equipal: a round leather seat on a woven barrel, then a hammock between two posts */
+/** an equipal: a round leather seat on a woven barrel, its low back */
+function equipal(k: Kit, g: Object3D, x: number, z: number, back: number): void {
+  k.add(k.style.cylinder(0.28, 0.32), k.mat('#c98a3e'), g, x, 0.16, z);
+  k.add(k.style.cylinder(0.3, 0.06), k.mat('#8a5a3c'), g, x, 0.34, z);
+  k.add(k.style.box(0.56, 0.4, 0.08), k.mat('#a0673f'), g, x, 0.55, z + back * 0.26);
+}
+
+/**
+ * the nap place: hammocks only, each between a post at its head and one past its napper's toes
+ * (render/cozy.ts hammock, the cozy kit's two the same); stage 3's two equipales stand at the long
+ * table's ends. Equipales, a low frame and hammocks on posts in one corner read as nothing, and the
+ * posts went through the nappers (Gabriel, bims-clip; bims m_33943)
+ */
 function lounge(b: Build): void {
-  const { k } = b;
+  const { k, o } = b;
   beds(b, (g, box, i) => {
-    const x = (box.x0 + box.x1) / 2;
-    const z = (box.z0 + box.z1) / 2;
-    if (i < 4) {
-      k.add(k.style.cylinder(0.28, 0.32), k.mat('#c98a3e'), g, x, 0.16, z);
-      k.add(k.style.cylinder(0.3, 0.06), k.mat('#8a5a3c'), g, x, 0.34, z);
-      k.add(k.style.box(0.56, 0.4, 0.08), k.mat('#a0673f'), g, x, 0.55, z - 0.26);
-      return;
-    }
-    for (const dz of [-0.45, 0.45]) k.add(k.style.cylinder(0.05, 1.2), k.mat('#6b4a32'), g, x, 0.6, z + dz);
-    const cs = i % 2 ? ['#2a9d8f', '#7b5fc0', '#e9c46a'] : [MARIGOLD, TALAVERA, '#e9c46a'];
-    for (let j = 0; j < 7; j++) {
-      const t = j / 6;
-      const s = k.add(k.style.box(0.5, 0.04, 0.14), k.mat(cs[j % 3] ?? MARIGOLD), g, x, 0.75 - Math.sin(t * Math.PI) * 0.35, z - 0.4 + t * 0.8);
-      s.rotation.x = -Math.cos(t * Math.PI) * 0.5;
-    }
+    hammock(k, g, box, i % 2 ? ['#2a9d8f', '#7b5fc0', '#e9c46a'] : [MARIGOLD, TALAVERA, '#e9c46a'], '#6b4a32');
   });
+  const s3 = b.stage(3);
+  const I = o.island;
+  if (s3) for (const [x, back] of [[I.x0 - 0.38, -1], [I.x1 + 0.38, 1]] as const) equipal(k, s3, x, (I.z0 + I.z1) / 2, back);
 }
 
 /** saguaros with arms, agaves, a violet jacaranda */
@@ -184,14 +191,14 @@ const PIECES: Record<number, Piece> = {
     for (let i = 0; i < 4; i++) k.add(k.style.box(0.4 + r() * 0.6, 0.04, 0.01), k.mat('#fffaf0'), g, p.x - 0.3 + r() * 0.2, 1.3 - i * 0.16, z + 0.05);
   },
   // a mural in bold colours over the nap place, a guitar against the wall
-  5: (k, g, p) => {
+  5: (k, g, p, b) => {
     const z = 0.02 + k.style.pictureZ;
     const cs = ['#2a9d8f', MARIGOLD, '#7b5fc0', '#e9c46a', TALAVERA];
     // the panels a hair apart and the sun a step out: touching, they shared planes and z-fought (walls.test.ts)
     cs.forEach((c, i) => k.add(k.style.box(0.94, 0.5 + (i % 2) * 0.2, 0.02), k.mat(c), g, p.x - 1.9 + i * 0.95, 1.15, z));
     const sun = k.add(k.style.cylinder(0.25, 0.02), k.mat('#e9c46a'), g, p.x, 1.3, z + 0.025);
     sun.rotation.x = Math.PI / 2;
-    const gx = p.x + 2.4;
+    const gx = pastNap(b.o);
     const body = k.add(k.style.ball(0.2), k.mat('#c98a3e'), g, gx, 0.3, 0.25);
     body.scale.set(1, 1.2, 0.4);
     const neck = k.add(k.style.box(0.07, 0.6, 0.04), k.mat('#6b4a32'), g, gx, 0.75, 0.22);
@@ -299,7 +306,9 @@ export const patio: MapLook = {
   shell,
   island,
   lounge,
-  desk: (b, d, name) => deskOf(b, d, name, { thing: (kk, g, h) => { if (h % 3 === 0) agavePot(kk, g, 0.45, 0.35); } }),
+  // a small agave on the desk top's back left corner (the lamp's on the right): drawn at the floor
+  // it stood inside the desk, its leaves through the top (Gabriel, bims-clip; render/clip.test.ts)
+  desk: (b, d, name) => deskOf(b, d, name, { thing: (kk, g, h) => { if (h % 3 === 0) agavePot(kk, onTop(g, -0.47, 0.7, 0.3), 0, 0); } }),
   mainDesk: (b) => mainDeskOf(b, '#c98a5a', '#6b4a32'),
   tree: ({ k: kk }, parent, x, z, size) => {
     tree(kk, parent, x, z, size);

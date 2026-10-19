@@ -8,7 +8,7 @@
 import type { Agent } from '@/proto';
 import { bims } from '@/proto/words_bims.gen';
 import { type Box, type Leg, type Office, type Pt, type Spot } from '../model';
-import { type Things, boxAt, deskNames, wayIn } from './plan';
+import { NAP_BED, NAP_ROW, NAP_Z0, type Things, boxAt, deskNames, napBedAt, wayIn } from './plan';
 
 /** A map of maps-b's office: the numbers its look reads past the common ones. */
 export interface BOffice extends Office {
@@ -88,28 +88,30 @@ export const QUEUE_N = 6;
  * whose desks start at 4.3): `n` nap places 4 a row from `lx0` (its left end) over `lw`, lanes
  * between their columns; the board after them; main's desk at the back right, its queue on its left.
  */
-export function backZone(x0: number, W: number, crossBack: number, o: { lx0?: number; lw?: number; n?: number; bed?: number } = {}): Back {
+export function backZone(x0: number, W: number, crossBack: number, o: { lx0?: number; lw?: number; n?: number; napZ?: number } = {}): Back {
   const lx0 = o.lx0 ?? x0 + 0.65;
   const lw = o.lw ?? W * 0.4 - 0.9;
   const n = o.n ?? 10;
-  const bed = o.bed ?? 0.72;
-  const step = lw / 3;
+  // a lane of 0.44 at least between two columns of beds (plan.ts NAP_BED): never squeezed
+  const step = Math.max(lw / 3, NAP_BED.w + 0.44);
   const lounge: Spot[] = [];
   const ways: Way[] = [];
   const furniture: Box[] = [];
   for (let i = 0; i < n; i++) {
     const j = i % 4;
     const x = lx0 + j * step;
-    const z = 1.0 + Math.floor(i / 4) * 1.05;
-    if (z + bed / 2 > crossBack - 0.2) break;
+    const z = (o.napZ ?? NAP_Z0) + Math.floor(i / 4) * NAP_ROW;
     const s = { x, z, wz: z, ax: j < 3 ? x + step / 2 : x - step / 2, face: 0 };
+    const bed = napBedAt(s);
+    if (bed.z1 > crossBack - 0.2) break;
     lounge.push(s);
-    furniture.push(boxAt(x, z - 0.05, bed, bed, s));
+    furniture.push(bed);
     ways.push({ s, to: { x: s.ax, z: crossBack } });
   }
-  const boardX = lx0 + lw + 1.6;
+  const boardX = lx0 + step * 3 + 1.6;
   const boardSpots = [-0.45, 0.45, 0].map((d) => ({ x: boardX + d, z: 0.75, wz: crossBack, ax: boardX + d, face: Math.PI }));
-  for (const s of boardSpots) ways.push({ s });
+  // the corridor reaches each board place (corridor(): past main's lane when the nap place is wide)
+  for (const s of boardSpots) ways.push({ s, to: { x: s.x, z: crossBack } });
   const mx = x0 + W - 1.55;
   const qx = mx - 1.45;
   const mainDesk: Spot = { x: mx, z: 1.25, wz: 0.8, ax: qx, face: 0 };

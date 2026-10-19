@@ -85,7 +85,7 @@ export function patioLayout(agents: readonly Agent[], prev?: PatioOffice): Patio
   const crossFront = tz + 1.55;
   const D = crossFront + 0.5;
 
-  const back = backZone({ x0: X0, W, main: 'right', bed: [0.6, 0.9], reach: AISLES });
+  const back = backZone({ x0: X0, W, main: 'right', reach: AISLES });
   const front = frontZone({ x0: X0, W, D, doorX: aM, terraceU: 1.0, out: 'left' });
   furniture.push(...back.furniture, ...front.furniture);
 

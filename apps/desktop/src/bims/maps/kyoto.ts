@@ -9,7 +9,7 @@ import type { Agent } from '@/proto';
 import { bims } from '@/proto/words_bims.gen';
 import type { Box, Leg, Office, Spot } from '../model';
 import { type BOffice, type Way, backZone, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
-import { type Plan, type Things, boxAt } from './plan';
+import { NAP_BED, NAP_Z0, type Plan, type Things, boxAt, napBedAt } from './plan';
 
 export interface KyotoOffice extends BOffice {
   /** the inner garden's floor box (gravel, moss, the lantern, the maple), right of the engawa */
@@ -38,18 +38,23 @@ export function kyotoLayout(agents: readonly Agent[], prev?: KyotoOffice): Kyoto
   const ways: Way[] = [...back.ways];
   const furniture: Box[] = [...back.furniture];
 
-  // the kotatsu: a long low table, 4 cushions behind it and 4 in front
+  // the kotatsu: a long low table, 4 beds behind it (a walkway between them and the table) and 4 in
+  // front, every napper facing the room (pose.ts napping), its head on the table's side; each bed
+  // holds its napper (plan.ts napBedAt), the back row walks out along the walkway to the side
   const kx = x0 + 2.6;
-  const kotatsu = boxAt(kx, 1.75, 2.8, 0.7);
+  const kotatsu = boxAt(kx, 2.1, 2.8, 0.55);
   furniture.push(kotatsu);
   const lounge: Spot[] = [];
   const side = x0 + 0.7;
+  const walk = 1.6;
+  // the front row's beds clear of the quilt that hangs past the table (render/maps/kyoto.ts)
+  const z1 = kotatsu.z1 + 0.1 + NAP_BED.back + NAP_BED.d / 2;
   for (const row of [0, 1]) {
-    for (const o of [-1.2, -0.4, 0.4, 1.2]) {
+    for (const o of [-1.275, -0.425, 0.425, 1.275]) {
       const x = kx + o;
-      const s: Spot = row === 0 ? { x, z: 1.0, wz: 0.45, ax: side, face: 0 } : { x, z: 2.5, wz: 2.5, ax: x, face: Math.PI };
+      const s: Spot = row === 0 ? { x, z: NAP_Z0 - 0.08, wz: walk, ax: side, face: 0 } : { x, z: z1, wz: z1, ax: x, face: 0 };
       lounge.push(s);
-      furniture.push(boxAt(x, s.z, 0.55, 0.55, s));
+      furniture.push(napBedAt(s));
       ways.push({ s, to: { x: s.ax, z: BACK } });
     }
   }

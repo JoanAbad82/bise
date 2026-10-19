@@ -14,7 +14,7 @@
 import type { Agent } from '@/proto';
 import { type Bar, type Box, type Leg, type Office, type Park, type Pt, QUEUE_GAP, type Spot } from '../model';
 import { backBusy, type CozyHints } from '../cozy';
-import { type Plan, boxAt, deskNames, wayIn } from './plan';
+import { NAP_ROW, NAP_Z0, type Plan, boxAt, deskNames, napBedAt, wayIn } from './plan';
 
 /** California's office: the numbers its look reads past the common ones. */
 export interface CaliforniaOffice extends Office {
@@ -42,7 +42,7 @@ const DESK_Z0 = 4.4;
 /** the back zone's corridor: the first desk row's walkway */
 const CROSS_BACK = DESK_Z0 - 0.5;
 const MIN_D = 16;
-const LOUNGE_N = 10;
+const LOUNGE_N = 8;
 const LOUNGE_W = 4.4;
 const QUEUE_N = 6;
 const TERRACE_N = 12;
@@ -88,7 +88,7 @@ export function californiaLayout(agents: readonly Agent[], prev?: CaliforniaOffi
   for (let i = 0; i < LOUNGE_N; i++) {
     const j = i % 4;
     const x = x0 + 0.65 + j * step;
-    const z = 1.0 + Math.floor(i / 4) * 1.05;
+    const z = NAP_Z0 + Math.floor(i / 4) * NAP_ROW;
     lounge.push({ x, z, wz: z, ax: j < 3 ? x + step / 2 : x - step / 2, face: 0 });
   }
   const boardX = x0 + LOUNGE_W + 1.15;
@@ -231,7 +231,7 @@ function furnitureOf(o: Pick<Office, 'desks' | 'mainDesk' | 'island' | 'lounge' 
   out.push(boxAt(o.mainDesk.x, o.mainDesk.z + 0.6, 2.3, 1.0));
   const i = o.island;
   out.push({ x0: i.x0 - 0.05, x1: i.x1 + 0.05, z0: i.z0 - 0.05, z1: i.z1 + 0.05 });
-  for (const l of o.lounge) out.push(boxAt(l.x, l.z - 0.05, 0.72, 0.72, l));
+  for (const l of o.lounge) out.push(napBedAt(l));
   for (const t of o.terrace) out.push(boxAt(t.x, t.z + 0.05, 0.5, 0.95, t));
   return out;
 }

@@ -10,7 +10,10 @@ import type { Agent } from '@/proto';
 import type { Box, Leg, Office, Pt, Spot } from '../model';
 import type { CozyHints } from '../cozy';
 import { type BOffice, LOFT_LIKE, QUEUE_N, type Way, corridor, keepSlots, outside, queueMoreOf, walksOf } from './bplan';
-import { type Plan, boxAt } from './plan';
+import { NAP_BED, NAP_ROW, type Plan, boxAt, napBedAt } from './plan';
+
+/** the nap place's columns: a bed (plan.ts NAP_BED) and a lane */
+const NAP_STEP = 1.2;
 
 export interface WorkshopOffice extends BOffice {
   /** the ping-pong table's floor box */
@@ -69,8 +72,15 @@ export function workshopLayout(agents: readonly Agent[], prev?: WorkshopOffice):
   const mainDesk: Spot = { x: mx, z: 3.0, wz: 3.0, ax: qx, face: 0 };
   furniture.push(boxAt(mx, 3.6, 2.3, 1.0));
   ways.push({ s: mainDesk });
+  // the nap place's first row: its beds start here (below); the land queue stops short of them
+  const napZ0 = D - 1.2 - NAP_ROW;
+  const napFront = napZ0 - NAP_BED.back - NAP_BED.d / 2;
   const queue: Spot[] = [];
-  for (let i = 0; i < QUEUE_N; i++) queue.push({ x: qx, z: 2.6 + i * 0.5, wz: BACK, ax: qx, face: Math.PI / 2 });
+  for (let i = 0; i < QUEUE_N; i++) {
+    const z = 2.6 + i * 0.5;
+    if (i > 0 && z > napFront - 0.3) break;
+    queue.push({ x: qx, z, wz: BACK, ax: qx, face: Math.PI / 2 });
+  }
   for (const s of queue) ways.push({ s });
   const boardX = x1 - 1.6;
   const boardSpots = [-0.45, 0.45, 0].map((d) => ({ x: boardX + d, z: 0.75, wz: BACK, ax: boardX + d, face: Math.PI }));
@@ -93,11 +103,12 @@ export function workshopLayout(agents: readonly Agent[], prev?: WorkshopOffice):
   const lounge: Spot[] = [];
   for (let i = 0; i < 8; i++) {
     const j = i % 4;
-    const x = x1 - 3.9 + j * 0.95;
-    const z = D - 3.0 + Math.floor(i / 4) * 1.05;
-    const s = { x, z, wz: z, ax: j < 3 ? x + 0.475 : x - 0.475, face: 0 };
+    // clear of the ping-pong table on the left, of the scooter by the roller door; the land queue stops short of the first row
+    const x = x1 - 4.65 + j * NAP_STEP;
+    const z = napZ0 + Math.floor(i / 4) * NAP_ROW;
+    const s = { x, z, wz: z, ax: j < 3 ? x + NAP_STEP / 2 : x - NAP_STEP / 2, face: 0 };
     lounge.push(s);
-    furniture.push(boxAt(x, z - 0.05, 0.62, 0.62, s));
+    furniture.push(napBedAt(s));
     ways.push({ s, to: { x: s.ax, z: crossFront } });
   }
 
@@ -112,7 +123,7 @@ export function workshopLayout(agents: readonly Agent[], prev?: WorkshopOffice):
     ...out.trunk,
     [{ x: aisle, z: BACK }, { x: aisle, z: crossFront }],
     corridor(crossFront, ways, [aisle]),
-    [{ x: qx, z: BACK }, { x: qx, z: 2.6 + (QUEUE_N - 1) * 0.5 }],
+    [{ x: qx, z: BACK }, { x: qx, z: queue[queue.length - 1]?.z ?? 2.6 }],
     ...sides,
   ];
   const walks = walksOf(trunk, ways);

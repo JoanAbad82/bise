@@ -40,7 +40,8 @@ export function riadLayout(agents: readonly Agent[], prev?: RiadOffice): RiadOff
   const front = patio.z1 + 0.6;
   const D = front + 0.6;
 
-  const back = backZone(x0, W, BACK);
+  // the beds clear of the banquette along the back wall (render/maps/riad.ts)
+  const back = backZone(x0, W, BACK, { napZ: 1.65 });
   const out = outside(x0, D, left, front);
   const ways: Way[] = [...back.ways, ...out.ways];
   const furniture: Box[] = [...back.furniture, ...out.furniture];

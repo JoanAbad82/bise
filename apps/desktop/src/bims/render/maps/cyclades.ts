@@ -16,7 +16,7 @@ import { DAY, NIGHT, WORLD, hash } from '../palette';
 import type { Build, MapLook, Wear } from './look';
 import {
   beds, cone, deskOf, floorOf, frames, gameTable, grow, mainDeskOf, nc, palOf, patterned,
-  pieceSpots, plinth, potted, terrace, treeSpots, type Piece,
+  pieceSpots, plinth, potted, terrace, treeSpots, type Piece, pastNap,
 } from './yard';
 
 const BLUE = '#2f5fa7';
@@ -118,19 +118,19 @@ function island(b: Build): void {
   }
 }
 
-/** the built-in white bench along the back wall, a blue cushion per place */
+/**
+ * the built-in white benches of the nap place, one per bed (its floor box: maps/plan.ts napBedAt),
+ * low, a blue cushion along it and a white bolster at its head; a long bench behind the beds had the
+ * nappers' heads in it (Gabriel, bims-clip)
+ */
 function lounge(b: Build): void {
-  const { k, o } = b;
-  const xs = o.lounge.map((s) => s.x);
-  const s3 = b.stage(3);
-  if (s3 && xs.length) {
-    const x0 = Math.min(...xs) - 0.5;
-    const x1 = Math.max(...xs) + 0.5;
-    k.add(k.style.box(x1 - x0, 0.3, 0.45), k.mat(k.pal.wall), s3, (x0 + x1) / 2, 0.15, 0.3);
-  }
+  const { k } = b;
   beds(b, (g, box) => {
-    k.add(k.style.box(0.7, 0.12, 0.5), k.mat(BLUE), g, (box.x0 + box.x1) / 2, 0.08, (box.z0 + box.z1) / 2);
-    k.add(k.style.box(0.5, 0.2, 0.1), k.mat(WHITE), g, (box.x0 + box.x1) / 2, 0.22, box.z0 + 0.05);
+    const x = (box.x0 + box.x1) / 2;
+    const z = (box.z0 + box.z1) / 2;
+    k.add(k.style.box(box.x1 - box.x0 - 0.04, 0.12, box.z1 - box.z0 - 0.04), k.mat(k.pal.wall), g, x, 0.06, z);
+    k.add(k.style.box(box.x1 - box.x0 - 0.14, 0.08, box.z1 - box.z0 - 0.3), k.mat(BLUE), g, x, 0.16, z + 0.08);
+    k.add(k.style.capsule(0.07, box.x1 - box.x0 - 0.3), k.mat(WHITE), g, x, 0.2, box.z0 + 0.14).rotation.z = Math.PI / 2;
   });
 }
 
@@ -166,13 +166,13 @@ const PIECES: Record<number, Piece> = {
     for (let i = 0; i < 3; i++) k.add(k.style.box(0.5 + i * 0.25, 0.04, 0.01), k.mat(WORLD.board[i] ?? BLUE), g, p.x - 0.3, 0.65 - i * 0.13, z + 0.05);
   },
   // a meander frieze on the low wall, a bouzouki leaning on it
-  5: (k, g, p) => {
+  5: (k, g, p, b) => {
     const z = 0.02;
     for (let i = 0; i < 12; i++) {
       k.add(k.style.box(0.18, 0.04, 0.02), k.mat(BLUE), g, p.x - 2.0 + i * 0.36, 0.72, z);
       k.add(k.style.box(0.04, 0.14, 0.02), k.mat(BLUE), g, p.x - 1.93 + i * 0.36, 0.66, z);
     }
-    const bx = p.x + 2.4;
+    const bx = pastNap(b.o);
     k.add(k.style.ball(0.14), k.mat('#c98a3e'), g, bx, 0.3, 0.3).scale.set(1, 1.2, 0.5);
     k.add(k.style.box(0.05, 0.55, 0.03), k.mat('#6b4a32'), g, bx, 0.7, 0.3);
   },

@@ -1,22 +1,23 @@
 // The tropical house's look (Brazil, modernist; render/maps/look.ts; its plan: maps/tropical.ts):
 // polished concrete, a cobogó wall at the back (blocks pierced with circles), azulejos on the side
 // wall, a thin flat roof on slim pilotis over the hammocks, the Copacabana wave along the front,
-// monsteras in pots along each S of desks, the juice bar on the right; hammock-chairs then
-// hammocks to nap; banana trees and palms; bright sneakers on every bim. Its growth (page
-// bims-maps, Brésil · la maison moderniste): a monstera, açaí bowls and the first banana tree,
-// two hammock-chairs, a board on the cobogó, an azulejo mural and a cavaquinho, tropical fruit and
-// heliconias, a straw parasol and a coconut kiosk, palms and hammocks, a pelada pitch, a pool with
-// wavy edges, the batucada drums, giant water lilies, a pipa, a golden cup; bossa nova record
-// sleeves, a gold record at 500. Owner: maps-c.
+// monsteras in pots along each S of desks, the juice bar on the right; hammocks to nap; banana
+// trees and palms; bright sneakers on every bim. Its growth (page bims-maps, Brésil · la maison
+// moderniste): a monstera, açaí bowls and the first banana tree, two hammocks, a board on the
+// cobogó, an azulejo mural and a cavaquinho, tropical fruit and heliconias, a straw parasol and a
+// coconut kiosk, palms and hammocks, a pelada pitch, a pool with wavy edges, the batucada drums,
+// giant water lilies, a pipa, a golden cup; bossa nova record sleeves, a gold record at 500.
+// Owner: maps-c.
 import { Group, type Object3D } from 'three';
 import type { Pt } from '../../model';
 import type { TropicalOffice } from '../../maps/tropical';
 import type { Kit } from '../kit';
+import { hammock } from '../cozy';
 import { DAY, NIGHT, WORLD, hash } from '../palette';
 import type { Build, MapLook, Wear } from './look';
 import {
   beds, block, cone, deskOf, floorOf, frames, grow, kite, mainDeskOf, nc, palOf, patterned,
-  pieceSpots, plinth, pond, potted, terrace, treeSpots, type Piece,
+  onTop, pieceSpots, plinth, pond, potted, terrace, treeSpots, type Piece, pastNap,
 } from './yard';
 
 const LEAF = '#2f7a4a';
@@ -132,25 +133,15 @@ function island(b: Build): void {
   }
 }
 
-/** a hammock-chair hung from the roof, then a full hammock between two pilotis */
+/**
+ * the nap place under its roof: hammocks only, each between a post at its head and one past its
+ * napper's toes (render/cozy.ts hammock, the cozy kit's two the same); hammock-chairs and hammocks
+ * on posts through the nappers read as nothing (Gabriel, bims-clip; bims m_33943)
+ */
 function lounge(b: Build): void {
   const { k } = b;
   beds(b, (g, box, i) => {
-    const x = (box.x0 + box.x1) / 2;
-    const z = (box.z0 + box.z1) / 2;
-    const cs = HAMMOCKS[i % 3] ?? HAMMOCKS[0];
-    if (i < 4) {
-      k.add(k.style.cylinder(0.01, 1.2), k.mat('#b9b3a8'), g, x, 1.35, z);
-      const seat = k.add(k.style.cap(0.32, 0.5), k.mat(cs[0]), g, x, 0.75, z);
-      seat.rotation.x = Math.PI;
-      return;
-    }
-    for (const dz of [-0.45, 0.45]) k.add(k.style.cylinder(0.04, 1.2), k.mat('#d8d2c6'), g, x, 0.6, z + dz);
-    for (let j = 0; j < 7; j++) {
-      const t = j / 6;
-      const s = k.add(k.style.box(0.5, 0.04, 0.14), k.mat(cs[j % 3] ?? SUN), g, x, 0.75 - Math.sin(t * Math.PI) * 0.35, z - 0.4 + t * 0.8);
-      s.rotation.x = -Math.cos(t * Math.PI) * 0.5;
-    }
+    hammock(k, g, box, HAMMOCKS[i % 3] ?? HAMMOCKS[0], '#d8d2c6');
   });
 }
 
@@ -194,10 +185,10 @@ const PIECES: Record<number, Piece> = {
     for (let i = 0; i < 4; i++) k.add(k.style.box(0.5 + (i % 3) * 0.2, 0.04, 0.01), k.mat(WORLD.board[i] ?? WORLD.marker), g, p.x - 0.3, 1.3 - i * 0.16, z + 0.05);
   },
   // an azulejo mural over the hammocks, a cavaquinho on a stand
-  5: (k, g, p) => {
+  5: (k, g, p, b) => {
     const z = 0.04 + k.style.pictureZ;
     for (let i = 0; i < 10; i++) for (let j = 0; j < 3; j++) k.add(k.style.box(0.34, 0.24, 0.02), k.mat((i + j) % 2 ? '#f3f6fb' : AZUL), g, p.x - 1.7 + i * 0.36, 0.95 + j * 0.26, z);
-    const cx = p.x + 2.3;
+    const cx = pastNap(b.o);
     k.add(k.style.ball(0.12), k.mat('#c98a3e'), g, cx, 0.35, 0.3).scale.set(1, 1.2, 0.4);
     k.add(k.style.box(0.05, 0.4, 0.03), k.mat('#6b4a32'), g, cx, 0.62, 0.3);
   },
@@ -299,7 +290,8 @@ export const tropical: MapLook = {
   shell,
   island,
   lounge,
-  desk: (b, d, name) => deskOf(b, d, name, { thing: (k, g, h) => { if (h % 4 === 1) potted(k, g, -0.5, 0.4, SUN, LEAF, 0.2); } }),
+  // a small potted plant on the desk top's back left corner: at the floor it stood inside the desk (bims-clip)
+  desk: (b, d, name) => deskOf(b, d, name, { thing: (k, g, h) => { if (h % 4 === 1) potted(k, onTop(g, -0.47, 0.7, 0.33), 0, 0, SUN, LEAF, 0.2); } }),
   mainDesk: (b) => mainDeskOf(b, '#a0673f', '#6b4a32'),
   tree: ({ k }, parent, x, z, size) => {
     tree(k, parent, x, z, size);

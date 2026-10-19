@@ -21,7 +21,7 @@ import { STYLE } from './style';
 const SIZES = [1, 3, 9, 20, 31];
 /** one event-loop turn: vitest's worker reads its RPC replies only between macrotasks; these laws
  *  build ~30 worlds a test (11-21 s alone, 45 s for the draw calls at load 25) and, run whole,
- *  failed -44's gate with 'Timeout calling onTaskUpdate' (gate-reds; lying.test.ts's fix, 8f7d3842a) */
+ *  failed -44's gate with 'Timeout calling onTaskUpdate' (gate-reds; the lying law's fix, 8f7d3842a) */
 const turn = (): Promise<void> => new Promise((done) => { setTimeout(done, 0); });
 /** the share of the floor the stage-0 base covers at least, up to 9 agents (the rug, the corner, the shelf, the lamp, two plants) */
 const FULL = 0.03;

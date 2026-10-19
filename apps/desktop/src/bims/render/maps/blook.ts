@@ -321,7 +321,7 @@ export const ARCADE_W = 0.55;
 
 /**
  * The arcade cabinet's place on the back wall past the whiteboard: behind the nap place's last bed
- * the napper laid its head inside it (Gabriel, bims-life; render/lying.test.ts).
+ * the napper laid its head inside it (Gabriel, bims-life; render/clip.test.ts).
  */
 export const pastBoard = (o: Office): Pt => ({ x: boardXOf(o) + 0.9 + 0.25 + ARCADE_W / 2, z: 0.3 });
 

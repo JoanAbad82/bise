@@ -12,6 +12,7 @@ import { Box3, type BufferGeometry, Group, type Material, Mesh, type Object3D } 
 import { BASE_BEDS } from '../growth';
 import { cozyAt, headRoom, type CozyStage, type Hung, type Item } from '../cozy';
 import type { Box, Office, Pt } from '../model';
+import { NAP_BED } from '../maps/plan';
 import type { Kit } from './kit';
 import { mergeRoot } from './merge';
 import { WORLD, hash } from './palette';
@@ -352,14 +353,7 @@ export function bed(k: Kit, g: Object3D, box: Box, kind: BedKind, c: CozyLook, i
       return;
     }
     case 'hammock': {
-      // a low frame, the cloth sagging between its ends
-      for (const sx of [-1, 1]) k.add(style.box(0.05, 0.3, 0.05), k.mat(c.wood), g, x + sx * (w / 2 - 0.05), 0.15, z);
-      k.add(style.box(w - 0.06, 0.03, 0.04), k.mat(c.wood), g, x, 0.02, z);
-      for (let j = 0; j < 5; j++) {
-        const t = j / 4;
-        const s = k.add(style.box((w - 0.14) / 5 + 0.02, 0.03, d - 0.2), k.mat(j % 2 ? c.cloth[0] : c.cloth[1]), g, x - (w - 0.14) / 2 + (w - 0.14) * (j + 0.5) / 5, 0.26 - Math.sin(t * Math.PI) * 0.12, z);
-        s.rotation.z = Math.cos(t * Math.PI) * 0.35;
-      }
+      hammock(k, g, box, [c.cloth[0], c.cloth[1]], c.wood);
       return;
     }
     case 'mat':
@@ -368,6 +362,42 @@ export function bed(k: Kit, g: Object3D, box: Box, kind: BedKind, c: CozyLook, i
       for (let j = 0; j < 2; j++) k.add(style.box(w - 0.06, 0.012, 0.035), k.mat(c.cloth[2]), g, x, 0.056, z - d / 4 + (j * d) / 2);
       k.add(style.capsule(0.06, w - 0.3), k.mat(c.cloth[1]), g, x, 0.11, box.z0 + 0.12).rotation.z = Math.PI / 2;
     }
+  }
+}
+
+/**
+ * A hammock along its bed's box (maps/plan.ts napBedAt): a post at its head (the back wall's side)
+ * and one past its napper's toes, 0.8 tall, the cloth slung between their tops and sagging under
+ * the napper (pose.ts napping: hips on its spot, its back up to its head), striped in `cloth`.
+ * Bims m_33943: one kind of bed in a nap place, its posts never through a napper (Gabriel, bims-clip).
+ */
+export function hammock(k: Kit, g: Object3D, box: Box, cloth: readonly string[], wood: string): void {
+  const { style } = k;
+  const x = (box.x0 + box.x1) / 2;
+  const hz = box.z0 + 0.04;
+  const fz = box.z1 - 0.025;
+  const spot = box.z1 - (NAP_BED.d / 2 - NAP_BED.back);
+  for (const [z, h] of [[hz, 0.8], [fz, 0.62]] as const) {
+    k.add(style.cylinder(0.035, h), k.mat(wood), g, x, h / 2, z);
+    k.add(style.box(0.56, 0.04, 0.04), k.mat(wood), g, x, h - 0.04, z);
+  }
+  // the cloth's line: down from the head post under the napper's back, its lowest under the hips, up to the foot post
+  const pts: readonly (readonly [number, number])[] = [[hz + 0.03, 0.74], [spot - 0.62, 0.6], [spot - 0.3, 0.32], [spot, 0.18], [fz - 0.03, 0.52]];
+  const n = 12;
+  const at = (t: number): readonly [number, number] => {
+    const f = t * (pts.length - 1);
+    const i = Math.min(pts.length - 2, Math.floor(f));
+    const a = pts[i] ?? pts[0] ?? [hz, 0.7];
+    const b = pts[i + 1] ?? a;
+    const u = f - i;
+    return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+  };
+  for (let j = 0; j < n; j++) {
+    const [z0, y0] = at(j / n);
+    const [z1, y1] = at((j + 1) / n);
+    const len = Math.hypot(z1 - z0, y1 - y0);
+    const s = k.add(style.box(0.52, 0.03, len + 0.01), k.mat(cloth[j % cloth.length] ?? wood), g, x, (y0 + y1) / 2, (z0 + z1) / 2);
+    s.rotation.x = -Math.atan2(y1 - y0, z1 - z0);
   }
 }
 
@@ -409,7 +439,7 @@ function napCorner(b: Build, g0: Groups, c: CozyLook, st: CozyStage): void {
   if (st.throwOn && first) {
     // a throw over the first bed's foot
     const g7 = need(g0, 7);
-    const top = c.bed === 'mat' ? 0.06 : c.bed === 'zabuton' ? 0.12 : c.bed === 'cushion' ? 0.225 : c.bed === 'pouf' ? 0.42 : 0.26;
+    const top = c.bed === 'mat' ? 0.06 : c.bed === 'zabuton' ? 0.12 : c.bed === 'cushion' ? 0.225 : c.bed === 'pouf' ? 0.42 : c.bed === 'hammock' ? 0.48 : 0.26;
     k.add(k.style.box(first.x1 - first.x0 - 0.12, 0.015, 0.16), k.mat(c.art[1]), g7, (first.x0 + first.x1) / 2, top, first.z1 - 0.14);
   }
 }
@@ -765,7 +795,7 @@ function mergeInto(b: Build, g0: Groups): void {
   for (const [n, g] of g0) {
     const into = b.stage(n);
     if (!into) continue;
-    // each loose piece's box, kept on the merged meshes: the laws (lying.test, cozy.test) read pieces, not one office-wide box
+    // each loose piece's box, kept on the merged meshes: the laws (clip.test, cozy.test) read pieces, not one office-wide box
     g.updateMatrixWorld(true);
     const parts: Box3[] = [];
     g.traverse((x) => { if (x instanceof Mesh) parts.push(new Box3().setFromObject(x)); });

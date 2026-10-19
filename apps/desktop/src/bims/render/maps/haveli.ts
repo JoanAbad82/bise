@@ -14,7 +14,7 @@ import { DAY, NIGHT, WORLD, hash, rng } from '../palette';
 import type { Build, MapLook, Wear } from './look';
 import {
   beds, cone, deskOf, floorOf, frames, gameTable, glow, grow, kite, mainDeskOf, nc, palOf,
-  patterned, pieceSpots, plinth, pond, potted, terrace, treeSpots, type Piece,
+  patterned, pieceSpots, plinth, pond, potted, terrace, treeSpots, type Piece, pastNap,
 } from './yard';
 
 const BLUE = '#3d6fb6';
@@ -182,14 +182,14 @@ const PIECES: Record<number, Piece> = {
     for (let i = 0; i < 4; i++) k.add(k.style.box(0.4 + r() * 0.6, 0.04, 0.01), k.mat('#fffaf0'), g, p.x - 0.3 + r() * 0.2, 1.3 - i * 0.16, z + 0.05);
   },
   // a fresco on the back wall (an elephant, flowers), a harmonium on the floor
-  5: (k, g, p) => {
+  5: (k, g, p, b) => {
     const z = 0.02 + k.style.pictureZ;
     k.add(k.style.box(3.6, 0.8, 0.02), k.mat('#f3e2b8'), g, p.x, 1.2, z);
     const el = k.add(k.style.ball(0.22), k.mat('#9a958c'), g, p.x - 0.6, 1.15, z + 0.02);
     el.scale.set(1.4, 0.9, 0.1);
     k.add(k.style.ball(0.12), k.mat('#9a958c'), g, p.x - 0.25, 1.28, z + 0.02).scale.z = 0.1;
     for (let i = 0; i < 6; i++) k.add(k.style.ball(0.07), k.mat(i % 2 ? SAFFRON : TEAL), g, p.x + 0.3 + i * 0.22, 1.1 + (i % 2) * 0.15, z + 0.02).scale.z = 0.2;
-    const hx = p.x + 2.4;
+    const hx = pastNap(b.o);
     k.add(k.style.box(0.55, 0.22, 0.3), k.mat('#8a5a3c'), g, hx, 0.11, 0.3);
     for (let i = 0; i < 6; i++) k.add(k.style.box(0.07, 0.02, 0.1), k.mat(i % 2 ? WORLD.ink : '#fffaf0'), g, hx - 0.2 + i * 0.08, 0.23, 0.38);
   },

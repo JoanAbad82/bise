@@ -37,7 +37,7 @@ export function nordicLayout(agents: readonly Agent[], prev?: NordicOffice): Nor
   const x0 = -W / 2;
 
   // the stove's corner first, then 8 sheepskins
-  const back = backZone(x0, W, BACK, { lx0: x0 + 1.4, lw: 3.0, n: 8, bed: 0.8 });
+  const back = backZone(x0, W, BACK, { lx0: x0 + 1.4, lw: 3.0, n: 8 });
   const out = outside(x0, D, -AISLE, front);
   const ways: Way[] = [...back.ways, ...out.ways];
   const furniture: Box[] = [...back.furniture, ...out.furniture, table];

@@ -59,7 +59,7 @@ export function sahelLayout(agents: readonly Agent[], prev?: SahelOffice): Sahel
 
   const crossFront = Math.max(lastZ + 0.88 + 1.2, tree.z + RING + 0.9);
   const D = crossFront + 0.5;
-  const back = backZone({ x0: X0, W, main: 'right', bed: [0.7, 0.5], reach: [AISLE] });
+  const back = backZone({ x0: X0, W, main: 'right', reach: [AISLE] });
   const front = frontZone({ x0: X0, W, D, doorX: tree.x, terraceU: 1.0, out: 'left' });
   furniture.push(...back.furniture, ...front.furniture);
 

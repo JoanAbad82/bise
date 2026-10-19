@@ -81,7 +81,7 @@ export function cycladesLayout(agents: readonly Agent[], prev?: CycladesOffice):
 
   const crossFront = Math.max(cubeZ(rows * 2 - 1) + 0.45 + 0.89 + 1.3, pz + 4.6);
   const D = crossFront + 0.5;
-  const back = backZone({ x0: X0, W, main: 'right', bed: [0.8, 0.6], reach: LANES });
+  const back = backZone({ x0: X0, W, main: 'right', reach: LANES });
   const front = frontZone({ x0: X0, W, D, doorX: r0, terraceU: 1.0, out: 'left' });
   furniture.push(...back.furniture, ...front.furniture);
 

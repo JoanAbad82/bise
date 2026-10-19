@@ -36,7 +36,8 @@ export function campusLayout(agents: readonly Agent[], prev?: CampusOffice): Cam
   const front = BACK + rowsP * PITCH_Z;
   const D = front + 0.6;
 
-  const back = backZone(x0, W, BACK);
+  // the beds clear of the stepped seats along the back wall (render/maps/campus.ts shell)
+  const back = backZone(x0, W, BACK, { napZ: 1.65 });
   const out = outside(x0, D, aisle, front);
   const ways: Way[] = [...back.ways, ...out.ways];
   const furniture: Box[] = [...back.furniture, ...out.furniture];

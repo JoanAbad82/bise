@@ -6,7 +6,7 @@
 // nearest corridor straight ahead. Pure, no three. Owner: maps-c.
 import type { Box, Leg, Office, Pt, Spot } from '../model';
 import { QUEUE_GAP } from '../model';
-import { boxAt, placesOf, wayIn } from './plan';
+import { NAP_ROW, NAP_Z0, boxAt, napBedAt, placesOf, wayIn } from './plan';
 
 /** the back zone's depth, and its corridor (every map of the chunk: the room's first 4.3 tiles) */
 export const BACK_D = 4.3;
@@ -36,14 +36,14 @@ export interface BackOpts {
   readonly main: 'right' | 'left';
   /** the nap place's spots, 4 a row (8 at most here) */
   readonly beds?: number;
-  /** a bed's floor box (across, along) */
-  readonly bed?: readonly [number, number];
+  /** the first row of beds' spot z (plan.ts NAP_Z0): further out past what stands along the back wall */
+  readonly napZ?: number;
   /** the corridor's ends past the back zone's own (the map's aisles) */
   readonly reach?: readonly number[];
 }
 
 /**
- * The back zone: the nap place in the corner on one side (4 beds a row, a lane between each two,
+ * The back zone: the nap place in the corner on one side (4 beds a row, plan.ts napBedAt, a lane between each two and between the rows,
  * up to the back corridor), the board on the back wall past it, main's desk in the other corner
  * and its land queue in a lane on its inner side. Measured from the nap place's wall (`u`).
  */
@@ -52,16 +52,15 @@ export function backZone(o: BackOpts): BackZone {
   const side = o.main === 'right' ? 1 : -1;
   const X = (u: number): number => (side === 1 ? x0 + u : x0 + W - u);
   const step = 1.3;
-  const [bw, bd] = o.bed ?? [0.72, 0.72];
   const lounge: Spot[] = [];
   const furniture: Box[] = [];
   for (let i = 0; i < (o.beds ?? 8); i++) {
     const j = i % 4;
     const u = 0.9 + j * step;
-    const z = 1.0 + Math.floor(i / 4) * 1.2;
+    const z = (o.napZ ?? NAP_Z0) + Math.floor(i / 4) * NAP_ROW;
     const s: Spot = { x: X(u), z, wz: z, ax: X(j < 3 ? u + step / 2 : u - step / 2), face: 0 };
     lounge.push(s);
-    furniture.push(boxAt(s.x, s.z, bw, bd, s));
+    furniture.push(napBedAt(s));
   }
   const bx = X(0.9 + 3 * step + 1.9);
   const boardSpots = [-0.45, 0.45, 0].map((d) => ({ x: bx + d, z: 0.75, wz: CROSS_BACK, ax: bx + d, face: Math.PI }));
