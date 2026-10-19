@@ -13,6 +13,7 @@ tools that never turn it red). Never his ~/.bise, no real gate.
 
   python3 -B tests/nightly_gate_test.py
 """
+import datetime
 import os
 import shutil
 import subprocess
@@ -34,6 +35,8 @@ echo "lockf: $HOME/.bise/run/heavy.lock: already locked"
 [ -n "${FAKE_SWEEP:-}" ] && rm -rf "$FAKE_SWEEP"
 [ -n "${FAKE_LAND:-}" ] && git -C "$FAKE_LAND" commit -q --allow-empty -m landed
 [ -n "${FAKE_HEAVY_FAIL:-}" ] && { echo "heavy-run: $FAKE_HEAVY_FAIL"; exit 2; }
+# the slots come at that time (the fake clock)
+[ -n "${FAKE_SLOT_AT:-}" ] && echo "$FAKE_SLOT_AT" >"$NIGHTLY_NOW"
 [ "${1:-}" = --alone ] && { echo "heavy-run: both slots"; shift; }
 exec "$@"
 """
@@ -43,7 +46,18 @@ exec "$@"
 # tooling that never ran, a map refused (review-gates m_29723)
 FAKE_COVMAP = """const [mode] = process.argv.slice(2);
 const e = process.env;
+import fs from 'node:fs';
+if (e.FAKE_ARGS) fs.appendFileSync(e.FAKE_ARGS, 'covmap ' + process.argv.slice(2).join(' ') + '\\n');
+const flag = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : ''; };
 if (mode === 'checks') {
+  // the night's end comes during the checks: two specs cut (cut.txt), the clock past the end
+  if (e.FAKE_COV_CHECKS === 'cut') {
+    const d = flag('--gate-dir') + '/desktop-cov-run';
+    fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(d + '/cut.txt', 'checks/a.spec.ts\\nchecks/b.spec.ts\\n');
+    fs.writeFileSync(e.NIGHTLY_NOW, String(Number(flag('--until')) + 300));
+    console.log('covmap checks: 1/1 green; 2 not run: cut by the night end'); process.exit(3);
+  }
   if (e.FAKE_COV_CHECKS === 'red') { console.log('FAIL keep-red'); process.exit(1); }
   // the hook broke: covmap.mjs's checksVerdict reruns the checks without coverage for the verdict
   if (e.FAKE_COV_CHECKS === 'nohook') { console.log('covmap checks: 3/3 green (the coverage hook never took a coverage: this is the run without coverage; no map tonight)'); process.exit(0); }
@@ -56,10 +70,25 @@ if (mode === 'map') {
 }
 process.exit(2);
 """
+# the desktop app's full end-to-end and the recorded core: their argv, a none run past the end
+FAKE_DESKTOP = """echo "desktop-full $*" >>"${FAKE_ARGS:-/dev/null}"
+until="${3#@}"
+[ -n "$until" ] && [ "$(cat "$NIGHTLY_DESKTOP_NOW")" -ge "$until" ] && { echo "STEP candidate: none (past)"; exit 2; }
+exit 0
+"""
+FAKE_CORE = """echo "core-record" >>"${FAKE_ARGS:-/dev/null}"
+exit 0
+"""
 FAKE_AUDIT = """import os, sys
 print("fake audit")
 sys.exit(1 if os.environ.get("FAKE_AUDIT_MISS") else 0)
 """
+
+
+def at(hh, mm, days=0):
+    """Today's epoch at hh:mm local, plus days."""
+    d = datetime.datetime.now().replace(hour=hh, minute=mm, second=0, microsecond=0) + datetime.timedelta(days=days)
+    return str(int(d.timestamp()))
 
 
 def check(ok, what):
@@ -87,6 +116,10 @@ def main():
             f.write(FAKE_COVMAP)
         with open(os.path.join(repo, "tests", "desktop_pick_audit.py"), "w") as f:
             f.write(FAKE_AUDIT)
+        with open(os.path.join(repo, "scripts", "nightly_desktop.sh"), "w") as f:
+            f.write(FAKE_DESKTOP)
+        with open(os.path.join(repo, "scripts", "core_record.sh"), "w") as f:
+            f.write(FAKE_CORE)
         heavy = os.path.join(t, "heavy-run")
         with open(heavy, "w") as f:
             f.write(FAKE_HEAVY)
@@ -103,9 +136,14 @@ def main():
         tree = os.path.join(out, "tree")
         wt = os.path.join(tree, "harness")
         env0 = {k: v for k, v in os.environ.items() if not k.startswith("GIT_") and not k.startswith("FAKE_")}
-        env0.update(BISE_HOME=home, NIGHTLY_HEAVY_RUN=heavy)
+        clock, args_log = os.path.join(t, "now"), os.path.join(t, "args")
+        env0.update(BISE_HOME=home, NIGHTLY_HEAVY_RUN=heavy, NIGHTLY_NOW=clock, FAKE_ARGS=args_log)
 
-        def night(**fake):
+        def night(NOW=None, **fake):
+            # the fake clock: 01:30 today, when the launchd job queues the night
+            with open(clock, "w") as f:
+                f.write(NOW or at(1, 30))
+            open(args_log, "w").close()
             env = dict(env0, **fake)
             p = subprocess.run(["bash", os.path.join(repo, "scripts", "nightly_gate.sh")], env=env,
                                capture_output=True, text=True, timeout=60)
@@ -180,6 +218,65 @@ def main():
               "the hook broke and a check is red: a red night naming it, the map lost (owned): rc %s, red %r" % (rc, red))
         rc, log, last, red = night(FAKE_GATE_RC="1", FAKE_COV_MAP="refuse")
         check(rc != 0 and red is not None and "e2e_fake" in red, "a red gate stays red whatever the map: %r" % red)
+
+        # the night's end (review-gates m_32494): nothing new starts at or after 06:00
+        end = at(6, 0)
+        def calls():
+            return open(args_log).read().splitlines()
+        # a night that finishes: every step, by value (checks, map + audit, desktop-full,
+        # core-record), each told the end
+        rc, log, last, red = night()
+        steps = [l.split(":")[0][5:] for l in log.splitlines() if l.startswith("STEP ") and ": start " in l]
+        check(rc == 0 and red is None and len(last.split()) == 4 and "cut:" not in last,
+              "a night that finishes: rc %s, last %r" % (rc, last))
+        check(steps == ["desktop-checks", "desktop-map", "desktop-pick-audit", "desktop-full", "core-record"],
+              "the order by value: %r" % steps)
+        c = calls()
+        check(any(x.startswith("covmap checks ") and "--until %s" % end in x for x in c)
+              and "desktop-full %s/desktop-%s --until @%s" % (out, datetime.date.today().isoformat(), end) in c,
+              "the end told to the checks and desktop-full: %r" % c)
+        check("nothing new starts after %s 06:00" % datetime.date.today().isoformat() in log, "QUEUED names the end: %r" % log)
+        # the end comes during the checks: the specs cut are none, nothing starts after them, the
+        # slots are free; a first cut night is not red
+        rc, log, last, red = night(FAKE_COV_CHECKS="cut")
+        c = calls()
+        check(rc == 0 and red is None and "STEP desktop-checks: none (cut by the night's end 06:00)" in log,
+              "a night cut at 06:00: none, not red: rc %s, red %r, log %r" % (rc, red, log))
+        check("desktop-map" not in log and "core-record" not in c and "STEP core-record: none (past the night's end 06:00, not started)" in log,
+              "cut: no map from a cut run, core-record never starts: %r %r" % (c, log))
+        check("STEP desktop-full: none (cut by the night's end 06:00)" in log and "green" not in log.split("STEP desktop-checks: none")[1],
+              "cut: desktop-full none, nothing green after the end: %r" % log)
+        check(last.split()[2] == "green" and last.split()[4] == "cut:core-record,desktop-checks,desktop-full",
+              "cut: last names what the end cut: %r" % last)
+        hist = os.path.join(out, "checks-runs.tsv")
+        check(open(hist).read().splitlines()[-1].split("\t")[2:] == ["cut", "2"], "cut: checks-runs.tsv %r" % open(hist).read())
+        # a second cut night in a row: red, desktop-checks-cut
+        rc, log, last, red = night(FAKE_COV_CHECKS="cut")
+        check(rc != 0 and last.split()[2] == "red" and red is not None and "desktop-checks-cut" in red,
+              "two cut nights: red: rc %s, last %r, red %r" % (rc, last, red))
+        # a night that finishes in between: the next cut is a first one again
+        rc, log, last, red = night()
+        check(rc == 0 and red is None, "a whole night after: green, red removed: rc %s" % rc)
+        rc, log, last, red = night(FAKE_COV_CHECKS="cut")
+        check(rc == 0 and red is None, "a cut night after a whole one: not red: rc %s, red %r" % (rc, red))
+        rc, log, last, red = night()
+        # the slots come past the end (06:10): nothing runs, not even the gate; a none night, the
+        # second in a row red
+        rc, log, last, red = night(FAKE_SLOT_AT=at(6, 10))
+        check(rc == 3 and "fake gate" not in log and "START " not in log and last.split()[1:3] == ["?", "none"]
+              and "past the night's end 06:00" in last and red is None,
+              "slots past the end: nothing runs, none: rc %s, last %r, red %r, log %r" % (rc, last, red, log))
+        # a Mac asleep at 01:30 runs the job at its wake (07:00): that night's end is past
+        rc, log, last, red = night(NOW=at(7, 0))
+        check(rc == 1 and "fake gate" not in log and red is not None and "two nights in a row" in red,
+              "a wake at 07:00, the second none night: red: rc %s, red %r, log %r" % (rc, red, log))
+        # queued at 23:00: the end is tomorrow's 06:00
+        rc, log, last, red = night(NOW=at(23, 0))
+        check(rc == 0 and "covmap checks --gate-dir %s --until %s" % (os.path.join(home, "gate"), at(6, 0, 1)) in calls(),
+              "queued at 23:00: tomorrow's 06:00: rc %s, %r" % (rc, calls()))
+        # NIGHTLY_UNTIL empty (a run by hand in the day): no end
+        rc, log, last, red = night(NOW=at(14, 0), NIGHTLY_UNTIL="")
+        check(rc == 0 and red is None and not any("--until" in x for x in calls()), "no end: %r" % calls())
 
         # launchd's PATH has no node (2026-10-18: desktop-checks and desktop-map 'node: No such
         # file', exit 127): the script puts fnm's default alias dir (FNM_DIR) first, so an
@@ -263,7 +360,7 @@ def main():
     if FAILS:
         print("nightly_gate_test: FAIL\n  " + "\n  ".join(FAILS))
         return 1
-    print("nightly_gate_test: ok (6 nights, the desktop steps, 5 tip runs)")
+    print("nightly_gate_test: ok (6 nights, the desktop steps, the night's end, 5 tip runs)")
     return 0
 
 

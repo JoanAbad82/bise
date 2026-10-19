@@ -2,7 +2,7 @@
 # The desktop app's full end-to-end (fast-try p7, architect m_29601): what only the real packed
 # app shows, run at night and before a desktop release, never between Gabriel and a try (his try
 # path: a candidate, the selected checks and the smoke; docs/desktop-try.md).
-#   scripts/nightly_desktop.sh <out dir> [<sha>] [--until HH:MM]
+#   scripts/nightly_desktop.sh <out dir> [<sha>] [--until HH:MM|@<epoch>]
 # <sha>: default HEAD of this tree. The nightly (scripts/nightly_gate.sh --in-slot) runs it as one
 # night_step, in the slot it holds; desktop_try and desktop_dmg nest there at nice 10 (heavy_argv),
 # never a second slot. Its steps, by value (a night cut short keeps the most useful part):
@@ -16,8 +16,9 @@
 #              read-only and checked (never launched)
 # Each cand.sh run is on its own throwaway world (~/.bise/gate/real-shape, fake provider and
 # accounts) with its gates A/B/C; a breach is a red. A step is green, red, or none (no result:
-# not run, with why). --until: nothing new starts at or after that local time (the night's 08:00);
-# what didn't run is none, never green. On battery: nothing runs (none: on battery).
+# not run, with why). --until: nothing new starts at or after that local time, or that epoch (the
+# nightly passes its own end, @<06:00's epoch>, so a run started late starts nothing); what didn't
+# run is none, never green. On battery: nothing runs (none: on battery).
 # The reds: each ok:false step of the cand.sh JSONs, named 'as-he-does/<mode>: <step name>' (digits
 # as N: a card's number changes each run), plus the steps' own reds, split by tests/known_reds.py
 # (known with its owner, else NEW). A known red is still red.
@@ -35,10 +36,10 @@ out="" sha="" until=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --until) until="${2:-}"; shift 2 ;;
-    *) if [ -z "$out" ]; then out="$1"; elif [ -z "$sha" ]; then sha="$1"; else echo "usage: nightly_desktop.sh <out dir> [<sha>] [--until HH:MM]" >&2; return 2; fi; shift ;;
+    *) if [ -z "$out" ]; then out="$1"; elif [ -z "$sha" ]; then sha="$1"; else echo "usage: nightly_desktop.sh <out dir> [<sha>] [--until HH:MM|@<epoch>]" >&2; return 2; fi; shift ;;
   esac
 done
-[ -n "$out" ] || { echo "usage: nightly_desktop.sh <out dir> [<sha>] [--until HH:MM]" >&2; return 2; }
+[ -n "$out" ] || { echo "usage: nightly_desktop.sh <out dir> [<sha>] [--until HH:MM|@<epoch>]" >&2; return 2; }
 mkdir -p "$out" && out="$(cd "$out" && pwd)"
 sha="$(git -C "$here" rev-parse --verify -q "${sha:-HEAD}^{commit}")" || { echo "no commit ${sha:-HEAD} in $here" >&2; return 2; }
 bh="${BISE_HOME:-$HOME/.bise}"
@@ -54,14 +55,18 @@ note() { echo "$*" | tee -a "$sum"; }
 # <name> green|red|none <why>
 record() { state_of+=("$1=$2"); note "STEP $1: $2${3:+ ($3)}"; [ "$2" = red ] && echo "FAIL $1"; return 0; }
 
-# the hard end: an epoch, the next HH:MM from the start (a 23:00 start ends tomorrow's 08:00)
+# the hard end: an epoch, the next HH:MM from the start (a 23:00 start ends tomorrow's 08:00), or
+# @<epoch> as is (the nightly's own end, already past when its slots came late: nothing starts)
 # (NIGHTLY_DESKTOP_NOW: a file holding the epoch, the test's clock)
 now() { if [ -n "${NIGHTLY_DESKTOP_NOW:-}" ]; then cat "$NIGHTLY_DESKTOP_NOW"; else date +%s; fi; }
 end=""
-if [ -n "$until" ]; then
-  end="$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date -r "$(now)" +%F) $until:00" +%s 2>/dev/null)" || { echo "--until wants HH:MM, got $until" >&2; return 2; }
-  [ "$end" -gt "$(now)" ] || end=$((end + 86400))
-fi
+case "$until" in
+  "") ;;
+  @*) end="${until#@}"; [[ "$end" =~ ^[0-9]+$ ]] || { echo "--until wants HH:MM or @<epoch>, got $until" >&2; return 2; }
+      until="$(date -r "$end" +%H:%M)" ;;
+  *) end="$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date -r "$(now)" +%F) $until:00" +%s 2>/dev/null)" || { echo "--until wants HH:MM or @<epoch>, got $until" >&2; return 2; }
+     [ "$end" -gt "$(now)" ] || end=$((end + 86400)) ;;
+esac
 late() { [ -n "$end" ] && [ "$(now)" -ge "$end" ]; }
 on_battery() { [ -n "${NIGHTLY_DESKTOP_BATTERY:-}" ] && { [ "$NIGHTLY_DESKTOP_BATTERY" = 1 ]; return; }; /usr/bin/pmset -g batt 2>/dev/null | head -1 | grep -q "Battery Power"; }
 

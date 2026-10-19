@@ -110,13 +110,14 @@ artifact for all the shots (never one artifact per PNG), sent to designer.
 
 ### The full end-to-end: at night and before a desktop release
 
-`scripts/nightly_desktop.sh <out> [<sha>] [--until HH:MM]`, one step of the nightly
+`scripts/nightly_desktop.sh <out> [<sha>] [--until HH:MM|@<epoch>]`, one step of the nightly
 (`scripts/nightly_gate.sh`, results in `~/.bise/run/nightly/desktop-<date>/summary.txt`, a red
 in the night's `red` file), by value: the candidate of the tip, every quick as-he-does row with
 the first run and a fake-voice take, `pnpm test:land`, the full as-he-does pass (first, cut,
 rows2, two restarts, second, the core with no env), the DMG (`scripts/desktop-dmg.sh`, mounted
 read-only and checked). Every tests/checks spec also runs once a night under coverage
-(try-select's step). Nothing new starts after 08:00 (`none`, never green); on battery nothing
+(try-select's step). Nothing new starts after the night's end, 06:00 (`--until @<epoch>`: the
+nightly's own end, so a late start starts nothing; `none`, never green); on battery nothing
 runs. A red as-he-does step is named `as-he-does/<mode>: <step>` (digits as N) and split by
 `tests/known_reds.py`: known with its owner, else NEW; test:land's reds by their check's name.
 Each run leaves its line in `~/.bise/run/nightly/desktop-runs.tsv` (when, sha,

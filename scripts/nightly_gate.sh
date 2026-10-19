@@ -5,8 +5,9 @@
 #   scripts/nightly_gate.sh             run it now (through ~/.bise/run/heavy-run)
 #   scripts/nightly_gate.sh --install [HH:MM]
 #                                       a launchd job every day at HH:MM
-#                                       (default 04:30; a Mac asleep then
-#                                       runs it at its wake)
+#                                       (default 01:30; a Mac asleep then
+#                                       runs it at its wake, past the
+#                                       night's end: nothing runs)
 #   scripts/nightly_gate.sh --uninstall
 #   scripts/nightly_gate.sh --tip       main's tip, once, if the machine is
 #                                       quiet now (both heavy slots and the
@@ -61,7 +62,7 @@ export PATH
 launchd_path="$HOME/.bend/bin:$HOME/.cargo/bin:$node_bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 if [ "${1:-}" = --install ]; then
-  at="${2:-04:30}" h="${at%%:*}" m="${at##*:}"
+  at="${2:-01:30}" h="${at%%:*}" m="${at##*:}"
   mkdir -p "$(dirname "$plist")"
   cat >"$plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -111,12 +112,33 @@ fi
 ulimit -n 10240 2>/dev/null
 unset SB_AGENT SB_SOCKET CARGO_TARGET_DIR
 
+# the night's end (review-gates m_32494): NIGHTLY_END, an epoch set when the night is queued, the
+# next NIGHTLY_UNTIL (default 06:00; empty: no end, a run by hand in the day) within 12 h; else
+# (a Mac asleep through the night runs the job at its wake) that morning's, already past: nothing
+# starts. In the slot nothing new starts at or after it: not the gate, not a step, not a batch of
+# desktop checks (covmap --until), not a desktop-full step (nightly_desktop --until @<end>); the
+# one running then ends, then the slots are free. NIGHTLY_NOW: a file holding an epoch, the
+# tests' clock (covmap reads it too).
+now() { if [ -n "${NIGHTLY_NOW:-}" ]; then cat "$NIGHTLY_NOW"; else date +%s; fi; }
+[ -n "${NIGHTLY_NOW:-}" ] && export NIGHTLY_DESKTOP_NOW="$NIGHTLY_NOW"
+night_until="${NIGHTLY_UNTIL-06:00}"
+night_end() {
+  local t e
+  t="$(now)"
+  e="$(date -j -f "%Y-%m-%d %H:%M:%S" "$(date -r "$t" +%F) $night_until:00" +%s 2>/dev/null)" || return 1
+  [ "$e" -le "$t" ] && [ $((e + 86400 - t)) -le 43200 ] && e=$((e + 86400))
+  echo "$e"
+}
+late() { [ -n "${NIGHTLY_END:-}" ] && [ "$(now)" -ge "$NIGHTLY_END" ]; }
+
 if [ "${1:-}" = --in-slot ]; then
   # in the heavy slot: the tree at main's tip now, then the gate. A line
-  # NOSTART <why> when the gate cannot start; START <date> <sha> when it does.
+  # NOSTART <why> when the gate cannot start; LATE <why> when the slots came
+  # past the night's end (nothing runs); START <date> <sha> when it does.
   repo="$(basename "$main_tree")"; case "$repo" in target|owner) repo=repo ;; esac
   tree="$out/tree" wt="$out/tree/$repo"
   cd / || exit 1
+  if late; then echo "LATE the slots came at $(date -r "$(now)" +%H:%M), past the night's end $(date -r "$NIGHTLY_END" +%H:%M): nothing ran"; exit 3; fi
   tip="$(git -C "$main_tree" rev-parse --verify -q main)" || { echo "NOSTART no branch main in $main_tree"; exit 1; }
   if [ ! -e "$wt/.git" ]; then
     rm -rf "$wt"; git -C "$main_tree" worktree prune
@@ -135,25 +157,30 @@ if [ "${1:-}" = --in-slot ]; then
   cd "$wt" || { echo "NOSTART cannot enter $wt"; exit 1; }
   GATE_ALL=1 /usr/bin/caffeinate -is bash tests/gate.sh full --all
   rc=$?
-  # the night's steps after the gate, in this tree and slot, in this order (fast-try p2, p5, p7).
+  # the night's steps after the gate, in this tree and slot, by value (review-gates m_32494):
+  # desktop-checks, desktop-map + its audit, desktop-full, core-record (fast-try p2, p7, p5).
   # night_step [--own <owner>] <name> <file> [<cmd>...]: skipped when <file> isn't in the tree;
-  # exit 0 green, 1 red: a "FAIL <name>" line (the red file names it) and the night is red; 126
-  # or 127 (its command not found or not runnable: a PATH without node) is red too, "FAIL <name>:
-  # cannot run": a product step that never ran proves nothing (desktop-checks is the one nightly
-  # run of the harness checks); else no result. --own: a tool of the gate, not the product: its
-  # red is a "STEP <name>: red (owner <owner>)" line, its 126/127 no result, the night keeps the
-  # gate's verdict (review-gates m_29697 #1)
+  # at or past the night's end it never starts: "STEP <name>: none (past <end>)", no verdict,
+  # never green; exit 0 green, 1 red: a "FAIL <name>" line (the red file names it) and the night
+  # is red; 126 or 127 (its command not found or not runnable: a PATH without node) is red too,
+  # "FAIL <name>: cannot run": a product step that never ran proves nothing (desktop-checks is the
+  # one nightly run of the harness checks); 3 cut by the night's end: none; else no result.
+  # --own: a tool of the gate, not the product: its red is a "STEP <name>: red (owner <owner>)"
+  # line, its 126/127 no result, the night keeps the gate's verdict (review-gates m_29697 #1)
+  end_at="${NIGHTLY_END:+$(date -r "$NIGHTLY_END" +%H:%M)}"
   night_step() {
     local own=""
     [ "$1" = --own ] && { own=$2; shift 2; }
     local n=$1 f=$2; shift 2
     [ -f "$f" ] || { echo "STEP $n: not in this tree, skipped"; return 0; }
+    if late; then echo "STEP $n: none (past the night's end $end_at, not started)"; return 3; fi
     echo "STEP $n: start $(date +%T)"
     /usr/bin/caffeinate -is "$@"; local r=$?
     case $r in
       0) echo "STEP $n: green" ;;
       1) if [ -n "$own" ]; then echo "STEP $n: red (owner $own; not a product red)"
          else echo "FAIL $n"; echo "STEP $n: red"; rc=1; fi ;;
+      3) echo "STEP $n: none (cut by the night's end $end_at)" ;;
       126|127) if [ -n "$own" ]; then echo "STEP $n: no result (exit $r: cannot run)"
          else echo "FAIL $n: cannot run (exit $r)"; echo "STEP $n: red"; rc=1; fi ;;
       *) echo "STEP $n: no result (exit $r)" ;;
@@ -161,22 +188,52 @@ if [ "${1:-}" = --in-slot ]; then
     return $r
   }
   # every harness check of the desktop, once, under V8 coverage: a red check is a product red
-  # (FAIL <check>, the night red, review-gates m_29723); then the coverage map from that run and
+  # (FAIL <check>, the night red, review-gates m_29723); the night's end stops it between two
+  # batches of specs: the specs it cut have no verdict and go in the map complete:false (picked
+  # every time until a night runs them). Its cut nights in checks-runs.tsv (<date> <sha>
+  # cut|ran <specs cut>): the second night in a row cut is red, "FAIL desktop-checks-cut"
+  # (owner gate-nightly, the rule of desktop-runs.tsv). Then the coverage map from that run and
   # its audit, tools of the gate owned by try-select (fast-try p2): a refused map or a miss never
   # turns the night red (MISS lines, <gate dir>/desktop-pick-misses.tsv; the selection goes back
   # to shadow mode), and a missing map only makes the selection ALL
-  day="$(date +%F)"
+  day="$(date +%F)" gate_dir="${BISE_HOME:-$HOME/.bise}/gate"
   covmap=apps/desktop/tests/harness/coverage/covmap.mjs
-  night_step desktop-checks "$covmap" node "$covmap" checks
-  if night_step --own try-select desktop-map "$covmap" node "$covmap" map --day "$day"; then
-    night_step --own try-select desktop-pick-audit tests/desktop_pick_audit.py python3 -B tests/desktop_pick_audit.py --day "$day"
+  rm -f "$gate_dir/desktop-cov-run/cut.txt"
+  night_step desktop-checks "$covmap" node "$covmap" checks --gate-dir "$gate_dir" ${NIGHTLY_END:+--until "$NIGHTLY_END"}
+  cr=$?
+  if [ -f "$covmap" ]; then
+    ncut=0
+    if [ $cr = 3 ] && [ ! -s "$gate_dir/desktop-cov-run/cut.txt" ]; then ncut=all
+    elif [ -s "$gate_dir/desktop-cov-run/cut.txt" ]; then ncut="$(wc -l <"$gate_dir/desktop-cov-run/cut.txt" | tr -d ' ')"; fi
+    hist="$out/checks-runs.tsv"
+    prev="$(tail -1 "$hist" 2>/dev/null | cut -f3)"
+    printf '%s\t%s\t%s\t%s\n' "$day" "$(git rev-parse --short HEAD)" "$([ "$ncut" = 0 ] && echo ran || echo cut)" "$ncut" >>"$hist"
+    if [ "$ncut" != 0 ] && [ "$prev" = cut ]; then
+      echo "FAIL desktop-checks-cut: the night's end cut the desktop checks two nights in a row ($ncut specs tonight; owner gate-nightly)"
+      rc=1
+    fi
   fi
-  # the recorded ambient-core of the QA world, typed and checked for invariants (feature-tests, p5)
-  night_step core-record scripts/core_record.sh bash scripts/core_record.sh
+  if [ $cr != 3 ] && night_step --own try-select desktop-map "$covmap" node "$covmap" map --gate-dir "$gate_dir" --day "$day"; then
+    night_step --own try-select desktop-pick-audit tests/desktop_pick_audit.py python3 -B tests/desktop_pick_audit.py --gate-dir "$gate_dir" --day "$day"
+  fi
   # the desktop app's full end-to-end (fast-try p7): the packed candidate of this tip, every quick
   # as-he-does row with the first run, test:land, the full as-he-does pass, the DMG; a product
-  # step; nothing new starts after 08:00 (scripts/nightly_desktop.sh, docs/desktop-try.md)
-  night_step desktop-full scripts/nightly_desktop.sh bash scripts/nightly_desktop.sh "$out/desktop-$day" --until 08:00
+  # step. It runs even past the night's end, to start nothing and say so: its steps none, its
+  # line in desktop-runs.tsv, where a second run in a row with no result is red
+  # (scripts/nightly_desktop.sh, docs/desktop-try.md)
+  if [ -f scripts/nightly_desktop.sh ]; then
+    echo "STEP desktop-full: start $(date +%T)"
+    /usr/bin/caffeinate -is bash scripts/nightly_desktop.sh "$out/desktop-$day" ${NIGHTLY_END:+--until "@$NIGHTLY_END"}
+    case $? in
+      0) echo "STEP desktop-full: green" ;;
+      1) echo "FAIL desktop-full"; echo "STEP desktop-full: red"; rc=1 ;;
+      126|127) echo "FAIL desktop-full: cannot run"; echo "STEP desktop-full: red"; rc=1 ;;
+      *) if late; then echo "STEP desktop-full: none (cut by the night's end $end_at)"
+         else echo "STEP desktop-full: none (some steps not run)"; fi ;;
+    esac
+  else echo "STEP desktop-full: not in this tree, skipped"; fi
+  # the recorded ambient-core of the QA world, typed and checked for invariants (feature-tests, p5)
+  night_step core-record scripts/core_record.sh bash scripts/core_record.sh
   exit $rc
 fi
 
@@ -211,12 +268,29 @@ if [ "${1:-}" = --tip ]; then
 fi
 
 day="$(date +%F)" log="$out/$(date +%F).log" s=$SECONDS
-echo "QUEUED $(date): waiting for a heavy slot" >"$log"
+if [ -n "$night_until" ]; then
+  NIGHTLY_END="$(night_end)" || { echo "NIGHTLY_UNTIL wants HH:MM, got $night_until" >&2; exit 2; }
+  export NIGHTLY_END
+fi
+echo "QUEUED $(date): waiting for a heavy slot${NIGHTLY_END:+, nothing new starts after $(date -r "$NIGHTLY_END" '+%F %H:%M')}" >"$log"
 # --alone: both heavy slots, never beside an agent's heavy job (2026-10-14:
 # beside one, at load 8-9, 5 long tests timed out that pass alone; issue 26)
 "${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" --alone /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
 rc=$?
 sha="$(awk '/^START /{print $NF; exit}' "$log")"
+late_why="$(sed -n 's/^LATE //p' "$log" | tail -1)"
+if [ -z "$sha" ] && [ -n "$late_why" ]; then
+  # the slots came past the night's end: nothing ran, a night with no result (none), never green;
+  # the second in a row is red (the rule of desktop-runs.tsv: the gate must not silently never run)
+  prev="$(cut -d' ' -f3 "$out/last" 2>/dev/null)"
+  echo "$day ? none $((SECONDS - s)) $late_why" >"$out/last"
+  if [ "$prev" = none ]; then
+    { echo "nightly full gate: nothing ran two nights in a row ($day: $late_why)"
+      echo "log: $log"; } >"$out/red.tmp" && mv "$out/red.tmp" "$out/red"
+    exit 1
+  fi
+  exit 3
+fi
 if [ -z "$sha" ]; then
   # the gate did not start: an infra failure, no test ran
   why="$(sed -n 's/^NOSTART //p' "$log" | tail -1)"
@@ -227,10 +301,12 @@ if [ -z "$sha" ]; then
   [ $rc = 0 ] && rc=1
   exit $rc
 fi
+# the steps the night's end cut (none, never green), named after the verdict of what ran
+cut="$(sed -nE 's/^STEP ([^:]*): none \((past|cut by) the night.s end.*/\1/p' "$log" | sort -u | paste -sd, -)"
 if [ $rc = 0 ]; then
-  echo "$day $sha green $((SECONDS - s))" >"$out/last"; rm -f "$out/red"
+  echo "$day $sha green $((SECONDS - s))${cut:+ cut:$cut}" >"$out/last"; rm -f "$out/red"
 else
-  echo "$day $sha red $((SECONDS - s))" >"$out/last"
+  echo "$day $sha red $((SECONDS - s))${cut:+ cut:$cut}" >"$out/last"
   { echo "nightly full gate red on main $sha ($day, $((SECONDS - s)) s): $(grep -E '^FAIL ' "$log" | awk '{sub(/:$/, "", $2); print $2}' | tr '\n' ' ')"
     echo "log: $log"; } >"$out/red.tmp" && mv "$out/red.tmp" "$out/red"
 fi

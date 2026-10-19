@@ -468,10 +468,15 @@ the map does not know.
 
 Every test still runs: `gate.sh full --all`, a release agent's full gate
 (SB_AGENT release*), main's tip (no change), and every night:
-`scripts/nightly_gate.sh` (launchd `dev.bise.nightly-gate`, 04:30, installed
+`scripts/nightly_gate.sh` (launchd `dev.bise.nightly-gate`, 01:30, installed
 with `--install`) runs `gate.sh full --all` on main's tip in its own tree
 and writes `~/.bise/run/nightly/last`, and `red` only while main is red
-(main watches it: `sb wake --on-file ~/.bise/run/nightly/red`).
+(main watches it: `sb wake --on-file ~/.bise/run/nightly/red`). It holds
+both heavy slots, so it ends by 06:00 (review-gates m_32494): nothing new
+starts after it (the gate, a step, a batch of 8 desktop checks, a
+desktop-full step); what it cut is `none`, never green (`last` names it,
+`cut:<steps>`; cut checks go in the coverage map complete:false), and the
+second night in a row with the checks cut, or with nothing run, is red.
 
 Measured: a change to tests/every_e2e.py, full gate green in 285 s (1 test
 picked) instead of 743 s for all 118.
