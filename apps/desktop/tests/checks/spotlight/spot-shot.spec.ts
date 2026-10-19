@@ -118,11 +118,15 @@ test('spotlight/spot-shot: the still rides his ask (via the capsule), ✕ and cl
         await expect(cap2.getByTestId('spot.shot')).toBeVisible({ timeout: 3000 });
         await cap2.getByTestId('spot.shot.drop').click();
         await expect.poll(() => cmds(w, 'shot_drop').some((c) => c['id'] === id), { timeout: 3000 }).toBe(true);
+        // the scripted core says it went, as the real one does
+        await w.core.send({ ev: 'shot', file: null } as never);
+        await expect(cap2.getByTestId('spot.shot')).toHaveCount(0);
         await close(w, cap2);
       } else {
         // closed on its still: that one dropped
         await close(w, cap);
         await expect.poll(() => cmds(w, 'shot_drop').some((c) => c['id'] === id), { timeout: 3000 }).toBe(true);
+        await w.core.send({ ev: 'shot', file: null } as never);
       }
     }
     // Screen Recording off: no still, the spot says why and opens the pane
