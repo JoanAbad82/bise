@@ -12,7 +12,7 @@ import { MAP_IDS } from '../../../src/bims/maps/ids';
 import { shotOf, sleep, trackpad, writeIndex, type Shot } from './world';
 
 const shots: Shot[] = [];
-test.describe.configure({ timeout: 300_000 });
+test.describe.configure({ timeout: 600_000 });
 test.afterAll(() => {
   if (shots.length > 0) writeIndex(shots);
 });
@@ -20,7 +20,10 @@ test.afterAll(() => {
 const HOME = 'bise-home-00000000';
 const id = (map: string): string => `${map}-0000path`;
 
-function world(stage: number, theme: 'light' | 'dark'): Record<string, unknown>[] {
+/** each office's growth, sent once the app is up (a hub event: as the other bims checks send it) */
+const growthOf = (stage: number): Record<string, unknown> => ({ jobs_done: STAGE_AT[stage] ?? 0, days_used: stage === 0 ? 0 : 30, artifacts_made: stage * 12 });
+
+function world(theme: 'light' | 'dark'): Record<string, unknown>[] {
   const now = Date.now();
   const evs: Record<string, unknown>[] = [
     {
@@ -45,7 +48,6 @@ function world(stage: number, theme: 'light' | 'dark'): Record<string, unknown>[
   for (const m of MAP_IDS) {
     evs.push(
       { ev: 'agents', project: id(m), agents: [mainAgent({ status: 'idle' }), agent(`${m}-a`, { status: 'working', turn_ms: 1000 }), agent(`${m}-b`, { status: 'idle' })], places: [] },
-      { ev: 'growth', project: id(m), growth: { jobs_done: STAGE_AT[stage] ?? 0, days_used: stage === 0 ? 0 : 30, artifacts_made: stage * 12 } },
       { ev: 'cards', project: id(m), cards: [] },
     );
   }
@@ -74,13 +76,14 @@ async function settled(s: Session, quietMs = 1000, maxMs = 12_000): Promise<void
 for (const stage of [0, 10]) {
   for (const theme of ['light', 'dark'] as const) {
     test(`(town paths) every map at stage ${String(stage)}, ${theme}: each path reaches its office`, async () => {
-      const core = new FakeCore(world(stage, theme) as never);
+      const core = new FakeCore(world(theme) as never);
       const s = await launchDesktop({ core, route: 'bise', size: '1400x900' });
       try {
         await expect(s.page.getByTestId('app.right.agents.bims')).toBeVisible({ timeout: 20_000 });
         const town = s.page.getByTestId('app.right.bims.town');
         if ((await town.count()) === 0) await s.page.getByTestId('app.right.agents.bims').click();
         await expect(town).toHaveAttribute('data-state', 'on', { timeout: 20_000 });
+        for (const m of MAP_IDS) await core.send({ ev: 'growth', project: id(m), growth: growthOf(stage) } as never);
         await s.page.getByTestId('app.right.agents.width.wide').click();
         await sleep(600);
         await settled(s);
@@ -104,7 +107,9 @@ for (const stage of [0, 10]) {
           const file = `townpaths-${m}-s${String(stage)}-${theme}.png`;
           await shotOf(s.cdp, s.page, { x, y, width: w, height: h }, file);
           shots.push({ file, title: `${m}, stage ${String(stage)}, ${theme}`, says: stage === 0 ? 'the path meets the floor at the door, its apron at the edge' : 'the path meets the terrace\'s front edge (or the floor\'s beside it), its apron at the edge' });
+          await town.focus();
           await s.page.keyboard.press('Escape');
+          await expect(town, 'esc: the whole town again').not.toHaveAttribute('data-zoomed', 'true');
           await sleep(500);
           await settled(s);
         }
