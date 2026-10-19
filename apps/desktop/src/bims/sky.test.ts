@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Local } from './eggs';
 import {
-  DARK_KEY_MAX, DAY_LIGHT, LIGHT_HEMI_MIN, NIGHT_LIGHT, SLOT_S, SKY_FADE_S, WEATHERS, blendAt, blending, lightOf, mixHex, mixSky,
+  DARK_KEY_MAX, LIGHT_LIT_MIN, NIGHT_LIGHT, litOf, SLOT_S, SKY_FADE_S, WEATHERS, blendAt, blending, lightOf, mixHex, mixSky,
   oddsOf, retarget, sameSky, seasonOf, skyAt, skyOf, slotOf, sunAt, weatherOf, type Sky, type Weather,
 } from './sky';
 
@@ -196,8 +196,56 @@ describe('a transition', () => {
 describe('the theme guards (bims m_33030)', () => {
   const all = [1, 4, 7, 10].flatMap((mo) => day(mo, 5).map((l) => skyAt(l).sky));
 
-  it('light UI: the hemisphere never under 60% of the day', () => {
-    for (const s of all) expect(lightOf(s, 'light').hemiI).toBeGreaterThanOrEqual(DAY_LIGHT.hemiI * LIGHT_HEMI_MIN - 1e-9);
+  // the lit result (bims m_33351), on the light floor and lawn: never one grey-brown multiply
+  const FLOOR = '#f6e7cf';
+  const GRASS = '#86c96f';
+  const rgb8 = (h: string): [number, number, number] => {
+    const n = parseInt(h.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const noonFloor = lum(litOf(lightOf(skyOf({ el: 60, az: 180 }, 'clear'), 'light'), FLOOR));
+  const clearDay = [-30, -12, -7, -4, -2, 0, 2, 5, 8, 12, 20, 40, 60].flatMap((el) => [skyOf({ el, az: 90 }, 'clear'), skyOf({ el, az: 270 }, 'clear')]);
+
+  it('light UI: a clear night floor keeps ~70% of noon and its hue (lit, not the light intensity)', () => {
+    for (const s of clearDay) {
+      const f = litOf(lightOf(s, 'light'), FLOOR);
+      expect(lum(f) / noonFloor, `el ${String(s.el)}`).toBeGreaterThanOrEqual(LIGHT_LIT_MIN);
+    }
+    // whatever the weather, never darker than half of noon
+    for (const s of all) expect(lum(litOf(lightOf(s, 'light'), FLOOR)) / noonFloor).toBeGreaterThanOrEqual(0.55);
+  });
+
+  it('light UI: the floor never goes mauve or blue, the lawn stays green', () => {
+    for (const s of [...clearDay, ...all]) {
+      const l = lightOf(s, 'light');
+      const [r, g, b] = rgb8(litOf(l, FLOOR));
+      expect(r, `floor r>=g at el ${String(s.el)}`).toBeGreaterThanOrEqual(g);
+      expect(g, `floor g>=b at el ${String(s.el)}`).toBeGreaterThanOrEqual(b - 2);
+      const [gr, gg, gb] = rgb8(litOf(l, GRASS));
+      expect(gg, 'grass green').toBeGreaterThan(Math.max(gr, gb));
+    }
+  });
+
+  it('light UI: dusk has a warm key from its side, night a cool one (they differ at a glance)', () => {
+    const [dr, , db] = rgb8(lightOf(skyOf({ el: -3, az: 300 }, 'clear'), 'light').key);
+    const [nr, , nb] = rgb8(lightOf(skyOf({ el: -30, az: 0 }, 'clear'), 'light').key);
+    expect(dr - db).toBeGreaterThan(80);
+    expect(nb).toBeGreaterThan(nr);
+  });
+
+  it('light UI: dawn is a pale-yellow key, golden hour an amber one', () => {
+    const [ar, ag, ab] = rgb8(lightOf(skyOf({ el: 4, az: 70 }, 'clear'), 'light').key);
+    const [gr, gg, gb] = rgb8(lightOf(skyOf({ el: 4, az: 290 }, 'clear'), 'light').key);
+    expect(ag, 'dawn pale: a high green').toBeGreaterThan(0xe0);
+    expect(ab, 'dawn: some blue, never amber').toBeGreaterThan(gb);
+    expect(ar - ag, 'golden hour: amber (red over green)').toBeLessThan(gr - gg);
+  });
+
+  it('light UI: the noon shadow reads (~0.3 or darker), never from a stronger key', () => {
+    const l = lightOf(skyOf({ el: 60, az: 180 }, 'clear'), 'light');
+    const lit = lum(litOf(l, FLOOR));
+    expect(1 - lum(litOf(l, FLOOR, true)) / lit).toBeGreaterThanOrEqual(0.3);
+    expect(l.keyI).toBeLessThanOrEqual(1.9);
   });
 
   it('dark UI: never a bright day room in a dark panel', () => {

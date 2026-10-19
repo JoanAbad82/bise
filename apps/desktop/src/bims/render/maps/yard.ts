@@ -126,9 +126,9 @@ export function ring(k: Kit, parent: Object3D, r: number, tube: number, color: s
   return k.add(new TorusGeometry(r, tube, 8, 20, arc), k.mat(color), parent, x, y, z);
 }
 
-/** a soft glow by night (a lantern, a brazier, a diya), plain by day */
+/** a soft glow by night (a lantern, a brazier, a diya), plain by day; the sky fades it (kit.ts glow) */
 export function glow(k: Kit, color: string, ei = 0.9): Material {
-  return k.pal.pendants ? k.style.material(color, { emissive: color, ei }) : k.mat(color);
+  return k.glow(color, { night: ei });
 }
 
 /** a box sized from a floor box, on the floor up to h */

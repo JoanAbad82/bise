@@ -214,7 +214,7 @@ function shell(b: Build): void {
   posts([...back, ...side(pt.x0 - 0.15), ...side(pt.x1 + 0.15)]);
   k.add(style.box(pw + 0.4, 0.14, 0.2), col, root, (pt.x0 + pt.x1) / 2, H + 0.1, pt.z0 - 0.15);
   for (const x of [pt.x0 - 0.15, pt.x1 + 0.15]) k.add(style.box(0.2, 0.14, pd), col, root, x, H + 0.1, (pt.z0 + pt.z1) / 2);
-  const lit = style.material(SAFFRON, night ? { emissive: SAFFRON, ei: 1.2 } : {});
+  const lit = k.glow(SAFFRON, { night: 1.2 });
   for (let i = 0; i + 1 < back.length; i += 2) {
     const a = back[i];
     const c = back[i + 1];

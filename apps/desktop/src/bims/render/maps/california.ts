@@ -171,12 +171,11 @@ function parkSlab(k: Kit, root: Object3D, p: Park, n: boolean, carved: boolean):
   // the floodlights (the plan's poles: never on the camera's side, bims m_28843)
   for (const { x: px, z: pz } of p.poles) {
     k.add(style.cylinder(0.045, 3.0), k.mat(POLE), root, px, 1.5, pz);
-    k.add(style.box(0.4, 0.2, 0.22), style.material('#fff3c4', { emissive: '#fff3c4', ei: n ? 1.5 : 0.1 }), root, px, 3.0, pz);
-    if (n) {
-      const l = new PointLight('#fff3c4', 6, 9, 1.4);
-      l.position.set(px, 2.8, pz);
-      root.add(l);
-    }
+    k.add(style.box(0.4, 0.2, 0.22), k.glow('#fff3c4', { night: 1.5, day: 0.1 }), root, px, 3.0, pz);
+    // lit at night, in either theme as the sky says (kit.ts light)
+    const l = k.light(new PointLight('#fff3c4', 6, 9, 1.4));
+    l.position.set(px, 2.8, pz);
+    root.add(l);
   }
   // the benches (the plan's: one by the rest spots, one past the quarter pipe)
   for (const bn of p.benches) k.add(style.box(bn.x1 - bn.x0, 0.35, bn.z1 - bn.z0, 0.05), k.mat('#c49a6c'), root, (bn.x0 + bn.x1) / 2, 0.18, (bn.z0 + bn.z1) / 2);
@@ -421,11 +420,9 @@ function island({ k, root, o }: Build): void {
     wh.rotation.x = Math.PI / 2;
   }
   ['#ffd166', '#7cc26b', '#f28c28'].forEach((c, j) => k.add(style.box(0.22, 0.06, 0.14), k.mat(c), root, x - 0.5 + j * 0.5, 0.86, i.z0 - 0.15));
-  if (pal.pendants) {
-    const l = new PointLight('#ffcf8a', 3.2, 4.5, 1.6);
-    l.position.set(x, 1.6, i.z0 - 0.8);
-    root.add(l);
-  }
+  const l = k.light(new PointLight('#ffcf8a', 3.2, 4.5, 1.6));
+  l.position.set(x, 1.6, i.z0 - 0.8);
+  root.add(l);
 }
 
 /** where each stage's piece stands (its cones while it is built; the unlock walks there) */

@@ -42,6 +42,8 @@ export interface World {
   readonly pieces: Pieces;
   /** the snow on the lawn and the terrace only (never desks or floors, bims m_33030): 0 none .. 1 white */
   cover(level: number): void;
+  /** its night glows and lights (kit.ts glow, light: lanterns, pendants, shades) at this level, 0..1: the sky's lamps */
+  lit(level: number): void;
   dispose(): void;
 }
 
@@ -115,6 +117,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
     }
   });
   let covered = 0;
+  let glowing = pal.pendants ? 1 : 0;
 
   return {
     root,
@@ -122,6 +125,11 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
     mainDesk,
     pal,
     pieces,
+    lit(level) {
+      if (level === glowing) return;
+      glowing = level;
+      k.lit(level);
+    },
     cover(level) {
       if (level === covered) return;
       covered = level;

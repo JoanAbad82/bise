@@ -180,7 +180,7 @@ function cups(k: Kit, g: Object3D, x: number, y: number, z: number, color: strin
 }
 
 /** The map's machine on a top at height y (the cabinet's, the island's), its middle at (x, z), facing +z. */
-export function machine(k: Kit, g: Object3D, x: number, y: number, z: number, kind: CoffeeKind, c: CozyLook, night: boolean): void {
+export function machine(k: Kit, g: Object3D, x: number, y: number, z: number, kind: CoffeeKind, c: CozyLook): void {
   const { style } = k;
   switch (kind) {
     case 'espresso': {
@@ -188,7 +188,7 @@ export function machine(k: Kit, g: Object3D, x: number, y: number, z: number, ki
       // a coloured cup on its top, warming
       k.add(style.cylinder(0.035, 0.06), k.mat(c.art[0]), g, x - 0.06, y + 0.33, z - 0.02);
       k.add(style.box(0.12, 0.04, 0.08), k.mat(WORLD.metal), g, x, y + 0.22, z + 0.14);
-      k.add(style.box(0.08, 0.03, 0.02), style.material(WORLD.coffeeLed, { emissive: WORLD.coffeeLed, ei: night ? 0.7 : 0.3 }), g, x, y + 0.26, z + 0.125);
+      k.add(style.box(0.08, 0.03, 0.02), k.glow(WORLD.coffeeLed, { night: 0.7, day: 0.3 }), g, x, y + 0.26, z + 0.125);
       return;
     }
     case 'kettle':
@@ -204,7 +204,7 @@ export function machine(k: Kit, g: Object3D, x: number, y: number, z: number, ki
       if (kind === 'attaya') {
         // the brasero under it, its coals lit at night
         k.add(style.cylinder(0.11, 0.1), k.mat(WORLD.dark), g, x, y + 0.05, z);
-        k.add(style.cylinder(0.08, 0.025), style.material('#f28c28', { emissive: '#f28c28', ei: night ? 0.8 : 0.2 }), g, x, y + 0.11, z);
+        k.add(style.cylinder(0.08, 0.025), k.glow('#f28c28', { night: 0.8, day: 0.2 }), g, x, y + 0.11, z);
       }
       const yy = kind === 'attaya' ? y + 0.12 : y;
       const b = k.add(style.ball(0.09), k.mat(kind === 'attaya' ? WORLD.metal : BRASS), g, x, yy + 0.08, z);
@@ -255,7 +255,7 @@ export function machine(k: Kit, g: Object3D, x: number, y: number, z: number, ki
 }
 
 /** the coffee corner's cabinet against its wall: its doors, its top, the machine and two cups while it stands there (stages 0-1) */
-function coffeeCorner(k: Kit, g0: Groups, it: Item, c: CozyLook, st: CozyStage, night: boolean, onIsland: boolean): void {
+function coffeeCorner(k: Kit, g0: Groups, it: Item, c: CozyLook, st: CozyStage, onIsland: boolean): void {
   const g = at(need(g0, 0), it);
   const { style } = k;
   const { w, d } = sizeOf(it);
@@ -269,7 +269,7 @@ function coffeeCorner(k: Kit, g0: Groups, it: Item, c: CozyLook, st: CozyStage, 
     m.position.set(-w / 4 + 0.02, hgt, -0.04);
     m.scale.setScalar(MACHINE_SCALE);
     g.add(m);
-    machine(k, m, 0, 0, 0, c.coffee, c, night);
+    machine(k, m, 0, 0, 0, c.coffee, c);
     cups(k, g, w / 4, hgt, 0.05, c.cloth[0]);
     if (st.coffeeOnIsland) {
       // stage 2 where the eating place has no top (a fountain, a tree, its own kettle): the sugar pot and a cup rail join the corner
@@ -290,13 +290,13 @@ function coffeeCorner(k: Kit, g0: Groups, it: Item, c: CozyLook, st: CozyStage, 
 }
 
 /** stage 2's coffee on the eating place's top: the machine, a sugar pot, cups hanging on a little rail */
-function coffeeOnIsland(k: Kit, g: Object3D, isl: Box, y: number, c: CozyLook, night: boolean): void {
+function coffeeOnIsland(k: Kit, g: Object3D, isl: Box, y: number, c: CozyLook): void {
   const long = isl.z1 - isl.z0 >= isl.x1 - isl.x0;
   const cx = (isl.x0 + isl.x1) / 2;
   const cz = (isl.z0 + isl.z1) / 2;
   const p = (along: number, across: number): Pt => (long ? { x: cx + across, z: isl.z0 + along } : { x: isl.x0 + along, z: cz + across });
   const m = p(0.35, 0);
-  machine(k, g, m.x, y, m.z, c.coffee, c, night);
+  machine(k, g, m.x, y, m.z, c.coffee, c);
   const s = p(0.72, -0.18);
   k.add(k.style.cylinder(0.05, 0.09), k.mat(CUP), g, s.x, y + 0.045, s.z);
   k.add(k.style.ball(0.025), k.mat(c.cloth[1]), g, s.x, y + 0.1, s.z);
@@ -529,7 +529,7 @@ function thing(k: Kit, g: Object3D, x: number, y: number, z: number, kind: Shelf
 }
 
 /** a floor lamp (a foot, a pole, its shade lit at night) and its small side table with a cup and a book: a corner, not a pole alone (designer m_32271) */
-function lamp(k: Kit, g: Object3D, it: Item, c: CozyLook, night: boolean): void {
+function lamp(k: Kit, g: Object3D, it: Item, c: CozyLook): void {
   const { style } = k;
   const { w } = sizeOf(it);
   const grp = at(g, it);
@@ -547,7 +547,7 @@ function lamp(k: Kit, g: Object3D, it: Item, c: CozyLook, night: boolean): void 
   k.add(style.cylinder(0.16, 0.03), k.mat(c.wood), p, 0, 0.015, 0);
   k.add(style.cylinder(0.022, 1.3), k.mat(WORLD.dark), p, 0, 0.68, 0);
   // a warm shade, lit at night
-  const shade = style.material(WARM, night ? { emissive: k.pal.lampOn, ei: 1.0 } : {});
+  const shade = k.glow(WARM, { night: 1.0, emissive: k.pal.lampOn });
   k.add(style.cylinder(0.2, 0.3), shade, p, 0, 1.45, 0);
 }
 
@@ -787,17 +787,16 @@ export function buildCozy(b: Build, c: CozyLook, handles: ReadonlyMap<string, De
   const cz = o.cozy;
   if (!cz || !b.stage(0)) return;
   const st = cozyAt(grow.stage);
-  const night = k.pal.pendants;
   const g0: Groups = new Map();
   // the world as the look built it: the desk objects find a free spot on each desk's top
   // their geometry's boxes moved, not every vertex: cheap enough for a town of offices
   const solid = meshBoxes(b.root, false);
   const onIsland = st.coffeeOnIsland && cz.islandTop !== undefined;
-  coffeeCorner(k, g0, cz.coffee, c, st, night, onIsland);
-  if (onIsland) coffeeOnIsland(k, need(g0, 2), o.island, cz.islandTop, c, night);
+  coffeeCorner(k, g0, cz.coffee, c, st, onIsland);
+  if (onIsland) coffeeOnIsland(k, need(g0, 2), o.island, cz.islandTop, c);
   napCorner(b, g0, c, st);
   shelf(k, g0, cz.shelf, c, st);
-  cz.lamps.slice(0, st.floorLamps).forEach((it, i) => { lamp(k, need(g0, i === 0 ? 0 : 10), it, c, night); });
+  cz.lamps.slice(0, st.floorLamps).forEach((it, i) => { lamp(k, need(g0, i === 0 ? 0 : 10), it, c); });
   cz.plants.slice(0, st.floorPlants).forEach((it, i) => {
     const g = at(need(g0, [0, 0, 1, 5][i] ?? 5), it);
     plant(k, g, 0, 0, 0, c.plant, c.pot, FLOOR_PLANT);

@@ -464,7 +464,7 @@ export interface OfficeRenderer {
    * outline on the canvas (css px, convex): the CSS rain falls outside it only (bims m_33030: never
    * inside the room). null: no sky.
    */
-  falling(): { readonly rain: number; readonly snow: number; readonly hull: readonly { readonly x: number; readonly y: number }[] } | null;
+  falling(): { readonly rain: number; readonly snow: number; readonly hull: readonly { readonly x: number; readonly y: number }[]; readonly haze: number; readonly air: string } | null;
   /** WebGL lost: the shell falls back to the list with one line */
   onLost(cb: () => void): void;
   dispose(): void;

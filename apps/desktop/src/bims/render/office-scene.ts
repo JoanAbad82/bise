@@ -141,6 +141,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     eclipsed = false;
     world = buildWorld(office, mainName(), style, look, isNight, grow, ground);
     world.cover(cover);
+    if (lamps !== null) world.lit(lamps);
     root.add(world.root);
     if (eggDecor) { root.remove(eggDecor.root); eggDecor.dispose(); }
     eggDecor = makeEggDecor(office, style, grow.stage);
@@ -363,6 +364,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       lamps = l;
       cover = c;
       world?.cover(c);
+      world?.lit(l ?? (world.pal.pendants ? 1 : 0));
     },
     pal: () => world?.pal ?? null,
     office: () => office,

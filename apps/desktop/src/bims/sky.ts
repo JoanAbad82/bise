@@ -53,6 +53,15 @@ export interface Sky {
   readonly cover: number;
   /** how much the key is the moon's, 0 the sun .. 1 the moon (its shadow is fainter) */
   readonly moon: number;
+  /** the sun's height, degrees (the light UI's own table reads it: lightOf) */
+  readonly el: number;
+  /** 1 a morning sun (dawn: a pale-yellow key), 0 an afternoon one (golden, dusk: amber) */
+  readonly morning: number;
+  /** the weather's own numbers (EFFECT), blended like the rest: the key's share, the grey and its colour, how much darker */
+  readonly keyF: number;
+  readonly grey: number;
+  readonly greyTo: string;
+  readonly darker: number;
 }
 
 export interface SkyMoment {
@@ -218,6 +227,9 @@ function dirOf(az: number, el: number): V3 {
   return { x: Math.sin(a) * Math.cos(e), y: Math.sin(e), z: -Math.cos(a) * Math.cos(e) };
 }
 
+/** the key's lowest height, degrees: a setting sun still lights the floor (its shadows long, never endless) */
+const KEY_EL_MIN = 12;
+
 /** the moon's key: high in the south-west, the same all night (a still night never moves) */
 const MOON = { az: 210, el: 40 } as const;
 
@@ -246,9 +258,10 @@ const EFFECT: Readonly<Record<Weather, Effect>> = {
 export function skyOf(sun: { el: number; az: number }, weather: Weather): Sky {
   const c = clearAt(sun.el);
   const fx = EFFECT[weather];
-  // the key: the sun above -2°, the moon below -8°, crossing between (never both)
-  const day = smooth(-8, -2, sun.el);
-  const sunDir = dirOf(sun.az, Math.max(sun.el, 6));
+  // the key: the sun above -6° (dusk keeps a warm key from its side, bims m_33351), the moon below
+  // -10°, crossing between (never both)
+  const day = smooth(-10, -6, sun.el);
+  const sunDir = dirOf(sun.az, Math.max(sun.el, KEY_EL_MIN));
   const moonDir = dirOf(MOON.az, MOON.el);
   const d = { x: lerp(moonDir.x, sunDir.x, day), y: lerp(moonDir.y, sunDir.y, day), z: lerp(moonDir.z, sunDir.z, day) };
   const n = Math.hypot(d.x, d.y, d.z) || 1;
@@ -270,6 +283,13 @@ export function skyOf(sun: { el: number; az: number }, weather: Weather): Sky {
     snow: fx.snow,
     cover: fx.cover,
     moon: 1 - day,
+    // under -18° the night is one sky (a still night draws no frame); the morning only counts above -12°
+    el: Math.max(sun.el, -18),
+    morning: sun.el > -12 && sun.az < 180 ? 1 : 0,
+    keyF: fx.keyI,
+    grey: fx.grey,
+    greyTo: fx.greyTo,
+    darker: fx.darker,
   };
 }
 
@@ -305,6 +325,12 @@ export function mixSky(a: Sky, b: Sky, k0: number): Sky {
     snow: lerp(a.snow, b.snow, k),
     cover: lerp(a.cover, b.cover, k),
     moon: lerp(a.moon, b.moon, k),
+    el: lerp(a.el, b.el, k),
+    morning: lerp(a.morning, b.morning, k),
+    keyF: lerp(a.keyF, b.keyF, k),
+    grey: lerp(a.grey, b.grey, k),
+    greyTo: mixHex(a.greyTo, b.greyTo, k),
+    darker: lerp(a.darker, b.darker, k),
   };
 }
 
@@ -342,8 +368,8 @@ export interface Light {
 /** the app's signed lights (palette.ts DAY and NIGHT): the ends the theme guards hold */
 export const DAY_LIGHT = { hemi: '#ffffff', ground: '#e9dcc4', hemiI: 1.55, key: '#fff4e0', keyI: 1.9 } as const;
 export const NIGHT_LIGHT = { hemi: '#ffd9a8', ground: '#3a2c22', hemiI: 1.5, key: '#a9b8e8', keyI: 0.7 } as const;
-/** light UI: the hemisphere never under this share of the day's (bims, names and pills read at night) */
-export const LIGHT_HEMI_MIN = 0.6;
+/** light UI: a lit floor never under this share of noon's (bims, names and pills read at night; bims m_33351: measured on the lit result) */
+export const LIGHT_LIT_MIN = 0.65;
 /** dark UI: the key never brighter than this (never a bright day room in a dark panel) */
 export const DARK_KEY_MAX = 0.95;
 /** the moon's shadow, a share of the day's */
@@ -351,8 +377,45 @@ export const MOON_SHADOW = 0.3;
 /** how far the backdrop leans to the air (fog: up to AIR_MIX + AIR_HAZE) */
 const AIR_MIX = 0.08;
 const AIR_HAZE = 0.12;
-/** light UI at night: the hemisphere's cool cast (never pink: the '?' pill's alone) */
-const NIGHT_COOL = '#b4c0e4';
+/**
+ * The light UI's own sky by the sun's height (bims m_33351): night and dusk read by hue and by the
+ * lamps, never by dimming everything into one grey-brown. Night: a cool blue fill strong enough
+ * that the floor keeps ~70% of noon and its hue, the moon a pale key; dusk and golden hour: an amber
+ * key low across the floor from the sun's side over a blue fill; dawn: a pale-yellow key (morning)
+ * over a pale cool fill. Never a pink or mauve cast (the '?' pill's alone).
+ */
+interface LightKey {
+  readonly el: number;
+  readonly key: string;
+  readonly keyI: number;
+  readonly hemi: string;
+  readonly ground: string;
+  readonly hemiI: number;
+}
+const LIGHT_KEYS: readonly LightKey[] = [
+  { el: -18, key: '#c4d0f2', keyI: 0.8, hemi: '#cfd6ea', ground: '#d8b98f', hemiI: 2.15 },
+  { el: -8, key: '#c4d0f2', keyI: 0.7, hemi: '#d0d7ea', ground: '#d8b98f', hemiI: 2.1 },
+  { el: -4, key: '#ffad5c', keyI: 1.6, hemi: '#d3d9e9', ground: '#dcbf96', hemiI: 1.9 },
+  { el: 0, key: '#ffb466', keyI: 2.6, hemi: '#d8dde9', ground: '#e2c8a2', hemiI: 1.7 },
+  { el: 6, key: '#ffc47a', keyI: 3.0, hemi: '#e2e5ee', ground: '#e6d2b2', hemiI: 1.5 },
+  { el: 15, key: '#ffe2ae', keyI: 2.6, hemi: '#f2f2f1', ground: '#e9dcc4', hemiI: 1.3 },
+  { el: 35, key: DAY_LIGHT.key, keyI: DAY_LIGHT.keyI, hemi: DAY_LIGHT.hemi, ground: DAY_LIGHT.ground, hemiI: 1.15 },
+];
+/** dawn's key: a pale yellow (a morning sun under 15°), never the evening's amber */
+const DAWN_KEY = '#fff0b8';
+
+function lightKeyAt(el: number): LightKey {
+  let a = LIGHT_KEYS[0] as LightKey;
+  if (el <= a.el) return a;
+  for (const b of LIGHT_KEYS) {
+    if (el <= b.el) {
+      const k = smooth(a.el, b.el, el);
+      return { el, key: mixHex(a.key, b.key, k), keyI: lerp(a.keyI, b.keyI, k), hemi: mixHex(a.hemi, b.hemi, k), ground: mixHex(a.ground, b.ground, k), hemiI: lerp(a.hemiI, b.hemiI, k) };
+    }
+    a = b;
+  }
+  return a;
+}
 
 /** the sky's light in this theme */
 export function lightOf(sky: Sky, theme: Theme): Light {
@@ -361,16 +424,19 @@ export function lightOf(sky: Sky, theme: Theme): Light {
   const air = sky.air;
   const airMix = AIR_MIX + AIR_HAZE * sky.haze;
   if (theme === 'light') {
-    const floor = DAY_LIGHT.hemiI * LIGHT_HEMI_MIN;
+    const t = lightKeyAt(sky.el);
+    const dawn = sky.morning * (1 - smooth(6, 15, sky.el)) * (1 - sky.moon);
+    // the weather: a weaker key (never under the moon's), a greyer fill, a little darker
+    const night = 1 - smooth(-6, 6, sky.el);
     return {
       dir: sky.dir,
-      key: sky.key,
-      keyI: sky.keyI,
+      key: mixHex(t.key, DAWN_KEY, dawn),
+      keyI: t.keyI * lerp(sky.keyF, 1, night * 0.5),
       shadow,
       soft: sky.soft,
-      hemi: mixHex(sky.hemi, NIGHT_COOL, 0.55 * sky.moon),
-      ground: sky.ground,
-      hemiI: Math.max(floor, lerp(sky.hemiI, floor, sky.dark)),
+      hemi: mixHex(t.hemi, sky.greyTo, sky.grey * (1 - 0.6 * night)),
+      ground: mixHex(t.ground, '#f4f6fa', sky.cover * (1 - 0.5 * night)),
+      hemiI: t.hemiI * (1 - sky.darker * 0.4),
       lamps: smooth(0.35, 0.8, sky.dark),
       air,
       airMix,
@@ -392,6 +458,20 @@ export function lightOf(sky: Sky, theme: Theme): Light {
     air,
     airMix,
   };
+}
+
+/**
+ * What a surface of that colour looks like under a light (linear light, three's Lambert: the
+ * hemisphere's sky on a face up, the key by its height, over π), back in sRGB hex; `shaded`: in the
+ * key's shadow. A model of the lit result for the laws (bims m_33351), not the renderer.
+ */
+export function litOf(l: Light, albedo: string, shaded = false): string {
+  const a = rgb(albedo);
+  const h = rgb(l.hemi);
+  const k = rgb(l.key);
+  const up = Math.max(0, l.dir.y) * (shaded ? 1 - l.shadow : 1);
+  const c = (i: 0 | 1 | 2): number => (a[i] * (h[i] * l.hemiI + k[i] * l.keyI * up)) / Math.PI;
+  return hexOf([Math.min(1, c(0)), Math.min(1, c(1)), Math.min(1, c(2))]);
 }
 
 // ---- a transition: from the sky drawn to the slot's, then rest

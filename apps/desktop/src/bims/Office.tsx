@@ -58,8 +58,13 @@ function pinnedSky(): { sky?: false; weather?: Weather } {
   return w === undefined ? {} : { weather: w };
 }
 
-/** the rain or snow layer (falling.ts): its kind, its density, the building cut out */
+/** the rain or snow layer (falling.ts): its kind, its density, the building cut out; the haze round the edges */
 function placeFalling(el: HTMLElement, l: FallingLook): void {
+  const haze = el.nextElementSibling as HTMLElement | null;
+  if (haze !== null) {
+    haze.style.opacity = l.haze > 0 ? String(l.haze) : '';
+    haze.style.setProperty('--air', l.air);
+  }
   if (l.kind === null) {
     delete el.dataset.kind;
     el.style.opacity = '';
@@ -422,7 +427,7 @@ export function Office({
       const motion = r.frame(t, played, hold ? { ...look, hold } : look);
       if (fallRef.current !== null) {
         const fh = holder.current;
-        const fl = fallingLook(r.falling(), fh?.clientWidth ?? 0, fh?.clientHeight ?? 0, reduced);
+        const fl = fallingLook(r.falling(), fh?.clientWidth ?? 0, fh?.clientHeight ?? 0);
         const sig = fallingSig(fl);
         if (sig !== lastFall) {
           lastFall = sig;
@@ -756,6 +761,7 @@ export function Office({
       <canvas ref={xfade} className="bims-xfade" aria-hidden="true" data-testid="app.right.bims.xfade" />
       {/* the rain or snow outside the building (falling.ts): a CSS loop, never a WebGL frame */}
       <div ref={fallRef} className="bims-falling" aria-hidden="true" data-testid="app.right.bims.falling" />
+      <div className="bims-haze" aria-hidden="true" data-testid="app.right.bims.haze" />
       <div className="bims-overlay">
         <svg ref={leaders} className="bims-leaders" aria-hidden="true" />
         <div ref={zzzRef} className="bims-zzzs" data-testid="app.right.bims.zzzs" />

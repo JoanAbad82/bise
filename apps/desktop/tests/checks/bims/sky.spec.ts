@@ -8,8 +8,8 @@
 //       the lamps are on at night and off at a clear noon (light UI); rain and snow show their layer,
 //       a dry sky none;
 //   (2) a transition: a slot change draws a blend of ~SKY_FADE_S at 30 fps at most, then 0;
-//   (3) reduced motion: no rain layer, the blend at the loop's rate;
-//   (4) 320: a rainy night and a dusk, the pills read.
+//   (3) reduced motion: the rain held still (no animation), the blend at the loop's rate;
+//   (4) 320: a rainy night and a dusk, the pills read. (1) is the wide bar (640, docked).
 // Shots: .harness-cache/bims-shots/sky-*.png and index.html (bims signs them); the transition's
 // frames in .harness-cache/bims-shots/sky-clip/. Owner: bims-sky.
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -103,12 +103,15 @@ async function show(s: Session, m: Moment): Promise<void> {
 
 for (const theme of ['light', 'dark'] as const) {
   test(`(1) the day and the weathers, wide, ${theme}`, async () => {
-    const { s } = await open(office, { theme, width: 1400 });
+    const { s } = await open(office, { theme, width: 1600 });
     try {
       await s.page.evaluate(() => {
         (window as unknown as { __biseSky?: unknown }).__biseSky = { weather: 'clear' };
       });
       await showOffice(s);
+      // wide: the 640 bar, docked (office.spec's SIZES)
+      await s.page.getByTestId('app.right.agents.width.wide').click();
+      await expect(s.page.getByTestId('app.panel')).toHaveAttribute('data-wide', 'docked', { timeout: 3000 });
       for (const m of [...DAY, ...WEATHER]) {
         await show(s, m);
         const k = await skyNow(s);
@@ -128,7 +131,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 
   test(`(4) 320: a rainy night and a dusk, ${theme}`, async () => {
-    const { s } = await open(office, { theme, width: 320 + 640 });
+    const { s } = await open(office, { theme, width: 1400 });
     try {
       await s.page.evaluate(() => {
         (window as unknown as { __biseSky?: unknown }).__biseSky = { weather: 'clear' };
@@ -183,7 +186,7 @@ test('(2) a transition: a blend of ~4 s at 30 fps, then rest (the clip)', async 
   }
 });
 
-test('(3) reduced motion: no rain layer, the blend at the loop rate', async () => {
+test('(3) reduced motion: the rain held still, the blend at the loop rate', async () => {
   const { s } = await open(office, { theme: 'light', width: 1400, reduced: true });
   try {
     await s.page.evaluate(() => {
@@ -197,8 +200,14 @@ test('(3) reduced motion: no rain layer, the blend at the loop rate', async () =
     const drawn = ((await probe(s.page))?.frames ?? 0) - f0;
     expect(drawn, 'the slow fade at the loop rate (8 fps)').toBeLessThan(SKY_FADE_REDUCED_S * 9 + 6);
     expect(drawn, 'it fades (never a cut)').toBeGreaterThan(SKY_FADE_REDUCED_S * 4);
-    expect((await skyNow(s))?.falling ?? null, 'no rain layer').toBeNull();
-    await shot(s, 'sky-light-wide-reduced-dusk-rain.png', 'sky · reduced motion · dusk, rain · wide · light', 'no rain drawn, the light faded in');
+    // the drops held still (bims m_33351: he can tell it rains), never moving
+    expect((await skyNow(s))?.falling ?? null, 'the rain layer, still').toBe('rain');
+    const anim = await s.page.evaluate(() => {
+      const el = document.querySelector('[data-testid="app.right.bims.falling"]');
+      return el === null ? '' : getComputedStyle(el, '::before').animationName;
+    });
+    expect(anim, 'no animation under reduced motion').toBe('none');
+    await shot(s, 'sky-light-wide-reduced-dusk-rain.png', 'sky · reduced motion · dusk, rain · light', 'still drops: he can tell it rains; the light faded in');
   } finally {
     await s.close();
   }

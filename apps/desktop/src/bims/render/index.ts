@@ -244,7 +244,8 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       for (const x of [o.x0 - HULL_PAD, o.x0 + o.W + HULL_PAD])
         for (const z of [-HULL_PAD, o.D + HULL_PAD])
           for (const y of [-0.2, HULL_H]) pts.push(toScreen(fit, { x, y, z }));
-      return { rain: s.rain, snow: s.snow, hull: hullOf(pts) };
+      const l = lightOf(s, lastLook.night ? 'dark' : 'light');
+      return { rain: s.rain, snow: s.snow, hull: hullOf(pts), haze: s.haze, air: l.air };
     },
     onLost(cb) {
       view.onLost(cb);

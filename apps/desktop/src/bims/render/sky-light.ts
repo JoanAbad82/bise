@@ -7,9 +7,9 @@ import type { Light } from '../sky';
 
 /** how far the key stands from what it lights (inside the shadow camera's near/far) */
 const KEY_DIST = 16;
-/** the shadow's softness: the clear sun's radius, and how much clouds add */
-const RADIUS = 8;
-const RADIUS_SOFT = 14;
+/** the shadow's softness: the clear sun's radius (crisp: it has to read at 320, bims m_33351), and how much clouds add */
+const RADIUS = 3;
+const RADIUS_SOFT = 16;
 
 export function applyLight(hemi: HemisphereLight, key: DirectionalLight, l: Light, at: { x: number; y: number; z: number }, dist = KEY_DIST): void {
   hemi.color.set(l.hemi);

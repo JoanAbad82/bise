@@ -204,7 +204,7 @@ function shell(b: Build): void {
   k.add(style.ball(0.25), k.mat('#8e9399'), root, at.maple.x + 0.6, 0.08, at.maple.z - 0.9).scale.y = 0.6;
   const l = at.lantern;
   k.add(style.box(0.22, 0.45, 0.22), k.mat(STONE), root, l.x, 0.22, l.z);
-  k.add(style.box(0.3, 0.2, 0.3), style.material('#e9d8a6', pal.pendants ? { emissive: '#e9d8a6', ei: 1.2 } : {}), root, l.x, 0.55, l.z);
+  k.add(style.box(0.3, 0.2, 0.3), k.glow('#e9d8a6', { night: 1.2 }), root, l.x, 0.55, l.z);
   k.add(style.box(0.42, 0.1, 0.42), k.mat('#8e9399'), root, l.x, 0.72, l.z);
   tree(k, root, at.maple.x, at.maple.z, 1.1, 0, b.grow.stage >= 6);
   // walls: earthen plaster in a dark wood frame; the left one low, its shoji
@@ -214,7 +214,7 @@ function shell(b: Build): void {
   for (let x = x0; x <= x0 + W + 0.01; x += 1.9) k.add(style.box(0.08, 1.8, 0.05), wood, root, x, 0.9, 0.01);
   k.add(style.box(W, 0.08, 0.06), wood, root, x0 + W / 2, 1.78, 0.01);
   for (let z = 0; z <= D + 0.01; z += 1.9) k.add(style.box(0.05, 1.2, 0.08), wood, root, x0 + 0.01, 0.6, z);
-  const paper = style.material('#fbf6e8', pal.pendants ? { emissive: '#fbf6e8', ei: 0.35 } : {});
+  const paper = k.glow('#fbf6e8', { night: 0.35 });
   for (let z = 4.6; z < D - 1.2; z += 1.9) {
     k.add(style.box(0.02, 0.8, 1.6), paper, root, x0 + 0.02, 0.62, z + 0.8);
     for (let i = 1; i < 4; i++) k.add(style.box(0.03, 0.8, 0.02), wood, root, x0 + 0.03, 0.62, z + i * 0.4);

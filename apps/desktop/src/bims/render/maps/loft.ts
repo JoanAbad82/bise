@@ -31,7 +31,7 @@ function shell({ k, root, o, grow }: Build): void {
   const wallH = 1.7;
   k.add(style.box(W + 0.2, wallH, 0.2), k.mat(pal.wall), root, cx, wallH / 2, -0.1);
   k.add(style.box(0.2, 1.0, D + 0.2), k.mat(pal.wall), root, x0 - 0.1, 0.5, D / 2);
-  const glass = style.material(pal.window, { emissive: pal.window, ei: pal.pendants ? 0.4 : 0 });
+  const glass = k.glow(pal.window, { night: 0.4 });
   for (let z = (o.desks.size > 0 ? Math.min(...[...o.desks.values()].map((d) => d.z)) : 4.3) + 0.1; z < D - 1; z += 2.3) {
     k.add(style.box(0.05, 0.45, 1.2), glass, root, x0, 0.62, z + 0.6);
   }
@@ -77,12 +77,11 @@ function island({ k, root, o, grow }: Build): void {
   const top = { ...full, z1: Math.min(full.z1, full.z0 + islandLen(o, grow.stage) + 0.15) };
   k.add(style.box(top.x1 - top.x0 - 0.2, 0.62, top.z1 - top.z0 - 0.15, 0.2), k.mat(pal.island), root, ix, 0.31, (top.z0 + top.z1) / 2);
   onFloor(k, root, top, 0.07, 0.66, pal.islandTop);
-  if (pal.pendants) {
-    for (let z = isl.z0 + 0.9; z < top.z1; z += 1.8) {
-      const l = new PointLight('#ffcf8a', 3.2, 4.5, 1.6);
-      l.position.set(ix, 1.5, z);
-      root.add(l);
-    }
+  // the pendants' light, at night in either theme as the sky says (kit.ts light)
+  for (let z = isl.z0 + 0.9; z < top.z1; z += 1.8) {
+    const l = k.light(new PointLight('#ffcf8a', 3.2, 4.5, 1.6));
+    l.position.set(ix, 1.5, z);
+    root.add(l);
   }
 }
 

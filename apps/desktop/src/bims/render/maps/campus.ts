@@ -37,7 +37,7 @@ function shell(b: Build): void {
   k.add(style.box(W, 0.14, D), style.floor(pal.floor, W, D), root, x0 + W / 2, -0.05, D / 2);
   k.add(style.box(W + 0.2, 1.7, 0.2), k.mat(pal.wall), root, x0 + W / 2, 0.85, -0.1);
   k.add(style.box(0.2, 1.0, D + 0.2), k.mat(pal.wall), root, x0 - 0.1, 0.5, D / 2);
-  const glass = style.material(pal.window, { emissive: pal.window, ei: pal.pendants ? 0.4 : 0 });
+  const glass = k.glow(pal.window, { night: 0.4 });
   for (let z = 4.6; z < D - 1; z += 2.3) k.add(style.box(0.05, 0.45, 1.2), glass, root, x0, 0.62, z + 0.6);
   // a round carpet under every pod that has a desk
   const used = new Set([...o.slots.values()].map((s) => Math.floor(s / 4)));

@@ -46,7 +46,7 @@ function nook(k: Kit, root: Object3D, o: NordicOffice): void {
   k.add(style.box(0.75, 0.45, 0.16, 0.08), k.mat('#c9d6e3'), root, x - 0.4, 0.55, z + 0.3);
   k.add(style.box(0.6, 0.1, 0.5), k.mat(SKIN), root, x - 0.4, 0.42, z - 0.05);
   k.add(style.cylinder(0.02, 1.3), k.mat(WORLD.dark), root, x - 1.0, 0.65, z + 0.55);
-  k.add(style.cap(0.18, 0.6), style.material('#fff2d6', pal.pendants ? { emissive: '#ffd166', ei: 0.9 } : {}), root, x - 1.0, 1.35, z + 0.55).userData.shade = true;
+  k.add(style.cap(0.18, 0.6), k.glow('#fff2d6', { night: 0.9, emissive: '#ffd166' }), root, x - 1.0, 1.35, z + 0.55).userData.shade = true;
 }
 const boardX = (o: Office): number => o.boardSpots.reduce((s, p) => s + p.x, 0) / Math.max(1, o.boardSpots.length);
 const counterX = (o: Office): number => (o.island.x0 + o.island.x1) / 2;
@@ -131,11 +131,10 @@ const grower: Grower = {
       for (const dz of [-0.3, 0.3]) k.add(k.style.cylinder(0.05, 0.09), k.mat(WORLD.paper), g, p.x, 0.74, p.z + dz);
     }),
     // 7 a campfire on the terrace, two log benches
-    piece((o) => ({ x: o.x0 + o.W - 3.4, z: o.D + 2.0 }), (k, g, p, b) => {
-      const night = b.k.pal.pendants;
+    piece((o) => ({ x: o.x0 + o.W - 3.4, z: o.D + 2.0 }), (k, g, p) => {
       k.add(k.style.cylinder(0.4, 0.08), k.mat('#8e9399'), g, p.x, 0.04, p.z);
       for (let i = 0; i < 3; i++) k.add(k.style.cylinder(0.05, 0.5), k.mat(DARK_WOOD), g, p.x, 0.12, p.z).rotation.set(Math.PI / 2, (i * Math.PI) / 3, 0);
-      k.add(k.style.cap(0.18, 0.8), k.style.material(WORLD.orange, { emissive: WORLD.orange, ei: night ? 1.4 : 0.5 }), g, p.x, 0.22, p.z);
+      k.add(k.style.cap(0.18, 0.8), k.glow(WORLD.orange, { night: 1.4, day: 0.5 }), g, p.x, 0.22, p.z);
       for (const dz of [-0.85, 0.85]) {
         const log = k.add(k.style.cylinder(0.12, 1.1), k.mat('#a0673f'), g, p.x, 0.12, p.z + dz);
         log.rotation.z = Math.PI / 2;
@@ -214,15 +213,15 @@ function shell(b: Build): void {
   k.add(style.box(t.x1 - t.x0 - 0.1, 0.5, tl - 0.1, 0.06), k.mat(pal.desk), root, 0, 0.25, tz);
   k.add(style.box(t.x1 - t.x0, 0.06, tl), k.mat(pal.deskTop), root, 0, 0.52, tz);
   k.add(style.box(0.4, 0.01, tl - 0.2), k.mat(night ? '#9aa4ad' : '#dfe7ee'), root, 0, 0.555, tz);
-  const flame = style.material('#ffd166', night ? { emissive: '#ffd166', ei: 2 } : {});
+  const flame = k.glow('#ffd166', { night: 2 });
   for (let z = t.z0 + 0.8; z < t.z1; z += 1.6) {
     k.add(style.cylinder(0.04, 0.16), k.mat(WORLD.paper), root, 0, 0.64, z);
     k.add(style.ball(0.035), flame, root, 0, 0.75, z);
   }
   // 2-3 mushroom table lamps on the table's middle line, between its rows of places (bims m_33464:
-  // the pendants hid the heads on the screen, shade.test.ts); lit at night like the desk lamps
+  // the pendants hid the heads on the screen, shade.test.ts); lit at night like the desk lamps, as the sky fades them (kit.ts glow)
   const cream = k.mat(night ? '#d8d2c6' : '#f3ead8');
-  const glow = style.material('#ffd166', night ? { emissive: '#ffd166', ei: 0.8 } : {});
+  const glow = k.glow('#ffd166', { night: 0.8 });
   for (const z of tableLamps(t, PITCH)) {
     k.add(style.cylinder(0.06, 0.02), cream, root, 0, 0.57, z);
     k.add(style.cylinder(0.015, 0.2), cream, root, 0, 0.68, z);
@@ -260,7 +259,7 @@ function lounge(b: Build): void {
   const sx = o.x0 + 0.55;
   k.add(style.cylinder(0.35, 0.8), k.mat(WORLD.dark), root, sx, 0.4, 0.55);
   k.add(style.cylinder(0.08, 1.2), k.mat(WORLD.dark), root, sx, 1.4, 0.55);
-  k.add(style.box(0.3, 0.22, 0.03), style.material(night ? '#ff9a3d' : '#5c3d2e', night ? { emissive: '#ff9a3d', ei: 1.5 } : {}), root, sx, 0.38, 0.9);
+  k.add(style.box(0.3, 0.22, 0.03), k.glow(night ? '#ff9a3d' : '#5c3d2e', { night: 1.5, emissive: '#ff9a3d' }), root, sx, 0.38, 0.9);
   for (let i = 0; i < 4; i++) k.add(style.cylinder(0.06, 0.5), k.mat('#a0673f'), root, sx - 0.2 + (i % 2) * 0.13, 0.06 + Math.floor(i / 2) * 0.12, 1.5).rotation.x = Math.PI / 2;
   const s3 = b.stage(3);
   if (s3) {
