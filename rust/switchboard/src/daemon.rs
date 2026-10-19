@@ -51,6 +51,7 @@ mod dev_servers;
 mod dispatch;
 mod drops;
 mod inbox;
+mod journal_file;
 mod keys;
 mod land;
 use keys::hash_keys;
@@ -279,7 +280,7 @@ struct Shell {
     hub: Hub,
     env: GitEnv,
     tx: Sender<Msg>,
-    journal: std::fs::File,
+    journal: journal_file::Out,
     repls: BTreeMap<String, Repl>,
     /// The live generation of each agent's REPL: lines and exits of an
     /// older (killed) generation are ignored.
@@ -463,34 +464,6 @@ fn stall_for_tests() {
 }
 
 const RESUME_TEXT: &str = "Your turn was interrupted by a restart of Switchboard; continue where you left off.";
-
-/// The journal's events, and the (1-based) numbers of the lines that are
-/// not a JSON object (a half-written last line...): they are never dropped
-/// in silence, the caller logs them. The Rust side does not decode the
-/// events (hub/gen/journal.bend does), so a kind it does not know still reaches
-/// sb-core.
-fn read_journal(text: &str) -> (Vec<Value>, Vec<usize>) {
-    let mut events = Vec::new();
-    let mut bad = Vec::new();
-    for (i, l) in text.lines().enumerate() {
-        if l.trim().is_empty() {
-            continue;
-        }
-        match serde_json::from_str::<Value>(l) {
-            Ok(v) if v.is_object() => events.push(v),
-            _ => bad.push(i + 1),
-        }
-    }
-    (events, bad)
-}
-
-fn lines_list(ns: &[usize]) -> String {
-    let mut s: Vec<String> = ns.iter().take(10).map(|n| n.to_string()).collect();
-    if ns.len() > 10 {
-        s.push("...".into());
-    }
-    s.join(", ")
-}
 
 fn log_line(paths: &Paths, s: &str) {
     if let Ok(mut f) = std::fs::OpenOptions::new()
@@ -850,7 +823,9 @@ impl Shell {
     fn run(&mut self, e: Effect) {
         match e {
             Effect::Journal(ev) => {
-                let _ = writeln!(self.journal, "{}", ev).and_then(|_| self.journal.flush());
+                if let Some(l) = self.journal.append(&ev.to_string()) {
+                    log_line(&self.env.paths, &l);
+                }
                 self.answers_journaled(&ev);
                 // /drop (design §7.3): its tab group closes too
                 if let Some(name) = crate::computer_use::archived(&ev) {
@@ -1704,7 +1679,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     let mut hub = Hub::with_core(&workspace, opts.core_bin.clone());
     hub.user_ids = xhub::is_home(&paths.workspace);
     boot.core(hub.core_pid());
-    let (mut events, unreadable) = read_journal(&std::fs::read_to_string(paths.journal()).unwrap_or_default());
+    let (mut events, unreadable) = journal_file::read(&paths.journal());
     // BISE-230: the task worktrees of the old place (<state>/worktrees/)
     // move to <home>/worktrees/<id>/<task>/, and the journal follows
     let legacy = paths.legacy_worktrees();
@@ -1718,7 +1693,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     crate::sweep::follow_moves(&mut events, &paths.worktrees);
     boot.step(&format!("journal read ({} events)", events.len()));
     if !unreadable.is_empty() {
-        log_line(&paths, &format!("journal: {} unreadable lines (not replayed), at line {}", unreadable.len(), lines_list(&unreadable)));
+        log_line(&paths, &format!("journal: {} unreadable lines (not replayed), at line {}", unreadable.len(), journal_file::lines_list(&unreadable)));
     }
     let skipped = hub.replay_with(&events, &mut |done, total| boot.replayed(done, total));
     if !skipped.is_empty() {
@@ -1736,17 +1711,14 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         let (jp, lp) = (paths.clone(), paths.clone());
         hub.set_revive(crate::core::Revive::new(
             Box::new(move || {
-                let (mut events, _) = read_journal(&std::fs::read_to_string(jp.journal()).unwrap_or_default());
+                let (mut events, _) = journal_file::read(&jp.journal());
                 crate::sweep::follow_moves(&mut events, &jp.worktrees);
                 events
             }),
             Box::new(move |s| log_line(&lp, s)),
         ));
     }
-    let journal = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(paths.journal())?;
+    let journal = journal_file::Out::new(std::fs::OpenOptions::new().create(true).append(true).open(paths.journal())?);
 
     let (tx, rx): (Sender<Msg>, Receiver<Msg>) = channel();
     let log_paths = paths.clone();

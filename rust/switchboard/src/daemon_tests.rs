@@ -1,5 +1,5 @@
 //! daemon.rs' unit tests: hub-fifo's urgent lane, a stop ahead of queued
-//! REPL lines, the journal's unknown kinds, the live lines' time.
+//! REPL lines, the live lines' time (the journal's: daemon/journal_file.rs).
 use super::*;
 
 /// hub-fifo's urgent lane holds a client's own messages, client-protocol's
@@ -36,19 +36,6 @@ fn a_stop_goes_ahead_of_queued_repl_lines() {
         _ => panic!("nothing in the inbox"),
     }
     assert!(Msg::is_urgent(&Msg::Shutdown { keep: true }));
-}
-
-/// A line that is not a JSON object (a half-written last line) is
-/// counted with its number, never dropped in silence; a kind the Rust
-/// side does not know is kept (sb-core decodes the events).
-#[test]
-fn the_journal_keeps_unknown_kinds_and_counts_unreadable_lines() {
-    let text = "{\"type\":\"main_notes_flushed\"}\n{\"type\":\"from_a_newer_hub\",\"x\":1}\n\n42\n{\"type\":\"main_no";
-    let (events, bad) = read_journal(text);
-    assert_eq!(events.len(), 2);
-    assert_eq!(events[1]["type"], "from_a_newer_hub");
-    assert_eq!(bad, vec![4, 5]);
-    assert_eq!(lines_list(&(1..=12).collect::<Vec<_>>()), "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, ...");
 }
 
 /// A live `line` carries its transcript time as `ts` too (BISE-271:
