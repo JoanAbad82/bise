@@ -100,7 +100,7 @@ function shell(b: Build): void {
   k.add(k.style.cylinder(0.008, lx1 - lx0), k.mat(WORLD.dark), root, (lx0 + lx1) / 2, 1.55, lz).rotation.z = Math.PI / 2;
   WAX.forEach(([a, c], i) => {
     k.add(k.style.box(0.9, 0.7, 0.01), k.mat(a), root, lx0 + 0.75 + i * 1.1, 1.15, lz);
-    for (let j = 0; j < 4; j++) k.add(k.style.box(0.12, 0.12, 0.01), k.mat(c), root, lx0 + 0.55 + i * 1.1 + (j % 2) * 0.4, 1.0 + Math.floor(j / 2) * 0.3, lz + 0.01);
+    for (let j = 0; j < 4; j++) k.add(k.style.box(0.12, 0.12, 0.01), k.mat(c), root, lx0 + 0.55 + i * 1.1 + (j % 2) * 0.4, 1.0 + Math.floor(j / 2) * 0.3, lz + 0.015);
   });
 }
 

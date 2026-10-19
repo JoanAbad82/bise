@@ -93,7 +93,7 @@ const grower: Grower = {
       k.add(k.style.box(w, 0.6, 0.02), k.mat('#fbf6e8'), g, p.x, 1.2, 0.02 + pz);
       for (let i = 0; i < 5; i++) {
         const c = i % 2 ? '#3d6fb6' : INDIGO;
-        k.add(k.style.box(w / 5 - 0.04, 0.08 + (i % 3) * 0.06, 0.01), k.mat(c), g, p.x - w / 2 + (i + 0.5) * (w / 5), 1.0 + (i % 3) * 0.07, 0.035 + pz);
+        k.add(k.style.box(w / 5 - 0.04, 0.08 + (i % 3) * 0.06, 0.01), k.mat(c), g, p.x - w / 2 + (i + 0.5) * (w / 5), 1.0 + (i % 3) * 0.07, 0.04 + pz);
       }
       k.add(k.style.ball(0.11), k.mat(WORLD.paper), g, p.x + w / 2 - 0.25, 1.36, 0.04 + pz);
       const gd = ky(b.o).garden;

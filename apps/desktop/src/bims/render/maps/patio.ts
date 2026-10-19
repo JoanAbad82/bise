@@ -187,8 +187,9 @@ const PIECES: Record<number, Piece> = {
   5: (k, g, p) => {
     const z = 0.02 + k.style.pictureZ;
     const cs = ['#2a9d8f', MARIGOLD, '#7b5fc0', '#e9c46a', TALAVERA];
-    cs.forEach((c, i) => k.add(k.style.box(0.95, 0.5 + (i % 2) * 0.2, 0.02), k.mat(c), g, p.x - 1.9 + i * 0.95, 1.15, z));
-    const sun = k.add(k.style.cylinder(0.25, 0.02), k.mat('#e9c46a'), g, p.x, 1.3, z + 0.02);
+    // the panels a hair apart and the sun a step out: touching, they shared planes and z-fought (walls.test.ts)
+    cs.forEach((c, i) => k.add(k.style.box(0.94, 0.5 + (i % 2) * 0.2, 0.02), k.mat(c), g, p.x - 1.9 + i * 0.95, 1.15, z));
+    const sun = k.add(k.style.cylinder(0.25, 0.02), k.mat('#e9c46a'), g, p.x, 1.3, z + 0.025);
     sun.rotation.x = Math.PI / 2;
     const gx = p.x + 2.4;
     const body = k.add(k.style.ball(0.2), k.mat('#c98a3e'), g, gx, 0.3, 0.25);

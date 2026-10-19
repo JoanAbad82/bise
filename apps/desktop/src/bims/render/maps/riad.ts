@@ -94,9 +94,9 @@ const grower: Grower = {
       const cx = (l0 + l1) / 2;
       k.add(k.style.box(w, 0.6, 0.02), k.mat('#f1e6d2'), g, cx, 1.5, 0.02 + pz);
       for (let i = 0; i < 4; i++) {
-        const d = k.add(k.style.box(0.24, 0.24, 0.01), k.mat('#2b2118'), g, cx - w / 2 + (i + 0.5) * (w / 4), 1.5, 0.035 + pz);
+        const d = k.add(k.style.box(0.24, 0.24, 0.01), k.mat('#2b2118'), g, cx - w / 2 + (i + 0.5) * (w / 4), 1.5, 0.04 + pz);
         d.rotation.z = Math.PI / 4;
-        k.add(k.style.box(0.12, 0.12, 0.01), k.mat('#f1e6d2'), g, cx - w / 2 + (i + 0.5) * (w / 4), 1.5, 0.04 + pz).rotation.z = Math.PI / 4;
+        k.add(k.style.box(0.12, 0.12, 0.01), k.mat('#f1e6d2'), g, cx - w / 2 + (i + 0.5) * (w / 4), 1.5, 0.055 + pz).rotation.z = Math.PI / 4;
       }
       k.add(k.style.cylinder(0.14, 0.3), k.mat(LEATHER), g, p.x, 0.15, p.z);
       k.add(k.style.cylinder(0.15, 0.02), k.mat('#f1e6d2'), g, p.x, 0.31, p.z);

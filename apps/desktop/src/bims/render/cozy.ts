@@ -605,7 +605,9 @@ function poster(k: Kit, g0: Groups, p: Hung, c: CozyLook, st: CozyStage, i: numb
         sea: [[0, -0.08, w * 0.85, 0.12, '#3d6fb6'], [0, 0.02, w * 0.85, 0.05, CUP], [0.08, 0.14, 0.08, 0.08, b]],
         movie: [[0, 0.06, w * 0.7, h * 0.4, a], [0, -h * 0.3, w * 0.6, 0.04, b]],
       };
-      for (const [dx, dy, sw, sh, col] of shapes[c.poster] ?? shapes.flat ?? []) k.add(style.box(sw, sh, 0.008), k.mat(col), g, dx, dy, z2);
+      // each shape a step out from the one before (more than its 8 mm): the botanic's leaves cross
+      // its stem, and in one plane they z-fought (walls.test.ts)
+      (shapes[c.poster] ?? shapes.flat ?? []).forEach(([dx, dy, sw, sh, col], i) => k.add(style.box(sw, sh, 0.008), k.mat(col), g, dx, dy, z2 + i * 0.013));
     }
   }
   if (st.framed) {

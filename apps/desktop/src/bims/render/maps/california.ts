@@ -129,8 +129,9 @@ function sunsetMural(k: Kit, parent: Object3D, xa: number, xb: number, n: boolea
   const w = xb - xa;
   const top = 1.75;
   const bh = 0.28;
-  SUNSET.forEach((c, i) => k.add(style.box(w, bh, 0.02), k.mat(n ? shade(c) : c), parent, (xa + xb) / 2, top - bh / 2 - i * bh, z));
-  const sun = k.add(style.cylinder(0.32, 0.03), k.mat('#fff3c4'), parent, xa + w * 0.62, top - 3.2 * bh, z + 0.02);
+  // the bands a hair apart: touching, their top and bottom faces shared a plane (walls.test.ts)
+  SUNSET.forEach((c, i) => k.add(style.box(w, bh - 0.008, 0.02), k.mat(n ? shade(c) : c), parent, (xa + xb) / 2, top - bh / 2 - i * bh, z));
+  const sun = k.add(style.cylinder(0.32, 0.03), k.mat('#fff3c4'), parent, xa + w * 0.62, top - 3.2 * bh, z + 0.045);
   sun.rotation.x = Math.PI / 2;
   sun.scale.y = 1;
   for (const px of [0.12, 0.3, 0.85]) {

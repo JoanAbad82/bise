@@ -81,9 +81,11 @@ export function mural(k: Kit, parent: Object3D, x0: number, x1: number): void {
   const w = x1 - x0;
   WORLD.mural.forEach((c, i) => {
     const bw = w / 4;
-    k.add(style.box(bw, 0.45 + (i % 2) * 0.12, 0.02), k.mat(c), parent, x0 + bw / 2 + (i * (w - bw)) / 4, 1.15 + (i % 2 ? -0.06 : 0.08), 0.01 + style.pictureZ);
+    // each blob a step out from the one before: they overlap, and side by side in one plane they
+    // z-fought, the one in front changing frame to frame (Gabriel, main m_32722)
+    k.add(style.box(bw, 0.45 + (i % 2) * 0.12, 0.02), k.mat(c), parent, x0 + bw / 2 + (i * (w - bw)) / 4, 1.15 + (i % 2 ? -0.06 : 0.08), 0.01 + i * 0.005 + style.pictureZ);
   });
-  glyph(k, parent, (x0 + x1) / 2, 1.18, 0.035 + style.pictureZ, k.pal.ink, 0.07);
+  glyph(k, parent, (x0 + x1) / 2, 1.18, 0.055 + style.pictureZ, k.pal.ink, 0.07);
 }
 
 /** the boombox on the island's far end (o3's notes, t1's friday party play over it) */
