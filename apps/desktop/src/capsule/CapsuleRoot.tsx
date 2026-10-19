@@ -91,10 +91,12 @@ export function CapsuleRoot(): JSX.Element {
   // the still the core took at fn down (null: none, dropped, sent); its drop is the core's
   const storeShot = useShot();
   const shot = useMemo(() => (storeShot === null ? null : shotOf(storeShot)), [storeShot]);
-  const dropShot = useCallback(() => {
-    store.command({ cmd: "shot_drop" });
-  }, [store]);
   const shotRef = useRef(shot);
+  // the still he sees goes, never a newer one (its id; spot-shot)
+  const dropShot = useCallback(() => {
+    const id = shotRef.current?.id;
+    store.command(id === undefined ? { cmd: "shot_drop" } : { cmd: "shot_drop", id });
+  }, [store]);
   // spot-shot: the spotlight going (esc, fn space, a card, a talk) drops the still it showed, only
   // that one (a talk's newer still stays); its ask took it already when he sent
   const spotShot = useRef<number | null>(null);
