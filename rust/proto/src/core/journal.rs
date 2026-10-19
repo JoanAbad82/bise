@@ -10,9 +10,8 @@
 //! `M.EX{XH.XOp{xid, XH.OpAcked{}}}` is the line `{"type": "x_acked",
 //! "xid": …}`. The records inside a line (a message, a card, a route...)
 //! are read and written by one codec per record, never one per kind
-//! ([`Codec`]): a declared record's generated one (`SC`,
-//! gen/state-codec.bend: a message, a card, his answer), else its hand
-//! one in bend/hub/codec.bend (`C`) until its family moves.
+//! ([`Codec`]): the declared record's generated one (`SC`,
+//! gen/state-codec.bend: a message, a card, his answer...).
 //!
 //! A new kind: one row here, `BISE_PROTO_BLESS=1 cargo test -p bise-proto
 //! --test core_gen`, then its `Ev` constructor and what it does.

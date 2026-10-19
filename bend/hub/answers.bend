@@ -92,14 +92,14 @@ def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
       LZ.or(Nat.is_eq(h, n), u => nat_in(t, n))
 
 # a card whose route line the shell will place (answer_pos): due
-def due_add(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
+def due_add(-o: S.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
   +r = X.Cx.r(o, cx)
   X.with_r(o, cx, X.R.with_due(r, M.snoc(Nat, nat_del(X.R.due(r), id), id)))
 
 # {"t":"answer_pos"}: the shell wrote card `card`'s route line in
 # `agent`'s transcript at `pos`: journaled when the card is due, once
 # (law answer_pos_once); else nothing
-def answer_pos.go(-o: M.St, due: Bool, +cx: X.Cx<o>, +card: Nat, +agent: String, +pos: Nat) -> X.Cx<o>:
+def answer_pos.go(-o: S.St, due: Bool, +cx: X.Cx<o>, +card: Nat, +agent: String, +pos: Nat) -> X.Cx<o>:
   match due:
     case True{}:
       +r = X.Cx.r(o, cx)
@@ -108,5 +108,5 @@ def answer_pos.go(-o: M.St, due: Bool, +cx: X.Cx<o>, +card: Nat, +agent: String,
     case False{}:
       cx
 
-def answer_pos(-o: M.St, +cx: X.Cx<o>, +card: Nat, +agent: String, +pos: Nat) -> X.Cx<o>:
+def answer_pos(-o: S.St, +cx: X.Cx<o>, +card: Nat, +agent: String, +pos: Nat) -> X.Cx<o>:
   answer_pos.go(o, nat_in(X.R.due(X.Cx.r(o, cx)), card), cx, card, agent, pos)

@@ -467,7 +467,7 @@ const RESUME_TEXT: &str = "Your turn was interrupted by a restart of Switchboard
 /// The journal's events, and the (1-based) numbers of the lines that are
 /// not a JSON object (a half-written last line...): they are never dropped
 /// in silence, the caller logs them. The Rust side does not decode the
-/// events (hub/codec.bend does), so a kind it does not know still reaches
+/// events (hub/gen/journal.bend does), so a kind it does not know still reaches
 /// sb-core.
 fn read_journal(text: &str) -> (Vec<Value>, Vec<usize>) {
     let mut events = Vec::new();

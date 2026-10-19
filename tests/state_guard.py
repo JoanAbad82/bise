@@ -32,11 +32,9 @@ DIRS = ["bend/hub", "bend/laws", "bend/proofs"]
 
 # the generated records whose family has not moved yet: their hand type and
 # its positional patterns stay until that family's land (state-schema
-# chunk 2), which takes its names out of this list
-MIGRATING = {
-    # St
-    "St",
-}
+# chunk 2), which takes its names out of this list. Empty since St's land
+# (state-st): every family moved.
+MIGRATING = set()
 
 # the hand records that are not sb-core's durable state (yet): the proof
 # spine (cx.bend's Core, Cx), the runtime records (cx.bend R and its

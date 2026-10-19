@@ -63,8 +63,6 @@ import ../wakes.bend as WK
 
 import ../xhub-model.bend as XH
 
-import ../codec.bend as C
-
 import ./state.bend as S
 
 import ./state-codec.bend as SC
@@ -122,7 +120,7 @@ fn field(k: &Kind, name: &str) -> &'static Field {
 }
 
 /// A journal field's cases in a decode∘encode proof: each a pattern, and
-/// whether it is rewritten by its codec's law `C.<name>_round`.
+/// whether it is rewritten by its codec's law `SC.<name>_round`.
 fn journal_cases(f: &Field, v: &str) -> Vec<(String, bool)> {
     match f.kind {
         FieldKind::Flag => vec![("True{}".into(), false), ("False{}".into(), false)],

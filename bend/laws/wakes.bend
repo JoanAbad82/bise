@@ -61,7 +61,7 @@ law wake_then_wins:
 # LAW: setting a watch, pause or alarm, never changes an agent's run (its
 # status: an agent with only alarms stays idle) nor its record.
 law wake_set_keeps_run:
-  for -o: HM.St
+  for -o: HS.St
   for ok: Bool
   for +cx: HX.Cx<o>
   for +a: String
@@ -74,7 +74,7 @@ law wake_set_keeps_run:
   {HC.rt(o, HC.wake_set.agent(o, ok, cx, agent, spec, max_text, max_ms, quiet, then), a) == HC.rt(o, cx, a) : HX.Rt}
 
 law wake_set_keeps_agents:
-  for -o: HM.St
+  for -o: HS.St
   for ok: Bool
   for +cx: HX.Cx<o>
   for +agent: String
@@ -83,7 +83,7 @@ law wake_set_keeps_agents:
   for +max_ms: Nat
   for +quiet: Bool
   for +then: Maybe<&2, Bool>
-  {HM.St.agents(HC.st(o, HC.wake_set.agent(o, ok, cx, agent, spec, max_text, max_ms, quiet, then))) == HM.St.agents(HC.st(o, cx)) : List<&2, HS.Agent>}
+  {HS.St.agents(HC.st(o, HC.wake_set.agent(o, ok, cx, agent, spec, max_text, max_ms, quiet, then))) == HS.St.agents(HC.st(o, cx)) : List<&2, HS.Agent>}
 
 # ---- his stop (the window's wake_stop) ----
 # His stop of a watch tells its agent once (`tell`: the words, Rust's
@@ -104,7 +104,7 @@ law wake_his_stop_tells:
 # LAW: a stop of a watch that ended (or never was) changes nothing: no
 # line, no message.
 law wake_stop_gone_quiet:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +why: String
   for +tell: String
@@ -157,7 +157,7 @@ law ask_max_tells:
 
 # LAW: a second hold that ends on the same message sets no second watch.
 law ask_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   for +orig: HS.Msg
@@ -167,7 +167,7 @@ law ask_once:
 
 # LAW: a reply ends exactly the reply watches it answers, in its step...
 law ask_reply_ends:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +from: String
   for +to: String
@@ -178,7 +178,7 @@ law ask_reply_ends:
 
 # LAW: ...with no wake: no message from bise (the reply is its own).
 law ask_reply_ends_quiet:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +from: String
   for +to: String
@@ -188,7 +188,7 @@ law ask_reply_ends_quiet:
 # LAW: the asker moved on (done, failed): its reply watches end, all of
 # them...
 law ask_done_ends:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   {HS.Wakes.live(HC.wks(o, HC.replies_end(o, cx, agent)))
@@ -196,7 +196,7 @@ law ask_done_ends:
 
 # LAW: ...quietly: it said it is done, no message.
 law ask_done_quiet:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   {HM.every(HX.d(o, HC.replies_end(o, cx, agent))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}
@@ -204,7 +204,7 @@ law ask_done_quiet:
 # LAW: the asked agent gone, a reply watch ends and its active agent hears
 # it once, in the same step (ended, it is never an orphan again).
 law ask_target_gone_tells:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +w: HS.Watch
   for e: {HR.agent_active(HC.st(o, HC.wake_end(o, cx, HS.Watch.id(w), "gone")), HS.Watch.agent(w)) == True{} : Bool}

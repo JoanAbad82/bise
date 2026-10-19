@@ -43,7 +43,7 @@ law feature_retire_archives_none:
   {HFT.retiree.life(HS.LArchived{}, ws, name) == False{} : Bool}
 
 law feature_retire_one:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +a: HS.Agent
   for +text: String
@@ -54,7 +54,7 @@ law feature_retire_one:
 # failed) gets its workspace only, never a message that would revive it
 # (no spawn); no kill, no interrupt on any path.
 law feature_retire_stops_nothing:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +life: HS.Life
   for +n: String
@@ -67,7 +67,7 @@ law feature_retire_stops_nothing:
 # reads it after its turn (pump keeps a queued-mode message while busy),
 # its turn untouched.
 law feature_retire_tells_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for +text: String

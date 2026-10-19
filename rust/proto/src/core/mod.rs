@@ -116,8 +116,8 @@ pub enum FieldKind {
 }
 
 /// A codec of one of sb-core's records: its module's alias in the
-/// journal's generated files (`C` the hand codec.bend; `SC`
-/// gen/state-codec.bend, the declared records' shapes), its Bend type,
+/// journal's generated files (`SC` gen/state-codec.bend, the declared
+/// records' shapes), its Bend type,
 /// `<module>.<name>_of` and `_json` (a [`FieldKind::Rec`]: the value
 /// under its key) or `_kvs` (inline: its keys). `cases`: the value's
 /// constructors, when a decode∘encode proof splits on them instead of

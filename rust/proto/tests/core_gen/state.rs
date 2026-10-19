@@ -117,7 +117,20 @@ pub(crate) fn state_types() -> String {
             let mut put = vars.clone();
             put[i] = "v".into();
             writeln!(s, "def {n}.with_{}(r: {n}, v: {t}) -> {n}:\n  match r:\n    case {}:\n      {}\n", f.name, rec("", n, &keep), rec("", n, &put)).unwrap();
+            // the field changed by g in one match, r consumed: the field
+            // keeps one owner, so g can reuse it in place (a getter then a
+            // setter shares it while r lives, and a list walk copies it)
+            let mut over = vars.clone();
+            over[i] = format!("g({})", vars[i]);
+            writeln!(s, "def {n}.over_{}(r: {n}, g: {t} -> {t}) -> {n}:\n  match r:\n    case {}:\n      {}\n", f.name, rec("", n, &vars), rec("", n, &over)).unwrap();
         }
+        // the record rebuilt by name from its getters (a proof's goal on
+        // T.open(r) computes; T.open_eq rewrites r into it)
+        let mut open = format!("{n}.empty()");
+        for f in r.fields {
+            open = format!("{n}.with_{}({open}, {n}.{}(r))", f.name, f.name);
+        }
+        writeln!(s, "def {n}.open(+r: {n}) -> {n}:\n  {open}\n").unwrap();
     }
     s
 }
@@ -148,7 +161,11 @@ pub(crate) fn state_laws() -> String {
             writeln!(s, "law {n}.{fname}.set_set:\n  for r: S.{n}\n  for a: {t}\n  for b: {t}").unwrap();
             writeln!(s, "  {{S.{n}.with_{fname}(S.{n}.with_{fname}(r, a), b) == S.{n}.with_{fname}(r, b) : S.{n}}}\n").unwrap();
             writeln!(s, "def {n}.{fname}.set_set(r, a, b):\n{open}").unwrap();
+            writeln!(s, "law {n}.{fname}.over:\n  for r: S.{n}\n  for g: {t} -> {t}\n  {{S.{n}.over_{fname}(r, g) == S.{n}.with_{fname}(r, g(S.{n}.{fname}(r))) : S.{n}}}\n").unwrap();
+            writeln!(s, "def {n}.{fname}.over(r, g):\n{open}").unwrap();
         }
+        writeln!(s, "law {n}.open_eq:\n  for r: S.{n}\n  {{S.{n}.open(r) == r : S.{n}}}\n").unwrap();
+        writeln!(s, "def {n}.open_eq(r):\n{open}").unwrap();
     }
     s
 }

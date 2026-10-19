@@ -34,14 +34,14 @@ law hub_step_replays:
   for +h: HC.Hub
   for +i: J.Json
   {HX.Core.d(HC.Hub.d(h), HX.Cx.c(HC.Hub.d(h), HC.step(h, i)))
-    == HM.apply_all(HX.journal(HX.Core.fx(HC.Hub.d(h), HX.Cx.c(HC.Hub.d(h), HC.step(h, i)))), HC.Hub.d(h)) : HM.St}
+    == HM.apply_all(HX.journal(HX.Core.fx(HC.Hub.d(h), HX.Cx.c(HC.Hub.d(h), HC.step(h, i)))), HC.Hub.d(h)) : HS.St}
 
 # LAW: over any sequence of inputs (git answers still missing included),
 # the final state is the replay of the whole journal over the first one.
 law hub_run_replays:
   for +ins: List<&2, J.Json>
   for +h: HC.Hub
-  {HC.Hub.d(HC.RunR.hub(HC.run(ins, h))) == HM.apply_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h)) : HM.St}
+  {HC.Hub.d(HC.RunR.hub(HC.run(ins, h))) == HM.apply_all(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h)) : HS.St}
 
 # LAW: every message the hub ever sends, over any sequence of inputs,
 # takes the next free id of the state it is sent in: no id is reused, so
@@ -62,14 +62,14 @@ law auto_never_asks:
 # past its deadline always gets its timeout (with the 25 s cap of `sb
 # wait`, no set of agents waiting on each other blocks longer).
 law tick_clears_late_waiters:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   HC.Later(HC.waiters_of_cx(o, HC.tick(o, cx)), HX.R.now(HX.Cx.r(o, cx)))
 
 # LAW: stopping or dropping a task leaves no wait of it behind (each got
 # its `stopped` error), whatever the state.
 law stop_leaves_no_waiter:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for +life: HS.Life
@@ -77,7 +77,7 @@ law stop_leaves_no_waiter:
   HC.NoneOf(HC.waiters_of_cx(o, HC.stop_task(o, cx, n, life, why)), n)
 
 # ---- the timers of `sb every` (hub/timers.bend, core.bend `timer_fire`) ----
-# The timers' state is in HM.St and their lines (every_set, every_fired,
+# The timers' state is in HS.St and their lines (every_set, every_fired,
 # every_run, every_stop) are events like the others: hub_run_replays,
 # msg_ids_fresh and the rest cover them as they are. The two laws on the
 # wake are LOCAL: they are stated on core.bend's `timer_fire`, the only
@@ -93,7 +93,7 @@ law stop_leaves_no_waiter:
 # fired + 1, or every_run for a run now) and, for its last time, the
 # timer's stop.
 law fire_is_a_message:
-  for -o: HM.St
+  for -o: HS.St
   for p: HX.Cx<o> & HC.SendR
   for +t: HS.Timer
   for +due: Bool
@@ -103,7 +103,7 @@ law fire_is_a_message:
 # LAW: a timer never stacks wakes: while a message from bise is still
 # queued for its agent, a fire (due or run now) changes nothing at all.
 law wake_never_stacked:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +t: HS.Timer
   for +text: String
@@ -149,11 +149,11 @@ law named_announces_once:
 # step (beside stop_leaves_no_waiter). A stop (`sb stop`) keeps them: they
 # wait, as before.
 law stop_leaves_no_timer:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for +why: String
-  HI.TimerNoneOf(HS.Tms.live(HM.St.tm(HX.d(o, HC.stop_task(o, cx, n, HS.LArchived{}, why)))), n)
+  HI.TimerNoneOf(HS.Tms.live(HS.St.tm(HX.d(o, HC.stop_task(o, cx, n, HS.LArchived{}, why)))), n)
 
 # ---- the project's pause (cost-pause, hub/pause.bend) ----
 # Its lines (paused, resumed) are events like the others: the replay laws
@@ -166,7 +166,7 @@ law stop_leaves_no_timer:
 # agent: his, an agent's, bise's timer and event wakes, a card's answer,
 # another hub's) leaves the step as it was; the message stays queued.
 law paused_delivers_nothing:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for q: {HP.is_paused(HX.d(o, cx)) == True{} : Bool}
@@ -174,7 +174,7 @@ law paused_delivers_nothing:
 
 # LAW: a paused project fires no timer: a due one waits for /resume.
 law timer_held_while_paused:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +t: HS.Timer
   for +due: Bool
@@ -184,13 +184,13 @@ law timer_held_while_paused:
 # LAW: pause is idempotent: a second /pause only says so (no line, no
 # interrupt); /resume of a running project likewise.
 law pause_idempotent:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for q: {HP.is_paused(HX.d(o, cx)) == True{} : Bool}
   {HC.pause(o, cx) == HC.notice(o, cx, HP.ALREADY()) : HX.Cx<o>}
 
 law resume_idempotent:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for q: {HP.is_paused(HX.d(o, cx)) == False{} : Bool}
   {HC.resume(o, cx) == HC.notice(o, cx, HP.NOT_PAUSED()) : HX.Cx<o>}
@@ -198,22 +198,22 @@ law resume_idempotent:
 # LAW: the paused line pauses, the resumed line resumes, and neither
 # touches a message: the queue's order is the same before and after.
 law paused_line_pauses:
-  for +s: HM.St
+  for +s: HS.St
   for +at: Nat
-  {HM.St.paused(HM.apply(s, HM.EPaused{at})) == Some{at} : Maybe<&2, Nat>}
+  {HS.St.paused(HM.apply(s, HM.EPaused{at})) == Some{at} : Maybe<&2, Nat>}
 
 law resumed_line_resumes:
-  for +s: HM.St
+  for +s: HS.St
   for +at: Nat
-  {HM.St.paused(HM.apply(s, HM.EResumed{at})) == None{} : Maybe<&2, Nat>}
+  {HS.St.paused(HM.apply(s, HM.EResumed{at})) == None{} : Maybe<&2, Nat>}
 
 law pause_keeps_order:
-  for +s: HM.St
+  for +s: HS.St
   for +at: Nat
   {HM.every(HM.apply(s, HM.EPaused{at})) == HM.every(s) : List<&2, HS.MRec>}
 
 law resume_keeps_order:
-  for +s: HM.St
+  for +s: HS.St
   for +at: Nat
   {HM.every(HM.apply(s, HM.EResumed{at})) == HM.every(s) : List<&2, HS.MRec>}
 
@@ -236,7 +236,7 @@ law wake_hit_once:
 # LAW: a hit that finds no live watch (ended: hit, max, stop, or its
 # agent dropped) changes nothing at all: no message, no line.
 law wake_gone_never_hits:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +text: String
   {HC.wake_hit.found(o, None{}, cx, text) == cx : HX.Cx<o>}
@@ -244,7 +244,7 @@ law wake_gone_never_hits:
 # LAW: dropping (archiving) a task leaves no live watch of it, in the
 # same step (beside stop_leaves_no_timer). A stop keeps them: they wait.
 law wake_drop_ends:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   HI.WatchNoneOf(HS.Wakes.live(HC.wks(o, HC.wakes_gone(o, HS.LArchived{}, cx, n))), n)
@@ -292,7 +292,7 @@ law busy_steers_now:
 
 # LAW: a timer reaches an active agent that is busy (before: idle only).
 law timer_reaches_busy:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +a: HS.Agent
   for p: {HC.is_active(HS.Agent.life(a)) == True{} : Bool}
@@ -304,7 +304,7 @@ law timer_reaches_busy:
 # still queued for it, fires on the timer's own terms only: due and under
 # its times.
 law timer_fires_busy:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +t: HS.Timer
   for p: {HP.is_paused(HX.d(o, cx)) == False{} : Bool}
@@ -316,7 +316,7 @@ law timer_fires_busy:
 # pump (the only step that steers: pump.send.go's "steer") leaves the
 # step as it was; the wake stays queued for /resume.
 law paused_steers_nothing:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for q: {HP.is_paused(HX.d(o, cx)) == True{} : Bool}
@@ -326,7 +326,7 @@ law paused_steers_nothing:
 # LAW: a page question answered on its page: its card closes, then the
 # card's asker is told or not (page_answer_tells_asker below).
 law page_answer_closes:
-  for -o: HM.St
+  for -o: HS.St
   for +c: HS.Card
   for +cx: HX.Cx<o>
   for +to: String
@@ -338,7 +338,7 @@ law page_answer_closes:
 # LAW: the asker told: exactly one message from bise to the card's asker,
 # with his answer; not told: nothing more than the close.
 law page_answer_tells_asker:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +c: HS.Card
   for +to: String
@@ -347,7 +347,7 @@ law page_answer_tells_asker:
   {HC.page_answered.tell(o, True{}, cx, c, to, page, text) == HC.fst(o, HC.send(o, cx, HC.msg(HM.HUB(), HS.Card.agent(c), HR.answer_words(HS.Card.id(c), page, to, text), False{}, None{}, False{}, False{}))) : HX.Cx<o>}
 
 law page_answer_quiet:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +c: HS.Card
   for +to: String
@@ -360,18 +360,18 @@ law page_answer_quiet:
 # else main. Live: registered and active (not stopped, failed or
 # archived).
 law page_card_asker_main:
-  for +s: HM.St
+  for +s: HS.St
   {HR.page_asker(s, []) == HM.MAIN() : String}
 
 law page_card_asker_first:
-  for +s: HM.St
+  for +s: HS.St
   for +h: String
   for +t: List<&2, String>
   for q: {HR.agent_active(s, h) == True{} : Bool}
   {HR.page_asker(s, h <> t) == h : String}
 
 law page_card_asker_next:
-  for +s: HM.St
+  for +s: HS.St
   for +h: String
   for +t: List<&2, String>
   for q: {HR.agent_active(s, h) == False{} : Bool}
@@ -380,7 +380,7 @@ law page_card_asker_next:
 # LAW: a plan card opens one card, asked by that chain's agent; a kind
 # that is no page card's opens nothing.
 law page_card_opens:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agents: List<&2, String>
   for +text: String
@@ -390,14 +390,14 @@ law page_card_opens:
 # pick is a page card too: one card, asked by the page's agent (main when
 # it is gone), never main's by default.
 law page_card_opens_question:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agents: List<&2, String>
   for +text: String
   {HC.page_card(o, cx, agents, "question", text) == HC.page_card.open(o, cx, "question", HR.page_asker(HX.d(o, cx), agents), text) : HX.Cx<o>}
 
 law page_card_other_kind:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agents: List<&2, String>
   for +text: String
@@ -465,7 +465,7 @@ law delivered_once:
 # message queued for it among all its messages (each got
 # recipient_unavailable). queued_for reads the same (hot_queued_for).
 law stop_leaves_no_queue:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for +life: HS.Life
@@ -482,7 +482,7 @@ law stop_leaves_no_queue:
 # message for the next turn. A card still open at the turn's end stays
 # open; the input arrives as a message (says.card with no card).
 law user_queued_never_answers_a_card:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +to: String
   for +text: String
@@ -502,7 +502,7 @@ def any_queued(xs: List<&2, HS.Msg>) -> Bool:
 # in id order (queued_for), in one say batch (user_queued_said_at_idle),
 # each once (delivered_once).
 law user_queued_waits_for_turn_end:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +name: String
   for +q: List<&2, HS.Msg>
@@ -516,7 +516,7 @@ law busy_batch_has_no_queued:
 # LAW: at idle, everything queued for the agent goes in one say batch, in
 # its order (queued and plain alike).
 law user_queued_said_at_idle:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +name: String
   for +q: List<&2, HS.Msg>
@@ -531,7 +531,7 @@ law user_queued_said_at_idle:
 # LAW: typed words on a confirm card (not 1, 2, 3 nor the TUI's explicit
 # `deny: <why>`) are refused: no verdict, the card stays open.
 law card_confirm_words_refused:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +c: HS.Card
   for +text: String
@@ -544,7 +544,7 @@ law card_confirm_words_refused:
 # card gets the same verdict path as its option 3, with his words as the
 # note (the gate reads them as no, never allow: gate::answer_of).
 law card_confirm_no_alias:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +c: HS.Card
   for +text: String
@@ -568,7 +568,7 @@ law card_confirm_no_thanks_is_words:
 # options' numbers: other words are refused, the item stays open, main is
 # not woken.
 law card_choice_words_refused:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +c: HS.Card
   for +text: String
@@ -583,7 +583,7 @@ law card_choice_words_refused:
 
 # LAW: only main forwards the user's words to a project.
 law xhub_only_main_forwards:
-  for +s: HM.St
+  for +s: HS.St
   for +from: String
   for +id: Nat
   for e: {String.eq(from, HM.MAIN()) == False{} : Bool}
@@ -592,10 +592,10 @@ law xhub_only_main_forwards:
 # LAW: a message of his is forwarded once: with an outbox entry for it,
 # main's forward is refused.
 law xhub_forward_once:
-  for +s: HM.St
+  for +s: HS.St
   for +id: Nat
   for +ob: HS.Out
-  for e: {HXH.out_by_msg(HS.Xs.outbox(HM.St.x(s)), id) == Some{ob} : Maybe<&2, HS.Out>}
+  for e: {HXH.out_by_msg(HS.Xs.outbox(HS.St.x(s)), id) == Some{ob} : Maybe<&2, HS.Out>}
   {HXB.forward(s, HM.MAIN(), id) == HXB.FwdErr{String.append(String.append(HXB.mid(id), " was already forwarded to "), HS.Out.project(ob))} : HXB.Fwd}
 
 # LAW: only his own words go by reference (architect's B): a message not
@@ -649,7 +649,7 @@ law route_one_outcome:
 # LAW: a correction acts only on a held route: one that went or was
 # cancelled gets a notice, nothing else.
 law route_correct_only_held:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +rid: Nat
   for +to: String
@@ -678,10 +678,10 @@ law route_fires_at_due_only:
 # (which pumps main), then delivered, settled and forwarded; main reads
 # it in a note at its next turn.
 law route_fire_makes_no_turn:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +r: HS.Route
-  {HC.route_fire(o, Some{r}, cx) == HC.route_fire.sent(o, HC.route_said(o, cx, r), r, HM.St.next_msg(HC.st(o, cx))) : HX.Cx<o>}
+  {HC.route_fire(o, Some{r}, cx) == HC.route_fire.sent(o, HC.route_said(o, cx, r), r, HS.St.next_msg(HC.st(o, cx))) : HX.Cx<o>}
 
 # ---- a held route with no target (an older hub's route model left it
 # in its journal; S2 step 5 is gone, only his `@<project>` routes now) ----
@@ -689,7 +689,7 @@ law route_fire_makes_no_turn:
 # LAW: such a route whose act fires goes plain to bise's main (the cancel
 # path), never to a project's outbox: his words are never lost.
 law route_unclear_goes_plain:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +r: HS.Route
   for e: {HXB.is_unclear(r) == True{} : Bool}
@@ -700,7 +700,7 @@ law route_unclear_goes_plain:
 # then the `routed` record naming the project, the out and that id (the
 # window and the TUI fold it on his entry by the id, never by position).
 law route_fire_says_where:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +r: HS.Route
   for +id: Nat
@@ -747,7 +747,7 @@ law xin_ask_has_no_parts:
 # LAW: before its end a followed task's progress makes no job_end: a
 # progress report changes nothing but the report itself.
 law follow_quiet_before_end:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +from: String
   for +summary: String
@@ -755,7 +755,7 @@ law follow_quiet_before_end:
 
 # LAW: its done ends the job in the same step (job_end when followed).
 law follow_done_at_its_report:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +from: String
   for +summary: String
@@ -763,7 +763,7 @@ law follow_done_at_its_report:
 
 # LAW: a failure ends it at once, in the same step as the failure.
 law follow_failed_at_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +from: String
   for +summary: String
@@ -772,7 +772,7 @@ law follow_failed_at_once:
 # LAW: an agent not followed has no job_end (so a second end of the same
 # job, after the first turned follow off, says nothing).
 law follow_done_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +name: String
   for +state: String
@@ -802,7 +802,7 @@ law follow_hub_cleared:
 # LAW (J): an end goes back only to a hub that asked: a follow of this
 # hub's own main or window ("") puts nothing in the outbox.
 law follow_end_back_only_to_who_asked:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +hub: String
   for +j: J.Json
@@ -831,13 +831,13 @@ law act_due_only:
 # cards share an id (every state the hub reaches: cards_unique), leaves no
 # open card of it.
 law stop_leaves_no_card:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for +life: HS.Life
   for +why: String
   for u: HI.UniqueCards(HX.d(o, cx))
-  {HC.card_ids(HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), n, Nil{}) == Nil{} : List<&2, Nat>}
+  {HC.card_ids(HS.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), n, Nil{}) == Nil{} : List<&2, Nat>}
 
 # LAW (L12 support): a new hub has no two open cards with one id...
 law init_cards_unique:
@@ -892,15 +892,15 @@ law split_kept_by_run:
 # below next_msg: CO.replay_fresh).
 law split_after_replay:
   for +ms: List<&2, Maybe<&2, HM.Ev>>
-  for +st: HM.St
+  for +st: HS.St
   for +i: Nat
   for +sk: List<&2, Nat>
   for u: HI.Split(st)
-  HI.Split(Pair.fst(HM.St, List<&2, Nat>, CO.replay_batch(ms, st, i, sk)))
+  HI.Split(Pair.fst(HS.St, List<&2, Nat>, CO.replay_batch(ms, st, i, sk)))
 
 # LAW: every message of a split state is in send order: ids ascending.
 law ids_ascending:
-  for +s: HM.St
+  for +s: HS.St
   for u: HI.Split(s)
   HI.Asc(HM.every(s))
 
@@ -908,7 +908,7 @@ law ids_ascending:
 # id does to every message what it did to one list of them (HI.apply1:
 # the new message last and its reply's settle, a state, a settle).
 law cold_is_inert:
-  for +s: HM.St
+  for +s: HS.St
   for +e: HM.Ev
   for u: HI.Split(s)
   for k: HX.FreshEv(s, e)
@@ -938,24 +938,24 @@ law take_moves_live_owed:
 
 # ...and msgs_moved replays to the same hot side, on every message too.
 law msgs_moved_replays:
-  for +s: HM.St
+  for +s: HS.St
   for +n: String
   for +h: String
   for u: HI.Split(s)
-  HX.Both<{HM.St.hot(HM.apply(s, HM.EMsgsMoved{n, h})) == HM.moved(HM.St.hot(s), n, h) : List<&2, HS.MRec>},
+  HX.Both<{HS.St.hot(HM.apply(s, HM.EMsgsMoved{n, h})) == HM.moved(HS.St.hot(s), n, h) : List<&2, HS.MRec>},
     {HM.every(HM.apply(s, HM.EMsgsMoved{n, h})) == HM.moved(HM.every(s), n, h) : List<&2, HS.MRec>}>
 
 # LAW: on a split state, each walk over the hot side reads what it
 # would read over every message: the cold ones are inert. The queues...
 law hot_queued_for:
-  for +s: HM.St
+  for +s: HS.St
   for +n: String
   for h: HI.Split(s)
   {HM.queued_for(s, n) == HM.queued_in(HM.every(s), HM.names_of(s, n)) : List<&2, HS.Msg>}
 
 # ...the replies owed...
 law hot_unanswered_for:
-  for +s: HM.St
+  for +s: HS.St
   for +n: String
   for h: HI.Split(s)
   {HM.unanswered_for(s, n) == HM.unanswered_in(HM.every(s), HM.names_of(s, n)) : List<&2, HS.Msg>}
@@ -963,16 +963,16 @@ law hot_unanswered_for:
 # ...and the pause's counts: the messages held, the agents a resume
 # wakes, the held messages that are not bise's own.
 law hot_held:
-  for +s: HM.St
+  for +s: HS.St
   for h: HI.Split(s)
   {HP.held(s) == HP.held.go(HM.every(s)) : Nat}
 
 law hot_woken:
-  for +s: HM.St
+  for +s: HS.St
   for h: HI.Split(s)
   {HP.woken(s) == List.length(&2, String, HP.woken.go(HM.every(s), Nil{})) : Nat}
 
 law hot_his:
-  for +s: HM.St
+  for +s: HS.St
   for h: HI.Split(s)
   {HP.his(s) == HP.his.go(HM.every(s)) : Nat}

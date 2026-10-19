@@ -14,7 +14,7 @@ import ../hub/picks.bend as HPK
 # LAW: a card closed without him (withdrawn, closed, an agent stopped)
 # journals no answer.
 law closed_without_him_has_no_answer:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +id: Nat
   for +res: String
@@ -42,7 +42,7 @@ law an_approval_digit_journals_its_words:
 # LAW: a card not due (closed without him, or its position given
 # already) takes no position: nothing changes.
 law answer_pos_not_due:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +card: Nat
   for +agent: String
@@ -52,7 +52,7 @@ law answer_pos_not_due:
 # LAW: the position is journaled at most once per card: a second
 # answer_pos for the same card changes nothing.
 law answer_pos_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +card: Nat
   for +agent: String

@@ -49,6 +49,16 @@ def Msg.id.set_set(r, a, b):
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
+law Msg.id.over:
+  for r: S.Msg
+  for g: Nat -> Nat
+  {S.Msg.over_id(r, g) == S.Msg.with_id(r, g(S.Msg.id(r))) : S.Msg}
+
+def Msg.id.over(r, g):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
 law Msg.thread.get_with:
   for r: S.Msg
   for v: Nat
@@ -85,6 +95,16 @@ law Msg.thread.set_set:
   {S.Msg.with_thread(S.Msg.with_thread(r, a), b) == S.Msg.with_thread(r, b) : S.Msg}
 
 def Msg.thread.set_set(r, a, b):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law Msg.thread.over:
+  for r: S.Msg
+  for g: Nat -> Nat
+  {S.Msg.over_thread(r, g) == S.Msg.with_thread(r, g(S.Msg.thread(r))) : S.Msg}
+
+def Msg.thread.over(r, g):
   match r:
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
@@ -129,6 +149,16 @@ def Msg.from.set_set(r, a, b):
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
+law Msg.from.over:
+  for r: S.Msg
+  for g: String -> String
+  {S.Msg.over_from(r, g) == S.Msg.with_from(r, g(S.Msg.from(r))) : S.Msg}
+
+def Msg.from.over(r, g):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
 law Msg.to.get_with:
   for r: S.Msg
   for v: String
@@ -165,6 +195,16 @@ law Msg.to.set_set:
   {S.Msg.with_to(S.Msg.with_to(r, a), b) == S.Msg.with_to(r, b) : S.Msg}
 
 def Msg.to.set_set(r, a, b):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law Msg.to.over:
+  for r: S.Msg
+  for g: String -> String
+  {S.Msg.over_to(r, g) == S.Msg.with_to(r, g(S.Msg.to(r))) : S.Msg}
+
+def Msg.to.over(r, g):
   match r:
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
@@ -209,6 +249,16 @@ def Msg.reply_to.set_set(r, a, b):
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
+law Msg.reply_to.over:
+  for r: S.Msg
+  for g: Maybe<&2, Nat> -> Maybe<&2, Nat>
+  {S.Msg.over_reply_to(r, g) == S.Msg.with_reply_to(r, g(S.Msg.reply_to(r))) : S.Msg}
+
+def Msg.reply_to.over(r, g):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
 law Msg.expect.get_with:
   for r: S.Msg
   for v: Bool
@@ -245,6 +295,16 @@ law Msg.expect.set_set:
   {S.Msg.with_expect(S.Msg.with_expect(r, a), b) == S.Msg.with_expect(r, b) : S.Msg}
 
 def Msg.expect.set_set(r, a, b):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law Msg.expect.over:
+  for r: S.Msg
+  for g: Bool -> Bool
+  {S.Msg.over_expect(r, g) == S.Msg.with_expect(r, g(S.Msg.expect(r))) : S.Msg}
+
+def Msg.expect.over(r, g):
   match r:
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
@@ -289,6 +349,16 @@ def Msg.auto.set_set(r, a, b):
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
+law Msg.auto.over:
+  for r: S.Msg
+  for g: Bool -> Bool
+  {S.Msg.over_auto(r, g) == S.Msg.with_auto(r, g(S.Msg.auto(r))) : S.Msg}
+
+def Msg.auto.over(r, g):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
 law Msg.text.get_with:
   for r: S.Msg
   for v: String
@@ -325,6 +395,16 @@ law Msg.text.set_set:
   {S.Msg.with_text(S.Msg.with_text(r, a), b) == S.Msg.with_text(r, b) : S.Msg}
 
 def Msg.text.set_set(r, a, b):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law Msg.text.over:
+  for r: S.Msg
+  for g: String -> String
+  {S.Msg.over_text(r, g) == S.Msg.with_text(r, g(S.Msg.text(r))) : S.Msg}
+
+def Msg.text.over(r, g):
   match r:
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
@@ -369,6 +449,16 @@ def Msg.created.set_set(r, a, b):
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
+law Msg.created.over:
+  for r: S.Msg
+  for g: Nat -> Nat
+  {S.Msg.over_created(r, g) == S.Msg.with_created(r, g(S.Msg.created(r))) : S.Msg}
+
+def Msg.created.over(r, g):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
 law Msg.plain.get_with:
   for r: S.Msg
   for v: Bool
@@ -405,6 +495,16 @@ law Msg.plain.set_set:
   {S.Msg.with_plain(S.Msg.with_plain(r, a), b) == S.Msg.with_plain(r, b) : S.Msg}
 
 def Msg.plain.set_set(r, a, b):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law Msg.plain.over:
+  for r: S.Msg
+  for g: Bool -> Bool
+  {S.Msg.over_plain(r, g) == S.Msg.with_plain(r, g(S.Msg.plain(r))) : S.Msg}
+
+def Msg.plain.over(r, g):
   match r:
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
@@ -449,6 +549,16 @@ def Msg.queued.set_set(r, a, b):
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
+law Msg.queued.over:
+  for r: S.Msg
+  for g: Bool -> Bool
+  {S.Msg.over_queued(r, g) == S.Msg.with_queued(r, g(S.Msg.queued(r))) : S.Msg}
+
+def Msg.queued.over(r, g):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
 law Msg.via.get_with:
   for r: S.Msg
   for v: Maybe<&2, String>
@@ -489,6 +599,16 @@ def Msg.via.set_set(r, a, b):
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
+law Msg.via.over:
+  for r: S.Msg
+  for g: Maybe<&2, String> -> Maybe<&2, String>
+  {S.Msg.over_via(r, g) == S.Msg.with_via(r, g(S.Msg.via(r))) : S.Msg}
+
+def Msg.via.over(r, g):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
 law Msg.parts.get_with:
   for r: S.Msg
   for v: String
@@ -525,6 +645,25 @@ law Msg.parts.set_set:
   {S.Msg.with_parts(S.Msg.with_parts(r, a), b) == S.Msg.with_parts(r, b) : S.Msg}
 
 def Msg.parts.set_set(r, a, b):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law Msg.parts.over:
+  for r: S.Msg
+  for g: String -> String
+  {S.Msg.over_parts(r, g) == S.Msg.with_parts(r, g(S.Msg.parts(r))) : S.Msg}
+
+def Msg.parts.over(r, g):
+  match r:
+    case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law Msg.open_eq:
+  for r: S.Msg
+  {S.Msg.open(r) == r : S.Msg}
+
+def Msg.open_eq(r):
   match r:
     case S.Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
@@ -571,6 +710,16 @@ def MRec.msg.set_set(r, a, b):
     case S.MRec{f0, f1, f2}:
       {==}
 
+law MRec.msg.over:
+  for r: S.MRec
+  for g: S.Msg -> S.Msg
+  {S.MRec.over_msg(r, g) == S.MRec.with_msg(r, g(S.MRec.msg(r))) : S.MRec}
+
+def MRec.msg.over(r, g):
+  match r:
+    case S.MRec{f0, f1, f2}:
+      {==}
+
 law MRec.st.get_with:
   for r: S.MRec
   for v: S.MSt
@@ -611,6 +760,16 @@ def MRec.st.set_set(r, a, b):
     case S.MRec{f0, f1, f2}:
       {==}
 
+law MRec.st.over:
+  for r: S.MRec
+  for g: S.MSt -> S.MSt
+  {S.MRec.over_st(r, g) == S.MRec.with_st(r, g(S.MRec.st(r))) : S.MRec}
+
+def MRec.st.over(r, g):
+  match r:
+    case S.MRec{f0, f1, f2}:
+      {==}
+
 law MRec.settled.get_with:
   for r: S.MRec
   for v: Bool
@@ -647,6 +806,25 @@ law MRec.settled.set_set:
   {S.MRec.with_settled(S.MRec.with_settled(r, a), b) == S.MRec.with_settled(r, b) : S.MRec}
 
 def MRec.settled.set_set(r, a, b):
+  match r:
+    case S.MRec{f0, f1, f2}:
+      {==}
+
+law MRec.settled.over:
+  for r: S.MRec
+  for g: Bool -> Bool
+  {S.MRec.over_settled(r, g) == S.MRec.with_settled(r, g(S.MRec.settled(r))) : S.MRec}
+
+def MRec.settled.over(r, g):
+  match r:
+    case S.MRec{f0, f1, f2}:
+      {==}
+
+law MRec.open_eq:
+  for r: S.MRec
+  {S.MRec.open(r) == r : S.MRec}
+
+def MRec.open_eq(r):
   match r:
     case S.MRec{f0, f1, f2}:
       {==}
@@ -693,6 +871,16 @@ def Card.id.set_set(r, a, b):
     case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
 
+law Card.id.over:
+  for r: S.Card
+  for g: Nat -> Nat
+  {S.Card.over_id(r, g) == S.Card.with_id(r, g(S.Card.id(r))) : S.Card}
+
+def Card.id.over(r, g):
+  match r:
+    case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
 law Card.kind.get_with:
   for r: S.Card
   for v: String
@@ -729,6 +917,16 @@ law Card.kind.set_set:
   {S.Card.with_kind(S.Card.with_kind(r, a), b) == S.Card.with_kind(r, b) : S.Card}
 
 def Card.kind.set_set(r, a, b):
+  match r:
+    case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Card.kind.over:
+  for r: S.Card
+  for g: String -> String
+  {S.Card.over_kind(r, g) == S.Card.with_kind(r, g(S.Card.kind(r))) : S.Card}
+
+def Card.kind.over(r, g):
   match r:
     case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
@@ -773,6 +971,16 @@ def Card.agent.set_set(r, a, b):
     case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
 
+law Card.agent.over:
+  for r: S.Card
+  for g: String -> String
+  {S.Card.over_agent(r, g) == S.Card.with_agent(r, g(S.Card.agent(r))) : S.Card}
+
+def Card.agent.over(r, g):
+  match r:
+    case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
 law Card.text.get_with:
   for r: S.Card
   for v: String
@@ -809,6 +1017,16 @@ law Card.text.set_set:
   {S.Card.with_text(S.Card.with_text(r, a), b) == S.Card.with_text(r, b) : S.Card}
 
 def Card.text.set_set(r, a, b):
+  match r:
+    case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Card.text.over:
+  for r: S.Card
+  for g: String -> String
+  {S.Card.over_text(r, g) == S.Card.with_text(r, g(S.Card.text(r))) : S.Card}
+
+def Card.text.over(r, g):
   match r:
     case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
@@ -853,6 +1071,16 @@ def Card.for_msg.set_set(r, a, b):
     case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
 
+law Card.for_msg.over:
+  for r: S.Card
+  for g: Maybe<&2, Nat> -> Maybe<&2, Nat>
+  {S.Card.over_for_msg(r, g) == S.Card.with_for_msg(r, g(S.Card.for_msg(r))) : S.Card}
+
+def Card.for_msg.over(r, g):
+  match r:
+    case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
 law Card.created.get_with:
   for r: S.Card
   for v: Nat
@@ -889,6 +1117,16 @@ law Card.created.set_set:
   {S.Card.with_created(S.Card.with_created(r, a), b) == S.Card.with_created(r, b) : S.Card}
 
 def Card.created.set_set(r, a, b):
+  match r:
+    case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Card.created.over:
+  for r: S.Card
+  for g: Nat -> Nat
+  {S.Card.over_created(r, g) == S.Card.with_created(r, g(S.Card.created(r))) : S.Card}
+
+def Card.created.over(r, g):
   match r:
     case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
@@ -933,6 +1171,16 @@ def Card.place.set_set(r, a, b):
     case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
 
+law Card.place.over:
+  for r: S.Card
+  for g: Maybe<&2, String> -> Maybe<&2, String>
+  {S.Card.over_place(r, g) == S.Card.with_place(r, g(S.Card.place(r))) : S.Card}
+
+def Card.place.over(r, g):
+  match r:
+    case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
 law Card.pr.get_with:
   for r: S.Card
   for v: Maybe<&2, Nat>
@@ -969,6 +1217,25 @@ law Card.pr.set_set:
   {S.Card.with_pr(S.Card.with_pr(r, a), b) == S.Card.with_pr(r, b) : S.Card}
 
 def Card.pr.set_set(r, a, b):
+  match r:
+    case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Card.pr.over:
+  for r: S.Card
+  for g: Maybe<&2, Nat> -> Maybe<&2, Nat>
+  {S.Card.over_pr(r, g) == S.Card.with_pr(r, g(S.Card.pr(r))) : S.Card}
+
+def Card.pr.over(r, g):
+  match r:
+    case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Card.open_eq:
+  for r: S.Card
+  {S.Card.open(r) == r : S.Card}
+
+def Card.open_eq(r):
   match r:
     case S.Card{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
@@ -1015,6 +1282,16 @@ def Ans.said.set_set(r, a, b):
     case S.Ans{f0, f1, f2, f3, f4, f5}:
       {==}
 
+law Ans.said.over:
+  for r: S.Ans
+  for g: String -> String
+  {S.Ans.over_said(r, g) == S.Ans.with_said(r, g(S.Ans.said(r))) : S.Ans}
+
+def Ans.said.over(r, g):
+  match r:
+    case S.Ans{f0, f1, f2, f3, f4, f5}:
+      {==}
+
 law Ans.pick_n.get_with:
   for r: S.Ans
   for v: Maybe<&2, Nat>
@@ -1051,6 +1328,16 @@ law Ans.pick_n.set_set:
   {S.Ans.with_pick_n(S.Ans.with_pick_n(r, a), b) == S.Ans.with_pick_n(r, b) : S.Ans}
 
 def Ans.pick_n.set_set(r, a, b):
+  match r:
+    case S.Ans{f0, f1, f2, f3, f4, f5}:
+      {==}
+
+law Ans.pick_n.over:
+  for r: S.Ans
+  for g: Maybe<&2, Nat> -> Maybe<&2, Nat>
+  {S.Ans.over_pick_n(r, g) == S.Ans.with_pick_n(r, g(S.Ans.pick_n(r))) : S.Ans}
+
+def Ans.pick_n.over(r, g):
   match r:
     case S.Ans{f0, f1, f2, f3, f4, f5}:
       {==}
@@ -1095,6 +1382,16 @@ def Ans.pick.set_set(r, a, b):
     case S.Ans{f0, f1, f2, f3, f4, f5}:
       {==}
 
+law Ans.pick.over:
+  for r: S.Ans
+  for g: String -> String
+  {S.Ans.over_pick(r, g) == S.Ans.with_pick(r, g(S.Ans.pick(r))) : S.Ans}
+
+def Ans.pick.over(r, g):
+  match r:
+    case S.Ans{f0, f1, f2, f3, f4, f5}:
+      {==}
+
 law Ans.via.get_with:
   for r: S.Ans
   for v: String
@@ -1131,6 +1428,16 @@ law Ans.via.set_set:
   {S.Ans.with_via(S.Ans.with_via(r, a), b) == S.Ans.with_via(r, b) : S.Ans}
 
 def Ans.via.set_set(r, a, b):
+  match r:
+    case S.Ans{f0, f1, f2, f3, f4, f5}:
+      {==}
+
+law Ans.via.over:
+  for r: S.Ans
+  for g: String -> String
+  {S.Ans.over_via(r, g) == S.Ans.with_via(r, g(S.Ans.via(r))) : S.Ans}
+
+def Ans.via.over(r, g):
   match r:
     case S.Ans{f0, f1, f2, f3, f4, f5}:
       {==}
@@ -1175,6 +1482,16 @@ def Ans.page.set_set(r, a, b):
     case S.Ans{f0, f1, f2, f3, f4, f5}:
       {==}
 
+law Ans.page.over:
+  for r: S.Ans
+  for g: String -> String
+  {S.Ans.over_page(r, g) == S.Ans.with_page(r, g(S.Ans.page(r))) : S.Ans}
+
+def Ans.page.over(r, g):
+  match r:
+    case S.Ans{f0, f1, f2, f3, f4, f5}:
+      {==}
+
 law Ans.block.get_with:
   for r: S.Ans
   for v: String
@@ -1211,6 +1528,25 @@ law Ans.block.set_set:
   {S.Ans.with_block(S.Ans.with_block(r, a), b) == S.Ans.with_block(r, b) : S.Ans}
 
 def Ans.block.set_set(r, a, b):
+  match r:
+    case S.Ans{f0, f1, f2, f3, f4, f5}:
+      {==}
+
+law Ans.block.over:
+  for r: S.Ans
+  for g: String -> String
+  {S.Ans.over_block(r, g) == S.Ans.with_block(r, g(S.Ans.block(r))) : S.Ans}
+
+def Ans.block.over(r, g):
+  match r:
+    case S.Ans{f0, f1, f2, f3, f4, f5}:
+      {==}
+
+law Ans.open_eq:
+  for r: S.Ans
+  {S.Ans.open(r) == r : S.Ans}
+
+def Ans.open_eq(r):
   match r:
     case S.Ans{f0, f1, f2, f3, f4, f5}:
       {==}
@@ -1257,6 +1593,16 @@ def Agent.name.set_set(r, a, b):
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
 
+law Agent.name.over:
+  for r: S.Agent
+  for g: String -> String
+  {S.Agent.over_name(r, g) == S.Agent.with_name(r, g(S.Agent.name(r))) : S.Agent}
+
+def Agent.name.over(r, g):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
 law Agent.is_main.get_with:
   for r: S.Agent
   for v: Bool
@@ -1293,6 +1639,16 @@ law Agent.is_main.set_set:
   {S.Agent.with_is_main(S.Agent.with_is_main(r, a), b) == S.Agent.with_is_main(r, b) : S.Agent}
 
 def Agent.is_main.set_set(r, a, b):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
+law Agent.is_main.over:
+  for r: S.Agent
+  for g: Bool -> Bool
+  {S.Agent.over_is_main(r, g) == S.Agent.with_is_main(r, g(S.Agent.is_main(r))) : S.Agent}
+
+def Agent.is_main.over(r, g):
   match r:
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
@@ -1337,6 +1693,16 @@ def Agent.parent.set_set(r, a, b):
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
 
+law Agent.parent.over:
+  for r: S.Agent
+  for g: Maybe<&2, String> -> Maybe<&2, String>
+  {S.Agent.over_parent(r, g) == S.Agent.with_parent(r, g(S.Agent.parent(r))) : S.Agent}
+
+def Agent.parent.over(r, g):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
 law Agent.life.get_with:
   for r: S.Agent
   for v: S.Life
@@ -1373,6 +1739,16 @@ law Agent.life.set_set:
   {S.Agent.with_life(S.Agent.with_life(r, a), b) == S.Agent.with_life(r, b) : S.Agent}
 
 def Agent.life.set_set(r, a, b):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
+law Agent.life.over:
+  for r: S.Agent
+  for g: S.Life -> S.Life
+  {S.Agent.over_life(r, g) == S.Agent.with_life(r, g(S.Agent.life(r))) : S.Agent}
+
+def Agent.life.over(r, g):
   match r:
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
@@ -1417,6 +1793,16 @@ def Agent.declared.set_set(r, a, b):
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
 
+law Agent.declared.over:
+  for r: S.Agent
+  for g: Maybe<&2, S.Decl> -> Maybe<&2, S.Decl>
+  {S.Agent.over_declared(r, g) == S.Agent.with_declared(r, g(S.Agent.declared(r))) : S.Agent}
+
+def Agent.declared.over(r, g):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
 law Agent.aliases.get_with:
   for r: S.Agent
   for v: List<&2, String>
@@ -1453,6 +1839,16 @@ law Agent.aliases.set_set:
   {S.Agent.with_aliases(S.Agent.with_aliases(r, a), b) == S.Agent.with_aliases(r, b) : S.Agent}
 
 def Agent.aliases.set_set(r, a, b):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
+law Agent.aliases.over:
+  for r: S.Agent
+  for g: List<&2, String> -> List<&2, String>
+  {S.Agent.over_aliases(r, g) == S.Agent.with_aliases(r, g(S.Agent.aliases(r))) : S.Agent}
+
+def Agent.aliases.over(r, g):
   match r:
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
@@ -1497,6 +1893,16 @@ def Agent.files.set_set(r, a, b):
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
 
+law Agent.files.over:
+  for r: S.Agent
+  for g: List<&2, String> -> List<&2, String>
+  {S.Agent.over_files(r, g) == S.Agent.with_files(r, g(S.Agent.files(r))) : S.Agent}
+
+def Agent.files.over(r, g):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
 law Agent.ws.get_with:
   for r: S.Agent
   for v: J.Json
@@ -1533,6 +1939,16 @@ law Agent.ws.set_set:
   {S.Agent.with_ws(S.Agent.with_ws(r, a), b) == S.Agent.with_ws(r, b) : S.Agent}
 
 def Agent.ws.set_set(r, a, b):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
+law Agent.ws.over:
+  for r: S.Agent
+  for g: J.Json -> J.Json
+  {S.Agent.over_ws(r, g) == S.Agent.with_ws(r, g(S.Agent.ws(r))) : S.Agent}
+
+def Agent.ws.over(r, g):
   match r:
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
@@ -1577,6 +1993,16 @@ def Agent.dir.set_set(r, a, b):
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
 
+law Agent.dir.over:
+  for r: S.Agent
+  for g: String -> String
+  {S.Agent.over_dir(r, g) == S.Agent.with_dir(r, g(S.Agent.dir(r))) : S.Agent}
+
+def Agent.dir.over(r, g):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
 law Agent.brief.get_with:
   for r: S.Agent
   for v: J.Json
@@ -1613,6 +2039,16 @@ law Agent.brief.set_set:
   {S.Agent.with_brief(S.Agent.with_brief(r, a), b) == S.Agent.with_brief(r, b) : S.Agent}
 
 def Agent.brief.set_set(r, a, b):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
+law Agent.brief.over:
+  for r: S.Agent
+  for g: J.Json -> J.Json
+  {S.Agent.over_brief(r, g) == S.Agent.with_brief(r, g(S.Agent.brief(r))) : S.Agent}
+
+def Agent.brief.over(r, g):
   match r:
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
@@ -1657,6 +2093,16 @@ def Agent.created.set_set(r, a, b):
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
 
+law Agent.created.over:
+  for r: S.Agent
+  for g: Nat -> Nat
+  {S.Agent.over_created(r, g) == S.Agent.with_created(r, g(S.Agent.created(r))) : S.Agent}
+
+def Agent.created.over(r, g):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
 law Agent.failure.get_with:
   for r: S.Agent
   for v: Maybe<&2, String>
@@ -1693,6 +2139,16 @@ law Agent.failure.set_set:
   {S.Agent.with_failure(S.Agent.with_failure(r, a), b) == S.Agent.with_failure(r, b) : S.Agent}
 
 def Agent.failure.set_set(r, a, b):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
+law Agent.failure.over:
+  for r: S.Agent
+  for g: Maybe<&2, String> -> Maybe<&2, String>
+  {S.Agent.over_failure(r, g) == S.Agent.with_failure(r, g(S.Agent.failure(r))) : S.Agent}
+
+def Agent.failure.over(r, g):
   match r:
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
@@ -1737,6 +2193,16 @@ def Agent.note.set_set(r, a, b):
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
 
+law Agent.note.over:
+  for r: S.Agent
+  for g: String -> String
+  {S.Agent.over_note(r, g) == S.Agent.with_note(r, g(S.Agent.note(r))) : S.Agent}
+
+def Agent.note.over(r, g):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
 law Agent.report.get_with:
   for r: S.Agent
   for v: J.Json
@@ -1773,6 +2239,16 @@ law Agent.report.set_set:
   {S.Agent.with_report(S.Agent.with_report(r, a), b) == S.Agent.with_report(r, b) : S.Agent}
 
 def Agent.report.set_set(r, a, b):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
+law Agent.report.over:
+  for r: S.Agent
+  for g: J.Json -> J.Json
+  {S.Agent.over_report(r, g) == S.Agent.with_report(r, g(S.Agent.report(r))) : S.Agent}
+
+def Agent.report.over(r, g):
   match r:
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
@@ -1817,6 +2293,16 @@ def Agent.snap.set_set(r, a, b):
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
 
+law Agent.snap.over:
+  for r: S.Agent
+  for g: Maybe<&2, String> -> Maybe<&2, String>
+  {S.Agent.over_snap(r, g) == S.Agent.with_snap(r, g(S.Agent.snap(r))) : S.Agent}
+
+def Agent.snap.over(r, g):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
 law Agent.follow.get_with:
   for r: S.Agent
   for v: Maybe<&2, String>
@@ -1853,6 +2339,25 @@ law Agent.follow.set_set:
   {S.Agent.with_follow(S.Agent.with_follow(r, a), b) == S.Agent.with_follow(r, b) : S.Agent}
 
 def Agent.follow.set_set(r, a, b):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
+law Agent.follow.over:
+  for r: S.Agent
+  for g: Maybe<&2, String> -> Maybe<&2, String>
+  {S.Agent.over_follow(r, g) == S.Agent.with_follow(r, g(S.Agent.follow(r))) : S.Agent}
+
+def Agent.follow.over(r, g):
+  match r:
+    case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      {==}
+
+law Agent.open_eq:
+  for r: S.Agent
+  {S.Agent.open(r) == r : S.Agent}
+
+def Agent.open_eq(r):
   match r:
     case S.Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       {==}
@@ -1899,6 +2404,16 @@ def Item.id.set_set(r, a, b):
     case S.Item{f0, f1}:
       {==}
 
+law Item.id.over:
+  for r: S.Item
+  for g: Nat -> Nat
+  {S.Item.over_id(r, g) == S.Item.with_id(r, g(S.Item.id(r))) : S.Item}
+
+def Item.id.over(r, g):
+  match r:
+    case S.Item{f0, f1}:
+      {==}
+
 law Item.text.get_with:
   for r: S.Item
   for v: String
@@ -1935,6 +2450,25 @@ law Item.text.set_set:
   {S.Item.with_text(S.Item.with_text(r, a), b) == S.Item.with_text(r, b) : S.Item}
 
 def Item.text.set_set(r, a, b):
+  match r:
+    case S.Item{f0, f1}:
+      {==}
+
+law Item.text.over:
+  for r: S.Item
+  for g: String -> String
+  {S.Item.over_text(r, g) == S.Item.with_text(r, g(S.Item.text(r))) : S.Item}
+
+def Item.text.over(r, g):
+  match r:
+    case S.Item{f0, f1}:
+      {==}
+
+law Item.open_eq:
+  for r: S.Item
+  {S.Item.open(r) == r : S.Item}
+
+def Item.open_eq(r):
   match r:
     case S.Item{f0, f1}:
       {==}
@@ -1981,6 +2515,16 @@ def Timer.id.set_set(r, a, b):
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
 
+law Timer.id.over:
+  for r: S.Timer
+  for g: Nat -> Nat
+  {S.Timer.over_id(r, g) == S.Timer.with_id(r, g(S.Timer.id(r))) : S.Timer}
+
+def Timer.id.over(r, g):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
 law Timer.agent.get_with:
   for r: S.Timer
   for v: String
@@ -2017,6 +2561,16 @@ law Timer.agent.set_set:
   {S.Timer.with_agent(S.Timer.with_agent(r, a), b) == S.Timer.with_agent(r, b) : S.Timer}
 
 def Timer.agent.set_set(r, a, b):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
+law Timer.agent.over:
+  for r: S.Timer
+  for g: String -> String
+  {S.Timer.over_agent(r, g) == S.Timer.with_agent(r, g(S.Timer.agent(r))) : S.Timer}
+
+def Timer.agent.over(r, g):
   match r:
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
@@ -2061,6 +2615,16 @@ def Timer.by.set_set(r, a, b):
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
 
+law Timer.by.over:
+  for r: S.Timer
+  for g: String -> String
+  {S.Timer.over_by(r, g) == S.Timer.with_by(r, g(S.Timer.by(r))) : S.Timer}
+
+def Timer.by.over(r, g):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
 law Timer.text.get_with:
   for r: S.Timer
   for v: String
@@ -2097,6 +2661,16 @@ law Timer.text.set_set:
   {S.Timer.with_text(S.Timer.with_text(r, a), b) == S.Timer.with_text(r, b) : S.Timer}
 
 def Timer.text.set_set(r, a, b):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
+law Timer.text.over:
+  for r: S.Timer
+  for g: String -> String
+  {S.Timer.over_text(r, g) == S.Timer.with_text(r, g(S.Timer.text(r))) : S.Timer}
+
+def Timer.text.over(r, g):
   match r:
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
@@ -2141,6 +2715,16 @@ def Timer.sched.set_set(r, a, b):
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
 
+law Timer.sched.over:
+  for r: S.Timer
+  for g: S.Sched -> S.Sched
+  {S.Timer.over_sched(r, g) == S.Timer.with_sched(r, g(S.Timer.sched(r))) : S.Timer}
+
+def Timer.sched.over(r, g):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
 law Timer.next.get_with:
   for r: S.Timer
   for v: Nat
@@ -2177,6 +2761,16 @@ law Timer.next.set_set:
   {S.Timer.with_next(S.Timer.with_next(r, a), b) == S.Timer.with_next(r, b) : S.Timer}
 
 def Timer.next.set_set(r, a, b):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
+law Timer.next.over:
+  for r: S.Timer
+  for g: Nat -> Nat
+  {S.Timer.over_next(r, g) == S.Timer.with_next(r, g(S.Timer.next(r))) : S.Timer}
+
+def Timer.next.over(r, g):
   match r:
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
@@ -2221,6 +2815,16 @@ def Timer.until.set_set(r, a, b):
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
 
+law Timer.until.over:
+  for r: S.Timer
+  for g: Maybe<&2, Nat> -> Maybe<&2, Nat>
+  {S.Timer.over_until(r, g) == S.Timer.with_until(r, g(S.Timer.until(r))) : S.Timer}
+
+def Timer.until.over(r, g):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
 law Timer.times.get_with:
   for r: S.Timer
   for v: Maybe<&2, Nat>
@@ -2257,6 +2861,16 @@ law Timer.times.set_set:
   {S.Timer.with_times(S.Timer.with_times(r, a), b) == S.Timer.with_times(r, b) : S.Timer}
 
 def Timer.times.set_set(r, a, b):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
+law Timer.times.over:
+  for r: S.Timer
+  for g: Maybe<&2, Nat> -> Maybe<&2, Nat>
+  {S.Timer.over_times(r, g) == S.Timer.with_times(r, g(S.Timer.times(r))) : S.Timer}
+
+def Timer.times.over(r, g):
   match r:
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
@@ -2301,6 +2915,16 @@ def Timer.fired.set_set(r, a, b):
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
 
+law Timer.fired.over:
+  for r: S.Timer
+  for g: Nat -> Nat
+  {S.Timer.over_fired(r, g) == S.Timer.with_fired(r, g(S.Timer.fired(r))) : S.Timer}
+
+def Timer.fired.over(r, g):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
 law Timer.page.get_with:
   for r: S.Timer
   for v: Maybe<&2, String>
@@ -2337,6 +2961,16 @@ law Timer.page.set_set:
   {S.Timer.with_page(S.Timer.with_page(r, a), b) == S.Timer.with_page(r, b) : S.Timer}
 
 def Timer.page.set_set(r, a, b):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
+law Timer.page.over:
+  for r: S.Timer
+  for g: Maybe<&2, String> -> Maybe<&2, String>
+  {S.Timer.over_page(r, g) == S.Timer.with_page(r, g(S.Timer.page(r))) : S.Timer}
+
+def Timer.page.over(r, g):
   match r:
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
@@ -2381,6 +3015,16 @@ def Timer.last.set_set(r, a, b):
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
 
+law Timer.last.over:
+  for r: S.Timer
+  for g: Nat -> Nat
+  {S.Timer.over_last(r, g) == S.Timer.with_last(r, g(S.Timer.last(r))) : S.Timer}
+
+def Timer.last.over(r, g):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
 law Timer.runs.get_with:
   for r: S.Timer
   for v: List<&2, Nat>
@@ -2417,6 +3061,16 @@ law Timer.runs.set_set:
   {S.Timer.with_runs(S.Timer.with_runs(r, a), b) == S.Timer.with_runs(r, b) : S.Timer}
 
 def Timer.runs.set_set(r, a, b):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
+law Timer.runs.over:
+  for r: S.Timer
+  for g: List<&2, Nat> -> List<&2, Nat>
+  {S.Timer.over_runs(r, g) == S.Timer.with_runs(r, g(S.Timer.runs(r))) : S.Timer}
+
+def Timer.runs.over(r, g):
   match r:
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
@@ -2461,6 +3115,16 @@ def Timer.name.set_set(r, a, b):
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
 
+law Timer.name.over:
+  for r: S.Timer
+  for g: String -> String
+  {S.Timer.over_name(r, g) == S.Timer.with_name(r, g(S.Timer.name(r))) : S.Timer}
+
+def Timer.name.over(r, g):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
 law Timer.held.get_with:
   for r: S.Timer
   for v: Bool
@@ -2497,6 +3161,25 @@ law Timer.held.set_set:
   {S.Timer.with_held(S.Timer.with_held(r, a), b) == S.Timer.with_held(r, b) : S.Timer}
 
 def Timer.held.set_set(r, a, b):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
+law Timer.held.over:
+  for r: S.Timer
+  for g: Bool -> Bool
+  {S.Timer.over_held(r, g) == S.Timer.with_held(r, g(S.Timer.held(r))) : S.Timer}
+
+def Timer.held.over(r, g):
+  match r:
+    case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      {==}
+
+law Timer.open_eq:
+  for r: S.Timer
+  {S.Timer.open(r) == r : S.Timer}
+
+def Timer.open_eq(r):
   match r:
     case S.Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       {==}
@@ -2543,6 +3226,16 @@ def TimerEnd.t.set_set(r, a, b):
     case S.TimerEnd{f0, f1, f2}:
       {==}
 
+law TimerEnd.t.over:
+  for r: S.TimerEnd
+  for g: S.Timer -> S.Timer
+  {S.TimerEnd.over_t(r, g) == S.TimerEnd.with_t(r, g(S.TimerEnd.t(r))) : S.TimerEnd}
+
+def TimerEnd.t.over(r, g):
+  match r:
+    case S.TimerEnd{f0, f1, f2}:
+      {==}
+
 law TimerEnd.at.get_with:
   for r: S.TimerEnd
   for v: Nat
@@ -2583,6 +3276,16 @@ def TimerEnd.at.set_set(r, a, b):
     case S.TimerEnd{f0, f1, f2}:
       {==}
 
+law TimerEnd.at.over:
+  for r: S.TimerEnd
+  for g: Nat -> Nat
+  {S.TimerEnd.over_at(r, g) == S.TimerEnd.with_at(r, g(S.TimerEnd.at(r))) : S.TimerEnd}
+
+def TimerEnd.at.over(r, g):
+  match r:
+    case S.TimerEnd{f0, f1, f2}:
+      {==}
+
 law TimerEnd.why.get_with:
   for r: S.TimerEnd
   for v: String
@@ -2619,6 +3322,25 @@ law TimerEnd.why.set_set:
   {S.TimerEnd.with_why(S.TimerEnd.with_why(r, a), b) == S.TimerEnd.with_why(r, b) : S.TimerEnd}
 
 def TimerEnd.why.set_set(r, a, b):
+  match r:
+    case S.TimerEnd{f0, f1, f2}:
+      {==}
+
+law TimerEnd.why.over:
+  for r: S.TimerEnd
+  for g: String -> String
+  {S.TimerEnd.over_why(r, g) == S.TimerEnd.with_why(r, g(S.TimerEnd.why(r))) : S.TimerEnd}
+
+def TimerEnd.why.over(r, g):
+  match r:
+    case S.TimerEnd{f0, f1, f2}:
+      {==}
+
+law TimerEnd.open_eq:
+  for r: S.TimerEnd
+  {S.TimerEnd.open(r) == r : S.TimerEnd}
+
+def TimerEnd.open_eq(r):
   match r:
     case S.TimerEnd{f0, f1, f2}:
       {==}
@@ -2665,6 +3387,16 @@ def Act.id.set_set(r, a, b):
     case S.Act{f0, f1, f2}:
       {==}
 
+law Act.id.over:
+  for r: S.Act
+  for g: Nat -> Nat
+  {S.Act.over_id(r, g) == S.Act.with_id(r, g(S.Act.id(r))) : S.Act}
+
+def Act.id.over(r, g):
+  match r:
+    case S.Act{f0, f1, f2}:
+      {==}
+
 law Act.due.get_with:
   for r: S.Act
   for v: Nat
@@ -2705,6 +3437,16 @@ def Act.due.set_set(r, a, b):
     case S.Act{f0, f1, f2}:
       {==}
 
+law Act.due.over:
+  for r: S.Act
+  for g: Nat -> Nat
+  {S.Act.over_due(r, g) == S.Act.with_due(r, g(S.Act.due(r))) : S.Act}
+
+def Act.due.over(r, g):
+  match r:
+    case S.Act{f0, f1, f2}:
+      {==}
+
 law Act.what.get_with:
   for r: S.Act
   for v: S.What
@@ -2741,6 +3483,25 @@ law Act.what.set_set:
   {S.Act.with_what(S.Act.with_what(r, a), b) == S.Act.with_what(r, b) : S.Act}
 
 def Act.what.set_set(r, a, b):
+  match r:
+    case S.Act{f0, f1, f2}:
+      {==}
+
+law Act.what.over:
+  for r: S.Act
+  for g: S.What -> S.What
+  {S.Act.over_what(r, g) == S.Act.with_what(r, g(S.Act.what(r))) : S.Act}
+
+def Act.what.over(r, g):
+  match r:
+    case S.Act{f0, f1, f2}:
+      {==}
+
+law Act.open_eq:
+  for r: S.Act
+  {S.Act.open(r) == r : S.Act}
+
+def Act.open_eq(r):
   match r:
     case S.Act{f0, f1, f2}:
       {==}
@@ -2787,6 +3548,16 @@ def Watch.id.set_set(r, a, b):
     case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
 
+law Watch.id.over:
+  for r: S.Watch
+  for g: Nat -> Nat
+  {S.Watch.over_id(r, g) == S.Watch.with_id(r, g(S.Watch.id(r))) : S.Watch}
+
+def Watch.id.over(r, g):
+  match r:
+    case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
 law Watch.agent.get_with:
   for r: S.Watch
   for v: String
@@ -2823,6 +3594,16 @@ law Watch.agent.set_set:
   {S.Watch.with_agent(S.Watch.with_agent(r, a), b) == S.Watch.with_agent(r, b) : S.Watch}
 
 def Watch.agent.set_set(r, a, b):
+  match r:
+    case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Watch.agent.over:
+  for r: S.Watch
+  for g: String -> String
+  {S.Watch.over_agent(r, g) == S.Watch.with_agent(r, g(S.Watch.agent(r))) : S.Watch}
+
+def Watch.agent.over(r, g):
   match r:
     case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
@@ -2867,6 +3648,16 @@ def Watch.spec.set_set(r, a, b):
     case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
 
+law Watch.spec.over:
+  for r: S.Watch
+  for g: J.Json -> J.Json
+  {S.Watch.over_spec(r, g) == S.Watch.with_spec(r, g(S.Watch.spec(r))) : S.Watch}
+
+def Watch.spec.over(r, g):
+  match r:
+    case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
 law Watch.max_text.get_with:
   for r: S.Watch
   for v: String
@@ -2903,6 +3694,16 @@ law Watch.max_text.set_set:
   {S.Watch.with_max_text(S.Watch.with_max_text(r, a), b) == S.Watch.with_max_text(r, b) : S.Watch}
 
 def Watch.max_text.set_set(r, a, b):
+  match r:
+    case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Watch.max_text.over:
+  for r: S.Watch
+  for g: String -> String
+  {S.Watch.over_max_text(r, g) == S.Watch.with_max_text(r, g(S.Watch.max_text(r))) : S.Watch}
+
+def Watch.max_text.over(r, g):
   match r:
     case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
@@ -2947,6 +3748,16 @@ def Watch.set_at.set_set(r, a, b):
     case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
 
+law Watch.set_at.over:
+  for r: S.Watch
+  for g: Nat -> Nat
+  {S.Watch.over_set_at(r, g) == S.Watch.with_set_at(r, g(S.Watch.set_at(r))) : S.Watch}
+
+def Watch.set_at.over(r, g):
+  match r:
+    case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
 law Watch.max_at.get_with:
   for r: S.Watch
   for v: Nat
@@ -2983,6 +3794,16 @@ law Watch.max_at.set_set:
   {S.Watch.with_max_at(S.Watch.with_max_at(r, a), b) == S.Watch.with_max_at(r, b) : S.Watch}
 
 def Watch.max_at.set_set(r, a, b):
+  match r:
+    case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Watch.max_at.over:
+  for r: S.Watch
+  for g: Nat -> Nat
+  {S.Watch.over_max_at(r, g) == S.Watch.with_max_at(r, g(S.Watch.max_at(r))) : S.Watch}
+
+def Watch.max_at.over(r, g):
   match r:
     case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
@@ -3027,6 +3848,16 @@ def Watch.quiet.set_set(r, a, b):
     case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
 
+law Watch.quiet.over:
+  for r: S.Watch
+  for g: Bool -> Bool
+  {S.Watch.over_quiet(r, g) == S.Watch.with_quiet(r, g(S.Watch.quiet(r))) : S.Watch}
+
+def Watch.quiet.over(r, g):
+  match r:
+    case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
 law Watch.resumes.get_with:
   for r: S.Watch
   for v: Bool
@@ -3063,6 +3894,25 @@ law Watch.resumes.set_set:
   {S.Watch.with_resumes(S.Watch.with_resumes(r, a), b) == S.Watch.with_resumes(r, b) : S.Watch}
 
 def Watch.resumes.set_set(r, a, b):
+  match r:
+    case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Watch.resumes.over:
+  for r: S.Watch
+  for g: Bool -> Bool
+  {S.Watch.over_resumes(r, g) == S.Watch.with_resumes(r, g(S.Watch.resumes(r))) : S.Watch}
+
+def Watch.resumes.over(r, g):
+  match r:
+    case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      {==}
+
+law Watch.open_eq:
+  for r: S.Watch
+  {S.Watch.open(r) == r : S.Watch}
+
+def Watch.open_eq(r):
   match r:
     case S.Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
       {==}
@@ -3109,6 +3959,16 @@ def WatchEnd.w.set_set(r, a, b):
     case S.WatchEnd{f0, f1, f2}:
       {==}
 
+law WatchEnd.w.over:
+  for r: S.WatchEnd
+  for g: S.Watch -> S.Watch
+  {S.WatchEnd.over_w(r, g) == S.WatchEnd.with_w(r, g(S.WatchEnd.w(r))) : S.WatchEnd}
+
+def WatchEnd.w.over(r, g):
+  match r:
+    case S.WatchEnd{f0, f1, f2}:
+      {==}
+
 law WatchEnd.at.get_with:
   for r: S.WatchEnd
   for v: Nat
@@ -3149,6 +4009,16 @@ def WatchEnd.at.set_set(r, a, b):
     case S.WatchEnd{f0, f1, f2}:
       {==}
 
+law WatchEnd.at.over:
+  for r: S.WatchEnd
+  for g: Nat -> Nat
+  {S.WatchEnd.over_at(r, g) == S.WatchEnd.with_at(r, g(S.WatchEnd.at(r))) : S.WatchEnd}
+
+def WatchEnd.at.over(r, g):
+  match r:
+    case S.WatchEnd{f0, f1, f2}:
+      {==}
+
 law WatchEnd.why.get_with:
   for r: S.WatchEnd
   for v: String
@@ -3185,6 +4055,25 @@ law WatchEnd.why.set_set:
   {S.WatchEnd.with_why(S.WatchEnd.with_why(r, a), b) == S.WatchEnd.with_why(r, b) : S.WatchEnd}
 
 def WatchEnd.why.set_set(r, a, b):
+  match r:
+    case S.WatchEnd{f0, f1, f2}:
+      {==}
+
+law WatchEnd.why.over:
+  for r: S.WatchEnd
+  for g: String -> String
+  {S.WatchEnd.over_why(r, g) == S.WatchEnd.with_why(r, g(S.WatchEnd.why(r))) : S.WatchEnd}
+
+def WatchEnd.why.over(r, g):
+  match r:
+    case S.WatchEnd{f0, f1, f2}:
+      {==}
+
+law WatchEnd.open_eq:
+  for r: S.WatchEnd
+  {S.WatchEnd.open(r) == r : S.WatchEnd}
+
+def WatchEnd.open_eq(r):
   match r:
     case S.WatchEnd{f0, f1, f2}:
       {==}
@@ -3231,6 +4120,16 @@ def Wakes.live.set_set(r, a, b):
     case S.Wakes{f0, f1, f2}:
       {==}
 
+law Wakes.live.over:
+  for r: S.Wakes
+  for g: List<&2, S.Watch> -> List<&2, S.Watch>
+  {S.Wakes.over_live(r, g) == S.Wakes.with_live(r, g(S.Wakes.live(r))) : S.Wakes}
+
+def Wakes.live.over(r, g):
+  match r:
+    case S.Wakes{f0, f1, f2}:
+      {==}
+
 law Wakes.ended.get_with:
   for r: S.Wakes
   for v: List<&2, S.WatchEnd>
@@ -3271,6 +4170,16 @@ def Wakes.ended.set_set(r, a, b):
     case S.Wakes{f0, f1, f2}:
       {==}
 
+law Wakes.ended.over:
+  for r: S.Wakes
+  for g: List<&2, S.WatchEnd> -> List<&2, S.WatchEnd>
+  {S.Wakes.over_ended(r, g) == S.Wakes.with_ended(r, g(S.Wakes.ended(r))) : S.Wakes}
+
+def Wakes.ended.over(r, g):
+  match r:
+    case S.Wakes{f0, f1, f2}:
+      {==}
+
 law Wakes.last_id.get_with:
   for r: S.Wakes
   for v: Nat
@@ -3307,6 +4216,25 @@ law Wakes.last_id.set_set:
   {S.Wakes.with_last_id(S.Wakes.with_last_id(r, a), b) == S.Wakes.with_last_id(r, b) : S.Wakes}
 
 def Wakes.last_id.set_set(r, a, b):
+  match r:
+    case S.Wakes{f0, f1, f2}:
+      {==}
+
+law Wakes.last_id.over:
+  for r: S.Wakes
+  for g: Nat -> Nat
+  {S.Wakes.over_last_id(r, g) == S.Wakes.with_last_id(r, g(S.Wakes.last_id(r))) : S.Wakes}
+
+def Wakes.last_id.over(r, g):
+  match r:
+    case S.Wakes{f0, f1, f2}:
+      {==}
+
+law Wakes.open_eq:
+  for r: S.Wakes
+  {S.Wakes.open(r) == r : S.Wakes}
+
+def Wakes.open_eq(r):
   match r:
     case S.Wakes{f0, f1, f2}:
       {==}
@@ -3353,6 +4281,16 @@ def Tms.live.set_set(r, a, b):
     case S.Tms{f0, f1, f2, f3, f4, f5}:
       {==}
 
+law Tms.live.over:
+  for r: S.Tms
+  for g: List<&2, S.Timer> -> List<&2, S.Timer>
+  {S.Tms.over_live(r, g) == S.Tms.with_live(r, g(S.Tms.live(r))) : S.Tms}
+
+def Tms.live.over(r, g):
+  match r:
+    case S.Tms{f0, f1, f2, f3, f4, f5}:
+      {==}
+
 law Tms.ended.get_with:
   for r: S.Tms
   for v: List<&2, S.TimerEnd>
@@ -3389,6 +4327,16 @@ law Tms.ended.set_set:
   {S.Tms.with_ended(S.Tms.with_ended(r, a), b) == S.Tms.with_ended(r, b) : S.Tms}
 
 def Tms.ended.set_set(r, a, b):
+  match r:
+    case S.Tms{f0, f1, f2, f3, f4, f5}:
+      {==}
+
+law Tms.ended.over:
+  for r: S.Tms
+  for g: List<&2, S.TimerEnd> -> List<&2, S.TimerEnd>
+  {S.Tms.over_ended(r, g) == S.Tms.with_ended(r, g(S.Tms.ended(r))) : S.Tms}
+
+def Tms.ended.over(r, g):
   match r:
     case S.Tms{f0, f1, f2, f3, f4, f5}:
       {==}
@@ -3433,6 +4381,16 @@ def Tms.last_id.set_set(r, a, b):
     case S.Tms{f0, f1, f2, f3, f4, f5}:
       {==}
 
+law Tms.last_id.over:
+  for r: S.Tms
+  for g: Nat -> Nat
+  {S.Tms.over_last_id(r, g) == S.Tms.with_last_id(r, g(S.Tms.last_id(r))) : S.Tms}
+
+def Tms.last_id.over(r, g):
+  match r:
+    case S.Tms{f0, f1, f2, f3, f4, f5}:
+      {==}
+
 law Tms.acts.get_with:
   for r: S.Tms
   for v: List<&2, S.Act>
@@ -3469,6 +4427,16 @@ law Tms.acts.set_set:
   {S.Tms.with_acts(S.Tms.with_acts(r, a), b) == S.Tms.with_acts(r, b) : S.Tms}
 
 def Tms.acts.set_set(r, a, b):
+  match r:
+    case S.Tms{f0, f1, f2, f3, f4, f5}:
+      {==}
+
+law Tms.acts.over:
+  for r: S.Tms
+  for g: List<&2, S.Act> -> List<&2, S.Act>
+  {S.Tms.over_acts(r, g) == S.Tms.with_acts(r, g(S.Tms.acts(r))) : S.Tms}
+
+def Tms.acts.over(r, g):
   match r:
     case S.Tms{f0, f1, f2, f3, f4, f5}:
       {==}
@@ -3513,6 +4481,16 @@ def Tms.next_act.set_set(r, a, b):
     case S.Tms{f0, f1, f2, f3, f4, f5}:
       {==}
 
+law Tms.next_act.over:
+  for r: S.Tms
+  for g: Nat -> Nat
+  {S.Tms.over_next_act(r, g) == S.Tms.with_next_act(r, g(S.Tms.next_act(r))) : S.Tms}
+
+def Tms.next_act.over(r, g):
+  match r:
+    case S.Tms{f0, f1, f2, f3, f4, f5}:
+      {==}
+
 law Tms.wk.get_with:
   for r: S.Tms
   for v: S.Wakes
@@ -3549,6 +4527,25 @@ law Tms.wk.set_set:
   {S.Tms.with_wk(S.Tms.with_wk(r, a), b) == S.Tms.with_wk(r, b) : S.Tms}
 
 def Tms.wk.set_set(r, a, b):
+  match r:
+    case S.Tms{f0, f1, f2, f3, f4, f5}:
+      {==}
+
+law Tms.wk.over:
+  for r: S.Tms
+  for g: S.Wakes -> S.Wakes
+  {S.Tms.over_wk(r, g) == S.Tms.with_wk(r, g(S.Tms.wk(r))) : S.Tms}
+
+def Tms.wk.over(r, g):
+  match r:
+    case S.Tms{f0, f1, f2, f3, f4, f5}:
+      {==}
+
+law Tms.open_eq:
+  for r: S.Tms
+  {S.Tms.open(r) == r : S.Tms}
+
+def Tms.open_eq(r):
   match r:
     case S.Tms{f0, f1, f2, f3, f4, f5}:
       {==}
@@ -3595,6 +4592,16 @@ def Out.xid.set_set(r, a, b):
     case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
       {==}
 
+law Out.xid.over:
+  for r: S.Out
+  for g: Nat -> Nat
+  {S.Out.over_xid(r, g) == S.Out.with_xid(r, g(S.Out.xid(r))) : S.Out}
+
+def Out.xid.over(r, g):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
 law Out.project.get_with:
   for r: S.Out
   for v: String
@@ -3631,6 +4638,16 @@ law Out.project.set_set:
   {S.Out.with_project(S.Out.with_project(r, a), b) == S.Out.with_project(r, b) : S.Out}
 
 def Out.project.set_set(r, a, b):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
+law Out.project.over:
+  for r: S.Out
+  for g: String -> String
+  {S.Out.over_project(r, g) == S.Out.with_project(r, g(S.Out.project(r))) : S.Out}
+
+def Out.project.over(r, g):
   match r:
     case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
       {==}
@@ -3675,6 +4692,16 @@ def Out.kind.set_set(r, a, b):
     case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
       {==}
 
+law Out.kind.over:
+  for r: S.Out
+  for g: S.XKind -> S.XKind
+  {S.Out.over_kind(r, g) == S.Out.with_kind(r, g(S.Out.kind(r))) : S.Out}
+
+def Out.kind.over(r, g):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
 law Out.msg.get_with:
   for r: S.Out
   for v: Nat
@@ -3711,6 +4738,16 @@ law Out.msg.set_set:
   {S.Out.with_msg(S.Out.with_msg(r, a), b) == S.Out.with_msg(r, b) : S.Out}
 
 def Out.msg.set_set(r, a, b):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
+law Out.msg.over:
+  for r: S.Out
+  for g: Nat -> Nat
+  {S.Out.over_msg(r, g) == S.Out.with_msg(r, g(S.Out.msg(r))) : S.Out}
+
+def Out.msg.over(r, g):
   match r:
     case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
       {==}
@@ -3755,6 +4792,16 @@ def Out.text.set_set(r, a, b):
     case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
       {==}
 
+law Out.text.over:
+  for r: S.Out
+  for g: String -> String
+  {S.Out.over_text(r, g) == S.Out.with_text(r, g(S.Out.text(r))) : S.Out}
+
+def Out.text.over(r, g):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
 law Out.st.get_with:
   for r: S.Out
   for v: S.OutSt
@@ -3791,6 +4838,16 @@ law Out.st.set_set:
   {S.Out.with_st(S.Out.with_st(r, a), b) == S.Out.with_st(r, b) : S.Out}
 
 def Out.st.set_set(r, a, b):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
+law Out.st.over:
+  for r: S.Out
+  for g: S.OutSt -> S.OutSt
+  {S.Out.over_st(r, g) == S.Out.with_st(r, g(S.Out.st(r))) : S.Out}
+
+def Out.st.over(r, g):
   match r:
     case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
       {==}
@@ -3835,6 +4892,16 @@ def Out.tries.set_set(r, a, b):
     case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
       {==}
 
+law Out.tries.over:
+  for r: S.Out
+  for g: Nat -> Nat
+  {S.Out.over_tries(r, g) == S.Out.with_tries(r, g(S.Out.tries(r))) : S.Out}
+
+def Out.tries.over(r, g):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
 law Out.context.get_with:
   for r: S.Out
   for v: String
@@ -3875,6 +4942,16 @@ def Out.context.set_set(r, a, b):
     case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
       {==}
 
+law Out.context.over:
+  for r: S.Out
+  for g: String -> String
+  {S.Out.over_context(r, g) == S.Out.with_context(r, g(S.Out.context(r))) : S.Out}
+
+def Out.context.over(r, g):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
 law Out.parts.get_with:
   for r: S.Out
   for v: String
@@ -3911,6 +4988,25 @@ law Out.parts.set_set:
   {S.Out.with_parts(S.Out.with_parts(r, a), b) == S.Out.with_parts(r, b) : S.Out}
 
 def Out.parts.set_set(r, a, b):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
+law Out.parts.over:
+  for r: S.Out
+  for g: String -> String
+  {S.Out.over_parts(r, g) == S.Out.with_parts(r, g(S.Out.parts(r))) : S.Out}
+
+def Out.parts.over(r, g):
+  match r:
+    case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      {==}
+
+law Out.open_eq:
+  for r: S.Out
+  {S.Out.open(r) == r : S.Out}
+
+def Out.open_eq(r):
   match r:
     case S.Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
       {==}
@@ -3957,6 +5053,16 @@ def XIn.hub.set_set(r, a, b):
     case S.XIn{f0, f1, f2, f3, f4}:
       {==}
 
+law XIn.hub.over:
+  for r: S.XIn
+  for g: String -> String
+  {S.XIn.over_hub(r, g) == S.XIn.with_hub(r, g(S.XIn.hub(r))) : S.XIn}
+
+def XIn.hub.over(r, g):
+  match r:
+    case S.XIn{f0, f1, f2, f3, f4}:
+      {==}
+
 law XIn.xid.get_with:
   for r: S.XIn
   for v: Nat
@@ -3993,6 +5099,16 @@ law XIn.xid.set_set:
   {S.XIn.with_xid(S.XIn.with_xid(r, a), b) == S.XIn.with_xid(r, b) : S.XIn}
 
 def XIn.xid.set_set(r, a, b):
+  match r:
+    case S.XIn{f0, f1, f2, f3, f4}:
+      {==}
+
+law XIn.xid.over:
+  for r: S.XIn
+  for g: Nat -> Nat
+  {S.XIn.over_xid(r, g) == S.XIn.with_xid(r, g(S.XIn.xid(r))) : S.XIn}
+
+def XIn.xid.over(r, g):
   match r:
     case S.XIn{f0, f1, f2, f3, f4}:
       {==}
@@ -4037,6 +5153,16 @@ def XIn.msg.set_set(r, a, b):
     case S.XIn{f0, f1, f2, f3, f4}:
       {==}
 
+law XIn.msg.over:
+  for r: S.XIn
+  for g: Nat -> Nat
+  {S.XIn.over_msg(r, g) == S.XIn.with_msg(r, g(S.XIn.msg(r))) : S.XIn}
+
+def XIn.msg.over(r, g):
+  match r:
+    case S.XIn{f0, f1, f2, f3, f4}:
+      {==}
+
 law XIn.kind.get_with:
   for r: S.XIn
   for v: S.XKind
@@ -4077,6 +5203,16 @@ def XIn.kind.set_set(r, a, b):
     case S.XIn{f0, f1, f2, f3, f4}:
       {==}
 
+law XIn.kind.over:
+  for r: S.XIn
+  for g: S.XKind -> S.XKind
+  {S.XIn.over_kind(r, g) == S.XIn.with_kind(r, g(S.XIn.kind(r))) : S.XIn}
+
+def XIn.kind.over(r, g):
+  match r:
+    case S.XIn{f0, f1, f2, f3, f4}:
+      {==}
+
 law XIn.replied.get_with:
   for r: S.XIn
   for v: Bool
@@ -4113,6 +5249,25 @@ law XIn.replied.set_set:
   {S.XIn.with_replied(S.XIn.with_replied(r, a), b) == S.XIn.with_replied(r, b) : S.XIn}
 
 def XIn.replied.set_set(r, a, b):
+  match r:
+    case S.XIn{f0, f1, f2, f3, f4}:
+      {==}
+
+law XIn.replied.over:
+  for r: S.XIn
+  for g: Bool -> Bool
+  {S.XIn.over_replied(r, g) == S.XIn.with_replied(r, g(S.XIn.replied(r))) : S.XIn}
+
+def XIn.replied.over(r, g):
+  match r:
+    case S.XIn{f0, f1, f2, f3, f4}:
+      {==}
+
+law XIn.open_eq:
+  for r: S.XIn
+  {S.XIn.open(r) == r : S.XIn}
+
+def XIn.open_eq(r):
   match r:
     case S.XIn{f0, f1, f2, f3, f4}:
       {==}
@@ -4159,6 +5314,16 @@ def Route.rid.set_set(r, a, b):
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
 
+law Route.rid.over:
+  for r: S.Route
+  for g: Nat -> Nat
+  {S.Route.over_rid(r, g) == S.Route.with_rid(r, g(S.Route.rid(r))) : S.Route}
+
+def Route.rid.over(r, g):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
 law Route.text.get_with:
   for r: S.Route
   for v: String
@@ -4195,6 +5360,16 @@ law Route.text.set_set:
   {S.Route.with_text(S.Route.with_text(r, a), b) == S.Route.with_text(r, b) : S.Route}
 
 def Route.text.set_set(r, a, b):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
+law Route.text.over:
+  for r: S.Route
+  for g: String -> String
+  {S.Route.over_text(r, g) == S.Route.with_text(r, g(S.Route.text(r))) : S.Route}
+
+def Route.text.over(r, g):
   match r:
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
@@ -4239,6 +5414,16 @@ def Route.via.set_set(r, a, b):
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
 
+law Route.via.over:
+  for r: S.Route
+  for g: String -> String
+  {S.Route.over_via(r, g) == S.Route.with_via(r, g(S.Route.via(r))) : S.Route}
+
+def Route.via.over(r, g):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
 law Route.to.get_with:
   for r: S.Route
   for v: String
@@ -4275,6 +5460,16 @@ law Route.to.set_set:
   {S.Route.with_to(S.Route.with_to(r, a), b) == S.Route.with_to(r, b) : S.Route}
 
 def Route.to.set_set(r, a, b):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
+law Route.to.over:
+  for r: S.Route
+  for g: String -> String
+  {S.Route.over_to(r, g) == S.Route.with_to(r, g(S.Route.to(r))) : S.Route}
+
+def Route.to.over(r, g):
   match r:
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
@@ -4319,6 +5514,16 @@ def Route.name.set_set(r, a, b):
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
 
+law Route.name.over:
+  for r: S.Route
+  for g: String -> String
+  {S.Route.over_name(r, g) == S.Route.with_name(r, g(S.Route.name(r))) : S.Route}
+
+def Route.name.over(r, g):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
 law Route.due.get_with:
   for r: S.Route
   for v: Nat
@@ -4355,6 +5560,16 @@ law Route.due.set_set:
   {S.Route.with_due(S.Route.with_due(r, a), b) == S.Route.with_due(r, b) : S.Route}
 
 def Route.due.set_set(r, a, b):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
+law Route.due.over:
+  for r: S.Route
+  for g: Nat -> Nat
+  {S.Route.over_due(r, g) == S.Route.with_due(r, g(S.Route.due(r))) : S.Route}
+
+def Route.due.over(r, g):
   match r:
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
@@ -4399,6 +5614,16 @@ def Route.act.set_set(r, a, b):
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
 
+law Route.act.over:
+  for r: S.Route
+  for g: Nat -> Nat
+  {S.Route.over_act(r, g) == S.Route.with_act(r, g(S.Route.act(r))) : S.Route}
+
+def Route.act.over(r, g):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
 law Route.why.get_with:
   for r: S.Route
   for v: String
@@ -4435,6 +5660,16 @@ law Route.why.set_set:
   {S.Route.with_why(S.Route.with_why(r, a), b) == S.Route.with_why(r, b) : S.Route}
 
 def Route.why.set_set(r, a, b):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
+law Route.why.over:
+  for r: S.Route
+  for g: String -> String
+  {S.Route.over_why(r, g) == S.Route.with_why(r, g(S.Route.why(r))) : S.Route}
+
+def Route.why.over(r, g):
   match r:
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
@@ -4479,6 +5714,16 @@ def Route.st.set_set(r, a, b):
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
 
+law Route.st.over:
+  for r: S.Route
+  for g: S.RSt -> S.RSt
+  {S.Route.over_st(r, g) == S.Route.with_st(r, g(S.Route.st(r))) : S.Route}
+
+def Route.st.over(r, g):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
 law Route.context.get_with:
   for r: S.Route
   for v: String
@@ -4519,6 +5764,16 @@ def Route.context.set_set(r, a, b):
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
 
+law Route.context.over:
+  for r: S.Route
+  for g: String -> String
+  {S.Route.over_context(r, g) == S.Route.with_context(r, g(S.Route.context(r))) : S.Route}
+
+def Route.context.over(r, g):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
 law Route.parts.get_with:
   for r: S.Route
   for v: String
@@ -4555,6 +5810,25 @@ law Route.parts.set_set:
   {S.Route.with_parts(S.Route.with_parts(r, a), b) == S.Route.with_parts(r, b) : S.Route}
 
 def Route.parts.set_set(r, a, b):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
+law Route.parts.over:
+  for r: S.Route
+  for g: String -> String
+  {S.Route.over_parts(r, g) == S.Route.with_parts(r, g(S.Route.parts(r))) : S.Route}
+
+def Route.parts.over(r, g):
+  match r:
+    case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      {==}
+
+law Route.open_eq:
+  for r: S.Route
+  {S.Route.open(r) == r : S.Route}
+
+def Route.open_eq(r):
   match r:
     case S.Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       {==}
@@ -4601,6 +5875,16 @@ def Xs.outbox.set_set(r, a, b):
     case S.Xs{f0, f1, f2, f3, f4}:
       {==}
 
+law Xs.outbox.over:
+  for r: S.Xs
+  for g: List<&2, S.Out> -> List<&2, S.Out>
+  {S.Xs.over_outbox(r, g) == S.Xs.with_outbox(r, g(S.Xs.outbox(r))) : S.Xs}
+
+def Xs.outbox.over(r, g):
+  match r:
+    case S.Xs{f0, f1, f2, f3, f4}:
+      {==}
+
 law Xs.next_xid.get_with:
   for r: S.Xs
   for v: Nat
@@ -4637,6 +5921,16 @@ law Xs.next_xid.set_set:
   {S.Xs.with_next_xid(S.Xs.with_next_xid(r, a), b) == S.Xs.with_next_xid(r, b) : S.Xs}
 
 def Xs.next_xid.set_set(r, a, b):
+  match r:
+    case S.Xs{f0, f1, f2, f3, f4}:
+      {==}
+
+law Xs.next_xid.over:
+  for r: S.Xs
+  for g: Nat -> Nat
+  {S.Xs.over_next_xid(r, g) == S.Xs.with_next_xid(r, g(S.Xs.next_xid(r))) : S.Xs}
+
+def Xs.next_xid.over(r, g):
   match r:
     case S.Xs{f0, f1, f2, f3, f4}:
       {==}
@@ -4681,6 +5975,16 @@ def Xs.xin.set_set(r, a, b):
     case S.Xs{f0, f1, f2, f3, f4}:
       {==}
 
+law Xs.xin.over:
+  for r: S.Xs
+  for g: List<&2, S.XIn> -> List<&2, S.XIn>
+  {S.Xs.over_xin(r, g) == S.Xs.with_xin(r, g(S.Xs.xin(r))) : S.Xs}
+
+def Xs.xin.over(r, g):
+  match r:
+    case S.Xs{f0, f1, f2, f3, f4}:
+      {==}
+
 law Xs.routes.get_with:
   for r: S.Xs
   for v: List<&2, S.Route>
@@ -4721,6 +6025,16 @@ def Xs.routes.set_set(r, a, b):
     case S.Xs{f0, f1, f2, f3, f4}:
       {==}
 
+law Xs.routes.over:
+  for r: S.Xs
+  for g: List<&2, S.Route> -> List<&2, S.Route>
+  {S.Xs.over_routes(r, g) == S.Xs.with_routes(r, g(S.Xs.routes(r))) : S.Xs}
+
+def Xs.routes.over(r, g):
+  match r:
+    case S.Xs{f0, f1, f2, f3, f4}:
+      {==}
+
 law Xs.next_rid.get_with:
   for r: S.Xs
   for v: Nat
@@ -4757,6 +6071,25 @@ law Xs.next_rid.set_set:
   {S.Xs.with_next_rid(S.Xs.with_next_rid(r, a), b) == S.Xs.with_next_rid(r, b) : S.Xs}
 
 def Xs.next_rid.set_set(r, a, b):
+  match r:
+    case S.Xs{f0, f1, f2, f3, f4}:
+      {==}
+
+law Xs.next_rid.over:
+  for r: S.Xs
+  for g: Nat -> Nat
+  {S.Xs.over_next_rid(r, g) == S.Xs.with_next_rid(r, g(S.Xs.next_rid(r))) : S.Xs}
+
+def Xs.next_rid.over(r, g):
+  match r:
+    case S.Xs{f0, f1, f2, f3, f4}:
+      {==}
+
+law Xs.open_eq:
+  for r: S.Xs
+  {S.Xs.open(r) == r : S.Xs}
+
+def Xs.open_eq(r):
   match r:
     case S.Xs{f0, f1, f2, f3, f4}:
       {==}
@@ -4803,6 +6136,16 @@ def St.agents.set_set(r, a, b):
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
 
+law St.agents.over:
+  for r: S.St
+  for g: List<&2, S.Agent> -> List<&2, S.Agent>
+  {S.St.over_agents(r, g) == S.St.with_agents(r, g(S.St.agents(r))) : S.St}
+
+def St.agents.over(r, g):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
 law St.order.get_with:
   for r: S.St
   for v: List<&2, String>
@@ -4839,6 +6182,16 @@ law St.order.set_set:
   {S.St.with_order(S.St.with_order(r, a), b) == S.St.with_order(r, b) : S.St}
 
 def St.order.set_set(r, a, b):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
+law St.order.over:
+  for r: S.St
+  for g: List<&2, String> -> List<&2, String>
+  {S.St.over_order(r, g) == S.St.with_order(r, g(S.St.order(r))) : S.St}
+
+def St.order.over(r, g):
   match r:
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
@@ -4883,6 +6236,16 @@ def St.hot.set_set(r, a, b):
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
 
+law St.hot.over:
+  for r: S.St
+  for g: List<&2, S.MRec> -> List<&2, S.MRec>
+  {S.St.over_hot(r, g) == S.St.with_hot(r, g(S.St.hot(r))) : S.St}
+
+def St.hot.over(r, g):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
 law St.cards.get_with:
   for r: S.St
   for v: List<&2, S.Card>
@@ -4919,6 +6282,16 @@ law St.cards.set_set:
   {S.St.with_cards(S.St.with_cards(r, a), b) == S.St.with_cards(r, b) : S.St}
 
 def St.cards.set_set(r, a, b):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
+law St.cards.over:
+  for r: S.St
+  for g: List<&2, S.Card> -> List<&2, S.Card>
+  {S.St.over_cards(r, g) == S.St.with_cards(r, g(S.St.cards(r))) : S.St}
+
+def St.cards.over(r, g):
   match r:
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
@@ -4963,6 +6336,16 @@ def St.notes.set_set(r, a, b):
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
 
+law St.notes.over:
+  for r: S.St
+  for g: List<&2, String> -> List<&2, String>
+  {S.St.over_notes(r, g) == S.St.with_notes(r, g(S.St.notes(r))) : S.St}
+
+def St.notes.over(r, g):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
 law St.next_msg.get_with:
   for r: S.St
   for v: Nat
@@ -4999,6 +6382,16 @@ law St.next_msg.set_set:
   {S.St.with_next_msg(S.St.with_next_msg(r, a), b) == S.St.with_next_msg(r, b) : S.St}
 
 def St.next_msg.set_set(r, a, b):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
+law St.next_msg.over:
+  for r: S.St
+  for g: Nat -> Nat
+  {S.St.over_next_msg(r, g) == S.St.with_next_msg(r, g(S.St.next_msg(r))) : S.St}
+
+def St.next_msg.over(r, g):
   match r:
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
@@ -5043,6 +6436,16 @@ def St.next_card.set_set(r, a, b):
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
 
+law St.next_card.over:
+  for r: S.St
+  for g: Nat -> Nat
+  {S.St.over_next_card(r, g) == S.St.with_next_card(r, g(S.St.next_card(r))) : S.St}
+
+def St.next_card.over(r, g):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
 law St.tm.get_with:
   for r: S.St
   for v: S.Tms
@@ -5079,6 +6482,16 @@ law St.tm.set_set:
   {S.St.with_tm(S.St.with_tm(r, a), b) == S.St.with_tm(r, b) : S.St}
 
 def St.tm.set_set(r, a, b):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
+law St.tm.over:
+  for r: S.St
+  for g: S.Tms -> S.Tms
+  {S.St.over_tm(r, g) == S.St.with_tm(r, g(S.St.tm(r))) : S.St}
+
+def St.tm.over(r, g):
   match r:
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
@@ -5123,6 +6536,16 @@ def St.x.set_set(r, a, b):
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
 
+law St.x.over:
+  for r: S.St
+  for g: S.Xs -> S.Xs
+  {S.St.over_x(r, g) == S.St.with_x(r, g(S.St.x(r))) : S.St}
+
+def St.x.over(r, g):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
 law St.paused.get_with:
   for r: S.St
   for v: Maybe<&2, Nat>
@@ -5159,6 +6582,16 @@ law St.paused.set_set:
   {S.St.with_paused(S.St.with_paused(r, a), b) == S.St.with_paused(r, b) : S.St}
 
 def St.paused.set_set(r, a, b):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
+law St.paused.over:
+  for r: S.St
+  for g: Maybe<&2, Nat> -> Maybe<&2, Nat>
+  {S.St.over_paused(r, g) == S.St.with_paused(r, g(S.St.paused(r))) : S.St}
+
+def St.paused.over(r, g):
   match r:
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
@@ -5203,6 +6636,16 @@ def St.old.set_set(r, a, b):
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}
 
+law St.old.over:
+  for r: S.St
+  for g: List<&2, S.MRec> -> List<&2, S.MRec>
+  {S.St.over_old(r, g) == S.St.with_old(r, g(S.St.old(r))) : S.St}
+
+def St.old.over(r, g):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
 law St.gone.get_with:
   for r: S.St
   for v: List<&2, S.Item>
@@ -5239,6 +6682,25 @@ law St.gone.set_set:
   {S.St.with_gone(S.St.with_gone(r, a), b) == S.St.with_gone(r, b) : S.St}
 
 def St.gone.set_set(r, a, b):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
+law St.gone.over:
+  for r: S.St
+  for g: List<&2, S.Item> -> List<&2, S.Item>
+  {S.St.over_gone(r, g) == S.St.with_gone(r, g(S.St.gone(r))) : S.St}
+
+def St.gone.over(r, g):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      {==}
+
+law St.open_eq:
+  for r: S.St
+  {S.St.open(r) == r : S.St}
+
+def St.open_eq(r):
   match r:
     case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       {==}

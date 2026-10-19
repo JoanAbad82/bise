@@ -72,81 +72,84 @@ def hub_prof_placed(c: Bool, +ag: List<&2, HS.Agent>, +x: String, +w: J.Json)
 
 # every event with its journal invariant (a free name for a new task or a
 # new name) keeps the names of the agents apart
-def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e)) -> HI.NamesApart(HM.apply(s, e)):
-  match s:
-    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs, +pz, +ho, +gn}:
-      match e:
-        case HM.ETaskCreated{+n, pa, br, ws, at}:
-          hub_nok_tr(HI.profile(HM.put_agent(HM.strip(ag, n), n, HM.agent_of_new(HM.ETaskCreated{n, pa, br, ws, at}, HN.free_dir(HM.dirs_of(ag), n)))),
-            HM.snoc(List<&2, String>, HI.profile(HM.strip(ag, n)), [n]),
-            PL2.hub_put_absent(HM.strip(ag, n), n, HM.agent_of_new(HM.ETaskCreated{n, pa, br, ws, at}, HN.free_dir(HM.dirs_of(ag), n)),
-              PLN.nm_free(ag, n, PLN.nm_held(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k))),
-            PL2.hub_nok_snoc(HI.profile(HM.strip(ag, n)), [n], PLN.nm_ok(ag, n, u),
-              PL2.hub_allapart_new(HI.profile(HM.strip(ag, n)), n, PLN.nm_free(ag, n, PLN.nm_held(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, n, k)))))
-        case HM.ERenamed{old, +new}:
-          hub_nok_ren(HM.strip(ag, new), old, new, PLN.nm_ok(ag, new, u), PLN.nm_free(ag, new, PLN.nm_held(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}, new, k)))
-        case HM.ELifecycle{+x, +l, +r}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OLife{l, r})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OLife{l, r}, {==}), u)
-        case HM.EWorkspace{+x, +w}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OWs{w})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OWs{w}, {==}), u)
-        case HM.EDeclared{+x, +d, +nt}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.ODeclared{d, nt})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.ODeclared{d, nt}, {==}), u)
-        case HM.EFileTouched{+x, +p}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFile{p})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OFile{p}, {==}), u)
-        case HM.ESnapshot{+x, +sn}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OSnap{sn})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OSnap{sn}, {==}), u)
-        case HM.EPlaced{+x, +w, +er}:
-          hub_nok_tr(HI.profile(Bool.pick(List<&2, HS.Agent>, String.is_empty(er), HM.map_agent(ag, x, HM.OWs{w}), ag)), HI.profile(ag), hub_prof_placed(String.is_empty(er), ag, x, w), u)
-        case HM.EReported{+x, +rp}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OReport{rp})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OReport{rp}, {==}), u)
-        case HM.EMsgsMoved{a, b}:
-          u
-        case HM.EMsgSent{m}:
-          u
-        case HM.EMsgState{a, b}:
-          u
-        case HM.ESettled{a}:
-          u
-        case HM.ECardOpened{c}:
-          u
-        case HM.ECardClosed{a, b, c}:
-          u
-        case HM.ECardAnswerPos{a, b, c}:
-          u
-        case HM.ECardWithdrawn{a, b}:
-          u
-        case HM.ECardLate{a}:
-          u
-        case HM.EMainNote{a, b}:
-          u
-        case HM.ENotesFlushed{}:
-          u
-        case HM.ETimerSet{a, b}:
-          u
-        case HM.ETimerFired{a, b, c, d, f}:
-          u
-        case HM.ETimerRun{a, b}:
-          u
-        case HM.ETimerStop{a, b, c}:
-          u
-        case HM.ETimerName{a, b, c, d}:
-          u
-        case HM.EX{a}:
-          u
-        case HM.EAct{a}:
-          u
-        case HM.EFollow{+x, +f, +h}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})}, {==}), u)
-        case HM.EJobEnd{+x, b}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{None{}})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OFollow{None{}}, {==}), u)
-        case HM.EWake{a}:
-          u
-        case HM.EPaused{a}:
-          u
-        case HM.EResumed{a}:
-          u
+# on the state opened by name (S.St.open), each event's apply computes
+def hub_apply_names.go(+e: HM.Ev, +s: HS.St, u: HI.NamesApart(s), +k: HX.FreshEv(s, e)) -> HI.NamesApart(HM.apply(HS.St.open(s), e)):
+  match e:
+    case HM.ETaskCreated{+n, pa, br, ws, at}:
+      hub_nok_tr(HI.profile(HM.put_agent(HM.strip(HS.St.agents(s), n), n, HM.agent_of_new(HM.ETaskCreated{n, pa, br, ws, at}, HN.free_dir(HM.dirs_of(HS.St.agents(s)), n)))),
+        HM.snoc(List<&2, String>, HI.profile(HM.strip(HS.St.agents(s), n)), [n]),
+        PL2.hub_put_absent(HM.strip(HS.St.agents(s), n), n, HM.agent_of_new(HM.ETaskCreated{n, pa, br, ws, at}, HN.free_dir(HM.dirs_of(HS.St.agents(s)), n)),
+          PLN.nm_free(HS.St.agents(s), n, PLN.nm_held(s, n, k))),
+        PL2.hub_nok_snoc(HI.profile(HM.strip(HS.St.agents(s), n)), [n], PLN.nm_ok(HS.St.agents(s), n, u),
+          PL2.hub_allapart_new(HI.profile(HM.strip(HS.St.agents(s), n)), n, PLN.nm_free(HS.St.agents(s), n, PLN.nm_held(s, n, k)))))
+    case HM.ERenamed{old, +new}:
+      hub_nok_ren(HM.strip(HS.St.agents(s), new), old, new, PLN.nm_ok(HS.St.agents(s), new, u), PLN.nm_free(HS.St.agents(s), new, PLN.nm_held(s, new, k)))
+    case HM.ELifecycle{+x, +l, +r}:
+      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OLife{l, r})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OLife{l, r}, {==}), u)
+    case HM.EWorkspace{+x, +w}:
+      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OWs{w})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OWs{w}, {==}), u)
+    case HM.EDeclared{+x, +d, +nt}:
+      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.ODeclared{d, nt})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.ODeclared{d, nt}, {==}), u)
+    case HM.EFileTouched{+x, +p}:
+      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OFile{p})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OFile{p}, {==}), u)
+    case HM.ESnapshot{+x, +sn}:
+      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OSnap{sn})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OSnap{sn}, {==}), u)
+    case HM.EPlaced{+x, +w, +er}:
+      hub_nok_tr(HI.profile(Bool.pick(List<&2, HS.Agent>, String.is_empty(er), HM.map_agent(HS.St.agents(s), x, HM.OWs{w}), HS.St.agents(s))), HI.profile(HS.St.agents(s)), hub_prof_placed(String.is_empty(er), HS.St.agents(s), x, w), u)
+    case HM.EReported{+x, +rp}:
+      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OReport{rp})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OReport{rp}, {==}), u)
+    case HM.EMsgsMoved{a, b}:
+      u
+    case HM.EMsgSent{m}:
+      u
+    case HM.EMsgState{a, b}:
+      u
+    case HM.ESettled{a}:
+      u
+    case HM.ECardOpened{c}:
+      u
+    case HM.ECardClosed{a, b, c}:
+      u
+    case HM.ECardAnswerPos{a, b, c}:
+      u
+    case HM.ECardWithdrawn{a, b}:
+      u
+    case HM.ECardLate{a}:
+      u
+    case HM.EMainNote{a, b}:
+      u
+    case HM.ENotesFlushed{}:
+      u
+    case HM.ETimerSet{a, b}:
+      u
+    case HM.ETimerFired{a, b, c, d, f}:
+      u
+    case HM.ETimerRun{a, b}:
+      u
+    case HM.ETimerStop{a, b, c}:
+      u
+    case HM.ETimerName{a, b, c, d}:
+      u
+    case HM.EX{a}:
+      u
+    case HM.EAct{a}:
+      u
+    case HM.EFollow{+x, +f, +h}:
+      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})}, {==}), u)
+    case HM.EJobEnd{+x, b}:
+      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OFollow{None{}})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OFollow{None{}}, {==}), u)
+    case HM.EWake{a}:
+      u
+    case HM.EPaused{a}:
+      u
+    case HM.EResumed{a}:
+      u
 
-def hub_apply_all_names(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.NamesApart(s), f: HX.Fresh(evs, s)) -> HI.NamesApart(HM.apply_all(evs, s)):
+def hub_apply_names(+s: HS.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e)) -> HI.NamesApart(HM.apply(s, e)):
+  %HSL.St.open_eq(s) : HI.NamesApart(HM.apply(_, e))
+  hub_apply_names.go(e, s, u, k)
+
+def hub_apply_all_names(+evs: List<&2, HM.Ev>, +s: HS.St, u: HI.NamesApart(s), f: HX.Fresh(evs, s)) -> HI.NamesApart(HM.apply_all(evs, s)):
   match evs:
     case Nil{}:
       u
@@ -155,14 +158,14 @@ def hub_apply_all_names(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.NamesApart(s), f
         case HX.Both{k, ft}:
           hub_apply_all_names(t, HM.apply(s, e), hub_apply_names(s, e, u, k), ft)
 
-def hub_napart_tr(-x: HM.St, -y: HM.St, e: {x == y : HM.St}, u: HI.NamesApart(y)) -> HI.NamesApart(x):
-  %Equal.sym(HM.St, x, y, e) : HI.NamesApart(_)
+def hub_napart_tr(-x: HS.St, -y: HS.St, e: {x == y : HS.St}, u: HI.NamesApart(y)) -> HI.NamesApart(x):
+  %Equal.sym(HS.St, x, y, e) : HI.NamesApart(_)
   u
 
 # ---- the timers of `sb every` (hub/timers.bend, core.bend `timer_fire`) ----
 
 # an emit adds its event at the end of the step's journal
-def hub_fx_emit(-o: HM.St, cx: HX.Cx<o>, -e: HM.Ev, -k: HX.FreshEv(HX.d(o, cx), e), -kq: HX.QuietEv(e), -kv: HX.DelivEv(HX.d(o, cx), e))
+def hub_fx_emit(-o: HS.St, cx: HX.Cx<o>, -e: HM.Ev, -k: HX.FreshEv(HX.d(o, cx), e), -kq: HX.QuietEv(e), -kv: HX.DelivEv(HX.d(o, cx), e))
     -> {HX.journal(HX.Core.fx(o, HX.Cx.c(o, HX.emit(o, cx, e, k, kq, kv)))) == HM.snoc(HM.Ev, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), e) : List<&2, HM.Ev>}:
   match cx:
     case HX.Cx{c, r}:
@@ -170,7 +173,7 @@ def hub_fx_emit(-o: HM.St, cx: HX.Cx<o>, -e: HM.Ev, -k: HX.FreshEv(HX.d(o, cx), 
         case HX.Core{d, fx, p, f, q, v}:
           Equal.sym(List<&2, HM.Ev>, HM.snoc(HM.Ev, HX.journal(fx), e), HX.journal(HM.snoc(HX.Fx, fx, HX.FJ{e})), HX.journal_snoc_ev(fx, e))
 
-def hub_spent_journal(-o: HM.St, +sp: Bool, +cx: HX.Cx<o>, +id: Nat, +at: Nat)
+def hub_spent_journal(-o: HS.St, +sp: Bool, +cx: HX.Cx<o>, +id: Nat, +at: Nat)
     -> {HX.journal(HX.Core.fx(o, HX.Cx.c(o, HC.timer_spent(o, sp, cx, id, at)))) == HI.fire_spent(sp, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), id, at) : List<&2, HM.Ev>}:
   match sp:
     case True{}:
@@ -178,7 +181,7 @@ def hub_spent_journal(-o: HM.St, +sp: Bool, +cx: HX.Cx<o>, +id: Nat, +at: Nat)
     case False{}:
       {==}
 
-def hub_count_journal(-o: HM.St, +due: Bool, +cx: HX.Cx<o>, +t: HS.Timer, +next: Nat)
+def hub_count_journal(-o: HS.St, +due: Bool, +cx: HX.Cx<o>, +t: HS.Timer, +next: Nat)
     -> {HX.journal(HX.Core.fx(o, HX.Cx.c(o, HC.timer_count(o, due, cx, t, next)))) == HI.fire_count(due, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), t, next, HC.now(o, cx)) : List<&2, HM.Ev>}:
   match due:
     case False{}:
@@ -195,7 +198,7 @@ def hub_count_journal(-o: HM.St, +due: Bool, +cx: HX.Cx<o>, +t: HS.Timer, +next:
           HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx2))), HM.snoc(HM.Ev, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), ev),
           hub_fx_emit(o, cx, ev, Unit{}, Unit{}, Unit{})))
 
-def hub_retry_journal(-o: HM.St, +due: Bool, +cx: HX.Cx<o>, +t: HS.Timer)
+def hub_retry_journal(-o: HS.St, +due: Bool, +cx: HX.Cx<o>, +t: HS.Timer)
     -> {HX.journal(HX.Core.fx(o, HX.Cx.c(o, HC.timer_retry(o, due, cx, t)))) == HI.fire_retry(due, HX.journal(HX.Core.fx(o, HX.Cx.c(o, cx))), t, HC.now(o, cx)) : List<&2, HM.Ev>}:
   match due:
     case False{}:
@@ -250,31 +253,31 @@ def hub_keep_drop(+xs: List<&2, HS.Timer>, +id: Nat, +rest: List<&2, Nat>)
     case Con{h, t}:
       hub_keep_drop.pick(Nat.is_eq(HS.Timer.id(h), id), h, t, id, rest, {==}, hub_keep_drop(t, id, rest))
 
-def hub_live_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat)
-    -> {HS.Tms.live(HM.St.tm(HM.apply(s, HM.ETimerStop{id, why, at}))) == HTM.drop(HS.Tms.live(HM.St.tm(s)), id) : List<&2, HS.Timer>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, +tm, xs, pz, ho, gn}:
-      +d = HTM.drop(HS.Tms.live(tm), id)
-      %HSL.Tms.ended.eta(HS.Tms.with_live(tm, d), HTM.ended_add(HTM.find(HS.Tms.live(tm), id), HS.Tms.ended(tm), at, why))
-        : {HS.Tms.live(_) == d : List<&2, HS.Timer>}
-      HSL.Tms.live.get_with(tm, d)
+def hub_live_tstop(+s: HS.St, +id: Nat, +why: String, +at: Nat)
+    -> {HS.Tms.live(HS.St.tm(HM.apply(s, HM.ETimerStop{id, why, at}))) == HTM.drop(HS.Tms.live(HS.St.tm(s)), id) : List<&2, HS.Timer>}:
+  %HSL.St.open_eq(s) : {HS.Tms.live(HS.St.tm(HM.apply(_, HM.ETimerStop{id, why, at}))) == HTM.drop(HS.Tms.live(HS.St.tm(s)), id) : List<&2, HS.Timer>}
+  +tm = HS.St.tm(s)
+  +d = HTM.drop(HS.Tms.live(tm), id)
+  %HSL.Tms.ended.eta(HS.Tms.with_live(tm, d), HTM.ended_add(HTM.find(HS.Tms.live(tm), id), HS.Tms.ended(tm), at, why))
+    : {HS.Tms.live(_) == d : List<&2, HS.Timer>}
+  HSL.Tms.live.get_with(tm, d)
 
 # the live timers after a drop's stops: those of no stopped id
-def hub_live_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
-    -> {HS.Tms.live(HM.St.tm(HX.d(o, HC.timers_gone.each(o, ids, cx, why)))) == HTM.keep_out(HS.Tms.live(HM.St.tm(HX.d(o, cx))), ids) : List<&2, HS.Timer>}:
+def hub_live_gone_each(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
+    -> {HS.Tms.live(HS.St.tm(HX.d(o, HC.timers_gone.each(o, ids, cx, why)))) == HTM.keep_out(HS.Tms.live(HS.St.tm(HX.d(o, cx))), ids) : List<&2, HS.Timer>}:
   match ids:
     case Nil{}:
-      Equal.sym(List<&2, HS.Timer>, HTM.keep_out(HS.Tms.live(HM.St.tm(HX.d(o, cx))), Nil{}), HS.Tms.live(HM.St.tm(HX.d(o, cx))),
-        hub_keep_nil(HS.Tms.live(HM.St.tm(HX.d(o, cx)))))
+      Equal.sym(List<&2, HS.Timer>, HTM.keep_out(HS.Tms.live(HS.St.tm(HX.d(o, cx))), Nil{}), HS.Tms.live(HS.St.tm(HX.d(o, cx))),
+        hub_keep_nil(HS.Tms.live(HS.St.tm(HX.d(o, cx)))))
     case Con{id, rest}:
       +ev = {HM.ETimerStop{id, why, HC.now(o, cx)} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      +l = HS.Tms.live(HM.St.tm(HX.d(o, cx)))
-      +l2 = HS.Tms.live(HM.St.tm(HX.d(o, cx2)))
-      +e2 = Equal.trans(List<&2, HS.Timer>, l2, HS.Tms.live(HM.St.tm(HM.apply(HX.d(o, cx), ev))), HTM.drop(l, id),
-        Equal.cong(HM.St, List<&2, HS.Timer>, s => HS.Tms.live(HM.St.tm(s)), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+      +l = HS.Tms.live(HS.St.tm(HX.d(o, cx)))
+      +l2 = HS.Tms.live(HS.St.tm(HX.d(o, cx2)))
+      +e2 = Equal.trans(List<&2, HS.Timer>, l2, HS.Tms.live(HS.St.tm(HM.apply(HX.d(o, cx), ev))), HTM.drop(l, id),
+        Equal.cong(HS.St, List<&2, HS.Timer>, s => HS.Tms.live(HS.St.tm(s)), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
         hub_live_tstop(HX.d(o, cx), id, why, HC.now(o, cx)))
-      Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HM.St.tm(HX.d(o, HC.timers_gone.each(o, rest, cx2, why)))), HTM.keep_out(l2, rest), HTM.keep_out(l, id <> rest),
+      Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HS.St.tm(HX.d(o, HC.timers_gone.each(o, rest, cx2, why)))), HTM.keep_out(l2, rest), HTM.keep_out(l, id <> rest),
         hub_live_gone_each(o, rest, cx2, why),
         Equal.trans(List<&2, HS.Timer>, HTM.keep_out(l2, rest), HTM.keep_out(HTM.drop(l, id), rest), HTM.keep_out(l, id <> rest),
           Equal.cong(List<&2, HS.Timer>, List<&2, HS.Timer>, ys => HTM.keep_out(ys, rest), l2, HTM.drop(l, id), e2),
@@ -401,26 +404,25 @@ def hub_tnone_tr(-x: List<&2, HS.Timer>, -y: List<&2, HS.Timer>, -n: String, e: 
   l
 
 # a watch's line leaves the timers as they were
-def hub_live_wake(s: HM.St, +e: HWK.WkEv)
-    -> {HS.Tms.live(HM.St.tm(HM.apply(s, HM.EWake{e}))) == HS.Tms.live(HM.St.tm(s)) : List<&2, HS.Timer>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, +tm, xs, pz, ho, gn}:
-      %HSL.Tms.wk.eta(tm, HWK.apply(HS.Tms.wk(tm), e)) : {HS.Tms.live(_) == HS.Tms.live(tm) : List<&2, HS.Timer>}
-      {==}
+def hub_live_wake(+s: HS.St, +e: HWK.WkEv)
+    -> {HS.Tms.live(HS.St.tm(HM.apply(s, HM.EWake{e}))) == HS.Tms.live(HS.St.tm(s)) : List<&2, HS.Timer>}:
+  %HSL.St.open_eq(s) : {HS.Tms.live(HS.St.tm(HM.apply(_, HM.EWake{e}))) == HS.Tms.live(HS.St.tm(s)) : List<&2, HS.Timer>}
+  %HSL.Tms.wk.eta(HS.St.tm(s), HWK.apply(HS.Tms.wk(HS.St.tm(s)), e)) : {HS.Tms.live(_) == HS.Tms.live(HS.St.tm(s)) : List<&2, HS.Timer>}
+  {==}
 
 # a drop's watch ends leave the timers as they were
-def hub_live_wakes_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HS.Tms.live(HM.St.tm(HX.d(o, HC.wakes_gone.each(o, ids, cx)))) == HS.Tms.live(HM.St.tm(HX.d(o, cx))) : List<&2, HS.Timer>}:
+def hub_live_wakes_each(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
+    -> {HS.Tms.live(HS.St.tm(HX.d(o, HC.wakes_gone.each(o, ids, cx)))) == HS.Tms.live(HS.St.tm(HX.d(o, cx))) : List<&2, HS.Timer>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, rest}:
       +ev = {HM.EWake{HWK.WEnd{id, "gone", HC.now(o, cx)}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      +e2 = Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HM.St.tm(HX.d(o, cx2))), HS.Tms.live(HM.St.tm(HM.apply(HX.d(o, cx), ev))), HS.Tms.live(HM.St.tm(HX.d(o, cx))),
-        Equal.cong(HM.St, List<&2, HS.Timer>, s => HS.Tms.live(HM.St.tm(s)), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+      +e2 = Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HS.St.tm(HX.d(o, cx2))), HS.Tms.live(HS.St.tm(HM.apply(HX.d(o, cx), ev))), HS.Tms.live(HS.St.tm(HX.d(o, cx))),
+        Equal.cong(HS.St, List<&2, HS.Timer>, s => HS.Tms.live(HS.St.tm(s)), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
         hub_live_wake(HX.d(o, cx), HWK.WEnd{id, "gone", HC.now(o, cx)}))
-      Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HM.St.tm(HX.d(o, HC.wakes_gone.each(o, rest, cx2)))), HS.Tms.live(HM.St.tm(HX.d(o, cx2))), HS.Tms.live(HM.St.tm(HX.d(o, cx))),
+      Equal.trans(List<&2, HS.Timer>, HS.Tms.live(HS.St.tm(HX.d(o, HC.wakes_gone.each(o, rest, cx2)))), HS.Tms.live(HS.St.tm(HX.d(o, cx2))), HS.Tms.live(HS.St.tm(HX.d(o, cx))),
         hub_live_wakes_each(o, rest, cx2), e2)
 
 # ---- the watches of `sb wake` (event-wake, hub/wakes.bend) ----
@@ -502,20 +504,20 @@ def hub_wk_keep_drop(+xs: List<&2, HS.Watch>, +id: Nat, +rest: List<&2, Nat>)
     case Con{h, t}:
       hub_wk_keep_drop.pick(Nat.is_eq(HS.Watch.id(h), id), h, t, id, rest, {==}, hub_wk_keep_drop(t, id, rest))
 
-def hub_wk_live_end(s: HM.St, +id: Nat, +why: String, +at: Nat)
-    -> {HS.Wakes.live(HS.Tms.wk(HM.St.tm(HM.apply(s, HM.EWake{HWK.WEnd{id, why, at}})))) == HWK.drop(HS.Wakes.live(HS.Tms.wk(HM.St.tm(s))), id) : List<&2, HS.Watch>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, +tm, xs, pz, ho, gn}:
-      +ws = HS.Tms.wk(tm)
-      +w2 = HWK.end(ws, id, why, at)
-      +d = HWK.drop(HS.Wakes.live(ws), id)
-      %Equal.sym(HS.Wakes, HS.Tms.wk(HS.Tms.with_wk(tm, w2)), w2, HSL.Tms.wk.get_with(tm, w2)) : {HS.Wakes.live(_) == d : List<&2, HS.Watch>}
-      %HSL.Wakes.ended.eta(HS.Wakes.with_live(ws, d), HWK.ended_add(HWK.find(HS.Wakes.live(ws), id), HS.Wakes.ended(ws), at, why))
-        : {HS.Wakes.live(_) == d : List<&2, HS.Watch>}
-      HSL.Wakes.live.get_with(ws, d)
+def hub_wk_live_end(+s: HS.St, +id: Nat, +why: String, +at: Nat)
+    -> {HS.Wakes.live(HS.Tms.wk(HS.St.tm(HM.apply(s, HM.EWake{HWK.WEnd{id, why, at}})))) == HWK.drop(HS.Wakes.live(HS.Tms.wk(HS.St.tm(s))), id) : List<&2, HS.Watch>}:
+  %HSL.St.open_eq(s) : {HS.Wakes.live(HS.Tms.wk(HS.St.tm(HM.apply(_, HM.EWake{HWK.WEnd{id, why, at}})))) == HWK.drop(HS.Wakes.live(HS.Tms.wk(HS.St.tm(s))), id) : List<&2, HS.Watch>}
+  +tm = HS.St.tm(s)
+  +ws = HS.Tms.wk(tm)
+  +w2 = HWK.end(ws, id, why, at)
+  +d = HWK.drop(HS.Wakes.live(ws), id)
+  %Equal.sym(HS.Wakes, HS.Tms.wk(HS.Tms.with_wk(tm, w2)), w2, HSL.Tms.wk.get_with(tm, w2)) : {HS.Wakes.live(_) == d : List<&2, HS.Watch>}
+  %HSL.Wakes.ended.eta(HS.Wakes.with_live(ws, d), HWK.ended_add(HWK.find(HS.Wakes.live(ws), id), HS.Wakes.ended(ws), at, why))
+    : {HS.Wakes.live(_) == d : List<&2, HS.Watch>}
+  HSL.Wakes.live.get_with(ws, d)
 
 # the live watches after a drop's ends: those of no ended id
-def hub_wk_live_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
+def hub_wk_live_each(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
     -> {HS.Wakes.live(HC.wks(o, HC.wakes_gone.each(o, ids, cx))) == HWK.keep_out(HS.Wakes.live(HC.wks(o, cx)), ids) : List<&2, HS.Watch>}:
   match ids:
     case Nil{}:
@@ -526,8 +528,8 @@ def hub_wk_live_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +l = HS.Wakes.live(HC.wks(o, cx))
       +l2 = HS.Wakes.live(HC.wks(o, cx2))
-      +e2 = Equal.trans(List<&2, HS.Watch>, l2, HS.Wakes.live(HS.Tms.wk(HM.St.tm(HM.apply(HX.d(o, cx), ev)))), HWK.drop(l, id),
-        Equal.cong(HM.St, List<&2, HS.Watch>, s => HS.Wakes.live(HS.Tms.wk(HM.St.tm(s))), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+      +e2 = Equal.trans(List<&2, HS.Watch>, l2, HS.Wakes.live(HS.Tms.wk(HS.St.tm(HM.apply(HX.d(o, cx), ev)))), HWK.drop(l, id),
+        Equal.cong(HS.St, List<&2, HS.Watch>, s => HS.Wakes.live(HS.Tms.wk(HS.St.tm(s))), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
         hub_wk_live_end(HX.d(o, cx), id, "gone", HC.now(o, cx)))
       Equal.trans(List<&2, HS.Watch>, HS.Wakes.live(HC.wks(o, HC.wakes_gone.each(o, rest, cx2))), HWK.keep_out(l2, rest), HWK.keep_out(l, id <> rest),
         hub_wk_live_each(o, rest, cx2),
@@ -775,20 +777,19 @@ def hub_via_hot(-A: Type, -f: List<&2, HS.MRec> -> A, -a: List<&2, HS.MRec>, -b:
       Equal.sym(A, f(b), f(HM.hot_of(b)), wb)))
 
 # a right index moves along an equality of states
-def hub_hot_tr(-a: HM.St, -b: HM.St, e: {a == b : HM.St}, k: {HM.hot_of(HM.St.hot(b)) == HM.hot_of(HM.every(b)) : List<&2, HS.MRec>})
-    -> {HM.hot_of(HM.St.hot(a)) == HM.hot_of(HM.every(a)) : List<&2, HS.MRec>}:
-  %Equal.sym(HM.St, a, b, e) : {HM.hot_of(HM.St.hot(_)) == HM.hot_of(HM.every(_)) : List<&2, HS.MRec>}
+def hub_hot_tr(-a: HS.St, -b: HS.St, e: {a == b : HS.St}, k: {HM.hot_of(HS.St.hot(b)) == HM.hot_of(HM.every(b)) : List<&2, HS.MRec>})
+    -> {HM.hot_of(HS.St.hot(a)) == HM.hot_of(HM.every(a)) : List<&2, HS.MRec>}:
+  %Equal.sym(HS.St, a, b, e) : {HM.hot_of(HS.St.hot(_)) == HM.hot_of(HM.every(_)) : List<&2, HS.MRec>}
   k
 
 # a lifecycle event keeps a right index right (it touches no message)
-def hub_hot_life(s: HM.St, +n: String, +l: HS.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>})
-    -> {HM.hot_of(HM.St.hot(HM.apply(s, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.every(HM.apply(s, HM.ELifecycle{n, l, r}))) : List<&2, HS.MRec>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      k
+def hub_hot_life(+s: HS.St, +n: String, +l: HS.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HS.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>})
+    -> {HM.hot_of(HS.St.hot(HM.apply(s, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.every(HM.apply(s, HM.ELifecycle{n, l, r}))) : List<&2, HS.MRec>}:
+  %HSL.St.open_eq(s) : {HM.hot_of(HS.St.hot(HM.apply(_, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.every(HM.apply(_, HM.ELifecycle{n, l, r}))) : List<&2, HS.MRec>}
+  k
 
 # with a right index, queued_for reads every message
-def hub_hot_qf(+s: HM.St, +n: String, h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>})
+def hub_hot_qf(+s: HS.St, +n: String, h: {HM.hot_of(HS.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>})
     -> {HM.queued_for(s, n) == HM.queued_in(HM.every(s), HM.names_of(s, n)) : List<&2, HS.Msg>}:
-  hub_via_hot(List<&2, HS.Msg>, x => HM.queued_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.every(s),
-    hub_qi_hot(HM.St.hot(s), HM.names_of(s, n)), hub_qi_hot(HM.every(s), HM.names_of(s, n)), h)
+  hub_via_hot(List<&2, HS.Msg>, x => HM.queued_in(x, HM.names_of(s, n)), HS.St.hot(s), HM.every(s),
+    hub_qi_hot(HS.St.hot(s), HM.names_of(s, n)), hub_qi_hot(HM.every(s), HM.names_of(s, n)), h)

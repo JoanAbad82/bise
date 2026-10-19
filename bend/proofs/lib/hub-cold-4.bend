@@ -6,6 +6,7 @@
 import Base
 import ../../hub/model.bend as HM
 import ../../hub/gen/state.bend as HS
+import ../../hub/gen/state-laws.bend as HSL
 import ../../hub/cx.bend as HX
 import ../../hub/inv.bend as HI
 import ../../hub/lazy.bend as HLZ
@@ -146,103 +147,106 @@ def hc_sent(+hot: List<&2, HS.MRec>, +old: List<&2, HS.MRec>, +nm: Nat, +m: HS.M
 
 # ---- an event on the state: every message as on one list, the split kept ----
 
-def hc_StOk(+s: HM.St, e: HM.Ev) -> Data:
+def hc_StOk(+s: HS.St, e: HM.Ev) -> Data:
   HX.Both<{HM.every(HM.apply(s, e)) == HI.apply1(HM.every(s), e) : List<&2, HS.MRec>}, HI.Split(HM.apply(s, e))>
 
 # a new message's id is at or above the next free one (HX.FreshEv: it is
 # the next free one; a boot replay skips the others, CO.replay_fresh)
-def hc_GeEv(+s: HM.St, e: HM.Ev) -> Data:
+def hc_GeEv(+s: HS.St, e: HM.Ev) -> Data:
   match e:
     case HM.EMsgSent{+m}:
-      {Nat.is_ge(HS.Msg.id(m), HM.St.next_msg(s)) == True{} : Bool}
+      {Nat.is_ge(HS.Msg.id(m), HS.St.next_msg(s)) == True{} : Bool}
     case _:
       Unit
 
-def hc_apply(+s: HM.St, e: HM.Ev, sp: HI.Split(s), k: hc_GeEv(s, e)) -> hc_StOk(s, e):
-  match s:
-    case HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol, gn}:
-      match e:
-        case HM.ETaskCreated{a, b, c, d, f}:
-          HX.Both{{==}, sp}
-        case HM.ELifecycle{a, b, c}:
-          HX.Both{{==}, sp}
-        case HM.EWorkspace{a, b}:
-          HX.Both{{==}, sp}
-        case HM.ESnapshot{a, b}:
-          HX.Both{{==}, sp}
-        case HM.EPlaced{a, b, c}:
-          HX.Both{{==}, sp}
-        case HM.EDeclared{a, b, c}:
-          HX.Both{{==}, sp}
-        case HM.EReported{a, b}:
-          HX.Both{{==}, sp}
-        case HM.EFileTouched{a, b}:
-          HX.Both{{==}, sp}
-        case HM.ERenamed{a, b}:
-          HX.Both{{==}, sp}
-        case HM.EMsgsMoved{f, t}:
-          PC5.hm_split(ho, ol, nm, f, t, sp)
-        case HM.EMsgSent{m}:
-          hc_sent(ho, ol, nm, m, sp, k)
-        case HM.EMsgState{id, x}:
-          hc_ev_op(ho, ol, nm, id, HM.OSt{x}, sp)
-        case HM.ESettled{id}:
-          hc_ev_op(ho, ol, nm, id, HM.OSettle{}, sp)
-        case HM.ECardOpened{c}:
-          HX.Both{{==}, sp}
-        case HM.ECardClosed{a, b, c}:
-          HX.Both{{==}, sp}
-        case HM.ECardAnswerPos{a, b, c}:
-          HX.Both{{==}, sp}
-        case HM.ECardWithdrawn{a, b}:
-          HX.Both{{==}, sp}
-        case HM.ECardLate{a}:
-          HX.Both{{==}, sp}
-        case HM.EMainNote{a, b}:
-          HX.Both{{==}, sp}
-        case HM.ENotesFlushed{}:
-          HX.Both{{==}, sp}
-        case HM.ETimerSet{a, b}:
-          HX.Both{{==}, sp}
-        case HM.ETimerFired{a, b, c, d, f}:
-          HX.Both{{==}, sp}
-        case HM.ETimerRun{a, b}:
-          HX.Both{{==}, sp}
-        case HM.ETimerStop{a, b, c}:
-          HX.Both{{==}, sp}
-        case HM.ETimerName{a, b, c, d}:
-          HX.Both{{==}, sp}
-        case HM.EX{a}:
-          HX.Both{{==}, sp}
-        case HM.EAct{a}:
-          HX.Both{{==}, sp}
-        case HM.EFollow{a, b, c}:
-          HX.Both{{==}, sp}
-        case HM.EJobEnd{a, b}:
-          HX.Both{{==}, sp}
-        case HM.EWake{a}:
-          HX.Both{{==}, sp}
-        case HM.EPaused{a}:
-          HX.Both{{==}, sp}
-        case HM.EResumed{a}:
-          HX.Both{{==}, sp}
+# on the state opened by name (S.St.open), each event's apply computes
+def hc_apply.go(+e: HM.Ev, +s: HS.St, sp: HI.Split(s), k: hc_GeEv(s, e)) -> hc_StOk(HS.St.open(s), e):
+  match e:
+    case HM.ETaskCreated{a, b, c, d, f}:
+      HX.Both{{==}, sp}
+    case HM.ELifecycle{a, b, c}:
+      HX.Both{{==}, sp}
+    case HM.EWorkspace{a, b}:
+      HX.Both{{==}, sp}
+    case HM.ESnapshot{a, b}:
+      HX.Both{{==}, sp}
+    case HM.EPlaced{a, b, c}:
+      HX.Both{{==}, sp}
+    case HM.EDeclared{a, b, c}:
+      HX.Both{{==}, sp}
+    case HM.EReported{a, b}:
+      HX.Both{{==}, sp}
+    case HM.EFileTouched{a, b}:
+      HX.Both{{==}, sp}
+    case HM.ERenamed{a, b}:
+      HX.Both{{==}, sp}
+    case HM.EMsgsMoved{f, t}:
+      PC5.hm_split(HS.St.hot(s), HS.St.old(s), HS.St.next_msg(s), f, t, sp)
+    case HM.EMsgSent{m}:
+      hc_sent(HS.St.hot(s), HS.St.old(s), HS.St.next_msg(s), m, sp, k)
+    case HM.EMsgState{id, x}:
+      hc_ev_op(HS.St.hot(s), HS.St.old(s), HS.St.next_msg(s), id, HM.OSt{x}, sp)
+    case HM.ESettled{id}:
+      hc_ev_op(HS.St.hot(s), HS.St.old(s), HS.St.next_msg(s), id, HM.OSettle{}, sp)
+    case HM.ECardOpened{c}:
+      HX.Both{{==}, sp}
+    case HM.ECardClosed{a, b, c}:
+      HX.Both{{==}, sp}
+    case HM.ECardAnswerPos{a, b, c}:
+      HX.Both{{==}, sp}
+    case HM.ECardWithdrawn{a, b}:
+      HX.Both{{==}, sp}
+    case HM.ECardLate{a}:
+      HX.Both{{==}, sp}
+    case HM.EMainNote{a, b}:
+      HX.Both{{==}, sp}
+    case HM.ENotesFlushed{}:
+      HX.Both{{==}, sp}
+    case HM.ETimerSet{a, b}:
+      HX.Both{{==}, sp}
+    case HM.ETimerFired{a, b, c, d, f}:
+      HX.Both{{==}, sp}
+    case HM.ETimerRun{a, b}:
+      HX.Both{{==}, sp}
+    case HM.ETimerStop{a, b, c}:
+      HX.Both{{==}, sp}
+    case HM.ETimerName{a, b, c, d}:
+      HX.Both{{==}, sp}
+    case HM.EX{a}:
+      HX.Both{{==}, sp}
+    case HM.EAct{a}:
+      HX.Both{{==}, sp}
+    case HM.EFollow{a, b, c}:
+      HX.Both{{==}, sp}
+    case HM.EJobEnd{a, b}:
+      HX.Both{{==}, sp}
+    case HM.EWake{a}:
+      HX.Both{{==}, sp}
+    case HM.EPaused{a}:
+      HX.Both{{==}, sp}
+    case HM.EResumed{a}:
+      HX.Both{{==}, sp}
+
+def hc_apply(+s: HS.St, e: HM.Ev, sp: HI.Split(s), k: hc_GeEv(s, e)) -> hc_StOk(s, e):
+  %HSL.St.open_eq(s) : hc_StOk(_, e)
+  hc_apply.go(e, s, sp, k)
 
 # the split holds after an event (law split_kept_by_run, one event)
-def hc_ok_split(-s: HM.St, -e: HM.Ev, o: hc_StOk(s, e)) -> HI.Split(HM.apply(s, e)):
+def hc_ok_split(-s: HS.St, -e: HM.Ev, o: hc_StOk(s, e)) -> HI.Split(HM.apply(s, e)):
   match o:
     case HX.Both{_, q}:
       q
 
-def hc_ok_every(-s: HM.St, -e: HM.Ev, o: hc_StOk(s, e)) -> {HM.every(HM.apply(s, e)) == HI.apply1(HM.every(s), e) : List<&2, HS.MRec>}:
+def hc_ok_every(-s: HS.St, -e: HM.Ev, o: hc_StOk(s, e)) -> {HM.every(HM.apply(s, e)) == HI.apply1(HM.every(s), e) : List<&2, HS.MRec>}:
   match o:
     case HX.Both{q, _}:
       q
 
-def hc_split_apply(+s: HM.St, e: HM.Ev, sp: HI.Split(s), k: hc_GeEv(s, e)) -> HI.Split(HM.apply(s, e)):
+def hc_split_apply(+s: HS.St, e: HM.Ev, sp: HI.Split(s), k: hc_GeEv(s, e)) -> HI.Split(HM.apply(s, e)):
   hc_ok_split(s, e, hc_apply(s, e, sp, k))
 
 # every message after an event: the one-list event on every message (law cold_is_inert)
-def hc_every_apply(+s: HM.St, e: HM.Ev, sp: HI.Split(s), k: hc_GeEv(s, e))
+def hc_every_apply(+s: HS.St, e: HM.Ev, sp: HI.Split(s), k: hc_GeEv(s, e))
     -> {HM.every(HM.apply(s, e)) == HI.apply1(HM.every(s), e) : List<&2, HS.MRec>}:
   hc_ok_every(s, e, hc_apply(s, e, sp, k))
 
@@ -254,11 +258,11 @@ def hc_ge_refl(+n: Nat) -> {Nat.is_ge(n, n) == True{} : Bool}:
       hc_ge_refl(p)
 
 # the journal's next free id is at or above it
-def hc_fresh_ge(+s: HM.St, e: HM.Ev, k: HX.FreshEv(s, e)) -> hc_GeEv(s, e):
+def hc_fresh_ge(+s: HS.St, e: HM.Ev, k: HX.FreshEv(s, e)) -> hc_GeEv(s, e):
   match e:
     case HM.EMsgSent{+m}:
-      %Equal.sym(Nat, HS.Msg.id(m), HM.St.next_msg(s), k) : {Nat.is_ge(_, HM.St.next_msg(s)) == True{} : Bool}
-      hc_ge_refl(HM.St.next_msg(s))
+      %Equal.sym(Nat, HS.Msg.id(m), HS.St.next_msg(s), k) : {Nat.is_ge(_, HS.St.next_msg(s)) == True{} : Bool}
+      hc_ge_refl(HS.St.next_msg(s))
     case HM.ETaskCreated{a, b, c, d, f}:
       Unit{}
     case HM.ELifecycle{a, b, c}:
@@ -323,7 +327,7 @@ def hc_fresh_ge(+s: HM.St, e: HM.Ev, k: HX.FreshEv(s, e)) -> hc_GeEv(s, e):
       Unit{}
 
 # the split holds after a journal of fresh events
-def hc_split_all(+evs: List<&2, HM.Ev>, +s: HM.St, sp: HI.Split(s), f: HX.Fresh(evs, s)) -> HI.Split(HM.apply_all(evs, s)):
+def hc_split_all(+evs: List<&2, HM.Ev>, +s: HS.St, sp: HI.Split(s), f: HX.Fresh(evs, s)) -> HI.Split(HM.apply_all(evs, s)):
   match evs:
     case Nil{}:
       sp
@@ -333,13 +337,13 @@ def hc_split_all(+evs: List<&2, HM.Ev>, +s: HM.St, sp: HI.Split(s), f: HX.Fresh(
           hc_split_all(t, HM.apply(s, e), hc_split_apply(s, e, sp, hc_fresh_ge(s, e, k)), ft)
 
 # a split state's every message: each one record, ids below the next free one (law msgs_unique)
-def hc_unique(+s: HM.St, +sp: HI.Split(s)) -> HI.Unique(s):
-  PC2.hc_every_unique(HM.St.hot(s), HM.St.old(s), HM.St.next_msg(s), sp)
+def hc_unique(+s: HS.St, +sp: HI.Split(s)) -> HI.Unique(s):
+  PC2.hc_every_unique(HS.St.hot(s), HS.St.old(s), HS.St.next_msg(s), sp)
 
 # ---- the boot replay keeps the split (law split_after_replay) ----
 
 # an event the replay applies: a new message's id at or above the next free one
-def hc_replay_ge(+st: HM.St, e: HM.Ev, ok: {CO.replay_fresh(st, e) == True{} : Bool}) -> hc_GeEv(st, e):
+def hc_replay_ge(+st: HS.St, e: HM.Ev, ok: {CO.replay_fresh(st, e) == True{} : Bool}) -> hc_GeEv(st, e):
   match e:
     case HM.EMsgSent{+m}:
       ok
@@ -406,7 +410,7 @@ def hc_replay_ge(+st: HM.St, e: HM.Ev, ok: {CO.replay_fresh(st, e) == True{} : B
     case HM.EResumed{a}:
       Unit{}
 
-def hc_replay_one(ok: Bool, +st: HM.St, +e: HM.Ev, +eok: {CO.replay_fresh(st, e) == ok : Bool}, sp: HI.Split(st))
+def hc_replay_one(ok: Bool, +st: HS.St, +e: HM.Ev, +eok: {CO.replay_fresh(st, e) == ok : Bool}, sp: HI.Split(st))
     -> HI.Split(CO.replay_one(ok, st, e)):
   match ok:
     case True{}:
@@ -414,8 +418,8 @@ def hc_replay_one(ok: Bool, +st: HM.St, +e: HM.Ev, +eok: {CO.replay_fresh(st, e)
     case False{}:
       sp
 
-def hc_replay_batch(+ms: List<&2, Maybe<&2, HM.Ev>>, +st: HM.St, +i: Nat, +sk: List<&2, Nat>, sp: HI.Split(st))
-    -> HI.Split(Pair.fst(HM.St, List<&2, Nat>, CO.replay_batch(ms, st, i, sk))):
+def hc_replay_batch(+ms: List<&2, Maybe<&2, HM.Ev>>, +st: HS.St, +i: Nat, +sk: List<&2, Nat>, sp: HI.Split(st))
+    -> HI.Split(Pair.fst(HS.St, List<&2, Nat>, CO.replay_batch(ms, st, i, sk))):
   match ms:
     case Nil{}:
       sp
@@ -504,12 +508,12 @@ def hc_kept1(+xs: List<&2, HS.MRec>, e: HM.Ev) -> HI.IsPrefix(HI.ids(xs), HI.ids
     case HM.EResumed{a}:
       PL1.hub_prefix_refl(HI.ids(xs))
 
-def hc_apply_kept(+s: HM.St, +e: HM.Ev, +sp: HI.Split(s), +k: hc_GeEv(s, e)) -> HI.Kept(s, HM.apply(s, e)):
+def hc_apply_kept(+s: HS.St, +e: HM.Ev, +sp: HI.Split(s), +k: hc_GeEv(s, e)) -> HI.Kept(s, HM.apply(s, e)):
   %Equal.sym(List<&2, HS.MRec>, HM.every(HM.apply(s, e)), HI.apply1(HM.every(s), e), hc_every_apply(s, e, sp, k))
     : HI.IsPrefix(HI.ids(HM.every(s)), HI.ids(_))
   hc_kept1(HM.every(s), e)
 
-def hc_kept_all(+evs: List<&2, HM.Ev>, +s: HM.St, +sp: HI.Split(s), f: HX.Fresh(evs, s)) -> HI.Kept(s, HM.apply_all(evs, s)):
+def hc_kept_all(+evs: List<&2, HM.Ev>, +s: HS.St, +sp: HI.Split(s), f: HX.Fresh(evs, s)) -> HI.Kept(s, HM.apply_all(evs, s)):
   match evs:
     case Nil{}:
       PL1.hub_prefix_refl(HI.ids(HM.every(s)))
@@ -522,15 +526,15 @@ def hc_kept_all(+evs: List<&2, HM.Ev>, +s: HM.St, +sp: HI.Split(s), f: HX.Fresh(
 
 # ---- the split along a step (stop_leaves_no_queue, the walks) ----
 
-def hc_split_tr(-a: HM.St, -b: HM.St, e: {a == b : HM.St}, sp: HI.Split(b)) -> HI.Split(a):
-  %Equal.sym(HM.St, a, b, e) : HI.Split(_)
+def hc_split_tr(-a: HS.St, -b: HS.St, e: {a == b : HS.St}, sp: HI.Split(b)) -> HI.Split(a):
+  %Equal.sym(HS.St, a, b, e) : HI.Split(_)
   sp
 
 # the hot index: the hot side's hot ones are every message's
-def hc_hot_index(+s: HM.St, +sp: HI.Split(s)) -> {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>}:
-  Equal.sym(List<&2, HS.MRec>, HM.hot_of(HM.every(s)), HM.hot_of(HM.St.hot(s)), PC2.hc_hot_every(HM.St.hot(s), HM.St.old(s), HM.St.next_msg(s), sp))
+def hc_hot_index(+s: HS.St, +sp: HI.Split(s)) -> {HM.hot_of(HS.St.hot(s)) == HM.hot_of(HM.every(s)) : List<&2, HS.MRec>}:
+  Equal.sym(List<&2, HS.MRec>, HM.hot_of(HM.every(s)), HM.hot_of(HS.St.hot(s)), PC2.hc_hot_every(HS.St.hot(s), HS.St.old(s), HS.St.next_msg(s), sp))
 
-def hc_split_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, sp: HI.Split(HX.d(o, cx))) -> HI.Split(HX.d(o, HC.reject_ids(o, ids, cx))):
+def hc_split_reject(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, sp: HI.Split(HX.d(o, cx))) -> HI.Split(HX.d(o, HC.reject_ids(o, ids, cx))):
   match ids:
     case Nil{}:
       sp
@@ -542,7 +546,7 @@ def hc_split_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, sp: HI.Split(
           hc_split_apply(HX.d(o, cx), ev, sp, Unit{})))
 
 # rejecting the ids: every message rejected by id, as on one list
-def hc_every_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +sp: HI.Split(HX.d(o, cx)))
+def hc_every_reject(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +sp: HI.Split(HX.d(o, cx)))
     -> {HM.every(HX.d(o, HC.reject_ids(o, ids, cx))) == PL1.hub_rej(ids, HM.every(HX.d(o, cx))) : List<&2, HS.MRec>}:
   match ids:
     case Nil{}:
@@ -558,5 +562,5 @@ def hc_every_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +sp: HI.Split
         hc_every_reject(o, t, cx2, sp2),
         Equal.cong(List<&2, HS.MRec>, List<&2, HS.MRec>, xs => PL1.hub_rej(t, xs), HM.every(HX.d(o, cx2)), mm,
           Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), ev)), mm,
-            Equal.cong(HM.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+            Equal.cong(HS.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
             hc_every_apply(HX.d(o, cx), ev, sp, Unit{}))))

@@ -24,7 +24,7 @@ pub struct CardOpened {
     pub card: Card,
 }
 
-/// sb-core's card (codec.bend `card_json`).
+/// sb-core's card (gen/state-codec.bend `Card.journal_json`).
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct Card {
     #[serde(default)]

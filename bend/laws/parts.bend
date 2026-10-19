@@ -10,7 +10,7 @@ import ../hub/model.bend as HM
 import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
-import ../hub/codec.bend as HCD
+import ../hub/gen/kit.bend as HK
 import ../hub/newtask.bend as HNT
 
 # ---- an agent's message parts (send-parts, architect m_23962) ----
@@ -23,19 +23,19 @@ law agent_send_keeps_parts:
   for +expect: Bool
   for +reply_to: Maybe<&2, Nat>
   for +q: J.Json
-  {HC.Snd.parts(HC.req_send.snd(from, to, expect, reply_to, q)) == HCD.get_s(q, "parts") : String}
+  {HC.Snd.parts(HC.req_send.snd(from, to, expect, reply_to, q)) == HK.get_s(q, "parts") : String}
 
 # LAW: a message without parts writes no msg-parts / sent-parts line, so
 # every feed is what it always was.
 law agent_no_parts_no_line:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   for +m: HS.Msg
   {HC.msg_parts(o, cx, agent, HS.Msg.with_parts(m, "")) == cx : HX.Cx<o>}
 
 law agent_no_parts_no_sent_line:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   for +m: HS.Msg

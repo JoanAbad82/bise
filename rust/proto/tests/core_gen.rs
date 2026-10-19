@@ -1,8 +1,8 @@
 //! sb-core's side of the seam (`bise_proto::core`), generated: the Bend
 //! codecs in `bend/hub/gen/`, never hand-edited (issue 25).
 //!
-//! - `kit.bend`: the field readers with sb-core's defaults (codec.bend's
-//!   `C.get_*`, copied), the writers, and their list laws;
+//! - `kit.bend`: the field readers with sb-core's defaults (core.bend's
+//!   `K.get_*`), the writers, and their list laws;
 //! - `in.bend`, `link.bend`, `fx.bend`: per enum, a Bend type with one
 //!   record per kind (two tags may share one: `card_close` is
 //!   `IConfirmClose`), its decode from `J.Json` (the tag looked up in a
@@ -15,11 +15,11 @@
 //!   tag "type"): each row's `M.Ev` pattern read from a line (the tag
 //!   looked up like In's, an unknown or missing tag: None, the line
 //!   skipped) and written by one match on `M.Ev` with no catch-all; the
-//!   records inside a line go through their hand codecs in
-//!   bend/hub/codec.bend (`C.<name>_of`, `_json`, `_kvs`);
+//!   records inside a line go through their generated codecs in
+//!   gen/state-codec.bend (`SC.<T>.<shape>_of`, `_json`, `_kvs`);
 //! - `journal-laws.bend`: per row, its tag alone reads its defaults and
 //!   its write reads back as itself (a record through its codec's own
-//!   law `C.<name>_round`; `every_set`, whose read may skip it, has its
+//!   law `SC.<T>.<shape>_round`; `every_set`, whose read may skip it, has its
 //!   tag law only); each line of fixtures/core_journal.jsonl reads back
 //!   as itself (an every_set's `at` after the timer's keys);
 //! - `laws.bend`: per record, decode∘encode is the identity, and an object
@@ -476,7 +476,7 @@ const KIT: &str = r#"
 type Delivered is Data:
   Delivered{id: Nat, rel: String}
 
-# ---- readers: sb-core's defaults (hub/codec.bend's C.get_*) ----
+# ---- readers: sb-core's defaults ----
 
 def get_s(+j: J.Json, +k: String) -> String:
   J.get_str_or(j, k, "")

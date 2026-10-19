@@ -124,6 +124,6 @@ def nm_none(m: Maybe<&2, HS.Agent>, e: {Maybe.is_some(&2, HS.Agent, m) == False{
       PL1.hub_absurd_eq(PL1.hub_tf_absurd(e), Maybe<&2, HS.Agent>, Some{x}, None{})
 
 # a name no agent holds (FreshEv): no agent has it as its name
-def nm_held(+s: HM.St, +n: String, k: {HM.name_held(s, n) == False{} : Bool}) -> {HM.agent_named(HM.St.agents(s), n) == None{} : Maybe<&2, HS.Agent>}:
-  nm_none(HM.agent_named(HM.St.agents(s), n),
-    PL1.hub_or_false_r(HM.reserved(n), Maybe.is_some(&2, HS.Agent, HM.agent_named(HM.St.agents(s), n)), k))
+def nm_held(+s: HS.St, +n: String, k: {HM.name_held(s, n) == False{} : Bool}) -> {HM.agent_named(HS.St.agents(s), n) == None{} : Maybe<&2, HS.Agent>}:
+  nm_none(HM.agent_named(HS.St.agents(s), n),
+    PL1.hub_or_false_r(HM.reserved(n), Maybe.is_some(&2, HS.Agent, HM.agent_named(HS.St.agents(s), n)), k))

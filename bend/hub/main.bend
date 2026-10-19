@@ -19,7 +19,7 @@ import ../vendor/json.bend as J
 import ./model.bend as M
 import ./cold.bend as CO
 
-import ./codec.bend as C
+import ./gen/state.bend as S
 
 import ./cx.bend as X
 
@@ -77,7 +77,7 @@ def answer.go(need: Maybe<&2, J.Json>, +h: H.Hub, +fx: List<&2, X.Fx>, +before: 
       (h, J.stringify(L.answer_need(q)))
     case None{}:
       (h, J.stringify(L.answer_step(fxs_json(fx), X.R.dirty(H.Hub.r(h)),
-        V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), False{}, List.append(&2, Nat, V.touched(X.journal(fx)), V.moved_ids(X.journal(fx), M.St.hot(H.Hub.d(h)))),
+        V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), False{}, List.append(&2, Nat, V.touched(X.journal(fx)), V.moved_ids(X.journal(fx), S.St.hot(H.Hub.d(h)))),
           List.append(&2, String, V.changed(X.journal(fx), before, X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h))), V.fx_names(fx)),
           X.journal(fx)),
         SD.said_id(SD.said(X.journal(fx))),
@@ -108,7 +108,7 @@ def evs_of(evs: List<&2, J.Json>) -> List<&2, Maybe<&2, M.Ev>>:
     case Con{+e, +rest}:
       GJ.of(e) <> evs_of(rest)
 
-def replay_many.done(p: M.St & List<&2, Nat>, +r: X.R) -> H.Hub & String:
+def replay_many.done(p: S.St & List<&2, Nat>, +r: X.R) -> H.Hub & String:
   match p:
     case (+d, +sk):
       (H.Hub{d, r}, J.stringify(L.answer_skipped_at(sk)))

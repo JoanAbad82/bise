@@ -52,8 +52,8 @@ def reply_min(a: Maybe<&2, S.Msg>, b: Maybe<&2, S.Msg>) -> Maybe<&2, S.Msg>:
 
 # the first reply to the message `id` among every message (sb wait, the
 # ask's pause): the earliest of the hot side's and of the old side's
-def reply_at(+st: M.St, +id: Nat, +replier: String) -> Maybe<&2, S.Msg>:
-  reply_min(reply_of(M.St.hot(st), id, replier), reply_last(M.St.old(st), M.id_above(M.St.old(st), id), id, replier))
+def reply_at(+st: S.St, +id: Nat, +replier: String) -> Maybe<&2, S.Msg>:
+  reply_min(reply_of(S.St.hot(st), id, replier), reply_last(S.St.old(st), M.id_above(S.St.old(st), id), id, replier))
 
 # ---- the boot replay (main.bend replay_many) ----
 # A journal event a replay applies: one this hub knows (GJ.of gives None
@@ -62,14 +62,14 @@ def reply_at(+st: M.St, +id: Nat, +replier: String) -> Maybe<&2, S.Msg>:
 # damaged journal; none in the 17 journals on his machine, issue 21
 # steps 3-4) would put the message out of send order in the split (law
 # ids_ascending): it is skipped, and the answer says so.
-def replay_fresh(+st: M.St, e: M.Ev) -> Bool:
+def replay_fresh(+st: S.St, e: M.Ev) -> Bool:
   match e:
     case M.EMsgSent{+m}:
-      Nat.is_ge(S.Msg.id(m), M.St.next_msg(st))
+      Nat.is_ge(S.Msg.id(m), S.St.next_msg(st))
     case _:
       True{}
 
-def replay_one(ok: Bool, +st: M.St, +e: M.Ev) -> M.St:
+def replay_one(ok: Bool, +st: S.St, +e: M.Ev) -> S.St:
   match ok:
     case True{}:
       M.apply(st, e)
@@ -80,7 +80,7 @@ def replay_one(ok: Bool, +st: M.St, +e: M.Ev) -> M.St:
 # the hot side and the head of the old side, so a boot is linear (one
 # list of every message made it quadratic). `i` counts the events, `sk`
 # the ones skipped (newest first).
-def replay_batch(ms: List<&2, Maybe<&2, M.Ev>>, +st: M.St, +i: Nat, +sk: List<&2, Nat>) -> M.St & List<&2, Nat>:
+def replay_batch(ms: List<&2, Maybe<&2, M.Ev>>, +st: S.St, +i: Nat, +sk: List<&2, Nat>) -> S.St & List<&2, Nat>:
   match ms:
     case Nil{}:
       (st, List.reverse(&2, Nat, sk))

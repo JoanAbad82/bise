@@ -151,6 +151,11 @@ def Msg.with_id(r: Msg, v: Nat) -> Msg:
     case Msg{_, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       Msg{v, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}
 
+def Msg.over_id(r: Msg, g: Nat -> Nat) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{g(f0), f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}
+
 def Msg.thread(r: Msg) -> Nat:
   match r:
     case Msg{_, f1, _, _, _, _, _, _, _, _, _, _, _}:
@@ -160,6 +165,11 @@ def Msg.with_thread(r: Msg, v: Nat) -> Msg:
   match r:
     case Msg{f0, _, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       Msg{f0, v, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}
+
+def Msg.over_thread(r: Msg, g: Nat -> Nat) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, g(f1), f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}
 
 def Msg.from(r: Msg) -> String:
   match r:
@@ -171,6 +181,11 @@ def Msg.with_from(r: Msg, v: String) -> Msg:
     case Msg{f0, f1, _, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       Msg{f0, f1, v, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}
 
+def Msg.over_from(r: Msg, g: String -> String) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, g(f2), f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}
+
 def Msg.to(r: Msg) -> String:
   match r:
     case Msg{_, _, _, f3, _, _, _, _, _, _, _, _, _}:
@@ -180,6 +195,11 @@ def Msg.with_to(r: Msg, v: String) -> Msg:
   match r:
     case Msg{f0, f1, f2, _, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       Msg{f0, f1, f2, v, f4, f5, f6, f7, f8, f9, f10, f11, f12}
+
+def Msg.over_to(r: Msg, g: String -> String) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, g(f3), f4, f5, f6, f7, f8, f9, f10, f11, f12}
 
 def Msg.reply_to(r: Msg) -> Maybe<&2, Nat>:
   match r:
@@ -191,6 +211,11 @@ def Msg.with_reply_to(r: Msg, v: Maybe<&2, Nat>) -> Msg:
     case Msg{f0, f1, f2, f3, _, f5, f6, f7, f8, f9, f10, f11, f12}:
       Msg{f0, f1, f2, f3, v, f5, f6, f7, f8, f9, f10, f11, f12}
 
+def Msg.over_reply_to(r: Msg, g: Maybe<&2, Nat> -> Maybe<&2, Nat>) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, f3, g(f4), f5, f6, f7, f8, f9, f10, f11, f12}
+
 def Msg.expect(r: Msg) -> Bool:
   match r:
     case Msg{_, _, _, _, _, f5, _, _, _, _, _, _, _}:
@@ -200,6 +225,11 @@ def Msg.with_expect(r: Msg, v: Bool) -> Msg:
   match r:
     case Msg{f0, f1, f2, f3, f4, _, f6, f7, f8, f9, f10, f11, f12}:
       Msg{f0, f1, f2, f3, f4, v, f6, f7, f8, f9, f10, f11, f12}
+
+def Msg.over_expect(r: Msg, g: Bool -> Bool) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, f3, f4, g(f5), f6, f7, f8, f9, f10, f11, f12}
 
 def Msg.auto(r: Msg) -> Bool:
   match r:
@@ -211,6 +241,11 @@ def Msg.with_auto(r: Msg, v: Bool) -> Msg:
     case Msg{f0, f1, f2, f3, f4, f5, _, f7, f8, f9, f10, f11, f12}:
       Msg{f0, f1, f2, f3, f4, f5, v, f7, f8, f9, f10, f11, f12}
 
+def Msg.over_auto(r: Msg, g: Bool -> Bool) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, f3, f4, f5, g(f6), f7, f8, f9, f10, f11, f12}
+
 def Msg.text(r: Msg) -> String:
   match r:
     case Msg{_, _, _, _, _, _, _, f7, _, _, _, _, _}:
@@ -220,6 +255,11 @@ def Msg.with_text(r: Msg, v: String) -> Msg:
   match r:
     case Msg{f0, f1, f2, f3, f4, f5, f6, _, f8, f9, f10, f11, f12}:
       Msg{f0, f1, f2, f3, f4, f5, f6, v, f8, f9, f10, f11, f12}
+
+def Msg.over_text(r: Msg, g: String -> String) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, f3, f4, f5, f6, g(f7), f8, f9, f10, f11, f12}
 
 def Msg.created(r: Msg) -> Nat:
   match r:
@@ -231,6 +271,11 @@ def Msg.with_created(r: Msg, v: Nat) -> Msg:
     case Msg{f0, f1, f2, f3, f4, f5, f6, f7, _, f9, f10, f11, f12}:
       Msg{f0, f1, f2, f3, f4, f5, f6, f7, v, f9, f10, f11, f12}
 
+def Msg.over_created(r: Msg, g: Nat -> Nat) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, f3, f4, f5, f6, f7, g(f8), f9, f10, f11, f12}
+
 def Msg.plain(r: Msg) -> Bool:
   match r:
     case Msg{_, _, _, _, _, _, _, _, _, f9, _, _, _}:
@@ -240,6 +285,11 @@ def Msg.with_plain(r: Msg, v: Bool) -> Msg:
   match r:
     case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, _, f10, f11, f12}:
       Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, v, f10, f11, f12}
+
+def Msg.over_plain(r: Msg, g: Bool -> Bool) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, g(f9), f10, f11, f12}
 
 def Msg.queued(r: Msg) -> Bool:
   match r:
@@ -251,6 +301,11 @@ def Msg.with_queued(r: Msg, v: Bool) -> Msg:
     case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, _, f11, f12}:
       Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, v, f11, f12}
 
+def Msg.over_queued(r: Msg, g: Bool -> Bool) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, g(f10), f11, f12}
+
 def Msg.via(r: Msg) -> Maybe<&2, String>:
   match r:
     case Msg{_, _, _, _, _, _, _, _, _, _, _, f11, _}:
@@ -261,6 +316,11 @@ def Msg.with_via(r: Msg, v: Maybe<&2, String>) -> Msg:
     case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, _, f12}:
       Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, v, f12}
 
+def Msg.over_via(r: Msg, g: Maybe<&2, String> -> Maybe<&2, String>) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, g(f11), f12}
+
 def Msg.parts(r: Msg) -> String:
   match r:
     case Msg{_, _, _, _, _, _, _, _, _, _, _, _, f12}:
@@ -270,6 +330,14 @@ def Msg.with_parts(r: Msg, v: String) -> Msg:
   match r:
     case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, _}:
       Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, v}
+
+def Msg.over_parts(r: Msg, g: String -> String) -> Msg:
+  match r:
+    case Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      Msg{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, g(f12)}
+
+def Msg.open(+r: Msg) -> Msg:
+  Msg.with_parts(Msg.with_via(Msg.with_queued(Msg.with_plain(Msg.with_created(Msg.with_text(Msg.with_auto(Msg.with_expect(Msg.with_reply_to(Msg.with_to(Msg.with_from(Msg.with_thread(Msg.with_id(Msg.empty(), Msg.id(r)), Msg.thread(r)), Msg.from(r)), Msg.to(r)), Msg.reply_to(r)), Msg.expect(r)), Msg.auto(r)), Msg.text(r)), Msg.created(r)), Msg.plain(r)), Msg.queued(r)), Msg.via(r)), Msg.parts(r))
 
 # ---- MRec ----
 
@@ -286,6 +354,11 @@ def MRec.with_msg(r: MRec, v: Msg) -> MRec:
     case MRec{_, f1, f2}:
       MRec{v, f1, f2}
 
+def MRec.over_msg(r: MRec, g: Msg -> Msg) -> MRec:
+  match r:
+    case MRec{f0, f1, f2}:
+      MRec{g(f0), f1, f2}
+
 def MRec.st(r: MRec) -> MSt:
   match r:
     case MRec{_, f1, _}:
@@ -296,6 +369,11 @@ def MRec.with_st(r: MRec, v: MSt) -> MRec:
     case MRec{f0, _, f2}:
       MRec{f0, v, f2}
 
+def MRec.over_st(r: MRec, g: MSt -> MSt) -> MRec:
+  match r:
+    case MRec{f0, f1, f2}:
+      MRec{f0, g(f1), f2}
+
 def MRec.settled(r: MRec) -> Bool:
   match r:
     case MRec{_, _, f2}:
@@ -305,6 +383,14 @@ def MRec.with_settled(r: MRec, v: Bool) -> MRec:
   match r:
     case MRec{f0, f1, _}:
       MRec{f0, f1, v}
+
+def MRec.over_settled(r: MRec, g: Bool -> Bool) -> MRec:
+  match r:
+    case MRec{f0, f1, f2}:
+      MRec{f0, f1, g(f2)}
+
+def MRec.open(+r: MRec) -> MRec:
+  MRec.with_settled(MRec.with_st(MRec.with_msg(MRec.empty(), MRec.msg(r)), MRec.st(r)), MRec.settled(r))
 
 # ---- Card ----
 
@@ -321,6 +407,11 @@ def Card.with_id(r: Card, v: Nat) -> Card:
     case Card{_, f1, f2, f3, f4, f5, f6, f7}:
       Card{v, f1, f2, f3, f4, f5, f6, f7}
 
+def Card.over_id(r: Card, g: Nat -> Nat) -> Card:
+  match r:
+    case Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Card{g(f0), f1, f2, f3, f4, f5, f6, f7}
+
 def Card.kind(r: Card) -> String:
   match r:
     case Card{_, f1, _, _, _, _, _, _}:
@@ -330,6 +421,11 @@ def Card.with_kind(r: Card, v: String) -> Card:
   match r:
     case Card{f0, _, f2, f3, f4, f5, f6, f7}:
       Card{f0, v, f2, f3, f4, f5, f6, f7}
+
+def Card.over_kind(r: Card, g: String -> String) -> Card:
+  match r:
+    case Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Card{f0, g(f1), f2, f3, f4, f5, f6, f7}
 
 def Card.agent(r: Card) -> String:
   match r:
@@ -341,6 +437,11 @@ def Card.with_agent(r: Card, v: String) -> Card:
     case Card{f0, f1, _, f3, f4, f5, f6, f7}:
       Card{f0, f1, v, f3, f4, f5, f6, f7}
 
+def Card.over_agent(r: Card, g: String -> String) -> Card:
+  match r:
+    case Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Card{f0, f1, g(f2), f3, f4, f5, f6, f7}
+
 def Card.text(r: Card) -> String:
   match r:
     case Card{_, _, _, f3, _, _, _, _}:
@@ -350,6 +451,11 @@ def Card.with_text(r: Card, v: String) -> Card:
   match r:
     case Card{f0, f1, f2, _, f4, f5, f6, f7}:
       Card{f0, f1, f2, v, f4, f5, f6, f7}
+
+def Card.over_text(r: Card, g: String -> String) -> Card:
+  match r:
+    case Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Card{f0, f1, f2, g(f3), f4, f5, f6, f7}
 
 def Card.for_msg(r: Card) -> Maybe<&2, Nat>:
   match r:
@@ -361,6 +467,11 @@ def Card.with_for_msg(r: Card, v: Maybe<&2, Nat>) -> Card:
     case Card{f0, f1, f2, f3, _, f5, f6, f7}:
       Card{f0, f1, f2, f3, v, f5, f6, f7}
 
+def Card.over_for_msg(r: Card, g: Maybe<&2, Nat> -> Maybe<&2, Nat>) -> Card:
+  match r:
+    case Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Card{f0, f1, f2, f3, g(f4), f5, f6, f7}
+
 def Card.created(r: Card) -> Nat:
   match r:
     case Card{_, _, _, _, _, f5, _, _}:
@@ -370,6 +481,11 @@ def Card.with_created(r: Card, v: Nat) -> Card:
   match r:
     case Card{f0, f1, f2, f3, f4, _, f6, f7}:
       Card{f0, f1, f2, f3, f4, v, f6, f7}
+
+def Card.over_created(r: Card, g: Nat -> Nat) -> Card:
+  match r:
+    case Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Card{f0, f1, f2, f3, f4, g(f5), f6, f7}
 
 def Card.place(r: Card) -> Maybe<&2, String>:
   match r:
@@ -381,6 +497,11 @@ def Card.with_place(r: Card, v: Maybe<&2, String>) -> Card:
     case Card{f0, f1, f2, f3, f4, f5, _, f7}:
       Card{f0, f1, f2, f3, f4, f5, v, f7}
 
+def Card.over_place(r: Card, g: Maybe<&2, String> -> Maybe<&2, String>) -> Card:
+  match r:
+    case Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Card{f0, f1, f2, f3, f4, f5, g(f6), f7}
+
 def Card.pr(r: Card) -> Maybe<&2, Nat>:
   match r:
     case Card{_, _, _, _, _, _, _, f7}:
@@ -390,6 +511,14 @@ def Card.with_pr(r: Card, v: Maybe<&2, Nat>) -> Card:
   match r:
     case Card{f0, f1, f2, f3, f4, f5, f6, _}:
       Card{f0, f1, f2, f3, f4, f5, f6, v}
+
+def Card.over_pr(r: Card, g: Maybe<&2, Nat> -> Maybe<&2, Nat>) -> Card:
+  match r:
+    case Card{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Card{f0, f1, f2, f3, f4, f5, f6, g(f7)}
+
+def Card.open(+r: Card) -> Card:
+  Card.with_pr(Card.with_place(Card.with_created(Card.with_for_msg(Card.with_text(Card.with_agent(Card.with_kind(Card.with_id(Card.empty(), Card.id(r)), Card.kind(r)), Card.agent(r)), Card.text(r)), Card.for_msg(r)), Card.created(r)), Card.place(r)), Card.pr(r))
 
 # ---- Ans ----
 
@@ -406,6 +535,11 @@ def Ans.with_said(r: Ans, v: String) -> Ans:
     case Ans{_, f1, f2, f3, f4, f5}:
       Ans{v, f1, f2, f3, f4, f5}
 
+def Ans.over_said(r: Ans, g: String -> String) -> Ans:
+  match r:
+    case Ans{f0, f1, f2, f3, f4, f5}:
+      Ans{g(f0), f1, f2, f3, f4, f5}
+
 def Ans.pick_n(r: Ans) -> Maybe<&2, Nat>:
   match r:
     case Ans{_, f1, _, _, _, _}:
@@ -415,6 +549,11 @@ def Ans.with_pick_n(r: Ans, v: Maybe<&2, Nat>) -> Ans:
   match r:
     case Ans{f0, _, f2, f3, f4, f5}:
       Ans{f0, v, f2, f3, f4, f5}
+
+def Ans.over_pick_n(r: Ans, g: Maybe<&2, Nat> -> Maybe<&2, Nat>) -> Ans:
+  match r:
+    case Ans{f0, f1, f2, f3, f4, f5}:
+      Ans{f0, g(f1), f2, f3, f4, f5}
 
 def Ans.pick(r: Ans) -> String:
   match r:
@@ -426,6 +565,11 @@ def Ans.with_pick(r: Ans, v: String) -> Ans:
     case Ans{f0, f1, _, f3, f4, f5}:
       Ans{f0, f1, v, f3, f4, f5}
 
+def Ans.over_pick(r: Ans, g: String -> String) -> Ans:
+  match r:
+    case Ans{f0, f1, f2, f3, f4, f5}:
+      Ans{f0, f1, g(f2), f3, f4, f5}
+
 def Ans.via(r: Ans) -> String:
   match r:
     case Ans{_, _, _, f3, _, _}:
@@ -435,6 +579,11 @@ def Ans.with_via(r: Ans, v: String) -> Ans:
   match r:
     case Ans{f0, f1, f2, _, f4, f5}:
       Ans{f0, f1, f2, v, f4, f5}
+
+def Ans.over_via(r: Ans, g: String -> String) -> Ans:
+  match r:
+    case Ans{f0, f1, f2, f3, f4, f5}:
+      Ans{f0, f1, f2, g(f3), f4, f5}
 
 def Ans.page(r: Ans) -> String:
   match r:
@@ -446,6 +595,11 @@ def Ans.with_page(r: Ans, v: String) -> Ans:
     case Ans{f0, f1, f2, f3, _, f5}:
       Ans{f0, f1, f2, f3, v, f5}
 
+def Ans.over_page(r: Ans, g: String -> String) -> Ans:
+  match r:
+    case Ans{f0, f1, f2, f3, f4, f5}:
+      Ans{f0, f1, f2, f3, g(f4), f5}
+
 def Ans.block(r: Ans) -> String:
   match r:
     case Ans{_, _, _, _, _, f5}:
@@ -455,6 +609,14 @@ def Ans.with_block(r: Ans, v: String) -> Ans:
   match r:
     case Ans{f0, f1, f2, f3, f4, _}:
       Ans{f0, f1, f2, f3, f4, v}
+
+def Ans.over_block(r: Ans, g: String -> String) -> Ans:
+  match r:
+    case Ans{f0, f1, f2, f3, f4, f5}:
+      Ans{f0, f1, f2, f3, f4, g(f5)}
+
+def Ans.open(+r: Ans) -> Ans:
+  Ans.with_block(Ans.with_page(Ans.with_via(Ans.with_pick(Ans.with_pick_n(Ans.with_said(Ans.empty(), Ans.said(r)), Ans.pick_n(r)), Ans.pick(r)), Ans.via(r)), Ans.page(r)), Ans.block(r))
 
 # ---- Agent ----
 
@@ -471,6 +633,11 @@ def Agent.with_name(r: Agent, v: String) -> Agent:
     case Agent{_, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       Agent{v, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
 
+def Agent.over_name(r: Agent, g: String -> String) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{g(f0), f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
+
 def Agent.is_main(r: Agent) -> Bool:
   match r:
     case Agent{_, f1, _, _, _, _, _, _, _, _, _, _, _, _, _, _}:
@@ -480,6 +647,11 @@ def Agent.with_is_main(r: Agent, v: Bool) -> Agent:
   match r:
     case Agent{f0, _, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       Agent{f0, v, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
+
+def Agent.over_is_main(r: Agent, g: Bool -> Bool) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, g(f1), f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
 
 def Agent.parent(r: Agent) -> Maybe<&2, String>:
   match r:
@@ -491,6 +663,11 @@ def Agent.with_parent(r: Agent, v: Maybe<&2, String>) -> Agent:
     case Agent{f0, f1, _, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       Agent{f0, f1, v, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
 
+def Agent.over_parent(r: Agent, g: Maybe<&2, String> -> Maybe<&2, String>) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, g(f2), f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
+
 def Agent.life(r: Agent) -> Life:
   match r:
     case Agent{_, _, _, f3, _, _, _, _, _, _, _, _, _, _, _, _}:
@@ -500,6 +677,11 @@ def Agent.with_life(r: Agent, v: Life) -> Agent:
   match r:
     case Agent{f0, f1, f2, _, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       Agent{f0, f1, f2, v, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
+
+def Agent.over_life(r: Agent, g: Life -> Life) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, g(f3), f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
 
 def Agent.declared(r: Agent) -> Maybe<&2, Decl>:
   match r:
@@ -511,6 +693,11 @@ def Agent.with_declared(r: Agent, v: Maybe<&2, Decl>) -> Agent:
     case Agent{f0, f1, f2, f3, _, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       Agent{f0, f1, f2, f3, v, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
 
+def Agent.over_declared(r: Agent, g: Maybe<&2, Decl> -> Maybe<&2, Decl>) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, g(f4), f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
+
 def Agent.aliases(r: Agent) -> List<&2, String>:
   match r:
     case Agent{_, _, _, _, _, f5, _, _, _, _, _, _, _, _, _, _}:
@@ -520,6 +707,11 @@ def Agent.with_aliases(r: Agent, v: List<&2, String>) -> Agent:
   match r:
     case Agent{f0, f1, f2, f3, f4, _, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       Agent{f0, f1, f2, f3, f4, v, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
+
+def Agent.over_aliases(r: Agent, g: List<&2, String> -> List<&2, String>) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, g(f5), f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}
 
 def Agent.files(r: Agent) -> List<&2, String>:
   match r:
@@ -531,6 +723,11 @@ def Agent.with_files(r: Agent, v: List<&2, String>) -> Agent:
     case Agent{f0, f1, f2, f3, f4, f5, _, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
       Agent{f0, f1, f2, f3, f4, f5, v, f7, f8, f9, f10, f11, f12, f13, f14, f15}
 
+def Agent.over_files(r: Agent, g: List<&2, String> -> List<&2, String>) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, g(f6), f7, f8, f9, f10, f11, f12, f13, f14, f15}
+
 def Agent.ws(r: Agent) -> J.Json:
   match r:
     case Agent{_, _, _, _, _, _, _, f7, _, _, _, _, _, _, _, _}:
@@ -540,6 +737,11 @@ def Agent.with_ws(r: Agent, v: J.Json) -> Agent:
   match r:
     case Agent{f0, f1, f2, f3, f4, f5, f6, _, f8, f9, f10, f11, f12, f13, f14, f15}:
       Agent{f0, f1, f2, f3, f4, f5, f6, v, f8, f9, f10, f11, f12, f13, f14, f15}
+
+def Agent.over_ws(r: Agent, g: J.Json -> J.Json) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, f6, g(f7), f8, f9, f10, f11, f12, f13, f14, f15}
 
 def Agent.dir(r: Agent) -> String:
   match r:
@@ -551,6 +753,11 @@ def Agent.with_dir(r: Agent, v: String) -> Agent:
     case Agent{f0, f1, f2, f3, f4, f5, f6, f7, _, f9, f10, f11, f12, f13, f14, f15}:
       Agent{f0, f1, f2, f3, f4, f5, f6, f7, v, f9, f10, f11, f12, f13, f14, f15}
 
+def Agent.over_dir(r: Agent, g: String -> String) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, f6, f7, g(f8), f9, f10, f11, f12, f13, f14, f15}
+
 def Agent.brief(r: Agent) -> J.Json:
   match r:
     case Agent{_, _, _, _, _, _, _, _, _, f9, _, _, _, _, _, _}:
@@ -560,6 +767,11 @@ def Agent.with_brief(r: Agent, v: J.Json) -> Agent:
   match r:
     case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, _, f10, f11, f12, f13, f14, f15}:
       Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, v, f10, f11, f12, f13, f14, f15}
+
+def Agent.over_brief(r: Agent, g: J.Json -> J.Json) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, g(f9), f10, f11, f12, f13, f14, f15}
 
 def Agent.created(r: Agent) -> Nat:
   match r:
@@ -571,6 +783,11 @@ def Agent.with_created(r: Agent, v: Nat) -> Agent:
     case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, _, f11, f12, f13, f14, f15}:
       Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, v, f11, f12, f13, f14, f15}
 
+def Agent.over_created(r: Agent, g: Nat -> Nat) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, g(f10), f11, f12, f13, f14, f15}
+
 def Agent.failure(r: Agent) -> Maybe<&2, String>:
   match r:
     case Agent{_, _, _, _, _, _, _, _, _, _, _, f11, _, _, _, _}:
@@ -580,6 +797,11 @@ def Agent.with_failure(r: Agent, v: Maybe<&2, String>) -> Agent:
   match r:
     case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, _, f12, f13, f14, f15}:
       Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, v, f12, f13, f14, f15}
+
+def Agent.over_failure(r: Agent, g: Maybe<&2, String> -> Maybe<&2, String>) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, g(f11), f12, f13, f14, f15}
 
 def Agent.note(r: Agent) -> String:
   match r:
@@ -591,6 +813,11 @@ def Agent.with_note(r: Agent, v: String) -> Agent:
     case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, _, f13, f14, f15}:
       Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, v, f13, f14, f15}
 
+def Agent.over_note(r: Agent, g: String -> String) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, g(f12), f13, f14, f15}
+
 def Agent.report(r: Agent) -> J.Json:
   match r:
     case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, f13, _, _}:
@@ -600,6 +827,11 @@ def Agent.with_report(r: Agent, v: J.Json) -> Agent:
   match r:
     case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, _, f14, f15}:
       Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, v, f14, f15}
+
+def Agent.over_report(r: Agent, g: J.Json -> J.Json) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, g(f13), f14, f15}
 
 def Agent.snap(r: Agent) -> Maybe<&2, String>:
   match r:
@@ -611,6 +843,11 @@ def Agent.with_snap(r: Agent, v: Maybe<&2, String>) -> Agent:
     case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, _, f15}:
       Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, v, f15}
 
+def Agent.over_snap(r: Agent, g: Maybe<&2, String> -> Maybe<&2, String>) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, g(f14), f15}
+
 def Agent.follow(r: Agent) -> Maybe<&2, String>:
   match r:
     case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, f15}:
@@ -620,6 +857,14 @@ def Agent.with_follow(r: Agent, v: Maybe<&2, String>) -> Agent:
   match r:
     case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, _}:
       Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, v}
+
+def Agent.over_follow(r: Agent, g: Maybe<&2, String> -> Maybe<&2, String>) -> Agent:
+  match r:
+    case Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15}:
+      Agent{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, g(f15)}
+
+def Agent.open(+r: Agent) -> Agent:
+  Agent.with_follow(Agent.with_snap(Agent.with_report(Agent.with_note(Agent.with_failure(Agent.with_created(Agent.with_brief(Agent.with_dir(Agent.with_ws(Agent.with_files(Agent.with_aliases(Agent.with_declared(Agent.with_life(Agent.with_parent(Agent.with_is_main(Agent.with_name(Agent.empty(), Agent.name(r)), Agent.is_main(r)), Agent.parent(r)), Agent.life(r)), Agent.declared(r)), Agent.aliases(r)), Agent.files(r)), Agent.ws(r)), Agent.dir(r)), Agent.brief(r)), Agent.created(r)), Agent.failure(r)), Agent.note(r)), Agent.report(r)), Agent.snap(r)), Agent.follow(r))
 
 # ---- Item ----
 
@@ -636,6 +881,11 @@ def Item.with_id(r: Item, v: Nat) -> Item:
     case Item{_, f1}:
       Item{v, f1}
 
+def Item.over_id(r: Item, g: Nat -> Nat) -> Item:
+  match r:
+    case Item{f0, f1}:
+      Item{g(f0), f1}
+
 def Item.text(r: Item) -> String:
   match r:
     case Item{_, f1}:
@@ -645,6 +895,14 @@ def Item.with_text(r: Item, v: String) -> Item:
   match r:
     case Item{f0, _}:
       Item{f0, v}
+
+def Item.over_text(r: Item, g: String -> String) -> Item:
+  match r:
+    case Item{f0, f1}:
+      Item{f0, g(f1)}
+
+def Item.open(+r: Item) -> Item:
+  Item.with_text(Item.with_id(Item.empty(), Item.id(r)), Item.text(r))
 
 # ---- Timer ----
 
@@ -661,6 +919,11 @@ def Timer.with_id(r: Timer, v: Nat) -> Timer:
     case Timer{_, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       Timer{v, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}
 
+def Timer.over_id(r: Timer, g: Nat -> Nat) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{g(f0), f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}
+
 def Timer.agent(r: Timer) -> String:
   match r:
     case Timer{_, f1, _, _, _, _, _, _, _, _, _, _, _, _}:
@@ -670,6 +933,11 @@ def Timer.with_agent(r: Timer, v: String) -> Timer:
   match r:
     case Timer{f0, _, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       Timer{f0, v, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}
+
+def Timer.over_agent(r: Timer, g: String -> String) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, g(f1), f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}
 
 def Timer.by(r: Timer) -> String:
   match r:
@@ -681,6 +949,11 @@ def Timer.with_by(r: Timer, v: String) -> Timer:
     case Timer{f0, f1, _, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       Timer{f0, f1, v, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}
 
+def Timer.over_by(r: Timer, g: String -> String) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, g(f2), f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}
+
 def Timer.text(r: Timer) -> String:
   match r:
     case Timer{_, _, _, f3, _, _, _, _, _, _, _, _, _, _}:
@@ -690,6 +963,11 @@ def Timer.with_text(r: Timer, v: String) -> Timer:
   match r:
     case Timer{f0, f1, f2, _, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       Timer{f0, f1, f2, v, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}
+
+def Timer.over_text(r: Timer, g: String -> String) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, g(f3), f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}
 
 def Timer.sched(r: Timer) -> Sched:
   match r:
@@ -701,6 +979,11 @@ def Timer.with_sched(r: Timer, v: Sched) -> Timer:
     case Timer{f0, f1, f2, f3, _, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
       Timer{f0, f1, f2, f3, v, f5, f6, f7, f8, f9, f10, f11, f12, f13}
 
+def Timer.over_sched(r: Timer, g: Sched -> Sched) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, g(f4), f5, f6, f7, f8, f9, f10, f11, f12, f13}
+
 def Timer.next(r: Timer) -> Nat:
   match r:
     case Timer{_, _, _, _, _, f5, _, _, _, _, _, _, _, _}:
@@ -710,6 +993,11 @@ def Timer.with_next(r: Timer, v: Nat) -> Timer:
   match r:
     case Timer{f0, f1, f2, f3, f4, _, f6, f7, f8, f9, f10, f11, f12, f13}:
       Timer{f0, f1, f2, f3, f4, v, f6, f7, f8, f9, f10, f11, f12, f13}
+
+def Timer.over_next(r: Timer, g: Nat -> Nat) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, f4, g(f5), f6, f7, f8, f9, f10, f11, f12, f13}
 
 def Timer.until(r: Timer) -> Maybe<&2, Nat>:
   match r:
@@ -721,6 +1009,11 @@ def Timer.with_until(r: Timer, v: Maybe<&2, Nat>) -> Timer:
     case Timer{f0, f1, f2, f3, f4, f5, _, f7, f8, f9, f10, f11, f12, f13}:
       Timer{f0, f1, f2, f3, f4, f5, v, f7, f8, f9, f10, f11, f12, f13}
 
+def Timer.over_until(r: Timer, g: Maybe<&2, Nat> -> Maybe<&2, Nat>) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, f4, f5, g(f6), f7, f8, f9, f10, f11, f12, f13}
+
 def Timer.times(r: Timer) -> Maybe<&2, Nat>:
   match r:
     case Timer{_, _, _, _, _, _, _, f7, _, _, _, _, _, _}:
@@ -730,6 +1023,11 @@ def Timer.with_times(r: Timer, v: Maybe<&2, Nat>) -> Timer:
   match r:
     case Timer{f0, f1, f2, f3, f4, f5, f6, _, f8, f9, f10, f11, f12, f13}:
       Timer{f0, f1, f2, f3, f4, f5, f6, v, f8, f9, f10, f11, f12, f13}
+
+def Timer.over_times(r: Timer, g: Maybe<&2, Nat> -> Maybe<&2, Nat>) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, f4, f5, f6, g(f7), f8, f9, f10, f11, f12, f13}
 
 def Timer.fired(r: Timer) -> Nat:
   match r:
@@ -741,6 +1039,11 @@ def Timer.with_fired(r: Timer, v: Nat) -> Timer:
     case Timer{f0, f1, f2, f3, f4, f5, f6, f7, _, f9, f10, f11, f12, f13}:
       Timer{f0, f1, f2, f3, f4, f5, f6, f7, v, f9, f10, f11, f12, f13}
 
+def Timer.over_fired(r: Timer, g: Nat -> Nat) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, f4, f5, f6, f7, g(f8), f9, f10, f11, f12, f13}
+
 def Timer.page(r: Timer) -> Maybe<&2, String>:
   match r:
     case Timer{_, _, _, _, _, _, _, _, _, f9, _, _, _, _}:
@@ -750,6 +1053,11 @@ def Timer.with_page(r: Timer, v: Maybe<&2, String>) -> Timer:
   match r:
     case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, _, f10, f11, f12, f13}:
       Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, v, f10, f11, f12, f13}
+
+def Timer.over_page(r: Timer, g: Maybe<&2, String> -> Maybe<&2, String>) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, g(f9), f10, f11, f12, f13}
 
 def Timer.last(r: Timer) -> Nat:
   match r:
@@ -761,6 +1069,11 @@ def Timer.with_last(r: Timer, v: Nat) -> Timer:
     case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, _, f11, f12, f13}:
       Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, v, f11, f12, f13}
 
+def Timer.over_last(r: Timer, g: Nat -> Nat) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, g(f10), f11, f12, f13}
+
 def Timer.runs(r: Timer) -> List<&2, Nat>:
   match r:
     case Timer{_, _, _, _, _, _, _, _, _, _, _, f11, _, _}:
@@ -770,6 +1083,11 @@ def Timer.with_runs(r: Timer, v: List<&2, Nat>) -> Timer:
   match r:
     case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, _, f12, f13}:
       Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, v, f12, f13}
+
+def Timer.over_runs(r: Timer, g: List<&2, Nat> -> List<&2, Nat>) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, g(f11), f12, f13}
 
 def Timer.name(r: Timer) -> String:
   match r:
@@ -781,6 +1099,11 @@ def Timer.with_name(r: Timer, v: String) -> Timer:
     case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, _, f13}:
       Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, v, f13}
 
+def Timer.over_name(r: Timer, g: String -> String) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, g(f12), f13}
+
 def Timer.held(r: Timer) -> Bool:
   match r:
     case Timer{_, _, _, _, _, _, _, _, _, _, _, _, _, f13}:
@@ -790,6 +1113,14 @@ def Timer.with_held(r: Timer, v: Bool) -> Timer:
   match r:
     case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, _}:
       Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, v}
+
+def Timer.over_held(r: Timer, g: Bool -> Bool) -> Timer:
+  match r:
+    case Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13}:
+      Timer{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, g(f13)}
+
+def Timer.open(+r: Timer) -> Timer:
+  Timer.with_held(Timer.with_name(Timer.with_runs(Timer.with_last(Timer.with_page(Timer.with_fired(Timer.with_times(Timer.with_until(Timer.with_next(Timer.with_sched(Timer.with_text(Timer.with_by(Timer.with_agent(Timer.with_id(Timer.empty(), Timer.id(r)), Timer.agent(r)), Timer.by(r)), Timer.text(r)), Timer.sched(r)), Timer.next(r)), Timer.until(r)), Timer.times(r)), Timer.fired(r)), Timer.page(r)), Timer.last(r)), Timer.runs(r)), Timer.name(r)), Timer.held(r))
 
 # ---- TimerEnd ----
 
@@ -806,6 +1137,11 @@ def TimerEnd.with_t(r: TimerEnd, v: Timer) -> TimerEnd:
     case TimerEnd{_, f1, f2}:
       TimerEnd{v, f1, f2}
 
+def TimerEnd.over_t(r: TimerEnd, g: Timer -> Timer) -> TimerEnd:
+  match r:
+    case TimerEnd{f0, f1, f2}:
+      TimerEnd{g(f0), f1, f2}
+
 def TimerEnd.at(r: TimerEnd) -> Nat:
   match r:
     case TimerEnd{_, f1, _}:
@@ -816,6 +1152,11 @@ def TimerEnd.with_at(r: TimerEnd, v: Nat) -> TimerEnd:
     case TimerEnd{f0, _, f2}:
       TimerEnd{f0, v, f2}
 
+def TimerEnd.over_at(r: TimerEnd, g: Nat -> Nat) -> TimerEnd:
+  match r:
+    case TimerEnd{f0, f1, f2}:
+      TimerEnd{f0, g(f1), f2}
+
 def TimerEnd.why(r: TimerEnd) -> String:
   match r:
     case TimerEnd{_, _, f2}:
@@ -825,6 +1166,14 @@ def TimerEnd.with_why(r: TimerEnd, v: String) -> TimerEnd:
   match r:
     case TimerEnd{f0, f1, _}:
       TimerEnd{f0, f1, v}
+
+def TimerEnd.over_why(r: TimerEnd, g: String -> String) -> TimerEnd:
+  match r:
+    case TimerEnd{f0, f1, f2}:
+      TimerEnd{f0, f1, g(f2)}
+
+def TimerEnd.open(+r: TimerEnd) -> TimerEnd:
+  TimerEnd.with_why(TimerEnd.with_at(TimerEnd.with_t(TimerEnd.empty(), TimerEnd.t(r)), TimerEnd.at(r)), TimerEnd.why(r))
 
 # ---- Act ----
 
@@ -841,6 +1190,11 @@ def Act.with_id(r: Act, v: Nat) -> Act:
     case Act{_, f1, f2}:
       Act{v, f1, f2}
 
+def Act.over_id(r: Act, g: Nat -> Nat) -> Act:
+  match r:
+    case Act{f0, f1, f2}:
+      Act{g(f0), f1, f2}
+
 def Act.due(r: Act) -> Nat:
   match r:
     case Act{_, f1, _}:
@@ -851,6 +1205,11 @@ def Act.with_due(r: Act, v: Nat) -> Act:
     case Act{f0, _, f2}:
       Act{f0, v, f2}
 
+def Act.over_due(r: Act, g: Nat -> Nat) -> Act:
+  match r:
+    case Act{f0, f1, f2}:
+      Act{f0, g(f1), f2}
+
 def Act.what(r: Act) -> What:
   match r:
     case Act{_, _, f2}:
@@ -860,6 +1219,14 @@ def Act.with_what(r: Act, v: What) -> Act:
   match r:
     case Act{f0, f1, _}:
       Act{f0, f1, v}
+
+def Act.over_what(r: Act, g: What -> What) -> Act:
+  match r:
+    case Act{f0, f1, f2}:
+      Act{f0, f1, g(f2)}
+
+def Act.open(+r: Act) -> Act:
+  Act.with_what(Act.with_due(Act.with_id(Act.empty(), Act.id(r)), Act.due(r)), Act.what(r))
 
 # ---- Watch ----
 
@@ -876,6 +1243,11 @@ def Watch.with_id(r: Watch, v: Nat) -> Watch:
     case Watch{_, f1, f2, f3, f4, f5, f6, f7}:
       Watch{v, f1, f2, f3, f4, f5, f6, f7}
 
+def Watch.over_id(r: Watch, g: Nat -> Nat) -> Watch:
+  match r:
+    case Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Watch{g(f0), f1, f2, f3, f4, f5, f6, f7}
+
 def Watch.agent(r: Watch) -> String:
   match r:
     case Watch{_, f1, _, _, _, _, _, _}:
@@ -885,6 +1257,11 @@ def Watch.with_agent(r: Watch, v: String) -> Watch:
   match r:
     case Watch{f0, _, f2, f3, f4, f5, f6, f7}:
       Watch{f0, v, f2, f3, f4, f5, f6, f7}
+
+def Watch.over_agent(r: Watch, g: String -> String) -> Watch:
+  match r:
+    case Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Watch{f0, g(f1), f2, f3, f4, f5, f6, f7}
 
 def Watch.spec(r: Watch) -> J.Json:
   match r:
@@ -896,6 +1273,11 @@ def Watch.with_spec(r: Watch, v: J.Json) -> Watch:
     case Watch{f0, f1, _, f3, f4, f5, f6, f7}:
       Watch{f0, f1, v, f3, f4, f5, f6, f7}
 
+def Watch.over_spec(r: Watch, g: J.Json -> J.Json) -> Watch:
+  match r:
+    case Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Watch{f0, f1, g(f2), f3, f4, f5, f6, f7}
+
 def Watch.max_text(r: Watch) -> String:
   match r:
     case Watch{_, _, _, f3, _, _, _, _}:
@@ -905,6 +1287,11 @@ def Watch.with_max_text(r: Watch, v: String) -> Watch:
   match r:
     case Watch{f0, f1, f2, _, f4, f5, f6, f7}:
       Watch{f0, f1, f2, v, f4, f5, f6, f7}
+
+def Watch.over_max_text(r: Watch, g: String -> String) -> Watch:
+  match r:
+    case Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Watch{f0, f1, f2, g(f3), f4, f5, f6, f7}
 
 def Watch.set_at(r: Watch) -> Nat:
   match r:
@@ -916,6 +1303,11 @@ def Watch.with_set_at(r: Watch, v: Nat) -> Watch:
     case Watch{f0, f1, f2, f3, _, f5, f6, f7}:
       Watch{f0, f1, f2, f3, v, f5, f6, f7}
 
+def Watch.over_set_at(r: Watch, g: Nat -> Nat) -> Watch:
+  match r:
+    case Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Watch{f0, f1, f2, f3, g(f4), f5, f6, f7}
+
 def Watch.max_at(r: Watch) -> Nat:
   match r:
     case Watch{_, _, _, _, _, f5, _, _}:
@@ -925,6 +1317,11 @@ def Watch.with_max_at(r: Watch, v: Nat) -> Watch:
   match r:
     case Watch{f0, f1, f2, f3, f4, _, f6, f7}:
       Watch{f0, f1, f2, f3, f4, v, f6, f7}
+
+def Watch.over_max_at(r: Watch, g: Nat -> Nat) -> Watch:
+  match r:
+    case Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Watch{f0, f1, f2, f3, f4, g(f5), f6, f7}
 
 def Watch.quiet(r: Watch) -> Bool:
   match r:
@@ -936,6 +1333,11 @@ def Watch.with_quiet(r: Watch, v: Bool) -> Watch:
     case Watch{f0, f1, f2, f3, f4, f5, _, f7}:
       Watch{f0, f1, f2, f3, f4, f5, v, f7}
 
+def Watch.over_quiet(r: Watch, g: Bool -> Bool) -> Watch:
+  match r:
+    case Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Watch{f0, f1, f2, f3, f4, f5, g(f6), f7}
+
 def Watch.resumes(r: Watch) -> Bool:
   match r:
     case Watch{_, _, _, _, _, _, _, f7}:
@@ -945,6 +1347,14 @@ def Watch.with_resumes(r: Watch, v: Bool) -> Watch:
   match r:
     case Watch{f0, f1, f2, f3, f4, f5, f6, _}:
       Watch{f0, f1, f2, f3, f4, f5, f6, v}
+
+def Watch.over_resumes(r: Watch, g: Bool -> Bool) -> Watch:
+  match r:
+    case Watch{f0, f1, f2, f3, f4, f5, f6, f7}:
+      Watch{f0, f1, f2, f3, f4, f5, f6, g(f7)}
+
+def Watch.open(+r: Watch) -> Watch:
+  Watch.with_resumes(Watch.with_quiet(Watch.with_max_at(Watch.with_set_at(Watch.with_max_text(Watch.with_spec(Watch.with_agent(Watch.with_id(Watch.empty(), Watch.id(r)), Watch.agent(r)), Watch.spec(r)), Watch.max_text(r)), Watch.set_at(r)), Watch.max_at(r)), Watch.quiet(r)), Watch.resumes(r))
 
 # ---- WatchEnd ----
 
@@ -961,6 +1371,11 @@ def WatchEnd.with_w(r: WatchEnd, v: Watch) -> WatchEnd:
     case WatchEnd{_, f1, f2}:
       WatchEnd{v, f1, f2}
 
+def WatchEnd.over_w(r: WatchEnd, g: Watch -> Watch) -> WatchEnd:
+  match r:
+    case WatchEnd{f0, f1, f2}:
+      WatchEnd{g(f0), f1, f2}
+
 def WatchEnd.at(r: WatchEnd) -> Nat:
   match r:
     case WatchEnd{_, f1, _}:
@@ -971,6 +1386,11 @@ def WatchEnd.with_at(r: WatchEnd, v: Nat) -> WatchEnd:
     case WatchEnd{f0, _, f2}:
       WatchEnd{f0, v, f2}
 
+def WatchEnd.over_at(r: WatchEnd, g: Nat -> Nat) -> WatchEnd:
+  match r:
+    case WatchEnd{f0, f1, f2}:
+      WatchEnd{f0, g(f1), f2}
+
 def WatchEnd.why(r: WatchEnd) -> String:
   match r:
     case WatchEnd{_, _, f2}:
@@ -980,6 +1400,14 @@ def WatchEnd.with_why(r: WatchEnd, v: String) -> WatchEnd:
   match r:
     case WatchEnd{f0, f1, _}:
       WatchEnd{f0, f1, v}
+
+def WatchEnd.over_why(r: WatchEnd, g: String -> String) -> WatchEnd:
+  match r:
+    case WatchEnd{f0, f1, f2}:
+      WatchEnd{f0, f1, g(f2)}
+
+def WatchEnd.open(+r: WatchEnd) -> WatchEnd:
+  WatchEnd.with_why(WatchEnd.with_at(WatchEnd.with_w(WatchEnd.empty(), WatchEnd.w(r)), WatchEnd.at(r)), WatchEnd.why(r))
 
 # ---- Wakes ----
 
@@ -996,6 +1424,11 @@ def Wakes.with_live(r: Wakes, v: List<&2, Watch>) -> Wakes:
     case Wakes{_, f1, f2}:
       Wakes{v, f1, f2}
 
+def Wakes.over_live(r: Wakes, g: List<&2, Watch> -> List<&2, Watch>) -> Wakes:
+  match r:
+    case Wakes{f0, f1, f2}:
+      Wakes{g(f0), f1, f2}
+
 def Wakes.ended(r: Wakes) -> List<&2, WatchEnd>:
   match r:
     case Wakes{_, f1, _}:
@@ -1006,6 +1439,11 @@ def Wakes.with_ended(r: Wakes, v: List<&2, WatchEnd>) -> Wakes:
     case Wakes{f0, _, f2}:
       Wakes{f0, v, f2}
 
+def Wakes.over_ended(r: Wakes, g: List<&2, WatchEnd> -> List<&2, WatchEnd>) -> Wakes:
+  match r:
+    case Wakes{f0, f1, f2}:
+      Wakes{f0, g(f1), f2}
+
 def Wakes.last_id(r: Wakes) -> Nat:
   match r:
     case Wakes{_, _, f2}:
@@ -1015,6 +1453,14 @@ def Wakes.with_last_id(r: Wakes, v: Nat) -> Wakes:
   match r:
     case Wakes{f0, f1, _}:
       Wakes{f0, f1, v}
+
+def Wakes.over_last_id(r: Wakes, g: Nat -> Nat) -> Wakes:
+  match r:
+    case Wakes{f0, f1, f2}:
+      Wakes{f0, f1, g(f2)}
+
+def Wakes.open(+r: Wakes) -> Wakes:
+  Wakes.with_last_id(Wakes.with_ended(Wakes.with_live(Wakes.empty(), Wakes.live(r)), Wakes.ended(r)), Wakes.last_id(r))
 
 # ---- Tms ----
 
@@ -1031,6 +1477,11 @@ def Tms.with_live(r: Tms, v: List<&2, Timer>) -> Tms:
     case Tms{_, f1, f2, f3, f4, f5}:
       Tms{v, f1, f2, f3, f4, f5}
 
+def Tms.over_live(r: Tms, g: List<&2, Timer> -> List<&2, Timer>) -> Tms:
+  match r:
+    case Tms{f0, f1, f2, f3, f4, f5}:
+      Tms{g(f0), f1, f2, f3, f4, f5}
+
 def Tms.ended(r: Tms) -> List<&2, TimerEnd>:
   match r:
     case Tms{_, f1, _, _, _, _}:
@@ -1040,6 +1491,11 @@ def Tms.with_ended(r: Tms, v: List<&2, TimerEnd>) -> Tms:
   match r:
     case Tms{f0, _, f2, f3, f4, f5}:
       Tms{f0, v, f2, f3, f4, f5}
+
+def Tms.over_ended(r: Tms, g: List<&2, TimerEnd> -> List<&2, TimerEnd>) -> Tms:
+  match r:
+    case Tms{f0, f1, f2, f3, f4, f5}:
+      Tms{f0, g(f1), f2, f3, f4, f5}
 
 def Tms.last_id(r: Tms) -> Nat:
   match r:
@@ -1051,6 +1507,11 @@ def Tms.with_last_id(r: Tms, v: Nat) -> Tms:
     case Tms{f0, f1, _, f3, f4, f5}:
       Tms{f0, f1, v, f3, f4, f5}
 
+def Tms.over_last_id(r: Tms, g: Nat -> Nat) -> Tms:
+  match r:
+    case Tms{f0, f1, f2, f3, f4, f5}:
+      Tms{f0, f1, g(f2), f3, f4, f5}
+
 def Tms.acts(r: Tms) -> List<&2, Act>:
   match r:
     case Tms{_, _, _, f3, _, _}:
@@ -1060,6 +1521,11 @@ def Tms.with_acts(r: Tms, v: List<&2, Act>) -> Tms:
   match r:
     case Tms{f0, f1, f2, _, f4, f5}:
       Tms{f0, f1, f2, v, f4, f5}
+
+def Tms.over_acts(r: Tms, g: List<&2, Act> -> List<&2, Act>) -> Tms:
+  match r:
+    case Tms{f0, f1, f2, f3, f4, f5}:
+      Tms{f0, f1, f2, g(f3), f4, f5}
 
 def Tms.next_act(r: Tms) -> Nat:
   match r:
@@ -1071,6 +1537,11 @@ def Tms.with_next_act(r: Tms, v: Nat) -> Tms:
     case Tms{f0, f1, f2, f3, _, f5}:
       Tms{f0, f1, f2, f3, v, f5}
 
+def Tms.over_next_act(r: Tms, g: Nat -> Nat) -> Tms:
+  match r:
+    case Tms{f0, f1, f2, f3, f4, f5}:
+      Tms{f0, f1, f2, f3, g(f4), f5}
+
 def Tms.wk(r: Tms) -> Wakes:
   match r:
     case Tms{_, _, _, _, _, f5}:
@@ -1080,6 +1551,14 @@ def Tms.with_wk(r: Tms, v: Wakes) -> Tms:
   match r:
     case Tms{f0, f1, f2, f3, f4, _}:
       Tms{f0, f1, f2, f3, f4, v}
+
+def Tms.over_wk(r: Tms, g: Wakes -> Wakes) -> Tms:
+  match r:
+    case Tms{f0, f1, f2, f3, f4, f5}:
+      Tms{f0, f1, f2, f3, f4, g(f5)}
+
+def Tms.open(+r: Tms) -> Tms:
+  Tms.with_wk(Tms.with_next_act(Tms.with_acts(Tms.with_last_id(Tms.with_ended(Tms.with_live(Tms.empty(), Tms.live(r)), Tms.ended(r)), Tms.last_id(r)), Tms.acts(r)), Tms.next_act(r)), Tms.wk(r))
 
 # ---- Out ----
 
@@ -1096,6 +1575,11 @@ def Out.with_xid(r: Out, v: Nat) -> Out:
     case Out{_, f1, f2, f3, f4, f5, f6, f7, f8}:
       Out{v, f1, f2, f3, f4, f5, f6, f7, f8}
 
+def Out.over_xid(r: Out, g: Nat -> Nat) -> Out:
+  match r:
+    case Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      Out{g(f0), f1, f2, f3, f4, f5, f6, f7, f8}
+
 def Out.project(r: Out) -> String:
   match r:
     case Out{_, f1, _, _, _, _, _, _, _}:
@@ -1105,6 +1589,11 @@ def Out.with_project(r: Out, v: String) -> Out:
   match r:
     case Out{f0, _, f2, f3, f4, f5, f6, f7, f8}:
       Out{f0, v, f2, f3, f4, f5, f6, f7, f8}
+
+def Out.over_project(r: Out, g: String -> String) -> Out:
+  match r:
+    case Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      Out{f0, g(f1), f2, f3, f4, f5, f6, f7, f8}
 
 def Out.kind(r: Out) -> XKind:
   match r:
@@ -1116,6 +1605,11 @@ def Out.with_kind(r: Out, v: XKind) -> Out:
     case Out{f0, f1, _, f3, f4, f5, f6, f7, f8}:
       Out{f0, f1, v, f3, f4, f5, f6, f7, f8}
 
+def Out.over_kind(r: Out, g: XKind -> XKind) -> Out:
+  match r:
+    case Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      Out{f0, f1, g(f2), f3, f4, f5, f6, f7, f8}
+
 def Out.msg(r: Out) -> Nat:
   match r:
     case Out{_, _, _, f3, _, _, _, _, _}:
@@ -1125,6 +1619,11 @@ def Out.with_msg(r: Out, v: Nat) -> Out:
   match r:
     case Out{f0, f1, f2, _, f4, f5, f6, f7, f8}:
       Out{f0, f1, f2, v, f4, f5, f6, f7, f8}
+
+def Out.over_msg(r: Out, g: Nat -> Nat) -> Out:
+  match r:
+    case Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      Out{f0, f1, f2, g(f3), f4, f5, f6, f7, f8}
 
 def Out.text(r: Out) -> String:
   match r:
@@ -1136,6 +1635,11 @@ def Out.with_text(r: Out, v: String) -> Out:
     case Out{f0, f1, f2, f3, _, f5, f6, f7, f8}:
       Out{f0, f1, f2, f3, v, f5, f6, f7, f8}
 
+def Out.over_text(r: Out, g: String -> String) -> Out:
+  match r:
+    case Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      Out{f0, f1, f2, f3, g(f4), f5, f6, f7, f8}
+
 def Out.st(r: Out) -> OutSt:
   match r:
     case Out{_, _, _, _, _, f5, _, _, _}:
@@ -1145,6 +1649,11 @@ def Out.with_st(r: Out, v: OutSt) -> Out:
   match r:
     case Out{f0, f1, f2, f3, f4, _, f6, f7, f8}:
       Out{f0, f1, f2, f3, f4, v, f6, f7, f8}
+
+def Out.over_st(r: Out, g: OutSt -> OutSt) -> Out:
+  match r:
+    case Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      Out{f0, f1, f2, f3, f4, g(f5), f6, f7, f8}
 
 def Out.tries(r: Out) -> Nat:
   match r:
@@ -1156,6 +1665,11 @@ def Out.with_tries(r: Out, v: Nat) -> Out:
     case Out{f0, f1, f2, f3, f4, f5, _, f7, f8}:
       Out{f0, f1, f2, f3, f4, f5, v, f7, f8}
 
+def Out.over_tries(r: Out, g: Nat -> Nat) -> Out:
+  match r:
+    case Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      Out{f0, f1, f2, f3, f4, f5, g(f6), f7, f8}
+
 def Out.context(r: Out) -> String:
   match r:
     case Out{_, _, _, _, _, _, _, f7, _}:
@@ -1166,6 +1680,11 @@ def Out.with_context(r: Out, v: String) -> Out:
     case Out{f0, f1, f2, f3, f4, f5, f6, _, f8}:
       Out{f0, f1, f2, f3, f4, f5, f6, v, f8}
 
+def Out.over_context(r: Out, g: String -> String) -> Out:
+  match r:
+    case Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      Out{f0, f1, f2, f3, f4, f5, f6, g(f7), f8}
+
 def Out.parts(r: Out) -> String:
   match r:
     case Out{_, _, _, _, _, _, _, _, f8}:
@@ -1175,6 +1694,14 @@ def Out.with_parts(r: Out, v: String) -> Out:
   match r:
     case Out{f0, f1, f2, f3, f4, f5, f6, f7, _}:
       Out{f0, f1, f2, f3, f4, f5, f6, f7, v}
+
+def Out.over_parts(r: Out, g: String -> String) -> Out:
+  match r:
+    case Out{f0, f1, f2, f3, f4, f5, f6, f7, f8}:
+      Out{f0, f1, f2, f3, f4, f5, f6, f7, g(f8)}
+
+def Out.open(+r: Out) -> Out:
+  Out.with_parts(Out.with_context(Out.with_tries(Out.with_st(Out.with_text(Out.with_msg(Out.with_kind(Out.with_project(Out.with_xid(Out.empty(), Out.xid(r)), Out.project(r)), Out.kind(r)), Out.msg(r)), Out.text(r)), Out.st(r)), Out.tries(r)), Out.context(r)), Out.parts(r))
 
 # ---- XIn ----
 
@@ -1191,6 +1718,11 @@ def XIn.with_hub(r: XIn, v: String) -> XIn:
     case XIn{_, f1, f2, f3, f4}:
       XIn{v, f1, f2, f3, f4}
 
+def XIn.over_hub(r: XIn, g: String -> String) -> XIn:
+  match r:
+    case XIn{f0, f1, f2, f3, f4}:
+      XIn{g(f0), f1, f2, f3, f4}
+
 def XIn.xid(r: XIn) -> Nat:
   match r:
     case XIn{_, f1, _, _, _}:
@@ -1200,6 +1732,11 @@ def XIn.with_xid(r: XIn, v: Nat) -> XIn:
   match r:
     case XIn{f0, _, f2, f3, f4}:
       XIn{f0, v, f2, f3, f4}
+
+def XIn.over_xid(r: XIn, g: Nat -> Nat) -> XIn:
+  match r:
+    case XIn{f0, f1, f2, f3, f4}:
+      XIn{f0, g(f1), f2, f3, f4}
 
 def XIn.msg(r: XIn) -> Nat:
   match r:
@@ -1211,6 +1748,11 @@ def XIn.with_msg(r: XIn, v: Nat) -> XIn:
     case XIn{f0, f1, _, f3, f4}:
       XIn{f0, f1, v, f3, f4}
 
+def XIn.over_msg(r: XIn, g: Nat -> Nat) -> XIn:
+  match r:
+    case XIn{f0, f1, f2, f3, f4}:
+      XIn{f0, f1, g(f2), f3, f4}
+
 def XIn.kind(r: XIn) -> XKind:
   match r:
     case XIn{_, _, _, f3, _}:
@@ -1221,6 +1763,11 @@ def XIn.with_kind(r: XIn, v: XKind) -> XIn:
     case XIn{f0, f1, f2, _, f4}:
       XIn{f0, f1, f2, v, f4}
 
+def XIn.over_kind(r: XIn, g: XKind -> XKind) -> XIn:
+  match r:
+    case XIn{f0, f1, f2, f3, f4}:
+      XIn{f0, f1, f2, g(f3), f4}
+
 def XIn.replied(r: XIn) -> Bool:
   match r:
     case XIn{_, _, _, _, f4}:
@@ -1230,6 +1777,14 @@ def XIn.with_replied(r: XIn, v: Bool) -> XIn:
   match r:
     case XIn{f0, f1, f2, f3, _}:
       XIn{f0, f1, f2, f3, v}
+
+def XIn.over_replied(r: XIn, g: Bool -> Bool) -> XIn:
+  match r:
+    case XIn{f0, f1, f2, f3, f4}:
+      XIn{f0, f1, f2, f3, g(f4)}
+
+def XIn.open(+r: XIn) -> XIn:
+  XIn.with_replied(XIn.with_kind(XIn.with_msg(XIn.with_xid(XIn.with_hub(XIn.empty(), XIn.hub(r)), XIn.xid(r)), XIn.msg(r)), XIn.kind(r)), XIn.replied(r))
 
 # ---- Route ----
 
@@ -1246,6 +1801,11 @@ def Route.with_rid(r: Route, v: Nat) -> Route:
     case Route{_, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       Route{v, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}
 
+def Route.over_rid(r: Route, g: Nat -> Nat) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{g(f0), f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}
+
 def Route.text(r: Route) -> String:
   match r:
     case Route{_, f1, _, _, _, _, _, _, _, _, _}:
@@ -1255,6 +1815,11 @@ def Route.with_text(r: Route, v: String) -> Route:
   match r:
     case Route{f0, _, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
       Route{f0, v, f2, f3, f4, f5, f6, f7, f8, f9, f10}
+
+def Route.over_text(r: Route, g: String -> String) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, g(f1), f2, f3, f4, f5, f6, f7, f8, f9, f10}
 
 def Route.via(r: Route) -> String:
   match r:
@@ -1266,6 +1831,11 @@ def Route.with_via(r: Route, v: String) -> Route:
     case Route{f0, f1, _, f3, f4, f5, f6, f7, f8, f9, f10}:
       Route{f0, f1, v, f3, f4, f5, f6, f7, f8, f9, f10}
 
+def Route.over_via(r: Route, g: String -> String) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, f1, g(f2), f3, f4, f5, f6, f7, f8, f9, f10}
+
 def Route.to(r: Route) -> String:
   match r:
     case Route{_, _, _, f3, _, _, _, _, _, _, _}:
@@ -1275,6 +1845,11 @@ def Route.with_to(r: Route, v: String) -> Route:
   match r:
     case Route{f0, f1, f2, _, f4, f5, f6, f7, f8, f9, f10}:
       Route{f0, f1, f2, v, f4, f5, f6, f7, f8, f9, f10}
+
+def Route.over_to(r: Route, g: String -> String) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, f1, f2, g(f3), f4, f5, f6, f7, f8, f9, f10}
 
 def Route.name(r: Route) -> String:
   match r:
@@ -1286,6 +1861,11 @@ def Route.with_name(r: Route, v: String) -> Route:
     case Route{f0, f1, f2, f3, _, f5, f6, f7, f8, f9, f10}:
       Route{f0, f1, f2, f3, v, f5, f6, f7, f8, f9, f10}
 
+def Route.over_name(r: Route, g: String -> String) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, f1, f2, f3, g(f4), f5, f6, f7, f8, f9, f10}
+
 def Route.due(r: Route) -> Nat:
   match r:
     case Route{_, _, _, _, _, f5, _, _, _, _, _}:
@@ -1295,6 +1875,11 @@ def Route.with_due(r: Route, v: Nat) -> Route:
   match r:
     case Route{f0, f1, f2, f3, f4, _, f6, f7, f8, f9, f10}:
       Route{f0, f1, f2, f3, f4, v, f6, f7, f8, f9, f10}
+
+def Route.over_due(r: Route, g: Nat -> Nat) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, f1, f2, f3, f4, g(f5), f6, f7, f8, f9, f10}
 
 def Route.act(r: Route) -> Nat:
   match r:
@@ -1306,6 +1891,11 @@ def Route.with_act(r: Route, v: Nat) -> Route:
     case Route{f0, f1, f2, f3, f4, f5, _, f7, f8, f9, f10}:
       Route{f0, f1, f2, f3, f4, f5, v, f7, f8, f9, f10}
 
+def Route.over_act(r: Route, g: Nat -> Nat) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, f1, f2, f3, f4, f5, g(f6), f7, f8, f9, f10}
+
 def Route.why(r: Route) -> String:
   match r:
     case Route{_, _, _, _, _, _, _, f7, _, _, _}:
@@ -1315,6 +1905,11 @@ def Route.with_why(r: Route, v: String) -> Route:
   match r:
     case Route{f0, f1, f2, f3, f4, f5, f6, _, f8, f9, f10}:
       Route{f0, f1, f2, f3, f4, f5, f6, v, f8, f9, f10}
+
+def Route.over_why(r: Route, g: String -> String) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, f1, f2, f3, f4, f5, f6, g(f7), f8, f9, f10}
 
 def Route.st(r: Route) -> RSt:
   match r:
@@ -1326,6 +1921,11 @@ def Route.with_st(r: Route, v: RSt) -> Route:
     case Route{f0, f1, f2, f3, f4, f5, f6, f7, _, f9, f10}:
       Route{f0, f1, f2, f3, f4, f5, f6, f7, v, f9, f10}
 
+def Route.over_st(r: Route, g: RSt -> RSt) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, f1, f2, f3, f4, f5, f6, f7, g(f8), f9, f10}
+
 def Route.context(r: Route) -> String:
   match r:
     case Route{_, _, _, _, _, _, _, _, _, f9, _}:
@@ -1336,6 +1936,11 @@ def Route.with_context(r: Route, v: String) -> Route:
     case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, _, f10}:
       Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, v, f10}
 
+def Route.over_context(r: Route, g: String -> String) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, g(f9), f10}
+
 def Route.parts(r: Route) -> String:
   match r:
     case Route{_, _, _, _, _, _, _, _, _, _, f10}:
@@ -1345,6 +1950,14 @@ def Route.with_parts(r: Route, v: String) -> Route:
   match r:
     case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, _}:
       Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, v}
+
+def Route.over_parts(r: Route, g: String -> String) -> Route:
+  match r:
+    case Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10}:
+      Route{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, g(f10)}
+
+def Route.open(+r: Route) -> Route:
+  Route.with_parts(Route.with_context(Route.with_st(Route.with_why(Route.with_act(Route.with_due(Route.with_name(Route.with_to(Route.with_via(Route.with_text(Route.with_rid(Route.empty(), Route.rid(r)), Route.text(r)), Route.via(r)), Route.to(r)), Route.name(r)), Route.due(r)), Route.act(r)), Route.why(r)), Route.st(r)), Route.context(r)), Route.parts(r))
 
 # ---- Xs ----
 
@@ -1361,6 +1974,11 @@ def Xs.with_outbox(r: Xs, v: List<&2, Out>) -> Xs:
     case Xs{_, f1, f2, f3, f4}:
       Xs{v, f1, f2, f3, f4}
 
+def Xs.over_outbox(r: Xs, g: List<&2, Out> -> List<&2, Out>) -> Xs:
+  match r:
+    case Xs{f0, f1, f2, f3, f4}:
+      Xs{g(f0), f1, f2, f3, f4}
+
 def Xs.next_xid(r: Xs) -> Nat:
   match r:
     case Xs{_, f1, _, _, _}:
@@ -1370,6 +1988,11 @@ def Xs.with_next_xid(r: Xs, v: Nat) -> Xs:
   match r:
     case Xs{f0, _, f2, f3, f4}:
       Xs{f0, v, f2, f3, f4}
+
+def Xs.over_next_xid(r: Xs, g: Nat -> Nat) -> Xs:
+  match r:
+    case Xs{f0, f1, f2, f3, f4}:
+      Xs{f0, g(f1), f2, f3, f4}
 
 def Xs.xin(r: Xs) -> List<&2, XIn>:
   match r:
@@ -1381,6 +2004,11 @@ def Xs.with_xin(r: Xs, v: List<&2, XIn>) -> Xs:
     case Xs{f0, f1, _, f3, f4}:
       Xs{f0, f1, v, f3, f4}
 
+def Xs.over_xin(r: Xs, g: List<&2, XIn> -> List<&2, XIn>) -> Xs:
+  match r:
+    case Xs{f0, f1, f2, f3, f4}:
+      Xs{f0, f1, g(f2), f3, f4}
+
 def Xs.routes(r: Xs) -> List<&2, Route>:
   match r:
     case Xs{_, _, _, f3, _}:
@@ -1391,6 +2019,11 @@ def Xs.with_routes(r: Xs, v: List<&2, Route>) -> Xs:
     case Xs{f0, f1, f2, _, f4}:
       Xs{f0, f1, f2, v, f4}
 
+def Xs.over_routes(r: Xs, g: List<&2, Route> -> List<&2, Route>) -> Xs:
+  match r:
+    case Xs{f0, f1, f2, f3, f4}:
+      Xs{f0, f1, f2, g(f3), f4}
+
 def Xs.next_rid(r: Xs) -> Nat:
   match r:
     case Xs{_, _, _, _, f4}:
@@ -1400,6 +2033,14 @@ def Xs.with_next_rid(r: Xs, v: Nat) -> Xs:
   match r:
     case Xs{f0, f1, f2, f3, _}:
       Xs{f0, f1, f2, f3, v}
+
+def Xs.over_next_rid(r: Xs, g: Nat -> Nat) -> Xs:
+  match r:
+    case Xs{f0, f1, f2, f3, f4}:
+      Xs{f0, f1, f2, f3, g(f4)}
+
+def Xs.open(+r: Xs) -> Xs:
+  Xs.with_next_rid(Xs.with_routes(Xs.with_xin(Xs.with_next_xid(Xs.with_outbox(Xs.empty(), Xs.outbox(r)), Xs.next_xid(r)), Xs.xin(r)), Xs.routes(r)), Xs.next_rid(r))
 
 # ---- St ----
 
@@ -1416,6 +2057,11 @@ def St.with_agents(r: St, v: List<&2, Agent>) -> St:
     case St{_, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       St{v, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}
 
+def St.over_agents(r: St, g: List<&2, Agent> -> List<&2, Agent>) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{g(f0), f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}
+
 def St.order(r: St) -> List<&2, String>:
   match r:
     case St{_, f1, _, _, _, _, _, _, _, _, _, _}:
@@ -1425,6 +2071,11 @@ def St.with_order(r: St, v: List<&2, String>) -> St:
   match r:
     case St{f0, _, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       St{f0, v, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}
+
+def St.over_order(r: St, g: List<&2, String> -> List<&2, String>) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, g(f1), f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}
 
 def St.hot(r: St) -> List<&2, MRec>:
   match r:
@@ -1436,6 +2087,11 @@ def St.with_hot(r: St, v: List<&2, MRec>) -> St:
     case St{f0, f1, _, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
       St{f0, f1, v, f3, f4, f5, f6, f7, f8, f9, f10, f11}
 
+def St.over_hot(r: St, g: List<&2, MRec> -> List<&2, MRec>) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, g(f2), f3, f4, f5, f6, f7, f8, f9, f10, f11}
+
 def St.cards(r: St) -> List<&2, Card>:
   match r:
     case St{_, _, _, f3, _, _, _, _, _, _, _, _}:
@@ -1445,6 +2101,11 @@ def St.with_cards(r: St, v: List<&2, Card>) -> St:
   match r:
     case St{f0, f1, f2, _, f4, f5, f6, f7, f8, f9, f10, f11}:
       St{f0, f1, f2, v, f4, f5, f6, f7, f8, f9, f10, f11}
+
+def St.over_cards(r: St, g: List<&2, Card> -> List<&2, Card>) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, f2, g(f3), f4, f5, f6, f7, f8, f9, f10, f11}
 
 def St.notes(r: St) -> List<&2, String>:
   match r:
@@ -1456,6 +2117,11 @@ def St.with_notes(r: St, v: List<&2, String>) -> St:
     case St{f0, f1, f2, f3, _, f5, f6, f7, f8, f9, f10, f11}:
       St{f0, f1, f2, f3, v, f5, f6, f7, f8, f9, f10, f11}
 
+def St.over_notes(r: St, g: List<&2, String> -> List<&2, String>) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, f2, f3, g(f4), f5, f6, f7, f8, f9, f10, f11}
+
 def St.next_msg(r: St) -> Nat:
   match r:
     case St{_, _, _, _, _, f5, _, _, _, _, _, _}:
@@ -1465,6 +2131,11 @@ def St.with_next_msg(r: St, v: Nat) -> St:
   match r:
     case St{f0, f1, f2, f3, f4, _, f6, f7, f8, f9, f10, f11}:
       St{f0, f1, f2, f3, f4, v, f6, f7, f8, f9, f10, f11}
+
+def St.over_next_msg(r: St, g: Nat -> Nat) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, f2, f3, f4, g(f5), f6, f7, f8, f9, f10, f11}
 
 def St.next_card(r: St) -> Nat:
   match r:
@@ -1476,6 +2147,11 @@ def St.with_next_card(r: St, v: Nat) -> St:
     case St{f0, f1, f2, f3, f4, f5, _, f7, f8, f9, f10, f11}:
       St{f0, f1, f2, f3, f4, f5, v, f7, f8, f9, f10, f11}
 
+def St.over_next_card(r: St, g: Nat -> Nat) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, f2, f3, f4, f5, g(f6), f7, f8, f9, f10, f11}
+
 def St.tm(r: St) -> Tms:
   match r:
     case St{_, _, _, _, _, _, _, f7, _, _, _, _}:
@@ -1485,6 +2161,11 @@ def St.with_tm(r: St, v: Tms) -> St:
   match r:
     case St{f0, f1, f2, f3, f4, f5, f6, _, f8, f9, f10, f11}:
       St{f0, f1, f2, f3, f4, f5, f6, v, f8, f9, f10, f11}
+
+def St.over_tm(r: St, g: Tms -> Tms) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, f2, f3, f4, f5, f6, g(f7), f8, f9, f10, f11}
 
 def St.x(r: St) -> Xs:
   match r:
@@ -1496,6 +2177,11 @@ def St.with_x(r: St, v: Xs) -> St:
     case St{f0, f1, f2, f3, f4, f5, f6, f7, _, f9, f10, f11}:
       St{f0, f1, f2, f3, f4, f5, f6, f7, v, f9, f10, f11}
 
+def St.over_x(r: St, g: Xs -> Xs) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, f2, f3, f4, f5, f6, f7, g(f8), f9, f10, f11}
+
 def St.paused(r: St) -> Maybe<&2, Nat>:
   match r:
     case St{_, _, _, _, _, _, _, _, _, f9, _, _}:
@@ -1505,6 +2191,11 @@ def St.with_paused(r: St, v: Maybe<&2, Nat>) -> St:
   match r:
     case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, _, f10, f11}:
       St{f0, f1, f2, f3, f4, f5, f6, f7, f8, v, f10, f11}
+
+def St.over_paused(r: St, g: Maybe<&2, Nat> -> Maybe<&2, Nat>) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, f2, f3, f4, f5, f6, f7, f8, g(f9), f10, f11}
 
 def St.old(r: St) -> List<&2, MRec>:
   match r:
@@ -1516,6 +2207,11 @@ def St.with_old(r: St, v: List<&2, MRec>) -> St:
     case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, _, f11}:
       St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, v, f11}
 
+def St.over_old(r: St, g: List<&2, MRec> -> List<&2, MRec>) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, g(f10), f11}
+
 def St.gone(r: St) -> List<&2, Item>:
   match r:
     case St{_, _, _, _, _, _, _, _, _, _, _, f11}:
@@ -1525,4 +2221,12 @@ def St.with_gone(r: St, v: List<&2, Item>) -> St:
   match r:
     case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, _}:
       St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, v}
+
+def St.over_gone(r: St, g: List<&2, Item> -> List<&2, Item>) -> St:
+  match r:
+    case St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+      St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, g(f11)}
+
+def St.open(+r: St) -> St:
+  St.with_gone(St.with_old(St.with_paused(St.with_x(St.with_tm(St.with_next_card(St.with_next_msg(St.with_notes(St.with_cards(St.with_hot(St.with_order(St.with_agents(St.empty(), St.agents(r)), St.order(r)), St.hot(r)), St.cards(r)), St.notes(r)), St.next_msg(r)), St.next_card(r)), St.tm(r)), St.x(r)), St.paused(r)), St.old(r)), St.gone(r))
 

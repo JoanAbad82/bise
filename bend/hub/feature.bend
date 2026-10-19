@@ -67,7 +67,7 @@ def retirees.add(m: Maybe<&2, S.Agent>, +name: String, +rest: List<&2, S.Agent>)
     case None{}:
       rest
 
-def retirees.go(ns: List<&2, String>, +st: M.St, +name: String) -> List<&2, S.Agent>:
+def retirees.go(ns: List<&2, String>, +st: S.St, +name: String) -> List<&2, S.Agent>:
   match ns:
     case Nil{}:
       Nil{}
@@ -75,8 +75,8 @@ def retirees.go(ns: List<&2, String>, +st: M.St, +name: String) -> List<&2, S.Ag
       retirees.add(M.get_agent(st, n), name, retirees.go(t, st, name))
 
 # the agents the retire moves, in the hub's order
-def retirees(+st: M.St, +name: String) -> List<&2, S.Agent>:
-  retirees.go(M.St.order(st), st, name)
+def retirees(+st: S.St, +name: String) -> List<&2, S.Agent>:
+  retirees.go(S.St.order(st), st, name)
 
 def cat(+xs: List<&2, String>) -> String:
   String.concat(xs)

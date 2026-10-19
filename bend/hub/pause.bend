@@ -8,7 +8,7 @@
 # fires no timer and starts no turn. Messages, timer wakes and event
 # wakes still queue, in their order: nothing is lost. `/resume` clears it
 # and pumps every agent in the hub's order. Journal: `paused {at}` and
-# `resumed {at}` (codec.bend), replayed like the rest: a restarted hub is
+# `resumed {at}` (gen/journal.bend), replayed like the rest: a restarted hub is
 # still paused. Not held: background commands and `sb wake` watches run
 # (their wake message waits in the queue); the REPLs stay up, idle.
 #
@@ -27,8 +27,8 @@ import ./cx.bend as X
 
 import ./lazy.bend as LZ
 
-def is_paused(+s: M.St) -> Bool:
-  Maybe.is_some(&2, Nat, M.St.paused(s))
+def is_paused(+s: S.St) -> Bool:
+  Maybe.is_some(&2, Nat, S.St.paused(s))
 
 def run_busy(r: S.Run) -> Bool:
   match r:
@@ -53,8 +53,8 @@ def busy.go(ns: List<&2, String>, +rts: List<&2, X.Rt>) -> List<&2, String>:
       +more = busy.go(rest, rts)
       Bool.pick(List<&2, String>, run_busy(X.Rt.run(rt_of(rts, n))), n <> more, more)
 
-def busy(+s: M.St, +rts: List<&2, X.Rt>) -> List<&2, String>:
-  busy.go(M.St.order(s), rts)
+def busy(+s: S.St, +rts: List<&2, X.Rt>) -> List<&2, String>:
+  busy.go(S.St.order(s), rts)
 
 # the messages held: queued for an agent, not delivered yet
 def is_queued(s: S.MSt) -> Bool:
@@ -72,8 +72,8 @@ def held.go(xs: List<&2, S.MRec>) -> Nat:
       +rest = held.go(t)
       Bool.pick(Nat, is_queued(S.MRec.st(r)), (1n + rest : Nat), rest)
 
-def held(+s: M.St) -> Nat:
-  held.go(M.St.hot(s))
+def held(+s: S.St) -> Nat:
+  held.go(S.St.hot(s))
 
 # ---- the words (the hub's notice; the clients draw `paused` typed) ----
 
@@ -93,8 +93,8 @@ def woken.go(xs: List<&2, S.MRec>, +acc: List<&2, String>) -> List<&2, String>:
       +to = S.Msg.to(S.MRec.msg(r))
       woken.go(t, Bool.pick(List<&2, String>, is_queued(S.MRec.st(r)) && Bool.not(str_in(acc, to)), to <> acc, acc))
 
-def woken(+s: M.St) -> Nat:
-  List.length(&2, String, woken.go(M.St.hot(s), Nil{}))
+def woken(+s: S.St) -> Nat:
+  List.length(&2, String, woken.go(S.St.hot(s), Nil{}))
 
 # the held messages that are not bise's own (its go-on notes)
 def his.go(xs: List<&2, S.MRec>) -> Nat:
@@ -105,8 +105,8 @@ def his.go(xs: List<&2, S.MRec>) -> Nat:
       +rest = his.go(t)
       Bool.pick(Nat, is_queued(S.MRec.st(r)) && Bool.not(String.eq(S.Msg.from(S.MRec.msg(r)), M.HUB())), (1n + rest : Nat), rest)
 
-def his(+s: M.St) -> Nat:
-  his.go(M.St.hot(s))
+def his(+s: S.St) -> Nat:
+  his.go(S.St.hot(s))
 
 # ---- the words (designer m_18789; the clients draw `paused` typed) ----
 

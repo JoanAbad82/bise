@@ -35,7 +35,7 @@ def from_bise(xs: List<&2, S.Msg>) -> Bool:
     case Con{+h, +t}:
       LZ.or(String.eq(S.Msg.from(h), M.HUB()), u => from_bise(t))
 
-def agent_of.go(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, S.Agent>:
+def agent_of.go(+s: S.St, m: Maybe<&2, String>) -> Maybe<&2, S.Agent>:
   match m:
     case None{}:
       None{}
@@ -43,7 +43,7 @@ def agent_of.go(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, S.Agent>:
       M.get_agent(s, n)
 
 # the agent named `n` (its name or an old one)
-def agent_of(+s: M.St, +n: String) -> Maybe<&2, S.Agent>:
+def agent_of(+s: S.St, +n: String) -> Maybe<&2, S.Agent>:
   agent_of.go(s, M.resolve(s, n))
 
 def life_active(l: S.Life) -> Bool:
@@ -61,7 +61,7 @@ def agent_active.go(m: Maybe<&2, S.Agent>) -> Bool:
       life_active(S.Agent.life(a))
 
 # known (by its name or an old one) and active
-def agent_active(+s: M.St, +n: String) -> Bool:
+def agent_active(+s: S.St, +n: String) -> Bool:
   agent_active.go(agent_of(s, n))
 
 # a page's own card (plan-ok, architect m_26549, m_26571): its asker is
@@ -74,7 +74,7 @@ def page_asker.pick(first: Bool, +h: String, +rest: String) -> String:
     case False{}:
       rest
 
-def page_asker(+s: M.St, agents: List<&2, String>) -> String:
+def page_asker(+s: S.St, agents: List<&2, String>) -> String:
   match agents:
     case Nil{}:
       M.MAIN()
@@ -129,11 +129,11 @@ def asked_gone.go(m: Maybe<&2, S.Agent>) -> Bool:
     case Some{+a}:
       life_gone(S.Agent.life(a))
 
-def asked_gone(+s: M.St, +n: String) -> Bool:
+def asked_gone(+s: S.St, +n: String) -> Bool:
   asked_gone.go(agent_of(s, n))
 
 # the reply watches whose asked agent is gone (dropped, or no such agent)
-def replies_orphan(+s: M.St, xs: List<&2, S.Watch>) -> List<&2, S.Watch>:
+def replies_orphan(+s: S.St, xs: List<&2, S.Watch>) -> List<&2, S.Watch>:
   match xs:
     case Nil{}:
       Nil{}

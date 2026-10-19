@@ -111,7 +111,7 @@ def placed_of.agent(m: Maybe<&2, S.Agent>, +name: String, +ws: J.Json, +err: Str
       placed_of.live(M.ws_placing(S.Agent.ws(a)) && Bool.not(is_archived(S.Agent.life(a))), a, name, ws, err)
 
 # the decision of `placed` for task `name` (`err` "": `ws` is made)
-def placed_of(+st: M.St, +name: String, +ws: J.Json, +err: String) -> Do:
+def placed_of(+st: S.St, +name: String, +ws: J.Json, +err: String) -> Do:
   placed_of.agent(M.get_agent(st, name), name, ws, err)
 
 # a placing task gets no REPL yet (core.bend's `spawn`)
@@ -196,7 +196,7 @@ def mate.hit(m: Maybe<&2, S.Agent>, +name: String, +place: String, +live: Bool) 
       Bool.not(String.eq(S.Agent.name(b), name)) && M.ws_worktree(S.Agent.ws(b)) && Bool.not(M.ws_dropped(S.Agent.ws(b)))
         && String.eq(Agent.place(b), place) && Bool.pick(Bool, live, Bool.not(gone), gone)
 
-def mates(xs: List<&2, String>, +s: M.St, +name: String, +place: String, +live: Bool) -> List<&2, String>:
+def mates(xs: List<&2, String>, +s: S.St, +name: String, +place: String, +live: Bool) -> List<&2, String>:
   match xs:
     case Nil{}:
       Nil{}
@@ -205,10 +205,10 @@ def mates(xs: List<&2, String>, +s: M.St, +name: String, +place: String, +live: 
       Bool.pick(List<&2, String>, mate.hit(M.get_agent(s, n), name, place, live), n <> rest, rest)
 
 # the other agents of a's worktree (none for the shared folder)
-def mates_of(+s: M.St, +a: S.Agent, +live: Bool) -> List<&2, String>:
-  mates(M.St.order(s), s, S.Agent.name(a), Agent.place(a), live)
+def mates_of(+s: S.St, +a: S.Agent, +live: Bool) -> List<&2, String>:
+  mates(S.St.order(s), s, S.Agent.name(a), Agent.place(a), live)
 
-def first_agent(+s: M.St, ns: List<&2, String>) -> Maybe<&2, S.Agent>:
+def first_agent(+s: S.St, ns: List<&2, String>) -> Maybe<&2, S.Agent>:
   match ns:
     case Nil{}:
       None{}
@@ -234,7 +234,7 @@ def drop.left.ws(m: Maybe<&2, S.Agent>) -> J.Json:
 # wt:<A's dir>), no worktree of its own (makes: False), no REPL (waits).
 # A's `placed` then places B the same way: A's worktree, or A's failure.
 
-def placing_of(xs: List<&2, String>, +s: M.St) -> List<&2, String>:
+def placing_of(xs: List<&2, String>, +s: S.St) -> List<&2, String>:
   match xs:
     case Nil{}:
       Nil{}
@@ -245,14 +245,14 @@ def placing_of(xs: List<&2, String>, +s: M.St) -> List<&2, String>:
 # the joiners of `name`'s place: exactly the live agents whose ws.place
 # is name's place (wt:<its dir>) and whose state is placing; never any
 # other placing agent (one placing its own worktree has no ws.place)
-def joiners.of(m: Maybe<&2, S.Agent>, +s: M.St) -> List<&2, String>:
+def joiners.of(m: Maybe<&2, S.Agent>, +s: S.St) -> List<&2, String>:
   match m:
     case None{}:
       Nil{}
     case Some{+a}:
       placing_of(mates_of(s, a, True{}), s)
 
-def joiners(+s: M.St, +name: String) -> List<&2, String>:
+def joiners(+s: S.St, +name: String) -> List<&2, String>:
   joiners.of(M.get_agent(s, name), s)
 
 # a joiner's `placed`: the ws its place's got (none when it failed) ...

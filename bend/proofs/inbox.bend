@@ -5,6 +5,7 @@
 import Base
 import ../vendor/json.bend as J
 import ../hub/model.bend as HM
+import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/answers.bend as HA
@@ -46,7 +47,7 @@ def hub_nat_in_del(xs: List<&2, Nat>, +n: Nat) -> {HA.nat_in(HA.nat_del(xs, n), 
     case Con{h, t}:
       hub_nat_in_del.step(Nat.is_eq(h, n), h, t, n, {==}, hub_nat_in_del(t, n))
 
-def hub_pos_once.go(-o: HM.St, +c: HX.Core<o>, +a: List<&2, HX.Rt>, +b: List<&2, HX.Waiter>, +s: List<&2, HX.Steer>,
+def hub_pos_once.go(-o: HS.St, +c: HX.Core<o>, +a: List<&2, HX.Rt>, +b: List<&2, HX.Waiter>, +s: List<&2, HX.Steer>,
     +d: List<&2, HX.Cnt>, +e: List<&2, HX.Kv>, +f: List<&2, HX.Kn>, +g: String, +h: Bool, +i: Nat, +j: Bool,
     +k: List<&2, J.Json>, +l: Maybe<&2, J.Json>, +m: Maybe<&2, HPK.Answer>, +du: List<&2, Nat>,
     +card: Nat, +agent: String, +pos: Nat, +agent2: String, +pos2: Nat, q: Bool, +eq: {HA.nat_in(du, card) == q : Bool})

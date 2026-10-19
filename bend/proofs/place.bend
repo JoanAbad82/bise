@@ -37,9 +37,7 @@ def Laws.placed_orphan_drops_only(o, cx, n, ws):
   {==}
 
 def Laws.placed_replays_as_ws(st, n, ws):
-  match st:
-    case HM.St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}:
-      {==}
+  {==}
 
 def Laws.place_join_no_create(o, cx, n, ws, p, e):
   %Equal.sym(Maybe<&2, String>, J.get_str(ws, "place"), Some{p}, e) : {HC.place.ask(o, HPL.no_place(_) && HM.ws_placing(ws), cx, n, ws) == cx : HX.Cx<o>}

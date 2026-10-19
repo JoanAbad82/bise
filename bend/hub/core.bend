@@ -11,7 +11,6 @@ import ./gen/state.bend as S
 
 import ./cx.bend as X
 import ./text.bend as T
-import ./codec.bend as C
 import ./cold.bend as CO
 import ./newtask.bend as NT
 
@@ -71,7 +70,7 @@ type NewTask is Data:
     objective: String, worktree: Bool, with_changes: Bool, parts: String}
 
 type Hub is Data:
-  Hub{d: M.St, r: X.R}
+  Hub{d: S.St, r: X.R}
 
 type CardK is Data:
   KQuestion{}
@@ -215,21 +214,21 @@ def ids_of(xs: List<&2, S.Msg>) -> List<&2, Nat>:
 
 # ---- context shortcuts ----
 
-def st(-o: M.St, +cx: X.Cx<o>) -> M.St:
+def st(-o: S.St, +cx: X.Cx<o>) -> S.St:
   X.d(o, cx)
 
-def rr(-o: M.St, +cx: X.Cx<o>) -> X.R:
+def rr(-o: S.St, +cx: X.Cx<o>) -> X.R:
   X.Cx.r(o, cx)
 
-def set_r(-o: M.St, +cx: X.Cx<o>, +r: X.R) -> X.Cx<o>:
+def set_r(-o: S.St, +cx: X.Cx<o>, +r: X.R) -> X.Cx<o>:
   X.with_r(o, cx, r)
 
-def out(-o: M.St, +cx: X.Cx<o>, +kvs: List<&2, Sigma<&2, &2, String, _ => J.Json>>) -> X.Cx<o>:
+def out(-o: S.St, +cx: X.Cx<o>, +kvs: List<&2, Sigma<&2, &2, String, _ => J.Json>>) -> X.Cx<o>:
   X.out(o, cx, J.obj(kvs))
 
 # one record of an agent's feed (FD: bise_proto::core::Feed's encoders);
 # the hub writes it as the line 'sb <kind> :: <json>'
-def feed(-o: M.St, +cx: X.Cx<o>, +agent: String, +rec: J.Json) -> X.Cx<o>:
+def feed(-o: S.St, +cx: X.Cx<o>, +agent: String, +rec: J.Json) -> X.Cx<o>:
   out(o, cx, F.feed(agent, rec))
 
 def parts_json.of(r: Result<&2, &2, String, J.Json>) -> J.Json:
@@ -246,38 +245,38 @@ def parts_json(+s: String) -> J.Json:
 
 # his message's parts after his you-id (msg-parts); none when he sent
 # none, so those lines are what they always were (law no_parts_no_line)
-def you_parts(-o: M.St, +cx: X.Cx<o>, +agent: String, +parts: String) -> X.Cx<o>:
+def you_parts(-o: S.St, +cx: X.Cx<o>, +agent: String, +parts: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.is_empty(parts), u => cx, u => feed(o, cx, agent, FD.you_parts(parts_json(parts))))
 
 # an agent's message parts (send-parts: `sb send --attach`) in `agent`'s
 # feed, after its msg-in (`sent`: after its sent line), by its id; none
 # when it has none (law agent_no_parts_no_line)
-def msg_parts(-o: M.St, +cx: X.Cx<o>, +agent: String, +m: S.Msg) -> X.Cx<o>:
+def msg_parts(-o: S.St, +cx: X.Cx<o>, +agent: String, +m: S.Msg) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.is_empty(S.Msg.parts(m)), u => cx, u => feed(o, cx, agent, FD.msg_parts(S.Msg.id(m), parts_json(S.Msg.parts(m)))))
 
-def sent_parts(-o: M.St, +cx: X.Cx<o>, +agent: String, +m: S.Msg) -> X.Cx<o>:
+def sent_parts(-o: S.St, +cx: X.Cx<o>, +agent: String, +m: S.Msg) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.is_empty(S.Msg.parts(m)), u => cx, u => feed(o, cx, agent, FD.sent_parts(S.Msg.id(m), parts_json(S.Msg.parts(m)))))
 
 # a route's parts after it, likewise
-def route_parts(-o: M.St, +cx: X.Cx<o>, +parts: String) -> X.Cx<o>:
+def route_parts(-o: S.St, +cx: X.Cx<o>, +parts: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.is_empty(parts), u => cx, u => feed(o, cx, M.MAIN(), FD.route_parts(parts_json(parts))))
 
 # his route in main's feed (his answer to `who`'s card, or his words to
 # `who`), then its parts
-def route_line(-o: M.St, +cx: X.Cx<o>, +who: String, +card: Maybe<&2, Nat>, +said: String, +parts: String) -> X.Cx<o>:
+def route_line(-o: S.St, +cx: X.Cx<o>, +who: String, +card: Maybe<&2, Nat>, +said: String, +parts: String) -> X.Cx<o>:
   route_parts(o, feed(o, cx, M.MAIN(), FD.route(who, card, said, None{}, None{}, None{})), parts)
 
 
-def reply(-o: M.St, +cx: X.Cx<o>, +token: Nat, +body: J.Json) -> X.Cx<o>:
+def reply(-o: S.St, +cx: X.Cx<o>, +token: Nat, +body: J.Json) -> X.Cx<o>:
   out(o, cx, F.reply(token, body))
 
-def reply_err(-o: M.St, +cx: X.Cx<o>, +token: Nat, +e: String) -> X.Cx<o>:
+def reply_err(-o: S.St, +cx: X.Cx<o>, +token: Nat, +e: String) -> X.Cx<o>:
   reply(o, cx, token, err_body(e))
 
-def notice(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
+def notice(-o: S.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   out(o, cx, F.notice(text))
 
-def rt(-o: M.St, +cx: X.Cx<o>, +n: String) -> X.Rt:
+def rt(-o: S.St, +cx: X.Cx<o>, +n: String) -> X.Rt:
   rt_find(X.R.rts(rr(o, cx)), n)
 
 # the runtime state `x` as set_rt stores it over `was`, the agent's
@@ -288,43 +287,43 @@ def rt_next(+was: X.Rt, +x: X.Rt) -> X.Rt:
 
 # set the runtime state of an agent (the Rust mirror follows): every
 # runtime change goes through here, so its ended turns count here
-def set_rt(-o: M.St, +cx: X.Cx<o>, +x0: X.Rt) -> X.Cx<o>:
+def set_rt(-o: S.St, +cx: X.Cx<o>, +x0: X.Rt) -> X.Cx<o>:
   +x = rt_next(rt(o, cx, X.Rt.name(x0)), x0)
   +cx2 = set_r(o, cx, X.R.with_rts(rr(o, cx), rt_put(X.R.rts(rr(o, cx)), x)))
   out(o, cx2, F.rt(X.Rt.name(x), run_str(X.Rt.run(x)), X.Rt.waiting(x), X.Rt.turn(x), X.Rt.turns(x)))
 
-def set_run(-o: M.St, +cx: X.Cx<o>, +n: String, +run: S.Run) -> X.Cx<o>:
+def set_run(-o: S.St, +cx: X.Cx<o>, +n: String, +run: S.Run) -> X.Cx<o>:
   set_rt(o, cx, X.Rt.with_run(rt(o, cx, n), run))
 
-def has_agent(-o: M.St, +cx: X.Cx<o>, +n: String) -> Bool:
+def has_agent(-o: S.St, +cx: X.Cx<o>, +n: String) -> Bool:
   Maybe.is_some(&2, S.Agent, M.get_agent(st(o, cx), n))
 
 # the runtime change applies only to a known agent (like the Rust
 # `if let Some(a) = self.st.agents.get_mut(..)`)
-def if_agent(-o: M.St, known: Bool, +cx: X.Cx<o>, +x: X.Rt) -> X.Cx<o>:
+def if_agent(-o: S.St, known: Bool, +cx: X.Cx<o>, +x: X.Rt) -> X.Cx<o>:
   match known:
     case True{}:
       set_rt(o, cx, x)
     case False{}:
       cx
 
-def upd_rt(-o: M.St, +cx: X.Cx<o>, +x: X.Rt) -> X.Cx<o>:
+def upd_rt(-o: S.St, +cx: X.Cx<o>, +x: X.Rt) -> X.Cx<o>:
   if_agent(o, has_agent(o, cx, X.Rt.name(x)), cx, x)
 
-def dirty(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def dirty(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   X.dirty(o, cx)
 
-def now(-o: M.St, +cx: X.Cx<o>) -> Nat:
+def now(-o: S.St, +cx: X.Cx<o>) -> Nat:
   X.now(o, cx)
 
 # every event keeps the journal's invariants: a caller that is not sending
 # a message proves them with `Unit{}, Unit{}`
-def emit(-o: M.St, +cx: X.Cx<o>, +e: M.Ev, k: X.FreshEv(X.d(o, cx), e), kq: X.QuietEv(e), kv: X.DelivEv(X.d(o, cx), e)) -> X.Cx<o>:
+def emit(-o: S.St, +cx: X.Cx<o>, +e: M.Ev, k: X.FreshEv(X.d(o, cx), e), kq: X.QuietEv(e), kv: X.DelivEv(X.d(o, cx), e)) -> X.Cx<o>:
   X.emit(o, cx, e, k, kq, kv)
 
 # ---- env queries (replayed answers, see hub/main.bend) ----
 
-def ask.go(-o: M.St, ans: List<&2, J.Json>, +cx: X.Cx<o>, +q: J.Json) -> X.Cx<o> & Maybe<&2, J.Json>:
+def ask.go(-o: S.St, ans: List<&2, J.Json>, +cx: X.Cx<o>, +q: J.Json) -> X.Cx<o> & Maybe<&2, J.Json>:
   match ans:
     case Con{+a, +rest}:
       (set_r(o, cx, X.R.with_ans(rr(o, cx), rest)), Some{a})
@@ -333,12 +332,12 @@ def ask.go(-o: M.St, ans: List<&2, J.Json>, +cx: X.Cx<o>, +q: J.Json) -> X.Cx<o>
 
 # the answer to an env query, or None: the step halts and the daemon
 # replays the input with the answer
-def ask(-o: M.St, +cx: X.Cx<o>, +q: J.Json) -> X.Cx<o> & Maybe<&2, J.Json>:
+def ask(-o: S.St, +cx: X.Cx<o>, +q: J.Json) -> X.Cx<o> & Maybe<&2, J.Json>:
   ask.go(o, X.R.ans(rr(o, cx)), cx, q)
 
 # ---- notes and cards ----
 
-def note_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
+def note_main(-o: S.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   emit(o, cx, M.EMainNote{text, now(o, cx)}, Unit{}, Unit{}, Unit{})
 
 # opens card number next_card (the caller reads it first when it needs it)
@@ -346,18 +345,18 @@ def note_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
 # agent's traffic (BISE-299)
 #
 # open_card_at: the same, about a place (and its PR): the hub's own items
-def open_card_at(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>, +place: Maybe<&2, String>, +pr: Maybe<&2, Nat>) -> X.Cx<o>:
-  +id = M.St.next_card(st(o, cx))
+def open_card_at(-o: S.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>, +place: Maybe<&2, String>, +pr: Maybe<&2, Nat>) -> X.Cx<o>:
+  +id = S.St.next_card(st(o, cx))
   +cx2 = emit(o, cx, M.ECardOpened{S.Card.with_pr(S.Card.with_place(S.Card.with_created(S.Card.with_for_msg(S.Card.with_text(S.Card.with_agent(S.Card.with_kind(S.Card.with_id(S.Card.empty(), id), kind), agent), text), for_msg), now(o, cx)), place), pr)}, {==}, Unit{}, Unit{})
   feed(o, cx2, M.MAIN(), FD.card(id, kind, agent, text))
 
-def open_card(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>) -> X.Cx<o>:
+def open_card(-o: S.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>) -> X.Cx<o>:
   open_card_at(o, cx, kind, agent, text, for_msg, None{}, None{})
 
 # the hub's Rust side opens one of its items (`card_open`: a PR ready to
 # merge, pr-design §6.3); a kind outside the user's inbox opens nothing
 # (BISE-299)
-def hub_card(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +place: Maybe<&2, String>, +pr: Maybe<&2, Nat>) -> X.Cx<o>:
+def hub_card(-o: S.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +place: Maybe<&2, String>, +pr: Maybe<&2, Nat>) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, CK.choice_kind(kind),
     u => open_card_at(o, cx, kind, agent, text, None{}, place, pr),
     u => notice(o, cx, String.append("not a hub item: ", kind)))
@@ -366,10 +365,10 @@ def hub_card(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: Strin
 # the user opens a `confirm` card for `agent` straight in the user's
 # inbox, whoever runs it (the approvals gate, approvals-design.md §9);
 # the user's answer goes to the gate (answer.kind: a `confirm` effect).
-def open_confirm(-o: M.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
+def open_confirm(-o: S.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
   open_card(o, cx, "confirm", agent, text, None{})
 
-def close_ids(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>, +res: String) -> X.Cx<o>:
+def close_ids(-o: S.St, ids: List<&2, Nat>, +cx: X.Cx<o>, +res: String) -> X.Cx<o>:
   match ids:
     case Nil{}:
       cx
@@ -387,12 +386,12 @@ def card_ids(cs: List<&2, S.Card>, +agent: String, +kinds: List<&2, String>) -> 
       +hit = String.eq(S.Card.agent(c), agent) && (List.is_empty(&2, String, kinds) || M.str_in(kinds, S.Card.kind(c)))
       Bool.pick(List<&2, Nat>, hit, S.Card.id(c) <> rest, rest)
 
-def close_cards(-o: M.St, +cx: X.Cx<o>, +agent: String, +kinds: List<&2, String>, +res: String) -> X.Cx<o>:
-  close_ids(o, card_ids(M.St.cards(st(o, cx)), agent, kinds), cx, res)
+def close_cards(-o: S.St, +cx: X.Cx<o>, +agent: String, +kinds: List<&2, String>, +res: String) -> X.Cx<o>:
+  close_ids(o, card_ids(S.St.cards(st(o, cx)), agent, kinds), cx, res)
 
 # ---- REPL lifecycle ----
 
-def spawn.if(-o: M.St, down: Bool, +cx: X.Cx<o>, +n: String, +resume: Bool) -> X.Cx<o>:
+def spawn.if(-o: S.St, down: Bool, +cx: X.Cx<o>, +n: String, +resume: Bool) -> X.Cx<o>:
   match down:
     case True{}:
       +cx2 = set_run(o, cx, n, S.RStarting{})
@@ -400,13 +399,13 @@ def spawn.if(-o: M.St, down: Bool, +cx: X.Cx<o>, +n: String, +resume: Bool) -> X
     case False{}:
       cx
 
-def spawn(-o: M.St, +cx: X.Cx<o>, +n: String, +resume: Bool) -> X.Cx<o>:
+def spawn(-o: S.St, +cx: X.Cx<o>, +n: String, +resume: Bool) -> X.Cx<o>:
   spawn.if(o, Bool.not(PL.waits(M.get_agent(st(o, cx), n))) && has_agent(o, cx, n) && is_down(X.Rt.run(rt(o, cx, n))), cx, n, resume)
 
 # ---- waiters ----
 
 # a wait gets its message (the message is not marked delivered here)
-def waiter_reply(-o: M.St, +cx: X.Cx<o>, +w: X.Waiter, +m: S.Msg, +kind: String) -> X.Cx<o>:
+def waiter_reply(-o: S.St, +cx: X.Cx<o>, +w: X.Waiter, +m: S.Msg, +kind: String) -> X.Cx<o>:
   +cx3 = reply(o, cx, X.Waiter.token(w), ok_body([
     J.kv("type", J.JStr{kind}), J.kv("from", J.JStr{S.Msg.from(m)}),
     J.kv("message_id", J.JStr{mid(S.Msg.id(m))}),
@@ -419,7 +418,7 @@ def waiter_reply(-o: M.St, +cx: X.Cx<o>, +w: X.Waiter, +m: S.Msg, +kind: String)
   +x = X.Rt.with_waiting(rt(o, cx4, X.Waiter.agent(w)), still)
   dirty(o, upd_rt(o, cx4, x))
 
-def mark_delivered.go(-o: M.St, +cx: X.Cx<o>, +id: Nat, c: Bool, +e: {X.queued_at(X.d(o, cx), id) == c : Bool}) -> X.Cx<o>:
+def mark_delivered.go(-o: S.St, +cx: X.Cx<o>, +id: Nat, c: Bool, +e: {X.queued_at(X.d(o, cx), id) == c : Bool}) -> X.Cx<o>:
   match c:
     case True{}:
       emit(o, cx, M.EMsgState{id, S.Delivered{}}, Unit{}, Unit{}, e)
@@ -428,20 +427,20 @@ def mark_delivered.go(-o: M.St, +cx: X.Cx<o>, +id: Nat, c: Bool, +e: {X.queued_a
 
 # a message becomes delivered only while it is queued (law
 # delivered_once): the check never fails in a state the hub reached
-def mark_delivered(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
+def mark_delivered(-o: S.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
   mark_delivered.go(o, cx, id, X.queued_at(X.d(o, cx), id), {==})
 
-def deliver_to_waiter(-o: M.St, +cx: X.Cx<o>, +w: X.Waiter, +m: S.Msg, +kind: String) -> X.Cx<o>:
+def deliver_to_waiter(-o: S.St, +cx: X.Cx<o>, +w: X.Waiter, +m: S.Msg, +kind: String) -> X.Cx<o>:
   waiter_reply(o, mark_delivered(o, cx, S.Msg.id(m)), w, m, kind)
 
-def reply_all(-o: M.St, ws: List<&2, X.Waiter>, +cx: X.Cx<o>, +why: String) -> X.Cx<o>:
+def reply_all(-o: S.St, ws: List<&2, X.Waiter>, +cx: X.Cx<o>, +why: String) -> X.Cx<o>:
   match ws:
     case Nil{}:
       cx
     case Con{+w, +rest}:
       reply_all(o, rest, reply_err(o, cx, X.Waiter.token(w), why), why)
 
-def fail_waiters(-o: M.St, +cx: X.Cx<o>, +agent: String, +why: String) -> X.Cx<o>:
+def fail_waiters(-o: S.St, +cx: X.Cx<o>, +agent: String, +why: String) -> X.Cx<o>:
   +ws = X.R.waiters(rr(o, cx))
   +cx2 = set_r(o, cx, X.R.with_waiters(rr(o, cx), X.waiters_not(ws, agent)))
   +cx3 = reply_all(o, X.waiters_of(ws, agent), cx2, why)
@@ -466,11 +465,11 @@ def leftover_at.go(m: Maybe<&2, S.MSt>) -> Bool:
 
 # a steer_leftover was steered in a turn that never read it: its feed line
 # was written then (qa-explore bug A)
-def leftover_at(+s: M.St, +id: Nat) -> Bool:
+def leftover_at(+s: S.St, +id: Nat) -> Bool:
   leftover_at.go(M.state_of(s, id))
 
 # the feed line of a delivered message: once, when it is first handed over
-def deliver.line(-o: M.St, again: Bool, you: Bool, +cx: X.Cx<o>, +name: String, +m: S.Msg) -> X.Cx<o>:
+def deliver.line(-o: S.St, again: Bool, you: Bool, +cx: X.Cx<o>, +name: String, +m: S.Msg) -> X.Cx<o>:
   match again you:
     case True{} _:
       cx
@@ -484,7 +483,7 @@ def deliver.line(-o: M.St, again: Bool, you: Bool, +cx: X.Cx<o>, +name: String, 
     case False{} False{}:
       msg_parts(o, feed(o, cx, name, FD.msg_in(S.Msg.from(m), Some{S.Msg.id(m)}, S.Msg.text(m))), name, m)
 
-def deliver_each(-o: M.St, batch: List<&2, S.Msg>, +cx: X.Cx<o>, +name: String, +acc: List<&2, K.Delivered>) -> X.Cx<o> & List<&2, K.Delivered>:
+def deliver_each(-o: S.St, batch: List<&2, S.Msg>, +cx: X.Cx<o>, +name: String, +acc: List<&2, K.Delivered>) -> X.Cx<o> & List<&2, K.Delivered>:
   match batch:
     case Nil{}:
       (cx, acc)
@@ -495,7 +494,7 @@ def deliver_each(-o: M.St, batch: List<&2, S.Msg>, +cx: X.Cx<o>, +name: String, 
       +cx3 = deliver.line(o, leftover_at(s, S.Msg.id(m)), S.Msg.plain(m) || Maybe.is_some(&2, String, S.Msg.via(m)), cx2, name, m)
       deliver_each(o, rest, cx3, name, M.snoc(K.Delivered, acc, K.Delivered{S.Msg.id(m), rel}))
 
-def pump.flush(-o: M.St, flush: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
+def pump.flush(-o: S.St, flush: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
   match flush:
     case True{}:
       emit(o, cx, M.ENotesFlushed{}, Unit{}, Unit{}, Unit{})
@@ -503,7 +502,7 @@ def pump.flush(-o: M.St, flush: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
       cx
 
 # the delivery (`notes`: main's, `status`: the task status block)
-def pump.send.go(-o: M.St, busy: Bool, +cx: X.Cx<o>, +name: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool, +msgs: List<&2, K.Delivered>) -> X.Cx<o>:
+def pump.send.go(-o: S.St, busy: Bool, +cx: X.Cx<o>, +name: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool, +msgs: List<&2, K.Delivered>) -> X.Cx<o>:
   match busy:
     case True{}:
       +r = rr(o, cx)
@@ -514,7 +513,7 @@ def pump.send.go(-o: M.St, busy: Bool, +cx: X.Cx<o>, +name: String, +ids: List<&
       +cx2 = upd_rt(o, cx, X.Rt{name, S.RBusy{}, X.Rt.waiting(rt(o, cx, name)), Some{now(o, cx)}, 0n})
       dirty(o, out(o, cx2, F.deliver("say", name, notes, status, msgs)))
 
-def pump.send(-o: M.St, busy: Bool, p: X.Cx<o> & List<&2, K.Delivered>, +name: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool) -> X.Cx<o>:
+def pump.send(-o: S.St, busy: Bool, p: X.Cx<o> & List<&2, K.Delivered>, +name: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool) -> X.Cx<o>:
   match p:
     case (+cx, +msgs):
       pump.send.go(o, busy, cx, name, ids, notes, status, msgs)
@@ -526,18 +525,18 @@ def jstrs(xs: List<&2, String>) -> List<&2, J.Json>:
     case Con{+h, +t}:
       J.JStr{h} <> jstrs(t)
 
-def pump.batch(-o: M.St, batch: List<&2, S.Msg>, +cx: X.Cx<o>, +name: String, +busy: Bool, +is_main: Bool) -> X.Cx<o>:
+def pump.batch(-o: S.St, batch: List<&2, S.Msg>, +cx: X.Cx<o>, +name: String, +busy: Bool, +is_main: Bool) -> X.Cx<o>:
   match batch:
     case Nil{}:
       cx
     case Con{+h, +t}:
       +b = {h <> t : List<&2, S.Msg>}
-      +notes = Bool.pick(List<&2, String>, is_main, M.St.notes(st(o, cx)), Nil{})
+      +notes = Bool.pick(List<&2, String>, is_main, S.St.notes(st(o, cx)), Nil{})
       +cx2 = pump.flush(o, Bool.not(List.is_empty(&2, String, notes)), cx)
       +status = is_main && M.any_from_user(b)
       pump.send(o, busy, deliver_each(o, b, cx2, name, Nil{}), name, ids_of(b), notes, status)
 
-def pump.run(-o: M.St, run: S.Run, +cx: X.Cx<o>, +name: String, +queued: List<&2, S.Msg>, +is_main: Bool) -> X.Cx<o>:
+def pump.run(-o: S.St, run: S.Run, +cx: X.Cx<o>, +name: String, +queued: List<&2, S.Msg>, +is_main: Bool) -> X.Cx<o>:
   match run:
     case S.RDown{}:
       cx
@@ -549,21 +548,21 @@ def pump.run(-o: M.St, run: S.Run, +cx: X.Cx<o>, +name: String, +queued: List<&2
     case S.RIdle{}:
       pump.batch(o, queued, cx, name, False{}, is_main)
 
-def pump.active(-o: M.St, active: Bool, +cx: X.Cx<o>, +name: String, +is_main: Bool) -> X.Cx<o>:
+def pump.active(-o: S.St, active: Bool, +cx: X.Cx<o>, +name: String, +is_main: Bool) -> X.Cx<o>:
   match active:
     case True{}:
       pump.run(o, X.Rt.run(rt(o, cx, name)), cx, name, M.queued_for(st(o, cx), name), is_main)
     case False{}:
       cx
 
-def pump.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
+def pump.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
       pump.active(o, is_active(S.Agent.life(a)), cx, name, S.Agent.is_main(a))
 
-def pump.paused(-o: M.St, paused: Bool, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
+def pump.paused(-o: S.St, paused: Bool, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
   match paused:
     case True{}:
       cx
@@ -572,20 +571,20 @@ def pump.paused(-o: M.St, paused: Bool, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
 
 # deliver what is queued for `name`, when its state allows it; a paused
 # project delivers nothing (law paused_delivers_nothing): it stays queued
-def pump(-o: M.St, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
+def pump(-o: S.St, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
   pump.paused(o, P.is_paused(st(o, cx)), cx, name)
 
 # ---- the watches' journal, before a send uses it (ask-wait) ----
-def tms(-o: M.St, +cx: X.Cx<o>) -> S.Tms:
-  M.St.tm(st(o, cx))
+def tms(-o: S.St, +cx: X.Cx<o>) -> S.Tms:
+  S.St.tm(st(o, cx))
 
-def wks(-o: M.St, +cx: X.Cx<o>) -> S.Wakes:
+def wks(-o: S.St, +cx: X.Cx<o>) -> S.Wakes:
   S.Tms.wk(tms(o, cx))
 
-def wake_end(-o: M.St, +cx: X.Cx<o>, +id: Nat, +why: String) -> X.Cx<o>:
+def wake_end(-o: S.St, +cx: X.Cx<o>, +id: Nat, +why: String) -> X.Cx<o>:
   emit(o, cx, M.EWake{WK.WEnd{id, why, now(o, cx)}}, Unit{}, Unit{}, Unit{})
 
-def wake_ends(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>, +why: String) -> X.Cx<o>:
+def wake_ends(-o: S.St, ids: List<&2, Nat>, +cx: X.Cx<o>, +why: String) -> X.Cx<o>:
   match ids:
     case Nil{}:
       cx
@@ -594,7 +593,7 @@ def wake_ends(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>, +why: String) -> X.Cx<
 
 # a message sent: the reply watches it answers end, in the same step, with
 # no wake (law ask_reply_ends_quiet)
-def reply_answered(-o: M.St, +cx: X.Cx<o>, +from: String, +to: String, reply_to: Maybe<&2, Nat>) -> X.Cx<o>:
+def reply_answered(-o: S.St, +cx: X.Cx<o>, +from: String, +to: String, reply_to: Maybe<&2, Nat>) -> X.Cx<o>:
   match reply_to:
     case None{}:
       cx
@@ -603,10 +602,10 @@ def reply_answered(-o: M.St, +cx: X.Cx<o>, +from: String, +to: String, reply_to:
 
 # ---- messages (RFC 0003) ----
 
-def serr(-o: M.St, +cx: X.Cx<o>, +e: String) -> X.Cx<o> & SendR:
+def serr(-o: S.St, +cx: X.Cx<o>, +e: String) -> X.Cx<o> & SendR:
   (cx, SErr{e})
 
-def send.waiter(-o: M.St, mw: Maybe<&2, X.Waiter>, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o> & SendR:
+def send.waiter(-o: S.St, mw: Maybe<&2, X.Waiter>, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o> & SendR:
   match mw:
     case Some{+w}:
       # a waiting recipient gets it as the result of its `sb wait`
@@ -635,10 +634,10 @@ def msg_of_snd(+s: Snd, +id: Nat, +thread: Nat, +now: Nat) -> S.Msg:
       +m2 = S.Msg.with_created(S.Msg.with_text(S.Msg.with_auto(S.Msg.with_expect(m, Bool.and(expect, Bool.not(auto))), auto), text), now)
       S.Msg.with_parts(S.Msg.with_via(S.Msg.with_queued(S.Msg.with_plain(m2, plain), queued), via), parts)
 
-def send.emit(-o: M.St, +cx: X.Cx<o>, +s: Snd, +thread: Nat) -> X.Cx<o> & SendR:
+def send.emit(-o: S.St, +cx: X.Cx<o>, +s: Snd, +thread: Nat) -> X.Cx<o> & SendR:
   match s:
     case Snd{+from, +to, +text, +expect, +reply_to, +plain, +auto, +queued, +via, +parts}:
-      +m = msg_of_snd(s, M.St.next_msg(st(o, cx)), thread, now(o, cx))
+      +m = msg_of_snd(s, S.St.next_msg(st(o, cx)), thread, now(o, cx))
       # a card is closed by the user's answer only (answer_card): no reply
       # here touches the user's inbox (BISE-299)
       +cx1 = emit(o, cx, M.EMsgSent{m}, {==}, quiet_ok(auto, expect), Unit{})
@@ -649,17 +648,17 @@ def send.emit(-o: M.St, +cx: X.Cx<o>, +s: Snd, +thread: Nat) -> X.Cx<o> & SendR:
         X.waiter_pick(X.R.waiters(rr(o, cx2)), to, reply_to, expect && Bool.not(plain) && Bool.not(String.eq(from, M.USER()))))
       send.waiter(o, w, cx2, m)
 
-def send.orig(-o: M.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +s: Snd, +r: Nat) -> X.Cx<o> & SendR:
+def send.orig(-o: S.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +s: Snd, +r: Nat) -> X.Cx<o> & SendR:
   match m:
     case None{}:
       serr(o, cx, String.append("reply_to inconnu : ", mid(r)))
     case Some{+orig}:
       send.emit(o, cx, s, S.Msg.thread(orig))
 
-def send.thread(-o: M.St, reply_to: Maybe<&2, Nat>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
+def send.thread(-o: S.St, reply_to: Maybe<&2, Nat>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   match reply_to:
     case None{}:
-      send.emit(o, cx, s, M.St.next_msg(st(o, cx)))
+      send.emit(o, cx, s, S.St.next_msg(st(o, cx)))
     case Some{+r}:
       send.orig(o, M.msg_of(st(o, cx), r), cx, s, r)
 
@@ -673,7 +672,7 @@ def Snd.reply_to(x: Snd) -> Maybe<&2, Nat>:
     case Snd{_, _, _, _, +reply_to, _, _, _, _, _}:
       reply_to
 
-def send.revive(-o: M.St, ok: Bool, +cx: X.Cx<o>, +s: Snd, +why: String) -> X.Cx<o> & SendR:
+def send.revive(-o: S.St, ok: Bool, +cx: X.Cx<o>, +s: Snd, +why: String) -> X.Cx<o> & SendR:
   match ok:
     case False{}:
       serr(o, cx, why)
@@ -687,11 +686,11 @@ def send.revive(-o: M.St, ok: Bool, +cx: X.Cx<o>, +s: Snd, +why: String) -> X.Cx
 def dropped_wt(+a: S.Agent) -> Bool:
   M.ws_worktree(S.Agent.ws(a)) && M.ws_dropped(S.Agent.ws(a))
 
-def unavailable(-o: M.St, +cx: X.Cx<o>, +s: Snd, +a: S.Agent) -> String:
+def unavailable(-o: S.St, +cx: X.Cx<o>, +s: Snd, +a: S.Agent) -> String:
   cat(["recipient_unavailable: @", Snd.to(s), " is ", ST.status_str(a, rt(o, cx, Snd.to(s))),
     Bool.pick(String, dropped_wt(a), " (its worktree was deleted: /restore)", "")])
 
-def create.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String) -> X.Cx<o> & TaskR:
+def create.sent(-o: S.St, p: X.Cx<o> & SendR, +name: String) -> X.Cx<o> & TaskR:
   match p:
     case (+cx, SOk{_}):
       (cx, TOk{name})
@@ -728,7 +727,7 @@ def Snd.from(x: Snd) -> String:
     case Snd{+from, _, _, _, _, _, _, _, _, _}:
       from
 
-def send.life(-o: M.St, life: S.Life, +cx: X.Cx<o>, +s: Snd, +a: S.Agent) -> X.Cx<o> & SendR:
+def send.life(-o: S.St, life: S.Life, +cx: X.Cx<o>, +s: Snd, +a: S.Agent) -> X.Cx<o> & SendR:
   match life:
     case S.LActive{}:
       send.thread(o, Snd.reply_to(s), cx, s)
@@ -739,14 +738,14 @@ def send.life(-o: M.St, life: S.Life, +cx: X.Cx<o>, +s: Snd, +a: S.Agent) -> X.C
     case S.LArchived{}:
       send.revive(o, String.eq(Snd.from(s), M.USER()) && Bool.not(dropped_wt(a)), cx, s, unavailable(o, cx, s, a))
 
-def send.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
+def send.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   match m:
     case None{}:
       serr(o, cx, String.append("recipient_unknown: no agent named ", Snd.to(s)))
     case Some{+a}:
       send.life(o, S.Agent.life(a), cx, s, a)
 
-def send.checked(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
+def send.checked(-o: S.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   match pre:
     case Some{+e}:
       serr(o, cx, e)
@@ -773,7 +772,7 @@ def Snd.with_to(x: Snd, +v: String) -> Snd:
     case Snd{+from, _, +text, +expect, +reply_to, +plain, +auto, +queued, +via, +parts}:
       Snd{from, v, text, expect, reply_to, plain, auto, queued, via, parts}
 
-def send.known(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
+def send.known(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   match m:
     case None{}:
       serr(o, cx, String.append("recipient_unknown: no agent named ", Snd.to(s)))
@@ -782,7 +781,7 @@ def send.known(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o>
         Bool.pick(Maybe<&2, String>, M.trim_is_empty(Snd.text(s)), Some{"message vide"}, None{}))
       send.checked(o, pre, cx, Snd.with_to(s, to))
 
-def send.user(-o: M.St, user: Bool, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
+def send.user(-o: S.St, user: Bool, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   match user:
     case True{}:
       serr(o, cx, "invalid_recipient: to talk to the user, go through main (sb notify)")
@@ -796,7 +795,7 @@ def send.user(-o: M.St, user: Bool, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
 # C2 amendment (BISE-86): a message from the user that cannot reach its
 # agent (stopped, dropped, archived) says so in the feed where the user
 # wrote it: an `undelivered` record {to, text} (the TUI marks it ✗)
-def undelivered.if(-o: M.St, gone: Bool, +cx: X.Cx<o>, +view: String, +name: String, +text: String) -> X.Cx<o>:
+def undelivered.if(-o: S.St, gone: Bool, +cx: X.Cx<o>, +view: String, +name: String, +text: String) -> X.Cx<o>:
   match gone:
     case True{}:
       feed(o, cx, view, FD.undelivered(name, text))
@@ -813,7 +812,7 @@ def undelivered.feed(m: Maybe<&2, String>, +to: String) -> String:
       to
 
 # the user's messages still queued for an agent that stops
-def undelivered_msgs(-o: M.St, xs: List<&2, S.Msg>, +cx: X.Cx<o>) -> X.Cx<o>:
+def undelivered_msgs(-o: S.St, xs: List<&2, S.Msg>, +cx: X.Cx<o>) -> X.Cx<o>:
   match xs:
     case Nil{}:
       cx
@@ -826,7 +825,7 @@ def unavailable_err(+e: String) -> Bool:
   String.starts_with(e, "recipient_unavailable")
 
 # the message `m` points to (a card's, a reply's)
-def for_msg_of(+s: M.St, m: Maybe<&2, Nat>) -> Maybe<&2, S.Msg>:
+def for_msg_of(+s: S.St, m: Maybe<&2, Nat>) -> Maybe<&2, S.Msg>:
   match m:
     case None{}:
       None{}
@@ -854,7 +853,7 @@ def question_text(q: Maybe<&2, S.Msg>) -> String:
 # shows; an older TUI reads `to m_<n>` as the receiver's name).
 # What main receives already shows as `msg-in` when delivered; main
 # answering a task's question shows as `answered` (level 2) instead.
-def feed_main(-o: M.St, +cx: X.Cx<o>, +m: S.Msg, +why: String) -> X.Cx<o>:
+def feed_main(-o: S.St, +cx: X.Cx<o>, +m: S.Msg, +why: String) -> X.Cx<o>:
   +from = S.Msg.from(m)
   +to = S.Msg.to(m)
   +q = for_msg_of(st(o, cx), S.Msg.reply_to(m))
@@ -874,17 +873,17 @@ def feed_main(-o: M.St, +cx: X.Cx<o>, +m: S.Msg, +why: String) -> X.Cx<o>:
 # the user is `msg-you` already. A view only: no state changes.
 # The sender must be an agent of this hub (architect m_10280): '@bise'
 # (a cross-hub delegation) or the hub's own name has no feed here.
-def is_task_send(-o: M.St, +cx: X.Cx<o>, +from: String, +to: String) -> Bool:
+def is_task_send(-o: S.St, +cx: X.Cx<o>, +from: String, +to: String) -> Bool:
   has_agent(o, cx, from) && Bool.not(String.eq(from, M.MAIN())) && Bool.not(String.eq(to, M.USER()))
 
-def feed_sender(-o: M.St, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
+def feed_sender(-o: S.St, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
   +from = S.Msg.from(m)
   +to = S.Msg.to(m)
   LZ.pick(X.Cx<o>, is_task_send(o, cx, from, to),
     u => sent_parts(o, feed(o, cx, from, FD.sent(to, S.Msg.id(m), S.Msg.expect(m), S.Msg.text(m))), from, m),
     u => cx)
 
-def send.fed(-o: M.St, p: X.Cx<o> & SendR, +why: String) -> X.Cx<o> & SendR:
+def send.fed(-o: S.St, p: X.Cx<o> & SendR, +why: String) -> X.Cx<o> & SendR:
   match p:
     case (+cx, SOk{+m}):
       (feed_main(o, feed_sender(o, cx, m), m, why), SOk{m})
@@ -893,35 +892,35 @@ def send.fed(-o: M.St, p: X.Cx<o> & SendR, +why: String) -> X.Cx<o> & SendR:
 
 # send a message, with main's reason when it answers for the user
 # (`sb send --why`); answers it, or why it was refused
-def send_why(-o: M.St, +cx: X.Cx<o>, +s: Snd, +why: String) -> X.Cx<o> & SendR:
+def send_why(-o: S.St, +cx: X.Cx<o>, +s: Snd, +why: String) -> X.Cx<o> & SendR:
   send.fed(o, send.user(o, String.eq(Snd.to(s), M.USER()), cx, s), why)
 
 # send a message; answers it, or why it was refused
-def send(-o: M.St, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
+def send(-o: S.St, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   send_why(o, cx, s, "")
 
 def msg(+from: String, +to: String, +text: String, +expect: Bool, +reply_to: Maybe<&2, Nat>, +plain: Bool, +auto: Bool) -> Snd:
   Snd{from, to, text, expect, reply_to, plain, auto, False{}, None{}, ""}
 
-def fst(-o: M.St, p: X.Cx<o> & SendR) -> X.Cx<o>:
+def fst(-o: S.St, p: X.Cx<o> & SendR) -> X.Cx<o>:
   match p:
     case (+cx, _):
       cx
 
 # a notification of the hub to main: it wakes main like any message (a
 # main note waits for main's next turn instead)
-def notify_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
+def notify_main(-o: S.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   fst(o, send(o, cx, msg(M.HUB(), M.MAIN(), text, False{}, None{}, False{}, False{})))
 
 # hub-loop (place.bend): a placing task's worktree is made by the shell
-def place.ask(-o: M.St, placing: Bool, +cx: X.Cx<o>, +name: String, +ws: J.Json) -> X.Cx<o>:
+def place.ask(-o: S.St, placing: Bool, +cx: X.Cx<o>, +name: String, +ws: J.Json) -> X.Cx<o>:
   match placing:
     case True{}:
       out(o, cx, F.worktree_create(name, J.get_bool_or(ws, "with_changes", False{})))
     case False{}:
       cx
 
-def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_held(X.d(o, cx), name) == False{} : Bool}) -> X.Cx<o> & TaskR:
+def create.go.new(-o: S.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_held(X.d(o, cx), name) == False{} : Bool}) -> X.Cx<o> & TaskR:
   +parent = NewTask.parent(t)
   +label = Bool.pick(String, M.ws_placing(ws), " (worktree being made)", NT.branch_label(M.ws_branch(ws)))
   +obj = T.one_line(NewTask.objective(t))
@@ -936,7 +935,7 @@ def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Jso
   # (law brief_keeps_parts)
   create.sent(o, send(o, cx5, Snd.with_parts(m, NT.brief_parts(head, NewTask.parts(t)))), name)
 
-def create.go.free(-o: M.St, taken: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_held(X.d(o, cx), name) == taken : Bool}) -> X.Cx<o> & TaskR:
+def create.go.free(-o: S.St, taken: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_held(X.d(o, cx), name) == taken : Bool}) -> X.Cx<o> & TaskR:
   match taken:
     case True{}:
       (cx, TErr{String.append("name already taken: ", name)})
@@ -945,7 +944,7 @@ def create.go.free(-o: M.St, taken: Bool, +cx: X.Cx<o>, +t: NewTask, +name: Stri
 
 # the name is still free (unique_name found it; it can only be taken if
 # its search ran out); an archived agent's or an old name is freed first
-def create.go(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json) -> X.Cx<o> & TaskR:
+def create.go(-o: S.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json) -> X.Cx<o> & TaskR:
   +cx2 = TK.take(o, cx, name)
   create.go.free(o, M.name_held(st(o, cx2), name), cx2, t, name, ws, {==})
 
@@ -954,7 +953,7 @@ def NewTask.with_changes(x: NewTask) -> Bool:
     case NewTask{_, _, _, _, _, _, +with_changes, _}:
       with_changes
 
-def create.git(-o: M.St, git: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) -> X.Cx<o> & TaskR:
+def create.git(-o: S.St, git: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) -> X.Cx<o> & TaskR:
   match git:
     case False{}:
       (cx, TErr{"the workspace is not a git repository: no worktree possible"})
@@ -962,7 +961,7 @@ def create.git(-o: M.St, git: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) ->
       # hub-loop: the shell makes it off its loop (place.bend)
       create.go(o, cx, t, name, PL.placing_ws(NewTask.with_changes(t)))
 
-def create.wt(-o: M.St, wt: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) -> X.Cx<o> & TaskR:
+def create.wt(-o: S.St, wt: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) -> X.Cx<o> & TaskR:
   match wt:
     case False{}:
       create.go(o, cx, t, name, PL.shared_ws(X.R.workspace(rr(o, cx))))
@@ -980,12 +979,12 @@ def NewTask.base(x: NewTask) -> String:
       base
 
 # RFC 0001 §7.1 and RFC 0002 §3-4 (the name was validated by the daemon)
-def create_task(-o: M.St, +cx: X.Cx<o>, +t: NewTask) -> X.Cx<o> & TaskR:
+def create_task(-o: S.St, +cx: X.Cx<o>, +t: NewTask) -> X.Cx<o> & TaskR:
   create.wt(o, NewTask.worktree(t), cx, t, NT.unique_name(st(o, cx), NewTask.base(t)))
 
 # `sb spawn --place <agent>|<branch>` (dev-flow §3.1): the new task joins
 # that place (`join`: its ws, found by the daemon); else as create_task
-def create_in(-o: M.St, +cx: X.Cx<o>, +t: NewTask, j: Maybe<&2, J.Json>) -> X.Cx<o> & TaskR:
+def create_in(-o: S.St, +cx: X.Cx<o>, +t: NewTask, j: Maybe<&2, J.Json>) -> X.Cx<o> & TaskR:
   match j:
     case Some{J.JObj{+kvs}}:
       create.go(o, cx, t, NT.unique_name(st(o, cx), NewTask.base(t)), J.JObj{kvs})
@@ -998,14 +997,14 @@ def create_in(-o: M.St, +cx: X.Cx<o>, +t: NewTask, j: Maybe<&2, J.Json>) -> X.Cx
 # which are core's, and timers.bend (imported by model.bend) cannot
 # import core (Bend has no import cycles).
 
-def live(-o: M.St, +cx: X.Cx<o>) -> List<&2, S.Timer>:
+def live(-o: S.St, +cx: X.Cx<o>) -> List<&2, S.Timer>:
   S.Tms.live(tms(o, cx))
 
 # a message from bise is queued for `n` (a wake not delivered yet)
-def bise_queued(+s: M.St, +n: String) -> Bool:
+def bise_queued(+s: S.St, +n: String) -> Bool:
   R.from_bise(M.queued_for(s, n))
 
-def ready.go(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>) -> Bool:
+def ready.go(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>) -> Bool:
   match m:
     case None{}:
       False{}
@@ -1014,15 +1013,15 @@ def ready.go(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>) -> Bool:
 
 # active, idle or busy: a wake reaches it now (a turn, or steered into its
 # turn: law timer_reaches_busy); starting or down: it waits
-def timer_ready(-o: M.St, +cx: X.Cx<o>, +n: String) -> Bool:
+def timer_ready(-o: S.St, +cx: X.Cx<o>, +n: String) -> Bool:
   ready.go(o, R.agent_of(st(o, cx), n), cx)
 
 # a paused project fires no timer (law timer_held_while_paused): a due
 # one fires at the first tick after /resume
-def timer_may(-o: M.St, +cx: X.Cx<o>, +t: S.Timer, +due: Bool) -> Bool:
+def timer_may(-o: S.St, +cx: X.Cx<o>, +t: S.Timer, +due: Bool) -> Bool:
   Bool.not(P.is_paused(st(o, cx))) && TM.may_fire(bise_queued(st(o, cx), S.Timer.agent(t)), due, t, timer_ready(o, cx, S.Timer.agent(t)), now(o, cx))
 
-def timer_spent(-o: M.St, spent: Bool, +cx: X.Cx<o>, +id: Nat, +at: Nat) -> X.Cx<o>:
+def timer_spent(-o: S.St, spent: Bool, +cx: X.Cx<o>, +id: Nat, +at: Nat) -> X.Cx<o>:
   match spent:
     case True{}:
       emit(o, cx, M.ETimerStop{id, "it ran its times", at}, Unit{}, Unit{}, Unit{})
@@ -1031,7 +1030,7 @@ def timer_spent(-o: M.St, spent: Bool, +cx: X.Cx<o>, +id: Nat, +at: Nat) -> X.Cx
 
 # the wake reached the queue: a due one counts (and ends the timer when it
 # ran its times, law times_bound), a run now is only a run
-def timer_count(-o: M.St, due: Bool, +cx: X.Cx<o>, +t: S.Timer, +next: Nat) -> X.Cx<o>:
+def timer_count(-o: S.St, due: Bool, +cx: X.Cx<o>, +t: S.Timer, +next: Nat) -> X.Cx<o>:
   match due:
     case False{}:
       emit(o, cx, M.ETimerRun{S.Timer.id(t), now(o, cx)}, Unit{}, Unit{}, Unit{})
@@ -1046,7 +1045,7 @@ def timer_count(-o: M.St, due: Bool, +cx: X.Cx<o>, +t: S.Timer, +next: Nat) -> X
 # timer_may wants it idle and active, and send then always queues): a due
 # one is tried again in a minute, nothing counted, one line that says so
 # (every_fired undelivered, the hub's warn); a run now is just not done
-def timer_retry(-o: M.St, due: Bool, +cx: X.Cx<o>, +t: S.Timer) -> X.Cx<o>:
+def timer_retry(-o: S.St, due: Bool, +cx: X.Cx<o>, +t: S.Timer) -> X.Cx<o>:
   match due:
     case False{}:
       cx
@@ -1054,14 +1053,14 @@ def timer_retry(-o: M.St, due: Bool, +cx: X.Cx<o>, +t: S.Timer) -> X.Cx<o>:
       emit(o, cx, M.ETimerFired{S.Timer.id(t), S.Timer.fired(t), Nat.add(now(o, cx), TM.MIN_MS()), S.Timer.last(t), True{}},
         Unit{}, Unit{}, Unit{})
 
-def timer_fire.sent(-o: M.St, p: X.Cx<o> & SendR, +t: S.Timer, +due: Bool, +next: Nat) -> X.Cx<o>:
+def timer_fire.sent(-o: S.St, p: X.Cx<o> & SendR, +t: S.Timer, +due: Bool, +next: Nat) -> X.Cx<o>:
   match p:
     case (+cx, SOk{_}):
       timer_count(o, due, cx, t, next)
     case (+cx, SErr{_}):
       timer_retry(o, due, cx, t)
 
-def timer_fire.go(-o: M.St, ok: Bool, +cx: X.Cx<o>, +t: S.Timer, +text: String, +due: Bool, +next: Nat) -> X.Cx<o>:
+def timer_fire.go(-o: S.St, ok: Bool, +cx: X.Cx<o>, +t: S.Timer, +text: String, +due: Bool, +next: Nat) -> X.Cx<o>:
   match ok:
     case False{}:
       cx
@@ -1071,12 +1070,12 @@ def timer_fire.go(-o: M.St, ok: Bool, +cx: X.Cx<o>, +t: S.Timer, +text: String, 
 # the only way a timer wakes its agent: a due wake (`due`, counted, its
 # next time `next`) from the tick, or /scheduled's run now; never while a
 # wake from bise is still queued for it (law wake_never_stacked)
-def timer_fire(-o: M.St, +cx: X.Cx<o>, +t: S.Timer, +text: String, +due: Bool, +next: Nat) -> X.Cx<o>:
+def timer_fire(-o: S.St, +cx: X.Cx<o>, +t: S.Timer, +text: String, +due: Bool, +next: Nat) -> X.Cx<o>:
   timer_fire.go(o, timer_may(o, cx, t, due), cx, t, text, due, next)
 
 # {"t":"every_set"}: the hub checked the request and computed `next_ms`
 # (its clock); a timer only for an active agent
-def timer_set.new(-o: M.St, s: Maybe<&2, S.Sched>, +cx: X.Cx<o>, +agent: String, +i: GI.In) -> X.Cx<o>:
+def timer_set.new(-o: S.St, s: Maybe<&2, S.Sched>, +cx: X.Cx<o>, +agent: String, +i: GI.In) -> X.Cx<o>:
   match s:
     case None{}:
       cx
@@ -1088,14 +1087,14 @@ def timer_set.new(-o: M.St, s: Maybe<&2, S.Sched>, +cx: X.Cx<o>, +agent: String,
         case _:
           cx
 
-def timer_set.active(-o: M.St, ok: Bool, +cx: X.Cx<o>, +agent: String, +sc: Maybe<&2, S.Sched>, +i: GI.In) -> X.Cx<o>:
+def timer_set.active(-o: S.St, ok: Bool, +cx: X.Cx<o>, +agent: String, +sc: Maybe<&2, S.Sched>, +i: GI.In) -> X.Cx<o>:
   match ok:
     case False{}:
       cx
     case True{}:
       timer_set.new(o, sc, cx, agent, i)
 
-def timer_set.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +sc: Maybe<&2, S.Sched>, +i: GI.In) -> X.Cx<o>:
+def timer_set.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +sc: Maybe<&2, S.Sched>, +i: GI.In) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -1103,12 +1102,12 @@ def timer_set.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +sc: Maybe<&2
       timer_set.active(o, is_active(S.Agent.life(a)), cx, S.Agent.name(a), sc, i)
 
 # `i`: the input, its IEverySet record
-def timer_set(-o: M.St, +cx: X.Cx<o>, +agent: String, +every_ms: Maybe<&2, Nat>, +daily_min: Maybe<&2, Nat>, +i: GI.In) -> X.Cx<o>:
+def timer_set(-o: S.St, +cx: X.Cx<o>, +agent: String, +every_ms: Maybe<&2, Nat>, +daily_min: Maybe<&2, Nat>, +i: GI.In) -> X.Cx<o>:
   timer_set.agent(o, R.agent_of(st(o, cx), agent), cx, SH.sched.go(every_ms, daily_min), i)
 
 # {"t":"every_stop"}: `sb every --stop`, /scheduled's x; `wake` (the
 # user's stop): what bise tells its agent, in the same step
-def timer_stop.found(-o: M.St, m: Maybe<&2, S.Timer>, +cx: X.Cx<o>, +id: Nat, +why: String, +wake: String) -> X.Cx<o>:
+def timer_stop.found(-o: S.St, m: Maybe<&2, S.Timer>, +cx: X.Cx<o>, +id: Nat, +why: String, +wake: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -1119,7 +1118,7 @@ def timer_stop.found(-o: M.St, m: Maybe<&2, S.Timer>, +cx: X.Cx<o>, +id: Nat, +w
 
 
 # {"t":"every_run"}: /scheduled's run now, through timer_fire
-def timer_run.found(-o: M.St, m: Maybe<&2, S.Timer>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
+def timer_run.found(-o: S.St, m: Maybe<&2, S.Timer>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -1132,7 +1131,7 @@ def timer_run.found(-o: M.St, m: Maybe<&2, S.Timer>, +cx: X.Cx<o>, +text: String
 # A timer set without a name is held: its ◷ set line waits for this step,
 # which announces it (architect m_15603: in sb-core, so a restart between
 # set and name still writes it, once; law named_announces_once)
-def timer_name.found(-o: M.St, m: Maybe<&2, S.Timer>, +cx: X.Cx<o>, +id: Nat, +name: String) -> X.Cx<o>:
+def timer_name.found(-o: S.St, m: Maybe<&2, S.Timer>, +cx: X.Cx<o>, +id: Nat, +name: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -1141,14 +1140,14 @@ def timer_name.found(-o: M.St, m: Maybe<&2, S.Timer>, +cx: X.Cx<o>, +id: Nat, +n
         u => emit(o, cx, M.ETimerName{id, name, S.Timer.held(t), now(o, cx)}, Unit{}, Unit{}, Unit{}))
 
 
-def timers_gone.each(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>, +why: String) -> X.Cx<o>:
+def timers_gone.each(-o: S.St, ids: List<&2, Nat>, +cx: X.Cx<o>, +why: String) -> X.Cx<o>:
   match ids:
     case Nil{}:
       cx
     case Con{+id, +rest}:
       timers_gone.each(o, rest, emit(o, cx, M.ETimerStop{id, why, now(o, cx)}, Unit{}, Unit{}, Unit{}), why)
 
-def timers_gone.if(-o: M.St, archived: Bool, +cx: X.Cx<o>, +n: String, +ns: List<&2, String>) -> X.Cx<o>:
+def timers_gone.if(-o: S.St, archived: Bool, +cx: X.Cx<o>, +n: String, +ns: List<&2, String>) -> X.Cx<o>:
   match archived:
     case False{}:
       cx
@@ -1157,7 +1156,7 @@ def timers_gone.if(-o: M.St, archived: Bool, +cx: X.Cx<o>, +n: String, +ns: List
 
 # an archived (dropped) agent's timers end with it, in the same step (law
 # stop_leaves_no_timer); a stopped one's wait for it, as before
-def timers_gone(-o: M.St, +life: S.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+def timers_gone(-o: S.St, +life: S.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   timers_gone.if(o, R.life_gone(life), cx, n, M.names_of(st(o, cx), n))
 
 # ---- the timers at a tick ----
@@ -1174,7 +1173,7 @@ def wake_q.go(ok: Bool, +t: S.Timer, +now: Nat) -> List<&2, J.Json>:
 
 # the wakes this tick may send (their texts and daily next times come
 # from the hub: one {need} for them all, answered by id)
-def wake_qs(-o: M.St, ts: List<&2, S.Timer>, +cx: X.Cx<o>) -> List<&2, J.Json>:
+def wake_qs(-o: S.St, ts: List<&2, S.Timer>, +cx: X.Cx<o>) -> List<&2, J.Json>:
   match ts:
     case Nil{}:
       Nil{}
@@ -1187,24 +1186,24 @@ def wake_ans(xs: List<&2, J.Json>, +id: Nat) -> Maybe<&2, J.Json>:
     case Nil{}:
       None{}
     case Con{+h, +t}:
-      LZ.pick(Maybe<&2, J.Json>, Nat.is_eq(C.get_nat(h, "id"), id), u => Some{h}, u => wake_ans(t, id))
+      LZ.pick(Maybe<&2, J.Json>, Nat.is_eq(K.get_n(h, "id"), id), u => Some{h}, u => wake_ans(t, id))
 
-def timers_tick.wake(-o: M.St, a: Maybe<&2, J.Json>, +cx: X.Cx<o>, +t: S.Timer) -> X.Cx<o>:
+def timers_tick.wake(-o: S.St, a: Maybe<&2, J.Json>, +cx: X.Cx<o>, +t: S.Timer) -> X.Cx<o>:
   match a:
     case None{}:
       cx
     case Some{+w}:
-      timer_fire(o, cx, t, C.get_s(w, "text"), True{},
-        TM.next_of(S.Timer.sched(t), S.Timer.next(t), now(o, cx), C.get_nat(w, "next_ms")))
+      timer_fire(o, cx, t, K.get_s(w, "text"), True{},
+        TM.next_of(S.Timer.sched(t), S.Timer.next(t), now(o, cx), K.get_n(w, "next_ms")))
 
-def timers_tick.end(-o: M.St, w: Maybe<&2, String>, +cx: X.Cx<o>, +t: S.Timer, +ans: List<&2, J.Json>) -> X.Cx<o>:
+def timers_tick.end(-o: S.St, w: Maybe<&2, String>, +cx: X.Cx<o>, +t: S.Timer, +ans: List<&2, J.Json>) -> X.Cx<o>:
   match w:
     case Some{+why}:
       emit(o, cx, M.ETimerStop{S.Timer.id(t), why, now(o, cx)}, Unit{}, Unit{}, Unit{})
     case None{}:
       timers_tick.wake(o, wake_ans(ans, S.Timer.id(t)), cx, t)
 
-def timers_tick.each(-o: M.St, ts: List<&2, S.Timer>, +cx: X.Cx<o>, +ans: List<&2, J.Json>) -> X.Cx<o>:
+def timers_tick.each(-o: S.St, ts: List<&2, S.Timer>, +cx: X.Cx<o>, +ans: List<&2, J.Json>) -> X.Cx<o>:
   match ts:
     case Nil{}:
       cx
@@ -1219,7 +1218,7 @@ def json_arr(m: Maybe<&2, J.Json>) -> List<&2, J.Json>:
     case _:
       Nil{}
 
-def timers_tick.asked(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +ts: List<&2, S.Timer>) -> X.Cx<o>:
+def timers_tick.asked(-o: S.St, p: X.Cx<o> & Maybe<&2, J.Json>, +ts: List<&2, S.Timer>) -> X.Cx<o>:
   match p:
     case (+cx, None{}):
       # the step halts: the hub answers, then runs the tick again (same now)
@@ -1227,14 +1226,14 @@ def timers_tick.asked(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +ts: List<&2, S.
     case (+cx, Some{+a}):
       timers_tick.each(o, ts, cx, json_arr(J.get(a, "wakes")))
 
-def timers_tick.ask(-o: M.St, qs: List<&2, J.Json>, +cx: X.Cx<o>, +ts: List<&2, S.Timer>) -> X.Cx<o>:
+def timers_tick.ask(-o: S.St, qs: List<&2, J.Json>, +cx: X.Cx<o>, +ts: List<&2, S.Timer>) -> X.Cx<o>:
   match qs:
     case Nil{}:
       timers_tick.each(o, ts, cx, Nil{})
     case Con{+q, +rest}:
       timers_tick.asked(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"every_wake"}), J.kv("wakes", J.JArr{q <> rest})])), ts)
 
-def timers_tick.go(-o: M.St, work: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
+def timers_tick.go(-o: S.St, work: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
   match work:
     case False{}:
       cx
@@ -1244,7 +1243,7 @@ def timers_tick.go(-o: M.St, work: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
 # the timers due now wake their agents (a busy one in its turn, steered:
 # law timer_fires_busy), the ended ones stop. A tick with none due or past its end does
 # nothing (idle-cpu)
-def timers_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def timers_tick(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   timers_tick.go(o, TM.any_work(live(o, cx), now(o, cx)), cx)
 
 # ---- watches (`sb wake`, hub/wakes.bend) ----
@@ -1256,7 +1255,7 @@ def timers_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
 def wake_snd(+agent: String, +text: String) -> Snd:
   Snd{M.HUB(), agent, text, False{}, None{}, False{}, False{}, False{}, None{}, ""}
 
-def wake_say(-o: M.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
+def wake_say(-o: S.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
   fst(o, send(o, cx, wake_snd(agent, text)))
 
 # {"t":"wake_hit"}: the look saw it happen. A live watch of an active
@@ -1264,7 +1263,7 @@ def wake_say(-o: M.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
 # (a busy one in its turn, steered). Ended or unknown:
 # nothing (laws wake_hit_once, wake_gone_never_hits); a stopped agent's
 # watch waits for it.
-def wake_hit.found(-o: M.St, m: Maybe<&2, S.Watch>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
+def wake_hit.found(-o: S.St, m: Maybe<&2, S.Watch>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -1273,12 +1272,12 @@ def wake_hit.found(-o: M.St, m: Maybe<&2, S.Watch>, +cx: X.Cx<o>, +text: String)
         u => wake_say(o, wake_end(o, cx, S.Watch.id(w), "hit"), S.Watch.agent(w), text),
         u => cx)
 
-def wake_hit(-o: M.St, +cx: X.Cx<o>, +id: Nat, +text: String) -> X.Cx<o>:
+def wake_hit(-o: S.St, +cx: X.Cx<o>, +id: Nat, +text: String) -> X.Cx<o>:
   wake_hit.found(o, WK.hit(wks(o, cx), id), cx, text)
 
 # {"t":"wake_set"}: the hub checked the request and wrote the words; a
 # watch only for an active agent, its id the next free one
-def wake_set.agent(-o: M.St, ok: Bool, +cx: X.Cx<o>, +agent: String, +spec: J.Json, +max_text: String, +max_ms: Nat, +quiet: Bool, +then: Maybe<&2, Bool>) -> X.Cx<o>:
+def wake_set.agent(-o: S.St, ok: Bool, +cx: X.Cx<o>, +agent: String, +spec: J.Json, +max_text: String, +max_ms: Nat, +quiet: Bool, +then: Maybe<&2, Bool>) -> X.Cx<o>:
   match ok:
     case False{}:
       cx
@@ -1286,7 +1285,7 @@ def wake_set.agent(-o: M.St, ok: Bool, +cx: X.Cx<o>, +agent: String, +spec: J.Js
       +w = WK.make(wks(o, cx), agent, spec, max_text, now(o, cx), max_ms, quiet, then)
       emit(o, cx, M.EWake{WK.WSet{w}}, Unit{}, Unit{}, Unit{})
 
-def wake_set(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +spec: J.Json, +max_text: String, +max_ms: Nat, +quiet: Bool, +then: Maybe<&2, Bool>) -> X.Cx<o>:
+def wake_set(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +spec: J.Json, +max_text: String, +max_ms: Nat, +quiet: Bool, +then: Maybe<&2, Bool>) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -1294,7 +1293,7 @@ def wake_set(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +spec: J.Json, +max_t
       wake_set.agent(o, R.agent_active(st(o, cx), n), cx, n, spec, max_text, max_ms, quiet, then)
 
 # {"t":"wake_stop"}: `sb wake --stop`, or his stop (`tell`: its agent hears it once); ended or unknown: nothing
-def wake_stop.found(-o: M.St, m: Maybe<&2, S.Watch>, +cx: X.Cx<o>, +why: String, +tell: String) -> X.Cx<o>:
+def wake_stop.found(-o: S.St, m: Maybe<&2, S.Watch>, +cx: X.Cx<o>, +why: String, +tell: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -1304,7 +1303,7 @@ def wake_stop.found(-o: M.St, m: Maybe<&2, S.Watch>, +cx: X.Cx<o>, +why: String,
 
 # a watch past its max ends, with its "still running" wake unless quiet
 # (law wake_max_once: ended, it is never due again)
-def wakes_tick.each(-o: M.St, ws: List<&2, S.Watch>, +cx: X.Cx<o>) -> X.Cx<o>:
+def wakes_tick.each(-o: S.St, ws: List<&2, S.Watch>, +cx: X.Cx<o>) -> X.Cx<o>:
   match ws:
     case Nil{}:
       cx
@@ -1314,7 +1313,7 @@ def wakes_tick.each(-o: M.St, ws: List<&2, S.Watch>, +cx: X.Cx<o>) -> X.Cx<o>:
         u => wake_say(o, cx2, S.Watch.agent(w), S.Watch.max_text(w)), u => cx2)
       wakes_tick.each(o, rest, cx3)
 
-def wakes_tick.go(-o: M.St, work: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
+def wakes_tick.go(-o: S.St, work: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
   match work:
     case False{}:
       cx
@@ -1322,10 +1321,10 @@ def wakes_tick.go(-o: M.St, work: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
       wakes_tick.each(o, WK.due(S.Wakes.live(wks(o, cx)), now(o, cx)), cx)
 
 # none past its max (the common case): nothing at all (idle-cpu)
-def wakes_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def wakes_tick(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   wakes_tick.go(o, WK.any_due(S.Wakes.live(wks(o, cx)), now(o, cx)), cx)
 
-def wakes_gone.each(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
+def wakes_gone.each(-o: S.St, ids: List<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
   match ids:
     case Nil{}:
       cx
@@ -1339,10 +1338,10 @@ def wakes_gone.each(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
 
 # its agent moved on (done, failed): its reply watches end quietly (law
 # ask_done_ends)
-def replies_end(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+def replies_end(-o: S.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   wake_ends(o, WK.replies_of(S.Wakes.live(wks(o, cx)), M.names_of(st(o, cx), agent)), cx, "moved on")
 
-def replies_gone.each(-o: M.St, ws: List<&2, S.Watch>, +cx: X.Cx<o>) -> X.Cx<o>:
+def replies_gone.each(-o: S.St, ws: List<&2, S.Watch>, +cx: X.Cx<o>) -> X.Cx<o>:
   match ws:
     case Nil{}:
       cx
@@ -1354,28 +1353,28 @@ def replies_gone.each(-o: M.St, ws: List<&2, S.Watch>, +cx: X.Cx<o>) -> X.Cx<o>:
 
 # the tick: a reply watch whose asked agent is gone ends, its agent told
 # once (law ask_target_gone_tells: ended, it is never an orphan again)
-def replies_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def replies_tick(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   replies_gone.each(o, R.replies_orphan(st(o, cx), S.Wakes.live(wks(o, cx))), cx)
 
 # an archived (dropped) agent's watches end with it, in the same step
 # (law wake_drop_ends); a stopped one's wait, as its timers do. The reply
 # watches waiting on it end at the next tick (replies_tick)
-def wakes_gone(-o: M.St, +life: S.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+def wakes_gone(-o: S.St, +life: S.Life, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, R.life_gone(life),
     u => wakes_gone.each(o, WK.ids_of(S.Wakes.live(wks(o, cx)), M.names_of(st(o, cx), n)), cx),
     u => cx)
 
-def reject_ids(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
+def reject_ids(-o: S.St, ids: List<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
   match ids:
     case Nil{}:
       cx
     case Con{+id, +rest}:
       reject_ids(o, rest, emit(o, cx, M.EMsgState{id, S.Rejected{"recipient_unavailable"}}, Unit{}, Unit{}, Unit{}))
 
-def set_waiters(-o: M.St, +cx: X.Cx<o>, +ws: List<&2, X.Waiter>) -> X.Cx<o>:
+def set_waiters(-o: S.St, +cx: X.Cx<o>, +ws: List<&2, X.Waiter>) -> X.Cx<o>:
   set_r(o, cx, X.R.with_waiters(rr(o, cx), ws))
 
-def stop_task.go(-o: M.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: String) -> X.Cx<o>:
+def stop_task.go(-o: S.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: String) -> X.Cx<o>:
   +cx1 = out(o, cx, F.kill(name))
   +cx2 = fail_waiters(o, cx1, name, "stopped")
   +r = rr(o, cx2)
@@ -1386,12 +1385,12 @@ def stop_task.go(-o: M.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: 
   close_cards(o, cx6, name, Nil{}, "agent stopped")
 
 # no wait of the stopped task survives (law stop_leaves_no_waiter)
-def stop_task(-o: M.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: String) -> X.Cx<o>:
+def stop_task(-o: S.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: String) -> X.Cx<o>:
   set_waiters(o, wakes_gone(o, life, timers_gone(o, life, stop_task.go(o, cx, name, life, reason), name), name), X.waiters_not(X.R.waiters(rr(o, cx)), name))
 
 # stop_task, after saying which of the user's queued messages will never
 # arrive (BISE-86)
-def stop_noted(-o: M.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: String) -> X.Cx<o>:
+def stop_noted(-o: S.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: String) -> X.Cx<o>:
   stop_task(o, undelivered_msgs(o, M.queued_for(st(o, cx), name), cx), name, life, reason)
 
 # ---- places (dev-flow §3.1): a worktree shared by agents (place.bend) ----
@@ -1399,7 +1398,7 @@ def stop_noted(-o: M.St, +cx: X.Cx<o>, +name: String, +life: S.Life, +reason: St
 
 # the place's folder is gone: so is it for the agents that left it
 # before (archived), with the same saved work (RFC 0002 §5, per place)
-def drop.left(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>, +snap: Maybe<&2, String>) -> X.Cx<o>:
+def drop.left(-o: S.St, ns: List<&2, String>, +cx: X.Cx<o>, +snap: Maybe<&2, String>) -> X.Cx<o>:
   match ns:
     case Nil{}:
       cx
@@ -1407,7 +1406,7 @@ def drop.left(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>, +snap: Maybe<&2, Str
       +cx2 = emit(o, cx, M.EWorkspace{n, PL.drop.left.ws(M.get_agent(st(o, cx), n))}, Unit{}, Unit{}, Unit{})
       drop.left(o, t, emit(o, cx2, M.ESnapshot{n, snap}, Unit{}, Unit{}, Unit{}), snap)
 
-def drop.ws(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o>:
+def drop.ws(-o: S.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o>:
   match r:
     case Fail{_}:
       cx
@@ -1417,19 +1416,19 @@ def drop.ws(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: S.Age
       +cx2 = emit(o, cx, M.EWorkspace{S.Agent.name(a), J.set(S.Agent.ws(a), "dropped", J.JBool{True{}})}, Unit{}, Unit{}, Unit{})
       drop.left(o, left, emit(o, cx2, M.ESnapshot{S.Agent.name(a), sn}, Unit{}, Unit{}, Unit{}), sn)
 
-def drop.finish(-o: M.St, +cx: X.Cx<o>, +a: S.Agent, +label: String) -> X.Cx<o> & DropR:
+def drop.finish(-o: S.St, +cx: X.Cx<o>, +a: S.Agent, +label: String) -> X.Cx<o> & DropR:
   +cx2 = feed(o, cx, M.MAIN(), FD.info(cat(["@", S.Agent.name(a), " archived", label])))
   # a client looking at it goes back to main
   (out(o, cx2, F.focus_main(S.Agent.name(a))), DDone{})
 
-def drop.git(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent) -> X.Cx<o> & DropR:
+def drop.git(-o: S.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent) -> X.Cx<o> & DropR:
   match p:
     case (+cx, None{}):
       (cx, DHalt{})
     case (+cx, Some{+ans}):
       drop.finish(o, drop.ws(o, PL.ans_ok(ans), cx, a), a, PL.drop_label(PL.ans_ok(ans)))
 
-def drop.now(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: S.Agent, +loss: J.Json) -> X.Cx<o> & DropR:
+def drop.now(-o: S.St, has_wt: Bool, +cx: X.Cx<o>, +a: S.Agent, +loss: J.Json) -> X.Cx<o> & DropR:
   match has_wt:
     case False{}:
       # a worktree others still work in stays (it goes with its last agent)
@@ -1440,7 +1439,7 @@ def drop.now(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: S.Agent, +loss: J.Json) -
       drop.git(o, ask(o, cx2, J.obj([J.kv("q", J.JStr{"worktree_drop"}), J.kv("name", J.JStr{S.Agent.name(a)}), J.kv("ws", S.Agent.ws(a)),
         J.kv("dirty", J.JNum{J.get_num_or(loss, "dirty", 0n)}), J.kv("unpushed", J.JNum{J.get_num_or(loss, "unpushed", 0n)})])), a)
 
-def drop.decide(-o: M.St, confirm: Bool, +cx: X.Cx<o>, +a: S.Agent, +has_wt: Bool, +loss: J.Json, +busy: Bool) -> X.Cx<o> & DropR:
+def drop.decide(-o: S.St, confirm: Bool, +cx: X.Cx<o>, +a: S.Agent, +has_wt: Bool, +loss: J.Json, +busy: Bool) -> X.Cx<o> & DropR:
   match confirm:
     case True{}:
       +dirty = J.get_num_or(loss, "dirty", 0n)
@@ -1451,7 +1450,7 @@ def drop.decide(-o: M.St, confirm: Bool, +cx: X.Cx<o>, +a: S.Agent, +has_wt: Boo
     case False{}:
       drop.now(o, has_wt, cx, a, loss)
 
-def drop.loss(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent, +force: Bool, +has_wt: Bool) -> X.Cx<o> & DropR:
+def drop.loss(-o: S.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent, +force: Bool, +has_wt: Bool) -> X.Cx<o> & DropR:
   match p:
     case (+cx, None{}):
       (cx, DHalt{})
@@ -1460,14 +1459,14 @@ def drop.loss(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent, +force: Boo
       +any = Nat.is_gt(Nat.add(J.get_num_or(loss, "dirty", 0n), J.get_num_or(loss, "unpushed", 0n)), 0n)
       drop.decide(o, Bool.not(force) && (busy || any), cx, a, has_wt, loss, busy)
 
-def drop.wt(-o: M.St, has_wt: Bool, +cx: X.Cx<o>, +a: S.Agent, +force: Bool) -> X.Cx<o> & DropR:
+def drop.wt(-o: S.St, has_wt: Bool, +cx: X.Cx<o>, +a: S.Agent, +force: Bool) -> X.Cx<o> & DropR:
   match has_wt:
     case True{}:
       drop.loss(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_loss"}), J.kv("name", J.JStr{S.Agent.name(a)}), J.kv("ws", S.Agent.ws(a))])), a, force, True{})
     case False{}:
       drop.loss(o, (cx, Some{J.obj([J.kv("dirty", J.JNum{0n}), J.kv("unpushed", J.JNum{0n})])}), a, force, False{})
 
-def drop.checks(-o: M.St, is_main: Bool, life: S.Life, +cx: X.Cx<o>, +a: S.Agent, +force: Bool) -> X.Cx<o> & DropR:
+def drop.checks(-o: S.St, is_main: Bool, life: S.Life, +cx: X.Cx<o>, +a: S.Agent, +force: Bool) -> X.Cx<o> & DropR:
   match is_main:
     case True{}:
       (cx, DErr{"main cannot be dropped"})
@@ -1480,14 +1479,14 @@ def drop.checks(-o: M.St, is_main: Bool, life: S.Life, +cx: X.Cx<o>, +a: S.Agent
           +last = List.is_empty(&2, String, PL.mates_of(st(o, cx), a, True{}))
           drop.wt(o, M.ws_worktree(S.Agent.ws(a)) && Bool.not(M.ws_dropped(S.Agent.ws(a)) || M.ws_placing(S.Agent.ws(a))) && last, cx, a, force)
 
-def drop.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +force: Bool) -> X.Cx<o> & DropR:
+def drop.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +force: Bool) -> X.Cx<o> & DropR:
   match m:
     case None{}:
       (cx, DErr{String.append("no agent named ", name)})
     case Some{+a}:
       drop.checks(o, S.Agent.is_main(a), S.Agent.life(a), cx, a, force)
 
-def agent_of(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, S.Agent>:
+def agent_of(+s: S.St, m: Maybe<&2, String>) -> Maybe<&2, S.Agent>:
   match m:
     case None{}:
       None{}
@@ -1495,10 +1494,10 @@ def agent_of(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, S.Agent>:
       M.get_agent(s, n)
 
 # RFC 0001 §9.4 + RFC 0002 §5
-def drop_task(-o: M.St, +cx: X.Cx<o>, +name: String, +force: Bool) -> X.Cx<o> & DropR:
+def drop_task(-o: S.St, +cx: X.Cx<o>, +name: String, +force: Bool) -> X.Cx<o> & DropR:
   drop.agent(o, agent_of(st(o, cx), M.resolve(st(o, cx), name)), cx, name, force)
 
-def restore.go(-o: M.St, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
+def restore.go(-o: S.St, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   +n = S.Agent.name(a)
   +cx2 = emit(o, cx, M.ELifecycle{n, S.LActive{}, None{}}, Unit{}, Unit{}, Unit{})
   +r = rr(o, cx2)
@@ -1507,7 +1506,7 @@ def restore.go(-o: M.St, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   # an idle task back from failed gets the mail it kept (law L4)
   (feed(o, pump(o, cx4, n), M.MAIN(), FD.info(cat(["@", n, " restored"]))), TOk{n})
 
-def restore.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
+def restore.res(-o: S.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match r:
     case Fail{+e}:
       (cx, TErr{e})
@@ -1515,23 +1514,23 @@ def restore.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: S
       +cx2 = emit(o, cx, M.EWorkspace{S.Agent.name(a), ws}, Unit{}, Unit{}, Unit{})
       restore.go(o, emit(o, cx2, M.ESnapshot{S.Agent.name(a), None{}}, Unit{}, Unit{}, Unit{}), a)
 
-def restore.ans(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent) -> X.Cx<o> & TaskR:
+def restore.ans(-o: S.St, p: X.Cx<o> & Maybe<&2, J.Json>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match p:
     case (+cx, None{}):
       (cx, THalt{})
     case (+cx, Some{+ans}):
       restore.res(o, PL.ans_ok(ans), cx, a)
 
-def restore.wt(-o: M.St, dropped: Bool, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
+def restore.wt(-o: S.St, dropped: Bool, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match dropped:
     case True{}:
       restore.ans(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_restore"}), J.kv("name", J.JStr{S.Agent.name(a)}), J.kv("ws", S.Agent.ws(a)),
-        J.kv("snapshot_ref", C.jmaybe_str(S.Agent.snap(a)))])), a)
+        J.kv("snapshot_ref", K.jmaybe_s(S.Agent.snap(a)))])), a)
     case False{}:
       restore.go(o, cx, a)
 
 # its place is live again (a mate restored it): it rejoins the folder
-def restore.join(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
+def restore.join(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match m:
     case None{}:
       restore.wt(o, True{}, cx, a)
@@ -1540,14 +1539,14 @@ def restore.join(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +a: S.Agent) -> 
       +cx2 = emit(o, cx, M.EWorkspace{n, S.Agent.ws(b)}, Unit{}, Unit{}, Unit{})
       restore.go(o, emit(o, cx2, M.ESnapshot{n, None{}}, Unit{}, Unit{}, Unit{}), a)
 
-def restore.dropped(-o: M.St, dropped: Bool, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
+def restore.dropped(-o: S.St, dropped: Bool, +cx: X.Cx<o>, +a: S.Agent) -> X.Cx<o> & TaskR:
   match dropped:
     case True{}:
       restore.join(o, PL.first_agent(st(o, cx), PL.mates_of(st(o, cx), a, True{})), cx, a)
     case False{}:
       restore.go(o, cx, a)
 
-def restore.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
+def restore.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
   match m:
     case None{}:
       (cx, TErr{String.append("no agent named ", name)})
@@ -1555,17 +1554,17 @@ def restore.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) 
       LZ.pick(X.Cx<o> & TaskR, is_active(S.Agent.life(a)), u => (cx, TErr{cat(["@", S.Agent.name(a), " is active"])}),
         u => restore.dropped(o, M.ws_worktree(S.Agent.ws(a)) && M.ws_dropped(S.Agent.ws(a)), cx, a))
 
-def restore_task(-o: M.St, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
+def restore_task(-o: S.St, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
   restore.agent(o, agent_of(st(o, cx), M.resolve(st(o, cx), name)), cx, name)
 
-def isolate.sent(-o: M.St, p: X.Cx<o> & SendR, +n: String, +branch: String) -> X.Cx<o> & TaskR:
+def isolate.sent(-o: S.St, p: X.Cx<o> & SendR, +n: String, +branch: String) -> X.Cx<o> & TaskR:
   match p:
     case (+cx, SErr{+e}):
       (cx, TErr{e})
     case (+cx, SOk{_}):
       (feed(o, cx, M.MAIN(), FD.info(cat(["@", n, " now works in the worktree ", branch]))), TOk{n})
 
-def isolate.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +n: String) -> X.Cx<o> & TaskR:
+def isolate.res(-o: S.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +n: String) -> X.Cx<o> & TaskR:
   match r:
     case Fail{+e}:
       (cx, TErr{e})
@@ -1579,21 +1578,21 @@ def isolate.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +n: S
       +text = cat(["[bise] Your working directory is now the isolated git worktree `", path, "` (branch `", branch, "`). Work only there from now on."])
       isolate.sent(o, send(o, cx4, msg(M.USER(), n, text, False{}, None{}, True{}, False{})), n, branch)
 
-def isolate.ans(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +n: String) -> X.Cx<o> & TaskR:
+def isolate.ans(-o: S.St, p: X.Cx<o> & Maybe<&2, J.Json>, +n: String) -> X.Cx<o> & TaskR:
   match p:
     case (+cx, None{}):
       (cx, THalt{})
     case (+cx, Some{+ans}):
       isolate.res(o, PL.ans_ok(ans), cx, n)
 
-def isolate.pre(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +n: String) -> X.Cx<o> & TaskR:
+def isolate.pre(-o: S.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +n: String) -> X.Cx<o> & TaskR:
   match pre:
     case Some{+e}:
       (cx, TErr{e})
     case None{}:
       isolate.ans(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_create"}), J.kv("name", J.JStr{n}), J.kv("with_changes", J.JBool{False{}})])), n)
 
-def isolate.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
+def isolate.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
   match m:
     case None{}:
       (cx, TErr{String.append("no agent named ", name)})
@@ -1606,19 +1605,19 @@ def isolate.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String) 
             Bool.pick(Maybe<&2, String>, X.R.git(rr(o, cx)), None{}, Some{"the workspace is not a git repository"}))))
       isolate.pre(o, pre, cx, n)
 
-def isolate_task(-o: M.St, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
+def isolate_task(-o: S.St, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
   isolate.agent(o, agent_of(st(o, cx), M.resolve(st(o, cx), name)), cx, name)
 
 # ---- `sb move <agent> <place>` (dev-flow §3.1, /isolate generalized) ----
 
-def move.sent(-o: M.St, p: X.Cx<o> & SendR, +n: String, +dest: String) -> X.Cx<o> & TaskR:
+def move.sent(-o: S.St, p: X.Cx<o> & SendR, +n: String, +dest: String) -> X.Cx<o> & TaskR:
   match p:
     case (+cx, SErr{+e}):
       (cx, TErr{e})
     case (+cx, SOk{_}):
       (feed(o, cx, M.MAIN(), FD.info(cat(["@", n, " moved to ", dest]))), TOk{n})
 
-def move.res(-o: M.St, +cx: X.Cx<o>, +n: String, +ws: J.Json) -> X.Cx<o> & TaskR:
+def move.res(-o: S.St, +cx: X.Cx<o>, +n: String, +ws: J.Json) -> X.Cx<o> & TaskR:
   +path = M.ws_path(ws)
   +branch = J.get_str_or(ws, "branch", "")
   +wt = M.ws_worktree(ws)
@@ -1632,7 +1631,7 @@ def move.res(-o: M.St, +cx: X.Cx<o>, +n: String, +ws: J.Json) -> X.Cx<o> & TaskR
   +dest = Bool.pick(String, wt, cat(["the worktree ", branch]), "the shared folder")
   move.sent(o, send(o, cx4, msg(M.USER(), n, text, False{}, None{}, True{}, False{})), n, dest)
 
-def move.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +ws: J.Json) -> X.Cx<o> & TaskR:
+def move.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +ws: J.Json) -> X.Cx<o> & TaskR:
   match m:
     case None{}:
       (cx, TErr{String.append("no agent named ", name)})
@@ -1645,7 +1644,7 @@ def move.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +ws
             Bool.pick(Maybe<&2, String>, is_busy(X.Rt.run(rt(o, cx, n))), Some{cat(["@", n, " is mid-turn: wait for the end of its turn"])}, None{}))))
       LZ.pick(X.Cx<o> & TaskR, Maybe.is_some(&2, String, pre), u => (cx, TErr{Maybe.default(&2, String, pre, "")}), u => move.res(o, cx, n, ws))
 
-def move.to(-o: M.St, j: Maybe<&2, J.Json>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
+def move.to(-o: S.St, j: Maybe<&2, J.Json>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
   match j:
     case Some{J.JObj{+kvs}}:
       move.agent(o, agent_of(st(o, cx), M.resolve(st(o, cx), name)), cx, name, J.JObj{kvs})
@@ -1654,7 +1653,7 @@ def move.to(-o: M.St, j: Maybe<&2, J.Json>, +cx: X.Cx<o>, +name: String) -> X.Cx
 
 # `ws`: the target place's (the daemon finds it; none: a new worktree,
 # /isolate); `pre_err`: the daemon refused (no such place...)
-def move_task(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +j: Maybe<&2, J.Json>) -> X.Cx<o> & TaskR:
+def move_task(-o: S.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +j: Maybe<&2, J.Json>) -> X.Cx<o> & TaskR:
   match pre:
     case Some{+e}:
       (cx, TErr{e})
@@ -1666,43 +1665,43 @@ def move_task(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +j:
 # an active agent gets the note from the hub, queued (a busy one reads it
 # after its turn, never a steer); a stopped or failed one only its new
 # workspace: never a revive (law feature_retire_stops_nothing)
-def feature_retire.tell(-o: M.St, life: S.Life, +cx: X.Cx<o>, +n: String, +text: String) -> X.Cx<o>:
+def feature_retire.tell(-o: S.St, life: S.Life, +cx: X.Cx<o>, +n: String, +text: String) -> X.Cx<o>:
   match life:
     case S.LActive{}:
       fst(o, send.thread(o, None{}, cx, Snd{M.HUB(), n, text, False{}, None{}, True{}, False{}, True{}, None{}, ""}))
     case _:
       cx
 
-def feature_retire.one(-o: M.St, +cx: X.Cx<o>, +a: S.Agent, +text: String) -> X.Cx<o>:
+def feature_retire.one(-o: S.St, +cx: X.Cx<o>, +a: S.Agent, +text: String) -> X.Cx<o>:
   +n = S.Agent.name(a)
   feature_retire.tell(o, S.Agent.life(a), emit(o, cx, M.EWorkspace{n, FT.unfeature(S.Agent.ws(a))}, Unit{}, Unit{}, Unit{}), n, text)
 
-def feature_retire.all(-o: M.St, xs: List<&2, S.Agent>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
+def feature_retire.all(-o: S.St, xs: List<&2, S.Agent>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   match xs:
     case Nil{}:
       cx
     case Con{+a, +t}:
       feature_retire.all(o, t, feature_retire.one(o, cx, a, text), text)
 
-def feature_retire(-o: M.St, +cx: X.Cx<o>, +name: String, +kept: String, +main: String) -> X.Cx<o>:
+def feature_retire(-o: S.St, +cx: X.Cx<o>, +name: String, +kept: String, +main: String) -> X.Cx<o>:
   +xs = FT.retirees(st(o, cx), name)
   +cx2 = feature_retire.all(o, xs, cx, FT.note(name, kept, main))
   feed(o, cx2, M.MAIN(), FD.info(FT.line(name, kept, main, xs)))
 
 # ---- the user ----
 
-def user_sent(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
+def user_sent(-o: S.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   out(o, cx, F.user_sent(text))
 
 # a card closed with his answer `a` (inbox-record): the journal keeps it
 # for the inbox's history
-def close_card_ans(-o: M.St, +cx: X.Cx<o>, +id: Nat, +res: String, +a: S.Ans) -> X.Cx<o>:
+def close_card_ans(-o: S.St, +cx: X.Cx<o>, +id: Nat, +res: String, +a: S.Ans) -> X.Cx<o>:
   +cx2 = emit(o, cx, M.ECardClosed{id, res, a}, Unit{}, Unit{}, Unit{})
   feed(o, cx2, M.MAIN(), FD.card_closed(id, res))
 
 # a card closed without his answer (withdrawn, closed, stopped): its
 # journal line carries no answer (law closed_without_him_has_no_answer)
-def close_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +res: String) -> X.Cx<o>:
+def close_card(-o: S.St, +cx: X.Cx<o>, +id: Nat, +res: String) -> X.Cx<o>:
   close_card_ans(o, cx, id, res, S.Ans.empty())
 
 # one of the card's options (picks.bend); its laws read it here
@@ -1717,17 +1716,17 @@ def answer_rec(+a: PK.Answer, +msg: Maybe<&2, Nat>) -> J.Json:
 
 # that route line in `agent`'s feed, then its parts; the step's answer
 # names the same answer (X.answered: inbox picks (3), architect m_22636)
-def answer_line(-o: M.St, +cx: X.Cx<o>, +agent: String, +who: String, +c: S.Card, +said: String, +parts: String, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
+def answer_line(-o: S.St, +cx: X.Cx<o>, +agent: String, +who: String, +c: S.Card, +said: String, +parts: String, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
   +a = PK.ans(S.Card.id(c), S.Card.text(c), who, said)
   +cx2 = feed(o, X.answered(o, cx, a), agent, answer_rec(a, msg))
   LZ.pick(X.Cx<o>, String.is_empty(parts), u => cx2, u => feed(o, cx2, agent, FD.route_parts(parts_json(parts))))
 
 # the same line in the asker's own feed (inbox picks (2)): an agent's
 # card has it in both feeds, main's own in main's alone
-def asker_line(-o: M.St, +cx: X.Cx<o>, +asker: String, +c: S.Card, +said: String, +parts: String, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
+def asker_line(-o: S.St, +cx: X.Cx<o>, +asker: String, +c: S.Card, +said: String, +parts: String, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.eq(asker, M.MAIN()), u => cx, u => answer_line(o, cx, asker, asker, c, said, parts, msg))
 
-def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: S.Card, +asker: String, +text: String, +parts: String, +via: String) -> X.Cx<o>:
+def answer.q.sent(-o: S.St, p: X.Cx<o> & SendR, +c: S.Card, +asker: String, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       notice(o, cx, e)
@@ -1751,7 +1750,7 @@ def MAIN_ANSWER_HEAD() -> String:
 # The same route line as an agent's card (answer.q.sent), his answer whole:
 # the clients fold that line into the "you answered" row and drop the
 # notify's twin (lines.rs is_main_answer_note, its head MAIN_ANSWER_HEAD)
-def answer.q.main(-o: M.St, +cx: X.Cx<o>, +c: S.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
+def answer.q.main(-o: S.St, +cx: X.Cx<o>, +c: S.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   +id = S.Card.id(c)
   +cx2 = notify_main(o, cx, cat([MAIN_ANSWER_HEAD(), ns(id), " (\"", T.one_line(S.Card.text(c)), "\"): \"", T.one_line(text), "\""]))
   +cx3 = answer_line(o, cx2, M.MAIN(), M.MAIN(), c, text, parts, None{})
@@ -1761,7 +1760,7 @@ def answer.q.main(-o: M.St, +cx: X.Cx<o>, +c: S.Card, +text: String, +parts: Str
 def answer.snd(+to: String, +text: String, +reply_to: Maybe<&2, Nat>, +parts: String) -> Snd:
   Snd{M.USER(), to, text, False{}, reply_to, False{}, False{}, False{}, None{}, parts}
 
-def answer.q(-o: M.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +c: S.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
+def answer.q(-o: S.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +c: S.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match m:
     case Some{+q}:
       answer.q.sent(o, send(o, cx, answer.snd(S.Msg.from(q), text, Some{S.Msg.id(q)}, parts)), c, S.Msg.from(q), text, parts, via)
@@ -1773,21 +1772,21 @@ def answer.q(-o: M.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +c: S.Card, +text: Str
         u => answer.q.sent(o, send(o, cx, answer.snd(ag, text, None{}, parts)), c, ag, text, parts, via),
         u => answer.q.main(o, cx, c, text, parts, via))
 
-def answer.dropped(-o: M.St, p: X.Cx<o> & DropR, +c: S.Card, +a: S.Ans) -> X.Cx<o>:
+def answer.dropped(-o: S.St, p: X.Cx<o> & DropR, +c: S.Card, +a: S.Ans) -> X.Cx<o>:
   match p:
     case (+cx, DErr{+e}):
       close_card_ans(o, notice(o, cx, e), S.Card.id(c), "accepted", a)
     case (+cx, _):
       close_card_ans(o, note_main(o, cx, String.append("the user accepted to drop @", S.Card.agent(c))), S.Card.id(c), "accepted", a)
 
-def answer.drop(-o: M.St, yes: Bool, +cx: X.Cx<o>, +c: S.Card, +a: S.Ans) -> X.Cx<o>:
+def answer.drop(-o: S.St, yes: Bool, +cx: X.Cx<o>, +c: S.Card, +a: S.Ans) -> X.Cx<o>:
   match yes:
     case True{}:
       answer.dropped(o, drop_task(o, cx, S.Card.agent(c), True{}), c, a)
     case False{}:
       close_card_ans(o, note_main(o, cx, String.append("the user refused to drop @", S.Card.agent(c))), S.Card.id(c), "refused", a)
 
-def answer.plain.sent(-o: M.St, p: X.Cx<o> & SendR, +id: Nat) -> X.Cx<o>:
+def answer.plain.sent(-o: S.St, p: X.Cx<o> & SendR, +id: Nat) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       notice(o, cx, e)
@@ -1806,10 +1805,10 @@ def card_kind(+k: String) -> CardK:
 
 
 # typed words on an approval card: the card stays open, nothing wakes
-def words_refused(-o: M.St, +cx: X.Cx<o>, +c: S.Card, +opts: String) -> X.Cx<o>:
+def words_refused(-o: S.St, +cx: X.Cx<o>, +c: S.Card, +opts: String) -> X.Cx<o>:
   notice(o, cx, cat(["notification #", ns(S.Card.id(c)), " waits for ", opts, " — typed words don't answer it"]))
 
-def answer.confirm(-o: M.St, ok: Bool, +cx: X.Cx<o>, +c: S.Card, +text: String, +via: String) -> X.Cx<o>:
+def answer.confirm(-o: S.St, ok: Bool, +cx: X.Cx<o>, +c: S.Card, +text: String, +via: String) -> X.Cx<o>:
   match ok:
     case True{}:
       # the approvals gate (approvals-design.md §9): the answer is the
@@ -1825,14 +1824,14 @@ def answer.confirm(-o: M.St, ok: Bool, +cx: X.Cx<o>, +c: S.Card, +text: String, 
 # item (a merge runs `gh pr merge`: the item stays open meanwhile); typed
 # words don't answer it (the composer rule: the window sends them to the
 # agent as a message)
-def answer.choice(-o: M.St, num: Bool, +cx: X.Cx<o>, +c: S.Card, +text: String) -> X.Cx<o>:
+def answer.choice(-o: S.St, num: Bool, +cx: X.Cx<o>, +c: S.Card, +text: String) -> X.Cx<o>:
   match num:
     case True{}:
       out(o, cx, F.card_choice(S.Card.id(c), S.Card.kind(c), S.Card.agent(c), S.Card.place(c), S.Card.pr(c), String.trim(text)))
     case False{}:
       words_refused(o, cx, c, "one of its numbers")
 
-def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: S.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
+def answer.kind(-o: S.St, k: CardK, +cx: X.Cx<o>, +c: S.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match k:
     case KQuestion{}:
       answer.q(o, for_msg_of(st(o, cx), S.Card.for_msg(c)), cx, c, text, parts, via)
@@ -1856,7 +1855,7 @@ def late.snd(+it: S.Item, +text: String, +parts: String) -> Snd:
 
 # sent: card_late takes the card out of the list (law late_answer_once);
 # not sent: the card stays answerable, he hears why
-def answer.late.sent(-o: M.St, p: X.Cx<o> & SendR, +id: Nat) -> X.Cx<o>:
+def answer.late.sent(-o: S.St, p: X.Cx<o> & SendR, +id: Nat) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       notice(o, cx, e)
@@ -1866,17 +1865,17 @@ def answer.late.sent(-o: M.St, p: X.Cx<o> & SendR, +id: Nat) -> X.Cx<o>:
 # his answer to a card that isn't open (withdrawn-answer, architect
 # m_30039): a card main withdrew while he answered it (`g`, still in
 # St.gone) reaches main, once, never dropped; any other card: refused
-def answer.late(-o: M.St, g: Maybe<&2, S.Item>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
+def answer.late(-o: S.St, g: Maybe<&2, S.Item>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
   match g:
     case None{}:
       notice(o, cx, cat(["notification #", ns(id), " isn't open"]))
     case Some{+it}:
       answer.late.sent(o, send(o, cx, late.snd(it, text, parts)), id)
 
-def answer.card(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String, +via: String) -> X.Cx<o>:
+def answer.card(-o: S.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match m:
     case None{}:
-      answer.late(o, G.find(M.St.gone(st(o, cx)), id), cx, id, text, parts)
+      answer.late(o, G.find(S.St.gone(st(o, cx)), id), cx, id, text, parts)
     case Some{+c}:
       answer.kind(o, card_kind(S.Card.kind(c)), cx, c, text, parts, via)
 
@@ -1884,8 +1883,8 @@ def answer.card(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +id: Nat, +text: S
 # none), kept on the asker's message and written after the route line;
 # `via`: where he answered ("inbox": the inbox's answer; "thread": his
 # words to the asker in its own view, says.card)
-def answer_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String, +via: String) -> X.Cx<o>:
-  answer.card(o, M.card_of(M.St.cards(st(o, cx)), id), cx, id, text, parts, via)
+def answer_card(-o: S.St, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String, +via: String) -> X.Cx<o>:
+  answer.card(o, M.card_of(S.St.cards(st(o, cx)), id), cx, id, text, parts, via)
 
 def asked_by(m: Maybe<&2, S.Msg>, +to: String) -> Bool:
   match m:
@@ -1896,7 +1895,7 @@ def asked_by(m: Maybe<&2, S.Msg>, +to: String) -> Bool:
 
 # RFC 0001 §7.3: answering a task that waits on the user, from its own
 # view, answers its question
-def question_card(cs: List<&2, S.Card>, +s: M.St, +to: String) -> Maybe<&2, Nat>:
+def question_card(cs: List<&2, S.Card>, +s: S.St, +to: String) -> Maybe<&2, Nat>:
   match cs:
     case Nil{}:
       None{}
@@ -1904,14 +1903,14 @@ def question_card(cs: List<&2, S.Card>, +s: M.St, +to: String) -> Maybe<&2, Nat>
       LZ.pick(Maybe<&2, Nat>, String.eq(S.Card.kind(c), "question") && asked_by(for_msg_of(s, S.Card.for_msg(c)), to),
         u => Some{S.Card.id(c)}, u => question_card(t, s, to))
 
-def says.sent(-o: M.St, p: X.Cx<o> & SendR, +to: String, +text: String) -> X.Cx<o>:
+def says.sent(-o: S.St, p: X.Cx<o> & SendR, +to: String, +text: String) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       undelivered.if(o, unavailable_err(e), notice(o, cx, e), to, to, text)
     case (+cx, SOk{_}):
       LZ.pick(X.Cx<o>, String.eq(to, M.MAIN()), u => cx, u => user_sent(o, cx, text))
 
-def says.card(-o: M.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
+def says.card(-o: S.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
   match card:
     case Some{+id}:
       answer_card(o, user_sent(o, cx, text), id, text, parts, "thread")
@@ -1923,8 +1922,8 @@ def says.card(-o: M.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: 
 # said at its turn's end (law user_queued_waits_for_turn_end); it never
 # answers a question card (law user_queued_never_answers_a_card).
 # `parts`: his message's parts (msg-parts, "" none), kept on the message
-def user_says(-o: M.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
-  says.card(o, Bool.pick(Maybe<&2, Nat>, queued || String.eq(to, M.MAIN()), None{}, question_card(M.St.cards(st(o, cx)), st(o, cx), to)), cx, to, text, queued, parts)
+def user_says(-o: S.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
+  says.card(o, Bool.pick(Maybe<&2, Nat>, queued || String.eq(to, M.MAIN()), None{}, question_card(S.St.cards(st(o, cx)), st(o, cx), to)), cx, to, text, queued, parts)
 
 def close_names(xs: List<&2, String>, +target: String) -> List<&2, String>:
   match xs:
@@ -1936,7 +1935,7 @@ def close_names(xs: List<&2, String>, +target: String) -> List<&2, String>:
       Bool.pick(List<&2, String>, Bool.not(String.eq(n, M.MAIN())) && (String.starts_with(n, Bool.pick(String, String.is_empty(first), "?", first)) || String.contains(n, target)),
         String.append("@", n) <> rest, rest)
 
-def route.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focus: String, +parts: String) -> X.Cx<o>:
+def route.sent(-o: S.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focus: String, +parts: String) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       undelivered.if(o, unavailable_err(e), notice(o, cx, e), focus, name, text)
@@ -1946,10 +1945,10 @@ def route.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focu
         u => note_main(o, cx2, cat(["the user wrote directly to @", name, ": \"", T.one_line(text), "\""])), u => cx2)
       cx3
 
-def route.target(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool, +parts: String) -> X.Cx<o>:
+def route.target(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool, +parts: String) -> X.Cx<o>:
   match m:
     case None{}:
-      +close = close_names(M.St.order(st(o, cx)), target)
+      +close = close_names(S.St.order(st(o, cx)), target)
       +hint = Bool.pick(String, List.is_empty(&2, String, close), "", cat([" — did you mean ", String.join(close, ", "), "?"]))
       notice(o, cx, cat(["no agent named @", target, hint]))
     case Some{+name}:
@@ -1961,18 +1960,18 @@ def route.target(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, 
 
 # `@task text`: a direct message, without main; `queued` and `parts` as
 # user_says
-def route(-o: M.St, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool, +parts: String) -> X.Cx<o>:
+def route(-o: S.St, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool, +parts: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.eq(target, M.MAIN()), u => user_says(o, cx, M.MAIN(), text, queued, parts),
     u => route.target(o, M.resolve(st(o, cx), target), cx, target, text, focus, queued, parts))
 
-def user_new.res(-o: M.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
+def user_new.res(-o: S.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
   match p:
     case (+cx, TErr{+e}):
       notice(o, cx, e)
     case (+cx, _):
       cx
 
-def user_drop.res(-o: M.St, p: X.Cx<o> & DropR, +name: String) -> X.Cx<o>:
+def user_drop.res(-o: S.St, p: X.Cx<o> & DropR, +name: String) -> X.Cx<o>:
   match p:
     case (+cx, DDone{}):
       note_main(o, cx, String.append("the user dropped the agent @", name))
@@ -1984,14 +1983,14 @@ def user_drop.res(-o: M.St, p: X.Cx<o> & DropR, +name: String) -> X.Cx<o>:
     case (+cx, DHalt{}):
       cx
 
-def user_confirm.res(-o: M.St, p: X.Cx<o> & DropR, +name: String) -> X.Cx<o>:
+def user_confirm.res(-o: S.St, p: X.Cx<o> & DropR, +name: String) -> X.Cx<o>:
   match p:
     case (+cx, DErr{+e}):
       notice(o, cx, e)
     case (+cx, _):
       note_main(o, cx, String.append("the user dropped the agent @", name))
 
-def user_restore.res(-o: M.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
+def user_restore.res(-o: S.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
   match p:
     case (+cx, TOk{+n}):
       note_main(o, cx, String.append("the user restored the agent @", n))
@@ -2000,7 +1999,7 @@ def user_restore.res(-o: M.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
     case (+cx, THalt{}):
       cx
 
-def user_isolate.res(-o: M.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
+def user_isolate.res(-o: S.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
   match p:
     case (+cx, TOk{+n}):
       note_main(o, cx, cat(["the user moved @", n, " into its own git worktree"]))
@@ -2011,17 +2010,17 @@ def user_isolate.res(-o: M.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
 
 # the rename itself (the user's /rename and main's sb rename): take.bend
 # frees the new name first (an archived agent's, an old name: name-free)
-def rename.apply(-o: M.St, +cx: X.Cx<o>, +old: String, +new: String) -> X.Cx<o>:
+def rename.apply(-o: S.St, +cx: X.Cx<o>, +old: String, +new: String) -> X.Cx<o>:
   TK.rename_to(o, cx, old, new)
 
-def rename.go(-o: M.St, ok: Bool, +cx: X.Cx<o>, +old: String, +new: String) -> X.Cx<o>:
+def rename.go(-o: S.St, ok: Bool, +cx: X.Cx<o>, +old: String, +new: String) -> X.Cx<o>:
   match ok:
     case False{}:
       notice(o, cx, String.append("invalid or taken name: ", new))
     case True{}:
       note_main(o, rename.apply(o, cx, old, new), cat(["the user renamed @", old, " to @", new, " (the old name still works)"]))
 
-def rename.old(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +new: String, +valid: Bool) -> X.Cx<o>:
+def rename.old(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +new: String, +valid: Bool) -> X.Cx<o>:
   match m:
     case None{}:
       notice(o, cx, String.append("no agent named @", name))
@@ -2032,14 +2031,14 @@ def rename.old(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +new
 # the typed fact of a stop (desktop reset, architect m_9650 D): in the same
 # step as the interrupt, a 'stopped' line in that agent's feed; the thread's
 # fold turns it into an entry of kind 'stopped' at its position
-def stopped(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+def stopped(-o: S.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   feed(o, cx, agent, FD.stopped("stopped"))
 
 # the interrupt's effect for that agent (the shell flags its REPL)
-def interrupt.fx(-o: M.St, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+def interrupt.fx(-o: S.St, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   out(o, cx, F.interrupt(n))
 
-def interrupt.go(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
+def interrupt.go(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case Some{+n}:
       LZ.pick(X.Cx<o>, is_busy(X.Rt.run(rt(o, cx, n))),
@@ -2051,7 +2050,7 @@ def interrupt.go(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
 # ---- the project's pause (cost-pause, hub/pause.bend) ----
 
 # each busy turn stops: the interrupt and its 'stopped' line
-def pause.stop(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
+def pause.stop(-o: S.St, ns: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
   match ns:
     case Nil{}:
       cx
@@ -2063,7 +2062,7 @@ def pause.stop(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
 
 # `/pause`: journaled, then every busy turn stops; already paused:
 # nothing changes (law pause_idempotent)
-def pause.go(-o: M.St, already: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
+def pause.go(-o: S.St, already: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
   match already:
     case True{}:
       notice(o, cx, P.ALREADY())
@@ -2072,10 +2071,10 @@ def pause.go(-o: M.St, already: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
       +cx2 = emit(o, cx, M.EPaused{now(o, cx)}, Unit{}, Unit{}, Unit{})
       notice(o, dirty(o, pause.stop(o, ns, cx2)), P.paused_text(List.length(&2, String, ns)))
 
-def pause(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def pause(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   pause.go(o, P.is_paused(st(o, cx)), cx)
 
-def resume.pump(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
+def resume.pump(-o: S.St, ns: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
   match ns:
     case Nil{}:
       cx
@@ -2084,7 +2083,7 @@ def resume.pump(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
 
 # `/resume`: journaled, then every agent gets what was held, in the hub's
 # order (law resume_delivers_held); not paused: nothing changes
-def resume.go(-o: M.St, paused: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
+def resume.go(-o: S.St, paused: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
   match paused:
     case False{}:
       notice(o, cx, P.NOT_PAUSED())
@@ -2092,14 +2091,14 @@ def resume.go(-o: M.St, paused: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
       +agents = P.woken(st(o, cx))
       +his = P.his(st(o, cx))
       +cx2 = emit(o, cx, M.EResumed{now(o, cx)}, Unit{}, Unit{}, Unit{})
-      notice(o, dirty(o, resume.pump(o, M.St.order(st(o, cx2)), cx2)), P.resumed_text(agents, his))
+      notice(o, dirty(o, resume.pump(o, S.St.order(st(o, cx2)), cx2)), P.resumed_text(agents, his))
 
-def resume(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def resume(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   resume.go(o, P.is_paused(st(o, cx)), cx)
 
 # his message `id`, still queued, taken back: Rejected{"taken_back"},
 # never delivered (an older sb-core replays it so); the queue loses it
-def unqueue.take(-o: M.St, s: S.MSt, +cx: X.Cx<o>, +id: Nat, +to: String) -> X.Cx<o>:
+def unqueue.take(-o: S.St, s: S.MSt, +cx: X.Cx<o>, +id: Nat, +to: String) -> X.Cx<o>:
   match s:
     case S.Queued{_}:
       emit(o, cx, M.EMsgState{id, S.Rejected{"taken_back"}}, Unit{}, Unit{}, Unit{})
@@ -2110,7 +2109,7 @@ def unqueue.take(-o: M.St, s: S.MSt, +cx: X.Cx<o>, +id: Nat, +to: String) -> X.C
     case S.Cancelled{}:
       notice(o, cx, cat([mid(id), " isn't waiting any more"]))
 
-def unqueue.go(-o: M.St, m: Maybe<&2, S.MRec>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
+def unqueue.go(-o: S.St, m: Maybe<&2, S.MRec>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
   match m:
     case None{}:
       notice(o, cx, cat(["no message ", mid(id), " to take back"]))
@@ -2133,7 +2132,7 @@ def st_after(m: Maybe<&2, S.MRec>, +x: S.MSt) -> Maybe<&2, S.MSt>:
 # HubCmd queued_take, the client socket only, issue 16): only a queued
 # message from the user changes (law unqueue_takes_back_only_his_queued);
 # anything else is a notice saying why, and nothing changes
-def unqueue(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
+def unqueue(-o: S.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
   unqueue.go(o, M.rec_at(st(o, cx), id), cx, id)
 
 # his queued message said now (the window's 'send now', architect
@@ -2141,7 +2140,7 @@ def unqueue(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
 # kept, steered into the running turn or a turn of its own (laws
 # steer_queued_*); the agent can't take it (down, starting, gone, the
 # project paused): a notice, and it stays queued
-def steer_queued.run(-o: M.St, run: S.Run, +cx: X.Cx<o>, +m: S.Msg, +name: String, +is_main: Bool) -> X.Cx<o>:
+def steer_queued.run(-o: S.St, run: S.Run, +cx: X.Cx<o>, +m: S.Msg, +name: String, +is_main: Bool) -> X.Cx<o>:
   match run:
     case S.RBusy{}:
       pump.batch(o, [m], cx, name, True{}, is_main)
@@ -2150,7 +2149,7 @@ def steer_queued.run(-o: M.St, run: S.Run, +cx: X.Cx<o>, +m: S.Msg, +name: Strin
     case _:
       notice(o, cx, cat([mid(S.Msg.id(m)), " stays queued: @", name, " isn't running"]))
 
-def steer_queued.agent(-o: M.St, a: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
+def steer_queued.agent(-o: S.St, a: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
   match a:
     case None{}:
       notice(o, cx, cat([mid(S.Msg.id(m)), " stays queued: @", S.Msg.to(m), " is gone"]))
@@ -2159,7 +2158,7 @@ def steer_queued.agent(-o: M.St, a: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +m: S.Msg)
         u => steer_queued.run(o, X.Rt.run(rt(o, cx, S.Agent.name(g))), cx, m, S.Agent.name(g), S.Agent.is_main(g)),
         u => notice(o, cx, cat([mid(S.Msg.id(m)), " stays queued: @", S.Agent.name(g), " can't take it now"])))
 
-def steer_queued.take(-o: M.St, s: S.MSt, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
+def steer_queued.take(-o: S.St, s: S.MSt, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
   match s:
     case S.Queued{_}:
       +to = S.Msg.to(m)
@@ -2167,7 +2166,7 @@ def steer_queued.take(-o: M.St, s: S.MSt, +cx: X.Cx<o>, +m: S.Msg) -> X.Cx<o>:
     case _:
       notice(o, cx, cat([mid(S.Msg.id(m)), " isn't waiting any more"]))
 
-def steer_queued.go(-o: M.St, r: Maybe<&2, S.MRec>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
+def steer_queued.go(-o: S.St, r: Maybe<&2, S.MRec>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
   match r:
     case None{}:
       notice(o, cx, cat(["no message ", mid(id), " to send now"]))
@@ -2176,17 +2175,17 @@ def steer_queued.go(-o: M.St, r: Maybe<&2, S.MRec>, +cx: X.Cx<o>, +id: Nat) -> X
         u => steer_queued.take(o, S.MRec.st(x), cx, S.MRec.msg(x)),
         u => notice(o, cx, cat([mid(id), " isn't one of your messages"])))
 
-def steer_queued(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
+def steer_queued(-o: S.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
   steer_queued.go(o, M.rec_at(st(o, cx), id), cx, id)
 
-def passthrough(-o: M.St, +cx: X.Cx<o>, +focus: String, +l: String) -> X.Cx<o>:
+def passthrough(-o: S.St, +cx: X.Cx<o>, +focus: String, +l: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, has_agent(o, cx, focus) && is_idle(X.Rt.run(rt(o, cx, focus))),
     u => out(o, dirty(o, set_run(o, cx, focus, S.RBusy{})), F.passthrough(focus, l)),
     u => notice(o, cx, "the agent is not idle: retry at the end of its turn"))
 
 # the daemon computed what main learns about a direct exchange (RFC
 # 0001 §7.4)
-def focus(-o: M.St, +cx: X.Cx<o>, +f: String, note: Maybe<&2, String>, +direct: String) -> X.Cx<o>:
+def focus(-o: S.St, +cx: X.Cx<o>, +f: String, note: Maybe<&2, String>, +direct: String) -> X.Cx<o>:
   match note:
     case Some{+n}:
       feed(o, note_main(o, cx, n), M.MAIN(), FD.direct(direct))
@@ -2205,24 +2204,24 @@ def focus(-o: M.St, +cx: X.Cx<o>, +f: String, note: Maybe<&2, String>, +direct: 
 # or as `@bise`'s question; main's answer (the end of its turn, or
 # `sb send @bise --reply-to`) goes back once, as an `xreply`.
 
-def xst(-o: M.St, +cx: X.Cx<o>) -> S.Xs:
-  M.St.x(st(o, cx))
+def xst(-o: S.St, +cx: X.Cx<o>) -> S.Xs:
+  S.St.x(st(o, cx))
 
-def xemit(-o: M.St, +cx: X.Cx<o>, +e: XH.XEv) -> X.Cx<o>:
+def xemit(-o: S.St, +cx: X.Cx<o>, +e: XH.XEv) -> X.Cx<o>:
   emit(o, cx, M.EX{e}, Unit{}, Unit{}, Unit{})
 
-def aemit(-o: M.St, +cx: X.Cx<o>, +e: TM.ActEv) -> X.Cx<o>:
+def aemit(-o: S.St, +cx: X.Cx<o>, +e: TM.ActEv) -> X.Cx<o>:
   emit(o, cx, M.EAct{e}, Unit{}, Unit{}, Unit{})
 
-def xdeliver(-o: M.St, +cx: X.Cx<o>, +ob: S.Out) -> X.Cx<o>:
+def xdeliver(-o: S.St, +cx: X.Cx<o>, +ob: S.Out) -> X.Cx<o>:
   out(o, cx, F.xdeliver(S.Out.xid(ob), S.Out.project(ob), SC.XKind.word(S.Out.kind(ob)), S.Out.msg(ob), S.Out.text(ob), S.Out.context(ob), S.Out.parts(ob)))
 
 # home: a new outbox entry, journaled, then its first delivery
-def xsend.new(-o: M.St, +cx: X.Cx<o>, +token: Nat, +ob: S.Out) -> X.Cx<o>:
+def xsend.new(-o: S.St, +cx: X.Cx<o>, +token: Nat, +ob: S.Out) -> X.Cx<o>:
   +cx2 = xdeliver(o, xemit(o, cx, XH.XOut{ob}), ob)
   reply(o, cx2, token, ok_body([J.kv("xid", J.JNum{S.Out.xid(ob)}), J.kv("project", J.JStr{S.Out.project(ob)})]))
 
-def xsend.fwd(-o: M.St, f: XB.Fwd, +cx: X.Cx<o>, +token: Nat, +project: String, +id: Nat) -> X.Cx<o>:
+def xsend.fwd(-o: S.St, f: XB.Fwd, +cx: X.Cx<o>, +token: Nat, +project: String, +id: Nat) -> X.Cx<o>:
   match f:
     case XB.FwdErr{+e}:
       reply_err(o, cx, token, e)
@@ -2231,26 +2230,26 @@ def xsend.fwd(-o: M.St, f: XB.Fwd, +cx: X.Cx<o>, +token: Nat, +project: String, 
 
 # `sb project send <p> --input m_<n>` (main only, req.main): `pre_err`,
 # the hub's (an unknown project, this hub itself)
-def req_xsend(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+def req_xsend(-o: S.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match pre:
     case Some{+e}:
       reply_err(o, cx, token, e)
     case None{}:
-      xsend.fwd(o, XB.forward(st(o, cx), M.MAIN(), C.get_nat(q, "msg")), cx, token, C.get_s(q, "project"), C.get_nat(q, "msg"))
+      xsend.fwd(o, XB.forward(st(o, cx), M.MAIN(), K.get_n(q, "msg")), cx, token, K.get_s(q, "project"), K.get_n(q, "msg"))
 
-def req_xask.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+def req_xask.go(-o: S.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match err:
     case Some{+e}:
       reply_err(o, cx, token, e)
     case None{}:
-      xsend.new(o, cx, token, S.Out.with_text(XB.out_to(xst(o, cx), C.get_s(q, "project"), S.KAsk{}), C.get_s(q, "text")))
+      xsend.new(o, cx, token, S.Out.with_text(XB.out_to(xst(o, cx), K.get_s(q, "project"), S.KAsk{}), K.get_s(q, "text")))
 
 # `sb project ask <p> "<question>"` (main only): bise's own words
-def req_xask(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
-  req_xask.go(o, Maybe.or(&2, String, pre, XB.ask_ok(C.get_s(q, "text"))), cx, token, q)
+def req_xask(-o: S.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+  req_xask.go(o, Maybe.or(&2, String, pre, XB.ask_ok(K.get_s(q, "text"))), cx, token, q)
 
 # home: the project hub has it (a late ack of a settled send: nothing)
-def xack(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
+def xack(-o: S.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2258,7 +2257,7 @@ def xack(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
       xemit(o, cx, XH.XOp{xid, XH.OpAcked{}})
 
 # home: a delivery failed: one more try, and the next one's act
-def xfail(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
+def xfail(-o: S.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2277,7 +2276,7 @@ def xanswer.kind(k: S.XKind, +ob: S.Out, +text: String) -> String:
 
 # home: the project's answer settles its send, once (law
 # xhub_outbox_settles_once) and reaches main from `@<project>`
-def xanswer(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat, +name: String, +text: String) -> X.Cx<o>:
+def xanswer(-o: S.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat, +name: String, +text: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2285,7 +2284,7 @@ def xanswer(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>, +xid: Nat, +name: Strin
       +cx2 = xemit(o, cx, XH.XOp{xid, XH.OpSettled{}})
       fst(o, send(o, cx2, msg(String.append("@", name), M.MAIN(), xanswer.kind(S.Out.kind(ob), ob, text), False{}, None{}, False{}, False{})))
 
-def xretry(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
+def xretry(-o: S.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2300,15 +2299,15 @@ def xretry(-o: M.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
 # turn: law route_fire_makes_no_turn) forwarded by the outbox, and main
 # gets a note with the id. A cancel says them to main as today.
 
-def route_ev(-o: M.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
+def route_ev(-o: S.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
   out(o, cx, F.route(S.Route.rid(r), S.Route.to(r), S.Route.name(r), S.Route.text(r), S.Route.due(r), S.Route.why(r)))
 
-def route_done(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +xid: Maybe<&2, Nat>, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
+def route_done(-o: S.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +xid: Maybe<&2, Nat>, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
   out(o, cx, F.route_done(rid, state, to, xid, msg))
 
 # home: the input route_hold (the shell's route.rs picked `to`, a project
 # hub id, `name` its name): held, its act set, the window told
-def route_hold.to(-o: M.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
+def route_hold.to(-o: S.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
   +r = XB.route_of_hold(xst(o, cx), tms(o, cx), d, now(o, cx))
   +cx2 = xemit(o, cx, XH.XRouteHeld{r})
   route_ev(o, aemit(o, cx2, TM.ActSet{XB.route_act(r)}), r)
@@ -2317,7 +2316,7 @@ def route_hold.to(-o: M.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
 # words and carried wherever they go (R41 (6): his images reach the
 # project, and bise's main keeps them on his message). No `to` (only an
 # older shell sent one): his words go to bise's main now, never held.
-def route_hold(-o: M.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
+def route_hold(-o: S.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.is_empty(S.Route.to(d)),
     u => user_says(o, cx, M.MAIN(), S.Route.text(d), False{}, S.Route.parts(d)),
     u => route_hold.to(o, cx, d))
@@ -2325,18 +2324,18 @@ def route_hold(-o: M.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
 # a held route with no target (left by an older hub's route model in its
 # journal) whose act fired: it ends, and his words reach bise's main as a
 # plain message (the cancel path, no route_done: the window never saw it)
-def route_plain(-o: M.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
+def route_plain(-o: S.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
   +cx2 = xemit(o, cx, XH.XRoute{S.Route.rid(r), XH.REnd{S.RCancelled{}}})
   says.sent(o, send(o, cx2, Snd{M.USER(), M.MAIN(), S.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(S.Route.via(r)), S.Route.parts(r)}), M.MAIN(), S.Route.text(r))
 
 # his routed words in bise's main thread, where he wrote them: his line,
 # its id, his parts, then where they went (the window and the TUI fold
 # the `routed` record onto his entry by the id; law route_fire_says_where)
-def route_fire.lines(-o: M.St, +cx: X.Cx<o>, +r: S.Route, +id: Nat, +xid: Nat) -> X.Cx<o>:
+def route_fire.lines(-o: S.St, +cx: X.Cx<o>, +r: S.Route, +id: Nat, +xid: Nat) -> X.Cx<o>:
   +cx2 = feed(o, feed(o, cx, M.MAIN(), FD.you(S.Route.text(r), XB.via_of(S.Route.via(r)))), M.MAIN(), FD.you_id(id))
   feed(o, you_parts(o, cx2, M.MAIN(), S.Route.parts(r)), M.MAIN(), FD.routed(S.Route.to(r), S.Route.name(r), xid, id))
 
-def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: S.Route, +id: Nat) -> X.Cx<o>:
+def route_fire.sent(-o: S.St, +cx: X.Cx<o>, +r: S.Route, +id: Nat) -> X.Cx<o>:
   +cx2 = emit(o, mark_delivered(o, cx, id), M.ESettled{id}, Unit{}, Unit{}, Unit{})
   +ob = XB.out_of_route(xst(o, cx2), r, id)
   +cx3 = xdeliver(o, xemit(o, route_fire.lines(o, cx2, r, id, S.Out.xid(ob)), XH.XOut{ob}), ob)
@@ -2348,26 +2347,26 @@ def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: S.Route, +id: Nat) -> X.Cx<o>:
 # his routed words as his message to main, journaled only: no send (a
 # send would pump main, a turn), no waiter, no card (law
 # route_fire_makes_no_turn)
-def route_said(-o: M.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
-  +msg = XB.msg_of_route(r, M.St.next_msg(st(o, cx)), now(o, cx))
+def route_said(-o: S.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
+  +msg = XB.msg_of_route(r, S.St.next_msg(st(o, cx)), now(o, cx))
   emit(o, cx, M.EMsgSent{msg}, {==}, quiet_ok(False{}, False{}), Unit{})
 
 # home: a held route's act fired: his message to main is created now (an
 # id for the history and `--input`), delivered and settled at once with
 # no turn (law route_fire_makes_no_turn), then forwarded once
-def route_fire(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
+def route_fire(-o: S.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+r}:
-      route_fire.sent(o, route_said(o, cx, r), r, M.St.next_msg(st(o, cx)))
+      route_fire.sent(o, route_said(o, cx, r), r, S.St.next_msg(st(o, cx)))
 
-def route_gone(-o: M.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
+def route_gone(-o: S.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
   notice(o, cx, cat(["route ", Nat.show(rid), " already went or was cancelled"]))
 
 # home: the input route_cancel: a held route ends, its act with it, and
 # his words reach main as a plain message (today's path)
-def route_cancel.go(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
+def route_cancel.go(-o: S.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
   match m:
     case None{}:
       route_gone(o, cx, rid)
@@ -2377,10 +2376,10 @@ def route_cancel.go(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>, +rid: Nat) ->
       +cx4 = route_done(o, cx3, rid, "cancelled", S.Route.to(r), None{}, None{})
       says.sent(o, send(o, cx4, Snd{M.USER(), M.MAIN(), S.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(S.Route.via(r)), S.Route.parts(r)}), M.MAIN(), S.Route.text(r))
 
-def route_cancel(-o: M.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
+def route_cancel(-o: S.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
   route_cancel.go(o, XB.held(xst(o, cx), rid), cx, rid)
 
-def route_correct.go(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String) -> X.Cx<o>:
+def route_correct.go(-o: S.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String) -> X.Cx<o>:
   match m:
     case None{}:
       route_gone(o, cx, rid)
@@ -2391,14 +2390,14 @@ def route_correct.go(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>, +rid: Nat, +
 # a held route gets its new project, same due time; `bise` keeps his
 # words here (a cancel); a route not held: a notice (law
 # route_correct_only_held)
-def route_correct(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String) -> X.Cx<o>:
+def route_correct(-o: S.St, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.eq(to, XB.VIA_BISE()),
     u => route_cancel(o, cx, rid),
     u => route_correct.go(o, XB.held(xst(o, cx), rid), cx, rid, to, name))
 
 # a held route's act fired: with no target (an older hub's), plain to
 # main (law route_unclear_goes_plain); else forwarded (route_fire)
-def route_go(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
+def route_go(-o: S.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2407,14 +2406,14 @@ def route_go(-o: M.St, m: Maybe<&2, S.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
         u => route_plain(o, cx, r),
         u => route_fire(o, Some{r}, cx))
 
-def act_fire(-o: M.St, w: S.What, +cx: X.Cx<o>) -> X.Cx<o>:
+def act_fire(-o: S.St, w: S.What, +cx: X.Cx<o>) -> X.Cx<o>:
   match w:
     case S.Retry{+xid}:
       xretry(o, XB.pending(xst(o, cx), xid), cx)
     case S.RouteSend{+rid}:
       route_go(o, XB.held(xst(o, cx), rid), cx)
 
-def acts_tick.each(-o: M.St, xs: List<&2, S.Act>, +cx: X.Cx<o>) -> X.Cx<o>:
+def acts_tick.each(-o: S.St, xs: List<&2, S.Act>, +cx: X.Cx<o>) -> X.Cx<o>:
   match xs:
     case Nil{}:
       cx
@@ -2423,10 +2422,10 @@ def acts_tick.each(-o: M.St, xs: List<&2, S.Act>, +cx: X.Cx<o>) -> X.Cx<o>:
 
 # the acts due at the tick fire once each (laws act_fires_once,
 # act_due_only); none due: nothing (idle-cpu)
-def acts_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def acts_tick(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   acts_tick.each(o, TM.acts_due(S.Tms.acts(tms(o, cx)), now(o, cx)), cx)
 
-def xboot.each(-o: M.St, xs: List<&2, S.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
+def xboot.each(-o: S.St, xs: List<&2, S.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
   match xs:
     case Nil{}:
       cx
@@ -2435,7 +2434,7 @@ def xboot.each(-o: M.St, xs: List<&2, S.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
 
 # home: at boot the pending sends go again (the project drops a second
 # copy: law xhub_xin_delivered_once)
-def xboot(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def xboot(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   xboot.each(o, XB.pendings(S.Xs.outbox(xst(o, cx))), cx)
 
 # `parts`: his routed message's (R41 (6), "" none), kept on his message
@@ -2449,7 +2448,7 @@ def xin.snd(k: S.XKind, +text: String, +parts: String) -> Snd:
     case S.KJobEnd{}:
       Snd{XB.FROM_BISE(), M.MAIN(), text, False{}, None{}, False{}, False{}, False{}, None{}, ""}
 
-def xin.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +k: S.XKind) -> X.Cx<o>:
+def xin.sent(-o: S.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +k: S.XKind) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       reply_err(o, cx, token, e)
@@ -2459,15 +2458,15 @@ def xin.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat,
 # J, bise's home hub: the line a followed task's end says in bise's main,
 # from `@<project>`: the same words as a local task's report to main
 def xjob_end.line(+j: J.Json) -> String:
-  cat(["[report: ", C.get_s(j, "state"), "] @", C.get_s(j, "agent"), " (followed): ", String.trim(C.get_s(j, "summary"))])
+  cat(["[report: ", K.get_s(j, "state"), "] @", K.get_s(j, "agent"), " (followed): ", String.trim(K.get_s(j, "summary"))])
 
-def xjob_end.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +j: J.Json) -> X.Cx<o>:
+def xjob_end.sent(-o: S.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +j: J.Json) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       reply_err(o, cx, token, e)
     case (+cx, SOk{+m}):
       +cx2 = xemit(o, cx, XH.XGot{S.XIn.with_replied(S.XIn.with_kind(S.XIn.with_msg(XH.xin_from(hub, xid), S.Msg.id(m)), S.KJobEnd{}), True{})})
-      +cx3 = out(o, cx2, F.followed_end(hub, C.get_s(j, "agent"), C.get_nat(j, "key"), C.get_s(j, "state"), C.get_s(j, "label"), C.get_s(j, "summary")))
+      +cx3 = out(o, cx2, F.followed_end(hub, K.get_s(j, "agent"), K.get_n(j, "key"), K.get_s(j, "state"), K.get_s(j, "label"), K.get_s(j, "summary")))
       reply(o, cx3, token, ok_body(Nil{}))
 
 # J, bise's home hub: a task it follows in the project `name` ended: one
@@ -2475,14 +2474,14 @@ def xjob_end.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid:
 # report (it wakes main by the same rule: main tells him), recorded as
 # received once (law xhub_xin_delivered_once), and fx followed_end for
 # the window
-def xjob_end(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +name: String) -> X.Cx<o>:
+def xjob_end(-o: S.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +name: String) -> X.Cx<o>:
   match r:
     case Fail{+e}:
       reply_err(o, cx, token, cat(["a job_end that isn't JSON: ", e]))
     case Done{+j}:
       xjob_end.sent(o, send(o, cx, msg(String.append("@", name), M.MAIN(), xjob_end.line(j), False{}, None{}, False{}, False{})), token, hub, xid, j)
 
-def xin.kind(-o: M.St, k: S.XKind, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +text: String, +name: String, +parts: String) -> X.Cx<o>:
+def xin.kind(-o: S.St, k: S.XKind, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +text: String, +name: String, +parts: String) -> X.Cx<o>:
   match k:
     case S.KJobEnd{}:
       xjob_end(o, J.parse(text), cx, token, hub, xid, name)
@@ -2493,7 +2492,7 @@ def xin.kind(-o: M.St, k: S.XKind, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid
 
 # project: bise's message, said to main once per origin (hub, xid); bise's
 # home hub: a followed task's end (kind job_end, `name` the project's)
-def xin(-o: M.St, seen: Bool, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +k: S.XKind, +text: String, +name: String, +parts: String) -> X.Cx<o>:
+def xin(-o: S.St, seen: Bool, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +k: S.XKind, +text: String, +name: String, +parts: String) -> X.Cx<o>:
   match seen:
     case True{}:
       reply(o, cx, token, ok_body([J.kv("seen", J.JBool{True{}})]))
@@ -2502,26 +2501,26 @@ def xin(-o: M.St, seen: Bool, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat
 
 # project: main answered bise's message: settled here, sent back once
 # (law xhub_xin_replied_once)
-def xreplied(-o: M.St, +cx: X.Cx<o>, +i: S.XIn, +text: String) -> X.Cx<o>:
+def xreplied(-o: S.St, +cx: X.Cx<o>, +i: S.XIn, +text: String) -> X.Cx<o>:
   +cx2 = emit(o, cx, M.ESettled{S.XIn.msg(i)}, Unit{}, Unit{}, Unit{})
   +cx3 = xemit(o, cx2, XH.XReplied{S.XIn.hub(i), S.XIn.xid(i)})
   out(o, cx3, F.xreply(S.XIn.hub(i), S.XIn.xid(i), text))
 
-def xreply_due(+s: M.St, +from: String, r: Maybe<&2, Nat>) -> Maybe<&2, S.XIn>:
+def xreply_due(+s: S.St, +from: String, r: Maybe<&2, Nat>) -> Maybe<&2, S.XIn>:
   match r:
     case None{}:
       None{}
     case Some{+id}:
-      Bool.pick(Maybe<&2, S.XIn>, String.eq(from, M.MAIN()), XB.reply_due(M.St.x(s), id), None{})
+      Bool.pick(Maybe<&2, S.XIn>, String.eq(from, M.MAIN()), XB.reply_due(S.St.x(s), id), None{})
 
 # project: `sb send @bise --reply-to m_<n> "..."`: main's answer to an
 # open message of bise's, before its turn ends
-def req_xreply(-o: M.St, r: Maybe<&2, S.XIn>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+def req_xreply(-o: S.St, r: Maybe<&2, S.XIn>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match r:
     case None{}:
       reply_err(o, cx, token, "@bise takes only main's answer to an open message from bise: sb send @bise --reply-to m_<n> \"...\"")
     case Some{+i}:
-      reply(o, xreplied(o, cx, i, C.get_s(q, "text")), token, ok_body([J.kv("to", J.JStr{XB.FROM_BISE()}), J.kv("delivery", J.JStr{"sent"})]))
+      reply(o, xreplied(o, cx, i, K.get_s(q, "text")), token, ok_body([J.kv("to", J.JStr{XB.FROM_BISE()}), J.kv("delivery", J.JStr{"sent"})]))
 
 # ---- the agents' `sb` requests (RFC 0003 §4, RFC 0001 §7.2, §7.5) ----
 
@@ -2540,7 +2539,7 @@ def jstr_list(xs: List<&2, J.Json>) -> List<&2, String>:
       +rest = jstr_list(t)
       jstr_list.one(h, rest)
 
-def main_only(-o: M.St, +cx: X.Cx<o>, +token: Nat) -> X.Cx<o>:
+def main_only(-o: S.St, +cx: X.Cx<o>, +token: Nat) -> X.Cx<o>:
   reply_err(o, cx, token, "reserved for main (the parent of the agents)")
 
 def req_send.delivered(m: Maybe<&2, S.MSt>) -> Bool:
@@ -2550,7 +2549,7 @@ def req_send.delivered(m: Maybe<&2, S.MSt>) -> Bool:
     case _:
       False{}
 
-def req_send.res(-o: M.St, p: X.Cx<o> & SendR, +token: Nat) -> X.Cx<o>:
+def req_send.res(-o: S.St, p: X.Cx<o> & SendR, +token: Nat) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       reply_err(o, cx, token, e)
@@ -2569,54 +2568,54 @@ def first_from(xs: List<&2, S.Msg>, +asker: String) -> Maybe<&2, Nat>:
     case Con{+m, +t}:
       LZ.pick(Maybe<&2, Nat>, String.eq(S.Msg.from(m), asker), u => Some{S.Msg.id(m)}, u => first_from(t, asker))
 
-def open_question.go(m: Maybe<&2, String>, +s: M.St, +me: String) -> Maybe<&2, Nat>:
+def open_question.go(m: Maybe<&2, String>, +s: S.St, +me: String) -> Maybe<&2, Nat>:
   match m:
     case None{}:
       None{}
     case Some{+asker}:
       first_from(M.unanswered_for(s, me), asker)
 
-def open_question(+s: M.St, +asker: String, +me: String) -> Maybe<&2, Nat>:
+def open_question(+s: S.St, +asker: String, +me: String) -> Maybe<&2, Nat>:
   open_question.go(M.resolve(s, asker), s, me)
 
 # an agent's `sb send` as the message it makes
 def req_send.snd(+from: String, +to: String, +expect: Bool, +reply_to: Maybe<&2, Nat>, +q: J.Json) -> Snd:
-  Snd{from, to, C.get_s(q, "text"), expect, reply_to, False{}, False{}, C.get_b(q, "queued"), None{}, C.get_s(q, "parts")}
+  Snd{from, to, K.get_s(q, "text"), expect, reply_to, False{}, False{}, K.get_b(q, "queued"), None{}, K.get_s(q, "parts")}
 
-def req_send.go(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
-  +to = C.get_s(q, "to")
-  +expect = C.get_b(q, "expect_reply")
+def req_send.go(-o: S.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
+  +to = K.get_s(q, "to")
+  +expect = K.get_b(q, "expect_reply")
   # a plain message to an agent that asked us something answers it
-  +reply_to = Maybe.or(&2, Nat, C.opt_nat(J.get(q, "reply_to")),
+  +reply_to = Maybe.or(&2, Nat, K.opt_n(J.get(q, "reply_to")),
     Bool.pick(Maybe<&2, Nat>, expect, None{}, open_question(st(o, cx), to, from)))
   # send-parts: its parts as the hub checked them (`sb send --attach`;
   # "" none), the text already theirs (law agent_send_keeps_parts)
-  req_send.res(o, send_why(o, cx, req_send.snd(from, to, expect, reply_to, q), C.get_s(q, "why")), token)
+  req_send.res(o, send_why(o, cx, req_send.snd(from, to, expect, reply_to, q), K.get_s(q, "why")), token)
 
 
 # BISE-299: a question main escalated (`sb card --for`) is in the user's
 # inbox: only the user answers it; an agent's reply to it is refused
-def req_send.held(-o: M.St, held: Maybe<&2, Nat>, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
+def req_send.held(-o: S.St, held: Maybe<&2, Nat>, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
   match held:
     case Some{+id}:
-      +r = C.get_nat(q, "reply_to")
+      +r = K.get_n(q, "reply_to")
       reply_err(o, cx, token, cat([mid(r), " is in the user's inbox (notification #", ns(id), "): only the user answers it",
         Bool.pick(String, String.eq(from, M.MAIN()), cat([". It is moot? `sb notify --withdraw ", ns(id), " \"why\"` takes it back first"]), "")]))
     case None{}:
       req_send.go(o, cx, token, from, q)
 
-def req_send.hold(+s: M.St, r: Maybe<&2, Nat>) -> Maybe<&2, Nat>:
+def req_send.hold(+s: S.St, r: Maybe<&2, Nat>) -> Maybe<&2, Nat>:
   match r:
     case None{}:
       None{}
     case Some{+id}:
-      CK.card_holding(M.St.cards(s), id)
+      CK.card_holding(S.St.cards(s), id)
 
-def req_send(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
-  LZ.pick(X.Cx<o>, String.eq(C.get_s(q, "to"), XB.FROM_BISE()),
-    u => req_xreply(o, xreply_due(st(o, cx), from, C.opt_nat(J.get(q, "reply_to"))), cx, token, q),
-    u => req_send.held(o, req_send.hold(st(o, cx), C.opt_nat(J.get(q, "reply_to"))), cx, token, from, q))
-def wait.park(-o: M.St, +cx: X.Cx<o>, +w: X.Waiter) -> X.Cx<o>:
+def req_send(-o: S.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
+  LZ.pick(X.Cx<o>, String.eq(K.get_s(q, "to"), XB.FROM_BISE()),
+    u => req_xreply(o, xreply_due(st(o, cx), from, K.opt_n(J.get(q, "reply_to"))), cx, token, q),
+    u => req_send.held(o, req_send.hold(st(o, cx), K.opt_n(J.get(q, "reply_to"))), cx, token, from, q))
+def wait.park(-o: S.St, +cx: X.Cx<o>, +w: X.Waiter) -> X.Cx<o>:
   +r = rr(o, cx)
   +cx2 = set_r(o, cx, X.R.with_waiters(r, M.snoc(X.Waiter, X.R.waiters(r), w)))
   dirty(o, upd_rt(o, cx2, X.Rt.with_waiting(rt(o, cx2, X.Waiter.agent(w)), True{})))
@@ -2625,7 +2624,7 @@ def wait.park(-o: M.St, +cx: X.Cx<o>, +w: X.Waiter) -> X.Cx<o>:
 # delivered to the wait, unless it is a queued-mode message (it waits for
 # the next turn); one already delivered is read again, without a second
 # delivery; a rejected or cancelled one never reaches the wait
-def wait.state(-o: M.St, s: Maybe<&2, S.MSt>, +cx: X.Cx<o>, +w: X.Waiter, +r: S.Msg) -> X.Cx<o>:
+def wait.state(-o: S.St, s: Maybe<&2, S.MSt>, +cx: X.Cx<o>, +w: X.Waiter, +r: S.Msg) -> X.Cx<o>:
   match s:
     case Some{S.Queued{_}}:
       LZ.pick(X.Cx<o>, S.Msg.queued(r), u => wait.park(o, cx, w), u => deliver_to_waiter(o, cx, w, r, "reply"))
@@ -2634,7 +2633,7 @@ def wait.state(-o: M.St, s: Maybe<&2, S.MSt>, +cx: X.Cx<o>, +w: X.Waiter, +r: S.
     case _:
       wait.park(o, cx, w)
 
-def wait.existing(-o: M.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +w: X.Waiter) -> X.Cx<o>:
+def wait.existing(-o: S.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +w: X.Waiter) -> X.Cx<o>:
   match m:
     case Some{+r}:
       wait.state(o, M.state_of(st(o, cx), S.Msg.id(r)), cx, w, r)
@@ -2642,7 +2641,7 @@ def wait.existing(-o: M.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +w: X.Waiter) -> 
       wait.park(o, cx, w)
 
 # the first reply to a message: CO.reply_at (hub/cold.bend)
-def wait.mine(-o: M.St, mine: Bool, +cx: X.Cx<o>, +token: Nat, +from: String, +orig: S.Msg, +timeout: Nat) -> X.Cx<o>:
+def wait.mine(-o: S.St, mine: Bool, +cx: X.Cx<o>, +token: Nat, +from: String, +orig: S.Msg, +timeout: Nat) -> X.Cx<o>:
   match mine:
     case False{}:
       reply_err(o, cx, token, "you can only wait for the reply to your own messages")
@@ -2650,17 +2649,17 @@ def wait.mine(-o: M.St, mine: Bool, +cx: X.Cx<o>, +token: Nat, +from: String, +o
       +w = {X.Waiter{token, from, S.Msg.id(orig), Nat.add(now(o, cx), Nat.mul(1000n, Nat.min(timeout, WAIT_CAP())))} : X.Waiter}
       wait.existing(o, CO.reply_at(st(o, cx), S.Msg.id(orig), S.Msg.to(orig)), cx, w)
 
-def wait.orig(-o: M.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +token: Nat, +from: String, +id: Nat, +timeout: Nat) -> X.Cx<o>:
+def wait.orig(-o: S.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +token: Nat, +from: String, +id: Nat, +timeout: Nat) -> X.Cx<o>:
   match m:
     case None{}:
       reply_err(o, cx, token, String.append("message inconnu : ", mid(id)))
     case Some{+orig}:
       wait.mine(o, String.eq(S.Msg.from(orig), from), cx, token, from, orig, timeout)
 
-def wait(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +id: Nat, +timeout: Nat) -> X.Cx<o>:
+def wait(-o: S.St, +cx: X.Cx<o>, +token: Nat, +from: String, +id: Nat, +timeout: Nat) -> X.Cx<o>:
   wait.orig(o, M.msg_of(st(o, cx), id), cx, token, from, id, timeout)
 
-def req_ask.res(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +from: String, +timeout: Nat) -> X.Cx<o>:
+def req_ask.res(-o: S.St, p: X.Cx<o> & SendR, +token: Nat, +from: String, +timeout: Nat) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       reply_err(o, cx, token, e)
@@ -2672,9 +2671,9 @@ def req_ask.res(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +from: String, +timeo
 def decl_of(+s: String) -> S.Decl:
   Bool.pick(S.Decl, String.eq(s, "done"), S.DDone{}, Bool.pick(S.Decl, String.eq(s, "blocked"), S.DBlocked{}, S.DWorking{}))
 
-def req_status(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +is_main: Bool, +q: J.Json) -> X.Cx<o>:
-  +status = C.get_s(q, "status")
-  +note = C.get_s(q, "note")
+def req_status(-o: S.St, +cx: X.Cx<o>, +token: Nat, +from: String, +is_main: Bool, +q: J.Json) -> X.Cx<o>:
+  +status = K.get_s(q, "status")
+  +note = K.get_s(q, "note")
   +cx1 = emit(o, cx, M.EDeclared{from, Some{decl_of(status)}, note}, Unit{}, Unit{}, Unit{})
   # done: it moved on, its reply watches end (ask-wait)
   +cx2 = LZ.pick(X.Cx<o>, String.eq(status, "done"), u => replies_end(o, cx1, from), u => cx1)
@@ -2700,7 +2699,7 @@ def job_label(+a: S.Agent) -> String:
 # outbox, journaled, delivered until that hub has it (a restart of either
 # hub loses nothing: the project's boot sends its pending entries again,
 # the home hub drops a second copy, law xhub_xin_delivered_once)
-def job_end.back(-o: M.St, local: Bool, +cx: X.Cx<o>, +hub: String, +j: J.Json) -> X.Cx<o>:
+def job_end.back(-o: S.St, local: Bool, +cx: X.Cx<o>, +hub: String, +j: J.Json) -> X.Cx<o>:
   match local:
     case True{}:
       cx
@@ -2711,7 +2710,7 @@ def job_end.back(-o: M.St, local: Bool, +cx: X.Cx<o>, +hub: String, +j: J.Json) 
 # `key`: the job's (its end's time on this hub's clock), the same in the
 # fx job_end and in what goes back to `hub`, so a window that hears both
 # shows one line
-def job_end.go(-o: M.St, f: Bool, +cx: X.Cx<o>, +name: String, +state: String, +summary: String, +label: String, +hub: String) -> X.Cx<o>:
+def job_end.go(-o: S.St, f: Bool, +cx: X.Cx<o>, +name: String, +state: String, +summary: String, +label: String, +hub: String) -> X.Cx<o>:
   match f:
     case True{}:
       +cx2 = emit(o, cx, M.EJobEnd{name, state}, Unit{}, Unit{}, Unit{})
@@ -2722,7 +2721,7 @@ def job_end.go(-o: M.St, f: Bool, +cx: X.Cx<o>, +name: String, +state: String, +
     case False{}:
       cx
 
-def job_end.of(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +state: String, +summary: String) -> X.Cx<o>:
+def job_end.of(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +state: String, +summary: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2731,7 +2730,7 @@ def job_end.of(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +name: String, +st
 
 # a task's end (done, failed): its job_end when followed, once (laws
 # follow_done_once, follow_failed_at_once)
-def job_end(-o: M.St, +cx: X.Cx<o>, +name: String, +state: String, +summary: String) -> X.Cx<o>:
+def job_end(-o: S.St, +cx: X.Cx<o>, +name: String, +state: String, +summary: String) -> X.Cx<o>:
   job_end.of(o, M.get_agent(st(o, cx), name), cx, name, state, summary)
 
 def is_archived_life(l: S.Life) -> Bool:
@@ -2750,24 +2749,24 @@ def follow_err.of(m: Maybe<&2, S.Agent>, +name: String) -> Maybe<&2, String>:
         Bool.pick(Maybe<&2, String>, is_archived_life(S.Agent.life(a)), Some{cat(["@", name, " is archived"])}, None{}))
 
 # who can be followed: a task of this hub, not main, not archived
-def follow_err(+s: M.St, +name: String) -> Maybe<&2, String>:
+def follow_err(+s: S.St, +name: String) -> Maybe<&2, String>:
   follow_err.of(M.get_agent(s, name), name)
 
 # `hub`: who asked ("" this hub's own main or window; else bise's home
 # hub, J): journaled with the follow, cleared at its job_end
-def follow_set(-o: M.St, +cx: X.Cx<o>, +name: String, +on: Bool, +hub: String) -> X.Cx<o>:
+def follow_set(-o: S.St, +cx: X.Cx<o>, +name: String, +on: Bool, +hub: String) -> X.Cx<o>:
   emit(o, cx, M.EFollow{name, on, hub}, Unit{}, Unit{}, Unit{})
 
 # the input follow (the window's typed command, or bise's `sb follow
 # <p>/<agent>` on this hub's socket): an error is the asker's notice
-def follow_in(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +on: Bool) -> X.Cx<o>:
+def follow_in(-o: S.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +on: Bool) -> X.Cx<o>:
   match err:
     case Some{+e}:
       notice(o, cx, e)
     case None{}:
       follow_set(o, cx, name, on, "")
 
-def req_follow.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +name: String, +on: Bool, +hub: String) -> X.Cx<o>:
+def req_follow.go(-o: S.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +name: String, +on: Bool, +hub: String) -> X.Cx<o>:
   match err:
     case Some{+e}:
       reply_err(o, cx, token, e)
@@ -2775,18 +2774,18 @@ def req_follow.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +
       reply(o, follow_set(o, cx, name, on, hub), token, ok_body([J.kv("agent", J.JStr{name}), J.kv("on", J.JBool{on})]))
 
 # `sb follow <agent> [--off]`: main only (his say-so goes through main)
-def req_follow(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
-  +name = C.get_s(q, "agent")
+def req_follow(-o: S.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
+  +name = K.get_s(q, "agent")
   req_follow.go(o,
     Bool.pick(Maybe<&2, String>, String.eq(from, M.MAIN()), follow_err(st(o, cx), name), Some{"only main follows a task: ask main"}),
-    cx, token, name, Bool.not(C.get_b(q, "off")), C.get_s(q, "hub"))
+    cx, token, name, Bool.not(K.get_b(q, "off")), K.get_s(q, "hub"))
 
 # the report's done and failed: their state change, then the job's end
 # (ask-wait: it moved on, its reply watches end)
-def report_done(-o: M.St, +cx: X.Cx<o>, +from: String) -> X.Cx<o>:
+def report_done(-o: S.St, +cx: X.Cx<o>, +from: String) -> X.Cx<o>:
   replies_end(o, emit(o, cx, M.EDeclared{from, Some{S.DDone{}}, ""}, Unit{}, Unit{}, Unit{}), from)
 
-def report_failed(-o: M.St, +cx: X.Cx<o>, +from: String, +summary: String) -> X.Cx<o>:
+def report_failed(-o: S.St, +cx: X.Cx<o>, +from: String, +summary: String) -> X.Cx<o>:
   replies_end(o, emit(o, cx, M.ELifecycle{from, S.LFailed{}, Some{summary}}, Unit{}, Unit{}, Unit{}), from)
 
 def report_lines(xs: List<&2, String>) -> List<&2, String>:
@@ -2801,14 +2800,14 @@ def report_text(+kind: String, +summary: String, +decisions: List<&2, String>) -
   Bool.pick(String, List.is_empty(&2, String, decisions), head,
     cat([head, "\nDecisions:", String.concat(report_lines(decisions))]))
 
-def req_report.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat) -> X.Cx<o>:
+def req_report.sent(-o: S.St, p: X.Cx<o> & SendR, +token: Nat) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       reply_err(o, cx, token, e)
     case (+cx, SOk{+m}):
       reply(o, cx, token, ok_body([J.kv("message_id", J.JStr{mid(S.Msg.id(m))})]))
 
-def req_report.kind(-o: M.St, +cx: X.Cx<o>, +from: String, +kind: String, +summary: String) -> X.Cx<o>:
+def req_report.kind(-o: S.St, +cx: X.Cx<o>, +from: String, +kind: String, +summary: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, String.eq(kind, "done"),
     u => job_end(o, report_done(o, cx, from), from, "done", summary),
     u => LZ.pick(X.Cx<o>, String.eq(kind, "blocked"),
@@ -2817,13 +2816,13 @@ def req_report.kind(-o: M.St, +cx: X.Cx<o>, +from: String, +kind: String, +summa
         u => job_end(o, report_failed(o, cx, from, summary), from, "failed", summary),
         u => cx)))
 
-def req_report.go(-o: M.St, is_main: Bool, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
+def req_report.go(-o: S.St, is_main: Bool, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
   match is_main:
     case True{}:
       reply_err(o, cx, token, "main reports to no one")
     case False{}:
-      +kind = C.get_s(q, "kind")
-      +summary = C.get_s(q, "summary")
+      +kind = K.get_s(q, "kind")
+      +summary = K.get_s(q, "summary")
       +decisions = jstr_list(Maybe.default(&2, List<&2, J.Json>, J.get_arr(q, "decisions"), Nil{}))
       # S10: a progress's --step n/m; emitter 5: its --result (proto's
       # DiffResult, checked by the CLI); null when absent
@@ -2846,7 +2845,7 @@ def req_spawn.ws(m: Maybe<&2, S.Agent>) -> J.Json:
     case Some{+a}:
       S.Agent.ws(a)
 
-def req_spawn.res(-o: M.St, p: X.Cx<o> & TaskR, +token: Nat) -> X.Cx<o>:
+def req_spawn.res(-o: S.St, p: X.Cx<o> & TaskR, +token: Nat) -> X.Cx<o>:
   match p:
     case (+cx, TOk{+n}):
       +ws = req_spawn.ws(M.get_agent(st(o, cx), n))
@@ -2857,17 +2856,17 @@ def req_spawn.res(-o: M.St, p: X.Cx<o> & TaskR, +token: Nat) -> X.Cx<o>:
       cx
 
 def new_task(+parent: String, +q: J.Json) -> NewTask:
-  NewTask{parent, C.get_s(q, "base"), Maybe.default(&2, J.Json, J.get(q, "brief"), J.JNull{}), C.get_s(q, "brief_text"),
-    C.get_s(q, "objective"), C.get_b(q, "worktree"), C.get_b(q, "with_changes"), C.get_s(q, "brief_parts")}
+  NewTask{parent, K.get_s(q, "base"), Maybe.default(&2, J.Json, J.get(q, "brief"), J.JNull{}), K.get_s(q, "brief_text"),
+    K.get_s(q, "objective"), K.get_b(q, "worktree"), K.get_b(q, "with_changes"), K.get_s(q, "brief_parts")}
 
-def req_spawn.pre(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+def req_spawn.pre(-o: S.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match pre:
     case Some{+e}:
       reply_err(o, cx, token, e)
     case None{}:
       req_spawn.res(o, create_in(o, cx, new_task(M.MAIN(), q), J.get(q, "join")), token)
 
-def req_interrupt(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +agent: String) -> X.Cx<o>:
+def req_interrupt(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +agent: String) -> X.Cx<o>:
   match m:
     case None{}:
       reply_err(o, cx, token, String.append("no agent named ", agent))
@@ -2876,7 +2875,7 @@ def req_interrupt(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +ag
         u => reply(o, stopped(o, interrupt.fx(o, cx, n), n), token, ok_body(Nil{})),
         u => reply_err(o, cx, token, "no turn in progress"))
 
-def req_stop(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +agent: String, +reason: String) -> X.Cx<o>:
+def req_stop(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +agent: String, +reason: String) -> X.Cx<o>:
   match m:
     case None{}:
       reply_err(o, cx, token, String.append("no agent named ", agent))
@@ -2884,13 +2883,13 @@ def req_stop(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +agent: 
       LZ.pick(X.Cx<o>, String.eq(n, M.MAIN()), u => reply_err(o, cx, token, String.append("no agent named ", agent)),
         u => reply(o, feed(o, stop_noted(o, cx, n, S.LStopped{}, reason), M.MAIN(), FD.info(cat(["main → @", n, " stopped: ", reason]))), token, ok_body(Nil{})))
 
-def req_drop.res(-o: M.St, p: X.Cx<o> & DropR, +token: Nat, +agent: String) -> X.Cx<o>:
+def req_drop.res(-o: S.St, p: X.Cx<o> & DropR, +token: Nat, +agent: String) -> X.Cx<o>:
   match p:
     case (+cx, DDone{}):
       reply(o, cx, token, ok_body([J.kv("dropped", J.JBool{True{}})]))
     case (+cx, DAsk{+q}):
       +n = Maybe.default(&2, String, M.resolve(st(o, cx), agent), agent)
-      +id = M.St.next_card(st(o, cx))
+      +id = S.St.next_card(st(o, cx))
       +text = Bool.pick(String, String.ends_with(q, " [y/N]"), String.take(q, Nat.sub(String.length(q), 6n)), q)
       +cx2 = open_card(o, cx, "drop", n, cat(["main suggests: ", text, " (answer yes or no)"]), None{})
       reply(o, cx2, token, ok_body([J.kv("dropped", J.JBool{False{}}), J.kv("card", J.JNum{id}),
@@ -2900,7 +2899,7 @@ def req_drop.res(-o: M.St, p: X.Cx<o> & DropR, +token: Nat, +agent: String) -> X
     case (+cx, DHalt{}):
       cx
 
-def req_card.settle(-o: M.St, m: Maybe<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
+def req_card.settle(-o: S.St, m: Maybe<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -2910,29 +2909,29 @@ def req_card.settle(-o: M.St, m: Maybe<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
 # a card main opens for a task's message (`sb card --for m_<n>`) shows in
 # that task's own feed too (a registered agent of this hub, not main) (bar A.3, architect m_10203), with the line
 # main's feed gets: a view; open or answered still comes from the cards
-def is_task_of(-o: M.St, +cx: X.Cx<o>, +agent: String) -> Bool:
+def is_task_of(-o: S.St, +cx: X.Cx<o>, +agent: String) -> Bool:
   has_agent(o, cx, agent) && Bool.not(String.eq(agent, M.MAIN()))
 
-def card_to_asker(-o: M.St, +cx: X.Cx<o>, +id: Nat, +agent: String, +text: String) -> X.Cx<o>:
+def card_to_asker(-o: S.St, +cx: X.Cx<o>, +id: Nat, +agent: String, +text: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, is_task_of(o, cx, agent),
     u => feed(o, cx, agent, FD.card(id, "question", agent, text)),
     u => cx)
 
-def req_card.go(-o: M.St, +cx: X.Cx<o>, +token: Nat, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>) -> X.Cx<o>:
-  +id = M.St.next_card(st(o, cx))
+def req_card.go(-o: S.St, +cx: X.Cx<o>, +token: Nat, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>) -> X.Cx<o>:
+  +id = S.St.next_card(st(o, cx))
   +cx2 = card_to_asker(o, open_card(o, cx, "question", agent, text, for_msg), id, agent, text)
   # main hands the question over: no automatic reply
   +cx3 = req_card.settle(o, for_msg, cx2)
   reply(o, cx3, token, ok_body([J.kv("card", J.JNum{id})]))
 
-def req_card.msg(-o: M.St, q: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +token: Nat, +text: String, +id: Nat) -> X.Cx<o>:
+def req_card.msg(-o: S.St, q: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +token: Nat, +text: String, +id: Nat) -> X.Cx<o>:
   match q:
     case None{}:
       reply_err(o, cx, token, String.append("message inconnu : ", mid(id)))
     case Some{+m}:
       req_card.go(o, cx, token, S.Msg.from(m), text, Some{id})
 
-def req_card(-o: M.St, for_msg: Maybe<&2, Nat>, +cx: X.Cx<o>, +token: Nat, +text: String) -> X.Cx<o>:
+def req_card(-o: S.St, for_msg: Maybe<&2, Nat>, +cx: X.Cx<o>, +token: Nat, +text: String) -> X.Cx<o>:
   match for_msg:
     case None{}:
       req_card.go(o, cx, token, M.MAIN(), text, None{})
@@ -2942,7 +2941,7 @@ def req_card(-o: M.St, for_msg: Maybe<&2, Nat>, +cx: X.Cx<o>, +token: Nat, +text
 # `sb close N ["note"]`: a card in the user's inbox is the user's to
 # answer or close (BISE-299): refused; an older journal's card of another
 # kind (closed at boot anyway) closes with a short resolution
-def req_close(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +token: Nat, +id: Nat, +note: String) -> X.Cx<o>:
+def req_close(-o: S.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +token: Nat, +id: Nat, +note: String) -> X.Cx<o>:
   match m:
     case None{}:
       reply_err(o, cx, token, String.append("no open notification #", ns(id)))
@@ -2955,7 +2954,7 @@ def req_close(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +token: Nat, +id: Na
 # main's withdraw of card `c`: closed without him, and journaled as
 # withdrawn so his answer already on its way still reaches main
 # (answer.late, hub/gone.bend)
-def withdraw(-o: M.St, +cx: X.Cx<o>, +c: S.Card, +why: String) -> X.Cx<o>:
+def withdraw(-o: S.St, +cx: X.Cx<o>, +c: S.Card, +why: String) -> X.Cx<o>:
   +cx2 = close_card(o, cx, S.Card.id(c), String.append("withdrawn by main: ", why))
   emit(o, cx2, M.ECardWithdrawn{S.Card.id(c), S.Card.text(c)}, Unit{}, Unit{}, Unit{})
 
@@ -2964,7 +2963,7 @@ def withdraw(-o: M.St, +cx: X.Cx<o>, +c: S.Card, +why: String) -> X.Cx<o>:
 # the card leaves his inbox, and the question it held is main's again;
 # his answer already on its way reaches main as a message (withdraw,
 # answer.late)
-def req_withdraw(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +token: Nat, +id: Nat, +why: String) -> X.Cx<o>:
+def req_withdraw(-o: S.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +token: Nat, +id: Nat, +why: String) -> X.Cx<o>:
   match m:
     case None{}:
       reply_err(o, cx, token, String.append("no open notification #", ns(id)))
@@ -2977,14 +2976,14 @@ def req_withdraw(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +token: Nat, +id:
         u => reply_err(o, cx, token, cat(["notification #", ns(id), " is a ", k, ": only the user answers or closes it"])))
 
 # `sb rename <task> <new-name>`: the same rules as the user's /rename
-def req_rename.go(-o: M.St, ok: Bool, +cx: X.Cx<o>, +token: Nat, +old: String, +new: String) -> X.Cx<o>:
+def req_rename.go(-o: S.St, ok: Bool, +cx: X.Cx<o>, +token: Nat, +old: String, +new: String) -> X.Cx<o>:
   match ok:
     case False{}:
       reply_err(o, cx, token, String.append("invalid or taken name: ", new))
     case True{}:
       reply(o, rename.apply(o, cx, old, new), token, ok_body([J.kv("name", J.JStr{new})]))
 
-def req_rename(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +name: String, +new: String, +valid: Bool) -> X.Cx<o>:
+def req_rename(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +name: String, +new: String, +valid: Bool) -> X.Cx<o>:
   match m:
     case None{}:
       reply_err(o, cx, token, String.append("no agent named ", name))
@@ -2994,7 +2993,7 @@ def req_rename(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +name:
 
 # `sb restore` / `sb isolate`: the user or main (main only on the
 # user's explicit request: its prompt says so)
-def req_task.res(-o: M.St, p: X.Cx<o> & TaskR, +token: Nat) -> X.Cx<o>:
+def req_task.res(-o: S.St, p: X.Cx<o> & TaskR, +token: Nat) -> X.Cx<o>:
   match p:
     case (+cx, TOk{+n}):
       reply(o, cx, token, ok_body([J.kv("name", J.JStr{n})]))
@@ -3023,50 +3022,50 @@ def cmd_tag(+c: String) -> Cmd:
   Bool.pick(Cmd, String.eq(c, "project_send"), CProjectSend{},
   Bool.pick(Cmd, String.eq(c, "project_ask"), CProjectAsk{}, CCard{}))))))))))))))))))
 
-def req.main.go(-o: M.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+def req.main.go(-o: S.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match c:
     case CSpawn{}:
-      req_spawn.pre(o, C.opt_str(J.get(q, "pre_err")), cx, token, q)
+      req_spawn.pre(o, K.opt_s(J.get(q, "pre_err")), cx, token, q)
     case CInterrupt{}:
-      req_interrupt(o, M.resolve(st(o, cx), C.get_s(q, "agent")), cx, token, C.get_s(q, "agent"))
+      req_interrupt(o, M.resolve(st(o, cx), K.get_s(q, "agent")), cx, token, K.get_s(q, "agent"))
     case CStop{}:
-      req_stop(o, M.resolve(st(o, cx), C.get_s(q, "agent")), cx, token, C.get_s(q, "agent"), C.get_s(q, "reason"))
+      req_stop(o, M.resolve(st(o, cx), K.get_s(q, "agent")), cx, token, K.get_s(q, "agent"), K.get_s(q, "reason"))
     case CDrop{}:
-      req_drop.res(o, drop_task(o, cx, C.get_s(q, "agent"), False{}), token, C.get_s(q, "agent"))
+      req_drop.res(o, drop_task(o, cx, K.get_s(q, "agent"), False{}), token, K.get_s(q, "agent"))
     case CClose{}:
-      req_close(o, M.card_of(M.St.cards(st(o, cx)), C.get_nat(q, "card")), cx, token, C.get_nat(q, "card"), C.get_s(q, "note"))
+      req_close(o, M.card_of(S.St.cards(st(o, cx)), K.get_n(q, "card")), cx, token, K.get_n(q, "card"), K.get_s(q, "note"))
     case CRename{}:
-      req_rename(o, M.resolve(st(o, cx), C.get_s(q, "agent")), cx, token, C.get_s(q, "agent"), C.get_s(q, "new_name"), C.get_b(q, "valid"))
+      req_rename(o, M.resolve(st(o, cx), K.get_s(q, "agent")), cx, token, K.get_s(q, "agent"), K.get_s(q, "new_name"), K.get_b(q, "valid"))
     case CRestore{}:
-      req_task.res(o, restore_task(o, cx, C.get_s(q, "agent")), token)
+      req_task.res(o, restore_task(o, cx, K.get_s(q, "agent")), token)
     case CIsolate{}:
-      req_task.res(o, isolate_task(o, cx, C.get_s(q, "agent")), token)
+      req_task.res(o, isolate_task(o, cx, K.get_s(q, "agent")), token)
     case CMove{}:
-      req_task.res(o, move_task(o, C.opt_str(J.get(q, "pre_err")), cx, C.get_s(q, "agent"), J.get(q, "ws")), token)
+      req_task.res(o, move_task(o, K.opt_s(J.get(q, "pre_err")), cx, K.get_s(q, "agent"), J.get(q, "ws")), token)
     case CWithdraw{}:
-      req_withdraw(o, M.card_of(M.St.cards(st(o, cx)), C.get_nat(q, "card")), cx, token, C.get_nat(q, "card"), C.get_s(q, "why"))
+      req_withdraw(o, M.card_of(S.St.cards(st(o, cx)), K.get_n(q, "card")), cx, token, K.get_n(q, "card"), K.get_s(q, "why"))
     case CProjectSend{}:
-      req_xsend(o, C.opt_str(J.get(q, "pre_err")), cx, token, q)
+      req_xsend(o, K.opt_s(J.get(q, "pre_err")), cx, token, q)
     case CProjectAsk{}:
-      req_xask(o, C.opt_str(J.get(q, "pre_err")), cx, token, q)
+      req_xask(o, K.opt_s(J.get(q, "pre_err")), cx, token, q)
     case _:
-      req_card(o, C.opt_nat(J.get(q, "for")), cx, token, C.get_s(q, "text"))
+      req_card(o, K.opt_n(J.get(q, "for")), cx, token, K.get_s(q, "text"))
 
-def req.main(-o: M.St, is_main: Bool, +cx: X.Cx<o>, +token: Nat, +c: Cmd, +q: J.Json) -> X.Cx<o>:
+def req.main(-o: S.St, is_main: Bool, +cx: X.Cx<o>, +token: Nat, +c: Cmd, +q: J.Json) -> X.Cx<o>:
   match is_main:
     case False{}:
       main_only(o, cx, token)
     case True{}:
       req.main.go(o, c, cx, token, q)
 
-def req.go(-o: M.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
+def req.go(-o: S.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
   match c:
     case CSend{}:
       req_send(o, cx, token, from, q)
     case CWait{}:
-      wait(o, cx, token, from, C.get_nat(q, "msg"), C.get_nat(q, "timeout_s"))
+      wait(o, cx, token, from, K.get_n(q, "msg"), K.get_n(q, "timeout_s"))
     case CAsk{}:
-      req_ask.res(o, send(o, cx, msg(from, C.get_s(q, "to"), C.get_s(q, "text"), True{}, None{}, False{}, False{})), token, from, C.get_nat(q, "timeout_s"))
+      req_ask.res(o, send(o, cx, msg(from, K.get_s(q, "to"), K.get_s(q, "text"), True{}, None{}, False{}, False{})), token, from, K.get_n(q, "timeout_s"))
     case CStatus{}:
       req_status(o, cx, token, from, String.eq(from, M.MAIN()), q)
     case CReport{}:
@@ -3076,19 +3075,19 @@ def req.go(-o: M.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Jso
     case other:
       req.main(o, String.eq(from, M.MAIN()), cx, token, other, q)
 
-def req.from(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +raw: String, +q: J.Json) -> X.Cx<o>:
+def req.from(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +raw: String, +q: J.Json) -> X.Cx<o>:
   match m:
     case None{}:
       reply_err(o, cx, token, String.append("agent inconnu : ", raw))
     case Some{+from}:
-      req.go(o, cmd_tag(C.get_s(q, "cmd")), cx, token, from, q)
+      req.go(o, cmd_tag(K.get_s(q, "cmd")), cx, token, from, q)
 
-def agent_req(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
+def agent_req(-o: S.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
   req.from(o, M.resolve(st(o, cx), from), cx, token, from, q)
 
 # ---- the step ----
 
-def Hub.d(x: Hub) -> M.St:
+def Hub.d(x: Hub) -> S.St:
   match x:
     case Hub{+d, _}:
       d
@@ -3104,7 +3103,7 @@ def hub_new(+workspace: String) -> Hub:
 # the context of one input over the hub
 def start(+h: Hub, +i: J.Json) -> X.Cx<Hub.d(h)>:
   +r = Hub.r(h)
-  +r2 = X.R.with_answered(X.R.with_need(X.R.with_ans(X.R.with_git(X.R.with_now(X.R.with_dirty(r, False{}), C.get_nat(i, "now")), C.get_b(i, "git")),
+  +r2 = X.R.with_answered(X.R.with_need(X.R.with_ans(X.R.with_git(X.R.with_now(X.R.with_dirty(r, False{}), K.get_n(i, "now")), K.get_b(i, "git")),
     Maybe.default(&2, List<&2, J.Json>, J.get_arr(i, "ans"), Nil{})), None{}), None{})
   X.Cx{X.core_start(Hub.d(h)), r2}
 
@@ -3115,7 +3114,7 @@ def agent_decl(m: Maybe<&2, S.Agent>) -> Maybe<&2, S.Decl>:
     case Some{+a}:
       S.Agent.declared(a)
 
-def turn.resume(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+def turn.resume(-o: S.St, go: Bool, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   match go:
     case True{}:
       emit(o, cx, M.EDeclared{agent, None{}, ""}, Unit{}, Unit{}, Unit{})
@@ -3131,12 +3130,12 @@ def decl_resumes(d: Maybe<&2, S.Decl>) -> Bool:
     case _:
       False{}
 
-def turn_started(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+def turn_started(-o: S.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   +decl = agent_decl(M.get_agent(st(o, cx), agent))
   +cx2 = dirty(o, upd_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), S.RBusy{}), Some{now(o, cx)})))
   turn.resume(o, decl_resumes(decl), cx2, agent)
 
-def steer_count(-o: M.St, +cx: X.Cx<o>, +agent: String, +injected: Bool) -> X.Cx<o>:
+def steer_count(-o: S.St, +cx: X.Cx<o>, +agent: String, +injected: Bool) -> X.Cx<o>:
   +r = rr(o, cx)
   +c = KL.cnt_get(X.R.counts(r), agent)
   +c2 = Bool.pick(X.Cnt, injected, X.Cnt{agent, X.Cnt.recv(c), 1n+X.Cnt.inj(c)}, X.Cnt{agent, 1n+X.Cnt.recv(c), X.Cnt.inj(c)})
@@ -3161,7 +3160,7 @@ def steer_rx_mark(xs: List<&2, X.Steer>, +n: String, +k: Nat) -> List<&2, X.Stee
 
 # the receipt's ids: the steer-mode deliveries since the last receipt
 # (none: a second receipt with no new steer marks nothing)
-def steer_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String, +total: Nat) -> X.Cx<o>:
+def steer_receipt.go(-o: S.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String, +total: Nat) -> X.Cx<o>:
   match new:
     case Nil{}:
       cx
@@ -3173,14 +3172,14 @@ def steer_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String,
 # the runtime read the steering (ISteered): the feed line naming the
 # messages it read, at this point of the turn ('sb steered : m_3 m_4');
 # R.steered stays whole for the turn's end (repl_idle reads it)
-def steer_receipt(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+def steer_receipt(-o: S.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   +xs = X.R.steered(rr(o, cx))
   +ids = KL.steer_get(xs, agent)
   steer_receipt.go(o, List.drop(&2, Nat, ids, KL.steer_seen(xs, agent)), cx, agent, List.length(&2, Nat, ids))
 
 # the received receipt's ids: the steer-mode deliveries since the last
 # received receipt (none: nothing marked, nothing written)
-def steer_rx_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String, +total: Nat) -> X.Cx<o>:
+def steer_rx_receipt.go(-o: S.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String, +total: Nat) -> X.Cx<o>:
   match new:
     case Nil{}:
       cx
@@ -3192,18 +3191,18 @@ def steer_rx_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: Stri
 # the runtime received the steering (ISteerRx, before it reads it): the
 # feed line naming those messages ('sb steer-rx : m_3 m_4', the clients'
 # ✓); its own cursor, rx_seen, apart from steered's
-def steer_rx_receipt(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+def steer_rx_receipt(-o: S.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   +xs = X.R.steered(rr(o, cx))
   +ids = KL.steer_get(xs, agent)
   steer_rx_receipt.go(o, List.drop(&2, Nat, ids, KL.steer_rx_seen(xs, agent)), cx, agent, List.length(&2, Nat, ids))
 
-def assistant(-o: M.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
+def assistant(-o: S.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
   +r = rr(o, cx)
   set_r(o, cx, X.R.with_last(r, M.snoc(X.Kv, KL.kv_del(X.R.last(r), agent), X.Kv{agent, text})))
 
 # ---- file overlap (RFC 0001 §10.3) ----
 
-def touch.others(-o: M.St, others: List<&2, String>, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
+def touch.others(-o: S.St, others: List<&2, String>, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
   match others:
     case Nil{}:
       cx
@@ -3222,7 +3221,7 @@ def overlap_hit(m: Maybe<&2, S.Agent>, +agent: String, +path: String, +place: St
         && String.eq(PL.Agent.place(a), place) && is_active(S.Agent.life(a))
         && M.str_in(S.Agent.files(a), path)
 
-def overlap_others(xs: List<&2, String>, +s: M.St, +agent: String, +path: String, +place: String) -> List<&2, String>:
+def overlap_others(xs: List<&2, String>, +s: S.St, +agent: String, +path: String, +place: String) -> List<&2, String>:
   match xs:
     case Nil{}:
       Nil{}
@@ -3230,22 +3229,22 @@ def overlap_others(xs: List<&2, String>, +s: M.St, +agent: String, +path: String
       +rest = overlap_others(t, s, agent, path, place)
       Bool.pick(List<&2, String>, overlap_hit(M.get_agent(s, n), agent, path, place), n <> rest, rest)
 
-def touch.new(-o: M.St, known: Bool, +cx: X.Cx<o>, +agent: String, +path: String, +place: String) -> X.Cx<o>:
+def touch.new(-o: S.St, known: Bool, +cx: X.Cx<o>, +agent: String, +path: String, +place: String) -> X.Cx<o>:
   match known:
     case True{}:
       cx
     case False{}:
       +cx2 = emit(o, cx, M.EFileTouched{agent, path}, Unit{}, Unit{}, Unit{})
-      touch.others(o, overlap_others(M.St.order(st(o, cx2)), st(o, cx2), agent, path, place), cx2, agent, path)
+      touch.others(o, overlap_others(S.St.order(st(o, cx2)), st(o, cx2), agent, path, place), cx2, agent, path)
 
-def touch.task(-o: M.St, task: Bool, +cx: X.Cx<o>, +agent: String, +path: String, +known: Bool, +place: String) -> X.Cx<o>:
+def touch.task(-o: S.St, task: Bool, +cx: X.Cx<o>, +agent: String, +path: String, +known: Bool, +place: String) -> X.Cx<o>:
   match task:
     case True{}:
       touch.new(o, known, cx, agent, path, place)
     case False{}:
       cx
 
-def touch.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
+def touch.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -3254,35 +3253,35 @@ def touch.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +
       # an agent's own files, two agents may share a worktree
       touch.task(o, Bool.not(S.Agent.is_main(a)), cx, agent, path, M.str_in(S.Agent.files(a), path), PL.Agent.place(a))
 
-def touch(-o: M.St, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
+def touch(-o: S.St, +cx: X.Cx<o>, +agent: String, +path: String) -> X.Cx<o>:
   touch.agent(o, M.get_agent(st(o, cx), agent), cx, agent, path)
 
-def repl_ready(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+def repl_ready(-o: S.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   +cx2 = upd_rt(o, cx, X.Rt.with_waiting(X.Rt.with_run(rt(o, cx, agent), S.RIdle{}), False{}))
   pump(o, dirty(o, cx2), agent)
 
-def crash.restart(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
+def crash.restart(-o: S.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
   +cx2 = set_run(o, cx, agent, S.RStarting{})
   +cx3 = out(o, cx2, F.spawn(agent, True{}, Some{reason}))
   +cx4 = feed(o, cx3, M.MAIN(), FD.warn(cat(["the session of @", agent, " crashed (", reason, ") — restart ", ns(n), "/", ns(MAX_CRASHES())])))
   LZ.pick(X.Cx<o>, String.eq(agent, M.MAIN()), u => cx4,
     u => notify_main(o, cx4, cat(["agent @", agent, " crashed (", reason, "). Its session restarts on its saved checkpoint (attempt ", ns(n), "/", ns(MAX_CRASHES()), "); the turn it was running is interrupted and it may need a new message to continue."])))
 
-def crash.fail(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
+def crash.fail(-o: S.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
   +why = cat(["the REPL crashed ", ns(n), " times: ", reason])
   +cx2 = job_end(o, emit(o, cx, M.ELifecycle{agent, S.LFailed{}, Some{why}}, Unit{}, Unit{}, Unit{}), agent, "failed", why)
   +cx3 = feed(o, cx2, M.MAIN(), FD.warn(cat(["@", agent, " failed: ", why])))
   LZ.pick(X.Cx<o>, String.eq(agent, M.MAIN()), u => cx3,
     u => notify_main(o, cx3, cat(["agent @", agent, " failed: ", why, ". It is not restarted anymore. A new message from you or the user restarts it; otherwise tell the user."])))
 
-def crash.pick(-o: M.St, again: Bool, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
+def crash.pick(-o: S.St, again: Bool, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
   match again:
     case True{}:
       crash.restart(o, cx, agent, n, reason)
     case False{}:
       crash.fail(o, cx, agent, n, reason)
 
-def crash.count(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String, +reason: String) -> X.Cx<o>:
+def crash.count(-o: S.St, go: Bool, +cx: X.Cx<o>, +agent: String, +reason: String) -> X.Cx<o>:
   match go:
     case False{}:
       cx
@@ -3292,7 +3291,7 @@ def crash.count(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String, +reason: Strin
       +cx2 = set_r(o, cx, X.R.with_crashes(r, M.snoc(X.Kn, KL.kn_del(X.R.crashes(r), agent), X.Kn{agent, n})))
       crash.pick(o, Nat.is_le(n, MAX_CRASHES()), cx2, agent, n, reason)
 
-def exited.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
+def exited.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -3300,13 +3299,13 @@ def exited.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, 
       +cx2 = set_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), S.RDown{}), None{}))
       crash.count(o, crashed && is_active(S.Agent.life(a)), dirty(o, cx2), agent, reason)
 
-def repl_exited(-o: M.St, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
+def repl_exited(-o: S.St, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
   +cx2 = fail_waiters(o, cx, agent, "interrupted_by_restart")
   +r = rr(o, cx2)
   +cx3 = set_r(o, cx2, X.R.with_steered(r, KL.steer_del(X.R.steered(r), agent)))
   exited.agent(o, M.get_agent(st(o, cx3), agent), cx3, agent, crashed, reason)
 
-def boot.live(-o: M.St, live: Bool, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+def boot.live(-o: S.St, live: Bool, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   match live:
     case True{}:
       +cx2 = set_run(o, cx, n, S.RStarting{})
@@ -3314,14 +3313,14 @@ def boot.live(-o: M.St, live: Bool, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
     case False{}:
       cx
 
-def boot.one(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+def boot.one(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
       boot.live(o, is_active(S.Agent.life(a)), cx, n)
 
-def boot.each(-o: M.St, names: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
+def boot.each(-o: S.St, names: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
   match names:
     case Nil{}:
       dirty(o, cx)
@@ -3332,24 +3331,24 @@ def boot.each(-o: M.St, names: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
 # that are not the user's (done, blocked, failed, overlap: the agents'
 # traffic, main's since BISE-299) close first; their reports and notes
 # are in main's thread already
-def boot(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
-  +cx2 = close_ids(o, CK.legacy_cards(M.St.cards(st(o, cx))), cx, "moved to main's inbox")
-  boot.each(o, M.St.order(st(o, cx2)), cx2)
+def boot(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
+  +cx2 = close_ids(o, CK.legacy_cards(S.St.cards(st(o, cx))), cx, "moved to main's inbox")
+  boot.each(o, S.St.order(st(o, cx2)), cx2)
 
 # the asked message, still with no reply watch and no reply, of an active
 # agent: one more pause, from the ask (laws ask_timeout_pauses, ask_once)
-def reply_pause.need(-o: M.St, +cx: X.Cx<o>, +agent: String, +orig: S.Msg) -> Bool:
+def reply_pause.need(-o: S.St, +cx: X.Cx<o>, +agent: String, +orig: S.Msg) -> Bool:
   Bool.not(Maybe.is_some(&2, S.Watch, WK.reply_for(S.Wakes.live(wks(o, cx)), agent, S.Msg.id(orig))))
     && Bool.not(Maybe.is_some(&2, S.Msg, CO.reply_at(st(o, cx), S.Msg.id(orig), S.Msg.to(orig)))) && R.agent_active(st(o, cx), agent)
 
-def reply_pause.go(-o: M.St, need: Bool, +cx: X.Cx<o>, +agent: String, +orig: S.Msg) -> X.Cx<o>:
+def reply_pause.go(-o: S.St, need: Bool, +cx: X.Cx<o>, +agent: String, +orig: S.Msg) -> X.Cx<o>:
   match need:
     case False{}:
       cx
     case True{}:
       emit(o, cx, M.EWake{WK.WSet{WK.make_reply(wks(o, cx), agent, S.Msg.to(orig), S.Msg.id(orig), S.Msg.created(orig), now(o, cx))}}, Unit{}, Unit{}, Unit{})
 
-def reply_pause.orig(-o: M.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+def reply_pause.orig(-o: S.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -3357,10 +3356,10 @@ def reply_pause.orig(-o: M.St, m: Maybe<&2, S.Msg>, +cx: X.Cx<o>, +agent: String
       reply_pause.go(o, reply_pause.need(o, cx, agent, orig), cx, agent, orig)
 
 # a wait that timed out (tick.each)
-def reply_pause(-o: M.St, +cx: X.Cx<o>, +w: X.Waiter) -> X.Cx<o>:
+def reply_pause(-o: S.St, +cx: X.Cx<o>, +w: X.Waiter) -> X.Cx<o>:
   reply_pause.orig(o, M.msg_of(st(o, cx), X.Waiter.msg(w)), cx, X.Waiter.agent(w))
 
-def tick.each(-o: M.St, late: List<&2, X.Waiter>, +cx: X.Cx<o>) -> X.Cx<o>:
+def tick.each(-o: S.St, late: List<&2, X.Waiter>, +cx: X.Cx<o>) -> X.Cx<o>:
   match late:
     case Nil{}:
       cx
@@ -3371,18 +3370,18 @@ def tick.each(-o: M.St, late: List<&2, X.Waiter>, +cx: X.Cx<o>) -> X.Cx<o>:
       +cx3 = dirty(o, upd_rt(o, cx2, X.Rt.with_waiting(rt(o, cx2, X.Waiter.agent(w)), still)))
       tick.each(o, rest, pump(o, reply_pause(o, cx3, w), X.Waiter.agent(w)))
 
-def tick.keep(-o: M.St, +cx: X.Cx<o>) -> List<&2, X.Waiter>:
+def tick.keep(-o: S.St, +cx: X.Cx<o>) -> List<&2, X.Waiter>:
   X.waiters_keep(X.R.waiters(rr(o, cx)), X.R.now(rr(o, cx)))
 
-def tick.go(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def tick.go(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   tick.each(o, X.waiters_late(X.R.waiters(rr(o, cx)), X.R.now(rr(o, cx))), set_waiters(o, cx, tick.keep(o, cx)))
 
 # the late waits get their timeout; the others stay (law
 # tick_clears_late_waiters; replies and pumps never add a wait)
-def tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+def tick(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   set_waiters(o, tick.go(o, cx), tick.keep(o, cx))
 
-def requeue(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
+def requeue(-o: S.St, ids: List<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
   match ids:
     case Nil{}:
       cx
@@ -3399,7 +3398,7 @@ def skip_steered(xs: List<&2, S.Msg>, +skip: Bool, +ids: List<&2, Nat>) -> List<
 
 # RFC 0003 §5.1: the end-of-turn answer to `@task message` typed in
 # another view goes back to that view, and main gets it as a note
-def auto_reply.local(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: S.Msg, +body: String) -> X.Cx<o>:
+def auto_reply.local(-o: S.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: S.Msg, +body: String) -> X.Cx<o>:
   match via:
     case None{}:
       fst(o, send(o, cx, msg(agent, S.Msg.from(m), body, False{}, Some{S.Msg.id(m)}, False{}, True{})))
@@ -3411,25 +3410,25 @@ def auto_reply.local(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: Str
         "\"): \"", T.clip_tail(T.one_line(body), 2000n), "\""]))
 
 # a message bise sent this hub (S2) is answered back to bise's hub
-def auto_reply.x(-o: M.St, r: Maybe<&2, S.XIn>, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: S.Msg, +body: String) -> X.Cx<o>:
+def auto_reply.x(-o: S.St, r: Maybe<&2, S.XIn>, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: S.Msg, +body: String) -> X.Cx<o>:
   match r:
     case Some{+i}:
       xreplied(o, cx, i, body)
     case None{}:
       auto_reply.local(o, via, cx, agent, m, body)
 
-def auto_reply(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: S.Msg, +body: String) -> X.Cx<o>:
+def auto_reply(-o: S.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: S.Msg, +body: String) -> X.Cx<o>:
   auto_reply.x(o, XB.reply_due(xst(o, cx), S.Msg.id(m)), via, cx, agent, m, body)
 
 # RFC 0003 §7: a question gets an answer, the end of the turn
-def auto_replies(-o: M.St, qs: List<&2, S.Msg>, +cx: X.Cx<o>, +agent: String, +body: String) -> X.Cx<o>:
+def auto_replies(-o: S.St, qs: List<&2, S.Msg>, +cx: X.Cx<o>, +agent: String, +body: String) -> X.Cx<o>:
   match qs:
     case Nil{}:
       cx
     case Con{+m, +rest}:
       auto_replies(o, rest, auto_reply(o, Bool.pick(Maybe<&2, String>, String.eq(S.Msg.from(m), M.USER()), S.Msg.via(m), None{}), cx, agent, m, body), agent, body)
 
-def idle.report(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
+def idle.report(-o: S.St, go: Bool, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
   match go:
     case True{}:
       emit(o, cx, M.EReported{agent, J.obj([J.kv("at_ms", J.JNum{now(o, cx)}), J.kv("kind", J.JStr{"turn"}),
@@ -3437,7 +3436,7 @@ def idle.report(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String, +text: String)
     case False{}:
       cx
 
-def idle.nudge(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+def idle.nudge(-o: S.St, go: Bool, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   match go:
     case True{}:
       +cx2 = upd_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), S.RBusy{}), Some{now(o, cx)}))
@@ -3449,7 +3448,7 @@ def idle.nudge(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
 # goes on once the user signs in again: no automatic reply nor report (a
 # `(no written reply…)` woke the parent, on the same plan, into a turn
 # that failed too); the questions stay unanswered for the turn to come
-def idle.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +unread: Bool, +steered: List<&2, Nat>, +held: Bool) -> X.Cx<o>:
+def idle.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +unread: Bool, +steered: List<&2, Nat>, +held: Bool) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -3466,7 +3465,7 @@ def idle.agent(-o: M.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +l
       +cx6 = idle.nudge(o, unread && List.is_empty(&2, S.Msg, M.queued_for(st(o, cx5), agent)) && Bool.not(P.is_paused(st(o, cx5))), cx5, agent)
       pump(o, cx6, agent)
 
-def repl_idle(-o: M.St, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +held: Bool) -> X.Cx<o>:
+def repl_idle(-o: S.St, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +held: Bool) -> X.Cx<o>:
   +cx1 = fail_waiters(o, cx, agent, "turn_ended")
   +r = rr(o, cx1)
   +steered = KL.steer_get(X.R.steered(r), agent)
@@ -3482,7 +3481,7 @@ def repl_idle(-o: M.St, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +held: Bo
 # ---- waits (RFC 0003 §6.2) ----
 
 # `/close N`: the user files a card without answering it
-def close_by_user(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
+def close_by_user(-o: S.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
   match m:
     case None{}:
       notice(o, cx, String.append("no open notification #", ns(id)))
@@ -3491,7 +3490,7 @@ def close_by_user(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +id: Nat) -> X.C
 
 # the gate's card closes without an answer (its agents were
 # interrupted): no card, nothing to do
-def confirm_close(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +id: Nat, +res: String) -> X.Cx<o>:
+def confirm_close(-o: S.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +id: Nat, +res: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -3501,10 +3500,10 @@ def confirm_close(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +id: Nat, +res: 
 # {"t":"page_answered"}: a page question answered (`to`: the agent its
 # pick went to); its card closes, and its asker hears it when that is
 # another agent (law page_answer_tells_asker)
-def page_answered.tell(-o: M.St, tell: Bool, +cx: X.Cx<o>, +c: S.Card, +to: String, +page: String, +text: String) -> X.Cx<o>:
+def page_answered.tell(-o: S.St, tell: Bool, +cx: X.Cx<o>, +c: S.Card, +to: String, +page: String, +text: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, tell, u => fst(o, send(o, cx, msg(M.HUB(), S.Card.agent(c), R.answer_words(S.Card.id(c), page, to, text), False{}, None{}, False{}, False{}))), u => cx)
 
-def page_answered(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +to: String, +page: String, +text: String, +block: String) -> X.Cx<o>:
+def page_answered(-o: S.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +to: String, +page: String, +text: String, +block: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
@@ -3515,10 +3514,10 @@ def page_answered(-o: M.St, m: Maybe<&2, S.Card>, +cx: X.Cx<o>, +to: String, +pa
 # {"t":"page_card"}: a page's own card (plan-ok): asked by the first live
 # agent of `agents`, else main (reach.bend page_asker), in its feed too;
 # a kind that is no page card's opens nothing. `key` is the hub's record.
-def page_card.open(-o: M.St, +cx: X.Cx<o>, +kind: String, +who: String, +text: String) -> X.Cx<o>:
-  card_to_asker(o, open_card(o, cx, kind, who, text, None{}), M.St.next_card(st(o, cx)), who, text)
+def page_card.open(-o: S.St, +cx: X.Cx<o>, +kind: String, +who: String, +text: String) -> X.Cx<o>:
+  card_to_asker(o, open_card(o, cx, kind, who, text, None{}), S.St.next_card(st(o, cx)), who, text)
 
-def page_card(-o: M.St, +cx: X.Cx<o>, +agents: List<&2, String>, +kind: String, +text: String) -> X.Cx<o>:
+def page_card(-o: S.St, +cx: X.Cx<o>, +agents: List<&2, String>, +kind: String, +text: String) -> X.Cx<o>:
   LZ.pick(X.Cx<o>, CK.page_kind(kind),
     u => page_card.open(o, cx, kind, R.page_asker(st(o, cx), agents), text),
     u => notice(o, cx, String.append("not a page card: ", kind)))
@@ -3528,7 +3527,7 @@ def force_run_of(+r: String) -> S.Run:
     Bool.pick(S.Run, String.eq(r, "idle"), S.RIdle{},
       Bool.pick(S.Run, String.eq(r, "busy"), S.RBusy{}, S.RDown{})))
 
-def placed.tell(-o: M.St, user: Bool, +cx: X.Cx<o>, +parent: String, +text: String) -> X.Cx<o>:
+def placed.tell(-o: S.St, user: Bool, +cx: X.Cx<o>, +parent: String, +text: String) -> X.Cx<o>:
   match user:
     case True{}:
       feed(o, cx, M.MAIN(), FD.warn(text))
@@ -3536,7 +3535,7 @@ def placed.tell(-o: M.St, user: Bool, +cx: X.Cx<o>, +parent: String, +text: Stri
       fst(o, send(o, cx, msg(M.HUB(), parent, text, False{}, None{}, False{}, False{})))
 
 # the shell's `placed` (place.bend's placed_of decided it)
-def placed(-o: M.St, d: PL.Do, +cx: X.Cx<o>) -> X.Cx<o>:
+def placed(-o: S.St, d: PL.Do, +cx: X.Cx<o>) -> X.Cx<o>:
   match d:
     case PL.POk{+n, +ws}:
       +cx2 = feed(o, emit(o, cx, M.EPlaced{n, ws, ""}, Unit{}, Unit{}, Unit{}), M.MAIN(), FD.info(PL.ready_text(n, ws)))
@@ -3550,21 +3549,21 @@ def placed(-o: M.St, d: PL.Do, +cx: X.Cx<o>) -> X.Cx<o>:
       cx
 
 # then its joiners (`sb spawn --place` while it was placing): the same
-def placed.join(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>, +d: PL.Do, +err: String) -> X.Cx<o>:
+def placed.join(-o: S.St, ns: List<&2, String>, +cx: X.Cx<o>, +d: PL.Do, +err: String) -> X.Cx<o>:
   match ns:
     case Nil{}:
       cx
     case Con{+b, +t}:
       placed.join(o, t, placed(o, PL.placed_of(st(o, cx), b, PL.join.ws(d), PL.join.err(d, err)), cx), d, err)
 
-def placed.in(-o: M.St, +cx: X.Cx<o>, +name: String, +ws: J.Json, +err: String) -> X.Cx<o>:
+def placed.in(-o: S.St, +cx: X.Cx<o>, +name: String, +ws: J.Json, +err: String) -> X.Cx<o>:
   +d = PL.placed_of(st(o, cx), name, ws, err)
   placed.join(o, PL.joiners(st(o, cx), name), placed(o, d, cx), d, err)
 
 # one input, decoded by the generated codec (gen/in.bend, from
 # bise_proto::core::In): an unknown tag is INone, a missing field its
 # default
-def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
+def dispatch(-o: S.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
   match i:
     case GI.IReq{+token, +from, +req}:
       agent_req(o, cx, token, from, req)
@@ -3625,7 +3624,7 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
     case GI.IFocus{+to, +note, +direct}:
       focus(o, cx, to, note, direct)
     case GI.IClose{+card}:
-      close_by_user(o, M.card_of(M.St.cards(st(o, cx)), card), cx, card)
+      close_by_user(o, M.card_of(S.St.cards(st(o, cx)), card), cx, card)
     case GI.IForceRun{+agent, +run}:
       # tests only: put an agent's REPL in a given state (then deliver, like
       # any change of run: law L4)
@@ -3633,9 +3632,9 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
     case GI.IConfirmOpen{+agent, +text}:
       open_confirm(o, cx, agent, text)
     case GI.IConfirmClose{+card, +res}:
-      confirm_close(o, M.card_of(M.St.cards(st(o, cx)), card), cx, card, res)
+      confirm_close(o, M.card_of(S.St.cards(st(o, cx)), card), cx, card, res)
     case GI.IPageAnswered{+card, +agent, +page, +text, +block}:
-      page_answered(o, M.card_of(M.St.cards(st(o, cx)), card), cx, agent, page, text, block)
+      page_answered(o, M.card_of(S.St.cards(st(o, cx)), card), cx, agent, page, text, block)
     case GI.IForge{+to, +text}:
       fst(o, send(o, cx, msg(M.GITHUB(), to, text, False{}, None{}, False{}, False{})))
     case GI.IPageCard{+agents, +kind, +text, +key}:
@@ -3690,14 +3689,14 @@ def step(+h: Hub, +i: J.Json) -> X.Cx<Hub.d(h)>:
 
 # ---- committing a step (what sb-core keeps) ----
 
-def commit.go(-o: M.St, need: Maybe<&2, J.Json>, +c: X.Core<o>, +r: X.R, +h: Hub) -> Turn:
+def commit.go(-o: S.St, need: Maybe<&2, J.Json>, +c: X.Core<o>, +r: X.R, +h: Hub) -> Turn:
   match need:
     case Some{+q}:
       Turn{h, Nil{}, Some{q}}
     case None{}:
       Turn{Hub{X.Core.d(o, c), X.R.with_ans(r, Nil{})}, X.Core.fx(o, c), None{}}
 
-def commit.cx(-o: M.St, cx: X.Cx<o>, +h: Hub) -> Turn:
+def commit.cx(-o: S.St, cx: X.Cx<o>, +h: Hub) -> Turn:
   match cx:
     case X.Cx{+c, +r}:
       commit.go(o, X.R.need(r), c, r, h)
@@ -3756,5 +3755,5 @@ def NoneOf(ws: List<&2, X.Waiter>, +n: String) -> Data:
     case Con{+w, +t}:
       X.Both<{String.eq(X.Waiter.agent(w), n) == False{} : Bool}, NoneOf(t, n)>
 
-def waiters_of_cx(-o: M.St, +cx: X.Cx<o>) -> List<&2, X.Waiter>:
+def waiters_of_cx(-o: S.St, +cx: X.Cx<o>) -> List<&2, X.Waiter>:
   X.R.waiters(rr(o, cx))

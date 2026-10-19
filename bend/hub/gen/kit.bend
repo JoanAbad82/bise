@@ -9,7 +9,7 @@ import ../../vendor/json.bend as J
 type Delivered is Data:
   Delivered{id: Nat, rel: String}
 
-# ---- readers: sb-core's defaults (hub/codec.bend's C.get_*) ----
+# ---- readers: sb-core's defaults ----
 
 def get_s(+j: J.Json, +k: String) -> String:
   J.get_str_or(j, k, "")

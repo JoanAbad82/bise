@@ -50,7 +50,7 @@ def his.go(m: Maybe<&2, S.Msg>, +id: Nat) -> Fwd:
         FwdOk{S.Msg.text(msg)},
         FwdErr{String.append(mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")})
 
-def forward.done(m: Maybe<&2, S.Out>, +s: M.St, +id: Nat) -> Fwd:
+def forward.done(m: Maybe<&2, S.Out>, +s: S.St, +id: Nat) -> Fwd:
   match m:
     case Some{+o}:
       FwdErr{String.append(String.append(mid(id), " was already forwarded to "), S.Out.project(o))}
@@ -59,9 +59,9 @@ def forward.done(m: Maybe<&2, S.Out>, +s: M.St, +id: Nat) -> Fwd:
 
 # `sb project send --input m_<id>` by `from`: only main, only a message
 # the user sent main, once per message (law xhub_forward_needs_his_message)
-def forward(+s: M.St, +from: String, +id: Nat) -> Fwd:
+def forward(+s: S.St, +from: String, +id: Nat) -> Fwd:
   Bool.pick(Fwd, String.eq(from, M.MAIN()),
-    forward.done(XH.out_by_msg(S.Xs.outbox(M.St.x(s)), id), s, id),
+    forward.done(XH.out_by_msg(S.Xs.outbox(S.St.x(s)), id), s, id),
     FwdErr{"only main forwards to the projects"})
 
 # bise's own question (`sb project ask`): words, never a blank (law

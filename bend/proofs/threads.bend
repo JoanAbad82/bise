@@ -43,10 +43,10 @@ def hub_rt_put_find(+xs: List<&2, HX.Rt>, +n: String, +run: HS.Run, +w: Bool, +t
 
 # ---- cost-pause: a delivery keeps the pause (L4 support) ----
 
-def hub_rts(-o: HM.St, +cx: HX.Cx<o>) -> List<&2, HX.Rt>:
+def hub_rts(-o: HS.St, +cx: HX.Cx<o>) -> List<&2, HX.Rt>:
   HX.R.rts(HX.Cx.r(o, cx))
 
-def hub_rts_set_rt(-o: HM.St, cx: HX.Cx<o>, +x: HX.Rt) -> {hub_rts(o, HC.set_rt(o, cx, x)) == HC.rt_put(hub_rts(o, cx), HC.rt_next(HC.rt(o, cx, HX.Rt.name(x)), x)) : List<&2, HX.Rt>}:
+def hub_rts_set_rt(-o: HS.St, cx: HX.Cx<o>, +x: HX.Rt) -> {hub_rts(o, HC.set_rt(o, cx, x)) == HC.rt_put(hub_rts(o, cx), HC.rt_next(HC.rt(o, cx, HX.Rt.name(x)), x)) : List<&2, HX.Rt>}:
   match cx:
     case HX.Cx{c, r}:
       match r:
@@ -116,7 +116,7 @@ def hub_wp_id(+m: HS.Msg, +p: String) -> {HS.Msg.id(HS.Msg.with_parts(m, p)) == 
   %HSL.Msg.parts.eta(m, p) : {HS.Msg.id(_) == HS.Msg.id(m) : Nat}
   {==}
 
-def hub_wp_line(-o: HM.St, +cx: HX.Cx<o>, +name: String, +m: HS.Msg, +p: String)
+def hub_wp_line(-o: HS.St, +cx: HX.Cx<o>, +name: String, +m: HS.Msg, +p: String)
     -> {HC.deliver.line(o, False{}, True{}, cx, name, HS.Msg.with_parts(m, p))
       == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HS.Msg.text(m), HS.Msg.via(m))), name, HFD.you_id(HS.Msg.id(m))), name, p) : HX.Cx<o>}:
   +w = HS.Msg.with_parts(m, p)
@@ -300,7 +300,7 @@ def Laws.steer_add_keeps_rx_seen(xs, n, ids):
 # ---- his queued message taken back ----
 
 # a notice changes no state (an out effect only)
-def hub_d_notice(-o: HM.St, +cx: HX.Cx<o>, +t: String) -> {HX.d(o, HC.notice(o, cx, t)) == HX.d(o, cx) : HM.St}:
+def hub_d_notice(-o: HS.St, +cx: HX.Cx<o>, +t: String) -> {HX.d(o, HC.notice(o, cx, t)) == HX.d(o, cx) : HS.St}:
   match cx:
     case HX.Cx{c, r}:
       match c:
@@ -320,7 +320,7 @@ def Laws.unqueue_leaves_an_unknown_id(o, cx, id):
   hub_d_notice(o, cx, HC.cat(["no message ", HC.mid(id), " to take back"]))
 
 def Laws.unqueue_never_takes_anothers(o, cx, r, id, e):
-  %Equal.sym(Bool, String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.unqueue.take(o, HS.MRec.st(r), cx, id, HS.Msg.to(HS.MRec.msg(r))), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
+  %Equal.sym(Bool, String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.unqueue.take(o, HS.MRec.st(r), cx, id, HS.Msg.to(HS.MRec.msg(r))), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HS.St}
   hub_d_notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"]))
 
 def Laws.steer_queued_steers_into_the_turn(o, cx, m, name, im):
@@ -348,7 +348,7 @@ def Laws.steer_queued_leaves_an_unknown_id(o, cx, id):
   hub_d_notice(o, cx, HC.cat(["no message ", HC.mid(id), " to send now"]))
 
 def Laws.steer_queued_never_steers_anothers(o, cx, r, id, e):
-  %Equal.sym(Bool, String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.steer_queued.take(o, HS.MRec.st(r), cx, HS.MRec.msg(r)), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
+  %Equal.sym(Bool, String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HLZ.pick(HX.Cx<o>, _, u => HC.steer_queued.take(o, HS.MRec.st(r), cx, HS.MRec.msg(r)), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HS.St}
   hub_d_notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"]))
 
 # Nat.is_eq says equal: they are

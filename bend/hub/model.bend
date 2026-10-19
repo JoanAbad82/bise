@@ -1,5 +1,7 @@
-# hub/model.bend — the Switchboard hub's durable state (RFC 0001 §12) and
-# its events. `apply` is the only way the durable state changes; the
+# hub/model.bend — the Switchboard hub's events and how they change its
+# durable state (RFC 0001 §12; the state itself, S.St, is declared in
+# bise_proto::core::state, gen/state.bend). `apply` is the only way the
+# durable state changes, through S.St's setters; the
 # Rust daemon keeps a read-only mirror of it (rust/switchboard/src/
 # model.rs) fed by the journal events the hub emits.
 import Base
@@ -11,14 +13,6 @@ import ./lazy.bend as LZ
 import ./gone.bend as G
 import ./names.bend as NM
 import ./gen/state.bend as S
-
-type St is Data:
-  St{agents: List<&2, S.Agent>, order: List<&2, String>, hot: List<&2, S.MRec>,
-    cards: List<&2, S.Card>, notes: List<&2, String>, next_msg: Nat,
-    next_card: Nat, tm: S.Tms, x: S.Xs, paused: Maybe<&2, Nat>,
-    old: List<&2, S.MRec>, gone: List<&2, S.Item>}
-# paused: since that ms (pause.bend; None runs); hot/old: the messages split
-# (issue 21); gone: withdrawn cards he may still answer (gone.bend)
 
 type Ev is Data:
   ETaskCreated{name: String, parent: String, brief: J.Json, ws: J.Json, at: Nat}
@@ -81,70 +75,6 @@ type AgentOp is Data:
 type MsgOp is Data:
   OSt{st: S.MSt}
   OSettle{}
-
-def St.agents(x: St) -> List<&2, S.Agent>:
-  match x:
-    case St{+agents, _, _, _, _, _, _, _, _, _, _, _}:
-      agents
-
-def St.order(x: St) -> List<&2, String>:
-  match x:
-    case St{_, +order, _, _, _, _, _, _, _, _, _, _}:
-      order
-
-# the hot messages (MRec.is_hot), ids ascending: what the walks read
-def St.hot(x: St) -> List<&2, S.MRec>:
-  match x:
-    case St{_, _, +hot, _, _, _, _, _, _, _, _, _}:
-      hot
-
-def St.cards(x: St) -> List<&2, S.Card>:
-  match x:
-    case St{_, _, _, +cards, _, _, _, _, _, _, _, _}:
-      cards
-
-def St.notes(x: St) -> List<&2, String>:
-  match x:
-    case St{_, _, _, _, +notes, _, _, _, _, _, _, _}:
-      notes
-
-def St.next_msg(x: St) -> Nat:
-  match x:
-    case St{_, _, _, _, _, +next_msg, _, _, _, _, _, _}:
-      next_msg
-
-def St.next_card(x: St) -> Nat:
-  match x:
-    case St{_, _, _, _, _, _, +next_card, _, _, _, _, _}:
-      next_card
-
-def St.tm(x: St) -> S.Tms:
-  match x:
-    case St{_, _, _, _, _, _, _, +tm, _, _, _, _}:
-      tm
-
-def St.x(x: St) -> S.Xs:
-  match x:
-    case St{_, _, _, _, _, _, _, _, +xs, _, _, _}:
-      xs
-
-# the cold messages, newest first (ids descending): a recent id is found
-# near the head, a message that turns cold goes in there
-def St.old(x: St) -> List<&2, S.MRec>:
-  match x:
-    case St{_, _, _, _, _, _, _, _, _, _, +old, _}:
-      old
-
-# the cards main withdrew he may still answer, newest first (hub/gone.bend)
-def St.gone(x: St) -> List<&2, S.Item>:
-  match x:
-    case St{_, _, _, _, _, _, _, _, _, _, _, +gone}:
-      gone
-
-def St.paused(x: St) -> Maybe<&2, Nat>:
-  match x:
-    case St{_, _, _, _, _, _, _, _, _, +pz, _, _}:
-      pz
 
 # the first entry whose key is `k`
 def find(~A: Data, ~K: Data, ~key: A -> K, ~eq: K -> K -> Bool, xs: List<&2, A>, +k: K) -> Maybe<&2, A>:
@@ -242,18 +172,18 @@ def agent_alias(xs: List<&2, S.Agent>, +n: String) -> Maybe<&2, String>:
     case Con{+a, +t}:
       LZ.pick(Maybe<&2, String>, str_in(S.Agent.aliases(a), n), u => Some{S.Agent.name(a)}, u => agent_alias(t, n))
 
-def get_agent(+st: St, +n: String) -> Maybe<&2, S.Agent>:
-  agent_named(St.agents(st), n)
+def get_agent(+st: S.St, +n: String) -> Maybe<&2, S.Agent>:
+  agent_named(S.St.agents(st), n)
 
 # the canonical name: itself, or the task an alias points to
-def resolve.pick(m: Maybe<&2, S.Agent>, +st: St, +n: String) -> Maybe<&2, String>:
+def resolve.pick(m: Maybe<&2, S.Agent>, +st: S.St, +n: String) -> Maybe<&2, String>:
   match m:
     case Some{+a}:
       Some{S.Agent.name(a)}
     case None{}:
-      agent_alias(St.agents(st), n)
+      agent_alias(S.St.agents(st), n)
 
-def resolve(+st: St, +n: String) -> Maybe<&2, String>:
+def resolve(+st: S.St, +n: String) -> Maybe<&2, String>:
   resolve.pick(get_agent(st, n), st, n)
 
 def reserved(+n: String) -> Bool:
@@ -275,12 +205,12 @@ def live_agent(m: Maybe<&2, S.Agent>) -> Bool:
 
 # name-free: a live (not archived) agent's name or bise's is taken; an
 # archived one's and an old name are free (core take, apply's strip)
-def name_taken(+st: St, +n: String) -> Bool:
-  reserved(n) || live_agent(agent_named(St.agents(st), n))
+def name_taken(+st: S.St, +n: String) -> Bool:
+  reserved(n) || live_agent(agent_named(S.St.agents(st), n))
 
 # no agent has it (any life), nor bise: a take's event (cx FreshEv)
-def name_held(+st: St, +n: String) -> Bool:
-  reserved(n) || Maybe.is_some(&2, S.Agent, agent_named(St.agents(st), n))
+def name_held(+st: S.St, +n: String) -> Bool:
+  reserved(n) || Maybe.is_some(&2, S.Agent, agent_named(S.St.agents(st), n))
 
 def agent_op.decl(l: S.Life, +d: Maybe<&2, S.Decl>) -> Maybe<&2, S.Decl>:
   match l:
@@ -480,8 +410,8 @@ def ins_all(hs: List<&2, S.MRec>, +os: List<&2, S.MRec>) -> List<&2, S.MRec>:
     case Con{+r, +t}:
       ins_desc(ins_all(t, os), r)
 # every message in send order (view_all; the laws' HI.Unique, HI.Kept)
-def every(+st: St) -> List<&2, S.MRec>:
-  List.reverse(&2, S.MRec, ins_all(St.hot(st), St.old(st)))
+def every(+st: S.St) -> List<&2, S.MRec>:
+  List.reverse(&2, S.MRec, ins_all(S.St.hot(st), S.St.old(st)))
 def drop_msg(xs: List<&2, S.MRec>, +id: Nat) -> List<&2, S.MRec>:
   match xs:
     case Nil{}:
@@ -533,8 +463,8 @@ def rec_in.go(m: Maybe<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat) -> Maybe<&
 # the record of the message `id`, hot or cold
 def rec_in(+hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat) -> Maybe<&2, S.MRec>:
   rec_in.go(rec_of(hot, id), old, id)
-def rec_at(+st: St, +id: Nat) -> Maybe<&2, S.MRec>:
-  rec_in(St.hot(st), St.old(st), id)
+def rec_at(+st: S.St, +id: Nat) -> Maybe<&2, S.MRec>:
+  rec_in(S.St.hot(st), S.St.old(st), id)
 # a reply from the recipient (or from the user) settles the question
 def settle_in.if(ok: Bool, +hot: List<&2, S.MRec>, +old: List<&2, S.MRec>, +id: Nat) -> Ms:
   match ok:
@@ -570,84 +500,93 @@ def moved(xs: List<&2, S.MRec>, +from: String, +to: String) -> List<&2, S.MRec>:
     case Con{+r, +t}:
       moved.if(MRec.is_hot(r) && String.eq(S.Msg.to(S.MRec.msg(r)), from), r, to) <> moved(t, from, to)
 
-def apply(+st: St, e: Ev) -> St:
-  match st:
-    case St{+agents, +order, +hot, +cards, +notes, +nm, +nc, +tm, +xs, +pz, +old, +gone}:
-      match e:
-        case ETaskCreated{+name, +parent, +brief, +ws, +at}:
-          St{put_agent(strip(agents, name), name, agent_of_new(ETaskCreated{name, parent, brief, ws, at}, NM.free_dir(dirs_of(agents), name))),
-            Bool.pick(List<&2, String>, str_in(order, name), order, snoc(String, order, name)),
-            hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case ELifecycle{+name, +life, +reason}:
-          St{map_agent(agents, name, OLife{life, reason}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case EWorkspace{+name, +ws}:
-          St{map_agent(agents, name, OWs{ws}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case ESnapshot{+name, +snap}:
-          St{map_agent(agents, name, OSnap{snap}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case EPlaced{+name, +ws, +err}:
-          St{Bool.pick(List<&2, S.Agent>, String.is_empty(err), map_agent(agents, name, OWs{ws}), agents), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case EDeclared{+name, +status, +note}:
-          St{map_agent(agents, name, ODeclared{status, note}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case EReported{+name, +report}:
-          St{map_agent(agents, name, OReport{report}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case EFileTouched{+name, +path}:
-          St{map_agent(agents, name, OFile{path}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case ERenamed{+name, +nn}:
-          St{map_agent(strip(agents, nn), name, ORename{nn}), NM.rename_in(order, name, nn), hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case EMsgsMoved{+from, +to}:
-          St{agents, order, moved(hot, from, to), cards, notes, nm, nc, tm, xs, pz, old, gone}
-        # the three message events, on the split (law cold_is_inert: on
-        # every message, the same as one list's snoc, map_msg, settle)
-        case EMsgSent{+m}:
-          +p = settle_in(S.Msg.reply_to(m), snoc(S.MRec, hot, new_rec(m)), old, S.Msg.from(m))
-          St{agents, order, Ms.hot(p), cards, notes, Nat.max(Nat.max(nm, 1n+S.Msg.id(m)), 1n+S.Msg.thread(m)), nc, tm, xs, pz, Ms.old(p), gone}
-        case EMsgState{+id, +s}:
-          +p = msg_op(hot, old, id, OSt{s})
-          St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p), gone}
-        case ESettled{+id}:
-          +p = msg_op(hot, old, id, OSettle{})
-          St{agents, order, Ms.hot(p), cards, notes, nm, nc, tm, xs, pz, Ms.old(p), gone}
-        case ECardOpened{+c}:
-          St{agents, order, hot, put_card(cards, c), notes, nm, Nat.max(nc, 1n+S.Card.id(c)), tm, xs, pz, old, gone}
-        case ECardClosed{+id, _, _}:
-          St{agents, order, hot, drop_card(cards, id), notes, nm, nc, tm, xs, pz, old, gone}
-        case ECardAnswerPos{_, _, _}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case ECardWithdrawn{+id, +text}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old, G.add(gone, id, text)}
-        case ECardLate{+id}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, xs, pz, old, G.drop(gone, id)}
-        case EMainNote{+text, _}:
-          St{agents, order, hot, cards, snoc(String, notes, text), nm, nc, tm, xs, pz, old, gone}
-        case ENotesFlushed{}:
-          St{agents, order, hot, cards, Nil{}, nm, nc, tm, xs, pz, old, gone}
-        case ETimerSet{+t, _}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.set(tm, t), xs, pz, old, gone}
-        case ETimerFired{+id, +fired, +next, +at, +undelivered}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.fired(tm, id, fired, next, at, undelivered), xs, pz, old, gone}
-        case ETimerRun{+id, +at}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.run(tm, id, at), xs, pz, old, gone}
-        case ETimerStop{+id, +why, +at}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.stop(tm, id, why, at), xs, pz, old, gone}
-        case ETimerName{+id, +name, _, _}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.named(tm, id, name), xs, pz, old, gone}
-        case EX{+xe}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, XH.apply(xs, xe), pz, old, gone}
-        case EAct{+ae}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.act_apply(tm, ae), xs, pz, old, gone}
-        case EFollow{+name, +on, +hub}:
-          St{map_agent(agents, name, OFollow{Bool.pick(Maybe<&2, String>, on, Some{hub}, None{})}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case EJobEnd{+name, _}:
-          St{map_agent(agents, name, OFollow{None{}}), order, hot, cards, notes, nm, nc, tm, xs, pz, old, gone}
-        case EWake{+we}:
-          St{agents, order, hot, cards, notes, nm, nc, TM.wk_apply(tm, we), xs, pz, old, gone}
-        case EPaused{+at}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, xs, Some{at}, old, gone}
-        case EResumed{_}:
-          St{agents, order, hot, cards, notes, nm, nc, tm, xs, None{}, old, gone}
+def apply(+st: S.St, e: Ev) -> S.St:
+  match e:
+    case ETaskCreated{+name, +parent, +brief, +ws, +at}:
+      S.St.over_order(S.St.over_agents(st, +ag => put_agent(strip(ag, name), name, agent_of_new(ETaskCreated{name, parent, brief, ws, at}, NM.free_dir(dirs_of(ag), name)))),
+        +od => Bool.pick(List<&2, String>, str_in(od, name), od, snoc(String, od, name)))
+    case ELifecycle{+name, +life, +reason}:
+      S.St.over_agents(st, ag => map_agent(ag, name, OLife{life, reason}))
+    case EWorkspace{+name, +ws}:
+      S.St.over_agents(st, ag => map_agent(ag, name, OWs{ws}))
+    case ESnapshot{+name, +snap}:
+      S.St.over_agents(st, ag => map_agent(ag, name, OSnap{snap}))
+    case EPlaced{+name, +ws, +err}:
+      S.St.over_agents(st, +ag => Bool.pick(List<&2, S.Agent>, String.is_empty(err), map_agent(ag, name, OWs{ws}), ag))
+    case EDeclared{+name, +status, +note}:
+      S.St.over_agents(st, ag => map_agent(ag, name, ODeclared{status, note}))
+    case EReported{+name, +report}:
+      S.St.over_agents(st, ag => map_agent(ag, name, OReport{report}))
+    case EFileTouched{+name, +path}:
+      S.St.over_agents(st, ag => map_agent(ag, name, OFile{path}))
+    case ERenamed{+name, +nn}:
+      S.St.over_order(S.St.over_agents(st, ag => map_agent(strip(ag, nn), name, ORename{nn})), od => NM.rename_in(od, name, nn))
+    case EMsgsMoved{+from, +to}:
+      S.St.over_hot(st, h => moved(h, from, to))
+    # the three message events, on the split (law cold_is_inert: on
+    # every message, the same as one list's snoc, map_msg, settle)
+    # (both lists change together: taken out first, so the state no longer
+    # holds them and each keeps one owner, like over_f's field)
+    case EMsgSent{+m}:
+      +nm = Nat.max(Nat.max(S.St.next_msg(st), 1n+S.Msg.id(m)), 1n+S.Msg.thread(m))
+      +h = S.St.hot(st)
+      +o = S.St.old(st)
+      +rest = S.St.with_old(S.St.with_hot(st, Nil{}), Nil{})
+      +p = settle_in(S.Msg.reply_to(m), snoc(S.MRec, h, new_rec(m)), o, S.Msg.from(m))
+      S.St.with_old(S.St.with_next_msg(S.St.with_hot(rest, Ms.hot(p)), nm), Ms.old(p))
+    case EMsgState{+id, +s}:
+      +h = S.St.hot(st)
+      +o = S.St.old(st)
+      +rest = S.St.with_old(S.St.with_hot(st, Nil{}), Nil{})
+      +p = msg_op(h, o, id, OSt{s})
+      S.St.with_old(S.St.with_hot(rest, Ms.hot(p)), Ms.old(p))
+    case ESettled{+id}:
+      +h = S.St.hot(st)
+      +o = S.St.old(st)
+      +rest = S.St.with_old(S.St.with_hot(st, Nil{}), Nil{})
+      +p = msg_op(h, o, id, OSettle{})
+      S.St.with_old(S.St.with_hot(rest, Ms.hot(p)), Ms.old(p))
+    case ECardOpened{+c}:
+      S.St.over_next_card(S.St.over_cards(st, cs => put_card(cs, c)), nc => Nat.max(nc, 1n+S.Card.id(c)))
+    case ECardClosed{+id, _, _}:
+      S.St.over_cards(st, cs => drop_card(cs, id))
+    case ECardAnswerPos{_, _, _}:
+      st
+    case ECardWithdrawn{+id, +text}:
+      S.St.over_gone(st, gn => G.add(gn, id, text))
+    case ECardLate{+id}:
+      S.St.over_gone(st, gn => G.drop(gn, id))
+    case EMainNote{+text, _}:
+      S.St.over_notes(st, ns => snoc(String, ns, text))
+    case ENotesFlushed{}:
+      S.St.with_notes(st, Nil{})
+    case ETimerSet{+t, _}:
+      S.St.over_tm(st, tm => TM.set(tm, t))
+    case ETimerFired{+id, +fired, +next, +at, +undelivered}:
+      S.St.over_tm(st, tm => TM.fired(tm, id, fired, next, at, undelivered))
+    case ETimerRun{+id, +at}:
+      S.St.over_tm(st, tm => TM.run(tm, id, at))
+    case ETimerStop{+id, +why, +at}:
+      S.St.over_tm(st, tm => TM.stop(tm, id, why, at))
+    case ETimerName{+id, +name, _, _}:
+      S.St.over_tm(st, tm => TM.named(tm, id, name))
+    case EX{+xe}:
+      S.St.over_x(st, xs => XH.apply(xs, xe))
+    case EAct{+ae}:
+      S.St.over_tm(st, tm => TM.act_apply(tm, ae))
+    case EFollow{+name, +on, +hub}:
+      S.St.over_agents(st, ag => map_agent(ag, name, OFollow{Bool.pick(Maybe<&2, String>, on, Some{hub}, None{})}))
+    case EJobEnd{+name, _}:
+      S.St.over_agents(st, ag => map_agent(ag, name, OFollow{None{}}))
+    case EWake{+we}:
+      S.St.over_tm(st, tm => TM.wk_apply(tm, we))
+    case EPaused{+at}:
+      S.St.with_paused(st, Some{at})
+    case EResumed{_}:
+      S.St.with_paused(st, None{})
 
 # the state after a journal: the replay of a list of events
-def apply_all(evs: List<&2, Ev>, +st: St) -> St:
+def apply_all(evs: List<&2, Ev>, +st: S.St) -> S.St:
   match evs:
     case Nil{}:
       st
@@ -680,12 +619,12 @@ def names_of.go(m: Maybe<&2, S.Agent>) -> List<&2, String>:
       S.Agent.aliases(a)
 
 # an agent's names: its own and its old ones (until another agent takes one)
-def names_of(+st: St, +n: String) -> List<&2, String>:
+def names_of(+st: S.St, +n: String) -> List<&2, String>:
   n <> names_of.go(get_agent(st, n))
 
 # messages waiting for delivery to `n` (under any of its names), oldest first
-def queued_for(+st: St, +n: String) -> List<&2, S.Msg>:
-  queued_in(St.hot(st), names_of(st, n))
+def queued_for(+st: S.St, +n: String) -> List<&2, S.Msg>:
+  queued_in(S.St.hot(st), names_of(st, n))
 
 def unanswered_in(xs: List<&2, S.MRec>, +ns: List<&2, String>) -> List<&2, S.Msg>:
   match xs:
@@ -696,8 +635,8 @@ def unanswered_in(xs: List<&2, S.MRec>, +ns: List<&2, String>) -> List<&2, S.Msg
       Bool.pick(List<&2, S.Msg>, str_in(ns, S.Msg.to(S.MRec.msg(r))) && MRec.owes(r), S.MRec.msg(r) <> rest, rest)
 
 # delivered messages to `n` that expect a reply it has not given
-def unanswered_for(+st: St, +n: String) -> List<&2, S.Msg>:
-  unanswered_in(St.hot(st), names_of(st, n))
+def unanswered_for(+st: S.St, +n: String) -> List<&2, S.Msg>:
+  unanswered_in(S.St.hot(st), names_of(st, n))
 
 def msg_of.go(m: Maybe<&2, S.MRec>) -> Maybe<&2, S.Msg>:
   match m:
@@ -706,7 +645,7 @@ def msg_of.go(m: Maybe<&2, S.MRec>) -> Maybe<&2, S.Msg>:
     case Some{+r}:
       Some{S.MRec.msg(r)}
 
-def msg_of(+st: St, +id: Nat) -> Maybe<&2, S.Msg>:
+def msg_of(+st: S.St, +id: Nat) -> Maybe<&2, S.Msg>:
   msg_of.go(rec_at(st, id))
 
 def state_of.go(m: Maybe<&2, S.MRec>) -> Maybe<&2, S.MSt>:
@@ -716,7 +655,7 @@ def state_of.go(m: Maybe<&2, S.MRec>) -> Maybe<&2, S.MSt>:
     case Some{+r}:
       Some{S.MRec.st(r)}
 
-def state_of(+st: St, +id: Nat) -> Maybe<&2, S.MSt>:
+def state_of(+st: S.St, +id: Nat) -> Maybe<&2, S.MSt>:
   state_of.go(rec_at(st, id))
 
 def ws_worktree(+ws: J.Json) -> Bool:
@@ -735,13 +674,13 @@ def ws_branch(+ws: J.Json) -> J.Json:
 def ws_path(+ws: J.Json) -> String:
   J.get_str_or(ws, "path", "")
 
-def init(+workspace: String) -> St:
+def init(+workspace: String) -> S.St:
   +ws = J.obj([J.kv("mode", J.str("shared")), J.kv("path", J.str(workspace)),
     J.kv("branch", J.JNull{}), J.kv("base_commit", J.JNull{}), J.kv("dropped", J.JBool{False{}})])
   +brief = J.obj([J.kv("objective", J.str("")), J.kv("context", J.str("")), J.kv("constraints", J.JArr{Nil{}}),
     J.kv("done_when", J.JNull{}), J.kv("report_format", J.JNull{})])
   +main = S.Agent.with_parent(S.Agent.with_is_main(agent_of_new(ETaskCreated{MAIN(), "", brief, ws, 0n}, MAIN()), True{}), None{})
-  St{[main], [MAIN()], Nil{}, Nil{}, Nil{}, 1n, 1n, TM.empty(), S.Xs.empty(), None{}, Nil{}, Nil{}}
+  S.St.with_order(S.St.with_agents(S.St.empty(), [main]), [MAIN()])
 
 # bise desktop S10: someone asked to hear when it ends (one job: off again
 # at its job_end)

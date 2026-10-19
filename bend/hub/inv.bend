@@ -43,8 +43,8 @@ def Below(ns: List<&2, Nat>, +n: Nat) -> Data:
 # law msgs_unique: each message is ONE record (its text and its single
 # delivery state, RFC 0003 §6.1): no two records share an id, and every
 # id is below the next free one (so a new message can never take one)
-def Unique(+s: M.St) -> Data:
-  X.Both<Distinct(ids(M.every(s))), Below(ids(M.every(s)), M.St.next_msg(s))>
+def Unique(+s: S.St) -> Data:
+  X.Both<Distinct(ids(M.every(s))), Below(ids(M.every(s)), S.St.next_msg(s))>
 
 # `a` is the start of `b`
 def IsPrefix(a: List<&2, Nat>, b: List<&2, Nat>) -> Data:
@@ -58,7 +58,7 @@ def IsPrefix(a: List<&2, Nat>, b: List<&2, Nat>) -> Data:
 
 # law msgs_kept: the messages of a state, in order, start the messages
 # of any later state: a message once sent is never removed
-def Kept(+s1: M.St, +s2: M.St) -> Data:
+def Kept(+s1: S.St, +s2: S.St) -> Data:
   IsPrefix(ids(M.every(s1)), ids(M.every(s2)))
 
 # ---- the split of the messages (issue 21 steps 3-4; laws split_*) ----
@@ -106,8 +106,8 @@ def Disjoint(hs: List<&2, S.MRec>, +os: List<&2, S.MRec>) -> Data:
 def Parts(+hs: List<&2, S.MRec>, +os: List<&2, S.MRec>, +nm: Nat) -> Data:
   X.Both<Asc(hs), X.Both<Desc(os), X.Both<AllCold(os), X.Both<Disjoint(hs, os), X.Both<Below(ids(hs), nm), Below(ids(os), nm)>>>>>
 
-def Split(+s: M.St) -> Data:
-  Parts(M.St.hot(s), M.St.old(s), M.St.next_msg(s))
+def Split(+s: S.St) -> Data:
+  Parts(S.St.hot(s), S.St.old(s), S.St.next_msg(s))
 
 # ---- every message as one list: what the split must keep (cold_is_inert) ----
 # The three message events on one list of every message, as model.bend's
@@ -162,10 +162,10 @@ def card_ids(cs: List<&2, S.Card>) -> List<&2, Nat>:
 
 # law cards_unique: no two open cards share an id, every id is below the
 # next free one
-def UniqueCards(+s: M.St) -> Data:
-  X.Both<Distinct(card_ids(M.St.cards(s))), Below(card_ids(M.St.cards(s)), M.St.next_card(s))>
+def UniqueCards(+s: S.St) -> Data:
+  X.Both<Distinct(card_ids(S.St.cards(s))), Below(card_ids(S.St.cards(s)), S.St.next_card(s))>
 
-def stuck.agent(m: Maybe<&2, S.Agent>, +s: M.St, +n: String) -> Bool:
+def stuck.agent(m: Maybe<&2, S.Agent>, +s: S.St, +n: String) -> Bool:
   match m:
     case None{}:
       False{}
@@ -175,7 +175,7 @@ def stuck.agent(m: Maybe<&2, S.Agent>, +s: M.St, +n: String) -> Bool:
 # law L4: agent `n` is idle, active, and has messages queued (a message
 # stuck: nothing would ever deliver it). A paused project holds them on
 # purpose (cost-pause): /resume delivers them, so they are not stuck
-def stuck(+s: M.St, +rts: List<&2, X.Rt>, +n: String) -> Bool:
+def stuck(+s: S.St, +rts: List<&2, X.Rt>, +n: String) -> Bool:
   Bool.and(H.is_idle(X.Rt.run(H.rt_find(rts, n))), stuck.agent(M.get_agent(s, n), s, n))
 
 # ---- law L4 support: the names of two agents never meet ----
@@ -222,8 +222,8 @@ def NamesOK(ps: List<&2, List<&2, String>>) -> Data:
 
 # law names_apart: no name or old name of an agent is a name or old name of
 # another one
-def NamesApart(+s: M.St) -> Data:
-  NamesOK(profile(M.St.agents(s)))
+def NamesApart(+s: S.St) -> Data:
+  NamesOK(profile(S.St.agents(s)))
 
 # ---- the timers (`sb every`, hub/timers.bend) ----
 
@@ -271,7 +271,7 @@ def fire_retry(due: Bool, +xs: List<&2, M.Ev>, +t: S.Timer, +now: Nat) -> List<&
 
 # law fire_is_a_message: the journal after the wake's send `p`: only the
 # retry line when the send was refused, the fire's events when it was queued
-def fire_journal(-o: M.St, p: X.Cx<o> & H.SendR, +t: S.Timer, +due: Bool, +next: Nat) -> List<&2, M.Ev>:
+def fire_journal(-o: S.St, p: X.Cx<o> & H.SendR, +t: S.Timer, +due: Bool, +next: Nat) -> List<&2, M.Ev>:
   match p:
     case (+cx, H.SErr{_}):
       fire_retry(due, X.journal(X.Core.fx(o, X.Cx.c(o, cx))), t, H.now(o, cx))

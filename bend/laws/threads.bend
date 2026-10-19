@@ -28,7 +28,7 @@ import ../hub/said.bend as HSD
 # LAW: the window's or the TUI's interrupt of a running turn emits fx
 # interrupt and then exactly one 'stopped' line for that agent.
 law interrupt_says_stopped_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == True{} : Bool}
@@ -37,7 +37,7 @@ law interrupt_says_stopped_once:
 # LAW: with no turn running, the interrupt is only a notice: no fx
 # interrupt, no 'stopped' line.
 law interrupt_idle_says_nothing:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == False{} : Bool}
@@ -46,7 +46,7 @@ law interrupt_idle_says_nothing:
 # LAW: an agent's `sb interrupt` of a running turn says it the same way
 # (one 'stopped' line after fx interrupt), then answers ok.
 law req_interrupt_says_stopped_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +token: Nat
   for +agent: String
@@ -65,7 +65,7 @@ law req_interrupt_says_stopped_once:
 # text; then its parts when it has some (send-parts, law
 # agent_no_parts_no_sent_line: none, nothing more).
 law task_send_says_sent_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
   for e: {HC.is_task_send(o, cx, HS.Msg.from(m), HS.Msg.to(m)) == True{} : Bool}
@@ -74,7 +74,7 @@ law task_send_says_sent_once:
 # LAW: main's messages, the user's, a message to the user, and a message
 # from a name that isn't an agent of this hub write no 'sent' line.
 law other_send_says_no_sent:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
   for e: {HC.is_task_send(o, cx, HS.Msg.from(m), HS.Msg.to(m)) == False{} : Bool}
@@ -83,7 +83,7 @@ law other_send_says_no_sent:
 # LAW: a sender this hub has no agent of ('@bise', a cross-hub
 # delegation, or any unknown name) is never a task's send.
 law unknown_sender_is_no_task_send:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +from: String
   for +to: String
@@ -93,7 +93,7 @@ law unknown_sender_is_no_task_send:
 # LAW: a card opened for a task's message also writes its 'card' line in
 # that task's feed (main's own cards stay in main's feed only).
 law task_card_shows_in_its_feed:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +id: Nat
   for +agent: String
@@ -104,7 +104,7 @@ law task_card_shows_in_its_feed:
 # LAW: a card whose agent isn't an agent of this hub (or is main) writes
 # no extra line.
 law other_card_no_extra_line:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +id: Nat
   for +agent: String
@@ -114,7 +114,7 @@ law other_card_no_extra_line:
 
 # LAW: an agent this hub doesn't have is never a task of it.
 law unknown_agent_is_no_task:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   for e: {HC.has_agent(o, cx, agent) == False{} : Bool}
@@ -127,7 +127,7 @@ law unknown_agent_is_no_task:
 # the "you answered" row, with his pick, no message: none was sent), and
 # the card closed as answered.
 law main_card_answer_routes_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +c: HS.Card
   for +text: String
@@ -146,7 +146,7 @@ law main_card_answer_routes_once:
 # message with no parts writes exactly these two lines (an older client's,
 # an agent-made one: the feed is what it always was).
 law you_line_carries_its_id:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +name: String
   for +m: HS.Msg
@@ -164,7 +164,7 @@ law you_line_carries_its_id:
 # after its you-id (the clients put them on that entry); the you line
 # and its id come first, as always.
 law you_parts_follow_the_id:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +name: String
   for +m: HS.Msg
@@ -176,7 +176,7 @@ law you_parts_follow_the_id:
 # parts writes the same lines (his text, its id), the parts only after
 # them. The model reads the text; the parts are for the clients.
 law parts_never_change_text:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +name: String
   for +m: HS.Msg
@@ -187,7 +187,7 @@ law parts_never_change_text:
 # LAW: a line with no parts is no line: a route line (an answer to a card,
 # a message to another agent) with none is the route line alone.
 law no_parts_no_line:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +who: String
   for +card: Maybe<&2, Nat>
@@ -196,7 +196,7 @@ law no_parts_no_line:
 
 # LAW: a route line with parts is followed by one 'route-parts' line.
 law route_parts_follow_the_route:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +who: String
   for +card: Maybe<&2, Nat>
@@ -263,7 +263,7 @@ law the_steps_pick_is_the_route_lines:
 
 # LAW: the answer noted in a step is the one the step's answer reads
 law the_noted_answer_is_read_back:
-  for -o: HM.St
+  for -o: HS.St
   for cx: HX.Cx<o>
   for +a: HPK.Answer
   {HX.R.answered(HX.Cx.r(o, HX.answered(o, cx, a))) == Some{a} : Maybe<&2, HPK.Answer>}
@@ -271,7 +271,7 @@ law the_noted_answer_is_read_back:
 # LAW: an agent's card: his answer's route line goes in the asker's feed
 # too (inbox picks (2); its fold makes the asker's msg-in that row).
 law an_agents_answer_is_in_the_askers_feed:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +asker: String
   for +c: HS.Card
@@ -283,7 +283,7 @@ law an_agents_answer_is_in_the_askers_feed:
 
 # LAW: main's own card: the one line in main's feed, no second.
 law mains_own_answer_is_one_line:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +c: HS.Card
   for +said: String
@@ -303,7 +303,7 @@ law answer_keeps_its_parts:
 # LAW: a steered receipt names the steer-mode deliveries since the last
 # one, on one feed line at this point of the turn, and marks them seen.
 law steered_receipt_names_the_new_ones:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   for +h: Nat
@@ -316,7 +316,7 @@ law steered_receipt_names_the_new_ones:
 # LAW: a receipt once every steered id was seen (or with none) marks
 # nothing and writes nothing (a second receipt with no new steer).
 law steered_receipt_after_all_seen_is_nothing:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   for +ids: List<&2, Nat>
@@ -340,7 +340,7 @@ law steer_add_keeps_seen:
 # LAW: a received receipt names the steer-mode deliveries since the last
 # one ('sb steer-rx : m_3 m_4') and moves rx_seen only (seen kept).
 law steer_rx_receipt_names_the_new_ones:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   for +h: Nat
@@ -353,7 +353,7 @@ law steer_rx_receipt_names_the_new_ones:
 # LAW: a received receipt with nothing new marks nothing and writes
 # nothing.
 law steer_rx_receipt_after_all_seen_is_nothing:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +agent: String
   for +ids: List<&2, Nat>
@@ -375,7 +375,7 @@ law steer_add_keeps_rx_seen:
 
 # LAW: a queued message of his is taken back: one EMsgState, Rejected.
 law unqueue_takes_back_a_queued_one:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +q: String
   for +id: Nat
@@ -386,33 +386,33 @@ law unqueue_takes_back_a_queued_one:
 # unchanged); so are one already rejected, one cancelled, an unknown id, and
 # a message that isn't his.
 law unqueue_leaves_a_delivered_one:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +id: Nat
   for +to: String
-  {HX.d(o, HC.unqueue.take(o, HS.Delivered{}, cx, id, to)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.unqueue.take(o, HS.Delivered{}, cx, id, to)) == HX.d(o, cx) : HS.St}
 
 law unqueue_leaves_a_rejected_one:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +r: String
   for +id: Nat
   for +to: String
-  {HX.d(o, HC.unqueue.take(o, HS.Rejected{r}, cx, id, to)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.unqueue.take(o, HS.Rejected{r}, cx, id, to)) == HX.d(o, cx) : HS.St}
 
 law unqueue_leaves_an_unknown_id:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +id: Nat
-  {HX.d(o, HC.unqueue.go(o, None{}, cx, id)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.unqueue.go(o, None{}, cx, id)) == HX.d(o, cx) : HS.St}
 
 law unqueue_never_takes_anothers:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +r: HS.MRec
   for +id: Nat
   for e: {String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()) == False{} : Bool}
-  {HX.d(o, HC.unqueue.go(o, Some{r}, cx, id)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.unqueue.go(o, Some{r}, cx, id)) == HX.d(o, cx) : HS.St}
 
 # LAW: the queue after a take-back is the queue before minus that message:
 # its own record becomes Rejected{"taken_back"} (no longer queued, so the
@@ -450,7 +450,7 @@ law unqueue_keeps_every_other_record:
 # LAW: a queued message of his to a busy agent goes into its running turn:
 # the pump's busy delivery of that message alone (steered, its id kept).
 law steer_queued_steers_into_the_turn:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
   for +name: String
@@ -459,7 +459,7 @@ law steer_queued_steers_into_the_turn:
 
 # LAW: to an idle agent, it is a turn of its own: the pump's idle delivery.
 law steer_queued_starts_a_turn_when_idle:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
   for +name: String
@@ -469,56 +469,56 @@ law steer_queued_starts_a_turn_when_idle:
 # LAW: an agent that can't take it (down, starting) leaves it queued: a
 # notice, the state unchanged; so does an agent that is gone.
 law steer_queued_waits_for_a_down_agent:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
   for +name: String
   for +im: Bool
-  {HX.d(o, HC.steer_queued.run(o, HS.RDown{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.run(o, HS.RDown{}, cx, m, name, im)) == HX.d(o, cx) : HS.St}
 
 law steer_queued_waits_for_a_starting_agent:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
   for +name: String
   for +im: Bool
-  {HX.d(o, HC.steer_queued.run(o, HS.RStarting{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.run(o, HS.RStarting{}, cx, m, name, im)) == HX.d(o, cx) : HS.St}
 
 law steer_queued_leaves_it_for_a_gone_agent:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
-  {HX.d(o, HC.steer_queued.agent(o, None{}, cx, m)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.agent(o, None{}, cx, m)) == HX.d(o, cx) : HS.St}
 
 # LAW: a message no longer queued (delivered, taken back, rejected,
 # cancelled) is left as it is, as are an unknown id and a message that
 # isn't his.
 law steer_queued_leaves_a_delivered_one:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
-  {HX.d(o, HC.steer_queued.take(o, HS.Delivered{}, cx, m)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.take(o, HS.Delivered{}, cx, m)) == HX.d(o, cx) : HS.St}
 
 law steer_queued_leaves_a_rejected_one:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
   for +r: String
-  {HX.d(o, HC.steer_queued.take(o, HS.Rejected{r}, cx, m)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.take(o, HS.Rejected{r}, cx, m)) == HX.d(o, cx) : HS.St}
 
 law steer_queued_leaves_an_unknown_id:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +id: Nat
-  {HX.d(o, HC.steer_queued.go(o, None{}, cx, id)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.go(o, None{}, cx, id)) == HX.d(o, cx) : HS.St}
 
 law steer_queued_never_steers_anothers:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +r: HS.MRec
   for +id: Nat
   for e: {String.eq(HS.Msg.from(HS.MRec.msg(r)), HM.USER()) == False{} : Bool}
-  {HX.d(o, HC.steer_queued.go(o, Some{r}, cx, id)) == HX.d(o, cx) : HM.St}
+  {HX.d(o, HC.steer_queued.go(o, Some{r}, cx, id)) == HX.d(o, cx) : HS.St}
 
 # LAW (the races, sb-core steps one input at a time): steered first, the
 # record is Delivered, so the turn's end never says it again
@@ -560,7 +560,7 @@ law said_is_his:
 # (HS.Msg.id), the id HSD.said_id answered for it: the answered id is the
 # id the you-id line carries later.
 law said_you_id:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +name: String
   for +m: HS.Msg
@@ -626,7 +626,7 @@ law hub_turns_never_moves_otherwise:
 # state carried): a step that ends a turn and starts the next one (the
 # idle's pump) goes through it twice, Busy -> Idle (+1), Idle -> Busy.
 law hub_set_rt_counts_turns:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +x: HX.Rt
   {HX.Rt.turns(HC.rt(o, HC.set_rt(o, cx, x), HX.Rt.name(x)))

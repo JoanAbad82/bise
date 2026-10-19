@@ -56,13 +56,11 @@ def Laws.wake_set_keeps_agents(o, ok, cx, agent, spec, max_text, max_ms, quiet, 
     case False{}:
       {==}
     case True{}:
-      match cx:
-        case HX.Cx{c, r}:
-          match c:
-            case HX.Core{d, fx, p, f, q, v}:
-              match d:
-                case HM.St{ag, ord, ms, cs, ns, nm, nc, tm, xs, pz, hot, gn}:
-                  {==}
+      +e = {HWK.WSet{HWK.make(HC.wks(o, cx), agent, spec, max_text, HC.now(o, cx), max_ms, quiet, then)} : HWK.WkEv}
+      +cx2 = HC.emit(o, cx, HM.EWake{e}, Unit{}, Unit{}, Unit{})
+      Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, cx2)), HS.St.agents(HM.apply(HX.d(o, cx), HM.EWake{e})), HS.St.agents(HX.d(o, cx)),
+        Equal.cong(HS.St, List<&2, HS.Agent>, s => HS.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.EWake{e}), PL1.hub_d_emit(o, cx, HM.EWake{e}, Unit{}, Unit{}, Unit{})),
+        PL1.hub_agents_wake(HX.d(o, cx), e))
 
 def Laws.wake_own_stop_quiet(a):
   {==}
@@ -88,7 +86,7 @@ def Laws.ask_pause_resumes(ws, agent, to, msg, asked_at, now):
 def Laws.ask_max_tells(ws, agent, to, msg, asked_at, now):
   {==}
 
-def ask_need_false(-o: HM.St, +cx: HX.Cx<o>, +agent: String, +orig: HS.Msg, +w: HS.Watch,
+def ask_need_false(-o: HS.St, +cx: HX.Cx<o>, +agent: String, +orig: HS.Msg, +w: HS.Watch,
     e: {HWK.reply_for(HS.Wakes.live(HC.wks(o, cx)), agent, HS.Msg.id(orig)) == Some{w} : Maybe<&2, HS.Watch>})
     -> {HC.reply_pause.need(o, cx, agent, orig) == False{} : Bool}:
   %Equal.sym(Maybe<&2, HS.Watch>, HWK.reply_for(HS.Wakes.live(HC.wks(o, cx)), agent, HS.Msg.id(orig)), Some{w}, e)
@@ -101,7 +99,7 @@ def Laws.ask_once(o, cx, agent, orig, w, e):
   {==}
 
 # the live watches after wake_ends: those of no ended id
-def ask_live_ends(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
+def ask_live_ends(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
     -> {HS.Wakes.live(HC.wks(o, HC.wake_ends(o, ids, cx, why))) == HWK.keep_out(HS.Wakes.live(HC.wks(o, cx)), ids) : List<&2, HS.Watch>}:
   match ids:
     case Nil{}:
@@ -112,8 +110,8 @@ def ask_live_ends(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +l = HS.Wakes.live(HC.wks(o, cx))
       +l2 = HS.Wakes.live(HC.wks(o, cx2))
-      +e2 = Equal.trans(List<&2, HS.Watch>, l2, HS.Wakes.live(HS.Tms.wk(HM.St.tm(HM.apply(HX.d(o, cx), ev)))), HWK.drop(l, id),
-        Equal.cong(HM.St, List<&2, HS.Watch>, s => HS.Wakes.live(HS.Tms.wk(HM.St.tm(s))), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+      +e2 = Equal.trans(List<&2, HS.Watch>, l2, HS.Wakes.live(HS.Tms.wk(HS.St.tm(HM.apply(HX.d(o, cx), ev)))), HWK.drop(l, id),
+        Equal.cong(HS.St, List<&2, HS.Watch>, s => HS.Wakes.live(HS.Tms.wk(HS.St.tm(s))), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
         PL3.hub_wk_live_end(HX.d(o, cx), id, why, HC.now(o, cx)))
       Equal.trans(List<&2, HS.Watch>, HS.Wakes.live(HC.wks(o, HC.wake_ends(o, rest, cx2, why))), HWK.keep_out(l2, rest), HWK.keep_out(l, id <> rest),
         ask_live_ends(o, rest, cx2, why),
@@ -122,7 +120,7 @@ def ask_live_ends(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
           PL3.hub_wk_keep_drop(l, id, rest)))
 
 # wake_ends leaves the messages as they were
-def ask_msgs_ends(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
+def ask_msgs_ends(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
     -> {HM.every(HX.d(o, HC.wake_ends(o, ids, cx, why))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}:
   match ids:
     case Nil{}:
@@ -133,7 +131,7 @@ def ask_msgs_ends(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
       Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, HC.wake_ends(o, t, cx2, why))), HM.every(HX.d(o, cx2)), HM.every(HX.d(o, cx)),
         ask_msgs_ends(o, t, cx2, why),
         Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), ev)), HM.every(HX.d(o, cx)),
-          Equal.cong(HM.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+          Equal.cong(HS.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           PL1.hub_msgs_wake(HX.d(o, cx), HWK.WEnd{id, why, HC.now(o, cx)})))
 
 def Laws.ask_reply_ends(o, cx, from, to, r):

@@ -21,7 +21,7 @@ import ../hub/gen/fx.bend as HF
 # spawn (every path: the create, a message to a down task, a restore)
 # changes nothing while its workspace is placing.
 law no_repl_before_placed:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for +r: Bool
@@ -52,7 +52,7 @@ law placed_err_fails:
 # word to the spawner (placed.tell: a message, or main's feed for his
 # own /new), after the journal's line; nothing else.
 law placed_err_tells_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for +err: String
@@ -65,7 +65,7 @@ law placed_err_tells_once:
 # LAW: a worktree made for a task gone meanwhile (dropped while placing)
 # goes again, and that is all the step does.
 law placed_orphan_drops_only:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for +ws: J.Json
@@ -74,17 +74,17 @@ law placed_orphan_drops_only:
 # LAW: the journal's `worktree_placed` replays as the workspace it carries
 # (a restart rebuilds the placed task as it was).
 law placed_replays_as_ws:
-  for +st: HM.St
+  for +st: HS.St
   for +n: String
   for +ws: J.Json
-  {HM.apply(st, HM.EPlaced{n, ws, ""}) == HM.apply(st, HM.EWorkspace{n, ws}) : HM.St}
+  {HM.apply(st, HM.EPlaced{n, ws, ""}) == HM.apply(st, HM.EWorkspace{n, ws}) : HS.St}
 
 # ---- a join while placing (`sb spawn B --place A`, A placing; rows233B) ----
 
 # LAW: a join on a placing agent never makes a worktree of its own: its
 # ws carries A's place, and place.ask emits no worktree_create for it.
 law place_join_no_create:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +n: String
   for +ws: J.Json
@@ -95,7 +95,7 @@ law place_join_no_create:
 # LAW: no REPL for the joiner before its place is made: its ws is placing,
 # so spawn changes nothing (no_repl_before_placed, on the joiner).
 law place_join_waits:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +b: String
   for +r: Bool

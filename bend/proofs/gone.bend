@@ -7,6 +7,7 @@ import ../hub/lazy.bend as GLZ
 import ../hub/model.bend as HM
 import ../laws/gone.bend as Laws
 import ../hub/gen/state.bend as HS
+import ../hub/gen/state-laws.bend as HSL
 
 # n equals itself
 def eq_refl(n: Nat) -> {Nat.is_eq(n, n) == True{} : Bool}:
@@ -107,29 +108,25 @@ def Laws.gone_drop_once(xs, id):
   take_none(G.del(xs, id), G.MAX(), id)(del_none(xs, id))
 
 def Laws.gone_withdrawn_adds(s, id, text):
-  match s:
-    case HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol, gn}:
-      {==}
+  %HSL.St.open_eq(s) : {HS.St.gone(HM.apply(_, HM.ECardWithdrawn{id, text})) == G.add(HS.St.gone(s), id, text) : List<&2, HS.Item>}
+  {==}
 
 def Laws.gone_late_drops(s, id):
-  match s:
-    case HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol, gn}:
-      {==}
+  %HSL.St.open_eq(s) : {HS.St.gone(HM.apply(_, HM.ECardLate{id})) == G.drop(HS.St.gone(s), id) : List<&2, HS.Item>}
+  {==}
 
 def Laws.gone_replay_withdrawn(s, id, text):
-  match s:
-    case HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol, gn}:
-      Laws.gone_add_finds(gn, id, text)
+  %HSL.St.open_eq(s) : {G.find(HS.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}], _)), id) == Some{G.item(id, text)} : Maybe<&2, HS.Item>}
+  Laws.gone_add_finds(HS.St.gone(s), id, text)
 
 def Laws.gone_replay_late(s, id, text):
-  match s:
-    case HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol, gn}:
-      Laws.gone_drop_once(G.add(gn, id, text), id)
+  %HSL.St.open_eq(s) : {G.find(HS.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}, HM.ECardLate{id}], _)), id) == None{} : Maybe<&2, HS.Item>}
+  Laws.gone_drop_once(G.add(HS.St.gone(s), id, text), id)
 
-def Laws.gone_bound_after_apply(s, e, h):
-  match s:
-    case HM.St{ag, od, ho, ca, no, nm, nc, tm, xs, pz, ol, gn}:
-      match e:
+# on the state opened by name (S.St.open), each event's apply computes
+def gone_bound.go(+e: HM.Ev, +s: HS.St, h: {Nat.is_le(List.length(&2, HS.Item, HS.St.gone(s)), G.MAX()) == True{} : Bool})
+    -> {Nat.is_le(List.length(&2, HS.Item, HS.St.gone(HM.apply(HS.St.open(s), e))), G.MAX()) == True{} : Bool}:
+  match e:
         case HM.ETaskCreated{a, b, c, d, f}:
           h
         case HM.ELifecycle{a, b, c}:
@@ -191,9 +188,13 @@ def Laws.gone_bound_after_apply(s, e, h):
         case HM.EResumed{a}:
           h
         case HM.ECardWithdrawn{id, text}:
-          Laws.gone_add_bound(gn, id, text)
+          Laws.gone_add_bound(HS.St.gone(s), id, text)
         case HM.ECardLate{id}:
-          Laws.gone_drop_bound(gn, id)
+          Laws.gone_drop_bound(HS.St.gone(s), id)
+
+def Laws.gone_bound_after_apply(s, e, h):
+  %HSL.St.open_eq(s) : {Nat.is_le(List.length(&2, HS.Item, HS.St.gone(HM.apply(_, e))), G.MAX()) == True{} : Bool}
+  gone_bound.go(e, s, h)
 
 def Laws.gone_init_empty(workspace):
   {==}

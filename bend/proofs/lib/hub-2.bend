@@ -14,8 +14,8 @@ import ../../hub/gen/feed.bend as HFD
 import ./hub-1.bend as PL1
 import ../../hub/lazy.bend as HLZ
 
-def hub_cards_wakes(-o: HM.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
-    -> {HM.St.cards(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HM.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
+def hub_cards_wakes(-o: HS.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
+    -> {HS.St.cards(HX.d(o, HC.wakes_gone(o, life, cx, n))) == HS.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
   match life:
     case HS.LActive{}:
       {==}
@@ -26,7 +26,7 @@ def hub_cards_wakes(-o: HM.St, +life: HS.Life, +cx: HX.Cx<o>, +n: String)
     case HS.LArchived{}:
       PL1.hub_cards_wakes_each(o, HWK.ids_of(HS.Wakes.live(HC.wks(o, cx)), HM.names_of(HX.d(o, cx), n)), cx)
 
-def hub_msgs_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
+def hub_msgs_gone(-o: HS.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
     -> {HM.every(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}:
   match g:
     case False{}:
@@ -34,23 +34,23 @@ def hub_msgs_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, 
     case True{}:
       PL1.hub_msgs_gone_each(o, HTM.ids_in(HC.live(o, cx), ns), cx, HC.cat(["@", n, " is gone"]))
 
-def hub_agents_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
-    -> {HM.St.agents(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
+def hub_agents_gone(-o: HS.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
+    -> {HS.St.agents(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HS.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match g:
     case False{}:
       {==}
     case True{}:
       PL1.hub_agents_gone_each(o, HTM.ids_in(HC.live(o, cx), ns), cx, HC.cat(["@", n, " is gone"]))
 
-def hub_cards_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
-    -> {HM.St.cards(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HM.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
+def hub_cards_gone(-o: HS.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
+    -> {HS.St.cards(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HS.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
   match g:
     case False{}:
       {==}
     case True{}:
       PL1.hub_cards_gone_each(o, HTM.ids_in(HC.live(o, cx), ns), cx, HC.cat(["@", n, " is gone"]))
 
-def hub_d_feed(-o: HM.St, +cx: HX.Cx<o>, +a: String, +rec: J.Json) -> {HX.d(o, HC.feed(o, cx, a, rec)) == HX.d(o, cx) : HM.St}:
+def hub_d_feed(-o: HS.St, +cx: HX.Cx<o>, +a: String, +rec: J.Json) -> {HX.d(o, HC.feed(o, cx, a, rec)) == HX.d(o, cx) : HS.St}:
   match cx:
     case HX.Cx{c, r}:
       match c:
@@ -58,7 +58,7 @@ def hub_d_feed(-o: HM.St, +cx: HX.Cx<o>, +a: String, +rec: J.Json) -> {HX.d(o, H
           {==}
 
 # closing cards keeps the messages
-def hub_msgs_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
+def hub_msgs_close_ids(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
     -> {HM.every(HX.d(o, HC.close_ids(o, ids, cx, res))) == HM.every(HX.d(o, cx)) : List<&2, HS.MRec>}:
   match ids:
     case Nil{}:
@@ -71,20 +71,19 @@ def hub_msgs_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: Stri
         Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, cx3)), HM.every(HX.d(o, cx2)), HM.every(HX.d(o, cx)),
           PL1.hub_msgs_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
           Equal.trans(List<&2, HS.MRec>, HM.every(HX.d(o, cx2)), HM.every(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HS.Ans.empty()})), HM.every(HX.d(o, cx)),
-            Equal.cong(HM.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HS.Ans.empty()}),
+            Equal.cong(HS.St, List<&2, HS.MRec>, s => HM.every(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HS.Ans.empty()}),
               PL1.hub_d_emit(o, cx, HM.ECardClosed{id, res, HS.Ans.empty()}, Unit{}, Unit{}, Unit{})),
             PL1.hub_msgs_closed(HX.d(o, cx), id, res))))
 
-def hub_agents_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.agents(HX.d(o, a)) == HM.St.agents(HX.d(o, b)) : List<&2, HS.Agent>}:
-  Equal.cong(HM.St, List<&2, HS.Agent>, s => HM.St.agents(s), HX.d(o, a), HX.d(o, b), e)
+def hub_agents_eq(-o: HS.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HS.St}) -> {HS.St.agents(HX.d(o, a)) == HS.St.agents(HX.d(o, b)) : List<&2, HS.Agent>}:
+  Equal.cong(HS.St, List<&2, HS.Agent>, s => HS.St.agents(s), HX.d(o, a), HX.d(o, b), e)
 
-def hub_agents_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.agents(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == HM.St.agents(s) : List<&2, HS.Agent>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      {==}
+def hub_agents_closed(+s: HS.St, +id: Nat, +res: String) -> {HS.St.agents(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == HS.St.agents(s) : List<&2, HS.Agent>}:
+  %HSL.St.open_eq(s) : {HS.St.agents(HM.apply(_, HM.ECardClosed{id, res, HS.Ans.empty()})) == HS.St.agents(s) : List<&2, HS.Agent>}
+  {==}
 
-def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
-    -> {HM.St.agents(HX.d(o, HC.close_ids(o, ids, cx, res))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
+def hub_agents_close_ids(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
+    -> {HS.St.agents(HX.d(o, HC.close_ids(o, ids, cx, res))) == HS.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match ids:
     case Nil{}:
       {==}
@@ -92,31 +91,30 @@ def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: St
       +ev = {HM.ECardClosed{id, res, HS.Ans.empty()} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
-      Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, HC.close_ids(o, rest, cx3, res))), HS.St.agents(HX.d(o, cx3)), HS.St.agents(HX.d(o, cx)),
         hub_agents_close_ids(o, rest, cx3, res),
-        Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
+        Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, cx3)), HS.St.agents(HX.d(o, cx2)), HS.St.agents(HX.d(o, cx)),
           hub_agents_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
-          Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
-            Equal.cong(HM.St, List<&2, HS.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+          Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, cx2)), HS.St.agents(HM.apply(HX.d(o, cx), ev)), HS.St.agents(HX.d(o, cx)),
+            Equal.cong(HS.St, List<&2, HS.Agent>, s => HS.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
             hub_agents_closed(HX.d(o, cx), id, res))))
 
-def hub_agents_state(s: HM.St, +id: Nat, +x: HS.MSt) -> {HM.St.agents(HM.apply(s, HM.EMsgState{id, x})) == HM.St.agents(s) : List<&2, HS.Agent>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      {==}
+def hub_agents_state(+s: HS.St, +id: Nat, +x: HS.MSt) -> {HS.St.agents(HM.apply(s, HM.EMsgState{id, x})) == HS.St.agents(s) : List<&2, HS.Agent>}:
+  %HSL.St.open_eq(s) : {HS.St.agents(HM.apply(_, HM.EMsgState{id, x})) == HS.St.agents(s) : List<&2, HS.Agent>}
+  {==}
 
-def hub_agents_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HM.St.agents(HX.d(o, HC.reject_ids(o, ids, cx))) == HM.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
+def hub_agents_reject(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
+    -> {HS.St.agents(HX.d(o, HC.reject_ids(o, ids, cx))) == HS.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, t}:
       +ev = {HM.EMsgState{id, HS.Rejected{"recipient_unavailable"}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, HC.reject_ids(o, t, cx2))), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, HC.reject_ids(o, t, cx2))), HS.St.agents(HX.d(o, cx2)), HS.St.agents(HX.d(o, cx)),
         hub_agents_reject(o, t, cx2),
-        Equal.trans(List<&2, HS.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
-          Equal.cong(HM.St, List<&2, HS.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+        Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, cx2)), HS.St.agents(HM.apply(HX.d(o, cx), ev)), HS.St.agents(HX.d(o, cx)),
+          Equal.cong(HS.St, List<&2, HS.Agent>, s => HS.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_agents_state(HX.d(o, cx), id, HS.Rejected{"recipient_unavailable"})))
 
 def hub_names_tr(-a: List<&2, HS.MRec>, -b: List<&2, HS.MRec>, -na: List<&2, String>, -nb: List<&2, String>,
@@ -200,42 +198,39 @@ def hub_KC(+cs: List<&2, HS.Card>, +n: String, d: HI.Distinct(HI.card_ids(cs))) 
         case HX.Both{dh, dt}:
           hub_KC.pick(Bool.and(String.eq(HS.Card.agent(h), n), Bool.or(List.is_empty(&2, String, Nil{}), HM.str_in(Nil{}, HS.Card.kind(h)))), h, t, n, {==}, dh, hub_KC(t, n, dt))
 
-def hub_cards_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.cards(HX.d(o, a)) == HM.St.cards(HX.d(o, b)) : List<&2, HS.Card>}:
-  Equal.cong(HM.St, List<&2, HS.Card>, s => HM.St.cards(s), HX.d(o, a), HX.d(o, b), e)
+def hub_cards_eq(-o: HS.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HS.St}) -> {HS.St.cards(HX.d(o, a)) == HS.St.cards(HX.d(o, b)) : List<&2, HS.Card>}:
+  Equal.cong(HS.St, List<&2, HS.Card>, s => HS.St.cards(s), HX.d(o, a), HX.d(o, b), e)
 
-def hub_cards_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.cards(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == HM.drop_card(HM.St.cards(s), id) : List<&2, HS.Card>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      {==}
+def hub_cards_closed(+s: HS.St, +id: Nat, +res: String) -> {HS.St.cards(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == HM.drop_card(HS.St.cards(s), id) : List<&2, HS.Card>}:
+  %HSL.St.open_eq(s) : {HS.St.cards(HM.apply(_, HM.ECardClosed{id, res, HS.Ans.empty()})) == HM.drop_card(HS.St.cards(s), id) : List<&2, HS.Card>}
+  {==}
 
-def hub_cards_life(s: HM.St, +n: String, +l: HS.Life, +r: Maybe<&2, String>) -> {HM.St.cards(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.St.cards(s) : List<&2, HS.Card>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      {==}
+def hub_cards_life(+s: HS.St, +n: String, +l: HS.Life, +r: Maybe<&2, String>) -> {HS.St.cards(HM.apply(s, HM.ELifecycle{n, l, r})) == HS.St.cards(s) : List<&2, HS.Card>}:
+  %HSL.St.open_eq(s) : {HS.St.cards(HM.apply(_, HM.ELifecycle{n, l, r})) == HS.St.cards(s) : List<&2, HS.Card>}
+  {==}
 
-def hub_cards_state(s: HM.St, +id: Nat, +x: HS.MSt) -> {HM.St.cards(HM.apply(s, HM.EMsgState{id, x})) == HM.St.cards(s) : List<&2, HS.Card>}:
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      {==}
+def hub_cards_state(+s: HS.St, +id: Nat, +x: HS.MSt) -> {HS.St.cards(HM.apply(s, HM.EMsgState{id, x})) == HS.St.cards(s) : List<&2, HS.Card>}:
+  %HSL.St.open_eq(s) : {HS.St.cards(HM.apply(_, HM.EMsgState{id, x})) == HS.St.cards(s) : List<&2, HS.Card>}
+  {==}
 
 # rejecting messages keeps the cards
-def hub_cards_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HM.St.cards(HX.d(o, HC.reject_ids(o, ids, cx))) == HM.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
+def hub_cards_reject(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
+    -> {HS.St.cards(HX.d(o, HC.reject_ids(o, ids, cx))) == HS.St.cards(HX.d(o, cx)) : List<&2, HS.Card>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, t}:
       +ev = {HM.EMsgState{id, HS.Rejected{"recipient_unavailable"}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, HC.reject_ids(o, t, cx2))), HM.St.cards(HX.d(o, cx2)), HM.St.cards(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Card>, HS.St.cards(HX.d(o, HC.reject_ids(o, t, cx2))), HS.St.cards(HX.d(o, cx2)), HS.St.cards(HX.d(o, cx)),
         hub_cards_reject(o, t, cx2),
-        Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, cx2)), HM.St.cards(HM.apply(HX.d(o, cx), ev)), HM.St.cards(HX.d(o, cx)),
-          Equal.cong(HM.St, List<&2, HS.Card>, s => HM.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+        Equal.trans(List<&2, HS.Card>, HS.St.cards(HX.d(o, cx2)), HS.St.cards(HM.apply(HX.d(o, cx), ev)), HS.St.cards(HX.d(o, cx)),
+          Equal.cong(HS.St, List<&2, HS.Card>, s => HS.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_cards_state(HX.d(o, cx), id, HS.Rejected{"recipient_unavailable"})))
 
 # closing cards drops them, one by one
-def hub_cards_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
-    -> {HM.St.cards(HX.d(o, HC.close_ids(o, ids, cx, res))) == hub_dropc(ids, HM.St.cards(HX.d(o, cx))) : List<&2, HS.Card>}:
+def hub_cards_close_ids(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
+    -> {HS.St.cards(HX.d(o, HC.close_ids(o, ids, cx, res))) == hub_dropc(ids, HS.St.cards(HX.d(o, cx))) : List<&2, HS.Card>}:
   match ids:
     case Nil{}:
       {==}
@@ -243,14 +238,14 @@ def hub_cards_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: Str
       +ev = {HM.ECardClosed{id, res, HS.Ans.empty()} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
-      Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, HC.close_ids(o, rest, cx3, res))), hub_dropc(rest, HM.St.cards(HX.d(o, cx3))),
-        hub_dropc(id <> rest, HM.St.cards(HX.d(o, cx))),
+      Equal.trans(List<&2, HS.Card>, HS.St.cards(HX.d(o, HC.close_ids(o, rest, cx3, res))), hub_dropc(rest, HS.St.cards(HX.d(o, cx3))),
+        hub_dropc(id <> rest, HS.St.cards(HX.d(o, cx))),
         hub_cards_close_ids(o, rest, cx3, res),
-        Equal.cong(List<&2, HS.Card>, List<&2, HS.Card>, cs => hub_dropc(rest, cs), HM.St.cards(HX.d(o, cx3)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
-          Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, cx3)), HM.St.cards(HX.d(o, cx2)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
+        Equal.cong(List<&2, HS.Card>, List<&2, HS.Card>, cs => hub_dropc(rest, cs), HS.St.cards(HX.d(o, cx3)), HM.drop_card(HS.St.cards(HX.d(o, cx)), id),
+          Equal.trans(List<&2, HS.Card>, HS.St.cards(HX.d(o, cx3)), HS.St.cards(HX.d(o, cx2)), HM.drop_card(HS.St.cards(HX.d(o, cx)), id),
             hub_cards_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
-            Equal.trans(List<&2, HS.Card>, HM.St.cards(HX.d(o, cx2)), HM.St.cards(HM.apply(HX.d(o, cx), ev)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
-              Equal.cong(HM.St, List<&2, HS.Card>, s => HM.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+            Equal.trans(List<&2, HS.Card>, HS.St.cards(HX.d(o, cx2)), HS.St.cards(HM.apply(HX.d(o, cx), ev)), HM.drop_card(HS.St.cards(HX.d(o, cx)), id),
+              Equal.cong(HS.St, List<&2, HS.Card>, s => HS.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
               hub_cards_closed(HX.d(o, cx), id, res)))))
 
 def hub_cids_tr(-a: List<&2, HS.Card>, -b: List<&2, HS.Card>, -n: String, e: {a == b : List<&2, HS.Card>},
@@ -365,76 +360,79 @@ def hub_ucards_open(+cs: List<&2, HS.Card>, +c: HS.Card, +nc: Nat, +k: {HS.Card.
           PL1.hub_below_snoc(HI.card_ids(cs), HS.Card.id(c), top, PL1.hub_below_mono(HI.card_ids(cs), nc, top, Nat.max_ge_l(nc, 1n+HS.Card.id(c)), b),
             PL1.hub_lt_ge(HS.Card.id(c), 1n+HS.Card.id(c), top, PL1.hub_lt_succ(HS.Card.id(c)), Nat.max_ge_r(nc, 1n+HS.Card.id(c)))))}
 
-def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, e)) -> HI.UniqueCards(HM.apply(s, e)):
-  match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho, gn}:
-      match e:
-        case HM.ECardOpened{c}:
-          hub_ucards_open(ca, c, nc, k, u)
-        case HM.ECardClosed{id, res, a}:
-          hub_ucards_drop(ca, id, nc, u)
-        case HM.ECardAnswerPos{a, b, c}:
-          u
-        case HM.ECardWithdrawn{a, b}:
-          u
-        case HM.ECardLate{a}:
-          u
-        case HM.ETaskCreated{a, b, c, d, f}:
-          u
-        case HM.ELifecycle{a, b, c}:
-          u
-        case HM.EWorkspace{a, b}:
-          u
-        case HM.ESnapshot{a, b}:
-          u
-        case HM.EPlaced{a, b, c}:
-          u
-        case HM.EDeclared{a, b, c}:
-          u
-        case HM.EReported{a, b}:
-          u
-        case HM.EFileTouched{a, b}:
-          u
-        case HM.ERenamed{a, b}:
-          u
-        case HM.EMsgsMoved{a, b}:
-          u
-        case HM.EMsgSent{m}:
-          u
-        case HM.EMsgState{a, b}:
-          u
-        case HM.ESettled{a}:
-          u
-        case HM.EMainNote{a, b}:
-          u
-        case HM.ENotesFlushed{}:
-          u
-        case HM.ETimerSet{a, b}:
-          u
-        case HM.ETimerFired{a, b, c, d, f}:
-          u
-        case HM.ETimerRun{a, b}:
-          u
-        case HM.ETimerStop{a, b, c}:
-          u
-        case HM.ETimerName{a, b, c, d}:
-          u
-        case HM.EX{a}:
-          u
-        case HM.EAct{a}:
-          u
-        case HM.EFollow{a, b, c}:
-          u
-        case HM.EJobEnd{a, b}:
-          u
-        case HM.EWake{a}:
-          u
-        case HM.EPaused{a}:
-          u
-        case HM.EResumed{a}:
-          u
+# on the state opened by name (S.St.open), each event's apply computes
+def hub_apply_ucards.go(+e: HM.Ev, +s: HS.St, u: HI.UniqueCards(s), k: HX.FreshEv(s, e)) -> HI.UniqueCards(HM.apply(HS.St.open(s), e)):
+  match e:
+    case HM.ECardOpened{c}:
+      hub_ucards_open(HS.St.cards(s), c, HS.St.next_card(s), k, u)
+    case HM.ECardClosed{id, res, a}:
+      hub_ucards_drop(HS.St.cards(s), id, HS.St.next_card(s), u)
+    case HM.ECardAnswerPos{a, b, c}:
+      u
+    case HM.ECardWithdrawn{a, b}:
+      u
+    case HM.ECardLate{a}:
+      u
+    case HM.ETaskCreated{a, b, c, d, f}:
+      u
+    case HM.ELifecycle{a, b, c}:
+      u
+    case HM.EWorkspace{a, b}:
+      u
+    case HM.ESnapshot{a, b}:
+      u
+    case HM.EPlaced{a, b, c}:
+      u
+    case HM.EDeclared{a, b, c}:
+      u
+    case HM.EReported{a, b}:
+      u
+    case HM.EFileTouched{a, b}:
+      u
+    case HM.ERenamed{a, b}:
+      u
+    case HM.EMsgsMoved{a, b}:
+      u
+    case HM.EMsgSent{m}:
+      u
+    case HM.EMsgState{a, b}:
+      u
+    case HM.ESettled{a}:
+      u
+    case HM.EMainNote{a, b}:
+      u
+    case HM.ENotesFlushed{}:
+      u
+    case HM.ETimerSet{a, b}:
+      u
+    case HM.ETimerFired{a, b, c, d, f}:
+      u
+    case HM.ETimerRun{a, b}:
+      u
+    case HM.ETimerStop{a, b, c}:
+      u
+    case HM.ETimerName{a, b, c, d}:
+      u
+    case HM.EX{a}:
+      u
+    case HM.EAct{a}:
+      u
+    case HM.EFollow{a, b, c}:
+      u
+    case HM.EJobEnd{a, b}:
+      u
+    case HM.EWake{a}:
+      u
+    case HM.EPaused{a}:
+      u
+    case HM.EResumed{a}:
+      u
 
-def hub_apply_all_ucards(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.UniqueCards(s), f: HX.Fresh(evs, s)) -> HI.UniqueCards(HM.apply_all(evs, s)):
+def hub_apply_ucards(+s: HS.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, e)) -> HI.UniqueCards(HM.apply(s, e)):
+  %HSL.St.open_eq(s) : HI.UniqueCards(HM.apply(_, e))
+  hub_apply_ucards.go(e, s, u, k)
+
+def hub_apply_all_ucards(+evs: List<&2, HM.Ev>, +s: HS.St, u: HI.UniqueCards(s), f: HX.Fresh(evs, s)) -> HI.UniqueCards(HM.apply_all(evs, s)):
   match evs:
     case Nil{}:
       u
@@ -443,8 +441,8 @@ def hub_apply_all_ucards(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.UniqueCards(s),
         case HX.Both{k, ft}:
           hub_apply_all_ucards(t, HM.apply(s, e), hub_apply_ucards(s, e, u, k), ft)
 
-def hub_ucards_tr(-x: HM.St, -y: HM.St, e: {x == y : HM.St}, u: HI.UniqueCards(y)) -> HI.UniqueCards(x):
-  %Equal.sym(HM.St, x, y, e) : HI.UniqueCards(_)
+def hub_ucards_tr(-x: HS.St, -y: HS.St, e: {x == y : HS.St}, u: HI.UniqueCards(y)) -> HI.UniqueCards(x):
+  %Equal.sym(HS.St, x, y, e) : HI.UniqueCards(_)
   u
 
 # ---- L4 support: string equality is reflexive ----

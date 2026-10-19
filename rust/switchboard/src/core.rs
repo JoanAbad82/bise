@@ -736,7 +736,7 @@ pub enum Input {
 #[allow(clippy::large_enum_variant)] // short-lived, one list per input
 pub enum Effect {
     /// Append to the journal (already applied to the state). The event is
-    /// sb-core's JSON as is: the Rust side never decodes it (hub/codec.bend
+    /// sb-core's JSON as is: the Rust side never decodes it (hub/gen/journal.bend
     /// does), so a new event kind needs no Rust change.
     Journal(Value),
     Spawn {

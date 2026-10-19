@@ -10,7 +10,6 @@ import ../hub/gen/feed.bend as HFD
 import ../hub/lazy.bend as HLZ
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
-import ../hub/codec.bend as HCD
 import ../hub/newtask.bend as HNT
 import ../laws/parts.bend as Laws
 

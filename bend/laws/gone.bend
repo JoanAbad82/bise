@@ -39,42 +39,42 @@ law gone_drop_once:
 
 # LAW: main's withdraw (card_withdrawn) puts the card in the list...
 law gone_withdrawn_adds:
-  for +s: HM.St
+  for +s: HS.St
   for +id: Nat
   for +text: String
-  {HM.St.gone(HM.apply(s, HM.ECardWithdrawn{id, text})) == G.add(HM.St.gone(s), id, text) : List<&2, HS.Item>}
+  {HS.St.gone(HM.apply(s, HM.ECardWithdrawn{id, text})) == G.add(HS.St.gone(s), id, text) : List<&2, HS.Item>}
 
 # ...his late answer delivered (card_late) takes it out...
 law gone_late_drops:
-  for +s: HM.St
+  for +s: HS.St
   for +id: Nat
-  {HM.St.gone(HM.apply(s, HM.ECardLate{id})) == G.drop(HM.St.gone(s), id) : List<&2, HS.Item>}
+  {HS.St.gone(HM.apply(s, HM.ECardLate{id})) == G.drop(HS.St.gone(s), id) : List<&2, HS.Item>}
 
 # ...so a replay of both lines leaves it unanswerable, and of the
 # withdraw alone answerable with its question.
 law gone_replay_withdrawn:
-  for +s: HM.St
+  for +s: HS.St
   for +id: Nat
   for +text: String
-  {G.find(HM.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}], s)), id) == Some{G.item(id, text)} : Maybe<&2, HS.Item>}
+  {G.find(HS.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}], s)), id) == Some{G.item(id, text)} : Maybe<&2, HS.Item>}
 
 law gone_replay_late:
-  for +s: HM.St
+  for +s: HS.St
   for +id: Nat
   for +text: String
-  {G.find(HM.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}, HM.ECardLate{id}], s)), id) == None{} : Maybe<&2, HS.Item>}
+  {G.find(HS.St.gone(HM.apply_all([HM.ECardWithdrawn{id, text}, HM.ECardLate{id}], s)), id) == None{} : Maybe<&2, HS.Item>}
 
 # LAW: no journal line grows the list past MAX.
 law gone_bound_after_apply:
-  for +s: HM.St
+  for +s: HS.St
   for +e: HM.Ev
-  for h: {Nat.is_le(List.length(&2, HS.Item, HM.St.gone(s)), G.MAX()) == True{} : Bool}
-  {Nat.is_le(List.length(&2, HS.Item, HM.St.gone(HM.apply(s, e))), G.MAX()) == True{} : Bool}
+  for h: {Nat.is_le(List.length(&2, HS.Item, HS.St.gone(s)), G.MAX()) == True{} : Bool}
+  {Nat.is_le(List.length(&2, HS.Item, HS.St.gone(HM.apply(s, e))), G.MAX()) == True{} : Bool}
 
 # LAW: a new hub's list is empty.
 law gone_init_empty:
   for +workspace: String
-  {HM.St.gone(HM.init(workspace)) == Nil{} : List<&2, HS.Item>}
+  {HS.St.gone(HM.init(workspace)) == Nil{} : List<&2, HS.Item>}
 
 # ---- his answer to a withdrawn card (withdrawn-answer, architect m_30039) ----
 # Main withdraws a card while he answers it: his answer reaches the hub
@@ -85,18 +85,18 @@ law gone_init_empty:
 # LAW: an answer to a card that isn't open is decided by the withdrawn
 # list alone.
 law answer_closed_card_is_late:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +id: Nat
   for +text: String
   for +parts: String
   for +via: String
-  {HC.answer.card(o, None{}, cx, id, text, parts, via) == HC.answer.late(o, G.find(HM.St.gone(HX.d(o, cx)), id), cx, id, text, parts) : HX.Cx<o>}
+  {HC.answer.card(o, None{}, cx, id, text, parts, via) == HC.answer.late(o, G.find(HS.St.gone(HX.d(o, cx)), id), cx, id, text, parts) : HX.Cx<o>}
 
 # LAW: a card main did not withdraw (or whose late answer went already)
 # is refused: one notice, nothing sent, nothing journaled.
 law late_answer_refused:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +id: Nat
   for +text: String
@@ -105,7 +105,7 @@ law late_answer_refused:
 
 # LAW: a withdrawn card's answer is sent to main, never dropped...
 law late_answer_sent:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +it: HS.Item
   for +id: Nat
@@ -116,7 +116,7 @@ law late_answer_sent:
 # ...once: sent, card_late takes it out of the list (gone_drop_once: a
 # second answer is refused)...
 law late_answer_once:
-  for -o: HM.St
+  for -o: HS.St
   for +cx: HX.Cx<o>
   for +m: HS.Msg
   for +id: Nat
