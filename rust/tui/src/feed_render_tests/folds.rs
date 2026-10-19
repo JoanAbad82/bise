@@ -615,9 +615,14 @@ fn an_interrupt_mid_answer_is_a_dim_stop_naming_who() {
 #[test]
 fn your_file_chips_draw_by_name_in_place() {
     use bise_proto::parts::Part;
+    // its image is still in the store (a deleted one says so: image_gone.rs)
+    let store = std::env::temp_dir().join(format!("tui-file-chips-{}", std::process::id()));
+    std::fs::create_dir_all(&store).expect("store");
+    std::fs::write(store.join("1.png"), "x").expect("store image");
+    let b64 = store.join("1.b64").to_string_lossy().into_owned();
     let parts = vec![
         Part::Text { text: "ajouter l'image ".into() },
-        Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: "/nowhere/1.b64".into(), caption: String::new() },
+        Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: b64, caption: String::new() },
         Part::Text { text: " dans ".into() },
         Part::File { path: "/u/My Desktop/deck.pptx".into(), name: "[File #2]".into(), missing: false },
         Part::Text { text: " et ".into() },
