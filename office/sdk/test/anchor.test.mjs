@@ -38,6 +38,10 @@ test("a known kind with a bad field is refused, naming the field", () => {
   assert.match(e.message, /slide/);
   assert.equal(refusal(() => office.readAnchor({ kind: "cell", sheet: "Q3" })).code, "anchor_shape");
   assert.equal(refusal(() => office.readAnchor({ kind: "region", rect: { x: 1, y: 2, w: 3 } })).code, "anchor_shape");
+  // a video's moment (video-view): seconds, 0 or more, a box optional
+  assert.deepEqual(office.readAnchor({ kind: "time", t: 12.5 }), { kind: "time", t: 12.5 });
+  assert.deepEqual(office.readAnchor({ kind: "time", t: 0, rect: { x: 1, y: 2, w: 3, h: 4 } }), { kind: "time", t: 0, rect: { x: 1, y: 2, w: 3, h: 4 } });
+  for (const t of [-1, "0:12", undefined]) assert.equal(refusal(() => office.readAnchor({ kind: "time", t })).code, "anchor_shape");
   assert.equal(refusal(() => office.readAnchor("B4")).code, "anchor_shape");
 });
 

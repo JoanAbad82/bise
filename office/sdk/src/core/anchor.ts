@@ -23,7 +23,7 @@ export const KINDS_OF: Record<FileKind, readonly AnchorKind[]> = {
   docx: ["para"],
 };
 
-const FIELDS: Record<AnchorKind, Record<string, "string" | "count" | "rect" | "string?" | "count?" | "rect?">> = {
+const FIELDS: Record<AnchorKind, Record<string, "string" | "count" | "rect" | "seconds" | "string?" | "count?" | "rect?">> = {
   block: { block: "string", quote: "string?" },
   cell: { sheet: "string", range: "string" },
   slide: { slide: "count", rect: "rect?" },
@@ -31,6 +31,8 @@ const FIELDS: Record<AnchorKind, Record<string, "string" | "count" | "rect" | "s
   para: { para: "string", quote: "string?" },
   region: { page: "count?", rect: "rect" },
   text: { line: "count", quote: "string?" },
+  // a video's moment, or a box on its frame there (video-view): t in seconds, finite, 0 or more
+  time: { t: "seconds", rect: "rect?" },
 };
 
 /** An anchor from a note's JSON, checked; throws OfficeError (anchor_kind, anchor_shape). */
@@ -67,6 +69,7 @@ export function anchorFor(file: FileKind, v: unknown): Anchor {
 function fits(v: unknown, want: string): boolean {
   if (want === "string") return typeof v === "string";
   if (want === "count") return typeof v === "number" && Number.isInteger(v) && v >= 1;
+  if (want === "seconds") return typeof v === "number" && Number.isFinite(v) && v >= 0;
   if (want === "rect") {
     if (!v || typeof v !== "object") return false;
     const r = v as Record<string, unknown>;
@@ -77,5 +80,5 @@ function fits(v: unknown, want: string): boolean {
 
 function describe(want: string): string {
   const w = want.replace("?", "");
-  return w === "count" ? "a whole number from 1" : w === "rect" ? "{x, y, w, h} in % of the frame" : "a string";
+  return w === "count" ? "a whole number from 1" : w === "rect" ? "{x, y, w, h} in % of the frame" : w === "seconds" ? "seconds from the start, 0 or more" : "a string";
 }

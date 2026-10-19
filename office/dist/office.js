@@ -23525,7 +23525,7 @@ function checkPackage(zip) {
 }
 
 // src/anchor.gen.ts
-var ANCHOR_KINDS = ["block", "cell", "slide", "shape", "para", "region", "text"];
+var ANCHOR_KINDS = ["block", "cell", "slide", "shape", "para", "region", "text", "time"];
 
 // src/core/anchor.ts
 var KINDS_OF = {
@@ -23540,7 +23540,9 @@ var FIELDS = {
   shape: { slide: "count", shape: "string", quote: "string?" },
   para: { para: "string", quote: "string?" },
   region: { page: "count?", rect: "rect" },
-  text: { line: "count", quote: "string?" }
+  text: { line: "count", quote: "string?" },
+  // a video's moment, or a box on its frame there (video-view): t in seconds, finite, 0 or more
+  time: { t: "seconds", rect: "rect?" }
 };
 function readAnchor(v) {
   if (!v || typeof v !== "object" || Array.isArray(v)) throw new OfficeError("anchor_shape", `an anchor is an object with a "kind", not ${JSON.stringify(v)}`);
@@ -23572,6 +23574,7 @@ function anchorFor(file, v) {
 function fits(v, want) {
   if (want === "string") return typeof v === "string";
   if (want === "count") return typeof v === "number" && Number.isInteger(v) && v >= 1;
+  if (want === "seconds") return typeof v === "number" && Number.isFinite(v) && v >= 0;
   if (want === "rect") {
     if (!v || typeof v !== "object") return false;
     const r = v;
@@ -23581,7 +23584,7 @@ function fits(v, want) {
 }
 function describe(want) {
   const w = want.replace("?", "");
-  return w === "count" ? "a whole number from 1" : w === "rect" ? "{x, y, w, h} in % of the frame" : "a string";
+  return w === "count" ? "a whole number from 1" : w === "rect" ? "{x, y, w, h} in % of the frame" : w === "seconds" ? "seconds from the start, 0 or more" : "a string";
 }
 
 // src/sheets/addr.ts
