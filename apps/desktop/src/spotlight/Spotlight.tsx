@@ -28,6 +28,9 @@ import {
   type SpotItem,
 } from "./list";
 import { W, newBrief } from "./words";
+
+/** The overlay scrollbar's stay after his last scroll (the capsule's SCROLLBAR_LINGER_MS). */
+const SCROLLBAR_LINGER_MS = 700;
 import { LiveText } from "./LiveText";
 import { shownName } from "@/agents/model";
 import { caretAtEnd, keep } from "@/app/keep";
@@ -382,6 +385,14 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   const testId = p.testId ?? "spot";
   const input = useRef<HTMLTextAreaElement>(null);
   const box = useRef<HTMLDivElement>(null);
+  // the field's overlay scrollbar timer (data-scrolling, spotlight.css)
+  const scrolling = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (scrolling.current !== null) window.clearTimeout(scrolling.current);
+    },
+    [],
+  );
   // his words survive a reload or an update swap until sent or put away with esc (keep.ts, amb-win)
   const [text, setText] = useState(() => keep.text(KEPT));
   // the list follows the words at React's pace; the input itself is never re-rendered by it
@@ -607,6 +618,10 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
         }
         input={
           <span className="b-spot-field">
+            {/* the chips on their own row above his words (designer m_32542, the composer's
+                attachments): the words keep the full width when they wrap */}
+            {(p.shot != null || p.shotOff != null || files.length > 0) && (
+            <span className="b-spot-chips">
             {p.shot != null && (
               <span className="b-spot-chip" data-kind="shot" title={p.shot.title} data-testid={`${testId}.shot`}>
                 <img className="thumb" src={p.shot.thumb} alt="" />
@@ -642,6 +657,8 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
                 ))}
               </span>
             )}
+            </span>
+            )}
             {/* his words wrap and the field grows to a few lines, then scrolls down: never sideways,
                 the start of a long ask stays in view (spot-shot); ⏎ sends, so no line break of his */}
             <textarea
@@ -659,6 +676,16 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
                 keep.setText(KEPT, e.currentTarget.value);
               }}
               onKeyDown={onKeyDown}
+              onScroll={(e) => {
+                // the DS overlay scrollbar, only while his words scroll (designer m_32542)
+                const el = e.currentTarget;
+                el.toggleAttribute("data-scrolling", true);
+                if (scrolling.current !== null) window.clearTimeout(scrolling.current);
+                scrolling.current = window.setTimeout(() => {
+                  el.toggleAttribute("data-scrolling", false);
+                  scrolling.current = null;
+                }, SCROLLBAR_LINGER_MS);
+              }}
               onPaste={(e) => {
                 // ⌘V of an image (a screenshot, a Finder copy) or a copied file: a chip, never its name as words
                 const list = Array.from(e.clipboardData.files);
