@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { counter, currentMatch, EMPTY, found, hitsIn, newer, older, refresh, search } from './find';
+import { asked, counter, currentMatch, EMPTY, found, hitsIn, newer, older, refresh, search } from './find';
 
 const page = [
   { pos: 10, text: 'the bench is Cold' },
@@ -32,6 +32,16 @@ describe('find', () => {
     s = found(s, { rid: 7, hits: [{ pos: 2, n: 1 }, ...hitsIn(page, 'cold')], upto: 15 }, page);
     expect(counter(s)).toBe('1/4');
     expect(currentMatch(s), 'he stays on the match he was on').toEqual({ pos: 12, k: 1 });
+  });
+
+  it("the hub is asked once the needle is still: an answer before that, or for a needle he typed on from, changes nothing", () => {
+    let s = search(page, 'cold', 0);
+    expect(counter(s)).toBe('1/3+');
+    expect(found(s, { rid: 3, hits: [{ pos: 1, n: 9 }], upto: 15 }, page)).toBe(s);
+    expect(asked(s, 'col', 3), 'asked for a needle he typed on from').toBe(s);
+    s = asked(s, 'cold', 4);
+    s = found(s, { rid: 4, hits: [{ pos: 2, n: 1 }, ...hitsIn(page, 'cold')], upto: 15 }, page);
+    expect(counter(s)).toBe('1/4');
   });
 
   it('new lines after the answer are matched here and never move the current match', () => {

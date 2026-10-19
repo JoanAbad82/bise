@@ -10,10 +10,13 @@ import { Field, IconButton } from '@/ds';
 import { thread } from '@/proto/words.gen';
 import { useStore, useThreadHits, useThreadOrder } from '@/store';
 import { findText } from './entry';
-import { counter, currentMatch, EMPTY, found, newer, offsetsIn, older, refresh, search, type FindState, type Findable } from './find';
+import { asked, counter, currentMatch, EMPTY, found, newer, offsetsIn, older, refresh, search, type FindState, type Findable } from './find';
 import type { FindMark } from './findmark';
 import { rangesIn } from './findranges';
 import { caretAtEnd, useKeptText } from '@/app/keep';
+
+/** How long the needle stays still before the hub searches the whole thread for it (ms). */
+const STILL_MS = 150;
 
 export interface FindBarProps {
   tkey: string;
@@ -64,9 +67,27 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
     }
   }
 
+  // the loaded entries are matched at each key; the hub is asked once the needle is still (STILL_MS):
+  // a find per key had the hub search the whole thread for each prefix ('k': every entry), the
+  // word's own answer after them all (history-perf: 5-9 s at 50k entries)
+  const asking = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(
+    () => () => {
+      clearTimeout(asking.current);
+    },
+    [],
+  );
+  const askHub = (needle: string): void => {
+    if (needle.trim() === '') return;
+    const rid = store.findInThread(project, agent, needle);
+    setS((x) => asked(x, needle, rid));
+  };
   const ask = (needle: string): void => {
-    const rid = needle.trim() === '' ? 0 : store.findInThread(project, agent, needle);
-    setS((x) => search(entries, needle, rid, x.moved));
+    clearTimeout(asking.current);
+    setS((x) => search(entries, needle, 0, x.moved));
+    asking.current = setTimeout(() => {
+      askHub(needle);
+    }, STILL_MS);
   };
 
   const cur = currentMatch(s);
@@ -133,7 +154,8 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
   const [searched, setSearched] = useState(first === '');
   if (!searched) {
     setSearched(true);
-    ask(first);
+    setS((x) => search(entries, first, 0, x.moved));
+    askHub(first);
   }
   useEffect(() => {
     field.current?.focus();

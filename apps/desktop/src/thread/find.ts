@@ -92,6 +92,11 @@ export function search(entries: Iterable<Findable>, needle: string, rid: number,
   return { needle, rid, hits, upto: -1, at: newest(hits), moved: moved + 1, partial: needle.trim() !== '' };
 }
 
+/** The find asked of the hub for `needle` (FindBar asks once the needle is still): its rid, if he hasn't typed on since. */
+export function asked(s: FindState, needle: string, rid: number): FindState {
+  return s.needle === needle ? { ...s, rid } : s;
+}
+
 /**
  * The hub's answer: its hits up to `upto`, then the loaded entries after it. A stale answer (an
  * older needle's) changes nothing. The current match stays the one he is on when the hub has it;

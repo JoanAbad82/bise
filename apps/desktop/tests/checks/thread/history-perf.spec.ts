@@ -56,7 +56,14 @@ class Hub {
   last = N;
   private seen = 0;
   private stop = false;
-  constructor(private readonly core: FakeCore) {}
+  /** Each entry's words in lower case, read once (as the hub's transcript index): a find reads these, not 50k new texts. */
+  private readonly lows: string[] = [];
+  constructor(private readonly core: FakeCore) {
+    for (let p = 1; p <= N; p++) this.low(p);
+  }
+  private low(pos: number): string {
+    return (this.lows[pos] ??= textOf(pos).toLowerCase());
+  }
   async serve(): Promise<void> {
     while (!this.stop) {
       const cmds = this.core.cmds() as unknown as Cmd[];
@@ -72,7 +79,7 @@ class Hub {
         } else if (c.cmd === 'find' && c.needle !== undefined) {
           const n = c.needle.toLowerCase();
           const hits: { pos: number; n: number }[] = [];
-          for (let p = 1; p <= this.last; p++) if (textOf(p).toLowerCase().includes(n)) hits.push({ pos: p, n: 1 });
+          for (let p = 1; p <= this.last; p++) if (this.low(p).includes(n)) hits.push({ pos: p, n: 1 });
           await this.core.send({ ev: 'thread_hits', project: P, agent: 'perf', rid: c.rid, needle: c.needle, hits, upto: this.last } as never);
         }
       }
