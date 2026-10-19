@@ -33,7 +33,7 @@ const usage = process.cpuUsage.bind(process);
 const wallNow = (): number => Number(hr()) / 1e6;
 const cpuNow = (): number => { const u = usage(); return (u.user + u.system) / 1000; };
 
-/** A real 250 ms tick (node's, not the window's or a fake one) that notes, between two ticks (two
+/** A real 50 ms tick (node's, not the window's or a fake one) that notes, between two ticks (two
  *  macrotasks), the CPU burnt and the wall time: worst() is the stretch that burnt the most CPU. */
 export function busyWatch(): { reset: () => void; worst: () => Stretch } {
   let wall = wallNow();
@@ -47,7 +47,7 @@ export function busyWatch(): { reset: () => void; worst: () => Stretch } {
     worst = note();
     wall = wallNow();
     cpu = cpuNow();
-  }, 250).unref();
+  }, 50).unref();
   return {
     reset: () => { wall = wallNow(); cpu = cpuNow(); worst = { cpuMs: 0, wallMs: 0 }; },
     worst: note,

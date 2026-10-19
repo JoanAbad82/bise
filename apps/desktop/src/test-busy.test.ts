@@ -29,16 +29,18 @@ describe('the busy-loop guard (src/test-busy.ts), in CPU time (review-gates m_33
   it('measures the CPU of a stretch with no macrotask, and a yield ends it', async () => {
     const w = busyWatch();
     w.reset();
-    burn(800);
-    expect(w.worst().cpuMs).toBeGreaterThanOrEqual(800);
-    // the same 800 ms of CPU cut by a macrotask every 100: no stretch near 800
+    burn(300);
+    expect(w.worst().cpuMs).toBeGreaterThanOrEqual(300);
+    // the same 300 ms of CPU cut by a macrotask every 50: no stretch near 300
     w.reset();
-    for (let i = 0; i < 8; i++) {
-      burn(100);
+    for (let i = 0; i < 6; i++) {
+      burn(50);
       await new Promise((done) => { setTimeout(done, 0); });
     }
-    expect(w.worst().cpuMs).toBeLessThan(700);
-  });
+    // (a stretch is the time between two of the guard's 50 ms ticks: ~50-100 ms here)
+    expect(w.worst().cpuMs).toBeLessThan(200);
+    // 0.6 s of CPU in all; at load 42 that took 15 s of wall with 1.6 s (2128270cc's run 1): its own timeout
+  }, 30_000);
 
   it("keeps the real clocks under a test's fake timers", () => {
     const w = busyWatch();
