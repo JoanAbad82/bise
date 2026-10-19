@@ -15,6 +15,7 @@ PAUSE_SHOTS=<dir> keeps the captures (.txt and .ansi) for the designer.
 python3 -u tests/tui_pause_tmux.py
 """
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -44,7 +45,17 @@ def usage(t, width):
     command(t, "/usage", "by model")
     # the hub's first read counts the transcripts: main's row comes after
     t.wait_gone("counting the week's transcripts", 40)
-    sc = t.wait_re(r"\bmain · ")
+    # under load the first read can end before main's turn is counted (the
+    # screen stays at `—`, 160 s at x4.0): r reads again until main's row
+    main_row = re.compile(r"\bmain · ")
+    for _ in range(6):
+        try:
+            sc = t.wait_re(main_row.pattern, 20)
+            break
+        except AssertionError:
+            t.keys("r")
+    else:
+        sc = t.wait_re(main_row.pattern, 20)
     for needle in ("usage", "today", "7 days", "all agents", "by agent", "main", "plans count tokens only", "r refresh   esc close"):
         assert needle in sc, "%r not in /usage:\n%s" % (needle, sc)
     shot(t, width + "-usage")

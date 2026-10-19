@@ -139,10 +139,10 @@ def main():
         # back on the voice screen it came from, dictation on; esc: the
         # feed says it
         sc = t.wait_re(r"› dictation +on", 30)
-        assert re.search(r"speech to text +Mistral · Voxtral Transcribe 3", sc), sc
+        assert re.search(r"speech to text +Mistral · Voxtral Mini Transcribe 3", sc), sc
         t.keys("Escape")
-        sc = t.wait(w("composer.voice_enabled", model="mistral/voxtral-mini-transcribe-3."), 30)
-        assert w("composer.voice_on_how") in sc, sc
+        # the notice's two lines draw apart under load: wait for both
+        sc = t.wait_all([w("composer.voice_enabled", model="mistral/voxtral-mini-transcribe-3."), w("composer.voice_on_how")], 30)
         assert len([r for r in E.fake_requests() if r.get("family") == "stt"]) == n, "checked once"
         cfg = open(os.path.join(root, "config.toml")).read()
         assert 'voice = "mistral/voxtral-mini-transcribe-3"' in cfg, cfg

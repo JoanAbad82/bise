@@ -159,7 +159,8 @@ def wide(t, E, bin_dir):
     rc = os.path.join(E.tmp, "reindex.rc")
     sb(E, "perf", "wake", "--on-file", rc, "--note", "the reindex")
     # designer m_22997: the agent and its end on a row, the note under it
-    sc = t.wait_re(r"◌ perf +→\S+ +│\n.*│ +if the reindex", 30)
+    # its end, `→08:07` or after 23:00 `→tmrw 00:07` (a 1 h watch)
+    sc = t.wait_re(r"◌ perf +→\S+(?: \d\d:\d\d)? +│\n.*│ +if the reindex", 30)
     # perf's turn on the wake above (the fake model's ack) may still run
     # under load: wait for it to end, then it is free
     sc = t.wait_re(r"\b\d+ ○ perf\b", 30)
