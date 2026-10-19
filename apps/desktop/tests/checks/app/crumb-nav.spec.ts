@@ -29,7 +29,7 @@ test("app/crumb-nav: an agent's thread — the project's name opens its main, as
   const s = await launchDesktop({ core, route: `agent/${P}/perf` });
   try {
     const { page } = s;
-    await expect(page.locator(T.field).first(), "perf's thread").toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(T.field).first(), 'on perf').toBeVisible({ timeout: 10_000 });
     await expect(page.locator(T.go(0)), "the project's name is the button").toHaveText('acme');
     await expect(page.locator(T.crumb), 'the words never change').toHaveText('acme›perf');
     await page.locator(T.go(0)).click();
@@ -62,7 +62,7 @@ test("app/crumb-nav: a review — the project's name → its main, the agent's n
     // the agent's name (a button) opens its thread; the 'changes' word is where he is, no button
     await expect(page.locator(T.go(1)), "the agent's name is a button").toHaveText('perf');
     await page.locator(T.go(1)).click();
-    await expect(page.locator(T.thread).first(), "perf's thread").toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
+    await expect(page.locator(T.thread).first(), 'on perf').toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
     await page.locator(T.back).click();
     await expect(page.locator(T.review)).toBeVisible({ timeout: 5000 });
     await expect(page.locator(T.go(2)), 'the last crumb is where he is, never a button').toHaveCount(0);
