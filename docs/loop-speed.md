@@ -450,6 +450,12 @@ What changed (no test dropped, no coverage lost):
 6. **heavy-run** (`~/.bise/run/heavy-run`, outside the repo): a `gate.sh
    full` job waits for the full-gate lock before it takes a slot, and every
    job logs its submit and start times to `~/.bise/run/heavy.log`.
+   Wait on a heavy job by running it as the bash tool's background
+   command (`~/.bise/run/heavy-run <cmd> > $TMPDIR/x.log 2>&1`, its end
+   wakes you, its queue included), not with `nohup` and a file wake: a
+   slot can take 40 min at p90 and over 2 h at the worst (10-19), so a
+   1 h `--max` fires while the job still waits (8 of 10 `--max` wakes
+   that day, gate-reds). A file wake needs a `--max` over the queue (3h).
 
 ## 11. Change-based test selection (loop-speed-4, the user's yes on q1)
 

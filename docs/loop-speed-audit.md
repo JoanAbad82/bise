@@ -80,6 +80,10 @@ gate log are lost; the report says so (`gate logs start <date>`).
 4. `wait:agent` large: not the gate's fault (reviews, a lander, main);
    say so to main.
 5. Wakes at `--max`: an agent waited on a file a dead job never wrote.
-   Watch the job (`sb wake --on-job <label>`), not only its file.
+   Watch the job (`sb wake --on-job <label>`), not only its file. A wake
+   whose heavy-run job was still in the queue at its `--max` (heavy.log:
+   submitted from the agent's tree, not started) is listed apart and not
+   counted: the job was alive; the agent should have run it as a
+   background command (loop-speed.md §10, heavy-run).
 
 Keep the thresholds here and in `health()` of the script the same.

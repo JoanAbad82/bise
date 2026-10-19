@@ -13,6 +13,7 @@ a fake `sb`). Never his ~/.bise.
   python3 -B tests/loop_audit_test.py
 """
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -59,7 +60,13 @@ RELEASE = NL.join(["== E2E (real hub, REPLs, git; scripted provider)", "ok   e2e
 
 def fake_home(h, now):
     hub = "harness-test"
-    write(os.path.join(h, "hubs", hub, "journal.jsonl"), "")
+    # two wakes ran to --max: t7's job never ran (dead), t8's sat in heavy-run's queue past it
+    wk = lambda i, a, s, e: (json.dumps({"type": "wake_set", "watch": {"id": i, "agent": a, "set_at": s * 1000,
+                                                                       "spec": {"kind": "file"}}}) + NL
+                             + json.dumps({"type": "wake_end", "id": i, "at": e * 1000, "why": "max"}) + NL)
+    write(os.path.join(h, "hubs", hub, "journal.jsonl"), wk(1, "t7", now - 9000, now - 5400) + wk(2, "t8", now - 9000, now - 5400))
+    write(os.path.join(h, "run", "heavy.log"),
+          "%d\t%d\t%d\t1\t0\t/w/t8/harness\ttests/gate.sh quick%s" % (now - 8990, now - 5000, now - 4700, NL))
     def own(mode, agent, start, body, end):
         write(os.path.join(h, "gate", "logs", "%s-%d-%d.log" % (mode, start, start % 1000)),
               "# gate %s agent=%s sha=abc1234 start=%d root=/x%s%s" % (mode, agent, start, NL, body), end)
@@ -114,6 +121,9 @@ def test_audit():
         check(q["steps_p50"].get("clippy") == 10, "quick's steps from its log (%s)" % q["steps_p50"])
         check(q["reds"] == {"clippy": 2, "sb-core": 1} and f["reds"] == {"partial_e2e": 1},
               "each mode's red runs by what was red (%s, %s)" % (q["reds"], f["reds"]))
+        wa = rep["waits"]
+        check([x["agent"] for x in wa["ended_at_max"]] == ["t7"] and [x["agent"] for x in wa["queued_at_max"]] == ["t8"],
+              "a --max wake whose job was still queued is not a dead job (%s)" % wa)
         check(rep["scratch_runs"] == 1, "a run on an agent's scratch tree is left out (%s)" % rep["scratch_runs"])
         t = rep["tests"]
         check(t.get("partial_e2e", {}).get("runs") == 2 and t["partial_e2e"]["fails"] == 1

@@ -379,6 +379,16 @@ def timings(h, since):
     return rows
 
 
+def queued_at(hv, agent, s, e):
+    """Whether a wake of `agent` set at s that ran to --max at e watched a
+    heavy-run job still waiting for its slot then: one submitted from the
+    agent's tree or tmp (its cwd) near the wake's set, not started by e."""
+    for x in hv:
+        if ("/%s/" % agent) in x["cwd"] and s - 600 <= x["submit"] <= e and (x["start"] is None or x["start"] >= e - 60):
+            return True
+    return False
+
+
 def heavy_waits(h, since):
     """heavy-run's log: <submit> <start> <end> <slot> <rc> <cwd> <cmd>."""
     path = os.path.join(h, "run", "heavy.log")
@@ -388,7 +398,9 @@ def heavy_waits(h, since):
             f = line.split("	")
             if len(f) >= 3 and f[0].isdigit() and int(f[0]) >= since:
                 out.append({"submit": int(f[0]), "start": int(f[1]) if f[1].isdigit() else None,
-                            "end": int(f[2]) if f[2].isdigit() else None, "cmd": f[-1].strip()[:80]})
+                            "end": int(f[2]) if f[2].isdigit() else None, "cmd": f[-1].strip()[:80],
+                            # heavy-run writes <submit> <start> - <slot> <cwd> <cmd>: the cwd is next to last
+                            "cwd": f[-2] if len(f) >= 5 else ""})
     return out
 
 
@@ -470,14 +482,17 @@ def audit(h, hub, since):
     rep["tests"] = {t: {"wall_p50": med(p["wall"]), "wall_p90": pct(p["wall"], 0.9), "cpu_p50": med(p["cpu"]),
                         "runs": p["runs"], "fails": p["fails"]} for t, p in per.items()}
     # waits
-    allw = [w for v in ws.values() for w in v]
-    rep["waits"] = {"set": len(allw), "by_kind": {}, "ended_at_max": [], "open_now": 0}
-    for s, e, k, why in allw:
+    allw = [(a, *w) for a, v in ws.items() for w in v]
+    rep["waits"] = {"set": len(allw), "by_kind": {}, "ended_at_max": [], "queued_at_max": [], "open_now": 0}
+    for a, s, e, k, why in allw:
         bk = rep["waits"]["by_kind"].setdefault(k or "?", {"n": 0, "hours": 0.0})
         bk["n"] += 1
         bk["hours"] = round(bk["hours"] + (e - s) / 3600, 2)
         if why == "max":
-            rep["waits"]["ended_at_max"].append({"kind": k, "hours": round((e - s) / 3600, 2)})
+            # its job still in heavy-run's queue at --max: alive, waiting for a slot, not dead
+            q = queued_at(hv, a, s, e)
+            rep["waits"]["queued_at_max" if q else "ended_at_max"].append(
+                {"agent": a, "kind": k, "hours": round((e - s) / 3600, 2)})
         if why == "open":
             rep["waits"]["open_now"] += 1
     starts = [x["start"] - x["submit"] for x in hv if x["start"]]
@@ -575,6 +590,9 @@ def report(rep):
     for k, v in rep["waits"]["by_kind"].items():
         w("- %s: %d, %.1f h" % (k, v["n"], v["hours"]))
     w("- ran to --max: %s" % rep["waits"]["ended_at_max"])
+    if rep["waits"]["queued_at_max"]:
+        w("- ran to --max with its job still in heavy-run's queue (not dead; watch the job's pid, or a --max over the queue): %s"
+          % rep["waits"]["queued_at_max"])
     hv = rep["heavy"]
     w("- heavy-run: %d jobs, slot wait p50 %s, p90 %s, max %s" % (hv["jobs"], fmt_s(hv["wait_p50"]), fmt_s(hv["wait_p90"]), fmt_s(hv["wait_max"])))
     return NL.join(L)
