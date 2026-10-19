@@ -45,7 +45,7 @@ SHOTS = os.environ.get("WAKE_SHOTS")
 SECS = int(os.environ.get("WAKE_TUI_SECS", "25"))
 # the command's name as drawn: `cargo test`, cut on the way (`cargo te…`)
 # when the top edge is short of room (the full gate's long workspace path)
-CARGO = r"cargo t\S*"
+CARGO = "(?:cargo test|%s)" % "|".join(re.escape("cargo test"[:n]) + "…" for n in range(1, 10))
 WAITING = re.compile(r"… continues when %s ends · \d+[sm]" % CARGO)
 
 
