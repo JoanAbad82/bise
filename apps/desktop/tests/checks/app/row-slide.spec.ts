@@ -48,20 +48,25 @@ const world = [
 ];
 
 /** Every frame's translateX of the line's words, from the row's next mouseenter or mouseleave
- *  (`on`: t 0 there; frames before it have a negative t), kept in the page. */
+ *  (`on`: t 0 there; frames before it have a negative t), kept in the page. Each recording has its
+ *  own frames and its own 'on': a stopped loop whose next frame comes after the next recording
+ *  started never writes into it (with one shared array and flag, under load the hover's loop lived
+ *  on into the leave's frames, its t counted from the mouseenter: x -44 at 't 1276', a red
+ *  'home within 200 ms' in 2 nightlies and on 10.7/10.8's land step; release-43's rs3.log). */
 async function record(role: Locator, on: 'mouseenter' | 'mouseleave'): Promise<void> {
   await role.evaluate((e, ev) => {
-    const w = window as unknown as { slideXs: { t: number; x: number }[]; slideOn: boolean };
+    const w = window as unknown as { slideRec?: { xs: { t: number; x: number }[]; on: boolean } };
     const inner = e.querySelector('.b-slide-in') as HTMLElement;
     const row = e.closest('[data-slide-row]') ?? e;
-    w.slideXs = [];
-    w.slideOn = true;
+    if (w.slideRec) w.slideRec.on = false;
+    const rec = { xs: [] as { t: number; x: number }[], on: true };
+    w.slideRec = rec;
     const start = performance.now();
     let t0: number | null = null;
     row.addEventListener(ev, () => { t0 = performance.now(); }, { once: true });
     const tick = () => {
-      if (!w.slideOn) return;
-      w.slideXs.push({ t: Math.round(performance.now() - (t0 ?? start + 1e6)), x: new DOMMatrix(getComputedStyle(inner).transform).m41 });
+      if (!rec.on) return;
+      rec.xs.push({ t: Math.round(performance.now() - (t0 ?? start + 1e6)), x: new DOMMatrix(getComputedStyle(inner).transform).m41 });
       requestAnimationFrame(tick);
     };
     tick();
@@ -70,9 +75,10 @@ async function record(role: Locator, on: 'mouseenter' | 'mouseleave'): Promise<v
 
 async function stop(page: Page): Promise<{ t: number; x: number }[]> {
   return page.evaluate(() => {
-    const w = window as unknown as { slideXs: { t: number; x: number }[]; slideOn: boolean };
-    w.slideOn = false;
-    return w.slideXs;
+    const w = window as unknown as { slideRec?: { xs: { t: number; x: number }[]; on: boolean } };
+    if (!w.slideRec) return [];
+    w.slideRec.on = false;
+    return w.slideRec.xs;
   });
 }
 
@@ -115,10 +121,12 @@ test('app/row-slide: the hovered row slides its now line left over time; on leav
     // left: from the leave on, never a frame further left than the one before, at 0 within 200 ms,
     // still after. Not 'never left of the last hovered frame read': the line slides on between that
     // read and the leave (longer under load: one frame 'further left' red in test:land, land-reds)
-    expect(left.every((f, i) => f.x >= (left[i - 1]?.x ?? -Infinity) - 0.01), `never further left after the leave: ${say}`).toBe(true);
+    const back = left.findIndex((f, i) => i > 0 && f.x < (left[i - 1]?.x ?? -Infinity) - 0.01);
+    expect(back, `never further left after the leave: ${say} first at ${JSON.stringify(left.slice(Math.max(0, back - 3), back + 3))}`).toBe(-1);
     const home = left.filter((f) => f.t >= 200);
     expect(home.length, 'frames after 200 ms').toBeGreaterThan(5);
-    expect(home.every((f) => Math.abs(f.x) < 0.5), `home within 200 ms and still: ${say}`).toBe(true);
+    const away = home.findIndex((f) => Math.abs(f.x) >= 0.5);
+    expect(away, `home within 200 ms and still: ${say} first at ${JSON.stringify(home.slice(Math.max(0, away - 3), away + 3))}`).toBe(-1);
     await expect(role, 'cut again at rest').not.toHaveText(WORDS);
   } finally {
     await done();
