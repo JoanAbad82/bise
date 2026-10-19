@@ -171,16 +171,6 @@
   html.pd .hbox .poster.l { display:none; } html.pd .hbox .poster.d { display:block; }
   /* the town builds itself from the centre: no still over it. the still shows only without WebGL, or if the town is slow to come */
   .hbox .poster { opacity:0; } .hbox.lost .poster, .hbox.slow:not(.ready) .poster { opacity:1; }
-  /* the feed card owns the town's bottom-right, so the controls sit top-right, the caption on their row (under 860 no feed: bottom-right) */
-  .hctl { position:absolute; right:24px; top:24px; display:flex; gap:8px; z-index:3; }
-  .hctl button, .hcap { font-family:Geist, -apple-system, system-ui, sans-serif; font-size:13px; }
-  .hctl button { min-width:32px; height:32px; padding:0 10px; border-radius:8px; border:1px solid var(--faint); background:color-mix(in srgb, var(--bg) 88%, transparent);
-    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:var(--dim); cursor:pointer; }
-  .hctl button:hover { color:var(--text); border-color:var(--rule); }
-  .hctl button:focus-visible { outline:2px solid var(--text); outline-offset:2px; }
-  .hcap { text-wrap:balance; position:absolute; right:104px; top:24px; max-width:300px; text-align:right; margin:0; color:var(--dim); font-style:normal; transition:opacity .4s ease; z-index:3; }
-  .hcap { padding:4px 12px; line-height:24px; border-radius:8px; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
-  .hcap.gone { opacity:0; }
   .app-sec { padding:6vh 6vw 0; }
   .app-sec .stage { margin-top:0; }
   @media (max-width:1000px) {
@@ -188,10 +178,6 @@
     .hbox { order:-1; height:58vh; min-height:360px; }
     .hbox canvas, .hbox .poster { --fade:linear-gradient(to bottom, #000 66%, rgba(0,0,0,.86) 74%, rgba(0,0,0,.5) 85%, rgba(0,0,0,.16) 94%, transparent); }
     .htext { padding:12px 6vw 24px; }
-  }
-  @media (max-width:859px) {
-    .hctl { top:auto; bottom:20px; right:20px; }
-    .hcap { top:auto; bottom:64px; right:20px; line-height:inherit; }
   }
   /* ===== why: the three problems ===== */
   /* the problem as one story: three beats, each led by its sentence, linked by 'but' and 'and' */
@@ -380,12 +366,6 @@
    <img class="poster l" src="desktop/town-day.jpg" width="2400" height="1250" alt="">
    <img class="poster d" src="desktop/town-night.jpg" width="2400" height="1250" alt="">
    <div class="hstage"></div>
-   <p class="hcap" id="hcap" hidden>drag to look around · the camera follows the action until&nbsp;you&nbsp;do</p>
-   <div class="hctl">
-     <button type="button" id="hback" hidden>▶ back to the film</button>
-     <button type="button" id="hin" aria-label="zoom in" title="zoom in">+</button>
-     <button type="button" id="hout" aria-label="zoom out" title="zoom out">−</button>
-   </div>
  </div>
 </section>
 
@@ -707,26 +687,18 @@
 </script>
 <script type="module">
 /* the bims' town, live (hero-town's bundle): mounted after first paint over the poster still.
-   the page draws the controls and the first-visit caption; the bundle draws the town. */
+   the bundle draws the town; no controls over it (drag, pinch and ⌘-wheel still work, the film resumes by itself). */
 const box = document.getElementById('town');
 const root = document.documentElement;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const theme = () => root.classList.contains('pd') ? 'dark' : 'light';
-const back = document.getElementById('hback'), cap = document.getElementById('hcap');
-let seen = false; try { seen = localStorage.getItem('bise-town-seen') === '1'; } catch {}
-const hideCap = () => { cap.classList.add('gone'); setTimeout(() => { cap.hidden = true; }, 400); try { localStorage.setItem('bise-town-seen', '1'); } catch {} };
 const slow = setTimeout(() => box.classList.add('slow'), 8000); /* the entry builds from empty paper: the still is only for a town that can't come (no WebGL) or a very slow load */
 (async () => {
   try {
     const { mount } = await import('/desktop/hero/hero.js');
     const town = mount(box.querySelector('.hstage'), { theme: theme(), ground: { light: '#f7f2e9', dark: '#24201c' }, reducedMotion });
     town.on('lost', () => box.classList.add('lost'));
-    town.on('ready', () => { clearTimeout(slow); box.classList.add('ready'); if (!seen) { cap.hidden = false; setTimeout(hideCap, 7000); } });
-    town.on('control', () => { back.hidden = false; if (!cap.hidden) hideCap(); });
-    town.on('film', () => { back.hidden = true; });
-    back.onclick = () => town.resumeFilm();
-    document.getElementById('hin').onclick = () => town.zoom(1);
-    document.getElementById('hout').onclick = () => town.zoom(-1);
+    town.on('ready', () => { clearTimeout(slow); box.classList.add('ready'); });
     new MutationObserver(() => town.setTheme(theme())).observe(root, { attributes: true, attributeFilter: ['class'] });
   } catch { box.classList.add('lost'); /* no bundle or no WebGL: the still */ }
 })();
