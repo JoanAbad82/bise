@@ -64,3 +64,28 @@ PROOFS CHECK, core_profile before/after (over 5%: architect's word).
 ## Slices
 
 (per slice: sha, what moved, proofs and replay)
+
+- **sha 1, 76f5a683c** (state-schema, signed m_32573): the declaration, the
+  generator, gen/state.bend + state-laws + state-codec, state-hand.bend,
+  Codec.module, tests/state_guard.py in quick/land/full (lists only shrink, a
+  check). Nothing imports the new files: no behaviour change; gen/journal.bend
+  byte-identical. All 4 Bend files ALL PROOFS CHECK; gate quick green.
+- **sha 2, 70be5f6ea** (state-schema): the families' asks: journal rows can name
+  SC (S, SC imported by journal/journal-laws), enum codecs `<E>.journal_*`,
+  `T.f.eta` stated rebuilt == setter (a proof rewrites with it, no positional
+  term), view pins fall back to the journal shape; scripts/core_same.py
+  (bp-hot's same.py, durable).
+- **guard, 0b84a2b96 + d3a9f7375 + 7fd915868**: HAND gains Answer and Turn
+  (picks.bend's Ans and core.bend's Out hid behind generated names; renamed by
+  their families) through RENAMES; the land compares the lists with its base.
+- **laws, e26bc1824**: per field `T.f.set_get`, `T.f.set_set` (state-timers:
+  named_keeps_the_rest); state-laws 536 lemmas, 1.35 s.
+- **Msg + MRec + MSt, 4d487aac8 + 18fe68ea7** (state-msg, signed by architect):
+  hub 12 files, laws 5, proofs 11 moved to S./HS.; hand MSt/Msg/MRec, their
+  getters, Msg.with_parts and codec.bend's msg/mst codecs deleted; MST/MSG rows
+  on SC; architect's builders (new_msg gone: msg_of_snd, msg_of_route). No
+  pairwise lemma. PROOF 15 files green, gen laws green; core_same on his
+  journal copy 260 steps 0 differing, view_all sha equal; bench_byte_equal 5
+  digests equal; old_core_replay -28, -29, -43, main ok; instructions within
+  ±1% (replay 127.0G -> 126.6G, tick 30.6M, say 22.9M -> 23.0M, view_all
+  15.9G); model.bend 1000 -> 906.
