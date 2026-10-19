@@ -15,7 +15,7 @@ const TABLE: &[(&str, &str, &str, &str, &str)] = &[
     ("foundry", "claude-opus-5-5", "claude-haiku-4-5", "foundry/claude-haiku-4-5", "-"),
     ("openai", "gpt-6-astra", "gpt-6-luna", "openai/gpt-6-luna", "openai/gpt-transcribe"),
     ("google", "gemini-3.8-flash", "gemini-3.5-flash-lite", "google/gemini-3.5-flash-lite", "-"),
-    ("mistral", "mistral-large-4", "mistral-small-latest", "mistral/mistral-small-latest", "mistral/voxtral-transcribe-3"),
+    ("mistral", "mistral-large-4", "mistral-small-latest", "mistral/mistral-small-latest", "mistral/voxtral-mini-transcribe-3"),
     ("openrouter", "anthropic/claude-sonnet-5.5", "google/gemini-3.8-flash", roles::JEV_OPENROUTER, "-"),
     // Groq transcribes, but is hidden from voice (the user, 2026-09-30)
     ("groq", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/openai/gpt-oss-20b", "-"),
@@ -152,7 +152,7 @@ fn a_voice_only_key_gives_voice_its_provider() {
     )
     .unwrap();
     let s = Setup::from_text(None, &|_| None).with_keys(&auth::Keys { env: &|_| None, store: &both, files: &[] });
-    assert_eq!(s.voice.model, "mistral/voxtral-transcribe-3");
+    assert_eq!(s.voice.model, "mistral/voxtral-mini-transcribe-3");
 }
 
 /// A ChatGPT sign-in alone (no key at all): ready when signed in, every

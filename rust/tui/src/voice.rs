@@ -6,8 +6,10 @@
 //! request (BISE-130: batch, the full model) and the text lands in the
 //! composer. The model, the language and a vocabulary come from
 //! `[voice]` in ~/.bise/config.toml (bise_catalog: Mistral's Voxtral
-//! Transcribe 3 by default, never Voxtral Mini; OpenAI, Groq, ElevenLabs, Deepgram, any
-//! OpenAI-compatible server), the key from the chat keys' resolution.
+//! Mini Transcribe 3 by default; OpenAI, Groq, ElevenLabs, Deepgram, any
+//! OpenAI-compatible server), the key from the chat keys' resolution. A
+//! model the provider no longer knows (a 404) is tried once more with
+//! the provider's voice pick ([`VoiceJob::fallback`]).
 //! While recording, Ctrl+C or Esc cancels. Off by default: `/voice`
 //! toggles it, saved in bise's prefs. The state shows as one chip in
 //! the composer text at the cursor ([`chip`], BISE-222); the transcript
@@ -895,7 +897,37 @@ pub fn transcribe_clip(
     if samples.len() < MIN_CLIP || peak(samples) <= SILENCE_PEAK || cancel.load(Ordering::SeqCst) {
         return Ok(String::new());
     }
-    let req = stt::request(job, &wav_bytes(samples, SAMPLE_RATE));
+    let wav = wav_bytes(samples, SAMPLE_RATE);
+    match transcribe_wav(job, &wav, send) {
+        // the provider doesn't know the model (Mistral took
+        // voxtral-transcribe-3 away): its voice pick, once; still no
+        // model, the user's model's failure says what to do
+        Err(f) if f.kind == FailKind::Model && !cancel.load(Ordering::SeqCst) => match &job.fallback {
+            Some(id) => {
+                let again = VoiceJob { model: id.clone(), name: format!("{}/{}", provider_of(&job.name), id), fallback: None, ..job.clone() };
+                match transcribe_wav(&again, &wav, send) {
+                    Err(g) if g.kind == FailKind::Model => Err(f),
+                    r => r,
+                }
+            }
+            None => Err(f),
+        },
+        r => r,
+    }
+}
+
+/// "mistral/voxtral-mini-transcribe-3" -> "mistral".
+fn provider_of(name: &str) -> &str {
+    name.split_once('/').map(|(p, _)| p).unwrap_or(name)
+}
+
+/// One request with the job's model: the text, or why not.
+fn transcribe_wav(
+    job: &VoiceJob,
+    wav: &[u8],
+    send: &dyn Fn(&http::Request) -> Result<http::Response, String>,
+) -> Result<String, Failure> {
+    let req = stt::request(job, wav);
     let resp = send(&req).map_err(|e| Failure { kind: FailKind::Down, said: stt::one_line(&e) })?;
     if !(200..300).contains(&resp.status) {
         return Err(Failure::of_answer(resp.status, &resp.body, &job.key));

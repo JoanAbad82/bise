@@ -11,7 +11,7 @@ dictation needs a speech-to-text model, the **voice** role. with a Mistral or an
 
 | provider | models | key |
 |---|---|---|
-| Mistral | `mistral/voxtral-transcribe-3`, `mistral/voxtral-small-transcribe-3` | `MISTRAL_API_KEY` |
+| Mistral | `mistral/voxtral-mini-transcribe-3`, `mistral/voxtral-small-transcribe-3` | `MISTRAL_API_KEY` |
 | OpenAI | `openai/gpt-transcribe`, `openai/gpt-4o-mini-transcribe`, `openai/gpt-4o-transcribe`, `openai/whisper-1` | `OPENAI_API_KEY` |
 | Groq | `groq/whisper-large-v3-turbo`, `groq/whisper-large-v3` | `GROQ_API_KEY` |
 | ElevenLabs | `elevenlabs/scribe_v2`, `elevenlabs/scribe_v1` | `ELEVENLABS_API_KEY` |
@@ -41,7 +41,7 @@ by default it reads aloud what needs you and what you asked. the first time, voi
 
 ```toml title="~/.bise/config.toml"
 [roles]
-voice = "mistral/voxtral-transcribe-3"   # dictation's model
+voice = "mistral/voxtral-mini-transcribe-3"   # dictation's model
 
 [voice]
 language = "fr"                          # unset: detected

@@ -142,6 +142,7 @@ fn fake_ports(wav: &str) -> Result<(Ports, Jobs), String> {
             key: String::new(),
             language: None,
             vocabulary: Vec::new(),
+            fallback: None,
         },
     });
     let say = super::SayJob { api: fake("fake-tts"), voice: "fake".into(), speed: 1.0 };

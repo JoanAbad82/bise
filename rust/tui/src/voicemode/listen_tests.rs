@@ -150,8 +150,8 @@ fn wav_pcm(bytes: &[u8]) -> Vec<i16> {
 fn live_transcribe_3_hears_a_spoken_sentence() {
     let mut job = crate::voice::resolve_job().expect("a voice key");
     assert_eq!(job.api, "mistral", "the voice role's provider is not Mistral");
-    job.model = "voxtral-transcribe-3".into();
-    job.name = "mistral/voxtral-transcribe-3".into();
+    job.model = "voxtral-mini-transcribe-3".into();
+    job.name = "mistral/voxtral-mini-transcribe-3".into();
     job.language = Some("en".into());
     job.vocabulary = vec!["clippy".into(), "bise".into()];
     let dir = std::env::temp_dir().join(format!("bise-listen-live-{}", std::process::id()));

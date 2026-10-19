@@ -77,7 +77,7 @@
 <h2 id="dictation"><a class="anchor" href="#dictation" aria-hidden="true">#</a>dictation</h2>
 <p><code class="key">ctrl+r</code> records; any key stops and keeps the text in the composer, ready to edit and send. <code class="key">esc</code> or <code class="key">ctrl+c</code> stops and drops it.</p>
 <p>dictation needs a speech-to-text model, the <strong>voice</strong> role. with a Mistral or an OpenAI key, bise picks one for you. <code class="key">/voice</code> shows what is set and changes it: the model, the language, the voice.</p>
-<div class="table"><table><thead><tr><th>provider</th><th>models</th><th>key</th></tr></thead><tbody><tr><td>Mistral</td><td><code>mistral/voxtral-transcribe-3</code>, <code>mistral/voxtral-small-transcribe-3</code></td><td><code>MISTRAL_API_KEY</code></td></tr><tr><td>OpenAI</td><td><code>openai/gpt-transcribe</code>, <code>openai/gpt-4o-mini-transcribe</code>, <code>openai/gpt-4o-transcribe</code>, <code>openai/whisper-1</code></td><td><code>OPENAI_API_KEY</code></td></tr><tr><td>Groq</td><td><code>groq/whisper-large-v3-turbo</code>, <code>groq/whisper-large-v3</code></td><td><code>GROQ_API_KEY</code></td></tr><tr><td>ElevenLabs</td><td><code>elevenlabs/scribe_v2</code>, <code>elevenlabs/scribe_v1</code></td><td><code>ELEVENLABS_API_KEY</code></td></tr><tr><td>Deepgram</td><td><code>deepgram/nova-3</code></td><td><code>DEEPGRAM_API_KEY</code></td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>provider</th><th>models</th><th>key</th></tr></thead><tbody><tr><td>Mistral</td><td><code>mistral/voxtral-mini-transcribe-3</code>, <code>mistral/voxtral-small-transcribe-3</code></td><td><code>MISTRAL_API_KEY</code></td></tr><tr><td>OpenAI</td><td><code>openai/gpt-transcribe</code>, <code>openai/gpt-4o-mini-transcribe</code>, <code>openai/gpt-4o-transcribe</code>, <code>openai/whisper-1</code></td><td><code>OPENAI_API_KEY</code></td></tr><tr><td>Groq</td><td><code>groq/whisper-large-v3-turbo</code>, <code>groq/whisper-large-v3</code></td><td><code>GROQ_API_KEY</code></td></tr><tr><td>ElevenLabs</td><td><code>elevenlabs/scribe_v2</code>, <code>elevenlabs/scribe_v1</code></td><td><code>ELEVENLABS_API_KEY</code></td></tr><tr><td>Deepgram</td><td><code>deepgram/nova-3</code></td><td><code>DEEPGRAM_API_KEY</code></td></tr></tbody></table></div>
 <p><code>bise models voice</code> lists them with the state of each key.</p>
 <h2 id="voice-mode"><a class="anchor" href="#voice-mode" aria-hidden="true">#</a>voice mode</h2>
 <p><code class="key">ctrl+r</code> twice starts voice mode: you talk with the agent in view, and it answers out loud.</p>
@@ -87,7 +87,7 @@
 <h2 id="settings"><a class="anchor" href="#settings" aria-hidden="true">#</a>settings</h2>
 <p><code class="key">/voice</code> changes all of these. they live in <code>[voice]</code>:</p>
 <div class="code"><div class="file">~/.bise/config.toml</div><div class="box"><pre><code class="lang-toml">[roles]
-voice = &quot;mistral/voxtral-transcribe-3&quot;   <span class="c"># dictation&#x27;s model</span>
+voice = &quot;mistral/voxtral-mini-transcribe-3&quot;   <span class="c"># dictation&#x27;s model</span>
 
 [voice]
 language = &quot;fr&quot;                          <span class="c"># unset: detected</span>

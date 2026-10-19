@@ -382,6 +382,77 @@ fn one_request_per_clip_and_the_text_trimmed() {
     );
 }
 
+/// Mistral took voxtral-transcribe-3 away (2026-10-19: a 404, "Mistral
+/// can't transcribe with voxtral-transcribe-3" on every take): the take
+/// goes once to the provider's voice pick, and its words land.
+#[test]
+fn a_model_the_provider_took_away_falls_back_to_its_voice_pick_once() {
+    let gone = br#"{"object":"error","message":"Invalid model: voxtral-transcribe-3","type":"invalid_model","code":"1500"}"#;
+    let models = std::cell::RefCell::new(Vec::new());
+    let send = |r: &http::Request| {
+        let body = String::from_utf8_lossy(&r.body).to_string();
+        let model = ["voxtral-transcribe-3", "voxtral-mini-transcribe-3"]
+            .into_iter()
+            .find(|m| body.contains(&format!("\r\n\r\n{}\r\n", m)))
+            .unwrap_or("?");
+        models.borrow_mut().push(model);
+        Ok(match model {
+            "voxtral-mini-transcribe-3" => http::Response { status: 200, body: br#"{"text":" the words come back "}"#.to_vec() },
+            _ => http::Response { status: 404, body: gone.to_vec() },
+        })
+    };
+    let job = VoiceJob {
+        name: "mistral/voxtral-transcribe-3".into(),
+        model: "voxtral-transcribe-3".into(),
+        fallback: Some("voxtral-mini-transcribe-3".into()),
+        ..job()
+    };
+    let no = AtomicBool::new(false);
+    assert_eq!(transcribe_clip(&job, &speech(), &no, &send), Ok("the words come back".into()));
+    assert_eq!(*models.borrow(), vec!["voxtral-transcribe-3", "voxtral-mini-transcribe-3"]);
+    // no fallback: the user's model's failure, one request
+    models.borrow_mut().clear();
+    let alone = VoiceJob { fallback: None, ..job.clone() };
+    assert_eq!(transcribe_clip(&alone, &speech(), &no, &send).map_err(|f| f.kind), Err(FailKind::Model));
+    assert_eq!(models.borrow().len(), 1);
+    // the fallback gone too: the user's model's failure, two requests
+    models.borrow_mut().clear();
+    let both = VoiceJob { fallback: Some("voxtral-transcribe-3".into()), ..job.clone() };
+    let f = transcribe_clip(&both, &speech(), &no, &send).unwrap_err();
+    assert_eq!((f.kind, models.borrow().len()), (FailKind::Model, 2));
+    // a wrong key does not fall back
+    models.borrow_mut().clear();
+    let fail = |_: &http::Request| Ok(http::Response { status: 401, body: br#"{"message":"Unauthorized"}"#.to_vec() });
+    assert_eq!(transcribe_clip(&job, &speech(), &no, &fail).map_err(|f| f.kind), Err(FailKind::WrongKey));
+}
+
+/// Gabriel's dictation on 2026-10-19, off-screen: Mistral answers 404 to
+/// voxtral-transcribe-3 and knows the Transcribe 3 ids it has now. His
+/// config (it names the old id) and the default both get their words.
+#[test]
+fn dictation_survives_mistral_taking_voxtral_transcribe_3_away() {
+    let mistral_now = |r: &http::Request| {
+        let body = String::from_utf8_lossy(&r.body).to_string();
+        let known = ["voxtral-mini-transcribe-3", "voxtral-small-transcribe-3"]
+            .iter()
+            .any(|m| body.contains(&format!("\r\n\r\n{}\r\n", m)));
+        Ok(if known {
+            http::Response { status: 200, body: br#"{"text":"bonjour"}"#.to_vec() }
+        } else {
+            http::Response { status: 404, body: br#"{"message":"Invalid model","type":"invalid_model"}"#.to_vec() }
+        })
+    };
+    let env = |k: &str| (k == "MISTRAL_API_KEY").then(|| "sk-fake".to_string());
+    let store = bise_catalog::auth::Store::default();
+    let keys = bise_catalog::auth::Keys { env: &env, store: &store, files: &[] };
+    let no_env = |_: &str| None;
+    for cfg in ["[roles]\nvoice = \"mistral/voxtral-transcribe-3\"\n", ""] {
+        let job = bise_catalog::Setup::from_text(Some(cfg), &no_env).voice_job(&keys).unwrap();
+        let got = transcribe_clip(&job, &speech(), &AtomicBool::new(false), &mistral_now);
+        assert_eq!(got.map_err(|f| f.kind), Ok("bonjour".to_string()), "config {cfg:?}");
+    }
+}
+
 /// The real thread end to end: BatchTranscriber against a local fake
 /// server (plain HTTP), the Voice controller on top.
 #[test]
@@ -448,6 +519,7 @@ fn job_for(api: &str, base: &str, model: &str) -> VoiceJob {
         key: "k-1".into(),
         language: Some("fr".into()),
         vocabulary: vec!["bise-catalog".into(), "GitHub".into()],
+        fallback: None,
     }
 }
 

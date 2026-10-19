@@ -210,6 +210,7 @@ pub fn listen_job() -> ListenJob {
             key: String::new(),
             language: None,
             vocabulary: Vec::new(),
+            fallback: None,
         },
     }
 }

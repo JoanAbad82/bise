@@ -243,8 +243,8 @@ fn the_providers_line_up_in_one_column() {
     assert_eq!(col("main  ", "Mistral"), col("agents ", "OpenAI"), "{sc}");
     assert_eq!(col("main  ", "mistral-medium"), col("agents ", "gpt-6-luna"), "{sc}");
     assert_eq!(col("main  ", "Mistral"), col("voice ", "Mistral"), "{sc}");
-    // an old config naming Voxtral Mini reads as Transcribe 3
-    assert!(line_of(&sc, "voice ").contains("voxtral-transcribe-3 · off") && !sc.contains("voxtral-mini"), "{sc}");
+    // a config naming a voice model shows it as written
+    assert!(line_of(&sc, "voice ").contains("voxtral-mini-latest · off"), "{sc}");
 }
 
 #[test]
@@ -424,7 +424,7 @@ fn a_voice_provider_is_set_up_then_its_model_picked_without_a_second_check() {
     let _ = take_voice_out();
     // Mistral: its key first, checked with its voice pick
     o.on_key(key(KeyCode::Enter), 1, &e);
-    assert!(matches!(&o.sub, Sub::Paste(p, m, _) if p.id == "mistral" && m == "mistral/voxtral-transcribe-3"), "{:?}", o.sub);
+    assert!(matches!(&o.sub, Sub::Paste(p, m, _) if p.id == "mistral" && m == "mistral/voxtral-mini-transcribe-3"), "{:?}", o.sub);
     let sc = screen(&o);
     assert!(sc.contains("paste your Mistral key") && sc.contains("for voice. then you pick the model."), "{sc}");
     // wrong key, then a good one: checked by a transcription
@@ -440,15 +440,15 @@ fn a_voice_provider_is_set_up_then_its_model_picked_without_a_second_check() {
     // then its voice models, on the one just checked
     assert!(matches!(&o.sub, Sub::Model(p, 0, _) if p.id == "mistral"), "{:?}", o.sub);
     let sc = screen(&o);
-    // Transcribe 3 first; Voxtral Mini is not offered
-    assert!(sc.contains("voxtral-transcribe-3") && !sc.contains("voxtral-mini") && !sc.contains("mistral-medium-latest"), "{sc}");
-    assert!(sc.find("voxtral-transcribe-3") < sc.find("voxtral-small-transcribe-3"), "{sc}");
+    // Transcribe 3 (mini, then small) first; the old Voxtral Mini is not offered
+    assert!(sc.contains("voxtral-mini-transcribe-3") && !sc.contains("voxtral-mini-latest") && !sc.contains("mistral-medium-latest"), "{sc}");
+    assert!(sc.find("voxtral-mini-transcribe-3") < sc.find("voxtral-small-transcribe-3"), "{sc}");
     assert_eq!(o.on_key(key(KeyCode::Enter), 1, &e), Out::Done);
     // (the chat checks of the other tests run alongside: the voice ones)
     let calls: Vec<_> = CALLS.lock().unwrap_or_else(|e| e.into_inner()).iter().filter(|(_, v)| *v).cloned().collect();
-    assert!(calls.len() == 2 && calls.iter().all(|(c, _)| c == "mistral/voxtral-transcribe-3 mistral"), "{calls:?}");
-    assert_eq!(take_voice_out(), Some(VoiceOut::On("mistral/voxtral-transcribe-3".into())));
-    assert!(cfg(&hm).contains("[roles]\nvoice = \"mistral/voxtral-transcribe-3\""), "{}", cfg(&hm));
+    assert!(calls.len() == 2 && calls.iter().all(|(c, _)| c == "mistral/voxtral-mini-transcribe-3 mistral"), "{calls:?}");
+    assert_eq!(take_voice_out(), Some(VoiceOut::On("mistral/voxtral-mini-transcribe-3".into())));
+    assert!(cfg(&hm).contains("[roles]\nvoice = \"mistral/voxtral-mini-transcribe-3\""), "{}", cfg(&hm));
     assert!(stored(&hm, "mistral"), "a normal provider key: /provider shows it, chat can use it");
 }
 
@@ -496,14 +496,14 @@ fn mistral_serves_main_and_voice() {
     o.on_key(key(KeyCode::Enter), 1, &e);
     o.on_key(key(KeyCode::Enter), 1, &e);
     settle(&mut o, &e);
-    assert!(cfg(&hm).contains("voice = \"mistral/voxtral-transcribe-3\""), "{}", cfg(&hm));
+    assert!(cfg(&hm).contains("voice = \"mistral/voxtral-mini-transcribe-3\""), "{}", cfg(&hm));
     // from /voice: the model only, dictation as it was
     assert_eq!(take_voice_out(), None);
     // esc on /voice comes back to /models, on the voice row
     let o = open(&e, Open::RolesAt("voice"));
     assert_eq!(shown()[o.sel].id, "voice");
     let sc = screen(&o);
-    assert!(line_of(&sc, "main  ").contains("Mistral") && line_of(&sc, "voice ").contains("Mistral  voxtral-transcribe-3"), "{sc}");
+    assert!(line_of(&sc, "main  ").contains("Mistral") && line_of(&sc, "voice ").contains("Mistral  voxtral-mini-transcribe-3"), "{sc}");
     assert!(line_of(&sc, "voice ").contains("› "), "{sc}");
 }
 

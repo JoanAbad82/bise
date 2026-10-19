@@ -43,7 +43,7 @@ or in `~/.bise/config.toml`:
 main = "anthropic/claude-opus-5-5"      # your team lead
 agents = "openai/gpt-6.1-sol"           # the agents main starts (unset: main's)
 small = "mistral/mistral-small-latest"  # titles, summaries
-voice = "mistral/voxtral-transcribe-3"  # listens when you talk
+voice = "mistral/voxtral-mini-transcribe-3"  # listens when you talk
 
 [roles.main]                            # the table form, to set the effort too
 model = "anthropic/claude-opus-5-5"

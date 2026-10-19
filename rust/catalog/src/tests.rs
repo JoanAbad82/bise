@@ -627,7 +627,7 @@ fn the_compaction_threshold_is_tokens_or_a_share_capped_at_80_percent() {
 #[test]
 fn the_voice_model_defaults_to_voxtral_and_the_config_picks_another() {
     let s = Setup::from_text(None, &no_env);
-    assert_eq!(s.voice.model, "mistral/voxtral-transcribe-3");
+    assert_eq!(s.voice.model, "mistral/voxtral-mini-transcribe-3");
     assert_eq!((s.voice.from, s.voice.language.clone()), ("default", None));
     let r = s.catalog.resolve_stt(&s.voice.model);
     assert_eq!((r.api.as_str(), r.base_url.as_str(), r.key_env.as_str()), ("mistral", "https://api.mistral.ai/v1", "MISTRAL_API_KEY"));
@@ -656,7 +656,7 @@ fn a_bad_voice_table_is_a_warning() {
     for k in ["voice.model", "voice.language", "voice.vocabulary", "voice.pitch: unknown key"] {
         assert!(w.contains(k), "{k}: {w}");
     }
-    assert_eq!(s.voice.model, "mistral/voxtral-transcribe-3");
+    assert_eq!(s.voice.model, "mistral/voxtral-mini-transcribe-3");
     let s = setup("voice = \"x\"\n");
     assert!(s.catalog.warnings.join("\n").contains("voice: not a table"));
     let s = setup("[providers.x]\nstt = \"nope\"\nkind = \"tts\"\n");
@@ -674,7 +674,7 @@ fn the_voice_job_takes_the_chat_keys_resolution() {
     let job = setup("[voice]\nlanguage = \"fr\"\nvocabulary = [\"bise\"]\n").voice_job(&keys).unwrap();
     assert_eq!(
         (job.api.as_str(), job.base_url.as_str(), job.model.as_str(), job.key.as_str()),
-        ("mistral", "https://api.mistral.ai/v1", "voxtral-transcribe-3", "m-file")
+        ("mistral", "https://api.mistral.ai/v1", "voxtral-mini-transcribe-3", "m-file")
     );
     assert_eq!((job.language.as_deref(), job.vocabulary.clone()), (Some("fr"), vec!["bise".to_string()]));
     assert!(!format!("{:?}", job).contains("m-file"));
@@ -706,14 +706,14 @@ fn voice_entries_stay_out_of_the_chat_list_and_the_handoff() {
     let store = crate::auth::Store::default();
     let keys = crate::auth::Keys { env: &env, store: &store, files: &[] };
     let out = cli::render(&s, None, &keys, None);
-    assert!(out.contains("voice        mistral/voxtral-transcribe-3  (default; listed)"), "{out}");
+    assert!(out.contains("voice        mistral/voxtral-mini-transcribe-3  (default; listed)"), "{out}");
     assert!(!out.contains("voxtral-mini-latest"), "{out}");
     assert!(out.contains("language auto"), "{out}");
     let (chat, voice) = out.split_once("\nvoice (speech to text").unwrap();
     assert!(!chat.contains("whisper") && !chat.contains("elevenlabs  ElevenLabs"), "{chat}");
     for l in [
         "  mistral  Mistral · mistral · key: env MISTRAL_API_KEY",
-        "    mistral/voxtral-transcribe-3",
+        "    mistral/voxtral-mini-transcribe-3",
         "  elevenlabs  ElevenLabs · elevenlabs · no key (ELEVENLABS_API_KEY or 'bise login elevenlabs')",
         "    deepgram/nova-3",
         "    groq/whisper-large-v3-turbo",
@@ -975,7 +975,7 @@ fn roles_come_from_the_roles_table_then_the_old_keys() {
     assert_eq!(s.role_model(roles::AGENTS), ("mistral/mistral-medium-latest".to_string(), roles::Source::SameAs(roles::MAIN)));
     assert_eq!(s.role_model(roles::SMALL), ("mistral/mistral-small-latest".to_string(), roles::Source::Auto));
     assert_eq!(s.role_model(roles::CLASSIFY).1, roles::Source::Auto);
-    assert_eq!(s.role_model(roles::VOICE), ("mistral/voxtral-transcribe-3".to_string(), roles::Source::Auto));
+    assert_eq!(s.role_model(roles::VOICE), ("mistral/voxtral-mini-transcribe-3".to_string(), roles::Source::Auto));
 }
 
 #[test]

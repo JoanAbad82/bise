@@ -18,7 +18,7 @@ project_doc_fallback_filenames = ["CLAUDE.md"]
 main = "anthropic/claude-opus-5-5"
 agents = "openai/gpt-6.1-sol"
 small = "mistral/mistral-small-latest"
-voice = "mistral/voxtral-transcribe-3"
+voice = "mistral/voxtral-mini-transcribe-3"
 
 [roles.main]                              # instead of the main line, to set the effort
 model = "anthropic/claude-opus-5-5"

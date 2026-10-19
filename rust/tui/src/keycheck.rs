@@ -198,6 +198,7 @@ fn voice_request(c: &Call) -> crate::voice::http::Request {
         key: c.key.clone(),
         language: None,
         vocabulary: Vec::new(),
+        fallback: None,
     };
     crate::voice::stt::request(&job, &crate::voice::wav_bytes(&samples, crate::voice::SAMPLE_RATE))
 }

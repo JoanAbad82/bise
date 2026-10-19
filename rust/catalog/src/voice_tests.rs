@@ -90,47 +90,64 @@ fn no_provider_listens_in_realtime_and_only_mistral_speaks() {
     }
 }
 
+const TRANSCRIBE_3: &str = "mistral/voxtral-mini-transcribe-3";
+
 #[test]
-fn transcribe_3_is_the_default_voice_model_and_voxtral_mini_is_gone() {
+fn mini_transcribe_3_is_the_default_voice_model_and_the_old_minis_are_not_listed() {
     let s = setup("");
     assert_eq!((s.voice.model.as_str(), s.voice.from), (TRANSCRIBE_3, "default"));
     assert_eq!(s.catalog.default_voice_model, TRANSCRIBE_3);
-    assert_eq!(s.catalog.provider("mistral").unwrap().voice_model, "voxtral-transcribe-3");
-    // in no list: the catalog's voice models have no voxtral-mini
-    let stt: Vec<String> = s.catalog.models.iter().filter(|m| m.stt).map(|m| m.name()).collect();
-    assert!(stt.contains(&TRANSCRIBE_3.to_string()), "{stt:?}");
-    assert!(stt.iter().all(|m| !retired_stt(m)), "{stt:?}");
+    assert_eq!(s.catalog.provider("mistral").unwrap().voice_model, "voxtral-mini-transcribe-3");
+    // Mistral's voice models: the two Transcribe 3 ones, not the id it
+    // took away (2026-10-19), nor the old Voxtral Mini
+    let stt: Vec<String> = s.catalog.models.iter().filter(|m| m.stt && m.provider == "mistral").map(|m| m.name()).collect();
+    assert_eq!(stt, vec![TRANSCRIBE_3.to_string(), "mistral/voxtral-small-transcribe-3".to_string()]);
     assert_eq!(s.catalog.resolve_stt(TRANSCRIBE_3).known, Known::Listed);
 }
 
 #[test]
-fn a_config_or_env_naming_voxtral_mini_reads_as_transcribe_3() {
-    for old in [
-        "mistral/voxtral-mini-latest",
-        "voxtral-mini-latest",
-        "mistral/voxtral-mini-2602",
-        " Mistral/Voxtral-Mini-Latest ",
-        "mistral/voxtral-mini-transcribe-realtime-2602",
+fn a_config_naming_a_voice_model_is_used_as_written() {
+    // no rewrite any more: the old one sent mistral/voxtral-mini-* to an
+    // id Mistral then took away (2026-10-19), and /voice could not get
+    // out of it
+    for (old, read) in [
+        ("mistral/voxtral-mini-latest", "mistral/voxtral-mini-latest"),
+        ("voxtral-mini-latest", "mistral/voxtral-mini-latest"),
+        ("mistral/voxtral-transcribe-3", "mistral/voxtral-transcribe-3"),
+        ("mistral/voxtral-mini-transcribe-3", TRANSCRIBE_3),
+        ("voxtral-small-transcribe-3", "mistral/voxtral-small-transcribe-3"),
+        ("openai/whisper-1", "openai/whisper-1"),
     ] {
         let mut w = Vec::new();
         let t: toml::Table = format!("[voice]\nmodel = {:?}\n", old).parse().unwrap();
         let cfg = VoiceConfig::read(&t, &mut w);
         assert!(w.is_empty(), "{old}: {w:?}");
         let v = VoiceSetup::of(&setup("").catalog, cfg, &no_env);
-        assert_eq!((v.model.as_str(), v.from), (TRANSCRIBE_3, "config"), "{old}");
+        assert_eq!((v.model.as_str(), v.from), (read, "config"), "{old}");
         let env = |k: &str| (k == "BISE_VOICE_MODEL").then(|| old.to_string());
         let s = Setup::from_text(None, &env);
-        assert_eq!(s.voice.model, TRANSCRIBE_3, "{old}");
+        assert_eq!(s.voice.model, read, "{old}");
         assert!(s.catalog.warnings.is_empty(), "{old}: {:?}", s.catalog.warnings);
     }
     // the roles' line too
     let s = setup("[roles]\nvoice = \"mistral/voxtral-mini-latest\"\n");
-    assert_eq!(s.voice.model, TRANSCRIBE_3);
-    // the other Mistral voice models and the TTS are not touched
+    assert_eq!(s.voice.model, "mistral/voxtral-mini-latest");
+}
+
+#[test]
+fn a_voice_model_falls_back_to_its_providers_pick_then_its_next_one() {
     let c = &setup("").catalog;
-    assert_eq!(c.canonical_stt("voxtral-small-transcribe-3"), "mistral/voxtral-small-transcribe-3");
-    assert_eq!(c.canonical_stt("openai/whisper-1"), "openai/whisper-1");
-    assert!(!retired_stt("mistral/voxtral-transcribe-3"));
+    // the id Mistral took away: its voice pick
+    assert_eq!(c.stt_fallback("mistral", "voxtral-transcribe-3").as_deref(), Some("voxtral-mini-transcribe-3"));
+    // the pick itself: the next listed one
+    assert_eq!(c.stt_fallback("mistral", "voxtral-mini-transcribe-3").as_deref(), Some("voxtral-small-transcribe-3"));
+    assert_eq!(c.stt_fallback("openai", "whisper-1").as_deref(), Some("gpt-transcribe"));
+    assert_eq!(c.stt_fallback("nope", "x"), None);
+    // his config on 2026-10-19: the job carries the fallback
+    let store = Store::default();
+    let keys = Keys { env: &mistral_key, store: &store, files: &[] };
+    let job = setup("[roles]\nvoice = \"mistral/voxtral-transcribe-3\"\n").voice_job(&keys).unwrap();
+    assert_eq!((job.model.as_str(), job.fallback.as_deref()), ("voxtral-transcribe-3", Some("voxtral-mini-transcribe-3")));
 }
 
 #[test]
@@ -142,7 +159,7 @@ fn the_calls_take_the_voice_roles_provider_and_its_key() {
     // no realtime model: voice mode transcribes each turn with the batch one
     assert_eq!(s.realtime_call(&keys).unwrap(), None);
     let job = s.voice_job(&keys).unwrap();
-    assert_eq!((job.name.as_str(), job.model.as_str(), job.api.as_str()), (TRANSCRIBE_3, "voxtral-transcribe-3", "mistral"));
+    assert_eq!((job.name.as_str(), job.model.as_str(), job.api.as_str()), (TRANSCRIBE_3, "voxtral-mini-transcribe-3", "mistral"));
     let tts = s.tts_call(&VoiceModeKeys::default(), &keys).unwrap();
     assert_eq!(tts.name, "mistral/voxtral-mini-tts-2603");
     assert_eq!((tts.model.as_str(), tts.key.as_str(), tts.provider_name.as_str()), ("voxtral-mini-tts-2603", "sk-secret-mistral", "Mistral"));

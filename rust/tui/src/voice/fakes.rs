@@ -88,6 +88,7 @@ pub(crate) fn job() -> VoiceJob {
         key: "sk-test".into(),
         language: None,
         vocabulary: Vec::new(),
+        fallback: None,
     }
 }
 
