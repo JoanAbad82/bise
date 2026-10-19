@@ -144,7 +144,6 @@ def main():
         settle(c)
         check(not os.path.exists(os.path.join(E.state, "pages", "weekly-update")), "a refused page stores nothing")
 
-        # main publishes
         c.say('[[bash: sb page publish %s --id weekly-update --title "weekly update"]]' % v1)
         c.wait_line("main", "published weekly-update v1", 90)
         settle(c)
