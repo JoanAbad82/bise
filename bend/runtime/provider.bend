@@ -15,6 +15,8 @@ import ../vendor/http/http.bend as Http
 import ../vendor/http/encoding/encoding.bend as Enc
 import ./settings.bend as St
 import ./provider-pure.bend as Pvp
+import ./plan-pure.bend as Plan
+import ./plan.bend as Pl
 import ../core/image.bend as Im
 import ./debug.bend as Dbg
 import ./debug-pure.bend as Dp
@@ -481,12 +483,14 @@ def model_call.log(+call: Nat, +tries: Nat, +model: String, +url: String,
 
 # the attempt the Core reads (Pvp.attempt_for, BISE-293); on a ChatGPT
 # plan provider, its failures read as the plan's lines (Pvp.attempt_plan)
+# (a model the plan refuses: Plan.refused_line, model = the id called)
 def got_for(+tools: List<&2, W.WTool>, +name: String, +key: String,
-    plan: Bool, +st: Api.Style, g: Got) -> Pvp.Attempt:
+    +plan: Bool, +model: String, +st: Api.Style, g: Got) -> Pvp.Attempt:
   match g:
     case Got{+a, +status, +raw}:
-      Pvp.attempt_plan(plan, status, Api.error_code(st, raw),
-        Pvp.attempt_for(tools, name, key, status, raw, a))
+      Pvp.attempt_plan.line(Plan.refused_line(plan, status, raw, model),
+        Pvp.attempt_plan(plan, status, Api.error_code(st, raw),
+          Pvp.attempt_for(tools, name, key, status, raw, a)))
 
 def got_attempt(g: Got) -> Pvp.Attempt:
   match g:
@@ -742,7 +746,7 @@ def model_call.try(fuel: Nat, +tries: Nat, n: Out, +request: String,
                 Pvp.size_retry_why(Pvp.prov_display(mfile, prov), got_status(g),
                   Nat.div(fill_bytes(fill), 2n)),
                 k4 => n3 => model_call.step(got_for(W.req_tools(wreq),
-                    Pvp.prov_display(mfile, prov), key, Api.facts_plan(facts), st, g),
+                    Pvp.prov_display(mfile, prov), key, Api.facts_plan(facts), model, st, g),
                   n3, k4, tries, req,
                   k2 => n2 => model_call.try(k2, Nat.add(tries, 1n), n2, request,
                     key, pv, call, req, limit, shrunk, live)),
@@ -959,11 +963,27 @@ def resolved_window() -> IO(U32):
 # core/ev.bend); a call outside a session (one-shot) passes 0. live: the
 # reply is the agent's answer, so its text streams in as partial lines
 # (runtime/live-pure.bend); a compaction summary or a one-shot: False
+# the id the session asked for, before a plan's swap (Pvp.asked_chosen)
+def asked_model() -> IO(String):
+  do IO<String>:
+    br : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_MODEL")
+    mr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_MODEL")
+    ar : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_AGENT_MODEL")
+    rr : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_ROLE")
+    +cfgt : String <- St.read_cfg()
+    +file : String <- models_file()
+    +choice : String <- choice_file()
+    IO.pure(String, Pvp.asked_chosen(choice, P.env_or(br, ""), P.env_or(mr, ""),
+      P.env_or(ar, ""), P.env_or(rr, ""), cfgt, file))
+
 def model_call.req(n: Out, +request: String, +req: U32, +live: Bool)
     -> IO(Out & Rem.RemoteRes):
   do IO<Out & Rem.RemoteRes>:
-    r : Pvp.Resolved <- resolution()
-    model_call.resolved(r, n, request, req, live)
+    +r : Pvp.Resolved <- resolution()
+    +asked : String <- asked_model()
+    +said : String <- Pl.swap_said(live, asked, Pvp.shown_model(r))
+    n1 : Out <- usage_note.pick(String.is_empty(said), n, said)
+    model_call.resolved(r, n1, request, req, live)
 
 def model_call(n: Out, +request: String) -> IO(Out & Rem.RemoteRes):
   model_call.req(n, request, 0, False{})

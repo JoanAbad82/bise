@@ -82,6 +82,8 @@ crate::words! { thread:
     compaction_failed(why) = "compaction failed: {why}";
     /// a session restored from its history: `session restored · 14 messages`
     session_restored(count) = "session restored · {count} messages";
+    /// a model his plan's list lacks, run as another (once per session)
+    model_swapped(from, to) = "{from} isn't on your ChatGPT plan: using {to} · /model to pick another";
     /// the desktop's restored row, its time unknown (and the start it knows the notice by)
     restored = "session restored";
     /// the desktop's restored row: `session restored · 14:02`

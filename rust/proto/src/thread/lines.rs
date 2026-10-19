@@ -222,6 +222,9 @@ pub enum Obs {
     CompactionStarted,
     CompactionFailed(String),
     SessionRestored(String),
+    /// a plan's swap said once per session (`model_swapped: <from> <to>`,
+    /// runtime/provider-pure.bend swap_note): the id asked, the one run
+    ModelSwapped { from: String, to: String },
     /// the compaction's summary
     CompactionDone(String),
     /// the last model call's usage, as the runtime writes it
@@ -713,6 +716,11 @@ pub fn obs(o: &str) -> Obs {
                 None => TurnEnd::Other(s(t)),
             },
         });
+    }
+    if let Some((from, to)) = o.strip_prefix("model_swapped: ").and_then(|t| t.split_once(' ')) {
+        if !from.is_empty() && !to.is_empty() && !to.contains(' ') {
+            return Obs::ModelSwapped { from: s(from), to: s(to) };
+        }
     }
     if let Some(t) = o.strip_prefix("turn_stalled: ") {
         return Obs::TurnStalled(s(t));

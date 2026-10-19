@@ -88,6 +88,10 @@ pub(crate) fn works_lines(setup: &bise_catalog::Setup, checker: &str) -> Vec<Str
     if !setup.model.is_empty() {
         v.push(settings::first_main_uses(&setup.model));
     }
+    // main written is one its plan lacks: run instead, said (plan_list)
+    if let Some((from, to)) = setup.catalog.plan.swaps.iter().find(|(_, to)| *to == setup.model) {
+        v.push(bise_catalog::plan_list::swap_line(&setup.catalog, from, to));
+    }
     v.extend(helpers_line(setup, checker));
     v
 }

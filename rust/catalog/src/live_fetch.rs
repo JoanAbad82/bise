@@ -6,7 +6,8 @@
 //! failure (no network, an error status, an answer that is not a list)
 //! keeps the old file; a short timeout, so no network costs little.
 //! [`read`] gives the lists to [`crate::Setup`] (the hub, the TUI, the
-//! hand-off). The parsing is `live_efforts`, pure.
+//! hand-off). The parsing is `live_efforts`, pure. [`export_handoff`]
+//! writes the hand-off from config.toml and these cached lists.
 use std::path::Path;
 use std::time::Duration;
 
@@ -141,4 +142,24 @@ fn write(cache_dir: &Path, store: &Store) -> std::io::Result<()> {
     std::fs::rename(&tmp, &path).inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp);
     })
+}
+
+/// Write the hand-off where the runtime will find it and return its
+/// path: `<cache_dir>/models.toml`, else the temp dir. None when neither
+/// is writable (the runtime then keeps its old table). `env` gives the
+/// providers' `base_url_env` variables (the hub: its environment, then
+/// the .env files read again, so an edit reaches the next call).
+pub fn export_handoff(config: &Path, cache_dir: &Path, env: &dyn Fn(&str) -> Option<String>) -> Option<std::path::PathBuf> {
+    let text = std::fs::read_to_string(config).ok();
+    let setup = Setup::from_parts(text.as_deref(), &read(cache_dir), env, env).with_plan_lists(crate::plan_list::read(cache_dir));
+    let fallback = std::env::temp_dir().join(format!("bise-models-{}.toml", std::process::id()));
+    let mut why = Vec::new();
+    let found = [cache_dir.join("models.toml"), fallback]
+        .into_iter()
+        .find(|p| setup.write_handoff(p).map_err(|e| why.push(format!("{}: {e}", p.display()))).is_ok());
+    if found.is_none() {
+        // no file: the runtime has no effort list of its own (efforts.rs)
+        eprintln!("warn: no models file for the runtime, its calls go without an effort ({})", why.join("; "));
+    }
+    found
 }

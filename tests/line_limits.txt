@@ -5,12 +5,12 @@
 # the file instead.
 1200 bend/core/wire.bend
 3759 bend/hub/core.bend
-1268 bend/runtime/provider-pure.bend
+1242 bend/runtime/provider-pure.bend
 1319 docs/brand/design-system/content.py
 1387 docs/brand/readme/make.py
-1328 rust/catalog/src/auth_cli.rs
+1327 rust/catalog/src/auth_cli.rs
 1118 rust/catalog/src/chatgpt.rs
-1689 rust/catalog/src/lib.rs
+1677 rust/catalog/src/lib.rs
 1251 rust/catalog/src/tests.rs
 1112 rust/harness/src/doctor.rs
 1230 rust/harness/src/main.rs
@@ -28,8 +28,8 @@
 1597 rust/tui/src/editor.rs
 1625 rust/tui/src/feed.rs
 1204 rust/tui/src/logview.rs
-2943 rust/tui/src/onboarding.rs
-1116 rust/tui/src/onboarding/roles.rs
+2917 rust/tui/src/onboarding.rs
+1103 rust/tui/src/onboarding/roles.rs
 2163 rust/tui/src/render.rs
 1017 rust/tui/src/run.rs
 1711 rust/tui/src/sb.rs
@@ -39,4 +39,4 @@
 1031 rust/tui/src/ui.rs
 1153 rust/tui/src/voicemode/speak.rs
 1232 rust/tui/src/voicemode/turn.rs
-1787 tests/fake_provider.py
+1780 tests/fake_provider.py

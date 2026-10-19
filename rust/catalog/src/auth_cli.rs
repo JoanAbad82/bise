@@ -547,17 +547,8 @@ fn chatgpt_login_main(paths: &Paths, setup: &Setup, no_browser: bool, events: bo
         Poll::Done(a) if events => {
             // the same default role as the terminal's, without the prose
             let listed: Vec<String> = chatgpt::fetch_models(paths).map(|m| m.into_iter().map(|m| m.slug).collect()).unwrap_or_default();
-            if setup.model.trim().is_empty() {
-                if let Some((main, _)) = crate::roles::one_login_defaults(&setup.catalog, chatgpt::ID, "openai", &listed) {
-                    let text = std::fs::read_to_string(&paths.config).unwrap_or_default();
-                    let new = crate::roles::with_role(&text, crate::roles::MAIN, &main);
-                    if let Some(d) = paths.config.parent() {
-                        let _ = std::fs::create_dir_all(d);
-                    }
-                    let _ = std::fs::write(&paths.config, new);
-                }
-            }
-            event(serde_json::json!({"ev": "done", "email": a.email}));
+            let note = chatgpt_main(paths, setup, &listed).and_then(|(_, line)| line);
+            event(serde_json::json!({"ev": "done", "email": a.email, "note": note}));
             0
         }
         Poll::Done(a) => {
@@ -565,17 +556,10 @@ fn chatgpt_login_main(paths: &Paths, setup: &Setup, no_browser: bool, events: bo
             println!("{}", out.ok(&format!("signed in as {}{}.", a.email, plan)));
             // the account's models for /models (best effort, the cache)
             let listed: Vec<String> = chatgpt::fetch_models(paths).map(|m| m.into_iter().map(|m| m.slug).collect()).unwrap_or_default();
-            if setup.model.trim().is_empty() {
-                if let Some((main, _)) = crate::roles::one_login_defaults(&setup.catalog, chatgpt::ID, "openai", &listed) {
-                    let text = std::fs::read_to_string(&paths.config).unwrap_or_default();
-                    let new = crate::roles::with_role(&text, crate::roles::MAIN, &main);
-                    if let Some(d) = paths.config.parent() {
-                        let _ = std::fs::create_dir_all(d);
-                    }
-                    if std::fs::write(&paths.config, new).is_ok() {
-                        println!("{}", out.dim(&format!("main and your agents use {} now, on your plan.", main)));
-                    }
-                }
+            match chatgpt_main(paths, setup, &listed) {
+                Some((_, Some(line))) => println!("{}", out.dim(&line)),
+                Some((main, None)) => println!("{}", out.dim(&format!("main and your agents use {} now, on your plan.", main))),
+                None => {}
             }
             println!("{}", out.dim("bise is running? the next agents it starts use it."));
             0
@@ -584,6 +568,21 @@ fn chatgpt_login_main(paths: &Paths, setup: &Setup, no_browser: bool, events: bo
         Poll::Unfinished | Poll::Waiting => fail(UNFINISHED),
         Poll::Failed(e) => fail(&e),
     }
+}
+
+/// The main a ChatGPT sign-in writes ([`crate::plan_list::sign_in_main`]:
+/// unset, or one of the plan's models its list lacks), with the line
+/// that says a swap; None: main stays (or the write failed). The main
+/// read is the one written (config.toml, env), before any swap.
+fn chatgpt_main(paths: &Paths, setup: &Setup, listed: &[String]) -> Option<(String, Option<String>)> {
+    let text = std::fs::read_to_string(&paths.config).unwrap_or_default();
+    let written = Setup::from_text(Some(&text), &|k| std::env::var(k).ok()).model;
+    let (main, line) = crate::plan_list::sign_in_main(&setup.catalog, crate::chatgpt::ID, "openai", &written, listed)?;
+    if let Some(d) = paths.config.parent() {
+        let _ = std::fs::create_dir_all(d);
+    }
+    std::fs::write(&paths.config, crate::roles::with_role(&text, crate::roles::MAIN, &main)).ok()?;
+    Some((main, line))
 }
 
 /// OpenRouter on a terminal: `1 sign in with your browser   2 paste a

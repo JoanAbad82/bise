@@ -98,6 +98,7 @@ import socketserver
 import sys
 import threading
 import time
+from fake_plan import plan_model_error, plan_models
 import urllib.request
 import zlib
 
@@ -1174,6 +1175,16 @@ class H(http.server.BaseHTTPRequestHandler):
                 self.send(err[0], json.dumps(err[1]).encode())
                 return
             plan = claims
+        elif family == "openai-responses" and os.environ.get("FAKE_PLAN_MODELS"):
+            # a plan whose list is $FAKE_PLAN_MODELS, behind a key_command
+            # token (chatgpt_plan_default_e2e): its model check alone
+            e = plan_model_error(body, oai_error)
+            if e:
+                with open(LOG, "a") as f:
+                    f.write(json.dumps({"agent": "", "family": family, "path": self.path, "status": 400,
+                                        "plan_error": e, "model": body.get("model")}) + "\n")
+                self.send(400, json.dumps(e).encode())
+                return
         # BISE-266: a key holding "bad" is refused (401), one holding
         # "broke" has no credit (402): the first run's key check
         auth = " ".join(self.headers.get(h, "") for h in ("authorization", "x-api-key", "x-goog-api-key"))
@@ -1519,24 +1530,6 @@ PLAN_FAILS = {
 }
 
 
-def plan_models():
-    """the account's model list, the real /v1/models shape of this route:
-    $FAKE_PLAN_MODELS = "slug[:display name[:hide]],..." or three listed
-    models and one hidden"""
-    spec = os.environ.get("FAKE_PLAN_MODELS")
-    if spec:
-        out = []
-        for one in spec.split(","):
-            p = one.strip().split(":")
-            out.append({"slug": p[0], "display_name": p[1] if len(p) > 1 and p[1] else p[0],
-                        "visibility": "hide" if len(p) > 2 and p[2] == "hide" else "list"})
-        return out
-    return [{"slug": "gpt-6.1-sol", "display_name": "GPT-6.1 Sol", "visibility": "list"},
-            {"slug": "gpt-6-astra", "display_name": "GPT-6 Astra", "visibility": "list"},
-            {"slug": "gpt-6-luna", "display_name": "GPT-6 Luna", "visibility": "list"},
-            {"slug": "gpt-6-internal-eval", "display_name": "internal eval", "visibility": "hide"}]
-
-
 def bearer_of(headers):
     a = headers.get("authorization") or ""
     return a[7:].strip() if a.lower().startswith("bearer ") else ""
@@ -1596,9 +1589,9 @@ def plan_body_error(body):
     for k in PLAN_UNSUPPORTED:
         if k in body:
             return unsupported(k, "Unsupported parameter for ChatGPT plan usage: '%s'." % k)
-    if body.get("model") not in [m["slug"] for m in plan_models()]:
-        return oai_error("model", "The model `%s` does not exist or you do not have access to it." % body.get("model"),
-                         "model_not_found")
+    e = plan_model_error(body, oai_error)
+    if e:
+        return e
     inp = body.get("input")
     if not isinstance(inp, list):
         return unsupported("input", "ChatGPT plan usage requires `input` to be an array.")

@@ -349,19 +349,6 @@ impl Onb {
         0
     }
 
-    /// The model `which model?` recommends for a role on `p`: its voice
-    /// pick, its small model (small jobs), else its pick.
-    pub(crate) fn recommended(&self, id: &str, p: &Provider) -> Option<String> {
-        let c = self.setup.catalog.provider(&p.id)?;
-        let m = match id {
-            r::VOICE => &c.voice_model,
-            // the checker: a small fast model is enough (design §4.2)
-            r::SMALL | r::CLASSIFY => &c.small_model,
-            _ => &c.model,
-        };
-        (!m.is_empty()).then(|| format!("{}/{}", p.id, m))
-    }
-
     /// Open a role's steps.
     pub(crate) fn open_pick(&mut self, id: &'static str, back: Back) -> Sub {
         let pn = self.pn_mut();

@@ -50,17 +50,28 @@ pub fn short(context: Option<u64>, config: bool, alias_of: Option<&str>) -> Stri
 pub fn picks(setup: &Setup, ready: &dyn Fn(&str) -> bool) -> Vec<Pick> {
     let c = &setup.catalog;
     let mut out = Vec::new();
-    for m in c.models.iter().filter(|m| !m.stt) {
-        let Some(p) = c.provider(&m.provider).filter(|p| p.chats() && p.needs.is_empty() && ready(&p.id)) else {
+    // a plan's own list first (plan_list): the catalog's models it lacks
+    // go, the ones only it has come in, at the end of its provider's
+    let listed = |pid: &str, id: &str| {
+        let l = c.listed_of(pid);
+        l.is_empty() || l.iter().any(|x| x == id)
+    };
+    let extra = c.plan.listed.iter().flat_map(|(pid, ids)| ids.iter().map(move |id| (pid.clone(), id.clone())));
+    let extra: Vec<(String, String, Source)> =
+        extra.filter(|(pid, id)| c.model(&format!("{pid}/{id}")).is_none()).map(|(p, i)| (p, i, Source::Builtin)).collect();
+    let mine = c.models.iter().filter(|m| !m.stt && listed(&m.provider, &m.id)).map(|m| (m.provider.clone(), m.id.clone(), m.source));
+    for (pid, id, source) in mine.chain(extra) {
+        let Some(p) = c.provider(&pid).filter(|p| p.chats() && p.needs.is_empty() && ready(&p.id)) else {
             continue;
         };
-        let r = c.resolve(&m.name());
-        let config = m.source == Source::Config;
+        let name = format!("{pid}/{id}");
+        let r = c.resolve(&name);
+        let config = source == Source::Config;
         let ctx = context_words(r.caps.context);
         let mine = if config { " · config.toml" } else { "" };
         out.push(Pick {
-            value: m.name(),
-            desc: format!("{} · {} · {}{}", names::long_name(&m.name()), p.name, ctx, mine),
+            desc: format!("{} · {} · {}{}", names::long_name(&name), p.name, ctx, mine),
+            value: name,
             provider: p.name.clone(),
             short: short(Some(r.caps.context), config, None),
             context: Some(r.caps.context),

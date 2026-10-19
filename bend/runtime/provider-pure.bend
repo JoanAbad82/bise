@@ -11,6 +11,7 @@ import ../core/text.bend as Tx
 import ../core/config.bend as Cf
 import ../core/image.bend as Im
 import ../vendor/json.bend as J
+import ./plan-pure.bend as Plan
 
 # ---- the provider registry ----
 # A model id is "provider/model" (the model may hold '/' itself:
@@ -521,13 +522,22 @@ def effort_asked(+choice: List<&2, Cf.KV>, +role: String,
 def NO_MODEL() -> String:
   "no model yet: run bise and pick a provider (it checks your key), or set model in ~/.bise/config.toml"
 
+# the full id a session asked for, before the swap (the note's <from>):
+# the same inputs as resolve_chosen; "" when there is no model
+def asked_chosen(+choice: String, +bise: String, +bend: String,
+    +agent: String, +role: String, +cfg: String, +file: String) -> String:
+  +reg = registry(file)
+  +name = chosen_name(Cf.parse_toml(choice),
+    model_name(bise, bend, agent, role, Cf.parse_toml(cfg), reg))
+  Bool.pick(String, String.is_empty(name), "", full_id(name, reg))
+
 def resolve_named(empty: Bool, +name: String, +reg: List<&2, Cf.KV>,
     +url_env: String, +asked: String) -> Resolved:
   match empty:
     case True{}:
       RErr{"", NO_MODEL()}
     case False{}:
-      resolve_id_effort(full_id(name, reg), reg, url_env, asked)
+      resolve_id_effort(Plan.swapped(full_id(name, reg), reg), reg, url_env, asked)
 
 # THE resolution with the session's choice (its file's text, "" when
 # none), pure
@@ -1051,42 +1061,6 @@ def attempt_for(+tools: List<&2, W.WTool>, +name: String, +key: String,
 # the turn stops on bise's line, never a retry loop on a limit nor an
 # "OpenAI refused the key" on a sign-in that expired.
 
-# subscription_sharing_usage_limit_exceeded: OpenAI says not to infer a
-# reset time from it, so the line points at the usage page
-def PLAN_LIMIT() -> String:
-  "your ChatGPT plan's limit for bise is reached. your usage is at chatgpt.com/settings/usage, or switch model with /model."
-
-# subscription_sharing_user_not_eligible (403): final, no retry
-def PLAN_OFF() -> String:
-  "ChatGPT plan use is off for bise. turn it on in your ChatGPT settings, or pick another provider in /provider."
-
-# subscription_sharing_usage_unavailable, once the retries are spent
-def PLAN_UNCHECKED_LINE() -> String:
-  "ChatGPT couldn't check your plan's usage. try again in a moment, or switch model with /model."
-
-def PLAN_EXPIRED() -> String:
-  "your ChatGPT sign-in expired. sign in again in /provider, or run bise login chatgpt."
-
-# the retries' cause while ChatGPT cannot check the plan's usage
-# (subscription_sharing_usage_unavailable: OpenAI's errors-and-recovery
-# says retry later with a bounded backoff); PLAN_UNCHECKED_LINE is said
-# only once the retries are spent (exhausted_for)
-def PLAN_UNCHECKED() -> String:
-  "ChatGPT could not check your plan's usage (subscription_sharing_usage_unavailable)"
-
-# the final line for a reply's status and error code, None: not one of
-# the plan's final failures (a usage limit, plan use not allowed, a
-# sign-in refused)
-def plan_line(+status: U32, +code: String) -> Maybe<&2, String>:
-  Bool.pick(Maybe<&2, String>,
-    String.eq(code, "subscription_sharing_usage_limit_exceeded"),
-    Some{PLAN_LIMIT()},
-    Bool.pick(Maybe<&2, String>,
-      String.eq(code, "subscription_sharing_user_not_eligible"),
-      Some{PLAN_OFF()},
-      Bool.pick(Maybe<&2, String>, U32.is_eq(status, 401),
-        Some{PLAN_EXPIRED()}, None{})))
-
 def attempt_plan.line(m: Maybe<&2, String>, a: Attempt) -> Attempt:
   match m:
     case Some{+l}:
@@ -1099,9 +1073,9 @@ def attempt_plan.line(m: Maybe<&2, String>, a: Attempt) -> Attempt:
 def plan_retry(a: Attempt) -> Attempt:
   match a:
     case ARetry{+ms, _}:
-      ARetry{ms, PLAN_UNCHECKED()}
+      ARetry{ms, Plan.PLAN_UNCHECKED()}
     case _:
-      ARetry{0, PLAN_UNCHECKED()}
+      ARetry{0, Plan.PLAN_UNCHECKED()}
 
 def attempt_plan.pick(unchecked: Bool, +status: U32, +code: String,
     a: Attempt) -> Attempt:
@@ -1109,7 +1083,7 @@ def attempt_plan.pick(unchecked: Bool, +status: U32, +code: String,
     case True{}:
       plan_retry(a)
     case False{}:
-      attempt_plan.line(plan_line(status, code), a)
+      attempt_plan.line(Plan.plan_line(status, code), a)
 
 # a call's attempt on a plan provider: a usage limit or a refused
 # sign-in ends the turn on its line; usage unavailable is retried; any
@@ -1129,7 +1103,7 @@ def attempt_plan(plan: Bool, +status: U32, +code: String, a: Attempt)
 def key_why.cmd(plan: Bool, +prov: String) -> String:
   match plan:
     case True{}:
-      PLAN_EXPIRED()
+      Plan.PLAN_EXPIRED()
     case False{}:
       String.concat(["no ", prov,
         " key: its key_command failed or printed nothing (config.toml)"])
@@ -1244,7 +1218,7 @@ def exhausted_text(+tries: Nat, +why: String) -> String:
 # the same, but a ChatGPT plan whose usage could never be checked ends
 # on the designer's line alone
 def exhausted_for(+tries: Nat, +why: String) -> String:
-  Bool.pick(String, String.eq(why, PLAN_UNCHECKED()), PLAN_UNCHECKED_LINE(),
+  Bool.pick(String, String.eq(why, Plan.PLAN_UNCHECKED()), Plan.PLAN_UNCHECKED_LINE(),
     exhausted_text(tries, why))
 
 # an interrupt during the retries stops them, and keeps the error that

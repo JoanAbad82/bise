@@ -41,6 +41,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthStr;
 
+mod models;
 mod provider;
 #[cfg(test)]
 mod provider_tests;
@@ -199,6 +200,8 @@ pub(crate) fn setup_of(env: Env, home: &bise_home::Home) -> bise_catalog::Setup 
     // one key, every role: the checker and voice follow the keys found
     bise_catalog::Setup::from_parts(text.as_deref(), &[], env, &|k| bise_catalog::with_files(env, &files, k))
         .with_keys(&bise_catalog::auth::Keys { env, store: &store, files: &files })
+        // a plan's own list first (plan_list): its pick, its swaps
+        .with_plan_lists(bise_catalog::plan_list::read(&home.cache_dir()))
 }
 
 /// Every provider a key can be pasted for, in catalog order.
@@ -822,35 +825,6 @@ impl Onb {
             (s, _) => s,
         };
         Out::Stay
-    }
-
-    /// The models offered for `p`: its pick first, then the catalog's chat
-    /// models of that provider.
-    pub(crate) fn models_of(&self, p: &Provider) -> Vec<String> {
-        // the voice picker (BISE-298): its voice models, its pick first
-        if self.voice_pick() {
-            return self.voice_models(p);
-        }
-        // a role's steps (BISE-301): the one recommended for the role first
-        let first = self.picking().and_then(|id| self.recommended(id, p)).or_else(|| bise_catalog::roles::pick_for(&self.setup.catalog, &p.id, &self.model));
-        let mut v: Vec<String> = first.into_iter().collect();
-        // the plan: the account's own list (cached at sign-in and when
-        // /models opens), then the catalog's
-        if p.plan {
-            for m in (self.logins.models)(&bise_catalog::auth_cli::Paths::of(&self.home)) {
-                let full = format!("{}/{}", p.id, m.slug);
-                if !v.contains(&full) {
-                    v.push(full);
-                }
-            }
-        }
-        for m in self.setup.catalog.models.iter().filter(|m| m.provider == p.id && !m.stt) {
-            let full = format!("{}/{}", m.provider, m.id);
-            if !v.contains(&full) {
-                v.push(full);
-            }
-        }
-        v
     }
 
     /// The rows of `which model?` (BISE-289): the models of `p` whose id

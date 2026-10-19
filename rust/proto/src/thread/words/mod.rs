@@ -79,6 +79,8 @@ pub fn obs_notice(o: &Obs, name: &dyn Fn(&str, &str) -> String) -> Option<Notice
         Obs::CompactionFailed(t) => notice(Err, thread::compaction_failed(t)),
         // the runtime's `14 messages`: its count
         Obs::SessionRestored(t) => notice(Info, thread::session_restored(t.trim_end_matches(" messages"))),
+        // a plan's swap (plan_list): the ids without their provider
+        Obs::ModelSwapped { from, to } => notice(Info, thread::model_swapped(bare_id(from), bare_id(to))),
         Obs::NullIteration => notice(Warn, thread::empty_response.into()),
         Obs::TurnDone(TurnEnd::Failed(why)) => Some(turn_failed(why, name)),
         Obs::TurnDone(TurnEnd::Interrupted { by: None }) => notice(Warn, thread::turn_interrupted.into()),
@@ -502,3 +504,7 @@ pub fn no_key(why: &str, name: &dyn Fn(&str, &str) -> String) -> Option<String> 
     Some(thread::no_key(name))
 }
 
+/// `chatgpt/gpt-6-luna` -> `gpt-6-luna` (a model's id, its provider off).
+fn bare_id(m: &str) -> &str {
+    m.split_once('/').map_or(m, |(_, id)| id)
+}

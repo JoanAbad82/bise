@@ -74,6 +74,8 @@ export const thread = {
   compaction_failed: (a: { why: string | number }): string => "compaction failed: " + String(a.why),
   /** a session restored from its history: `session restored · 14 messages` */
   session_restored: (a: { count: string | number }): string => "session restored · " + String(a.count) + " messages",
+  /** a model his plan's list lacks, run as another (once per session) */
+  model_swapped: (a: { from: string | number; to: string | number }): string => String(a.from) + " isn't on your ChatGPT plan: using " + String(a.to) + " · /model to pick another",
   /** the desktop's restored row, its time unknown (and the start it knows the notice by) */
   restored: "session restored",
   /** the desktop's restored row: `session restored · 14:02` */

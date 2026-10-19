@@ -701,6 +701,14 @@
     "one": null,
     "text": "~ not sure"
   },
+  "thread.model_swapped": {
+    "args": [
+      "from",
+      "to"
+    ],
+    "one": null,
+    "text": "{from} isn't on your ChatGPT plan: using {to} · /model to pick another"
+  },
   "thread.newer_messages": {
     "args": [],
     "one": null,

@@ -31,6 +31,7 @@ pub mod live_fetch;
 pub mod openrouter_login;
 pub mod names;
 pub mod picks;
+pub mod plan_list;
 pub mod roles;
 pub mod secrets_cli;
 pub mod spawn;
@@ -404,6 +405,8 @@ pub struct Catalog {
     pub default_voice_model: String,
     /// what was ignored while reading, one line each
     pub warnings: Vec<String>,
+    /// the plans' own model lists and their swaps ([`plan_list`])
+    pub plan: plan_list::Plans,
 }
 
 /// Split "provider/id" at the first '/' (ids may hold '/').
@@ -432,6 +435,7 @@ impl Catalog {
             default_model: String::new(),
             default_voice_model: String::new(),
             warnings: Vec::new(),
+            plan: Default::default(),
         }
     }
 
@@ -1286,6 +1290,7 @@ impl Setup {
         let store = auth::Store::read(&home.auth_file()).unwrap_or_default();
         Setup::from_parts(text.as_deref(), &live_fetch::read(&home.cache_dir()), &real, &|k| with_files(&real, &files, k))
             .with_keys(&auth::Keys { env: &real, store: &store, files: &files })
+            .with_plan_lists(plan_list::read(&home.cache_dir()))
     }
 
     /// The model of a role: "main" or "agent".
@@ -1341,6 +1346,7 @@ impl Setup {
         for (a, to) in &c.aliases {
             o.push_str(&format!("{} = {}\n", q(a), q(to)));
         }
+        o.push_str(&plan_list::swaps_toml(c, q));
         // the runtime only calls chat models: the speech-to-text entries
         // (BISE-130) stay out, the file is the same as before them
         for p in c.providers.iter().filter(|p| p.chats()) {
@@ -1657,25 +1663,7 @@ fn key(s: &str) -> String {
     }
 }
 
-/// Write the hand-off where the runtime will find it and return its
-/// path: `<cache_dir>/models.toml`, else the temp dir. None when neither
-/// is writable (the runtime then keeps its old table). `env` gives the
-/// providers' `base_url_env` variables (the hub: its environment, then
-/// the .env files read again, so an edit reaches the next call).
-pub fn export_handoff(config: &Path, cache_dir: &Path, env: &dyn Fn(&str) -> Option<String>) -> Option<PathBuf> {
-    let text = std::fs::read_to_string(config).ok();
-    let setup = Setup::from_parts(text.as_deref(), &live_fetch::read(cache_dir), env, env);
-    let fallback = std::env::temp_dir().join(format!("bise-models-{}.toml", std::process::id()));
-    let mut why = Vec::new();
-    let found = [cache_dir.join("models.toml"), fallback]
-        .into_iter()
-        .find(|p| setup.write_handoff(p).map_err(|e| why.push(format!("{}: {e}", p.display()))).is_ok());
-    if found.is_none() {
-        // no file: the runtime has no effort list of its own (efforts.rs)
-        eprintln!("warn: no models file for the runtime, its calls go without an effort ({})", why.join("; "));
-    }
-    found
-}
+pub use live_fetch::export_handoff;
 
 #[cfg(test)]
 mod tests;
