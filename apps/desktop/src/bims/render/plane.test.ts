@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Office, Spot } from '../model';
 import { BACK, RIGHT, UP, fitSite, siteOf, toScreen, type V3 } from './camera';
-import { cameraStart, catchPoint, flightAt, planFlight, shadowOf, type FlightPlan } from './plane';
+import { DART, cameraStart, catchPoint, dartAt, flightAt, glideAt, planFlight, planGlide, shadowOf, sizeAt, startPx, startSize, type FlightPlan } from './plane';
+import { BEAT, HELD_LEN, PLANE_CATCH, heldAt } from './catch';
 import { PLANE_FLIGHT } from './pose';
 
 /** the prototype's office numbers for n agents (maps/loft.ts owns the real ones; these only size the site) */
@@ -43,7 +44,6 @@ describe('his paper plane', () => {
       expect(at.y).toBeGreaterThan(fit.heightPx);
       expect(at.x).toBeCloseTo(fit.widthPx / 2, 3);
       expect(dot({ x: s0.p.x - hand.x, y: s0.p.y - hand.y, z: s0.p.z - hand.z }, BACK)).toBeGreaterThan(5);
-      expect(s0.grow).toBeGreaterThan(2); // close to his eye: big
     }
   });
 
@@ -53,7 +53,6 @@ describe('his paper plane', () => {
     expect(end.p.x).toBeCloseTo(hand.x, 6);
     expect(end.p.y).toBeCloseTo(hand.y, 6);
     expect(end.p.z).toBeCloseTo(hand.z, 6);
-    expect(end.grow).toBe(1);
     const moved = { x: hand.x + 0.3, y: hand.y, z: hand.z - 0.2 };
     const m = flightAt(f, PLANE_FLIGHT, moved);
     expect(m.p.x).toBeCloseTo(moved.x, 6);
@@ -166,5 +165,83 @@ describe('his paper plane', () => {
   it('is replayable: the same seed the same flight, another seed another', () => {
     expect(flightAt(plan(11), 1.3)).toEqual(flightAt(plan(11), 1.3));
     expect(flightAt(plan(11), 1.3).p).not.toEqual(flightAt(plan(12), 1.3).p);
+  });
+
+  it('is a paper dart: one pointed nose, triangular wings to the tail, a keel under the spine', () => {
+    const d = dartAt(0);
+    const pts = Object.values(d);
+    // the nose is one point, ahead of all the others: nothing else within a fifth of its length
+    const front = Math.max(...pts.map((p) => p.z));
+    expect(pts.filter((p) => Math.abs(p.z - front) < 1e-9).every((p) => p.x === 0 && p.y === 0)).toBe(true);
+    for (const p of [d.tipR, d.tipL, d.keel]) expect(p.z).toBeLessThan(front - 0.8);
+    // its wings are triangles (their corners fold onto the nose) with a dihedral, the keel hangs under
+    expect(d.cornerR).toEqual(d.nose);
+    expect(d.cornerL).toEqual(d.nose);
+    expect(d.tipR.y).toBeGreaterThan(0);
+    expect(d.tipR.x).toBeCloseTo(-d.tipL.x, 9);
+    expect(d.keel.y).toBeLessThan(-0.1);
+    // the width at 10% from the nose: a point, never a blunt box
+    expect(DART.span * 0.1).toBeLessThan(0.05);
+  });
+
+  it('unfolds into a flat letter: the keel into the spine, the wings into the sheet', () => {
+    const s = dartAt(1);
+    for (const p of Object.values(s)) expect(p.y).toBeCloseTo(0, 9);
+    expect(s.keel).toEqual(s.tail);
+    const w = s.cornerR.x - s.cornerL.x;
+    expect(w / 1).toBeGreaterThan(0.7); // a letter's width for its height
+    expect(w / 1).toBeLessThan(0.85);
+  });
+
+  it('shrinks all the way from his eye to the bim\'s hand, never grows, ends at the bim\'s size', () => {
+    for (const w of [320, 640, 1300]) {
+      const f = fitSite(siteOf(officeFor(6)), w, 2000);
+      const big = startSize(f, HELD_LEN);
+      expect(big).toBeGreaterThan(1.5);
+      expect(sizeAt(0, big)).toBeCloseTo(big, 9);
+      expect(sizeAt(1, big)).toBe(1);
+      let prev = Infinity;
+      for (let i = 0; i <= 200; i++) {
+        const k = sizeAt(i / 200, big);
+        expect(k).toBeLessThanOrEqual(prev + 1e-12);
+        prev = k;
+      }
+      // fast at first, like perspective: half its extra size gone by a fifth of the way
+      expect(sizeAt(0.2, big) - 1).toBeLessThan((big - 1) / 2);
+      // and big on screen as it leaves, never a page
+      expect(startPx(f)).toBeGreaterThanOrEqual(48);
+      expect(startPx(f)).toBeLessThanOrEqual(160);
+    }
+  });
+
+  it('starts all out of the view, under its bottom edge, its whole size below', () => {
+    const at = toScreen(fit, cameraStart(fit));
+    expect(at.y - fit.heightPx).toBeGreaterThan(startPx(fit) / 2);
+  });
+
+  it('lands in the hand: the flight and the glide end on the hand, and the hand holds it from that frame', () => {
+    const glide = planGlide({ from: cameraStart(fit, 0.82), to: hand, seed: 3, dur: 2.8, px: fit.scale });
+    for (const end of [flightAt(plan(2), PLANE_FLIGHT), glideAt(glide, 2.8)]) {
+      expect(end.u).toBeCloseTo(1, 9);
+      expect(Math.hypot(end.p.x - hand.x, end.p.y - hand.y, end.p.z - hand.z)).toBeLessThan(1e-9);
+    }
+    // no frame where it is gone before the hand holds it: flying until the catch, held from it
+    for (const away of ['desk', 'pocket'] as const) {
+      expect(heldAt(-0.001, away)).toBeNull();
+      const first = heldAt(0, away);
+      expect(first?.shown).toBe(true);
+      expect(first?.grip).toBeCloseTo(0, 12); // held at its middle: the flight's last point
+      expect(first?.hold).toBe(0); // the flight's last orientation, turning from there
+      expect(first?.fold).toBe(0); // still a plane
+      for (let c = 0; c < BEAT.away; c += 0.01) expect(heldAt(c, away)?.shown).toBe(true);
+    }
+    // read open, then: on the desk (still there at the catch's end) or into the pocket (hidden in the body)
+    expect(heldAt(BEAT.read - 0.1, 'pocket')?.fold).toBe(1);
+    expect(heldAt(PLANE_CATCH, 'desk')?.put).toBe(1);
+    expect(heldAt(PLANE_CATCH, 'desk')?.shown).toBe(true);
+    expect(heldAt(BEAT.away - 0.001, 'pocket')?.put).toBeGreaterThan(0.99);
+    // reduced motion: the open sheet in its hand from the start, then on the desk
+    expect(heldAt(-PLANE_FLIGHT, 'desk', true)?.fold).toBe(1);
+    expect(heldAt(BEAT.read, 'desk', true)?.put).toBe(1);
   });
 });

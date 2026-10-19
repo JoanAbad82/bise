@@ -11,7 +11,8 @@ import type { BimFrame, Look, Motion, Office } from '../model';
 import { makeBim, type Bim } from './bim';
 import { pillOf } from '../labels';
 import { siteOf, type Fit, type V3 } from './camera';
-import { cameraStart, catchPoint, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, type FlightPlan, type GlidePlan, type Plane } from './plane';
+import { cameraStart, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, sizeAt, startSize, type FlightFrame, type FlightPlan, type GlidePlan, type Plane } from './plane';
+import { DESK_SPOT, HELD_LEN, ON_DESK, PLANE_CATCH, POCKET_SINK, awayOf, heldAt } from './catch';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { skateRig } from './skate';
 import { eggRig } from './egg';
@@ -26,15 +27,21 @@ import { makeUnlock } from './unlock';
 import { seatChair } from './furniture';
 import type { Style } from './style';
 
-/** his plane's length in office units (plane.ts's wings), its least length on screen, and the iso view's shortening of it */
-const PLANE_LEN = 0.42;
-const PLANE_MIN_PX = 12;
+/** the length on screen (css px) the loop and the zigzag are sized for, its office length for that; the shadow's own length (plane.ts) */
+const LOOP_PX = 12;
+const LOOP_LEN = 0.42;
+const SHADOW_LEN = 0.42;
 /** a gliding plane's least shadow alpha (plane.ts SHADOW_ALPHA is 0.2 on the floor) */
 const GLIDE_SHADOW = 0.09;
 /** a bim's pill, office units up (over its head: its loop keeps clear of it); the plane's shadow just over the floor */
 const PILL_Y = 1.7;
 const FLOOR_LIFT = 0.02;
 const PLANE_FORESHORTEN = 1.25;
+const mixV = (a: V3, b: V3, f: number): V3 => ({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f });
+const unit = (a: V3): V3 => {
+  const l = Math.hypot(a.x, a.y, a.z) || 1;
+  return { x: a.x / l, y: a.y / l, z: a.z / l };
+};
 /** how much of the eclipse's violet goes into the backdrop */
 const ECLIPSE_MIX = 0.45;
 /** the lit bim's halo on the floor (focus.ts; bims m_28199): the text's colour at low alpha, never the accent */
@@ -109,7 +116,10 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
   const rigs = new Map<string, Rig>();
   /** his planes in flight, by bim and when it left ('name@12.30'): the mesh, its plan; each ends on its own catch */
   /** each flight's plan: the app's (zigzag and loop) or the film's paper glide (pose.plane.glide) */
-  const planes = new Map<string, { mesh: Plane; leftAt: string; plan: FlightPlan | GlidePlan; glide: boolean }>();
+  const planes = new Map<string, { mesh: Plane; leftAt: string; plan: FlightPlan | GlidePlan; glide: boolean; big: number }>();
+  /** the sheets laid on desks after a catch, by bim (Pose.letter) */
+  const letters = new Map<string, Plane>();
+  const tmp = new Vector3();
   const basis = new Matrix4();
   const axis = [new Vector3(), new Vector3(), new Vector3()] as const;
   // the halo under a lit bim (focus.ts): one ring, flat on the floor, shown under each lit bim's feet
@@ -184,21 +194,64 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     return b;
   }
 
-  function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit, light: boolean): boolean {
+  /** a plane's mesh at p, its nose and top, scaled (x, y along its width and height, z its length) */
+  function place(mesh: Plane, p: V3, nose: V3, up: V3, sx: number, sz: number): void {
+    const g = mesh.group;
+    g.visible = true;
+    g.scale.set(sx, sx, sz);
+    g.position.set(p.x, p.y, p.z);
+    // its nose along +z, its top +y (plane.ts): upside down over the loop's top, banked in the turns
+    basis.makeBasis(
+      axis[0].set(up.y * nose.z - up.z * nose.y, up.z * nose.x - up.x * nose.z, up.x * nose.y - up.y * nose.x),
+      axis[1].set(up.x, up.y, up.z),
+      axis[2].set(nose.x, nose.y, nose.z),
+    );
+    g.quaternion.setFromRotationMatrix(basis);
+  }
+
+  /** the bim's right hand in the office's units (bim.ts hand, its pose applied this frame) */
+  function handOf(name: string): V3 | null {
+    const b = bims.get(name);
+    if (!b) return null;
+    b.hand(tmp);
+    root.worldToLocal(tmp);
+    return { x: tmp.x, y: tmp.y, z: tmp.z };
+  }
+
+  /** where a sheet lies on its bim's desk (catch.ts DESK_SPOT), office units; null: no desk */
+  function deskSpot(name: string, rig: Rig): V3 | null {
+    const d = world?.desks.get(name);
+    if (!d) return null;
+    const c = Math.cos(rig.dir);
+    const sn = Math.sin(rig.dir);
+    return { x: rig.x + DESK_SPOT.x * c + DESK_SPOT.z * sn, y: d.top.y + 0.004, z: rig.z - DESK_SPOT.x * sn + DESK_SPOT.z * c };
+  }
+
+  /**
+   * His planes: each from his side of the screen to the bim's hand (its own flight, the size shrinking
+   * to the bim's), then held, read and put away (catch.ts), one mesh all the way, never swapped; the
+   * sheets left on desks (Pose.letter). Reduced motion: no flight, the open sheet in its hand, then on
+   * its desk. True while one moves.
+   */
+  function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit, light: boolean, reduced: boolean): boolean {
     const flying = new Set<string>();
     const site = office ? siteOf(office) : null;
+    let moving = false;
+    /** the bims whose desk shows a sheet this frame (one each) */
+    const laid = new Set<string>();
     // every plane on its way, each its own flight: a newer one never cuts an older (designer m_32877)
     const flights = frames.flatMap((f) => [...(f.pose.aloft ?? []), ...(f.pose.plane ? [f.pose.plane] : [])].map((fp) => ({ f, fp })));
     for (const { f, fp } of flights) {
       const s = fp.since;
       const dur = fp.dur ?? PLANE_FLIGHT;
-      if (s < 0 || s >= dur) continue;
+      if (s < 0 || s >= dur + PLANE_CATCH) continue;
       const rig = rigs.get(f.name);
-      if (!rig) continue;
-      // in front of it, at its right hand (plane.ts catchPoint): never on its head or its spot
-      const hand = catchPoint(rig.x, rig.z, rig.dir);
-      // never smaller than PLANE_MIN_PX on screen (designer via bims-qa m_27793: at 320 it was a speck)
-      const size = Math.max(1, ((fp.minPx ?? PLANE_MIN_PX) * PLANE_FORESHORTEN * fit.scale) / PLANE_LEN);
+      const hand = handOf(f.name);
+      if (!rig || !hand) continue;
+      const desk = deskSpot(f.name, rig);
+      const away = desk !== null ? awayOf(f.pose.seg.act) : 'pocket';
+      const held = heldAt(s - dur, away, reduced);
+      if (reduced && held === null) continue;
       // one plan per flight, made when it leaves (his pan or zoom mid-flight moves no plane); keyed by
       // its bim and when it left, so two to one bim fly side by side
       const leftAt = (t - s).toFixed(2);
@@ -206,47 +259,101 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       flying.add(key);
       let p = planes.get(key);
       if (!p) {
+        // the loop and the zigzag size with LOOP_PX on screen (designer via bims-qa m_27793)
+        const unit = Math.max(1, (LOOP_PX * PLANE_FORESHORTEN * fit.scale) / LOOP_LEN);
         // the newest is the one the egg may loop (eggs.ts reads pose.plane)
         const loops = fp.loops ?? (fp === f.pose.plane && f.egg?.kind === 'loop' ? 2 : 1);
         const avoid = pillHeads(frames, f.name);
         const from = cameraStart(fit, fp.startX);
         const seed = hash(key);
         const glide = fp.glide === true;
-        const plan = glide ? planGlide({ from, to: hand, seed, dur, px: fit.scale }) : planFlight({ from, to: hand, seed, loops, unit: size, avoid, dur });
-        p = { mesh: makePlane(style), leftAt, plan, glide };
+        const plan = glide ? planGlide({ from, to: hand, seed, dur, px: fit.scale }) : planFlight({ from, to: hand, seed, loops, unit, avoid, dur });
+        p = { mesh: makePlane(style), leftAt, plan, glide, big: startSize(fit, HELD_LEN) };
         planes.set(key, p);
         root.add(p.mesh.group, p.mesh.shadow);
       }
-      const fl = p.glide ? glideAt(p.plan as GlidePlan, s, hand) : flightAt(p.plan as FlightPlan, s, hand);
-      const g = p.mesh.group;
-      g.visible = true;
       p.mesh.setInk(light);
-      // its soft shadow on the floor once it is over the slab, fainter and wider as it climbs
-      // a glide (the film's paper plane) keeps a faint one however high, so the eye finds it (designer m_32270)
-      const raw = shadowOf(fl.p, 0);
-      const sh = p.glide ? { ...raw, alpha: Math.max(raw.alpha, GLIDE_SHADOW) } : raw;
-      const over = site !== null && fl.p.x > site.x0 && fl.p.x < site.x1 && fl.p.z > site.z0 && fl.p.z < site.z1;
-      p.mesh.shadow.visible = over && sh.alpha > 0.01;
-      if (p.mesh.shadow.visible) {
-        p.mesh.shadow.position.set(fl.p.x, FLOOR_LIFT, fl.p.z);
-        p.mesh.shadow.rotation.z = Math.atan2(fl.nose.x, fl.nose.z);
-        p.mesh.shadow.scale.set(0.8 * size * sh.size, 1.4 * size * sh.size, 1);
-        (p.mesh.shadow.material as MeshBasicMaterial).opacity = sh.alpha;
+      const at = (x: number): FlightFrame => (p.glide ? glideAt(p.plan as GlidePlan, x, hand) : flightAt(p.plan as FlightPlan, x, hand));
+      if (held === null) {
+        // flying: to the hand's real point, from big near his eye to the bim's own size
+        moving = true;
+        const fl = at(s);
+        const size = HELD_LEN * sizeAt(fl.u, p.big);
+        p.mesh.setFold(0);
+        place(p.mesh, fl.p, fl.nose, fl.up, size, size);
+        // its soft shadow on the floor once it is over the slab, fainter and wider as it climbs
+        // a glide (the film's paper plane) keeps a faint one however high, so the eye finds it (designer m_32270)
+        const raw = shadowOf(fl.p, 0);
+        const sh = p.glide ? { ...raw, alpha: Math.max(raw.alpha, GLIDE_SHADOW) } : raw;
+        const over = site !== null && fl.p.x > site.x0 && fl.p.x < site.x1 && fl.p.z > site.z0 && fl.p.z < site.z1;
+        p.mesh.shadow.visible = over && sh.alpha > 0.01;
+        if (p.mesh.shadow.visible) {
+          p.mesh.shadow.position.set(fl.p.x, FLOOR_LIFT, fl.p.z);
+          p.mesh.shadow.rotation.z = Math.atan2(fl.nose.x, fl.nose.z);
+          p.mesh.shadow.scale.set(0.8 * size / SHADOW_LEN, 1.4 * size / SHADOW_LEN, 1);
+          (p.mesh.shadow.material as MeshBasicMaterial).opacity = sh.alpha;
+        }
+        continue;
       }
-      g.scale.setScalar(size * fl.grow);
-      g.position.set(fl.p.x, fl.p.y, fl.p.z);
-      // its nose along +z, its top +y (plane.ts): upside down over the loop's top, banked in the turns
-      basis.makeBasis(
-        axis[0].set(fl.up.y * fl.nose.z - fl.up.z * fl.nose.y, fl.up.z * fl.nose.x - fl.up.x * fl.nose.z, fl.up.x * fl.nose.y - fl.up.y * fl.nose.x),
-        axis[1].set(fl.up.x, fl.up.y, fl.up.z),
-        axis[2].set(fl.nose.x, fl.nose.y, fl.nose.z),
-      );
-      g.quaternion.setFromRotationMatrix(basis);
+      // in its hand: where catch.ts says, in the bim's frame, from the flight's last orientation
+      moving = moving || !reduced;
+      p.mesh.shadow.visible = false;
+      if (!held.shown) { p.mesh.group.visible = false; continue; }
+      const toOffice = (v: V3): V3 => {
+        const c = Math.cos(rig.dir);
+        const sn = Math.sin(rig.dir);
+        return { x: v.x * c + v.z * sn, y: v.y, z: -v.x * sn + v.z * c };
+      };
+      const end = reduced ? null : at(dur);
+      const nose = toOffice(held.nose);
+      const up = toOffice(held.up);
+      const o = end === null ? { nose, up } : blendTurn(end, { nose, up }, held.hold);
+      const side = HELD_LEN * (1 - 0.5 * held.quarter);
+      // the hand grips it at `grip` along its length
+      let c = { x: hand.x - o.nose.x * held.grip * side, y: hand.y - o.nose.y * held.grip * side, z: hand.z - o.nose.z * held.grip * side };
+      if (away === 'desk' && desk !== null) c = mixV(c, desk, held.put);
+      else c = mixV(c, { x: c.x + toOffice(POCKET_SINK).x, y: c.y, z: c.z + toOffice(POCKET_SINK).z }, held.put);
+      if (away === 'desk' && held.put > 0) laid.add(f.name);
+      p.mesh.setFold(held.fold);
+      place(p.mesh, c, o.nose, o.up, side, side);
     }
     for (const [key, p] of planes) {
       if (!flying.has(key)) { root.remove(p.mesh.group, p.mesh.shadow); p.mesh.dispose(); planes.delete(key); }
     }
-    return flying.size > 0;
+    // the sheets on desks: read, laid there, kept while the bim keeps its state (timeline.ts Pose.letter)
+    const kept = new Set<string>();
+    for (const f of frames) {
+      if (f.pose.letter === undefined || laid.has(f.name) || awayOf(f.pose.seg.act) !== 'desk') continue;
+      // its own catch still going (that plane's sheet is in its hand): none yet
+      const rig = rigs.get(f.name);
+      const spot = rig ? deskSpot(f.name, rig) : null;
+      if (!rig || !spot) continue;
+      let m = letters.get(f.name);
+      if (!m) {
+        m = makePlane(style);
+        m.setFold(1);
+        letters.set(f.name, m);
+        root.add(m.group);
+      }
+      m.setInk(light);
+      kept.add(f.name);
+      const c = Math.cos(rig.dir);
+      const sn = Math.sin(rig.dir);
+      const turn = (v: V3): V3 => ({ x: v.x * c + v.z * sn, y: v.y, z: -v.x * sn + v.z * c });
+      place(m, spot, turn(ON_DESK.nose), turn(ON_DESK.up), HELD_LEN, HELD_LEN);
+    }
+    for (const [name, m] of letters) {
+      if (!kept.has(name)) { root.remove(m.group); m.dispose(); letters.delete(name); }
+    }
+    return moving;
+  }
+
+  /** the way between two orientations (nlerp, the top squared to the nose again) */
+  function blendTurn(a: { nose: V3; up: V3 }, b: { nose: V3; up: V3 }, f: number): { nose: V3; up: V3 } {
+    const nose = unit(mixV(a.nose, b.nose, f));
+    const u = mixV(a.up, b.up, f);
+    const d = u.x * nose.x + u.y * nose.y + u.z * nose.z;
+    return { nose, up: unit({ x: u.x - nose.x * d, y: u.y - nose.y * d, z: u.z - nose.z * d }) };
   }
 
   /** where the '?' / '✗' pills are (labels.ts pillOf: over the asking and the failed bims' heads), but the target's */
@@ -348,7 +455,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
         lightDesk(d, pal, rig?.screen ?? 0, (rig ? rig.lamp : name !== mainName()) || allLit, lamps ?? undefined);
         seatChair(d.chair, rig?.seat);
       }
-      if (!look.reduced && drawPlanes(t, frames, fit, !look.night)) motion = 'walk';
+      if (drawPlanes(t, frames, fit, !look.night, look.reduced)) motion = 'walk';
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
       if (eggDecor?.update(look.eggs) === true) motion = 'walk';
       // the unlock moment: two bims bring the new piece in from the door

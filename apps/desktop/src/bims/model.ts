@@ -343,6 +343,11 @@ export interface Pose extends Pt {
    * flies its own flight to its catch, never cut by the next (Gabriel via designer m_32877), oldest first
    */
   readonly aloft?: readonly PlaneFlight[];
+  /**
+   * seconds since his newest plane to it left, once its catch is over (timeline.ts PLANE_S), when it
+   * left in the state the bim still holds: a bim at its desk keeps the read sheet on it (render/catch.ts)
+   */
+  readonly letter?: number;
 }
 
 /** one of his paper planes to a bim (Pose.plane) */
@@ -352,7 +357,6 @@ export interface PlaneFlight {
   readonly loops?: 0 | 1 | 2;
   readonly startX?: number;
   readonly glide?: boolean;
-  readonly minPx?: number;
 }
 
 /**

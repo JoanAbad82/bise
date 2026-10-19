@@ -7,6 +7,7 @@
 import type { Activity, ActivityKind, Doing, Motion, Pose } from '../model';
 import { walkTime } from '../avoid';
 import { SIT, SIT_S, sitBeat, toWorld } from '../sit';
+import { BEAT, PLANE_CATCH, REACH_S, awayOf } from './catch';
 
 /** rotations in radians: [x, y, z] */
 export type Rot = readonly [number, number, number];
@@ -18,8 +19,6 @@ export interface Props {
   readonly pine: boolean;
   /** a sheet held in both hands: main's paper, an urgent ask's form to sign */
   readonly sheet: boolean;
-  /** his paper plane, caught, in the right hand */
-  readonly plane: boolean;
   readonly skate: boolean;
   readonly glasses: boolean;
   /** the grey cloud over the laptop (failed), 0..1 */
@@ -98,7 +97,7 @@ export interface RigInput {
 }
 
 export const NO_PROPS: Props = {
-  crate: false, mug: false, orange: false, pine: false, sheet: false, plane: false,
+  crate: false, mug: false, orange: false, pine: false, sheet: false,
   skate: false, glasses: false, cloud: 0, hot: null,
   marker: false, newspaper: false, bigScreen: false, magnifier: false, poster: false, shredder: null, progress: null,
   coin: null, golden: false, crateUp: false, eaten: 0,
@@ -361,9 +360,8 @@ export function transitionOf(from: ActivityKind | null, to: ActivityKind): numbe
   return 0.6;
 }
 
-/** his plane: the flight (its zigzag and loop, plane.ts), then the catch / read / thumbs up / sit back */
+/** his plane: the flight (its zigzag and loop, plane.ts), then the catch (catch.ts: its beats, PLANE_CATCH) */
 export const PLANE_FLIGHT = 3.0;
-export const PLANE_CATCH = 2.0;
 
 const ease = (x: number): number => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const mix = (a: number, b: number, f: number): number => a + (b - a) * f;
@@ -416,15 +414,48 @@ function beat(from: ActivityKind | null, to: ActivityKind, f: number, b: Body): 
   return b;
 }
 
-/** his plane landing in the bim's hand at s seconds after it left (s >= dur, its flight's length) */
-function caught(b: Body, s: number, dur: number): Body {
+/** the right arm up and ahead, open to the plane (catch.ts REACH_S); the arm holding it in; the read's; to the pocket at its hip; laying it on the desk */
+const ARM = {
+  reach: [-2.3, 0, 0.25] as Rot,
+  give: [-2.0, 0, 0.2] as Rot,
+  hold: [-1.5, 0, -0.25] as Rot,
+  read: [-1.35, 0, -0.35] as Rot,
+  pocket: [-0.2, 0, 0] as Rot,
+  desk: [-1.0, 0, 0.3] as Rot,
+  thumbs: [-0.4, 0, 2.2] as Rot,
+} as const;
+
+/**
+ * His plane coming into the bim's hand, s seconds after it left (dur: its flight's length): catch.ts's
+ * beats. It looks up and raises its arm REACH_S before it lands, the hand gives a little on the
+ * impact, brings it in, it reads (head down), puts it away (the desk when it sits at one, else its
+ * pocket), a short thumbs up. The plane itself is office-scene's, at the hand: never a prop here.
+ */
+function caught(b: Body, s: number, dur: number, desk: boolean): Body {
   const c = s - dur;
-  if (c < 0 || c > PLANE_CATCH) return b;
-  // the plane in its hand from the catch's first frame: the flight ends there, never a gap (bims m_31601)
-  if (c < 0.4) return { ...b, armR: [0, 0, 2.6], props: { ...b.props, plane: true }, eyes: 1, mouth: 'smile', screen: Math.max(b.screen, 0.4) };
-  if (c < 1.3) return { ...b, armR: [-1.4, 0, -0.3], head: [0.35, 0, 0], props: { ...b.props, plane: true }, eyes: 1, mouth: 'smile' };
-  if (c < 1.7) return { ...b, armR: [-0.4, 0, 2.2], mouth: 'laugh', eyes: 0.3 }; // thumbs up
-  return blend({ ...b, armR: [-0.4, 0, 2.2] }, b, ease((c - 1.7) / 0.3));
+  if (c < -REACH_S || c > PLANE_CATCH) return b;
+  if (c < 0) {
+    const f = ease((c + REACH_S) / REACH_S);
+    return { ...blend(b, { ...b, armR: ARM.reach, head: [-0.35, 0, 0] }, f), eyes: 1, mouth: 'oh' };
+  }
+  const look = { ...b, eyes: 1, mouth: 'smile' as const };
+  if (c < BEAT.give) return { ...look, armR: mixR(ARM.reach, ARM.give, ease(c / BEAT.give)), head: [-0.35, 0, 0] };
+  if (c < BEAT.bring) {
+    const f = ease((c - BEAT.give) / (BEAT.bring - BEAT.give));
+    return { ...look, armR: mixR(ARM.give, ARM.hold, f), head: mixR([-0.35, 0, 0], [0.2, 0, 0], f) };
+  }
+  if (c < BEAT.read) {
+    const f = ease((c - BEAT.bring) / 0.2);
+    return { ...look, armR: mixR(ARM.hold, ARM.read, f), head: mixR([0.2, 0, 0], [0.35, 0, 0], f) };
+  }
+  const away = desk ? ARM.desk : ARM.pocket;
+  if (c < BEAT.away) {
+    const f = ease((c - BEAT.read) / (BEAT.away - BEAT.read));
+    return { ...look, armR: mixR(ARM.read, away, f), head: mixR([0.35, 0, 0], b.head, f) };
+  }
+  // the thumbs up, short, then back to its pose
+  if (c < BEAT.thumbs) return { ...b, armR: mixR(away, ARM.thumbs, ease((c - BEAT.away) / 0.12)), mouth: 'laugh', eyes: 0.3 };
+  return blend({ ...b, armR: ARM.thumbs }, b, ease((c - BEAT.thumbs) / (PLANE_CATCH - BEAT.thumbs)));
 }
 
 /** where the bim stands under reduced motion: no walk, a fade out at the start then in at the end */
@@ -505,7 +536,10 @@ export function rigOf(inp: RigInput): Rig {
     const s = pose.plane.since;
     const dur = pose.plane.dur ?? PLANE_FLIGHT;
     if (s < dur + PLANE_CATCH) motion = 'walk';
-    if (arrived) b = caught(b, s, dur);
+    if (arrived) b = caught(b, s, dur, awayOf(act) === 'desk');
+  } else if (pose.plane && arrived) {
+    // reduced motion: no flight, the open sheet read in its hand (catch.ts heldAt), then put away
+    if (pose.plane.since < (pose.plane.dur ?? PLANE_FLIGHT) + BEAT.read) b = { ...b, armR: ARM.read, head: [0.35, 0, 0] };
   }
 
   const dir = b.face ?? pose.dir;

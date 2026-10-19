@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity, ActivityKind, Doing, Path, Pose, Segment, Spot } from '../model';
-import { BITE_S, BITES, FADE, FRUIT_S, PICK_S, PLANE_CATCH, PLANE_FLIGHT, louder, placeOf, rigOf, transitionOf, workLoops } from './pose';
+import { BEAT, PLANE_CATCH, REACH_S } from './catch';
+import { PLANE_S } from '../timeline';
+import { BITE_S, BITES, FADE, FRUIT_S, PICK_S, PLANE_FLIGHT, louder, placeOf, rigOf, transitionOf, workLoops } from './pose';
 import type { BimEgg } from '../eggs';
 import { eggRig } from './egg';
 import { headClearance } from './laptop';
@@ -165,13 +167,36 @@ describe('pose: his paper plane', () => {
   it('runs at the display rate while it flies and the bim reads it, then goes back to the pose', () => {
     expect(rig(poseOf('work', { plane: 0.5 }), 5).motion).toBe('walk');
     const reading = rig(poseOf('work', { plane: PLANE_FLIGHT + 0.8 }), 5);
-    expect(reading.props.plane).toBe(true);
+    expect(reading.head[0]).toBeGreaterThan(0.2); // head down, reading
     expect(reading.motion).toBe('walk');
     expect(rig(poseOf('sleep', { plane: PLANE_FLIGHT + PLANE_CATCH + 0.1 }), 5).motion).toBe('still');
   });
 
   it('draws no plane under reduced motion', () => {
     expect(rig(poseOf('sleep', { plane: 0.5 }), 5, true).motion).toBe('still');
+  });
+
+  it('looks up and raises its arm before the plane lands, gives a little, brings it in, reads it', () => {
+    const at = (c: number) => rig(poseOf('work', { plane: PLANE_FLIGHT + c }), 5);
+    const before = rig(poseOf('work', { plane: PLANE_FLIGHT - REACH_S - 0.05 }), 5);
+    const landing = at(-0.01);
+    // the arm goes up (more negative x: up and ahead) and the head looks up, before the catch
+    expect(landing.armR[0]).toBeLessThan(before.armR[0] - 0.05);
+    expect(landing.armR[0]).toBeLessThan(-2);
+    expect(landing.head[0]).toBeLessThan(0);
+    // the impact: the hand gives a little (the arm comes down a bit), then brings it in
+    expect(at(BEAT.give).armR[0]).toBeGreaterThan(landing.armR[0]);
+    expect(at(BEAT.bring).armR[0]).toBeGreaterThan(at(BEAT.give).armR[0]);
+    // never a jump in the arm across the catch's frames
+    for (let c = -REACH_S; c < PLANE_CATCH; c += 1 / 120) {
+      const a = at(c).armR;
+      const b = at(c + 1 / 120).armR;
+      expect(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])).toBeLessThan(0.25);
+    }
+  });
+
+  it('runs the whole catch inside the timeline\'s plane window', () => {
+    expect(PLANE_S).toBeGreaterThanOrEqual(PLANE_FLIGHT + PLANE_CATCH - 1e-9);
   });
 });
 

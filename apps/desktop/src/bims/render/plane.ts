@@ -5,7 +5,7 @@
 // pitch wave (phugoid), a little yaw wobble, one looping on its way, and a nose-up flare into the
 // hand. Its speed comes from its height: slower up the climbs and over the loop, faster in the dives.
 // The path is pure and seeded (planFlight, flightAt); the mesh only follows it.
-import { CircleGeometry, EdgesGeometry, Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, type Material } from 'three';
+import { BufferAttribute, BufferGeometry, CircleGeometry, DoubleSide, Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, type Material } from 'three';
 import { BACK, RIGHT, UP, type Fit, type V3 } from './camera';
 import { WORLD, rng } from './palette';
 import { PLANE_FLIGHT } from './pose';
@@ -29,24 +29,51 @@ const smooth = (a: number, b: number, x: number): number => {
 /** 0 → 1 with no speed at either end: a loop enters and leaves on the path's own tangent */
 const smoother = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
 
-/** how far below the view's bottom edge it starts, css px; how high above the floor at least, units */
-const START_PX = 36;
+/** how far below the view's bottom edge it starts, css px (past half its own size there); how high above the floor at least, units */
+const START_PX = 12;
 const START_Y = 1.6;
-/** how big it starts (close to his eye), then 1 from FAR of the way on */
-export const PLANE_GROW = 2.6;
-const FAR = 0.4;
 /** the u sampling of the time table */
 const N = 240;
 
 /**
- * Where his plane leaves from: the middle of the view's bottom edge, just under it, toward the
- * camera (an ortho view: the same spot on screen, in front of everything), and START_Y above the floor
- * at least. Pure.
+ * Its length on screen as it leaves (close to his eye: big), css px: a fifth of the view's width,
+ * never under START_MIN_PX nor over START_MAX_PX (bims m_32994: it never covers a pill or a name for
+ * more than a blink, it shrinks fast).
  */
-export function cameraStart(fit: Fit, startX = 0.5): V3 {
+const START_MIN_PX = 48;
+const START_MAX_PX = 160;
+/** the iso view's shortening of its length on screen */
+const FORESHORTEN = 1.25;
+export function startPx(fit: Fit): number {
+  return Math.min(START_MAX_PX, Math.max(START_MIN_PX, 0.2 * fit.widthPx));
+}
+
+/** how many times its held size (catch.ts HELD_LEN) it is as it leaves, for that view. Pure. */
+export function startSize(fit: Fit, heldLen: number): number {
+  return Math.max(1, (startPx(fit) * FORESHORTEN * fit.scale) / heldLen);
+}
+
+/**
+ * Its size along the way (u: 0 his hand, 1 the bim's), times its held size: `big` at the start, 1 in
+ * the bim's hand, shrinking all the way like a plane flying away from the eye (its distance grows,
+ * its size goes as 1 / distance: fast at first), its shrink easing out into the hand (Gabriel: « leur
+ * taille ne change pas »). Never grows. Pure.
+ */
+export function sizeAt(u: number, big: number): number {
+  const k = clamp01(u);
+  const far = 1 - (1 - k) * (1 - k);
+  return 1 / (1 / big + (1 - 1 / big) * far);
+}
+
+/**
+ * Where his plane leaves from: the middle of the view's bottom edge, just under it (`below` css px:
+ * a big plane starts all out of the view), toward the camera (an ortho view: the same spot on screen,
+ * in front of everything), and START_Y above the floor at least. Pure.
+ */
+export function cameraStart(fit: Fit, startX = 0.5, below = START_PX + startPx(fit) / 2): V3 {
   // startX: where along the bottom edge, a fraction of the view's width (a film's feed sits bottom left)
   const vx = fit.left + (fit.right - fit.left) * clamp01(startX);
-  const vy = fit.bottom - START_PX * fit.scale;
+  const vy = fit.bottom - below * fit.scale;
   const onScreen = add(add(fit.target, RIGHT, vx), UP, vy);
   // along BACK the screen spot stays; far enough toward him to be above the floor and in front of the office
   const k = Math.max(8, (START_Y - onScreen.y) / BACK.y);
@@ -216,12 +243,11 @@ export function planFlight(inp: PlanInput): FlightPlan {
   return { ...plan, times: times.map((t) => (total > 0 ? t / total : 0)) };
 }
 
-/** the plane at a moment: where, its nose and its top (an orthonormal pair), how big (1: its size) */
+/** the plane at a moment: where, its nose and its top (an orthonormal pair); its size is sizeAt(u) */
 export interface FlightFrame {
   readonly p: V3;
   readonly nose: V3;
   readonly up: V3;
-  readonly grow: number;
   /** u: how far along its path (0..1) */
   readonly u: number;
 }
@@ -279,7 +305,7 @@ export function flightAt(f: FlightPlan, s: number, to: V3 = f.to): FlightFrame {
   nose = norm(add(nose, cross(up, nose), wobble));
   // orthonormal: the top square to the nose
   up = norm(sub(up, mul(nose, dot(up, nose))));
-  return { p, nose, up, u, grow: 1 + (PLANE_GROW - 1) * (1 - smooth(0, FAR, u)) };
+  return { p, nose, up, u };
 }
 
 /**
@@ -380,7 +406,7 @@ export function glideAt(g: GlidePlan, s: number, to: V3 = g.to): FlightFrame {
   const bank = Math.max(-GLIDE_BANK, Math.min(GLIDE_BANK, Math.atan(turn * 3)));
   let up = norm(add(Y, cross(nose, Y), Math.tan(bank)));
   up = norm(sub(up, mul(nose, dot(up, nose))));
-  return { p, nose, up, u, grow: 1 + (PLANE_GROW - 1) * (1 - smooth(0, FAR, u)) };
+  return { p, nose, up, u };
 }
 
 /** its ground shadow (bims m_31314: it sells the height, the loop's most): how dark at the floor, gone by FADE_H units up */
@@ -393,38 +419,98 @@ export function shadowOf(p: V3, floor: number): { alpha: number; size: number } 
   return { alpha: SHADOW_ALPHA * (1 - smooth(0, SHADOW_FADE_H, h)), size: 1 + h * 0.12 };
 }
 
+/**
+ * The folded paper dart (Gabriel: « il n'est pas en triangle au bout, il n'est pas pointu »), length 1
+ * along +z, its nose at z = 0.5: one point; two triangular wings from the nose to their tips at the
+ * tail, a little dihedral; a triangular keel under the spine. `fold` 0 the plane, 1 the open sheet
+ * it was folded from (a letter, 0.78 wide): the keel flattens into the spine, the wings open to the
+ * sheet's halves, their leading edges stay as its creases. Seven points, the same triangles at every
+ * fold (one face each, never two on one plane: the coplanar law). Pure.
+ */
+export const DART = { span: 0.3, dihedral: 0.07, keel: 0.16, sheet: 0.39 } as const;
+export type Dart = Record<'nose' | 'tail' | 'tipR' | 'cornerR' | 'tipL' | 'cornerL' | 'keel', V3>;
+export function dartAt(fold: number): Dart {
+  const f = clamp01(fold);
+  const lerp = (a: V3, b: V3): V3 => add(a, sub(b, a), f);
+  const nose = { x: 0, y: 0, z: 0.5 };
+  const tail = { x: 0, y: 0, z: -0.5 };
+  const { span, dihedral, keel, sheet } = DART;
+  return {
+    nose, tail,
+    tipR: lerp({ x: span, y: dihedral, z: -0.5 }, { x: sheet, y: 0, z: -0.5 }),
+    cornerR: lerp(nose, { x: sheet, y: 0, z: 0.5 }),
+    tipL: lerp({ x: -span, y: dihedral, z: -0.5 }, { x: -sheet, y: 0, z: -0.5 }),
+    cornerL: lerp(nose, { x: -sheet, y: 0, z: 0.5 }),
+    keel: lerp({ x: 0, y: -keel, z: -0.5 }, tail),
+  };
+}
+/** the wings' triangles, the keel's, and the ink's edges, as the dart's point names */
+const WING_TRIS = [['nose', 'tail', 'tipR'], ['nose', 'tipR', 'cornerR'], ['nose', 'tipL', 'tail'], ['nose', 'cornerL', 'tipL']] as const;
+const KEEL_TRIS = [['nose', 'keel', 'tail']] as const;
+const INK_EDGES = [
+  ['nose', 'tipR'], ['tipR', 'tail'], ['nose', 'cornerR'], ['cornerR', 'tipR'],
+  ['nose', 'tipL'], ['tipL', 'tail'], ['nose', 'cornerL'], ['cornerL', 'tipL'],
+  ['nose', 'tail'], ['nose', 'keel'], ['keel', 'tail'],
+] as const;
+type Name = keyof Dart;
+
 export interface Plane {
-  /** the plane itself, oriented by the caller */
+  /** the plane itself (length 1 along +z: the caller scales it), oriented by the caller */
   readonly group: Group;
   /** its soft shadow, flat on the floor (the caller places it; hidden off the slab) */
   readonly shadow: Mesh;
   /** a hairline ink edge (light theme: white paper on the cream page needs one) */
   setInk(on: boolean): void;
+  /** 0 the folded plane, 1 the open sheet (dartAt) */
+  setFold(fold: number): void;
   dispose(): void;
+}
+
+function fill(buf: BufferAttribute, d: Dart, list: readonly (readonly Name[])[]): void {
+  let i = 0;
+  for (const names of list) for (const n of names) { const p = d[n]; buf.setXYZ(i++, p.x, p.y, p.z); }
+  buf.needsUpdate = true;
 }
 
 export function makePlane(style: Style): Plane {
   const g = new Group();
   const paper: Material = style.material(WORLD.paper, { flat: true });
-  const fold: Material = style.material(WORLD.paperShade, { flat: true });
-  // its nose along +z: two wings in a shallow V, a keel under them
-  const wingL = new Mesh(style.box(0.16, 0.012, 0.42), paper);
-  wingL.position.set(-0.08, 0, 0);
-  wingL.rotation.z = 0.25;
-  const wingR = new Mesh(style.box(0.16, 0.012, 0.42), paper);
-  wingR.position.set(0.08, 0, 0);
-  wingR.rotation.z = -0.25;
-  const keel = new Mesh(style.box(0.02, 0.07, 0.38), fold);
-  keel.position.set(0, -0.035, -0.01);
-  g.add(wingL, wingR, keel);
-  // the ink edge: each part's outline, a hairline at any size (lines are one px)
+  const shade: Material = style.material(WORLD.paperShade, { flat: true });
+  // one face each, seen from both sides
+  paper.side = DoubleSide;
+  shade.side = DoubleSide;
+  const part = (tris: number, m: Material): { mesh: Mesh; pos: BufferAttribute } => {
+    const geo = new BufferGeometry();
+    const pos = new BufferAttribute(new Float32Array(tris * 9), 3);
+    geo.setAttribute('position', pos);
+    return { mesh: new Mesh(geo, m), pos };
+  };
+  const wings = part(WING_TRIS.length, paper);
+  const keel = part(KEEL_TRIS.length, shade);
+  // the ink edge: the outline and the creases, a hairline at any size (lines are one px)
+  const inkGeo = new BufferGeometry();
+  const inkPos = new BufferAttribute(new Float32Array(INK_EDGES.length * 6), 3);
+  inkGeo.setAttribute('position', inkPos);
   const inkMat = new LineBasicMaterial({ color: WORLD.ink, transparent: true, opacity: 0.55 });
-  const edges = [wingL, wingR, keel].map((m) => {
-    const e = new LineSegments(new EdgesGeometry(m.geometry), inkMat);
-    m.add(e);
-    return e;
-  });
-  g.scale.setScalar(1.3);
+  const ink = new LineSegments(inkGeo, inkMat);
+  g.add(wings.mesh, keel.mesh, ink);
+  let last = -1;
+  const setFold = (fold: number): void => {
+    const f = clamp01(fold);
+    if (f === last) return;
+    last = f;
+    const d = dartAt(f);
+    fill(wings.pos, d, WING_TRIS);
+    fill(keel.pos, d, KEEL_TRIS);
+    fill(inkPos, d, INK_EDGES);
+    for (const geo of [wings.mesh.geometry, keel.mesh.geometry, inkGeo]) {
+      geo.computeBoundingSphere();
+    }
+    wings.mesh.geometry.computeVertexNormals();
+    // flat on the sheet: no keel left to draw
+    keel.mesh.visible = f < 0.97;
+  };
+  setFold(0);
   const shadowMat = new MeshBasicMaterial({ color: WORLD.ink, transparent: true, opacity: SHADOW_ALPHA, depthWrite: false });
   const shadow = new Mesh(new CircleGeometry(0.2, 24), shadowMat);
   shadow.rotation.x = -Math.PI / 2;
@@ -434,14 +520,13 @@ export function makePlane(style: Style): Plane {
     group: g,
     shadow,
     setInk(on) {
-      for (const e of edges) e.visible = on;
+      ink.visible = on;
     },
+    setFold,
     dispose() {
-      for (const m of [wingL, wingR, keel]) m.geometry.dispose();
-      for (const e of edges) e.geometry.dispose();
-      shadow.geometry.dispose();
+      for (const geo of [wings.mesh.geometry, keel.mesh.geometry, inkGeo, shadow.geometry]) geo.dispose();
       paper.dispose();
-      fold.dispose();
+      shade.dispose();
       inkMat.dispose();
       shadowMat.dispose();
     },

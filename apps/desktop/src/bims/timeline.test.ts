@@ -183,8 +183,10 @@ describe('timeline', () => {
     expect(tl.poseAt('a1', 4.5)?.plane).toEqual({ since: 0.5 });
     expect(tl.poseAt('main', 4.5)?.plane).toBeUndefined();
     expect(tl.moving(5)).toBe(true);
-    expect(tl.poseAt('a1', 4 + PLANE_S)?.plane).toBeUndefined();
-    expect(tl.moving(4 + PLANE_S)).toBe(false);
+    expect(tl.poseAt('a1', 4 + PLANE_S + 1e-6)?.plane).toBeUndefined();
+    expect(tl.moving(4 + PLANE_S + 1e-6)).toBe(false);
+    // its sheet stays with it (on its desk) while it keeps that state
+    expect(tl.poseAt('a1', 4 + PLANE_S + 30)?.letter).toBeCloseTo(PLANE_S + 30, 6);
   });
 
   it('keeps an earlier plane on its way when a newer one leaves for the same agent (designer m_32877)', () => {
@@ -198,7 +200,7 @@ describe('timeline', () => {
     tl.update(a, o, 5.5, [sent(5.5)]);
     expect(tl.poseAt('a1', 5.6)?.plane).toEqual({ since: expect.closeTo(0.1, 6) as number });
     expect(tl.poseAt('a1', 5.6)?.aloft?.map((p) => p.since.toFixed(1))).toEqual(['1.6', '0.6']);
-    expect(tl.poseAt('a1', 4 + PLANE_S + 0.1)?.aloft?.map((p) => p.since.toFixed(1))).toEqual(['4.1']);
+    expect(tl.poseAt('a1', 4 + PLANE_S + 0.1)?.aloft?.map((p) => p.since.toFixed(1))).toEqual([(PLANE_S - 0.9).toFixed(1)]);
   });
 
   it('rebuilds the room when it grows: every bim at its spot in the new one', () => {

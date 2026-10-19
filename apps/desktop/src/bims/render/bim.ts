@@ -1,5 +1,5 @@
 // One bim's meshes (three): a round, happy body in plain blocks, its outfit from its name, and the
-// props its poses show (a box to land, a mug, fruit, a sheet, his plane, a skate, sunglasses, the
+// props its poses show (a box to land, a mug, fruit, a sheet, a skate, sunglasses, the
 // failed cloud, hot's sweat and steam). Its materials are its own, so it can fade (reduced motion)
 // and go grey (stopped). apply() copies a pose.ts Rig onto the meshes; nothing here decides.
 import { type BufferGeometry, Color, Group, type Material, Mesh, type MeshBasicMaterial, type MeshLambertMaterial, type Object3D, Vector3 } from 'three';
@@ -21,6 +21,8 @@ export interface Bim {
   headTop(out: Vector3): Vector3;
   /** its feet on the floor, world units */
   feet(out: Vector3): Vector3;
+  /** its right hand, world units (his paper plane lands there and stays in it: office-scene.ts) */
+  hand(out: Vector3): Vector3;
   dispose(): void;
 }
 
@@ -183,9 +185,6 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
   const coin = add(style.cylinder(0.09, 0.025), mat(WORLD.gold, 0.4), g, 0, 1.4, 0);
   coin.rotation.x = Math.PI / 2;
   add(style.box(0.06, 0.12, 0.06), mat(WORLD.pineLeaf), pine, 0, 0.16, 0.03);
-  const plane = new Group();
-  hand.add(plane);
-  add(style.box(0.2, 0.01, 0.14), mat(WORLD.paper), plane, 0, 0.02, 0.06);
   const sheet = add(style.box(0.3, 0.38, 0.015), mat(WORLD.paper), body, 0, 0.58, 0.32);
   sheet.rotation.x = -0.35;
   const skate = new Group();
@@ -299,7 +298,6 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       const left = Math.max(0.15, 1 - p.eaten * 0.85);
       orange.scale.setScalar(left);
       pine.scale.setScalar(left);
-      plane.visible = p.plane;
       sheet.visible = p.sheet;
       skate.visible = p.skate;
       glasses.visible = p.glasses;
@@ -364,6 +362,9 @@ export function makeBim(name: string, main: boolean, style: Style, outfit?: Outf
       head.getWorldPosition(out);
       out.y += 0.3 * s - anchor;
       return out;
+    },
+    hand(out) {
+      return hand.getWorldPosition(out);
     },
     feet(out) {
       // in the world, as headTop: in the town its office's root carries its place

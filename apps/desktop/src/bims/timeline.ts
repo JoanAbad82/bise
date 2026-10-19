@@ -28,8 +28,8 @@ export const SPEED = { walk: 2.4, hurry: 3.5, skate: 3.4, carry: 1.8 } as const;
 export const MAX_WALK_S = 6;
 /** after a walk (or a change in place), the renderer's transition (spec §5): the loop still runs */
 export const SETTLE_S = 1.5;
-/** his paper plane: the flight from his side of the screen (pose.ts PLANE_FLIGHT, 3 s), then the catch, read, thumbs up (PLANE_CATCH, 2 s) */
-export const PLANE_S = 5.0;
+/** his paper plane: the flight from his side of the screen (pose.ts PLANE_FLIGHT, 3 s), then the catch, read, put away, thumbs up (render/catch.ts PLANE_CATCH, 2.2 s) */
+export const PLANE_S = 5.2;
 /** the segments kept per bim (a pose asked a bit in the past still answers) */
 const KEEP = 8;
 
@@ -99,12 +99,15 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
     const plane = b.planes.findLast((te) => te <= t && t - te < PLANE_S);
     // the ones before it still on their way (the renderer ends each on its own catch)
     const aloft = plane === undefined ? [] : b.planes.filter((te) => te < plane && t - te < PLANE_S).map((te) => ({ since: t - te }));
+    // its sheet, read and put away: the newest plane past its catch that left in this state
+    const letter = b.planes.findLast((te) => te >= seg.t && t - te >= PLANE_S);
     return {
       x: p.x, z: p.z, dir: p.dir, moving: walking, since: t - seg.t, seg,
       // it stops on its walk to let one pass, or it stands beside its spot (avoid.ts): standing, not its activity's pose
       ...(at?.waiting || (!walking && aside(seg)) ? { waiting: true } : {}),
       ...(plane === undefined ? {} : { plane: { since: t - plane } }),
       ...(aloft.length === 0 ? {} : { aloft }),
+      ...(letter === undefined ? {} : { letter: t - letter }),
     };
   };
 
@@ -236,7 +239,7 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
         b.planes.push(e.t);
         b.planes.sort((x, y) => x - y);
       }
-      for (const b of bims.values()) b.planes = b.planes.filter((te) => te > t - PLANE_S - 60);
+      for (const b of bims.values()) b.planes = b.planes.filter((te, i, all) => te > t - PLANE_S - 60 || i === all.length - 1);
     },
 
     poseAt(name: string, t: number): Pose | null {

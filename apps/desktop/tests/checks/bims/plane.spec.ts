@@ -1,9 +1,11 @@
-// bims/plane · his paper plane's flight (bims-plane): his message to login-test, at 320 and 640
-// docked, light and dark, off screen. The office's clock runs at SLOW (Date.now in the renderer
-// only) so the screencast catches the whole flight frame by frame: it leaves from his side of the
-// screen (the view's bottom edge, big), zigzags, loops once, lands in login-test's hand. Passes when
-// the office draws through the flight and stops drawing after it. The frames go to
-// .harness-cache/bims-shots/plane-<tag>/ (the clip bims signs). Owner: bims-plane.
+// bims/plane · his paper plane's flight and catch (bims-plane, plane-catch): his message to
+// login-test (at its desk), at 320 and 640 docked, light and dark, and to copy-fix (on the terrace:
+// the pocket), off screen. The office's clock runs at SLOW (Date.now in the renderer only) so the
+// screencast catches it frame by frame: it leaves from his side of the screen (the view's bottom
+// edge, big), shrinks to the bim's size as it zigzags and loops once, lands in its raised hand,
+// unfolds, is read, then laid on the desk (or slipped in the pocket). Passes when the office draws
+// through it. The frames go to .harness-cache/bims-shots/plane-<tag>/ (the clips bims signs).
+// Owner: plane-catch.
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test, expect } from '../../harness';
@@ -13,15 +15,18 @@ import { P, SHOTS, open, probe, settle, showOffice, sleep } from './world';
 /** the renderer's clock, slowed: 3 s of flight over 3 / SLOW s of frames */
 const SLOW = 0.25;
 const SIZES = [
-  { w: 320, win: 1400, wide: null },
-  { w: 640, win: 1600, wide: 'docked' },
+  { w: 320, win: 1400, wide: null, to: 'login-test' },
+  { w: 640, win: 1600, wide: 'docked', to: 'login-test' },
+  { w: 640, win: 1600, wide: 'docked', to: 'copy-fix' },
 ] as const;
+/** the flight (3 s), the catch (2.2 s) and a beat after, office seconds */
+const WATCH_S = 5.8;
 
-test.describe.configure({ timeout: 120_000 });
+test.describe.configure({ timeout: 150_000 });
 
 for (const theme of ['light', 'dark'] as const) {
-  for (const { w, win, wide } of SIZES) {
-    const tag = `${wide === null ? String(w) : `${String(w)}-${wide}`}-${theme}`;
+  for (const { w, win, wide, to } of SIZES) {
+    const tag = `${wide === null ? String(w) : `${String(w)}-${wide}`}${to === 'login-test' ? '' : `-${to}`}-${theme}`;
     test(`his plane's flight, ${tag}`, async () => {
       const { s, core } = await open(office, { theme });
       try {
@@ -55,8 +60,8 @@ for (const theme of ['light', 'dark'] as const) {
         s.cdp.on('Page.screencastFrame', onFrame);
         await s.cdp.send('Page.startScreencast', { format: 'png', everyNthFrame: 1 });
         const before = (await probe(s.page))?.frames ?? 0;
-        await core.send({ ev: 'activity', project: P, item: { kind: 'message', from: { who: 'you' }, to: { who: 'agent', name: 'login-test' }, mode: 'steer', expects_reply: false, at_ms: at, id: `qa-plane-${tag}` } } as never);
-        await sleep((3.4 / SLOW) * 1000);
+        await core.send({ ev: 'activity', project: P, item: { kind: 'message', from: { who: 'you' }, to: { who: 'agent', name: to }, mode: 'steer', expects_reply: false, at_ms: at, id: `qa-plane-${tag}` } } as never);
+        await sleep((WATCH_S / SLOW) * 1000);
         await s.cdp.send('Page.stopScreencast').catch(() => undefined);
         s.cdp.off('Page.screencastFrame', onFrame);
         const drawn = ((await probe(s.page))?.frames ?? 0) - before;
