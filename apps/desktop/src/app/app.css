@@ -556,6 +556,18 @@ body:has(.app-shell) {
   color: var(--c-text);
   text-decoration: underline;
 }
+/* its focus ring whole around the word (designer m_33506): 2 px, 2 px out, r 4; the crumb's
+   overflow: hidden clipped the ds one to a caret-like bar, so the crumb gets 4 px of room inside
+   (padding) and gives it back outside (margin): nothing moves */
+.app-crumb:has(.app-crumb-go) {
+  padding: var(--s-1);
+  margin: calc(-1 * var(--s-1));
+}
+.app-crumb-go:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 /* ‹ › right after the lights (designer's desktop-history): 28 px, 4 apart, the crumb at 8 (the
    title's gap is 10, so the pair takes 2 back); nothing on a side: faint at 45%, no hover */
 .app-hist {
