@@ -115,7 +115,7 @@ export interface Cozy {
   /** where a bim stands at the coffee corner (a place of the walk graph) */
   readonly coffeeSpots: readonly Spot[];
   readonly shelf: Item;
-  /** floor lamps: the nap corner's, then stage 10's */
+  /** floor lamps, each with its side table: the nap corner's, then stage 10's */
   readonly lamps: readonly Item[];
   /** floor plants: the base one, stage 1's, stage 5's */
   readonly plants: readonly Item[];
@@ -193,7 +193,7 @@ const STEP = 0.1;
 export const SIZE = {
   coffee: { w: 0.85, d: 0.5, h: 1.35 },
   shelf: { w: 1.1, d: 0.35, h: 0.9 },
-  lamp: { w: 0.44, d: 0.44, h: 1.65 },
+  lamp: { w: 0.78, d: 0.44, h: 1.65 },
   plant: { w: 0.8, d: 0.8, h: 1.25 },
   poster: { w: 0.8, h: 1.0 },
 } as const;
@@ -296,12 +296,14 @@ function spotsFor(r: Room, w: number, d: number, to: Pt): Item[] {
 }
 
 /** where no wall has room: every place on the floor a free-standing piece may stand, facing the viewer (+z), nearest `to` first */
-function freeSpots(r: Room, w: number, d: number, to: Pt): Item[] {
+function freeSpots(r: Room, w: number, d: number, to: Pt, reach = FREE_REACH): Item[] {
+  // the whole floor on a coarser grid (a fallback: fewer places to try)
+  const step = Number.isFinite(reach) ? FREE_STEP : 0.3;
   const { o } = r;
   const out: Item[] = [];
-  for (let x = o.x0 + w / 2 + 0.1; x <= o.x0 + o.W - w / 2 - 0.1; x += FREE_STEP) {
-    for (let z = d / 2 + 0.1; z <= o.D - d / 2 - 0.1; z += FREE_STEP) {
-      if (Math.abs(x - to.x) > FREE_REACH || Math.abs(z - to.z) > FREE_REACH) continue;
+  for (let x = o.x0 + w / 2 + 0.1; x <= o.x0 + o.W - w / 2 - 0.1; x += step) {
+    for (let z = d / 2 + 0.1; z <= o.D - d / 2 - 0.1; z += step) {
+      if (Math.abs(x - to.x) > reach || Math.abs(z - to.z) > reach) continue;
       const cx = Math.round(x * 100) / 100;
       const cz = Math.round(z * 100) / 100;
       out.push({ box: { x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2 }, wall: 'free', face: 0, h: 0 });
@@ -320,7 +322,8 @@ function place(r: Room, w: number, d: number, h: number, to: Pt, free = false, o
   if (free) {
     const dist = (i: Item): number => Math.hypot(centre(i.box).x - to.x, centre(i.box).z - to.z);
     const all = [...spotsFor(r, w, d, to).filter((i) => !onBusy(r, i)), ...freeSpots(r, w, d, to)].sort((p, q) => dist(p) - dist(q));
-    for (const i of all) {
+    // nothing near what it belongs by: anywhere on the floor, the nearest first
+    for (const i of [...all, ...freeSpots(r, w, d, to, Infinity)]) {
       if (!clear(r, i.box) || !ok(i)) continue;
       const it = { ...i, h };
       r.taken.push(it.box);
@@ -335,7 +338,7 @@ function place(r: Room, w: number, d: number, h: number, to: Pt, free = false, o
     return it;
   }
   // no wall has room (a room lined with desks, a corridor along each wall): standing free on the floor
-  for (const i of freeSpots(r, w, d, to)) {
+  for (const i of freeSpots(r, w, d, to, Infinity)) {
     if (!clear(r, i.box) || !ok(i)) continue;
     const it = { ...i, h };
     r.taken.push(it.box);
@@ -466,8 +469,8 @@ export function placeCozy(o: Office, hints: CozyHints): Cozy | null {
     pieces: pieces.filter((p) => p.x >= o.x0 - 0.5 && p.x <= o.x0 + o.W + 0.5 && p.z >= -0.5 && p.z <= o.D + 0.5),
     taken: [],
   };
-  // the coffee corner on the eating place's camera side (its front, +z: bims m_32218)
-  const isl = { x: (o.island.x0 + o.island.x1) / 2, z: o.island.z1 + 0.7 };
+  // the coffee corner against a wall, the left one by the eating place first, off the walkways round it (designer m_32271)
+  const isl = { x: o.x0, z: (o.island.z0 + o.island.z1) / 2 };
   const l01 = o.lounge.slice(0, 2);
   const nap = { x: avg(l01.map((s) => s.x), o.x0 + 1), z: avg(l01.map((s) => s.z), 1) };
   const rug = rugOf(o, r.solid);
@@ -486,7 +489,7 @@ export function placeCozy(o: Office, hints: CozyHints): Cozy | null {
   // the coffee corner first (by the eating place, its spot reaching a walk), then the shelf by the nap corner
   const C = SIZE.coffee;
   let cs: { spot: Spot; leg: Leg } | null = null;
-  const coffee = place(r, C.w, C.d, C.h, isl, true, (i) => {
+  const coffee = place(r, C.w, C.d, C.h, isl, false, (i) => {
     cs = coffeeSpot(r, i);
     return cs !== null;
   });
@@ -502,15 +505,18 @@ export function placeCozy(o: Office, hints: CozyHints): Cozy | null {
   // the floor lamp by the nap corner, free-standing there when no wall is near (bims m_32218)
   const lamp0 = place(r, L.w, L.d, L.h, nap, true);
   // the big plants: by the door and by main's desk (stage 0), by the coffee corner (1), by the shelf (5)
-  const plants = [o.door, { x: o.mainDesk.x, z: o.mainDesk.z }, centre(coffee.box), centre(shelf.box)].map((to) => place(r, P.w, P.d, P.h, to, true));
+  const day0 = [o.door, { x: o.mainDesk.x, z: o.mainDesk.z }].map((to) => place(r, P.w, P.d, P.h, to, true));
+  // the posters are the first day's: they get their wall before the later plants and lamp take it
+  const now = [coffee, shelf, ...[lamp0, ...day0].filter((x): x is Item => x !== null)];
+  const mid = { x: o.x0 + o.W / 2, z: 0 };
+  const p0 = hang(r, mid, [], now);
+  const p1 = hang(r, p0 ? { x: p0.x, z: p0.z } : mid, p0 ? [p0] : [], now);
+  for (const p of [p0, p1]) if (p) r.solid.push(boxOn(o, p.wall, p.wall === 'back' ? p.x : p.z, p.w, 0.42));
+  const plants = [...day0, ...[centre(coffee.box), centre(shelf.box)].map((to) => place(r, P.w, P.d, P.h, to, true))];
   const lamp1 = place(r, L.w, L.d, L.h, centre(shelf.box));
-  const floor = [coffee, shelf, ...[lamp0, lamp1, ...plants].filter((x): x is Item => x !== null)];
   const tall = (it: Item): boolean => (r.walls.find((w) => w.wall === it.wall)?.top ?? 0) >= HANG_WALL;
   // over the shelf only: the coffee corner's machine and cups stand where its leaves would hang
   const hangOver = tall(shelf) ? 'shelf' : null;
-  const mid = { x: o.x0 + o.W / 2, z: 0 };
-  const p0 = hang(r, mid, [], floor);
-  const p1 = hang(r, p0 ? { x: p0.x, z: p0.z } : mid, p0 ? [p0] : [], floor);
   return {
     coffee,
     coffeeSpots: [spot],
@@ -524,9 +530,24 @@ export function placeCozy(o: Office, hints: CozyHints): Cozy | null {
   };
 }
 
+/** placeCozy's answers by the office's shape (its map, size, room, desks, places): the same shape, the same places */
+const placed = new Map<string, Cozy | null>();
+const PLACED_MAX = 96;
+const keyOf = (o: Office): string => {
+  const pts = [...o.desks.values(), o.mainDesk, ...o.lounge, ...o.islandSpots, ...o.boardSpots, o.door].map((p) => `${p.x.toFixed(3)},${p.z.toFixed(3)}`).join(';');
+  return `${o.map}|${o.size}|${o.x0.toFixed(3)}|${o.W.toFixed(3)}|${o.D.toFixed(3)}|${String(o.walks.length)}|${pts}`;
+};
+
 /** The office with its cozy pieces and the coffee corner's leg on its walk graph (maps/index.ts layoutOf). Pure. */
 export function withCozy(o: Office, hints: CozyHints): Office {
-  const cozy = placeCozy(o, hints);
+  const key = keyOf(o);
+  let cozy = placed.get(key);
+  if (cozy === undefined) {
+    cozy = placeCozy(o, hints);
+    placed.set(key, cozy);
+    // the last offices placed (the town's projects, the office's sizes): a layout again is free
+    if (placed.size > PLACED_MAX) placed.delete(placed.keys().next().value ?? key);
+  }
   if (!cozy) return o;
   const legs = cozy.coffeeSpots.map((s): Leg => [{ x: s.x, z: s.z }, { x: s.ax, z: s.wz }]);
   return { ...o, cozy, walks: [...o.walks, ...legs] };

@@ -528,10 +528,22 @@ function thing(k: Kit, g: Object3D, x: number, y: number, z: number, kind: Shelf
   }
 }
 
-/** a floor lamp: a foot, a pole, its shade lit at night */
+/** a floor lamp (a foot, a pole, its shade lit at night) and its small side table with a cup and a book: a corner, not a pole alone (designer m_32271) */
 function lamp(k: Kit, g: Object3D, it: Item, c: CozyLook, night: boolean): void {
   const { style } = k;
-  const p = at(g, it);
+  const { w } = sizeOf(it);
+  const grp = at(g, it);
+  const t = new Group();
+  t.position.set(w / 2 - 0.2, 0, 0);
+  grp.add(t);
+  k.add(style.cylinder(0.17, 0.035), k.mat(c.wood), t, 0, 0.45, 0);
+  k.add(style.cylinder(0.025, 0.43), k.mat(c.wood), t, 0, 0.215, 0);
+  k.add(style.cylinder(0.1, 0.02), k.mat(c.wood), t, 0, 0.01, 0);
+  k.add(style.box(0.16, 0.035, 0.12), k.mat(c.art[1]), t, -0.03, 0.485, -0.02);
+  k.add(style.cylinder(0.035, 0.07), k.mat(c.cloth[0]), t, 0.07, 0.502, 0.05);
+  const p = new Group();
+  p.position.set(-w / 2 + 0.22, 0, 0);
+  grp.add(p);
   k.add(style.cylinder(0.16, 0.03), k.mat(c.wood), p, 0, 0.015, 0);
   k.add(style.cylinder(0.022, 1.3), k.mat(WORLD.dark), p, 0, 0.68, 0);
   // a warm shade, lit at night

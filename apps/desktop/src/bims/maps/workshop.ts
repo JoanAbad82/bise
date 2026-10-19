@@ -141,6 +141,8 @@ const workshopCozy: CozyHints = {
   },
   keepOut: (o) => {
     const out: Box[] = [{ x0: o.x0 + o.W - 0.8, x1: o.x0 + o.W, z0: 4.1, z1: o.D }];
+    // the tyre against the left wall
+    out.push({ x0: o.x0, x1: o.x0 + 0.65, z0: o.D - 1.4, z1: o.D - 0.6 });
     // the old car in the front middle and its tyres (render/maps/workshop.ts shell)
     const bx = (o.island.x0 + o.island.x1) / 2;
     const bz = (o.island.z0 + o.island.z1) / 2;
