@@ -185,8 +185,13 @@ describe('timeline', () => {
     expect(tl.moving(5)).toBe(true);
     expect(tl.poseAt('a1', 4 + PLANE_S + 1e-6)?.plane).toBeUndefined();
     expect(tl.moving(4 + PLANE_S + 1e-6)).toBe(false);
-    // its sheet stays with it (on its desk) while it keeps that state
+    // its sheet stays on its desk while it stays there, whatever it does at it
     expect(tl.poseAt('a1', 4 + PLANE_S + 30)?.letter).toBeCloseTo(PLANE_S + 30, 6);
+    tl.update(acts({ main: MAIN, a1: { k: 'work', at: 'desk' } }), o, 40, []);
+    expect(tl.poseAt('a1', 41)?.letter).toBeCloseTo(37, 6);
+    // it leaves its desk: no sheet with it
+    tl.update(acts({ main: MAIN, a1: { k: 'snack', at: 'island' } }), o, 50, []);
+    expect(tl.poseAt('a1', 52)?.letter).toBeUndefined();
   });
 
   it('keeps an earlier plane on its way when a newer one leaves for the same agent (designer m_32877)', () => {

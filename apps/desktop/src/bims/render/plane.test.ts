@@ -206,8 +206,10 @@ describe('his paper plane', () => {
         expect(k).toBeLessThanOrEqual(prev + 1e-12);
         prev = k;
       }
-      // fast at first, like perspective: half its extra size gone by a fifth of the way
-      expect(sizeAt(0.2, big) - 1).toBeLessThan((big - 1) / 2);
+      // a steady zoom out, a little faster at first: never a speck early (over 40% of its start a
+      // tenth of the way in), past half its start by a fifth of the way
+      expect(sizeAt(0.1, big)).toBeGreaterThan(0.4 * big);
+      expect(sizeAt(0.2, big)).toBeLessThan(0.75 * big);
       // and big on screen as it leaves, never a page
       expect(startPx(f)).toBeGreaterThanOrEqual(48);
       expect(startPx(f)).toBeLessThanOrEqual(160);
@@ -243,5 +245,18 @@ describe('his paper plane', () => {
     // reduced motion: the open sheet in its hand from the start, then on the desk
     expect(heldAt(-PLANE_FLIGHT, 'desk', true)?.fold).toBe(1);
     expect(heldAt(BEAT.read, 'desk', true)?.put).toBe(1);
+  });
+
+  it('a newer plane\'s reach cuts a catch short: its sheet goes away, never just gone', () => {
+    const cut = 0.6;
+    for (const away of ['desk', 'pocket'] as const) {
+      const at = heldAt(cut, away, false, cut);
+      expect(at).toEqual(heldAt(cut, away));
+      // a little later: on its way away, still drawn; then at its end (on the desk, or hidden in the pocket)
+      expect(heldAt(cut + 0.1, away, false, cut)?.shown).toBe(true);
+      expect(heldAt(cut + 0.5, away, false, cut)?.put).toBe(1);
+    }
+    expect(heldAt(cut + 0.5, 'desk', false, cut)?.shown).toBe(true);
+    expect(heldAt(cut + 0.5, 'pocket', false, cut)?.shown).toBe(false);
   });
 });

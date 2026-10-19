@@ -535,10 +535,11 @@ export function rigOf(inp: RigInput): Rig {
   }
 
   if (pose.plane && !reduced) {
-    const s = pose.plane.since;
-    const dur = pose.plane.dur ?? PLANE_FLIGHT;
-    if (s < dur + PLANE_CATCH) motion = 'walk';
-    if (arrived) b = caught(b, s, dur, awayOf(act) === 'desk', pose.plane.thumbs !== false);
+    // the newest plane whose reach has begun: a newer one takes the arm, the older's sheet goes away (catch.ts cut)
+    const all = [...(pose.aloft ?? []), pose.plane];
+    const on = all.findLast((p) => p.since >= (p.dur ?? PLANE_FLIGHT) - REACH_S && p.since < (p.dur ?? PLANE_FLIGHT) + PLANE_CATCH);
+    if (all.some((p) => p.since < (p.dur ?? PLANE_FLIGHT) + PLANE_CATCH)) motion = 'walk';
+    if (arrived && on) b = caught(b, on.since, on.dur ?? PLANE_FLIGHT, awayOf(act) === 'desk', on.thumbs !== false);
   } else if (pose.plane && arrived) {
     // reduced motion: no flight, the open sheet read in its hand (catch.ts heldAt), then put away
     if (pose.plane.since < (pose.plane.dur ?? PLANE_FLIGHT) + BEAT.read) b = { ...b, armR: ARM.read, head: [0.35, 0, 0] };

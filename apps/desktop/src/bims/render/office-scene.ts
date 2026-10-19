@@ -12,7 +12,7 @@ import { makeBim, type Bim } from './bim';
 import { pillOf } from '../labels';
 import { siteOf, type Fit, type V3 } from './camera';
 import { cameraStart, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, sizeAt, startSize, type FlightFrame, type FlightPlan, type GlidePlan, type Plane } from './plane';
-import { DESK_SPOT, HELD_LEN, ON_DESK, PLANE_CATCH, POCKET_SINK, awayOf, heldAt } from './catch';
+import { DESK_SPOT, HELD_LEN, ON_DESK, PLANE_CATCH, POCKET_SINK, REACH_S, awayOf, heldAt } from './catch';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { skateRig } from './skate';
 import { eggRig } from './egg';
@@ -240,8 +240,16 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     /** the bims whose desk shows a sheet this frame (one each) */
     const laid = new Set<string>();
     // every plane on its way, each its own flight: a newer one never cuts an older (designer m_32877)
-    const flights = frames.flatMap((f) => [...(f.pose.aloft ?? []), ...(f.pose.plane ? [f.pose.plane] : [])].map((fp) => ({ f, fp })));
-    for (const { f, fp } of flights) {
+    const flights = frames.flatMap((f) => {
+      const own = [...(f.pose.aloft ?? []), ...(f.pose.plane ? [f.pose.plane] : [])];
+      // a newer plane's reach cuts this one's catch short (catch.ts heldAt cut), in this one's catch time
+      return own.map((fp, i) => {
+        const next = own[i + 1];
+        const cut = next === undefined ? Infinity : fp.since - (fp.dur ?? PLANE_FLIGHT) + ((next.dur ?? PLANE_FLIGHT) - REACH_S - next.since);
+        return { f, fp, cut };
+      });
+    });
+    for (const { f, fp, cut } of flights) {
       const s = fp.since;
       const dur = fp.dur ?? PLANE_FLIGHT;
       if (s < 0 || s >= dur + PLANE_CATCH) continue;
@@ -250,7 +258,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       if (!rig || !hand) continue;
       const desk = deskSpot(f.name, rig);
       const away = desk !== null ? awayOf(f.pose.seg.act) : 'pocket';
-      const held = heldAt(s - dur, away, reduced);
+      const held = heldAt(s - dur, away, reduced, cut);
       if (reduced && held === null) continue;
       // one plan per flight, made when it leaves (his pan or zoom mid-flight moves no plane); keyed by
       // its bim and when it left, so two to one bim fly side by side

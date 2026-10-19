@@ -99,8 +99,9 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
     const plane = b.planes.findLast((te) => te <= t && t - te < PLANE_S);
     // the ones before it still on their way (the renderer ends each on its own catch)
     const aloft = plane === undefined ? [] : b.planes.filter((te) => te < plane && t - te < PLANE_S).map((te) => ({ since: t - te }));
-    // its sheet, read and put away: the newest plane past its catch that left in this state
-    const letter = b.planes.findLast((te) => te >= seg.t && t - te >= PLANE_S);
+    // its sheet, read and laid on its desk: the newest plane past its catch, while the bim never left
+    // that desk since it left (render/catch.ts awayOf: its desk or main's; a state change there keeps it)
+    const letter = b.planes.findLast((te) => t - te >= PLANE_S && stayed(b, te, t, seg));
     return {
       x: p.x, z: p.z, dir: p.dir, moving: walking, since: t - seg.t, seg,
       // it stops on its walk to let one pass, or it stands beside its spot (avoid.ts): standing, not its activity's pose
@@ -109,6 +110,14 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
       ...(aloft.length === 0 ? {} : { aloft }),
       ...(letter === undefined ? {} : { letter: t - letter }),
     };
+  };
+
+  /** at the same desk from the plane's start `te` to t: every segment since is at that desk spot */
+  const stayed = (b: Bim, te: number, t: number, now: Segment): boolean => {
+    if (now.act.at !== 'desk' && now.act.at !== 'main') return false;
+    const from = b.segs.findLastIndex((s) => s.t <= te);
+    if (from < 0) return false;
+    return b.segs.slice(from).every((s) => s.t > t || (s.act.at === now.act.at && Math.hypot(s.spot.x - now.spot.x, s.spot.z - now.spot.z) < 1e-6));
   };
 
   const push = (b: Bim, seg: Segment): void => {

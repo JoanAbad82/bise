@@ -55,14 +55,15 @@ export function startSize(fit: Fit, heldLen: number): number {
 
 /**
  * Its size along the way (u: 0 his hand, 1 the bim's), times its held size: `big` at the start, 1 in
- * the bim's hand, shrinking all the way like a plane flying away from the eye (its distance grows,
- * its size goes as 1 / distance: fast at first), its shrink easing out into the hand (Gabriel: « leur
- * taille ne change pas »). Never grows. Pure.
+ * the bim's hand, shrinking all the way as it flies away from the eye (Gabriel: « leur taille ne
+ * change pas »): the same ratio per stretch of its way (a steady zoom out, never 1 / distance: from
+ * 40x that leaves it a speck a tenth of the way in), a little faster at first, easing into the hand.
+ * Never grows. Pure.
  */
 export function sizeAt(u: number, big: number): number {
   const k = clamp01(u);
-  const far = 1 - (1 - k) * (1 - k);
-  return 1 / (1 / big + (1 - 1 / big) * far);
+  const far = 0.5 * k + 0.5 * (1 - (1 - k) * (1 - k));
+  return Math.pow(big, 1 - far);
 }
 
 /**

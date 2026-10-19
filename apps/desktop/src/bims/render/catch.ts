@@ -29,8 +29,11 @@ export const PLANE_CATCH = 2.2;
 /** where a caught plane goes once read */
 export type Away = 'desk' | 'pocket';
 
-/** at its own desk (its activity's spot) it lays the sheet there; anywhere else, its pocket */
-export const awayOf = (act: Pick<Activity, 'at'>): Away => (act.at === 'desk' ? 'desk' : 'pocket');
+/** at its own desk (its activity's spot, main's too) it lays the sheet there; anywhere else, its pocket */
+export const awayOf = (act: Pick<Activity, 'at'>): Away => (act.at === 'desk' || act.at === 'main' ? 'desk' : 'pocket');
+
+/** a newer plane's reach cuts a catch short: the sheet goes away over CUT_S from where it was */
+const CUT_S = 0.35;
 
 /** the plane in the hand at a moment of the catch */
 export interface Held {
@@ -86,7 +89,20 @@ function turn(a: { nose: V3; up: V3 }, b: { nose: V3; up: V3 }, f: number): { no
  * flight, no fold: the open sheet in the hand from the plane's start (c = -flight) to the read's end,
  * then where it goes. Pure.
  */
-export function heldAt(c: number, away: Away, reduced = false): Held | null {
+export function heldAt(c: number, away: Away, reduced = false, cut = Infinity): Held | null {
+  if (!reduced && c > cut && cut >= 0) {
+    // a newer plane is coming: this one goes away now, from where it was at the cut
+    const from = heldAt(cut, away);
+    if (from === null) return null;
+    const k = ease(cut, cut + CUT_S, c);
+    const to = away === 'desk' ? ON_DESK : { ...from, ...POCKET, quarter: 1, grip: -0.3, put: 1 };
+    const o = turn(from, to, k);
+    return {
+      fold: from.fold + (to.fold - from.fold) * k, quarter: from.quarter + (to.quarter - from.quarter) * k,
+      ...o, hold: 1, grip: from.grip + (to.grip - from.grip) * k, put: Math.max(from.put, k),
+      shown: away === 'desk' || k < 1,
+    };
+  }
   if (reduced) {
     if (c >= BEAT.read) return away === 'desk' ? { fold: 1, quarter: 0, ...DESK, hold: 1, grip: 0, put: 1, shown: true } : null;
     return { fold: 1, quarter: 0, ...READ, hold: 1, grip: -0.4, put: 0, shown: true };
