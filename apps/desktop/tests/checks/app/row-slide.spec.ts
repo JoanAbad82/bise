@@ -130,6 +130,10 @@ test('app/row-slide: the hovered row slides its now line left over time; on leav
     const left = fromStart(l);
     const say = JSON.stringify({ started: { hovered: h.s, left: l.s }, hovered: hovered.filter((_, i) => i % 4 === 0), left: left.filter((_, i) => i % 4 === 0) });
     expect(h.s, `the hover starts a transform transition: ${say}`).not.toBeNull();
+    // and soon: a hover style that reaches the line late (a slow render, a debounce) is a lag he sees.
+    // 1000 ms: well above the browser's own start under load (~270 ms at load 23, review-gates m_33500)
+    test.info().annotations.push({ type: 'hover start', description: `${String(h.s)} ms after the mouseenter` });
+    expect(h.s ?? Infinity, `the hover's transition starts within 1000 ms of the mouseenter: ${say}`).toBeLessThan(1000);
     // hovered: still at first (the 250 ms delay), then left at ~44 px/s, more and more, never back right
     expect(hovered.length, 'frames while hovered').toBeGreaterThan(10);
     expect(hovered.filter((f) => f.t < 200).every((f) => f.x === 0), `still for the delay: ${say}`).toBe(true);
