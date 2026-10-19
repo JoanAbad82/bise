@@ -3,7 +3,7 @@ import { activities } from './activity';
 import { agent, crowd, mainAgent, office as officeSnap } from './fixtures';
 import { loftLayout as layoutOf } from './maps/loft';
 import type { Activity, BimEvent, Office, Pose } from './model';
-import { bedsAt, LAST_STAGE } from './growth';
+import { bedsAt, builtAt, LAST_STAGE } from './growth';
 import { COFFEE_S, MAX_WALK_S, PLANE_S, SETTLE_S, SPEED, VISIT_S, newTimeline } from './timeline';
 
 /** a value the test knows is there */
@@ -309,7 +309,7 @@ describe('timeline: a napper lies only on a bean bag that is built (his bug, bim
   it('no bed built: every napper naps at its desk', () => {
     const o = office();
     const tl = newTimeline();
-    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP }), o, 10, [], 0);
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP }), o, 10, [], { beds: 0, chairs: 8 });
     for (const n of ['a1', 'a2']) {
       expect(at(tl.poseAt(n, 10))).toEqual({ x: o.desks.get(n)?.x, z: o.desks.get(n)?.z });
       expect(tl.poseAt(n, 10)?.seg.act).toEqual({ k: 'nap', at: 'desk' });
@@ -320,26 +320,26 @@ describe('timeline: a napper lies only on a bean bag that is built (his bug, bim
     const tl = newTimeline();
     const beds = bedsAt(0);
     expect(beds).toBe(2);
-    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 10, [], beds);
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 10, [], { beds, chairs: 8 });
     expect(at(tl.poseAt('a1', 10))).toEqual({ x: must(o.lounge[0]).x, z: must(o.lounge[0]).z });
     expect(at(tl.poseAt('a2', 10))).toEqual({ x: must(o.lounge[1]).x, z: must(o.lounge[1]).z });
     expect(at(tl.poseAt('a3', 10))).toEqual({ x: o.desks.get('a3')?.x, z: o.desks.get('a3')?.z });
     const before = tl.poseAt('a1', 10)?.seg;
-    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 20, [], beds);
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 20, [], { beds, chairs: 8 });
     expect(tl.poseAt('a1', 20)?.seg).toBe(before);
     expect(tl.moving(20)).toBe(false);
   });
   it('the stage grows (or its growth comes after the rows): a napper at its desk goes to the new bean bag', () => {
     const o = office();
     const tl = newTimeline();
-    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 10, [], 0);
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 10, [], { beds: 0, chairs: 8 });
     expect(at(tl.poseAt('a1', 10))).toEqual({ x: o.desks.get('a1')?.x, z: o.desks.get('a1')?.z });
-    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 11, [], 2);
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, 11, [], { beds: 2, chairs: 8 });
     const end = 11 + MAX_WALK_S + 1;
     expect(at(tl.poseAt('a1', end))).toEqual({ x: must(o.lounge[0]).x, z: must(o.lounge[0]).z });
     expect(at(tl.poseAt('a2', end))).toEqual({ x: must(o.lounge[1]).x, z: must(o.lounge[1]).z });
     expect(at(tl.poseAt('a3', end))).toEqual({ x: o.desks.get('a3')?.x, z: o.desks.get('a3')?.z });
-    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, end, [], 2);
+    tl.update(acts({ main: MAIN, a1: NAP, a2: NAP, a3: NAP }), o, end, [], { beds: 2, chairs: 8 });
     expect(tl.moving(end)).toBe(false);
   });
   it('every stage: a napper in the lounge stands on a spot whose bean bag the stage built', () => {
@@ -347,7 +347,7 @@ describe('timeline: a napper lies only on a bean bag that is built (his bug, bim
     for (let stage = 0; stage <= LAST_STAGE; stage++) {
       const tl = newTimeline();
       const all = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`a${String(i + 1)}`, NAP]));
-      tl.update(acts({ main: MAIN, ...all }), o, 10, [], bedsAt(stage));
+      tl.update(acts({ main: MAIN, ...all }), o, 10, [], builtAt(stage));
       for (const n of Object.keys(all)) {
         const p = must(tl.poseAt(n, 10) ?? undefined);
         const i = o.lounge.findIndex((l) => l.x === p.x && l.z === p.z);

@@ -23,7 +23,7 @@ import { boxAhead, chair, deskLamp, laptop } from '../furniture';
 import { glyph, onFloor, type Kit } from '../kit';
 import { PATH_HALF, terraceSlab } from '../decor';
 import { HOODIE, WORLD, hash, type Palette } from '../palette';
-import { cones, deckChair, garden } from '../stages';
+import { cones, deckChairs, garden } from '../stages';
 import type { Build, DeskHandles } from './look';
 import { frameXs } from '../cozy';
 
@@ -194,9 +194,6 @@ export function mainDeskOf(b: Build, top: string, body: string): DeskHandles {
   return { screen, lamp, top: { x: cx, y: 0.55, z: cz }, chair: seat };
 }
 
-const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;
-const at = (xs: readonly number[], i: number): number => xs[Math.min(i, xs.length - 1)] ?? 0;
-
 /** each nap place's bed the stage has reached (growth.ts bedsAt) past the cozy kit's two base beds (render/cozy.ts), in its stage's group (a napper past them naps at its desk) */
 export function beds(b: Build, draw: (parent: Group, box: Box, i: number) => void): void {
   const { o, grow } = b;
@@ -210,16 +207,10 @@ export function beds(b: Build, draw: (parent: Group, box: Box, i: number) => voi
 
 /** the terrace: its slab from stage 1 (the first done bim makes it), its deck chairs by the stage's count */
 export function terrace(b: Build, slab: string, cloth: readonly string[]): void {
-  const { k, o, grow } = b;
   const s1 = b.stage(1);
   if (!s1) return;
-  onFloor(k, s1, terraceSlab(o), 0.08, 0, slab);
-  const own = o.furniture.filter((x) => x.of !== undefined && o.terrace.some((t) => t.x === x.of?.x && t.z === x.of.z));
-  own.forEach((box, i) => {
-    if (i >= at(CHAIRS, grow.stage)) return;
-    const st = ([1, 4, 7, 7, 10, 10, 10, 10] as const)[i] ?? 0;
-    deckChair(k, b.stage(st) ?? s1, box, cloth[i % cloth.length] ?? WORLD.paper);
-  });
+  onFloor(b.k, s1, terraceSlab(b.o), 0.08, 0, slab);
+  deckChairs(b, (i) => cloth[i % cloth.length] ?? WORLD.paper);
 }
 
 /** a wall's span for the frames: x from xa to xb at height y (the top row), on the back wall */

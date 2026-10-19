@@ -9,7 +9,7 @@
 import type { Agent } from '@/proto';
 import type { BimEvent, BimFrame, Label, Look, NewTimelineFn, ActivitiesFn, LabelsFn, LayoutFn, Office, Snapshot, Timeline } from './model';
 import { clockSig, eggLabels, eggsAt, NO_EGGS, noteLands, withForced, type Forced, type Land, type Local } from './eggs';
-import { bedsAt, NO_GROW, UNLOCK_LABEL, UNLOCK_WALK, unlockOf, type Grow } from './growth';
+import { builtAt, NO_GROW, UNLOCK_LABEL, UNLOCK_WALK, unlockOf, type Grow } from './growth';
 import { dayOf } from './skate';
 import { MAX_WALK_S, SETTLE_S } from './timeline';
 import type { MapId } from './maps/ids';
@@ -193,7 +193,7 @@ export function makeDriver(parts: DriverParts): OfficeDriver {
         lastActs = JSON.stringify([...acts]);
         // a map with a park: who skates reads the stage, the jobs' high-water mark (never the live count), his day, reduced motion
         const fun = parts.pastimes === false ? undefined : { stage: g.stage, jobs: g.jobs, dow: local.dow, day: dayOf(local.y, local.mo, local.d), reduced };
-        timeline.update(acts, office, t, events, bedsAt(g.stage), fun);
+        timeline.update(acts, office, t, events, builtAt(g.stage), fun);
         events = [];
       }
       return office === null ? null : { office, reshaped };

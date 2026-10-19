@@ -15,7 +15,8 @@
 // it may wait, step aside, go round one standing, stop beside a spot someone stands on, or come in
 // by the door a little later; with no clear way at all it goes on with what it did and tries again
 // at the next update (a walk that ended beside its spot too), never through anyone.
-import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, QUEUE_GAP, type Segment, type SitAt, type Sits, type Spot, type Timeline } from './model';
+import type { Built } from './growth';
+import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, type Pt, QUEUE_GAP, type Segment, type SitAt, type Sits, type Spot, type Timeline } from './model';
 import { pastimes } from './skate';
 import { chairSpots, seatedAct, seatWaits, SIT_S, sitWay, visitAt } from './sit';
 import { coffeeAtCorner } from './cozy';
@@ -136,7 +137,7 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
   };
 
   return {
-    update(acts: ReadonlyMap<string, Activity>, next: Office, t: number, events: readonly BimEvent[], beds?: number, fun?: FunIn): void {
+    update(acts: ReadonlyMap<string, Activity>, next: Office, t: number, events: readonly BimEvent[], built?: Built, fun?: FunIn): void {
       const first = office === null;
       // a room that grew (the loft's rows, its 3 columns) or another map: its world is rebuilt, every bim at its spot in it
       const rebuilt = office !== null && (office.map !== next.map || office.size !== next.size);
@@ -154,12 +155,15 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
 
       for (const [name, row] of acts) {
         let b = bims.get(name);
-        const act = coffeeFor(bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, beds), next, fun?.stage);
+        const want = coffeeFor(bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, built?.beds), next, fun?.stage);
         const pt = b?.over ? undefined : fun2.get(name);
         const parkSpot = pt ? next.park?.spots[pt.slot] : undefined;
-        // the stage too: a skater rides the park as built now, never one a stage behind (a new piece starts a new line)
-        const sig = pt && parkSpot ? `skate|${String(pt.slot)}|${pt.pool ? 'pool' : ''}|${pt.nine ? '900' : ''}|${String(pt.stage)}` : sigOf(act);
         const last = b?.segs.at(-1);
+        // a done bim reclines only on a deck chair (chairFor): at the spot it holds now, then at the one it gets
+        let act = chairFor(want, next, last?.spot, built?.chairs);
+        // the stage too: a skater rides the park as built now, never one a stage behind (a new piece starts a new line)
+        const skate = pt && parkSpot ? `skate|${String(pt.slot)}|${pt.pool ? 'pool' : ''}|${pt.nine ? '900' : ''}|${String(pt.stage)}` : null;
+        let sig = skate ?? sigOf(act);
         const fixed = opts.spotOf?.(name, next, act) ?? parkSpot ?? fixedSpot(next, name, act);
         // a napper at its desk goes to a bean bag built since (bedFor): the same sig, another place
         // one that stopped beside its spot (another bim stood in its way, avoid.ts) goes on to it; one kept out comes in
@@ -167,6 +171,8 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
         if (b?.key) held.delete(b.key);
         const shared = fixed ? null : sharedSpot(next, act.at as Shared, held, b?.pref);
         const spot = fixed ?? shared?.spot ?? next.door;
+        act = chairFor(want, next, spot, built?.chairs);
+        sig = skate ?? sigOf(act);
         const key = shared?.key ?? null;
         if (key) held.set(key, name);
         if (b && shared?.ix !== undefined) b.pref.set(act.at as Shared, shared.ix);
@@ -326,7 +332,7 @@ function aside(seg: Segment): boolean {
 
 /** what makes two activities the same stretch: its kind, its rank in the queue, its trip, the other bim of a message */
 function sigOf(a: Activity): string {
-  return `${a.k}|${a.rank === undefined ? '' : String(a.rank)}|${a.key === undefined ? '' : String(a.key)}|${a.with ?? ''}`;
+  return `${a.k}|${a.rank === undefined ? '' : String(a.rank)}|${a.key === undefined ? '' : String(a.key)}|${a.with ?? ''}${a.standing ? '|stand' : ''}`;
 }
 
 /**
@@ -450,6 +456,19 @@ function bedFor(act: Activity, mine: string | null, held: ReadonlyMap<string, st
   const free = (i: number): boolean => { const k = `lounge:${String(i)}`; return k === mine || !held.has(k); };
   for (let i = 0; i < n; i++) if (free(i)) return act;
   return { ...act, at: 'desk' };
+}
+
+/**
+ * A done bim at a terrace spot with no deck chair built (`chairs`: the terrace spots that have one,
+ * growth.ts chairsAt; all when absent), or beside one (every spot taken), stands there with a mug:
+ * never reclined in the air (bims-chair, the law in render/deck.test.ts). Pure.
+ */
+export function chairFor(act: Activity, o: Office, spot: Pt | undefined, chairs: number | undefined): Activity {
+  if (act.k !== 'done') return act;
+  const i = spot ? o.terrace.findIndex((t) => near(t, spot)) : -1;
+  const chair = i >= 0 && i < (chairs ?? o.terrace.length);
+  if (chair) return act.standing ? { k: act.k, at: act.at } : act;
+  return act.standing ? act : { ...act, standing: true };
 }
 
 /**

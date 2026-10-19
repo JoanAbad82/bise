@@ -20,7 +20,7 @@ import { FEATURE_STAGE, GOLDEN_STAGE } from '../../skate';
 import { type Kit, boxOf, glyph, onFloor } from '../kit';
 import { terraceSlab } from '../decor';
 import { DAY, NIGHT, WORLD, hash, type Palette } from '../palette';
-import { cones, deckChair, garden, islandLen, loftLounge } from '../stages';
+import { cones, deckChairs, garden, islandLen, loftLounge } from '../stages';
 import type { Build, DeskHandles, MapLook } from './look';
 import { loft } from './loft';
 
@@ -465,13 +465,7 @@ function growth(b: Build): void {
   // the terrace out front, its deck chairs with the stages (the loft's counts)
   const s1t = s(1);
   if (s1t) onFloor(k, s1t, terraceSlab(o), 0.08, 0, pal.terrace);
-  const chairs = o.furniture.filter((f) => f.of !== undefined && o.terrace.some((t) => t.x === f.of?.x && t.z === f.of.z));
-  const nChairs = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8][Math.min(g.stage, 10)] ?? 8;
-  chairs.forEach((c, i) => {
-    if (i >= nChairs) return;
-    const at = ([1, 4, 7, 7, 10, 10, 10, 10] as const)[i] ?? 0;
-    deckChair(k, s(at) ?? s0, c, i % 2 ? '#ffd166' : '#6cb4ee');
-  });
+  deckChairs(b, (i) => (i % 2 ? '#ffd166' : '#6cb4ee'));
 
   // 1: an agave in a terracotta pot
   const s1 = s(1);

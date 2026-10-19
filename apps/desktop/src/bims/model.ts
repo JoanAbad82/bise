@@ -9,7 +9,7 @@
 import type { Agent, Card, Place } from '@/proto';
 import type { Cam } from './zoom';
 import type { BimEgg, OfficeEggs } from './eggs';
-import type { Grow } from './growth';
+import type { Built, Grow } from './growth';
 import type { Cozy } from './cozy';
 import type { MapId } from './maps/ids';
 import type { Sky } from './sky';
@@ -96,6 +96,8 @@ export interface Activity {
   readonly with?: string;
   /** how the message went ('visit': queued = a post-it on its desk, steer = a tap on the shoulder) */
   readonly mode?: 'steer' | 'queued';
+  /** ('done') no deck chair at its terrace spot (timeline.ts chairFor): it stands there, a mug in hand, never reclined in the air */
+  readonly standing?: true;
 }
 
 /** The hub's Agent.doing kinds (architect m_27522, bims-facts m_27638); absent = nothing running. */
@@ -383,10 +385,11 @@ export type LayoutFn = (agents: readonly Agent[], map?: MapId) => Office;
 export interface Timeline {
   /** a new snapshot's activities (or the same ones at a later t): new segments for what changed */
   /**
-   * `beds`: the lounge spots with a bean bag at this stage (growth.ts bedsAt; all when absent): past them a napper naps at its desk.
+   * `built`: what the stage has built (growth.ts builtAt; all when absent): past its bean bags a
+   * napper naps at its desk, past its deck chairs a done bim stands with a mug.
    * `fun`: what the pastimes read (skate.ts: who skates on a map with a park); absent: nobody skates
    */
-  update(acts: ReadonlyMap<string, Activity>, office: Office, t: number, events: readonly BimEvent[], beds?: number, fun?: FunIn): void;
+  update(acts: ReadonlyMap<string, Activity>, office: Office, t: number, events: readonly BimEvent[], built?: Built, fun?: FunIn): void;
   /** where a bim is at t; null for one the timeline doesn't know (or that has left) */
   poseAt(name: string, t: number): Pose | null;
   /** the bims on the map at t, a leaving one until it's out */

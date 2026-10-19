@@ -12,7 +12,7 @@ import { chair, deskLamp, laptop } from '../furniture';
 import { type Kit, boxOf, glyph, onFloor } from '../kit';
 import { decorOf, terraceSlab } from '../decor';
 import { DAY, HOODIE, NIGHT, type Palette, WORLD, hash, rng } from '../palette';
-import { bigPlant, boombox, cones, deckChair, fruitBowl, garden, loftTree, mural, whiteboard } from '../stages';
+import { bigPlant, boombox, cones, deckChairs, fruitBowl, garden, loftTree, mural, whiteboard } from '../stages';
 import type { Build, DeskHandles } from './look';
 import { frameXs } from '../cozy';
 
@@ -106,9 +106,6 @@ export const boxHolding = (o: Office, p: Pt): Box | undefined => o.furniture.fin
 
 // ---- the nap place
 
-const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;
-const at = <T>(xs: readonly T[], i: number): T => xs[Math.min(i, xs.length - 1)] as T;
-
 /** A bed on lounge spot i for BASE_BEDS <= i < growth.ts bedsAt(stage) (a napper lies only on one; the first two: the cozy kit's, render/cozy.ts), each in its stage's group (its spot's box: Office.furniture). */
 export function beds(b: Build, draw: (k: Kit, parent: Object3D, box: Box, i: number) => void): void {
   const { o, grow } = b;
@@ -158,12 +155,7 @@ export function grow(b: Build, g: Grower): void {
   // the terrace: grass in a new office; its deck chairs come with the stages (the loft's)
   const s1 = b.stage(1);
   if (s1) onFloor(k, s1, terraceSlab(o), 0.08, 0, k.pal.terrace);
-  const chairs = o.furniture.filter((f) => f.of !== undefined && o.terrace.some((t) => t.x === f.of?.x && t.z === f.of.z));
-  const nChairs = at(CHAIRS, gr.stage);
-  chairs.forEach((f, i) => {
-    if (i >= nChairs) return;
-    deckChair(k, b.stage(([1, 4, 7, 7, 10, 10, 10, 10] as const)[i] ?? 0) ?? s0, f, WORLD.chair[i % 2] ?? WORLD.paper);
-  });
+  deckChairs(b, (i) => WORLD.chair[i % 2] ?? WORLD.paper);
   for (let n = 1; n < g.pieces.length && n <= gr.stage; n++) {
     const p = g.pieces[n];
     const grp = b.stage(n);

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { activities, SNACK_MIN, SNACK_SPREAD } from './activity';
 import { agent, mainAgent, snap } from './fixtures';
 import { layoutOf } from './maps';
-import { bedsAt, LAST_STAGE } from './growth';
+import { builtAt, LAST_STAGE } from './growth';
 import { newTimeline } from './timeline';
 
 /** the share of an idle bim's time it may walk */
@@ -35,7 +35,7 @@ export function pace(n: number, secs: number): Pace {
   const at = new Map<string, number>();
   const was = new Map<string, boolean>();
   for (let t = 0; t <= secs; t++) {
-    tl.update(activities(s, t), o, t, [], bedsAt(LAST_STAGE));
+    tl.update(activities(s, t), o, t, [], builtAt(LAST_STAGE));
     for (const name of names) {
       const p = tl.poseAt(name, t);
       if (!p) continue;

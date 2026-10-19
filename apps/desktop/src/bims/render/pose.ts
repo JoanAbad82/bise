@@ -333,6 +333,8 @@ function rest(act: Activity, lt: number, ph: number, stay = lt): Body {
     case 'landing':
       return { ...STAND, armL: [-1.3, 0, 0], armR: [-1.3, 0, 0], props: { ...NO_PROPS, crate: true } };
     case 'done':
+      // no deck chair at its spot (timeline.ts chairFor): it stands there facing the view, a mug in hand, sunglasses
+      if (act.standing) return { ...STAND, armR: [-1.5, 0, 0], head: [-0.1, 0, 0.06], mouth: 'laugh', eyes: 0.3, props: { ...NO_PROPS, mug: true, glasses: true } };
       // on a deck chair (stages.ts deckChair), sunglasses: its seat under it, its back on the
       // backrest's tilt (DECK.tilt), its legs down along the seat
       return {

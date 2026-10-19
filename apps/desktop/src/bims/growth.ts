@@ -38,6 +38,32 @@ export function bedStage(i: number): number {
   const s = BEDS.findIndex((n) => n > i);
   return s < 0 ? LAST_STAGE + 1 : s;
 }
+/**
+ * the terrace's deck chairs built at each stage (chair i stands on terrace spot i): the first done
+ * bim's at stage 1 (bims m_28178), 8 from stage 10
+ */
+const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;
+
+/** How many of the terrace's spots have a deck chair at this stage: a done bim reclines only on one, past them it stands with a mug (bims-chair). Pure. */
+export function chairsAt(stage: number): number {
+  return CHAIRS[Math.max(0, Math.min(stage, CHAIRS.length - 1))] ?? 0;
+}
+
+/** The stage deck chair i comes with (its stage's group: the unlock moment brings it in). Pure. */
+export function chairStage(i: number): number {
+  const s = CHAIRS.findIndex((n) => n > i);
+  return s < 0 ? LAST_STAGE + 1 : s;
+}
+
+/** what the stage has built for the bims to lie on: the lounge's bean bags, the terrace's deck chairs (the timeline reads it) */
+export interface Built {
+  readonly beds: number;
+  readonly chairs: number;
+}
+
+/** The beds and deck chairs built at this stage. Pure. */
+export const builtAt = (stage: number): Built => ({ beds: bedsAt(stage), chairs: chairsAt(stage) });
+
 /** the share of the way to the next stage past which its cones stand */
 export const BUILD_AT = 0.7;
 /** the unlock moment: two bims walk the piece in from the door (s), then its label shows (s) */

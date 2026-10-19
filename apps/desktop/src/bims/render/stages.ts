@@ -2,22 +2,20 @@
 // bureau qui grandit"): each building stage's pieces in a group of their own (the unlock moment
 // hides the new one until two bims bring it in, unlock.ts), the garden on the wider ground (flowers,
 // the trees' size), the wall frames (one per 10 artifacts, golden from 500), and the cones and
-// striped barrier where the next piece goes. Bean bags and deck chairs: the stage's count (a bim
-// napping or done past them sits on the rug or the slab; the agents size the desks, the stage the
-// decor). Built with world.ts's kit; nothing here decides.
+// striped barrier where the next piece goes. Bean bags and deck chairs: the stage's count (growth.ts
+// bedsAt, chairsAt: a napper past them naps at its desk, a done bim stands with a mug; the agents
+// size the desks, the stage the decor). Every map's look draws its deck chairs with deckChairs.
+// Built with world.ts's kit; nothing here decides.
 // Owner: bims-grow.
 import { Group, type Object3D } from 'three';
 import type { Box, Office, Pt } from '../model';
-import { BASE_BEDS, bedStage, bedsAt, type Grow } from '../growth';
+import { BASE_BEDS, bedStage, bedsAt, chairStage, chairsAt, type Grow } from '../growth';
 import { type Decor, decorOf, terraceSlab } from './decor';
 import { type Kit, boxOf, glyph, onFloor } from './kit';
 import { WORLD, hash, rng } from './palette';
 import type { Build } from './maps/look';
 import { frameXs } from './cozy';
 
-
-const CHAIRS = [0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8] as const;
-const at = <T>(xs: readonly T[], i: number): T => xs[Math.min(i, xs.length - 1)] as T;
 
 export function loftTree(k: Kit, parent: Object3D, x: number, z: number, size: number): void {
   const { style } = k;
@@ -169,7 +167,6 @@ export function loftLounge(b: Build): void {
 export function buildStages(b: Build): void {
   const { k, o, grow: g } = b;
   const { style, pal } = k;
-  const boxes = o.furniture;
   const s = (n: number): Group | null => b.stage(n);
   const d: Decor = decorOf(o);
   const { x0, W, D } = o;
@@ -182,14 +179,7 @@ export function buildStages(b: Build): void {
   // (bims m_28178). Its deck chairs come with the stages
   const s1t = s(1);
   if (s1t) onFloor(k, s1t, terraceSlab(o), 0.08, 0, pal.terrace);
-  const isChair = (b: Box): boolean => b.of !== undefined && o.terrace.some((t) => t.x === b.of?.x && t.z === b.of.z);
-  const chairs = boxes.filter(isChair);
-  const nChairs = at(CHAIRS, g.stage);
-  chairs.forEach((b, i) => {
-    if (i >= nChairs) return;
-    const st = ([1, 4, 7, 7, 10, 10, 10, 10] as const)[i] ?? 0;
-    deckChair(k, s(st) ?? s0, b, WORLD.chair[i % 2] ?? WORLD.paper);
-  });
+  deckChairs(b, (i) => WORLD.chair[i % 2] ?? WORLD.paper);
 
   // stage 1: a plant; 2: the island's fruit, a first tree; 4: the whiteboard, a 2nd plant
   const s1 = s(1);
@@ -339,8 +329,34 @@ export function cones(k: Kit, parent: Object3D, p: Pt): void {
   for (const dx of [-0.5, 0.5]) k.add(style.box(0.04, 0.32, 0.04), k.mat(WORLD.ink), parent, p.x + dx, 0.16, p.z + 0.45);
 }
 
+/**
+ * The terrace's deck chairs the stage has built (growth.ts chairsAt): chair i on terrace spot i (its
+ * spot's box: Office.furniture), in the stage group it came with, its cloth `cloth(i)`. Every map's
+ * look draws them here: a done bim reclines only on one (timeline.ts chairFor, the law in
+ * render/deck.test.ts).
+ */
+export function deckChairs(b: Build, cloth: (i: number) => string): void {
+  const s0 = b.stage(0);
+  if (!s0) return;
+  chairBoxes(b.o, b.grow.stage).forEach((box, i) => {
+    if (box) deckChair(b.k, b.stage(chairStage(i)) ?? s0, box, cloth(i));
+  });
+}
+
+/** the floor box of each deck chair the stage has built, by terrace spot (null: its spot has no box). Pure. */
+export function chairBoxes(o: Office, stage: number): (Box | null)[] {
+  return o.terrace.slice(0, chairsAt(stage)).map((t) => o.furniture.find((f) => f.of?.x === t.x && f.of.z === t.z) ?? null);
+}
+
+/** the seat of a deck chair in its floor box (deckChair's cloth): x across it, z from the backrest's hinge to its front, its top at DECK.seat */
+export function seatOf(b: Box): { x0: number; x1: number; z0: number; z1: number; y: number } {
+  return { x0: b.x0, x1: b.x1, z0: b.z0 + DECK_HINGE, z1: b.z1, y: DECK.seat };
+}
+
 /** a deck chair's sizes (office units): its seat's top, its backrest's tilt (the done bim's back, pose.ts) and length */
 export const DECK = { seat: 0.24, tilt: 0.6, back: 0.54, cloth: 0.05, rail: 0.04 } as const;
+/** the backrest's hinge, this far behind the deck chair's box's back edge: the seat runs from there to its front */
+const DECK_HINGE = 0.42;
 
 /**
  * A deck chair in its floor box (Gabriel: the slabs didn't read as deck chairs, the bims hovered
@@ -354,7 +370,7 @@ export function deckChair(k: Kit, parent: Object3D, b: Box, cloth: string): void
   const wood = k.mat(pal.desk);
   const fab = k.mat(cloth);
   // the seat ends where the backrest starts: a little behind the box's middle
-  const hinge = b.z0 + 0.42;
+  const hinge = b.z0 + DECK_HINGE;
   const seatD = b.z1 - hinge;
   k.add(style.box(w, DECK.cloth, seatD), fab, parent, x, DECK.seat - DECK.cloth / 2, hinge + seatD / 2);
   const back = k.add(style.box(w, DECK.cloth, DECK.back), fab, parent, x, 0, 0);
