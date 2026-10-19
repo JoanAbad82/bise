@@ -27,6 +27,8 @@ import type { Style } from './style';
 /** his plane's length in office units (plane.ts's wings), its least length on screen, and the iso view's shortening of it */
 const PLANE_LEN = 0.42;
 const PLANE_MIN_PX = 12;
+/** a gliding plane's least shadow alpha (plane.ts SHADOW_ALPHA is 0.2 on the floor) */
+const GLIDE_SHADOW = 0.09;
 /** a bim's pill, office units up (over its head: its loop keeps clear of it); the plane's shadow just over the floor */
 const PILL_Y = 1.7;
 const FLOOR_LIFT = 0.02;
@@ -208,7 +210,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       g.visible = true;
       p.mesh.setInk(light);
       // its soft shadow on the floor once it is over the slab, fainter and wider as it climbs
-      const sh = shadowOf(fl.p, 0);
+      // a glide (the film's paper plane) keeps a faint one however high, so the eye finds it (designer m_32270)
+      const raw = shadowOf(fl.p, 0);
+      const sh = p.glide ? { ...raw, alpha: Math.max(raw.alpha, GLIDE_SHADOW) } : raw;
       const over = site !== null && fl.p.x > site.x0 && fl.p.x < site.x1 && fl.p.z > site.z0 && fl.p.z < site.z1;
       p.mesh.shadow.visible = over && sh.alpha > 0.01;
       if (p.mesh.shadow.visible) {

@@ -108,7 +108,10 @@ export function makeFeed(box: HTMLElement): Feed {
           el = document.createElement('div');
           els.set(r.key, el);
         }
-        list.append(el);
+        // moved only when out of place: moving a row restarts its fade in (every typed letter re-added
+        // every row, so the panel stood empty under his typing: designer m_32270)
+        const at = s.rows.indexOf(r);
+        if (list.children[at] !== el) list.insertBefore(el, list.children[at] ?? null);
         el.className = `bh-feed-row ${r.who}${r.asks !== null ? ' waiting' : ''}${r.folding !== null ? ' folding' : ''}`;
         el.style.setProperty('--fold', r.folding === null ? '0' : r.folding.toFixed(3));
         el.replaceChildren();
