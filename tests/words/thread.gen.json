@@ -612,7 +612,7 @@
       "days"
     ],
     "one": null,
-    "text": "deleted · images are kept {days}"
+    "text": "deleted · kept {days}"
   },
   "thread.image_deleted_settings": {
     "args": [],
