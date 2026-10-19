@@ -76,12 +76,15 @@ for (const theme of ['light', 'dark'] as const) {
       const title = `film ${n}`;
       makeClip(path.join(shop.ws, `film-${n}.mp4`));
       worldSay('shop', `[[bash: sb artifact add film-${n}.mp4 --title "${title}"]] added`);
-      const s = await open(w, project, size);
+      // opened from the right bar at 1400 (under 1000 the bar slides away), then at its size
+      const s = await open(w, project, '1400x900');
       const shot = (name: string) => s.page.screenshot({ path: test.info().outputPath(`${name}-${theme}-${size}.png`) });
       try {
         const { page } = s;
         await page.emulateMedia({ colorScheme: theme });
         await openRow(page, project, title);
+        const [width, height] = size.split('x').map(Number) as [number, number];
+        await page.setViewportSize({ width, height });
         await expect(page.locator(T.frame), 'the hub frames a video in its viewer, /a/<id>/view').toHaveAttribute('src', /\/a\/[^/?#]+\/view(\?|$)/u);
         const f = page.frameLocator(T.frame);
         const root = f.locator('.office-video');
@@ -104,6 +107,13 @@ for (const theme of ['light', 'dark'] as const) {
         });
 
         const fi = await frameInput(page, frame);
+        // a control of the player, clicked through the frame's own session (an OOPIF: the
+        // harness's off-screen window never routes a plain click there)
+        const tap = async (sel: string) => {
+          const b = await f.locator(sel).boundingBox();
+          if (b === null) throw new Error(`no ${sel}`);
+          await fi.click(Math.round(b.x + b.width / 2), Math.round(b.y + b.height / 2));
+        };
         const sb = await f.locator('.office-video .screen').boundingBox();
         if (sb === null) throw new Error('no screen');
         const cx = Math.round(sb.x + sb.width / 2);
@@ -130,10 +140,10 @@ for (const theme of ['light', 'dark'] as const) {
           await key(frame, '.');
           await expect.poll(async () => (await player(frame)).t - t1).toBeGreaterThan(0.02);
           expect((await player(frame)).paused).toBe(true);
-          await f.locator('.office-video .rate').click();
+          await tap('.office-video .rate');
           await expect(f.locator('.office-video .rate')).toHaveText('1.5×');
           expect((await player(frame)).rate).toBe(1.5);
-          await f.locator('.office-video .loop').click();
+          await tap('.office-video .loop');
           await expect(f.locator('.office-video .loop')).toHaveAttribute('aria-pressed', 'true');
           expect((await player(frame)).loop).toBe(true);
         });
@@ -141,9 +151,9 @@ for (const theme of ['light', 'dark'] as const) {
         await test.step("a hover on the track shows that moment's frame and its time", async () => {
           const tb = await f.locator('.office-video .track').boundingBox();
           if (tb === null) throw new Error('no track');
-          await fi.move(Math.round(tb.x + tb.width * 0.25), Math.round(tb.y + tb.height / 2));
+          await fi.move(Math.round(tb.x + tb.width * 0.3), Math.round(tb.y + tb.height / 2));
           await expect(f.locator('.office-video .peek')).toBeVisible();
-          await expect(f.locator('.office-video .peek .at')).toHaveText('0:02');
+          await expect(f.locator('.office-video .peek .at')).toHaveText('0:02'); // 30% of 8 s: 2.4 s
           await page.waitForTimeout(400);
           await shot('peek');
           await fi.move(cx, cy);
