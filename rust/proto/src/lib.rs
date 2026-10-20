@@ -95,6 +95,7 @@ pub mod jsonrpc;
 pub mod rpc;
 pub mod sb;
 pub mod slash;
+pub mod socket;
 pub mod thread;
 pub mod words;
 

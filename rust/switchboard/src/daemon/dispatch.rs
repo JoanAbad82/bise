@@ -258,10 +258,10 @@ impl Shell {
             Msg::Placed { name, ws, err } => self.step(Input::Placed { name, ws, err }),
             Msg::XHub { token, stream, v } => self.xhub_op(token, stream, v),
             Msg::Version { mut stream, v, asker } => {
-                let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("");
-                let what = v.get("do").and_then(|x| x.as_str()).unwrap_or("");
-                // `from` is the judged agent's (docs/issues/17), then main's ops are main's
-                match self.speaks_as(&asker, from, &format!("version {what}")).and_then(|()| version_allowed(from, what)) {
+                let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                let what = v.get("do").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                // sb-core says `from` is the sender's (daemon/agent_req.rs, docs/issues/17), then main's ops are main's
+                match self.spoke(0, &from, &format!("version {what}"), &asker).and_then(|()| version_allowed(&from, &what)) {
                     Ok(()) => {
                         let text = self.version_op(&v);
                         write_json(&mut stream, &json!({"ok": true, "text": text}));

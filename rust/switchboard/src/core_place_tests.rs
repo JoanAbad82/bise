@@ -115,7 +115,7 @@ fn a_join_while_placing_waits_for_its_place() {
                 attach: Vec::new(),
             };
             // the hub alone: the shell's worker has not answered yet
-            t.hub.handle(Input::Agent { token: t.token, from: MAIN.into(), req }, &mut t.env)
+            t.hub.handle(Input::Agent { token: t.token, from: MAIN.into(), req, by: crate::peer::Sender::hub() }, &mut t.env)
         };
         let creates = |fx: &[Effect]| fx.iter().filter(|e| matches!(e, Effect::Place(crate::place_job::Job::Create { .. }))).count();
         let fx = spawn(&mut t, "a", "new");

@@ -18,8 +18,15 @@ core_kinds! {
     /// One input of sb-core (its dispatch's tags).
     pub enum In, tag "t" {
         /// an agent's `sb` request (`token` 0: the hub's own, no reply
-        /// awaited); `req` is the request as the agent sent it
-        Req = "req" => IReq { token: Nat, from: Str, req: Json },
+        /// awaited); `req` is the request as the agent sent it; `who`,
+        /// `dir`, `sock`: its sender, as for `speaks` (`hub`: the hub's own)
+        Req = "req" => IReq { token: Nat, from: Str, req: Json, who: Str, dir: StrOmit, sock: StrOmit },
+        /// a request the hub serves itself (inspect, history, page_*,
+        /// artifact...: no `req` step): may its sender say `from`? (issue
+        /// 37 #2, bend/hub/peer.bend); fx `spoke` answers. `who`, `dir`:
+        /// the judge's fact on the sender (outside, hub, agent, other_hub,
+        /// gone; "" reads gone), `sock` the socket it came on
+        Speaks = "speaks" => ISpeaks { token: Nat, from: Str, cmd: Str, who: Str, dir: StrOmit, sock: StrOmit },
         /// the waits' timeouts, `sb every`'s timers and `sb wake`'s max
         Tick = "tick" => ITick {},
         /// an agent's turn ended (`leftover`: steering its runtime never

@@ -54,6 +54,32 @@ pub fn parse_tag(s: &str) -> Option<Tag> {
 mod tests {
     use super::*;
 
+    /// The dir key has two copies, this one (the tags the spawner writes)
+    /// and sb-core's (bend/hub/peer.bend `agent_key`, the speaker's rule):
+    /// both are pinned by rust/proto/fixtures/agent_key.jsonl (issue 37
+    /// #2, architect m_35407). Here every line keys as it says, and the
+    /// Bend law `agent_key_fixture` names every line, in order.
+    #[test]
+    fn the_agent_key_fixture_pins_rust_and_bend() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let text = std::fs::read_to_string(root.join("proto/fixtures/agent_key.jsonl")).expect("the fixture");
+        let field = |l: &str, k: &str| -> String {
+            let at = l.find(&format!("\"{k}\": \"")).expect(k) + k.len() + 5;
+            l[at..at + l[at..].find('"').expect("a closing quote")].to_string()
+        };
+        let rows: Vec<(String, String)> = text.lines().filter(|l| !l.trim().is_empty()).map(|l| (field(l, "dir"), field(l, "key"))).collect();
+        assert!(rows.len() >= 8 && rows.iter().any(|(d, _)| d.is_empty()), "spaces, dots, unicode and an empty dir");
+        for (dir, key) in &rows {
+            assert_eq!(agent_key("", dir), format!(".{key}"), "{dir:?}");
+        }
+        let laws = std::fs::read_to_string(root.join("../bend/laws/peer.bend")).expect("bend/laws/peer.bend");
+        let law = &laws[laws.find("law agent_key_fixture:").expect("the Bend law")..];
+        let dirs: String = rows.iter().map(|(d, _)| format!("HPR.agent_key(\"{d}\")")).collect::<Vec<_>>().join(", ");
+        let keys: String = rows.iter().map(|(_, k)| format!("\"{k}\"")).collect::<Vec<_>>().join(", ");
+        assert!(law.contains(&format!("[{dirs}]")), "the Bend law keys every dir of the fixture, in order");
+        assert!(law.contains(&format!("== [{keys}]")), "to the fixture's keys");
+    }
+
     #[test]
     fn a_tag_round_trips_and_a_hub_id_is_its_socket() {
         assert_eq!(parse_tag(&tag("aa", "t 1.b", 7)), Some(Tag { hub: "aa".into(), dir: "t_1_b".into(), ms: 7 }));

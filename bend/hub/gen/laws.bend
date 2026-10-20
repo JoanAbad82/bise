@@ -16,9 +16,15 @@ import ./fx.bend as FX
 # ---- In ----
 
 law in_req_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"req"})])) == IN.IReq{0n, "", J.JNull{}} : IN.In}
+  {IN.of(J.obj([J.kv("t", J.JStr{"req"})])) == IN.IReq{0n, "", J.JNull{}, "", "", ""} : IN.In}
 
 def in_req_bare():
+  {==}
+
+law in_speaks_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"speaks"})])) == IN.ISpeaks{0n, "", "", "", "", ""} : IN.In}
+
+def in_speaks_bare():
   {==}
 
 law in_tick_bare:
@@ -367,10 +373,41 @@ law in_IReq_round:
   for token: Nat
   for from: String
   for req: J.Json
-  {IN.of(IN.json(IN.IReq{token, from, req})) == IN.IReq{token, from, req} : IN.In}
+  for who: String
+  for dir: String
+  for sock: String
+  {IN.of(IN.json(IN.IReq{token, from, req, who, dir, sock})) == IN.IReq{token, from, req, who, dir, sock} : IN.In}
 
-def in_IReq_round(token, from, req):
-  {==}
+def in_IReq_round(token, from, req, who, dir, sock):
+  match dir sock:
+    case SNil{} SNil{}:
+      {==}
+    case SNil{} SCon{h_sock, t_sock}:
+      {==}
+    case SCon{h_dir, t_dir} SNil{}:
+      {==}
+    case SCon{h_dir, t_dir} SCon{h_sock, t_sock}:
+      {==}
+
+law in_ISpeaks_round:
+  for token: Nat
+  for from: String
+  for cmd: String
+  for who: String
+  for dir: String
+  for sock: String
+  {IN.of(IN.json(IN.ISpeaks{token, from, cmd, who, dir, sock})) == IN.ISpeaks{token, from, cmd, who, dir, sock} : IN.In}
+
+def in_ISpeaks_round(token, from, cmd, who, dir, sock):
+  match dir sock:
+    case SNil{} SNil{}:
+      {==}
+    case SNil{} SCon{h_sock, t_sock}:
+      {==}
+    case SCon{h_dir, t_dir} SNil{}:
+      {==}
+    case SCon{h_dir, t_dir} SCon{h_sock, t_sock}:
+      {==}
 
 law in_ITick_round:
   {IN.of(IN.json(IN.ITick{})) == IN.ITick{} : IN.In}
@@ -1181,6 +1218,12 @@ law fx_reply_bare:
 def fx_reply_bare():
   {==}
 
+law fx_spoke_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"spoke"})])) == FX.FSpoke{0n, False{}, ""} : FX.Fx}
+
+def fx_spoke_bare():
+  {==}
+
 law fx_notice_bare:
   {FX.of(J.obj([J.kv("fx", J.JStr{"notice"})])) == FX.FNotice{""} : FX.Fx}
 
@@ -1381,6 +1424,19 @@ law fx_FReply_round:
 
 def fx_FReply_round(token, body):
   {==}
+
+law fx_FSpoke_round:
+  for token: Nat
+  for ok: Bool
+  for why: String
+  {FX.of(FX.json(FX.FSpoke{token, ok, why})) == FX.FSpoke{token, ok, why} : FX.Fx}
+
+def fx_FSpoke_round(token, ok, why):
+  match why:
+    case SNil{}:
+      {==}
+    case SCon{h_why, t_why}:
+      {==}
 
 law fx_FNotice_round:
   for text: String

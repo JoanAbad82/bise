@@ -30,6 +30,8 @@ type Fx is Data:
   FFeed{agent: String, rec: J.Json}
   # reply
   FReply{token: Nat, body: J.Json}
+  # spoke
+  FSpoke{token: Nat, ok: Bool, why: String}
   # notice
   FNotice{text: String}
   # deliver
@@ -97,6 +99,9 @@ def FFeed.of(+i: J.Json) -> Fx:
 
 def FReply.of(+i: J.Json) -> Fx:
   FReply{K.get_n(i, "token"), K.get_j(i, "body")}
+
+def FSpoke.of(+i: J.Json) -> Fx:
+  FSpoke{K.get_n(i, "token"), K.get_b(i, "ok"), K.get_s(i, "why")}
 
 def FNotice.of(+i: J.Json) -> Fx:
   FNotice{K.get_s(i, "text")}
@@ -319,20 +324,29 @@ def of.t21(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case LT{}:
       FNone{}
     case EQ{}:
-      FUserSent.of(i)
+      FSpoke.of(i)
+    case GT{}:
+      FNone{}
+
+def of.t23(c: Cmp, +t: String, +i: J.Json) -> Fx:
+  match c:
+    case LT{}:
+      FNone{}
+    case EQ{}:
+      FWorktreeCreate.of(i)
     case GT{}:
       FNone{}
 
 def of.t22(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t21(String.order(t, "user_sent"), t, i)
+      of.t21(String.order(t, "spoke"), t, i)
     case EQ{}:
-      FWorktreeCreate.of(i)
+      FUserSent.of(i)
     case GT{}:
-      FNone{}
+      of.t23(String.order(t, "worktree_create"), t, i)
 
-def of.t24(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t25(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
@@ -341,23 +355,23 @@ def of.t24(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       FNone{}
 
-def of.t25(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t26(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t24(String.order(t, "xdeliver"), t, i)
+      of.t25(String.order(t, "xdeliver"), t, i)
     case EQ{}:
       FXReply.of(i)
     case GT{}:
       FNone{}
 
-def of.t23(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t24(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t22(String.order(t, "worktree_create"), t, i)
+      of.t22(String.order(t, "user_sent"), t, i)
     case EQ{}:
       FWorktreeDrop.of(i)
     case GT{}:
-      of.t25(String.order(t, "xreply"), t, i)
+      of.t26(String.order(t, "xreply"), t, i)
 
 def of.t20(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
@@ -366,7 +380,7 @@ def of.t20(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case EQ{}:
       FSpawn.of(i)
     case GT{}:
-      of.t23(String.order(t, "worktree_drop"), t, i)
+      of.t24(String.order(t, "worktree_drop"), t, i)
 
 def of.t13(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
@@ -377,7 +391,7 @@ def of.t13(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       of.t20(String.order(t, "spawn"), t, i)
 
-# the record of a tag (a binary search over the 26 sorted tags); any
+# the record of a tag (a binary search over the 27 sorted tags); any
 # other tag: FNone
 def of_tag(+t: String, +i: J.Json) -> Fx:
   of.t13(String.order(t, "reply"), t, i)
@@ -412,6 +426,8 @@ def kvs(x: Fx) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("fx", J.JStr{"feed"}), J.kv("agent", J.JStr{agent}), J.kv("rec", rec)]
     case FReply{+token, +body}:
       [J.kv("fx", J.JStr{"reply"}), J.kv("token", J.JNum{token}), J.kv("body", body)]
+    case FSpoke{+token, +ok, +why}:
+      K.cat([[J.kv("fx", J.JStr{"spoke"}), J.kv("token", J.JNum{token}), J.kv("ok", J.JBool{ok})], K.omit_s("why", why)])
     case FNotice{+text}:
       [J.kv("fx", J.JStr{"notice"}), J.kv("text", J.JStr{text})]
     case FDeliver{+mode, +agent, +notes, +status, +msgs}:
@@ -483,6 +499,9 @@ def feed(+agent: String, +rec: J.Json) -> List<&2, Sigma<&2, &2, String, _ => J.
 
 def reply(+token: Nat, +body: J.Json) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FReply{token, body})
+
+def spoke(+token: Nat, +ok: Bool, +why: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  kvs(FSpoke{token, ok, why})
 
 def notice(+text: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FNotice{text})

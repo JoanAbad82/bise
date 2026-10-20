@@ -18,6 +18,8 @@
 {"fx": "renamed", "old": "t9", "new": "t9b"}
 {"fx": "retarget", "from": "marketing", "to": "design"}
 {"fx": "reply", "token": 1, "body": {"ok": true}}
+{"fx": "spoke", "token": 4, "ok": true}
+{"fx": "spoke", "token": 3, "ok": false, "why": "the hub could not read which process sent this request (gone already?): refused"}
 {"fx": "route", "rid": 1, "to": "shop-1", "name": "shop", "text": "look", "due_ms": 1002000, "why": "you named shop"}
 {"fx": "route_asked", "routed": true}
 {"fx": "route_asked", "routed": false}

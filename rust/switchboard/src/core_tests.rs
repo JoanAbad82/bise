@@ -119,11 +119,9 @@ impl T {
     pub(super) fn req(&mut self, from: &str, req: AgentReq) -> (u64, Vec<Effect>) {
         self.token += 1;
         let tok = self.token;
-        let fx = self.go(Input::Agent {
-            token: tok,
-            from: from.into(),
-            req,
-        });
+        // the user's own shell (the judge's `outside`): any `from`
+        let by = crate::peer::Sender::of(&crate::peer::Who::Outside, crate::peer::Sock::Agent);
+        let fx = self.go(Input::Agent { token: tok, from: from.into(), req, by });
         (tok, fx)
     }
 

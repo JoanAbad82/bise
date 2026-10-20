@@ -44,6 +44,7 @@ import ./place.bend as PL
 import ./cardkind.bend as CK
 import ./gone.bend as G
 import ./take.bend as TK
+import ./peer.bend as PR
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -2522,21 +2523,6 @@ def req_xreply(-o: S.St, r: Maybe<&2, S.XIn>, +cx: X.Cx<o>, +token: Nat, +q: J.J
 
 # ---- the agents' `sb` requests (RFC 0003 §4, RFC 0001 §7.2, §7.5) ----
 
-def jstr_list.one(h: J.Json, +rest: List<&2, String>) -> List<&2, String>:
-  match h:
-    case J.JStr{+s}:
-      s <> rest
-    case _:
-      rest
-
-def jstr_list(xs: List<&2, J.Json>) -> List<&2, String>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      +rest = jstr_list(t)
-      jstr_list.one(h, rest)
-
 def main_only(-o: S.St, +cx: X.Cx<o>, +token: Nat) -> X.Cx<o>:
   reply_err(o, cx, token, "reserved for main (the parent of the agents)")
 
@@ -2821,7 +2807,7 @@ def req_report.go(-o: S.St, is_main: Bool, +cx: X.Cx<o>, +token: Nat, +from: Str
     case False{}:
       +kind = K.get_s(q, "kind")
       +summary = K.get_s(q, "summary")
-      +decisions = jstr_list(Maybe.default(&2, List<&2, J.Json>, J.get_arr(q, "decisions"), Nil{}))
+      +decisions = M.jstr_list(Maybe.default(&2, List<&2, J.Json>, J.get_arr(q, "decisions"), Nil{}))
       # S10: a progress's --step n/m; emitter 5: its --result (proto's
       # DiffResult, checked by the CLI); null when absent
       +cx2 = emit(o, cx, M.EReported{from, J.obj([J.kv("at_ms", J.JNum{now(o, cx)}), J.kv("kind", J.JStr{kind}),
@@ -3081,6 +3067,15 @@ def req.from(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +raw: St
 
 def agent_req(-o: S.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
   req.from(o, M.resolve(st(o, cx), from), cx, token, from, q)
+
+# issue 37 #2 (peer.bend): a request runs only with its sender's ok, else
+# fx spoke alone (law req_refused_says_only_why)
+def agent_req.by(-o: S.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
+  match m:
+    case None{}:
+      agent_req(o, cx, token, from, q)
+    case Some{+why}:
+      out(o, cx, PR.spoke(token, Some{why}))
 
 # ---- the step ----
 
@@ -3562,8 +3557,10 @@ def placed.in(-o: S.St, +cx: X.Cx<o>, +name: String, +ws: J.Json, +err: String) 
 # default
 def dispatch(-o: S.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
   match i:
-    case GI.IReq{+token, +from, +req}:
-      agent_req(o, cx, token, from, req)
+    case GI.IReq{+token, +from, +req, +who, +dir, +sock}:
+      agent_req.by(o, PR.req_ok(st(o, cx), who, dir, sock, from), cx, token, from, req)
+    case GI.ISpeaks{+token, +from, _, +who, +dir, +sock}:
+      out(o, cx, PR.spoke(token, PR.req_ok(st(o, cx), who, dir, sock, from)))
     case GI.ITick{}:
       replies_tick(o, wakes_tick(o, acts_tick(o, timers_tick(o, tick(o, cx)))))
     case GI.IIdle{+agent, +leftover, +held}:

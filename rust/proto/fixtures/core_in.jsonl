@@ -41,7 +41,9 @@
 {"t": "passthrough", "focus": "main", "line": "/status", "now": 2, "git": false, "ans": []}
 {"agent": "a", "ans": [], "git": true, "now": 1000000, "t": "ready"}
 {"ans": [], "git": true, "name": "docs", "new_name": "api", "now": 1000000, "t": "rename", "valid": true}
-{"ans": [], "from": "a", "git": true, "now": 1000000, "req": {"agent": "b", "cmd": "restore"}, "t": "req", "token": 3}
+{"ans": [], "dir": "a", "from": "a", "git": true, "now": 1000000, "req": {"agent": "b", "cmd": "restore"}, "sock": "agent", "t": "req", "token": 3, "who": "agent"}
+{"ans": [], "from": "a", "git": true, "now": 1000000, "req": {"agent": "b", "cmd": "restore"}, "t": "req", "token": 0, "who": "hub"}
+{"ans": [], "cmd": "inspect", "dir": "a", "from": "a", "git": true, "now": 1000000, "sock": "agent", "t": "speaks", "token": 4, "who": "agent"}
 {"ans": [], "git": true, "name": "fix", "now": 1000000, "t": "restore"}
 {"ans": [], "focus": "docs", "git": true, "now": 1000000, "queued": false, "t": "route", "target": "docs", "text": "merci"}
 {"ans": [], "git": true, "now": 1000000, "rid": 1, "t": "route_cancel"}

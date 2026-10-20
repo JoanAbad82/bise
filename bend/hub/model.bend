@@ -131,6 +131,22 @@ def snoc(-A: Data, xs: List<&2, A>, +x: A) -> List<&2, A>:
     case Con{+h, +t}:
       h <> snoc(A, t, x)
 
+# the strings of a JSON list (the rest skipped)
+def jstr_list.one(h: J.Json, +rest: List<&2, String>) -> List<&2, String>:
+  match h:
+    case J.JStr{+s}:
+      s <> rest
+    case _:
+      rest
+
+def jstr_list(xs: List<&2, J.Json>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      +rest = jstr_list(t)
+      jstr_list.one(h, rest)
+
 def str_in(xs: List<&2, String>, +s: String) -> Bool:
   match xs:
     case Nil{}:

@@ -12,6 +12,23 @@ use bise_proto::core::link::{ANeed, AStep, Answer};
 use bise_proto::core::{fx as cfx, Fx as CoreFx, In};
 
 impl Hub {
+    /// An agent request (issue 37 #2): one core.rs answers or acts on
+    /// before sb-core's `req` step takes sb-core's `speaks` on its sender
+    /// first; the rest ride the `req` step, which checks it.
+    pub(super) fn agent_step(&mut self, fx: &mut Fx, env: &mut dyn Env, token: Token, from: &str, req: AgentReq, by: crate::peer::Sender) {
+        if super::pure::rides_req(&req) || self.spoke_ok(fx, env, token, from, by.clone()) {
+            self.agent_req(fx, env, token, from, req, by)
+        }
+    }
+
+    /// sb-core's `speaks` on `by` (bend/hub/peer.bend): true, ok (its fx dropped); false, fx spoke alone.
+    fn spoke_ok(&mut self, fx: &mut Fx, env: &mut dyn Env, token: Token, from: &str, by: crate::peer::Sender) -> bool {
+        self.core(fx, env, None, In::Speaks(by.speaks(token, from.into(), String::new())));
+        let ok = !fx.iter().any(|e| matches!(e, Effect::Spoke { ok: false, .. }));
+        fx.retain(|e| !(ok && matches!(e, Effect::Spoke { .. })));
+        ok
+    }
+
     /// Run one input in sb-core: answer its git queries (the input is
     /// replayed with the answers), then apply the effects it returns.
     pub(super) fn core(&mut self, fx: &mut Fx, env: &mut dyn Env, client: Option<ClientId>, input: In) {

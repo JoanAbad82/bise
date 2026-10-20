@@ -73,7 +73,7 @@ impl Shell {
                 self.replies.insert(token, stream);
                 // J: `hub` asked: the job's end goes back there (its outbox)
                 let req = crate::core::AgentReq::Follow { agent: s("agent"), on: v.get("on").and_then(Value::as_bool).unwrap_or(true), hub: s("hub") };
-                self.step(Input::Agent { token, from: crate::model::MAIN.into(), req });
+                self.step(Input::Agent { token, from: crate::model::MAIN.into(), req, by: crate::peer::Sender::hub() });
             }
             _ => {
                 self.step(Input::XReply { xid, name: s("name"), text: s("text") });

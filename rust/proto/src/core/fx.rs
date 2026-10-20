@@ -36,6 +36,10 @@ core_kinds! {
         Feed = "feed" => FFeed { agent: Str, rec: Json },
         /// the answer to an agent's request
         Reply = "reply" => FReply { token: Nat, body: Json },
+        /// sb-core's word on a request's sender (issue 37 #2): the answer
+        /// to `speaks`, and a `req` refused before it runs (then nothing
+        /// else); `why` the line `sb` prints when not `ok`
+        Spoke = "spoke" => FSpoke { token: Nat, ok: Bool, why: StrOmit },
         /// a notice to the client that typed the input
         Notice = "notice" => FNotice { text: Str },
         /// messages for an agent: `mode` `say` (a new turn) or `steer`;

@@ -1,11 +1,13 @@
 //! Small pure helpers of core.rs's handlers (moved out of core.rs to keep
 //! it under its line ratchet, architect m_27675): the direct-exchange
-//! note, a new task's free name, the `sb` commands that need git. No hub
+//! note, a new task's free name, the `sb` commands that need git, a
+//! message id's and a JSON field's reading. No hub
 //! state: arguments in, words or a name out.
 
 use super::AgentReq;
 use crate::model::{State, MAIN};
 use crate::util::{clip_tail, one_line};
+use serde_json::Value;
 
 /// RFC 0001 §7.4: what main (`note`) and the user's own feed (`direct`)
 /// read after the user talked directly to `task`: the messages sent,
@@ -88,7 +90,39 @@ pub(super) fn worktree_path(path: &str) -> Result<String, String> {
     }
 }
 
+pub(super) fn jstr(v: &Value, k: &str) -> String {
+    v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
+}
+
 /// The one line `sb <cmd>` answers in a workspace without git.
 pub(crate) fn not_in_a_repo(cmd: &str) -> String {
     format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)
+}
+
+/// Issue 37 #2: an agent request core.rs turns into sb-core's `req` step
+/// with nothing done before it (no reply, effect or state change), so
+/// sb-core checks its sender in that step. Anything else (core.rs answers
+/// it itself, or acts first) takes the `speaks` step before; a variant
+/// not listed here does too: forgetting one costs a step, never a check.
+pub(super) fn rides_req(req: &AgentReq) -> bool {
+    match req {
+        AgentReq::Send { switch, .. } => switch.is_none(),
+        AgentReq::Spawn { ask, feature, .. } => ask.is_empty() && feature.is_empty(),
+        AgentReq::Wait { .. }
+        | AgentReq::Ask { .. }
+        | AgentReq::Status { .. }
+        | AgentReq::Report { .. }
+        | AgentReq::Follow { .. }
+        | AgentReq::Move { .. }
+        | AgentReq::Stop { .. }
+        | AgentReq::Card { .. }
+        | AgentReq::Close { .. }
+        | AgentReq::Withdraw { .. }
+        | AgentReq::Rename { .. }
+        | AgentReq::Restore { .. }
+        | AgentReq::Isolate { .. }
+        | AgentReq::ProjectSend { .. }
+        | AgentReq::ProjectAsk { .. } => true,
+        _ => false,
+    }
 }

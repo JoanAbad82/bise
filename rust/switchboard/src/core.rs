@@ -92,10 +92,6 @@ pub trait Env {
 pub use bise_proto::sb::{parse_msg_id, Req as AgentReq};
 pub use bise_proto::sb::{Every as EveryReq, Wake as WakeReq};
 
-pub(crate) fn jstr(v: &Value, k: &str) -> String {
-    v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
-}
-
 #[derive(Clone, Debug)]
 pub enum Input {
     /// The daemon started: spawn every live agent.
@@ -166,11 +162,10 @@ pub enum Input {
         client: ClientId,
         id: u64,
     },
-    Agent {
-        token: Token,
-        from: String,
-        req: AgentReq,
-    },
+    /// `by`: its sender, sb-core refuses it first when it may not speak as `from` (issue 37 #2)
+    Agent { token: Token, from: String, req: AgentReq, by: crate::peer::Sender },
+    /// A request the shell serves itself: may its sender speak as `from`? Answered by fx spoke.
+    Speaks { token: Token, from: String, cmd: String, by: crate::peer::Sender },
     Tick,
     /// `/scheduled`'s stop: the user stopped timer `id`; its agent hears
     /// it from bise, once (`why`: words after the id, may be empty).
@@ -537,6 +532,8 @@ pub enum Effect {
     },
     /// The answer to [`Input::RouteAsk`]: his words were held ([`Effect::Route`] first).
     RouteAsked { routed: bool },
+    /// sb-core's word on a request's sender: `speaks`' answer, or a refused `req` alone.
+    Spoke { token: Token, ok: bool, why: String },
     /// Its end: `state` "sent" (`xid` its delivery, `msg` his message
     /// it became in bise's main) or "cancelled".
     RouteDone {
@@ -1521,7 +1518,8 @@ impl Hub {
             }
             Input::ClientUnqueue { client, id } => self.core(&mut fx, env, Some(client), In::Unqueue(ci::Unqueue { id })),
             Input::ClientSteerQueued { client, id } => self.core(&mut fx, env, Some(client), In::SteerQueued(ci::SteerQueued { id })),
-            Input::Agent { token, from, req } => self.agent_req(&mut fx, env, token, &from, req),
+            Input::Agent { token, from, req, by } => self.agent_step(&mut fx, env, token, &from, req, by),
+            Input::Speaks { token, from, cmd, by } => self.core(&mut fx, env, None, In::Speaks(by.speaks(token, from, cmd))),
             // the waits' timeouts, then sb every's timers (sb-core decides)
             Input::Tick => self.core(&mut fx, env, None, In::Tick(ci::Tick {})),
             Input::EveryStop { id, why } => self.timer_stop_by_user(&mut fx, env, id, &why),
@@ -1651,7 +1649,7 @@ impl Hub {
                             "summary": summary, "decisions": []});
                         // token 0: no connection waits for this reply
                         // (connection tokens start at 1)
-                        self.core(fx, env, None, In::Req(ci::Req { token: 0, from: agent_s, req: q }));
+                        self.core(fx, env, None, In::Req(ci::Req { token: 0, from: agent_s, req: q, who: "hub".into(), dir: String::new(), sock: String::new() }));
                     }
                 }
             }
@@ -1718,7 +1716,7 @@ impl Hub {
         Ok(to)
     }
 
-    fn agent_req(&mut self, fx: &mut Fx, env: &mut dyn Env, token: Token, from: &str, req: AgentReq) {
+    fn agent_req(&mut self, fx: &mut Fx, env: &mut dyn Env, token: Token, from: &str, req: AgentReq, by: crate::peer::Sender) {
         let reply = |fx: &mut Fx, body: Value| fx.push(Effect::Reply { token, body });
         // the home workspace (docs/ambient-pages.md §5.1): no git, so no
         // land, feature or flow; one line that says why, never a git error
@@ -1966,14 +1964,14 @@ impl Hub {
                 return;
             }
         };
-        self.core(fx, env, None, In::Req(ci::Req { token, from: from.to_string(), req: q }));
+        self.core(fx, env, None, In::Req(ci::Req { token, from: from.to_string(), req: q, who: by.who, dir: by.dir, sock: by.sock }));
     }
 }
 
 #[path = "core_pure.rs"]
 mod pure;
 pub(crate) use pure::not_in_a_repo;
-use pure::{direct_exchange, force_run_input, git_only, unique_name};
+use pure::{direct_exchange, force_run_input, git_only, jstr, unique_name};
 
 #[path = "core_link.rs"]
 mod link;

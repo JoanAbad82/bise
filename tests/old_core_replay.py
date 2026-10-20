@@ -136,8 +136,8 @@ WRITE = [
      "context": "", "projects": [{"id": "shop-1", "name": "shop"}]},
     # withdrawn-answer (architect m_30039): main withdraws its card 2, his
     # answer comes after: card_withdrawn, then main's message and card_late
-    {"t": "req", "token": 1, "from": "main", "req": {"cmd": "card", "text": "ship v2?", "for": None}},
-    {"t": "req", "token": 2, "from": "main", "req": {"cmd": "withdraw", "card": 2, "why": "moot"}},
+    {"t": "req", "token": 1, "from": "main", "req": {"cmd": "card", "text": "ship v2?", "for": None}, "who": "outside", "sock": "agent"},
+    {"t": "req", "token": 2, "from": "main", "req": {"cmd": "withdraw", "card": 2, "why": "moot"}, "who": "outside", "sock": "agent"},
     {"t": "answer", "card": 2, "text": "yes, ship it"},
     # name-free (architect m_31139): x archived, then a new x: the old one
     # is renamed x-2 (renamed), the new one created (task_created), kinds

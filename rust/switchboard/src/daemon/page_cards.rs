@@ -394,6 +394,7 @@ impl Shell {
             self.step(Input::Agent {
                 token: 0,
                 from: MAIN.to_string(),
+                by: crate::peer::Sender::hub(),
                 // (the page's title first: where this step is, with no page
                 // open; notif-words)
                 req: crate::core::AgentReq::card(crate::pages::checklist::with_title(&meta.title, &s.card_text())),
@@ -423,7 +424,7 @@ impl Shell {
     /// `key` maps it back to the page's own answer path. None: no card.
     pub(super) fn open_page_card(&mut self, id: &str, text: String, key: String) -> Option<u64> {
         let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
-        self.step(Input::Agent { token: 0, from: MAIN.to_string(), req: crate::core::AgentReq::card(text) });
+        self.step(Input::Agent { token: 0, from: MAIN.to_string(), req: crate::core::AgentReq::card(text), by: crate::peer::Sender::hub() });
         let card = self.hub.st.open_cards().filter(|c| !before.contains(&c.id) && c.kind == "question").map(|c| c.id).max()?;
         self.page_cards().insert(card, (id.to_string(), key));
         Some(card)

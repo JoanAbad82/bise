@@ -7,14 +7,15 @@
 //! line (bise_proto's HubEv::Refused),
 //! is closed, and leaves one hub.log line naming the agent.
 //! An agent request (`agent`, `version`; agent.sock only)
-//! carries its sender's verdict ([`Asker`]) to the daemon thread, which
-//! checks its `from` against it before anything else (`Shell::speaks_as`,
-//! the rule `crate::peer::speaker`, docs/issues/17). The peer is read with
-//! `bise_peer::table::around`: only the processes the judge walks.
+//! carries its sender's verdict ([`Asker`]) to the daemon thread, where
+//! sb-core checks its `from` against it before anything runs
+//! (daemon/agent_req.rs, bend/hub/peer.bend, docs/issues/17, issue 37 #2).
+//! The peer is read with `bise_peer::table::around`: only the processes
+//! the judge walks.
 
 use super::{log_line, write_json, Msg};
 use crate::paths::Paths;
-use crate::peer::{access, judge, speaker, Access, HubSide, Known, Sock, Who};
+use crate::peer::{access, judge, Access, HubSide, Sock, Who};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader};
@@ -73,7 +74,7 @@ impl Doors {
     }
 
     /// The sender of an agent request on `sock`, judged at its accept.
-    fn asker(&self, pid: Option<u32>, sock: &'static str) -> Asker {
+    fn asker(&self, pid: Option<u32>, sock: Sock) -> Asker {
         let (who, peer) = self.who(pid);
         Asker { who, peer, sock }
     }
@@ -85,35 +86,27 @@ impl Doors {
 pub(super) struct Asker {
     pub(super) who: Who,
     pub(super) peer: String,
-    pub(super) sock: &'static str,
+    pub(super) sock: Sock,
 }
 
-impl super::Shell {
-    /// Whether the request that says `from` may be served (the pure rule
-    /// is `peer::speaker`); refused: one hub.log line, and the words the
-    /// caller prints. agent.sock's agent requests call it.
-    pub(super) fn speaks_as(&self, asker: &Asker, from: &str, cmd: &str) -> Result<(), String> {
-        let agents: Vec<Known> =
-            self.hub.st.agents.values().map(|a| Known { name: &a.name, dir: &a.dir, aliases: &a.aliases }).collect();
-        speaker(&asker.who, from, &agents).inspect_err(|why| {
-            log_line(&self.opts.paths, &format!("agent request refused on {} ({cmd}): {}: {why}", asker.sock, asker.peer));
-        })
+impl Asker {
+    /// Its fact for sb-core's inputs (`req`, `speaks`).
+    pub(super) fn by(&self) -> crate::peer::Sender {
+        crate::peer::Sender::of(&self.who, self.sock)
     }
+}
 
-    /// An agent request: served only when its sender speaks as itself.
-    pub(super) fn agent_new(&mut self, token: super::Token, mut stream: UnixStream, v: Value, asker: &Asker) {
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("");
-        // its sb gave up before the loop took it (a busy hub): not run
-        // late, or a send it will retry is delivered twice (hub-stall)
-        if super::outbox::peer_gone(&stream) {
-            log_line(&self.opts.paths, &format!("sb {} from {}: its sb gave up before the hub took it: not run", s("cmd"), s("from")));
-            return;
+/// A socket's file name, for hub.log and the refusals.
+pub(super) trait SockName {
+    fn name(self) -> &'static str;
+}
+
+impl SockName for Sock {
+    fn name(self) -> &'static str {
+        match self {
+            Sock::Agent => "agent.sock",
+            Sock::Client => "hub.sock",
         }
-        if let Err(e) = self.speaks_as(asker, s("from"), s("cmd")) {
-            write_json(&mut stream, &json!({"ok": false, "error": e}));
-            return;
-        }
-        self.agent_request(token, stream, v);
     }
 }
 
@@ -153,9 +146,9 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
     let init = bise_proto::rpc::is_rpc(&v) && v.get("method").and_then(|x| x.as_str()) == Some(bise_proto::rpc::INITIALIZE);
     let op = if init { "hello".to_string() } else { v.get("op").and_then(|x| x.as_str()).unwrap_or("").to_string() };
     let mut stream = stream;
-    let name = if sock == Sock::Agent { "agent.sock" } else { "hub.sock" };
-    // an agent request's sender, judged here (agent.sock): the daemon
-    // thread maps it to an agent (`Shell::speaks_as`, docs/issues/17)
+    let name = sock.name();
+    // an agent request's sender, judged here (agent.sock): sb-core maps
+    // it to an agent (daemon/agent_req.rs, docs/issues/17)
     let mut asker = None;
     // a client's pid and program, judged at its accept (hub.log names it)
     let mut peer_of = String::new();
@@ -165,7 +158,7 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
             return;
         }
         Access::Open => {}
-        Access::Agent => asker = Some(doors.asker(pid, name)),
+        Access::Agent => asker = Some(doors.asker(pid, sock)),
         Access::User => {
             let (who, peer) = doors.who(pid);
             if let Some(why) = who.refusal_of(&op) {
@@ -207,11 +200,11 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
             let _ = tx.send(Msg::ClientGone { id });
         }
         "agent" => {
-            let asker = asker.unwrap_or_else(|| doors.asker(pid, name));
+            let asker = asker.unwrap_or_else(|| doors.asker(pid, sock));
             let _ = tx.send(Msg::AgentNew { token: id, stream, v, asker });
         }
         "version" => {
-            let asker = asker.unwrap_or_else(|| doors.asker(pid, name));
+            let asker = asker.unwrap_or_else(|| doors.asker(pid, sock));
             let _ = tx.send(Msg::Version { stream, v, asker });
         }
         "xin" | "xreply" | "xfollow" => {
@@ -289,16 +282,16 @@ mod tests {
 
     /// The sb-core reads (`list`, `tasks`) journal nothing, on a hub with
     /// agents and their state; the others never step sb-core
-    /// (Shell::agent_request answers them before its sb-core arm).
+    /// (daemon/agent_req.rs's shell_request answers them).
     #[test]
     fn an_agents_read_journals_nothing() {
         let (mut h, mut env) = (Hub::new("/w"), NoEnv);
         let spawn = json!({"cmd": "spawn", "name": "t1", "objective": "o", "worktree": false});
-        h.handle(Input::Agent { token: 1, from: "main".into(), req: AgentReq::decode(spawn).expect("spawn") }, &mut env);
+        h.handle(Input::Agent { token: 1, from: "main".into(), req: AgentReq::decode(spawn).expect("spawn"), by: crate::peer::Sender::hub() }, &mut env);
         for (i, c) in ["list", "tasks"].iter().enumerate() {
             for from in ["main", "t1"] {
                 let req = AgentReq::decode(json!({"cmd": c})).expect("a read");
-                let fx = h.handle(Input::Agent { token: 10 + i as u64, from: from.into(), req }, &mut env);
+                let fx = h.handle(Input::Agent { token: 10 + i as u64, from: from.into(), req, by: crate::peer::Sender::hub() }, &mut env);
                 assert!(!fx.iter().any(|e| matches!(e, Effect::Journal(_))), "sb {c} from {from} journaled: {fx:?}");
                 assert!(fx.iter().any(|e| matches!(e, Effect::Reply { .. })), "sb {c} from {from} answered");
             }
