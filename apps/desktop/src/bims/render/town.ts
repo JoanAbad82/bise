@@ -5,13 +5,17 @@
 // when its still pose changes; close up (his pinch past LIVE_ZOOM, or the dive) the offices in view,
 // LIVE_MAX at most, show their scene itself, posed live each frame. One hemisphere light and one sun
 // with its soft shadow for the whole town (view.ts), under his clock's sky when frame() gets one
-// (sky.ts, sky-light.ts: a blend, then rest; the hero passes none: its fixed light). It draws only
+// (sky.ts lightOf, sky-light.ts: a blend, then rest), the office's one light for both themes
+// (bims-light, direction A): the day's materials always, offices and townscape, the lamps and glows
+// by the sky (baked offices too), the night's warm pools of the offices nearest the view, POOLS_MAX
+// at most (town/pools.ts); the backdrop is the theme's page. No sky: the day palette's fixed light.
+// The hero's film (TownOpts.themed) keeps the theme's materials and light, as signed. It draws only
 // when frame() is called. In test
 // mode it exposes window.__biseTown = { frames, calls, ms, offices, merged, live, check } for the
 // town's check, and window.__biseTownDrawn() (each office: in view, drawn, where, inside the camera's
 // planes) for its camera path. The camera's near and far planes wrap the whole town (town/camera.ts
 // townDepth). Owner: maps-e.
-import { Box3, type BufferGeometry, Group, type Material, Mesh, type Object3D, Vector3 } from 'three';
+import { Box3, type BufferGeometry, Group, type Material, Mesh, type MeshLambertMaterial, type Object3D, PointLight, Vector3 } from 'three';
 import type { Motion } from '../model';
 import type { Step } from '../office-driver';
 import { growSig, NO_GROW } from '../growth';
@@ -23,9 +27,10 @@ import { STYLE } from './style';
 import { mergeRoot, type Merged } from './merge';
 import { makeOfficeScene, type OfficeScene } from './office-scene';
 import { makeView } from './view';
-import { applyLight, backdropOf } from './sky-light';
-import { blendAt, blending, retarget, type Blend } from '../sky';
-import { townLightOf, type TownLight } from '../sky-town';
+import { applyLight } from './sky-light';
+import { POOL, blendAt, blending, lightOf, retarget, type Blend, type Light } from '../sky';
+import { poolsOf } from './world';
+import { POOLS_MAX, townPools } from '../town/pools';
 import { pickAt, type Target } from './pick';
 import { TOWN_DAY, TOWN_NIGHT, buildTownscape } from './townscape';
 import { diveFit, townDepth, townFit } from '../town/camera';
@@ -92,7 +97,8 @@ interface Spot {
   readonly scene: OfficeScene;
   /** what its scene was set to (office-scene setOffice): its plan's shape */
   shape: string;
-  bake: { readonly sig: string; readonly merged: Merged; readonly holder: Group } | null;
+  /** its bake, and its glows' copies with the scene's own (the sky's lamps reach them: frame()) */
+  bake: { readonly sig: string; readonly merged: Merged; readonly holder: Group; readonly glows: readonly (readonly [MeshLambertMaterial, MeshLambertMaterial])[] } | null;
   /** its scene is in the town now, posed live */
   live: boolean;
   /** live: its walls baked (its world's hundreds of meshes in a handful), its bims moving over them */
@@ -131,9 +137,20 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   let sunKey = '';
   /** the sky's blend and the light drawn (sky.ts); null: the theme's fixed sun (the hero) */
   let blend: Blend | null = null;
-  let skyLight: TownLight | null = null;
+  let skyLight: Light | null = null;
+  /** the hero's: the theme's materials and fixed light (TownOpts.themed); else the day's, under the sky */
+  const themed = opts.themed === true;
+  /** the night's lamp pools (town/pools.ts): a fixed count, lit by the sky's lamps; none in the hero's film */
+  const pools = themed ? [] : Array.from({ length: POOLS_MAX }, () => new PointLight(POOL.color, 0, POOL.distance, POOL.decay));
+  for (const l of pools) scene.add(l);
+  /** each pool's full intensity (0: unused), and where they were placed last */
+  let poolI: number[] = pools.map(() => 0);
+  let poolKey = '';
+  /** where the sun aims now (aimSun): the pools go to the offices nearest it */
+  let aimAt = { x: 0, z: 0 };
   const spots = new Map<string, Spot>();
-  let scape: { sig: string; merged: Merged; loose: Group | null } | null = null;
+  /** the townscape merged (its lawn and road keep their own materials: lift() lights them at night) */
+  let scape: { sig: string; merged: Merged; loose: Group | null; lift: (level: number) => void } | null = null;
   /** the hero's entry build holds the town loose (TownOpts.entry) until settle() */
   let held = opts.entry === true;
   /** the lawn's holes the townscape was built with last (the entry leaves no cube there) */
@@ -148,7 +165,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     let s = spots.get(id);
     if (!s) {
       // no grass block of its own (bims m_28807): the town's lawn is its ground
-      s = { scene: makeOfficeScene(STYLE, { ground: false, themed: true }), shape: '', bake: null, live: false, walls: null };
+      s = { scene: makeOfficeScene(STYLE, { ground: false, themed }), shape: '', bake: null, live: false, walls: null };
       spots.set(id, s);
     }
     return s;
@@ -288,15 +305,17 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       return p ? own.map((b) => ({ x0: b.x0 + p.x, x1: b.x1 + p.x, z0: b.z0 + p.z, z1: b.z1 + p.z })) : [];
     });
     lastPits = pits;
-    const sSig = `${String(plan.seed)}|${JSON.stringify(plan.lawn)}|${String(plan.road.length)}|${String(plan.trees.length)}|${String(plan.offices.length)}|${isNight ? 'n' : 'd'}|${JSON.stringify(pits)}`;
+    // the day's lawn and road in both themes (the sky lights them); the hero's film its theme's
+    const dark = themed && isNight;
+    const sSig = `${String(plan.seed)}|${JSON.stringify(plan.lawn)}|${String(plan.road.length)}|${String(plan.trees.length)}|${String(plan.offices.length)}|${dark ? 'n' : 'd'}|${JSON.stringify(pits)}`;
     if (scape?.sig === sSig) return;
     if (scape) {
       scene.remove(scape.merged.group);
       scape.merged.dispose();
       dropLoose(scape);
     }
-    const pal = isNight ? NIGHT : DAY;
-    const root = buildTownscape(plan, STYLE, pal, isNight ? TOWN_NIGHT : TOWN_DAY, pits);
+    const built = buildTownscape(plan, STYLE, dark ? NIGHT : DAY, dark ? TOWN_NIGHT : TOWN_DAY, pits);
+    const { root, lift } = built;
     const merged = mergeRoot(root, STYLE, STYLE.shadows);
     scene.add(merged.group);
     if (opts.entry === true) {
@@ -305,10 +324,10 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       merged.group.visible = !held;
       root.visible = held;
       scene.add(root);
-      scape = { sig: sSig, merged, loose: root };
+      scape = { sig: sSig, merged, loose: root, lift };
     } else {
       disposeGeometries(root);
-      scape = { sig: sSig, merged, loose: null };
+      scape = { sig: sSig, merged, loose: null, lift };
     }
     lightUp(isNight);
     shadowsDirty = true;
@@ -327,24 +346,26 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     probe.merged = { from, to };
   }
 
-  /** the one light of the town: the loft's palette's sky and sun, the sun's shadow over the whole lawn */
+  /**
+   * The one light of the town, the sun's shadow over the whole lawn: the sky's (sky.ts lightOf, set
+   * by aimSun), else the day palette's fixed one (the hero's: its theme's); the backdrop the theme's
+   * page, untouched (as the office's).
+   */
   function lightUp(isNight: boolean): void {
     if (!plan) return;
-    const pal = isNight ? NIGHT : DAY;
+    const pal = themed && isNight ? NIGHT : DAY;
     v3.tint(pal);
-    if (isNight && opts.nightLift !== undefined) {
+    if (themed && isNight && opts.nightLift !== undefined) {
       v3.hemi.intensity *= opts.nightLift;
       sun.intensity *= opts.nightLift;
     }
-    const paper = opts.sky ? (isNight ? opts.sky.night : opts.sky.day) : pal.bg;
-    v3.sky(skyLight ? '#' + backdropOf(paper, skyLight).getHexString() : paper);
-    if (skyLight) {
-      v3.hemi.color.set(skyLight.hemi);
-      v3.hemi.groundColor.set(skyLight.ground);
-      v3.hemi.intensity = skyLight.hemiI;
-      sun.color.set(skyLight.key);
-      sun.intensity = skyLight.keyI;
-    }
+    v3.sky(opts.sky ? (isNight ? opts.sky.night : opts.sky.day) : (isNight ? NIGHT : DAY).bg);
+    const lamps = skyLight?.lamps ?? 0;
+    pools.forEach((l, i) => {
+      l.intensity = (poolI[i] ?? 0) * lamps;
+    });
+    // the night's lift on the day lawn and road (townscape.ts NIGHT_GLOW)
+    scape?.lift(skyLight?.lift ?? 0);
     if (STYLE.shadows) {
       sun.castShadow = true;
       sun.shadow.mapSize.set(2048, 2048);
@@ -386,6 +407,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     const key = `${cx.toFixed(2)}|${cz.toFixed(2)}|${half.toFixed(2)}`;
     if (key === sunKey) return;
     sunKey = key;
+    aimAt = { x: cx, z: cz };
+    placePools();
     // the office's sun: up and a little to the west of the room, as world.ts puts it; under a sky,
     // from the sun's or the moon's side (sky-light.ts), as far
     if (skyLight) applyLight(v3.hemi, sun, skyLight, { x: cx, y: 0, z: cz }, TOWN_KEY_DIST);
@@ -405,6 +428,28 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       cam.updateProjectionMatrix();
       shadowsDirty = true;
     }
+  }
+
+  /** the night's pools to the offices nearest where the sun aims (town/pools.ts), lit by the sky's lamps */
+  function placePools(): void {
+    if (pools.length === 0 || !plan) return;
+    const offices = plan.offices.flatMap((p) => {
+      const o = spots.get(p.id)?.scene.office();
+      return o ? [{ x: p.x, z: p.z, pools: poolsOf(o) }] : [];
+    });
+    const placed = townPools(offices, aimAt, pools.length);
+    const key = JSON.stringify(placed);
+    if (key === poolKey) return;
+    poolKey = key;
+    poolI = pools.map((l, i) => {
+      const p = placed[i];
+      if (p) l.position.set(p.x, POOL.y, p.z);
+      return p?.i ?? 0;
+    });
+    const lamps = skyLight?.lamps ?? 0;
+    pools.forEach((l, i) => {
+      l.intensity = (poolI[i] ?? 0) * lamps;
+    });
   }
 
   function applyFit(): void {
@@ -519,10 +564,15 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       if (opts.clearView === true && world) dropOccluders(world);
       s.scene.root.position.set(0, 0, 0);
       const merged = mergeRoot(s.scene.root, STYLE, STYLE.shadows);
+      const glows: [MeshLambertMaterial, MeshLambertMaterial][] = [];
       for (const c of merged.group.children) {
         // the materials it kept (a lit screen, the glass) are its scene's: its own copies, so a rebuilt scene can't take them
         const m = (c as unknown as { material: Material }).material;
-        if (m !== merged.baked) (c as unknown as { material: Material }).material = m.clone();
+        if (m === merged.baked) continue;
+        const copy = m.clone();
+        (c as unknown as { material: Material }).material = copy;
+        // a glow (kit.ts: a lantern, a shade) and a desk's lamp and screen follow the sky's lamps on its scene's own
+        if (m.userData.live === true && 'emissiveIntensity' in m) glows.push([copy as MeshLambertMaterial, m as MeshLambertMaterial]);
       }
       s.scene.root.position.set(p.x, 0, p.z);
       dropBake(s);
@@ -531,7 +581,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       holder.position.set(p.x, 0, p.z);
       holder.visible = !s.live;
       scene.add(holder);
-      s.bake = { sig, merged, holder };
+      s.bake = { sig, merged, holder, glows };
       // the bake's pose is no longer the live one: a live office poses itself at its next frame
       shadowsDirty = true;
       count();
@@ -594,7 +644,8 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
         blend = retarget(blend, sky.sky, sky.t, sky.reduced);
         moving = blending(blend, sky.t);
         if (moving || blend !== was) {
-          skyLight = townLightOf(blendAt(blend, sky.t), isNight ? 'dark' : 'light');
+          // one light for both themes (direction A), the office's
+          skyLight = themed ? null : lightOf(blendAt(blend, sky.t));
           relit = true;
         }
       } else if (blend !== null) {
@@ -604,15 +655,22 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       }
       if (night !== isNight) {
         night = isNight;
-        if (skyLight && blend) skyLight = townLightOf(blendAt(blend, sky?.t ?? 0), isNight ? 'dark' : 'light');
         syncScape(isNight);
         lightUp(isNight);
       } else if (relit) {
         lightUp(isNight);
         shadowsDirty = true;
       }
-      // the live offices' desk lamps fade with the sky (never pop); no snow in the town yet (its lawn)
-      for (const s of spots.values()) s.scene.weather(skyLight ? skyLight.lamps : null, 0);
+      // the offices' lamps, screens and glows fade with the sky (never pop), the baked ones' too (their live
+      // materials' copies follow their scene's: emissive only, no light); no snow in the town yet (its lawn)
+      for (const s of spots.values()) {
+        s.scene.weather(skyLight ? skyLight.lamps : null, 0);
+        for (const [copy, own] of s.bake?.glows ?? []) {
+          copy.emissiveIntensity = own.emissiveIntensity;
+          copy.color.copy(own.color);
+        }
+      }
+      placePools();
       // the live offices' scenes in the town, the others' bakes
       const live = new Set(api.liveIds());
       for (const [id, s] of spots) {

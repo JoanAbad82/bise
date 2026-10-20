@@ -470,16 +470,18 @@ export function lightOf(sky: Sky): Light {
  * What a surface of that colour looks like under a light (linear light, three's Lambert: the
  * hemisphere's sky on a face up, the key by its height, over π), back in sRGB hex; `shaded`: in the
  * key's shadow. `pool`: that share (0..1) of a lamp pool's light right under it (POOL_PEAK, times
- * the lamps). A model of the lit result for the laws (bims m_33351), not the renderer.
+ * the lamps). `glow`: its night lift's emissive colour, times l.lift (the town's lawn and road:
+ * townscape.ts NIGHT_GLOW). A model of the lit result for the laws (bims m_33351), not the renderer.
  */
-export function litOf(l: Light, albedo: string, shaded = false, pool = 0): string {
+export function litOf(l: Light, albedo: string, shaded = false, pool = 0, glow = '#000000'): string {
   const a = rgb(albedo);
   const h = rgb(l.hemi);
   const k = rgb(l.key);
   const p = rgb(POOL.color);
+  const e = rgb(glow);
   const up = Math.max(0, l.dir.y) * (shaded ? 1 - l.shadow : 1);
   const pi = POOL_PEAK * pool * l.lamps;
-  const c = (i: 0 | 1 | 2): number => (a[i] * (h[i] * l.hemiI + k[i] * l.keyI * up + p[i] * pi)) / Math.PI;
+  const c = (i: 0 | 1 | 2): number => (a[i] * (h[i] * l.hemiI + k[i] * l.keyI * up + p[i] * pi)) / Math.PI + e[i] * l.lift;
   return hexOf([Math.min(1, c(0)), Math.min(1, c(1)), Math.min(1, c(2))]);
 }
 

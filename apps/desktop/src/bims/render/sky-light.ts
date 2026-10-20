@@ -1,11 +1,10 @@
 // The sky on a view's two lights (bims-sky): sky.ts says the light (pure), this puts it on the
 // hemisphere and the key light, aims the key from the sun's or the moon's side over a centre, and
 // sets its shadow's darkness and softness. The office (render/index.ts) and the town (render/town.ts)
-// call it per frame while a blend runs, once when it rests; the town alone leans its backdrop to the
-// air (backdropOf, sky-town.ts). Owner: bims-sky.
-import { Color, type ColorRepresentation, type DirectionalLight, type HemisphereLight } from 'three';
+// call it per frame while a blend runs, once when it rests; their backdrop is the theme's page,
+// untouched. Owner: bims-sky.
+import type { DirectionalLight, HemisphereLight } from 'three';
 import type { Light } from '../sky';
-import type { TownLight } from '../sky-town';
 
 /** how far the key stands from what it lights (inside the shadow camera's near/far) */
 const KEY_DIST = 16;
@@ -24,9 +23,4 @@ export function applyLight(hemi: HemisphereLight, key: DirectionalLight, l: Ligh
   key.target.updateMatrixWorld();
   key.shadow.intensity = l.shadow;
   key.shadow.radius = RADIUS + RADIUS_SOFT * l.soft;
-}
-
-/** the town's backdrop: the paper leaning a little to the air (the office's is the theme's page, untouched) */
-export function backdropOf(paper: ColorRepresentation, l: TownLight): Color {
-  return new Color(paper).lerp(new Color(l.air), l.airMix);
 }

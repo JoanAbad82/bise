@@ -3,7 +3,7 @@
 // the road crosses it, the dirt paths to the doors (a footbridge where one meets the river), a few
 // small houses, the trees in clumps and a little square every 4 or 5 offices, from the town's plan (town/plan.ts). Built once per plan and
 // theme and merged (merge.ts): a handful of draw calls. Never the app's pink or red. Owner: maps-e.
-import { BufferAttribute, BufferGeometry, ConeGeometry, Group, Mesh } from 'three';
+import { BufferAttribute, BufferGeometry, ConeGeometry, Group, type Material, Mesh, type MeshLambertMaterial } from 'three';
 import type { Box, Pt } from '../model';
 import { slabWithPits } from './ground';
 import { ROAD, RIVER, BANK, type TownPlan } from '../town/plan';
@@ -40,6 +40,19 @@ export const TOWN_NIGHT: TownColours = {
   trunk: '#6e4a31', leaves: ['#3f8a3e', '#4f9a4a', '#356f33'],
   walls: ['#8a7663', '#5e7686', '#9a9284', '#9a8455', '#6f8466'], roofs: ['#8a4a33', '#3c4350', '#1f6a62'], stone: '#6f685f',
 };
+
+/**
+ * the night's lift on the day lawn and road (bims m_35061: never a black-green slab on the cream page):
+ * their emissive, times the sky's Light.lift (0 day .. 1 night); a lit night lawn ~#2f5a3e, still
+ * night, never grey or teal (town-light.test.ts). Linear sums worked out on lightOf's nights.
+ */
+export const NIGHT_GLOW = { lawn: '#212b17', road: '#232e3d' } as const;
+
+/** the townscape, and its night lift (the lawn and the road: NIGHT_GLOW times level) */
+export interface Townscape {
+  readonly root: Group;
+  readonly lift: (level: number) => void;
+}
 
 /** the lawn's top: the offices' own grass blocks stand a little over it */
 export const LAWN_TOP = -0.06;
@@ -82,9 +95,17 @@ function norm(dx: number, dz: number): Pt {
 }
 
 /** The town's ground and everything on it but the offices, as one group (not merged yet). */
-export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: TownColours, pits: readonly Box[] = []): Group {
+export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: TownColours, pits: readonly Box[] = []): Townscape {
   const k = kitOf(style, pal);
   const root = new Group();
+  // the lawn's and the road's own materials, lifted at night (never merged away: merge.ts keeps a live one)
+  const glowing = (color: string, glow: string): MeshLambertMaterial => {
+    const m = style.material(color, { emissive: glow, ei: 0 }) as MeshLambertMaterial;
+    m.userData.live = true;
+    return m;
+  };
+  const lawnMat = glowing(pal.grass, NIGHT_GLOW.lawn);
+  const roadMat = glowing(c.road, NIGHT_GLOW.road);
   const { lawn } = plan;
   const inLawn = (p: Pt): boolean => p.x > lawn.x0 && p.x < lawn.x1 && p.z > lawn.z0 && p.z < lawn.z1;
   const lw = lawn.x1 - lawn.x0;
@@ -93,17 +114,17 @@ export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: To
   const cz = (lawn.z0 + lawn.z1) / 2;
   // the floating block, as each office's: dirt under a grass top, holed where an office carves under its floor (render/ground.ts)
   k.add(slabWithPits(style, lw, 1.2, ld, 0.45, cx, cz, pits), k.mat(pal.dirt), root, cx, LAWN_TOP - 0.08 - 0.6 - 0.01, cz);
-  k.add(slabWithPits(style, lw, 0.16, ld, 0.05, cx, cz, pits), k.mat(pal.grass), root, cx, LAWN_TOP - 0.08, cz);
+  k.add(slabWithPits(style, lw, 0.16, ld, 0.05, cx, cz, pits), lawnMat, root, cx, LAWN_TOP - 0.08, cz);
 
-  const flat = (g: BufferGeometry, color: string): void => {
-    const m = new Mesh(g, k.mat(color));
+  const flat = (g: BufferGeometry, color: string, mat?: Material): void => {
+    const m = new Mesh(g, mat ?? k.mat(color));
     root.add(m);
   };
   if (plan.river.length > 1) {
     flat(ribbon(plan.river, BANK, LAWN_TOP + 0.005, inLawn), c.bank);
     flat(ribbon(plan.river, RIVER, LAWN_TOP + 0.012, inLawn), c.water);
   }
-  flat(ribbon(plan.road, ROAD, LAWN_TOP + 0.02, inLawn), c.road);
+  flat(ribbon(plan.road, ROAD, LAWN_TOP + 0.02, inLawn), c.road, roadMat);
   // the dashes down the middle: every other metre or so
   const dashes: Pt[][] = [];
   for (let i = 0; i + 2 < plan.road.length; i += 5) {
@@ -191,7 +212,13 @@ export function buildTownscape(plan: TownPlan, style: Style, pal: Palette, c: To
 
   // the trees: a trunk and three round leaves (the prototype's clayTree)
   for (const t of plan.trees) tree(t.x, t.z, t.size);
-  return root;
+  return {
+    root,
+    lift: (level) => {
+      lawnMat.emissiveIntensity = level;
+      roadMat.emissiveIntensity = level;
+    },
+  };
 
   function tree(x: number, z: number, s: number): void {
     const t = { x, z };

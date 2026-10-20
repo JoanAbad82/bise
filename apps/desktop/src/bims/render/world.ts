@@ -8,7 +8,7 @@
 // lawn and the terrace (cover). The office's block (ground) also has the night's: four warm lamp
 // pools that fade with the lamps (lit), its dirt sides lifted at night (lift, designer m_34173) and
 // its soft shadow on the page, the slab's own shape under it (page: the theme's strength). Built with
-// the day's palette in both themes (bims-light, direction A; the town passes its theme's). Never the
+// the day's palette in both themes (bims-light, direction A; the hero film's town passes its theme's). Never the
 // accent pink or the error red.
 import {
   type BufferGeometry,

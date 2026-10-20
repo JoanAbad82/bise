@@ -79,6 +79,12 @@ export interface TownOpts {
   /** at night, the light's strength times this (the hero on a dark page: bims m_31057); absent: 1 */
   readonly nightLift?: number;
   /**
+   * the hero's film, as signed (bims m_34678): its offices and townscape keep the theme's materials
+   * (the night palette in dark) under the palette's fixed light. Absent: the day's materials in both
+   * themes under the sky's one light (sky.ts lightOf), as the office.
+   */
+  readonly themed?: boolean;
+  /**
    * the hero's entry build (design's hero-entry §2): the town drawn loose, its townscape and its
    * offices' worlds unmerged (their bakes made at once, hidden) so each thing can be grown in, until
    * settle(). Absent: merged from the first frame.

@@ -272,6 +272,55 @@ test('(town) a pinch zooms in: the offices in view go live, 4 at most; esc: the 
   }
 });
 
+/** a June noon and night (sky.ts LAT 46°N), clear: the town's sky pinned (window.__biseLocal, __biseSky) */
+const MOMENTS = [
+  { key: 'noon', h: 13, m: 50 },
+  { key: 'night', h: 2, m: 0 },
+] as const;
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const at of MOMENTS) {
+    test(`(town) the sky's one light, ${at.key}, ${theme}: day materials, pools capped, frames under budget, shots`, async () => {
+      const { s } = await openTown(fakes(12), theme);
+      try {
+        await s.page.evaluate((x) => {
+          const w = window as unknown as { __biseLocal?: unknown; __biseSky?: unknown };
+          w.__biseLocal = { y: 2026, mo: 6, d: 21, s: x.h * 3600 + x.m * 60 };
+          w.__biseSky = { weather: 'clear' };
+        }, at);
+        await showTown(s);
+        // every office baked (a busy machine: the bakes take a while), then still
+        await settled(s, 2500, 60_000);
+        const p = await probe(s);
+        console.log(`town 12 ${at.key} ${theme}: frame ${String(p?.ms.toFixed(2))} ms, ${String(p?.calls)} draw calls`);
+        expect(p?.ms ?? 999, `a frame's render call, ms (budget ${String(FRAME_MS)})`).toBeLessThan(FRAME_MS);
+        await shot(s, 'app.right.bims.town', `townlight-${at.key}-320-${theme}.png`, `town, ${at.key}, 320, ${theme}`, "the office's one light: day materials, the lawn and road their colours; night: the moon's blue, the lamps and the pools of the offices nearest the view");
+        await s.page.getByTestId('app.right.agents.width.wide').click();
+        await sleep(600);
+        await settled(s);
+        await shot(s, 'app.right.bims.town', `townlight-${at.key}-wide-${theme}.png`, `town, ${at.key}, wide, ${theme}`, 'the same town at 640');
+        // one office pinched in: its bims live under the same light
+        const box = await s.page.getByTestId('app.right.bims.town').boundingBox();
+        if (box === null) throw new Error('no town');
+        const x = box.x + box.width / 2;
+        const y = box.y + Math.min(box.height, 900 - box.y) / 2;
+        for (let i = 0; i < 16; i++) await trackpad(s.cdp, x, y, { dy: -20, pinch: true });
+        await expect(s.page.getByTestId('app.right.bims.town')).toHaveAttribute('data-zoomed', 'true');
+        await expect.poll(async () => (await probe(s))?.live.length ?? 0, { timeout: 5000 }).toBeGreaterThan(0);
+        await sleep(1000);
+        const zp = await probe(s);
+        const recent = [...(zp?.recent ?? [])].sort((a, b) => a - b);
+        const median = recent[Math.floor(recent.length / 2)] ?? 999;
+        console.log(`town 12 zoomed ${at.key} ${theme}: ${String(zp?.live.length)} live, median frame ${median.toFixed(2)} ms`);
+        expect(median, "a live frame's render call, median ms").toBeLessThan(FRAME_MS);
+        await shot(s, 'app.right.bims.town', `townlight-${at.key}-zoomed-${theme}.png`, `town, ${at.key}, pinched in, ${theme}`, 'an office close up, its bims live, under the same light');
+      } finally {
+        await s.close();
+      }
+    });
+  }
+}
+
 test('(town) zoomed in: a live bim shows its line on hover, a click opens its agent; labels never overlap', async () => {
   const { s } = await openTown(fakes(12), 'light');
   try {
