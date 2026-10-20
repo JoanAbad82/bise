@@ -250,6 +250,8 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"hub","note":"updating the bise running here to v2026.10.2-30… your agents keep running.","project":"home-0c0ffee0","up":false,"workspace":"/Users/camille/.bise"},
   {"ev":"sent","shot":false,"text":"is the build green?","voice":true},
   {"agent":"perf","ev":"agent_sent","mode":"queued"},
+  {"agent":"main","cid":12,"ev":"send_answered","project":"shop-0badc0de","result":{"msg_id":41,"reason":"made"}},
+  {"agent":"main","cid":13,"ev":"send_answered","project":"shop-0badc0de"},
   {"ev":"word","i":8,"turn":1},
   {"ev":"phase","line":"main is reading the logs","phase":"working"},
   {"ev":"phase","page":{"id":"weekly-update","title":"Weekly update"},"phase":"listening"},
