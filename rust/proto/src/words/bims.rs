@@ -80,7 +80,7 @@ crate::words! { bims:
     lost = "can't draw the office here";
 
     // ---- his camera: pinch to zoom, two fingers or a drag to move
-    /// the button back to the whole office, in its top-right corner while zoomed
+    /// the button back to the whole office, in its bottom-right corner while zoomed
     fit = "fit";
     /// its tip
     fit_tip = "back to the whole office";
@@ -273,6 +273,10 @@ crate::words! { bims:
     map_pick_tip(map) = "draw this project's office as the {map}";
     /// the tip on the row of the map it has now
     map_current_tip(map) = "this project's office is the {map} now";
+    /// the map chip in the office's bottom-left corner (its words are the map's name): its name for a screen reader
+    map_chip_label = "Change this office's map";
+    /// the map chip's tip: the menu it opens is /bims's
+    map_chip_tip = "map · /bims";
 
     // ---- the town on bise's thread (page bims-maps v9): one office per project, a sign in front
     /// the town's own label (its canvas, for a screen reader)

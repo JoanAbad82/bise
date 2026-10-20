@@ -144,6 +144,16 @@
     "one": null,
     "text": "pods of four, a long counter, steps to sit on"
   },
+  "bims.map_chip_label": {
+    "args": [],
+    "one": null,
+    "text": "Change this office's map"
+  },
+  "bims.map_chip_tip": {
+    "args": [],
+    "one": null,
+    "text": "map · /bims"
+  },
   "bims.map_current_tip": {
     "args": [
       "map"

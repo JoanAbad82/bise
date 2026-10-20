@@ -576,6 +576,10 @@ export function RightBar({ project, name, over, column }: { project: string; nam
                 onOpen={(agent) => {
                   openAgent(project, agent);
                 }}
+                // the map chip's pick: the same prefs as '/bims <map>' (thread/commands.ts)
+                onPickMap={(m) => {
+                  store.command({ cmd: 'prefs_set', key: mapPrefKey(project), value: m });
+                }}
               />
               </BimsFold>
             )

@@ -278,11 +278,9 @@
 .bims-card-state {
   color: var(--c-text-2);
 }
-/* zoomed: back to the whole office, top right (zoom.ts FIT; esc and a double-click on the floor too) */
-.bims-fit {
-  position: absolute;
-  top: var(--s-1);
-  right: var(--s-1);
+/* the office's two corner chips (brief bims-mapsel): quiet, text-2 on the 85% solid, no border;
+   the map bottom left (MapChip.tsx, the ds Dropdown's trigger), '⤢ fit' bottom right while zoomed */
+.bims-chip {
   padding: 0 var(--s-1);
   border: 0;
   border-radius: var(--r-1);
@@ -291,14 +289,48 @@
   font: var(--t-11) / 1.6 var(--font-ui);
   pointer-events: auto;
   cursor: pointer;
-  z-index: 4;
 }
-.bims-fit:hover {
+.bims-chip:hover {
   color: var(--c-text);
 }
-.bims-fit:focus-visible {
+.bims-chip:focus-visible {
   outline: 2px solid var(--c-focus);
   outline-offset: -2px;
+}
+/* the ds trigger's own look gives way to the chip's: its height, its gap, its tint, its ring */
+.b-ptrig.bims-chip {
+  height: auto;
+  gap: var(--s-1);
+  font: var(--t-11) / 1.6 var(--font-ui);
+}
+.b-ptrig.bims-chip:hover,
+.b-ptrig.bims-chip[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
+  color: var(--c-text);
+}
+.b-ptrig.bims-chip:focus-visible {
+  box-shadow: none;
+}
+.b-ptrig.bims-chip .w {
+  line-height: 1.6;
+}
+.bims-mapsel {
+  position: absolute;
+  left: var(--s-1);
+  bottom: var(--s-1);
+  display: flex;
+  z-index: 4;
+}
+/* zoomed: back to the whole office, bottom right (zoom.ts FIT; esc and a double-click on the floor too) */
+.bims-fit {
+  position: absolute;
+  right: var(--s-1);
+  bottom: var(--s-1);
+  z-index: 4;
+}
+/* ctrl held while zoomed: '+N names' goes over '⤢ fit', never under it */
+.bims-office[data-zoomed] .bims-more {
+  bottom: calc(var(--s-1) + var(--t-11) * 1.6 + var(--s-1));
 }
 /* WebGL lost: one line over the rows (never a blank section) */
 .bims-lost {

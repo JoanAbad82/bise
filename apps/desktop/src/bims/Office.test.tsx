@@ -7,6 +7,8 @@ import type { Agent } from '@/proto';
 import type { Activity, Label, Motion, Office as OfficeMap, OfficeRenderer, Pose, Timeline } from './model';
 import { BimsSwitch, labelsSig, Office, tagOf, type Parts } from './Office';
 import { bimsView } from './view';
+import { readyMaps } from './maps';
+import { bims as bimsWords } from '@/proto/words_bims.gen';
 
 // ---- a hand-driven rAF: a test runs the frames itself
 let frames: (() => void)[] = [];
@@ -390,5 +392,63 @@ describe('the map (/bims)', () => {
     await flush();
     expect(r.setOffice).toHaveBeenCalledTimes(2);
     expect(r.copyTo).not.toHaveBeenCalled();
+  });
+});
+
+describe('the map chip (brief bims-mapsel)', () => {
+  const mountChip = (parts: Parts, o: { map?: 'loft' | 'kyoto' | 'workshop'; onPickMap?: (m: string) => void } = {}) =>
+    render(<Office project="p1" agents={AGENTS} cards={[]} places={[]} {...(o.map === undefined ? {} : { map: o.map })} parts={parts} onOpen={vi.fn()} onPickMap={o.onPickMap ?? vi.fn()} />);
+  const chip = () => screen.getByTestId('app.right.bims.map');
+
+  it("shows the map's name, the loft when he never picked one; its name and tip say what it does", async () => {
+    const { rerender } = mountChip(fakeParts(fakeRenderer()).parts);
+    await flush(2);
+    expect(chip().textContent).toBe(bimsWords.map_loft);
+    expect(chip().getAttribute('aria-label')).toBe(bimsWords.map_chip_label);
+    expect(chip().getAttribute('aria-haspopup')).toBe('menu');
+    rerender(<Office project="p1" agents={AGENTS} cards={[]} places={[]} map="workshop" parts={fakeParts(fakeRenderer()).parts} onOpen={vi.fn()} onPickMap={vi.fn()} />);
+    expect(chip().textContent).toBe(bimsWords.map_workshop);
+  });
+
+  it('a click opens the menu: the ready maps in order, two-line, the current one checked', async () => {
+    mountChip(fakeParts(fakeRenderer()).parts, { map: 'kyoto' });
+    await flush(2);
+    expect(screen.queryByTestId('app.right.bims.map.menu')).toBeNull();
+    fireEvent.click(chip());
+    expect(screen.getByTestId('app.right.bims.map.menu')).toBeTruthy();
+    expect(chip().getAttribute('aria-expanded')).toBe('true');
+    const rows = readyMaps().map((id) => screen.getByTestId(`app.right.bims.map.${id}`));
+    expect(rows.map((r) => r.getAttribute('data-row'))).toEqual(readyMaps());
+    expect(screen.getByTestId('app.right.bims.map.kyoto').getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByTestId('app.right.bims.map.loft').getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByTestId('app.right.bims.map.loft').textContent).toContain(bimsWords.map_loft_mood);
+  });
+
+  it("a pick sends the map (the caller writes /bims's prefs) and closes; no bim opens under it", async () => {
+    const onPickMap = vi.fn();
+    const onOpen = vi.fn();
+    render(<Office project="p1" agents={AGENTS} cards={[]} places={[]} parts={fakeParts(fakeRenderer()).parts} onOpen={onOpen} onPickMap={onPickMap} />);
+    await flush(2);
+    fireEvent.click(chip(), { clientX: 10, clientY: 10 });
+    fireEvent.click(screen.getByTestId('app.right.bims.map.kyoto'), { clientX: 10, clientY: 10 });
+    expect(onPickMap).toHaveBeenCalledWith('kyoto');
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('app.right.bims.map.menu')).toBeNull();
+  });
+
+  it('esc closes it with no change', async () => {
+    const onPickMap = vi.fn();
+    mountChip(fakeParts(fakeRenderer()).parts, { onPickMap });
+    await flush(2);
+    fireEvent.click(chip());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('app.right.bims.map.menu')).toBeNull();
+    expect(onPickMap).not.toHaveBeenCalled();
+  });
+
+  it('no chip without onPickMap (the town, the film)', async () => {
+    mount(fakeParts(fakeRenderer()).parts);
+    await flush(2);
+    expect(screen.queryByTestId('app.right.bims.map')).toBeNull();
   });
 });

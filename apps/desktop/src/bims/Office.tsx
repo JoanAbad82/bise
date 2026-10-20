@@ -26,7 +26,8 @@ import { awayNow, nightNow, testMode } from './room';
 import { wakeIn } from './skate';
 import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
-import { cutLines, cutWords, placeTags, TAG_INSET, type TagIn } from './tags';
+import { cutLines, cutWords, placeTags, TAG_INSET, type KeepRect, type TagIn } from './tags';
+import { MapChip } from './MapChip';
 import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from './zoom';
 import { konamiDone, localOf, type Forced, type Local } from './eggs';
 import { OPEN_DELAY_S, soonest } from './pokes';
@@ -194,6 +195,7 @@ export function Office({
   parts,
   follow = null,
   onOpen,
+  onPickMap,
 }: {
   project: string;
   /** the project's live agents (main among them) */
@@ -209,6 +211,8 @@ export function Office({
   follow?: string | null;
   /** a click on a bim: open that agent, as its row's click */
   onOpen: (agent: string) => void;
+  /** his pick in the map chip's menu (MapChip.tsx, bottom left); absent (the town): no chip */
+  onPickMap?: (map: MapId) => void;
 }) {
   const [state, setState] = useState<OfficeState>('loading');
   // the scene fades in once its first frame is drawn and the fold has grown (Fold.tsx)
@@ -229,6 +233,9 @@ export function Office({
   const tags = useRef(new Map<string, HTMLDivElement>());
   const leaders = useRef<SVGSVGElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
+  // the two corner chips (the map bottom left, '⤢ fit' bottom right): no tag draws under them
+  const mapChipRef = useRef<HTMLDivElement>(null);
+  const fitRef = useRef<HTMLButtonElement>(null);
   // the sleepers' z's (zzz.ts): placed by hand at each draw, a CSS loop between draws
   const zzzRef = useRef<HTMLDivElement>(null);
   const fallRef = useRef<HTMLDivElement>(null);
@@ -327,7 +334,14 @@ export function Office({
       const rank = ranks.current.get(name) ?? 3;
       ins.push({ name, x: h.x, y: h.y, w, h: th, pill: el.dataset.mode === 'pill', rank });
     }
-    const { at, left } = placeTags(ins, box.clientWidth, box.clientHeight);
+    const at0 = box.getBoundingClientRect();
+    const keep: KeepRect[] = [];
+    for (const el of [mapChipRef.current, fitRef.current]) {
+      if (el === null) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width > 0) keep.push({ left: r.left - at0.left, top: r.top - at0.top, w: r.width, h: r.height });
+    }
+    const { at, left } = placeTags(ins, box.clientWidth, box.clientHeight, keep);
     const more = left > 0 && live.current.held ? bims.held_left_out({ n: left }) : '';
     if (moreRef.current !== null && moreRef.current.textContent !== more) moreRef.current.textContent = more;
     let lines = '';
@@ -767,9 +781,17 @@ export function Office({
             {newTag.text}
           </div>
         )}
+        {/* the map chip, bottom left, a project's office only (the town passes no onPickMap) */}
+        {onPickMap !== undefined && (
+          <div ref={mapChipRef} className="bims-mapsel" data-testid="app.right.bims.mapsel">
+            <MapChip map={map} onPick={onPickMap} />
+          </div>
+        )}
+        {/* '⤢ fit', bottom right, while zoomed or following */}
         {!fitted && (
           <Press
-            look="bims-fit"
+            ref={fitRef}
+            look="bims-chip bims-fit"
             data-testid="app.right.bims.fit"
             {...tipAttrs(bims.fit_tip, 'esc')}
             onClick={(e) => {
