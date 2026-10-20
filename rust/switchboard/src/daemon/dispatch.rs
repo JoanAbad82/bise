@@ -51,8 +51,14 @@ impl Shell {
     pub(super) fn serve(&mut self, rx: Receiver<Msg>, tick_queued: &TickFlag) -> bool {
         let mut inbox = Inbox::new(rx, Msg::is_urgent);
         let keep = loop {
-            if self.state_gate.due(now_ms()) {
+            // a client's message waiting goes first (inbox push_now)
+            if self.state_gate.due(now_ms()) && inbox.push_now() {
+                // watched like a message: a slow push says so in hub.log
+                self.loop_watch.on("state push".into());
                 self.push_state();
+                if let Some(l) = self.loop_watch.idle() {
+                    log_line(&self.opts.paths, &l);
+                }
             }
             let m = match inbox.next(self.state_gate.wait(now_ms())) {
                 Next::Msg(m) => m,

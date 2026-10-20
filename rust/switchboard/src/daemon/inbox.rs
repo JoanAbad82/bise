@@ -16,6 +16,12 @@
 //! never starves the rest: after [`URGENT_RUN`] urgent messages in a row,
 //! one of the rest.
 //!
+//! A due state push waits for the urgent lane too ([`Inbox::push_now`],
+//! send-fast): the loop pushed before it took the next message, so his
+//! send waited behind a whole push (on his hub 60% of the loop's time,
+//! 2026-10-20). Bounded the same way: after [`URGENT_RUN`] deferrals in
+//! a row, the push goes.
+//!
 //! Pure over the channel: no clock, no hub; `daemon::run` reads it.
 
 use std::collections::VecDeque;
@@ -42,11 +48,26 @@ pub(super) struct Inbox<T> {
     rest: VecDeque<T>,
     /// Urgent messages taken since the last one of the rest.
     run: usize,
+    /// Due pushes put off for the urgent lane, in a row.
+    deferred: usize,
 }
 
 impl<T> Inbox<T> {
     pub(super) fn new(rx: Receiver<T>, urgent_of: fn(&T) -> bool) -> Inbox<T> {
-        Inbox { rx, urgent_of, urgent: VecDeque::new(), rest: VecDeque::new(), run: 0 }
+        Inbox { rx, urgent_of, urgent: VecDeque::new(), rest: VecDeque::new(), run: 0, deferred: 0 }
+    }
+
+    /// A state push is due: true when it goes now; false while an urgent
+    /// message waits (it goes first), at most [`URGENT_RUN`] times in a
+    /// row, so a flooding client never starves the push.
+    pub(super) fn push_now(&mut self) -> bool {
+        self.drain();
+        if self.urgent.is_empty() || self.deferred >= URGENT_RUN {
+            self.deferred = 0;
+            return true;
+        }
+        self.deferred += 1;
+        false
     }
 
     /// The next message: an urgent one first (within the fairness bound),
@@ -152,6 +173,40 @@ mod tests {
         let at = |r| got.iter().position(|m| *m == r).unwrap();
         assert_eq!(at("r1"), URGENT_RUN);
         assert_eq!(at("r2"), 2 * URGENT_RUN + 1);
+    }
+
+    /// Law (send-fast): a client's line that waits goes before a due
+    /// state push; with nothing urgent the push goes at once.
+    #[test]
+    fn a_clients_line_goes_before_a_due_push() {
+        let (tx, rx) = channel();
+        let mut i = Inbox::new(rx, client);
+        assert!(i.push_now(), "nothing waits: the push goes");
+        tx.send("r1").unwrap();
+        assert!(i.push_now(), "a REPL line waits behind the push");
+        tx.send("c-send").unwrap();
+        assert!(!i.push_now(), "his send waits: the push waits");
+        assert_eq!(take(&mut i, 1), ["c-send"]);
+        assert!(i.push_now(), "then the push");
+        assert_eq!(take(&mut i, 1), ["r1"]);
+    }
+
+    /// Law (architect m_35024): a push is never starved: client lines in
+    /// a row put it off URGENT_RUN times at most.
+    #[test]
+    fn a_flooding_client_never_starves_the_push() {
+        let (tx, rx) = channel();
+        for _ in 0..(3 * URGENT_RUN) {
+            tx.send("c").unwrap();
+        }
+        let mut i = Inbox::new(rx, client);
+        let mut taken = 0;
+        while !i.push_now() {
+            take(&mut i, 1);
+            taken += 1;
+        }
+        assert_eq!(taken, URGENT_RUN);
+        assert!(!i.push_now(), "the next push waits again for a client still waiting");
     }
 
     #[test]
