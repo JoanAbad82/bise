@@ -729,7 +729,39 @@ def candidate_then_promote():
               "a failed repack leaves the try checkout, stamp and candidate as they were")
         builds.pop()
 
-        stamp = T.promote(env, b, repo=repo)
+        # promote-lock: a pass on the candidate holds cand.sh's lock (a lockf, as cand.sh takes it,
+        # on this test's HOME): the promote refuses after its wait with nothing moved, the candidate
+        # dir intact; a pass that ends within the wait lets it through
+        import threading
+        import cand_lock as L
+        env["HOME"] = os.path.join(w, "home")
+        base = L.lock_base(env["HOME"], c["app"])
+        os.makedirs(os.path.dirname(base))
+        with open(base + ".holder", "w") as f:
+            f.write("pid 4242 since now, out q, app %s" % c["app"])
+        hold = subprocess.Popen(["/usr/bin/lockf", base + ".lock", "sleep", "60"])
+        check(wait.until(lambda: subprocess.run(["/usr/bin/lockf", "-t", "0", base + ".lock", "true"], capture_output=True).returncode == 75,
+                         10, "the pass holds the lock"), "the stand-in pass holds the candidate lock")
+        try:
+            T.promote(dict(env, CAND_LOCK_WAIT="1"), b, repo=repo)
+            check(False, "a promote while a pass holds the candidate lock")
+        except T.TryError as e:
+            check("refused" in str(e) and "pid 4242" in str(e), "the refusal names the pass: %s" % e)
+        check(git("rev-parse", "HEAD", cwd=trysrc) == a and open(T.stamp_path(paths)).read() == before and T.cand_built(c)
+              and os.path.isdir(c["src"]), "a refused promote moves nothing and the candidate dir survives")
+        builds.pop()   # its repack: the counts below are the promote that goes through
+        said = []
+        T.say = said.append
+        threading.Thread(target=lambda: wait.until(lambda: any("held by" in s for s in said), 30, "promote waits") and hold.kill(),
+                         daemon=True).start()
+
+        stamp = T.promote(dict(env, CAND_LOCK_WAIT="60"), b, repo=repo)
+        hold.wait()
+        T.say = lambda *x: None
+        check(any("held by pid 4242" in s and "waiting up to 60 s" in s for s in said), "the promote said it waits for the pass: %s" % said)
+        check(not os.path.exists(base + ".lock") or "desktop-try --promote" in open(base + ".holder").read(),
+              "the promote held the lock as its holder")
+        env["HOME"] = genv["HOME"]
         m = T.try_module(trysrc)
         tp = m.try_paths(env)
         check(len(builds) == 2, "promote repacks once: %d" % len(builds))
@@ -758,6 +790,28 @@ def candidate_then_promote():
             pass
     finally:
         T.subprocess.run, T.say = real_run, real_say
+        shutil.rmtree(w, ignore_errors=True)
+
+
+def cand_users():
+    """promote-lock: cand_lock.users(dir) finds a process running from under a candidate dir (a copy
+    of /bin/sleep there), by the given or the resolved path, and nothing once it ended."""
+    import cand_lock as L
+    w = tempfile.mkdtemp(prefix="dt-users-")
+    p = None
+    try:
+        # /bin/sleep named as if it ran from the dir (ps shows argv; a copied platform binary is killed)
+        os.makedirs(os.path.join(w, "cand", "dist"))
+        p = subprocess.Popen([os.path.join(os.path.realpath(w), "cand", "dist", "sleep"), "60"], executable="/bin/sleep")
+        d = os.path.join(w, "cand")
+        check(wait.until(lambda: p.pid in [u for u, _ in L.users(d)], 10, "the user shows"), "users() finds a process under the dir")
+        check(L.users(os.path.join(w, "other")) == [], "nothing under another dir")
+        p.kill()
+        p.wait()
+        check(wait.until(lambda: L.users(d) == [], 10, "no user"), "no user once it ended")
+    finally:
+        if p and p.poll() is None:
+            p.kill()
         shutil.rmtree(w, ignore_errors=True)
 
 
@@ -853,6 +907,7 @@ if __name__ == "__main__":
     quit_only_this_bundle()
     real_open_in_background_offscreen()
     candidate_then_promote()
+    cand_users()
     if "--pure" not in sys.argv:
         hook_keeps_pid()
         integration()

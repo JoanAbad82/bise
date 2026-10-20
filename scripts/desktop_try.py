@@ -66,6 +66,7 @@ import time
 from desktop_try_env import (GATE, SELF_CONTAINED, TryError, clone_names, config_for_try, guard, his_env,  # one module,
                              his_bise, his_repos, homes, keep_old_root, live_build, not_swapped, self_contained, try_env,
                              under)  # split for its size
+import cand_lock  # cand.sh's lock on a candidate, held by --promote
 from heavy_slot import HEAVY_RUN, heavy_argv, under_heavy_slot  # noqa: F401  (desktop_dmg, the tests read them here)
 from try_procs import hub_socks, stop_hub, try_pids  # split for its size
 from try_build import incremental, promote_install, root_script, work_build_paths, work_paths  # noqa: F401  (root_script: desktop_app's)
@@ -404,7 +405,7 @@ def swap_staged(paths):
 # root. Once the gate passes, --promote <sha> repacks that build as his 'bise try' (repack_script:
 # electron-builder --dir on the candidate's own out/, bise, helper and root; no rebuild), moves the
 # try checkout to that sha and the bundle and root into the try's staged place: they go live at
-# once when no try is open, else at his next --try.
+# once when no try is open, else at his next --try; under cand.sh's lock on it (cand_lock.py).
 
 
 def try_checkout(env):
@@ -529,6 +530,19 @@ def promote(env, sha, checkout=None, repo=REPO):
         raise TryError("the repack as %s failed (exit %d)" % (APP_ID, r.returncode))
     if bundle_id(probe["promoted"]) != APP_ID or not os.path.exists(packed_bise(probe["promoted"])):
         raise TryError("the repack in %s is not %s with its bise inside (id: %s)" % (probe["promoted_dir"], APP_ID, bundle_id(probe["promoted"])))
+    # the moves hold cand.sh's lock on the candidate, taken once the heavy slot is let go (no deadlock with
+    # a pass waiting in a slot); a pass runs: wait up to CAND_LOCK_WAIT s (7200), then refuse, nothing moved
+    try:
+        with cand_lock.held(env.get("HOME") or os.path.expanduser("~"), probe["app"], "desktop-try --promote %s" % sha[:12],
+                            float(env.get("CAND_LOCK_WAIT") or 7200), say):
+            return promote_locked(env, sha, checkout, repo, probe, sign)
+    except cand_lock.Busy as e:
+        raise TryError("promote %s refused, nothing moved: %s" % (sha[:8], e))
+
+
+def promote_locked(env, sha, checkout, repo, probe, sign):  # promote's moves, under the candidate's lock
+    if not cand_built(probe):
+        raise TryError("the candidate %s went while promote waited for its lock" % sha[:8])
     run(["git", "-C", checkout, "checkout", "-q", "--detach", sha], env)
     m = try_module(checkout)
     tp = m.try_paths(env)
@@ -552,9 +566,12 @@ def promote(env, sha, checkout=None, repo=REPO):
     if live_root and live_root != root:
         new["live_root"] = live_root
     write_stamp(tp, new)
-    # the candidate is used up: its worktree and dir go
-    subprocess.run(["git", "-C", repo, "worktree", "remove", "--force", probe["src"]], env=env, capture_output=True)
-    shutil.rmtree(probe["dir"], ignore_errors=True)
+    # the candidate is used up: its worktree and dir go, unless a process still runs from it
+    if busy := cand_lock.users(probe["dir"]):
+        say("kept %s: %d process(es) still run from it (pid %s); remove it once they end" % (probe["dir"], len(busy), busy[0][0]))
+    else:
+        subprocess.run(["git", "-C", repo, "worktree", "remove", "--force", probe["src"]], env=env, capture_output=True)
+        shutil.rmtree(probe["dir"], ignore_errors=True)
     if m.swap_staged(tp):
         say("promoted %s: live now (the previous bundle waits in %s until the new core answers)" % (sha[:8], prev_bundle(tp)))
     else:
