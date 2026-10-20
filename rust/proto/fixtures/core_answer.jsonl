@@ -6,3 +6,4 @@
 {"fx": [], "dirty": false, "view": {"agents": [], "all_agents": false, "msgs": [], "all_msgs": false, "next_msg": 1, "next_card": 1}}
 {"need": {"q": "worktree_create", "name": "b", "with_changes": false}}
 {"error": "json: invalid literal: expected null"}
+{"st": {"agents": [], "order": [], "next_msg": 1}}

@@ -18,6 +18,10 @@ type Link is Data:
   TPing{}
   # view_all
   TView{}
+  # photo
+  TPhoto{}
+  # restore_photo
+  TRestorePhoto{st: J.Json}
   # any other tag
   TStep{}
 
@@ -38,6 +42,12 @@ def TPing.of(i: J.Json) -> Link:
 def TView.of(i: J.Json) -> Link:
   TView{}
 
+def TPhoto.of(i: J.Json) -> Link:
+  TPhoto{}
+
+def TRestorePhoto.of(+i: J.Json) -> Link:
+  TRestorePhoto{K.get_j(i, "st")}
+
 def of.t0(c: Cmp, +t: String, +i: J.Json) -> Link:
   match c:
     case LT{}:
@@ -47,16 +57,25 @@ def of.t0(c: Cmp, +t: String, +i: J.Json) -> Link:
     case GT{}:
       TStep{}
 
-def of.t1(c: Cmp, +t: String, +i: J.Json) -> Link:
+def of.t2(c: Cmp, +t: String, +i: J.Json) -> Link:
   match c:
     case LT{}:
-      of.t0(String.order(t, "init"), t, i)
+      TStep{}
     case EQ{}:
       TPing.of(i)
     case GT{}:
       TStep{}
 
-def of.t3(c: Cmp, +t: String, +i: J.Json) -> Link:
+def of.t1(c: Cmp, +t: String, +i: J.Json) -> Link:
+  match c:
+    case LT{}:
+      of.t0(String.order(t, "init"), t, i)
+    case EQ{}:
+      TPhoto.of(i)
+    case GT{}:
+      of.t2(String.order(t, "ping"), t, i)
+
+def of.t4(c: Cmp, +t: String, +i: J.Json) -> Link:
   match c:
     case LT{}:
       TStep{}
@@ -65,28 +84,37 @@ def of.t3(c: Cmp, +t: String, +i: J.Json) -> Link:
     case GT{}:
       TStep{}
 
-def of.t4(c: Cmp, +t: String, +i: J.Json) -> Link:
+def of.t6(c: Cmp, +t: String, +i: J.Json) -> Link:
   match c:
     case LT{}:
-      of.t3(String.order(t, "replay_many"), t, i)
+      TStep{}
     case EQ{}:
       TView.of(i)
     case GT{}:
       TStep{}
 
-def of.t2(c: Cmp, +t: String, +i: J.Json) -> Link:
+def of.t5(c: Cmp, +t: String, +i: J.Json) -> Link:
   match c:
     case LT{}:
-      of.t1(String.order(t, "ping"), t, i)
+      of.t4(String.order(t, "replay_many"), t, i)
+    case EQ{}:
+      TRestorePhoto.of(i)
+    case GT{}:
+      of.t6(String.order(t, "view_all"), t, i)
+
+def of.t3(c: Cmp, +t: String, +i: J.Json) -> Link:
+  match c:
+    case LT{}:
+      of.t1(String.order(t, "photo"), t, i)
     case EQ{}:
       TReplay.of(i)
     case GT{}:
-      of.t4(String.order(t, "view_all"), t, i)
+      of.t5(String.order(t, "restore_photo"), t, i)
 
-# the record of a tag (a binary search over the 5 sorted tags); any
+# the record of a tag (a binary search over the 7 sorted tags); any
 # other tag: TStep
 def of_tag(+t: String, +i: J.Json) -> Link:
-  of.t2(String.order(t, "replay"), t, i)
+  of.t3(String.order(t, "replay"), t, i)
 
 # one Link from its JSON object
 def of(+i: J.Json) -> Link:
@@ -106,6 +134,10 @@ def kvs(x: Link) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("t", J.JStr{"ping"})]
     case TView{}:
       [J.kv("t", J.JStr{"view_all"})]
+    case TPhoto{}:
+      [J.kv("t", J.JStr{"photo"})]
+    case TRestorePhoto{+st}:
+      [J.kv("t", J.JStr{"restore_photo"}), J.kv("st", st)]
     case TStep{}:
       Nil{}
 
@@ -120,6 +152,8 @@ type Answer is Data:
   AStep{fx: List<&2, J.Json>, dirty: Bool, view: J.Json, msg: Maybe<&2, Nat>, ans_card: Maybe<&2, Nat>, ans_who: Maybe<&2, String>, ans_said: Maybe<&2, String>, ans_ask: Maybe<&2, String>, ans_pick: Maybe<&2, String>}
   # need
   ANeed{need: J.Json}
+  # photo
+  APhoto{st: J.Json}
   # view
   AView{view: J.Json}
   # skipped
@@ -136,6 +170,9 @@ def AStep.of(+i: J.Json) -> Answer:
 
 def ANeed.of(+i: J.Json) -> Answer:
   ANeed{K.get_j(i, "need")}
+
+def APhoto.of(+i: J.Json) -> Answer:
+  APhoto{K.get_j(i, "st")}
 
 def AView.of(+i: J.Json) -> Answer:
   AView{K.get_j(i, "view")}
@@ -158,6 +195,8 @@ def answer_kvs(x: Answer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       K.cat([[J.kv("fx", J.JArr{fx}), J.kv("dirty", J.JBool{dirty}), J.kv("view", view)], K.omit_mn("msg", msg), K.omit_mn("ans_card", ans_card), K.omit_ms("ans_who", ans_who), K.omit_ms("ans_said", ans_said), K.omit_ms("ans_ask", ans_ask), K.omit_ms("ans_pick", ans_pick)])
     case ANeed{+need}:
       [J.kv("need", need)]
+    case APhoto{+st}:
+      [J.kv("st", st)]
     case AView{+view}:
       [J.kv("view", view)]
     case ASkipped{+skipped}:
@@ -177,6 +216,9 @@ def answer_step(+fx: List<&2, J.Json>, +dirty: Bool, +view: J.Json, +msg: Maybe<
 
 def answer_need(+need: J.Json) -> J.Json:
   answer_json(ANeed{need})
+
+def answer_photo(+st: J.Json) -> J.Json:
+  answer_json(APhoto{st})
 
 def answer_view(+view: J.Json) -> J.Json:
   answer_json(AView{view})

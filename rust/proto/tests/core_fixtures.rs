@@ -74,6 +74,7 @@ fn every_answer_line_round_trips() {
         let tag = match &a {
             Answer::Step(_) => "step",
             Answer::Need(_) => "need",
+            Answer::Photo(_) => "photo",
             Answer::View(_) => "view",
             Answer::Skipped(s) if matches!(s.skipped, Skipped::One(_)) => "skipped",
             Answer::Skipped(_) => "skipped_at",

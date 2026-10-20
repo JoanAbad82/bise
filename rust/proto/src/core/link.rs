@@ -19,6 +19,13 @@ core_kinds! {
         Ping = "ping" => TPing {},
         /// the whole view
         ViewAll = "view_all" => TView {},
+        /// the durable state as its photo (issue 36), answered `{"st":
+        /// <St photo>}`; read-only, refused while an env query is pending
+        Photo = "photo" => TPhoto {},
+        /// the durable state from a photo, the runtime fresh (issue 36):
+        /// answers `{}`; a photo that is not an object changes nothing and
+        /// answers the error
+        RestorePhoto = "restore_photo" => TRestorePhoto { st: Json },
     }
 }
 
@@ -32,6 +39,7 @@ core_kinds! {
 pub enum Answer {
     Step(AStep),
     Need(ANeed),
+    Photo(APhoto),
     View(AView),
     Skipped(ASkipped),
     Error(AError),
@@ -80,6 +88,12 @@ pub struct AStep {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ANeed {
     pub need: serde_json::Value,
+}
+
+/// `photo`: the durable state, its photo shape (St.photo_json).
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct APhoto {
+    pub st: serde_json::Value,
 }
 
 /// `view_all`: the whole view.
@@ -166,6 +180,7 @@ pub const ANSWER: Table = Table {
         Kind { tag: "step", rust: "Step", bend: "AStep", fields: &[Field::new("fx", FieldKind::Jsons), Field::new("dirty", FieldKind::Bool), Field::new("view", FieldKind::Json), Field::new("msg", FieldKind::OptNatOmit),
             Field::new("ans_card", FieldKind::OptNatOmit), Field::new("ans_who", FieldKind::OptStrOmit), Field::new("ans_said", FieldKind::OptStrOmit), Field::new("ans_ask", FieldKind::OptStrOmit), Field::new("ans_pick", FieldKind::OptStrOmit)] },
         Kind { tag: "need", rust: "Need", bend: "ANeed", fields: &[Field::new("need", FieldKind::Json)] },
+        Kind { tag: "photo", rust: "Photo", bend: "APhoto", fields: &[Field::new("st", FieldKind::Json)] },
         Kind { tag: "view", rust: "View", bend: "AView", fields: &[Field::new("view", FieldKind::Json)] },
         Kind { tag: "skipped", rust: "Skipped", bend: "ASkipped", fields: &[Field::new("skipped", FieldKind::Bool)] },
         Kind { tag: "skipped_at", rust: "Skipped", bend: "ASkippedAt", fields: &[Field::new("skipped", FieldKind::Nats)] },

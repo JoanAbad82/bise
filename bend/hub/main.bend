@@ -36,6 +36,9 @@ import ./picks.bend as PK
 # the link's requests and answers, generated from bise_proto::core
 import ./gen/link.bend as L
 
+# the hub's photo (issue 36): photo / restore_photo
+import ./photo.bend as PH
+
 import ./gen/journal.bend as GJ
 
 import ./gen/fx.bend as F
@@ -97,7 +100,7 @@ def replay(+h: H.Hub, m: Maybe<&2, M.Ev>) -> H.Hub & String:
       (h, J.stringify(L.answer_skipped(True{})))
     case Some{+e}:
       +ok = CO.replay_fresh(H.Hub.d(h), e)
-      (H.Hub{CO.replay_one(ok, H.Hub.d(h), e), H.Hub.r(h)}, J.stringify(Bool.pick(J.Json, ok, L.answer_done(), L.answer_skipped(True{}))))
+      (H.Hub{CO.replay_one(ok, H.Hub.d(h), e), H.Hub.r(h), False{}}, J.stringify(Bool.pick(J.Json, ok, L.answer_done(), L.answer_skipped(True{}))))
 
 # {"t":"replay_many","evs":[..]}: a batch of journal events at boot,
 # answered {"skipped":[<index in the batch>..]} (CO.replay_batch).
@@ -111,10 +114,26 @@ def evs_of(evs: List<&2, J.Json>) -> List<&2, Maybe<&2, M.Ev>>:
 def replay_many.done(p: S.St & List<&2, Nat>, +r: X.R) -> H.Hub & String:
   match p:
     case (+d, +sk):
-      (H.Hub{d, r}, J.stringify(L.answer_skipped_at(sk)))
+      (H.Hub{d, r, False{}}, J.stringify(L.answer_skipped_at(sk)))
 
 def replay_many(+h: H.Hub, +evs: List<&2, J.Json>) -> H.Hub & String:
   replay_many.done(CO.replay_batch(evs_of(evs), H.Hub.d(h), 0n, Nil{}), H.Hub.r(h))
+
+# `photo`: the durable state's photo, or why not (an env query pending)
+def photo.answer(m: Maybe<&2, J.Json>) -> J.Json:
+  match m:
+    case Some{+st}:
+      L.answer_photo(st)
+    case None{}:
+      L.answer_error("photo: an env query is pending")
+
+# `restore_photo`: the hub from the photo; not an object: unchanged
+def restore_photo(m: Maybe<&2, H.Hub>, +h: H.Hub) -> H.Hub & String:
+  match m:
+    case Some{+h2}:
+      (h2, J.stringify(L.answer_done()))
+    case None{}:
+      (h, J.stringify(L.answer_error("restore_photo: only a hub that applied nothing yet, from a photo object")))
 
 # the link's own requests (gen/link.bend, from bise_proto::core::Link);
 # any other tag is a step of sb-core
@@ -130,6 +149,10 @@ def handle.link(l: L.Link, +h: H.Hub, +i: J.Json) -> H.Hub & String:
       (h, J.stringify(L.answer_done()))
     case L.TView{}:
       (h, J.stringify(L.answer_view(V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), True{}, Nil{}, Nil{}, Nil{}))))
+    case L.TPhoto{}:
+      (h, J.stringify(photo.answer(PH.photo(h))))
+    case L.TRestorePhoto{+st}:
+      restore_photo(PH.restore(h, st), h)
     case L.TStep{}:
       answer(V.marks(X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h))), H.commit(h, i))
 

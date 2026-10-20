@@ -210,3 +210,26 @@ tests/fixtures/bend-recv-repro/).
   identity; its check ~4.4 s -> ~4.8 s (7.0 s once under load). Nothing
   imports the photo codec yet: no behaviour change. The text round trip
   (escapes, non-ASCII) moves to chunk 3, where sb-core writes and reads it.
+- **UTF-8 fix, 400fbd1eb** (boot-photo, signed architect m_34484, review-gates
+  m_34728): see "Found on the way" above. His journal copy: 18 -> 4 U+FFFD in
+  a full replay's view.
+- **chunk 3, sb-core photo / restore_photo** (boot-photo): bise_proto
+  Link::Photo / RestorePhoto and Answer::Photo (fixtures), bend/hub/photo.bend
+  (photo: none while an env query is pending; restore: the state from the
+  photo, R fresh in the same workspace; not an object: unchanged, an error
+  answer), main.bend call lines only. A restore takes only a hub that
+  applied nothing yet (Hub.fresh: true at init, false after any step,
+  replay or restore; architect m_34907): a photo never replaces a live
+  state. Laws (bend/laws/photo.bend, ALL PROOFS CHECK): photo_is_the_state,
+  restore_keeps_the_state, restore_only_fresh, replay_from_photo (replay of
+  p ++ t from st == replay of t from the photo of p's state); core tests
+  core_photo_tests.rs (a stepped hub refuses, a fresh one restores once).
+  His journal copy (134,537 events, sb-core with arch): photo after 10, 50,
+  90, 100 % of the events, restored in a fresh sb-core, then the tail: every
+  view_all and photo byte-identical to the full replay's (0 differing); the
+  photo of a restored hub is the same 35,039,299 bytes (125k non-ASCII chars,
+  74 astral: the text round trip). Instructions: full replay 76.5 G; photo
+  (encode) 15.0 G; restore_photo of the 100 % photo 26.8 G (its J.parse ~21 G,
+  the decode ~6 G); so a boot from a fresh photo is ~2.9x cheaper in sb-core
+  than a full replay today (it was ~5x before arch-split made the replay 134
+  -> 76 G); the parse dominates, and chunk 5 (cold records out) shrinks it.

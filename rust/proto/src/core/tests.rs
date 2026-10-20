@@ -182,6 +182,7 @@ fn each_answer_shape_reads_as_its_row_and_writes_back() {
         let rust = match &a {
             Answer::Step(_) => "Step",
             Answer::Need(_) => "Need",
+            Answer::Photo(_) => "Photo",
             Answer::View(_) => "View",
             Answer::Skipped(_) => "Skipped",
             Answer::Error(_) => "Error",

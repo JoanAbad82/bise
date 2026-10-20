@@ -70,7 +70,7 @@ type NewTask is Data:
     objective: String, worktree: Bool, with_changes: Bool, parts: String}
 
 type Hub is Data:
-  Hub{d: S.St, r: X.R}
+  Hub{d: S.St, r: X.R, fresh: Bool}
 
 type CardK is Data:
   KQuestion{}
@@ -3089,16 +3089,16 @@ def agent_req(-o: S.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) ->
 
 def Hub.d(x: Hub) -> S.St:
   match x:
-    case Hub{+d, _}:
+    case Hub{+d, _, _}:
       d
 
 def Hub.r(x: Hub) -> X.R:
   match x:
-    case Hub{_, +r}:
+    case Hub{_, +r, _}:
       r
 
 def hub_new(+workspace: String) -> Hub:
-  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}, None{}, Nil{}}}
+  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}, None{}, Nil{}}, True{}}
 
 # the context of one input over the hub
 def start(+h: Hub, +i: J.Json) -> X.Cx<Hub.d(h)>:
@@ -3694,7 +3694,7 @@ def commit.go(-o: S.St, need: Maybe<&2, J.Json>, +c: X.Core<o>, +r: X.R, +h: Hub
     case Some{+q}:
       Turn{h, Nil{}, Some{q}}
     case None{}:
-      Turn{Hub{X.Core.d(o, c), X.R.with_ans(r, Nil{})}, X.Core.fx(o, c), None{}}
+      Turn{Hub{X.Core.d(o, c), X.R.with_ans(r, Nil{}), False{}}, X.Core.fx(o, c), None{}}
 
 def commit.cx(-o: S.St, cx: X.Cx<o>, +h: Hub) -> Turn:
   match cx:

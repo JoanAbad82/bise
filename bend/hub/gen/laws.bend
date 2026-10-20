@@ -1043,6 +1043,18 @@ law link_view_all_bare:
 def link_view_all_bare():
   {==}
 
+law link_photo_bare:
+  {LINK.of(J.obj([J.kv("t", J.JStr{"photo"})])) == LINK.TPhoto{} : LINK.Link}
+
+def link_photo_bare():
+  {==}
+
+law link_restore_photo_bare:
+  {LINK.of(J.obj([J.kv("t", J.JStr{"restore_photo"})])) == LINK.TRestorePhoto{J.JNull{}} : LINK.Link}
+
+def link_restore_photo_bare():
+  {==}
+
 law link_unknown_tag:
   {LINK.of(J.obj([J.kv("t", J.JStr{"weather"})])) == LINK.TStep{} : LINK.Link}
 
@@ -1086,6 +1098,19 @@ law link_TView_round:
   {LINK.of(LINK.json(LINK.TView{})) == LINK.TView{} : LINK.Link}
 
 def link_TView_round():
+  {==}
+
+law link_TPhoto_round:
+  {LINK.of(LINK.json(LINK.TPhoto{})) == LINK.TPhoto{} : LINK.Link}
+
+def link_TPhoto_round():
+  {==}
+
+law link_TRestorePhoto_round:
+  for st: J.Json
+  {LINK.of(LINK.json(LINK.TRestorePhoto{st})) == LINK.TRestorePhoto{st} : LINK.Link}
+
+def link_TRestorePhoto_round(st):
   {==}
 
 # ---- Fx ----
@@ -1691,6 +1716,13 @@ law answer_need_round:
   {LINK.ANeed.of(LINK.answer_json(LINK.ANeed{need})) == LINK.ANeed{need} : LINK.Answer}
 
 def answer_need_round(need):
+  {==}
+
+law answer_photo_round:
+  for st: J.Json
+  {LINK.APhoto.of(LINK.answer_json(LINK.APhoto{st})) == LINK.APhoto{st} : LINK.Answer}
+
+def answer_photo_round(st):
   {==}
 
 law answer_view_round:
