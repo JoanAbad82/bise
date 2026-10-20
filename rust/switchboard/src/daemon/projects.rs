@@ -22,6 +22,10 @@ use crate::view::{self, Writer};
 pub(super) struct Projects {
     writer: Writer,
     since: Since,
+    /// The last pushed snapshot not written yet: the tick writes it
+    /// (send-fast: the tick built a whole new snapshot for it, pages and
+    /// artifacts read from disk, 12% of his loop's time).
+    pending: Option<Snapshot>,
 }
 
 impl Projects {
@@ -51,14 +55,21 @@ impl Shell {
         let now = now_ms();
         self.projects.writer.changed(now);
         if self.projects.writer.due(now) {
+            self.projects.pending = None;
             self.view_write(snap, None);
+        } else {
+            self.projects.pending = Some(snap.clone());
         }
     }
 
-    /// At each tick: a change not written yet, once the debounce allows.
+    /// At each tick: a change not written yet, once the debounce allows:
+    /// the last pushed snapshot (no new build on the loop).
     pub(super) fn view_tick(&mut self) {
         if self.projects.writer.due(now_ms()) {
-            let snap = self.snapshot();
+            let snap = match self.projects.pending.take() {
+                Some(s) => s,
+                None => self.snapshot(),
+            };
             self.view_write(&snap, None);
         }
     }
