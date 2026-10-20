@@ -4,10 +4,12 @@
 // motion (asleep: eyes closed, head down; idle: sunk in the bean bag; failed: slumped; in line: the
 // box). Loops (typing, hot's sweat, the '?' hops, eating at the island) are 'loop' at LOOP_FPS;
 // reduced motion has none.
-import type { Activity, ActivityKind, Doing, Motion, Pose } from '../model';
+import type { Activity, ActivityKind, Doing, Motion, Pose, Pt } from '../model';
 import { walkTime } from '../avoid';
 import { SIT, SIT_S, sitBeat, toWorld } from '../sit';
+import { NAP_UP } from '../timeline';
 import { BEAT, PLANE_CATCH, REACH_S, awayOf } from './catch';
+import { FLAT, NAP_DZ, SINK_DROP, SLING_LIFT, type NapRest } from './nap';
 
 /** rotations in radians: [x, y, z] */
 export type Rot = readonly [number, number, number];
@@ -98,6 +100,8 @@ export interface RigInput {
   /** the bim's own loop phase (palette.outfitOf) */
   readonly phase: number;
   readonly reduced: boolean;
+  /** the bed at a lounge spot (render/nap.ts napRests: its shape, the height its napper rests at); absent: the old fixed recline */
+  readonly bedAt?: (p: Pt) => NapRest | undefined;
 }
 
 export const NO_PROPS: Props = {
@@ -219,13 +223,46 @@ export function workLoops(act: Activity): boolean {
 }
 
 /**
- * napping: sunk in its bed, facing the room, hands folded on its belly (arms out read fallen, and
- * stuck out of the bed: Gabriel, bims-clip; bims m_33943). Its footprint is maps/plan.ts NAP_BED's.
+ * napping, reclined: sunk in a bean bag, on a hammock's cloth, facing the room, hands folded on its
+ * belly (arms out read fallen, and stuck out of the bed: Gabriel, bims-clip; bims m_33943). Its
+ * footprint is maps/plan.ts NAP_BED's. With no bed known (a test's bim): at the loft's bean bag.
  */
 const napping: Body = {
-  ...STAND, y: 0.22, dz: 0.15, body: [-0.9, 0, 0], legL: -0.4, legR: -0.4, armL: [-0.7, 0, 0.75], armR: [-0.7, 0, -0.75],
+  ...STAND, y: 0.22, dz: NAP_DZ.sink, body: [-0.9, 0, 0], legL: -0.4, legR: -0.4, armL: [-0.7, 0, 0.75], armR: [-0.7, 0, -0.75],
   eyes: 0.15, mouth: 'oh', face: 0,
 };
+
+/**
+ * Napping on its bed (bims-nap: they lay in the air, 20 cm over a mat, the back hanging at 52° over a
+ * cushion): flat (a mat, a cushion, a cot, a bench), on its back, back and heels on the bed's top,
+ * its head up on the pillow and tilted to the room (render/nap.ts FLAT); a bean bag, sunk in it;
+ * a hammock, on its cloth.
+ */
+function nappingOn(r: NapRest | undefined): Body {
+  if (!r) return napping;
+  if (r.shape === 'sink') return { ...napping, y: r.top - SINK_DROP };
+  if (r.shape === 'sling') return { ...napping, y: r.top + SLING_LIFT };
+  return {
+    ...napping, y: r.top + FLAT.lift, dz: NAP_DZ.flat, body: [FLAT.body, 0, 0], head: [FLAT.head, 0, 0], legL: FLAT.legs, legR: FLAT.legs,
+  };
+}
+
+/** sat on its flat bed's edge, before it lies back (and after it sits up): its seat on the top, legs out */
+function perched(r: NapRest): Body {
+  return { ...STAND, ...SEATED, y: r.top - 0.18, dz: NAP_DZ.flat, armL: [-0.5, 0, 0.3], armR: [-0.5, 0, -0.3], face: 0, eyes: 0.5 };
+}
+
+/** lying down on its bed (f 0..1, its arrival's beat), or getting up (1..0): on a flat bed it sits on the edge first, never pops into the lie (bims m_35286) */
+function lieDown(r: NapRest | undefined, f: number): Body {
+  const lie = nappingOn(r);
+  const stand: Body = { ...STAND, face: 0, dz: lie.dz };
+  if (!r || r.shape !== 'flat') return blend(stand, lie, ease(f));
+  const sit = perched(r);
+  return f < 0.4 ? blend(stand, sit, ease(f / 0.4)) : blend(sit, lie, ease((f - 0.4) / 0.6));
+}
+
+/** lying down and getting up (s): the beat of its arrival on a bed, of its leaving it (timeline.ts NAP_UP: it waits there that long) */
+export const NAP_DOWN = NAP_UP;
 
 /**
  * asleep at its desk: head down on the arms in front of the laptop, eyes closed, screen off. Leaning
@@ -308,7 +345,7 @@ function eating(fruit: number, stay: number, ph: number): Body {
 }
 
 /** a kind's pose at rest, at loop time lt (lt is 0 under reduced motion); `stay`: s since it arrived (its own loops from there) */
-function rest(act: Activity, lt: number, ph: number, stay = lt): Body {
+function rest(act: Activity, lt: number, ph: number, stay = lt, bed?: NapRest): Body {
   const k = act.k;
   const urgent = act.urgent === true;
   const fruit = act.fruit ?? 0;
@@ -322,7 +359,7 @@ function rest(act: Activity, lt: number, ph: number, stay = lt): Body {
       return { ...STAND, head: [0, 0.35, 0], armR: [0, 0, 2.4], face: Math.PI };
     case 'nap':
       // no bean bag free at this stage (timeline.ts bedFor): it naps at its desk, as one asleep
-      return act.at === 'desk' ? asleep : napping;
+      return act.at === 'desk' ? asleep : nappingOn(bed);
     case 'sleep':
     case 'waitagent':
       return asleep;
@@ -525,12 +562,16 @@ export function rigOf(inp: RigInput): Rig {
   const place = placeOf(pose, reduced);
   const walkT = seg.path.len > 0.01 && seg.from !== null ? walkTime(seg) : 0;
   const arrived = reduced ? !place.fading : !pose.moving;
-  const dur = reduced ? 0 : transitionOf(seg.from, k);
+  // its bed (a napper in the lounge), the one it gets up from (its walk starts there)
+  const bed = k === 'nap' && act.at === 'lounge' ? inp.bedAt?.(seg.spot) : undefined;
+  const left = seg.from === 'nap' && seg.path.len > 0.01 ? inp.bedAt?.(seg.path.pts[0] ?? seg.spot) : undefined;
+  const down = bed !== undefined && walkT > 0;
+  const dur = reduced ? 0 : down ? NAP_DOWN : transitionOf(seg.from, k);
   // at its desk without a walk: its activity's pose after the hop
   const hopT = !reduced && (seg.sit?.up || seg.sit?.down) ? SIT_S.hop : 0;
   const u = pose.since - (reduced ? Math.min(FADE, walkT) : walkT) - hopT;
   // a loop of its own from its arrival (eating); reduced motion holds it chewing, a fruit in hand
-  const target = rest(act, lt, phase, reduced ? PICK_S + BITE_S - 0.2 : Math.max(0, u - dur));
+  const target = rest(act, lt, phase, reduced ? PICK_S + BITE_S - 0.2 : Math.max(0, u - dur), bed);
 
   // its sit at its desk or its get-up (sit.ts): beside its chair, the chair out, a side step, the hop; never through it
   const sat = !reduced ? sitBeat(seg, pose.since) : null;
@@ -538,7 +579,11 @@ export function rigOf(inp: RigInput): Rig {
 
   let b: Body;
   let motion: Motion;
-  if (sat) {
+  if (left && !reduced && pose.since < NAP_DOWN) {
+    // up from its bed before it walks off (timeline.ts NAP_UP: it waits there that long)
+    b = lieDown(left, 1 - pose.since / NAP_DOWN);
+    motion = 'walk';
+  } else if (sat) {
     const { beat } = sat;
     const step = beat.step ? walking(k, t) : STAND;
     const legs = SEATED.legL * beat.legs;
@@ -562,6 +607,10 @@ export function rigOf(inp: RigInput): Rig {
     motion = 'walk';
   } else if (!arrived) {
     b = target; // reduced: the end pose, fading in or out
+    motion = 'walk';
+  } else if (u < dur && down) {
+    // on its bed: it sits on the edge, then lies back
+    b = lieDown(bed, u / dur);
     motion = 'walk';
   } else if (u < dur) {
     // sat down on its walk's end (sit.ts): from seated

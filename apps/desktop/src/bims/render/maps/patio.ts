@@ -305,6 +305,7 @@ export const patio: MapLook = {
   pal,
   shell,
   island,
+  bedShape: 'sling',
   lounge,
   // a small agave on the desk top's back left corner (the lamp's on the right): drawn at the floor
   // it stood inside the desk, its leaves through the top (Gabriel, bims-clip; render/clip.test.ts)

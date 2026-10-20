@@ -289,6 +289,7 @@ export const tropical: MapLook = {
   pal,
   shell,
   island,
+  bedShape: 'sling',
   lounge,
   // a small potted plant on the desk top's back left corner: at the floor it stood inside the desk (bims-clip)
   desk: (b, d, name) => deskOf(b, d, name, { thing: (k, g, h) => { if (h % 4 === 1) potted(k, onTop(g, -0.47, 0.7, 0.33), 0, 0, SUN, LEAF, 0.2); } }),

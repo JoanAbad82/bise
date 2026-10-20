@@ -15,6 +15,7 @@ import { DAY, HOODIE, NIGHT, type Palette, WORLD, hash, rng } from '../palette';
 import { bigPlant, boombox, cones, deckChairs, fruitBowl, garden, loftTree, mural, whiteboard } from '../stages';
 import type { Build, DeskHandles } from './look';
 import { frameXs } from '../cozy';
+import { bedGroup } from '../nap';
 
 // ---- palettes
 
@@ -116,7 +117,7 @@ export function beds(b: Build, draw: (k: Kit, parent: Object3D, box: Box, i: num
     if (i < BASE_BEDS || i >= n) return;
     const box = o.furniture.find((f) => f.of && f.of.x === sp.x && f.of.z === sp.z);
     if (!box) return;
-    draw(b.k, b.stage(bedStage(i)) ?? s0, box, i);
+    draw(b.k, bedGroup(b.stage(bedStage(i)) ?? s0, sp), box, i);
   });
 }
 

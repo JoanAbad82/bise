@@ -587,6 +587,7 @@ export const california: MapLook = {
   pal: (n) => (n ? CAL_NIGHT : CAL_DAY),
   shell,
   island,
+  bedShape: 'sink',
   lounge: loftLounge,
   desk: (b, spot, name): DeskHandles => loft.desk(b, spot, name),
   mainDesk: (b, name): DeskHandles => loft.mainDesk(b, name),

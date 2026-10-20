@@ -14,6 +14,7 @@ import type { SahelOffice } from '../../maps/sahel';
 import type { Kit } from '../kit';
 import { DAY, NIGHT, WORLD, hash } from '../palette';
 import type { Build, MapLook, Wear } from './look';
+import { pillow } from '../cozy';
 import {
   beds, cone, deskOf, floorOf, frames, gameTable, glow, grow, mainDeskOf, nc, palOf, patterned,
   pieceSpots, plinth, terrace, treeSpots, type Piece, pastNap,
@@ -132,8 +133,9 @@ function lounge(b: Build): void {
   beds(b, (g, box, i) => {
     const x = (box.x0 + box.x1) / 2;
     const z = (box.z0 + box.z1) / 2;
-    mat(k, g, x, z, 0.75, 0.6, MATS[i % 4] ?? STRAW);
-    k.add(k.style.capsule(0.07, 0.4), k.mat(MATS[(i + 1) % 4] ?? STRAW), g, x, 0.1, box.z0 + 0.05).rotation.z = Math.PI / 2;
+    // the bed's size (bims-nap: a 0.6 mat held half a lying bim)
+    mat(k, g, x, z, box.x1 - box.x0 - 0.06, box.z1 - box.z0 - 0.06, MATS[i % 4] ?? STRAW);
+    pillow(k, g, box, 0.045, MATS[(i + 1) % 4] ?? STRAW);
   });
 }
 

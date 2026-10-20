@@ -76,6 +76,7 @@ export const campus: MapLook = {
   ),
   shell,
   island,
+  bedShape: 'sink',
   lounge: loftLounge,
   desk: (b, d, name) => turnedDesk(b, d, name, { w: 1.6, d: 0.78, at: 0.5 }),
   mainDesk: (b) => {

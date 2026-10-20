@@ -116,6 +116,7 @@ export const loft: MapLook = {
   pal: paletteOf,
   shell,
   island,
+  bedShape: 'sink',
   lounge: loftLounge,
   desk,
   mainDesk: (b) => mainDesk(b),

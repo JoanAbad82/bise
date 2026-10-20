@@ -17,6 +17,8 @@ import { type Kit, boxOf, onFloor } from '../kit';
 import { HOODIE, WORLD, hash } from '../palette';
 import { ahead, beds, bigDesk, boxHolding, grow, onPlinth, palettes, pieceAtOf, plainFrame, pool, type Grower, type Piece } from './blook';
 import type { Build, DeskHandles, MapLook } from './look';
+import { pillow } from '../cozy';
+import { boxTop } from '../style';
 
 const PINE = '#d9b98a';
 const DARK_WOOD = '#6b4a32';
@@ -268,8 +270,10 @@ function lounge(b: Build): void {
     for (let i = 0; i < 4; i++) k.add(style.box(Math.min(2.2, l1 - l0), 0.025, 0.06), k.mat(WORLD.paper), s3, (l0 + l1) / 2, 0.04, 2.65 + i * 0.22);
   }
   beds(b, (kk, parent, box) => {
-    const s = kk.add(kk.style.ball(0.4), kk.mat(night ? '#c9c4bb' : SKIN), parent, (box.x0 + box.x1) / 2, 0.05, (box.z0 + box.z1) / 2);
-    s.scale.set(1.0, 0.18, 0.9);
+    // a sheepskin the bed's size, flat on the floor (bims-nap: a round one held half a lying bim)
+    const c = night ? '#c9c4bb' : SKIN;
+    kk.add(kk.style.box(box.x1 - box.x0 - 0.06, 0.06, box.z1 - box.z0 - 0.06, 0.03), kk.mat(c), parent, (box.x0 + box.x1) / 2, 0.05, (box.z0 + box.z1) / 2);
+    pillow(kk, parent, box, boxTop(0.05, 0.06, 0.03), '#9a958c');
   });
 }
 

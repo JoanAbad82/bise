@@ -10,6 +10,7 @@
 import { Group, type Object3D } from 'three';
 import type { Box, Office, Pt } from '../model';
 import { BASE_BEDS, bedStage, bedsAt, chairStage, chairsAt, type Grow } from '../growth';
+import { bedGroup } from './nap';
 import { type Decor, decorOf, terraceSlab } from './decor';
 import { type Kit, boxOf, glyph, onFloor } from './kit';
 import { WORLD, hash, rng } from './palette';
@@ -158,7 +159,9 @@ export function loftLounge(b: Build): void {
     // the first two: the cozy kit's base beds (render/cozy.ts)
     if (i < BASE_BEDS || i >= nBeans) return;
     const st = bedStage(i);
-    const bag = k.add(style.ball((b.x1 - b.x0) / 2 / 1.05 / 0.92), k.mat(WORLD.bean[i % WORLD.bean.length] ?? pal.rug), s(st) ?? s0, (b.x0 + b.x1) / 2, 0.2, (b.z0 + b.z1) / 2);
+    // its own group, tagged as its bed's (render/nap.ts bedGroup: clip.test tells it from what else stands there)
+    const parent = b.of ? bedGroup(s(st) ?? s0, b.of) : (s(st) ?? s0);
+    const bag = k.add(style.ball((b.x1 - b.x0) / 2 / 1.05 / 0.92), k.mat(WORLD.bean[i % WORLD.bean.length] ?? pal.rug), parent, (b.x0 + b.x1) / 2, 0.2, (b.z0 + b.z1) / 2);
     bag.scale.set(1.05, 0.62, 1.05);
   });
 }

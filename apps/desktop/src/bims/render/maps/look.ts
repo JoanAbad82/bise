@@ -13,6 +13,7 @@ import type { Seat } from '../furniture';
 import type { Palette } from '../palette';
 import type { Style } from '../style';
 import type { CozyLook } from '../cozy';
+import type { NapShape } from '../nap';
 
 /** A desk's parts the frame drives (lightDesk) */
 export interface DeskHandles {
@@ -57,6 +58,8 @@ export interface MapLook {
   island(b: Build): void;
   /** the nap place: a bed per lounge spot the stage has reached (growth.ts bedsAt: lounge spot i has one from that count, the loft's bean bags); a napper past them naps at its desk (timeline.ts bedFor) */
   lounge(b: Build): void;
+  /** its own beds' shape past the cozy kit's two (render/nap.ts: how a napper lies on them); absent: flat */
+  readonly bedShape?: NapShape;
   /** one agent's desk at its spot (its box in Office.furniture), its screen and lamp handed back */
   desk(b: Build, spot: Spot, name: string): DeskHandles;
   /** main's desk, the neon behind it */

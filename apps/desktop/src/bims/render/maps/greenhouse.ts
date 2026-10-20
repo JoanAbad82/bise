@@ -84,6 +84,7 @@ export const greenhouse: MapLook = {
   ),
   shell,
   island,
+  bedShape: 'sink',
   lounge: loftLounge,
   desk: (b, d, name) => turnedDesk(b, d, name, { w: 1.1, d: 0.55, at: 0.5 }),
   mainDesk: (b) => {

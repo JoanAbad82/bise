@@ -62,6 +62,8 @@ interface Over {
 /** seconds at the spot (spec §6): a coffee and a chat, a post-it or a tap, a sheet handed to main */
 export const COFFEE_S = 6;
 export const VISIT_S = 3;
+/** a napper gets up from its bed (s) before it walks off: it sits up, then stands (render/pose.ts lieDown) */
+export const NAP_UP = 1.0;
 export const REPORT_S = 3;
 /** an event older than this when it reaches the office is not played (a late or replayed one) */
 const STALE_S = 10;
@@ -355,7 +357,9 @@ function walk(o: Office, t: number, act: Activity, sig: string, from: { x: numbe
   const head = sit.out ? p.pts.slice(0, 3) : [];
   const tail = sit.in ? p.pts.slice(-2) : [];
   const headLen = makePath(head).len;
-  const headT = sit.out ? (sit.out.standing ? 0 : SIT_S.hop) + headLen / seg.speed + SIT_S.back : 0;
+  // up from its bed first (bims-nap: never a pop out of the lie)
+  const up = was && was.act.k === 'nap' && was.act.at === 'lounge' && near(from, was.spot) ? NAP_UP : 0;
+  const headT = (sit.out ? (sit.out.standing ? 0 : SIT_S.hop) + headLen / seg.speed + SIT_S.back : 0) + up;
   const start = head.at(-1) ?? from;
   const end = sit.in ? (p.pts.at(-3) ?? spot) : spot;
   // beside its chair taken (a visitor stands there): it stays seated and tries again
@@ -370,8 +374,8 @@ function walk(o: Office, t: number, act: Activity, sig: string, from: { x: numbe
   const reached = !sit.in || (plan.pts.at(-1) !== undefined && near(plan.pts.at(-1) as Spot, end) && tailFree);
   const pts = [...head, ...plan.pts.slice(head.length > 0 ? 1 : 0), ...(reached ? tail : [])];
   const walked = makePath(pts);
-  const waits = plan.waits.map((w) => ({ d: w.d + headLen, s: w.s }));
-  const planned: Segment = { ...seg, t: sit.out ? t : plan.t, speed, path: walked, ...(waits.length > 0 ? { waits } : {}) };
+  const waits = [...(up > 0 ? [{ d: 0, s: up }] : []), ...plan.waits.map((w) => ({ d: w.d + headLen, s: w.s }))];
+  const planned: Segment = { ...seg, t: sit.out || up > 0 ? t : plan.t, speed, path: walked, ...(waits.length > 0 ? { waits } : {}) };
   const sat = sitWay(walked, sit.in && reached ? { spot, act } : null, sit.out && was ? { spot: was.spot, act: was.act } : null);
   return [sat.in || sat.out ? { ...planned, sit: sat, waits: seatWaits(walked, sat, waits) } : planned, true];
 }

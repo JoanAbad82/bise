@@ -7,7 +7,8 @@
 //   napper (pose.ts napping, the bim as bim.ts builds it, each mesh's own box) lies inside its own
 //   bed (maps/plan.ts napBedAt);
 // - the world as world.ts builds it, the smallest and the biggest office, stages 0..14: under a
-//   desk's top nothing but the desk; through a bed nothing but its own pieces; through a napper on
+//   desk's top nothing but the desk; through a bed nothing but its own pieces (render/nap.ts bedGroup
+//   tags them: riad's tea table stood in bed 5 and counted as its own, bims-nap); through a napper on
 //   each bed the stage has, nothing but its own bed's low pieces (a cushion, a hammock's cloth: never
 //   a post, a frame or a backrest 0.5 tall); through a bim at its desk nothing but its desk and its
 //   chair. A merged cozy mesh counts by its pieces (render/cozy.ts meshBoxes); flat things on the
@@ -22,7 +23,8 @@ import { Box3, Mesh, type Object3D, Vector3 } from 'three';
 import { crowd } from '../fixtures';
 import { layoutOf, readyMaps } from '../maps';
 import { bedsAt, LAST_STAGE, NO_GROW } from '../growth';
-import type { Activity, Box, Office, Pose, Spot } from '../model';
+import type { Activity, Box, Office, Pose, Pt, Spot } from '../model';
+import { bedKey, bedPieces, restAt, shapeAt, type NapRest } from './nap';
 import { buildWorld } from './world';
 import { meshBoxes } from './cozy';
 import { lookOf } from './maps';
@@ -52,13 +54,13 @@ function shown(m: Object3D): boolean {
 }
 
 /** each mesh's box of the bim `name` posed with `act` at `spot`, world units, shrunk by SLACK; `head`: its head's box alone */
-function bimBoxes(name: string, spot: Spot, act: Activity, head = false): Box3[] {
+function bimBoxes(name: string, spot: Spot, act: Activity, head = false, bedAt?: (p: Pt) => NapRest | undefined): Box3[] {
   const bim = makeBim(name, false, STYLE);
   const pose: Pose = {
     x: spot.x, z: spot.z, dir: spot.face, moving: false, since: 30,
     seg: { t: 0, act, sig: act.k, spot, path: { pts: [spot], seg: [], len: 0 }, speed: 2.4, from: null },
   };
-  bim.apply(rigOf({ pose, t: 30, main: false, phase: 1.3, reduced: false }));
+  bim.apply(rigOf({ pose, t: 30, main: false, phase: 1.3, reduced: false, ...(bedAt ? { bedAt } : {}) }));
   bim.group.updateMatrixWorld(true);
   const out: Box3[] = [];
   let top: Object3D | undefined;
@@ -128,7 +130,9 @@ function planReds(o: Office): string[] {
       if (f === bed || f.of?.x === s.x && f.of.z === s.z) continue;
       if (overlap(bed, f)) out.push(`bed ${String(i)} ${fmtBox(bed)} over ${isBed(o, f) ? 'bed' : 'furniture'} ${fmtBox(f)}`);
     }
-    const body = bimBoxes(napName(i), s, NAP).reduce((a, b) => a.union(b), new Box3());
+    // its napper as it lies on its bed's shape (render/nap.ts), on a cushion's height
+    const rest: NapRest = { shape: shapeAt(lookOf(o.map), i), top: 0.2 };
+    const body = bimBoxes(napName(i), s, NAP, false, () => rest).reduce((a, b) => a.union(b), new Box3());
     if (!within(body, bed, 0)) out.push(`napper ${String(i)} ${fmt(body)} off its bed ${fmtBox(bed)}`);
   });
   return out;
@@ -138,6 +142,10 @@ function planReds(o: Office): string[] {
 function worldReds(o: Office, stage: number, seated: ReadonlyMap<string, Box3[]>): string[] {
   const w = buildWorld(o, 'main', STYLE, lookOf(o.map), false, { ...NO_GROW, stage });
   const meshes = meshBoxes(w.root).filter((b) => !b.isEmpty() && b.max.y >= FLAT);
+  // each bed's own pieces, as tagged (render/nap.ts bedGroup): anything else in its box is in the way (bims m_35422: riad's tea table stood in bed 5)
+  const pieces = bedPieces(w.root);
+  const naps = w.naps;
+  const bedAt = (p: Pt): NapRest | undefined => restAt(o, naps, p);
   w.dispose();
   const out: string[] = [];
   // under a desk's top: the desk alone (its body and top cover most of its floor box)
@@ -161,9 +169,10 @@ function worldReds(o: Office, stage: number, seated: ReadonlyMap<string, Box3[]>
     if (!bed) return;
     // the bed's own height (a hammock's posts); what hangs on the wall over its head is the napper's to clear
     const v = volume(bed, 0.05, FLAT, 0.9);
-    const body = bimBoxes(napName(i), s, NAP);
+    const body = bimBoxes(napName(i), s, NAP, false, bedAt);
+    const mine = pieces.get(bedKey(s)) ?? [];
     for (const m of meshes) {
-      const own = within(m, bed, 0.1);
+      const own = mine.some((p) => p.equals(m));
       if (!own && m.intersectsBox(v)) out.push(`bed ${String(i)} ${fmtBox(bed)}: ${fmt(m)} through it`);
       if (own && m.max.y - m.min.y < SOFT_H) continue;
       if (body.some((p) => p.intersectsBox(m))) out.push(`napper ${String(i)}: ${fmt(m)} through it`);
@@ -187,6 +196,8 @@ function worldReds(o: Office, stage: number, seated: ReadonlyMap<string, Box3[]>
 function stringReds(o: Office): string[] {
   const w = buildWorld(o, 'main', STYLE, lookOf(o.map), false, { ...NO_GROW, stage: LAST_STAGE });
   w.root.updateMatrixWorld(true);
+  const naps = w.naps;
+  const bedAt = (p: Pt): NapRest | undefined => restAt(o, naps, p);
   const strings: Box3[] = [];
   // a long string in short pieces along it: its whole box on the screen is a wide rectangle its line only crosses
   w.root.traverse((m) => { if (m.userData.string === true) strings.push(...pieces(new Box3().setFromObject(m, true))); });
@@ -195,7 +206,7 @@ function stringReds(o: Office): string[] {
   const out: string[] = [];
   const fits: readonly [string, Fit][] = [['320', fitSite(siteOf(o), 320, 0)], ['640', fitSite(wideSiteOf(o), 640, 0)]];
   o.lounge.slice(0, bedsAt(LAST_STAGE)).forEach((s, i) => {
-    const head = bimBoxes(napName(i), s, NAP, true).reduce((a, b) => a.union(b), new Box3());
+    const head = bimBoxes(napName(i), s, NAP, true, bedAt).reduce((a, b) => a.union(b), new Box3());
     for (const [px, fit] of fits) {
       const r = onScreen(fit, head);
       for (const b of strings) if (depth(b) > depth(head) && meets(r, onScreen(fit, b))) out.push(`${px}: napper ${String(i)}'s head under a string ${fmt(b)}`);

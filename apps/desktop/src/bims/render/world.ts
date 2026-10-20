@@ -34,6 +34,7 @@ import { SHADOW_BLUR, SHADOW_DROP, SLAB_LOW, groundOf } from './camera';
 import { slabWithPits } from './ground';
 import { kitOf } from './kit';
 import { buildCozy } from './cozy';
+import { napRests, type NapRest } from './nap';
 import type { Palette } from './palette';
 import type { Build, DeskHandles, MapLook } from './maps/look';
 import type { Style } from './style';
@@ -51,6 +52,8 @@ export interface World {
   readonly pal: Palette;
   /** each stage's pieces: the unlock moment hides the newest until it is brought in */
   readonly pieces: Pieces;
+  /** each lounge bed's rest at this stage, measured on these meshes (render/nap.ts napRests; pose.ts lays its napper on it) */
+  readonly naps: readonly (NapRest | undefined)[];
   /** the snow on the lawn and the terrace only (never desks or floors, bims m_33030): 0 none .. 1 white */
   cover(level: number): void;
   /** its night glows and lights (kit.ts glow, light: lanterns, pendants, shades, the lamp pools) at this level, 0..1: the sky's lamps */
@@ -190,6 +193,8 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   look.growth(b);
   // what makes it cozy from day one, and cozier at each stage (render/cozy.ts, Office.cozy)
   buildCozy(b, look.cozy, desks, mainName);
+  // what each napper rests on, as built (bims-nap: never in the air over its bed)
+  const naps = napRests(root, o, look, grow.stage);
   if (style.shadows) castShadows(root);
   // the cube's soft shadow on the page (designer m_34173): after castShadows, it takes and casts none
   const under = ground ? cubeShadow(gw, gd, gx, gz) : null;
@@ -213,6 +218,7 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
     mainDesk,
     pal,
     pieces,
+    naps,
     lit(level) {
       if (level === glowing) return;
       glowing = level;

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Activity, ActivityKind, Doing, Path, Pose, Segment, Spot } from '../model';
 import { BEAT, PLANE_CATCH, REACH_S } from './catch';
 import { PLANE_S } from '../timeline';
-import { BITE_S, BITES, FADE, FRUIT_S, PICK_S, PLANE_FLIGHT, louder, placeOf, rigOf, transitionOf, workLoops } from './pose';
+import { BITE_S, BITES, FADE, FRUIT_S, NAP_DOWN, PICK_S, PLANE_FLIGHT, louder, placeOf, rigOf, transitionOf, workLoops } from './pose';
+import { FLAT } from './nap';
 import type { BimEgg } from '../eggs';
 import { eggRig } from './egg';
 import { headClearance } from './laptop';
@@ -307,5 +308,35 @@ describe('sitting (sit.ts seatedAct, bims-sit)', () => {
       const seated = r.legL < -1.2 && Math.hypot(r.x - desk.x, r.z - desk.z) < 1e-6;
       expect(seatedAct(act), `${k} ${String(doing)}`).toBe(seated);
     }
+  });
+});
+
+describe('napping on its bed (render/nap.ts, bims-nap)', () => {
+  const flat = { shape: 'flat' as const, top: 0.05 };
+  const bedAt = (): typeof flat => flat;
+  const nap = (o: Parameters<typeof poseOf>[1]): Pose => poseOf('nap', { ...o, act: { at: 'lounge' } });
+  const at = (p: Pose, t: number) => rigOf({ pose: p, t, main: false, phase: 1.3, reduced: false, bedAt });
+  it('lies on a flat bed at its top: over a mat lower than on the old fixed recline, and flatter', () => {
+    const r = at(nap({}), 20);
+    expect(r.y).toBeCloseTo(flat.top + FLAT.lift, 6);
+    expect(r.body[0]).toBeCloseTo(FLAT.body, 6);
+    const high = at(nap({}), 20);
+    expect(rigOf({ pose: nap({}), t: 20, main: false, phase: 1.3, reduced: false, bedAt: () => ({ shape: 'flat', top: 0.25 }) }).y - high.y).toBeCloseTo(0.2, 6);
+  });
+  it('sits on the edge then lies back on its arrival, never a pop: no jump between 20 ms frames', () => {
+    let prev = at(nap({ path: walk, since: walk.len / 2.4 }), 0);
+    for (let s = walk.len / 2.4; s < walk.len / 2.4 + NAP_DOWN + 0.5; s += 0.02) {
+      const r = at(nap({ path: walk, since: s }), 10 + s);
+      expect(Math.abs(r.body[0] - prev.body[0]), `body at +${s.toFixed(2)}`).toBeLessThan(0.15);
+      expect(Math.abs(r.y - prev.y), `y at +${s.toFixed(2)}`).toBeLessThan(0.05);
+      prev = r;
+    }
+    expect(prev.body[0]).toBeCloseTo(FLAT.body, 6);
+  });
+  it('gets up before it walks off: lying at the start of its walk, standing at NAP_DOWN', () => {
+    const off = (s: number) => at(poseOf('work', { from: 'nap', path: walk, since: s }), 10 + s);
+    expect(off(0).body[0]).toBeCloseTo(FLAT.body, 6);
+    expect(off(NAP_DOWN * 0.7).legL).toBeLessThan(-1);
+    expect(off(NAP_DOWN + 0.01).body[0]).not.toBeCloseTo(FLAT.body, 1);
   });
 });

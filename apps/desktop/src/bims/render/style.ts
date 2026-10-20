@@ -133,6 +133,9 @@ function planks(color: string): CanvasTexture {
   return t;
 }
 
+/** The top of a rounded box (roundBox) of height h, radius r, whose middle is at y: its bevel sits r/4 under y + h/2 (a napper lies on it: render/nap.ts). Pure. */
+export const boxTop = (y: number, h: number, r = 0): number => y + h / 2 - (r > 0 ? Math.max(0.004, Math.min(r, h / 2)) / 4 : 0);
+
 /** a box with rounded edges (the prototype's roundBox): a rounded rect extruded with a 3-step bevel */
 function roundBox(w: number, h: number, d: number, r0: number): BufferGeometry {
   const r = Math.max(0.004, Math.min(r0, w / 2 - 0.001, d / 2 - 0.001, h / 2));

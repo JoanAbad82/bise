@@ -12,6 +12,8 @@ import type { HaveliOffice } from '../../maps/haveli';
 import type { Kit } from '../kit';
 import { DAY, NIGHT, WORLD, hash, rng } from '../palette';
 import type { Build, MapLook, Wear } from './look';
+import { pillow } from '../cozy';
+import { boxTop } from '../style';
 import {
   beds, cone, deskOf, floorOf, frames, gameTable, glow, grow, kite, mainDeskOf, nc, palOf,
   patterned, pieceSpots, plinth, pond, potted, terrace, treeSpots, type Piece, pastNap,
@@ -128,7 +130,10 @@ function lounge(b: Build): void {
     for (let i = 0; i < 8; i++) k.add(k.style.box(x1 - x0, 0.02, 0.3), k.mat([BLUE, GOLD, TEAL, CREAM][i % 4] ?? GOLD), s3, (x0 + x1) / 2, 0.035, 0.6 + i * 0.3);
   }
   beds(b, (g, box, i) => {
-    k.add(k.style.box(0.58, 0.16, 0.58), k.mat(CUSHIONS[i % 4] ?? SAFFRON), g, (box.x0 + box.x1) / 2, 0.1, (box.z0 + box.z1) / 2);
+    // a gadda the bed's size (bims-nap: a 0.58 cushion held half a lying bim)
+    const c = CUSHIONS[i % 4] ?? SAFFRON;
+    k.add(k.style.box(box.x1 - box.x0 - 0.06, 0.14, box.z1 - box.z0 - 0.06, 0.04), k.mat(c), g, (box.x0 + box.x1) / 2, 0.09, (box.z0 + box.z1) / 2);
+    pillow(k, g, box, boxTop(0.09, 0.14, 0.04), c);
   });
   // the jhoola along the lounge's side wall, between its two rows, its back to the wall: on the
   // back wall it hung where the first row's nappers lay their heads (Gabriel, bims-life)

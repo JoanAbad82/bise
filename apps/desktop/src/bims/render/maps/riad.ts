@@ -1,9 +1,9 @@
 // The riad's look (render/maps/look.ts; its plan: maps/riad.ts): terracotta floors, tall ochre walls
 // with a zellige dado and a carved plaster band, the patio paved in zellige, arcades on its three
 // inner sides with brass lanterns (lit at night), the fountain (the eating place), a blue banquette
-// and leather poufs at the back left (the nap place), the studded door; every bim but main wears
+// and leather floor cushions at the back left (the nap place), the studded door; every bim but main wears
 // yellow babouches. Its growth (page bims-maps « Maroc · le riad »): a pot of mint, the tea tray
-// and the first orange tree, two poufs, a slate in carved plaster, a Berber rug on the wall and a
+// and the first orange tree, two floor cushions, a slate in carved plaster, a Berber rug on the wall and a
 // darbouka, a tajine and jasmine, an awning over the terrace, the four orange trees, a draughts
 // board, the fountain's second tier, a steaming hammam, a long zellige basin, a balloon over the
 // Atlas, a golden brass lantern; frames under small plaster arches. Owner: maps-b.
@@ -15,6 +15,8 @@ import { type Kit, boxOf, onFloor } from '../kit';
 import { WORLD } from '../palette';
 import { balloon, beds, bigDesk, boxHolding, dim, grow, onPlinth, palettes, pieceAtOf, turnedDesk, type Grower, type Piece } from './blook';
 import type { Build, MapLook } from './look';
+import { pillow } from '../cozy';
+import { boxTop } from '../style';
 
 const TEAL = '#2a9d8f';
 const BLUE = '#3d6fb6';
@@ -31,10 +33,17 @@ const loungeX = (o: Office): [number, number] => {
   const xs = o.lounge.map((s) => s.x);
   return xs.length ? [Math.min(...xs) - 0.4, Math.max(...xs) + 0.4] : [o.x0 + 0.3, o.x0 + 4];
 };
-/** the low brass table in front of the poufs (between their lanes) */
-const teaTable = (o: Office): Pt => {
-  const a = o.lounge[1];
-  return { x: a?.x ?? o.x0 + 1.8, z: 2.95 };
+/** the banquette along the back wall (shell): its top */
+const BANQUETTE = 0.35;
+/**
+ * the tea things on the banquette, in a lane between two columns of beds where no bed or head is
+ * (bims-nap, bims m_35422: the brass table on the floor stood in bed 5, stage 13's); lane 0 the
+ * tray, lane 1 the tajine
+ */
+const teaTable = (o: Office, lane = 0): Pt => {
+  const a = o.lounge[lane];
+  const b = o.lounge[lane + 1];
+  return { x: a && b ? (a.x + b.x) / 2 : (a?.x ?? o.x0 + 1.2) + 0.6, z: 0.36 };
 };
 /** the patio's four corners, the orange trees' pots */
 const corners = (o: Office): Pt[] => {
@@ -68,15 +77,16 @@ const grower: Grower = {
       k.add(k.style.cylinder(0.18, 0.3), k.mat(TEAL), g, p.x, 0.15, p.z);
       for (let i = 0; i < 4; i++) k.add(k.style.ball(0.13), k.mat(i % 2 ? '#7cc26b' : '#5fb35a'), g, p.x + Math.sin(i * 1.6) * 0.1, 0.38 + (i % 2) * 0.08, p.z + Math.cos(i * 1.6) * 0.1);
     }),
-    // 2 the tea tray on the brass table, the teapot and its glasses (the first orange tree in the patio)
-    piece(teaTable, (k, g, p, b) => {
-      k.add(k.style.cylinder(0.32, 0.03), k.mat(SAFFRON), g, p.x, 0.43, p.z);
-      k.add(k.style.ball(0.1), k.mat('#d8d4cc'), g, p.x, 0.53, p.z);
-      k.add(k.style.cylinder(0.015, 0.12), k.mat('#d8d4cc'), g, p.x + 0.1, 0.57, p.z).rotation.z = -0.9;
-      for (let i = 0; i < 3; i++) k.add(k.style.cylinder(0.03, 0.08), k.style.material(TEAL, { opacity: 0.8 }), g, p.x - 0.15 + i * 0.12, 0.49, p.z + 0.17);
+    // 2 the tea tray on the banquette, the teapot and its glasses (the first orange tree in the patio)
+    piece((o) => teaTable(o), (k, g, p, b) => {
+      const y = BANQUETTE;
+      k.add(k.style.cylinder(0.17, 0.03), k.mat(SAFFRON), g, p.x, y + 0.015, p.z);
+      k.add(k.style.ball(0.08), k.mat('#d8d4cc'), g, p.x - 0.04, y + 0.1, p.z - 0.03);
+      k.add(k.style.cylinder(0.012, 0.1), k.mat('#d8d4cc'), g, p.x + 0.04, y + 0.13, p.z - 0.03).rotation.z = -0.9;
+      for (let i = 0; i < 3; i++) k.add(k.style.cylinder(0.025, 0.07), k.style.material(TEAL, { opacity: 0.8 }), g, p.x - 0.08 + i * 0.08, y + 0.065, p.z + 0.1);
       for (const c of corners(b.o).slice(0, 1)) orangeTree(k, g, c, b.k.pal.pendants);
     }),
-    // 3 two leather poufs (beds)
+    // 3 two leather floor cushions (beds)
     piece((o) => ({ x: (loungeX(o)[0] + loungeX(o)[1]) / 2, z: 1.5 })),
     // 4 a slate in a carved plaster frame
     piece((o) => ({ x: boardX(o), z: 0.9 }), (k, g, p) => {
@@ -101,10 +111,10 @@ const grower: Grower = {
       k.add(k.style.cylinder(0.14, 0.3), k.mat(LEATHER), g, p.x, 0.15, p.z);
       k.add(k.style.cylinder(0.15, 0.02), k.mat('#f1e6d2'), g, p.x, 0.31, p.z);
     }),
-    // 6 a tajine on the tea table (jasmine flowers outside)
-    piece((o) => ({ x: teaTable(o).x + 0.0, z: teaTable(o).z }), (k, g, p) => {
-      k.add(k.style.cylinder(0.2, 0.04), k.mat('#b5651d'), g, p.x - 0.12, 0.47, p.z - 0.1);
-      k.add(k.style.cap(0.17, 0.95), k.mat('#c98a3e'), g, p.x - 0.12, 0.62, p.z - 0.1).scale.y = 1.2;
+    // 6 a tajine on the banquette (jasmine flowers outside)
+    piece((o) => teaTable(o, 1), (k, g, p) => {
+      k.add(k.style.cylinder(0.16, 0.04), k.mat('#b5651d'), g, p.x, BANQUETTE + 0.02, p.z);
+      k.add(k.style.cap(0.14, 0.95), k.mat('#c98a3e'), g, p.x, BANQUETTE + 0.04, p.z).scale.y = 1.2;
     }),
     // 7 a canvas awning stretched over the terrace on four posts
     piece((o) => decorOf(o).parasol, (k, g, p) => {
@@ -225,13 +235,9 @@ function shell(b: Build): void {
   }
   // the banquette along the back wall behind the poufs, its cushions
   const [l0, l1] = loungeX(o);
-  k.add(style.box(l1 - l0, 0.35, 0.5), k.mat(BLUE), root, (l0 + l1) / 2, 0.18, 0.3);
+  k.add(style.box(l1 - l0, BANQUETTE, 0.5), k.mat(BLUE), root, (l0 + l1) / 2, BANQUETTE / 2, 0.3);
   // its cushions thin against the wall: a napper on a pouf lays its head just in front of them (Gabriel, bims-life)
   for (let i = 0; i < 5; i++) k.add(style.box(0.5, 0.36, 0.1), k.mat(([SAFFRON, TEAL, WORLD.orange, '#9b8fe0', SAFFRON] as const)[i] ?? SAFFRON), root, l0 + 0.4 + (i * (l1 - l0 - 0.8)) / 4, 0.5, 0.08);
-  // the brass tea table in front of the poufs
-  const t = teaTable(o);
-  k.add(style.cylinder(0.06, 0.4), k.mat(BRASS), root, t.x, 0.2, t.z);
-  k.add(style.cylinder(0.4, 0.04), k.mat(SAFFRON), root, t.x, 0.41, t.z);
   // the studded door, open: its frame, the leaf against the wall
   const dx = o.door.x;
   for (const s of [-0.55, 0.55]) k.add(style.box(0.14, 1.6, 0.14), k.mat(pal.wall), root, dx + s, 0.8, D - 0.05);
@@ -269,9 +275,13 @@ export const riad: MapLook = {
   ),
   shell,
   island,
+  // leather floor cushions the bed's size, like its base ones (bims-nap: a round pouf held half a lying bim)
   lounge: (b) => { beds(b, (k, parent, box) => {
-      k.add(k.style.cylinder((box.x1 - box.x0) / 2 - 0.05, 0.32), k.mat(LEATHER), parent, (box.x0 + box.x1) / 2, 0.16, (box.z0 + box.z1) / 2);
-      k.add(k.style.cylinder(0.12, 0.01), k.mat(SAFFRON), parent, (box.x0 + box.x1) / 2, 0.325, (box.z0 + box.z1) / 2);
+      const x = (box.x0 + box.x1) / 2;
+      k.add(k.style.box(box.x1 - box.x0 - 0.04, 0.2, box.z1 - box.z0 - 0.04, 0.06), k.mat(LEATHER), parent, x, 0.11, (box.z0 + box.z1) / 2);
+      const top = boxTop(0.11, 0.2, 0.06);
+      k.add(k.style.box(box.x1 - box.x0 - 0.16, 0.012, 0.035), k.mat(SAFFRON), parent, x, top + 0.006, box.z1 - 0.1);
+      pillow(k, parent, box, top, SAFFRON);
     }); },
   desk: (b, d, name) => turnedDesk(b, d, name, { w: 1.4, d: 0.78, at: 0.5 }),
   mainDesk: (b) => {

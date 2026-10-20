@@ -8,13 +8,15 @@
 // and go in that stage's group, so the unlock moment hides them with the stage's piece. Clay, the
 // map's colours, never the accent pink or the error red; a detail under 6 cm is a mesh of its own,
 // never a painted face. Nothing here decides. Owner: bims-cozy.
-import { Box3, type BufferGeometry, Group, type Material, Mesh, type Object3D } from 'three';
+import { Box3, type BufferGeometry, Color, Group, type Material, Mesh, type Object3D } from 'three';
 import { BASE_BEDS } from '../growth';
 import { cozyAt, headRoom, type CozyStage, type Hung, type Item } from '../cozy';
 import type { Box, Office, Pt } from '../model';
 import { NAP_BED } from '../maps/plan';
 import type { Kit } from './kit';
 import { mergeRoot } from './merge';
+import { boxTop } from './style';
+import { FLAT, bedGroup, bedOfMesh } from './nap';
 import { WORLD, hash } from './palette';
 import type { Build, DeskHandles } from './maps/look';
 
@@ -315,7 +317,23 @@ function coffeeOnIsland(k: Kit, g: Object3D, isl: Box, y: number, c: CozyLook): 
 
 // ---- the nap corner
 
-/** a base bed in its floor box (Office.furniture), the napper lies on it (pose.ts); i: its spot */
+/** a flat base bed's top (bed below draws it so): its pillow lies there; a pouf or a hammock has none */
+const BED_TOP: Readonly<Partial<Record<BedKind, number>>> = {
+  cushion: boxTop(0.11, 0.2, 0.06), zabuton: boxTop(0.06, 0.1, 0.06), sofa: boxTop(0.22, 0.06, 0.03), bench: boxTop(0.22, 0.06, 0.03), cot: 0.2, charpai: 0.2, mat: 0.05,
+};
+
+/**
+ * A flat bed's pillow under its napper's head (bims-nap, bims m_35286: the head a little up reads as
+ * on a pillow): its own mesh, the bed's colour a step lighter, on the bed's top `top` at the head's
+ * place (render/nap.ts FLAT: its middle FLAT.headZ from the spot, its top FLAT.headUp over the bed).
+ */
+export function pillow(k: Kit, g: Object3D, box: Box, top: number, colour: string): void {
+  const spot = box.z1 - (NAP_BED.d / 2 - NAP_BED.back);
+  const c = `#${new Color(colour).lerp(new Color('#ffffff'), 0.35).getHexString()}`;
+  k.add(k.style.box(Math.min(0.44, box.x1 - box.x0 - 0.12), FLAT.headUp, 0.26, 0.025), k.mat(c), g, (box.x0 + box.x1) / 2, top + FLAT.headUp / 2, spot + FLAT.headZ);
+}
+
+/** a base bed in its floor box (Office.furniture), the napper lies on it (pose.ts; a flat one with a pillow); i: its spot */
 export function bed(k: Kit, g: Object3D, box: Box, kind: BedKind, c: CozyLook, i: number): void {
   const { style } = k;
   const x = (box.x0 + box.x1) / 2;
@@ -323,6 +341,8 @@ export function bed(k: Kit, g: Object3D, box: Box, kind: BedKind, c: CozyLook, i
   const w = box.x1 - box.x0;
   const d = box.z1 - box.z0;
   const cl = c.cloth[i % 2 === 0 ? 0 : 1];
+  const top = BED_TOP[kind];
+  if (top !== undefined) pillow(k, g, box, top, cl);
   switch (kind) {
     case 'pouf': {
       // a bean bag's size (stages.ts loftLounge): it reads at the fit
@@ -335,7 +355,7 @@ export function bed(k: Kit, g: Object3D, box: Box, kind: BedKind, c: CozyLook, i
     case 'zabuton': {
       k.add(style.box(w - 0.04, kind === 'zabuton' ? 0.1 : 0.2, d - 0.04, 0.06), k.mat(cl), g, x, kind === 'zabuton' ? 0.06 : 0.11, z);
       // the embroidery's border, a mesh of its own (no painted face)
-      k.add(style.box(w - 0.16, 0.012, 0.035), k.mat(c.cloth[2]), g, x, kind === 'zabuton' ? 0.116 : 0.216, z + (d - 0.04) / 2 - 0.08);
+      k.add(style.box(w - 0.16, 0.012, 0.035), k.mat(c.cloth[2]), g, x, (BED_TOP[kind] ?? 0.2) + 0.006, z + (d - 0.04) / 2 - 0.08);
       return;
     }
     case 'sofa':
@@ -360,7 +380,6 @@ export function bed(k: Kit, g: Object3D, box: Box, kind: BedKind, c: CozyLook, i
     default: {
       k.add(style.box(w - 0.06, 0.03, d - 0.06), k.mat(cl), g, x, 0.035, z);
       for (let j = 0; j < 2; j++) k.add(style.box(w - 0.06, 0.012, 0.035), k.mat(c.cloth[2]), g, x, 0.056, z - d / 4 + (j * d) / 2);
-      k.add(style.capsule(0.06, w - 0.3), k.mat(c.cloth[1]), g, x, 0.11, box.z0 + 0.12).rotation.z = Math.PI / 2;
     }
   }
 }
@@ -414,8 +433,9 @@ function napCorner(b: Build, g0: Groups, c: CozyLook, st: CozyStage): void {
     // its border, a band of its own a hair higher
     for (const [dz, w] of [[r.z0 + 0.1, r.x1 - r.x0 - 0.12], [r.z1 - 0.1, r.x1 - r.x0 - 0.12]] as const) k.add(k.style.box(w, 0.006, 0.05), k.mat(c.cloth[2]), s0, (r.x0 + r.x1) / 2, 0.036, dz);
   }
-  const boxes = o.lounge.slice(0, BASE_BEDS).map((s) => o.furniture.find((f) => f.of?.x === s.x && f.of.z === s.z));
-  boxes.forEach((bx, i) => { if (bx) bed(k, s0, bx, c.bed, c, i); });
+  const spots = o.lounge.slice(0, BASE_BEDS);
+  const boxes = spots.map((s) => o.furniture.find((f) => f.of?.x === s.x && f.of.z === s.z));
+  boxes.forEach((bx, i) => { const sp = spots[i]; if (bx && sp) bed(k, bedGroup(s0, sp), bx, c.bed, c, i); });
   const first = boxes[0];
   if (st.cushions && cz.rug) {
     // two cushions on the rug's front corners, off the beds (a wall's bench may stand at its back)
@@ -436,11 +456,13 @@ function napCorner(b: Build, g0: Groups, c: CozyLook, st: CozyStage): void {
       p.rotation.y = 0.4 * (j ? -1 : 1);
     });
   }
-  if (st.throwOn && first) {
-    // a throw over the first bed's foot
-    const g7 = need(g0, 7);
-    const top = c.bed === 'mat' ? 0.06 : c.bed === 'zabuton' ? 0.12 : c.bed === 'cushion' ? 0.225 : c.bed === 'pouf' ? 0.42 : c.bed === 'hammock' ? 0.48 : 0.26;
-    k.add(k.style.box(first.x1 - first.x0 - 0.12, 0.015, 0.16), k.mat(c.art[1]), g7, (first.x0 + first.x1) / 2, top, first.z1 - 0.14);
+  if (st.throwOn && first && spots[0]) {
+    // a throw over the first bed's foot, its own piece
+    const g7 = bedGroup(need(g0, 7), spots[0]);
+    // on a flat bed thin and flat on its top: the napper's heels rest on it, its back on the bed (render/nap.test.ts)
+    const flat = BED_TOP[c.bed];
+    const top = c.bed === 'pouf' ? 0.42 : c.bed === 'hammock' ? 0.48 : (flat ?? 0.25) + 0.006;
+    k.add(k.style.box(first.x1 - first.x0 - 0.12, flat === undefined ? 0.015 : 0.008, 0.16), k.mat(c.art[1]), g7, (first.x0 + first.x1) / 2, top, first.z1 - 0.14);
   }
 }
 
@@ -798,10 +820,19 @@ function mergeInto(b: Build, g0: Groups): void {
     // each loose piece's box, kept on the merged meshes: the laws (clip.test, cozy.test) read pieces, not one office-wide box
     g.updateMatrixWorld(true);
     const parts: Box3[] = [];
-    g.traverse((x) => { if (x instanceof Mesh) parts.push(new Box3().setFromObject(x)); });
+    // a bed's pieces by its key too (render/nap.ts bedGroup): clip.test tells them from what else stands in its box
+    const bedParts: Record<string, Box3[]> = {};
+    g.traverse((x) => {
+      if (!(x instanceof Mesh)) return;
+      const box = new Box3().setFromObject(x);
+      parts.push(box);
+      const key = bedOfMesh(x);
+      if (key !== undefined) (bedParts[key] ??= []).push(box);
+    });
     const m = mergeRoot(g, b.k.style, b.k.style.shadows);
     for (const mesh of [...m.group.children]) {
       mesh.userData.parts = parts;
+      mesh.userData.bedParts = bedParts;
       into.add(mesh);
     }
     g.traverse((x) => { if (x instanceof Mesh) (x.geometry as BufferGeometry).dispose(); });

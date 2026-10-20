@@ -7,13 +7,14 @@
 // snow cover come from its caller (weather(): sky.ts through render/index.ts or town.ts). Owner: bims-wire.
 import { Color, Group, Matrix4, Mesh, MeshBasicMaterial, RingGeometry, Vector3, type ColorRepresentation, type Object3D } from 'three';
 import type { Agent } from '@/proto';
-import type { BimFrame, Look, Motion, Office } from '../model';
+import type { BimFrame, Look, Motion, Office, Pt } from '../model';
 import { makeBim, type Bim } from './bim';
 import { pillOf } from '../labels';
 import { siteOf, type Fit, type V3 } from './camera';
 import { cameraStart, viewPoint, flightAt, glideAt, makePlane, planFlight, planGlide, shadowOf, sizeAt, startSize, type FlightFrame, type FlightPlan, type GlidePlan, type Plane } from './plane';
 import { DESK_SPOT, HELD_LEN, ON_DESK, PLANE_CATCH, POCKET_SINK, REACH_S, awayOf, heldAt } from './catch';
 import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
+import { restAt, type NapRest } from './nap';
 import { skateRig } from './skate';
 import { eggRig } from './egg';
 import { makeEggDecor, type EggDecor } from './eggdecor';
@@ -465,6 +466,10 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     },
     frame(t, frames, look, fit, onRig) {
       if (!office || !world) return null;
+      // each napper on its bed's rest as built (render/nap.ts)
+      const o = office;
+      const naps = world.naps;
+      const bedAt = (p: Pt): NapRest | undefined => restAt(o, naps, p);
       let motion: Motion = 'still';
       const seen = new Set<string>();
       rigs.clear();
@@ -474,7 +479,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         // a skater in the park (skate.ts): its line's pose once it is there; on the way, the walk's
         const park = office.park;
         const skater = park && !look.reduced ? skateRig(f.name, f.pose, park, b.outfit.phase) : null;
-        const rig = eggRig(skater ?? rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced }), f.egg ?? null);
+        const rig = eggRig(skater ?? rigOf({ pose: f.pose, t, main: f.main, phase: b.outfit.phase, reduced: look.reduced, bedAt }), f.egg ?? null);
         b.apply(rig);
         if (primed && !look.reduced && !shownLast.has(f.name) && !appearing.has(f.name)) appearing.set(f.name, t);
         const since = appearing.get(f.name);

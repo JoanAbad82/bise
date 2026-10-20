@@ -24,6 +24,7 @@ import { glyph, onFloor, type Kit } from '../kit';
 import { PATH_HALF, terraceSlab } from '../decor';
 import { HOODIE, WORLD, hash, type Palette } from '../palette';
 import { cones, deckChairs, garden } from '../stages';
+import { bedGroup } from '../nap';
 import type { Build, DeskHandles } from './look';
 import { frameXs } from '../cozy';
 
@@ -204,7 +205,7 @@ export function beds(b: Build, draw: (parent: Group, box: Box, i: number) => voi
   own.forEach((box, i) => {
     if (i < BASE_BEDS || i >= bedsAt(grow.stage)) return;
     const g = b.stage(bedStage(i));
-    if (g) draw(g, box, i);
+    if (g && box.of) draw(bedGroup(g, box.of), box, i);
   });
 }
 

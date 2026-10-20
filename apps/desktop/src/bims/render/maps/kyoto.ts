@@ -15,6 +15,8 @@ import { type Kit, boxOf, onFloor } from '../kit';
 import { WORLD } from '../palette';
 import { arcade, beds, bigDesk, boxHolding, grow, onPlinth, palettes, pieceAtOf, pool, turnedDesk, type Grower, type Piece } from './blook';
 import type { Build, MapLook } from './look';
+import { pillow } from '../cozy';
+import { boxTop } from '../style';
 
 const WOOD = '#4a3222';
 const MAT_EDGE = '#3d4a2e';
@@ -255,7 +257,9 @@ function lounge(b: Build): void {
   k.add(style.box(kt.x1 - kt.x0 - 0.2, 0.05, kt.z1 - kt.z0 - 0.1), k.mat('#7a5a3c'), root, cx, 0.25, cz);
   if (b.grow.stage >= 2) for (const dx of [0, 0.16]) k.add(style.ball(0.09), k.mat(WORLD.orange), root, cx + dx, 0.33, cz + dx / 2);
   beds(b, (kk, parent, box, i) => {
-    kk.add(kk.style.box(box.x1 - box.x0, 0.08, box.z1 - box.z0, 0.04), kk.mat(CUSHIONS[i % CUSHIONS.length] ?? INDIGO), parent, (box.x0 + box.x1) / 2, 0.05, (box.z0 + box.z1) / 2);
+    const c = CUSHIONS[i % CUSHIONS.length] ?? INDIGO;
+    kk.add(kk.style.box(box.x1 - box.x0, 0.08, box.z1 - box.z0, 0.04), kk.mat(c), parent, (box.x0 + box.x1) / 2, 0.05, (box.z0 + box.z1) / 2);
+    pillow(kk, parent, box, boxTop(0.05, 0.08, 0.04), c);
   });
 }
 

@@ -14,6 +14,7 @@ import type { CycladesOffice } from '../../maps/cyclades';
 import type { Kit } from '../kit';
 import { DAY, NIGHT, WORLD, hash } from '../palette';
 import type { Build, MapLook, Wear } from './look';
+import { pillow } from '../cozy';
 import {
   beds, cone, deskOf, floorOf, frames, gameTable, grow, mainDeskOf, nc, palOf, patterned,
   pieceSpots, plinth, potted, terrace, treeSpots, type Piece, pastNap,
@@ -130,7 +131,7 @@ function lounge(b: Build): void {
     const z = (box.z0 + box.z1) / 2;
     k.add(k.style.box(box.x1 - box.x0 - 0.04, 0.12, box.z1 - box.z0 - 0.04), k.mat(k.pal.wall), g, x, 0.06, z);
     k.add(k.style.box(box.x1 - box.x0 - 0.14, 0.08, box.z1 - box.z0 - 0.3), k.mat(BLUE), g, x, 0.16, z + 0.08);
-    k.add(k.style.capsule(0.07, box.x1 - box.x0 - 0.3), k.mat(WHITE), g, x, 0.2, box.z0 + 0.14).rotation.z = Math.PI / 2;
+    pillow(k, g, box, 0.2, WHITE);
   });
 }
 
