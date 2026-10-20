@@ -10,5 +10,11 @@ as-he-does/quick: pinch (ctrl+wheel) on an image artifact in the hub's viewer (/
 cut	f1776235a	nightly-world	gate/cut: 12 min timeout on desktop-checks' 2-project world (a candidate check of ambient-lead's, run by no other runner); nightly-reds takes it after 10.9 (main m_35250)
 empty	f1776235a	nightly-world	gate/empty: needs the packed app's bise (BISE_EMPTY_BISE), which desktop-checks never has; nightly-reds takes it after 10.9 (main m_35250)
 notify-real	f1776235a	nightly-world	gate/notify-real: R45 away and R47 reply red, 'no post in 45 s', on desktop-checks' world; nightly-reds takes it after 10.9 (main m_35250)
+news-real	f1776235a	nightly-world	thread/news-real: shop's seeded rows missing (no 'the logo' artifact card, no approval for release's git push --force, no 'receipts → checkout' message) on real.sh's own world (--projects 2), suspect world; first real run 2026-10-20 on f1776235a (before: no world up); not triaged; owner nightly-reds by review-gates' 09:30 read (main m_35457)
+list	f1776235a	nightly-world	agents/list: at rest alerts is 'waiting' in the app, '…' in the TUI, suspect product; first real run 2026-10-20 on f1776235a (before: no world up); not triaged; owner nightly-reds by review-gates' 09:30 read (main m_35457)
+find	f1776235a	nightly-world	thread/find: the count says '1/4+', not 'n/4', suspect product; first real run 2026-10-20 on f1776235a (before: no world up); not triaged; owner nightly-reds by review-gates' 09:30 read (main m_35457)
+interrupt	f1776235a	nightly-world	thread/interrupt: the stop line's box is empty (0x0), suspect product; first real run 2026-10-20 on f1776235a (before: no world up); not triaged; owner nightly-reds by review-gates' 09:30 read (main m_35457)
+answer	f1776235a	nightly-world	spotlight/answer: the answer clipped, offscreen or under 13 px, suspect load or layout; first real run 2026-10-20 on f1776235a (before: no world up); not triaged; owner nightly-reds by review-gates' 09:30 read (main m_35457)
+feature-drop	f1776235a	nightly-world	review/feature-drop: a locator.click timed out at 30 s, suspect load; first real run 2026-10-20 on f1776235a (before: no world up); not triaged; owner nightly-reds by review-gates' 09:30 read (main m_35457)
 
 file_chips_e2e	feab9c5fe	card-image-parts	sends turn/send files, refused by name since feab9c5fe (issue 31); the test moves to parts
