@@ -103,7 +103,7 @@ def texts(root=ROOT):
 
 
 def naming(word, txt):
-    """The stems whose file names `word` (a whole word: e2e is not repl_start_e2e)."""
+    """The stems whose file names `word` (a whole word: e2e is not artifacts_e2e)."""
     rx = re.compile(r"(?<![\w-])" + re.escape(word) + r"(?![\w-])")
     return {s for s, t in txt.items() if rx.search(t)}
 
@@ -466,7 +466,7 @@ def self_test():
     # the TUI: every tmux test, and the tests that drive the TUI otherwise
     sel, _ = select(["rust/tui/src/feed.rs"], tests, txt)
     tmux = {t for t in tests if t.endswith("_tmux")}
-    assert sel is not None and tmux <= sel and "e2e" in sel and "repl_start_e2e" not in sel, sorted(sel or [])
+    assert sel is not None and tmux <= sel and "e2e" in sel and "artifacts_e2e" not in sel, sorted(sel or [])
     # docs: nothing, unless a test names the file
     assert select(["docs/loop-speed.md"], tests, txt)[0] == set()
     # a helper runs every test naming it, transitively (e2e.py: nearly all)
