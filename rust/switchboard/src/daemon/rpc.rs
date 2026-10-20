@@ -187,7 +187,13 @@ impl Shell {
         }
         let cmd = match rpc::cmd(method, params) {
             Ok(c) => c,
-            Err(e) => return self.rpc_respond(id, Response::err(Some(rid), e)),
+            Err(e) => {
+                // an older app's removed field (bise_proto::REMOVED): its name in the log
+                if let Some(f) = e.data.as_ref().and_then(|d| d.field.as_deref()) {
+                    log_line(&self.opts.paths, &format!("{method}: refused, an older app sent the removed field {f}"));
+                }
+                return self.rpc_respond(id, Response::err(Some(rid), e));
+            }
         };
         let Some(row) = rpc::method_row(method) else { return };
         if let Some(p) = cmd.project().filter(|p| *p != self.project()) {

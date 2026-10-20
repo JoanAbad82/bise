@@ -319,8 +319,9 @@ fn a_removed_field_with_data_is_refused_by_name() {
     };
     let e = answer(serde_json::json!(["/Users/ana/Desktop/shot.png"])).unwrap_err();
     assert_eq!(e.code, code::HUB_REFUSED);
-    assert_eq!(e.message, crate::words::common::removed_field("files"));
-    assert_eq!(e.data.and_then(|d| d.reason).as_deref(), Some("removed_field"));
+    assert_eq!(e.message, crate::words::common::removed_field);
+    let d = e.data.unwrap();
+    assert_eq!((d.reason.as_deref(), d.field.as_deref()), (Some("removed_field"), Some("files")));
     assert!(matches!(answer(serde_json::json!([])), Ok(HubCmd::Answer { .. })));
     assert!(matches!(answer(serde_json::Value::Null), Ok(HubCmd::Answer { .. })));
     for r in crate::REMOVED {

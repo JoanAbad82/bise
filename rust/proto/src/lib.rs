@@ -155,9 +155,10 @@ pub fn removed_in(v: &Value, key: &str) -> Option<&'static Removed> {
     REMOVED.iter().find(|r| r.cmd == tag && v.get(r.field).is_some_and(data))
 }
 
-/// The refusal of a command that carries a removed field.
+/// The refusal of a command that carries a removed field, for a log or a
+/// test: his words, then the field and where it went.
 pub fn removed_refusal(r: &Removed) -> String {
-    words::common::removed_field(r.field)
+    format!("{} ({} removed: {})", words::common::removed_field, r.field, r.went)
 }
 
 /// One line as a JSON value.

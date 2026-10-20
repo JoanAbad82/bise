@@ -291,7 +291,7 @@ pub fn cmd(method: &str, params: Value) -> Result<HubCmd, RpcError> {
     let v = tagged(params, "cmd", row.cmd).map_err(|e| RpcError::new(code::INVALID_PARAMS, format!("{method}: {e}")))?;
     // an older app's removed field with data: refused by name (REMOVED)
     if let Some(r) = crate::removed_in(&v, "cmd") {
-        return Err(RpcError::refused(crate::removed_refusal(r), Some("removed_field")));
+        return Err(RpcError::removed(r));
     }
     // row.cmd is a known tag (law): never `Unknown`
     HubCmd::from_value(v).map_err(|e| RpcError::new(code::INVALID_PARAMS, format!("{method}: {e}")))

@@ -92,6 +92,11 @@ pub struct ErrorData {
     /// "undelivered" (the hub wrote its undelivered line in the thread)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// reason `removed_field`: the field an older app's command carried
+    /// that bise no longer reads (crate::REMOVED), for its log and a
+    /// support question; never in what he reads
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
 }
 
 /// The error codes: JSON-RPC's own, then bise's (-32000..-32099).
@@ -117,8 +122,15 @@ impl RpcError {
 
     /// The hub refused this action: its words, `reason` for a send.
     pub fn refused(message: impl Into<String>, reason: Option<&str>) -> RpcError {
-        let data = reason.map(|r| ErrorData { kind: None, reason: Some(r.to_string()) });
+        let data = reason.map(|r| ErrorData { kind: None, reason: Some(r.to_string()), field: None });
         RpcError { code: code::HUB_REFUSED, message: message.into(), data }
+    }
+
+    /// A command carrying a removed field with data (crate::REMOVED): his
+    /// words, reason `removed_field`, the field in the detail.
+    pub fn removed(r: &crate::Removed) -> RpcError {
+        let data = ErrorData { kind: None, reason: Some("removed_field".into()), field: Some(r.field.into()) };
+        RpcError { code: code::HUB_REFUSED, message: crate::words::common::removed_field.into(), data: Some(data) }
     }
 
     pub fn with_kind(mut self, kind: ErrorKind) -> RpcError {

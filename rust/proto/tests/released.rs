@@ -104,7 +104,7 @@ fn released_files_lists_are_refused_by_name() {
     let hub = lines("hub_cmd_files.jsonl");
     for l in &hub {
         let e = HubCmd::decode(l).expect_err(l);
-        assert_eq!(e, bise_proto::words::common::removed_field("files"), "{l}");
+        assert!(e.starts_with(bise_proto::words::common::removed_field) && e.contains("files removed"), "{l}: {e}");
         let mut empty: Value = serde_json::from_str(l).unwrap();
         empty["files"] = Value::Array(Vec::new());
         let m = HubCmd::from_value(empty.clone()).unwrap_or_else(|e| panic!("an empty files list refused: {e}\n  {l}"));
