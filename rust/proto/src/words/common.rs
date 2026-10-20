@@ -35,6 +35,11 @@ crate::words! { common:
     /// a plan's title
     title_plan(agent) = "{agent} proposes a plan";
 
+    /// a command an older app sent with a field the hub no longer reads
+    /// (bise_proto::REMOVED): the refusal its sender shows (composer: the
+    /// failed send, inbox: the failed answer), nothing was sent
+    removed_field(field) = "this app is older than its hub: {field} isn't read any more, update the app; nothing was sent";
+
     /// how many lines are folded away: an item's body (inbox), a tool's
     /// closed box in the TUI's feed (thread)
     more_lines(n) = one "{n} more line" | "{n} more lines";

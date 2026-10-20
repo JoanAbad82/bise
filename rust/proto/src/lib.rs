@@ -39,7 +39,10 @@
 //! released version already has `Unknown` (an older reader of one without
 //! it fails on the whole event). Its law: `tests/released.rs` reads what
 //! v2026.10.2-28 wrote (`fixtures/released/`) with today's types and
-//! writes it back with every released key and value unchanged. What has no producer yet lives in [`draft`]: its fixtures
+//! writes it back with every released key and value unchanged. Its one
+//! exception: a field a released client sends that the hub no longer
+//! reads ([`REMOVED`]) is refused by name when it carries data, never
+//! read with its data dropped. What has no producer yet lives in [`draft`]: its fixtures
 //! are there for the window's fake core, its names may still move until
 //! its stream emits it.
 //!
@@ -115,6 +118,46 @@ pub(crate) fn decode<T: DeserializeOwned>(v: Value, key: &str, tags: &[&str], un
         return Ok(unknown(tag, v));
     }
     serde_json::from_value(v).map_err(|e| format!("{tag}: {e}"))
+}
+
+/// A field a released client sends that the hub no longer reads: its
+/// command's tag, the field, where what it carried goes now. The wire
+/// rule's one exception (architect m_34507): ignoring it would drop his
+/// work silently (an older app's `files`: his pasted image lost, only
+/// the text arriving), so a command carrying it with data is refused by
+/// name and nothing is sent. Empty or absent: read as any line. A row is
+/// never deleted: an old client's error stays clear.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Removed {
+    pub cmd: &'static str,
+    pub field: &'static str,
+    pub went: &'static str,
+}
+
+/// Every removed field (issue 31: the desktops' `files` list became the
+/// typed `parts`, shims-due ff9c5cdd5).
+pub const REMOVED: &[Removed] = &[
+    Removed { cmd: "send", field: "files", went: "parts (issue 31)" },
+    Removed { cmd: "answer", field: "files", went: "parts (issue 31)" },
+    Removed { cmd: "slash", field: "files", went: "parts (issue 31)" },
+];
+
+/// The removed field a command (its tag under `key`) carries with data.
+pub fn removed_in(v: &Value, key: &str) -> Option<&'static Removed> {
+    let tag = v.get(key)?.as_str()?;
+    let data = |x: &Value| match x {
+        Value::Null => false,
+        Value::Array(a) => !a.is_empty(),
+        Value::String(s) => !s.is_empty(),
+        Value::Object(o) => !o.is_empty(),
+        _ => true,
+    };
+    REMOVED.iter().find(|r| r.cmd == tag && v.get(r.field).is_some_and(data))
+}
+
+/// The refusal of a command that carries a removed field.
+pub fn removed_refusal(r: &Removed) -> String {
+    words::common::removed_field(r.field)
 }
 
 /// One line as a JSON value.

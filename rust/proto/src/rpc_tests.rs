@@ -308,3 +308,22 @@ fn an_older_install_hubs_steps_are_one_copy_paste_line() {
     assert!(hub_older_steps(false, "~/my apps/bise").contains("run `~/'my apps/bise' switchboard --stop`"));
     assert!(hub_older_steps(false, "/x/it's/bise").contains(r"run `'/x/it'\''s/bise' switchboard --stop`"));
 }
+
+/// An older app's `files` list (bise_proto::REMOVED, architect m_34507):
+/// with paths, `card/answer` (and `send`, `slash`) is refused by name,
+/// nothing sent; an empty list reads as the command.
+#[test]
+fn a_removed_field_with_data_is_refused_by_name() {
+    let answer = |files: serde_json::Value| {
+        cmd("card/answer", serde_json::json!({"project": "p", "card": 11, "reply": "this one", "files": files}))
+    };
+    let e = answer(serde_json::json!(["/Users/ana/Desktop/shot.png"])).unwrap_err();
+    assert_eq!(e.code, code::HUB_REFUSED);
+    assert_eq!(e.message, crate::words::common::removed_field("files"));
+    assert_eq!(e.data.and_then(|d| d.reason).as_deref(), Some("removed_field"));
+    assert!(matches!(answer(serde_json::json!([])), Ok(HubCmd::Answer { .. })));
+    assert!(matches!(answer(serde_json::Value::Null), Ok(HubCmd::Answer { .. })));
+    for r in crate::REMOVED {
+        assert!(crate::hub::HubCmd::TAGS.contains(&r.cmd), "{}: not a hub command", r.cmd);
+    }
+}

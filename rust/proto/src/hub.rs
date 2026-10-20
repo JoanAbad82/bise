@@ -843,7 +843,12 @@ impl HubCmd {
         Self::from_value(parse(line)?)
     }
 
+    /// A command carrying a removed field with data ([`crate::REMOVED`])
+    /// is refused by name, never read with its data dropped.
     pub fn from_value(v: Value) -> Result<HubCmd, String> {
+        if let Some(r) = crate::removed_in(&v, "cmd") {
+            return Err(crate::removed_refusal(r));
+        }
         decode(v, "cmd", Self::TAGS, |tag, raw| HubCmd::Unknown { tag, raw })
     }
 

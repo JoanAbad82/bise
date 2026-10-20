@@ -86,10 +86,13 @@ fn released_message_lines_fold_to_the_same_entries() {
 }
 
 /// An older desktop's `files` list (`send`, `answer`, `slash`, the app's
-/// `send`; removed from the wire in issue 31): its released lines still
-/// read as their command, the list ignored, every other key kept.
+/// `send`; removed from the wire in issue 31). A hub command still
+/// carrying one with paths is refused by name (bise_proto::REMOVED,
+/// architect m_34507): his pasted file is never dropped silently. The same
+/// line with an empty list reads as its command, every other key kept. The
+/// app's `send` (the window's own protocol) still reads, the list ignored.
 #[test]
-fn released_files_lists_are_read_and_ignored() {
+fn released_files_lists_are_refused_by_name() {
     use bise_proto::app_cmd::AppCmd;
     use bise_proto::hub::HubCmd;
     let same_without_files = |file: &str, l: &str, now: Value| {
@@ -100,9 +103,13 @@ fn released_files_lists_are_read_and_ignored() {
     };
     let hub = lines("hub_cmd_files.jsonl");
     for l in &hub {
-        let m = HubCmd::decode(l).unwrap_or_else(|e| panic!("hub_cmd_files.jsonl: refused: {e}\n  {l}"));
+        let e = HubCmd::decode(l).expect_err(l);
+        assert_eq!(e, bise_proto::words::common::removed_field("files"), "{l}");
+        let mut empty: Value = serde_json::from_str(l).unwrap();
+        empty["files"] = Value::Array(Vec::new());
+        let m = HubCmd::from_value(empty.clone()).unwrap_or_else(|e| panic!("an empty files list refused: {e}\n  {l}"));
         assert!(!matches!(m, HubCmd::Unknown { .. }), "unknown: {l}");
-        same_without_files("hub_cmd_files.jsonl", l, m.to_value());
+        same_without_files("hub_cmd_files.jsonl", &empty.to_string(), m.to_value());
     }
     let app = lines("app_cmd_files.jsonl");
     for l in &app {

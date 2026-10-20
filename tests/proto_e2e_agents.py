@@ -103,6 +103,11 @@ def answers_round(c, E):
     c.say('[[bash: sb notify --for %s "which screenshot?"]]' % msg2)
     card2 = card_of(c, "which screenshot")
     c.wait_idle("main", timeout=30)
+    # an older app's answer with its removed `files` list (bise_proto::REMOVED,
+    # architect m_34507): refused by name, nothing sent, the card still open
+    err = refused(req(c, "card/answer", card=card2["id"], reply="this one", files=[png]), "card/answer with the removed files")
+    check("files" in err["message"] and (err.get("data") or {}).get("reason") == "removed_field", "the refusal names files: %r" % err)
+    check(any(x["id"] == card2["id"] for x in c.cards()), "the card stays open after the refusal")
     n_t3 = len([r for r in E.fake_requests() if r.get("agent") == "t3"])
     # his pasted image goes as a part (card/answer's older 'files' list went in ff9c5cdd5, issue 31)
     parts = [{"kind": "text", "text": "this one"}, {"kind": "image", "name": "[Image #1]", "source": png}]
