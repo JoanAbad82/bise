@@ -73,9 +73,7 @@ impl CoreLink {
     /// One input line, one answer line; an error when sb-core is gone
     /// (or answers something that is not JSON).
     pub fn call(&mut self, v: &Value) -> std::io::Result<Value> {
-        let mut line = v.to_string();
-        line.push('\n');
-        self.w.write_all(line.as_bytes())?;
+        self.w.write_all(line_of(v).as_bytes())?;
         let mut back = String::new();
         if self.r.read_line(&mut back)? == 0 {
             return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "its connection closed"));
@@ -96,5 +94,31 @@ impl Drop for CoreLink {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+    }
+}
+
+/// One input line for sb-core: its JSON with no byte >= 0x80, then a
+/// newline. sb-core's reader (main.bend `conn`) decodes each recv on its
+/// own: a multi-byte char cut by a recv boundary would read as U+FFFD
+/// (~14 chars of his journal's message text at every boot, issue 36).
+fn line_of(v: &Value) -> String {
+    let mut line = bise_proto::ascii::ascii_json(v);
+    line.push('\n');
+    line
+}
+
+#[cfg(test)]
+mod line_tests {
+    use super::line_of;
+    use serde_json::json;
+
+    #[test]
+    fn a_line_to_sb_core_never_holds_a_byte_past_ascii() {
+        let text: String = "é─😀".repeat(20_000);
+        let v = json!({"t": "replay_many", "evs": [{"type": "main_note", "text": text}]});
+        let line = line_of(&v);
+        assert!(line.bytes().all(|b| b < 0x80));
+        assert!(line.ends_with('\n') && !line[..line.len() - 1].contains('\n'));
+        assert_eq!(serde_json::from_str::<serde_json::Value>(line.trim_end()).unwrap(), v);
     }
 }

@@ -167,6 +167,10 @@ mod core_names_tests;
 #[path = "core_attach_tests.rs"]
 mod core_attach_tests;
 
+/// issue 36's: a long line to sb-core keeps its multi-byte chars.
+#[path = "core_utf8_tests.rs"]
+mod core_utf8_tests;
+
 /// les bims' tests (doing, activity), out of core_tests.rs too.
 #[path = "core_doing_tests.rs"]
 mod core_doing_tests;

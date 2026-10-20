@@ -46,6 +46,7 @@ import ../runtime/selftools.bend as Sf
 import ../runtime/selftools-pure.bend as Sfp
 import ./repl-core-pure.bend as Rcp
 import ../core/ev.bend as Ev
+import ../core/utf8.bend as U8
 
 # what the loops return: keep serving, or stop. The reload path
 # unwinds to main so the process exits 0 — the parent then recompiles
@@ -345,26 +346,36 @@ def repl_data(+live: Bool, closed: Bool, s: Socket, +data: String, +sess: T.Sess
       repl_lines.go(live, Rcp.cmd_whole(data), s, sess,
         s2 => sess2 => next(Rcp.cmd_tail(data))(s2)(sess2))
 
-def repl_got(+live: Bool, s: Socket, +data: String, +carry: String, +sess: T.Session,
-    next: String -> Socket -> T.Session -> IO(Flow)) -> IO(Flow):
-  repl_data(live, String.is_empty(data), s, String.append(carry, data), sess, next)
+# one recv's bytes, after the bytes of the char the last recv cut
+# (core/utf8.bend: a char a recv boundary cuts reaches its line whole,
+# issue 36); no bytes: the hub closed the connection
+@unsafe
+def repl_got(+live: Bool, s: Socket, +bs: List<&2, U32>, +carry: String, +pend: List<&2, U32>, +sess: T.Session) -> IO(Flow):
+  repl_decoded(live, List.is_empty(&2, U32, bs), s, U8.decode(pend, bs), carry, sess)
 
-def repl_after(+live: Bool, rm: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>,
-    +carry: String, +sess: T.Session, next: String -> Socket -> T.Session -> IO(Flow))
-    -> IO(Flow):
+@unsafe
+def repl_decoded(+live: Bool, closed: Bool, s: Socket, r: String & List<&2, U32>, +carry: String, +sess: T.Session) -> IO(Flow):
+  match r:
+    case (+text, +pend2):
+      repl_data(live, closed, s, String.append(carry, text), sess,
+        c => s2 => sess2 => repl_conn(live, s2, c, pend2, sess2))
+
+@unsafe
+def repl_after(+live: Bool, rm: Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>>,
+    +carry: String, +pend: List<&2, U32>, +sess: T.Session) -> IO(Flow):
   match rm:
     case (s, Fail{_}):
       do IO<Flow>:
         Socket.close(s)
         IO.pure(Flow, Go{sess})
     case (s, Done{m}):
-      repl_got(live, s, Rcp.recv_text(m), carry, sess, next)
+      repl_got(live, s, Rcp.recv_bytes(m), carry, pend, sess)
 
 @unsafe
-def repl_conn(+live: Bool, sock: Socket, +carry: String, sess: T.Session) -> IO(Flow):
+def repl_conn(+live: Bool, sock: Socket, +carry: String, +pend: List<&2, U32>, sess: T.Session) -> IO(Flow):
   do IO<Flow>:
-    rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(sock, 4096)
-    repl_after(live, rm, carry, sess, c => s2 => sess2 => repl_conn(live, s2, c, sess2))
+    rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>> <- TCP.recv_bytes(sock, 4096)
+    repl_after(live, rm, carry, pend, sess)
 
 # ---- the accept loop: one connection at a time, session survives ----
 
@@ -442,7 +453,7 @@ def greet_conn(+live: Bool, out: Pv.Out, +sess: T.Session) -> IO(Flow):
       IO.pure(Flow, Go{sess})
     case Pv.ONet{s2}:
       resume_queued(live, List.is_empty(&2, String, S.sess_queued(sess)), s2,
-        sess, s3 => sess3 => repl_conn(live, s3, "", sess3))
+        sess, s3 => sess3 => repl_conn(live, s3, "", Nil{}, sess3))
 
 
 

@@ -224,6 +224,11 @@ def conn.got(s: Socket, +h: H.Hub, +part: String, +data: String) -> IO(H.Hub):
 @unsafe
 def conn(s: Socket, +h: H.Hub, +part: String) -> IO(H.Hub):
   do IO<H.Hub>:
+    # TCP.recv decodes each recv on its own: a multi-byte char a recv
+    # boundary cuts would read as U+FFFD. Safe only because the hub writes
+    # every line ASCII-only (bise_proto::ascii, CoreLink::call; its test
+    # pins no byte >= 0x80, issue 36); the REPL's reader decodes bytes
+    # across recvs instead (core/utf8.bend)
     rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(s, 65536)
     conn.after(rm, h, part)
 

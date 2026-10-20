@@ -72,6 +72,7 @@ pub mod app_cmd;
 pub mod app_rows;
 pub mod app_rpc;
 pub mod approvals;
+pub mod ascii;
 pub mod core_ev;
 pub mod commands;
 pub mod context;

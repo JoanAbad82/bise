@@ -17,6 +17,14 @@ def recv_text(m: Maybe<&1, String>) -> String:
     case Some{+d}:
       d
 
+# the same for TCP.recv_bytes: None, the closed connection, is no bytes
+def recv_bytes(m: Maybe<&1, List<&2, U32>>) -> List<&2, U32>:
+  match m:
+    case None{}:
+      Nil{}
+    case Some{+d}:
+      d
+
 # ---- what one input line asks for ----
 
 type Plan is Data:

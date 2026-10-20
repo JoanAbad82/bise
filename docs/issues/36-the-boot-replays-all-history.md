@@ -144,6 +144,45 @@ tags and main; scripts/core_same.py for every no-behaviour-change claim. New
 code in new files (crate::photo, crate::cold); daemon.rs, core.rs and
 core.bend get call lines only.
 
+## Found on the way: a char cut by a recv was lost (fix sha before chunk 3)
+
+Chunk 3's check (restore a photo, take it again: byte-identical) failed on
+one '─' that came back as three U+FFFD. Bend's `TCP.recv` decodes each recv
+on its own, so a multi-byte UTF-8 char cut by a recv boundary is lost. Two
+readers did that:
+
+- sb-core (`bend/hub/main.bend` `conn`, 64 KB a recv): the hub sent raw
+  UTF-8, and a boot's `replay_many` line is ~110 KB. On his journal copy a
+  full replay sent ASCII-escaped gives a view with 4 U+FFFD (3 journal
+  lines already hold them: that text was lost before, it stays lost); sent
+  raw, as the hub did, 18: ~14 chars of message text damaged in sb-core's
+  state (and the mirror) at every boot, where the cuts fell.
+- an agent's REPL (`bend/runtime/repl-core.bend` `repl_conn`, 4 KB a
+  recv): his messages to agents over 4 KB reached the model with U+FFFD
+  where a cut fell.
+
+The fix (architect m_34443, m_34454), each sized to its reader:
+
+- the sb-core link: the hub writes every line ASCII-only
+  (`bise_proto::ascii`: each non-ASCII char as `\uXXXX`, a surrogate pair
+  past U+FFFF; `core_proc.rs` `line_of`, its test pins no byte >= 0x80).
+  sb-core's reader is unchanged and safe only because of that (a comment at
+  its recv says so). A 36 MB photo as a list of bytes in Bend would cost
+  too much.
+- the REPL link: the REPL reads bytes (`TCP.recv_bytes`) and decodes them
+  with `bend/core/utf8.bend`, which keeps the bytes of a cut char (at most
+  3) for the next recv; an invalid byte is one U+FFFD and the next byte
+  starts afresh (Rust's `from_utf8_lossy` rule). The `say` wire is
+  unchanged: any mix of old and new hub and REPL works. Laws
+  (bend/laws/utf8.bend): an ASCII chunk decodes to itself; a cut anywhere
+  changes nothing; a cut char then ASCII, a stray byte then ASCII: one
+  U+FFFD, the ASCII byte kept.
+
+Its limits: the `say` wire's literal backslash-n is still ambiguous
+(`wire_escape` escapes newlines only, before this fix too); and a recv that
+decodes per chunk is a Bend bug class (a minimal repro for Bend upstream:
+tests/fixtures/bend-recv-repro/).
+
 ## Done when
 
 - On his journal copy: a boot from a photo at the last event sends 0 events
