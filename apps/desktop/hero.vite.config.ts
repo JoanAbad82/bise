@@ -14,8 +14,9 @@ const out = resolve(__dirname, '../../site/desktop/hero');
 /** gzip budgets, bytes */
 const ENTRY_BUDGET = 6 * 1024;
 // 260 until the cozy offices (bims-cozy 39b0e932c: every map's base pieces, +12 KB gzip): far under
-// designer's ceiling of 1.5 MB all in (m_30837); the next step down is loading only the film's maps
-const FILM_BUDGET = 280 * 1024;
+// designer's ceiling of 1.5 MB all in (m_30837); the next step down is loading only the film's maps.
+// 290 since main grew 279 -> 284.5 KB with the workshop pods, town light and town paths (main m_35420)
+const FILM_BUDGET = 290 * 1024;
 
 function budget(): Plugin {
   return {
