@@ -613,15 +613,12 @@ mod tests {
             thread: id,
             from: USER.into(),
             to: "docs".into(),
-            reply_to: None,
-            expect_reply: false,
-            auto: false,
             text: format!("m{id}"),
             created_ms: id,
             plain: true,
             queued: true,
-            via: None,
             parts: parts.into(),
+            ..Default::default()
         };
         let busy = || Some(MsgState::Queued { reason: "busy".into() });
         st.put_msg_judged(m(1, parts), busy(), false);
@@ -672,15 +669,10 @@ mod tests {
                 thread: 1,
                 from: "docs".into(),
                 to: "auth-fix".into(),
-                reply_to: None,
                 expect_reply: true,
-                auto: false,
                 text: "v1 ou v2 ?".into(),
                 created_ms: 1,
-                plain: false,
-                queued: false,
-                via: None,
-                parts: String::new(),
+                ..Default::default()
             },
             Some(MsgState::Queued { reason: "new".into() }),
             false,
@@ -700,15 +692,11 @@ mod tests {
             thread: id,
             from: from.into(),
             to: to.into(),
-            reply_to: None,
             expect_reply,
-            auto: false,
             text: format!("m{id}"),
             created_ms: id,
-            plain: false,
             queued,
-            via: None,
-            parts: String::new(),
+            ..Default::default()
         }
     }
 

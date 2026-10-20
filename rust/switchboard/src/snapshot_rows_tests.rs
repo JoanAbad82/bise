@@ -7,15 +7,11 @@ fn msg(id: u64, from: &str, to: &str, queued: bool) -> Msg {
         thread: id,
         from: from.into(),
         to: to.into(),
-        reply_to: None,
         expect_reply: true,
-        auto: false,
         text: format!("m{id}"),
         created_ms: id,
-        plain: false,
         queued,
-        via: None,
-        parts: String::new(),
+        ..Default::default()
     }
 }
 

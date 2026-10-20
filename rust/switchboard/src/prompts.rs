@@ -332,13 +332,8 @@ mod tests {
             to: "auth".into(),
             reply_to: Some(40),
             expect_reply: true,
-            auto: false,
             text: "v1 ou v2 ?".into(),
-            created_ms: 0,
-            plain: false,
-            queued: false,
-            via: None,
-            parts: String::new(),
+            ..Default::default()
         }
     }
 
