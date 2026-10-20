@@ -124,3 +124,38 @@ PROOFS CHECK, core_profile before/after (over 5%: architect's word).
 After the five families: MIGRATING = {St}; codec.bend is 68 lines of readers
 core.bend still calls. Next: St (and codec.bend whole), then the probe, then
 the Rust chunk.
+
+- **St, a54961883** (state-st, signed): hand St, its getters and apply's
+  positional match gone, codec.bend gone; generated `T.over_f` keeps apply's
+  fields single-owner (replay within ±0.4% of base). MIGRATING empty.
+- **Rust chunk, 0fa32ab06 + 9e8c9eccc + ad11b0378** (signed m_34330): the
+  records switchboard reads (Msg, Card, MsgState, Lifecycle, Declared, Run)
+  generated from `core::state::STATE` into `state/generated.rs`, read as
+  sb-core reads them, pinned on core_view.jsonl, core_journal.jsonl and
+  fixtures/core_state_defaults.jsonl (both sides); Workspace/Mode/Brief/Report
+  in `bise_proto::core::state`; model.rs's hand copies gone; `model::Agent` =
+  sb-core's view row whole (`core: ViewAgent`) + the hub's
+  activity/place/place_branch.
+
+## The probe (done-when, run on main ad11b0378, then reverted)
+
+A field `lang: Str` added to Msg, `probe: Nat` to St, each used once; blessed
+(core_gen), quick gate green. Lines outside gen/ and `state/generated.rs`:
+
+| field | declaration (`rust/proto/src/core/state.rs`) | use site | total |
+|---|---|---|---|
+| Msg.lang | 2 (the field, its journal key) | 3 (prompts.rs: a `lang` attr) | 5 |
+| St.probe | 2 (the field, its photo key, issue 36) | 1 (model.bend: ECardOpened bumps it with `S.St.over_probe`) | 3 |
+
+Generated: gen/state.bend, state-codec.bend, state-laws.bend and 3 lines of
+`state/generated.rs`. Before the probe, six switchboard tests built a Msg
+field by field and would each have broken (11 lines for Msg); they now take
+the rest from `..Default::default()`.
+
+Not counted, still by hand: a St field that Rust also reads goes through the
+view, and switchboard's `State` copies 5 view keys by hand (order, main_notes,
+next_msg, next_card, paused; `HAND_MIRRORS` in core_view_tests.rs, may only
+shrink): such a field costs ~5 more lines (the view row, view.bend's fill,
+State's field, its load, HAND_MIRRORS). **Follow-up, owner state-schema**:
+take HAND_MIRRORS to zero by reading the view's scalars as one generated
+record (a VIEW shape change, planned and signed on its own).
