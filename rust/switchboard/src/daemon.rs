@@ -59,6 +59,7 @@ mod loop_watch;
 mod merged;
 mod outbox;
 mod state_gate;
+mod contexts;
 mod tindex;
 mod usage;
 mod wake_look;
@@ -425,6 +426,8 @@ struct Shell {
     projects: projects::Projects,
     /// when the state goes to the clients (daemon/state_gate.rs)
     state_gate: state_gate::StateGate,
+    /// when the pending contexts are built (daemon/contexts.rs)
+    context_gate: state_gate::StateGate,
     /// S9: the fn context of the input being stepped: (agent, its JSON).
     /// Its 'you' line goes to the transcript without the rendered block,
     /// with an `sb context : <json>` line after it in the same append
@@ -852,6 +855,7 @@ impl Shell {
                 }
             }
             Effect::Steer { agent, text } => {
+                self.contexts_now();
                 if let Some(r) = self.dir_of(&agent).and_then(|d| self.repls.get(&d)) {
                     let ok = std::fs::OpenOptions::new()
                         .create(true)
@@ -876,16 +880,7 @@ impl Shell {
                     let _ = std::fs::write(&r.interrupt, &by);
                 }
             }
-            Effect::Context { agent, text } => {
-                if let Some(dir) = self.dir_of(&agent) {
-                    let d = self.opts.paths.agent_dir(&dir);
-                    let _ = std::fs::create_dir_all(&d);
-                    let tmp = d.join("context.txt.tmp");
-                    if std::fs::write(&tmp, &text).is_ok() {
-                        let _ = std::fs::rename(&tmp, d.join("context.txt"));
-                    }
-                }
-            }
+            Effect::Context { agent, text } => self.context_write(&agent, &text),
             Effect::Line { agent, line } => {
                 self.typed_line(&line);
                 self.feed(&agent, &line)
@@ -1180,6 +1175,7 @@ impl Shell {
     }
 
     fn repl_write(&mut self, agent: &str, line: &str) -> bool {
+        self.contexts_now();
         let Some(dir) = self.dir_of(agent) else {
             return false;
         };
@@ -1274,6 +1270,7 @@ impl Shell {
     /// REPL, so this very turn has the fresh skills. Stats only, once per
     /// turn: no timer.
     fn skills_before_turn(&mut self, agent: &str) {
+        self.contexts_now();
         let Some(dir) = self.dir_of(agent) else {
             return;
         };
@@ -1308,6 +1305,7 @@ impl Shell {
     /// while a message is queued for it (`recycle::main_holds`); its
     /// explicit relaunches (/reload, plugins, skills, keys) do not.
     fn switch_idle_repls(&mut self) {
+        self.contexts_now();
         let stale: Vec<(String, String)> = self
             .hub
             .st
@@ -1744,6 +1742,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         rpc: rpc::Rpcs::default(),
         projects: projects::Projects::boot(&paths),
         state_gate: state_gate::StateGate::default(),
+        context_gate: state_gate::StateGate::every(crate::contexts::CONTEXT_MS),
         search: search::Index::default(),
         xsearch: search::Index::default(),
         offsets: BTreeMap::new(),
@@ -1919,6 +1918,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         let _ = std::fs::remove_file(paths.agent_socket());
     }
     sh.flush_offsets();
+    sh.contexts_now();
     if keep_agents {
         log_line(&paths, "hub stop (REPLs kept for the next hub)");
     } else {

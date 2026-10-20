@@ -51,6 +51,8 @@ impl Shell {
     pub(super) fn serve(&mut self, rx: Receiver<Msg>, tick_queued: &TickFlag) -> bool {
         let mut inbox = Inbox::new(rx, Msg::is_urgent);
         let keep = loop {
+            // the pending contexts, at most every CONTEXT_MS (daemon/contexts.rs)
+            self.contexts_tick();
             // a client's message waiting goes first (inbox push_now)
             if self.state_gate.due(now_ms()) && inbox.push_now() {
                 // watched like a message: a slow push says so in hub.log
@@ -60,7 +62,8 @@ impl Shell {
                     log_line(&self.opts.paths, &l);
                 }
             }
-            let m = match inbox.next(self.state_gate.wait(now_ms())) {
+            let wait = [self.state_gate.wait(now_ms()), self.context_gate.wait(now_ms())].into_iter().flatten().min();
+            let m = match inbox.next(wait) {
                 Next::Msg(m) => m,
                 Next::Idle => continue,
                 Next::Closed => break false,
@@ -161,6 +164,8 @@ impl Shell {
                         interrupt,
                     },
                 );
+                // its first lines (missed ones, the resume) after the contexts
+                self.contexts_now();
                 self.start_connected(&dir);
                 self.recycle_started(&dir);
                 crate::util::timing(&format!("repl connected {} (adopted {})", dir, adopted));

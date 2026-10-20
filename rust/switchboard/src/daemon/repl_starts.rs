@@ -172,6 +172,8 @@ impl Shell {
     /// Start the REPL of `name` on a supervisor thread. `port`: the port of the process it replaces (a switch keeps the
     /// port: background commands and steer files are keyed by it).
     pub(super) fn spawn_on(&mut self, name: &str, resume: bool, crash_note: Option<String>, port: Option<u16>) {
+        // it reads context.txt at its first call (daemon/contexts.rs)
+        self.contexts_now();
         let Some(a) = self.hub.st.agents.get(name).cloned() else {
             return;
         };

@@ -3,8 +3,8 @@
 
 use super::*;
 
-struct FakeEnv {
-    now: u64,
+pub(super) struct FakeEnv {
+    pub(super) now: u64,
     git: bool,
     loss: Loss,
     dropped: Vec<String>,
@@ -74,16 +74,16 @@ impl Env for FakeEnv {
     }
 }
 
-struct T {
-    hub: Hub,
-    env: FakeEnv,
+pub(super) struct T {
+    pub(super) hub: Hub,
+    pub(super) env: FakeEnv,
     token: u64,
     /// Every journal event so far (what the daemon writes to disk).
     journal: std::rc::Rc<std::cell::RefCell<Vec<Value>>>,
 }
 
 impl T {
-    fn new() -> T {
+    pub(super) fn new() -> T {
         let mut t = T {
             hub: Hub::new("/w"),
             env: FakeEnv::new(),
@@ -101,7 +101,7 @@ impl T {
         t
     }
 
-    fn go(&mut self, input: Input) -> Vec<Effect> {
+    pub(super) fn go(&mut self, input: Input) -> Vec<Effect> {
         let mut fx = self.hub.handle(input, &mut self.env);
         for e in &fx {
             if let Effect::Journal(ev) = e {
@@ -116,7 +116,7 @@ impl T {
         fx
     }
 
-    fn req(&mut self, from: &str, req: AgentReq) -> (u64, Vec<Effect>) {
+    pub(super) fn req(&mut self, from: &str, req: AgentReq) -> (u64, Vec<Effect>) {
         self.token += 1;
         let tok = self.token;
         let fx = self.go(Input::Agent {
@@ -332,8 +332,8 @@ fn the_board_of_main_follows_the_tasks() {
             ask: Default::default(), parts: String::new(),
         },
     );
-    let ctx = fx
-        .iter()
+    // a step with no delivery leaves them pending (core_contexts.rs)
+    let ctx = [fx, t.hub.contexts_flush(t.env.now)].concat().iter()
         .find_map(|e| match e {
             Effect::Context { agent, text } if agent == MAIN => Some(text.clone()),
             _ => None,

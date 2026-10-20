@@ -7,6 +7,9 @@
 //! pending change always goes ([`StateGate::wait`] bounds the loop's
 //! wait), and the clients always get the latest state.
 //!
+//! The agents' contexts go through a gate of the same shape, its own
+//! period ([`StateGate::every`], crate::contexts::CONTEXT_MS: send-fast).
+//!
 //! Pure: the caller gives the time.
 
 use std::time::Duration;
@@ -14,15 +17,28 @@ use std::time::Duration;
 /// The shortest gap between two state broadcasts.
 pub(super) const EVERY_MS: u64 = 100;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct StateGate {
     /// The last snapshot sent.
     last_ms: Option<u64>,
     /// A change not sent yet.
     pending: bool,
+    /// The shortest gap between two sends.
+    every_ms: u64,
+}
+
+impl Default for StateGate {
+    fn default() -> Self {
+        StateGate::every(EVERY_MS)
+    }
 }
 
 impl StateGate {
+    /// A gate whose sends are at least `every_ms` apart.
+    pub(super) fn every(every_ms: u64) -> StateGate {
+        StateGate { last_ms: None, pending: false, every_ms }
+    }
+
     /// The hub's state changed (sb-core's `state` effect).
     pub(super) fn changed(&mut self) {
         self.pending = true;
@@ -30,14 +46,14 @@ impl StateGate {
 
     /// A pending change may go now.
     pub(super) fn due(&self, now: u64) -> bool {
-        self.pending && self.last_ms.is_none_or(|t| now.saturating_sub(t) >= EVERY_MS)
+        self.pending && self.last_ms.is_none_or(|t| now.saturating_sub(t) >= self.every_ms)
     }
 
     /// How long the loop may wait for a message before a pending change
     /// is due; None: nothing pending, wait for a message.
     pub(super) fn wait(&self, now: u64) -> Option<Duration> {
         self.pending.then(|| {
-            let at = self.last_ms.map_or(0, |t| t + EVERY_MS);
+            let at = self.last_ms.map_or(0, |t| t + self.every_ms);
             Duration::from_millis(at.saturating_sub(now))
         })
     }

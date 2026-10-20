@@ -2159,13 +2159,6 @@ impl Hub {
         self.core(fx, env, Some(client), In::ConfirmDrop(ci::ConfirmDrop { name }));
     }
 
-    /// At every input: the contexts whose inputs changed (contexts.rs).
-    fn refresh_contexts(&mut self, fx: &mut Fx, now: u64) {
-        for (agent, text) in self.contexts.refresh(&self.st, now, &self.models) {
-            fx.push(Effect::Context { agent, text });
-        }
-    }
-
     /// Issue #4: who `sb send --model` may move: a task, by main or its
     /// parent. Its name, or the words of the refusal.
     fn switch_target(&self, from: &str, to: &str) -> Result<String, String> {
@@ -2441,6 +2434,8 @@ mod wake_link;
 
 #[path = "core_doing.rs"]
 mod doing_link;
+#[path = "core_contexts.rs"]
+mod contexts_link;
 
 #[path = "core_feature.rs"]
 pub mod feature;
