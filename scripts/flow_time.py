@@ -151,7 +151,15 @@ def summary(rows):
     out["causes_h"] = {k: round(v / 3600, 1) for k, v in tot.most_common()}
     out["slowest"] = [(r["name"], round((r["landed"] - r["spawn"]) / 3600, 1))
                       for r in sorted(L, key=lambda r: r["spawn"] - r["landed"])[:5]]
+    # main's rule (m_35426): a task is dropped in the turn main reads its land;
+    # these slipped (over 15 min), the longest first
+    late = [r for r in L if r["archived"] - r["landed"] > LATE_DROP]
+    out["late_drops"] = [(r["name"], round((r["archived"] - r["landed"]) / 3600, 1))
+                         for r in sorted(late, key=lambda r: r["landed"] - r["archived"])]
     return out
+
+
+LATE_DROP = 15 * 60
 
 
 # ---- readers ---------------------------------------------------------------
@@ -238,6 +246,7 @@ def self_test():
            "split": {"agent working (model + tools)": 300, "landed, not archived yet": 100}}
     sm = summary([row, {"name": "b", "spawn": 0, "archived": 5, "landed": None}])
     assert sm["on_main"] == 1 and sm["steps"]["spawn -> on main"]["p50"] == 300, sm
+    assert summary([dict(row, archived=300 + 3600)])["late_drops"] == [("a", 1.0)] and sm["late_drops"] == []
     print("flow_time self-test: ok")
 
 

@@ -153,6 +153,16 @@ def test_audit():
         check(out.returncode == 0 and "- full: 5 runs, 3 green" in out.stdout and "vitest-related misses" in out.stdout and "partial_e2e" in out.stdout
               and "- gate logs start " in out.stdout,
               "the report shows them (rc %d)%s" % (out.returncode, "" if out.returncode == 0 else NL + out.stderr[-800:]))
+        # heavy.log: an old job (its start line only) and a new one (start + end line, flow-time)
+        with open(os.path.join(h, "run", "heavy.log"), "a") as fh:
+            fh.write("%d\t%d\t-\theavy2.lock\t/w/old/harness\tcargo build%s" % (now - 4000, now - 3900, NL))
+            fh.write("%d\t%d\t-\theavy2.lock\t/w/new/harness\tcargo test%s" % (now - 3000, now - 2900, NL))
+            fh.write("%d\t%d\t%d\theavy2.lock\t/w/new/harness\tcargo test\trc=1%s" % (now - 3000, now - 2900, now - 2800, NL))
+        hv = {x["cwd"]: x for x in la.heavy_waits(h, now - 86400)}
+        check(set(hv) == {"/w/t8/harness", "/w/old/harness", "/w/new/harness"}
+              and hv["/w/new/harness"]["end"] == now - 2800 and hv["/w/t8/harness"]["end"] == now - 4700
+              and hv["/w/old/harness"]["end"] == now - 2900,
+              "heavy.log: one row a job, its end from its end line, else the next start on its slot (%s)" % hv)
 
 
 FAKE_SB = "#!/bin/sh\nexit 0\n"

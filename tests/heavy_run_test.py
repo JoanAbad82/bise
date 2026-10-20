@@ -10,6 +10,9 @@ import sys
 import tempfile
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wait  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 HEAVY = os.path.join(HERE, "..", "scripts", "heavy-run")
 fails = []
@@ -21,13 +24,25 @@ def check(ok, what):
         fails.append(what)
 
 
-def wait_for(pred, secs=30):
-    end = time.time() + secs
-    while time.time() < end:
-        if pred():
-            return True
-        time.sleep(0.1)
-    return False
+def wait_for(pred, secs=30, what="the state"):
+    try:
+        return bool(wait.until(pred, secs, what))
+    except AssertionError as e:
+        print("     " + str(e)[:300])
+        return False
+
+
+def stays(pred, secs, what):
+    try:
+        return bool(wait.holds(pred, secs, what))
+    except AssertionError as e:
+        print("     " + str(e)[:300])
+        return False
+
+
+def held(slot):
+    """The slot is taken (a probe with lockf -t 0 fails)."""
+    return subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", slot, "true"], capture_output=True).returncode != 0
 
 
 with tempfile.TemporaryDirectory() as home:
@@ -70,6 +85,30 @@ with tempfile.TemporaryDirectory() as home:
     check(len(starts) == 6 and len(ends) == 6, "a start and an end line per job: %d/%d" % (len(starts), len(ends)))
     check(all(l.endswith("rc=0") and l.split("\t")[2].isdigit() for l in ends), "the end line has its end time and rc")
 
+    # a SIGKILLed waiter's ticket and a reused pid's ticket (a process
+    # younger than the ticket) block nobody
+    go3 = os.path.join(home, "go3")
+    holder = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go3], env=env)
+    check(wait_for(lambda: len([l for l in lines() if l.split("\t")[2] == "-"]) == 7), "a holder takes the slot")
+    dead = subprocess.Popen([HEAVY, "--prio", "true"], env=dict(env, HEAVY_SUBMIT="1"), stderr=subprocess.DEVNULL)
+    check(wait_for(lambda: any(f.startswith("0-1-") for f in os.listdir(q))), "a --prio waiter's ticket")
+    dead.kill()
+    dead.wait()
+    young = subprocess.Popen(["sleep", "60"])
+    with open(os.path.join(q, "0-2-%d" % young.pid), "w") as fh:
+        fh.write("%d" % (time.time() - 1000))
+    after = subprocess.Popen([HEAVY, "sh", "-c", 'echo "$HEAVY_SLOT" > "$0"', os.path.join(home, "slotenv")], env=env,
+                             stderr=subprocess.DEVNULL)
+    wait_for(lambda: any(f.startswith("2-") for f in os.listdir(q)), what="the next job's ticket")
+    open(go3, "w").close()
+    check(after.wait(timeout=30) == 0, "the next job runs past a killed waiter's and a reused pid's tickets")
+    young.kill()
+    holder.wait(timeout=10)
+    slot_env = open(os.path.join(home, "slotenv")).read().split()
+    check(len(slot_env) == 2 and slot_env[0] == "heavy.lock" and slot_env[1].isdigit(),
+          "the job has HEAVY_SLOT=<slot> <pid>: %r" % slot_env)
+    check(os.listdir(q) == [], "the dead tickets are gone: %r" % os.listdir(q))
+
     # the job's rc comes back; a land check is ranked without --land
     r = subprocess.run([HEAVY, "sh", "-c", "exit 3", "tests/gate.sh", "full"], env=env, capture_output=True)
     check(r.returncode == 3, "the job's rc comes back: %d" % r.returncode)
@@ -86,19 +125,38 @@ with tempfile.TemporaryDirectory() as home:
         env2 = dict(env, HEAVY_SLOTS="2")
         hold = subprocess.Popen(["/usr/bin/lockf", "-k", os.path.join(run, "heavy.lock"), "sh", "-c",
                                  'while [ ! -e "$0" ]; do sleep 0.1; done', go2])
-        time.sleep(0.5)
+        wait_for(lambda: held(os.path.join(run, "heavy.lock")), what="the plain lockf holds slot 1")
         alone = subprocess.Popen([HEAVY, "--alone", "sh", "-c", 'echo alone >> "$0"', order], env=env2)
-        check(wait_for(lambda: any(open(os.path.join(q, f)).read().strip() == "alone" for f in os.listdir(q))),
+        check(wait_for(lambda: any(open(os.path.join(q, f)).read().split()[-1:] == ["alone"] for f in os.listdir(q))),
               "an --alone waiter holds an 'alone' ticket")
         rest = subprocess.Popen([HEAVY, "sh", "-c", 'echo rest >> "$0"', order], env=env2, stderr=subprocess.DEVNULL)
-        time.sleep(5)
-        check(not os.path.exists(order), "slot 2 free, slot 1 held by a plain lockf: nothing ran past the --alone waiter")
+        check(stays(lambda: not os.path.exists(order), 3, "nothing runs"),
+              "slot 2 free, slot 1 held by a plain lockf: nothing ran past the --alone waiter")
         open(go2, "w").close()
         alone.wait(timeout=30)
         rest.wait(timeout=30)
         hold.wait(timeout=10)
         got = open(order).read().split() if os.path.exists(order) else []
         check(got == ["alone", "rest"], "the --alone job first, then the rest: %r" % got)
+        # an --alone measure keeps its class: after a land check submitted before it
+        os.remove(order)
+        go4 = os.path.join(home, "go4")
+        hold = subprocess.Popen(["/usr/bin/lockf", "-k", os.path.join(run, "heavy.lock"), "sh", "-c",
+                                 'while [ ! -e "$0" ]; do sleep 0.1; done', go4])
+        wait_for(lambda: held(os.path.join(run, "heavy.lock")), what="the plain lockf holds slot 1")
+        env1 = dict(env, HEAVY_SLOTS="1")
+        land = subprocess.Popen([HEAVY, "--land", "sh", "-c", 'echo land >> "$0"', order], env=dict(env1, HEAVY_SUBMIT="3000"),
+                                stderr=subprocess.DEVNULL)
+        meas = subprocess.Popen([HEAVY, "--alone", "sh", "-c", 'echo alone >> "$0"', order], env=dict(env1, HEAVY_SUBMIT="3001"))
+        check(wait_for(lambda: len(os.listdir(q)) == 2), "both wait with a ticket")
+        check(stays(lambda: not os.path.exists(order), 2, "nothing runs"),
+              "the --alone measure takes no slot while a land check is ahead")
+        open(go4, "w").close()
+        land.wait(timeout=30)
+        meas.wait(timeout=30)
+        hold.wait(timeout=10)
+        got = open(order).read().split() if os.path.exists(order) else []
+        check(got == ["land", "alone"], "a land check before an --alone measure: %r" % got)
     else:
         print("skip --alone on battery (it waits for AC power)")
     # --install

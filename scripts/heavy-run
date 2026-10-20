@@ -15,14 +15,15 @@
 # by rank, then first come first served (before: every waiter polled every
 # 2 s and the luckiest got the slot; 25 % of the tasks' spawn-to-main time
 # was this queue). Ranks:
-#   0 --prio  the user's priority work (his own ask, never an experiment);
-#     --alone too (the nightly), and while it waits nothing else starts
+#   0 --prio  the user's priority work (his own ask, never an experiment)
 #   1 a land check, one step from main: tests/gate.sh full or rerun,
-#     pnpm test:land, or --land (a wrapper script that runs one of them)
+#     pnpm test:land, or --land (a wrapper script that runs one of them);
+#     the nightly (scripts/nightly_gate.sh)
 #   2 the rest
 #   3 --low   experiments, load tests, shots, repacks: whatever no land waits on
 # --alone takes every slot (the nightly, a benchmark that needs a quiet
-#         machine); on battery it waits for AC power. A slot held without
+#         machine), in its rank's turn; while it waits for them no job
+#         behind it starts. On battery it waits for AC power. A slot held without
 #         heavy-run (an old caller's lockf) is busy all the same: every slot
 #         is probed.
 # heavy.log: a line when the job gets its slot, "<submitted> <started> -
@@ -131,17 +132,6 @@ printf "%s\t%s\t-\t%s\t%s\t%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" >>
 printf "%s\t%s\t%s\t%s\t%s\t%s\trc=%s\n" "$HEAVY_SUBMIT" "$t0" "$(date +%s)" "${2##*/}" "$PWD" "$c" "$rc" >>"$L" 2>/dev/null
 exit $rc'
 
-# --alone (the nightly, a benchmark): rank 0, and its ticket says "alone":
-# while it waits, no other job starts (the queue drains, review-gates
-# m_35348: never starved); it takes each slot as it frees (blocking lockf).
-if [ "$ALONE" = 1 ]; then
-  while on_battery; do sleep 60; done
-  T="$Q/0-$HEAVY_SUBMIT-$$"
-  echo alone >"$T"
-  # exec keeps this pid: a killed --alone waiter's ticket is a dead one
-  exec /usr/bin/lockf -k "$S1" /usr/bin/lockf -k "$S2" /usr/bin/lockf -k "$S3" /usr/bin/lockf -k "$S4" /bin/bash -c "$JOB" _ "$T" "all" 10 "$@"
-fi
-
 # a full gate (tests/gate.sh full) runs one at a time on the machine (its own
 # lock, ~/.bise/gate/full-<uid>.lock): while another one holds that lock, a
 # full gate waits here, before it takes a slot, instead of holding a slot
@@ -156,44 +146,62 @@ case " $* " in
     done ;;
 esac
 
+# the rank: what the job is (review-gates m_35387), --alone or not
 rank=2
-case " $* " in *"gate.sh full"*|*"gate.sh rerun"*|*"test:land"*) rank=1 ;; esac
+case " $* " in *"gate.sh full"*|*"gate.sh rerun"*|*"test:land"*|*"nightly_gate.sh"*) rank=1 ;; esac
 [ "$LAND" = 1 ] && rank=1
 [ "$LOW" = 1 ] && rank=3
 [ "$PRIO" = 1 ] && rank=0
+[ "$ALONE" = 1 ] && while on_battery; do sleep 60; done
 T="$Q/$rank-$HEAVY_SUBMIT-$$"
-: >"$T"
+# the ticket holds its own time (a reused pid started after it is no
+# waiter) and "alone" for an --alone job: one ahead holds back every job
+# behind it until it runs, so it gets all the slots and is never starved
+echo "$(date +%s)$([ "$ALONE" = 1 ] && echo ' alone')" >"$T"
 trap 'rm -f "$T"' EXIT
-# the live tickets ahead of this one (a dead waiter's ticket is removed);
-# a live --alone ticket anywhere: 99, nothing starts until it runs
+# the live tickets ahead of this one, 99 behind a waiting --alone; a dead
+# waiter's ticket (its pid gone, or reused by a younger process) is removed.
+# One ps for every ticket, only when a slot is free.
 ahead() {
-  local n=0 f mine=1
-  for f in $(ls "$Q" 2>/dev/null | sort -t- -k1,1n -k2,2n -k3,3n); do
-    [ "$Q/$f" = "$T" ] && { mine=0; continue; }
-    if kill -0 "${f##*-}" 2>/dev/null; then
-      [ -s "$Q/$f" ] && { echo 99; return; }
-      [ "$mine" = 1 ] && n=$((n + 1))
-    else
-      rm -f "$Q/$f"
-    fi
-  done
-  echo "$n"
+  local list pids
+  list=$(ls "$Q" 2>/dev/null | sort -t- -k1,1n -k2,2n -k3,3n)
+  [ -n "$list" ] || { echo 0; return; }
+  # ps refuses the whole list for one pid out of range: those are dead anyway
+  pids=$(printf '%s\n' $list | sed 's/.*-//' | awk '$1 ~ /^[0-9]+$/ && $1 > 0 && $1 < 100000' | paste -sd, -)
+  { [ -n "$pids" ] && ps -o pid=,etime= -p "$pids" 2>/dev/null | sed 's/^ */P /'
+    for f in $list; do echo "T $f $(head -c 40 "$Q/$f" 2>/dev/null)"; done; } |
+  awk -v now="$(date +%s)" -v me="${T##*/}" '
+    $1 == "P" { k = split($3, a, /[-:]/)
+                age[$2] = k == 4 ? a[1]*86400 + a[2]*3600 + a[3]*60 + a[4] : (k == 3 ? a[1]*3600 + a[2]*60 + a[3] : a[1]*60 + a[2]); next }
+    $1 == "T" { pid = $2; sub(/.*-/, "", pid); made = $3 + 0
+                if (!(pid in age) || (made > 0 && age[pid] < now - made - 2)) { print "rm", $2; next }
+                if ($2 == me) { mine = 1; next }
+                if (!mine) { n++; if ($4 == "alone") held = 1 } }
+    END { print "n", held ? 99 : n + 0 }' |
+  while read -r k v; do if [ "$k" = rm ]; then rm -f "$Q/$v"; else echo "$v"; fi; done
 }
 
 # lockf -t 0 exits 75 (EX_TEMPFAIL) when the slot is taken.
 while :; do
   if on_battery; then n=15; slots="$S1 $S2"; else n=10; slots="$S1 $S2 $S3 $S4"; fi
   if [ -n "${HEAVY_SLOTS:-}" ]; then slots=$(echo "$S1 $S2 $S3 $S4" | cut -d' ' -f1-"$HEAVY_SLOTS"); fi
-  # probe the slots quietly first: a taken slot makes lockf print
-  # 'already locked' on every try, which buried a job's real last lines.
-  free=""
-  for s in $slots; do /usr/bin/lockf -k -t 0 "$s" /usr/bin/true 2>/dev/null && free="$free $s"; done
-  if [ -n "$free" ] && [ "$(ahead)" -lt "$(echo $free | wc -w)" ]; then
-    for s in $free; do
-      /usr/bin/lockf -k -t 0 "$s" /bin/bash -c "$JOB" _ "$T" "$s" "$n" "$@"
-      rc=$?
-      [ "$rc" -ne 75 ] && exit "$rc"
-    done
+  if [ "$ALONE" = 1 ]; then
+    # its turn (nobody ahead): take each slot as it frees, holding the queue
+    # (its ticket stays until the job runs); exec keeps this pid
+    [ "$(ahead)" = 0 ] && exec /usr/bin/lockf -k "$S1" /usr/bin/lockf -k "$S2" /usr/bin/lockf -k "$S3" /usr/bin/lockf -k "$S4" \
+      /bin/bash -c "$JOB" _ "$T" "all" 10 "$@"
+  else
+    # probe the slots quietly first: a taken slot makes lockf print
+    # 'already locked' on every try, which buried a job's real last lines.
+    free=""
+    for s in $slots; do /usr/bin/lockf -k -t 0 "$s" /usr/bin/true 2>/dev/null && free="$free $s"; done
+    if [ -n "$free" ] && [ "$(ahead)" -lt "$(echo $free | wc -w)" ]; then
+      for s in $free; do
+        /usr/bin/lockf -k -t 0 "$s" /bin/bash -c "$JOB" _ "$T" "$s" "$n" "$@"
+        rc=$?
+        [ "$rc" -ne 75 ] && exit "$rc"
+      done
+    fi
   fi
   [ -n "${waited:-}" ] || { echo "heavy-run: every heavy slot is busy or promised to an earlier job, waiting (rank $rank)" >&2; waited=1; }
   sleep 2

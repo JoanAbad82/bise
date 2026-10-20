@@ -647,6 +647,12 @@ def report(rep):
             w("- %-42s %6.1f h  %3.0f %%" % (k, v, 100 * v / whole))
         if fl["slowest"]:
             w("- slowest to main: " + ", ".join("%s %.1f h" % kv for kv in fl["slowest"]))
+        if fl.get("late_drops"):
+            # main's rule (m_35426): drop a task in the turn it reads its land, page and
+            # artifacts kept; only the long-running roles, a release until it is out, and a
+            # task whose next step is already queued stay
+            w("- landed, not archived for over 15 min (main drops in the turn it reads the land): "
+              + ", ".join("%s %.1f h" % kv for kv in fl["late_drops"][:10]))
         w("")
     w("## gates")
     st = rep["gate_logs_start"]
