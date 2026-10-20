@@ -743,7 +743,7 @@ pub const STATE: State = State {
         },
         Record {
             name: "St",
-            doc: "the hub's durable state; `paused` since that ms (None runs); `hot`/`old` the messages split (hot ids ascending, old newest first); `gone` the withdrawn cards he may still answer, newest first",
+            doc: "the hub's durable state; `paused` since that ms (None runs); `hot`/`old` the messages split (hot ids ascending, old newest first); `gone` the withdrawn cards he may still answer, newest first; `agents`/`arch` the agents split (agents: not archived, in creation order; arch: archived, newest archived first; `order` every name, in creation order)",
             fields: &[
                 f("agents", Ts("Agent")),
                 f("order", Strs),
@@ -757,6 +757,7 @@ pub const STATE: State = State {
                 f("paused", OptNat),
                 f("old", Ts("MRec")),
                 f("gone", Ts("Item")),
+                f("arch", Ts("Agent")),
             ],
             // the photo a boot starts from (issue 36): every field
             shapes: &[photo(&[

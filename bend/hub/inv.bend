@@ -221,9 +221,24 @@ def NamesOK(ps: List<&2, List<&2, String>>) -> Data:
       X.Both<ApartAll(p, r), NamesOK(r)>
 
 # law names_apart: no name or old name of an agent is a name or old name of
-# another one
+# another one, live or archived (the agents split: St.agents, then arch)
 def NamesApart(+s: S.St) -> Data:
-  NamesOK(profile(S.St.agents(s)))
+  NamesOK(profile(List.append(&2, S.Agent, S.St.agents(s), S.St.arch(s))))
+
+# ---- the agents split (issue 21 sha 2, hub/agents.bend) ----
+
+# every agent of `xs` is live (`v` True) or archived (`v` False)
+def Lives(xs: List<&2, S.Agent>, +v: Bool) -> Data:
+  match xs:
+    case Nil{}:
+      Unit
+    case Con{+a, +t}:
+      X.Both<{M.live_life(S.Agent.life(a)) == v : Bool}, Lives(t, v)>
+
+# law split_agents_*: St.agents holds no archived agent, arch only
+# archived ones (any journal: every event keeps it, Fresh or not)
+def AgentsSplit(+s: S.St) -> Data:
+  X.Both<Lives(S.St.agents(s), True{}), Lives(S.St.arch(s), False{})>
 
 # ---- the timers (`sb every`, hub/timers.bend) ----
 

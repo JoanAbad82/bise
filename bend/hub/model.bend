@@ -1,7 +1,9 @@
 # hub/model.bend — the Switchboard hub's events and how they change its
 # durable state (RFC 0001 §12; the state itself, S.St, is declared in
 # bise_proto::core::state, gen/state.bend). `apply` is the only way the
-# durable state changes, through S.St's setters; the
+# durable state changes, through S.St's setters (the agents split, issue
+# 21 sha 2: St.agents the agents not archived, St.arch the archived ones,
+# hub/agents.bend; lookups read St.agents, then arch); the
 # Rust daemon keeps a read-only mirror of it (rust/switchboard/src/
 # model.rs) fed by the journal events the hub emits.
 import Base
@@ -12,6 +14,7 @@ import ./xhub-model.bend as XH
 import ./lazy.bend as LZ
 import ./gone.bend as G
 import ./names.bend as NM
+import ./agents.bend as AG
 import ./gen/state.bend as S
 
 type Ev is Data:
@@ -172,8 +175,32 @@ def agent_alias(xs: List<&2, S.Agent>, +n: String) -> Maybe<&2, String>:
     case Con{+a, +t}:
       LZ.pick(Maybe<&2, String>, str_in(S.Agent.aliases(a), n), u => Some{S.Agent.name(a)}, u => agent_alias(t, n))
 
+# the agents split (agents.bend): St.agents, then the archived ones
+def get_agent.or(m: Maybe<&2, S.Agent>, +st: S.St, +n: String) -> Maybe<&2, S.Agent>:
+  match m:
+    case Some{+a}:
+      Some{a}
+    case None{}:
+      agent_named(S.St.arch(st), n)
+
 def get_agent(+st: S.St, +n: String) -> Maybe<&2, S.Agent>:
-  agent_named(S.St.agents(st), n)
+  get_agent.or(agent_named(S.St.agents(st), n), st, n)
+
+# the agents not archived, in creation order (the live walks: a tick's
+# boot, overlaps, retirees)
+def live_names(+st: S.St) -> List<&2, String>:
+  AG.names(S.St.agents(st))
+
+def alias_of.or(m: Maybe<&2, String>, +st: S.St, +n: String) -> Maybe<&2, String>:
+  match m:
+    case Some{+a}:
+      Some{a}
+    case None{}:
+      agent_alias(S.St.arch(st), n)
+
+# the agent that has `n` as an old name
+def alias_of(+st: S.St, +n: String) -> Maybe<&2, String>:
+  alias_of.or(agent_alias(S.St.agents(st), n), st, n)
 
 # the canonical name: itself, or the task an alias points to
 def resolve.pick(m: Maybe<&2, S.Agent>, +st: S.St, +n: String) -> Maybe<&2, String>:
@@ -181,7 +208,7 @@ def resolve.pick(m: Maybe<&2, S.Agent>, +st: S.St, +n: String) -> Maybe<&2, Stri
     case Some{+a}:
       Some{S.Agent.name(a)}
     case None{}:
-      agent_alias(S.St.agents(st), n)
+      alias_of(st, n)
 
 def resolve(+st: S.St, +n: String) -> Maybe<&2, String>:
   resolve.pick(get_agent(st, n), st, n)
@@ -206,11 +233,11 @@ def live_agent(m: Maybe<&2, S.Agent>) -> Bool:
 # name-free: a live (not archived) agent's name or bise's is taken; an
 # archived one's and an old name are free (core take, apply's strip)
 def name_taken(+st: S.St, +n: String) -> Bool:
-  reserved(n) || live_agent(agent_named(S.St.agents(st), n))
+  reserved(n) || live_agent(get_agent(st, n))
 
 # no agent has it (any life), nor bise: a take's event (cx FreshEv)
 def name_held(+st: S.St, +n: String) -> Bool:
-  reserved(n) || Maybe.is_some(&2, S.Agent, agent_named(S.St.agents(st), n))
+  reserved(n) || Maybe.is_some(&2, S.Agent, get_agent(st, n))
 
 def agent_op.decl(l: S.Life, +d: Maybe<&2, S.Decl>) -> Maybe<&2, S.Decl>:
   match l:
@@ -500,27 +527,131 @@ def moved(xs: List<&2, S.MRec>, +from: String, +to: String) -> List<&2, S.MRec>:
     case Con{+r, +t}:
       moved.if(MRec.is_hot(r) && String.eq(S.Msg.to(S.MRec.msg(r)), from), r, to) <> moved(t, from, to)
 
+# ---- the agents split (agents.bend; laws HI.AgentsSplit, names_apart) ----
+# Each agent event computes the two sides from St.agents, arch and
+# St.order: `side` True the new St.agents, False the new arch (AG.side);
+# AG.set puts both back, so every other field is unchanged by computation.
+
+# an agent event, on the side that holds the agent (St.agents first: a
+# match, so arch is walked only for an archived agent's event)
+def on_agent.go(live: Bool, side: Bool, +ag: List<&2, S.Agent>, +ar: List<&2, S.Agent>, +n: String, +op: AgentOp) -> List<&2, S.Agent>:
+  match live side:
+    case True{} True{}:
+      map_agent(ag, n, op)
+    case True{} False{}:
+      ar
+    case False{} True{}:
+      ag
+    case False{} False{}:
+      map_agent(ar, n, op)
+
+def on_agent(+st: S.St, +n: String, +op: AgentOp) -> S.St:
+  +c = AG.has(S.St.agents(st), n)
+  AG.set(st, on_agent.go(c, True{}, S.St.agents(st), S.St.arch(st), n, op), on_agent.go(c, False{}, S.St.agents(st), S.St.arch(st), n, op))
+
+# hub-loop: a placed task's worktree (`ok`: no error), else nothing
+def placed.go(ok: Bool, side: Bool, +ag: List<&2, S.Agent>, +ar: List<&2, S.Agent>, +n: String, +ws: J.Json) -> List<&2, S.Agent>:
+  match ok:
+    case True{}:
+      on_agent.go(AG.has(ag, n), side, ag, ar, n, OWs{ws})
+    case False{}:
+      AG.side(side, ag, ar)
+
+def placed(+ok: Bool, +st: S.St, +n: String, +ws: J.Json) -> S.St:
+  AG.set(st, placed.go(ok, True{}, S.St.agents(st), S.St.arch(st), n, ws), placed.go(ok, False{}, S.St.agents(st), S.St.arch(st), n, ws))
+
+# a lifecycle: a live agent archived goes to arch's head, an archived one
+# brought back to its creation place in St.agents; else it stays
+def life.live.to(stay: Bool, side: Bool, +a: S.Agent, +pre: List<&2, S.Agent>, +post: List<&2, S.Agent>, +ar: List<&2, S.Agent>) -> List<&2, S.Agent>:
+  match stay side:
+    case True{} True{}:
+      List.append(&2, S.Agent, pre, a <> post)
+    case True{} False{}:
+      ar
+    case False{} True{}:
+      List.append(&2, S.Agent, pre, post)
+    case False{} False{}:
+      a <> ar
+
+def life.arch.to(back: Bool, side: Bool, +a: S.Agent, +pre: List<&2, S.Agent>, +post: List<&2, S.Agent>, +ag: List<&2, S.Agent>, +ord: List<&2, String>) -> List<&2, S.Agent>:
+  match back side:
+    case True{} True{}:
+      AG.ins(ord, ag, a)
+    case True{} False{}:
+      List.append(&2, S.Agent, pre, post)
+    case False{} True{}:
+      ag
+    case False{} False{}:
+      List.append(&2, S.Agent, pre, a <> post)
+
+def life.arch(m: Maybe<&2, S.Agent>, side: Bool, +pre: List<&2, S.Agent>, +post: List<&2, S.Agent>, +ag: List<&2, S.Agent>, +ar: List<&2, S.Agent>, +ord: List<&2, String>, +l: S.Life, +why: Maybe<&2, String>) -> List<&2, S.Agent>:
+  match m:
+    case None{}:
+      AG.side(side, ag, ar)
+    case Some{+a}:
+      life.arch.to(live_life(l), side, agent_op(a, OLife{l, why}), pre, post, ag, ord)
+
+def life.live(m: Maybe<&2, S.Agent>, side: Bool, +pre: List<&2, S.Agent>, +post: List<&2, S.Agent>, +ag: List<&2, S.Agent>, +ar: List<&2, S.Agent>, +ord: List<&2, String>, +n: String, +l: S.Life, +why: Maybe<&2, String>) -> List<&2, S.Agent>:
+  match m:
+    case None{}:
+      life.arch(AG.hit(ar, n), side, AG.pre(ar, n), AG.post(ar, n), ag, ar, ord, l, why)
+    case Some{+a}:
+      life.live.to(live_life(l), side, agent_op(a, OLife{l, why}), pre, post, ar)
+
+def life_ev(+st: S.St, +n: String, +l: S.Life, +why: Maybe<&2, String>) -> S.St:
+  +ag = S.St.agents(st)
+  +m = AG.hit(ag, n)
+  +p = AG.pre(ag, n)
+  +q = AG.post(ag, n)
+  AG.set(st, life.live(m, True{}, p, q, ag, S.St.arch(st), S.St.order(st), n, l, why), life.live(m, False{}, p, q, ag, S.St.arch(st), S.St.order(st), n, l, why))
+
+# a new task `a` named `n` (`held`: an archived agent has the name, an
+# older journal's reuse: the new one takes its creation place, as
+# put_agent replaced it in place before the split)
+def new_task.go(held: Bool, side: Bool, +ag: List<&2, S.Agent>, +ar: List<&2, S.Agent>, +ord: List<&2, String>, +n: String, +a: S.Agent) -> List<&2, S.Agent>:
+  match held side:
+    case False{} True{}:
+      put_agent(strip(ag, n), n, a)
+    case False{} False{}:
+      strip(ar, n)
+    case True{} True{}:
+      AG.ins(ord, strip(ag, n), a)
+    case True{} False{}:
+      AG.drop(strip(ar, n), n)
+
+def new_task(+st: S.St, +n: String, +a: S.Agent) -> S.St:
+  +c = AG.has(S.St.arch(st), n)
+  AG.set(st, new_task.go(c, True{}, S.St.agents(st), S.St.arch(st), S.St.order(st), n, a), new_task.go(c, False{}, S.St.agents(st), S.St.arch(st), S.St.order(st), n, a))
+
+# a rename: the new name out of every old names list, then the agent
+def renamed(+st: S.St, +n: String, +nn: String) -> S.St:
+  +ag = strip(S.St.agents(st), nn)
+  +ar = strip(S.St.arch(st), nn)
+  +c = AG.has(ag, n)
+  AG.set(st, on_agent.go(c, True{}, ag, ar, n, ORename{nn}), on_agent.go(c, False{}, ag, ar, n, ORename{nn}))
+
 def apply(+st: S.St, e: Ev) -> S.St:
   match e:
     case ETaskCreated{+name, +parent, +brief, +ws, +at}:
-      S.St.over_order(S.St.over_agents(st, +ag => put_agent(strip(ag, name), name, agent_of_new(ETaskCreated{name, parent, brief, ws, at}, NM.free_dir(dirs_of(ag), name)))),
+      +dirs = dirs_of(List.append(&2, S.Agent, S.St.agents(st), S.St.arch(st)))
+      S.St.over_order(new_task(st, name, agent_of_new(ETaskCreated{name, parent, brief, ws, at}, NM.free_dir(dirs, name))),
         +od => Bool.pick(List<&2, String>, str_in(od, name), od, snoc(String, od, name)))
     case ELifecycle{+name, +life, +reason}:
-      S.St.over_agents(st, ag => map_agent(ag, name, OLife{life, reason}))
+      life_ev(st, name, life, reason)
     case EWorkspace{+name, +ws}:
-      S.St.over_agents(st, ag => map_agent(ag, name, OWs{ws}))
+      on_agent(st, name, OWs{ws})
     case ESnapshot{+name, +snap}:
-      S.St.over_agents(st, ag => map_agent(ag, name, OSnap{snap}))
+      on_agent(st, name, OSnap{snap})
     case EPlaced{+name, +ws, +err}:
-      S.St.over_agents(st, +ag => Bool.pick(List<&2, S.Agent>, String.is_empty(err), map_agent(ag, name, OWs{ws}), ag))
+      placed(String.is_empty(err), st, name, ws)
     case EDeclared{+name, +status, +note}:
-      S.St.over_agents(st, ag => map_agent(ag, name, ODeclared{status, note}))
+      on_agent(st, name, ODeclared{status, note})
     case EReported{+name, +report}:
-      S.St.over_agents(st, ag => map_agent(ag, name, OReport{report}))
+      on_agent(st, name, OReport{report})
     case EFileTouched{+name, +path}:
-      S.St.over_agents(st, ag => map_agent(ag, name, OFile{path}))
+      on_agent(st, name, OFile{path})
     case ERenamed{+name, +nn}:
-      S.St.over_order(S.St.over_agents(st, ag => map_agent(strip(ag, nn), name, ORename{nn})), od => NM.rename_in(od, name, nn))
+      S.St.over_order(renamed(st, name, nn), od => NM.rename_in(od, name, nn))
     case EMsgsMoved{+from, +to}:
       S.St.over_hot(st, h => moved(h, from, to))
     # the three message events, on the split (law cold_is_inert: on
@@ -575,9 +706,9 @@ def apply(+st: S.St, e: Ev) -> S.St:
     case EAct{+ae}:
       S.St.over_tm(st, tm => TM.act_apply(tm, ae))
     case EFollow{+name, +on, +hub}:
-      S.St.over_agents(st, ag => map_agent(ag, name, OFollow{Bool.pick(Maybe<&2, String>, on, Some{hub}, None{})}))
+      on_agent(st, name, OFollow{Bool.pick(Maybe<&2, String>, on, Some{hub}, None{})})
     case EJobEnd{+name, _}:
-      S.St.over_agents(st, ag => map_agent(ag, name, OFollow{None{}}))
+      on_agent(st, name, OFollow{None{}})
     case EWake{+we}:
       S.St.over_tm(st, tm => TM.wk_apply(tm, we))
     case EPaused{+at}:

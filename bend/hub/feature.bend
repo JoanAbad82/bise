@@ -76,7 +76,7 @@ def retirees.go(ns: List<&2, String>, +st: S.St, +name: String) -> List<&2, S.Ag
 
 # the agents the retire moves, in the hub's order
 def retirees(+st: S.St, +name: String) -> List<&2, S.Agent>:
-  retirees.go(S.St.order(st), st, name)
+  retirees.go(M.live_names(st), st, name)
 
 def cat(+xs: List<&2, String>) -> String:
   String.concat(xs)

@@ -15,8 +15,10 @@ import ../../hub/xhub.bend as HXB
 import ./hub-1.bend as PL1
 import ./hub-2.bend as PL2
 import ./hub-names.bend as PLN
+import ./hub-agents.bend as PLA
 import ../../hub/names.bend as HN
 import ../../hub/lazy.bend as HLZ
+import ../../hub/agents.bend as HAG
 
 # entries listed before a renamed one stay apart from the renamed list
 def hub_aa_map_ren(+x: List<&2, String>, +t: List<&2, HS.Agent>, +old: String, +new: String, a: HI.ApartAll(x, HI.profile(t)), +fx: {HM.str_in(x, new) == False{} : Bool})
@@ -76,28 +78,29 @@ def hub_prof_placed(c: Bool, +ag: List<&2, HS.Agent>, +x: String, +w: J.Json)
 def hub_apply_names.go(+e: HM.Ev, +s: HS.St, u: HI.NamesApart(s), +k: HX.FreshEv(s, e)) -> HI.NamesApart(HM.apply(HS.St.open(s), e)):
   match e:
     case HM.ETaskCreated{+n, pa, br, ws, at}:
-      hub_nok_tr(HI.profile(HM.put_agent(HM.strip(HS.St.agents(s), n), n, HM.agent_of_new(HM.ETaskCreated{n, pa, br, ws, at}, HN.free_dir(HM.dirs_of(HS.St.agents(s)), n)))),
-        HM.snoc(List<&2, String>, HI.profile(HM.strip(HS.St.agents(s), n)), [n]),
-        PL2.hub_put_absent(HM.strip(HS.St.agents(s), n), n, HM.agent_of_new(HM.ETaskCreated{n, pa, br, ws, at}, HN.free_dir(HM.dirs_of(HS.St.agents(s)), n)),
-          PLN.nm_free(HS.St.agents(s), n, PLN.nm_held(s, n, k))),
-        PL2.hub_nok_snoc(HI.profile(HM.strip(HS.St.agents(s), n)), [n], PLN.nm_ok(HS.St.agents(s), n, u),
-          PL2.hub_allapart_new(HI.profile(HM.strip(HS.St.agents(s), n)), n, PLN.nm_free(HS.St.agents(s), n, PLN.nm_held(s, n, k)))))
+      PLA.ag_new_ok(HAG.has(HS.St.arch(s), n), HS.St.agents(s), HS.St.arch(s), HS.St.order(s), n,
+        HM.agent_of_new(HM.ETaskCreated{n, pa, br, ws, at}, HN.free_dir(HM.dirs_of(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s))), n)), {==}, {==}, PLN.nm_held(s, n, k), u)
     case HM.ERenamed{old, +new}:
-      hub_nok_ren(HM.strip(HS.St.agents(s), new), old, new, PLN.nm_ok(HS.St.agents(s), new, u), PLN.nm_free(HS.St.agents(s), new, PLN.nm_held(s, new, k)))
+      PLA.ag_ren_ok(HAG.has(HM.strip(HS.St.agents(s), new), old), HM.strip(HS.St.agents(s), new), HM.strip(HS.St.arch(s), new), old, new, {==},
+        hub_nok_ren(List.append(&2, HS.Agent, HM.strip(HS.St.agents(s), new), HM.strip(HS.St.arch(s), new)), old, new,
+          PLA.ag_ok_eq(List.append(&2, HS.Agent, HM.strip(HS.St.agents(s), new), HM.strip(HS.St.arch(s), new)), HM.strip(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s)), new), Equal.sym(List<&2, HS.Agent>, HM.strip(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s)), new), List.append(&2, HS.Agent, HM.strip(HS.St.agents(s), new), HM.strip(HS.St.arch(s), new)), PLA.ag_strip_app(HS.St.agents(s), HS.St.arch(s), new)), PLN.nm_ok(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s)), new, u)),
+          PLA.ag_free_eq(HI.profile(List.append(&2, HS.Agent, HM.strip(HS.St.agents(s), new), HM.strip(HS.St.arch(s), new))), HI.profile(HM.strip(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s)), new)), new,
+            Equal.cong(List<&2, HS.Agent>, List<&2, List<&2, String>>, z => HI.profile(z), List.append(&2, HS.Agent, HM.strip(HS.St.agents(s), new), HM.strip(HS.St.arch(s), new)), HM.strip(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s)), new), Equal.sym(List<&2, HS.Agent>, HM.strip(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s)), new), List.append(&2, HS.Agent, HM.strip(HS.St.agents(s), new), HM.strip(HS.St.arch(s), new)), PLA.ag_strip_app(HS.St.agents(s), HS.St.arch(s), new))),
+            PLN.nm_free(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s)), new, PLN.nm_held(s, new, k)))))
     case HM.ELifecycle{+x, +l, +r}:
-      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OLife{l, r})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OLife{l, r}, {==}), u)
+      PLA.ag_life_ok(HAG.hit(HS.St.agents(s), x), HAG.pre(HS.St.agents(s), x), HAG.post(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), HS.St.order(s), x, l, r, PLA.ag_cut_whole(HS.St.agents(s), x), u)
     case HM.EWorkspace{+x, +w}:
-      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OWs{w})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OWs{w}, {==}), u)
+      PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OWs{w}, {==}, u)
     case HM.EDeclared{+x, +d, +nt}:
-      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.ODeclared{d, nt})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.ODeclared{d, nt}, {==}), u)
+      PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.ODeclared{d, nt}, {==}, u)
     case HM.EFileTouched{+x, +p}:
-      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OFile{p})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OFile{p}, {==}), u)
+      PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OFile{p}, {==}, u)
     case HM.ESnapshot{+x, +sn}:
-      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OSnap{sn})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OSnap{sn}, {==}), u)
+      PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OSnap{sn}, {==}, u)
     case HM.EPlaced{+x, +w, +er}:
-      hub_nok_tr(HI.profile(Bool.pick(List<&2, HS.Agent>, String.is_empty(er), HM.map_agent(HS.St.agents(s), x, HM.OWs{w}), HS.St.agents(s))), HI.profile(HS.St.agents(s)), hub_prof_placed(String.is_empty(er), HS.St.agents(s), x, w), u)
+      PLA.ag_placed_ok(String.is_empty(er), HS.St.agents(s), HS.St.arch(s), x, w, u)
     case HM.EReported{+x, +rp}:
-      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OReport{rp})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OReport{rp}, {==}), u)
+      PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OReport{rp}, {==}, u)
     case HM.EMsgsMoved{a, b}:
       u
     case HM.EMsgSent{m}:
@@ -135,9 +138,9 @@ def hub_apply_names.go(+e: HM.Ev, +s: HS.St, u: HI.NamesApart(s), +k: HX.FreshEv
     case HM.EAct{a}:
       u
     case HM.EFollow{+x, +f, +h}:
-      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})}, {==}), u)
+      PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})}, {==}, u)
     case HM.EJobEnd{+x, b}:
-      hub_nok_tr(HI.profile(HM.map_agent(HS.St.agents(s), x, HM.OFollow{None{}})), HI.profile(HS.St.agents(s)), PL2.hub_prof_map(HS.St.agents(s), x, HM.OFollow{None{}}, {==}), u)
+      PLA.ag_on_ok(HAG.has(HS.St.agents(s), x), HS.St.agents(s), HS.St.arch(s), x, HM.OFollow{None{}}, {==}, u)
     case HM.EWake{a}:
       u
     case HM.EPaused{a}:

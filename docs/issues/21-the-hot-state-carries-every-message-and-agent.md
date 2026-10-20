@@ -10,7 +10,8 @@ Steps 3-4 redone as plan A by bp-hot (d1fe6f8d5, "steps 3-4: the split"
 below): say 18.9 -> 2.0 ms in sb-core. Not done: the archived agents
 (sha 2), ~86 % of a live tick (A/B: 1.01 -> 0.14 ms without them);
 signed, then stopped with the refactors (Gabriel, architect m_30924):
-bp-hot ends at sha 1. Plan in "sha 2: the archived agents" below.
+bp-hot ends at sha 1; done by arch-split for the boot-photo brief (chunk
+6): a live tick 87.6M -> 2.2M instructions, "sha 2: done" below.
 Plan agreed by architect
 (m_15238). Found by hub-fifo (2026-10-09). Label: hub, perf. Follows
 bcca8231 (one pass per step) and hub-fifo's inbox lanes and state throttle.
@@ -445,7 +446,7 @@ and says give the same bytes (view_all sha256 equal);
 `bench_byte_equal`: the same 5 digests; `old_core_replay` against
 v2026.10.2-28, -29 and main: green.
 
-## sha 2: the archived agents (signed by architect m_30761, not started)
+## sha 2: the archived agents (signed by architect m_30761, done: "sha 2: done" below)
 
 **Measure** (main d1fe6f8d5, heavy-run --alone, 2 runs each): his journal
 copy against the same copy without the own events (task_created,
@@ -500,3 +501,65 @@ parts (old, arch, gone), so the next field costs one edit.
   found; the laws cover any event.
 - A reply to a very old message: `msgs` keeps every message, lookups by
   id read it, so routing is the same.
+
+## sha 2: done (arch-split, boot-photo brief chunk 6)
+
+Plan B2 as signed, with architect's calls of m_34135:
+
+- **State.** St's 13th field `arch` (rust/proto core state.rs, core_gen
+  blessed): the archived agents, newest archived first; St.agents the
+  others, in creation order. bend/hub/agents.bend owns the two-list
+  helpers (pre/hit/post: a list cut at a name; ins by St.order's place;
+  drop; side, set). No helper record (tests/state_guard.py: a record is
+  sb-core state, declared in bise_proto): each agent event computes
+  St.agents (`side` True) and arch (False) from the same values, and
+  AG.set puts both back, so every other field is the one before by
+  computation. Lookups (get_agent, alias_of, name_taken,
+  name_held, take's) read St.agents, then arch. A lifecycle to archived
+  moves the record to arch's head, out of it back to its St.order place; a
+  task_created of an archived agent's name (an older journal; name-free
+  renames it first today) takes its place in St.agents.
+- **Walks.** A step's view walks St.agents unless a changed name is an
+  archived agent's (then St.order, each looked up), view_all walks
+  St.order; overlap_others, boot.each and retirees walk St.agents' names.
+  busy and resume.pump keep St.order (no lookup per name in busy; resume
+  is rare): the same answers, no proof of 'an archived agent is never
+  busy' needed.
+- **Laws** (bend/laws/agents.bend, proofs/agents.bend, lib/hub-agents.bend):
+  split_agents_at_init, split_agents_kept_by_run, split_agents_after_replay
+  (HI.AgentsSplit: St.agents holds no archived agent, arch only archived
+  ones; any journal); agents_apart_sides (with names apart, no name on
+  both sides). names_apart now reads St.agents ++ arch (HI.NamesApart); a
+  lifecycle move is a slide of one entry, and NamesOK is kept by a slide
+  (Apart is symmetric). The 'agents unchanged' lemmas of hub-1/hub-2
+  read both sides (PL1.hub_ag). No unsafe.
+- **Not a law** (architect m_34135): St.agents' names in St.order's order,
+  and every name of both sides in St.order. A rename to a held name (an
+  older journal) breaks the second; under Fresh the proof would go through
+  rename_in and the insert, over the budget. tests/agents_split_check.py
+  checks both after every event (bend/tests/agents-split-check.bend) on a
+  generated journal (archives, restores, live and archived renames, a
+  reused archived name) and on his journal copy.
+
+**Numbers** (his journal copy, 134,699 events, retired instructions of
+sb-core, measure.py in arch-split's tmp):
+
+| | before (main f03183397) | after |
+|---|---|---|
+| live tick, median of 200 | 87.61M, 15.4 ms | 2.22M, 0.31 ms |
+| say to main, median of 20 | 25.17M, 3.9 ms | 19.84M, 1.7 ms |
+| boot replay | 134.4G, 36.9 s | 76.2G, 12.2 s |
+| view_all | 36,006,065 bytes, sha 086f1282 | the same bytes, the same sha |
+
+(Before under a shared slot, after with heavy-run --alone: compare the
+instructions; the final build's tick 2.22M, say 19.34M, replay 76.3G.)
+
+**Same answers.** core_same on his copy: 273 steps, 0 differing, view_all
+sha equal at the middle and the end. bench_byte_equal: main's and this
+tree's 5 digests equal (tick, hello, user line, archive designer, restore
+designer). old_core_replay against main f03183397, v2026.10.2-43 and -44:
+green. The two tags predate the bend pin (bend/VERSION, b5692ae11) and do
+not build with today's bend 2.0.37: their sb-core was built with the bend
+they shipped with (~/.bend/versions/2.0.35) and given to the same script.
+tests/agents_split_check.py: 0 bad events on the generated journal (31)
+and on his copy (134,699). PROOF: 17 files, ALL PROOFS CHECK, no unsafe.

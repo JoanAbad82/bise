@@ -6103,17 +6103,17 @@ law St.agents.get_with:
 
 def St.agents.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.agents.eta:
   for r: S.St
   for v: List<&2, S.Agent>
-  {S.St{v, S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r)} == S.St.with_agents(r, v) : S.St}
+  {S.St{v, S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_agents(r, v) : S.St}
 
 def St.agents.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.agents.set_get:
@@ -6122,7 +6122,7 @@ law St.agents.set_get:
 
 def St.agents.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.agents.set_set:
@@ -6133,7 +6133,7 @@ law St.agents.set_set:
 
 def St.agents.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.agents.over:
@@ -6143,7 +6143,7 @@ law St.agents.over:
 
 def St.agents.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.order.get_with:
@@ -6153,17 +6153,17 @@ law St.order.get_with:
 
 def St.order.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.order.eta:
   for r: S.St
   for v: List<&2, String>
-  {S.St{S.St.agents(r), v, S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r)} == S.St.with_order(r, v) : S.St}
+  {S.St{S.St.agents(r), v, S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_order(r, v) : S.St}
 
 def St.order.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.order.set_get:
@@ -6172,7 +6172,7 @@ law St.order.set_get:
 
 def St.order.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.order.set_set:
@@ -6183,7 +6183,7 @@ law St.order.set_set:
 
 def St.order.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.order.over:
@@ -6193,7 +6193,7 @@ law St.order.over:
 
 def St.order.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.hot.get_with:
@@ -6203,17 +6203,17 @@ law St.hot.get_with:
 
 def St.hot.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.hot.eta:
   for r: S.St
   for v: List<&2, S.MRec>
-  {S.St{S.St.agents(r), S.St.order(r), v, S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r)} == S.St.with_hot(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), v, S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_hot(r, v) : S.St}
 
 def St.hot.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.hot.set_get:
@@ -6222,7 +6222,7 @@ law St.hot.set_get:
 
 def St.hot.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.hot.set_set:
@@ -6233,7 +6233,7 @@ law St.hot.set_set:
 
 def St.hot.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.hot.over:
@@ -6243,7 +6243,7 @@ law St.hot.over:
 
 def St.hot.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.cards.get_with:
@@ -6253,17 +6253,17 @@ law St.cards.get_with:
 
 def St.cards.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.cards.eta:
   for r: S.St
   for v: List<&2, S.Card>
-  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), v, S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r)} == S.St.with_cards(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), v, S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_cards(r, v) : S.St}
 
 def St.cards.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.cards.set_get:
@@ -6272,7 +6272,7 @@ law St.cards.set_get:
 
 def St.cards.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.cards.set_set:
@@ -6283,7 +6283,7 @@ law St.cards.set_set:
 
 def St.cards.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.cards.over:
@@ -6293,7 +6293,7 @@ law St.cards.over:
 
 def St.cards.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.notes.get_with:
@@ -6303,17 +6303,17 @@ law St.notes.get_with:
 
 def St.notes.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.notes.eta:
   for r: S.St
   for v: List<&2, String>
-  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), v, S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r)} == S.St.with_notes(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), v, S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_notes(r, v) : S.St}
 
 def St.notes.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.notes.set_get:
@@ -6322,7 +6322,7 @@ law St.notes.set_get:
 
 def St.notes.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.notes.set_set:
@@ -6333,7 +6333,7 @@ law St.notes.set_set:
 
 def St.notes.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.notes.over:
@@ -6343,7 +6343,7 @@ law St.notes.over:
 
 def St.notes.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_msg.get_with:
@@ -6353,17 +6353,17 @@ law St.next_msg.get_with:
 
 def St.next_msg.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_msg.eta:
   for r: S.St
   for v: Nat
-  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), v, S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r)} == S.St.with_next_msg(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), v, S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_next_msg(r, v) : S.St}
 
 def St.next_msg.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_msg.set_get:
@@ -6372,7 +6372,7 @@ law St.next_msg.set_get:
 
 def St.next_msg.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_msg.set_set:
@@ -6383,7 +6383,7 @@ law St.next_msg.set_set:
 
 def St.next_msg.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_msg.over:
@@ -6393,7 +6393,7 @@ law St.next_msg.over:
 
 def St.next_msg.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_card.get_with:
@@ -6403,17 +6403,17 @@ law St.next_card.get_with:
 
 def St.next_card.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_card.eta:
   for r: S.St
   for v: Nat
-  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), v, S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r)} == S.St.with_next_card(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), v, S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_next_card(r, v) : S.St}
 
 def St.next_card.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_card.set_get:
@@ -6422,7 +6422,7 @@ law St.next_card.set_get:
 
 def St.next_card.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_card.set_set:
@@ -6433,7 +6433,7 @@ law St.next_card.set_set:
 
 def St.next_card.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.next_card.over:
@@ -6443,7 +6443,7 @@ law St.next_card.over:
 
 def St.next_card.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.tm.get_with:
@@ -6453,17 +6453,17 @@ law St.tm.get_with:
 
 def St.tm.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.tm.eta:
   for r: S.St
   for v: S.Tms
-  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), v, S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r)} == S.St.with_tm(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), v, S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_tm(r, v) : S.St}
 
 def St.tm.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.tm.set_get:
@@ -6472,7 +6472,7 @@ law St.tm.set_get:
 
 def St.tm.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.tm.set_set:
@@ -6483,7 +6483,7 @@ law St.tm.set_set:
 
 def St.tm.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.tm.over:
@@ -6493,7 +6493,7 @@ law St.tm.over:
 
 def St.tm.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.x.get_with:
@@ -6503,17 +6503,17 @@ law St.x.get_with:
 
 def St.x.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.x.eta:
   for r: S.St
   for v: S.Xs
-  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), v, S.St.paused(r), S.St.old(r), S.St.gone(r)} == S.St.with_x(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), v, S.St.paused(r), S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_x(r, v) : S.St}
 
 def St.x.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.x.set_get:
@@ -6522,7 +6522,7 @@ law St.x.set_get:
 
 def St.x.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.x.set_set:
@@ -6533,7 +6533,7 @@ law St.x.set_set:
 
 def St.x.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.x.over:
@@ -6543,7 +6543,7 @@ law St.x.over:
 
 def St.x.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.paused.get_with:
@@ -6553,17 +6553,17 @@ law St.paused.get_with:
 
 def St.paused.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.paused.eta:
   for r: S.St
   for v: Maybe<&2, Nat>
-  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), v, S.St.old(r), S.St.gone(r)} == S.St.with_paused(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), v, S.St.old(r), S.St.gone(r), S.St.arch(r)} == S.St.with_paused(r, v) : S.St}
 
 def St.paused.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.paused.set_get:
@@ -6572,7 +6572,7 @@ law St.paused.set_get:
 
 def St.paused.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.paused.set_set:
@@ -6583,7 +6583,7 @@ law St.paused.set_set:
 
 def St.paused.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.paused.over:
@@ -6593,7 +6593,7 @@ law St.paused.over:
 
 def St.paused.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.old.get_with:
@@ -6603,17 +6603,17 @@ law St.old.get_with:
 
 def St.old.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.old.eta:
   for r: S.St
   for v: List<&2, S.MRec>
-  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), v, S.St.gone(r)} == S.St.with_old(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), v, S.St.gone(r), S.St.arch(r)} == S.St.with_old(r, v) : S.St}
 
 def St.old.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.old.set_get:
@@ -6622,7 +6622,7 @@ law St.old.set_get:
 
 def St.old.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.old.set_set:
@@ -6633,7 +6633,7 @@ law St.old.set_set:
 
 def St.old.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.old.over:
@@ -6643,7 +6643,7 @@ law St.old.over:
 
 def St.old.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.gone.get_with:
@@ -6653,17 +6653,17 @@ law St.gone.get_with:
 
 def St.gone.get_with(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.gone.eta:
   for r: S.St
   for v: List<&2, S.Item>
-  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), v} == S.St.with_gone(r, v) : S.St}
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), v, S.St.arch(r)} == S.St.with_gone(r, v) : S.St}
 
 def St.gone.eta(r, v):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.gone.set_get:
@@ -6672,7 +6672,7 @@ law St.gone.set_get:
 
 def St.gone.set_get(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.gone.set_set:
@@ -6683,7 +6683,7 @@ law St.gone.set_set:
 
 def St.gone.set_set(r, a, b):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.gone.over:
@@ -6693,7 +6693,57 @@ law St.gone.over:
 
 def St.gone.over(r, g):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law St.arch.get_with:
+  for r: S.St
+  for v: List<&2, S.Agent>
+  {S.St.arch(S.St.with_arch(r, v)) == v : List<&2, S.Agent>}
+
+def St.arch.get_with(r, v):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law St.arch.eta:
+  for r: S.St
+  for v: List<&2, S.Agent>
+  {S.St{S.St.agents(r), S.St.order(r), S.St.hot(r), S.St.cards(r), S.St.notes(r), S.St.next_msg(r), S.St.next_card(r), S.St.tm(r), S.St.x(r), S.St.paused(r), S.St.old(r), S.St.gone(r), v} == S.St.with_arch(r, v) : S.St}
+
+def St.arch.eta(r, v):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law St.arch.set_get:
+  for r: S.St
+  {S.St.with_arch(r, S.St.arch(r)) == r : S.St}
+
+def St.arch.set_get(r):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law St.arch.set_set:
+  for r: S.St
+  for a: List<&2, S.Agent>
+  for b: List<&2, S.Agent>
+  {S.St.with_arch(S.St.with_arch(r, a), b) == S.St.with_arch(r, b) : S.St}
+
+def St.arch.set_set(r, a, b):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
+      {==}
+
+law St.arch.over:
+  for r: S.St
+  for g: List<&2, S.Agent> -> List<&2, S.Agent>
+  {S.St.over_arch(r, g) == S.St.with_arch(r, g(S.St.arch(r))) : S.St}
+
+def St.arch.over(r, g):
+  match r:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 
 law St.open_eq:
@@ -6702,6 +6752,6 @@ law St.open_eq:
 
 def St.open_eq(r):
   match r:
-    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11}:
+    case S.St{f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12}:
       {==}
 

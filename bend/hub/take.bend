@@ -182,8 +182,8 @@ def take.archived(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +n: String) -> 
 # a take of `n` frees it: after it, no agent has `n` as its name unless a
 # live one does (the caller refuses), and its old holder's things are its
 def take(-o: S.St, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
-  +cx2 = take.archived(o, M.agent_named(S.St.agents(X.d(o, cx)), n), cx, n)
-  take.held(o, M.agent_alias(S.St.agents(X.d(o, cx2)), n), cx2, n)
+  +cx2 = take.archived(o, M.get_agent(X.d(o, cx), n), cx, n)
+  take.held(o, M.alias_of(X.d(o, cx2), n), cx2, n)
 
 # the rename (the user's /rename, main's sb rename): the new name taken,
 # then the rename on the state the take left (refused when a live agent

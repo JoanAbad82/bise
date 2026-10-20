@@ -35,7 +35,7 @@ def hub_msgs_gone(-o: HS.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, 
       PL1.hub_msgs_gone_each(o, HTM.ids_in(HC.live(o, cx), ns), cx, HC.cat(["@", n, " is gone"]))
 
 def hub_agents_gone(-o: HS.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2, String>)
-    -> {HS.St.agents(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == HS.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
+    -> {PL1.hub_ag(HX.d(o, HC.timers_gone.if(o, g, cx, n, ns))) == PL1.hub_ag(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match g:
     case False{}:
       {==}
@@ -75,15 +75,15 @@ def hub_msgs_close_ids(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: Stri
               PL1.hub_d_emit(o, cx, HM.ECardClosed{id, res, HS.Ans.empty()}, Unit{}, Unit{}, Unit{})),
             PL1.hub_msgs_closed(HX.d(o, cx), id, res))))
 
-def hub_agents_eq(-o: HS.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HS.St}) -> {HS.St.agents(HX.d(o, a)) == HS.St.agents(HX.d(o, b)) : List<&2, HS.Agent>}:
-  Equal.cong(HS.St, List<&2, HS.Agent>, s => HS.St.agents(s), HX.d(o, a), HX.d(o, b), e)
+def hub_agents_eq(-o: HS.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HS.St}) -> {PL1.hub_ag(HX.d(o, a)) == PL1.hub_ag(HX.d(o, b)) : List<&2, HS.Agent>}:
+  Equal.cong(HS.St, List<&2, HS.Agent>, s => PL1.hub_ag(s), HX.d(o, a), HX.d(o, b), e)
 
-def hub_agents_closed(+s: HS.St, +id: Nat, +res: String) -> {HS.St.agents(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == HS.St.agents(s) : List<&2, HS.Agent>}:
-  %HSL.St.open_eq(s) : {HS.St.agents(HM.apply(_, HM.ECardClosed{id, res, HS.Ans.empty()})) == HS.St.agents(s) : List<&2, HS.Agent>}
+def hub_agents_closed(+s: HS.St, +id: Nat, +res: String) -> {PL1.hub_ag(HM.apply(s, HM.ECardClosed{id, res, HS.Ans.empty()})) == PL1.hub_ag(s) : List<&2, HS.Agent>}:
+  %HSL.St.open_eq(s) : {PL1.hub_ag(HM.apply(_, HM.ECardClosed{id, res, HS.Ans.empty()})) == PL1.hub_ag(s) : List<&2, HS.Agent>}
   {==}
 
 def hub_agents_close_ids(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
-    -> {HS.St.agents(HX.d(o, HC.close_ids(o, ids, cx, res))) == HS.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
+    -> {PL1.hub_ag(HX.d(o, HC.close_ids(o, ids, cx, res))) == PL1.hub_ag(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match ids:
     case Nil{}:
       {==}
@@ -91,30 +91,30 @@ def hub_agents_close_ids(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: St
       +ev = {HM.ECardClosed{id, res, HS.Ans.empty()} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
-      Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, HC.close_ids(o, rest, cx3, res))), HS.St.agents(HX.d(o, cx3)), HS.St.agents(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Agent>, PL1.hub_ag(HX.d(o, HC.close_ids(o, rest, cx3, res))), PL1.hub_ag(HX.d(o, cx3)), PL1.hub_ag(HX.d(o, cx)),
         hub_agents_close_ids(o, rest, cx3, res),
-        Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, cx3)), HS.St.agents(HX.d(o, cx2)), HS.St.agents(HX.d(o, cx)),
+        Equal.trans(List<&2, HS.Agent>, PL1.hub_ag(HX.d(o, cx3)), PL1.hub_ag(HX.d(o, cx2)), PL1.hub_ag(HX.d(o, cx)),
           hub_agents_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
-          Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, cx2)), HS.St.agents(HM.apply(HX.d(o, cx), ev)), HS.St.agents(HX.d(o, cx)),
-            Equal.cong(HS.St, List<&2, HS.Agent>, s => HS.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+          Equal.trans(List<&2, HS.Agent>, PL1.hub_ag(HX.d(o, cx2)), PL1.hub_ag(HM.apply(HX.d(o, cx), ev)), PL1.hub_ag(HX.d(o, cx)),
+            Equal.cong(HS.St, List<&2, HS.Agent>, s => PL1.hub_ag(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
             hub_agents_closed(HX.d(o, cx), id, res))))
 
-def hub_agents_state(+s: HS.St, +id: Nat, +x: HS.MSt) -> {HS.St.agents(HM.apply(s, HM.EMsgState{id, x})) == HS.St.agents(s) : List<&2, HS.Agent>}:
-  %HSL.St.open_eq(s) : {HS.St.agents(HM.apply(_, HM.EMsgState{id, x})) == HS.St.agents(s) : List<&2, HS.Agent>}
+def hub_agents_state(+s: HS.St, +id: Nat, +x: HS.MSt) -> {PL1.hub_ag(HM.apply(s, HM.EMsgState{id, x})) == PL1.hub_ag(s) : List<&2, HS.Agent>}:
+  %HSL.St.open_eq(s) : {PL1.hub_ag(HM.apply(_, HM.EMsgState{id, x})) == PL1.hub_ag(s) : List<&2, HS.Agent>}
   {==}
 
 def hub_agents_reject(-o: HS.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
-    -> {HS.St.agents(HX.d(o, HC.reject_ids(o, ids, cx))) == HS.St.agents(HX.d(o, cx)) : List<&2, HS.Agent>}:
+    -> {PL1.hub_ag(HX.d(o, HC.reject_ids(o, ids, cx))) == PL1.hub_ag(HX.d(o, cx)) : List<&2, HS.Agent>}:
   match ids:
     case Nil{}:
       {==}
     case Con{id, t}:
       +ev = {HM.EMsgState{id, HS.Rejected{"recipient_unavailable"}} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, HC.reject_ids(o, t, cx2))), HS.St.agents(HX.d(o, cx2)), HS.St.agents(HX.d(o, cx)),
+      Equal.trans(List<&2, HS.Agent>, PL1.hub_ag(HX.d(o, HC.reject_ids(o, t, cx2))), PL1.hub_ag(HX.d(o, cx2)), PL1.hub_ag(HX.d(o, cx)),
         hub_agents_reject(o, t, cx2),
-        Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, cx2)), HS.St.agents(HM.apply(HX.d(o, cx), ev)), HS.St.agents(HX.d(o, cx)),
-          Equal.cong(HS.St, List<&2, HS.Agent>, s => HS.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
+        Equal.trans(List<&2, HS.Agent>, PL1.hub_ag(HX.d(o, cx2)), PL1.hub_ag(HM.apply(HX.d(o, cx), ev)), PL1.hub_ag(HX.d(o, cx)),
+          Equal.cong(HS.St, List<&2, HS.Agent>, s => PL1.hub_ag(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), PL1.hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
           hub_agents_state(HX.d(o, cx), id, HS.Rejected{"recipient_unavailable"})))
 
 def hub_names_tr(-a: List<&2, HS.MRec>, -b: List<&2, HS.MRec>, -na: List<&2, String>, -nb: List<&2, String>,

@@ -3235,7 +3235,7 @@ def touch.new(-o: S.St, known: Bool, +cx: X.Cx<o>, +agent: String, +path: String
       cx
     case False{}:
       +cx2 = emit(o, cx, M.EFileTouched{agent, path}, Unit{}, Unit{}, Unit{})
-      touch.others(o, overlap_others(S.St.order(st(o, cx2)), st(o, cx2), agent, path, place), cx2, agent, path)
+      touch.others(o, overlap_others(M.live_names(st(o, cx2)), st(o, cx2), agent, path, place), cx2, agent, path)
 
 def touch.task(-o: S.St, task: Bool, +cx: X.Cx<o>, +agent: String, +path: String, +known: Bool, +place: String) -> X.Cx<o>:
   match task:
@@ -3333,7 +3333,7 @@ def boot.each(-o: S.St, names: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
 # are in main's thread already
 def boot(-o: S.St, +cx: X.Cx<o>) -> X.Cx<o>:
   +cx2 = close_ids(o, CK.legacy_cards(S.St.cards(st(o, cx))), cx, "moved to main's inbox")
-  boot.each(o, S.St.order(st(o, cx2)), cx2)
+  boot.each(o, M.live_names(st(o, cx2)), cx2)
 
 # the asked message, still with no reply watch and no reply, of an active
 # agent: one more pause, from the ask (laws ask_timeout_pauses, ask_once)

@@ -123,7 +123,43 @@ def nm_none(m: Maybe<&2, HS.Agent>, e: {Maybe.is_some(&2, HS.Agent, m) == False{
     case Some{x}:
       PL1.hub_absurd_eq(PL1.hub_tf_absurd(e), Maybe<&2, HS.Agent>, Some{x}, None{})
 
-# a name no agent holds (FreshEv): no agent has it as its name
-def nm_held(+s: HS.St, +n: String, k: {HM.name_held(s, n) == False{} : Bool}) -> {HM.agent_named(HS.St.agents(s), n) == None{} : Maybe<&2, HS.Agent>}:
-  nm_none(HM.agent_named(HS.St.agents(s), n),
-    PL1.hub_or_false_r(HM.reserved(n), Maybe.is_some(&2, HS.Agent, HM.agent_named(HS.St.agents(s), n)), k))
+# the agents split (hub/agents.bend): a lookup reads St.agents, then
+# arch: the same as a lookup in both lists, one after the other
+def nm_get_app.pick(c: Bool, +h: HS.Agent, +t: List<&2, HS.Agent>, +s: HS.St, +n: String, +e: {String.eq(HS.Agent.name(h), n) == c : Bool},
+    ih: {HM.get_agent.or(HM.agent_named(t, n), s, n) == HM.agent_named(List.append(&2, HS.Agent, t, HS.St.arch(s)), n) : Maybe<&2, HS.Agent>})
+    -> {HM.get_agent.or(HLZ.pick(Maybe<&2, HS.Agent>, c, u => Some{h}, u => HM.agent_named(t, n)), s, n)
+        == HLZ.pick(Maybe<&2, HS.Agent>, c, u => Some{h}, u => HM.agent_named(List.append(&2, HS.Agent, t, HS.St.arch(s)), n)) : Maybe<&2, HS.Agent>}:
+  match c:
+    case True{}:
+      {==}
+    case False{}:
+      ih
+
+def nm_get_app(+xs: List<&2, HS.Agent>, +s: HS.St, +n: String)
+    -> {HM.get_agent.or(HM.agent_named(xs, n), s, n) == HM.agent_named(List.append(&2, HS.Agent, xs, HS.St.arch(s)), n) : Maybe<&2, HS.Agent>}:
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      nm_get_app.pick(String.eq(HS.Agent.name(h), n), h, t, s, n, {==}, nm_get_app(t, s, n))
+
+def nm_get(+s: HS.St, +n: String) -> {HM.get_agent(s, n) == HM.agent_named(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s)), n) : Maybe<&2, HS.Agent>}:
+  nm_get_app(HS.St.agents(s), s, n)
+
+# a name no agent holds (FreshEv): no agent, live or archived, has it as
+# its name
+def nm_held(+s: HS.St, +n: String, k: {HM.name_held(s, n) == False{} : Bool})
+    -> {HM.agent_named(List.append(&2, HS.Agent, HS.St.agents(s), HS.St.arch(s)), n) == None{} : Maybe<&2, HS.Agent>}:
+  %nm_get(s, n) : {_ == None{} : Maybe<&2, HS.Agent>}
+  nm_none(HM.get_agent(s, n),
+    PL1.hub_or_false_r(HM.reserved(n), Maybe.is_some(&2, HS.Agent, HM.get_agent(s, n)), k))
+
+# an agent's names read both sides: the same both sides, the same names
+def nm_names_of_eq(+a: HS.St, +b: HS.St, +n: String, e: {PL1.hub_ag(a) == PL1.hub_ag(b) : List<&2, HS.Agent>})
+    -> {HM.names_of(a, n) == HM.names_of(b, n) : List<&2, String>}:
+  Equal.trans(List<&2, String>, HM.names_of(a, n), n <> HM.names_of.go(HM.agent_named(PL1.hub_ag(a), n)), HM.names_of(b, n),
+    Equal.cong(Maybe<&2, HS.Agent>, List<&2, String>, m => n <> HM.names_of.go(m), HM.get_agent(a, n), HM.agent_named(PL1.hub_ag(a), n), nm_get(a, n)),
+    Equal.trans(List<&2, String>, n <> HM.names_of.go(HM.agent_named(PL1.hub_ag(a), n)), n <> HM.names_of.go(HM.agent_named(PL1.hub_ag(b), n)), HM.names_of(b, n),
+      Equal.cong(List<&2, HS.Agent>, List<&2, String>, xs => n <> HM.names_of.go(HM.agent_named(xs, n)), PL1.hub_ag(a), PL1.hub_ag(b), e),
+      Equal.sym(List<&2, String>, HM.names_of(b, n), n <> HM.names_of.go(HM.agent_named(PL1.hub_ag(b), n)),
+        Equal.cong(Maybe<&2, HS.Agent>, List<&2, String>, m => n <> HM.names_of.go(m), HM.get_agent(b, n), HM.agent_named(PL1.hub_ag(b), n), nm_get(b, n)))))

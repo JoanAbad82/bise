@@ -22,6 +22,7 @@ import ../hub/lazy.bend as HLZ
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
 import ./lib/hub-3.bend as PL3
+import ./lib/hub-names.bend as PLN
 import ./lib/hub-cold.bend as PLC
 import ./lib/hub-cold-2.bend as PLC2
 import ./lib/hub-cold-3.bend as PLC3
@@ -34,23 +35,7 @@ def Laws.hub_step_replays(h, i):
   PL1.hub_core_ok(HC.Hub.d(h), HX.Cx.c(HC.Hub.d(h), HC.step(h, i)))
 
 def Laws.hub_run_replays(ins, h):
-  match ins:
-    case Nil{}:
-      {==}
-    case Con{i, rest}:
-      Equal.trans(HS.St,
-        HC.Hub.d(HC.RunR.hub(HC.run(rest, HC.Turn.hub(HC.commit(h, i))))),
-        HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HC.Hub.d(HC.Turn.hub(HC.commit(h, i)))),
-        HM.apply_all(List.append(&2, HM.Ev, HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i))))), HC.Hub.d(h)),
-        Laws.hub_run_replays(rest, HC.Turn.hub(HC.commit(h, i))),
-        Equal.trans(HS.St,
-          HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HC.Hub.d(HC.Turn.hub(HC.commit(h, i)))),
-          HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HM.apply_all(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h))),
-          HM.apply_all(List.append(&2, HM.Ev, HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i))))), HC.Hub.d(h)),
-          Equal.cong(HS.St, HS.St, x => HM.apply_all(HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), x),
-            HC.Hub.d(HC.Turn.hub(HC.commit(h, i))), HM.apply_all(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.Hub.d(h)),
-            PL1.hub_commit_ok(h, i)),
-          PL1.hub_append(HX.journal(HC.Turn.fx(HC.commit(h, i))), HC.RunR.journal(HC.run(rest, HC.Turn.hub(HC.commit(h, i)))), HC.Hub.d(h))))
+  PL1.hub_run_replays(ins, h)
 
 def Laws.msg_ids_fresh(ins, h):
   match ins:
@@ -142,15 +127,14 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u):
       PL2.hub_msgs_close_ids(o, HC.card_ids(HS.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
       PLC4.hc_every_reject(o, ids, cx5, sp5)))
   # the names at the end: those of cx5 (no agent changes after it)
-  +en = Equal.cong(List<&2, HS.Agent>, List<&2, String>, xs => n <> HM.names_of.go(HM.agent_named(xs, n)),
-    HS.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HS.St.agents(HX.d(o, cx5)),
-    Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HS.St.agents(HX.d(o, g)), HS.St.agents(HX.d(o, cx5)),
-      Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HS.St.agents(HX.d(o, tg)), HS.St.agents(HX.d(o, g)),
-        Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HS.St.agents(HX.d(o, wg)), HS.St.agents(HX.d(o, tg)),
+  +en = PLN.nm_names_of_eq(HX.d(o, HC.stop_task(o, cx, n, life, why)), HX.d(o, cx5), n,
+    Equal.trans(List<&2, HS.Agent>, PL1.hub_ag(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL1.hub_ag(HX.d(o, g)), PL1.hub_ag(HX.d(o, cx5)),
+      Equal.trans(List<&2, HS.Agent>, PL1.hub_ag(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL1.hub_ag(HX.d(o, tg)), PL1.hub_ag(HX.d(o, g)),
+        Equal.trans(List<&2, HS.Agent>, PL1.hub_ag(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL1.hub_ag(HX.d(o, wg)), PL1.hub_ag(HX.d(o, tg)),
           PL2.hub_agents_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
           PL1.hub_agents_wakes(o, life, tg, n)),
         PL2.hub_agents_gone(o, HR.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
-      Equal.trans(List<&2, HS.Agent>, HS.St.agents(HX.d(o, g)), HS.St.agents(HX.d(o, cx6)), HS.St.agents(HX.d(o, cx5)),
+      Equal.trans(List<&2, HS.Agent>, PL1.hub_ag(HX.d(o, g)), PL1.hub_ag(HX.d(o, cx6)), PL1.hub_ag(HX.d(o, cx5)),
         PL2.hub_agents_close_ids(o, HC.card_ids(HS.St.cards(HX.d(o, cx6)), n, Nil{}), cx6, "agent stopped"),
         PL2.hub_agents_reject(o, ids, cx5))))
   PL2.hub_names_tr(HM.every(HX.d(o, HC.stop_task(o, cx, n, life, why))), PL1.hub_rej(ids, m5), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n), n5, ef, en,

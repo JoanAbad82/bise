@@ -19,6 +19,7 @@ import ./core.bend as H
 import ./timers.bend as TM
 import ./wakes.bend as WK
 import ./lazy.bend as LZ
+import ./agents.bend as AG
 
 def jdecl(d: Maybe<&2, S.Decl>, +note: String) -> J.Json:
   match d:
@@ -477,8 +478,43 @@ def wakes_ended(go: Bool, +s: S.St) -> Maybe<&2, List<&2, J.Json>>:
 # journal) changed the durable state (or all); the timers and the
 # watches when an event changed them (or all). cost-pause: `paused`
 # (null: it runs) in every view, a few bytes.
+def agent_or(m: Maybe<&2, S.Agent>, +rest: List<&2, S.Agent>) -> List<&2, S.Agent>:
+  match m:
+    case None{}:
+      rest
+    case Some{+a}:
+      a <> rest
+
+# the agents split (agents.bend): every agent, in creation order (St.order,
+# each looked up: St.agents, then arch), the ones in `names` or all
+def every_agents(ord: List<&2, String>, +s: S.St, +all: Bool, +names: List<&2, String>) -> List<&2, S.Agent>:
+  match ord:
+    case Nil{}:
+      Nil{}
+    case Con{+n, +t}:
+      LZ.pick(List<&2, S.Agent>, all || M.str_in(names, n),
+        u => agent_or(M.get_agent(s, n), every_agents(t, s, all, names)), u => every_agents(t, s, all, names))
+
+# a name of `names` is an archived agent's
+def any_arch(ns: List<&2, String>, +s: S.St) -> Bool:
+  match ns:
+    case Nil{}:
+      False{}
+    case Con{+n, +t}:
+      LZ.or(AG.has(S.St.arch(s), n), u => any_arch(t, s))
+
+# a step's agents: St.agents' changed ones when no archived agent changed
+# (a tick, a say: the archived ones are never walked), else every agent
+# in creation order (view_all, a step that archived or restored one)
+def view_agents(wide: Bool, +s: S.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +names: List<&2, String>) -> List<&2, J.Json>:
+  match wide:
+    case True{}:
+      agents_json(every_agents(S.St.order(s), s, all, names), rts, ws, s, True{}, Nil{})
+    case False{}:
+      agents_json(S.St.agents(s), rts, ws, s, False{}, names)
+
 def view.go(+s: S.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +ids: List<&2, Nat>, +names: List<&2, String>, +durable: Bool, +timers: Bool, +ended: Bool, +wakes: Bool) -> J.Json:
-  V.view(agents_json(S.St.agents(s), rts, ws, s, all, names), all,
+  V.view(view_agents(all || any_arch(names, s), s, rts, ws, all, names), all,
     msgs_json(all || Bool.not(List.is_empty(&2, Nat, ids)), view_recs(s, all, ids), all, ids), all,
     S.St.next_msg(s), S.St.next_card(s), S.St.paused(s),
     order_when(durable, s), cards_when(durable, s), notes_when(durable, s),
