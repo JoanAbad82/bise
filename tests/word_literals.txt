@@ -49,7 +49,7 @@
 1 tests/tui_palette_tmux.py  # lint shape: the palette's count, not panel.tip_agents
 1 tests/tui_pause_tmux.py  # lint shape: a part of a row, not inbox.all_agents
 1 tests/tui_psi_hover_tmux.py  # lint shape: the worktree tip's other words, not composer.tab_worktree_at
-2 tests/tui_scheduled_tmux.py  # lint shape: the hub's schedule labels, not scheduled.every
+1 tests/tui_scheduled_tmux.py  # lint shape: the hub's schedule labels, not scheduled.every
 1 tests/tui_tabs_tmux.py  # lint shape: a part of a row, not thread.ctx_screen
 1 tests/tui_text_layer_tmux.py  # lint shape: a part of a row, not inbox.your_answer
 1 tests/tui_voice_tmux.py  # lint shape: the voice line, not thread.wake_ended
