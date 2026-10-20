@@ -301,7 +301,11 @@
 .b-ptrig.bims-chip {
   height: auto;
   gap: var(--s-1);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
   font: var(--t-11) / 1.6 var(--font-ui);
+  cursor: pointer;
 }
 .b-ptrig.bims-chip:hover,
 .b-ptrig.bims-chip[aria-expanded='true'] {

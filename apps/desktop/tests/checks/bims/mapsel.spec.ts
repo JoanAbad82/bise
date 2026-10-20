@@ -29,8 +29,9 @@ async function shot(s: Session, file: string, title: string, says: string, withM
     const m = await s.page.getByTestId('app.right.bims.map.menu').boundingBox();
     if (m !== null) {
       const top = Math.min(b.y, m.y);
+      const left = Math.min(b.x, m.x);
       const right = Math.max(b.x + b.width, m.x + m.width);
-      b = { x: b.x, y: top, width: right - b.x, height: b.y + b.height - top };
+      b = { x: left, y: top, width: right - left, height: b.y + b.height - top };
     }
   }
   await shotOf(s.cdp, s.page, { x: b.x - 8, y: b.y - 8, width: b.width + 16, height: b.height + 16 }, file);
@@ -93,8 +94,14 @@ for (const theme of ['light', 'dark'] as const) {
           await core.waitCmd((c) => c.cmd === 'prefs_set' && c.key === KEY && c.value === 'workshop');
           await expect(page.getByTestId('app.right.bims.map.menu')).toHaveCount(0);
           // the hub echoes his prefs: every window draws the pick
-          await core.send({ ev: 'prefs', prefs: { onboarded: true, theme, excluded_apps: [], bims: { map: { [P]: 'workshop' } } } } as never);
-          await expect(box).toHaveAttribute('data-want', 'workshop', { timeout: 5000 });
+          // (sent again until the window has it: one 320-dark run of 4 kept the loft after a single send)
+          await expect
+            .poll(async () => {
+              await core.send({ ev: 'prefs', prefs: { onboarded: true, theme, excluded_apps: [], bims: { map: { [P]: 'workshop' } } } } as never);
+              await sleep(500);
+              return box.getAttribute('data-want');
+            }, { timeout: 10_000 })
+            .toBe('workshop');
           await expect(box).toHaveAttribute('data-map', 'workshop', { timeout: 10_000 });
           await expect(chip).toHaveText('Workshop');
           await sleep(500);
