@@ -74,7 +74,7 @@ test('thread/file-chips: a drop of documents makes file chips, ⏎ sends each wh
       await shots(page, core, 'composer');
 
       // the hub answers his send with its message id, and his entry carries it: the row goes (A1)
-      await core.result('send', undefined, { msg_id: 2 });
+      await core.result('send', undefined, { msg_id: 2, reason: 'made' });
       await page.keyboard.press('Enter');
       const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as Record<string, unknown>;
       expect(sent['files'], 'never a files list').toBeUndefined();

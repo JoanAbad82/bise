@@ -28,7 +28,7 @@ test('thread/pending-echo: a page, a steer or a queued delivery turns his pendin
     await expect(field, "bise's composer").toBeVisible({ timeout: 10_000 });
     // the hub answers each send with its message id, and its echo carries it (A1: no words match)
     const send = async (words: string, msgId: number): Promise<void> => {
-      await core.result('send', undefined, { msg_id: msgId });
+      await core.result('send', undefined, { msg_id: msgId, reason: 'made' });
       await field.click();
       await page.keyboard.type(words);
       await page.keyboard.press('Enter');

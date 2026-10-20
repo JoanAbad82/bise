@@ -94,7 +94,7 @@ async function run(size: string, shots: boolean): Promise<void> {
       const composer = await looks(page, '[data-testid="composer.field"]');
 
       // ⏎ on the prose line after the last fence sends; his entry lands as the hub keeps it
-      await core.result('send', undefined, { msg_id: 2 });
+      await core.result('send', undefined, { msg_id: 2, reason: 'made' });
       await page.keyboard.press('Enter');
       await core.waitCmd((c) => c.cmd === 'send', 5000);
       await core.send({ ev: 'entry', project: HOME, agent: 'main', entry: { pos: 2, at_ms: Date.now(), kind: 'you', msg_id: 2, text: TEXT, parts: [{ kind: 'text', text: TEXT }] } } as never);

@@ -48,7 +48,7 @@ test("thread/send-image-echo: a send with an image leaves 'sending…' when its 
     await expect(page.locator('[data-testid^="composer.chip."][data-kind="image"]')).toHaveCount(1, { timeout: 5000 });
     await page.keyboard.type(WORDS);
     // the hub answers his send with its message id; its echo carries it (A1: no words match)
-    await core.result('send', undefined, { msg_id: 2 });
+    await core.result('send', undefined, { msg_id: 2, reason: 'made' });
     await page.keyboard.press('Enter');
     const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as Record<string, unknown>;
     const img = ((sent['parts'] ?? []) as Record<string, unknown>[]).find((p) => p['kind'] === 'image');

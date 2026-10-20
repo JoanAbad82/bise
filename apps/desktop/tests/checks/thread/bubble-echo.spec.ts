@@ -96,7 +96,7 @@ for (const theme of ['light', 'dark'] as const) {
         expect(inField.map((c) => c.kind), 'the four chips in his order').toEqual(['quote', 'image', 'file', 'paste']);
 
         // the hub answers his send with its message id; its echo carries it (A1: no words match)
-        await core.result('send', undefined, { msg_id: 3 });
+        await core.result('send', undefined, { msg_id: 3, reason: 'made' });
         await page.keyboard.press('Enter');
         const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as { parts?: unknown[]; cid?: number };
         const parts = sent.parts ?? [];
