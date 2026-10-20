@@ -446,7 +446,7 @@ def new_tree(root, to, changed, cov, specs):
     known = set(cov["files"]) | set(cov["shared"])
     ts = {p: texts[p] for p in changed if p in texts and p.startswith(APP_SRC) and p.endswith(desktop_assets.EXTS)
           and p not in known and not VITEST_FILE.match(p)}
-    return desktop_assets.Tree(texts, desktop_assets.emits_js(root, ts), specs, set(cov["files"]))
+    return desktop_assets.Tree(texts, desktop_assets.emits_js(root, ts), specs, set(cov["files"]), cov["shared"])
 
 
 def git_tops(root=ROOT):
@@ -578,7 +578,10 @@ def desktop_pick_self_test():
     assert sel is None and "audit" in w, w
     # the new tree places a .css by the checks that loaded its importer (desktop_assets' own self-test
     # has every rule); without the tree, or without the import, it is ALL
-    texts = {APP_SRC + "app/a.tsx": "import './look.css';\n", APP_SRC + "app/look.css": ".l {}\n", keep: "", menus: ""}
+    texts = {APP_SRC + "app/a.tsx": "import './look.css';\n", APP_SRC + "app/look.css": ".l {}\n", keep: "", menus: "",
+             APP_SRC + "renderer/index.html": '<script type="module" src="../app/a.tsx"></script>',
+             APP_SRC + "main/index.ts": "import '../app/b';\nimport '../app/c';\nimport '../shared/api';\n",
+             APP_SRC + "app/b.tsx": "", APP_SRC + "app/c.ts": "", APP_SRC + "shared/api.ts": ""}
     lcov = fake_cov(loads=True, checks={"checks/app/keep.spec.ts": {"covered": [0], "imports": [], "loads": [0, 1], "complete": True},
                                         "checks/app/menus.spec.ts": {"covered": [1], "imports": [], "loads": [1], "complete": True}})
     tree = desktop_assets.Tree(texts, {}, specs, set(lcov["files"]))

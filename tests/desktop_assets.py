@@ -89,8 +89,8 @@ def resolve(importer, spec, exists):
 
 def graph(texts):
     """texts: {repo path: text} of the tree's code files. (importers: {path: set of paths that import
-    it}, dyn: sorted files with an import the graph can't follow)."""
-    imp, dyn = {}, []
+    it}, fwd: {path: set of paths it imports}, dyn: sorted files with an import the graph can't follow)."""
+    imp, fwd, dyn = {}, {}, []
     exists = texts.__contains__
     for p, t in texts.items():
         if not p.endswith(CODE):
@@ -99,9 +99,10 @@ def graph(texts):
             r = resolve(p, s, exists)
             if r and r != p:
                 imp.setdefault(r, set()).add(p)
+                fwd.setdefault(p, set()).add(r)
         if dynamic(p, t) and not VITEST.match(p):
             dyn.append(p)
-    return imp, sorted(dyn)
+    return imp, fwd, sorted(dyn)
 
 
 def hero_guard(known, importers, texts):
@@ -121,14 +122,35 @@ def hero_guard(known, importers, texts):
     return None
 
 
+# the app's entries (electron.vite.config.ts): the renderer's html, the main process, the preload
+ENTRIES = (SRC + "main/index.ts", SRC + "main/preload.ts")
+
+
+def unreached(fwd, texts, mapped):
+    """The mapped files the static graph doesn't reach from the app's entries, sorted: a missed
+    edge would hide a bundled importer, so any of them makes every placement ALL (review-gates
+    m_34909: the graph proves it sees what V8 saw)."""
+    todo = [p for p in texts if p.startswith(SRC + "renderer/") and p.endswith(".html")]
+    todo += [p for p in ENTRIES if p in texts]
+    seen = set()
+    while todo:
+        f = todo.pop()
+        if f in seen:
+            continue
+        seen.add(f)
+        todo.extend(fwd.get(f, ()))
+    return sorted(f for f in mapped if f.startswith(SRC) and f not in seen)
+
+
 class Tree:
     """The new tree's facts desktop-pick needs: its graph, the hero's guard and checks, which of the
     changed .ts emit no JS. texts: {repo path: text}; emits: {path: True|False} (absent: unknown);
-    specs: the checks' spec paths."""
+    specs: the checks' spec paths; known, shared: the map's files and shared files."""
 
-    def __init__(self, texts, emits, specs, known):
+    def __init__(self, texts, emits, specs, known, shared=()):
         self.texts = texts
-        self.importers, self.dyn = graph(texts)
+        self.importers, fwd, self.dyn = graph(texts)
+        self.unreached = unreached(fwd, texts, set(known) | set(shared))
         self.emits = emits
         self.hero_why = hero_guard(known, self.importers, texts)
         self.hero_checks = {s for s in specs if any(w in texts.get(s, "") for w in HERO_WORDS)}
@@ -151,6 +173,8 @@ def place(p, tree, cov, shared):
     if tree is None:
         return None, "%s: the map doesn't know it (new, renamed, type-only or an asset V8 can't see)" % p
     known = set(cov["files"])
+    if tree.unreached:
+        return None, "%s: the import graph misses %d files V8 saw (%s)" % (p, len(tree.unreached), tree.unreached[0])
     if p == HERO_CONFIG or p.startswith(HERO):
         if tree.hero_why:
             return None, "%s: the hero build, but %s" % (p, tree.hero_why)
@@ -269,6 +293,8 @@ def self_test():
         return c
     base = {
         SRC + "renderer/index.html": '<script type="module" src="./main.tsx"></script>',
+        SRC + "renderer/main.tsx": "import '../app/A';\nimport '../app/B';\nimport '@/bims/Office';\n",
+        SRC + "bims/Office.tsx": "export const O = 1;\n",
         SRC + "app/A.tsx": "import './a.css';\nimport { T } from '@/app/types';\nexport const A = 1;\n",
         SRC + "app/a.css": "@import './b.css';\n.a { color: red }\n",
         SRC + "app/b.css": ".b { color: blue }\n",
@@ -291,7 +317,7 @@ def self_test():
 
     def pick(p, texts=None, c=None, em=None):
         cv = c or cov()
-        t = Tree(base if texts is None else texts, emits if em is None else em, [X, Y, Z], set(cv["files"]))
+        t = Tree(base if texts is None else texts, emits if em is None else em, [X, Y, Z], set(cv["files"]), cv["shared"])
         return place(p, t, cv, set(cv["shared"]))
 
     def mut(**kw):
@@ -305,6 +331,13 @@ def self_test():
     assert resolve(SRC + "app/A.tsx", "react", base.__contains__) is None
     assert specifiers("x.ts", "// import './no'\nimport x from \"./y\"; export * from './z'; await import('./w');") == ["./y", "./z", "./w"]
     assert specifiers("x.css", "/* @import './no'; */ @import url(./c.css); @import \"d.css\";") == ["./c.css", "d.css"]
+    # the graph reaches every mapped file; a missed edge (an import hidden behind a stray '/*' in a
+    # string) leaves one unreached: every placement ALL (review-gates m_34909)
+    assert Tree(base, emits, [], set(files), [SRC + "main/index.ts"]).unreached == []
+    hidden = mut(**{SRC + "renderer/main.tsx": "const g = '/*';\nimport '../app/A';\nconst e = '*/';\nimport '../app/B';\nimport '@/bims/Office';\n"})
+    assert Tree(hidden, emits, [], set(files), [SRC + "main/index.ts"]).unreached == [SRC + "app/A.tsx"]
+    assert pick(SRC + "bims/coplanar.ts", hidden)[0] is None and "misses 1" in pick(SRC + "bims/coplanar.ts", hidden)[1]
+    assert pick(SRC + "app/types.ts", hidden)[0] is None and pick(HERO_CONFIG, hidden)[0] is None
     # a css: the checks that loaded its importer, through an @import chain too
     assert pick(SRC + "app/a.css") == ({X}, pick(SRC + "app/a.css")[1]), pick(SRC + "app/a.css")
     assert pick(SRC + "app/b.css")[0] == {X}
