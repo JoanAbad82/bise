@@ -58,6 +58,8 @@ async function width(s: Session, w: 'narrow' | 'wide'): Promise<void> {
 
 for (const theme of ['light', 'dark'] as const) {
   test(`(workshop) 12, 18, 19, 24 and 30 desks, 320 and 640 docked, noon and night, ${theme}`, async () => {
+    // 5 rooms x 2 hours x 2 widths: each hour's sky blend (30 s) then rest, ~10 min on a loaded machine
+    test.setTimeout(25 * 60_000);
     const { s, core } = await open(desks(COUNTS[0]), { theme, width: 1600, growth: GROWN });
     try {
       await showOffice(s);
