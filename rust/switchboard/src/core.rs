@@ -1193,18 +1193,6 @@ fn parse<T: serde::de::DeserializeOwned>(x: &Value) -> Option<T> {
     T::deserialize(x).ok()
 }
 
-/// sb-core's `force_run` input: an agent's REPL state (a restarted
-/// sb-core gets it bare, without the step's envelope).
-fn force_run_input(agent: &str, run: Run) -> Value {
-    let run = match run {
-        Run::Down => "down",
-        Run::Starting => "starting",
-        Run::Idle => "idle",
-        Run::Busy => "busy",
-    };
-    In::ForceRun(ci::ForceRun { agent: agent.into(), run: run.into() }).to_value()
-}
-
 impl Hub {
     /// The tests' hub: their sb-core is the test setting `SB_CORE_BIN`
     /// (the gate's cache file), else [`default_core_bin`].
@@ -2433,7 +2421,7 @@ impl Hub {
 #[path = "core_pure.rs"]
 mod pure;
 pub(crate) use pure::not_in_a_repo;
-use pure::{direct_exchange, git_only, unique_name};
+use pure::{direct_exchange, force_run_input, git_only, unique_name};
 
 #[path = "core_link.rs"]
 mod link;

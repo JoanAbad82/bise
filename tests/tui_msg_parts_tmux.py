@@ -157,10 +157,17 @@ def main():
         paste(PASTE)
         t.wait_re(r"▤ \d")
         t.keys("Enter")
-        sc = t.wait_re(r"@t3 : look at ▤" if not os.environ.get("PARITY") else r"@t3 : look at|t3 to you", 30)
-        shot("to-another-agent")
-        route = [r for r in sc.splitlines() if "@t3 : look at" in r]
-        expect(route and not any(tg in r for r in route for tg in TAGS), "the route row: %r" % route)
+        if os.environ.get("PARITY"):
+            sc = t.wait_re(r"@t3 : look at|t3 to you", 30)
+            shot("to-another-agent")
+        else:
+            # at-start: a leading @t3 opens t3's thread, his words there
+            # without the @, the paste a chip (main's view keeps '· sent to t3')
+            sc = t.wait_re(r"look at ▤", 30)
+            shot("to-another-agent")
+            said = [r for r in mine(sc) if "look at" in r]
+            expect(said and all("▤" in r and "@t3" not in r for r in said), "his message in t3's thread: %r" % said)
+            no_tag(said, "to another agent")
         print("ok: a message to another agent draws its chip")
 
         # 4. his screenshot: a card answer with a quote of main, as text

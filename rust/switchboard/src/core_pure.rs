@@ -55,6 +55,20 @@ pub(super) fn git_only(req: &AgentReq) -> Option<&'static str> {
     }
 }
 
+/// sb-core's `force_run` input: an agent's REPL state (a restarted
+/// sb-core gets it bare, without the step's envelope).
+pub(super) fn force_run_input(agent: &str, run: crate::model::Run) -> serde_json::Value {
+    use crate::model::Run;
+    use bise_proto::core::{input as ci, In};
+    let run = match run {
+        Run::Down => "down",
+        Run::Starting => "starting",
+        Run::Idle => "idle",
+        Run::Busy => "busy",
+    };
+    In::ForceRun(ci::ForceRun { agent: agent.into(), run: run.into() }).to_value()
+}
+
 /// The one line `sb <cmd>` answers in a workspace without git.
 pub(crate) fn not_in_a_repo(cmd: &str) -> String {
     format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)
