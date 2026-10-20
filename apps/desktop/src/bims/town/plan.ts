@@ -151,6 +151,35 @@ export function rowSizes(n: number, per: number, r: () => number): number[] {
 
 const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.z - b.z);
 
+/**
+ * "a point of pts closer than m to (x, z)", with the points in buckets of `cell`: a reach up to
+ * `cell` looks in the 9 buckets round it, a longer one at every point. The same answer as a scan.
+ */
+function nearIndex(pts: readonly Pt[], cell: number): (x: number, z: number, m: number) => boolean {
+  const buckets = new Map<number, Pt[]>();
+  // two 26-bit cell indices in one key (the town is a few hundred tiles across)
+  const keyAt = (i: number, j: number): number => (i + 0x2000000) * 0x4000000 + (j + 0x2000000);
+  for (const q of pts) {
+    const k = keyAt(Math.floor(q.x / cell), Math.floor(q.z / cell));
+    const b = buckets.get(k);
+    if (b === undefined) buckets.set(k, [q]);
+    else b.push(q);
+  }
+  const hit = (q: Pt, x: number, z: number, m: number): boolean => Math.abs(q.x - x) < m && Math.abs(q.z - z) < m && Math.hypot(q.x - x, q.z - z) < m;
+  return (x, z, m) => {
+    if (m > cell) return pts.some((q) => hit(q, x, z, m));
+    const ci = Math.floor(x / cell);
+    const cj = Math.floor(z / cell);
+    for (let j = cj - 1; j <= cj + 1; j++) {
+      for (let i = ci - 1; i <= ci + 1; i++) {
+        const b = buckets.get(keyAt(i, j));
+        if (b !== undefined && b.some((q) => hit(q, x, z, m))) return true;
+      }
+    }
+    return false;
+  };
+}
+
 /** A polyline resampled every `step` along its length (its ends kept). Pure. */
 export function resample(pts: readonly Pt[], step: number): Pt[] {
   const first = pts[0];
@@ -400,8 +429,11 @@ function layOut(sites: readonly TownSite[], seed: number): TownPlan {
 
   // houses along the road and trees in clumps, only where nothing else is
   const near = (pts: readonly Pt[], x: number, z: number, m: number): boolean => pts.some((q) => Math.abs(q.x - x) < m && Math.abs(q.z - z) < m && Math.hypot(q.x - x, q.z - z) < m);
+  // the road's and the river's points in buckets: the trees ask free() thousands of times
+  const nearRoad = nearIndex(road, ROAD + 1.2 + 1.4);
+  const nearRiver = nearIndex(river, BANK + 0.6 + 1.4);
   const free = (x: number, z: number, m: number): boolean =>
-    inLawn(x, z) && (heart === null || x < heart.x0 - m || x > heart.x1 + m || z < heart.z0 - m || z > heart.z1 + m) && !squares.some((q) => Math.abs(q.x - x) < q.w / 2 + m + 0.4 && Math.abs(q.z - z) < q.d / 2 + m + 0.4) && !inside(offices, x, z, 1.2 + m) && !near(road, x, z, ROAD + 1.2 + m) && !near(river, x, z, BANK + 0.6 + m) &&
+    inLawn(x, z) && (heart === null || x < heart.x0 - m || x > heart.x1 + m || z < heart.z0 - m || z > heart.z1 + m) && !squares.some((q) => Math.abs(q.x - x) < q.w / 2 + m + 0.4 && Math.abs(q.z - z) < q.d / 2 + m + 0.4) && !inside(offices, x, z, 1.2 + m) && !nearRoad(x, z, ROAD + 1.2 + m) && !nearRiver(x, z, BANK + 0.6 + m) &&
     paths.every((pa) => Math.abs(pa.x - x) > 1.2 + m || z < pa.z0 || z > pa.z1);
   const houses: House[] = [];
   const houseMax = Math.min(10, 3 + offices.length);

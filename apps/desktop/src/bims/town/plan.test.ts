@@ -9,10 +9,21 @@ import { BANK, ROAD, crossings, perRow, rngOf, rowSizes, seedOf, smooth, townPla
 import { siteOf, townSeed } from './ground';
 import { PATH_HALF } from '../render/decor';
 
+/** an office of n agents, laid out once: the tests draw thousands of sites from 14 sizes, and the
+ *  layout was a third of town-paths' time (5 s timeouts at gate load, bims-test-load) */
+const offices = new Map<number, ReturnType<typeof layoutOf>>();
+function officeOf(n: number): ReturnType<typeof layoutOf> {
+  let o = offices.get(n);
+  if (o === undefined) {
+    o = layoutOf([mainAgent(), ...Array.from({ length: n }, (_, i) => agent(`a${String(i)}`))]);
+    offices.set(n, o);
+  }
+  return o;
+}
+
 /** a project's site: n agents, that many jobs done (its stage) and days used (its garden) */
 function site(id: string, n: number, jobs: number, days: number): TownSite {
-  const agents = [mainAgent(), ...Array.from({ length: n }, (_, i) => agent(`a${String(i)}`))];
-  return siteOf(id, layoutOf(agents), growOf({ jobs_done: jobs, days_used: days, artifacts_made: 0 }));
+  return siteOf(id, officeOf(n), growOf({ jobs_done: jobs, days_used: days, artifacts_made: 0 }));
 }
 
 const JOBS = [0, 3, 15, 60, 150, 1000];

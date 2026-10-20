@@ -267,25 +267,47 @@ export const routerBuilds = (): number => builds;
 
 const routers = new Map<string, Router>();
 const solids = new Map<string, Solid[]>();
+/** a park's area as a key, kept per park: clearAt and route ask for it on every call */
+const areaKeys = new WeakMap<Park, string>();
 const keyOf = (park: Park, stage: number): string => {
-  const a = park.area;
-  return `${String(a.x0)},${String(a.x1)},${String(a.z0)},${String(a.z1)}|${String(stage)}`;
+  let k = areaKeys.get(park);
+  if (k === undefined) {
+    const a = park.area;
+    k = `${String(a.x0)},${String(a.x1)},${String(a.z0)},${String(a.z1)}|`;
+    areaKeys.set(park, k);
+  }
+  return k + String(stage);
 };
 /** a bounded memo: the 2 last parks and stages */
-function memo<T>(m: Map<string, T>, key: string, make: () => T): T {
-  const hit = m.get(key);
+interface Memo<T> {
+  readonly m: Map<string, T>;
+  // the last park and stage asked and their key: the same park asked again builds no key
+  park: Park | null;
+  stage: number;
+  key: string;
+}
+const memoOf = <T>(m: Map<string, T>): Memo<T> => ({ m, park: null, stage: -1, key: '' });
+function memo<T>(c: Memo<T>, park: Park, stage: number, make: () => T): T {
+  if (c.park !== park || c.stage !== stage) {
+    c.park = park;
+    c.stage = stage;
+    c.key = keyOf(park, stage);
+  }
+  const hit = c.m.get(c.key);
   if (hit !== undefined) return hit;
   const v = make();
-  m.set(key, v);
-  if (m.size > 2) m.delete(m.keys().next().value as string);
+  c.m.set(c.key, v);
+  if (c.m.size > 2) c.m.delete(c.m.keys().next().value as string);
   return v;
 }
+const solidsMemo = memoOf(solids);
+const routersMemo = memoOf(routers);
 function solidsCache(park: Park, stage: number): Solid[] {
-  return memo(solids, keyOf(park, stage), () => solidsOf(park, stage));
+  return memo(solidsMemo, park, stage, () => solidsOf(park, stage));
 }
 
 function routerOf(park: Park, stage: number): Router {
-  return memo(routers, keyOf(park, stage), () => {
+  return memo(routersMemo, park, stage, () => {
     builds++;
     const a = park.area;
     const nx = Math.ceil((a.x1 - a.x0) / CELL);
@@ -334,33 +356,54 @@ function astar(r: Router, s: [number, number], g: [number, number]): Pt[] | null
   const gs = new Float64Array(n).fill(Infinity);
   const from = new Int32Array(n).fill(-1);
   const closed = new Uint8Array(n);
-  const heap: [number, number][] = [];
+  // a binary heap of (f, cell) in two typed arrays: no pair allocated per push (the GC was a third
+  // of a line's cost); the same sift as before, so the same order and the same routes
+  let hf = new Float64Array(1024);
+  let hk = new Int32Array(1024);
+  let size = 0;
   const push = (f: number, k: number): void => {
-    heap.push([f, k]);
-    let i = heap.length - 1;
+    if (size === hf.length) {
+      const nf = new Float64Array(size * 2);
+      const nk = new Int32Array(size * 2);
+      nf.set(hf);
+      nk.set(hk);
+      hf = nf;
+      hk = nk;
+    }
+    let i = size++;
     while (i > 0) {
       const p = (i - 1) >> 1;
-      if ((heap[p] as [number, number])[0] <= f) break;
-      [heap[p], heap[i]] = [heap[i] as [number, number], heap[p] as [number, number]];
+      if ((hf[p] as number) <= f) break;
+      hf[i] = hf[p] as number;
+      hk[i] = hk[p] as number;
       i = p;
     }
+    hf[i] = f;
+    hk[i] = k;
   };
-  const pop = (): [number, number] | undefined => {
-    const top = heap[0];
-    const last = heap.pop();
-    if (heap.length > 0 && last) {
-      heap[0] = last;
+  /** the cell of the lowest f, or -1 when the heap is empty */
+  const pop = (): number => {
+    if (size === 0) return -1;
+    const top = hk[0] as number;
+    size--;
+    if (size > 0) {
+      const lf = hf[size] as number;
+      const lk = hk[size] as number;
       let i = 0;
       for (;;) {
         const l = i * 2 + 1;
         const rr = l + 1;
         let m = i;
-        if (l < heap.length && (heap[l] as [number, number])[0] < (heap[m] as [number, number])[0]) m = l;
-        if (rr < heap.length && (heap[rr] as [number, number])[0] < (heap[m] as [number, number])[0]) m = rr;
+        let mf = lf;
+        if (l < size && (hf[l] as number) < mf) { m = l; mf = hf[l] as number; }
+        if (rr < size && (hf[rr] as number) < mf) m = rr;
         if (m === i) break;
-        [heap[m], heap[i]] = [heap[i] as [number, number], heap[m] as [number, number]];
+        hf[i] = hf[m] as number;
+        hk[i] = hk[m] as number;
         i = m;
       }
+      hf[i] = lf;
+      hk[i] = lk;
     }
     return top;
   };
@@ -374,9 +417,8 @@ function astar(r: Router, s: [number, number], g: [number, number]): Pt[] | null
   gs[sk] = 0;
   push(h(s[0], s[1]), sk);
   for (;;) {
-    const top = pop();
-    if (!top) return null;
-    const k = top[1];
+    const k = pop();
+    if (k === -1) return null;
     if (closed[k] === 1) continue;
     closed[k] = 1;
     if (k === gk) break;
