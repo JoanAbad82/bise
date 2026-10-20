@@ -26,18 +26,15 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Instant;
 
+/// A check's end: what it found, and how long the call took (ms).
+pub(crate) type CheckEnd<'a> = (Result<&'a crate::firstkey::Works, &'a crate::firstkey::Failed>, u64);
+
 /// A `provider_check` event (bise_proto's CoreEv, draft): the key never
-/// in it.
-pub(crate) fn provider_check(
-    id: &str,
-    name: &str,
-    state: CheckState,
-    model: &str,
-    pasted: bool,
-    works: Option<&crate::firstkey::Works>,
-    failed: Option<&crate::firstkey::Failed>,
-    ms: Option<u64>,
-) -> Value {
+/// in it. `end`: none while it checks.
+pub(crate) fn provider_check(id: &str, name: &str, state: CheckState, model: &str, pasted: bool, end: Option<CheckEnd<'_>>) -> Value {
+    let works = end.and_then(|(r, _)| r.ok());
+    let failed = end.and_then(|(r, _)| r.err());
+    let ms = end.map(|(_, ms)| ms);
     let ev = CoreEv::ProviderCheck {
         id: id.to_string(),
         name: name.to_string(),
@@ -279,7 +276,7 @@ impl Core {
         s.using.insert(id.clone(), (seq, Instant::now()));
         let pasted = key.is_some();
         let (name, model) = (s.ports.provider_use)(&id, key, seq, s.tx.clone());
-        self.emit(provider_check(&id, &name, CheckState::Checking, &model, pasted, None, None, None));
+        self.emit(provider_check(&id, &name, CheckState::Checking, &model, pasted, None));
     }
 
     /// A check ended: dropped when a newer one for that provider runs;
@@ -292,12 +289,9 @@ impl Core {
         }
         s.using.remove(&used.id);
         let ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
-        let (state, works, failed) = match &used.res {
-            Ok(w) => (CheckState::Works, Some(w), None),
-            Err(f) => (CheckState::Failed, None, Some(f)),
-        };
-        self.emit(provider_check(&used.id, &used.name, state, &used.model, used.pasted, works, failed, Some(ms)));
-        if works.is_some() {
+        let state = if used.res.is_ok() { CheckState::Works } else { CheckState::Failed };
+        self.emit(provider_check(&used.id, &used.name, state, &used.model, used.pasted, Some((used.res.as_ref(), ms))));
+        if used.res.is_ok() {
             self.emit_accounts();
             self.emit_roles();
         }
