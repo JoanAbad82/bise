@@ -26,8 +26,9 @@
 # what a tag reads (scripts/desktop_tag.py): <out>/reds.txt (each red's exact name) and
 # <out>/steps.tsv (each step's state). Each run's line in <BISE_HOME>/run/nightly/desktop-runs.tsv:
 # <when> <sha> green|red|none <out dir>. Exit 0 green, 1 red ('FAIL <step>' lines), 2 no result; a second run in a row with no result is red (desktop-runs.tsv keeps each
-# run's verdict; the summary names the last green run). The candidate dir it built is removed at the end (disk); one built before
-# (another agent's, desktop_try says "is built") is kept.
+# run's verdict; the summary names the last green run). The candidate dir it built is kept for a rerun
+# (the newest 2; under 20 GB free it is removed at the end); one built before (another agent's,
+# desktop_try says "is built") is kept.
 # Tests: tests/nightly_desktop_test.py (fake desktop-try, cand.sh, dmg and pnpm: NIGHTLY_DESKTOP_*).
 nightly_desktop() {
 set -uo pipefail
@@ -174,10 +175,47 @@ for s in "${steps[@]}"; do
   esac
 done
 
-# disk: the candidate this run built (its DMG and share build inside), never one that was there
+# the candidate this run built stays (fast-loop, his « 4 min max »): a rerun of named rows on it
+# (scripts/desktop_rerun.py) opens it at once instead of a ~10 min rebuild. The nightly lists each
+# candidate it built in <BISE_HOME>/run/nightly/cands.txt and prunes only from that list (review-gates
+# m_35943: never another agent's, promote-lock's incident): the newest NIGHTLY_DESKTOP_KEEP_CANDS (2)
+# stay, an older one goes unless a cand.sh run holds its lock or a process runs from it
+# (cand_lock.users). Under NIGHTLY_DESKTOP_KEEP_GB (20) GB free the night's own goes too, as before
+# (heavy-run waits under 15). NIGHTLY_DESKTOP_FREE_GB: the free GB the test fakes.
+free_gb() { [ -n "${NIGHTLY_DESKTOP_FREE_GB:-}" ] && { echo "$NIGHTLY_DESKTOP_FREE_GB"; return; }; df -k "$bh" 2>/dev/null | awk 'NR==2 {print int($4 / 1048576)}'; }
+cand_busy() {  # why a candidate dir must stay: a cand.sh run holds its lock, or a process runs from it
+  local a l u; for a in "$1"/dist/*/*.app; do
+    [ -d "$a" ] || continue
+    l="$HOME/.bise/gate/locks/cand-$(printf '%s' "$(cd "$a" && pwd -P)" | shasum -a 256 | cut -c1-16).lock"
+    # -k: the probe never unlinks the lock file (a cand.sh starting now keeps the same inode)
+    [ -e "$l" ] && ! /usr/bin/lockf -k -t 0 "$l" /usr/bin/true 2>/dev/null && { echo "a cand.sh run holds it ($(cat "$l.holder" 2>/dev/null))"; return 0; }
+  done
+  u="$(python3 -B -c 'import sys; sys.path.insert(0, sys.argv[1]); import cand_lock; print(" ".join(str(p) for p, _ in cand_lock.users(sys.argv[2])))' "$here/scripts" "$1" 2>/dev/null)" || { echo "who runs from it is unknown (cand_lock.py failed)"; return 0; }
+  [ -n "$u" ] && { echo "pid $u runs from it"; return 0; }
+  return 1
+}
 if [ -n "$made" ] && [ -d "$made" ]; then
-  rm -rf "$made" && git -C "$here" worktree prune 2>/dev/null
-  note "removed the night's candidate $made"
+  built="$bh/run/nightly/cands.txt"; mkdir -p "$(dirname "$built")"
+  if [ "$(free_gb)" -lt "${NIGHTLY_DESKTOP_KEEP_GB:-20}" ]; then
+    rm -rf "$made" && git -C "$here" worktree prune 2>/dev/null
+    note "removed the night's candidate $made ($(free_gb) GB free, under ${NIGHTLY_DESKTOP_KEEP_GB:-20})"
+  else
+    { grep -vxF "$made" "$built" 2>/dev/null; echo "$made"; } > "$built.tmp" && mv "$built.tmp" "$built"
+    note "kept the night's candidate $made (a rerun opens it: scripts/desktop_rerun.py $out)"
+  fi
+  # the older ones the nightly built, newest last in cands.txt
+  if [ -f "$built" ]; then
+    keep=() n=0
+    while IFS= read -r d; do
+      [ -n "$d" ] && [ -d "$d" ] || continue
+      n=$((n + 1))
+      if [ $n -le "${NIGHTLY_DESKTOP_KEEP_CANDS:-2}" ]; then keep+=("$d"); continue; fi
+      if why="$(cand_busy "$d")"; then keep+=("$d"); note "kept the older candidate $d: $why"; continue; fi
+      rm -rf "$d" && note "removed the older candidate $d"
+    done < <(tail -r "$built")
+    printf '%s\n' "${keep[@]+"${keep[@]}"}" | tail -r | sed '/^$/d' > "$built.tmp" && mv "$built.tmp" "$built"
+  fi
+  git -C "$here" worktree prune 2>/dev/null
 fi
 
 [ ${#reds[@]} -gt 0 ] && python3 -B "$here/tests/known_reds.py" split "${reds[@]}" | tee -a "$sum"

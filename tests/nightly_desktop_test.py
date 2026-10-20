@@ -9,7 +9,8 @@ green / red / none, the exit (0, 1, 2), a red step of a cand.sh JSON named with 
 split by known_reds, a gate breach is red, nothing new after --until (none, never green), on
 battery nothing runs, each run's line in desktop-runs.tsv (when, sha, verdict, out dir) and what a
 tag reads (reds.txt: each red's name, test:land's by name; steps.tsv: each step's state), the
-candidate it built removed and one built before kept. Never his ~/.bise, no real build or app.
+candidate it built kept for a rerun (the newest 2, removed under 20 GB free) and one built
+before kept. Never his ~/.bise, no real build or app.
 
   python3 -B tests/nightly_desktop_test.py
 """
@@ -28,7 +29,7 @@ echo "try $*" >> "$FAKE_LOG"
 sha=$2; d="$FAKE_CAND_DIR/${sha:0:12}"
 [ -n "${FAKE_BUILT_BEFORE:-}" ] && echo "bise try: candidate ${sha:0:8} is built: $d/app"
 [ "${FAKE_TRY_RC:-0}" = 0 ] || { echo "cargo: error"; exit 1; }
-mkdir -p "$d/app"
+mkdir -p "$d/app"; echo '{}' > "$d/cand.json"
 # the clock moves past the end while it builds
 [ -n "${FAKE_TRY_NOW:-}" ] && echo "$FAKE_TRY_NOW" > "$NIGHTLY_DESKTOP_NOW"
 echo "{\\"sha\\": \\"$sha\\", \\"app\\": \\"$d/app\\", \\"dir\\": \\"$d\\"}"
@@ -85,7 +86,8 @@ def main():
         repo, home = os.path.join(t, "harness"), os.path.join(t, "home")
         for d in (("apps", "desktop", "node_modules", "@playwright", "test"), ("apps", "desktop", "node_modules", "electron", "dist", "Electron.app"), ("scripts",), ("tests",)):
             os.makedirs(os.path.join(repo, *d))
-        shutil.copy(os.path.join(ROOT, "scripts", "nightly_desktop.sh"), os.path.join(repo, "scripts"))
+        for f in ("nightly_desktop.sh", "cand_lock.py"):
+            shutil.copy(os.path.join(ROOT, "scripts", f), os.path.join(repo, "scripts"))
         for f in ("known_reds.py", "known_reds.txt"):
             shutil.copy(os.path.join(ROOT, "tests", f), os.path.join(repo, "tests"))
         with open(os.path.join(repo, "tests", "known_reds.txt"), "a") as f:
@@ -140,7 +142,7 @@ def main():
         check(len(lr) == 4 and lr[1:] == [sha, "green", out], "green: desktop-runs.tsv's line %s" % lr)
         check(facts() == ([], {"candidate": "green", "quick": "green", "land": "green", "full": "green", "dmg": "green"}), "green: reds.txt, steps.tsv %s" % (facts(),))
         check(not os.path.exists(os.path.join(home, ".bise", "run", "nightly", "desktop-green.tsv")), "green: no desktop-green.tsv any more")
-        check(not os.path.exists(os.path.join(t, "cand", sha[:12])), "green: the candidate it built is removed")
+        check(os.path.isdir(os.path.join(t, "cand", sha[:12])) and "kept the night's candidate" in o, "green: the candidate it built is kept for a rerun")
         check("STEP dmg: green" in o and "nightly desktop: green" in o, "green: summary\n" + o)
 
         # a red step in quick's JSON: digits as N, a known red with its owner; still red (exit 1)
@@ -188,6 +190,36 @@ def main():
         check(rc == 0, "a green run after: green\n" + o)
         rc, o, _ = run(NIGHTLY_DESKTOP_BATTERY="1")
         check(rc == 2, "one none after a green: no result, not red\n" + o)
+
+        # the newest 2 the nightly built stay (cands.txt), an older one goes; another agent's candidate
+        # (not in cands.txt) and one a process runs from always stay; under 20 GB free the night's goes
+        cands_txt = os.path.join(home, ".bise", "run", "nightly", "cands.txt")
+        cd = lambda n: os.path.join(t, "cand", n)
+        for n in ("aaaaaaaaaaaa", "bbbbbbbbbbbb", "cccccccccccc", "oooooooooooo"):
+            os.makedirs(cd(n), exist_ok=True)
+            open(os.path.join(cd(n), "cand.json"), "w").write("{}")
+        # cccc: a process runs from it (sleep through a symlink under its dir: a copy of a system
+        # binary is killed at its first exec here)
+        os.symlink("/bin/sleep", os.path.join(cd("cccccccccccc"), "sleep"))
+        busy = subprocess.Popen([os.path.join(cd("cccccccccccc"), "sleep"), "60"])
+        try:
+            with open(cands_txt, "w") as f:
+                f.write("".join(cd(n) + "\n" for n in ("cccccccccccc", "aaaaaaaaaaaa", "bbbbbbbbbbbb")))
+            shutil.rmtree(cd(sha[:12]), ignore_errors=True)
+            rc, o, _ = run()
+        finally:
+            busy.kill()
+            busy.wait()
+        left = sorted(os.listdir(os.path.join(t, "cand")))
+        want = sorted(["bbbbbbbbbbbb", "cccccccccccc", "oooooooooooo", sha[:12]])
+        check(rc == 0 and left == want and "removed the older candidate %s" % cd("aaaaaaaaaaaa") in o, "keep 2: %s\n%s" % (left, o))
+        check("kept the older candidate %s: pid %d runs from it" % (cd("cccccccccccc"), busy.pid) in o, "keep 2: the busy one kept\n" + o)
+        check(open(cands_txt).read().split() == [cd("cccccccccccc"), cd("bbbbbbbbbbbb"), cd(sha[:12])], "keep 2: cands.txt %s" % open(cands_txt).read())
+        for n in ("bbbbbbbbbbbb", "cccccccccccc", "oooooooooooo"):
+            shutil.rmtree(cd(n), ignore_errors=True)
+        shutil.rmtree(cd(sha[:12]), ignore_errors=True)
+        rc, o, _ = run(NIGHTLY_DESKTOP_FREE_GB="12")
+        check(rc == 0 and not os.path.exists(cd(sha[:12])) and "12 GB free" in o, "low disk: removed\n" + o)
 
         # a candidate built before (another agent's) is kept
         rc, o, _ = run(FAKE_BUILT_BEFORE="1")
