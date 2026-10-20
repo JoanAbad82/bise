@@ -773,6 +773,7 @@ pub const STATE: State = State {
                 k("paused", W::OptNat),
                 k("old", W::Recs),
                 k("gone", W::Recs),
+                k("arch", W::Recs),
             ])],
         },
     ],
