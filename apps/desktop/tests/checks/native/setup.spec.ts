@@ -15,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { test, expect } from '../../harness';
 import path from 'node:path';
 import { capsulePage, onWorld, sleep } from './world';
+import { settings } from '../../../src/proto/words.gen';
 
 /** the scripted core that logs a line on stderr first (what the window should show as its last log line) */
 const NOISY = path.join(__dirname, 'fakes', 'core-noisy.mjs');
@@ -30,10 +31,10 @@ test("setup/perms: his first fn hold with one missing: the capsule's sheet (mark
     const sheet = cap.getByTestId('capsule.perms');
     await expect(sheet, 'the sheet, instead of the talk').toBeVisible({ timeout: 3000 });
     await expect(cap.getByTestId('capsule.talk'), 'no talk while it asks').toHaveCount(0);
-    await expect.soft(sheet).toContainText('to hear you from any app');
-    await expect.soft(sheet).toContainText('nothing leaves unless you hold fn');
+    await expect.soft(sheet).toContainText(settings.onb_perms_title);
+    await expect.soft(sheet).toContainText(settings.onb_perms_sub);
     // macOS's own names, as System Settings shows them (designer m_34345)
-    for (const name of ['Microphone', 'Accessibility', 'Screen Recording']) await expect.soft(sheet).toContainText(name);
+    for (const name of [settings.onb_perm_mic, settings.onb_perm_accessibility, settings.onb_perm_screen]) await expect.soft(sheet).toContainText(name);
     await expect.poll(() => core.cmds().some((c) => c['cmd'] === 'prefs_set' && c['key'] === 'hints.fn_perms' && c['value'] === true), { message: 'marked shown (hints.fn_perms)', timeout: 2000 }).toBe(true);
     expect(core.cmds().some((c) => c['cmd'] === 'talk_start'), 'the core never listened').toBe(false);
     await helper.send({ ev: 'fn', act: 'talk_end', by: 'fn' });

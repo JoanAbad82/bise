@@ -11,6 +11,7 @@ import { mkdirSync, copyFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { FakeCore, FakeHelper, launchDesktop, test, expect, type Session } from '../../harness';
+import { settings } from '../../../src/proto/words.gen';
 
 const NOW = 1791100400000;
 const HOME = 'bise-home-00000000';
@@ -22,7 +23,7 @@ const accounts = {
     { id: 'anthropic-key', kind: 'key', label: 'Anthropic', state: 'signed_in', from: { t: 'env', var: 'ANTHROPIC_API_KEY' } },
   ],
 };
-const WORKS = { ev: 'provider_check', id: 'anthropic-key', name: 'Anthropic', state: 'works', model: 'anthropic/claude-opus-5-5', label: 'opus 5.5', answer: 'hi, ready when you are.', ms: 1200, main: 'anthropic/claude-opus-5-5', lines: ['main uses anthropic/claude-opus-5-5.'] };
+const WORKS = { ev: 'provider_check', id: 'anthropic-key', name: 'Anthropic', state: 'works', model: 'anthropic/claude-opus-5-5', label: 'opus 5.5', answer: 'hi, ready when you are.', ms: 1200, main: 'anthropic/claude-opus-5-5', lines: [settings.first_main_uses({ model: 'anthropic/claude-opus-5-5' })] };
 const found = (home: string) => ({
   ev: 'found',
   dir: `${home}/code`,
@@ -95,7 +96,7 @@ test("settings/onboarding-first/mark: hello's ':*' is typed in the mono font, ':
     // the '*' is the ':' 's size (never a 15 px line's: an Onb's .s once caught it)
     const sizes = await page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>('[data-testid="setup.mark"] > span'), (e) => getComputedStyle(e).fontSize));
     expect(sizes).toEqual(['112px', '112px']);
-    await expect(hello).toContainText("hi. i'm bise.");
+    await expect(hello).toContainText(settings.onb_hello_title);
   } finally {
     await s.close();
   }
