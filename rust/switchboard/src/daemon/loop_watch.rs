@@ -11,7 +11,9 @@
 //!
 //! A message with parts (a Tick) names its part as it goes
 //! ([`LoopWatch::phase`]): `hub loop busy 30 s on input Tick: sb-core`
-//! (hub-tick: a Tick sat 38 min in sb-core and the line said only Tick).
+//! (hub-tick: a Tick sat 38 min in sb-core and the line said only Tick);
+//! its end line names the part that held it longest, with its time
+//! (`on input Tick: idle check 1.8 s`), never merely the last part.
 //!
 //! A message that held it 1 s or more, never said busy, says
 //! `hub loop held 2.1 s on <msg> (<split>)` at its end.
@@ -59,6 +61,31 @@ struct Mark {
     since_ms: u64,
     /// lines said for this busy spell
     said: u32,
+    /// a message with parts (a Tick): each part's name and start, in
+    /// order; the end line names the longest one, not the last
+    phases: Vec<(String, u64)>,
+}
+
+impl Mark {
+    /// What the message is at now: its kind, and its part if it has parts.
+    fn now_on(&self) -> String {
+        match self.phases.last() {
+            Some((p, _)) => format!("{}: {}", self.what, p),
+            None => self.what.clone(),
+        }
+    }
+
+    /// The part that held it longest, with its time (the end line's
+    /// words): `input Tick: idle check 1.8 s`; none for a message
+    /// without parts.
+    fn held_on(&self, end_ms: u64) -> String {
+        let ends = self.phases.iter().skip(1).map(|(_, at)| *at).chain([end_ms]);
+        let longest = self.phases.iter().zip(ends).map(|((p, at), end)| (end.saturating_sub(*at), p)).max_by_key(|(ms, _)| *ms);
+        match longest {
+            Some((ms, p)) => format!("{}: {} {:.1} s", self.what, p, ms as f64 / 1000.0),
+            None => self.what.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -83,7 +110,7 @@ impl LoopWatch {
                     None
                 } else {
                     m.said += 1;
-                    Some(format!("hub loop busy {} s on {} ({})", busy / 1000, m.what, split(busy, &spent)))
+                    Some(format!("hub loop busy {} s on {} ({})", busy / 1000, m.now_on(), split(busy, &spent)))
                 }
             };
             if let Some(l) = line {
@@ -97,27 +124,30 @@ impl LoopWatch {
     pub(super) fn on(&self, what: String) {
         let mut m = self.mark.lock().unwrap_or_else(|e| e.into_inner());
         self.spent.reset();
-        *m = Mark { what, since_ms: now_ms(), said: 0 };
+        *m = Mark { what, since_ms: now_ms(), said: 0, phases: Vec::new() };
     }
 
     /// The message the loop runs is at `phase` now (hub-tick: a Tick's
-    /// parts): the busy lines name it, the spell keeps its start.
+    /// parts): the busy lines name it, the spell keeps its start, and its
+    /// end line names the part that held it longest (send-fast: the held
+    /// line named the Tick's last part, 'computer use', for 1,096 s of
+    /// his 24 h that were idle_check's).
     pub(super) fn phase(&self, phase: &str) {
         let mut m = self.mark.lock().unwrap_or_else(|e| e.into_inner());
-        let base = m.what.split(": ").next().unwrap_or("").to_string();
-        m.what = format!("{}: {}", base, phase);
+        m.phases.push((phase.to_string(), now_ms()));
     }
 
     /// The loop is done with it; a spell long enough to be said says its
     /// end too. The line to log, if any.
     pub(super) fn idle(&self) -> Option<String> {
         let mut m = self.mark.lock().unwrap_or_else(|e| e.into_inner());
-        let busy = now_ms().saturating_sub(m.since_ms);
+        let end = now_ms();
+        let busy = end.saturating_sub(m.since_ms);
         let out = if m.said > 0 {
-            Some(format!("hub loop free after {} s on {} ({})", busy / 1000, m.what, split(busy, &self.spent)))
+            Some(format!("hub loop free after {} s on {} ({})", busy / 1000, m.held_on(end), split(busy, &self.spent)))
         } else {
             // a hold too short for a busy line, said once at its end
-            (busy >= HELD_MS).then(|| format!("hub loop held {:.1} s on {} ({})", busy as f64 / 1000.0, m.what, split(busy, &self.spent)))
+            (busy >= HELD_MS).then(|| format!("hub loop held {:.1} s on {} ({})", busy as f64 / 1000.0, m.held_on(end), split(busy, &self.spent)))
         };
         *m = Mark::default();
         out
@@ -265,6 +295,22 @@ mod tests {
         w.phase("sb-core");
         w.phase("wakes look");
         let m = w.mark.lock().unwrap();
-        assert_eq!((m.what.as_str(), m.since_ms), ("input Tick: wakes look", since));
+        assert_eq!((m.now_on().as_str(), m.since_ms), ("input Tick: wakes look", since));
+    }
+
+    /// send-fast: the end line names the part that held the loop
+    /// longest, with its time, not the last part.
+    #[test]
+    fn the_end_line_names_the_longest_part_not_the_last() {
+        let w = LoopWatch::default();
+        w.on("input Tick".into());
+        {
+            let mut m = w.mark.lock().unwrap();
+            let t = now_ms();
+            m.since_ms = t - 2_000;
+            m.phases = vec![("sb-core".into(), t - 2_000), ("idle check".into(), t - 1_900), ("computer use".into(), t - 100)];
+        }
+        let l = w.idle().unwrap();
+        assert!(l.starts_with("hub loop held 2.0 s on input Tick: idle check 1.8 s ("), "{l}");
     }
 }
