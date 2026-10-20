@@ -87,7 +87,9 @@ describe('town plan', () => {
     }
   });
 
-  it('runs every path from its office\'s door (the terrace\'s or the floor\'s front edge) into the road: both its end corners on the road ribbon (town-paths)', () => {
+  // one test per project count: 72 plans in one test took 6-10 s at gate load (5 s timeouts,
+  // bims-test-load); the same loops and expects, each count under its own timeout
+  it.each(Array.from({ length: 24 }, (_, i) => i + 1))('runs every path from its office\'s door (the terrace\'s or the floor\'s front edge) into the road: both its end corners on the road ribbon (town-paths, %i projects)', (n) => {
     const toSeg = (x: number, z: number, a: { x: number; z: number }, b: { x: number; z: number }): number => {
       const dx = b.x - a.x;
       const dz = b.z - a.z;
@@ -103,21 +105,19 @@ describe('town plan', () => {
       }
       return d;
     };
-    for (let n = 1; n <= 24; n++) {
-      for (let s = 0; s < 3; s++) {
-        const ss = sites(n, n * 31 + s);
-        const plan = townPlan(ss, townSeed(ss.map((x) => x.id)) + s);
-        expect(plan.paths, `${String(n)} projects: one path per door`).toHaveLength(n);
-        plan.offices.forEach((p) => {
-          const pa = plan.paths.find((q) => Math.abs(q.x - p.door.x) < 1e-9 && Math.abs(q.z0 - p.door.z) < 1e-9);
-          expect(pa, `${p.id}: a path from its door`).toBeDefined();
-          if (pa === undefined) return;
-          for (const dx of [-PATH_HALF, 0, PATH_HALF]) {
-            const d = toRoad(plan, pa.x + dx, pa.z1);
-            expect(d, `${p.id} (${String(n)} projects, draw ${String(s)}): its end ${dx.toFixed(1)} across is ${d.toFixed(2)} from the road's middle`).toBeLessThan(ROAD - 0.05);
-          }
-        });
-      }
+    for (let s = 0; s < 3; s++) {
+      const ss = sites(n, n * 31 + s);
+      const plan = townPlan(ss, townSeed(ss.map((x) => x.id)) + s);
+      expect(plan.paths, `${String(n)} projects: one path per door`).toHaveLength(n);
+      plan.offices.forEach((p) => {
+        const pa = plan.paths.find((q) => Math.abs(q.x - p.door.x) < 1e-9 && Math.abs(q.z0 - p.door.z) < 1e-9);
+        expect(pa, `${p.id}: a path from its door`).toBeDefined();
+        if (pa === undefined) return;
+        for (const dx of [-PATH_HALF, 0, PATH_HALF]) {
+          const d = toRoad(plan, pa.x + dx, pa.z1);
+          expect(d, `${p.id} (${String(n)} projects, draw ${String(s)}): its end ${dx.toFixed(1)} across is ${d.toFixed(2)} from the road's middle`).toBeLessThan(ROAD - 0.05);
+        }
+      });
     }
   });
 
