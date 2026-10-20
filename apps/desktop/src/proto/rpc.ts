@@ -32,7 +32,13 @@ export type ErrorData = { kind?: ErrorKind | null,
  * a failed `turn/send`: "refused" (nothing reached the thread) or
  * "undelivered" (the hub wrote its undelivered line in the thread)
  */
-reason?: string | null, };
+reason?: string | null, 
+/**
+ * reason `removed_field`: the field an older app's command carried
+ * that bise no longer reads (crate::REMOVED), for its log and a
+ * support question; never in what he reads
+ */
+field?: string | null, };
 
 /**
  * JSON-RPC's error object; `data.kind` lets a client draw a failure by

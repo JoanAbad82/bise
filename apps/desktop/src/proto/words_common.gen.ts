@@ -26,6 +26,8 @@ export const common = {
   title_asks: (a: { agent: string | number }): string => String(a.agent) + " asks",
   /** a plan's title */
   title_plan: (a: { agent: string | number }): string => String(a.agent) + " proposes a plan",
+  /** a command an older app sent with a field bise no longer reads (bise_proto::REMOVED): the refusal its sender shows (composer: the failed send, inbox: the failed answer); the field is in the error's detail and the hub's log, never in what he reads (designer m_34516) */
+  removed_field: "this app is older than your bise, so nothing was sent. update the app, then send it again.",
   /** how many lines are folded away: an item's body (inbox), a tool's closed box in the TUI's feed (thread) */
   more_lines: (a: { n: number }): string => a.n === 1 ? String(a.n) + " more line" : String(a.n) + " more lines",
   /** a send that was refused: an item's answer (inbox), his message in the thread (thread) */

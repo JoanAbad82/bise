@@ -77,6 +77,11 @@
     "one": null,
     "text": "you picked {name}"
   },
+  "common.removed_field": {
+    "args": [],
+    "one": null,
+    "text": "this app is older than your bise, so nothing was sent. update the app, then send it again."
+  },
   "common.signing_wait": {
     "args": [
       "label"
