@@ -1,0 +1,6 @@
+{
+  "_": "The real-core world's run rules, one copy for tests/checks/real.sh and the nightly's desktop-checks step (tests/harness/coverage/covmap.mjs). first: run before the rest, in a run of their own (news-real reads shop's seeded news rows before the inbox checks fill that thread). fresh: run last, each on a fresh world of its own (review/feature-drop drops the feature review/feature merges; feature-refused moves shop's main). keys: the variables no run of them keeps (one fake Mistral key stands in): a hub or the app's core started with his keys counts his providers as ready.",
+  "first": ["checks/thread/news-real.spec.ts"],
+  "fresh": ["checks/review/feature-drop.spec.ts", "checks/review/feature-refused.spec.ts"],
+  "keys": "(_api_key|_token|_secret|_bedrock|_password)$|^(anthropic|openai|azure|mistral|codestral|gemini|google|aws|openrouter|staging_mistral|gemfury)_"
+}

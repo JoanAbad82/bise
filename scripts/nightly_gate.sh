@@ -201,6 +201,11 @@ if [ "${1:-}" = --in-slot ]; then
   day="$(date +%F)" gate_dir="${BISE_HOME:-$HOME/.bise}/gate"
   covmap=apps/desktop/tests/harness/coverage/covmap.mjs
   rm -f "$gate_dir/desktop-cov-run/cut.txt"
+  # the real-core checks' world (covmap brings it up) and core-record's run this tree's own bise
+  # (scripts/tree_bise.sh: built in the gate's target, never the seed's clone a stopped gate left)
+  if [ -f scripts/tree_bise.sh ] && [ -z "${QA_BISE:-}" ] && qb="$(bash scripts/tree_bise.sh)"; then
+    export QA_BISE="$qb" AMBIENT_QA_APP_ROOT="$PWD"
+  fi
   night_step desktop-checks "$covmap" node "$covmap" checks --gate-dir "$gate_dir" ${NIGHTLY_END:+--until "$NIGHTLY_END"}
   cr=$?
   if [ -f "$covmap" ]; then

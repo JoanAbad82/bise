@@ -13,6 +13,8 @@ desktop=$(cd "$here/../.." && pwd)
 qa="$desktop/../../dev/plugins/ambient-qa/qa.py"
 up=(world up --projects 2)
 [ -n "${QA_BISE:-}" ] && up+=(--bise "$QA_BISE")
+# the run's rules (first, fresh, keys), one copy with the nightly's desktop-checks step (covmap.mjs)
+rule() { python3 -c 'import json, sys; v = json.load(open(sys.argv[1]))[sys.argv[2]]; print(" ".join("tests/" + s for s in v) if isinstance(v, list) else v)' "$here/real.json" "$1"; }
 
 # No real key reaches the run: world up builds its hubs' env from an allowlist since amb-tools'
 # b81056b0 (and refuses a leak), and world.ts starts the TUI next to it with the same rule
@@ -21,7 +23,7 @@ up=(world up --projects 2)
 # and the window's model catalog then differs from the TUI's). Every key, token and provider
 # variable goes; one fake Mistral key (never valid) stands in, as the world's hubs have one.
 for v in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' |
-           grep -iE '(_api_key|_token|_secret|_bedrock|_password)$|^(anthropic|openai|azure|mistral|codestral|gemini|google|aws|openrouter|staging_mistral|gemfury)_'); do
+           grep -iE "$(rule keys)"); do
   unset "$v"
 done
 export MISTRAL_API_KEY=qa-fake-not-a-key
@@ -47,7 +49,7 @@ cd "$desktop" || exit 1
 # checks that change the world for good (review/feature-drop drops the feature that
 # review/feature merges) run last, each on a fresh world of its own
 # (review/feature-refused moves shop's main)
-fresh=(tests/checks/review/feature-drop.spec.ts tests/checks/review/feature-refused.spec.ts)
+fresh=($(rule fresh))
 is_fresh() { local f; for f in "${fresh[@]}"; do [ "$1" = "$f" ] && return 0; done; return 1; }
 mine=() later=()
 for s in "${specs[@]}"; do
@@ -69,7 +71,7 @@ rc=0
 # thread/news-real reads the seeded news rows of shop's thread: it runs first, in the same world,
 # before the inbox checks fill that thread with their own asks (e3f7e598's batch: run last, its
 # rows had scrolled out of reach). Playwright orders files by path, so it gets its own call.
-first=tests/checks/thread/news-real.spec.ts rest=()
+first="$(rule first)" rest=()
 for s in ${mine[@]+"${mine[@]}"}; do
   if [ "$s" = "$first" ]; then
     PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real-first.json" pnpm exec playwright test -c tests/harness/playwright.config.ts "$s" -g "$grep" --reporter=list,json || rc=1

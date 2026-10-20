@@ -351,19 +351,26 @@ async function runChecks(argv) {
   const report = path.join(covDir, 'report.json');
   const { heavyArgv } = await import('../heavy.mjs');
   const playwright = path.join(DESKTOP, 'node_modules', '.bin', 'playwright');
+  // the real-core checks read an ambient-qa world (tests/checks/world.ts): up before the first run
+  // when a spec uses it, again before each fresh spec, down at the end, by real.sh's rules
+  // (real.json); his keys never reach the run (2026-10-20: no world up, ~86 checks red in ms)
+  const real = new RealWorld(specs);
+  const baseEnv = real.needed ? scrubKeys(process.env, real.rules.keys) : process.env;
   // one playwright run per batch of specs: the end is checked between batches, never inside one
   const runBatch = (cov, specsOf, out) => {
     const [bin, args] = heavyArgv([playwright, 'test', '-c', path.join(here, '..', 'playwright.config.ts'), '--reporter=list,json', ...specsOf.map((s) => path.join('tests', s))]);
     const t0 = Date.now();
-    const env = { ...process.env, ...electron.env, PLAYWRIGHT_JSON_OUTPUT_NAME: out, ...(cov ? { BISE_HARNESS_COVERAGE: covDir } : {}) };
+    const env = { ...baseEnv, ...electron.env, PLAYWRIGHT_JSON_OUTPUT_NAME: out, ...(cov ? { BISE_HARNESS_COVERAGE: covDir } : {}) };
     const r = spawnSync(bin, args, { cwd: DESKTOP, stdio: 'inherit', env });
     console.log(`covmap checks${cov ? '' : ' (without coverage)'}: ${specsOf.length} specs, rc ${r.status} in ${Math.round((Date.now() - t0) / 1000)} s`);
   };
   const cut = new Set();
   const run = (cov, specsOf, out) => {
-    const r = runBatches(specsOf, BATCH, late, (batch, i) => {
+    real.up(baseEnv);
+    const r = runBatches(planBatches(specsOf, BATCH, real.rules), late, (batch, i) => {
+      if (batch.fresh) real.up(baseEnv);
       const f = path.join(covDir, `${path.basename(out, '.json')}-${i}.json`);
-      runBatch(cov, batch, f);
+      runBatch(cov, batch.specs, f);
       return f;
     });
     for (const s of r.cut) cut.add(s);
@@ -375,14 +382,55 @@ async function runChecks(argv) {
     } catch { rmSync(out, { force: true }); }
     return { out, ran: r.ran };
   };
-  const first = run(true, specs, report);
-  const v = checksVerdict(covDir, report, () => run(false, first.ran, path.join(covDir, 'report-plain.json')).out);
+  let v;
+  try {
+    const first = run(true, specs, report);
+    v = checksVerdict(covDir, report, () => run(false, first.ran, path.join(covDir, 'report-plain.json')).out);
+  } finally {
+    real.down(baseEnv);
+  }
   const cutList = [...cut].sort();
   writeFileSync(path.join(covDir, 'cut.txt'), cutList.map((s) => s + '\n').join(''));
   for (const s of v.red) console.log(`FAIL ${s}`);
   if (v.red.length) spawnSync('python3', [path.join(REPO, 'tests', 'known_reds.py'), 'split', ...v.red], { stdio: 'inherit' });
   console.log(`covmap checks: ${v.said}${cutList.length ? `; ${cutSay(cutList)}` : ''}`);
   return v.red.length ? 1 : cutList.length ? 3 : 0;
+}
+
+/**
+ * The ambient-qa world the real-core checks read (dev/plugins/ambient-qa/qa.py world up|down, as
+ * tests/checks/real.sh: 2 projects, $QA_BISE when set: the nightly hands this tree's own,
+ * scripts/tree_bise.sh). Needed only when one of `specs` uses it. A world that doesn't come up is
+ * said once here; its checks then fail on their own ('no world up'), never hidden.
+ */
+class RealWorld {
+  constructor(specs) {
+    this.rules = JSON.parse(readFileSync(path.join(DESKTOP, 'tests', 'checks', 'real.json'), 'utf8'));
+    this.needed = specs.some((s) => usesWorld(readFileSync(path.join(DESKTOP, 'tests', s), 'utf8')));
+  }
+
+  qa(args, env) {
+    return spawnSync('python3', ['-B', path.join(REPO, 'dev', 'plugins', 'ambient-qa', 'qa.py'), 'world', ...args],
+      { cwd: REPO, encoding: 'utf8', env });
+  }
+
+  up(env) {
+    if (!this.needed) return;
+    this.down(env);
+    const t0 = Date.now();
+    const r = this.qa(['up', '--projects', '2', ...(env.QA_BISE ? ['--bise', env.QA_BISE] : [])], env);
+    const s = Math.round((Date.now() - t0) / 1000);
+    if (r.status === 0) console.log(`covmap checks: the real-core world is up (${s} s)`);
+    else {
+      const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split(os.EOL).slice(-20).join(os.EOL);
+      console.log(`covmap checks: the real-core world didn't come up (exit ${r.status}, ${s} s): its checks fail 'no world up'`);
+      console.log(tail);
+    }
+  }
+
+  down(env) {
+    if (this.needed) this.qa(['down'], env);
+  }
 }
 
 /** Specs per playwright run: the night's end is checked between two runs, so a run started just
@@ -409,17 +457,45 @@ export function listChecks(testsDir) {
  * after it (nothing new starts past the night's end; the batch running then ends). runOne(batch,
  * i) runs one and returns its report file. {ran, cut, reports}.
  */
-export function runBatches(specs, size, late, runOne) {
+export function runBatches(batches, late, runOne) {
   const ran = [];
   const cut = [];
   const reports = [];
-  for (let i = 0; i < specs.length; i += size) {
-    const batch = specs.slice(i, i + size);
-    if (cut.length || late()) { cut.push(...batch); continue; }
-    reports.push(runOne(batch, i / size));
-    ran.push(...batch);
-  }
+  batches.forEach((batch, i) => {
+    if (cut.length || late()) { cut.push(...batch.specs); return; }
+    reports.push(runOne(batch, i));
+    ran.push(...batch.specs);
+  });
   return { ran, cut, reports };
+}
+
+/** `specs` in runs of at most `size`, in order: [{specs, fresh:false}]. Pure. */
+export function chunks(specs, size) {
+  const out = [];
+  for (let i = 0; i < specs.length; i += size) out.push({ specs: specs.slice(i, i + size), fresh: false });
+  return out;
+}
+
+/**
+ * The runs of a checks run, in order, by the real-core world's rules (tests/checks/real.json, the
+ * ones real.sh follows): the `first` specs in a run of their own, then the rest by path BATCH at a
+ * time, then each `fresh` spec alone, on a fresh world (fresh:true). Pure.
+ */
+export function planBatches(specs, size, rules) {
+  const first = specs.filter((s) => rules.first.includes(s));
+  const fresh = specs.filter((s) => rules.fresh.includes(s) && !first.includes(s));
+  const rest = specs.filter((s) => !first.includes(s) && !fresh.includes(s));
+  return [...(first.length ? [{ specs: first, fresh: false }] : []), ...chunks(rest, size), ...fresh.map((s) => ({ specs: [s], fresh: true }))];
+}
+
+/** Whether a spec's source runs on the real-core world (it imports tests/checks/world.ts). Pure. */
+export const usesWorld = (src) => /from '(?:\.\.?\/)+world'/.test(src);
+
+/** `env` without his keys (real.json's `keys`, as real.sh's scrub), one fake Mistral key in. Pure. */
+export function scrubKeys(env, keys) {
+  const re = new RegExp(keys, 'i');
+  const out = Object.fromEntries(Object.entries(env).filter(([k]) => !re.test(k)));
+  return { ...out, MISTRAL_API_KEY: 'qa-fake-not-a-key' };
 }
 
 /** A check the night's end cut: no verdict tonight (green null), complete:false so test_map.py's
@@ -561,12 +637,26 @@ export function selfTest() {
   // the night's end (review-gates m_32494): checked between batches only; what it cuts never runs
   let clock = 0;
   const started = [];
-  const rb = runBatches(['a', 'b', 'c', 'd', 'e'], 2, () => clock >= 10, (batch, i) => { started.push(batch.join()); clock += 6; return `r${i}`; });
+  const rb = runBatches(chunks(['a', 'b', 'c', 'd', 'e'], 2), () => clock >= 10, (batch, i) => { started.push(batch.specs.join()); clock += 6; return `r${i}`; });
   assert(started.join('|') === 'a,b|c,d' && rb.ran.join() === 'a,b,c,d' && rb.cut.join() === 'e' && rb.reports.join() === 'r0,r1', `batches cut at the end ${JSON.stringify(rb)}`);
-  const none = runBatches(['a', 'b'], 8, () => true, () => { throw new Error('ran past the end'); });
+  const none = runBatches(chunks(['a', 'b'], 8), () => true, () => { throw new Error('ran past the end'); });
   assert(none.ran.length === 0 && none.cut.join() === 'a,b' && none.reports.length === 0, 'past the end: nothing runs');
-  const all = runBatches(['a', 'b', 'c'], 2, () => false, (b, i) => `r${i}`);
+  const all = runBatches(chunks(['a', 'b', 'c'], 2), () => false, (b, i) => `r${i}`);
   assert(all.cut.length === 0 && all.ran.join() === 'a,b,c', 'no end: every batch');
+  // the real-core world's rules (real.json, real.sh's): first alone, the rest by path, each fresh
+  // spec last and alone on a fresh world
+  const rules = { first: ['n'], fresh: ['f1', 'f2'] };
+  const plan = planBatches(['a', 'f1', 'b', 'n', 'c', 'f2'], 2, rules);
+  assert(JSON.stringify(plan) === JSON.stringify([{ specs: ['n'], fresh: false }, { specs: ['a', 'b'], fresh: false }, { specs: ['c'], fresh: false },
+    { specs: ['f1'], fresh: true }, { specs: ['f2'], fresh: true }]), `the world's order ${JSON.stringify(plan)}`);
+  assert(JSON.stringify(planBatches(['a', 'b'], 8, rules)) === JSON.stringify([{ specs: ['a', 'b'], fresh: false }]), 'no real spec: plain batches');
+  const shipped = JSON.parse(readFileSync(path.join(DESKTOP, 'tests', 'checks', 'real.json'), 'utf8'));
+  const listed = listChecks(path.join(DESKTOP, 'tests'));
+  assert([...shipped.first, ...shipped.fresh].every((s) => listed.includes(s)), `real.json names checks that exist: ${JSON.stringify(shipped)}`);
+  assert(usesWorld("import { realWorld } from '../world';") && usesWorld("from './world'") && !usesWorld("from '../harness'"), 'usesWorld: an import of checks/world.ts');
+  assert(listed.some((s) => usesWorld(readFileSync(path.join(DESKTOP, 'tests', s), 'utf8'))), 'the real-core checks are seen (a full run brings the world up)');
+  const sc = scrubKeys({ PATH: '/bin', OPENAI_API_KEY: 'sk', GH_TOKEN: 'g', MISTRAL_API_KEY: 'real', AWS_REGION: 'x', HOME: '/h' }, shipped.keys);
+  assert(JSON.stringify(sc) === JSON.stringify({ PATH: '/bin', HOME: '/h', MISTRAL_API_KEY: 'qa-fake-not-a-key' }), `no key of his reaches the run: ${JSON.stringify(sc)}`);
   // a cut check: no verdict, never complete, its covered files the older nights'
   const cn = { ...n1, checks: { c: cutCheck(['i']) } };
   const cm = unite([cn, { ...n1, sha: 'z', checks: { c: { ran: ['f2'], complete: true } } }]);

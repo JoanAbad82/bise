@@ -28,18 +28,13 @@ record() {
   done
   export MISTRAL_API_KEY=qa-fake-not-a-key
   local up=(world up --rich)
-  # in the nightly's tree (no QA_BISE): this tree's bise, in the gate's target beside it
-  # ($CARGO_TARGET_DIR, else <tree>/../target), with the tree's repl-live; else qa.py picks one.
-  # Built here first: a no-op after the gate's build, but a gate that stopped before its cargo
-  # build left the seed's bise there, another tree's code (2026-10-20: the gate seed's, built in
-  # release-35's dropped worktree)
-  local t="${CARGO_TARGET_DIR:-$here/../target}"
-  if [ -z "${QA_BISE:-}" ] && [ -d "$t" ] && [ -e "$here/repl-live" ]; then
-    if ! (cd "$here/rust" && CARGO_TARGET_DIR="$t" cargo build --offline -q -p bend-harness) >&2; then
-      echo "core_record: this tree's bise didn't build (cargo build -p bend-harness in $t)" >&2
-      return 2
-    fi
-    QA_BISE="$t/debug/bise"; export AMBIENT_QA_APP_ROOT="$here"
+  # in the nightly's tree (no QA_BISE): this tree's bise, built in the gate's target beside it
+  # (scripts/tree_bise.sh: never the seed's clone a stopped gate left there); else qa.py picks one
+  if [ -z "${QA_BISE:-}" ]; then
+    local b r
+    b="$(bash "$here/scripts/tree_bise.sh")"; r=$?
+    [ $r = 2 ] && return 2
+    [ $r = 0 ] && { QA_BISE="$b"; export AMBIENT_QA_APP_ROOT="$here"; }
   fi
   [ -n "${QA_BISE:-}" ] && up+=(--bise "$QA_BISE")
   down() { python3 -B "$qa" world down > /dev/null 2>&1 || true; }
