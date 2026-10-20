@@ -2,7 +2,8 @@
 // with an oil stain, tall grey walls, a pegboard of tools, wooden desks against the walls, the
 // workbench (the eating place) with its vise and toolbox, the ping-pong table, the roller door
 // rolled up on the right by the nap place, a scooter inside it, a mint Vespa in the front middle, the neon :* over the board; its growth is the loft's (blook.ts
-// loftGrower), the mural in the back left corner. Owner: maps-b.
+// loftGrower), the mural in the back left corner. Past 18 desks the floor's pods and corners (page
+// bims-workshop; drawn by render/maps/workshop-floor.ts where maps/workshop-floor.ts puts them). Owner: maps-b.
 import { Group, type Mesh, type Object3D } from 'three';
 import type { WorkshopOffice } from '../../maps/workshop';
 import { decorOf } from '../decor';
@@ -12,6 +13,7 @@ import { WORLD } from '../palette';
 import { loftLounge, loftTree } from '../stages';
 import { bigDesk, boxHolding, grow, loftGrower, palettes, pieceAtOf, turnedDesk } from './blook';
 import type { Build, MapLook } from './look';
+import { corner, podBeam } from './workshop-floor';
 
 const WALL_H = 2.1;
 const TOOLS = ['#f39a4c', '#6cb4ee', '#2b2d42', '#ffd166'] as const;
@@ -65,11 +67,11 @@ function shell(b: Build): void {
   scooter(k, sc, 0, 0);
   // a Vespa in the front middle, on its side stand, side on to the camera (where the old car
   // stood: its wheels z-fought, bims-vespa)
-  const bench = benchOf(o);
-  const free0 = bench.x + 1.6;
-  const free1 = x1 - 4.6;
-  const cz = (bench.z + 0.75 + o.crossFront) / 2;
-  if (free1 - free0 > 2.6) vespa(k, root, (free0 + free1) / 2 + 0.3, cz);
+  // (its place is the plan's: on the front band once the room has corners, maps/workshop.ts)
+  if (o.vespa) vespa(k, root, o.vespa.x, o.vespa.z);
+  // the floor past the walls (page bims-workshop): each pod's lamp beam, each workshop corner
+  for (const p of o.pods) podBeam(k, root, p);
+  o.corners.forEach((c, i) => corner(k, root, c, i));
   // an oil stain, a tyre against the left wall
   const oil = k.add(style.cylinder(0.5, 0.01), k.mat('#9a978f'), root, x0 + W * 0.62, 0.025, D * 0.72);
   oil.scale.z = 0.6;

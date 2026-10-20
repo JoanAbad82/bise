@@ -75,7 +75,7 @@ export type PokeKind =
 /** what a poke plays: its reaction, or under reduced motion its word alone */
 export type PlayKind = PokeKind | 'word';
 
-export type SpotKind = 'desk' | 'main' | 'lounge' | 'island' | 'coffee' | 'board' | 'queue' | 'door' | 'terrace';
+export type SpotKind = 'desk' | 'main' | 'lounge' | 'island' | 'coffee' | 'nook' | 'board' | 'queue' | 'door' | 'terrace';
 
 export interface Activity {
   readonly k: ActivityKind;
@@ -102,6 +102,8 @@ export interface Activity {
   readonly turn?: number;
   /** (standing 'done') it sips its mug, the mug at its mouth */
   readonly sip?: true;
+  /** ('snack' at a nook) it sits there (the sofa, the drum stool); absent: it stands, thinking (the bench, the lift, beside a taken nook) */
+  readonly sits?: true;
 }
 
 /** The hub's Agent.doing kinds (architect m_27522, bims-facts m_27638); absent = nothing running. */
@@ -142,6 +144,14 @@ export interface Spot extends Pt {
   readonly wz: number;
   readonly ax: number;
   readonly face: number;
+}
+
+/**
+ * A place in a workshop corner an idle bim hangs at on a trip (maps/workshop-floor.ts, timeline.ts
+ * nookFor): seated (the sofa, the drum stool) or standing, thinking (the maker bench, the lift).
+ */
+export interface Nook extends Spot {
+  readonly sit: boolean;
 }
 
 /** A piece of furniture's floor box; `of`: the spot it belongs to (a bim sits in its bean bag). */
@@ -198,6 +208,8 @@ export interface Office {
   readonly park?: Park;
   /** its cozy pieces (cozy.ts placeCozy, maps/index.ts layoutOf): the coffee corner's spot is on `walks`; absent: a bare room */
   readonly cozy?: Cozy;
+  /** the nooks of its corners (the workshop's: a sofa, a drum stool, a bench), places of the walk graph an idle trip may go to instead of the island; absent: none */
+  readonly nooks?: readonly Nook[];
 }
 
 /** A straight piece to grind or ride across, along x: a curb, a ledge, a rail, a flat lane (h 0). */

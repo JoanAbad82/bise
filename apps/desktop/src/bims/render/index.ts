@@ -10,7 +10,7 @@
 // (sky-light.ts), the lamps and their pools, the slab's night lift and the snow (office-scene
 // weather); the page under the cube is the theme's own. falling() says what falls and the
 // building's outline for the CSS rain.
-// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, skate, head, zoom, cam, sky } for
+// In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, skate, head, at, zoom, cam, sky } for
 // the headless checks (bims-qa; skate: each skater's phase per frame, budget.spec (5)).
 import { Vector3 } from 'three';
 import type { BimFrame, Look, MakeRenderer, Motion, OfficeRenderer } from '../model';
@@ -63,6 +63,8 @@ interface Probe {
   /** each drawn frame of an arrived skater: its session n (skate.ts skateAt) and whether it rides its line or rests */
   skate: { t: number; name: string; n: number; phase: 'line' | 'rest' }[];
   head(name: string): { x: number; y: number } | null;
+  /** a floor point of the office on the canvas, css px (a check pinches in on a corner there); null: no fit yet */
+  at(x: number, y: number, z: number): { x: number; y: number } | null;
   /** his camera's zoom now (zoom.ts Cam; 1 = the fit): the follow check reads how close it looks */
   zoom(): number;
   /** his whole camera now (zoom and where it looks): his camera check reads whether a wheel moved it */
@@ -96,7 +98,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   let skyMoving = false;
 
   const probe: Probe | null = testMode()
-    ? { frames: 0, slowest: null, trace: [], skate: [], head: (name) => headOf(name), zoom: () => cam.zoom, cam: () => cam, sky: () => (drawnSky ? { light: drawnSky, blending: skyMoving } : null) }
+    ? { frames: 0, slowest: null, trace: [], skate: [], head: (name) => headOf(name), at: (x, y, z) => (fit ? toScreen(fit, { x, y, z }) : null), zoom: () => cam.zoom, cam: () => cam, sky: () => (drawnSky ? { light: drawnSky, blending: skyMoving } : null) }
     : null;
   if (probe) (window as unknown as { __biseBims?: Probe }).__biseBims = probe;
 

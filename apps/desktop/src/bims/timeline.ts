@@ -35,7 +35,7 @@ export const PLANE_S = 5.2;
 /** the segments kept per bim (a pose asked a bit in the past still answers) */
 const KEEP = 8;
 
-type Shared = 'lounge' | 'island' | 'coffee' | 'board' | 'terrace';
+type Shared = 'lounge' | 'island' | 'coffee' | 'nook' | 'board' | 'terrace';
 
 interface Bim {
   segs: Segment[];
@@ -156,7 +156,7 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
 
       for (const [name, row] of acts) {
         let b = bims.get(name);
-        const want = coffeeFor(bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, built?.beds), next, fun?.stage);
+        const want = nookFor(name, coffeeFor(bedFor(b?.over?.act ?? row, b?.key ?? null, held, next.lounge.length, built?.beds), next, fun?.stage), next);
         const pt = b?.over ? undefined : fun2.get(name);
         const parkSpot = pt ? next.park?.spots[pt.slot] : undefined;
         const last = b?.segs.at(-1);
@@ -172,7 +172,7 @@ export function newTimeline(opts: TimelineOpts = {}): Timeline {
         if (b?.key) held.delete(b.key);
         const shared = fixed ? null : sharedSpot(next, act.at as Shared, held, b?.pref);
         const spot = fixed ?? shared?.spot ?? next.door;
-        act = chairFor(want, next, spot, built?.chairs);
+        act = sitsAt(chairFor(want, next, spot, built?.chairs), next, spot);
         sig = skate ?? sigOf(act);
         const key = shared?.key ?? null;
         if (key) held.set(key, name);
@@ -514,9 +514,30 @@ function coffeeFor(act: Activity, o: Office, stage: number | undefined): Activit
   return coffeeAtCorner(o, stage, coffee) ? { ...act, at: 'coffee' } : act;
 }
 
+/**
+ * A trip to a corner's nook instead of the island (the workshop's corners, page bims-workshop): on an
+ * office with nooks, every other idle trip (its name and trip number) goes to one: the sofa, the drum
+ * stool, the maker bench, the lift. Its length and rhythm stay the island's (activity.ts idleLife). Pure.
+ */
+function nookFor(name: string, act: Activity, o: Office): Activity {
+  if (act.k !== 'snack' || act.at !== 'island' || !o.nooks?.length) return act;
+  return hash(`${name}#nook#${String(act.key ?? 0)}`) % 2 === 0 ? { ...act, at: 'nook' } : act;
+}
+
+/** a trip at a nook sits when its nook is a seat (the sofa, the drum stool); beside a taken one, or at a bench, it stands. Pure. */
+function sitsAt(act: Activity, o: Office, spot: Pt): Activity {
+  if (act.at !== 'nook') return act;
+  const sits = o.nooks?.some((n) => n.sit && near(n, spot)) === true;
+  if (sits === (act.sits === true)) return act;
+  if (sits) return { ...act, sits: true };
+  const rest: { -readonly [K in keyof Activity]: Activity[K] } = { ...act };
+  delete rest.sits;
+  return rest;
+}
+
 /** the first free spot of that kind (its last one if free); all taken: standing beside one; none: null */
 function sharedSpot(o: Office, at: Shared, held: ReadonlyMap<string, string>, pref: ReadonlyMap<Shared, number> | undefined): { spot: Spot; key: string; ix?: number } | null {
-  const list = at === 'lounge' ? o.lounge : at === 'island' ? o.islandSpots : at === 'coffee' ? (o.cozy?.coffeeSpots ?? o.islandSpots) : at === 'board' ? o.boardSpots : o.terrace;
+  const list = at === 'lounge' ? o.lounge : at === 'island' ? o.islandSpots : at === 'coffee' ? (o.cozy?.coffeeSpots ?? o.islandSpots) : at === 'nook' ? (o.nooks ?? o.islandSpots) : at === 'board' ? o.boardSpots : o.terrace;
   const free = (i: number) => !held.has(`${at}:${String(i)}`);
   const mine = pref?.get(at);
   const ix = mine !== undefined && mine < list.length && free(mine) ? mine : list.findIndex((_, i) => free(i));

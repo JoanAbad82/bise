@@ -253,6 +253,21 @@ const HOLD: Rot = [-1.3, 0, -0.2];
 const MOUTH: Rot = [-2.25, 0, -0.45];
 const BOWL: Rot = [-0.75, 0, 0.1];
 
+/**
+ * An idle trip at a workshop corner's nook (timeline.ts nookFor): on the sofa or the drum stool,
+ * seated, leaning back, a foot tapping; at the maker bench or by the lift, standing, chin on the
+ * hand, the head turning slowly (think).
+ */
+function hanging(sits: boolean, lt: number, ph: number): Body {
+  if (sits) {
+    return {
+      ...STAND, ...SEATED, body: [-0.12, 0, 0], armL: [-0.5, 0, 0.25], armR: [-0.5, 0, -0.25],
+      head: [-0.05, Math.sin(lt * 0.6 + ph) * 0.2, 0], legR: SEATED.legR + Math.max(0, Math.sin(lt * 4 + ph)) * 0.12, eyes: 0.7,
+    };
+  }
+  return { ...STAND, armR: [-2.2, 0, -0.5], armL: [-1.2, 0, 0], head: [-0.25, 0.2 + Math.sin(lt * 1.5 + ph) * 0.15, 0] };
+}
+
 function eating(fruit: number, stay: number, ph: number): Body {
   const n = Math.floor(stay / FRUIT_S);
   const u = stay - n * FRUIT_S;
@@ -312,7 +327,7 @@ function rest(act: Activity, lt: number, ph: number, stay = lt): Body {
     case 'waitagent':
       return asleep;
     case 'snack':
-      return eating(fruit, stay, ph);
+      return act.at === 'nook' ? hanging(act.sits === true, lt, ph) : eating(fruit, stay, ph);
     case 'asks': {
       // standing by its desk, hand up, hops (faster and with a sheet when urgent)
       const sp = urgent ? 5.2 : 2.6;

@@ -68,5 +68,5 @@ export function wayIn(s: Spot): Leg[] {
 
 /** Every place of an office a bim may walk to (the contract: each is on the walk graph), its park's spots too. Pure. */
 export function placesOf(o: Office): Spot[] {
-  return [...o.desks.values(), o.mainDesk, ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, o.door, ...o.terrace, o.exit, ...(o.park?.spots ?? []), ...(o.cozy?.coffeeSpots ?? [])];
+  return [...o.desks.values(), o.mainDesk, ...o.islandSpots, ...o.lounge, ...o.boardSpots, ...o.queue, o.door, ...o.terrace, o.exit, ...(o.park?.spots ?? []), ...(o.cozy?.coffeeSpots ?? []), ...(o.nooks ?? [])];
 }
