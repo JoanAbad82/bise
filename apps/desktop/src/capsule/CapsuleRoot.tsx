@@ -29,6 +29,7 @@ import { menuCards } from "./TrayMenu";
 import { answeredOver, errorOver, heardOver, lingerOf, OVER_FADE_MS } from "./over";
 import { asksForScreen, shotOf, shotPref } from "./shot";
 import { useAgentPreview, useSpotData } from "./data";
+import { MARK_SHOWN, nextAsk, sheetOpens, shownIn, type Perms } from "@/setup/perms";
 import { CORNER_OUT_MS, START, step, type CapEvent, type Fx, type State, type View } from "./machine";
 
 interface Model {
@@ -81,7 +82,16 @@ export function CapsuleRoot(): JSX.Element {
   // (prefs.context.shot, absent: never asked); the ask shows on the first talk that needs it, once
   // a run, until he answers it ('not now' or the grant set the pref)
   const [screen, setScreen] = useState<Grant | undefined>(undefined);
-  const shotOn = shotPref(usePrefs());
+  const prefs = usePrefs();
+  const shotOn = shotPref(prefs);
+  // fn's permissions sheet (setup/perms.ts): the helper's perms, and whether it was shown once
+  // (prefs hints.fn_perms; the ref holds it from the moment it opens, before the prefs come back)
+  const [perms, setPerms] = useState<Perms>({});
+  const permsRef = useRef<Perms>({});
+  const sheetShown = useRef(false);
+  useEffect(() => {
+    if (shownIn(prefs)) sheetShown.current = true;
+  }, [prefs]);
   const [ask, setAsk] = useState<{ talk: boolean; shown: boolean; on: boolean }>({ talk: false, shown: false, on: false });
   const inTalk = view.kind === "talk";
   if (inTalk !== ask.talk) {
@@ -118,6 +128,7 @@ export function CapsuleRoot(): JSX.Element {
   const menuEsc = useRef<(() => boolean) | null>(null);
   useEffect(() => {
     viewRef.current = view;
+    permsRef.current = perms;
     menuRef.current = menuCards(spot);
     shotRef.current = shot;
   });
@@ -405,9 +416,19 @@ export function CapsuleRoot(): JSX.Element {
         // fn ⌫ while he talks: the still goes, the talk goes on (designer m_21903)
         const v = viewRef.current;
         if (v.kind === "talk" && v.phase === "listen" && shotRef.current !== null) dropShot();
+      } else if (ev.ev === "fn" && sheetOpens(ev.act, ev.key, permsRef.current, sheetShown.current)) {
+        // his first fn with a permission missing: the sheet, once (marked shown at once)
+        sheetShown.current = true;
+        store.command(MARK_SHOWN);
+        dispatch({ ev: "perms_sheet" });
       } else if (ev.ev === "fn") dispatch({ ev: "fn", act: ev.act, key: ev.key });
       else if (ev.ev === "front") setFront(frontOf(ev));
-      else if (ev.ev === "perms") setScreen(ev.screen);
+      else if (ev.ev === "perms") {
+        setScreen(ev.screen);
+        const p = { mic: ev.mic, accessibility: ev.accessibility, screen: ev.screen };
+        permsRef.current = p;
+        setPerms(p);
+      }
     });
     const offState = bise.capsule.onState((s) => {
       dispatch({ ev: "window", shown: s.shown, why: s.why });
@@ -415,14 +436,19 @@ export function CapsuleRoot(): JSX.Element {
     void bise.helperState().then((evs) => {
       for (const ev of evs) {
         if (ev.ev === "front") setFront(frontOf(ev));
-        else if (ev.ev === "perms") setScreen(ev.screen);
+        else if (ev.ev === "perms") {
+          setScreen(ev.screen);
+          const p = { mic: ev.mic, accessibility: ev.accessibility, screen: ev.screen };
+          permsRef.current = p;
+          setPerms(p);
+        }
       }
     });
     return () => {
       offHelper();
       offState();
     };
-  }, [bise, keepWithBise, dropShot]);
+  }, [bise, keepWithBise, dropShot, store]);
 
   // a card opened from the spotlight's waiting row has the keyboard (the spotlight had it): its
   // digits pick, esc goes back to the list, ⏎ opens it in bise, ⌘⌫ closes it (the strip's keys)
@@ -531,6 +557,24 @@ export function CapsuleRoot(): JSX.Element {
           ? {
               onOpen: () => {
                 bise?.helper({ cmd: "perm", perm: "screen", action: "open" });
+              },
+            }
+          : null
+      }
+      perms={
+        view.kind === "perms"
+          ? {
+              perms,
+              // macOS's prompts in turn: the next one missing (a refused one: its System Settings pane);
+              // his yes to the screen turns the still's switch on, so the talk never asks it again
+              onAllow: () => {
+                const a = nextAsk(perms);
+                if (a === null) return;
+                bise?.helper({ cmd: "perm", perm: a.perm, action: a.action });
+                if (a.perm === "screen") store.command({ cmd: "prefs_set", key: "context.shot", value: true });
+              },
+              onNotNow: () => {
+                dispatch({ ev: "not_now" });
               },
             }
           : null

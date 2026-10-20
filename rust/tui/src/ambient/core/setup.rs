@@ -36,6 +36,7 @@ pub(crate) fn provider_check(
     pasted: bool,
     works: Option<&crate::firstkey::Works>,
     failed: Option<&crate::firstkey::Failed>,
+    ms: Option<u64>,
 ) -> Value {
     let ev = CoreEv::ProviderCheck {
         id: id.to_string(),
@@ -50,6 +51,7 @@ pub(crate) fn provider_check(
         why: failed.map(|f| f.why),
         said: failed.map(|f| f.said.clone()).filter(|t| !t.is_empty()),
         url: failed.and_then(|f| f.url.clone()),
+        ms,
     };
     serde_json::to_value(ev).unwrap_or_else(|_| json!({}))
 }
@@ -123,7 +125,8 @@ pub(crate) struct Setup {
     /// `provider_use`: the last seq given, and each provider's newest
     /// (an older check's end is dropped, architect m_28532)
     use_seq: u64,
-    using: std::collections::HashMap<String, u64>,
+    /// the check running per provider: its seq and when it started (its end says how long)
+    using: std::collections::HashMap<String, (u64, Instant)>,
 }
 
 /// R8 (the TUI's sb.rs /model, architect m_12214): a `/model <model>`
@@ -273,25 +276,27 @@ impl Core {
         let Some(s) = self.setup.as_mut() else { return };
         s.use_seq += 1;
         let seq = s.use_seq;
-        s.using.insert(id.clone(), seq);
+        s.using.insert(id.clone(), (seq, Instant::now()));
         let pasted = key.is_some();
         let (name, model) = (s.ports.provider_use)(&id, key, seq, s.tx.clone());
-        self.emit(provider_check(&id, &name, CheckState::Checking, &model, pasted, None, None));
+        self.emit(provider_check(&id, &name, CheckState::Checking, &model, pasted, None, None, None));
     }
 
     /// A check ended: dropped when a newer one for that provider runs;
     /// else works (then the accounts and roles it changed) or failed.
     fn on_used(&mut self, seq: u64, used: crate::firstkey::Used) {
         let Some(s) = self.setup.as_mut() else { return };
-        if s.using.get(&used.id) != Some(&seq) {
+        let Some(&(running, t0)) = s.using.get(&used.id) else { return };
+        if running != seq {
             return;
         }
         s.using.remove(&used.id);
+        let ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
         let (state, works, failed) = match &used.res {
             Ok(w) => (CheckState::Works, Some(w), None),
             Err(f) => (CheckState::Failed, None, Some(f)),
         };
-        self.emit(provider_check(&used.id, &used.name, state, &used.model, used.pasted, works, failed));
+        self.emit(provider_check(&used.id, &used.name, state, &used.model, used.pasted, works, failed, Some(ms)));
         if works.is_some() {
             self.emit_accounts();
             self.emit_roles();

@@ -9,3 +9,5 @@
 .b-onb .steps i.on{background:var(--c-ink)}
 .b-fn{display:inline-flex;align-items:center;justify-content:center;width:64px;height:58px;border-radius:var(--r-3);font:var(--t-17) var(--font-mono);background:var(--c-raised);box-shadow:inset 0 -3px 0 var(--c-active),0 0 0 1px var(--c-line-strong)}
 .b-fn.down{transform:translateY(2px);box-shadow:inset 0 0 0 1px var(--c-line-strong),0 0 24px var(--c-accent-line)}
+/* the step's mark over its title (mark.tsx Kiss or Wordmark): on the background, nothing around it */
+.b-onb .mk{display:flex;justify-content:center;margin-bottom:var(--s-2)}

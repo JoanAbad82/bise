@@ -139,3 +139,11 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
 .b-cap-sub-g.acc { color: var(--c-accent); }
 .b-cap-sub-g.err { color: var(--c-err); }
 .b-cap-sub-g.dim { color: var(--c-text-3); }
+/* fn's permissions sheet (setup/PermSheet.tsx, desktop-onboarding v4 §3): at the top, on the glass,
+   the title, its line, the three rows, [allow], the dim 'not now' line */
+.b-cap-perms { display: flex; flex-direction: column; gap: var(--s-2); width: 440px; padding: var(--s-5); box-sizing: border-box; font: var(--t-13)/1.45 var(--font-ui); color: var(--c-text-2); }
+.b-cap-perms .t { font: 500 var(--t-17)/1.25 var(--font-display); color: var(--c-text); }
+.b-cap-perms .b-group { margin: var(--s-1) 0 0; }
+.b-cap-perms .acts { display: flex; margin-top: var(--s-2); }
+.b-cap-perms .later { margin: 0; color: var(--c-text-3); font-size: var(--t-12); }
+.b-cap-perms .later .b-act { font-size: inherit; color: var(--c-text-2); padding: 0; }

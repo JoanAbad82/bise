@@ -1,27 +1,32 @@
-// The first launch's screen (route `onboarding`): one step at a time in
-// the DS's Onb frame (the pearl, a title, a line, the step's rows, its
-// button, the step dots), ⏎ the step's button, esc a step back, "skip for
-// now" ends it. Draws model.ts from props; the store-fed screen
-// (screen.tsx) gives it the core's accounts and found repos, the helper's
-// permissions and fn. Owner: amb-home.
-import { useState } from 'react';
-import type { Account, AppCmd, Found, Perm } from '@/proto';
-import { Act, Button, Check, Chip, Field, Group, Help, Onb, type GroupItem } from '@/ds';
+// The first launch's screen (route `onboarding`, desktop-onboarding v4):
+// four steps in the DS's Onb frame (a 480 px column: the mark, a title, a
+// line, the step's rows, its button, the step dots), '← back' top left and
+// 'skip for now' top right; ⏎ the step's button, esc a step back. hello
+// shows bise's typed ':*' (never the mist pearl); the last step, first, is
+// a real composer: ⏎ sends his first message to bise and opens bise with it
+// running, an idea chip fills the composer, holding fn works too, 'open
+// bise' leaves without asking. Draws model.ts from props; the store-fed
+// screen (screen.tsx) gives it the core's accounts and found repos, the
+// helper's permissions and fn. Owner: amb-home.
+import { useEffect, useRef, useState } from 'react';
+import type { Account, AppCmd, Found } from '@/proto';
+import { Act, Button, Check, Chip, Field, Group, Help, Kbd, Kiss, Onb, type GroupItem } from '@/ds';
+import { Composer } from '@/composer';
+import type { ComposerActions } from '@/composer/actions';
 import type { ProviderCheck } from '@/settings';
 import { PayStep } from './PayStep';
 import { afterSignIn, PAY_START, ready, upOf, type PayState } from './pay';
 import {
-  allAllowed, back, choose as choose_, chosenTicked, filterFound, finish, fnAct, next, pick, pickChosen, PERMS, START, stepOf, STEPS, ticked,
-  type OnbState, type Perms,
+  back, baseName, choose as choose_, chosenTicked, filterFound, finish, firstSend, fnAct, ideas, next, pick, pickChosen, START, stepOf, STEPS, ticked, tickedNames,
+  type OnbState,
 } from './model';
+import type { Perms } from './perms';
 import { settings } from '@/proto/words.gen';
 import './setup.css';
 
 export interface OnboardingPorts {
   send: (cmd: AppCmd) => void;
-  /** a permission: ask = macOS's own prompt while it still allows one, open = its System Settings pane */
-  perm: (perm: Perm, action: 'ask' | 'open') => void;
-  /** the first launch ended (done or skipped): open bise */
+  /** the first launch ended (done, skipped, or his first message sent): open bise */
   done: () => void;
   /** the system's folder picker (window.bise.pickFolder, amb-mac): a path, or null when he cancels */
   pickFolder?: () => Promise<string | null>;
@@ -45,11 +50,12 @@ export interface OnboardingProps {
   home?: string;
 }
 
-const PERM_WORDS: Record<string, { label: string; sub: string; lost: string }> = {
-  mic: { label: settings.perm_mic, sub: settings.onb_mic_sub, lost: settings.onb_mic_lost },
-  accessibility: { label: settings.perm_accessibility, sub: settings.onb_accessibility_sub, lost: settings.onb_accessibility_lost },
-  screen: { label: settings.perm_screen, sub: settings.onb_screen_sub, lost: settings.onb_screen_lost },
-};
+/** The marks' sizes: hello's ':*' (designer's A, 112 px) and the first message's. */
+const HELLO_KISS = 112;
+const FIRST_KISS = 48;
+
+/** A fn sentinel in onb_first_fn's words, where the key chip goes. */
+const FN_HOLE = '\u0000';
 
 export function Onboarding({ accounts, found, perms, fn = null, check = null, signInError = null, ports, now: pinned, home = '' }: OnboardingProps) {
   const [opened] = useState(() => Date.now());
@@ -65,6 +71,17 @@ export function Onboarding({ accounts, found, perms, fn = null, check = null, si
     setSeen(fn.n);
     setSt(s);
   }
+  // he held fn on the first message and let go, the mic his: bise has his words; the first launch ends there
+  const saidByFn = stepOf(s) === 'first' && s.tried && perms.mic === 'allowed';
+  const ended = useRef(false);
+  useEffect(() => {
+    if (!saidByFn || ended.current) return;
+    ended.current = true;
+    for (const c of finish(s).cmds) ports.send(c);
+    ports.done();
+  }, [saidByFn, s, ports]);
+  // the first message's composer (its fill for an idea chip)
+  const composer = useRef<ComposerActions | null>(null);
   // the model step (pay.ts): a sign-in he started here that ended signed in gets its check, once
   const [pay, setPay] = useState<PayState>(PAY_START);
   const [payAccounts, setPayAccounts] = useState(accounts);
@@ -97,49 +114,11 @@ export function Onboarding({ accounts, found, perms, fn = null, check = null, si
       body = (
         <Onb
           {...frame}
-          pearl
+          mark={<Kiss size={HELLO_KISS} pop turn testId="setup.mark" />}
           title={settings.onb_hello_title}
           sub={settings.onb_hello_sub}
           cta={{ text: settings.onb_start, onClick: go, testId: 'setup.next' }}
         />
-      );
-      break;
-    case 'permissions':
-      body = (
-        <Onb
-          {...frame}
-          title={settings.onb_perms_title}
-          sub={settings.onb_perms_sub}
-          cta={{ text: allAllowed(perms) ? settings.onb_continue : settings.onb_continue_for_now, onClick: go, testId: 'setup.next' }}
-        >
-          <Group
-            testId="setup.perms"
-            items={PERMS.map((p) => {
-              const g = perms[p];
-              const w = PERM_WORDS[p] ?? { label: p, sub: '', lost: '' };
-              return {
-                id: p,
-                label: w.label,
-                sub: g === 'denied' ? w.lost : w.sub,
-                control:
-                  g === 'allowed' ? (
-                    <Chip tone="ok">{settings.onb_allowed}</Chip>
-                  ) : g === 'denied' ? (
-                    <span className="setup-acts">
-                      <Chip tone="err">{settings.onb_denied}</Chip>
-                      <Button onClick={() => { ports.perm(p, 'open'); }} testId={`setup.perm.${p}.open`}>
-                        {settings.open_system_settings}
-                      </Button>
-                    </span>
-                  ) : (
-                    <Button onClick={() => { ports.perm(p, 'ask'); }} testId={`setup.perm.${p}`}>
-                      {settings.perm_allow}
-                    </Button>
-                  ),
-              };
-            })}
-          />
-        </Onb>
       );
       break;
     case 'model':
@@ -242,20 +221,43 @@ export function Onboarding({ accounts, found, perms, fn = null, check = null, si
       );
       break;
     }
-    case 'fn':
+    case 'first': {
+      const [before = '', after = ''] = settings.onb_first_fn({ key: FN_HOLE }).split(FN_HOLE);
       body = (
-        <Onb
-          {...frame}
-          pearl={{ mood: s.fn === 'down' ? 'listen' : s.tried ? 'done' : 'rest' }}
-          fn={s.fn}
-          title={settings.onb_fn_title}
-          sub={settings.onb_fn_sub}
-          cta={{ text: s.tried ? settings.onb_open : settings.onb_open_untried, onClick: go, testId: 'setup.next' }}
-        >
-          <Help>{s.tried ? settings.onb_fn_done : settings.onb_fn_help}</Help>
+        <Onb {...frame} mark={<Kiss size={FIRST_KISS} testId="setup.mark" />} title={settings.onb_first_title}>
+          <div className="setup-first" data-testid="setup.first">
+            <Composer
+              target="onboarding/first"
+              placeholder={settings.onb_first_placeholder}
+              keys=""
+              onSend={(out) => {
+                const r = firstSend(s, out.text);
+                if (r !== null) run(r);
+              }}
+              onReady={(a) => {
+                composer.current = a;
+                a.focus();
+              }}
+              testId="setup.composer"
+            />
+            <div className="setup-ideas" data-testid="setup.ideas">
+              {ideas(tickedNames(s, found, now)).map((t, i) => (
+                // an idea fills the composer, never sends (designer's brief §2.4)
+                <Chip key={t} onClick={() => { composer.current?.fill(t); }} testId={`setup.idea.${String(i)}`}>
+                  {t}
+                </Chip>
+              ))}
+            </div>
+            <p className="setup-fnline" data-testid="setup.fnline">
+              {before}
+              <Kbd>fn</Kbd>
+              {after}
+            </p>
+          </div>
         </Onb>
       );
       break;
+    }
   }
   return (
     <section
@@ -263,7 +265,8 @@ export function Onboarding({ accounts, found, perms, fn = null, check = null, si
       data-testid="setup.root"
       tabIndex={-1}
       onKeyDown={(e) => {
-        if (e.defaultPrevented || e.target instanceof HTMLInputElement) return;
+        // the fields and the first message's composer keep their keys (its ⏎ sends, its esc is its own)
+        if (e.defaultPrevented || e.target instanceof HTMLInputElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
         if (e.key === 'Enter' && !e.metaKey && !e.shiftKey) {
           e.preventDefault();
           go();
@@ -276,20 +279,21 @@ export function Onboarding({ accounts, found, perms, fn = null, check = null, si
         }
       }}
     >
-      {body}
-      <div className="setup-foot">
-        {s.at > 0 && (
-          // designer m_18736: back and skip are Acts; only the step's own action is a Button (pri)
-          <Act onClick={() => { setSt(back(s)); }} testId="setup.back">
-            {settings.onb_back}
-          </Act>
-        )}
-        {at !== 'fn' && (
-          <Act onClick={() => { run(finish(s)); }} testId="setup.skip">
-            {settings.onb_skip}
-          </Act>
-        )}
+      {/* designer m_18736: back and skip are Acts; only the step's own action is a Button (pri). v4: at the top,
+          '← back' left, 'skip for now' right ('open bise' on the first message: it leaves without asking) */}
+      <div className="setup-top">
+        <span>
+          {s.at > 0 && (
+            <Act onClick={() => { setSt(back(s)); }} testId="setup.back">
+              {settings.onb_back}
+            </Act>
+          )}
+        </span>
+        <Act onClick={() => { run(finish(s)); }} testId={at === 'first' ? 'setup.open' : 'setup.skip'}>
+          {at === 'first' ? settings.onb_open : settings.onb_skip}
+        </Act>
       </div>
+      {body}
     </section>
   );
 }
@@ -315,12 +319,6 @@ export function homePath(p: string, home: string, max = 40): string {
   let tail = parts.at(-1) ?? '';
   for (let i = parts.length - 2; i > 0 && `${head}/…/${parts[i] ?? ''}/${tail}`.length <= max; i -= 1) tail = `${parts[i] ?? ''}/${tail}`;
   return `${head}/…/${tail}`;
-}
-
-/** A path's last part, its name in the list. Pure. */
-export function baseName(p: string): string {
-  const parts = p.replace(/\/+$/, '').split('/');
-  return parts[parts.length - 1] ?? p;
 }
 
 function ago(ms: number): string {

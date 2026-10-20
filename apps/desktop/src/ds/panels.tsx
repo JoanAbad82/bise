@@ -164,8 +164,8 @@ export function FnKey({ down }: { down?: boolean }) {
 }
 
 export interface OnbProps {
-  /** bise's 120 px ':*' in mist (bise-presence v10); its mood */
-  pearl?: boolean | { mood: string };
+  /** over the title: bise's typed ':*' (mark.tsx Kiss; never the mist pearl, desktop-onboarding v4) */
+  mark?: ReactNode;
   title: ReactNode;
   sub?: ReactNode;
   children?: ReactNode;
@@ -176,10 +176,10 @@ export interface OnbProps {
   testId?: string;
 }
 /** an onboarding step */
-export function Onb({ pearl, title, sub: subtitle, children, fn, cta, steps, step, testId }: OnbProps) {
+export function Onb({ mark, title, sub: subtitle, children, fn, cta, steps, step, testId }: OnbProps) {
   return (
     <div className="b-onb" data-testid={testId}>
-      {pearl && <Pearl size={120} mood={typeof pearl === "object" ? pearl.mood : undefined} glyph />}
+      {mark != null && <div className="mk">{mark}</div>}
       <div className="t">{title}</div>
       {subtitle != null && <div className="s">{subtitle}</div>}
       {children}

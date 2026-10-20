@@ -1,52 +1,72 @@
-// native/setup · bar S.7 (the permissions on a first run) and S.5 (the core can't be reached), on
-// the scripted helper and core. Real clicks in the window; the effects read outside the app: what
-// the helper was asked (perm ask / open), the core process restarted (a new stub, its first
+// native/setup · fn's permissions, just in time (desktop-onboarding v4 §3) and S.5 (the core can't
+// be reached), on the scripted helper and core. Real clicks in the window and the capsule; the
+// effects read outside the app: what the helper was asked (perm ask / open), what the core got
+// (prefs_set hints.fn_perms, no talk_start), the core process restarted (a new stub, its first
 // command again), no Terminal ever (no external link). macOS's own prompts and System Settings'
 // panes are the VM pass's (README.md).
-//   S.7  first run with none granted: each permission has its allow; continue works with none
-//        ('continue for now'); a click asks the helper (perm ask); a refused one says how to grant
-//        it later and offers System Settings (perm open); a grant shows at once
+//   perms  the first launch has four steps, no permissions; his first fn hold with one missing
+//          opens the capsule's sheet instead of the talk, marked shown; [allow] asks them in turn
+//          (a refused one: its pane); a grant shows at once; 'not now' opens the spotlight; the
+//          next hold talks, never the sheet again
 //   S.5  the core dies while the app runs: the app starts the core again by itself; a spell under
 //        2 s says nothing (designer, CoreLine QUIET_DOWN_MS), a longer one is one line with the
 //        core's last log line; Terminal never opens
 import { execFileSync } from 'node:child_process';
 import { test, expect } from '../../harness';
 import path from 'node:path';
-import { onWorld, sleep } from './world';
+import { capsulePage, onWorld, sleep } from './world';
 
 /** the scripted core that logs a line on stderr first (what the window should show as its last log line) */
 const NOISY = path.join(__dirname, 'fakes', 'core-noisy.mjs');
 
-const PERMS = ['mic', 'accessibility', 'screen'] as const;
-
 /** src/app/CoreLine.tsx QUIET_DOWN_MS: how long the core may be down before the window says so. */
 const QUIET_DOWN_MS = 2000;
 
-test('setup/perms: none granted: allow asks the helper, a refusal says how, a grant shows, continue for now', async () => {
-  await onWorld(async ({ s, helper }) => {
-    const { page } = s;
+test("setup/perms: his first fn hold with one missing: the capsule's sheet (marked shown), allow asks in turn, not now opens the spotlight; never twice", async () => {
+  await onWorld(async ({ s, helper, core }) => {
     await helper.send({ ev: 'perms', accessibility: 'ask', mic: 'ask', screen: 'ask' });
-    await page.getByTestId('setup.next').click(); // hello -> permissions
-    await expect(page.getByTestId('setup.perms'), 'the permissions step').toBeVisible();
-    for (const p of PERMS) await expect.soft(page.getByTestId(`setup.perm.${p}`), `${p}: allow`).toBeVisible();
-    await expect(page.getByTestId('setup.next'), "he can go on with none: 'continue for now'").toHaveText(/continue for now/);
+    const cap = await capsulePage(s);
+    await helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });
+    const sheet = cap.getByTestId('capsule.perms');
+    await expect(sheet, 'the sheet, instead of the talk').toBeVisible({ timeout: 3000 });
+    await expect(cap.getByTestId('capsule.talk'), 'no talk while it asks').toHaveCount(0);
+    await expect.soft(sheet).toContainText('to hear you from any app');
+    await expect.soft(sheet).toContainText('nothing leaves unless you hold fn');
+    // macOS's own names, as System Settings shows them (designer m_34345)
+    for (const name of ['Microphone', 'Accessibility', 'Screen Recording']) await expect.soft(sheet).toContainText(name);
+    await expect.poll(() => core.cmds().some((c) => c['cmd'] === 'prefs_set' && c['key'] === 'hints.fn_perms' && c['value'] === true), { message: 'marked shown (hints.fn_perms)', timeout: 2000 }).toBe(true);
+    expect(core.cmds().some((c) => c['cmd'] === 'talk_start'), 'the core never listened').toBe(false);
+    await helper.send({ ev: 'fn', act: 'talk_end', by: 'fn' });
+    await expect(sheet, 'his release leaves it up').toBeVisible();
 
-    await page.getByTestId('setup.perm.mic').click();
+    await cap.getByTestId('capsule.perms.allow').click();
     await helper.waitCmd((c) => c.cmd === 'perm' && c.perm === 'mic' && c.action === 'ask', 1000);
-    await helper.send({ ev: 'perms', accessibility: 'ask', mic: 'denied', screen: 'ask' });
-    const open = page.getByTestId('setup.perm.mic.open');
-    await expect(open, 'a refused mic offers System Settings').toBeVisible();
-    await expect.soft(page.getByTestId('setup.perms'), 'and says what is lost or how to grant it').toContainText(/settings|later|without/i);
-    await open.click();
-    await helper.waitCmd((c) => c.cmd === 'perm' && c.perm === 'mic' && c.action === 'open', 1000);
+    await helper.send({ ev: 'perms', accessibility: 'denied', mic: 'allowed', screen: 'ask' });
+    await expect.soft(sheet, 'a grant shows at once').toContainText('allowed');
+    await cap.getByTestId('capsule.perms.allow').click();
+    await helper.waitCmd((c) => c.cmd === 'perm' && c.perm === 'accessibility' && c.action === 'open', 1000);
 
-    await page.getByTestId('setup.perm.accessibility').click();
-    await helper.waitCmd((c) => c.cmd === 'perm' && c.perm === 'accessibility' && c.action === 'ask', 1000);
-    await helper.send({ ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen: 'allowed' });
-    for (const p of PERMS) await expect.soft(page.getByTestId(`setup.perm.${p}`), `${p}: no allow once granted`).toBeHidden();
-    await expect(page.getByTestId('setup.next'), 'all granted: continue').toHaveText(/^continue$/);
+    await cap.getByTestId('capsule.perms.later').click();
+    await expect(cap.getByTestId('spot'), "'not now': his words go typed, in the spotlight").toBeVisible({ timeout: 2000 });
+    await helper.send({ ev: 'fn', act: 'esc' });
+    await expect(cap.getByTestId('spot')).toBeHidden({ timeout: 2000 });
+
+    // the next hold talks: the sheet never comes back
+    await helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });
+    await expect(cap.getByTestId('capsule.talk'), 'the next hold talks').toBeVisible({ timeout: 3000 });
+    await expect(cap.getByTestId('capsule.perms')).toHaveCount(0);
+    await helper.send({ ev: 'fn', act: 'cancel' });
+  });
+});
+
+test('setup/perms: the first launch no longer asks them: four steps, no permissions step', async () => {
+  await onWorld(async ({ s }) => {
+    const { page } = s;
+    await expect(page.getByTestId('setup.step.hello')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('setup.step.hello').locator('.steps i')).toHaveCount(4);
     await page.getByTestId('setup.next').click();
-    await expect(page.getByTestId('setup.perms'), 'continue leaves the step').toBeHidden();
+    await expect(page.getByTestId('setup.step.model'), 'hello -> the model, no permissions step').toBeVisible();
+    await expect(page.getByTestId('setup.perms')).toHaveCount(0);
   }, { route: 'onboarding' });
 });
 

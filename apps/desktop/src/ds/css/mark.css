@@ -154,3 +154,57 @@
     transform: none !important;
   }
 }
+/* bise's ':*' typed (mark.tsx Kiss, desktop-onboarding v4): the mono font always (his taste rule),
+   ':' in ink, '*' in the accent, nothing around it. pop: the ':' fades in (300 ms), then the '*'
+   pops once (1 s); its parts' classes are their own (an Onb's .s is its line); turn: then one step (60°, the mono star's six arms) every 8 s. */
+.b-kiss {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+.b-kiss-c {
+  color: var(--c-ink);
+}
+.b-kiss-s {
+  display: inline-block;
+  color: var(--c-accent);
+  transform-origin: 50% 42%;
+}
+.b-kiss.pop .b-kiss-c {
+  animation: b-kiss-in 300ms ease-out both;
+}
+.b-kiss.pop .b-kiss-s {
+  animation: b-kiss-pop 1s ease-out 300ms both;
+}
+.b-kiss.pop.turn .b-kiss-s {
+  animation: b-kiss-pop 1s ease-out 300ms both, b-kiss-turn 8s ease-in-out 1.3s infinite;
+}
+.b-kiss.turn:not(.pop) .b-kiss-s {
+  animation: b-kiss-turn 8s ease-in-out infinite;
+}
+@keyframes b-kiss-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes b-kiss-pop {
+  0% { transform: scale(0.4) rotate(-10deg); opacity: 0; }
+  35% { transform: scale(1.4) rotate(-4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes b-kiss-turn {
+  0%, 92.5% { transform: rotate(0); }
+  100% { transform: rotate(60deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .b-kiss-c,
+  .b-kiss-s,
+  .b-kiss.pop .b-kiss-s,
+  .b-kiss.pop.turn .b-kiss-s,
+  .b-kiss.turn:not(.pop) .b-kiss-s {
+    animation: none;
+  }
+}

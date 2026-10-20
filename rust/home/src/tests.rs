@@ -488,6 +488,11 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert!(prefs::set_dotted(&o, "hints.first_card", json!(false)).is_err(), "never unseen by the window");
     assert!(prefs::set_dotted(&o, "hints.first_card", Value::Null).is_err(), "never taken out");
     assert!(prefs::set_dotted(&o, "hints.first_card", json!("yes")).is_err());
+    // the desktop's own: the capsule's permissions sheet, shown once (only true, never unseen)
+    let f = prefs::set_dotted(&o, "hints.fn_perms", json!(true)).unwrap();
+    assert_eq!(f["hints"]["fn_perms"], json!(true));
+    assert!(prefs::set_dotted(&o, "hints.fn_perms", json!(false)).is_err(), "fn_perms only takes true");
+    assert!(prefs::set_dotted(&o, "hints.fn_perms", Value::Null).is_err());
     assert!(prefs::set_dotted(&o, "hints.other", json!(true)).is_err(), "only the TUI's hints");
     assert!(prefs::set_dotted(&o, "hints.first_card.x", json!(true)).is_err());
     assert!(prefs::set_dotted(&o, "setup.asked", json!(true)).is_err());

@@ -7,17 +7,25 @@ crate::words! { settings:
     /// onboarding: the hello step's title
     onb_hello_title = "hi. i'm bise.";
     /// onboarding: the hello step's line
-    onb_hello_sub = "hold fn and talk to me, from any app. i look after your projects with a team of agents, and i only ask you what needs you.";
+    onb_hello_sub = "i run your projects with a team of agents, and i only ask you what needs you.";
     /// onboarding: the hello step's button
     onb_start = "start";
-    /// onboarding: the permissions step's title
-    onb_perms_title = "three permissions";
-    /// onboarding: the permissions step's line
-    onb_perms_sub = "nothing leaves unless you hold fn. you choose what i read in settings · privacy.";
+    /// fn's permissions sheet (the capsule, his first fn hold with one missing): its title
+    onb_perms_title = "to hear you from any app";
+    /// fn's permissions sheet: its line
+    onb_perms_sub = "bise needs three permissions. nothing leaves unless you hold fn.";
+    /// fn's permissions sheet: the way out, before onb_not_now_says
+    onb_not_now = "not now";
+    /// fn's permissions sheet: what "not now" keeps
+    onb_not_now_says = "your words still go to bise, typed in the spotlight.";
     /// onboarding: a step's button
     onb_continue = "continue";
-    /// onboarding: the permissions step's button, one not allowed
-    onb_continue_for_now = "continue for now";
+    /// fn's permissions sheet: the rows, macOS's own names (as System Settings shows them)
+    onb_perm_mic = "Microphone";
+    /// fn's permissions sheet: the rows, macOS's own names
+    onb_perm_accessibility = "Accessibility";
+    /// fn's permissions sheet: the rows, macOS's own names
+    onb_perm_screen = "Screen Recording";
     /// onboarding: what the microphone is for
     onb_mic_sub = "to talk while you hold fn";
     /// onboarding: the microphone denied
@@ -32,12 +40,14 @@ crate::words! { settings:
     onb_screen_lost = "fn will send your words without a capture";
     /// onboarding: a permission allowed
     onb_allowed = "✓ allowed";
-    /// onboarding: a permission denied
-    onb_denied = "denied";
-    /// onboarding: the model step's line under "how do you want to pay for the models?"
+    /// onboarding: the model step's title
+    onb_model_title = "which model should i use?";
+    /// onboarding: the model step's line under onb_model_title
     onb_pay_sub = "a plan you already have, or a key. you can add more later in settings › models.";
     /// onboarding: "it works", what the model answered to its one tiny call
     onb_answered(answer) = "it said: “{answer}”";
+    /// onboarding: how long the check's call took, after onb_answered
+    onb_took(secs) = " · {secs} s";
     /// onboarding: a check that failed, its button (the provider didn't answer, no network)
     onb_try_again = "try again";
     /// onboarding: a pasted key the provider refused, with its words (under the field)
@@ -55,7 +65,7 @@ crate::words! { settings:
     /// onboarding: the projects step's title
     onb_projects_title = "your projects";
     /// onboarding: the projects step, repos found
-    onb_projects_found = "i found these repos in your folder. tick the ones bise should work in.";
+    onb_projects_found = "i found these repos in your folder. tick the ones i should work in.";
     /// onboarding: the projects step, none found
     onb_projects_none = "bise works in your repos. choose the folder that has them.";
     /// onboarding: the projects step's button
@@ -70,18 +80,24 @@ crate::words! { settings:
     onb_no_repos = "no repos in this folder. choose a folder…, or continue without one.";
     /// onboarding: no repo matches the filter
     onb_no_match(q) = "no repo matches “{q}”. choose a folder…, or clear the filter.";
-    /// onboarding: the fn step's title
-    onb_fn_title = "try it: hold fn";
-    /// onboarding: the fn step's line
-    onb_fn_sub = "and say, for example, “what moved in storefront this week?”";
-    /// onboarding: the fn step's button, tried
+    /// onboarding: the first message's title
+    onb_first_title = "what should i do first?";
+    /// onboarding: the first message's composer, empty
+    onb_first_placeholder = "write to bise, then ⏎";
+    /// onboarding: a first message's idea, his first ticked project
+    onb_first_moved(project) = "what moved in {project} this week?";
+    /// onboarding: a first message's idea, his second ticked project (else the first)
+    onb_first_flaky(project) = "find the flaky tests in {project}";
+    /// onboarding: a first message's idea, with projects
+    onb_first_prs = "review my open PRs";
+    /// onboarding: a first message's idea, no project ticked
+    onb_first_show = "show me what you can do";
+    /// onboarding: a first message's idea, no project ticked
+    onb_first_setup = "set up a project for me";
+    /// onboarding: under the first message's composer; {key} is fn, drawn as a key
+    onb_first_fn(key) = "or hold {key} and say it, from any app.";
+    /// onboarding: the first message's way out, top right (leaves without asking)
     onb_open = "open bise";
-    /// onboarding: the fn step's button, not tried
-    onb_open_untried = "open bise without trying";
-    /// onboarding: the fn step, tried
-    onb_fn_done = "✓ that's it: bise answers in the capsule, at the bottom of the screen.";
-    /// onboarding: the fn step, not tried
-    onb_fn_help = "fn space opens the spotlight · fn fn talks without holding";
     /// onboarding: a step back
     onb_back = "← back";
     /// onboarding: end it

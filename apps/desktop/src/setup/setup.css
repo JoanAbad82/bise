@@ -1,10 +1,10 @@
 /* the first launch (src/setup, amb-home): the ds's .b-onb centered, its foot under it; ds tokens only */
 /* safe center: a step taller than the window starts at its top and scrolls, never cut above (round 3) */
-.setup { display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: var(--s-4); height: 100%; min-height: 0; overflow-y: auto; padding: var(--s-6) var(--s-4); outline: none; }
+.setup { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: var(--s-4); height: 100%; min-height: 0; overflow-y: auto; padding: var(--s-8) var(--s-4) var(--s-6); outline: none; box-sizing: border-box; }
 /* the step fits the window: it shrinks to the height left (the ds's 420 px floor is for the gallery) */
-.setup .b-onb { flex: 0 1 auto; min-height: 0; max-height: 100%; max-width: 560px; width: 100%; box-sizing: border-box; }
+/* v4: one 480 px column for every step (designer's brief §2) */
+.setup .b-onb { flex: 0 1 auto; min-height: 0; max-height: 100%; max-width: 480px; width: 100%; box-sizing: border-box; padding-left: 0; padding-right: 0; }
 .setup .b-onb .b-group, .setup .b-onb .b-help { text-align: left; }
-.setup-foot { flex: none; }
 /* the projects step: filter + 'choose a folder…' over the list; the list scrolls inside, the button stays */
 .setup-pick { display: flex; gap: var(--s-2); width: 100%; margin-top: var(--s-3); }
 .setup-pick .b-field { flex: 1 1 auto; min-width: 0; }
@@ -15,7 +15,8 @@
 .setup .b-onb .b-btn.pri { min-height: var(--h-control-lg); }
 /* the list's last 24 px fade into the ground: 'more below'; its 24 px bottom padding means the
    fade covers only that padding once he has scrolled to the end, or when everything fits */
-.setup-list { flex: 1 1 auto; min-height: 72px; width: 100%; overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--s-6); box-sizing: border-box;
+/* half an --s-1 (2 px) of room on top and sides: the box's line and radius show all round (its shadow was cut at the top, designer m_34345) */
+.setup-list { flex: 1 1 auto; min-height: 72px; width: calc(100% + var(--s-1)); margin: 0 calc(var(--s-1) / -2); overflow-y: auto; overscroll-behavior: contain; padding: calc(var(--s-1) / 2) calc(var(--s-1) / 2) var(--s-6); box-sizing: border-box;
   -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent); mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent); }
 .setup-list .b-group { margin: 0; }
 @media (max-height: 640px) {
@@ -25,7 +26,17 @@
   .setup .b-onb .steps { margin-top: var(--s-2); }
 }
 .setup-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
-.setup-foot { display: flex; gap: var(--s-2); }
+/* '← back' top left, 'skip for now' (or 'open bise') top right: 13 px, dim (designer's brief §2) */
+.setup-top { position: absolute; top: var(--s-3); left: var(--s-4); right: var(--s-4); display: flex; justify-content: space-between; align-items: center; }
+.setup-top .b-act { font-size: var(--t-13); color: var(--c-text-3); }
+.setup-top .b-act:hover { color: var(--c-text-2); }
+/* the first message (v4 §2.4): a real composer, the ideas under it (a click fills, never sends), the fn line */
+.setup-first { display: flex; flex-direction: column; align-items: stretch; gap: var(--s-3); width: 100%; margin-top: var(--s-4); text-align: left; }
+.setup-ideas { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-2); }
+.setup-ideas .b-chip { cursor: pointer; border: 0; font-family: var(--font-ui); }
+.setup-ideas .b-chip:hover { color: var(--c-text); }
+.setup-fnline { margin: var(--s-2) 0 0; text-align: center; color: var(--c-text-3); font-size: var(--t-13); }
+.setup-fnline .b-kbd { margin: 0 var(--s-1); vertical-align: 1px; }
 /* a demo tip (L25 / S37): one line, the accent's soft fill, keys as keys */
 .setup-tip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s-1); padding: var(--s-2) var(--pad-control-x); border-radius: var(--r-2); background: var(--c-accent-soft); box-shadow: inset 0 0 0 1px var(--c-accent-line); color: var(--c-text-2); font-size: var(--t-13); }
 /* the first-run text in main's empty thread (L1 / M18): dim words, the suggestion a link-like button */
@@ -39,6 +50,8 @@
 .setup .b-onb .t { text-wrap: balance; }
 .setup-works { width: 100%; text-align: center; }
 .setup-said { margin: 0 0 var(--s-2); color: var(--c-text); font: var(--t-15)/var(--lh-read) var(--font-read); }
+.setup-said .setup-ok { color: var(--c-ok); }
+.setup-said .setup-took { color: var(--c-text-3); }
 .setup-dim { margin: 0; color: var(--c-text-3); font-size: var(--t-12); }
 .setup-dim.err { color: var(--c-err); }
 .setup .b-onb code, .setup-dim code { font: var(--t-12) var(--font-mono); }

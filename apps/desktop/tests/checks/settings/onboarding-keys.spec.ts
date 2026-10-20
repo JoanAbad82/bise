@@ -80,11 +80,10 @@ async function shot(s: Session, name: string): Promise<void> {
   }
 }
 
-/** hello -> permissions -> the model step */
+/** hello -> the model step */
 async function toModel(s: Session): Promise<void> {
   const { page } = s;
   await expect(page.getByTestId('setup.step.hello')).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId('setup.next').click();
   await page.getByTestId('setup.next').click();
   await expect(page.getByTestId('setup.step.model')).toBeVisible();
   await expect(page.getByTestId('setup.pay'), 'the core lists how to pay').toBeVisible({ timeout: 20_000 });

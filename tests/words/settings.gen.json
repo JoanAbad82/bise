@@ -1759,40 +1759,56 @@
     "one": null,
     "text": "continue"
   },
-  "settings.onb_continue_for_now": {
-    "args": [],
-    "one": null,
-    "text": "continue for now"
-  },
-  "settings.onb_denied": {
-    "args": [],
-    "one": null,
-    "text": "denied"
-  },
   "settings.onb_filter": {
     "args": [],
     "one": null,
     "text": "filter: type a name or a path"
   },
-  "settings.onb_fn_done": {
-    "args": [],
+  "settings.onb_first_flaky": {
+    "args": [
+      "project"
+    ],
     "one": null,
-    "text": "✓ that's it: bise answers in the capsule, at the bottom of the screen."
+    "text": "find the flaky tests in {project}"
   },
-  "settings.onb_fn_help": {
-    "args": [],
+  "settings.onb_first_fn": {
+    "args": [
+      "key"
+    ],
     "one": null,
-    "text": "fn space opens the spotlight · fn fn talks without holding"
+    "text": "or hold {key} and say it, from any app."
   },
-  "settings.onb_fn_sub": {
-    "args": [],
+  "settings.onb_first_moved": {
+    "args": [
+      "project"
+    ],
     "one": null,
-    "text": "and say, for example, “what moved in storefront this week?”"
+    "text": "what moved in {project} this week?"
   },
-  "settings.onb_fn_title": {
+  "settings.onb_first_placeholder": {
     "args": [],
     "one": null,
-    "text": "try it: hold fn"
+    "text": "write to bise, then ⏎"
+  },
+  "settings.onb_first_prs": {
+    "args": [],
+    "one": null,
+    "text": "review my open PRs"
+  },
+  "settings.onb_first_setup": {
+    "args": [],
+    "one": null,
+    "text": "set up a project for me"
+  },
+  "settings.onb_first_show": {
+    "args": [],
+    "one": null,
+    "text": "show me what you can do"
+  },
+  "settings.onb_first_title": {
+    "args": [],
+    "one": null,
+    "text": "what should i do first?"
   },
   "settings.onb_found_env": {
     "args": [
@@ -1818,7 +1834,7 @@
   "settings.onb_hello_sub": {
     "args": [],
     "one": null,
-    "text": "hold fn and talk to me, from any app. i look after your projects with a team of agents, and i only ask you what needs you."
+    "text": "i run your projects with a team of agents, and i only ask you what needs you."
   },
   "settings.onb_hello_title": {
     "args": [],
@@ -1843,6 +1859,11 @@
     "one": null,
     "text": "to talk while you hold fn"
   },
+  "settings.onb_model_title": {
+    "args": [],
+    "one": null,
+    "text": "which model should i use?"
+  },
   "settings.onb_no_match": {
     "args": [
       "q"
@@ -1860,35 +1881,55 @@
     "one": null,
     "text": "no repos in this folder. choose a folder…, or continue without one."
   },
+  "settings.onb_not_now": {
+    "args": [],
+    "one": null,
+    "text": "not now"
+  },
+  "settings.onb_not_now_says": {
+    "args": [],
+    "one": null,
+    "text": "your words still go to bise, typed in the spotlight."
+  },
   "settings.onb_open": {
     "args": [],
     "one": null,
     "text": "open bise"
-  },
-  "settings.onb_open_untried": {
-    "args": [],
-    "one": null,
-    "text": "open bise without trying"
   },
   "settings.onb_pay_sub": {
     "args": [],
     "one": null,
     "text": "a plan you already have, or a key. you can add more later in settings › models."
   },
+  "settings.onb_perm_accessibility": {
+    "args": [],
+    "one": null,
+    "text": "Accessibility"
+  },
+  "settings.onb_perm_mic": {
+    "args": [],
+    "one": null,
+    "text": "Microphone"
+  },
+  "settings.onb_perm_screen": {
+    "args": [],
+    "one": null,
+    "text": "Screen Recording"
+  },
   "settings.onb_perms_sub": {
     "args": [],
     "one": null,
-    "text": "nothing leaves unless you hold fn. you choose what i read in settings · privacy."
+    "text": "bise needs three permissions. nothing leaves unless you hold fn."
   },
   "settings.onb_perms_title": {
     "args": [],
     "one": null,
-    "text": "three permissions"
+    "text": "to hear you from any app"
   },
   "settings.onb_projects_found": {
     "args": [],
     "one": null,
-    "text": "i found these repos in your folder. tick the ones bise should work in."
+    "text": "i found these repos in your folder. tick the ones i should work in."
   },
   "settings.onb_projects_none": {
     "args": [],
@@ -1927,6 +1968,13 @@
     "args": [],
     "one": null,
     "text": "start"
+  },
+  "settings.onb_took": {
+    "args": [
+      "secs"
+    ],
+    "one": null,
+    "text": " · {secs} s"
   },
   "settings.onb_try_again": {
     "args": [],

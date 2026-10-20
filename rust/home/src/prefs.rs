@@ -97,6 +97,15 @@ fn bims_key(parts: &[&str], v: &Value) -> Result<(), String> {
 /// another value (unseeing one is not the window's).
 pub const WINDOW_HINTS: &[&str] = &["first_agent", "first_level3", "first_card", "first_steer", "first_yolo", "first_auto"];
 
+/// The desktop's own one-time things, in the same `hints` object, marked
+/// seen the same way (only true): the TUI never shows them.
+///   - `fn_perms`: the capsule's permissions sheet was shown once, at his
+///     first fn hold with a permission missing (desktop onboarding v3). It
+///     means shown, never granted: whether one is missing comes from the
+///     helper's perms each time, so one he revokes later shows in settings ›
+///     privacy and in the capsule's state, never in this sheet again.
+pub const DESKTOP_HINTS: &[&str] = &["fn_perms"];
+
 /// The type a typed key keeps (a wrong one is refused).
 fn typed(key: &str, v: &Value) -> Result<(), String> {
     let ok = match key {
@@ -126,8 +135,8 @@ pub fn set_dotted(obj: &Value, key: &str, value: Value) -> Result<Value, String>
     let top = parts[0];
     if top == "hints" {
         match parts[..] {
-            [_, name] if WINDOW_HINTS.contains(&name) && value == Value::Bool(true) => {}
-            [_, name] if WINDOW_HINTS.contains(&name) => return Err(format!("hints.{name} can only be true")),
+            [_, name] if (WINDOW_HINTS.contains(&name) || DESKTOP_HINTS.contains(&name)) && value == Value::Bool(true) => {}
+            [_, name] if WINDOW_HINTS.contains(&name) || DESKTOP_HINTS.contains(&name) => return Err(format!("hints.{name} can only be true")),
             _ => return Err(format!("{key} is not a hint the window marks")),
         }
     } else if !WINDOW_KEYS.contains(&top) {

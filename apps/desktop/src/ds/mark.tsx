@@ -94,3 +94,19 @@ export function BiseMark({ waits = false, kiss, working = false, listening = fal
     </span>
   );
 }
+
+/**
+ * bise's ':*' typed (desktop-onboarding v4, his pick A): always in the mono font (his taste rule),
+ * ':' in ink, '*' in the accent, on the background with nothing around it (no mist, no halo, no
+ * shadow). `pop`: as it comes the ':' fades in, then the '*' does one kiss pop (.4 → 1.4 → 1,
+ * -10° → 0, 1 s, bise.dev's hero); `turn`: then the '*' turns one step every 8 s, like bise's ':*'
+ * at work. Still under reduced motion. `size`: its font size in px (unset: the text's).
+ */
+export function Kiss({ pop = false, turn = false, size, testId }: { pop?: boolean; turn?: boolean; size?: number; testId?: string }) {
+  return (
+    <span className={cx("b-kiss", pop && "pop", turn && "turn")} style={size === undefined ? undefined : { fontSize: size }} data-testid={testId} role="img" aria-label=":*">
+      <span className="b-kiss-c" aria-hidden="true">:</span>
+      <span className="b-kiss-s" aria-hidden="true">*</span>
+    </span>
+  );
+}

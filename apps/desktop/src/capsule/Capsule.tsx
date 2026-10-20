@@ -26,6 +26,8 @@ import {
   type SpotRoute,
 } from "@/spotlight";
 import type { View } from "./machine";
+import { PermSheet } from "@/setup/PermSheet";
+import type { Perms } from "@/setup/perms";
 import { beatOf, presenceOf } from "./presence";
 import type { PreviewLine } from "@/spotlight/preview";
 import type { Part } from "@/proto";
@@ -92,6 +94,8 @@ export interface CapsuleProps {
   readonly onShotDrop?: () => void;
   /** The spotlight's 'no screenshot' chip: his switch wants the still, Screen Recording is off (spot-shot). */
   readonly shotOff?: { readonly onOpen: () => void } | null;
+  /** fn's permissions sheet (the 'perms' view): the helper's perms, [allow], 'not now'. */
+  readonly perms?: { readonly perms: Perms; readonly onAllow: () => void; readonly onNotNow: () => void } | null;
   /** The one-time ask for Screen Recording, under his words (designer m_21903). */
   readonly screenAsk?: { readonly onOpen: () => void; readonly onLater: () => void } | null;
   /** The pointer is over the corner card (its 8 s close waits while it is). */
@@ -254,6 +258,7 @@ export function Capsule(p: CapsuleProps): JSX.Element {
           {p.card(v.id)}
         </div>
       )}
+      {v.kind === "perms" && p.perms != null && <PermSheet perms={p.perms.perms} onAllow={p.perms.onAllow} onNotNow={p.perms.onNotNow} />}
       {v.kind === "menu" && (
         <TrayMenu
           spot={p.spot}

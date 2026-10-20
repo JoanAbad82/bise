@@ -8,7 +8,7 @@ import { Markdown } from "@/thread/Markdown";
 // the thread's layout around the markdown (its code block's head, its pre), as the window draws it
 import "@/thread/thread.css";
 import {
-  Act, Answered, Art, ArtName, Bar, BiseMark, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Dropdown, Empty, Err,
+  Act, Answered, Art, ArtName, Bar, BiseMark, Kiss, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Dropdown, Empty, Err,
   Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Picker, PickerSeg, PickerTrigger, Quote, Route, Row,
   SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
@@ -363,7 +363,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     </Settings>
   ),
   onboarding: () => (
-    <Onb pearl={{ mood: "listen" }} title="hold fn, then talk" sub="bise hears you only while fn is down. let go and it acts on what you said."
+    <Onb mark={<Kiss size={112} pop turn />} title="hold fn, then talk" sub="bise hears you only while fn is down. let go and it acts on what you said."
       fn="down" cta={{ text: "continue" }} steps={4} step={1} testId="ds.onb" />
   ),
   capsule: () => (

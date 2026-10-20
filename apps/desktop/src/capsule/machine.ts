@@ -10,6 +10,9 @@
 // esc or fn esc closes; the tray's click opens the dropdown; a blur that hid the window closes the
 // view. Effects: the capsule window (show, hide), the main window (open), the helper's mic
 // (own_mic, so its quiet sampling skips bise's own use).
+// fn's permissions sheet (desktop-onboarding v4 §3): his first fn hold (fn fn, fn space) with one
+// missing opens it at the top instead (CapsuleRoot decides with setup/perms.ts sheetOpens); its
+// 'not now' goes on to the spotlight, typed; esc closes it.
 // The talk, its answer and every 'over' line show in the corner card (his pick C, designer
 // m_22118): bottom-right of the pointer's screen, growing upward (amb-mac's 'corner', d6622e50).
 import type { FnAct } from '@/proto';
@@ -42,7 +45,9 @@ export type View =
    * `from` 'menu'): esc and its answer go back to that list
    */
   | { readonly kind: 'card'; readonly id: string; readonly from?: 'menu' }
-  | { readonly kind: 'menu' };
+  | { readonly kind: 'menu' }
+  /** fn's permissions, asked once at his first fn with one missing (setup/PermSheet.tsx) */
+  | { readonly kind: 'perms' };
 
 export interface State {
   readonly view: View;
@@ -76,6 +81,10 @@ export type CapEvent =
   | { readonly ev: 'open_card'; readonly id: string }
   /** the card's 'esc later': back to the spotlight */
   | { readonly ev: 'later' }
+  /** his first fn with a permission missing: the sheet instead of the talk (setup/perms.ts sheetOpens) */
+  | { readonly ev: 'perms_sheet' }
+  /** the sheet's 'not now': his words go to bise typed, in the spotlight */
+  | { readonly ev: 'not_now' }
   /** esc, a close, or an 'open in bise' that moved him to the window */
   | { readonly ev: 'close' };
 
@@ -168,6 +177,10 @@ export function step(s: State, e: CapEvent): Step {
       return v.kind === 'menu' ? go(s, { kind: 'card', id: e.id, from: 'menu' }) : stay(s);
     case 'later':
       return back(s);
+    case 'perms_sheet':
+      return go(s, { kind: 'perms' }, { fx: 'show', at: 'top', keys: true });
+    case 'not_now':
+      return v.kind === 'perms' ? go(s, { kind: 'spot' }, { fx: 'show', at: 'top', keys: true }) : stay(s);
     case 'close':
       return close(s);
   }

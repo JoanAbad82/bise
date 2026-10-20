@@ -62,6 +62,10 @@ pub enum CoreEv {
         said: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         url: Option<String>,
+        /// how long the one real call took, its end (works or failed): the
+        /// first launch's '✓ it said: “…” · 1.2 s' (desktop-onboarding v4)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ms: Option<u64>,
     },
     /// the answer to `found_scan`
     Found { dir: String, items: Vec<Found> },

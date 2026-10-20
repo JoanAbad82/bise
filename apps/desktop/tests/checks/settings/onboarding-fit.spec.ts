@@ -53,10 +53,15 @@ test('settings/onboarding-fit: the projects step fits 680/1100 wide and short he
   try {
     const { page } = s;
     await expect(page.getByTestId('setup.step.hello')).toBeVisible({ timeout: 10_000 });
-    for (const step of ['permissions', 'model', 'projects']) {
-      await page.getByTestId('setup.next').click();
-      await expect(page.getByTestId(`setup.step.${step}`)).toBeVisible({ timeout: 5000 });
-    }
+    await page.getByTestId('setup.next').click();
+    await expect(page.getByTestId('setup.step.model')).toBeVisible({ timeout: 5000 });
+    // the model step goes on once a check works (pay.ts): a key found, its check answered by the script
+    await core.send({ ev: 'accounts', items: [{ id: 'anthropic-key', kind: 'key', label: 'Anthropic', state: 'signed_in', from: { t: 'env', var: 'ANTHROPIC_API_KEY' } }] } as never);
+    await page.getByTestId('setup.pay.found-anthropic-key').click();
+    await page.waitForTimeout(300);
+    await core.send({ ev: 'provider_check', id: 'anthropic-key', name: 'Anthropic', state: 'works', model: 'anthropic/claude-opus-5-5', answer: 'hi' } as never);
+    await page.getByTestId('setup.next').click();
+    await expect(page.getByTestId('setup.step.projects')).toBeVisible({ timeout: 5000 });
     const home = await page.evaluate(() => (window as unknown as { bise: { home: string } }).bise.home);
     await core.send(found(home) as never);
     await expect(page.getByTestId('setup.found.dotfiles')).toBeAttached({ timeout: 5000 });

@@ -5,7 +5,7 @@
 // again).
 import { useEffect, useState } from 'react';
 import type { HelperEv } from '@/proto';
-import type { Perms } from './model';
+import type { Perms } from './perms';
 
 /** The helper's last perms and fn act (none on a platform without the helper). */
 export function useHelper(): { perms: Perms; fn: { act: string; n: number } | null } {

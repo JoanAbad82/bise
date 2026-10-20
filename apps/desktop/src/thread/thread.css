@@ -1191,7 +1191,7 @@
   padding: var(--s-12) var(--pad-column);
   text-align: center;
 }
-/* bise's 120 px ':*' in mist (NoProject.tsx, bise-presence v10) */
+/* bise's typed ':*' (NoProject.tsx, ds Kiss): on the background, nothing around it */
 .th-noproj-pearl {
   display: inline-flex;
 }

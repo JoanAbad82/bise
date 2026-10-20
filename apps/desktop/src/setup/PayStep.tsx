@@ -85,9 +85,14 @@ export function PayStep({ frame, accounts, check, s, set, send, go, open, signIn
   if (ph === 'works' && check !== null) {
     const title = check.label != null && check.label !== '' ? check.label : shortModel(check.model ?? '');
     return (
-      <Onb {...frame} pearl={{ mood: 'done' }} title={settings.first_works({ model: title })} cta={cont}>
+      <Onb {...frame} title={settings.first_works({ model: title })} cta={cont}>
         <div className="setup-works" data-testid="setup.pay.works">
-          {check.answer != null && <p className="setup-said" data-testid="setup.pay.answer">{settings.onb_answered({ answer: check.answer })}</p>}
+          {check.answer != null && (
+            <p className="setup-said" data-testid="setup.pay.answer">
+              <span className="setup-ok">✓</span> {settings.onb_answered({ answer: check.answer })}
+              {check.ms != null && <span className="setup-took">{settings.onb_took({ secs: (check.ms / 1000).toFixed(1) })}</span>}
+            </p>
+          )}
           {(check.lines ?? []).map((l) => (
             <p key={l} className="setup-dim">{withIds(l)}</p>
           ))}
@@ -184,7 +189,7 @@ export function PayStep({ frame, accounts, check, s, set, send, go, open, signIn
 
   const items: GroupItem[] = rows(accounts).map((r) => rowItem(r, () => { run(pickRow(s, r, check)); }));
   return (
-    <Onb {...frame} title={settings.first_pay} sub={settings.onb_pay_sub} cta={cont}>
+    <Onb {...frame} title={settings.onb_model_title} sub={settings.onb_pay_sub} cta={cont}>
       <div className="setup-list">
         <Group list testId="setup.pay" items={items} />
       </div>

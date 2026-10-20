@@ -29,12 +29,6 @@ export function OnboardingScreen() {
         send: (cmd) => {
           store.command(cmd);
         },
-        perm: (perm, action) => {
-          window.bise.helper({ cmd: 'perm', perm, action: action === 'ask' ? 'ask' : 'open' });
-          // the screen step is the fn screenshot's ask (designer m_21902, ambient-lead m_21913):
-          // his yes here turns the switch on, so the capsule never asks again
-          if (perm === 'screen') store.command({ cmd: 'prefs_set', key: 'context.shot', value: true });
-        },
         done: () => {
           router.go({ screen: 'bise' });
         },

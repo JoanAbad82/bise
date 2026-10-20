@@ -1,24 +1,21 @@
-// The first launch (bar S.2, S.4, S.7, S.9; desktop-app v9 "le premier
-// lancement"; the old window's winsetup.js onboarding, ported): five
-// steps, hello, permissions, model, projects, fn. Pure: which step, what
-// ⏎ does on each, what it sends. Owner: amb-home.
+// The first launch (bar S.2, S.4, S.9; desktop-onboarding v4, his pick:
+// the old window's winsetup.js onboarding, cut to four): hello, model,
+// projects, first (his first message to bise). Pure: which step, what ⏎
+// does on each, what it sends, the first message's ideas. Owner: amb-home.
 //
 // The rules kept from the old window: the model step goes on only once a
 // provider's live check works (pay.ts: an agent with no model can't answer); the
 // projects step scans his folder when it comes up and adds the repos he
 // ticked (his recent ones come ticked: last commit under 30 days); the
 // last step, or skip, writes onboarded true (absent = a fresh home, the
-// core's for_window says false) and opens bise. Permissions never block:
-// each has allow and "continue for now"; a refused one says how to grant it.
-import type { AppCmd, Found, Grant, Perm } from '@/proto';
+// core's for_window says false) and opens bise; the first message sends
+// his words to bise first. The permissions are not a step: the capsule asks
+// them the first time he holds fn (perms.ts).
+import type { AppCmd, Found } from '@/proto';
+import { settings } from '@/proto/words.gen';
 
-export const STEPS = ['hello', 'permissions', 'model', 'projects', 'fn'] as const;
+export const STEPS = ['hello', 'model', 'projects', 'first'] as const;
 export type Step = (typeof STEPS)[number];
-
-/** The three permissions the first launch asks: all the helper has. */
-export const PERMS: readonly Perm[] = ['mic', 'accessibility', 'screen'];
-
-export type Perms = Readonly<Partial<Record<Perm, Grant>>>;
 
 /** A repo found less than 30 days ago comes ticked. */
 export const RECENT_MS = 30 * 86_400_000;
@@ -67,8 +64,30 @@ export function ticked(s: OnbState, f: Found, now: number): boolean {
   return s.picks[f.path] ?? (!f.known && now - f.last_ms < RECENT_MS);
 }
 
-export function allAllowed(p: Perms): boolean {
-  return PERMS.every((x) => p[x] === 'allowed');
+/** The names of the projects he ticked (chosen by hand first, then found), in that order. */
+export function tickedNames(s: OnbState, found: readonly Found[], now: number): string[] {
+  const chosen = s.chosen.filter((p) => chosenTicked(s, p)).map(baseName);
+  const picked = found.filter((f) => !f.known && ticked(s, f, now)).map((f) => f.name);
+  return [...chosen, ...picked];
+}
+
+/** The first message's three ideas (designer's brief §2.4), from his ticked projects; none ticked: two. */
+export function ideas(names: readonly string[]): string[] {
+  const [a, b] = names;
+  if (a === undefined) return [settings.onb_first_show, settings.onb_first_setup];
+  return [settings.onb_first_moved({ project: a }), settings.onb_first_flaky({ project: b ?? a }), settings.onb_first_prs];
+}
+
+/** His first message: to bise (main), then the first launch ends (onboarded true) and opens bise. Blank: nothing. */
+export function firstSend(s: OnbState, text: string): { s: OnbState; cmds: AppCmd[]; done: boolean } | null {
+  if (text.trim() === '') return null;
+  return finish(s, [{ cmd: 'send', text }]);
+}
+
+/** A path's last part, its name in the list. Pure. */
+export function baseName(p: string): string {
+  const parts = p.replace(/\/+$/, '').split('/');
+  return parts[parts.length - 1] ?? p;
 }
 
 export interface Ctx {
@@ -87,7 +106,8 @@ export function next(s: OnbState, c: Ctx): { s: OnbState; cmds: AppCmd[]; done: 
     for (const p of s.chosen) if (chosenTicked(s, p)) cmds.push({ cmd: 'project_add', path: p });
     for (const f of c.found) if (!f.known && ticked(s, f, c.now)) cmds.push({ cmd: 'project_add', path: f.path });
   }
-  if (at === 'fn') return finish(s, cmds);
+  // the first message's ⏎ is its composer's (firstSend); the step has no button
+  if (at === 'first') return { s, cmds, done: false };
   const n = { ...s, at: s.at + 1 };
   if (stepOf(n) === 'projects' && c.found.length === 0) cmds.push({ cmd: 'found_scan' });
   return { s: n, cmds, done: false };
@@ -111,7 +131,7 @@ export function pickChosen(s: OnbState, path: string): OnbState {
   return { ...s, picks: { ...s.picks, [path]: !chosenTicked(s, path) } };
 }
 
-/** The helper's fn: held, let go (a hold counts as a try once he lets go). */
+/** The helper's fn on the first message: held, let go (a hold counts once he lets go: he said it, bise has it). */
 export function fnAct(s: OnbState, act: string): OnbState {
   if (act === 'talk_start') return { ...s, fn: 'down' };
   if (act === 'talk_end' || act === 'cancel') return { ...s, fn: 'up', tried: s.tried || s.fn === 'down' };

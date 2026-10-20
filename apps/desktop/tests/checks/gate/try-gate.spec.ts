@@ -134,7 +134,7 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       note('R34', 'the rich world has 3 projects, not 22: the picker is shot as it is');
       // a step mounted, not just the root (amb-home m_12866)
       await p.locator('[data-testid^="setup.step."]').first().waitFor({ timeout: 20_000 });
-      // setup's own steps: hello → permissions → model → projects (the picker: setup.list / setup.filter / setup.choose)
+      // setup's own steps: hello → model → projects → first (the picker: setup.list / setup.filter / setup.choose)
       const picker = p.locator('[data-testid="setup.list"], [data-testid="setup.filter"], [data-testid="setup.choose"]').first();
       const seen: string[] = [];
       for (let i = 0; i < 8 && !(await picker.isVisible().catch(() => false)); i++) {

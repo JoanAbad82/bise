@@ -1,10 +1,20 @@
 // @vitest-environment happy-dom
 import type { ReactElement } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Account, AppCmd, Found } from '@/proto';
 import { core_ev } from '@/proto/fixtures.gen';
-import { fnAct, next, START, stepOf, ticked } from './model';
+import { firstSend, fnAct, ideas, next, START, stepOf, STEPS, ticked } from './model';
+
+// the first message's composer: its props (the real one is ProseMirror's, tested in src/composer)
+const composer = vi.hoisted(() => ({ props: null as null | { placeholder?: string; onSend: (o: { text: string }) => void; onReady?: (a: { fill: (t: string) => void; focus: () => void }) => void }, filled: [] as string[] }));
+vi.mock('@/composer', () => ({
+  Composer: (props: NonNullable<typeof composer.props>) => {
+    composer.props = props;
+    props.onReady?.({ fill: (t) => composer.filled.push(t), focus: () => undefined });
+    return <div data-testid="setup.composer">{props.placeholder}</div>;
+  },
+}));
 import { homePath, noRepoWords, Onboarding, type OnboardingPorts } from './Onboarding';
 import { FirstRun, showsFirstRun } from './FirstRun';
 import { helloOpens, startHereUrl } from './screen';
@@ -25,7 +35,7 @@ const found = (): Found[] => {
 const ports = (): OnboardingPorts & { sent: AppCmd[]; log: string[] } => {
   const sent: AppCmd[] = [];
   const log: string[] = [];
-  return { sent, log, send: (c) => sent.push(c), perm: (p, a) => log.push(`perm ${p} ${a}`), done: () => log.push('done') };
+  return { sent, log, send: (c) => sent.push(c), done: () => log.push('done') };
 };
 
 /** The model step's check that works (ChatGPT, signed in in the fixture): its pick, then the answer. */
@@ -37,10 +47,10 @@ function passModel(rerender: (ui: ReactElement) => void, ui: (check: typeof WORK
 }
 
 describe('the first launch model', () => {
-  it('walks hello, permissions, model (only signed in), projects (scans, adds the ticked), fn (onboarded true)', () => {
+  it('walks four steps: hello, model (only signed in), projects (scans, adds the ticked), first (its ⏎ is the composer\'s)', () => {
+    expect([...STEPS]).toEqual(['hello', 'model', 'projects', 'first']);
     const c = { signedIn: false, found: [] as Found[], now: NOW };
     let r = next(START, c);
-    r = next(r.s, c);
     expect(stepOf(r.s)).toBe('model');
     expect(next(r.s, c).s).toBe(r.s);
     r = next(r.s, { ...c, signedIn: true });
@@ -48,8 +58,16 @@ describe('the first launch model', () => {
     expect(r.cmds).toEqual([{ cmd: 'found_scan' }]);
     r = next(r.s, { ...c, signedIn: true, found: found() });
     expect(r.cmds).toEqual([{ cmd: 'project_add', path: '/Users/camille/code/shop' }]);
-    r = next(r.s, c);
-    expect(r).toMatchObject({ done: true, cmds: [{ cmd: 'prefs_set', key: 'onboarded', value: true }] });
+    expect(stepOf(r.s)).toBe('first');
+    expect(next(r.s, c)).toEqual({ s: r.s, cmds: [], done: false });
+    expect(firstSend(r.s, '   ')).toBeNull();
+    expect(firstSend(r.s, 'review my open PRs')).toMatchObject({ done: true, cmds: [{ cmd: 'send', text: 'review my open PRs' }, { cmd: 'prefs_set', key: 'onboarded', value: true }] });
+  });
+
+  it('the first message\'s ideas come from his ticked projects; none ticked: two to start with', () => {
+    expect(ideas(['storefront', 'shop'])).toEqual(['what moved in storefront this week?', 'find the flaky tests in shop', 'review my open PRs']);
+    expect(ideas(['shop'])).toEqual(['what moved in shop this week?', 'find the flaky tests in shop', 'review my open PRs']);
+    expect(ideas([])).toEqual(['show me what you can do', 'set up a project for me']);
   });
 
   it('a recent repo comes ticked, an old one or a known one not; fn counts once he lets go', () => {
@@ -66,17 +84,22 @@ describe('the first launch model', () => {
 });
 
 describe('Onboarding', () => {
-  it('⏎ walks the steps; permissions ask through the helper; skip writes onboarded and opens bise', () => {
+  it("hello: bise's typed ':*' (mono, no pearl, no canvas), its words, four dots; skip writes onboarded and opens bise", () => {
     const p = ports();
-    render(<Onboarding accounts={accounts()} found={found()} perms={{ mic: 'ask', accessibility: 'allowed', screen: 'denied' }} ports={p} now={NOW} />);
-    expect(screen.getByTestId('setup.step.hello')).toBeTruthy();
+    render(<Onboarding accounts={accounts()} found={found()} perms={{}} ports={p} now={NOW} />);
+    const hello = screen.getByTestId('setup.step.hello');
+    const mark = screen.getByTestId('setup.mark');
+    expect(mark.classList.contains('b-kiss')).toBe(true);
+    expect(mark.textContent).toBe(':*');
+    expect(mark.querySelector('.b-kiss-s')?.textContent).toBe('*');
+    expect(hello.querySelector('[data-bise-pearl], canvas')).toBeNull();
+    expect(hello.textContent).toContain("hi. i'm bise.");
+    expect(hello.textContent).toContain('i run your projects with a team of agents, and i only ask you what needs you.');
+    expect(hello.querySelectorAll('.steps i').length).toBe(4);
+    expect(screen.queryByTestId('setup.back')).toBeNull();
     fireEvent.keyDown(screen.getByTestId('setup.root'), { key: 'Enter' });
-    fireEvent.click(screen.getByTestId('setup.perm.mic'));
-    fireEvent.click(screen.getByTestId('setup.perm.screen.open'));
-    expect(screen.queryByTestId('setup.perm.accessibility')).toBeNull();
-    expect(p.log).toEqual(['perm mic ask', 'perm screen open']);
-    fireEvent.click(screen.getByTestId('setup.next'));
     expect(screen.getByTestId('setup.step.model')).toBeTruthy();
+    expect(screen.queryByTestId('setup.perms')).toBeNull();
     fireEvent.click(screen.getByTestId('setup.skip'));
     expect(p.sent).toEqual([{ cmd: 'prefs_set', key: 'onboarded', value: true }]);
     expect(p.log.at(-1)).toBe('done');
@@ -88,9 +111,8 @@ describe('Onboarding', () => {
     const { rerender } = render(<Onboarding accounts={out} found={[]} perms={{}} ports={p} now={NOW} />);
     const root = screen.getByTestId('setup.root');
     fireEvent.keyDown(root, { key: 'Enter' });
-    fireEvent.keyDown(root, { key: 'Enter' });
     expect(screen.getByTestId('setup.step.model')).toBeTruthy();
-    expect(screen.getByTestId('setup.step.model').textContent).toContain('how do you want to pay for the models?');
+    expect(screen.getByTestId('setup.step.model').textContent).toContain('which model should i use?');
     // nothing works yet: ⏎ stays
     fireEvent.keyDown(root, { key: 'Enter' });
     expect(screen.getByTestId('setup.step.model')).toBeTruthy();
@@ -113,9 +135,11 @@ describe('Onboarding', () => {
     g.value = 'sk-right';
     fireEvent.keyDown(g, { key: 'Enter' });
     expect(p.sent.at(-1)).toEqual({ cmd: 'provider_use', id: 'anthropic-key', key: 'sk-right' });
-    rerender(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} check={{ ...base, state: 'works', label: 'opus 5.5', answer: 'Hi there!', main: 'anthropic/claude-opus-5-5', lines: ['main uses anthropic/claude-opus-5-5.'] }} />);
+    rerender(<Onboarding accounts={accounts()} found={[]} perms={{}} ports={p} now={NOW} check={{ ...base, state: 'works', label: 'opus 5.5', answer: 'Hi there!', ms: 1234, main: 'anthropic/claude-opus-5-5', lines: ['main uses anthropic/claude-opus-5-5.'] }} />);
     expect(screen.getByTestId('setup.step.model').textContent).toContain('it works: opus 5.5 answered.');
-    expect(screen.getByTestId('setup.pay.answer').textContent).toBe('it said: “Hi there!”');
+    // the live check's line: ✓, the model's own words, how long the call took
+    expect(screen.getByTestId('setup.pay.answer').textContent).toBe('✓ it said: “Hi there!” · 1.2 s');
+    expect(screen.getByTestId('setup.step.model').querySelector('[data-bise-pearl], canvas')).toBeNull();
     fireEvent.keyDown(root, { key: 'Enter' });
     expect(screen.getByTestId('setup.step.projects')).toBeTruthy();
     expect(p.sent.at(-1)).toEqual({ cmd: 'found_scan' });
@@ -128,7 +152,6 @@ describe('Onboarding', () => {
     const out = accounts().map((a) => ({ ...a, state: 'signed_out' as const }));
     const { rerender } = render(<Onboarding accounts={out} found={[]} perms={{}} ports={p} now={NOW} />);
     const root = screen.getByTestId('setup.root');
-    fireEvent.keyDown(root, { key: 'Enter' });
     fireEvent.keyDown(root, { key: 'Enter' });
     fireEvent.click(screen.getByTestId('setup.pay.chatgpt'));
     expect(p.sent).toEqual([{ cmd: 'sign_in', id: 'chatgpt' }]);
@@ -144,7 +167,6 @@ describe('Onboarding', () => {
     const withEnv = accounts().map((a) => (a.kind === 'key' ? { ...a, state: 'signed_in' as const, from: { t: 'env' as const, var: 'ANTHROPIC_API_KEY' } } : a));
     render(<Onboarding accounts={withEnv} found={[]} perms={{}} ports={p} now={NOW} />);
     const root = screen.getByTestId('setup.root');
-    fireEvent.keyDown(root, { key: 'Enter' });
     fireEvent.keyDown(root, { key: 'Enter' });
     const rows = screen.getByTestId('setup.pay').querySelectorAll('[data-row]');
     expect(rows[0]?.textContent).toContain('use the ANTHROPIC_API_KEY from your shell');
@@ -163,9 +185,10 @@ describe('Onboarding', () => {
     const list: Found[] = [...found(), { name: 'billing', path: '/Users/camille/code/billing', git: true, known: false, last_ms: NOW - 90 * 86_400_000 }];
     const ui = (check: typeof WORKS | null = null) => <Onboarding accounts={accounts()} found={list} perms={{}} ports={{ ...p, pickFolder }} now={NOW} check={check} />;
     const { rerender } = render(ui());
-    for (let i = 0; i < 2; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    fireEvent.click(screen.getByTestId('setup.next'));
     passModel(rerender, ui);
     expect(screen.getByTestId('setup.step.projects')).toBeTruthy();
+    expect(screen.getByTestId('setup.step.projects').textContent).toContain('i found these repos in your folder. tick the ones i should work in.');
     // the rows' checks (the rows themselves carry setup.found.<path>)
     const names = () =>
       [...screen.getByTestId('setup.found').querySelectorAll('[data-testid^="setup.found."], [data-testid^="setup.chosen."]')]
@@ -201,29 +224,70 @@ describe('Onboarding', () => {
     const pp = ports();
     const ui = (check: typeof WORKS | null = null) => <Onboarding accounts={accounts()} found={found()} perms={{}} ports={pp} now={NOW} check={check} />;
     const { rerender } = render(ui());
-    for (let i = 0; i < 2; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    fireEvent.click(screen.getByTestId('setup.next'));
     passModel(rerender, ui);
     expect(screen.queryByTestId('setup.choose')).toBeNull();
   });
 
-  it('the fn step: holding fn then letting go turns its button into open bise', () => {
+  it('first: a real composer; an idea from his ticked projects fills it, never sends; ⏎ sends to bise, onboarded, opens bise', () => {
     const p = ports();
     const props = { accounts: accounts(), found: found(), perms: {}, ports: p, now: NOW };
     const { rerender } = render(<Onboarding {...props} />);
-    for (let i = 0; i < 2; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    fireEvent.click(screen.getByTestId('setup.next'));
     passModel(rerender, (check) => <Onboarding {...props} check={check} />);
     fireEvent.click(screen.getByTestId('setup.next'));
-    expect(screen.getByTestId('setup.step.fn')).toBeTruthy();
-    expect(screen.getByTestId('setup.next').textContent).toBe('open bise without trying');
-    rerender(<Onboarding {...props} check={WORKS} fn={{ act: 'talk_start', n: 1 }} />);
-    rerender(<Onboarding {...props} check={WORKS} fn={{ act: 'talk_end', n: 2 }} />);
-    expect(screen.getByTestId('setup.next').textContent).toBe('open bise');
-    fireEvent.click(screen.getByTestId('setup.next'));
-    expect(p.sent).toEqual([
-      { cmd: 'provider_use', id: 'chatgpt' },
-      { cmd: 'project_add', path: '/Users/camille/code/shop' },
+    const first = screen.getByTestId('setup.step.first');
+    expect(first.textContent).toContain('what should i do first?');
+    expect(screen.getByTestId('setup.composer').textContent).toBe('write to bise, then ⏎');
+    expect(screen.getByTestId('setup.fnline').textContent).toBe('or hold fn and say it, from any app.');
+    expect(screen.getByTestId('setup.fnline').querySelector('.b-kbd')?.textContent).toBe('fn');
+    // no button: the composer is the step's way on; 'open bise' top right, no skip
+    expect(screen.queryByTestId('setup.next')).toBeNull();
+    expect(screen.queryByTestId('setup.skip')).toBeNull();
+    expect(screen.getByTestId('setup.open').textContent).toBe('open bise');
+    expect([...screen.getByTestId('setup.ideas').children].map((c) => c.textContent)).toEqual(['what moved in shop this week?', 'find the flaky tests in shop', 'review my open PRs']);
+    const before = p.sent.length;
+    fireEvent.click(screen.getByTestId('setup.idea.0'));
+    expect(composer.filled.at(-1)).toBe('what moved in shop this week?');
+    expect(p.sent.length).toBe(before);
+    // ⏎ in the composer: his words to bise, then the first launch ends and bise opens
+    fireEvent.keyDown(screen.getByTestId('setup.root'), { key: 'Enter' });
+    expect(p.log).toEqual([]);
+    act(() => {
+      composer.props?.onSend({ text: 'what moved in shop this week?' });
+    });
+    expect(p.sent.slice(before)).toEqual([
+      { cmd: 'send', text: 'what moved in shop this week?' },
       { cmd: 'prefs_set', key: 'onboarded', value: true },
     ]);
+    expect(p.log).toEqual(['done']);
+  });
+
+  it('first: no project ticked gives two ideas; open bise leaves without asking', () => {
+    const p = ports();
+    const props = { accounts: accounts(), found: [] as Found[], perms: {}, ports: p, now: NOW };
+    const { rerender } = render(<Onboarding {...props} />);
+    fireEvent.click(screen.getByTestId('setup.next'));
+    passModel(rerender, (check) => <Onboarding {...props} check={check} />);
+    fireEvent.click(screen.getByTestId('setup.next'));
+    expect([...screen.getByTestId('setup.ideas').children].map((c) => c.textContent)).toEqual(['show me what you can do', 'set up a project for me']);
+    fireEvent.click(screen.getByTestId('setup.open'));
+    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'onboarded', value: true });
+    expect(p.sent.some((c) => c.cmd === 'send')).toBe(false);
+    expect(p.log).toEqual(['done']);
+  });
+
+  it('first: holding fn there works too: once he lets go with the mic allowed, bise has it and opens', () => {
+    const p = ports();
+    const props = { accounts: accounts(), found: found(), perms: { mic: 'allowed', accessibility: 'allowed', screen: 'allowed' } as const, ports: p, now: NOW };
+    const { rerender } = render(<Onboarding {...props} />);
+    fireEvent.click(screen.getByTestId('setup.next'));
+    passModel(rerender, (check) => <Onboarding {...props} check={check} />);
+    fireEvent.click(screen.getByTestId('setup.next'));
+    rerender(<Onboarding {...props} check={WORKS} fn={{ act: 'talk_start', n: 1 }} />);
+    expect(p.log).toEqual([]);
+    rerender(<Onboarding {...props} check={WORKS} fn={{ act: 'talk_end', n: 2 }} />);
+    expect(p.sent.at(-1)).toEqual({ cmd: 'prefs_set', key: 'onboarded', value: true });
     expect(p.log).toEqual(['done']);
   });
 });
