@@ -41,8 +41,11 @@ FULL = open(os.path.join(ROOT, "prompts", "tool-desc-run-typescript.txt")).read(
 # sb page row) and +154 for main, measured on main_role_desktop.txt.
 # Then card-links (5bf91107c, sb notify --artifact): the bise-pages skill
 # and blocks.md lines a task reads, +119 for a task (29717, measured on
-# 645685421), rounded to +120; main stays under its budget
-TASK_BUDGET = 27000 + 2044 + 546 + 8 + 120
+# 645685421), rounded to +120; main stays under its budget. Then issue 21
+# (the user's yes on m_34252): edit's description sends the model to bash
+# instead of Vibe's read_file, +74 chars measured (t1 29791 on 0f3a00890);
+# main stays under its budget
+TASK_BUDGET = 27000 + 2044 + 546 + 8 + 120 + 74 + 1
 MAIN_BUDGET = 38500 + 2184 + 229 + 34 + 216 + 548 + 327 + 154 + 546 + 154
 fails = []
 
