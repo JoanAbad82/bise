@@ -39,13 +39,52 @@ gone = threading.Event()
 
 
 def drain():
-    # the hub's say/steer lines: read and dropped; EOF = the hub is gone
-    while conn.recv(65536):
-        pass
+    # the hub's say/steer lines: read and dropped (logged with FLOOD_RECV_LOG);
+    # EOF = the hub is gone
+    while True:
+        got = conn.recv(65536)
+        if not got:
+            break
+        if recv_log:
+            heard("say", got.decode("utf-8", "replace"))
     gone.set()
 
 
+# FLOOD_RECV_DIR: a folder; each thing the hub sends this REPL (a `say` on
+# its connection, a steer in its steer file) goes to <dir>/<agent dir>.log
+# as `<ms>\t<say|steer>\t<text>` the moment it is read (send_latency_e2e.py)
+recv_dir = os.environ.get("FLOOD_RECV_DIR", "")
+recv_log = os.path.join(recv_dir, os.path.basename(here) + ".log") if recv_dir else ""
+recv_lock = threading.Lock()
+
+
+def heard(how, text):
+    with recv_lock, open(recv_log, "a") as f:
+        f.write("%d\t%s\t%s\n" % (int(time.time() * 1000), how, text.replace("\n", " ")))
+
+
+def steers():
+    # the steer file, read as it grows (every 5 ms)
+    at = 0
+    while not gone.is_set():
+        try:
+            size = os.path.getsize(steer)
+        except OSError:
+            size = at
+        if size < at:
+            at = 0
+        if size > at:
+            with open(steer, "rb") as f:
+                f.seek(at)
+                got = f.read()
+            at += len(got)
+            heard("steer", got.decode("utf-8", "replace"))
+        time.sleep(0.005)
+
+
 threading.Thread(target=drain, daemon=True).start()
+if recv_log:
+    threading.Thread(target=steers, daemon=True).start()
 t0 = time.time()
 # paced: `rate` lines a second from the flood's start, written every 20 ms;
 # each line ends with its write time (` @<ms>`): the hub's transcript
