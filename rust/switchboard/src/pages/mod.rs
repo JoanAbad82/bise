@@ -88,8 +88,9 @@ pub struct Pages {
     rows_memo: Mutex<RowsMemo>,
 }
 
-/// The pages' rows and overdue count, keyed by (store generation, day).
-type RowsMemo = crate::store_gen::Memo<(u64, i64), (Vec<bise_proto::rows::Page>, usize)>;
+/// The pages' rows and overdue count, keyed by (store generation, day,
+/// the pages folder's stamp).
+type RowsMemo = crate::store_gen::Memo<(u64, i64, u64), (Vec<bise_proto::rows::Page>, usize)>;
 
 /// The progress lines a new SSE stream replays.
 const PROGRESS_KEPT: usize = 8;
@@ -280,7 +281,8 @@ impl Pages {
     /// (nor the day) moved them since its build.
     fn rows_now(&self) -> (Vec<bise_proto::rows::Page>, usize) {
         let today = crate::every::local_day(crate::util::now_ms()).unwrap_or(i64::MAX);
-        let key = (crate::store_gen::now(), today);
+        // a page written by another process moves the stamp (store_gen)
+        let key = (crate::store_gen::now(), today, crate::store_gen::dir_stamp(&self.store.dir));
         let mut memo = self.rows_memo.lock().unwrap_or_else(|e| e.into_inner());
         memo.get(key, || (self.fresh_rows(), self.fresh_overdue()))
     }

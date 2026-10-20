@@ -12,12 +12,16 @@
 //! doors call [`bump`] (pages/store.rs `write_atomic`, artifacts.rs
 //! `write_atomic` and `copy_whole`, artifacts_archive.rs's removal), and so
 //! does each change of what a page row reads from memory (pages/mod.rs
-//! `set_busy`, `done_at`). What changes outside the hub (an artifact's
-//! target file the user deletes: its row's `gone`) is caught by the
-//! artifacts memo's backstop: its key also holds a 10 s time bucket.
+//! `set_busy`, `done_at`). What changes outside the hub is in the keys
+//! too: [`dir_stamp`], the mtimes of the pages' folder and of each page's
+//! folder (a page written by another process: artifacts_e2e, release-45
+//! m_35739), and of the artifacts' folder; an artifact's target file the
+//! user deletes (its row's `gone`) by the artifacts memo's backstop, a
+//! 10 s time bucket.
 //!
 //! A memo only derives; it never decides (architect m_35024).
 
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static GEN: AtomicU64 = AtomicU64::new(1);
@@ -30,6 +34,21 @@ pub fn bump() {
 /// The stores' generation now.
 pub fn now() -> u64 {
     GEN.load(Ordering::Acquire)
+}
+
+/// One number for the state of `dir` on disk: its mtime and each of its
+/// folders' (name, mtime). A folder or file added, removed or renamed in
+/// it, or in one of its folders, moves it (a write_atomic renames into
+/// the folder). One stat per folder: cheap next to reading the files.
+pub fn dir_stamp(dir: &Path) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mtime = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    mtime(dir).hash(&mut h);
+    let mut kids: Vec<_> = std::fs::read_dir(dir).map(|rd| rd.flatten().map(|e| (e.file_name(), mtime(&e.path()))).collect()).unwrap_or_default();
+    kids.sort();
+    kids.hash(&mut h);
+    h.finish()
 }
 
 /// A value derived from a key: built again only when the key differs
@@ -102,6 +121,22 @@ mod tests {
         }
         let pages = include_str!("pages/mod.rs");
         assert_eq!(pages.split("#[cfg(test)]").next().unwrap_or(pages).matches("crate::store_gen::bump()").count(), 2, "pages/mod.rs: set_busy and mark_done (a row's `held`) bump");
+    }
+
+    /// A page written by another process (no bump) moves the stamp:
+    /// its folder made, then its meta.json written in it.
+    #[test]
+    fn a_write_from_outside_the_hub_moves_the_stamp() {
+        let d = std::env::temp_dir().join(format!("sb-stamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let s0 = dir_stamp(&d);
+        std::fs::create_dir_all(d.join("weekly")).unwrap();
+        let s1 = dir_stamp(&d);
+        assert_ne!(s0, s1, "a page's folder made");
+        std::fs::write(d.join("weekly").join("meta.json"), "{}").unwrap();
+        assert_ne!(s1, dir_stamp(&d), "a file written in a page's folder");
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

@@ -46,7 +46,7 @@ pub(super) struct Art {
     /// again only when a store write, the agents' names or the 10 s
     /// backstop move them (crate::store_gen, send-fast): the state push
     /// and the view ask for them up to 10 times a second.
-    memo: std::cell::RefCell<crate::store_gen::Memo<(u64, u64, u64), ArtView>>,
+    memo: std::cell::RefCell<crate::store_gen::Memo<(u64, u64, u64, u64), ArtView>>,
 }
 
 /// What the artifacts event is built from (the memo's value).
@@ -172,7 +172,10 @@ impl Shell {
     /// `{"ev":"artifacts","rows":[…],"new":N,"seen_ms":T}`.
     pub(super) fn artifacts_ev(&self) -> Value {
         let now = now_ms();
-        let key = (crate::store_gen::now(), self.art_who_key(), now / ART_BACKSTOP_MS);
+        // the folders' stamps: a page or an artifact written by another process
+        let st = &self.opts.paths.state;
+        let disk = crate::store_gen::dir_stamp(&st.join("pages")) ^ crate::store_gen::dir_stamp(&st.join("artifacts")).rotate_left(1);
+        let key = (crate::store_gen::now(), self.art_who_key(), now / ART_BACKSTOP_MS, disk);
         let mut view = self.art.memo.borrow_mut().get(key, || {
             let store = self.art_store();
             let who = self.art_who();
