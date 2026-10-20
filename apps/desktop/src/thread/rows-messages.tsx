@@ -84,7 +84,7 @@ function WentRow({ e, ctx, name }: { e: Entry; ctx: RowCtx; name: string }) {
       >
         {shownName(name)}
       </span>
-      <span className="th-went-words">{` · ${text}`}</span>
+      {` · ${text}`}
     </div>
   );
 }
