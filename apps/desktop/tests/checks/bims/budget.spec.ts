@@ -13,15 +13,17 @@
 //   (6) an idle bim eating at the island (bims-life): the loop's ~8 fps (LOOP_FPS) while it eats,
 //       0 blurred or hidden, 0 once it naps again (the office's clock set: page.clock);
 //   (4) a lost WebGL context shows the list right under its one line (no office-high hole);
-//   (7) the sky (sky.ts, bims-sky): a new slot's blend draws ~SKY_FADE_S at 30 fps at most, then 0;
+//   (7) the sky (sky.ts, bims-sky): a new slot's blend draws SKY_FADE_S (30 s) at ~BLEND_FPS (10), then 0;
+//       into the night (the lamps and their 4 warm pools on: bims-light) no frame over 50 ms;
 //       0 while it rains (its CSS layer, never WebGL); hidden: no blend, no frame.
 // The sizes, labels, night, planes and reduced motion: office.spec.ts. Owner: bims-qa.
 import { test, expect } from '../../harness';
 import { agent, office, snap, watch } from '../../../src/bims/fixtures';
 import { idleLife } from '../../../src/bims/activity';
 import { SKY_FADE_S } from '../../../src/bims/sky';
+import { BLEND_FPS } from '../../../src/bims/loop';
 import {
-  NAMES, P, drawnIn, loseContext, open, rowsOf, setHidden, settle, shotOf, showOffice, sleep, threeChunks, watchScripts,
+  NAMES, P, drawnIn, loseContext, open, resetSlowest, rowsOf, setHidden, settle, shotOf, showOffice, sleep, slowest, threeChunks, watchScripts,
   withRows, writeIndex,
 } from './world';
 
@@ -268,7 +270,7 @@ test('(4) a lost WebGL context shows the list with its line', async () => {
   }
 });
 
-test('(7) the sky: a blend of a few seconds at 30 fps at most, then 0, rain included', async () => {
+test('(7) the sky: a 30 s blend at ~10 fps, no frame over 50 ms, then 0, rain included', async () => {
   const { s } = await open(STILL);
   /** a moment of his (window.__biseLocal) and its weather pinned, the office woken (its focus handler) */
   const pin = (h: number, weather: string): Promise<void> =>
@@ -283,10 +285,15 @@ test('(7) the sky: a blend of a few seconds at 30 fps at most, then 0, rain incl
     await showOffice(s);
     await settle(s);
     expect((await drawnIn(s, 2000)).frames, 'a clear noon at rest draws nothing').toBe(0);
-    await pin(21, 'rain');
+    // into the night: the lamps and their 4 warm pools come on over the blend (their cost measured)
+    await resetSlowest(s);
+    await pin(23, 'rain');
     const blend = await drawnIn(s, (SKY_FADE_S + 1.5) * 1000);
-    expect(blend.frames, 'the blend draws').toBeGreaterThan(SKY_FADE_S * 8);
-    expect(blend.frames, '30 fps at most, never the display rate').toBeLessThan(SKY_FADE_S * 30 + 12);
+    expect(blend.frames, 'the blend draws').toBeGreaterThan(SKY_FADE_S * BLEND_FPS * 0.5);
+    expect(blend.frames, `${String(BLEND_FPS)} fps at most, never the display rate`).toBeLessThan(SKY_FADE_S * BLEND_FPS + 12);
+    const ms = await slowest(s);
+    console.log(`(7) the night blend with the lamp pools: slowest frame ${ms.toFixed(1)} ms`);
+    expect(ms, 'no frame over 50 ms (the lamp pools included)').toBeLessThan(50);
     await expect(s.page.getByTestId('app.right.bims.falling'), 'it rains: the CSS layer').toHaveAttribute('data-kind', 'rain');
     expect((await drawnIn(s, 2000)).frames, 'rain at rest: 0 WebGL frames').toBe(0);
     await setHidden(s.page, true);

@@ -370,7 +370,7 @@ export interface PlaneFlight {
 /**
  * How the loop runs after a frame (battery, architect m_27495): 'walk' at the display's rate (a walk,
  * a transition, a plane, a fade), 'loop' at LOOP_FPS (only ambient loops: typing, the '?' jumps),
- * 'blend' at 30 fps while the sky changes (sky.ts, a few seconds every 5 min at most),
+ * 'blend' at ~10 fps while the sky changes (sky.ts SKY_FADE_S, 30 s every 5 min at most),
  * 'still' stopped until the next snapshot, hover, size or theme change. Asleep, napping, on the
  * terrace, failed, blocked, stopped or in line are still poses: no breathing loop in v1.
  */
@@ -477,9 +477,9 @@ export interface OfficeRenderer {
   /**
    * What falls now (sky.ts: rain, snow, 0..1, as drawn at the last frame) and the building's
    * outline on the canvas (css px, convex): the CSS rain falls outside it only (bims m_33030: never
-   * inside the room). null: no sky.
+   * inside the room), and the cube's outline it falls inside (never on the page). null: no sky.
    */
-  falling(): { readonly rain: number; readonly snow: number; readonly hull: readonly { readonly x: number; readonly y: number }[]; readonly haze: number; readonly air: string } | null;
+  falling(): { readonly rain: number; readonly snow: number; readonly hull: readonly { readonly x: number; readonly y: number }[]; readonly cube: readonly { readonly x: number; readonly y: number }[] } | null;
   /** WebGL lost: the shell falls back to the list with one line */
   onLost(cb: () => void): void;
   dispose(): void;

@@ -5,21 +5,24 @@
 // the renderer, the iso camera, the office's light) at his camera's zoom (camera.ts viewFit); it
 // answers where heads are and what is under a point (pick.ts). It renders only when frame() is
 // called and says how the loop must run next (Motion). The look is style.ts. The sky (sky.ts): each
-// frame blends the drawn sky to Look.sky (its few seconds at 30 fps: Motion 'blend', then rest) and
-// puts it on the lights (sky-light.ts), the desk lamps and the snow (office-scene weather); falling()
-// says what falls and the building's outline for the CSS rain.
+// frame blends the drawn sky to Look.sky (SKY_FADE_S at ~10 fps: Motion 'blend', then rest; reduced
+// motion: a cut) and puts its one light (both themes, bims-light direction A) on the lights
+// (sky-light.ts), the lamps and their pools, the slab's night lift and the snow (office-scene
+// weather); the page under the cube is the theme's own. falling() says what falls and the
+// building's outline for the CSS rain.
 // In test mode (window.bise.test) it exposes window.__biseBims = { frames, trace, skate, head, zoom, cam, sky } for
 // the headless checks (bims-qa; skate: each skater's phase per frame, budget.spec (5)).
 import { Vector3 } from 'three';
 import type { BimFrame, Look, MakeRenderer, Motion, OfficeRenderer } from '../model';
 import { FIT, type Cam } from '../zoom';
-import { type Fit, fitSite, siteOf, toScreen, viewFit, wideSiteOf } from './camera';
+import { type Fit, fitSite, groundOf, siteOf, toScreen, viewFit, wideSiteOf } from './camera';
+import { NO_GROW } from '../growth';
 import { pickAt, type Target } from './pick';
 import type { Rig } from './pose';
 import { sinceArrived, skateAt } from '../skate';
 import { STYLE } from './style';
 import { lightOffice } from './world';
-import { applyLight, backdropOf } from './sky-light';
+import { applyLight } from './sky-light';
 import { blendAt, blending, lightOf, retarget, sameSky, type Blend, type Light } from '../sky';
 import { louder } from './pose';
 import { makeOfficeScene } from './office-scene';
@@ -53,6 +56,8 @@ const WIDE_FIT_PX = 480;
 /** what the headless check reads (test mode only) */
 interface Probe {
   frames: number;
+  /** the slowest frame drawn, ms (the render and the GPU's finish); null: not measured (a check sets 0 to start) */
+  slowest: number | null;
   /** each bim's place per frame; y its height off the floor (a skater up a ramp, in the bowl: below 0) */
   trace: { t: number; name: string; x: number; z: number; y: number; op: number }[];
   /** each drawn frame of an arrived skater: its session n (skate.ts skateAt) and whether it rides its line or rests */
@@ -91,7 +96,7 @@ export const makeRenderer: MakeRenderer = (canvas) => {
   let skyMoving = false;
 
   const probe: Probe | null = testMode()
-    ? { frames: 0, trace: [], skate: [], head: (name) => headOf(name), zoom: () => cam.zoom, cam: () => cam, sky: () => (drawnSky ? { light: drawnSky, blending: skyMoving } : null) }
+    ? { frames: 0, slowest: null, trace: [], skate: [], head: (name) => headOf(name), zoom: () => cam.zoom, cam: () => cam, sky: () => (drawnSky ? { light: drawnSky, blending: skyMoving } : null) }
     : null;
   if (probe) (window as unknown as { __biseBims?: Probe }).__biseBims = probe;
 
@@ -113,10 +118,11 @@ export const makeRenderer: MakeRenderer = (canvas) => {
     // his drag or pinch holds a new blend until he lets go (bims m_33030)
     blend = retarget(blend, look.sky, t, look.reduced, look.hold === true);
     const sky = blendAt(blend, t);
-    const l = lightOf(sky, look.night ? 'dark' : 'light');
+    // one light for both themes (direction A); the page under the cube is the theme's, untouched
+    const l = lightOf(sky);
     applyLight(view.hemi, view.sun, l, { x: o.x0 + o.W / 2, y: 0, z: o.D / 2 });
-    office.weather(l.lamps, sky.cover);
-    if (paper !== null) view.sky('#' + backdropOf(paper, l).getHexString());
+    office.weather(l.lamps, sky.cover, l.lift);
+    if (paper !== null) view.sky(paper);
     drawnSky = l;
     // a blend his gesture holds: the loop's rate until he lets go, then it starts
     skyMoving = blending(blend, t) || (look.hold === true && !sameSky(blend.to, look.sky));
@@ -189,10 +195,18 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       if (!fit) return 'still';
       const posed = office.frame(t, frames, look, fit, probe ? traced(t) : undefined);
       if (posed === null) return 'still';
-      // the sky's blend: 30 fps for its few seconds (reduced motion: the loop's rate), then rest
-      const motion = skyMoving ? louder(posed, look.reduced ? 'loop' : 'blend') : posed;
+      // the sky's blend: ~10 fps over its 30 s (reduced motion: a cut, never a blend), then rest
+      const motion = skyMoving ? louder(posed, 'blend') : posed;
+      const t0 = probe ? performance.now() : 0;
       view.render();
-      if (probe) probe.frames++;
+      if (probe) {
+        probe.frames++;
+        // the slowest frame's cost, the GPU's work included, only while a check measures (budget.spec (7): the lamp pools)
+        if (probe.slowest !== null) {
+          view.renderer.getContext().finish();
+          probe.slowest = Math.max(probe.slowest, performance.now() - t0);
+        }
+      }
       return motion;
     },
     headOf,
@@ -244,8 +258,11 @@ export const makeRenderer: MakeRenderer = (canvas) => {
       for (const x of [o.x0 - HULL_PAD, o.x0 + o.W + HULL_PAD])
         for (const z of [-HULL_PAD, o.D + HULL_PAD])
           for (const y of [-0.2, HULL_H]) pts.push(toScreen(fit, { x, y, z }));
-      const l = lightOf(s, lastLook.night ? 'dark' : 'light');
-      return { rain: s.rain, snow: s.snow, hull: hullOf(pts), haze: s.haze, air: l.air };
+      // where it falls: over the cube only (bims m_34321), its top's outline raised by the room's height
+      const g = groundOf(o, lastLook.grow ?? NO_GROW);
+      const cube: { x: number; y: number }[] = [];
+      for (const x of [g.x0, g.x1]) for (const z of [g.z0, g.z1]) for (const y of [0, HULL_H]) cube.push(toScreen(fit, { x, y, z }));
+      return { rain: s.rain, snow: s.snow, hull: hullOf(pts), cube: hullOf(cube) };
     },
     onLost(cb) {
       view.onLost(cb);

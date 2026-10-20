@@ -79,6 +79,8 @@
   overflow: hidden;
   pointer-events: none;
   display: none;
+  /* clipped to the cube (falling.ts); its raised top fades out, never a hard edge in the air */
+  mask-image: linear-gradient(to bottom, transparent 0, #000 22%);
   transition: opacity 600ms linear;
 }
 [data-theme='light'] .bims-falling {
@@ -148,15 +150,6 @@
 @media (prefers-reduced-motion: reduce) {
   .bims-falling::before,
   .bims-falling::after { animation: none; }
-}
-/* the haze (fog): the air's colour round the edges, the room clear; still, never a frame */
-.bims-haze {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  background: radial-gradient(ellipse 70% 62% at 50% 52%, transparent 45%, var(--air, transparent) 100%);
-  transition: opacity 600ms linear;
 }
 /* nothing takes the pointer but the pills (spec §1 rule 6): hover and click go to the canvas */
 .bims-overlay {

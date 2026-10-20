@@ -24,7 +24,8 @@ import { mergeRoot, type Merged } from './merge';
 import { makeOfficeScene, type OfficeScene } from './office-scene';
 import { makeView } from './view';
 import { applyLight, backdropOf } from './sky-light';
-import { blendAt, blending, lightOf, retarget, type Blend, type Light } from '../sky';
+import { blendAt, blending, retarget, type Blend } from '../sky';
+import { townLightOf, type TownLight } from '../sky-town';
 import { pickAt, type Target } from './pick';
 import { TOWN_DAY, TOWN_NIGHT, buildTownscape } from './townscape';
 import { diveFit, townDepth, townFit } from '../town/camera';
@@ -130,7 +131,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   let sunKey = '';
   /** the sky's blend and the light drawn (sky.ts); null: the theme's fixed sun (the hero) */
   let blend: Blend | null = null;
-  let skyLight: Light | null = null;
+  let skyLight: TownLight | null = null;
   const spots = new Map<string, Spot>();
   let scape: { sig: string; merged: Merged; loose: Group | null } | null = null;
   /** the hero's entry build holds the town loose (TownOpts.entry) until settle() */
@@ -147,7 +148,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     let s = spots.get(id);
     if (!s) {
       // no grass block of its own (bims m_28807): the town's lawn is its ground
-      s = { scene: makeOfficeScene(STYLE, { ground: false }), shape: '', bake: null, live: false, walls: null };
+      s = { scene: makeOfficeScene(STYLE, { ground: false, themed: true }), shape: '', bake: null, live: false, walls: null };
       spots.set(id, s);
     }
     return s;
@@ -593,7 +594,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
         blend = retarget(blend, sky.sky, sky.t, sky.reduced);
         moving = blending(blend, sky.t);
         if (moving || blend !== was) {
-          skyLight = lightOf(blendAt(blend, sky.t), isNight ? 'dark' : 'light');
+          skyLight = townLightOf(blendAt(blend, sky.t), isNight ? 'dark' : 'light');
           relit = true;
         }
       } else if (blend !== null) {
@@ -603,7 +604,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       }
       if (night !== isNight) {
         night = isNight;
-        if (skyLight && blend) skyLight = lightOf(blendAt(blend, sky?.t ?? 0), isNight ? 'dark' : 'light');
+        if (skyLight && blend) skyLight = townLightOf(blendAt(blend, sky?.t ?? 0), isNight ? 'dark' : 'light');
         syncScape(isNight);
         lightUp(isNight);
       } else if (relit) {

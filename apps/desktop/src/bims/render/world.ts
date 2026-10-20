@@ -5,21 +5,32 @@
 // stage's pieces in a group of its own (the unlock moment hides the newest). Built once per office, map, theme and growth; what changes per frame (a
 // desk's screen and lamp) is handed back as handles. Its light is the view's (render/view.ts,
 // lightOffice here sets it for an office; the sky's on top: render/sky-light.ts), and the snow on the
-// lawn and the terrace (cover). Never the accent pink or the error red.
+// lawn and the terrace (cover). The office's block (ground) also has the night's: four warm lamp
+// pools that fade with the lamps (lit), its dirt sides lifted at night (lift, designer m_34173) and
+// its soft shadow on the page, the slab's own shape under it (page: the theme's strength). Built with
+// the day's palette in both themes (bims-light, direction A; the town passes its theme's). Never the
+// accent pink or the error red.
 import {
   type BufferGeometry,
   Color,
+  DataTexture,
   Group,
   type HemisphereLight,
   type DirectionalLight,
+  LinearFilter,
   type Material,
   Mesh,
+  MeshBasicMaterial,
   type MeshLambertMaterial,
   type Object3D,
+  PlaneGeometry,
+  PointLight,
+  RGBAFormat,
 } from 'three';
 import type { Office } from '../model';
 import { NO_GROW, type Grow } from '../growth';
-import { groundOf } from './camera';
+import { POOL, SIDE_MIN } from '../sky';
+import { SHADOW_BLUR, SHADOW_DROP, SLAB_LOW, groundOf } from './camera';
 import { slabWithPits } from './ground';
 import { kitOf } from './kit';
 import { buildCozy } from './cozy';
@@ -42,9 +53,72 @@ export interface World {
   readonly pieces: Pieces;
   /** the snow on the lawn and the terrace only (never desks or floors, bims m_33030): 0 none .. 1 white */
   cover(level: number): void;
-  /** its night glows and lights (kit.ts glow, light: lanterns, pendants, shades) at this level, 0..1: the sky's lamps */
+  /** its night glows and lights (kit.ts glow, light: lanterns, pendants, shades, the lamp pools) at this level, 0..1: the sky's lamps */
   lit(level: number): void;
+  /** the slab's dirt sides lifted toward SIDE_MIN (sky.ts Light.lift), 0 day .. 1 night */
+  lift(level: number): void;
+  /** the page under the cube: the dark theme's or the light one's (the shadow's strength) */
+  page(dark: boolean): void;
   dispose(): void;
+}
+
+/** where the pools hang and how strong each is lit: main's desk, the island, the lounge, one desk */
+export function poolsOf(o: Office): { x: number; z: number; i: number }[] {
+  const desks = [...o.desks.values()];
+  const desk = desks[Math.min(3, desks.length - 1)];
+  const at = [
+    { s: o.mainDesk, i: 7 },
+    { s: o.islandSpots[0], i: 7 },
+    { s: o.lounge[0], i: 6 },
+    { s: desk, i: 5 },
+  ];
+  return at.flatMap(({ s, i }) => (s ? [{ x: s.x, z: s.z, i }] : []));
+}
+
+/** the cube's shadow on the page: black, this strong on the light page and the dark one (designer m_34173) */
+const UNDER = { light: 0.15, dark: 0.35 } as const;
+/** the shadow's texels per world unit */
+const UNDER_RES = 12;
+
+/**
+ * The slab's soft shadow on the page: its own rounded footprint SHADOW_DROP under its underside,
+ * blurred by SHADOW_BLUR and kept inside the slab's width (only under it, no halo). Unlit; the
+ * slab hides the part right under it, so it shows only below the cube.
+ */
+function cubeShadow(w: number, d: number, x: number, z: number): Mesh {
+  const pw = w + 2 * SHADOW_BLUR;
+  const pd = d + 2 * SHADOW_BLUR;
+  const tw = Math.max(8, Math.round(pw * UNDER_RES));
+  const th = Math.max(8, Math.round(pd * UNDER_RES));
+  const data = new Uint8Array(tw * th * 4);
+  // the footprint inset by half the blur: the shadow's soft edge ends near the slab's own edge
+  const hx = w / 2 - SHADOW_BLUR / 2;
+  const hz = d / 2 - SHADOW_BLUR / 2;
+  const r = 0.45;
+  for (let j = 0; j < th; j++) {
+    for (let i = 0; i < tw; i++) {
+      const px = ((i + 0.5) / tw - 0.5) * pw;
+      const pz = ((j + 0.5) / th - 0.5) * pd;
+      // a rounded rectangle's signed distance
+      const qx = Math.abs(px) - (hx - r);
+      const qz = Math.abs(pz) - (hz - r);
+      const sd = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - r;
+      const t = Math.max(0, Math.min(1, (sd + SHADOW_BLUR / 2) / SHADOW_BLUR));
+      data[(j * tw + i) * 4 + 3] = Math.round(255 * (1 - t * t * (3 - 2 * t)));
+    }
+  }
+  const map = new DataTexture(data, tw, th, RGBAFormat);
+  map.magFilter = LinearFilter;
+  map.minFilter = LinearFilter;
+  map.needsUpdate = true;
+  const geo = new PlaneGeometry(pw, pd);
+  geo.rotateX(-Math.PI / 2);
+  const m = new Mesh(geo, new MeshBasicMaterial({ color: 0x000000, map, transparent: true, opacity: UNDER.light, depthWrite: false }));
+  m.position.set(x, SLAB_LOW - SHADOW_DROP, z);
+  m.renderOrder = -1;
+  m.castShadow = false;
+  m.receiveShadow = false;
+  return m;
 }
 
 /** the snow's white, and the most it covers (a little of the ground's colour shows through) */
@@ -78,9 +152,17 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   const gz = (site.z0 + site.z1) / 2;
   // holed where the map carves under its floor (California's bowl), so the carving shows
   const pits = look.pits?.(o, grow.stage) ?? [];
+  // the dirt's own material (never kit.mat's shared one): at night its sides are lifted (lift())
+  const dirt = style.material(pal.dirt, { emissive: SIDE_MIN, ei: 0 }) as MeshLambertMaterial;
   if (ground) {
-    k.add(slabWithPits(style, gw, 1.2, gd, 0.45, gx, gz, pits), k.mat(pal.dirt), root, gx, -0.75, gz);
+    k.add(slabWithPits(style, gw, 1.2, gd, 0.45, gx, gz, pits), dirt, root, gx, SLAB_LOW + 0.6, gz);
     k.add(slabWithPits(style, gw, 0.16, gd, 0, gx, gz, pits), k.mat(pal.grass), root, gx, -0.1, gz);
+    // the night's warm pools over main's desk, the island, the lounge and one desk: the lamps' (kit.light)
+    for (const p of poolsOf(o)) {
+      const l = k.light(new PointLight(POOL.color, p.i, POOL.distance, POOL.decay));
+      l.position.set(p.x, POOL.y, p.z);
+      root.add(l);
+    }
   }
 
   // the map's look on the plan's office; the stages' groups made as the builders ask for them
@@ -106,6 +188,9 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
   // what makes it cozy from day one, and cozier at each stage (render/cozy.ts, Office.cozy)
   buildCozy(b, look.cozy, desks, mainName);
   if (style.shadows) castShadows(root);
+  // the cube's soft shadow on the page (designer m_34173): after castShadows, it takes and casts none
+  const under = ground ? cubeShadow(gw, gd, gx, gz) : null;
+  if (under) root.add(under);
 
   // the lawn's and the terrace's materials (kit.mat shares one per colour): what snow covers
   const ground0 = new Map<MeshLambertMaterial, Color>();
@@ -129,6 +214,12 @@ export function buildWorld(o: Office, mainName: string, style: Style, look: MapL
       if (level === glowing) return;
       glowing = level;
       k.lit(level);
+    },
+    lift(level) {
+      dirt.emissiveIntensity = level;
+    },
+    page(dark) {
+      if (under) (under.material as MeshBasicMaterial).opacity = dark ? UNDER.dark : UNDER.light;
     },
     cover(level) {
       if (level === covered) return;

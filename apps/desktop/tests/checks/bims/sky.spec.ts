@@ -1,14 +1,14 @@
 // bims/sky · the living sky (bims-sky, sky.ts): the office's light follows his local time and the
 // weather, on a still office (budget.spec's: nothing moves but the sky), off screen. Each moment is pinned (test mode:
 // window.__biseLocal his calendar and time, window.__biseSky its weather), then the office blends to
-// it (4 s) and rests. Passes when, light and dark:
+// it (SKY_FADE_S, 30 s at ~10 fps) and rests; one light in both themes (bims-light, direction A). Passes when, light and dark:
 //   (1) the day sweep (night, dawn, morning, noon, golden hour, dusk; a clear June day) and each
 //       weather at noon (clouds, overcast, rain, fog; snow on a January noon) draw, then rest: 0
 //       frames once the blend is done, rain and snow included (their CSS layer is no WebGL frame);
 //       the lamps are on at night and off at a clear noon (light UI); rain and snow show their layer,
 //       a dry sky none;
-//   (2) a transition: a slot change draws a blend of ~SKY_FADE_S at 30 fps at most, then 0;
-//   (3) reduced motion: the rain held still (no animation), the blend at the loop's rate;
+//   (2) a transition: a slot change draws a blend of SKY_FADE_S at ~10 fps (BLEND_FPS), then 0;
+//   (3) reduced motion: the rain held still (no animation), no blend: a cut to the hour's light;
 //   (4) 320: a rainy night and a dusk, the pills read. (1) is the wide bar (640).
 // Shots: .harness-cache/bims-shots/sky-*.png and index.html (bims signs them); the transition's
 // frames in .harness-cache/bims-shots/sky-clip/. Owner: bims-sky.
@@ -17,7 +17,8 @@ import path from 'node:path';
 import { PNG } from 'pngjs';
 import { test, expect, Recorder, type Session } from '../../harness';
 import { agent, snap, watch } from '../../../src/bims/fixtures';
-import { SKY_FADE_S, SKY_FADE_REDUCED_S } from '../../../src/bims/sky';
+import { SKY_FADE_S } from '../../../src/bims/sky';
+import { BLEND_FPS } from '../../../src/bims/loop';
 import { SHOTS, drawnIn, open, probe, settle, shotOf, showOffice, sleep, writeIndex, type Shot } from './world';
 
 const shots: Shot[] = [];
@@ -103,6 +104,8 @@ async function show(s: Session, m: Moment): Promise<void> {
 
 for (const theme of ['light', 'dark'] as const) {
   test(`(1) the day and the weathers, wide, ${theme}`, async () => {
+    // 11 moments, each a 30 s blend (SKY_FADE_S) then rest
+    test.setTimeout((DAY.length + WEATHER.length) * (SKY_FADE_S + 15) * 1000 + 60_000);
     const { s } = await open(office, { theme, width: 1600 });
     try {
       await s.page.evaluate(() => {
@@ -148,7 +151,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('(2) a transition: a blend of ~4 s at 30 fps, then rest (the clip)', async () => {
+test('(2) a transition: a blend of 30 s at ~10 fps, then rest (the clip)', async () => {
   const { s } = await open(office, { theme: 'light', width: 1400 });
   try {
     await s.page.evaluate(() => {
@@ -166,9 +169,9 @@ test('(2) a transition: a blend of ~4 s at 30 fps, then rest (the clip)', async 
     await sleep((SKY_FADE_S + 1.5) * 1000);
     const frames = await rec.stop();
     const drawn = ((await probe(s.page))?.frames ?? 0) - f0;
-    // ~SKY_FADE_S at 30 fps at most (a loaded machine drops some), never the display's rate
-    expect(drawn, 'the blend draws its few seconds').toBeGreaterThan(SKY_FADE_S * 10);
-    expect(drawn, 'never more than 30 fps').toBeLessThan(SKY_FADE_S * 30 + 12);
+    // SKY_FADE_S at ~BLEND_FPS (a loaded machine drops some), never the display's rate
+    expect(drawn, 'the blend draws its 30 s').toBeGreaterThan(SKY_FADE_S * BLEND_FPS * 0.5);
+    expect(drawn, `never more than ${String(BLEND_FPS)} fps`).toBeLessThan(SKY_FADE_S * BLEND_FPS + 12);
     expect((await drawnIn(s, 1500)).frames, 'then rest').toBe(0);
     // the clip's frames, cropped to the office, for bims
     const dir = path.join(SHOTS, 'sky-clip');
@@ -186,7 +189,7 @@ test('(2) a transition: a blend of ~4 s at 30 fps, then rest (the clip)', async 
   }
 });
 
-test('(3) reduced motion: the rain held still, the blend at the loop rate', async () => {
+test('(3) reduced motion: the rain held still, a cut (no blend)', async () => {
   const { s } = await open(office, { theme: 'light', width: 1400, reduced: true });
   try {
     await s.page.evaluate(() => {
@@ -196,10 +199,12 @@ test('(3) reduced motion: the rain held still, the blend at the loop rate', asyn
     await show(s, at('noon', 'noon', 6, 21, 13, 50));
     const f0 = (await probe(s.page))?.frames ?? 0;
     await pin(s, at('dusk-rain', 'dusk, rain', 6, 21, 22, 0, 'rain'));
-    await sleep((SKY_FADE_REDUCED_S + 1.5) * 1000);
+    await sleep(3000);
     const drawn = ((await probe(s.page))?.frames ?? 0) - f0;
-    expect(drawn, 'the slow fade at the loop rate (8 fps)').toBeLessThan(SKY_FADE_REDUCED_S * 9 + 6);
-    expect(drawn, 'it fades (never a cut)').toBeGreaterThan(SKY_FADE_REDUCED_S * 4);
+    // the cut: the frame that draws the new light, never a blend's
+    expect(drawn, 'a cut, no blend').toBeLessThanOrEqual(3);
+    expect(drawn, 'the new light is drawn').toBeGreaterThanOrEqual(1);
+    expect((await skyNow(s))?.blending, 'no blend runs').toBe(false);
     // the drops held still (bims m_33351: he can tell it rains), never moving
     expect((await skyNow(s))?.falling ?? null, 'the rain layer, still').toBe('rain');
     const anim = await s.page.evaluate(() => {
@@ -207,7 +212,7 @@ test('(3) reduced motion: the rain held still, the blend at the loop rate', asyn
       return el === null ? '' : getComputedStyle(el, '::before').animationName;
     });
     expect(anim, 'no animation under reduced motion').toBe('none');
-    await shot(s, 'sky-light-wide-reduced-dusk-rain.png', 'sky · reduced motion · dusk, rain · light', 'still drops: he can tell it rains; the light faded in');
+    await shot(s, 'sky-light-wide-reduced-dusk-rain.png', 'sky · reduced motion · dusk, rain · light', 'still drops: he can tell it rains; the light cut to the hour (no blend)');
   } finally {
     await s.close();
   }

@@ -4,15 +4,15 @@
 // the day of the year at a fixed latitude (no geolocation); below the horizon a cool moon takes the
 // key. The weather is a deterministic spell per 5-min slot, picked by season. Both are sampled once
 // per slot (skyAt reads the slot's start): between slots nothing changes, so a still office draws
-// no frame; a new slot blends from the drawn sky to the next (mixSky) over SKY_FADE_S, then rests.
-// Never the sun or the moon drawn: only their light. Owner: bims-sky.
+// no frame; a new slot blends from the drawn sky to the next (mixSky) over SKY_FADE_S at ~10 fps,
+// then rests (reduced motion: a cut). Never the sun or the moon drawn: only their light. The light
+// of a sky (lightOf) is one for both themes (bims-light, direction A). Owner: bims-sky.
 import { hash, type Local } from './eggs';
 
 /** a slot's length, s: the sky changes at most this often */
 export const SLOT_S = 300;
-/** a transition's length, s (reduced motion: SKY_FADE_REDUCED_S, at the loop's rate) */
-export const SKY_FADE_S = 4;
-export const SKY_FADE_REDUCED_S = 8;
+/** a transition's length, s, drawn at loop.ts's 'blend' rate (~10 fps); reduced motion: none, a cut */
+export const SKY_FADE_S = 30;
 /** the latitude his days are drawn at, degrees north (Paris-ish) */
 export const LAT = 46;
 /** local solar noon, hours: Paris (2.35°E) on CET, 12:51; an hour later in summer time (April to October) */
@@ -342,12 +342,13 @@ export function sameSky(a: Sky, b: Sky): boolean {
 /** a transition's ease: slow in, slow out */
 export const ease = (k: number): number => smooth(0, 1, k);
 
-// ---- the light on the lights: the sky through the app's theme (bims m_33030: the theme keeps the
-// materials and the backdrop, the sky drives the lights and the lamps; readability beats realism)
+// ---- the light on the lights: one light for both themes (bims-light, direction A: Gabriel's pick on
+// page bims-light v3). His hour and the weather light the office, never the app's theme: the world
+// keeps its day materials in both themes, the theme only sets the background the cube floats on
+// (render/office-scene.ts sky()). Night is a deep blue with warm lamp pools (render/world.ts), never
+// a grey veil; the slab's sides are lifted at night so the cube's edge reads on a dark page.
 
-export type Theme = 'light' | 'dark';
-
-/** What the view's two lights, the desk lamps and the backdrop take. */
+/** What the view's two lights, the desk lamps, the lamp pools and the slab's sides take. */
 export interface Light {
   readonly dir: V3;
   readonly key: string;
@@ -358,32 +359,24 @@ export interface Light {
   readonly hemi: string;
   readonly ground: string;
   readonly hemiI: number;
-  /** the desk lamps' glow, 0 off .. 1 on (they fade over a blend, never pop) */
+  /** the desk lamps' glow, the lanterns, the pendants and the lamp pools, 0 off .. 1 on (they fade over a blend, never pop) */
   readonly lamps: number;
-  /** the backdrop: the page's paper tinted toward the air by `airMix` (a little: the slab stays a slab) */
-  readonly air: string;
-  readonly airMix: number;
+  /** the slab's dirt sides lifted toward SIDE_MIN, 0 day .. 1 night (designer m_34173: the cube's edge reads on a dark page) */
+  readonly lift: number;
 }
 
-/** the app's signed lights (palette.ts DAY and NIGHT): the ends the theme guards hold */
-export const DAY_LIGHT = { hemi: '#ffffff', ground: '#e9dcc4', hemiI: 1.55, key: '#fff4e0', keyI: 1.9 } as const;
-export const NIGHT_LIGHT = { hemi: '#ffd9a8', ground: '#3a2c22', hemiI: 1.5, key: '#a9b8e8', keyI: 0.7 } as const;
-/** light UI: a lit floor never under this share of noon's (bims, names and pills read at night; bims m_33351: measured on the lit result) */
-export const LIGHT_LIT_MIN = 0.65;
-/** dark UI: the key never brighter than this (never a bright day room in a dark panel) */
-export const DARK_KEY_MAX = 0.95;
-/** the moon's shadow, a share of the day's */
-export const MOON_SHADOW = 0.3;
-/** how far the backdrop leans to the air (fog: up to AIR_MIX + AIR_HAZE) */
-const AIR_MIX = 0.08;
-const AIR_HAZE = 0.12;
+/** the clear sun's shadow and the moon's (how dark, under a clear sky) */
+export const SUN_SHADOW = 0.7;
+export const MOON_SHADOW = 0.35;
+/** at night the slab's sides never darker than this on screen (designer m_34173): world.ts lifts them to it */
+export const SIDE_MIN = '#24324f';
+
 /**
- * The light UI's own sky by the sun's height (bims m_33351): night and dusk read by hue and by the
- * lamps, never by dimming everything into one grey-brown. Night: a cool blue fill strong enough
- * that the floor keeps ~70% of noon and its hue, the moon a pale key; dusk and golden hour: an amber
- * key low across the floor from the sun's side over a blue fill (yellow-amber, never red: white
- * walls go cream, never salmon, bims m_33424); dawn: a pale-yellow key (morning)
- * over a pale cool fill. Never a pink or mauve cast (the '?' pill's alone).
+ * The sky by the sun's height (the renders on page bims-light v3, signed): noon a warm white key
+ * over a white fill; golden hour an amber key low from the west over a pale blue fill; dawn a
+ * pale-yellow key from the east; night a pale moon over a deep blue fill, the lamps on. Evening and
+ * morning share their ends; Sky.morning blends the two. Never a pink or mauve cast (the '?' pill's
+ * alone): the floor stays r >= g >= b, or a cool blue.
  */
 interface LightKey {
   readonly el: number;
@@ -392,86 +385,135 @@ interface LightKey {
   readonly hemi: string;
   readonly ground: string;
   readonly hemiI: number;
+  /** the lamps at that height of a clear sky (golden hour half on) */
+  readonly lamps: number;
 }
-const LIGHT_KEYS: readonly LightKey[] = [
-  { el: -18, key: '#c4d0f2', keyI: 0.8, hemi: '#cfd6ea', ground: '#d8b98f', hemiI: 2.15 },
-  { el: -8, key: '#c4d0f2', keyI: 0.7, hemi: '#d0d7ea', ground: '#d8b98f', hemiI: 2.1 },
-  { el: -4, key: '#ffbe6a', keyI: 1.6, hemi: '#d3d9e9', ground: '#dcbf96', hemiI: 1.9 },
-  { el: 0, key: '#ffc574', keyI: 2.6, hemi: '#d8dde9', ground: '#e2c8a2', hemiI: 1.7 },
-  { el: 6, key: '#ffd186', keyI: 3.0, hemi: '#e2e5ee', ground: '#e6d2b2', hemiI: 1.5 },
-  { el: 15, key: '#ffe2ae', keyI: 2.6, hemi: '#f2f2f1', ground: '#e9dcc4', hemiI: 1.3 },
-  { el: 35, key: DAY_LIGHT.key, keyI: DAY_LIGHT.keyI, hemi: DAY_LIGHT.hemi, ground: DAY_LIGHT.ground, hemiI: 1.15 },
+const NIGHT_KEY: LightKey = { el: -18, key: '#9fb7ff', keyI: 0.75, hemi: '#2f78a4', ground: '#14203a', hemiI: 1.6, lamps: 1 };
+const NOON_KEY: LightKey = { el: 35, key: '#fff3dc', keyI: 2.3, hemi: '#ffffff', ground: '#e6d6b8', hemiI: 1.2, lamps: 0 };
+const EVENING: readonly LightKey[] = [
+  NIGHT_KEY,
+  { ...NIGHT_KEY, el: -8 },
+  { el: -3, key: '#ffb65e', keyI: 1.4, hemi: '#90acc0', ground: '#4a4a5a', hemiI: 1.7, lamps: 0.9 },
+  { el: 3, key: '#ffbf66', keyI: 2.3, hemi: '#c8d7f2', ground: '#e8cfa2', hemiI: 1.85, lamps: 0.7 },
+  { el: 12, key: '#ffc56e', keyI: 2.6, hemi: '#e2ecfa', ground: '#f2dcb4', hemiI: 1.9, lamps: 0.5 },
+  { el: 24, key: '#ffe9c6', keyI: 2.4, hemi: '#f4f7fc', ground: '#ecd9b6', hemiI: 1.5, lamps: 0 },
+  NOON_KEY,
 ];
-/** dawn's key: a pale yellow (a morning sun under 15°), never the evening's amber */
-const DAWN_KEY = '#fff0b8';
+const MORNING: readonly LightKey[] = [
+  NIGHT_KEY,
+  { ...NIGHT_KEY, el: -8 },
+  { el: -3, key: '#ffd58e', keyI: 1.3, hemi: '#96accc', ground: '#4e505e', hemiI: 1.6, lamps: 0.8 },
+  { el: 3, key: '#ffe0a0', keyI: 2.1, hemi: '#d4e0f6', ground: '#eadabd', hemiI: 1.65, lamps: 0.55 },
+  { el: 8, key: '#ffe6a8', keyI: 2.4, hemi: '#e6eefb', ground: '#efdcbc', hemiI: 1.6, lamps: 0.35 },
+  { el: 22, key: '#fff0d2', keyI: 2.35, hemi: '#f6f9fd', ground: '#e9d8b8', hemiI: 1.4, lamps: 0 },
+  NOON_KEY,
+];
 
-function lightKeyAt(el: number): LightKey {
-  let a = LIGHT_KEYS[0] as LightKey;
+function keyIn(keys: readonly LightKey[], el: number): LightKey {
+  let a = keys[0] as LightKey;
   if (el <= a.el) return a;
-  for (const b of LIGHT_KEYS) {
-    if (el <= b.el) {
-      const k = smooth(a.el, b.el, el);
-      return { el, key: mixHex(a.key, b.key, k), keyI: lerp(a.keyI, b.keyI, k), hemi: mixHex(a.hemi, b.hemi, k), ground: mixHex(a.ground, b.ground, k), hemiI: lerp(a.hemiI, b.hemiI, k) };
-    }
+  for (const b of keys) {
+    if (el <= b.el) return mixKey(a, b, smooth(a.el, b.el, el));
     a = b;
   }
   return a;
 }
-
-/** the sky's light in this theme */
-export function lightOf(sky: Sky, theme: Theme): Light {
-  const moonShadow = lerp(1, MOON_SHADOW, sky.moon);
-  const shadow = moonShadow * (1 - 0.75 * sky.soft);
-  const air = sky.air;
-  const airMix = AIR_MIX + AIR_HAZE * sky.haze;
-  if (theme === 'light') {
-    const t = lightKeyAt(sky.el);
-    const dawn = sky.morning * (1 - smooth(6, 15, sky.el)) * (1 - sky.moon);
-    // the weather: a weaker key (never under the moon's), a greyer fill, a little darker
-    const night = 1 - smooth(-6, 6, sky.el);
-    return {
-      dir: sky.dir,
-      key: mixHex(t.key, DAWN_KEY, dawn),
-      keyI: t.keyI * lerp(sky.keyF, 1, night * 0.5),
-      shadow,
-      soft: sky.soft,
-      hemi: mixHex(t.hemi, sky.greyTo, sky.grey * (1 - 0.6 * night)),
-      ground: mixHex(t.ground, '#f4f6fa', sky.cover * (1 - 0.5 * night)),
-      hemiI: t.hemiI * (1 - sky.darker * 0.4),
-      lamps: smooth(0.35, 0.8, sky.dark),
-      air,
-      airMix,
-    };
-  }
-  // dark UI: the night palette's light, the sky's colour and direction leaning in by day
-  const day = 1 - sky.dark;
+function mixKey(a: LightKey, b: LightKey, k: number): LightKey {
   return {
-    dir: sky.dir,
-    key: mixHex(NIGHT_LIGHT.key, sky.key, day),
-    keyI: Math.min(DARK_KEY_MAX, lerp(NIGHT_LIGHT.keyI, sky.keyI, day)),
-    shadow,
+    el: lerp(a.el, b.el, k),
+    key: mixHex(a.key, b.key, k),
+    keyI: lerp(a.keyI, b.keyI, k),
+    hemi: mixHex(a.hemi, b.hemi, k),
+    ground: mixHex(a.ground, b.ground, k),
+    hemiI: lerp(a.hemiI, b.hemiI, k),
+    lamps: lerp(a.lamps, b.lamps, k),
+  };
+}
+
+/** how much the weather alone lights the lamps (rain by day: about half on) */
+const LAMPS_DARKER = 2.4;
+
+/** the camera's side, flat (render/camera.ts BACK: azimuth 45°, from the south-east) */
+const VIEW = { x: Math.SQRT1_2, z: Math.SQRT1_2 } as const;
+
+/**
+ * The key from the camera's half (bims m_34321): a sun behind the back walls is mirrored to the
+ * front (left stays left, right stays right), so a low sun always lights the floor and the walls'
+ * shadows fall behind or aside, never across the room. Continuous: a key square to the view is kept.
+ */
+export function frontOf(d: V3): V3 {
+  const k = d.x * VIEW.x + d.z * VIEW.z;
+  return k >= 0 ? d : { x: d.x - 2 * k * VIEW.x, y: d.y, z: d.z - 2 * k * VIEW.z };
+}
+
+/** the sky's light, the same in both themes (direction A) */
+export function lightOf(sky: Sky): Light {
+  const t = mixKey(keyIn(EVENING, sky.el), keyIn(MORNING, sky.el), sky.morning);
+  const night = 1 - smooth(-6, 6, sky.el);
+  // the weather on top (bims-sky's, unchanged): a weaker key (never under the moon's), a greyer
+  // fill, a little darker, the snow on the ground's bounce; the lamps on under a dark sky
+  return {
+    dir: frontOf(sky.dir),
+    key: t.key,
+    keyI: t.keyI * lerp(sky.keyF, 1, night * 0.5),
+    shadow: lerp(SUN_SHADOW, MOON_SHADOW, sky.moon) * (1 - 0.75 * sky.soft),
     soft: sky.soft,
-    hemi: mixHex(NIGHT_LIGHT.hemi, sky.hemi, 0.5 * day),
-    ground: mixHex(NIGHT_LIGHT.ground, sky.ground, 0.4 * day),
-    hemiI: NIGHT_LIGHT.hemiI,
-    // the dark world is built lit (its lanterns, pendants): its desk lamps stay on
-    lamps: 1,
-    air,
-    airMix,
+    hemi: mixHex(t.hemi, sky.greyTo, sky.grey * (1 - 0.85 * night)),
+    ground: mixHex(t.ground, '#f4f6fa', sky.cover * (1 - 0.5 * night)),
+    hemiI: t.hemiI * (1 - sky.darker * 0.4),
+    lamps: Math.max(t.lamps, smooth(0.35, 0.8, sky.dark), clamp01(sky.darker * LAMPS_DARKER)),
+    lift: night,
   };
 }
 
 /**
  * What a surface of that colour looks like under a light (linear light, three's Lambert: the
  * hemisphere's sky on a face up, the key by its height, over π), back in sRGB hex; `shaded`: in the
- * key's shadow. A model of the lit result for the laws (bims m_33351), not the renderer.
+ * key's shadow. `pool`: that share (0..1) of a lamp pool's light right under it (POOL_PEAK, times
+ * the lamps). A model of the lit result for the laws (bims m_33351), not the renderer.
  */
-export function litOf(l: Light, albedo: string, shaded = false): string {
+export function litOf(l: Light, albedo: string, shaded = false, pool = 0): string {
   const a = rgb(albedo);
   const h = rgb(l.hemi);
   const k = rgb(l.key);
+  const p = rgb(POOL.color);
   const up = Math.max(0, l.dir.y) * (shaded ? 1 - l.shadow : 1);
-  const c = (i: 0 | 1 | 2): number => (a[i] * (h[i] * l.hemiI + k[i] * l.keyI * up)) / Math.PI;
+  const pi = POOL_PEAK * pool * l.lamps;
+  const c = (i: 0 | 1 | 2): number => (a[i] * (h[i] * l.hemiI + k[i] * l.keyI * up + p[i] * pi)) / Math.PI;
+  return hexOf([Math.min(1, c(0)), Math.min(1, c(1)), Math.min(1, c(2))]);
+}
+
+/** the night's warm lamp pools (render/world.ts): their colour, reach, fall-off and height (bims m_34321: a yellow warm, never toward pink) */
+export const POOL = { color: '#ffcf7a', distance: 7, decay: 1.2, y: 2.2, peak: 7 } as const;
+/** a pool's light on the floor right under it (three's point light: intensity over distance^decay, near its cut-off) */
+export const POOL_PEAK = (POOL.peak / POOL.y ** POOL.decay) * (1 - (POOL.y / POOL.distance) ** 4) ** 2;
+
+/** a colour's hue, degrees (0..360), and its saturation (HSV, 0..1) */
+export function hueOf(hex: string): { hue: number; sat: number } {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const hi = Math.max(r, g, b);
+  const d = hi - Math.min(r, g, b);
+  if (d === 0) return { hue: 0, sat: 0 };
+  const h = hi === r ? ((g - b) / d) % 6 : hi === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { hue: (h * 60 + 360) % 360, sat: d / hi };
+}
+
+/**
+ * A slab's side facing `face` (a horizontal unit: +x east, +z south), as litOf: the hemisphere's
+ * sky and ground half each, the key by its angle, and the night's lift (SIDE_MIN by l.lift, the
+ * dirt's emissive in world.ts). A model for the laws, not the renderer.
+ */
+export function sideOf(l: Light, albedo: string, face: { readonly x: number; readonly z: number }): string {
+  const a = rgb(albedo);
+  const h = rgb(l.hemi);
+  const g = rgb(l.ground);
+  const k = rgb(l.key);
+  const e = rgb(SIDE_MIN);
+  const on = Math.max(0, l.dir.x * face.x + l.dir.z * face.z);
+  const c = (i: 0 | 1 | 2): number => (a[i] * (((h[i] + g[i]) / 2) * l.hemiI + k[i] * l.keyI * on)) / Math.PI + e[i] * l.lift;
   return hexOf([Math.min(1, c(0)), Math.min(1, c(1)), Math.min(1, c(2))]);
 }
 
@@ -502,5 +544,7 @@ export const blending = (b: Blend, t: number): boolean => b.dur > 0 && t < b.at 
 export function retarget(b: Blend | null, to: Sky, t: number, reduced: boolean, hold = false): Blend {
   if (b === null) return { from: to, to, at: t, dur: 0 };
   if (sameSky(b.to, to) || hold) return b;
-  return { from: blendAt(b, t), to, at: t, dur: reduced ? SKY_FADE_REDUCED_S : SKY_FADE_S };
+  // reduced motion: a cut to the hour's sky, never a blend
+  if (reduced) return { from: to, to, at: t, dur: 0 };
+  return { from: blendAt(b, t), to, at: t, dur: SKY_FADE_S };
 }

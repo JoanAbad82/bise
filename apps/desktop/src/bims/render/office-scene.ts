@@ -17,7 +17,7 @@ import { PLANE_FLIGHT, louder, rigOf, type Rig } from './pose';
 import { skateRig } from './skate';
 import { eggRig } from './egg';
 import { makeEggDecor, type EggDecor } from './eggdecor';
-import { MAIN_HOODIE, WORLD, hash, outfitOf, type Outfit, type Palette } from './palette';
+import { MAIN_HOODIE, WORLD, hash, outfitOf, paletteOf, type Outfit, type Palette } from './palette';
 import { buildWorld, castShadows, lightDesk, type DeskHandles, type World } from './world';
 import { NO_GROW, growSig, type Grow } from '../growth';
 import { cozyAt } from '../cozy';
@@ -62,10 +62,10 @@ export interface OfficeScene {
   prepare(look: Look): boolean;
   /** pose every bim for t through this fit (planes size to it); null: no world yet */
   frame(t: number, frames: readonly BimFrame[], look: Look, fit: Fit, onRig?: OnRig): Motion | null;
-  /** the backdrop behind it: its palette's, violet in an eclipse; null before a world */
+  /** the backdrop behind it: the theme's page (themed: its palette's), violet in an eclipse; null before a world */
   sky(): ColorRepresentation | null;
-  /** the sky's lamps (0..1) and snow on the ground (0..1) for the next frames; lamps null: the theme's */
-  weather(lamps: number | null, cover: number): void;
+  /** the sky's lamps (0..1), snow on the ground (0..1) and the slab's night lift (0..1) for the next frames; lamps null: the theme's */
+  weather(lamps: number | null, cover: number, lift?: number): void;
   /** its palette (the view's lights), null before a world */
   pal(): Palette | null;
   readonly office: () => Office | null;
@@ -95,8 +95,10 @@ export function appearOut(p: number): number {
 }
 
 /** `ground`: its floating grass block (false in the town: its lawn is the ground) */
-export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } = {}): OfficeScene {
+export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; readonly themed?: boolean } = {}): OfficeScene {
   const ground = o.ground ?? true;
+  // the town's offices keep the theme's materials until the town moves to one light (bims m_34193)
+  const themed = o.themed ?? false;
   const root = new Group();
   let office: Office | null = null;
   let agents: readonly Agent[] = [];
@@ -104,6 +106,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
   let night: boolean | null = null;
   /** the sky's lamps (sky.ts lightOf) and snow cover; lamps null: the theme's */
   let lamps: number | null = null;
+  /** the slab's night lift (sky.ts Light.lift) */
+  let lift = 0;
   let cover = 0;
   let eclipsed = false;
   let eggDecor: EggDecor | null = null;
@@ -149,8 +153,11 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     if (!office) return;
     const look = lookOf(office.map);
     eclipsed = false;
-    world = buildWorld(office, mainName(), style, look, isNight, grow, ground);
+    // the office keeps its day materials in both themes (bims-light, direction A); the town its theme's
+    world = buildWorld(office, mainName(), style, look, themed && isNight, grow, ground);
     world.cover(cover);
+    world.page(isNight);
+    world.lift(lift);
     if (lamps !== null) world.lit(lamps);
     root.add(world.root);
     if (eggDecor) { root.remove(eggDecor.root); eggDecor.dispose(); }
@@ -425,7 +432,14 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
         growKey = growSig(g);
         rebuildWorld(look.night);
         grew = true;
-      } else if (night !== look.night) rebuildWorld(look.night);
+      } else if (night !== look.night) {
+        // the theme: the town's world again; the office's only changes the page under it
+        if (themed) rebuildWorld(look.night);
+        else {
+          night = look.night;
+          world?.page(look.night);
+        }
+      }
       // t4: the eclipse turns the sky behind the office violet
       eclipsed = look.eggs?.eclipse === true;
       const fool = look.eggs?.april === true;
@@ -463,7 +477,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
       for (const name of seen) shownLast.add(name);
       if (frames.length > 0) primed = true;
       if (appearing.size > 0) motion = 'walk';
-      drawHalos(frames, look.night);
+      // the halo reads on the floor as lit: the night's (light) when the lamps are on, in the office
+      drawHalos(frames, themed ? look.night : (lamps ?? 0) >= 0.5);
       for (const [name, d] of world.desks) {
         const rig = rigs.get(name);
         // from stage 9 every desk's lamp is lit at night, its bim there or not (cozy.ts cozyAt: the desk lamps); a stopped bim's stays off
@@ -481,12 +496,16 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean } =
     sky() {
       if (!world) return null;
       // a sky event, not the bar changing colour (bims m_28109): the violet blended into the backdrop
-      return eclipsed ? new Color(world.pal.bg).lerp(new Color(WORLD.eclipse), ECLIPSE_MIX) : world.pal.bg;
+      // the theme's own page (the office's world is the day's in both themes)
+      const paper = themed ? world.pal.bg : paletteOf(night === true).bg;
+      return eclipsed ? new Color(paper).lerp(new Color(WORLD.eclipse), ECLIPSE_MIX) : paper;
     },
-    weather(l, c) {
+    weather(l, c, up = 0) {
       lamps = l;
       cover = c;
+      lift = up;
       world?.cover(c);
+      world?.lift(up);
       world?.lit(l ?? (world.pal.pendants ? 1 : 0));
     },
     pal: () => world?.pal ?? null,

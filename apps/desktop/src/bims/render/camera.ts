@@ -25,9 +25,18 @@ export interface Site {
   readonly yHigh: number;
 }
 
-/** the building's site: what the camera fits at 320 (the garden past it is cropped, a soft fade) */
+/** the floating block's underside (world.ts: the dirt slab, 1.2 high, its middle at -0.75) */
+export const SLAB_LOW = -1.35;
+/**
+ * The cube's soft shadow (designer m_34173): the slab's own shape this far under its underside, so
+ * it shows ~24 px under the cube at 640 docked (world.ts), and how far its blur reaches past it.
+ */
+export const SHADOW_DROP = 1.2;
+export const SHADOW_BLUR = 0.55;
+
+/** the building's site: what the camera fits at 320 (the garden past it is cropped, a soft fade); its low end takes the cube's shadow in */
 export function siteOf(o: Office): Site {
-  return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.8, yLow: -1.35, yHigh: 2.5 };
+  return { x0: o.x0 - 1.2, x1: o.x0 + o.W + 1.2, z0: -1.5, z1: o.D + 4.8, yLow: SLAB_LOW - SHADOW_DROP, yHigh: 2.5 };
 }
 
 /** The whole ground for this growth: the grass block world.ts builds (growth.ts groundMargin). */

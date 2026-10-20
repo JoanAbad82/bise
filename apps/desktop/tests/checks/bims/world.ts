@@ -159,6 +159,22 @@ export const probe = (page: Page): Promise<BimsProbe | null> =>
     return b === undefined ? null : { frames: b.frames, trace: b.trace.slice() };
   });
 
+/** Start measuring each frame's cost (the probe's slowest, test mode: the render and the GPU's finish). */
+export const resetSlowest = (s: Session): Promise<void> =>
+  s.page.evaluate(() => {
+    const b = (window as unknown as { __biseBims?: { slowest: number | null } }).__biseBims;
+    if (b !== undefined) b.slowest = 0;
+  });
+
+/** The slowest frame since resetSlowest, ms (then stops measuring). */
+export const slowest = (s: Session): Promise<number> =>
+  s.page.evaluate(() => {
+    const b = (window as unknown as { __biseBims?: { slowest: number | null } }).__biseBims;
+    const ms = b?.slowest ?? 0;
+    if (b !== undefined) b.slowest = null;
+    return ms;
+  });
+
 /** A bim's head on the page (css px), from the renderer's headOf through the probe; null off view. */
 export const headOf = (page: Page, name: string): Promise<{ x: number; y: number } | null> =>
   page.evaluate((n) => {

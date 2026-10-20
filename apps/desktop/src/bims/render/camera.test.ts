@@ -20,10 +20,11 @@ function officeFor(n: number): Office {
 }
 
 describe('camera fit', () => {
-  it('fits 14 agents in about 190 px at 320 wide (the brief)', () => {
+  it('fits 14 agents in about 190 px at 320 wide (the brief), plus the cube shadow\'s room under it', () => {
     const f = fitSite(siteOf(officeFor(14)), 320, 2000);
     expect(f.heightPx).toBeGreaterThan(170);
-    expect(f.heightPx).toBeLessThan(215);
+    // the cube's soft shadow (designer m_34173) takes ~13 px under the slab at 320
+    expect(f.heightPx).toBeLessThan(230);
     expect(f.widthPx).toBe(320);
   });
 
