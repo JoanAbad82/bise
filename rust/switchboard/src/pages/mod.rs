@@ -85,8 +85,11 @@ pub struct Pages {
     /// the rows and the overdue count, built again only when a store
     /// write or the day moves them (crate::store_gen, send-fast): the
     /// state push asks for them up to 10 times a second
-    rows_memo: Mutex<crate::store_gen::Memo<(u64, i64), (Vec<bise_proto::rows::Page>, usize)>>,
+    rows_memo: Mutex<RowsMemo>,
 }
+
+/// The pages' rows and overdue count, keyed by (store generation, day).
+type RowsMemo = crate::store_gen::Memo<(u64, i64), (Vec<bise_proto::rows::Page>, usize)>;
 
 /// The progress lines a new SSE stream replays.
 const PROGRESS_KEPT: usize = 8;
