@@ -28,6 +28,10 @@
 //   - a check covers source file F when a source-map segment of F sits at a generated offset whose
 //     INNERMOST V8 range has count > 0 (a function of F ran, or F's module code ran). The bundle's
 //     top level spans everything at count 1: an outer range never decides (review-gates #2);
+//   - a check "loads" every renderer source of every bundle its coverage saw, ran or not (V8 lists a
+//     loaded script even when none of it ran): a CSS file applies once its chunk loads, so
+//     tests/desktop_assets.py picks a .css by them (pick-assets, review-gates m_34815); the map's
+//     "loads" is true only when every night of its union recorded them;
 //   - the universe ("files"): every source under src/ with code in a renderer bundle; "shared":
 //     every source of the main and preload bundles (tests/test_map.py: ALL);
 //   - a check is "complete" only when it ran green, every launch's hook took every target's
@@ -149,7 +153,9 @@ export function readBuild(outDir) {
         if (!f || !f.startsWith('apps/desktop/src/')) continue;
         (kind === 'renderer' ? files : shared).add(f);
       }
-      bundles[rel] = { kind, sources, segs, starts: lineStarts(readFileSync(js, 'utf8')) };
+      // its renderer files: a check that loaded this bundle loaded their CSS (test_map.py's "loads")
+      const own = kind === 'renderer' ? [...withCode].map((i) => sources[i]).filter((f) => f && f.startsWith('apps/desktop/src/')) : [];
+      bundles[rel] = { kind, sources, segs, own, starts: lineStarts(readFileSync(js, 'utf8')) };
     }
   }
   return { bundles, files: [...files].sort(), shared: [...shared].sort(), faults };
@@ -158,10 +164,12 @@ export function readBuild(outDir) {
 // ---- one check's coverage
 /**
  * One check's coverage folder (<check>/<launch>/{n-target.json, hook.json}) against the build:
- * {ran: Set of repo paths, faults: why it is incomplete}.
+ * {ran: Set of repo paths, loads: Set of the repo paths of every renderer bundle it loaded (ran or
+ * not: CSS applies once its chunk loads), faults: why it is incomplete}.
  */
 export function checkCoverage(dir, build) {
   const ran = new Set();
+  const loads = new Set();
   const faults = [];
   const launches = existsSync(dir) ? readdirSync(dir).filter((n) => statSync(path.join(dir, n)).isDirectory()) : [];
   for (const l of launches) {
@@ -178,6 +186,7 @@ export function checkCoverage(dir, build) {
         const b = build.bundles[rel];
         if (!b) continue; // not the app's bundle (the pageapp, a fixture)
         if (!b.sources) { faults.push(`${rel} ran without a source map`); continue; }
+        for (const f of b.own ?? []) loads.add(f);
         for (const s of ranSources(script.functions, b.segs, b.starts)) {
           const f = b.sources[s];
           if (f && f.startsWith('apps/desktop/src/')) ran.add(f);
@@ -185,7 +194,7 @@ export function checkCoverage(dir, build) {
       }
     }
   }
-  return { ran, faults, launches: launches.length };
+  return { ran, loads, faults, launches: launches.length };
 }
 
 // ---- a spec's imports (TypeScript's own resolution: exact, not a guess)
@@ -250,10 +259,14 @@ export function unite(nights) {
   for (const [c, e] of Object.entries(now.checks)) {
     const ran = new Set();
     for (const n of nights) for (const f of n.checks[c]?.ran ?? []) if (idx.has(f)) ran.add(idx.get(f));
-    checks[c] = { covered: [...ran].sort((a, b) => a - b), imports: e.imports, complete: e.complete, why: e.why };
+    const loads = new Set();
+    for (const n of nights) for (const f of n.checks[c]?.loads ?? []) if (idx.has(f)) loads.add(idx.get(f));
+    checks[c] = { covered: [...ran].sort((a, b) => a - b), loads: [...loads].sort((a, b) => a - b), imports: e.imports, complete: e.complete, why: e.why };
   }
   return {
     schema: SCHEMA, sha: now.sha, day: now.day, epoch: now.epoch,
+    // a css picks by loads only when EVERY night of the union has them (review-gates m_34815 #1)
+    loads: nights.every((n) => n.loads === true),
     nights: nights.map((n) => ({ sha: n.sha, day: n.day })), files, shared: now.shared, checks,
   };
 }
@@ -281,13 +294,13 @@ export async function write(covDir, reportFile, gdir, day) {
     if (!green) faults.push('red in the map run');
     // a renderer bundle without a source map: its files can't be told (review-gates #4)
     faults.push(...build.faults.filter((f) => f.includes('/renderer/')));
-    checks[spec] = { ran: [...c.ran].sort(), imports: await specImports(spec, ts), green, complete: faults.length === 0, why: faults.slice(0, 3) };
+    checks[spec] = { ran: [...c.ran].sort(), loads: [...c.loads].sort(), imports: await specImports(spec, ts), green, complete: faults.length === 0, why: faults.slice(0, 3) };
   }
   // the specs the night's end cut (checks' cut.txt): in the map, never complete
   const cutFile = path.join(covDir, 'cut.txt');
   const cut = existsSync(cutFile) ? readFileSync(cutFile, 'utf8').split('\n').filter((s) => s.startsWith('checks/')) : [];
   for (const spec of cut) if (!checks[spec]) checks[spec] = cutCheck(await specImports(spec, ts));
-  const night = { sha: git('rev-parse', 'HEAD'), day, epoch: Math.floor(Date.now() / 1000), files: build.files, shared: build.shared, checks };
+  const night = { sha: git('rev-parse', 'HEAD'), day, epoch: Math.floor(Date.now() / 1000), files: build.files, shared: build.shared, checks, loads: true };
   const faults = mapFaults(night);
   if (faults.length) throw new Error(`covmap: no map written: ${faults.join('; ')}`);
   const nd = path.join(gdir, 'desktop-cov');
@@ -412,7 +425,7 @@ export function runBatches(specs, size, late, runOne) {
 /** A check the night's end cut: no verdict tonight (green null), complete:false so test_map.py's
  * desktop-pick always picks it until a night runs it; its covered files stay the older nights'. */
 export function cutCheck(imports) {
-  return { ran: [], imports, green: null, complete: false, why: ['not run tonight: cut by the night\'s end'] };
+  return { ran: [], loads: [], imports, green: null, complete: false, why: ['not run tonight: cut by the night\'s end'] };
 }
 
 /**
@@ -537,6 +550,13 @@ export function selfTest() {
   const n1 = { sha: 'b', day: '2026-10-18', epoch: 2, files: ['f1', 'f2'], shared: ['s'], checks: { c: { ran: ['f1'], imports: ['i'], complete: true } } };
   const n2 = { sha: 'a', day: '2026-10-17', epoch: 1, files: ['f1', 'f2', 'gone'], shared: [], checks: { c: { ran: ['f2', 'gone'] }, old: { ran: ['f1'] } } };
   const m = unite([n1, n2]);
+  assert(m.loads === false && JSON.stringify(m.checks.c.loads) === '[]', 'nights without loads: the map has no loads');
+  const l1 = { ...n1, loads: true, checks: { c: { ran: ['f1'], loads: ['f1'], imports: ['i'], complete: true } } };
+  const l2 = { ...n2, loads: true, checks: { c: { ran: ['f2'], loads: ['f2', 'gone'] } } };
+  let lm = unite([l1, l2]);
+  assert(lm.loads === true && JSON.stringify(lm.checks.c.loads) === '[0,1]', `loads: the union of the nights ${JSON.stringify(lm)}`);
+  lm = unite([l1, l2, n2]);
+  assert(lm.loads === false, 'one night of the union without loads: the map has no loads');
   assert(JSON.stringify(m.checks.c.covered) === '[0,1]' && !m.checks.old && m.sha === 'b' && m.day === '2026-10-18' && m.nights.length === 2, `unite ${JSON.stringify(m)}`);
   // the night's end (review-gates m_32494): checked between batches only; what it cuts never runs
   let clock = 0;

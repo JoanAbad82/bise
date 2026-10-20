@@ -47,6 +47,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+import desktop_assets  # noqa: E402  what the coverage map can't see (pick-assets)
 
 # top-level paths no e2e/tmux test reads at run time
 NONE_PREFIXES = ("docs/", "site/", "nix/", ".github/", "office/")
@@ -55,7 +57,7 @@ NONE_FILES = {"LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "README.md", "flake.ni
 TUI_PREFIXES = ("rust/tui/", "rust/vendor/crossterm/")
 PROOF_PREFIXES = ("bend/laws/", "bend/proofs/")
 # the gate's own files: a change to them runs everything
-GATE_FILES = {"tests/gate.sh", "tests/run_all.sh", "tests/slow_first.py", "tests/test_map.py"}
+GATE_FILES = {"tests/gate.sh", "tests/run_all.sh", "tests/slow_first.py", "tests/test_map.py", "tests/desktop_assets.py"}
 # every top-level entry of the repo, and what it is: none, tui, mixed (some
 # paths in it have a rule), all
 TOP = {
@@ -247,11 +249,13 @@ def cov_problem(cov, now, nightly_days):
     return None
 
 
-def desktop_pick(changed, cov, all_list, specs):
+def desktop_pick(changed, cov, all_list, specs, tree=None):
     """(None, why) for every check, or (checks, whys). changed: the repo paths of the change (the
     map's sha to the new tree, the try's from to the new tree: review-gates m_29412 #1); cov: a
     trusted map (cov_problem None); all_list: the files the audit sent to ALL until the next map;
-    specs: the checks of the new tree (apps/desktop/tests/checks/**.spec.ts, repo paths)."""
+    specs: the checks of the new tree (apps/desktop/tests/checks/**.spec.ts, repo paths); tree: the
+    new tree's import graph (desktop_assets.Tree, or a function that makes it) that places what the map can't see (a .css, a
+    type-only or vitest-only module, the hero build), None: those are ALL."""
     files = cov["files"]
     known = set(files)
     shared = set(cov["shared"])
@@ -263,6 +267,13 @@ def desktop_pick(changed, cov, all_list, specs):
         for f in e["imports"]:
             covers.setdefault(f, set()).add(c)
     picked, whys = set(), []
+    built = []
+
+    def new_tree():
+        # the graph costs seconds: read only when a path needs it (tree may be a thunk)
+        if not built:
+            built.append(tree() if callable(tree) else tree)
+        return built[0]
     for p in sorted(set(x.strip() for x in changed if x.strip())):
         if desktop([p]) is None:
             continue
@@ -282,7 +293,11 @@ def desktop_pick(changed, cov, all_list, specs):
             elif VITEST_FILE.match(p):
                 whys.append("%s: a vitest file, no check" % p)
             else:
-                return None, "%s: the map doesn't know it (new, renamed, type-only or an asset V8 can't see)" % p
+                got, why = desktop_assets.place(p, new_tree(), cov, shared)
+                if got is None:
+                    return None, why
+                picked |= got
+                whys.append(why)
         elif p.startswith(APP_CHECKS) and p.endswith(".spec.ts"):
             picked.add(p)
             whys.append("%s: the check itself" % p)
@@ -290,6 +305,12 @@ def desktop_pick(changed, cov, all_list, specs):
             got = covers[p]
             picked |= got
             whys.append("%s: %d checks import it" % (p, len(got)))
+        elif p == desktop_assets.HERO_CONFIG and tree is not None:
+            got, why = desktop_assets.place(p, new_tree(), cov, shared)
+            if got is None:
+                return None, why
+            picked |= got
+            whys.append(why)
         else:
             return None, "%s: the map doesn't know it (the harness, a config, a fixture read by path)" % p
     # a check the map can't vouch for runs every time: new, or its coverage incomplete
@@ -378,7 +399,7 @@ def desktop_pick_cli(root, frm, to, gdir, now, days, log=None):
             specs = [s for s in out.split() if s.endswith(".spec.ts") and os.path.exists(os.path.join(root, s))]
             specs += [s for s in changed if s.startswith(APP_CHECKS) and s.endswith(".spec.ts")
                       and s not in specs and os.path.exists(os.path.join(root, s))]
-            sel, why = desktop_pick(changed, cov, all_list, specs)
+            sel, why = desktop_pick(changed, cov, all_list, specs, lambda: new_tree(root, to, changed, cov, specs))
     if log:
         line = {"t": int(now), "kind": log, "from": frm, "to": to or "worktree", "map": msha,
                 "all": why if sel is None else None, "picked": sorted(sel or []), "changed": sorted(changed)}
@@ -388,6 +409,44 @@ def desktop_pick_cli(root, frm, to, gdir, now, days, log=None):
         except OSError:
             pass
     return sel, why, changed, msha
+
+
+def new_tree(root, to, changed, cov, specs):
+    """The new tree's import graph for desktop_assets (its code files under apps/desktop, the
+    commit's or the working tree's), None when git can't read it: what the map can't see is ALL."""
+    if to:
+        rc, out = git(root, "ls-tree", "-r", "--name-only", to, "--", "apps/desktop")
+        if rc:
+            return None
+        paths = desktop_assets.tree_paths(out.split("\n"))
+        r = subprocess.run(["git", "cat-file", "--batch"], cwd=root, input="".join("%s:%s\n" % (to, p) for p in paths).encode(),
+                           capture_output=True)
+        if r.returncode:
+            return None
+        texts, buf = {}, r.stdout
+        for p in paths:
+            head, _, buf = buf.partition(b"\n")
+            parts = head.split()
+            if len(parts) != 3:
+                return None
+            n = int(parts[2])
+            texts[p] = buf[:n].decode("utf8", "replace")
+            buf = buf[n + 1:]
+    else:
+        rc, out = git(root, "ls-files", "-co", "--exclude-standard", "--", "apps/desktop")
+        if rc:
+            return None
+        texts = {}
+        for p in desktop_assets.tree_paths(out.split("\n")):
+            try:
+                with open(os.path.join(root, p), encoding="utf8", errors="replace") as fh:
+                    texts[p] = fh.read()
+            except OSError:
+                continue
+    known = set(cov["files"]) | set(cov["shared"])
+    ts = {p: texts[p] for p in changed if p in texts and p.startswith(APP_SRC) and p.endswith(desktop_assets.EXTS)
+          and p not in known and not VITEST_FILE.match(p)}
+    return desktop_assets.Tree(texts, desktop_assets.emits_js(root, ts), specs, set(cov["files"]))
 
 
 def git_tops(root=ROOT):
@@ -449,6 +508,7 @@ def self_test():
     faults = gen_seams_law(gen_files())
     assert not faults, "\n".join(faults)
     desktop_pick_self_test()
+    desktop_assets.self_test()
     print("test_map self-test: ok (%d tests, %d in the TUI group)" % (len(tests), len(select(["rust/tui/x"], tests, txt)[0])))
 
 
@@ -516,6 +576,18 @@ def desktop_pick_self_test():
         assert sel is None and why in w, (p, w)
     sel, w = pick(APP_SRC + "app/c.ts", all_list=[APP_SRC + "app/c.ts"])
     assert sel is None and "audit" in w, w
+    # the new tree places a .css by the checks that loaded its importer (desktop_assets' own self-test
+    # has every rule); without the tree, or without the import, it is ALL
+    texts = {APP_SRC + "app/a.tsx": "import './look.css';\n", APP_SRC + "app/look.css": ".l {}\n", keep: "", menus: ""}
+    lcov = fake_cov(loads=True, checks={"checks/app/keep.spec.ts": {"covered": [0], "imports": [], "loads": [0, 1], "complete": True},
+                                        "checks/app/menus.spec.ts": {"covered": [1], "imports": [], "loads": [1], "complete": True}})
+    tree = desktop_assets.Tree(texts, {}, specs, set(lcov["files"]))
+    assert desktop_pick([APP_SRC + "app/look.css"], lcov, set(), specs, tree)[0] == {keep}
+    tree = desktop_assets.Tree({**texts, APP_SRC + "app/a.tsx": ""}, {}, specs, set(lcov["files"]))
+    assert desktop_pick([APP_SRC + "app/look.css"], lcov, set(), specs, tree)[0] is None
+    tree = desktop_assets.Tree(texts, {}, specs, set(lcov["files"]))
+    assert desktop_pick([APP + "hero.vite.config.ts"], lcov, set(), specs, tree)[0] == set()
+    assert desktop_pick([APP + "hero.vite.config.ts"], lcov, set(), specs)[0] is None
     # a check the map can't vouch for runs every time: a new one, one without full coverage
     new = APP_CHECKS + "app/new.spec.ts"
     assert pick(APP_SRC + "app/c.ts", specs=specs + [new])[0] == {new}
