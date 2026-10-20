@@ -998,8 +998,9 @@
   font: var(--t-12) / var(--lh-row, 1.5) var(--font-mono);
   white-space: pre;
 }
-/* the gust beside the composer's label (designer's desktop-working v2 (2), the TUI's divider):
-   8 px after 'to bise', the 5ch box, nothing else; hover: '<name> is working · 40 s' */
+/* the breath beside the composer's label (designer's desktop-working v2 (2), the TUI's divider;
+   one glyph, designer m_34075): 8 px after 'to bise', the 1ch box, nothing else; hover:
+   '<name> is working · 40 s' */
 .th-mark {
   position: relative;
   display: inline-block;

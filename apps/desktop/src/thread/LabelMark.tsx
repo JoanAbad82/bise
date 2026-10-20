@@ -1,14 +1,15 @@
 // The working mark on the composer's label line (designer's desktop-working page v2 (2), his
-// m_21668, the TUI's divider): '<to bise>' + 8 px + the 5-cell gust while the addressee works,
-// nothing else beside it; hover: 'bise is working · 40 s' (the turn's age). Starting: the '·'
-// pulse in the same place. Idle, waiting on him, waiting for an event, paused: nothing. The motion
-// (110 ms, half speed and a tone down while he types, still under reduced motion or a window that
-// isn't key) is the signs' own (working/gust.ts). Owner: amb-home.
+// m_21668, the TUI's divider): '<to bise>' + 8 px + the 1-cell breath while the addressee works
+// (one glyph at a time in a 1ch box, a still is one '∿': designer m_34075; the 5-cell gust read as
+// stray characters in a shot), nothing else beside it; hover: 'bise is working · 40 s' (the turn's
+// age). Starting: the '·' pulse in the same place. Idle, waiting on him, waiting for an event,
+// paused: nothing. The motion (110 ms, the hush while he types, still under reduced motion or a
+// window that isn't key) is the signs' own (working/gust.ts). Owner: amb-home.
 import { useState } from 'react';
 import { tipAttrs } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents } from '@/store';
-import { Gust, Pulse } from '@/working/Signs';
+import { Breath, Pulse } from '@/working/Signs';
 import { turnAge } from '@/working/gust';
 import { workingRowShows } from './head';
 
@@ -47,7 +48,7 @@ export function LabelMark({ project, agent, name, starting }: { project: string;
         setAt(null);
       }}
     >
-      <Gust testId="thread.mark.gust" />
+      <Breath testId="thread.mark.breath" />
     </span>
   );
 }

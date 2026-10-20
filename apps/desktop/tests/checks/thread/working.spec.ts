@@ -1,20 +1,21 @@
 // thread/working · the working mark beside the composer's label (designer's desktop-working v2,
 // his m_21668, tui-parity m_21679: the TUI's divider).
 // Passes when, with the scripted core (FakeCore, fake data):
-//   - while perf works, its thread has no working row: the TUI's 5-cell gust sits 8 px after
-//     'to perf' on the label line (its frames step at 110 ms, only the TUI's 9 frames, in a box
-//     that never changes width), nothing else beside it; the label's right has no 'working';
+//   - while perf works, its thread has no working row: the 1-cell breath sits 8 px after
+//     'to perf' on the label line (one glyph at a time, only the breath's glyphs, in a box
+//     that never changes width: designer m_34075), nothing else beside it; the label's right has
+//     no 'working';
 //   - the head chip keeps its 1-cell breath before 'working · 14 min';
-//   - hover on the gust: 'perf is working · 14 min';
+//   - hover on the breath: 'perf is working · 14 min';
 //   - the step at work is drawn once: a running command keeps its '$' and ends with '∿ N s'; a
 //     call the model described ('lecture du PDF…') is the growing fold '▸ lecture du PDF…  ∿ N s'
 //     at the thread's end, with no mono line for it;
-//   - while he types the gust goes calm: no cell in ink;
+//   - while he types the breath hushes: never in ink;
 //   - idle: no mark, no '∿' on the tool row;
-//   - reduced motion: one still ∿ in ink, no frame moves;
+//   - reduced motion: one still ∿ in ink, exactly one glyph, no frame moves;
 // and writes the shots for designer at 1100, light and dark: working (perf's command, docs' fold),
 // a long turn read up, the hover tooltip, idle (in $SHOTS when set, else the test's output dir).
-// Owner: amb-home (the gust's motion: amb-web's working/).
+// Owner: amb-home (the breath's motion: amb-web's working/).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { thread } from '../../../src/proto/words.gen';
@@ -22,7 +23,7 @@ import { thread } from '../../../src/proto/words.gen';
 const HOME = 'bise-home-00000000';
 const P = 'storefront-1a2b3c4d';
 const MIN = 60_000;
-const GUST5 = ['≈    ', '∿≈   ', '~∿≈  ', '·~∿≈ ', ' ·~∿≈', '  ·~∿', '   ·~', '    ·', '     '];
+const BREATH = ['·', '~', '∿', '≈'];
 const prefs = (theme: 'light' | 'dark') => ({
   ev: 'prefs',
   prefs: {
@@ -110,7 +111,7 @@ const world = (now: number) => {
   ];
 };
 
-test('thread/working: only the gust beside the label while it works, the step drawn once, a hover says the age, calm while he types, still under reduced motion', async () => {
+test('thread/working: only the breath beside the label while it works, one glyph at a time, the step drawn once, a hover says the age, calm while he types, still under reduced motion', async () => {
   test.setTimeout(150_000);
   const now = Date.now();
   const core = new FakeCore(world(now) as unknown as ConstructorParameters<typeof FakeCore>[0]);
@@ -137,7 +138,7 @@ test('thread/working: only the gust beside the label while it works, the step dr
       shots.push({ label, png: await page.screenshot({ clip: { x: 0, y: H - 340, width: W, height: 340 } }) });
     };
     const mark = page.getByTestId('thread.mark');
-    const gust = page.getByTestId('thread.mark.gust');
+    const breath = page.getByTestId('thread.mark.breath');
     const label = page.locator('.th-screen [data-testid="composer.tab"]').first();
     /** px from the bottom of the last element matching `sel` (the thread's last row) to the label's top */
     const endGap = (sel: string) =>
@@ -148,14 +149,14 @@ test('thread/working: only the gust beside the label while it works, the step dr
         if (!last || !lbl) return -1;
         return Math.round(lbl.getBoundingClientRect().top - last.getBoundingClientRect().bottom);
       }, sel);
-    /** the gust's cells over `ms`, every 30 ms: text, tones, box width */
+    /** the breath's cells over `ms`, every 30 ms: text, tones, box width, how many cells */
     const sample = (ms: number) =>
       page.evaluate(async (ms) => {
-        const el = document.querySelector('[data-testid="thread.mark.gust"]') as HTMLElement;
-        const out: { text: string; tones: string[]; w: number }[] = [];
+        const el = document.querySelector('[data-testid="thread.mark.breath"]') as HTMLElement;
+        const out: { text: string; tones: string[]; w: number; cells: number }[] = [];
         const end = Date.now() + ms;
         while (Date.now() < end) {
-          out.push({ text: el.textContent, tones: Array.from(el.children).filter((c) => c.textContent !== ' ').map((c) => (c as HTMLElement).dataset['tone'] ?? ''), w: el.getBoundingClientRect().width });
+          out.push({ text: el.textContent, tones: Array.from(el.children).filter((c) => c.textContent !== ' ').map((c) => (c as HTMLElement).dataset['tone'] ?? ''), w: el.getBoundingClientRect().width, cells: el.children.length });
           await new Promise((r) => setTimeout(r, 30));
         }
         return out;
@@ -166,7 +167,7 @@ test('thread/working: only the gust beside the label while it works, the step dr
     // (1) no working row at the thread's end
     await expect(page.getByTestId('thread.live')).toHaveCount(0);
     await expect(page.getByTestId('thread.screen')).not.toContainText('is working');
-    // (2) the gust on the label line, 8 px after 'to perf', nothing else beside it
+    // (2) the breath on the label line, 8 px after 'to perf', nothing else beside it
     await expect(mark).toHaveAttribute('data-state', 'working');
     await expect(label.locator('[data-testid="composer.tab.to"] [data-testid="thread.mark"]')).toHaveCount(1);
     const gap = await page.evaluate(() => {
@@ -180,14 +181,16 @@ test('thread/working: only the gust beside the label while it works, the step dr
     });
     expect(gap.words).toBe('to perf');
     expect(Math.abs(gap.gap - 8), `8 px after the words (${String(gap.gap)})`).toBeLessThanOrEqual(1);
-    await expect(gust).toHaveAttribute('aria-hidden', 'true');
-    // the label's right: model · effort · mode · context, never 'working' (the gust says it)
+    await expect(breath).toHaveAttribute('aria-hidden', 'true');
+    // the label's right: model · effort · mode · context, never 'working' (the breath says it)
     await expect(label).not.toContainText('working');
-    // (2) the gust steps through the TUI's frames, in a fixed box
+    // (2) the breath steps through its glyphs, one at a time, in a fixed box (designer m_34075:
+    // never two frames side by side)
     const run = await sample(700);
     const seen = new Set(run.map((x) => x.text));
-    expect(seen.size, `the gust moves (several frames in 700 ms): ${JSON.stringify([...seen])}`).toBeGreaterThanOrEqual(4);
-    for (const t of seen) expect(GUST5, `'${t}' is one of the TUI's frames`).toContain(t);
+    expect(seen.size, `the breath moves (several glyphs in 700 ms): ${JSON.stringify([...seen])}`).toBeGreaterThanOrEqual(3);
+    for (const t of seen) expect(BREATH, `'${t}' is one of the breath's glyphs`).toContain(t);
+    expect(run.every((x) => x.cells === 1 && x.text.length === 1), 'one glyph at a time').toBe(true);
     expect(new Set(run.map((x) => Math.round(x.w))).size, 'the box keeps its width').toBe(1);
     // (5) the head chip's breath, unchanged
     await expect(page.getByTestId('thread.head.state')).toHaveText(/^[·~∿≈] working · 14 min$/);
@@ -222,9 +225,9 @@ test('thread/working: only the gust beside the label while it works, the step dr
       await list.evaluate((el) => {
         el.scrollTop = el.scrollHeight;
       });
-      await expect(gust).toHaveText(/∿/);
+      await expect(breath).toHaveText(/^[·~∿≈]$/);
       await shot(`${t}-working-command`);
-      // a long turn, read up a bit: the label's gust stays, nothing else at the end
+      // a long turn, read up a bit: the label's breath stays, nothing else at the end
       await list.evaluate((el) => {
         el.scrollTop = Math.max(0, el.scrollTop - 400);
       });
@@ -272,9 +275,10 @@ test('thread/working: only the gust beside the label while it works, the step dr
     await page.getByTestId('app.right.agent.docs').click();
     await expect(page.getByTestId('app.title.crumb')).toHaveText(/›docs$/u, { timeout: 10_000 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(gust).toHaveText('∿    ', { timeout: 2000 });
+    await expect(breath).toHaveText('∿', { timeout: 2000 });
     const still = await sample(600);
-    expect(new Set(still.map((x) => x.text)), 'still: one ∿').toEqual(new Set(['∿    ']));
+    expect(new Set(still.map((x) => x.text)), 'still: one ∿').toEqual(new Set(['∿']));
+    expect(still.every((x) => x.cells === 1), 'a still shows exactly one mark glyph').toBe(true);
     expect(still.every((x) => x.tones.join() === 'ink'), 'the still ∿ is in ink').toBe(true);
     await page.emulateMedia({ reducedMotion: null });
   } finally {
