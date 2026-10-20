@@ -3,7 +3,8 @@
 // from that part, never the template: his pick on a question that had a card is '✓ you answered
 // bise · <question>' (the thread's name for main) with his words; a note is '✓ you sent bise a note on <title>' (the title pink, its view on a click) with his note
 // under it; three notes 'you sent bise 3 notes on <title>', one per line (designer m_21035). Never 'answer with:',
-// '<page-notes', '[from the page'. A light 1100 shot for designer. Owner: page-answer-row.
+// '<page-notes', '[from the page'. His answer with an image (card-image-parts): his words and the image chip
+// of his own bubble, never the '<image …>' tag. A light 1100 shot for designer. Owner: page-answer-row.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { thread } from '../../../src/proto/words.gen';
 
@@ -19,6 +20,7 @@ const ag = (name: string) => ({ name, main: name === 'main', status: 'idle', arc
 const HINT = '\n\n[from the page: answer on the page; one short line at most]';
 const template = (n: number, lines: string) =>
   `you sent ${String(n)} note${n === 1 ? '' : 's'} on your page "the plan" (plan v1, http://127.0.0.1:47100/p/plan):\n${lines}\nanswer with: sb page publish <file> --id plan --notes-done n1 (or --note-answer n1="…")\n<page-notes page="plan" version="1">[]</page-notes>${HINT}`;
+const MARKER = '<image name="[Image #1]" path="/nowhere/shot.png" mime="image/png" b64="/nowhere/images/ab.b64">';
 const you = (pos: number, text: string, notes: object[]) => ({
   pos,
   at_ms: NOW - (10 - pos) * MIN,
@@ -53,6 +55,21 @@ const world = () => [
         { block: 'r1', kind: 'tick', text: 'done' },
         { block: 'p2', kind: 'edit', text: 'Q3', quote: 'Q2' },
       ]),
+      // card-image-parts: his answer to a card with an image and words, its note typed (the hub
+      // keeps his parts; an older hub's marker in the text is read back typed by the fold)
+      you(6, template(1, `1. on q3: pick: ${MARKER} the walls look fake`), [
+        {
+          block: 'q3',
+          kind: 'pick',
+          text: 'the walls look fake',
+          card: 687,
+          asked: 'which plan for the climbing hall?',
+          parts: [
+            { kind: 'image', name: '[Image #1]', source: '/nowhere/shot.png', mime: 'image/png', b64_file: '/nowhere/images/ab.b64' },
+            { kind: 'text', text: ' the walls look fake' },
+          ],
+        },
+      ]),
     ],
     before: null,
     more: false,
@@ -75,8 +92,11 @@ test("thread/page-answers: his answers on a page are rows of his words, never th
     await expect(page.getByTestId('thread.pageanswer.5')).toContainText('you sent bise 3 notes on the plan');
     await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText(thread.mark_done);
     await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText(thread.note_edit({ old: 'Q2', new: 'Q3' }));
+    // his image and words: the words, then the image chip of his own bubble, never the tag
+    await expect(page.getByTestId('thread.pageanswer.6.words')).toHaveText('the walls look fake');
+    await expect(page.getByTestId('thread.pageanswer.6.image.1')).toBeVisible();
     const all = await page.locator('body').innerText();
-    for (const bad of ['answer with:', '<page-notes', '[from the page', 'you sent 1 note on your page']) {
+    for (const bad of ['answer with:', '<page-notes', '[from the page', 'you sent 1 note on your page', '<image', 'b64=']) {
       expect(all, `never the hub's template: ${bad}`).not.toContain(bad);
     }
     await page.screenshot({ path: test.info().outputPath('page-answers-light.png') });

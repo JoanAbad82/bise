@@ -25,6 +25,7 @@ fn words_on_a_drafts_card_are_a_page_note() {
             quote: "2 drafts wait for you · release replies".into(),
             card: 7,
             asked: "2 drafts wait for you · release replies\nreplies to Lucas and Marc".into(),
+            parts: Vec::new(),
         }]
     );
     let _ = std::fs::remove_dir_all(d);
@@ -182,7 +183,7 @@ fn a_page_message_carries_his_notes_typed() {
     s.publish(&publish("t1", Some("w"), Some("efforts")), vec![], 10, &|_| false).unwrap();
     let m = s.meta("w").unwrap();
     let q = super::super::questions::Question { block: "q-live".into(), text: "Est-ce que bise lit les listes ?".into(), card: 516, ..Default::default() };
-    let pick = s.add_pick("w", "q-live", "la table maintenant", 1, 11).unwrap();
+    let pick = s.add_pick("w", "q-live", "la table maintenant", &[], 1, 11).unwrap();
     s.set_drafts(&Target::Page("w".into()), &[json!({"block": "p1", "kind": "note", "text": "shorter", "quote": "Revenue grew"}), json!({"block": "p2", "kind": "edit", "before": "Q2", "after": "Q3"})], 1, 12).unwrap();
     let sent = s.send(&Target::Page("w".into()), 13).unwrap();
     let mut all = vec![pick];
@@ -192,7 +193,7 @@ fn a_page_message_carries_his_notes_typed() {
     assert_eq!(bise_proto::parts::render(std::slice::from_ref(&part)), text, "the model's text, byte for byte");
     let bise_proto::parts::Part::Page { to, page, title, version, notes, .. } = part else { panic!("{part:?}") };
     assert_eq!((to.as_str(), page.as_str(), title.as_str(), version), ("main", "w", "efforts", 1));
-    let n = |block: &str, kind: &str, text: &str, quote: &str, card: u64, asked: &str| bise_proto::parts::PageNote { block: block.into(), kind: kind.into(), text: text.into(), quote: quote.into(), card, asked: asked.into() };
+    let n = |block: &str, kind: &str, text: &str, quote: &str, card: u64, asked: &str| bise_proto::parts::PageNote { block: block.into(), kind: kind.into(), text: text.into(), quote: quote.into(), card, asked: asked.into(), parts: Vec::new() };
     assert_eq!(
         notes,
         vec![
@@ -201,6 +202,31 @@ fn a_page_message_carries_his_notes_typed() {
             n("p2", "edit", "Q3", "Q2", 0, ""),
         ]
     );
+    let _ = std::fs::remove_dir_all(d);
+}
+
+/// card-image-parts (architect m_35268): a card answered with an image
+/// and words keeps his parts on the pick note; its text is his words
+/// alone; the model's line renders the parts (the image's marker, so the
+/// model gets it); the wire's note carries them for the chips.
+#[test]
+fn a_pick_with_an_image_keeps_his_parts() {
+    use bise_proto::parts::Part;
+    let d = temp();
+    let s = Store::new(&d);
+    s.publish(&publish("t1", Some("w"), Some("efforts")), vec![], 10, &|_| false).unwrap();
+    let m = s.meta("w").unwrap();
+    let img = Part::Image { name: "[Image #1]".into(), source: "/u/shot.png".into(), mime: "image/png".into(), b64_file: "/h/images/ab.b64".into(), caption: String::new() };
+    let parts = vec![img.clone(), Part::Text { text: " les murs ne sont pas réalistes".into() }];
+    let pick = s.add_pick("w", "q-live", "les murs ne sont pas réalistes", &parts, 1, 11).unwrap();
+    assert_eq!(s.notes("w")[0].parts, parts, "stored with the note");
+    let text = notes_message(&m, "u", std::slice::from_ref(&pick));
+    let marker = bise_proto::parts::render(std::slice::from_ref(&img));
+    assert!(text.contains(&format!("pick: {marker} les murs")), "{text}");
+    let q = super::super::questions::Question { block: "q-live".into(), text: "quel plan ?".into(), card: 687, ..Default::default() };
+    let Part::Page { notes, .. } = page_part(&m, std::slice::from_ref(&q), &[pick], "bims", &text) else { panic!() };
+    assert_eq!(notes[0].text, "les murs ne sont pas réalistes", "his words, never a marker");
+    assert_eq!(notes[0].parts, parts);
     let _ = std::fs::remove_dir_all(d);
 }
 

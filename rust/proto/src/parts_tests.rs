@@ -467,3 +467,22 @@ fn anchor_labels_follow_their_fixture() {
         assert_eq!(crate::anchor::label(&a), r["label"].as_str().unwrap(), "{}", r["anchor"]);
     }
 }
+
+/// card-image-parts (architect m_35268): an older hub's page note, his
+/// image rendered as a marker in its text, reads back typed (the image
+/// part, his words alone as its text); a typed or plain note is kept.
+#[test]
+fn an_old_page_note_with_a_marker_reads_typed() {
+    let marker = "<image name=\"[Image #1]\" path=\"/u/825cb.png\" mime=\"image/png\" b64=\"/h/images/a12b.b64\">";
+    let old = PageNote { block: "pick".into(), kind: "pick".into(), text: format!("{marker} C'est pas mal mais"), card: 687, asked: "quel plan ?".into(), ..PageNote::default() };
+    let plain = PageNote { text: "A · la halle".into(), ..old.clone() };
+    let page = |notes: Vec<PageNote>| Part::Page { text: "x".into(), to: "bims".into(), page: "bims-climb".into(), title: String::new(), version: 2, notes };
+    let Part::Page { notes, .. } = &typed_page_notes(vec![page(vec![old, plain.clone()])])[0] else { panic!() };
+    assert_eq!(notes[0].text, "C'est pas mal mais", "his words, never the tag");
+    assert!(matches!(&notes[0].parts[..], [Part::Image { name, source, .. }, Part::Text { .. }] if name == "[Image #1]" && source == "/u/825cb.png"), "{:?}", notes[0].parts);
+    assert_eq!(notes[1], plain, "a plain note is kept");
+    let typed = PageNote { text: "hi".into(), parts: vec![t("hi")], ..plain };
+    assert_eq!(typed_page_notes(vec![page(vec![typed.clone()])]), vec![page(vec![typed])], "a typed note is kept");
+    let v = serde_json::to_value(page(vec![PageNote { parts: vec![t("hi")], ..PageNote::default() }])).unwrap();
+    assert_eq!(v["notes"][0]["parts"], serde_json::json!([{"kind": "text", "text": "hi"}]), "parts on the wire");
+}

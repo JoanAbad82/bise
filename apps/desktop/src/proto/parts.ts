@@ -11,9 +11,11 @@ import type { Anchor } from './anchor';
  * he picked, his note; an edit's new words), what it is on (`quote`: the
  * words he selected, an edit's old words; "" none) and, when it answers
  * a question that had a card, that card and its question (`card` 0 and
- * `asked` "" none).
+ * `asked` "" none). `parts` (card-image-parts, architect m_35268): his
+ * answer as he typed it (his words, images and files, as `Send.parts`),
+ * none for a plain one; `text` is then his words alone, never a marker.
  */
-export type PageNote = { block: string, kind: string, text?: string, quote?: string, card?: number, asked?: string, };
+export type PageNote = { block: string, kind: string, text?: string, quote?: string, card?: number, asked?: string, parts?: Array<Part>, };
 
 /**
  * Which line the hub added ([`Part::Hint`]): the capsule's (he typed it

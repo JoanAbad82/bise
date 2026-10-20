@@ -261,7 +261,9 @@ impl Shell {
     /// `answered`, and the pick is a `pick` note on that block, sent to
     /// the page's agent (main when it is gone) like any notes.
     /// `via`: the door that took it (`inbox` or `page`), kept with it.
-    pub(super) fn page_answer_without_card(&mut self, id: &str, block: &str, reply: &str, via: &str) {
+    /// `parts`: his answer's typed parts (none: a plain one), kept on the
+    /// pick note (card-image-parts).
+    pub(super) fn page_answer_without_card(&mut self, id: &str, block: &str, reply: &str, parts: &[bise_proto::parts::Part], via: &str) {
         let Some(pages) = self.pg.pages.clone() else { return };
         let Some(meta) = pages.store.meta(id) else { return };
         let mut qs = pages.store.questions(id);
@@ -274,7 +276,7 @@ impl Shell {
             log_line(&self.opts.paths, &format!("page {id}: questions not saved: {e}"));
         }
         pages.push(id, "answered", &answered);
-        let note = match pages.locked(|s| s.add_pick(id, block, reply, meta.version(), now_ms())) {
+        let note = match pages.locked(|s| s.add_pick(id, block, reply, parts, meta.version(), now_ms())) {
             Ok(n) => n,
             Err(e) => return log_line(&self.opts.paths, &format!("page {id}: the pick not saved: {e}")),
         };
@@ -581,7 +583,7 @@ impl Shell {
         let drafts = crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id), &meta.went_blocks()), &|a| pages.held(id, a, meta.version()));
         let mut sent = Vec::new();
         for d in drafts.iter().filter(|d| keys.is_none_or(|k| k.contains(&d.key()))) {
-            match pages.locked(|s| s.add_sent(id, &d.block, d.item.as_deref(), "approve", "send", meta.version(), now_ms())) {
+            match pages.locked(|s| s.add_sent(id, &d.block, d.item.as_deref(), "approve", "send", &[], meta.version(), now_ms())) {
                 Ok(n) => sent.push(n),
                 Err(e) => log_line(&self.opts.paths, &format!("page {id}: an approve not saved: {e}")),
             }
@@ -659,24 +661,25 @@ impl Shell {
     /// gets the notes message (main when it is gone), its card closes and
     /// the next step's turn comes. `text`: the user's words when they are
     /// not a plain "done". False: no such row.
-    pub(super) fn page_tick(&mut self, id: &str, item: &str, text: &str) -> bool {
+    /// `parts`: his words' typed parts, kept on a note (none: plain).
+    pub(super) fn page_tick(&mut self, id: &str, item: &str, text: &str, parts: &[bise_proto::parts::Part]) -> bool {
         let Some(pages) = self.pg.pages.clone() else { return false };
         let Some(meta) = pages.store.meta(id) else { return false };
         let rows = pages.store.html(id, meta.version()).map(|h| crate::pages::checklist::rows_of(&h)).unwrap_or_default();
         let Some(row) = rows.iter().find(|r| r.item == item) else { return false };
         let go = crate::pages::checklist::is_done_word(text) || text.trim().eq_ignore_ascii_case("send");
-        let (kind, words) = match (go, row.drafted) {
+        let (kind, words, parts) = match (go, row.drafted) {
             // a drafted step's "send": an approve of its draft, so the
             // page's agent sends it (pm's D fail 30)
-            (true, true) => ("approve", "send"),
-            (true, false) => ("tick", "done"),
-            (false, _) => ("note", text.trim()),
+            (true, true) => ("approve", "send", &[][..]),
+            (true, false) => ("tick", "done", &[][..]),
+            (false, _) => ("note", text.trim(), parts),
         };
         let (block, on) = match (kind, row.draft.as_deref()) {
             ("approve", Some(d)) => (d.to_string(), None),
             _ => (row.block.clone(), Some(item)),
         };
-        let note = match pages.locked(|s| s.add_sent(id, &block, on, kind, words, meta.version(), now_ms())) {
+        let note = match pages.locked(|s| s.add_sent(id, &block, on, kind, words, parts, meta.version(), now_ms())) {
             Ok(n) => n,
             Err(e) => {
                 log_line(&self.opts.paths, &format!("page {id}: the tick not saved: {e}"));
@@ -713,8 +716,9 @@ impl Shell {
     /// ([`Page::Done`]); a question's digit as its option's words
     /// ([`Page::Reply`], the line to step); else [`Page::Not`]. The
     /// caller ends with [`Self::page_answers`] (the page hears it).
-    pub(super) fn page_first(&mut self, client: ClientId, line: &str) -> Page {
-        if self.page_step_answer(client, line) {
+    /// `parts`: his answer's typed parts (card/answer's; none: a line).
+    pub(super) fn page_first(&mut self, client: ClientId, line: &str, parts: &[bise_proto::parts::Part]) -> Page {
+        if self.page_step_answer(client, line, parts) {
             return Page::Done;
         }
         match self.page_reply_text(line) {
@@ -726,7 +730,7 @@ impl Shell {
     /// `/answer N reply` on a step's card: the step ticked (or the words
     /// as a note on its row), never the hub's question path. False: not
     /// a step's card.
-    fn page_step_answer(&mut self, client: ClientId, text: &str) -> bool {
+    fn page_step_answer(&mut self, client: ClientId, text: &str, parts: &[bise_proto::parts::Part]) -> bool {
         let Some(rest) = text.trim().strip_prefix("/answer ") else { return false };
         let Some((n, reply)) = rest.trim().split_once(' ') else { return false };
         let Ok(card) = n.trim_start_matches('#').parse::<u64>() else { return false };
@@ -738,8 +742,8 @@ impl Shell {
             return self.page_plan_answer(client, &id, card, reply);
         }
         match key.strip_prefix("row:").and_then(|k| k.split_once('/')).map(|(_, i)| i.to_string()) {
-            Some(item) => self.page_tick(&id, &item, reply),
-            None => self.page_question_answer(&id, &key, card, reply, "inbox"),
+            Some(item) => self.page_tick(&id, &item, reply, parts),
+            None => self.page_question_answer(&id, &key, card, reply, parts, "inbox"),
         }
     }
 
@@ -750,7 +754,7 @@ impl Shell {
     /// main, the card's asker (pm's 25: a task's page); sb-core's
     /// `page_answered` closes it and tells the asker in one message when
     /// the pick went to another agent (wake-deliver).
-    pub(super) fn page_question_answer(&mut self, id: &str, block: &str, card: u64, reply: &str, via: &str) -> bool {
+    pub(super) fn page_question_answer(&mut self, id: &str, block: &str, card: u64, reply: &str, parts: &[bise_proto::parts::Part], via: &str) -> bool {
         let Some(pages) = self.pg.pages.clone() else { return false };
         let reply = reply.trim();
         let words = match reply.parse::<usize>() {
@@ -767,7 +771,7 @@ impl Shell {
         let agent = pages.store.meta(id).map(|m| m.agent).unwrap_or_default();
         let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
         self.step(Input::PageAnswered { card, agent: to, page: id.to_string(), text: words.clone(), block: block.to_string() });
-        self.page_answer_without_card(id, block, &words, via);
+        self.page_answer_without_card(id, block, &words, parts, via);
         true
     }
 

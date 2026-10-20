@@ -245,7 +245,9 @@ fn split_hints(text: &str) -> (&str, Vec<Part>) {
 /// he picked, his note; an edit's new words), what it is on (`quote`: the
 /// words he selected, an edit's old words; "" none) and, when it answers
 /// a question that had a card, that card and its question (`card` 0 and
-/// `asked` "" none).
+/// `asked` "" none). `parts` (card-image-parts, architect m_35268): his
+/// answer as he typed it (his words, images and files, as `Send.parts`),
+/// none for a plain one; `text` is then his words alone, never a marker.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PageNote {
@@ -259,6 +261,9 @@ pub struct PageNote {
     pub card: u64,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub asked: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<Part>>"))]
+    pub parts: Vec<Part>,
 }
 
 fn is_zero(n: &u64) -> bool {
@@ -350,6 +355,28 @@ pub fn page_of(parts: &[Part]) -> Option<PageSaid<'_>> {
         Part::Page { to, page, title, notes, .. } => Some(PageSaid { to, title: if title.is_empty() { page } else { title }, notes }),
         _ => None,
     })
+}
+
+/// `parts` with each page note typed (card-image-parts, architect
+/// m_35268): a note an older hub wrote, his answer's images rendered as
+/// markers in its text and no parts, gets its parts read back from that
+/// text (`parse`) and its text becomes his words alone, so every client
+/// draws chips, never a tag. A note with parts, or a plain one, is kept.
+/// The fold's one read of a page part (the only copy of this fallback).
+// TODO(page-note-markers): goes in a later release, once no stored
+// message has a page note with an image marker in its text
+pub fn typed_page_notes(mut parts: Vec<Part>) -> Vec<Part> {
+    for p in &mut parts {
+        let Part::Page { notes, .. } = p else { continue };
+        for n in notes.iter_mut().filter(|n| n.parts.is_empty()) {
+            let read = of_text(&n.text);
+            if read.iter().any(|q| matches!(q, Part::Image { .. })) {
+                n.text = words(&read).trim().to_string();
+                n.parts = read;
+            }
+        }
+    }
+    parts
 }
 
 /// [`page_of`]'s view of a page part.

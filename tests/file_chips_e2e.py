@@ -114,13 +114,22 @@ def main():
         mine = [e for e in yous(c, project) if same(e)]
         check(len(mine) == 1, "the parts after a restart (the journal)")
 
-        # 4. an older desktop's files list (removed in issue 31): ignored, his words alone go
+        # 4. an older desktop's files list (removed in issue 31, refused by name since feab9c5fe):
+        # nothing sent; the same files as parts go, each a chip in his words
         r = c.rpc("turn/send", {"project": project, "agent": "main", "text": "lis ces fichiers", "files": [files["q3.pdf"], files["data.csv"]], "mode": "now"})
-        check("error" not in r, "a send with an old files list is taken: %r" % r)
-        c.wait(lambda: any(e.get("text") == "lis ces fichiers" for e in yous(c, project)), 60, "his words alone on his entry")
+        data = (r.get("error") or {}).get("data") or {}
+        check((data.get("reason"), data.get("field")) == ("removed_field", "files"), "a send with an old files list is refused by name: %r" % r)
+        check(not any(e.get("text") == "lis ces fichiers" for e in yous(c, project)), "nothing sent with it")
+        r = c.rpc("turn/send", {"project": project, "agent": "main", "text": "", "parts": [
+            {"kind": "text", "text": "lis ces fichiers "},
+            {"kind": "file", "name": "[File #1]", "path": files["q3.pdf"]},
+            {"kind": "text", "text": " "},
+            {"kind": "file", "name": "[File #2]", "path": files["data.csv"]},
+        ], "mode": "now"})
+        check("error" not in r, "the same files as parts are taken: %r" % r)
         c.wait_status("main", "idle", 60)
-        check(not any(files["q3.pdf"] in q.get("user", "") and "lis ces fichiers" in q.get("user", "") for q in E.fake_requests() if q.get("agent") == "main"),
-              "the list never reaches the model")
+        c.wait(lambda: any("lis ces fichiers " + marker(1, files["q3.pdf"]) + " " + marker(2, files["data.csv"]) in q.get("user", "")
+                           for q in E.fake_requests() if q.get("agent") == "main"), 60, "the files reach the model as their chips' markers")
 
         # 5. a relative path: refused
         r = c.rpc("turn/send", {"project": project, "agent": "main", "text": "", "parts": [{"kind": "file", "name": "[File #1]", "path": "deck.pptx"}], "mode": "now"})

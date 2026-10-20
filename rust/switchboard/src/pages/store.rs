@@ -142,6 +142,10 @@ pub struct Note {
     pub answer: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sent_ms: Option<u64>,
+    /// his answer's typed parts (card-image-parts, architect m_35268): a
+    /// card answered with images; `text` is then his words alone
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<bise_proto::parts::Part>,
     /// anything else the note layer keeps on a note
     #[serde(flatten)]
     pub extra: serde_json::Map<String, Value>,
@@ -507,15 +511,16 @@ impl Store {
 
     /// A pick on question `block` with no open card (ambient-lead
     /// m_5343): a note of kind `pick`, sent at once. The note.
-    pub fn add_pick(&self, id: &str, block: &str, reply: &str, version: u64, now: u64) -> Result<Note, String> {
-        self.add_sent(id, block, None, "pick", reply, version, now)
+    /// `parts`: his answer's typed parts (none: a plain one).
+    pub fn add_pick(&self, id: &str, block: &str, reply: &str, parts: &[bise_proto::parts::Part], version: u64, now: u64) -> Result<Note, String> {
+        self.add_sent(id, block, None, "pick", reply, parts, version, now)
     }
 
     /// A note the hub makes for the user (a pick with no card, a step
     /// ticked from its card or by voice), sent at once: `item` is the
     /// list item it is on (a checklist row). The note.
     #[allow(clippy::too_many_arguments)]
-    pub fn add_sent(&self, id: &str, block: &str, item: Option<&str>, kind: &str, text: &str, version: u64, now: u64) -> Result<Note, String> {
+    pub fn add_sent(&self, id: &str, block: &str, item: Option<&str>, kind: &str, text: &str, parts: &[bise_proto::parts::Part], version: u64, now: u64) -> Result<Note, String> {
         let mut notes = self.notes(id);
         let mut n = Note {
             id: next_id(&notes),
@@ -526,6 +531,7 @@ impl Store {
             at_ms: now,
             status: "sent".into(),
             sent_ms: Some(now),
+            parts: parts.to_vec(),
             ..Note::default()
         };
         if let Some(i) = item {
@@ -708,6 +714,16 @@ fn short(s: &str) -> String {
 }
 
 /// One note as a line of the message (§2.6).
+/// His words in a note for the model: his typed parts rendered as his
+/// messages are (one renderer: an image stays its marker, so the model
+/// gets the image), else the note's text.
+fn said(n: &Note) -> String {
+    match n.parts.is_empty() {
+        true => n.text.clone().unwrap_or_default(),
+        false => bise_proto::parts::render(&n.parts),
+    }
+}
+
 fn note_line(n: &Note) -> String {
     let what = match n.kind.as_str() {
         "edit" => {
@@ -720,9 +736,9 @@ fn note_line(n: &Note) -> String {
         "approve" => "approve".to_string(),
         "skip" => "skip".to_string(),
         "tick" => "✓ tick".to_string(),
-        "pick" => format!("pick: {}", n.text.as_deref().unwrap_or("")),
-        "voice" => format!("(said) {}", n.text.as_deref().unwrap_or("")),
-        _ => n.text.clone().unwrap_or_default(),
+        "pick" => format!("pick: {}", said(n)),
+        "voice" => format!("(said) {}", said(n)),
+        _ => said(n),
     };
     // on a ui block's rows (a k-diff, a k-term): the lines, numbers and text, under the note
     if let Some(l) = super::notelines::of(n) {
@@ -782,6 +798,7 @@ pub fn page_part(m: &Meta, questions: &[super::questions::Question], sent: &[Not
                 quote,
                 card: q.map(|q| q.card).unwrap_or(0),
                 asked: q.map(|q| q.text.trim().to_string()).unwrap_or_default(),
+                parts: n.parts.clone(),
             }
         })
         .collect();
@@ -802,6 +819,7 @@ pub fn batch_words(m: &Meta, url: &str, card: u64, line: &str, asked: &str, to: 
         quote: line.to_string(),
         card,
         asked: asked.trim().to_string(),
+        parts: Vec::new(),
     };
     let part = bise_proto::parts::Part::Page { text: text.clone(), to: to.to_string(), page: m.id.clone(), title: m.title.clone(), version: m.version(), notes: vec![note] };
     (text, part)

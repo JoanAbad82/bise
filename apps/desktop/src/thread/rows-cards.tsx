@@ -147,6 +147,9 @@ export function PageAnswerRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: E
   if (p === null) return <Marker>{e.text}</Marker>;
   // the agent's name as the thread draws its author (a project's main is 'bise'; designer m_21035)
   const a = pageAnswer({ ...p, to: shownName(p.to) });
+  // one answer's typed parts (card-image-parts): his images as his own bubble's chips, never a tag
+  const only = p.notes.length === 1 ? p.notes[0] : undefined;
+  const images = only?.parts != null && only.parts.length > 0 ? youView(only.parts).images : [];
   // the page's name pink and clickable, its view (desktop-agents-bar §5)
   const on =
     a.on === '' ? null : (
@@ -172,10 +175,15 @@ export function PageAnswerRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: E
   return (
     <div className="th-approval" data-ok>
       <YouBubble head={<AnsweredHead ok>{head}</AnsweredHead>} under={e.at_ms > 0 ? clock(e.at_ms) : undefined} timeAlways={lastOfRun(e, next)} testId={`thread.pageanswer.${String(e.pos)}`}>
-        {a.words === '' ? undefined : (
-          <div className="th-you-words" data-testid={`thread.pageanswer.${String(e.pos)}.words`}>
-            {a.words}
-          </div>
+        {a.words === '' && images.length === 0 ? undefined : (
+          <>
+            {a.words !== '' && (
+              <div className="th-you-words" data-testid={`thread.pageanswer.${String(e.pos)}.words`}>
+                {a.words}
+              </div>
+            )}
+            <ImageChips images={images} testId={`thread.pageanswer.${String(e.pos)}`} />
+          </>
         )}
       </YouBubble>
     </div>

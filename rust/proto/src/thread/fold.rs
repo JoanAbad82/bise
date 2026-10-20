@@ -511,7 +511,7 @@ impl Fold<'_> {
             // parts its text reads as)
             Hub::YouParts(raw) => {
                 if let (Some(i), Ok(p)) = (id_you, serde_json::from_str::<Vec<Part>>(&raw)) {
-                    self.out[i].parts = p;
+                    self.out[i].parts = crate::parts::typed_page_notes(p);
                 }
             }
             // bise's home hub: his words went to a project, not to main:
@@ -535,7 +535,7 @@ impl Fold<'_> {
             }
             Hub::RouteParts(raw) => {
                 if let (Some(i), Ok(p)) = (route, serde_json::from_str::<Vec<Part>>(&raw)) {
-                    self.out[i].parts = p;
+                    self.out[i].parts = crate::parts::typed_page_notes(p);
                 }
             }
             // an agent's message with parts (send-parts): on the entry of

@@ -134,8 +134,14 @@ impl Shell {
                 // a page's card first (daemon/page_cards.rs, as the input
                 // op had it): a step ticked, a drafts or replaced batch
                 // card answered there; a question's digit becomes its
-                // option's words, and the page hears it (P3b)
-                let reply = match self.page_first(id, &format!("/answer {card} {}", reply.trim())) {
+                // option's words, and the page hears it (P3b). His typed
+                // parts go with it, his words alone in the line: the pick
+                // note keeps his structure, never the rendered markers
+                // (card-image-parts, architect m_35268)
+                let typed: Vec<bise_proto::parts::Part> = serde_json::from_str(&parts).unwrap_or_default();
+                let words = bise_proto::parts::words(&typed);
+                let line = if typed.is_empty() || words.trim().is_empty() { reply.trim() } else { words.trim() };
+                let reply = match self.page_first(id, &format!("/answer {card} {line}"), &typed) {
                     Page::Done => return self.page_answers(),
                     Page::Reply(l) => l.splitn(3, ' ').nth(2).unwrap_or_default().to_string(),
                     Page::Not => reply,
@@ -649,7 +655,7 @@ impl Shell {
             // (the input op's, P3b): a step ticked there, a question's
             // digit as its option's words, and the page hears it
             Slash::Step(cmd) => {
-                let cmd = match self.page_first(id, line) {
+                let cmd = match self.page_first(id, line, &[]) {
                     Page::Done => return self.page_answers(),
                     Page::Reply(l) => crate::router::parse(&l, &agent),
                     Page::Not => cmd,

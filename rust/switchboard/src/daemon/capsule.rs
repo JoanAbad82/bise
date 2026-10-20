@@ -45,7 +45,7 @@ impl Shell {
         // back); never on an answer or a slash command
         // a step of his answered on its card (roadmap D): ticked
         // on its page, the page's agent told there
-        let page = self.page_first(id, &s("text"));
+        let page = self.page_first(id, &s("text"), &[]);
         let queued = v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false);
         let text = match page {
             Page::Done => return Took::Page,

@@ -126,7 +126,13 @@ fn kind_evs(e: &Entry) -> Vec<Ev> {
 fn page_answer(e: &Entry) -> Vec<Ev> {
     let Some(p) = bise_proto::parts::page_of(&e.parts) else { return Vec::new() };
     let (text, asked, note) = bise_proto::thread::words::page_answer(&p, &unicode_width::UnicodeWidthStr::width);
-    vec![Ev::Approval { ok: true, text, note, parts: Vec::new(), asked, open: false }]
+    // one answer's typed parts (card-image-parts): his words and his
+    // images' chips, as his own bubble draws them, never a tag
+    let parts = match p.notes {
+        [n] => n.parts.clone(),
+        _ => Vec::new(),
+    };
+    vec![Ev::Approval { ok: true, text, note, parts, asked, open: false }]
 }
 
 /// event-wake: a watch's end as the TUI's row (the entry's and the line

@@ -16,3 +16,4 @@
 # tag is on no site (stale); a line that doesn't parse; a line whose removal release is out
 # (the highest tag of that kind merged into HEAD is at or past it): red in quick, full and the
 # nightly, a warning in land (the owner gets the red at their next quick gate).
+page-note-markers	architect	v2026.10.2-60	a page note an older hub stored with his image as a marker in its text (no parts) still draws as words + an image chip (bise_proto::parts::typed_page_notes, read in the fold)

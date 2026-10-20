@@ -112,7 +112,7 @@ impl Shell {
             },
         };
         let label = reply.trim().to_string();
-        if let Err(e) = pages.locked(|s| s.add_sent(id, &block, item.as_deref(), "start", &label, meta.version(), now_ms())) {
+        if let Err(e) = pages.locked(|s| s.add_sent(id, &block, item.as_deref(), "start", &label, &[], meta.version(), now_ms())) {
             log_line(&self.opts.paths, &format!("page {id}: a plan's start not saved: {e}"));
             return false;
         }
