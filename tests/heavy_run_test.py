@@ -46,7 +46,10 @@ def held(slot):
 
 
 with tempfile.TemporaryDirectory() as home:
-    env = dict(os.environ, HOME=home, HEAVY_SLOTS="1")
+    # plenty of faked free space: the real disk's never makes a job wait here
+    open(os.path.join(home, "plenty_kb"), "w").write(str(500 * 1048576))
+    env = dict(os.environ, HOME=home, HEAVY_SLOTS="1", HEAVY_FREE_KB_FILE=os.path.join(home, "plenty_kb"))
+    env.pop("SB_AGENT", None)
     env.pop("HEAVY_SLOT", None)
     env.pop("HEAVY_SUBMIT", None)
     run = os.path.join(home, ".bise", "run")
@@ -159,6 +162,48 @@ with tempfile.TemporaryDirectory() as home:
         check(got == ["land", "alone"], "a land check before an --alone measure: %r" % got)
     else:
         print("skip --alone on battery (it waits for AC power)")
+    # the disk (disk-guard): faked free space; under 15 GB a job waits and
+    # says why (stderr and the agent's status, a fake sb); a running job is
+    # stopped under 5 GB with rc=28 and a clear line
+    GB = 1048576
+    freef = os.path.join(home, "free_kb")
+    said = os.path.join(home, "sb_said")
+    fbin = os.path.join(home, "bin")
+    os.makedirs(fbin, exist_ok=True)
+    with open(os.path.join(fbin, "sb"), "w") as fh:
+        fh.write('#!/bin/sh\necho "$*" >> "%s"\n' % said)
+    os.chmod(os.path.join(fbin, "sb"), 0o755)
+    envd = dict(env, HEAVY_FREE_KB_FILE=freef, HEAVY_DISK_POLL="0.2", SB_AGENT="fake",
+                PATH=fbin + os.pathsep + env["PATH"])
+    open(freef, "w").write(str(12 * GB))
+    ran = os.path.join(home, "disk_ran")
+    errf = open(os.path.join(home, "disk_err"), "w+")
+    waiter = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran], env=envd, stderr=errf)
+    check(stays(lambda: not os.path.exists(ran), 2, "the job waits"), "12 GB free: the job waits for disk")
+    sb_lines = lambda: open(said).read() if os.path.exists(said) else ""
+    check("disk is nearly full (12 GB free" in sb_lines() and sb_lines().startswith("status working --note"),
+          "the waiting agent's status says why: %r" % sb_lines())
+    open(freef, "w").write(str(20 * GB))
+    check(waiter.wait(timeout=30) == 0 and os.path.exists(ran), "20 GB free: the job runs")
+    errf.seek(0)
+    err = errf.read()
+    check("heavy-run: waiting: the disk is nearly full (12 GB free" in err and "20 GB free again" in err,
+          "stderr names the wait and its end: %r" % err)
+    r = subprocess.Popen([HEAVY, "sh", "-c", 'sleep 60 & wait', "x"], env=envd, stderr=subprocess.PIPE, text=True)
+    wait_for(lambda: len([l for l in lines() if l.split("\t")[2] == "-"]) > len(
+        [l for l in lines() if l.split("\t")[2] != "-"]), what="the long job runs")
+    t0 = time.time()
+    open(freef, "w").write(str(3 * GB))
+    try:
+        _, err = r.communicate(timeout=20)
+    except subprocess.TimeoutExpired:
+        r.kill()
+        _, err = r.communicate()
+    check(r.returncode == 28 and time.time() - t0 < 15, "3 GB free: the running job is stopped, rc=28: %r" % r.returncode)
+    check("heavy-run: stopped" in err and "3 GB free" in err, "the stop line says why: %r" % err)
+    check("heavy-run: stopped" in sb_lines(), "the stop goes to the agent's status")
+    check(lines()[-1].endswith("rc=28"), "heavy.log ends the job with rc=28: %r" % lines()[-1])
+    check(not [f for f in os.listdir(run) if f.startswith("disk-stop.")], "no disk-stop marker left")
     # --install
     r = subprocess.run([HEAVY, "--install"], env=env, capture_output=True, text=True)
     dst = os.path.join(run, "heavy-run")

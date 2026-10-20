@@ -69,6 +69,45 @@ S4="$D/heavy4.lock"
 Q="$D/queue"
 mkdir -p "$D" "$Q" && touch "$S1" "$S2" "$S3" "$S4"
 
+# the disk (disk-guard, 2026-10-20: agents' builds filled it, macOS hit
+# 'critical low disk' and killed the app and every Chrome tab at 17:48). A
+# job waits for a slot while the data volume has under HEAVY_DISK_WAIT_GB
+# (15) free, saying why; a running job is stopped (its process tree,
+# TERM then KILL after 5 s) when it drops under HEAVY_DISK_STOP_GB (5), with
+# rc=28 (ENOSPC) and a "heavy-run: stopped" line. Both also go to the
+# agent's status (sb status, when SB_AGENT is set), so the hub shows why.
+# HEAVY_FREE_KB_FILE (tests): the free KB are read from that file, not df.
+# HEAVY_DISK_POLL: seconds between two checks of a running job (10).
+free_kb() {
+  if [ -n "${HEAVY_FREE_KB_FILE:-}" ]; then cat "$HEAVY_FREE_KB_FILE" 2>/dev/null; return; fi
+  local v=/System/Volumes/Data; [ -d "$v" ] || v="$HOME"
+  df -k "$v" 2>/dev/null | awk 'NR==2 {print $4}'
+}
+# under $1 GB free (an unreadable free space counts as enough)
+disk_under() { local k; k=$(free_kb); [ -n "$k" ] && [ "$k" -lt $(( $1 * 1048576 )) ] 2>/dev/null; }
+free_gb() { local k; k=$(free_kb); echo $(( ${k:-0} / 1048576 )); }
+tell_hub() {
+  [ -n "${SB_AGENT:-}" ] && command -v sb >/dev/null 2>&1 && sb status working --note "$1" >/dev/null 2>&1 || true
+}
+# the process tree under $1, but for $2's (the watcher's own)
+tree() { local c; for c in $(pgrep -P "$1"); do [ "$c" = "$2" ] && continue; tree "$c" "$2"; echo "$c"; done; }
+# runs in the background of a job's shell ($1): marks $2 and stops the job
+# when the disk gets too low
+disk_watch() {
+  local me=$BASHPID
+  while kill -0 "$1" 2>/dev/null; do
+    if disk_under "${HEAVY_DISK_STOP_GB:-5}"; then
+      echo "$(free_gb)" >"$2"
+      kill -TERM $(tree "$1" "$me") 2>/dev/null
+      sleep 5
+      kill -KILL $(tree "$1" "$me") 2>/dev/null
+      return
+    fi
+    sleep "${HEAVY_DISK_POLL:-10}"
+  done
+}
+export -f free_kb disk_under free_gb tell_hub tree disk_watch
+
 # HEAVY_SLOTS (tests): use only the first n slots, whatever the power.
 on_battery() { /usr/bin/pmset -g batt 2>/dev/null | head -1 | grep -q "Battery Power"; }
 # sccache (build-cache, 2026-10-10): rustc outputs shared across worktrees
@@ -128,7 +167,14 @@ export HEAVY_SUBMIT="${HEAVY_SUBMIT:-$(date +%s)}"
 JOB='export HEAVY_SLOT="${2##*/} $$"; rm -f "$1"; L="$HOME/.bise/run/heavy.log"
 c=$(printf "%s " "${@:4}" | cut -c1-160); t0=$(date +%s)
 printf "%s\t%s\t-\t%s\t%s\t%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" >>"$L" 2>/dev/null
+stop="$HOME/.bise/run/disk-stop.$$"; rm -f "$stop"
+disk_watch $$ "$stop" </dev/null >/dev/null 2>&1 & w=$!
 /usr/bin/caffeinate -is nice -n "$3" "${@:4}"; rc=$?
+kill $w 2>/dev/null; wait $w 2>/dev/null
+if [ -e "$stop" ]; then
+  m="heavy-run: stopped \"$c\": the disk is nearly full ($(cat "$stop") GB free on the data volume, under ${HEAVY_DISK_STOP_GB:-5} GB). Free some space, then run it again."
+  echo "$m" >&2; tell_hub "$m"; rm -f "$stop"; rc=28
+fi
 printf "%s\t%s\t%s\t%s\t%s\t%s\trc=%s\n" "$HEAVY_SUBMIT" "$t0" "$(date +%s)" "${2##*/}" "$PWD" "$c" "$rc" >>"$L" 2>/dev/null
 exit $rc'
 
@@ -183,6 +229,17 @@ ahead() {
 
 # lockf -t 0 exits 75 (EX_TEMPFAIL) when the slot is taken.
 while :; do
+  if disk_under "${HEAVY_DISK_WAIT_GB:-15}"; then
+    if [ -z "${diskwait:-}" ]; then
+      m="heavy-run: waiting: the disk is nearly full ($(free_gb) GB free on the data volume, a heavy job needs ${HEAVY_DISK_WAIT_GB:-15} GB): $(printf '%s ' "$@" | cut -c1-80)"
+      echo "$m" >&2; tell_hub "$m"; diskwait=1
+    fi
+    sleep "${HEAVY_DISK_POLL:-10}"; continue
+  fi
+  if [ -n "${diskwait:-}" ]; then
+    m="heavy-run: $(free_gb) GB free again, the job goes on: $(printf '%s ' "$@" | cut -c1-80)"
+    echo "$m" >&2; tell_hub "$m"; diskwait=""
+  fi
   if on_battery; then n=15; slots="$S1 $S2"; else n=10; slots="$S1 $S2 $S3 $S4"; fi
   if [ -n "${HEAVY_SLOTS:-}" ]; then slots=$(echo "$S1 $S2 $S3 $S4" | cut -d' ' -f1-"$HEAVY_SLOTS"); fi
   if [ "$ALONE" = 1 ]; then
