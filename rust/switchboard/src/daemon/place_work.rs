@@ -41,13 +41,8 @@ impl PlaceWork {
 /// `.switchboard/config.toml` counts from the next worktree).
 fn git_env(paths: &Paths) -> GitEnv {
     let log_paths = paths.clone();
-    GitEnv {
-        paths: paths.clone(),
-        config: Config::load(paths),
-        log: Box::new(move |s| log_line(&log_paths, s)),
-        merged: BTreeMap::new(),
-        git_memo: None,
-    }
+    // this worker is off the loop already: its rm runs here
+    GitEnv::new(paths, Box::new(move |s| log_line(&log_paths, s)), crate::trash::Trash::now())
 }
 
 fn worker(rx: Receiver<Job>, paths: Paths, to_loop: Sender<Msg>) {

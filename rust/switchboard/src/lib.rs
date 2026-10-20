@@ -88,6 +88,7 @@ pub mod snapshot;
 pub mod snapshot_rows;
 pub mod scratch;
 pub mod sweep;
+pub mod trash;
 pub mod switch;
 pub mod tools_env;
 pub mod transcript;

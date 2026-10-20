@@ -12,7 +12,9 @@ A real hub, the scripted provider, a workspace of FILES files (a
 worktree's checkout costs what his does, a little):
   1. 25 tasks, 30 live `sb wake` watches (20 pids, 10 files);
   2. a sampler: main's `sb list` every 200 ms;
-  3. meanwhile a spawn and an /archive (each a worktree of FILES files), and a burst of every watch's event;
+  3. meanwhile a spawn and an /archive (each a worktree of FILES files;
+     the dropped one with a rust/target of TARGET files: its rm runs off
+     the loop, trash.rs), and a burst of every watch's event;
   4. every `sb list` answered in under LIMIT s, every watch fired once,
      and hub.log has no "gave up before the hub took it" and no
      "hub loop busy" (its split, crate::spent, is printed when there is).
@@ -37,6 +39,8 @@ TASKS = 25
 PIDS = 20
 FILES_W = 10
 FILES = int(os.environ.get("HUB_LOOP_FILES", "8000"))
+# the dropped worktree's rust/target, in files (HUB_LOOP_TARGET)
+TARGET = int(os.environ.get("HUB_LOOP_TARGET", "30000"))
 
 
 def sb(E, agent, *args, ok=True):
@@ -69,7 +73,28 @@ def big_repo(ws, n):
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "f%05d.txt" % i), "w") as f:
             f.write("file %d\n" % i * 20)
+    with open(os.path.join(ws, ".gitignore"), "a") as f:
+        f.write("target/\n")
     e2e.sh(ws, "git add -A && git commit -qm files")
+
+
+def big_target(path, n):
+    """A cargo target of `n` files (ignored): what a drop's rm deletes."""
+    for i in range(n):
+        d = os.path.join(path, "rust", "target", "debug", "deps", "d%02d" % (i % 100))
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "o%05d.rlib" % i), "w") as f:
+            f.write("x" * 4096)
+
+
+def worktree_of(ws, branch):
+    """The path of the worktree on `branch`, from git."""
+    out = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=ws, capture_output=True, text=True).stdout
+    for block in out.split("\n\n"):
+        lines = dict(l.split(" ", 1) for l in block.splitlines() if " " in l)
+        if lines.get("branch") == "refs/heads/" + branch:
+            return lines["worktree"]
+    raise AssertionError("no worktree on %s: %s" % (branch, out))
 
 
 class Sampler(threading.Thread):
@@ -126,6 +151,11 @@ def main():
         print("sb spawn answered in %.2f s" % (time.time() - ts))
         # his /archive (main's `sb drop` asks him first)
         dropped = names[-1]
+        # its big rust/target (drop-offloop: its rm held his loop 110 s)
+        wt = worktree_of(E.ws, "sb/" + dropped)
+        tt = time.time()
+        big_target(wt, TARGET)
+        print("target: %d files in %.1f s" % (TARGET, time.time() - tt))
         ts = time.time()
         marks["archive"] = round(ts - t0, 1)
         c.say("/archive %s" % dropped)
@@ -135,7 +165,11 @@ def main():
         if conf:
             c.confirm(conf[-1]["id"], True)
         c.wait_status(dropped, "archived", 60)
-        print("/archive done in %.2f s" % (time.time() - ts))
+        archive_took = time.time() - ts
+        print("/archive done in %.2f s" % archive_took)
+        check(not os.path.exists(wt), "the dropped worktree's path is free at the answer")
+        wait.until(lambda: "removed off the loop in" in hub_log(E), 120, "the trash removed its folder")
+        print("  " + [l for l in hub_log(E).splitlines() if "removed off the loop in" in l][-1])
         marks["burst"] = round(time.time() - t0, 1)
         for p in sleeps:
             p.kill()

@@ -11,7 +11,9 @@
 //! The hub removes the folder of a task that is archived (at its /drop)
 //! or unknown (at the hub's start), when no worktree in it has
 //! uncommitted changes or commits that no branch or remote has. It never
-//! deletes such work: it keeps the folder and says so. `migrate` moves
+//! deletes such work: it keeps the folder and says so. A drop's folder
+//! set aside (`.<task>.dropped-<ms>`, trash.rs) whose rm a hub stop cut
+//! is trash: the start's sweep removes it. `migrate` moves
 //! the worktrees of the old place (`<state>/worktrees/<task>`) here.
 
 use crate::core::Loss;
@@ -77,7 +79,17 @@ fn checkouts(dir: &Path) -> Vec<PathBuf> {
     if is_linked(dir) {
         return vec![dir.to_path_buf()];
     }
-    children(dir).into_iter().filter(|p| is_linked(p)).collect()
+    // a folder set aside at a drop (trash.rs) was judged then: never read
+    let aside = |p: &PathBuf| p.file_name().is_some_and(|n| crate::trash::is_aside(&n.to_string_lossy()));
+    children(dir).into_iter().filter(|p| is_linked(p) && !aside(p)).collect()
+}
+
+/// The task folder `dir` holds no checkout but `checkout` (gone already,
+/// or there) and no repository: it can go whole with it (worktree.rs
+/// `remove`).
+pub fn holds_only(dir: &Path, checkout: &Path) -> bool {
+    let me = checkout.file_name();
+    checkouts(dir).iter().all(|c| c.file_name() == me) && !children(dir).iter().any(|p| is_repo(p))
 }
 
 /// What removing a worktree would lose: its uncommitted changes
@@ -175,6 +187,11 @@ pub fn sweep(root: &Path, owners: &Owners, only: Option<&BTreeSet<String>>, now:
     for d in children(root) {
         let name = d.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         if name.starts_with('.') {
+            // a drop's folder set aside, its rm cut by a hub stop
+            // (trash.rs): at the start only, a drop's trash is busy with it
+            if only.is_none() && crate::trash::is_aside(&name) && std::fs::remove_dir_all(&d).is_ok() {
+                out.push(Outcome::Removed(d));
+            }
             continue;
         }
         let Ok(meta) = std::fs::symlink_metadata(&d) else { continue };
@@ -438,6 +455,31 @@ mod tests {
         let mut o = owners(&[], &["gone"]);
         o.paths.insert(other.join("repo"));
         assert!(sweep(&root, &o, None, crate::util::now_ms(), "sb/").is_empty());
+        let _ = std::fs::remove_dir_all(t);
+    }
+
+    /// drop-offloop: a folder set aside at a drop (trash.rs) whose rm a hub
+    /// stop cut: never read as a checkout (no loss check: its files were
+    /// judged at the drop), and the start's sweep finishes it; a drop's
+    /// sweep leaves it to its trash.
+    #[test]
+    fn an_aside_folder_is_trash() {
+        let (t, repo, root) = setup("aside");
+        let d = task(&repo, &root, "x", Some("x"));
+        sh(&d.join("repo"), "echo dirty >> f");
+        let aside = root.join(".x.dropped-17");
+        std::fs::rename(&d, &aside).unwrap();
+        // inside a task folder too: not a checkout
+        let inner = task(&repo, &root, "y", Some("y"));
+        std::fs::rename(inner.join("repo"), inner.join(".repo.dropped-5")).unwrap();
+        assert!(checkouts(&inner).is_empty());
+        assert!(holds_only(&inner, &inner.join("repo")));
+        let only: BTreeSet<String> = ["x".to_string()].into();
+        assert!(sweep(&root, &owners(&[], &["x"]), Some(&only), crate::util::now_ms(), "sb/").is_empty());
+        assert!(aside.exists());
+        let out = sweep(&root, &owners(&["y"], &[]), None, crate::util::now_ms(), "sb/");
+        assert_eq!(out, vec![Outcome::Removed(aside.clone())]);
+        assert!(!aside.exists() && inner.exists());
         let _ = std::fs::remove_dir_all(t);
     }
 

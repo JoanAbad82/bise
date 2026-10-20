@@ -82,7 +82,7 @@ use crate::prompts;
 use crate::search;
 use crate::transcript;
 use crate::util::{now_ms, wire_escape};
-use crate::worktree::{Config, GitEnv};
+use crate::worktree::GitEnv;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::Write;
@@ -1721,14 +1721,10 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     let journal = journal_file::Out::new(std::fs::OpenOptions::new().create(true).append(true).open(paths.journal())?);
 
     let (tx, rx): (Sender<Msg>, Receiver<Msg>) = channel();
-    let log_paths = paths.clone();
-    let env = GitEnv {
-        paths: paths.clone(),
-        config: Config::load(&paths),
-        log: Box::new(move |s| log_line(&log_paths, s)),
-        merged: BTreeMap::new(),
-        git_memo: None,
-    };
+    let (log_paths, trash_paths) = (paths.clone(), paths.clone());
+    // a drop's folder rm on the trash's worker, off this loop (trash.rs)
+    let trash = crate::trash::Trash::worker(Box::new(move |s| log_line(&trash_paths, s)));
+    let env = GitEnv::new(&paths, Box::new(move |s| log_line(&log_paths, s)), trash);
     // the checker (approvals-design.md §4): a chat model in the role runs
     // through repl-live's one-shot, like the role lines
     let runner = crate::approvals::check::Runner::new(&bise_home::Home::from_env())

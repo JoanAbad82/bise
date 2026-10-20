@@ -99,6 +99,19 @@ pub fn is_git_dir(dir: &Path) -> bool {
     git(dir, &["rev-parse", "--is-inside-work-tree"]).is_ok_and(|s| s == "true")
 }
 
+/// The admin dir a linked worktree's `.git` file names
+/// (`gitdir: <repo>/.git/worktrees/<id>`), when it names that worktree
+/// back (its `gitdir` file): what `git worktree prune` would remove for it.
+fn admin_dir(checkout: &Path) -> Option<PathBuf> {
+    let dotgit = checkout.join(".git");
+    let text = std::fs::read_to_string(&dotgit).ok()?;
+    let d = PathBuf::from(text.trim().strip_prefix("gitdir:")?.trim());
+    let d = if d.is_absolute() { d } else { checkout.join(d) };
+    let back = std::fs::read_to_string(d.join("gitdir")).ok()?;
+    let ok = d.parent()?.file_name()? == "worktrees" && Path::new(back.trim()) == dotgit;
+    ok.then_some(d)
+}
+
 /// Run git in `dir`; stdout trimmed, or the error with stderr.
 pub fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
     git_env(dir, args, &[])
@@ -155,12 +168,20 @@ pub struct GitEnv {
     /// [`IS_GIT_FRESH_MS`] (a `git init` by hand) and after this env's own
     /// worktree ops; None: ask.
     pub git_memo: Option<(bool, u64)>,
+    /// Where a removed worktree's folder goes (trash.rs: the hub's loop
+    /// gives it to a worker).
+    pub trash: crate::trash::Trash,
 }
 
 /// How long [`GitEnv`] trusts its last `is_git` answer.
 pub const IS_GIT_FRESH_MS: u64 = 10_000;
 
 impl GitEnv {
+    /// The hub's git on `paths` (its config read now).
+    pub fn new(paths: &Paths, log: Box<dyn FnMut(&str) + Send>, trash: crate::trash::Trash) -> GitEnv {
+        GitEnv { paths: paths.clone(), config: Config::load(paths), log, merged: BTreeMap::new(), git_memo: None, trash }
+    }
+
     fn ws(&self) -> &Path {
         &self.paths.workspace
     }
@@ -248,7 +269,49 @@ impl GitEnv {
         (dir.parent()? == self.paths.worktrees).then(|| dir.to_path_buf())
     }
 
+    /// Remove the worktree `path` and its branch. Its folder (the task's
+    /// whole folder when it holds nothing else) goes aside at once and its
+    /// rm to the trash, off the loop (trash.rs); a task folder with other
+    /// checkouts, or a rename that fails: all here, as before.
     fn remove(&mut self, path: &Path, branch: &str) {
+        let target = match self.task_dir(path) {
+            Some(d) if crate::sweep::holds_only(&d, path) => Some(d),
+            Some(_) => None,
+            None => Some(path.to_path_buf()),
+        };
+        // its admin dir in the repo (`.git/worktrees/<id>`), read before
+        let admin = admin_dir(path);
+        let aside = target.filter(|t| t.exists()).map(|t| {
+            let a = crate::trash::aside_of(&t, crate::util::now_ms()).ok_or_else(|| "no parent".to_string())?;
+            std::fs::rename(&t, &a).map(|_| a).map_err(|e| format!("{}: {}", t.display(), e))
+        });
+        match aside {
+            Some(Ok(a)) => {
+                // git forgets it: its own admin dir only; unknown, `worktree
+                // prune`, which also forgets any other worktree whose
+                // folder is missing at this moment (repo-wide)
+                match admin {
+                    Some(d) => {
+                        let _ = std::fs::remove_dir_all(d);
+                    }
+                    None => {
+                        let _ = git(self.ws(), &["worktree", "prune"]);
+                    }
+                }
+                if !branch.is_empty() {
+                    let _ = git(self.ws(), &["branch", "-D", branch]);
+                }
+                self.trash.put(a);
+            }
+            Some(Err(e)) => {
+                (self.log)(&format!("worktree {} not set aside ({e}): removed on the loop", path.display()));
+                self.remove_here(path, branch);
+            }
+            None => self.remove_here(path, branch),
+        }
+    }
+
+    fn remove_here(&mut self, path: &Path, branch: &str) {
         let _ = git(
             self.ws(),
             &["worktree", "remove", "--force", &path.to_string_lossy()],
@@ -574,6 +637,7 @@ mod tests {
                 log: Box::new(|_| {}),
                 merged: BTreeMap::new(),
                 git_memo: None,
+                trash: crate::trash::Trash::now(),
             },
         )
     }
@@ -701,6 +765,67 @@ mod tests {
         let other = git(&env.paths.workspace, &["rev-parse", "sb/other"]).unwrap();
         let ob = env.worktree_create("v", false).unwrap();
         assert_eq!(ob.base_commit.as_deref(), Some(other.as_str()));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// drop-offloop: a drop never holds the loop for its folder's rm. The
+    /// trash here never runs until the test says so (a rm as slow as you
+    /// like): the drop answers, git forgets the worktree and its branch,
+    /// its path and name are free, and the trash only ever gets a folder
+    /// set aside; x spawned again at once keeps its files when it runs.
+    #[test]
+    fn a_drop_leaves_the_rm_to_the_trash() {
+        let (root, mut env) = repo("trash");
+        let held = std::sync::Arc::new(std::sync::Mutex::new(Vec::<PathBuf>::new()));
+        let h = held.clone();
+        env.trash = crate::trash::Trash::with(move |p| h.lock().unwrap().push(p));
+        let ws = env.worktree_create("x", false).unwrap();
+        let p = PathBuf::from(&ws.path);
+        let task = env.paths.worktrees.join("x");
+        // a big target (gate.sh's, and the repo's own rust/target)
+        sh(&p, "mkdir -p rust/target/debug && for i in $(seq 1 200); do echo $i > rust/target/debug/f$i; done");
+        std::fs::create_dir_all(task.join("target")).unwrap();
+        std::fs::write(task.join("target/big"), vec![0u8; 1 << 20]).unwrap();
+        let t0 = std::time::Instant::now();
+        assert_eq!(env.worktree_drop("x", &ws, &Loss::default()).unwrap(), None);
+        assert!(t0.elapsed() < std::time::Duration::from_secs(1), "{:?}", t0.elapsed());
+        assert!(!task.exists(), "the task's folder is free at the answer");
+        let list = git(&env.paths.workspace, &["worktree", "list", "--porcelain"]).unwrap();
+        assert!(!list.contains("/x/"), "git forgot it: {list}");
+        assert!(git(&env.paths.workspace, &["show-ref", "--verify", "--quiet", "refs/heads/sb/x"]).is_err());
+        let queued = held.lock().unwrap().clone();
+        assert_eq!(queued.len(), 1);
+        let aside = &queued[0];
+        assert!(crate::trash::is_aside(&aside.file_name().unwrap().to_string_lossy()), "{}", aside.display());
+        assert!(aside.join("target/big").exists() && aside.join("repo/rust/target/debug/f1").exists());
+        // x again, at once: the same folder, the same branch
+        let again = env.worktree_create("x", false).unwrap();
+        assert_eq!(PathBuf::from(&again.path), p);
+        assert_eq!(again.branch.as_deref(), Some("sb/x"));
+        std::fs::write(p.join("mine"), "new x").unwrap();
+        // the trash runs now
+        for a in queued {
+            std::fs::remove_dir_all(a).unwrap();
+        }
+        assert_eq!(std::fs::read_to_string(p.join("mine")).unwrap(), "new x");
+        assert_eq!(git(&p, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap(), "sb/x");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// Only that worktree's admin dir goes: a sibling whose folder is
+    /// missing at that moment stays known to git (no repo-wide prune).
+    #[test]
+    fn a_drop_forgets_only_its_own_worktree() {
+        let (root, mut env) = repo("admin");
+        let a = env.worktree_create("a", false).unwrap();
+        let b = env.worktree_create("b", false).unwrap();
+        assert!(admin_dir(Path::new(&a.path)).is_some());
+        let gone = root.join("b-moved");
+        std::fs::rename(&b.path, &gone).unwrap();
+        env.worktree_drop("a", &a, &Loss::default()).unwrap();
+        let list = git(&env.paths.workspace, &["worktree", "list", "--porcelain"]).unwrap();
+        assert!(!list.contains(&a.path), "{list}");
+        assert!(list.contains(&b.path), "b is still known: {list}");
         let _ = std::fs::remove_dir_all(root);
     }
 
