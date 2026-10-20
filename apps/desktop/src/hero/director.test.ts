@@ -3,7 +3,7 @@
 // safe frame, and the visitor keeps the camera until he lets it go.
 import { describe, expect, it } from 'vitest';
 import { FILM_S, FLIGHT_FRAME, KILN, PAGE, SHOTS } from './cast';
-import { aimCam, aimInMap, FADE_X, fitCam, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, inside, LEAD_S, MIN_ZOOM, OFFICE_AIM, resumes, RESUME_IDLE_S, SAFE, shotAt, shotCam, springStep, still } from './director';
+import { aimCam, aimInMap, FADE_X, fitCam, FOCUS, NARROW_W, narrowness, glideCam, glideOf, GLIDE_MIN_S, holdCam, inFrame, inside, LEAD_S, MIN_ZOOM, OFFICE_AIM, resumes, RESUME_IDLE_S, SAFE, shotAt, shotCam, springStep, still } from './director';
 import { panAround, zoomAround } from './gestures';
 import { eggWords } from './overlay';
 
@@ -153,6 +153,44 @@ describe('a whole-office shot', () => {
       const p = inFrame(c ?? { zoom: 1, u: 0.5, v: 0.5 }, { u: (box.u0 + box.u1) / 2, v: (box.v0 + box.v1) / 2 });
       expect(p.u).toBeCloseTo(OFFICE_AIM.x, 4);
       expect(p.v).toBeCloseTo(OFFICE_AIM.y, 4);
+    }
+  });
+});
+
+describe('a shot on a bim (Gabriel: closer to the bim doing the thing, more on a phone)', () => {
+  const box = { u0: 0.4, u1: 0.6, v0: 0.4, v1: 0.6 };
+  const geo = (w: number, h: number, bims: Record<string, { u: number; v: number }> = { a: { u: 0.5, v: 0.5 } }) => ({
+    town: () => box,
+    office: () => box,
+    spot: () => null,
+    bim: (_o: string, n: string) => bims[n] ?? null,
+    frame: () => ({ w, h, bim: 20 }),
+  });
+  /** the bim's height in the shot's frame, fractions of its height */
+  const height = (size: 'follow' | 'close' | 'tight', w: number, h: number): number => {
+    const c = shotCam({ at: 0, size, subject: { k: 'bim', office: KILN, name: 'a' } }, geo(w, h));
+    return ((c?.zoom ?? 0) * 20) / h;
+  };
+
+  it('shows the bim at least FOCUS of the frame, more on a narrow frame than on a desk one', () => {
+    for (const size of ['tight', 'follow', 'close'] as const) {
+      expect(height(size, 864, 900)).toBeGreaterThanOrEqual(FOCUS[size].desk - 1e-9);
+      expect(height(size, 390, 490)).toBeGreaterThanOrEqual(FOCUS[size].narrow - 1e-9);
+      expect(height(size, 390, 490)).toBeGreaterThan(height(size, 864, 900));
+    }
+    expect(narrowness(NARROW_W.narrow)).toBe(1);
+    expect(narrowness(NARROW_W.desk)).toBe(0);
+  });
+
+  it('keeps both bims of a pair in the frame', () => {
+    const bims = { a: { u: 0.47, v: 0.5 }, b: { u: 0.53, v: 0.5 } };
+    for (const [w, h] of [[390, 490], [864, 900]] as const) {
+      const c = shotCam({ at: 0, size: 'follow', subject: { k: 'pair', office: KILN, names: ['a', 'b'] } }, geo(w, h, bims));
+      for (const p of Object.values(bims)) {
+        const q = inFrame(c ?? { zoom: 1, u: 0.5, v: 0.5 }, p);
+        expect(q.u).toBeGreaterThanOrEqual(0);
+        expect(q.u).toBeLessThanOrEqual(1);
+      }
     }
   });
 });

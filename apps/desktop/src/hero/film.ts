@@ -62,6 +62,8 @@ interface Probe {
   hands: string;
   shot: number;
   cam: Cam;
+  /** a bim's height at the last frame, fractions of the frame's height (director.ts FOCUS) */
+  bimH?: number;
   /** the last frames' phases, ms: the offices' brains, their poses, the draw, the words */
   phases: { brain: number; pose: number; draw: number; words: number }[];
   /** each office at the last frame: drawn live, its bims (where the driver poses them, on the canvas or not) */
@@ -91,6 +93,8 @@ const EGG_S = 2;
 const BODY_Y = 0.9;
 /** an office's walls' height, world units: its box on the fit goes that high */
 const WALL_Y = 2.6;
+/** a bim's height, feet to the top of its head, world units (render/bim.ts: its head at HEAD_Y, 0.22 round) */
+const BIM_H = 1.15;
 
 export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   let dark = opts.theme === 'dark';
@@ -195,6 +199,12 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       const b = steps.get(id)?.frames.find((x) => x.name === name);
       if (!f || !p || !b) return null;
       return frac(f, p.x + b.pose.x, BODY_Y, p.z + b.pose.z);
+    },
+    frame() {
+      const f = fit();
+      const w = box.clientWidth;
+      const h = box.clientHeight;
+      return f && w > 0 && h > 0 ? { w, h, bim: BIM_H / f.scale } : null;
     },
   };
   const officeZoom = (id: string | null): number | null => {
@@ -445,6 +455,8 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       probe.hands = hands.k;
       probe.shot = shotIx;
       probe.cam = spring.cam;
+      const fr = geo.frame?.() ?? null;
+      probe.bimH = fr === null ? 0 : (fr.bim * spring.cam.zoom) / fr.h;
       const live = new Set(r.liveIds());
       probe.offices = CAST.map((c) => ({
         id: c.id,

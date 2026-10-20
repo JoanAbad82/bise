@@ -171,7 +171,49 @@ export interface Geometry {
   bim(office: string, name: string): At | null;
   /** the lawn's top, its corners on the fit in order round it (a diamond): a film shot shows nothing past it */
   ground?(): readonly At[] | null;
+  /** the frame, css px, and a bim's height in it at the fit (zoom 1): what FOCUS sizes a bim by */
+  frame?(): Frame | null;
 }
+
+/** the frame the film plays in, css px; `bim`: a bim's height (feet to head) at the town's fit */
+export interface Frame {
+  readonly w: number;
+  readonly h: number;
+  readonly bim: number;
+}
+
+/**
+ * a shot on a bim (or a pair, or main's desk): the least height of a bim, fractions of the frame's
+ * height, on a desktop frame and a narrow one (Gabriel: « s'approcher plus [du bim qui fait le truc
+ * intéressant], surtout sur mobile, où la map entière est petite »). Past its size's own zoom: the
+ * camera only comes closer.
+ */
+export const FOCUS: Readonly<Record<'tight' | 'follow' | 'close', { readonly desk: number; readonly narrow: number }>> = {
+  tight: { desk: 0.07, narrow: 0.1 },
+  follow: { desk: 0.1, narrow: 0.15 },
+  close: { desk: 0.14, narrow: 0.2 },
+};
+/** a frame this narrow (css px) or narrower takes FOCUS's narrow heights; as wide or wider, its desk ones; between, a blend */
+export const NARROW_W = { narrow: 480, desk: 720 } as const;
+
+/** how narrow a frame is: 0 desk, 1 narrow (a phone), by its width. Pure. */
+export const narrowness = (w: number): number => clamp((NARROW_W.desk - w) / (NARROW_W.desk - NARROW_W.narrow), 0, 1);
+
+/** the zoom that shows a bim `frac` of the frame's height. Pure. */
+export const bimZoom = (f: Frame, frac: number): number => (frac * f.h) / Math.max(1e-6, f.bim);
+
+/** a shot's FOCUS zoom on this frame, null: not a focus shot (an office, the wide, the closest). Pure. */
+export function focusZoom(shot: Shot, f: Frame | null): number | null {
+  if (f === null || f.w <= 0 || f.h <= 0 || f.bim <= 0) return null;
+  if (shot.subject.k === 'office' || shot.subject.k === 'town') return null;
+  if (shot.size !== 'tight' && shot.size !== 'follow' && shot.size !== 'close') return null;
+  const n = narrowness(f.w);
+  const want = FOCUS[shot.size];
+  return bimZoom(f, want.desk + (want.narrow - want.desk) * n);
+}
+
+/** a pair's two bims stay this far inside the frame (fractions), its left past the page's fade on a desk frame */
+export const PAIR_IN = 0.08;
 
 /** The office a subject is in, null for the town. Pure. */
 export const officeOf = (s: Subject): string | null => (s.k === 'town' ? null : s.office);
@@ -219,7 +261,31 @@ function sizedCam(shot: Shot, g: Geometry): Cam | null {
   // a subject gone missing (it left): its office's shot, never an empty frame
   // (its OFFICE framing, on the lawn: the bare fit showed paper while order-test was not in yet, 0:40.5)
   if (at === null) return aimInMap(middle, office.zoom * OFFICE_TIGHT, OFFICE_AIM.x, OFFICE_AIM.y, ground);
-  return aimInMap(at, office.zoom * CLOSER[shot.size], shot.frame?.x ?? SAFE.x, shot.frame?.y ?? SAFE.y, ground);
+  const fx = shot.frame?.x ?? SAFE.x;
+  const fy = shot.frame?.y ?? SAFE.y;
+  const frame = g.frame?.() ?? null;
+  // the bim that does the thing, big enough in the frame (FOCUS), a pair both in it
+  let zoom = Math.max(office.zoom * CLOSER[shot.size], focusZoom(shot, frame) ?? 0);
+  if (s.k === 'pair') zoom = Math.min(zoom, Math.max(office.zoom * CLOSER[shot.size], pairZoom(s, g, at, fx, fy, frame)));
+  return aimInMap(at, zoom, fx, fy, ground);
+}
+
+/** the closest a pair's shot gets with both its bims inside the frame (PAIR_IN in, past the page's fade on a desk frame). Pure. */
+function pairZoom(s: Extract<Subject, { k: 'pair' }>, g: Geometry, at: At, fx: number, fy: number, frame: Frame | null): number {
+  const left = frame === null ? FADE_X : FADE_X * (1 - narrowness(frame.w));
+  let z = MAX_ZOOM;
+  for (const n of s.names) {
+    const b = g.bim(s.office, n);
+    if (b === null) continue;
+    const du = b.u - at.u;
+    const dv = b.v - at.v;
+    // the bim's frame point fx + du·z stays in [left + PAIR_IN, 1 - PAIR_IN], fy + dv·z in [PAIR_IN, 1 - PAIR_IN]
+    if (du > 1e-9) z = Math.min(z, (1 - PAIR_IN - fx) / du);
+    if (du < -1e-9) z = Math.min(z, (fx - left - PAIR_IN) / -du);
+    if (dv > 1e-9) z = Math.min(z, (1 - PAIR_IN - fy) / dv);
+    if (dv < -1e-9) z = Math.min(z, (fy - PAIR_IN) / -dv);
+  }
+  return z;
 }
 
 /** The shot playing at film time T: the last one whose camera has left (LEAD_S before its action). Pure. */
