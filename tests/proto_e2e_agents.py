@@ -104,7 +104,9 @@ def answers_round(c, E):
     card2 = card_of(c, "which screenshot")
     c.wait_idle("main", timeout=30)
     n_t3 = len([r for r in E.fake_requests() if r.get("agent") == "t3"])
-    ok(req(c, "card/answer", card=card2["id"], reply="this one", files=[png]), "card/answer with files")
+    # his pasted image goes as a part (card/answer's older 'files' list went in ff9c5cdd5, issue 31)
+    parts = [{"kind": "text", "text": "this one"}, {"kind": "image", "name": "[Image #1]", "source": png}]
+    ok(req(c, "card/answer", card=card2["id"], reply="this one", parts=parts), "card/answer with an image part")
     c.wait(lambda: not c.cards(), 30, "the screenshot card closed by the answer")
     c.wait(lambda: len([r for r in E.fake_requests() if r.get("agent") == "t3"]) > n_t3, 30, "t3's model called after the answer")
     c.wait_idle("t3", timeout=30)
