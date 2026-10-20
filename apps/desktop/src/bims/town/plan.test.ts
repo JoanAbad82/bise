@@ -21,9 +21,17 @@ function officeOf(n: number): ReturnType<typeof layoutOf> {
   return o;
 }
 
-/** a project's site: n agents, that many jobs done (its stage) and days used (its garden) */
+/** a project's site: n agents, that many jobs done (its stage) and days used (its garden); its
+ *  ground drawn once per size, stage and garden (siteOf only copies the id) */
+const grounds = new Map<string, TownSite>();
 function site(id: string, n: number, jobs: number, days: number): TownSite {
-  return siteOf(id, officeOf(n), growOf({ jobs_done: jobs, days_used: days, artifacts_made: 0 }));
+  const key = `${String(n)}|${String(jobs)}|${String(days)}`;
+  let s = grounds.get(key);
+  if (s === undefined) {
+    s = siteOf(id, officeOf(n), growOf({ jobs_done: jobs, days_used: days, artifacts_made: 0 }));
+    grounds.set(key, s);
+  }
+  return { ...s, id };
 }
 
 const JOBS = [0, 3, 15, 60, 150, 1000];
