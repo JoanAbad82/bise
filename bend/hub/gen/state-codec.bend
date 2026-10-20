@@ -4574,14 +4574,14 @@ def Xs.photo_round(x):
 
 def St.photo_kvs(r: S.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match r:
-    case S.St{+agents, +order, +hot, +cards, +notes, +next_msg, +next_card, +tm, +x, +paused, +old, +gone}:
+    case S.St{+agents, +order, +hot, +cards, +notes, +next_msg, +next_card, +tm, +x, +paused, +old, +gone, _}:
       [J.kv("agents", J.JArr{Agent.photo_list(agents)}), J.kv("order", J.JArr{K.jstrs(order)}), J.kv("hot", J.JArr{MRec.photo_list(hot)}), J.kv("cards", J.JArr{Card.journal_list(cards)}), J.kv("notes", J.JArr{K.jstrs(notes)}), J.kv("next_msg", J.JNum{next_msg}), J.kv("next_card", J.JNum{next_card}), J.kv("tm", Tms.photo_json(tm)), J.kv("x", Xs.photo_json(x)), J.kv("paused", K.jmaybe_n(paused)), J.kv("old", J.JArr{MRec.photo_list(old)}), J.kv("gone", J.JArr{Item.photo_list(gone)})]
 
 def St.photo_json(r: S.St) -> J.Json:
   J.obj(St.photo_kvs(r))
 
 def St.photo_of(+j: J.Json) -> S.St:
-  S.St{Agent.photo_list_of(rd.j(J.get(j, "agents"))), rd.ss(J.get(j, "order")), MRec.photo_list_of(rd.j(J.get(j, "hot"))), Card.journal_list_of(rd.j(J.get(j, "cards"))), rd.ss(J.get(j, "notes")), rd.n(J.get(j, "next_msg")), rd.n(J.get(j, "next_card")), Tms.photo_of(rd.j(J.get(j, "tm"))), Xs.photo_of(rd.j(J.get(j, "x"))), K.opt_n(J.get(j, "paused")), MRec.photo_list_of(rd.j(J.get(j, "old"))), Item.photo_list_of(rd.j(J.get(j, "gone")))}
+  S.St{Agent.photo_list_of(rd.j(J.get(j, "agents"))), rd.ss(J.get(j, "order")), MRec.photo_list_of(rd.j(J.get(j, "hot"))), Card.journal_list_of(rd.j(J.get(j, "cards"))), rd.ss(J.get(j, "notes")), rd.n(J.get(j, "next_msg")), rd.n(J.get(j, "next_card")), Tms.photo_of(rd.j(J.get(j, "tm"))), Xs.photo_of(rd.j(J.get(j, "x"))), K.opt_n(J.get(j, "paused")), MRec.photo_list_of(rd.j(J.get(j, "old"))), Item.photo_list_of(rd.j(J.get(j, "gone"))), Nil{}}
 
 law St.photo.agents:
   for +agents: List<&2, S.Agent>
@@ -4596,9 +4596,10 @@ law St.photo.agents:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {Agent.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "agents"))) == agents : List<&2, S.Agent>}
+  for +arch: List<&2, S.Agent>
+  {Agent.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "agents"))) == agents : List<&2, S.Agent>}
 
-def St.photo.agents(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.agents(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   Agent.photo_list_round(agents)
 
 law St.photo.order:
@@ -4614,9 +4615,10 @@ law St.photo.order:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "order")) == order : List<&2, String>}
+  for +arch: List<&2, S.Agent>
+  {rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "order")) == order : List<&2, String>}
 
-def St.photo.order(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.order(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   K.strs_round(order)
 
 law St.photo.hot:
@@ -4632,9 +4634,10 @@ law St.photo.hot:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "hot"))) == hot : List<&2, S.MRec>}
+  for +arch: List<&2, S.Agent>
+  {MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "hot"))) == hot : List<&2, S.MRec>}
 
-def St.photo.hot(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.hot(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   MRec.photo_list_round(hot)
 
 law St.photo.cards:
@@ -4650,9 +4653,10 @@ law St.photo.cards:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))) == cards : List<&2, S.Card>}
+  for +arch: List<&2, S.Agent>
+  {Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "cards"))) == cards : List<&2, S.Card>}
 
-def St.photo.cards(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.cards(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   Card.journal_list_round(cards)
 
 law St.photo.notes:
@@ -4668,9 +4672,10 @@ law St.photo.notes:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")) == notes : List<&2, String>}
+  for +arch: List<&2, S.Agent>
+  {rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "notes")) == notes : List<&2, String>}
 
-def St.photo.notes(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.notes(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   K.strs_round(notes)
 
 law St.photo.next_msg:
@@ -4686,9 +4691,10 @@ law St.photo.next_msg:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")) == next_msg : Nat}
+  for +arch: List<&2, S.Agent>
+  {rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_msg")) == next_msg : Nat}
 
-def St.photo.next_msg(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.next_msg(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   {==}
 
 law St.photo.next_card:
@@ -4704,9 +4710,10 @@ law St.photo.next_card:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")) == next_card : Nat}
+  for +arch: List<&2, S.Agent>
+  {rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_card")) == next_card : Nat}
 
-def St.photo.next_card(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.next_card(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   {==}
 
 law St.photo.tm:
@@ -4722,9 +4729,10 @@ law St.photo.tm:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))) == tm : S.Tms}
+  for +arch: List<&2, S.Agent>
+  {Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "tm"))) == tm : S.Tms}
 
-def St.photo.tm(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.tm(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   Tms.photo_round(tm)
 
 law St.photo.x:
@@ -4740,9 +4748,10 @@ law St.photo.x:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))) == x : S.Xs}
+  for +arch: List<&2, S.Agent>
+  {Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))) == x : S.Xs}
 
-def St.photo.x(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.x(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   Xs.photo_round(x)
 
 law St.photo.paused:
@@ -4758,9 +4767,10 @@ law St.photo.paused:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")) == paused : Maybe<&2, Nat>}
+  for +arch: List<&2, S.Agent>
+  {K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")) == paused : Maybe<&2, Nat>}
 
-def St.photo.paused(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.paused(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   match paused:
     case None{}:
       {==}
@@ -4780,9 +4790,10 @@ law St.photo.old:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))) == old : List<&2, S.MRec>}
+  for +arch: List<&2, S.Agent>
+  {MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))) == old : List<&2, S.MRec>}
 
-def St.photo.old(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.old(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   MRec.photo_list_round(old)
 
 law St.photo.gone:
@@ -4798,9 +4809,10 @@ law St.photo.gone:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone"))) == gone : List<&2, S.Item>}
+  for +arch: List<&2, S.Agent>
+  {Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))) == gone : List<&2, S.Item>}
 
-def St.photo.gone(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
+def St.photo.gone(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
   Item.photo_list_round(gone)
 
 # the fields it carries come back (the others at their default)
@@ -4817,31 +4829,23 @@ law St.photo_round_by_fields:
   for +paused: Maybe<&2, Nat>
   for +old: List<&2, S.MRec>
   for +gone: List<&2, S.Item>
-  {St.photo_of(St.photo_json(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})) == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+  for +arch: List<&2, S.Agent>
+  {St.photo_of(St.photo_json(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})) == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
 
-def St.photo_round_by_fields(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone):
-  %Equal.sym(List<&2, S.Agent>, Agent.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "agents"))), agents, St.photo.agents(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{_, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "order")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "hot"))), Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))), rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(List<&2, String>, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "order")), order, St.photo.order(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, _, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "hot"))), Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))), rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(List<&2, S.MRec>, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "hot"))), hot, St.photo.hot(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, _, Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))), rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(List<&2, S.Card>, Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "cards"))), cards, St.photo.cards(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, _, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(List<&2, String>, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "notes")), notes, St.photo.notes(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, _, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(Nat, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_msg")), next_msg, St.photo.next_msg(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, _, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(Nat, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "next_card")), next_card, St.photo.next_card(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, _, Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(S.Tms, Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "tm"))), tm, St.photo.tm(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, _, Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(S.Xs, Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "x"))), x, St.photo.x(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, _, K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(Maybe<&2, Nat>, K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "paused")), paused, St.photo.paused(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, _, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(List<&2, S.MRec>, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "old"))), old, St.photo.old(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, _, Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone")))} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
-  %Equal.sym(List<&2, S.Item>, Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone})), "gone"))), gone, St.photo.gone(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, _} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone} : S.St}
+def St.photo_round_by_fields(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch):
+  %Equal.sym(List<&2, S.Agent>, Agent.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "agents"))), agents, St.photo.agents(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{_, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "order")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "hot"))), Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "cards"))), rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(List<&2, String>, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "order")), order, St.photo.order(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, _, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "hot"))), Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "cards"))), rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(List<&2, S.MRec>, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "hot"))), hot, St.photo.hot(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, _, Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "cards"))), rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(List<&2, S.Card>, Card.journal_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "cards"))), cards, St.photo.cards(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, hot, _, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "notes")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(List<&2, String>, rd.ss(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "notes")), notes, St.photo.notes(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, hot, cards, _, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_msg")), rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_msg")), next_msg, St.photo.next_msg(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, hot, cards, notes, _, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_card")), Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(Nat, rd.n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "next_card")), next_card, St.photo.next_card(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, hot, cards, notes, next_msg, _, Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "tm"))), Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(S.Tms, Tms.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "tm"))), tm, St.photo.tm(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, _, Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))), K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(S.Xs, Xs.photo_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "x"))), x, St.photo.x(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, _, K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(Maybe<&2, Nat>, K.opt_n(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "paused")), paused, St.photo.paused(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, _, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(List<&2, S.MRec>, MRec.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "old"))), old, St.photo.old(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, _, Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
+  %Equal.sym(List<&2, S.Item>, Item.photo_list_of(rd.j(J.get(J.obj(St.photo_kvs(S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch})), "gone"))), gone, St.photo.gone(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, arch)) : {S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, _, Nil{}} == S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone, Nil{}} : S.St}
   {==}
-
-law St.photo_round:
-  for x: S.St
-  {St.photo_of(St.photo_json(x)) == x : S.St}
-
-def St.photo_round(x):
-  match x:
-    case S.St{agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone}:
-      St.photo_round_by_fields(agents, order, hot, cards, notes, next_msg, next_card, tm, x, paused, old, gone)
 
 # ---- the view shapes, pinned on fixtures/core_view.jsonl (a key order change is red) ----
 
