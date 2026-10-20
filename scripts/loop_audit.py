@@ -91,7 +91,7 @@ def session_view(events):
     [(start, end, class, cmd)], lands [t], edits [t]."""
     agent, turns, calls, lands, edits = None, [], [], [], []
     pending, open_turn, results = {}, None, {}
-    causes, want_cause = {}, False
+    causes, wakes, want_cause = {}, {}, False
     for e in events:
         t, d = e.get("type"), e.get("data") or {}
         at = iso_epoch(e["at"]) if "at" in e else None
@@ -103,6 +103,7 @@ def session_view(events):
         elif want_cause and t in ("agent_message", "user_message"):
             text = ((d.get("content") or [{}])[0]).get("text", "")
             causes[open_turn] = wake_cause(text)
+            wakes[open_turn] = text[:300]
             want_cause = False
         elif t == "turn_ended" and open_turn is not None:
             turns.append((open_turn, at))
@@ -129,7 +130,7 @@ def session_view(events):
                 lands.append(at)
     if open_turn is not None and calls:
         turns.append((open_turn, max(c[1] for c in calls)))
-    return {"agent": agent, "turns": turns, "calls": calls, "lands": lands, "edits": edits, "causes": causes}
+    return {"agent": agent, "turns": turns, "calls": calls, "lands": lands, "edits": edits, "causes": causes, "wakes": wakes}
 
 
 def wake_cause(text):
@@ -433,17 +434,28 @@ def queued_at(hv, agent, s, e):
 
 
 def heavy_waits(h, since):
-    """heavy-run's log: <submit> <start> <end> <slot> <rc> <cwd> <cmd>."""
+    """heavy-run's log: a line when a job gets its slot, <submit> <start> -
+    <slot> <cwd> <cmd>, and since flow-time one when it ends, <submit> <start>
+    <end> <slot> <cwd> <cmd> rc=<n>: one row per job, its end from the second
+    line, else the next start on its slot (capped at 3 h)."""
     path = os.path.join(h, "run", "heavy.log")
-    out = []
+    rows, ends = {}, {}
     if os.path.exists(path):
         for line in open(path, errors="replace"):
-            f = line.split("	")
-            if len(f) >= 3 and f[0].isdigit() and int(f[0]) >= since:
-                out.append({"submit": int(f[0]), "start": int(f[1]) if f[1].isdigit() else None,
-                            "end": int(f[2]) if f[2].isdigit() else None, "cmd": f[-1].strip()[:80],
-                            # heavy-run writes <submit> <start> - <slot> <cwd> <cmd>: the cwd is next to last
-                            "cwd": f[-2] if len(f) >= 5 else ""})
+            f = line.rstrip(NL).split("\t")
+            if len(f) < 6 or not f[0].isdigit() or int(f[0]) < since or not f[1].isdigit():
+                continue
+            key = (f[0], f[1], f[3])
+            if f[2].isdigit():
+                ends[key] = int(f[2])
+                continue
+            rows[key] = {"submit": int(f[0]), "start": int(f[1]), "end": None, "slot": f[3],
+                         "cwd": f[4], "cmd": f[5].strip()[:80]}
+    out = sorted(rows.values(), key=lambda x: x["start"])
+    nxt = {}
+    for x in reversed(out):
+        x["end"] = ends.get((str(x["submit"]), str(x["start"]), x["slot"])) or min(nxt.get(x["slot"], x["start"] + 3600), x["start"] + 3 * 3600)
+        nxt[x["slot"]] = x["start"]
     return out
 
 
@@ -543,7 +555,20 @@ def audit(h, hub, since):
     rep["heavy"] = {"jobs": len(hv), "wait_p50": med(starts), "wait_p90": pct(starts, 0.9), "wait_max": max(starts or [0])}
     rep["reds"] = reds
     rep["adhoc"] = adhoc
+    rep["flow"] = flow_section(h, hub, since, ss)
     return rep
+
+
+def flow_section(h, hub, since, ss):
+    """spawn -> on main -> archived of the tasks archived in the window (scripts/flow_time.py)."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import flow_time
+    path = os.path.join(h, "hubs", hub, "journal.jsonl")
+    if not os.path.exists(path):
+        return None
+    repo = os.environ.get("FLOW_REPO") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = flow_time.flow(read_jsonl(path), ss, heavy_waits(h, since - 7 * 86400), repo, since)
+    return out["summary"]
 
 
 def group(cs):
@@ -560,6 +585,11 @@ def fmt_s(v):
     return "%.0f s" % v if v < 120 else ("%.1f min" % (v / 60) if v < 7200 else "%.1f h" % (v / 3600))
 
 
+def flow_p50(rep):
+    v = ((rep.get("flow") or {}).get("steps", {}).get("spawn -> on main") or {}).get("p50")
+    return None if v is None else round(v)
+
+
 # health checks: (name, value from the report, threshold, ok when value <= threshold)
 def health(rep):
     q, f = rep["gates"]["quick"], rep["gates"]["full"]
@@ -573,6 +603,8 @@ def health(rep):
         ("wakes that ran to --max", len(rep["waits"]["ended_at_max"]), 0),
         # one and quick's desktop_check goes back to the whole pnpm check (review-gates m_33177)
         ("vitest-related misses", len(rep["related_misses"]), 0),
+        # Gabriel's metric (flow-time): a task's spawn to its code on main
+        ("spawn -> on main p50 (s)", flow_p50(rep), 3 * 3600),
     ]
     return [(n, v, lim, v is None or v <= lim) for n, v, lim in checks]
 
@@ -605,6 +637,17 @@ def report(rep):
             "%s %d %s" % (a, n, fmt_s(m)) for a, n, m in sorted(
                 ((a, len(v), med(v)) for a, v in group(cs).items()), key=lambda r: -r[1])))
     w("")
+    fl = rep.get("flow")
+    if fl:
+        w("## spawn -> on main -> archived (%d tasks archived, %d with code on main)" % (fl["tasks"], fl["on_main"]))
+        for k, v in fl["steps"].items():
+            w("- %-22s p50 %-8s p90 %s" % (k, fmt_s(v["p50"]), fmt_s(v["p90"])))
+        whole = sum(fl["causes_h"].values()) or 1
+        for k, v in list(fl["causes_h"].items())[:8]:
+            w("- %-42s %6.1f h  %3.0f %%" % (k, v, 100 * v / whole))
+        if fl["slowest"]:
+            w("- slowest to main: " + ", ".join("%s %.1f h" % kv for kv in fl["slowest"]))
+        w("")
     w("## gates")
     st = rep["gate_logs_start"]
     if st is None or st > rep["since"]:

@@ -30,7 +30,8 @@ parsing on synthetic traces.
 One source per fact: the agents' own copies of a gate's output (their
 `$TMPDIR`, deleted at the task's drop) are not read. Runs before the first
 gate log are lost; the report says so (`gate logs start <date>`).
-| `~/.bise/run/heavy.log` | heavy-run: when each job was submitted and when it got its slot |
+| `~/.bise/run/heavy.log` | heavy-run: when each job was submitted and when it got its slot (a line), when it ended and its rc (a second line, since flow-time) |
+| git (main's history and reflog) | when main first held each commit; a task's commits are the ones whose subject starts like its `sb land "<message>"` (scripts/flow_time.py) |
 
 ## What it computes
 
@@ -42,6 +43,16 @@ gate log are lost; the report says so (`gate logs start <date>`).
   turn: `wait:job` (a wake on a job, a file or a background command),
   `wait:timer` (an `sb every` timer), `wait:agent` (another agent's
   message), `wait:user`.
+- **spawn -> on main -> archived** (flow-time, Gabriel's metric: « le
+  temps entre le lancement d'un agent et le code mergé sur main et l'agent
+  archivé »): per task archived in the window, spawn -> first commit ->
+  its code on main -> archived, p50 and p90, and where the hours went: each
+  second of spawn -> on main counts once, in the first that holds it (its
+  heavy job queued, by kind; running; the agent in a turn; the gap before
+  its next turn, named by the message that woke it: the user's decision,
+  a peer, main, a provider outage, a freeze, its own timer, a job), then
+  the drop wait. Tasks with no commit on main are counted apart.
+  `scripts/flow_time.py` (its self-test: `python3 scripts/flow_time.py`).
 - **gates**: runs, green share, green time p50/p90, the wait for the
   full-gate lock, each quick step's p50, and the red runs by what was red
   (a test red even alone, a step, line_gate, a setup; else the rc). A run
@@ -64,6 +75,7 @@ gate log are lost; the report says so (`gate logs start <date>`).
 | full gates red | 20 % | a red gate for nothing costs a rerun; above that, fix flakes first |
 | wakes that ran to --max | 0 | a dead job nobody noticed |
 | vitest-related misses | 0 | quick's desktop_check runs only the vitest files related to the change (gate.sh desktop_related, `<gate dir>/vitest-related.jsonl`); a file red in a full gate that a green related quick before it skipped is a suspect miss: one, and quick goes back to the whole `pnpm check` (review-gates m_33177) |
+| spawn -> on main p50 | 3 h | Gabriel's metric (flow-time): 4.8 h on the 111 tasks archived 16-20 oct |
 
 ## How to read it, what to do
 

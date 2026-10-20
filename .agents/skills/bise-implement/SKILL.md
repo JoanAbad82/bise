@@ -48,6 +48,9 @@ each from this repo. It is short. The architect agent keeps it current.
 
 - apps/desktop: `pnpm check` + `pnpm test:land` (the fixed harness set in
   `apps/desktop/tests/harness/land.mjs`, off-screen, under the heavy lock).
+- heavy-run queues by rank (docs/loop-speed.md §10.6): your own script that
+  wraps a land check runs as `heavy-run --land`; an experiment, a load test,
+  shots or a measure as `heavy-run --low`, never `--prio`.
 
 ## Unsure? Ask before writing it
 

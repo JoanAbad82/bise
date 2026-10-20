@@ -1,0 +1,202 @@
+#!/bin/bash
+# heavy-run [--alone] [--land] [--low] [--prio] <command...>
+# heavy-run --install   copy this file to ~/.bise/run/heavy-run (new file + mv)
+# The source of ~/.bise/run/heavy-run (scripts/heavy-run, since flow-time,
+# 2026-10-20; tests/heavy_run_test.py). Runs a heavy job (cargo, gates,
+# builds, playwright, test:land) in a shared slot: 4 slots on AC power, 2 on
+# battery (the user's rule: 2 since 2026-10-09, « on peut paralléliser » on
+# AC, 2026-10-18). nice 10 on AC, 15 on battery.
+#   slot 1 = ~/.bise/run/heavy.lock (the old single lock: old callers still count)
+#   slot 2 = ~/.bise/run/heavy2.lock
+#   slots 3-4 = ~/.bise/run/heavy3.lock, heavy4.lock (AC power only)
+# The queue (flow-time, 2026-10-20): each waiting job holds a ticket,
+# ~/.bise/run/queue/<rank>-<submitted>-<pid>; a job takes a free slot only
+# when fewer live tickets are ahead of it than slots are free, so jobs start
+# by rank, then first come first served (before: every waiter polled every
+# 2 s and the luckiest got the slot; 25 % of the tasks' spawn-to-main time
+# was this queue). Ranks:
+#   0 --prio  the user's priority work (his own ask, never an experiment);
+#     --alone too (the nightly), and while it waits nothing else starts
+#   1 a land check, one step from main: tests/gate.sh full or rerun,
+#     pnpm test:land, or --land (a wrapper script that runs one of them)
+#   2 the rest
+#   3 --low   experiments, load tests, shots, repacks: whatever no land waits on
+# --alone takes every slot (the nightly, a benchmark that needs a quiet
+#         machine); on battery it waits for AC power. A slot held without
+#         heavy-run (an old caller's lockf) is busy all the same: every slot
+#         is probed.
+# heavy.log: a line when the job gets its slot, "<submitted> <started> -
+# <slot> <cwd> <command>", and one when it ends, "<submitted> <started>
+# <ended> <slot> <cwd> <command> rc=<n>" (scripts/loop_audit.py reads both).
+# The whole body is one function, read before it runs: an edit of this file
+# while jobs wait in it can't make them run half-old, half-new text (bash
+# reads a script as it goes; an in-place edit killed a waiting job with
+# "said: unbound variable", 2026-10-12). --install writes a new file + mv.
+heavy_run() {
+set -u
+if [ "${1:-}" = --install ]; then
+  dst="$HOME/.bise/run/heavy-run"
+  mkdir -p "${dst%/*}" && cp "$0" "$dst.new.$$" && chmod 755 "$dst.new.$$" && mv -f "$dst.new.$$" "$dst" \
+    && echo "installed $dst"
+  return $?
+fi
+# no heavy-run inside a heavy job (gate-reds, main m_33473): a job holding a
+# slot that asks for one again waits on the others, and a --alone job holding
+# the other 3 waits for its slot: both wait forever (pr20's run.sh, 40 min on
+# 2026-10-19). Each job runs with HEAVY_SLOT="<slot> <pid>" (below); a call
+# with that pid among its ancestors is refused. A HEAVY_SLOT inherited by a
+# process that outlived its job (a daemon) is not an ancestor: it may run.
+if [ -n "${HEAVY_SLOT:-}" ]; then
+  hp="${HEAVY_SLOT##* }" p=$$
+  while [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null; do
+    if [ "$p" = "$hp" ]; then
+      echo "heavy-run: refused: this command already runs inside a heavy job (slot ${HEAVY_SLOT% *}, pid $hp); a nested heavy-run waits for a second slot while holding one, and deadlocks against a --alone job. Run it directly: the slot you hold covers it." >&2
+      return 2
+    fi
+    p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+  done
+fi
+# launchd jobs start with maxfiles 256: bend-tui's tests then panic on
+# UnixStream::pair() (EMFILE) and a full gate goes red for nothing (core-b,
+# 2026-10-12). Raise the soft limit for every heavy job, whoever starts it.
+ulimit -n 10240 2>/dev/null || ulimit -n "$(ulimit -Hn)" 2>/dev/null || true
+D="$HOME/.bise/run"
+S1="$D/heavy.lock"
+S2="$D/heavy2.lock"
+S3="$D/heavy3.lock"
+S4="$D/heavy4.lock"
+Q="$D/queue"
+mkdir -p "$D" "$Q" && touch "$S1" "$S2" "$S3" "$S4"
+
+# HEAVY_SLOTS (tests): use only the first n slots, whatever the power.
+on_battery() { /usr/bin/pmset -g batt 2>/dev/null | head -1 | grep -q "Battery Power"; }
+# sccache (build-cache, 2026-10-10): rustc outputs shared across worktrees
+# through a disk cache (~/.cache/sccache, 8G cap: the disk is tight). Never a
+# shared target dir. One sccache server per worktree (its own socket), started
+# with SCCACHE_BASEDIRS = that worktree's root, so paths inside the worktree
+# hash the same in every worktree. Incremental is left on: sccache skips the
+# workspace crates cargo builds incrementally (dev profile) and caches the
+# dependencies, the bulk of a cold build. Off: HEAVY_NO_SCCACHE=1, or a
+# RUSTC_WRAPPER already set by the caller, or a caller with a file size limit
+# (an agent's bash tool: 50 MB): the server it would start keeps that limit
+# and every later compile of that worktree would die of SIGXFSZ.
+# Measured (cargo build -p switchboard, fresh target): 95 s plain, 122 s
+# cold cache, 64 s warm cache from another worktree (86 % hits).
+# OFF by default since 2026-10-12 (loop-speed-4), opt in with HEAVY_SCCACHE=1:
+# measured on the live servers 0 hits of 66 compiles (41 + 25), and it made
+# gates red for nothing: (1) a worktree's server outlives the gate run that
+# started it and keeps that run's TMPDIR (~/.bise/gate/<pid>, deleted at its
+# end): the next gate's compiles die "Failed to create temp dir"; (2) inside
+# the approvals sandbox test, sccache's socket path from the box's long
+# TMPDIR is over macOS's 104 bytes (SUN_LEN, core-b). The seed clone
+# (gate.sh) already shares the deps between task targets for 0 bytes.
+SCC=/opt/homebrew/bin/sccache
+if [ -n "${HEAVY_SCCACHE:-}" ] && [ -z "${HEAVY_NO_SCCACHE:-}" ] && [ -z "${RUSTC_WRAPPER:-}" ] && [ -x "$SCC" ] \
+   && [ "$(ulimit -f)" = unlimited ]; then
+  export RUSTC_WRAPPER="$SCC" SCCACHE_DIR="$HOME/.cache/sccache" SCCACHE_CACHE_SIZE=8G
+  if root=$(git rev-parse --show-toplevel 2>/dev/null); then
+    mkdir -p "$HOME/.cache/sccache-srv"
+    h=$(printf %s "$root" | /usr/bin/shasum | cut -c1-12)
+    export SCCACHE_BASEDIRS="$root" SCCACHE_SERVER_UDS="$HOME/.cache/sccache-srv/$h.sock"
+  fi
+fi
+
+# cargo parallelism (main, 2026-10-10): two jobs at cargo's default (12
+# rustc each on this 12-core Mac) put the load at 35 and starved agents'
+# REPL starts for 1007 s (amb-web, ambient-pm, launch crashed). Each job
+# gets 5 jobs by default, so two jobs leave cores for the hub, the REPLs
+# and the user. A caller's CARGO_BUILD_JOBS wins; --alone keeps the default.
+# With 4 slots on AC: 4 jobs each, so 4 cargo builds stay at 16 rustc.
+[ -z "${CARGO_BUILD_JOBS:-}" ] && export CARGO_BUILD_JOBS=4
+
+
+ALONE=0; PRIO=0; LOW=0; LAND=0
+while :; do
+  case "${1:-}" in
+    --alone) ALONE=1; shift ;;
+    --land) LAND=1; shift ;;
+    --low) LOW=1; shift ;;
+    --prio) PRIO=1; shift ;;
+    *) break ;;
+  esac
+done
+
+# the job, in its slot: $1 its ticket (gone once it runs), $2 the slot, $3
+# the nice level, then the command. HEAVY_SLOT="<slot> <pid of this shell>".
+export HEAVY_SUBMIT="${HEAVY_SUBMIT:-$(date +%s)}"
+JOB='export HEAVY_SLOT="${2##*/} $$"; rm -f "$1"; L="$HOME/.bise/run/heavy.log"
+c=$(printf "%s " "${@:4}" | cut -c1-160); t0=$(date +%s)
+printf "%s\t%s\t-\t%s\t%s\t%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" >>"$L" 2>/dev/null
+/usr/bin/caffeinate -is nice -n "$3" "${@:4}"; rc=$?
+printf "%s\t%s\t%s\t%s\t%s\t%s\trc=%s\n" "$HEAVY_SUBMIT" "$t0" "$(date +%s)" "${2##*/}" "$PWD" "$c" "$rc" >>"$L" 2>/dev/null
+exit $rc'
+
+# --alone (the nightly, a benchmark): rank 0, and its ticket says "alone":
+# while it waits, no other job starts (the queue drains, review-gates
+# m_35348: never starved); it takes each slot as it frees (blocking lockf).
+if [ "$ALONE" = 1 ]; then
+  while on_battery; do sleep 60; done
+  T="$Q/0-$HEAVY_SUBMIT-$$"
+  echo alone >"$T"
+  # exec keeps this pid: a killed --alone waiter's ticket is a dead one
+  exec /usr/bin/lockf -k "$S1" /usr/bin/lockf -k "$S2" /usr/bin/lockf -k "$S3" /usr/bin/lockf -k "$S4" /bin/bash -c "$JOB" _ "$T" "all" 10 "$@"
+fi
+
+# a full gate (tests/gate.sh full) runs one at a time on the machine (its own
+# lock, ~/.bise/gate/full-<uid>.lock): while another one holds that lock, a
+# full gate waits here, before it takes a slot, instead of holding a slot
+# idle for 7-10 min (loop-speed-4, 2026-10-12: release-29 held one 637 s).
+GLOCK="$HOME/.bise/gate/full-$(id -u).lock"
+case " $* " in
+  *"gate.sh full"*)
+    said=""
+    while o=$(cat "$GLOCK/owner" 2>/dev/null) && [ -n "$o" ] && kill -0 "${o%% *}" 2>/dev/null; do
+      [ -n "$said" ] || { echo "heavy-run: waiting for the full gate of ${o#* * } before taking a slot"; said=1; }
+      sleep 5
+    done ;;
+esac
+
+rank=2
+case " $* " in *"gate.sh full"*|*"gate.sh rerun"*|*"test:land"*) rank=1 ;; esac
+[ "$LAND" = 1 ] && rank=1
+[ "$LOW" = 1 ] && rank=3
+[ "$PRIO" = 1 ] && rank=0
+T="$Q/$rank-$HEAVY_SUBMIT-$$"
+: >"$T"
+trap 'rm -f "$T"' EXIT
+# the live tickets ahead of this one (a dead waiter's ticket is removed);
+# a live --alone ticket anywhere: 99, nothing starts until it runs
+ahead() {
+  local n=0 f mine=1
+  for f in $(ls "$Q" 2>/dev/null | sort -t- -k1,1n -k2,2n -k3,3n); do
+    [ "$Q/$f" = "$T" ] && { mine=0; continue; }
+    if kill -0 "${f##*-}" 2>/dev/null; then
+      [ -s "$Q/$f" ] && { echo 99; return; }
+      [ "$mine" = 1 ] && n=$((n + 1))
+    else
+      rm -f "$Q/$f"
+    fi
+  done
+  echo "$n"
+}
+
+# lockf -t 0 exits 75 (EX_TEMPFAIL) when the slot is taken.
+while :; do
+  if on_battery; then n=15; slots="$S1 $S2"; else n=10; slots="$S1 $S2 $S3 $S4"; fi
+  if [ -n "${HEAVY_SLOTS:-}" ]; then slots=$(echo "$S1 $S2 $S3 $S4" | cut -d' ' -f1-"$HEAVY_SLOTS"); fi
+  # probe the slots quietly first: a taken slot makes lockf print
+  # 'already locked' on every try, which buried a job's real last lines.
+  free=""
+  for s in $slots; do /usr/bin/lockf -k -t 0 "$s" /usr/bin/true 2>/dev/null && free="$free $s"; done
+  if [ -n "$free" ] && [ "$(ahead)" -lt "$(echo $free | wc -w)" ]; then
+    for s in $free; do
+      /usr/bin/lockf -k -t 0 "$s" /bin/bash -c "$JOB" _ "$T" "$s" "$n" "$@"
+      rc=$?
+      [ "$rc" -ne 75 ] && exit "$rc"
+    done
+  fi
+  [ -n "${waited:-}" ] || { echo "heavy-run: every heavy slot is busy or promised to an earlier job, waiting (rank $rank)" >&2; waited=1; }
+  sleep 2
+done
+}
+heavy_run "$@"; exit $?

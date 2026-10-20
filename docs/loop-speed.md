@@ -447,9 +447,18 @@ What changed (no test dropped, no coverage lost):
    (2.5-3 min of one core) is skipped when the same .bend files and bend
    version passed whole before, in any worktree
    (`~/.bise/gate/proof-cache`).
-6. **heavy-run** (`~/.bise/run/heavy-run`, outside the repo): a `gate.sh
-   full` job waits for the full-gate lock before it takes a slot, and every
-   job logs its submit and start times to `~/.bise/run/heavy.log`.
+6. **heavy-run** (`scripts/heavy-run`, installed as `~/.bise/run/heavy-run`
+   by `scripts/heavy-run --install`): a `gate.sh full` job waits for the
+   full-gate lock before it takes a slot, and every job logs its submit and
+   start times, then its end and rc, to `~/.bise/run/heavy.log`. Since
+   flow-time (2026-10-20) the waiters queue: by rank, then first come.
+   Rank 0 `--prio` (his own ask) and `--alone` (the nightly: nothing else
+   starts while it waits), 1 a land check (`gate.sh full|rerun`,
+   `test:land`, or `--land` for a script that wraps one), 2 the rest, 3
+   `--low`: experiments, load tests, shots, repacks. Before, every waiter
+   polled the slots every 2 s and the luckiest won: a land check waited
+   behind jobs submitted after it (25 % of the tasks' spawn-to-main time
+   was this queue). A load test never runs as `--prio`.
    Wait on a heavy job by running it as the bash tool's background
    command (`~/.bise/run/heavy-run <cmd> > $TMPDIR/x.log 2>&1`, its end
    wakes you, its queue included), not with `nohup` and a file wake: a

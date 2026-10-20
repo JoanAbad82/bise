@@ -126,6 +126,8 @@ echo "== The nightly gate makes its tree in the heavy slot (tests/nightly_gate_t
 python3 -B tests/nightly_gate_test.py || exit 1
 echo "== The loop audit reads every gate log and timings.tsv (tests/loop_audit_test.py)"
 python3 -B tests/loop_audit_test.py || exit 1
+echo "== heavy-run's queue: by rank, then first come (tests/heavy_run_test.py)"
+python3 -B tests/heavy_run_test.py || exit 1
 echo "== Rust: build, unit and scenario tests, clippy"
 # the Bend binaries the e2e/tmux tests run (./repl-live, ./repl-scripted,
 # ./sb-core; not in git): from bins.sh's cache, compiled on a miss

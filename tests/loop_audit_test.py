@@ -66,7 +66,8 @@ def fake_home(h, now):
                              + json.dumps({"type": "wake_end", "id": i, "at": e * 1000, "why": "max"}) + NL)
     write(os.path.join(h, "hubs", hub, "journal.jsonl"), wk(1, "t7", now - 9000, now - 5400) + wk(2, "t8", now - 9000, now - 5400))
     write(os.path.join(h, "run", "heavy.log"),
-          "%d\t%d\t%d\t1\t0\t/w/t8/harness\ttests/gate.sh quick%s" % (now - 8990, now - 5000, now - 4700, NL))
+          "%d\t%d\t-\theavy.lock\t/w/t8/harness\ttests/gate.sh quick%s" % (now - 8990, now - 5000, NL)
+          + "%d\t%d\t%d\theavy.lock\t/w/t8/harness\ttests/gate.sh quick\trc=0%s" % (now - 8990, now - 5000, now - 4700, NL))
     def own(mode, agent, start, body, end):
         write(os.path.join(h, "gate", "logs", "%s-%d-%d.log" % (mode, start, start % 1000)),
               "# gate %s agent=%s sha=abc1234 start=%d root=/x%s%s" % (mode, agent, start, NL, body), end)
