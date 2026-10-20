@@ -66,6 +66,8 @@ TOP = {
     "default.nix": "none", ".gitignore": "none",
     # the repo's tracked config (issue 28): the land reads it, no test hub does
     "bise.toml": "none",
+    # every agent's prompt in this repo (BISE-232): words only, no test reads it
+    "AGENTS.md": "none",
     "rust": "mixed", "bend": "mixed", "tests": "mixed",
     "kit": "all", "prompts": "all", "plugins": "all", ".agents": "all", "scripts": "all",
     "packaging": "all", "computer-use": "all", "run.sh": "all", "apps": "mixed", "dev": "desktop",
