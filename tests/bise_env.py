@@ -154,6 +154,21 @@ def clean_env(**extra):
     return env
 
 
+# A test's git works in its own throwaway repo, never in a repo the caller's
+# environment points to: `git bisect run` (and a git hook or alias) exports
+# GIT_DIR, and e2e.Env's `git init && git config user.email t@t` in its ws
+# then wrote core.bare=true and user t into the real repo's .git/config
+# (every sb land failed, keep-current m_34361). tests/run_all.sh unsets them
+# too and fails a run that changes that file.
+GIT_REPO_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+                 "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX")
+
+
+def drop_git_repo_vars(environ=os.environ):
+    for k in GIT_REPO_VARS:
+        environ.pop(k, None)
+
+
 def on_test_home(env):
     """`env` (a test's copy of the caller's environment) on a throwaway
     HOME (test_home), without the XDG homes; cargo keeps its real
@@ -235,6 +250,9 @@ def refuse_real_run_dir(env, tmp):
 
 
 def _self_test():
+    env = {"GIT_DIR": "/r/.git/worktrees/w", "GIT_PREFIX": "", "PATH": "/bin"}
+    drop_git_repo_vars(env)
+    assert env == {"PATH": "/bin"}, "drop_git_repo_vars keeps %r" % env
     for extra in ({"HOME": "/t/h"}, {"BISE_HOME": "/t/b"}, {}):
         env = clean_env(**extra)
         kept = [k for k in OWN_PATHS if k in env]
