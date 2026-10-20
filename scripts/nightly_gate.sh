@@ -279,6 +279,10 @@ day="$(date +%F)" log="$out/$(date +%F).log" s=$SECONDS
 if [ -n "$night_until" ]; then
   NIGHTLY_END="$(night_end)" || { echo "NIGHTLY_UNTIL wants HH:MM, got $night_until" >&2; exit 2; }
   export NIGHTLY_END
+else
+  # no end: never a caller's (2026-10-20: tests/nightly_gate_test.py, run by the night's own
+  # gate, inherited that night's 06:00 and its 'no end' night started nothing)
+  unset NIGHTLY_END
 fi
 echo "QUEUED $(date): waiting for a heavy slot${NIGHTLY_END:+, nothing new starts after $(date -r "$NIGHTLY_END" '+%F %H:%M')}" >"$log"
 # --alone: both heavy slots, never beside an agent's heavy job (2026-10-14:

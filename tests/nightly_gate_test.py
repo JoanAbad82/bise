@@ -136,7 +136,8 @@ def main():
         out = os.path.join(home, "run", "nightly")
         tree = os.path.join(out, "tree")
         wt = os.path.join(tree, "harness")
-        env0 = {k: v for k, v in os.environ.items() if not k.startswith("GIT_") and not k.startswith("FAKE_")}
+        # never the caller's night (NIGHTLY_END, NIGHTLY_NOW...): the nightly's gate runs this test
+        env0 = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", "FAKE_", "NIGHTLY_"))}
         clock, args_log = os.path.join(t, "now"), os.path.join(t, "args")
         env0.update(BISE_HOME=home, NIGHTLY_HEAVY_RUN=heavy, NIGHTLY_NOW=clock, FAKE_ARGS=args_log)
 
@@ -282,6 +283,11 @@ def main():
         # NIGHTLY_UNTIL empty (a run by hand in the day): no end
         rc, log, last, red = night(NOW=at(14, 0), NIGHTLY_UNTIL="")
         check(rc == 0 and red is None and not any("--until" in x for x in calls()), "no end: %r" % calls())
+        # ...even under a caller's NIGHTLY_END (2026-10-20: this test, run by the night's own gate,
+        # inherited that night's 06:00; its no-end night was past it and started nothing)
+        rc, log, last, red = night(NOW=at(14, 0), NIGHTLY_UNTIL="", NIGHTLY_END=at(6, 0))
+        check(rc == 0 and red is None and "fake gate" in log and not any("--until" in x for x in calls()),
+              "no end, a caller's NIGHTLY_END ignored: rc %s, %r" % (rc, calls()))
 
         # launchd's PATH has no node (2026-10-18: desktop-checks and desktop-map 'node: No such
         # file', exit 127): the script puts fnm's default alias dir (FNM_DIR) first, so an

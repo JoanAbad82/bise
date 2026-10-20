@@ -286,6 +286,10 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="",
     root = os.environ.get("BISE_APP_ROOT")
     if root and os.path.exists(os.path.join(root, "sb-core")):
         E.env["SB_CORE_BIN"] = os.path.join(root, "sb-core")
+    # e2e.Env drops the caller's BISE_APP_ROOT (bise_env.INTERNAL): the hub gets this tree's,
+    # never the source path baked in its build (world.hub_env, 2026-10-20's nightly)
+    if root:
+        E.env["BISE_APP_ROOT"] = root
     if kind == "model":
         for k in SCRIPTED_VARS:
             E.env.pop(k, None)
@@ -546,7 +550,7 @@ def _start_hub(bise, root, kind="fake", connectors=False, computer=False, user_a
     log = open(os.path.join(QA_DIR, "hub.log"), "a")
     # never the calling agent's hub identity (e2e.host_env drops it for the hub; the daemon too)
     env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR")}
-    env["BISE_APP_ROOT"] = root    # e2e.Env passes it on to the hub: its repl-live
+    env["BISE_APP_ROOT"] = root    # the daemon's; it hands it to the hub (e2e.Env alone drops it)
     env["AMBIENT_QA_DIR"] = QA_DIR  # without SB_AGENT the daemon would pick another QA dir
     env["AMBIENT_QA_SET"] = sets
     p = subprocess.Popen([sys.executable, "-u", os.path.realpath(__file__), "_hub", "--bise", bise, "--kind", kind]

@@ -98,6 +98,13 @@ def world_fixtures_seed_every_desktop_shape():
     check(set(world.leaked(his)) >= {"OPENAI_API_KEY", "MISTRAL_API_KEY", "GH_TOKEN", "AWS_SECRET_ACCESS_KEY", "SOME_PASSWORD"},
           "leaked names every real key (MISTRAL_API_KEY too when it isn't the fake one)")
     check(world.leaked({"MISTRAL_API_KEY": "fake-key", "PATH": "/bin"}) == [], "the fake key isn't a leak")
+    # 2026-10-20's nightly: e2e.Env drops BISE_APP_ROOT, so a world hub found repl-live only through
+    # the source path baked in its build (the gate seed's, a dropped worktree): every hub died.
+    # The hub's env names the tree itself, the allowlist and the fake key kept.
+    he = world.hub_env(dict(his, BISE_APP_ROOT="/caller/tree"), "/the/tree")
+    check(he["BISE_APP_ROOT"] == "/the/tree" and he["MISTRAL_API_KEY"] == "fake-key" and world.leaked(he) == []
+          and set(he) == {"PATH", "HOME", "MISTRAL_API_KEY", "BEND_PROVIDER_URL", "BEND_MODEL", "BISE_APP_ROOT"},
+          "hub_env: the world's tree as BISE_APP_ROOT, the allowlist else: %s" % sorted(he))
     cards = [c for p in world.plan(3) for c in p["cards"]]
     check(any("merge" in c and "\n1. " in c for c in cards) and len(cards) >= 2, "a merge question and a question with options")
     w = os.path.join(world.GATE, "w-test")

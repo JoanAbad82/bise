@@ -110,7 +110,7 @@ def daemon(bise, root, n, rich=False, agents=0):
     tmp = os.path.join(world, "t")
     os.makedirs(tmp, exist_ok=True)
     tempfile.tempdir = tmp
-    os.environ["BISE_APP_ROOT"] = root    # e2e.Env passes it on: the hubs' repl-live
+    os.environ["BISE_APP_ROOT"] = root    # this daemon's; e2e.Env drops it: hub_env sets the hubs'
     import e2e  # noqa: E402
     e2e.EXE = bise
     try:
@@ -135,7 +135,7 @@ def daemon(bise, root, n, rich=False, agents=0):
             if files is not None:
                 make_repo(ws, files, next((p.get("origin") for p in projects if p["name"] == name), None))
             E = e2e.Env()
-            E.env = world_env(E.env)      # never his keys (main m_10585)
+            E.env = hub_env(E.env, root)  # never his keys (main m_10585); the tree's repl-live
             if rich:
                 # D5: scripted calls and answers for his plain words, no echo (fake_provider.py)
                 os.makedirs(scripts_dir(world), exist_ok=True)
@@ -261,6 +261,17 @@ def world_env(env):
     variable, plus the fake key. Pure."""
     out = {k: v for k, v in env.items() if (k in ENV_KEEP or k.startswith("BEND_")) and not SECRET.search(k)}
     out.update(FAKE_KEYS)
+    return out
+
+
+def hub_env(env, root):
+    """A world hub's env: world_env, and BISE_APP_ROOT = the tree whose repl-live it runs. e2e.Env
+    drops the caller's BISE_APP_ROOT (bise_env.INTERNAL), so without it the hub found its runtime
+    only through the source path baked in its build: on 2026-10-20 the nightly's bise was the gate
+    seed's (built in release-35's dropped worktree) and every world hub died with 'repl-live not
+    found'. Pure."""
+    out = world_env(env)
+    out["BISE_APP_ROOT"] = root
     return out
 
 
