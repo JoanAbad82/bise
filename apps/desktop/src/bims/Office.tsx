@@ -13,7 +13,7 @@
 // lands as the camera arrives). The sky (sky.ts, bims-sky): the clock's sky blends in the renderer, a
 // blend due mid-drag or pinch waits until he lets go (Look.hold); the rain or snow is a CSS layer
 // outside the building (falling.ts). Owner: bims-wire.
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Press, tipAttrs } from '@/ds';
 import { reducedMotion, textWidth } from '@/ds/hooks';
 import type { Agent, Card, Place } from '@/proto';
@@ -359,6 +359,9 @@ export function Office({
     }
     if (leaders.current !== null && leaders.current.innerHTML !== lines) leaders.current.innerHTML = lines;
   }, []);
+  // '⤢ fit' shows or goes after a frame's layout (the follow camera's last step sets it): the tags
+  // again at once, clear of it, even if no frame follows (designer m_35455)
+  useLayoutEffect(layoutTags, [layoutTags, fitted]);
 
   useEffect(() => {
     const cv = canvas.current;

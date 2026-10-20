@@ -114,10 +114,10 @@ describe('the corner chips keep out (brief bims-mapsel)', () => {
   // the map chip bottom left, '⤢ fit' bottom right, in a 320 × 200 office
   const MAP = { left: 4, top: 178, w: 70, h: 18 };
   const FIT = { left: 270, top: 178, w: 46, h: 18 };
-  it('an edge pill near a bottom corner slides along the edge past the chip, toward the middle', () => {
+  it('an edge pill near a bottom corner stops above the chip, 4 px clear (designer m_35455)', () => {
     const { at } = placeTags([tag('l', 10, 300, 16, true), tag('r', 315, 300, 16, true)], 320, 200, [MAP, FIT]);
-    expect(at.get('l')).toEqual({ left: 76, top: 180, lead: true });
-    expect(at.get('r')).toEqual({ left: 252, top: 180, lead: true });
+    expect(at.get('l')).toEqual({ left: 4, top: 158, lead: true });
+    expect(at.get('r')).toEqual({ left: 300, top: 158, lead: true });
   });
   it('no tag, pill or name, ever sits under a chip', () => {
     const tags = Array.from({ length: 12 }, (_, i) => tag(`n${String(i)}`, (i * 29) % 320, 150 + (i % 4) * 14, i % 3 === 0 ? 16 : 60, i % 3 === 0, i % 3));

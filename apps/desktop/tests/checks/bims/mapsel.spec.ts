@@ -86,6 +86,8 @@ for (const theme of ['light', 'dark'] as const) {
           const c = await chip.boundingBox();
           if (m === null || c === null) throw new Error('no menu');
           expect(m.y + m.height, 'over the chip').toBeLessThanOrEqual(c.y);
+          // more rows than room: the ds Picker's 16 px fade at the bottom says so (designer m_35455)
+          await expect(menu.locator('.b-picker-list'), 'a fade at the bottom while rows are below').toHaveClass(/fade-bottom/u);
           await shot(s, `mapsel-menu-${w}-${theme}.png`, `the menu open, ${w}, ${theme}`, "/bims's rows, two lines each, the Loft ✓, upward from the chip", true);
         });
 
@@ -104,6 +106,18 @@ for (const theme of ['light', 'dark'] as const) {
             .toBe('workshop');
           await expect(box).toHaveAttribute('data-map', 'workshop', { timeout: 10_000 });
           await expect(chip).toHaveText('Workshop');
+          // open again: the picked row scrolled into the list's view, ✓
+          await chip.click();
+          const list = page.getByTestId('app.right.bims.map.menu').locator('.b-picker-list');
+          const row = page.getByTestId('app.right.bims.map.workshop');
+          await expect(row).toHaveAttribute('aria-checked', 'true');
+          const lb = await list.boundingBox();
+          const rb = await row.boundingBox();
+          if (lb === null || rb === null) throw new Error('no list');
+          expect(rb.y, 'the picked row in view').toBeGreaterThanOrEqual(lb.y - 1);
+          expect(rb.y + rb.height, 'the picked row in view').toBeLessThanOrEqual(lb.y + lb.height + 1);
+          await page.keyboard.press('Escape');
+          await expect(page.getByTestId('app.right.bims.map.menu')).toHaveCount(0);
           await sleep(500);
           await settle(s, 800, 8000);
           await page.mouse.move(5, 300);

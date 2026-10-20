@@ -61,12 +61,11 @@ export function placeTags(tags: readonly TagIn[], boxW: number, boxH: number, ke
   const order = [...byRank.filter((t) => t.pill), ...byRank.filter((t) => !t.pill)];
   // the corner chips are placed first: a label meets them as it meets a tag
   const placed: Rect[] = [...keep];
-  // a pill that meets a chip slides along its edge past it, toward the office's middle
+  // a pill that meets a chip stops above it, TAG_INSET clear (designer m_35455: an edge pill keeps out of the corners)
   const past = (r: Rect): Rect => {
     const k = keep.find((c) => meets(c, r));
     if (k === undefined) return r;
-    const right = k.left + k.w / 2 < boxW / 2;
-    return { ...r, left: right ? k.left + k.w + PILL_GAP : k.left - r.w - PILL_GAP };
+    return { ...r, top: k.top - TAG_INSET - r.h };
   };
   const at = new Map<string, TagOut>();
   let left = 0;
@@ -81,7 +80,7 @@ export function placeTags(tags: readonly TagIn[], boxW: number, boxH: number, ke
       const own = { ...home, top: clamp(home.top) };
       const by = (dx: number, dy: number): Rect => ({ ...own, left: tagLeft(t.x + dx, t.w, boxW), top: clamp(own.top + dy) });
       const tries = [own, by(t.w + PILL_GAP, 0), by(-t.w - PILL_GAP, 0), by(0, -t.h - PILL_GAP), by(0, t.h + PILL_GAP), by(t.w + PILL_GAP, -t.h - PILL_GAP), by(-t.w - PILL_GAP, -t.h - PILL_GAP)];
-      // each try first slid past a chip it would sit under (an edge pill near a bottom corner)
+      // each try first lifted over a chip it would sit under (an edge pill near a bottom corner)
       const ok = tries.map(past).find((r) => !placed.some((p) => meets(p, r))) ?? past(own);
       placed.push(ok);
       at.set(t.name, { left: ok.left, top: ok.top, lead: ok !== own });
