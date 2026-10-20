@@ -75,8 +75,12 @@ def speaker(+st: S.St, +kind: String, +dir: String, +from: String) -> Maybe<&2, 
       v => Bool.pick(Maybe<&2, String>, String.eq(kind, "other_hub"), Some{other_hub(dir)}, Some{GONE()})))
 
 # An agent request (input req): the speaker's rule, and it came on
-# agent.sock (law agent_req_only_on_agent_sock); the hub's own requests
-# (kind `hub`) have no socket.
+# agent.sock (law agent_req_only_on_agent_sock). The hub's own requests
+# (kind `hub`) have no socket: made in the hub's process, never by a
+# connection (rust peer.rs Sender::hub, its callers named there: a model
+# switch's report, a page step's card, bise's home hub's xfollow, the
+# turn-failed report; the accept threads never set it, test
+# no_connection_is_the_hub).
 def SOCK_REFUSED() -> String:
   "an agent request is served on agent.sock only"
 

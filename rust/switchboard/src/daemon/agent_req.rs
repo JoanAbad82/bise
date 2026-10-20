@@ -236,6 +236,100 @@ mod tests {
         assert_eq!(spoke(&fx), vec![(false, "an agent request is served on agent.sock only".to_string())]);
     }
 
+    /// The variant's name, by an exhaustive match: a new `AgentReq`
+    /// variant does not compile here until it has a fixture below.
+    fn kind(r: &AgentReq) -> &'static str {
+        match r {
+            AgentReq::List => "list",
+            AgentReq::Tasks => "tasks",
+            AgentReq::Send { .. } => "send",
+            AgentReq::Wait { .. } => "wait",
+            AgentReq::Ask { .. } => "ask",
+            AgentReq::Status { .. } => "status",
+            AgentReq::Worktree { .. } => "worktree",
+            AgentReq::Flow { .. } => "flow",
+            AgentReq::Report { .. } => "report",
+            AgentReq::Follow { .. } => "follow",
+            AgentReq::Spawn { .. } => "spawn",
+            AgentReq::Switch { .. } => "switch",
+            AgentReq::Feature { .. } => "feature",
+            AgentReq::Move { .. } => "move",
+            AgentReq::Land { .. } => "land",
+            AgentReq::Interrupt { .. } => "interrupt",
+            AgentReq::Stop { .. } => "stop",
+            AgentReq::Drop { .. } => "drop",
+            AgentReq::Card { .. } => "card",
+            AgentReq::Close { .. } => "close",
+            AgentReq::Withdraw { .. } => "withdraw",
+            AgentReq::Rename { .. } => "rename",
+            AgentReq::Restore { .. } => "restore",
+            AgentReq::Isolate { .. } => "isolate",
+            AgentReq::Every(_) => "every",
+            AgentReq::Wake(_) => "wake",
+            AgentReq::ProjectSend { .. } => "project_send",
+            AgentReq::ProjectAsk { .. } => "project_ask",
+        }
+    }
+
+    /// architect m_35671: rides_req skips the `speaks` step, so it is
+    /// proved here, not trusted. Every variant (the conditional ones both
+    /// ways), sent by another project's agent: the outcome is fx spoke's
+    /// refusal alone: no reply, journal line, notice or other effect, and
+    /// the hub's state as it was. A listed variant that one day acts before
+    /// sb-core's req step turns this red.
+    #[test]
+    fn every_request_from_another_hub_is_refused_alone() {
+        let reqs = [
+            json!({"cmd": "list"}),
+            json!({"cmd": "tasks"}),
+            json!({"cmd": "send", "to": "t1", "text": "go"}),
+            json!({"cmd": "send", "to": "t1", "text": "go", "model": "gpt-5", "effort": "high"}),
+            json!({"cmd": "wait", "msg": "m_1"}),
+            json!({"cmd": "ask", "to": "t1", "text": "?"}),
+            json!({"cmd": "status", "status": "working", "note": "n"}),
+            json!({"cmd": "worktree", "path": "/tmp/w"}),
+            json!({"cmd": "flow", "set": "trunk"}),
+            json!({"cmd": "report", "kind": "progress", "summary": "s"}),
+            json!({"cmd": "follow", "agent": "t1"}),
+            json!({"cmd": "spawn", "name": "t9", "objective": "o"}),
+            json!({"cmd": "spawn", "name": "t9", "objective": "o", "model": "gpt-5"}),
+            json!({"cmd": "spawn", "name": "t9", "objective": "o", "feature": "f"}),
+            json!({"cmd": "switch", "to": "t1", "model": "gpt-5"}),
+            json!({"cmd": "feature", "step": "new", "name": "f"}),
+            json!({"cmd": "move", "agent": "t1", "place": "new"}),
+            json!({"cmd": "land", "message": "m"}),
+            json!({"cmd": "interrupt", "agent": "t1"}),
+            json!({"cmd": "stop", "agent": "t1", "reason": "r"}),
+            json!({"cmd": "drop", "agent": "t1"}),
+            json!({"cmd": "card", "text": "q?"}),
+            json!({"cmd": "close", "card": 1}),
+            json!({"cmd": "withdraw", "card": 1, "why": "w"}),
+            json!({"cmd": "rename", "agent": "t1", "new_name": "t8"}),
+            json!({"cmd": "restore", "agent": "t1"}),
+            json!({"cmd": "isolate", "agent": "t1"}),
+            json!({"cmd": "every", "step": "add", "to": "t1", "text": "x", "every_ms": 60000}),
+            json!({"cmd": "wake", "step": "list"}),
+            json!({"cmd": "project_send", "project": "shop", "msg": "m_1"}),
+            json!({"cmd": "project_ask", "project": "shop", "text": "?"}),
+        ];
+        let (mut h, mut env) = hub();
+        let other = Sender::of(&Who::OtherHub("t1".into()), Sock::Agent);
+        let words = "this request comes from agent t1's process (another project's hub): an agent speaks only on its own hub";
+        let mut seen = std::collections::BTreeSet::new();
+        for (i, v) in reqs.iter().enumerate() {
+            let req = AgentReq::from_json(v).unwrap_or_else(|e| panic!("{v}: {e}"));
+            seen.insert(kind(&req));
+            let before = format!("{:?}", h.st);
+            let fx = h.handle(Input::Agent { token: 100 + i as u64, from: "t1".into(), req, by: other.clone() }, &mut env);
+            assert!(
+                matches!(fx.as_slice(), [Effect::Spoke { ok: false, why, .. }] if why == words),
+                "{v}: the refusal alone, got {fx:?}"
+            );
+            assert_eq!(format!("{:?}", h.st), before, "{v}: the hub's state as it was");
+        }
+        assert_eq!(seen.len(), 28, "a fixture for every variant: {seen:?}");
+    }
+
     /// The shell's own requests ask `speaks` and get one fx spoke.
     #[test]
     fn speaks_answers_once_and_fails_closed() {

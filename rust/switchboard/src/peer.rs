@@ -33,8 +33,12 @@ pub struct Sender {
 }
 
 impl Sender {
-    /// The hub's own request (a report it makes for an agent, a card it
-    /// opens, bise's home hub asking through `xin`).
+    /// The hub's own request, made in its process, never by a connection
+    /// (the accept threads build a sender with [`Sender::of`] only, which
+    /// never says `hub`): a model switch's report and main's note to the
+    /// task (daemon.rs), a page step's card (daemon/page_cards.rs), bise's
+    /// home hub's `xfollow` (daemon/xhub.rs: hub.sock's op, past the hello
+    /// gate), sb-core's own turn-failed report (core.rs), the tests.
     pub fn hub() -> Sender {
         Sender { who: "hub".into(), dir: String::new(), sock: String::new() }
     }
@@ -69,5 +73,17 @@ mod tests {
         assert_eq!(s(&Who::Gone).who, "gone");
         assert_eq!(Sender::of(&Who::Outside, Sock::Client).sock, "client");
         assert_eq!(Sender::hub(), Sender { who: "hub".into(), dir: "".into(), sock: "".into() });
+    }
+
+    /// architect m_35671: no connection presents itself as the hub: every
+    /// judge's verdict, on either socket, gives a sender that is not `hub`.
+    #[test]
+    fn no_connection_is_the_hub() {
+        let verdicts = [Who::Outside, Who::Agent("hub".into()), Who::OtherHub("hub".into()), Who::Gone];
+        for who in &verdicts {
+            for sock in [Sock::Agent, Sock::Client] {
+                assert_ne!(Sender::of(who, sock).who, "hub", "{who:?} on {sock:?}");
+            }
+        }
     }
 }
