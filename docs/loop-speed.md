@@ -21,6 +21,7 @@ free disk), HEAD 9b8ad22 (applied on 6bf6a86+), with other agents working at the
    - edit with one patch per file (or one script for many), then one gate; no read-back of an edit the tool confirmed;
    - message another agent only when you change an interface it uses (a function signature, a file format, a gate rule); otherwise, just rebase at commit time and fix conflicts then.
 10. A commit subject is at most 72 characters; the details go in the body (`git commit -m "<subject>" -m "<body>"`). The hub lists the versions by subject: 2 KB one-line subjects made that list ~39 KB and blocked its hello.
+11. Landing when main moved during your quick gate (main m_35563, 2026-10-20): a green quick gate counts only on the sha it ran on. When `sb land` rebases your commits over others, you may land without a new quick gate only when all three hold: (a) `gate.sh quick` GREEN on your pre-rebase sha; (b) `sb land`'s own check green on the rebased tree; (c) 0 files in common between your commits and the commits you rebased over (`git diff --name-only <old main>..<new main>` against yours). Then run `gate.sh quick` on the landed sha right away and put its GATE line in your report; red: revert your land on main first, then fix. One file in common: no shortcut. Rebase, run the quick gate on the rebased sha, then land. This holds for every land, product code included.
 
 ## 1. Where the time goes
 
