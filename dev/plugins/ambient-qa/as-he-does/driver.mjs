@@ -3254,15 +3254,19 @@ async function rows0170(harness, say) {
     // read 'running for 8 s'; the same binary spawns to bash in 2 s on a quiet hub): wait for the
     // line itself, then for its minutes counted from when it showed, never from the seed
     const under = await until(async () => { const l = await waitLine(); return l && /running for \d+ (s|min)$/.test(l.text) ? l : null; }, 180000, 1000);
+    // the wait must not hide a slow start (review-gates m_35126): the seed's spawn to the line, read
+    // when the line showed minus its own count, in each step's info
+    const ago = (t) => { const m = /· running for (\d+) (s|min)$/.exec(t ?? ''); return m ? Number(m[1]) * (m[2] === 'min' ? 60 : 1) : 0; };
+    const spawn_to_line_s = under ? Math.round((Date.now() - t0) / 1000) - ago(under.text) : null;
     const line = (await until(async () => { const l = await waitLine(); return l && /running for \d+ min$/.test(l.text) ? l : null; }, 75000, 1000)) ?? (await waitLine());
-    step("the pause under a minute says seconds: 'running for N s'", /^continues when the zq bench ends · running for \d+ (s|min)$/.test(under?.text ?? ''), { under });
+    step("the pause under a minute says seconds: 'running for N s'", /^continues when the zq bench ends · running for \d+ (s|min)$/.test(under?.text ?? ''), { under, spawn_to_line_s });
     const h = await head();
     const r = await agentRow('zqbench');
     const lbl = await label();
     await page.mouse.move(1, 300);
     await shot('pause-zqbench');
     step("a paused agent (zqbench, sb wake --on-exit --then): 'continues when the zq bench ends · running for N min' over the composer, whole",
-      on && /^continues when the zq bench ends · running for \d+ min$/.test(line?.text ?? '') && line?.whole === true, { on, line });
+      on && /^continues when the zq bench ends · running for \d+ min$/.test(line?.text ?? '') && line?.whole === true, { on, line, spawn_to_line_s });
     step("its head: '… waiting · N min'; its AGENTS row '…' ending on 'N min'; the composer's label never says waiting",
       /^… waiting · \d+ min$/.test(h) && r?.g === '…' && /^\d+ min$/.test(r?.end ?? '') && !/waiting|idle|since/.test(lbl), { head: h, row: r, label: lbl });
     step("its pause is no alarm: not in SCHEDULED & WATCHING", (await alarmRows('zq bench')).length === 0, { alarms: await alarmRows('zq bench') });
@@ -3274,6 +3278,7 @@ async function rows0170(harness, say) {
     await clear();
     // the hub holds an ask 25 s at most (core.bend WAIT_CAP) and the line's duration runs from the
     // ask's start (round 2: '· 0 s', gone at 25 s): read it, its head and its name while it holds
+    const ts = Date.now();
     await say(`[[bash: sb spawn zqsearch --objective 'zq search {{bash: ${ASK}}}']] seeded zqsearch`);
     await until(async () => ((await agentRow('zqsearch')) ? true : null), 60000, 500);
     const on = await openAgent('zqsearch');
@@ -3281,14 +3286,16 @@ async function rows0170(harness, say) {
     // at 60 s, the ask's line at ~62 s): the line is waited for, up to 180 s
     const line = await until(async () => { const l = await waitLine(); return l && /answers/.test(l.text) ? l : null; }, 180000, 250);
     const at = Date.now();
+    // the spawn to the ask's line (review-gates m_35126: the 180 s wait must not hide a slow start)
+    const spawn_to_line_s = line ? Math.round((at - ts) / 1000) : null;
     const h = await head();
     const r = await agentRow('zqsearch');
     const who = flat(await text('[data-testid="thread.waiting.who"]'));
     await page.mouse.move(1, 300);
     await shot('reply-zqsearch');
     step("an agent waiting on another (zqsearch's sb ask): 'continues when zqdocs answers · N s|min', the name a link",
-      on && /^continues when zqdocs answers · \d+ (s|min)$/.test(line?.text ?? '') && who === 'zqdocs', { on, line, who });
-    step("its head: '… waiting · N s|min'; its AGENTS row '…' ending on the same", /^… waiting · \d+ (s|min)$/.test(h) && r?.g === '…' && /^\d+ (s|min)$/.test(r?.end ?? ''), { head: h, row: r });
+      on && /^continues when zqdocs answers · \d+ (s|min)$/.test(line?.text ?? '') && who === 'zqdocs', { on, line, who, spawn_to_line_s });
+    step("its head: '… waiting · N s|min'; its AGENTS row '…' ending on the same", /^… waiting · \d+ (s|min)$/.test(h) && r?.g === '…' && /^\d+ (s|min)$/.test(r?.end ?? ''), { head: h, row: r, spawn_to_line_s });
     step("no 'since' on zqsearch's view", (await noSince('zqsearch')).since === null, await noSince('zqsearch'));
     await click('the waited-on name', page.locator('[data-testid="thread.waiting.who"]').first());
     const went = await until(async () => ((await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent')) === 'zqdocs' ? true : null), 5000, 250);
