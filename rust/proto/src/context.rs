@@ -1,7 +1,7 @@
 //! The fn context (architect's decision F): what the Mac app read of the
 //! front app when the user pressed fn, sent with his words. One typed
-//! struct for every reader: the home hub's route guess
-//! (switchboard's route.rs), the routed message to a project's main, the
+//! struct for every reader: the home hub's routed words (sb-core's
+//! route_ask carries it as text), the routed message to a project's main, the
 //! transcript's render. Every field is optional (an excluded app sends
 //! nothing, a terminal has no URL) and left out of the JSON when absent.
 

@@ -47,6 +47,9 @@ core_kinds! {
         XReply = "xreply" => FXReply { hub: Str, xid: Nat, text: Str },
         /// his words held for a project (S2 step 2)
         Route = "route" => FRoute { rid: Nat, to: Str, name: Str, text: Str, due_ms: Nat, why: Str },
+        /// the answer to input `route_ask`, one per ask: `routed`, his
+        /// words were held for a project (fx `route` came before it)
+        RouteAsked = "route_asked" => FRouteAsked { routed: Bool },
         /// a held route ended (`xid`: the out it became, none when
         /// cancelled; `msg`: his message it became in bise's main, the
         /// window's pending row settles by it)

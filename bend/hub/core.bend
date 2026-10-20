@@ -2292,12 +2292,12 @@ def xretry(-o: S.St, m: Maybe<&2, S.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
       xdeliver(o, cx, ob)
 
 # ---- the routing hold (S2 step 2) ----
-# His words to bise's main that the shell's route.rs sends to a project
-# (input route_hold) wait HOLD_MS on the one clock (a RouteSend act): the
-# window shows them (fx route) and he may correct the target or cancel.
-# At the fire they become his message to main (an id, recorded, never a
-# turn: law route_fire_makes_no_turn) forwarded by the outbox, and main
-# gets a note with the id. A cancel says them to main as today.
+# His words he addressed to a project (input route_ask, XB.addressed) wait
+# HOLD_MS on the one clock (a RouteSend act): the window shows them (fx
+# route) and he may correct the target or cancel. At the fire they become
+# his message to main (an id, recorded, never a turn: law
+# route_fire_makes_no_turn) forwarded by the outbox, and main gets a note
+# with the id. A cancel says them to main as today.
 
 def route_ev(-o: S.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
   out(o, cx, F.route(S.Route.rid(r), S.Route.to(r), S.Route.name(r), S.Route.text(r), S.Route.due(r), S.Route.why(r)))
@@ -2305,21 +2305,21 @@ def route_ev(-o: S.St, +cx: X.Cx<o>, +r: S.Route) -> X.Cx<o>:
 def route_done(-o: S.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +xid: Maybe<&2, Nat>, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
   out(o, cx, F.route_done(rid, state, to, xid, msg))
 
-# home: the input route_hold (the shell's route.rs picked `to`, a project
-# hub id, `name` its name): held, its act set, the window told
-def route_hold.to(-o: S.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
+# home: his words for project `to` (`d`, XB.route_for): held, act set, told
+def route_held(-o: S.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
   +r = XB.route_of_hold(xst(o, cx), tms(o, cx), d, now(o, cx))
   +cx2 = xemit(o, cx, XH.XRouteHeld{r})
   route_ev(o, aemit(o, cx2, TM.ActSet{XB.route_act(r)}), r)
 
-# `parts`: his message's parts (msg-parts JSON, "" none): held with his
-# words and carried wherever they go (R41 (6): his images reach the
-# project, and bise's main keeps them on his message). No `to` (only an
-# older shell sent one): his words go to bise's main now, never held.
-def route_hold(-o: S.St, +cx: X.Cx<o>, +d: S.Route) -> X.Cx<o>:
-  LZ.pick(X.Cx<o>, String.is_empty(S.Route.to(d)),
-    u => user_says(o, cx, M.MAIN(), S.Route.text(d), False{}, S.Route.parts(d), ""),
-    u => route_hold.to(o, cx, d))
+# input route_ask (issue 37 #1): held for `m` (XB.addressed) or not, then
+# one fx route_asked says which, all the shell reads (laws/route.bend).
+# `text` (whole, `@<project>` in), `parts` (R41 (6)) go to the project.
+def route_ask(-o: S.St, m: Maybe<&2, XB.Proj()>, +cx: X.Cx<o>, +text: String, +via: String, +context: String, +parts: String) -> X.Cx<o>:
+  match m:
+    case None{}:
+      out(o, cx, F.route_asked(False{}))
+    case Some{+p}:
+      out(o, route_held(o, cx, XB.route_for(p, text, via, context, parts)), F.route_asked(True{}))
 
 # a held route with no target (left by an older hub's route model in its
 # journal) whose act fired: it ends, and his words reach bise's main as a
@@ -3661,8 +3661,8 @@ def dispatch(-o: S.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       xfail(o, XB.pending(xst(o, cx), xid), cx, xid)
     case GI.IXReply{+xid, +name, +text}:
       xanswer(o, XB.open(xst(o, cx), xid), cx, xid, name, text)
-    case GI.IRouteHold{+text, +via, +to, +name, +why, +context, +parts}:
-      route_hold(o, cx, S.Route.with_parts(S.Route.with_context(S.Route.with_why(S.Route.with_name(S.Route.with_to(S.Route.with_via(S.Route.with_text(S.Route.empty(), text), via), to), name), why), context), parts))
+    case GI.IRouteAsk{+focus, +text, +via, +queued, +context, +parts, +projects}:
+      route_ask(o, XB.addressed(XB.projs(projects), st(o, cx), queued, focus, text, via), cx, text, via, context, parts)
     case GI.IRouteCorrect{+rid, +to, +name}:
       route_correct(o, cx, rid, to, name)
     case GI.IRouteCancel{+rid}:

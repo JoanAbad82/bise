@@ -132,7 +132,8 @@ WRITE = [
     {"t": "confirm_open", "agent": "main", "text": "drop docs?"},
     {"t": "every_set", "agent": "main", "by": "user", "text": "check the deploy", "next_ms": 1760000600000, "every_ms": 600000},
     {"t": "wake_set", "agent": "main", "spec": {"kind": "pid", "pid": 4242}, "max_text": "1h", "max_ms": 3600000, "quiet": False},
-    {"t": "route_hold", "text": "tell shop to deploy", "via": "spotlight", "to": "shop-1", "name": "shop", "why": "named shop", "context": ""},
+    {"t": "route_ask", "focus": "", "text": "@shop deploy", "via": "spotlight", "queued": False,
+     "context": "", "projects": [{"id": "shop-1", "name": "shop"}]},
     # withdrawn-answer (architect m_30039): main withdraws its card 2, his
     # answer comes after: card_withdrawn, then main's message and card_late
     {"t": "req", "token": 1, "from": "main", "req": {"cmd": "card", "text": "ship v2?", "for": None}},

@@ -119,6 +119,14 @@ decision is wrong. It does not change the ranking.
   input field: the registered projects, on the home hub's user input
   only. Once per message he sends: no hot path.
 - **Contagion**: 16 sites in 2 files.
+- **Done** (rust-to-bend, architect m_35221): input `route_ask` and fx
+  `route_asked` (xhub.bend `addressed`, laws in `bend/laws/route.bend`);
+  route.rs is gone, routing.rs only reads the projects and the answer.
+  Measured on his journal copy: a plain line to main costs 3.9 M
+  instructions more (on top of the input's 25.6 M, about +15 %).
+  Known cost: a long pasted text is parsed twice, by `route_ask` then by
+  the input step (a 200 KB paste: 127 M for the ask). Accepted, a rare
+  line.
 
 ### 2 · the socket access check
 

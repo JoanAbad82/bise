@@ -17,9 +17,9 @@
 1052 rust/plugins/src/resolve.rs
 1163 rust/proto/src/thread/fold_tests.rs
 1655 rust/switchboard/src/approvals/tiers.rs
-2468 rust/switchboard/src/core.rs
-4591 rust/switchboard/src/core_tests.rs
-2016 rust/switchboard/src/daemon.rs
+2467 rust/switchboard/src/core.rs
+4368 rust/switchboard/src/core_tests.rs
+2008 rust/switchboard/src/daemon.rs
 1187 rust/switchboard/src/daemon/gate.rs
 1207 rust/switchboard/src/daemon/versions.rs
 1301 rust/tui/src/attach.rs

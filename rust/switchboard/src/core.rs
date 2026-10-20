@@ -683,23 +683,19 @@ pub enum Input {
         name: String,
         text: String,
     },
-    /// desktop S2 step 2, bise's home hub: his words to bise's main that
-    /// he addressed to project `to` (`@<project> …`, route.rs; a hub id,
-    /// `name` its name, `why` the reason, `via` his view): held 2 s, then
-    /// forwarded.
-    RouteHold {
+    /// His words (issue 37 #1): held for the project he addressed (xhub.bend `addressed`),
+    /// answered by [`Effect::RouteAsked`]; `text` goes there whole. `projects`: (id, name)
+    /// of the registered ones (bise's home hub only, else empty).
+    RouteAsk {
+        focus: String,
         text: String,
         via: String,
-        to: String,
-        name: String,
-        why: String,
-        /// his fn context (FnContext JSON), as the input op had it: sb-core
-        /// carries it as text to the project, which renders it there
-        /// (fn_context::with_context); never on the home hub
+        queued: bool,
+        /// his fn context (FnContext JSON): carried as text, rendered by the project
         context: Option<Value>,
-        /// his message's parts (msg-parts JSON, "" none): held with his
-        /// words, kept on his message here and forwarded (R41 (6))
+        /// his message's parts (msg-parts JSON, "" none), forwarded (R41 (6))
         parts: String,
+        projects: Vec<(String, String)>,
     },
     /// A held route goes to `to` instead (the shell checked it in the
     /// registry; `bise`: a cancel). `client`: the typed connection that
@@ -943,6 +939,8 @@ pub enum Effect {
         due_ms: u64,
         why: String,
     },
+    /// The answer to [`Input::RouteAsk`]: his words were held ([`Effect::Route`] first).
+    RouteAsked { routed: bool },
     /// Its end: `state` "sent" (`xid` its delivery, `msg` his message
     /// it became in bise's main) or "cancelled".
     RouteDone {
@@ -2003,9 +2001,10 @@ impl Hub {
             Input::XAck { xid } => self.core(&mut fx, env, None, In::XAck(ci::XAck { xid })),
             Input::XFail { xid } => self.core(&mut fx, env, None, In::XFail(ci::XFail { xid })),
             Input::XReply { xid, name, text } => self.core(&mut fx, env, None, In::XReply(ci::XReply { xid, name, text })),
-            Input::RouteHold { text, via, to, name, why, context, parts } => {
+            Input::RouteAsk { focus, text, via, queued, context, parts, projects } => {
                 let context = context.filter(|c| !c.is_null()).map_or(String::new(), |c| c.to_string());
-                self.core(&mut fx, env, None, In::RouteHold(ci::RouteHold { text, via, to, name, why, context, parts }))
+                let projects = projects.into_iter().map(|(id, name)| json!({"id": id, "name": name})).collect();
+                self.core(&mut fx, env, None, In::RouteAsk(ci::RouteAsk { focus, text, via, queued, context, parts, projects }))
             }
             Input::RouteCorrect { client, rid, to, name } => {
                 self.core(&mut fx, env, client, In::RouteCorrect(ci::RouteCorrect { rid, to, name }))

@@ -6,7 +6,7 @@ stopped.
 - route-name (his m_75, architect m_24939): words that only NAME a project
   ("je les voie pas dans shop non plus") stay with bise's main: no route;
 - his words addressed to a project ("@shop ...") are routed by the shell
-  (daemon/routing.rs: route::addressed): sb-core holds them (route_held,
+  (issue 37 #1: sb-core's route_ask, xhub.bend addressed): it holds them (route_held,
   to shop's hub id, why 'you wrote @shop'), sends them at 2 s
   (route_sent), the home hub starts shop's hub and delivers them once as
   his words via bise (shop's main thread: his `you` line with via bise,

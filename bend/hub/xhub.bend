@@ -23,6 +23,11 @@ import ./xhub-model.bend as XH
 
 import ./timers.bend as TM
 
+import ./lazy.bend as LZ
+
+import ../vendor/json.bend as J
+import ./gen/kit.bend as K
+
 # the sender of bise's own question in a project hub: not a valid agent
 # name, so no agent can be it
 def FROM_BISE() -> String:
@@ -186,7 +191,7 @@ def HOLD_MS() -> Nat:
   2000n
 
 # a new held route from his hold `d` (its words, target and parts set by
-# name from route_hold's input): the next rid, due HOLD_MS from `now`,
+# name by XB.route_for): the next rid, due HOLD_MS from `now`,
 # its act the clock's next one
 def route_of_hold(+x: S.Xs, +tm: S.Tms, +d: S.Route, +now: Nat) -> S.Route:
   S.Route.with_act(S.Route.with_due(S.Route.with_rid(d, S.Xs.next_rid(x)), Nat.add(now, HOLD_MS())), S.Tms.next_act(tm))
@@ -241,3 +246,160 @@ def msg_of_route(+r: S.Route, +id: Nat, +now: Nat) -> S.Msg:
 # held, with no target yet
 def is_unclear(+r: S.Route) -> Bool:
   is_held(S.Route.st(r)) && String.is_empty(S.Route.to(r))
+
+# ---- his words' route (home side, step 1; issue 37 #1) ----
+# His words to the agent in view go to a project only when he addressed
+# it: `@<project> words`, a registered project's name (ASCII case aside)
+# as their first word, words after it, no agent of this hub by that name
+# (an agent wins), sent to main now, not a command, not fn space's 'start
+# an agent'. Never because a name, a path or a URL in his words points
+# there (his m_75). core.bend's route_ask holds what `addressed` picks.
+# Laws: bend/laws/hub.bend `route_ask_*`, `addressed_*`, `address_*`.
+
+# a registered project his words may be addressed to: (its hub id, what
+# a route names; its name in the projects list)
+def Proj() -> Data:
+  Sigma<&2, &2, String, _ => String>
+
+def proj.id(p: Proj()) -> String:
+  (id, _) = p
+  id
+
+def proj.name(p: Proj()) -> String:
+  (_, name) = p
+  name
+
+# the registered projects of input route_ask (`{id, name}` each)
+def projs(js: List<&2, J.Json>) -> List<&2, Proj()>:
+  match js:
+    case Nil{}:
+      Nil{}
+    case Con{+j, +t}:
+      (K.get_s(j, "id"), K.get_s(j, "name")) <> projs(t)
+
+# Rust's char::is_whitespace, as route.rs read his words: ASCII's 9-13
+# and 32, then U+0085, U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029,
+# U+202F, U+205F, U+3000
+def is_ws(c: Char) -> Bool:
+  match c:
+    case Chr{+x}:
+      (U32.is_ge(x, 9) && U32.is_le(x, 13)) || U32.is_eq(x, 32) || U32.is_eq(x, 133) || U32.is_eq(x, 160) || U32.is_eq(x, 5760) || (U32.is_ge(x, 8192) && U32.is_le(x, 8202)) || U32.is_eq(x, 8232) || U32.is_eq(x, 8233) || U32.is_eq(x, 8239) || U32.is_eq(x, 8287) || U32.is_eq(x, 12288)
+
+def is_code(c: Char, +n: U32) -> Bool:
+  match c:
+    case Chr{+x}:
+      U32.is_eq(x, n)
+
+# the text from its first non-blank char: walks the leading blanks only
+def skip_ws(s: String) -> String:
+  match s:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, +t}:
+      LZ.pick(String, is_ws(h), u => skip_ws(t), u => SCon{h, t})
+
+# a name's trailing ':' and ',' cut (`@harness: fix it`)
+def drop_marks(s: String) -> String:
+  match s:
+    case SNil{}:
+      SNil{}
+    case SCon{+h, +t}:
+      LZ.pick(String, is_code(h, 58) || is_code(h, 44), u => drop_marks(t), u => SCon{h, t})
+
+def cut_marks(+s: String) -> String:
+  String.reverse(drop_marks(String.reverse(s)))
+
+# (the first word, what follows its first blank); None: no blank
+def head.cons(+c: Char, m: Maybe<&2, Proj()>) -> Maybe<&2, Proj()>:
+  match m:
+    case None{}:
+      None{}
+    case Some{(+name, +words)}:
+      Some{(SCon{c, name}, words)}
+
+def head(s: String) -> Maybe<&2, Proj()>:
+  match s:
+    case SNil{}:
+      None{}
+    case SCon{+h, +t}:
+      LZ.pick(Maybe<&2, Proj()>, is_ws(h), u => Some{("", t)}, u => head.cons(h, head(t)))
+
+def address.ok(+name: String, +words: String) -> Maybe<&2, String>:
+  Bool.pick(Maybe<&2, String>, String.is_empty(name) || String.is_empty(skip_ws(words)), None{}, Some{name})
+
+def address.of(m: Maybe<&2, Proj()>) -> Maybe<&2, String>:
+  match m:
+    case None{}:
+      None{}
+    case Some{(+name, +words)}:
+      address.ok(cut_marks(name), words)
+
+def address.at(s: String) -> Maybe<&2, String>:
+  match s:
+    case SNil{}:
+      None{}
+    case SCon{+h, +t}:
+      LZ.pick(Maybe<&2, String>, is_code(h, 64), u => address.of(head(t)), u => None{})
+
+# the `@name` his words start with (None: no address, or no words after
+# it). Reads the head of his text only: its leading blanks, the name up
+# to the first blank, then the words' leading blanks up to their first
+# char; a pasted 200 KB text is never walked (core_tests pins it).
+def address(+text: String) -> Maybe<&2, String>:
+  address.at(skip_ws(text))
+
+# his words, if they may go to a project: sent to main (or the agent in
+# view unset) now, not empty, not a command (an `/answer` included), not
+# fn space's 'start an agent' (bise's main starts it)
+def words_start(s: String) -> Bool:
+  match s:
+    case SNil{}:
+      False{}
+    case SCon{+h, _}:
+      Bool.not(is_code(h, 47))
+
+def routable(queued: Bool, +focus: String, +text: String, +via: String) -> Bool:
+  Bool.not(queued) && (String.is_empty(focus) || String.eq(focus, M.MAIN())) && words_start(skip_ws(text)) && Bool.not(String.eq(via, "capsule-start"))
+
+def same_name(+a: String, +b: String) -> Bool:
+  String.eq(String.to_lower(a), String.to_lower(b))
+
+# the project named `n`, ASCII case aside: the list's first
+def project_named(ps: List<&2, Proj()>, +n: String) -> Maybe<&2, Proj()>:
+  match ps:
+    case Nil{}:
+      None{}
+    case Con{+p, +t}:
+      LZ.pick(Maybe<&2, Proj()>, same_name(proj.name(p), n), u => Some{p}, u => project_named(t, n))
+
+# an agent of this hub by that name (or alias): his `@name` is for it
+def addressed.free(m: Maybe<&2, String>, +n: String, +ps: List<&2, Proj()>) -> Maybe<&2, Proj()>:
+  match m:
+    case Some{_}:
+      None{}
+    case None{}:
+      project_named(ps, n)
+
+def addressed.to(m: Maybe<&2, String>, +st: S.St, +ps: List<&2, Proj()>) -> Maybe<&2, Proj()>:
+  match m:
+    case None{}:
+      None{}
+    case Some{+n}:
+      addressed.free(M.resolve(st, n), n, ps)
+
+# the project his words are addressed to; None: they stay with the agent
+# in view. No project (a hub other than bise's home): None, his text
+# unread.
+def addressed(ps: List<&2, Proj()>, +st: S.St, queued: Bool, +focus: String, +text: String, +via: String) -> Maybe<&2, Proj()>:
+  match ps:
+    case Nil{}:
+      None{}
+    case Con{+p, +t}:
+      LZ.pick(Maybe<&2, Proj()>, routable(queued, focus, text, via), u => addressed.to(address(text), st, Con{p, t}), u => None{})
+
+# the route his words make for project `p`: his words (whole), his view,
+# his fn context and parts; the why he reads
+def route_for(+p: Proj(), +text: String, +via: String, +context: String, +parts: String) -> S.Route:
+  +r = S.Route.with_to(S.Route.with_via(S.Route.with_text(S.Route.empty(), text), via), proj.id(p))
+  +r2 = S.Route.with_why(S.Route.with_name(r, proj.name(p)), String.append("you wrote @", proj.name(p)))
+  S.Route.with_parts(S.Route.with_context(r2, context), parts)

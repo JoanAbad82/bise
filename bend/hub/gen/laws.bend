@@ -297,10 +297,10 @@ law in_x_reply_bare:
 def in_x_reply_bare():
   {==}
 
-law in_route_hold_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"route_hold"})])) == IN.IRouteHold{"", "", "", "", "", "", ""} : IN.In}
+law in_route_ask_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"route_ask"})])) == IN.IRouteAsk{"", "", "", False{}, "", "", Nil{}} : IN.In}
 
-def in_route_hold_bare():
+def in_route_ask_bare():
   {==}
 
 law in_route_correct_bare:
@@ -921,17 +921,17 @@ law in_IXReply_round:
 def in_IXReply_round(xid, name, text):
   {==}
 
-law in_IRouteHold_round:
+law in_IRouteAsk_round:
+  for focus: String
   for text: String
   for via: String
-  for to: String
-  for name: String
-  for why: String
+  for queued: Bool
   for context: String
   for parts: String
-  {IN.of(IN.json(IN.IRouteHold{text, via, to, name, why, context, parts})) == IN.IRouteHold{text, via, to, name, why, context, parts} : IN.In}
+  for projects: List<&2, J.Json>
+  {IN.of(IN.json(IN.IRouteAsk{focus, text, via, queued, context, parts, projects})) == IN.IRouteAsk{focus, text, via, queued, context, parts, projects} : IN.In}
 
-def in_IRouteHold_round(text, via, to, name, why, context, parts):
+def in_IRouteAsk_round(focus, text, via, queued, context, parts, projects):
   match parts:
     case SNil{}:
       {==}
@@ -1186,6 +1186,12 @@ law fx_route_bare:
 def fx_route_bare():
   {==}
 
+law fx_route_asked_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"route_asked"})])) == FX.FRouteAsked{False{}} : FX.Fx}
+
+def fx_route_asked_bare():
+  {==}
+
 law fx_route_done_bare:
   {FX.of(J.obj([J.kv("fx", J.JStr{"route_done"})])) == FX.FRouteDone{0n, "", "", None{}, None{}} : FX.Fx}
 
@@ -1407,6 +1413,13 @@ law fx_FRoute_round:
   {FX.of(FX.json(FX.FRoute{rid, to, name, text, due_ms, why})) == FX.FRoute{rid, to, name, text, due_ms, why} : FX.Fx}
 
 def fx_FRoute_round(rid, to, name, text, due_ms, why):
+  {==}
+
+law fx_FRouteAsked_round:
+  for routed: Bool
+  {FX.of(FX.json(FX.FRouteAsked{routed})) == FX.FRouteAsked{routed} : FX.Fx}
+
+def fx_FRouteAsked_round(routed):
   {==}
 
 law fx_FRouteDone_round:

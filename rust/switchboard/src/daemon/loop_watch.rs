@@ -1,4 +1,5 @@
-//! The loop's watchdog (hub-stall): what the hub's loop runs, and a
+//! The loop's watchdog (hub-stall): what the hub's loop runs (its sb-core
+//! step: [`Shell::step`](super::Shell::step), `step_fx`), and a
 //! hub.log line when one message holds it. On 2026-10-14 his loop sat
 //! 27 min in one call and nothing said where; now hub.log says
 //! `hub loop busy 30 s on <msg>` at 5 s, 30 s, then each minute, and
@@ -183,6 +184,23 @@ fn split(busy_ms: u64, spent: &Spent) -> String {
 }
 
 impl super::Shell {
+    /// One sb-core step: its effects run, then what follows every step.
+    pub(super) fn step(&mut self, input: crate::core::Input) {
+        let fx = self.hub.handle(input, &mut self.env);
+        self.step_fx(fx);
+    }
+
+    /// A step's effects (`fx`, sb-core's answer to one input) run, then
+    /// what follows every step.
+    pub(super) fn step_fx(&mut self, fx: Vec<crate::core::Effect>) {
+        self.run_timed(fx);
+        self.answers_flush();
+        // a gate card closed without an answer is a no
+        self.gate_sweep();
+        // a stop or a /drop: its folders and processes (daemon/drops.rs)
+        self.downs_after_step();
+    }
+
     /// Run a step's effects, each timed in the split (crate::spent).
     pub(super) fn run_timed(&mut self, fx: Vec<crate::core::Effect>) {
         for e in fx {

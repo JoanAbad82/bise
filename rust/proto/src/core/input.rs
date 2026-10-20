@@ -122,9 +122,15 @@ core_kinds! {
         XAck = "x_ack" => IXAck { xid: Nat },
         XFail = "x_fail" => IXFail { xid: Nat },
         XReply = "x_reply" => IXReply { xid: Nat, name: Str, text: Str },
-        /// the routing hold (S2 step 2): `context` is his fn context's
-        /// JSON text ("" none)
-        RouteHold = "route_hold" => IRouteHold { text: Str, via: Str, to: Str, name: Str, why: Str, context: Str, parts: StrOmit },
+        /// his words to the agent in view, before they are said (issue 37
+        /// #1): sb-core holds them for a project when he addressed one
+        /// (`@<project> …`, xhub.bend `addressed`), and answers fx
+        /// `route_asked` either way. `text` goes whole to the project
+        /// (`@<project>` included); `context`: his fn context's JSON text
+        /// ("" none); `projects`:
+        /// the registered projects `{id, name}` (bise's home hub only,
+        /// [] elsewhere)
+        RouteAsk = "route_ask" => IRouteAsk { focus: Str, text: Str, via: Str, queued: Bool, context: Str, parts: StrOmit, projects: Jsons },
         RouteCorrect = "route_correct" => IRouteCorrect { rid: Nat, to: Str, name: Str },
         RouteCancel = "route_cancel" => IRouteCancel { rid: Nat },
         /// S10: follow a task

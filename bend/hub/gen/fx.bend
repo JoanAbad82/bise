@@ -40,6 +40,8 @@ type Fx is Data:
   FXReply{hub: String, xid: Nat, text: String}
   # route
   FRoute{rid: Nat, to: String, name: String, text: String, due_ms: Nat, why: String}
+  # route_asked
+  FRouteAsked{routed: Bool}
   # route_done
   FRouteDone{rid: Nat, state: String, to: String, xid: Maybe<&2, Nat>, msg: Maybe<&2, Nat>}
   # job_end
@@ -110,6 +112,9 @@ def FXReply.of(+i: J.Json) -> Fx:
 
 def FRoute.of(+i: J.Json) -> Fx:
   FRoute{K.get_n(i, "rid"), K.get_s(i, "to"), K.get_s(i, "name"), K.get_s(i, "text"), K.get_n(i, "due_ms"), K.get_s(i, "why")}
+
+def FRouteAsked.of(+i: J.Json) -> Fx:
+  FRouteAsked{K.get_b(i, "routed")}
 
 def FRouteDone.of(+i: J.Json) -> Fx:
   FRouteDone{K.get_n(i, "rid"), K.get_s(i, "state"), K.get_s(i, "to"), K.opt_n(J.get(i, "xid")), K.opt_n(J.get(i, "msg"))}
@@ -201,6 +206,15 @@ def of.t7(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       FNone{}
 
+def of.t9(c: Cmp, +t: String, +i: J.Json) -> Fx:
+  match c:
+    case LT{}:
+      FNone{}
+    case EQ{}:
+      FKill.of(i)
+    case GT{}:
+      FNone{}
+
 def of.t8(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
@@ -208,34 +222,34 @@ def of.t8(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case EQ{}:
       FJournal.of(i)
     case GT{}:
-      FNone{}
-
-def of.t10(c: Cmp, +t: String, +i: J.Json) -> Fx:
-  match c:
-    case LT{}:
-      FNone{}
-    case EQ{}:
-      FNotice.of(i)
-    case GT{}:
-      FNone{}
+      of.t9(String.order(t, "kill"), t, i)
 
 def of.t11(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t10(String.order(t, "notice"), t, i)
+      FNone{}
     case EQ{}:
       FPassthrough.of(i)
     case GT{}:
       FNone{}
 
-def of.t9(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t12(c: Cmp, +t: String, +i: J.Json) -> Fx:
+  match c:
+    case LT{}:
+      of.t11(String.order(t, "passthrough"), t, i)
+    case EQ{}:
+      FRenamed.of(i)
+    case GT{}:
+      FNone{}
+
+def of.t10(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       of.t8(String.order(t, "journal"), t, i)
     case EQ{}:
-      FKill.of(i)
+      FNotice.of(i)
     case GT{}:
-      of.t11(String.order(t, "passthrough"), t, i)
+      of.t12(String.order(t, "renamed"), t, i)
 
 def of.t6(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
@@ -244,36 +258,36 @@ def of.t6(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case EQ{}:
       FInterrupt.of(i)
     case GT{}:
-      of.t9(String.order(t, "kill"), t, i)
+      of.t10(String.order(t, "notice"), t, i)
 
-def of.t13(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t14(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
     case EQ{}:
-      FReply.of(i)
+      FRetarget.of(i)
+    case GT{}:
+      FNone{}
+
+def of.t16(c: Cmp, +t: String, +i: J.Json) -> Fx:
+  match c:
+    case LT{}:
+      FNone{}
+    case EQ{}:
+      FRouteAsked.of(i)
     case GT{}:
       FNone{}
 
 def of.t15(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      FNone{}
+      of.t14(String.order(t, "retarget"), t, i)
     case EQ{}:
       FRoute.of(i)
     case GT{}:
-      FNone{}
+      of.t16(String.order(t, "route_asked"), t, i)
 
-def of.t14(c: Cmp, +t: String, +i: J.Json) -> Fx:
-  match c:
-    case LT{}:
-      of.t13(String.order(t, "reply"), t, i)
-    case EQ{}:
-      FRetarget.of(i)
-    case GT{}:
-      of.t15(String.order(t, "route"), t, i)
-
-def of.t17(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t18(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
@@ -282,25 +296,25 @@ def of.t17(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       FNone{}
 
-def of.t18(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t19(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t17(String.order(t, "rt"), t, i)
+      of.t18(String.order(t, "rt"), t, i)
     case EQ{}:
       FSay.of(i)
     case GT{}:
       FNone{}
 
-def of.t16(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t17(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t14(String.order(t, "retarget"), t, i)
+      of.t15(String.order(t, "route"), t, i)
     case EQ{}:
       FRouteDone.of(i)
     case GT{}:
-      of.t18(String.order(t, "say"), t, i)
+      of.t19(String.order(t, "say"), t, i)
 
-def of.t20(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t21(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
@@ -309,16 +323,16 @@ def of.t20(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       FNone{}
 
-def of.t21(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t22(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t20(String.order(t, "user_sent"), t, i)
+      of.t21(String.order(t, "user_sent"), t, i)
     case EQ{}:
       FWorktreeCreate.of(i)
     case GT{}:
       FNone{}
 
-def of.t23(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t24(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
@@ -327,46 +341,46 @@ def of.t23(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case GT{}:
       FNone{}
 
-def of.t24(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t25(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t23(String.order(t, "xdeliver"), t, i)
+      of.t24(String.order(t, "xdeliver"), t, i)
     case EQ{}:
       FXReply.of(i)
     case GT{}:
       FNone{}
 
-def of.t22(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t23(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t21(String.order(t, "worktree_create"), t, i)
+      of.t22(String.order(t, "worktree_create"), t, i)
     case EQ{}:
       FWorktreeDrop.of(i)
     case GT{}:
-      of.t24(String.order(t, "xreply"), t, i)
+      of.t25(String.order(t, "xreply"), t, i)
 
-def of.t19(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t20(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t16(String.order(t, "route_done"), t, i)
+      of.t17(String.order(t, "route_done"), t, i)
     case EQ{}:
       FSpawn.of(i)
     case GT{}:
-      of.t22(String.order(t, "worktree_drop"), t, i)
+      of.t23(String.order(t, "worktree_drop"), t, i)
 
-def of.t12(c: Cmp, +t: String, +i: J.Json) -> Fx:
+def of.t13(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       of.t6(String.order(t, "interrupt"), t, i)
     case EQ{}:
-      FRenamed.of(i)
+      FReply.of(i)
     case GT{}:
-      of.t19(String.order(t, "spawn"), t, i)
+      of.t20(String.order(t, "spawn"), t, i)
 
-# the record of a tag (a binary search over the 25 sorted tags); any
+# the record of a tag (a binary search over the 26 sorted tags); any
 # other tag: FNone
 def of_tag(+t: String, +i: J.Json) -> Fx:
-  of.t12(String.order(t, "renamed"), t, i)
+  of.t13(String.order(t, "reply"), t, i)
 
 # one Fx from its JSON object
 def of(+i: J.Json) -> Fx:
@@ -408,6 +422,8 @@ def kvs(x: Fx) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("fx", J.JStr{"xreply"}), J.kv("hub", J.JStr{hub}), J.kv("xid", J.JNum{xid}), J.kv("text", J.JStr{text})]
     case FRoute{+rid, +to, +name, +text, +due_ms, +why}:
       [J.kv("fx", J.JStr{"route"}), J.kv("rid", J.JNum{rid}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name}), J.kv("text", J.JStr{text}), J.kv("due_ms", J.JNum{due_ms}), J.kv("why", J.JStr{why})]
+    case FRouteAsked{+routed}:
+      [J.kv("fx", J.JStr{"route_asked"}), J.kv("routed", J.JBool{routed})]
     case FRouteDone{+rid, +state, +to, +xid, +msg}:
       K.cat([[J.kv("fx", J.JStr{"route_done"}), J.kv("rid", J.JNum{rid}), J.kv("state", J.JStr{state}), J.kv("to", J.JStr{to}), J.kv("xid", K.jmaybe_n(xid))], K.omit_mn("msg", msg)])
     case FJobEnd{+agent, +state, +label, +summary, +key, +hub}:
@@ -482,6 +498,9 @@ def xreply(+hub: String, +xid: Nat, +text: String) -> List<&2, Sigma<&2, &2, Str
 
 def route(+rid: Nat, +to: String, +name: String, +text: String, +due_ms: Nat, +why: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FRoute{rid, to, name, text, due_ms, why})
+
+def route_asked(+routed: Bool) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  kvs(FRouteAsked{routed})
 
 def route_done(+rid: Nat, +state: String, +to: String, +xid: Maybe<&2, Nat>, +msg: Maybe<&2, Nat>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FRouteDone{rid, state, to, xid, msg})

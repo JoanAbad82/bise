@@ -81,7 +81,6 @@ pub mod prompts;
 pub mod recycle;
 pub mod repl_start;
 pub mod role;
-pub mod route;
 pub mod router;
 pub mod search;
 pub mod snapshot;

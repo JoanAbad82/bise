@@ -8,3 +8,4 @@ streaming	d8e6d29ae	gate-reds	load flake, green alone 10/10 (load 35), red only 
 budget	d8e6d29ae	gate-reds	load flake, green alone 33/35, red only at load >= 37: '(6) an eater' never the display rate, 13-17 fps against < 12 (test:land run 4 at load ~37; alone, its 2 reds at load 53); main m_33979
 as-he-does/quick: pinch (ctrl+wheel) on an image artifact in the hub's viewer (/a/<id>/view): fit at open, no chip; zooms around the pointer (±N px), a % chip, the window zoom ne	80ebf9c4d	desk-cut-15	flaky drift (dy 5.7 px in the nightly of 80ebf9c4d at load ~40), green alone on rows25 at load 20 (pinch-out); review-gates m_32399
 
+file_chips_e2e	feab9c5fe	card-image-parts	sends turn/send files, refused by name since feab9c5fe (issue 31); the test moves to parts

@@ -100,8 +100,8 @@ type In is Data:
   IXFail{xid: Nat}
   # x_reply
   IXReply{xid: Nat, name: String, text: String}
-  # route_hold
-  IRouteHold{text: String, via: String, to: String, name: String, why: String, context: String, parts: String}
+  # route_ask
+  IRouteAsk{focus: String, text: String, via: String, queued: Bool, context: String, parts: String, projects: List<&2, J.Json>}
   # route_correct
   IRouteCorrect{rid: Nat, to: String, name: String}
   # route_cancel
@@ -268,8 +268,8 @@ def IXFail.of(+i: J.Json) -> In:
 def IXReply.of(+i: J.Json) -> In:
   IXReply{K.get_n(i, "xid"), K.get_s(i, "name"), K.get_s(i, "text")}
 
-def IRouteHold.of(+i: J.Json) -> In:
-  IRouteHold{K.get_s(i, "text"), K.get_s(i, "via"), K.get_s(i, "to"), K.get_s(i, "name"), K.get_s(i, "why"), K.get_s(i, "context"), K.get_s(i, "parts")}
+def IRouteAsk.of(+i: J.Json) -> In:
+  IRouteAsk{K.get_s(i, "focus"), K.get_s(i, "text"), K.get_s(i, "via"), K.get_b(i, "queued"), K.get_s(i, "context"), K.get_s(i, "parts"), K.get_js(i, "projects")}
 
 def IRouteCorrect.of(+i: J.Json) -> In:
   IRouteCorrect{K.get_n(i, "rid"), K.get_s(i, "to"), K.get_s(i, "name")}
@@ -615,7 +615,7 @@ def of.t38(c: Cmp, +t: String, +i: J.Json) -> In:
     case LT{}:
       INone{}
     case EQ{}:
-      IRouteCancel.of(i)
+      IRouteAsk.of(i)
     case GT{}:
       INone{}
 
@@ -626,21 +626,21 @@ def of.t37(c: Cmp, +t: String, +i: J.Json) -> In:
     case EQ{}:
       IRoute.of(i)
     case GT{}:
-      of.t38(String.order(t, "route_cancel"), t, i)
+      of.t38(String.order(t, "route_ask"), t, i)
 
 def of.t40(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       INone{}
     case EQ{}:
-      IRouteHold.of(i)
+      IRouteCorrect.of(i)
     case GT{}:
       INone{}
 
 def of.t41(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t40(String.order(t, "route_hold"), t, i)
+      of.t40(String.order(t, "route_correct"), t, i)
     case EQ{}:
       ISay.of(i)
     case GT{}:
@@ -651,7 +651,7 @@ def of.t39(c: Cmp, +t: String, +i: J.Json) -> In:
     case LT{}:
       of.t37(String.order(t, "route"), t, i)
     case EQ{}:
-      IRouteCorrect.of(i)
+      IRouteCancel.of(i)
     case GT{}:
       of.t41(String.order(t, "say"), t, i)
 
@@ -662,7 +662,7 @@ def of.t35(c: Cmp, +t: String, +i: J.Json) -> In:
     case EQ{}:
       IRestore.of(i)
     case GT{}:
-      of.t39(String.order(t, "route_correct"), t, i)
+      of.t39(String.order(t, "route_cancel"), t, i)
 
 def of.t43(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
@@ -904,8 +904,8 @@ def kvs(x: In) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("t", J.JStr{"x_fail"}), J.kv("xid", J.JNum{xid})]
     case IXReply{+xid, +name, +text}:
       [J.kv("t", J.JStr{"x_reply"}), J.kv("xid", J.JNum{xid}), J.kv("name", J.JStr{name}), J.kv("text", J.JStr{text})]
-    case IRouteHold{+text, +via, +to, +name, +why, +context, +parts}:
-      K.cat([[J.kv("t", J.JStr{"route_hold"}), J.kv("text", J.JStr{text}), J.kv("via", J.JStr{via}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name}), J.kv("why", J.JStr{why}), J.kv("context", J.JStr{context})], K.omit_s("parts", parts)])
+    case IRouteAsk{+focus, +text, +via, +queued, +context, +parts, +projects}:
+      K.cat([[J.kv("t", J.JStr{"route_ask"}), J.kv("focus", J.JStr{focus}), J.kv("text", J.JStr{text}), J.kv("via", J.JStr{via}), J.kv("queued", J.JBool{queued}), J.kv("context", J.JStr{context})], K.omit_s("parts", parts), [J.kv("projects", J.JArr{projects})]])
     case IRouteCorrect{+rid, +to, +name}:
       [J.kv("t", J.JStr{"route_correct"}), J.kv("rid", J.JNum{rid}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name})]
     case IRouteCancel{+rid}:

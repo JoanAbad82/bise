@@ -46,10 +46,9 @@
 {"ans": [], "focus": "docs", "git": true, "now": 1000000, "queued": false, "t": "route", "target": "docs", "text": "merci"}
 {"ans": [], "git": true, "now": 1000000, "rid": 1, "t": "route_cancel"}
 {"ans": [], "git": true, "name": "bise", "now": 1000000, "rid": 1, "t": "route_correct", "to": "bise"}
-{"ans": [], "context": "", "git": true, "name": "", "now": 1000000, "t": "route_hold", "text": "first words", "to": "", "via": "", "why": ""}
-{"ans": [], "context": "", "git": true, "name": "shop", "now": 1000000, "parts": "[{\"kind\":\"text\",\"text\":\"look \"},{\"kind\":\"image\",\"name\":\"[Image #1]\",\"source\":\"/d/s.png\",\"mime\":\"image/png\",\"b64_file\":\"/h/images/ab.b64\"}]", "t": "route_hold", "text": "look", "to": "shop-1", "via": "", "why": "you named shop"}
-{"ans": [], "context": "", "git": true, "name": "shop", "now": 1000000, "t": "route_hold", "text": "update the docs", "to": "shop-1", "via": "", "why": "Safari: shop.test"}
-{"ans": [], "context": "{\"app\":\"Safari\",\"url\":\"https://grafana.shop.test/d/p99\"}", "git": true, "name": "shop", "now": 1000000, "t": "route_hold", "text": "why does p99 rise", "to": "shop-1", "via": "", "why": "the front page"}
+{"ans": [], "context": "", "focus": "", "git": true, "now": 1000000, "parts": "[{\"kind\":\"text\",\"text\":\"look \"},{\"kind\":\"image\",\"name\":\"[Image #1]\",\"source\":\"/d/s.png\",\"mime\":\"image/png\",\"b64_file\":\"/h/images/ab.b64\"}]", "projects": [{"id": "shop-1", "name": "shop"}], "queued": false, "t": "route_ask", "text": "@shop look", "via": ""}
+{"ans": [], "context": "", "focus": "", "git": true, "now": 1000000, "projects": [{"id": "shop-1", "name": "shop"}], "queued": false, "t": "route_ask", "text": "@shop update the docs", "via": ""}
+{"ans": [], "context": "{\"app\":\"Safari\",\"url\":\"https://grafana.shop.test/d/p99\"}", "focus": "", "git": true, "now": 1000000, "projects": [{"id": "shop-1", "name": "shop"}], "queued": false, "t": "route_ask", "text": "@shop why does p99 rise", "via": ""}
 {"ans": [], "focus": "a", "git": true, "now": 1000000, "parts": "[{\"kind\":\"quote\",\"from\":\"main\",\"text\":\"q\"},{\"kind\":\"text\",\"text\":\"why?\"}]", "queued": true, "t": "say", "text": "<selection from=\"main\">\nq\n</selection>\nwhy?"}
 {"ans": [], "focus": "a", "git": true, "now": 1000000, "queued": false, "t": "say", "text": "go"}
 {"agent": "main", "ans": [], "git": true, "now": 1000000, "t": "steer_rx"}

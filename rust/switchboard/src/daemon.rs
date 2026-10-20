@@ -810,16 +810,6 @@ impl Shell {
         self.proto_on(v);
     }
 
-    fn step(&mut self, input: Input) {
-        let fx = self.hub.handle(input, &mut self.env);
-        self.run_timed(fx);
-        self.answers_flush();
-        // a gate card closed without an answer is a no
-        self.gate_sweep();
-        // a stop or a /drop: its folders and processes (daemon/drops.rs)
-        self.downs_after_step();
-    }
-
     fn run(&mut self, e: Effect) {
         match e {
             Effect::Journal(ev) => {
@@ -976,6 +966,8 @@ impl Shell {
             Effect::FollowedEnd { project, agent, key, state, label, summary } => self.followed_end(project, agent, key, &state, label, summary),
             Effect::MergedChanged => self.merged_all(),
             Effect::Activity(item) => self.proto_route(HubEv::Activity { project: self.project(), item }),
+            // read by route_input before the effects run (daemon/routing.rs)
+            Effect::RouteAsked { .. } => {}
             Effect::RouteDone { rid, state, to, xid, msg } => self.proto_route(HubEv::RouteDone { project: self.project(), rid, state, to, xid, msg }),
         }
     }
