@@ -49,7 +49,11 @@ mod state;
 
 #[path = "core_gen/photo.rs"]
 mod photo;
-use state::{rust_types, state_codec, state_laws, state_types};
+use state::{state_codec, state_laws, state_types};
+
+#[path = "core_gen/state_rust.rs"]
+mod state_rust;
+use state_rust::rust_types;
 
 const BLESS: &str = "BISE_PROTO_BLESS";
 const KV: &str = "Sigma<&2, &2, String, _ => J.Json>";
