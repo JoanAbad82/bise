@@ -739,6 +739,12 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       const feet = s.scene.feet(name, v);
       return { ...p, feet: feet ? toScreen(f, feet).y : p.y };
     },
+    glidesOf(id) {
+      const f = shownFit();
+      const s = spots.get(id);
+      if (!f || !s?.live) return [];
+      return s.scene.glides().map((g) => ({ name: g.name, nose: toScreen(f, g.nose), tail: toScreen(f, g.tail) }));
+    },
     placedOf: (id) => placedOf(id) ?? null,
     pickBim(x, y) {
       const f = shownFit();

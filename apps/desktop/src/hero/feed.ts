@@ -5,7 +5,7 @@
 // into his plane (the 3D plane leaves from under the feed: run.ts FEED_X). Empty again at the fold.
 // feedAt is pure (tested); makeFeed draws it. Owner: hero-town.
 import { FEED, PAGE, type Line } from './cast';
-import { FOLD_LINE_S, foldShape, WORDS, type Launch } from './fold';
+import { dart, FOLD_LINE_S, foldShape, SPAN, WORDS, type Launch } from './fold';
 
 /** the lines shown at once (designer: 3-4 lines) */
 export const FEED_ROWS = 4;
@@ -92,6 +92,11 @@ export interface Feed {
   readonly root: HTMLElement;
   /** the feed at film time T; `launch`: where the 3D plane of a folding row leaves (its rect on the page), null not known */
   draw(T: number, launch?: (rowKey: string, rect: DOMRect) => Launch | null): void;
+  /**
+   * his 3D planes still under the panel (the canvas is under it): drawn as their dart over it, clipped
+   * to it, so the plane flies out of his box (their nose and tail, css px from the panel's top left)
+   */
+  lift(planes: readonly { readonly nose: { readonly x: number; readonly y: number }; readonly tail: { readonly x: number; readonly y: number } }[]): void;
   dispose(): void;
 }
 
@@ -135,7 +140,10 @@ export function makeFeed(box: HTMLElement): Feed {
   list.className = 'bh-feed-rows';
   const field = document.createElement('div');
   field.className = 'bh-feed-field';
-  root.append(list, field);
+  // the lifting darts: over the rows, clipped to the panel
+  const lifts = document.createElementNS(SVG, 'svg');
+  lifts.setAttribute('class', 'bh-lift');
+  root.append(list, field, lifts);
   box.append(root);
   const els = new Map<string, HTMLDivElement>();
   let last = '';
@@ -210,6 +218,18 @@ export function makeFeed(box: HTMLElement): Feed {
       }
       field.textContent = s.typing === '' ? s.placeholder : s.typing;
       field.classList.toggle('empty', s.typing === '');
+    },
+    lift(planes) {
+      const w = root.clientWidth;
+      const h = root.clientHeight;
+      lifts.setAttribute('viewBox', `0 0 ${String(w)} ${String(h)}`);
+      while (lifts.children.length > planes.length) lifts.lastElementChild?.remove();
+      while (lifts.children.length < planes.length) lifts.append(document.createElementNS(SVG, 'polygon'));
+      planes.forEach((p, i) => {
+        const len = Math.hypot(p.nose.x - p.tail.x, p.nose.y - p.tail.y);
+        const pts = len < 1 ? [] : dart((p.nose.x + p.tail.x) / 2, (p.nose.y + p.tail.y) / 2, { len, hx: (p.nose.x - p.tail.x) / len, hy: (p.nose.y - p.tail.y) / len }, SPAN);
+        lifts.children[i]?.setAttribute('points', pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '));
+      });
     },
     dispose() {
       root.remove();

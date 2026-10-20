@@ -400,6 +400,20 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     return { len: startPx(f), hx: h.x, hy: -h.y };
   }
 
+  /** his planes still under the feed's panel: their dart over it (feed.ts lift), from the canvas's px to the panel's */
+  function liftDarts(): void {
+    const c = canvas.getBoundingClientRect();
+    const f = feed.root.getBoundingClientRect();
+    if (f.width <= 0) {
+      feed.lift([]);
+      return;
+    }
+    const dx = c.left - f.left;
+    const dy = c.top - f.top;
+    const on = (p: { x: number; y: number }): { x: number; y: number } => ({ x: p.x + dx, y: p.y + dy });
+    feed.lift(r.liveIds().flatMap((id) => r.glidesOf(id).map((g) => ({ nose: on(g.nose), tail: on(g.tail) }))));
+  }
+
   function draw(nowMs: number): void {
     raf = 0;
     if (!running()) return;
@@ -451,6 +465,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     // the feed: nothing on the paper while the town grows, in as the camera leaves the wide; out with the words in the fold
     feed.root.style.opacity = ems === null ? '' : String(T < PAGE.fold ? feedOpacity(ems) : wordsAt(ems));
     feed.draw(T, launchOf);
+    liftDarts();
     page.draw(T);
     stamped(T);
     const t4 = performance.now();

@@ -35,8 +35,8 @@ const smooth = (x: number): number => {
 };
 const mix = (a: readonly [number, number], b: readonly [number, number], k: number): [number, number] => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
 
-/** the dart from above, its wings open (`span` of its length each side), centred on (cx, cy): its tail's left tip, nose, tail's right tip, tail's middle */
-function dart(cx: number, cy: number, l: Launch, span: number): [number, number][] {
+/** the dart from above, its wings open (`span` of its length each side), centred on (cx, cy): its tail's left tip, nose, tail's right tip, tail's middle. Pure. */
+export function dart(cx: number, cy: number, l: Launch, span: number): [number, number][] {
   const h = Math.hypot(l.hx, l.hy) || 1;
   const hx = l.hx / h;
   const hy = l.hy / h;
@@ -58,7 +58,7 @@ function dart(cx: number, cy: number, l: Launch, span: number): [number, number]
 
 /** the open sheet's half-span, then the dart's (plane.ts DART: sheet 0.39, span 0.3), of its length */
 const SHEET = 0.39;
-const SPAN = 0.3;
+export const SPAN = 0.3;
 
 /**
  * The bubble (w × h css px) folding at f (0..1 over FOLD_LINE_S) into the dart `l` leaves as, centred
