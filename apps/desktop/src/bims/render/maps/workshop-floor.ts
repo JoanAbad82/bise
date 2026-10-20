@@ -1,14 +1,13 @@
 // The workshop's free floor drawn (its plan: maps/workshop-floor.ts, page bims-workshop, Gabriel's
 // pick C): each pod's lamp beam (two posts, a beam along the pod, three workshop shades that glow at
-// night through kit.glow, one point light that fades with the sky's lamps), its plant at its left
+// night through kit.glow; its light is a pool of world.ts poolsOf, Office.lamps), its plant at its left
 // end; each corner, every piece inside its floor box (render/clip.test.ts): the lounge, the band,
 // the maker bench, the lift with the old yellow car up, the pallet racks, the motorbike. The bims'
 // kit only (style shapes, kit.mat, WORLD colours), details under ~6 cm their own raised meshes, no
 // two faces in one plane (coplanar.test.ts), never pink or red. Owner: maps-b.
-import { Group, type Object3D, PointLight } from 'three';
+import { Group, type Object3D } from 'three';
 import type { Corner, CornerKind, Pod } from '../../maps/workshop-floor';
 import { POD_BEAM_Z, POD_PLANT, POD_POST } from '../../maps/workshop-floor';
-import { POOL } from '../../sky';
 import type { Kit } from '../kit';
 import { WORLD } from '../palette';
 
@@ -22,8 +21,6 @@ const TEAL = '#2a9d8f';
 const VIOLET = '#9b8fe0';
 const ORANGE = '#f39a4c';
 
-/** a pod light's strength at night (kit.light: it fades with the sky's lamps), its height over the desks */
-export const POD_LIGHT = { i: 4, y: 1.9 } as const;
 /** a shade's place along the pod (over each desk pair), its height */
 const SHADES = [-1.8, 0, 1.8] as const;
 const SHADE_Y = 2.06;
@@ -49,7 +46,7 @@ function stool(k: Kit, g: Object3D, x: number, z: number, top: number, color: st
   k.add(style.cylinder(0.17, 0.06), k.mat(color), g, x, top - 0.03, z);
 }
 
-/** one pod's lamp beam, its three shades, its light and its plant */
+/** one pod's lamp beam, its three shades and its plant (its light: world.ts poolsOf) */
 export function podBeam(k: Kit, root: Object3D, p: Pod): void {
   const { style } = k;
   const g = new Group();
@@ -69,9 +66,6 @@ export function podBeam(k: Kit, root: Object3D, p: Pod): void {
     k.add(style.cap(0.22, 0.45), shade, g, lx, SHADE_Y, 0).userData.shade = true;
     k.add(style.ball(0.05), bulb, g, lx, SHADE_Y - 0.02, 0).userData.shade = true;
   }
-  const light = k.light(new PointLight(POOL.color, POD_LIGHT.i, POOL.distance, POOL.decay));
-  light.position.set(0, POD_LIGHT.y, 0);
-  g.add(light);
   plant(k, g, -POD_PLANT, -POD_BEAM_Z, 0.26);
 }
 

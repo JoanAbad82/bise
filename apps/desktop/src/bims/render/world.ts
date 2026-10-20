@@ -62,7 +62,10 @@ export interface World {
   dispose(): void;
 }
 
-/** where the pools hang and how strong each is lit: main's desk, the island, the lounge, one desk */
+/** a map's own night lamp's pool (Office.lamps: the workshop's pods), a little softer than the common ones */
+const LAMP_I = 4;
+
+/** where the pools hang and how strong each is lit: main's desk, the island, the lounge, one desk, then the map's own lamps (Office.lamps) */
 export function poolsOf(o: Office): { x: number; z: number; i: number }[] {
   const desks = [...o.desks.values()];
   const desk = desks[Math.min(3, desks.length - 1)];
@@ -72,7 +75,7 @@ export function poolsOf(o: Office): { x: number; z: number; i: number }[] {
     { s: o.lounge[0], i: 6 },
     { s: desk, i: 5 },
   ];
-  return at.flatMap(({ s, i }) => (s ? [{ x: s.x, z: s.z, i }] : []));
+  return [...at.flatMap(({ s, i }) => (s ? [{ x: s.x, z: s.z, i }] : [])), ...(o.lamps ?? []).map((p) => ({ x: p.x, z: p.z, i: LAMP_I }))];
 }
 
 /** the cube's shadow on the page: black, this strong on the light page and the dark one (designer m_34173) */

@@ -2,8 +2,8 @@
 // The workshop's floor as drawn (render/maps/workshop-floor.ts on maps/workshop-floor.ts, page
 // bims-workshop): every corner's pieces stand inside their floor boxes (what a walk keeps off), no
 // other mesh goes through a corner piece (a cozy plant, a stage's piece, a desk), the Vespa inside
-// its box, no two faces of a corner or a pod beam in one plane (coplanar.ts), and one night light per
-// pod, no more (budget.spec.ts measures the frames).
+// its box, no two faces of a corner or a pod beam in one plane (coplanar.ts), and one night pool per
+// pod, no more, none without its ground (the town's own pools: budget.spec.ts measures the frames).
 import { describe, expect, it } from 'vitest';
 import { Box3, Group, Mesh, type Object3D, PointLight, Vector3 } from 'three';
 import { crowd } from '../../fixtures';
@@ -65,13 +65,13 @@ describe('the workshop floor as drawn', () => {
     });
   });
 
-  it('a pod beam has no two faces in one plane, one light', () => {
+  it('a pod beam has no two faces in one plane, no light of its own (its pool is world.ts poolsOf\'s)', () => {
     const root = new Group();
     podBeam(kit(), root, podAt(0));
     expect(coplanarClashes(root)).toEqual([]);
     let lights = 0;
     root.traverse((o) => { if (o instanceof PointLight) lights++; });
-    expect(lights).toBe(1);
+    expect(lights).toBe(0);
   });
 
   it('nothing goes through a corner piece, the Vespa inside its box, stages 0 and last, 13 to 31 desks', async () => {
@@ -106,7 +106,7 @@ describe('the workshop floor as drawn', () => {
     expect([...new Set(bad)].slice(0, 12)).toEqual([]);
   }, 120_000);
 
-  it('one night light per pod past the four pools', () => {
+  it('one night pool per pod past the four, with its ground (poolsOf: the town lights them within its cap)', () => {
     for (const n of [12, 19, 31]) {
       const o = ws(n);
       const w = buildWorld(o, 'main', STYLE, lookOf('workshop'), false, NO_GROW);

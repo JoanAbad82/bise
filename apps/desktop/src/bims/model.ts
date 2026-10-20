@@ -208,6 +208,8 @@ export interface Office {
   readonly park?: Park;
   /** its cozy pieces (cozy.ts placeCozy, maps/index.ts layoutOf): the coffee corner's spot is on `walks`; absent: a bare room */
   readonly cozy?: Cozy;
+  /** where it hangs night lamps past the common pools (the workshop's pods): render/world.ts poolsOf lights them, within the town's cap there; absent: none */
+  readonly lamps?: readonly Pt[];
   /** the nooks of its corners (the workshop's: a sofa, a drum stool, a bench), places of the walk graph an idle trip may go to instead of the island; absent: none */
   readonly nooks?: readonly Nook[];
 }

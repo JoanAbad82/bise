@@ -193,6 +193,8 @@ export function workshopLayout(agents: readonly Agent[], prev?: WorkshopOffice):
     slots, cap, crossBack: BACK,
     pingpong, aisle, crossFront, pods, corners, vespa,
     ...(nooks.length > 0 ? { nooks } : {}),
+    // each pod's lamp beam lights the floor at night (render/world.ts poolsOf)
+    ...(pods.length > 0 ? { lamps: pods.map((p) => ({ x: p.x, z: p.z })) } : {}),
   };
 }
 
