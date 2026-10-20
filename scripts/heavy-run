@@ -9,6 +9,11 @@
 #   slot 1 = ~/.bise/run/heavy.lock (the old single lock: old callers still count)
 #   slot 2 = ~/.bise/run/heavy2.lock
 #   slots 3-4 = ~/.bise/run/heavy3.lock, heavy4.lock (AC power only)
+#   slot 5 = ~/.bise/run/heavy5.lock, the release lane (fast-loop, his pick on
+#     page loop-4min: « une voie release ... le verdict ne bloque personne mais
+#     charge plus la machine »): only a --prio job takes it, and a --prio job
+#     tries it first, so a release's verdict never waits for the agents' 4
+#     slots and never takes one of them while the lane is free.
 # The queue (flow-time, 2026-10-20): each waiting job holds a ticket,
 # ~/.bise/run/queue/<rank>-<submitted>-<pid>; a job takes a free slot only
 # when fewer live tickets are ahead of it than slots are free, so jobs start
@@ -66,8 +71,9 @@ S1="$D/heavy.lock"
 S2="$D/heavy2.lock"
 S3="$D/heavy3.lock"
 S4="$D/heavy4.lock"
+S5="$D/heavy5.lock"
 Q="$D/queue"
-mkdir -p "$D" "$Q" && touch "$S1" "$S2" "$S3" "$S4"
+mkdir -p "$D" "$Q" && touch "$S1" "$S2" "$S3" "$S4" "$S5"
 
 # the disk (disk-guard, 2026-10-20: agents' builds filled it, macOS hit
 # 'critical low disk' and killed the app and every Chrome tab at 17:48). A
@@ -111,10 +117,25 @@ disk_watch() {
     sleep "${HEAVY_DISK_POLL:-10}"
   done
 }
-export -f free_kb disk_under free_gb tell_hub tree disk_watch
+# whether a release-lane job (heavy5.lock) ran at any time from epoch $1 to
+# now, read from heavy.log ($2): an --alone job's end line says so
+# ('lane=busy'), since --alone never takes the lane (review-gates m_35984):
+# a timing red in a night with it may come from the lane's load
+lane_during() {
+  awk -F'\t' -v t0="$1" -v now="$(date +%s)" '
+    $4 != "heavy5.lock" { next }
+    $3 == "-" { open[$1 FS $2] = $2; next }
+    { delete open[$1 FS $2]; if ($2 <= now && $3 >= t0) busy = 1 }
+    END { for (k in open) if (open[k] <= now) busy = 1; if (busy) print "busy" }' "$2" 2>/dev/null
+}
+export -f free_kb disk_under free_gb tell_hub tree disk_watch lane_during
 
 # HEAVY_SLOTS (tests): use only the first n slots, whatever the power.
-on_battery() { /usr/bin/pmset -g batt 2>/dev/null | head -1 | grep -q "Battery Power"; }
+# HEAVY_ON_BATTERY=0|1 (tests): the power as given, not pmset's
+on_battery() {
+  [ -n "${HEAVY_ON_BATTERY:-}" ] && { [ "$HEAVY_ON_BATTERY" = 1 ]; return; }
+  /usr/bin/pmset -g batt 2>/dev/null | head -1 | grep -q "Battery Power"
+}
 # sccache (build-cache, 2026-10-10): rustc outputs shared across worktrees
 # through a disk cache (~/.cache/sccache, 8G cap: the disk is tight). Never a
 # shared target dir. One sccache server per worktree (its own socket), started
@@ -180,7 +201,8 @@ if [ -e "$stop" ]; then
   m="heavy-run: stopped \"$c\": the disk is nearly full ($(cat "$stop") GB free on the data volume, under ${HEAVY_DISK_STOP_GB:-5} GB). Free some space, then run it again."
   echo "$m" >&2; tell_hub "$m"; rm -f "$stop"; rc=28
 fi
-printf "%s\t%s\t%s\t%s\t%s\t%s\trc=%s\n" "$HEAVY_SUBMIT" "$t0" "$(date +%s)" "${2##*/}" "$PWD" "$c" "$rc" >>"$L" 2>/dev/null
+lane=""; [ "$2" = all ] && [ "$(lane_during "$t0" "$L")" = busy ] && lane="	lane=busy"
+printf "%s\t%s\t%s\t%s\t%s\t%s\trc=%s%s\n" "$HEAVY_SUBMIT" "$t0" "$(date +%s)" "${2##*/}" "$PWD" "$c" "$rc" "$lane" >>"$L" 2>/dev/null
 exit $rc'
 
 # a full gate (tests/gate.sh full) runs one at a time on the machine (its own
@@ -247,6 +269,8 @@ while :; do
   fi
   if on_battery; then n=15; slots="$S1 $S2"; else n=10; slots="$S1 $S2 $S3 $S4"; fi
   if [ -n "${HEAVY_SLOTS:-}" ]; then slots=$(echo "$S1 $S2 $S3 $S4" | cut -d' ' -f1-"$HEAVY_SLOTS"); fi
+  # the release lane: --prio alone, first (HEAVY_NO_LANE=1: none, tests)
+  [ "$PRIO" = 1 ] && [ -z "${HEAVY_NO_LANE:-}" ] && slots="$S5 $slots"
   if [ "$ALONE" = 1 ]; then
     # its turn (nobody ahead): take each slot as it frees, holding the queue
     # (its ticket stays until the job runs); exec keeps this pid

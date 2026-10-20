@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FAILS = []
@@ -139,7 +140,8 @@ def main():
         # never the caller's night (NIGHTLY_END, NIGHTLY_NOW...): the nightly's gate runs this test
         env0 = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", "FAKE_", "NIGHTLY_"))}
         clock, args_log = os.path.join(t, "now"), os.path.join(t, "args")
-        env0.update(BISE_HOME=home, NIGHTLY_HEAVY_RUN=heavy, NIGHTLY_NOW=clock, FAKE_ARGS=args_log)
+        env0.update(BISE_HOME=home, NIGHTLY_HEAVY_RUN=heavy, NIGHTLY_NOW=clock, FAKE_ARGS=args_log,
+                    HEAVY_LOG=os.path.join(t, "heavy.log"))
 
         def night(NOW=None, **fake):
             # the fake clock: 01:30 today, when the launchd job queues the night
@@ -168,6 +170,13 @@ def main():
         check("heavy-run: both slots" in log, "first night: heavy-run --alone, never beside an agent's job: %r" % log)
         check(last.split()[1:3] == [short(), "green"], "first night: last %r" % last)
         check(red is None, "first night: no red")
+        check("LANE " not in log, "first night: no release job in the lane, no LANE line: %r" % log)
+        # a release job in heavy-run's lane (heavy5.lock) during the night: the log says so
+        with open(os.path.join(t, "heavy.log"), "w") as f:
+            f.write("1\t%d\t-\theavy5.lock\t/x\tpython3 scripts/desktop_tag.py \n" % (int(time.time()) - 60))
+        rc, log, last, red = night()
+        check("LANE a release job ran in the lane during this night" in log, "a lane night: the LANE line: %r" % log)
+        os.remove(os.path.join(t, "heavy.log"))
 
         # 2. the tree removed while the run waits (the hub's sweep), and a land on main
         rc, log, last, red = night(FAKE_SWEEP=tree, FAKE_LAND=repo)

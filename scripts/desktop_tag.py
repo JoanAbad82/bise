@@ -155,7 +155,8 @@ def cut(tag, sha, notes, repo=REPO, env=None):
         nightly = env.get("DESKTOP_TAG_NIGHTLY") or os.path.join(repo, "scripts", "nightly_desktop.sh")
         say("no run of %s yet: running %s now, in a heavy slot (hours); its out: %s" % (sha[:12], nightly, out))
         cmd = ["/usr/bin/caffeinate", "-is", "bash", nightly, out, sha]
-        subprocess.run(heavy_argv(cmd, os.path.join(bh, "run", "heavy.lock")), cwd=repo, env=env)
+        # a release's verdict: --prio, in heavy-run's release lane, never one of the agents' 4 slots
+        subprocess.run(heavy_argv(cmd, os.path.join(bh, "run", "heavy.lock"), prio=True), cwd=repo, env=env)
         run = last_run(read(tsv), sha)
         if run is None:
             raise TagError("the end-to-end on %s left no run line (%s/summary.txt): no tag" % (sha[:12], out))

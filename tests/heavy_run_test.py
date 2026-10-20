@@ -48,7 +48,8 @@ def held(slot):
 with tempfile.TemporaryDirectory() as home:
     # plenty of faked free space: the real disk's never makes a job wait here
     open(os.path.join(home, "plenty_kb"), "w").write(str(500 * 1048576))
-    env = dict(os.environ, HOME=home, HEAVY_SLOTS="1", HEAVY_FREE_KB_FILE=os.path.join(home, "plenty_kb"))
+    # on AC as far as heavy-run knows (HEAVY_ON_BATTERY=0): the --alone cases run on battery too
+    env = dict(os.environ, HOME=home, HEAVY_SLOTS="1", HEAVY_FREE_KB_FILE=os.path.join(home, "plenty_kb"), HEAVY_ON_BATTERY="0")
     env.pop("SB_AGENT", None)
     env.pop("HEAVY_SLOT", None)
     env.pop("HEAVY_SUBMIT", None)
@@ -93,7 +94,8 @@ with tempfile.TemporaryDirectory() as home:
     go3 = os.path.join(home, "go3")
     holder = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go3], env=env)
     check(wait_for(lambda: len([l for l in lines() if l.split("\t")[2] == "-"]) == 7), "a holder takes the slot")
-    dead = subprocess.Popen([HEAVY, "--prio", "true"], env=dict(env, HEAVY_SUBMIT="1"), stderr=subprocess.DEVNULL)
+    # (no release lane here: a --prio job would run in it at once, no waiter)
+    dead = subprocess.Popen([HEAVY, "--prio", "true"], env=dict(env, HEAVY_SUBMIT="1", HEAVY_NO_LANE="1"), stderr=subprocess.DEVNULL)
     check(wait_for(lambda: any(f.startswith("0-1-") for f in os.listdir(q))), "a --prio waiter's ticket")
     dead.kill()
     dead.wait()
@@ -118,10 +120,22 @@ with tempfile.TemporaryDirectory() as home:
     # nested: refused
     r = subprocess.run([HEAVY, "sh", "-c", '"$0" true', HEAVY], env=env, capture_output=True, text=True)
     check(r.returncode == 2 and "refused" in r.stderr, "a heavy-run inside a heavy job is refused")
+    # the release lane (heavy5.lock, fast-loop): every agent slot held, a --prio
+    # job runs at once in the lane; a plain job never takes it
+    go5 = os.path.join(home, "go5")
+    hold = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go5], env=env)
+    check(wait_for(lambda: held(os.path.join(run, "heavy.lock"))), "a job holds the one agent slot")
+    r = subprocess.run([HEAVY, "--prio", "sh", "-c", 'echo "$HEAVY_SLOT"'], env=env, capture_output=True, text=True, timeout=30)
+    check(r.returncode == 0 and r.stdout.split()[:1] == ["heavy5.lock"], "a --prio job runs in the release lane: %r" % r.stdout)
+    plain = subprocess.Popen([HEAVY, "true"], env=env, stderr=subprocess.DEVNULL)
+    check(stays(lambda: plain.poll() is None, 2, "the plain job waits"), "a plain job never takes the release lane")
+    open(go5, "w").close()
+    check(plain.wait(timeout=30) == 0, "the plain job runs once the agent slot frees")
+    hold.wait(timeout=10)
     # a slot held without heavy-run (an old caller's lockf) is busy; an --alone
     # waiter (the nightly) drains the queue: a job after it never takes the
     # free slot 2 meanwhile
-    on_ac = "Battery Power" not in subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True).stdout
+    on_ac = True  # HEAVY_ON_BATTERY=0 in env
     if on_ac:
         os.remove(order)
         go2 = os.path.join(home, "go2")
@@ -160,6 +174,16 @@ with tempfile.TemporaryDirectory() as home:
         hold.wait(timeout=10)
         got = open(order).read().split() if os.path.exists(order) else []
         check(got == ["land", "alone"], "a land check before an --alone measure: %r" % got)
+        # an --alone job that ran while a release-lane job ran: its end line says
+        # 'lane=busy' (the lane runs beside it; a timing red may come from it)
+        go6 = os.path.join(home, "go6")
+        lane = subprocess.Popen([HEAVY, "--prio", "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go6], env=env1)
+        check(wait_for(lambda: held(os.path.join(run, "heavy5.lock"))), "a --prio job holds the release lane")
+        a = subprocess.run([HEAVY, "--alone", "sh", "-c", "echo marked"], env=env1, capture_output=True, text=True, timeout=30)
+        open(go6, "w").close()
+        lane.wait(timeout=10)
+        end = [l for l in lines() if l.split("\t")[2] != "-" and "echo marked" in l]
+        check(a.returncode == 0 and len(end) == 1 and end[0].endswith("rc=0\tlane=busy"), "an --alone job beside the lane is marked: %r" % end)
     else:
         print("skip --alone on battery (it waits for AC power)")
     # the disk (disk-guard): faked free space; under 15 GB a job waits and

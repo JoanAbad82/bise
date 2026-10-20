@@ -67,7 +67,8 @@ def fake_home(h, now):
     write(os.path.join(h, "hubs", hub, "journal.jsonl"), wk(1, "t7", now - 9000, now - 5400) + wk(2, "t8", now - 9000, now - 5400))
     write(os.path.join(h, "run", "heavy.log"),
           "%d\t%d\t-\theavy.lock\t/w/t8/harness\ttests/gate.sh quick%s" % (now - 8990, now - 5000, NL)
-          + "%d\t%d\t%d\theavy.lock\t/w/t8/harness\ttests/gate.sh quick\trc=0%s" % (now - 8990, now - 5000, now - 4700, NL))
+          + "%d\t%d\t%d\theavy.lock\t/w/t8/harness\ttests/gate.sh quick\trc=0%s" % (now - 8990, now - 5000, now - 4700, NL)
+          + "%d\t%d\t-\theavy5.lock\t/w/rel/harness\tpython3 scripts/desktop_tag.py x%s" % (now - 4000, now - 4000, NL))
     def own(mode, agent, start, body, end):
         write(os.path.join(h, "gate", "logs", "%s-%d-%d.log" % (mode, start, start % 1000)),
               "# gate %s agent=%s sha=abc1234 start=%d root=/x%s%s" % (mode, agent, start, NL, body), end)
@@ -137,6 +138,7 @@ def test_audit():
         wa = rep["waits"]
         check([x["agent"] for x in wa["ended_at_max"]] == ["t7"] and [x["agent"] for x in wa["queued_at_max"]] == ["t8"],
               "a --max wake whose job was still queued is not a dead job (%s)" % wa)
+        check([x["cmd"] for x in rep["heavy"]["lane"]] == ["python3 scripts/desktop_tag.py x"], "the release lane's jobs by command (%s)" % rep["heavy"]["lane"])
         check(rep["scratch_runs"] == 1, "a run on an agent's scratch tree is left out (%s)" % rep["scratch_runs"])
         t = rep["tests"]
         check(t.get("partial_e2e", {}).get("runs") == 2 and t["partial_e2e"]["fails"] == 1
@@ -159,7 +161,7 @@ def test_audit():
             fh.write("%d\t%d\t-\theavy2.lock\t/w/new/harness\tcargo test%s" % (now - 3000, now - 2900, NL))
             fh.write("%d\t%d\t%d\theavy2.lock\t/w/new/harness\tcargo test\trc=1%s" % (now - 3000, now - 2900, now - 2800, NL))
         hv = {x["cwd"]: x for x in la.heavy_waits(h, now - 86400)}
-        check(set(hv) == {"/w/t8/harness", "/w/old/harness", "/w/new/harness"}
+        check(set(hv) == {"/w/t8/harness", "/w/old/harness", "/w/new/harness", "/w/rel/harness"}
               and hv["/w/new/harness"]["end"] == now - 2800 and hv["/w/t8/harness"]["end"] == now - 4700
               and hv["/w/old/harness"]["end"] == now - 2900,
               "heavy.log: one row a job, its end from its end line, else the next start on its slot (%s)" % hv)

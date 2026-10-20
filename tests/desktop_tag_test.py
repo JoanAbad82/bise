@@ -102,7 +102,8 @@ def repo_flow():
             f.write(FAKE_NIGHTLY)
         env = dict(os.environ, BISE_HOME=bh, DESKTOP_TAG_NIGHTLY=fake, FAKE_LOG=log)
         # no heavy slot in the test: the argv as it is
-        T.heavy_argv = lambda cmd, lock: [c for c in cmd if c not in ("/usr/bin/caffeinate", "-is")]
+        prios = []  # a release's run asks heavy-run's release lane (--prio)
+        T.heavy_argv = lambda cmd, lock, prio=False: (prios.append(prio), [c for c in cmd if c not in ("/usr/bin/caffeinate", "-is")])[1]
         runs = os.path.join(bh, "run", "nightly", "desktop-runs.tsv")
         calls = lambda: open(log).read().splitlines() if os.path.exists(log) else []  # noqa: E731
 
@@ -171,6 +172,7 @@ def repo_flow():
         g("tag", "-a", "desktop-v2026.10.5", "-m", "nightly-desktop: green %s w" % ("0" * 40))
         for tag, why in (("desktop-v2026.10.3", "lightweight"), ("desktop-v2026.10.4", "carries no"), ("desktop-v2026.10.5", "carries no")):
             check(raises(lambda: T.check(tag, repo=repo), why) is None, "check %s" % tag)
+        check(prios and all(prios), "a release's run asks the release lane (--prio): %r" % prios)
     finally:
         T.heavy_argv = saved_heavy
         for k, v in saved.items():

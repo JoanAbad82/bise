@@ -51,6 +51,7 @@ def pure():
         f.write("#!/bin/sh\n")
     os.chmod(hr, 0o755)
     check(T.heavy_argv(cmd, lock, under=False, heavy_run=hr) == [hr] + cmd, "through heavy-run")
+    check(T.heavy_argv(cmd, lock, under=False, heavy_run=hr, prio=True) == [hr, "--prio"] + cmd, "a release: --prio, the release lane")
     check(T.heavy_argv(cmd, lock, under=False, heavy_run=hr + "-none") == ["/usr/bin/lockf", "-k", lock, "nice", "-n", "10"] + cmd, "the old lock")
     check(T.heavy_argv(cmd, lock, under=True, heavy_run=hr) == ["nice", "-n", "10"] + cmd, "in a slot already: no second one")
     check(T.under_heavy_slot(env={}) is False, "this test runs in no slot")

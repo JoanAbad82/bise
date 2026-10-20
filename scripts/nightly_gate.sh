@@ -149,6 +149,7 @@ if [ "${1:-}" = --in-slot ]; then
     || { echo "NOSTART cannot check out main ($tip) in $wt"; exit 1; }
   [ -f "$wt/tests/gate.sh" ] || { echo "NOSTART no tests/gate.sh in $wt"; exit 1; }
   echo "START $(date) $(git -C "$wt" rev-parse --short HEAD)"
+  slot_t0=$(date +%s)
   # caffeinate -is: the Mac never sleeps under the gate. On 2026-10-14
   # it took 'Maintenance Sleep' 5 times during the run (pmset -g log): each
   # test running across one ended at the wake, a timeout (5 reds; issue 26).
@@ -247,6 +248,15 @@ if [ "${1:-}" = --in-slot ]; then
   else echo "STEP desktop-full: not in this tree, skipped"; fi
   # the recorded ambient-core of the QA world, typed and checked for invariants (feature-tests, p5)
   night_step core-record scripts/core_record.sh bash scripts/core_record.sh
+  # heavy-run's release lane (heavy5.lock, --prio) runs beside an --alone job: a timing red of this
+  # night may come from its load (review-gates m_35984); heavy.log says whether one ran meanwhile
+  if awk -F'\t' -v t0="$slot_t0" -v now="$(date +%s)" '
+      $4 != "heavy5.lock" { next }
+      $3 == "-" { open[$1 FS $2] = $2; next }
+      { delete open[$1 FS $2]; if ($2 <= now && $3 >= t0) busy = 1 }
+      END { for (k in open) if (open[k] <= now) busy = 1; exit !busy }' "${HEAVY_LOG:-$HOME/.bise/run/heavy.log}" 2>/dev/null; then
+    echo "LANE a release job ran in the lane during this night (heavy5.lock, heavy.log): a timing red may come from its load"
+  fi
   exit $rc
 fi
 

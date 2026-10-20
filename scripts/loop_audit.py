@@ -552,7 +552,10 @@ def audit(h, hub, since):
         if why == "open":
             rep["waits"]["open_now"] += 1
     starts = [x["start"] - x["submit"] for x in hv if x["start"]]
-    rep["heavy"] = {"jobs": len(hv), "wait_p50": med(starts), "wait_p90": pct(starts, 0.9), "wait_max": max(starts or [0])}
+    rep["heavy"] = {"jobs": len(hv), "wait_p50": med(starts), "wait_p90": pct(starts, 0.9), "wait_max": max(starts or [0]),
+                    # the release lane (heavy5.lock, --prio only): each job by command, so a use that
+                    # is no release shows the next day (review-gates m_35984)
+                    "lane": [{"cmd": x["cmd"], "cwd": x["cwd"], "start": x["start"]} for x in hv if x["slot"] == "heavy5.lock"]}
     rep["reds"] = reds
     rep["adhoc"] = adhoc
     rep["flow"] = flow_section(h, hub, since, ss)
@@ -690,6 +693,8 @@ def report(rep):
           % rep["waits"]["queued_at_max"])
     hv = rep["heavy"]
     w("- heavy-run: %d jobs, slot wait p50 %s, p90 %s, max %s" % (hv["jobs"], fmt_s(hv["wait_p50"]), fmt_s(hv["wait_p90"]), fmt_s(hv["wait_max"])))
+    for x in hv.get("lane", []):
+        w("- release lane (--prio, releases only): %s in %s" % (x["cmd"], x["cwd"]))
     return NL.join(L)
 
 

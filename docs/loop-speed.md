@@ -459,7 +459,16 @@ What changed (no test dropped, no coverage lost):
    `--low`: experiments, load tests, shots, repacks. Before, every waiter
    polled the slots every 2 s and the luckiest won: a land check waited
    behind jobs submitted after it (25 % of the tasks' spawn-to-main time
-   was this queue). A load test never runs as `--prio`.
+   was this queue). A load test never runs as `--prio`. Since fast-loop
+   (2026-10-20, his pick on page loop-4min) a 5th slot, `heavy5.lock`, is
+   the release lane: only a `--prio` job takes it, first, so a release's
+   verdict (scripts/desktop_tag.py runs its nightly `--prio`) never waits
+   for the agents' 4 slots and never takes one of them while it is free.
+   So `--prio` is only for a release main names (loop_audit lists every
+   heavy5 job by command: another use shows the next day). `--alone` never
+   takes the lane: an `--alone` job's end line in heavy.log says `lane=busy`
+   when a lane job ran meanwhile, and the nightly's log a `LANE` line (a
+   timing red that night may come from the lane's load).
    Wait on a heavy job by running it as the bash tool's background
    command (`~/.bise/run/heavy-run <cmd> > $TMPDIR/x.log 2>&1`, its end
    wakes you, its queue included), not with `nohup` and a file wake: a
