@@ -9,18 +9,6 @@
 use super::*;
 use crate::wake::{self, Spec};
 
-impl WakeReq {
-    /// `sb wake`'s `add` request: the spec, the max (at most a day), the
-    /// agent's `--then` / `--alarm` (none: sb-core's default by kind).
-    pub fn add(v: &Value) -> Result<WakeReq, String> {
-        Ok(WakeReq::Add {
-            spec: Spec::from_json(&v["spec"]).ok_or("sb wake: --on-exit, --on-file or --on-job")?,
-            max_ms: v["max_ms"].as_u64().unwrap_or(wake::MAX_DEFAULT_MS).min(wake::MAX_MOST_MS),
-            then: v["then"].as_bool(),
-        })
-    }
-}
-
 impl Hub {
     pub fn wakes(&self) -> &wake::Wakes {
         &self.st.wakes
@@ -49,21 +37,29 @@ impl Hub {
         };
         match r {
             WakeReq::List => json!({"ok": true, "text": self.st.wakes.list(&by, env.now())}),
-            WakeReq::StopBg(slot) => match self.st.wakes.of_bg(&by, &slot) {
-                Some(id) => self.wake_req(fx, env, from, WakeReq::Stop(id)),
+            WakeReq::Stop { bg: Some(slot), .. } => match self.st.wakes.of_bg(&by, &slot) {
+                Some(id) => self.wake_req(fx, env, from, WakeReq::Stop { id: Some(id), bg: None }),
                 None => json!({"ok": false, "error": format!("no watch on background {} (it ended, or `sb wake` lists yours)", slot)}),
             },
-            WakeReq::Stop(id) => {
+            WakeReq::Stop { id: None, bg: None } => json!({"ok": false, "error": "usage: sb wake --stop <id|bg/<n>>"}),
+            WakeReq::Stop { id: Some(id), bg: None } => {
                 if self.st.wakes.live.get(&id).is_none_or(|w| w.agent != by) {
                     return json!({"ok": false, "error": format!("no watch #{} of yours (`sb wake` lists them)", id)});
                 }
                 self.core(fx, env, None, In::WakeStop(ci::WakeStop { id, why: format!("stopped by {}", by), tell: String::new() }));
                 json!({"ok": true, "text": format!("watch #{} stopped", id)})
             }
-            WakeReq::Add { spec, max_ms, then } => match self.wake_set(fx, env, &by, &spec, max_ms, then) {
-                Some((id, resumes)) => json!({"ok": true, "id": id, "text": wake::set_text(id, &spec, max_ms, resumes)}),
-                None => json!({"ok": false, "error": format!("sb wake: @{} is not active", by)}),
-            },
+            WakeReq::Add { spec, max_ms, then } => {
+                // the spec is wake.rs's (its one reader); the max at most a day
+                let Some(spec) = Spec::from_json(&spec) else {
+                    return json!({"ok": false, "error": "sb wake: --on-exit, --on-file or --on-job"});
+                };
+                let max_ms = max_ms.unwrap_or(wake::MAX_DEFAULT_MS).min(wake::MAX_MOST_MS);
+                match self.wake_set(fx, env, &by, &spec, max_ms, then) {
+                    Some((id, resumes)) => json!({"ok": true, "id": id, "text": wake::set_text(id, &spec, max_ms, resumes)}),
+                    None => json!({"ok": false, "error": format!("sb wake: @{} is not active", by)}),
+                }
+            }
         }
     }
 

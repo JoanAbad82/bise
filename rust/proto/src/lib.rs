@@ -93,6 +93,7 @@ pub mod pty;
 pub mod rows;
 pub mod jsonrpc;
 pub mod rpc;
+pub mod sb;
 pub mod slash;
 pub mod thread;
 pub mod words;

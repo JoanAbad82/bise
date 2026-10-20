@@ -294,10 +294,10 @@ mod tests {
     fn an_agents_read_journals_nothing() {
         let (mut h, mut env) = (Hub::new("/w"), NoEnv);
         let spawn = json!({"cmd": "spawn", "name": "t1", "objective": "o", "worktree": false});
-        h.handle(Input::Agent { token: 1, from: "main".into(), req: AgentReq::from_json(&spawn).expect("spawn") }, &mut env);
+        h.handle(Input::Agent { token: 1, from: "main".into(), req: AgentReq::decode(spawn).expect("spawn") }, &mut env);
         for (i, c) in ["list", "tasks"].iter().enumerate() {
             for from in ["main", "t1"] {
-                let req = AgentReq::from_json(&json!({"cmd": c})).expect("a read");
+                let req = AgentReq::decode(json!({"cmd": c})).expect("a read");
                 let fx = h.handle(Input::Agent { token: 10 + i as u64, from: from.into(), req }, &mut env);
                 assert!(!fx.iter().any(|e| matches!(e, Effect::Journal(_))), "sb {c} from {from} journaled: {fx:?}");
                 assert!(fx.iter().any(|e| matches!(e, Effect::Reply { .. })), "sb {c} from {from} answered");

@@ -9,7 +9,7 @@ use super::*;
 /// the hub never reads a path for an agent with its own authority, but
 /// an image it stores). A path is made absolute against the cwd; `m_<n>`
 /// (the parts of a message it got) goes as is, the hub checks it.
-pub(super) fn into(req: &mut Map<String, Value>, o: &Map<String, Value>) -> Result<(), String> {
+pub(super) fn of(o: &Map<String, Value>) -> Result<Vec<String>, String> {
     let mut out = Vec::new();
     for a in list_of(o.get("attach")) {
         if crate::core::parse_msg_id(&a).is_some() {
@@ -23,8 +23,5 @@ pub(super) fn into(req: &mut Map<String, Value>, o: &Map<String, Value>) -> Resu
             Err(e) => return Err(format!("--attach {a}: cannot read it ({e})")),
         }
     }
-    if !out.is_empty() {
-        req.insert("attach".into(), json!(out));
-    }
-    Ok(())
+    Ok(out)
 }

@@ -48,11 +48,13 @@ fn an_agent_says_where_it_works() {
     // none: its own workspace again
     t.req("docs", AgentReq::Worktree { path: String::new() });
     assert!(place(&mut t).is_none());
-    // the CLI's JSON: an absolute path or none
-    let r = |p: &str| AgentReq::from_json(&json!({"cmd": "worktree", "path": p}));
-    assert_eq!(r("none"), Ok(AgentReq::Worktree { path: String::new() }));
-    assert_eq!(r("/tmp/x-wt/"), Ok(AgentReq::Worktree { path: "/tmp/x-wt".into() }));
+    // the CLI's path: an absolute path or none (a relative one refused)
+    let r = |p: &str| crate::core::pure::worktree_path(p);
+    assert_eq!(r("none"), Ok(String::new()));
+    assert_eq!(r("/tmp/x-wt/"), Ok("/tmp/x-wt".into()));
     assert!(r("x-wt").is_err());
+    let (tok, fx) = t.req("docs", AgentReq::Worktree { path: "x-wt".into() });
+    assert!(fx.iter().any(|e| matches!(e, Effect::Reply { token, body } if *token == tok && body["ok"] == false)), "{:?}", fx);
     // qa-explore B: main works in the workspace, it cannot mark itself
     let (tok, fx) = t.req(MAIN, AgentReq::Worktree { path: "/tmp/docs-wt".into() });
     assert!(fx.iter().any(|e| matches!(e, Effect::Reply { token, body } if *token == tok && body["ok"] == false)), "{:?}", fx);
@@ -110,6 +112,7 @@ fn a_join_while_placing_waits_for_its_place() {
                 feature: String::new(),
                 ask: Default::default(),
                 parts: String::new(),
+                attach: Vec::new(),
             };
             // the hub alone: the shell's worker has not answered yet
             t.hub.handle(Input::Agent { token: t.token, from: MAIN.into(), req }, &mut t.env)
@@ -145,4 +148,30 @@ fn a_join_while_placing_waits_for_its_place() {
         }
         assert_eq!(t.hub.snapshot(0).places[0].agents, ["a", "b"]);
     }
+}
+
+/// The home workspace (docs/ambient-pages.md §5.1): land, feature and
+/// flow say "not in a repo" in one line, nothing goes to git.
+#[test]
+fn land_feature_and_flow_say_not_in_a_repo_without_git() {
+    let mut t = T::new();
+    t.env.git = false;
+    let reqs = [
+        ("land", AgentReq::Land { here: true, message: "x".into(), add: Vec::new() }),
+        ("feature", AgentReq::Feature { op: "new".into(), name: "foo".into() }),
+        ("feature", AgentReq::Feature { op: "list".into(), name: String::new() }),
+        ("flow", AgentReq::Flow { set: String::new() }),
+    ];
+    for (cmd, req) in reqs {
+        let (tok, fx) = t.req(MAIN, req);
+        let r = reply(&fx, tok).unwrap();
+        assert_eq!(r["ok"], false);
+        let e = r["error"].as_str().unwrap();
+        assert!(e.starts_with(&format!("sb {}: not in a repo", cmd)) && !e.contains('\n'), "{}", e);
+        assert!(!fx.iter().any(|e| matches!(e, Effect::Land { .. } | Effect::Feature { .. } | Effect::Flow { .. })));
+    }
+    // with git: the land goes on to the daemon
+    t.env.git = true;
+    let (_, fx) = t.req(MAIN, AgentReq::Land { here: true, message: "x".into(), add: Vec::new() });
+    assert!(fx.iter().any(|e| matches!(e, Effect::Land { .. })));
 }

@@ -62,10 +62,10 @@ fn an_answer_by_number_names_its_option_in_both_feeds() {
     t.spawn_task("docs");
     let (_, _) = t.req(
         "docs",
-        AgentReq::Send { to: MAIN.into(), text: "where?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new() },
+        AgentReq::Send { to: MAIN.into(), text: "where?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new() },
     );
     let id = t.hub.st.msgs().values().find(|m| m.text == "where?").unwrap().id;
-    t.req(MAIN, AgentReq::Card { text: "where does the balance show?\n1. at every step\n2. only at checkout".into(), for_msg: Some(id) });
+    t.req(MAIN, AgentReq::Card { text: "where does the balance show?\n1. at every step\n2. only at checkout".into(), for_msg: Some(id), page: None, artifact: None, open: Vec::new() });
     t.turn(MAIN, "asked");
     let card = *t.hub.st.cards.keys().next().unwrap();
     t.hub.answered = None;
@@ -80,7 +80,7 @@ fn an_answer_by_number_names_its_option_in_both_feeds() {
         assert_eq!(rs, vec![json!({"sb": "route", "who": "docs", "card": card, "said": "2", "msg": answer, "pick_n": 2, "pick": "only at checkout"})], "{feed}: {fx:?}");
     }
     // words: no pick
-    t.req(MAIN, AgentReq::Card { text: "and then?\n1. ship\n2. wait".into(), for_msg: Some(id) });
+    t.req(MAIN, AgentReq::Card { text: "and then?\n1. ship\n2. wait".into(), for_msg: Some(id), page: None, artifact: None, open: Vec::new() });
     let card2 = *t.hub.st.cards.keys().next().unwrap();
     let fx = t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Answer { card: card2, text: "ship it today".into(), parts: String::new() } });
     let r = recs(&fx, MAIN).into_iter().find(|r| r["sb"] == "route").expect("the route line");
@@ -91,7 +91,7 @@ fn an_answer_by_number_names_its_option_in_both_feeds() {
     t.turn(MAIN, "ok");
     assert_eq!(t.hub.answered, None);
     // main's own card: one line, no message, in main's feed alone
-    t.req(MAIN, AgentReq::Card { text: "merge?\n1. merge\n2. not yet".into(), for_msg: None });
+    t.req(MAIN, AgentReq::Card { text: "merge?\n1. merge\n2. not yet".into(), for_msg: None, page: None, artifact: None, open: Vec::new() });
     let card3 = *t.hub.st.cards.keys().next().unwrap();
     let fx = t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Answer { card: card3, text: "1".into(), parts: String::new() } });
     let rs: Vec<Value> = recs(&fx, MAIN).into_iter().filter(|r| r["sb"] == "route").collect();
@@ -113,7 +113,7 @@ fn a_watch_is_a_pause_or_an_alarm_on_the_agents_row() {
     let row = |t: &mut T| t.hub.snapshot(t.env.now).agent("perf").clone();
     let spec = |what| Spec { what, tail: None, note: String::new() };
     let file = || spec(What::File { path: "/t/build.rc".into() });
-    let add = |t: &mut T, s: Spec, then| t.req("perf", AgentReq::Wake(WakeReq::Add { spec: s, max_ms: MAX_DEFAULT_MS, then })).1;
+    let add = |t: &mut T, s: Spec, then| t.req("perf", AgentReq::Wake(WakeReq::Add { spec: s.json(), max_ms: Some(MAX_DEFAULT_MS), then })).1;
     let status = row(&mut t).status;
     add(&mut t, spec(What::Pid { pid: 4242, start: String::new() }), None);
     add(&mut t, file(), None);
@@ -146,7 +146,7 @@ fn a_watch_is_a_pause_or_an_alarm_on_the_agents_row() {
     }).collect();
     assert_eq!(told, [format!("the user stopped watch #{} (build.rc): it won't wake you", ws[1].id)], "{fx:?}");
     // the agent's own stop tells it nothing
-    let (_, fx) = t.req("perf", AgentReq::Wake(WakeReq::Stop(ws[2].id)));
+    let (_, fx) = t.req("perf", AgentReq::Wake(WakeReq::Stop { id: Some(ws[2].id), bg: None }));
     assert!(!fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "message_sent")), "{fx:?}");
     assert_eq!(row(&mut t).watching.len(), 2);
 }

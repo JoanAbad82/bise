@@ -7,6 +7,7 @@
 
 use super::*;
 use crate::wake::{Spec, What};
+use bise_proto::sb::Wake;
 
 pub(super) const WAKE_USAGE: &str = "usage: sb wake --on-exit <pid> | --on-file <path> | --on-job <launchd label> [--then | --alarm] [--tail <file>] [--note \"<words>\"] [--max 1h] | sb wake | sb wake --stop <id|bg/<n>>";
 
@@ -18,22 +19,19 @@ fn absolute(p: &str) -> String {
     std::env::current_dir().map(|d| d.join(path).to_string_lossy().into_owned()).unwrap_or_else(|_| p.to_string())
 }
 
-pub(super) fn wake_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String> {
+pub(super) fn wake_req(rest: &[String]) -> Result<Wake, String> {
     let (pos, o) = parse_args(rest, &["on-exit", "on-file", "on-job", "tail", "note", "max", "stop"], &["then", "alarm"])?;
     if o.contains_key("stop") {
         // `#3` or `3`: a watch; `bg/3`: the watch of background command 3
         let which = str_of(&o, "stop");
-        req.insert("step".into(), json!("stop"));
-        match which.strip_prefix("bg/") {
-            Some(slot) if !slot.is_empty() => req.insert("bg".into(), json!(slot)),
-            _ => req.insert("id".into(), json!(which.trim_start_matches('#').parse::<u64>().map_err(|_| WAKE_USAGE.to_string())?)),
-        };
-        return Ok(());
+        return Ok(match which.strip_prefix("bg/") {
+            Some(slot) if !slot.is_empty() => Wake::Stop { id: None, bg: Some(slot.to_string()) },
+            _ => Wake::Stop { id: Some(which.trim_start_matches('#').parse::<u64>().map_err(|_| WAKE_USAGE.to_string())?), bg: None },
+        });
     }
     let ons: Vec<&str> = ["on-exit", "on-file", "on-job"].into_iter().filter(|k| o.contains_key(*k)).collect();
     if ons.is_empty() && (pos.is_empty() || pos == ["list"]) {
-        req.insert("step".into(), json!("list"));
-        return Ok(());
+        return Ok(Wake::List);
     }
     if ons.len() != 1 || !pos.is_empty() {
         return Err(WAKE_USAGE.into());
@@ -61,27 +59,21 @@ pub(super) fn wake_req(rest: &[String], req: &mut Map<String, Value>) -> Result<
     };
     let tail = Some(str_of(&o, "tail")).filter(|t| !t.is_empty()).map(|t| absolute(&t));
     let spec = Spec { what, tail, note: str_of(&o, "note").trim().to_string() };
-    req.insert("step".into(), json!("add"));
-    req.insert("spec".into(), spec.json());
     // a pause (the agent continues its work at the end) or an alarm;
     // neither: sb-core's default by kind (a pid: pause; file, job: alarm)
-    match (o.contains_key("then"), o.contains_key("alarm")) {
+    let then = match (o.contains_key("then"), o.contains_key("alarm")) {
         (true, true) => return Err("sb wake: --then or --alarm, not both".into()),
-        (true, false) => {
-            req.insert("then".into(), json!(true));
-        }
-        (false, true) => {
-            req.insert("then".into(), json!(false));
-        }
-        (false, false) => {}
-    }
+        (t, a) => (t || a).then_some(t),
+    };
     let max = str_of(&o, "max");
-    if !max.is_empty() {
+    let max_ms = if max.is_empty() {
+        None
+    } else {
         let ms = crate::every::parse_dur(&max)?;
         if ms > crate::wake::MAX_MOST_MS {
             return Err("sb wake: --max is at most 24h".into());
         }
-        req.insert("max_ms".into(), json!(ms));
-    }
-    Ok(())
+        Some(ms)
+    };
+    Ok(Wake::Add { spec: spec.json(), max_ms, then })
 }

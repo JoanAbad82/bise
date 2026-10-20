@@ -126,19 +126,19 @@ impl Shell {
     /// isn't there is refused before the card opens (pm's B m_6008).
     /// Ok(None): no link; Ok(Some): the card's link `{page?, artifact?,
     /// opens?}` (card_link.rs, card-links); Err: the refusal's words.
-    pub(super) fn card_page_link(&self, cmd: &str, v: &Value) -> Result<Option<CardLink>, String> {
-        if cmd != "card" {
+    pub(super) fn card_page_link(&self, req: &crate::core::AgentReq) -> Result<Option<CardLink>, String> {
+        let crate::core::AgentReq::Card { page, artifact, open, .. } = req else {
             return Ok(None);
-        }
+        };
         let store = crate::artifacts::Store::new(&self.opts.paths.state);
         let art = |id: &str| store.get(id);
         let mut link = CardLink::default();
-        if let Some(spec) = v.get("artifact").or(v.get("page")).and_then(Value::as_str) {
+        if let Some(spec) = artifact.as_deref().or(page.as_deref()) {
             let (page, a) = crate::card_link::artifact(self.pg.pages.as_deref(), &art, spec)?;
             link.page = page;
             link.artifact = Some(a);
         }
-        let specs: Vec<&str> = v.get("open").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+        let specs: Vec<&str> = open.iter().map(String::as_str).collect();
         if !specs.is_empty() {
             link.opens = specs.iter().map(|s| crate::card_link::open_act(self.pg.pages.as_deref(), &art, s)).collect::<Result<_, _>>()?;
         }
@@ -394,7 +394,7 @@ impl Shell {
                 from: MAIN.to_string(),
                 // (the page's title first: where this step is, with no page
                 // open; notif-words)
-                req: crate::core::AgentReq::Card { text: crate::pages::checklist::with_title(&meta.title, &s.card_text()), for_msg: None },
+                req: crate::core::AgentReq::card(crate::pages::checklist::with_title(&meta.title, &s.card_text())),
             });
             match self.hub.st.open_cards().filter(|c| !before.contains(&c.id) && c.kind == "question").map(|c| c.id).max() {
                 Some(card) => {
@@ -421,7 +421,7 @@ impl Shell {
     /// `key` maps it back to the page's own answer path. None: no card.
     pub(super) fn open_page_card(&mut self, id: &str, text: String, key: String) -> Option<u64> {
         let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
-        self.step(Input::Agent { token: 0, from: MAIN.to_string(), req: crate::core::AgentReq::Card { text, for_msg: None } });
+        self.step(Input::Agent { token: 0, from: MAIN.to_string(), req: crate::core::AgentReq::card(text) });
         let card = self.hub.st.open_cards().filter(|c| !before.contains(&c.id) && c.kind == "question").map(|c| c.id).max()?;
         self.page_cards().insert(card, (id.to_string(), key));
         Some(card)

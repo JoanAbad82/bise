@@ -34,6 +34,7 @@ fn a_real_hub() -> (T, u64) {
             feature: String::new(),
             ask: Default::default(),
             parts: String::new(),
+            attach: Vec::new(),
         },
     );
     assert!(fx.iter().any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "dark")), "{fx:?}");
@@ -52,7 +53,7 @@ fn a_real_hub() -> (T, u64) {
     let local = vec![Local { place: "wt:dark".into(), branch: "sb/dark".into(), tip: Some("tip1".into()), commits: Some(2), dirty: None }];
     t.go(Input::Prs(Report { at_ms: 1_000, prs: Some(Ok(vec![pr])), local, activity: Vec::new() }));
     // his question (with options), bise's drop card (a worktree with work)
-    t.req(MAIN, AgentReq::Card { text: "keep the banner?\n1. yes\n2. no".into(), for_msg: None });
+    t.req(MAIN, AgentReq::Card { text: "keep the banner?\n1. yes\n2. no".into(), for_msg: None, page: None, artifact: None, open: Vec::new() });
     t.user(MAIN, "/new -w fix: x");
     t.go(Input::ReplReady { agent: "fix".into() });
     t.go(Input::ReplIdle { agent: "fix".into(), leftover: false });
@@ -60,11 +61,11 @@ fn a_real_hub() -> (T, u64) {
     t.req(MAIN, AgentReq::Drop { agent: "fix".into() });
     // a live timer and a stopped one
     let add = |text: &str| {
-        AgentReq::Every(EveryReq::Add { to: String::new(), text: text.into(), sched: crate::every::Sched::Every(600_000), until_ms: None, times: Some(6), page: None, name: None })
+        AgentReq::Every(EveryReq::Add { to: String::new(), text: text.into(), every_ms: Some(600_000), daily_min: None, until_ms: None, times: Some(6), page: None, name: None })
     };
     t.req(MAIN, add("check HN"));
     t.req(MAIN, add("check reddit"));
-    t.req(MAIN, AgentReq::Every(EveryReq::Stop(2)));
+    t.req(MAIN, AgentReq::Every(EveryReq::Stop { id: 2 }));
     // the forge's answer is late by now
     (t, 1_000 + PR_STALE_MS + 5_000)
 }

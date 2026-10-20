@@ -198,6 +198,7 @@ impl T {
                 place: String::new(),
                 feature: String::new(),
                 ask: Default::default(), parts: String::new(),
+                attach: Vec::new(),
             },
         );
         assert!(
@@ -330,6 +331,7 @@ fn the_board_of_main_follows_the_tasks() {
             place: String::new(),
             feature: String::new(),
             ask: Default::default(), parts: String::new(),
+            attach: Vec::new(),
         },
     );
     // a step with no delivery leaves them pending (core_contexts.rs)
@@ -403,6 +405,7 @@ fn ask_waits_for_the_reply() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let r = reply(&fx, tok).expect("the wait ends");
@@ -454,6 +457,7 @@ fn a_waiting_agent_says_who_it_waits_on() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     assert!(reply(&fx, tok).is_some(), "the wait ends");
@@ -748,6 +752,7 @@ fn an_escalated_question_is_answered_by_the_user() {
         AgentReq::Card {
             text: "La doc : v1 ou v2 ?".into(),
             for_msg: Some(id),
+            page: None, artifact: None, open: Vec::new(),
         },
     );
     assert!(
@@ -779,6 +784,7 @@ fn answering_in_the_task_view_answers_its_question() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let id = t
@@ -794,6 +800,7 @@ fn answering_in_the_task_view_answers_its_question() {
         AgentReq::Card {
             text: "v1 ou v2 ?".into(),
             for_msg: Some(id),
+            page: None, artifact: None, open: Vec::new(),
         },
     );
     t.go(Input::ReplIdle {
@@ -869,6 +876,7 @@ fn peers_cannot_reach_an_archived_task_but_the_user_can() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     assert!(reply(&fx, tok).unwrap()["error"]
@@ -879,60 +887,6 @@ fn peers_cannot_reach_an_archived_task_but_the_user_can() {
     assert!(fx
         .iter()
         .any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "b")));
-}
-
-/// The home workspace (docs/ambient-pages.md §5.1): land, feature and
-/// flow say "not in a repo" in one line, nothing goes to git.
-#[test]
-fn land_feature_and_flow_say_not_in_a_repo_without_git() {
-    let mut t = T::new();
-    t.env.git = false;
-    let reqs = [
-        ("land", AgentReq::Land { here: true, message: "x".into(), add: Vec::new() }),
-        ("feature", AgentReq::Feature { op: "new".into(), name: "foo".into() }),
-        ("feature", AgentReq::Feature { op: "list".into(), name: String::new() }),
-        ("flow", AgentReq::Flow { set: None }),
-    ];
-    for (cmd, req) in reqs {
-        let (tok, fx) = t.req(MAIN, req);
-        let r = reply(&fx, tok).unwrap();
-        assert_eq!(r["ok"], false);
-        let e = r["error"].as_str().unwrap();
-        assert!(e.starts_with(&format!("sb {}: not in a repo", cmd)) && !e.contains('\n'), "{}", e);
-        assert!(!fx.iter().any(|e| matches!(e, Effect::Land { .. } | Effect::Feature { .. } | Effect::Flow { .. })));
-    }
-    // with git: the land goes on to the daemon
-    t.env.git = true;
-    let (_, fx) = t.req(MAIN, AgentReq::Land { here: true, message: "x".into(), add: Vec::new() });
-    assert!(fx.iter().any(|e| matches!(e, Effect::Land { .. })));
-}
-
-/// `sb every` (every.rs): at least a minute, an active agent, a message;
-/// set, listed in `sb tasks`, stopped, each change in the journal.
-#[test]
-fn every_sets_lists_and_stops_timers() {
-    use crate::every::Sched;
-    let mut t = T::new();
-    let add = |sched, to: &str| AgentReq::Every(EveryReq::Add { to: to.into(), text: "check HN".into(), sched, until_ms: None, times: None, page: None, name: None });
-    for (req, why) in [
-        (add(Sched::Every(30_000), ""), "at least 1m"),
-        (add(Sched::Every(600_000), "ghost"), "no active agent @ghost"),
-    ] {
-        let (tok, fx) = t.req(MAIN, req);
-        let e = reply(&fx, tok).unwrap()["error"].as_str().unwrap().to_string();
-        assert!(e.contains(why), "{}", e);
-        assert!(!fx.iter().any(|e| matches!(e, Effect::Journal(_))));
-    }
-    let (tok, fx) = t.req(MAIN, add(Sched::Every(600_000), ""));
-    let r = reply(&fx, tok).unwrap();
-    assert!(r["text"].as_str().unwrap().starts_with("timer set: #1 @main  check HN · every 10m"), "{}", r);
-    assert!(fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "every_set")));
-    let (tok, fx) = t.req(MAIN, AgentReq::Tasks);
-    assert!(reply(&fx, tok).unwrap()["text"].as_str().unwrap().contains("## timers (sb every)\n#1 @main  check HN · every 10m"));
-    let (tok, fx) = t.req(MAIN, AgentReq::Every(EveryReq::Stop(1)));
-    assert_eq!(reply(&fx, tok).unwrap()["text"], "timer #1 stopped");
-    let (tok, fx) = t.req(MAIN, AgentReq::Every(EveryReq::List));
-    assert!(reply(&fx, tok).unwrap()["text"].as_str().unwrap().starts_with("no timers"));
 }
 
 #[test]
@@ -1041,6 +995,7 @@ fn journal_replay_rebuilds_the_same_state() {
             place: String::new(),
             feature: String::new(),
             ask: Default::default(), parts: String::new(),
+            attach: Vec::new(),
         },
     );
     record(fx);
@@ -1196,6 +1151,7 @@ fn many_task_messages_always_reach_main() {
                 queued: false,
                 why: String::new(),
                 switch: None, parts: String::new(),
+                attach: Vec::new(),
             },
         );
         assert!(say_to(&fx, MAIN).is_some(), "message {} held: {:?}", i, fx);
@@ -1234,6 +1190,7 @@ fn a_user_message_to_main_starts_with_the_task_status() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let s = steer_to(&fx, MAIN).or_else(|| say_to(&fx, MAIN)).unwrap();
@@ -1258,6 +1215,7 @@ fn sb_tasks_details_every_task() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let (tok, fx) = t.req(MAIN, AgentReq::Tasks);
@@ -1310,6 +1268,7 @@ fn agents_talk_as_long_as_they_want() {
                 queued: false,
                 why: String::new(),
                 switch: None, parts: String::new(),
+                attach: Vec::new(),
             },
         );
         assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "message {}", i);
@@ -1335,6 +1294,7 @@ fn send(t: &mut T, from: &str, to: &str, text: &str, queued: bool) -> (u64, Vec<
             queued,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     )
 }
@@ -1519,6 +1479,7 @@ fn a_queued_message_does_not_end_a_wait() {
             queued: true,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     assert!(
@@ -1547,6 +1508,7 @@ fn docs_question_card(t: &mut T) -> (u64, u64) {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let id = t
@@ -1562,6 +1524,7 @@ fn docs_question_card(t: &mut T) -> (u64, u64) {
         AgentReq::Card {
             text: "v1 ou v2 ?".into(),
             for_msg: Some(id),
+            page: None, artifact: None, open: Vec::new(),
         },
     );
     let card = *t.hub.st.cards.keys().next().unwrap();
@@ -1587,6 +1550,7 @@ fn main_cannot_answer_an_escalated_question_only_the_user_can() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     assert!(t.hub.st.cards.contains_key(&card));
@@ -1604,6 +1568,7 @@ fn main_cannot_answer_an_escalated_question_only_the_user_can() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let e = err_of(&fx, tok);
@@ -1622,6 +1587,7 @@ fn main_cannot_answer_an_escalated_question_only_the_user_can() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let e = err_of(&fx, tok);
@@ -1652,6 +1618,7 @@ fn agent_traffic_never_reaches_the_user_inbox() {
                 queued: false,
                 why: String::new(),
                 switch: None, parts: String::new(),
+                attach: Vec::new(),
             },
         )
     };
@@ -1696,6 +1663,7 @@ fn main_withdraws_its_own_card_with_a_why() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{:?}", fx);
@@ -1718,7 +1686,7 @@ fn the_user_closes_a_card_without_answering() {
 fn answering_a_main_card_starts_a_main_turn_holding_the_answer() {
     let mut t = T::new();
     t.user(MAIN, "prépare la release");
-    let (_, _) = t.req(MAIN, AgentReq::Card { text: "on publie ce soir ?".into(), for_msg: None });
+    let (_, _) = t.req(MAIN, AgentReq::Card { text: "on publie ce soir ?".into(), for_msg: None, page: None, artifact: None, open: Vec::new() });
     let card = *t.hub.st.cards.keys().next().unwrap();
     t.turn(MAIN, "J'ai demandé à l'utilisateur.");
     assert_eq!(t.status(MAIN), Status::Idle);
@@ -1729,7 +1697,7 @@ fn answering_a_main_card_starts_a_main_turn_holding_the_answer() {
     assert_eq!(t.status(MAIN), Status::Working);
     assert!(!t.hub.st.main_notes.iter().any(|n| n.contains("oui, à 20h")), "{:?}", t.hub.st.main_notes);
     // busy: a second answer steers the running turn
-    t.req(MAIN, AgentReq::Card { text: "et le changelog ?".into(), for_msg: None });
+    t.req(MAIN, AgentReq::Card { text: "et le changelog ?".into(), for_msg: None, page: None, artifact: None, open: Vec::new() });
     let card = *t.hub.st.cards.keys().next().unwrap();
     let fx = t.user(MAIN, &format!("/answer {} je l'écris", card));
     let steered = steer_to(&fx, MAIN).expect("a busy main gets it at once");
@@ -1746,7 +1714,7 @@ fn answering_mains_card_routes_it_and_notes_main() {
     use bise_proto::thread::lines::{self, Hub, Rec};
     let mut t = T::new();
     t.user(MAIN, "prépare la release");
-    t.req(MAIN, AgentReq::Card { text: "merge checkout into main?\n\n1. merge\n2. not yet".into(), for_msg: None });
+    t.req(MAIN, AgentReq::Card { text: "merge checkout into main?\n\n1. merge\n2. not yet".into(), for_msg: None, page: None, artifact: None, open: Vec::new() });
     let card = *t.hub.st.cards.keys().next().unwrap();
     t.turn(MAIN, "J'ai demandé à l'utilisateur.");
     let fx = t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Answer { card, text: "this one\nand the second line".into(), parts: String::new() } });
@@ -1783,6 +1751,7 @@ fn question_then_reply(t: &mut T, queued: bool) -> (u64, u64) {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let q = t.hub.st.msgs().values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
@@ -1796,6 +1765,7 @@ fn question_then_reply(t: &mut T, queued: bool) -> (u64, u64) {
             queued,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let r = t.hub.st.msgs().values().find(|m| m.text == "v2").unwrap().id;
@@ -1930,6 +1900,7 @@ fn spawn_in(t: &mut T, name: &str, place: &str) -> (u64, Vec<Effect>) {
             place: if place == "new" { String::new() } else { place.into() },
             feature: String::new(),
             ask: Default::default(), parts: String::new(),
+            attach: Vec::new(),
         },
     )
 }
@@ -2081,6 +2052,7 @@ fn a_restored_idle_task_gets_its_queued_mail() {
             queued: true,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     t.req(
@@ -2134,6 +2106,7 @@ fn a_spawn_with_a_model_is_answered_by_the_daemons_pick() {
         place: String::new(),
         feature: String::new(),
         ask: bise_catalog::spawn::Ask { model: model.into(), ..Default::default() }, parts: String::new(),
+        attach: Vec::new(),
     };
     let (tok, fx) = t.req(MAIN, spawn("fast", "mistral/mistral-small-latest"));
     let picked = fx.iter().find_map(|e| match e {
@@ -2266,6 +2239,7 @@ fn send_v2(t: &mut T, from: &str, to: &str, text: &str, expect: bool, reply_to: 
             queued: false,
             why: why.into(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let r = reply(&fx, tok).expect("send answers");
@@ -2355,6 +2329,7 @@ fn main_answering_a_question_is_answered() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     t.turn(MAIN, "thinking");
@@ -2378,6 +2353,7 @@ fn main_answering_a_question_is_answered() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     let q2 = t.hub.st.msgs().values().filter(|m| m.from == "docs" && m.to == MAIN).map(|m| m.id).max().unwrap();
@@ -2436,6 +2412,7 @@ fn a_message_the_user_cannot_deliver_says_so() {
             queued: false,
             why: String::new(),
             switch: None, parts: String::new(),
+            attach: Vec::new(),
         },
     );
     assert!(fx.iter().all(|e| !matches!(e, Effect::Line { line, .. } if line.starts_with("sb undelivered"))), "{:?}", fx);
@@ -2613,15 +2590,17 @@ fn flow_is_the_users_and_mains() {
         "{:?}",
         fx
     );
-    let (_, fx) = t.req(MAIN, AgentReq::Flow { set: None });
+    let (_, fx) = t.req(MAIN, AgentReq::Flow { set: String::new() });
     assert!(fx.iter().any(|e| matches!(e, Effect::Flow { client: None, token: Some(_), set: None })), "{:?}", fx);
-    let (_, fx) = t.req("docs", AgentReq::Flow { set: Some(FlowMode::Pr) });
+    let (_, fx) = t.req(MAIN, AgentReq::Flow { set: "pr".into() });
+    assert!(fx.iter().any(|e| matches!(e, Effect::Flow { client: None, token: Some(_), set: Some(FlowMode::Pr) })), "{:?}", fx);
+    let (_, fx) = t.req("docs", AgentReq::Flow { set: "pr".into() });
     assert!(!fx.iter().any(|e| matches!(e, Effect::Flow { .. })));
     assert!(fx.iter().any(|e| matches!(e, Effect::Reply { body, .. } if body["ok"] == false)), "{:?}", fx);
-    let r = |set: &str| AgentReq::from_json(&serde_json::json!({"cmd": "flow", "set": set}));
-    assert_eq!(r(""), Ok(AgentReq::Flow { set: None }));
-    assert_eq!(r("pr"), Ok(AgentReq::Flow { set: Some(FlowMode::Pr) }));
-    assert!(r("x").is_err());
+    // a mode devflow doesn't read: refused, said back
+    let (_, fx) = t.req(MAIN, AgentReq::Flow { set: "x".into() });
+    assert!(!fx.iter().any(|e| matches!(e, Effect::Flow { .. })));
+    assert!(fx.iter().any(|e| matches!(e, Effect::Reply { body, .. } if body["error"] == "usage: sb flow [pr|trunk]")), "{:?}", fx);
 }
 
 /// BENCH (hub-lag): the cost of one step on a real journal.
@@ -2921,6 +2900,7 @@ mod prs {
                 place: String::new(),
                 feature: String::new(),
                 ask: Default::default(), parts: String::new(),
+                attach: Vec::new(),
             },
         );
         assert!(fx.iter().any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == name)), "{:?}", fx);
@@ -3571,6 +3551,7 @@ mod prs {
                 place: String::new(),
                 feature: String::new(),
                 ask: Default::default(), parts: String::new(),
+                attach: Vec::new(),
             },
         );
         assert!(!fx.iter().any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "github")), "{:?}", fx);
@@ -3731,7 +3712,7 @@ fn bise_forwards_his_message_once_and_settles_on_the_answer() {
     t.spawn_task("docs");
     let (tok, fx) = t.req("docs", AgentReq::ProjectSend { project: "shop".into(), msg: his });
     assert_eq!(reply(&fx, tok).unwrap()["ok"], false);
-    let (_, _) = t.req("docs", AgentReq::Send { to: MAIN.into(), text: "fyi".into(), expect_reply: false, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new() });
+    let (_, _) = t.req("docs", AgentReq::Send { to: MAIN.into(), text: "fyi".into(), expect_reply: false, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new() });
     let theirs = last_msg(&t);
     let (tok, fx) = t.req(MAIN, AgentReq::ProjectSend { project: "shop".into(), msg: theirs });
     assert!(reply(&fx, tok).unwrap()["error"].as_str().unwrap().contains("not a message the user sent you"), "{:?}", fx);
@@ -3801,7 +3782,7 @@ fn a_project_says_bise_message_once_and_answers_it_once() {
     assert!(said.contains("from=\"@bise\""), "{}", said);
     let q = last_msg(&t);
     let send = |t: &mut T| {
-        t.req(MAIN, AgentReq::Send { to: "@bise".into(), text: "green".into(), expect_reply: false, reply_to: Some(q), queued: false, why: String::new(), switch: None, parts: String::new() })
+        t.req(MAIN, AgentReq::Send { to: "@bise".into(), text: "green".into(), expect_reply: false, reply_to: Some(q), queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new() })
     };
     let (tok, fx) = send(&mut t);
     assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{:?}", fx);
@@ -3973,7 +3954,7 @@ fn a_reports_result_is_kept_with_it() {
 fn open_card(t: &mut T, kind: &str, text: &str) -> u64 {
     match kind {
         "question" => {
-            t.req(MAIN, AgentReq::Card { text: text.into(), for_msg: None });
+            t.req(MAIN, AgentReq::Card { text: text.into(), for_msg: None, page: None, artifact: None, open: Vec::new() });
         }
         "confirm" => {
             t.go(Input::ConfirmOpen { agent: MAIN.into(), text: text.into() });
@@ -4269,7 +4250,7 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let watching = |t: &mut T| serde_json::to_value(&t.hub.snapshot(t.env.now).agent("perf").watching).unwrap();
     assert_eq!(watching(&mut t), json!([]));
     let spec = crate::wake::Spec { what: crate::wake::What::Pid { pid: 4242, start: String::new() }, tail: None, note: "the build".into() };
-    let (tok, _) = t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS, then: None }));
+    let (tok, _) = t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.json(), max_ms: Some(crate::wake::MAX_DEFAULT_MS), then: None }));
     let _ = tok;
     let w = watching(&mut t);
     assert_eq!((w[0]["what"].as_str(), w[0]["kind"].as_str()), (Some("the build"), Some("pid")), "{w}");
@@ -4291,9 +4272,9 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     assert_eq!(m, bise_proto::thread::WakeFold { agent: "perf".into(), ..l });
     assert_eq!(watching(&mut t), json!([]), "the hit ends it: the row moves");
     // a stop: one line, no message
-    t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS, then: None }));
+    t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.json(), max_ms: Some(crate::wake::MAX_DEFAULT_MS), then: None }));
     let id = watching(&mut t)[0]["id"].as_u64().unwrap();
-    let (_, fx) = t.req("perf", AgentReq::Wake(WakeReq::Stop(id)));
+    let (_, fx) = t.req("perf", AgentReq::Wake(WakeReq::Stop { id: Some(id), bg: None }));
     let ls = wakes(&fx);
     assert_eq!(ls.len(), 1, "{fx:?}");
     assert!(ls[0].contains("\"ev\":\"stopped\"") && !ls[0].contains("\"msg\""), "{}", ls[0]);
@@ -4306,7 +4287,7 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     // an archived agent's watch ends 'gone': no line (the wake started a
     // turn: it ends first, so the drop needs no card)
     t.go(Input::ReplIdle { agent: "perf".into(), leftover: false });
-    t.req("perf", AgentReq::Wake(WakeReq::Add { spec, max_ms: crate::wake::MAX_DEFAULT_MS, then: None }));
+    t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.json(), max_ms: Some(crate::wake::MAX_DEFAULT_MS), then: None }));
     let (_, fx) = t.req(MAIN, AgentReq::Drop { agent: "perf".into() });
     assert!(fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "wake_end" && j["why"] == "gone")), "{fx:?}");
     assert!(wakes(&fx).is_empty(), "{fx:?}");
@@ -4351,10 +4332,10 @@ fn his_card_answer_keeps_its_parts() {
     t.spawn_task("docs");
     let (_, _) = t.req(
         "docs",
-        AgentReq::Send { to: MAIN.into(), text: "v1 ou v2 ?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new() },
+        AgentReq::Send { to: MAIN.into(), text: "v1 ou v2 ?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new() },
     );
     let id = t.hub.st.msgs().values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
-    t.req(MAIN, AgentReq::Card { text: "La doc : v1 ou v2 ?".into(), for_msg: Some(id) });
+    t.req(MAIN, AgentReq::Card { text: "La doc : v1 ou v2 ?".into(), for_msg: Some(id), page: None, artifact: None, open: Vec::new() });
     t.turn(MAIN, "J'ai demandé à l'utilisateur.");
     let card = *t.hub.st.cards.keys().next().unwrap();
     let parts = r#"[{"kind":"quote","from":"main","text":"q"},{"kind":"text","text":"v2"}]"#;

@@ -184,15 +184,15 @@ impl Hub {
 /// unless the script asked for a new artifact; `changed`: what the write
 /// changed (`bise_proto::office::Changed`, read at the hub's door).
 fn add_request(path: &str, artifact: bool, changed: Option<Vec<Anchor>>, agent: &str) -> Result<Value, String> {
+    use bise_proto::sb::{Artifact, Req};
     let mut req = switchboard::cli::build(&["artifact".into(), "add".into(), path.into()])?;
+    if let Req::Artifact(Artifact::Add { known_only, changed: c, .. }) = &mut req {
+        *known_only = !artifact;
+        *c = changed.map(|c| json!(Changed(c)));
+    }
+    let mut req = req.to_value();
     req["op"] = json!("agent");
     req["from"] = json!(agent);
-    if !artifact {
-        req["known_only"] = json!(true);
-    }
-    if let Some(c) = changed {
-        req["changed"] = json!(Changed(c));
-    }
     Ok(req)
 }
 
@@ -237,7 +237,14 @@ mod tests {
         let r = add_request("/w/q3.pptx", true, Some(vec![Anchor::Slide { slide: 2, rect: None }]), "deck").unwrap();
         assert!(r.get("known_only").is_none());
         assert_eq!(r["changed"], json!([{"kind": "slide", "slide": 2}]));
-        assert_eq!(Changed::of_request(&r).unwrap().0.len(), 1, "the hub reads what the harness sends");
+        // the hub reads what the harness sends, as an sb request
+        match bise_proto::sb::Req::decode(r).unwrap() {
+            bise_proto::sb::Req::Artifact(bise_proto::sb::Artifact::Add { known_only, changed, .. }) => {
+                assert!(!known_only);
+                assert_eq!(changed.as_ref().and_then(Changed::of_value).unwrap().0.len(), 1);
+            }
+            r => panic!("{r:?}"),
+        }
     }
 
     #[test]

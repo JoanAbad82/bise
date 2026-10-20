@@ -2,98 +2,37 @@
 //! what it prints. Moved out of cli.rs unchanged (architect m_12143).
 
 use super::*;
+use bise_proto::sb::Req;
 
 const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... [--went <kind>:<ref>[@<block>]=<url>]... [--taste] [--public|--private] | sb page start <id> [--title <t>] [--agent <name>] [--ask <words>] | sb page tick <page> <item> [words] | sb page waiting | sb page list | sb page notes <id>";
 
 /// `sb page publish|list|notes` (docs/ambient-pages.md §2.2): the hub's
 /// `page_*` request. The file is read here (the agent's path, from its
 /// cwd).
-pub(super) fn page_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String> {
-    match rest.first().map(String::as_str) {
+pub(super) fn page_req(rest: &[String]) -> Result<Req, String> {
+    let at = |i: usize| rest.get(i).cloned().ok_or(PAGE_USAGE);
+    Ok(match rest.first().map(String::as_str) {
         Some("publish") => {
             let (pos, o) = parse_args(&rest[1..], &["id", "title", "notes-done", "note-answer", "went"], &["taste", "public", "private"])?;
-            let file = pos.first().ok_or(PAGE_USAGE)?;
-            let html = std::fs::read_to_string(file).map_err(|e| format!("{file}: {e}"))?;
-            req.insert("cmd".into(), json!("page_publish"));
-            req.insert("html".into(), json!(html));
-            for k in ["id", "title"] {
-                if o.contains_key(k) {
-                    req.insert(k.into(), json!(str_of(&o, k)));
-                }
-            }
-            let done: Vec<String> = list_of(o.get("notes-done"))
-                .iter()
-                .flat_map(|d| d.split(',').map(|x| x.trim().to_string()).collect::<Vec<_>>())
-                .filter(|x| !x.is_empty())
-                .collect();
-            req.insert("done".into(), json!(done));
-            let mut answers = Map::new();
-            for a in list_of(o.get("note-answer")) {
-                let (id, text) = a.split_once('=').ok_or(format!("--note-answer expects <note>=\"<answer>\", got {a:?}"))?;
-                answers.insert(id.trim().to_string(), json!(text.trim().trim_matches('"')));
-            }
-            req.insert("answers".into(), Value::Object(answers));
-            // where its text went (docs/ambient-roadmap.md A)
-            let mut went = Vec::new();
-            for w in list_of(o.get("went")) {
-                went.push(serde_json::to_value(crate::pages::store::Went::parse(&w)?).map_err(|e| e.to_string())?);
-            }
-            if !went.is_empty() {
-                req.insert("went".into(), Value::Array(went));
-            }
-            // it followed ~/bise/taste.md (the hub counts its rules)
-            if o.contains_key("taste") {
-                req.insert("taste".into(), json!(true));
-            }
-            // --public: in the static export the user's mirror publishes (his setting); --private: out again
-            match (o.contains_key("public"), o.contains_key("private")) {
-                (true, true) => return Err("--public or --private, not both".into()),
-                (true, false) => {
-                    req.insert("public".into(), json!(true));
-                }
-                (false, true) => {
-                    req.insert("public".into(), json!(false));
-                }
-                _ => {}
-            }
+            Req::PagePublish(super::build::publish(&o, pos.first().ok_or(PAGE_USAGE)?)?)
         }
         Some("start") => {
             let (pos, o) = parse_args(&rest[1..], &["title", "agent", "ask"], &[])?;
-            let id = pos.first().ok_or(PAGE_USAGE)?;
-            req.insert("cmd".into(), json!("page_start"));
-            req.insert("id".into(), json!(id));
-            for k in ["title", "agent", "ask"] {
-                if o.contains_key(k) {
-                    req.insert(k.into(), json!(str_of(&o, k)));
-                }
-            }
+            let opt = |k: &str| o.contains_key(k).then(|| str_of(&o, k));
+            Req::PageStart { id: pos.first().ok_or(PAGE_USAGE)?.clone(), title: opt("title"), agent: opt("agent"), ask: opt("ask") }
         }
-        Some("waiting") => {
-            req.insert("cmd".into(), json!("page_waiting"));
-        }
+        Some("waiting") => Req::PageWaiting,
         Some("tick") => {
             // a step of the user's he says is done (roadmap D): words other
             // than "done" go as a note on that row
             let (pos, _) = parse_args(&rest[1..], &[], &[])?;
             let (Some(id), Some(item)) = (pos.first(), pos.get(1)) else { return Err(PAGE_USAGE.into()) };
-            req.insert("cmd".into(), json!("page_tick"));
-            req.insert("id".into(), json!(id));
-            req.insert("item".into(), json!(item));
-            if pos.len() > 2 {
-                req.insert("text".into(), json!(pos[2..].join(" ")));
-            }
+            Req::PageTick { id: id.clone(), item: item.clone(), text: (pos.len() > 2).then(|| pos[2..].join(" ")) }
         }
-        Some("list") => {
-            req.insert("cmd".into(), json!("page_list"));
-        }
-        Some("notes") => {
-            let id = rest.get(1).ok_or(PAGE_USAGE)?;
-            req.insert("cmd".into(), json!("page_notes"));
-            req.insert("id".into(), json!(id));
-        }
+        Some("list") => Req::PageList,
+        Some("notes") => Req::PageNotes { id: at(1)? },
         _ => return Err(PAGE_USAGE.into()),
-    }
-    Ok(())
+    })
 }
 
 /// What `sb page` prints.

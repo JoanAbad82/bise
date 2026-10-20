@@ -88,9 +88,9 @@ impl Shell {
     /// the home workspace bise keeps about the user, one `- ` line each;
     /// after a change the `about-you` page, when there is one, is redrawn
     /// from them and republished by its own agent (no model turn).
-    pub(super) fn keeps_op(&mut self, cmd: &str, v: &Value) -> Value {
+    pub(super) fn keeps_op(&mut self, cmd: &str, k: &bise_proto::sb::Keep) -> Value {
         use crate::keeps;
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+        use bise_proto::sb::Keep;
         let name = if cmd == "taste" { keeps::TASTE } else { keeps::PEOPLE };
         let path = match keeps::file(name) {
             Ok(p) => p,
@@ -102,9 +102,8 @@ impl Shell {
             let n = keeps::items(t).len();
             format!("{n} {}", if n == 1 { what } else { noun })
         };
-        let step = s("step");
-        let changed = match (cmd, step.as_str()) {
-            (_, "list") => {
+        let changed = match (cmd, k) {
+            (_, Keep::List) => {
                 let items = keeps::items(&text);
                 let body = if items.is_empty() {
                     format!("nothing kept yet ({}): sb {cmd} {}", path.display(), if cmd == "taste" { "add \"<rule>\"" } else { "set <name> \"<who>\"" })
@@ -114,14 +113,14 @@ impl Shell {
                 };
                 return json!({"ok": true, "text": body, "items": items});
             }
-            ("taste", "add") => keeps::taste_add(&text, &s("rule"), Some(s("source")).filter(|f| !f.trim().is_empty()).as_deref()).map(|t| {
-                let line = format!("kept: {}", s("rule").split_whitespace().collect::<Vec<_>>().join(" "));
+            ("taste", Keep::Add { rule, source }) => keeps::taste_add(&text, rule, Some(source.as_str()).filter(|f| !f.trim().is_empty())).map(|t| {
+                let line = format!("kept: {}", rule.split_whitespace().collect::<Vec<_>>().join(" "));
                 (t, line)
             }),
-            ("taste", "remove") => keeps::taste_remove(&text, &s("which")).map(|(t, gone)| (t, format!("removed: {gone}"))),
-            ("people", "set") => keeps::people_set(&text, &s("name"), &s("who")).map(|t| (t, format!("kept: {}", s("name").trim()))),
-            ("people", "remove") => keeps::people_remove(&text, &s("name")).map(|t| (t, format!("removed: {}", s("name").trim()))),
-            _ => Err(format!("sb {cmd}: unknown step {step:?}")),
+            ("taste", Keep::Remove { which, .. }) => keeps::taste_remove(&text, which).map(|(t, gone)| (t, format!("removed: {gone}"))),
+            ("people", Keep::Set { name, who }) => keeps::people_set(&text, name, who).map(|t| (t, format!("kept: {}", name.trim()))),
+            ("people", Keep::Remove { name, .. }) => keeps::people_remove(&text, name).map(|t| (t, format!("removed: {}", name.trim()))),
+            _ => Err(format!("sb {cmd}: unknown step")),
         };
         let (new, line) = match changed {
             Ok(x) => x,
@@ -190,29 +189,26 @@ impl Shell {
         }
     }
 
-    pub(super) fn page_op(&mut self, cmd: &str, from: &str, v: &Value) -> Value {
+    pub(super) fn page_op(&mut self, from: &str, req: AgentReq) -> Value {
         let Some(pages) = self.pg.pages.clone() else {
             return json!({"ok": false, "error": "the page server is not running (see the hub log)"});
         };
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).map(String::from);
-        match cmd {
-            "page_list" => json!({"ok": true, "pages": pages.list_json()}),
-            "page_notes" => {
-                let id = s("id").unwrap_or_default();
+        match req {
+            AgentReq::PageList => json!({"ok": true, "pages": pages.list_json()}),
+            AgentReq::PageNotes { id } => {
                 match pages.store.meta(&id) {
                     Some(_) => json!({"ok": true, "id": id, "notes": pages.store.notes(&id)}),
                     None => json!({"ok": false, "error": format!("no page {id}")}),
                 }
             }
-            "page_waiting" => {
+            AgentReq::PageWaiting => {
                 let items = pages.waiting();
                 json!({"ok": true, "waiting": items, "lines": items.iter().map(|w| w.line()).collect::<Vec<_>>()})
             }
-            "page_tick" => {
+            AgentReq::PageTick { id, item, text } => {
                 // a step of his he says is done (by voice, through main):
                 // the same path as its card's answer (roadmap D)
-                let (id, item) = (s("id").unwrap_or_default(), s("item").unwrap_or_default());
-                let words = s("text").filter(|t| !t.trim().is_empty()).unwrap_or_else(|| "done".into());
+                let words = text.filter(|t| !t.trim().is_empty()).unwrap_or_else(|| "done".into());
                 if pages.store.meta(&id).is_none() {
                     return json!({"ok": false, "error": format!("no page {id}")});
                 }
@@ -222,17 +218,16 @@ impl Shell {
                     json!({"ok": false, "error": format!("{id} has no checklist row {item}")})
                 }
             }
-            "page_start" => {
+            AgentReq::PageStart { id, title, agent, ask } => {
                 // the page shows within seconds of the ask; the first
                 // publish is v1 (ambient-lead m_5000)
-                let id = s("id").unwrap_or_default();
-                let agent = s("agent").filter(|a| !a.is_empty()).unwrap_or_else(|| from.to_string());
+                let agent = agent.filter(|a| !a.is_empty()).unwrap_or_else(|| from.to_string());
                 if agent != from && !self.hub.st.agents.contains_key(&agent) {
                     return json!({"ok": false, "error": format!("no agent {agent}")});
                 }
                 let gone: Vec<String> = self.hub.st.agents.keys().filter(|n| self.page_agent_gone(n)).cloned().collect();
                 let is_gone = |n: &str| gone.iter().any(|g| g == n) || !self.hub.st.agents.contains_key(n);
-                match pages.start(&id, s("title").as_deref(), s("ask").as_deref(), &agent, now_ms(), &is_gone) {
+                match pages.start(&id, title.as_deref(), ask.as_deref(), &agent, now_ms(), &is_gone) {
                     Ok(meta) => {
                         // its writer's turn: the caller's runs now; another
                         // agent's is the next one (its end without a
@@ -251,26 +246,18 @@ impl Shell {
                     Err(e) => json!({"ok": false, "error": e}),
                 }
             }
-            _ => {
-                let list = |k: &str| -> Vec<String> {
-                    v.get(k).and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
-                };
-                let answers: Vec<(String, String)> = v
-                    .get("answers")
-                    .and_then(|x| x.as_object())
-                    .map(|o| o.iter().map(|(k, a)| (k.clone(), a.as_str().unwrap_or("").to_string())).collect())
-                    .unwrap_or_default();
+            AgentReq::PagePublish(r) => {
                 // --went (docs/ambient-roadmap.md A): the CLI read them
                 let mut went = Vec::new();
-                for w in v.get("went").and_then(|x| x.as_array()).into_iter().flatten() {
-                    match serde_json::from_value::<crate::pages::store::Went>(w.clone()) {
+                for w in r.went {
+                    match serde_json::from_value::<crate::pages::store::Went>(w) {
                         Ok(w) => went.push(w),
                         Err(e) => return json!({"ok": false, "error": format!("--went: {e}")}),
                     }
                 }
                 // --taste: the rules of ~/bise/taste.md now (the frame says
                 // 'following your taste · N rules'); no file: nothing
-                let taste = v.get("taste").and_then(|x| x.as_bool()).unwrap_or(false).then(|| {
+                let taste = r.taste.then(|| {
                     std::fs::read_to_string(crate::paths::home_workspace().join("taste.md")).ok().map(|t| crate::pages::store::taste_rules(&t))
                 });
                 if taste == Some(None) {
@@ -279,14 +266,14 @@ impl Shell {
                 let p = crate::pages::store::Publish {
                     taste: taste.flatten(),
                     agent: from.to_string(),
-                    id: s("id").filter(|x| !x.is_empty()),
-                    title: s("title").filter(|x| !x.is_empty()),
-                    html: s("html").unwrap_or_default(),
-                    done: list("done"),
-                    answers,
+                    id: r.id.filter(|x| !x.is_empty()),
+                    title: r.title.filter(|x| !x.is_empty()),
+                    html: r.html,
+                    done: r.done,
+                    answers: r.answers.into_iter().collect(),
                     went,
                     // --public / --private (pages-ui): the static export and the user's mirror
-                    public: v.get("public").and_then(Value::as_bool),
+                    public: r.public,
                 };
                 let gone: Vec<String> = self.hub.st.agents.keys().filter(|n| self.page_agent_gone(n)).cloned().collect();
                 let is_gone = |n: &str| gone.iter().any(|g| g == n) || !self.hub.st.agents.contains_key(n);
@@ -326,6 +313,7 @@ impl Shell {
                     Err(lines) => json!({"ok": false, "error": lines.join("\n"), "lint": lines}),
                 }
             }
+            r => json!({"ok": false, "error": format!("sb {}: not a page request", r.tag())}),
         }
     }
 

@@ -61,19 +61,9 @@ pub fn read_profiles(t: &toml::Table, warnings: &mut Vec<String>) -> Vec<(String
     out
 }
 
-/// What main asked at the spawn. All "": nothing asked.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Ask {
-    pub model: String,
-    pub effort: String,
-    pub profile: String,
-}
-
-impl Ask {
-    pub fn is_empty(&self) -> bool {
-        self.model.trim().is_empty() && self.effort.trim().is_empty() && self.profile.trim().is_empty()
-    }
-}
+/// What main asked at the spawn (`sb spawn --model/--effort/--profile`,
+/// typed with the request in `bise_proto::sb`). All "": nothing asked.
+pub use bise_proto::sb::Ask;
 
 /// What the task runs on, and the words that say it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

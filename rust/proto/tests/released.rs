@@ -140,3 +140,13 @@ fn released_anchors_keep_their_meaning() {
     }
     assert!(n >= Anchor::KINDS.len(), "{n} lines: one per kind at least");
 }
+
+/// What the `sb` of v2026.10.2-43 and -44 sent (their cli.rs and cli/ are
+/// the same as each other's; `build` over every command's arguments, issue
+/// 27): today's hub reads each request as its command, every key it wrote
+/// kept (an adopted REPL's older `sb` talks to this hub).
+#[test]
+fn released_sb_requests_keep_their_meaning() {
+    use bise_proto::sb::Req;
+    check("sb_req_v2026.10.2-44.jsonl", |l| Req::decode(serde_json::from_str(l).map_err(|e| e.to_string())?), |m| matches!(m, Req::Unknown { .. }), Req::to_value);
+}

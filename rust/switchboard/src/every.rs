@@ -43,6 +43,16 @@ pub enum Sched {
 }
 
 impl Sched {
+    /// `sb every`'s request: `every_ms`, else `daily_min` (a minute of
+    /// the day); neither is the sender's error.
+    pub fn of_wire(every_ms: Option<u64>, daily_min: Option<u64>) -> Result<Sched, String> {
+        match (every_ms, daily_min) {
+            (Some(p), _) => Ok(Sched::Every(p)),
+            (None, Some(m)) if m < 24 * 60 => Ok(Sched::Daily(m as u32)),
+            _ => Err("sb every: every_ms or daily_min".into()),
+        }
+    }
+
     pub fn label(&self) -> String {
         match self {
             Sched::Every(ms) => format!("every {}", dur_label(*ms)),

@@ -69,6 +69,25 @@ pub(super) fn force_run_input(agent: &str, run: crate::model::Run) -> serde_json
     In::ForceRun(ci::ForceRun { agent: agent.into(), run: run.into() }).to_value()
 }
 
+/// `sb flow [pr|trunk]`'s `set`: "" asks, else devflow's mode (its one
+/// parser).
+pub(super) fn flow_set(set: &str) -> Result<Option<crate::flow::FlowMode>, String> {
+    match set.trim() {
+        "" => Ok(None),
+        m => crate::devflow::parse_mode(m).map(Some).map_err(|_| "usage: sb flow [pr|trunk]".to_string()),
+    }
+}
+
+/// `sb worktree <path>|none`: "" or "none" is none, else an absolute
+/// path, its trailing `/` taken off.
+pub(super) fn worktree_path(path: &str) -> Result<String, String> {
+    match path.trim() {
+        "" | "none" => Ok(String::new()),
+        p if p.starts_with('/') => Ok(p.trim_end_matches('/').to_string()),
+        p => Err(format!("sb worktree: an absolute path or none, not {}", p)),
+    }
+}
+
 /// The one line `sb <cmd>` answers in a workspace without git.
 pub(crate) fn not_in_a_repo(cmd: &str) -> String {
     format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)

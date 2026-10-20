@@ -29,9 +29,9 @@ pub const CHANGED_CAP: usize = 24;
 pub struct Changed(pub Vec<Anchor>);
 
 impl Changed {
-    /// The request's `changed` field: None when absent or not a list.
-    pub fn of_request(req: &Value) -> Option<Changed> {
-        let v = req.get("changed")?;
+    /// An `sb artifact add` request's `changed` field
+    /// (`sb::Artifact::Add`): None when it is not a list.
+    pub fn of_value(v: &Value) -> Option<Changed> {
         let mut list: Vec<Anchor> = serde_json::from_value(v.clone()).ok()?;
         list.truncate(CHANGED_CAP);
         Some(Changed(list))
@@ -295,9 +295,15 @@ mod tests {
     #[test]
     fn the_add_requests_changed_field() {
         let many: Vec<Value> = (1..=40).map(|n| json!({"kind": "slide", "slide": n})).collect();
-        assert_eq!(Changed::of_request(&json!({"changed": many})).unwrap().0.len(), CHANGED_CAP);
-        assert_eq!(Changed::of_request(&json!({"changed": [{"kind": "para", "para": "A1"}]})), Some(Changed(vec![para("A1")])));
-        assert_eq!(Changed::of_request(&json!({})), None);
-        assert_eq!(Changed::of_request(&json!({"changed": "slide 2"})), None);
+        assert_eq!(Changed::of_value(&json!(many)).unwrap().0.len(), CHANGED_CAP);
+        assert_eq!(Changed::of_value(&json!([{"kind": "para", "para": "A1"}])), Some(Changed(vec![para("A1")])));
+        assert_eq!(Changed::of_value(&json!("slide 2")), None);
+        // on the request: absent is none, as before
+        let add = |v: Value| match crate::sb::Req::decode(v).unwrap() {
+            crate::sb::Req::Artifact(crate::sb::Artifact::Add { changed, .. }) => changed.as_ref().and_then(Changed::of_value),
+            r => panic!("{r:?}"),
+        };
+        assert_eq!(add(json!({"cmd": "artifact", "do": "add", "target": "a.docx"})), None);
+        assert_eq!(add(json!({"cmd": "artifact", "do": "add", "target": "a.docx", "changed": "slide 2"})), None);
     }
 }

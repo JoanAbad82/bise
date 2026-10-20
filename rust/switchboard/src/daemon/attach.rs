@@ -25,29 +25,27 @@ use std::path::Path;
 impl Shell {
     /// `req` with the parts its `attach` list makes (`v`: the CLI's
     /// request); none: unchanged. Err: the words of the refusal.
-    pub(super) fn attached(&self, from: &str, v: &Value, req: AgentReq) -> Result<AgentReq, String> {
-        let list: Vec<String> = v.get("attach").and_then(|a| a.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
-        if list.is_empty() {
-            return Ok(req);
-        }
-        attach::capped(list.len())?;
-        let sender = self.hub.st.resolve(from).unwrap_or_else(|| from.to_string());
+    pub(super) fn attached(&self, from: &str, req: AgentReq) -> Result<AgentReq, String> {
+        let sender = || self.hub.st.resolve(from).unwrap_or_else(|| from.to_string());
         match req {
-            AgentReq::Send { to, text, expect_reply, reply_to, queued, why, switch, .. } => {
+            AgentReq::Send { to, text, expect_reply, reply_to, queued, why, switch, attach, .. } if !attach.is_empty() => {
+                attach::capped(attach.len())?;
+                let sender = sender();
                 let tmps = self.hub.st.resolve(&to).and_then(|r| {
                     let dir = |n: &str| self.hub.st.agents.get(n).map(|a| self.opts.paths.agent_tmp(&a.dir));
                     Some((dir(&sender)?, dir(&r)?))
                 });
-                let items = self.items(&sender, &list, tmps.as_ref())?;
+                let items = self.items(&sender, &attach, tmps.as_ref())?;
                 let said = said(&text, &items)?;
-                Ok(AgentReq::Send { to, text: said.text, expect_reply, reply_to, queued, why, switch, parts: said.parts })
+                Ok(AgentReq::Send { to, text: said.text, expect_reply, reply_to, queued, why, switch, attach, parts: said.parts })
             }
-            AgentReq::Spawn { name, brief, worktree, with_changes, place, feature, ask, .. } => {
-                let items = self.items(&sender, &list, None)?;
+            AgentReq::Spawn { name, brief, worktree, with_changes, place, feature, ask, attach, .. } if !attach.is_empty() => {
+                attach::capped(attach.len())?;
+                let items = self.items(&sender(), &attach, None)?;
                 let said = said(&crate::prompts::brief_body(&brief), &items)?;
-                Ok(AgentReq::Spawn { name, brief, worktree, with_changes, place, feature, ask, parts: said.parts })
+                Ok(AgentReq::Spawn { name, brief, worktree, with_changes, place, feature, ask, attach, parts: said.parts })
             }
-            _ => Err("--attach goes with sb send or sb spawn".into()),
+            req => Ok(req),
         }
     }
 

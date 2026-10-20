@@ -85,419 +85,15 @@ pub trait Env {
     }
 }
 
-/// A request of the `sb` CLI (RFC 0003 §4, RFC 0001 §7.2, §7.5).
-#[derive(Clone, Debug, PartialEq)]
-pub enum AgentReq {
-    List,
-    /// `sb tasks`: the detailed state of every task.
-    Tasks,
-    Send {
-        to: String,
-        text: String,
-        expect_reply: bool,
-        reply_to: Option<u64>,
-        /// `--mode queued`: delivered only as a new turn.
-        queued: bool,
-        /// `--why`: main's reason when it answers a task for the user
-        /// (shown in the `answered` line of main's feed).
-        why: String,
-        /// `--model`/`--effort` with the text (issue #4): the task moves
-        /// to that model from its next turn, then the message goes.
-        switch: Option<(String, String)>,
-        /// send-parts: the message's parts as the hub checked them from
-        /// `--attach` (msg-parts JSON, "" none; `text` is their render).
-        /// Set by the daemon only (daemon/attach.rs), never by the CLI.
-        parts: String,
-    },
-    Wait {
-        msg: u64,
-        timeout_s: u64,
-    },
-    Ask {
-        to: String,
-        text: String,
-        timeout_s: u64,
-    },
-    Status {
-        status: Declared,
-        note: String,
-    },
-    /// `sb worktree <path>|none` (BISE-136): the agent works in a private
-    /// git worktree of its own (`gate.sh new`), or no longer ("" = none).
-    /// A view-only fact: never sent to sb-core, never journaled.
-    Worktree {
-        path: String,
-    },
-    /// `sb flow [pr|trunk]` (main, dev-flow §2): the repo's flow and the
-    /// question to ask, or the user's answer saved. The daemon's
-    /// (`Effect::Flow`): never sent to sb-core.
-    Flow {
-        set: Option<crate::flow::FlowMode>,
-    },
-    Report {
-        kind: String,
-        summary: String,
-        decisions: Vec<String>,
-        /// S10: `--step n/m` (n, m)
-        step: Option<(u32, u32)>,
-        /// emitter 5: `--result` (proto's DiffResult, checked by the CLI)
-        result: Option<Value>,
-    },
-    /// S10: `sb follow <agent> [--off]` (main only, sb-core decides).
-    Follow {
-        agent: String,
-        on: bool,
-        /// J: the hub that asked (bise's home hub, through its xfollow op;
-        /// "" this hub's own main): the job's end goes back there
-        hub: String,
-    },
-    Spawn {
-        name: String,
-        brief: Brief,
-        worktree: bool,
-        with_changes: bool,
-        /// `--place <agent>|<branch>` (dev-flow §3.1): join that worktree;
-        /// "" = the shared folder, or a new worktree with `worktree`.
-        place: String,
-        /// `--feature <name>` (dev-flow §5.1): a new worktree from the
-        /// feature's tip, landing on it. "" = none.
-        feature: String,
-        /// `--model`, `--effort`, `--profile` (issue #4): all "" = the
-        /// agents default, as before.
-        ask: bise_catalog::spawn::Ask,
-        /// send-parts: the brief's parts from `--attach` (msg-parts JSON,
-        /// "" none; the context's text is their render), the daemon's
-        parts: String,
-    },
-    /// `sb send <task> --model <id> [--effort <e>]` without a text
-    /// (issue #4): the task's model from its next turn.
-    Switch {
-        to: String,
-        model: String,
-        effort: String,
-    },
-    /// `sb feature new|sync|ready|merge|drop|list [<name>]` (dev-flow
-    /// §5.1): the daemon's (`Effect::Feature`), git off the hub's loop.
-    Feature {
-        op: String,
-        name: String,
-    },
-    /// `sb move <agent> new|shared|<agent>|<branch>` (dev-flow §3.1).
-    Move {
-        agent: String,
-        place: String,
-    },
-    /// `sb land [--here] [--add <path>]... "<message>"` (dev-flow §5):
-    /// run by the daemon, off the hub's loop (`Effect::Land`).
-    Land {
-        here: bool,
-        message: String,
-        add: Vec<String>,
-    },
-    Interrupt {
-        agent: String,
-    },
-    Stop {
-        agent: String,
-        reason: String,
-    },
-    Drop {
-        agent: String,
-    },
-    Card {
-        text: String,
-        for_msg: Option<u64>,
-    },
-    /// `sb close N ["note"]`: refused on a card of the user's inbox
-    /// (BISE-299: only the user closes those).
-    Close {
-        card: u64,
-        note: String,
-    },
-    /// `sb notify --withdraw N "why"`: main takes back its own notification
-    /// (BISE-299).
-    Withdraw {
-        card: u64,
-        why: String,
-    },
-    /// `sb rename <task> <new-name>`: the same rules as `/rename`.
-    Rename {
-        agent: String,
-        new_name: String,
-    },
-    /// `sb restore <task>`: only on the user's explicit request.
-    Restore {
-        agent: String,
-    },
-    /// `sb isolate <task>`: only on the user's explicit request.
-    Isolate {
-        agent: String,
-    },
-    /// `sb every` (docs/ambient-roadmap.md B): the hub's timers (every.rs);
-    /// the Rust side's, never sent to sb-core.
-    Every(EveryReq),
-    /// `sb wake` (event-wake, wake.rs): the caller's watches; the watch
-    /// itself is sb-core's (`wake_set`, `wake_stop` inputs).
-    Wake(WakeReq),
-    /// `sb project send <project> --input m_<n>` (bise's main, desktop S2):
-    /// the user's message `msg` to main, forwarded by reference.
-    ProjectSend {
-        project: String,
-        msg: u64,
-    },
-    /// `sb project ask <project> "<question>"`: bise's own question.
-    ProjectAsk {
-        project: String,
-        text: String,
-    },
-}
+/// A request of the `sb` CLI (RFC 0003 §4, RFC 0001 §7.2, §7.5), typed
+/// once in `bise_proto::sb` (issue 27): the CLI builds it, the daemon
+/// decodes it (`Req::decode`), [`Hub::agent_req`] and the daemon's file
+/// ops match on it.
+pub use bise_proto::sb::{parse_msg_id, Req as AgentReq};
+pub use bise_proto::sb::{Every as EveryReq, Wake as WakeReq};
 
-/// `sb every`'s three forms.
-#[derive(Clone, Debug, PartialEq)]
-pub enum EveryReq {
-    List,
-    Stop(u64),
-    /// `--show <id>`: its line and the words it sends
-    Show(u64),
-    /// `to` "": the caller; `name` None: the hub names it (every_name.rs)
-    Add { to: String, text: String, sched: crate::every::Sched, until_ms: Option<u64>, times: Option<u64>, page: Option<String>, name: Option<String> },
-}
-
-/// `sb wake`'s three forms (only for the caller: waking another agent is
-/// a message).
-#[derive(Clone, Debug, PartialEq)]
-pub enum WakeReq {
-    List,
-    Stop(u64),
-    /// `--stop bg/<n>`: the watch of the caller's background command n
-    StopBg(String),
-    /// one watch, its max (ms), `then`: --then / --alarm (none: by kind)
-    Add { spec: crate::wake::Spec, max_ms: u64, then: Option<bool> },
-}
-
-/// `m_12` or `12`.
-pub fn parse_msg_id(s: &str) -> Option<u64> {
-    s.trim().trim_start_matches("m_").parse().ok()
-}
-
-fn jstr(v: &Value, k: &str) -> String {
+pub(crate) fn jstr(v: &Value, k: &str) -> String {
     v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
-}
-
-fn jstrs(v: &Value, k: &str) -> Vec<String> {
-    v.get(k)
-        .and_then(|x| x.as_array())
-        .map(|a| {
-            a.iter()
-                .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-impl AgentReq {
-    pub fn from_json(v: &Value) -> Result<AgentReq, String> {
-        let cmd = jstr(v, "cmd");
-        let timeout = v.get("timeout_s").and_then(|x| x.as_u64()).unwrap_or(20);
-        let req = match cmd.as_str() {
-            "list" => AgentReq::List,
-            "tasks" => AgentReq::Tasks,
-            "send" => AgentReq::Send {
-                to: jstr(v, "to"),
-                text: jstr(v, "text"),
-                expect_reply: v
-                    .get("expect_reply")
-                    .and_then(|x| x.as_bool())
-                    .unwrap_or(false),
-                reply_to: v
-                    .get("reply_to")
-                    .and_then(|x| x.as_str())
-                    .and_then(parse_msg_id),
-                queued: match jstr(v, "mode").as_str() {
-                    "" | "steer" => false,
-                    "queued" => true,
-                    m => return Err(format!("unknown mode: {} (steer|queued)", m)),
-                },
-                why: jstr(v, "why"),
-                switch: (v.get("model").is_some() || v.get("effort").is_some())
-                    .then(|| (jstr(v, "model"), jstr(v, "effort"))),
-                // never the CLI's: the daemon fills it from `attach`
-                parts: String::new(),
-            },
-            "wait" => AgentReq::Wait {
-                msg: parse_msg_id(&jstr(v, "msg")).ok_or("invalid message id")?,
-                timeout_s: timeout,
-            },
-            "ask" => AgentReq::Ask {
-                to: jstr(v, "to"),
-                text: jstr(v, "text"),
-                timeout_s: timeout,
-            },
-            "status" => AgentReq::Status {
-                status: match jstr(v, "status").as_str() {
-                    "working" => Declared::Working,
-                    "done" => Declared::Done,
-                    "blocked" => Declared::Blocked,
-                    s => return Err(format!("unknown status: {} (working|done|blocked)", s)),
-                },
-                note: jstr(v, "note"),
-            },
-            "flow" => AgentReq::Flow {
-                set: match jstr(v, "set").trim() {
-                    "" => None,
-                    m => Some(crate::devflow::parse_mode(m).map_err(|_| "usage: sb flow [pr|trunk]".to_string())?),
-                },
-            },
-            "worktree" => AgentReq::Worktree {
-                path: match jstr(v, "path").trim() {
-                    "" | "none" => String::new(),
-                    p if p.starts_with('/') => p.trim_end_matches('/').to_string(),
-                    p => return Err(format!("sb worktree: an absolute path or none, not {}", p)),
-                },
-            },
-            "report" => {
-                let kind = jstr(v, "kind");
-                if !["progress", "done", "failed", "blocked"].contains(&kind.as_str()) {
-                    return Err(format!(
-                        "unknown report kind: {} (progress|done|failed|blocked)",
-                        kind
-                    ));
-                }
-                let n = |k: &str| v.get(k).and_then(Value::as_u64).and_then(|x| u32::try_from(x).ok());
-                AgentReq::Report {
-                    kind,
-                    summary: jstr(v, "summary"),
-                    decisions: jstrs(v, "decisions"),
-                    step: n("step").zip(n("of")),
-                    result: v.get("result").filter(|r| r.is_object()).cloned(),
-                }
-            }
-            "follow" => AgentReq::Follow {
-                agent: jstr(v, "agent").trim_start_matches('@').to_string(),
-                on: !v.get("off").and_then(Value::as_bool).unwrap_or(false),
-                hub: String::new(),
-            },
-            "spawn" => AgentReq::Spawn {
-                name: jstr(v, "name"),
-                brief: Brief {
-                    objective: jstr(v, "objective"),
-                    context: jstr(v, "context"),
-                    constraints: jstrs(v, "constraints"),
-                    done_when: Some(jstr(v, "done_when")).filter(|s| !s.is_empty()),
-                    report_format: Some(jstr(v, "report_format")).filter(|s| !s.is_empty()),
-                },
-                worktree: v.get("worktree").and_then(|x| x.as_bool()).unwrap_or(false),
-                with_changes: v
-                    .get("with_changes")
-                    .and_then(|x| x.as_bool())
-                    .unwrap_or(false),
-                place: jstr(v, "place"),
-                feature: jstr(v, "feature"),
-                ask: bise_catalog::spawn::Ask {
-                    model: jstr(v, "model"),
-                    effort: jstr(v, "effort"),
-                    profile: jstr(v, "profile"),
-                },
-                parts: String::new(),
-            },
-            "switch" => AgentReq::Switch {
-                to: jstr(v, "to"),
-                model: jstr(v, "model"),
-                effort: jstr(v, "effort"),
-            },
-            "feature" => AgentReq::Feature {
-                op: jstr(v, "step"),
-                name: jstr(v, "name"),
-            },
-            "move" => AgentReq::Move {
-                agent: jstr(v, "agent"),
-                place: jstr(v, "place"),
-            },
-            "land" => AgentReq::Land {
-                here: v.get("here").and_then(|x| x.as_bool()).unwrap_or(false),
-                message: jstr(v, "message"),
-                add: v
-                    .get("add")
-                    .and_then(|x| x.as_array())
-                    .map(|xs| xs.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
-                    .unwrap_or_default(),
-            },
-            "interrupt" => AgentReq::Interrupt {
-                agent: jstr(v, "agent"),
-            },
-            "stop" => AgentReq::Stop {
-                agent: jstr(v, "agent"),
-                reason: jstr(v, "reason"),
-            },
-            "drop" => AgentReq::Drop {
-                agent: jstr(v, "agent"),
-            },
-            "card" => AgentReq::Card {
-                text: jstr(v, "text"),
-                for_msg: v.get("for").and_then(|x| x.as_str()).and_then(parse_msg_id),
-            },
-            "close" => AgentReq::Close {
-                card: v
-                    .get("card")
-                    .and_then(|x| x.as_u64())
-                    .ok_or("usage: sb close <card> [\"<note>\"]")?,
-                note: jstr(v, "note"),
-            },
-            "withdraw" => AgentReq::Withdraw {
-                card: v
-                    .get("card")
-                    .and_then(|x| x.as_u64())
-                    .ok_or("usage: sb notify --withdraw <notification> \"<why>\"")?,
-                why: jstr(v, "why"),
-            },
-            "rename" => AgentReq::Rename {
-                agent: jstr(v, "agent"),
-                new_name: jstr(v, "new_name"),
-            },
-            "restore" => AgentReq::Restore {
-                agent: jstr(v, "agent"),
-            },
-            "isolate" => AgentReq::Isolate {
-                agent: jstr(v, "agent"),
-            },
-            "wake" => AgentReq::Wake(match jstr(v, "step").as_str() {
-                "" | "list" => WakeReq::List,
-                "stop" if v["bg"].is_string() => WakeReq::StopBg(jstr(v, "bg")),
-                "stop" => WakeReq::Stop(v["id"].as_u64().ok_or("usage: sb wake --stop <id|bg/<n>>")?),
-                "add" => WakeReq::add(v)?,
-                other => return Err(format!("sb wake: unknown step {}", other)),
-            }),
-            "every" => AgentReq::Every(match jstr(v, "step").as_str() {
-                "" | "list" => EveryReq::List,
-                "stop" => EveryReq::Stop(v["id"].as_u64().ok_or("usage: sb every --stop <id>")?),
-                "show" => EveryReq::Show(v["id"].as_u64().ok_or("usage: sb every --show <id>")?),
-                "add" => EveryReq::Add {
-                    to: jstr(v, "to").trim_start_matches('@').to_string(),
-                    text: jstr(v, "text"),
-                    sched: match (v["every_ms"].as_u64(), v["daily_min"].as_u64()) {
-                        (Some(p), _) => crate::every::Sched::Every(p),
-                        (None, Some(m)) if m < 24 * 60 => crate::every::Sched::Daily(m as u32),
-                        _ => return Err("sb every: every_ms or daily_min".into()),
-                    },
-                    until_ms: v["until_ms"].as_u64(),
-                    times: v["times"].as_u64(),
-                    page: v["page"].as_str().filter(|p| !p.is_empty()).map(String::from),
-                    name: v["name"].as_str().map(str::trim).filter(|n| !n.is_empty()).map(String::from),
-                },
-                o => return Err(format!("sb every: unknown step {}", o)),
-            }),
-            "project_send" => AgentReq::ProjectSend {
-                project: jstr(v, "project"),
-                msg: parse_msg_id(&jstr(v, "msg")).ok_or("usage: sb project send <project> --input m_<n>")?,
-            },
-            "project_ask" => AgentReq::ProjectAsk {
-                project: jstr(v, "project"),
-                text: jstr(v, "text"),
-            },
-            other => return Err(format!("unknown command: {}", other)),
-        };
-        Ok(req)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -1485,11 +1081,11 @@ impl Hub {
         };
         match r {
             EveryReq::List => json!({"ok": true, "text": self.st.timers.list(now)}),
-            EveryReq::Show(id) => match self.st.timers.map.get(&id) {
+            EveryReq::Show { id } => match self.st.timers.map.get(&id) {
                 Some(t) => json!({"ok": true, "text": crate::every::show(t, now)}),
                 None => json!({"ok": false, "error": format!("no timer #{} (`sb every` lists them)", id)}),
             },
-            EveryReq::Stop(id) => {
+            EveryReq::Stop { id } => {
                 let no = json!({"ok": false, "error": format!("no timer #{} (`sb every` lists them)", id)});
                 if !self.st.timers.map.contains_key(&id) {
                     return no;
@@ -1501,7 +1097,11 @@ impl Hub {
                 }
                 json!({"ok": true, "text": format!("timer #{} stopped", id)})
             },
-            EveryReq::Add { to, text, sched, until_ms, times, page, name } => {
+            EveryReq::Add { to, text, every_ms, daily_min, until_ms, times, page, name } => {
+                let sched = match crate::every::Sched::of_wire(every_ms, daily_min) {
+                    Ok(s) => s,
+                    Err(e) => return json!({"ok": false, "error": e}),
+                };
                 let to = if to.is_empty() { by.clone() } else { to };
                 let agent = match self.st.resolve(&to) {
                     Some(a) if self.st.agents[&a].lifecycle == Lifecycle::Active => a,
@@ -2211,6 +1811,7 @@ impl Hub {
                 why,
                 switch,
                 parts,
+                attach: _,
             } => {
                 // issue #4: the model first, so the message's turn runs on it
                 if let Some((model, effort)) = switch {
@@ -2254,6 +1855,10 @@ impl Hub {
                     reply(fx, json!({"ok": false, "error": "sb flow is main's: ask main"}));
                     return;
                 }
+                let set = match pure::flow_set(&set) {
+                    Ok(s) => s,
+                    Err(e) => return reply(fx, json!({"ok": false, "error": e})),
+                };
                 fx.push(Effect::Flow { client: None, token: Some(token), set });
                 return;
             }
@@ -2269,6 +1874,10 @@ impl Hub {
                 return;
             }
             AgentReq::Worktree { path } => {
+                let path = match pure::worktree_path(&path) {
+                    Ok(p) => p,
+                    Err(e) => return reply(fx, json!({"ok": false, "error": e})),
+                };
                 let Some(name) = self.st.resolve(from) else {
                     reply(fx, json!({"ok": false, "error": format!("unknown agent: {}", from)}));
                     return;
@@ -2309,6 +1918,7 @@ impl Hub {
                 feature,
                 ask,
                 parts,
+                attach: _,
             } => {
                 // issue #4: the answer waits for the daemon's pick of the model
                 if !ask.is_empty() {
@@ -2375,7 +1985,8 @@ impl Hub {
                 }
                 json!({"cmd": "drop", "agent": agent})
             }
-            AgentReq::Card { text, for_msg } => {
+            // its page or artifact links are the daemon's (daemon/page_cards.rs)
+            AgentReq::Card { text, for_msg, .. } => {
                 json!({"cmd": "card", "text": text, "for": for_msg})
             }
             AgentReq::Close { card, note } => json!({"cmd": "close", "card": card, "note": note}),
@@ -2405,6 +2016,11 @@ impl Hub {
                 Ok(hub) => json!({"cmd": "project_ask", "project": hub, "text": text}),
                 Err(e) => json!({"cmd": "project_ask", "pre_err": e}),
             },
+            // the daemon's own (daemon.rs `agent_request`): never here
+            r => {
+                reply(fx, json!({"ok": false, "error": format!("sb {}: not a request of the hub's core", r.tag())}));
+                return;
+            }
         };
         self.core(fx, env, None, In::Req(ci::Req { token, from: from.to_string(), req: q }));
     }

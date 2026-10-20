@@ -1,5 +1,15 @@
 use super::*;
 
+/// The request's JSON, as it goes on the wire.
+fn build(args: &[String]) -> Result<Value, String> {
+    super::build(args).map(|r| r.to_value())
+}
+
+/// The hub's read of it.
+fn decode(v: &Value) -> Result<crate::core::AgentReq, String> {
+    crate::core::AgentReq::decode(v.clone()).and_then(|r| if r.tag() == v["cmd"] { Ok(r) } else { Err(format!("read as {}", r.tag())) })
+}
+
 fn a(s: &[&str]) -> Vec<String> {
     s.iter().map(|x| x.to_string()).collect()
 }
@@ -63,7 +73,7 @@ fn send_flags() {
     assert_eq!(r["text"], "v2 please");
     assert_eq!(r["expect_reply"], true);
     assert_eq!(r["reply_to"], "m_4");
-    assert!(r.get("mode").is_none());
+    assert_eq!(r["mode"], "steer");
     assert!(r.get("why").is_none());
     let w = build(&a(&["send", "docs", "v2", "--reply-to", "m_4", "--why", "the brief says v2"])).unwrap();
     assert_eq!(w["why"], "the brief says v2");
@@ -146,7 +156,8 @@ fn requests_parse_in_the_core() {
         vec!["isolate", "a"],
     ] {
         let r = build(&a(&args)).unwrap();
-        crate::core::AgentReq::from_json(&r).unwrap_or_else(|e| panic!("{:?}: {}", args, e));
+        let req = decode(&r).unwrap_or_else(|e| panic!("{:?}: {}", args, e));
+        assert!(!matches!(req, crate::core::AgentReq::Unknown { .. }), "{:?}", args);
     }
 }
 
@@ -173,7 +184,7 @@ fn notify_is_a_card_on_the_wire_and_sb_card_is_unknown() {
 fn a_card_can_link_its_page_and_item() {
     let r = build(&a(&["notify", "--page", "launch-watch#hn-41", "reply to tptacek?"])).unwrap();
     assert_eq!((r["page"].as_str(), r["text"].as_str()), (Some("launch-watch#hn-41"), Some("reply to tptacek?")));
-    crate::core::AgentReq::from_json(&r).unwrap();
+    decode(&r).unwrap();
     assert_eq!(build(&a(&["notify", "--page", "w", "q?"])).unwrap()["page"], "w");
     assert!(build(&a(&["notify", "q?"])).unwrap().get("page").is_none());
     assert!(build(&a(&["notify", "--page", "#hn-41", "q?"])).is_err(), "an item needs its page");
@@ -183,7 +194,7 @@ fn a_card_can_link_its_page_and_item() {
 fn a_notification_links_any_artifact() {
     let r = build(&a(&["notify", "--artifact", "les-bims-prototype", "which look?"])).unwrap();
     assert_eq!((r["artifact"].as_str(), r["text"].as_str()), (Some("les-bims-prototype"), Some("which look?")));
-    crate::core::AgentReq::from_json(&r).unwrap();
+    decode(&r).unwrap();
     assert!(build(&a(&["notify", "--artifact", "#x", "q?"])).is_err(), "an item needs its artifact");
     assert!(build(&a(&["notify", "--artifact", "a", "--page", "b", "q?"])).is_err(), "one link");
 }

@@ -675,6 +675,7 @@ impl Shell {
                 queued: true,
                 why: String::new(),
                 switch: None,
+                attach: Vec::new(),
                 parts: String::new(),
             },
         });
@@ -1496,69 +1497,56 @@ impl Shell {
         self.notice_out(id, None, "not JSON-RPC: refused");
     }
 
-    /// `sb inspect` and `sb history` read files; the rest goes to the core.
-    /// Its sender is checked first (`accept.rs` `agent_new`, docs/issues/17).
+    /// One `sb` request (`bise_proto::sb::Req`, decoded once): the file
+    /// ops are read here; the rest goes to the core. Its sender is checked
+    /// first (`accept.rs` `agent_new`, docs/issues/17).
     fn agent_request(&mut self, token: Token, mut stream: UnixStream, v: Value) {
         let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("").to_string();
-        let cmd = v.get("cmd").and_then(|x| x.as_str()).unwrap_or("");
-        match cmd {
+        let req = match AgentReq::decode_known(v) {
+            Ok(req) => req,
+            Err(e) => {
+                write_json(&mut stream, &json!({"ok": false, "error": e}));
+                return;
+            }
+        };
+        let body = match req {
             // another project's thread (S2 C, xread.rs): `<p>/<agent>`
-            "inspect" if xread::wanted(cmd, &v) => {
-                write_json(&mut stream, &self.xinspect(&v));
-            }
+            AgentReq::Inspect(q) if xread::elsewhere(&q.agent) => self.xinspect(&q),
+            AgentReq::Show { agent, pos, context } if xread::elsewhere(&agent) => self.xshow(&agent, pos, context),
+            AgentReq::History(h) if xread::wanted(&h) => self.xsearch(&h),
             // S10: bise's `sb follow <p>/<agent>`: on that project's hub
-            "follow" if self.wants_follow(&v) => {
-                self.xfollow(stream, &v);
+            AgentReq::Follow { agent, on, .. } if self.wants_follow(&agent) => return self.xfollow(stream, &from, &agent, on),
+            AgentReq::Inspect(q) => self.inspect(&from, &q),
+            AgentReq::Show { agent, pos, context } => self.search(&history::Look::show(&agent, pos, context)),
+            AgentReq::History(h) => self.search(&history::Look::history(&h)),
+            r @ (AgentReq::PagePublish(_) | AgentReq::PageStart { .. } | AgentReq::PageTick { .. } | AgentReq::PageWaiting | AgentReq::PageList | AgentReq::PageNotes { .. }) => self.page_op(&from, r),
+            AgentReq::Taste(k) => self.keeps_op("taste", &k),
+            AgentReq::People(k) => self.keeps_op("people", &k),
+            AgentReq::Artifact(a) => self.artifact_cmd(&from, a),
+            AgentReq::ProjectList => xhub::list_body(),
+            req => return self.core_request(token, stream, from, req),
+        };
+        write_json(&mut stream, &body);
+    }
+
+    /// An `sb` request for the core: its `--attach` parts made first
+    /// (daemon/attach.rs), a notification's links checked before it opens.
+    fn core_request(&mut self, token: Token, mut stream: UnixStream, from: String, req: AgentReq) {
+        // `sb notify --page|--artifact|--open`'s links, checked before the
+        // card opens (daemon/page_cards.rs)
+        let checked = self.attached(&from, req).and_then(|req| self.card_page_link(&req).map(|link| (req, link)));
+        let (req, link) = match checked {
+            Ok(x) => x,
+            Err(e) => {
+                write_json(&mut stream, &json!({"ok": false, "error": e}));
+                return;
             }
-            "history" | "show" if xread::wanted(cmd, &v) => {
-                write_json(&mut stream, &self.xsearch(cmd, &v));
-            }
-            "inspect" => {
-                let body = self.inspect(&from, &v);
-                write_json(&mut stream, &body);
-            }
-            "history" | "show" => {
-                let body = self.search(cmd, &v);
-                write_json(&mut stream, &body);
-            }
-            "page_publish" | "page_start" | "page_tick" | "page_waiting" | "page_list" | "page_notes" => {
-                let body = self.page_op(cmd, &from, &v);
-                write_json(&mut stream, &body);
-            }
-            "taste" | "people" => {
-                let body = self.keeps_op(cmd, &v);
-                write_json(&mut stream, &body);
-            }
-            "artifact" => {
-                let body = self.artifact_cmd(&from, &v);
-                write_json(&mut stream, &body);
-            }
-            "project_list" => {
-                write_json(&mut stream, &xhub::list_body());
-            }
-            // send-parts: `--attach` made parts (daemon/attach.rs)
-            _ => match AgentReq::from_json(&v).and_then(|req| self.attached(&from, &v, req)) {
-                Ok(req) => {
-                    // `sb card --page`'s link, checked before the card opens
-                    // (daemon/page_cards.rs)
-                    let link = match self.card_page_link(cmd, &v) {
-                        Ok(l) => l,
-                        Err(e) => {
-                            write_json(&mut stream, &json!({"ok": false, "error": e}));
-                            return;
-                        }
-                    };
-                    let before: Vec<u64> = self.hub.st.cards.keys().copied().collect();
-                    self.replies.insert(token, stream);
-                    self.step(Input::Agent { token, from, req });
-                    if let Some(l) = link {
-                        self.link_new_card(&before, l);
-                    }
-                }
-                Err(e) => {
-                    write_json(&mut stream, &json!({"ok": false, "error": e}));
-                }
-            },
+        };
+        let before: Vec<u64> = self.hub.st.cards.keys().copied().collect();
+        self.replies.insert(token, stream);
+        self.step(Input::Agent { token, from, req });
+        if let Some(l) = link {
+            self.link_new_card(&before, l);
         }
     }
 }

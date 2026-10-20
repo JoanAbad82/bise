@@ -83,6 +83,6 @@ fn an_agent_s_garbage_numbers_are_refused_at_parse() {
         json!({"cmd": "wait", "msg": "m_x"}),
         json!({"cmd": "every", "step": "stop", "id": -1}),
     ] {
-        assert!(AgentReq::from_json(&v).is_err(), "{}", v);
+        assert!(AgentReq::decode(v.clone()).is_err(), "{}", v);
     }
 }

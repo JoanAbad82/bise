@@ -168,6 +168,7 @@ dependencies = [
  "base64",
  "bend-plugins",
  "bise-home",
+ "bise-proto",
  "bise-secrets",
  "libc",
  "ring",

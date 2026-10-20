@@ -1,0 +1,111 @@
+{"cmd":"list"}
+{"cmd":"tasks"}
+{"cmd":"send","expect_reply":false,"mode":"steer","text":"on it","to":"main"}
+{"cmd":"send","expect_reply":true,"mode":"steer","text":"v2?","to":"docs"}
+{"cmd":"send","expect_reply":false,"mode":"steer","reply_to":"m_12","text":"8080","to":"main"}
+{"cmd":"send","expect_reply":false,"mode":"queued","text":"after this turn","to":"fix"}
+{"cmd":"send","expect_reply":false,"mode":"steer","text":"now","to":"fix"}
+{"cmd":"send","expect_reply":false,"mode":"steer","reply_to":"m_4","text":"use v2","to":"fix","why":"the user said v2 yesterday"}
+{"cmd":"switch","effort":"low","model":"openai/gpt-5","to":"fix"}
+{"cmd":"send","effort":"","expect_reply":false,"mode":"steer","model":"openai/gpt-5","text":"go on","to":"fix"}
+{"cmd":"send","expect_reply":false,"mode":"steer","text":"done","to":"@bise"}
+{"attach":["/w/shop/launch.html","m_7"],"cmd":"send","expect_reply":false,"mode":"steer","text":"see these","to":"fix"}
+{"cmd":"ask","text":"which port?","timeout_s":20,"to":"main"}
+{"cmd":"ask","text":"v2?","timeout_s":60,"to":"docs"}
+{"cmd":"wait","msg":"m_3","timeout_s":20}
+{"cmd":"wait","msg":"m_3","timeout_s":5}
+{"cmd":"status","note":"","status":"working"}
+{"cmd":"status","note":"need the key","status":"blocked"}
+{"cmd":"status","note":"landed","status":"done"}
+{"cmd":"flow"}
+{"cmd":"flow","set":"pr"}
+{"cmd":"flow","set":"trunk"}
+{"cmd":"worktree","path":"none"}
+{"agent":"fix","cmd":"follow","off":false}
+{"agent":"fix","cmd":"follow","off":true}
+{"cmd":"report","decisions":[],"kind":"progress","of":7,"step":3,"summary":"half way"}
+{"cmd":"report","decisions":["v2","no flag"],"kind":"done","summary":"all good"}
+{"cmd":"report","decisions":[],"kind":"failed","result":{"after":290.0,"before":420.0,"label":"p99","unit":"ms"},"summary":"red"}
+{"cmd":"report","decisions":[],"kind":"blocked","summary":"need the key"}
+{"agent":"main","before":"#120","cmd":"inspect","last":5,"origin":false,"query":"mode sombre"}
+{"agent":"main","cmd":"inspect","last":20,"origin":true,"query":""}
+{"agent":"fix","at":"#4","cmd":"inspect","last":20,"origin":false,"query":""}
+{"agent":"fix","around":"#9","cmd":"inspect","last":3,"origin":false,"query":""}
+{"after":"#2","agent":"fix","cmd":"inspect","last":20,"origin":false,"query":""}
+{"agent":"shop/fix","cmd":"inspect","last":20,"origin":false,"query":""}
+{"agents":[],"archived":"","cmd":"history","limit":10,"page":1,"query":"dark mode","roles":[]}
+{"agents":["fix","docs"],"archived":"only","cmd":"history","limit":5,"page":2,"query":"dark mode","roles":["user","hub"],"since":1791229364769}
+{"agents":[],"archived":"no","cmd":"history","limit":10,"page":1,"query":"login","roles":[],"until":1767225600000}
+{"agents":[],"archived":"","cmd":"history","limit":10,"page":1,"project":"shop","query":"login","roles":[]}
+{"agents":[],"all":true,"archived":"","cmd":"history","limit":10,"page":1,"query":"login","roles":[]}
+{"agent":"fix","cmd":"show","context":3,"pos":12}
+{"agent":"docs","cmd":"show","context":5,"pos":3}
+{"agent":"shop/fix","cmd":"show","context":3,"pos":12}
+{"cmd":"every","every_ms":600000,"step":"add","text":"check the build","to":""}
+{"cmd":"every","daily_min":450,"page":"digest","step":"add","text":"the morning digest","to":"news"}
+{"cmd":"every","every_ms":3600000,"name":"build watch","step":"add","text":"look","times":3,"to":"","until_ms":1792446164770}
+{"cmd":"every","step":"list"}
+{"cmd":"every","id":3,"step":"stop"}
+{"cmd":"every","id":4,"step":"show"}
+{"cmd":"wake","max_ms":7200000,"spec":{"kind":"pid","note":"the build ends","pid":84784,"start":"Mon Oct 19 21:42:43 2026"},"step":"add"}
+{"cmd":"wake","spec":{"kind":"file","path":"/tmp/x.rc","tail":"/tmp/x.out"},"step":"add","then":true}
+{"cmd":"wake","spec":{"kind":"file","path":"/w/shop/out/build.rc"},"step":"add","then":false}
+{"cmd":"wake","step":"list"}
+{"cmd":"wake","id":3,"step":"stop"}
+{"bg":"2","cmd":"wake","step":"stop"}
+{"cmd":"taste","step":"list"}
+{"cmd":"taste","rule":"no emoji","source":"main#12","step":"add"}
+{"cmd":"taste","step":"remove","which":"3"}
+{"cmd":"taste","step":"remove","which":"no emoji"}
+{"cmd":"people","step":"list"}
+{"cmd":"people","name":"ana","step":"set","who":"the designer"}
+{"cmd":"people","name":"ana","step":"remove"}
+{"cmd":"land","here":false,"message":"fix(tui): the bar"}
+{"cmd":"land","here":true,"message":"wip"}
+{"add":["/w/shop/src/a.rs","/w/shop/docs"],"cmd":"land","here":false,"message":"feat: x"}
+{"cmd":"artifact","cwd":"/w/shop","do":"add","kind":"doc","target":"out/report.html","title":"the report"}
+{"cmd":"artifact","cwd":"/w/shop","do":"add","target":"https://example.com/pr/1"}
+{"archived":false,"cmd":"artifact","do":"list","words":""}
+{"agent":"docs","archived":true,"cmd":"artifact","do":"list","words":"launch"}
+{"cmd":"artifact","do":"archive","ids":["a1","a2"]}
+{"cmd":"artifact","do":"unarchive","ids":["a1"]}
+{"agent":"docs","before_ms":1767225600000,"cmd":"artifact","do":"archive","ids":[],"kind":"doc"}
+{"cmd":"page_list"}
+{"cmd":"page_waiting"}
+{"cmd":"page_notes","id":"launch"}
+{"agent":"docs","ask":"the plan","cmd":"page_start","id":"launch","title":"Launch"}
+{"cmd":"page_tick","id":"launch","item":"s1"}
+{"cmd":"page_tick","id":"launch","item":"s2","text":"half done"}
+{"answers":{},"cmd":"page_publish","done":[],"html":"<section class=\"kit\"><h1>Launch</h1></section>"}
+{"answers":{"n2":"not yet"},"cmd":"page_publish","done":["n1","n3"],"html":"<section class=\"kit\"><h1>Launch</h1></section>","id":"launch","public":true,"taste":true,"title":"Launch","went":[{"at":0,"kind":"mail","ref":"m1","url":"https://example.com/m1"}]}
+{"answers":{},"cmd":"page_publish","done":[],"html":"<section class=\"kit\"><h1>Launch</h1></section>","id":"launch","public":false}
+{"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"","feature":"","model":"","name":"fix","objective":"fix the bar","profile":"","report_format":"","with_changes":false,"worktree":false}
+{"cmd":"spawn","constraints":["no push","tests"],"context":"c","done_when":"green","effort":"","feature":"","model":"","name":"fix","objective":"o","profile":"","report_format":"short","with_changes":false,"worktree":true}
+{"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"high","feature":"","model":"openai/gpt-5","name":"fix","objective":"o","profile":"","report_format":"","with_changes":true,"worktree":true}
+{"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"","feature":"","model":"","name":"fix","objective":"o","place":"docs","profile":"fast","report_format":"","with_changes":false,"worktree":false}
+{"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"","feature":"checkout","model":"","name":"fix","objective":"o","profile":"","report_format":"","with_changes":false,"worktree":false}
+{"attach":["/w/shop/launch.html"],"cmd":"spawn","constraints":[],"context":"","done_when":"","effort":"","feature":"","model":"","name":"fix","objective":"o","profile":"","report_format":"","with_changes":false,"worktree":false}
+{"agent":"fix","cmd":"move","place":"new"}
+{"agent":"fix","cmd":"move","place":"docs"}
+{"cmd":"feature","step":"list"}
+{"cmd":"feature","name":"checkout","step":"new"}
+{"cmd":"feature","name":"checkout","step":"merge"}
+{"cmd":"feature","name":"checkout","step":"retire"}
+{"agent":"fix","cmd":"interrupt"}
+{"agent":"fix","cmd":"drop"}
+{"agent":"fix","cmd":"restore"}
+{"agent":"fix","cmd":"isolate"}
+{"agent":"fix","cmd":"stop","reason":"no longer needed"}
+{"agent":"fix","cmd":"stop","reason":""}
+{"card":3,"cmd":"close","note":"handled"}
+{"card":4,"cmd":"close","note":""}
+{"agent":"a","cmd":"rename","new_name":"b"}
+{"cmd":"card","text":"v1 or v2?"}
+{"cmd":"card","for":"m_2","text":"v1 or v2?"}
+{"cmd":"card","page":"launch#hn-41","text":"reply?"}
+{"artifact":"a1#intro","cmd":"card","text":"this one?"}
+{"cmd":"card","open":["1=a1","2=a2#top"],"text":"which?\n1. a\n2. b"}
+{"card":5,"cmd":"withdraw","why":"the user answered in chat"}
+{"cmd":"project_list"}
+{"cmd":"project_send","msg":"m_12","project":"shop"}
+{"cmd":"project_ask","project":"shop","text":"is it green?"}

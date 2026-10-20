@@ -256,22 +256,22 @@ impl Shell {
     }
 
     /// `sb artifact add|list` (an agent's request).
-    pub(super) fn artifact_cmd(&mut self, from: &str, v: &Value) -> Value {
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+    pub(super) fn artifact_cmd(&mut self, from: &str, r: bise_proto::sb::Artifact) -> Value {
+        use bise_proto::sb::Artifact;
         let store = self.art_store();
-        match s("do").as_str() {
-            "add" => {
+        match r {
+            Artifact::Add { target, cwd, title, kind, known_only, changed } => {
                 let add = Add {
-                    target: s("target"),
-                    title: v.get("title").and_then(|x| x.as_str()).map(String::from),
-                    kind: v.get("kind").and_then(|x| x.as_str()).map(String::from),
+                    target,
+                    title,
+                    kind,
                     agent: from.to_string(),
                     by: from.to_string(),
-                    cwd: s("cwd"),
-                    known_only: v.get("known_only") == Some(&json!(true)),
+                    cwd,
+                    known_only,
                     // the turn from sb-core's fact, never from the request
                     turn: self.art_turn(from),
-                    changed: bise_proto::office::Changed::of_request(v).map(|c| c.0),
+                    changed: changed.as_ref().and_then(bise_proto::office::Changed::of_value).map(|c| c.0),
                 };
                 match store.add(&add, now_ms()) {
                     Ok(a) => {
@@ -288,33 +288,33 @@ impl Shell {
                     Err(e) => json!({"ok": false, "error": e}),
                 }
             }
-            "list" => {
-                let agent = Some(s("agent")).filter(|a| !a.is_empty());
-                let archived = v.get("archived") == Some(&json!(true));
-                json!({"ok": true, "text": store.list_text(&s("words"), agent.as_deref(), archived, now_ms())})
+            Artifact::List { words, agent, archived } => {
+                let agent = agent.filter(|a| !a.is_empty());
+                json!({"ok": true, "text": store.list_text(&words, agent.as_deref(), archived, now_ms())})
             }
-            "archive" | "unarchive" => {
-                let opt = |k: &str| Some(s(k)).filter(|x| !x.is_empty());
-                let pick = artifacts::Pick {
-                    ids: v.get("ids").and_then(Value::as_array).into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).collect(),
-                    agent: opt("agent"),
-                    before_ms: v.get("before_ms").and_then(Value::as_u64),
-                    kind: opt("kind"),
-                };
-                let text = if s("do") == "archive" {
-                    store.archive(&pick, now_ms()).map(|a| artifacts::archived_text(&a))
-                } else {
-                    store.unarchive(&pick).map(|(back, not)| artifacts::unarchived_text(&back, &not))
-                };
-                match text {
-                    Ok(text) => {
-                        self.artifacts_refresh(false);
-                        json!({"ok": true, "text": text})
-                    }
-                    Err(e) => json!({"ok": false, "error": e}),
-                }
+            Artifact::Archive(p) => self.artifact_pick(true, p),
+            Artifact::Unarchive(p) => self.artifact_pick(false, p),
+        }
+    }
+
+    /// `sb artifact archive|unarchive`: those picked out of the list, or
+    /// back in it.
+    fn artifact_pick(&mut self, archive: bool, p: bise_proto::sb::ArtifactPick) -> Value {
+        let store = self.art_store();
+        let bise_proto::sb::ArtifactPick { ids, agent, kind, before_ms } = p;
+        let some = |x: Option<String>| x.filter(|x| !x.is_empty());
+        let pick = artifacts::Pick { ids, agent: some(agent), before_ms, kind: some(kind) };
+        let text = if archive {
+            store.archive(&pick, now_ms()).map(|a| artifacts::archived_text(&a))
+        } else {
+            store.unarchive(&pick).map(|(back, not)| artifacts::unarchived_text(&back, &not))
+        };
+        match text {
+            Ok(text) => {
+                self.artifacts_refresh(false);
+                json!({"ok": true, "text": text})
             }
-            _ => json!({"ok": false, "error": "usage: sb artifact add <path or link> | list | archive | unarchive"}),
+            Err(e) => json!({"ok": false, "error": e}),
         }
     }
 

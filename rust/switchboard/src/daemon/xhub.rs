@@ -112,20 +112,17 @@ impl Shell {
         });
     }
 
-    /// Whether `sb follow` request `v` goes to another project's hub: on
+    /// Whether `sb follow` of `agent` goes to another project's hub: on
     /// bise's home hub, an agent named `<p>/<agent>`.
-    pub(super) fn wants_follow(&self, v: &Value) -> bool {
-        crate::paths::is_home(&self.opts.paths.workspace) && v.get("agent").and_then(Value::as_str).is_some_and(|a| a.contains('/'))
+    pub(super) fn wants_follow(&self, agent: &str) -> bool {
+        crate::paths::is_home(&self.opts.paths.workspace) && agent.contains('/')
     }
 
     /// S10, bise's home hub: `sb follow <p>/<agent> [--off]` (main only):
     /// the project's hub follows its task (started first when stopped);
     /// a command, not a message: no outbox, its answer or its failure
     /// comes back to main at once (on a thread: the hub never waits).
-    pub(super) fn xfollow(&mut self, mut stream: UnixStream, v: &Value) {
-        let from = v.get("from").and_then(Value::as_str).unwrap_or("");
-        let target = v.get("agent").and_then(Value::as_str).unwrap_or("");
-        let on = !v.get("off").and_then(Value::as_bool).unwrap_or(false);
+    pub(super) fn xfollow(&mut self, mut stream: UnixStream, from: &str, target: &str, on: bool) {
         if from != crate::model::MAIN {
             write_json(&mut stream, &json!({"ok": false, "error": "only main follows a task: ask main"}));
             return;

@@ -32,7 +32,7 @@ fn a_reply_still_pending_after_the_hold_is_a_pause() {
     assert!(reply(&t.go(Input::Tick), tok2).is_some());
     assert_eq!(watching(&mut t, "a").as_array().unwrap().len(), 1);
     // its reply ends it in the same step: no wake line, no bise message
-    let (_, fx) = t.req("b", AgentReq::Send { to: "a".into(), text: "8080".into(), expect_reply: false, reply_to: Some(id), queued: false, why: String::new(), switch: None, parts: String::new() });
+    let (_, fx) = t.req("b", AgentReq::Send { to: "a".into(), text: "8080".into(), expect_reply: false, reply_to: Some(id), queued: false, why: String::new(), switch: None, parts: String::new(), attach: Vec::new() });
     assert!(fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "wake_end" && j["why"] == "answered")), "{fx:?}");
     assert!(lines_of(&fx, "a").iter().all(|l| !l.starts_with("sb wake :: ")), "{fx:?}");
     assert!(!t.journal.borrow().iter().any(|j| j["type"] == "message_sent" && j["msg"]["from"] == "switchboard" && j["msg"]["to"] == "a"), "no bise message");

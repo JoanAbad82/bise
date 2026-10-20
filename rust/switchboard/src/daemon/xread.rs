@@ -19,10 +19,11 @@
 //! projects with one query and one scoring. It refreshes only when a query
 //! runs, never on a tick (core-idle-cpu's burn).
 
-use super::history::{inspect_page, respond};
+use super::history::{inspect_page, respond, Look};
 use super::Shell;
 use crate::search::Who;
 use crate::util::now_ms;
+use bise_proto::sb::{History, Inspect};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
@@ -46,14 +47,14 @@ pub(super) fn split_ref(s: &str) -> Result<(String, String), String> {
     Ok((p.to_string(), a.to_string()))
 }
 
-/// Whether request `v` of `cmd` reads another project.
-pub(super) fn wanted(cmd: &str, v: &Value) -> bool {
-    let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("");
-    match cmd {
-        "history" => !s("project").is_empty() || v.get("all") == Some(&json!(true)),
-        "show" | "inspect" => s("agent").contains('/'),
-        _ => false,
-    }
+/// Whether `sb history` request `h` reads another project.
+pub(super) fn wanted(h: &History) -> bool {
+    h.project.as_deref().is_some_and(|p| !p.is_empty()) || h.all
+}
+
+/// Whether `sb show` or `sb inspect` of `agent` reads another project.
+pub(super) fn elsewhere(agent: &str) -> bool {
+    agent.contains('/')
 }
 
 /// A registered project as a reader sees it.
@@ -104,16 +105,15 @@ pub(super) fn who_of(name: &str, state: &Path) -> Vec<Who> {
         .collect()
 }
 
-/// `--agent` names inside `<p>`: a bare name is that project's.
-fn qualify(v: &Value, p: &str) -> Value {
-    let mut v = v.clone();
-    let agents: Vec<String> = v
-        .get("agents")
-        .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(Value::as_str).map(|x| if x.contains('/') { x.to_string() } else { format!("{p}/{x}") }).collect())
-        .unwrap_or_default();
-    v["agents"] = json!(agents);
-    v
+/// `--agent` names inside `<p>`: a bare name is that project's; `scope`
+/// the project the search keeps to (none: `--all`).
+fn qualify(h: &History, p: &str, scope: Option<&str>) -> Look {
+    let mut look = Look::history(h);
+    if let Look::Search(q) = &mut look {
+        q.agents = q.agents.iter().map(|x| if x.contains('/') { x.to_string() } else { format!("{p}/{x}") }).collect();
+        q.scope = scope.map(String::from);
+    }
+    look
 }
 
 impl Shell {
@@ -145,21 +145,25 @@ impl Shell {
     }
 
     /// `sb history --project|--all` and `sb show <p>/<agent>#<pos>`.
-    pub(super) fn xsearch(&mut self, cmd: &str, v: &Value) -> Value {
+    pub(super) fn xshow(&mut self, agent: &str, pos: u64, context: Option<u64>) -> Value {
         let t0 = std::time::Instant::now();
         if !super::xhub::is_home(&self.opts.paths.workspace) {
             return json!({"ok": false, "error": REFUSED});
         }
-        let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
-        let all = v.get("all") == Some(&json!(true));
-        let res = if cmd == "show" {
-            split_ref(&s("agent")).and_then(|(p, a)| {
-                let (name, who) = self.refresh_one(&p)?;
-                let mut v = v.clone();
-                v["agent"] = json!(format!("{name}/{a}"));
-                Ok(respond(&self.xsearch, &who, cmd, &v, now_ms(), t0))
-            })
-        } else if all {
+        let res = split_ref(agent).and_then(|(p, a)| {
+            let (name, who) = self.refresh_one(&p)?;
+            Ok(respond(&self.xsearch, &who, &Look::show(&format!("{name}/{a}"), pos, context), now_ms(), t0))
+        });
+        res.unwrap_or_else(|e| json!({"ok": false, "error": e}))
+    }
+
+    /// `sb history --project|--all`.
+    pub(super) fn xsearch(&mut self, h: &History) -> Value {
+        let t0 = std::time::Instant::now();
+        if !super::xhub::is_home(&self.opts.paths.workspace) {
+            return json!({"ok": false, "error": REFUSED});
+        }
+        let res = if h.all {
             let ps = projects(&self.project());
             let mut keep = vec![HOME.to_string()];
             let mut who = self.home_who();
@@ -170,27 +174,22 @@ impl Shell {
                 keep.push(pr.name.clone());
             }
             self.xsearch.retain_prefixes(&keep);
-            Ok(respond(&self.xsearch, &who, cmd, &qualify(v, HOME), now_ms(), t0))
+            Ok(respond(&self.xsearch, &who, &qualify(h, HOME, None), now_ms(), t0))
         } else {
-            self.refresh_one(&s("project")).map(|(name, who)| {
-                let mut v = qualify(v, &name);
-                v["scope"] = json!(name);
-                respond(&self.xsearch, &who, cmd, &v, now_ms(), t0)
-            })
+            self.refresh_one(h.project.as_deref().unwrap_or_default()).map(|(name, who)| respond(&self.xsearch, &who, &qualify(h, &name, Some(&name)), now_ms(), t0))
         };
         res.unwrap_or_else(|e| json!({"ok": false, "error": e}))
     }
 
     /// `sb inspect <p>/<agent>`: a page of that project's thread.
-    pub(super) fn xinspect(&mut self, v: &Value) -> Value {
+    pub(super) fn xinspect(&mut self, q: &Inspect) -> Value {
         if !super::xhub::is_home(&self.opts.paths.workspace) {
             return json!({"ok": false, "error": REFUSED});
         }
-        if v.get("origin") == Some(&json!(true)) {
+        if q.origin {
             return json!({"ok": false, "error": "--origin reads your own thread: sb inspect <agent> --origin"});
         }
-        let target = v.get("agent").and_then(Value::as_str).unwrap_or("");
-        let res = split_ref(target).and_then(|(p, a)| {
+        let res = split_ref(&q.agent).and_then(|(p, a)| {
             let pr = project(&p, &self.project())?;
             let who = who_of(&pr.name, &pr.state);
             let full = format!("{}/{a}", pr.name);
@@ -203,7 +202,7 @@ impl Shell {
             if !plain(&dir) || !path.is_file() {
                 return Err(format!("no agent named {a} in {}", pr.name));
             }
-            Ok(inspect_page(&full, &path, v, now_ms()))
+            Ok(inspect_page(&full, &path, q, now_ms()))
         });
         res.unwrap_or_else(|e| json!({"ok": false, "error": e}))
     }
@@ -252,10 +251,12 @@ mod tests {
 
     #[test]
     fn only_a_project_or_a_ref_reads_across() {
-        assert!(wanted("history", &json!({"project": "shop"})));
-        assert!(wanted("history", &json!({"all": true})));
-        assert!(!wanted("history", &json!({"query": "x"})));
-        assert!(wanted("show", &json!({"agent": "shop/perf"})));
-        assert!(!wanted("inspect", &json!({"agent": "perf"})));
+        let h = |v: serde_json::Value| serde_json::from_value::<History>(v).unwrap();
+        assert!(wanted(&h(json!({"project": "shop"}))));
+        assert!(wanted(&h(json!({"all": true}))));
+        assert!(!wanted(&h(json!({"query": "x"}))));
+        assert!(!wanted(&h(json!({"project": ""}))));
+        assert!(elsewhere("shop/perf"));
+        assert!(!elsewhere("perf"));
     }
 }
