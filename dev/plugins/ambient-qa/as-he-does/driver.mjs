@@ -666,6 +666,8 @@ if (mode === 'rows2') {
   // 96750f52 (ambient-lead m_21810 (b)): the working mark, the TUI's gust after 'to main' on the
   // composer's label line; no 'is working' row in the thread (thread.live / thread.waiting are gone),
   // and nothing in the thread moves with the gust's frames (sampled every 110 ms, its frame step)
+  // 491959b8f (designer m_34075, signed m_34467): the mark is the 1-cell breath now, one glyph a
+  // frame (thread.mark.breath, 6 frames of 110 ms); 2+ glyphs in 16 samples is it moving
   await harness();
   await say('take a moment [[slow: 12]]');
   const mark = page.locator('[data-testid="thread.mark"][data-state="working"]').first();
@@ -676,7 +678,7 @@ if (mode === 'rows2') {
     const geo = () => page.evaluate(() => {
       const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height].map(Math.round).join(','); };
       const sc = document.querySelector('[data-testid="thread.list"] [data-virtuoso-scroller]') ?? document.querySelector('[data-testid="thread.list"]');
-      return { list: r('[data-testid="thread.list"]'), mark: r('[data-testid="thread.mark"]'), composer: r('[data-testid="composer"]'), scroll: sc ? `${Math.round(sc.scrollTop)},${sc.scrollHeight}` : null, gust: document.querySelector('[data-testid="thread.mark.gust"]')?.textContent ?? null };
+      return { list: r('[data-testid="thread.list"]'), mark: r('[data-testid="thread.mark"]'), composer: r('[data-testid="composer"]'), scroll: sc ? `${Math.round(sc.scrollTop)},${sc.scrollHeight}` : null, breath: document.querySelector('[data-testid="thread.mark.breath"]')?.textContent ?? null };
     }).catch(() => null);
     // 96db3e08 run: one 18 px scrollTop move right after the send (the send's bottom settle, not
     // the gust?). Let the send settle 500 ms before sampling, so a move left is the gust's (ambient-lead m_22035)
@@ -684,7 +686,7 @@ if (mode === 'rows2') {
     const g = [];
     for (let i = 0; i < 16; i++) { g.push(await geo()); await page.waitForTimeout(110); }
     const same = (k) => new Set(g.map((x) => x?.[k] ?? null)).size === 1;
-    wk.gust_frames = new Set(g.map((x) => x?.gust ?? null)).size;
+    wk.breath_frames = new Set(g.map((x) => x?.breath ?? null)).size;
     // the scroller may grow when a row lands (new content, kept at the bottom): that is not the gust
     // moving it. Red only when scrollTop moves while scrollHeight stays (the thread jumps by itself).
     const sc = g.map((x) => (x?.scroll ?? '').split(',').map(Number));
@@ -705,8 +707,8 @@ if (mode === 'rows2') {
     await page.mouse.move(1, 400);
   }
   // the home thread names its main 'bise' (ambient-lead m_22076): the label reads 'to bise'
-  step("the working mark: a gust after 'to bise' while main works, no 'is working' row, the thread still under its frames",
-    marked && /^to (bise|main)\b/.test((wk.label ?? '').trim()) && wk.on_label_line && wk.old_rows === 0 && !wk.is_working_text && wk.gust_frames >= 2 && Object.values(wk.still).every(Boolean), wk);
+  step("the working mark: a breath after 'to bise' while main works, no 'is working' row, the thread still under its frames",
+    marked && /^to (bise|main)\b/.test((wk.label ?? '').trim()) && wk.on_label_line && wk.old_rows === 0 && !wk.is_working_text && wk.breath_frames >= 2 && Object.values(wk.still).every(Boolean), wk);
   await until(async () => (/ack: take a moment/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
   await say('one quick thought [[think: weighing the proof rows]]');
   // the TUI folds a thought too (ambient-lead m_20609): the row is there, then opens to its words
@@ -3248,8 +3250,11 @@ async function rows0170(harness, say) {
     const on = await openAgent('zqbench');
     // the pause runs from zqbench's sb wake, some seconds after the seed (round 2: 54 s at t0 + 65 s):
     // its words under a minute ('running for 54 s') kept, then read again once in minutes
-    const under = await waitLine();
-    const line = (await until(async () => { const l = await waitLine(); return l && /running for \d+ min$/.test(l.text) ? l : null; }, 60000, 1000)) ?? (await waitLine());
+    // its start under load (400fbd1eb's nightly: the sb wake ran ~110 s after the spawn, the line
+    // read 'running for 8 s'; the same binary spawns to bash in 2 s on a quiet hub): wait for the
+    // line itself, then for its minutes counted from when it showed, never from the seed
+    const under = await until(async () => { const l = await waitLine(); return l && /running for \d+ (s|min)$/.test(l.text) ? l : null; }, 180000, 1000);
+    const line = (await until(async () => { const l = await waitLine(); return l && /running for \d+ min$/.test(l.text) ? l : null; }, 75000, 1000)) ?? (await waitLine());
     step("the pause under a minute says seconds: 'running for N s'", /^continues when the zq bench ends · running for \d+ (s|min)$/.test(under?.text ?? ''), { under });
     const h = await head();
     const r = await agentRow('zqbench');
@@ -3272,7 +3277,9 @@ async function rows0170(harness, say) {
     await say(`[[bash: sb spawn zqsearch --objective 'zq search {{bash: ${ASK}}}']] seeded zqsearch`);
     await until(async () => ((await agentRow('zqsearch')) ? true : null), 60000, 500);
     const on = await openAgent('zqsearch');
-    const line = await until(async () => { const l = await waitLine(); return l && /answers/.test(l.text) ? l : null; }, 60000, 250);
+    // under load its first turn came ~60 s after the spawn (400fbd1eb's nightly: head 'starting'
+    // at 60 s, the ask's line at ~62 s): the line is waited for, up to 180 s
+    const line = await until(async () => { const l = await waitLine(); return l && /answers/.test(l.text) ? l : null; }, 180000, 250);
     const at = Date.now();
     const h = await head();
     const r = await agentRow('zqsearch');
