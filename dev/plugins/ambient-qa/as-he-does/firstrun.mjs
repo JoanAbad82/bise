@@ -1,7 +1,7 @@
 // The first run's model step in the packed app (desk-cut-10, main m_28811; onboard-keys-2
 // 6f6130882): the candidate opened on a FRESH stand-in home (cand.sh AS_HE_DOES_FIRSTRUN=1: no key,
 // no prefs, the fake provider behind every provider's base_url, the keychain probe off), read over
-// CDP on 127.0.0.1. Hello, permissions (never asked: 'next' only), the model step: an API key ->
+// CDP on 127.0.0.1. Hello (one 'start': v4 has no permissions step), the model step: an API key ->
 // Anthropic -> a bad key fails under its field and is never saved; a good one is checked live,
 // "it works" with the model's own answer, the key in auth.json, main's model in config.toml,
 // continue enabled. Never the projects step (it scans a home).
@@ -55,7 +55,8 @@ try {
   await shot('hello');
   step('a fresh home opens on the first run (hello)', hello, { url: page.url() });
   if (!hello) process.exit(1);
-  await page.getByTestId('setup.next').click({ timeout: 5000 });
+  // hello's 'start' leads straight to the model step (v4, 577a153a6: hello, model, projects,
+  // first; no permissions step): one click, never a second on the model's still-disabled continue
   await page.getByTestId('setup.next').click({ timeout: 5000 });
   const model = await seen('setup.step.model', 10000) && await seen('setup.pay', 20000);
   const nextOff = await page.getByTestId('setup.next').isDisabled().catch(() => null);
