@@ -3,7 +3,7 @@ a throwaway hub on the fake provider, the real `sb every`, tmux at 150
 and 80 columns, dark and light.
 
   t1 schedules its own (every 2m, 6 times), main schedules one for t2
-      (every day 07:30): main's thread has main's ◷ line only; the
+      (every day HM, 3 h from now): main's thread has main's ◷ line only; the
       agents panel shows ◷ and the next run on both rows, its legend
   t1's thread: its ◷ scheduled line, never `switchboard`
   /scheduled: the list soonest first, its key bar; ⏎ opens one; r runs
@@ -18,6 +18,7 @@ python3 -u tests/tui_scheduled_tmux.py
 """
 import os
 import subprocess
+import time
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -26,6 +27,10 @@ from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
 from words import w, w_re  # noqa: E402
 
 SHOTS = os.environ.get("SCHED_SHOTS")
+# the daily task's time: 3 h from now, so the panel shows its clock time (`◷ 07:30`)
+# and never `◷ 40m` (within the hour, sb/panel.rs next_run): a fixed 07:30 was red
+# from 06:30 to 07:30 (state-schema m_34465)
+HM = time.strftime("%H:%M", time.localtime(time.time() + 3 * 3600))
 
 # the scheduled screen's words, by key (bise_proto::words::scheduled): a word designer changes moves this test
 NAME = "fake timer name"   # the fake model's name for a task
@@ -86,18 +91,18 @@ def setup(t, E):
     out = sb(E, "t1", E.ws, "every", "2m", "check the build and tell me what failed", "--times", "6")
     # sched-names: the list's line, its name (the fallback until the model's) after its agent
     assert "timer set: #1 @t1  " in out and " · every 2m · " in out, out
-    out = sb(E, "main", E.ws, "every", "day", "07:30", "ship a release if main landed something", "--to", "t2")
-    assert "timer set: #2 @t2  " in out and " · every day 07:30 · " in out, out
+    out = sb(E, "main", E.ws, "every", "day", HM, "ship a release if main landed something", "--to", "t2")
+    assert "timer set: #2 @t2  " in out and " · every day %s · " % HM in out, out
 
 
 def wide(t, E):
     setup(t, E)
     # main's thread: main's own, never t1's; the panel's ◷ and its legend
     # sched-names: its name (the fake model's), never its id (designer m_14531)
-    sc = t.wait(w("scheduled.set_for", by="main", title=NAME, agent="t2") + " · every day 07:30")
+    sc = t.wait(w("scheduled.set_for", by="main", title=NAME, agent="t2") + " · every day " + HM)
     assert w("scheduled.set_own", agent="t1", title="") not in sc and "scheduled #" not in sc, sc
-    sc = t.wait("◷ 07:30")
-    assert "◷ 2m" in sc and "◷ 07:30" in sc, sc
+    sc = t.wait("◷ " + HM)
+    assert "◷ 2m" in sc and "◷ " + HM in sc, sc
     assert "= its next run" not in sc, sc
     no_switchboard(sc)
     shot(t, "150-main-thread")
@@ -110,7 +115,7 @@ def wide(t, E):
     assert len(rows) == 2 and "◷ t1" in rows[0] and NAME in rows[0] and "› " in rows[0], sc
     assert "#" not in "\n".join(rows), sc
     assert "every 2m" in rows[0] and w("scheduled.n_of", count=0, total=6) in rows[0] and w("scheduled.by", who="t1") in rows[0], rows[0]
-    assert "every day 07:30" in rows[1] and w("scheduled.by", who="main") in rows[1], rows[1]
+    assert "every day " + HM in rows[1] and w("scheduled.by", who="main") in rows[1], rows[1]
     assert keybar(("⏎", "key_open"), ("r", "key_run_now"), ("x", "key_stop"), ("/", "key_find"), ("tab", "key_ended_too"), ("esc", "key_close")) in sc, sc
     shot(t, "150-list")
     # one opened
@@ -186,7 +191,7 @@ def narrow(t):
     assert SUB not in sc, sc
     assert keybar(("⏎", "key_open"), ("r", "key_run_now"), ("x", "key_stop"), ("esc", "key_close")) in sc, sc
     # 80 columns (designer m_15602): who it wakes, its name, its next run; no rhythm
-    assert "◷ t2" in sc and NAME in sc and w("scheduled.daily", hm="07:30") not in sc, sc
+    assert "◷ t2" in sc and NAME in sc and w("scheduled.daily", hm=HM) not in sc, sc
     for line in sc.splitlines():
         assert len(line) <= 80, line
     shot(t, "80-list")
