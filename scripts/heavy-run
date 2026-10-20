@@ -76,6 +76,11 @@ mkdir -p "$D" "$Q" && touch "$S1" "$S2" "$S3" "$S4"
 # TERM then KILL after 5 s) when it drops under HEAVY_DISK_STOP_GB (5), with
 # rc=28 (ENOSPC) and a "heavy-run: stopped" line. Both also go to the
 # agent's status (sb status, when SB_AGENT is set), so the hub shows why.
+# Known limits (review-gates m_35740): the stop follows parent pids, so a
+# child that left the tree (setsid, a daemon, a hub a test started) is not
+# stopped; the status note sets the agent to 'working', over a blocked or
+# done status. Without SB_AGENT (the nightly under launchd) the lines are
+# only on stderr: the nightly's <date>.log has them (its 2>&1).
 # HEAVY_FREE_KB_FILE (tests): the free KB are read from that file, not df.
 # HEAVY_DISK_POLL: seconds between two checks of a running job (10).
 free_kb() {
