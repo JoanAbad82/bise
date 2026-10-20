@@ -5,6 +5,7 @@
 // routed one keeps it for its route (thread/routes.ts). Pure.
 // Owner: amb-win (store.ts calls it; amb-core's file).
 import type { Entry, SendReason } from "@/proto";
+import type { SendRefusal } from "@/shared/local";
 import { sentParts, sentWords, type Pending } from "./types";
 
 /**
@@ -21,6 +22,23 @@ export interface Sent {
   readonly cid: number;
   readonly msg_id: number | null;
   readonly reason: SendReason | null;
+}
+
+/** The window-local 'send_refused' (main's ipc.ts): the core answered his send `cid` with an error,
+ *  `reason` typed (shared/local.ts SendRefusal): late, gone, or the hub's refusal. */
+export interface SendRefused {
+  readonly project: string;
+  readonly agent: string;
+  readonly cid: number;
+  readonly reason: SendRefusal;
+}
+
+export function sendRefusedOf(raw: unknown): SendRefused | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (r["ev"] !== "send_refused" || typeof r["project"] !== "string" || typeof r["agent"] !== "string" || typeof r["cid"] !== "number") return null;
+  const reason = r["reason"] === "late" || r["reason"] === "gone" ? r["reason"] : "refused";
+  return { project: r["project"], agent: r["agent"], cid: r["cid"], reason };
 }
 
 export function sentOf(raw: unknown): Sent | null {

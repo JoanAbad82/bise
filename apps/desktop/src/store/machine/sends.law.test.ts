@@ -18,6 +18,9 @@
 //    last cid only grows;
 // 6. a resend gives the same words, mode and parts under the new cid, the old row gone;
 // 7. an input that changes nothing: the same state back, nothing out.
+// 8. the core gave up waiting for its hub (late): a row on its way turns late, never failed (its hub
+//    may still make it: no retry); gone: not sent, its words kept for its echo; the hub's refusal
+//    changes nothing here (its error event settles it). queue-drawer-fix, architect m_34889.
 import { describe, expect, it } from "vitest";
 import type { Entry, Part } from "@/proto";
 import type { CoreCmd } from "@/shared/api";
@@ -88,6 +91,10 @@ function nextInput(r: ReturnType<typeof rng>, s: SendsState, at: number, cid: nu
     const reason = made ? ("made" as const) : r.pick([null, "page", "command", "routed", "unknown"] as const);
     return { at_ms: at, in: "win", ev: { ev: "sent", project: row?.project ?? project, agent: row?.agent ?? agent, cid: someCid, msg_id: made ? 100 + someCid : null, reason } };
   }
+  if (k < 60 && k >= 56) {
+    // the core answered his send with an error of its own (late, gone) or the hub's (queue-drawer-fix)
+    return { at_ms: at, in: "win", ev: { ev: "send_refused", project: row?.project ?? project, agent: row?.agent ?? agent, cid: someCid, reason: r.pick(["late", "late", "gone", "refused"] as const) } };
+  }
   if (k < 70 || k < 76) {
     const e: Entry = {
       kind: "you",
@@ -142,7 +149,7 @@ describe("the sends slice's law", () => {
         expect(JSON.stringify(stepSends(s, f, input)), where).toBe(JSON.stringify([next, outs]));
         // 7. nothing changed: the same state, nothing out (a send's answer or error for a row it
         //    names is always written again, as today's store did: a new list, its thread told)
-        const rewrites = (input.in === "win" && input.ev.ev === "sent") || (input.in === "ev" && input.ev.ev === "error");
+        const rewrites = (input.in === "win" && (input.ev.ev === "sent" || input.ev.ev === "send_refused")) || (input.in === "ev" && input.ev.ev === "error");
         if (JSON.stringify(next) === before && !rewrites) {
           expect(next, where).toBe(s);
           expect(outs, where).toEqual([]);
@@ -184,7 +191,20 @@ describe("the sends slice's law", () => {
           }
         }
         // 3. every row ends
-        if (input.in === "win" && input.ev.ev === "core" && input.ev.state === "down") expect(rows.some((p) => p.state === "sending"), where).toBe(false);
+        if (input.in === "win" && input.ev.ev === "core" && input.ev.state === "down") expect(rows.some((p) => p.state === "sending" || p.state === "late"), where).toBe(false);
+        // 8. the core gave up waiting (late): a row on its way with no id turns late, never failed (no
+        //    retry: its hub may still make it); gone: not sent, its words kept for its echo (lostAt);
+        //    the hub's refusal: its error event settles it, this changes nothing (queue-drawer-fix)
+        if (input.in === "win" && input.ev.ev === "send_refused") {
+          const { cid, reason } = input.ev;
+          const key = threadKey(input.ev.project, input.ev.agent);
+          const had = rowsBefore.find((p) => p.cid === cid && threadKey(p.project, p.agent) === key);
+          const now = rows.find((p) => p.cid === cid && threadKey(p.project, p.agent) === key);
+          const open = had !== undefined && (had.state === "sending" || had.state === "late") && typeof had.msgId !== "number";
+          if (!open || reason === "refused") expect(now, where).toEqual(had);
+          else if (reason === "late") expect(now?.state, where).toBe("late");
+          else expect([now?.state, typeof now?.lostAt], where).toEqual(["failed", "number"]);
+        }
         if (input.in === "ev" && input.ev.ev === "error" && input.ev.cmd === "send" && input.ev.cid != null) {
           const cid = input.ev.cid;
           const had = rowsBefore.find((p) => p.cid === cid);
@@ -206,7 +226,7 @@ describe("the sends slice's law", () => {
         }
         // the reads: a thread's rows and 'one on its way'
         for (const [p, a] of THREADS) expect(pendingOf(next, threadKey(p, a)), where).toBe(next.threads[threadKey(p, a)]?.pending ?? pendingOf(sendsInit(), "x"));
-        expect(sendingNow(next), where).toBe(rows.some((p) => p.state === "sending"));
+        expect(sendingNow(next), where).toBe(rows.some((p) => p.state === "sending" || p.state === "late"));
         s = next;
       }
     }

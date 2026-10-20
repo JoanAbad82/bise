@@ -12,8 +12,8 @@ import { entryOf } from '@/composer/entry';
 import type { Outgoing } from '@/composer/message';
 import { attachedCounts, segmentsOfParts } from '@/composer/partsback';
 import { rowExtra, type QueueRow } from '@/composer/QueueDrawer';
-import { useAgents, useCoreEvent, useStore } from '@/store/hooks';
-import type { Ev } from '@/store/types';
+import { useAgents, useCoreEvent, usePending, useStore } from '@/store/hooks';
+import { threadKey, type Ev, type Pending } from '@/store/types';
 import { shownName } from '@/agents/model';
 import type { Part } from '@/proto';
 
@@ -29,6 +29,19 @@ export function queueRow(q: Queued): QueueRow {
   return { id: q.id, text: words === '' ? q.text.split(/\s+/u).join(' ').trim() : words, extra: rowExtra(images, others) };
 }
 
+/**
+ * The drawer's rows: the hub's queue, then his queued sends the hub hasn't answered yet (sending, or
+ * late: the core gave up waiting): the hub was slow (stalled 90 s on 400fbd1eb) and his words
+ * showed nowhere (queue-drawer-fix, architect m_34866). Once answered, the hub's queue says where it
+ * is (its message id is its queued id; the hub sends its queue before the answer). Those have no
+ * hub id to act on: `sending`, their buttons off; their id is the send's cid. Pure.
+ */
+export function drawerRows(queued: readonly Queued[], pending: readonly Pending[]): readonly QueueRow[] {
+  const going = pending.filter((p) => p.mode === 'queued' && p.state !== 'failed' && typeof p.msgId !== 'number');
+  const rows = queued.map(queueRow);
+  return going.length === 0 ? rows : [...rows, ...going.map((p) => ({ ...queueRow({ id: p.cid, text: p.text, ...(p.parts === undefined ? {} : { parts: p.parts }) }), sending: true }))];
+}
+
 /** His taken-back message as a composer entry: his chips from his parts, else his words. Pure. */
 export function takenEntry(t: { readonly text: string; readonly parts?: readonly Part[] }): string {
   return entryOf(t.parts !== undefined && t.parts.length > 0 ? segmentsOfParts(t.parts) : [{ kind: 'text', text: t.text }]);
@@ -41,7 +54,8 @@ export function useThreadQueue(project: string, agent: string, composer: RefObje
 } {
   const store = useStore();
   const queued = useAgents(project).find((a) => a.name === agent)?.queued;
-  const rows = useMemo(() => (queued ?? []).map(queueRow), [queued]);
+  const pending = usePending(threadKey(project, agent));
+  const rows = useMemo(() => drawerRows(queued ?? [], pending), [queued, pending]);
   // the one take in flight: its id and why (edit: into the field; delete: kept for undo)
   const asked = useRef<{ id: number; how: 'edit' | 'delete' } | null>(null);
   const [deleted, setDeleted] = useState<{ text: string; parts?: readonly Part[] } | null>(null);
@@ -90,7 +104,7 @@ export function useThreadQueue(project: string, agent: string, composer: RefObje
     [store, project, agent],
   );
   const onEditNewest = useCallback(() => {
-    const id = rows.at(-1)?.id;
+    const id = rows.findLast((r) => r.sending !== true)?.id;
     if (id === undefined) return false;
     take(id, 'edit');
     return true;

@@ -311,6 +311,18 @@ pub enum CoreEv {
     Sent { text: String, voice: bool, shot: bool },
     /// his `agent_send` reached the agent's hub, `now` or `queued`
     AgentSent { agent: String, mode: Mode },
+    /// his send `cid` the core answered late (its hub said nothing in 30 s,
+    /// error reason "late"), settled at last (queue-drawer-fix, architect
+    /// m_34889): its hub's `SendResult`, or none when it went (its
+    /// connection lost, or 10 min passed). Main's ipc.ts gives it to the
+    /// window that sent it, as its window-local 'sent' or 'send_refused'.
+    SendAnswered {
+        project: Project,
+        agent: String,
+        cid: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        result: Option<crate::rpc::SendResult>,
+    },
     /// main's spoken answer of `turn`: the word `i` (0-based) is being
     /// said now
     Word { turn: u64, i: u64 },
@@ -362,7 +374,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "provider_check", "found", "away_summary", "plugins", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "provider_check", "found", "away_summary", "plugins", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "send_answered", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { answeredEv, refusedEv, RESTARTED_WORDS } from './local';
+import { answeredEv, lateAnsweredEv, refusedEv, RESTARTED_WORDS, sendRefusedEv } from './local';
 
 const P = 'acme-1a2b3c4d';
 const pick = { agent: 'perf', notice: 'you answered perf: warm', pick: 'warm', question: 'which bench?' };
@@ -28,5 +28,21 @@ describe("the window-local events main builds from the core's answers (ipc.ts, t
     expect(refusedEv(P, 9, "notification #9 isn't open")).toEqual({ ev: 'card_refused', project: P, card: 9, text: "notification #9 isn't open" });
     expect(refusedEv(P, 9, RESTARTED_WORDS)).toEqual({ ev: 'card_refused', project: P, card: 9, text: RESTARTED_WORDS });
     expect(RESTARTED_WORDS).toMatch(/^bise restarted before your answer was confirmed/);
+  });
+
+  it("a send the core answered with an error: send_refused, its reason typed from data, never from the words", () => {
+    const send = { cmd: 'send', project: P, agent: 'main', text: 'hi', cid: 3 };
+    const at = (reason: unknown) => sendRefusedEv(send, { data: { reason } });
+    expect(at('late')).toEqual({ ev: 'send_refused', project: P, agent: 'main', cid: 3, reason: 'late' });
+    expect(at('gone')).toMatchObject({ reason: 'gone' });
+    expect(at('undelivered')).toMatchObject({ reason: 'refused' });
+    expect(sendRefusedEv(send, {})).toMatchObject({ reason: 'refused' });
+    expect(sendRefusedEv({ cmd: 'answer', project: P, card: 9 }, { data: { reason: 'late' } })).toBeNull();
+  });
+
+  it("the core's send_answered: the window's sent with the hub's late result, or send_refused gone", () => {
+    expect(lateAnsweredEv({ ev: 'send_answered', project: P, agent: 'main', cid: 3, result: { msg_id: 41, reason: 'made' } })).toEqual({ ev: 'sent', project: P, agent: 'main', cid: 3, msg_id: 41, reason: 'made' });
+    expect(lateAnsweredEv({ ev: 'send_answered', project: P, agent: 'main', cid: 3 })).toEqual({ ev: 'send_refused', project: P, agent: 'main', cid: 3, reason: 'gone' });
+    expect(lateAnsweredEv({ ev: 'sent', text: 'x' })).toBeNull();
   });
 });

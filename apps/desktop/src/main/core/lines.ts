@@ -52,7 +52,13 @@ export type RpcId = number;
 /** What one line of the core is. */
 export type CoreLine =
   | { readonly kind: 'event'; readonly ev: Record<string, unknown> }
-  | { readonly kind: 'answer'; readonly id: RpcId | null; readonly result: unknown; readonly error: { readonly code: number; readonly message: string } | null };
+  | { readonly kind: 'answer'; readonly id: RpcId | null; readonly result: unknown; readonly error: RpcErr | null };
+/** A response's error: its code, words, and typed `data` (a send's `reason`: architect m_34889) as it came. */
+export interface RpcErr {
+  readonly code: number;
+  readonly message: string;
+  readonly data?: unknown;
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -83,7 +89,7 @@ export function readLine(line: string): CoreLine | null {
   if (!('result' in v) && !('error' in v)) return null;
   const id = typeof v['id'] === 'number' ? v['id'] : null;
   const e = v['error'];
-  const error = isObj(e) ? { code: typeof e['code'] === 'number' ? e['code'] : 0, message: typeof e['message'] === 'string' ? e['message'] : '' } : null;
+  const error = isObj(e) ? { code: typeof e['code'] === 'number' ? e['code'] : 0, message: typeof e['message'] === 'string' ? e['message'] : '', ...(isObj(e['data']) ? { data: e['data'] } : {}) } : null;
   return { kind: 'answer', id, result: v['result'] ?? null, error };
 }
 

@@ -60,7 +60,7 @@ function rpcSide(write, hubEvs) {
       const i = refusals.findIndex((r) => r.cmd === cmd.cmd && (r.card === undefined || r.card === cmd.card));
       if (i >= 0) {
         const [r] = refusals.splice(i, 1);
-        write(JSON.stringify({ jsonrpc: '2.0', id: m.id, error: { code: -32001, message: r.message } }));
+        write(JSON.stringify({ jsonrpc: '2.0', id: m.id, error: { code: -32001, message: r.message, ...(r.reason === undefined ? {} : { data: { reason: r.reason } }) } }));
       } else {
         // the events the hub's step sent before it answered (its rows without the card it closed):
         // the real hub broadcasts a step's cards before the request's response (FakeCore.result)

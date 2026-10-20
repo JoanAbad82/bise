@@ -21,8 +21,17 @@ import { Press } from '@/ds';
 
 // the list's own end, inside the scroller (designer's composer-strip A): the 12 px the bottom fade
 // lies on at the end, so it never fades the last row (thread.css .th-list-end)
-function ListEnd() {
-  return <div className="th-list-end" aria-hidden="true" />;
+// the tail (his sends on their way) is the scrollable list's own end, in Virtuoso's footer, never a
+// band pinned under the list (his « directement dans l'historique en bas, dans la partie
+// scrollable », queue-drawer-fix); given as Virtuoso's own `context` (a React context set
+// around it never reached its footer), so the footer component stays the same one
+function ListEnd({ context: tail }: { context?: ReactNode }) {
+  return (
+    <>
+      {tail}
+      <div className="th-list-end" aria-hidden="true" />
+    </>
+  );
 }
 // Virtuoso reads its `components` object (never undefined): the end always, the head when it has one
 const END = { Footer: ListEnd };
@@ -61,8 +70,8 @@ export interface ThreadListProps {
   onOlder: () => void;
   /** above the oldest row while `more` (a loading line) */
   head?: ReactNode;
-  /** under the newest row, outside the virtual list: drawn in the same
-   * frame as the change that adds it (his sends before they land) */
+  /** under the newest row, the scrollable list's end (its footer): drawn in
+   * the same frame as the change that adds it (his sends before they land) */
   tail?: ReactNode;
   testId?: string;
   ref?: Ref<ThreadListHandle>;
@@ -612,6 +621,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
     >
       <Virtuoso
         ref={virtuoso}
+        context={tail}
         scrollerRef={scrollerRef}
         style={FILL}
         data={keys}
@@ -636,7 +646,6 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         components={head !== undefined && more ? { Header: () => head, Footer: ListEnd } : END}
         increaseViewportBy={{ top: 600, bottom: 300 }}
       />
-      {tail}
       {!atBottom && !stuck && (
         <Press look="th-to-end" onClick={toEnd} data-testid="thread.to-end">
           ↓ back to the bottom{seen.unseen > 0 ? ` · ${String(seen.unseen)} new` : ''}

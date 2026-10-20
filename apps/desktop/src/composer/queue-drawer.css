@@ -95,6 +95,11 @@
   flex: none;
   color: var(--c-text-3);
 }
+/* on its way: the hub doesn't list it yet (queue-drawer-fix): its words in text-3, like a sending
+   bubble, its buttons off */
+.b-qdrawer .r[data-state="sending"] {
+  color: var(--c-text-3);
+}
 .b-qdrawer .acts {
   display: flex;
   align-items: center;

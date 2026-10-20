@@ -16,7 +16,7 @@ import { Latest } from '../../shared/latest';
 import { CoreProcess } from './process';
 import { DictationRoutes, type Route } from './dictation';
 import { SubRoutes } from './subs';
-import { answeredEv, refusedEv, RESTARTED_WORDS } from '../../shared/local';
+import { answeredEv, lateAnsweredEv, refusedEv, RESTARTED_WORDS, sendRefusedEv } from '../../shared/local';
 
 let core: CoreProcess | null = null;
 // the last state events, for a window or a main-side listener that comes after they went out
@@ -186,6 +186,16 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         return lastReport;
       },
       onEvent: (ev) => {
+        // a send the core answered late, settled at last: the window that sent it only, as its 'sent'
+        // or 'send_refused' gone (queue-drawer-fix, architect m_34889)
+        const late = lateAnsweredEv(ev);
+        if (late !== null) {
+          const sk = sendKey({ cmd: 'send', project: ev['project'], agent: ev['agent'], cid: ev['cid'] });
+          const to = sk === null ? undefined : sends.get(sk);
+          if (sk !== null) sends.delete(sk);
+          if (to !== undefined) toWindow({ to: 'window', window: to, ev: late });
+          return;
+        }
         // a dictation's words: its window only, never kept, never main's listeners
         const r = dictations.route(ev);
         if (r.to !== 'all') {
@@ -213,6 +223,16 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         if (ev !== null) toWindow({ to: 'window', window: to, ev });
       },
       onRefused: (cmd, error) => {
+        // his send answered with an error: its window hears why (typed); a late one stays in `sends`
+        // for the core's 'send_answered' (its hub may still make it)
+        const sk = sendKey(cmd);
+        const sender = sk === null ? undefined : sends.get(sk);
+        const refused = sendRefusedEv(cmd, error);
+        if (sk !== null && sender !== undefined && refused !== null) {
+          if (refused.ev === 'send_refused' && refused.reason !== 'late') sends.delete(sk);
+          toWindow({ to: 'window', window: sender, ev: refused });
+          return;
+        }
         const ak = answerKey(cmd);
         const by = ak === null ? undefined : answers.get(ak);
         if (ak === null || by === undefined) return;

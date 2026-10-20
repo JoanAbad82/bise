@@ -102,6 +102,8 @@ export const TAGS = {
   hub: true,
   sent: true,
   agent_sent: true,
+  // main's ipc.ts gives it to its window as 'sent' or 'send_refused' (never seen raw here)
+  send_answered: true,
   word: true,
   phase: true,
   page: true,
@@ -198,7 +200,9 @@ export interface Pending {
   /** the thread he typed it in when not `agent`'s (at-start): a retry leaves its trace there too */
   readonly from?: string;
   readonly at_ms: number;
-  readonly state: 'sending' | 'failed';
+  /** late: the core gave up waiting for its hub's answer (30 s), which may still make it: drawn as
+   *  sending, no retry; its end comes as the core's late 'sent' (queue-drawer-fix) */
+  readonly state: 'sending' | 'late' | 'failed';
   readonly why?: string;
   /** A1: the message id the hub answered the send with (echo.ts); absent: not answered yet (a
    *  send answered with no message has no row: send-reason) */

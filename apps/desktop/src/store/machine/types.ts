@@ -8,7 +8,7 @@
 import type { Artifact, Mode, Part, ProjectRow } from "@/proto";
 import type { OptAct } from "@/proto/rows";
 import type { BiseApi, CoreCmd, CoreState } from "@/shared/api";
-import type { Sent } from "../echo";
+import type { SendRefused, Sent } from "../echo";
 import type { Acted } from "../acted";
 import type { AnswerFrom, AnsweredFrom, CardAnswered } from "../answered";
 import type { Refused } from "../refused";
@@ -24,6 +24,8 @@ export type WinEv =
   | { readonly ev: "card_refused"; readonly project: string; readonly card: number; readonly text: string }
   /** turn/send's result (A1): his send `cid` has its message id (null: the hub made none) */
   | ({ readonly ev: "sent" } & Sent)
+  /** the core answered his send `cid` with an error of its own (late, gone) or the hub's (queue-drawer-fix) */
+  | ({ readonly ev: "send_refused" } & SendRefused)
   /** main's connection to the core changed (CorePort.onState); the facts hold the new state already */
   | { readonly ev: "core"; readonly state: CoreState };
 

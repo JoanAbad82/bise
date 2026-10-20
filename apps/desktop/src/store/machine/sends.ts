@@ -14,7 +14,7 @@
 // An input that changes nothing gives the same state back and no output. Pure. Owner: amb-core.
 import type { Entry } from "@/proto";
 import { common } from "@/proto/words.gen";
-import { answered, echoOf, keepLanded, type Sent } from "../echo";
+import { answered, echoOf, keepLanded, type SendRefused, type Sent } from "../echo";
 import { threadKey, type Ev, type EvOf, type Pending } from "../types";
 import type { HubFacts, Input, Intent, Output } from "./types";
 
@@ -42,10 +42,13 @@ export function pendingOf(s: SendsState, key: string): readonly Pending[] {
   return s.threads[key]?.pending ?? NO_ROWS;
 }
 
-/** A message of his is still on its way (a row sending): the app's update waits for it. */
+/** A message of his is still on its way (a row sending, or late): the app's update waits for it. */
 export function sendingNow(s: SendsState): boolean {
-  return Object.values(s.threads).some((t) => t.pending.some((p) => p.state === "sending"));
+  return Object.values(s.threads).some((t) => t.pending.some(onItsWay));
 }
+
+/** A row not settled yet: sending, or late (the core gave up waiting, its hub may still make it). */
+const onItsWay = (p: Pending): boolean => p.state === "sending" || p.state === "late";
 
 type Step = readonly [SendsState, readonly Output[]];
 
@@ -56,6 +59,7 @@ export function stepSends(s: SendsState, f: HubFacts, input: Input): Step {
       return evCame(s, input.ev);
     case "win":
       if (input.ev.ev === "sent") return [sentCame(s, input.ev), NONE];
+      if (input.ev.ev === "send_refused") return [sendRefused(s, input.ev, input.at_ms), NONE];
       if (input.ev.ev === "core") return [input.ev.state === "down" ? failAll(s, common.not_sent, input.at_ms) : s, NONE];
       return [s, NONE];
     case "do":
@@ -114,6 +118,25 @@ function sentCame(s: SendsState, sent: Sent): SendsState {
 }
 
 /**
+ * The core answered his send `cid` with an error (queue-drawer-fix, architect m_34889). Late: its
+ * hub said nothing in 30 s and may still make it: the row turns late (drawn sending, no retry),
+ * its end comes as the core's late 'sent' (then his echo by its id) or 'send_refused' gone. Gone:
+ * its hub's connection went (or 10 min passed): 'not sent', with lostAt as for a core gone (echo.ts
+ * takes it by its words from an entry written by then). Refused: the hub's own error event with
+ * the cid settles it (sendFailed). Only a row with no message id yet.
+ */
+function sendRefused(s: SendsState, r: SendRefused, at: number): SendsState {
+  if (r.reason === "refused") return s;
+  const key = threadKey(r.project, r.agent);
+  const t = s.threads[key];
+  const p = t?.pending.find((x) => x.cid === r.cid);
+  if (t === undefined || p === undefined || !onItsWay(p) || typeof p.msgId === "number") return s;
+  const next: Pending = r.reason === "late" ? { ...p, state: "late" } : { ...p, state: "failed", why: common.not_sent, lostAt: at };
+  if (next.state === p.state) return s;
+  return withThread(s, key, { ...t, pending: t.pending.map((x) => (x.cid === r.cid ? next : x)) });
+}
+
+/**
  * G: his send failed. With its cid: refused, his row shows 'not delivered' with retry; undelivered,
  * the hub wrote its undelivered entry in the thread, which stands in for his row (gone). Without a
  * cid (an older core, shim 'sends-oldest'): the oldest row on its way of that project fails.
@@ -153,9 +176,9 @@ function failOldest(s: SendsState, project: string | null, why: string): SendsSt
 function failAll(s: SendsState, why: string, at: number): SendsState {
   let next = s;
   for (const [key, t] of Object.entries(s.threads)) {
-    if (!t.pending.some((p) => p.state === "sending")) continue;
+    if (!t.pending.some(onItsWay)) continue;
     const pending = t.pending.map((p) =>
-      p.state !== "sending" ? p : { ...p, state: "failed" as const, why, ...(typeof p.msgId === "number" ? {} : { lostAt: at }) },
+      !onItsWay(p) ? p : { ...p, state: "failed" as const, why, ...(typeof p.msgId === "number" ? {} : { lostAt: at }) },
     );
     next = withThread(next, key, { ...t, pending });
   }

@@ -522,6 +522,7 @@ impl Core {
                 c.hub.close();
                 c.rpc.lost(super::hub_rpc::GONE);
                 self.replies.extend(c.rpc.take_replies());
+                self.answered_late(&id, c.rpc.take_late_sends());
             }
             close = true;
         }
@@ -590,6 +591,7 @@ impl Core {
                 c.hub.close();
                 c.rpc.lost(super::hub_rpc::GONE);
                 self.replies.extend(c.rpc.take_replies());
+                self.answered_late(&id, c.rpc.take_late_sends());
             }
         }
         for id in want {
@@ -614,8 +616,25 @@ impl Core {
     /// The app's requests the connections answered, for the run loop
     /// ([`Core::take_replies`]), before the events they caused.
     fn take_rpc_replies(&mut self) {
-        for c in self.hubs.conns.values_mut() {
+        let mut late = Vec::new();
+        for (id, c) in self.hubs.conns.iter_mut() {
             self.replies.extend(c.rpc.take_replies());
+            late.push((id.clone(), c.rpc.take_late_sends()));
+        }
+        for (id, l) in late {
+            self.answered_late(&id, l);
+        }
+    }
+
+    /// The sends this core answered late, settled at last: each to the
+    /// app as `CoreEv::SendAnswered` (hub_rpc.rs `LateSend`), so his row
+    /// meets its echo by the hub's message id, or says it went.
+    fn answered_late(&mut self, project: &str, late: Vec<super::hub_rpc::LateSend>) {
+        for l in late {
+            if l.result.is_none() {
+                eprintln!("ambient-core: hub {project}: send {} to {} never answered (its connection went, or {} s passed)", l.cid, l.agent, super::hub_rpc::SEND_KEPT.as_secs());
+            }
+            self.ev(CoreEv::SendAnswered { project: project.to_string(), agent: l.agent, cid: l.cid, result: l.result });
         }
     }
 
@@ -703,6 +722,7 @@ impl Core {
         };
         c.rpc.lost(&text);
         self.replies.extend(c.rpc.take_replies());
+        self.answered_late(id, c.rpc.take_late_sends());
         for (cmd, _, app) in c.pending {
             let tag = cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
             let cid = cmd.get("cid").and_then(Value::as_u64);
@@ -878,10 +898,11 @@ impl Core {
 
     /// Every project connection closed (the core's end).
     pub(super) fn close_projects(&mut self) {
-        for (_, mut c) in std::mem::take(&mut self.hubs.conns) {
+        for (id, mut c) in std::mem::take(&mut self.hubs.conns) {
             c.hub.close();
             c.rpc.lost(super::hub_rpc::GONE);
             self.replies.extend(c.rpc.take_replies());
+            self.answered_late(&id, c.rpc.take_late_sends());
         }
     }
 }

@@ -18,6 +18,9 @@ export interface QueueRow {
   readonly text: string;
   /** what goes with them, in text-3 after the words (' · 1 image'); '' none */
   readonly extra: string;
+  /** on its way: the hub doesn't list it yet, so nothing to act on (its buttons off; `id` is the
+   *  send's cid, never a hub id) */
+  readonly sending?: boolean;
 }
 
 export interface QueueDrawerProps {
@@ -106,8 +109,9 @@ function Row({ row, who, fieldEmpty, onSteer, onEdit, onDelete, testId }: { row:
       ro.disconnect();
     };
   }, [row.text]);
+  const off = row.sending === true;
   const keys = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey || off) return;
     if (e.key === "Enter") onSteer();
     else if (e.key === "e" && fieldEmpty) onEdit();
     else if (e.key === "Backspace" || e.key === "Delete") onDelete();
@@ -115,7 +119,7 @@ function Row({ row, who, fieldEmpty, onSteer, onEdit, onDelete, testId }: { row:
     e.preventDefault();
   };
   return (
-    <div className="r" role="listitem" tabIndex={0} onKeyDown={keys} aria-label={row.text} data-testid={testId}>
+    <div className="r" role="listitem" tabIndex={0} onKeyDown={keys} aria-label={row.text} data-state={off ? "sending" : undefined} data-testid={testId}>
       <span className="w" {...tipAttrs(cut === null ? undefined : row.text)}>
         <span ref={words} className="t" data-testid={`${testId}.text`}>
           {cut ?? row.text}
@@ -123,16 +127,16 @@ function Row({ row, who, fieldEmpty, onSteer, onEdit, onDelete, testId }: { row:
         {row.extra !== "" && <span className="x">{row.extra}</span>}
       </span>
       <span className="acts">
-        <IconButton size="bar" label={composer.queue_send_now({ who })} keys="⏎" onClick={onSteer} testId={`${testId}.steer`}>
+        <IconButton size="bar" label={composer.queue_send_now({ who })} keys="⏎" disabled={off} onClick={onSteer} testId={`${testId}.steer`}>
           <Icon d={ICONS.steer} />
         </IconButton>
         {/* a draft in the field: edit waits; the tip on its wrapper says why (a disabled button gets no hover) */}
         <span className={cx("hold", !fieldEmpty && "off")} {...tipAttrs(fieldEmpty ? undefined : composer.queue_edit_wait)}>
-          <IconButton size="bar" label={composer.queue_edit} keys="↑" disabled={!fieldEmpty} onClick={onEdit} testId={`${testId}.edit`}>
+          <IconButton size="bar" label={composer.queue_edit} keys="↑" disabled={off || !fieldEmpty} onClick={onEdit} testId={`${testId}.edit`}>
             <Icon d={ICONS.edit} />
           </IconButton>
         </span>
-        <IconButton size="bar" label={composer.queue_delete} keys="⌫" onClick={onDelete} testId={`${testId}.delete`}>
+        <IconButton size="bar" label={composer.queue_delete} keys="⌫" disabled={off} onClick={onDelete} testId={`${testId}.delete`}>
           <Icon d={ICONS.delete} />
         </IconButton>
       </span>
@@ -199,7 +203,7 @@ export function QueueDrawer({ rows, who, fieldEmpty, deleted, onSteer, onEdit, o
         <div ref={list} className="rows" role="list" onScroll={look} data-above={hidden.above || undefined} data-below={hidden.below || undefined} data-testid={`${testId}.rows`}>
           {rows.map((r, i) => (
             <Row
-              key={r.id}
+              key={r.sending === true ? `c${String(r.id)}` : r.id}
               row={r}
               who={who}
               fieldEmpty={fieldEmpty}

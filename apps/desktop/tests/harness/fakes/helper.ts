@@ -105,10 +105,11 @@ export class FakeCore extends Stub<CoreEv | HubEv, AppCmd | HubCmd> {
 
   /**
    * The next request for `cmd` (and `card`) is refused with `message`, as the real core answers its
-   * hub's refusal to that very request (architect m_23524: one request, one answer).
+   * hub's refusal to that very request (architect m_23524: one request, one answer). `reason`: its
+   * typed `data.reason` (a send the core gave up on: 'late' or 'gone', queue-drawer-fix).
    */
-  async refuse(cmd: string, card: number | undefined, message: string): Promise<void> {
-    await this.raw([JSON.stringify({ harness: 'refuse', cmd, ...(card === undefined ? {} : { card }), message })]);
+  async refuse(cmd: string, card: number | undefined, message: string, reason?: string): Promise<void> {
+    await this.raw([JSON.stringify({ harness: 'refuse', cmd, ...(card === undefined ? {} : { card }), message, ...(reason === undefined ? {} : { reason }) })]);
   }
 
   /**

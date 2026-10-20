@@ -18,7 +18,13 @@
 //!   result as is (card/answer's `AnswerResult`, turn/send's `SendResult`),
 //!   `{}` when it came as an event, the hub's error as is; the connection
 //!   lost ([`GONE`]) or no answer in [`ASK_LATE`] ([`LATE`]): an error,
+//!   its reason typed in `data.reason` ([`REASON_LATE`], [`REASON_GONE`]),
 //!   never a request left waiting ([`RpcConn::take_replies`]);
+//! - a send answered [`LATE`] is kept for its hub's own response (the hub
+//!   may still make his message): that response, its connection's loss or
+//!   [`SEND_KEPT`] settles it as a [`LateSend`] ([`RpcConn::take_late_sends`],
+//!   the core's `send_answered`), so his row never stays 'sending…'
+//!   (queue-drawer-fix, architect m_34889);
 //! - a hub that doesn't serve `initialize` (from before client-protocol,
 //!   v2026.10.2-30) is [`Read::NotRpc`]: the connection is refused with
 //!   `bise_proto::rpc::HUB_OLDER`'s words, nothing more is said to it.
@@ -39,6 +45,30 @@ pub const GONE: &str = "its hub went away before it answered. try again in a mom
 pub const LATE: &str = "its hub didn't answer. try again in a moment.";
 /// How long an app request waits for its hub's response.
 pub const ASK_LATE: std::time::Duration = std::time::Duration::from_secs(30);
+/// How long a send answered [`LATE`] waits for its hub's own response
+/// (architect m_34889): after it, the core says it gone.
+pub const SEND_KEPT: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// Why the core answered an app request with an error of its own, typed
+/// in the error's `data.reason` (the window never reads the words).
+pub const REASON_LATE: &str = "late";
+pub const REASON_GONE: &str = "gone";
+
+/// A send the core answered [`LATE`], settled by its hub at last
+/// (queue-drawer-fix, architect m_34889): its `SendResult`, or none when
+/// its connection went or [`SEND_KEPT`] passed first (gone). The core
+/// says it as `CoreEv::SendAnswered`, so his row meets its echo by the
+/// hub's message id and never stays 'sending…'.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LateSend {
+    pub agent: String,
+    pub cid: u64,
+    pub result: Option<rpc::SendResult>,
+}
+
+fn core_err(why: &str, reason: &str) -> RpcError {
+    RpcError { data: Some(rpc::ErrorData { kind: None, reason: Some(reason.to_string()) }), ..RpcError::new(rpc::code::REFUSED, why) }
+}
 
 /// One request waiting for its response.
 #[derive(Clone, Debug, PartialEq)]
@@ -46,6 +76,10 @@ struct Waiting {
     method: &'static str,
     tag: String,
     cid: Option<u64>,
+    /// a send's agent (none for any other request)
+    agent: Option<String>,
+    /// a send answered [`LATE`] already, kept for its hub's own response
+    late: bool,
     /// the app's request it answers (none: the core's own, a subscribe
     /// at a welcome, voice mode's)
     app: Option<Id>,
@@ -77,6 +111,8 @@ pub struct RpcConn {
     waiting: BTreeMap<u64, Waiting>,
     /// the app's requests answered, for the core to write ([`RpcConn::take_replies`])
     replies: Vec<Response>,
+    /// sends answered late, settled since ([`RpcConn::take_late_sends`])
+    late_sends: Vec<LateSend>,
     wm: Watermark,
     /// `initialize` answered on this connection
     pub ready: bool,
@@ -89,7 +125,8 @@ impl RpcConn {
     pub fn initialize(&mut self, version: &str) -> Value {
         self.lost(GONE);
         let replies = std::mem::take(&mut self.replies);
-        *self = RpcConn { replies, ..RpcConn::default() };
+        let late_sends = std::mem::take(&mut self.late_sends);
+        *self = RpcConn { replies, late_sends, ..RpcConn::default() };
         let params = serde_json::to_value(InitializeParams::new("bise-ambient-core", version)).unwrap_or_default();
         Message::Request(Request::new(Id::Num(INIT), rpc::INITIALIZE, params)).to_value()
     }
@@ -97,7 +134,7 @@ impl RpcConn {
     /// `hub/read` (a gap): its result replaces the state.
     pub fn read_again(&mut self) -> Value {
         self.next += 1;
-        self.waiting.insert(self.next, Waiting { method: rpc::HUB_READ, tag: String::new(), cid: None, app: None, at: Instant::now() });
+        self.waiting.insert(self.next, Waiting { method: rpc::HUB_READ, tag: String::new(), cid: None, agent: None, late: false, app: None, at: Instant::now() });
         Message::Request(Request::new(Id::Num(self.next), rpc::HUB_READ, Value::Object(Default::default()))).to_value()
     }
 
@@ -110,7 +147,8 @@ impl RpcConn {
         let req = rpc::request(Id::Num(self.next), &cmd)?;
         let row = rpc::method_row(&req.method)?;
         let cid = v.get("cid").and_then(Value::as_u64);
-        self.waiting.insert(self.next, Waiting { method: row.method, tag: row.cmd.to_string(), cid, app, at: now });
+        let agent = if row.cmd == "send" { v.get("agent").and_then(Value::as_str).map(String::from) } else { None };
+        self.waiting.insert(self.next, Waiting { method: row.method, tag: row.cmd.to_string(), cid, agent, late: false, app, at: now });
         Some(Message::Request(req).to_value())
     }
 
@@ -119,24 +157,54 @@ impl RpcConn {
         std::mem::take(&mut self.replies)
     }
 
+    /// The sends answered late that their hub settled since the last call.
+    pub fn take_late_sends(&mut self) -> Vec<LateSend> {
+        std::mem::take(&mut self.late_sends)
+    }
+
+    /// A late send kept: its end, `result` none for gone.
+    fn settle_late(&mut self, w: Waiting, result: Option<rpc::SendResult>) {
+        if let (Some(agent), Some(cid)) = (w.agent, w.cid) {
+            self.late_sends.push(LateSend { agent, cid, result });
+        }
+    }
+
     /// The connection is lost (its hub went, a new `initialize`, the core
     /// lets it go): every app request still waiting on it is answered with
     /// `why` (the hub never said; it may or may not have acted).
     pub fn lost(&mut self, why: &str) {
         for (_, w) in std::mem::take(&mut self.waiting) {
-            if let Some(app) = w.app {
-                self.replies.push(Response::err(Some(app), RpcError::new(rpc::code::REFUSED, why)));
+            if w.late {
+                self.settle_late(w, None);
+            } else if let Some(app) = w.app {
+                self.replies.push(Response::err(Some(app), core_err(why, REASON_GONE)));
             }
         }
     }
 
     /// The app requests waiting since before `before` get `why` as their
-    /// error, and their hub's late response is dropped.
+    /// error (reason [`REASON_LATE`]). Their hub's late response is
+    /// dropped, but a send's: the hub may still make his message, so it is
+    /// kept until that response ([`LateSend`]), its connection's loss, or
+    /// [`SEND_KEPT`] after it was asked (then gone).
     pub fn late(&mut self, before: Instant, why: &str) {
         let late: Vec<u64> = self.waiting.iter().filter(|(_, w)| w.app.is_some() && w.at < before).map(|(id, _)| *id).collect();
         for id in late {
-            if let Some(app) = self.waiting.remove(&id).and_then(|w| w.app) {
-                self.replies.push(Response::err(Some(app), RpcError::new(rpc::code::REFUSED, why)));
+            let Some(mut w) = self.waiting.remove(&id) else { continue };
+            if let Some(app) = w.app.take() {
+                self.replies.push(Response::err(Some(app), core_err(why, REASON_LATE)));
+            }
+            if w.agent.is_some() && w.cid.is_some() {
+                w.late = true;
+                self.waiting.insert(id, w);
+            }
+        }
+        // the kept sends past their bound: gone
+        let Some(bound) = before.checked_sub(SEND_KEPT.saturating_sub(ASK_LATE)) else { return };
+        let gone: Vec<u64> = self.waiting.iter().filter(|(_, w)| w.late && w.at < bound).map(|(id, _)| *id).collect();
+        for id in gone {
+            if let Some(w) = self.waiting.remove(&id) {
+                self.settle_late(w, None);
             }
         }
     }
@@ -195,6 +263,13 @@ impl RpcConn {
         }
         let result = r.result.unwrap_or(Value::Null);
         let read = self.result(project, &w, result.clone());
+        if w.late {
+            // a send answered late: its hub's result at last (an older hub's
+            // {} reads as a SendResult with neither field, as the window's 'sent')
+            let sr = serde_json::from_value::<rpc::SendResult>(result).unwrap_or(rpc::SendResult { msg_id: None, reason: None });
+            self.settle_late(w, Some(sr));
+            return read;
+        }
         // the app's request gets the hub's result as is (card/answer's
         // AnswerResult, turn/send's SendResult), or `{}` when it came as an
         // event already (a thread's page, command/run's words): never twice
@@ -380,5 +455,60 @@ mod tests {
         assert_eq!(c.read("shop", json!({"ok": false, "error": "hub.sock does not serve the op \"\""})), Read::NotRpc);
         let refused = serde_json::to_value(Response::err(Some(Id::Num(0)), RpcError::new(rpc::code::REFUSED, "an agent's process"))).unwrap();
         assert_eq!(c.read("shop", refused), Read::Refused("an agent's process".into()));
+    }
+
+    fn send_req(c: &mut RpcConn, cid: u64, app: u64, t: Instant) -> u64 {
+        let req = c.request(&json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now", "cid": cid}), Some(Id::Num(app)), t).unwrap();
+        req["id"].as_u64().unwrap()
+    }
+
+    #[test]
+    fn a_send_answered_late_is_kept_for_its_hubs_answer_then_gone_at_the_bound() {
+        let ms = std::time::Duration::from_millis;
+        let t0 = Instant::now();
+        let mut c = RpcConn::default();
+        c.initialize("v1");
+        c.read("shop", init_result(4));
+        // the hub answers the send 40 s later: LATE (typed) at 30 s, then its msg_id, once
+        let id = send_req(&mut c, 12, 5, t0);
+        c.late(t0 + ASK_LATE + ms(1), LATE);
+        let r = c.take_replies();
+        let e = r[0].error.clone().unwrap();
+        assert_eq!((r.len(), r[0].id.clone(), e.data.and_then(|d| d.reason)), (1, Some(Id::Num(5)), Some(REASON_LATE.to_string())), "the reason typed, never the words");
+        assert!(c.take_late_sends().is_empty(), "not settled yet");
+        let resp = serde_json::to_value(Response::ok(Id::Num(id), json!({"msg_id": 41, "reason": "made"}))).unwrap();
+        c.read("shop", resp.clone());
+        assert!(c.take_replies().is_empty(), "the app's request was answered once");
+        let made = rpc::SendResult { msg_id: Some(41), reason: Some(rpc::SendReason::Made) };
+        assert_eq!(c.take_late_sends(), vec![LateSend { agent: "main".into(), cid: 12, result: Some(made) }]);
+        c.read("shop", resp);
+        assert!(c.take_late_sends().is_empty(), "settled once");
+        // a hub that never answers: nothing kept after SEND_KEPT, said gone once
+        send_req(&mut c, 13, 6, t0);
+        c.late(t0 + ASK_LATE + ms(1), LATE);
+        c.take_replies();
+        // (`late`'s `before` is the core's now less ASK_LATE, hubs.rs)
+        c.late(t0 + SEND_KEPT - ASK_LATE - ms(1), LATE);
+        assert!(c.take_late_sends().is_empty(), "within the bound");
+        c.late(t0 + SEND_KEPT - ASK_LATE + ms(1), LATE);
+        assert_eq!(c.take_late_sends(), vec![LateSend { agent: "main".into(), cid: 13, result: None }]);
+        assert!(c.waiting.is_empty(), "nothing left in the map after the bound");
+        // its connection goes first: gone; a request still waiting gets GONE, typed gone
+        send_req(&mut c, 14, 7, t0);
+        c.late(t0 + ASK_LATE + ms(1), LATE);
+        c.take_replies();
+        send_req(&mut c, 15, 8, t0 + ASK_LATE);
+        c.lost(GONE);
+        assert_eq!(c.take_late_sends(), vec![LateSend { agent: "main".into(), cid: 14, result: None }]);
+        let r = c.take_replies();
+        assert_eq!((r.len(), r[0].id.clone(), r[0].error.clone().and_then(|e| e.data).and_then(|d| d.reason)), (1, Some(Id::Num(8)), Some(REASON_GONE.to_string())));
+        assert!(c.waiting.is_empty());
+        // a late card answer is still dropped, never kept
+        let req = c.request(&json!({"cmd": "answer", "project": "shop", "card": 3, "reply": "1"}), Some(Id::Num(9)), t0).unwrap();
+        c.late(t0 + ASK_LATE + ms(1), LATE);
+        c.take_replies();
+        assert!(c.waiting.is_empty());
+        c.read("shop", serde_json::to_value(Response::ok(Id::Num(req["id"].as_u64().unwrap()), json!({}))).unwrap());
+        assert!(c.take_late_sends().is_empty() && c.take_replies().is_empty());
     }
 }

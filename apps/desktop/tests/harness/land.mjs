@@ -66,6 +66,9 @@ export const LAND = [
   // his queued messages: the drawer's rows and ops; a tab-queued send never a bubble in the thread
   // until the hub says it, then his bubble at its place (his « pas dans l'historique », queued-rows)
   'checks/thread/queue-drawer.spec.ts',
+  // a slow hub (queue-drawer-fix): a queued send in the drawer before the hub lists it, a late echo
+  // clears 'sending…' (no ghost), his sending rows scroll with the thread (no sticky band)
+  'checks/thread/send-late.spec.ts',
   'checks/composer/at-files.spec.ts',
   // the @ / $ lists stay the same node, visible with rows, on every frame while he types (his flicker, at-steady)
   'checks/composer/picker-steady.spec.ts',

@@ -58,7 +58,7 @@ import {
 import { applyTyped } from "./apply";
 import { answers, listsLive, merged, planJump, planNewer } from "./window";
 import { trim } from "./trim";
-import { sentOf } from "./echo";
+import { sendRefusedOf, sentOf } from "./echo";
 import type { Thread } from "./base";
 import { cardAnsweredOf, cardKeyOf, type AnsweredFrom } from "./answered";
 import { StoreVoice } from "./voice";
@@ -85,6 +85,8 @@ export class Store extends StoreVoice {
     // A1: the window-local 'sent' (main's ipc.ts): his send `cid` has its message id. Always a known event.
     const sent = sentOf(raw);
     if (sent !== null) return this.settled({ ev: "sent", ...sent });
+    const late = sendRefusedOf(raw);
+    if (late !== null) return this.settled({ ev: "send_refused", ...late });
     // main's window-local answers to this window's own card requests (machine/types.ts WinEv)
     const done = cardAnsweredOf(raw);
     if (done !== null) return this.settled({ ev: "card_answered", ...done });

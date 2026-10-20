@@ -36,12 +36,11 @@
 .th-list-end {
   height: var(--s-3);
 }
-/* his sends on their way, after the list (ThreadRows tail): they take the list end's 12 px and end
-   on their own, so a bubble sits where its entry lands and nothing moves at its echo (bubble-parts) */
+/* his sends on their way, the list's end in its footer (ThreadRows tail, ThreadList ListEnd): right
+   after the last row, the list end's 12 px after them, so a bubble sits where its entry lands and
+   nothing moves at its echo (bubble-parts); they scroll with the thread (queue-drawer-fix) */
 .th-tail {
   position: relative;
-  margin-top: calc(-1 * var(--s-3));
-  padding-bottom: var(--s-3);
 }
 
 /* scrolled up: back to the newest, with what came meanwhile */

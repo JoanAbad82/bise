@@ -53,6 +53,8 @@
 {"ev":"hub","up":false,"workspace":"/Users/camille/.bise","project":"home-0c0ffee0","note":"updating the bise running here to v2026.10.2-30… your agents keep running."}
 {"ev":"sent","text":"is the build green?","voice":true,"shot":false}
 {"ev":"agent_sent","agent":"perf","mode":"queued"}
+{"ev":"send_answered","project":"shop-0badc0de","agent":"main","cid":12,"result":{"msg_id":41,"reason":"made"}}
+{"ev":"send_answered","project":"shop-0badc0de","agent":"main","cid":13}
 {"ev":"word","turn":1,"i":8}
 {"ev":"phase","phase":"working","line":"main is reading the logs"}
 {"ev":"phase","phase":"listening","page":{"id":"weekly-update","title":"Weekly update"}}

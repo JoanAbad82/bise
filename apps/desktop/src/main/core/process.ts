@@ -13,7 +13,7 @@ import { childEnv } from '../childenv';
 import { Backoff, coreArgs, type CoreConfig } from './env';
 import { constants } from 'node:os';
 import { crashLoop, earlyEnd, exitOf, failedToStart, reasonOf } from './exit';
-import { INITIALIZED_LINE, initializeLine, LineSplitter, notAnEventLog, readLine, refusedLog, requestOf } from './lines';
+import { INITIALIZED_LINE, initializeLine, LineSplitter, notAnEventLog, readLine, refusedLog, requestOf, type RpcErr } from './lines';
 import type { CoreExit, CoreState } from '../../shared/api';
 
 /** At most this much of a run's stderr is read back from the log at its end. */
@@ -32,7 +32,7 @@ export interface CoreHooks {
   /** a request's result (not its error): the command as the window sent it, and what the core answered (A1) */
   readonly onAnswer?: (cmd: Readonly<Record<string, unknown>>, result: unknown) => void;
   /** a request's error: the command as the window sent it, and the core's or its hub's words (architect m_23524) */
-  readonly onRefused?: (cmd: Readonly<Record<string, unknown>>, error: { readonly code: number; readonly message: string }) => void;
+  readonly onRefused?: (cmd: Readonly<Record<string, unknown>>, error: RpcErr) => void;
 }
 
 export interface CoreOptions {
