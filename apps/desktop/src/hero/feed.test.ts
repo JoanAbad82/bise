@@ -4,17 +4,21 @@
 import { describe, expect, it } from 'vitest';
 import { FILM_S, PAGE } from './cast';
 import { FEED_ROWS, feedAt } from './feed';
+import { FOLD_LINE_S } from './fold';
 import { foldOf, PAGE_W_MAX, pageBox } from './page';
 
 describe('the feed', () => {
   it('types his first line, then sends it and folds it into his plane', () => {
-    const typing = feedAt(3.5);
+    const typing = feedAt(3.4);
     expect(typing.rows).toEqual([]);
     expect('build a shop for kiln, my pottery studio'.startsWith(typing.typing)).toBe(true);
     expect(typing.typing.length).toBeGreaterThan(0);
-    expect(feedAt(4.25).rows[0]?.words).toBe('build a shop for kiln, my pottery studio');
-    expect(feedAt(4.4).rows[0]?.folding).not.toBeNull();
-    expect(feedAt(5).rows[0]?.folding).toBeNull();
+    // typed before its fold starts, FOLD_LINE_S before its plane (4.3): the fold ends as the 3D plane leaves
+    expect(feedAt(4.3 - FOLD_LINE_S).rows[0]?.words).toBe('build a shop for kiln, my pottery studio');
+    expect(feedAt(4.0).rows[0]?.folding).not.toBeNull();
+    expect(feedAt(4.3).rows[0]?.folding).toBeNull();
+    expect(feedAt(4.4).rows[0]?.back).not.toBeNull();
+    expect(feedAt(5).rows[0]).toMatchObject({ folding: null, back: null });
   });
 
   it("shows bise's question while it waits, the answer's field, then the choice he picks", () => {

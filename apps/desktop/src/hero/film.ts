@@ -8,6 +8,7 @@
 // Owner: hero-town.
 import type { Label } from '../bims/model';
 import { siteOf, toScreen, type Fit } from '../bims/render/camera';
+import { glideHeading, startPx } from '../bims/render/plane';
 import { makeTownRenderer } from '../bims/render/town';
 import { growOf } from '../bims/growth';
 import { layoutOf } from '../bims/maps';
@@ -15,10 +16,11 @@ import { sleepers } from '../bims/zzz';
 import { NO_ATTENTION, type Step } from '../bims/office-driver';
 import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
-import { BUBBLE_S, BUBBLES, CAST, FOLD_S, PAGE, REDUCED_T, SHOTS, STAMP, type Bubble, type Shot } from './cast';
+import { BUBBLE_S, BUBBLES, CAST, FEED, FOLD_S, NOTES, PAGE, REDUCED_T, SHOTS, STAMP, type Bubble, type Shot } from './cast';
 import { makeFeed } from './feed';
+import type { Launch } from './fold';
 import { makePage, type KilnLoader } from './page';
-import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
+import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, inFrame, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
 import { easeInOut, ENTRY, feedOpacity, makeEntry, wordsAt } from './entry';
 import { makeGestures } from './gestures';
 import { eggWords, makeOverlay } from './overlay';
@@ -367,18 +369,35 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   }
 
   /**
-   * Where his planes leave from: the top left corner of his line folding into one (else his last sent
-   * line), fractions of the canvas from its top left (designer m_33582: from the feed's corner, never
-   * the page's left fade); null: no line of his shown.
+   * Where his planes leave from: the middle of his line folding into one (fold.ts: the dart is
+   * there, the 3D plane takes over), else of his last sent line, fractions of the canvas from its
+   * top left (designer m_33582: from the feed, never the page's left fade); null: no line of his shown.
    */
   function sentBubble(): { x: number; y: number } | null {
-    const rows = feed.root.querySelectorAll<HTMLElement>('.bh-feed-row.you');
+    const rows = [...feed.root.querySelectorAll<HTMLElement>('.bh-feed-row.you')].filter((e) => e.offsetWidth > 0);
     const el = feed.root.querySelector<HTMLElement>('.bh-feed-row.you.folding') ?? rows[rows.length - 1];
     if (!el) return null;
     const c = canvas.getBoundingClientRect();
     const b = el.getBoundingClientRect();
     if (c.width <= 0 || c.height <= 0 || b.width <= 0) return null;
-    return { x: (b.left - c.left) / c.width, y: (b.top - c.top) / c.height };
+    return { x: (b.left + b.width / 2 - c.left) / c.width, y: (b.top + b.height / 2 - c.top) / c.height };
+  }
+
+  /** a folding line's launch (fold.ts): the 3D plane's length on screen as it leaves, and its heading toward its bim (plane.ts glideHeading) */
+  function launchOf(rowKey: string, rect: DOMRect): Launch | null {
+    const line = FEED[Number(rowKey.slice(1))];
+    if (line?.who !== 'you' || line.plane === undefined) return null;
+    const plane = line.plane;
+    const note = NOTES.find((n) => n.from === 'you' && Math.abs(n.at - plane) < 0.05);
+    const f = r.shownFit();
+    const at = note ? geo.bim(note.office, note.to) : null;
+    if (!note || !f || !at) return null;
+    const c = canvas.getBoundingClientRect();
+    const p = inFrame(spring.cam, at);
+    const wx = p.u * c.width - (rect.left + rect.width / 2 - c.left);
+    const wy = -(p.v * c.height - (rect.top + rect.height / 2 - c.top));
+    const h = glideHeading(wx, wy);
+    return { len: startPx(f), hx: h.x, hy: -h.y };
   }
 
   function draw(nowMs: number): void {
@@ -431,7 +450,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     words();
     // the feed: nothing on the paper while the town grows, in as the camera leaves the wide; out with the words in the fold
     feed.root.style.opacity = ems === null ? '' : String(T < PAGE.fold ? feedOpacity(ems) : wordsAt(ems));
-    feed.draw(T);
+    feed.draw(T, launchOf);
     page.draw(T);
     stamped(T);
     const t4 = performance.now();

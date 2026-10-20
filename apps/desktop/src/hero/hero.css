@@ -22,6 +22,8 @@
   --bh-line: #1d1a1714;
   /* bise's words: ink, a step softer than his, never faint (designer m_31992) */
   --bh-text2: #4a443c;
+  /* the paper plane's ink edge (bims render/plane.ts: WORLD.ink at 0.55, light only) */
+  --bh-plane-ink: #1d1a178c;
   /* the app's spacing tokens (src/ds/tokens.css) the page has none of: the tip look's */
   --s-1: 4px;
   --pad-pill: 3px;
@@ -35,6 +37,8 @@ html.pd .bims-hero {
   --bh-win: #1f1c19;
   --bh-line: #ece6da1f;
   --bh-text2: #cfc8bc;
+  /* no ink on the dark page: the paper's own shade for its crease */
+  --bh-plane-ink: #c9c1b2;
 }
 .bims-hero .bh-canvas {
   position: absolute;
@@ -157,8 +161,15 @@ html.pd .bims-hero {
 @media (max-width: 1199px) {
   .bims-hero .bh-feed { width: 260px; }
 }
+/* a phone: the compact feed (bims m_35441), his last line (or the one folding) and the field, bottom
+   right, ~40% of the width: his planes leave from it there too */
 @media (max-width: 859px) {
-  .bims-hero .bh-feed { display: none; }
+  .bims-hero .bh-feed { right: 10px; bottom: 10px; width: 44%; padding: 8px; gap: 4px; border-radius: 12px; font-size: 12px; }
+  .bims-hero .bh-feed-row:not(:last-child) { display: none; }
+  .bims-hero .bh-feed.has-fold .bh-feed-row:not(.folding) { display: none; }
+  .bims-hero .bh-feed.has-fold .bh-feed-row.folding { display: block; }
+  .bims-hero .bh-feed-row { max-width: 100%; }
+  .bims-hero .bh-feed-choices { display: none; }
 }
 .bims-hero .bh-feed-rows {
   display: flex;
@@ -182,9 +193,29 @@ html.pd .bims-hero {
   background: var(--bh-soft);
   box-shadow: none;
 }
-.bims-hero .bh-feed-row.folding {
-  /* his line folds into his plane: it dips toward the bottom-left as the plane leaves under it */
-  transform: translate(calc(var(--fold) * -6px), calc(var(--fold) * 4px)) scale(calc(1 - var(--fold) * 0.04));
+/* his line folds into his plane (fold.ts): its words fade, then the dart (an svg over it) is the bubble;
+   back in once the 3D plane took over */
+.bims-hero .bh-feed-row.you { position: relative; }
+.bims-hero .bh-feed-row.folding .bh-feed-words { opacity: var(--words); }
+.bims-hero .bh-feed-row.folded { background: transparent; box-shadow: none; }
+.bims-hero .bh-feed-row.folded > :not(.bh-fold) { visibility: hidden; }
+.bims-hero .bh-feed-row.back { opacity: var(--words); }
+.bims-hero .bh-fold {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.bims-hero .bh-fold polygon {
+  fill: color-mix(in srgb, var(--bh-soft), #fffaf0 var(--paper));
+  stroke: var(--bh-plane-ink);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.bims-hero .bh-fold line {
+  stroke: var(--bh-plane-ink);
+  stroke-width: 1;
 }
 .bims-hero .bh-feed-row.waiting {
   color: var(--bh-text);

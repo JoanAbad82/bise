@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Office, Spot } from '../model';
 import { BACK, RIGHT, UP, fitSite, siteOf, toScreen, type V3 } from './camera';
-import { DART, cameraStart, viewPoint, catchPoint, dartAt, flightAt, glideAt, planFlight, planGlide, shadowOf, sizeAt, startPx, startSize, type FlightPlan } from './plane';
+import { DART, cameraStart, viewPoint, catchPoint, dartAt, flightAt, glideAt, glideHeading, glideSide, planFlight, planGlide, shadowOf, sizeAt, startPx, startSize, type FlightPlan } from './plane';
 import { BEAT, HELD_LEN, PLANE_CATCH, heldAt } from './catch';
 import { PLANE_FLIGHT } from './pose';
 
@@ -287,5 +287,31 @@ describe('his paper plane', () => {
         expect(off).toBeLessThan(way / 3);
       }
     }
+  });
+
+  it('flies an S: out to the screen’s left first, then back across its way into the hand; it leaves along glideHeading (the feed’s 2D dart)', () => {
+    const from = viewPoint(fit, { x: 0.8, y: 0.85 });
+    const onScreen = (p: V3): { x: number; y: number } => ({ x: dot({ x: p.x - from.x, y: p.y - from.y, z: p.z - from.z }, RIGHT), y: dot({ x: p.x - from.x, y: p.y - from.y, z: p.z - from.z }, UP) });
+    const w = onScreen(hand);
+    // no toss (it rises on screen, across a way that goes up): the S alone
+    const g = planGlide({ from, to: hand, seed: 5, dur: 2.8, px: 0 });
+    // which side of the straight way a point is (> 0: its left as it goes)
+    const sideOf = (p: { x: number; y: number }): number => w.x * p.y - w.y * p.x;
+    const offs = Array.from({ length: 99 }, (_, i) => sideOf(onScreen(glideAt(g, ((i + 1) / 100) * 2.8).p)));
+    const first = offs.findIndex((o) => Math.abs(o) > 1e-3);
+    const peakL = Math.max(...offs);
+    const peakR = -Math.min(...offs);
+    expect(offs[first] ?? 0).toBeGreaterThan(0);
+    expect(peakR).toBeGreaterThan(0);
+    expect(peakR).toBeLessThan(peakL);
+    // the screen's left, whichever way it goes (up when the way is level)
+    for (const [x, y] of [[-1, 1], [1, 1], [-1, -1], [1, -1]] as const) expect(glideSide(x, y).x).toBeLessThan(0);
+    expect(glideSide(-1, 0).y).toBeGreaterThan(0);
+    const h = glideHeading(w.x, w.y);
+    const a = onScreen(glideAt(g, 0).p);
+    const b = onScreen(glideAt(g, 0.02).p);
+    const l = Math.hypot(b.x - a.x, b.y - a.y);
+    expect((b.x - a.x) / l).toBeCloseTo(h.x, 1);
+    expect((b.y - a.y) / l).toBeCloseTo(h.y, 1);
   });
 });

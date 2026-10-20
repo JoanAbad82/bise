@@ -324,9 +324,10 @@ export function flightAt(f: FlightPlan, s: number, to: V3 = f.to): FlightFrame {
 /**
  * The film's paper plane (the hero, designer's hero-fix-2 §2: « trop vite, pas comme un avion en
  * papier »): light and slow. Tossed from the feed (it rises TOSS_PX over its first 0.3 s, slowing at
- * the top), then a glide at a nearly constant speed down one wide curve, rolling into it (never past
- * GLIDE_BANK) and level again after; a slow pitch wobble; it flares into the hand (nose up, half its
- * speed over its last 0.25 s). No zigzag, no loop. The app's flight (planFlight) is unchanged.
+ * the top), then a glide at a nearly constant speed along an S: out to the screen's left of its
+ * straight way, then a smaller swing back into the hand (Gabriel, via main m_35063; bims m_35441),
+ * rolling into each turn (never past GLIDE_BANK); a slow pitch wobble; it flares into the hand (nose
+ * up, half its speed over its last 0.25 s). No loop. The app's flight (planFlight) is unchanged.
  */
 export interface GlidePlan {
   readonly from: V3;
@@ -350,15 +351,44 @@ const FLARE_PITCH = (10 * Math.PI) / 180;
 export const GLIDE_BANK = (25 * Math.PI) / 180;
 const WOBBLE = { pitch: (4 * Math.PI) / 180, period: 1.2 } as const;
 
-/** the glide's path at u: a cubic from the toss to the hand, bowed to one side, the toss's bump on it */
+/**
+ * the S's swing off the straight way at u, times its bow: out to `side` first, then a smaller swing
+ * back the other way, into the hand (Gabriel: « part un peu sur la gauche et revient jusqu'aux bims »)
+ */
+const S_BACK = 0.6;
+const swing = (u: number): number => Math.sin(2 * Math.PI * u) * (1 - S_BACK * u);
+/** its slope at the toss: how far off the straight way it leaves, per bow (the feed's 2D dart points that way) */
+const SWING_0 = 2 * Math.PI;
+/** how far the S bows, a fraction of the way he sees */
+const S_BOW = 0.2;
+
+/** the glide's path at u: the straight way from the toss to the hand, swung into an S, the toss's bump on it */
 function glidePath(g: GlidePlan, u: number, to: V3): V3 {
   const d = sub(to, g.from);
-  const c1 = add(add(g.from, d, 0.35), g.side, g.bow);
-  const c2 = add(add(g.from, d, 0.72), g.side, g.bow * 0.55);
-  const v = 1 - u;
-  const b = add(add(add(mul(g.from, v * v * v), c1, 3 * v * v * u), c2, 3 * v * u * u), to, u * u * u);
+  const b = add(add(g.from, d, u), g.side, g.bow * swing(u));
   const bump = smooth(0, 0.1, u) * (1 - smooth(0.1, 0.45, u));
   return add(b, Y, g.toss * bump);
+}
+
+/**
+ * The S's side on the screen for a way of (wx, wy) view units (x right, y up): the perpendicular
+ * that leaves to the screen's left (up when the way is level). Pure.
+ */
+export function glideSide(wx: number, wy: number): { readonly x: number; readonly y: number } {
+  const seen = Math.hypot(wx, wy);
+  if (seen < 1e-9) return { x: -1, y: 0 };
+  const sign = Math.abs(wy) > 0.1 * seen ? Math.sign(wy) : Math.sign(wx) || 1;
+  return { x: (-wy / seen) * sign, y: (wx / seen) * sign };
+}
+
+/** The way a glide leaves on screen, for a way of (wx, wy) (x right, y up): its unit heading as it is tossed. Pure. */
+export function glideHeading(wx: number, wy: number): { readonly x: number; readonly y: number } {
+  const s = glideSide(wx, wy);
+  const k = S_BOW * Math.hypot(wx, wy) * SWING_0;
+  const x = wx + s.x * k;
+  const y = wy + s.y * k;
+  const l = Math.hypot(x, y);
+  return l < 1e-9 ? { x: -1, y: 0 } : { x: x / l, y: y / l };
 }
 
 /** Plan a glide from `from` (the feed's side of the screen) to `to` (the hand); `px`: units per css px. Pure. */
@@ -370,9 +400,10 @@ export function planGlide(inp: { readonly from: V3; readonly to: V3; readonly se
   const wx = dot(d, RIGHT);
   const wy = dot(d, UP);
   const seen = Math.hypot(wx, wy);
-  const sign = rand() < 0.5 ? 1 : -1;
-  const side = seen < 1e-9 ? RIGHT : add(mul(RIGHT, (-wy / seen) * sign), UP, (wx / seen) * sign);
-  const base = { from: inp.from, to: inp.to, side, bow: 0.22 * seen, toss: TOSS_PX * inp.px, dur: inp.dur, phase: rand() * Math.PI * 2, us: [] as number[] };
+  // the S leaves to the screen's left first (Gabriel), never a seeded side
+  const s2 = glideSide(wx, wy);
+  const side = add(mul(RIGHT, s2.x), UP, s2.y);
+  const base = { from: inp.from, to: inp.to, side, bow: S_BOW * seen, toss: TOSS_PX * inp.px, dur: inp.dur, phase: rand() * Math.PI * 2, us: [] as number[] };
   // the path's length table, then the time it takes along it: a little faster out of the hand
   // (slowing at the toss's top), steady, then half speed in the flare
   const len: number[] = [0];
