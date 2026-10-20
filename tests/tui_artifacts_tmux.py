@@ -362,7 +362,12 @@ def gone(t, E, branch, wt):
     t.wait_gone("all on main already")
     e2e.sh(E.ws, "git branch -D %s" % branch)
     sc = t.screen()
-    click(t, *psi_of(sc, "t1"))
+    # one cell right of ψ (still the row's ψ end): a press on the same
+    # cell within 400 ms of the first is a double click for the text
+    # layer (textlayer.rs), which selects the word and opens nothing; a
+    # fast hub answers the first click, C-g and the delete in less
+    x, y = psi_of(sc, "t1")
+    click(t, x + 1, y)
     sc = t.wait("t1's folder is gone · show what it landed last")
     assert "fatal" not in sc and "cannot change" not in sc and "▲" not in sc, sc
     shot(t, "150-gone")
