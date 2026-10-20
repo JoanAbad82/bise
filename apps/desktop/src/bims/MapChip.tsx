@@ -39,8 +39,9 @@ export function MapChip({ map, onPick }: { map: MapId; onPick: (id: MapId) => vo
         name={bims.map_chip_label}
         tip={bims.map_chip_tip}
         testId="app.right.bims.map"
+        // above the chip; on its left edge unless that passes the window (pickerPlace 'auto': at 320
+        // docked it ends on the chip's right edge, over the thread)
         side="above"
-        align="start"
         groups={[{ id: 'maps', rows }]}
         onPick={(id) => {
           const m = rows.find((r) => r.id === id);
