@@ -6,9 +6,10 @@
 // still live. That card is a question for him like any other (the TUI shows it): ambient-lead
 // m_20142. Passes when, on telemetry, after main's `sb spawn keeper-N && sb spawn gone-N && sb drop
 // gone-N` in one turn (gone-N mid-turn):
-//   - the hub asks with a 'drop' card naming @gone-N, and gone-N stays live;
-//   - that card is in his inbox block on main's thread, opens in place, and 'yes' typed in the
-//     composer answers it: the hub archives gone-N (status 'done', archived true);
+//   - the hub asks with a 'drop' card about gone-N (its agent), and gone-N stays live;
+//   - that card is in his inbox block on main's thread, opens in place as 'archive gone-N?' with
+//     its 2 options (drop-card: '1 archive it' / '2 keep it'), and option 1 answers it: the hub
+//     archives gone-N (status 'done', archived true);
 //   - /agents typed in main's composer lists keeper-N and never gone-N;
 //   - /archived lists gone-N with its restore, and never keeper-N.
 import path from 'node:path';
@@ -23,7 +24,7 @@ const T = {
   restore: (n: string) => `[data-testid="agents.restore.${n}"]`,
 };
 
-test('agents/dropped-real: a drop mid-turn asks him in the inbox; yes archives it: out of /agents, under /archived', async () => {
+test('agents/dropped-real: a drop mid-turn asks him in the inbox; option 1 archives it: out of /agents, under /archived', async () => {
   test.setTimeout(180_000);
   const w = realWorld();
   const P = 'telemetry';
@@ -47,8 +48,9 @@ test('agents/dropped-real: a drop mid-turn asks him in the inbox; yes archives i
     // under `cards`: the TUI's inbox lists both, and so must the window (the store merges them)
     const dropCard = async () => {
       const st = await hubState(hubOf(w, P).sock);
-      const all = [...((st['cards'] as unknown[] | undefined) ?? []), ...((st['others'] as unknown[] | undefined) ?? [])] as { kind?: string; text?: string; id?: number }[];
-      return all.find((c) => c.kind === 'drop' && (c.text ?? '').includes(`@${gone}`));
+      const all = [...((st['cards'] as unknown[] | undefined) ?? []), ...((st['others'] as unknown[] | undefined) ?? [])] as { kind?: string; agent?: string; id?: number }[];
+      // the card is about its agent (drop-card: its text says what is kept, its title names it)
+      return all.find((c) => c.kind === 'drop' && c.agent === gone);
     };
     await expect.poll(async () => (await row(keeper))?.status, { timeout: 30_000, message: `the hub has ${keeper}` }).toBeTruthy();
     await expect.poll(async () => (await dropCard())?.kind, { timeout: 30_000, message: `the hub asks him to drop ${gone} (mid-turn)` }).toBe('drop');
@@ -67,12 +69,11 @@ test('agents/dropped-real: a drop mid-turn asks him in the inbox; yes archives i
       await block.locator('[data-testid^="inbox.block.row."]').first().click({ timeout: 10_000 });
       for (let i = 0; i < 10 && !((await open.textContent({ timeout: 2000 }).catch(() => '')) ?? '').includes(gone); i++) await page.keyboard.press('ArrowDown');
     }
-    await expect(open, `the drop card opens in place and names @${gone}`).toContainText(`@${gone}`, { timeout: 5000 });
+    await expect(open, `the drop card opens in place and names ${gone}`).toContainText(`archive ${gone}?`, { timeout: 5000 });
+    await expect(open.locator('[role="option"]'), 'its 2 options').toHaveText([/archive it/, /keep it/]);
     await page.screenshot({ path: test.info().outputPath('drop-card.png') });
-    await page.locator(`${T.thread} ${T.field}`).click({ timeout: 10_000 });
-    await page.keyboard.type('yes');
-    await page.keyboard.press('Enter');
-    await expect.poll(async () => (await row(gone))?.archived, { timeout: 30_000, message: `'yes' archives ${gone}` }).toBe(true);
+    await open.locator('[role="option"]').first().click();
+    await expect.poll(async () => (await row(gone))?.archived, { timeout: 30_000, message: `'1 archive it' archives ${gone}` }).toBe(true);
     await expect(block.locator('[data-testid^="inbox.block.row."], [data-testid^="inbox.block.open."]').filter({ hasText: gone }), 'the card leaves the inbox').toHaveCount(0, { timeout: 10_000 });
     test.info().annotations.push({ type: 'hub', description: JSON.stringify(await row(gone)) });
 
