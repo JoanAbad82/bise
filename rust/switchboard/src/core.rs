@@ -34,19 +34,6 @@ use std::path::PathBuf;
 pub type ClientId = u64;
 pub type Token = u64;
 
-/// What a worktree drop would lose (RFC 0002 §5.1).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Loss {
-    pub dirty: usize,
-    pub unpushed: usize,
-}
-
-impl Loss {
-    pub fn any(&self) -> bool {
-        self.dirty > 0 || self.unpushed > 0
-    }
-}
-
 /// The side of the world the core may query synchronously.
 pub trait Env {
     fn now(&self) -> u64;
@@ -1979,6 +1966,7 @@ impl Hub {
 #[path = "core_pure.rs"]
 mod pure;
 pub(crate) use pure::not_in_a_repo;
+pub use pure::Loss;
 use pure::{direct_exchange, force_run_input, git_only, jstr, unique_name};
 
 #[path = "core_link.rs"]

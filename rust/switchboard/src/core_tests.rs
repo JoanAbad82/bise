@@ -852,25 +852,9 @@ fn exited(agent: &str, reason: &str) -> Input {
     Input::ReplExited { agent: agent.into(), crashed: true, reason: reason.into(), stalled: false, loaded: false, row: 0 }
 }
 
-/// main m_36148, hub/stall.bend: starts that stall under load never fail
-/// the agent; the 4th in a row waits for the machine (wait_load); a stall
-/// on an idle machine counts as a crash does.
-#[test]
-fn a_stalled_start_under_load_never_fails_the_agent() {
-    let mut t = T::new();
-    t.spawn_task("a");
-    let stall = |loaded, row| Input::ReplExited { agent: "a".into(), crashed: true, reason: "no progress".into(), stalled: true, loaded, row };
-    let spawn = |fx: &[Effect]| fx.iter().find_map(|e| match e { Effect::Spawn { agent, wait_load, .. } if agent == "a" => Some(*wait_load), _ => None });
-    for row in 1..=9 {
-        assert_eq!(spawn(&t.go(stall(true, row))), Some(row > 3), "loaded stall {row}: starts again, the 4th on waits");
-    }
-    assert_ne!(t.status("a"), Status::Failed);
-    for i in 1..=5 {
-        assert_eq!(spawn(&t.go(stall(false, i))), Some(false), "an idle machine's stall {i} counts");
-    }
-    t.go(stall(false, 6));
-    assert_eq!(t.status("a"), Status::Failed, "the 6th counted one fails it");
-}
+/// A stalled start under load never fails the agent (hub/stall.bend).
+#[path = "core_stall_tests.rs"]
+mod stall_tests;
 
 #[test]
 fn peers_cannot_reach_an_archived_task_but_the_user_can() {

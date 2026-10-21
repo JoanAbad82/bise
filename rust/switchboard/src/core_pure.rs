@@ -9,6 +9,19 @@ use crate::model::{State, MAIN};
 use crate::util::{clip_tail, one_line};
 use serde_json::Value;
 
+/// What a worktree drop would lose (RFC 0002 §5.1).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Loss {
+    pub dirty: usize,
+    pub unpushed: usize,
+}
+
+impl Loss {
+    pub fn any(&self) -> bool {
+        self.dirty > 0 || self.unpushed > 0
+    }
+}
+
 /// RFC 0001 §7.4: what main (`note`) and the user's own feed (`direct`)
 /// read after the user talked directly to `task`: the messages sent,
 /// and the end of the task's reply since.
