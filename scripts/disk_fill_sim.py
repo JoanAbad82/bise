@@ -3,7 +3,7 @@
 15 agents building at once. Not in the gate (~3 min, writes ~20 GB to a
 throwaway disk image); run it by hand, under heavy-run --low:
 
-  ~/.bise/run/heavy-run --low python3 tests/disk_fill_sim.py [--agents 15] [--gb 12]
+  ~/.bise/run/heavy-run --low python3 scripts/disk_fill_sim.py [--agents 15] [--gb 12]
 
 A real APFS volume of --gb GB (a sparse disk image in $TMPDIR, detached and
 deleted at the end) holds 15 fake agent worktrees. Each agent runs 2 heavy
@@ -26,8 +26,8 @@ import threading
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-HEAVY = os.path.join(HERE, "..", "scripts", "heavy-run")
-RECLAIM = os.path.join(HERE, "..", "scripts", "disk_reclaim.py")
+HEAVY = os.path.join(HERE, "heavy-run")
+RECLAIM = os.path.join(HERE, "disk_reclaim.py")
 GB = 1 << 30
 
 BUILD = r'''
