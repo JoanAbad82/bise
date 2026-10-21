@@ -24,8 +24,17 @@ const tag = process.env.AS_HE_DOES_TAG ? `-${process.env.AS_HE_DOES_TAG}` : '';
 const WATCHDOG_MS = Number(process.env.AS_HE_DOES_WATCHDOG_MS ?? 600000);
 // AS_HE_DOES_QUICK_ROWS=quote,merge: a quick pass of those rows alone (rows37's and rowsE812's rows
 // whose name holds one of the words), to prove or clear a red on a fresh world (ambient-lead m_23521)
-const ONLY = (process.env.AS_HE_DOES_QUICK_ROWS ?? '').split(',').map((w) => w.trim()).filter(Boolean);
-const wanted = (name) => ONLY.length === 0 || ONLY.some((w) => name.includes(w));
+// AS_HE_DOES_ROWS_FILE (fast-loop, scripts/desktop_rerun.py): one row name a line, as reds.txt says
+// them (digits as N, commas kept): a row runs when its name holds one, digits as N on both sides.
+// AS_HE_DOES_GROUPS=rowsC2BA,rows233B: those row groups alone, seed included (a step's `group` says
+// which group it ran in): a rerun of 5 reds runs 2 seeds, not 15.
+const ONLY = [...(process.env.AS_HE_DOES_QUICK_ROWS ?? '').split(','),
+  ...(process.env.AS_HE_DOES_ROWS_FILE ? fs.readFileSync(process.env.AS_HE_DOES_ROWS_FILE, 'utf8').split('\n') : [])]
+  .map((w) => w.trim()).filter(Boolean);
+const asN = (s) => s.replace(/\d+/g, 'N');
+const wanted = (name) => ONLY.length === 0 || ONLY.some((w) => name.includes(w) || asN(name).includes(asN(w)));
+const GROUPS = (process.env.AS_HE_DOES_GROUPS ?? '').split(',').map((w) => w.trim()).filter(Boolean);
+let GROUP = null;
 const ANSWER_MS = Number(process.env.AS_HE_DOES_ANSWER_MS ?? 240000);
 const MESSAGE = 'hello from the as-he-does proof';
 
@@ -35,7 +44,7 @@ const save = () => fs.writeFileSync(path.join(out, `${mode}${tag}.json`), JSON.s
 const T0 = Date.now();
 let lastStep = { name: null, at: T0 };
 const step = (name, ok, info) => {
-  res.steps.push({ name, ok, info: info ?? null, at_s: Math.round((Date.now() - T0) / 1000) });
+  res.steps.push({ name, ok, info: info ?? null, at_s: Math.round((Date.now() - T0) / 1000), ...(GROUP ? { group: GROUP } : {}) });
   lastStep = { name, at: Date.now() };
   save();
 };
@@ -1245,12 +1254,17 @@ if (mode === 'quick') {
   // on main's next request, the quote's included); the bims office first: it seeds nothing.
   // All rows: rowsE812 first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the
   // time the others take
-  const groups = ONLY.length
+  const picked = ONLY.length
     // the groups whose steps aren't named rows run whole, by the group's name
     // (AS_HE_DOES_QUICK_ROWS=quickRows,rows25,rows0170)
     ? [rowsCF30, rowsDDDE, rowsD3D8, rows42D1, rows4E20, newRows, rows37, rowsE812, rowsF2A7, rows233B, rowsC2BA, rowsDC47,
       ...[['quickRows', quickRows], ['rows25', rows25], ['rows0170', rows0170]].filter(([n]) => ONLY.includes(n)).map(([, g]) => g)]
     : [rowsE812, rowsCF30, rowsDDDE, rowsF2A7, rows233B, rowsC2BA, rowsDC47, rowsD3D8, rows42D1, rows4E20, quickRows, newRows, rows37, rows25, rows0170];
+  // AS_HE_DOES_GROUPS: those groups, in the chosen rows' order (rows37 before rowsE812's seed)
+  const groups = GROUPS.length
+    ? [rowsCF30, rowsDDDE, rowsD3D8, rows42D1, rows4E20, newRows, rows37, rowsE812, rowsF2A7, rows233B, rowsC2BA, rowsDC47, quickRows, rows25, rows0170]
+      .filter((g) => GROUPS.includes(g.name))
+    : picked;
   // the pass limit sized to its groups: GROUP_MS each from here (the stall watchdog still ends a
   // hang at 600 s with no step); AS_HE_DOES_WATCHDOG_MS set by hand wins. Measured (review-gates
   // m_29770): the first all-rows quick pass on AC (night5, ef6eac813, 15 groups) ended at at_s 4849,
@@ -1258,7 +1272,8 @@ if (mode === 'quick') {
   // pass, so a pass 2x slower is red and a normal one has its margin
   const GROUP_MS = 600000;
   if (process.env.AS_HE_DOES_WATCHDOG_MS === undefined) passLimit(Date.now() - T0 + groups.length * GROUP_MS);
-  for (const g of groups) await g(harness, say);
+  for (const g of groups) { GROUP = g.name; await g(harness, say); }
+  GROUP = null;
 }
 
 // d0d45f92's rows (ambient-lead m_22519): the help sheet opaque, esc never stops a turn and ctrl+c
