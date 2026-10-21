@@ -1,5 +1,5 @@
 # Landing in this repo
 
-A green `tests/gate.sh quick` counts only on the sha it ran on. If `sb land` rebased you over other commits, you may land without a new quick gate only when all three hold: quick GREEN on your pre-rebase sha, `sb land`'s own check green, and 0 files in common with the commits you rebased over.
-Then run `gate.sh quick` on the landed sha at once and put its GATE line in your report. If it is red, revert your land on main first, then fix. One file in common: rebase, run quick on the rebased sha, then land.
+Land first, full gate after. Before `sb land`: `tests/gate.sh quick` GREEN on your sha, plus any check your brief or reviewer names for your area; `sb land`'s own land check must then be green (it refuses a red one). No `gate.sh full` before a land.
+After the land, the tip gate runs the full gate on main's tip: put your land sha in your report and watch its result. If the tip goes red in your area, revert your land on main first, then fix and land again. Shots are signed after the land, on the landed sha. A release is cut only from a tip-green sha.
 The full rule: docs/loop-speed.md §0, rule 11.
