@@ -268,6 +268,20 @@ mod tests {
             AgentReq::Wake(_) => "wake",
             AgentReq::ProjectSend { .. } => "project_send",
             AgentReq::ProjectAsk { .. } => "project_ask",
+            AgentReq::ProjectList => "project_list",
+            AgentReq::Inspect(_) => "inspect",
+            AgentReq::History(_) => "history",
+            AgentReq::Show { .. } => "show",
+            AgentReq::Taste(_) => "taste",
+            AgentReq::People(_) => "people",
+            AgentReq::Artifact(_) => "artifact",
+            AgentReq::PagePublish(_) => "page_publish",
+            AgentReq::PageStart { .. } => "page_start",
+            AgentReq::PageWaiting => "page_waiting",
+            AgentReq::PageTick { .. } => "page_tick",
+            AgentReq::PageList => "page_list",
+            AgentReq::PageNotes { .. } => "page_notes",
+            AgentReq::Unknown { .. } => "unknown",
         }
     }
 
@@ -311,13 +325,29 @@ mod tests {
             json!({"cmd": "wake", "step": "list"}),
             json!({"cmd": "project_send", "project": "shop", "msg": "m_1"}),
             json!({"cmd": "project_ask", "project": "shop", "text": "?"}),
+            // the shell's own: the shell steps `speaks` for them, and an
+            // `Input::Agent` carrying one is refused alone as well
+            json!({"cmd": "project_list"}),
+            json!({"cmd": "inspect", "agent": "t1"}),
+            json!({"cmd": "history", "query": "x"}),
+            json!({"cmd": "show", "agent": "t1", "pos": 1}),
+            json!({"cmd": "taste", "step": "list"}),
+            json!({"cmd": "people", "step": "list"}),
+            json!({"cmd": "artifact", "do": "list"}),
+            json!({"cmd": "page_publish", "html": "<p>x</p>"}),
+            json!({"cmd": "page_start", "id": "p"}),
+            json!({"cmd": "page_waiting"}),
+            json!({"cmd": "page_tick", "id": "p", "item": "i"}),
+            json!({"cmd": "page_list"}),
+            json!({"cmd": "page_notes", "id": "p"}),
+            json!({"cmd": "what-is-this"}),
         ];
         let (mut h, mut env) = hub();
         let other = Sender::of(&Who::OtherHub("t1".into()), Sock::Agent);
         let words = "this request comes from agent t1's process (another project's hub): an agent speaks only on its own hub";
         let mut seen = std::collections::BTreeSet::new();
         for (i, v) in reqs.iter().enumerate() {
-            let req = AgentReq::from_json(v).unwrap_or_else(|e| panic!("{v}: {e}"));
+            let req = AgentReq::decode(v.clone()).unwrap_or_else(|e| panic!("{v}: {e}"));
             seen.insert(kind(&req));
             let before = format!("{:?}", h.st);
             let fx = h.handle(Input::Agent { token: 100 + i as u64, from: "t1".into(), req, by: other.clone() }, &mut env);
@@ -327,7 +357,7 @@ mod tests {
             );
             assert_eq!(format!("{:?}", h.st), before, "{v}: the hub's state as it was");
         }
-        assert_eq!(seen.len(), 28, "a fixture for every variant: {seen:?}");
+        assert_eq!(seen.len(), 42, "a fixture for every variant: {seen:?}");
     }
 
     /// The shell's own requests ask `speaks` and get one fx spoke.
