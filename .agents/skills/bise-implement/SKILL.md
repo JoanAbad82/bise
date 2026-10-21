@@ -46,8 +46,13 @@ each from this repo. It is short. The architect agent keeps it current.
 
 ## Before sb land
 
-- apps/desktop: `pnpm check` + `pnpm test:land` (the fixed harness set in
-  `apps/desktop/tests/harness/land.mjs`, off-screen, under the heavy lock).
+- the fast checks only: `tests/gate.sh quick` GREEN on your sha (for
+  apps/desktop it runs typecheck, lint, the related vitest units and the
+  build: `pnpm check`'s fast half). No end-to-end before a land: no
+  `pnpm test:land`, Playwright, desktop harness check, as-he-does row,
+  `*_e2e.py`, `*_tmux.py` or `gate.sh full`. They run on main after the land
+  (the tip gate, the nightly, a release); a red there names you in tip-red
+  (docs/loop-speed.md §0 rule 11).
 - heavy-run queues by rank (docs/loop-speed.md §10.6): your own script that
   wraps a land check runs as `heavy-run --land`; an experiment, a load test,
   shots or a measure as `heavy-run --low`, never `--prio`.
