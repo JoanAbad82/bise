@@ -40,6 +40,13 @@ async function closeOn(s: Session, name: string): Promise<void> {
   await settle(s, 800, 6000);
 }
 
+/** the project grown to `stage` (clip.spec.ts grow: the counters, then the office's data-stage) */
+async function grow(s: Session, core: FakeCore, g: Record<string, number>, stage: number): Promise<void> {
+  await s.page.evaluate((x) => { (window as unknown as { __biseGrow?: unknown }).__biseGrow = x; }, g);
+  await core.send({ ev: 'growth', project: P, growth: g } as never);
+  await expect.poll(() => s.page.getByTestId('app.right.bims').getAttribute('data-stage'), { timeout: 5000 }).toBe(String(stage));
+}
+
 async function pick(s: Session, core: FakeCore, map: string, theme: 'light' | 'dark'): Promise<void> {
   await core.send({ ev: 'prefs', prefs: { onboarded: true, theme, excluded_apps: [], bims: { map: { [P]: map } } } } as never);
   await expect(s.page.getByTestId('app.right.bims'), 'his pick draws').toHaveAttribute('data-map', map, { timeout: 8000 });
@@ -52,7 +59,7 @@ for (const theme of ['light', 'dark'] as const) {
     try {
       await s.page.getByTestId('app.right.agents.bims').click();
       await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-shown', 'true', { timeout: 20_000 });
-      await expect(s.page.getByTestId('app.right.bims')).toHaveAttribute('data-stage', '14', { timeout: 8000 });
+      await grow(s, core, LAST, 14);
       for (const map of MAP_IDS) {
         await s.page.getByTestId('app.right.agents.width.wide').click();
         await pick(s, core, map, theme);
