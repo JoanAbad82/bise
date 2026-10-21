@@ -43,7 +43,11 @@ core_kinds! {
         Touch = "touch" => ITouch { agent: Str, path: Str },
         /// an agent's REPL is up
         Ready = "ready" => IReady { agent: Str },
-        Exited = "exited" => IExited { agent: Str, crashed: Bool, reason: Str },
+        /// (`stalled`: its start made no progress; `loaded`: the machine
+        /// was at load x2+ then; `row`: that REPL's stalls in a row, the
+        /// shell's count, repl_start::Starts. An older core ignores them:
+        /// crashed, it counts as before; hub/stall.bend)
+        Exited = "exited" => IExited { agent: Str, crashed: Bool, reason: Str, stalled: Bool, loaded: Bool, row: Nat },
         /// the hub started: sb-core's state is the replayed journal
         Boot = "boot" => IBoot {},
         /// his message to the agent in view (`parts`: msg-parts JSON, only

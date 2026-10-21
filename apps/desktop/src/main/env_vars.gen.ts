@@ -72,6 +72,7 @@ export const TEST_VARS = [
   'SB_SETUP',
   'SB_SLOW_SPAWN',
   'SB_STALL_START',
+  'SB_START_STILL_MS',
   'SB_STATE_DIR',
   'SB_STT_WAV',
   'SB_VOICE',

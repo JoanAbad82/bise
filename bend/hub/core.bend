@@ -45,6 +45,7 @@ import ./cardkind.bend as CK
 import ./gone.bend as G
 import ./take.bend as TK
 import ./peer.bend as PR
+import ./stall.bend as SL
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -399,7 +400,7 @@ def spawn.if(-o: S.St, down: Bool, +cx: X.Cx<o>, +n: String, +resume: Bool) -> X
   match down:
     case True{}:
       +cx2 = set_run(o, cx, n, S.RStarting{})
-      dirty(o, out(o, cx2, F.spawn(n, resume, None{})))
+      dirty(o, out(o, cx2, F.spawn(n, resume, None{}, False{})))
     case False{}:
       cx
 
@@ -3254,7 +3255,7 @@ def repl_ready(-o: S.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
 
 def crash.restart(-o: S.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
   +cx2 = set_run(o, cx, agent, S.RStarting{})
-  +cx3 = out(o, cx2, F.spawn(agent, True{}, Some{reason}))
+  +cx3 = out(o, cx2, F.spawn(agent, True{}, Some{reason}, False{}))
   +cx4 = feed(o, cx3, M.MAIN(), FD.warn(cat(["the session of @", agent, " crashed (", reason, ") — restart ", ns(n), "/", ns(MAX_CRASHES())])))
   LZ.pick(X.Cx<o>, String.eq(agent, M.MAIN()), u => cx4,
     u => notify_main(o, cx4, cat(["agent @", agent, " crashed (", reason, "). Its session restarts on its saved checkpoint (attempt ", ns(n), "/", ns(MAX_CRASHES()), "); the turn it was running is interrupted and it may need a new message to continue."])))
@@ -3283,25 +3284,58 @@ def crash.count(-o: S.St, go: Bool, +cx: X.Cx<o>, +agent: String, +reason: Strin
       +cx2 = set_r(o, cx, X.R.with_crashes(r, M.snoc(X.Kn, KL.kn_del(X.R.crashes(r), agent), X.Kn{agent, n})))
       crash.pick(o, Nat.is_le(n, MAX_CRASHES()), cx2, agent, n, reason)
 
-def exited.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
+# a stalled start under load (hub/stall.bend): it starts again, not
+# counted; `wait`: its K()-th in a row, the spawn waits for a tick under
+# load x2 and its row shows it waiting
+def crash.again.line(wait: Bool, +agent: String, +reason: String) -> J.Json:
+  match wait:
+    case True{}:
+      FD.warn(cat(["@", agent, " waits for the machine: ", reason, " — it starts when the load is under x2"]))
+    case False{}:
+      FD.info(cat(["@", agent, " starts again: ", reason, " (the machine is slow: not a crash)"]))
+
+def crash.again(-o: S.St, +wait: Bool, +cx: X.Cx<o>, +agent: String, +reason: String) -> X.Cx<o>:
+  +cx2 = upd_rt(o, cx, X.Rt.with_waiting(X.Rt.with_run(rt(o, cx, agent), S.RStarting{}), wait))
+  +cx3 = out(o, cx2, F.spawn(agent, True{}, None{}, wait))
+  feed(o, cx3, M.MAIN(), crash.again.line(wait, agent, reason))
+
+def crash.do(-o: S.St, d: SL.Do, +cx: X.Cx<o>, +agent: String, +reason: String) -> X.Cx<o>:
+  match d:
+    case SL.Count{}:
+      crash.count(o, True{}, cx, agent, reason)
+    case SL.Again{}:
+      crash.again(o, False{}, cx, agent, reason)
+    case SL.SWait{}:
+      crash.again(o, True{}, cx, agent, reason)
+
+def crash.go(-o: S.St, go: Bool, +cx: X.Cx<o>, +agent: String, d: SL.Do, +reason: String) -> X.Cx<o>:
+  match go:
+    case False{}:
+      cx
+    case True{}:
+      crash.do(o, d, cx, agent, reason)
+
+def exited.agent(-o: S.St, m: Maybe<&2, S.Agent>, +cx: X.Cx<o>, +agent: String, +crashed: Bool, d: SL.Do, +reason: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+a}:
       +cx2 = set_rt(o, cx, X.Rt.with_turn(X.Rt.with_run(rt(o, cx, agent), S.RDown{}), None{}))
-      crash.count(o, crashed && is_active(S.Agent.life(a)), dirty(o, cx2), agent, reason)
+      crash.go(o, crashed && is_active(S.Agent.life(a)), dirty(o, cx2), agent, d, reason)
 
-def repl_exited(-o: S.St, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
+# `stalled`, `loaded`, `row`: the shell's facts on a crashed start
+# (hub/stall.bend picks what it does to the crash count)
+def repl_exited(-o: S.St, +cx: X.Cx<o>, +agent: String, +crashed: Bool, d: SL.Do, +reason: String) -> X.Cx<o>:
   +cx2 = fail_waiters(o, cx, agent, "interrupted_by_restart")
   +r = rr(o, cx2)
   +cx3 = set_r(o, cx2, X.R.with_steered(r, KL.steer_del(X.R.steered(r), agent)))
-  exited.agent(o, M.get_agent(st(o, cx3), agent), cx3, agent, crashed, reason)
+  exited.agent(o, M.get_agent(st(o, cx3), agent), cx3, agent, crashed, d, reason)
 
 def boot.live(-o: S.St, live: Bool, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
   match live:
     case True{}:
       +cx2 = set_run(o, cx, n, S.RStarting{})
-      out(o, cx2, F.spawn(n, True{}, None{}))
+      out(o, cx2, F.spawn(n, True{}, None{}, False{}))
     case False{}:
       cx
 
@@ -3577,8 +3611,8 @@ def dispatch(-o: S.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       touch(o, cx, agent, path)
     case GI.IReady{+agent}:
       repl_ready(o, cx, agent)
-    case GI.IExited{+agent, +crashed, +reason}:
-      repl_exited(o, cx, agent, crashed, reason)
+    case GI.IExited{+agent, +crashed, +reason, +stalled, +loaded, +row}:
+      repl_exited(o, cx, agent, crashed, SL.pick(stalled, loaded, row), reason)
     case GI.IBoot{}:
       xboot(o, boot(o, cx))
     case GI.ISay{+focus, +text, +queued, +parts, +from}:

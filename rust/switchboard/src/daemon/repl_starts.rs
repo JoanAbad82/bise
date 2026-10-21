@@ -27,15 +27,19 @@ pub(super) struct Queued {
     pub(super) crash_note: Option<String>,
     pub(super) port: Option<u16>,
     pub(super) asked_ms: u64,
+    /// sb-core's `wait_load` (hub/stall.bend): admitted only at a load
+    /// under x2
+    pub(super) wait_load: bool,
 }
 
-/// Why a REPL is gone (probation reads it).
+/// Why a REPL is gone (probation reads it; sb-core the stall's facts).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Gone {
     /// It exited, crashed or could not be run.
     Died,
-    /// Its start made no progress (crate::repl_start).
-    Stalled { reports: bool },
+    /// Its start made no progress (crate::repl_start): `loaded` at load
+    /// x2+, `row` that REPL's stalls in a row.
+    Stalled { reports: bool, loaded: bool, row: u32 },
 }
 
 impl Gone {
@@ -43,7 +47,7 @@ impl Gone {
     pub(super) fn reports(self) -> bool {
         match self {
             Gone::Died => true,
-            Gone::Stalled { reports } => reports,
+            Gone::Stalled { reports, .. } => reports,
         }
     }
 }
@@ -64,14 +68,17 @@ impl Shell {
         self.admit_starts();
     }
 
-    /// The queued spawns that get a free slot, in order.
+    /// The queued spawns that get a free slot, in order; one sb-core
+    /// said waits for the machine (`wait_load`) only at a load under x2.
     pub(super) fn admit_starts(&mut self) {
         if self.start_queue.is_empty() {
             return;
         }
+        let loaded = self.start_queue.values().any(|q| q.wait_load) && crate::load::is_loaded(crate::load::factor());
         let cands: Vec<Cand> = self
             .start_queue
             .iter()
+            .filter(|(_, q)| !(q.wait_load && loaded))
             .map(|(dir, q)| Cand {
                 dir: dir.clone(),
                 kind: Kind::Start,
@@ -165,7 +172,7 @@ impl Shell {
                 kill_pid(*pid);
             }
             if let Some(gen) = self.gens.get(&s.dir).copied() {
-                let _ = self.repl_gone(s.dir, gen, reason, Gone::Stalled { reports: s.reports });
+                let _ = self.repl_gone(s.dir, gen, reason, Gone::Stalled { reports: s.reports, loaded: s.loaded, row: s.row });
             }
         }
         self.admit_starts();
@@ -175,7 +182,7 @@ impl Shell {
 impl Shell {
     /// Start the REPL of `name` on a supervisor thread. `port`: the port of the process it replaces (a switch keeps the
     /// port: background commands and steer files are keyed by it).
-    pub(super) fn spawn_on(&mut self, name: &str, resume: bool, crash_note: Option<String>, port: Option<u16>) {
+    pub(super) fn spawn_on(&mut self, name: &str, resume: bool, crash_note: Option<String>, port: Option<u16>, wait_load: bool) {
         // it reads context.txt at its first call (daemon/contexts.rs)
         self.contexts_now();
         let Some(a) = self.hub.st.agents.get(name).cloned() else {
@@ -227,7 +234,7 @@ impl Shell {
         // a fresh process, in a free slot; a switch's new process holds
         // the slot of its reload
         if !self.starts.in_flight(&dir) {
-            let q = Queued { name: a.name.clone(), gen, resume, crash_note, port, asked_ms: now_ms() };
+            let q = Queued { name: a.name.clone(), gen, resume, crash_note, port, asked_ms: now_ms(), wait_load };
             return self.queue_start(&dir, q);
         }
         self.spawn_fresh(&a.name, gen, resume, crash_note, port);
@@ -385,6 +392,15 @@ impl Shell {
             env.apply(&mut cmd);
             supervise(cmd, dir, gen, adir, port, tx, paths)
         });
+    }
+}
+
+/// The hub's starts: the idle limit is START_STILL_MS, or in a test
+/// `SB_START_STILL_MS` (ms; times the load factor all the same).
+pub(super) fn new_starts() -> crate::repl_start::Starts {
+    match bise_home::env::test_setting("SB_START_STILL_MS").and_then(|s| s.trim().parse::<u64>().ok()) {
+        Some(ms) => crate::repl_start::Starts::with_still_ms(ms),
+        None => Default::default(),
     }
 }
 

@@ -13,7 +13,7 @@ type Fx is Data:
   # rt
   FRt{agent: String, run: String, waiting: Bool, turn_ms: Maybe<&2, Nat>, turns: Nat}
   # spawn
-  FSpawn{agent: String, resume: Bool, crash_note: Maybe<&2, String>}
+  FSpawn{agent: String, resume: Bool, crash_note: Maybe<&2, String>, wait_load: Bool}
   # kill
   FKill{agent: String}
   # worktree_create
@@ -74,7 +74,7 @@ def FRt.of(+i: J.Json) -> Fx:
   FRt{K.get_s(i, "agent"), K.get_s(i, "run"), K.get_b(i, "waiting"), K.opt_n(J.get(i, "turn_ms")), K.get_n(i, "turns")}
 
 def FSpawn.of(+i: J.Json) -> Fx:
-  FSpawn{K.get_s(i, "agent"), K.get_b(i, "resume"), K.opt_s(J.get(i, "crash_note"))}
+  FSpawn{K.get_s(i, "agent"), K.get_b(i, "resume"), K.opt_s(J.get(i, "crash_note")), K.get_b(i, "wait_load")}
 
 def FKill.of(+i: J.Json) -> Fx:
   FKill{K.get_s(i, "agent")}
@@ -408,8 +408,8 @@ def kvs(x: Fx) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("fx", J.JStr{"journal"}), J.kv("ev", ev)]
     case FRt{+agent, +run, +waiting, +turn_ms, +turns}:
       [J.kv("fx", J.JStr{"rt"}), J.kv("agent", J.JStr{agent}), J.kv("run", J.JStr{run}), J.kv("waiting", J.JBool{waiting}), J.kv("turn_ms", K.jmaybe_n(turn_ms)), J.kv("turns", J.JNum{turns})]
-    case FSpawn{+agent, +resume, +crash_note}:
-      [J.kv("fx", J.JStr{"spawn"}), J.kv("agent", J.JStr{agent}), J.kv("resume", J.JBool{resume}), J.kv("crash_note", K.jmaybe_s(crash_note))]
+    case FSpawn{+agent, +resume, +crash_note, +wait_load}:
+      [J.kv("fx", J.JStr{"spawn"}), J.kv("agent", J.JStr{agent}), J.kv("resume", J.JBool{resume}), J.kv("crash_note", K.jmaybe_s(crash_note)), J.kv("wait_load", J.JBool{wait_load})]
     case FKill{+agent}:
       [J.kv("fx", J.JStr{"kill"}), J.kv("agent", J.JStr{agent})]
     case FWorktreeCreate{+name, +with_changes}:
@@ -473,8 +473,8 @@ def journal(+ev: J.Json) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
 def rt(+agent: String, +run: String, +waiting: Bool, +turn_ms: Maybe<&2, Nat>, +turns: Nat) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FRt{agent, run, waiting, turn_ms, turns})
 
-def spawn(+agent: String, +resume: Bool, +crash_note: Maybe<&2, String>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  kvs(FSpawn{agent, resume, crash_note})
+def spawn(+agent: String, +resume: Bool, +crash_note: Maybe<&2, String>, +wait_load: Bool) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  kvs(FSpawn{agent, resume, crash_note, wait_load})
 
 def kill(+agent: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FKill{agent})

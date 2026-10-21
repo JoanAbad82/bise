@@ -76,7 +76,7 @@ def in_ready_bare():
   {==}
 
 law in_exited_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"exited"})])) == IN.IExited{"", False{}, ""} : IN.In}
+  {IN.of(J.obj([J.kv("t", J.JStr{"exited"})])) == IN.IExited{"", False{}, "", False{}, False{}, 0n} : IN.In}
 
 def in_exited_bare():
   {==}
@@ -472,9 +472,12 @@ law in_IExited_round:
   for agent: String
   for crashed: Bool
   for reason: String
-  {IN.of(IN.json(IN.IExited{agent, crashed, reason})) == IN.IExited{agent, crashed, reason} : IN.In}
+  for stalled: Bool
+  for loaded: Bool
+  for row: Nat
+  {IN.of(IN.json(IN.IExited{agent, crashed, reason, stalled, loaded, row})) == IN.IExited{agent, crashed, reason, stalled, loaded, row} : IN.In}
 
-def in_IExited_round(agent, crashed, reason):
+def in_IExited_round(agent, crashed, reason, stalled, loaded, row):
   {==}
 
 law in_IBoot_round:
@@ -1165,7 +1168,7 @@ def fx_rt_bare():
   {==}
 
 law fx_spawn_bare:
-  {FX.of(J.obj([J.kv("fx", J.JStr{"spawn"})])) == FX.FSpawn{"", False{}, None{}} : FX.Fx}
+  {FX.of(J.obj([J.kv("fx", J.JStr{"spawn"})])) == FX.FSpawn{"", False{}, None{}, False{}} : FX.Fx}
 
 def fx_spawn_bare():
   {==}
@@ -1352,9 +1355,10 @@ law fx_FSpawn_round:
   for agent: String
   for resume: Bool
   for crash_note: Maybe<&2, String>
-  {FX.of(FX.json(FX.FSpawn{agent, resume, crash_note})) == FX.FSpawn{agent, resume, crash_note} : FX.Fx}
+  for wait_load: Bool
+  {FX.of(FX.json(FX.FSpawn{agent, resume, crash_note, wait_load})) == FX.FSpawn{agent, resume, crash_note, wait_load} : FX.Fx}
 
-def fx_FSpawn_round(agent, resume, crash_note):
+def fx_FSpawn_round(agent, resume, crash_note, wait_load):
   match crash_note:
     case None{}:
       {==}

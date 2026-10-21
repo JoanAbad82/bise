@@ -70,7 +70,7 @@ pub(super) fn read(f: CoreFx) -> Plain {
 pub(super) fn plain(f: CoreFx) -> Plain {
     let e = match f {
         CoreFx::Rt(_) => return Plain::Nothing,
-        CoreFx::Spawn(s) => Effect::Spawn { agent: s.agent, resume: s.resume, crash_note: s.crash_note },
+        CoreFx::Spawn(s) => Effect::Spawn { agent: s.agent, resume: s.resume, crash_note: s.crash_note, wait_load: s.wait_load },
         CoreFx::Kill(k) => Effect::Kill { agent: k.agent },
         CoreFx::WorktreeCreate(w) => Effect::Place(Job::Create { name: w.name, with_changes: w.with_changes }),
         CoreFx::WorktreeDrop(w) => Effect::Place(Job::Drop { name: w.name, ws: w.ws, dirty: w.dirty, unpushed: w.unpushed }),
@@ -166,11 +166,11 @@ mod tests {
     fn plain_effects_keep_every_field() {
         assert_eq!(
             eff(json!({"fx": "spawn", "agent": "a", "resume": true, "crash_note": "boom"})),
-            Effect::Spawn { agent: "a".into(), resume: true, crash_note: Some("boom".into()) }
+            Effect::Spawn { agent: "a".into(), resume: true, crash_note: Some("boom".into()), wait_load: false }
         );
         assert_eq!(
-            eff(json!({"fx": "spawn", "agent": "w", "resume": false, "crash_note": null})),
-            Effect::Spawn { agent: "w".into(), resume: false, crash_note: None }
+            eff(json!({"fx": "spawn", "agent": "w", "resume": false, "crash_note": null, "wait_load": true})),
+            Effect::Spawn { agent: "w".into(), resume: false, crash_note: None, wait_load: true }
         );
         assert_eq!(
             eff(json!({"fx": "route_done", "rid": 1, "state": "cancelled", "to": "shop-1", "xid": null})),

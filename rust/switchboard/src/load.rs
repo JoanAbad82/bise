@@ -5,8 +5,9 @@
 //! 100 on 12 cores). What scales with it: a REPL start's no-progress
 //! limit (crate::repl_start), a stall that counts as a crash or not
 //! (sb-core's `IExited`), the idle recycle's hold (crate::recycle).
-//! A test sets it with the test setting `SB_LOAD_FACTOR` (the hub's
-//! tests run it as a process), never from the real machine.
+//! A test sets it with the test setting `SB_LOAD_FACTOR` (a file
+//! holding the factor; the hub's tests run it as a process), never from
+//! the real machine.
 
 /// The highest factor: past it, the machine is just "very loaded".
 pub const MAX_FACTOR: f64 = 8.0;
@@ -31,11 +32,13 @@ pub fn is_loaded(factor: f64) -> bool {
     factor >= LOADED
 }
 
-/// The machine's factor now (`SB_LOAD_FACTOR` in a test); 1 when the
-/// load can't be read.
+/// The machine's factor now (in a test, the number in the file
+/// `SB_LOAD_FACTOR` names, read each time: a test moves the load); 1
+/// when the load can't be read.
 pub fn factor() -> f64 {
-    if let Some(f) = bise_home::env::test_setting("SB_LOAD_FACTOR").and_then(|s| s.trim().parse::<f64>().ok()) {
-        return f.clamp(1.0, MAX_FACTOR);
+    if let Some(f) = bise_home::env::test_setting("SB_LOAD_FACTOR") {
+        let n = std::fs::read_to_string(f).ok().and_then(|s| s.trim().parse::<f64>().ok());
+        return n.unwrap_or(1.0).clamp(1.0, MAX_FACTOR);
     }
     let mut avg = [0f64; 3];
     // SAFETY: getloadavg writes at most `nelem` doubles into `avg`.

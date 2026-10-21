@@ -102,6 +102,10 @@ pub struct Stall {
     pub reports: bool,
     /// The machine was loaded when it stalled (crate::load::is_loaded).
     pub loaded: bool,
+    /// This REPL's stalls in a row, this one counted: +1 a stall, reset
+    /// only when it connects (sb-core bounds its restarts by it,
+    /// hub/stall.bend).
+    pub row: u32,
 }
 
 /// The starts in flight, and the stalls of this hub.
@@ -114,6 +118,17 @@ pub struct Starts {
     stalled: BTreeSet<String>,
     /// stalled ones restarted: they go first (until their next start)
     first: BTreeSet<String>,
+    /// the idle machine's limit; 0: [`START_STILL_MS`] (a test's own:
+    /// [`Starts::with_still_ms`])
+    still_ms: u64,
+}
+
+impl Starts {
+    /// Starts whose idle limit is `ms` instead of [`START_STILL_MS`] (the
+    /// hub's tests: `SB_START_STILL_MS`).
+    pub fn with_still_ms(ms: u64) -> Starts {
+        Starts { still_ms: ms, ..Starts::default() }
+    }
 }
 
 /// A stall reports to probation (see the module header).
@@ -173,7 +188,10 @@ impl Starts {
     /// `factor` (the load when judged, not at their begin): out of
     /// flight, counted, each said once.
     pub fn stalled(&mut self, now_ms: u64, factor: f64) -> Vec<Stall> {
-        let limit = still_limit_ms(factor);
+        let limit = match self.still_ms {
+            0 => still_limit_ms(factor),
+            ms => (ms as f64 * factor.max(1.0)) as u64,
+        };
         let loaded = crate::load::is_loaded(factor);
         let late: Vec<(String, Kind, u64)> = self
             .flight
@@ -189,7 +207,8 @@ impl Starts {
             let n = self.row.entry(dir.clone()).or_insert(0);
             *n += 1;
             let reports = stall_reports(*n, self.stalled.len(), self.started.len());
-            out.push(Stall { dir, kind, secs, reports, loaded });
+            let row = *n;
+            out.push(Stall { dir, kind, secs, reports, loaded, row });
         }
         out
     }
@@ -286,7 +305,7 @@ mod tests {
         s.progress("c", 40_000);
         s.progress("d", 40_000);
         let st = s.stalled(45_000, 1.0);
-        assert_eq!(st, [Stall { dir: "a".into(), kind: Kind::Switch, secs: 45, reports: false, loaded: false }]);
+        assert_eq!(st, [Stall { dir: "a".into(), kind: Kind::Switch, secs: 45, reports: false, loaded: false, row: 1 }]);
         assert!(!s.in_flight("a"), "a stalled start leaves its slot");
         assert!(s.goes_first("a") && !s.goes_first("b"), "its restart goes first");
         // restarted, it stalls again: a reason to roll back
@@ -320,5 +339,48 @@ mod tests {
         }
         let st = s.stalled(45_000, 1.0);
         assert_eq!(st.iter().map(|x| x.reports).collect::<Vec<_>>(), [false, false, true, true]);
+    }
+
+    /// architect m_36171: sb-core bounds a loaded stall's restarts by the
+    /// row (hub/stall.bend), so the row is +1 per stall of that REPL,
+    /// reset only when it connects (not when it dies or is killed), and
+    /// never shared between REPLs.
+    #[test]
+    fn the_row_counts_one_repls_stalls_until_it_connects() {
+        let mut s = Starts::default();
+        let stall = |s: &mut Starts, d: &str, t: u64| {
+            s.begin(d, Kind::Start, t);
+            s.stalled(t + START_STILL_MS, 1.0).into_iter().find(|x| x.dir == d).map(|x| x.row)
+        };
+        assert_eq!(stall(&mut s, "a", 0), Some(1));
+        assert_eq!(stall(&mut s, "a", 100_000), Some(2));
+        // a death or a kill (ended) keeps the row
+        s.begin("a", Kind::Start, 200_000);
+        s.ended("a");
+        assert_eq!(stall(&mut s, "a", 300_000), Some(3));
+        // another REPL has its own
+        assert_eq!(stall(&mut s, "b", 400_000), Some(1));
+        // connected: from nothing again
+        s.begin("a", Kind::Start, 500_000);
+        s.connected("a");
+        assert_eq!(stall(&mut s, "a", 600_000), Some(1));
+        assert_eq!(stall(&mut s, "b", 700_000), Some(2));
+    }
+
+    /// main m_36148: the same stillness stalls an idle machine's start,
+    /// not a loaded one's; judged at the load then, `loaded` from x2.
+    #[test]
+    fn the_limit_scales_with_the_load_when_judged() {
+        assert_eq!(still_limit_ms(1.0), START_STILL_MS);
+        assert_eq!(still_limit_ms(0.5), START_STILL_MS, "never under the idle limit");
+        assert_eq!(still_limit_ms(4.0), 4 * START_STILL_MS);
+        let mut s = Starts::default();
+        s.begin("a", Kind::Start, 0);
+        assert!(s.stalled(100_000, 4.0).is_empty(), "100 s still at x4: not yet");
+        let st = s.stalled(100_000, 1.5);
+        assert!(st.len() == 1 && !st[0].loaded, "the load fell to x1.5: stalled, not loaded");
+        s.begin("b", Kind::Start, 0);
+        let st = s.stalled(4 * START_STILL_MS, 4.0);
+        assert!(st.len() == 1 && st[0].loaded);
     }
 }

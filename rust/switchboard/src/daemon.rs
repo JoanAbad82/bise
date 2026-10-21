@@ -832,11 +832,7 @@ impl Shell {
                     crate::computer_use::drop_agent(&self.proc_hub, name);
                 }
             }
-            Effect::Spawn {
-                agent,
-                resume,
-                crash_note,
-            } => self.spawn_on(&agent, resume, crash_note, None),
+            Effect::Spawn { agent, resume, crash_note, wait_load } => self.spawn_on(&agent, resume, crash_note, None, wait_load),
             Effect::Place(j) => self.place_work.run(j),
             Effect::Kill { agent } => {
                 if let Some(dir) = self.dir_of(&agent) {
@@ -1664,7 +1660,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         gens: BTreeMap::new(),
         next_gen: 1,
         pids: BTreeMap::new(),
-        starts: Default::default(),
+        starts: repl_starts::new_starts(),
         start_queue: BTreeMap::new(),
         clients: BTreeMap::new(),
         replies: BTreeMap::new(),

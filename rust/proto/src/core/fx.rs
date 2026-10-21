@@ -18,8 +18,9 @@ core_kinds! {
         Journal = "journal" => FJournal { ev: Json },
         /// an agent's runtime state (the view carries it too)
         Rt = "rt" => FRt { agent: Str, run: Str, waiting: Bool, turn_ms: OptNat, turns: Nat },
-        /// start an agent's REPL (`crash_note`: a restart after a crash)
-        Spawn = "spawn" => FSpawn { agent: Str, resume: Bool, crash_note: OptStr },
+        /// start an agent's REPL (`crash_note`: a restart after a crash;
+        /// `wait_load`: only at a tick under load x2, hub/stall.bend)
+        Spawn = "spawn" => FSpawn { agent: Str, resume: Bool, crash_note: OptStr, wait_load: Bool },
         Kill = "kill" => FKill { agent: Str },
         /// hub-loop: make the worktree of task `name` off the hub's loop,
         /// then send input `placed` (its REPL starts after it)

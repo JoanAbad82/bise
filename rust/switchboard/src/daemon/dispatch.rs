@@ -332,7 +332,7 @@ impl Shell {
             if let Some(name) = self.agent_by_dir(&dir).map(|a| a.name.clone()) {
                 self.restored.insert(dir.clone());
                 self.switch_spawned.insert(dir.clone());
-                self.spawn_on(&name, true, None, port);
+                self.spawn_on(&name, true, None, port, false);
                 return Flow::Go;
             }
         }
@@ -345,8 +345,13 @@ impl Shell {
         if cause.reports() {
             crate::switch::report_failure(&self.opts.paths, &format!("the REPL of {} stopped: {}", dir, reason));
         }
+        // a stall's facts: sb-core decides if it counts (hub/stall.bend)
+        let (stalled, loaded, row) = match cause {
+            super::repl_starts::Gone::Stalled { loaded, row, .. } => (true, loaded, u64::from(row)),
+            super::repl_starts::Gone::Died => (false, false, 0),
+        };
         if let Some(name) = self.agent_by_dir(&dir).map(|a| a.name.clone()) {
-            self.step(Input::ReplExited { agent: name, crashed: true, reason });
+            self.step(Input::ReplExited { agent: name, crashed: true, reason, stalled, loaded, row });
         }
         Flow::Go
     }

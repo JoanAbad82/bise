@@ -110,10 +110,16 @@ pub enum Input {
         agent: String,
         leftover: bool,
     },
+    /// `stalled`/`loaded`/`row`: a start that made no progress, the
+    /// machine at load x2+ then, that REPL's stalls in a row (sb-core's
+    /// hub/stall.bend decides what they do to the crash count)
     ReplExited {
         agent: String,
         crashed: bool,
         reason: String,
+        stalled: bool,
+        loaded: bool,
+        row: u64,
     },
     ClientHello {
         client: ClientId,
@@ -334,6 +340,8 @@ pub enum Effect {
         agent: String,
         resume: bool,
         crash_note: Option<String>,
+        /// admitted only at a tick under load x2 (hub/stall.bend)
+        wait_load: bool,
     },
     Kill {
         agent: String,
@@ -1480,8 +1488,8 @@ impl Hub {
             Input::Onto { agent, reply } => {
                 let _ = reply.send(self.onto_now(&agent).flatten());
             }
-            Input::ReplExited { agent, crashed, reason } => {
-                self.core(&mut fx, env, None, In::Exited(ci::Exited { agent, crashed, reason }))
+            Input::ReplExited { agent, crashed, reason, stalled, loaded, row } => {
+                self.core(&mut fx, env, None, In::Exited(ci::Exited { agent, crashed, reason, stalled, loaded, row }))
             }
             Input::ClientHello { client } => {
                 self.clients.insert(
