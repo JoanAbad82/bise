@@ -279,10 +279,17 @@ pub fn answered_split(who: &str, words: &str, width: &dyn Fn(&str) -> usize) -> 
 pub fn page_answer(p: &crate::parts::PageSaid<'_>, width: &dyn Fn(&str) -> usize) -> (String, String, String) {
     let (to, title, notes) = (p.to, p.title, p.notes);
     if let [n] = notes {
+        // his answer with images or files (card-image-parts, designer
+        // m_36256): the head names the question, his words in the bubble
+        // over the chips, never on the head's line
+        let chips = n.parts.iter().any(|p| matches!(p, crate::parts::Part::Image { .. } | crate::parts::Part::File { .. }));
         // a drawn pick's option (notif-artifact, designer m_26560): `you
         // picked A` (its name before ` · `), what it asked beside
-        if let Some(name) = Some(n).filter(|n| n.kind == "pick" && !n.asked.is_empty()).and_then(|n| n.text.split_once(" · ")).map(|(k, _)| k.trim()).filter(|k| !k.is_empty() && width(k) <= 12) {
+        if let Some(name) = Some(n).filter(|n| n.kind == "pick" && !n.asked.is_empty() && !chips).and_then(|n| n.text.split_once(" · ")).map(|(k, _)| k.trim()).filter(|k| !k.is_empty() && width(k) <= 12) {
             return (common::picked(name), n.asked.trim().to_string(), String::new());
+        }
+        if !n.asked.is_empty() && chips {
+            return (thread::answered_to(to), n.asked.trim().to_string(), page_note_words(n, false).trim().to_string());
         }
         if !n.asked.is_empty() {
             let (head, note) = answered_split(to, &page_note_words(n, false), width);

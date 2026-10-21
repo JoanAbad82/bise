@@ -207,12 +207,15 @@ export function pickedName(text: string): string {
 export function pageAnswer(p: PagePart): { head: string; on: string; asked: string; words: string } {
   const title = p.title != null && p.title !== '' ? p.title : p.page;
   const only = p.notes.length === 1 ? p.notes[0] : undefined;
+  // his answer with images or files (card-image-parts, designer m_36256): the head names the
+  // question, his words in the bubble over the chips, never on the head's line
+  const chips = only?.parts?.some((x) => x.kind === 'image' || x.kind === 'file') === true;
   // a drawn pick's option (notif-artifact, designer m_26560): 'you picked A' (its name before ' · ')
-  const name = only !== undefined && only.kind === 'pick' && (only.asked ?? '') !== '' ? pickedName(only.text ?? '') : '';
+  const name = only !== undefined && only.kind === 'pick' && (only.asked ?? '') !== '' && !chips ? pickedName(only.text ?? '') : '';
   if (only !== undefined && name !== '') return { head: common.picked({ name }), on: '', asked: (only.asked ?? '').trim(), words: '' };
   if (only !== undefined && (only.asked ?? '') !== '') {
     const w = pageNoteWords(only, false).trim();
-    const short = !w.includes('\n') && Array.from(w).length <= ON_THE_LINE;
+    const short = !chips && !w.includes('\n') && Array.from(w).length <= ON_THE_LINE;
     return short
       ? { head: common.fold_answered({ agent: p.to, pick: w }), on: '', asked: (only.asked ?? '').trim(), words: '' }
       : { head: thread.answered_to({ who: p.to }), on: '', asked: (only.asked ?? '').trim(), words: w };

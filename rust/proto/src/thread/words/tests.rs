@@ -14,7 +14,12 @@ fn a_page_answer_reads_as_his_words() {
     assert_eq!(said(std::slice::from_ref(&short)).0, "you answered main: xhigh");
     // a drawn pick's option (notif-artifact): you picked its name, what it asked beside
     let drawn = PageNote { text: "A · a pink border and a clear label".into(), asked: "which composer look?".into(), ..short };
-    assert_eq!(said(&[drawn]), ("you picked A".into(), "which composer look?".into(), String::new()));
+    assert_eq!(said(std::slice::from_ref(&drawn)), ("you picked A".into(), "which composer look?".into(), String::new()));
+    // his answer with an image (card-image-parts, designer m_36256): the
+    // head names the question, his words in the bubble, never on the line
+    let img = crate::parts::Part::Image { name: "[Image #1]".into(), source: "/u/a.png".into(), mime: "image/png".into(), b64_file: "/h/a.b64".into(), caption: String::new() };
+    let shot = PageNote { text: "the walls look fake".into(), parts: vec![img, crate::parts::Part::Text { text: " the walls look fake".into() }], ..drawn.clone() };
+    assert_eq!(said(&[shot]), ("you answered main".into(), "which composer look?".into(), "the walls look fake".into()));
     // a note, a tick, an edit, a keep: the page named, his words one per line
     let notes = [note("note", "shorter", "Revenue grew"), note("tick", "done", ""), note("edit", "Q3", "Q2"), note("keep", "", "")];
     assert_eq!(said(&notes[..1]).0, "you sent main a note on ↗ efforts");

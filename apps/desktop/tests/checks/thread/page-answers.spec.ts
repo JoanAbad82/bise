@@ -93,8 +93,12 @@ test("thread/page-answers: his answers on a page are rows of his words, never th
     await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText(thread.mark_done);
     await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText(thread.note_edit({ old: 'Q2', new: 'Q3' }));
     // his image and words: the words, then the image chip of his own bubble, never the tag
-    // short words go on the head's line ('you answered bise: …', as any short answer)
-    await expect(page.getByTestId('thread.pageanswer.6')).toContainText(common.fold_answered({ agent: 'bise', pick: 'the walls look fake' }));
+    // with an image, the head names the question and the bubble holds his words, short ones too
+    // (designer m_36256): 'you answered bise · <question>', then his words over the chip
+    await expect(page.getByTestId('thread.pageanswer.6')).toContainText(thread.answered_card({ who: 'bise', question: 'which plan for the climbing hall?' }));
+    await expect(page.getByTestId('thread.pageanswer.6')).not.toContainText(common.fold_answered({ agent: 'bise', pick: 'the walls look fake' }));
+    await expect(page.getByTestId('thread.pageanswer.6.words')).toHaveText('the walls look fake');
+    await page.getByTestId('thread.pageanswer.6').screenshot({ path: test.info().outputPath('page-answer-image-row-light.png') });
     await expect(page.getByTestId('thread.pageanswer.6.image.1')).toBeVisible();
     const all = await page.locator('body').innerText();
     for (const bad of ['answer with:', '<page-notes', '[from the page', 'you sent 1 note on your page', '<image', 'b64=']) {
