@@ -27,10 +27,15 @@ lang?: string, text: string, cut?: boolean, };
  */
 export type LogItem = { 
 /**
- * the log's seq (0: the context's system prompt and tools); pages
- * go by it (`HubCmd::Log.before`)
+ * the log's seq (0: the context's system prompt and tools)
  */
-seq: number, turn?: number, 
+seq: number, 
+/**
+ * its place in the whole history (the event's index << 16 | its
+ * rank among that event's rows): never moves as the log grows;
+ * pages go by it (`HubCmd::Log.before`), and find answers with it
+ */
+pos: number, turn?: number, 
 /**
  * the event's time
  */
@@ -64,3 +69,100 @@ estimated?: boolean,
  * a faint line above the body (a result's call id, exit, time)
  */
 meta?: string, };
+
+/**
+ * One block of a completion row: a text, a call or a result, with what
+ * it is ("tool_use · bash", "result"), drawn as its body says (a bash
+ * call is `code` bash, run_typescript `code` ts, another call `code`
+ * json, a text `md`, a result `code` json when it parses, else `plain`).
+ */
+export type CompBlock = { label?: string, body: LogBody, };
+
+/**
+ * One row of `/debug completion`: a slice of the request body the
+ * provider got (`bise_session::completion`). Row 0 is the request's
+ * head (the model, the params and the tools); the others are its
+ * system prompt and its messages, in the body's order, each with the
+ * provider's own role word (user, assistant, tool, developer,
+ * function_call, ...).
+ */
+export type CompRow = { 
+/**
+ * its place in the body (0: the head); pages go by it
+ */
+n: number, role: string, 
+/**
+ * the one-line summary of its header
+ */
+head: string, blocks: Array<CompBlock>, 
+/**
+ * the bytes of its slice of the body, and its tokens (bytes / 4)
+ */
+bytes: number, tokens: number, };
+
+/**
+ * One request the agent's ring keeps (`bise_session::reqlog`), for
+ * `/debug completion`'s [ ] steps, oldest first.
+ */
+export type CompSlot = { slot: number, req: number, 
+/**
+ * `turn` or `compaction`
+ */
+kind: string, 
+/**
+ * the full model id it went to, `provider/model`
+ */
+model: string, at_ms: number, 
+/**
+ * false: being written (the call is going out now)
+ */
+writing?: boolean, };
+
+/**
+ * `HubCmd::Completion`: which request, shown how.
+ */
+export type CompletionAsk = { 
+/**
+ * none: the hub's own (the TUI's socket serves one project)
+ */
+project: string, agent: string, 
+/**
+ * the ring slot (none: the newest request)
+ */
+slot?: number, 
+/**
+ * another family's body for the same request: `provider/model`, or
+ * a provider of the catalog (its first model); none: as sent
+ */
+provider?: string, 
+/**
+ * each row its slice of the body as sent (`r`)
+ */
+raw?: boolean, find?: string, };
+
+/**
+ * `HubEv::Completion`: one request's body as rows, whole (a body is a
+ * few MB at most; the clients draw only the rows in view).
+ */
+export type Completion = { project: string, agent: string, 
+/**
+ * the request shown (its ring slot; `slots` has the others)
+ */
+slot: CompSlot, 
+/**
+ * the family the rows are in (`anthropic`, `openai-chat`,
+ * `openai-responses`)
+ */
+family: string, 
+/**
+ * rendered for this model, not as sent (none: as sent)
+ */
+shown_as?: string, 
+/**
+ * the body's bytes
+ */
+bytes: number, rows: Array<CompRow>, slots: Array<CompSlot>, 
+/**
+ * with `find`: the `n` of every row that holds it
+ */
+hits?: Array<number>, };

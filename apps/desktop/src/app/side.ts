@@ -136,7 +136,7 @@ export function panelProject(route: Route, home: string | undefined, projects: n
     case 'agents':
     case 'changes':
     case 'review':
-    case 'log':
+    case 'debug':
     case 'feature':
     case 'prs':
     case 'commit':
@@ -164,8 +164,8 @@ export function crumbOf(route: Route, name: (project: string) => string): string
       return [name(route.project), route.screen];
     case 'review':
       return [name(route.project), route.agent, panel.crumb_changes];
-    case 'log':
-      return [name(route.project), route.agent, panel.crumb_log];
+    case 'debug':
+      return [name(route.project), route.agent, panel.crumb_debug];
     case 'feature':
       return [name(route.project), `ψ ${route.name}`];
     case 'commit':
@@ -199,7 +199,7 @@ export function crumbGoOf(route: Route, name: (project: string) => string): { c:
   return crumbOf(route, name).slice(0, -1).map((c, i) => {
     if ('project' in route && route.project !== '' && i === 0 && c === name(route.project))
       return { c, go: { screen: 'thread', project: route.project, agent: MAIN } };
-    if ((route.screen === 'review' || route.screen === 'log') && i === 1)
+    if ((route.screen === 'review' || route.screen === 'debug') && i === 1)
       return { c, go: { screen: 'thread', project: route.project, agent: route.agent } };
     if (c === panel.crumb_settings) return { c, go: { screen: 'settings' } };
     return { c };

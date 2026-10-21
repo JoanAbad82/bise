@@ -4,9 +4,10 @@
 //! only become wire rows ([`items`], bodies cut to TOOL_TEXT_CAP) and a
 //! page (`bise_proto::log::page`: rows and bytes capped).
 
-use bise_proto::log::{page, LogBody, LogBodyKind, LogItem, LogRole};
+use bise_proto::log::{LogBody, LogBodyKind, LogItem, LogRole, LOG_PAGE_BYTES, LOG_PAGE_ITEMS};
 use bise_proto::thread::TOOL_TEXT_CAP;
-use bise_session::history::{history, iso_ms, Body, Item, Role, Source};
+use bise_session::history::{iso_ms, Body, Item, Role};
+use bise_session::history_cache::Caches;
 use bise_session::tool_output::cut_to;
 use bise_session::{Log, Redactor};
 use std::path::Path;
@@ -29,7 +30,7 @@ fn item(it: &Item, log: &Log) -> LogItem {
         Role::Tools => (LogRole::Tools, None),
         Role::Summary => (LogRole::Summary, None),
         Role::Error => (LogRole::Error, None),
-        Role::Event => (LogRole::Event, None),
+        Role::Event | Role::Sent(_) => (LogRole::Event, None),
     };
     let body = |kind, lang: Option<&str>, text: &str| {
         let o = cut_to(text, TOOL_TEXT_CAP);
@@ -38,6 +39,7 @@ fn item(it: &Item, log: &Log) -> LogItem {
     let some = |s: &str| (!s.is_empty()).then(|| s.to_string());
     LogItem {
         seq: it.seq,
+        pos: it.pos,
         turn: it.turn,
         at_ms: log.events.get(it.idx).and_then(|e| iso_ms(&e.at)),
         role,
@@ -57,17 +59,39 @@ fn item(it: &Item, log: &Log) -> LogItem {
     }
 }
 
+/// The hub's history caches (bise_session::history_cache): one per
+/// session folder read, at most [`CACHES_MAX`], one not read for
+/// [`CACHES_IDLE_MS`] dropped. Owned here: only the `log` read uses them.
+static CACHES: std::sync::LazyLock<std::sync::Mutex<Caches>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(Caches::new(CACHES_MAX, CACHES_IDLE_MS)));
+const CACHES_MAX: usize = 4;
+const CACHES_IDLE_MS: u64 = 10 * 60 * 1000;
+
+/// What a `log` read answers: a page, whether older rows remain, and
+/// with `find`, the pos of every row that holds it.
+pub(super) type Page = (Vec<LogItem>, bool, Option<Vec<u64>>);
+
 /// A page of the session log in `dir` (the agent's current session):
-/// the rows with a seq under `before`, and whether older ones remain.
-pub(super) fn answer(dir: &Path, blobs: &Path, redact: &Redactor, before: Option<u64>) -> Result<(Vec<LogItem>, bool), String> {
-    let log = bise_session::read_dir(dir).map_err(|e| format!("no session log: {e}"))?;
-    let rows = history(&Source { log: &log, blobs, redact });
-    Ok(page(items(&rows, &log), before))
+/// the rows with a pos under `before`, and whether older ones remain;
+/// with `find`, its hits in the whole history and, without `before`,
+/// the page that ends at the newest hit.
+pub(super) fn answer(dir: &Path, blobs: &Path, redact: &Redactor, before: Option<u64>, find: Option<&str>) -> Result<Page, String> {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
+    let mut all = CACHES.lock().unwrap_or_else(|e| e.into_inner());
+    let c = all.get(dir, blobs, redact, now).map_err(|e| format!("no session log: {e}"))?;
+    let hits = find.map(|f| c.find(redact, f));
+    let before = match (&hits, before) {
+        (Some(h), None) => h.last().map(|p| p + 1),
+        _ => before,
+    };
+    let (rows, more) = c.page(redact, before, LOG_PAGE_ITEMS, LOG_PAGE_BYTES);
+    Ok((items(&rows, c.log()), more, hits))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bise_session::history::{history, Source};
     use serde_json::json;
 
     /// a session of one turn with `key` in every text the rows show: his
@@ -119,8 +143,9 @@ mod tests {
         let tui = format!("{rows:?}");
         assert!(!json.contains(key) && !tui.contains(key), "the key leaked: {json}");
         assert!(json.contains("you") && json.contains("call") && json.contains("result"), "{json}");
-        let (p, more) = answer(&tmp, &tmp, &redact, None).unwrap();
+        let (p, more, hits) = answer(&tmp, &tmp, &redact, None, Some("done with")).unwrap();
         assert_eq!((p, more), (wire.clone(), false));
+        assert_eq!(hits, Some(vec![wire.last().unwrap().pos]));
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }

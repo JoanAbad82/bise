@@ -65,7 +65,8 @@ def main():
     port = s.getsockname()[1]
     s.close()
     session = os.path.join(tmp, "session.txt")
-    dump = os.path.join(tmp, "wire-dump")
+    dump = os.path.join(tmp, "requests") + "/"
+    os.makedirs(dump, exist_ok=True)
     env = {k: v for k, v in os.environ.items() if not k.startswith(("BEND_", "SB_", "BISE_"))}
     env.update(HOME=tmp, XDG_STATE_HOME=os.path.join(tmp, "state"), BISE_MODELS_FILE=models, BEND_CONFIG=cfg,
                BEND_REPL_PORT=str(port), BEND_SESSION_FILE=session, BEND_WIRE_LOG=os.path.join(tmp, "wire.log"),

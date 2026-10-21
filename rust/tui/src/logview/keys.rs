@@ -72,25 +72,30 @@ pub(crate) fn on_key(app: &mut App, k: &KeyEvent) -> bool {
         KeyCode::Char('d') if ctrl => v.scroll(page as isize / 2, width),
         KeyCode::Char('u') if ctrl => v.scroll(-(page as isize / 2), width),
         KeyCode::Tab | KeyCode::BackTab => {
-            let m = if v.mode == Mode::History { Mode::Model } else { Mode::History };
-            // from the history, the model view opens on the cursor's request
-            if m == Mode::Model {
-                if let Some(&i) = v.vis.get(v.sel) {
-                    let idx = v.history[i].idx;
-                    if let Some(r) = v.requests.iter().position(|r| r.idx >= idx) {
-                        v.req = r;
-                    }
-                }
-            }
+            let m = if v.mode == Mode::History { Mode::Completion } else { Mode::History };
             v.set_mode(m);
         }
         KeyCode::Char('[') => v.step_request(-1),
         KeyCode::Char(']') => v.step_request(1),
-        KeyCode::Up | KeyCode::Char('k') => v.sel = v.sel.saturating_sub(1),
+        KeyCode::Up | KeyCode::Char('k') => {
+            // the first entry built: the events above it, built now
+            if v.sel == 0 {
+                v.grow(false);
+            }
+            v.sel = v.sel.saturating_sub(1);
+        }
         KeyCode::Down | KeyCode::Char('j') => v.sel = (v.sel + 1).min(n.saturating_sub(1)),
         KeyCode::PageDown => v.scroll(page as isize, width),
-        KeyCode::PageUp => v.scroll(-(page as isize), width),
-        KeyCode::Home | KeyCode::Char('g') => (v.sel, v.top) = (0, (0, 0)),
+        KeyCode::PageUp => {
+            if v.top.0 == 0 {
+                v.grow(false);
+            }
+            v.scroll(-(page as isize), width)
+        }
+        KeyCode::Home | KeyCode::Char('g') => {
+            v.grow(true);
+            (v.sel, v.top) = (0, (0, 0))
+        }
         KeyCode::End | KeyCode::Char('G') => v.bottom(),
         KeyCode::Char(' ') | KeyCode::Enter => {
             if let Some(&i) = v.vis.get(v.sel) {
@@ -105,6 +110,7 @@ pub(crate) fn on_key(app: &mut App, k: &KeyEvent) -> bool {
             rows.extend(v.tools().into_iter().map(|t| format!("tool:{t}")));
             v.picker = Some(Picker { rows, sel: 0 });
         }
+        KeyCode::Char('r') if v.mode == Mode::Completion => v.toggle_raw(),
         KeyCode::Char('r') => {
             // read the log again (it grew)
             let agent = v.agent.clone();

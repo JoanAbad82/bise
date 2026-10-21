@@ -28,8 +28,10 @@ export const TAGS = {
   // the answer to queued_take (turn/unqueue): his taken-back words, to the asking window (main 34c35175)
   queued_taken: true,
   // the answer to log (log/read): a page of an agent's raw session, read through onEvent by the
-  // window's /log screen (main 0c227ae3)
+  // window's /debug screen (main 0c227ae3); `hits` with a find
   log: true,
+  // the answer to completion (log/completion): a request of the agent's ring, /debug completion
+  completion: true,
   diff: true,
   route: true,
   route_done: true,

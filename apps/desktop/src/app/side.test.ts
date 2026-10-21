@@ -95,7 +95,7 @@ describe('the frame', () => {
       { c: 'storefront', go: { screen: 'thread', project: 'p', agent: 'main' } },
     ]);
     // a log: the project → its main, the agent → its thread, its own word stays plain (the last)
-    expect(crumbGoOf({ screen: 'log', project: 'p', agent: 'perf' }, name)[1]).toEqual({ c: 'perf', go: { screen: 'thread', project: 'p', agent: 'perf' } });
+    expect(crumbGoOf({ screen: 'debug', project: 'p', agent: 'perf' }, name)[1]).toEqual({ c: 'perf', go: { screen: 'thread', project: 'p', agent: 'perf' } });
     // a project's lists (agents, archived, changes…): their word is the last, where he is; the project's name is the way back
     expect(crumbGoOf({ screen: 'agents', project: 'p' }, name)).toEqual([{ c: 'storefront', go: { screen: 'thread', project: 'p', agent: 'main' } }]);
     expect(crumbGoOf({ screen: 'agents', project: 'p', archived: true }, name)).toEqual([{ c: 'storefront', go: { screen: 'thread', project: 'p', agent: 'main' } }]);

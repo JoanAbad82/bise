@@ -1,8 +1,28 @@
 """The fake ChatGPT plan's model list (fake_provider.py's /models and its
 model check): $FAKE_PLAN_MODELS, else three listed models and one hidden.
 A model OpenAI has that the list lacks gets the plan route's own 400
-(chatgpt-default, token-audit m_33677)."""
+(chatgpt-default, token-audit m_33677). Also the plan route's token
+tests: a Bearer's token, and whether it is a JWT (moved from
+fake_provider.py, its line limit)."""
+import base64
+import json
 import os
+
+
+def bearer_of(headers):
+    a = headers.get("authorization") or ""
+    return a[7:].strip() if a.lower().startswith("bearer ") else ""
+
+
+def is_jwt(token):
+    parts = token.split(".")
+    if len(parts) != 3:
+        return False
+    try:
+        head = json.loads(base64.urlsafe_b64decode(parts[0] + "=" * (-len(parts[0]) % 4)))
+    except ValueError:
+        return False
+    return isinstance(head, dict) and head.get("alg") == "RS256"
 
 
 def plan_models():

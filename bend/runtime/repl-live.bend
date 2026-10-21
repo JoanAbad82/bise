@@ -29,6 +29,7 @@ import ./repl-core.bend as Rc
 import ./debug.bend as Dbg
 import ./repl-core-pure.bend as Rcp
 import ./oneshot.bend as Os
+import ./render.bend as Rd
 
 # how many tokens of the user's most recent messages a compaction keeps
 # verbatim after the summary, counted from the newest (core/history.bend
@@ -279,9 +280,21 @@ def main.pick(empty: Bool, +path: String) -> IO(Unit):
     case False{}:
       Os.run(path)
 
+# BISE_RENDER=<wire file> (/debug completion <provider>): the body
+# Pv.request_body makes of it, written, no call (runtime/render.bend)
+@unsafe
+def main.render(empty: Bool, +render: String, +oneshot: String) -> IO(Unit):
+  match empty:
+    case True{}:
+      main.pick(String.is_empty(oneshot), oneshot)
+    case False{}:
+      Rd.run(render)
+
 @unsafe
 def main() -> IO(Unit):
   do IO<Unit>:
     r : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_ONESHOT")
+    d : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_RENDER")
     +path : String <- IO.pure(String, P.env_or(r, ""))
-    main.pick(String.is_empty(path), path)
+    +render : String <- IO.pure(String, P.env_or(d, ""))
+    main.render(String.is_empty(render), render, path)

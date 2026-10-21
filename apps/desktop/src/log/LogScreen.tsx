@@ -1,13 +1,15 @@
-// /log in the window (tui-parity N2, designer m_17266): the agent's raw session as the TUI's
-// rust/tui/src/logview.rs draws it, read-only and redacted by the hub. The hub answers
-// `log {project, agent, before?}` with a page of LogItems (newest rows, oldest first, `more`
-// when older remain); the screen opens at the end, asks the page before when he scrolls to
-// the top, and keeps his place. One header row per entry ('#seq  time  label  head … size'),
-// its body under it on a rail in the kind's colour (prose in the thread's sans at 680, tools
-// in the code box), folds past 6 lines ('▸ 34 lines · 2.1 KB'), turns and compactions as
-// rules. Keys: ⌘F or / find (n N), f filter, g G top / bottom, ↑↓ j k move, space open,
-// ⌘O open all, r reload, esc back. 'what the model got' (the TUI's tab) comes later: its
-// tab is in the head, greyed. Owner: amb-web.
+// /debug in the window (designer m_17266, debug-views v3): two tabs, history and completion
+// (Completion.tsx). History is the agent's raw session as the TUI's rust/tui/src/logview.rs
+// draws it, read-only and redacted by the hub. The hub answers `log {project, agent, before?}`
+// with a page of LogItems (newest rows, oldest first, `more` when older remain; `before` is a
+// row's pos); the screen opens at the end, asks the page before when he scrolls to the top,
+// and keeps his place. `log {find}` answers the pos of every row of the whole history that
+// holds the words: '3 of 27', n N (⌘G ⇧⌘G) go to the next one and read the pages up to it.
+// One header row per entry ('#seq  time  label  head … size'), its body under it on a rail in
+// the kind's colour (prose in the thread's sans at 680, tools in the code box), folds past 6
+// lines ('▸ 34 lines · 2.1 KB'), turns and compactions as rules. Keys: ⌘F or / find, f filter,
+// g G top / bottom, ↑↓ j k move, space open, ⌘O open all, r reload, ⌘] or tab completion, esc
+// back. Owners: amb-web, debug-cmd.
 import {
   useCallback,
   useEffect,
@@ -18,7 +20,7 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import type { LogItem } from "@/proto";
-import { Head, Input, Press } from "@/ds";
+import { Head, Press } from "@/ds";
 import { useCoreEvent, useStore } from "@/store";
 import type { Ev } from "@/store/store";
 import { useRouter } from "@/app/router";
@@ -26,11 +28,11 @@ import { stepOf } from "@/app/listkeys";
 import { Markdown } from "@/thread/Markdown";
 import { Code } from "@/thread/Code";
 import { rangesIn } from "@/thread/findranges";
+import { Completion } from "./Completion";
+import { FindLine, K, useScreenKeys } from "./parts";
 import {
   codeText,
   editDiff,
-  findCount,
-  findRows,
   foldLabel,
   folds,
   kindOf,
@@ -41,27 +43,90 @@ import {
   ruleKind,
   shown,
   sizeOf,
+  stepHit,
   timeOf,
   type EditDiff,
   type Kind,
 } from "./model";
 import "./log.css";
 
-/** A row and the key it keeps across pages (an older page goes before it). */
+/** A row and its key: its pos in the history (an older page goes before it). */
 interface Row {
   readonly key: number;
   readonly it: LogItem;
 }
+const rowOf = (it: LogItem): Row => ({ key: it.pos, it });
 
 /** Ask the page before when he is this close to the top. */
 const NEAR_TOP = 240;
+/** A find asks the hub once he stops typing this long. */
+const FIND_MS = 180;
 
+export type DebugTab = "history" | "completion";
+
+/** /debug: the head with its two tabs, and the tab shown. */
 export function LogScreen({
   project,
   agent,
+  tab: first = "history",
+  provider,
 }: {
   project: string;
   agent: string;
+  tab?: DebugTab;
+  provider?: string | undefined;
+}) {
+  const [tab, setTab] = useState<DebugTab>(first);
+  const other = () => {
+    setTab((t) => (t === "history" ? "completion" : "history"));
+  };
+  const tabOf = (t: DebugTab) => (
+    <span
+      className={`lg-tab${tab === t ? " on" : ""}`}
+      role="tab"
+      aria-selected={tab === t}
+      data-testid={`log.tab.${t}`}
+      onClick={() => {
+        setTab(t);
+      }}
+    >
+      {t}
+    </span>
+  );
+  return (
+    <section className="lg" data-testid="log">
+      <Head
+        title={`${agent} · debug`}
+        sub={<span data-testid="log.sub">read-only · redacted</span>}
+        end={
+          <span className="lg-tabs" role="tablist">
+            {tabOf("history")}
+            {tabOf("completion")}
+          </span>
+        }
+      />
+      {tab === "history" ? (
+        <History project={project} agent={agent} onTab={other} />
+      ) : (
+        <Completion
+          project={project}
+          agent={agent}
+          provider={provider}
+          onTab={other}
+        />
+      )}
+    </section>
+  );
+}
+
+function History({
+  project,
+  agent,
+  onTab,
+}: {
+  project: string;
+  agent: string;
+  onTab: () => void;
 }) {
   const store = useStore();
   const router = useRouter();
@@ -77,14 +142,20 @@ export function LogScreen({
   const [finding, setFinding] = useState(false);
   const [needle, setNeedle] = useState("");
   const [at, setAt] = useState(0);
+  // the hub's hits for the needle (row positions in the whole history, oldest first); null
+  // while it is asked
+  const [hitPos, setHitPos] = useState<readonly number[] | null>([]);
   // an older page asked, not answered yet
   const [paging, setPaging] = useState(false);
   const list = useRef<HTMLDivElement>(null);
-  const root = useRef<HTMLElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
   // the page asked (undefined: the newest), its scroll height before (an older page keeps his place)
   const asked = useRef<{ before?: number; height: number } | null>(null);
-  const keys = useRef({ old: 0, next: 1 });
+  // the finds asked, oldest first (the hub answers in order): their needles
+  const finds = useRef<string[]>([]);
+  // a hit older than the rows read: the pages before are read up to it
+  const want = useRef<number | null>(null);
 
   // the hub's command, and what was asked (no React state: the open's effect calls it)
   const send = useCallback(
@@ -101,10 +172,35 @@ export function LogScreen({
     },
     [store, project, agent],
   );
-  const ask = (before?: number) => {
-    setPaging(before !== undefined);
-    send(before);
-  };
+  // the needle's hits in the whole history (the hub's history_cache find), once he stops typing
+  useEffect(() => {
+    const n = needle.trim();
+    if (n === "") return;
+    const t = setTimeout(() => {
+      finds.current.push(n);
+      store.command({ cmd: "log", project, agent, find: n });
+    }, FIND_MS);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [store, project, agent, needle]);
+  const ask = useCallback(
+    (before?: number) => {
+      setPaging(before !== undefined);
+      send(before);
+    },
+    [send],
+  );
+  const reveal = useCallback(
+    (key: number, block: ScrollLogicalPosition = "nearest") => {
+      requestAnimationFrame(() => {
+        list.current
+          ?.querySelector(`[data-key="${String(key)}"]`)
+          ?.scrollIntoView({ block });
+      });
+    },
+    [],
+  );
   useEffect(() => {
     send();
     root.current?.focus();
@@ -125,25 +221,30 @@ export function LogScreen({
         }
         if (ev.ev !== "log" || ev.project !== project || ev.agent !== agent)
           return;
+        if (ev.hits !== undefined) {
+          // a find's answer: its hits only (its page is the one ending at the newest hit,
+          // the rows read stay); a later needle's answer wins
+          const n = finds.current.shift();
+          if (finds.current.length === 0 && n !== undefined) {
+            setHitPos(ev.hits);
+            setAt(Math.max(0, ev.hits.length - 1));
+          }
+          return;
+        }
         const q = asked.current;
         if (q?.before === undefined) {
           // the newest page: the rows from scratch (an open, a reload)
-          const k = keys.current;
-          k.old = 0;
-          k.next = ev.items.length + 1;
-          setRows(ev.items.map((it, i) => ({ key: i + 1, it })));
+          setRows(ev.items.map(rowOf));
           setOpen(new Set());
           setCursor(null);
         } else {
-          const k = keys.current;
           setRows((rs) => {
-            const first = rs[0]?.it.seq;
+            const first = rs[0]?.it.pos;
             const older =
               first === undefined
                 ? ev.items
-                : ev.items.filter((o) => o.seq <= first);
-            k.old -= older.length;
-            return [...older.map((it, i) => ({ key: k.old + i, it })), ...rs];
+                : ev.items.filter((o) => o.pos < first);
+            return [...older.map(rowOf), ...rs];
           });
         }
         setMore(ev.more);
@@ -168,11 +269,28 @@ export function LogScreen({
 
   const onScroll = () => {
     const el = list.current;
-    const first = rows[0]?.it.seq;
+    const first = rows[0]?.it.pos;
     if (el === null || !more || asked.current !== null || first === undefined)
       return;
     if (el.scrollTop < NEAR_TOP) ask(first);
   };
+
+  // a hit older than the rows read: the next page before, until it is read (or none remain)
+  useEffect(() => {
+    const w = want.current;
+    if (w === null || asked.current !== null) return;
+    const r = rows.find((x) => x.key === w);
+    if (r !== undefined) {
+      want.current = null;
+      setCursor(w);
+      setOpen((o) => new Set(o).add(w));
+      reveal(w, "center");
+      return;
+    }
+    const first = rows[0]?.it.pos;
+    if (more && first !== undefined && w < first) ask(first);
+    else want.current = null;
+  }, [rows, more, ask, reveal]);
 
   const visible = useMemo(
     () => rows.filter((r) => shown(r.it, hidden)),
@@ -182,14 +300,9 @@ export function LogScreen({
     () => visible.filter((r) => r.it.rule === undefined),
     [visible],
   );
-  const hits = useMemo(
-    () =>
-      findRows(
-        visible.map((r) => r.it),
-        needle,
-      ).map((i) => visible[i]?.key ?? 0),
-    [visible, needle],
-  );
+  // the hub's hits, the row keys (pos) to go to; the rows read mark theirs
+  const hits = useMemo(() => hitPos ?? [], [hitPos]);
+  const hitSet = useMemo(() => new Set(hits), [hits]);
   const kinds = useMemo(() => kindsIn(rows.map((r) => r.it)), [rows]);
 
   // the find marks only the matched words, in the selection's tint (the current match's row
@@ -216,21 +329,21 @@ export function LogScreen({
   }, [needle, hits, at, visible, open]);
   const isOpen = (r: Row): boolean => !folds(r.it) || open.has(r.key);
 
-  const reveal = (key: number, block: ScrollLogicalPosition = "nearest") => {
-    requestAnimationFrame(() => {
-      list.current
-        ?.querySelector(`[data-key="${String(key)}"]`)
-        ?.scrollIntoView({ block });
-    });
-  };
-  const goHit = (i: number) => {
-    if (hits.length === 0) return;
-    const n = ((i % hits.length) + hits.length) % hits.length;
-    const key = hits[n] ?? 0;
+  // a hit by its place in the hub's list: there when its row is read, else the pages before
+  // are read up to it (the effect above)
+  const goHit = (n: number) => {
+    const key = hits[n];
+    if (key === undefined) return;
     setAt(n);
-    setCursor(key);
-    setOpen((o) => new Set(o).add(key));
-    reveal(key, "center");
+    if (rows.some((r) => r.key === key)) {
+      setCursor(key);
+      setOpen((o) => new Set(o).add(key));
+      reveal(key, "center");
+    } else {
+      want.current = key;
+      const first = rows[0]?.it.pos;
+      if (more && first !== undefined && asked.current === null) ask(first);
+    }
   };
   const toggle = (key: number) => {
     setOpen((o) => {
@@ -283,14 +396,25 @@ export function LogScreen({
   const closeFind = () => {
     setFinding(false);
     setNeedle("");
+    setHitPos([]);
     root.current?.focus();
   };
 
   const onKey = (e: KeyboardEvent) => {
     const mod = e.metaKey || e.ctrlKey;
+    if (mod && (e.key === "]" || e.key === "[")) {
+      e.preventDefault();
+      onTab();
+      return;
+    }
     if (mod && e.key.toLowerCase() === "f") {
       e.preventDefault();
       openFind();
+      return;
+    }
+    if (mod && e.key.toLowerCase() === "g") {
+      e.preventDefault();
+      goHit(stepHit(at, e.shiftKey ? -1 : 1, hits.length));
       return;
     }
     if (mod && e.key.toLowerCase() === "o") {
@@ -310,15 +434,18 @@ export function LogScreen({
       if (filtering) setFiltering(false);
       else if (finding || needle !== "") closeFind();
       else router.back();
+    } else if (k === "Tab") {
+      done();
+      onTab();
     } else if (k === "/") {
       done();
       openFind();
     } else if (k === "n" && hits.length > 0) {
       done();
-      goHit(at + 1);
+      goHit(stepHit(at, 1, hits.length));
     } else if (k === "N" && hits.length > 0) {
       done();
-      goHit(at - 1);
+      goHit(stepHit(at, -1, hits.length));
     } else if (k === "f") {
       done();
       setFiltering((f) => !f);
@@ -340,53 +467,10 @@ export function LogScreen({
       reload();
     }
   };
-  // the screen's keys on window in the capture phase, as the thread's: they run before
-  // type-anywhere (composer/grab.ts, on document), so f g G j k n r stay /log's and never send
-  // the focus to the composer. Only while the focus is in the screen.
-  const keyRef = useRef(onKey);
-  useLayoutEffect(() => {
-    keyRef.current = onKey;
-  });
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      const el = root.current;
-      if (el !== null && el.contains(document.activeElement)) keyRef.current(e);
-    };
-    window.addEventListener("keydown", h, true);
-    return () => {
-      window.removeEventListener("keydown", h, true);
-    };
-  }, []);
+  useScreenKeys(root, onKey);
 
-  const title = `${agent} · session log`;
   return (
-    <section className="lg" data-testid="log" tabIndex={-1} ref={root}>
-      <Head
-        title={title}
-        sub={<span data-testid="log.sub">read-only · redacted</span>}
-        end={
-          <span className="lg-tabs" role="tablist">
-            <span
-              className="lg-tab on"
-              role="tab"
-              aria-selected="true"
-              data-testid="log.tab.full"
-            >
-              full history
-            </span>
-            <span
-              className="lg-tab"
-              role="tab"
-              aria-selected="false"
-              aria-disabled="true"
-              title="later"
-              data-testid="log.tab.model"
-            >
-              what the model got
-            </span>
-          </span>
-        }
-      />
+    <div className="lg-pane" tabIndex={-1} ref={root} data-testid="debug.history">
       {filtering && (
         <div className="lg-filter" data-testid="log.filter">
           {kinds.map((k) => (
@@ -438,7 +522,7 @@ export function LogScreen({
               agent={agent}
               open={isOpen(r)}
               at={r.key === cursor}
-              hit={hits.includes(r.key)}
+              hit={hitSet.has(r.key)}
               onToggle={toggle}
               onPick={pick}
             />
@@ -447,79 +531,41 @@ export function LogScreen({
       </div>
       <div className="lg-keys" data-testid="log.keys">
         {finding ? (
-          <span className="lg-find">
-            <span className="w">find</span>
-            <Input
-              ref={field}
-              data-testid="log.find"
-              value={needle}
-              placeholder="find in the log"
-              onChange={(e) => {
-                setNeedle(e.target.value);
-                setAt(0);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  closeFind();
-                } else if (e.key === "Enter") {
-                  e.preventDefault();
-                  goHit(
-                    e.shiftKey
-                      ? at - 1
-                      : at + 1 - (cursorIsHit(cursor, hits, at) ? 0 : 1),
-                  );
-                }
-              }}
-            />
-          </span>
+          <FindLine
+            field={field}
+            needle={needle}
+            at={at}
+            of={hits.length}
+            busy={hitPos === null}
+            onNeedle={(n) => {
+              setNeedle(n);
+              // the hits come from the hub (the effect above): none for blank words, else asked
+              setHitPos(n.trim() === "" ? [] : null);
+            }}
+            onStep={(by) => {
+              // the first ⏎ goes to the current hit (the newest), the next ones move on
+              goHit(stepHit(at, cursor === hits[at] ? by : 0, hits.length));
+            }}
+            onClose={closeFind}
+          />
         ) : (
           <>
             <span className="lg-keyline">
               <K k="⌘F">find</K>
-              <K k="n N">next / previous</K>
+              <K k="⌘G">next</K>
               <K k="f">filter</K>
               <K k="g G">top / bottom</K>
-              <K k="space">open</K>
+              <K k="⏎">open</K>
               <K k="⌘O">open all</K>
-              <K k="r">reload</K>
+              <K k="⌘]">completion</K>
             </span>
             <K k="esc" esc>
               back
             </K>
           </>
         )}
-        {needle.trim() !== "" && (
-          <span className="lg-count" data-testid="log.count">
-            {findCount(at, hits.length)}
-          </span>
-        )}
       </div>
-    </section>
-  );
-}
-
-/** ⏎ in the field: the first press goes to the current match, the next ones move on. */
-const cursorIsHit = (
-  cursor: number | null,
-  hits: readonly number[],
-  at: number,
-): boolean => cursor !== null && hits[at] === cursor;
-
-function K({
-  k,
-  esc = false,
-  children,
-}: {
-  k: string;
-  esc?: boolean;
-  children: string;
-}) {
-  return (
-    <span className={esc ? "lg-k esc" : "lg-k"}>
-      <kbd>{k}</kbd> {children}
-    </span>
+    </div>
   );
 }
 

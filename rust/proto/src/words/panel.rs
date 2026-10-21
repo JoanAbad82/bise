@@ -276,8 +276,8 @@ crate::words! { panel:
     // ---- the desktop's title bar
     /// the crumb of an agent's changes
     crumb_changes = "changes";
-    /// the crumb of an agent's session log
-    crumb_log = "session log";
+    /// the crumb of an agent's /debug (its history, its requests)
+    crumb_debug = "debug";
     /// the crumb of settings
     crumb_settings = "settings";
     /// the crumb of an unknown route

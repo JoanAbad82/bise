@@ -148,15 +148,15 @@
     "one": null,
     "text": "crash report"
   },
+  "panel.crumb_debug": {
+    "args": [],
+    "one": null,
+    "text": "debug"
+  },
   "panel.crumb_lab": {
     "args": [],
     "one": null,
     "text": "lab"
-  },
-  "panel.crumb_log": {
-    "args": [],
-    "one": null,
-    "text": "session log"
   },
   "panel.crumb_not_found": {
     "args": [],

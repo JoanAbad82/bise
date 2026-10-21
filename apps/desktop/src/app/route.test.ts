@@ -140,7 +140,7 @@ describe('esc up (designer desktop-history)', () => {
     expect(upOf({ screen: 'thread', project: 'p', agent: 'perf' })).toEqual({ screen: 'thread', project: 'p', agent: MAIN });
     expect(upOf({ screen: 'thread', project: 'p', agent: MAIN })).toEqual({ screen: 'bise' });
     expect(upOf({ screen: 'bise' })).toBeNull();
-    for (const s of ['agents/p', 'agents/p/archived', 'artifacts', 'scheduled', 'settings/keys', 'changes/p', 'log/p/a', 'report']) expect(upOf(parseRoute(s)), s).toBe('back');
+    for (const s of ['agents/p', 'agents/p/archived', 'artifacts', 'scheduled', 'settings/keys', 'changes/p', 'debug/p/a', 'debug/p/a/completion/openai', 'report']) expect(upOf(parseRoute(s)), s).toBe('back');
     const r = createRouter({ screen: 'changes', project: 'p' });
     expect(escTarget(r)).toEqual({ screen: 'thread', project: 'p', agent: MAIN });
     expect(escTarget(createRouter({ screen: 'settings' }))).toEqual({ screen: 'bise' });

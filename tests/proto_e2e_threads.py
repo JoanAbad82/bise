@@ -336,21 +336,25 @@ def tools_round(c, E):
 
     # log/read gives a page of main's raw session, the TUI's rows: his
     # message, the calls and their results (seq 1 2000's and the
-    # write_file's), oldest first; a page 'before' its first row's seq
-    # has only older rows
+    # write_file's), oldest first; a page 'before' its first row's pos
+    # has only older rows (pos: the row's stable place, debug-cmd)
     lg = ok(req(c, "log/read", agent="main"), "log/read")
     check(isinstance(lg, dict) and "items" in lg, "log/read's result has its rows: %r" % (json.dumps(lg)[:600],))
     items = lg["items"]
     roles = {i["role"] for i in items}
     check(items and {"you", "call", "result"} <= roles, "log rows: %r" % sorted(roles))
-    check([i["seq"] for i in items] == sorted(i["seq"] for i in items), "oldest first")
+    check([i["pos"] for i in items] == sorted(i["pos"] for i in items), "oldest first")
     check(any(i["role"] == "call" and i.get("tool") == "write_file" for i in items), "the write_file call is a row")
     check(any(i["role"] == "result" and i.get("ok") is True for i in items), "a result with its ok")
     check(all(len(i.get("body", {}).get("text", "")) <= 4096 for i in items), "bodies capped")
     if lg["more"]:
-        first = items[0]["seq"]
+        first = items[0]["pos"]
         older = ok(req(c, "log/read", agent="main", before=first), "an older log page")
-        check(all(i["seq"] < first for i in older["items"]), "an older page: %r" % older)
+        check(all(i["pos"] < first for i in older["items"]), "an older page: %r" % older)
+    # find: every row that holds it in the whole history, and the page
+    # that ends at the newest
+    hit = ok(req(c, "log/read", agent="main", find="write_file"), "log/read with find")
+    check(hit.get("hits") and hit["items"][-1]["pos"] == hit["hits"][-1], "find's hits and its page: %r" % json.dumps(hit)[:400])
     refused(req(c, "log/read", agent="nobody"), "log/read of an unknown agent")
 
 

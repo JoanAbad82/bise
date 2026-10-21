@@ -1,14 +1,17 @@
-//! `/log`: the raw session of the agent in view, read
-//! from its session log (`~/.bise/sessions/<id>/`, rust/session), in a
-//! full screen. Two views: the full history (every entry in order, the
-//! turns and the compactions as rules) and what the model got for one
-//! request (the system prompt, the tools and the context the log held
-//! right before it, compaction applied). Read-only: the log is read
-//! once at open (`r` reads it again); every text is redacted.
+//! `/debug`: the agent in view, in a full screen, two tabs.
+//! `/debug history`: its raw session (`~/.bise/sessions/<id>/`), every
+//! entry in order, the turns and compactions as rules, the end first
+//! (bise_session::history_cache: older events built as you go up, the
+//! whole log for a search). `/debug completion [provider]`: a request
+//! of its ring (bise_session::reqlog) exactly as the provider got it, cut
+//! into rows by bise_session::completion; with a provider, the body
+//! that provider's family would get, made by the runtime through the hub
+//! (`log/completion`). Read-only; every text is redacted.
 //!
 //! Keys: ↑↓ (j/k) move between entries, space or ⏎ opens one, ctrl+o
 //! opens them all, / searches (n/N), f filters roles and tools, tab
-//! switches views, [ ] change the request, g/G top/bottom, esc closes.
+//! switches tabs, [ ] change the request, r the raw JSON, g/G
+//! top/bottom, esc closes.
 //!
 //! Here: the state ([`View`]) and how it loads and moves; the keys in
 //! `keys.rs`, the words, rows and the frame in `rows.rs`.
@@ -19,6 +22,7 @@
 
 // the rows: bise_session's builder, the hub's typed `log` read uses it too
 use bise_session::history as model;
+mod comp;
 mod keys;
 mod rows;
 #[cfg(test)]
@@ -27,10 +31,10 @@ pub(crate) use keys::{mouse, on_key};
 pub(crate) use rows::*;
 
 use crate::{theme, App};
-use bise_session::reader::Log;
-use bise_session::Redactor;
+use bise_session::history_cache::HistoryCache;
+use bise_session::{reqlog, Redactor};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use model::{Body, Item, Request, Role};
+use model::{Body, Item, Role};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -60,14 +64,14 @@ pub(crate) fn enabled(app: &App) -> bool {
     SHIPPED || crate::sb::release::dev(app) || std::env::var("BISE_DEV").is_ok_and(|v| !v.is_empty() && v != "0")
 }
 
-/// The `/log` command, for the popup and `/help` when enabled: the
-/// catalog's (bise_proto::commands::LOG, the window's too).
-pub(crate) const COMMAND: crate::commands::Cmd = bise_proto::commands::LOG;
+/// The `/debug` command, for the popup and `/help`: the catalog's
+/// (bise_proto::commands::DEBUG, the window's too).
+pub(crate) const COMMAND: crate::commands::Cmd = bise_proto::commands::DEBUG;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Mode {
     History,
-    Model,
+    Completion,
 }
 
 /// The `/` field: what is typed, and whether it still takes keys.
@@ -88,15 +92,19 @@ pub(crate) struct Picker {
 /// The screen while open.
 pub(crate) struct View {
     pub(crate) agent: String,
-    log: Log,
-    blobs: PathBuf,
     redact: Redactor,
     pub(crate) mode: Mode,
-    history: Vec<Item>,
-    requests: Vec<Request>,
-    /// the request of the model view (an index of `requests`)
-    pub(crate) req: usize,
-    model: Vec<Item>,
+    /// the history, its end built first
+    hc: HistoryCache,
+    /// the completion tab's rows (comp.rs) and what they are
+    comp: Vec<Item>,
+    pub(crate) comp_of: comp::Shown,
+    /// the agent's request ring, oldest first, and the one shown
+    slots: Vec<reqlog::Slot>,
+    pub(crate) slot: Option<usize>,
+    req_dir: PathBuf,
+    /// `r`: each row its slice of the body as sent
+    pub(crate) raw: bool,
     /// the entries whose fold differs from the default, per view
     flipped: [HashSet<usize>; 2],
     /// ctrl+o: everything open
@@ -121,10 +129,6 @@ pub(crate) struct View {
     pub(crate) note: String,
     /// the width of the last frame (the default folds depend on it)
     width: usize,
-    /// the request bodies logged by `BISE_DEBUG_REQUESTS` (ms, file)
-    dumps: Vec<(u64, PathBuf)>,
-    /// the model view's request has its exact body (its first entry)
-    exact: bool,
     /// where the cursor was when `/` opened (esc in the field goes back)
     origin: (usize, (usize, usize)),
     /// `n` or `N` went round the end: "back to the first" (until a key)
@@ -144,21 +148,35 @@ fn session_dir(agent: &str) -> Result<PathBuf, String> {
     Ok(bise_home::Home::from_env().sessions_dir().join(id))
 }
 
-/// `/log [N]` on the agent in view: the screen, or why not.
+/// What `/debug` asks: the tab, and for completion the provider.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Ask {
+    History,
+    Completion(Option<String>),
+}
+
+/// `/debug [history | completion [provider]]`: the ask, or the usage.
+pub(crate) fn parse(typed: &str) -> Result<Ask, String> {
+    let mut w = typed.split_whitespace().skip(1);
+    match (w.next(), w.next(), w.next()) {
+        (None, ..) | (Some("history"), None, _) => Ok(Ask::History),
+        (Some("completion"), p, None) => Ok(Ask::Completion(p.map(str::to_string))),
+        _ => Err("usage: /debug [history | completion [provider]]".into()),
+    }
+}
+
+/// `/debug ...` on the agent in view: the screen, or why not. A
+/// completion for another provider asks the hub (its runtime renders
+/// it): the tab opens and its rows come with the answer.
 pub(crate) fn open(app: &mut App, typed: &str) -> Result<(), String> {
+    let ask = parse(typed)?;
     let agent = app.sb.focus.clone();
     let dir = session_dir(&agent)?;
-    let req: Option<u64> = typed.split_whitespace().nth(1).and_then(|w| w.trim_start_matches('#').parse().ok());
-    let mut v = View::load(agent, &dir)?;
-    if let Some(n) = req {
-        // requests count from 1 in the log (a REPL restart starts its own
-        // numbers again: the position, never the REPL's number)
-        match (n as usize).checked_sub(1).filter(|&i| i < v.requests.len()) {
-            Some(i) => {
-                v.req = i;
-                v.set_mode(Mode::Model);
-            }
-            None => v.note = format!("no request {n} in this log: the last one is {}", v.requests.len()),
+    let mut v = View::load(agent.clone(), &dir)?;
+    if let Ask::Completion(p) = &ask {
+        v.set_mode(Mode::Completion);
+        if let Some(p) = p {
+            v.ask_hub(app, p.clone());
         }
     }
     app.logview = Some(v);
@@ -167,29 +185,25 @@ pub(crate) fn open(app: &mut App, typed: &str) -> Result<(), String> {
 
 impl View {
     pub(crate) fn load(agent: String, dir: &Path) -> Result<View, String> {
-        let log = bise_session::read_dir(dir).map_err(|e| format!("cannot read {}: {e}", dir.display()))?;
         let home = bise_home::Home::from_env();
         let redact = Redactor::from_home(&home.auth_file(), &home.env_files());
-        let dumps = HUB_DIR.get().map(|h| model::request_files(&h.join("agents").join(&agent).join("requests"))).unwrap_or_default();
-        let mut v = View::of(agent, log, home.blobs_dir(), redact);
-        v.dumps = dumps;
-        Ok(v)
+        let req_dir = HUB_DIR.get().map(|h| h.join("agents").join(&agent).join("requests")).unwrap_or_default();
+        View::of(agent, dir, &home.blobs_dir(), req_dir, redact)
     }
 
-    pub(crate) fn of(agent: String, log: Log, blobs: PathBuf, redact: Redactor) -> View {
-        let src = model::Source { log: &log, blobs: &blobs, redact: &redact };
-        let history = model::history(&src);
-        let requests = model::requests(&log);
+    pub(crate) fn of(agent: String, dir: &Path, blobs: &Path, req_dir: PathBuf, redact: Redactor) -> Result<View, String> {
+        let hc = HistoryCache::open(dir, blobs, &redact).map_err(|e| format!("cannot read {}: {e}", dir.display()))?;
         let mut v = View {
             agent,
-            log,
-            blobs,
             redact,
             mode: Mode::History,
-            history,
-            req: requests.len().saturating_sub(1),
-            requests,
-            model: Vec::new(),
+            hc,
+            comp: Vec::new(),
+            comp_of: comp::Shown::default(),
+            slots: Vec::new(),
+            slot: None,
+            req_dir,
+            raw: false,
             flipped: [HashSet::new(), HashSet::new()],
             all_open: false,
             vis: Vec::new(),
@@ -203,34 +217,37 @@ impl View {
             page: 20,
             note: String::new(),
             width: 100,
-            dumps: Vec::new(),
-            exact: false,
             origin: (0, (0, 0)),
             wrapped: "",
         };
         v.refilter();
         v.bottom();
-        v
+        Ok(v)
     }
 
     fn mi(&self) -> usize {
-        (self.mode == Mode::Model) as usize
+        (self.mode == Mode::Completion) as usize
     }
 
     pub(crate) fn items(&self) -> &[Item] {
         match self.mode {
-            Mode::History => &self.history,
-            Mode::Model => &self.model,
+            Mode::History => self.hc.rows(),
+            Mode::Completion => &self.comp,
         }
+    }
+
+    /// The events of the log, and how many are not built yet (above).
+    pub(crate) fn events(&self) -> (usize, usize) {
+        (self.hc.log().events.len(), self.hc.from())
     }
 
     pub(crate) fn set_mode(&mut self, m: Mode) {
         self.mode = m;
-        if m == Mode::Model {
-            self.build_model();
+        if m == Mode::Completion && self.comp.is_empty() {
+            self.read_ring(None);
         }
         self.refilter();
-        if m == Mode::Model {
+        if m == Mode::Completion {
             self.sel = 0;
             self.top = (0, 0);
         } else {
@@ -238,40 +255,107 @@ impl View {
         }
     }
 
-    fn build_model(&mut self) {
+    /// The history built up to `to` more events above (all: None), the
+    /// cursor, folds and search kept on their entries.
+    pub(crate) fn grow(&mut self, all: bool) {
+        if self.hc.from() == 0 {
+            return;
+        }
+        let before = self.hc.rows().len();
+        if all {
+            self.hc.all(&self.redact);
+        } else {
+            let first = self.hc.rows().first().map(|r| r.pos);
+            self.hc.page(&self.redact, first, 1, usize::MAX);
+        }
+        let added = self.hc.rows().len() - before;
+        if self.mode != Mode::History || added == 0 {
+            return;
+        }
+        self.flipped[0] = self.flipped[0].iter().map(|i| i + added).collect();
+        self.cache.retain(|k, _| k.0 != 0);
+        let cur = self.vis.get(self.sel).map(|i| i + added);
+        let top = (self.vis.get(self.top.0).map(|i| i + added), self.top.1);
+        self.vis = (0..self.items().len()).filter(|&i| self.shown(&self.items()[i])).collect();
+        self.sel = cur.and_then(|c| self.vis.iter().position(|&i| i == c)).unwrap_or(0);
+        self.top = (top.0.and_then(|t| self.vis.iter().position(|&i| i == t)).unwrap_or(self.sel), top.1);
+        self.rehit();
+    }
+
+    /// The ring read again and request `slot` (an index of the ring;
+    /// none: the newest) shown as sent, in rows.
+    pub(crate) fn read_ring(&mut self, slot: Option<usize>) {
+        self.slots = reqlog::slots(&self.req_dir);
+        let ready: Vec<usize> = (0..self.slots.len()).filter(|&i| self.slots[i].meta().is_some()).collect();
+        self.slot = slot.filter(|i| ready.contains(i)).or(ready.last().copied());
+        let got = match self.slot {
+            None => Err("no request kept yet: the agent has not called its model since its start".to_string()),
+            Some(i) => reqlog::body(&self.slots[i]).and_then(|b| comp::of_body(&b, self.raw, &self.redact)),
+        };
+        match got {
+            Ok((items, shown)) => {
+                self.comp = items;
+                self.comp_of = shown;
+                self.note.clear();
+            }
+            Err(e) => {
+                self.comp.clear();
+                self.comp_of = comp::Shown::default();
+                self.note = e;
+            }
+        }
+        self.after_comp();
+    }
+
+    /// The hub's answer for a provider (`log/completion`, sb/rpc.rs):
+    /// its rows replace the tab's.
+    pub(crate) fn hub_rows(&mut self, c: &bise_proto::log::Completion) {
+        let (items, shown) = comp::of_rows(&c.rows, &c.family, c.bytes, c.shown_as.clone());
+        self.comp = items;
+        self.comp_of = shown;
+        self.slots = reqlog::slots(&self.req_dir);
+        self.slot = self.slots.iter().position(|s| s.n as u64 == c.slot.slot);
+        self.note.clear();
+        self.after_comp();
+    }
+
+    fn after_comp(&mut self) {
         self.cache.retain(|k, _| k.0 == 0);
         self.flipped[1].clear();
-        self.model = match self.requests.get(self.req) {
-            Some(r) => {
-                let src = model::Source { log: &self.log, blobs: &self.blobs, redact: &self.redact };
-                model::model_view(&src, r)
-            }
-            None => Vec::new(),
-        };
-        self.exact = false;
-        // the exact body, when the REPL logged it (BISE_DEBUG_REQUESTS)
-        let at = |i: usize| self.requests.get(i).and_then(|r| model::iso_ms(&self.log.events[r.idx].at));
-        if let (Some(reply), false) = (at(self.req), self.model.is_empty()) {
-            let since = self.req.checked_sub(1).and_then(at).unwrap_or(0);
-            if let Some(p) = model::dump_for(&self.dumps, since, reply) {
-                let it = model::exact_item(p, &self.redact, &self.model[0]);
-                self.model.insert(0, it);
-                self.exact = true;
-            }
+        if self.mode == Mode::Completion {
+            self.refilter();
+            self.sel = 0;
+            self.top = (0, 0);
         }
     }
 
-    /// The request of the model view moves by `d` (clamped).
+    /// `/debug completion <provider>`: the hub renders the shown request
+    /// for that provider (the agent's runtime; none here).
+    fn ask_hub(&mut self, app: &mut App, provider: String) {
+        let slot = self.slot.map(|i| self.slots[i].n as u64);
+        let params = serde_json::json!({"agent": self.agent, "slot": slot, "provider": provider, "raw": self.raw});
+        app.sb.call("log/completion", params, crate::sb::rpc::Then::Completion);
+        self.note = format!("asking the hub for {provider}'s body…");
+    }
+
+    /// `[` `]`: the request before or after in the ring (as sent).
     pub(crate) fn step_request(&mut self, d: isize) {
-        if self.requests.is_empty() {
+        let ready: Vec<usize> = (0..self.slots.len()).filter(|&i| self.slots[i].meta().is_some()).collect();
+        if self.mode != Mode::Completion {
+            self.set_mode(Mode::Completion);
             return;
         }
-        let n = self.requests.len() as isize;
-        let r = (self.req as isize + d).clamp(0, n - 1) as usize;
-        if r != self.req || self.mode != Mode::Model {
-            self.req = r;
-            self.set_mode(Mode::Model);
+        let at = self.slot.and_then(|s| ready.iter().position(|&i| i == s)).unwrap_or(ready.len().saturating_sub(1)) as isize;
+        let to = (at + d).clamp(0, ready.len() as isize - 1);
+        if let Some(&i) = ready.get(to as usize) {
+            self.read_ring(Some(i));
         }
+    }
+
+    /// `r`: the rows as the body's raw slices, or drawn.
+    pub(crate) fn toggle_raw(&mut self) {
+        self.raw = !self.raw;
+        self.read_ring(self.slot);
     }
 
     /// The tools of the view's calls and results, sorted.
@@ -493,6 +577,8 @@ impl View {
 
     /// `/` opens the field; the cursor's place is kept for esc.
     pub(crate) fn start_search(&mut self) {
+        // the whole history: a search finds what was never scrolled to
+        self.grow(true);
         self.origin = (self.sel, self.top);
         self.search = Some(Search { text: String::new(), typing: true });
         self.hits.clear();

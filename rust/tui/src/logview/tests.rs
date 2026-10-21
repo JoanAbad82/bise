@@ -1,8 +1,7 @@
-//! `/log`: the entries of a small log, the model view after a
-//! compaction, search, filters, folds, redaction.
+//! `/debug`: the entries of a small log, a request as its provider got
+//! it, search, filters, folds, redaction.
 use super::model::{self, Body, Role};
 use super::*;
-use bise_session::read_bytes;
 
 fn line(seq: u64, turn: Option<u64>, typ: &str, data: serde_json::Value) -> String {
     let mut v = serde_json::json!({"seq": seq, "at": format!("2026-10-02T14:02:{:02}.000Z", seq % 60), "type": typ, "v": 1, "data": data});
@@ -14,7 +13,7 @@ fn line(seq: u64, turn: Option<u64>, typ: &str, data: serde_json::Value) -> Stri
 
 /// A session: system prompt, a turn with thinking, a bash call, an
 /// edit, an injected status, then a compaction and a second turn.
-fn sample() -> Log {
+fn sample() -> String {
     use serde_json::json;
     let text = |t: &str| json!([{"kind": "text", "text": t}]);
     let lines = [
@@ -40,12 +39,28 @@ fn sample() -> Log {
         line(18, Some(2), "usage", json!({"req": 3, "model": "m", "input": 1400, "output": 10})),
         line(19, Some(2), "turn_ended", json!({"outcome": "done"})),
     ];
-    let bytes = lines.join("\n") + "\n";
-    read_bytes(&[("events.jsonl".into(), bytes.into_bytes())])
+    lines.join("\n") + "\n"
+}
+
+/// A session folder of its own (the tests run side by side) holding
+/// `events`, and a request ring beside it.
+fn folder(events: &str) -> PathBuf {
+    static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let d = std::env::temp_dir().join(format!("logview-{}-{n}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(d.join("requests")).unwrap();
+    std::fs::write(d.join("events.jsonl"), events).unwrap();
+    d
+}
+
+fn view_of(events: &str) -> View {
+    let d = folder(events);
+    View::of("main".into(), &d, &d, d.join("requests"), Redactor::default()).unwrap()
 }
 
 fn view() -> View {
-    View::of("main".into(), sample(), PathBuf::from("/nonexistent"), Redactor::default())
+    view_of(&sample())
 }
 
 fn text(lines: &[Line]) -> String {
@@ -56,7 +71,7 @@ fn text(lines: &[Line]) -> String {
 fn the_history_has_every_entry_with_its_role() {
     let v = view();
     let roles: Vec<String> = v
-        .history
+        .items()
         .iter()
         .map(|i| match &i.rule {
             Some(r) => format!("rule {r}"),
@@ -85,23 +100,23 @@ fn the_history_has_every_entry_with_its_role() {
             "assistant ",
         ]
     );
-    let bash = &v.history[6];
+    let bash = &v.items()[6];
     assert_eq!(bash.body, Body::Code { lang: "bash", text: "cargo test signup".into() });
-    let edit = &v.history[7];
+    let edit = &v.items()[7];
     assert_eq!(edit.head, "src/a.rs  +2 −1");
     assert_eq!(edit.body.text(), "--- src/a.rs\n+++ src/a.rs\n-let a = 1;\n+let a = 2;\n+let b = 3;\n");
-    assert_eq!(v.history[8].role, Role::Result { ok: false });
-    assert!(matches!(&v.history[9].body, Body::Code { lang: "json", text } if text.contains("\"ok\": true")));
-    assert_eq!(v.history[10].head, "<task_status> (steer)");
+    assert_eq!(v.items()[8].role, Role::Result { ok: false });
+    assert!(matches!(&v.items()[9].body, Body::Code { lang: "json", text } if text.contains("\"ok\": true")));
+    assert_eq!(v.items()[10].head, "<task_status> (steer)");
     // a result's header is its output; the call id goes over the body
-    assert_eq!(v.history[8].head, "test failed: «redacted:anthropic»");
-    assert_eq!(v.history[8].meta, "call_1 failed · exit 101");
+    assert_eq!(v.items()[8].head, "test failed: «redacted:anthropic»");
+    assert_eq!(v.items()[8].meta, "call_1 failed · exit 101");
 }
 
 #[test]
 fn a_key_never_shows() {
     let v = view();
-    let r = &v.history[8];
+    let r = &v.items()[8];
     assert!(!r.body.text().contains("sk-ant-api03"), "{}", r.body.text());
     assert!(r.body.text().contains("«redacted:anthropic»"));
 }
@@ -123,40 +138,55 @@ fn an_old_compaction_shows_its_real_summary() {
         line(7, None, "compaction_done", json!({"id": 1, "summary": text("The earlier conversation was compacted. A summary replaces it; continue from the preserved user messages."), "replaces": {"from": 3, "to": 4}, "kept": [3]})),
         line(8, None, "context_injected", json!({"kind": "summary", "content": text("Summary of the earlier conversation:\n<summary>signup fixed, tests green</summary>")})),
     ];
-    let bytes = lines.join("\n") + "\n";
-    let log = read_bytes(&[("events.jsonl".into(), bytes.into_bytes())]);
-    let v = View::of("main".into(), log, PathBuf::from("/nonexistent"), Redactor::default());
-    let row = v.history.iter().find(|i| i.role == Role::Summary).expect("a summary row");
+    let v = view_of(&(lines.join("\n") + "\n"));
+    let row = v.items().iter().find(|i| i.role == Role::Summary).expect("a summary row");
     assert!(row.body.text().contains("signup fixed, tests green"), "{}", row.body.text());
     // a new compaction already carries its summary: shown as it is
     let s = view();
-    let row = s.history.iter().find(|i| i.role == Role::Summary).expect("a summary row");
+    let row = s.items().iter().find(|i| i.role == Role::Summary).expect("a summary row");
     assert!(row.body.text().contains("signup fixed"), "{}", row.body.text());
 }
 
+/// A request of the ring, as its provider got it: the head, the system
+/// prompt, each message under its provider word, a bash call as its
+/// command; `[` `]` step the ring, `r` shows each row's bytes; a request
+/// no slot holds says so, never a rebuild.
 #[test]
-fn what_the_model_got_after_a_compaction() {
+fn completion_shows_the_ring_as_sent() {
     let mut v = view();
-    assert_eq!(v.requests.iter().map(|r| r.req).collect::<Vec<_>>(), [1, 2, 3]);
-    v.req = 2;
-    v.set_mode(Mode::Model);
-    let got: Vec<String> = v
-        .model
-        .iter()
-        .map(|i| match &i.rule {
-            Some(r) => format!("rule {r}"),
-            None => i.role.key().to_string(),
-        })
-        .collect();
-    assert_eq!(got, ["system", "system", "rule 6 entries before this were compacted (0 kept)", "summary", "you"]);
-    // request 2: the whole first turn so far, no compaction yet
-    v.step_request(-1);
-    let got: Vec<&str> = v.model.iter().map(|i| i.role.key()).collect();
-    assert_eq!(got, ["system", "system", "you", "thinking", "call", "call", "result", "result", "injected"]);
-    let t = text(&lines(&mut v, 120, 30));
-    assert!(t.contains("what the model got · request 2 of 3"), "{t}");
-    assert!(t.contains("missing: each call's <bise_state>"), "{t}");
+    let ring = v.req_dir.clone();
+    let put = |n: usize, req: u64, body: &str| {
+        std::fs::write(ring.join(format!("{n}.json")), body).unwrap();
+        std::fs::write(ring.join(format!("{n}.wire")), "MSG").unwrap();
+        let meta = format!("{{\"req\":{req},\"kind\":\"turn\",\"model\":\"fake/claude-x\",\"try\":0,\"call\":1,\"json_len\":{},\"wire_len\":3}}\n", body.len());
+        std::fs::write(ring.join(format!("{n}.meta")), meta).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(15));
+    };
+    v.set_mode(Mode::Completion);
+    assert!(v.items().is_empty() && v.note.contains("no request kept yet"), "{}", v.note);
+    put(1, 1, r#"{"model":"claude-x","system":"You are main.","messages":[{"role":"user","content":"fix it"}]}"#);
+    put(2, 2, r#"{"model":"claude-x","system":"You are main.","messages":[{"role":"user","content":"fix it"},{"role":"assistant","content":[{"type":"text","text":"on it"},{"type":"tool_use","id":"t1","name":"bash","input":{"arg":"cargo test"}}]}]}"#);
+    v.read_ring(None);
+    let got: Vec<String> = v.items().iter().map(|i| format!("{}|{}", role_label(i, "main").0, i.head)).collect();
+    assert_eq!(
+        got[..5],
+        [
+            "request|anthropic · claude-x · 0 tools".to_string(),
+            "params|model".into(),
+            "system|the system prompt · 1 lines".into(),
+            "user|fix it".into(),
+            "assistant|on it".into()
+        ]
+    );
+    assert_eq!(v.items()[5].body, Body::Code { lang: "bash", text: "cargo test".into() });
+    let t = text(&lines(&mut v, 150, 30));
+    assert!(t.contains("request 2 of 2") && t.contains("anthropic") && t.contains("history   completion"), "{t}");
     assert!(t.contains("~"), "tokens are estimated: {t}");
+    v.step_request(-1);
+    assert_eq!(v.items().len(), 4, "request 1: head, params, system, one message");
+    v.toggle_raw();
+    // the message's row: its bytes as sent
+    assert!(matches!(&v.items().last().unwrap().body, Body::Code { lang: "json", text } if text == r#"{"role":"user","content":"fix it"}"#));
 }
 
 #[test]
@@ -165,7 +195,7 @@ fn the_screen_at_120_columns() {
     v.sel = 0;
     v.top = (0, 0);
     let t = text(&lines(&mut v, 120, 60));
-    assert!(t.starts_with("log of main   full history   what the model got · request 3 of 3"), "{t}");
+    assert!(t.starts_with("/debug main · 19 events · newest at the bottom") && t.lines().next().unwrap().ends_with("history   completion"), "{t}");
     assert!(t.contains("#7  14:02:07    ✗ result"), "{t}");
     assert!(t.contains("── turn 1 · 14:02 · user · 9.0k in · 1.1k out ──"), "{t}");
     assert!(t.contains("── compacted · 9.0k → 1.4k tokens ──"), "{t}");
@@ -211,7 +241,7 @@ fn filters_hide_roles_and_tools() {
     v.off.insert("tool:bash".into());
     v.off.insert("thinking".into());
     v.refilter();
-    let shown: Vec<&Item> = v.vis.iter().map(|&i| &v.history[i]).collect();
+    let shown: Vec<&Item> = v.vis.iter().map(|&i| &v.items()[i]).collect();
     assert!(shown.iter().all(|i| i.tool != "bash" && i.role != Role::Thinking));
     assert!(shown.iter().any(|i| i.tool == "edit"));
     // rules go while filtered
@@ -251,6 +281,7 @@ fn the_calls_show_their_code() {
 /// `LOGVIEW_SESSION=~/.bise/sessions/<id> LOGVIEW_OUT=<file> cargo test -p
 /// bend-tui real_session -- --ignored`: the history at 150 and 80
 /// columns, the model view of the last request, a search.
+/// A real session, end first: `LOGVIEW_SESSION=<folder> LOGVIEW_OUT=<file>`.
 #[test]
 #[ignore]
 fn real_session() {
@@ -260,43 +291,11 @@ fn real_session() {
     let t0 = std::time::Instant::now();
     let mut v = View::load("main".into(), Path::new(&dir)).unwrap();
     let mut o = String::new();
-    let _ = writeln!(o, "loaded {} items, {} requests in {:?}", v.history.len(), v.requests.len(), t0.elapsed());
-    let find = |v: &View, pred: &dyn Fn(&Item) -> bool| v.vis.iter().position(|&i| pred(&v.history[i]));
-    // somewhere with a compaction rule in view
-    if let Some(k) = find(&v, &|i| i.rule.as_deref().is_some_and(|r| r.starts_with("compacted"))) {
-        v.sel = k.saturating_sub(12);
-        v.top = (v.sel, 0);
-    }
-    for w in [150, 80] {
-        let t1 = std::time::Instant::now();
-        let s = text(&lines(&mut v, w, 60));
-        let _ = writeln!(o, "\n===== full history at {w} ({:?}) =====\n{s}", t1.elapsed());
-    }
-    v.bottom();
     let s = text(&lines(&mut v, 150, 60));
-    let _ = writeln!(o, "\n===== bottom at 150 =====\n{s}");
-    let t2 = std::time::Instant::now();
-    v.set_mode(Mode::Model);
-    let s = text(&lines(&mut v, 150, 60));
-    let _ = writeln!(o, "\n===== what the model got, last request ({:?}) =====\n{s}", t2.elapsed());
-    v.set_mode(Mode::History);
-    v.search = Some(Search { text: "compact".into(), typing: false });
-    v.rehit();
-    v.jump(true);
-    let s = text(&lines(&mut v, 150, 40));
-    let _ = writeln!(o, "\n===== search 'compact' =====\n{s}");
-    // the filter picker, over a filtered history
-    v.search = None;
-    v.off.insert("thinking".into());
-    v.refilter();
-    let mut rows: Vec<String> = model::ROLE_KEYS.iter().map(|s| s.to_string()).collect();
-    rows.extend(v.tools().into_iter().map(|t| format!("tool:{t}")));
-    let p = Picker { rows, sel: 2 };
-    v.picker = Some(p.clone());
-    let s = text(&picker_rows(&v, &p));
-    let k = text(&[key_row(&v, 150)]);
-    let top = text(&top_rows(&v, 150));
-    let _ = writeln!(o, "\n===== filter picker =====\n{top}\n{s}\n{k}");
+    let _ = writeln!(o, "opened in {:?}, {} rows built\n{s}", t0.elapsed(), v.items().len());
+    let t1 = std::time::Instant::now();
+    v.start_search();
+    let _ = writeln!(o, "\nthe whole history built for a search in {:?}: {} rows", t1.elapsed(), v.items().len());
     std::fs::write(out, o).unwrap();
 }
 
@@ -307,31 +306,6 @@ fn an_image_is_a_line_never_its_base64() {
     assert_eq!(model::image_tags("no image"), "no image");
 }
 
-#[test]
-fn the_exact_body_when_logged() {
-    let dir = std::env::temp_dir().join(format!("logview-{}", std::process::id()));
-    let _ = std::fs::create_dir_all(&dir);
-    let f = dir.join("123-0.json");
-    std::fs::write(&f, r#"{"model":"m","messages":[{"role":"user","content":"hi"}],"img":"QUFB"}"#).unwrap();
-    let mut v = view();
-    // written before request 3's answer (14:02:17), after request 2's
-    let at = model::iso_ms("2026-10-02T14:02:16.000Z").unwrap();
-    v.dumps = vec![(at, f.clone())];
-    v.req = 2;
-    v.set_mode(Mode::Model);
-    assert!(v.exact);
-    assert!(v.model[0].head.starts_with("the exact request body · 123-0.json"), "{}", v.model[0].head);
-    assert!(v.model[0].head.ends_with("1 messages"));
-    v.step_request(-1);
-    assert!(!v.exact);
-    let _ = std::fs::remove_dir_all(&dir);
-    assert_eq!(model::iso_ms("1970-01-01T00:00:01.500Z"), Some(1500));
-    assert_eq!(model::iso_ms("2026-10-02T00:00:00.000Z"), Some(1_790_899_200_000));
-}
-
-
-/// A blank row after each entry, so they read apart (the user: "ça
-/// manque d'espace entre les messages").
 #[test]
 fn a_blank_row_between_entries() {
     let mut v = view();
@@ -362,8 +336,7 @@ fn bodies_stop_at_the_measure() {
         line(2, Some(1), "turn_started", json!({"cause": "user"})),
         line(3, Some(1), "user_message", json!({"content": text_of(&long), "delivery": "prompt"})),
     ];
-    let log = read_bytes(&[("events.jsonl".into(), (ls.join("\n") + "\n").into_bytes())]);
-    let mut v = View::of("main".into(), log, PathBuf::from("/nonexistent"), Redactor::default());
+    let mut v = view_of(&(ls.join("\n") + "\n"));
     v.toggle_all();
     let t = text(&lines(&mut v, 220, 60));
     let body: Vec<&str> = t.lines().filter(|l| l.contains("prompt is long") && !l.contains("› you")).collect();
@@ -382,7 +355,7 @@ fn bodies_stop_at_the_measure() {
 fn each_kind_has_its_color_and_label() {
     let v = view();
     let label = |pred: &dyn Fn(&Item) -> bool| {
-        let it = v.history.iter().find(|i| pred(i)).expect("an entry");
+        let it = v.items().iter().find(|i| pred(i)).expect("an entry");
         role_label(it, "main")
     };
     type Case<'a> = (&'a dyn Fn(&Item) -> bool, &'a str, ratatui::style::Color);
@@ -402,7 +375,7 @@ fn each_kind_has_its_color_and_label() {
     }
     assert_eq!(label(&|i| i.role == Role::Result { ok: true }).0, "  └ result");
     // the rail of an open body: its kind's color; none for events
-    let call = v.history.iter().find(|i| i.tool == "bash").unwrap();
+    let call = v.items().iter().find(|i| i.tool == "bash").unwrap();
     let rows = entry_rows(call, 120, true, Mode::History, "main");
     assert_eq!(rows[1].spans[0].content, "  ▎ ");
     assert_eq!(rows[1].spans[0].style.fg, Some(theme::syntax_call()));
@@ -415,13 +388,13 @@ fn the_key_bar_says_top_and_bottom() {
     let k = |v: &View, w| text(&[key_row(v, w)]);
     assert_eq!(
         k(&v, 150),
-        "/ search   f filter   g top   G bottom   tab what the model got   space open   ctrl+o open all   esc close"
+        "/ search   f filter   g top   G bottom   tab completion   space open   ctrl+o open all   esc close"
     );
     // narrow: from the right, never `/ search` nor `esc close`
     assert_eq!(k(&v, 60), "/ search   f filter   g top   G bottom   esc close");
     assert_eq!(k(&v, 20), "/ search   esc close");
-    v.set_mode(Mode::Model);
-    assert!(k(&v, 160).starts_with("/ search   f filter   [ ] request   g top   G bottom   tab full history"), "{}", k(&v, 160));
+    v.set_mode(Mode::Completion);
+    assert!(k(&v, 160).starts_with("[ ] request   r raw json   / search   g top   G bottom   tab history"), "{}", k(&v, 160));
     v.set_mode(Mode::History);
     v.search = Some(Search { text: "signup".into(), typing: false });
     v.rehit();
@@ -469,29 +442,12 @@ fn incsearch_wraps_and_esc_goes_back() {
     assert_eq!(v.sel, bottom);
 }
 
-/// The top bar counts the requests as the subtitle does (by position: a
-/// REPL restart numbers its requests from 1 again), in the singular for
-/// one, and says when there is none.
+/// The top bar: the agent, the events, the two tabs; what is above.
 #[test]
-fn the_top_bar_counts_like_the_subtitle() {
-    use serde_json::json;
-    let text_of = |t: &str| json!([{"kind": "text", "text": t}]);
-    let reply = |seq, turn| line(seq, Some(turn), "assistant_message", json!({"req": 1, "model": "m", "parts": [{"kind": "text", "text": "ok"}], "calls": []}));
-    let mk = |ls: &[String]| {
-        let log = read_bytes(&[("events.jsonl".into(), (ls.join("\n") + "\n").into_bytes())]);
-        View::of("main".into(), log, PathBuf::from("/nonexistent"), Redactor::default())
-    };
-    let start = line(1, None, "session_start", json!({"session": "s-1", "format": 1, "created_by": "bise", "cwd": "/w"}));
-    let ask = |seq, turn| line(seq, Some(turn), "user_message", json!({"content": text_of("hi"), "delivery": "prompt"}));
-    // two REPLs, each with its request 1
-    let mut v = mk(&[start.clone(), ask(2, 1), reply(3, 1), ask(4, 2), reply(5, 2)]);
+fn the_top_bar_names_the_agent_and_the_tabs() {
+    let mut v = view();
     let t = text(&lines(&mut v, 150, 30));
-    assert!(t.contains("what the model got · request 2 of 2"), "{t}");
-    assert!(t.contains("· 5 entries · 2 requests"), "{t}");
-    let mut v = mk(&[start.clone(), ask(2, 1), reply(3, 1)]);
-    let t = text(&lines(&mut v, 150, 30));
-    assert!(t.contains("request 1 of 1") && t.contains("· 1 request"), "{t}");
-    let mut v = mk(&[start]);
-    let t = text(&lines(&mut v, 150, 30));
-    assert!(t.contains("what the model got · no request yet") && t.contains("· 1 entry · 0 requests"), "{t}");
+    let first = t.lines().next().unwrap();
+    assert!(first.starts_with("/debug main · 19 events · newest at the bottom") && first.ends_with("history   completion"), "{first}");
+    assert!(t.contains("the whole session"), "{t}");
 }

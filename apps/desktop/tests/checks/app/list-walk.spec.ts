@@ -59,9 +59,9 @@ const WALKS: Record<string, Walk & { route: string; ready: string }> = {
     sel: (p) => one(p, '[data-testid="agents.screen"] .ag-item.is-sel', 'data-row'),
   },
   log: {
-    route: `log/${P}/perf`,
+    route: `debug/${P}/perf`,
     ready: '[data-testid^="log.row."]',
-    focus: '[data-testid="log"]',
+    focus: '[data-testid="debug.history"]',
     rows: (p) => attrs(p, '[data-testid="log.list"] .lg-e[data-testid^="log.row."]', 'data-testid'),
     sel: (p) => one(p, '[data-testid="log.list"] .lg-e.at', 'data-testid'),
   },

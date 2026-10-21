@@ -24,7 +24,7 @@ pub(crate) fn dev(app: &App) -> bool {
     app.sb.versions_dev == Some(true)
 }
 
-/// The dev commands when this is the dev build, else none (`/log` is
+/// The dev commands when this is the dev build, else none (`/debug` is
 /// not one: shipped to everyone, logview.rs).
 pub(crate) fn dev_commands(app: &App) -> &'static [Cmd] {
     if dev(app) {
@@ -224,21 +224,23 @@ mod tests {
         assert!(dev_commands(&app).is_empty());
         set_versions_dev(&mut app, true);
         assert_eq!(dev_commands(&app)[0].name, "/release-bise");
-        assert!(!dev_commands(&app).iter().any(|c| c.name == "/log"), "/log is shipped, not a dev command");
+        assert!(!dev_commands(&app).iter().any(|c| c.name == "/debug"), "/debug is shipped, not a dev command");
     }
 
-    /// `/log` is shipped: an installed bise (not the dev build, no
+    /// `/debug` is shipped: an installed bise (not the dev build, no
     /// `BISE_DEV`) offers it in the popup.
     #[test]
-    fn a_release_build_offers_log() {
+    fn a_release_build_offers_debug() {
         let mut app = test_app();
         set_versions_dev(&mut app, false);
         if std::env::var("BISE_DEV").is_ok_and(|v| !v.is_empty() && v != "0") {
             return; // the env says dev: this test proves nothing here
         }
         assert!(crate::logview::enabled(&app));
+        app.ed.text = "/deb".into();
+        assert!(crate::commands::popup_items(&app).iter().any(|i| i.label == "/debug"));
         app.ed.text = "/lo".into();
-        assert!(crate::commands::popup_items(&app).iter().any(|i| i.label == "/log"));
+        assert!(!crate::commands::popup_items(&app).iter().any(|i| i.label == "/log"), "/log is gone");
     }
 
     /// `release/plan`'s answer (its result: the event's fields).

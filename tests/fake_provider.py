@@ -98,7 +98,7 @@ import socketserver
 import sys
 import threading
 import time
-from fake_plan import plan_model_error, plan_models
+from fake_plan import bearer_of, is_jwt, plan_model_error, plan_models
 import urllib.request
 import zlib
 
@@ -1149,6 +1149,12 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send(400, json.dumps({"type": "error", "error": {
                 "type": "invalid_request_error", "message": "Request content length exceeded 32 MB limit."}}).encode())
             return
+        # debug-cmd: $FAKE_RAW (a folder) gets every body's bytes as
+        # received, <n>.json in order, for the byte-for-byte checks
+        if os.environ.get("FAKE_RAW"):
+            d = os.environ["FAKE_RAW"]
+            with open(os.path.join(d, "%06d.json" % len(os.listdir(d))), "wb") as f:
+                f.write(raw)
         body = json.loads(raw or b"{}")
         family = family_of(self.path)
         # prompt-diet: $FAKE_BODIES gets every whole request body, one JSON
@@ -1528,22 +1534,6 @@ PLAN_FAILS = {
     "not-eligible": (403, "subscription_sharing_user_not_eligible",
                      "ChatGPT plan usage is not available for this user or workspace."),
 }
-
-
-def bearer_of(headers):
-    a = headers.get("authorization") or ""
-    return a[7:].strip() if a.lower().startswith("bearer ") else ""
-
-
-def is_jwt(token):
-    parts = token.split(".")
-    if len(parts) != 3:
-        return False
-    try:
-        head = json.loads(base64.urlsafe_b64decode(parts[0] + "=" * (-len(parts[0]) % 4)))
-    except ValueError:
-        return False
-    return isinstance(head, dict) and head.get("alg") == "RS256"
 
 
 def plan_token(token):

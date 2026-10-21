@@ -29,6 +29,7 @@ mod find;
 mod growth;
 mod tool_out;
 mod log;
+mod completion;
 mod send;
 
 use super::rpc::Typed;

@@ -1,8 +1,8 @@
-"""/log (BISE_DEV=1), read like a document (user: "ça manque d'espace entre
+"""/debug history (BISE_DEV=1), read like a document (user: "ça manque d'espace entre
 les messages", "c'est full width", "pas de shortcuts pour jump tout en
 haut ou tout en bas", "la recherche ne permet pas de sauter d'un cas à
 l'autre", "un code couleur pour les types de messages"). Two prompts to
-main (fake provider: `ack: ...`), then /log: a blank row between entries;
+main (fake provider: `ack: ...`), then /debug: a blank row between entries;
 each kind's label in its color (`› you` accent, `§ system` orange); the
 key bar says `g top   G bottom`; `/ack` jumps live to the first match from
 the cursor with `n of m`, n and N go round the ends (`back to the first`,
@@ -44,13 +44,13 @@ def shot(t, name):
 
 
 def open_log(t):
-    t.typed("/log")
+    t.typed("/debug")
     t.keys("Enter")
-    sc = t.wait("log of main")
+    sc = t.wait("/debug main")
     # the command popup may take the first ⏎
-    if "full history" not in sc:
+    if "history   completion" not in sc:
         t.keys("Enter")
-        sc = t.wait("full history")
+        sc = t.wait("history   completion")
     return t.wait("esc close")
 
 
@@ -70,7 +70,7 @@ def main():
         shot(t, "history-150-" + theme)
         rows = sc.splitlines()
         # the key bar's words
-        assert any(r.strip().startswith("/ search   f filter   g top   G bottom   tab what the model got") for r in rows), sc
+        assert any(r.strip().startswith("/ search   f filter   g top   G bottom   tab completion") for r in rows), sc
         # a blank row above every header but the first
         heads = [y for y, r in enumerate(rows) if re.match(r"^\s*[›]?\s*#\d+\s", r)]
         assert len(heads) >= 4, sc
@@ -120,7 +120,7 @@ def main():
         t.keys("Escape")
         t.wait("g top   G bottom")
         t.keys("Escape")
-        t.wait_gone("log of main")
+        t.wait_gone("/debug main")
     # wide: the entries stop at the measure
     with tui_session(200, 45, "BISE_DEV=1 BISE_THEME=" + theme) as t:
         t.wait("bise :*")
@@ -143,7 +143,7 @@ def main():
         sc = t.wait("  ▎ ")
         shot(t, "history-80-nocolor-" + theme)
         assert any(r.strip().startswith("/ search") and r.rstrip().endswith("esc close") for r in sc.splitlines()), sc
-    print("PASS tui /log")
+    print("PASS tui /debug")
 
 
 if __name__ == "__main__":

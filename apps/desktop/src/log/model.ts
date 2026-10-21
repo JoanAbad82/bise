@@ -1,7 +1,14 @@
-// /log's words and rows (the TUI's rust/tui/src/logview.rs, designer m_17266): the
-// role column's label and colour kind, a header's size, a fold's '▸ 34 lines · 2.1 KB',
-// the rules, the pages kept oldest first, find and filter over the rows. Owner: amb-web. Pure.
-import type { LogItem, LogRole } from "@/proto";
+// /debug's words and rows (the TUI's rust/tui/src/logview.rs, designer m_17266 and
+// debug-views v3): the role column's label and colour kind, a header's size, a fold's
+// '▸ 34 lines · 2.1 KB', the rules, the pages kept oldest first, the hub's hits stepped, and
+// the completion tab's rows. Owners: amb-web, debug-cmd. Pure.
+import type {
+  CompBlock,
+  CompRow,
+  Completion,
+  LogItem,
+  LogRole,
+} from "@/proto";
 
 /** A body folds past this many lines (designer m_17266: past 6 lines). */
 export const FOLD_LINES = 6;
@@ -237,25 +244,16 @@ export function withOlder(
   rows: readonly LogItem[],
   older: readonly LogItem[],
 ): LogItem[] {
-  const first = rows[0]?.seq;
+  const first = rows[0]?.pos;
   return [
-    ...(first === undefined ? older : older.filter((o) => o.seq <= first)),
+    ...(first === undefined ? older : older.filter((o) => o.pos < first)),
     ...rows,
   ];
 }
 
-/** What a find looks in: the header, the body, the rule, the meta. */
-const findText = (it: LogItem): string =>
-  [it.head, it.rule ?? "", it.meta ?? "", it.body?.text ?? ""]
-    .join("\n")
-    .toLowerCase();
-
-/** The rows (their places) a needle finds, oldest first; an empty needle finds none. */
-export function findRows(rows: readonly LogItem[], needle: string): number[] {
-  const n = needle.trim().toLowerCase();
-  if (n === "") return [];
-  return rows.flatMap((it, i) => (findText(it).includes(n) ? [i] : []));
-}
+/** The hit to go to from `at` by `by` (n, N), wrapping; -1 without hits. */
+export const stepHit = (at: number, by: number, of: number): number =>
+  of === 0 ? -1 : (((at + by) % of) + of) % of;
 
 /** The find's count at the key line's right: '3 of 12', 'no match'. */
 export const findCount = (at: number, of: number): string =>
@@ -286,3 +284,61 @@ export const kindsIn = (rows: readonly LogItem[]): Kind[] =>
 /** A row shows under a filter (rules always show). */
 export const shown = (it: LogItem, hidden: ReadonlySet<Kind>): boolean =>
   it.rule !== undefined || !hidden.has(kindOf(it));
+
+// ---- /debug completion (the hub's CompRow, bise_session::completion) ----
+
+/** The TUI's short_num (bise_session::history): 18, 1.2k, 41k, 1.2M. */
+export function shortNum(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 10_000) return `${(n / 1000).toFixed(1)}k`;
+  if (n < 1_000_000) return `${String(Math.floor(n / 1000))}k`;
+  return `${(n / 1_000_000).toFixed(1)}M`;
+}
+
+/** A row's right column: '~1.2k tok' (bytes / 4, the TUI's estimate). */
+export const tokensWord = (n: number): string => `~${shortNum(n)} tok`;
+
+/** How a block draws: bash a command box, code highlighted, markdown, text. */
+export function compBlockView(b: CompBlock): "cmd" | "code" | "md" | "text" {
+  if (b.body.kind === "md") return "md";
+  if (b.body.kind === "code" && b.body.lang === "bash") return "cmd";
+  if (b.body.kind === "code" && b.body.lang !== undefined) return "code";
+  return "text";
+}
+
+/** A row folds: the request's head and the system prompt always, the rest past FOLD_LINES. */
+export const compFolds = (r: CompRow): boolean =>
+  r.role === "request" ||
+  r.role === "system" ||
+  r.blocks.reduce((n, b) => n + linesOf(b.body.text), 0) > FOLD_LINES;
+
+/** The `n` of every row that holds a needle (any case): its role, head, labels, texts. */
+export function compHits(rows: readonly CompRow[], needle: string): number[] {
+  const n = needle.trim().toLowerCase();
+  if (n === "") return [];
+  const has = (s: string | undefined): boolean =>
+    s !== undefined && s.toLowerCase().includes(n);
+  return rows
+    .filter(
+      (r) =>
+        has(r.role) ||
+        has(r.head) ||
+        r.blocks.some((b) => has(b.label) || has(b.body.text)),
+    )
+    .map((r) => r.n);
+}
+
+/** The request's line: 'request 41 · 8 of 8 kept · anthropic · claude-x · 14:02:01 · 41.2 KB'. */
+export function compTitle(c: Completion, tz?: string): string {
+  const ready = c.slots.filter((s) => s.writing !== true);
+  const i = ready.findIndex((s) => s.slot === c.slot.slot);
+  const as = c.shown_as === undefined ? "" : ` · as ${c.shown_as} would get it`;
+  return [
+    `request ${String(c.slot.req)}`,
+    `${String(i + 1)} of ${String(ready.length)} kept`,
+    c.family,
+    c.slot.model,
+    timeOf(c.slot.at_ms, tz),
+    shortBytes(c.bytes),
+  ].join(" · ") + as;
+}

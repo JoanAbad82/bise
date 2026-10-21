@@ -9,7 +9,7 @@
 //! probation (a death always does).
 
 use super::{
-    adopt, adoptable, busy_at, debug_requests, free_port, hash_keys, kill_pid, log_line, plugins_fingerprint,
+    adopt, adoptable, busy_at, free_port, hash_keys, kill_pid, log_line, plugins_fingerprint,
     prompt_is_stale, skill_roots, skills_fingerprint, stall_for_tests, supervise, write_logged, Msg, PromptInputs,
     Shell, PROMPT_PLUGINS_FILE,
 };
@@ -310,16 +310,13 @@ impl Shell {
         if let Some(j) = &self.opts.jsrt_bin {
             env.set("BEND_JSRT_BIN", j);
         }
-        // dev: the exact body of every model request, one file each in
-        // agents/<a>/requests/ (the TUI's /log shows them), when the hub
-        // runs with BISE_DEBUG_REQUESTS=1 or <hub>/debug-requests exists
-        // (read at each REPL start: no hub restart). Bodies only, no
-        // headers: the keys go in headers.
-        if debug_requests(&self.opts.paths.state) {
-            let req_dir = adir.join("requests");
-            if std::fs::create_dir_all(&req_dir).is_ok() {
-                env.set("BEND_WIRE_DUMP", format!("{}/", req_dir.display()));
-            }
+        // the request ring (/debug completion, bise_session::reqlog): the
+        // exact body of the agent's last model calls, a few slots in
+        // agents/<a>/requests/ the REPL overwrites in turn. Bodies only,
+        // no headers: the keys go in headers.
+        let req_dir = adir.join("requests");
+        if std::fs::create_dir_all(&req_dir).is_ok() {
+            env.set("BEND_WIRE_DUMP", format!("{}/", req_dir.display()));
         }
         for (k, v) in crate::tools_env::temp_env(&tmp, &run) {
             env.set(k, v);

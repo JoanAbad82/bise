@@ -67,6 +67,9 @@ pub(crate) enum Then {
     /// `inbox/history` (`/inbox`): the first page (None) or the one
     /// before that card (inbox_screen.rs)
     Inbox(Option<u64>),
+    /// `log/completion` (`/debug completion <provider>`): the rows the
+    /// hub's runtime made for that provider (logview.rs)
+    Completion,
 }
 
 /// The requests waiting for their answer, by id (cells: a popup asks
@@ -182,6 +185,13 @@ fn run(app: &mut App, then: Then, r: Response) {
         (Then::Usage, Ok(v)) => {
             if let Ok(Some(ev)) = bise_proto::rpc::ev_of_result("usage/read", v) {
                 crate::usage_screen::answered(app, ev);
+            }
+        }
+        (Then::Completion, Ok(v)) => {
+            if let Ok(Some(bise_proto::hub::HubEv::Completion(c))) = bise_proto::rpc::ev_of_result("log/completion", v) {
+                if let Some(lv) = app.logview.as_mut() {
+                    lv.hub_rows(&c);
+                }
             }
         }
         (Then::Inbox(before), Ok(v)) => {

@@ -15,7 +15,7 @@ export function barScope(route: Route, project: string): BarScope {
   switch (route.screen) {
     case 'thread':
     case 'review':
-    case 'log':
+    case 'debug':
       return route.project === project && route.agent !== MAIN ? { level: 'agent', agent: route.agent } : { level: 'project' };
     default:
       return { level: 'project' };

@@ -1,17 +1,17 @@
-//! The entries `/log` shows, made from a session log (rust/session):
-//! pure, no screen. Two views of one log: the full history (every
-//! entry, in order, the turns and compactions as rules) and what the
-//! model got for one request (the system prompt, the tools, and the
-//! context the log's state held right before that request: compaction
-//! applied, the way `State` rebuilds it). Every text goes through the
-//! redactor: a key never reaches the screen.
+//! The entries `/debug history` shows, made from a session log
+//! (rust/session): pure, no screen. The full history: every entry, in
+//! order, the turns and compactions as rules; a window of it
+//! ([`history_range`], for `history_cache`). What the model got for a
+//! request is not rebuilt here: `/debug completion` shows the body sent
+//! (`reqlog`, `completion`). Every text goes through the redactor: a
+//! key never reaches the screen.
 //!
 //! Moved from the TUI's logview (TP-N2, architect m_17272): the TUI's
 //! `/log` and the hub's typed `log` read (the window's /log) build their
 //! rows here, one builder, the redaction inside it.
 use crate::reader::{Event, Log};
 use crate::types::*;
-use crate::{Redactor, State};
+use crate::Redactor;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::Path;
@@ -41,6 +41,9 @@ pub enum Role {
     Error,
     /// the rest: model set, process opened, queued input...
     Event,
+    /// a part of a request as the provider got it (`/debug completion`):
+    /// the provider's own word (user, assistant, tool_use · bash, result)
+    Sent(String),
 }
 
 impl Role {
@@ -58,6 +61,7 @@ impl Role {
             Role::Summary => "summary",
             Role::Error => "error",
             Role::Event => "event",
+            Role::Sent(_) => "sent",
         }
     }
 }
@@ -95,6 +99,8 @@ pub struct Item {
     pub seq: u64,
     /// the event's index in the log
     pub idx: usize,
+    /// its place in the whole history ([`pos_of`]): pages go by it
+    pub pos: u64,
     pub turn: Option<u64>,
     /// HH:MM:SS
     pub time: String,
@@ -118,6 +124,7 @@ impl Item {
         Item {
             seq: e.seq,
             idx,
+            pos: 0,
             turn: e.turn,
             time: time_of(&e.at),
             role,
@@ -134,6 +141,7 @@ impl Item {
         Item {
             seq: e.seq,
             idx,
+            pos: 0,
             turn: e.turn,
             time: time_of(&e.at),
             role: Role::Event,
@@ -701,22 +709,21 @@ fn tools_view(t: &[ToolDef]) -> (String, Body) {
     (head, Body::Code { lang: "json", text: body })
 }
 
-/// The usage of each request (req → (input, output, cache read)), the
-/// first one the log has for it.
-fn usage_by_req(log: &Log) -> HashMap<u64, (u64, u64, u64)> {
-    let mut m = HashMap::new();
-    for e in &log.events {
-        if let Some(Payload::Usage(u)) = &e.payload {
-            m.entry(u.req).or_insert((u.input, u.output, u.cache_read.unwrap_or(0)));
-        }
-    }
-    m
-}
-
 /// The full history: every entry in order, a rule at each turn's
 /// start (its usage on it) and where each compaction cut.
 pub fn history(src: &Source) -> Vec<Item> {
+    history_range(src, 0, src.log.events.len())
+}
+
+/// The rows of the events `from..to` only, as [`history`] has them
+/// (its rows of those events, in order): a page of a long log costs
+/// its own events, not the whole log's (`history_cache`). The maps a
+/// row reads across events (a call's tool, a turn's usage) still see
+/// the whole log.
+pub fn history_range(src: &Source, from: usize, to: usize) -> Vec<Item> {
     let log = src.log;
+    let to = to.min(log.events.len());
+    let from = from.min(to);
     let tools = src.call_tools();
     // per turn: the context size of its last request and its output
     let mut turn_use: HashMap<u64, (u64, u64)> = HashMap::new();
@@ -727,9 +734,13 @@ pub fn history(src: &Source) -> Vec<Item> {
             w.1 += u.output;
         }
     }
-    let mut last_in: Option<u64> = None;
+    // the context size before `from` (a compaction's rule says it)
+    let mut last_in: Option<u64> = log.events[..from].iter().rev().find_map(|e| match &e.payload {
+        Some(Payload::Usage(u)) => Some(u.input + u.cache_read.unwrap_or(0)),
+        _ => None,
+    });
     let mut out = Vec::new();
-    for (i, e) in log.events.iter().enumerate() {
+    for (i, e) in log.events.iter().enumerate().take(to).skip(from) {
         match &e.payload {
             Some(Payload::TurnStarted { cause }) => {
                 let t = e.turn.unwrap_or(0);
@@ -761,7 +772,24 @@ pub fn history(src: &Source) -> Vec<Item> {
         it.meta = src.red(std::mem::take(&mut it.meta));
         it.rule = it.rule.take().map(|r| src.red(r));
     }
+    set_pos(&mut out);
     out
+}
+
+/// Each row's stable place: its event's index, then its rank among
+/// that event's rows ([`Item::pos`]).
+fn set_pos(rows: &mut [Item]) {
+    let mut last = (usize::MAX, 0u64);
+    for it in rows {
+        last = if last.0 == it.idx { (it.idx, last.1 + 1) } else { (it.idx, 0) };
+        it.pos = pos_of(it.idx, last.1);
+    }
+}
+
+/// A row's place in the whole history: the same whichever window built
+/// it, and it never moves as the log grows (append-only). Pages go by it.
+pub fn pos_of(idx: usize, rank: u64) -> u64 {
+    ((idx as u64) << 16) | rank.min(0xffff)
 }
 
 /// The context size of the first request after event `i`.
@@ -770,105 +798,6 @@ fn next_input(log: &Log, i: usize) -> Option<u64> {
         Some(Payload::Usage(u)) => Some(u.input + u.cache_read.unwrap_or(0)),
         _ => None,
     })
-}
-
-/// One request to the model: the reply's event, its number, its turn.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Request {
-    /// the index of the event that answered it (an assistant message,
-    /// a failed request): the context is the state right before it
-    pub idx: usize,
-    pub req: u64,
-    pub turn: Option<u64>,
-    pub time: String,
-    /// (input, output, cache read) when the log has its usage
-    pub usage: Option<(u64, u64, u64)>,
-    pub model: String,
-}
-
-/// Every request of the log, in order: one per assistant message, and
-/// one per failed request that no message answered.
-pub fn requests(log: &Log) -> Vec<Request> {
-    let usage = usage_by_req(log);
-    let mut out: Vec<Request> = Vec::new();
-    for (i, e) in log.events.iter().enumerate() {
-        let (req, model) = match &e.payload {
-            Some(Payload::AssistantMessage(a)) => (a.req, a.model.clone()),
-            _ => continue,
-        };
-        out.push(Request { idx: i, req, turn: e.turn, time: time_of(&e.at), usage: usage.get(&req).copied(), model });
-    }
-    out
-}
-
-/// The state of the log right before event `idx` (from the last
-/// checkpoint before it).
-pub fn state_before(log: &Log, idx: usize) -> State {
-    let idx = idx.min(log.events.len());
-    let start = log.events[..idx]
-        .iter()
-        .rposition(|e| matches!(e.payload, Some(Payload::Checkpoint(_))))
-        .unwrap_or(0);
-    let mut st = State::default();
-    for e in &log.events[start..idx] {
-        st.apply(e.seq, e.turn, e.payload.as_ref());
-    }
-    st
-}
-
-/// What the model got for request `r`: the system prompt, the tools,
-/// then the context entries in the order the state holds them, a rule
-/// before a compaction's summary saying how many entries it replaced.
-/// The tokens of each entry are estimated (bytes / 4).
-pub fn model_view(src: &Source, r: &Request) -> Vec<Item> {
-    let log = src.log;
-    let st = state_before(log, r.idx);
-    let tools = src.call_tools();
-    let e0 = &log.events[r.idx];
-    let mut out = Vec::new();
-    let mut sys = Item::entry(e0, r.idx, Role::System, String::new(), Body::None);
-    let text = src.red(src.text_of(&st.system));
-    sys.head = format!("system prompt · {} lines", text.lines().count());
-    sys.body = Body::Md(text);
-    sys.seq = 0;
-    sys.time = String::new();
-    sys.turn = None;
-    out.push(sys);
-    let (head, body) = tools_view(&st.tools);
-    let mut tl = Item::entry(e0, r.idx, Role::Tools, head, body);
-    tl.seq = 0;
-    tl.time = String::new();
-    tl.turn = None;
-    out.push(tl);
-    for &seq in &st.context {
-        let Some(i) = log.events.iter().position(|e| e.seq == seq) else { continue };
-        let e = &log.events[i];
-        if let Some(Payload::CompactionDone(c)) = &e.payload {
-            let n = log.events.iter().filter(|x| x.seq >= c.replaces.from && x.seq <= c.replaces.to && is_context(x)).count();
-            let kept = c.kept.len();
-            out.push(Item::rule(e, i, format!("{} entries before this were compacted ({} kept)", n.saturating_sub(kept), kept)));
-        }
-        let from = out.len();
-        src.entries(i, &tools, &mut out);
-        for it in &mut out[from..] {
-            it.tokens = Some(((it.bytes() as u64).div_ceil(4), true));
-        }
-    }
-    out
-}
-
-/// An event that goes into the context (State::apply's pushes).
-fn is_context(e: &Event) -> bool {
-    matches!(
-        e.payload,
-        Some(
-            Payload::UserMessage(_)
-                | Payload::ContextInjected(_)
-                | Payload::AgentMessage(_)
-                | Payload::AssistantMessage(_)
-                | Payload::ToolResult(_)
-        )
-    )
 }
 
 /// `2026-10-02T14:02:31.123Z` → ms since the epoch (UTC).
@@ -887,69 +816,4 @@ pub fn iso_ms(at: &str) -> Option<u64> {
     let days = era * 146_097 + doe - 719_468;
     let t = ((days * 24 + h) * 60 + mi) * 60 + s;
     u64::try_from(t * 1000 + ms).ok()
-}
-
-/// The request bodies the REPL wrote (`BISE_DEBUG_REQUESTS`): each
-/// file and when it was written (ms), oldest first.
-pub fn request_files(dir: &Path) -> Vec<(u64, std::path::PathBuf)> {
-    let Ok(rd) = std::fs::read_dir(dir) else { return Vec::new() };
-    let mut v: Vec<(u64, std::path::PathBuf)> = rd
-        .flatten()
-        .filter(|e| e.file_name().to_string_lossy().ends_with(".json"))
-        .filter_map(|e| {
-            let t = e.metadata().ok()?.modified().ok()?;
-            let ms = t.duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
-            Some((ms, e.path()))
-        })
-        .collect();
-    v.sort();
-    v
-}
-
-/// The body sent for a request answered at `reply_ms`: the last file
-/// written before the answer, and after `since_ms` (the answer before).
-pub fn dump_for(files: &[(u64, std::path::PathBuf)], since_ms: u64, reply_ms: u64) -> Option<&std::path::Path> {
-    files.iter().rev().find(|(t, _)| *t <= reply_ms && *t > since_ms).map(|(_, p)| p.as_path())
-}
-
-/// Long base64 strings (images) as a word: the screen is for reading.
-fn shorten_blobs(v: &mut Value) {
-    match v {
-        Value::String(s) if s.len() > 4000 && !s.contains(' ') => {
-            *s = format!("[{} of base64]", short_bytes(s.len()));
-        }
-        Value::Array(a) => a.iter_mut().for_each(shorten_blobs),
-        Value::Object(m) => m.values_mut().for_each(shorten_blobs),
-        _ => {}
-    }
-}
-
-/// The exact body of a request, as an entry: JSON pretty, redacted,
-/// images shortened.
-pub fn exact_item(path: &Path, redact: &Redactor, like: &Item) -> Item {
-    let raw = std::fs::read_to_string(path).unwrap_or_default();
-    let mut it = like.clone();
-    it.role = Role::System;
-    it.tool = String::new();
-    it.rule = None;
-    it.tokens = None;
-    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-    match serde_json::from_str::<Value>(&raw) {
-        Ok(mut v) => {
-            let msgs = v.get("messages").or_else(|| v.get("input")).and_then(Value::as_array).map(|a| a.len());
-            shorten_blobs(&mut v);
-            let text = serde_json::to_string_pretty(&v).unwrap_or_default();
-            it.head = format!(
-                "the exact request body · {name} · {}{}",
-                short_bytes(raw.len()),
-                msgs.map(|n| format!(" · {n} messages")).unwrap_or_default()
-            );
-            it.body = Body::Code { lang: "json", text: redact.text(&text) };
-        }
-        Err(_) => {
-            it.head = format!("the exact request body · {name} · {} (not JSON)", short_bytes(raw.len()));
-            it.body = Body::Plain(redact.text(&raw));
-        }
-    }
-    it
 }

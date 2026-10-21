@@ -186,10 +186,26 @@ pub enum HubEv {
         parts: Vec<Part>,
     },
     /// a page of an agent's raw session (the answer to `log`, this
-    /// connection only; the window's `/log`): rows oldest first, every
-    /// text redacted; `more`: older rows remain (ask with `before` = the
-    /// first row's seq)
-    Log { project: Project, agent: String, items: Vec<crate::log::LogItem>, more: bool },
+    /// connection only; `/debug history`): rows oldest first, every text
+    /// redacted; `more`: older rows remain (ask with `before` = the first
+    /// row's pos). With `find`: `hits`, the pos of every row that holds
+    /// it in the whole history, oldest first, and the page ends at the
+    /// newest hit
+    Log {
+        project: Project,
+        agent: String,
+        items: Vec<crate::log::LogItem>,
+        more: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        hits: Option<Vec<u64>>,
+    },
+    /// `/debug completion` (the answer to `completion`, this connection
+    /// only): request `slot` of the agent's ring as its provider got it,
+    /// cut into rows (`bise_session::completion`), or as `shown_as`'s
+    /// family would get it (the runtime's own render, no call made);
+    /// `slots`: every request the ring keeps, oldest first
+    Completion(Box<crate::log::Completion>),
     /// an agent's change (the answer to `diff`): its checkout or branch
     /// vs `base`; `head` its branch (none: the shared folder)
     Diff {
@@ -436,7 +452,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "thread_hits", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "completion", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "activity", "confirm", "flow", "paused", "switch", "growth", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -642,7 +658,15 @@ pub enum HubCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[cfg_attr(feature = "ts", ts(optional))]
         before: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        find: Option<String>,
     },
+    /// `/debug completion`: request `slot` of `agent`'s ring (none: the
+    /// newest), as sent, or as `provider` (a `provider/model` or a
+    /// provider of the catalog) would get it; `raw`: each row its bytes
+    /// as sent; `find`: the hits. The user's authority, a client's only
+    Completion(Box<crate::log::CompletionAsk>),
     /// his queued message `id` (an `Agent.queued` row) taken back before
     /// its turn ends (the window's "edit · drop"): `queued_taken` answers
     /// this connection with its words, or an error says why (delivered,
@@ -837,7 +861,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "find", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "completion", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -920,42 +944,10 @@ impl HubCmd {
             | HubCmd::Log { project, .. }
             | HubCmd::QueuedTake { project, .. }
             | HubCmd::QueuedSteer { project, .. } => project,
+            HubCmd::Completion(c) => &c.project,
             HubCmd::Unknown { .. } => return None,
         };
         Some(v)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn unknown_tags_are_kept_and_bad_fields_are_errors() {
-        let e = HubEv::decode(r#"{"ev":"weather","project":"p","to":"q"}"#).unwrap();
-        assert!(matches!(&e, HubEv::Unknown { tag, .. } if tag == "weather"));
-        assert_eq!(e.encode(), r#"{"ev":"weather","project":"p","to":"q"}"#);
-        assert!(HubEv::decode(r#"{"ev":"typing","project":"p"}"#).is_err(), "a known tag without its fields");
-        assert!(HubEv::decode(r#"{"project":"p"}"#).is_err());
-        let c = HubCmd::decode(r#"{"cmd":"approve","project":"p","card":3}"#).unwrap();
-        assert!(matches!(c, HubCmd::Unknown { .. }), "approve is answer's path: not a command");
-        // unknown fields are ignored
-        let t = HubEv::decode(r#"{"ev":"typing","project":"p","agent":"a","text":"x","new":1}"#).unwrap();
-        assert_eq!(t, HubEv::Typing { project: "p".into(), agent: "a".into(), text: "x".into() });
-        assert_eq!(t.tag(), "typing");
-    }
-
-    /// hub-skew (architect m_11314): a hub older than `cmds` says none, a
-    /// newer one lists its tags.
-    #[test]
-    fn a_welcome_without_cmds_is_an_older_hub() {
-        let old = HubEv::decode(r#"{"ev":"welcome","project":"p","proto":1,"workspace":"/w","name":"w"}"#).unwrap();
-        assert!(matches!(&old, HubEv::Welcome { cmds, .. } if cmds.is_empty()));
-        let new = HubEv::decode(r#"{"ev":"welcome","project":"p","proto":1,"workspace":"/w","name":"w","cmds":["subscribe","slash"]}"#).unwrap();
-        assert!(matches!(&new, HubEv::Welcome { cmds, .. } if cmds == &["subscribe", "slash"]));
-        // an older client's hello is no command any more: Unknown, refused
-        let hello = HubCmd::decode(r#"{"cmd":"hello","proto":1,"typed_only":true}"#).unwrap();
-        assert!(matches!(&hello, HubCmd::Unknown { tag, .. } if tag == "hello"));
     }
 }
 
@@ -980,13 +972,4 @@ pub enum ErrorKind {
 }
 
 #[cfg(test)]
-mod size {
-    /// A client keeps events in enums of its own (the core's `Read`):
-    /// one big variant would weigh on all of them (clippy's
-    /// large_enum_variant); box the rare big ones.
-    #[test]
-    fn a_hub_event_stays_small() {
-        let n = std::mem::size_of::<super::HubEv>();
-        assert!(n <= 264, "HubEv is {n} bytes");
-    }
-}
+mod tests;

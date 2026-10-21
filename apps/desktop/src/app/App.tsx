@@ -435,9 +435,13 @@ function ScreenOf({ route }: { route: Route }) {
       return <Known project={route.project}>{() => <ReviewScreen project={route.project} agent={route.agent} />}</Known>;
     case 'prs':
       return <Known project={route.project}>{() => <PrsScreen project={route.project} />}</Known>;
-    case 'log':
-      // the agent's raw session, read-only (/log, amb-web's src/log)
-      return <Known project={route.project}>{() => <LogScreen key={`${route.project}/${route.agent}`} project={route.project} agent={route.agent} />}</Known>;
+    case 'debug':
+      // /debug: the agent's raw session or a request as its provider got it, read-only (src/log)
+      return (
+        <Known project={route.project}>
+          {() => <LogScreen key={formatRoute(route)} project={route.project} agent={route.agent} tab={route.tab ?? 'history'} provider={route.provider} />}
+        </Known>
+      );
     case 'feature':
       return <Known project={route.project}>{() => <FeatureScreen project={route.project} name={route.name} />}</Known>;
     case 'commit':

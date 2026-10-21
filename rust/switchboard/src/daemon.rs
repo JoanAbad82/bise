@@ -1928,12 +1928,6 @@ fn wait_previous_hub(paths: &Paths) {
     log_line(paths, &format!("waited {} ms for the previous hub (pid {}) to stop", t0.elapsed().as_millis(), pid));
 }
 
-/// Dev: log every model request's body (`BISE_DEBUG_REQUESTS=1` in the
-/// hub's environment, or a `debug-requests` file in its state folder).
-fn debug_requests(state: &std::path::Path) -> bool {
-    std::env::var("BISE_DEBUG_REQUESTS").is_ok_and(|v| !v.is_empty() && v != "0") || state.join("debug-requests").exists()
-}
-
 #[cfg(test)]
 #[path = "daemon_tests.rs"]
 mod tests;

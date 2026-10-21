@@ -80,9 +80,15 @@ export function windowRun(name: string, args: string, at: { project: string; age
     }
     case 'prs':
       return go({ screen: 'prs', project: at.project });
-    case 'log':
-      // N2: the raw session of the agent in view (or the one named), read-only (amb-web's src/log)
-      return go({ screen: 'log', project: at.project, agent: arg === '' ? at.agent : arg });
+    case 'debug': {
+      // /debug [history | completion [provider]] on the agent in view (the TUI's logview.rs
+      // parse): its raw session, or its last request as sent (as `provider` would get it)
+      const [sub, prov, extra] = arg.split(/\s+/u).filter((w) => w !== '');
+      const base = { screen: 'debug', project: at.project, agent: at.agent } as const;
+      if (sub === undefined || (sub === 'history' && prov === undefined)) return go(base);
+      if (sub !== 'completion' || extra !== undefined) return undefined;
+      return go(prov === undefined ? { ...base, tab: 'completion' } : { ...base, tab: 'completion', provider: prov });
+    }
     // a window command with words of its own (/artifacts add <url>, /plugins enable <x>) is the hub's
     case 'artifacts':
       return arg === '' ? go({ screen: 'artifacts', project: at.project }) : undefined;

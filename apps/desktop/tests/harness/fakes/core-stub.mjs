@@ -75,8 +75,25 @@ function answer(cmd) {
     // the inbox screen's history (inbox/history): the world's page of that project; an older one
     // (before) has none
     case 'inbox_history': return cmd.before == null ? of(['inbox_history']) : [];
-    // /log: the world's pages of that agent's session, the newest (no before) or the one before a seq
-    case 'log': return of(['log'], (ev) => (cmd.before === undefined ? (ev.items[0]?.seq ?? 0) >= Math.max(...evs.filter((e) => e.ev === 'log' && same(e, cmd)).map((e) => e.items[0]?.seq ?? 0)) : (ev.items.at(-1)?.seq ?? 0) < cmd.before)).slice(-1);
+    // /debug history: the world's pages of that agent's session, the newest (no before) or the one
+    // before a pos; a find: the pos of every row of every page that holds it (any case), no rows
+    case 'log': {
+      if (cmd.find !== undefined) {
+        const n = String(cmd.find).toLowerCase();
+        const rows = of(['log']).flatMap((ev) => ev.items);
+        const has = (it) => [it.head, it.rule ?? '', it.meta ?? '', it.body?.text ?? ''].join('\n').toLowerCase().includes(n);
+        const hits = [...new Set(rows.filter(has).map((it) => it.pos))].sort((a, b) => a - b);
+        return [{ ev: 'log', project: cmd.project, agent: cmd.agent, items: [], more: false, hits }];
+      }
+      const newest = Math.max(...of(['log']).map((e) => e.items[0]?.pos ?? 0));
+      return of(['log'], (ev) => (cmd.before === undefined ? (ev.items[0]?.pos ?? 0) >= newest : (ev.items.at(-1)?.pos ?? 0) < cmd.before)).slice(-1);
+    }
+    // /debug completion: the world's request in that slot, else its newest; raw: the world's raw
+    // one when it has it
+    case 'completion': {
+      const all = of(['completion'], (ev) => (cmd.slot === undefined || ev.slot.slot === cmd.slot) && (ev.raw === true) === (cmd.raw === true));
+      return all.slice(-1).map((ev) => Object.fromEntries(Object.entries(ev).filter(([k]) => k !== 'raw')));
+    }
     default: return [];
   }
 }

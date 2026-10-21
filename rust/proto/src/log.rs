@@ -68,9 +68,13 @@ pub struct LogBody {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct LogItem {
-    /// the log's seq (0: the context's system prompt and tools); pages
-    /// go by it (`HubCmd::Log.before`)
+    /// the log's seq (0: the context's system prompt and tools)
     pub seq: u64,
+    /// its place in the whole history (the event's index << 16 | its
+    /// rank among that event's rows): never moves as the log grows;
+    /// pages go by it (`HubCmd::Log.before`), and find answers with it
+    #[serde(default)]
+    pub pos: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub turn: Option<u64>,
@@ -110,6 +114,107 @@ pub struct LogItem {
     pub meta: Option<String>,
 }
 
+/// One block of a completion row: a text, a call or a result, with what
+/// it is ("tool_use · bash", "result"), drawn as its body says (a bash
+/// call is `code` bash, run_typescript `code` ts, another call `code`
+/// json, a text `md`, a result `code` json when it parses, else `plain`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CompBlock {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub label: Option<String>,
+    pub body: LogBody,
+}
+
+/// One row of `/debug completion`: a slice of the request body the
+/// provider got (`bise_session::completion`). Row 0 is the request's
+/// head (the model, the params and the tools); the others are its
+/// system prompt and its messages, in the body's order, each with the
+/// provider's own role word (user, assistant, tool, developer,
+/// function_call, ...).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CompRow {
+    /// its place in the body (0: the head); pages go by it
+    pub n: u64,
+    pub role: String,
+    /// the one-line summary of its header
+    pub head: String,
+    pub blocks: Vec<CompBlock>,
+    /// the bytes of its slice of the body, and its tokens (bytes / 4)
+    pub bytes: u64,
+    pub tokens: u64,
+}
+
+/// One request the agent's ring keeps (`bise_session::reqlog`), for
+/// `/debug completion`'s [ ] steps, oldest first.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CompSlot {
+    pub slot: u64,
+    pub req: u64,
+    /// `turn` or `compaction`
+    pub kind: String,
+    /// the full model id it went to, `provider/model`
+    pub model: String,
+    pub at_ms: u64,
+    /// false: being written (the call is going out now)
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub writing: bool,
+}
+
+/// `HubCmd::Completion`: which request, shown how.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CompletionAsk {
+    /// none: the hub's own (the TUI's socket serves one project)
+    #[serde(default)]
+    pub project: crate::Project,
+    pub agent: String,
+    /// the ring slot (none: the newest request)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub slot: Option<u64>,
+    /// another family's body for the same request: `provider/model`, or
+    /// a provider of the catalog (its first model); none: as sent
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub provider: Option<String>,
+    /// each row its slice of the body as sent (`r`)
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub raw: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub find: Option<String>,
+}
+
+/// `HubEv::Completion`: one request's body as rows, whole (a body is a
+/// few MB at most; the clients draw only the rows in view).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Completion {
+    pub project: crate::Project,
+    pub agent: String,
+    /// the request shown (its ring slot; `slots` has the others)
+    pub slot: CompSlot,
+    /// the family the rows are in (`anthropic`, `openai-chat`,
+    /// `openai-responses`)
+    pub family: String,
+    /// rendered for this model, not as sent (none: as sent)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub shown_as: Option<String>,
+    /// the body's bytes
+    pub bytes: u64,
+    pub rows: Vec<CompRow>,
+    pub slots: Vec<CompSlot>,
+    /// with `find`: the `n` of every row that holds it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub hits: Option<Vec<u64>>,
+}
+
 /// At most this many rows in one `log` event.
 pub const LOG_PAGE_ITEMS: usize = 200;
 /// At most about this many bytes of bodies in one `log` event (a page of
@@ -144,6 +249,7 @@ mod tests {
     fn item(seq: u64, body: usize) -> LogItem {
         LogItem {
             seq,
+            pos: seq,
             turn: None,
             at_ms: None,
             role: LogRole::Assistant,

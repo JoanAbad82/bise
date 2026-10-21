@@ -24,6 +24,23 @@ pub(crate) fn kind_color(role: &Role) -> ratatui::style::Color {
         Role::System | Role::Tools => theme::syntax_number(),
         Role::Summary => theme::syntax_string(),
         Role::Event => theme::faint(),
+        Role::Sent(w) => sent_color(w),
+    }
+}
+
+/// A provider word's color in `/debug completion`: the history's for
+/// the same kind (designer's debug-views v2).
+fn sent_color(w: &str) -> ratatui::style::Color {
+    match w {
+        "user" => theme::accent(),
+        "assistant" | "model" => theme::text(),
+        "system" | "developer" | "request" | "params" | "instructions" => theme::syntax_number(),
+        w if w.starts_with("tools") => theme::syntax_number(),
+        w if w.starts_with("tool_use") || w.contains("function_call") && !w.ends_with("output") => theme::syntax_call(),
+        "result · failed" => theme::error(),
+        w if w.starts_with("result") || w == "tool" || w.ends_with("output") => theme::dim(),
+        "thinking" | "reasoning" | "reasoning_text" | "summary_text" => theme::dim(),
+        _ => theme::faint(),
     }
 }
 
@@ -53,8 +70,21 @@ pub(crate) fn role_label(it: &Item, agent_word: &str) -> (String, Style) {
         Role::Summary => format!("{} summary", g(theme::G_SUMMARY)),
         Role::Error => format!("{} error", g(theme::G_INTERRUPTED)),
         Role::Event => "· event".into(),
+        Role::Sent(w) => sent_word(w),
     };
     (w, st)
+}
+
+/// A provider word as the role column says it: a call by its tool's
+/// glyph and word, the rest as the provider wrote it.
+fn sent_word(w: &str) -> String {
+    let g = theme::glyph;
+    match w.strip_prefix("tool_use · ") {
+        Some("bash") => format!("{} bash", g(theme::G_BASH)),
+        Some("run_typescript") => format!("{} run_typescript", g(theme::G_TS)),
+        Some(t) => format!("⚙ {t}"),
+        None => w.to_string(),
+    }
 }
 
 /// The rail left of an open body, in its kind's color (none for events).
@@ -89,7 +119,7 @@ pub(super) fn pad(s: &str, w: usize) -> String {
 /// size (history).
 pub(super) fn size_label(it: &Item, mode: Mode) -> String {
     match (mode, it.tokens) {
-        (Mode::Model, Some((n, est))) => format!("{}{} tok", if est { "~" } else { "" }, model::short_num(n)),
+        (Mode::Completion, Some((n, est))) => format!("{}{} tok", if est { "~" } else { "" }, model::short_num(n)),
         _ if it.bytes() > 0 => model::short_bytes(it.bytes()),
         _ => String::new(),
     }
@@ -277,70 +307,70 @@ pub(super) fn mark(line: Line<'static>, needle: &str) -> Line<'static> {
     Line::from(out)
 }
 
-/// The top bar: the two views, the active one in text; the filter.
+/// The top bar (designer's debug-views v2): the agent and what the tab
+/// shows on the left, the two tabs on the right, the active one in text;
+/// under it, what is above (history) or how the rows were made
+/// (completion); then the filter and a note.
 pub(super) fn top_rows(v: &View, width: usize) -> Vec<Line<'static>> {
     let on = Style::default().fg(theme::text()).add_modifier(Modifier::BOLD);
     let off = Style::default().fg(theme::dim());
     let faint = Style::default().fg(theme::faint());
-    let (h, m) = if v.mode == Mode::History { (on, off) } else { (off, on) };
-    // the requests by position, as the subtitle counts them
-    let (req, m) = match v.requests.get(v.req) {
-        Some(_) => (format!("what the model got {} request {} of {}", dot(), v.req + 1, v.requests.len()), m),
-        None => (format!("what the model got {} no request yet", dot()), faint),
+    let (h, c) = if v.mode == Mode::History { (on, off) } else { (off, on) };
+    let (events, above) = v.events();
+    let left = if v.mode == Mode::History {
+        format!("/debug {} {} {} {} newest at the bottom", v.agent, dot(), count(events, "event", "events"), dot())
+    } else {
+        let ready: Vec<&bise_session::reqlog::Slot> = v.slots.iter().filter(|s| s.meta().is_some()).collect();
+        match v.slot.and_then(|i| v.slots.get(i)).and_then(|s| s.meta().map(|m| (s, m))) {
+            Some((s, m)) => {
+                let k = ready.iter().position(|r| r.n == s.n).map_or(0, |k| k + 1);
+                let model = v.comp_of.shown_as.clone().map(|m| format!("as {m}")).unwrap_or_else(|| m.model.clone());
+                format!(
+                    "/debug {} {} request {k} of {} {} {} {} {} {} {}",
+                    v.agent,
+                    dot(),
+                    ready.len(),
+                    dot(),
+                    v.comp_of.family,
+                    dot(),
+                    model,
+                    dot(),
+                    model::short_bytes(v.comp_of.bytes as usize)
+                )
+            }
+            None => format!("/debug {} {} no request kept yet", v.agent, dot()),
+        }
     };
-    let mut first = vec![
-        Span::styled(format!("log of {}   ", v.agent), faint),
-        Span::styled("full history", h),
+    let tabs = "history   completion";
+    let room = width.saturating_sub(tabs.width() + 2);
+    let left = crate::render::fit_chars(&left, room);
+    let fill = room.saturating_sub(left.width());
+    let mut rows = vec![Line::from(vec![
+        Span::styled(left, faint),
+        Span::raw(" ".repeat(fill + 2)),
+        Span::styled("history", h),
         Span::raw("   "),
-        Span::styled(req, m),
-    ];
+        Span::styled("completion", c),
+    ])];
+    let second = if v.mode == Mode::History {
+        if above > 0 {
+            format!("{} {} older events {} scroll up, or g for the top", theme::glyph("↑"), above, dot())
+        } else {
+            "the whole session".to_string()
+        }
+    } else if v.raw {
+        "each row as its bytes went out (r: drawn)".to_string()
+    } else if v.comp_of.shown_as.is_some() {
+        "this request as that provider's family gets it: made by the agent's runtime, not sent".to_string()
+    } else {
+        format!("the body sent, since the last compaction {} kept for the last 8 requests", dot())
+    };
+    rows.push(Line::from(Span::styled(crate::render::fit_chars(&second, width), faint)));
     if !v.off.is_empty() {
         let mut keys: Vec<&String> = v.off.iter().collect();
         keys.sort();
         let keys: Vec<String> = keys.iter().map(|k| k.trim_start_matches("tool:").to_string()).collect();
-        first.push(Span::styled(format!("   hidden: {}", keys.join(" ")), faint));
-    }
-    let mut rows = vec![Line::from(first)];
-    let second = if v.mode == Mode::Model {
-        match v.requests.get(v.req) {
-            Some(r) => {
-                let usage = r
-                    .usage
-                    .map(|(i, o, c)| {
-                        format!(" {} {} in ({} cached) {} {} out", dot(), model::short_num(i + c), model::short_num(c), dot(), model::short_num(o))
-                    })
-                    .unwrap_or_default();
-                let n = v.model.iter().filter(|i| i.rule.is_none() && !matches!(i.role, Role::System | Role::Tools)).count();
-                format!(
-                    "turn {} {} {} {} {}{usage} {} {}",
-                    r.turn.unwrap_or(0),
-                    dot(),
-                    r.time,
-                    dot(),
-                    r.model,
-                    dot(),
-                    count(n, "entry", "entries")
-                )
-            }
-            None => "no request in this log yet".into(),
-        }
-    } else {
-        format!(
-            "every entry of the session log, in order {} {} {} {}",
-            dot(),
-            count(v.history.iter().filter(|i| i.rule.is_none()).count(), "entry", "entries"),
-            dot(),
-            count(v.requests.len(), "request", "requests")
-        )
-    };
-    rows.push(Line::from(Span::styled(crate::render::fit_chars(&second, width), faint)));
-    if v.mode == Mode::Model {
-        let how = if v.exact {
-            "first: the exact body sent (BISE_DEBUG_REQUESTS); then the context rebuilt from the session log"
-        } else {
-            "rebuilt from the log. missing: each call's <bise_state> (BISE_DEBUG_REQUESTS=1 logs it)"
-        };
-        rows.push(Line::from(Span::styled(crate::render::fit_chars(how, width), faint)));
+        rows.push(Line::from(Span::styled(format!("hidden: {}", keys.join(" ")), faint)));
     }
     if !v.note.is_empty() {
         rows.push(Line::from(Span::styled(crate::render::fit_chars(&v.note, width), Style::default().fg(theme::error()))));
@@ -380,14 +410,14 @@ pub(super) fn key_row(v: &View, width: usize) -> Line<'static> {
         &[("space", "show/hide"), ("a", "show all"), ("esc", "done")]
     } else if v.searching() {
         &[("/", "search"), ("n", "next"), ("N", "previous"), ("esc", "clear search")]
-    } else if v.mode == Mode::Model {
+    } else if v.mode == Mode::Completion {
         &[
-            ("/", "search"),
-            ("f", "filter"),
             ("[ ]", "request"),
+            ("r", "raw json"),
+            ("/", "search"),
             ("g", "top"),
             ("G", "bottom"),
-            ("tab", "full history"),
+            ("tab", "history"),
             ("space", "open"),
             ("ctrl+o", "open all"),
             ("esc", "close"),
@@ -398,7 +428,7 @@ pub(super) fn key_row(v: &View, width: usize) -> Line<'static> {
             ("f", "filter"),
             ("g", "top"),
             ("G", "bottom"),
-            ("tab", "what the model got"),
+            ("tab", "completion"),
             ("space", "open"),
             ("ctrl+o", "open all"),
             ("esc", "close"),

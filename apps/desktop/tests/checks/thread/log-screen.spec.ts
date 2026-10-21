@@ -1,10 +1,13 @@
-// thread/log-screen · TP-N2 (docs/terminal-parity.md; the TUI's rust/tui/src/logview.rs, designer
-// m_17266): '/log' in an agent's composer opens its raw session, read-only, in the window. The
-// window asks the hub `log {project, agent}`, draws the newest page at the end (one header row per
-// entry with its kind's label, turns and compactions as rules, a body past 6 lines folded as
-// '▸ 34 lines · 2.1 KB'), asks `log {before: first seq}` when he scrolls to the top and keeps his
-// place, finds with ⌘F and counts 'n of m', and esc goes back to the thread. FakeCore stands in
-// for the hub (its world holds the two pages). Light + dark shots at 1100. Owner: amb-web.
+// thread/log-screen · /debug (the TUI's rust/tui/src/logview.rs, designer m_17266 and
+// debug-views v3): '/debug' in an agent's composer opens its raw session, read-only, in the
+// window. The window asks the hub `log {project, agent}`, draws the newest page at the end (one
+// header row per entry with its kind's label, turns and compactions as rules, a body past 6 lines
+// folded as '▸ 34 lines · 2.1 KB'), asks `log {before: first pos}` when he scrolls to the top and
+// keeps his place, finds in the whole history with ⌘F (`log {find}`, the hub's hits) and counts
+// 'n of m'; ⌘] opens the completion tab (`completion {}`: the ring's newest request, bash as a
+// command, run_typescript as code, JSON calls, markdown), [ ] step requests, r the raw JSON; esc
+// goes back to the thread. FakeCore stands in for the hub. Light + dark shots at 1100.
+// Owners: amb-web, debug-cmd.
 import { FakeCore, launchDesktop, test, expect } from "../../harness";
 
 const P = "acme-1a2b3c4d";
@@ -194,8 +197,8 @@ const world = () => [
     ev: "commands",
     items: [
       {
-        name: "/log",
-        desc: "the agent's raw session log",
+        name: "/debug",
+        desc: "the agent in view: its raw session, or a request as its provider got it",
         args: [],
         runs: "window",
         runnable: true,
@@ -217,12 +220,77 @@ const world = () => [
     before: null,
     more: false,
   },
-  { ev: "log", project: P, agent: "perf", items: newest, more: true },
-  { ev: "log", project: P, agent: "perf", items: older, more: false },
+  { ev: "log", project: P, agent: "perf", items: newest.map(withPos), more: true },
+  { ev: "log", project: P, agent: "perf", items: older.map(withPos), more: false },
+  completion(7, 41),
+  completion(6, 40),
+  { ...completion(7, 41), raw: true },
 ];
-const logCmds = (core: FakeCore) => core.cmds().filter((c) => c.cmd === "log");
+// the hub's rows: pos (paging, hits) here the seq
+const withPos = <T extends { seq: number }>(it: T) => ({ ...it, pos: it.seq });
+const logCmds = (core: FakeCore) =>
+  core.cmds().filter((c) => c.cmd === "log" && !("find" in c));
+const findCmds = (core: FakeCore) =>
+  core.cmds().filter((c) => c.cmd === "log" && "find" in c);
+const compCmds = (core: FakeCore) =>
+  core.cmds().filter((c) => c.cmd === "completion");
 
-test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages older on scroll-up, finds, esc back", async () => {
+/** A request of the ring as the hub cuts it (bise_session::completion): the head, the system
+ *  prompt, then the messages with a bash call, a run_typescript call and a JSON call. */
+function completion(slot: number, req: number) {
+  const md = (text: string) => ({ kind: "md", text });
+  const code = (lang: string, text: string) => ({ kind: "code", lang, text });
+  const row = (n: number, role: string, head: string, blocks: unknown[]) => ({
+    n,
+    role,
+    head,
+    blocks,
+    bytes: 400 + n * 10,
+    tokens: 100 + n * 3,
+  });
+  const slots = [6, 7].map((s) => ({
+    slot: s,
+    req: s + 34,
+    kind: "anthropic",
+    model: "anthropic/claude-opus-5-5",
+    at_ms: at(600 + s),
+  }));
+  return {
+    ev: "completion",
+    project: P,
+    agent: "perf",
+    slot: slots.find((s) => s.slot === slot),
+    family: "anthropic",
+    bytes: 41_200,
+    slots,
+    rows: [
+      row(0, "request", `anthropic · claude-opus-5-5 · 46 tools · request ${String(req)}`, [
+        { label: "params", body: code("json", '{\n  "max_tokens": 32000,\n  "stream": true\n}') },
+      ]),
+      row(1, "system", "the prompt bise sends perf", [md("You are **perf**, an agent of bise.\n\nline\nline\nline\nline\nline")]),
+      row(2, "user", "make the product page faster on mobile", [md("make the product page faster on mobile")]),
+      row(3, "assistant", "pnpm bench web/product --runs 3", [
+        md("i'll bench it first."),
+        { label: "tool_use · bash", body: code("bash", "pnpm bench web/product --runs 3") },
+      ]),
+      row(4, "user", "p50 2.2 s · p95 3.1 s · lcp hero.jpg", [
+        { label: "result", body: { kind: "plain", text: "p50 2.2 s · p95 3.1 s · lcp hero.jpg" } },
+      ]),
+      row(5, "assistant", "read lighthouse.json", [
+        {
+          label: "tool_use · run_typescript",
+          body: code("ts", "const r = JSON.parse(await bash('cat lighthouse.json'));\nreturn r.audits.slice(0, 5).map((a) => a.id);"),
+        },
+      ]),
+      row(6, "assistant", "web_search", [
+        { label: "tool_use · web_search", body: code("json", '{\n  "query": "lcp hero image preload",\n  "limit": 5\n}') },
+      ]),
+      row(7, "assistant", `run ${String(req)}: the page paints in 2.2 s`, [md(`run ${String(req)}: the page paints in **2.2 s** on mobile.`)]),
+    ],
+  };
+}
+
+test("thread/log-screen: /debug opens the raw session (rows, rules, folds), pages older on scroll-up, finds in the whole history, the completion tab, esc back", async () => {
   test.setTimeout(120_000);
   const core = new FakeCore(
     world() as unknown as ConstructorParameters<typeof FakeCore>[0],
@@ -239,24 +307,29 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
     const field = page.locator('[data-testid="composer.field"]');
     await expect(field).toBeVisible({ timeout: 10_000 });
     await field.click();
-    await page.keyboard.type("/log");
+    await page.keyboard.type("/debug");
     await page.keyboard.press("Enter");
     const log = page.getByTestId("log");
-    await expect(log, "/log opens the screen").toBeVisible({ timeout: 5000 });
+    const pane = page.getByTestId("debug.history");
+    await expect(log, "/debug opens the screen").toBeVisible({ timeout: 5000 });
     await expect.poll(() => logCmds(core), { timeout: 3000 }).toHaveLength(1);
     expect(logCmds(core)[0], "the newest page of the agent in view").toEqual({
       cmd: "log",
       project: P,
       agent: "perf",
     });
-    await expect(page.locator(".b-head .t1")).toHaveText("perf · session log");
+    await expect(page.locator(".b-head .t1")).toHaveText("perf · debug");
     await expect(page.getByTestId("log.sub")).toHaveText(
       "read-only · redacted",
     );
     await expect(
-      page.getByTestId("log.tab.model"),
-      "'what the model got' has its tab, greyed",
-    ).toHaveAttribute("aria-disabled", "true");
+      page.getByTestId("log.tab.history"),
+      "history is the tab shown",
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("log.tab.completion")).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
 
     const row = (seq: number) =>
       page.locator(`[data-testid^="log.row."][data-seq="${String(seq)}"]`);
@@ -361,13 +434,24 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
     await expect(find).toBeFocused();
     await page.keyboard.type("query");
     const count = page.getByTestId("log.count");
-    await expect(count).toHaveText(/^1 of \d+$/);
+    // the hub finds in the whole history (both pages here), the newest hit first
+    await expect(count).toHaveText(/^(\d+) of \1$/);
+    await expect.poll(() => findCmds(core).at(-1), { timeout: 3000 }).toEqual({
+      cmd: "log",
+      project: P,
+      agent: "perf",
+      find: "query",
+    });
     const total = Number(
       /of (\d+)/.exec((await count.textContent()) ?? "")?.[1] ?? 0,
     );
     expect(total, "query is in several rows").toBeGreaterThan(2);
     await page.keyboard.press("Enter");
-    await expect(count).toHaveText(`1 of ${String(total)}`);
+    await expect(count).toHaveText(`${String(total)} of ${String(total)}`);
+    await page.keyboard.press("Enter");
+    await expect(count, "⏎ wraps to the oldest").toHaveText(
+      `1 of ${String(total)}`,
+    );
     await page.keyboard.press("Enter");
     await expect(count).toHaveText(`2 of ${String(total)}`);
     // only the matched words are marked (CSS highlights), the current match's on its own
@@ -388,7 +472,7 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
     await shot("3-log-find.png");
     await page.keyboard.press("Escape");
     await expect(count, "esc in the field clears the find").toHaveCount(0);
-    await expect(log, "and stays on /log").toBeVisible();
+    await expect(log, "and stays on /debug").toBeVisible();
 
     // scroll to the top: the page before 300, his place kept
     const anchor = row(301);
@@ -424,7 +508,7 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
     await page.evaluate(() => {
       document.documentElement.setAttribute("data-theme", "dark");
     });
-    await log.focus();
+    await pane.focus();
     await page.keyboard.press("Shift+G");
     await expect.poll(atEnd, { timeout: 3000 }).toBeLessThan(4);
     await shot("6-log-dark-end.png");
@@ -442,14 +526,99 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
     });
     await page.keyboard.type("slice");
     await expect(find).toHaveValue("slice");
-    await expect(count).toHaveText(/^1 of \d+$/);
+    await expect(count).toHaveText(/^\d+ of \d+$/);
     await page.keyboard.press("Escape");
+
+    // the completion tab: ⌘] from history, the newest request of the ring as sent
+    await pane.focus();
+    await page.keyboard.press("Meta+]");
+    const comp = page.getByTestId("debug.completion");
+    await expect(comp, "⌘] opens completion").toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId("log.tab.completion")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect.poll(() => compCmds(core), { timeout: 3000 }).toHaveLength(1);
+    expect(compCmds(core)[0], "the newest request, as sent").toEqual({
+      cmd: "completion",
+      project: P,
+      agent: "perf",
+    });
+    await expect(page.getByTestId("comp.title")).toHaveText(
+      /^request 41 · 2 of 2 kept · anthropic · anthropic\/claude-opus-5-5 · \d\d:\d\d:\d\d · 40\.2 KB$/,
+    );
+    // the head and the system prompt fold; bash a command box, run_typescript code, JSON
+    await expect(page.getByTestId("comp.row.0.fold")).toBeVisible();
+    await expect(page.getByTestId("comp.row.1.fold")).toBeVisible();
+    await expect(page.getByTestId("comp.row.3.b1")).toHaveAttribute(
+      "data-view",
+      "cmd",
+    );
+    await expect(page.getByTestId("comp.row.3.b1")).toContainText(
+      "pnpm bench web/product --runs 3",
+    );
+    await expect(page.getByTestId("comp.row.5.b0")).toHaveAttribute(
+      "data-view",
+      "code",
+    );
+    await expect(
+      page.getByTestId("comp.row.5.b0").locator("code.language-ts"),
+    ).toHaveCount(1);
+    await expect(page.getByTestId("comp.row.6.b0")).toHaveAttribute(
+      "data-view",
+      "code",
+    );
+    await expect(
+      page.getByTestId("comp.row.6.b0").locator("code.language-json"),
+    ).toHaveCount(1);
+    await expect(page.getByTestId("comp.row.7.b0")).toHaveAttribute(
+      "data-view",
+      "md",
+    );
+    await expect(
+      page.getByTestId("comp.row.7.b0").locator("strong"),
+    ).toHaveText("2.2 s");
+    await expect(page.getByTestId("comp.row.2.role")).toHaveText("user");
+    await expect(page.getByTestId("comp.row.7")).toContainText("tok");
+    await shot("7-debug-completion-dark.png");
+    // a find in the request: '1 of 2'
+    await page.keyboard.press("Meta+f");
+    await page.keyboard.type("hero");
+    await expect(page.getByTestId("log.count")).toHaveText("1 of 2");
+    await page.keyboard.press("Escape");
+    // [ the request before, ] back; r the raw JSON
+    await comp.focus();
+    await page.keyboard.press("[");
+    await expect.poll(() => compCmds(core).at(-1), { timeout: 3000 }).toEqual({
+      cmd: "completion",
+      project: P,
+      agent: "perf",
+      slot: 6,
+    });
+    await expect(page.getByTestId("comp.title")).toHaveText(/^request 40 · 1 of 2 kept/);
+    await page.keyboard.press("]");
+    await expect(page.getByTestId("comp.title")).toHaveText(/^request 41 · 2 of 2 kept/);
+    await page.keyboard.press("r");
+    await expect.poll(() => compCmds(core).at(-1), { timeout: 3000 }).toEqual({
+      cmd: "completion",
+      project: P,
+      agent: "perf",
+      slot: 7,
+      raw: true,
+    });
+    await expect(page.getByTestId("comp.title")).toContainText("raw json");
+    await page.keyboard.press("r");
     await page.evaluate(() => {
       document.documentElement.setAttribute("data-theme", "light");
     });
+    await expect(page.getByTestId("comp.title")).not.toContainText("raw json");
+    await shot("8-debug-completion-light.png");
+    // ⌘[ back to history
+    await page.keyboard.press("Meta+[");
+    await expect(pane).toBeVisible({ timeout: 3000 });
 
     // esc goes back to the thread
-    await log.focus();
+    await pane.focus();
     await page.keyboard.press("Escape");
     await expect(log).toHaveCount(0, { timeout: 3000 });
     await expect(field, "back on the thread").toBeVisible();

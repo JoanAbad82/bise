@@ -213,12 +213,13 @@ pub const COMMANDS: &[Cmd] = &[
     Cmd { name: "/quit", desc: "quit (the agents keep running)", args: &[], client: true },
 ];
 
-/// `/log` (the TUI's logview.rs, the window's TP-N2): a client screen, not
-/// in [`COMMANDS`] (the TUI offers it only in a dev build, its usage has
-/// no completer); `commands/list` sends it after them.
-pub const LOG: Cmd = Cmd {
-    name: "/log",
-    desc: "the raw session of the agent in view: every entry, and what the model got: /log [<request>]",
+/// `/debug` (the TUI's logview.rs, the window's src/log, debug-cmd): a
+/// client screen, not in [`COMMANDS`] (its usage has no completer);
+/// `commands/list` sends it after them. The only way in (Gabriel): no
+/// other name, no key.
+pub const DEBUG: Cmd = Cmd {
+    name: "/debug",
+    desc: "the agent in view: its raw session, or a request as its provider got it: /debug [history | completion [provider]]",
     args: &[],
     client: true,
 };
@@ -291,9 +292,9 @@ impl From<&Arg> for ArgRow {
     }
 }
 
-/// The catalog as `commands/list` sends it: [`COMMANDS`], then [`LOG`].
+/// The catalog as `commands/list` sends it: [`COMMANDS`], then [`DEBUG`].
 pub fn rows() -> Vec<CommandRow> {
-    COMMANDS.iter().chain([&LOG]).map(|c| CommandRow { name: c.name.into(), desc: c.desc.into(), args: c.args.iter().map(ArgRow::from).collect(), client: c.client }).collect()
+    COMMANDS.iter().chain([&DEBUG]).map(|c| CommandRow { name: c.name.into(), desc: c.desc.into(), args: c.args.iter().map(ArgRow::from).collect(), client: c.client }).collect()
 }
 
 #[cfg(test)]
@@ -346,9 +347,9 @@ mod tests {
     #[test]
     fn the_rows_are_the_tables_json_and_round_trip() {
         let rows = rows();
-        let table: Vec<&Cmd> = COMMANDS.iter().chain([&LOG]).collect();
+        let table: Vec<&Cmd> = COMMANDS.iter().chain([&DEBUG]).collect();
         assert_eq!(serde_json::to_value(&rows).unwrap(), serde_json::to_value(table).unwrap());
-        assert_eq!(rows.last().map(|r| (r.name.as_str(), r.client)), Some(("/log", true)), "/log after the catalog");
+        assert_eq!(rows.last().map(|r| (r.name.as_str(), r.client)), Some(("/debug", true)), "/debug after the catalog");
         let back: Vec<CommandRow> = serde_json::from_value(serde_json::to_value(&rows).unwrap()).unwrap();
         assert_eq!(back, rows);
         let newer: ArgRow = serde_json::from_value(json!({"kind": "colour"})).unwrap();

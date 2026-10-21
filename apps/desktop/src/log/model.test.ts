@@ -4,7 +4,7 @@ import {
   codeText,
   editDiff,
   findCount,
-  findRows,
+  stepHit,
   foldLabel,
   folds,
   kindOf,
@@ -23,7 +23,7 @@ const item = (
   seq: number,
   role: LogItem["role"],
   over: Partial<LogItem> = {},
-): LogItem => ({ seq, role, head: `row ${String(seq)}`, ...over });
+): LogItem => ({ seq, pos: seq, role, head: `row ${String(seq)}`, ...over });
 
 describe("log model: edits and find marks (designer m_17531)", () => {
   it("draws an edit's args as − / + lines with its counts", () => {
@@ -170,17 +170,18 @@ describe("log model", () => {
     expect(withOlder([], [item(1, "you")]).map((r) => r.seq)).toEqual([1]);
   });
 
-  it("finds in heads, bodies and rules, and counts", () => {
-    const rows = [
-      item(1, "you", { head: "make it fast" }),
-      item(2, "result", {
-        head: "ok",
-        body: { kind: "plain", text: "FAILED query::slow" },
-      }),
-      item(3, "event", { head: "", rule: "turn 2 · slow" }),
-    ];
-    expect(findRows(rows, "slow")).toEqual([1, 2]);
-    expect(findRows(rows, "  ")).toEqual([]);
+  it("keeps an older page's rows below the first one's position only", () => {
+    const rows = [item(10, "you"), item(11, "assistant")];
+    expect(
+      withOlder(rows, [item(9, "you"), item(10, "you")]).map((r) => r.pos),
+    ).toEqual([9, 10, 11]);
+  });
+
+  it("steps through the hub's hits, wrapping, and counts", () => {
+    expect(stepHit(0, 1, 3)).toBe(1);
+    expect(stepHit(2, 1, 3)).toBe(0);
+    expect(stepHit(0, -1, 3)).toBe(2);
+    expect(stepHit(0, 1, 0)).toBe(-1);
     expect(findCount(0, 2)).toBe("1 of 2");
     expect(findCount(0, 0)).toBe("no match");
   });

@@ -265,7 +265,7 @@ impl Shell {
             // the window's /log: a page of the agent's raw session (log.rs,
             // bise_session::history's rows, redacted there), read on a
             // thread, to this client only (issue 16: his raw sessions)
-            HubCmd::Log { project, agent, before } => {
+            HubCmd::Log { project, agent, before, find } => {
                 let Some(dir) = self.dir_of(&agent) else { return self.proto_error(id, &tag, &format!("no agent {agent}")) };
                 let adir = self.opts.paths.agent_dir(&dir);
                 let tx = self.tx.clone();
@@ -274,9 +274,35 @@ impl Shell {
                     let redact = bise_session::Redactor::from_home(&home.auth_file(), &home.env_files());
                     let got = super::super::session_log::session_of(&adir)
                         .ok_or_else(|| format!("{agent} has no session log yet"))
-                        .and_then(|s| super::log::answer(&home.sessions_dir().join(s), &home.blobs_dir(), &redact, before));
+                        .and_then(|s| super::log::answer(&home.sessions_dir().join(s), &home.blobs_dir(), &redact, before, find.as_deref()));
                     let v = match got {
-                        Ok((items, more)) => HubEv::Log { project, agent, items, more }.to_value(),
+                        Ok((items, more, hits)) => HubEv::Log { project, agent, items, more, hits }.to_value(),
+                        Err(text) => HubEv::Error { project: Some(project), cmd: Some(tag), text, cid: None, reason: None, kind: None }.to_value(),
+                    };
+                    let _ = tx.send(Msg::Typed { to: super::super::rpc::Typed::Answer(id), v });
+                });
+            }
+            // /debug completion: a request of the agent's ring as rows
+            // (completion.rs), another family's through the runtime's
+            // render; read on a thread, to this client only (issue 16)
+            HubCmd::Completion(mut ask) => {
+                if ask.project.is_empty() {
+                    ask.project = self.project();
+                }
+                let Some(dir) = self.dir_of(&ask.agent) else { return self.proto_error(id, &tag, &format!("no agent {}", ask.agent)) };
+                let req_dir = self.opts.paths.agent_dir(&dir).join("requests");
+                let setup = self.setup().clone();
+                let models: Vec<String> = bise_catalog::picks::picks(&setup, &|_| true).into_iter().map(|p| p.value).filter(|v| v.contains('/')).collect();
+                let (repl, root) = (self.opts.repl_bin.clone(), self.opts.app_root.clone());
+                let keys = self.opts.spawn_env.map(|f| f()).unwrap_or_default();
+                let tx = self.tx.clone();
+                std::thread::spawn(move || {
+                    let home = bise_home::Home::from_env();
+                    let redact = bise_session::Redactor::from_home(&home.auth_file(), &home.env_files());
+                    let render = |wire: &std::path::Path, model: &str| super::completion::render(&repl, &root, wire, model, &keys);
+                    let project = ask.project.clone();
+                    let v = match super::completion::answer(&ask, &req_dir, &models, &render, &redact) {
+                        Ok(c) => HubEv::Completion(Box::new(c)).to_value(),
                         Err(text) => HubEv::Error { project: Some(project), cmd: Some(tag), text, cid: None, reason: None, kind: None }.to_value(),
                     };
                     let _ = tx.send(Msg::Typed { to: super::super::rpc::Typed::Answer(id), v });

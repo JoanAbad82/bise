@@ -75,6 +75,8 @@ pub const METHODS: &[MethodRow] = &[
     m("tool/output", "tool_out", Some("tool_out")),
     // the window's /log: a page of an agent's raw session (TP-N2)
     m("log/read", "log", Some("log")),
+    // /debug completion: a request of the agent's ring, as rows
+    m("log/completion", "completion", Some("completion")),
     // his queued message taken back (the window's "edit · drop")
     m("turn/unqueue", "queued_take", Some("queued_taken")),
     // his queued message said now (the window's "send now"): sb-core

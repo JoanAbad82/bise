@@ -12,7 +12,7 @@
 //   agents/<p>/archived        its archived agents (/archived)
 //   changes/<p>                a project's changes (branches, merged today)
 //   review/<p>/<a>             an agent's change, to review and merge
-//   log/<p>/<a>                an agent's raw session, read-only (/log, amb-web's src/log)
+//   debug/<p>/<a>[/completion[/<provider>]]  /debug: an agent's raw session, or a request as sent
 //   feature/<p>/<name>         a feature: its branch, agents, try / merge / drop
 //   prs/<p>                    its open pull requests (the TUI's /prs)
 //   commit/<p>/<sha>           one commit already on main, read-only
@@ -35,8 +35,9 @@ export type Route =
   | { screen: 'changes'; project: string }
   | { screen: 'prs'; project: string }
   | { screen: 'review'; project: string; agent: string }
-  /** an agent's raw session log (/log, the TUI's logview.rs) */
-  | { screen: 'log'; project: string; agent: string }
+  /** /debug: an agent's raw session (history) or a request as its provider got it (completion,
+      as `provider` would get it when named), the TUI's logview.rs */
+  | { screen: 'debug'; project: string; agent: string; tab?: 'completion'; provider?: string }
   | { screen: 'feature'; project: string; name: string }
   | { screen: 'commit'; project: string; sha: string }
   | { screen: 'branch'; project: string; branch: string }
@@ -88,8 +89,11 @@ export function formatRoute(r: Route): string {
       return `${r.screen}/${r.project}`;
     case 'review':
       return `review/${r.project}/${r.agent}`;
-    case 'log':
-      return `log/${r.project}/${r.agent}`;
+    case 'debug': {
+      const base = `debug/${r.project}/${r.agent}`;
+      if (r.tab === undefined) return base;
+      return r.provider === undefined ? `${base}/completion` : `${base}/completion/${r.provider}`;
+    }
     case 'feature':
       return `feature/${r.project}/${r.name}`;
     case 'commit':
@@ -141,8 +145,17 @@ export function parseRoute(path: string): Route {
     case 'environments':
       return one !== undefined ? { screen: head, project: one } : nf;
     case 'review':
-    case 'log':
       return a !== undefined && b !== undefined ? { screen: head, project: a, agent: b } : nf;
+    case 'debug': {
+      // debug/<p>/<a>[/completion[/<provider or provider/model>]]
+      const [p, ag, tab, ...prov] = args;
+      if (p === undefined || ag === undefined || !NAME.test(p) || !NAME.test(ag)) return nf;
+      if (tab === undefined) return { screen: 'debug', project: p, agent: ag };
+      if (tab !== 'completion' || prov.length > 2 || !prov.every((x) => NAME.test(x))) return nf;
+      return prov.length === 0
+        ? { screen: 'debug', project: p, agent: ag, tab }
+        : { screen: 'debug', project: p, agent: ag, tab, provider: prov.join('/') };
+    }
     case 'feature':
       return a !== undefined && b !== undefined ? { screen: 'feature', project: a, name: b } : nf;
     case 'commit':
@@ -231,7 +244,7 @@ export function sameRoute(a: Route, b: Route): boolean {
 /**
  * Where esc goes up from `r` (designer's desktop-history, the esc list; esc-up.ts asks): an
  * agent opened large → its project's main, a project's main → bise, a list or a tool screen
- * (agents, archived, artifacts, scheduled, settings, changes, /log, the report…) → 'back',
+ * (agents, archived, artifacts, scheduled, settings, changes, /debug, the report…) → 'back',
  * the place before (as ‹; with nothing behind, the project's main or bise). bise, the first
  * run and the labs: null, esc does nothing. An open artifact is its view's own esc. Pure.
  */

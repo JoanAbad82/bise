@@ -5,7 +5,7 @@
 import type { FnContext } from './context';
 import type { DiffFile, DiffResult } from './diff';
 import type { InboxRecord, StateFilter } from './inbox';
-import type { LogItem } from './log';
+import type { Completion, CompletionAsk, LogItem } from './log';
 import type { BranchRow, ReleaseEv, UpdateEv, VersionItem } from './ops';
 import type { Part } from './parts';
 import type { Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, FlowMode, Growth, Merged, Model, Page, Place, Pr, ReportKind, ScheduledTask, SwitchRow, UsageRow, Worktree } from './rows';
@@ -60,7 +60,7 @@ built?: string | null, } | { "ev": "agents", project: string, agents: Array<Agen
  * of 18 KB shown'), when the session log answered; none for the
  * preview (the size isn't known)
  */
-total?: number, } | { "ev": "queued_taken", project: string, agent: string, id: number, text: string, parts?: Array<Part>, } | { "ev": "log", project: string, agent: string, items: Array<LogItem>, more: boolean, } | { "ev": "diff", project: string, agent: string, base: string, head?: string | null, files: Array<DiffFile>, 
+total?: number, } | { "ev": "queued_taken", project: string, agent: string, id: number, text: string, parts?: Array<Part>, } | { "ev": "log", project: string, agent: string, items: Array<LogItem>, more: boolean, hits?: Array<number>, } | { "ev": "completion" } & Completion | { "ev": "diff", project: string, agent: string, base: string, head?: string | null, files: Array<DiffFile>, 
 /**
  * what the change measured (none: nothing measured; boxed: the
  * enum stays small, the wire is the same)
@@ -206,7 +206,7 @@ from?: string | null, } | { "cmd": "answer", project: string, card: number, repl
 /**
  * his answer as typed parts, as `Send.parts` (`reply` then ignored)
  */
-parts?: Array<Part>, } | { "cmd": "close", project: string, card: number, } | { "cmd": "confirm", project: string, id: number, yes: boolean, } | { "cmd": "approvals", project: string, mode?: string | null, } | { "cmd": "remove_rule", project: string, rule: ApprovalRule, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, at_ms?: number | null, } | { "cmd": "diff", project: string, agent?: string | null, commit?: string | null, branch?: string | null, pr?: number | null, range?: string | null, req?: number | null, } | { "cmd": "tool_out", project: string, agent: string, pos: number, } | { "cmd": "log", project: string, agent: string, before?: number, } | { "cmd": "queued_take", project: string, agent: string, id: number, } | { "cmd": "queued_steer", project: string, agent: string, id: number, } | { "cmd": "branches", project: string, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "inbox_history", project: string, agent?: string | null, state?: StateFilter | null, words?: string | null, 
+parts?: Array<Part>, } | { "cmd": "close", project: string, card: number, } | { "cmd": "confirm", project: string, id: number, yes: boolean, } | { "cmd": "approvals", project: string, mode?: string | null, } | { "cmd": "remove_rule", project: string, rule: ApprovalRule, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, at_ms?: number | null, } | { "cmd": "diff", project: string, agent?: string | null, commit?: string | null, branch?: string | null, pr?: number | null, range?: string | null, req?: number | null, } | { "cmd": "tool_out", project: string, agent: string, pos: number, } | { "cmd": "log", project: string, agent: string, before?: number, find?: string, } | { "cmd": "completion" } & CompletionAsk | { "cmd": "queued_take", project: string, agent: string, id: number, } | { "cmd": "queued_steer", project: string, agent: string, id: number, } | { "cmd": "branches", project: string, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "inbox_history", project: string, agent?: string | null, state?: StateFilter | null, words?: string | null, 
 /**
  * a card id: only the older ones (the next page)
  */

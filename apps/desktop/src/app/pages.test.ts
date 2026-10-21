@@ -40,8 +40,8 @@ describe('the app pages ⌘K finds (ambient-lead m_21499)', () => {
   it("a project's pages read 'changes · acme', the project in view first; the log is the agent in view's", () => {
     const changes = pages.filter((p) => p.name === 'changes');
     expect(changes.map((p) => p.of)).toEqual(['acme', 'bise']);
-    expect(pages.filter((p) => p.name === 'log').map((p) => [p.of, p.go])).toEqual([['perf · acme', { route: 'log/acme-2/perf' }]]);
-    expect(appPages({ projects, route: { screen: 'scheduled' }, settings: PAGES }).some((p) => p.name === 'log')).toBe(false);
+    // /debug is the only way in: no page row for it
+    expect(pages.some((p) => p.name === 'log' || p.name === 'debug')).toBe(false);
   });
 
   it('a key only where it does exactly that row', () => {

@@ -130,9 +130,9 @@ def main():
 
         cmds = r.call("commands/list")["result"]["commands"]
         # the 37 of the catalog (/pause, /resume, /usage: cost-pause), then
-        # /log (a client screen, TP-N2)
+        # /debug (a client screen, debug-cmd)
         check(len(cmds) == 38 and any(c["name"] == "/new" and not c["client"] for c in cmds)
-              and cmds[-1]["name"] == "/log" and cmds[-1]["client"], "commands/list: %d" % len(cmds))
+              and cmds[-1]["name"] == "/debug" and cmds[-1]["client"], "commands/list: %d" % len(cmds))
         helped = r.call("command/run", {"project": project, "agent": "main", "line": "/help"})["result"]
         check(helped.get("notice"), "command/run /help: %r" % helped)
         read = r.call("hub/read")["result"]
