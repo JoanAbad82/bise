@@ -6,7 +6,7 @@
 // '<page-notes', '[from the page'. His answer with an image (card-image-parts): his words and the image chip
 // of his own bubble, never the '<image …>' tag. A light 1100 shot for designer. Owner: page-answer-row.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
-import { thread } from '../../../src/proto/words.gen';
+import { common, thread } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
@@ -93,7 +93,8 @@ test("thread/page-answers: his answers on a page are rows of his words, never th
     await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText(thread.mark_done);
     await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText(thread.note_edit({ old: 'Q2', new: 'Q3' }));
     // his image and words: the words, then the image chip of his own bubble, never the tag
-    await expect(page.getByTestId('thread.pageanswer.6.words')).toHaveText('the walls look fake');
+    // short words go on the head's line ('you answered bise: …', as any short answer)
+    await expect(page.getByTestId('thread.pageanswer.6')).toContainText(common.fold_answered({ agent: 'bise', pick: 'the walls look fake' }));
     await expect(page.getByTestId('thread.pageanswer.6.image.1')).toBeVisible();
     const all = await page.locator('body').innerText();
     for (const bad of ['answer with:', '<page-notes', '[from the page', 'you sent 1 note on your page', '<image', 'b64=']) {
