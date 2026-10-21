@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # The agents' gate (docs/loop-speed.md), run in the
 # foreground, never `sleep N; tail` in a loop:
-#   gate.sh [quick]   what the tree's changes touch, ~5-10 s warm: clippy -D
+#   gate.sh [quick]   the check before a land (docs/loop-speed.md §0 rule 11): fast
+#                     steps only, never an e2e, tmux, Playwright, desktop
+#                     harness or as-he-does step (those run on main: the tip
+#                     gate, the nightly, a release's full --all).
+#                     What the tree's changes touch, ~5-10 s warm: clippy -D
 #                     warnings (next to the tests, in $target/clippy), the
 #                     tests of the changed crates and of the crates using them; if a .bend file of core/ hub/ vendor/
 #                     or of laws/ proofs/ changed: PROOF, every bend/proofs/*.bend

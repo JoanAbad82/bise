@@ -192,6 +192,12 @@ def main():
         rc, log, last, red = night(FAKE_GATE_RC="1")
         check(rc != 0 and last.split()[2] == "red", "red night: rc %s, last %r" % (rc, last))
         check(red is not None and "e2e_fake" in red and "did not start" not in red, "red night: red %r" % red)
+        # ... and who landed since the last green night: the tip-red file main forwards (review-gates m_36509)
+        trf = os.path.join(out, "tip-red")
+        tr = open(trf).read() if os.path.exists(trf) else ""
+        check(tr.startswith("to: main\n") and "nightly red on main" in tr and "e2e_fake" in tr, "red night: tip-red %r" % tr)
+        if os.path.exists(trf):
+            os.remove(trf)
 
         # 4. a stale tree (an old commit, a stray file) is checked out at the tip and cleaned
         git(wt, "checkout", "-q", "--detach", "main~1")
@@ -346,6 +352,9 @@ def main():
         rc, log, last = tip_run()
         check(rc == 0 and log == "", "tip green: no run (rc %s, log %r)" % (rc, log))
         os.remove(green)
+        # the red nights above left their tip-red (main deletes it once forwarded)
+        if os.path.exists(os.path.join(out, "tip-red")):
+            os.remove(os.path.join(out, "tip-red"))
         # 8-10. another full gate holds its lock, the load is high: the tip gate runs all the same, in
         # one slot as a land check, in the tree with --all; tip-last says green
         lock = os.path.join(gate_dir, "full-%d.lock" % os.getuid())
@@ -358,6 +367,8 @@ def main():
         check("heavy-run: rank 1, a land check" in log and "heavy-run: both slots" not in log, "tip: --land, one slot: %r" % log)
         check(last[:2] == [full, "green"], "tip: tip-last %r" % last)
         check(not os.path.exists(os.path.join(out, "tip-red")), "tip green: no tip-red")
+        check("desktop-full" not in log or ("STEP desktop-full: none (a tip run" in log and "desktop-full start" not in log),
+              "tip: no desktop-full end-to-end (the nightly and a release run it): %r" % log)
         # 11. the same sha again (tried): nothing runs; a red one is not retried either
         rc, log, last = tip_run()
         check(rc == 0 and log == "", "tip tried: no second run (rc %s, log %r)" % (rc, log))

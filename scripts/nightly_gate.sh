@@ -243,7 +243,11 @@ if [ "${1:-}" = --in-slot ]; then
   # step. It runs even past the night's end, to start nothing and say so: its steps none, its
   # line in desktop-runs.tsv, where a second run in a row with no result is red
   # (scripts/nightly_desktop.sh, docs/desktop-try.md)
-  if [ -f scripts/nightly_desktop.sh ]; then
+  # a tip run skips it (fast-loop): ~1h45 a sha would hold its slot past the next lands; the
+  # nightly and a release's desktop_tag.py run it
+  if [ -n "${TIP_RUN:-}" ] && [ -f scripts/nightly_desktop.sh ]; then
+    echo "STEP desktop-full: none (a tip run: the nightly and a release run it)"
+  elif [ -f scripts/nightly_desktop.sh ]; then
     echo "STEP desktop-full: start $(date +%T)"
     /usr/bin/caffeinate -is bash scripts/nightly_desktop.sh "$out/desktop-$day" ${NIGHTLY_END:+--until "@$NIGHTLY_END"}
     case $? in
@@ -281,7 +285,7 @@ if [ "${1:-}" = --tip ]; then
   log="$out/tip-$(date +%Y%m%d-%H%M%S).log" s=$SECONDS
   echo "QUEUED $(date): main $tip, a land check in heavy-run's queue" >"$log"
   # one heavy slot, ranked as a land check: an agent's heavy job may take the others
-  "${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" --land /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
+  TIP_RUN=1 "${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" --land /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
   rc=$?
   sha="$(awk '/^START /{print $NF; exit}' "$log")"
   if [ -z "$sha" ]; then state=infra; sha="$tip"
@@ -339,10 +343,20 @@ fi
 cut="$(sed -nE 's/^STEP ([^:]*): none \((past|cut by) the night.s end.*/\1/p' "$log" | sort -u | paste -sd, -)"
 if [ $rc = 0 ]; then
   echo "$day $sha green $((SECONDS - s))${cut:+ cut:$cut}" >"$out/last"; rm -f "$out/red"
+  # the green nights, for the next red's blame (the lands since the last green night)
+  [ -n "$sha" ] && printf '%s\t%s\n' "$(git -C "$main_tree" rev-parse "$sha" 2>/dev/null || echo "$sha")" "$(date +%s)" >>"$out/nightly-green.tsv"
 else
   echo "$day $sha red $((SECONDS - s))${cut:+ cut:$cut}" >"$out/last"
   { echo "nightly full gate red on main $sha ($day, $((SECONDS - s)) s): $(grep -E '^FAIL ' "$log" | awk '{sub(/:$/, "", $2); print $2}' | tr '\n' ' ')"
     echo "log: $log"; } >"$out/red.tmp" && mv "$out/red.tmp" "$out/red"
+  # who landed since the last green night (desktop-full runs only at night now: review-gates
+  # m_36509): the same tip-red file main forwards, merged with one main hasn't sent yet
+  if full="$(git -C "$main_tree" rev-parse "$sha" 2>/dev/null)"; then
+    bh="${BISE_HOME:-$HOME/.bise}"
+    j=(); for f in ${TIP_JOURNALS:-"$bh"/hubs/*/journal.jsonl}; do [ -f "$f" ] && j+=(--journal "$f"); done
+    python3 -B "$here/scripts/tip_blame.py" --what "nightly" --repo "$main_tree" --tested "$full" --green "$out/nightly-green.tsv" \
+      --log "$log" ${j[@]+"${j[@]}"} --out "$out/tip-red" || echo "tip_blame failed: no tip-red" >>"$log"
+  fi
 fi
 # old logs: two weeks
 find "$out" -name '20*.log' -mtime +14 -delete 2>/dev/null

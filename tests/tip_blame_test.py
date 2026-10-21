@@ -64,6 +64,13 @@ def main():
                             "--green", green, "--log", log, "--journal", journal, "--out", out], capture_output=True, text=True)
         check(r.returncode == 0 and open(out).read().startswith("to: beta alpha main\n") and not os.path.exists(out + ".tmp"),
               "the file: rc %s %s" % (r.returncode, r.stderr))
+        # a second red before main forwarded the first: one file, one 'to:' line, both reports
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "tip_blame.py"), "--repo", repo, "--tested", sha["a2"],
+                            "--green", green, "--log", log, "--journal", journal, "--out", out, "--what", "nightly"], capture_output=True, text=True)
+        both = open(out).read()
+        check(r.returncode == 0 and both.startswith("to: beta alpha main\n") and both.count("to:") == 1
+              and "tip gate red on main %s" % sha["b1"][:9] in both and "nightly red on main %s" % sha["a2"][:9] in both,
+              "merged\n" + both)
         # no green known: the last 20 commits, said so
         _, text = B.report(repo, sha["b1"], os.path.join(t, "none.tsv"), log, [journal], now=0)
         check("(none known: the last 20)" in text and "feat: base" in text, "no green\n" + text)

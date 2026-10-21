@@ -73,7 +73,7 @@ def fails(log_text):
     return names
 
 
-def report(repo, tested, green_tsv, log, journals, now=None):
+def report(repo, tested, green_tsv, log, journals, now=None, what="tip gate"):
     """(agents, text): the tip-red file's content"""
     green = last_green(repo, green_tsv, tested)
     rng = "%s..%s" % (green, tested) if green else tested
@@ -102,13 +102,26 @@ def report(repo, tested, green_tsv, log, journals, now=None):
     when = time.strftime("%Y-%m-%d %H:%M", time.localtime(now or time.time()))
     text = "\n".join([
         "to: %s" % " ".join(agents + ["main"]),
-        "tip gate red on main %s (%s): %s" % (tested[:9], when, " ".join(red) or "no FAIL line, see the log"),
+        "%s red on main %s (%s): %s" % (what, tested[:9], when, " ".join(red) or "no FAIL line, see the log"),
         "commits since the last green %s:" % (green[:9] if green else "(none known: the last 20)"),
         *commits,
         "log: %s" % log,
         "your land in this range? revert it first if the red is yours, then fix (main m_36091)",
     ]) + "\n"
     return agents, text
+
+
+def merged(old, new):
+    """a report main has not forwarded yet (the file still there) and a new one: one 'to:' line, every
+    agent of both (main last), then both bodies"""
+    def split(t):
+        lines = t.splitlines()
+        to = lines[0][3:].split() if lines and lines[0].startswith("to:") else []
+        return [w for w in to if w != "main"], lines[1:] if to or (lines and lines[0].startswith("to:")) else lines
+    a, ab = split(old)
+    b, bb = split(new)
+    to = a + [w for w in b if w not in a] + ["main"]
+    return "\n".join(["to: " + " ".join(to), *ab, "", *bb]) + "\n"
 
 
 def main(argv):
@@ -119,10 +132,12 @@ def main(argv):
     a.add_argument("--log", required=True)
     a.add_argument("--journal", action="append", default=[])
     a.add_argument("--out")
+    a.add_argument("--what", default="tip gate")
     o = a.parse_args(argv)
     tested = git(o.repo, "rev-parse", o.tested) or o.tested
-    _, text = report(o.repo, tested, o.green, o.log, o.journal)
+    _, text = report(o.repo, tested, o.green, o.log, o.journal, what=o.what)
     if o.out:
+        text = merged(open(o.out).read(), text) if os.path.exists(o.out) else text
         with open(o.out + ".tmp", "w") as f:
             f.write(text)
         os.replace(o.out + ".tmp", o.out)
