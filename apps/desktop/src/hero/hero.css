@@ -24,6 +24,7 @@
   --bh-text2: #4a443c;
   /* the paper plane's ink edge (bims render/plane.ts: WORLD.ink at 0.55, light only) */
   --bh-plane-ink: #1d1a178c;
+  --bh-plane-ink-dart: #1d1a178c;
   /* the app's spacing tokens (src/ds/tokens.css) the page has none of: the tip look's */
   --s-1: 4px;
   --pad-pill: 3px;
@@ -39,6 +40,7 @@ html.pd .bims-hero {
   --bh-text2: #cfc8bc;
   /* no ink on the dark page: the paper's own shade for its crease */
   --bh-plane-ink: #c9c1b2;
+  --bh-plane-ink-dart: #c9c1b2;
 }
 .bims-hero .bh-canvas {
   position: absolute;
@@ -206,32 +208,35 @@ html.pd .bims-hero {
   height: 28px;
   border-radius: 8px;
   background: var(--bh-accent);
-  opacity: var(--back);
 }
-.bims-hero .bh-feed-send.folding { background: transparent; }
 .bims-hero .bh-send-svg {
   position: absolute;
   inset: 0;
+  width: 28px;
+  height: 28px;
   overflow: visible;
   pointer-events: none;
 }
+/* the arrow: gone while it folds and flies (it is the dart, then the plane), back in after */
 .bims-hero .bh-send-arrow {
   fill: var(--bh-on);
   transform: translate(4px, 4px);
+  opacity: var(--back);
 }
-.bims-hero .bh-feed-send.folding .bh-send-arrow { opacity: var(--words); }
+.bims-hero .bh-feed-send.folding .bh-send-arrow { opacity: 0; }
 .bims-hero .bh-send-svg polygon,
 .bims-hero .bh-send-svg line { display: none; }
+/* the dart: white paper, its ink edge, from the first frame (bims m_36638) */
 .bims-hero .bh-feed-send.folding .bh-send-svg polygon {
   display: inline;
-  fill: color-mix(in srgb, var(--bh-accent), #fffaf0 var(--paper));
-  stroke: var(--bh-plane-ink);
+  fill: #fffaf0;
+  stroke: var(--bh-plane-ink-dart);
   stroke-width: 1;
   stroke-linejoin: round;
 }
 .bims-hero .bh-feed-send.folding .bh-send-svg line {
   display: inline;
-  stroke: var(--bh-plane-ink);
+  stroke: var(--bh-plane-ink-dart);
   stroke-width: 1;
 }
 /* his planes over the page (TownOpts.planesOver): over the feed, never in the way of his hands */

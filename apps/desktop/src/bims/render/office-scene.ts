@@ -40,6 +40,12 @@ const FLOOR_LIFT = 0.02;
 const PLANE_FORESHORTEN = 1.25;
 /** three's layer the hero's glides fly in when Look.planesUp (town.ts draws it over the page: TownOpts.planesOver) */
 export const UP_LAYER = 1;
+/**
+ * a glide leaving the hero's send button: its world length per css px of its dart (bims m_36638: it
+ * takes over at the dart's own size). Measured on the hero: PLANE_FORESHORTEN's 1.25 showed a 30 px
+ * dart's plane at 12-15 px (seen from above, banking, its wings' span reads more than its length)
+ */
+const BUTTON_SEEN = 2.5;
 const mixV = (a: V3, b: V3, f: number): V3 => ({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f });
 const unit = (a: V3): V3 => {
   const l = Math.hypot(a.x, a.y, a.z) || 1;
@@ -314,7 +320,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         const glide = fp.glide === true;
         const plan = glide ? planGlide({ from, to: hand, seed, dur, px: fit.scale }) : planFlight({ from, to: hand, seed, loops, unit, avoid, dur });
         // from the hero's send button: its dart's length there (the same plane, never a jump in size); else big near his eye
-        const big = planeFrom?.px !== undefined ? (planeFrom.px * PLANE_FORESHORTEN * fit.scale) / HELD_LEN : startSize(fit, HELD_LEN);
+        const big = planeFrom?.px !== undefined ? (planeFrom.px * BUTTON_SEEN * fit.scale) / HELD_LEN : startSize(fit, HELD_LEN);
         p = { mesh: makePlane(style), leftAt, plan, glide, big };
         planes.set(key, p);
         root.add(p.mesh.group, p.mesh.shadow);

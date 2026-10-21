@@ -101,19 +101,24 @@ const SVG = 'http://www.w3.org/2000/svg';
 /** the send button's arrow (a small paper-plane arrow, pointing right) */
 const ARROW = 'M3 10 L17 4 L12 16 L10 11 Z';
 
-/** the send button folding into the dart (fold.ts): its polygon and crease, in its svg */
-function drawFold(svg: SVGSVGElement, w: number, h: number, f: number, l: Launch | null): void {
+/** the arrow's box in the button, css px (ARROW drawn at +4, +4): what lifts and folds into the dart */
+const GLYPH = { x: 7, y: 8, w: 14, h: 12 } as const;
+
+/**
+ * the button's arrow folding into the dart (fold.ts; bims m_36638): white paper with its ink edge
+ * from the first frame, lifting off the button (which stays a button), its polygon and crease in its svg
+ */
+function drawFold(svg: SVGSVGElement, f: number, l: Launch | null): void {
   const poly = svg.querySelector('polygon');
   const line = svg.querySelector('line');
   if (l === null) return;
-  const shape = foldShape(f, w, h, l);
-  svg.style.setProperty('--paper', `${(shape.paper * 100).toFixed(1)}%`);
-  svg.style.setProperty('--words', shape.words.toFixed(3));
-  poly?.setAttribute('points', shape.points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '));
-  line?.setAttribute('x1', shape.spine.a[0].toFixed(1));
-  line?.setAttribute('y1', shape.spine.a[1].toFixed(1));
-  line?.setAttribute('x2', shape.spine.b[0].toFixed(1));
-  line?.setAttribute('y2', shape.spine.b[1].toFixed(1));
+  const shape = foldShape(f, GLYPH.w, GLYPH.h, l);
+  const at = ([x, y]: readonly [number, number]): string => `${(x + GLYPH.x).toFixed(1)},${(y + GLYPH.y).toFixed(1)}`;
+  poly?.setAttribute('points', shape.points.map(at).join(' '));
+  line?.setAttribute('x1', (shape.spine.a[0] + GLYPH.x).toFixed(1));
+  line?.setAttribute('y1', (shape.spine.a[1] + GLYPH.y).toFixed(1));
+  line?.setAttribute('x2', (shape.spine.b[0] + GLYPH.x).toFixed(1));
+  line?.setAttribute('y2', (shape.spine.b[1] + GLYPH.y).toFixed(1));
   line?.style.setProperty('opacity', shape.spine.alpha.toFixed(3));
 }
 
@@ -153,13 +158,7 @@ export function makeFeed(box: HTMLElement): Feed {
       const fold = s.send.fold;
       send.className = `bh-feed-send${fold !== null ? ' folding' : ''}${s.send.back !== null ? ' back' : ''}`;
       send.style.setProperty('--back', s.send.back === null ? '1' : s.send.back.toFixed(3));
-      if (fold !== null) {
-        const w = send.offsetWidth;
-        const h = send.offsetHeight;
-        svg.setAttribute('width', String(w));
-        svg.setAttribute('height', String(h));
-        drawFold(svg, w, h, fold, launch?.(send.getBoundingClientRect()) ?? null);
-      }
+      if (fold !== null) drawFold(svg, fold, launch?.(send.getBoundingClientRect()) ?? null);
       const sig = JSON.stringify({ ...s, send: null });
       if (sig === last) return;
       last = sig;

@@ -373,8 +373,9 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     };
   }
 
-  /** his send button's dart as the 3D plane leaves from it: its length on screen, css px (feed.ts: the button folds into it) */
-  const SEND_DART_PX = 30;
+  /** his send button's dart as the 3D plane leaves from it: its length on screen, css px, on a desk frame and a narrow one (bims m_36638) */
+  const SEND_DART_PX = { desk: 32, narrow: 40 } as const;
+  const dartPx = (): number => (box.clientWidth < 860 ? SEND_DART_PX.narrow : SEND_DART_PX.desk);
 
   /**
    * Where his planes leave from: his send button's middle (it folded into the plane there), fractions
@@ -384,7 +385,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     const c = canvas.getBoundingClientRect();
     const b = feed.sendButton.getBoundingClientRect();
     if (c.width <= 0 || c.height <= 0 || b.width <= 0) return null;
-    return { x: (b.left + b.width / 2 - c.left) / c.width, y: (b.top + b.height / 2 - c.top) / c.height, px: SEND_DART_PX };
+    return { x: (b.left + b.width / 2 - c.left) / c.width, y: (b.top + b.height / 2 - c.top) / c.height, px: dartPx() };
   }
 
   /** the send button's fold (fold.ts): the 3D plane it becomes, its length and heading toward the bim of the plane about to leave (plane.ts glideHeading) */
@@ -398,7 +399,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     const wx = p.u * c.width - (rect.left + rect.width / 2 - c.left);
     const wy = -(p.v * c.height - (rect.top + rect.height / 2 - c.top));
     const h = glideHeading(wx, wy);
-    return { len: SEND_DART_PX, hx: h.x, hy: -h.y };
+    return { len: dartPx(), hx: h.x, hy: -h.y };
   }
 
   function draw(nowMs: number): void {
