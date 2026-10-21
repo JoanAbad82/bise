@@ -193,6 +193,8 @@ html.pd .bims-hero {
   background: var(--bh-soft);
   box-shadow: none;
 }
+/* his sent line lands as its bubble in the frame the field clears: no fade in (designer m_36640) */
+.bims-hero .bh-feed-row.you { animation: none; }
 /* the field and its send button (feed.ts, Gabriel via main m_36299): the button presses, folds into
    his paper plane (fold.ts) and leaves as the 3D one; a new one comes back */
 .bims-hero .bh-feed-input {
@@ -207,7 +209,8 @@ html.pd .bims-hero {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: var(--bh-accent);
+  /* ink like the app's composer (designer m_36640): pink stays for what waits on him */
+  background: var(--bh-text);
 }
 .bims-hero .bh-send-svg {
   position: absolute;
@@ -219,7 +222,7 @@ html.pd .bims-hero {
 }
 /* the arrow: gone while it folds and flies (it is the dart, then the plane), back in after */
 .bims-hero .bh-send-arrow {
-  fill: var(--bh-on);
+  fill: var(--bh-bg);
   transform: translate(4px, 4px);
   opacity: var(--back);
 }
