@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 // kiln's main is seen whole in every shot it acts in (Gabriel via main m_31852: it stood hidden behind
-// the workshop's roller door frame). The film's camera is the app's one isometric direction (only its
-// zoom and its aim move), so the law is one ray each: from main's head and its body at its desk, toward
-// the camera, through kiln's world as world.ts builds it with what the film drops (TownOpts.clearView).
+// the workshop's roller door frame, since moved to the left wall: bims-gate). The film's camera is the
+// app's one isometric direction (only its zoom and its aim move), so the law is one ray each: from
+// main's head and its body at its desk, toward the camera, through kiln's world as world.ts builds it.
 import { describe, expect, it } from 'vitest';
 import { Mesh, Raycaster, Vector3, type Object3D } from 'three';
 import { growOf } from '../bims/growth';
@@ -22,20 +22,16 @@ const MARKS = [
 ] as const;
 
 describe("kiln's main", () => {
-  it('is seen head and body from the camera once the film drops what its map tags as in the way', () => {
+  it('is seen head and body from the camera, nothing dropped', () => {
     const c = CAST.find((x) => x.id === KILN);
     if (!c) throw new Error('no kiln');
     const o = layoutOf(rowsAt(c, 0).agents, c.map);
     const w = buildWorld(o, 'main', STYLE, lookOf(o.map), false, growOf(growthOf(c)));
     w.root.updateMatrixWorld(true);
-    const tagged: Object3D[] = [];
     const meshes: Object3D[] = [];
     w.root.traverse((m) => {
-      if (m.userData.occludes === true) tagged.push(m);
-      else if (m instanceof Mesh) meshes.push(m);
+      if (m instanceof Mesh) meshes.push(m);
     });
-    // the door's frame is tagged: without it, nothing would stand in the way to drop
-    expect(tagged.length).toBeGreaterThan(0);
     const dir = new Vector3(BACK.x, BACK.y, BACK.z).normalize();
     const blocked: string[] = [];
     for (const m of MARKS) {

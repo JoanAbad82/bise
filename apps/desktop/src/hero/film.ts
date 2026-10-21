@@ -123,7 +123,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   // button to the bim's hand): their own canvas, over the feed
   const planes = document.createElement('canvas');
   planes.className = 'bh-planes';
-  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced, clearView: true, themed: true, planesOver: planes });
+  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced, themed: true, planesOver: planes });
   const overlay = makeOverlay(box);
   const feed = makeFeed(box);
   box.append(planes);

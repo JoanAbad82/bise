@@ -1,11 +1,11 @@
 // The workshop's look (render/maps/look.ts; its plan: maps/workshop.ts): a garage, concrete floor
 // with an oil stain, tall grey walls, a pegboard of tools, wooden desks against the walls, the
 // workbench (the eating place) with its vise and toolbox, the ping-pong table, the roller door
-// rolled up on the right by the nap place, a scooter inside it, a mint Vespa in the front middle, the neon :* over the board; its growth is the loft's (blook.ts
+// rolled up on the left wall's front stretch, a scooter across it, a mint Vespa in the front middle, the neon :* over the board; its growth is the loft's (blook.ts
 // loftGrower), the mural in the back left corner. Past 18 desks the floor's pods and corners (page
 // bims-workshop; drawn by render/maps/workshop-floor.ts where maps/workshop-floor.ts puts them). Owner: maps-b.
-import { Group, type Mesh, type Object3D } from 'three';
-import type { WorkshopOffice } from '../../maps/workshop';
+import { Group, type Object3D } from 'three';
+import { type WorkshopOffice, scooterAt } from '../../maps/workshop';
 import { decorOf } from '../decor';
 import { boxOf, onFloor } from '../kit';
 import { AZ } from '../camera';
@@ -41,28 +41,30 @@ function shell(b: Build): void {
   const x1 = x0 + W;
   k.add(style.box(W, 0.14, D), style.floor(pal.floor, W, D), root, x0 + W / 2, -0.05, D / 2);
   k.add(style.box(W + 0.2, WALL_H, 0.2), k.mat(pal.wall), root, x0 + W / 2, WALL_H / 2, -0.1);
-  k.add(style.box(0.2, 1.2, D + 0.2), k.mat(pal.wall), root, x0 - 0.1, 0.6, D / 2);
+  // the left wall, cut for the roller door (below)
+  const { z0: wz0, z1: wz1 } = o.roller;
+  k.add(style.box(0.2, 1.2, wz0 + 0.1), k.mat(pal.wall), root, x0 - 0.1, 0.6, (wz0 - 0.1) / 2);
+  k.add(style.box(0.2, 1.2, D + 0.1 - wz1), k.mat(pal.wall), root, x0 - 0.1, 0.6, (wz1 + D + 0.1) / 2);
   k.add(style.box(W + 0.2, 0.08, 0.24), k.mat(pal.wallTop), root, x0 + W / 2, WALL_H, -0.1);
   // the pegboard with its tools, over the board's left
   const px = boardX(o) - 1.0;
   k.add(style.box(1.2, 0.5, 0.04), k.mat('#c49a6c'), root, px, 1.75, 0.03 + style.pictureZ);
   for (let i = 0; i < 6; i++) k.add(style.box(0.06, 0.3, 0.04), k.mat(TOOLS[i % TOOLS.length] ?? WORLD.dark), root, px - 0.45 + i * 0.18, 1.75 + (i % 2) * 0.06, 0.07 + style.pictureZ);
-  // the roller door on the right edge, most of the way up: its two posts, the drum's housing, the
-  // bottom of its slats under it; a scooter parked inside it, along the wall (across the room it
-  // stood where the nap place's last napper lays its head on a small office: Gabriel, bims-life)
-  const rz0 = 4.3;
-  const rz1 = D - 0.4;
-  // the door's frame stands between the camera and main's desk: tagged, a film drops it (TownOpts.clearView, Gabriel via main m_31852)
-  const front = (m: Mesh): void => {
-    m.userData.occludes = true;
-  };
-  for (const z of [rz0, rz1]) front(k.add(style.box(0.16, WALL_H, 0.16), k.mat(pal.wallTop), root, x1 + 0.05, WALL_H / 2, z));
-  front(k.add(style.box(0.36, 0.34, rz1 - rz0 + 0.2), k.mat(pal.wallTop), root, x1 + 0.05, WALL_H - 0.05, (rz0 + rz1) / 2));
-  front(k.add(style.box(0.06, 0.4, rz1 - rz0 - 0.16), k.mat('#9aa3ab'), root, x1 + 0.05, WALL_H - 0.42, (rz0 + rz1) / 2));
-  for (let i = 0; i < 3; i++) front(k.add(style.box(0.07, 0.02, rz1 - rz0 - 0.16), k.mat('#77838c'), root, x1 + 0.05, WALL_H - 0.3 - i * 0.12, (rz0 + rz1) / 2));
+  // the roller door rolled up on the left wall's front stretch (maps/workshop.ts rollerOf): the far
+  // side from the camera, it hides nothing (on the right edge it stood before main's desk: Gabriel via
+  // main m_35959, bims m_35967); its two posts, the drum's housing, the bottom of its slats under it,
+  // the wall cut for its opening; a scooter parked across it, its nose out through it
+  const { z0: rz0, z1: rz1 } = o.roller;
+  const rx = x0 - 0.1;
+  const rm = (rz0 + rz1) / 2;
+  for (const z of [rz0, rz1]) k.add(style.box(0.16, WALL_H, 0.16), k.mat(pal.wallTop), root, rx, WALL_H / 2, z);
+  k.add(style.box(0.36, 0.34, rz1 - rz0 + 0.2), k.mat(pal.wallTop), root, rx, WALL_H - 0.05, rm);
+  k.add(style.box(0.06, 0.4, rz1 - rz0 - 0.16), k.mat('#9aa3ab'), root, rx + 0.02, WALL_H - 0.42, rm);
+  for (let i = 0; i < 3; i++) k.add(style.box(0.07, 0.02, rz1 - rz0 - 0.16), k.mat('#77838c'), root, rx + 0.03, WALL_H - 0.3 - i * 0.12, rm);
+  const sp = scooterAt(o);
   const sc = new Group();
-  sc.position.set(x1 - 0.35, 0, rz0 + 0.65);
-  sc.rotation.y = -Math.PI / 2;
+  sc.position.set(sp.x, 0, sp.z);
+  sc.rotation.y = Math.PI;
   root.add(sc);
   scooter(k, sc, 0, 0);
   // a Vespa in the front middle, on its side stand, side on to the camera (where the old car
@@ -72,11 +74,10 @@ function shell(b: Build): void {
   // the floor past the walls (page bims-workshop): each pod's lamp beam, each workshop corner
   for (const p of o.pods) podBeam(k, root, p);
   o.corners.forEach((c, i) => corner(k, root, c, i));
-  // an oil stain, a tyre against the left wall
+  // an oil stain, a tyre lying flat on the right edge (low: nothing tall before main's desk)
   const oil = k.add(style.cylinder(0.5, 0.01), k.mat('#9a978f'), root, x0 + W * 0.62, 0.025, D * 0.72);
   oil.scale.z = 0.6;
-  const tyre = k.add(style.cylinder(0.3, 0.16), k.mat(WORLD.dark), root, x0 + 0.25, 0.3, D - 1.0);
-  tyre.rotation.z = Math.PI / 2;
+  k.add(style.cylinder(0.3, 0.16), k.mat(WORLD.dark), root, x1 - 0.4, 0.09, 4.8);
   onFloor(k, root, boxOf(decorOf(o).doorMat), 0.04, 0.03, WORLD.mat);
 }
 
@@ -152,7 +153,7 @@ export function vespa(k: Build['k'], root: Object3D, x: number, z: number): Grou
   return g;
 }
 
-/** a scooter, its nose towards the roller door */
+/** a scooter, its nose to its +x (towards the roller door) */
 function scooter(k: Build['k'], root: Object3D, x: number, z: number): void {
   const { style } = k;
   const body = k.mat('#6cb4ee');

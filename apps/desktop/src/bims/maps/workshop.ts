@@ -2,7 +2,7 @@
 // from its walls' desks (two of three against the back wall, the third against the left one, each
 // facing its wall; the walls just past the last ones, bims m_28835; 18 at most), the workbench (the
 // eating place, its places along both long sides) and a ping-pong table right behind the back desks'
-// chairs, the roller door rolled up on the right wall, the nap place by it at the front right. Main's
+// chairs, the roller door rolled up on the left wall's front stretch, the nap place at the front right. Main's
 // desk stands free at the right, its queue on its left, the board on the back wall above it. Past 18
 // desks the next ones sit in pods of six on the floor, and the floor gets its workshop corners (page
 // bims-workshop, Gabriel's pick C: maps/workshop-floor.ts, each at a fixed place, the room grows round
@@ -32,7 +32,22 @@ export interface WorkshopOffice extends BOffice {
   readonly corners: readonly Corner[];
   /** the Vespa's place (render/maps/workshop.ts vespa); null: no room for it */
   readonly vespa: Pt | null;
+  /** the roller door's span along the left wall, its front stretch (render/maps/workshop.ts shell) */
+  readonly roller: { readonly z0: number; readonly z1: number };
 }
+
+/**
+ * the roller door on the left wall's front stretch, past the last left desk (its box's edge + 0.3)
+ * or 3 deep, whichever is further front, to 0.3 short of the front: the far side from the camera,
+ * so it hides nothing (on the right edge it stood before main's desk: Gabriel via main m_35959, bims m_35967)
+ */
+export function rollerOf(nLeft: number, D: number): { z0: number; z1: number } {
+  const lastEdge = nLeft > 0 ? 3.0 + (nLeft - 1) * PITCH + 0.8 : 0;
+  return { z0: Math.max(lastEdge + 0.3, D - 3.0), z1: D - 0.3 };
+}
+
+/** the scooter parked across the roller door, its nose out through it (render/maps/workshop.ts scooter) */
+export const scooterAt = (o: { x0: number; roller: { z0: number; z1: number } }): Pt => ({ x: o.x0 + 0.65, z: (o.roller.z0 + o.roller.z1) / 2 });
 
 /** the back corridor (behind the back desks' chairs), a desk's pitch along its wall */
 const BACK = 1.9;
@@ -191,7 +206,7 @@ export function workshopLayout(agents: readonly Agent[], prev?: WorkshopOffice):
     walks, furniture,
     queueMore: queueMoreOf(queue, mainDesk, backLeg, x0),
     slots, cap, crossBack: BACK,
-    pingpong, aisle, crossFront, pods, corners, vespa,
+    pingpong, aisle, crossFront, pods, corners, vespa, roller: rollerOf(nLeft, D),
     ...(nooks.length > 0 ? { nooks } : {}),
     // each pod's lamp beam lights the floor at night (render/world.ts poolsOf)
     ...(pods.length > 0 ? { lamps: pods.map((p) => ({ x: p.x, z: p.z })) } : {}),
@@ -204,7 +219,7 @@ export const vespaBox = (v: Pt): Box => boxAt(v.x, v.z, VESPA_HALF * 2, VESPA_HA
 /** where its look puts the loft's pieces past the common ones (render/maps/workshop.ts loftGrower: the arcade by the left wall, the nap place's middle): nothing cozy there */
 const workshopPieces = (o: Office): Pt[] => [{ x: o.x0 + 0.5, z: 1.2 }, { x: o.x0 + o.W - 2.5, z: o.D - 2.5 }];
 
-/** its look's walls (render/maps/workshop.ts): the tall back one, its left part taken (the mural, the frames, the pegboard, the board); the roller door and its scooter along the right one */
+/** its look's walls (render/maps/workshop.ts): the tall back one, its left part taken (the mural, the frames, the pegboard, the board); the roller door and its scooter on the left one's front stretch, the tyre on the right edge */
 const workshopCozy: CozyHints = {
   pieces: workshopPieces,
   walls: (o) => {
@@ -212,11 +227,13 @@ const workshopCozy: CozyHints = {
     return [{ wall: 'back', top: 2.1, busy: [[o.x0, bx + 1.0], [o.mainDesk.x - 0.6, o.mainDesk.x + 0.6]] }, { wall: 'left', top: 1.0 }, { wall: 'right', top: 0 }];
   },
   keepOut: (o) => {
+    // the right edge kept low: the tyre, nothing tall before main's desk
     const out: Box[] = [{ x0: o.x0 + o.W - 0.8, x1: o.x0 + o.W, z0: 4.1, z1: o.D }];
-    // the tyre against the left wall
-    out.push({ x0: o.x0, x1: o.x0 + 0.65, z0: o.D - 1.4, z1: o.D - 0.6 });
-    // the Vespa (render/maps/workshop.ts shell), the floor's corners with their rugs (maps/workshop-floor.ts)
+    // the roller door's scooter across the left wall's front stretch
     const ws = o as WorkshopOffice;
+    const sc = scooterAt(ws);
+    out.push({ x0: o.x0, x1: sc.x + 0.6, z0: Math.min(sc.z - 0.35, ws.roller.z0), z1: Math.max(sc.z + 0.35, ws.roller.z1) });
+    // the Vespa (render/maps/workshop.ts shell), the floor's corners with their rugs (maps/workshop-floor.ts)
     if (ws.vespa) out.push(vespaBox(ws.vespa));
     for (const c of ws.corners) out.push(cornerRug(c));
     return out;
