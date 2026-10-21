@@ -94,7 +94,8 @@ impl T {
         assert!(fx.contains(&Effect::Spawn {
             agent: MAIN.into(),
             resume: true,
-            crash_note: None
+            crash_note: None,
+            wait_load: false
         }));
         t.go(Input::ReplReady { agent: MAIN.into() });
         t.go(Input::ClientHello { client: 1 });
@@ -824,11 +825,7 @@ fn a_crashing_repl_restarts_then_fails() {
     let mut t = T::new();
     t.spawn_task("a");
     for i in 1..=5 {
-        let fx = t.go(Input::ReplExited {
-            agent: "a".into(),
-            crashed: true,
-            reason: "boom".into(),
-        });
+        let fx = t.go(exited("a", "boom"));
         assert!(
             fx.iter()
                 .any(|e| matches!(e, Effect::Spawn { agent, resume: true, .. } if agent == "a")),
@@ -836,11 +833,7 @@ fn a_crashing_repl_restarts_then_fails() {
             i
         );
     }
-    let fx = t.go(Input::ReplExited {
-        agent: "a".into(),
-        crashed: true,
-        reason: "boom".into(),
-    });
+    let fx = t.go(exited("a", "boom"));
     assert!(!fx.iter().any(|e| matches!(e, Effect::Spawn { .. })));
     assert_eq!(t.status("a"), Status::Failed);
     // BISE-299: a failure is main's to handle (a bise message), never a
@@ -852,6 +845,31 @@ fn a_crashing_repl_restarts_then_fails() {
     assert!(fx
         .iter()
         .any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "a")));
+}
+
+/// A crashed REPL of `agent` (no stall).
+fn exited(agent: &str, reason: &str) -> Input {
+    Input::ReplExited { agent: agent.into(), crashed: true, reason: reason.into(), stalled: false, loaded: false, row: 0 }
+}
+
+/// main m_36148, hub/stall.bend: starts that stall under load never fail
+/// the agent; the 4th in a row waits for the machine (wait_load); a stall
+/// on an idle machine counts as a crash does.
+#[test]
+fn a_stalled_start_under_load_never_fails_the_agent() {
+    let mut t = T::new();
+    t.spawn_task("a");
+    let stall = |loaded, row| Input::ReplExited { agent: "a".into(), crashed: true, reason: "no progress".into(), stalled: true, loaded, row };
+    let spawn = |fx: &[Effect]| fx.iter().find_map(|e| match e { Effect::Spawn { agent, wait_load, .. } if agent == "a" => Some(*wait_load), _ => None });
+    for row in 1..=9 {
+        assert_eq!(spawn(&t.go(stall(true, row))), Some(row > 3), "loaded stall {row}: starts again, the 4th on waits");
+    }
+    assert_ne!(t.status("a"), Status::Failed);
+    for i in 1..=5 {
+        assert_eq!(spawn(&t.go(stall(false, i))), Some(false), "an idle machine's stall {i} counts");
+    }
+    t.go(stall(false, 6));
+    assert_eq!(t.status("a"), Status::Failed, "the 6th counted one fails it");
 }
 
 #[test]
@@ -1104,11 +1122,7 @@ fn main_hears_when_a_task_crashes_and_when_it_fails() {
         leftover: false,
     });
     t.turn(MAIN, "vu");
-    let fx = t.go(Input::ReplExited {
-        agent: "a".into(),
-        crashed: true,
-        reason: "bend: out of memory".into(),
-    });
+    let fx = t.go(exited("a", "bend: out of memory"));
     let s = say_to(&fx, MAIN).expect("main is woken");
     assert!(s.contains("from=\"bise\" relation=\"hub\""), "{}", s);
     assert!(
@@ -1117,18 +1131,10 @@ fn main_hears_when_a_task_crashes_and_when_it_fails() {
         s
     );
     for _ in 2..=5 {
-        t.go(Input::ReplExited {
-            agent: "a".into(),
-            crashed: true,
-            reason: "boom".into(),
-        });
+        t.go(exited("a", "boom"));
     }
     t.turn(MAIN, "vu");
-    let fx = t.go(Input::ReplExited {
-        agent: "a".into(),
-        crashed: true,
-        reason: "boom".into(),
-    });
+    let fx = t.go(exited("a", "boom"));
     let s = say_to(&fx, MAIN).expect("main is woken again");
     assert!(s.contains("agent @a failed"), "{}", s);
 }
@@ -2796,7 +2802,7 @@ fn bench_byte_equal() {
         .expect("an active task");
     env.now += 500;
     h.handle(user(&format!("/archive {task} --force")), &mut env);
-    h.handle(Input::ReplExited { agent: task.clone(), crashed: false, reason: String::new() }, &mut env);
+    h.handle(Input::ReplExited { agent: task.clone(), crashed: false, reason: String::new(), stalled: false, loaded: false, row: 0 }, &mut env);
     seen(&format!("archive {task}"), &mut h, env.now);
     env.now += 500;
     h.handle(user(&format!("/restore {task}")), &mut env);
@@ -2813,7 +2819,7 @@ fn a_step_keeps_the_archived_agents_it_does_not_send() {
     t.spawn_task("b");
     t.go(Input::ReplIdle { agent: "b".into(), leftover: false });
     t.user(MAIN, "/archive b --force");
-    t.go(Input::ReplExited { agent: "b".into(), crashed: false, reason: String::new() });
+    t.go(Input::ReplExited { agent: "b".into(), crashed: false, reason: String::new(), stalled: false, loaded: false, row: 0 });
     assert_eq!(t.status("b"), Status::Archived);
     let out = t.hub.link.call(&json!({"t": "tick", "now": 1_000_000, "git": true, "ans": []})).unwrap();
     let sent: Vec<&str> = out["view"]["agents"].as_array().unwrap().iter().map(|a| a["name"].as_str().unwrap()).collect();
@@ -4222,7 +4228,7 @@ fn an_agents_row_says_running_and_turns_from_one_source() {
     // a crash mid-turn ends it too
     t.user("a", "crash");
     line(&mut t, "  obs: turn_started");
-    t.go(Input::ReplExited { agent: "a".into(), crashed: true, reason: "test".into() });
+    t.go(exited("a", "test"));
     assert_eq!(row(&mut t), (false, base + 7), "a crash mid-turn");
 }
 

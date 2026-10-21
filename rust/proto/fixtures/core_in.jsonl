@@ -21,8 +21,9 @@
 {"agent": "u", "ans": [], "by": "main", "every_ms": 60000, "git": true, "next_ms": 1790000060000, "now": 1790000000000, "t": "every_set", "text": "check HN", "until_ms": 1790000180000}
 {"ans": [], "git": true, "id": 1, "now": 1000000, "t": "every_stop", "wake": "", "why": "stopped by main"}
 {"ans": [], "git": true, "id": 1, "now": 1790000480000, "t": "every_stop", "wake": "the user stopped timer #1 (check HN): don't set it again unless they ask", "why": "stopped by the user"}
-{"agent": "b", "ans": [], "crashed": false, "git": true, "now": 1000000, "reason": "", "t": "exited"}
-{"agent": "a", "ans": [], "crashed": true, "git": true, "now": 1000000, "reason": "boom", "t": "exited"}
+{"agent": "b", "ans": [], "crashed": false, "git": true, "now": 1000000, "reason": "", "t": "exited", "stalled": false, "loaded": false, "row": 0}
+{"agent": "a", "ans": [], "crashed": true, "git": true, "now": 1000000, "reason": "boom", "t": "exited", "stalled": false, "loaded": false, "row": 0}
+{"agent": "s", "ans": [], "crashed": true, "git": true, "now": 1000000, "reason": "its REPL made no progress in 180 s while starting (load x4.0, 4 at once at most, the rest wait)", "t": "exited", "stalled": true, "loaded": true, "row": 2}
 {"ans": [], "direct": "", "focus": "docs", "git": true, "note": null, "now": 1000000, "t": "focus"}
 {"ans": [], "direct": "You talked to @docs (1 message)", "focus": "main", "git": true, "note": "The user talked directly to @docs (1 message): \"utilise la v2\". Last reply of @docs: \"brief lu ok, v2\"", "now": 1000000, "t": "focus"}
 {"agent": "perf", "ans": [], "git": true, "now": 1000000, "on": true, "t": "follow"}

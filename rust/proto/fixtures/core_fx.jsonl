@@ -28,8 +28,9 @@
 {"fx": "rt", "agent": "w", "run": "idle", "waiting": false, "turn_ms": null, "turns": 0}
 {"fx": "rt", "agent": "a", "run": "busy", "waiting": true, "turn_ms": 1000000, "turns": 0}
 {"fx": "say", "agent": "main", "text": "[bise] The message(s) just above arrived while you were writing your last answer: you have not answered them yet. Answer them now."}
-{"fx": "spawn", "agent": "w", "resume": true, "crash_note": null}
-{"fx": "spawn", "agent": "a", "resume": true, "crash_note": "boom"}
+{"fx": "spawn", "agent": "w", "resume": true, "crash_note": null, "wait_load": false}
+{"fx": "spawn", "agent": "a", "resume": true, "crash_note": "boom", "wait_load": false}
+{"fx": "spawn", "agent": "s", "resume": true, "crash_note": null, "wait_load": true}
 {"fx": "user_sent", "text": "go"}
 {"fx": "xdeliver", "xid": 1, "project": "shop-1", "kind": "input", "msg": 1, "text": "look", "context": "", "parts": "[{\"kind\":\"text\",\"text\":\"look \"},{\"kind\":\"image\",\"name\":\"[Image #1]\",\"source\":\"/d/s.png\",\"mime\":\"image/png\",\"b64_file\":\"/h/images/ab.b64\"}]"}
 {"fx": "xdeliver", "xid": 1, "project": "shop-1", "kind": "ask", "msg": 0, "text": "status?", "context": ""}
