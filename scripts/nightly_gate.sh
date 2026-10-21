@@ -9,17 +9,25 @@
 #                                       runs it at its wake, past the
 #                                       night's end: nothing runs)
 #   scripts/nightly_gate.sh --uninstall
-#   scripts/nightly_gate.sh --tip       main's tip, once, if the machine is
-#                                       quiet now (both heavy slots and the
-#                                       full gate lock free, load below
-#                                       TIP_GATE_MAX_LOAD, default the
-#                                       cores): the same gate in the same
-#                                       tree, in one heavy slot. A green
-#                                       one records the sha (gate.sh's
-#                                       green-shas.tsv): a release on it
-#                                       skips its gate. Nothing to do (the
-#                                       tip green or tried, a busy machine):
-#                                       exits at once. Its results:
+#   scripts/nightly_gate.sh --tip       main's tip, once per sha: the same
+#                                       gate in the same tree, in one heavy
+#                                       slot as a land check (heavy-run
+#                                       --land, rank 1), never waiting for a
+#                                       quiet machine (Gabriel 10:55: « merger
+#                                       et tester après sur main »: the agents
+#                                       land first, this gate tests main);
+#                                       the sha tested is main's newest tip
+#                                       when the slot comes. A green one
+#                                       records the sha (gate.sh's
+#                                       green-shas.tsv): a release cut needs
+#                                       it. A red one writes tip-red
+#                                       (scripts/tip_blame.py: the commits
+#                                       since the last green, each one's
+#                                       agent, the failing tests, the log;
+#                                       its 'to:' line names who main
+#                                       forwards it to, then main deletes
+#                                       it). Nothing to do (the tip green or
+#                                       tried): exits at once. Its results:
 #                                       tip-<time>.log and tip-last (<sha>
 #                                       green|red|infra <secs> <log>).
 #   scripts/nightly_gate.sh --install-tip | --uninstall-tip
@@ -261,31 +269,30 @@ if [ "${1:-}" = --in-slot ]; then
 fi
 
 if [ "${1:-}" = --tip ]; then
-  # main's tip in a quiet slot (fast-release, gate-lane): nothing to do or a
-  # busy machine exits at once, the next move of main or tick tries again
+  # main's tip as a land check (fast-loop, review-gates m_36198): once per sha, queued in
+  # heavy-run's rank 1 whatever the load; the next move of main or tick tries again
   bh="${BISE_HOME:-$HOME/.bise}"
   tip="$(git -C "$main_tree" rev-parse --verify -q main)" || exit 0
   grep -q "^$tip	" "$bh/gate/green-shas.tsv" 2>/dev/null && exit 0
   [ "$(cut -d' ' -f1 "$out/tip-last" 2>/dev/null)" = "$tip" ] && exit 0
-  for l in "$bh/run/heavy.lock" "$bh/run/heavy2.lock"; do
-    [ -e "$l" ] || continue
-    /usr/bin/lockf -k -t 0 "$l" /usr/bin/true 2>/dev/null || exit 0
-  done
-  o="$(cat "$bh/gate/full-$(id -u).lock/owner" 2>/dev/null)"
-  [ -n "$o" ] && kill -0 "${o%% *}" 2>/dev/null && exit 0
-  load="$(sysctl -n vm.loadavg 2>/dev/null | awk '{ print int($2) }')"
-  [ "${load:-0}" -lt "${TIP_GATE_MAX_LOAD:-$(sysctl -n hw.ncpu 2>/dev/null || echo 8)}" ] || exit 0
-  # one tip run at a time (lockf -t 0: a second one exits 75)
+  # one tip run at a time, waiting ones included (lockf -t 0: a second one exits 75; the one in
+  # line tests main's newest tip when its slot comes)
   [ -n "${TIP_LOCKED:-}" ] || TIP_LOCKED=1 exec /usr/bin/lockf -t 0 "$out/tip.lock" /bin/bash "$here/scripts/nightly_gate.sh" --tip
   log="$out/tip-$(date +%Y%m%d-%H%M%S).log" s=$SECONDS
-  echo "QUEUED $(date): main $tip, a quiet machine (load $load)" >"$log"
-  # one heavy slot: an agent's heavy job may take the other
-  "${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
+  echo "QUEUED $(date): main $tip, a land check in heavy-run's queue" >"$log"
+  # one heavy slot, ranked as a land check: an agent's heavy job may take the others
+  "${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" --land /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
   rc=$?
   sha="$(awk '/^START /{print $NF; exit}' "$log")"
   if [ -z "$sha" ]; then state=infra; sha="$tip"
   else sha="$(git -C "$main_tree" rev-parse "$sha" 2>/dev/null || echo "$tip")"; [ $rc = 0 ] && state=green || state=red; fi
   echo "$sha $state $((SECONDS - s)) $log" >"$out/tip-last"
+  # red: who landed since the last green, told through tip-red (main forwards it, main m_36219)
+  if [ "$state" = red ]; then
+    j=(); for f in ${TIP_JOURNALS:-"$bh"/hubs/*/journal.jsonl}; do [ -f "$f" ] && j+=(--journal "$f"); done
+    python3 -B "$here/scripts/tip_blame.py" --repo "$main_tree" --tested "$sha" --green "$bh/gate/green-shas.tsv" \
+      --log "$log" ${j[@]+"${j[@]}"} --out "$out/tip-red" || echo "tip_blame failed: no tip-red" >>"$log"
+  fi
   find "$out" -name 'tip-*.log' -mtime +7 -delete 2>/dev/null
   exit $rc
 fi

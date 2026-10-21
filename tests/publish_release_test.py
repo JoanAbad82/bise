@@ -12,6 +12,7 @@ on the fake run, all within a few seconds.
 Run: python3 tests/publish_release_test.py
 """
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -65,8 +66,20 @@ def main():
         with open(SCRIPT) as src, open(script, "w") as dst:
             dst.write(src.read())
         os.chmod(script, 0o755)
+        os.makedirs(os.path.join(work, "scripts"), exist_ok=True)
+        shutil.copy(os.path.join(REPO, "scripts", "tip_green.py"), os.path.join(work, "scripts"))
         env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ["PATH"], TMPDIR=t,
                    GIT_CONFIG_NOSYSTEM="1", HOME=t)
+        env.pop("BISE_HOME", None)
+        # a sha main's tip gate never passed: refused before any tag (main m_36204)
+        p = subprocess.run([script, "v9.9.8", "--rev", sha, "--remote", "origin"], cwd=work, env=env,
+                           capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        if p.returncode == 0 or "is not tip-green" not in p.stderr + p.stdout or git(work, "tag", "-l"):
+            print("FAIL publish_release_test: a sha not tip-green was not refused before its tag\n" + p.stderr + p.stdout)
+            sys.exit(1)
+        os.makedirs(os.path.join(t, ".bise", "gate"), exist_ok=True)
+        with open(os.path.join(t, ".bise", "gate", "green-shas.tsv"), "w") as f:
+            f.write("%s\t1\t1\ttip\tlog\n" % sha)
         p = subprocess.run([script, "v9.9.9", "--rev", sha, "--remote", "origin"], cwd=work, env=env,
                            capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
         out = p.stderr + p.stdout

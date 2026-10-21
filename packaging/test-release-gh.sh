@@ -220,6 +220,9 @@ echo "== publish-release.sh: tag, CI's draft, publish (stub gh, throwaway repo)"
 G=$W/git BARE=$W/bare.git GS=$W/ghs STUB2=$W/stub2
 mkdir -p "$G/packaging" "$GS/rel" "$STUB2"
 for f in publish-release.sh ci-release.sh check-release.py make-release.sh install.sh; do cp "$HERE/$f" "$G/packaging/"; done
+# publish-release.sh tags only a tip-green sha (scripts/tip_green.py, main m_36204): every commit of
+# this throwaway repo is green here (P writes them), the refusal is tests/publish_release_test.py's
+mkdir -p "$G/scripts" && cp "$HERE/../scripts/tip_green.py" "$G/scripts/"
 gitq() { git -C "$G" -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false "$@" >/dev/null 2>&1; }
 gitq init -q -b main && gitq add -A && gitq commit -qm one
 git init -q --bare "$BARE"
@@ -306,7 +309,8 @@ if a[:2] == ["run", "watch"]:
 die("stub: " + " ".join(a), 2)
 EOF
 chmod 755 "$STUB2/gh"
-P() { env -i HOME="$W/home-rel" PATH="$STUB2:/usr/bin:/bin:/usr/sbin:/sbin" TMPDIR="$W/tmp/" \
+P() { mkdir -p "$W/home-rel/.bise/gate"; git -C "$G" rev-list --all | sed 's/$/	1	1	test	log/' >"$W/home-rel/.bise/gate/green-shas.tsv"
+  env -i HOME="$W/home-rel" PATH="$STUB2:/usr/bin:/bin:/usr/sbin:/sbin" TMPDIR="$W/tmp/" \
   GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
   "$G/packaging/publish-release.sh" --repo o/r --url "$CH" "$@" 2>&1; }
 mkdir -p "$W/home-rel" "$W/tmp"

@@ -25,6 +25,10 @@
 #              (update-card), so write them for users: what they can do
 #              now, no commit hashes. Works on the draft before
 #              --publish, and on a published release (fixes its notes).
+#   --not-tip-green "<why>"  tag a sha main's tip gate never passed
+#              (scripts/tip_green.py: else a new tag needs the sha in
+#              ~/.bise/gate/green-shas.tsv); only when main names it, the
+#              line 'not-tip-green <sha>: <why>' goes to the release log
 #   --dry-run  say what would be done, change nothing
 #   --next-tag print the tag a release would take now (default above),
 #              change nothing (/release-bise's preview, BISE-235)
@@ -59,7 +63,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$HERE" && git rev-parse --show-toplevel)"
 SITE_INSTALL="$REPO_DIR/site/install.sh"
-repo=gvergnaud/bise channel="" tag="" rev=HEAD notes="" whats_new="" draft=0 dry=0 local=0 publish=0 remote="" next=0
+repo=gvergnaud/bise channel="" tag="" rev=HEAD notes="" whats_new="" draft=0 dry=0 local=0 publish=0 remote="" next=0 not_green=""
 adds=() froms=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -76,6 +80,7 @@ while [ $# -gt 0 ]; do
     --publish) publish=1 ;;
     --dry-run) dry=1 ;;
     --next-tag) next=1 ;;
+    --not-tip-green) not_green="$2"; shift ;;
     -h|--help) sed -n '2,57p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "publish-release: unknown argument $1" >&2; exit 2 ;;
     *) tag="$1" ;;
@@ -235,6 +240,13 @@ if [ -z "$remote_sha" ]; then
   fi
   local_sha="$(git -C "$REPO_DIR" rev-parse -q --verify "refs/tags/$tag^{commit}" || true)"
   [ -z "$local_sha" ] || [ "$local_sha" = "$commit" ] || die "the local tag $tag is on ${local_sha:0:12}, not ${commit:0:12}"
+  # a new tag only on a sha main's tip gate passed, or one main names (main m_36204): the line
+  # (tip-green / not-tip-green <why>) goes to the release log
+  if [ -z "$local_sha" ]; then
+    tg="$(python3 -B "$REPO_DIR/scripts/tip_green.py" "$commit" --repo "$REPO_DIR" ${not_green:+--not-tip-green "$not_green"})" \
+      || die "$tg"
+    say "$tg"
+  fi
   if [ "$dry" = 1 ]; then
     say "dry run: would tag ${commit:0:12} $tag, git push $remote $tag, watch release.yml, show the draft"
     exit 0

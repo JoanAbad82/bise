@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """desktop-tag: the one way to cut a desktop release tag (fast-try p7, architect m_29670).
 
-  scripts/desktop_tag.py <desktop-vYYYY.M.N> [<sha>] [--notes-file <f>]
+  scripts/desktop_tag.py <desktop-vYYYY.M.N> [<sha>] [--notes-file <f>] [--not-tip-green "<why>"]
+      only from a sha main's tip gate passed (scripts/tip_green.py: a line in green-shas.tsv), or
+      one main names with --not-tip-green "<why>" (printed: the release log keeps it);
       from a clean checkout at <sha> (default HEAD): the tag only when the desktop app's full
       end-to-end (scripts/nightly_desktop.sh) ran on that exact sha with every step run (no
       'none') and every red of it owned: listed in tests/known_reds.txt AS IT IS AT THAT SHA (git
@@ -34,6 +36,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(REPO, "tests"))
 from heavy_slot import heavy_argv  # noqa: E402
 import known_reds as K  # noqa: E402
+import tip_green  # noqa: E402
 
 TAG_RE = re.compile(r"^desktop-v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,4}$")
 MARK = "nightly-desktop:"
@@ -137,7 +140,7 @@ def check(tag, repo=REPO):
     say("%s: annotated, %s" % (tag, line))
 
 
-def cut(tag, sha, notes, repo=REPO, env=None):
+def cut(tag, sha, notes, repo=REPO, env=None, why=None):
     env = dict(os.environ if env is None else env)
     if not TAG_RE.match(tag):
         raise TagError("a desktop tag is desktop-vYYYY.M.N (got %r)" % tag)
@@ -148,6 +151,11 @@ def cut(tag, sha, notes, repo=REPO, env=None):
     if git("rev-parse", "HEAD", repo=repo) != sha or git("status", "--porcelain", "--untracked-files=no", repo=repo):
         raise TagError("check out %s, clean, first: the end-to-end runs this checkout" % sha[:12])
     bh = env.get("BISE_HOME") or os.path.join(os.path.expanduser("~"), ".bise")
+    # tip-green first (main m_36204): never hours of end-to-end on a sha no release may take
+    ok, tg = tip_green.verdict(tip_green.green_shas(os.path.join(bh, "gate", "green-shas.tsv")), sha, why)
+    say(tg)
+    if not ok:
+        raise TagError(tg)
     tsv = os.path.join(bh, "run", "nightly", "desktop-runs.tsv")
     run = last_run(read(tsv), sha)
     if run is None:
@@ -185,9 +193,16 @@ def main(argv):
                 raise TagError("--notes-file <f>")
             notes = open(args[i + 1]).read()
             del args[i:i + 2]
+        why = None
+        if "--not-tip-green" in args:
+            i = args.index("--not-tip-green")
+            if i + 1 >= len(args) or not args[i + 1].strip():
+                raise TagError("--not-tip-green \"<why>\"")
+            why = args[i + 1]
+            del args[i:i + 2]
         if not 1 <= len(args) <= 2 or args[0].startswith("-"):
-            raise TagError("usage: desktop_tag.py <desktop-vYYYY.M.N> [<sha>] [--notes-file <f>] | check <tag>")
-        cut(args[0], args[1] if len(args) == 2 else None, notes)
+            raise TagError("usage: desktop_tag.py <desktop-vYYYY.M.N> [<sha>] [--notes-file <f>] [--not-tip-green \"<why>\"] | check <tag>")
+        cut(args[0], args[1] if len(args) == 2 else None, notes, why=why)
         return 0
     except (TagError, ValueError) as e:
         say(str(e))

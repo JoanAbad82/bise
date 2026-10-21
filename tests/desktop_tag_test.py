@@ -116,6 +116,18 @@ def repo_flow():
                 return "ERR " + str(e)
 
         check("desktop-vYYYY.M.N" in cut("v2026.10.1"), "a bad tag name")
+        # tip-green first (main m_36204): a sha the tip gate never passed is refused before any run,
+        # unless main names it (--not-tip-green "<why>": said, the release log keeps it)
+        r = cut("desktop-v2026.10.1")
+        check(r.startswith("ERR refused: %s is not tip-green" % sha[:12]) and calls() == [], "not tip-green: refused, no run: %s %s" % (r, calls()))
+        try:
+            T.cut("desktop-v2026.10.1", None, "", repo=repo, env=dict(env, FAKE_REDS="as-he-does/full: row nine"), why="main: a hotfix")
+        except T.TagError as e:
+            r = str(e)
+        check("1 red(s) outside" in r, "--not-tip-green: past the tip check to the run: %s" % r)
+        os.makedirs(os.path.join(bh, "gate"), exist_ok=True)
+        with open(os.path.join(bh, "gate", "green-shas.tsv"), "w") as f:
+            f.write("%s\t1\t1\ttip\tlog\n" % sha)
         # one red outside the file: refused, naming it; no tag
         r = cut("desktop-v2026.10.1", FAKE_REDS="as-he-does/quick: row one|as-he-does/full: row nine")
         check(r.startswith("ERR") and "1 red(s) outside" in r and "as-he-does/full: row nine" in r, "outside: %s" % r)
@@ -133,6 +145,8 @@ def repo_flow():
         # back on the first sha, the same red is outside
         g("commit", "-q", "-am", "two")
         sha2 = g("rev-parse", "HEAD")
+        with open(os.path.join(bh, "gate", "green-shas.tsv"), "a") as f:
+            f.write("%s\t2\t1\ttip\tlog\n" % sha2)
         r = cut("desktop-v2026.10.9", FAKE_REDS="as-he-does/full: row nine")
         check(r == "nightly-desktop: owned-reds 1 %s 2026-10-18T05:00:00 (owners: night-reds)" % sha2, "at sha2: %s" % r)
         g("tag", "-d", "desktop-v2026.10.9")

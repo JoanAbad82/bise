@@ -39,6 +39,7 @@ echo "lockf: $HOME/.bise/run/heavy.lock: already locked"
 # the slots come at that time (the fake clock)
 [ -n "${FAKE_SLOT_AT:-}" ] && echo "$FAKE_SLOT_AT" >"$NIGHTLY_NOW"
 [ "${1:-}" = --alone ] && { echo "heavy-run: both slots"; shift; }
+[ "${1:-}" = --land ] && { echo "heavy-run: rank 1, a land check"; shift; }
 exec "$@"
 """
 
@@ -109,7 +110,8 @@ def main():
         repo, home = os.path.join(t, "harness"), os.path.join(t, "home")
         os.makedirs(os.path.join(repo, "scripts"))
         os.makedirs(os.path.join(repo, "tests"))
-        shutil.copy(os.path.join(ROOT, "scripts", "nightly_gate.sh"), os.path.join(repo, "scripts"))
+        for f in ("nightly_gate.sh", "tip_blame.py"):
+            shutil.copy(os.path.join(ROOT, "scripts", f), os.path.join(repo, "scripts"))
         with open(os.path.join(repo, "tests", "gate.sh"), "w") as f:
             f.write(FAKE_GATE)
         cov = os.path.join(repo, "apps", "desktop", "tests", "harness", "coverage")
@@ -322,9 +324,10 @@ def main():
         rc, log, last, red = night()
         check(rc == 0 and red is None, "green again after: rc %s" % rc)
 
-        # --tip: main's tip in a quiet slot, once per sha, never on a green one or a busy machine
+        # --tip: main's tip as a land check (heavy-run --land), once per sha, never on a green one,
+        # whatever the load or another full gate (land first, test after: main m_36204)
         def tip_run(**fake):
-            env = dict(env0, **dict({"TIP_GATE_MAX_LOAD": "100000"}, **fake))
+            env = dict(env0, **fake)
             before = set(f for f in os.listdir(out) if f.startswith("tip-") and f.endswith(".log"))
             p = subprocess.run(["bash", os.path.join(repo, "scripts", "nightly_gate.sh"), "--tip"], env=env,
                                capture_output=True, text=True, timeout=60)
@@ -343,28 +346,30 @@ def main():
         rc, log, last = tip_run()
         check(rc == 0 and log == "", "tip green: no run (rc %s, log %r)" % (rc, log))
         os.remove(green)
-        # 8. another full gate holds the lock (a live pid): nothing runs
+        # 8-10. another full gate holds its lock, the load is high: the tip gate runs all the same, in
+        # one slot as a land check, in the tree with --all; tip-last says green
         lock = os.path.join(gate_dir, "full-%d.lock" % os.getuid())
         os.makedirs(lock)
         with open(os.path.join(lock, "owner"), "w") as f:
             f.write("%d x agent root\n" % os.getpid())
-        rc, log, last = tip_run()
-        check(rc == 0 and log == "", "tip with a full gate running: no run (rc %s, log %r)" % (rc, log))
-        shutil.rmtree(lock)
-        # 9. a busy machine (load over the limit): nothing runs
         rc, log, last = tip_run(TIP_GATE_MAX_LOAD="0")
-        check(rc == 0 and log == "", "tip on a busy machine: no run (rc %s, log %r)" % (rc, log))
-        # 10. quiet: the gate runs in the tree with --all in one slot, tip-last says green
-        rc, log, last = tip_run()
-        check(rc == 0 and "fake gate %s in %s GATE_ALL=1 args=full --all" % (short(), wt) in log, "tip quiet: the gate ran: rc %s, %r" % (rc, log))
-        check("heavy-run: both slots" not in log, "tip quiet: one heavy slot, not --alone: %r" % log)
-        check(last[:2] == [full, "green"], "tip quiet: tip-last %r" % last)
+        shutil.rmtree(lock)
+        check(rc == 0 and "fake gate %s in %s GATE_ALL=1 args=full --all" % (short(), wt) in log, "tip, busy: the gate ran: rc %s, %r" % (rc, log))
+        check("heavy-run: rank 1, a land check" in log and "heavy-run: both slots" not in log, "tip: --land, one slot: %r" % log)
+        check(last[:2] == [full, "green"], "tip: tip-last %r" % last)
+        check(not os.path.exists(os.path.join(out, "tip-red")), "tip green: no tip-red")
         # 11. the same sha again (tried): nothing runs; a red one is not retried either
         rc, log, last = tip_run()
         check(rc == 0 and log == "", "tip tried: no second run (rc %s, log %r)" % (rc, log))
         git(repo, "commit", "-q", "--allow-empty", "-m", "moved")
-        rc, log, last = tip_run(FAKE_GATE_RC="1")
+        jour = os.path.join(t, "journal.jsonl")
+        with open(jour, "w") as f:
+            f.write('{"msg":{"text":"✓ lander landed 1 commit on main (%s)"}}\n' % git(repo, "rev-parse", "--short", "main"))
+        rc, log, last = tip_run(FAKE_GATE_RC="1", TIP_JOURNALS=jour)
         check(rc != 0 and last[:2] == [git(repo, "rev-parse", "main"), "red"], "tip red: rc %s, tip-last %r" % (rc, last))
+        tr = open(os.path.join(out, "tip-red")).read() if os.path.exists(os.path.join(out, "tip-red")) else ""
+        check(tr.startswith("to: lander main\n") and " moved (lander)" in tr,
+              "tip red: tip-red names the lander and its commit: %r" % tr)
         rc, log, last = tip_run()
         check(log == "", "tip red: not retried on the same sha (%r)" % log)
 
