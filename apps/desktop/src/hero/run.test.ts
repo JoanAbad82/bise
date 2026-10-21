@@ -57,8 +57,8 @@ describe('the hero film', () => {
       const r = runs.find((x) => x.cast.id === KILN);
       return r ? stepOf(r, false, false)?.played.find((f) => f.name === name) : undefined;
     };
-    // paper planes from the feed: 3 s the first, 2.8 s the next, gliding, never a loop
-    expect(at(5, 'main')?.pose.plane).toMatchObject({ dur: 3, loops: 0, startX: FEED_X, glide: true });
+    // paper planes from his send button: 2.5 s the first (it leaves at 4.8, caught at 7.3), 2.8 s the next, gliding, never a loop
+    expect(at(5, 'main')?.pose.plane).toMatchObject({ dur: 2.5, loops: 0, startX: FEED_X, glide: true });
     expect(at(8.5, 'main')?.pose.plane).toMatchObject({ dur: 2.8, loops: 0, glide: true });
     // an agent pops at its desk, never walking in by the door
     const catalog = at(10.75, 'catalog');

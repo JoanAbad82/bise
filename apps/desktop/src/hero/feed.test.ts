@@ -1,24 +1,33 @@
-// The feed plays bims-film v14's lines: typed then sent, folded into the plane, bise's waiting lines
+// The feed plays bims-film v14's lines: typed, held, then sent (its button folds into the plane), bise's waiting lines
 // with their field or their choices, a ✓ per crate in, empty at the fold; the page sits where designer
 // put it and falls apart from its edge in.
 import { describe, expect, it } from 'vitest';
-import { FILM_S, PAGE } from './cast';
-import { FEED_ROWS, feedAt } from './feed';
-import { FOLD_LINE_S } from './fold';
+import { FEED, FILM_S, PAGE } from './cast';
+import { FEED_ROWS, feedAt, SEND_S, sentAt } from './feed';
 import { foldOf, PAGE_W_MAX, pageBox } from './page';
 
 describe('the feed', () => {
-  it('types his first line, then sends it and folds it into his plane', () => {
+  it('types his first line, holds it in his field to be read, then sends it: a bubble that stays, its button folding into his plane', () => {
     const typing = feedAt(3.4);
     expect(typing.rows).toEqual([]);
     expect('build a shop for kiln, my pottery studio'.startsWith(typing.typing)).toBe(true);
     expect(typing.typing.length).toBeGreaterThan(0);
-    // typed before its fold starts, FOLD_LINE_S before its plane (4.3): the fold ends as the 3D plane leaves
-    expect(feedAt(4.3 - FOLD_LINE_S).rows[0]?.words).toBe('build a shop for kiln, my pottery studio');
-    expect(feedAt(4.0).rows[0]?.folding).not.toBeNull();
-    expect(feedAt(4.3).rows[0]?.folding).toBeNull();
-    expect(feedAt(4.4).rows[0]?.back).not.toBeNull();
-    expect(feedAt(5).rows[0]).toMatchObject({ folding: null, back: null });
+    // typed by 4.2, held whole in the field until its send (SEND_S before its plane, 4.8)
+    expect(feedAt(4.3)).toMatchObject({ rows: [], typing: 'build a shop for kiln, my pottery studio' });
+    expect(feedAt(4.8 - SEND_S + 0.01).rows[0]?.words).toBe('build a shop for kiln, my pottery studio');
+    expect(feedAt(4.6).send.fold).not.toBeNull();
+    expect(feedAt(4.8).send.fold).toBeNull();
+    expect(feedAt(4.9).send.back).not.toBeNull();
+    // the bubble stays after the send
+    expect(feedAt(6).rows[0]?.words).toBe('build a shop for kiln, my pottery studio');
+  });
+
+  it('holds each of his lines in the field at least a moment before it goes, one line at a time', () => {
+    for (const l of FEED) {
+      if (l.who !== 'you' || l.plane === undefined) continue;
+      const typed = feedAt(sentAt(l) - 0.01).typing;
+      expect(typed).toBe(l.words);
+    }
   });
 
   it("shows bise's question while it waits, the answer's field, then the choice he picks", () => {

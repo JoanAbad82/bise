@@ -161,7 +161,8 @@ export const FOLD_S = FILM_S - PAGE.fold;
 export const BUBBLE_S = 1.8;
 
 /** paper planes, tossed then gliding (designer's hero-fix-2 §2, bims-film v14): 3 s the first, 2.8 s the next, never a loop */
-const FIRST: Flight = { dur: 3, loops: 0 };
+// the first leaves 0.5 s later than it did (his line held to be read, then sent: main m_36302), its catch at 0:07.3 kept
+const FIRST: Flight = { dur: 2.5, loops: 0 };
 const SHORT: Flight = { dur: 2.8, loops: 0 };
 
 export const CAST: readonly Cast[] = [
@@ -219,7 +220,7 @@ export const CAST: readonly Cast[] = [
 
 /** his lines' planes leave the feed when the line folds (FEED's `plane`), the agents' visits */
 export const NOTES: readonly Note[] = [
-  { at: 4.3, office: KILN, from: 'you', to: 'main', flight: FIRST },
+  { at: 4.8, office: KILN, from: 'you', to: 'main', flight: FIRST },
   // at most two in the air, on different curves (bims-film v14)
   { at: 7.6, office: KILN, from: 'you', to: 'main', flight: SHORT },
   { at: 9.1, office: KILN, from: 'you', to: 'main', flight: SHORT },
@@ -238,17 +239,18 @@ export const NOTES: readonly Note[] = [
 
 /** the feed (bims-film v14), in its order */
 export const FEED: readonly Line[] = [
-  { at: 3, who: 'you', words: 'build a shop for kiln, my pottery studio', plane: 4.3, tick: 60.2 },
+  { at: 3, who: 'you', words: 'build a shop for kiln, my pottery studio', plane: 4.8, tick: 60.2 },
   // each ✓ when its crate is in main's queue (the office brains' arrivals)
-  { at: 6, who: 'you', words: 'a grid of pots with prices', plane: 7.6, tick: 53.5 },
-  { at: 6.6, who: 'you', words: 'a cart and card payments', plane: 9.1, tick: 54.9 },
-  { at: 7.2, who: 'you', words: 'email the receipt', plane: 10.6, tick: 55.1 },
+  // one line in his field at a time: typed, held to be read, sent (its button folds into its plane)
+  { at: 5.6, who: 'you', words: 'a grid of pots with prices', plane: 7.6, tick: 53.5 },
+  { at: 7.6, who: 'you', words: 'a cart and card payments', plane: 9.1, tick: 54.9 },
+  { at: 9.2, who: 'you', words: 'email the receipt', plane: 10.6, tick: 55.1 },
   { at: 14, who: 'bise', words: 'on it: 4 agents in kiln' },
   { at: 27.3, who: 'ask', bim: 'checkout', words: 'ship worldwide or EU only?', field: 'answering checkout', until: 30 },
   { at: 29, who: 'you', words: 'EU only', plane: 30 },
   { at: 34.5, who: 'you', words: 'make it warm, like paper', plane: 36, tick: 56.2 },
-  { at: 35.1, who: 'you', words: 'test the whole checkout before you ship', plane: 37.5, tick: 56.3 },
-  { at: 52, who: 'ask', bim: 'checkout', words: 'ship it, or review it first?', choices: ['ship it', 'review it for me'], pick: { at: 53.4, n: 2 }, until: 53.6 },
+  { at: 35.8, who: 'you', words: 'test the whole checkout before you ship', plane: 37.5, tick: 56.3 },
+  { at: 52, who: 'ask', bim: 'checkout', words: 'ship it, or review it first?', choices: ['ship it', 'review it for me'], pick: { at: 53.2, n: 2 }, until: 53.6 },
   { at: 60.2, who: 'bise', words: 'all done. it runs on localhost:5173', tick: 60.2 },
 ];
 

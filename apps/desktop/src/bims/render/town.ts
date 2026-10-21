@@ -15,7 +15,7 @@
 // town's check, and window.__biseTownDrawn() (each office: in view, drawn, where, inside the camera's
 // planes) for its camera path. The camera's near and far planes wrap the whole town (town/camera.ts
 // townDepth). Owner: maps-e.
-import { Box3, type BufferGeometry, Group, type Material, Mesh, type MeshLambertMaterial, type Object3D, PointLight, Vector3 } from 'three';
+import { Box3, type BufferGeometry, Group, type Material, Mesh, type MeshLambertMaterial, type Object3D, PointLight, Vector3, WebGLRenderer } from 'three';
 import type { Motion } from '../model';
 import type { Step } from '../office-driver';
 import { growSig, NO_GROW } from '../growth';
@@ -25,7 +25,7 @@ import { lookOf } from './maps';
 import { DAY, NIGHT } from './palette';
 import { STYLE } from './style';
 import { mergeRoot, type Merged } from './merge';
-import { makeOfficeScene, type OfficeScene } from './office-scene';
+import { makeOfficeScene, UP_LAYER, type OfficeScene } from './office-scene';
 import { makeView } from './view';
 import { applyLight } from './sky-light';
 import { POOL, blendAt, blending, lightOf, retarget, type Blend, type Light } from '../sky';
@@ -123,6 +123,10 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   // the town's shadow is drawn again only when something in it moved (a bake, a live office's frame)
   const v3 = makeView(canvas, { shadowAuto: false });
   const { renderer, scene, sun } = v3;
+  // the hero's planes over its page (TownOpts.planesOver): the same scene and camera, only UP_LAYER, lit as the town
+  const over = opts.planesOver ? new WebGLRenderer({ canvas: opts.planesOver, alpha: true, antialias: STYLE.antialias, powerPreference: 'low-power' }) : null;
+  over?.setClearColor(0x000000, 0);
+  if (over) for (const l of [v3.hemi, sun]) l.layers.enable(UP_LAYER);
 
   let plan: TownPlan | null = null;
   let planKey = '';
@@ -241,7 +245,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     }
     s.scene.prepare(step.look);
     const f = shownFit();
-    return f ? s.scene.frame(t, step.played, step.look, f) : null;
+    return f ? s.scene.frame(t, step.played, over ? { ...step.look, planesUp: true } : step.look, f) : null;
   }
 
   /** where each office stands, its bake or its live scene shown */
@@ -473,6 +477,10 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       v3.camera.updateProjectionMatrix();
     }
     v3.size(f);
+    if (over) {
+      over.setPixelRatio(Math.min(window.devicePixelRatio || 1, STYLE.maxPixelRatio));
+      over.setSize(f.widthPx, f.heightPx, false);
+    }
     aimSun(f);
   }
 
@@ -692,6 +700,11 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
         shadowsDirty = false;
       }
       v3.render();
+      if (over) {
+        v3.camera.layers.set(UP_LAYER);
+        over.render(scene, v3.camera);
+        v3.camera.layers.set(0);
+      }
       if (probe) {
         probe.frames++;
         probe.ms = performance.now() - t0;
@@ -738,12 +751,6 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       if (p.x < 0 || p.y < -20 || p.x > f.widthPx || p.y > f.heightPx) return null;
       const feet = s.scene.feet(name, v);
       return { ...p, feet: feet ? toScreen(f, feet).y : p.y };
-    },
-    glidesOf(id) {
-      const f = shownFit();
-      const s = spots.get(id);
-      if (!f || !s?.live) return [];
-      return s.scene.glides().map((g) => ({ name: g.name, nose: toScreen(f, g.nose), tail: toScreen(f, g.tail) }));
     },
     placedOf: (id) => placedOf(id) ?? null,
     pickBim(x, y) {
@@ -816,6 +823,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
         scape = null;
       }
       v3.dispose();
+      over?.dispose();
       if (probe) delete (window as unknown as { __biseTown?: Probe }).__biseTown;
       if (probe) delete (window as unknown as { __biseTownDrawn?: unknown }).__biseTownDrawn;
     },

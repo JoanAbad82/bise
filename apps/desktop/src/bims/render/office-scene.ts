@@ -38,6 +38,8 @@ const GLIDE_SHADOW = 0.09;
 const PILL_Y = 1.7;
 const FLOOR_LIFT = 0.02;
 const PLANE_FORESHORTEN = 1.25;
+/** three's layer the hero's glides fly in when Look.planesUp (town.ts draws it over the page: TownOpts.planesOver) */
+export const UP_LAYER = 1;
 const mixV = (a: V3, b: V3, f: number): V3 => ({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f });
 const unit = (a: V3): V3 => {
   const l = Math.hypot(a.x, a.y, a.z) || 1;
@@ -75,8 +77,6 @@ export interface OfficeScene {
   feet(name: string, out: Vector3): Vector3 | null;
   /** every bim's name, shown or not */
   names(): readonly string[];
-  /** the film's paper planes in flight this frame (glides): their nose and tail, world units (the hero draws its feed's dart on them) */
-  glides(): readonly { readonly name: string; readonly nose: Vector3; readonly tail: Vector3 }[];
   /** a bim's body (the hero's entry pops it in), null: no such bim */
   body(name: string): Object3D | null;
   desk(name: string): DeskHandles | undefined;
@@ -254,11 +254,15 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
    * sheets left on desks (Pose.letter). Reduced motion: no flight, the open sheet in its hand, then on
    * its desk. True while one moves.
    */
-  /** the glides in flight this frame (glides()) */
-  const gliding: { name: string; mesh: Plane }[] = [];
-  function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit, light: boolean, reduced: boolean, planeFrom?: Look['planeFrom']): boolean {
+  /** a plane's meshes on one layer (three's layers are each object's own, never its children's) */
+  const layerOf = (g: Object3D, n: number): void => {
+    if (g.layers.isEnabled(n) && g.layers.mask === 1 << n) return;
+    g.traverse((o) => {
+      o.layers.set(n);
+    });
+  };
+  function drawPlanes(t: number, frames: readonly BimFrame[], fit: Fit, light: boolean, reduced: boolean, planeFrom?: Look['planeFrom'], overPage = false): boolean {
     const flying = new Set<string>();
-    gliding.length = 0;
     const site = office ? siteOf(office) : null;
     let moving = false;
     /** the bims whose desk shows a sheet this frame (one each) */
@@ -300,7 +304,9 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         const seed = hash(key);
         const glide = fp.glide === true;
         const plan = glide ? planGlide({ from, to: hand, seed, dur, px: fit.scale }) : planFlight({ from, to: hand, seed, loops, unit, avoid, dur });
-        p = { mesh: makePlane(style), leftAt, plan, glide, big: startSize(fit, HELD_LEN) };
+        // from the hero's send button: its dart's length there (the same plane, never a jump in size); else big near his eye
+        const big = planeFrom?.px !== undefined ? (planeFrom.px * PLANE_FORESHORTEN * fit.scale) / HELD_LEN : startSize(fit, HELD_LEN);
+        p = { mesh: makePlane(style), leftAt, plan, glide, big };
         planes.set(key, p);
         root.add(p.mesh.group, p.mesh.shadow);
       }
@@ -315,7 +321,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         const size = HELD_LEN * sizeAt(fl.u, p.big);
         p.mesh.setFold(0);
         place(p.mesh, fl.p, fl.nose, fl.up, size, size);
-        if (p.glide) gliding.push({ name: f.name, mesh: p.mesh });
+        // the hero's glide in the layer over its page (its chat): from the button to the hand, one plane
+        layerOf(p.mesh.group, p.glide && overPage ? UP_LAYER : 0);
         // its soft shadow on the floor once it is over the slab, fainter and wider as it climbs
         // a glide (the film's paper plane) keeps a faint one however high, so the eye finds it (designer m_32270)
         const raw = shadowOf(fl.p, 0);
@@ -330,7 +337,8 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         }
         continue;
       }
-      // in its hand: where catch.ts says, in the bim's frame, from the flight's last orientation
+      // in its hand: where catch.ts says, in the bim's frame, from the flight's last orientation (back in the town's layer)
+      layerOf(p.mesh.group, 0);
       moving = moving || !reduced;
       p.mesh.shadow.visible = false;
       if (!held.shown) { p.mesh.group.visible = false; continue; }
@@ -502,7 +510,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       drawHalos(frames, themed ? look.night : (lamps ?? 0) >= 0.5);
       lightDesks();
       for (const [name, d] of world.desks) seatChair(d.chair, rigs.get(name)?.seat);
-      if (drawPlanes(t, frames, fit, !look.night, look.reduced, look.planeFrom)) motion = 'walk';
+      if (drawPlanes(t, frames, fit, !look.night, look.reduced, look.planeFrom, look.planesUp === true)) motion = 'walk';
       // the office's own eggs: the ghost crossing asks for frames; april's outfits rebuild the bims once
       if (eggDecor?.update(look.eggs) === true) motion = 'walk';
       // the unlock moment: two bims bring the new piece in from the door
@@ -529,12 +537,6 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
     },
     pal: () => world?.pal ?? null,
     office: () => office,
-    glides() {
-      return gliding.map((g) => {
-        g.mesh.group.updateWorldMatrix(true, false);
-        return { name: g.name, nose: g.mesh.group.localToWorld(new Vector3(0, 0, 0.5)), tail: g.mesh.group.localToWorld(new Vector3(0, 0, -0.5)) };
-      });
-    },
     headTop(name, out) {
       return shown(name)?.headTop(out) ?? null;
     },

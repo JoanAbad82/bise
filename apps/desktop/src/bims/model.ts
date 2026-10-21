@@ -461,8 +461,14 @@ export interface Look {
   readonly sky?: Sky;
   /** his drag or pinch is on: a sky blend due now waits until he lets go */
   readonly hold?: boolean;
-  /** where his planes leave from on the view, fractions from its top left (the hero's sent bubble, the feed's corner); absent: the view's bottom edge */
-  readonly planeFrom?: { readonly x: number; readonly y: number };
+  /**
+   * where his planes leave from on the view, fractions from its top left (the hero's send button),
+   * and their length on screen there, css px (the button's dart); absent: the view's bottom edge,
+   * big near his eye
+   */
+  readonly planeFrom?: { readonly x: number; readonly y: number; readonly px?: number };
+  /** the film's glides drawn in the layer over the page (TownOpts.planesOver: the hero's planes fly over its chat) */
+  readonly planesUp?: boolean;
 }
 
 /**

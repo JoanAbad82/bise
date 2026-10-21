@@ -8,7 +8,7 @@
 // Owner: hero-town.
 import type { Label } from '../bims/model';
 import { siteOf, toScreen, type Fit } from '../bims/render/camera';
-import { glideHeading, startPx } from '../bims/render/plane';
+import { glideHeading } from '../bims/render/plane';
 import { makeTownRenderer } from '../bims/render/town';
 import { growOf } from '../bims/growth';
 import { layoutOf } from '../bims/maps';
@@ -16,8 +16,8 @@ import { sleepers } from '../bims/zzz';
 import { NO_ATTENTION, type Step } from '../bims/office-driver';
 import type { Cam } from '../bims/zoom';
 import type { TownSite } from '../bims/town/types';
-import { BUBBLE_S, BUBBLES, CAST, FEED, FOLD_S, NOTES, PAGE, REDUCED_T, SHOTS, STAMP, type Bubble, type Shot } from './cast';
-import { makeFeed } from './feed';
+import { BUBBLE_S, BUBBLES, CAST, FOLD_S, NOTES, PAGE, REDUCED_T, SHOTS, STAMP, type Bubble, type Shot } from './cast';
+import { makeFeed, SEND_S } from './feed';
 import type { Launch } from './fold';
 import { makePage, type KilnLoader } from './page';
 import { aimCam, drift, GLIDE_IN_S, glideCam, glideOf, holdCam, LEAD_S, officeOf, OFFICE_BOX, fitCam, inFrame, present, RESUME_S, resumes, shotAt, shotCam, springStep, still, type At, type Box, type Geometry, type Hands, type Spring } from './director';
@@ -119,9 +119,14 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
   let warmed = false;
   /** frames since the warm one (-1: none yet): 'ready' waits for a cheap one */
   let sinceWarm = -1;
-  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced, clearView: true, themed: true });
+  // his planes fly over the page, its chat too (Gabriel via main m_36299: one plane from his send
+  // button to the bim's hand): their own canvas, over the feed
+  const planes = document.createElement('canvas');
+  planes.className = 'bh-planes';
+  const r = makeTownRenderer(canvas, { allLive: true, box: true, sky: { day: ground.light, night: ground.dark }, nightLift: NIGHT_LIFT, entry: !reduced, clearView: true, themed: true, planesOver: planes });
   const overlay = makeOverlay(box);
   const feed = makeFeed(box);
+  box.append(planes);
   // a click in the shop takes the camera, as a drag would (bims-film v13)
   const page = makePage(overlay.root, dark ? 'dark' : 'light', opts.kiln ?? null, () => {
     lastTouch = wall();
@@ -368,50 +373,32 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     };
   }
 
+  /** his send button's dart as the 3D plane leaves from it: its length on screen, css px (feed.ts: the button folds into it) */
+  const SEND_DART_PX = 30;
+
   /**
-   * Where his planes leave from: the middle of his line folding into one (fold.ts: the dart is
-   * there, the 3D plane takes over), else of his last sent line, fractions of the canvas from its
-   * top left (designer m_33582: from the feed, never the page's left fade); null: no line of his shown.
+   * Where his planes leave from: his send button's middle (it folded into the plane there), fractions
+   * of the canvas from its top left, and the dart's length there; null: no button shown.
    */
-  function sentBubble(): { x: number; y: number } | null {
-    const rows = [...feed.root.querySelectorAll<HTMLElement>('.bh-feed-row.you')].filter((e) => e.offsetWidth > 0);
-    const el = feed.root.querySelector<HTMLElement>('.bh-feed-row.you.folding') ?? rows[rows.length - 1];
-    if (!el) return null;
+  function sendFrom(): { x: number; y: number; px: number } | null {
     const c = canvas.getBoundingClientRect();
-    const b = el.getBoundingClientRect();
+    const b = feed.sendButton.getBoundingClientRect();
     if (c.width <= 0 || c.height <= 0 || b.width <= 0) return null;
-    return { x: (b.left + b.width / 2 - c.left) / c.width, y: (b.top + b.height / 2 - c.top) / c.height };
+    return { x: (b.left + b.width / 2 - c.left) / c.width, y: (b.top + b.height / 2 - c.top) / c.height, px: SEND_DART_PX };
   }
 
-  /** a folding line's launch (fold.ts): the 3D plane's length on screen as it leaves, and its heading toward its bim (plane.ts glideHeading) */
-  function launchOf(rowKey: string, rect: DOMRect): Launch | null {
-    const line = FEED[Number(rowKey.slice(1))];
-    if (line?.who !== 'you' || line.plane === undefined) return null;
-    const plane = line.plane;
-    const note = NOTES.find((n) => n.from === 'you' && Math.abs(n.at - plane) < 0.05);
-    const f = r.shownFit();
+  /** the send button's fold (fold.ts): the 3D plane it becomes, its length and heading toward the bim of the plane about to leave (plane.ts glideHeading) */
+  function launchOf(rect: DOMRect): Launch | null {
+    const T = filmT(t);
+    const note = NOTES.find((n) => n.from === 'you' && n.flight !== undefined && T >= n.at - SEND_S && T < n.at);
     const at = note ? geo.bim(note.office, note.to) : null;
-    if (!note || !f || !at) return null;
+    if (!note || !at) return null;
     const c = canvas.getBoundingClientRect();
     const p = inFrame(spring.cam, at);
     const wx = p.u * c.width - (rect.left + rect.width / 2 - c.left);
     const wy = -(p.v * c.height - (rect.top + rect.height / 2 - c.top));
     const h = glideHeading(wx, wy);
-    return { len: startPx(f), hx: h.x, hy: -h.y };
-  }
-
-  /** his planes still under the feed's panel: their dart over it (feed.ts lift), from the canvas's px to the panel's */
-  function liftDarts(): void {
-    const c = canvas.getBoundingClientRect();
-    const f = feed.root.getBoundingClientRect();
-    if (f.width <= 0) {
-      feed.lift([]);
-      return;
-    }
-    const dx = c.left - f.left;
-    const dy = c.top - f.top;
-    const on = (p: { x: number; y: number }): { x: number; y: number } => ({ x: p.x + dx, y: p.y + dy });
-    feed.lift(r.liveIds().flatMap((id) => r.glidesOf(id).map((g) => ({ nose: on(g.nose), tail: on(g.tail) }))));
+    return { len: SEND_DART_PX, hx: h.x, hy: -h.y };
   }
 
   function draw(nowMs: number): void {
@@ -431,7 +418,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     /** the wave at the loop's start (its camera: entryCam), not the fold at its end (the fold's shot) */
     const waving = ems !== null && T < PAGE.fold;
     const n = night();
-    const planeFrom = sentBubble();
+    const planeFrom = sendFrom();
     for (const run of runs) {
       advance(run, t, n, reduced);
       const st = stepOf(run, n, reduced, attentionOf(run));
@@ -465,7 +452,6 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
     // the feed: nothing on the paper while the town grows, in as the camera leaves the wide; out with the words in the fold
     feed.root.style.opacity = ems === null ? '' : String(T < PAGE.fold ? feedOpacity(ems) : wordsAt(ems));
     feed.draw(T, launchOf);
-    liftDarts();
     page.draw(T);
     stamped(T);
     const t4 = performance.now();
@@ -727,6 +713,7 @@ export function playFilm(box: HTMLElement, opts: FilmOpts = {}): Film {
       overlay.dispose();
       r.dispose();
       canvas.remove();
+      planes.remove();
       if (probe) delete (window as unknown as { __bimsHero?: Probe }).__bimsHero;
     },
   };

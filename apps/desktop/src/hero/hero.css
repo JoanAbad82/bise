@@ -161,13 +161,11 @@ html.pd .bims-hero {
 @media (max-width: 1199px) {
   .bims-hero .bh-feed { width: 260px; }
 }
-/* a phone: the compact feed (bims m_35441), his last line (or the one folding) and the field, bottom
+/* a phone: the compact feed (bims m_35441), his last line and the field with its send button, bottom
    right, ~40% of the width: his planes leave from it there too */
 @media (max-width: 859px) {
   .bims-hero .bh-feed { right: 10px; bottom: 10px; width: 44%; padding: 8px; gap: 4px; border-radius: 12px; font-size: 12px; }
   .bims-hero .bh-feed-row:not(:last-child) { display: none; }
-  .bims-hero .bh-feed.has-fold .bh-feed-row:not(.folding) { display: none; }
-  .bims-hero .bh-feed.has-fold .bh-feed-row.folding { display: block; }
   .bims-hero .bh-feed-row { max-width: 100%; }
   .bims-hero .bh-feed-choices { display: none; }
 }
@@ -193,45 +191,56 @@ html.pd .bims-hero {
   background: var(--bh-soft);
   box-shadow: none;
 }
-/* his line folds into his plane (fold.ts): its words fade, then the dart (an svg over it) is the bubble;
-   back in once the 3D plane took over */
-.bims-hero .bh-feed-row.you { position: relative; }
-.bims-hero .bh-feed-row.folding .bh-feed-words { opacity: var(--words); }
-.bims-hero .bh-feed-row.folded { background: transparent; box-shadow: none; }
-.bims-hero .bh-feed-row.folded > :not(.bh-fold) { visibility: hidden; }
-.bims-hero .bh-feed-row.back { opacity: var(--words); }
-.bims-hero .bh-fold {
+/* the field and its send button (feed.ts, Gabriel via main m_36299): the button presses, folds into
+   his paper plane (fold.ts) and leaves as the 3D one; a new one comes back */
+.bims-hero .bh-feed-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bims-hero .bh-feed-input .bh-feed-field { flex: 1; min-width: 0; }
+.bims-hero .bh-feed-send {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bh-accent);
+  opacity: var(--back);
+}
+.bims-hero .bh-feed-send.folding { background: transparent; }
+.bims-hero .bh-send-svg {
   position: absolute;
-  left: 0;
-  top: 0;
+  inset: 0;
   overflow: visible;
   pointer-events: none;
 }
-.bims-hero .bh-fold polygon {
-  fill: color-mix(in srgb, var(--bh-soft), #fffaf0 var(--paper));
+.bims-hero .bh-send-arrow {
+  fill: var(--bh-on);
+  transform: translate(4px, 4px);
+}
+.bims-hero .bh-feed-send.folding .bh-send-arrow { opacity: var(--words); }
+.bims-hero .bh-send-svg polygon,
+.bims-hero .bh-send-svg line { display: none; }
+.bims-hero .bh-feed-send.folding .bh-send-svg polygon {
+  display: inline;
+  fill: color-mix(in srgb, var(--bh-accent), #fffaf0 var(--paper));
   stroke: var(--bh-plane-ink);
   stroke-width: 1;
   stroke-linejoin: round;
 }
-/* his 3D planes still under the panel, as their dart over it, clipped to it (feed.ts lift) */
-.bims-hero .bh-lift {
+.bims-hero .bh-feed-send.folding .bh-send-svg line {
+  display: inline;
+  stroke: var(--bh-plane-ink);
+  stroke-width: 1;
+}
+/* his planes over the page (TownOpts.planesOver): over the feed, never in the way of his hands */
+.bims-hero .bh-planes {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  border-radius: inherit;
   pointer-events: none;
-}
-.bims-hero .bh-lift polygon {
-  fill: #fffaf0;
-  stroke: var(--bh-plane-ink);
-  stroke-width: 1;
-  stroke-linejoin: round;
-}
-.bims-hero .bh-fold line {
-  stroke: var(--bh-plane-ink);
-  stroke-width: 1;
 }
 .bims-hero .bh-feed-row.waiting {
   color: var(--bh-text);

@@ -52,8 +52,6 @@ export interface TownRenderer {
   pick(x: number, y: number): string | null;
   /** a live office's bim's head on the canvas (css px; its label goes there) and its feet's y; null off view or not live */
   headOf(id: string, name: string): { readonly x: number; readonly y: number; readonly feet: number } | null;
-  /** a live office's paper planes gliding now (the film's): their nose and tail on the canvas, css px */
-  glidesOf(id: string): readonly { readonly name: string; readonly nose: { readonly x: number; readonly y: number }; readonly tail: { readonly x: number; readonly y: number } }[];
   /** the live office's bim under a canvas point (pick.ts: the nearest body); null: none */
   pickBim(x: number, y: number): { readonly id: string; readonly name: string } | null;
   /** where the plan put an office (its offset and its ground, town units); null: no such office */
@@ -86,6 +84,11 @@ export interface TownOpts {
    * themes under the sky's one light (sky.ts lightOf), as the office.
    */
   readonly themed?: boolean;
+  /**
+   * a transparent canvas over the page's own layers (the hero's chat): the glides drawn there, over
+   * them (Look.planesUp, office-scene's UP_LAYER), with the same camera; absent: every plane in the town's canvas
+   */
+  readonly planesOver?: HTMLCanvasElement;
   /**
    * the hero's entry build (design's hero-entry §2): the town drawn loose, its townscape and its
    * offices' worlds unmerged (their bakes made at once, hidden) so each thing can be grown in, until
