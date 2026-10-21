@@ -301,9 +301,8 @@ notes, the panel open, on a throwaway hub).
 
 Also:
 
-- **Line limits**: `kit/notes.js` (1,277) is on the ratchet: generalising
-  it splits it (anchor kinds in `kit/notes-anchors.js`), never grows it.
-  `server.rs` (898): the `/a/<id>/view`, `/a/<id>/events`,
+- **Where the code goes**: generalising `kit/notes.js` puts the anchor
+  kinds in `kit/notes-anchors.js`. In `server.rs`, the `/a/<id>/view`, `/a/<id>/events`,
   `/api/a/<id>/notes|send` routes go in a new `pages/artifact_routes.rs`.
 - **Clients draw**: the hub/server decides `frame_url` (`proto_view`), the
   "updating…" state and the notes words; the desktop only draws them. Words

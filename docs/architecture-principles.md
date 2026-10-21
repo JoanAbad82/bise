@@ -138,7 +138,7 @@ Who gets woken, told or queued is a decision.
   `strip_prefix("sb route : ")` next to it. A wording change in the hub breaks
   the inbox silently.
 
-### 5. One job per function, files under 1,000 lines
+### 5. One job per function, one job per file
 
 Split before you add, not after.
 
@@ -207,11 +207,8 @@ new feed-text parsing in the TUI, no growth of `daemon::run`.
    from main.
 4. A typed client protocol shared by the hub, the TUI and the ambient core.
 5. Group `core::Hub`'s runtime fields by feature, in their modules.
-6. (done.) The 1,000-line rule as a gate check, with a shrinking exceptions
-   list: `tests/line_gate.py` in `gate.sh quick`, the list in
-   `tests/line_limits.txt`.
-7. (done, issue 31.) Delete the compatibility left "for one release". A
+6. (done, issue 31.) Delete the compatibility left "for one release". A
    compatibility shim is registered in `tests/shims.txt` with its owner and
    its removal release (`tests/shims_check.py` in the quick gate and land).
-8. `docs/IMPLEMENTATION.md` becomes a short English index of the module
+7. `docs/IMPLEMENTATION.md` becomes a short English index of the module
    headers, or goes.

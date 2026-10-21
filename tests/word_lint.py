@@ -27,7 +27,7 @@ Python files are read with ast (every str constant but docstrings), the desktop'
 .mjs/.mts with a small tokenizer ('…', "…", `…` without ${}, comments skipped).
 
 tests/word_literals.txt ("<count> <path>  # <owner: why it stays>", sorted by path) holds the
-words left as literals, a ratchet like tests/line_limits.txt:
+words left as literals, a shrink-only ratchet:
   - a file's count never goes past its line, and a drop lowers its line in the same commit (the
     line goes at 0, or when the file is gone);
   - vs the base (GATE_BASE, default HEAD) a count goes up, or a path comes in, only by the

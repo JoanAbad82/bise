@@ -199,7 +199,7 @@ fn clip_head(s: &str, max: usize) -> String {
 mod tests {
     use super::*;
 
-    const TS: &str = "ok   line_gate (0s)\u{a}FAIL desktop (14s)\u{a}src/inbox/InboxCard.tsx(315,17): error TS2323: Cannot redeclare exported variable 'typeWords'.\u{a}error during build:\u{a}log: /g/sb-gate-land-desktop.log\u{a}GATE land FAILED: desktop\u{a}";
+    const TS: &str = "ok   word_lint (0s)\u{a}FAIL desktop (14s)\u{a}src/inbox/InboxCard.tsx(315,17): error TS2323: Cannot redeclare exported variable 'typeWords'.\u{a}error during build:\u{a}log: /g/sb-gate-land-desktop.log\u{a}GATE land FAILED: desktop\u{a}";
 
     /// Every way of landing, onto the trunk or another branch, its base
     /// moved or not: whether the land check runs (issue 28 part 2).
@@ -235,7 +235,7 @@ mod tests {
             r
         );
         assert!(r.contains("error during build:\u{a}your branch is rebased on main: fix it, then sb land again"), "{}", r);
-        assert!(!r.contains("line_gate"), "{}", r);
+        assert!(!r.contains("word_lint"), "{}", r);
     }
 
     #[test]

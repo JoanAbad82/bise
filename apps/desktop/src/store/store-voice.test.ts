@@ -1,5 +1,5 @@
 // The store's voice side (dictation, sign-in, fn's talk words, the talk's still, loudness), moved out
-// of store.test.ts as is (line_gate: no file over 1,000 lines).
+// of store.test.ts as is.
 import { describe, expect, it, vi } from "vitest";
 import type { CoreCmd } from "@/shared/api";
 import { DICTATE_STOP_WAIT_MS, Store } from "./store";

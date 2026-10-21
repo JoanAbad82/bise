@@ -10,8 +10,6 @@
 #                     tests of the changed crates and of the crates using them; if a .bend file of core/ hub/ vendor/
 #                     or of laws/ proofs/ changed: PROOF, every bend/proofs/*.bend
 #                     in parallel (tests/proof_run.py, 4 jobs);
-#                     no changed source over 1,000 lines or its count in
-#                     tests/line_limits.txt (tests/line_gate.py, ~0.1 s);
 #                     no changed test hard-codes a UI word past its count in
 #                     tests/word_literals.txt (tests/word_lint.py, issue 29).
 #                     The tests run bins.sh's cached sb-core of the tree's
@@ -19,8 +17,7 @@
 #                     compile per source hash for every worktree and the
 #                     full gate; never a copy of its own: the EDR deletes
 #                     fresh unsigned copies). The bend part runs next to cargo.
-#   gate.sh full      everything: first tests/line_gate.py --all (the whole
-#                     tree vs tests/line_limits.txt, ~0.5 s), cargo build, run_all.sh (it puts ./repl-live
+#   gate.sh full      everything: cargo build, run_all.sh (it puts ./repl-live
 #                     ./repl-scripted ./sb-core in place with bins.sh: a copy
 #                     from the cache, a compile when their sources changed;
 #                     never commit them) with FUZZ_RUNS=2000
@@ -39,7 +36,7 @@
 #                     untracked file): its sha goes to <gate dir>/green-shas.tsv
 #                     (this file owns it: <sha> <end epoch> <secs> <agent>
 #                     <log>). A full gate on a clean tree whose sha is there
-#                     runs only line_gate and word_lint (GATE_FORCE=1: all
+#                     runs only word_lint (GATE_FORCE=1: all
 #                     of it): a release on a sha that scripts/nightly_gate.sh
 #                     --tip (main's tip, in a quiet slot) gated skips its own.
 #   gate.sh rerun     after a full gate red only on e2e/tmux tests: those
@@ -340,7 +337,7 @@ if [ "$mode" = land ]; then
   changed="$(git diff --name-only "$base" "$head")" || { echo "GATE land FAILED: diff ($base..$head)"; exit 1; }
   map_paths $changed
   dwhy=""; [ -n "$changed" ] && dwhy="$(desktop_why $changed)"
-  src=0; printf '%s\n' "$changed" | grep -qE '\.(rs|bend|ts|tsx|py)$|^tests/line_limits\.txt$' && src=1
+  src=0; printf '%s\n' "$changed" | grep -qE '\.(rs|bend|ts|tsx|py)$' && src=1
   if [ $src = 0 ] && [ -z "$pkgs" ] && [ -z "$dwhy" ] && [ "${proto_ts:-0}${office:-0}${kit:-0}${words:-0}${bendw:-0}" = 00000 ]; then
     echo "GATE land GREEN (0s): no step for these paths"; exit 0
   fi
@@ -518,9 +515,9 @@ green_file="$gdir/green-shas.tsv"
 clean_tree() { [ -z "$(git status --porcelain 2>/dev/null)" ]; }
 if [ "$mode" = full ] && [ "${GATE_FORCE:-}" != 1 ] && clean_tree \
   && g="$(awk -F'\t' -v s="$(git rev-parse HEAD)" '$1 == s { l = $0 } END { print l }' "$green_file" 2>/dev/null)" && [ -n "$g" ]; then
-  python3 tests/line_gate.py --all && python3 tests/word_lint.py --all || { echo "GATE full FAILED"; exit 1; }
+  python3 tests/word_lint.py --all || { echo "GATE full FAILED"; exit 1; }
   IFS=$'\t' read -r _ gend gsecs gagent glogf <<<"$g"
-  echo "GATE full GREEN (0s): $(git rev-parse --short HEAD) passed a full gate with every test at $(date -r "$gend" '+%F %T') (${gsecs}s, ${gagent:-?}, $glogf): line_gate and word_lint only (GATE_FORCE=1 runs it all)"
+  echo "GATE full GREEN (0s): $(git rev-parse --short HEAD) passed a full gate with every test at $(date -r "$gend" '+%F %T') (${gsecs}s, ${gagent:-?}, $glogf): word_lint only (GATE_FORCE=1 runs it all)"
   exit 0
 fi
 case "$mode" in full|rerun) gate_lock ;; esac
@@ -675,7 +672,6 @@ if [ "$mode" = land ]; then
     [ -z "$maps" ] || { echo "error: source maps in out/ ($maps): BISE_DESKTOP_SOURCEMAP is set?"; return 1; }
   }
   target="${CARGO_TARGET_DIR:-$root/rust/target}"
-  [ $src = 1 ] && lstep line_gate env GATE_BASE="$base" python3 tests/line_gate.py $changed
   [ "${words:-0}" = 1 ] && lstep word_lint env GATE_BASE="$base" python3 tests/word_lint.py $changed
   [ "${bendw:-0}" = 1 ] && lstep pick_gate bash -c 'python3 tests/pick_gate.py --self-test && python3 tests/pick_gate.py'
   # every shim registered with its end date (issue 31); an overdue one is
@@ -717,10 +713,6 @@ if [ "$mode" = rerun ]; then
 fi
 if [ "$mode" = full ]; then
   s=$SECONDS
-  # the whole tree against tests/line_limits.txt (~0.5 s, first: a red here
-  # needs no build): an unlisted file over 1,000 lines or a count above its
-  # file's, which a commit without the quick gate can leave
-  python3 tests/line_gate.py --all || { echo "GATE full FAILED"; exit 1; }
   # every test against tests/word_literals.txt (issue 29, ~1 s)
   python3 tests/word_lint.py --all || { echo "GATE full FAILED"; exit 1; }
   # every shim registered, none past its removal release (issue 31, ~0.1 s)
@@ -819,9 +811,6 @@ fi
 # def that calls itself twice with the same arguments (2^n: hub-tick) (tests/pick_gate.py)
 python3 "$root/tests/pick_gate.py" --self-test >/dev/null || { python3 "$root/tests/pick_gate.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 python3 "$root/tests/pick_gate.py" || { echo "GATE quick FAILED"; exit 1; }
-# no changed source file over 1,000 lines or past its count in the shrink-only
-# tests/line_limits.txt (tests/line_gate.py, architecture-principles.md rule 5)
-GATE_BASE="$base" python3 "$root/tests/line_gate.py" $changed || { echo "GATE quick FAILED"; exit 1; }
 # no changed test hard-codes a UI word past its count in the shrink-only
 # tests/word_literals.txt (tests/word_lint.py, issue 29: read it by key)
 GATE_BASE="$base" python3 "$root/tests/word_lint.py" $changed || { echo "GATE quick FAILED"; exit 1; }

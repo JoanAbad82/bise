@@ -96,8 +96,7 @@ The agent runtime (repl-live): `ps -o time` against its age, then `sample
   ALL PROOFS CHECK (a law may unfold the def you rewrote).
 - Before/after numbers from core_profile.py in the commit message, same
   journal copy, same load (under the heavy lock).
-- Bend rules from `bise-implement` hold: core.bend's line ratchet, laws for
-  any changed decision (a perf change changes none).
+- Bend rules from `bise-implement` hold: laws for any changed decision (a perf change changes none).
 
 ## 4. Keep the record
 

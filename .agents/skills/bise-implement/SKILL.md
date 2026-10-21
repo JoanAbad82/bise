@@ -33,8 +33,8 @@ each from this repo. It is short. The architect agent keeps it current.
 4. Across a seam, structure: a new fact for the TUI is an event field, never
    a phrase it finds in feed text.
 5. Pure part in its own module with unit tests; the shell only calls it.
-6. No change pushes a file over 1,000 lines, or makes `daemon::run` longer:
-   split first.
+6. No change makes `daemon::run` (or any loop-step function) longer: split
+   first. A file is split by its jobs, never by a line count.
 7. Replace an old way and delete it in the same change; no "kept for one
    release". A compatibility shim an older install truly needs is registered
    in `tests/shims.txt` with its owner and removal release, and its

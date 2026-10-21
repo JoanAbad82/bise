@@ -7,13 +7,12 @@ step and its log, and main's sha does not move:
 
   reds:  clippy (a warning), proto_ts (a generated TS file stale), desktop
          (a type error; skipped with the reason without node_modules),
-         word_lint (a UI word as a literal in a tmux test), line_gate (a
-         file over 1,000 lines)
+         word_lint (a UI word as a literal in a tmux test)
   ways:  a worktree land whose base moved, one whose base did not, a
          `sb land --here` from main's checkout, `sb feature merge`
 
 Every red goes the new way (a worktree land whose base did not move); the
-cheap one (line_gate) goes the other three (architect m_28364: the whole
+cheap one (word_lint) goes the other three (architect m_28364: the whole
 ways x trunk x moved matrix is land_check.rs's unit table).
 
 A docs-only change lands on each way, before (bise.toml without [land]) and
@@ -99,11 +98,7 @@ def reds(desktop):
     def word(d):
         with open(os.path.join(d, "tests/land_every_red_tmux.py"), "w") as f:
             f.write("WAIT_ON = %r" % a_word() + NL)
-
-    def lines(d):
-        with open(os.path.join(d, "tests/land_every_long.py"), "w") as f:
-            f.write(NL.join("x%d = %d" % (i, i) for i in range(1001)) + NL)
-    rs = {"clippy": ("clippy", clippy), "proto_ts": ("proto_ts", proto), "word_lint": ("word_lint", word), "line_gate": ("line_gate", lines)}
+    rs = {"clippy": ("clippy", clippy), "proto_ts": ("proto_ts", proto), "word_lint": ("word_lint", word)}
     if desktop:
         rs["desktop"] = ("desktop", ts)
     return rs
@@ -216,10 +211,10 @@ def main():
             check(main_sha() != m, "%s: main moved" % way)
             print("ok   %s: a docs-only change lands" % way)
         # every red on the new path (a worktree land whose base did not
-        # move); the cheap one (a file over its limit) on the other three
+        # move); the cheap one (a UI word as a literal) on the other three
         # (architect m_28364: the 4 x 3 matrix is land_check's unit table)
         rs = reds(desktop)
-        plan = [(n, "worktree") for n in rs] + [("line_gate", w) for w in WAYS if w != "worktree"]
+        plan = [(n, "worktree") for n in rs] + [("word_lint", w) for w in WAYS if w != "worktree"]
         for name, way in plan:
             step, plant = rs[name]
             if True:

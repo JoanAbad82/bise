@@ -197,17 +197,15 @@ STEP_RX = re.compile(r"^ok\s+(test-build|clippy|PROOF|sb-core|proto_ts|test_\S+|
 # a red step: "FAIL desktop_check", "FAIL sb-core build", "FAIL pick_gate: ..." (a test's line has its time)
 STEP_FAIL_RX = re.compile(r"^FAIL ([\w-]+)(?=$|:| build$)", re.M)
 GATE_FAIL_RX = re.compile(r"^GATE FAILED: (.*)$", re.M)
-LINE_GATE_RX = re.compile(r"tests/line_limits\.txt")
 VITEST_FAIL_RX = re.compile(r"FAIL\s+(src/\S+\.test\.tsx?)")
 SHA_RX = re.compile(r" sha=(\S+)")
 
 
 def red_names(text, tests):
     """What made a gate run red: its tests red even alone (a FLAKY one ends
-    ok), its red steps, line_gate's lines, a setup that failed."""
+    ok), its red steps, a setup that failed."""
     return sorted({t for t, (ok, _, _) in tests.items() if not ok}
                   | {"tests" if s.startswith("test_") else s for s in STEP_FAIL_RX.findall(text)}
-                  | ({"line_gate"} if LINE_GATE_RX.search(text) else set())
                   | {"setup: " + g[:40] for g in GATE_FAIL_RX.findall(text)})
 
 

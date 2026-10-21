@@ -55,7 +55,7 @@ gate log are lost; the report says so (`gate logs start <date>`).
   `scripts/flow_time.py` (its self-test: `python3 scripts/flow_time.py`).
 - **gates**: runs, green share, green time p50/p90, the wait for the
   full-gate lock, each quick step's p50, and the red runs by what was red
-  (a test red even alone, a step, line_gate, a setup; else the rc). A run
+  (a test red even alone, a step, a setup; else the rc). A run
   on an agent's scratch tree (`agents/<a>/tmp/`, an experiment such as a
   newer Bend) is left out and counted on its own line.
 - **tests**: wall p50/p90 and CPU p50 per test, how many runs it was red
