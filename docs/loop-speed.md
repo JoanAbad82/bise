@@ -479,20 +479,28 @@ What changed (no test dropped, no coverage lost):
    the disk hit 1.3 GB free, 2 jobs hung 12.7 h in their slots and the
    queue's restart put the load at 113). A job starts only when the data
    volume has 15 GB free + its reserve (3 GB for cargo on a warm target,
-   10 cold, for a full gate or `--alone`, 2 otherwise) + the reserves of the
-   running jobs (`~/.bise/run/reserve/`). Short of it, heavy-run starts
+   10 cold, for a full gate or `--alone`, 2 otherwise; cold targets measured
+   7.1-11 GB on 10-21, a gate's task-dir seed clone counts warm) + what the
+   running jobs may still write: their reserves (`~/.bise/run/reserve/`)
+   minus what the disk lost since the oldest of them started. Short of it, heavy-run starts
    `scripts/disk_reclaim.py` (installed next to it): it deletes the agents'
    worktree cargo targets, least recently used first, never one whose cargo
    lock is held or used in the last 30 min; any target unused for 6 h goes
    anyway (checked at each job start, every 10 min at most). The owner's
    next job there prints the new target's `RECLAIMED.txt`; each deletion is
    a line in `~/.bise/run/reclaim.log`. A running job reclaims under 15 GB
-   and is stopped under 5 (rc 28). A job over `HEAVY_MAX_MIN` (180, 360
-   for `--alone`) is stopped, rc 124. CPU: a slot gets `CARGO_BUILD_JOBS=4`,
+   and is stopped under 5 (rc 28). A job that ran awake longer than its
+   limit is stopped, rc 124: about twice the longest run of its kind in
+   heavy.log (full gate 150 min, `test:land` 180, desktop_tag 240,
+   `--alone` and the nightly 360, the rest 120; `HEAVY_MAX_MIN` wins). No
+   job starts on battery under 30 % (10-20: the Mac ran its jobs on battery
+   to 1 %, slept at 21:43 and hibernated to 10:20). CPU: a slot gets `CARGO_BUILD_JOBS=4`,
    `RUST_TEST_THREADS=4`, `SB_TEST_JOBS=2` (an `--alone` job keeps the
    defaults); while a heavy job runs, a new one (not `--prio`) starts only
    under load 2 x cores (the hub's own "loaded", send-fast's load.rs) and
-   20 s after the last start, so the 1-min load has seen it.
+   20 s after the last start, so the 1-min load has seen it; 600 s at most
+   (`HEAVY_LOAD_WAIT_MAX`), then it goes in its turn: the load that is not
+   heavy-run's (50-90 on 10-21 with no rustc running) never starves it.
 
 ## 11. Change-based test selection (loop-speed-4, the user's yes on q1)
 

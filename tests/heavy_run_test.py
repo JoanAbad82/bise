@@ -210,13 +210,13 @@ with tempfile.TemporaryDirectory() as home:
     waiter = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran], env=envd, stderr=errf)
     check(stays(lambda: not os.path.exists(ran), 2, "the job waits"), "12 GB free: the job waits for disk")
     sb_lines = lambda: open(said).read() if os.path.exists(said) else ""
-    check("disk is nearly full (12 GB free" in sb_lines() and sb_lines().startswith("status working --note"),
+    check("waiting for disk room: 12 GB free" in sb_lines() and sb_lines().startswith("status working --note"),
           "the waiting agent's status says why: %r" % sb_lines())
     open(freef, "w").write(str(20 * GB))
     check(waiter.wait(timeout=30) == 0 and os.path.exists(ran), "20 GB free: the job runs")
     errf.seek(0)
     err = errf.read()
-    check("heavy-run: waiting: the disk is nearly full (12 GB free" in err and "20 GB free again" in err,
+    check("heavy-run: waiting for disk room: 12 GB free" in err and "disk room again (20 GB free)" in err,
           "stderr names the wait and its end: %r" % err)
     r = subprocess.Popen([HEAVY, "sh", "-c", 'sleep 60 & wait', "x"], env=envd, stderr=subprocess.PIPE, text=True)
     wait_for(lambda: len([l for l in lines() if l.split("\t")[2] == "-"]) > len(
@@ -256,10 +256,25 @@ with tempfile.TemporaryDirectory() as home:
     check(wait_for(lambda: os.path.exists(reclaimed) and "--want 27" in open(reclaimed).read(), 10),
           "the waiting job asks the reclaim for 27 GB")
     e2.seek(0)
-    check("needs 27 GB: 15 free + 2 for it + 10 the running jobs may write" in e2.read(), "the wait says the sum")
+    check("starts at 27 GB (15 kept free + 2 it may write + 10 the running jobs may still write)" in e2.read(), "the wait says the sum")
     open(freef, "w").write(str(27 * GB))
     check(second.wait(timeout=30) == 0 and os.path.exists(ran2), "27 GB free: it runs")
+    # what the disk lost since the running job started counts as written by
+    # it: started at 30 GB free, now 22 (8 written): 2 left, a 2 GB job
+    # needs 19 and runs (the whole sum would want 27: main m_36317)
     open(go_r, "w").close()
+    big.wait(timeout=30)
+    open(freef, "w").write(str(30 * GB))
+    go_w = os.path.join(home, "go_written")
+    big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_w],
+                           env=dict(envr, HEAVY_RESERVE_GB="10"), stderr=subprocess.DEVNULL)
+    check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]),
+          "the 10 GB job runs")
+    open(freef, "w").write(str(22 * GB))
+    ran5 = os.path.join(home, "ran5")
+    r = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', ran5], env=envr, capture_output=True, text=True, timeout=30)
+    check(r.returncode == 0 and os.path.exists(ran5), "8 GB written since it started: a 2 GB job runs at 22 GB free: %r" % r.stderr[-300:])
+    open(go_w, "w").close()
     big.wait(timeout=30)
     check(not [f for f in os.listdir(os.path.join(run, "reserve"))], "the reserves are gone with their jobs")
     # the load (mac-budget): with a heavy job running, a new one waits while
@@ -280,8 +295,32 @@ with tempfile.TemporaryDirectory() as home:
     check(stays(lambda: not os.path.exists(ran4), 3, "it waits"), "load 50, a heavy job runs: the next one waits %r" % lines()[-3:])
     e4.seek(0)
     check("the machine is busy (load 50, the limit 24" in e4.read(), "the wait says the load")
+    # the load gate keeps the queue's order (rank, then submit time) and
+    # never holds the --prio lane (review-gates m_36096)
+    lorder = os.path.join(home, "load_order")
+    rest_a = subprocess.Popen([HEAVY, "sh", "-c", 'echo rest-a >> "$0"', lorder], env=dict(envl, HEAVY_SUBMIT="5000"),
+                              stderr=subprocess.DEVNULL)
+    rest_b = subprocess.Popen([HEAVY, "sh", "-c", 'echo rest-b >> "$0"', lorder], env=dict(envl, HEAVY_SUBMIT="5001"),
+                              stderr=subprocess.DEVNULL)
+    land2 = subprocess.Popen([HEAVY, "--land", "sh", "-c", 'echo land >> "$0"', lorder], env=dict(envl, HEAVY_SUBMIT="5002"),
+                             stderr=subprocess.DEVNULL)
+    r = subprocess.run([HEAVY, "--prio", "sh", "-c", 'echo "$HEAVY_SLOT"'], env=dict(envl, HEAVY_NO_LANE=""), capture_output=True,
+                       text=True, timeout=30)
+    check(r.returncode == 0 and r.stdout.startswith("heavy5.lock"), "load 50: a --prio job still runs in the lane: %r" % r.stdout)
+    check(wait_for(lambda: len(os.listdir(q)) >= 4), "the held jobs wait with their tickets")
     open(loadf, "w").write("10")
     check(w4.wait(timeout=30) == 0 and os.path.exists(ran4), "load 10: it runs")
+    for j in (rest_a, rest_b, land2):
+        j.wait(timeout=60)
+    # the load never starves a job: past HEAVY_LOAD_WAIT_MAX it goes
+    open(loadf, "w").write("50")
+    ran6 = os.path.join(home, "ran6")
+    r = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', ran6], env=dict(envl, HEAVY_LOAD_WAIT_MAX="3"), capture_output=True,
+                       text=True, timeout=60)
+    check(r.returncode == 0 and os.path.exists(ran6) and "3 s at most" in r.stderr,
+          "load 50 for good: the job goes after HEAVY_LOAD_WAIT_MAX: %r" % r.stderr[-300:])
+    got = open(lorder).read().split() if os.path.exists(lorder) else []
+    check(got == ["land", "rest-a", "rest-b"], "after the load wait, by rank then submit time: %r" % got)
     open(go_l, "w").close()
     hold.wait(timeout=30)
     # the time limit: a job over HEAVY_MAX_MIN is stopped, rc=124

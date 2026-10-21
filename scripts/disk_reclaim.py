@@ -176,13 +176,13 @@ def lock_all(t):
 
 def job_cwds():
     """The cwds of the running heavy-run jobs (~/.bise/run/reserve/<slot>.<pid>:
-    "<GB>\t<cwd>"), the dead ones' files skipped."""
+    "<GB>\t<cwd>\t<free KB at its start>"), the dead ones' files skipped."""
     d = os.path.expanduser("~/.bise/run/reserve")
     out = []
     for f in _files(d):
         try:
             os.kill(int(f.rsplit(".", 1)[1]), 0)
-            out.append(open(os.path.join(d, f)).read().split("\t", 1)[1].strip())
+            out.append(open(os.path.join(d, f)).read().split("\t")[1].strip())
         except (ValueError, IndexError, OSError):
             pass
     return out
