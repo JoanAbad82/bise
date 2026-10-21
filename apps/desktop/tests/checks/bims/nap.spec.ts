@@ -8,7 +8,7 @@ import { test, expect, type Session } from '../../harness';
 import type { FakeCore } from '../../harness';
 import { agent, snap } from '../../../src/bims/fixtures';
 import { MAP_IDS } from '../../../src/bims/maps/ids';
-import { P, open, settle, shotOf, sleep, writeIndex, type Shot } from './world';
+import { P, headOf, open, settle, shotOf, sleep, trackpad, writeIndex, type Shot } from './world';
 
 const shots: Shot[] = [];
 test.describe.configure({ timeout: 900_000 });
@@ -32,9 +32,11 @@ async function shot(s: Session, file: string, title: string, says: string): Prom
   shots.push({ file, title, says });
 }
 
-/** the follow camera on one bim (its row clicked), then still */
+/** close on one bim: a pinch around its head (life.spec.ts), then still */
 async function closeOn(s: Session, name: string): Promise<void> {
-  await s.page.getByTestId(`app.right.agent.${name}`).click({ position: { x: 24, y: 10 } });
+  const h = await headOf(s.page, name);
+  if (h === null) throw new Error(`${name} is off view`);
+  for (let i = 0; i < 8; i++) await trackpad(s.cdp, h.x, h.y, { dy: -60, pinch: true });
   await s.page.mouse.move(5, 400);
   await sleep(500);
   await settle(s, 800, 6000);
@@ -70,7 +72,10 @@ for (const theme of ['light', 'dark'] as const) {
         await shot(s, `nap-${map}-${theme}.png`, `${map}, stage 14, 640 docked, ${when}`, SAYS);
         await closeOn(s, 'nap-a');
         await shot(s, `nap-${map}-close-${theme}.png`, `${map}, nap-a on its bed, close, ${when}`, SAYS);
-        await s.page.getByTestId('app.right.bims.fit').click();
+        // back to the whole office (the fit chip shows while zoomed)
+        const fit = s.page.getByTestId('app.right.bims.fit');
+        if ((await fit.count()) > 0) await fit.click();
+        await settle(s, 600, 4000);
         if (AT_320.has(map)) {
           await s.page.getByTestId('app.right.agents.width.narrow').click();
           await sleep(1500);
