@@ -35,6 +35,9 @@ const asN = (s) => s.replace(/\d+/g, 'N');
 const wanted = (name) => ONLY.length === 0 || ONLY.some((w) => name.includes(w) || asN(name).includes(asN(w)));
 const GROUPS = (process.env.AS_HE_DOES_GROUPS ?? '').split(',').map((w) => w.trim()).filter(Boolean);
 let GROUP = null;
+// the time a step spent polling (`until`) since the step before (fast-loop): each step's `wait_s`
+// says how much of its at_s gap was a wait for the app or the hub, not the step's own work
+let WAITED_MS = 0;
 const ANSWER_MS = Number(process.env.AS_HE_DOES_ANSWER_MS ?? 240000);
 const MESSAGE = 'hello from the as-he-does proof';
 
@@ -44,7 +47,8 @@ const save = () => fs.writeFileSync(path.join(out, `${mode}${tag}.json`), JSON.s
 const T0 = Date.now();
 let lastStep = { name: null, at: T0 };
 const step = (name, ok, info) => {
-  res.steps.push({ name, ok, info: info ?? null, at_s: Math.round((Date.now() - T0) / 1000), ...(GROUP ? { group: GROUP } : {}) });
+  res.steps.push({ name, ok, info: info ?? null, at_s: Math.round((Date.now() - T0) / 1000), wait_s: Math.round(WAITED_MS / 1000), ...(GROUP ? { group: GROUP } : {}) });
+  WAITED_MS = 0;
   lastStep = { name, at: Date.now() };
   save();
 };
@@ -127,12 +131,16 @@ const closed = () => {
 };
 const until = async (fn, ms, every = 1000) => {
   const t0 = Date.now();
-  for (;;) {
-    if (page.isClosed()) closed();
-    const v = await fn().catch(() => null);
-    if (v) return v;
-    if (Date.now() - t0 > ms) return null;
-    await new Promise((r) => setTimeout(r, every));
+  try {
+    for (;;) {
+      if (page.isClosed()) closed();
+      const v = await fn().catch(() => null);
+      if (v) return v;
+      if (Date.now() - t0 > ms) return null;
+      await new Promise((r) => setTimeout(r, every));
+    }
+  } finally {
+    WAITED_MS += Date.now() - t0;
   }
 };
 // the alarm rows of the right bar's SCHEDULED & WATCHING whose words hold `words` (agent-waiting-states
