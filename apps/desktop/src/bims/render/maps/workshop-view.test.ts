@@ -4,7 +4,8 @@
 // - from the office's camera (camera.ts: one isometric direction at 320 and wide, only the fit
 //   changes), a ray from each desk bim's head and chest, seated, toward the camera meets no mesh of
 //   the world, at 6, 12, 18, 19 and 30 desks and every stage;
-// - nothing taller than 1.0 stands on the camera's sides of the room (the right edge, the front edge).
+// - nothing taller than 1.0 stands on the camera's sides of the room where they are before the bims (the right
+//   edge in front of main's desk, the front edge right of the left aisle).
 import { describe, expect, it } from 'vitest';
 import { Box3, Mesh, Raycaster, Vector3, type Object3D } from 'three';
 import { crowd } from '../../fixtures';
@@ -24,6 +25,8 @@ const CHEST = 0.55;
 /** how far in from an edge a piece counts as on it, and how tall it may be there */
 const EDGE = 0.6;
 const LOW = 1.0;
+/** main's desk's depth from its chair to its front (maps/workshop.ts: its box at z + 0.6, 1.0 deep): the plant beside it is decor.ts's, on every map */
+const MAIN_DEPTH = 1.1;
 
 const turn = (): Promise<void> => new Promise((done) => { setTimeout(done, 0); });
 
@@ -71,10 +74,15 @@ describe('the workshop keeps its bims in sight', () => {
         const { meshes, dispose } = meshesOf(o, stage);
         for (const m of meshes) {
           const b = new Box3().setFromObject(m, true);
-          // the room's own floor reaches both edges; a piece stands on one when it is inside the room's span
-          const inside = b.max.x > o.x0 && b.min.x < x1 && b.max.z > 0 && b.min.z < o.D;
-          const onEdge = (b.max.x > x1 - EDGE && b.min.x < x1 + EDGE) || (b.max.z > o.D - EDGE && b.min.z < o.D + EDGE);
-          if (inside && onEdge && b.max.y > LOW) out.push(`${String(n)} desks, stage ${String(stage)}: ${m.name || m.type} up to ${b.max.y.toFixed(2)} at (${((b.min.x + b.max.x) / 2).toFixed(2)},${((b.min.z + b.max.z) / 2).toFixed(2)})`);
+          // a piece stands on an edge when its middle does, on the stretches before the bims: the right edge in front of
+          // main's desk, the front edge right of the left aisle (the corner plant past it and the grass behind main's desk
+          // stand beside the room on the screen, never before a bim: the ray law above says so)
+          const cx = (b.min.x + b.max.x) / 2;
+          const cz = (b.min.z + b.max.z) / 2;
+          const right = cx > x1 - EDGE && cx < x1 + EDGE && cz > o.mainDesk.z + MAIN_DEPTH && cz < o.D;
+          const front = cz > o.D - EDGE && cz < o.D + EDGE && cx > (o as Office & { aisle: number }).aisle && cx < x1;
+          const onEdge = right || front;
+          if (onEdge && b.max.y > LOW) out.push(`${String(n)} desks, stage ${String(stage)}: ${m.name || m.type} up to ${b.max.y.toFixed(2)} at (${((b.min.x + b.max.x) / 2).toFixed(2)},${((b.min.z + b.max.z) / 2).toFixed(2)})`);
         }
         dispose();
         await turn();
