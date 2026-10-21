@@ -544,6 +544,13 @@ def integration():
     if not os.access(bise, os.X_OK):
         print("skip the integration part: no %s" % bise)
         return
+    # the try hub's app root is this tree (try_env's BISE_APP_ROOT): with no ./repl-live it exits at
+    # once ('BISE_APP_ROOT=<tree> has no repl-live'), and the socket wait below ran out at 116-120 s
+    # (nightly-reds, promote-lock m_35629). The gate's build puts it there (gate.sh's bins)
+    repl = os.path.join(ROOT, "repl-live")
+    if not os.access(repl, os.X_OK):
+        print("skip the integration part: no %s (the tree's REPL: tests/gate.sh builds it)" % repl)
+        return
     gate = os.path.realpath(os.path.expanduser("~/.bise/gate"))
     os.makedirs(gate, exist_ok=True)
     w = tempfile.mkdtemp(prefix="dtry-", dir=gate)
@@ -598,9 +605,17 @@ def integration():
         henv = T.try_env(T.his_env(os.environ), real, tryh)
         henv["BEND_PROVIDER_URL"] = "http://127.0.0.1:9/v1/chat/completions"
         ws = os.path.join(tryh, "repos", "alpha")
-        hub = subprocess.Popen([bise, "sbd", "--workspace", ws], env=henv, stdin=subprocess.DEVNULL,
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        wait.until(lambda: T.hub_socks(tryh), 30, "the try hub's socket under %s/hubs" % tryh, poll=0.2)
+        herr = os.path.join(w, "hub.stderr")
+        with open(herr, "w") as err:
+            hub = subprocess.Popen([bise, "sbd", "--workspace", ws], env=henv, stdin=subprocess.DEVNULL,
+                                   stdout=err, stderr=err, start_new_session=True)
+
+        # a hub that exits never makes its socket: say why at once, never after the whole wait
+        def sock_or_exit():
+            if hub.poll() is not None:
+                raise AssertionError("the try hub exited (rc %s) before its socket: %s" % (hub.returncode, open(herr).read()[-800:]))
+            return T.hub_socks(tryh)
+        wait.until(sock_or_exit, 30, "the try hub's socket under %s/hubs" % tryh, poll=0.2)
         check(T.hub_socks(tryh) and T.hub_socks(tryh)[0].startswith(tryh + "/hubs/"), "the hub's state is in the try home: %s" % T.hub_socks(tryh))
         r = go("--stop")
         check(r.returncode == 0 and "your own bise wasn't touched" in r.stderr, "--stop: %s" % r.stderr[-400:])
