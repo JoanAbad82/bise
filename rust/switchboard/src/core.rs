@@ -709,21 +709,6 @@ pub struct Hub {
     spawn_asks: BTreeMap<Token, bise_catalog::spawn::Ask>,
 }
 
-/// What the hub needs to restart a dead sb-core (BISE-292): the journal
-/// (the durable state, replayed into the new one) and hub.log.
-pub struct Revive {
-    pub journal: Box<dyn FnMut() -> Vec<Value>>,
-    pub log: Box<dyn Fn(&str)>,
-    /// When the last restarts happened (ms): a crash loop gives up.
-    times: Vec<u64>,
-}
-
-impl Revive {
-    pub fn new(journal: Box<dyn FnMut() -> Vec<Value>>, log: Box<dyn Fn(&str)>) -> Revive {
-        Revive { journal, log, times: Vec::new() }
-    }
-}
-
 /// More restarts than this in `REVIVE_WINDOW_MS`: sb-core dies on its
 /// state, not by accident; the hub stops (as before BISE-292).
 /// A PR the forge has not answered about for this long shows as stale
@@ -944,47 +929,6 @@ impl Hub {
     /// One call to sb-core, with no revival: its death panics.
     fn raw(&mut self, v: &Value) -> Value {
         self.link.call(v).unwrap_or_else(|e| panic!("sb-core: {}", e))
-    }
-
-    /// A new sb-core with the durable state of the journal and the REPL
-    /// states of the old one (the REPLs themselves never stopped).
-    fn restart_core(&mut self, why: &str) {
-        let Some(r) = self.revive.as_mut() else {
-            panic!("sb-core: {}", why);
-        };
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |d| d.as_millis() as u64);
-        r.times.retain(|t| now.saturating_sub(*t) < REVIVE_WINDOW_MS);
-        if r.times.len() >= REVIVE_LIMIT {
-            (r.log)(&format!("sb-core stopped ({}): {} restarts in {} s, the hub stops", why, REVIVE_LIMIT, REVIVE_WINDOW_MS / 1000));
-            panic!("sb-core: {} ({} restarts in {} s)", why, REVIVE_LIMIT, REVIVE_WINDOW_MS / 1000);
-        }
-        r.times.push(now);
-        (r.log)(&format!("sb-core stopped ({}): restarting it on the journal", why));
-        let events = (r.journal)();
-        self.link = CoreLink::start(&self.core_bin).unwrap_or_else(|e| panic!("sb-core: {} (and it cannot restart: {})", why, e));
-        let runs: Vec<(String, Run)> = self
-            .st
-            .agents
-            .values()
-            .filter(|a| a.run != Run::Down)
-            .map(|a| (a.name.clone(), a.run))
-            .collect();
-        self.raw(&Link::Init(cl::Init { workspace: self.workspace.clone() }).to_value());
-        let skipped = self.replay(&events).len();
-        for (agent, run) in runs {
-            self.raw(&force_run_input(&agent, run));
-        }
-        let out = self.raw(&Link::ViewAll(cl::ViewAll {}).to_value());
-        self.load_answer_view(&out);
-        if let Some(r) = self.revive.as_ref() {
-            (r.log)(&format!("sb-core restarted: {} journal events replayed ({} skipped)", events.len(), skipped));
-        }
-        self.revived.push(format!(
-            "sb-core, the hub's state machine, stopped ({}): restarted, its state rebuilt from the journal. the agents kept running",
-            why
-        ));
     }
 
     /// The agent's last activity, for the views (not a decision).
@@ -2033,6 +1977,10 @@ use pure::{direct_exchange, force_run_input, git_only, unique_name};
 
 #[path = "core_link.rs"]
 mod link;
+
+#[path = "core_photo.rs"]
+mod photo;
+pub use photo::{Rebuilt, Revive};
 
 #[path = "core_fx.rs"]
 mod core_fx;

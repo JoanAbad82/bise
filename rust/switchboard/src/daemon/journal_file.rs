@@ -88,7 +88,6 @@ impl<W: Write> Out<W> {
 
     /// Every line of this session reached the file (read by the boot
     /// photo, docs/issues/36 chunk 4).
-    #[allow(dead_code)]
     pub(super) fn ok(&self) -> bool {
         self.ok
     }

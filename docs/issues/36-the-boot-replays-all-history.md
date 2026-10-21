@@ -233,3 +233,24 @@ tests/fixtures/bend-recv-repro/).
   the decode ~6 G); so a boot from a fresh photo is ~2.9x cheaper in sb-core
   than a full replay today (it was ~5x before arch-split made the replay 134
   -> 76 G); the parse dominates, and chunk 5 (cold records out) shrinks it.
+- **chunk 4, the Rust photo** (boot-photo, signed architect m_35726):
+  crate::photo (photo.rs: the file `<state>/photo/<key>.json` =
+  `{v:1,key,events,prefix,paths,st}`, key = FNV-1a of the sb-core binary's
+  bytes (deviation signed: nothing to run at boot, any rebuild = full
+  replay), prefix = chained FNV of journal events 1..k, paths = hash of their
+  ws paths; tmp + fsync + rename, two keys kept, tmp cleaned at boot);
+  core_photo.rs (child of core: Hub::photo, Hub::rebuild from (k, st) then
+  events[k..], PR lines of every event read; Revive and restart_core moved
+  here, a revival restores the photo too); daemon/photo_take.rs (boot pick
+  and one hub.log line saying why a full replay; photo after a full-replay
+  boot, at a clean stop unless the last took > 2 s, idle once a day after
+  10 min without a journal event; all only while journal_file::Out::ok).
+  sb-core's restore reads any object (St.photo_of is lenient): the key and
+  the prefix keep a wrong photo out (signed). core.rs 2467 -> 2415,
+  daemon.rs 2008 -> 2006. His copy, release build, retired instructions
+  (ignored tests photo_on_a_real_journal, boot_phases_on_a_real_journal):
+  photo + tail == full replay (photo and mirror) at 10/50/90/100 %; full
+  boot ~103 G (sb-core replay 75.8 + view_all 19.1, hub 7.7); boot from the
+  100 % photo ~54 G (sb-core restore 26.6 + view_all 18.7, hub 8.8): 1.9x.
+  Restore and view_all both scale with St (35 MB photo, 36 MB view): chunk
+  5's target.

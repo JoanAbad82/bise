@@ -120,6 +120,8 @@ impl Shell {
                     self.plan_prs();
                     w.phase("idle check");
                     self.idle_check();
+                    w.phase("photo");
+                    self.photo_idle();
                     w.phase("images");
                     self.image_care();
                     w.phase("computer use");

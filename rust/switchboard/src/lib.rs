@@ -74,6 +74,7 @@ pub mod parts_in;
 pub mod paths;
 pub mod peer;
 pub use bise_peer::os as peer_os;
+pub mod photo;
 pub mod place;
 pub mod place_job;
 pub mod procs;

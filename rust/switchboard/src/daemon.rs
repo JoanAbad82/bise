@@ -58,6 +58,7 @@ use keys::hash_keys;
 mod loop_watch;
 mod merged;
 mod outbox;
+mod photo_take;
 mod state_gate;
 mod contexts;
 mod tindex;
@@ -445,6 +446,8 @@ struct Shell {
     wake_look: wake_look::WakeLook,
     /// sb-core's worktrees, made off the loop (`daemon/place_work.rs`)
     place_work: place_work::PlaceWork,
+    /// the boot photo's bookkeeping (`daemon/photo_take.rs`, issue 36)
+    photos: photo_take::Photos,
 }
 
 /// What an agent whose turn was cut by a restart receives.
@@ -820,6 +823,7 @@ impl Shell {
                 if let Some(l) = self.journal.append(&ev.to_string()) {
                     log_line(&self.env.paths, &l);
                 }
+                self.photos.journaled(&ev);
                 self.answers_journaled(&ev);
                 // /drop (design §7.3): its tab group closes too
                 if let Some(name) = crate::computer_use::archived(&ev) {
@@ -1673,29 +1677,21 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     if !unreadable.is_empty() {
         log_line(&paths, &format!("journal: {} unreadable lines (not replayed), at line {}", unreadable.len(), journal_file::lines_list(&unreadable)));
     }
-    let skipped = hub.replay_with(&events, &mut |done, total| boot.replayed(done, total));
-    if !skipped.is_empty() {
-        let mut kinds: Vec<String> = skipped.iter().map(|e| e["type"].to_string()).collect();
-        kinds.dedup();
-        log_line(
-            &paths,
-            &format!("journal: {} events of a kind this hub does not know (not applied; a newer hub wrote them?): {}", skipped.len(), kinds.join(", ")),
-        );
-    }
+    // from the boot photo when one fits the journal (issue 36), else all of it
+    let photos = photo_take::boot(&mut hub, &paths, &opts.core_bin, &events, !moved.is_empty(), &boot);
     boot.step("journal replayed");
     // sb-core dies (an OOM, a runtime error, killed): the hub restarts it
     // on the journal instead of dying with it (BISE-292)
-    {
-        let (jp, lp) = (paths.clone(), paths.clone());
-        hub.set_revive(crate::core::Revive::new(
-            Box::new(move || {
-                let (mut events, _) = journal_file::read(&jp.journal());
-                crate::sweep::follow_moves(&mut events, &jp.worktrees);
-                events
-            }),
-            Box::new(move |s| log_line(&lp, s)),
-        ));
-    }
+    let jp = paths.clone();
+    hub.set_revive(photo_take::revive(
+        &paths,
+        &photos,
+        Box::new(move || {
+            let (mut events, _) = journal_file::read(&jp.journal());
+            crate::sweep::follow_moves(&mut events, &jp.worktrees);
+            events
+        }),
+    ));
     let journal = journal_file::Out::new(std::fs::OpenOptions::new().create(true).append(true).open(paths.journal())?);
 
     let (tx, rx): (Sender<Msg>, Receiver<Msg>) = channel();
@@ -1786,6 +1782,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         art: art::Art::default(),
         wake_look: wake_look::WakeLook::start(tx.clone()),
         place_work: place_work::PlaceWork::start(&paths, tx.clone()),
+        photos,
     };
     sh.answers_replayed(&events);
     sh.start_pages(&paths, &tx);
@@ -1898,6 +1895,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     boot.done();
 
     let keep_agents = sh.serve(rx, &tick_queued);
+    sh.photo_stop();
     // for good: no new client reaches a hub that is going (it would wait
     // for a hello that never comes); a `bise` meanwhile starts the next
     // hub, which waits for this one to be gone (`wait_previous_hub`)
