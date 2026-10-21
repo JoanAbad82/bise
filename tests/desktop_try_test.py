@@ -546,10 +546,18 @@ def integration():
         return
     # the try hub's app root is this tree (try_env's BISE_APP_ROOT): with no ./repl-live it exits at
     # once ('BISE_APP_ROOT=<tree> has no repl-live'), and the socket wait below ran out at 116-120 s
-    # (nightly-reds, promote-lock m_35629). The gate's build puts it there (gate.sh's bins)
+    # (nightly-reds, promote-lock m_35629). The test places it itself (scripts/bins.sh: a cache hit
+    # ~0.3 s, a miss builds it); under a gate (SB_RUN_KIND) a REPL it can't place is red, by hand a
+    # printed skip (review-gates m_36050: never a silent green where nobody placed it)
     repl = os.path.join(ROOT, "repl-live")
-    if not os.access(repl, os.X_OK):
-        print("skip the integration part: no %s (the tree's REPL: tests/gate.sh builds it)" % repl)
+    placed = subprocess.run([os.path.join(ROOT, "scripts", "bins.sh"), "repl-live"], cwd=ROOT,
+                            capture_output=True, text=True)
+    if placed.returncode != 0 or not os.access(repl, os.X_OK):
+        why = "no %s: scripts/bins.sh repl-live: %s" % (repl, (placed.stderr or placed.stdout)[-400:])
+        if os.environ.get("SB_RUN_KIND"):
+            check(False, "the try hub's REPL: " + why)
+            return
+        print("skip the integration part (by hand, outside a gate): " + why)
         return
     gate = os.path.realpath(os.path.expanduser("~/.bise/gate"))
     os.makedirs(gate, exist_ok=True)
