@@ -22,7 +22,12 @@ A=$(cd "$A" && pwd -P) || { echo "no $2"; exit 2; }
 P=${AS_HE_DOES_PYTHON:-$HOME/.pyenv/versions/3.11.13/bin/python3}
 HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)
 RS="$P -B $HERE/../realshape.py"
-G=$HOME/.bise/gate/real-shape; [ -n "$SMOKE" ] && G=$HOME/.bise/gate/smoke
+# a world per heavy slot (fast-loop, his pick q-slow on loop-4min; review-gates m_36599): world 1 is
+# ~/.bise/gate/real-shape (CDP 9341), world n ~/.bise/gate/real-shape-n (CDP 9341 + 10 (n - 1));
+# the smoke keeps its own (~/.bise/gate/smoke, 9342). CAND_WORLD_N: the one this run took (below).
+world() { if [ "$1" = 1 ]; then echo "$HOME/.bise/gate/real-shape"; else echo "$HOME/.bise/gate/real-shape-$1"; fi; }
+WN=${CAND_WORLD_N:-1}
+G=$(world "$WN"); [ -n "$SMOKE" ] && G=$HOME/.bise/gate/smoke
 H=$G/w/h
 # One run per world and one run per candidate path (main m_30102): two runs in the two heavy slots
 # shared the world, and one's stop sweep (every pid naming $G/w) killed the other's hubs
@@ -30,26 +35,61 @@ H=$G/w/h
 # app by path (review-gates m_29603). Each lock is a lockf on a file: <world>/locks/world.lock and
 # ~/.bise/gate/locks/cand-<sha16 of the app path>.lock. A busy one: one line naming its holder,
 # then a wait of up to CAND_LOCK_WAIT s (7200), then exit 2 with that line; never a sweep.
+# The order is always the candidate's lock first, then a world's (no two runs can deadlock): a run
+# holding its candidate polls its worlds every 2 s (lockf -t 0 each) until one is free or the wait
+# ends. Its worlds (CAND_WORLDS, 3): a release (heavy-run's --prio lane, HEAVY_SLOT 'heavy5.lock …',
+# or CAND_PRIO=1) any, world 1 first; any other run 2..CAND_WORLDS, so world 1 stays a release's and
+# a release never waits behind two agents' runs; CAND_WORLDS=1: world 1 for everyone (the old way).
+# A world whose CDP port another process listens on is skipped with a line, never shared.
 # Tested in tests/cand_lock_test.py.
 LOCKS=$HOME/.bise/gate/locks
 CAND_LOCK=$LOCKS/cand-$(printf '%s' "$A" | shasum -a 256 | cut -c1-16)
+NW=${CAND_WORLDS:-3}
+holder() { cat "$1.holder" 2>/dev/null || echo "an unknown run"; }
+busy() { ! /usr/bin/lockf -t 0 "$1.lock" /usr/bin/true 2>/dev/null; }
+prio() { case "${HEAVY_SLOT:-}" in heavy5.lock*) return 0;; esac; [ -n "${CAND_PRIO:-}" ]; }
+mine() { if [ -n "$SMOKE" ] || [ "$NW" -le 1 ]; then echo 1; elif prio; then seq 1 "$NW"; else seq 2 "$NW"; fi; }
+wlock() { if [ -n "$SMOKE" ]; then echo "$G/locks/world"; else echo "$(world "$1")/locks/world"; fi; }
 if [ -z "${CAND_LOCKED:-}" ]; then
-  mkdir -p "$G/locks" "$LOCKS"
-  holder() { cat "$1.holder" 2>/dev/null || echo "an unknown run"; }
-  busy() { ! /usr/bin/lockf -t 0 "$1.lock" /usr/bin/true 2>/dev/null; }
-  for l in "$G/locks/world" "$CAND_LOCK"; do
-    busy "$l" && echo "$(date +%T) cand.sh: $l is held by $(holder "$l"); waiting up to ${CAND_LOCK_WAIT:-7200} s (or stop that run: kill its pid)"
-  done
-  CAND_LOCKED=1 /usr/bin/lockf -t "${CAND_LOCK_WAIT:-7200}" "$G/locks/world.lock" \
-    /usr/bin/lockf -t "${CAND_LOCK_WAIT:-7200}" "$CAND_LOCK.lock" /bin/bash "$0" "${CAND_ARGS[@]}"
+  mkdir -p "$LOCKS"; for n in $(mine); do mkdir -p "$(dirname "$(wlock "$n")")"; done
+  W=${CAND_LOCK_WAIT:-7200}
+  busy "$CAND_LOCK" && echo "$(date +%T) cand.sh: $CAND_LOCK is held by $(holder "$CAND_LOCK"); waiting up to $W s (or stop that run: kill its pid)"
+  free=; for n in $(mine); do busy "$(wlock "$n")" || { free=1; break; }; done
+  [ -z "$free" ] && for n in $(mine); do echo "$(date +%T) cand.sh: $(wlock "$n") is held by $(holder "$(wlock "$n")"); waiting up to $W s (or stop that run: kill its pid)"; done
+  CAND_DEADLINE=$(( $(date +%s) + W )) CAND_LOCKED=1 /usr/bin/lockf -t "$W" "$CAND_LOCK.lock" /bin/bash "$0" "${CAND_ARGS[@]}"
   rc=$?
   if [ $rc = 75 ]; then
-    for l in "$G/locks/world" "$CAND_LOCK"; do busy "$l" && echo "cand.sh: gave up after ${CAND_LOCK_WAIT:-7200} s: $l is still held by $(holder "$l"); wait for it, or stop that run by its pid (kill <pid>), never by name"; done
+    for l in "$CAND_LOCK" $(for n in $(mine); do wlock "$n"; done); do busy "$l" && echo "cand.sh: gave up after $W s: $l is still held by $(holder "$l"); wait for it, or stop that run by its pid (kill <pid>), never by name"; done
     exit 2
   fi
   exit $rc
 fi
-for l in "$G/locks/world" "$CAND_LOCK"; do echo "pid $$ since $(date '+%F %T'), out $O, app $A" > "$l.holder"; done
+if [ "$CAND_LOCKED" = 1 ]; then
+  . "$HERE/ports.sh" || { echo "no $HERE/ports.sh"; exit 2; }
+  skipped=" "
+  while :; do
+    for n in $(mine); do
+      l=$(wlock "$n"); busy "$l" && continue
+      p=$(cdp_world "$n"); [ -n "$SMOKE" ] && p=$CDP_SMOKE
+      # a connect to it (lsof walks every process: 5 s and more at load 100+)
+      if (exec 3<> "/dev/tcp/127.0.0.1/$p") 2> /dev/null; then
+        case "$skipped" in *" $n "*) ;; *) echo "$(date +%T) cand.sh: world $n skipped: its CDP port $p is taken by another process"; skipped="$skipped$n ";; esac
+        continue
+      fi
+      rm -f "$O/.world"
+      CAND_LOCKED=2 CAND_WORLD_N=$n /usr/bin/lockf -t 0 "$l.lock" /bin/bash "$0" "${CAND_ARGS[@]}"
+      rc=$?
+      # 75 with no .world: lockf lost the race for that world (the run never started): the next one
+      { [ $rc != 75 ] || [ -e "$O/.world" ]; } && exit $rc
+    done
+    [ "$(date +%s)" -ge "${CAND_DEADLINE:-0}" ] && break
+    sleep 2
+  done
+  for n in $(mine); do l=$(wlock "$n"); busy "$l" && echo "cand.sh: gave up after ${CAND_LOCK_WAIT:-7200} s: $l is still held by $(holder "$l"); wait for it, or stop that run by its pid (kill <pid>), never by name"; done
+  exit 2
+fi
+echo "$WN" > "$O/.world"
+for l in "$G/locks/world" "$CAND_LOCK"; do echo "pid $$ since $(date '+%F %T'), out $O, app $A, world $WN" > "$l.holder"; done
 # the locks live as long as this process (lockf's children): any exit frees them, a breach's exit 3,
 # a kill and a crash included (the kernel drops a dead owner's lock). CAND_LOCK_HOLD=<s>: the test's
 # stand-in run, holding the locks that long and nothing else (tests/cand_lock_test.py)
@@ -65,7 +105,7 @@ HIS="$HOME/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app"
 EXE=$([ -f "$A/Contents/Info.plist" ] && /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$A/Contents/Info.plist" 2>/dev/null)
 MAIN="$A/Contents/MacOS/${EXE:-bise try}"
 . "$HERE/ports.sh" || { echo "no $HERE/ports.sh"; exit 2; }
-PORT_CDP=$CDP_GATE; [ -n "$SMOKE" ] && PORT_CDP=$CDP_SMOKE
+PORT_CDP=$(cdp_world "$WN"); [ -n "$SMOKE" ] && PORT_CDP=$CDP_SMOKE
 # PW_FROM: a checkout whose apps/desktop has node_modules (@playwright/test, pngjs); the workspace's
 # may have none (try-gate-25e5's first runs: every drive 'Cannot find module')
 export PW_FROM=${PW_FROM:-$T/apps/desktop}
@@ -186,8 +226,16 @@ libgate() {
 # the candidate's own preferences domain, at the end of every mode (the quick one too: cand-e91f98d7
 # run): through cfprefsd first (it caches and writes back); an emptied domain can leave its file as
 # '{}' (run 40fc444d): only then rm it, and check after ~5 s that cfprefsd didn't write it back.
-# cfprefsd itself is never touched (ambient-lead m_20883)
+# cfprefsd itself is never touched (ambient-lead m_20883). Every candidate has the one id
+# (dev.bise.desktop.cand): while a run on another world (or the smoke) holds its lock, its app may
+# still write that domain, so the delete is left to the last run to end (logged)
 candprefs() {
+  local n; for n in $(seq 1 "$NW") smoke; do
+    [ "$n" = "$WN" ] && [ -z "$SMOKE" ] && continue
+    [ "$n" = smoke ] && [ -n "$SMOKE" ] && continue
+    local l; if [ "$n" = smoke ]; then l=$HOME/.bise/gate/smoke/locks/world; else l=$(world "$n")/locks/world; fi
+    [ -e "$l.lock" ] && busy "$l" && { say "cand prefs: left to the last run ($l is held by $(holder "$l"))"; grep 'cand prefs:' $O/run.out 2>/dev/null >> $O/cand-prefs.txt; return 0; }
+  done
   defaults delete "$CAND_ID" > $O/cand-prefs-delete.txt 2>&1; echo "rc=$?" >> $O/cand-prefs-delete.txt
   if [ -e "$CANDPREF" ]; then say "cand prefs: 'defaults delete $CAND_ID' done, the file is still there ($(stat -f %z "$CANDPREF") bytes, $(plutil -p "$CANDPREF" 2>/dev/null | tr -d '[:space:]'))"
   else say "cand prefs: 'defaults delete $CAND_ID' done, the file is gone"; fi
@@ -219,7 +267,8 @@ $RS libsnap --out $O/before.json
 if [ -n "$SMOKE" ]; then
   $RS smoke-world --root $G/w | tail -8
 else
-  $RS build | tail -8
+  # rebuilt at every run's start (emptied first): a killed run's leftovers never reach the next
+  $RS build --root $G/w | tail -8
 fi
 # every model request in a line (the quote row reads it), in the world, never /tmp's default
 export FAKE_LOG=$G/fake/requests.jsonl AS_HE_DOES_FAKE_LOG=$G/fake/requests.jsonl

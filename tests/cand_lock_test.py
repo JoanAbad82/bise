@@ -50,8 +50,15 @@ def main():
         cand_lock = os.path.join(locks, "cand-" + hashlib.sha256(app.encode()).hexdigest()[:16])
         os.makedirs(os.path.join(world, "locks"))
         os.makedirs(locks)
-        env = dict(os.environ, HOME=home)
-        for k in ("CAND_LOCKED", "CAND_LOCK_WAIT"):
+        # one world (CAND_WORLDS=1, the old way) for the cases up to the worlds' own, at the end
+        # its own CDP base, off the real runs' 9341.. (a real run on world 1 listens there: its
+        # port would make this test's world 1 skipped), from a port the kernel just gave free
+        import socket
+        with socket.socket() as s0:
+            s0.bind(("127.0.0.1", 0))
+            cdp_base = s0.getsockname()[1] % 20000 + 30000
+        env = dict(os.environ, HOME=home, CAND_WORLDS="1", AS_HE_DOES_CDP_GATE=str(cdp_base))
+        for k in ("CAND_LOCKED", "CAND_LOCK_WAIT", "CAND_WORLD_N", "CAND_PRIO", "HEAVY_SLOT", "CAND_DEADLINE"):
             env.pop(k, None)
 
         def run(wait=None):
@@ -72,12 +79,14 @@ def main():
         app2 = os.path.join(t, "other cand.app")
         os.makedirs(os.path.join(app2, "Contents"))
 
-        def start(a, hold, rc=0):
+        def start(a, hold, rc=0, out="out-held", **more):
             """A stand-in run holding the locks `hold` s (CAND_LOCK_HOLD), in its own process group."""
-            e = dict(env, CAND_LOCK_HOLD=str(hold), CAND_LOCK_HOLD_RC=str(rc))
-            p = subprocess.Popen(["bash", CAND, os.path.join(t, "out-held"), a], env=e, stdout=subprocess.PIPE,
+            e = dict(env, CAND_LOCK_HOLD=str(hold), CAND_LOCK_HOLD_RC=str(rc), **more)
+            p = subprocess.Popen(["bash", CAND, os.path.join(t, out), a], env=e, stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT, text=True, stdin=subprocess.DEVNULL, start_new_session=True)
             holders.append(p)
+            if more:  # the worlds' cases wait for their own holder lines
+                return p
             # held AND its holder line written (try-smoke m_30184: under load the line came after
             # the lock, so the test read the last run's pid), up to 30 s
             hf = os.path.join(world, "locks", "world.holder")
@@ -113,9 +122,11 @@ def main():
         # its lockf waiting on the world lock, up to 30 s
         def seen():
             ps = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout.splitlines()
-            waiting = [l for l in ps if "out-wait" in l and "lockf" in l and "world.lock" in l]
+            # waiting: it holds its candidate's lock (lockf … cand-<sha>.lock bash cand.sh out-wait)
+            # and polls the world
+            waiting = [l for l in ps if "out-wait" in l and "lockf" in l]
             return (waiting, [l for l in ps if os.path.join(world, "w") in l]) if waiting else None
-        _, swept = wait.until(seen, 30, "sweep case: the waiting run's lockf on the world lock")
+        _, swept = wait.until(seen, 30, "sweep case: the waiting run, its candidate's lock held")
         check(not swept, "sweep case: the sweep's pattern matches a waiting run: %s" % swept)
         os.killpg(w.pid, 9)
         w.wait()
@@ -153,6 +164,80 @@ def main():
         rc, o = run(wait=30)
         check(rc == 2 and "held by pid 3, a short run; waiting" in o and past in o and "gave up" not in o and time.time() - t0 >= 1,
               "short holder: %s %s" % (rc, o))
+
+        # a world per heavy slot (CAND_WORLDS=3, fast-loop, review-gates m_36599): an agent's run
+        # takes world 2, a second candidate world 3 at once, a third waits naming both and never
+        # takes world 1 (a release's); a release (heavy-run's --prio lane) takes world 1 at once
+        worlds = {n: os.path.join(home, ".bise", "gate", "real-shape" if n == 1 else "real-shape-%d" % n) for n in (1, 2, 3)}
+        wh = lambda n: os.path.join(worlds[n], "locks", "world.holder")  # noqa: E731
+        app3 = os.path.join(t, "third cand.app")
+        os.makedirs(os.path.join(app3, "Contents"))
+
+        # by its holder line only: a lockf probe here takes the lock for a moment, and a run trying
+        # that world then (lockf -t 0) skips to the next one (this test's own race at load 400)
+        def holding(n, out, p):
+            try:
+                wait.until(lambda: os.path.exists(wh(n)) and out in open(wh(n)).read() and ("world %d" % n) in open(wh(n)).read(),
+                           30, "world %d held by %s, its holder line written" % (n, out))
+            except AssertionError:
+                p.kill()
+                raise AssertionError("world %d never held by %s; its output: %s" % (n, out, p.communicate(timeout=10)[0]))
+            return open(wh(n)).read().split()[1]
+        a = start(app, 30, out="out-w2", CAND_WORLDS="3")
+        pa = holding(2, "out-w2", a)
+        b = start(app2, 30, out="out-w3", CAND_WORLDS="3")
+        pb = holding(3, "out-w3", b)
+        check(not busy(os.path.join(worlds[1], "locks", "world.lock")), "worlds: two agents' runs left world 1 free")
+        check("world 2" in open(wh(2)).read() and "world 3" in open(wh(3)).read(), "worlds: the holder lines name their world")
+        # no writable path in common: each run's world, holder and out dir are its own
+        check(len({worlds[2], worlds[3]}) == 2 and not worlds[3].startswith(worlds[2] + os.sep), "worlds: distinct dirs")
+        e3 = dict(env, CAND_WORLDS="3", CAND_LOCK_WAIT="2")
+        r = subprocess.run(["bash", CAND, os.path.join(t, "out-w4"), app3], env=e3, capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        o = r.stdout + r.stderr
+        check(r.returncode == 2 and ("real-shape-2/locks/world is still held by pid %s" % pa) in o and ("real-shape-3/locks/world is still held by pid %s" % pb) in o
+              and "real-shape/locks/world" not in o and "no %s/Contents/MacOS/" % app3 not in o, "worlds: a third agent's run waits on 2 and 3 only: %s %s" % (r.returncode, o))
+        for prio in ({"HEAVY_SLOT": "heavy5.lock 1"}, {"CAND_PRIO": "1"}):
+            r = subprocess.run(["bash", CAND, os.path.join(t, "out-w1"), app3], env=dict(e3, **prio), capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+            o = r.stdout + r.stderr
+            check(r.returncode == 2 and "no %s/Contents/MacOS/" % app3 in o and "held by" not in o and "world 1" in open(wh(1)).read(),
+                  "worlds: a release (%s) takes world 1 at once: %s %s" % (prio, r.returncode, o))
+
+        # sweeps: a stop on one world (pidsunder "<world>/w", cand.sh's own awk) never names another's
+        # processes, either way round
+        fn = next(l for l in open(CAND).read().splitlines() if l.startswith("pidsunder()"))
+        marks = {}
+        for n in (1, 2):
+            os.makedirs(os.path.join(worlds[n], "w"), exist_ok=True)
+            # a process whose command names <world>/w/h/hub (python keeps its argv; sh -c would exec and
+            # drop it), alive until its stdin closes or the test's end kills it
+            m = subprocess.Popen([sys.executable, "-c", "import sys; sys.stdin.read()", os.path.join(worlds[n], "w", "h", "hub")],
+                                 stdin=subprocess.PIPE, start_new_session=True)
+            holders.append(m)
+            marks[n] = str(m.pid)
+        for n, other in ((1, 2), (2, 1)):
+            got = subprocess.run(["bash", "-c", fn + '\npidsunder "$1"', "x", os.path.join(worlds[n], "w")], capture_output=True, text=True).stdout.split()
+            check(marks[n] in got and marks[other] not in got, "sweeps: world %d's stop names %s (its own %s, not world %d's %s)" % (n, got, marks[n], other, marks[other]))
+
+        # a world whose CDP port another process listens on: skipped with a line, never shared
+        for p in (a, b):
+            try:
+                os.killpg(p.pid, 9)
+            except (ProcessLookupError, PermissionError):  # already ended (macOS: EPERM on a zombie's group)
+                p.kill()
+            p.wait()
+        s = socket.socket()
+        try:
+            s.bind(("127.0.0.1", cdp_base + 10))
+            s.listen(64)  # never accepted: each probe of cand.sh's poll sits in the backlog (1 refused the 2nd)
+            r = subprocess.run(["bash", CAND, os.path.join(t, "out-port"), app3], env=dict(env, CAND_WORLDS="2", CAND_LOCK_WAIT="2"),
+                               capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+            o = r.stdout + r.stderr
+            check(r.returncode == 2 and o.count("world 2 skipped: its CDP port %d is taken by another process" % (cdp_base + 10)) == 1 and "no %s/Contents/MacOS/" % app3 not in o,
+                  "worlds: a taken port: %s %s" % (r.returncode, o))
+        except OSError as e:
+            print("cand_lock_test: port %d in use here, the taken-port case not run (%s)" % (cdp_base + 10, e))
+        finally:
+            s.close()
     finally:
         for p in holders:
             try:
