@@ -2,6 +2,7 @@
 //! is documented in `.agents/skills/bend-harness-qa/reference/`).
 
 use crate::util::{strip_thinking, wire_unescape};
+use bise_proto::thread::lines::{self, Obs, Rec};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Wire {
@@ -45,27 +46,18 @@ pub fn parse(line: &str) -> Wire {
     if line == "--- idle" {
         return Wire::Idle;
     }
-    let t = line.trim_start();
-    if t == "obs: turn_started" {
-        return Wire::TurnStarted;
-    }
-    if let Some(rest) = t.strip_prefix("obs: assistant: ") {
-        return Wire::Assistant(strip_thinking(&wire_unescape(rest)));
-    }
-    if t.starts_with("obs: steering_received: ") {
-        return Wire::SteeringReceived;
-    }
-    if t.starts_with("obs: steered: ") {
-        return Wire::Steered;
-    }
-    if let Some(rest) = t.strip_prefix("obs: turn_done: ") {
-        return Wire::TurnDone(rest.trim().to_string());
-    }
-    if t.starts_with("obs: compaction_started #") {
-        return Wire::CompactionStarted;
-    }
-    if t.starts_with("obs: compaction_done:") || t.starts_with("obs: context_compaction_failed:") {
-        return Wire::CompactionEnded;
+    // the runtime's observations, either form (bise_proto's lines::read)
+    if let Rec::Obs(o) = lines::read(line) {
+        return match o {
+            Obs::TurnStarted => Wire::TurnStarted,
+            Obs::Assistant(t) => Wire::Assistant(strip_thinking(&wire_unescape(&t))),
+            Obs::SteeringReceived(_) => Wire::SteeringReceived,
+            Obs::Steered(_) => Wire::Steered,
+            Obs::TurnDone(end) => Wire::TurnDone(end.text().trim().to_string()),
+            Obs::CompactionStarted => Wire::CompactionStarted,
+            Obs::CompactionDone(_) | Obs::CompactionFailed(_) => Wire::CompactionEnded,
+            _ => Wire::Other,
+        };
     }
     if line.starts_with("tool_result #") {
         return Wire::ToolResult;

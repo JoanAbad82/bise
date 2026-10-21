@@ -17,9 +17,6 @@ pub struct UsageLine {
     pub cache_write: u64,
 }
 
-/// The prefix of the line on the wire, before [`parse`]'s text.
-pub const PREFIX: &str = "  obs: usage: ";
-
 /// Parse the text after `obs: usage: `. Unknown keys are ignored; a
 /// text without `in=` is not a usage line.
 pub fn parse(t: &str) -> Option<UsageLine> {
@@ -43,9 +40,14 @@ pub fn parse(t: &str) -> Option<UsageLine> {
     has_in.then_some(u)
 }
 
-/// A whole wire line (`  obs: usage: ...`); None for any other line.
+/// A whole wire line (either form: bise_proto's `lines::read`); None for
+/// any other line.
 pub fn of_line(line: &str) -> Option<UsageLine> {
-    parse(line.strip_prefix(PREFIX)?)
+    use bise_proto::thread::lines::{read, Obs, Rec};
+    match read(line) {
+        Rec::Obs(Obs::Usage(t)) => parse(&t),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

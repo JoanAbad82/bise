@@ -16,6 +16,7 @@ import os, socket, subprocess, sys, tempfile, time, base64, random, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 N = 20
 LIMIT_MB = 300
@@ -67,7 +68,7 @@ try:
     f = sock.makefile("rb")
     while True:
         line = f.readline()
-        if not line or line.startswith(b"  obs: turn_done"): break
+        if not line or obs_lines.kind(line) == "turn_done": break
     took = time.time() - t1
     after = mb()
     # the fake provider logs the request after its reply's stream ends:

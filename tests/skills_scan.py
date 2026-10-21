@@ -33,6 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 from repl_bash_env import clean_env, free_port, tool_results  # noqa: E402
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 
 SKILL = """---
@@ -178,7 +179,7 @@ def main():
             line = f.readline()
             if not line:
                 sys.exit("FAIL the REPL closed the connection: %s" % open(err).read()[-300:])
-            if line.startswith(b"  obs: turn_done"):
+            if obs_lines.kind(line) == "turn_done":
                 break
         sock.close()
         res = tool_results(session)

@@ -23,6 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import fake_provider as F  # noqa: E402
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 
 FAILS = []
@@ -121,7 +122,7 @@ def main():
             if not line:
                 break
             out.append(line.decode(errors="replace").rstrip())
-            if line.startswith(b"  obs: turn_done"):
+            if obs_lines.kind(line) == "turn_done":
                 break
         sock.close()
         return out

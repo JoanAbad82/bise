@@ -53,3 +53,9 @@ words 'card #' of transcripts written before notif-rename; they go when
 the clients read the route line's typed card instead of words),
 `TODO(notif-open)` (waits on office-artifacts), `TODO(client-protocol
 step 7)`.
+
+Exempt for good, not a shim: `rust/proto/src/thread/legacy.rs`, the
+reader of the older text lines (the hub's `sb <kind> : <text>`, issue 25;
+the runtime's `  obs: <kind>: <text>`, issue 38). Transcripts are never
+rewritten and stay on disk, so it lives as long as history does: never
+give it a removal release.

@@ -16,6 +16,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import obs_lines  # noqa: E402
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 from proto_rpc import (agent_row, check_keys, entries, hub_all, hub_now, notes, ok, refused, req, run,  # noqa: E402
@@ -323,7 +324,7 @@ def undelivered_round(c):
     where = "t4" if any(l.startswith("sb undelivered") for l in c.lines("t4")) else "main"
     nd = [e for e in thread_of(c, where) if e["kind"] == "not_delivered"]
     check(nd and nd[-1]["not_delivered"] == {"to": "t4", "text": "still there?"} and "cid" not in nd[-1], "the not_delivered entry: %r" % nd)
-    if any(l.startswith("  obs: usage: ") for l in c.lines("main")):
+    if any(obs_lines.kind(l) == "usage" for l in c.lines("main")):
         rows = [a for ev in hub_all(c, "hub/agents") for a in ev["agents"] if a["name"] == "main" and a.get("usage")]
         check(rows and rows[-1]["usage"]["context"] > 0 and rows[-1]["usage"]["words"] and rows[-1]["usage"]["short"], "main's usage on its row: %r" % rows[-1:])
 

@@ -31,6 +31,7 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import fake_provider as F  # noqa: E402
 import provider_folds as P  # noqa: E402
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 
 FAILS = []
@@ -270,7 +271,7 @@ def part_d():
             if ctrl_c_on and ctrl_c_on in out[-1]:
                 open(flag, "w").write("1")
                 ctrl_c_on = None
-            if line.startswith(b"  obs: turn_done"):
+            if obs_lines.kind(line) == "turn_done":
                 break
         sock.close()
         return out
@@ -283,7 +284,7 @@ def part_d():
         out = turn("fake/claude-x", "[[error: overloaded retry=0]] [[think: two steps]] [[bash: echo a1]] [[bash: echo a2]]")
         recs = [json.loads(l) for l in open(F.LOG)]
         text = open(session).read()
-        said = [l for l in out if "obs: assistant:" in l]
+        said = [l for l in out if obs_lines.kind(l) == "assistant"]
         check([r["status"] for r in recs] == [529, 200, 200, 200] and all(
             r["family"] == "anthropic" and r["stream"] and r["path"] == "/v1/messages" for r in recs),
             "anthropic via [providers.fake]: streamed to /v1/messages, the 529 retried: %r"
@@ -306,7 +307,7 @@ def part_d():
         n += len(recs)
         out = turn("fakegem/g", "hello")
         recs = [json.loads(l) for l in open(F.LOG)][n:]
-        errs = [l for l in out if "rror" in l or "not supported" in l.lower() or "obs: assistant" in l]
+        errs = [l for l in out if "rror" in l or "not supported" in l.lower() or obs_lines.kind(l) == "assistant"]
         check(repl.poll() is None and (recs and recs[0]["family"] == "gemini" or errs),
               "a gemini model: a reply, or a clean error before BISE-148: %r" % (errs[-1:] or out[-2:]))
         n += len(recs)
@@ -356,7 +357,7 @@ def part_d():
         # The interrupted slow request can finish after the next turn starts.
         recs = [json.loads(l) for l in open(F.LOG)][n:]
         recs = [r for r in recs if r.get("model") == "patient"]
-        said = [l for l in out if "obs: assistant:" in l]
+        said = [l for l in out if obs_lines.kind(l) == "assistant"]
         check(not [l for l in out if "provider_retry" in l] and said and "ack: " in said[-1]
               and [r["status"] for r in recs] == [200] and took >= 3,
               "idle_timeout_sec = 8: the same 3 s wait answers, no retry (%.1fs): %r"

@@ -19,6 +19,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import obs_lines  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
@@ -51,7 +52,7 @@ def main():
         c.wait_idle("main")
         # a first call, so usage has something to count
         c.say("hello there")
-        c.wait(lambda: any("obs: usage:" in l for l in c.lines("main")), 90, "main's first usage line")
+        c.wait(lambda: any(obs_lines.kind(l) == "usage" for l in c.lines("main")), 90, "main's first usage line")
         c.wait_idle("main")
 
         # A) a pause stops the running turn

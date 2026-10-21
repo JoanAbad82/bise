@@ -30,6 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import fake_provider as F  # noqa: E402
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 
 FAILS = []
@@ -108,7 +109,7 @@ def main():
             if not line:
                 break
             out.append(line.decode(errors="replace").rstrip())
-            if line.startswith(b"  obs: turn_done"):
+            if obs_lines.kind(line) == "turn_done":
                 if t0 is not None:
                     took = time.time() - t0
                 break
@@ -177,7 +178,7 @@ def main():
 
         # D) the next message is answered; a restart keeps the one result
         out, _ = turn("hello again")
-        said = [l for l in out if "obs: assistant:" in l]
+        said = [l for l in out if obs_lines.kind(l) == "assistant"]
         check(bool(said) and "ack: hello again" in said[-1] and not os.path.getsize(flag),
               "D the next message gets its answer, the flag is cleared: %r" % said[-1:])
         procs[-1].terminate()

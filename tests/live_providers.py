@@ -28,6 +28,7 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import provider_folds as P  # noqa: E402
 import bise_env  # noqa: E402
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 
 # row -> (catalog provider, model, family override). The cheapest
@@ -228,12 +229,12 @@ def harness_turn(row, prov, model, family, base, key_env, env):
             if not line:
                 break
             lines.append(line.decode(errors="replace").rstrip())
-            if line.startswith(b"  obs: turn_done"):
+            if obs_lines.kind(line) == "turn_done":
                 break
         sock.close()
         text = open(session).read() if os.path.exists(session) else ""
         ok = ("tool bash ok: " + token) in text
-        said = [l for l in lines if "obs: assistant:" in l or "ERROR" in l or "obs: error" in l]
+        said = [l for l in lines if obs_lines.kind(l) == "assistant" or "ERROR" in l or obs_lines.kind(l) == "error"]
         return "%s %s: %s/%s (%s) %s" % ("ok  " if ok else "FAIL", row, pid, model, family,
                                         (said[-1] if said else "no reply")[:200] + ("" if ok else " (logs: %s)" % tmp))
     finally:

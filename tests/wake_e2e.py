@@ -19,6 +19,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import obs_lines  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
@@ -108,7 +109,7 @@ def main():
         # steered into the busy turn: the wake comes before that turn's end
         ls = c.lines("t1")
         k_sleep = max(i for i, l in enumerate(ls) if l.startswith("tool #") and l.endswith("bash : sleep 6"))
-        k_done = next(i for i in range(k_sleep, len(ls)) if ls[i].strip().startswith("obs: turn_done"))
+        k_done = next(i for i in range(k_sleep, len(ls)) if obs_lines.kind(ls[i]) == "turn_done")
         check(k_sleep < ls.index(w) < k_done, "the wake inside the busy turn (wake #%d, sleep #%d, turn_done #%d)" % (ls.index(w), k_sleep, k_done))
 
         # 4. a restart keeps a watch

@@ -505,7 +505,8 @@ pub fn step_of(line: &str) -> Option<String> {
         let text = r.split_once(" : ").map_or("", |(_, t)| t);
         return Some(one_line(&unescape(text), 80));
     }
-    line.starts_with("  obs: turn_done").then(String::new)
+    use bise_proto::thread::lines::{read, Obs, Rec};
+    matches!(read(line), Rec::Obs(Obs::TurnDone(_))).then(String::new)
 }
 
 /// A subscribed thread's newest lines and what was sent of each entry.

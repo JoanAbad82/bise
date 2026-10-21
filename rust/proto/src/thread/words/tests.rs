@@ -80,13 +80,13 @@ fn a_switch_says_one_line_per_phase() {
 fn a_plan_swap_is_one_info_notice() {
     // chatgpt-default: the runtime's swap line folds into one info notice,
     // the ids without their provider; a line off its shape stays Other
-    let o = lines::obs("model_swapped: chatgpt/gpt-6.1-sol chatgpt/gpt-6-luna");
+    let o = crate::thread::legacy::obs("model_swapped: chatgpt/gpt-6.1-sol chatgpt/gpt-6-luna");
     assert_eq!(o, lines::Obs::ModelSwapped { from: "chatgpt/gpt-6.1-sol".into(), to: "chatgpt/gpt-6-luna".into() });
     let n = obs_notice(&o, &|_, k| k.to_string()).unwrap();
     assert_eq!(n.level, NoticeLevel::Info);
     assert_eq!(n.text, "gpt-6.1-sol isn't on your ChatGPT plan: using gpt-6-luna · /model to pick another");
     for odd in ["model_swapped: one", "model_swapped:  b", "model_swapped: a b c"] {
-        assert!(matches!(lines::obs(odd), lines::Obs::Other(_)), "{odd}");
+        assert!(matches!(crate::thread::legacy::obs(odd), lines::Obs::Other(_)), "{odd}");
     }
 }
 

@@ -10,9 +10,17 @@
 //! Only shrinks: new code never writes a shape read here. Each shape has a
 //! sample in `fixtures/legacy_lines.jsonl` (from the git history of every
 //! writer and the tests' lines), with the record it upgrades to.
+//!
+//! The runtime's text observations (`  obs: <kind>: <text>`, [`obs`]) are
+//! read here too, since issue 38 (their records: `thread/obs.rs`; samples
+//! in `fixtures/obs_lines.jsonl`).
+//!
+//! Not a compat shim with an end date (issue 31's exempt list): old
+//! transcripts stay on disk for good, so this reader lives as long as
+//! history does. Never "expire" it.
 
 use crate::core::feed::{self, Feed};
-use crate::thread::lines::{field, is_msg_id, msg_id, unescape, Hub};
+use crate::thread::lines::{field, is_msg_id, msg_id, unescape, Hub, Obs, TurnEnd};
 
 /// An older line (`sb <kind> : <text>`) as the record it means; None when
 /// it is not one (a new line, not a hub line), or its kind is unknown here,
@@ -182,3 +190,83 @@ fn route(text: &str) -> Option<Feed> {
 #[cfg(test)]
 #[path = "legacy_tests.rs"]
 mod tests;
+
+/// An older text observation line (`  obs: …`) as its view; None for any
+/// other line.
+pub(crate) fn obs_line(line: &str) -> Option<Obs> {
+    line.strip_prefix("  obs: ").map(obs)
+}
+
+/// An observation made of the text after its prefix.
+type ObsOf = fn(String) -> Obs;
+
+/// The runtime's older text observation (`  obs: <kind>: <text>`, before
+/// issue 38's `obs <kind> :: <json>`), the `  obs: ` taken off.
+pub fn obs(o: &str) -> Obs {
+    let s = |t: &str| t.to_string();
+    if o == "turn_started" {
+        return Obs::TurnStarted;
+    }
+    if let Some(t) = o.strip_prefix("assistant: ") {
+        return Obs::Assistant(s(t));
+    }
+    if o == "assistant:" {
+        return Obs::Assistant(String::new());
+    }
+    if let Some(n) = o.strip_prefix("tool_started #") {
+        return n.parse().map(Obs::ToolStarted).unwrap_or(Obs::Plumbing);
+    }
+    if let Some(rest) = o.strip_prefix("tool_finished #") {
+        let Some((id, tail)) = rest.split_once(' ') else { return Obs::Plumbing };
+        return id.parse().map(|id| Obs::ToolFinished { id, ok: tail == "ok" }).unwrap_or(Obs::Plumbing);
+    }
+    if o.starts_with("tool_result_committed") {
+        return Obs::Plumbing;
+    }
+    let with: [(&str, ObsOf); 11] = [
+        ("steering_received: ", Obs::SteeringReceived),
+        ("steered: ", Obs::Steered),
+        ("notification_received: ", Obs::NotificationReceived),
+        ("notification_delivered: ", Obs::NotificationDelivered),
+        ("provider_retry: ", Obs::ProviderRetry),
+        ("harness_restarted: ", Obs::HarnessRestarted),
+        ("candidate_discarded: ", Obs::CandidateDiscarded),
+        ("context_compaction_failed: ", Obs::CompactionFailed),
+        ("session_restored: ", Obs::SessionRestored),
+        ("compaction_done: ", Obs::CompactionDone),
+        ("usage: ", Obs::Usage),
+    ];
+    if o.starts_with("compaction_started #") {
+        return Obs::CompactionStarted;
+    }
+    for (p, f) in with {
+        if let Some(t) = o.strip_prefix(p) {
+            return f(s(t));
+        }
+    }
+    if o == "null_iteration" {
+        return Obs::NullIteration;
+    }
+    if let Some(t) = o.strip_prefix("turn_done: ") {
+        return Obs::TurnDone(match t {
+            "completed" => TurnEnd::Completed,
+            "interrupted" => TurnEnd::Interrupted { by: None },
+            t => match t.strip_prefix("failed: ") {
+                Some(why) => match why.strip_prefix("interrupted by ") {
+                    Some(by) => TurnEnd::Interrupted { by: Some(s(by)) },
+                    None => TurnEnd::Failed(s(why)),
+                },
+                None => TurnEnd::Other(s(t)),
+            },
+        });
+    }
+    if let Some((from, to)) = o.strip_prefix("model_swapped: ").and_then(|t| t.split_once(' ')) {
+        if !from.is_empty() && !to.is_empty() && !to.contains(' ') {
+            return Obs::ModelSwapped { from: s(from), to: s(to) };
+        }
+    }
+    if let Some(t) = o.strip_prefix("turn_stalled: ") {
+        return Obs::TurnStalled(s(t));
+    }
+    Obs::Other(s(o))
+}

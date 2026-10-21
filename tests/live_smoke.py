@@ -12,6 +12,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import obs_lines  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
 
@@ -45,13 +46,13 @@ def main():
         print("file:", open(os.path.join(ws, "hello.txt")).read().strip(), flush=True)
         c.wait_feed("main", "msg-in", 400, **{"from": "hello"})
         c.wait_idle("main", "hello", timeout=400)
-        texts = [l for l in c.lines("main") if "obs: assistant:" in l]
+        texts = [l for l in c.lines("main") if obs_lines.kind(l) == "assistant"]
         print("main said:", texts[-1][:400] if texts else None, flush=True)
         c.say("Quelles tâches existent, et dans quel état ?")
         n = len(texts)
-        c.wait(lambda: len([l for l in c.lines("main") if "obs: assistant:" in l]) > n, 300, "main answers")
+        c.wait(lambda: len([l for l in c.lines("main") if obs_lines.kind(l) == "assistant"]) > n, 300, "main answers")
         c.wait_idle("main", timeout=300)
-        texts = [l for l in c.lines("main") if "obs: assistant:" in l]
+        texts = [l for l in c.lines("main") if obs_lines.kind(l) == "assistant"]
         print("main said:", texts[-1][:600], flush=True)
         ok = open(os.path.join(ws, "hello.txt")).read().strip() == "bonjour" and "hello" in texts[-1]
         print("PASS live" if ok else "FAIL live", flush=True)

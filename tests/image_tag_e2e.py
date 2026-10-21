@@ -27,6 +27,7 @@ import os, socket, subprocess, sys, tempfile, time, json, shutil, base64
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 OP = "<" + "image"   # never a literal tag in this file's output
 PNG = base64.b64encode(bytes.fromhex(
@@ -93,7 +94,7 @@ def turn(model, text):
     f = sock.makefile("rb")
     while True:
         line = f.readline()
-        if not line or line.startswith(b"  obs: turn_done"):
+        if not line or obs_lines.kind(line) == "turn_done":
             break
     sock.close()
     return [json.loads(l) for l in open(flog).readlines()[n:]]

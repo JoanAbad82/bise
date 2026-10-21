@@ -53,7 +53,7 @@ pub(crate) fn ingest_line(app: &mut App, line: String, ts: Option<u64>) {
         None => {}
     }
     // the end of a turn keeps its time (BISE-271: its hover)
-    let ended = (line.starts_with("  obs: turn_done: ") && !replayed).then(|| ts.unwrap_or_else(crate::when::now_ms));
+    let ended = (!replayed && matches!(bise_proto::thread::lines::read(line), bise_proto::thread::lines::Rec::Obs(bise_proto::thread::lines::Obs::TurnDone(_)))).then(|| ts.unwrap_or_else(crate::when::now_ms));
     // a replayed reasoning section has no duration
     let ms = if replayed { 0 } else { ms };
     let parsed = if replayed {

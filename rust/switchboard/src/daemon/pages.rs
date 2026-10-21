@@ -625,15 +625,16 @@ impl Shell {
             }
             return;
         }
-        let o = line.strip_prefix("  obs: ").unwrap_or("");
-        if o == "turn_started" || o.starts_with("steering_received: ") || o.starts_with("steered: ") {
+        if crate::pages::took_input(line) {
             *seen = true;
             return;
         }
-        if !(o.starts_with("turn_done: ") && *seen) {
+        use bise_proto::thread::lines::{read, Obs, Rec};
+        let Rec::Obs(Obs::TurnDone(end)) = read(line) else { return };
+        if !*seen {
             return;
         }
-        let how = o.trim_start_matches("turn_done: ").trim().to_string();
+        let how = end.text().trim().to_string();
         let ids = std::mem::take(ids);
         self.pg.page_turns.remove(name);
         let Some(pages) = self.pg.pages.clone() else { return };

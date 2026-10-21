@@ -81,8 +81,8 @@ pub fn classify(line: &str) -> Option<(Role, String)> {
     if let Some(r) = line.strip_prefix("tool #") {
         return tool(r, "tool");
     }
-    if let Some(r) = line.trim_start().strip_prefix("obs: compaction_done: ") {
-        return Some((Role::Hub, format!("compaction summary: {}", wire_unescape(r))));
+    if let bise_proto::thread::lines::Rec::Obs(bise_proto::thread::lines::Obs::CompactionDone(r)) = bise_proto::thread::lines::read(line) {
+        return Some((Role::Hub, format!("compaction summary: {}", wire_unescape(&r))));
     }
     let text = readable(line)?;
     use bise_proto::thread::lines::{read, Hub, Rec};

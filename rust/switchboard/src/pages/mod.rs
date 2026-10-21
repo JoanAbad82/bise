@@ -102,8 +102,8 @@ pub const PAGE_WAIT_MS: u64 = 45_000;
 /// A feed line that shows the agent took an input: a turn started, or a
 /// message steered into the running one.
 pub fn took_input(line: &str) -> bool {
-    let o = line.strip_prefix("  obs: ").unwrap_or("");
-    o == "turn_started" || o.starts_with("steering_received: ") || o.starts_with("steered: ")
+    use bise_proto::thread::lines::{read, Obs, Rec};
+    matches!(read(line), Rec::Obs(Obs::TurnStarted | Obs::SteeringReceived(_) | Obs::Steered(_)))
 }
 
 /// What to do with page messages that `agent` has not taken for

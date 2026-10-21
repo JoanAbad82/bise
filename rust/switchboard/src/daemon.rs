@@ -1433,13 +1433,13 @@ impl Shell {
             return self.on_partial(&name, line);
         }
         if self.restored.contains(dir) {
-            if line.contains("obs: session_restored") {
+            let restored = matches!(bise_proto::thread::lines::read(line), bise_proto::thread::lines::Rec::Obs(bise_proto::thread::lines::Obs::SessionRestored(_)));
+            if restored || !line.starts_with("history ") {
                 self.restored.remove(dir);
             }
-            if line.starts_with("history ") || line.contains("obs: session_restored") {
+            if restored || line.starts_with("history ") {
                 return;
             }
-            self.restored.remove(dir);
         }
         // the approvals gate (spec §3): the hub's, not the feed's
         if let Some(rest) = line.strip_prefix("gate ") {

@@ -44,9 +44,8 @@ pub fn parse(text: &str) -> Vec<Raw> {
 /// What a human would call "the conversation": user messages, messages
 /// in, assistant texts and tool calls, one entry each.
 pub fn readable(line: &str) -> Option<String> {
-    let t = line.trim_start();
-    if let Some(r) = t.strip_prefix("obs: assistant: ") {
-        let v = strip_thinking(&wire_unescape(r));
+    if let lines::Rec::Obs(lines::Obs::Assistant(r)) = lines::read(line) {
+        let v = strip_thinking(&wire_unescape(&r));
         return (!v.is_empty()).then(|| format!("assistant: {}", v));
     }
     if let Some(rest) = line.strip_prefix("sb ") {

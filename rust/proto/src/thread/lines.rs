@@ -247,6 +247,20 @@ pub enum TurnEnd {
     Other(String),
 }
 
+impl TurnEnd {
+    /// Its words as the text line said them (`completed`, `failed: <why>`,
+    /// `failed: interrupted by <who>`, `interrupted`).
+    pub fn text(&self) -> String {
+        match self {
+            TurnEnd::Completed => "completed".into(),
+            TurnEnd::Failed(why) => format!("failed: {why}"),
+            TurnEnd::Interrupted { by: Some(by) } => format!("failed: interrupted by {by}"),
+            TurnEnd::Interrupted { by: None } => "interrupted".into(),
+            TurnEnd::Other(t) => t.clone(),
+        }
+    }
+}
+
 /// The approvals gate of the running call (`sb gate : check|card|done <n>`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GateStep {
@@ -382,8 +396,14 @@ pub fn read(line: &str) -> Rec {
     if let Some(r) = line.strip_prefix("core rejected: ") {
         return Rec::Rejected(r.to_string());
     }
-    match line.strip_prefix("  obs: ") {
-        Some(o) => Rec::Obs(obs(o)),
+    if let Some(rest) = line.strip_prefix(super::obs::PREFIX) {
+        if let Some((_, r)) = super::obs::ObsRec::read_rest(rest) {
+            // the writer's bug: its JSON shown, never a guess
+            return Rec::Obs(r.map(super::obs::ObsRec::view).unwrap_or_else(|_| Obs::Other(rest.to_string())));
+        }
+    }
+    match super::legacy::obs_line(line) {
+        Some(o) => Rec::Obs(o),
         None => Rec::Raw(line.to_string()),
     }
 }
@@ -657,79 +677,6 @@ pub fn is_hidden(rec: &Rec) -> bool {
         ),
         _ => false,
     }
-}
-
-/// An observation made of the text after its prefix.
-type ObsOf = fn(String) -> Obs;
-
-/// The runtime's observation, the `  obs: ` taken off.
-pub fn obs(o: &str) -> Obs {
-    let s = |t: &str| t.to_string();
-    if o == "turn_started" {
-        return Obs::TurnStarted;
-    }
-    if let Some(t) = o.strip_prefix("assistant: ") {
-        return Obs::Assistant(s(t));
-    }
-    if o == "assistant:" {
-        return Obs::Assistant(String::new());
-    }
-    if let Some(n) = o.strip_prefix("tool_started #") {
-        return n.parse().map(Obs::ToolStarted).unwrap_or(Obs::Plumbing);
-    }
-    if let Some(rest) = o.strip_prefix("tool_finished #") {
-        let Some((id, tail)) = rest.split_once(' ') else { return Obs::Plumbing };
-        return id.parse().map(|id| Obs::ToolFinished { id, ok: tail == "ok" }).unwrap_or(Obs::Plumbing);
-    }
-    if o.starts_with("tool_result_committed") {
-        return Obs::Plumbing;
-    }
-    let with: [(&str, ObsOf); 11] = [
-        ("steering_received: ", Obs::SteeringReceived),
-        ("steered: ", Obs::Steered),
-        ("notification_received: ", Obs::NotificationReceived),
-        ("notification_delivered: ", Obs::NotificationDelivered),
-        ("provider_retry: ", Obs::ProviderRetry),
-        ("harness_restarted: ", Obs::HarnessRestarted),
-        ("candidate_discarded: ", Obs::CandidateDiscarded),
-        ("context_compaction_failed: ", Obs::CompactionFailed),
-        ("session_restored: ", Obs::SessionRestored),
-        ("compaction_done: ", Obs::CompactionDone),
-        ("usage: ", Obs::Usage),
-    ];
-    if o.starts_with("compaction_started #") {
-        return Obs::CompactionStarted;
-    }
-    for (p, f) in with {
-        if let Some(t) = o.strip_prefix(p) {
-            return f(s(t));
-        }
-    }
-    if o == "null_iteration" {
-        return Obs::NullIteration;
-    }
-    if let Some(t) = o.strip_prefix("turn_done: ") {
-        return Obs::TurnDone(match t {
-            "completed" => TurnEnd::Completed,
-            "interrupted" => TurnEnd::Interrupted { by: None },
-            t => match t.strip_prefix("failed: ") {
-                Some(why) => match why.strip_prefix("interrupted by ") {
-                    Some(by) => TurnEnd::Interrupted { by: Some(s(by)) },
-                    None => TurnEnd::Failed(s(why)),
-                },
-                None => TurnEnd::Other(s(t)),
-            },
-        });
-    }
-    if let Some((from, to)) = o.strip_prefix("model_swapped: ").and_then(|t| t.split_once(' ')) {
-        if !from.is_empty() && !to.is_empty() && !to.contains(' ') {
-            return Obs::ModelSwapped { from: s(from), to: s(to) };
-        }
-    }
-    if let Some(t) = o.strip_prefix("turn_stalled: ") {
-        return Obs::TurnStalled(s(t));
-    }
-    Obs::Other(s(o))
 }
 
 /// A hub line, its `sb ` taken off: a [`Feed`] record

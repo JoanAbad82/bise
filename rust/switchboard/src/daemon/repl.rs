@@ -58,7 +58,7 @@ pub(super) fn busy_at(wire: &Path, offset: u64) -> bool {
     for l in text.lines() {
         if l == "--- idle" {
             busy = false;
-        } else if l.trim_start().starts_with("obs: turn_started") {
+        } else if crate::wire::parse(l) == crate::wire::Wire::TurnStarted {
             busy = true;
         }
     }

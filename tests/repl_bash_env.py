@@ -31,6 +31,7 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import bise_env  # noqa: E402
 import scripted_ts  # noqa: E402  (EXE, jsrt_env, run_session)
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 
 
@@ -127,7 +128,7 @@ def part_a(tmp):
             if not line:
                 sys.exit("FAIL the REPL closed the connection: exit %s, %s"
                          % (repl.poll(), open(err).read()[-300:]))
-            if line.startswith(b"  obs: turn_done"):
+            if obs_lines.kind(line) == "turn_done":
                 break
         sock.close()
         res = tool_results(session)

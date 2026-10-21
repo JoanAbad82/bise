@@ -29,6 +29,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import obs_lines  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
@@ -54,8 +55,8 @@ def live_timers(E, agent):
 
 def turn_of(lines, k):
     """The turn line `k` falls in: (its turn_started, its turn_done), or None."""
-    start = max((i for i in range(k) if lines[i].strip() == "obs: turn_started"), default=None)
-    done = next((i for i in range(k, len(lines)) if lines[i].strip().startswith("obs: turn_done")), None)
+    start = max((i for i in range(k) if obs_lines.kind(lines[i]) == "turn_started"), default=None)
+    done = next((i for i in range(k, len(lines)) if obs_lines.kind(lines[i]) == "turn_done"), None)
     if start is None or done is None:
         return None
     if any(lines[i] == "--- idle" for i in range(start, k)):

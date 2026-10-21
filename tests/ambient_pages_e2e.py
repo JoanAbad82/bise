@@ -18,6 +18,7 @@ import sys
 import threading
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import obs_lines  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
@@ -66,7 +67,7 @@ def settle(c, timeout=120):
     model answers the first message instead (a race on a loaded machine)."""
     def quiet():
         lines = c.lines("main")
-        started = max((i for i, l in enumerate(lines) if l.strip() == "obs: turn_started"), default=-1)
+        started = max((i for i, l in enumerate(lines) if obs_lines.kind(l) == "turn_started"), default=-1)
         idle = max((i for i, l in enumerate(lines) if l == "--- idle"), default=-1)
         return idle >= started
 
@@ -494,11 +495,11 @@ def main():
         # its page still wakes it (pm's D fail 37). That first turn's end
         # first: on a loaded machine t4 was still in its sb page publish,
         # the tick went into that turn and no new one started
-        c.wait(lambda: any(l.startswith("  obs: turn_done") for l in c.lines("t4")), 120, "t4's first turn done")
+        c.wait(lambda: any(obs_lines.kind(l) == "turn_done" for l in c.lines("t4")), 120, "t4's first turn done")
         n4 = len(c.lines("t4"))
         c.say("/answer %d done" % step_card("s1")["id"])
         c.wait(lambda: tps.seen("ticked", lambda d: d == {"block": "steps", "item": "s1"}), 30, "the task page's step ticked")
-        c.wait(lambda: any("you sent 1 note" in l for l in c.lines("t4")[n4:]) and any(l == "  obs: turn_started" for l in c.lines("t4")[n4:]),
+        c.wait(lambda: any("you sent 1 note" in l for l in c.lines("t4")[n4:]) and any(obs_lines.kind(l) == "turn_started" for l in c.lines("t4")[n4:]),
                60, "the tick wakes t4 after its plain answer")
         # q2 (PAGE_V3's second question) stays asked; s1 and q1 are done
         left = lambda: sorted((x["page"].get("item") or x["page"]["block"]) for x in c.cards() if (x.get("page") or {}).get("id") == "task-plan")

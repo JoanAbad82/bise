@@ -44,11 +44,21 @@ The last two untyped seams between bise's processes.
   (tests/released.rs). So the steer default stays written:
   `"mode":"steer"` is a released key.
 
-**Sha 2a · obs records, the reader first.** `bise_proto` declares the obs
-kinds (`obs <kind> :: <json>`, like Feed, with core_kinds); the generated
-Bend encoders compile but nothing calls them yet; thread/lines.rs reads
-both forms, the old text parser moves to legacy.rs, and every Rust reader
-goes through `lines::read`.
+**Sha 2a · obs records, the reader first** (signed, architect m_35725).
+`bise_proto::thread::obs::ObsRec` declares the 23 kinds the runtime
+writes (`obs <kind> :: <json>`, like Feed, with core_kinds; its home is
+the transcript's, next to lines.rs); `ObsRec::view` gives today's
+`lines::Obs`, so the fold and the TUI don't move. thread/lines.rs reads
+both forms; the old text parser lives in legacy.rs, for good (old
+transcripts stay on disk: not a shim, issue 31's exempt list). Every Rust
+reader goes through `lines::read`; tests/obs_readers.rs fails on a
+prefix test of obs text anywhere else. core_gen writes
+bend/core/gen/obs.bend (one encoder per kind, its whole line), imported
+by bend/core/obs.bend and not called yet, and bend/proofs/obs.bend: per
+line of fixtures/obs_lines.jsonl, a law that the encoder writes exactly
+that record line, so the format is proven equal on both sides before the
+writers switch. Python tests read obs lines through tests/obs_lines.py
+(both forms).
 
 **Sha 2b · the writers.** The 17 `show_obs` kinds and the 9 hand writers
 switch to the records.

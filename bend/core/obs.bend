@@ -5,6 +5,10 @@
 import Base
 import ./types.bend as T
 import ./wire.bend as W
+# issue 38 sha 2a: the typed obs lines' encoders (generated from
+# bise_proto::thread::obs::ObsRec), compiled but not called yet: the writers
+# below switch to them in 2b, the release after the reader ships
+import ./gen/obs.bend as OG
 
 # a preview must stay on ONE wire line: newlines become spaces (a raw
 # newline in an obs splits it, and the client reads the tail as noise).
