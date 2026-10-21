@@ -67,6 +67,7 @@ pub mod land;
 pub mod land_check;
 pub mod land_pick;
 pub mod land_queue;
+pub mod load;
 pub mod model;
 pub mod pages;
 pub mod parts_in;

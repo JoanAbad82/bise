@@ -199,6 +199,7 @@ pub const VARS: &[Var] = &[
     internal("SB_CORE_PORT", "sb-core's TCP port"),
     test("SB_EVERY_MIN_MS", "the shortest sb every period (tests)"),
     internal("SB_LAUNCH_DIR", "the folder bise was launched from, for the version it re-execs"),
+    test("SB_LOAD_FACTOR", "the machine's load factor the hub sees, 1 to 8 (tests; switchboard::load)"),
     test("SB_ONBOARDING", "off/on: the onboarding (tests)"),
     internal("SB_PORT_OFFSET", "an agent's dev-server port offset"),
     test_input("SB_SEARCH_BENCH", "a folder to bench search on (an ignored test)"),

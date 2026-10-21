@@ -6,7 +6,8 @@
 //! (`reload`, same binary, port and session, writes queued meanwhile,
 //! the restored greeting kept out of the feed). Nothing goes to sb-core,
 //! the journal or the transcript. A turn that starts first just waits:
-//! only an idle REPL is asked, at its next idle.
+//! only an idle REPL is asked, at its next idle. A loaded machine holds
+//! it (`load_holds`: at most 30 min, or twice the budget read).
 
 use super::{log_line, Shell};
 use crate::recycle::{budget, Churn};
@@ -19,6 +20,8 @@ pub(super) struct Recycle {
     /// when his last line to main came (ms; hub-tick: main's own recycle
     /// waits [`crate::recycle::HIS_LINE_HOLD_MS`] after it)
     his_main_ms: Option<u64>,
+    /// when each REPL became due (ms; crate::recycle::load_holds)
+    due_ms: std::collections::BTreeMap<String, u64>,
 }
 
 impl Recycle {
@@ -27,7 +30,7 @@ impl Recycle {
     }
 
     pub(super) fn with_budget(budget: u64) -> Recycle {
-        Recycle { churn: Churn::default(), budget, his_main_ms: None }
+        Recycle { churn: Churn::default(), budget, his_main_ms: None, due_ms: Default::default() }
     }
 
     /// `dir`'s REPL waits for its recycle.
@@ -47,6 +50,7 @@ impl Shell {
         let r = &mut self.recycle;
         r.churn.line(dir, line);
         if line == "--- idle" && r.churn.idle(dir, r.budget) {
+            r.due_ms.insert(dir.to_string(), crate::util::now_ms());
             let read = r.churn.read(dir);
             log_line(
                 &self.opts.paths,
@@ -64,9 +68,19 @@ impl Shell {
         crate::recycle::main_holds(explicit, crate::board::queued_count(&self.hub.st, crate::model::MAIN), since)
     }
 
+    /// `dir`'s due recycle waits for the machine (crate::recycle::
+    /// load_holds, at the load now); `switch_idle_repls` asks again at
+    /// its next idle or tick.
+    pub(super) fn load_holds(&self, dir: &str, explicit: bool) -> bool {
+        let r = &self.recycle;
+        let since = r.due_ms.get(dir).map_or(0, |t| crate::util::now_ms().saturating_sub(*t));
+        !explicit && crate::recycle::load_holds(explicit, crate::load::factor(), since, r.churn.read(dir), r.budget)
+    }
+
     /// A new process of `dir` is connected (spawned, adopted, switched).
     pub(super) fn recycle_started(&mut self, dir: &str) {
         self.recycle.churn.started(dir);
+        self.recycle.due_ms.remove(dir);
     }
 
     /// `switch_idle_repls` wrote `reload` to `dir`'s REPL.

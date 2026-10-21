@@ -4,8 +4,9 @@
 //! recycle is admitted by `switch_admitted` from what is left. Each phase
 //! of a start is progress (`Msg::ReplStartStep`, `ReplSpawned`, the old
 //! process's exit in a switch); `check_starts` ends a start without
-//! progress for START_STILL_MS: its process killed, a `ReplGone` that
-//! says whether the stall reports to probation (a death always does).
+//! progress for `still_limit_ms` at the load now (crate::load): its
+//! process killed, a `ReplGone` that says whether the stall reports to
+//! probation (a death always does).
 
 use super::{
     adopt, adoptable, busy_at, debug_requests, free_port, hash_keys, kill_pid, log_line, plugins_fingerprint,
@@ -150,10 +151,13 @@ impl Shell {
     /// connected) finds it dead and kills its process, never an orphan
     /// that got the brief and shares the agent's session.
     pub(super) fn check_starts(&mut self, at_ms: u64) {
-        for s in self.starts.stalled(at_ms) {
+        // the limit scales with the load (crate::repl_start)
+        let factor = crate::load::factor();
+        for s in self.starts.stalled(at_ms, factor) {
             let reason = format!(
-                "its REPL made no progress in {} s while starting ({} at once at most, the rest wait)",
+                "its REPL made no progress in {} s while starting (load x{:.1}, {} at once at most, the rest wait)",
                 s.secs,
+                factor,
                 crate::repl_start::MAX_IN_FLIGHT
             );
             log_line(&self.opts.paths, &format!("repl {} not started: {}", s.dir, reason));

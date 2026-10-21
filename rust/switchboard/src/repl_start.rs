@@ -10,10 +10,16 @@
 //! - Order ([`order`]): a REPL the user's input waits on (main, his
 //!   focus, queued messages) first, then fresh starts before switches,
 //!   oldest first; recycles always last (they may wait as long as needed).
-//! - Failure: a start in flight fails after [`START_STILL_MS`] without
+//! - Failure: a start in flight fails after [`still_limit_ms`] without
 //!   progress (its phases: the thread runs, the tools note, AGENTS.md,
 //!   the process spawned, its banner; crate::watch, the boot's rule too),
-//!   never after a fixed time in all.
+//!   never after a fixed time in all. The limit is [`START_STILL_MS`]
+//!   times the machine's load factor (crate::load) when it is judged:
+//!   45 s idle, 6 min at load x8 (main m_36148: at load 85-100 starts
+//!   made no progress for 94-124 s and counted as crashes).
+//! - A stall at a loaded machine ([`Stall::loaded`]) is sb-core's to
+//!   count or not (`IExited`'s cause): it never counts toward the
+//!   agent's crashes.
 //! - A stall is not a death: a slow start on a loaded machine does not
 //!   fail a version's probation. But a version whose REPLs never start
 //!   must roll back: a stall reports to probation ([`Stall::reports`])
@@ -25,8 +31,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// REPL starts in flight at once.
 pub const MAX_IN_FLIGHT: usize = 4;
-/// A start without progress for this long has failed.
+/// A start without progress for this long, on an idle machine, has
+/// failed ([`still_limit_ms`] scales it with the load).
 pub const START_STILL_MS: u64 = 45_000;
+
+/// How long a start may stand still at load `factor` (crate::load).
+pub fn still_limit_ms(factor: f64) -> u64 {
+    (START_STILL_MS as f64 * factor.max(1.0)) as u64
+}
 
 /// What a start is (its place in the order).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -88,6 +100,8 @@ pub struct Stall {
     pub secs: u64,
     /// A reason for a probation to roll back (see the module header).
     pub reports: bool,
+    /// The machine was loaded when it stalled (crate::load::is_loaded).
+    pub loaded: bool,
 }
 
 /// The starts in flight, and the stalls of this hub.
@@ -155,13 +169,16 @@ impl Starts {
         self.flight.remove(dir);
     }
 
-    /// The starts without progress for START_STILL_MS: out of flight,
-    /// counted, each said once.
-    pub fn stalled(&mut self, now_ms: u64) -> Vec<Stall> {
+    /// The starts without progress for [`still_limit_ms`] at load
+    /// `factor` (the load when judged, not at their begin): out of
+    /// flight, counted, each said once.
+    pub fn stalled(&mut self, now_ms: u64, factor: f64) -> Vec<Stall> {
+        let limit = still_limit_ms(factor);
+        let loaded = crate::load::is_loaded(factor);
         let late: Vec<(String, Kind, u64)> = self
             .flight
             .iter()
-            .filter(|(_, (_, w))| w.stalled(now_ms))
+            .filter(|(_, (_, w))| w.still_ms(now_ms) >= limit)
             .map(|(d, (k, w))| (d.clone(), *k, w.still_ms(now_ms) / 1000))
             .collect();
         let mut out = Vec::new();
@@ -172,7 +189,7 @@ impl Starts {
             let n = self.row.entry(dir.clone()).or_insert(0);
             *n += 1;
             let reports = stall_reports(*n, self.stalled.len(), self.started.len());
-            out.push(Stall { dir, kind, secs, reports });
+            out.push(Stall { dir, kind, secs, reports, loaded });
         }
         out
     }
@@ -236,7 +253,7 @@ mod tests {
         s.begin("amb-kit", Kind::Switch, 0);
         for t in (10_000..300_000).step_by(30_000) {
             s.progress("amb-kit", t);
-            assert!(s.stalled(t + 29_000).is_empty(), "at {} ms", t);
+            assert!(s.stalled(t + 29_000, 1.0).is_empty(), "at {} ms", t);
         }
         assert!(s.in_flight("amb-kit"));
     }
@@ -253,10 +270,10 @@ mod tests {
         // the tick was sent at 40 s; the banner's progress, sent at 30 s,
         // was taken at 59 s when the busy loop came back
         s.progress("route-name", 59_000);
-        assert!(s.stalled(40_000).is_empty());
+        assert!(s.stalled(40_000, 1.0).is_empty());
         // a start that truly stands still still fails
         s.begin("still", Kind::Start, 0);
-        assert_eq!(s.stalled(START_STILL_MS).iter().map(|x| x.dir.as_str()).collect::<Vec<_>>(), ["still"]);
+        assert_eq!(s.stalled(START_STILL_MS, 1.0).iter().map(|x| x.dir.as_str()).collect::<Vec<_>>(), ["still"]);
     }
 
     #[test]
@@ -268,8 +285,8 @@ mod tests {
         s.progress("b", 40_000);
         s.progress("c", 40_000);
         s.progress("d", 40_000);
-        let st = s.stalled(45_000);
-        assert_eq!(st, [Stall { dir: "a".into(), kind: Kind::Switch, secs: 45, reports: false }]);
+        let st = s.stalled(45_000, 1.0);
+        assert_eq!(st, [Stall { dir: "a".into(), kind: Kind::Switch, secs: 45, reports: false, loaded: false }]);
         assert!(!s.in_flight("a"), "a stalled start leaves its slot");
         assert!(s.goes_first("a") && !s.goes_first("b"), "its restart goes first");
         // restarted, it stalls again: a reason to roll back
@@ -278,7 +295,7 @@ mod tests {
         for d in ["b", "c", "d"] {
             s.progress(d, 90_000);
         }
-        let st = s.stalled(95_000);
+        let st = s.stalled(95_000, 1.0);
         assert!(st.len() == 1 && st[0].reports, "{:?}", st);
         // a start that connects forgets its stalls
         s.begin("a", Kind::Start, 100_000);
@@ -287,7 +304,7 @@ mod tests {
         s.progress("b", 150_000);
         s.progress("c", 150_000);
         s.progress("d", 150_000);
-        assert!(!s.stalled(155_000)[0].reports);
+        assert!(!s.stalled(155_000, 1.0)[0].reports);
     }
 
     #[test]
@@ -301,7 +318,7 @@ mod tests {
         for d in ["a", "b", "c", "d"] {
             s.begin(d, Kind::Switch, 0);
         }
-        let st = s.stalled(45_000);
+        let st = s.stalled(45_000, 1.0);
         assert_eq!(st.iter().map(|x| x.reports).collect::<Vec<_>>(), [false, false, true, true]);
     }
 }

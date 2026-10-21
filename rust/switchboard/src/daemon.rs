@@ -1321,8 +1321,8 @@ impl Shell {
                         .get(&a.dir)
                         .is_some_and(|b| !Self::same_bin(b, &self.opts.repl_bin));
                 let due = explicit || self.recycle.is_due(&a.dir);
-                // main's own recycle waits for a message queued for it
-                due && !(a.is_main && self.main_holds(explicit))
+                // main's for a message queued for it, any for the load
+                due && !(a.is_main && self.main_holds(explicit)) && !self.load_holds(&a.dir, explicit)
             })
             .map(|a| (a.name.clone(), a.dir.clone()))
             .collect();

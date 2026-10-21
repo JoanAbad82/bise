@@ -102,9 +102,37 @@ pub fn main_holds(explicit: bool, queued: usize, since_his_line_ms: Option<u64>)
 /// How long after his last line to main its own recycle waits.
 pub const HIS_LINE_HOLD_MS: u64 = 10 * 60 * 1000;
 
+/// The longest a due recycle waits for the machine (main m_36148).
+pub const LOAD_HOLD_MAX_MS: u64 = 30 * 60 * 1000;
+
+/// A due recycle waits while the machine is loaded (`factor`,
+/// crate::load): a restart costs ~2.4 cpu-s and a start at load 90
+/// stalls. But the recycle is here because the REPL's heap grows
+/// (architect m_36171): the hold ends after [`LOAD_HOLD_MAX_MS`] since
+/// it was due (`due_ms`), or once the REPL read twice the `budget`
+/// (`read`), whichever comes first. Only the hub's own recycle holds
+/// (`explicit` false): /reload, a new binary, plugins, skills, keys go.
+pub fn load_holds(explicit: bool, factor: f64, due_ms: u64, read: u64, budget: u64) -> bool {
+    !explicit && crate::load::is_loaded(factor) && due_ms < LOAD_HOLD_MAX_MS && read < budget.saturating_mul(2)
+}
+
 #[cfg(test)]
 mod main_holds_tests {
     use super::*;
+
+    /// main m_36148, architect m_36171: at load x2+ the hub's own
+    /// recycle waits, at most 30 min, and never past twice the budget.
+    #[test]
+    fn a_recycle_waits_for_a_loaded_machine_up_to_30_min_or_twice_the_budget() {
+        let (min, b) = (60 * 1000, 3_000_000);
+        assert!(load_holds(false, 2.0, 0, b, b), "loaded: waits");
+        assert!(!load_holds(false, 1.9, 0, b, b), "not loaded: goes");
+        assert!(!load_holds(true, 8.0, 0, b, b), "an explicit relaunch goes");
+        assert!(load_holds(false, 8.0, 29 * min, b, b));
+        assert!(!load_holds(false, 8.0, 30 * min, b, b), "30 min since due: goes");
+        assert!(load_holds(false, 8.0, min, 2 * b - 1, b));
+        assert!(!load_holds(false, 8.0, min, 2 * b, b), "twice the budget read: goes");
+    }
 
     /// relaunch-fix: a8aaddeed held main 2 min after any line of his,
     /// for every relaunch, so /reload and a plugin change never
