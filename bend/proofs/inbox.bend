@@ -28,6 +28,21 @@ def Laws.an_approval_digit_journals_its_words():
 def Laws.answer_pos_not_due(o, cx, card, agent, pos):
   {==}
 
+def Laws.drop_card_words():
+  {==}
+
+def Laws.drop_option_1_is_yes(o, cx, parts, via):
+  {==}
+
+def Laws.drop_option_2_is_no(o, cx, parts, via):
+  {==}
+
+def Laws.old_drop_card_digit_keeps(o, cx, parts, via):
+  {==}
+
+def Laws.old_drop_card_yes_archives(o, cx, parts, via):
+  {==}
+
 # a card deleted from a list is no longer in it (ih: the same for the tail)
 def hub_nat_in_del.step(b: Bool, -h: Nat, -t: List<&2, Nat>, -n: Nat, +e: {Nat.is_eq(h, n) == b : Bool}, ih: {HA.nat_in(HA.nat_del(t, n), n) == False{} : Bool})
     -> {HA.nat_in(Bool.pick(List<&2, Nat>, Nat.is_eq(h, n), HA.nat_del(t, n), h <> HA.nat_del(t, n)), n) == False{} : Bool}:

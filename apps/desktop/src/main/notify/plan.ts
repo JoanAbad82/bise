@@ -10,6 +10,7 @@ export const WORDS = {
   en: {
     asks: 'asks',
     proposes: 'proposes a plan',
+    archive: (who: string) => `archive ${who}?`,
     open: 'open in bise',
     reply: 'Reply',
     placeholder: 'your answer',
@@ -20,6 +21,7 @@ export const WORDS = {
   fr: {
     asks: 'demande',
     proposes: 'propose un plan',
+    archive: (who: string) => `archiver ${who} ?`,
     open: 'ouvrir dans bise',
     reply: 'Répondre',
     placeholder: 'ta réponse',
@@ -65,10 +67,13 @@ export type Place = { readonly name: string; readonly home: boolean };
 
 export const cardKey = (project: string, id: number): string => `${project}#${id}`;
 
-/** '<agent> asks · <project>': main speaks as bise; an agent of bise's home names no project. */
+/** '<agent> asks · <project>': main speaks as bise; an agent of bise's home names no project; a drop
+ * card names what it archives. */
 export function titleOf(c: Card, place: Place | undefined, lang: Lang): string {
   const who = c.agent === 'main' || c.agent === '' ? 'bise' : c.agent;
   const where = place === undefined || place.home ? '' : ` · ${place.name}`;
+  // main's drop card is about its agent (drop-card, designer m_35655): 'archive sculpt-engine?'
+  if (c.kind === 'drop') return `${WORDS[lang].archive(c.agent)}${where}`;
   // a plan an agent proposes (plan-ok): 'lean-install proposes a plan'
   return `${who} ${c.kind === 'plan' ? WORDS[lang].proposes : WORDS[lang].asks}${where}`;
 }

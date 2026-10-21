@@ -155,3 +155,16 @@ def pick_of_ans(m: Maybe<&2, Answer>) -> Maybe<&2, String>:
       None{}
     case Some{+a}:
       pick_words(ans_pick(a))
+
+# his answer picks option `n` of the card (`1` on '1. archive it'); words,
+# or a digit on a card with no such option (a drop card opened before its
+# options, drop-card): no
+def is_n(m: Maybe<&2, Nat>, +n: Nat) -> Bool:
+  match m:
+    case None{}:
+      False{}
+    case Some{+k}:
+      Nat.is_eq(k, n)
+
+def picks(+card: String, +t: String, +n: Nat) -> Bool:
+  is_n(pick_n(option_pick(card, t)), n)

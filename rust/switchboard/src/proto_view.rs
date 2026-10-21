@@ -260,10 +260,10 @@ pub fn jobs(snap: &Snapshot) -> Vec<Followed> {
         .collect()
 }
 
-/// His cards: the user's kinds, bise's own bookkeeping (a `drop`) left
-/// to the TUI (pm's C fail 36).
+/// His cards: the user's kinds, a `drop` too (drop-card, architect
+/// m_35666: he answers it with its 1/2 options, so the banner posts it).
 fn his(kind: &str, user_kind: fn(&str) -> bool) -> bool {
-    user_kind(kind) && kind != "drop"
+    user_kind(kind)
 }
 
 /// The snapshot's open cards as rows, in its order: his (`HubEv::Cards`'
@@ -784,9 +784,10 @@ mod tests {
         assert_eq!(agents(&s2, &mut since, 200, uk, &|_| None, &|_| None, &|_| None)[1].since_ms, 200);
         assert_eq!(agents(&s2, &mut since, 300, uk, &|_| None, &|_| None, &|_| None)[1].since_ms, 200);
         let (c, others) = cards(&snap(), "acme", 5_000, uk);
-        assert_eq!(c.iter().map(|c| c.id).collect::<Vec<_>>(), [9, 10], "his kinds, no drop");
-        // P4c-4a: bise's own (a drop, a done) are the others, in order
-        assert_eq!(others.iter().map(|c| (c.id, c.kind.as_str())).collect::<Vec<_>>(), [(11, "drop"), (12, "done")]);
+        // drop-card: a drop is his (he answers it), never in both lists
+        assert_eq!(c.iter().map(|c| c.id).collect::<Vec<_>>(), [9, 10, 11], "his kinds, a drop too");
+        // P4c-4a: bise's own (a done) are the others, in order
+        assert_eq!(others.iter().map(|c| (c.id, c.kind.as_str())).collect::<Vec<_>>(), [(12, "done")]);
         assert_eq!(c[0].text, "which bench?\n1. cold\n2. warm");
         assert_eq!((c[0].question.as_str(), c[0].options.len(), c[0].since_ms, c[0].urgent), ("which bench?", 2, 4_000, false));
         assert!(c[1].urgent && c[1].page.as_ref().is_some_and(|p| p.block.as_deref() == Some("q1")));

@@ -139,9 +139,39 @@ def placing_note() -> String:
 def plural(+n: Nat) -> String:
   Bool.pick(String, Nat.is_gt(n, 1n), "s", "")
 
-def loss_text(+dirty: Nat, +unpushed: Nat) -> String:
-  String.concat([Nat.show(dirty), " changed file", plural(dirty), " and ", Nat.show(unpushed),
-    " unpushed commit", plural(unpushed), " will be saved (/restore)"])
+def count(+n: Nat, +what: String) -> String:
+  String.concat([Nat.show(n), " ", what, plural(n)])
+
+def kept(+n: Nat, +what: String) -> String:
+  String.concat(["its ", count(n, what), Bool.pick(String, Nat.is_gt(n, 1n), " are kept", " is kept")])
+
+# what a drop keeps of its work (drop-card, designer m_35655): only the
+# counts that aren't 0; both 0: nothing is lost
+def kept_text(+dirty: Nat, +unpushed: Nat) -> String:
+  Bool.pick(String, Nat.is_gt(dirty, 0n),
+    Bool.pick(String, Nat.is_gt(unpushed, 0n),
+      String.concat(["its ", count(dirty, "changed file"), " and ", count(unpushed, "unpushed commit"), " are kept; /restore brings it back"]),
+      String.append(kept(dirty, "changed file"), "; /restore brings it back")),
+    Bool.pick(String, Nat.is_gt(unpushed, 0n), String.append(kept(unpushed, "unpushed commit"), "; /restore brings it back"), "nothing of its work is lost"))
+
+# why a drop asks first: mid-turn, what it keeps
+def drop_body(+busy: Bool, +dirty: Nat, +unpushed: Nat) -> String:
+  String.concat([Bool.pick(String, busy, "it is mid-turn. ", ""), kept_text(dirty, unpushed), "."])
+
+# the terminal's /archive confirmation
+def confirm_q(+name: String, +body: String) -> String:
+  String.concat(["archive @", name, "? ", body, " [y/N]"])
+
+# a drop card's options: 1 archives like `yes`, 2 keeps like `no`
+# (core.bend answer.drop, picks.bend picks)
+def drop_opts() -> String:
+  "
+1. archive it
+2. keep it"
+
+# main's drop card (its title says 'archive <agent>?')
+def drop_card(+body: String) -> String:
+  String.concat(["main suggests it. ", body, drop_opts()])
 
 def drop_label(r: Result<&2, &2, String, J.Json>) -> String:
   match r:

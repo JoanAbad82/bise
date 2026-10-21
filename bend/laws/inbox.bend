@@ -10,6 +10,7 @@ import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/answers.bend as HA
 import ../hub/picks.bend as HPK
+import ../hub/place.bend as HPL
 
 # LAW: a card closed without him (withdrawn, closed, an agent stopped)
 # journals no answer.
@@ -60,3 +61,52 @@ law answer_pos_once:
   for +agent2: String
   for +pos2: Nat
   {HA.answer_pos(o, HA.answer_pos(o, cx, card, agent, pos), card, agent2, pos2) == HA.answer_pos(o, cx, card, agent, pos) : HX.Cx<o>}
+
+# drop-card (Gabriel: 1 for yes, 2 for no): main's drop card, with its
+# options (place.bend drop_card), and a card opened before them
+def drop_card(+text: String) -> HS.Card:
+  HS.Card.with_text(HS.Card.with_agent(HS.Card.with_kind(HS.Card.with_id(HS.Card.empty(), 4n), "drop"), "fix"), text)
+
+def new_drop() -> HS.Card:
+  drop_card(HPL.drop_card(HPL.drop_body(True{}, 4n, 0n)))
+
+def old_drop() -> HS.Card:
+  drop_card("main suggests: archive @fix? 4 changed files and 0 unpushed commit will be saved (/restore). (answer yes or no)")
+
+# LAW: main's drop card says what it keeps and shows its two options.
+law drop_card_words:
+  {HPL.drop_card(HPL.drop_body(True{}, 4n, 0n)) == "main suggests it. it is mid-turn. its 4 changed files are kept; /restore brings it back.
+1. archive it
+2. keep it" : String}
+
+# LAW: option 1 of a drop card archives exactly like `yes`, its pick in
+# the history; option 2 keeps the agent exactly like `no`.
+law drop_option_1_is_yes:
+  for -o: HS.St
+  for +cx: HX.Cx<o>
+  for +parts: String
+  for +via: String
+  {HC.answer.kind(o, HC.KDrop{}, cx, new_drop(), "1", parts, via) == HC.answer.drop(o, True{}, cx, new_drop(), HA.his_ans(new_drop(), "1", via)) : HX.Cx<o>}
+
+law drop_option_2_is_no:
+  for -o: HS.St
+  for +cx: HX.Cx<o>
+  for +parts: String
+  for +via: String
+  {HC.answer.kind(o, HC.KDrop{}, cx, new_drop(), "2", parts, via) == HC.answer.drop(o, False{}, cx, new_drop(), HA.his_ans(new_drop(), "2", via)) : HX.Cx<o>}
+
+# LAW: a digit on a drop card opened before its options is no option: it
+# keeps the agent (the safe default); `yes` still archives it.
+law old_drop_card_digit_keeps:
+  for -o: HS.St
+  for +cx: HX.Cx<o>
+  for +parts: String
+  for +via: String
+  {HC.answer.kind(o, HC.KDrop{}, cx, old_drop(), "1", parts, via) == HC.answer.drop(o, False{}, cx, old_drop(), HA.his_ans(old_drop(), "1", via)) : HX.Cx<o>}
+
+law old_drop_card_yes_archives:
+  for -o: HS.St
+  for +cx: HX.Cx<o>
+  for +parts: String
+  for +via: String
+  {HC.answer.kind(o, HC.KDrop{}, cx, old_drop(), "yes", parts, via) == HC.answer.drop(o, True{}, cx, old_drop(), HA.his_ans(old_drop(), "yes", via)) : HX.Cx<o>}

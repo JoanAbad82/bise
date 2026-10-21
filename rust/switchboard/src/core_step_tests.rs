@@ -159,6 +159,10 @@ mod core_ask_tests;
 #[path = "core_late_tests.rs"]
 mod core_late_tests;
 
+/// drop-card's tests, out of core_tests.rs too.
+#[path = "core_drop_card_tests.rs"]
+mod core_drop_card_tests;
+
 /// name-free's tests, out of core_tests.rs too.
 #[path = "core_names_tests.rs"]
 mod core_names_tests;

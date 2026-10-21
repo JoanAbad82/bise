@@ -54,6 +54,26 @@ describe('notify plan: what one notification says (designer m_14211)', () => {
     expect(n.reply).toBe(false);
   });
 
+  it("a drop card (drop-card, designer m_35655): 'archive <agent>?', its two options as buttons, each answers its digit", () => {
+    const drop = card({
+      kind: 'drop',
+      agent: 'sculpt-engine',
+      question: 'main suggests it. its 4 changed files are kept; /restore brings it back.',
+      options: [
+        { n: 1, label: 'archive it' },
+        { n: 2, label: 'keep it' },
+      ],
+    });
+    expect(titleOf(drop, acme, 'en')).toBe('archive sculpt-engine? · acme');
+    expect(titleOf(drop, acme, 'fr')).toBe('archiver sculpt-engine ? · acme');
+    const n = noteOf(drop, acme, 'en', false);
+    expect(n.actions).toEqual(['archive it', 'keep it', 'open in bise']);
+    expect(effectOf(n, { action: 0 })).toEqual({ t: 'answer', cmd: { cmd: 'answer', project: 'acme-1', card: 7, reply: '1' } });
+    expect(effectOf(n, { action: 1 })).toEqual({ t: 'answer', cmd: { cmd: 'answer', project: 'acme-1', card: 7, reply: '2' } });
+    // typed yes/no still answer it
+    expect(n.reply).toBe(true);
+  });
+
   it('a quiet moment: silent', () => {
     expect(noteOf(card(), acme, 'en', true).silent).toBe(true);
     expect(noteOf(card(), acme, 'en', false).silent).toBe(false);

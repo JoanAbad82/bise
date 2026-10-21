@@ -107,7 +107,7 @@ export const inbox = {
   /** a failed restart's title */
   title_restart: "restart failed",
   /** a drop's title */
-  title_drop: (a: { agent: string | number }): string => "drop " + String(a.agent) + "?",
+  title_drop: (a: { agent: string | number }): string => "archive " + String(a.agent) + "?",
   /** an overlap's title */
   title_overlap: "overlap",
   /** a done agent's title */

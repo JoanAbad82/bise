@@ -115,7 +115,7 @@ crate::words! { inbox:
     /// a failed restart's title
     title_restart = "restart failed";
     /// a drop's title
-    title_drop(agent) = "drop {agent}?";
+    title_drop(agent) = "archive {agent}?";
     /// an overlap's title
     title_overlap = "overlap";
     /// a done agent's title

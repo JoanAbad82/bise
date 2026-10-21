@@ -119,7 +119,9 @@ fn the_typed_state_rows_carry_everything_the_older_state_did() {
         assert!(pos.windows(2).all(|w| w[0] < w[1]), "the snapshot's order: {pos:?}");
     }
     assert_eq!(his.len() + others.len(), snap.cards.len(), "every open card once");
-    assert!(his.iter().any(|c| c.kind == "question" && c.options.len() == 2) && others.iter().any(|c| c.kind == "drop"), "{his:?} {others:?}");
+    // drop-card (architect m_35666): a drop is his, with its 2 options, never in others
+    assert!(his.iter().any(|c| c.kind == "question" && c.options.len() == 2), "{his:?}");
+    assert!(his.iter().any(|c| c.kind == "drop" && c.options.len() == 2) && !others.iter().any(|c| c.kind == "drop"), "{his:?} {others:?}");
     for c in his.iter().chain(&others) {
         let o = &snap.cards[at(c.id)];
         assert_eq!((&c.kind, &c.agent, &c.text, c.for_msg, c.pr), (&o.kind, &o.agent, &o.text, o.for_msg, o.pr), "card");

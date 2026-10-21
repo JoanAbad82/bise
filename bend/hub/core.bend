@@ -1447,9 +1447,7 @@ def drop.decide(-o: S.St, confirm: Bool, +cx: X.Cx<o>, +a: S.Agent, +has_wt: Boo
     case True{}:
       +dirty = J.get_num_or(loss, "dirty", 0n)
       +unpushed = J.get_num_or(loss, "unpushed", 0n)
-      +parts = List.append(&2, String, Bool.pick(List<&2, String>, busy, ["the agent is mid-turn"], Nil{}),
-        Bool.pick(List<&2, String>, Nat.is_gt(Nat.add(dirty, unpushed), 0n), [PL.loss_text(dirty, unpushed)], Nil{}))
-      (cx, DAsk{cat(["archive @", S.Agent.name(a), "? ", String.join(parts, " ; "), ". [y/N]"])})
+      (cx, DAsk{PL.drop_body(busy, dirty, unpushed)})
     case False{}:
       drop.now(o, has_wt, cx, a, loss)
 
@@ -1839,7 +1837,7 @@ def answer.kind(-o: S.St, k: CardK, +cx: X.Cx<o>, +c: S.Card, +text: String, +pa
     case KQuestion{}:
       answer.q(o, for_msg_of(st(o, cx), S.Card.for_msg(c)), cx, c, text, parts, via)
     case KDrop{}:
-      answer.drop(o, is_yes(text), cx, c, A.said_ans(text, via))
+      answer.drop(o, is_yes(text) || PK.picks(S.Card.text(c), text, 1n), cx, c, A.his_ans(c, text, via))
     case KConfirm{}:
       answer.confirm(o, A.confirm_ok(text), cx, c, text, via)
     case KChoice{}:
@@ -1977,7 +1975,7 @@ def user_drop.res(-o: S.St, p: X.Cx<o> & DropR, +name: String) -> X.Cx<o>:
       note_main(o, cx, String.append("the user dropped the agent @", name))
     case (+cx, DAsk{+q}):
       +canon = Maybe.default(&2, String, M.resolve(st(o, cx), name), name)
-      out(o, cx, F.confirm_name(canon, q))
+      out(o, cx, F.confirm_name(canon, PL.confirm_q(canon, q)))
     case (+cx, DErr{+e}):
       notice(o, cx, e)
     case (+cx, DHalt{}):
@@ -2890,8 +2888,7 @@ def req_drop.res(-o: S.St, p: X.Cx<o> & DropR, +token: Nat, +agent: String) -> X
     case (+cx, DAsk{+q}):
       +n = Maybe.default(&2, String, M.resolve(st(o, cx), agent), agent)
       +id = S.St.next_card(st(o, cx))
-      +text = Bool.pick(String, String.ends_with(q, " [y/N]"), String.take(q, Nat.sub(String.length(q), 6n)), q)
-      +cx2 = open_card(o, cx, "drop", n, cat(["main suggests: ", text, " (answer yes or no)"]), None{})
+      +cx2 = open_card(o, cx, "drop", n, PL.drop_card(q), None{})
       reply(o, cx2, token, ok_body([J.kv("dropped", J.JBool{False{}}), J.kv("card", J.JNum{id}),
         J.kv("reason", J.JStr{"the user must confirm: a notification for it is open in the inbox"})]))
     case (+cx, DErr{+e}):
