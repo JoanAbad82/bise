@@ -19,7 +19,7 @@ import type { Built } from './growth';
 import { type Activity, type BimEvent, type FunIn, type Office, type Pastime, type Pose, type Pt, QUEUE_GAP, type Segment, type SitAt, type Sits, type Spot, type Timeline } from './model';
 import { pastimes } from './skate';
 import { hash } from './activity';
-import { chairSpots, seatedAct, seatWaits, SIT_S, sitWay, visitAt } from './sit';
+import { chairSpots, NAP_UP, seatedAct, seatWaits, SIT_S, sitWay, visitAt } from './sit';
 import { coffeeAtCorner } from './cozy';
 import { along, makePath, path } from './paths';
 import { BODY_R, type Budget, planOn, posAt, progress, trackOf, UPDATE_BUDGET, walkTime, type Track } from './avoid';
@@ -62,8 +62,6 @@ interface Over {
 /** seconds at the spot (spec §6): a coffee and a chat, a post-it or a tap, a sheet handed to main */
 export const COFFEE_S = 6;
 export const VISIT_S = 3;
-/** a napper gets up from its bed (s) before it walks off: it sits up, then stands (render/pose.ts lieDown) */
-export const NAP_UP = 1.0;
 export const REPORT_S = 3;
 /** an event older than this when it reaches the office is not played (a late or replayed one) */
 const STALE_S = 10;

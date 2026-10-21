@@ -6,8 +6,7 @@
 // reduced motion has none.
 import type { Activity, ActivityKind, Doing, Motion, Pose, Pt } from '../model';
 import { walkTime } from '../avoid';
-import { SIT, SIT_S, sitBeat, toWorld } from '../sit';
-import { NAP_UP } from '../timeline';
+import { NAP_UP, SIT, SIT_S, sitBeat, toWorld } from '../sit';
 import { BEAT, PLANE_CATCH, REACH_S, awayOf } from './catch';
 import { FLAT, NAP_DZ, SINK_DROP, SLING_LIFT, type NapRest } from './nap';
 
@@ -261,7 +260,7 @@ function lieDown(r: NapRest | undefined, f: number): Body {
   return f < 0.4 ? blend(stand, sit, ease(f / 0.4)) : blend(sit, lie, ease((f - 0.4) / 0.6));
 }
 
-/** lying down and getting up (s): the beat of its arrival on a bed, of its leaving it (timeline.ts NAP_UP: it waits there that long) */
+/** lying down and getting up (s): the beat of its arrival on a bed, of its leaving it (sit.ts NAP_UP: the timeline waits there that long) */
 export const NAP_DOWN = NAP_UP;
 
 /**
@@ -580,7 +579,7 @@ export function rigOf(inp: RigInput): Rig {
   let b: Body;
   let motion: Motion;
   if (left && !reduced && pose.since < NAP_DOWN) {
-    // up from its bed before it walks off (timeline.ts NAP_UP: it waits there that long)
+    // up from its bed before it walks off (sit.ts NAP_UP: the timeline waits there that long)
     b = lieDown(left, 1 - pose.since / NAP_DOWN);
     motion = 'walk';
   } else if (sat) {

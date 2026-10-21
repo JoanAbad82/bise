@@ -31,6 +31,8 @@ export const SIT = {
 /** the beats' lengths, s: the chair out (the bim beside it), the hop (up, chair in, down, slide in), the chair back in */
 // (a sit at its desk without a walk, Segment.sit up / down: the hop alone, where it stands)
 export const SIT_S = { pull: 0.35, hop: 0.75, back: 0.3 } as const;
+/** a napper gets up from its bed (s) before it walks off: it sits up, then stands (timeline.ts waits; render/pose.ts lieDown) */
+export const NAP_UP = 1.0;
 
 /** the chair's floor box at `back` (how far it slid back), as a box in the spot's frame: u across, v along the desk's way */
 export interface Local {

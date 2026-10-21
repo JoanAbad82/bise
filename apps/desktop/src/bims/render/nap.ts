@@ -8,7 +8,6 @@
 import { Box3, Group, Mesh, type Object3D, Raycaster, Vector3 } from 'three';
 import { BASE_BEDS, bedsAt } from '../growth';
 import type { Office, Pt } from '../model';
-import type { BedKind } from './cozy';
 
 export type NapShape = 'flat' | 'sink' | 'sling';
 
@@ -43,14 +42,14 @@ export const FLAT = {
 export const SINK_DROP = 0.22;
 export const SLING_LIFT = 0.025;
 
-/** A base bed's shape (render/cozy.ts bed: the cozy kit's kinds). Pure. */
-export function shapeOfKind(k: BedKind): NapShape {
+/** A base bed's shape (render/cozy.ts BedKind: the cozy kit's kinds; a string here: pose.ts reads this file in the node project, render/cozy.ts is not in it). Pure. */
+export function shapeOfKind(k: string): NapShape {
   return k === 'pouf' ? 'sink' : k === 'hammock' ? 'sling' : 'flat';
 }
 
 /** what a look says of its nap place: the base beds' kind, its own beds' shape past them */
 export interface NapLook {
-  readonly cozy: { readonly bed: BedKind };
+  readonly cozy: { readonly bed: string };
   readonly bedShape?: NapShape;
 }
 
