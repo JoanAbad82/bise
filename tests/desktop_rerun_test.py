@@ -44,6 +44,9 @@ def main():
             "marks: ψ text-N on a worktree", "never in the source"]
     g = R.groups_from_source(rows, SRC)
     check(g == {rows[0]: "rowsAAA", rows[1]: "rowsBBB", rows[2]: "rowsBBB"}, "source groups %s" % g)
+    src2 = SRC.replace("  step(\"the bar's", "  await row('agents bar', async () => {\n    step(\"the bar's")
+    check(R.row_names(rows, src2) == {rows[1]: "agents bar", rows[2]: "agents bar"}, "row names %s" % R.row_names(rows, src2))
+    check(R.row_names(rows, SRC) == {}, "no row(): none %s" % R.row_names(rows, SRC))
     steps = [{"name": "a pinch on the hub's viewer: zooms (±3 px), a % chip", "ok": False, "group": "rowsAAA"},
              {"name": "the bar's signs: ✓ done (zqfin), no state word", "ok": True}]
     check(R.groups_from_json(rows, steps) == {rows[0]: "rowsAAA"}, "json groups %s" % R.groups_from_json(rows, steps))

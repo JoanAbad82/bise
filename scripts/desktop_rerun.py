@@ -96,6 +96,27 @@ def groups_from_source(rows, src):
     return found
 
 
+def row_names(rows, src):
+    """{red: the name of the driver's `row('<name>', …)` that holds its step}: AS_HE_DOES_ROWS_FILE
+    picks rows by that name, not the step's words (70f939beb's first rerun ran the seed of rows233B
+    and none of its 3 reds: their steps sit inside row('agents bar', …)). A step in no row (a group
+    with no row gate, rows25's) runs with its group."""
+    src = src.replace("\\'", "'").replace('\\"', '"')
+    heads = [m.start() for m in re.finditer(r"^async function (\w+)\(", src, re.M)]
+    calls = [(m.start(), m.group(2)) for m in re.finditer(r"await row\((['\"`])(.*?)\1", src)]
+    found = {}
+    for r in rows:
+        key = re.split(r"N", r, maxsplit=1)[0][:60]
+        at = src.find(key) if len(key) >= 12 else -1
+        if at < 0:
+            continue
+        top = max([h for h in heads if h < at] or [0])
+        mine = [n for c, n in calls if top < c < at]
+        if mine:
+            found[r] = mine[-1]
+    return found
+
+
 def spec_files(tree, names):
     """{name: path} for test:land names (basename of a checks/**/<name>.spec.ts)"""
     found = {}
@@ -175,8 +196,10 @@ def main(argv):
             if not app:
                 say("the candidate build failed: %s" % r.stdout[-400:])
                 return 1
+        # the rows file: each red's step words and the row() that holds it (the driver's gate)
+        named = row_names(rows, open(os.path.join(REPO, DRIVER, "driver.mjs")).read())
         with open(os.path.join(out, "rows.txt"), "w") as f:
-            f.write("".join(r + "\n" for r in rows))
+            f.write("".join(r + "\n" for r in rows) + "".join(n + "\n" for n in sorted(set(named.values()))))
         env = dict(os.environ, AS_HE_DOES_ONLY="quick", AS_HE_DOES_ROWS_FILE=os.path.join(out, "rows.txt"),
                    PW_FROM=os.path.join(tree, "apps", "desktop"))
         if groups:
