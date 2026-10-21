@@ -408,92 +408,8 @@ pub fn abort_probation(paths: &Paths) {
 }
 
 /// `sbswitch --to <version dir> [--probation <s>]`: the whole switch.
-/// Copy the hub state (journal, sessions, transcripts) aside before a
-/// switch or a restart: `/tmp/sb-backup-<state dir name>-<ms>`.
-fn backup(paths: &Paths) -> Result<PathBuf, String> {
-    backup_in(&paths.state, Path::new("/tmp"), now_ms(), KEEP_BACKUPS)
-}
-
-/// The backups of one state dir kept in /tmp: each holds the journal
-/// and every transcript, a few GB once a workspace has lived.
-const KEEP_BACKUPS: usize = 5;
-
-/// Back `state` up into `<dir>/sb-backup-<state dir name>-<ms>`, then
-/// keep only the `keep` newest backups of that state dir (only after a
-/// backup that worked: a failing one never costs an old one).
-fn backup_in(state: &Path, dir: &Path, ms: u64, keep: usize) -> Result<PathBuf, String> {
-    let name = state
-        .file_name()
-        .ok_or("the state dir has no name")?
-        .to_string_lossy()
-        .to_string();
-    let prefix = format!("sb-backup-{}-", name);
-    let dest = dir.join(format!("{}{}", prefix, ms));
-    backup_to(state, &dest)?;
-    let mut old: Vec<(u64, PathBuf)> = std::fs::read_dir(dir)
-        .map(|rd| {
-            rd.flatten()
-                .filter_map(|e| {
-                    let f = e.file_name().to_string_lossy().to_string();
-                    let ms = f.strip_prefix(&prefix)?;
-                    // only <ms>: another state dir's name may extend this one
-                    if ms.is_empty() || !ms.chars().all(|c| c.is_ascii_digit()) {
-                        return None;
-                    }
-                    let ms: u64 = ms.parse().ok()?;
-                    e.file_type().ok()?.is_dir().then(|| (ms, e.path()))
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    old.sort();
-    let drop = old.len().saturating_sub(keep);
-    for (_, p) in old.into_iter().take(drop) {
-        let _ = std::fs::remove_dir_all(p);
-    }
-    Ok(dest)
-}
-
-/// `rsync` of the state dir `src` into `dest`, regular files, links and
-/// dirs only. Not `-a`: it implies -D, and copying a unix socket makes
-/// rsync bind a new one at the destination, which fails (`mkstempsock:
-/// Invalid argument`) once the path passes the 104-byte socket limit, as
-/// the e2e and tmux sockets under agents/*/tmp do. macOS's openrsync has
-/// no --no-specials, hence the explicit -rlptg. The agents' scratch
-/// folders (agents/*/tmp: sockets, FIFOs, GBs of test trees) are not
-/// state; nor are the live REPLs' side channels (agents/*/run: their
-/// bend-sh-*.sh, bend-prog-* come and go, one vanished mid-copy failed a
-/// switch's backup with exit 23), but `approvals-mode`, kept there, is.
-/// A file gone mid-copy anyway (exit 24) is not a failed backup. rsync's
-/// stderr is kept for the error, never left in hub.err.
-fn backup_to(src: &Path, dest: &Path) -> Result<(), String> {
-    let out = std::process::Command::new("rsync")
-        .args(["-rlptg", "--exclude", "/hub.sock", "--exclude", "/agents/*/tmp/"])
-        .args(["--include", "/agents/*/run/approvals-mode", "--exclude", "/agents/*/run/*"])
-        .arg(format!("{}/", src.display()))
-        .arg(format!("{}/", dest.display()))
-        .stdin(std::process::Stdio::null())
-        .output()
-        .map_err(|e| format!("rsync: {}", e))?;
-    let err = String::from_utf8_lossy(&out.stderr);
-    if out.status.success() || out.status.code() == Some(24) || (out.status.code() == Some(23) && only_vanished(&err)) {
-        return Ok(());
-    }
-    let first = err.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
-    Err(if first.is_empty() {
-        format!("rsync {}", out.status)
-    } else {
-        format!("rsync {}: {}", out.status, crate::util::clip(first, 200))
-    })
-}
-
-/// rsync's errors are only files gone mid-copy: macOS's openrsync says
-/// exit 23 with `<file>: open (2)` (ENOENT) where rsync says 24 (an
-/// agent's role-request.txt vanished in an e2e's backup).
-fn only_vanished(stderr: &str) -> bool {
-    let errs: Vec<&str> = stderr.lines().filter(|l| l.contains("error")).collect();
-    !errs.is_empty() && errs.iter().all(|l| l.contains(": open (2)") || l.contains("No such file or directory (2)"))
-}
+// the state's backup before a switch or a restart (/tmp/sb-backup-*)
+mod backup;
 
 /// The workspace is bise's own source tree (dev mode, BISE-131): there
 /// `/restart` builds the latest commit, then switches to it; anywhere
@@ -585,8 +501,11 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
     }
     let (from_id, to_id) = (id_of(&from), id_of(&to));
     log(paths, &format!("{} -> {}", from.display(), to.display()));
-    let saved = match backup(paths) {
-        Ok(d) => format!(" · state backed up: {}", d.display()),
+    let saved = match backup::backup(&paths.state, now_ms()) {
+        Ok((d, how)) => {
+            log(paths, &format!("state backup ({}): {}", how.word(), d.display()));
+            format!(" · state backed up: {}", d.display())
+        }
         Err(e) => {
             log(paths, &format!("state backup failed: {}", e));
             format!(" · the state backup failed ({}): nothing is backed up", e)
@@ -872,89 +791,6 @@ mod state_tests {
             assert_eq!(st["current"], "v");
         }
         assert_eq!(super::state_of(Some("{\"good\": \"x\"}"))["good"], "x");
-    }
-
-    /// A state dir with a socket and a FIFO deep down (an e2e hub's
-    /// socket, a tmux socket, a bg command's stdin): the backup copies the
-    /// state and skips them, where `rsync -a` died on "mkstempsock:
-    /// Invalid argument" (the hub's own c2c30af8 switch); the agents'
-    /// scratch folders are not copied; only the 5 newest backups stay.
-    #[test]
-    fn a_backup_skips_sockets_fifos_and_scratch_and_keeps_the_newest_five() {
-        use std::path::Path;
-        let t = std::env::temp_dir().join(format!("sb-bk-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&t);
-        let st = t.join("state-of-a-workspace");
-        let run = st.join("agents/x/run");
-        let deep = st.join("agents/x/tmp/sb-e2e-0000/st");
-        for d in [&run, &deep] {
-            std::fs::create_dir_all(d).unwrap();
-        }
-        std::fs::write(st.join("journal.jsonl"), "{}\n").unwrap();
-        std::fs::write(st.join("agents/x/transcript.log"), "1\tsb you : fake\n").unwrap();
-        std::fs::write(deep.join("big.bin"), "scratch").unwrap();
-        // a live REPL's side channels come and go; its approvals mode stays
-        std::fs::write(run.join("approvals-mode"), "auto").unwrap();
-        std::fs::write(run.join("bend-sh-59301-2714723221.sh"), "echo").unwrap();
-        // made from inside the folder: a full path may pass the socket limit
-        let mk = |d: &Path| {
-            let ok = std::process::Command::new("python3")
-                .current_dir(d)
-                .args(["-c", "import socket,os; socket.socket(socket.AF_UNIX).bind('hub.sock'); os.mkfifo('0.in')"])
-                .status()
-                .unwrap()
-                .success();
-            assert!(ok, "socket and fifo made in {}", d.display());
-        };
-        mk(&run);
-        mk(&deep);
-        let dir = t.join("backups-in-a-folder-with-a-long-enough-name-to-pass-the-limit");
-        std::fs::create_dir_all(&dir).unwrap();
-        for ms in 1..=6u64 {
-            std::fs::create_dir_all(dir.join(format!("sb-backup-state-of-a-workspace-{}", ms))).unwrap();
-        }
-        // another state dir whose name extends this one's, and a stray file
-        std::fs::create_dir_all(dir.join("sb-backup-state-of-a-workspace-2-7")).unwrap();
-        std::fs::create_dir_all(dir.join("sb-backup-state-of-a-workspace-x")).unwrap();
-        let b = super::backup_in(&st, &dir, 100, 5).expect("the backup works");
-        assert_eq!(b, dir.join("sb-backup-state-of-a-workspace-100"));
-        assert_eq!(std::fs::read_to_string(b.join("journal.jsonl")).unwrap(), "{}\n");
-        assert!(b.join("agents/x/transcript.log").is_file());
-        assert!(b.join("agents/x/run").is_dir());
-        assert!(!b.join("agents/x/run/hub.sock").exists() && !b.join("agents/x/run/0.in").exists());
-        assert_eq!(std::fs::read_to_string(b.join("agents/x/run/approvals-mode")).unwrap(), "auto");
-        assert!(!b.join("agents/x/run/bend-sh-59301-2714723221.sh").exists(), "a REPL's scratch is not state");
-        assert!(!b.join("agents/x/tmp").exists(), "scratch is not state");
-        let mut left: Vec<String> =
-            std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
-        left.sort();
-        assert_eq!(
-            left,
-            [
-                "sb-backup-state-of-a-workspace-100",
-                "sb-backup-state-of-a-workspace-2-7",
-                "sb-backup-state-of-a-workspace-3",
-                "sb-backup-state-of-a-workspace-4",
-                "sb-backup-state-of-a-workspace-5",
-                "sb-backup-state-of-a-workspace-6",
-                "sb-backup-state-of-a-workspace-x",
-            ]
-        );
-        // a failed backup says why and costs no old one
-        let e = super::backup_in(&t.join("no-such-state"), &dir, 200, 1).unwrap_err();
-        assert!(e.starts_with("rsync "), "{}", e);
-        assert!(dir.join("sb-backup-state-of-a-workspace-3").is_dir());
-        let _ = std::fs::remove_dir_all(&t);
-    }
-
-    #[test]
-    fn a_file_gone_mid_backup_is_not_a_failed_backup_another_error_is() {
-        use super::only_vanished;
-        let gone = "rsync(40552): error: /st/agents/t7/role-request.txt: open (2) in /v\nrsync(40552): error: /st/agents/a/run/bend-sh-1.sh: open (2)\n";
-        assert!(only_vanished(gone));
-        assert!(!only_vanished("rsync(1): error: /st/journal.jsonl: open (13)\n"), "permission denied is a failure");
-        assert!(!only_vanished(&format!("{}rsync(1): error: write failed: No space left on device (28)\n", gone)));
-        assert!(!only_vanished(""));
     }
 
     #[test]
