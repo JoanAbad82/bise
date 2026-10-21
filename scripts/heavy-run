@@ -5,7 +5,11 @@
 # 2026-10-20; tests/heavy_run_test.py). Runs a heavy job (cargo, gates,
 # builds, playwright, test:land) in a shared slot: 4 slots on AC power, 2 on
 # battery (the user's rule: 2 since 2026-10-09, « on peut paralléliser » on
-# AC, 2026-10-18). nice 10 on AC, 15 on battery.
+# AC, 2026-10-18). nice 10 on AC, 15 on battery. The disk and CPU budget
+# (mac-budget, 2026-10-21; docs/loop-speed.md §10.7): a disk reserve per
+# job and the reclaim of idle cargo targets (scripts/disk_reclaim.py,
+# --install puts it next to this file), a time limit per job (rc 124),
+# threads per slot, and a start held while the load is over 2 x cores.
 #   slot 1 = ~/.bise/run/heavy.lock (the old single lock: old callers still count)
 #   slot 2 = ~/.bise/run/heavy2.lock
 #   slots 3-4 = ~/.bise/run/heavy3.lock, heavy4.lock (AC power only)
@@ -43,7 +47,11 @@ set -u
 if [ "${1:-}" = --install ]; then
   dst="$HOME/.bise/run/heavy-run"
   mkdir -p "${dst%/*}" && cp "$0" "$dst.new.$$" && chmod 755 "$dst.new.$$" && mv -f "$dst.new.$$" "$dst" \
-    && echo "installed $dst"
+    && echo "installed $dst" || return $?
+  # its disk reclaim, next to it (scripts/disk_reclaim.py)
+  src="$(cd "$(dirname "$0")" && pwd)/disk_reclaim.py"
+  cp "$src" "${dst%/*}/disk_reclaim.py.new.$$" && mv -f "${dst%/*}/disk_reclaim.py.new.$$" "${dst%/*}/disk_reclaim.py" \
+    && echo "installed ${dst%/*}/disk_reclaim.py"
   return $?
 fi
 # no heavy-run inside a heavy job (gate-reds, main m_33473): a job holding a
@@ -88,10 +96,11 @@ mkdir -p "$D" "$Q" && touch "$S1" "$S2" "$S3" "$S4" "$S5"
 # done status. Without SB_AGENT (the nightly under launchd) the lines are
 # only on stderr: the nightly's <date>.log has them (its 2>&1).
 # HEAVY_FREE_KB_FILE (tests): the free KB are read from that file, not df.
+# HEAVY_DISK_VOLUME (the simulated fill): that volume's free space instead.
 # HEAVY_DISK_POLL: seconds between two checks of a running job (10).
 free_kb() {
   if [ -n "${HEAVY_FREE_KB_FILE:-}" ]; then cat "$HEAVY_FREE_KB_FILE" 2>/dev/null; return; fi
-  local v=/System/Volumes/Data; [ -d "$v" ] || v="$HOME"
+  local v=${HEAVY_DISK_VOLUME:-/System/Volumes/Data}; [ -d "$v" ] || v="$HOME"
   df -k "$v" 2>/dev/null | awk 'NR==2 {print $4}'
 }
 # under $1 GB free (an unreadable free space counts as enough)
@@ -102,13 +111,40 @@ tell_hub() {
 }
 # the process tree under $1, but for $2's (the watcher's own)
 tree() { local c; for c in $(pgrep -P "$1"); do [ "$c" = "$2" ] && continue; tree "$c" "$2"; echo "$c"; done; }
-# runs in the background of a job's shell ($1): marks $2 and stops the job
-# when the disk gets too low
+# the disk reclaim (mac-budget, 2026-10-21): scripts/disk_reclaim.py,
+# installed next to this file, deletes the agents' idle cargo targets (its
+# header has the rule). Started in the background, never twice at once (its
+# own lock), at most once a minute: reclaim <want GB> when the disk is under
+# what a job needs; reclaim 0 (the idle ones only) at most every 10 min, at
+# each job's start. HEAVY_RECLAIM (tests): the command instead;
+# HEAVY_RECLAIM_GAP (the simulated fill): seconds between two, not 60.
+reclaim() {
+  local s="$HOME/.bise/run/reclaim.stamp" gap="${HEAVY_RECLAIM_GAP:-60}" now
+  [ "$1" = 0 ] && { s="$s.idle"; gap=600; }
+  now=$(date +%s)
+  [ -e "$s" ] && [ $(( now - $(stat -f %m "$s" 2>/dev/null || echo 0) )) -lt "$gap" ] && return 0
+  touch "$s"
+  local r="${HEAVY_RECLAIM:-/usr/bin/python3 $HOME/.bise/run/disk_reclaim.py}"
+  ( $r --want "$1" >>"$HOME/.bise/run/reclaim.out" 2>&1 & ) </dev/null >/dev/null 2>&1
+}
+# runs in the background of a job's shell ($1): marks $2 ("disk <GB>" or
+# "time <min>") and stops the job when the disk gets too low or the job runs
+# over HEAVY_MAX_MIN ($3) minutes; under the floor (HEAVY_DISK_WAIT_GB) it
+# reclaims first, so a job that grows a target is not the one that pays
 disk_watch() {
-  local me=$BASHPID
+  local me=$BASHPID last now ran=0 why="" step
+  last=$(date +%s)
   while kill -0 "$1" 2>/dev/null; do
-    if disk_under "${HEAVY_DISK_STOP_GB:-5}"; then
-      echo "$(free_gb)" >"$2"
+    # the time it ran awake: a gap between two checks counts 30 s at most,
+    # so a night the Mac slept (2026-10-20, 21:43 to 10:20, an empty
+    # battery) is not a stuck job
+    now=$(date +%s); step=$(( now - last )); [ "$step" -gt 30 ] && step=30; ran=$(( ran + step )); last=$now
+    if disk_under "${HEAVY_DISK_STOP_GB:-5}"; then why="disk $(free_gb)"
+    elif [ "${3:-0}" -gt 0 ] && [ "$ran" -ge "${HEAVY_MAX_SEC:-$(( $3 * 60 ))}" ]; then why="time $3"
+    elif disk_under "${HEAVY_DISK_WAIT_GB:-15}"; then reclaim $(( ${HEAVY_DISK_WAIT_GB:-15} + 10 ))
+    fi
+    if [ -n "$why" ]; then
+      echo "$why" >"$2"
       kill -TERM $(tree "$1" "$me") 2>/dev/null
       sleep 5
       kill -KILL $(tree "$1" "$me") 2>/dev/null
@@ -116,6 +152,38 @@ disk_watch() {
     fi
     sleep "${HEAVY_DISK_POLL:-10}"
   done
+}
+# the GB a job may still write (its reserve): a cargo build or test, a gate,
+# a bins/versions build: 3 on a warm target (cargo's CACHEDIR.TAG in the
+# repo's target or rust/target), 10 cold or for a full gate, the nightly or
+# --alone (a cold target grew 8-11 GB on 2026-10-20); anything else 2.
+# HEAVY_RESERVE_GB wins.
+reserve_gb() {
+  [ -n "${HEAVY_RESERVE_GB:-}" ] && { echo "$HEAVY_RESERVE_GB"; return; }
+  case " $* " in
+    *"gate.sh full"*|*nightly_gate.sh*|*" --alone "*) echo 10; return ;;
+    *cargo*|*gate.sh*|*bins.sh*|*"versions.sh build"*|*run_all.sh*) ;;
+    *) echo 2; return ;;
+  esac
+  local r; r=$(git rev-parse --show-toplevel 2>/dev/null) || r=$PWD
+  if [ -e "$r/rust/target/CACHEDIR.TAG" ] || [ -e "$r/target/CACHEDIR.TAG" ]; then echo 3; else echo 10; fi
+}
+# the GB still reserved by the running jobs: ~/.bise/run/reserve/<slot>.<pid>,
+# "<GB>\t<cwd>" (written by each job, gone at its end; a dead job's file
+# counts 0; disk_reclaim.py never deletes a target under a running job's cwd)
+reserved_gb() {
+  local f n=0 p
+  for f in "$HOME/.bise/run/reserve/"*; do
+    [ -e "$f" ] || continue
+    p=${f##*.}
+    if kill -0 "$p" 2>/dev/null; then n=$(( n + $(cut -f1 "$f" 2>/dev/null || echo 0) )); else rm -f "$f"; fi
+  done
+  echo "$n"
+}
+# the 1-minute load average, an integer (HEAVY_LOAD_FILE: tests)
+load1() {
+  if [ -n "${HEAVY_LOAD_FILE:-}" ]; then cat "$HEAVY_LOAD_FILE" 2>/dev/null; return; fi
+  /usr/sbin/sysctl -n vm.loadavg 2>/dev/null | awk '{print int($2)}'
 }
 # whether a release-lane job (heavy5.lock) ran at any time from epoch $1 to
 # now, read from heavy.log ($2): an --alone job's end line says so
@@ -128,10 +196,15 @@ lane_during() {
     { delete open[$1 FS $2]; if ($2 <= now && $3 >= t0) busy = 1 }
     END { for (k in open) if (open[k] <= now) busy = 1; if (busy) print "busy" }' "$2" 2>/dev/null
 }
-export -f free_kb disk_under free_gb tell_hub tree disk_watch lane_during
+export -f free_kb disk_under free_gb tell_hub tree reclaim disk_watch lane_during
 
 # HEAVY_SLOTS (tests): use only the first n slots, whatever the power.
 # HEAVY_ON_BATTERY=0|1 (tests): the power as given, not pmset's
+# the battery's charge in % (HEAVY_BATTERY_PCT: tests); 100 when unknown
+battery_pct() {
+  [ -n "${HEAVY_BATTERY_PCT:-}" ] && { echo "$HEAVY_BATTERY_PCT"; return; }
+  /usr/bin/pmset -g batt 2>/dev/null | grep -oE '[0-9]+%' | head -1 | tr -d % | grep . || echo 100
+}
 on_battery() {
   [ -n "${HEAVY_ON_BATTERY:-}" ] && { [ "$HEAVY_ON_BATTERY" = 1 ]; return; }
   /usr/bin/pmset -g batt 2>/dev/null | head -1 | grep -q "Battery Power"
@@ -187,19 +260,45 @@ while :; do
   esac
 done
 
+# the CPU (mac-budget, 2026-10-21): a slot gets HEAVY_THREADS (4) threads, so
+# 5 busy slots fit about 2 x the 12 cores. cargo builds were capped already
+# (CARGO_BUILD_JOBS above); each cargo test binary ran 12 test threads and a
+# gate 4 e2e hubs at once: RUST_TEST_THREADS=4 and SB_TEST_JOBS=2 in a slot.
+# A caller's value wins; an --alone job has the machine, it keeps them.
+if [ "$ALONE" = 0 ]; then
+  export RUST_TEST_THREADS="${RUST_TEST_THREADS:-${HEAVY_THREADS:-4}}"
+  export SB_TEST_JOBS="${SB_TEST_JOBS:-$(( (${HEAVY_THREADS:-4} + 1) / 2 ))}"
+fi
+# the job's disk reserve (reserve_gb) and its time limit in minutes
+# (HEAVY_MAX_MIN, else 180, 360 for --alone; 0: none)
+export HEAVY_RESERVE; HEAVY_RESERVE=$(reserve_gb "$([ "$ALONE" = 1 ] && echo --alone)" "$@")
+export HEAVY_MAX="${HEAVY_MAX_MIN:-$([ "$ALONE" = 1 ] && echo 360 || echo 180)}"
+
 # the job, in its slot: $1 its ticket (gone once it runs), $2 the slot, $3
 # the nice level, then the command. HEAVY_SLOT="<slot> <pid of this shell>".
 export HEAVY_SUBMIT="${HEAVY_SUBMIT:-$(date +%s)}"
 JOB='export HEAVY_SLOT="${2##*/} $$"; rm -f "$1"; L="$HOME/.bise/run/heavy.log"
 c=$(printf "%s " "${@:4}" | cut -c1-160); t0=$(date +%s)
 printf "%s\t%s\t-\t%s\t%s\t%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" >>"$L" 2>/dev/null
+touch "$HOME/.bise/run/last-start"
+rv="$HOME/.bise/run/reserve/${2##*/}.$$"; mkdir -p "${rv%/*}"; printf "%s\t%s\n" "$HEAVY_RESERVE" "$PWD" >"$rv"
+r=$(git rev-parse --show-toplevel 2>/dev/null) || r=$PWD
+for f in "$r"/target/RECLAIMED.txt "$r"/*/target/RECLAIMED.txt "$r"/*/*/target/RECLAIMED.txt; do
+  [ -e "$f" ] && { echo "$(cat "$f") (${f%/RECLAIMED.txt})" >&2; rm -f "$f"; }
+done
+reclaim 0
 stop="$HOME/.bise/run/disk-stop.$$"; rm -f "$stop"
-disk_watch $$ "$stop" </dev/null >/dev/null 2>&1 & w=$!
+disk_watch $$ "$stop" "$HEAVY_MAX" </dev/null >/dev/null 2>&1 & w=$!
 /usr/bin/caffeinate -is nice -n "$3" "${@:4}"; rc=$?
 kill $w 2>/dev/null; wait $w 2>/dev/null
+rm -f "$rv"
 if [ -e "$stop" ]; then
-  m="heavy-run: stopped \"$c\": the disk is nearly full ($(cat "$stop") GB free on the data volume, under ${HEAVY_DISK_STOP_GB:-5} GB). Free some space, then run it again."
-  echo "$m" >&2; tell_hub "$m"; rm -f "$stop"; rc=28
+  why=$(cat "$stop")
+  case "$why" in
+    time*) m="heavy-run: stopped \"$c\": it ran ${why#time } min, over its limit (HEAVY_MAX_MIN=${why#time }): a stuck job holds a slot (2 held 12.7 h on 2026-10-20). Find why it hangs, or give it a larger HEAVY_MAX_MIN."; rc=124 ;;
+    *) m="heavy-run: stopped \"$c\": the disk is nearly full (${why#disk } GB free on the data volume, under ${HEAVY_DISK_STOP_GB:-5} GB). Free some space, then run it again."; rc=28 ;;
+  esac
+  echo "$m" >&2; tell_hub "$m"; rm -f "$stop"
 fi
 lane=""; [ "$2" = all ] && [ "$(lane_during "$t0" "$L")" = busy ] && lane="	lane=busy"
 printf "%s\t%s\t%s\t%s\t%s\t%s\trc=%s%s\n" "$HEAVY_SUBMIT" "$t0" "$(date +%s)" "${2##*/}" "$PWD" "$c" "$rc" "$lane" >>"$L" 2>/dev/null
@@ -256,17 +355,30 @@ ahead() {
 
 # lockf -t 0 exits 75 (EX_TEMPFAIL) when the slot is taken.
 while :; do
-  if disk_under "${HEAVY_DISK_WAIT_GB:-15}"; then
+  # the disk: the floor (HEAVY_DISK_WAIT_GB, 15) + what the running jobs may
+  # still write + this job's own reserve must be free; else reclaim, and wait
+  need=$(( ${HEAVY_DISK_WAIT_GB:-15} + HEAVY_RESERVE + $(reserved_gb) ))
+  if disk_under "$need"; then
+    reclaim "$need"
     if [ -z "${diskwait:-}" ]; then
-      m="heavy-run: waiting: the disk is nearly full ($(free_gb) GB free on the data volume, a heavy job needs ${HEAVY_DISK_WAIT_GB:-15} GB): $(printf '%s ' "$@" | cut -c1-80)"
+      m="heavy-run: waiting: the disk is nearly full ($(free_gb) GB free on the data volume, a heavy job needs $need GB: ${HEAVY_DISK_WAIT_GB:-15} free + $HEAVY_RESERVE for it + $(( need - ${HEAVY_DISK_WAIT_GB:-15} - HEAVY_RESERVE )) the running jobs may write; reclaiming idle cargo targets): $(printf '%s ' "$@" | cut -c1-80)"
       echo "$m" >&2; tell_hub "$m"; diskwait=1
     fi
     sleep "${HEAVY_DISK_POLL:-10}"; continue
   fi
   if [ -n "${diskwait:-}" ]; then
-    m="heavy-run: $(free_gb) GB free again, the job goes on: $(printf '%s ' "$@" | cut -c1-80)"
-    echo "$m" >&2; tell_hub "$m"; diskwait=""
+    # stderr only: the hub's note would outlive the job (10 idle agents
+    # read "heavy-run: 32 GB free again" on 2026-10-21)
+    echo "heavy-run: $(free_gb) GB free again, the job goes on: $(printf '%s ' "$@" | cut -c1-80)" >&2; diskwait=""
   fi
+  # the battery (mac-budget): on battery under HEAVY_BATTERY_MIN (30) %, no
+  # job starts. On 2026-10-20 the Mac ran its jobs on battery to 1 %, slept
+  # at 21:43 and hibernated to 10:20: no night, no nightly, main hung 11 h.
+  if on_battery && [ "$(battery_pct)" -lt "${HEAVY_BATTERY_MIN:-30}" ] 2>/dev/null; then
+    [ -n "${battwait:-}" ] || { m="heavy-run: waiting: on battery at $(battery_pct) %, under ${HEAVY_BATTERY_MIN:-30} %: plug the Mac in: $(printf '%s ' "$@" | cut -c1-80)"; echo "$m" >&2; tell_hub "$m"; battwait=1; }
+    sleep "${HEAVY_DISK_POLL:-10}"; continue
+  fi
+  battwait=""
   if on_battery; then n=15; slots="$S1 $S2"; else n=10; slots="$S1 $S2 $S3 $S4"; fi
   if [ -n "${HEAVY_SLOTS:-}" ]; then slots=$(echo "$S1 $S2 $S3 $S4" | cut -d' ' -f1-"$HEAVY_SLOTS"); fi
   # the release lane: --prio alone, first (HEAVY_NO_LANE=1: none, tests)
@@ -281,6 +393,18 @@ while :; do
     # 'already locked' on every try, which buried a job's real last lines.
     free=""
     for s in $slots; do /usr/bin/lockf -k -t 0 "$s" /usr/bin/true 2>/dev/null && free="$free $s"; done
+    # the load (mac-budget): while a heavy job runs, another one starts only
+    # under HEAVY_LOAD_MAX (2 x the cores) and HEAVY_START_GAP (20) s after
+    # the last start, so the 1-min load has seen it (at 10:20 on 2026-10-21
+    # the queue started at once and the load hit 113). --prio is exempt.
+    if [ -n "$free" ] && [ "$PRIO" = 0 ] && [ "$(echo $free | wc -w)" -lt "$(echo $slots | wc -w)" ]; then
+      lmax="${HEAVY_LOAD_MAX:-$(( 2 * $(/usr/sbin/sysctl -n hw.ncpu 2>/dev/null || echo 8) ))}"
+      ls_=$(stat -f %m "$D/last-start" 2>/dev/null || echo 0)
+      if [ "$(load1)" -ge "$lmax" ] 2>/dev/null || [ $(( $(date +%s) - ls_ )) -lt "${HEAVY_START_GAP:-20}" ]; then
+        [ -n "${loadwait:-}" ] || { echo "heavy-run: a slot is free but the machine is busy (load $(load1), the limit $lmax while a heavy job runs), waiting" >&2; loadwait=1; }
+        free=""
+      fi
+    fi
     if [ -n "$free" ] && [ "$(ahead)" -lt "$(echo $free | wc -w)" ]; then
       for s in $free; do
         /usr/bin/lockf -k -t 0 "$s" /bin/bash -c "$JOB" _ "$T" "$s" "$n" "$@"

@@ -475,6 +475,24 @@ What changed (no test dropped, no coverage lost):
    slot can take 40 min at p90 and over 2 h at the worst (10-19), so a
    1 h `--max` fires while the job still waits (8 of 10 `--max` wakes
    that day, gate-reds). A file wake needs a `--max` over the queue (3h).
+7. **The disk and CPU budget** (mac-budget, 2026-10-21; the night of 10-20
+   the disk hit 1.3 GB free, 2 jobs hung 12.7 h in their slots and the
+   queue's restart put the load at 113). A job starts only when the data
+   volume has 15 GB free + its reserve (3 GB for cargo on a warm target,
+   10 cold, for a full gate or `--alone`, 2 otherwise) + the reserves of the
+   running jobs (`~/.bise/run/reserve/`). Short of it, heavy-run starts
+   `scripts/disk_reclaim.py` (installed next to it): it deletes the agents'
+   worktree cargo targets, least recently used first, never one whose cargo
+   lock is held or used in the last 30 min; any target unused for 6 h goes
+   anyway (checked at each job start, every 10 min at most). The owner's
+   next job there prints the new target's `RECLAIMED.txt`; each deletion is
+   a line in `~/.bise/run/reclaim.log`. A running job reclaims under 15 GB
+   and is stopped under 5 (rc 28). A job over `HEAVY_MAX_MIN` (180, 360
+   for `--alone`) is stopped, rc 124. CPU: a slot gets `CARGO_BUILD_JOBS=4`,
+   `RUST_TEST_THREADS=4`, `SB_TEST_JOBS=2` (an `--alone` job keeps the
+   defaults); while a heavy job runs, a new one (not `--prio`) starts only
+   under load 2 x cores (the hub's own "loaded", send-fast's load.rs) and
+   20 s after the last start, so the 1-min load has seen it.
 
 ## 11. Change-based test selection (loop-speed-4, the user's yes on q1)
 

@@ -49,7 +49,9 @@ with tempfile.TemporaryDirectory() as home:
     # plenty of faked free space: the real disk's never makes a job wait here
     open(os.path.join(home, "plenty_kb"), "w").write(str(500 * 1048576))
     # on AC as far as heavy-run knows (HEAVY_ON_BATTERY=0): the --alone cases run on battery too
-    env = dict(os.environ, HOME=home, HEAVY_SLOTS="1", HEAVY_FREE_KB_FILE=os.path.join(home, "plenty_kb"), HEAVY_ON_BATTERY="0")
+    env = dict(os.environ, HOME=home, HEAVY_SLOTS="1", HEAVY_FREE_KB_FILE=os.path.join(home, "plenty_kb"), HEAVY_ON_BATTERY="0",
+               # the machine's real load never holds a job here (the load cases fake it)
+               HEAVY_LOAD_MAX="9999", HEAVY_START_GAP="0", HEAVY_RECLAIM_GAP="0", HEAVY_RECLAIM="true")
     env.pop("SB_AGENT", None)
     env.pop("HEAVY_SLOT", None)
     env.pop("HEAVY_SUBMIT", None)
@@ -177,8 +179,11 @@ with tempfile.TemporaryDirectory() as home:
         # an --alone job that ran while a release-lane job ran: its end line says
         # 'lane=busy' (the lane runs beside it; a timing red may come from it)
         go6 = os.path.join(home, "go6")
-        lane = subprocess.Popen([HEAVY, "--prio", "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go6], env=env1)
-        check(wait_for(lambda: held(os.path.join(run, "heavy5.lock"))), "a --prio job holds the release lane")
+        lane_err = open(os.path.join(home, "lane_err"), "w+")
+        lane = subprocess.Popen([HEAVY, "--prio", "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go6], env=env1, stderr=lane_err)
+        ok = wait_for(lambda: held(os.path.join(run, "heavy5.lock")))
+        lane_err.seek(0)
+        check(ok, "a --prio job holds the release lane %r %r" % (lane_err.read()[-500:], lines()[-2:]))
         a = subprocess.run([HEAVY, "--alone", "sh", "-c", "echo marked"], env=env1, capture_output=True, text=True, timeout=30)
         open(go6, "w").close()
         lane.wait(timeout=10)
@@ -228,10 +233,94 @@ with tempfile.TemporaryDirectory() as home:
     check("heavy-run: stopped" in sb_lines(), "the stop goes to the agent's status")
     check(lines()[-1].endswith("rc=28"), "heavy.log ends the job with rc=28: %r" % lines()[-1])
     check(not [f for f in os.listdir(run) if f.startswith("disk-stop.")], "no disk-stop marker left")
+    # the reserves (mac-budget): a job needs 15 GB + its reserve + what the
+    # running jobs reserved; while it waits, the reclaim runs (a fake here)
+    reclaimed = os.path.join(home, "reclaim_args")
+    fake_reclaim = os.path.join(fbin, "reclaim")
+    with open(fake_reclaim, "w") as fh:
+        fh.write('#!/bin/sh\necho "$*" >> "%s"\n' % reclaimed)
+    os.chmod(fake_reclaim, 0o755)
+    envr = dict(envd, HEAVY_SLOTS="2", HEAVY_RECLAIM=fake_reclaim)
+    open(freef, "w").write(str(25 * GB))
+    go_r = os.path.join(home, "go_reserve")
+    big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_r],
+                           env=dict(envr, HEAVY_RESERVE_GB="10"), stderr=subprocess.DEVNULL)
+    check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]
+                   if os.path.isdir(os.path.join(run, "reserve")) else False),
+          "a running job leaves its reserve in ~/.bise/run/reserve")
+    ran2 = os.path.join(home, "ran2")
+    e2 = open(os.path.join(home, "err2"), "w+")
+    second = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran2], env=envr, stderr=e2)
+    check(stays(lambda: not os.path.exists(ran2), 2, "the second job waits"),
+          "25 GB free, 10 reserved by a running job: a 2 GB job waits (needs 27) %r" % lines()[-3:])
+    check(wait_for(lambda: os.path.exists(reclaimed) and "--want 27" in open(reclaimed).read(), 10),
+          "the waiting job asks the reclaim for 27 GB")
+    e2.seek(0)
+    check("needs 27 GB: 15 free + 2 for it + 10 the running jobs may write" in e2.read(), "the wait says the sum")
+    open(freef, "w").write(str(27 * GB))
+    check(second.wait(timeout=30) == 0 and os.path.exists(ran2), "27 GB free: it runs")
+    open(go_r, "w").close()
+    big.wait(timeout=30)
+    check(not [f for f in os.listdir(os.path.join(run, "reserve"))], "the reserves are gone with their jobs")
+    # the load (mac-budget): with a heavy job running, a new one waits while
+    # the load is over HEAVY_LOAD_MAX; a lone job never waits for it
+    loadf = os.path.join(home, "load")
+    open(loadf, "w").write("50")
+    envl = dict(envr, HEAVY_LOAD_FILE=loadf, HEAVY_LOAD_MAX="24")
+    ran3 = os.path.join(home, "ran3")
+    lone = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', ran3], env=envl, capture_output=True, timeout=30)
+    check(lone.returncode == 0 and os.path.exists(ran3), "load 50, no heavy job: a lone job runs")
+    go_l = os.path.join(home, "go_load")
+    hold = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_l], env=envl,
+                            stderr=subprocess.DEVNULL)
+    wait_for(lambda: held(os.path.join(run, "heavy.lock")), what="slot 1 held")
+    ran4 = os.path.join(home, "ran4")
+    e4 = open(os.path.join(home, "err4"), "w+")
+    w4 = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran4], env=envl, stderr=e4)
+    check(stays(lambda: not os.path.exists(ran4), 3, "it waits"), "load 50, a heavy job runs: the next one waits %r" % lines()[-3:])
+    e4.seek(0)
+    check("the machine is busy (load 50, the limit 24" in e4.read(), "the wait says the load")
+    open(loadf, "w").write("10")
+    check(w4.wait(timeout=30) == 0 and os.path.exists(ran4), "load 10: it runs")
+    open(go_l, "w").close()
+    hold.wait(timeout=30)
+    # the time limit: a job over HEAVY_MAX_MIN is stopped, rc=124
+    r = subprocess.run([HEAVY, "sh", "-c", "sleep 60 & wait"], env=dict(envr, HEAVY_MAX_MIN="1", HEAVY_MAX_SEC="2"),
+                       capture_output=True, text=True, timeout=40)
+    check(r.returncode == 124 and "over its limit (HEAVY_MAX_MIN=1)" in r.stderr,
+          "a job over its time limit is stopped, rc=124: %r %r" % (r.returncode, r.stderr[-200:]))
+    check(lines()[-1].endswith("rc=124"), "heavy.log ends it with rc=124")
+    # the battery: on battery under 30 %, no job starts; plugged in, it runs
+    ranb = os.path.join(home, "ranb")
+    eb = open(os.path.join(home, "errb"), "w+")
+    wb = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ranb], env=dict(envr, HEAVY_ON_BATTERY="1", HEAVY_BATTERY_PCT="12"),
+                          stderr=eb)
+    check(stays(lambda: not os.path.exists(ranb), 2, "it waits"), "on battery at 12 %: the job waits")
+    wb.kill()
+    wb.wait()
+    eb.seek(0)
+    check("on battery at 12 %, under 30 %: plug the Mac in" in eb.read(), "the wait says plug it in")
+    r = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', ranb], env=dict(envr, HEAVY_ON_BATTERY="1", HEAVY_BATTERY_PCT="80"),
+                       capture_output=True, timeout=30)
+    check(r.returncode == 0 and os.path.exists(ranb), "on battery at 80 %: it runs")
+    # the per-slot threads, and an --alone job keeps the defaults
+    r = subprocess.run([HEAVY, "sh", "-c", 'echo "$RUST_TEST_THREADS/$SB_TEST_JOBS/$CARGO_BUILD_JOBS"'],
+                       env={k: v for k, v in envr.items() if k not in ("RUST_TEST_THREADS", "SB_TEST_JOBS", "CARGO_BUILD_JOBS")},
+                       capture_output=True, text=True, timeout=30)
+    check(r.stdout.strip() == "4/2/4", "a slot gets 4 test threads, 2 e2e jobs, 4 cargo jobs: %r" % r.stdout)
+    # a reclaimed target: the owner's next job there says so, once
+    wt = os.path.join(home, "wt")
+    os.makedirs(os.path.join(wt, "rust", "target"))
+    open(os.path.join(wt, "rust", "target", "RECLAIMED.txt"), "w").write("heavy-run: this cargo target was deleted at X\n")
+    r = subprocess.run([HEAVY, "true"], env=envr, cwd=wt, capture_output=True, text=True, timeout=30)
+    check("this cargo target was deleted at X" in r.stderr and not os.path.exists(os.path.join(wt, "rust", "target", "RECLAIMED.txt")),
+          "the next job in that worktree prints RECLAIMED.txt and removes it: %r" % r.stderr[-300:])
     # --install
     r = subprocess.run([HEAVY, "--install"], env=env, capture_output=True, text=True)
     dst = os.path.join(run, "heavy-run")
     check(r.returncode == 0 and os.access(dst, os.X_OK) and open(dst).read() == open(HEAVY).read(),
           "--install copies the script to ~/.bise/run/heavy-run")
+    check(open(os.path.join(run, "disk_reclaim.py")).read() == open(os.path.join(HERE, "..", "scripts", "disk_reclaim.py")).read(),
+          "--install puts disk_reclaim.py next to it")
 
 sys.exit(1 if fails else 0)
