@@ -106,14 +106,14 @@ describe('the workshop floor as drawn', () => {
     expect([...new Set(bad)].slice(0, 12)).toEqual([]);
   }, 120_000);
 
-  it('one night pool per pod past the four, with its ground (poolsOf: the town lights them within its cap)', () => {
-    for (const n of [12, 19, 31]) {
-      const o = ws(n);
-      const w = buildWorld(o, 'main', STYLE, lookOf('workshop'), false, NO_GROW);
-      let lights = 0;
-      w.root.traverse((x) => { if (x instanceof PointLight) lights++; });
-      w.dispose();
-      expect(lights, `${String(n)} desks`).toBe(4 + o.pods.length);
-    }
+  // one test per desk count: 3 worlds built in one test took over 5 s at gate load (bims-nap
+  // m_36304, bims-vitest); the same worlds and expect, each under its own timeout
+  it.each([12, 19, 31])('one night pool per pod past the four, with its ground (poolsOf: the town lights them within its cap; %i desks)', (n) => {
+    const o = ws(n);
+    const w = buildWorld(o, 'main', STYLE, lookOf('workshop'), false, NO_GROW);
+    let lights = 0;
+    w.root.traverse((x) => { if (x instanceof PointLight) lights++; });
+    w.dispose();
+    expect(lights, `${String(n)} desks`).toBe(4 + o.pods.length);
   });
 });

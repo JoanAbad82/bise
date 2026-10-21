@@ -155,10 +155,12 @@ describe('the sitting law (bims-sit): never through the chair', () => {
     expect(sitBeat(seg, reach + 0.01)?.beat).toMatchObject({ u: SIT.side, facing: true });
   });
 
+  // one test per map and bim count: the 3 counts of a map in one test took over 5 s at gate load
+  // (load ~60, bims-vitest); the same loops and samples, each count under its own timeout
   for (const map of MAP_IDS) {
-    it(`${map}: every bim sits down at its desk and gets up without a part of it in its chair`, () => {
+    it.each([1, 5, 12])(`${map}, %i bims: every bim sits down at its desk and gets up without a part of it in its chair`, (n) => {
       const bad: string[] = [];
-      for (const n of [1, 5, 12]) {
+      {
         const o = office(map, n);
         const names = ['main', ...Array.from({ length: n - 1 }, (_, i) => `a${String(i + 1)}`)];
         for (const who of names) {
