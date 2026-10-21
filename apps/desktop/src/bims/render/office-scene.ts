@@ -254,6 +254,15 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
    * sheets left on desks (Pose.letter). Reduced motion: no flight, the open sheet in its hand, then on
    * its desk. True while one moves.
    */
+  /**
+   * a point of the view (world units) in this office's own (the plane flies in its root): in the town
+   * the office stands at its place, and his button's point taken as the office's flew from that far off
+   */
+  const local = (w: V3): V3 => {
+    root.updateWorldMatrix(true, false);
+    const v = root.worldToLocal(new Vector3(w.x, w.y, w.z));
+    return { x: v.x, y: v.y, z: v.z };
+  };
   /** a plane's meshes on one layer (three's layers are each object's own, never its children's) */
   const layerOf = (g: Object3D, n: number): void => {
     if (g.layers.isEnabled(n) && g.layers.mask === 1 << n) return;
@@ -300,7 +309,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
         // the newest is the one the egg may loop (eggs.ts reads pose.plane)
         const loops = fp.loops ?? (fp === f.pose.plane && f.egg?.kind === 'loop' ? 2 : 1);
         const avoid = pillHeads(frames, f.name);
-        const from = planeFrom ? viewPoint(fit, planeFrom) : cameraStart(fit, fp.startX);
+        const from = planeFrom ? local(viewPoint(fit, planeFrom)) : cameraStart(fit, fp.startX);
         const seed = hash(key);
         const glide = fp.glide === true;
         const plan = glide ? planGlide({ from, to: hand, seed, dur, px: fit.scale }) : planFlight({ from, to: hand, seed, loops, unit, avoid, dur });
@@ -312,7 +321,7 @@ export function makeOfficeScene(style: Style, o: { readonly ground?: boolean; re
       }
       p.mesh.setInk(light);
       // a glide from the view's point (the hero's sent bubble) leaves from it as the camera moves
-      const from = p.glide && planeFrom ? viewPoint(fit, planeFrom) : undefined;
+      const from = p.glide && planeFrom ? local(viewPoint(fit, planeFrom)) : undefined;
       const at = (x: number): FlightFrame => (p.glide ? glideAt(p.plan as GlidePlan, x, hand, from) : flightAt(p.plan as FlightPlan, x, hand));
       if (held === null) {
         // flying: to the hand's real point, from big near his eye to the bim's own size
