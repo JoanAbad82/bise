@@ -61,11 +61,13 @@ const SHEET = 0.39;
 export const SPAN = 0.3;
 
 /**
- * The bubble (w × h css px) folding at f (0..1 over FOLD_LINE_S) into the dart `l` leaves as, centred
- * on the bubble's middle. Pure.
+ * The shape (w × h css px: its box) folding at f (0..1 over its fold) into the dart `l` leaves as,
+ * centred on the box's middle. `start`: its own corners (tail's left tip, nose, tail's right tip,
+ * notch: the send button's arrow is a dart already, designer + bims m_36787/8); absent: the box's
+ * (top left, top right, bottom right, bottom left). Pure.
  */
-export function foldShape(f: number, w: number, h: number, l: Launch): FoldShape {
-  const rect: [number, number][] = [
+export function foldShape(f: number, w: number, h: number, l: Launch, start?: readonly (readonly [number, number])[]): FoldShape {
+  const rect: readonly (readonly [number, number])[] = start ?? [
     [0, 0],
     [w, 0],
     [w, h],
@@ -84,6 +86,6 @@ export function foldShape(f: number, w: number, h: number, l: Launch): FoldShape
   // the crease: the bubble's diagonal (top right to bottom left), then the dart's spine (nose to notch)
   const nose = target[1] ?? [cx, cy];
   const notch = target[3] ?? [cx, cy];
-  const spine = { a: mix([w, 0], nose, k), b: mix([0, h], notch, k), alpha: smooth((f - WORDS) / 0.1) };
+  const spine = { a: mix(rect[1] ?? [w, 0], nose, k), b: mix(rect[3] ?? [0, h], notch, k), alpha: smooth((f - WORDS) / 0.1) };
   return { points, paper: k, words, spine };
 }

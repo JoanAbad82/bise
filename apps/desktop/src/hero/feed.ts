@@ -103,6 +103,13 @@ const ARROW = 'M3 10 L17 4 L12 16 L10 11 Z';
 
 /** the arrow's box in the button, css px (ARROW drawn at +4, +4): what lifts and folds into the dart */
 const GLYPH = { x: 7, y: 8, w: 14, h: 12 } as const;
+/** ARROW's own corners in GLYPH (tail's left tip, nose, tail's right tip, notch): the fold starts as the arrow, never a box */
+const ARROW_PTS: readonly (readonly [number, number])[] = [
+  [0, 6],
+  [14, 0],
+  [9, 12],
+  [7, 7],
+];
 
 /**
  * the button's arrow folding into the dart (fold.ts; bims m_36638): white paper with its ink edge
@@ -112,7 +119,7 @@ function drawFold(svg: SVGSVGElement, f: number, l: Launch | null): void {
   const poly = svg.querySelector('polygon');
   const line = svg.querySelector('line');
   if (l === null) return;
-  const shape = foldShape(f, GLYPH.w, GLYPH.h, l);
+  const shape = foldShape(f, GLYPH.w, GLYPH.h, l, ARROW_PTS);
   const at = ([x, y]: readonly [number, number]): string => `${(x + GLYPH.x).toFixed(1)},${(y + GLYPH.y).toFixed(1)}`;
   poly?.setAttribute('points', shape.points.map(at).join(' '));
   line?.setAttribute('x1', (shape.spine.a[0] + GLYPH.x).toFixed(1));
