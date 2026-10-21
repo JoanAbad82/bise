@@ -321,6 +321,92 @@ mod tests {
         assert!(e.starts_with("a is also changed by @y, @z"), "{}", e);
     }
 
+    /// issue 37 #3: rust/proto/fixtures/land_pick.jsonl, today's pick on
+    /// every case of these tests and more, one per line: its input
+    /// (changes, files, add, others, alone) and its answer (mine and
+    /// left_out, or why). sb-core's land.bend reads the same file.
+    /// `BISE_PROTO_BLESS=1` writes it.
+    #[test]
+    fn the_pick_fixture_is_todays_pick() {
+        use serde_json::json;
+        let ch = |p: &str, r: bool| ch(p, r);
+        let many: Vec<Change> = (0..=SWEEP_MAX).map(|i| ch(&format!("out/{:03}", i), true)).chain([ch("a", true)]).collect();
+        let max: Vec<Change> = many[1..].to_vec();
+        let shared = vec![
+            ch("a", true),
+            ch("b", true),
+            ch("c", true),
+            ch("old.txt", false),
+            ch("gone", true),
+            ch("gen/v.svg", true),
+            ch("x/", true),
+            ch("y/", false),
+        ];
+        let alone = vec![ch("a", true), ch("Cargo.lock", false), ch("gone", true), mv("new.rs", "old.rs"), ch("n.txt", true), ch("sed.rs", false), ch("x/", false)];
+        let gen = vec![ch("c", true), ch("gen/v.svg", true), ch("gen/old.rs", false), ch("gen/y.txt", true)];
+        let y: &[(&str, &[&str])] = &[("y", &["gen/y.txt"])];
+        type Case<'a> = (Vec<Change>, &'a [&'a str], &'a [&'a str], &'a [(&'a str, &'a [&'a str])], bool);
+        let cases: Vec<Case> = vec![
+            (alone.clone(), &["a"], &[], &[], true),
+            (alone.clone(), &[], &[], &[], true),
+            (alone.clone(), &["a"], &[], &[], false),
+            (alone, &["a"], &["n.txt"], &[("z", &["sed.rs"])], true),
+            (many, &["a"], &[], &[], true),
+            (max, &["a"], &[], &[], true),
+            (shared.clone(), &["a", "unchanged"], &[], &[("y", &["b"])], false),
+            (shared.clone(), &["a"], &[], &[("y", &["b"])], true),
+            (shared.clone(), &[], &[], &[], false),
+            (shared, &["a"], &["."], &[("y", &["b"])], false),
+            (gen.clone(), &[], &["c"], y, false),
+            (gen.clone(), &[], &["gen/"], y, false),
+            (gen.clone(), &[], &["gen"], y, false),
+            (gen.clone(), &[], &["gen/y.txt"], y, false),
+            (gen.clone(), &[], &["nope"], y, false),
+            (gen.clone(), &[], &["."], y, false),
+            (gen.clone(), &[], &["c", "nope"], y, false),
+            (gen, &["gen/y.txt"], &[], y, true),
+            (vec![mv("b.rs", "a.rs")], &["a.rs"], &[], &[], false),
+            (vec![mv("b.rs", "a.rs")], &["b.rs"], &[], &[], false),
+            (vec![mv("b.rs", "a.rs")], &[], &[], &[], true),
+            (vec![mv("b.rs", "a.rs")], &[], &["a.rs"], &[], false),
+            (vec![ch("a.rs", true), ch("b.rs", true)], &["b.rs"], &[], &[], false),
+            (vec![ch("a", true)], &["a"], &[], &[("y", &["a"]), ("z", &["a"])], false),
+            (vec![ch("a", true)], &[], &[], &[("y", &["a"])], true),
+            (vec![ch("a", true), ch("a", true)], &["a"], &[], &[], false),
+            (vec![ch("x/", true)], &["x/"], &["x"], &[], false),
+            (vec![ch("x/", false), ch("y/", true)], &[], &[], &[], false),
+            (vec![], &["a"], &[], &[], true),
+            (vec![], &[], &["a"], &[], false),
+            (vec![ch("é/ü.txt", true), ch("sp ace", true)], &["sp ace"], &[], &[], false),
+            (vec![ch("d/a", true), ch("d/b", false), ch("dd/c", true)], &[], &["d"], &[], false),
+            (vec![ch("d/a", true), mv("e/b", "d/b")], &[], &["d/"], &[("y", &["e/b"])], false),
+        ];
+        let strs = |xs: &[String]| json!(xs);
+        let lines: Vec<String> = cases
+            .iter()
+            .map(|(cs, files, add, others, alone)| {
+                let input = json!({
+                    "changes": cs.iter().map(|c| json!({"path": c.path, "from": c.from.clone().unwrap_or_default(), "recent": c.recent})).collect::<Vec<_>>(),
+                    "files": files,
+                    "add": add.iter().map(|a| json!([a, a])).collect::<Vec<_>>(),
+                    "others": others.iter().map(|(n, fs)| json!([n, fs])).collect::<Vec<_>>(),
+                    "alone": alone,
+                });
+                let out = match pick_of(cs, files, add, others, *alone) {
+                    Ok(p) => json!({"ok": true, "mine": strs(&p.mine), "left_out": strs(&p.left_out), "why": ""}),
+                    Err(e) => json!({"ok": false, "mine": [], "left_out": [], "why": e}),
+                };
+                json!({"in": input, "out": out}).to_string()
+            })
+            .collect();
+        let text = lines.join("\n") + "\n";
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../proto/fixtures/land_pick.jsonl");
+        if std::env::var("BISE_PROTO_BLESS").is_ok() {
+            std::fs::write(&path, &text).expect("write the fixture");
+        }
+        assert_eq!(std::fs::read_to_string(&path).unwrap_or_default(), text, "land_pick.jsonl: BISE_PROTO_BLESS=1 writes it");
+    }
+
     #[test]
     fn the_note_names_the_files_and_the_repos() {
         assert_eq!(left_out_note(&[]), "");
