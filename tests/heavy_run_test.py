@@ -40,6 +40,13 @@ def stays(pred, secs, what):
         return False
 
 
+def job_ends(p, secs=30):
+    """The process's rc once it ends, waiting as wait.until does (scaled by
+    the machine's load: a fixed 30 s timed out at load 120); None if not."""
+    wait_for(lambda: p.poll() is not None, secs, "the job ends")
+    return p.poll()
+
+
 def held(slot):
     """The slot is taken (a probe with lockf -t 0 fails)."""
     return subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", slot, "true"], capture_output=True).returncode != 0
@@ -171,19 +178,20 @@ with tempfile.TemporaryDirectory() as home:
         check(stays(lambda: not os.path.exists(order), 2, "nothing runs"),
               "the --alone measure takes no slot while a land check is ahead")
         open(go4, "w").close()
-        land.wait(timeout=30)
-        meas.wait(timeout=30)
-        hold.wait(timeout=10)
+        job_ends(land)
+        job_ends(meas)
+        job_ends(hold)
         got = open(order).read().split() if os.path.exists(order) else []
         check(got == ["land", "alone"], "a land check before an --alone measure: %r" % got)
         # an --alone job that ran while a release-lane job ran: its end line says
         # 'lane=busy' (the lane runs beside it; a timing red may come from it)
         go6 = os.path.join(home, "go6")
-        lane_err = open(os.path.join(home, "lane_err"), "w+")
-        lane = subprocess.Popen([HEAVY, "--prio", "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go6], env=env1, stderr=lane_err)
-        ok = wait_for(lambda: held(os.path.join(run, "heavy5.lock")))
-        lane_err.seek(0)
-        check(ok, "a --prio job holds the release lane %r %r" % (lane_err.read()[-500:], lines()[-2:]))
+        lane = subprocess.Popen([HEAVY, "--prio", "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go6], env=env1,
+                                stderr=subprocess.DEVNULL)
+        # read from heavy.log, not by probing the lock: a probe holds the lock for
+        # a moment, and at load 100+ the --prio job's own try met it and took slot 1
+        check(wait_for(lambda: any(l.split("\t")[2:4] == ["-", "heavy5.lock"] and "go6" in l for l in lines())),
+              "a --prio job holds the release lane")
         a = subprocess.run([HEAVY, "--alone", "sh", "-c", "echo marked"], env=env1, capture_output=True, text=True, timeout=30)
         open(go6, "w").close()
         lane.wait(timeout=10)
@@ -258,12 +266,12 @@ with tempfile.TemporaryDirectory() as home:
     e2.seek(0)
     check("starts at 27 GB (15 kept free + 2 it may write + 10 the running jobs may still write)" in e2.read(), "the wait says the sum")
     open(freef, "w").write(str(27 * GB))
-    check(second.wait(timeout=30) == 0 and os.path.exists(ran2), "27 GB free: it runs")
+    check(job_ends(second, 30) == 0 and os.path.exists(ran2), "27 GB free: it runs")
     # what the disk lost since the running job started counts as written by
     # it: started at 30 GB free, now 22 (8 written): 2 left, a 2 GB job
     # needs 19 and runs (the whole sum would want 27: main m_36317)
     open(go_r, "w").close()
-    big.wait(timeout=30)
+    job_ends(big, 30)
     open(freef, "w").write(str(30 * GB))
     go_w = os.path.join(home, "go_written")
     big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_w],
@@ -275,7 +283,7 @@ with tempfile.TemporaryDirectory() as home:
     r = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', ran5], env=envr, capture_output=True, text=True, timeout=30)
     check(r.returncode == 0 and os.path.exists(ran5), "8 GB written since it started: a 2 GB job runs at 22 GB free: %r" % r.stderr[-300:])
     open(go_w, "w").close()
-    big.wait(timeout=30)
+    job_ends(big, 30)
     check(not [f for f in os.listdir(os.path.join(run, "reserve"))], "the reserves are gone with their jobs")
     # the load (mac-budget): with a heavy job running, a new one waits while
     # the load is over HEAVY_LOAD_MAX; a lone job never waits for it
@@ -288,7 +296,8 @@ with tempfile.TemporaryDirectory() as home:
     go_l = os.path.join(home, "go_load")
     hold = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_l], env=envl,
                             stderr=subprocess.DEVNULL)
-    wait_for(lambda: held(os.path.join(run, "heavy.lock")), what="slot 1 held")
+    # its start line, not a probe of the lock (a probe can meet a waiter's own try)
+    wait_for(lambda: any(l.split("\t")[2] == "-" and "go_load" in l for l in lines()), what="slot 1 held")
     ran4 = os.path.join(home, "ran4")
     e4 = open(os.path.join(home, "err4"), "w+")
     w4 = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran4], env=envl, stderr=e4)
@@ -309,9 +318,9 @@ with tempfile.TemporaryDirectory() as home:
     check(r.returncode == 0 and r.stdout.startswith("heavy5.lock"), "load 50: a --prio job still runs in the lane: %r" % r.stdout)
     check(wait_for(lambda: len(os.listdir(q)) >= 4), "the held jobs wait with their tickets")
     open(loadf, "w").write("10")
-    check(w4.wait(timeout=30) == 0 and os.path.exists(ran4), "load 10: it runs")
+    check(job_ends(w4, 30) == 0 and os.path.exists(ran4), "load 10: it runs")
     for j in (rest_a, rest_b, land2):
-        j.wait(timeout=60)
+        job_ends(j, 60)
     # the load never starves a job: past HEAVY_LOAD_WAIT_MAX it goes
     open(loadf, "w").write("50")
     ran6 = os.path.join(home, "ran6")
@@ -322,7 +331,7 @@ with tempfile.TemporaryDirectory() as home:
     got = open(lorder).read().split() if os.path.exists(lorder) else []
     check(got == ["land", "rest-a", "rest-b"], "after the load wait, by rank then submit time: %r" % got)
     open(go_l, "w").close()
-    hold.wait(timeout=30)
+    job_ends(hold, 30)
     # the time limit: a job over HEAVY_MAX_MIN is stopped, rc=124
     r = subprocess.run([HEAVY, "sh", "-c", "sleep 60 & wait"], env=dict(envr, HEAVY_MAX_MIN="1", HEAVY_MAX_SEC="2"),
                        capture_output=True, text=True, timeout=40)

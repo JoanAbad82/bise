@@ -125,7 +125,9 @@ reclaim() {
   [ -e "$s" ] && [ $(( now - $(stat -f %m "$s" 2>/dev/null || echo 0) )) -lt "$gap" ] && return 0
   touch "$s"
   local r="${HEAVY_RECLAIM:-/usr/bin/python3 $HOME/.bise/run/disk_reclaim.py}"
-  ( $r --want "$1" >>"$HOME/.bise/run/reclaim.out" 2>&1 & ) </dev/null >/dev/null 2>&1
+  # fds 3-9 closed: a job's slot lock (lockf's fd, 3; 3-6 for --alone) must
+  # not outlive the job in a reclaim that runs on
+  ( $r --want "$1" >>"$HOME/.bise/run/reclaim.out" 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & ) </dev/null >/dev/null 2>&1
 }
 # runs in the background of a job's shell ($1): marks $2 ("disk <GB>" or
 # "time <min>") and stops the job when the disk gets too low or the job runs
@@ -300,6 +302,9 @@ fi
 export HEAVY_RESERVE; HEAVY_RESERVE=$(reserve_gb "$([ "$ALONE" = 1 ] && echo --alone)" "$@")
 export HEAVY_MAX; HEAVY_MAX=$(max_min "$([ "$ALONE" = 1 ] && echo --alone)" "$@")
 
+# The watcher runs with fds 3-9 closed: its sleep outlives a kill of the
+# watcher by up to HEAVY_DISK_POLL s and held the slot's lock (lockf's fd)
+# that long after the job ended (a --prio job found the lane busy, 10-21).
 # the job, in its slot: $1 its ticket (gone once it runs), $2 the slot, $3
 # the nice level, then the command. HEAVY_SLOT="<slot> <pid of this shell>".
 export HEAVY_SUBMIT="${HEAVY_SUBMIT:-$(date +%s)}"
@@ -314,7 +319,7 @@ for f in "$r"/target/RECLAIMED.txt "$r"/*/target/RECLAIMED.txt "$r"/*/*/target/R
 done
 reclaim 0
 stop="$HOME/.bise/run/disk-stop.$$"; rm -f "$stop"
-disk_watch $$ "$stop" "$HEAVY_MAX" </dev/null >/dev/null 2>&1 & w=$!
+disk_watch $$ "$stop" "$HEAVY_MAX" </dev/null >/dev/null 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & w=$!
 /usr/bin/caffeinate -is nice -n "$3" "${@:4}"; rc=$?
 kill $w 2>/dev/null; wait $w 2>/dev/null
 rm -f "$rv"
