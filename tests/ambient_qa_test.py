@@ -496,6 +496,16 @@ def real_home_env_finds_its_hub_by_his_rules():
 
 
 @test
+def the_gate_tree_is_not_his_state():
+    """the nightly's and tip gate's own tree (~/.bise/run/nightly/tree/<repo>) may be a world's BISE_APP_ROOT; the rest of ~/.bise/run stays refused"""
+    tree = os.path.expanduser("~/.bise/run/nightly/tree/harness")
+    check(qa.reaches_his_state(tree) is None and qa.reaches_his_state(tree + "/rust") is None, "the gate tree: not his state")
+    qa.refuse_his_state(["BISE_APP_ROOT=" + tree])
+    for his in ("~/.bise/run", "~/.bise/run/nightly", "~/.bise/run/x.sock", "~/.bise/run/nightly/treex"):
+        check(qa.reaches_his_state(os.path.expanduser(his)) == os.path.expanduser("~/.bise/run"), "still his: %s" % his)
+
+
+@test
 def a_term_stops_a_run_like_ctrl_c():
     """kill <run pid> raises KeyboardInterrupt in the run, so its finally clauses stop its hub"""
     try:

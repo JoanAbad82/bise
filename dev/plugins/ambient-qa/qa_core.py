@@ -714,6 +714,10 @@ def _short_agent():
 # his own state: a harness path must never point there (ambient-lead m_8004)
 HIS_STATE = [os.path.expanduser(p) for p in ("~/.bise/hubs", "~/.bise/run", "~/.bise/dev/ambient", "~/.bise/sessions",
                                               "~/.local/state/switchboard", "~/bise")]
+# the gate's own checkout (scripts/nightly_gate.sh: the nightly's and the tip gate's tree), under
+# ~/.bise/run but code, never his state: the real-core world's hubs run its repl-live
+# (BISE_APP_ROOT, QA_BISE; tip 156b45461: 32 real-core checks 'no world up' on this refusal)
+GATE_TREE = os.path.expanduser("~/.bise/run/nightly/tree")
 
 
 
@@ -735,6 +739,9 @@ def reaches_his_state(path):
     rp = os.path.realpath(path)
     if os.path.isfile(rp) and os.access(rp, os.X_OK) and not rp.endswith((".sock", ".pid")):
         return None   # a program (his bise: ~/.bise/dev/build links into ~/.local/state/switchboard/build), never state
+    gt = os.path.realpath(GATE_TREE)
+    if rp == gt or rp.startswith(gt + "/"):
+        return None   # the gate's own tree
     for his in HIS_STATE:
         if rp == os.path.realpath(his) or rp.startswith(os.path.realpath(his) + "/"):
             return his
