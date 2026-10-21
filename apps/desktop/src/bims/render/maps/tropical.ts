@@ -100,13 +100,23 @@ function shell(b: Build): void {
     g.stroke();
   });
   k.add(k.style.box(0.02, 0.9, D), az, root, x0 + 0.01, 0.5, D / 2);
-  // the thin flat roof on slim pilotis over the hammocks (the lounge's corner)
+  // the thin flat roof on slim pilotis along the back wall, behind the hammocks: it ends behind the
+  // first row's heads, a scalloped valance on its edge (bims-nap, bims m_36558: over the hammocks it
+  // hid the nappers from the office's camera; render/nap.test.ts)
   const lx = o.lounge.map((s) => s.x);
   if (lx.length) {
     const r0 = Math.min(...lx) - 0.7;
     const r1 = Math.max(...lx) + 0.7;
-    for (const px of [r0, r1]) k.add(k.style.cylinder(0.05, 1.95), k.mat('#d8d2c6'), root, px, 0.97, 3.0);
-    k.add(k.style.box(r1 - r0 + 0.2, 0.08, 3.1), k.mat(nc('#f3efe4', night, 0.7)), root, (r0 + r1) / 2, 1.97, 1.5);
+    const edge = Math.min(...o.lounge.map((s) => s.z)) - 0.95;
+    const roof = nc('#f3efe4', night, 0.7);
+    for (const px of [r0, r1]) k.add(k.style.cylinder(0.05, 1.95), k.mat('#d8d2c6'), root, px, 0.97, edge - 0.05);
+    k.add(k.style.box(r1 - r0 + 0.2, 0.08, edge + 0.05), k.mat(roof), root, (r0 + r1) / 2, 1.97, (edge - 0.05) / 2);
+    // the valance: half discs hanging off the edge, side by side
+    const n = Math.max(2, Math.round((r1 - r0 + 0.2) / 0.16));
+    for (let i = 0; i < n; i++) {
+      const d = k.add(k.style.cylinder(0.075, 0.02), k.mat(i % 2 ? '#2a9d8f' : roof), root, r0 - 0.1 + ((i + 0.5) * (r1 - r0 + 0.2)) / n, 1.93, edge);
+      d.rotation.x = Math.PI / 2;
+    }
   }
   // monsteras past each row's S, in front of the desks; a football by the door
   for (const path of o.paths) {

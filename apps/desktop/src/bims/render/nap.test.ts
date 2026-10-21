@@ -8,9 +8,13 @@
 // - a flat bed (a mat, a cushion, a cot, a bench): its back's lowest point and both heels on the
 //   top, within TOUCH; no part of it lower than the top under it (nothing in the bed);
 // - a bean bag or a pouf: its back sunk in it, at most SUNK, never over it;
-// - a hammock: its back on the cloth, within TOUCH.
+// - a hammock: its back on the cloth, within TOUCH;
+// - at the office's camera (camera.ts: 320 and 640 docked), nothing taller than its head's middle
+//   and nearer the camera than its head covers that head on the screen (bims m_36521: a round
+//   bush hid greenhouse's nap-f, sahel's shelter beam crossed a row of nappers), as shade.test.ts
+//   does for desk heads and lamp shades.
 import { describe, expect, it } from 'vitest';
-import { Group, Mesh, type Object3D, Vector3 } from 'three';
+import { Box3, Group, Mesh, type Object3D, Vector3 } from 'three';
 import { crowd } from '../fixtures';
 import { layoutOf, readyMaps } from '../maps';
 import { bedStage, bedsAt, LAST_STAGE, NO_GROW } from '../growth';
@@ -20,6 +24,9 @@ import { lookOf } from './maps';
 import { makeBim } from './bim';
 import { rigOf } from './pose';
 import { restAt, surfaceAt, type NapRest } from './nap';
+import { meshBoxes } from './cozy';
+import { HEAD_Y } from './laptop';
+import { BACK, type Fit, fitSite, siteOf, toScreen, wideSiteOf } from './camera';
 import { STYLE } from './style';
 
 /** how near the top a point that rests on it is */
@@ -52,7 +59,7 @@ function lowest(m: Mesh): Vector3 {
 }
 
 /** the napper's parts: its hoodie (the back), its feet, every shown mesh */
-function napper(name: string, spot: Spot, bedAt: (p: { x: number; z: number }) => NapRest | undefined): { back: Vector3; heels: Vector3[]; all: { m: Mesh; low: Vector3 }[] } {
+function napper(name: string, spot: Spot, bedAt: (p: { x: number; z: number }) => NapRest | undefined): { back: Vector3; heels: Vector3[]; all: { m: Mesh; low: Vector3 }[]; head: Box3 } {
   const bim = makeBim(name, false, STYLE);
   const pose: Pose = {
     x: spot.x, z: spot.z, dir: spot.face, moving: false, since: 30,
@@ -70,15 +77,45 @@ function napper(name: string, spot: Spot, bedAt: (p: { x: number; z: number }) =
     const m = o as Mesh;
     all.push({ m, low: lowest(m) });
   });
-  const out = { back: lowest(hoodie), heels: feet.map(lowest), all };
+  const top = body.children.find((c) => c instanceof Group && Math.abs(c.position.y - HEAD_Y) < 1e-6);
+  const head = top ? new Box3().setFromObject(top, true) : new Box3();
+  const out = { back: lowest(hoodie), heels: feet.map(lowest), all, head };
   bim.dispose();
   return out;
 }
 
 const f2 = (n: number): string => n.toFixed(3);
+const fmt = (b: Box3): string => `${b.min.toArray().map((v) => v.toFixed(2)).join(',')}..${b.max.toArray().map((v) => v.toFixed(2)).join(',')}`;
+
+interface Rect { readonly x0: number; readonly x1: number; readonly y0: number; readonly y1: number }
+/** a box's 8 corners on the screen: their bounds, css px (shade.test.ts) */
+function onScreen(fit: Fit, b: Box3): Rect {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+    const p = toScreen(fit, { x, y, z });
+    x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
+  }
+  return { x0, x1, y0, y1 };
+}
+/** two screen boxes overlap by more than a few px each way (an edge grazed reads as in view) */
+const covers = (a: Rect, b: Rect): boolean => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 3 && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > 3;
+/** how near the camera a box's middle is */
+const depth = (b: Box3): number => ((b.min.x + b.max.x) / 2) * BACK.x + ((b.min.y + b.max.y) / 2) * BACK.y + ((b.min.z + b.max.z) / 2) * BACK.z;
+/** a box cut in pieces 0.1 long along its longest side (clip.test.ts: a long beam's box is a wide rectangle its line only crosses) */
+function pieces(b: Box3): Box3[] {
+  const size = b.getSize(new Vector3());
+  const axis = size.x >= size.y && size.x >= size.z ? 'x' : size.y >= size.z ? 'y' : 'z';
+  const n = Math.max(1, Math.ceil(size[axis] / 0.1));
+  return Array.from({ length: n }, (_, i) => {
+    const p = b.clone();
+    p.min[axis] = b.min[axis] + (size[axis] * i) / n;
+    p.max[axis] = b.min[axis] + (size[axis] * (i + 1)) / n;
+    return p;
+  });
+}
 
 /** the reds of one world: each built bed's napper off its top */
-function napReds(o: Office, stage: number): string[] {
+function napReds(o: Office, stage: number, heads = false): string[] {
   const look = lookOf(o.map);
   const w = buildWorld(o, 'main', STYLE, look, false, { ...NO_GROW, stage });
   w.root.updateMatrixWorld(true);
@@ -86,10 +123,23 @@ function napReds(o: Office, stage: number): string[] {
   w.root.traverse((m) => { if (m instanceof Mesh) meshes.push(m); });
   const out: string[] = [];
   const bedAt = (p: { x: number; z: number }): NapRest | undefined => restAt(o, w.naps, p);
+  const boxes = meshBoxes(w.root).filter((b) => !b.isEmpty()).flatMap(pieces);
+  const fits: readonly [string, Fit][] = [['320', fitSite(siteOf(o), 320, 0)], ['640', fitSite(wideSiteOf(o), 640, 0)]];
   o.lounge.slice(0, bedsAt(stage)).forEach((s, i) => {
     const rest = w.naps[i];
     if (!rest) { out.push(`bed ${String(i)}: no rest measured`); return; }
     const n = napper(`agent-${String(i + 1)}`, s, bedAt);
+    // its head on the screen: nothing taller than its middle, nearer the camera, over it
+    if (heads) {
+    const mid = (n.head.min.y + n.head.max.y) / 2;
+    const near = boxes.filter((b) => b.max.y > mid && depth(b) > depth(n.head));
+    for (const [px, fit] of fits) {
+      const r = onScreen(fit, n.head);
+      const over = near.find((b) => covers(r, onScreen(fit, b)));
+      if (over) out.push(`bed ${String(i)}: at ${px}, its napper's head ${fmt(n.head)} under ${fmt(over)}`);
+    }
+    return;
+    }
     const under = (p: Vector3): number => surfaceAt(meshes, p.x, p.z);
     const back = under(n.back);
     const tag = `bed ${String(i)} (${rest.shape})`;
@@ -111,6 +161,23 @@ function napReds(o: Office, stage: number): string[] {
   w.dispose();
   return out;
 }
+
+describe('nap: every napper\'s head in view at the office camera', () => {
+  for (const id of readyMaps()) {
+    it(`${id}: every bed at stage ${String(LAST_STAGE)}, 320 and 640, 0..31 agents (each room size once)`, async () => {
+      const out: string[] = [];
+      const seen = new Set<string>();
+      for (let n = 0; n <= 31; n++) {
+        const o = layoutOf(crowd(n).agents, id);
+        if (seen.has(o.size)) continue;
+        seen.add(o.size);
+        out.push(...napReds(o, LAST_STAGE, true).map((r) => `${String(n)} agents, ${r}`));
+        await turn();
+      }
+      expect([...new Set(out)].join('\n')).toBe('');
+    }, 180_000);
+  }
+});
 
 describe('nap: every napper rests on its bed', () => {
   for (const id of readyMaps()) {

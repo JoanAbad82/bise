@@ -411,6 +411,25 @@ function hang(r: Room, near: Pt, others: readonly Hung[], floor: readonly Item[]
   return cands[0]?.hg ?? null;
 }
 
+/** the office camera's way along the floor, from what it looks at toward it (render/camera.ts BACK's x, z: AZ = 45°) */
+const TOWARD_CAMERA = { x: Math.SQRT1_2, z: Math.SQRT1_2 } as const;
+/** how far toward the camera a floor lamp's shade (1.65 tall) is drawn over a napper's head: its height over the head's, over tan(30°) */
+const SIGHT = 2.8;
+
+/**
+ * The floor between a napper's head on that lounge spot and the camera, in boxes 0.7 wide: a floor
+ * lamp standing there is drawn over the head (bims-nap, bims m_36558: on the smallest campus and
+ * kyoto offices; render/nap.test.ts checks every head on screen). Pure.
+ */
+export function sightOf(s: Spot): Box[] {
+  const h = { x: s.x - Math.sin(s.face) * 0.6, z: s.z - Math.cos(s.face) * 0.6 };
+  return Array.from({ length: Math.ceil(SIGHT / 0.35) + 1 }, (_, i) => {
+    const x = h.x + TOWARD_CAMERA.x * i * 0.35;
+    const z = h.z + TOWARD_CAMERA.z * i * 0.35;
+    return { x0: x - 0.35, x1: x + 0.35, z0: z - 0.35, z1: z + 0.35 };
+  });
+}
+
 /** where a napper's head lies on that lounge spot: behind it, the way it faces (render/clip.test.ts checks the real pose) */
 export function headRoom(s: Spot): Box {
   const bx = -Math.sin(s.face);
@@ -502,8 +521,15 @@ export function placeCozy(o: Office, hints: CozyHints): Cozy | null {
   if (!shelf) return null;
   const L = SIZE.lamp;
   const P = SIZE.plant;
+  // the floor lamps never between a napper's head and the camera (sightOf): only while they are placed
+  const sight = o.lounge.flatMap(sightOf);
+  const outOfSight = <T>(f: () => T): T => {
+    const n = r.solid.length;
+    r.solid.push(...sight);
+    try { return f(); } finally { r.solid.splice(n, sight.length); }
+  };
   // the floor lamp by the nap corner, free-standing there when no wall is near (bims m_32218)
-  const lamp0 = place(r, L.w, L.d, L.h, nap, true);
+  const lamp0 = outOfSight(() => place(r, L.w, L.d, L.h, nap, true));
   // the big plants: by the door and by main's desk (stage 0), by the coffee corner (1), by the shelf (5)
   const day0 = [o.door, { x: o.mainDesk.x, z: o.mainDesk.z }].map((to) => place(r, P.w, P.d, P.h, to, true));
   // the posters are the first day's: they get their wall before the later plants and lamp take it
@@ -513,7 +539,7 @@ export function placeCozy(o: Office, hints: CozyHints): Cozy | null {
   const p1 = hang(r, p0 ? { x: p0.x, z: p0.z } : mid, p0 ? [p0] : [], now);
   for (const p of [p0, p1]) if (p) r.solid.push(boxOn(o, p.wall, p.wall === 'back' ? p.x : p.z, p.w, 0.42));
   const plants = [...day0, ...[centre(coffee.box), centre(shelf.box)].map((to) => place(r, P.w, P.d, P.h, to, true))];
-  const lamp1 = place(r, L.w, L.d, L.h, centre(shelf.box));
+  const lamp1 = outOfSight(() => place(r, L.w, L.d, L.h, centre(shelf.box)));
   const tall = (it: Item): boolean => (r.walls.find((w) => w.wall === it.wall)?.top ?? 0) >= HANG_WALL;
   // over the shelf only: the coffee corner's machine and cups stand where its leaves would hang
   const hangOver = tall(shelf) ? 'shelf' : null;

@@ -142,8 +142,9 @@ const grower: Grower = {
       k.add(k.style.cylinder(0.045, 0.7), k.mat('#a8c96a'), g, p.x - 0.35, 0.42, p.z - 0.1).rotation.z = 1.1;
       k.add(k.style.cylinder(0.02, 0.35), k.mat('#6b8f3a'), g, p.x - 0.4, 0.2, p.z - 0.1);
     }),
-    // 11 an old arcade cabinet past the kotatsu's end, clear of the last bed (bims-clip)
-    piece((o) => ({ x: ky(o).kotatsu.x1 + 0.65, z: 0.3 }), (k, g, p) => { arcade(k, g, p); }),
+    // 11 an old arcade cabinet past the kotatsu's end, clear of the last bed (bims-clip) and of its
+    // napper's head on screen (bims-nap, bims m_36558: 0.5 further)
+    piece((o) => ({ x: ky(o).kotatsu.x1 + 1.15, z: 0.3 }), (k, g, p) => { arcade(k, g, p); }),
     // 12 a koi pond, its orange wooden bridge, two koi
     piece((o) => ({ x: o.x0 - 1.9, z: o.D + 2.2 }), (k, g, p, b) => {
       pool(k, g, p.x, p.z, 1.0, 0.75, b.k.pal.pendants);

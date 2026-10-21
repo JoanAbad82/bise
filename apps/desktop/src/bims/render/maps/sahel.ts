@@ -49,11 +49,19 @@ function mat(k: Kit, g: Object3D, x: number, z: number, w: number, d: number, c:
   for (let i = 0; i < 5; i++) k.add(k.style.box(w, 0.02, d / 5), k.mat(i % 2 ? c : STRAW), g, x, 0.035, z - d / 2 + (i + 0.5) * (d / 5));
 }
 
-/** a branch shelter: four posts, a roof of a few thin branches and straw (bims: thick ones crossed the bims' heads at 320) */
-function hangar(k: Kit, g: Object3D, x0: number, x1: number, z0: number, z1: number): void {
+/**
+ * a branch shelter: four posts, a roof of a few thin branches and straw (bims: thick ones crossed
+ * the bims' heads at 320). `from`: its straw's middles no nearer the back than this z: over the
+ * desks, far enough that at the office's camera it is never drawn over a napper's head behind it
+ * (bims-nap, bims m_36521; render/nap.test.ts); none when the shelter is all nearer
+ */
+function hangar(k: Kit, g: Object3D, x0: number, x1: number, z0: number, z1: number, from = z0 + 0.5): void {
   for (const x of [x0, x1]) for (const z of [z0, z1]) k.add(k.style.cylinder(0.08, 2.0), k.mat(WOOD), g, x, 1.0, z);
   for (let z = z0; z <= z1 + 0.01; z += 1.8) k.add(k.style.cylinder(0.018, x1 - x0 + 0.4), k.mat('#b08a5a'), g, (x0 + x1) / 2, 2.02, z).rotation.z = Math.PI / 2;
-  for (let i = 0; i < 3; i++) k.add(k.style.box(x1 - x0, 0.03, 0.4), k.mat(STRAW), g, (x0 + x1) / 2, 2.06, z0 + 0.5 + (i * (z1 - z0 - 1)) / 2);
+  const a = Math.max(z0 + 0.5, from);
+  const b = z1 - 0.5;
+  if (b < a) return;
+  for (let i = 0; i < 3; i++) k.add(k.style.box(x1 - x0, 0.03, 0.4), k.mat(STRAW), g, (x0 + x1) / 2, 2.06, a + (i * (b - a)) / 2);
 }
 
 /**
@@ -85,7 +93,8 @@ function shell(b: Build): void {
     cone(k, root, 0.25, 0.5, k.pal.wall, offNap(o, x), 2.05, -0.15);
   }
   // the hangar over the desks, a woven mat under each desk
-  hangar(k, root, H.x0, H.x1, H.z0, H.z1);
+  // its straw drawn over no napper's head: 2.8 past the nap place's front row (the camera's slant at the roof's height)
+  hangar(k, root, H.x0, H.x1, H.z0, H.z1, Math.max(...o.lounge.map((l) => l.z), H.z0) + 2.8);
   for (const d of o.desks.values()) mat(k, root, d.x, d.z + 0.3, 1.6, 1.4, MATS[hash(`${d.x}`) % 4] ?? STRAW);
   // granaries with straw hats in the yard's back corner, water jars by the door
   for (const [gx, gz] of [[x0 + W - 0.9, 5.0], [x0 + W - 0.9, 6.3]] as const) {
