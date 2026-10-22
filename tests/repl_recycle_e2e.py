@@ -52,7 +52,12 @@ def rss_kb(pid):
 
 def main():
     E = Env()
-    E.env.update(BISE_RECYCLE_TOKENS="150", BEND_BG_AFTER="2")
+    # the hub sees load x1: at x2+ a due recycle waits for the machine
+    # (recycle::load_holds, 8b2561d1d, its own unit test), and the tip
+    # gate's pool runs at x2-2.5, so the recycle never came
+    load = os.path.join(E.tmp, "load-factor")
+    open(load, "w").write("1")
+    E.env.update(BISE_RECYCLE_TOKENS="150", BEND_BG_AFTER="2", SB_LOAD_FACTOR=load)
     ok = False
     try:
         c = E.start_hub()
