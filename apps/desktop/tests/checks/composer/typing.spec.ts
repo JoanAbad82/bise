@@ -8,7 +8,7 @@
 // the send button), 500+ replaced nodes for one line.
 import { test, expect, typeAndWatch, caretBlinks, Recorder, flashes } from '../../harness';
 import { T, fieldText, onTarget } from './target';
-import { movingMask, maskShare, changedOutsideStill } from './still';
+import { movingMask, maskShare, changedOutsideStill, movingShare } from './still';
 
 const LINE1 = "salut, je regarde ça ce soir : «on garde la file d'attente» ou pas ?";
 const LINE2 = 'le reçu est déjà là, à vérifier côté hub.';
@@ -18,10 +18,18 @@ test('composer/typing: caret, 0 replaced nodes, nothing changes outside the fiel
   await onTarget(async ({ page, cdp }) => {
     const field = page.locator(T.field);
     await field.click();
-    await page.keyboard.type('s'); // the first letter may switch the send button on: allowed
     // the lab runs with no core: 2 s after launch (CoreLine QUIET_START_MS) the status line says
     // 'starting bise…' under the title bar and moves the screen; the window's start, not typing
     await page.getByTestId('app.core').waitFor({ state: 'visible', timeout: 4000 }).catch(() => undefined);
+    // the first letter may switch the send button on, and zen fades the chrome in (zen.css, 250 ms):
+    // allowed. Typed AFTER the wait above: zen holds ZEN_HOLD_MS (5 s) after a typing key, and up
+    // to 4 s of wait + the idle record outlasted it, so zen faded out and back in on the first key
+    // typed below (red 2/6 at load 9: the whole chrome's text and the send button moved)
+    await page.keyboard.type('s');
+    await page.waitForFunction(() => {
+      const shell = document.querySelector('.app-shell');
+      return shell === null || !shell.hasAttribute('data-zen') || getComputedStyle(shell).getPropertyValue('--zen').trim() === '45%';
+    }, undefined, { timeout: 4000 }).catch(() => undefined);
     await page.waitForTimeout(300);
     const box = await field.boundingBox();
     expect(box, 'the field is on the page').not.toBeNull();
@@ -32,9 +40,10 @@ test('composer/typing: caret, 0 replaced nodes, nothing changes outside the fiel
     test.info().annotations.push({ type: 'idle', description: `${(maskShare(mask) * 100).toFixed(1)}% of the window moves on its own` });
 
     await rec.start();
-    const typed = await typeAndWatch(page, T.field, LINE1.slice(1), [T.composer, ...T.lists], 25);
+    const typed = await typeAndWatch(page, T.field, LINE1.slice(1), [T.composer, ...T.lists], 25, false);
     await page.waitForTimeout(250);
     const frames = await rec.stop();
+    test.info().annotations.push({ type: 'moving', description: `${(movingShare(frames) * 100).toFixed(1)}% of the window is intended motion (pearls, status pill)` });
     const outside = changedOutsideStill(frames, box, mask).filter((n) => n > 4).length;
     const flashed = flashes(frames, box);
     const caret = await caretBlinks(page, T.field);

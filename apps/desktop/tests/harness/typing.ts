@@ -76,8 +76,10 @@ const snap = (page: Page, field: string): Promise<Snap> =>
  * Clicks the field, then types `text` one key at a time and checks focus and caret after each key;
  * mutations are counted under `watch` (the field and the lists) from the first key to the last.
  */
-export async function typeAndWatch(page: Page, field: string, text: string, watch: string[] = [field], delayMs = 40): Promise<TypingReport> {
-  await page.click(field);
+export async function typeAndWatch(page: Page, field: string, text: string, watch: string[] = [field], delayMs = 40, click = true): Promise<TypingReport> {
+  // click: false keeps the focus the caller gave (a click is a gesture of its own: the app's zen
+  // leaves on it, and its fade back is drawn while the keys are watched)
+  if (click) await page.click(field);
   await watchMutations(page, watch);
   const focusLost: number[] = [];
   const caretJumps: number[] = [];

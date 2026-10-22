@@ -2,9 +2,5 @@
 # One per line, tab-separated: <test>	<since>	<owner>	<why>. A red here is known: the full gate
 # and test:land say so; any other red is NEW. Remove the line in the commit that fixes it.
 keep-all	d8e6d29ae	gate-reds	load flake, green alone 25/25 (5 runs of its 5 tests, load 41), red only at load >= 37: 'agents: Tune...' after a relaunch the model id's caret is not after his words (row-slide's test:land run 4 of 5, with 4 other reds); main m_33979
-open	bb7c7ebd3	desk-reds	shipped in 10.9: red alone 2/2 on bb7c7ebd3 and on 6a79da476: 'no bise-desktop: external line matched in 5000 ms' (release-48's 10.10 triage; main m_37744)
-feature	bb7c7ebd3	desk-reds	shipped in 10.9: 'a feature with 2 agents' red alone 2/2 on bb7c7ebd3 and on 6a79da476: the right bar never shows the feature gift-cards with its agents (the ⌘D case is green) (release-48; main m_37744)
-voice-real	bb7c7ebd3	desk-reds	shipped in 10.9: red alone 2/2 on bb7c7ebd3 and on 6a79da476: the pane (the core's voice_mode on) never shows (release-48; main m_37744)
 answer-everywhere	bb7c7ebd3	desk-reds	shipped in 10.9, a product leak: 'its hub stopped' red alone and serial on bb7c7ebd3 2/3 and on 6a79da476 every run: the stopped hub's repl-live processes stay (3 killed by the harness rule), and the world goes down after; the other two cases green (release-48; review-gates m_37750)
-typing	bb7c7ebd3	desk-reds	shipped flake: red alone 1/2 on bb7c7ebd3 and 1/2 on 6a79da476: 'frames that changed outside the field' (release-48; main m_37744)
 

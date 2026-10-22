@@ -13,7 +13,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: { alias: { '@': resolve(__dirname, 'src') } },
   test: {
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/feature/**/*.test.ts'],
+    // tests/checks/**/*.test.ts: a check's pure helpers (composer/still.ts); the checks are *.spec.ts
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/feature/**/*.test.ts', 'tests/checks/**/*.test.ts'],
     environment: 'node',
     passWithNoTests: true,
     // the window's keep starts empty for every test (src/test-setup.ts)

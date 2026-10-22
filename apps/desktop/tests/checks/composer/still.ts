@@ -37,17 +37,44 @@ export function movingMask(idle: Frame[], grow = 3): Mask | null {
 
 export const maskShare = (m: Mask | null): number => (m ? m.on.reduce((n, v) => n + v, 0) / (m.width * m.height) : 0);
 
-/** For each pair of frames: the pixels that changed outside `box` and outside the mask. */
+/** Past this share of the window, the intended-motion boxes hide too much to judge (review-gates m_37859). */
+export const MOVING_CAP = 0.05;
+
+/** The share of the window the frames' intended-motion boxes cover (their union, in device px). */
+export function movingShare(frames: Frame[]): number {
+  const f = frames[0];
+  if (!f) return 0;
+  const { width, height } = f.png, s = f.scale;
+  const boxes = frames.flatMap((x) => x.masks ?? []);
+  if (boxes.length === 0) return 0;
+  let n = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (boxes.some((b) => x >= b.x * s && x < (b.x + b.width) * s && y >= b.y * s && y < (b.y + b.height) * s)) n++;
+    }
+  }
+  return n / (width * height);
+}
+
+/** For each pair of frames: the pixels that changed outside `box`, the mask and the frames'
+ *  intended-motion boxes. Throws when those boxes cover more than MOVING_CAP of the window. */
 export function changedOutsideStill(frames: Frame[], box: Box, mask: Mask | null): number[] {
+  const share = movingShare(frames);
+  if (share > MOVING_CAP) throw new Error(`intended-motion boxes cover ${(share * 100).toFixed(1)}%: too wide to judge`);
   const out: number[] = [];
   for (let k = 1; k < frames.length; k++) {
     const A = frames[k - 1], B = frames[k];
     if (!A || !B) continue;
     const { width, height } = A.png, s = A.scale;
+    // the recorder's boxes of intended motion (frames.ts PEARL_SELECTOR: the pearls, the title bar's
+    // status pill whose ∿ breathes while bise starts): a slow breath can miss the idle record
+    const moving = B.masks ?? [];
+    const inBox = (x: number, y: number, b: Box): boolean => x >= b.x * s && x < (b.x + b.width) * s && y >= b.y * s && y < (b.y + b.height) * s;
     let n = 0;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        if (x >= box.x * s && x < (box.x + box.width) * s && y >= box.y * s && y < (box.y + box.height) * s) continue;
+        if (inBox(x, y, box)) continue;
+        if (moving.some((b) => inBox(x, y, b))) continue;
         if (mask && mask.width === width && mask.on[y * width + x]) continue;
         if (diff(A.png.data, B.png.data, (y * width + x) * 4) > THRESHOLD) n++;
       }

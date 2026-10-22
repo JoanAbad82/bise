@@ -28,7 +28,8 @@ const T = {
 
 /** The feature view (amb-win efe231a3): its screen, state line, cards and answers. */
 const F = {
-  group: '[data-testid="app.right.feature.gift-cards"]',
+  // the feature's head in the right bar: a group row named by its branch (e3ce0c60b, barrows.ts)
+  group: '[data-testid^="app.right.group."]:has-text("gift-cards")',
   screen: '[data-testid="feature.screen"]',
   state: '[data-testid="feature.state"]',
 };
@@ -124,7 +125,7 @@ test('review/feature: a feature with 2 agents shows, is tried and merged only on
     await expect(page.locator(T.thread)).toHaveAttribute('data-project', project, { timeout: 10_000 });
     try {
       // in the right bar, where its agents are since 54a96790 (the words also come in the thread's reports: not a feature view)
-      await expect.soft(page.locator('[data-testid="app.right.feature.gift-cards"]'), "the window's right bar shows the feature gift-cards with its agents, as the TUI's 'ψ gift-cards'").toBeVisible({ timeout: 5000 });
+      await expect.soft(page.locator(F.group).first(), "the window's right bar shows the feature gift-cards with its agents, as the TUI's 'ψ gift-cards'").toBeVisible({ timeout: 5000 });
     } finally {
       await page.screenshot({ path: test.info().outputPath('feature.png') });
     }

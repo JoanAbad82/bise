@@ -37,8 +37,16 @@ const WAV = path.join(REPO, 'rust', 'tui', 'src', 'voicemode', 'testdata', 'sent
 function lastAnswer(w: World, project: string, agent: string): string {
   const f = path.join(path.dirname(hubOf(w, project).sock), 'agents', agent, 'transcript.log');
   const lines = existsSync(f) ? readFileSync(f, 'utf8').split('\n') : [];
-  const said = lines.map((l) => l.slice(l.indexOf('\t') + 1).trimStart()).filter((l) => l.startsWith('obs: assistant: '));
-  return (said.at(-1) ?? '').slice('obs: assistant: '.length).replace(/\\n/g, '\n').trim();
+  // the runtime's typed obs record since e27071cbd: '<ms>\tobs assistant :: {"text": …}'
+  const head = 'obs assistant :: ';
+  const said = lines.map((l) => l.slice(l.indexOf('\t') + 1).trimStart()).filter((l) => l.startsWith(head));
+  const last = said.at(-1);
+  if (last === undefined) return '';
+  try {
+    return ((JSON.parse(last.slice(head.length)) as { text?: string }).text ?? '').trim();
+  } catch {
+    return '';
+  }
 }
 
 /** The answer's first words as the thread shows them: its first line, markdown marks dropped, 40 chars at most. */
@@ -49,7 +57,10 @@ function firstWords(text: string): string {
 
 /** The app on checkout's thread with voice mode's fakes; a fresh world's first-run setup is skipped first. */
 async function launchVoice(w: World, route: string, heard: string): Promise<{ s: Session; helper: FakeHelper }> {
-  const env = { BISE_VOICE_FAKE: WAV, BISE_VOICE_FAKE_HEARD: heard };
+  // the voice role's key, a fake one as the world's hubs have (real.sh): harnessEnv's allowlist
+  // passes no key, and without one the core refuses the first ctrl+r ('voice needs a key'), so
+  // the second never turns voice mode on
+  const env = { BISE_VOICE_FAKE: WAV, BISE_VOICE_FAKE_HEARD: heard, MISTRAL_API_KEY: 'qa-fake-not-a-key' };
   let helper = new FakeHelper();
   let s = await launchReal(w, { route, helper, env });
   await s.page.locator(`${T.field}, ${T.setupSkip}`).first().waitFor({ timeout: 15_000 }).catch(() => undefined);

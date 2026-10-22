@@ -16,6 +16,9 @@ import { hubOf, launchOn, realWorld, worldSay } from '../world';
 const T = {
   field: '[data-testid="composer.field"]',
   pages: '[data-testid^="thread.page."]',
+  open: '[data-testid="artifact.open"]',
+  title: '[data-testid="artifact.title"]',
+  browser: '[data-testid="artifact.browser"]',
 };
 
 test('pages/open: a page row with its version, opened on click; a new version shows', async () => {
@@ -39,7 +42,12 @@ test('pages/open: a page row with its version, opened on click; a new version sh
     await expect(row, "the page's row: ↗ title").toContainText(`↗ ${title}`, { timeout: 30_000 });
     await expect(row, 'its version: v1').toContainText('v1');
     await page.screenshot({ path: test.info().outputPath('page-v1.png') });
+    // a click opens the page's own view in the window (b4114e72d, designer's desktop-agents-bar
+    // §5), its '↗ browser' the hub's URL
     await row.click({ timeout: 10_000 });
+    await expect(page.locator(T.open), "a click opens the page's view").toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(T.title), 'its title').toHaveText(title);
+    await page.locator(T.browser).click({ timeout: 10_000 });
     const url = await out.wait('bise-desktop: external', () => true, 5000);
     test.info().annotations.push({ type: 'opened', description: url });
     expect(url, "a click opens the page's URL").toMatch(new RegExp(`^https?://[^ ]+plan-${n}`));
