@@ -47,14 +47,22 @@ test('native/badge: the Dock badge and the window title count what waits, and fo
     // the start, the badge is read on each change after. The fixture world has cards in other
     // projects too, and in a fresh test home bise's notifications ask waits beside them (one number,
     // designer m_25690): read the start, then each change moves it by what changed
+    // The ask lands a moment after the cards (+1): n is the start only once the count holds still
+    // for a while, else a late ask counts in the new card's step
     let n = 0;
+    let seen = -1;
+    let since = 0;
     await expect
       .poll(async () => {
         const m = /^bise · (\d+) waiting/.exec(await title(w));
         n = m ? Number(m[1]) : 0;
-        return n;
-      }, { message: "the title says 'N waiting'", timeout: 3000 })
-      .toBeGreaterThanOrEqual(2);
+        if (n !== seen) {
+          seen = n;
+          since = Date.now();
+        }
+        return n >= 2 && Date.now() - since >= 1000;
+      }, { message: "the title says 'N waiting', and holds", timeout: 6000, intervals: [100] })
+      .toBe(true);
     const first = cards.cards[0];
     if (!first) throw new Error('no card');
     await w.core.send({ ...cards, cards: [...cards.cards, { ...first, id: 97, question: 'merge it?' }] });
