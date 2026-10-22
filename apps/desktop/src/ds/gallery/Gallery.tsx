@@ -13,6 +13,12 @@ import {
   SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
 } from "../index";
+import { BimsToggle } from "@/bims/Cube";
+import { BimsSwitch } from "@/bims/Office";
+import { FitChip, NameLabel, Pill } from "@/bims/chips";
+import { mapRows, MapChip } from "@/bims/MapChip";
+import { MAP_IDS } from "@/bims/maps/ids";
+import { mapName } from "@/bims/maps/words";
 
 const OUT = ["13  workers: [Worker; 4],", "14  queue: Bounded<64>,"].join(String.fromCharCode(10));
 const OPTS: Opt[] = [{ n: 1, text: "keep 4 workers", on: true }, { n: 2, text: "go to 8" }, { n: 3, text: "ask me later", state: "hover" }];
@@ -109,6 +115,11 @@ function TrayIcon({ turn, wait }: { turn?: number; wait?: boolean }) {
     ctx.putImageData(new ImageData(new Uint8ClampedArray(px), 30, 30), 0, 0);
   }, [turn, wait]);
   return <canvas ref={cv} width={30} height={30} style={{ width: 15, height: 15 }} />;
+}
+
+/** one entry of a section and its name under it */
+function Entry({ name, children }: { name: string; children: ReactNode }) {
+  return <figure className="g-entry">{children}<figcaption>{name}</figcaption></figure>;
 }
 
 /** the sections, in the reference's order; each draws in one theme */
@@ -455,6 +466,64 @@ export const SECTIONS: Record<string, () => ReactNode> = {
       <TuiMd />
     </div>
   ),
+  // the bims' UI parts (designer m_37940), the app's own components: the AGENTS head's toggle (off,
+  // on with its '320 · wide', cube-only at a tight head), the map chip (rest, open, the fade after a
+  // pick: the old office over the new one, mid-way), '⤢ fit', the '?' / '✗' pills, a bim's labels
+  bims: () => {
+    const noop = () => undefined;
+    const head = (k: string, w: number, on: boolean, title: string) => (
+      <div className="g-agents" style={{ width: w }} data-testid={"ds.bims.toggle." + k}>
+        <span className="g-agents-title"><span className="g-agents-label">{title}</span></span>
+        <BimsSwitch view={{ view: on ? "bims" : "list", wide: false }} />
+        <BimsToggle view={{ view: on ? "bims" : "list", wide: false }} />
+        <span className="g-agents-all">all ›</span>
+      </div>
+    );
+    return (
+      <div className="g-col">
+        <div className="g-row g-top">
+          <Entry name="toggle off">{head("off", 304, false, "AGENTS · 3")}</Entry>
+          <Entry name="toggle on">{head("on", 304, true, "AGENTS · 3")}</Entry>
+          <Entry name="toggle cube-only (the 320 bar, a long count)">{head("cube-only", 304, true, "AGENTS · 128")}</Entry>
+        </div>
+        <div className="g-row g-top">
+          <Entry name="chip rest">
+            <div className="g-office" data-testid="ds.bims.map.rest"><div className="bims-mapsel"><MapChip map="loft" onPick={noop} /></div></div>
+          </Entry>
+          <Entry name="chip crossfade">
+            <div className="g-office" data-testid="ds.bims.map.xfade">
+              <div className="bims-xfade g-xfade" data-on="" />
+              <div className="bims-mapsel"><MapChip map="greenhouse" onPick={noop} /></div>
+            </div>
+          </Entry>
+          <Entry name="fit rest">
+            <div className="g-office" data-testid="ds.bims.fit.rest"><FitChip onFit={noop} /></div>
+          </Entry>
+          <Entry name="fit hover">
+            <div className="g-office g-hover" data-testid="ds.bims.fit.hover"><FitChip onFit={noop} /></div>
+          </Entry>
+        </div>
+        <div className="g-row g-top">
+          <Entry name="chip open (13 maps, capped: the fade below)">
+            <div className="g-office g-office-open" data-testid="ds.bims.map.open">
+              <Picker groups={[{ id: "maps", rows: mapRows(MAP_IDS, "loft") }]} maxHeight={260} onPick={noop} />
+              <div className="bims-mapsel"><PickerTrigger extra="bims-chip" open>{mapName("loft")}</PickerTrigger></div>
+            </div>
+          </Entry>
+          <div className="g-col">
+            <Entry name="pills"><div className="g-row"><Pill name="search" pill="asks" onOpen={noop} /><Pill name="index" pill="failed" onOpen={noop} /></div></Entry>
+            <Entry name="labels: walking, an event, with its pill">
+              <div className="g-row">
+                <NameLabel name="alerts" mode="name">alerts</NameLabel>
+                <NameLabel name="search" mode="event">search · runs the tests</NameLabel>
+                <span className="g-row g-tight"><NameLabel name="index" mode="event">index · failed</NameLabel><Pill name="index" pill="failed" onOpen={noop} /></span>
+              </div>
+            </Entry>
+          </div>
+        </div>
+      </div>
+    );
+  },
   window: () => (
     <Win
       side={<Side foot="+ add a project"><Row kind="me" name="bise" sub="every project" /><SectionHead>projects</SectionHead><Row kind="pj" name="telemetry" dot="nd" end="2" needs on /></Side>}

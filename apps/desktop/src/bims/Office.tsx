@@ -28,6 +28,7 @@ import { useOfficeEvents } from './events';
 import { bimsView, type BimsView } from './view';
 import { cutLines, cutWords, placeTags, TAG_INSET, type KeepRect, type TagIn } from './tags';
 import { MapChip } from './MapChip';
+import { FitChip, NameLabel, Pill } from './chips';
 import { atFit, DRAG_PX, FIT, panBy, sameCam, wheelCam, type Cam } from './zoom';
 import { konamiDone, localOf, type Forced, type Local } from './eggs';
 import { OPEN_DELAY_S, soonest } from './pokes';
@@ -792,18 +793,12 @@ export function Office({
         )}
         {/* '⤢ fit', bottom right, while zoomed or following */}
         {!fitted && (
-          <Press
+          <FitChip
             ref={fitRef}
-            look="bims-chip bims-fit"
-            data-testid="app.right.bims.fit"
-            {...tipAttrs(bims.fit_tip, 'esc')}
-            onClick={(e) => {
-              e.stopPropagation();
+            onFit={() => {
               moveCam(FIT);
             }}
-          >
-            <span aria-hidden="true">⤢</span> {bims.fit}
-          </Press>
+          />
         )}
         {[...labels.values()].map((l) => {
           const tagRef = (el: HTMLDivElement | null) => {
@@ -819,9 +814,9 @@ export function Office({
           return (
             <div key={l.name} className="bims-tag" data-mode={l.mode} ref={tagRef}>
               {tag.text !== null && (
-                <span className="bims-label" data-mode={l.mode} data-testid={`app.right.bims.label.${l.name}`}>
+                <NameLabel name={l.name} mode={l.mode}>
                   {boxW > 0 ? cutWords(tag.text, boxW - 2 * TAG_INSET - CHIP_PAD - (tag.pill === null ? 0 : PILL_ROOM), measure) : tag.text}
-                </span>
+                </NameLabel>
               )}
               {tag.pill !== null && <Pill name={l.name} pill={tag.pill} onOpen={onOpen} />}
             </div>
@@ -832,23 +827,6 @@ export function Office({
   );
 }
 
-/** The '?' / '✗' pill: its own colours, its tip, a click opens its agent. */
-function Pill({ name, pill, onOpen }: { name: string; pill: 'asks' | 'failed'; onOpen: (agent: string) => void }) {
-  return (
-    <span
-      className={`bims-pill ${pill}`}
-      data-pill={pill}
-      data-testid={`app.right.bims.pill.${name}`}
-      {...tipAttrs(pill === 'asks' ? bims.pill_asks_tip({ agent: name }) : bims.pill_failed_tip({ agent: name }))}
-      onClick={(e) => {
-        e.stopPropagation();
-        onOpen(name);
-      }}
-    >
-      {pill === 'asks' ? '?' : '✗'}
-    </span>
-  );
-}
 
 /**
  * The hover card (Gabriel: multi-line, easy to read; designer m_27920): its name in 600 with its
