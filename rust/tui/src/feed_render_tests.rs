@@ -794,6 +794,9 @@ fn a_card_is_level_one() {
     assert_eq!(lines[1].spans[1].style.fg, Some(crate::theme::text()));
     let blocked = rows_text(&ev_rows(&Ev::Card { card: crate::wire::CardParts::of_line("#4 blocked @api-v2 : the schema file isn't in the repo"), closed: String::new() }, 0, 100));
     assert_eq!(blocked[0], " ┃ ? api-v2 needs you");
+    // drop-card (designer m_37336): a card with its own title says it, as the inbox does
+    let drop = rows_text(&ev_rows(&Ev::Card { card: crate::wire::CardParts::of_line("#5 drop @gone : main suggests it. nothing of its work is lost."), closed: String::new() }, 0, 100));
+    assert_eq!(drop[0], " ┃ ? archive gone?");
     let done = rows_text(&ev_rows(&Ev::Card { card: crate::wire::CardParts::of_line("#3 done @bench : p95 at 180 ms"), closed: String::new() }, 0, 100));
     assert_eq!(done, vec![" ✓ bench is done: p95 at 180 ms".to_string()]);
 }
@@ -834,7 +837,8 @@ fn an_answered_card_fades_in_place() {
         ("task stopped", "agent stopped"),
     ] {
         let ev = Ev::Card { card: crate::wire::CardParts::of_line("#5 drop @x : y"), closed: res.into() };
-        assert_eq!(rows_text(&ev_rows(&ev, 0, 100))[0], format!(" ┃ ? x needs you · {}", word));
+        // a drop card says its own title (drop-card, designer m_37336)
+        assert_eq!(rows_text(&ev_rows(&ev, 0, 100))[0], format!(" ┃ ? archive x? · {}", word));
     }
     // a done card is a line for you: it does not fade
     push_event(&mut events, &mut cache, card("#4 done @bench : p95 at 180 ms"));

@@ -76,7 +76,7 @@ def old_drop() -> HS.Card:
 
 # LAW: main's drop card says what it keeps and shows its two options.
 law drop_card_words:
-  {HPL.drop_card(HPL.drop_body(True{}, 4n, 0n)) == "main suggests it. it is mid-turn. its 4 changed files are kept; /restore brings it back.
+  {HPL.drop_card(HPL.drop_body(True{}, 4n, 0n)) == "main suggests it. it's working right now: archiving stops its turn. its 4 changed files are kept; /restore brings it back.
 1. archive it
 2. keep it" : String}
 

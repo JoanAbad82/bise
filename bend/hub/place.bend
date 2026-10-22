@@ -154,9 +154,9 @@ def kept_text(+dirty: Nat, +unpushed: Nat) -> String:
       String.append(kept(dirty, "changed file"), "; /restore brings it back")),
     Bool.pick(String, Nat.is_gt(unpushed, 0n), String.append(kept(unpushed, "unpushed commit"), "; /restore brings it back"), "nothing of its work is lost"))
 
-# why a drop asks first: mid-turn, what it keeps
+# why a drop asks first: mid-turn (designer m_37336), what it keeps
 def drop_body(+busy: Bool, +dirty: Nat, +unpushed: Nat) -> String:
-  String.concat([Bool.pick(String, busy, "it is mid-turn. ", ""), kept_text(dirty, unpushed), "."])
+  String.concat([Bool.pick(String, busy, "it's working right now: archiving stops its turn. ", ""), kept_text(dirty, unpushed), "."])
 
 # the terminal's /archive confirmation
 def confirm_q(+name: String, +body: String) -> String:

@@ -893,7 +893,7 @@ fn card_lines(card: &crate::wire::CardParts, closed: &str, width: usize) -> Vec<
         _ => {}
     }
     let page = card.page.as_ref().map(|p| if kind == "plan" { format!("{} ↗", crate::sb::answer_target::question_cut(&thread::card_plan_on(name, p), width.saturating_sub(8).max(12))) } else { thread::card_page_asks(name, card.question.lines().next().unwrap_or(""), p) });
-    let mut title = page.clone().unwrap_or_else(|| if name.is_empty() { thread::card_needs.to_string() } else if kind == "plan" { bise_proto::words::common::title_plan(name) } else { thread::card_needs_name(name) });
+    let mut title = page.clone().unwrap_or_else(|| if name.is_empty() { thread::card_needs.to_string() } else if kind == "plan" { bise_proto::words::common::title_plan(name) } else if kind == "drop" { bise_proto::words::inbox::title_drop(name) } else { thread::card_needs_name(name) });
     let (bar_st, title_st, body_st) = if closed.is_empty() {
         let accent_st = Style::default().fg(accent()).add_modifier(Modifier::BOLD);
         (Style::default().fg(accent()), accent_st, text_st)
