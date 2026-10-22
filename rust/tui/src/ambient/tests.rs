@@ -380,24 +380,23 @@ fn a_cards_body_does_not_repeat_its_options() {
     assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": 1, "reply": "arrête-le"}));
 }
 
-/// Law (pm's C fail 36): bise's own bookkeeping (main's archive
-/// suggestion, a `drop` card) is never a card on ambient: not on the
-/// glass, not in the count, not in needs-you; it stays in the TUI.
+/// drop-card (architect m_35666): main's archive suggestion (a `drop`
+/// card) is his card like any other: on the glass, answered with its
+/// digit.
 #[test]
-fn housekeeping_cards_stay_in_the_tui() {
+fn an_archive_card_is_on_the_glass_and_answered_by_its_digit() {
     let mut t = T::new();
     t.hub.say(json!({"ev": "state", "agents": [], "cards": [
-        {"id": 2, "kind": "drop", "agent": "proxy-fix", "text": "main suggests: archive @proxy-fix? the agent is mid-turn. (answer yes or no)"},
+        {"id": 2, "kind": "drop", "agent": "proxy-fix", "text": "main suggests it. nothing of its work is lost.\n1. archive it\n2. keep it"},
         {"id": 3, "kind": "question", "agent": "main", "text": "ship as a PR?
 1. yes
 2. no"}]}));
     t.until(|o| has(o, "state"));
     let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
     let ids: Vec<u64> = st["cards"].as_array().unwrap().iter().map(|c| c["id"].as_u64().unwrap()).collect();
-    assert_eq!(ids, vec![3]);
-    // and it cannot be answered from the capsule
+    assert_eq!(ids, vec![2, 3]);
     t.cmd(Cmd::Answer { card: 2, reply: "1".into() });
-    assert!(has(&t.take(), "error"));
+    assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": 2, "reply": "1"}));
 }
 
 #[test]

@@ -35,13 +35,14 @@ pub(crate) fn ambient_options(kind: &str, agent: &str, text: &str) -> Vec<(usize
 }
 
 /// What digit `d` sends as `/answer <id> <reply>`, as the box's `pick`
-/// does: a hub item's digit itself, else the option's words. None: no
-/// such option, or one the box acts on locally (a PR or release page to
-/// open, the feature drop's second ask).
+/// does: a hub item's or an archive card's digit itself (sb-core reads
+/// a drop card's `1` as its yes, drop-card), else the option's words.
+/// None: no such option, or one the box acts on locally (a PR or
+/// release page to open, the feature drop's second ask).
 pub(crate) fn ambient_reply(kind: &str, agent: &str, text: &str, d: usize) -> Option<String> {
     let s = base_shape(&ambient_card(kind, agent, text));
     let i = s.by_digit(d)?;
-    if !choice_kind(kind) {
+    if !choice_kind(kind) && kind != "drop" {
         return s.options.get(i).cloned();
     }
     (!ambient_local(kind, d)).then(|| d.to_string())

@@ -425,10 +425,9 @@ impl Core {
     pub(super) fn emit_state(&mut self) {
         self.agent_names = self.hub_agents.iter().map(|a| a.name.clone()).collect();
         let user_kind = self.ports.user_kind;
-        // bise's own bookkeeping (main's archive suggestion, a `drop`
-        // card) stays in the TUI: never on the glass, in the count or in
-        // needs-you (pm's C fail 36)
-        self.cards = self.home.cards.iter().filter(|c| user_kind(&c.kind) && c.kind != "drop").map(card_info).collect();
+        // his cards, a `drop` too (drop-card, architect m_35666: he answers
+        // it with 1 archive it / 2 keep it, on the glass as anywhere)
+        self.cards = self.home.cards.iter().filter(|c| user_kind(&c.kind)).map(card_info).collect();
         for c in self.cards.iter().filter(|c| c.batch.is_some()) {
             if !self.batches_seen.contains(&c.id) {
                 self.batches_seen.push(c.id);
