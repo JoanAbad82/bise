@@ -495,8 +495,8 @@ def self_test():
     sel, _ = select(["tests/fake_provider.py"], tests, txt)
     assert "e2e" in sel and "core_restart" in sel, sorted(sel)
     # a test alone: itself (and the tests naming it)
-    sel, _ = select(["tests/every_e2e.py"], tests, txt)
-    assert "every_e2e" in sel and "tui_tmux" not in sel, sorted(sel)
+    sel, _ = select(["tests/wake_e2e.py"], tests, txt)
+    assert "wake_e2e" in sel and "tui_tmux" not in sel, sorted(sel)
     # the laws: PROOF
     assert select(["bend/laws/hub.bend"], tests, txt)[0] == {"PROOF"}
     assert select(["bend/proofs/lib/hub-1.bend"], tests, txt)[0] == {"PROOF"}
