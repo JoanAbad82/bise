@@ -180,6 +180,22 @@ describe('the thread screen', () => {
     expect(v.getByTestId('thread.entry.950').textContent).toContain('■ stopped');
   });
 
+  it("thread/news-rows: a landing says who landed where, its short sha, and a click opens that commit", () => {
+    const { store } = setup();
+    act(() => {
+      store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 27, at_ms: 1, kind: 'landed', text: '', landed: { agent: 'perf', target: 'main', from: 'sb/perf', sha: '1f4b96c00abc', files: 2, add: 10, del: 1 } } });
+    });
+    const router = createRouter({ screen: 'bise' });
+    const v = render(
+      <StoreProvider store={store}>
+        <RouterContext value={router}><EntryRow ctx={ctx} pos={27} /></RouterContext>
+      </StoreProvider>,
+    );
+    expect(v.getByTestId('thread.landed.27').textContent).toContain('perf landed on main · 1f4b96c');
+    fireEvent.click(v.getByTestId('thread.landed.27.sha'));
+    expect(router.get()).toEqual({ screen: 'commit', project: P, sha: '1f4b96c00abc' });
+  });
+
   it('thread/approval-raw: his no is drawn from the approval entry, its ok a boolean on the row', () => {
     const { store } = setup();
     act(() => {

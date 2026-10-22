@@ -392,6 +392,8 @@ describe('artifacts in the @ list (commands.rs, W11)', () => {
     expect(artifactRows(at('PERF'), made, now)[0]).toMatchObject({ label: '↗ Perf notes', desc: 'page · perf · 5 min ago', tag: 'artifact' });
     expect(artifactRows(at('doc'), made, now).map((r) => r.id)).toEqual(['artifact.pricing']);
     expect(artifactRows(at('src/'), made, now)).toEqual([]);
+    // a path query lists no artifact, even one whose title holds it (min-tests: the clause on its own)
+    expect(artifactRows(at('notes/'), made.map((a) => ({ ...a, title: `${a.title} notes/` })), now)).toEqual([]);
     expect(artifactRows(at('perf', true), made, now)).toEqual([]);
     const many = Array.from({ length: 12 }, (_, i) => ({ id: `a${i}`, title: 'Perf notes', kind: 'page', agent: 'perf', url: 'http://h', atMs: now }));
     expect(artifactRows(at(''), many, now)).toHaveLength(8);

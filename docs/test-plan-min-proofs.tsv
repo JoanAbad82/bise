@@ -88,3 +88,72 @@ batch	line	test	file:fn broken	the break	red?	after revert
 3	app/keep-scroll	apps/desktop src/app/keep.test.ts › a scroll, a focus or a mode lives 10 minutes (now asserts the literal)	src/app/keep.ts:SHORT_MS	the constant changed: 9 minutes	red	green again
 3	app/list-walk	apps/desktop src/app/listkeys.test.tsx › the TUI's moves (now asserts the literal)	src/app/listkeys.ts:PAGE	the constant changed: 9	red	green again
 3	app/reload-line	apps/desktop src/app/ReloadLine.test.ts › 'up' and 'passed' show 3 s (now asserts the literal)	src/app/ReloadLine.tsx:SHOW_DONE_MS	the constant changed: 2 s	red	green again
+4	thread/agent-head	apps/desktop src/thread/head.test.ts › the role line is its objective	src/thread/head.ts:roleOf	the role line ignores its objective	red	green again
+4	thread/answer-in-thread	apps/desktop src/store/answered.test.ts › goes to the asking project's main thread	src/store/answered.ts:jumpOf	the jump goes to bise's main, not the asking project's	red	green again
+4	thread/answered-link	apps/desktop src/thread/answerlink.test.ts › an answered card: its asker's thread	src/thread/answerlink.ts:cardTarget	an answered card links this thread, not its asker's	red	green again
+4	thread/at-start	apps/desktop src/thread/lead.test.ts › anything else is words for the thread he's in	src/thread/lead.ts:leadAgent	a leading @name of no live agent routes	red	green again
+4	thread/brief-row	apps/desktop src/thread/entry.test.ts › reads the name, the objective and the body	src/thread/entry.ts:briefOf	the brief's objective is never read	red	green again
+4	thread/delivery	apps/desktop src/thread/entry.test.ts › his message's delivery mark is the TUI's	src/thread/entry.ts:deliveryMark	read shows ✓, not ✓✓	red	green again
+4	thread/tool-source	apps/desktop src/thread/entry.test.ts › bash: its command from the args	src/thread/entry.ts:toolSource	bash shows its raw args, not its command	red	green again
+4	thread/pause-seconds	apps/desktop src/thread/wake.test.ts › a pause under a minute reads in seconds	src/thread/wake.ts:pauseInSeconds	a pause in seconds is not seen as one	red	green again
+4	thread/waiting-states	apps/desktop src/thread/wake.test.ts › a duration for what runs now	src/thread/wake.ts:waitLen	minutes read 'mn'	red	green again
+4	thread/wake	apps/desktop src/thread/wake.test.ts › the hub's head, only a non-zero rc red	src/thread/wake.ts:wakeLine	no '–' when he stopped waiting	red	green again
+4	thread/find-walk	apps/desktop src/thread/find.test.ts › starts on the newest match	src/thread/find.ts:older	⏎ never moves to the older match	red	green again
+4	thread/find-bar	apps/desktop src/thread/find.test.ts › the loaded ones meanwhile say '+'	src/thread/find.ts:counter	the partial count has no '+' (its pixel place: LOST)	red	green again
+4	thread/from-fn	apps/desktop src/thread/parts.test.ts › from fn: the shared cases	src/thread/parts.ts:viaFn	'from fn' shows even when he said it	red	green again
+4	thread/page-answers	apps/desktop src/thread/parts.test.ts › notes, a tick, an edit: the page named	src/thread/parts.ts:pageAnswer	the page named by its id, not its title	red	green again
+4	thread/parts	apps/desktop src/thread/parts.test.ts › a long one drops its extension first	src/thread/parts.ts:chipName	a long name keeps its extension	red	green again
+4	thread/hierarchy	apps/desktop src/thread/tiers.test.ts › two messages bise → perf share it	src/thread/tiers.ts:sameRoute	two messages on one route never share it	red	green again
+4	thread/quote-pop	apps/desktop src/thread/quote.test.ts › the words as selected, trailing newlines dropped	src/thread/quote.ts:quoteText	trailing newlines kept	red	green again
+4	thread/quote-send	apps/desktop src/thread/quote.test.ts › who said it	src/thread/quote.ts:quoteFrom	his own row quoted as the agent's	red	green again
+4	thread/image-deleted	apps/desktop src/thread/ImageGone.test.tsx › his setting: 7 when unset	src/thread/ImageGone.tsx:keepDays	unset keeps 30 days	red	green again
+4	thread/tool-rows	apps/desktop src/thread/entry.test.ts › R11/S9: each call's state on its line	src/thread/entry.ts:toolEnd	a failed call doesn't say its exit	red	green again
+4	thread/working	apps/desktop src/thread/head.test.ts › the state chip: working with its time	src/thread/head.ts:stateChip	working without its time	red	green again
+4	thread/waiting-failed	apps/desktop src/thread/head.test.ts › the state chip: working with its time	src/thread/head.ts:stateChip	waiting for him not in the accent (needs false)	red	green again
+4	thread/empty-enter	apps/desktop src/thread/head.test.ts › signs in again when an expired sign-in stopped this agent	src/thread/head.ts:emptyEnter	⏎ on the empty field never signs in again	red	green again
+4	thread/fold-hold	apps/desktop src/thread/parity.test.tsx › B11: a long message of his folds	src/thread/YouBody.tsx:foldOf	his long message never folds	red	green again
+4	thread/folds-open	apps/desktop src/thread/parity.test.tsx › thinking: the TUI's head words	src/thread/rows-tools.tsx:thoughtFor	the thought's time not in the TUI's words	red	green again
+4	thread/to-agent	apps/desktop src/thread/parity.test.tsx › A.3 S16	src/thread/rows-cards.tsx:toAgentName	'main → perf' for perf's message to main	red	green again
+4	thread/tool-counts	apps/desktop src/thread/entry.test.ts › reads and searches fold into counted words	src/thread/entry.ts:toolLines	the counted words joined with 'and'	red	green again
+4	thread/hover-time	apps/desktop src/thread/entry.test.ts › a clock in his zone	src/thread/entry.ts:clock	the clock ignores his zone	red	green again
+4	thread/report-rows	apps/desktop src/thread/entry.test.ts › waiting for your answer: …' -> 'blocked · waiting for your answer'	src/thread/entry.ts:reportLine	a blocked report keeps the whole question	red	green again
+4	thread/composer-sources	apps/desktop src/thread/commands.test.ts › a window command is ready when its screen exists	src/thread/commands.ts:hasScreen	a window command with its screen is not ready (first try, every window command ready, stayed green: the fixture has none without a screen)	red	green again
+4	thread/log-screen	apps/desktop src/log/model.test.ts › folds past 6 lines	src/log/model.ts:folds	a 6-line body folds (first try, > FOLD_LINES + 2, stayed green: the test's long body has 34)	red	green again
+4	thread/queue-drawer	apps/desktop src/thread/ThreadQueue.test.ts › never a steer, never a failed one	src/thread/ThreadQueue.ts:drawerRows	a failed send stays in the drawer	red	green again
+4	thread/restart-truth	apps/desktop src/inbox/restart.test.ts › a short id and its full sha are the same version	src/inbox/restart.ts:sameVersion	a short id and its sha are two versions	red	green again
+4	thread/hints	apps/desktop src/app/hints.test.ts › once up it stays	src/app/hints.tsx:shows	a hint up goes when its thing stops	red	green again
+4	thread/inbox-strip	apps/desktop src/inbox/stripRows.test.ts › the ones acted on here left out	src/inbox/stripRows.ts:stripList	an item he acted on stays in the strip	red	green again
+4	thread/streaming	apps/desktop src/shared/partial.test.ts › appends at the end	src/shared/partial.ts:partialOf	a delta replaces the text instead of appending at its offset (the frame-by-frame look: LOST)	red	green again
+4	thread/dock-choice	apps/desktop src/inbox/model.test.ts › a docked item only options decide says what it waits for	src/inbox/model.ts:pickWaits	'waits for 1' whatever its options	red	green again
+4	thread/scheduled-real	apps/desktop src/scheduled/scheduled.test.tsx › says times, runs and ends as the TUI's screen	src/scheduled/model.ts:ordinal	'2th', not '2nd'	red	green again
+4	thread/at-artifacts	apps/desktop src/composer/pure.test.ts › by title, agent, kind or id, never in a path query	src/composer/pick.ts:artifactRows	artifacts listed in a path query (first try stayed green: no fixture title held the query; the test now has one)	red	green again
+4	thread/commands	apps/desktop src/thread/commands.test.ts › window commands open their screens, /help the key list	src/thread/commands.ts:windowRun	/help opens the inbox, not the key list	red	green again
+4	thread/window-commands	apps/desktop src/thread/commands.test.ts › a window command's words act as its settings switch	src/thread/commands.ts:windowRun	/theme auto sets 'auto', not the system's	red	green again
+4	thread/batch2-rows	apps/desktop src/thread/parity.test.tsx › a notice says its level in a glyph	src/thread/rows-news.tsx:NOTICE_MARK	a warning's glyph is the info dot (head.test's S40 describe is empty; the rows are parity.test's)	red	green again
+4	thread/code-fences	apps/desktop src/composer/pure.test.ts › fences dim, the block between them is code	src/composer/mdcolor.ts:colorLines	a fence is not dimmed	red	green again
+4	thread/answer-docked	apps/desktop src/thread/tab.test.ts › an open item wins	src/thread/tab.ts:pinkState	a closed item's answer still pink	red	green again
+4	thread/answer-drafts-real	apps/desktop src/composer/pm/engine.test.tsx › the card's half answer and the thread's draft swap with the key	src/composer/pm/PmField.tsx:writeNow	the card's half answer is not kept	red	green again
+4	thread/answer-images	apps/desktop src/store/store.test.ts › R41: an answer carries the images he attached as parts	src/store/machine/cards.ts:answer	an answer's image parts are not sent	red	green again
+4	thread/paste-image	apps/desktop src/main/images.test.ts › the kind comes from the bytes	src/main/images.ts:imageExt	a pasted png is stored as jpg	red	green again
+4	thread/older-history	apps/desktop src/thread/parity.test.tsx › N11: rows that came at the end while scrolled up	src/thread/ThreadList.tsx:newAtEnd	one row too many counted as new at the end	red	green again
+4	thread/at-memory	apps/desktop src/composer/useSources.test.tsx › filePicked sends file_picked	src/store/store.ts:filePicked	the picked path is not sent	red	green again
+4	thread/computer-live	apps/desktop src/thread/ComputerLine.test.tsx › adds the age only while it drives	src/thread/ComputerLine.tsx:computerWords	the age shows when it stopped too	red	green again
+4	thread/ctrl-c-stop	apps/desktop src/thread/ThreadScreen.test.tsx › ctrl+c while its turn runs sends stop	src/thread/ThreadScreen.tsx:onKeyDown ctrl+c	ctrl+c never stops the turn	red	green again
+4	thread/interrupt	apps/desktop src/thread/ThreadScreen.test.tsx › ctrl+c while its turn runs sends stop	src/thread/ThreadScreen.tsx:onKeyDown ctrl+c	ctrl+c at rest sends a stop	red	green again
+4	thread/esc-order	apps/desktop src/composer/Composer.test.tsx › R18: esc no list took goes to the screen while busy	src/composer/pm/keys.ts:Escape	esc while busy skips the screen	red	green again
+4	thread/keys-real	apps/desktop src/composer/Composer.test.tsx › ⇧⇥ in the field is the approvals switch	src/composer/pm/keys.ts:Tab	⇧⇥ never switches approvals	red	green again
+4	thread/send-image-echo	apps/desktop src/store/store.test.ts › goes when its echo lands with the hub's marker before his words	src/store/types.ts:sentWords	the hub's image marker stays in the echo's words: the pending row never meets it (first try, imageFile's hash, stayed green: not this row's clause)	red	green again
+4	thread/file-chips	apps/desktop src/composer/pure.test.ts › file-chips: a file chip is a file part where it was	src/composer/message.ts:buildMessage	a file part carries its name, not its absolute path	red	green again
+4	thread/file-links	apps/desktop src/thread/parity.test.tsx › names a file in inline code, with its line	src/thread/paths.ts:pathOf	a file's line is dropped	red	green again
+4	thread/shot-caption	apps/desktop src/thread/parts.test.ts › quotes first, his words, a paste as its chip label in place	src/thread/parts.ts:youView	the still's caption is dropped	red	green again
+4	thread/history-perf	apps/desktop src/store/trim.test.ts › scrolled far up: the newest go into a gap	src/store/trim.ts:trim	a long thread is never trimmed (the 50k-entry time bound: LOST)	red	green again
+4	thread/inbox-scope	apps/desktop src/inbox/Block.test.tsx › acme's view lists acme's items only	src/inbox/Block.tsx:InboxBlock head	'1 in other projects' never shows	red	green again
+4	thread/answers	apps/desktop src/thread/ThreadScreen.test.tsx › ⛔4: an entry row draws its words as markdown	src/thread/Markdown.tsx:answer body	an answer's words drawn as raw text, no markdown (its last line scrolled into view: LOST)	red	green again
+4	thread/news-real	apps/desktop src/thread/entry.test.ts › reads the hub's spawn notice	src/thread/entry.ts:handoffOf	the spawn notice's brief is dropped	red	green again
+4	thread/first-run	apps/desktop src/composer/Composer.test.tsx › fill(text): the field holds the words alone, all selected	src/composer/pm/PmField.tsx:fill	the first message's words are not selected	red	green again
+4	thread/pending-echo	apps/desktop src/store/store.test.ts › a send goes when its echo comes in a page too	src/store/echo.ts:echoOf	an echo never meets its send by id	red	green again
+4	thread/demo-tour	apps/desktop src/setup/tour.test.tsx › walks start, inside, card, steer, end	src/setup/tour.ts:tip	an open card never gets its tip (first try, sent()'s card step, stayed green: the walk goes through observe)	red	green again
+4	thread/send-late	apps/desktop src/store/echo.test.ts › but a row the core went down before answering (lost) is taken by its words	src/store/echo.ts:echoOf	a lost send's late echo never takes its row (first try, lostAt dropped, stayed green)	red	green again
+4	thread/news-rows	apps/desktop src/thread/ThreadScreen.test.tsx › thread/news-rows: a landing says who landed where (new)	src/thread/rows-news.tsx:LandedRow	a landing's sha opens the changes, not that commit	red	green again
+4	thread/bubble-echo	apps/desktop src/thread/YouBody.test.tsx › a plain send draws as its landed entry does	src/thread/rows-messages.tsx:PendingRow	the sending bubble draws other words than its landed entry	red	green again
+4	thread/steady-bottom	(none: app/pages.test's m_21505 is the search's pages group, a wrong map)	-	LOST: a wheel over a long thread moves only the thread (scroll containment: CSS overflow, no computed state)	-	-
