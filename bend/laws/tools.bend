@@ -564,6 +564,25 @@ law every_offered_tool_is_ours:
       Xt.def_names(Xt.catalog_pure("s", "r", "b"))))
     == (False{}, False{}, False{}) : Bool & Bool & Bool}
 
+# a name with a dot (`self.compact`): OpenAI refuses it off
+# ^[a-zA-Z0-9_-]+$ (BISE-293)
+def dotted(+n: String) -> Bool:
+  Bool.not(Nat.is_le(List.length(&2, String, String.split(n, '.')), 1n))
+
+# LAW (BISE-293, tui_tool_names_tmux): no tool list the runtime builds
+# offers a name with a dot: self.compact and self.reload are
+# run_typescript bindings, never top-level tools (a provider refuses
+# the whole request for one).
+law no_offered_tool_name_has_a_dot:
+  {(List.any(&2, String, n => dotted(n),
+      Xt.def_names(Xt.catalog_live("s", "r", "b", "k", "p", True{}))),
+    List.any(&2, String, n => dotted(n),
+      Xt.def_names(Xt.catalog_live("s", "r", "b", "k", "p", False{}))),
+    List.any(&2, String, n => dotted(n),
+      Xt.def_names(Xt.catalog_pure("s", "r", "b"))),
+    dotted("self.compact"))
+    == (False{}, False{}, False{}, True{}) : Bool & Bool & Bool & Bool}
+
 # LAW: only `auto` in the mode file asks; `yolo`, no file (no hub) or
 # anything else never does (yolo costs no round trip).
 law gate_only_auto_asks:

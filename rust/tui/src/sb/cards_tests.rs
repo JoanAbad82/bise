@@ -952,3 +952,21 @@ fn an_answer_from_mains_view_opens_the_askers_thread() {
     assert_eq!(asker_view("main", "gone", &agents, false), None);
     assert_eq!(asker_view("main", "perf", &agents, true), None);
 }
+
+/// tui_answer_target_tmux (min-tests): an open question takes his words
+/// (`↳ answering <who>`, the heavy bar), an approval never does: its
+/// divider keeps `you → main` and the plain bar.
+#[test]
+fn an_open_question_takes_his_words_an_approval_never() {
+    let (mut app, _hub) = app_with_hub();
+    app.sb.cards = vec![card(15, "question", "search", "which size system should the filter use: EU, or US too?")];
+    open(&mut app);
+    let a = answer_target::answering(&app).expect("a question takes his words");
+    assert_eq!((a.who.as_str(), a.esc_to.as_str()), ("search", "main"));
+    assert!(answer_target::bar(&app, 2).is_some());
+    let (mut app, _hub) = app_with_hub();
+    app.sb.cards = vec![card(14, "approval", "release", "npm publish --tag next")];
+    open(&mut app);
+    assert_eq!(answer_target::answering(&app), None);
+    assert!(answer_target::bar(&app, 2).is_none());
+}

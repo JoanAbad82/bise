@@ -11,6 +11,7 @@ import ../hub/core.bend as HC
 import ../hub/answers.bend as HA
 import ../hub/picks.bend as HPK
 import ../hub/place.bend as HPL
+import ../hub/cardkind.bend as CK
 
 # LAW: a card closed without him (withdrawn, closed, an agent stopped)
 # journals no answer.
@@ -110,3 +111,30 @@ law old_drop_card_yes_archives:
   for +parts: String
   for +via: String
   {HC.answer.kind(o, HC.KDrop{}, cx, old_drop(), "yes", parts, via) == HC.answer.drop(o, True{}, cx, old_drop(), HA.his_ans(old_drop(), "yes", via)) : HX.Cx<o>}
+
+# LAW (BISE-299, tui_inbox_split_tmux): the user's inbox holds only what
+# needs him: main's escalations (question, drop), confirmations, the
+# hub's items and a page's own cards. The agents' traffic (a report, a
+# blocked task, an ask to main, an overlap, a crash) is never his card.
+def his_kinds() -> List<&2, String>:
+  ["question", "drop", "confirm", "merge", "plan"]
+
+def traffic_kinds() -> List<&2, String>:
+  ["report", "blocked", "ask", "overlap", "crash"]
+
+def all_his(xs: List<&2, String>) -> Bool:
+  match xs:
+    case Nil{}:
+      True{}
+    case Con{+h, +t}:
+      Bool.and(CK.user_kind(h), all_his(t))
+
+def none_his(xs: List<&2, String>) -> Bool:
+  match xs:
+    case Nil{}:
+      True{}
+    case Con{+h, +t}:
+      Bool.and(Bool.not(CK.user_kind(h)), none_his(t))
+
+law only_his_kinds_are_his_cards:
+  {Bool.and(all_his(his_kinds()), none_his(traffic_kinds())) == True{} : Bool}

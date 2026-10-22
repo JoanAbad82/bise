@@ -404,6 +404,9 @@ def Laws.own_names_are_never_unknown():
 def Laws.every_offered_tool_is_ours():
   {==}
 
+def Laws.no_offered_tool_name_has_a_dot():
+  {==}
+
 def Laws.gate_only_auto_asks():
   {==}
 

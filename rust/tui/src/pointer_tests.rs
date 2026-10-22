@@ -245,3 +245,31 @@ fn off_nothing_is_written() {
     assert_eq!(osc22s(&s.term.backend().take_output()), "");
     OFF.with(|c| c.set(false));
 }
+
+/// tui_turn_time_tmux (min-tests, BISE-271): the mouse over a reply puts
+/// when its turn ended at the row's right end; off the history it goes,
+/// and the reply's words never move.
+#[test]
+fn the_mouse_over_a_reply_says_when_its_turn_ended() {
+    let mut app = crate::sb::bench::test_app();
+    let t = crate::when::now_ms() - 60_000;
+    app.events.push(Ev::You("ship it".into(), crate::wire::Mark::Sent, false, None));
+    app.events.push(Ev::Assistant("shipped the signup page".into()));
+    app.events.push(Ev::Ended(t));
+    let label = crate::when::ended_now(t);
+    let mut s = Screen::new(app);
+    let (x, y) = s.find("shipped the signup");
+    let row = |s: &mut Screen| {
+        let mut term = Terminal::new(TestBackend::new(120, 36)).unwrap();
+        term.draw(|f| draw_frame(&mut s.app, f)).unwrap();
+        let buf = term.backend().buffer().clone();
+        (0..120u16).map(|cx| buf[(cx, y)].symbol().to_string()).collect::<String>()
+    };
+    assert!(!row(&mut s).contains(&label), "no time before the hover");
+    s.hover(x + 2, y);
+    let hovered = row(&mut s);
+    assert!(hovered.contains(&label), "{label:?} in {hovered:?}");
+    assert_eq!(hovered.find("shipped the signup").map(|i| hovered[..i].chars().count() as u16), Some(x), "the words stay");
+    s.hover(119, 35);
+    assert!(!row(&mut s).contains(&label), "off the reply: gone");
+}

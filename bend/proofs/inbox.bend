@@ -11,6 +11,7 @@ import ../hub/core.bend as HC
 import ../hub/answers.bend as HA
 import ../hub/picks.bend as HPK
 import ../hub/lazy.bend as HLZ
+import ../hub/cardkind.bend as CK
 import ../laws/inbox.bend as Laws
 
 def Laws.closed_without_him_has_no_answer(o, cx, id, res):
@@ -29,6 +30,9 @@ def Laws.answer_pos_not_due(o, cx, card, agent, pos):
   {==}
 
 def Laws.drop_card_words():
+  {==}
+
+def Laws.only_his_kinds_are_his_cards():
   {==}
 
 def Laws.drop_option_1_is_yes(o, cx, parts, via):
