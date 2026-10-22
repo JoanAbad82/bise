@@ -161,8 +161,9 @@ copy() { cp -c "$1" "$2" 2>/dev/null || cp "$1" "$2"; }
 compile() {  # <src> <name> <out>
   local src="$1" name="$2" out="$3" r; r="$(recipe "$name" "$src")"
   if [ "${r%% *}" = node ]; then
-    # its own node_modules from the lockfile (a fresh worktree has none)
-    (cd "$src/office/sdk" && { [ -d node_modules ] || pnpm -s install --frozen-lockfile --prefer-offline; } \
+    # its own node_modules from the lockfile, every time: a fresh worktree has
+    # none, a kept one's can predate a new dependency (a no-op when current)
+    (cd "$src/office/sdk" && pnpm -s install --frozen-lockfile --prefer-offline \
       && node build.mjs --only "$name.js" --out "$out" >/dev/null && chmod +x "$out"); return
   fi
   if [ "${r%% *}" != cargo ]; then

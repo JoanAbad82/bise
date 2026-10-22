@@ -18,10 +18,11 @@ if ! command -v pnpm >/dev/null 2>&1; then
   done
 fi
 if ! command -v pnpm >/dev/null 2>&1; then miss="no pnpm on PATH"
-elif [ ! -d "$sdk/node_modules" ]; then
-  if [ "$strict" = strict ]; then
-    (cd "$sdk" && pnpm -s install --frozen-lockfile --prefer-offline) || miss="pnpm install failed in office/sdk"
-  else miss="no node_modules; run pnpm -C office/sdk install"; fi
+elif [ "$strict" = strict ]; then
+  # every time, not only with no node_modules: a kept tree's (the tip gate's)
+  # can predate a new dependency (Univer: TS2307 on 6a79da476); a no-op when current
+  (cd "$sdk" && pnpm -s install --frozen-lockfile --prefer-offline) || miss="pnpm install failed in office/sdk"
+elif [ ! -d "$sdk/node_modules" ]; then miss="no node_modules; run pnpm -C office/sdk install"
 fi
 if [ -n "$miss" ]; then
   if [ "$strict" = strict ]; then echo "FAIL office_check: $miss"; exit 1; fi
