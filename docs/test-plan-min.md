@@ -667,7 +667,9 @@ review-gates (m_37051): these 49 go with no check left (the last 5, from app/bar
 
 ## Deleted, not yet replaced
 
-**deleted, not yet replaced: 0** (min-tests lowers it by one per transform line it ticks; each replacement goes to review-gates with a mutation that turns it red).
+**deleted, not yet replaced: 356** (min-tests lowers it by one per transform line it ticks; each replacement goes to review-gates with a mutation that turns it red).
+
+review-gates m_37172: a row counts as replaced only when proven: its test goes red on a deliberate break of the product code, reverted after (no e2e). A '— covered by' row is not proven until it also says '— proven: <break>'. min-tests reopened the count to 356 (the 352 covered rows, and app/bar-slide, thread/art-chips, composer/empty-line, thread/messages-right whose logic still gets a test, review-gates m_37202) and lowers it per proven row.
 
 ## Transform lines
 
