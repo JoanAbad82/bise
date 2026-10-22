@@ -8,16 +8,19 @@
 //! - `GET /a/<id>/events`: the stream of its saves ([`events`]; server.rs
 //!   runs it, as `/p/<id>/events`);
 //! - `GET /kit/office/office.js`, `/kit/office/office-view.js`,
-//!   `office-pdf.js`, `pdf.worker.js`: the office SDK's bundles (the last two
-//!   pdf.js and its worker, pdf-notes), read from `office/dist` in the app root (one copy, never
+//!   `office-pdf.js`, `pdf.worker.js`, `office-sheet.js`: the office SDK's bundles (pdf.js and
+//!   its worker, pdf-notes; Univer's grid, xlsx-univer), read from `office/dist` in the app root (one copy, never
 //!   in `kit/`, architect m_23781); the renderers beside them
 //!   (`kit/office/*.js`) are kit files;
 //! - `GET /a/<id>/notes`, `POST /api/a/<id>/notes|send`: the notes on an
 //!   artifact ([`notes`]; the POSTs through [`post`], server.rs's `/api`
-//!   arm, after its token and origin checks).
+//!   arm, after its token and origin checks);
+//! - `POST /api/a/<id>/save`: his edits in the xlsx grid, the file and its
+//!   next version ([`save`], decided and written by the hub).
 
 pub mod events;
 pub mod notes;
+pub mod save;
 pub mod view;
 
 use super::server::Response;
@@ -25,7 +28,7 @@ use super::store::valid_id;
 use super::Pages;
 
 /// The bundles the viewer loads, from `Pages::office_dir`.
-const BUNDLES: &[&str] = &["office.js", "office-view.js", "office-pdf.js", "pdf.worker.js"];
+const BUNDLES: &[&str] = &["office.js", "office-view.js", "office-pdf.js", "pdf.worker.js", "office-sheet.js"];
 
 /// The response for `segs` (the path's segments), or None: not an
 /// artifact route of this module.
@@ -48,6 +51,7 @@ pub fn post(pages: &Pages, segs: &[&str], body: &[u8]) -> Option<Response> {
     Some(match segs {
         ["api", "a", id, "notes"] if valid_id(id) => notes::post_notes(pages, id, body),
         ["api", "a", id, "send"] if valid_id(id) => notes::post_send(pages, id),
+        ["api", "a", id, "save"] if valid_id(id) => save::post(pages, id, body),
         _ => return None,
     })
 }

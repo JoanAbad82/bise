@@ -250,6 +250,40 @@ pub fn record_said(pages: &Pages, said: &[Part], now: u64) -> Vec<String> {
     changed
 }
 
+/// His edits in the viewer's grid made version `v` (artifact/save.rs):
+/// one sent note of kind `edit` naming it (his drafts stay drafts), and
+/// the message its maker gets, as from him: (the text, its parts' JSON).
+/// Called once per sitting, on the save that makes the version.
+pub fn record_edit(pages: &Pages, id: &str, title: &str, v: u64, now: u64) -> Option<(String, String, Note)> {
+    let t = Target::Artifact(id.to_string());
+    let words = format!("I edited {title} in the viewer: v{v} has my changes. Read it before you change the file again.");
+    let note = json!({"kind": "edit", "text": words, "version": v, "via": "viewer"});
+    let made = pages.locked(|s| {
+        let drafts: Vec<Value> = s.notes_of(&t).into_iter().filter(|n| n.status == "draft").filter_map(|n| serde_json::to_value(n).ok()).collect();
+        let before: Vec<String> = drafts.iter().filter_map(|d| d["id"].as_str().map(str::to_string)).collect();
+        let mut all = drafts;
+        all.push(note);
+        let mut notes = s.set_drafts(&t, &all, v, now)?;
+        let mut made = None;
+        for n in notes.iter_mut().filter(|n| n.status == "draft" && !before.contains(&n.id)) {
+            n.status = "sent".into();
+            n.sent_ms = Some(now);
+            made = Some(n.clone());
+        }
+        s.save_notes_of(&t, &notes)?;
+        Ok::<_, String>(made)
+    });
+    let note = made.ok().flatten()?;
+    push(pages, id);
+    let ps = edit_parts(id, title, &view_url(pages, id), v);
+    Some((parts::render(&ps), serde_json::to_string(&ps).unwrap_or_default(), note))
+}
+
+/// The maker's message for his edits (designer signs the words).
+pub fn edit_parts(id: &str, title: &str, url: &str, v: u64) -> Vec<Part> {
+    vec![Part::Text { text: format!("I edited \"{title}\" in the viewer (artifact {id} v{v}, {url}): v{v} has my changes (values, formulas, column widths, row heights). Read it before you change the file again.") }]
+}
+
 #[cfg(test)]
 #[path = "notes_tests.rs"]
 mod tests;

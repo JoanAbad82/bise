@@ -27,4 +27,12 @@ if [ -n "$miss" ]; then
   if [ "$strict" = strict ]; then echo "FAIL office_check: $miss"; exit 1; fi
   echo "skipped office_check: $miss"; exit 0
 fi
+# the xlsx grid's bundle (office-sheet.js) is built, never committed (architect
+# m_37322): it must be there and built from these sources (scripts/bins.sh writes
+# the key it was built from beside it)
+want="$("$root/scripts/bins.sh" key office-sheet 2>/dev/null)"
+have="$(cat "$root/office/dist/office-sheet.js.key" 2>/dev/null)"
+if [ -z "$want" ] || [ ! -f "$root/office/dist/office-sheet.js" ] || [ "$want" != "$have" ]; then
+  echo "FAIL office_check: office/dist/office-sheet.js is missing or stale for its sources: run scripts/bins.sh office-sheet"; exit 1
+fi
 cd "$sdk" && pnpm -s check

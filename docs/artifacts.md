@@ -187,6 +187,20 @@ it as [<title>](artifact:<id>)` (words signed off by designer, m_7214). A stored
 page with the same id (only possible with an older store): the page's
 id gets `-page`.
 
+### His edits in the xlsx grid (xlsx-univer)
+
+The viewer draws an xlsx in Univer's grid (kit/office/sheet.js, docs/office.md):
+he resizes columns and rows, types values and formulas, and 2 s after his last
+edit the file saves itself: `POST /api/a/<id>/save`
+(`pages/artifact/save.rs`; the hub writes it, `daemon/art.rs` `art_save`)
+writes the artifact's file through a temp file and a rename, then adds the
+version, by `you`. One version per sitting (`artifacts_turns::Sitting` on the
+version, like an agent's turn): his next saves in the same viewer session
+replace it. A version that came in since his base, or a file an agent changed on
+disk, is a 409: the viewer asks `keep mine` or `take v<n>`. The maker hears it
+once per sitting, an `edit` note naming the version. A file whose folder is gone
+is a 410 (save a copy instead).
+
 ### Notes on an artifact (art-notes)
 
 Any artifact the viewer draws (xlsx, pptx, docx, an image, a site) takes

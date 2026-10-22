@@ -4,9 +4,14 @@
 //! version replaces that version's copy: `v` stays n, its `rev` grows, and
 //! each rev keeps what it changed (the writer's list, plan §9b).
 //!
+//! The user's edits in the viewer's grid (page xlsx-univer, architect
+//! m_37328) follow the same rule with another author: his saves in one
+//! sitting (one edit session of the viewer, [`Sitting`]) make one version.
+//!
 //! Pure: the turn ([`Turn`]) is stamped by the hub at its door from
 //! sb-core's fact (the agent's `turn_ms`, `daemon/art.rs`), never from the
-//! request; `artifacts.rs` only calls [`place`] and [`merged`].
+//! request; a sitting's id comes from the viewer (pages/artifact/save.rs).
+//! `artifacts.rs` only calls [`place`], [`place_sitting`] and [`merged`].
 
 use bise_proto::anchor::Anchor;
 use serde::{Deserialize, Serialize};
@@ -18,6 +23,24 @@ use serde::{Deserialize, Serialize};
 pub struct Turn {
     pub agent: String,
     pub started_ms: u64,
+}
+
+/// A sitting of the user's edits in the viewer: who (`you`), the viewer's
+/// edit session, and the newest save of it applied (`seq`, counted by the
+/// viewer from 1: a retry of one already applied writes nothing).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Sitting {
+    pub by: String,
+    pub session: String,
+    #[serde(default)]
+    pub seq: u64,
+}
+
+impl Sitting {
+    /// The same sitting (who and session; `seq` is where it is in it).
+    pub fn same(&self, other: &Sitting) -> bool {
+        self.by == other.by && self.session == other.session
+    }
 }
 
 /// One save of a version: its number in the version (1, 2, …), when, and
@@ -46,6 +69,16 @@ pub enum Place {
 pub fn place(last: Option<&Turn>, now: Option<&Turn>) -> Place {
     match (last, now) {
         (Some(a), Some(b)) if a == b => Place::Same,
+        _ => Place::New,
+    }
+}
+
+/// The same rule for a save of his in the viewer: the newest version made
+/// in the same sitting is replaced; a version by an agent, another
+/// sitting, or none, is a new version.
+pub fn place_sitting(last: Option<&Sitting>, now: Option<&Sitting>) -> Place {
+    match (last, now) {
+        (Some(a), Some(b)) if a.same(b) => Place::Same,
         _ => Place::New,
     }
 }
@@ -122,6 +155,22 @@ mod tests {
         assert_eq!(place(Some(&t), None), Place::New, "a save outside a turn (the user's add)");
         assert_eq!(place(None, Some(&t)), Place::New, "after a version made outside a turn");
         assert_eq!(place(None, None), Place::New, "two adds outside a turn never merge");
+    }
+
+    fn sitting(session: &str, seq: u64) -> Sitting {
+        Sitting { by: "you".into(), session: session.into(), seq }
+    }
+
+    /// His sitting replaces its own version only: another sitting, an
+    /// agent's version, or a save with no sitting is a new version.
+    #[test]
+    fn only_his_same_sitting_replaces() {
+        let a = sitting("s1", 1);
+        assert_eq!(place_sitting(Some(&a), Some(&sitting("s1", 2))), Place::Same);
+        assert_eq!(place_sitting(Some(&a), Some(&sitting("s2", 1))), Place::New, "another sitting");
+        assert_eq!(place_sitting(None, Some(&a)), Place::New, "after an agent's version");
+        assert_eq!(place_sitting(Some(&a), None), Place::New, "a save that is not his edit");
+        assert_eq!(place_sitting(Some(&a), Some(&Sitting { by: "agent".into(), ..sitting("s1", 2) })), Place::New);
     }
 
     #[test]

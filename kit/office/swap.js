@@ -13,6 +13,9 @@
 //   `v3 · 2 slides changed` and its `← v2` link to that version) in a 28 px strip, unless the
 //   desktop's side panel frames it (window.name 'bise-app': the panel draws the row's).
 //
+// A view may hold a version (`view.hold(ev)`: sheet.js, its own saves and a version that came
+// during his edits); `office.take(ev)` draws one past the hold.
+//
 // It decides no words: they come from the hub (bise_proto::office::live_words).
 // Pure helpers exported for the tests: slidesOf, sheetsOf, cellIn, fileUrl.
 
@@ -127,8 +130,10 @@ function start() {
   let pending = null;
   let latest = null;
 
-  async function take(ev) {
+  async function take(ev, force = false) {
     if (ev.n === info.version && ev.rev === info.rev) return;
+    // a view with edits of his own decides (sheet.js: its own saves, a version during his edits)
+    if (!force && office.view && office.view.hold && office.view.hold(ev)) return;
     const url = fileUrl(info.id, ev.n, info.name, ev.rev);
     // a streamed kind (a video): the player reads the new url by its ranges, no bytes fetched here
     let bytes = null;
@@ -161,6 +166,9 @@ function start() {
       pending = null;
     }
   }
+
+  // the view's `take v<n>` (sheet.js): that version drawn, its hold passed
+  office.take = (ev) => take(ev, true).catch((e) => console.error(e));
 
   const es = new EventSource(`/a/${encodeURIComponent(info.id)}/events`);
   es.addEventListener("version", (e) => {

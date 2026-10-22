@@ -110,7 +110,8 @@ mod tests {
         let files: [(&str, &str, usize, usize); 3] = [
             // (file, its code, its write calls, its bumps)
             ("pages/store.rs", include_str!("pages/store.rs"), 4, 1),
-            ("artifacts.rs", include_str!("artifacts.rs"), 6, 2),
+            // + write_source: his edits in the viewer over the file (xlsx-univer, architect m_37387)
+            ("artifacts.rs", include_str!("artifacts.rs"), 8, 3),
             ("artifacts_archive.rs", include_str!("artifacts_archive.rs"), 2, 1),
         ];
         for (name, src, writes, bumps) in files {

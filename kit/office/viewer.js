@@ -7,7 +7,7 @@
 // refuses one (architect m_23781).
 //
 // What a renderer exports: `draw(root, bytes, info)` → a view { place(), restore(place),
-// selection(), notes: string[] }: where the user is (a sheet and its scroll, a slide, the
+// selection(), notes: string[], dispose?() }: where the user is (a sheet and its scroll, a slide, the
 // doc's scroll), put back after a new version is drawn; what is selected as an Anchor
 // (bise_proto::anchor); and what it could not draw, said in the frame's foot.
 //
@@ -88,6 +88,7 @@ async function show(bytes) {
     main.querySelector(":scope > .office-stage")?.remove();
     main.querySelector(":scope > .office-state")?.remove();
     main.prepend(stage);
+    view?.dispose?.();
     view = next;
     if (place) view.restore(place);
     foot(main, view.notes);

@@ -24,6 +24,11 @@ target/
 # Logs
 logs/
 
+# the viewer's xlsx grid (Univer, ~7 MB): built by scripts/bins.sh office-sheet
+# from office/sdk, never committed (architect m_37322)
+/office/dist/office-sheet.js
+/office/dist/office-sheet.js.key
+
 # Dependencies
 node_modules/
 

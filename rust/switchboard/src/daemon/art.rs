@@ -2,7 +2,8 @@
 //! `artifacts` event (artifacts/seen, artifacts/add's words), `sb
 //! artifact` (add, list, archive, unarchive), the thread lines, `diff/read` and `branches/list`'s answers
 //! (computed off the hub's loop), each agent's
-//! `changes` in the state, and the `landed` line after a land.
+//! `changes` in the state, the `landed` line after a land, and his edits
+//! saved from the viewer's grid ([`Shell::art_save`], pages/artifact/save.rs).
 
 use super::*;
 use crate::artifacts::{self, Add, Added, Store};
@@ -255,6 +256,54 @@ impl Shell {
         Ok(format!("↗ added: {}", a.meta.title))
     }
 
+    /// His edits in the viewer's grid (pages/artifact/save.rs): decided
+    /// here, the store's only writer; the file written, the version added
+    /// (one per sitting), its frame on the viewer's stream, the list, and
+    /// on the save that makes the version, its maker told once (an `edit`
+    /// note, the notes' Sent path). (status, body) for the page thread.
+    pub(super) fn art_save(&mut self, pages: &crate::pages::Pages, id: &str, req: crate::pages::artifact::save::SaveReq) -> (u16, Value) {
+        use crate::pages::artifact::save::{decide, Decision};
+        let store = self.art_store();
+        let Some(m) = store.stored().into_iter().find(|m| m.id == id) else { return (404, json!({"error": "no such artifact"})) };
+        if !m.source.to_lowercase().ends_with(".xlsx") {
+            return (400, json!({"error": "only an xlsx is edited in the viewer"}));
+        }
+        let latest = m.current().cloned();
+        let disk_same = || match &latest {
+            Some(l) => std::fs::read(&m.source).ok().is_some_and(|b| Some(b) == store.copy_bytes(&m, l)),
+            None => true,
+        };
+        match decide(latest.as_ref(), &req, disk_same) {
+            Decision::Already { v, rev } => return (200, json!({"v": v, "rev": rev})),
+            Decision::Stale { v, rev } => return (409, json!({"v": v, "rev": rev, "error": format!("v{v} came in while you edited")})),
+            Decision::Disk { v, rev } => return (409, json!({"v": v, "rev": rev, "disk": true, "error": "the file changed on disk while you edited"})),
+            Decision::Write => {}
+        }
+        if let Err(e) = store.write_source(&m, &req.bytes) {
+            return (410, json!({"error": format!("the file is gone ({e}): save a copy instead")}));
+        }
+        let cwd = std::path::Path::new(&m.source).parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+        let sitting = crate::artifacts_turns::Sitting { by: "you".into(), session: req.session.clone(), seq: req.seq };
+        let add = Add { target: m.source.clone(), agent: m.agent.clone(), by: "you".into(), cwd, known_only: true, sitting: Some(sitting), ..Default::default() };
+        let a = match store.add(&add, now_ms()) {
+            Ok(a) => a,
+            Err(e) => return (500, json!({"error": e})),
+        };
+        let Some(v) = a.meta.current().cloned() else { return (500, json!({"error": "no version after the save"})) };
+        if a.new_version {
+            self.art_live_push(&a.meta);
+            if !a.replaced {
+                self.art_lines(&a);
+                if let Some((text, parts, _)) = crate::pages::artifact::notes::record_edit(pages, id, &a.meta.title, v.v, now_ms()) {
+                    let to = if self.page_agent_gone(&a.meta.agent) { MAIN.to_string() } else { a.meta.agent.clone() };
+                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: true, parts, from: String::new() });
+                }
+            }
+            self.artifacts_refresh(false);
+        }
+        (200, json!({"v": v.v, "rev": v.rev()}))
+    }
+
     /// `sb artifact add|list` (an agent's request).
     pub(super) fn artifact_cmd(&mut self, from: &str, r: bise_proto::sb::Artifact) -> Value {
         use bise_proto::sb::Artifact;
@@ -271,6 +320,7 @@ impl Shell {
                     known_only,
                     // the turn from sb-core's fact, never from the request
                     turn: self.art_turn(from),
+                    sitting: None,
                     changed: changed.as_ref().and_then(bise_proto::office::Changed::of_value).map(|c| c.0),
                 };
                 match store.add(&add, now_ms()) {

@@ -1,0 +1,156 @@
+/// <reference lib="dom" />
+// The viewer's xlsx grid, office/dist/office-sheet.js (page xlsx-univer,
+// architect m_37322): Univer (Apache-2.0, open-source packages only, no
+// Univer Pro) on a snapshot the SDK made (src/sheets/univer.ts). Built,
+// never committed (scripts/bins.sh office-sheet), loaded only by
+// kit/office/sheet.js when an xlsx is shown. Its stylesheet is in it as
+// text, put in the page once (one file to serve under the viewer's CSP).
+//
+// What it gives sheet.js: the grid in a container, the grid's snapshot
+// now (Univer's own save, for editsBetween), a call after each change the
+// user made (a typed value, a resize, a paste, an undo), his selection,
+// the light or dark look. The ribbon, the context menus and the sheet
+// menus are off: the viewer edits values, formulas and sizes, no more.
+
+import { CommandType, LocaleType, LogLevel, mergeLocales, Univer, type IWorkbookData } from "@univerjs/core";
+import { FUniver } from "@univerjs/core/facade";
+import { defaultTheme } from "@univerjs/themes";
+import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
+import enUS from "@univerjs/preset-sheets-core/locales/en-US";
+// @ts-expect-error esbuild's text loader (build.mjs): the stylesheet as a string
+import css from "@univerjs/preset-sheets-core/lib/index.css";
+import type { UWorkbook } from "../sheets/univer.ts";
+
+export type GridPlace = { sheet: string; range: string | null };
+
+export type Grid = {
+  /** the grid as it is now, as Univer saves it */
+  snapshot(): UWorkbook;
+  /** called after each change the user made (never for opening or a selection) */
+  onChange(fn: () => void): void;
+  /** the sheet shown and the selected range ("B4:D9"), or null */
+  place(): GridPlace;
+  /** show that sheet and select that range again */
+  restore(p: GridPlace): void;
+  /** where a range of the sheet shown is, in the page's pixels (null: another sheet, or off screen) */
+  rect(sheet: string, range: string): DOMRect | null;
+  /** the selection's text, as the grid shows it, cells joined by spaces */
+  text(): string;
+  /** called when the grid scrolls, zooms, or shows another sheet (the marks follow) */
+  onMove(fn: () => void): void;
+  dark(on: boolean): void;
+  dispose(): void;
+};
+
+// bise's look on Univer's scales (kit/tokens.css; designer signs it): a selection, a picked
+// tab, the formula bar's focus are ink, never the accent (the accent is only what is his);
+// the grays are the kit's warm ones. Univer's dark mode turns the same scales around.
+const ink = { 50: "#f6f3ed", 100: "#ece7de", 200: "#d9d2c5", 300: "#b5ad9f", 400: "#8a8174", 500: "#5a5349", 600: "#3a352f", 700: "#2a2622", 800: "#1d1a17", 900: "#171513" };
+const theme = {
+  ...defaultTheme,
+  primary: ink,
+  gray: { 0: "#ffffff", 50: "#faf7f0", 100: "#f2ede2", 200: "#e6e0d4", 300: "#b5ad9f", 400: "#8a8174", 500: "#5a5349", 600: "#3a352f", 700: "#2a2622", 800: "#1f1c19", 900: "#171513", 1000: "#000000" },
+} as typeof defaultTheme;
+
+let styled = false;
+
+/** Univer's stylesheet in the page, once. */
+function style(): void {
+  if (styled) return;
+  styled = true;
+  const s = document.createElement("style");
+  s.dataset.univer = "";
+  s.textContent = css as string;
+  document.head.append(s);
+}
+
+/** The grid of `data` in `el` (which must have a size). */
+export function mountGrid(el: HTMLElement, data: UWorkbook, opts: { dark: boolean }): Grid {
+  style();
+  const univer = new Univer({
+    theme,
+    darkMode: opts.dark,
+    locale: LocaleType.EN_US,
+    locales: { [LocaleType.EN_US]: mergeLocales(enUS) },
+    logLevel: LogLevel.ERROR,
+  });
+  const preset = UniverSheetsCorePreset({
+    container: el,
+    header: true,
+    toolbar: false,
+    contextMenu: false,
+    formulaBar: true,
+    footer: { sheetBar: true, statisticBar: false, menus: false, zoomSlider: false } as never,
+  } as never);
+  for (const p of preset.plugins) {
+    if (Array.isArray(p)) univer.registerPlugin(p[0], p[1]);
+    else univer.registerPlugin(p);
+  }
+  const api = FUniver.newAPI(univer);
+  const book = api.createWorkbook({ ...(data as unknown as Partial<IWorkbookData>), locale: LocaleType.EN_US });
+
+  const listeners: (() => void)[] = [];
+  const movers: (() => void)[] = [];
+  const moved = () => {
+    for (const fn of movers) fn();
+  };
+  // a change is a mutation after he touched the grid (a key, a pointer, a
+  // paste): opening, its commands and the formula engine's first pass are not
+  let his = false;
+  const touched = () => {
+    his = true;
+  };
+  for (const t of ["pointerdown", "keydown", "paste", "drop"]) el.addEventListener(t, touched, { capture: true });
+  const subs = [
+    api.addEvent(api.Event.CommandExecuted, (c) => {
+      if (c.type === CommandType.MUTATION && his) for (const fn of listeners) fn();
+    }),
+    api.addEvent(api.Event.Scroll, moved),
+    api.addEvent(api.Event.ActiveSheetChanged, moved),
+  ];
+
+  return {
+    snapshot: () => book.save() as unknown as UWorkbook,
+    onChange: (fn) => {
+      listeners.push(fn);
+    },
+    place() {
+      const ws = book.getActiveSheet();
+      const r = ws.getSelection()?.getActiveRange();
+      return { sheet: ws.getSheetName(), range: r ? r.getA1Notation() : null };
+    },
+    restore(p) {
+      const ws = book.getSheetByName(p.sheet);
+      if (!ws) return;
+      book.setActiveSheet(ws);
+      if (p.range) ws.setActiveRange(ws.getRange(p.range));
+    },
+    rect(sheet, range) {
+      const ws = book.getActiveSheet();
+      if (ws.getSheetName() !== sheet) return null;
+      try {
+        const [a, b = a] = range.split(":");
+        const r0 = ws.getRange(a).getCellRect();
+        const r1 = ws.getRange(b).getCellRect();
+        const box = el.getBoundingClientRect();
+        const left = Math.min(r0.left, r1.left) + box.left;
+        const top = Math.min(r0.top, r1.top) + box.top;
+        return new DOMRect(left, top, Math.max(r0.right, r1.right) + box.left - left, Math.max(r0.bottom, r1.bottom) + box.top - top);
+      } catch {
+        return null;
+      }
+    },
+    text() {
+      const r = book.getActiveSheet().getSelection()?.getActiveRange();
+      return r ? r.getDisplayValues().flat().filter(Boolean).join(" ") : "";
+    },
+    onMove: (fn) => {
+      movers.push(fn);
+    },
+    dark: (on) => api.toggleDarkMode(on),
+    dispose() {
+      for (const s of subs) s.dispose();
+      univer.dispose();
+    },
+  };
+}

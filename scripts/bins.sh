@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # bins.sh — the Bend native binaries (repl-live, repl-scripted, sb-core,
-# harness-demo) and the V8 engine of a version (bend-jsrt, RELEASE build,
-# BISE-133). They are NOT in git (BISE-114): each one is built from
+# harness-demo), the V8 engine of a version (bend-jsrt, RELEASE build,
+# BISE-133), and the viewer's xlsx grid (office-sheet: Univer, ~7 MB of
+# JS built by office/sdk/build.mjs into office/dist/office-sheet.js,
+# never committed, architect m_37322). They are NOT in git (BISE-114): each one is built from
 # its sources into a cache keyed by the CONTENT of those sources, shared
 # by every worktree and by versions.sh, then copied where it is run.
 #
@@ -100,7 +102,9 @@ recipe() {
     sb-core) echo "${b}hub/main.bend ${b}hub ${b}vendor" ;;
     # a cargo build (release): the crate and its path dependencies
     bend-jsrt) echo "cargo rust/jsrt rust/images rust/home" ;;
-    *) say "unknown binary: $1 (repl-live repl-scripted sb-core harness-demo bend-jsrt)"; exit 2 ;;
+    # a node build (office/sdk/build.mjs --only): its entry, the build and the lockfile
+    office-sheet) echo "node office/sdk/src/view/sheet.ts office/sdk/build.mjs office/sdk/package.json office/sdk/pnpm-lock.yaml" ;;
+    *) say "unknown binary: $1 (repl-live repl-scripted sb-core harness-demo bend-jsrt office-sheet)"; exit 2 ;;
   esac
 }
 
@@ -114,6 +118,7 @@ recipe() {
 key() {  # <src> <name>
   local r; r="$(recipe "$2" "$1")"
   if [ "${r%% *}" = cargo ]; then jsrt_key "$1" ${r#cargo }; return; fi
+  if [ "${r%% *}" = node ]; then node_key "$1" ${r#node }; return; fi
   set -- "$1" $r
   # only the dirs <src> has (find exits 1 on a missing one: pipefail)
   local d dirs=(); for d in "${@:3}"; do if [ -e "$1/$d" ]; then dirs+=("$d"); fi; done
@@ -134,6 +139,13 @@ jsrt_key() {  # <src> <dir>...
      | while read -r f; do printf '%s %s\n' "$(shasum < "$f" | cut -c1-40)" "$f"; done
    echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET $JSRT_PROFILE") | shasum | cut -c1-12
 }
+# the key of a node build: each file's path and content (the grid's entry
+# imports only types from the SDK: the SDK's own sources are not inputs)
+node_key() {  # <src> <file>...
+  local src="$1"; shift
+  (cd "$src" && for f in "$@"; do if [ -f "$f" ]; then printf '%s %s\n' "$(shasum < "$f" | cut -c1-40)" "$f"; fi; done) | shasum | cut -c1-12
+}
+
 # the engine's release profile (BISE-133, measured): plain release 68.1 MB
 # (a rebuild of the local crates 2 s), thin LTO 68.1 MB, fat LTO + 1
 # codegen unit 63.5 MB (rebuild 38 s, cold ~4 min): a new engine is rare.
@@ -148,6 +160,11 @@ copy() { cp -c "$1" "$2" 2>/dev/null || cp "$1" "$2"; }
 # compile <name> of <src> into <out>
 compile() {  # <src> <name> <out>
   local src="$1" name="$2" out="$3" r; r="$(recipe "$name" "$src")"
+  if [ "${r%% *}" = node ]; then
+    # its own node_modules from the lockfile (a fresh worktree has none)
+    (cd "$src/office/sdk" && { [ -d node_modules ] || pnpm -s install --frozen-lockfile --prefer-offline; } \
+      && node build.mjs --only "$name.js" --out "$out" >/dev/null && chmod +x "$out"); return
+  fi
   if [ "${r%% *}" != cargo ]; then
     (cd "$src" && bend "${r%% *}" -o "$out" >/dev/null); return
   fi
@@ -200,14 +217,14 @@ cached() {  # <src> <name>
     local s=$SECONDS
     compile "$src" "$name" "$f.tmp.$$" || { rm -f "$f.tmp.$$"; return 1; }
     # signed with bise's stable dev identity (dev-sign.sh): every copy of
-    # it keeps one designated requirement, so macOS keeps its grants
-    "$REPO/scripts/dev-sign.sh" sign "$name" "$f.tmp.$$"
+    # it keeps one designated requirement, so macOS keeps its grants (a JS bundle: nothing to sign)
+    if [ "$name" != office-sheet ]; then "$REPO/scripts/dev-sign.sh" sign "$name" "$f.tmp.$$"; fi
     mv "$f.tmp.$$" "$f"
     say "$name: built in $((SECONDS - s)) s ($f)"
     prune "$name"
   else
     # a build from before dev-sign.sh: signed now (a no-op once it is)
-    "$REPO/scripts/dev-sign.sh" sign "$name" "$f"
+    if [ "$name" != office-sheet ]; then "$REPO/scripts/dev-sign.sh" sign "$name" "$f"; fi
     touch "$f"
   fi
   echo "$f"
@@ -238,6 +255,8 @@ prefetch() {  # <src> <name>...
 # <src>/<name> = the cache file (a new inode: a running binary keeps its own)
 place() {  # <src> <name>
   local src="$1" name="$2" f out="$1/$2"
+  # the grid's bundle goes where the page server reads it (pages/artifact BUNDLES)
+  if [ "$name" = office-sheet ]; then out="$1/office/dist/office-sheet.js"; fi
   if ! f="$(cached "$src" "$name")"; then
     if [ -x "$out" ]; then say "compiling $name failed: the existing $out is kept"; return 0; fi
     say "compiling $name failed"; return 1

@@ -552,3 +552,54 @@ fn an_html_file_and_its_files_over_50_mb_have_no_copy() {
     assert_eq!(added_text(&a), "added deck (page) · v1 · no copy kept (over 50 MB) · link it as [deck](artifact:deck)");
     assert!(!state.join("artifacts/deck/v1").exists(), "nothing copied");
 }
+
+/// His edits in the viewer (xlsx-univer, architect m_37328): one version
+/// per sitting. The same sitting again replaces its version (same v, new
+/// bytes, rev grows); a new sitting, or a sitting after an agent's
+/// version or after another sitting, is v+1.
+#[test]
+fn his_saves_in_one_sitting_make_one_version() {
+    let root = tmp("sitting");
+    let (state, work) = (root.join("state"), root.join("work"));
+    std::fs::create_dir_all(&work).unwrap();
+    let f = work.join("q3.xlsx");
+    let s = Store::new(&state);
+    std::fs::write(&f, b"PK agent v1").unwrap();
+    add(&s, &work, "q3.xlsx", None, 10).unwrap();
+    let his = |bytes: &[u8], session: &str, seq: u64, at: u64| {
+        std::fs::write(&f, bytes).unwrap();
+        let sitting = Some(crate::artifacts_turns::Sitting { by: "you".into(), session: session.into(), seq });
+        s.add(&Add { target: f.to_string_lossy().to_string(), agent: "pricing-page".into(), by: "you".into(), cwd: work.to_string_lossy().to_string(), known_only: true, sitting, ..Default::default() }, at).unwrap()
+    };
+    let copy = |a: &Added| s.copy_bytes(&a.meta, a.meta.current().unwrap()).unwrap();
+    let a = his(b"PK his edit 1", "s1", 1, 20);
+    assert_eq!((a.meta.current().unwrap().v, a.replaced), (2, false), "his first save: a new version over the agent's");
+    let b = his(b"PK his edit 1 and 2", "s1", 2, 30);
+    let v = b.meta.current().unwrap();
+    assert_eq!((v.v, v.rev(), b.replaced, v.sitting.as_ref().unwrap().seq), (2, 2, true, 2), "the same sitting: the same version, its rev grew");
+    assert_eq!(copy(&b), b"PK his edit 1 and 2", "with the new bytes");
+    let c = his(b"PK another sitting", "s2", 1, 40);
+    assert_eq!((c.meta.current().unwrap().v, c.replaced), (3, false), "a new sitting");
+    let d = his(b"PK back to the old sitting", "s1", 3, 50);
+    assert_eq!(d.meta.current().unwrap().v, 4, "an older sitting after another one saved");
+    // the agent saves (no sitting), then his sitting s1 again: a new version
+    std::fs::write(&f, b"PK agent again").unwrap();
+    assert_eq!(add(&s, &work, "q3.xlsx", None, 60).unwrap().meta.current().unwrap().v, 5);
+    assert_eq!(his(b"PK s1 after the agent", "s1", 4, 70).meta.current().unwrap().v, 6, "the newest by the agent: v+1 even with his sitting");
+}
+
+/// write_source: over the file through a temp file; a gone folder says so.
+#[test]
+fn his_save_writes_the_file_and_refuses_a_gone_folder() {
+    let root = tmp("write-source");
+    let (state, work) = (root.join("state"), root.join("work"));
+    std::fs::create_dir_all(&work).unwrap();
+    std::fs::write(work.join("q3.xlsx"), b"PK one").unwrap();
+    let s = Store::new(&state);
+    let m = add(&s, &work, "q3.xlsx", None, 10).unwrap().meta;
+    s.write_source(&m, b"PK two").unwrap();
+    assert_eq!(std::fs::read(work.join("q3.xlsx")).unwrap(), b"PK two");
+    assert_eq!(std::fs::read_dir(&work).unwrap().count(), 1, "no temp file left");
+    std::fs::remove_dir_all(&work).unwrap();
+    assert!(s.write_source(&m, b"PK three").unwrap_err().contains("is gone"));
+}

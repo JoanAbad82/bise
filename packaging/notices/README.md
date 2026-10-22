@@ -16,6 +16,7 @@ upstream repositories, at the version shipped where there is one:
 | deno.LICENSE.md, nugine-simd.LICENSE, dasp.LICENSE-MIT, dprint-swc-ext.LICENSE | the repos of crates packaged without a license file |
 | fflate.LICENSE, xmldom.LICENSE | the npm packages at the version in office/sdk/pnpm-lock.yaml (bundled into office/dist/office.js) |
 | docx-preview.LICENSE, jszip.LICENSE | the npm packages at the version in office/sdk/pnpm-lock.yaml (bundled into office/dist/office-view.js); jszip's is the MIT half of its dual license, the one bise takes |
+| office-sheet/*.LICENSE, office-sheet/ISC.spdx.txt | the npm packages bundled into office/dist/office-sheet.js (Univer and what it bundles: React, rxjs, radix-ui, ...), at the version in office/sdk/pnpm-lock.yaml; a package with no LICENSE file uses the SPDX text of its package.json's license |
 | three.LICENSE | the npm package three at the version in apps/desktop/pnpm-lock.yaml (bundled into the desktop renderer's bims chunk) |
 | MIT.spdx.txt | spdx.org/licenses/MIT (sys_traits declares MIT and has no text anywhere) |
 

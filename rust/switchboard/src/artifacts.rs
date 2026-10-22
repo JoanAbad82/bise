@@ -13,7 +13,7 @@
 //! writer, so there is no lock.
 
 use crate::artifacts_assets;
-use crate::artifacts_turns::{self, Place, Rev, Turn};
+use crate::artifacts_turns::{self, Place, Rev, Sitting, Turn};
 use bise_proto::anchor::Anchor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -49,6 +49,11 @@ pub struct Version {
     /// a save in the same turn by the same agent replaces this version.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn: Option<Turn>,
+    /// His sitting in the viewer that made it (artifacts_turns::Sitting):
+    /// his next save in it replaces this version; its `seq` the newest
+    /// save applied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sitting: Option<Sitting>,
     /// Its saves, oldest first (none in a store from before them: one).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub revs: Vec<Rev>,
@@ -113,6 +118,9 @@ pub struct Add {
     /// The turn it came in, stamped by the hub from sb-core's fact (never
     /// from the request); None outside a turn.
     pub turn: Option<Turn>,
+    /// His edits in the viewer's grid (pages/artifact/save.rs): the sitting
+    /// they came in; None for any other add.
+    pub sitting: Option<Sitting>,
     /// What the save changed, as the writer said it (`bise office run`);
     /// None: it said nothing.
     pub changed: Option<Vec<Anchor>>,
@@ -619,8 +627,13 @@ impl Store {
                 return Ok(Added { meta, new_version: false, page: false, not_artifact: false, replaced: false, ..Added::none() });
             }
         }
-        // a save in the same turn by the same agent: the newest version again
-        let same = artifacts_turns::place(meta.versions.last().and_then(|l| l.turn.as_ref()), a.turn.as_ref()) == Place::Same;
+        // a save in the same turn by the same agent, or in the same sitting of
+        // his edits: the newest version again
+        let last = meta.versions.last();
+        let same = match &a.sitting {
+            Some(_) => artifacts_turns::place_sitting(last.and_then(|l| l.sitting.as_ref()), a.sitting.as_ref()),
+            None => artifacts_turns::place(last.and_then(|l| l.turn.as_ref()), a.turn.as_ref()),
+        } == Place::Same;
         let v = match meta.versions.last() {
             Some(l) if same => l.v,
             Some(l) => l.v + 1,
@@ -655,15 +668,35 @@ impl Store {
                 }
                 let r = rev(&last.revs);
                 last.revs.push(r);
-                *last = Version { at_ms: now, target, copy, no_copy, sig, ..last.clone() };
+                *last = Version { at_ms: now, target, copy, no_copy, sig, sitting: a.sitting.clone().or(last.sitting.clone()), ..last.clone() };
             }
             _ => {
                 let revs = vec![rev(&[])];
-                meta.versions.push(Version { v, at_ms: now, target, copy, no_copy, sig, turn: a.turn.clone(), revs });
+                meta.versions.push(Version { v, at_ms: now, target, copy, no_copy, sig, turn: a.turn.clone(), sitting: a.sitting.clone(), revs });
             }
         }
         self.save(&meta)?;
         Ok(Added { meta, new_version: true, page: false, not_artifact: false, replaced: same, assets: assets.files.len(), unkept: assets.unkept, scripts: assets.scripts })
+    }
+
+    /// The bytes of bise's copy of version `v` (None: no copy, or unreadable).
+    pub fn copy_bytes(&self, meta: &Meta, v: &Version) -> Option<Vec<u8>> {
+        std::fs::read(self.dir().join(&meta.id).join(v.copy.as_ref()?)).ok()
+    }
+
+    /// His edits of a file artifact in the viewer (pages/artifact/save.rs,
+    /// daemon/art.rs `art_save`): `bytes` over its file, through a temp file
+    /// and a rename (a reader never sees half a file). Err: its folder is
+    /// gone (an archived agent's temp folder), or the write failed.
+    pub fn write_source(&self, meta: &Meta, bytes: &[u8]) -> Result<PathBuf, String> {
+        let p = PathBuf::from(&meta.source);
+        let dir = p.parent().filter(|d| d.is_dir()).ok_or_else(|| format!("{} is gone", meta.source))?;
+        let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let tmp = dir.join(format!(".{name}.bise-save"));
+        std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
+        crate::store_gen::bump();
+        std::fs::rename(&tmp, &p).map_err(|e| e.to_string())?;
+        Ok(p)
     }
 
     /// Every artifact, stored ones and pages, newest first (the time of

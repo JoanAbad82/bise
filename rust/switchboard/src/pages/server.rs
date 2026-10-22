@@ -101,6 +101,8 @@ fn reason(status: u16) -> &'static str {
         404 => "Not Found",
         405 => "Method Not Allowed",
         409 => "Conflict",
+        410 => "Gone",
+        503 => "Service Unavailable",
         _ => "Error",
     }
 }

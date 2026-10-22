@@ -35,7 +35,24 @@ browser, `platform: "browser"`, a 2 MB budget `build.mjs` enforces. It
 never goes into `office.js`, which stays DOM-free
 (`test/viewer.test.mjs` imports it with no window).
 
-Cargo and nix never run pnpm, so the bundle is committed like generated
+A third, `office/dist/office-sheet.js`, is the viewer's xlsx grid (page
+xlsx-univer, architect m_37322): Univer (Apache-2.0, open-source packages
+only; no Univer Pro), React and what they bundle, ~7 MB, loaded by
+kit/office/sheet.js alone when an xlsx is shown. It is **built, never
+committed** (a 7 MB blob per rebuild in a public history): `scripts/bins.sh
+office-sheet` builds it from `src/view/sheet.ts`, `build.mjs` and the
+lockfile into its cache (keyed by their content) and places it with its
+`.key`; run.sh and versions.sh call it, and `tests/office_check.sh` fails
+when it is missing or stale. Univer's hyphenation dictionaries (5 MB) are
+empty modules in it (a cell never hyphenates). The grid reads the workbook
+as `book.univer()` (src/sheets/univer.ts: Univer's snapshot, plain JSON),
+and the user's edits come back as `editsBetween(before, after)` replayed with
+`book.apply(edits)` then `book.save()`: the grid never writes the xlsx, so
+what exceljs keeps (carry.ts: charts, pivots) comes through. The saves go to
+`POST /api/a/<id>/save` (rust/switchboard/src/pages/artifact/save.rs): the
+file on disk and the artifact's next version, one per sitting.
+
+Cargo and nix never run pnpm, so the other bundles are committed like generated
 code. `build.mjs` builds with esbuild `platform: "neutral"` (a node import
 fails the build) and refuses a bundle that still names `require("…")`,
 `node:`, `process.env` or `Buffer.from`.

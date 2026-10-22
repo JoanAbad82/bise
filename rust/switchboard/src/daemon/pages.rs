@@ -329,6 +329,11 @@ impl Shell {
             crate::pages::PageMsg::Opened { .. } => {
                 self.state_now();
             }
+            // his edits in the viewer's grid: the file and the version (daemon/art.rs)
+            crate::pages::PageMsg::Save { id, req, reply } => {
+                let (status, body) = self.art_save(&pages, &id, req);
+                reply.send(status, body);
+            }
             crate::pages::PageMsg::Mirror { id, error } => {
                 // the last good public copy stays up; main hears it once (designer m_7509)
                 self.feed_rec(MAIN, Feed::warn(format!("▲ couldn't publish {id} to the public mirror: {error}")));

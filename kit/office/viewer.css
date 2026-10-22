@@ -15,25 +15,15 @@ body { font: var(--text-ui) / 1.4 var(--font-ui); }
 .office-foot { flex: none; border-top: 1px solid var(--line); padding: 6px 12px; color: var(--kick); font-size: var(--text-kicker); }
 .office-foot p { margin: 2px 0; }
 
-/* xlsx: the bar, the grid, the tabs */
-.office-sheet { flex-direction: column; }
-.office-bar { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: var(--text-kicker); min-height: 18px; }
-.office-bar .where { color: var(--faint); min-width: 8ch; }
-.office-bar .formula { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.office-grid { flex: 1; min-height: 0; overflow: auto; background: var(--surface-card); }
-.office-grid table { border-collapse: collapse; table-layout: fixed; font: var(--text-ui) / 1.3 var(--font-ui); color: #1d1a17; background: #ffffff; }
-.office-grid col.rn { width: 44px; }
-.office-grid th { position: sticky; background: var(--surface-made); color: var(--faint); font-weight: 400; border: 1px solid var(--line); padding: 2px 4px; }
-.office-grid thead th { top: 0; z-index: 2; }
-.office-grid th.rn { left: 0; z-index: 1; text-align: right; }
-.office-grid th.corner { left: 0; z-index: 3; }
-.office-grid td { border: 1px solid #1d1a1714; padding: 2px 4px; height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: cell; }
-.office-grid td.sel { outline: 1px solid var(--ink); outline-offset: -1px; background-image: linear-gradient(color-mix(in srgb, var(--ink) 9%, transparent), color-mix(in srgb, var(--ink) 9%, transparent)); }
-.office-grid td.novalue::after { content: "·"; color: var(--faint); }
-.office-grid td.error { color: var(--risk); }
-.office-tabs { flex: none; display: flex; gap: 2px; overflow-x: auto; border-top: 1px solid var(--line); padding: 0 8px; }
-.office-tabs button { font: inherit; color: var(--dim); background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
-.office-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+/* xlsx: Univer's grid (kit/office/sheet.js, office-sheet.js) and the save strip above it */
+.office-sheet { flex-direction: column; position: relative; }
+.office-univer { flex: 1; min-height: 0; position: relative; }
+/* the save's words sit in the grid's foot, right of the sheet tabs: no shift of the grid */
+.office-save { position: absolute; right: 12px; bottom: 0; height: 36px; z-index: 6; display: flex; align-items: center; gap: 8px; font-size: var(--text-kicker); color: var(--dim); pointer-events: none; }
+.office-save button { pointer-events: auto; }
+.office-save[data-state="conflict"] .words, .office-save[data-state="failed"] .words { color: var(--ink); }
+.office-save button { font: inherit; color: var(--ink); background: none; border: 0; padding: 2px 4px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.office-cell-mark { position: fixed; pointer-events: none; z-index: 5; }
 
 /* pptx: the rail and the slide */
 .office-deck { flex-direction: row; }

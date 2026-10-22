@@ -1,17 +1,29 @@
-// bise kit · the xlsx renderer of the office viewer (viewer.js; plan §4): the sheets module's
-// outline (sheets.open(bytes).inspect(), office-sheets m_23804) as a grid: sheet tabs, column
-// widths, merged cells, the values as shown, fills, bold, alignment; a click selects a cell
-// (its formula in the bar), shift+click a range. Rows are added as the user scrolls (a long
-// sheet draws its first rows at once). Not drawn, said in the foot: charts (their titles),
-// pivot tables, and formulas with no saved value.
+// bise kit · the xlsx renderer of the office viewer (viewer.js; page xlsx-univer, architect
+// m_37322, m_37328): the workbook in Univer's grid (office/dist/office-sheet.js, loaded here
+// only), where he resizes columns and rows, types values and formulas (recomputed by the
+// grid), and his edits save themselves 2 s after the last one: the grid's edits
+// (editsBetween) are replayed on the file with the office SDK, which keeps what the grid never
+// saw (charts, pivots), and the bytes go to POST /api/a/<id>/save, which writes the file and
+// makes the next version (the saves of one sitting replace it: one version per sitting).
 //
-// Pure helpers (exported for kit/office/check.mjs): parseRef, colName, rangeOf, model.
+// A version made elsewhere while he has edits not saved yet: the save is refused (409) and
+// the strip offers `keep mine` (save over it) or `take v<n>` (draw it, his edits dropped).
+// His own saves come back on the artifact's stream: they are not drawn again (hold).
+//
+// What the notes layer (select.js) asks of a view: selection() as an Anchor, box() and quote()
+// of the selection, where(anchor) for the marks (boxes over the canvas, moved as it scrolls).
+//
+// The save's body: one JSON line {base, rev, session, seq, force}, then the bytes
+// (pages/artifact/save.rs). A 503 (the hub busy) is tried again with the same seq: a save
+// that landed late answers its version, never a second one.
+//
+// Pure helpers (exported for office/sdk/test/viewer.test.mjs): parseRef, colName, rangeOf, saveBody,
+// saveState; and saver, the save loop without the DOM.
 
-import { sheets } from "/kit/office/office.js";
+import { sheets, editsBetween } from "/kit/office/office.js";
 
-/** Rows drawn at once, and again each time the end comes near. */
-const CHUNK = 200;
-const DEFAULT_WIDTH = 72;
+/** How long after his last edit the file is saved. */
+export const SAVE_AFTER_MS = 2000;
 
 /** `B4` → { col: 2, row: 4 } (1-based); null for anything else. */
 export function parseRef(ref) {
@@ -37,34 +49,35 @@ export function rangeOf(a, b) {
   return c0 === c1 && r0 === r1 ? one : `${one}:${colName(c1)}${r1}`;
 }
 
-/** A sheet node of the outline as what the grid draws: cells by `row:col`, the size, the merges. */
-export function model(sheet) {
-  const p = sheet.props || {};
-  const cells = new Map();
-  let rows = 0;
-  let cols = 0;
-  for (const c of sheet.children || []) {
-    if (c.type !== "cell") continue;
-    const ref = parseRef(String(c.id).split("!").pop());
-    if (!ref) continue;
-    cells.set(`${ref.row}:${ref.col}`, c);
-    rows = Math.max(rows, ref.row);
-    cols = Math.max(cols, ref.col);
+/** The save's body: the header line, then the file's bytes. */
+export function saveBody(head, bytes) {
+  const line = new TextEncoder().encode(`${JSON.stringify(head)}\n`);
+  const out = new Uint8Array(line.length + bytes.length);
+  out.set(line);
+  out.set(bytes, line.length);
+  return out;
+}
+
+/**
+ * The strip's words for a state: `idle` (nothing), `waiting` (edits not saved yet),
+ * `saving`, `saved` (v), `conflict` (v: the version that came in), `failed` (why).
+ */
+export function saveState(state) {
+  switch (state.kind) {
+    case "waiting":
+      return { text: "edited", actions: [] };
+    case "saving":
+      return { text: "saving…", actions: [] };
+    case "saved":
+      return { text: `saved · v${state.v}`, actions: [] };
+    case "conflict":
+      if (state.disk) return { text: "the file changed on disk while you edited", actions: [{ id: "keep", text: "keep mine" }, { id: "take", text: `take v${state.v}` }] };
+      return { text: `v${state.v} came in while you edited`, actions: [{ id: "keep", text: "keep mine" }, { id: "take", text: `take v${state.v}` }] };
+    case "failed":
+      return { text: `couldn't save: ${state.why}`, actions: [{ id: "retry", text: "try again" }] };
+    default:
+      return { text: "", actions: [] };
   }
-  const dims = typeof p.dims === "string" ? p.dims.split(":").map(parseRef) : [];
-  if (dims[1]) [rows, cols] = [Math.max(rows, dims[1].row), Math.max(cols, dims[1].col)];
-  // a merge: its top-left cell spans it, the others are not drawn
-  const spans = new Map();
-  const covered = new Set();
-  for (const r of p.merged || []) {
-    const [a, b] = String(r).split(":").map(parseRef);
-    if (!a || !b) continue;
-    spans.set(`${a.row}:${a.col}`, { rows: b.row - a.row + 1, cols: b.col - a.col + 1 });
-    for (let y = a.row; y <= b.row; y++) for (let x = a.col; x <= b.col; x++) if (y !== a.row || x !== a.col) covered.add(`${y}:${x}`);
-    rows = Math.max(rows, b.row);
-    cols = Math.max(cols, b.col);
-  }
-  return { name: sheet.name || sheet.id, rows: Math.max(rows, 1), cols: Math.max(cols, 1), cells, spans, covered, props: p };
 }
 
 function el(tag, cls, text) {
@@ -74,182 +87,262 @@ function el(tag, cls, text) {
   return e;
 }
 
+/** Light or dark, as the frame wears it (kit.js's <html data-theme>, else the system's). */
+function darkNow() {
+  const t = document.documentElement.dataset.theme;
+  if (t === "dark" || t === "light") return t === "dark";
+  return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
+
 /** What the foot says this file has that the grid does not draw. */
-function notesOf(models) {
+function notesOf(outline) {
   const out = [];
-  for (const m of models) {
-    for (const c of m.props.charts || []) out.push(`${m.name}: the chart "${c.title || "untitled"}" is not drawn here.`);
-    if (m.props.pivots) out.push(`${m.name}: ${m.props.pivots} pivot table${m.props.pivots > 1 ? "s are" : " is"} not drawn here.`);
-    let none = 0;
-    for (const c of m.cells.values()) if (c.props && c.props.noValue) none++;
-    if (none) out.push(`${m.name}: ${none} formula${none > 1 ? "s have" : " has"} no saved value (blank here until Excel computes ${none > 1 ? "them" : "it"}).`);
+  for (const s of outline.nodes.filter((n) => n.type === "sheet")) {
+    const p = s.props || {};
+    for (const c of p.charts || []) out.push(`${s.name}: the chart "${c.title || "untitled"}" is not drawn here (it stays in the file).`);
+    if (p.pivots) out.push(`${s.name}: ${p.pivots} pivot table${p.pivots > 1 ? "s are" : " is"} not drawn here (kept in the file).`);
   }
   return out;
 }
 
-export async function draw(root, bytes) {
-  const book = await sheets.open(bytes);
-  const models = book.inspect().nodes.filter((n) => n.type === "sheet").map(model);
-  root.classList.add("office-sheet");
-  const bar = el("div", "office-bar");
-  const where = el("span", "where");
-  const formula = el("span", "formula");
-  bar.append(where, formula);
-  const scroller = el("div", "office-grid");
-  const tabs = el("nav", "office-tabs");
-  tabs.setAttribute("aria-label", "sheets");
-  root.append(bar, scroller, tabs);
+const token = () => (document.querySelector('meta[name="bise-token"]') || {}).content || "";
 
-  let current = 0;
-  let sel = null; // { a, b } corners, 1-based
-  let drawn = 0;
-  let tbody = null;
-  let more = null;
+/**
+ * His edits saved (the viewer's save loop, without the DOM: the tests drive it with a fake
+ * grid). `grid.snapshot()` is the grid now; `post(head, bytes)` sends a save and gives
+ * `{status, answer}`; `later(fn, ms)` schedules and gives its cancel; `onState(state)` is told
+ * each state (saveState's words); `take(ev)` draws a version past the hold.
+ */
+export function saver({ book, grid, info, session, post, later, onState, take }) {
+  let saved = grid.snapshot(); // the grid's snapshot the file was last saved from
+  let base = { v: info.version, rev: info.rev ?? 1 };
+  let state = { kind: "idle" };
+  let cancel = null;
+  let inFlight = null;
+  let dirty = false;
+  const mine = new Set(); // `${v}:${rev}` of the saves made here
+  let stashed = null; // a version that came during a save
+  let keepAgainst = null; // the version `keep mine` saves over
+  let seq = 0; // this sitting's saves, from 1
+  const set = (s) => {
+    state = s;
+    onState(s);
+  };
 
-  function cellNode(m, row, col) {
-    return m.cells.get(`${row}:${col}`);
+  function changed() {
+    dirty = true;
+    if (state.kind !== "conflict" && state.kind !== "saving") set({ kind: "waiting" });
+    cancel?.();
+    cancel = later(save, SAVE_AFTER_MS);
   }
 
-  function rowEl(m, row) {
-    const tr = el("tr");
-    tr.append(el("th", "rn", String(row)));
-    const h = m.props.heights && m.props.heights[row];
-    if (h) tr.style.height = `${h}px`;
-    for (let col = 1; col <= m.cols; col++) {
-      const key = `${row}:${col}`;
-      if (m.covered.has(key)) continue;
-      const c = cellNode(m, row, col);
-      const td = el("td", null, c ? (c.text ?? "") : "");
-      td.dataset.ref = `${colName(col)}${row}`;
-      const span = m.spans.get(key);
-      if (span) {
-        if (span.rows > 1) td.rowSpan = span.rows;
-        if (span.cols > 1) td.colSpan = span.cols;
+  async function save() {
+    cancel?.();
+    cancel = null;
+    if (inFlight) return inFlight;
+    if (state.kind === "conflict" && !keepAgainst) return;
+    const now = grid.snapshot();
+    const edits = editsBetween(saved, now);
+    if (edits.length === 0 && !keepAgainst) {
+      dirty = false;
+      set({ kind: "idle" });
+      return;
+    }
+    book.apply(edits);
+    saved = now;
+    dirty = false;
+    set({ kind: "saving" });
+    const against = keepAgainst || base;
+    keepAgainst = null;
+    seq += 1;
+    const head = { base: against.v, rev: against.rev, session, seq, force: !!against.force };
+    inFlight = (async () => {
+      const bytes = await book.save();
+      let r;
+      // the hub busy past its wait: the same save again (its seq makes a retry harmless)
+      for (let tries = 0; tries < 4; tries++) {
+        r = await post(head, bytes);
+        if (r.status !== 503) break;
       }
-      const p = (c && c.props) || {};
-      if (p.bold) td.style.fontWeight = "600";
-      if (p.italic) td.style.fontStyle = "italic";
-      if (p.fill) td.style.background = p.fill;
-      if (p.color) td.style.color = p.color;
-      if (p.align) td.style.textAlign = p.align;
-      else if (typeof p.value === "number") td.style.textAlign = "right";
-      if (p.noValue) td.classList.add("novalue");
-      if (p.error) td.classList.add("error");
-      tr.append(td);
-    }
-    return tr;
+      const a = r.answer || {};
+      if (r.status === 409 && a.v) return { kind: "conflict", v: a.v, rev: a.rev, disk: !!a.disk };
+      if (r.status !== 200) return { kind: "failed", why: a.error || `${r.status}` };
+      mine.add(`${a.v}:${a.rev}`);
+      base = { v: a.v, rev: a.rev };
+      Object.assign(info, { version: a.v, latest: a.v, rev: a.rev });
+      return { kind: "saved", v: a.v };
+    })().catch((e) => ({ kind: "failed", why: e.message || String(e) }));
+    const done = await inFlight;
+    inFlight = null;
+    set(done);
+    if (dirty && done.kind === "saved") changed();
+    const ev = stashed;
+    stashed = null;
+    if (ev && !mine.has(`${ev.n}:${ev.rev}`) && done.kind !== "conflict") came(ev);
   }
 
-  function addRows(m) {
-    const end = Math.min(m.rows, drawn + CHUNK);
-    const frag = document.createDocumentFragment();
-    for (let r = drawn + 1; r <= end; r++) frag.append(rowEl(m, r));
-    tbody.append(frag);
-    drawn = end;
-    if (drawn >= m.rows && more) {
-      more.remove();
-      more = null;
-    }
+  /** A version made elsewhere: drawn when he has nothing unsaved, else he picks. */
+  function came(ev) {
+    if (!dirty && state.kind !== "conflict") return false;
+    set({ kind: "conflict", v: ev.n, rev: ev.rev });
+    return true;
   }
-
-  function showSheet(i) {
-    current = i;
-    sel = null;
-    drawn = 0;
-    const m = models[i];
-    scroller.replaceChildren();
-    for (const [j, b] of [...tabs.children].entries()) b.setAttribute("aria-selected", String(j === i));
-    if (!m) {
-      scroller.append(el("p", "office-empty", "this workbook has no sheets."));
-      return;
-    }
-    const table = el("table");
-    const colgroup = el("colgroup");
-    colgroup.append(el("col", "rn"));
-    const head = el("tr");
-    head.append(el("th", "corner"));
-    for (let col = 1; col <= m.cols; col++) {
-      const c = el("col");
-      const w = m.props.widths && m.props.widths[col - 1];
-      c.style.width = `${w || DEFAULT_WIDTH}px`;
-      colgroup.append(c);
-      head.append(el("th", "cn", colName(col)));
-    }
-    const thead = el("thead");
-    thead.append(head);
-    tbody = el("tbody");
-    table.append(colgroup, thead, tbody);
-    scroller.append(table);
-    addRows(m);
-    if (drawn < m.rows) {
-      more = el("p", "office-more", `rows ${drawn + 1}–${m.rows} as you scroll`);
-      scroller.append(more);
-    }
-    paint();
-  }
-
-  scroller.addEventListener("scroll", () => {
-    const m = models[current];
-    if (m && drawn < m.rows && scroller.scrollTop + scroller.clientHeight > scroller.scrollHeight - 400) addRows(m);
-  });
-
-  /** The selection's outline in the grid and its words in the bar. */
-  function paint() {
-    for (const td of scroller.querySelectorAll("td.sel")) td.classList.remove("sel");
-    const m = models[current];
-    if (!sel || !m) {
-      where.textContent = m ? m.name : "";
-      formula.textContent = "";
-      return;
-    }
-    const range = rangeOf(sel.a, sel.b);
-    for (const td of scroller.querySelectorAll("td[data-ref]")) {
-      const r = parseRef(td.dataset.ref);
-      if (r.col >= Math.min(sel.a.col, sel.b.col) && r.col <= Math.max(sel.a.col, sel.b.col) && r.row >= Math.min(sel.a.row, sel.b.row) && r.row <= Math.max(sel.a.row, sel.b.row)) td.classList.add("sel");
-    }
-    where.textContent = `${m.name}!${range}`;
-    const c = cellNode(m, sel.a.row, sel.a.col);
-    const p = (c && c.props) || {};
-    formula.textContent = p.formula ? `=${String(p.formula).replace(/^=/, "")}` : (c?.text ?? "");
-  }
-
-  scroller.addEventListener("click", (e) => {
-    const td = e.target.closest("td[data-ref]");
-    if (!td) return;
-    const r = parseRef(td.dataset.ref);
-    sel = e.shiftKey && sel ? { a: sel.a, b: r } : { a: r, b: r };
-    paint();
-  });
-
-  for (const [i, m] of models.entries()) {
-    const b = el("button", null, m.name);
-    b.type = "button";
-    b.setAttribute("role", "tab");
-    b.addEventListener("click", () => showSheet(i));
-    tabs.append(b);
-  }
-  showSheet(0);
 
   return {
-    notes: notesOf(models),
+    get state() {
+      return state;
+    },
+    get dirty() {
+      return dirty;
+    },
+    changed,
+    save,
+    /** `keep mine`: his edits saved over the version that came (over the disk's file too). */
+    keep() {
+      if (state.kind !== "conflict") return;
+      keepAgainst = { v: state.v, rev: state.rev, force: !!state.disk };
+      return save();
+    },
+    /** `take v<n>`: that version drawn, his edits not saved dropped. */
+    take() {
+      if (state.kind !== "conflict") return;
+      const ev = { n: state.v, rev: state.rev };
+      dirty = false;
+      set({ kind: "idle" });
+      take(ev);
+    },
+    /** A version on the artifact's stream: true when this view keeps it from being drawn. */
+    hold(ev) {
+      if (mine.has(`${ev.n}:${ev.rev}`)) return true;
+      if (inFlight) {
+        stashed = ev;
+        return true;
+      }
+      return came(ev);
+    },
+  };
+}
+
+export async function draw(root, bytes, info) {
+  const [book, ui] = await Promise.all([sheets.open(bytes), import("/kit/office/office-sheet.js")]);
+  root.classList.add("office-sheet");
+  const strip = el("div", "office-save");
+  strip.setAttribute("role", "status");
+  const host = el("div", "office-univer");
+  root.append(host, strip);
+
+  const session = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  let grid = null;
+  let save = null;
+
+  function paint(state) {
+    const w = saveState(state);
+    strip.dataset.state = state.kind;
+    strip.replaceChildren();
+    if (!w.text) return;
+    strip.append(el("span", "words", w.text));
+    for (const a of w.actions) {
+      const b = el("button", null, a.text);
+      b.type = "button";
+      b.dataset.do = a.id;
+      strip.append(b);
+    }
+  }
+  strip.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-do]");
+    if (!b || !save) return;
+    if (b.dataset.do === "keep") save.keep();
+    else if (b.dataset.do === "take") save.take();
+    else if (b.dataset.do === "retry") save.save();
+  });
+  const post = async (head, bytes) => {
+    const r = await fetch(`/api/a/${encodeURIComponent(info.id)}/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream", "X-Bise-Token": token() },
+      body: saveBody(head, bytes),
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    return { status: r.status, answer: await r.json().catch(() => ({})) };
+  };
+  const later = (fn, ms) => {
+    const t = setTimeout(fn, ms);
+    return () => clearTimeout(t);
+  };
+
+  // the grid needs its size: mounted once the viewer put the stage in the page
+  const mount = () => {
+    if (!host.isConnected) return requestAnimationFrame(mount);
+    grid = ui.mountGrid(host, book.univer(), { dark: darkNow() });
+    save = saver({ book, grid, info, session, post, later, onState: paint, take: (ev) => window.biseOffice.take?.(ev) });
+    grid.onChange(() => save.changed());
+    grid.onMove(() => moveMarks());
+    new MutationObserver(() => grid && grid.dark(darkNow())).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => grid && grid.dark(darkNow()));
+    if (pendingPlace) grid.restore(pendingPlace);
+  };
+  let pendingPlace = null;
+  mount();
+
+  // the marks the notes layer asked for, kept over their cells as the grid moves
+  const marks = new Set();
+  function moveMarks() {
+    for (const m of marks) {
+      if (!m.box.isConnected) {
+        marks.delete(m);
+        continue;
+      }
+      const r = grid && grid.rect(m.a.sheet, m.a.range);
+      m.box.hidden = !r;
+      if (r) Object.assign(m.box.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    }
+  }
+
+  window.addEventListener("pagehide", () => {
+    if (save && save.dirty) save.save();
+  });
+
+  return {
+    notes: notesOf(book.inspect({ maxCells: 0 })),
     place() {
-      return { sheet: models[current]?.name, top: scroller.scrollTop, left: scroller.scrollLeft, sel };
+      return grid ? grid.place() : pendingPlace || { sheet: book.sheetNames[0], range: null };
     },
     restore(p) {
-      const i = models.findIndex((m) => m.name === p.sheet);
-      if (i < 0) return;
-      showSheet(i);
-      const m = models[i];
-      while (drawn < m.rows && scroller.scrollHeight < p.top + scroller.clientHeight) addRows(m);
-      scroller.scrollTop = p.top;
-      scroller.scrollLeft = p.left;
-      sel = p.sel;
-      paint();
+      if (grid) grid.restore(p);
+      else pendingPlace = p;
     },
     /** The selection as an Anchor (bise_proto::anchor `cell`), or null. */
     selection() {
-      const m = models[current];
-      return sel && m ? { kind: "cell", sheet: m.name, range: rangeOf(sel.a, sel.b) } : null;
+      const p = grid && grid.place();
+      return p && p.range ? { kind: "cell", sheet: p.sheet, range: p.range } : null;
+    },
+    box() {
+      const p = grid && grid.place();
+      return p && p.range ? grid.rect(p.sheet, p.range) : null;
+    },
+    quote() {
+      return grid ? grid.text() : "";
+    },
+    where(a) {
+      if (a.kind !== "cell") return null;
+      const has = book.sheetNames.includes(a.sheet);
+      const r = grid && grid.rect(a.sheet, a.range);
+      if (!r) return { els: [], found: has };
+      const box = el("div", "office-cell-mark");
+      box.dataset.ours = "1";
+      document.body.append(box);
+      const m = { a, box };
+      marks.add(m);
+      moveMarks();
+      return { els: [box], found: true };
+    },
+    /** A version on the artifact's stream: true when this view keeps it from being drawn. */
+    hold(ev) {
+      return save ? save.hold(ev) : false;
+    },
+    dispose() {
+      for (const m of marks) m.box.remove();
+      grid && grid.dispose();
     },
   };
 }

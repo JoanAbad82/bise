@@ -48,6 +48,9 @@ pub enum PageMsg {
     Answer { id: String, block: String, reply: String },
     /// the user opened a newer version of page `id` in a browser
     Opened { id: String },
+    /// his edits of artifact `id` in the viewer's grid (artifact/save.rs):
+    /// the hub decides, writes the file and the version, and answers `reply`
+    Save { id: String, req: artifact::save::SaveReq, reply: artifact::save::Reply },
     /// the user's mirror of the public pages failed after a publish of `id`
     /// (mirror.rs): one line in main's thread
     Mirror { id: String, error: String },

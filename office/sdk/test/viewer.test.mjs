@@ -36,27 +36,35 @@ test("office.js loads with no window or document, and has no docx-preview in it"
 });
 
 test("the grid names cells and ranges as the sheets module does", async () => {
-  const { parseRef, colName, rangeOf, model } = await helpers("sheet.js");
+  const { parseRef, colName, rangeOf } = await helpers("sheet.js");
   assert.deepEqual(parseRef("B4"), { col: 2, row: 4 });
   assert.deepEqual(parseRef("$AA$10"), { col: 27, row: 10 });
   assert.equal(parseRef("Sheet1"), null);
   assert.deepEqual([1, 26, 27, 52, 703].map(colName), ["A", "Z", "AA", "AZ", "AAA"]);
   assert.equal(rangeOf({ col: 4, row: 9 }, { col: 2, row: 4 }), "B4:D9");
   assert.equal(rangeOf({ col: 2, row: 4 }, { col: 2, row: 4 }), "B4");
-  const m = model({
-    id: "Q3",
-    type: "sheet",
-    name: "Q3",
-    props: { merged: ["A1:C1"], dims: "A1:E30" },
-    children: [
-      { id: "Q3!A1", type: "cell", text: "Revenue" },
-      { id: "Q3!B4", type: "cell", text: "1,200", props: { value: 1200 } },
-    ],
-  });
-  assert.deepEqual([m.rows, m.cols], [30, 5], "the sheet's dims, beyond its last cell");
-  assert.deepEqual(m.spans.get("1:1"), { rows: 1, cols: 3 });
-  assert.ok(m.covered.has("1:2") && m.covered.has("1:3") && !m.covered.has("1:1"));
-  assert.equal(m.cells.get("4:2").text, "1,200");
+});
+
+// xlsx-univer: his edits saved (pages/artifact/save.rs reads this body)
+test("a save is its header line then the file's bytes", async () => {
+  const { saveBody } = await helpers("sheet.js");
+  const body = saveBody({ base: 3, rev: 2, session: "s1", seq: 1, force: false }, new Uint8Array([80, 75, 3, 4]));
+  const nl = body.indexOf(10);
+  assert.deepEqual(JSON.parse(new TextDecoder().decode(body.subarray(0, nl))), { base: 3, rev: 2, session: "s1", seq: 1, force: false });
+  assert.deepEqual([...body.subarray(nl + 1)], [80, 75, 3, 4]);
+});
+
+test("the save's words: nothing at rest, then edited, saving, saved, or what he can do", async () => {
+  const { saveState } = await helpers("sheet.js");
+  assert.deepEqual(saveState({ kind: "idle" }), { text: "", actions: [] });
+  assert.equal(saveState({ kind: "waiting" }).text, "edited");
+  assert.equal(saveState({ kind: "saving" }).text, "saving…");
+  assert.equal(saveState({ kind: "saved", v: 4 }).text, "saved · v4");
+  const c = saveState({ kind: "conflict", v: 5, rev: 1 });
+  assert.equal(c.text, "v5 came in while you edited");
+  assert.deepEqual(c.actions.map((a) => a.text), ["keep mine", "take v5"]);
+  assert.equal(saveState({ kind: "conflict", v: 5, rev: 1, disk: true }).text, "the file changed on disk while you edited");
+  assert.deepEqual(saveState({ kind: "failed", why: "the file is gone" }).actions.map((a) => a.id), ["retry"]);
 });
 
 test("a slide's boxes are placed in % of the slide", async () => {
@@ -299,4 +307,72 @@ test("a video's player: its states, its keys, its moments", async () => {
   assert.equal(timeWords(12.6, 90), "0:12 / 1:30");
   assert.equal(timeWords(3725, 7200), "1:02:05 / 2:00:00");
   assert.equal(timeWords(4, NaN), "0:04");
+});
+
+// xlsx-univer: his resize and edit in the grid, saved by the viewer's save loop (sheet.js
+// saver) on the SDK, with a fake grid (Univer needs a canvas) and a fake hub.
+test("a column resized and a cell typed in the grid save as the next version, one per sitting", async () => {
+  const sdk = pathToFileURL(join(root, "office", "dist", "office.js")).href;
+  const src = readFileSync(join(root, "kit", "office", "sheet.js"), "utf8").replace('from "/kit/office/office.js"', `from ${JSON.stringify(sdk)}`);
+  const { saver, SAVE_AFTER_MS } = await import(`data:text/javascript;base64,${Buffer.from(src).toString("base64")}`);
+  const { sheets } = await import(sdk);
+  const start = await sheets.create({ sheet: "Q3", rows: [["Item", "Amount"], ["a", 1200], ["Total", "=SUM(B2:B2)"]], date: new Date(Date.UTC(2026, 0, 1)) });
+  const book = await sheets.open(await start.save());
+  // the grid: Univer's snapshot of the book, changed the way his gestures change it
+  let snap = book.univer();
+  const grid = { snapshot: () => JSON.parse(JSON.stringify(snap)) };
+  const gesture = (fn) => {
+    snap = JSON.parse(JSON.stringify(snap));
+    fn(snap.sheets.sheet1);
+    save.changed();
+  };
+  const posts = [];
+  let answer = { status: 200, answer: { v: 2, rev: 1 } };
+  const post = async (head, bytes) => {
+    posts.push({ head, bytes });
+    return answer;
+  };
+  const timers = [];
+  const later = (fn, ms) => {
+    const t = { fn, ms };
+    timers.push(t);
+    return () => timers.splice(timers.indexOf(t), 1);
+  };
+  const states = [];
+  const info = { id: "q3", version: 1, rev: 1 };
+  const save = saver({ book, grid, info, session: "s1", post, later, onState: (s) => states.push(s.kind), take: () => {} });
+
+  gesture((s) => (s.columnData[1] = { w: 180 })); // B dragged wider
+  gesture((s) => (s.cellData[1][1] = { v: 5000, t: 2 })); // B2 typed
+  gesture((s) => (s.cellData[2][1].v = 5000)); // the total, recomputed by the grid
+  assert.equal(timers.length, 1, "one save waiting, pushed back by each edit");
+  assert.equal(timers[0].ms, SAVE_AFTER_MS);
+  await timers.pop().fn();
+  assert.deepEqual(states, ["waiting", "waiting", "waiting", "saving", "saved"]);
+  assert.equal(posts.length, 1);
+  assert.deepEqual(posts[0].head, { base: 1, rev: 1, session: "s1", seq: 1, force: false });
+  const o = (await sheets.open(posts[0].bytes)).inspect();
+  const cell = (id) => o.nodes[0].children.find((c) => c.id === id).props;
+  assert.equal(o.nodes[0].props.widths[1], 180, "the width he dragged");
+  assert.equal(cell("Q3!B2").value, 5000, "the value he typed");
+  assert.deepEqual([cell("Q3!B3").formula, cell("Q3!B3").value], ["=SUM(B2:B2)", 5000], "the formula kept, its result the grid's");
+  assert.deepEqual(info, { id: "q3", version: 2, latest: 2, rev: 1 });
+  assert.ok(save.hold({ n: 2, rev: 1 }), "his own save comes back on the stream: not drawn again");
+
+  // the next edit of the sitting: seq 2, from the version he made
+  answer = { status: 200, answer: { v: 2, rev: 2 } };
+  gesture((s) => (s.rowData[0] = { h: 40 }));
+  await timers.pop().fn();
+  assert.deepEqual(posts[1].head, { base: 2, rev: 1, session: "s1", seq: 2, force: false });
+
+  // an agent's v3 lands while he has an edit not saved: he picks, nothing is overwritten
+  gesture((s) => (s.cellData[0][0] = { v: "Line", t: 1 }));
+  assert.ok(save.hold({ n: 3, rev: 1 }), "not drawn over his edit");
+  assert.deepEqual(save.state, { kind: "conflict", v: 3, rev: 1 });
+  await timers.pop().fn();
+  assert.equal(posts.length, 2, "no autosave while he has not picked");
+  answer = { status: 200, answer: { v: 4, rev: 1 } };
+  await save.keep();
+  assert.deepEqual(posts[2].head, { base: 3, rev: 1, session: "s1", seq: 3, force: false }, "keep mine: saved over v3");
+  assert.equal(save.state.kind, "saved");
 });
