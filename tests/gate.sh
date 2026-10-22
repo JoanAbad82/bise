@@ -719,6 +719,8 @@ if [ "$mode" = land ]; then
   # every shim registered with its end date (issue 31); an overdue one is
   # only a warning here (its owner gets the red at their quick gate)
   lstep shims bash -c 'python3 tests/shims_check.py --self-test && python3 tests/shims_check.py --land'
+  # apply and replay_batch reach no need: a cold record is fetched before, never inside (issue 36)
+  lstep cold_apply bash -c 'python3 tests/cold_apply_lint.py --self-test && python3 tests/cold_apply_lint.py'
   # sb-core's records by position only in bend/hub/gen/ (state-schema)
   lstep state_guard env GATE_BASE="$base" bash -c 'python3 tests/state_guard.py --self-test && python3 tests/state_guard.py'
   # quick's clippy, in its warm dir: the workspace, so both share every artifact

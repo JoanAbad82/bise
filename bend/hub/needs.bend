@@ -9,46 +9,49 @@ import ./model.bend as M
 import ./gen/state.bend as S
 import ./gen/in.bend as GI
 import ./gen/kit.bend as K
+import ./lazy.bend as LZ
 
-type Needs is Data:
-  Needs{msgs: List<&2, Nat>, agents: List<&2, String>}
+# the messages (by id) and the agents (by name) a step or a batch needs: a
+# pair, not a record (it never enters St: state_guard's rule is for St's)
+def Needs() -> Data:
+  Sigma<&2, &2, List<&2, Nat>, _ => List<&2, String>>
 
-def Needs.msgs(x: Needs) -> List<&2, Nat>:
+def Needs.msgs(x: Needs()) -> List<&2, Nat>:
   match x:
-    case Needs{+m, _}:
+    case Tuple{+m, _}:
       m
 
-def Needs.agents(x: Needs) -> List<&2, String>:
+def Needs.agents(x: Needs()) -> List<&2, String>:
   match x:
-    case Needs{_, +a}:
+    case Tuple{_, +a}:
       a
 
-def none() -> Needs:
-  Needs{Nil{}, Nil{}}
+def none() -> Needs():
+  Tuple{Nil{}, Nil{}}
 
-def of_agent(+n: String) -> Needs:
-  Needs{Nil{}, [n]}
+def of_agent(+n: String) -> Needs():
+  Tuple{Nil{}, [n]}
 
-def of_msg(+id: Nat) -> Needs:
-  Needs{[id], Nil{}}
+def of_msg(+id: Nat) -> Needs():
+  Tuple{[id], Nil{}}
 
 # a message event's reply settles the question it answers (settle_in)
-def of_reply(r: Maybe<&2, Nat>) -> Needs:
+def of_reply(r: Maybe<&2, Nat>) -> Needs():
   match r:
     case None{}:
       none()
     case Some{+id}:
       of_msg(id)
 
-def union(a: Needs, b: Needs) -> Needs:
+def union(a: Needs(), b: Needs()) -> Needs():
   match a b:
-    case Needs{+am, +aa} Needs{+bm, +ba}:
-      Needs{List.append(&2, Nat, am, bm), List.append(&2, String, aa, ba)}
+    case Tuple{+am, +aa} Tuple{+bm, +ba}:
+      Tuple{List.append(&2, Nat, am, bm), List.append(&2, String, aa, ba)}
 
 # the records an event may read or change, besides the hot side and the
 # arch name index (names, aliases, dirs: name_taken, resolve, dirs_of and
 # the strips of a new task or a rename read only those)
-def needs(e: M.Ev) -> Needs:
+def needs(e: M.Ev) -> Needs():
   match e:
     case M.ETaskCreated{+name, _, _, _, _}:
       of_agent(name)
@@ -86,47 +89,48 @@ def needs(e: M.Ev) -> Needs:
 # in the batch (newest first), so a later event under the new name needs
 # the record stored under an older one
 
-type Rn is Data:
-  Rn{name: String, was: List<&2, String>}
+def Rn() -> Data:
+  Sigma<&2, &2, String, _ => List<&2, String>>
 
-def was_of(rn: List<&2, Rn>, +n: String) -> List<&2, String>:
+def was_of(rn: List<&2, Rn()>, +n: String) -> List<&2, String>:
   match rn:
     case Nil{}:
       Nil{}
-    case Con{Rn{+k, +w}, +t}:
-      Bool.pick(List<&2, String>, String.eq(k, n), w, was_of(t, n))
+    case Con{Tuple{+k, +w}, +t}:
+      # the walk stops at the first rename to `n` (LZ.pick: Bool.pick computes both)
+      LZ.pick(List<&2, String>, String.eq(k, n), u => w, u => was_of(t, n))
 
 # an event's agent needs, with the earlier names of each in the batch
-def with_was(xs: List<&2, String>, +rn: List<&2, Rn>) -> List<&2, String>:
+def with_was(xs: List<&2, String>, +rn: List<&2, Rn()>) -> List<&2, String>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+n, +t}:
       List.append(&2, String, n <> was_of(rn, n), with_was(t, rn))
 
-def renames(e: M.Ev, +rn: List<&2, Rn>) -> List<&2, Rn>:
+def renames(e: M.Ev, +rn: List<&2, Rn()>) -> List<&2, Rn()>:
   match e:
     case M.ERenamed{+name, +nn}:
-      Rn{nn, name <> was_of(rn, name)} <> rn
+      Tuple{nn, name <> was_of(rn, name)} <> rn
     case _:
       rn
 
-def needs_with.go(x: Needs, +rn: List<&2, Rn>) -> Needs:
+def needs_with.go(x: Needs(), +rn: List<&2, Rn()>) -> Needs():
   match x:
-    case Needs{+ms, +ags}:
-      Needs{ms, with_was(ags, rn)}
+    case Tuple{+ms, +ags}:
+      Tuple{ms, with_was(ags, rn)}
 
-def needs_with(e: M.Ev, +rn: List<&2, Rn>) -> Needs:
+def needs_with(e: M.Ev, +rn: List<&2, Rn()>) -> Needs():
   needs_with.go(needs(e), rn)
 
-def needs_batch.go(es: List<&2, M.Ev>, +rn: List<&2, Rn>) -> Needs:
+def needs_batch.go(es: List<&2, M.Ev>, +rn: List<&2, Rn()>) -> Needs():
   match es:
     case Nil{}:
       none()
     case Con{+e, +t}:
       union(needs_with(e, rn), needs_batch.go(t, renames(e, rn)))
 
-def needs_batch(es: List<&2, M.Ev>) -> Needs:
+def needs_batch(es: List<&2, M.Ev>) -> Needs():
   needs_batch.go(es, Nil{})
 
 # ---- a step: its needs at its start, before anything is decided ----
@@ -139,20 +143,20 @@ def needs_batch(es: List<&2, M.Ev>) -> Needs:
 # record the runtime names (waiters, steered), and a boot's runtime names
 # none.
 
-def of_id(+id: Nat) -> Needs:
-  Bool.pick(Needs, Nat.is_eq(id, 0n), none(), of_msg(id))
+def of_id(+id: Nat) -> Needs():
+  Bool.pick(Needs(), Nat.is_eq(id, 0n), none(), of_msg(id))
 
-def of_card(m: Maybe<&2, S.Card>) -> Needs:
+def of_card(m: Maybe<&2, S.Card>) -> Needs():
   match m:
     case None{}:
       none()
     case Some{+c}:
       of_reply(S.Card.for_msg(c))
 
-def card_needs(+st: S.St, +card: Nat) -> Needs:
+def card_needs(+st: S.St, +card: Nat) -> Needs():
   of_card(M.card_of(S.St.cards(st), card))
 
-def needs_in(+st: S.St, i: GI.In) -> Needs:
+def needs_in(+st: S.St, i: GI.In) -> Needs():
   match i:
     case GI.IReq{_, _, +q, _, _, _}:
       union(of_id(K.get_n(q, "msg")), of_id(K.get_n(q, "reply_to")))

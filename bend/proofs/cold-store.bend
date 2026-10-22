@@ -498,6 +498,255 @@ def ail.go(+e: HM.Ev, +s: HS.St, +x: Nat, -r: HS.MRec, +n: {HM.nat_in(N.Needs.ms
     case HM.EResumed{a}:
       {==}
 
+# ---- the cold message `x` stays where it was: an event that does not name it ----
+
+def cs_rec_map.go(a: Bool, +h: HS.MRec, +t: List<&2, HS.MRec>, +id: Nat, +op: HM.MsgOp, +x: Nat,
+    +ea: {Nat.is_eq(HM.MRec.id(h), id) == a : Bool}, +n: {Nat.is_eq(id, x) == False{} : Bool},
+    ih: {HM.rec_of(HM.map_msg(t, id, op), x) == HM.rec_of(t, x) : Maybe<&2, HS.MRec>})
+    -> {HM.rec_of(HM.map_msg(h <> t, id, op), x) == HM.rec_of(h <> t, x) : Maybe<&2, HS.MRec>}:
+  match a:
+    case True{}:
+      +eb = cs_ne(HM.MRec.id(h), id, x, ea, n)
+      +eo = Equal.trans(Bool, Nat.is_eq(HM.MRec.id(HM.rec_op(h, op)), x), Nat.is_eq(HM.MRec.id(h), x), False{},
+        Equal.cong(Nat, Bool, v => Nat.is_eq(v, x), HM.MRec.id(HM.rec_op(h, op)), HM.MRec.id(h), PC1.hc_rec_op_id(h, op)), eb)
+      %Equal.sym(List<&2, HS.MRec>, HM.map_msg(h <> t, id, op), HM.rec_op(h, op) <> t, PC1.hc_map_hd_T(h, t, id, op, ea))
+        : {HM.rec_of(_, x) == HM.rec_of(h <> t, x) : Maybe<&2, HS.MRec>}
+      Equal.trans(Maybe<&2, HS.MRec>, HM.rec_of(HM.rec_op(h, op) <> t, x), HM.rec_of(t, x), HM.rec_of(h <> t, x),
+        PC2.hc_rec_hd_F(HM.rec_op(h, op), t, x, eo), Equal.sym(Maybe<&2, HS.MRec>, HM.rec_of(h <> t, x), HM.rec_of(t, x), PC2.hc_rec_hd_F(h, t, x, eb)))
+    case False{}:
+      %Equal.sym(List<&2, HS.MRec>, HM.map_msg(h <> t, id, op), h <> HM.map_msg(t, id, op), PC1.hc_map_hd_F(h, t, id, op, ea))
+        : {HM.rec_of(_, x) == HM.rec_of(h <> t, x) : Maybe<&2, HS.MRec>}
+      cs_rec_hd(Nat.is_eq(HM.MRec.id(h), x), h, HM.map_msg(t, id, op), t, x, {==}, ih)
+
+# an op on another id finds `x` as before
+def cs_rec_map(+xs: List<&2, HS.MRec>, +id: Nat, +op: HM.MsgOp, +x: Nat, +n: {Nat.is_eq(id, x) == False{} : Bool})
+    -> {HM.rec_of(HM.map_msg(xs, id, op), x) == HM.rec_of(xs, x) : Maybe<&2, HS.MRec>}:
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      cs_rec_map.go(Nat.is_eq(HM.MRec.id(h), id), h, t, id, op, x, {==}, n, cs_rec_map(t, id, op, x, n))
+
+def cs_keep_cold.go(back: Bool, +c: HS.MRec, +hot: List<&2, HS.MRec>, +old: List<&2, HS.MRec>, +x: Nat, +id: Nat, +op: HM.MsgOp,
+    +n: {Nat.is_eq(id, x) == False{} : Bool})
+    -> {HM.rec_of(HM.Ms.old(HM.msg_op.cold.go(back, c, hot, old, id, op)), x) == HM.rec_of(old, x) : Maybe<&2, HS.MRec>}:
+  match back:
+    case True{}:
+      cs_rec_drop(old, id, x, Equal.trans(Bool, Nat.is_eq(x, id), Nat.is_eq(id, x), False{}, cs_eq_sym(x, id), n))
+    case False{}:
+      cs_rec_map(old, id, op, x, n)
+
+def cs_keep_cold(m: Maybe<&2, HS.MRec>, +hot: List<&2, HS.MRec>, +old: List<&2, HS.MRec>, +x: Nat, +id: Nat, +op: HM.MsgOp,
+    +n: {Nat.is_eq(id, x) == False{} : Bool})
+    -> {HM.rec_of(HM.Ms.old(HM.msg_op.cold(m, hot, old, id, op)), x) == HM.rec_of(old, x) : Maybe<&2, HS.MRec>}:
+  match m:
+    case None{}:
+      {==}
+    case Some{+c}:
+      cs_keep_cold.go(HM.MRec.is_hot(HM.rec_op(c, op)), c, hot, old, x, id, op, n)
+
+def cs_keep_op.in(in_hot: Bool, +hot: List<&2, HS.MRec>, +old: List<&2, HS.MRec>, +x: Nat, +id: Nat, +op: HM.MsgOp,
+    +n: {Nat.is_eq(id, x) == False{} : Bool}, +nh: {HM.nat_in(HI.ids(hot), x) == False{} : Bool},
+    +a: HI.Asc(hot), +j: HI.Disjoint(hot, old))
+    -> {HM.rec_of(HM.Ms.old(HM.msg_op.in(in_hot, hot, old, id, op)), x) == HM.rec_of(old, x) : Maybe<&2, HS.MRec>}:
+  match in_hot:
+    case True{}:
+      +hs = HM.map_msg(hot, id, op)
+      +cs = HM.cold_of(hs)
+      +nhs = Equal.trans(Bool, HM.nat_in(HI.ids(hs), x), HM.nat_in(HI.ids(hot), x), False{},
+        Equal.cong(List<&2, Nat>, Bool, v => HM.nat_in(v, x), HI.ids(hs), HI.ids(hot), PL1.hub_ids_map(hot, id, op)), nh)
+      Equal.trans(Maybe<&2, HS.MRec>, HM.rec_of(HM.ins_all(cs, old), x), HM.rec_in(cs, old, x), HM.rec_of(old, x),
+        PC2.hc_rec_all(cs, old, x, PC3.hc_asc_cold(hs, PC3.hc_asc_map(hot, id, op, a)), PC3.hc_disj_cold(hs, old, PC3.hc_disj_map(hot, old, id, op, j))),
+        Equal.cong(Maybe<&2, HS.MRec>, Maybe<&2, HS.MRec>, m => HM.rec_in.go(m, old, x), HM.rec_of(cs, x), None{},
+          PC2.hc_rec_miss(cs, x, PC3.hc_nin_cold(hs, x, nhs))))
+    case False{}:
+      cs_keep_cold(HM.rec_of(old, id), hot, old, x, id, op, n)
+
+def cs_keep_op(+hot: List<&2, HS.MRec>, +old: List<&2, HS.MRec>, +x: Nat, +id: Nat, +op: HM.MsgOp,
+    +n: {Nat.is_eq(id, x) == False{} : Bool}, +nh: {HM.nat_in(HI.ids(hot), x) == False{} : Bool},
+    +a: HI.Asc(hot), +j: HI.Disjoint(hot, old))
+    -> {HM.rec_of(HM.Ms.old(HM.msg_op(hot, old, id, op)), x) == HM.rec_of(old, x) : Maybe<&2, HS.MRec>}:
+  cs_keep_op.in(Maybe.is_some(&2, HS.MRec, HM.rec_of(hot, id)), hot, old, x, id, op, n, nh, a, j)
+
+def cs_keep_settle.if(ok: Bool, +hot: List<&2, HS.MRec>, +old: List<&2, HS.MRec>, +x: Nat, +id: Nat,
+    +n: {Nat.is_eq(id, x) == False{} : Bool}, +nh: {HM.nat_in(HI.ids(hot), x) == False{} : Bool}, +a: HI.Asc(hot), +j: HI.Disjoint(hot, old))
+    -> {HM.rec_of(HM.Ms.old(HM.settle_in.if(ok, hot, old, id)), x) == HM.rec_of(old, x) : Maybe<&2, HS.MRec>}:
+  match ok:
+    case True{}:
+      cs_keep_op(hot, old, x, id, HM.OSettle{}, n, nh, a, j)
+    case False{}:
+      {==}
+
+def cs_keep_settle.go(orig: Maybe<&2, HS.MRec>, +hot: List<&2, HS.MRec>, +old: List<&2, HS.MRec>, +x: Nat, +id: Nat, +from: String,
+    +n: {Nat.is_eq(id, x) == False{} : Bool}, +nh: {HM.nat_in(HI.ids(hot), x) == False{} : Bool}, +a: HI.Asc(hot), +j: HI.Disjoint(hot, old))
+    -> {HM.rec_of(HM.Ms.old(HM.settle_in.go(orig, hot, old, id, from)), x) == HM.rec_of(old, x) : Maybe<&2, HS.MRec>}:
+  match orig:
+    case None{}:
+      {==}
+    case Some{+o}:
+      cs_keep_settle.if(String.eq(HS.Msg.to(HS.MRec.msg(o)), from) || String.eq(from, HM.USER()), hot, old, x, id, n, nh, a, j)
+
+def cs_keep_settle(r: Maybe<&2, Nat>, +hot: List<&2, HS.MRec>, +old: List<&2, HS.MRec>, +x: Nat, +from: String,
+    +n: {HM.nat_in(N.Needs.msgs(N.of_reply(r)), x) == False{} : Bool}, +nh: {HM.nat_in(HI.ids(hot), x) == False{} : Bool},
+    +a: HI.Asc(hot), +j: HI.Disjoint(hot, old))
+    -> {HM.rec_of(HM.Ms.old(HM.settle_in(r, hot, old, from)), x) == HM.rec_of(old, x) : Maybe<&2, HS.MRec>}:
+  match r:
+    case None{}:
+      {==}
+    case Some{+id}:
+      +ni = PL1.hub_lor_false_l(Nat.is_eq(id, x), HM.nat_in(Nil{}, x), n)
+      cs_keep_settle.go(HM.rec_in(hot, old, id), hot, old, x, id, from, ni, nh, a, j)
+
+def cs_keep.go(+e: HM.Ev, +s: HS.St, +x: Nat, -r: HS.MRec, +n: {HM.nat_in(N.Needs.msgs(N.needs(e)), x) == False{} : Bool},
+    +u: HI.Split(s), +k: HX.FreshEv(s, e), +o: {HM.rec_of(HS.St.old(s), x) == Some{r} : Maybe<&2, HS.MRec>})
+    -> {HM.rec_of(HS.St.old(HM.apply(HS.St.open(s), e)), x) == Some{r} : Maybe<&2, HS.MRec>}:
+  match e:
+    case HM.EMsgSent{m}:
+      +hot = HS.St.hot(s)
+      +old = HS.St.old(s)
+      +nm = HS.St.next_msg(s)
+      +top = Nat.max(Nat.max(nm, 1n+HS.Msg.id(m)), 1n+HS.Msg.thread(m))
+      +hs = HM.snoc(HS.MRec, hot, HM.new_rec(m))
+      +kg = Equal.trans(Bool, Nat.is_ge(HS.Msg.id(m), nm), Nat.is_ge(nm, nm), True{}, Equal.cong(Nat, Bool, v => Nat.is_ge(v, nm), HS.Msg.id(m), nm, k), cs_ge_refl(nm))
+      +ps = PC4.hc_parts_sent(hot, old, nm, m, u, kg)
+      Equal.trans(Maybe<&2, HS.MRec>, HM.rec_of(HM.Ms.old(HM.settle_in(HS.Msg.reply_to(m), hs, old, HS.Msg.from(m))), x), HM.rec_of(old, x), Some{r},
+        cs_keep_settle(HS.Msg.reply_to(m), hs, old, x, HS.Msg.from(m), n, cs_disj_nin(hs, old, x, r, PC2.hc_p_disj(hs, old, top, ps), o),
+          PC2.hc_p_asc(hs, old, top, ps), PC2.hc_p_disj(hs, old, top, ps)), o)
+    case HM.EMsgState{id, y}:
+      +hot = HS.St.hot(s)
+      +old = HS.St.old(s)
+      +nm = HS.St.next_msg(s)
+      Equal.trans(Maybe<&2, HS.MRec>, HM.rec_of(HM.Ms.old(HM.msg_op(hot, old, id, HM.OSt{y})), x), HM.rec_of(old, x), Some{r},
+        cs_keep_op(hot, old, x, id, HM.OSt{y}, PL1.hub_lor_false_l(Nat.is_eq(id, x), HM.nat_in(Nil{}, x), n),
+          cs_disj_nin(hot, old, x, r, PC2.hc_p_disj(hot, old, nm, u), o), PC2.hc_p_asc(hot, old, nm, u), PC2.hc_p_disj(hot, old, nm, u)), o)
+    case HM.ESettled{id}:
+      +hot = HS.St.hot(s)
+      +old = HS.St.old(s)
+      +nm = HS.St.next_msg(s)
+      Equal.trans(Maybe<&2, HS.MRec>, HM.rec_of(HM.Ms.old(HM.msg_op(hot, old, id, HM.OSettle{})), x), HM.rec_of(old, x), Some{r},
+        cs_keep_op(hot, old, x, id, HM.OSettle{}, PL1.hub_lor_false_l(Nat.is_eq(id, x), HM.nat_in(Nil{}, x), n),
+          cs_disj_nin(hot, old, x, r, PC2.hc_p_disj(hot, old, nm, u), o), PC2.hc_p_asc(hot, old, nm, u), PC2.hc_p_disj(hot, old, nm, u)), o)
+    case HM.ETaskCreated{a, b, c, d, f}:
+      o
+    case HM.ELifecycle{a, b, c}:
+      o
+    case HM.EWorkspace{a, b}:
+      o
+    case HM.ESnapshot{a, b}:
+      o
+    case HM.EPlaced{a, b, c}:
+      o
+    case HM.EDeclared{a, b, c}:
+      o
+    case HM.EReported{a, b}:
+      o
+    case HM.EFileTouched{a, b}:
+      o
+    case HM.ERenamed{a, b}:
+      o
+    case HM.EMsgsMoved{f, t}:
+      o
+    case HM.ECardOpened{c}:
+      o
+    case HM.ECardClosed{a, b, c}:
+      o
+    case HM.ECardAnswerPos{a, b, c}:
+      o
+    case HM.ECardWithdrawn{a, b}:
+      o
+    case HM.ECardLate{a}:
+      o
+    case HM.EMainNote{a, b}:
+      o
+    case HM.ENotesFlushed{}:
+      o
+    case HM.ETimerSet{a, b}:
+      o
+    case HM.ETimerFired{a, b, c, d, f}:
+      o
+    case HM.ETimerRun{a, b}:
+      o
+    case HM.ETimerStop{a, b, c}:
+      o
+    case HM.ETimerName{a, b, c, d}:
+      o
+    case HM.EX{a}:
+      o
+    case HM.EAct{a}:
+      o
+    case HM.EFollow{a, b, c}:
+      o
+    case HM.EJobEnd{a, b}:
+      o
+    case HM.EWake{a}:
+      o
+    case HM.EPaused{a}:
+      o
+    case HM.EResumed{a}:
+      o
+
+def cs_keep(+s: HS.St, +e: HM.Ev, +x: Nat, -r: HS.MRec, +n: {HM.nat_in(N.Needs.msgs(N.needs(e)), x) == False{} : Bool},
+    +u: HI.Split(s), +k: HX.FreshEv(s, e), +o: {HM.rec_of(HS.St.old(s), x) == Some{r} : Maybe<&2, HS.MRec>})
+    -> {HM.rec_of(HS.St.old(HM.apply(s, e)), x) == Some{r} : Maybe<&2, HS.MRec>}:
+  %HSL.St.open_eq(s) : {HM.rec_of(HS.St.old(HM.apply(_, e)), x) == Some{r} : Maybe<&2, HS.MRec>}
+  cs_keep.go(e, s, x, r, n, u, k, o)
+
 def Laws.apply_is_local_msg(s, e, x, r, u, k, o, n):
   %HSL.St.open_eq(s) : {HM.apply(N.drop_old(_, x), e) == N.drop_old(HM.apply(_, e), x) : HS.St}
   ail.go(e, s, x, r, n, u, k, o)
+
+# ---- a batch: one ask before it, the same state ----
+
+def cs_msgs_with(x: N.Needs(), +rn: List<&2, N.Rn()>) -> {N.Needs.msgs(N.needs_with.go(x, rn)) == N.Needs.msgs(x) : List<&2, Nat>}:
+  match x:
+    case Tuple{ms, ags}:
+      {==}
+
+def cs_msgs_union(a: N.Needs(), b: N.Needs()) -> {N.Needs.msgs(N.union(a, b)) == List.append(&2, Nat, N.Needs.msgs(a), N.Needs.msgs(b)) : List<&2, Nat>}:
+  match a b:
+    case Tuple{am, aa} Tuple{bm, ba}:
+      {==}
+
+def cs_nin_left(+a: List<&2, Nat>, -b: List<&2, Nat>, +x: Nat, +n: {HM.nat_in(List.append(&2, Nat, a, b), x) == False{} : Bool})
+    -> {HM.nat_in(a, x) == False{} : Bool}:
+  match a:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      PL1.hub_lor_false(Nat.is_eq(h, x), HM.nat_in(t, x),
+        PL1.hub_lor_false_l(Nat.is_eq(h, x), HM.nat_in(List.append(&2, Nat, t, b), x), n),
+        cs_nin_left(t, b, x, PL1.hub_lor_false_r(Nat.is_eq(h, x), HM.nat_in(List.append(&2, Nat, t, b), x), n)))
+
+def cs_nin_right(+a: List<&2, Nat>, +b: List<&2, Nat>, +x: Nat, +n: {HM.nat_in(List.append(&2, Nat, a, b), x) == False{} : Bool})
+    -> {HM.nat_in(b, x) == False{} : Bool}:
+  match a:
+    case Nil{}:
+      n
+    case Con{h, t}:
+      cs_nin_right(t, b, x, PL1.hub_lor_false_r(Nat.is_eq(h, x), HM.nat_in(List.append(&2, Nat, t, b), x), n))
+
+def cs_fetch(+es: List<&2, HM.Ev>, +s: HS.St, +x: Nat, +r: HS.MRec, +rn: List<&2, N.Rn()>, +u: HI.Split(s), +f: HX.Fresh(es, s),
+    +o: {HM.rec_of(HS.St.old(s), x) == Some{r} : Maybe<&2, HS.MRec>}, +n: {HM.nat_in(N.Needs.msgs(N.needs_batch.go(es, rn)), x) == False{} : Bool})
+    -> {HM.apply_all(es, N.drop_old(s, x)) == N.drop_old(HM.apply_all(es, s), x) : HS.St}:
+  match es:
+    case Nil{}:
+      {==}
+    case Con{e, t}:
+      match f:
+        case HX.Both{k, ft}:
+          +a = N.needs_with(e, rn)
+          +b = N.needs_batch.go(t, N.renames(e, rn))
+          +napp = Equal.trans(Bool, HM.nat_in(List.append(&2, Nat, N.Needs.msgs(a), N.Needs.msgs(b)), x), HM.nat_in(N.Needs.msgs(N.union(a, b)), x), False{},
+            Equal.cong(List<&2, Nat>, Bool, v => HM.nat_in(v, x), List.append(&2, Nat, N.Needs.msgs(a), N.Needs.msgs(b)), N.Needs.msgs(N.union(a, b)),
+              Equal.sym(List<&2, Nat>, N.Needs.msgs(N.union(a, b)), List.append(&2, Nat, N.Needs.msgs(a), N.Needs.msgs(b)), cs_msgs_union(a, b))), n)
+          +ne = Equal.trans(Bool, HM.nat_in(N.Needs.msgs(N.needs(e)), x), HM.nat_in(N.Needs.msgs(a), x), False{},
+            Equal.cong(List<&2, Nat>, Bool, v => HM.nat_in(v, x), N.Needs.msgs(N.needs(e)), N.Needs.msgs(a),
+              Equal.sym(List<&2, Nat>, N.Needs.msgs(a), N.Needs.msgs(N.needs(e)), cs_msgs_with(N.needs(e), rn))),
+            cs_nin_left(N.Needs.msgs(a), N.Needs.msgs(b), x, napp))
+          +nt = cs_nin_right(N.Needs.msgs(a), N.Needs.msgs(b), x, napp)
+          Equal.trans(HS.St, HM.apply_all(t, HM.apply(N.drop_old(s, x), e)), HM.apply_all(t, N.drop_old(HM.apply(s, e), x)), N.drop_old(HM.apply_all(t, HM.apply(s, e)), x),
+            Equal.cong(HS.St, HS.St, w => HM.apply_all(t, w), HM.apply(N.drop_old(s, x), e), N.drop_old(HM.apply(s, e), x), Laws.apply_is_local_msg(s, e, x, r, u, k, o, ne)),
+            cs_fetch(t, HM.apply(s, e), x, r, N.renames(e, rn), PC4.hc_split_apply(s, e, u, PC4.hc_fresh_ge(s, e, k)), ft, cs_keep(s, e, x, r, ne, u, k, o), nt))
+
+def Laws.fetch_then_apply_list(s, es, x, r, u, f, o, n):
+  cs_fetch(es, s, x, r, Nil{}, u, f, o, n)
