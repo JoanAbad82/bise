@@ -184,6 +184,15 @@ map_paths() {  # <changed path>...
     # (tests/pick_gate.py, hub-tick m_28679; quick runs it always)
     case "$f" in bend/*) bendw=1 ;; esac
   done
+  # a file a crate reads at compile time from outside its folder (include_str!, include_bytes!,
+  # CARGO_MANIFEST_DIR joins: prompts/, kit/examples/, bend/laws/...) maps as a change in that
+  # crate's folder: its tests and clippy (tests/include_map.py reads them from the source,
+  # review-gates m_37101). Only paths outside rust/ are looked up: a crate's own files map above.
+  local out=() x
+  for f in "$@"; do case "$f" in rust/*) ;; *) out+=("$f") ;; esac; done
+  if [ ${#out[@]} -gt 0 ]; then
+    for x in $(python3 "$root/tests/include_map.py" "${out[@]}" 2>/dev/null); do map_paths "$x"; done
+  fi
 }
 # node as the desktop lanes find it (desktop_path): the hub's land queue has no shell setup
 kit_check() { local f; desktop_path; for f in "$root"/kit/check.mjs "$root"/kit/*.check.mjs; do echo "node ${f#"$root"/}"; node "$f" || return 1; done; }
@@ -800,6 +809,8 @@ python3 "$root/tests/state_guard.py" --self-test >/dev/null || { python3 "$root/
 python3 "$root/tests/state_guard.py" || { echo "GATE quick FAILED"; exit 1; }
 # the full gate's test map knows every test and every top-level path (tests/test_map.py)
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
+# the crates' compile-time reads outside rust/ map to their crate (tests/include_map.py)
+python3 "$root/tests/include_map.py" --self-test >/dev/null || { python3 "$root/tests/include_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # the desktop checks' selection: its shadow never fails a land, its audit, the coverage map's rules
 # on synthetic coverage (fast-try p2; review-gates m_29412)
 python3 -B "$root/tests/desktop_pick_test.py" >/dev/null || { python3 -B "$root/tests/desktop_pick_test.py"; echo "GATE quick FAILED"; exit 1; }
@@ -888,12 +899,19 @@ fi
 # the changed crates; the binary itself is built by gate.sh full.
 # clippy runs next to the tests in its own target dir ($target/clippy: its
 # own cargo lock; ~300 MB, 30-40 s the first time)
+# No Rust or hub change ($pkgs empty, map_paths): no clippy either. It only
+# re-read an unchanged workspace (1-3 s warm), but cold, on a target the disk
+# reclaim deleted, it took 200-490 s (fast-loop: p50 83 s, p90 491 s of the
+# quick gate's p50 282 s over 78 runs, 74 of them with no Rust change)
 target="${CARGO_TARGET_DIR:-$root/rust/target}"
+clippy_pid=""
+if [ -n "$pkgs" ]; then
 { s=$SECONDS
   if (cd rust && cargo clippy --offline -q --workspace --all-targets --target-dir "$target/clippy" -- -D warnings) >"$out/clippy.log" 2>&1
   then echo "ok   clippy ($((SECONDS - s))s)" >"$out/clippy.res"; echo 0 >"$out/clippy.rc"
   else echo 1 >"$out/clippy.rc"; fi; } &
 clippy_pid=$!
+fi
 if [ -n "$pkgs" ]; then
   args=""; for p in $pkgs; do args="$args -p $p"; done
   if [ -n "${sbcore_pid:-}" ]; then
@@ -919,9 +937,13 @@ fi
 [ "${office_skills:-0}" = 1 ] && step office_skills python3 tests/office_skills_check.py
 # then the desktop's own checks, when the change reaches it (tests/test_map.py desktop)
 if [ -n "$changed" ] && [ -n "$(desktop_why $changed)" ]; then desktop_check || exit 1; fi
-wait "$clippy_pid"
-[ "$(cat "$out/clippy.rc")" = 0 ] || fail clippy "$out/clippy.log"
-cat "$out/clippy.res"
+if [ -n "$clippy_pid" ]; then
+  wait "$clippy_pid"
+  [ "$(cat "$out/clippy.rc")" = 0 ] || fail clippy "$out/clippy.log"
+  cat "$out/clippy.res"
+else
+  echo "skipped clippy: no Rust or hub change vs $base"
+fi
 if [ $bend_changed = 1 ]; then
   wait; cat "$out/proof.res"; [ "$(cat "$out/proof.rc")" = 0 ] || exit 1
 fi
