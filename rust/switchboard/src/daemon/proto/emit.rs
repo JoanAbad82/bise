@@ -68,9 +68,10 @@ impl Shell {
     /// line, none when a compaction ended after it), so a hub restart no
     /// longer blanks the gauge. Once per agent, never per broadcast; live
     /// lines then move it (`proto_usage_line`). No usage, no row: never
-    /// an invented 0.
+    /// an invented 0. Live agents only (`proto_view::seeds`): his 888
+    /// archived tails were 18 % of `initialize`.
     fn seed_usage(&mut self, snap: &Snapshot) {
-        for name in snap.agents.iter().map(|a| a.name.clone()) {
+        for name in crate::proto_view::seeds(snap).map(str::to_string) {
             if !self.proto.seeded.insert(name.clone()) || self.proto.usage.contains_key(&name) {
                 continue;
             }
@@ -414,9 +415,11 @@ impl Shell {
     }
 
     /// P4b: each agent the heads don't know yet, from the lines the hub
-    /// buffered of it (its transcript's tail at start), folded once.
+    /// buffered of it (its transcript's tail at start), folded once. Live
+    /// agents only (`proto_view::seeds`): folding every archived agent's
+    /// lines was 72 % of `initialize` on his 888 agents.
     fn seed_heads(&mut self, snap: &Snapshot) {
-        let names: Vec<String> = snap.agents.iter().map(|a| a.name.clone()).filter(|n| !self.proto.heads.has(n)).collect();
+        let names: Vec<String> = crate::proto_view::seeds(snap).filter(|n| !self.proto.heads.has(n)).map(str::to_string).collect();
         if names.is_empty() {
             return;
         }

@@ -66,6 +66,15 @@ pub fn agents(
     out
 }
 
+/// The agents whose head and usage the hub seeds from their buffered
+/// lines: the live ones only (agents-light (a), architect m_37151). An
+/// archived row shows no head nor gauge, and folding his 888 agents' tails
+/// was 90 % of `initialize`; a restored agent is live again, so the next
+/// agents event seeds it.
+pub fn seeds(snap: &Snapshot) -> impl Iterator<Item = &str> {
+    snap.agents.iter().filter(|a| a.status != crate::model::Status::Archived).map(|a| a.name.as_str())
+}
+
 /// A non-empty, trimmed text.
 fn some(s: &str) -> Option<String> {
     Some(s.trim().to_string()).filter(|s| !s.is_empty())
@@ -757,6 +766,17 @@ mod tests {
         // his /model switch: the next rows follow
         s.agents[1] = with_model(s.agents[1].clone(), "anthropic/claude-haiku-4-5");
         assert_eq!(agents(&s, &mut since, 200, uk, &vision, &|_| None, &|_| None)[1].vision, Some(true));
+    }
+
+    /// agents-light (a), architect m_37151: initialize never reads or
+    /// folds an archived agent's lines; restored, it is seeded at the next
+    /// agents event.
+    #[test]
+    fn only_live_agents_get_their_head_and_usage_seeded() {
+        let mut s = snap();
+        assert_eq!(seeds(&s).collect::<Vec<_>>(), ["main", "perf"], "the archived one is not seeded");
+        s.agents[2].status = crate::model::Status::Idle;
+        assert_eq!(seeds(&s).collect::<Vec<_>>(), ["main", "perf", "old"], "restored: seeded again");
     }
 
     #[test]
