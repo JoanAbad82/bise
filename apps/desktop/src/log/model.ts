@@ -341,3 +341,10 @@ export function compTitle(c: Completion, tz?: string): string {
     shortBytes(c.bytes),
   ].join(" · ") + as;
 }
+
+/** A row's role word: a message with no text of its own (only calls, or only results) goes by
+ *  its first block's ('tool_use · bash', 'result'), never by its provider role (designer m_37596). */
+export const compRole = (r: CompRow): string =>
+  r.n > 0 && r.blocks.length > 0 && r.blocks.every((b) => b.label !== undefined)
+    ? (r.blocks[0]?.label ?? r.role)
+    : r.role;

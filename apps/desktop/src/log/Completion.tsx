@@ -20,6 +20,7 @@ import {
   compBlockView,
   compFolds,
   compHits,
+  compRole,
   compTitle,
   linesOf,
   shortBytes,
@@ -329,7 +330,7 @@ function CRow({
         <div className="lg-h" onClick={onToggle}>
           <span className="seq">{row.n === 0 ? "" : String(row.n)}</span>
           <span className="label" data-testid={`${id}.role`}>
-            {row.role}
+            {compRole(row)}
           </span>
           <span className="head">{row.head}</span>
           <span className="size">{tokensWord(row.tokens)}</span>

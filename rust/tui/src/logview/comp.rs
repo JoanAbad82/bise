@@ -76,17 +76,25 @@ fn block_head(label: &str, text: &str) -> String {
 }
 
 /// The entries of the rows: a row's first block under its header when
-/// it has no label of its own, each other block an entry after it.
+/// it has no label of its own, each other block an entry after it. A
+/// message with no text of its own (a user message holding only a
+/// tool_result, an assistant one holding only calls) has no header row:
+/// its calls and results are its entries, the first one with its tokens
+/// (designer m_37596).
 pub(crate) fn of_rows(rows: &[CompRow], family: &str, bytes: u64, shown_as: Option<String>) -> (Vec<Item>, Shown) {
     let mut out = Vec::new();
     for r in rows {
         let mut blocks = r.blocks.iter().peekable();
-        let first = blocks.next_if(|b| b.label.is_none()).map(|b| body(&b.body)).unwrap_or(Body::None);
-        out.push(item(r.n, 0, r.role.clone(), r.head.clone(), first, Some(r.tokens)));
+        let first = blocks.next_if(|b| b.label.is_none()).map(|b| body(&b.body));
+        let bare = first.is_none() && r.n > 0 && !r.blocks.is_empty();
+        if !bare {
+            out.push(item(r.n, 0, r.role.clone(), r.head.clone(), first.unwrap_or(Body::None), Some(r.tokens)));
+        }
         for (k, b) in blocks.enumerate() {
             let label = b.label.clone().unwrap_or_default();
             let head = block_head(&label, &b.body.text);
-            out.push(item(r.n, k as u64 + 1, label, head, body(&b.body), None));
+            let tokens = (bare && k == 0).then_some(r.tokens);
+            out.push(item(r.n, k as u64 + 1, label, head, body(&b.body), tokens));
         }
     }
     (out, Shown { family: family.to_string(), bytes, shown_as })

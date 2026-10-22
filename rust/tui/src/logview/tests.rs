@@ -428,7 +428,9 @@ fn incsearch_wraps_and_esc_goes_back() {
     v.incsearch();
     v.search_done();
     assert_eq!(role(&v), Role::You);
-    assert!(v.is_open(v.vis[v.sel]));
+    // the hit opens; this one-line prompt has no body to open (its head says it all)
+    let i = v.vis[v.sel];
+    assert!(v.is_open(i) || v.items()[i].body == Body::None);
     assert_eq!(v.hit_label(), "1 of 3");
     v.jump(false);
     assert_eq!(v.hit_label(), "back to the last · 3 of 3");
@@ -450,4 +452,46 @@ fn the_top_bar_names_the_agent_and_the_tabs() {
     let first = t.lines().next().unwrap();
     assert!(first.starts_with("/debug main · 19 events · newest at the bottom") && first.ends_with("history   completion"), "{first}");
     assert!(t.contains("the whole session"), "{t}");
+}
+
+#[test]
+fn a_body_that_only_repeats_its_head_is_not_drawn() {
+    // designer m_37596: ':* main  Fixed: `a` is 2 now.' then 'Fixed: a is 2 now.'
+    let v = view();
+    let fixed = v.items().iter().find(|i| i.head.starts_with("Fixed:")).expect("the reply");
+    assert_eq!(fixed.body, Body::None, "{:?}", fixed.body);
+    // a body with more lines stays
+    let status = v.items().iter().find(|i| i.role == Role::Injected).expect("the status");
+    assert_ne!(status.body, Body::None);
+}
+
+#[test]
+fn a_message_of_only_calls_or_results_has_no_row_of_its_own() {
+    // designer m_37596: '#4 user  p50…' then '#4 result …'; '#5 assistant  const r = …'
+    let body = serde_json::json!({
+        "model": "claude-x", "system": "You are main.",
+        "messages": [
+            {"role": "user", "content": "bench it"},
+            {"role": "assistant", "content": [{"type": "tool_use", "id": "t1", "name": "bash", "input": {"arg": "pnpm bench"}}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "p50 2.2 s"}]},
+            {"role": "assistant", "content": [{"type": "text", "text": "done"}]}
+        ]
+    })
+    .to_string();
+    let (items, _) = comp::of_body(&body, false, &Redactor::default()).unwrap();
+    // the provider's words (the role column draws a call as its glyph and tool)
+    let roles: Vec<String> = items
+        .iter()
+        .map(|i| match &i.role {
+            Role::Sent(w) => w.clone(),
+            r => format!("{r:?}"),
+        })
+        .collect();
+    let at = |r: &str| roles.iter().position(|x| x == r);
+    let call = at("tool_use · bash").expect("the call");
+    let result = at("result").expect("the result");
+    assert_ne!(roles[call - 1], "assistant", "{roles:?}");
+    assert_ne!(roles[result - 1], "user", "{roles:?}");
+    assert_eq!(roles.iter().filter(|r| *r == "user").count(), 1, "{roles:?}");
+    assert_eq!(roles.iter().filter(|r| *r == "assistant").count(), 1, "{roles:?}");
 }

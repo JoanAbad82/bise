@@ -205,14 +205,35 @@ pub fn short_bytes(n: usize) -> String {
 }
 
 /// A body that says only what its head already shows whole: one line of
-/// text, the same words, no markdown (designer m_37475: a body appears
-/// only when it adds something, more lines, markdown, a diff, code).
+/// text whose words, markup left out, are the head's (designer m_37475,
+/// m_37596: a body appears only when it adds something, more lines, a
+/// diff, code; `Fixed: `a` is 2 now.` under the same head adds nothing).
 fn says_only(head: &str, body: &Body) -> bool {
     let text = match body {
         Body::Md(t) | Body::Plain(t) => t.trim(),
         _ => return false,
     };
-    !text.contains('\n') && text == head.trim() && !text.contains(['*', '`', '_', '[', '#', '>', '|', '~'])
+    !text.contains('\n') && !head.ends_with('…') && words_of(text) == words_of(head)
+}
+
+/// A line's words as drawn: tags (`<bise_state>`) and markdown marks
+/// (`*`, `` ` ``, `_`, `~`) out, spaces collapsed.
+fn words_of(s: &str) -> String {
+    let mut out = String::new();
+    let mut in_tag = false;
+    for c in s.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' if in_tag => {
+                in_tag = false;
+                out.push(' ');
+            }
+            _ if in_tag => {}
+            '*' | '`' | '_' | '~' => {}
+            c => out.push(c),
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// The first non-empty line, cut at `max` chars.

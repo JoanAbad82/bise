@@ -5,6 +5,7 @@ import {
   editDiff,
   findCount,
   stepHit,
+  compRole,
   foldLabel,
   folds,
   kindOf,
@@ -197,5 +198,30 @@ describe("log model", () => {
     expect(rows.filter((r) => shown(r, hidden)).map((r) => r.seq)).toEqual([
       1, 3,
     ]);
+  });
+});
+
+describe("debug completion rows (designer m_37596)", () => {
+  const block = (label: string | undefined, text: string) => ({
+    ...(label === undefined ? {} : { label }),
+    body: { kind: "plain" as const, text },
+  });
+  const row = (n: number, role: string, blocks: ReturnType<typeof block>[]) => ({
+    n,
+    role,
+    head: "h",
+    blocks,
+    bytes: 10,
+    tokens: 3,
+  });
+  it("a message of only calls or results goes by its first block's word", () => {
+    expect(compRole(row(5, "assistant", [block("tool_use · run_typescript", "const r = 1")]))).toBe(
+      "tool_use · run_typescript",
+    );
+    expect(compRole(row(4, "user", [block("result", "p50 2.2 s")]))).toBe("result");
+    expect(compRole(row(3, "assistant", [block(undefined, "i'll bench it"), block("tool_use · bash", "ls")]))).toBe(
+      "assistant",
+    );
+    expect(compRole(row(0, "request", [block("params", "{}")]))).toBe("request");
   });
 });
