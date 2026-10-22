@@ -132,17 +132,31 @@ reclaim() {
 # runs in the background of a job's shell ($1): marks $2 ("disk <GB>" or
 # "time <min>") and stops the job when the disk gets too low or the job runs
 # over HEAVY_MAX_MIN ($3) minutes; under the floor (HEAVY_DISK_WAIT_GB) it
-# reclaims first, so a job that grows a target is not the one that pays
+# reclaims first, so a job that grows a target is not the one that pays.
+# $4 (an --alone job's, HEAVY_IDLE_MIN): minutes awake with no CPU used by
+# the job's processes (under HEAVY_IDLE_CPU_CS, 200 = 2 s, in all), past which it is stuck: stopped
+# too (main m_36953: a caffeinate with no child, 0 % CPU for 3 h, held
+# every slot). Its CPU is read every HEAVY_IDLE_POLL (60) s.
+cpu_cs() { # the CPU centiseconds of the pids $@, summed (ps's [[h:]m]m:ss.cc)
+  [ $# -gt 0 ] || { echo 0; return; }
+  ps -o time= -p "$(echo "$@" | tr ' ' ',')" 2>/dev/null |
+    awk '{ n = split($1, a, ":"); s = 0; for (i = 1; i <= n; i++) s = s * 60 + a[i]; t += s } END { printf "%d\n", t * 100 }'
+}
 disk_watch() {
-  local me=$BASHPID last now ran=0 why="" step
+  local me=$BASHPID last now ran=0 why="" step busy_ran=0 cpu=0 c seen=0
   last=$(date +%s)
   while kill -0 "$1" 2>/dev/null; do
     # the time it ran awake: a gap between two checks counts 30 s at most,
     # so a night the Mac slept (2026-10-20, 21:43 to 10:20, an empty
     # battery) is not a stuck job
     now=$(date +%s); step=$(( now - last )); [ "$step" -gt 30 ] && step=30; ran=$(( ran + step )); last=$now
+    if [ "${4:-0}" -gt 0 ] && [ $(( ran - seen )) -ge "${HEAVY_IDLE_POLL:-60}" ]; then
+      seen=$ran; c=$(cpu_cs $(tree "$1" "$me"))
+      [ $(( c - cpu )) -ge "${HEAVY_IDLE_CPU_CS:-200}" ] && { cpu=$c; busy_ran=$ran; }
+    fi
     if disk_under "${HEAVY_DISK_STOP_GB:-5}"; then why="disk $(free_gb)"
     elif [ "${3:-0}" -gt 0 ] && [ "$ran" -ge "${HEAVY_MAX_SEC:-$(( $3 * 60 ))}" ]; then why="time $3"
+    elif [ "${4:-0}" -gt 0 ] && [ $(( ran - busy_ran )) -ge "${HEAVY_IDLE_SEC:-$(( $4 * 60 ))}" ]; then why="idle $4"
     elif disk_under "${HEAVY_DISK_WAIT_GB:-15}"; then reclaim $(( ${HEAVY_DISK_WAIT_GB:-15} + 10 ))
     fi
     if [ -n "$why" ]; then
@@ -175,8 +189,22 @@ reserve_gb() {
   done
   echo 10
 }
+# the running jobs, for the queue's waiting line (main m_36953: 7 waiters
+# waited 3-5 h behind a hung --alone job no line named): "<slot> <agent or
+# folder> <N> min: <command>", '; ' between them
+holders() {
+  local f p slot cwd who out=""
+  for f in "$HOME/.bise/run/reserve/"*; do
+    [ -e "$f" ] || continue
+    p=${f##*.}; kill -0 "$p" 2>/dev/null || continue
+    slot=${f##*/}; slot=${slot%.*}; slot=${slot%.lock}
+    cwd=$(cut -f2 "$f"); who=$(echo "$cwd" | sed -n 's#.*/worktrees/[^/]*/\([^/]*\)/.*#\1#p'); [ -n "$who" ] || who=${cwd##*/}
+    out="$out${out:+; }$slot $who $(( ($(date +%s) - $(stat -f %m "$f")) / 60 )) min: $(cut -f4 "$f" | cut -c1-60)"
+  done
+  echo "$out"
+}
 # what the running jobs may still write, in GB. Each running job has
-# ~/.bise/run/reserve/<slot>.<pid>: "<GB>\t<cwd>\t<free KB at its start>"
+# ~/.bise/run/reserve/<slot>.<pid>: "<GB>\t<cwd>\t<free KB at its start>\t<command>"
 # (gone at its end; a dead job's file is removed). The space the disk lost
 # since the oldest of them started counts as written by them: their sum
 # minus that drop, never under 0 (main m_36317: the whole sum, held to
@@ -202,7 +230,10 @@ reserved_gb() {
 max_min() {
   [ -n "${HEAVY_MAX_MIN:-}" ] && { echo "$HEAVY_MAX_MIN"; return; }
   case " $* " in
-    *" --alone "*|*nightly_gate.sh*) echo 360 ;;
+    *nightly_gate.sh*) echo 360 ;;
+    # any other --alone job holds every slot: the rest's limit (main m_36953:
+    # a cost measure held the 4 slots 6.5 h on 2026-10-21, 3 h of it hung)
+    *" --alone "*) echo 120 ;;
     *desktop_tag*|*desktop-release*) echo 240 ;;
     *test:land*) echo 180 ;;
     *"gate.sh full"*|*"gate.sh rerun"*) echo 150 ;;
@@ -225,7 +256,7 @@ lane_during() {
     { delete open[$1 FS $2]; if ($2 <= now && $3 >= t0) busy = 1 }
     END { for (k in open) if (open[k] <= now) busy = 1; if (busy) print "busy" }' "$2" 2>/dev/null
 }
-export -f free_kb disk_under free_gb tell_hub tree reclaim disk_watch lane_during
+export -f free_kb disk_under free_gb tell_hub tree reclaim cpu_cs disk_watch lane_during
 
 # HEAVY_SLOTS (tests): use only the first n slots, whatever the power.
 # HEAVY_ON_BATTERY=0|1 (tests): the power as given, not pmset's
@@ -312,14 +343,15 @@ JOB='export HEAVY_SLOT="${2##*/} $$"; rm -f "$1"; L="$HOME/.bise/run/heavy.log"
 c=$(printf "%s " "${@:4}" | cut -c1-160); t0=$(date +%s)
 printf "%s\t%s\t-\t%s\t%s\t%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" >>"$L" 2>/dev/null
 touch "$HOME/.bise/run/last-start"
-rv="$HOME/.bise/run/reserve/${2##*/}.$$"; mkdir -p "${rv%/*}"; printf "%s\t%s\t%s\n" "$HEAVY_RESERVE" "$PWD" "$(free_kb)" >"$rv"
+rv="$HOME/.bise/run/reserve/${2##*/}.$$"; mkdir -p "${rv%/*}"; printf "%s\t%s\t%s\t%s\n" "$HEAVY_RESERVE" "$PWD" "$(free_kb)" "$c" >"$rv"
 r=$(git rev-parse --show-toplevel 2>/dev/null) || r=$PWD
 for f in "$r"/target/RECLAIMED.txt "$r"/*/target/RECLAIMED.txt "$r"/*/*/target/RECLAIMED.txt; do
   [ -e "$f" ] && { echo "$(cat "$f") (${f%/RECLAIMED.txt})" >&2; rm -f "$f"; }
 done
 reclaim 0
 stop="$HOME/.bise/run/disk-stop.$$"; rm -f "$stop"
-disk_watch $$ "$stop" "$HEAVY_MAX" </dev/null >/dev/null 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & w=$!
+idle=0; [ "$2" = all ] && idle="${HEAVY_IDLE_MIN:-30}"
+disk_watch $$ "$stop" "$HEAVY_MAX" "$idle" </dev/null >/dev/null 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & w=$!
 /usr/bin/caffeinate -is nice -n "$3" "${@:4}"; rc=$?
 kill $w 2>/dev/null; wait $w 2>/dev/null
 rm -f "$rv"
@@ -327,6 +359,7 @@ if [ -e "$stop" ]; then
   why=$(cat "$stop")
   case "$why" in
     time*) m="heavy-run: stopped \"$c\": it ran ${why#time } min, over its limit (HEAVY_MAX_MIN=${why#time }): a stuck job holds a slot (2 held 12.7 h on 2026-10-20). Find why it hangs, or give it a larger HEAVY_MAX_MIN."; rc=124 ;;
+    idle*) m="heavy-run: stopped \"$c\": an --alone job (it holds every slot) used no CPU for ${why#idle } min: it hangs. Find why, or give it a larger HEAVY_IDLE_MIN."; rc=124 ;;
     *) m="heavy-run: stopped \"$c\": the disk is nearly full (${why#disk } GB free on the data volume, under ${HEAVY_DISK_STOP_GB:-5} GB). Free some space, then run it again."; rc=28 ;;
   esac
   echo "$m" >&2; tell_hub "$m"; rm -f "$stop"
@@ -450,7 +483,7 @@ while :; do
       done
     fi
   fi
-  [ -n "${waited:-}" ] || { echo "heavy-run: every heavy slot is busy or promised to an earlier job, waiting (rank $rank)" >&2; waited=1; }
+  [ -n "${waited:-}" ] || { h=$(holders); echo "heavy-run: every heavy slot is busy or promised to an earlier job, waiting (rank $rank)${h:+; held by: $h}" >&2; waited=1; }
   # held by the load: poll every 5 s, not 2 (each round spawns ~10
   # processes per waiter: 6 waiters made ~45 spawns/s at load 120)
   if [ -n "$held" ]; then sleep 5; else sleep 2; fi

@@ -338,6 +338,41 @@ with tempfile.TemporaryDirectory() as home:
     check(r.returncode == 124 and "over its limit (HEAVY_MAX_MIN=1)" in r.stderr,
           "a job over its time limit is stopped, rc=124: %r %r" % (r.returncode, r.stderr[-200:]))
     check(lines()[-1].endswith("rc=124"), "heavy.log ends it with rc=124")
+    # an --alone job that uses no CPU (main m_36953: a hung caffeinate held every slot 3 h at 0 %):
+    # stopped past HEAVY_IDLE_MIN, rc=124, said; one that burns CPU runs on (0.1 s a window here: the
+    # test machine may be loaded); a plain job never
+    # (plenty of disk: envr carries the disk cases' low free space, an --alone job reserves 10 GB)
+    roomy = dict(envr, HEAVY_FREE_KB_FILE=os.path.join(home, "plenty_kb"))
+    idle = dict(roomy, HEAVY_IDLE_MIN="1", HEAVY_IDLE_SEC="4", HEAVY_IDLE_POLL="1", HEAVY_IDLE_CPU_CS="10", HEAVY_DISK_POLL="1")
+    try:
+        r = subprocess.run([HEAVY, "--alone", "sh", "-c", "sleep 60 & wait"], env=idle, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired as e:
+        r = subprocess.CompletedProcess(e.cmd, -1, "", (e.stderr or b"").decode() if isinstance(e.stderr, bytes) else (e.stderr or ""))
+    check(r.returncode == 124 and "an --alone job (it holds every slot) used no CPU for 1 min" in r.stderr,
+          "an idle --alone job is stopped, rc=124: %r %r" % (r.returncode, r.stderr[-300:]))
+    burn = 'import time\nt = time.time()\nwhile time.time() - t < 8: pass'
+    r = subprocess.run([HEAVY, "--alone", sys.executable, "-c", burn], env=idle, capture_output=True, text=True, timeout=60)
+    check(r.returncode == 0, "a busy --alone job runs past HEAVY_IDLE_SEC: %r %r" % (r.returncode, r.stderr[-300:]))
+    r = subprocess.run([HEAVY, "sh", "-c", "sleep 6 & wait"], env=idle, capture_output=True, text=True, timeout=60)
+    check(r.returncode == 0, "a plain job is never stopped for idling: %r %r" % (r.returncode, r.stderr[-300:]))
+    # the waiting line names the jobs holding the slots (slot, folder, minutes, command)
+    go_h = os.path.join(home, "go_h")
+    hw = os.path.join(home, "holder-wt")
+    os.makedirs(hw)
+    hold2 = [subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.2; done', go_h], env=roomy, cwd=hw) for _ in range(2)]
+    wait_for(lambda: len([f for f in os.listdir(os.path.join(run, "reserve")) if not f.startswith(".")]) >= 2, 30, "two jobs hold both slots")
+    eh = open(os.path.join(home, "errh"), "w+")
+    wh = subprocess.Popen([HEAVY, "true"], env=roomy, stderr=eh)
+    wait_for(lambda: "busy or promised" in open(eh.name).read(), 30, "the waiter's line")
+    eh.seek(0)
+    said = eh.read()
+    check("held by: heavy" in said and " holder-wt 0 min: sh -c while" in said, "the waiting line names the holders: %r" % said)
+    open(go_h, "w").close()
+    for j in hold2 + [wh]:
+        job_ends(j, 30)
+    # an --alone job's time limit is the rest's (120 min); the nightly's stays 360
+    check("*\" --alone \"*) echo 120" in open(HEAVY).read() and "*nightly_gate.sh*) echo 360" in open(HEAVY).read(),
+          "max_min: --alone 120, the nightly 360")
     # the battery: on battery under 30 %, no job starts; plugged in, it runs
     ranb = os.path.join(home, "ranb")
     eb = open(os.path.join(home, "errb"), "w+")
