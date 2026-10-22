@@ -53,7 +53,7 @@ type Fx is Data:
   # card_choice
   FCardChoice{card: Nat, kind: String, agent: String, place: Maybe<&2, String>, pr: Maybe<&2, Nat>, text: String}
   # confirm
-  FConfirm{card: Maybe<&2, Nat>, agent: Maybe<&2, String>, name: Maybe<&2, String>, text: String}
+  FConfirm{card: Maybe<&2, Nat>, agent: Maybe<&2, String>, text: String}
   # focus_main
   FFocusMain{name: String}
   # user_sent
@@ -134,7 +134,7 @@ def FCardChoice.of(+i: J.Json) -> Fx:
   FCardChoice{K.get_n(i, "card"), K.get_s(i, "kind"), K.get_s(i, "agent"), K.opt_s(J.get(i, "place")), K.opt_n(J.get(i, "pr")), K.get_s(i, "text")}
 
 def FConfirm.of(+i: J.Json) -> Fx:
-  FConfirm{K.opt_n(J.get(i, "card")), K.opt_s(J.get(i, "agent")), K.opt_s(J.get(i, "name")), K.get_s(i, "text")}
+  FConfirm{K.opt_n(J.get(i, "card")), K.opt_s(J.get(i, "agent")), K.get_s(i, "text")}
 
 def FFocusMain.of(+i: J.Json) -> Fx:
   FFocusMain{K.get_s(i, "name")}
@@ -448,8 +448,8 @@ def kvs(x: Fx) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("fx", J.JStr{"followed_end"}), J.kv("project", J.JStr{project}), J.kv("agent", J.JStr{agent}), J.kv("key", J.JNum{key}), J.kv("state", J.JStr{state}), J.kv("label", J.JStr{label}), J.kv("summary", J.JStr{summary})]
     case FCardChoice{+card, +kind, +agent, +place, +pr, +text}:
       [J.kv("fx", J.JStr{"card_choice"}), J.kv("card", J.JNum{card}), J.kv("kind", J.JStr{kind}), J.kv("agent", J.JStr{agent}), J.kv("place", K.jmaybe_s(place)), J.kv("pr", K.jmaybe_n(pr)), J.kv("text", J.JStr{text})]
-    case FConfirm{+card, +agent, +name, +text}:
-      K.cat([[J.kv("fx", J.JStr{"confirm"})], K.omit_mn("card", card), K.omit_ms("agent", agent), K.omit_ms("name", name), [J.kv("text", J.JStr{text})]])
+    case FConfirm{+card, +agent, +text}:
+      K.cat([[J.kv("fx", J.JStr{"confirm"})], K.omit_mn("card", card), K.omit_ms("agent", agent), [J.kv("text", J.JStr{text})]])
     case FFocusMain{+name}:
       [J.kv("fx", J.JStr{"focus_main"}), J.kv("name", J.JStr{name})]
     case FUserSent{+text}:
@@ -534,10 +534,7 @@ def card_choice(+card: Nat, +kind: String, +agent: String, +place: Maybe<&2, Str
   kvs(FCardChoice{card, kind, agent, place, pr, text})
 
 def confirm_card(+card: Nat, +agent: String, +text: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  kvs(FConfirm{Some{card}, Some{agent}, None{}, text})
-
-def confirm_name(+name: String, +text: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  kvs(FConfirm{None{}, None{}, Some{name}, text})
+  kvs(FConfirm{Some{card}, Some{agent}, text})
 
 def focus_main(+name: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FFocusMain{name})

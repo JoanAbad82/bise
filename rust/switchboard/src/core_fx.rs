@@ -97,8 +97,8 @@ pub(super) fn plain(f: CoreFx) -> Plain {
             label: j.label,
             summary: j.summary,
         },
-        // a gate card's verdict (approvals), not the client's yes/no
-        CoreFx::Confirm(c) if c.card.is_some() => Effect::Confirm {
+        // a gate card's verdict (approvals)
+        CoreFx::Confirm(c) => Effect::Confirm {
             card: c.card.unwrap_or(0),
             agent: c.agent.unwrap_or_default(),
             text: c.text,
@@ -187,12 +187,11 @@ mod tests {
     }
 
     #[test]
-    fn a_confirm_with_a_card_is_the_gates_the_other_the_clients() {
+    fn a_confirm_is_the_gates_verdict() {
         assert_eq!(
             eff(json!({"fx": "confirm", "card": 3, "agent": "t8", "text": "2"})),
             Effect::Confirm { card: 3, agent: "t8".into(), text: "2".into() }
         );
-        assert!(matches!(rd(&json!({"fx": "confirm", "name": "tq", "text": "archive?"})), Plain::Hub(CoreFx::Confirm(_))));
     }
 
     #[test]

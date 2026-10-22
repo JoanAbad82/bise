@@ -201,19 +201,6 @@ impl Hub {
                     fx.push(notice(c, &n.text));
                 }
             }
-            // the client's yes/no in the status row (a gate card's verdict
-            // is core_fx.rs's)
-            CoreFx::Confirm(q) => {
-                if let Some(c) = client {
-                    let id = self.next_confirm;
-                    self.next_confirm += 1;
-                    self.confirms.insert(id, (c, q.name.unwrap_or_default()));
-                    fx.push(Effect::ToClient {
-                        client: c,
-                        body: json!({"ev": "confirm", "id": id, "text": q.text}),
-                    });
-                }
-            }
             CoreFx::FocusMain(m) => {
                 for (c, v) in self.clients.iter() {
                     if v.focus == m.name {

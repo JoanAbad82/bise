@@ -309,10 +309,10 @@ pub enum HubEv {
     /// les bims: a message sent or a report made, hub-wide, as it
     /// happens (crate::activity: no body, no text)
     Activity { project: Project, item: crate::activity::ActivityEv },
-    /// a yes/no question from the hub to the window that asked (bar
-    /// I9: archive a working agent...), answered by `confirm` with its
-    /// `id`; only that connection gets it. Left unanswered it holds
-    /// nothing in the hub: a later command just asks again
+    /// an older hub's yes/no question (bar I9: archive a working agent);
+    /// a new hub never sends it, his /archive asks with the 1/2 drop card
+    /// (drop-card), and the clients ignore it. TODO(archive-confirm): goes
+    /// in a later release, through a RETIRED tags table (tests/shims.txt)
     Confirm { project: Project, id: u64, text: String },
     /// the repo's flow (`config.toml`'s `[flow] mode`), on change; none:
     /// not set
@@ -599,8 +599,9 @@ pub enum HubCmd {
     /// close a card without answering it (the TUI's `/close N`): the
     /// hub's one close path (sb-core's `close`), a refusal as `error`
     Close { project: Project, card: u64 },
-    /// his answer to the hub's `confirm` `id`: yes or no (a no comes
-    /// back as `notice`, never as `error`)
+    /// an older client's answer to an older hub's `confirm`; a new hub
+    /// refuses it (no such question). TODO(archive-confirm): goes in a
+    /// later release, through a RETIRED tags table (tests/shims.txt)
     Confirm { project: Project, id: u64, yes: bool },
     /// the approvals mode (bar V8/W21, the TUI's shift+tab and
     /// `/approvals yolo|auto`): `yolo`, `auto` or `toggle` sets it and

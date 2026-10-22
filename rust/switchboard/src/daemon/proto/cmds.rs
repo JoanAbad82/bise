@@ -174,17 +174,10 @@ impl Shell {
                 }
                 self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Close { card } });
             }
-            // his answer to the hub's yes/no question: sb-core's own
-            // confirm path; a no's line comes back as a notice, not an
-            // error (an unknown or answered id: sb-core says nothing)
-            HubCmd::Confirm { id: cid, yes, .. } => {
-                self.stepping(id, &tag, None, |sh| {
-                    if let Some(s) = sh.proto.stepping.as_mut() {
-                        s.as_notice = true;
-                    }
-                    sh.step(Input::ClientConfirm { client: id, id: cid, yes });
-                });
-            }
+            // an older client's yes to an older hub's question: this hub
+            // never asks one (drop-card: /archive asks with the 1/2 card).
+            // TODO(archive-confirm): goes in a later release
+            HubCmd::Confirm { .. } => self.proto_error(id, &tag, "no such question: archive cards are answered in the inbox (1 archive it, 2 keep it)"),
             // bar V8/W21: shift+tab and `/approvals [yolo|auto]` (his command:
             // docs/issues/16 keeps agents' connections from it). A mode
             // sets it and every connection hears it (with flash); none

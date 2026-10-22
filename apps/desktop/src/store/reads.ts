@@ -33,7 +33,6 @@ import type { CoreState } from "@/shared/api";
 import {
   type Away,
   type BranchesList,
-  type Confirm,
   type Dictation,
   type Diff,
   diffKey,
@@ -90,10 +89,6 @@ export class StoreReads extends StoreBase {
         ? { cmd: "card_in_view" }
         : { cmd: "card_in_view", project, card },
     );
-  }
-  /** the hub's open yes/no questions to this window, oldest first */
-  confirms(project: string): readonly Confirm[] {
-    return this.slice(`confirms:${project}`, EMPTY);
   }
   /** the hub's last line to this window: a notice (a no's '@x stays: nothing archived', /flow) or a refused slash line */
   notice(project: string): HubLine | null {

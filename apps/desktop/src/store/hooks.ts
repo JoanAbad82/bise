@@ -12,7 +12,7 @@ import type { AnswerJump } from './store';
 import type { Acted } from './acted';
 import type { Refused } from './refused';
 import type { InboxItem } from '@/inbox/listed';
-import { diffKey, toolOutKey, Store, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadHits, type ThreadOrder, type VoiceModeState, type TalkShot } from './store';
+import { diffKey, toolOutKey, Store, type ToolOut, type Away, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadHits, type ThreadOrder, type VoiceModeState, type TalkShot } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -85,7 +85,6 @@ export const useAgents = (project: string): readonly Agent[] => useSlice(`agents
 /** A project's open cards: its `projects` row's, the one copy every view and count reads. */
 export const useCards = (project: string): readonly Card[] => useSlice('projects', (s) => s.cards(project));
 export const useVoiceAnswer = (): EvOf<'voice_answer'> | null => useSlice('voice_answer', (s) => s.voiceAnswer());
-export const useConfirms = (project: string): readonly Confirm[] => useSlice(`confirms:${project}`, (s) => s.confirms(project));
 export const useNotice = (project: string): HubLine | null => useSlice(`notice:${project}`, (s) => s.notice(project));
 /** bar V8/W21: the approvals mode, checker and rules of a project's hub; null until it said. */
 export const useApprovals = (project: string): EvOf<'approvals'> | null => useSlice(`approvals:${project}`, (s) => s.approvals(project));

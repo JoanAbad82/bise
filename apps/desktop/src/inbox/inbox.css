@@ -1,15 +1,5 @@
 /* src/inbox (amb-home): one inbox, the block at the bottom of every view (no ⌘I screen since
    designer m_19631); ds tokens only */
-/* the hub's yes/no question over the composer (confirm.tsx, bar I9) */
-.confirm-bar {
-  display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); margin: 0 var(--s-4) var(--s-2);
-  font-size: var(--t-13); color: var(--c-text); background: var(--c-sunken); border-radius: var(--r-2);
-  box-shadow: 0 0 0 1px var(--c-line); outline: none;
-}
-.confirm-bar:focus { box-shadow: 0 0 0 1px var(--c-focus); }
-.confirm-bar .q { flex: 1; min-width: 0; }
-.confirm-bar.note { color: var(--c-text-2); }
-.confirm-bar.error { color: var(--c-err); }
 /* a typed command's result (desktop-notices, designer): one quiet row in the thread, above the
    composer, never a bar under it; tier 4 (dim sans 13, '·') from .th-notice.info. On the thread's
    text column like the rows above it, its '·' on the column's left edge (his restart row sat 16 px

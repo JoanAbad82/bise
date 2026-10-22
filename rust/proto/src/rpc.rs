@@ -57,6 +57,7 @@ pub const METHODS: &[MethodRow] = &[
     m("turn/interrupt", "stop", None),
     m("card/answer", "answer", None),
     m("card/close", "close", None),
+    // an older hub's yes/no rows: TODO(archive-confirm), goes in a later release
     m("confirm/answer", "confirm", None),
     // no mode: a read (the current mode and rules); a mode: an action
     m("approvals/set", "approvals", Some("approvals")),
@@ -222,6 +223,7 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("thread/partial", "partial", Scope::Thread),
     n("route/held", "route", Scope::Hub),
     n("route/done", "route_done", Scope::Hub),
+    // TODO(archive-confirm): goes in a later release
     n("confirm/ask", "confirm", Scope::One),
     n("card/open", "card_open", Scope::One),
     // inbox-record: a card closed, or its answer's position came

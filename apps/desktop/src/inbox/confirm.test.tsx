@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { CoreCmd } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
-import { ConfirmBar, confirmWords, HubNoteRow } from './confirm';
+import { HubNoteRow } from './confirm';
 
 afterEach(cleanup);
 
@@ -15,62 +15,22 @@ function setup() {
   store.setCore('up');
   render(
     <StoreProvider store={store}>
-      <ConfirmBar project={P} />
       <HubNoteRow project={P} />
     </StoreProvider>,
   );
-  const ask = (id: number) => {
-    act(() => {
-      store.apply({ ev: 'confirm', project: P, id, text: '@perf is working: archive it anyway? (y/n)' });
-    });
-  };
-  return { sent, store, ask };
+  return { sent, store };
 }
 
-describe('ConfirmBar', () => {
-  it('nothing asked: nothing shows', () => {
-    setup();
-    expect(screen.queryByTestId('confirm.bar')).toBeNull();
-  });
-
-  it('y answers yes, n answers no and shows the hub line, esc puts it off with nothing sent', () => {
-    const { sent, store, ask } = setup();
-    ask(3);
-    const bar = screen.getByTestId('confirm.bar');
-    expect(bar.textContent).toContain('archive it anyway?');
-    expect(document.activeElement).toBe(bar);
-    fireEvent.keyDown(bar, { key: 'y' });
-    expect(sent.at(-1)).toEqual({ cmd: 'confirm', project: P, id: 3, yes: true });
-    expect(screen.queryByTestId('confirm.bar')).toBeNull();
-
-    ask(4);
-    fireEvent.keyDown(screen.getByTestId('confirm.bar'), { key: 'n' });
-    expect(sent.at(-1)).toEqual({ cmd: 'confirm', project: P, id: 4, yes: false });
+// /archive's yes/no strip went (drop-card, architect m_37339): his /archive asks with the inbox's
+// 1/2 card; the hub's plain lines stay the thread's quiet row
+describe('HubNoteRow', () => {
+  it("the hub's plain line is the thread's quiet row, not a box under the composer", () => {
+    const { store } = setup();
+    expect(screen.queryByTestId('confirm.notice')).toBeNull();
     act(() => {
-      store.apply({ ev: 'notice', project: P, cmd: 'confirm', text: 'drop of @perf cancelled' });
+      store.apply({ ev: 'notice', project: P, cmd: 'slash', text: 'flow: trunk' });
     });
-    // the hub's plain line is the thread's quiet row (HubNoteRow), not a box under the composer
-    expect(screen.getByTestId('confirm.notice').textContent).toBe('· drop of @perf cancelled');
-    expect(screen.getByTestId('confirm.notice').classList.contains('confirm-bar')).toBe(false);
-
-    ask(5);
-    const n = sent.length;
-    fireEvent.keyDown(screen.getByTestId('confirm.bar'), { key: 'Escape' });
-    expect(sent.length).toBe(n);
-    expect(screen.queryByTestId('confirm.bar')).toBeNull();
-  });
-
-  it("no is the default (the TUI's [y/N], designer m_18733): the filled button, and ⏎; the keycaps say y/n, the words don't", () => {
-    const { sent, ask } = setup();
-    ask(7);
-    expect(screen.getByTestId('confirm.bar').textContent).not.toContain('(y/n)');
-    expect(screen.getByTestId('confirm.no').className).toContain('pri');
-    expect(screen.getByTestId('confirm.yes').className).not.toContain('pri');
-    fireEvent.keyDown(screen.getByTestId('confirm.bar'), { key: 'Enter' });
-    expect(sent.at(-1)).toEqual({ cmd: 'confirm', project: P, id: 7, yes: false });
-    expect(confirmWords('archive it anyway? (y/n)')).toBe('archive it anyway?');
-    expect(confirmWords('drop it? [y/N]')).toBe('drop it?');
-    expect(confirmWords("archive @perf? it's mid-turn.")).toBe("archive @perf? it's mid-turn.");
+    expect(screen.getByTestId('confirm.notice').textContent).toBe('· flow: trunk');
   });
 
   describe('his /restart row (ambient-lead m_22833, his m_22835)', () => {
@@ -139,12 +99,5 @@ describe('ConfirmBar', () => {
       hello(store);
       expect(screen.queryByTestId('confirm.notice')).toBeNull();
     });
-  });
-
-  it('the buttons do the same as the keys', () => {
-    const { sent, ask } = setup();
-    ask(6);
-    fireEvent.click(screen.getByTestId('confirm.no'));
-    expect(sent.at(-1)).toEqual({ cmd: 'confirm', project: P, id: 6, yes: false });
   });
 });

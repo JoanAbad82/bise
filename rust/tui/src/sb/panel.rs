@@ -1336,8 +1336,6 @@ pub(crate) fn key_mode(app: &App) -> crate::keybar::Mode {
     let sb = &app.sb;
     if sb.drop_ask.is_some() {
         Mode::DropAsk
-    } else if sb.confirm.is_some() {
-        Mode::Confirm
     } else if sb.card.open {
         Mode::Card
     } else if sb.selected.is_some() {

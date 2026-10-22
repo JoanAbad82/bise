@@ -20,7 +20,6 @@ import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
 import { useProjects, useStore } from '@/store';
 import { useFnVoice } from '@/voicemode';
-import { ConfirmBar } from '@/inbox';
 import { SettingsScreen } from '@/settings';
 import { useSetupFirstOpens } from '@/settings/setup-first';
 import { OnboardingScreen, useFirstLaunch } from '@/setup';
@@ -382,22 +381,10 @@ function Current({ top }: { top: ReactNode }) {
       <div className="app-screen">
         <ScreenOf key={formatRoute(route)} route={route} />
       </div>
-      <RouteConfirm route={route} />
       <RouteBottom route={route} />
       <RouteTerminal route={route} />
     </Main>
   );
-}
-
-/**
- * The hub's yes/no question for the project in view (bar I9/C46/S30,
- * amb-home's ConfirmBar): under the screen, wherever he clicked (agents,
- * thread, review…); nothing while no question is open.
- */
-function RouteConfirm({ route }: { route: Route }) {
-  const project = projectOf(route);
-  // the hub's other lines are the composer's key line (ThreadComposer keyLineOf) or a thread row (HubNoteRow)
-  return project === undefined ? null : <ConfirmBar project={project} />;
 }
 
 /**

@@ -1976,19 +1976,12 @@ def user_drop.res(-o: S.St, p: X.Cx<o> & DropR, +name: String) -> X.Cx<o>:
     case (+cx, DDone{}):
       note_main(o, cx, String.append("the user dropped the agent @", name))
     case (+cx, DAsk{+q}):
-      +canon = Maybe.default(&2, String, M.resolve(st(o, cx), name), name)
-      out(o, cx, F.confirm_name(canon, PL.confirm_q(canon, q)))
+      # his own /archive asks like main's drop: the 1/2 card (drop-card)
+      open_card(o, cx, "drop", Maybe.default(&2, String, M.resolve(st(o, cx), name), name), PL.drop_asked(q), None{})
     case (+cx, DErr{+e}):
       notice(o, cx, e)
     case (+cx, DHalt{}):
       cx
-
-def user_confirm.res(-o: S.St, p: X.Cx<o> & DropR, +name: String) -> X.Cx<o>:
-  match p:
-    case (+cx, DErr{+e}):
-      notice(o, cx, e)
-    case (+cx, _):
-      note_main(o, cx, String.append("the user dropped the agent @", name))
 
 def user_restore.res(-o: S.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
   match p:
@@ -3625,8 +3618,6 @@ def dispatch(-o: S.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       user_new.res(o, create_task(o, cx, NewTask{M.USER(), base, brief, brief_text, objective, worktree, with_changes, ""}))
     case GI.IDrop{+name, +force}:
       user_drop.res(o, drop_task(o, cx, name, force), name)
-    case GI.IConfirmDrop{+name}:
-      user_confirm.res(o, drop_task(o, cx, name, True{}), name)
     case GI.IRestore{+name}:
       user_restore.res(o, restore_task(o, cx, name))
     case GI.IIsolate{+name}:

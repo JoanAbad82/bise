@@ -158,10 +158,6 @@ def kept_text(+dirty: Nat, +unpushed: Nat) -> String:
 def drop_body(+busy: Bool, +dirty: Nat, +unpushed: Nat) -> String:
   String.concat([Bool.pick(String, busy, "it's working right now: archiving stops its turn. ", ""), kept_text(dirty, unpushed), "."])
 
-# the terminal's /archive confirmation
-def confirm_q(+name: String, +body: String) -> String:
-  String.concat(["archive @", name, "? ", body, " [y/N]"])
-
 # a drop card's options: 1 archives like `yes`, 2 keeps like `no`
 # (core.bend answer.drop, picks.bend picks)
 def drop_opts() -> String:
@@ -172,6 +168,10 @@ def drop_opts() -> String:
 # main's drop card (its title says 'archive <agent>?')
 def drop_card(+body: String) -> String:
   String.concat(["main suggests it. ", body, drop_opts()])
+
+# his own /archive's card: he asked, the facts alone (architect m_37339)
+def drop_asked(+body: String) -> String:
+  String.append(body, drop_opts())
 
 def drop_label(r: Result<&2, &2, String, J.Json>) -> String:
   match r:

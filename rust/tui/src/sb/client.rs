@@ -126,7 +126,6 @@ pub(super) fn new_sb(writer: std::sync::Arc<std::sync::Mutex<UnixStream>>, works
         card: CardView::default(),
         selected: None,
         preview: false,
-        confirm: None,
         release_ask: None,
         release: None,
         updating: None,
@@ -292,7 +291,7 @@ pub(crate) fn hub_event_lines(raw: &str, printed: &mut Printed) -> Vec<String> {
     };
     // a thread's entry (client-protocol step 4): its lines not printed yet
     if v.get("jsonrpc").is_some() {
-        // the hub's words and its yes/no (hub/notice, confirm/ask)
+        // the hub's words (hub/notice)
         if let Some(text) = said(&v) {
             return vec![format!("[hub] {text}")];
         }
@@ -330,13 +329,12 @@ fn thread_of(v: &Value) -> Option<(String, Vec<bise_proto::thread::Entry>)> {
     }
 }
 
-/// A `hub/notice` or `confirm/ask` notification's words (another one:
-/// None).
+/// A `hub/notice` notification's words (another one: None).
 fn said(v: &Value) -> Option<String> {
     use bise_proto::{hub::HubEv, rpc};
     let Ok(rpc::Message::Notification(n)) = rpc::Message::from_value(v.clone()) else { return None };
     match rpc::ev(&n).ok()?.0 {
-        HubEv::Notice { text, .. } | HubEv::Confirm { text, .. } => Some(text),
+        HubEv::Notice { text, .. } => Some(text),
         _ => None,
     }
 }

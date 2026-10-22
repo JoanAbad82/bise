@@ -210,8 +210,8 @@ def lists_round(c):
 
 
 def confirm_round(c, E, sock, project):
-    """bar I9: the hub's yes/no question goes to the window that asked
-    only; no comes back as words (never an error), yes does it. bar
+    """drop-card: archiving a working agent asks with the 1/2 drop card
+    in every window's inbox; 2 keeps it, 1 archives it. bar
     V8/W21: approvals, from the TUI's own event: a read answers the asker
     only; a mode switches it for every connection with flash; a bad word
     and a rule already gone are errors."""
@@ -222,19 +222,20 @@ def confirm_round(c, E, sock, project):
     # mid-turn: the hub asks before archiving it
     c.say("[[slow: 60]] long turn", focus="tq")
     c.wait_status("tq", "working", 30)
+    def drop_card(cl):
+        return next((x for x in cl.cards() if x["kind"] == "drop" and x["agent"] == "tq"), None)
     ok(req(w, "agent/archive", agent="tq", force=False), "agent/archive mid-turn")
-    w.wait(lambda: notes(w, "confirm/ask"), 20, "confirm/ask in the asking window")
-    q = notes(w, "confirm/ask")[-1]
-    check(q["project"] == project and "archive @tq" in q["text"], "the question: %r" % q)
-    check(not notes(c, "confirm/ask"), "the other window got no confirm")
-    n = len(w.notices())
-    ok(req(w, "confirm/answer", id=q["id"], yes=False), "a no")
-    w.wait(lambda: len(w.notices()) > n, 20, "no's words")
-    check(c.agent("tq")["status"] != "archived", "no kept tq: %r" % c.agent("tq"))
+    w.wait(lambda: drop_card(w), 20, "the archive card in the inbox")
+    q = drop_card(w)
+    check("archiving stops its turn" in q["text"] and "1. archive it" in q["text"], "the card: %r" % q)
+    c.wait(lambda: drop_card(c), 20, "every window's inbox has it")
+    ok(req(w, "card/answer", card=q["id"], reply="2"), "2 keeps it")
+    w.wait(lambda: drop_card(w) is None, 20, "the card closed")
+    check(c.agent("tq")["status"] != "archived", "2 kept tq: %r" % c.agent("tq"))
     ok(req(w, "agent/archive", agent="tq", force=False), "agent/archive again")
-    w.wait(lambda: len(notes(w, "confirm/ask")) >= 2, 20, "asked again")
-    ok(req(w, "confirm/answer", id=notes(w, "confirm/ask")[-1]["id"], yes=True), "a yes")
-    c.wait(lambda: c.agent("tq")["status"] == "archived", 30, "yes archived tq")
+    w.wait(lambda: drop_card(w), 20, "asked again")
+    ok(req(w, "card/answer", card=drop_card(w)["id"], reply="1"), "1 archives it")
+    c.wait(lambda: c.agent("tq")["status"] == "archived", 30, "1 archived tq")
 
     appr = hub_now(w, "hub/approvals")
     check(appr and appr["mode"] in ("yolo", "auto") and isinstance(appr["rules"], list), "approvals at initialize: %r" % appr)

@@ -4,6 +4,7 @@
 # the gate checks every bend/proofs/*.bend: a law here with no proof there
 # fails it.
 import Base
+import ../vendor/json.bend as J
 import ../hub/model.bend as HM
 import ../hub/gen/state.bend as HS
 import ../hub/cx.bend as HX
@@ -138,3 +139,25 @@ def none_his(xs: List<&2, String>) -> Bool:
 
 law only_his_kinds_are_his_cards:
   {Bool.and(all_his(his_kinds()), none_his(traffic_kinds())) == True{} : Bool}
+
+# LAW: his own /archive of a working or dirty agent asks with the same
+# drop card (architect m_37339): the facts alone (he asked, no 'main
+# suggests it') and its 2 options; nothing is archived until he picks 1
+# (answer.drop, the laws above).
+law archive_ask_is_a_drop_card:
+  for -o: HS.St
+  for +cx: HX.Cx<o>
+  for +q: String
+  for +name: String
+  {HC.user_drop.res(o, (cx, HC.DAsk{q}), name) == HC.open_card(o, cx, "drop", Maybe.default(&2, String, HM.resolve(HC.st(o, cx), name), name), HPL.drop_asked(q), None{}) : HX.Cx<o>}
+
+# LAW: a drop that must ask changes nothing: it hands back the same
+# context with what the card will say.
+law a_drop_that_asks_archives_nothing:
+  for -o: HS.St
+  for +cx: HX.Cx<o>
+  for +a: HS.Agent
+  for +has_wt: Bool
+  for +loss: J.Json
+  for +busy: Bool
+  {HC.drop.decide(o, True{}, cx, a, has_wt, loss, busy) == (cx, HC.DAsk{HPL.drop_body(busy, J.get_num_or(loss, "dirty", 0n), J.get_num_or(loss, "unpushed", 0n))}) : HX.Cx<o> & HC.DropR}

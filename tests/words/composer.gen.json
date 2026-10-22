@@ -271,11 +271,6 @@
     "one": null,
     "text": "next item"
   },
-  "composer.bar_no": {
-    "args": [],
-    "one": null,
-    "text": "no"
-  },
   "composer.bar_older": {
     "args": [],
     "one": null,
@@ -415,11 +410,6 @@
     "args": [],
     "one": null,
     "text": "word"
-  },
-  "composer.bar_yes": {
-    "args": [],
-    "one": null,
-    "text": "yes"
   },
   "composer.box_tip": {
     "args": [],

@@ -33,8 +33,6 @@ pub(crate) enum Mode {
     Quote,
     /// `D` asks before dropping an agent (BISE-43)
     DropAsk,
-    /// a yes / no question in the status row
-    Confirm,
     /// the card view (ctrl+1-9, a click on an inbox row): the composer
     /// answers the card
     Card,
@@ -109,7 +107,6 @@ impl Mode {
             Mode::Images => &[("ctrl+v", composer::bar_paste_image), REST[0], REST[1], REST[2]],
             Mode::Quote => &[ASK, ("tab", composer::bar_quote), ("cmd+c", composer::bar_copy), ("esc", composer::bar_drop)],
             Mode::DropAsk => &[("y", composer::bar_archive), ("n or esc", composer::bar_keep)],
-            Mode::Confirm => &[("y", composer::bar_yes), ("n", composer::bar_no), ("esc", composer::bar_cancel)],
             Mode::Find => &[("⏎", composer::bar_older), ("shift+⏎", composer::bar_newer), ("esc", composer::bar_close)],
             Mode::Palette => &[("↑↓", composer::bar_choose), ("⏎", composer::bar_open), ("esc", composer::bar_close)],
             Mode::Queued => &[("⏎", composer::bar_send_now), ("e", composer::bar_edit), ("d", composer::bar_delete), ("esc", composer::bar_back)],

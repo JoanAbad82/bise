@@ -7,7 +7,6 @@
 {"agent": "dark", "ans": [], "git": true, "kind": "merge", "now": 1000000, "place": "wt:dark", "pr": 412, "t": "card_open", "text": "#412 is ready to merge\ndark mode\napproved · 3 of 3 checks pass · 2 commits · +40 −3\ngithub.com/o/r/pull/412\n\n1. squash and merge\n2. open it on GitHub\n3. not yet"}
 {"ans": [], "card": 1, "git": true, "now": 1000000, "t": "close"}
 {"ans": [], "card": 2, "git": true, "now": 1791748154918, "res": "interrupted", "t": "confirm_close"}
-{"ans": [], "git": true, "name": "fix", "now": 1000000, "t": "confirm_drop"}
 {"agent": "main", "ans": [], "git": true, "now": 1000000, "t": "confirm_open", "text": "main wants to push"}
 {"ans": [], "force": true, "git": true, "name": "b", "now": 1000000, "t": "drop"}
 {"ans": [], "git": true, "id": 1, "name": "first", "now": 1790000000000, "t": "every_name"}

@@ -256,7 +256,6 @@ pub(super) struct Sb {
     /// Index in `nav()` of the highlighted entry of the panel.
     selected: Option<usize>,
     preview: bool,
-    confirm: Option<(u64, String)>,
     /// `/release-bise`'s plan waiting for your y/n (BISE-235).
     release_ask: Option<release::Ask>,
     /// The release running: its tag, since when (the header's item).
@@ -649,7 +648,6 @@ fn hub_reconnected(app: &mut App) {
     sb.seen.clear();
     sb.lives.clear();
     sb.ready = false;
-    sb.confirm = None;
     sb.release_ask = None;
     sb.release = None;
     sb.rpc.forget();
@@ -812,17 +810,6 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
     drafts::save_now(app);
     app.popup_sel = 0;
     let mut out: Vec<Ev> = Vec::new();
-    let sb = &mut app.sb;
-    if let Some((id, _)) = sb.confirm.clone() {
-        let t = typed.to_lowercase();
-        let yes = matches!(t.as_str(), "y" | "yes" | "o" | "oui");
-        let no = matches!(t.as_str(), "n" | "no" | "non");
-        if yes || no {
-            sb.confirm = None;
-            sb.call("confirm/answer", json!({"id": id, "yes": yes}), rpc::Then::Shown);
-            return out;
-        }
-    }
     if release::answer(app, &typed) {
         return out;
     }

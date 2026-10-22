@@ -60,7 +60,6 @@ core_kinds! {
         /// `/new`: `brief` is the Brief as JSON, `brief_text` its body
         New = "new" => INew { base: Str, brief: Json, brief_text: Str, objective: Str, worktree: Bool, with_changes: Bool },
         Drop = "drop" => IDrop { name: Str, force: Bool },
-        ConfirmDrop = "confirm_drop" => IConfirmDrop { name: Str },
         Restore = "restore" => IRestore { name: Str },
         Isolate = "isolate" => IIsolate { name: Str },
         /// hub-loop: the shell made (or failed to make) the worktree of

@@ -35,6 +35,12 @@ def Laws.drop_card_words():
 def Laws.only_his_kinds_are_his_cards():
   {==}
 
+def Laws.archive_ask_is_a_drop_card(o, cx, q, name):
+  {==}
+
+def Laws.a_drop_that_asks_archives_nothing(o, cx, a, has_wt, loss, busy):
+  {==}
+
 def Laws.drop_option_1_is_yes(o, cx, parts, via):
   {==}
 

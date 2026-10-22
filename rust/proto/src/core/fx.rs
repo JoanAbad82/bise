@@ -65,9 +65,9 @@ core_kinds! {
         FollowedEnd = "followed_end" => FFollowedEnd { project: Str, agent: Str, key: Nat, state: Str, label: Str, summary: Str },
         /// his number on a hub item (merge.rs)
         CardChoice = "card_choice" => FCardChoice { card: Nat, kind: Str, agent: Str, place: OptStr, pr: OptNat, text: Str },
-        /// `card`+`agent`: the gate card's verdict; `name`: ask the
-        /// client that typed the input yes or no
-        Confirm = "confirm" => FConfirm { card: OptNatOmit, agent: OptStrOmit, name: OptStrOmit, text: Str },
+        /// the gate card's verdict (`/archive`'s own yes/no is a drop
+        /// card now, drop-card)
+        Confirm = "confirm" => FConfirm { card: OptNatOmit, agent: OptStrOmit, text: Str },
         /// the clients on `name` go back to main (it was archived)
         FocusMain = "focus_main" => FFocusMain { name: Str },
         /// his text, for the client's direct-exchange note
@@ -84,5 +84,4 @@ core_kinds! {
 /// encoder with all its fields.
 pub const SHAPES: &[(&str, &str, &[&str])] = &[
     ("confirm_card", "confirm", &["card", "agent", "text"]),
-    ("confirm_name", "confirm", &["name", "text"]),
 ];

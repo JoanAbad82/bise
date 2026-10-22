@@ -39,6 +39,7 @@ export const TAGS = {
   job_end: true,
   followed_end: true,
   activity: true,
+  // an older hub's yes/no, ignored (drop-card): TODO(archive-confirm), goes in a later release
   confirm: true,
   approvals: true,
   notice: true,
@@ -172,13 +173,6 @@ export function typed(raw: unknown): Ev | null {
 }
 
 export const threadKey = (project: string, agent: string): string => `${project}/${agent}`;
-
-/** The hub's yes/no question to this window (bar I9: archive a working agent...). */
-export interface Confirm {
-  readonly project: string;
-  readonly id: number;
-  readonly text: string;
-}
 
 /** The hub's last line to this window for a project: a plain line (a notice: /flow, a confirm's no) or an error (a refused slash line: his words to fix). */
 export interface HubLine {

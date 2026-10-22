@@ -20,11 +20,6 @@
 // slice (machine/cards.ts: his answers and closes in flight and how they
 // settle); his gestures on it come in as store.do(intent).
 //
-// The hub's yes/no questions (`confirm`, bar I9) belong to the connection
-// that asked: a new `welcome` for that project (the core reconnected, so the
-// hub sees a new connection) drops them, so he never answers an id the hub
-// tied to a gone connection.
-//
 // Unknown tags (a newer core, the capsule's older events) are ignored at
 // runtime: only the tags of TAGS are applied, and TAGS is checked complete
 // against the generated unions at compile time. The store's shapes, TAGS and
@@ -532,26 +527,9 @@ export class Store extends StoreVoice {
     this.command({ cmd: "find", project, agent, needle, rid });
     return rid;
   }
-  /** His answer to the hub's yes/no question (a no's line comes back as a notice). */
-  confirm(project: string, id: number, yes: boolean): void {
-    this.dropConfirm(project, id);
-    this.command({ cmd: "confirm", project, id, yes });
-  }
   /** The hub's line he saw on the key line is over (he typed, sent, esc, its time): it goes, unless a newer one came. */
   dropNotice(project: string, line: HubLine): void {
     if (this.notice(project) === line) this.put(`notice:${project}`, null);
-  }
-  /** Put off (esc): the question leaves the window; the hub holds nothing for it, a later command asks again. */
-  putOff(project: string, id: number): void {
-    this.dropConfirm(project, id);
-  }
-  private dropConfirm(project: string, id: number): void {
-    const now = this.confirms(project);
-    if (now.some((c) => c.id === id))
-      this.put(
-        `confirms:${project}`,
-        now.filter((c) => c.id !== id),
-      );
   }
   stop(project: string, agent: string): void {
     this.command({ cmd: "stop", project, agent });
@@ -579,7 +557,6 @@ export type {
   Away,
   AwayProject,
   BranchesList,
-  Confirm,
   Dictation,
   Diff,
   Ev,

@@ -285,7 +285,7 @@ def stop_hub(sock_path, keep_agents=False):
 PROTO = 1
 # the one-client notifications notices() lists, by their `kind` (a
 # response's words join them as a notice, as the terminal shows them)
-SAID = {"hub/notice": "notice", "confirm/ask": "confirm"}
+SAID = {"hub/notice": "notice"}
 
 
 class Client:
@@ -415,9 +415,9 @@ class Client:
         """ctrl+c on `agent` (turn/interrupt): its response."""
         return self.rpc("turn/interrupt", {"project": self.project(), "agent": agent})
 
-    def confirm(self, cid, yes):
-        """y or n to the hub's question `cid` (confirm/answer): its response."""
-        return self.rpc("confirm/answer", {"project": self.project(), "id": cid, "yes": yes})
+    def answer(self, card, reply):
+        """his answer to card `card` (card/answer): its response."""
+        return self.rpc("card/answer", {"project": self.project(), "card": card, "reply": reply})
 
     def approvals_set(self, mode=None):
         """shift+tab (`toggle`), `/approvals yolo|auto`, or with no mode
@@ -465,9 +465,9 @@ class Client:
         return [l for n in names for l in self._tail(os.path.join(self.agents_dir, n, "transcript.log"))]
 
     def notices(self):
-        """What the hub said to this client, in order: hub/notice and
-        confirm/ask's params with their `kind` (notice, confirm), and a
-        response's notice or refusal words as a notice."""
+        """What the hub said to this client, in order: hub/notice's
+        params with their `kind` (notice), and a response's notice or
+        refusal words as a notice."""
         with self.lock:
             return list(self.said)
 
@@ -659,11 +659,12 @@ def t_worktree_drop_restore(E, c):
     c.wait_idle("t4")
     check(out(wt, "git log -1 --format=%s") == "wt", "the commit is on the task's branch")
     check(not os.path.exists(os.path.join(E.ws, "wt.txt")), "the workspace is untouched")
+    # his /archive asks with the 1/2 drop card (drop-card): 1 archives
     c.say("/archive t4")
-    c.wait(lambda: any(n["kind"] == "confirm" for n in c.notices()), 30, "a confirmation")
-    conf = [n for n in c.notices() if n["kind"] == "confirm"][-1]
-    check("1 unpushed commit" in conf["text"], conf["text"])
-    check("error" not in c.confirm(conf["id"], True), "the confirm is answered")
+    c.wait(lambda: any(x["kind"] == "drop" and x["agent"] == "t4" for x in c.cards()), 30, "the archive card")
+    card = [x for x in c.cards() if x["kind"] == "drop" and x["agent"] == "t4"][-1]
+    check("1 unpushed commit is kept" in card["text"] and "1. archive it" in card["text"], card["text"])
+    check("error" not in c.answer(card["id"], "1"), "the card is answered")
     c.wait_status("t4", "archived", 30)
     check(not os.path.exists(wt), "worktree removed")
     check(not os.path.exists(os.path.dirname(wt)), "and its folder")

@@ -896,7 +896,7 @@ impl Shell {
             Effect::Land { token, job } => self.land(token, *job),
             Effect::ToClient { client, body } => {
                 // typed, or nothing: no client reads the older line
-                let _ = self.typed_notice(client, &body) || self.typed_confirm(client, &body) || self.rpc_effect(client, &body);
+                let _ = self.typed_notice(client, &body) || self.rpc_effect(client, &body);
             }
             Effect::Renamed { old, new } => self.renamed(old, new),
             Effect::Retarget { from, to } => self.retarget(&from, &to),

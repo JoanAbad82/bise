@@ -172,9 +172,7 @@ export const inbox = {
   key_open_beside: "open beside",
   /** a key's words: the TUI card's page opens in the browser */
   key_open_browser: "open in your browser",
-  /** a key's words: yes (the desktop's confirm bar) */
-  key_yes: "yes",
-  /** a key's words: no (the desktop's confirm bar), and a gate's no */
+  /** a key's words: a gate's no */
   no: "no",
   /** the TUI's divider: he writes */
   you: "you",

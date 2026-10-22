@@ -628,27 +628,14 @@ fn dropping_a_worktree_with_work_asks_first() {
         dirty: 3,
         unpushed: 2,
     };
+    // his own /archive asks with the same 1/2 card as main's drop
+    // (drop-card, architect m_37339): no yes/no event, nothing archived yet
     let fx = t.user(MAIN, "/archive fix");
-    let (id, text) = fx
-        .iter()
-        .find_map(|e| match e {
-            Effect::ToClient { body, .. } if body["ev"] == "confirm" => Some((
-                body["id"].as_u64().unwrap(),
-                body["text"].as_str().unwrap().to_string(),
-            )),
-            _ => None,
-        })
-        .expect("a confirmation");
-    assert!(
-        text.contains("3 changed files and 2 unpushed commits"),
-        "{}",
-        text
-    );
-    let fx = t.go(Input::ClientConfirm {
-        client: 1,
-        id,
-        yes: true,
-    });
+    assert!(!fx.iter().any(|e| matches!(e, Effect::ToClient { body, .. } if body["ev"] == "confirm")), "{fx:?}");
+    assert_ne!(t.status("fix"), Status::Archived);
+    let c = t.hub.st.cards.values().find(|c| c.kind == "drop").expect("a drop card").clone();
+    assert_eq!(c.text, "its 3 changed files and 2 unpushed commits are kept; /restore brings it back.\n1. archive it\n2. keep it");
+    let fx = t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Answer { card: c.id, text: "1".into(), parts: String::new() } });
     assert!(fx.contains(&Effect::Kill {
         agent: "fix".into()
     }));

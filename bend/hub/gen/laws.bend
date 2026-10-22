@@ -111,12 +111,6 @@ law in_drop_bare:
 def in_drop_bare():
   {==}
 
-law in_confirm_drop_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"confirm_drop"})])) == IN.IConfirmDrop{""} : IN.In}
-
-def in_confirm_drop_bare():
-  {==}
-
 law in_restore_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"restore"})])) == IN.IRestore{""} : IN.In}
 
@@ -538,13 +532,6 @@ law in_IDrop_round:
   {IN.of(IN.json(IN.IDrop{name, force})) == IN.IDrop{name, force} : IN.In}
 
 def in_IDrop_round(name, force):
-  {==}
-
-law in_IConfirmDrop_round:
-  for name: String
-  {IN.of(IN.json(IN.IConfirmDrop{name})) == IN.IConfirmDrop{name} : IN.In}
-
-def in_IConfirmDrop_round(name):
   {==}
 
 law in_IRestore_round:
@@ -1288,7 +1275,7 @@ def fx_card_choice_bare():
   {==}
 
 law fx_confirm_bare:
-  {FX.of(J.obj([J.kv("fx", J.JStr{"confirm"})])) == FX.FConfirm{None{}, None{}, None{}, ""} : FX.Fx}
+  {FX.of(J.obj([J.kv("fx", J.JStr{"confirm"})])) == FX.FConfirm{None{}, None{}, ""} : FX.Fx}
 
 def fx_confirm_bare():
   {==}
@@ -1573,27 +1560,18 @@ def fx_FCardChoice_round(card, kind, agent, place, pr, text):
 law fx_FConfirm_round:
   for card: Maybe<&2, Nat>
   for agent: Maybe<&2, String>
-  for name: Maybe<&2, String>
   for text: String
-  {FX.of(FX.json(FX.FConfirm{card, agent, name, text})) == FX.FConfirm{card, agent, name, text} : FX.Fx}
+  {FX.of(FX.json(FX.FConfirm{card, agent, text})) == FX.FConfirm{card, agent, text} : FX.Fx}
 
-def fx_FConfirm_round(card, agent, name, text):
-  match card agent name:
-    case None{} None{} None{}:
+def fx_FConfirm_round(card, agent, text):
+  match card agent:
+    case None{} None{}:
       {==}
-    case None{} None{} Some{x_name}:
+    case None{} Some{x_agent}:
       {==}
-    case None{} Some{x_agent} None{}:
+    case Some{x_card} None{}:
       {==}
-    case None{} Some{x_agent} Some{x_name}:
-      {==}
-    case Some{x_card} None{} None{}:
-      {==}
-    case Some{x_card} None{} Some{x_name}:
-      {==}
-    case Some{x_card} Some{x_agent} None{}:
-      {==}
-    case Some{x_card} Some{x_agent} Some{x_name}:
+    case Some{x_card} Some{x_agent}:
       {==}
 
 law fx_FFocusMain_round:

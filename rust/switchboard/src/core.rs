@@ -133,11 +133,6 @@ pub enum Input {
     ClientGone {
         client: ClientId,
     },
-    ClientConfirm {
-        client: ClientId,
-        id: u64,
-        yes: bool,
-    },
     ClientInterrupt {
         client: ClientId,
         agent: String,
@@ -605,9 +600,6 @@ pub struct Hub {
     pub st: State,
     pub workspace: String,
     clients: BTreeMap<ClientId, ClientView>,
-    /// Drop confirmations pending on a client: id -> (client, task).
-    confirms: BTreeMap<u64, (ClientId, String)>,
-    next_confirm: u64,
     /// (time, text) of recent assistant messages, for direct-exchange excerpts.
     recent: BTreeMap<String, VecDeque<(u64, String)>>,
     /// The agents' contexts, rebuilt where their inputs changed (contexts.rs).
@@ -786,8 +778,6 @@ impl Hub {
             st: State::new(workspace),
             workspace: workspace.to_string(),
             clients: BTreeMap::new(),
-            confirms: BTreeMap::new(),
-            next_confirm: 1,
             recent: BTreeMap::new(),
             contexts: Default::default(),
             rows: Default::default(),
@@ -1505,7 +1495,6 @@ impl Hub {
                 self.set_focus(&mut fx, env, client, MAIN);
                 self.clients.remove(&client);
             }
-            Input::ClientConfirm { client, id, yes } => self.confirm(&mut fx, env, client, id, yes),
             Input::ClientInterrupt { client, agent } => {
                 self.interrupt_by = Some("user".into());
                 self.core(&mut fx, env, Some(client), In::Interrupt(ci::Interrupt { agent }));
@@ -1683,17 +1672,6 @@ impl Hub {
             (input.note, input.direct) = (Some(note), direct);
         }
         self.core(fx, env, Some(client), In::Focus(input));
-    }
-
-    fn confirm(&mut self, fx: &mut Fx, env: &mut dyn Env, client: ClientId, id: u64, yes: bool) {
-        let Some((_, name)) = self.confirms.remove(&id) else {
-            return;
-        };
-        if !yes {
-            fx.push(notice(client, &format!("@{} stays: nothing archived", name)));
-            return;
-        }
-        self.core(fx, env, Some(client), In::ConfirmDrop(ci::ConfirmDrop { name }));
     }
 
     /// Issue #4: who `sb send --model` may move: a task, by main or its

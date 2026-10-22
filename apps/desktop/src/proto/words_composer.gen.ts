@@ -54,10 +54,6 @@ export const composer = {
   bar_archive: "archive",
   /** key bar, D asks: keep the agent */
   bar_keep: "keep",
-  /** key bar, a question: yes */
-  bar_yes: "yes",
-  /** key bar, a question: no */
-  bar_no: "no",
   /** key bar, find: the older match */
   bar_older: "older",
   /** key bar, find: the newer match */

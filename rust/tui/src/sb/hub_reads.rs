@@ -14,7 +14,6 @@
 //! - `hub/approvals`: the mode for the key bar, the checker and the rules
 //!   (`/approvals`' read, approvals/set without a mode, opens the screen
 //!   on the same fields: sb/rpc.rs's `Then::Approvals`);
-//! - `confirm/ask`: the hub's yes/no question (`y`/`n`, esc: no);
 //! - `hub/artifacts`: the list, its new ones and when he last looked
 //!   (`artifacts.rs`'s store, the header's `↗ N new`, /artifacts);
 //! - `hub/agents`, `hub/cards`, `hub/scheduled`, `hub/flow` (P4c-4b, the
@@ -175,7 +174,6 @@ fn apply(app: &mut App, n: &Notification) {
     let Ok((ev, _)) = rpc::ev(n) else { return };
     match &ev {
         HubEv::Approvals { .. } => approvals(app, &ev, false),
-        HubEv::Confirm { id, text, .. } => confirm(app, *id, text),
         HubEv::Artifacts { items, seen_ms, .. } => artifacts(app, items, *seen_ms),
         HubEv::Agents { agents: rows, places, archived, .. } => {
             let rows = app.sb.archived.merge(rows, archived.as_deref());
@@ -392,14 +390,6 @@ fn artifacts(app: &mut App, items: &[bise_proto::rows::Artifact], seen_ms: Optio
 
 /// The hub asks yes or no (`/archive` of a task with unpushed work...):
 /// its words, how to answer, and the question kept for `y`/`n`.
-fn confirm(app: &mut App, id: u64, text: &str) {
-    push_event(&mut app.events, &mut app.cache, Ev::Warn(text.to_string()));
-    push_event(&mut app.events, &mut app.cache, Ev::Info("answer y (yes) or n (no), then ⏎".into()));
-    let sb = &mut app.sb;
-    sb.confirm = Some((id, text.to_string()));
-    sb.calls += 1;
-}
-
 /// The hub's typed state rows for tests (what an initialized connection
 /// gets): an agent by its status word, a card by its words, their
 /// notifications as the lines `dispatch` reads.
@@ -589,14 +579,10 @@ mod tests {
     }
 
     #[test]
-    fn confirm_ask_asks_and_keeps_the_question() {
+    fn a_method_this_terminal_does_not_read_adds_nothing() {
         let mut app = crate::sb::bench::test_app();
         let n = app.events.len();
-        read(&mut app, note(&HubEv::Confirm { project: "p".into(), id: 7, text: "t4 has 1 unpushed commit: archive it?".into() }));
-        assert_eq!(app.sb.confirm, Some((7, "t4 has 1 unpushed commit: archive it?".into())));
-        assert_eq!(app.events.len(), n + 2);
-        // a method this terminal doesn't read: nothing
         read(&mut app, json!({"jsonrpc": "2.0", "method": "hub/newer", "params": {}}));
-        assert_eq!(app.events.len(), n + 2);
+        assert_eq!(app.events.len(), n);
     }
 }

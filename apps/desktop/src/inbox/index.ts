@@ -13,5 +13,5 @@ export { InboxBlock, openInbox, leaveClosed, answeringOf, closedAnswering, useNo
 export { blockList } from './listed';
 export { cardDraftKey } from './drafts';
 export { ThreadInbox, inboxOf } from './screen';
-export { ConfirmBar, HubNoteRow } from './confirm';
+export { HubNoteRow } from './confirm';
 export { InboxStrip, useStripCard, type InboxStripProps, type StripPorts } from './Strip';

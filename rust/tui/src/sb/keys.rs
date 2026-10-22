@@ -36,7 +36,6 @@ pub(crate) struct Scene {
     preview: bool,
     archived_open: bool,
     drop_ask: bool,
-    confirm: bool,
     card: (bool, Option<u64>, usize),
 }
 
@@ -48,7 +47,6 @@ pub(crate) fn scene(app: &App) -> Scene {
         preview: sb.preview,
         archived_open: sb.archived_open,
         drop_ask: sb.drop_ask.is_some(),
-        confirm: sb.confirm.is_some(),
         card: (sb.card.open, sb.card.sel, sb.card.scroll),
     }
 }
@@ -157,10 +155,6 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
             true
         }
         (KeyCode::Esc, _) if !popup_open => {
-            if let Some((id, _)) = sb.confirm.take() {
-                sb.call("confirm/answer", json!({"id": id, "yes": false}), super::rpc::Then::Shown);
-                return true;
-            }
             if sb.selected.is_some() || sb.preview {
                 sb.selected = None;
                 sb.preview = false;

@@ -275,21 +275,6 @@ impl Shell {
         }
     }
 
-    /// `Effect::ToClient`'s body for `client` when it is sb-core's yes/no
-    /// question (`confirm`, bar I9) and `client` is a typed connection:
-    /// sent as the typed `confirm`, to that connection only. True: done
-    /// with it.
-    pub(super) fn typed_confirm(&mut self, client: ClientId, body: &Value) -> bool {
-        if body.get("ev").and_then(Value::as_str) != Some("confirm") || !self.proto.conns.contains_key(&client) {
-            return false;
-        }
-        let id = body.get("id").and_then(Value::as_u64).unwrap_or(0);
-        let text = body.get("text").and_then(Value::as_str).unwrap_or("").to_string();
-        let project = self.project();
-        self.proto_send(client, &HubEv::Confirm { project, id, text });
-        true
-    }
-
     /// A handler's typed result for `client` when it is the typed
     /// command being stepped: its `error` when refused; done, the change
     /// shows in the events, and a command that answers the hub's words

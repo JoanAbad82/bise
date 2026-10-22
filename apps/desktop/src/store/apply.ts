@@ -21,7 +21,7 @@ import {
 } from "./types";
 import type { Store } from "./store";
 
-/** no confirms: one shared empty list, so a reader keeps the same reference */
+/** one shared empty list, so a reader keeps the same reference */
 const EMPTY: readonly never[] = [];
 
 /** Applies one typed event to the store's slices and threads. */
@@ -298,13 +298,6 @@ export function applyTyped(s: Store, ev: Ev): void {
       // G: his send's error settles its row (machine/sends.ts)
       if (ev.cmd === "send") s.sendFailed(ev);
       return;
-    case "confirm":
-      // a question belongs to the connection that asked: only this window gets it
-      s.put(`confirms:${ev.project}`, [
-        ...s.confirms(ev.project).filter((c) => c.id !== ev.id),
-        { project: ev.project, id: ev.id, text: ev.text },
-      ]);
-      return;
     case "notice": {
       // the answer to his own /restart (its cid): the row says the app's version too
       const restart = ev.cid != null && s.restartCids.delete(ev.cid);
@@ -347,10 +340,6 @@ export function applyTyped(s: Store, ev: Ev): void {
       // its hub took this core (again): no refusal holds
       if (s.slices.get(`hub_refused:${ev.project}`) != null)
         s.put(`hub_refused:${ev.project}`, null);
-      // a new hello: the hub tied the open questions to a connection
-      // that is gone (the core reconnected), so none can be answered
-      if (s.confirms(ev.project).length > 0)
-        s.put(`confirms:${ev.project}`, EMPTY);
       // the hub's last plain line was said on the connection before this hello: a /restart's
       // 'restarting the hub …' is over once the hub says hello again, so it goes (his m_22835:
       // it stayed 40 min after the hub came back; designer m_22843: no past line). A refused line
