@@ -348,6 +348,49 @@ def rich_world_fixtures():
     shutil.rmtree(d, ignore_errors=True)
 
 
+@test
+def world_lock_refuses_a_second_user():
+    """one world, one user: a second take of its lock is refused, naming the holder; a process that inherits it holds it to its end"""
+    import world
+    d = tempfile.mkdtemp(prefix="qa-world-lock-", dir=os.environ.get("TMPDIR"))
+    w = os.path.join(d, "w-x")
+    fd = world.take_world(w)
+    world.note_holder(w, os.getpid(), "tree-a")     # a live holder
+    try:
+        world.take_world(w)
+        check(False, "a second take went through")
+    except qa.QAError as e:
+        check(("in use by tree-a (pid %d" % os.getpid()) in str(e) and qa.REPO in str(e) and "AMBIENT_WORLD_DIR" in str(e), str(e))
+    # the daemon's way: a child inherits the fd, the parent closes its copy; held while the child lives
+    child = subprocess.Popen([sys.executable, "-c", "import sys; sys.stdin.read()"], stdin=subprocess.PIPE, pass_fds=(fd,))
+    os.close(fd)
+    try:
+        world.take_world(w)
+        check(False, "taken while the child holds it")
+    except qa.QAError:
+        pass
+    child.stdin.close()
+    child.wait(timeout=10)
+    fd2 = world.take_world(w)     # its end freed it
+    os.close(fd2)
+    # its daemon died, a child (a hub) still holds the lock: the refusal says so, with lsof and world down
+    fd = world.take_world(w)
+    dead = subprocess.Popen([sys.executable, "-c", "pass"])
+    dead.wait()
+    world.note_holder(w, dead.pid, "tree-b")
+    child = subprocess.Popen([sys.executable, "-c", "import sys; sys.stdin.read()"], stdin=subprocess.PIPE, pass_fds=(fd,))
+    os.close(fd)
+    try:
+        world.take_world(w)
+        check(False, "taken while an orphan holds it")
+    except qa.QAError as e:
+        check(("its daemon (pid %d, tree-b" % dead.pid) in str(e) and "is gone but processes still hold the lock" in str(e)
+              and ("lsof %s.lock" % w) in str(e) and "qa.py world down" in str(e), str(e))
+    child.stdin.close()
+    child.wait(timeout=10)
+    shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     print("%d failed" % len(failures) if failures else "all ambient-qa world tests pass")
     sys.exit(1 if failures else 0)

@@ -91,6 +91,40 @@ def _read(path):
         return None
 
 
+def take_world(world):
+    """The world's own lock (release-48 m_37753: two trees on one ambient-qa world killed each
+    other's hubs): an exclusive flock on <world>.lock, beside the world (up removes the world dir),
+    returned as an open fd; the world's daemon inherits it and holds it for its life, so the lock
+    goes with the daemon (its `down`, its crash). Held already: QAError naming its holder
+    (<world>.lock.holder: pid, tree, agent, since), never a second user."""
+    import fcntl
+    import qa
+    lp = world.rstrip(os.sep) + ".lock"
+    os.makedirs(os.path.dirname(lp), exist_ok=True)
+    fd = os.open(lp, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        h = _read(lp + ".holder") or {}
+        if h.get("pid") and not _alive(h.get("pid")):
+            # its daemon died, its hubs (they inherit the fd) live on and still use the world
+            raise qa.QAError("refused: the world %s is in use: its daemon (pid %s, %s, tree %s) is gone but processes still hold "
+                             "the lock: `lsof %s` lists them; `qa.py world down` kills them"
+                             % (world, h["pid"], h.get("agent") or "another run", h.get("tree", "?"), lp))
+        raise qa.QAError("refused: the world %s is in use by %s (pid %s, tree %s, since %s): two trees on one world kill each "
+                         "other's hubs; wait for its `qa.py world down`, or give this run its own AMBIENT_WORLD_DIR"
+                         % (world, h.get("agent") or "another run", h.get("pid", "?"), h.get("tree", "?"), h.get("since", "?")))
+    return fd
+
+
+def note_holder(world, pid, agent):
+    """Who holds the world's lock, for the next one refused (take_world)."""
+    import qa
+    with open(world.rstrip(os.sep) + ".lock.holder", "w") as f:
+        json.dump({"pid": pid, "tree": qa.REPO, "agent": agent, "since": time.strftime("%Y-%m-%d %H:%M:%S")}, f)
+
+
 def _alive(pid):
     try:
         os.kill(int(pid), 0)
@@ -466,6 +500,15 @@ def up(n=3, bise=None, root=None, rich=False, agents=0):
     if not root:
         raise qa.QAError("%s has no app root with a built repl-live (--root)" % bise)
     ensure_helpers_locked(root)
+    lk = take_world(world)
+    try:
+        return _up(world, P, n, bise, root, rich, agents, lk)
+    finally:
+        os.close(lk)     # the daemon holds its own copy: the lock lives as long as it does
+
+
+def _up(world, P, n, bise, root, rich, agents, lk):
+    import qa
     if os.path.exists(world):
         shutil.rmtree(world)
     os.makedirs(world)
@@ -474,7 +517,9 @@ def up(n=3, bise=None, root=None, rich=False, agents=0):
     env["AMBIENT_WORLD_DIR"] = world     # the daemon has no SB_AGENT: same folder as this caller's
     p = subprocess.Popen([sys.executable, "-u", "-B", os.path.join(HERE, "qa.py"), "_world", "--bise", bise, "--root", root, "--projects", str(n)]
                          + (["--rich", "--agents", str(agents)] if rich else []),
-                         stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=qa.REPO, env=env)
+                         stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=qa.REPO, env=env,
+                         pass_fds=(lk,))
+    note_holder(world, p.pid, qa._short_agent())
     t0, limit = time.time(), world_timeout()
     print("world: up within %.0f s at most (load factor %.1f%s)" % (limit, _load_factor(),
           ", AMBIENT_QA_WORLD_TIMEOUT" if os.environ.get("AMBIENT_QA_WORLD_TIMEOUT") else ""), file=log, flush=True)
