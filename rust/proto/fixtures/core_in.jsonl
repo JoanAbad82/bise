@@ -74,8 +74,3 @@
 {"ans": [], "git": true, "now": 1000000, "t": "pause"}
 {"ans": [], "git": true, "now": 1000500, "t": "resume"}
 {"agents": ["lean-install", "main"], "ans": [], "git": true, "key": "plan:plan", "kind": "plan", "now": 1000000, "t": "page_card", "text": "lean installs: start the plan lean-install recommends?\n1. start the plan\n2. open the plan"}
-{"t": "land_claim", "key": "wt:a"}
-{"t": "land_pick", "changes": [{"path": "a.rs", "from": "", "recent": true}], "files": ["a.rs"], "add": [], "others": [], "conflicts": [], "alone": true, "worktree": true, "here": false, "pr_mode": false, "message": "fix: a"}
-{"t": "land_join", "ticket": 1, "target": "refs/heads/main", "place": "wt:a", "agent": "a", "trunk": "refs/heads/main", "dirty": []}
-{"t": "land_end", "ticket": 1, "key": "wt:a"}
-{"t": "land_live", "claims": [{"key": "wt:a", "since": 1000}], "line": [{"ticket": 1, "target": "refs/heads/main", "place": "wt:a", "agent": "a", "trunk": "refs/heads/main", "go": true}]}

@@ -1,9 +1,9 @@
 //! `sb land` on the hub's side (dev-flow §5): the land runs in its own
-//! thread, in sb-core's line (the views say who waits), git and the
+//! thread, in line on the queue (the views say who waits), git and the
 //! check never on the hub's loop; its answer to the agent's `sb`, and a
 //! line in main's feed.
 //!
-//! land-wait: one land per place at a time (sb-core's claim, issue 37 #3):
+//! land-wait: one land per place at a time (`land_queue::Queue::claim`):
 //! a second is refused at once. The `sb` waits for its land
 //! (`client::wait_for`, 2 h); a land whose `sb` is gone (it gave up, it
 //! was killed) or whose answer could not be written tells its agent with
@@ -15,11 +15,7 @@
 //! bims' lands count.
 
 use super::*;
-use crate::land_line::{go_of, ranks_of, LandCore};
-use bise_proto::core::{Fx as CoreFx, In};
-use std::collections::BTreeMap;
 use std::io::Write;
-use std::sync::{Condvar, Mutex};
 
 /// The start of bise's message for a land whose `sb` did not hear it;
 /// the answer's own words follow.
@@ -52,11 +48,11 @@ impl Shell {
         let Some(mut stream) = self.replies.remove(&token) else {
             return;
         };
-        let key = crate::land_line::claim_key(&job.place, &job.agent, job.here);
-        let claim = match self.lands.claim(&key) {
+        let key = crate::land_queue::claim_key(&job.place, &job.agent, job.here);
+        let claim = match self.lands.claim(&key, now_ms()) {
             Ok(c) => c,
-            Err(e) => {
-                write_json(&mut stream, &json!({"ok": false, "error": e}));
+            Err(since) => {
+                write_json(&mut stream, &json!({"ok": false, "error": crate::land_queue::busy(since, now_ms())}));
                 return;
             }
         };
@@ -65,7 +61,8 @@ impl Shell {
         std::thread::spawn(move || {
             let _claim = claim;
             let txj = tx.clone();
-            let res = crate::land::run(&job, &queue, &mut || drop(txj.send(Msg::Land { line: None })));
+            let mut onto = features::onto_now(&tx, &job.agent, job.onto.clone());
+            let res = crate::land::run_onto(&job, &queue, &mut || drop(txj.send(Msg::Land { line: None })), &mut onto);
             let mut landed: Option<Feed> = None;
             let (body, line) = match res {
                 Ok(o) => {
@@ -74,8 +71,9 @@ impl Shell {
                     if let Some(e) = &o.push_error {
                         text = format!("{} ({})", text, e);
                     }
-                    if !o.note.is_empty() {
-                        text = format!("{}. {}", text, o.note);
+                    let note = crate::land::left_out_note(&o.left_out);
+                    if !note.is_empty() {
+                        text = format!("{}. {}", text, note);
                     }
                     (json!({"ok": true, "text": text.clone()}), Feed::info(text))
                 }
@@ -93,73 +91,6 @@ impl Shell {
                 let _ = tx.send(Msg::Land { line: Some(f) });
             }
         });
-    }
-
-    /// One land step on the loop: its land fx to its thread (go's to the
-    /// waiting threads, ranks to the views), the rest as any step's.
-    pub(super) fn land_step(&mut self, s: Step) {
-        let fx = self.hub.handle(crate::core::Input::Land(s.i), &mut self.env);
-        let (land, rest): (Vec<_>, Vec<_>) = fx.into_iter().partition(|e| matches!(e, Effect::LandFx(_)));
-        let land: Vec<CoreFx> = land.into_iter().filter_map(|e| if let Effect::LandFx(f) = e { Some(f) } else { None }).collect();
-        self.lands.gave(&land);
-        if let Some(r) = land.iter().find_map(ranks_of) {
-            self.hub.landing = r;
-        }
-        let _ = s.reply.send(land);
-        self.step_fx(rest);
-    }
-}
-
-/// sb-core's land line for the land threads (issue 37 #3,
-/// crate::land_line): a step goes through the hub's loop
-/// (`Msg::LandStep`) and its land fx come back to its thread; `land_go`
-/// wakes the thread whose ticket goes, `land_ranks` is the views' lids
-/// (`Hub::landing`). Fail closed: a loop gone answers nothing (the land
-/// is refused, nothing moved). After a core restart the hub gives the
-/// live lands back itself (core_link.rs `lands_back`).
-pub(super) struct LoopCore {
-    tx: std::sync::mpsc::Sender<Msg>,
-    /// The tickets that got go, for the threads that wait on them.
-    got: Mutex<BTreeMap<u64, String>>,
-    cv: Condvar,
-}
-
-/// A land thread's step, for the loop to run ([`Shell::land_step`]).
-pub(super) struct Step {
-    i: In,
-    reply: std::sync::mpsc::Sender<Vec<CoreFx>>,
-}
-
-impl LoopCore {
-    /// The line of a hub whose loop reads `tx`.
-    pub(super) fn line(tx: std::sync::mpsc::Sender<Msg>) -> crate::land::Line {
-        crate::land::Line::new(std::sync::Arc::new(LoopCore { tx, got: Mutex::default(), cv: Condvar::new() }))
-    }
-}
-
-impl LandCore for LoopCore {
-    fn step(&self, i: In) -> Vec<CoreFx> {
-        let (reply, rx) = std::sync::mpsc::channel();
-        if self.tx.send(Msg::LandStep(Step { i, reply })).is_err() {
-            return Vec::new();
-        }
-        rx.recv().unwrap_or_default()
-    }
-
-    fn wait_go(&self, ticket: u64) -> Result<String, String> {
-        let mut g = self.got.lock().unwrap_or_else(|e| e.into_inner());
-        loop {
-            if let Some(t) = g.remove(&ticket) {
-                return Ok(t);
-            }
-            g = self.cv.wait(g).unwrap_or_else(|e| e.into_inner());
-        }
-    }
-
-    fn gave(&self, fx: &[CoreFx]) {
-        let mut g = self.got.lock().unwrap_or_else(|e| e.into_inner());
-        g.extend(fx.iter().filter_map(go_of));
-        self.cv.notify_all();
     }
 }
 

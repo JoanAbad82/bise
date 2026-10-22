@@ -220,8 +220,9 @@ pub enum Input {
     },
     /// A feature step ended (dev-flow §5.1, the daemon's thread).
     Feature(FeatureDone),
-    /// `sb land`'s steps (issue 37 #3, bend/hub/land.bend): their fx come back as [`Effect::LandFx`]
-    Land(In),
+    /// A land in line on a feature asks where its agent lands now
+    /// (`feature::onto`): the daemon answers from the state on its loop.
+    Onto { agent: String, reply: std::sync::mpsc::Sender<Option<String>> },
     /// update-card: a check of the release channel (the daemon's, at
     /// the start and every hour, or `/update`).
     Release(update_card::ReleaseCheck),
@@ -367,7 +368,8 @@ pub enum Effect {
         token: Token,
         body: Value,
     },
-    /// `sb land` (dev-flow §5): run in a daemon thread, in sb-core's line; answers `token`.
+    /// `sb land` (dev-flow §5): the daemon runs it in a thread, in line
+    /// on its land queue, then answers `token`.
     Land {
         token: Token,
         job: Box<crate::land::Job>,
@@ -522,8 +524,6 @@ pub enum Effect {
     RouteAsked { routed: bool },
     /// sb-core's word on a request's sender: `speaks`' answer, or a refused `req` alone.
     Spoke { token: Token, ok: bool, why: String },
-    /// sb-core's answer to a land step (land_claimed, land_picked, land_joined, land_go, land_ranks).
-    LandFx(bise_proto::core::Fx),
     /// Its end: `state` "sent" (`xid` its delivery, `msg` his message
     /// it became in bise's main) or "cancelled".
     RouteDone {
@@ -622,8 +622,9 @@ pub struct Hub {
     /// Agents whose call waits on a `confirm` card (approvals-design.md
     /// §10): shown `waiting` on `you`; runtime only, like `activity`.
     on_you: BTreeSet<String>,
-    /// dev-flow §3.1: the PR of each place, by place id, and its rank in the
-    /// land line (sb-core's `land_ranks`; its lid: `land_line::lid` of it).
+    /// dev-flow §3.1: the PR of each place, by place id (pr-hub, wave 2;
+    /// empty until then) and its rank in the land queue's line (set by the
+    /// daemon; its lid `waits to land · 2nd` is `land_queue::lid` of it).
     pub prs: BTreeMap<String, crate::place::PrSnapshot>,
     pub landing: BTreeMap<String, u32>,
     /// The repo's `[flow] mode` (None: not set), for the views' held
@@ -671,10 +672,8 @@ pub struct Hub {
     /// How to bring sb-core back when it dies (the daemon's; none: a
     /// death panics, as at boot and in most tests).
     revive: Option<Revive>,
-    /// Lines for main's feed from a revival, out at the next input; the
-    /// lands sb-core holds (issue 37 #3), given back to it after one.
+    /// Lines for main's feed from a revival, out at the next input.
     revived: Vec<String>,
-    lands: crate::land_line::Mirror,
     /// From a step's answer: his message's id (A1, `msg`) for `turn/send`;
     /// his answer to a card (inbox picks (3), `ans_*`) for `card/answer`
     pub said: Option<u64>,
@@ -810,7 +809,6 @@ impl Hub {
             core_bin,
             revive: None,
             revived: Vec::new(),
-            lands: Default::default(),
             said: None,
             answered: None,
             interrupt_by: None,
@@ -1464,7 +1462,9 @@ impl Hub {
             }
             Input::Prs(r) => self.prs_in(&mut fx, env, r),
             Input::Feature(d) => self.feature_done(&mut fx, env, d),
-            Input::Land(i) => self.land_step(&mut fx, env, i),
+            Input::Onto { agent, reply } => {
+                let _ = reply.send(self.onto_now(&agent).flatten());
+            }
             Input::ReplExited { agent, crashed, reason, stalled, loaded, row } => {
                 self.core(&mut fx, env, None, In::Exited(ci::Exited { agent, crashed, reason, stalled, loaded, row }))
             }

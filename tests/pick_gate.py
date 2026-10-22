@@ -146,18 +146,6 @@ def self_calls(name, text):
         yield text[m.end():j - 1].replace(" ", "")
 
 
-def both_branches(name, text):
-    """A Bool.pick in `text` whose two branches both call `name`, with any
-    arguments: both run, so 2^n calls too (land.bend nub.go, issue 37 #3:
-    `Bool.pick(T, c, f(t, seen), h <> f(t, h <> seen))`)."""
-    call = re.compile(r"(?<![\w.])" + re.escape(name) + r"\s*\(")
-    for p in picks(text):
-        a = args(p)
-        if len(a) == 4 and call.search(a[2]) and call.search(a[3]):
-            return True
-    return False
-
-
 def doubled_defs(lines):
     """The defs of a .bend file's lines that call themselves twice with
     the same arguments in one statement (LZ.pick's lazy branches aside)."""
@@ -170,7 +158,7 @@ def doubled_defs(lines):
             if LAZY.search(l):
                 continue
             calls = list(self_calls(name, l))
-            if len(calls) != len(set(calls)) or both_branches(name, l):
+            if len(calls) != len(set(calls)):
                 found.append(name)
                 return
 
@@ -317,7 +305,6 @@ SELF_TEST = [
     ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      Bool.pick(L, c(h), h <> f(t), f(t))\n", ["f"]),
     ("def g.go(xs: L) -> Nat:\n  match xs:\n    case Con{+h, +t}:\n      Bool.pick(Nat, c(h),\n        (1n + g.go(t) : Nat), g.go(t))\n", ["g.go"]),
     ("def any(xs: L) -> Bool:\n  match xs:\n    case Con{+h, +t}:\n      any(t) || (c(h) && any(t))\n", ["any"]),
-    ("def nub.go(xs: L, +seen: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      Bool.pick(L, in(seen, h), nub.go(t, seen), h <> nub.go(t, h <> seen))\n", ["nub.go"]),
     ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      +rest = f(t)\n      Bool.pick(L, c(h), h <> rest, rest)\n", []),
     ("def f(xs: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      LZ.pick(L, c(h), u => h <> f(t), u => f(t))\n", []),
     ("def f(xs: L, ys: L) -> L:\n  match xs:\n    case Con{+h, +t}:\n      g(f(t, ys), f(ys, t))\n", []),

@@ -310,7 +310,7 @@ law steered_receipt_names_the_new_ones:
   for +t: List<&2, Nat>
   for +total: Nat
   {HC.steer_receipt.go(o, h <> t, cx, agent, total)
-    == HC.feed(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HKL.steer_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
+    == HC.feed(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HC.steer_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
       agent, HFD.steered(h <> t)) : HX.Cx<o>}
 
 # LAW: a receipt once every steered id was seen (or with none) marks
@@ -347,7 +347,7 @@ law steer_rx_receipt_names_the_new_ones:
   for +t: List<&2, Nat>
   for +total: Nat
   {HC.steer_rx_receipt.go(o, h <> t, cx, agent, total)
-    == HC.feed(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HKL.steer_rx_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
+    == HC.feed(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HC.steer_rx_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
       agent, HFD.steer_rx(h <> t)) : HX.Cx<o>}
 
 # LAW: a received receipt with nothing new marks nothing and writes

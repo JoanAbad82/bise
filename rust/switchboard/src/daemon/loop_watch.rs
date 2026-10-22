@@ -198,7 +198,6 @@ impl Msg {
             Msg::Version { .. } => "sb version".into(),
             Msg::Page(_) => "page".into(),
             Msg::Land { .. } => "land".into(),
-            Msg::LandStep(_) => "land step".into(),
             Msg::GateChecked { dir, .. } => format!("gate checked {dir}"),
             Msg::RoleLine { dir, .. } => format!("role line {dir}"),
             Msg::Typed { .. } => "typed event".into(),

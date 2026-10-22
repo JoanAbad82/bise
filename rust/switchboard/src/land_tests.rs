@@ -33,7 +33,7 @@ fn a_worktree_alone_lands_every_change_however_made_and_is_clean_after() {
     let mut j = job("x", &wt, &ws, &["a"], &[]);
     j.place = "wt:x".into();
     j.here = false;
-    let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+    let o = run(&j, &Queue::default(), &mut || {}).unwrap();
     assert_eq!(log(&ws), lines(&["x's work", "deps", "init"]), "one commit");
     // git show names a rename by its new path (r.rs -> s.rs, m.rs -> n.rs)
     assert_eq!(landed(&ws, "main"), ["Cargo.lock", "a", "b", "c", "n.rs", "new/x.txt", "s.rs"]);
@@ -42,7 +42,7 @@ fn a_worktree_alone_lands_every_change_however_made_and_is_clean_after() {
         assert!(git(&ws, &["show", &format!("main:{}", gone)]).is_err(), "{} deleted or renamed", gone);
     }
     assert_eq!(o.left_out, ["sub/"], "the nested repo is named, never taken");
-    assert!(o.note.contains("sub/ is its own repo"), "{}", o.note);
+    assert!(left_out_note(&o.left_out).contains("sub/ is its own repo"), "{}", left_out_note(&o.left_out));
     assert_eq!(status(&wt), ["?? sub/"], "clean but the nested repo; build.log ignored");
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }
@@ -58,26 +58,26 @@ fn the_shared_folder_names_a_changed_tracked_file_and_add_takes_it() {
     sh(&ws, "echo d > d && git add d && git commit -qm d && echo a2 > a && echo b2 > b && echo d2 > d && git mv d e.txt && mv a a.rs && echo a3 > a.rs");
     let mut j = job("x", &ws, &ws, &["a.rs"], &[("y", &["b"])]);
     j.since_ms = since;
-    let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+    let o = run(&j, &Queue::default(), &mut || {}).unwrap();
     assert_eq!(landed(&ws, "main"), ["a.rs"], "only mine");
     assert_eq!(o.left_out, ["a", "e.txt"], "the deletion and the rename named; b is y's, c is old");
-    let note = o.note.clone();
+    let note = left_out_note(&o.left_out);
     assert!(note.contains("left out 2 files") && note.contains("changed or new since you started") && note.contains("--add"), "{}", note);
     // --add the rename: both sides land; --add a: the deletion
     j.add = vec!["e.txt".into(), "a".into()];
     j.message = "the rest".into();
-    let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+    let o = run(&j, &Queue::default(), &mut || {}).unwrap();
     assert!(o.left_out.is_empty(), "{:?}", o.left_out);
     assert_eq!(landed(&ws, "main"), ["a", "d", "e.txt"]);
     assert_eq!(log(&ws), lines(&["the rest", "x's work", "d", "init"]));
     assert_eq!(status(&ws), [" M b", " M c"], "y's and the user's stay");
     // y's tracked file: refused, even named
     j.add = vec!["b".into()];
-    let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+    let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
     assert!(e.contains("b is also changed by @y"), "{}", e);
     // the user's old change, named: it lands
     j.add = vec!["c".into()];
-    run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+    run(&j, &Queue::default(), &mut || {}).unwrap();
     assert_eq!(git(&ws, &["show", "main:c"]).unwrap(), "c-old");
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }
@@ -91,7 +91,7 @@ fn too_many_changes_in_a_worktree_are_refused_with_the_list() {
     sh(&wt, "for f in t/*; do echo x >> $f; done && rm a");
     let mut j = job("x", &wt, &ws, &[], &[]);
     j.place = "wt:x".into();
-    let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+    let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
     assert!(e.starts_with(&format!("{} new or changed files not ignored in the worktree (first: a, t/1, t/10)", SWEEP_MAX + 1)), "{}", e);
     assert_eq!(git(&wt, &["log", "--format=%s", "-1"]).unwrap(), "t", "nothing landed");
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
@@ -116,14 +116,14 @@ fn a_moved_base_runs_the_land_check_from_mains_tip_and_red_refuses() {
     // main's tip .. the branch's
     sh(&wt, "echo 1 > one && git add one && git commit -qm one");
     let (base, head) = (git(&ws, &["rev-parse", "main"]).unwrap(), git(&wt, &["rev-parse", "HEAD"]).unwrap());
-    run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+    run(&j, &Queue::default(), &mut || {}).unwrap();
     let args = std::fs::read_to_string(ws.parent().unwrap().join("args")).unwrap();
     assert_eq!(args.trim(), format!("{} {}", base, head), "a fast-forward runs the check");
     // and a red one is refused: main unmoved
     sh(&ws, "echo t > twin0 && git add twin0 && git commit -qm twin0");
     sh(&wt, "git rebase -q main && cp twin0 twin && echo m > mine && git add . && git commit -qm clash && rm -f ../args");
     let base = git(&ws, &["rev-parse", "main"]).unwrap();
-    assert!(run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err().contains("red at dup"));
+    assert!(run(&j, &Queue::default(), &mut || {}).unwrap_err().contains("red at dup"));
     assert_eq!(git(&ws, &["rev-parse", "main"]).unwrap(), base, "main did not move");
     sh(&wt, "git reset -q --hard main");
     // main moves (another land), the branch adds the clash: refused with
@@ -131,7 +131,7 @@ fn a_moved_base_runs_the_land_check_from_mains_tip_and_red_refuses() {
     sh(&ws, "echo t > twin && git add twin && git commit -qm twin");
     sh(&wt, "echo m > mine && git add mine && git commit -qm mine");
     let base = git(&ws, &["rev-parse", "main"]).unwrap();
-    let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+    let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
     assert_eq!(e, "the land check is red at dup on main + your branch:\u{a}error: twin and mine\u{a}your branch is rebased on main: fix it, then sb land again");
     assert_eq!(git(&ws, &["rev-parse", "main"]).unwrap(), base, "main did not move");
     assert_eq!(log(&wt), lines(&["twin", "twin0", "one", "check", "init"]));
@@ -142,10 +142,10 @@ fn a_moved_base_runs_the_land_check_from_mains_tip_and_red_refuses() {
     // the branch cannot switch its own check off: it is read at main's tip
     sh(&wt, "printf '[land]\\ncheck = \"true\"\\n' > bise.toml && git commit -qam off");
     sh(&ws, "echo t2 > twin && git commit -qam twin2");
-    assert!(run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err().contains("red at dup"));
+    assert!(run(&j, &Queue::default(), &mut || {}).unwrap_err().contains("red at dup"));
     // fixed: lands
     sh(&wt, "git rm -q mine && git commit -qm fix");
-    run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+    run(&j, &Queue::default(), &mut || {}).unwrap();
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }
 
@@ -153,7 +153,7 @@ fn a_moved_base_runs_the_land_check_from_mains_tip_and_red_refuses() {
 fn a_here_land_on_main_is_checked_in_the_check_tree_and_red_moves_nothing() {
     let ws = repo("here-checked");
     sh(&ws, "echo a2 > a");
-    run(&job("x", &ws, &ws, &["a"], &[]), &crate::land_line::local::line(), &mut || {}).unwrap();
+    run(&job("x", &ws, &ws, &["a"], &[]), &Queue::default(), &mut || {}).unwrap();
     let checks = job("x", &ws, &ws, &[], &[]).checks;
     assert!(!checks.join(".land-check").exists(), "no bise.toml: no check, no tree");
     // red when the tree has `bad`: run where HEAD is the new commit
@@ -163,7 +163,7 @@ fn a_here_land_on_main_is_checked_in_the_check_tree_and_red_moves_nothing() {
     );
     let base = git(&ws, &["rev-parse", "main"]).unwrap();
     sh(&ws, "echo x > bad");
-    let e = run(&job("x", &ws, &ws, &["bad"], &[]), &crate::land_line::local::line(), &mut || {}).unwrap_err();
+    let e = run(&job("x", &ws, &ws, &["bad"], &[]), &Queue::default(), &mut || {}).unwrap_err();
     assert_eq!(
         e,
         "the land check is red at lines on main + your files:\u{a}error: bad\u{a}nothing landed, your files are as they were: fix them, then sb land --here again"
@@ -172,7 +172,7 @@ fn a_here_land_on_main_is_checked_in_the_check_tree_and_red_moves_nothing() {
     assert!(ws.join("bad").exists(), "the file is kept");
     // green: lands, checked on the commit main now points at
     sh(&ws, "rm bad && echo a3 > a");
-    let o = run(&job("x", &ws, &ws, &["a"], &[]), &crate::land_line::local::line(), &mut || {}).unwrap();
+    let o = run(&job("x", &ws, &ws, &["a"], &[]), &Queue::default(), &mut || {}).unwrap();
     let tree = crate::scratch::check_tree_dir(&checks, &ws);
     let head = std::fs::read_to_string(tree.parent().unwrap().join("head")).unwrap();
     assert_eq!(head.trim(), git(&ws, &["rev-parse", "main"]).unwrap());
@@ -188,6 +188,6 @@ fn a_here_land_on_a_worktree_branch_is_not_checked() {
     sh(&wt, "echo a2 > a");
     let mut j = job("x", &wt, &ws, &["a"], &[]);
     j.place = "wt:x".into();
-    let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+    let o = run(&j, &Queue::default(), &mut || {}).unwrap();
     assert_eq!(o.target, "sb/x");
 }

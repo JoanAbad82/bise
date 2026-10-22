@@ -1,7 +1,7 @@
 //! Feature branches (dev-flow §5.1): git in temp repos, and the words.
 
 use super::*;
-use crate::land::{self, Job};
+use crate::land::{self, Job, Queue};
 use std::process::Command;
 
 fn sh(dir: &Path, script: &str) {
@@ -67,9 +67,9 @@ fn new_lands_sync_merge_end_to_end() {
     let b = agent_wt(&ws, "cu-b", "cu");
     sh(&a, "echo a2 > a");
     sh(&b, "echo new > n");
-    let o = land::run(&job("cu-a", &a, &ws, &["a"], "cu"), &crate::land_line::local::line(), &mut || {}).unwrap();
+    let o = land::run(&job("cu-a", &a, &ws, &["a"], "cu"), &Queue::default(), &mut || {}).unwrap();
     assert_eq!((o.target.as_str(), o.commits, o.pushed), ("cu", 1, None));
-    let o = land::run(&job("cu-b", &b, &ws, &["n"], "cu"), &crate::land_line::local::line(), &mut || {}).unwrap();
+    let o = land::run(&job("cu-b", &b, &ws, &["n"], "cu"), &Queue::default(), &mut || {}).unwrap();
     assert_eq!((o.target.as_str(), o.commits), ("cu", 1), "b's land rebased on a's");
     assert_eq!(out(&ws, &["log", "--format=%s", "main"]), "init", "main never moved");
     assert_eq!(out(&ws, &["log", "--format=%s", "cu"]), "cu-b's work\u{a}cu-a's work\u{a}init");
@@ -95,8 +95,8 @@ fn new_lands_sync_merge_end_to_end() {
     // merge: rebased, checked, main fast-forwarded (the shared folder's
     // files too), linear; the branch then goes to the trash
     let flow = crate::flow::FlowConfig { mode: Some(crate::flow::FlowMode::Trunk), check: Some("test -f n".into()), ..Default::default() };
-    let q = crate::land_line::local::line();
-    let m = merge(&ws, &scratch, &scratch, "cu", &flow, &q.wait_turn("refs/heads/main", "feature:cu", "", "refs/heads/main", &[], &mut || {}).unwrap()).unwrap();
+    let q = Queue::default();
+    let m = merge(&ws, &scratch, &scratch, "cu", &flow, &q.wait_turn("refs/heads/main", "feature:cu", &mut || {})).unwrap();
     assert_eq!((m.commits, m.pushed), (2, None), "no remote: no push");
     assert_eq!(out(&ws, &["log", "--format=%s", "main"]), "cu-b's work\u{a}cu-a's work\u{a}main again\u{a}main moves\u{a}init");
     assert_eq!(std::fs::read_to_string(ws.join("n")).unwrap(), "new\u{a}", "the shared folder moved with main");
@@ -135,14 +135,14 @@ fn a_conflicting_sync_says_the_files_and_moves_nothing() {
     create(&ws, "cu", 1).unwrap();
     let a = agent_wt(&ws, "cu-a", "cu");
     sh(&a, "echo mine > a");
-    land::run(&job("cu-a", &a, &ws, &["a"], "cu"), &crate::land_line::local::line(), &mut || {}).unwrap();
+    land::run(&job("cu-a", &a, &ws, &["a"], "cu"), &Queue::default(), &mut || {}).unwrap();
     sh(&ws, "echo theirs > a && git commit -qam 'main edits a'");
     let tip = out(&ws, &["rev-parse", "cu"]);
     let e = rebase(&ws, &scratch, "cu", None).unwrap_err();
     assert!(e.starts_with("a changed on main too"), "{}", e);
     assert_eq!(out(&ws, &["rev-parse", "cu"]), tip);
-    let q = crate::land_line::local::line();
-    let turn = q.wait_turn("refs/heads/main", "feature:cu", "", "refs/heads/main", &[], &mut || {}).unwrap();
+    let q = Queue::default();
+    let turn = q.wait_turn("refs/heads/main", "feature:cu", &mut || {});
     let e = merge(&ws, &scratch, &scratch, "cu", &crate::flow::FlowConfig::default(), &turn).unwrap_err();
     assert!(e.contains("conflicts"), "{}", e);
     assert_eq!(out(&ws, &["log", "-1", "--format=%s", "main"]), "main edits a");
@@ -238,7 +238,7 @@ fn a_retire_checks_the_tip_is_in_main_and_renames_the_branch() {
     create(&ws, "cu", 1).unwrap();
     let a = agent_wt(&ws, "cu-a", "cu");
     sh(&a, "echo a2 > a");
-    land::run(&job("cu-a", &a, &ws, &["a"], "cu"), &crate::land_line::local::line(), &mut || {}).unwrap();
+    land::run(&job("cu-a", &a, &ws, &["a"], "cu"), &Queue::default(), &mut || {}).unwrap();
     // one commit main lacks: refused, the number said
     assert_eq!(missing(&ws, "refs/heads/main", "cu").unwrap(), 1);
     assert_eq!(
@@ -262,16 +262,30 @@ fn a_retire_checks_the_tip_is_in_main_and_renames_the_branch() {
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }
 
-// a land from a feature's worktree lands on the feature (sb-core keeps
-// its line while its agent lands there; a retire that ended it sends it
-// to the trunk: bend/laws/land.bend, the daemon's test)
+// a land in line on a feature that a retire ended meanwhile goes to the
+// trunk: `onto_now` is read again once its turn comes
 #[test]
-fn a_land_from_a_features_worktree_lands_on_the_feature() {
+fn a_land_queued_behind_a_retire_goes_to_main() {
     let ws = repo("retire-land");
+    create(&ws, "cu", 1).unwrap();
+    let a = agent_wt(&ws, "cu-a", "cu");
+    sh(&a, "echo a2 > a");
+    let q = Queue::default();
+    // the retire holds the feature's turn; the land waits behind it
+    let turn = q.wait_turn("refs/heads/cu", "feature:cu", &mut || {});
+    let (j, q2) = (job("cu-a", &a, &ws, &["a"], "cu"), q.clone());
+    let land = std::thread::spawn(move || land::run_onto(&j, &q2, &mut || {}, &mut || None));
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    sh(&ws, "git branch -m cu cu-retired");
+    drop(turn);
+    let o = land.join().unwrap().unwrap();
+    assert_eq!((o.target.as_str(), o.commits), ("main", 1));
+    assert_eq!(out(&ws, &["log", "--format=%s", "main"]), "cu-a's work\u{a}init");
+    // the feature still there and still the agent's: it lands there
     create(&ws, "cv", 2).unwrap();
     let b = agent_wt(&ws, "cv-b", "cv");
     sh(&b, "echo b2 > b");
-    let o = land::run(&job("cv-b", &b, &ws, &["b"], "cv"), &crate::land_line::local::line(), &mut || {}).unwrap();
+    let o = land::run_onto(&job("cv-b", &b, &ws, &["b"], "cv"), &q, &mut || {}, &mut || Some("refs/heads/cv".into())).unwrap();
     assert_eq!(o.target, "cv");
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }

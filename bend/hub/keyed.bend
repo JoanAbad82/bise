@@ -73,21 +73,3 @@ def steer_rename(xs: List<&2, X.Steer>, +old: String, +new: String) -> List<&2, 
       Nil{}
     case Con{+h, +t}:
       Bool.pick(X.Steer, String.eq(X.Steer.agent(h), old), X.Steer{new, X.Steer.ids(h), X.Steer.seen(h), X.Steer.rx_seen(h)}, h) <> steer_rename(t, old, new)
-
-# an agent's steered list with `seen` set to `k` (the list itself kept;
-# moved from core.bend, issue 37 #3)
-def steer_mark(xs: List<&2, X.Steer>, +n: String, +k: Nat) -> List<&2, X.Steer>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      Bool.pick(X.Steer, String.eq(X.Steer.agent(h), n), X.Steer{n, X.Steer.ids(h), k, X.Steer.rx_seen(h)}, h) <> steer_mark(t, n, k)
-
-# an agent's steered list with `rx_seen` set to `k` (the list and `seen`
-# kept)
-def steer_rx_mark(xs: List<&2, X.Steer>, +n: String, +k: Nat) -> List<&2, X.Steer>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      Bool.pick(X.Steer, String.eq(X.Steer.agent(h), n), X.Steer{n, X.Steer.ids(h), X.Steer.seen(h), k}, h) <> steer_rx_mark(t, n, k)

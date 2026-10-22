@@ -21,15 +21,13 @@
 //!   main is the repo's default branch (`trunk::trunk_ref`, issue #8),
 //!   not the shared folder's branch: its files move only when it has
 //!   main checked out ([`move_main`]).
-//! - One land at a time per target ref ([`Line`], sb-core's line: issue
-//!   37 #3, bend/hub/land.bend): the others wait in
+//! - One land at a time per target ref ([`Queue`]): the others wait in
 //!   line, and the views say so (`waits to land · 2nd`).
 
 use crate::flow::{FlowConfig, FlowMode};
-pub use crate::land_line::{Line, Picked, Turn};
-use crate::land_pick::Change;
-use bise_proto::core::input as ci;
-use serde_json::{json, Value};
+pub use crate::land_pick::left_out_note;
+use crate::land_pick::{pick, Change, Claims, Picked};
+pub use crate::land_queue::{Queue, Turn};
 use std::path::{Path, PathBuf};
 
 /// What the hub knows when an agent asks to land (core.rs builds it from
@@ -76,9 +74,8 @@ pub struct Outcome {
     pub pushed: Option<bool>,
     pub push_error: Option<String>,
     /// New files of the place that no agent claimed, made since the agent
-    /// started: not landed, named in the answer (`note`, sb-core's words).
+    /// started: not landed, named in the answer ([`left_out_note`]).
     pub left_out: Vec<String>,
-    pub note: String,
 }
 
 // ---- git ----
@@ -270,38 +267,19 @@ fn changes(dir: &Path, since_ms: u64) -> Result<Vec<Change>, String> {
     Ok(all)
 }
 
-/// The facts sb-core's pick reads (bend/hub/land.bend `decide`, issue
-/// 12): the place's changes, the agent's claims (its file tools' files,
-/// `--add`) and the other agents' files, relative to the place's folder,
-/// and the conflict blocks in the changed files (git's facts: sb-core
-/// keeps the ones of the files it takes).
-fn pick_input(job: &Job) -> Result<ci::LandPick, String> {
+/// What the land takes and names ([`crate::land_pick::pick`]): the
+/// place's changes, the agent's claims (its file tools' files, `--add`)
+/// and the other agents' files, relative to the place's folder.
+fn own_changes(job: &Job) -> Result<Picked, String> {
     let rel = |fs: &[String]| -> Vec<String> { fs.iter().filter_map(|f| relative(&job.dir, f)).collect() };
     let mut add = Vec::new();
     for a in &job.add {
         let p = relative(&job.dir, a).ok_or_else(|| format!("{}: not in your place's folder ({})", a, job.dir.display()))?;
-        add.push(json!({"arg": a, "rel": p}));
+        add.push((a.clone(), p));
     }
-    let others: Vec<Value> = job.others.iter().map(|(n, fs)| json!({"name": n, "files": rel(fs)})).collect();
-    let changes = changes(&job.dir, job.since_ms)?;
-    let mut conflicts = Vec::new();
-    for c in changes.iter().filter(|c| !c.path.ends_with('/')) {
-        if let Ok(t) = std::fs::read_to_string(job.dir.join(&c.path)) {
-            conflicts.extend(crate::land_pick::conflict_blocks(&t).into_iter().map(|(a, b)| json!({"path": c.path, "a": a, "b": b})));
-        }
-    }
-    Ok(ci::LandPick {
-        changes: json!(changes.iter().map(|c| json!({"path": c.path, "from": c.from.clone().unwrap_or_default(), "recent": c.recent})).collect::<Vec<_>>()),
-        files: json!(rel(&job.files)),
-        add: json!(add),
-        others: json!(others),
-        conflicts: json!(conflicts),
-        alone: job.worktree && job.others.is_empty(),
-        worktree: job.worktree,
-        here: job.here,
-        pr_mode: job.flow.mode == Some(FlowMode::Pr),
-        message: job.message.clone(),
-    })
+    let others: Vec<(String, Vec<String>)> = job.others.iter().map(|(n, fs)| (n.clone(), rel(fs))).collect();
+    let claims = Claims { files: &rel(&job.files), add: &add, others: &others };
+    pick(&changes(&job.dir, job.since_ms)?, &claims, job.worktree && job.others.is_empty())
 }
 
 pub(crate) fn shorten(dir: &Path, sha: &str) -> String {
@@ -369,19 +347,41 @@ fn pushed(job: &Job, target: &str, main: &str) -> (Option<bool>, Option<String>)
     }
 }
 
-/// `sb land` for `job`, in `line` (sb-core decides what it takes, its
-/// refusals before its turn, its turn and whether the check runs: issue
-/// 37 #3). `joined`: the views refresh.
-pub fn run(job: &Job, line: &Line, joined: &mut dyn FnMut()) -> Result<Outcome, String> {
+/// `sb land` for `job`, in line on `queue`. `joined`: the views refresh.
+pub fn run(job: &Job, queue: &Queue, joined: &mut dyn FnMut()) -> Result<Outcome, String> {
+    run_onto(job, queue, joined, &mut || job.onto.clone())
+}
+
+/// [`run`], with `onto_now`: where the agent lands now (the hub's state,
+/// `core::feature::onto`), read again once in line on a feature: a
+/// retire may have ended it meanwhile, and its agents land on the trunk.
+pub fn run_onto(job: &Job, queue: &Queue, joined: &mut dyn FnMut(), onto_now: &mut dyn FnMut() -> Option<String>) -> Result<Outcome, String> {
     let main = crate::trunk::trunk_ref(&job.shared)?;
-    let picked = line.pick(pick_input(job)?)?;
+    if !job.here && job.worktree && job.flow.mode == Some(FlowMode::Pr) {
+        return Err("this repo ships through pull requests: commit with `sb land --here`, then open a PR".into());
+    }
+    let Picked { mine, left_out } = own_changes(job)?;
+    let texts: Vec<(String, String)> =
+        mine.iter().filter_map(|p| std::fs::read_to_string(job.dir.join(p)).ok().map(|t| (p.clone(), t))).collect();
+    if let Some(e) = crate::land_pick::conflict_refusal(&texts) {
+        return Err(e);
+    }
     if !job.here && job.worktree {
         // a feature's agent lands on the feature (dev-flow §5.1)
         let onto = job.onto.clone().unwrap_or_else(|| main.clone());
-        return land_branch(job, line, joined, &onto, &main, picked);
+        let line = Line { queue, joined, onto_now };
+        return land_branch(job, line, &onto, &main, &mine, left_out);
+    }
+    if mine.is_empty() {
+        let note = left_out_note(&left_out);
+        let note = if note.is_empty() { note } else { format!("; {}", note) };
+        return Err(format!("nothing of yours to land: the files you changed match the branch{}", note));
+    }
+    if job.message.trim().is_empty() {
+        return Err("sb land needs a commit message: sb land [--here] \"<message>\"".into());
     }
     let target = head_ref(&job.dir)?;
-    let turn = line.wait_turn(&target, &job.place, &job.agent, &target, &[], joined)?;
+    let turn = queue.wait_turn(&target, &job.place, joined);
     // onto the trunk: the land check on the new commit, in the warm check
     // tree, before the swap (issue 28 part 2); a CAS miss checks again
     let via = crate::land_check::Via::Here;
@@ -392,10 +392,9 @@ pub fn run(job: &Job, line: &Line, joined: &mut dyn FnMut()) -> Result<Outcome, 
             Ok(())
         }
     };
-    let new = commit_files(&job.dir, &target, &picked.mine, &job.message, &mut verify, &mut || {})?;
+    let new = commit_files(&job.dir, &target, &mine, &job.message, &mut verify, &mut || {})?;
     let (pushed, push_error) = pushed(job, &target, &main);
-    let Picked { left_out, note, .. } = picked;
-    Ok(Outcome { target: short(&target).to_string(), sha: shorten(&job.dir, &new), commits: 1, pushed, push_error, left_out, note })
+    Ok(Outcome { target: short(&target).to_string(), sha: shorten(&job.dir, &new), commits: 1, pushed, push_error, left_out })
 }
 
 /// Move `main` (a ref) from `base` to `tip`, a fast-forward: in the
@@ -412,22 +411,49 @@ pub(crate) fn move_main(shared: &Path, main: &str, base: &str, tip: &str) -> Res
     }
 }
 
-/// A worktree's branch onto `onto` (the default branch `real_main`, or
-/// the agent's feature): its agent's files first, then rebase, check,
-/// fast-forward. sb-core gives the turn on the line it decides: the
-/// feature's while its agent still lands there, else the trunk's (a
-/// retire ahead of it ended the feature).
-fn land_branch(job: &Job, line: &Line, joined: &mut dyn FnMut(), onto: &str, real_main: &str, picked: Picked) -> Result<Outcome, String> {
-    let Picked { mine, left_out, note } = picked;
+/// A land's place in line: the queue, the views' refresh, and where its
+/// agent lands now ([`run`]'s `onto_now`).
+struct Line<'a> {
+    queue: &'a Queue,
+    joined: &'a mut dyn FnMut(),
+    onto_now: &'a mut dyn FnMut() -> Option<String>,
+}
+
+/// A worktree's branch onto `main` (the default branch, or the agent's
+/// feature: `real_main` says which is pushed): its agent's files first,
+/// then rebase, check, fast-forward.
+fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String], left_out: Vec<String>) -> Result<Outcome, String> {
+    let Line { queue, joined, onto_now } = l;
     let branch = head_ref(&job.dir)?;
     if !mine.is_empty() {
-        commit_files(&job.dir, &branch, &mine, &job.message, &mut |_, _| Ok(()), &mut || {})?;
+        if job.message.trim().is_empty() {
+            return Err("you have changes not committed: give a message (sb land \"<message>\"), or commit them with sb land --here first".into());
+        }
+        commit_files(&job.dir, &branch, mine, &job.message, &mut |_, _| Ok(()), &mut || {})?;
     }
     let dirty = git(&job.dir, &["status", "--porcelain", "--untracked-files=no"])?;
-    let dirty: Vec<String> = dirty.lines().map(|l| l.get(3..).unwrap_or(l).to_string()).collect();
-    let _turn = line.wait_turn(onto, &job.place, &job.agent, real_main, &dirty, joined)?;
-    let main = _turn.target().to_string();
-    let main = main.as_str();
+    if !dirty.is_empty() {
+        let files: Vec<&str> = dirty.lines().map(|l| l.get(3..).unwrap_or(l)).take(5).collect();
+        return Err(format!(
+            "the worktree has changes not committed ({}): each agent lands its own with sb land --here first",
+            files.join(", ")
+        ));
+    }
+    let mut turn = queue.wait_turn(main, &job.place, joined);
+    // in line on a feature: a retire ahead of it may have ended it (the
+    // agent lands on the trunk now): its line there, then the trunk's
+    let now;
+    let main = if main != real_main {
+        now = onto_now().unwrap_or_else(|| real_main.to_string());
+        if now != main {
+            drop(turn);
+            turn = queue.wait_turn(&now, &job.place, joined);
+        }
+        now.as_str()
+    } else {
+        main
+    };
+    let _turn = turn;
     let base = git(&job.shared, &["rev-parse", "--verify", main])?;
     let tip = git(&job.dir, &["rev-parse", "HEAD"])?;
     if git(&job.dir, &["merge-base", "--is-ancestor", &tip, &base]).is_ok() {
@@ -482,7 +508,6 @@ fn land_branch(job: &Job, line: &Line, joined: &mut dyn FnMut(), onto: &str, rea
         pushed,
         push_error,
         left_out,
-        note,
     })
 }
 
@@ -554,7 +579,7 @@ mod tests {
         sh(&ws, "echo a2 > a && echo new > n && echo b2 > b && echo c2 > c");
         let abs_a = ws.join("a").to_string_lossy().to_string();
         let j = job("x", &ws, &ws, &[&abs_a, "n", "/elsewhere/z"], &[("y", &["b"])]);
-        let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        let o = run(&j, &Queue::default(), &mut || {}).unwrap();
         assert_eq!((o.target.as_str(), o.commits, o.pushed), ("main", 1, None));
         assert_eq!(log(&ws), lines(&["x's work", "init"]));
         let files = git(&ws, &["show", "--name-only", "--format=", "main"]).unwrap();
@@ -563,7 +588,7 @@ mod tests {
         let st = git(&ws, &["status", "--porcelain"]).unwrap();
         assert_eq!(st.lines().collect::<Vec<_>>(), [" M b", " M c"]);
         // again: nothing of mine left
-        let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
         assert!(e.contains("nothing of yours"), "{}", e);
         let _ = std::fs::remove_dir_all(ws.parent().unwrap());
     }
@@ -573,7 +598,7 @@ mod tests {
         let ws = repo("overlap");
         sh(&ws, "echo a2 > a");
         let j = job("x", &ws, &ws, &["a"], &[("y", &["a", "b"])]);
-        let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
         assert!(e.contains("a is also changed by @y") && e.contains("main decides"), "{}", e);
         assert_eq!(log(&ws), "init", "nothing landed");
         let _ = std::fs::remove_dir_all(ws.parent().unwrap());
@@ -609,21 +634,21 @@ mod tests {
         sh(&wt, "echo a2 > a && echo b2 > b");
         let mut jx = job("x", &wt, &ws, &["a"], &[("y", &["b"])]);
         jx.place = "wt:x".into();
-        run(&jx, &crate::land_line::local::line(), &mut || {}).unwrap();
+        run(&jx, &Queue::default(), &mut || {}).unwrap();
         let st = git(&wt, &["status", "--porcelain"]).unwrap();
         assert_eq!(st.trim(), "M b", "y's file is untouched");
         // the plain land refuses while y's file is not committed
         jx.here = false;
-        let e = run(&jx, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&jx, &Queue::default(), &mut || {}).unwrap_err();
         assert!(e.contains("not committed (b)"), "{}", e);
         let mut jy = job("y", &wt, &ws, &["b"], &[("x", &["a"])]);
         jy.place = "wt:x".into();
-        run(&jy, &crate::land_line::local::line(), &mut || {}).unwrap();
+        run(&jy, &Queue::default(), &mut || {}).unwrap();
         // main moved meanwhile (c): the branch is rebased, checked, then main
         // fast-forwards, the shared folder's files with it
         sh(&ws, "echo c2 > c && git commit -qam c-on-main");
         jx.flow.check = Some("test -f a".into());
-        let o = run(&jx, &crate::land_line::local::line(), &mut || {}).unwrap();
+        let o = run(&jx, &Queue::default(), &mut || {}).unwrap();
         assert_eq!((o.target.as_str(), o.commits), ("main", 2));
         assert_eq!(log(&ws), lines(&["y's work", "x's work", "c-on-main", "init"]));
         assert_eq!(std::fs::read_to_string(ws.join("a")).unwrap().trim_end(), "a2");
@@ -632,42 +657,43 @@ mod tests {
         sh(&ws, "echo c3 > c && git commit -qam c3");
         sh(&wt, "echo a3 > a");
         jx.flow.check = Some("echo broken; exit 1".into());
-        let e = run(&jx, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&jx, &Queue::default(), &mut || {}).unwrap_err();
         assert!(e.contains("the check `echo broken; exit 1` failed: broken"), "{}", e);
         assert_eq!(log(&ws).lines().next(), Some("c3"));
         // PR flow: no landing on main
         jx.flow.mode = Some(FlowMode::Pr);
-        let e = run(&jx, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&jx, &Queue::default(), &mut || {}).unwrap_err();
         assert!(e.contains("pull requests"), "{}", e);
         let _ = std::fs::remove_dir_all(ws.parent().unwrap());
     }
 
     #[test]
-    fn the_line_lands_one_at_a_time_per_ref() {
-        let main = "refs/heads/main";
-        let q = crate::land_line::local::line();
-        let first = q.wait_turn(main, "wt:a", "a", main, &[], &mut || {}).unwrap();
+    fn the_queue_lands_one_at_a_time_per_ref_and_says_who_waits() {
+        let q = Queue::default();
+        let first = q.wait_turn("refs/heads/main", "wt:a", &mut || {});
         let q2 = q.clone();
         let (tx, rx) = std::sync::mpsc::channel();
         let h = std::thread::spawn(move || {
-            let _t = q2.wait_turn(main, "wt:b", "b", main, &[], &mut || {}).unwrap();
+            let _t = q2.wait_turn("refs/heads/main", "wt:b", &mut || {});
             tx.send(()).unwrap();
         });
         // another ref is not in that line
-        let other = q.wait_turn("refs/heads/sb/c", "wt:c", "c", main, &[], &mut || {}).unwrap();
+        let other = q.wait_turn("refs/heads/sb/c", "wt:c", &mut || {});
         std::thread::sleep(std::time::Duration::from_millis(100));
         assert!(rx.try_recv().is_err(), "b waits while a lands");
+        let ranks = q.ranks();
+        assert_eq!((ranks["wt:a"], ranks["wt:b"], ranks["wt:c"]), (1, 2, 1));
+        let lids = crate::land_queue::lids(&ranks);
+        assert_eq!(lids["wt:a"], "landing");
+        assert_eq!(lids["wt:b"], "waits to land · 2nd");
+        assert_eq!(lids["wt:c"], "landing");
         drop(first);
         rx.recv_timeout(std::time::Duration::from_secs(5)).expect("b's turn");
         h.join().unwrap();
         drop(other);
-        // a second land of a place is refused while the first runs
-        let c = q.claim("wt:a").unwrap();
-        assert!(q.claim("wt:a").err().is_some_and(|e| e.starts_with("a land of this place is in line or checking")));
-        drop(c);
-        assert!(q.claim("wt:a").is_ok());
-        let lids = crate::land_line::lids(&[("wt:a".to_string(), 1), ("wt:b".to_string(), 2), ("x".to_string(), 11)].into());
-        assert_eq!((lids["wt:a"].as_str(), lids["wt:b"].as_str(), lids["x"].as_str()), ("landing", "waits to land · 2nd", "waits to land · 11th"));
+        assert!(q.ranks().is_empty());
+        assert_eq!(crate::land_queue::ordinal(3), "3rd");
+        assert_eq!(crate::land_queue::ordinal(11), "11th");
     }
 
     #[test]
@@ -678,7 +704,7 @@ mod tests {
         sh(&ws, "echo a2 > a");
         let mut j = job("x", &ws, &ws, &["a"], &[]);
         j.flow.mode = Some(FlowMode::Trunk);
-        let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        let o = run(&j, &Queue::default(), &mut || {}).unwrap();
         assert_eq!(o.pushed, Some(true));
         assert_eq!(git(&remote, &["log", "--format=%s", "-1", "main"]).unwrap(), "x's work");
         // the remote moved: fetch, rebase (the shared folder is clean), push
@@ -687,14 +713,14 @@ mod tests {
         sh(&ws, "echo b2 > b");
         let mut j = job("x", &ws, &ws, &["b"], &[]);
         j.flow.mode = Some(FlowMode::Trunk);
-        let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        let o = run(&j, &Queue::default(), &mut || {}).unwrap();
         assert_eq!(o.pushed, Some(true), "{:?}", o.push_error);
         assert_eq!(git(&remote, &["log", "--format=%s", "main"]).unwrap(), lines(&["x's work", "theirs", "x's work", "init"]));
         // push = false: lands stay local
         sh(&ws, "echo a3 > a");
         let mut j = job("x", &ws, &ws, &["a"], &[]);
         j.flow = FlowConfig { mode: Some(FlowMode::Trunk), check: None, push: false, ..FlowConfig::default() };
-        assert_eq!(run(&j, &crate::land_line::local::line(), &mut || {}).unwrap().pushed, None);
+        assert_eq!(run(&j, &Queue::default(), &mut || {}).unwrap().pushed, None);
         let _ = std::fs::remove_dir_all(ws.parent().unwrap());
     }
 
@@ -720,7 +746,7 @@ mod tests {
         let mut j = job("x", &wt, &ws, &["a"], &[]);
         j.place = "wt:x".into();
         j.here = false;
-        let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        let o = run(&j, &Queue::default(), &mut || {}).unwrap();
         assert!(o.left_out.is_empty(), "{:?}", o.left_out);
         assert_eq!(landed(&ws, "main"), ["a", "feat/v-light.svg", "kit/fonts/OFL.txt", "kit/fonts/n.woff2"]);
         assert_eq!(git(&ws, &["show", "main:kit/fonts/n.woff2"]).unwrap(), "w");
@@ -730,7 +756,7 @@ mod tests {
         sh(&wt, "mkdir -p more/deep && echo d > more/deep/x.txt");
         let mut j = job("x", &wt, &ws, &[], &[]);
         j.place = "wt:x".into();
-        run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        run(&j, &Queue::default(), &mut || {}).unwrap();
         assert_eq!(landed(&wt, "HEAD"), ["more/deep/x.txt"]);
         let _ = std::fs::remove_dir_all(ws.parent().unwrap());
     }
@@ -745,29 +771,29 @@ mod tests {
         sh(&ws, "echo gen2 > a && mkdir -p feat && echo l > feat/v-light.svg && echo d > feat/v-dark.svg && echo y > feat/theirs.txt");
         let mut j = job("x", &ws, &ws, &["a"], &[("y", &["feat/theirs.txt"])]);
         j.since_ms = crate::util::now_ms() - 60_000;
-        let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        let o = run(&j, &Queue::default(), &mut || {}).unwrap();
         assert_eq!(landed(&ws, "main"), ["a"], "never swept in: they may be anyone's");
         assert_eq!(o.left_out, ["feat/v-dark.svg", "feat/v-light.svg"], "named, not dropped silently");
-        let note = o.note.clone();
+        let note = left_out_note(&o.left_out);
         assert!(note.contains("left out 2 files") && note.contains("feat/v-dark.svg") && note.contains("--add"), "{}", note);
         // nothing else of mine: the error names them too
-        let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
         assert!(e.contains("nothing of yours") && e.contains("feat/v-light.svg") && e.contains("--add"), "{}", e);
         // --add the folder: the svgs land, y's file and the user's stay out
         j.add = vec![ws.join("feat").to_string_lossy().to_string()];
         j.message = "the svgs".into();
-        let o = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        let o = run(&j, &Queue::default(), &mut || {}).unwrap();
         assert!(o.left_out.is_empty(), "{:?}", o.left_out);
         assert_eq!(landed(&ws, "main"), ["feat/v-dark.svg", "feat/v-light.svg"]);
         let st = git(&ws, &["status", "--porcelain"]).unwrap();
         assert_eq!(st.lines().collect::<Vec<_>>(), ["?? feat/theirs.txt", "?? scratch.txt"]);
         // --add another agent's file: refused, main decides
         j.add = vec!["feat/theirs.txt".into()];
-        let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
         assert!(e.contains("also changed by @y"), "{}", e);
         // --add a path with nothing new: said, not ignored
         j.add = vec!["nope".into()];
-        let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
         assert!(e.contains("--add nope: no new or changed file"), "{}", e);
         assert_eq!(log(&ws), lines(&["the svgs", "x's work", "init"]));
         let _ = std::fs::remove_dir_all(ws.parent().unwrap());
@@ -784,12 +810,12 @@ mod tests {
         sh(&wt, "echo a2 > a && mkdir gen && echo y > gen/y.txt && echo n > y-new.txt");
         let mut jx = job("x", &wt, &ws, &["a"], &[("y", &["y-new.txt"])]);
         jx.place = "wt:x".into();
-        let o = run(&jx, &crate::land_line::local::line(), &mut || {}).unwrap();
+        let o = run(&jx, &Queue::default(), &mut || {}).unwrap();
         assert_eq!(landed(&wt, "HEAD"), ["a"]);
         assert_eq!(o.left_out, ["gen/y.txt"]);
         // the plain land: the untracked files do not block, and are named
         jx.here = false;
-        let o = run(&jx, &crate::land_line::local::line(), &mut || {}).unwrap();
+        let o = run(&jx, &Queue::default(), &mut || {}).unwrap();
         assert_eq!(log(&ws), lines(&["x's work", "init"]));
         assert_eq!(o.left_out, ["gen/y.txt"]);
         assert!(!ws.join("gen").exists() && wt.join("y-new.txt").exists());
@@ -805,7 +831,7 @@ mod tests {
         sh(&wt, &format!("mkdir out && for i in $(seq 1 {}); do echo $i > out/$i; done && echo a2 > a", SWEEP_MAX + 1));
         let mut j = job("x", &wt, &ws, &["a"], &[]);
         j.place = "wt:x".into();
-        let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
         assert!(e.contains(&format!("{} new or changed files not ignored", SWEEP_MAX + 1)) && e.contains(".gitignore"), "{}", e);
         assert_eq!(git(&wt, &["log", "--format=%s"]).unwrap(), "init", "nothing landed");
         let _ = std::fs::remove_dir_all(ws.parent().unwrap());
@@ -845,7 +871,7 @@ mod tests {
         let ws = repo("sign-on");
         sign_with_throwaway_key(&ws);
         sh(&ws, "echo a2 > a");
-        run(&job("x", &ws, &ws, &["a"], &[]), &crate::land_line::local::line(), &mut || {}).unwrap();
+        run(&job("x", &ws, &ws, &["a"], &[]), &Queue::default(), &mut || {}).unwrap();
         assert_eq!(log(&ws), lines(&["x's work", "init"]));
         assert!(signed(&ws, "main"), "{}", git(&ws, &["cat-file", "-p", "main"]).unwrap());
         let _ = std::fs::remove_dir_all(ws.parent().unwrap());
@@ -857,7 +883,7 @@ mod tests {
         let key = sign_with_throwaway_key(&ws);
         sh(&ws, "git config commit.gpgsign false");
         sh(&ws, "echo a2 > a");
-        run(&job("x", &ws, &ws, &["a"], &[]), &crate::land_line::local::line(), &mut || {}).unwrap();
+        run(&job("x", &ws, &ws, &["a"], &[]), &Queue::default(), &mut || {}).unwrap();
         assert!(!signed(&ws, "main"));
         assert!(key.exists());
         let _ = std::fs::remove_dir_all(ws.parent().unwrap());
@@ -871,7 +897,7 @@ mod tests {
         sh(&ws, &format!("git config user.signingkey {}", missing.display()));
         sh(&ws, "echo a2 > a");
         let before = git(&ws, &["rev-parse", "main"]).unwrap();
-        let e = run(&job("x", &ws, &ws, &["a"], &[]), &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&job("x", &ws, &ws, &["a"], &[]), &Queue::default(), &mut || {}).unwrap_err();
         assert_signing_line(&e, "land again");
         // never an unsigned commit: main did not move, the change is there
         assert_eq!(git(&ws, &["rev-parse", "main"]).unwrap(), before);
@@ -890,25 +916,25 @@ mod tests {
         sh(&wt, "echo a2 > a");
         let mut j = job("x", &wt, &ws, &["a"], &[]);
         j.place = "wt:x".into();
-        run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        run(&j, &Queue::default(), &mut || {}).unwrap();
         assert!(signed(&wt, "HEAD"), "the --here commit is signed");
         // main moves: the plain land rebases, and the rebased commit is signed
         sh(&ws, "echo c2 > c && git commit -qam c-on-main");
         j.here = false;
-        run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        run(&j, &Queue::default(), &mut || {}).unwrap();
         assert_eq!(log(&ws), lines(&["x's work", "c-on-main", "init"]));
         assert!(signed(&ws, "main"), "the rebased commit is signed");
         // the key goes missing: the rebase fails on signing, nothing moves
         sh(&wt, "echo a3 > a");
         j.here = true;
-        run(&j, &crate::land_line::local::line(), &mut || {}).unwrap();
+        run(&j, &Queue::default(), &mut || {}).unwrap();
         sh(&ws, &format!("git config user.signingkey {}", key.display()));
         sh(&ws, "echo c3 > c && git commit -qam c3");
         let missing = ws.parent().unwrap().join("missing-key");
         sh(&ws, &format!("git config user.signingkey {}", missing.display()));
         let (main_before, branch_before) = (git(&ws, &["rev-parse", "main"]).unwrap(), git(&wt, &["rev-parse", "HEAD"]).unwrap());
         j.here = false;
-        let e = run(&j, &crate::land_line::local::line(), &mut || {}).unwrap_err();
+        let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
         assert_signing_line(&e, "land again");
         assert_eq!(git(&ws, &["rev-parse", "main"]).unwrap(), main_before);
         assert_eq!(git(&wt, &["rev-parse", "HEAD"]).unwrap(), branch_before, "the branch keeps its commit");

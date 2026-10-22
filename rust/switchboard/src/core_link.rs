@@ -21,15 +21,6 @@ impl Hub {
         }
     }
 
-    /// A land step (issue 37 #3): sb-core's fx, and the hub's mirror of
-    /// the lands it holds follows them (given back after a revival).
-    pub(super) fn land_step(&mut self, fx: &mut Fx, env: &mut dyn Env, i: In) {
-        let (k, now, seen) = (fx.len(), env.now(), i.clone());
-        self.core(fx, env, None, i);
-        let got: Vec<&CoreFx> = fx[k..].iter().filter_map(|e| if let Effect::LandFx(f) = e { Some(f) } else { None }).collect();
-        self.lands.saw(&seen, &got, now);
-    }
-
     /// sb-core's `speaks` on `by` (bend/hub/peer.bend): true, ok (its fx dropped); false, fx spoke alone.
     fn spoke_ok(&mut self, fx: &mut Fx, env: &mut dyn Env, token: Token, from: &str, by: crate::peer::Sender) -> bool {
         self.core(fx, env, None, In::Speaks(by.speaks(token, from.into(), String::new())));
@@ -89,7 +80,6 @@ impl Hub {
             Err(e) => e,
         };
         self.restart_core(&e.to_string());
-        self.lands_back();
         match self.link.call(v) {
             Ok(out) => Some(out),
             Err(e) => {
@@ -98,19 +88,6 @@ impl Hub {
                 self.revived.push(format!("sb-core stopped twice on the same input ({}): that input was dropped", what));
                 None
             }
-        }
-    }
-
-    /// After a revival (sb-core's runtime fresh), the lands still running
-    /// first, before the input is run again: their holders keep go, the
-    /// waiters their order (issue 37 #3, architect m_36620). Its answer
-    /// gives go to nobody new (each target's holder came back); a step
-    /// that does goes out at the next land step's wait (`land_go` is
-    /// read by the land threads' core: daemon/land.rs `LoopCore`).
-    fn lands_back(&mut self) {
-        let Some(live) = self.lands.live() else { return };
-        if let Err(e) = self.link.call(&live.step(0, false, Vec::new()).to_value()) {
-            self.revived.push(format!("the lands in line could not be given back to sb-core ({}): they end with an error", e));
         }
     }
 

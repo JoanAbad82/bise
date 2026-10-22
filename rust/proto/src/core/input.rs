@@ -27,27 +27,6 @@ core_kinds! {
         /// the judge's fact on the sender (outside, hub, agent, other_hub,
         /// gone; "" reads gone), `sock` the socket it came on
         Speaks = "speaks" => ISpeaks { token: Nat, from: Str, cmd: Str, who: Str, dir: StrOmit, sock: StrOmit },
-        /// `sb land` (issue 37 #3, bend/hub/land.bend): none of these is
-        /// journaled; the line and the claims are sb-core's runtime.
-        /// A land starts: its claim `key` (land_line's claim_key) at the
-        /// step's clock; fx `land_claimed` answers
-        LandClaim = "land_claim" => ILandClaim { key: Str },
-        /// what it takes and its refusals before its turn: `changes`
-        /// ({path, from, recent}), `files`, `add` ({arg, rel}), `others`
-        /// ({name, files}), `conflicts` ({path, a, b}: git conflict blocks
-        /// in the changed files); fx `land_picked` answers
-        LandPick = "land_pick" => ILandPick { changes: Json, files: Json, add: Json, others: Json, conflicts: Json, alone: Bool, worktree: Bool, here: Bool, pr_mode: Bool, message: Str },
-        /// ticket `ticket` of `place` joins the line of `target`, or of
-        /// `agent`'s feature line when `target` is one and it still runs
-        /// (else the trunk `trunk`); `dirty`: a worktree's files not
-        /// committed (refused); fx `land_joined`, then `land_go` when first
-        LandJoin = "land_join" => ILandJoin { ticket: Nat, target: Str, place: Str, agent: Str, trunk: Str, dirty: Json },
-        /// a land ended: its ticket leaves the line, its claim ends
-        LandEnd = "land_end" => ILandEnd { ticket: Nat, key: Str },
-        /// after a core restart, the lands still running, before any other
-        /// land input: `claims` ({key, since}), `line` ({ticket, target,
-        /// place, go}, in ticket order)
-        LandLive = "land_live" => ILandLive { claims: Json, line: Json },
         /// the waits' timeouts, `sb every`'s timers and `sb wake`'s max
         Tick = "tick" => ITick {},
         /// an agent's turn ended (`leftover`: steering its runtime never

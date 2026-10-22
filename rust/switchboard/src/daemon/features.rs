@@ -135,7 +135,7 @@ struct Job {
     /// The land check's warm tree's root (`scratch::CheckTree`).
     checks: PathBuf,
     flow: FlowConfig,
-    queue: crate::land::Line,
+    queue: crate::land::Queue,
     features: Features,
     tx: std::sync::mpsc::Sender<Msg>,
     /// An agent asked (`sb feature`), else the user answered an item.
@@ -330,7 +330,7 @@ fn step(job: &Job) -> Out {
             Ok((text, done()))
         }
         "sync" => {
-            let _turn = job.queue.wait_turn(&feature_ref, &place, "", &feature_ref, &[], &mut || {})?;
+            let _turn = job.queue.wait_turn(&feature_ref, &place, &mut || {});
             match feature::rebase(&job.shared, &job.scratch, name, job.flow.check.as_deref())? {
                 None => Ok((format!("{} is on {}'s tip already.", name, main), done())),
                 Some((old, new)) => {
@@ -351,7 +351,7 @@ fn step(job: &Job) -> Out {
             }
         }
         "ready" => {
-            let _turn = job.queue.wait_turn(&feature_ref, &place, "", &feature_ref, &[], &mut || {})?;
+            let _turn = job.queue.wait_turn(&feature_ref, &place, &mut || {});
             let tip = feature::check(&job.shared, &job.scratch, name, job.flow.check.as_deref())?;
             job.features.update(&job.state, name, |f| f.checked = job.flow.check.as_ref().map(|_| tip.clone()));
             let f = feature::facts(&job.shared, &format!("refs/heads/{}", main), name)?;
@@ -363,7 +363,7 @@ fn step(job: &Job) -> Out {
             Ok((format!("the user's inbox asks them to try {} now.", name), d))
         }
         "try" => {
-            let _turn = job.queue.wait_turn(&feature_ref, &place, "", &feature_ref, &[], &mut || {})?;
+            let _turn = job.queue.wait_turn(&feature_ref, &place, &mut || {});
             // behind main: synced first (the user tries what would land)
             let mut synced = String::new();
             if let Some((old, new)) = feature::rebase(&job.shared, &job.scratch, name, job.flow.check.as_deref())? {
@@ -418,9 +418,9 @@ fn step(job: &Job) -> Out {
             Ok(("the trial is over; the branch stays.".into(), d))
         }
         "merge" => {
-            let _feat_turn = job.queue.wait_turn(&feature_ref, &place, "", &feature_ref, &[], &mut || {})?;
+            let _feat_turn = job.queue.wait_turn(&feature_ref, &place, &mut || {});
             let main_ref = crate::trunk::trunk_ref(&job.shared)?;
-            let main_turn = job.queue.wait_turn(&main_ref, &place, "", &main_ref, &[], &mut || {})?;
+            let main_turn = job.queue.wait_turn(&main_ref, &place, &mut || {});
             let m = feature::merge(&job.shared, &job.scratch, &job.checks, name, &job.flow, &main_turn)?;
             let kept = feature::trash(&job.shared, name, now).unwrap_or_default();
             {
@@ -436,7 +436,7 @@ fn step(job: &Job) -> Out {
             Ok((format!("{} (the branch's tip kept in {})", line, kept), d))
         }
         "drop" => {
-            let _turn = job.queue.wait_turn(&feature_ref, &place, "", &feature_ref, &[], &mut || {})?;
+            let _turn = job.queue.wait_turn(&feature_ref, &place, &mut || {});
             let commits = facts(&job.features).map(|f| f.ahead).unwrap_or(0);
             let kept = feature::trash(&job.shared, name, now)?;
             {
@@ -473,11 +473,11 @@ fn step(job: &Job) -> Out {
 /// a branch that's gone. So: the check, sb-core's step (who moves, their
 /// note, main's line), then the rename (never a delete), then the
 /// registry, all under the feature's land turn: a land queued behind
-/// gets go on the trunk's line instead (sb-core sees its agent no longer
-/// lands on the feature: bend/hub/land.bend `retarget`). Run again, it finishes whatever is left.
+/// reads its agent's new place once in line (`land::run`'s `onto_now`)
+/// and goes to the trunk. Run again, it finishes whatever is left.
 fn retire(job: &Job, feature_ref: &str, place: &str, main: &str) -> Out {
     let name = job.name.as_str();
-    let _turn = job.queue.wait_turn(feature_ref, place, "", feature_ref, &[], &mut || {})?;
+    let _turn = job.queue.wait_turn(feature_ref, place, &mut || {});
     let trunk = crate::trunk::trunk_ref(&job.shared)?;
     let branch = feature::exists(&job.shared, name);
     if branch {
@@ -532,4 +532,15 @@ fn retire(job: &Job, feature_ref: &str, place: &str, main: &str) -> Out {
     let mut d = FeatureDone { name: name.to_string(), ..FeatureDone::default() };
     d.close = Some("retired".into());
     Ok((format!("{} retired: {}.", name, did.join(", ")), d))
+}
+
+/// A land's `onto_now` (`land::run`): asks the hub's loop where `agent`
+/// lands now; `was` (the request's) when the hub does not answer.
+pub(super) fn onto_now(tx: &std::sync::mpsc::Sender<Msg>, agent: &str, was: Option<String>) -> impl FnMut() -> Option<String> {
+    let (tx, agent) = (tx.clone(), agent.to_string());
+    move || {
+        let (reply, rx) = std::sync::mpsc::channel();
+        let _ = tx.send(Msg::input(Input::Onto { agent: agent.clone(), reply }));
+        rx.recv().unwrap_or_else(|_| was.clone())
+    }
 }

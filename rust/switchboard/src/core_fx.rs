@@ -87,7 +87,6 @@ pub(super) fn plain(f: CoreFx) -> Plain {
         CoreFx::Route(r) => Effect::Route { rid: r.rid, to: r.to, name: r.name, text: r.text, due_ms: r.due_ms, why: r.why },
         CoreFx::RouteAsked(r) => Effect::RouteAsked { routed: r.routed },
         CoreFx::Spoke(r) => Effect::Spoke { token: r.token, ok: r.ok, why: r.why },
-        f @ (CoreFx::LandClaimed(_) | CoreFx::LandPicked(_) | CoreFx::LandJoined(_) | CoreFx::LandGo(_) | CoreFx::LandRanks(_)) => Effect::LandFx(f),
         CoreFx::RouteDone(r) => Effect::RouteDone { rid: r.rid, state: r.state, to: r.to, xid: r.xid, msg: r.msg },
         CoreFx::JobEnd(j) => Effect::JobEnd { agent: j.agent, state: j.state, label: j.label, summary: j.summary, key: j.key },
         CoreFx::FollowedEnd(j) => Effect::FollowedEnd {

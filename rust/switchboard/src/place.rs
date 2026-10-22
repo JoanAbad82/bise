@@ -206,7 +206,7 @@ pub struct PlaceView {
     pub pr: Option<PrView>,
     pub lid: Option<String>,
     /// its rank in the land queue's line, 1-based (1: it lands now; the
-    /// lid is `land_line::lid` of it); None when not in line
+    /// lid is `land_queue::lid` of it); None when not in line
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub landing: Option<u32>,
     /// dev-flow §5.1, pr-design §4.1 item 8: a feature branch's place

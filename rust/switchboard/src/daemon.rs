@@ -244,8 +244,6 @@ enum Msg {
     Land {
         line: Option<Feed>,
     },
-    /// A land thread's step through sb-core (daemon/land.rs `LoopCore`).
-    LandStep(land::Step),
     /// The page server (docs/ambient-pages.md §2.4): notes sent from a
     /// page, or its drafts changed.
     Page(crate::pages::PageMsg),
@@ -408,8 +406,8 @@ struct Shell {
     down: BTreeSet<String>,
     /// The approvals mode and gate (approvals-design.md §8-§10).
     gates: gate::Gates,
-    /// `sb land`'s line: sb-core's, through this loop (issue 37 #3).
-    lands: crate::land::Line,
+    /// `sb land`'s line: one land at a time per target ref (dev-flow §5).
+    lands: crate::land::Queue,
     /// The feature branches (dev-flow §5.1): the registry, their facts,
     /// the try builds running (`daemon/features.rs`).
     features: features::Features,
@@ -729,6 +727,8 @@ impl Shell {
         // pr-news: whose bots' comments reach the agents (`[pr] trusted_bots`)
         self.hub.pr_bots =
             crate::forge::news::trusted_bots(&std::fs::read_to_string(self.opts.paths.config()).unwrap_or_default());
+        // who lands, who waits in line (the boxes' lids are said from it)
+        self.hub.landing = self.lands.ranks();
         // the features' lids and Δ (dev-flow §5.1)
         self.feature_views();
         let mut snap = self.hub.snapshot(now_ms());
@@ -964,8 +964,8 @@ impl Shell {
             Effect::FollowedEnd { project, agent, key, state, label, summary } => self.followed_end(project, agent, key, &state, label, summary),
             Effect::MergedChanged => self.merged_all(),
             Effect::Activity(item) => self.proto_route(HubEv::Activity { project: self.project(), item }),
-            // read before the effects run (daemon/routing.rs, daemon/agent_req.rs, daemon/land.rs)
-            Effect::RouteAsked { .. } | Effect::Spoke { .. } | Effect::LandFx(_) => {}
+            // read before the effects run (daemon/routing.rs, daemon/agent_req.rs)
+            Effect::RouteAsked { .. } | Effect::Spoke { .. } => {}
             Effect::RouteDone { rid, state, to, xid, msg } => self.proto_route(HubEv::RouteDone { project: self.project(), rid, state, to, xid, msg }),
         }
     }
@@ -1710,7 +1710,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
             std::env::var(crate::approvals::mode::ENV).ok().as_deref(),
             runner,
         ),
-        lands: land::LoopCore::line(tx.clone()),
+        lands: crate::land::Queue::default(),
         features: features::Features::load(&paths.state),
         prs: None,
         cu: crate::computer_use::Watch::new(&proc_hub),
