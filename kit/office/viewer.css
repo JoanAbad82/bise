@@ -18,8 +18,9 @@ body { font: var(--text-ui) / 1.4 var(--font-ui); }
 /* xlsx: Univer's grid (kit/office/sheet.js, office-sheet.js) and the save strip above it */
 .office-sheet { flex-direction: column; position: relative; }
 .office-univer { flex: 1; min-height: 0; position: relative; }
-/* the formula bar and the sheet tabs (Univer's DOM) in the app's sans, digits in columns */
-.office-univer, .office-univer [contenteditable] { font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
+/* the chrome (formula bar, sheet tabs: Univer's DOM) in the app's sans, digits in columns; the
+   cell editor keeps the cell's own font */
+.office-univer { font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
 /* the save's words sit in the grid's foot, right of the sheet tabs: no shift of the grid */
 .office-save { position: absolute; right: 12px; bottom: 0; height: 36px; z-index: 6; display: flex; align-items: center; gap: 8px; font-size: var(--text-kicker); color: var(--dim); pointer-events: none; }
 .office-save button { pointer-events: auto; }
