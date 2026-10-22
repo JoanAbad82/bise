@@ -328,14 +328,13 @@ export function compHits(rows: readonly CompRow[], needle: string): number[] {
     .map((r) => r.n);
 }
 
-/** The request's line: 'request 41 · 8 of 8 kept · anthropic · claude-x · 14:02:01 · 41.2 KB'. */
+/** The request's line: 'request 41 · 8 requests kept · anthropic · claude-x · 14:02:01 · 41.2 KB'. */
 export function compTitle(c: Completion, tz?: string): string {
   const ready = c.slots.filter((s) => s.writing !== true);
-  const i = ready.findIndex((s) => s.slot === c.slot.slot);
   const as = c.shown_as === undefined ? "" : ` · as ${c.shown_as} would get it`;
   return [
     `request ${String(c.slot.req)}`,
-    `${String(i + 1)} of ${String(ready.length)} kept`,
+    `${String(ready.length)} ${ready.length === 1 ? "request" : "requests"} kept`,
     c.family,
     c.slot.model,
     timeOf(c.slot.at_ms, tz),

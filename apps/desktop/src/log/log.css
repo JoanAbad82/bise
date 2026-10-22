@@ -377,3 +377,8 @@
   content: "$ ";
   color: var(--c-text-3);
 }
+/* a completion row has no time: its head takes the row's width, the tokens at the right edge
+   (designer m_37475) */
+.lg-c > .lg-h {
+  grid-template-columns: 4ch 10ch minmax(0, 1fr) auto;
+}

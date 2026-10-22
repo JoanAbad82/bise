@@ -322,7 +322,7 @@ function CRow({
     <>
       {rule && <div className="lg-rule compact"><span className="w">messages since the compaction</span></div>}
       <div
-        className={`lg-e r-${row.role.replace(/[^a-z_]/gu, "")}${at ? " at" : ""}${hit ? " hit" : ""}`}
+        className={`lg-e lg-c r-${row.role.replace(/[^a-z_]/gu, "")}${at ? " at" : ""}${hit ? " hit" : ""}`}
         data-n={row.n}
         data-testid={id}
       >

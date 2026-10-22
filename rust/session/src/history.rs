@@ -204,6 +204,17 @@ pub fn short_bytes(n: usize) -> String {
     }
 }
 
+/// A body that says only what its head already shows whole: one line of
+/// text, the same words, no markdown (designer m_37475: a body appears
+/// only when it adds something, more lines, markdown, a diff, code).
+fn says_only(head: &str, body: &Body) -> bool {
+    let text = match body {
+        Body::Md(t) | Body::Plain(t) => t.trim(),
+        _ => return false,
+    };
+    !text.contains('\n') && text == head.trim() && !text.contains(['*', '`', '_', '[', '#', '>', '|', '~'])
+}
+
 /// The first non-empty line, cut at `max` chars.
 pub fn first_line(s: &str, max: usize) -> String {
     let l = s.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
@@ -522,6 +533,7 @@ impl Source<'_> {
         let mut push = |role: Role, head: String, body: Body| {
             let head = self.red(head);
             let body = self.red_body(body);
+            let body = if says_only(&head, &body) { Body::None } else { body };
             out.push(Item::entry(e, idx, role, head, body));
         };
         match p {
