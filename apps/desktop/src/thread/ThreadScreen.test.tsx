@@ -5,7 +5,7 @@ import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
 import { answeredMark, approvalParts, cutWords, EntryRow, gapOf, type RowCtx, withoutImageMarks } from './rows';
 import { ThreadScreen } from './ThreadScreen';
-import { aboutParts } from './ThreadComposer';
+import { aboutParts } from './about';
 import { createRouter, RouterContext } from '@/app/router';
 
 // the composer is amb-web's: here a stand-in that counts its renders

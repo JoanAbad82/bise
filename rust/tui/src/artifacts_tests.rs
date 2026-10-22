@@ -191,3 +191,37 @@ fn a_reply_names_an_artifact_as_a_chip() {
     let (_, urls) = crate::links::collect(|| crate::markdown::inline_spans("see https://example.com", st));
     assert_eq!(urls, ["https://example.com"]);
 }
+
+/// about-chip: his words about an open artifact (the desktop's `about
+/// [title](url): …`) draw its chip, never the link or its path, for an
+/// xlsx copy (spaces, an older version's), a page and an html file; an
+/// artifact the list lacks: its title alone.
+#[test]
+fn his_about_lead_is_the_artifacts_chip() {
+    let hub = "/Users/me/.bise/hubs/docs-1/artifacts";
+    let items = rows_of(json!([
+        {"id": "projection", "title": "projection achat ou location", "kind": "sheet", "agent": "office", "at_ms": T, "version": 3, "new": false,
+         "url": format!("{hub}/projection/v3/projection achat ou location.xlsx"), "target": "/w/projection achat ou location.xlsx",
+         "copy": format!("{hub}/projection/v3/projection achat ou location.xlsx"),
+         "versions": [{"v": 2, "at_ms": T - MIN, "target": "/w/projection achat ou location.xlsx", "copy": format!("{hub}/projection/v2/projection achat ou location.xlsx")}]},
+        {"id": "q3-notes", "title": "Q3 notes", "kind": "page", "agent": "writer", "at_ms": T, "version": 1, "new": false,
+         "url": "http://127.0.0.1:47438/p/q3-notes", "target": "/Users/me/.bise/pages/q3-notes/v1.html"},
+        {"id": "mock", "title": "the mock", "kind": "site", "agent": "web", "at_ms": T, "version": 2, "new": false,
+         "url": format!("{hub}/mock/v2/index.html"), "target": "/w/mock/index.html"},
+    ]));
+    set_rows(&items, None);
+    let st = ratatui::style::Style::default();
+    let draw = |text: &str| crate::links::collect(|| crate::attach::chip_spans(text, st));
+    let words = |spans: &[ratatui::text::Span<'static>]| spans.iter().map(|s| s.content.as_ref()).collect::<String>().replace('\u{a0}', " ");
+    let (spans, urls) = draw(&format!("about [projection achat ou location]({hub}/projection/v2/projection achat ou location.xlsx): En fait 3200"));
+    assert_eq!(words(&spans), "about  ↗ projection achat ou location : En fait 3200");
+    assert_eq!(urls, ["artifact:projection"]);
+    let (spans, urls) = draw("about [Q3 notes](http://127.0.0.1:47438/p/q3-notes): why?");
+    assert_eq!(words(&spans), "about  ↗ Q3 notes : why?");
+    assert_eq!(urls, ["artifact:q3-notes"]);
+    let (_, urls) = draw(&format!("about [the mock]({hub}/mock/v2/index.html): ok"));
+    assert_eq!(urls, ["artifact:mock"]);
+    let (spans, urls) = draw("about [old deck](/x/y (1).pdf): hm");
+    assert_eq!(words(&spans), "about old deck: hm");
+    assert!(urls.is_empty());
+}

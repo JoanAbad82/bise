@@ -11,7 +11,7 @@ import { emitAction } from '@/app/menu';
 import { aboutWords, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
 import { browserUrl, cutFolder, frameSrc, themedUrl } from './Open';
-import { aboutText } from '@/thread/ThreadComposer';
+import { aboutText } from '@/thread/about';
 import { load } from '@/composer/drafts';
 import { entryOf, entrySegments } from '@/composer/entry';
 

@@ -8,7 +8,6 @@ import { load, save } from '@/composer/drafts';
 import { shownName } from '@/agents/model';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
 import type { ComposerActions, KeyLine } from '@/composer';
-import type { Part } from '@/proto';
 import type { Outgoing } from '@/composer/message';
 import { threadKey, useApprovals, useCards, useCommands, useCoreEvent, useFiles, useNotice, useSkills, useStore, type HubLine } from '@/store';
 import { useRouter } from '@/app/router';
@@ -28,6 +27,7 @@ import { composerWords } from './head';
 import { ABOUT_HEAD } from '@/artifacts/maker';
 import { otherTip } from '@/app/tipwords';
 import { useComposerHeld } from './foldHint';
+import { aboutParts, aboutText } from './about';
 import { composer } from '../proto/words.gen';
 
 /**
@@ -449,22 +449,6 @@ export function refusedSlashOf(ev: unknown, project: string): boolean | null {
 /** The composer's field holds nothing he typed since (his words come back only into an empty field). */
 function fieldEmpty(): boolean {
   return (document.querySelector('[data-testid="composer.field"]')?.textContent ?? '').trim() === '';
-}
-
-/** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */
-export function aboutText(a: { title: string; url: string }, text: string): string {
-  return `about [${a.title.replace(/[[\]]/gu, '')}](${a.url}): ${text}`;
-}
-
-/** The same lead on typed parts: after his quotes (the hub renders them in front anyway), before his words. Pure. */
-export function aboutParts(a: { title: string; url: string }, parts: readonly Part[]): Part[] {
-  const lead: Part = { kind: 'text', text: aboutText(a, '') };
-  const i = parts.findIndex((p) => p.kind !== 'quote');
-  const at = i < 0 ? parts.length : i;
-  const next = parts[at];
-  // joined with his first words when they are words (parts as a composer makes them: adjacent texts joined)
-  if (next?.kind === 'text') return [...parts.slice(0, at), { kind: 'text', text: lead.text + next.text }, ...parts.slice(at + 1)];
-  return [...parts.slice(0, at), lead, ...parts.slice(at)];
 }
 
 /** A card of a project, as the composer answers it. */

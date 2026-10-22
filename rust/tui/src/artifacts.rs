@@ -317,6 +317,43 @@ pub(crate) fn url_of(id: &str, v: Option<u32>) -> String {
     }
 }
 
+/// The artifact the url of an `about [title](url): ` lead names (the
+/// desktop's open-artifact composer, about-chip): one whose path or link
+/// it is ([`resolve`], or a version's copy: a v2 copy after a v3 came),
+/// else the id its shape names when the list has it: the store's copy
+/// `…/artifacts/<id>/v<n>/…`, the page server's `/a/<id>/<n>/…`, `/p/<id>`.
+pub(crate) fn of_lead_url(url: &str) -> Option<String> {
+    if let Some(id) = resolve(url) {
+        return Some(id);
+    }
+    let copy = STORE.with(|st| {
+        st.borrow()
+            .rows
+            .iter()
+            .find(|a| a.copy.as_deref() == Some(url) || a.versions.iter().any(|v| v.copy.as_deref() == Some(url)))
+            .map(|a| a.id.clone())
+    });
+    if copy.is_some() {
+        return copy;
+    }
+    let seg: Vec<&str> = url.split(['?', '#']).next().unwrap_or("").split('/').collect();
+    let num = |s: &str, v: bool| {
+        let s = if v { s.strip_prefix('v').unwrap_or("") } else { s };
+        !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
+    };
+    let shaped = seg.windows(2).enumerate().find_map(|(i, w)| {
+        let next = seg.get(i + 2).copied().unwrap_or("");
+        let after = seg.len() > i + 3;
+        match w[0] {
+            "artifacts" if num(next, true) && after => Some(w[1]),
+            "a" if num(next, false) && after => Some(w[1]),
+            "p" if seg.len() == i + 2 || (seg.len() == i + 3 && next.is_empty()) => Some(w[1]),
+            _ => None,
+        }
+    })?;
+    get(shaped).map(|a| a.id)
+}
+
 /// A link or a path met in a reply: the artifact registered under it
 /// (its keys, its targets), compared without the scheme, a trailing
 /// slash, `./`, or a line number.

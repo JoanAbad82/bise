@@ -372,6 +372,21 @@ fn wxh((w, h): (u32, u32)) -> String {
 /// `text` as spans in `style`, each image marker an accent chip
 /// `▣ login.png` (a user line of the history; one line, no `\n`).
 pub(crate) fn chip_spans(text: &str, style: Style) -> Vec<Span<'static>> {
+    // his words about an open artifact (the desktop's composer, about-chip):
+    // `about [title](url): …` draws its link as the artifact's chip, never the
+    // link or its path; its title alone when the list has no such artifact
+    if let Some((a, b, title, id)) = about_lead(text) {
+        let mut out = chip_spans(&text[..a], style);
+        match id {
+            Some(id) => {
+                let gone = crate::artifacts::get(&id).is_some_and(|x| x.gone);
+                out.extend(crate::render::artifact_chip(&title, gone, &crate::artifacts::url_of(&id, None)));
+            }
+            None => out.push(Span::styled(title, style)),
+        }
+        out.extend(chip_spans(&text[b..], style));
+        return out.into_iter().filter(|s| !s.content.is_empty()).collect();
+    }
     // an artifact's chip as sent, `[pricing page](artifact:pricing-page)`:
     // the same chip as in the composer and in replies (site/m/artifacts E)
     if let Some((a, b, title, url)) = artifact_link(text) {
@@ -409,6 +424,24 @@ pub(crate) fn chip_spans(text: &str, style: Style) -> Vec<Span<'static>> {
         out.extend(image_spans(rest, style));
     }
     out
+}
+
+/// The `about [title](url): ` lead at the start of `text` (the desktop's
+/// aboutText): the byte range of its `[title](url)`, the title, and the
+/// artifact the url names. The url ends at the lead's own `): ` (a path
+/// may hold spaces and parens).
+fn about_lead(text: &str) -> Option<(usize, usize, String, Option<String>)> {
+    const HEAD: &str = "about [";
+    let rest = text.strip_prefix(HEAD)?;
+    let close = rest.find("](")?;
+    let title = &rest[..close];
+    if title.contains(['[', ']']) {
+        return None;
+    }
+    let after = &rest[close + 2..];
+    let (end, _) = after.match_indices("):").find(|(i, _)| matches!(after[i + 2..].chars().next(), None | Some(' ') | Some('\t')))?;
+    let b = HEAD.len() + close + 2 + end + 1;
+    Some(("about ".len(), b, title.to_string(), crate::artifacts::of_lead_url(&after[..end])))
 }
 
 /// The first `[title](artifact:id)` in `text`: its byte range, its title

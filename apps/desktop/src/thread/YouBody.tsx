@@ -21,6 +21,7 @@ import { AttachChip, FileThumb } from './AttachChip';
 import { fileUrl } from './rows-cards';
 import { PartImageChip } from './ImageGone';
 import { anchorMeta, chipName, pageWords, youView, type YouView } from './parts';
+import { aboutChipMd } from './about';
 import type { RowCtx } from './rows';
 
 /** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
@@ -104,9 +105,11 @@ export function YouBody({ parts, plain, ctx, id, foldPos, extra }: { parts: read
     },
   };
   const view = parts !== null ? youView(parts) : null;
-  const words = parts !== null ? bubbleWords(parts) : { md: plain, chips: [] };
   // a part of an artifact says the artifact's name, as his composer's row did (designer m_24208)
   const arts = useArtifacts(ctx.project);
+  // an open artifact's 'about' lead is its chip, never its markdown link or path (about-chip)
+  const said = parts !== null ? bubbleWords(parts) : { md: plain, chips: [] };
+  const words = { md: aboutChipMd(said.md, arts), chips: said.chips };
   const titles = new Map(arts.map((a) => [a.id, a.title]));
   const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, n: q.n, about: q.anchor !== undefined ? anchorMeta(q.anchor, titles.get(q.anchor.artifact)) : q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : [];
   const fold = foldOf(words.md);
