@@ -147,3 +147,15 @@ numbers. The next audit starts from there.
   digest identical. pick_gate's third check refuses a strict search in
   bend/hub. Left: queued_in still walks every hot message (14k on his
   hub, term_drop is most of the 10 ms).
+- 2026-10-22 (big-msg-perf): repl-live, one 2 MB `say` on the fake
+  provider (/usr/bin/time -l). Base 317.6e9 instructions, 53.5 s user,
+  sample: STRING_SPLIT, STRING_APPEND, term_drop under repl_conn and
+  cmd_whole: repl-core.bend appended each 4096-byte recv to the
+  unfinished line and split the whole line twice per recv. Now
+  repl-core-pure's feed keeps the line as its pieces, splits only the
+  new chunk and joins once: 25.0e9, 2.28 s user (small turn: 5.65e9,
+  0.66 s), request body sha256 identical (2 MB and small).
+  tests/repl_read_cost.py (run_all): x3.8 instructions for x4 the line,
+  x14.8 on the old path. Left: the rest is linear (wire escape_nl,
+  json escape, term_drop); persist.bend read_all's chunk append is the
+  same pattern on a fallback path (not measured).
