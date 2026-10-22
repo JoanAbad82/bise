@@ -5,15 +5,4 @@
 # literals the file already had. 'lint shape': the literal has a word's shape but is not that word
 # (a description, fixture data, a hub label); the others name the area that moves it. tests/word_lint.py.
 1 apps/desktop/tests/checks/thread/computer-use.spec.ts  # lint shape: 'driving again' is a test's words
-1 tests/tui_computer_use_tmux.py  # lint shape: 'for apps' is computer use's grant text, settings to check
-1 tests/tui_file_links_tmux.py  # lint shape: the file-link note, not settings.first_opening
-1 tests/tui_inbox_split_tmux.py  # lint shape: a part of a row, not settings.check_needs_you
-1 tests/tui_links_tmux.py  # lint shape: the link note, not settings.first_opening
-1 tests/tui_palette_tmux.py  # lint shape: the palette's count, not panel.tip_agents
-1 tests/tui_pause_tmux.py  # lint shape: a part of a row, not inbox.all_agents
-1 tests/tui_psi_hover_tmux.py  # lint shape: the worktree tip's other words, not composer.tab_worktree_at
-1 tests/tui_scheduled_tmux.py  # lint shape: the hub's schedule labels, not scheduled.every
-1 tests/tui_tabs_tmux.py  # lint shape: a part of a row, not thread.ctx_screen
-1 tests/tui_text_layer_tmux.py  # lint shape: a part of a row, not inbox.your_answer
 1 tests/tui_voice_tmux.py  # lint shape: the voice line, not thread.wake_ended
-1 tests/tui_you_fold_click_tmux.py  # the thread's fold words matched by settings.release_more_lines: thread to check

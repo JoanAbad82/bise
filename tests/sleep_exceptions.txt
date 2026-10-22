@@ -12,8 +12,6 @@ fake_mcp_http.py | time.sleep(float(arguments.get("secs", 1))) | the fake MCP se
 fake_openai_auth.py | time.sleep(wait) | the fake ChatGPT auth server's slow_refresh: a slow token refresh is the input
 repl_bash_env.py | HOG = "python3 -c 'import time; m=\"%s\"; a=[b\"x\"*(25<<20) for k in range(12)]; time.sleep(30)'" | the memory hog's command line: a process that must stay alive until the watchdog kills it
 subscriptions_tui_tmux.py | time.sleep(4) | the fake browser script: the user takes 4 s to click, so the waiting bar shows
-tui_computer_use_tmux.py | time.sleep(3) | the fake computer-use helper's live-test: a slow check is the input (the TUI shows it running)
-tui_text_layer_tmux.py | time.sleep(DOUBLE_CLICK_GAP) | two presses on one cell within 400 ms are a double click (app::MouseState::press): the gap between two clicks is the input
 ambient_qa_test.py | p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"]) | a live child process standing for a qa.py run in progress (its pid in run.lock): the test kills it when done
 fake_provider.py | time.sleep(float(slow.group(1))) | the fake model's [[slow: N]] reply: a slow provider is the input of the tests that use it
 fake_provider.py | time.sleep(float(sc["slow"])) | a $FAKE_SCRIPTS script's "slow": the same slow provider, for a message with no marker in it (ambient-qa's rich world)
@@ -23,4 +21,3 @@ fake_repl_flood.py | time.sleep(0.005) | the flooding fake's steer-file reader (
 send_latency_e2e.py | time.sleep(float(os.environ.get("SEND_WARM_S", "60"))) | SEND_BURN's warm-up: the 1-min load average catches up before he sends (the load is the input, never a state to wait for)
 send_latency_e2e.py | time.sleep(0.25) | his sends' pace: one every 250 ms while the agents work is the input under test
 hub_flood_e2e.py | time.sleep(STATE_WINDOW_S) | the window the state events are counted in: at most ~10 per second while the REPLs flood is the behavior under test
-tui_roles_tmux.py | time.sleep(0.5) | the dictation retry test: the next ctrl+r must come after voicemode::DOUBLE_CTRL_R (400 ms) or it reads as ctrl+r twice and opens voice mode; the gap between two key presses is the input under test (2b65c3580)
