@@ -63,6 +63,8 @@ impl Agent {
             turn_seen: Some(std::time::Instant::now()),
             report: a.report.as_ref().map(|r| r.text.clone()).unwrap_or_default(),
             report_ms: a.report.as_ref().map(|r| r.at_ms).filter(|ms| *ms > 0),
+            since_ms: a.since_ms,
+            title: a.title.clone(),
             role: a.role.clone(),
             created_ms: a.created_ms.unwrap_or(0),
             waiting_on: waiting_word(a.waiting_on.as_ref()),

@@ -67,11 +67,19 @@ pub enum HubEv {
     /// every agent of the hub, on change; `places` (P4c-4a, none from an
     /// older hub): the project's worktrees as the terminal's panel draws
     /// them, from the same snapshot (an agent's `place_id` is one's id)
+    /// agents-light (issue 36, architect m_37220): to a client that said
+    /// `capabilities.archived_list` (rpc::CAP_ARCHIVED_LIST), `agents` is
+    /// the live agents only and `archived` the light list of the others:
+    /// `None` = unchanged since this connection's last agents event, `Some`
+    /// = the whole list (always on a connection's first: initialize,
+    /// hub/read). A client merges both with `rows::Archived`.
     Agents {
         project: Project,
         agents: Vec<Agent>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         places: Vec<Place>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        archived: Option<Vec<crate::rows::ArchivedAgent>>,
     },
     /// every open card of the hub that is his, on change; `others`
     /// (P4c-4a, none from an older hub): the rest, bise's own (a drop, a

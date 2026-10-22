@@ -35,9 +35,65 @@ impl Shell {
         self.proto_route(HubEv::FollowedEnd { project, agent, key, state, label, summary });
     }
 
-    /// The rows of the snapshot: `agents`, `cards`.
+    /// The rows of the snapshot: `agents` (the live ones, agents-light;
+    /// `archived` none: [`Shell::agents_for`] gives each connection its
+    /// shape), `cards`.
     pub(in crate::daemon) fn proto_rows(&mut self, snap: &Snapshot) -> (HubEv, HubEv) {
         let project = self.project();
+        let agents = self.agent_rows(snap, proto_view::Which::Live);
+        let (cards, others) = proto_view::cards(snap, &project, now_ms(), crate::model::user_kind);
+        let places = proto_view::places(snap);
+        (HubEv::Agents { project: project.clone(), agents, places, archived: None }, HubEv::Cards { project, cards, others })
+    }
+
+    /// The agents event for connection `id`: a light one gets the live
+    /// rows and the archived list when it hasn't got this one yet
+    /// (always its first); an older client every row in full.
+    pub(in crate::daemon) fn agents_for(&mut self, id: ClientId, snap: &Snapshot, live: &HubEv) -> HubEv {
+        if !self.proto.light(id) {
+            return self.full_agents(snap);
+        }
+        let (list, hash) = self.archived_now(snap);
+        with_archived(live, self.proto.archived_for(id, &list, hash))
+    }
+
+    /// agents-light: the archived agents' light rows now, and their hash
+    /// (what a connection got last is compared by it).
+    fn archived_now(&mut self, snap: &Snapshot) -> (Vec<bise_proto::rows::ArchivedAgent>, u64) {
+        use std::hash::{Hash, Hasher};
+        let list = proto_view::archived(snap, &mut self.proto.since, now_ms());
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        serde_json::to_string(&list).unwrap_or_default().hash(&mut h);
+        (list, h.finish())
+    }
+
+    /// The older clients' agents event: every agent's row in full, the
+    /// archived ones inside `agents`. TODO(agents-full-archived): goes in
+    /// a later release (tests/shims.txt).
+    fn full_agents(&mut self, snap: &Snapshot) -> HubEv {
+        let agents = self.agent_rows(snap, proto_view::Which::All);
+        HubEv::Agents { project: self.project(), agents, places: proto_view::places(snap), archived: None }
+    }
+
+    /// `agent/get`: one agent's full row, archived or not (the same
+    /// builder as the agents event's rows).
+    pub(in crate::daemon) fn agent_row(&mut self, snap: &Snapshot, name: &str) -> Option<bise_proto::rows::Agent> {
+        self.agent_rows_with(snap, |snap, since, now, vision, usage, head| proto_view::agent_named(snap, name, since, now, crate::model::user_kind, vision, usage, head))
+    }
+
+    /// The snapshot's agents as rows, `which` of them.
+    fn agent_rows(&mut self, snap: &Snapshot, which: proto_view::Which) -> Vec<bise_proto::rows::Agent> {
+        self.agent_rows_with(snap, |snap, since, now, vision, usage, head| proto_view::agents(snap, since, now, crate::model::user_kind, vision, usage, head, which))
+    }
+
+    /// The row builder's inputs (the live agents seeded, the catalog,
+    /// their usage and heads), given to `make`.
+    #[allow(clippy::type_complexity)]
+    fn agent_rows_with<T>(
+        &mut self,
+        snap: &Snapshot,
+        make: impl FnOnce(&Snapshot, &mut proto_view::Since, u64, &dyn Fn(&str) -> Option<bool>, &dyn Fn(&str) -> Option<AgentUsage>, &dyn Fn(&str) -> Option<bise_proto::Pos>) -> T,
+    ) -> T {
         let now = now_ms();
         self.seed_usage(snap);
         self.seed_heads(snap);
@@ -56,10 +112,7 @@ impl Shell {
         };
         let heads = &self.proto.heads;
         let head = |name: &str| heads.last(name);
-        let agents = proto_view::agents(snap, &mut self.proto.since, now, crate::model::user_kind, &vision, &usage, &head);
-        let (cards, others) = proto_view::cards(snap, &project, now, crate::model::user_kind);
-        let places = proto_view::places(snap);
-        (HubEv::Agents { project: project.clone(), agents, places }, HubEv::Cards { project, cards, others })
+        make(snap, &mut self.proto.since, now, &vision, &usage, &head)
     }
 
     /// S13 (amb-win m_10985, architect m_10999): an agent the hub has no
@@ -178,9 +231,28 @@ impl Shell {
         let (a, c) = (agents.encode(), cards.encode());
         let new = (a != self.proto.last.0, c != self.proto.last.1);
         self.proto.last = (a, c);
-        if new.0 {
-            self.proto_note(&ids, &agents);
+        // agents-light (architect m_37000 2.): the live rows when they
+        // changed, the archived list only to a connection that hasn't got
+        // this one (a usage tick never resends it)
+        let (list, hash) = self.archived_now(snap);
+        let full = self.proto.any_full().then(|| self.full_agents(snap)).filter(|f| {
+            let e = f.encode();
+            let moved = e != self.proto.full;
+            self.proto.full = e;
+            moved
+        });
+        let mut outs = Vec::new();
+        for id in &ids {
+            if self.proto.light(*id) {
+                let arch = self.proto.archived_for(*id, &list, hash);
+                if new.0 || arch.is_some() {
+                    outs.push((*id, with_archived(&agents, arch)));
+                }
+            } else if let Some(f) = &full {
+                outs.push((*id, f.clone()));
+            }
         }
+        self.proto_note_each(&outs);
         // les bims: the project's growth, when it changed
         self.growth_changed(&ids, Some(snap), None);
         if new.1 {
@@ -497,4 +569,12 @@ fn models_mtimes() -> (Option<std::time::SystemTime>, Option<std::time::SystemTi
     let home = bise_home::Home::from_env();
     let at = |p: PathBuf| std::fs::metadata(p).and_then(|m| m.modified()).ok();
     (at(home.config_file()), at(home.auth_file()))
+}
+
+/// The live agents event with `archived` set (agents-light).
+fn with_archived(live: &HubEv, archived: Option<Vec<bise_proto::rows::ArchivedAgent>>) -> HubEv {
+    match live {
+        HubEv::Agents { project, agents, places, .. } => HubEv::Agents { project: project.clone(), agents: agents.clone(), places: places.clone(), archived },
+        other => other.clone(),
+    }
 }

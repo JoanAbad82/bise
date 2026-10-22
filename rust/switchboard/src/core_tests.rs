@@ -4166,7 +4166,7 @@ fn an_agents_row_says_running_and_turns_from_one_source() {
     let row = |t: &mut T| -> (bool, u64) {
         let snap = t.hub.snapshot(t.env.now);
         let mut since = crate::proto_view::Since::new();
-        let rows = crate::proto_view::agents(&snap, &mut since, t.env.now, crate::model::user_kind, &|_| None, &|_| None, &|_| None);
+        let rows = crate::proto_view::agents(&snap, &mut since, t.env.now, crate::model::user_kind, &|_| None, &|_| None, &|_| None, crate::proto_view::Which::All);
         let a = rows.iter().find(|r| r.name == "a").expect("a's row");
         (a.turn_running(), a.turns)
     };

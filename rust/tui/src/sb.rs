@@ -148,6 +148,11 @@ pub(super) struct Agent {
     /// task: what it did, and about when it stopped).
     report: String,
     report_ms: Option<u64>,
+    /// Since when it has its status, and its title (the hub's row): what
+    /// an archived one's light row carries when it has no report nor
+    /// objective (agents-light, architect m_37220).
+    since_ms: u64,
+    title: String,
     /// What it is doing now, one line (BISE-126): the hub's role line, ""
     /// for main.
     role: String,
@@ -190,7 +195,13 @@ impl Agent {
 
     /// When it was last heard of: its last report, else its creation.
     fn last_ms(&self) -> u64 {
-        self.report_ms.unwrap_or(self.created_ms)
+        self.report_ms.or(Some(self.since_ms).filter(|ms| *ms > 0)).unwrap_or(self.created_ms)
+    }
+
+    /// What an archived row says under its name: its report, else its
+    /// objective, else its title (a light row has only that).
+    fn archived_what(&self) -> &str {
+        [&self.report, &self.objective, &self.title].into_iter().find(|s| !s.is_empty()).map_or("", |s| s.as_str())
     }
 
     /// The current turn's age now: the hub's `turn_ms` plus the time
@@ -309,6 +320,9 @@ pub(super) struct Sb {
     /// The scheduled tasks (sb every), active then a week of ended ones
     /// (the state's `timers`): /scheduled and the panel's ◷ next run.
     pub(crate) timers: Vec<crate::scheduled::Task>,
+    /// agents-light: the hub's archived light list as last sent (an
+    /// agents event without one keeps it), merged into the rows.
+    pub(crate) archived: bise_proto::rows::Archived,
     /// The JSON-RPC requests waiting for their answer (sb/rpc.rs).
     rpc: rpc::Calls,
 }

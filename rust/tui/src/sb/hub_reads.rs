@@ -177,7 +177,10 @@ fn apply(app: &mut App, n: &Notification) {
         HubEv::Approvals { .. } => approvals(app, &ev, false),
         HubEv::Confirm { id, text, .. } => confirm(app, *id, text),
         HubEv::Artifacts { items, seen_ms, .. } => artifacts(app, items, *seen_ms),
-        HubEv::Agents { agents: rows, places, .. } => agents(app, rows, places),
+        HubEv::Agents { agents: rows, places, archived, .. } => {
+            let rows = app.sb.archived.merge(rows, archived.as_deref());
+            agents(app, &rows, places)
+        }
         HubEv::Cards { cards: his, others, .. } => cards(app, his, others),
         HubEv::Scheduled { items, ended, .. } => app.sb.timers = items.iter().chain(ended).map(super::state_rows::task_of_row).collect(),
         HubEv::Flow { flow, .. } => app.sb.flow = super::state_rows::flow_word(*flow),
@@ -449,7 +452,7 @@ pub(crate) mod rows_for_tests {
         let (his, others) = cards.into_iter().partition(|c| c.kind == "question" || c.kind == "confirm");
         let line = |ev: &HubEv| Message::Notification(rpc::note(ev, None).unwrap()).to_value().to_string();
         [
-            line(&HubEv::Agents { project: "p".into(), agents, places: vec![] }),
+            line(&HubEv::Agents { project: "p".into(), agents, places: vec![], archived: None }),
             line(&HubEv::Cards { project: "p".into(), cards: his, others }),
         ]
     }

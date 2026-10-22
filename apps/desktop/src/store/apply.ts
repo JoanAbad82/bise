@@ -33,7 +33,7 @@ export function applyTyped(s: Store, ev: Ev): void {
       s.rowsCame(ev);
       return;
     case "agents":
-      s.put(`agents:${ev.project}`, ev.agents);
+      s.agentsCame(ev);
       // its worktrees and their PRs (the TUI's places, P4c-4a): the right bar's marks and groups
       s.put(`places:${ev.project}`, ev.places ?? EMPTY);
       return;

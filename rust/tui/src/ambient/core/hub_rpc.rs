@@ -322,7 +322,7 @@ mod tests {
     use serde_json::json;
 
     fn init_result(seq: u64) -> Value {
-        let agents = rpc::note(&HubEv::Agents { project: "shop".into(), agents: vec![], places: vec![] }, None).unwrap();
+        let agents = rpc::note(&HubEv::Agents { project: "shop".into(), agents: vec![], places: vec![], archived: Some(vec![]) }, None).unwrap();
         let r = InitializeResult {
             project: "shop".into(),
             proto: 1,

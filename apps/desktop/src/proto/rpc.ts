@@ -5,6 +5,7 @@
 import type { CommandRow } from './commands';
 import type { ErrorKind } from './hub';
 import type { JsonValue } from './json';
+import type { Agent } from './rows';
 
 /**
  * A request's id, as the client chose it (a number or a string).
@@ -71,6 +72,17 @@ capabilities: JsonValue, };
  * it: `thread/subscribe` brings each (architect m_13089, change 4).
  */
 export type HubState = { watermark: Watermark, state: Array<Notification>, };
+
+/**
+ * `agent/get`'s params: the agent, by its name now.
+ */
+export type AgentGetParams = { name: string, };
+
+/**
+ * `agent/get`'s result: its full row (the agents event's builder), none
+ * when the hub has no agent of that name.
+ */
+export type AgentGetResult = { agent: Agent | null, };
 
 /**
  * `initialize`'s result: who this hub is, what it serves, its state.

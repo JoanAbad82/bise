@@ -293,6 +293,9 @@ pub struct Core {
     /// the hub's agents as last seen (round 10's preview: status,
     /// objective, report)
     hub_agents: Vec<bise_proto::rows::Agent>,
+    /// agents-light: the home hub's archived light list as last sent
+    /// (merged into `hub_agents`)
+    hub_archived: bise_proto::rows::Archived,
     /// the hub's pages as last seen
     hub_pages: Vec<bise_proto::rows::Page>,
     /// every project's typed connection, for the window (core/hubs.rs)
@@ -362,6 +365,7 @@ impl Core {
             since: std::collections::HashMap::new(),
             followed: Vec::new(),
             hub_agents: Vec::new(),
+            hub_archived: Default::default(),
             hub_pages: Vec::new(),
             feeds: Vec::new(),
             hubs: Default::default(),

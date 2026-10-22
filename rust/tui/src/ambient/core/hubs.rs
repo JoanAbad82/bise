@@ -105,6 +105,9 @@ struct Conn {
     welcomed: bool,
     /// its own rows, as its hub sent them (fresher than its view.json)
     rows: Option<(Vec<Agent>, Vec<Card>)>,
+    /// agents-light: its hub's archived light list as last sent (merged
+    /// into `rows`)
+    archived: bise_proto::rows::Archived,
     /// commands for a hub not welcomed yet, each with its deadline and
     /// the app's request (sent at the welcome, else an error at the
     /// deadline)
@@ -123,7 +126,7 @@ struct Conn {
 
 impl Conn {
     fn new(hub: Hub, until: Option<Instant>) -> Conn {
-        Conn { hub, welcomed: false, rows: None, pending: Vec::new(), until, cmds: Vec::new(), rpc: RpcConn::default(), down: None }
+        Conn { hub, welcomed: false, rows: None, archived: Default::default(), pending: Vec::new(), until, cmds: Vec::new(), rpc: RpcConn::default(), down: None }
     }
 
     /// One window command (a `HubCmd`'s JSON) to its hub, as a request
@@ -778,9 +781,9 @@ impl Core {
                     self.project_error(id, &cmd, HUB_LACKS, cid, Some(ErrorKind::HubOlder), app);
                 }
             }
-            HubEv::Agents { agents, .. } => {
+            HubEv::Agents { agents, archived, .. } => {
                 let cards = c.rows.take().map(|r| r.1).unwrap_or_default();
-                c.rows = Some((agents, cards));
+                c.rows = Some((c.archived.merge(&agents, archived.as_deref()), cards));
             }
             HubEv::Cards { cards, others, .. } => {
                 let agents = c.rows.take().map(|r| r.0).unwrap_or_default();

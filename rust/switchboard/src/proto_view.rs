@@ -4,7 +4,7 @@
 //! field) to `bise_proto` rows, and the live fold of a subscribed thread (only
 //! the entries that changed go out).
 
-use bise_proto::rows::{question, Phase, Agent, Artifact, ArtifactPr, ArtifactVersion, Card, CardPage, AgentMode, Report, ReportKind, Status};
+use bise_proto::rows::{question, Phase, Agent, ArchivedAgent, Artifact, ArtifactPr, ArtifactVersion, Card, CardPage, AgentMode, Report, ReportKind, Status};
 use bise_proto::diff::{DiffFile, DiffLine, DiffView, Hunk, LineKind};
 use bise_proto::hub::{HubEv, Job as Followed, JobState};
 use bise_proto::thread::lines::unescape;
@@ -51,6 +51,7 @@ pub type Since = BTreeMap<String, (Status, u64)>;
 /// agent's `waits` counts its open ones); `vision`: the hub's model
 /// catalog's rule (`bise_catalog::Catalog::vision`, K4), read at each
 /// call so a /model change shows on the next agents event.
+#[allow(clippy::too_many_arguments)]
 pub fn agents(
     snap: &Snapshot,
     since: &mut Since,
@@ -60,10 +61,92 @@ pub fn agents(
     usage: &dyn Fn(&str) -> Option<bise_proto::rows::AgentUsage>,
     // its head (heads.rs): its newest entry's pos
     head: &dyn Fn(&str) -> Option<bise_proto::Pos>,
+    which: Which,
 ) -> Vec<Agent> {
-    let out: Vec<Agent> = snap.agents.iter().map(|a| agent(snap, a, since, now, user_kind, vision, usage, head)).collect();
-    since.retain(|n, _| out.iter().any(|a| &a.name == n));
+    let keep = |a: &&AgentRow| which == Which::All || a.status != crate::model::Status::Archived;
+    let out: Vec<Agent> = snap.agents.iter().filter(keep).map(|a| agent(snap, a, since, now, user_kind, vision, usage, head)).collect();
+    since.retain(|n, _| snap.agents.iter().any(|a| &a.name == n));
     out
+}
+
+/// Which agents [`agents`] makes rows of: every one (the older clients'
+/// shape, agents-light's shim), or the live ones (the archived go as
+/// [`archived`]'s light rows).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Which {
+    All,
+    Live,
+}
+
+/// agents-light (architect m_37000/m_37220): the archived agents as light
+/// rows, the snapshot's order: their identity (name, aliases, dir),
+/// status and since when as [`agent`] says them, and [`about`].
+pub fn archived(snap: &Snapshot, since: &mut Since, now: u64) -> Vec<ArchivedAgent> {
+    snap.agents
+        .iter()
+        .filter(|a| a.status == crate::model::Status::Archived)
+        .map(|a| {
+            let (status, _) = Status::of_hub(a.status.as_str());
+            ArchivedAgent {
+                name: a.name.clone(),
+                aliases: a.aliases.clone(),
+                dir: some(&a.dir).unwrap_or_else(|| a.name.clone()),
+                status,
+                since_ms: since_of(a, status, since, now),
+                about: about(&title_of(a), &purpose_of(a)),
+            }
+        })
+        .collect()
+}
+
+/// What an archived row says of an agent: its title, else its purpose
+/// (the sidebar's rule; the hub's one choice).
+pub fn about(title: &str, purpose: &str) -> String {
+    if title.is_empty() { purpose } else { title }.to_string()
+}
+
+/// `agent/get`: one agent's full row (archived or not), by the same fn as
+/// [`agents`]' rows.
+#[allow(clippy::too_many_arguments)]
+pub fn agent_named(
+    snap: &Snapshot,
+    name: &str,
+    since: &mut Since,
+    now: u64,
+    user_kind: fn(&str) -> bool,
+    vision: &dyn Fn(&str) -> Option<bool>,
+    usage: &dyn Fn(&str) -> Option<bise_proto::rows::AgentUsage>,
+    head: &dyn Fn(&str) -> Option<bise_proto::Pos>,
+) -> Option<Agent> {
+    let a = snap.agents.iter().find(|a| a.name == name)?;
+    Some(agent(snap, a, since, now, user_kind, vision, usage, head))
+}
+
+/// Since when an agent has its status: kept while it keeps it, else now;
+/// first seen: its report's time (not working), else its creation.
+fn since_of(a: &AgentRow, status: Status, since: &mut Since, now: u64) -> u64 {
+    let report_ms = a.report_ms.filter(|m| *m > 0);
+    let created_ms = Some(a.created_ms).filter(|m| *m > 0);
+    let first = report_ms.filter(|_| !status.working()).or(created_ms).unwrap_or(now);
+    let at = match since.get(&a.name) {
+        Some((st, at)) if *st == status => *at,
+        Some(_) => now,
+        None => first,
+    };
+    since.insert(a.name.clone(), (status, at));
+    at
+}
+
+/// Its title: what it says it does now, else its role, its report, its
+/// objective (one line).
+fn title_of(a: &AgentRow) -> String {
+    let title = [some(&a.note), some(&a.role), a.report.as_deref().and_then(some), some(&a.objective)].into_iter().flatten().next().unwrap_or_default();
+    one_line(&title, 120)
+}
+
+/// Its objective's first line.
+fn purpose_of(a: &AgentRow) -> String {
+    one_line(a.objective.trim(), 200)
 }
 
 /// The agents whose head and usage the hub seeds from their buffered
@@ -96,15 +179,8 @@ fn agent(
     let working = status.working();
     let report_ms = a.report_ms.filter(|m| *m > 0);
     let created_ms = Some(a.created_ms).filter(|m| *m > 0);
-    let first = report_ms.filter(|_| !working).or(created_ms).unwrap_or(now);
-    let at = match since.get(&name) {
-        Some((st, at)) if *st == status => *at,
-        Some(_) => now,
-        None => first,
-    };
-    since.insert(name.clone(), (status, at));
+    let at = since_of(a, status, since, now);
     let report_text = a.report.as_deref().and_then(some);
-    let title = [some(&a.note), some(&a.role), report_text.clone(), some(&a.objective)].into_iter().flatten().next().unwrap_or_default();
     let worktree = a.mode == crate::model::Mode::Worktree;
     let report = report_text.map(|text| Report {
         kind: match status {
@@ -124,8 +200,8 @@ fn agent(
         status,
         phase: Phase::of_hub(a.status.as_str()),
         archived,
-        title: one_line(&title, 120),
-        purpose: one_line(a.objective.trim(), 200),
+        title: title_of(a),
+        purpose: purpose_of(a),
         since_ms: at,
         waits,
         parent: a.parent.as_deref().and_then(some),
@@ -759,13 +835,13 @@ mod tests {
         let mut s = snap();
         s.agents[1] = with_model(s.agents[1].clone(), "mistral/codestral-latest");
         s.agents[2] = with_model(s.agents[2].clone(), "ollama/llava");
-        let a = agents(&s, &mut since, 100, uk, &vision, &|_| None, &|_| None);
+        let a = agents(&s, &mut since, 100, uk, &vision, &|_| None, &|_| None, Which::All);
         assert_eq!((a[1].model.as_deref(), a[1].vision), (Some("mistral/codestral-latest"), Some(false)), "listed, no vision");
         assert_eq!((a[2].model.as_deref(), a[2].vision), (Some("ollama/llava"), None), "unlisted: never a guess");
         assert_eq!((a[0].model.as_deref(), a[0].vision), (None, None), "no model in the snapshot");
         // his /model switch: the next rows follow
         s.agents[1] = with_model(s.agents[1].clone(), "anthropic/claude-haiku-4-5");
-        assert_eq!(agents(&s, &mut since, 200, uk, &vision, &|_| None, &|_| None)[1].vision, Some(true));
+        assert_eq!(agents(&s, &mut since, 200, uk, &vision, &|_| None, &|_| None, Which::All)[1].vision, Some(true));
     }
 
     /// agents-light (a), architect m_37151: initialize never reads or
@@ -779,10 +855,31 @@ mod tests {
         assert_eq!(seeds(&s).collect::<Vec<_>>(), ["main", "perf", "old"], "restored: seeded again");
     }
 
+    /// agents-light (architect m_37220): the archived agents' light rows
+    /// say what their full rows said (status, since, title as about,
+    /// dir), and the live rows leave them out.
+    #[test]
+    fn an_archived_agent_is_a_light_row() {
+        let mut since = Since::new();
+        let full = agents(&snap(), &mut since, 100, uk, &|_| None, &|_| None, &|_| None, Which::All);
+        let live = agents(&snap(), &mut since, 100, uk, &|_| None, &|_| None, &|_| None, Which::Live);
+        assert_eq!(live.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["main", "perf"]);
+        let light = archived(&snap(), &mut since, 100);
+        let o = &full[2];
+        assert_eq!(light.len(), 1);
+        let l = &light[0];
+        assert_eq!((l.name.as_str(), l.dir.as_str(), l.status, l.since_ms, l.about.as_str()), (o.name.as_str(), o.dir.as_str(), o.status, o.since_ms, o.title.as_str()));
+        assert_eq!(about("", "make it fast"), "make it fast", "no title: its purpose");
+        let mut s = snap();
+        s.agents.truncate(2);
+        assert!(archived(&s, &mut since, 100).is_empty());
+        assert!(agent_named(&snap(), "old", &mut since, 100, uk, &|_| None, &|_| None, &|_| None).is_some_and(|a| a.archived && a.report.is_some()), "agent/get: the full row");
+    }
+
     #[test]
     fn the_snapshot_becomes_rows() {
         let mut since = Since::new();
-        let a = agents(&snap(), &mut since, 100, uk, &|_| None, &|_| None, &|_| None);
+        let a = agents(&snap(), &mut since, 100, uk, &|_| None, &|_| None, &|_| None, Which::All);
         assert_eq!(a.len(), 3);
         let p = &a[1];
         assert_eq!((p.status, p.title.as_str(), p.purpose.as_str(), p.waits), (Status::Working, "profiling the hub", "make the e2e fast", 2));
@@ -802,8 +899,8 @@ mod tests {
         // a status change moves since; the same keeps it
         let mut s2 = snap();
         s2.agents[1].status = crate::model::Status::Idle;
-        assert_eq!(agents(&s2, &mut since, 200, uk, &|_| None, &|_| None, &|_| None)[1].since_ms, 200);
-        assert_eq!(agents(&s2, &mut since, 300, uk, &|_| None, &|_| None, &|_| None)[1].since_ms, 200);
+        assert_eq!(agents(&s2, &mut since, 200, uk, &|_| None, &|_| None, &|_| None, Which::All)[1].since_ms, 200);
+        assert_eq!(agents(&s2, &mut since, 300, uk, &|_| None, &|_| None, &|_| None, Which::All)[1].since_ms, 200);
         let (c, others) = cards(&snap(), "acme", 5_000, uk);
         // drop-card: a drop is his (he answers it), never in both lists
         assert_eq!(c.iter().map(|c| c.id).collect::<Vec<_>>(), [9, 10, 11], "his kinds, a drop too");

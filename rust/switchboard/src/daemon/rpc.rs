@@ -182,8 +182,17 @@ impl Shell {
             return self.rpc_respond(id, Response::ok(rid, serde_json::to_value(rpc::CommandsList::now()).unwrap_or_default()));
         }
         if method == rpc::HUB_READ {
-            let state = self.hub_state();
+            let state = self.hub_state(id);
             return self.rpc_respond(id, Response::ok(rid, serde_json::to_value(state).unwrap_or_default()));
+        }
+        if method == rpc::AGENT_GET {
+            let p: rpc::AgentGetParams = match serde_json::from_value(params) {
+                Ok(p) => p,
+                Err(e) => return self.rpc_respond(id, Response::err(Some(rid), RpcError::new(code::INVALID_PARAMS, format!("agent/get: {e}")))),
+            };
+            let snap = self.snapshot();
+            let r = rpc::AgentGetResult { agent: self.agent_row(&snap, &p.name) };
+            return self.rpc_respond(id, Response::ok(rid, serde_json::to_value(r).unwrap_or_default()));
         }
         let cmd = match rpc::cmd(method, params) {
             Ok(c) => c,
@@ -232,7 +241,7 @@ impl Shell {
         }
         crate::util::timing(&format!("rpc initialize from {} {}", p.client.name, p.client.version));
         self.rpc.conns.insert(id, Conn { init: true, ..Default::default() });
-        self.proto.typed(id);
+        self.proto.typed(id, p.reads_archived_list());
         let ws = self.opts.paths.workspace.clone();
         let result = InitializeResult {
             project: self.project(),
@@ -246,17 +255,21 @@ impl Shell {
             pages_url: self.pg.pages.as_ref().map(|p| p.base()),
             methods: rpc::methods(),
             notifications: rpc::notifications(),
-            hub: self.hub_state(),
+            hub: self.hub_state(id),
         };
         self.rpc_respond(id, Response::ok(rid, serde_json::to_value(result).unwrap_or_default()));
     }
 
     /// The hub-wide state now, at the current watermark (`initialize`,
     /// `hub/read`): every hub-wide kind, the scanned ones from their last
-    /// scan (none yet: a scan starts, its notification follows).
-    fn hub_state(&mut self) -> HubState {
+    /// scan (none yet: a scan starts, its notification follows). Its
+    /// `agents` always carries the archived list (agents-light: a
+    /// connection's first agents event, or its resync).
+    fn hub_state(&mut self, id: ClientId) -> HubState {
         let snap = self.snapshot();
         let (agents, cards) = self.proto_rows(&snap);
+        self.proto.forget_archived(id);
+        let agents = self.agents_for(id, &snap, &agents);
         let jobs = HubEv::Jobs { project: self.project(), items: crate::proto_view::jobs(&snap) };
         let arts = self.artifacts_ev();
         let arts = self.proto_artifacts(&arts);
@@ -390,6 +403,19 @@ impl Shell {
         }
     }
 
+    /// One hub-wide event in a shape per connection (agents-light: the
+    /// archived list or not, the older full shape): the watermark moves
+    /// once, as [`Shell::proto_note`]'s, so no client sees a gap.
+    pub(super) fn proto_note_each(&mut self, outs: &[(ClientId, HubEv)]) {
+        if outs.is_empty() {
+            return;
+        }
+        self.rpc.bump();
+        for (id, ev) in outs {
+            self.rpc_out(*id, ev, false);
+        }
+    }
+
     /// A thread's typed event reached the loop (`Msg::Typed`).
     pub(super) fn typed_msg(&mut self, to: Typed, v: Value) {
         let Ok(ev) = HubEv::from_value(v) else { return };
@@ -505,7 +531,7 @@ mod tests {
         let moments: BTreeSet<&str> =
             ["job_end", "followed_end", "route", "route_done", "page_changed", "inbox_recorded", "activity"].into_iter().collect();
         let src = include_str!("rpc.rs");
-        let body = src.split("fn hub_state(&mut self)").nth(1).and_then(|s| s.split("\n    }\n").next()).unwrap();
+        let body = src.split("fn hub_state(&mut self, id: ClientId)").nth(1).and_then(|s| s.split("\n    }\n").next()).unwrap();
         for row in rpc::NOTIFICATIONS.iter().filter(|r| r.scope == rpc::Scope::Hub) {
             match state.get(row.ev) {
                 Some(maker) => assert!(body.contains(maker), "{}: hub_state never calls {maker}", row.method),

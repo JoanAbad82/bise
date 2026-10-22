@@ -294,6 +294,94 @@ impl Agent {
             _ => false,
         }
     }
+
+    /// The row of an archived agent a client merges from its light row
+    /// ([`Archived::merge`]): the light row's fields, the rest at their
+    /// defaults (never invented; `agent/get` gives the full row). `about`
+    /// is its title, `purpose` stays empty.
+    pub fn of_archived(a: &ArchivedAgent) -> Agent {
+        Agent {
+            name: a.name.clone(),
+            main: false,
+            status: a.status,
+            phase: None,
+            archived: true,
+            title: a.about.clone(),
+            purpose: String::new(),
+            since_ms: a.since_ms,
+            waits: 0,
+            parent: None,
+            branch: None,
+            checkout_branch: None,
+            worktree: None,
+            turn_ms: None,
+            report: None,
+            queued: Vec::new(),
+            dir: a.dir.clone(),
+            aliases: a.aliases.clone(),
+            model: None,
+            vision: None,
+            effort: None,
+            usage: None,
+            waiting_on: None,
+            mode: None,
+            path: String::new(),
+            objective: String::new(),
+            note: String::new(),
+            role: String::new(),
+            msgs_queued: 0,
+            inbox: 0,
+            created_ms: None,
+            place: None,
+            place_id: String::new(),
+            efforts: Vec::new(),
+            changes: None,
+            last_pos: None,
+            turns: 0,
+            watching: Vec::new(),
+            doing: None,
+        }
+    }
+}
+
+/// agents-light (issue 36, architect m_37000/m_37220): an archived agent
+/// as `HubEv::Agents.archived` lists it, what the sidebar's archived row,
+/// search and ⌘K draw: its identity (name, aliases, dir: the fields of
+/// chunk 5c's archived name index) and status, since when, and `about`
+/// (its title, else its purpose: the hub's one choice,
+/// `proto_view::about`). The full row comes from `agent/get`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ArchivedAgent {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
+    /// its folder in the hub's `agents/` (its identity across a rename)
+    pub dir: String,
+    pub status: Status,
+    pub since_ms: u64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub about: String,
+}
+
+/// What a client keeps of a hub's archived list: an agents event with
+/// `archived: None` leaves it, `Some` replaces it (the first event of a
+/// connection always has it). The one merge of the Rust clients; the
+/// desktop's store (store/apply.ts) mirrors it, both pinned by
+/// fixtures/archived_merge.json.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Archived(pub Vec<ArchivedAgent>);
+
+impl Archived {
+    /// An agents event's rows: the live ones, then each archived one
+    /// ([`Agent::of_archived`]), after keeping its list when it has one.
+    /// An older hub's archived rows inside `agents` stay as they are.
+    pub fn merge(&mut self, agents: &[Agent], archived: Option<&[ArchivedAgent]>) -> Vec<Agent> {
+        if let Some(list) = archived {
+            self.0 = list.to_vec();
+        }
+        agents.iter().cloned().chain(self.0.iter().map(Agent::of_archived)).collect()
+    }
 }
 
 /// Where an agent works (named apart from `hub::Mode`, a send's).

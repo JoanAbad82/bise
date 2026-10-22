@@ -4,7 +4,7 @@
 // bise_proto::rpc's tables: a method's params are its HubCmd's fields, a notification's its HubEv's.
 
 export const PROTO = 1;
-export const OWN_METHODS = ["initialize", "hub/read", "commands/list"] as const;
+export const OWN_METHODS = ["initialize", "hub/read", "commands/list", "agent/get"] as const;
 
 export const METHODS = {
   "thread/subscribe": { cmd: "subscribe", result: "thread" },
@@ -106,6 +106,7 @@ export const RESULTS = {
   "initialize": "InitializeResult",
   "hub/read": "HubState",
   "commands/list": "CommandsList",
+  "agent/get": "AgentGetResult",
   "command/run": "CommandRunResult",
   "artifacts/add": "CommandRunResult",
   "version/info": "CommandRunResult",

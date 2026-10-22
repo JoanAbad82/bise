@@ -148,8 +148,8 @@ impl Core {
         let mut state = false;
         for ev in evs {
             match ev {
-                HubEv::Agents { agents, .. } => {
-                    self.hub_agents = agents;
+                HubEv::Agents { agents, archived, .. } => {
+                    self.hub_agents = self.hub_archived.merge(&agents, archived.as_deref());
                     self.main_row();
                     state = true;
                 }

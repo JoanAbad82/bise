@@ -1,7 +1,7 @@
 // The store's base (store.ts's split, ambient-lead m_22445): its slices, threads and listeners,
 // the core's port, and the one way out to the core (command). Reads in reads.ts, voice in voice.ts,
 // the events and his actions in store.ts.
-import type { Entry } from "@/proto";
+import type { ArchivedAgent, Entry } from "@/proto";
 import type { CoreCmd, CorePort } from "@/shared/api";
 import type { Ev, FilesAnswer, ThreadOrder } from "./types";
 import type { Ask } from "./window";
@@ -66,6 +66,8 @@ export class StoreBase {
     { project: string; resolve: (a: FilesAnswer | null) => void }
   >();
   protected readonly newestRid = new Map<string, number>();
+  /** agents-light: each project's archived light list as its hub last sent it (store/archived.ts) */
+  protected readonly archivedKept = new Map<string, readonly ArchivedAgent[]>();
   /** each project's newest ⌘F over a thread (findInThread): its thread and rid, for a refusal */
   /** @internal for apply.ts */ readonly finding = new Map<string, { key: string; rid: number }>();
   /** commands asked from this core (said again when a core comes up) */

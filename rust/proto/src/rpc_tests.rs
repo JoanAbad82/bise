@@ -286,8 +286,10 @@ fn initialize_lists_every_method_and_notification() {
     assert_eq!(notifications().len(), NOTIFICATIONS.len());
     let p = InitializeParams::new("bise-tui", "v2026.10.8");
     let v = serde_json::to_value(&p).unwrap();
-    assert_eq!(v, serde_json::json!({"proto": PROTO, "client": {"name": "bise-tui", "version": "v2026.10.8"}, "capabilities": {}}));
+    assert_eq!(v, serde_json::json!({"proto": PROTO, "client": {"name": "bise-tui", "version": "v2026.10.8"}, "capabilities": {"archived_list": true}}));
+    assert!(p.reads_archived_list());
     assert_eq!(serde_json::from_value::<InitializeParams>(serde_json::json!({"proto": 1, "client": {"name": "x"}})).unwrap().capabilities, Value::Null);
+    assert!(!serde_json::from_value::<InitializeParams>(serde_json::json!({"proto": 1, "client": {"name": "x"}})).unwrap().reads_archived_list(), "an older client: the full shape");
 }
 
 

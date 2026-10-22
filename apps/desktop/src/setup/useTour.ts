@@ -54,9 +54,27 @@ export function paletteOpen(open: boolean): void {
   bump();
 }
 
-/** The demo agents of a project in the hub's (start) order, with their ⌥ numbers. Pure. */
-export function membersOf(agents: readonly Agent[], nums: ReadonlyMap<string, number>): Member[] {
-  return agents.filter((a) => !a.main && isDemo(a.purpose)).map((a) => ({ name: a.name, number: a.archived ? null : (nums.get(a.name) ?? null), archived: a.archived }));
+/** The demo agents of a project in the hub's (start) order, with their ⌥ numbers. An archived
+ *  row has no purpose (agents-light: its light row, architect m_37220): it is a demo one when the
+ *  window saw it live as one (`known`, by its dir). Pure. */
+export function membersOf(agents: readonly Agent[], nums: ReadonlyMap<string, number>, known: ReadonlySet<string> = new Set()): Member[] {
+  return agents
+    .filter((a) => !a.main && (isDemo(a.purpose) || (a.archived && known.has(a.dir))))
+    .map((a) => ({ name: a.name, number: a.archived ? null : (nums.get(a.name) ?? null), archived: a.archived }));
+}
+
+/** Each project's demo agents the window saw live, by dir (membersOf's `known`). */
+const demoDirs = new Map<string, Set<string>>();
+
+/** `project`'s known demo dirs, with its live demo agents now added. */
+export function knownDemos(project: string, agents: readonly Agent[]): ReadonlySet<string> {
+  let known = demoDirs.get(project);
+  if (known === undefined) {
+    known = new Set();
+    demoDirs.set(project, known);
+  }
+  for (const a of agents) if (!a.main && !a.archived && isDemo(a.purpose)) known.add(a.dir);
+  return known;
 }
 
 /** The thread in view for this project: an agent's name, 'main' anywhere else. Pure. */
@@ -70,8 +88,8 @@ export function cardOf(cards: readonly Card[]): string | null {
 }
 
 /** What the tour sees now. Pure. */
-export function snapOf(agents: readonly Agent[], nums: ReadonlyMap<string, number>, route: Route, project: string, cards: readonly Card[], open: boolean): Snap {
-  return { members: membersOf(agents, nums), focus: focusOf(route, project), card: cardOf(cards), palette: open };
+export function snapOf(agents: readonly Agent[], nums: ReadonlyMap<string, number>, route: Route, project: string, cards: readonly Card[], open: boolean, known: ReadonlySet<string> = new Set()): Snap {
+  return { members: membersOf(agents, nums, known), focus: focusOf(route, project), card: cardOf(cards), palette: open };
 }
 
 /** A new snapshot of a project: observe() once, whichever screen saw it first. */
@@ -101,6 +119,7 @@ export function tipNow(project: string, snap: Snap): Tip | null {
 /** For the tests: forget every tour and the palette flag. */
 export function resetTours(): void {
   held.clear();
+  demoDirs.clear();
   palette = false;
   bump();
 }
@@ -113,7 +132,7 @@ export function useTour(project: string): { tip: Tip | null; snap: Snap; sent: (
   useSyncExternalStore(subscribe, getVersion);
   const open = palette;
   const cards = useMemo(() => rows.find((r) => r.project === project)?.cards ?? [], [rows, project]);
-  const snap = useMemo(() => snapOf(agents, numbersOf(project, agents), route, project, cards, open), [agents, project, route, cards, open]);
+  const snap = useMemo(() => snapOf(agents, numbersOf(project, agents), route, project, cards, open, knownDemos(project, agents)), [agents, project, route, cards, open]);
   useEffect(() => {
     observeTour(project, snap);
   }, [project, snap]);

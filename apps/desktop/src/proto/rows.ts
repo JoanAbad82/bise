@@ -190,6 +190,20 @@ watching: Array<AgentWatch>,
 doing?: Doing | null, };
 
 /**
+ * agents-light (issue 36, architect m_37000/m_37220): an archived agent
+ * as `HubEv::Agents.archived` lists it, what the sidebar's archived row,
+ * search and ⌘K draw: its identity (name, aliases, dir: the fields of
+ * chunk 5c's archived name index) and status, since when, and `about`
+ * (its title, else its purpose: the hub's one choice,
+ * `proto_view::about`). The full row comes from `agent/get`.
+ */
+export type ArchivedAgent = { name: string, aliases?: Array<string>, 
+/**
+ * its folder in the hub's `agents/` (its identity across a rename)
+ */
+dir: string, status: Status, since_ms: number, about?: string, };
+
+/**
  * An option a client does itself (card-state, architect m_23450): the
  * hub never hears it and the item stays. One rule for the TUI's pick()
  * and the window ([`opt_act`]).

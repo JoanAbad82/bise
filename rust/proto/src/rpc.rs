@@ -132,7 +132,11 @@ pub const INITIALIZED: &str = "initialized";
 pub const HUB_READ: &str = "hub/read";
 /// the slash commands' catalog ([`CommandsList`])
 pub const COMMANDS_LIST: &str = "commands/list";
-pub const OWN_METHODS: &[&str] = &[INITIALIZE, HUB_READ, COMMANDS_LIST];
+/// agents-light (architect m_37220): one agent's full row, archived or
+/// not ([`AgentGetParams`] -> [`AgentGetResult`]): what an archived
+/// agent's light row doesn't carry
+pub const AGENT_GET: &str = "agent/get";
+pub const OWN_METHODS: &[&str] = &[INITIALIZE, HUB_READ, COMMANDS_LIST, AGENT_GET];
 pub const COMMAND_RUN: &str = "command/run";
 
 /// The methods whose result is a type of this module, not a [`HubEv`]'s
@@ -141,6 +145,7 @@ pub const OWN_RESULTS: &[(&str, &str)] = &[
     (INITIALIZE, "InitializeResult"),
     (HUB_READ, "HubState"),
     (COMMANDS_LIST, "CommandsList"),
+    (AGENT_GET, "AgentGetResult"),
     (COMMAND_RUN, "CommandRunResult"),
     // the hub's words (architect m_13313: one owned type for them)
     ("artifacts/add", "CommandRunResult"),
@@ -520,10 +525,41 @@ pub struct InitializeParams {
     pub capabilities: Value,
 }
 
+/// agents-light (architect m_37220): the client reads `HubEv::Agents`'
+/// `archived` light list (and merges it with `rows::Archived`); without
+/// it, a hub sends the older shape (every archived row in full inside
+/// `agents`).
+pub const CAP_ARCHIVED_LIST: &str = "archived_list";
+
 impl InitializeParams {
+    /// Every Rust client of this version reads the archived light list
+    /// ([`CAP_ARCHIVED_LIST`]): the TUI and the desktop's core merge it
+    /// (`rows::Archived`), `bise stop` and `/version` never read agents.
     pub fn new(name: &str, version: &str) -> InitializeParams {
-        InitializeParams { proto: PROTO, client: ClientInfo { name: name.into(), version: version.into() }, capabilities: Value::Object(Map::new()) }
+        let caps = Map::from_iter([(CAP_ARCHIVED_LIST.to_string(), Value::Bool(true))]);
+        InitializeParams { proto: PROTO, client: ClientInfo { name: name.into(), version: version.into() }, capabilities: Value::Object(caps) }
     }
+
+    /// Whether the client said [`CAP_ARCHIVED_LIST`].
+    pub fn reads_archived_list(&self) -> bool {
+        self.capabilities.get(CAP_ARCHIVED_LIST).and_then(Value::as_bool) == Some(true)
+    }
+}
+
+/// `agent/get`'s params: the agent, by its name now.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct AgentGetParams {
+    pub name: String,
+}
+
+/// `agent/get`'s result: its full row (the agents event's builder), none
+/// when the hub has no agent of that name.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct AgentGetResult {
+    #[serde(default)]
+    pub agent: Option<crate::rows::Agent>,
 }
 
 /// The hub-wide state at a watermark: `initialize`'s and `hub/read`'s.

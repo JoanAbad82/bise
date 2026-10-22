@@ -967,14 +967,14 @@ fn archived_lines(
         if selected {
             *sel_row = Some(lines.len());
         }
-        let age = a.report_ms.map(|t| short_age(now.saturating_sub(t))).unwrap_or_default();
+        let age = Some(a.last_ms()).filter(|t| *t > 0).map(|t| short_age(now.saturating_sub(t))).unwrap_or_default();
         let name_style = Style::default().fg(if focused { accent() } else { dim() });
         let first = lines.len();
         let bg = selected.then(selection_bg);
         let right = if age.is_empty() { Vec::new() } else { vec![Span::styled(format!(" {age}"), Style::default().fg(dim()))] };
         lines.push(row(None, (G_STOPPED, faint()), &a.name, name_style, Vec::new(), right, w, bg));
         if selected || focused {
-            let what = if a.report.is_empty() { &a.objective } else { &a.report };
+            let what = a.archived_what();
             lines.push(Line::from(Span::styled(
                 format!("     {}", fit(what, w.saturating_sub(6))),
                 Style::default().fg(dim()),

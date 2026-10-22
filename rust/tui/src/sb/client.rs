@@ -151,6 +151,7 @@ pub(super) fn new_sb(writer: std::sync::Arc<std::sync::Mutex<UnixStream>>, works
         setup: Default::default(),
         approvals: Default::default(),
         timers: Vec::new(),
+        archived: Default::default(),
         rpc: Default::default(),
     }
 }

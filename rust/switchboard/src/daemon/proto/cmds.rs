@@ -608,6 +608,7 @@ impl Shell {
                 if self.rpc.init(id) || self.proto.has(id) {
                     let snap = self.snapshot();
                     let (agents, _) = self.proto_rows(&snap);
+                    let agents = self.agents_for(id, &snap, &agents);
                     self.proto_send(id, &agents);
                 }
                 let text = crate::board::user_board(&self.hub.st, now_ms());

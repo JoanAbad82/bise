@@ -2,7 +2,7 @@
 // that observe() moves once per new snapshot, whichever screen saw it.
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Agent, Card } from '@/proto';
-import { cardOf, focusOf, membersOf, observeTour, resetTours, sentTour, snapOf, tipNow } from './useTour';
+import { cardOf, focusOf, knownDemos, membersOf, observeTour, resetTours, sentTour, snapOf, tipNow } from './useTour';
 
 afterEach(resetTours);
 
@@ -19,6 +19,11 @@ describe('the demo tour holder', () => {
       { name: 'pm', number: 3, archived: false },
     ]);
     expect(membersOf([...team.slice(0, 3), ag('pm', { purpose: 'bise demo', archived: true })], nums).at(-1)).toEqual({ name: 'pm', number: null, archived: true });
+    // agents-light: an archived row from its light row has no purpose: a demo one when seen live
+    const light = ag('pm', { purpose: '', archived: true, dir: 'pm' });
+    expect(membersOf([...team.slice(0, 3), light], nums).at(-1)?.name).toBe('designer');
+    const known = knownDemos('lp', team.map((a) => ({ ...a, dir: a.name })));
+    expect(membersOf([...team.slice(0, 3), light], nums, known).at(-1)).toEqual({ name: 'pm', number: null, archived: true });
   });
 
   it("the focus is the thread in view for this project, else main's", () => {

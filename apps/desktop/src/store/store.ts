@@ -58,6 +58,7 @@ import {
 import { applyTyped } from "./apply";
 import { answers, listsLive, merged, planJump, planNewer } from "./window";
 import { trim } from "./trim";
+import { mergeArchived } from "./archived";
 import { sendRefusedOf, sentOf } from "./echo";
 import type { Thread } from "./base";
 import { cardAnsweredOf, cardKeyOf, type AnsweredFrom } from "./answered";
@@ -381,6 +382,13 @@ export class Store extends StoreVoice {
   /** The newest `@` answer of a project (a partial one, then the full one). */
   filesNow(project: string): FilesAnswer | null {
     return this.slice<FilesAnswer | null>(`files:${project}`, null);
+  }
+
+  /** @internal for apply.ts */ agentsCame(ev: EvOf<"agents">): void {
+    // agents-light: the live rows and the archived list (kept when the event has none), one slice
+    const m = mergeArchived(ev.agents, ev.archived, this.archivedKept.get(ev.project) ?? []);
+    this.archivedKept.set(ev.project, m.kept);
+    this.put(`agents:${ev.project}`, m.rows);
   }
 
   /** @internal for apply.ts */ filesAnswer(ev: EvOf<"files">): void {
