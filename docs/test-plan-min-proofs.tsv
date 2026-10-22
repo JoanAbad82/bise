@@ -43,3 +43,48 @@ batch	line	test	file:fn broken	the break	red?	after revert
 2	app/history-place	apps/desktop src/agents/keep-sel.test.tsx › the row he selected is selected again after a reload	src/app/listkeys.ts:useListKeys	the kept selection is never read back. The thread's scroll place (useKeptScroll on a real layout) has no unit: LOST	red	green again
 2	app/clicks	apps/desktop src/app/sidebar.test.tsx › a project's row opens its main's thread… (new)	src/app/Sidebar.tsx:ProjectRow onClick	a project's row opens its agents list, not its main's thread	red	green again
 2	app/sidebar-foot	apps/desktop src/app/sidebar.test.tsx › …the foot's settings opens settings (new)	src/app/Sidebar.tsx:foot settings onClick	the foot's settings opens the inbox. Its hover look and its uncovered centre are pixels: LOST	red	green again
+3	composer/accents	apps/desktop src/composer/grab.test.ts › a letter, an accent, a dead key, an IME key	src/composer/grab.ts:grabsKey	a dead key (an accent's start) is not grabbed	red	green again
+3	composer/agent-target	apps/desktop src/thread/tab.test.ts › is pink, with its place and context, when his words go to an agent that is not main	src/thread/tab.ts:pinkState	words to another agent are not pink	red	green again
+3	composer/answer-target	apps/desktop src/thread/answering.test.ts › takes the answering project's notice	src/thread/ThreadComposer.tsx:answerNoteOf	the answering project's notice is dropped	red	green again
+3	composer/art-target	apps/desktop src/thread/tab.test.ts › an open artifact decides by its maker alone	src/thread/tab.ts:pinkState	an open artifact's maker never makes it pink	red	green again
+3	composer/at-chips	apps/desktop src/composer/pure.test.ts › a pick inserts the bare path	src/composer/tokens.ts:filePick	a picked path with a space is not quoted	red	green again
+3	composer/at-files	apps/desktop src/composer/pure.test.ts › prefix matches come before substring matches	src/composer/tokens.ts:prefixFirst	substring matches before prefix ones	red	green again
+3	composer/at-folders	apps/desktop src/composer/pure.test.ts › a pick inserts the bare path	src/composer/tokens.ts:filePick	a picked folder stops browsing	red	green again
+3	composer/at-perf	apps/desktop src/composer/pm/at-steady.test.tsx › a key typed before the first file answer keeps the @ list	src/composer/pm/PmField.tsx:rows held	the @ list drops its rows while the answer is on its way. The 100 ms bound: LOST	red	green again
+3	composer/attach-list	apps/desktop src/composer/pm/attach.test.tsx › a file: its name, its size and its folder under ~	src/composer/message.ts:attachRow	a file's folder not under ~	red	green again
+3	composer/chip-paste	apps/desktop src/composer/pm/chipclip.test.ts › select all, cut, paste: the field and its attachment list as before	src/composer/pm/paste.ts:copyFrom	a copy carries no chips, only their labels	red	green again
+3	composer/cmd-notice	apps/desktop src/thread/keyline.test.ts › a refused line is the key line's error	src/thread/ThreadComposer.tsx:keyLineOf	the hub's refusal is not the key line's error	red	green again
+3	composer/code-fence-enter	apps/desktop src/composer/pure.test.ts › ⏎ in a ``` block is a newline	src/composer/mdlive.ts:enterMakesNewline	⏎ inside a code block sends	red	green again
+3	composer/controls	apps/desktop src/composer/hover.test.ts › has a hover	src/composer/composer.css:.send hover	the send has no hover rule (the hover's look: LOST)	red	green again
+3	composer/dictate-anywhere	apps/desktop src/composer/dictate.test.tsx › gets a space after a word	src/composer/dictate.ts:dictated	no space between his word and the dictated ones	red	green again
+3	composer/dictation-meter	apps/desktop src/composer/pm/meter.test.ts › each level comes in on the right	src/composer/pm/meter.ts:push	the newest level comes in on the left	red	green again
+3	composer/dictation	apps/desktop src/composer/dictate.test.tsx › is replaced from where it began	src/composer/dictate.ts:replaceOp	the whole take is replaced, not only the chars that changed	red	green again
+3	composer/dollar-skills	apps/desktop src/composer/pure.test.ts › @ and $ open a word	src/composer/tokens.ts:triggerAt	$ opens no skill list	red	green again
+3	composer/drafts	apps/desktop src/composer/pure.test.ts › history is newest first	src/composer/drafts.ts:remember	history oldest first	red	green again
+3	composer/edit-keys	apps/desktop src/composer/grab.test.ts › never ⌘/ctrl shortcuts	src/composer/grab.ts:grabsKey	ctrl shortcuts are grabbed as text	red	green again
+3	composer/emoji	apps/desktop src/composer/pure.test.ts › a typed closing colon replaces a known name only	src/composer/emoji.ts:typedEmoji	a closing ':' never makes the emoji	red	green again
+3	composer/frame-click	apps/desktop src/ds/ds.test.tsx › the whole box is the input	src/ds/composer.tsx:ComposerFrame onMouseDown	a press on the padding never focuses the field	red	green again
+3	composer/images	apps/desktop src/composer/pm/attach.test.tsx › an image: its file name, never the [Image #n] tag	src/composer/message.ts:attachRow	an image's row shows its [Image #n] tag	red	green again
+3	composer/keybar	apps/desktop src/composer/pure.test.ts › one set of keys per mode	src/composer/keybar.ts:barPairs	recording shows no esc cancel	red	green again
+3	composer/lists-real	apps/desktop src/composer/pure.test.ts › filters by prefix; a not-yet command shows greyed	src/composer/pick.ts:commandRows	a not-yet command is not greyed	red	green again
+3	composer/live-markdown	apps/desktop src/composer/pure.test.ts › prose: list markers, headings, inline code	src/composer/mdcolor.ts:proseRuns	a heading is not colored	red	green again
+3	composer/long-paste	apps/desktop src/composer/pure.test.ts › a paste of 12 lines or 1200 characters is long	src/composer/message.ts:isLongPaste	12 lines is short	red	green again
+3	composer/no-vision	apps/desktop src/composer/pure.test.ts › the no-vision line names the model	src/composer/message.ts:noVisionLine	the line doesn't name the model	red	green again
+3	composer/option-keys	apps/desktop src/thread/quote.test.ts › a printable key types after the quote	src/thread/quote.ts:quoteKey	⌥1 (¡) types after a quote	red	green again
+3	composer/paste-image	apps/desktop src/main/clipfence.test.ts › a seeded text and image paste with ⌘V alone	src/main/clipfence.ts:clipKey	⌘V is not a paste	red	green again
+3	composer/paste-link	apps/desktop src/composer/linkpaste.test.ts › gives [words](url)	src/composer/linkpaste.ts:linkPaste	a URL over words replaces them, no link	red	green again
+3	composer/picker-steady	apps/desktop src/composer/pm/at-steady.test.tsx › a key typed before the first file answer keeps the @ list	src/composer/pm/PmField.tsx:waiting	the field never knows an @ answer is on its way	red	green again
+3	composer/prefixes	apps/desktop src/composer/pure.test.ts › say and steer go out without their word	src/composer/message.ts:buildMessage	'say ' goes out with its word	red	green again
+3	composer/question-space	apps/desktop src/composer/grab.test.ts › space types a space	src/composer/grab.ts:grabsKey	space is not grabbed	red	green again
+3	composer/quote	apps/desktop src/composer/pm/attach.test.tsx › a quote: its first words and where it came from	src/composer/message.ts:quoteAbout	a quote of main says 'main', not the thread's name	red	green again
+3	composer/type-anywhere	apps/desktop src/composer/grab.test.ts › an input, a textarea, a select	src/composer/grab.ts:editable	a focused select loses its keys to the composer	red	green again
+3	composer/draft-quit	apps/desktop src/composer/pm/engine.test.tsx › a draft saved and a send made while he talks	src/composer/pm/PmField.tsx:writeNow	the field's write keeps no draft (first try, drafts.save, stayed green: that test reads a stored entry). The quit itself (app.quit flushing storage): LOST	red	green again
+3	composer/list-indent	apps/desktop src/composer/pure.test.ts › tab indents an item by its marker width	src/composer/mdlive.ts:indent	tab indents 4 under a sibling, whatever its marker (first try, the item's own unit, stayed green: the sibling's wins)	red	green again
+3	composer/slash	apps/desktop src/composer/pure.test.ts › / only at the start of the message	src/composer/tokens.ts:triggerAt	/ opens the list on a later line of the message (first try, start === 0, stayed green)	red	green again
+3	composer/dictation-retry	apps/desktop src/composer/dictation-laws.test.tsx › words with an error land, and the kept take goes	src/composer/pm/dictation.ts:final	the kept take is never dropped	red	green again
+3	composer/subword	apps/desktop src/composer/pure.test.ts › subword moves stop at camelCase	src/composer/mdlive.ts:subwordLeft	⌥← stops at every char	red	green again
+3	composer/queue-steer	apps/desktop src/composer/Composer.test.tsx › tab during a turn queues his words… (new)	src/composer/pm/keys.ts:Tab	tab during a turn doesn't queue	red	green again
+3	review/feature-refused	rust/switchboard feature_tests.rs › a_refused_answer_says_why_on_the_item	switchboard/src/feature.rs:refused_line	the line drops its why (heavy-run --low, one build)	red	green again
+3	app/keep-scroll	apps/desktop src/app/keep.test.ts › a scroll, a focus or a mode lives 10 minutes (now asserts the literal)	src/app/keep.ts:SHORT_MS	the constant changed: 9 minutes	red	green again
+3	app/list-walk	apps/desktop src/app/listkeys.test.tsx › the TUI's moves (now asserts the literal)	src/app/listkeys.ts:PAGE	the constant changed: 9	red	green again
+3	app/reload-line	apps/desktop src/app/ReloadLine.test.ts › 'up' and 'passed' show 3 s (now asserts the literal)	src/app/ReloadLine.tsx:SHOW_DONE_MS	the constant changed: 2 s	red	green again

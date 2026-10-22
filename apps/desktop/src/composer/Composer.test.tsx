@@ -214,6 +214,27 @@ describe('the composer', () => {
     expect(onSend).toHaveBeenLastCalledWith(buildMessage(segs));
   });
 
+  // min-tests: composer/queue-steer: tab during a turn queues his words and sends nothing; ⏎ sends at once
+  it('tab during a turn queues his words, the field empties, nothing sent; ⏎ during a turn sends at once', async () => {
+    const onQueue = vi.fn();
+    const { getByTestId, onSend, act: a } = await mount({ busy: true, onQueue });
+    const field = getByTestId('composer.field');
+    await act(async () => {
+      a.insertText('after this one');
+      await Promise.resolve();
+    });
+    fireEvent.keyDown(field, { key: 'Tab', code: 'Tab' });
+    expect(onQueue).toHaveBeenCalledWith(buildMessage([{ kind: 'text', text: 'after this one' }]));
+    expect(onSend).not.toHaveBeenCalled();
+    expect(field.textContent).toBe('');
+    await act(async () => {
+      a.insertText('now');
+      a.submit();
+      await Promise.resolve();
+    });
+    expect(onSend).toHaveBeenLastCalledWith(buildMessage([{ kind: 'text', text: 'now' }]));
+  });
+
   // min-tests: composer/approvals-toggle (TP-R6) and composer/no-undo (bar T K23)
   it('⇧⇥ in the field is the approvals switch (onShiftTab), never an outdent; ⌘Z with nothing to undo says so', async () => {
     const onShiftTab = vi.fn();

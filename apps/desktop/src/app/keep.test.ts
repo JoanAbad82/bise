@@ -1,7 +1,7 @@
 // The keep's laws (ambient-lead m_11756, m_11763): his text until sent or emptied, the view with
 // no age, the short bits 10 minutes, unreadable words read as empty.
 import { describe, expect, it } from 'vitest';
-import { createKeep, KEEP_KEY, parseKeep, SHORT_MS, WRITE_MS, type KeepStore } from './keep';
+import { createKeep, KEEP_KEY, parseKeep, WRITE_MS, type KeepStore } from './keep';
 import { cardDraftKey, pruneCardDrafts } from '@/inbox/drafts';
 
 function mem(): KeepStore & { data: Map<string, string>; writes: number } {
@@ -90,7 +90,7 @@ describe('the keep', () => {
     k.setView('route', { screen: 'thread', project: 'acme', agent: 'perf' });
     k.setView('scroll:acme/perf', 42, true);
     k.flush();
-    c.tick(SHORT_MS - 1);
+    c.tick(10 * 60_000 - 1);
     const again = createKeep(s, c.now, c.later);
     expect(again.view('scroll:acme/perf')).toBe(42);
     c.tick(2);

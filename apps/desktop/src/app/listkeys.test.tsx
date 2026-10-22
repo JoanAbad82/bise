@@ -9,7 +9,7 @@ const ROWS = Array.from({ length: 25 }, (_, i) => `r${String(i)}`);
 
 describe('the list keys (pure)', () => {
   it("the TUI's moves: ↑/k ↓/j one, pgup/pgdn ten, home/end the ends; others are no move", () => {
-    expect(['ArrowDown', 'j', 'ArrowUp', 'k', 'PageDown', 'PageUp'].map(stepOf)).toEqual([1, 1, -1, -1, PAGE, -PAGE]);
+    expect(['ArrowDown', 'j', 'ArrowUp', 'k', 'PageDown', 'PageUp'].map(stepOf)).toEqual([1, 1, -1, -1, 10, -10]);
     expect(['a', ' ', 'Enter', 'Escape'].map(stepOf)).toEqual([0, 0, 0, 0]);
     expect(moved(ROWS, 'r0', stepOf('End'))).toBe('r24');
     expect(moved(ROWS, 'r24', stepOf('Home'))).toBe('r0');

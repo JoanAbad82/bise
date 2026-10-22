@@ -19,7 +19,8 @@ describe('reloadView: the switch row as the status line, in Rust switch_line wor
   it("'up' and 'passed' show 3 s from at_ms, fold, then go", () => {
     for (const p of ['up', 'passed'] as const) {
       expect(reloadView(row(p), AT + 100)).toEqual({ text: '✓ reloaded on f7178b72', tone: 'done', fold: false, shas: ['f7178b72'] });
-      expect(reloadView(row(p), AT + SHOW_DONE_MS)?.fold).toBe(true);
+      expect(reloadView(row(p), AT + 2999)?.fold).toBe(false);
+      expect(reloadView(row(p), AT + 3000)?.fold).toBe(true);
       expect(reloadView(row(p), AT + SHOW_DONE_MS + FOLD_MS)).toBeNull();
     }
   });
