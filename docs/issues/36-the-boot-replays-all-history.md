@@ -270,3 +270,37 @@ tests/fixtures/bend-recv-repro/).
   full, each with its whole objective, + the light list), hub/scheduled
   95 KB (the last week's ended timers included). The next measure starts
   from these.
+- **chunk 5a, what a step or a batch needs** (boot-photo, signed architect
+  m_37467), bbb5e56f3: bend/hub/needs.bend (needs, needs_batch through a
+  batch's renames, needs_in, drop_old); laws apply_is_local_msg and
+  fetch_then_apply_list proven (bend/proofs/cold-store.bend);
+  tests/cold_apply_lint.py (M.apply, replay_batch and needs.bend reach no
+  need). step_is_local / view_is_local are aims, not gates (architect
+  m_37415), checked on his journal copy by tests/cold_local_check.py: 78
+  inputs committed with every cold message outside needs_in dropped,
+  journal/effects/need diffs 0, misses 0. No sb-core change.
+
+## Next (not started; boot-photo was archived after 5a)
+
+- **5b, messages out, fetch on miss** (architect m_37415): cold_out of
+  St.old with generations into crate::cold's store. In a STEP (never in
+  apply), every cold lookup (msg_of, rec_at, reply_at, agent_named/alias on
+  arch) that meets a stored id or name not in memory halts with a need for
+  it through the existing need/ans, and the input runs again once fetched
+  (a step is pure until committed). needs_in stays the batching
+  optimisation (one ask up front); a miss costs a round trip, never a wrong
+  answer. Law, about the lookup fn only: a step's lookup of a stored record
+  reads it or emits its need, never answers None for it. One hub.log line
+  per miss ('needs_in missed msg 1234 for input answer') and a miss count
+  in the boot/step measure.
+- **5c, archived agents out**: the arch name index (name, aliases, dir,
+  plus the light row's status, since_ms, about: one index with
+  agents-light) stays in memory; the full records go to the store.
+- **5d**: the mirror and view_all read cold records through crate::cold;
+  done-when as plan v2 (photo < ~5 MB on his copy, restore + view_all flat
+  on the 10x synthetic journal, boot by phase). Each 5x sha to the
+  architect with core_same, old_core_replay and boot-by-phase numbers.
+- **agents-light's TUI parity check** (architect's point 5): on main, the
+  TUI's archived section draws the same rows from the light list as from
+  the old full shape (age from since_ms, text report/objective/title).
+- **Shim agents-full-archived** goes in v2026.10.2-52 (tests/shims.txt).
