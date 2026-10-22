@@ -561,8 +561,7 @@ def feature_name(+target: String) -> String:
   Bool.pick(String, String.starts_with(target, "refs/heads/"), String.drop(target, 11n), target)
 
 # an agent sb-core does not know (a feature's own merge or retire, no
-# agent, a land whose agent is gone) keeps its land's target: it stays
-# in that line (architect m_37473)
+# agent) keeps its line
 def onto.of(m: Maybe<&2, S.Agent>, +target: String, +trunk: String) -> String:
   match m:
     case None{}:
