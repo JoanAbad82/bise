@@ -1,0 +1,16 @@
+batch	line	test	file:fn broken	the break	red?	after revert
+1	app/bar-slide	apps/desktop src/app/over.test.ts › closes it when the window goes wide, and back to narrow it stays closed (new)	src/app/over.ts:overOf	drop 'slid.width === width' (the class it opened on)	red	green again
+1	app/bottom-block	apps/desktop src/app/route.test.ts › a review to its agent, a project's screen to its main…	src/app/route.ts:bottomTarget	a review's bottom block writes to main, not its agent	red	green again
+1	app/working-count	apps/desktop src/app/side.test.ts › the number at work and his pink count…	src/app/side.ts:projectSide	the count shows only above 2 at work	red	green again
+1	app/report	apps/desktop src/main/core/report.test.ts › is named crash-HH-MM.md in local time	src/main/core/report.ts:reportName	hours and minutes swapped in the file name	red	green again
+1	artifacts/links	apps/desktop src/main/framelink.test.ts (its frameLink tests: 5 red of 22)	src/main/framelink.ts:frameLink	a web link from the frame is dropped, never sent out	red	green again
+1	artifacts/links	apps/desktop src/main/menu.test.ts › externalUrl (window.bise.openExternal)	src/main/external.ts:externalUrl	no web url goes to openExternal	red	green again
+1	bims/budget	apps/desktop src/bims/Office.test.tsx › nothing while the renderer loads…, one frame and it stops when all is still	src/bims/Office.tsx:draw (the loop)	a still office (next null) keeps asking frames. Clause (1), three in its own chunk, has no unit: LOST	red	green again
+1	bims/mapsel	apps/desktop src/bims/Office.test.tsx › a pick sends the map…	src/bims/MapChip.tsx:MapChip	a pick sends the loft whatever he picked	red	green again
+1	bims/toggle	apps/desktop src/bims/Office.test.tsx › no 'bims' pill in the head…	src/bims/Office.tsx:BimsSwitch	320 | wide shows with the office off	red	green again
+1	thread/approval-raw	apps/desktop src/thread/ThreadScreen.test.tsx › thread/approval-raw: his no is drawn from the approval entry, its ok a boolean on the row (new)	src/thread/rows-cards.tsx:ApprovalRow	data-ok is not the entry's boolean ('no' for false)	red	green again
+1	thread/approval-raw	apps/desktop src/thread/entry.test.ts › everything he said goes right…	src/thread/entry.ts:sideOf	his approval drawn on the agent's side	red	green again
+1	thread/news-links	apps/desktop src/review/prs.test.tsx › …a click opens the PR in his browser	src/review/PrsScreen.tsx:PrRow	a click opens another url than the PR's	red	green again
+1	thread/opens-at-end	apps/desktop src/thread/thread.test.tsx › firstItemIndex goes down by the rows added in front…	src/thread/ThreadList.tsx:nextFirstIndex	rows added in front don't move firstItemIndex	red	green again
+1	thread/route-hold	apps/desktop src/thread/routes.test.tsx › his pending row shows '→ bise · acme · 2 s to change'…	src/thread/rows-messages.tsx:HoldLine	the hold names the project id, not its name	red	green again
+1	agents/lifecycle	apps/desktop src/review/review.test.tsx › lists the live agents, opens one, stops and archives…	src/agents/AgentsScreen.tsx:restore button	restore sends archive, not unarchive	red	green again

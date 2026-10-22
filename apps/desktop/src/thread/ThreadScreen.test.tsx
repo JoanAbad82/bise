@@ -180,6 +180,19 @@ describe('the thread screen', () => {
     expect(v.getByTestId('thread.entry.950').textContent).toContain('■ stopped');
   });
 
+  it('thread/approval-raw: his no is drawn from the approval entry, its ok a boolean on the row', () => {
+    const { store } = setup();
+    act(() => {
+      store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 85, at_ms: 1, kind: 'approval', text: '', approval: { ok: false, text: 'you said no to release: git push --force', note: 'use a branch' } } });
+    });
+    const v = render(
+      <StoreProvider store={store}>
+        <EntryRow ctx={ctx} pos={85} />
+      </StoreProvider>,
+    );
+    expect(v.getByTestId('thread.approval.85').closest('.th-approval')?.getAttribute('data-ok')).toBe('false');
+  });
+
   it('a new entry never re-renders the composer', () => {
     const { store } = setup();
     render(

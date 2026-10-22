@@ -18,6 +18,7 @@ import { useModHeld } from "./held";
 import { useProjects } from "@/store";
 import { keep } from "./keep";
 import { formatRoute, type Route } from "./route";
+import { overOf, type Slid } from "./over";
 import { type Side, useRoute, useRouter } from "./router";
 import { TitleStatus } from "./TitleStatus";
 import {
@@ -130,18 +131,10 @@ export function useFrame(): FrameState {
   const home = rows.find((p) => p.home)?.project;
   const [hidden, setHidden] = useKeptFlag("frame.side.hidden");
   const [kept, setKept] = useKeptFlag("frame.panel");
-  // what slid over, for the route and the width class it opened on: a move closes it (he picked a
-  // row in it), and so does the window crossing 1000 or 1100 px (try-gate dc4770c1: slid over at
-  // 800, then 1400, the docked bar came under it with the scrim still taking every click). Back
-  // under 1000 it stays closed: the class it opened on is gone.
+  // what slid over, for the route and the width class it opened on (overOf, over.ts)
   const at_ = formatRoute(route);
-  const [slid, setSlid] = useState<{
-    what: "side" | "panel";
-    at: string;
-    width: Width;
-  } | null>(null);
-  const over =
-    slid !== null && slid.at === at_ && slid.width === width ? slid.what : null;
+  const [slid, setSlid] = useState<Slid | null>(null);
+  const over = overOf(slid, at_, width);
   const setOver = (
     f: (o: "side" | "panel" | null) => "side" | "panel" | null,
   ) => {
