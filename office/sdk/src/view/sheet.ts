@@ -123,13 +123,29 @@ export function mountGrid(el: HTMLElement, data: UWorkbook, opts: { dark: boolea
     his = true;
   };
   for (const t of ["pointerdown", "keydown", "paste", "drop"]) el.addEventListener(t, touched, { capture: true });
+  // the look's own mutations (the gridlines' color) are never his change
+  let quiet = false;
+  // the gridlines in dark: the kit's rule color (tokens.css --line, the warm grey of the panel's
+  // own rules; designer m_37891), never Univer's olive; in light Univer's own (signed as is)
+  const lines = (dark: boolean): void => {
+    const rule = dark ? getComputedStyle(document.documentElement).getPropertyValue("--line").trim() : "";
+    quiet = true;
+    try {
+      for (const ws of book.getSheets()) ws.setGridLinesColor((rule || undefined) as string);
+    } catch {
+      // a look, never a reason to fail the grid
+    } finally {
+      quiet = false;
+    }
+  };
   const subs = [
     api.addEvent(api.Event.CommandExecuted, (c) => {
-      if (c.type === CommandType.MUTATION && his) for (const fn of listeners) fn();
+      if (c.type === CommandType.MUTATION && his && !quiet) for (const fn of listeners) fn();
     }),
     api.addEvent(api.Event.Scroll, moved),
     api.addEvent(api.Event.ActiveSheetChanged, moved),
   ];
+  lines(opts.dark);
 
   return {
     snapshot: () => book.save() as unknown as UWorkbook,
@@ -181,7 +197,10 @@ export function mountGrid(el: HTMLElement, data: UWorkbook, opts: { dark: boolea
     onMove: (fn) => {
       movers.push(fn);
     },
-    dark: (on) => api.toggleDarkMode(on),
+    dark: (on) => {
+      api.toggleDarkMode(on);
+      lines(on);
+    },
     dispose() {
       for (const s of subs) s.dispose();
       univer.dispose();

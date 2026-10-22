@@ -160,6 +160,7 @@ def root_ships_what_a_version_dir_has():
     # import of it a 404), and a failed build stops the root
     check("scripts/bins.sh path --src \"$PWD\" office-sheet)\" || { " in s
           and "cp \"$g\" /r/root-abc.tmp/office/dist/office-sheet.js" in s, "root_script: the xlsx grid: %s" % s)
+    check("scripts/runtime_check.sh /r/root-abc.tmp\nrm -rf /r/root-abc && mv" in s, "root_script: checked whole before the rename: %s" % s)
 
 
 def root_of(script):

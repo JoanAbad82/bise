@@ -214,6 +214,8 @@ build_from() {
     echo "macos=$MACOSX_DEPLOYMENT_TARGET"
     echo "repo=$REPO"
   } > "$tmp/VERSION"
+  # whole for the viewer (the xlsx grid above): never a version dir without it
+  "$REPO/scripts/runtime_check.sh" "$tmp" || { say "version $id is not whole (runtime_check.sh)"; exit 1; }
   rm -rf "$vdir"; mv "$tmp" "$vdir"
   CLEAN_TMP=""
   say "version $id built: $vdir ($(du -sh "$vdir" | cut -f1))"

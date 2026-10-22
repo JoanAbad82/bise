@@ -26,6 +26,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 function need(name) {
   const p = process.env[name];
@@ -45,6 +46,14 @@ const helper = need('BISE_PACK_HELPER');
 const root = need('BISE_PACK_ROOT');
 for (const f of ['VERSION', 'repl-live', 'sb-core']) {
   if (!existsSync(join(root, f))) throw new Error(`electron-builder.mjs: BISE_PACK_ROOT (${root}) has no ${f}: not a runtime`);
+}
+// whole for the artifact viewer (office/dist with the xlsx grid, built, never committed: a root
+// without it shipped an app whose xlsx viewer imported a 404, xlsx-fix): scripts/runtime_check.sh
+// says what is missing, and no pack goes on without it
+try {
+  execFileSync('bash', [fileURLToPath(new URL('../../scripts/runtime_check.sh', import.meta.url)), root], { stdio: ['ignore', 'inherit', 'pipe'] });
+} catch (e) {
+  throw new Error(`electron-builder.mjs: BISE_PACK_ROOT (${root}) is not whole: ${String(e.stderr ?? e.message).trim()}`);
 }
 // optional: the release's VERSION file (make-release writes id= and built=)
 const version = process.env['BISE_PACK_VERSION'] ? need('BISE_PACK_VERSION') : null;

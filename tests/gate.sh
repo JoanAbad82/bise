@@ -849,6 +849,8 @@ python3 "$root/tests/include_map.py" --self-test >/dev/null || { python3 "$root/
 # the desktop checks' selection: its shadow never fails a land, its audit, the coverage map's rules
 # on synthetic coverage (fast-try p2; review-gates m_29412)
 python3 -B "$root/tests/desktop_pick_test.py" >/dev/null || { python3 -B "$root/tests/desktop_pick_test.py"; echo "GATE quick FAILED"; exit 1; }
+# every build that ships a runtime checks it is whole for the viewer (the xlsx grid; xlsx-fix)
+python3 -B "$root/tests/runtime_check_test.py" >/dev/null || { python3 -B "$root/tests/runtime_check_test.py"; echo "GATE quick FAILED"; exit 1; }
 python3 -B "$root/tests/desktop_pick_audit.py" --self-test >/dev/null || { python3 -B "$root/tests/desktop_pick_audit.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 if [ -d "$root/apps/desktop" ]; then
   node "$root/apps/desktop/tests/harness/coverage/covmap.mjs" --self-test >/dev/null || { node "$root/apps/desktop/tests/harness/coverage/covmap.mjs" --self-test; echo "GATE quick FAILED"; exit 1; }

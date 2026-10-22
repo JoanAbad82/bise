@@ -64,6 +64,8 @@ def root_script(root):
             "if [ -d computer-use/extension ]; then cp -R computer-use/extension %s/computer-use/extension && rm -rf %s/computer-use/extension/test; fi"
             % (q(t), q(t)),
             "printf 'id=%%s\\ncommit=%%s\\nrepo=%%s\\n' %s \"$(git rev-parse HEAD)\" \"$PWD\" > %s/VERSION" % (q(os.path.basename(root)), q(t)),
+            # whole for the viewer (the xlsx grid above), or no root: scripts/runtime_check.sh
+            "scripts/runtime_check.sh %s" % q(t),
             "rm -rf %s && mv %s %s" % (q(root), q(t), q(root))]
 
 

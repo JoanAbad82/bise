@@ -141,6 +141,8 @@ if [ -d "$vdir/computer-use/extension" ]; then mkdir -p "$app/computer-use"; cp 
 kit=""
 if [ -d "$vdir/kit" ]; then cp -R "$vdir/kit" "$app/kit"; kit=kit
 elif [ -d "$vdir/apps/ambient/kit" ]; then mkdir -p "$app/apps/ambient"; cp -R "$vdir/apps/ambient/kit" "$app/apps/ambient/kit"; fi
+# whole for the viewer (office/dist with the xlsx grid, never committed): never a release without it
+"$REPO/scripts/runtime_check.sh" "$app" || { say "$id is not whole for the viewer (scripts/runtime_check.sh): build its version again"; exit 1; }
 cp "$js" "$app/$jsrt_at"
 # VERSION: the dev repo path means nothing on the user's machine (the
 # daemon would look for versions.sh there); the target says what it runs on
