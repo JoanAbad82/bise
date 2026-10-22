@@ -245,6 +245,12 @@ with tempfile.TemporaryDirectory() as home:
           "the waiting agent's status says why: %r" % sb_lines())
     open(freef, "w").write(str(20 * GB))
     check(waiter.wait(timeout=30) == 0 and os.path.exists(ran), "20 GB free: the job runs")
+    # its start line says what it waited on (review-gates m_37641): the disk, some seconds
+    st = [l.split("\t") for l in lines() if ran in l and l.split("\t")[2] == "-"]
+    wt = dict(kv.split(":") for kv in st[-1][6][len("waited="):].split()) if st and st[-1][6:7] and st[-1][6].startswith("waited=") else {}
+    # (its last round, the slot probe once the disk was there, counts a second or two as slot)
+    check(int(wt.get("disk", 0)) >= 2 and int(wt.get("slot", 9)) <= 2 and wt.get("load") == "0",
+          "its start line: waited=disk:>=2 slot:<=2 load:0: %r" % (st[-1][6:] if st else lines()[-2:]))
     errf.seek(0)
     err = errf.read()
     check("heavy-run: waiting for disk room: 11 GB free" in err and "disk room again (20 GB free)" in err,
@@ -417,13 +423,15 @@ with tempfile.TemporaryDirectory() as home:
     check(r.returncode == 0 and os.path.exists(ran6), "the reserves capped at 4: a 2 GB job runs at 18 GB free (needs 16): %r" % r.stderr[-300:])
     open(go_c, "w").close()
     job_ends(big, 30)
-    # the running jobs count what their kind measured (main m_37463), from 3
-    # measured runs on (review-gates m_37481), else their flat guess: an
+    # the running jobs count what their kind measured (main m_37463), from 10
+    # measured runs on (review-gates m_37660), else their flat guess: an
     # 'other' job (flat 2) beside a 2 GB job at 13 GB free (10 floor + 2):
-    # 3 runs at 0 count 0 (it runs); none, or 2 runs at 0, count the flat 2
-    # (it waits, 14); 3 runs at 3 GB count 3 (it waits, 15)
-    for measured, runs_now, what in (([0] * 3, True, "3 runs at 0: 0"), ([], False, "nothing measured: flat 2"),
-                                     ([0] * 2, False, "2 runs at 0: under 3, flat 2"), ([3 * GB] * 3, False, "3 runs at 3 GB: 3")):
+    # 10 runs at 0 count 0 (it runs); none, or 9 runs at 0, count the flat 2
+    # (it waits, 14); 10 runs at 3 GB count 3 (it waits, 15); 9 small runs and
+    # one 6.5 GB script: the p90 is the second largest, 1, not 7 (it runs, 13)
+    for measured, runs_now, what in (([0] * 10, True, "10 runs at 0: 0"), ([], False, "nothing measured: flat 2"),
+                                     ([0] * 9, False, "9 runs at 0: under 10, flat 2"), ([3 * GB] * 10, False, "10 runs at 3 GB: 3"),
+                                     ([GB // 10] * 9 + [int(6.5 * GB)], True, "9 small runs + one 6.5 GB: 1, not 7")):
         if os.path.exists(dtsv):
             os.remove(dtsv)
         if measured:
@@ -437,14 +445,15 @@ with tempfile.TemporaryDirectory() as home:
         check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]), "the 'other' job runs")
         rf = [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")][0]
         parts = open(os.path.join(run, "reserve", rf)).read().rstrip("\n").split("\t")
-        check(parts[0] == "2" and parts[4] == "other", "its reserve file: 2 GB, kind other: %r" % parts)
+        check(parts[4] == "other", "its reserve file: kind other: %r" % parts)
         parts[2] = str(13 * GB)
         open(os.path.join(run, "reserve", rf), "w").write("\t".join(parts) + "\n")
         open(freef, "w").write(str(13 * GB))
         ran7 = os.path.join(home, "ran7")
         if os.path.exists(ran7):
             os.remove(ran7)
-        small = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran7], env=envr, stderr=subprocess.DEVNULL)
+        # its own reserve named (2): the case is what the running job counts
+        small = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran7], env=dict(envr, HEAVY_RESERVE_GB="2"), stderr=subprocess.DEVNULL)
         if runs_now:
             check(job_ends(small, 30) == 0 and os.path.exists(ran7), "a running 'other' job, %s: a 2 GB job runs at 13 GB free" % what)
         else:

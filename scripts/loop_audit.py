@@ -454,14 +454,30 @@ def heavy_waits(h, since):
             # gate: the gate mode, read from the whole command before its cut to 80 (an agent's
             # quick gate is a 90+ char worktree path: review-gates m_37235)
             g = GATE_CMD_RX.search(f[5])
+            # waited: what it waited on before its start, in s ('waited=disk:5 slot:0 load:0 batt:0',
+            # since review-gates m_37641); None on older lines
+            w = next((x[len("waited="):] for x in f[6:] if x.startswith("waited=")), None)
+            waited = {k: int(v) for k, v in (kv.split(":", 1) for kv in w.split() if ":" in kv) if v.isdigit()} if w is not None else None
             rows[key] = {"submit": int(f[0]), "start": int(f[1]), "end": None, "slot": f[3],
-                         "cwd": f[4], "cmd": f[5].strip()[:80], "gate": g.group(1) if g else None}
+                         "cwd": f[4], "cmd": f[5].strip()[:80], "gate": g.group(1) if g else None, "waited": waited}
     out = sorted(rows.values(), key=lambda x: x["start"])
     nxt = {}
     for x in reversed(out):
         x["end"] = ends.get((str(x["submit"]), str(x["start"]), x["slot"])) or min(nxt.get(x["slot"], x["start"] + 3600), x["start"] + 3 * 3600)
         nxt[x["slot"]] = x["start"]
     return out
+
+
+def waited_on(hv, mode):
+    """The seconds the gate.sh <mode> jobs waited, by what they waited on (disk, slot, load, batt),
+    summed over the jobs whose start line says it, and how many said it. Pure."""
+    tot, n = {}, 0
+    for x in hv:
+        if x.get("gate") == mode and x.get("waited") is not None:
+            n += 1
+            for k, v in x["waited"].items():
+                tot[k] = tot.get(k, 0) + v
+    return tot, n
 
 
 def gate_queue(hv, mode, runs):
@@ -520,7 +536,7 @@ def audit(h, hub, since):
         rep["gates"][mode] = {"runs": len(runs), "green": sum(r["green"] for r in runs), "reds": why,
                               "secs_p50": med(green), "secs_p90": pct(green, 0.9),
                               "queue_p50": med(queue), "queue_p90": pct(queue, 0.9), "queue_max": max(queue or [0]),
-                              "queue_from": qfrom, "light": light,
+                              "queue_from": qfrom, "light": light, "waited_on": waited_on(hv, mode),
                               "steps_p50": {s: med([r["steps"][s] for r in runs if s in r["steps"]])
                                             for s in sorted({s for r in runs for s in r["steps"]})}}
     # tests: run_all.sh's timings.tsv (every e2e/tmux run, wherever its
@@ -684,6 +700,10 @@ def report(rep):
         w("- %s: %d runs, %d green; green p50 %s, p90 %s; queue p50 %s, p90 %s, max %s (%s; %d light, no slot); steps p50 %s" % (
             mode, g["runs"], g["green"], fmt_s(g["secs_p50"]), fmt_s(g["secs_p90"]), fmt_s(g["queue_p50"]),
             fmt_s(g["queue_p90"]), fmt_s(g["queue_max"]), g["queue_from"], g["light"], ", ".join("%s %s" % (s, fmt_s(v)) for s, v in g["steps_p50"].items())))
+        tot, n = g.get("waited_on") or ({}, 0)
+        if n:
+            w("  - what its %d runs with the field waited on, in total: %s" % (n, ", ".join(
+                "%s %s" % (k, fmt_s(v)) for k, v in sorted(tot.items(), key=lambda kv: -kv[1]))))
         if g["reds"]:
             w("  - its red runs, by what was red: %s" % ", ".join(
                 "%s %d" % kv for kv in sorted(g["reds"].items(), key=lambda kv: -kv[1])))
@@ -767,11 +787,14 @@ def self_test():
             fh.write("100\t509\t-\theavy.lock\t%s\t%s/tests/gate.sh quick \n" % (wt, wt))
             fh.write("100\t509\t700\theavy.lock\t%s\t%s/tests/gate.sh quick \trc=0\n" % (wt, wt))
             fh.write("200\t200\t-\tlight\t%s\ttests/gate.sh quick \n" % wt)
+            fh.write("250\t400\t-\theavy3.lock\t%s\ttests/gate.sh quick \twaited=disk:100 slot:40 load:10 batt:0\n" % wt)
             fh.write("300\t900\t-\theavy2.lock\t%s\tbash tests/gate.sh full \n" % wt)
         hv = heavy_waits(hd, 0)
     long_q = [x for x in hv if x["slot"] == "heavy.lock"][0]
     assert "gate.sh quick" not in long_q["cmd"] and long_q["gate"] == "quick", long_q
-    assert gate_queue(hv, "quick", [{"queue": 0}]) == ([0, 409], "heavy.log", 1), gate_queue(hv, "quick", [])
+    assert gate_queue(hv, "quick", [{"queue": 0}]) == ([0, 150, 409], "heavy.log", 1), gate_queue(hv, "quick", [])
+    assert waited_on(hv, "quick") == ({"disk": 100, "slot": 40, "load": 10, "batt": 0}, 1), waited_on(hv, "quick")
+    assert waited_on(hv, "full") == ({}, 0)
     assert gate_queue(hv, "full", []) == ([600], "heavy.log", 0), gate_queue(hv, "full", [])
     assert gate_queue([], "quick", [{"queue": 7}]) == ([7], "gate logs", 0)
     assert r["tests"] == {"e2e": (True, 49, 120), "every_e2e": (False, 93, None)}, r

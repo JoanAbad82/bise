@@ -36,7 +36,8 @@
 #         heavy-run (an old caller's lockf) is busy all the same: every slot
 #         is probed.
 # heavy.log: a line when the job gets its slot, "<submitted> <started> -
-# <slot> <cwd> <command>", and one when it ends, "<submitted> <started>
+# <slot> <cwd> <command> waited=disk:<s> slot:<s> load:<s> batt:<s>" (what it
+# waited on, review-gates m_37641), and one when it ends, "<submitted> <started>
 # <ended> <slot> <cwd> <command> rc=<n>" (scripts/loop_audit.py reads both).
 # The whole body is one function, read before it runs: an edit of this file
 # while jobs wait in it can't make them run half-old, half-new text (bash
@@ -227,15 +228,17 @@ p90_gb() {
 # what a RUNNING job of kind $1 may still write, for the jobs that wait
 # (main m_37463, Gabriel: « on ship beaucoup trop lentement »: agents sat
 # for hours at 25 GB free behind the running jobs' flat 10 GB guesses): the
-# measured p90 of its kind in disk.tsv, from 3 measured runs on (review-gates
-# m_37481); under 3, the flat guess. The bias: a job a reclaim overlaps logs
+# measured p90 of its kind in disk.tsv, from 10 measured runs on (review-gates
+# m_37481, m_37660: at 5 the p90 is the max, and one 6.5 GB script made every
+# running 'other' job count 7; at 10 it is the second largest); under 10, the
+# flat guess. The bias: a job a reclaim overlaps logs
 # '-', and the long ones nearly always do (a gate quick, a release build), so
 # today the measure sees the short jobs and leans LOW (cargo-cold's 1 GB is
 # small cargo tests; a running gate quick writes 3-4). The 5 GB stop guards
 # a guess that comes out low: one job killed with rc 28, never the disk.
 measured_gb() {
   local flat; case "$1" in full|cargo-cold) flat=10 ;; cargo-warm) flat=3 ;; *) flat=2 ;; esac
-  p90_gb "$1" 3 "$flat" 0 ""
+  p90_gb "$1" 10 "$flat" 0 ""
 }
 # the running jobs, for the queue's waiting line (main m_36953: 7 waiters
 # waited 3-5 h behind a hung --alone job no line named): "<slot> <agent or
@@ -462,7 +465,7 @@ export HEAVY_MAX; HEAVY_MAX=$(max_min "$([ "$ALONE" = 1 ] && echo --alone)" "$@"
 export HEAVY_SUBMIT="${HEAVY_SUBMIT:-$(date +%s)}"
 JOB='export HEAVY_SLOT="${2##*/} $$"; rm -f "$1"; L="$HOME/.bise/run/heavy.log"
 c=$(printf "%s " "${@:4}" | cut -c1-160); t0=$(date +%s)
-printf "%s\t%s\t-\t%s\t%s\t%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" >>"$L" 2>/dev/null
+printf "%s\t%s\t-\t%s\t%s\t%s\twaited=%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" "${HEAVY_WAITED:-}" >>"$L" 2>/dev/null
 touch "$HOME/.bise/run/last-start"
 rv="$HOME/.bise/run/reserve/${2##*/}.$$"; mkdir -p "${rv%/*}"; k0=$(free_kb)
 others=$(ls "${rv%/*}" 2>/dev/null | grep -vc "^${rv##*/}\$")
@@ -568,8 +571,20 @@ ahead() {
   while read -r k v; do if [ "$k" = rm ]; then rm -f "$Q/$v"; else echo "$v"; fi; done
 }
 
+# what the job waited on before its start, in seconds (review-gates m_37641: boot-photo's 38 min
+# from submit to start could not be read): each round's time goes to the reason the round before
+# ended on (disk, battery, load, else a slot); tally adds it, and HEAVY_WAITED carries
+# "disk:<s> slot:<s> load:<s> batt:<s>" to the job's start line in heavy.log (waited=...)
+wd=0 ws=0 wl=0 wb=0 why="" prev=$(date +%s)
+tally() {
+  local now; now=$(date +%s)
+  case "$why" in disk) wd=$((wd + now - prev)) ;; slot) ws=$((ws + now - prev)) ;; load) wl=$((wl + now - prev)) ;; batt) wb=$((wb + now - prev)) ;; esac
+  prev=$now; why=""
+  export HEAVY_WAITED="disk:$wd slot:$ws load:$wl batt:$wb"
+}
 # lockf -t 0 exits 75 (EX_TEMPFAIL) when the slot is taken.
 while :; do
+  tally
   held=""
   # the disk: the floor (HEAVY_DISK_WAIT_GB, 10; 15 before 2026-10-22, main m_37463) + what the running jobs may
   # still write + this job's own reserve must be free; else reclaim, and wait
@@ -580,7 +595,7 @@ while :; do
       m="heavy-run: waiting for disk room: $(free_gb) GB free, this job starts at $need GB (${HEAVY_DISK_WAIT_GB:-10} kept free + $HEAVY_RESERVE it may write + $(( need - ${HEAVY_DISK_WAIT_GB:-10} - HEAVY_RESERVE )) the running jobs may still write); reclaiming idle cargo targets: $(printf '%s ' "$@" | cut -c1-80)"
       echo "$m" >&2; tell_hub "$m"; diskwait=1
     fi
-    sleep "${HEAVY_DISK_POLL:-10}"; continue
+    why=disk; sleep "${HEAVY_DISK_POLL:-10}"; continue
   fi
   if [ -n "${diskwait:-}" ]; then
     m="heavy-run: disk room again ($(free_gb) GB free), the job goes on: $(printf '%s ' "$@" | cut -c1-80)"
@@ -591,7 +606,7 @@ while :; do
   # at 21:43 and hibernated to 10:20: no night, no nightly, main hung 11 h.
   if on_battery && [ "$(battery_pct)" -lt "${HEAVY_BATTERY_MIN:-30}" ] 2>/dev/null; then
     [ -n "${battwait:-}" ] || { m="heavy-run: waiting: on battery at $(battery_pct) %, under ${HEAVY_BATTERY_MIN:-30} %: plug the Mac in: $(printf '%s ' "$@" | cut -c1-80)"; echo "$m" >&2; tell_hub "$m"; battwait=1; }
-    sleep "${HEAVY_DISK_POLL:-10}"; continue
+    why=batt; sleep "${HEAVY_DISK_POLL:-10}"; continue
   fi
   battwait=""
   if on_battery; then n=15; slots="$S1 $S2"; else n=10; slots="$S1 $S2 $S3 $S4"; fi
@@ -606,6 +621,7 @@ while :; do
       free=0
       for s in "$S1" "$S2" "$S3" "$S4"; do /usr/bin/lockf -k -t 0 "$s" /usr/bin/true 2>/dev/null && free=$((free + 1)); done
       if [ "$free" = 4 ]; then
+        why=slot; tally
         /usr/bin/lockf -k -t 0 "$S1" /usr/bin/lockf -k -t 0 "$S2" /usr/bin/lockf -k -t 0 "$S3" /usr/bin/lockf -k -t 0 "$S4" \
           /bin/bash -c "$JOB" _ "$T" "all" 10 "$@"
         rc=$?
@@ -636,6 +652,7 @@ while :; do
       fi
     fi
     if [ -n "$free" ] && [ "$(ahead)" -lt "$(echo $free | wc -w)" ]; then
+      why=slot; tally
       for s in $free; do
         /usr/bin/lockf -k -t 0 "$s" /bin/bash -c "$JOB" _ "$T" "$s" "$n" "$@"
         rc=$?
@@ -646,7 +663,7 @@ while :; do
   [ -n "${waited:-}" ] || { h=$(holders); echo "heavy-run: every heavy slot is busy or promised to an earlier job, waiting (rank $rank)${h:+; held by: $h}" >&2; waited=1; }
   # held by the load: poll every 5 s, not 2 (each round spawns ~10
   # processes per waiter: 6 waiters made ~45 spawns/s at load 120)
-  if [ -n "$held" ]; then sleep 5; else sleep 2; fi
+  if [ -n "$held" ]; then why=load; sleep 5; else why=slot; sleep 2; fi
 done
 }
 heavy_run "$@"; exit $?
