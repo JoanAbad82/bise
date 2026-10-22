@@ -324,19 +324,37 @@ with tempfile.TemporaryDirectory() as home:
     check(len(d) == 7 and d[1] == "other" and d[2] == str(3 * GB) and d[3] == str(40 * GB) and d[4] == str(37 * GB),
           "disk.tsv: kind other, wrote 3 GB (40 at start, 37 at the lowest, 39 at the end): %r" % d)
     check(not [f for f in os.listdir(run) if f.startswith("disk-min.")], "no disk-min file left")
-    # a reclaim during the job (its mark touched mid-job): space freed under
-    # it, its measure is not one: written '-', and its kind stays flat
+    # a reclaim during the job (review-gates m_37481): what it freed (its
+    # reclaim.log line) is added back. 40 GB at the start, a reclaim frees 3
+    # (43), the job writes 4: 39 at the end, the lowest seen 39. It wrote
+    # 40 - 39 + 3 = 4 GB, not the 1 the lowest alone says
+    rlog = os.path.join(run, "reclaim.log")
     go_m = os.path.join(home, "go_mark")
+    open(freef, "w").write(str(40 * GB))
     big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_m], env=envr, stderr=subprocess.DEVNULL)
     check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]), "the reclaimed job runs")
-    mark = os.path.join(run, "reclaim.mark")
-    open(mark, "w").close()
-    # its mtime past the job's start whatever the second (no sleep)
-    os.utime(mark, (time.time() + 5, time.time() + 5))
+    open(freef, "w").write(str(43 * GB))
+    with open(rlog, "a") as fh:
+        fh.write("%d\t/x/rust/target\t30\t3.0\tlow\n" % time.time())
+        fh.write("%d\t/y/rust/target\t30\t5.0\tlow\n" % (time.time() - 3600))
+    open(freef, "w").write(str(39 * GB))
+    check(wait_for(lambda: [f for f in os.listdir(run) if f.startswith("disk-min.")
+                            and open(os.path.join(run, f)).read().strip() == str(39 * GB)]), "the watcher saw 39 GB")
     open(go_m, "w").close()
     job_ends(big, 30)
     d = open(dtsv).read().splitlines()[-1].split("\t")
-    check(d[1] == "other" and d[2] == "-", "a reclaim mid-job: written '-': %r" % d[:3])
+    check(d[1] == "other" and d[2] == str(4 * GB), "a reclaim freed 3 GB mid-job: it wrote 4 GB (the reclaim an hour before not counted): %r" % d[:5])
+    # a reclaim still running at its end has not logged what it freed: '-'
+    go_m2 = os.path.join(home, "go_mark2")
+    big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_m2], env=envr, stderr=subprocess.DEVNULL)
+    check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]), "the next job runs")
+    open(os.path.join(run, "reclaim.running"), "w").close()
+    open(go_m2, "w").close()
+    job_ends(big, 30)
+    os.remove(os.path.join(run, "reclaim.running"))
+    os.remove(rlog)
+    d = open(dtsv).read().splitlines()[-1].split("\t")
+    check(d[1] == "other" and d[2] == "-", "a reclaim still running at its end: written '-': %r" % d[:3])
 
     def reserve(kind, rows):
         with open(dtsv, "w") as fh:
@@ -367,6 +385,10 @@ with tempfile.TemporaryDirectory() as home:
         r.kill()
         _, err = r.communicate()
     check(r.returncode == 28 and "3 GB free" in err, "it wrote past its reserve: stopped at 3 GB free, rc=28: %r %r" % (r.returncode, err[-200:]))
+    # its heavy.log line for the audit (review-gates m_37481): the free GB and each running job's counted share
+    ds = [l.split("\t") for l in lines() if "\tdisk-stop\t" in l]
+    check(ds and ds[-1][2] == "heavy.lock" and ds[-1][3] == "3" and ds[-1][4].startswith("heavy.lock.") and " other 0" in ds[-1][4],
+          "rc 28: a disk-stop line in heavy.log (slot, 3 GB free, its share 'other 0'): %r" % (ds[-1:] or lines()[-2:]))
     os.remove(dtsv)
     # the total reserved is capped (HEAVY_RESERVE_TOTAL_MAX, 20): with 4 here,
     # a 10 GB job running, a 2 GB job needs 15 + 2 + 4 = 21 and runs at 22

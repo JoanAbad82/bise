@@ -128,8 +128,8 @@ reclaim() {
   # fds 3-9 closed: a job's slot lock (lockf's fd, 3; 3-6 for --alone) must
   # not outlive the job in a reclaim that runs on
   # reclaim.mark (touched at its start and end) and reclaim.running (while it
-  # runs): a job it overlaps logs no measure in disk.tsv (review-gates
-  # m_37215: space freed under a job would make it look like it wrote ~0)
+  # runs); what it freed is in reclaim.log, each deletion's GB with its time:
+  # a job's measure adds it back (review-gates m_37215, m_37481)
   local d="$HOME/.bise/run"
   # (a double fork, as before: never a child of the job, so a stop of the
   # job's tree or an --alone job's CPU count never includes it)
@@ -314,7 +314,24 @@ lane_during() {
     { delete open[$1 FS $2]; if ($2 <= now && $3 >= t0) busy = 1 }
     END { for (k in open) if (open[k] <= now) busy = 1; if (busy) print "busy" }' "$2" 2>/dev/null
 }
-export -f free_kb disk_under free_gb tell_hub tree reclaim cpu_cs disk_watch lane_during
+# the running jobs (this one too, while its reserve file is there), each
+# "<slot>.<pid> <kind or -> <GB counted for it>", '; ' between them
+shares() {
+  local f kd g out=""
+  for f in "$HOME/.bise/run/reserve/"*; do
+    [ -e "$f" ] || continue; kill -0 "${f##*.}" 2>/dev/null || continue
+    kd=$(cut -f5 "$f"); case "$kd" in full|cargo-warm|cargo-cold|other) g=$(measured_gb "$kd") ;; *) g=$(cut -f1 "$f") ;; esac
+    out="$out${out:+; }${f##*/} ${kd:--} $g"
+  done
+  echo "$out"
+}
+# the KB the disk reclaims freed from epoch $1 to $2 (reclaim.log: <epoch>
+# <path> <idle min> <GB freed> <reason>)
+reclaimed_kb() {
+  awk -F'\t' -v t0="$1" -v t1="$2" '$1 >= t0 && $1 <= t1 && $4 ~ /^[0-9.]+$/ { s += $4 } END { printf "%d\n", s * 1048576 }' \
+    "$HOME/.bise/run/reclaim.log" 2>/dev/null || echo 0
+}
+export -f free_kb disk_under free_gb tell_hub tree reclaim cpu_cs disk_watch lane_during p90_gb measured_gb reclaimed_kb shares
 
 # HEAVY_SLOTS (tests): use only the first n slots, whatever the power.
 # HEAVY_ON_BATTERY=0|1 (tests): the power as given, not pmset's
@@ -459,20 +476,23 @@ idle=0; [ "$2" = all ] && idle="${HEAVY_IDLE_MIN:-30}"
 disk_watch $$ "$stop" "$HEAVY_MAX" "$idle" "$mnf" </dev/null >/dev/null 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & w=$!
 /usr/bin/caffeinate -is nice -n "$3" "${@:4}"; rc=$?
 kill $w 2>/dev/null; wait $w 2>/dev/null
+sh=""; [ -e "$stop" ] && sh=$(shares)
 rm -f "$rv"
 # what it wrote, for the next reserve of its kind (reserve_gb): the free KB
-# at its start minus the lowest the watcher saw (or at its end), never under
-# 0; the jobs running beside it write meanwhile too: an upper bound. A
-# reclaim during its run (reclaim.mark newer than its start, or one running
-# now) frees space under it, so its measure would be low: written is "-",
-# which reserve_gb skips.
+# at its start minus the lowest the watcher saw, or at its start minus at its
+# end plus what reclaims freed meanwhile (the GB in reclaim.log from its
+# start to its end; review-gates m_37481: before, the long jobs overlapped a
+# reclaim and logged a dash, so the measure saw the short ones only), the larger,
+# never under 0; the jobs running beside it write meanwhile too: an upper
+# bound. A reclaim still running at its end has not logged what it freed:
+# written is "-", which reserve_gb skips.
 # ~/.bise/run/disk.tsv: <end> <kind> <written KB> <free KB at start> <lowest> <others> <command>
 k1=$(free_kb); mn=$(cat "$mnf" 2>/dev/null); rm -f "$mnf"
 [ -n "$k1" ] && { [ -z "$mn" ] || [ "$k1" -lt "$mn" ]; } && mn=$k1
 if [ -n "$k0" ] && [ -n "$mn" ]; then
-  wr=$(( k0 - mn )); [ "$wr" -lt 0 ] && wr=0
-  rmk="$HOME/.bise/run/reclaim.mark"
-  { [ -e "$HOME/.bise/run/reclaim.running" ] || { [ -e "$rmk" ] && [ "$(stat -f %m "$rmk")" -ge "$t0" ]; }; } && wr=-
+  fr=$(reclaimed_kb "$t0" "$(date +%s)")
+  wr=$(( k0 - mn )); w2=$(( k0 - ${k1:-$k0} + ${fr:-0} )); [ "$w2" -gt "$wr" ] && wr=$w2; [ "$wr" -lt 0 ] && wr=0
+  [ -e "$HOME/.bise/run/reclaim.running" ] && wr=-
   printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$(date +%s)" "$HEAVY_KIND" "$wr" "$k0" "$mn" "$others" "$c" >>"$HOME/.bise/run/disk.tsv" 2>/dev/null
 fi
 if [ -e "$stop" ]; then
@@ -480,7 +500,10 @@ if [ -e "$stop" ]; then
   case "$why" in
     time*) m="heavy-run: stopped \"$c\": it ran ${why#time } min, over its limit (HEAVY_MAX_MIN=${why#time }): a stuck job holds a slot (2 held 12.7 h on 2026-10-20). Find why it hangs, or give it a larger HEAVY_MAX_MIN."; rc=124 ;;
     idle*) m="heavy-run: stopped \"$c\": an --alone job (it holds every slot) used no CPU for ${why#idle } min: it hangs. Find why, or give it a larger HEAVY_IDLE_MIN."; rc=124 ;;
-    *) m="heavy-run: stopped \"$c\": the disk is nearly full (${why#disk } GB free on the data volume, under ${HEAVY_DISK_STOP_GB:-5} GB). Free some space, then run it again."; rc=28 ;;
+    *) m="heavy-run: stopped \"$c\": the disk is nearly full (${why#disk } GB free on the data volume, under ${HEAVY_DISK_STOP_GB:-5} GB). Free some space, then run it again."; rc=28
+       # one line for the audit (review-gates m_37481: two in a day put the floor back to 15):
+       # <epoch> disk-stop <slot> <free GB> <each running job: slot kind counted GB> <command>
+       printf "%s\tdisk-stop\t%s\t%s\t%s\t%s\n" "$(date +%s)" "${2##*/}" "${why#disk }" "${sh:-none}" "$c" >>"$L" 2>/dev/null ;;
   esac
   echo "$m" >&2; tell_hub "$m"; rm -f "$stop"
 fi
