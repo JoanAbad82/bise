@@ -19,18 +19,7 @@
 1 apps/desktop/tests/checks/settings/sign-in-expired.spec.ts  # lint shape: a card option's label in the fixture, not settings.sign_in
 3 apps/desktop/tests/checks/spotlight/projects.spec.ts  # lint shape: spotlight's project line (no catalog area yet), not inbox/panel words
 1 apps/desktop/tests/checks/terminal/early.spec.ts  # lint shape: a test description, not inbox.waits_for
-1 apps/desktop/tests/checks/thread/composer-sources.spec.ts  # lint shape: a test description, not panel.tip_name_waits
-3 apps/desktop/tests/checks/thread/computer-live.spec.ts  # computer use's step text from the fixture, and panel.driving's shape: panel to check
 1 apps/desktop/tests/checks/thread/computer-use.spec.ts  # lint shape: 'driving again' is a test's words
-2 apps/desktop/tests/checks/thread/dock-choice.spec.ts  # a test description quoting the tab: thread to move the assert
-1 apps/desktop/tests/checks/thread/find-bar.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
-6 apps/desktop/tests/checks/thread/hierarchy.spec.ts  # the wake/scheduled rows with glyphs and times: thread to move them (wake rows are not scheduled.*)
-1 apps/desktop/tests/checks/thread/messages-right.spec.ts  # lint shape: a test description, not inbox.waits_for
-2 apps/desktop/tests/checks/thread/news-rows.spec.ts  # scheduled rows' whole lines: scheduled to move them
-1 apps/desktop/tests/checks/thread/parts.spec.ts  # lint shape: a part chip's label, not composer.quote_about
-1 apps/desktop/tests/checks/thread/tiers.spec.ts  # a wake row's words (not scheduled.ended): thread to move it
-2 apps/desktop/tests/checks/thread/waiting-failed.spec.ts  # lint shape: the thread's 'waiting on bise' / 'waiting on you', not bims.state_waits_on
-3 apps/desktop/tests/checks/thread/wake.spec.ts  # wake rows' words (not scheduled.ended): thread to move them
 1 tests/tui_computer_use_tmux.py  # lint shape: 'for apps' is computer use's grant text, settings to check
 1 tests/tui_file_links_tmux.py  # lint shape: the file-link note, not settings.first_opening
 1 tests/tui_inbox_split_tmux.py  # lint shape: a part of a row, not settings.check_needs_you

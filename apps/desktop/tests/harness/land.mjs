@@ -28,22 +28,6 @@ export const LAND = [
   // inbox-open (his ask): ⏎ opens a past item whole in the pane beside the list, ⌘⏎ lands on his
   // answer 23 pages back in its thread (the store's window around it, the gap row loads newer)
   'checks/inbox/inbox-open.spec.ts',
-  'checks/thread/reading.spec.ts',
-  // a 50k-entry thread with lines appending: ⌘F counts every hit via the hub, jumps far back, the read
-  // row and the current match never move, no long task while he scrolls (his m_26614, thread-perf)
-  'checks/thread/history-perf.spec.ts',
-  // ⌘F: ⏎ x3, ⇧⏎, ↓, ↑ each move the mark and scroll to the match, far above the loaded rows or in
-  // a folded run of agent messages (find-scroll, his 'ça reste au premier match')
-  'checks/thread/find-walk.spec.ts',
-  'checks/thread/streaming.spec.ts',
-  'checks/thread/esc-order.spec.ts',
-  'checks/thread/first-run.spec.ts',
-  // his queued messages: the drawer's rows and ops; a tab-queued send never a bubble in the thread
-  // until the hub says it, then his bubble at its place (his « pas dans l'historique », queued-rows)
-  'checks/thread/queue-drawer.spec.ts',
-  // a slow hub (queue-drawer-fix): a queued send in the drawer before the hub lists it, a late echo
-  // clears 'sending…' (no ghost), his sending rows scroll with the thread (no sticky band)
-  'checks/thread/send-late.spec.ts',
   'checks/composer/at-files.spec.ts',
   // the @ / $ lists stay the same node, visible with rows, on every frame while he types (his flicker, at-steady)
   'checks/composer/picker-steady.spec.ts',
@@ -51,12 +35,6 @@ export const LAND = [
   // 100 ms, no long task while it opens or filters (his « le submenu de @ … freeze la ui », at-perf)
   'checks/composer/at-perf.spec.ts',
   'checks/composer/answer-target.spec.ts',
-  // any file a chip like an image's, in place in the parts, the bubble opens it (file-chips)
-  'checks/thread/file-chips.spec.ts',
-  // his ``` blocks: wrap in his bubble, a bare fence gray, md highlighted, the composer as the bubble (code-fences, main m_31084)
-  'checks/thread/code-fences.spec.ts',
-  // a project's view lists its own inbox items; global bise and the inbox screen every project's (inbox-scope)
-  'checks/thread/inbox-scope.spec.ts',
   // an @-picked image or code file is a chip at the @, the caret after it, its parts in the send (at-chips)
   'checks/composer/at-chips.spec.ts',
   // a copy with chips pastes them back with their rows; cut+paste and copy+paste over it change nothing (chip-paste, his m_30833)

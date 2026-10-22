@@ -41,9 +41,8 @@ fi
 specs=()
 for a in "$@"; do specs+=("tests/checks/$a"); done
 if [ ${#specs[@]} -eq 0 ]; then
-  specs=(tests/checks/thread/send.spec.ts tests/checks/thread/answers.spec.ts tests/checks/thread/send-offline.spec.ts
-         tests/checks/thread/interrupt.spec.ts tests/checks/thread/find.spec.ts tests/checks/inbox/cmd-i.spec.ts
-         tests/checks/agents tests/checks/review tests/checks/spotlight/answer.spec.ts)
+  specs=(tests/checks/thread/send.spec.ts tests/checks/thread/send-offline.spec.ts
+         tests/checks/inbox/answer-everywhere.spec.ts tests/checks/agents tests/checks/review)
 fi
 cd "$desktop" || exit 1
 # checks that change the world for good (review/feature-drop drops the feature that
@@ -68,9 +67,9 @@ rc=0
 # the list on stdout, and every annotation (the checks' measured times) in a JSON beside it
 # (given to Playwright alone, never exported: world up refuses any env value that reaches
 # ~/.bise/hubs, where an agent's TMPDIR lives)
-# thread/news-real reads the seeded news rows of shop's thread: it runs first, in the same world,
-# before the inbox checks fill that thread with their own asks (e3f7e598's batch: run last, its
-# rows had scrolled out of reach). Playwright orders files by path, so it gets its own call.
+# real.json's `first` runs first, in the same world, before the other checks fill its threads
+# (none today: thread/news-real, the one that needed it, went in the e2e cull, docs/test-plan-min.md).
+# Playwright orders files by path, so it gets its own call.
 first="$(rule first)" rest=()
 for s in ${mine[@]+"${mine[@]}"}; do
   if [ "$s" = "$first" ]; then
