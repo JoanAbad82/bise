@@ -2,7 +2,6 @@
 # flow is .switchboard/config.toml, ignored). Read from main's tip, never from
 # the branch being landed (rust/switchboard/src/flow.rs, land_check.rs).
 
-[land]
-# run on a worktree land whose base moved, on the rebased tree, before main
-# moves, as `<check> <base> <head>`; red refuses the land (issue 28)
-check = "tests/gate.sh land"
+# No [land] check (Gabriel 2026-10-22: « On supprime seulement le contrôle 3
+# et sa file »): the agent's own `gate.sh quick` runs before `sb land`, the
+# tip gate on main after; a land is commit, rebase, move main, push.
