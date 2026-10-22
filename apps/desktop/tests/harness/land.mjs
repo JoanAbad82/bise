@@ -28,17 +28,6 @@ export const LAND = [
   // inbox-open (his ask): ⏎ opens a past item whole in the pane beside the list, ⌘⏎ lands on his
   // answer 23 pages back in its thread (the store's window around it, the gap row loads newer)
   'checks/inbox/inbox-open.spec.ts',
-  'checks/composer/at-files.spec.ts',
-  // the @ / $ lists stay the same node, visible with rows, on every frame while he types (his flicker, at-steady)
-  'checks/composer/picker-steady.spec.ts',
-  // '@' on a big project (28 agents titled by their briefs, a 50k-file tree) draws its rows within
-  // 100 ms, no long task while it opens or filters (his « le submenu de @ … freeze la ui », at-perf)
-  'checks/composer/at-perf.spec.ts',
-  'checks/composer/answer-target.spec.ts',
-  // an @-picked image or code file is a chip at the @, the caret after it, its parts in the send (at-chips)
-  'checks/composer/at-chips.spec.ts',
-  // a copy with chips pastes them back with their rows; cut+paste and copy+paste over it change nothing (chip-paste, his m_30833)
-  'checks/composer/chip-paste.spec.ts',
   'checks/spotlight/streaming.spec.ts',
   // the real pages server's CSP in the artifact view (ambient-lead m_20610, architect m_20628)
   'checks/artifacts/frame-csp.spec.ts',

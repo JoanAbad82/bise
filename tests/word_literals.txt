@@ -5,10 +5,6 @@
 # literals the file already had. 'lint shape': the literal has a word's shape but is not that word
 # (a description, fixture data, a hub label); the others name the area that moves it. tests/word_lint.py.
 2 apps/desktop/tests/checks/artifacts/open-cases.spec.ts  # a part of composer's '↳ to bise · about …' tab in toContainText: composer to move it whole
-3 apps/desktop/tests/checks/composer/dictate-anywhere.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
-1 apps/desktop/tests/checks/composer/draft-quit.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
-1 apps/desktop/tests/checks/composer/option-keys.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
-2 apps/desktop/tests/checks/composer/type-anywhere.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
 1 apps/desktop/tests/checks/gate/counts.spec.ts  # lint shape: a diff count, not panel.names_more
 1 apps/desktop/tests/checks/gate/images.spec.ts  # lint shape: a regex in a note, not the row
 1 apps/desktop/tests/checks/gate/right.spec.ts  # lint shape: a step's name, not the bar's word
