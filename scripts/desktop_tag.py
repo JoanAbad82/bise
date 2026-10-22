@@ -129,6 +129,39 @@ def run_facts(run):
     return steps, reds
 
 
+def judge_checks(run, known):
+    """The desktop checks' run of that sha against known_reds: ('green', []) | ('owned-reds',
+    [(red, owner)]); else TagError (a cut or no-result run, a red outside the file). Pure but for
+    reading the run's reds.txt."""
+    reds = [l.strip() for l in read(os.path.join(run["out"], "reds.txt")).splitlines() if l.strip()]
+    try:
+        return judge(run["verdict"], {}, reds, known)
+    except TagError as e:
+        raise TagError("the desktop checks (%s): %s" % (run["when"], e))
+
+
+def checks_run(bh, sha, repo, env):
+    """The last run of the desktop checks on exactly `sha` (<bh>/run/nightly/checks-verdicts.tsv,
+    the nightly's or a tag's own); none there or one with no result: covmap.mjs checks runs now,
+    in heavy-run's release lane, and its line goes in the file."""
+    tsv = os.path.join(bh, "run", "nightly", "checks-verdicts.tsv")
+    run = last_run(read(tsv), sha)
+    if run is not None and run["verdict"] != "none":
+        return run
+    out = os.path.join(bh, "run", "nightly", "desktop-tag-checks-%s-%s" % (sha[:8], datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+    os.makedirs(out, exist_ok=True)
+    fake = env.get("DESKTOP_TAG_CHECKS")
+    cmd = (["bash", fake] if fake else ["node", os.path.join(repo, "apps", "desktop", "tests", "harness", "coverage", "covmap.mjs")]) + ["checks", "--gate-dir", out]
+    say("no desktop checks run of %s yet: running them now, in a heavy slot; its out: %s" % (sha[:12], out))
+    rc = subprocess.run(heavy_argv(["/usr/bin/caffeinate", "-is"] + cmd, os.path.join(bh, "run", "heavy.lock"), prio=True), cwd=repo, env=env).returncode
+    verdict = {0: "green", 1: "red"}.get(rc, "none")
+    run = {"when": datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"), "verdict": verdict, "out": os.path.join(out, "desktop-cov-run")}
+    os.makedirs(os.path.dirname(tsv), exist_ok=True)
+    with open(tsv, "a") as f:
+        f.write("%s\t%s\t%s\t%s\n" % (run["when"], sha, verdict, run["out"]))
+    return run
+
+
 def check(tag, repo=REPO):
     """CI's check of a pushed tag (its object fetched as it is: actions/checkout can leave a
     lightweight copy of the pushed tag, so the workflow fetches refs/tags/<tag> with --force)."""
@@ -174,6 +207,12 @@ def cut(tag, sha, notes, repo=REPO, env=None, why=None):
     say("the run of %s (%s): %s; open known reds at that sha: %d" % (sha[:12], run["when"], run["verdict"], len(known)))
     steps, reds = run_facts(run)
     kind, owned = judge(run["verdict"], steps, reds, known)
+    # the desktop checks (tests/checks, Playwright) on that exact sha too (review-gates m_37177):
+    # the tip runs none of them and nightly_desktop.sh only test:land's set, so a release with a
+    # red check would pass whenever the night was red, skipped or never ran
+    ckind, cowned = judge_checks(checks_run(bh, sha, repo, env), known)
+    if ckind != "green":
+        kind, owned = "owned-reds", owned + cowned
     line = mark_line(kind, owned, sha, run["when"])
     r = subprocess.run(["git", "-C", repo, "tag", "-a", tag, sha, "-F", "-"], input=message(notes, line), capture_output=True, text=True)
     if r.returncode != 0:

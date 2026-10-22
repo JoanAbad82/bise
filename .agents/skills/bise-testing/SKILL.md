@@ -81,8 +81,9 @@ own (a measured box in a feature test), never as a new Playwright spec.
    fact is a DELETE.
 7. **E2E only on main** (AGENTS.md, docs/loop-speed.md §0 rule 11): before a
    land, `tests/gate.sh quick` and nothing end-to-end, even when a brief
-   names one. The tip gate runs the e2e, tmux and desktop checks on main's
-   tip; as-he-does runs in the nightly and a release. Put your land sha in
+   names one. The tip gate runs run_all's e2e and tmux tests on main's tip;
+   the desktop Playwright checks, their coverage map and as-he-does run in
+   the nightly and before a release, on its exact sha. Put your land sha in
    your report and watch the tip gate's result for it. Red on your sha:
    revert on main first, then fix and land again.
 8. **A flaky test is a bug**, never a retry loop or a longer sleep: find the

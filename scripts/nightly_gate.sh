@@ -138,6 +138,13 @@ night_end() {
   echo "$e"
 }
 late() { [ -n "${NIGHTLY_END:-}" ] && [ "$(now)" -ge "$NIGHTLY_END" ]; }
+# the Mac's last wake before now, from pmset's log (no root): why a night ran late or not at all
+# (NIGHTLY_PMSET_LOG: a file, the tests'). '2026-10-21 10:20:06 Wake from Hibernate [CDNVA]: due to ...'
+last_wake() {
+  { if [ -n "${NIGHTLY_PMSET_LOG:-}" ]; then cat "$NIGHTLY_PMSET_LOG"; else pmset -g log 2>/dev/null; fi; } |
+    grep -E '^[0-9-]+ [0-9:]+ [+-][0-9]+ +(Wake|DarkWake) ' | tail -1 |
+    sed -E 's/[[:space:]]+/ /g; s/^([0-9-]+ [0-9:]+) [+-][0-9]+ [A-Za-z]+ /\1 /' | cut -c1-160
+}
 
 if [ "${1:-}" = --in-slot ]; then
   # in the heavy slot: the tree at main's tip now, then the gate. A line
@@ -209,6 +216,12 @@ if [ "${1:-}" = --in-slot ]; then
   # to shadow mode), and a missing map only makes the selection ALL
   day="$(date +%F)" gate_dir="${BISE_HOME:-$HOME/.bise}/gate"
   covmap=apps/desktop/tests/harness/coverage/covmap.mjs
+  # a tip run skips the desktop checks, their map and audit, and core-record (review-gates
+  # m_37134: the 04:31 tip run sat 5 h in desktop-checks, a slot and a 10 GB reserve held while
+  # 5 agents waited for disk room): a tip gate is the gate per sha; the nightly runs these
+  if [ -n "${TIP_RUN:-}" ]; then
+    for n in desktop-checks desktop-map desktop-pick-audit; do echo "STEP $n: none (a tip run: the nightly runs it)"; done
+  else
   rm -f "$gate_dir/desktop-cov-run/cut.txt"
   # the real-core checks' world (covmap brings it up) and core-record's run this tree's own bise
   # (scripts/tree_bise.sh: built in the gate's target, never the seed's clone a stopped gate left)
@@ -224,6 +237,13 @@ if [ "${1:-}" = --in-slot ]; then
     hist="$out/checks-runs.tsv"
     prev="$(tail -1 "$hist" 2>/dev/null | cut -f3)"
     printf '%s\t%s\t%s\t%s\n' "$day" "$(git rev-parse --short HEAD)" "$([ "$ncut" = 0 ] && echo ran || echo cut)" "$ncut" >>"$hist"
+    # the checks' verdict on this exact sha, for a release (scripts/desktop_tag.py, review-gates
+    # m_37177: the tip runs no desktop check, so a tag needs a night's or its own run of them):
+    # checks-verdicts.tsv '<when> <sha> green|red|none <dir with reds.txt>'; cut is none
+    cdir="$out/checks-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$cdir" && cp "$gate_dir/desktop-cov-run/reds.txt" "$cdir/reds.txt" 2>/dev/null
+    case $cr in 0) cv=green ;; 1) cv=red ;; *) cv=none ;; esac
+    printf '%s\t%s\t%s\t%s\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$(git rev-parse HEAD)" "$cv" "$cdir" >>"$out/checks-verdicts.tsv"
     if [ "$ncut" != 0 ] && [ "$prev" = cut ]; then
       echo "FAIL desktop-checks-cut: the night's end cut the desktop checks two nights in a row ($ncut specs tonight; owner gate-nightly)"
       rc=1
@@ -237,6 +257,7 @@ if [ "${1:-}" = --in-slot ]; then
   else mapped=now; fi
   if [ -n "$mapped" ] && night_step --own try-select ${mapped#now} desktop-map "$covmap" node "$covmap" map --gate-dir "$gate_dir" --day "$day"; then
     night_step --own try-select desktop-pick-audit tests/desktop_pick_audit.py python3 -B tests/desktop_pick_audit.py --gate-dir "$gate_dir" --day "$day"
+  fi
   fi
   # the desktop app's full end-to-end (fast-try p7): the packed candidate of this tip, every quick
   # as-he-does row with the first run, test:land, the full as-he-does pass, the DMG; a product
@@ -259,7 +280,8 @@ if [ "${1:-}" = --in-slot ]; then
     esac
   else echo "STEP desktop-full: not in this tree, skipped"; fi
   # the recorded ambient-core of the QA world, typed and checked for invariants (feature-tests, p5)
-  night_step core-record scripts/core_record.sh bash scripts/core_record.sh
+  if [ -n "${TIP_RUN:-}" ]; then echo "STEP core-record: none (a tip run: the nightly runs it)"
+  else night_step core-record scripts/core_record.sh bash scripts/core_record.sh; fi
   # heavy-run's release lane (heavy5.lock, --prio) runs beside an --alone job: a timing red of this
   # night may come from its load (review-gates m_35984); heavy.log says whether one ran meanwhile
   if awk -F'\t' -v t0="$slot_t0" -v now="$(date +%s)" '
@@ -273,6 +295,20 @@ if [ "${1:-}" = --in-slot ]; then
 fi
 
 if [ "${1:-}" = --tip ]; then
+  # a night that never started (review-gates m_37144: on 2026-10-22 the nightly job was disabled at
+  # 01:00 and nothing said so): from 07:00, a day with no <date>.log gets its why once, in last and
+  # red (main's watch). NIGHTLY_JOB_LOADED (tests): 1 or 0 instead of launchctl print
+  nday="$(date -r "$(now)" +%F)"
+  if [ "$(date -r "$(now)" +%H)" -ge 7 ] && [ ! -e "$out/$nday.log" ] && [ ! -e "$out/nostart-$nday" ]; then
+    : >"$out/nostart-$nday"
+    if [ "${NIGHTLY_JOB_LOADED:-$(launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1 && echo 1 || echo 0)}" = 0 ]; then
+      why="the nightly job $LABEL is not loaded (disabled or removed; nightly_gate.sh --install puts it back)"
+    else
+      w="$(last_wake)"; why="its job is loaded but wrote no log${w:+ (the last wake in the pmset log: $w)}"
+    fi
+    echo "$nday ? nostart 0 $why" >"$out/last"
+    { echo "nightly full gate did not start ($nday): $why"; echo "log: none ($out/$nday.log never written)"; } >"$out/red.tmp" && mv "$out/red.tmp" "$out/red"
+  fi
   # main's tip as a land check (fast-loop, review-gates m_36198): once per sha, queued in
   # heavy-run's rank 1 whatever the load; the next move of main or tick tries again
   bh="${BISE_HOME:-$HOME/.bise}"
@@ -285,7 +321,9 @@ if [ "${1:-}" = --tip ]; then
   log="$out/tip-$(date +%Y%m%d-%H%M%S).log" s=$SECONDS
   echo "QUEUED $(date): main $tip, a land check in heavy-run's queue" >"$log"
   # one heavy slot, ranked as a land check: an agent's heavy job may take the others
-  TIP_RUN=1 "${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" --land /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
+  # its wall cap (main m_37136: the 04:31 run held a slot 5 h): TIP_MAX_MIN (120) min, then
+  # heavy-run stops it (rc 124, an infra state, no tip-red)
+  TIP_RUN=1 HEAVY_MAX_MIN="${TIP_MAX_MIN:-120}" "${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" --land /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
   rc=$?
   sha="$(awk '/^START /{print $NF; exit}' "$log")"
   if [ -z "$sha" ]; then state=infra; sha="$tip"
@@ -314,6 +352,21 @@ else
   # gate, inherited that night's 06:00 and its 'no end' night started nothing)
   unset NIGHTLY_END
 fi
+# started past its end (review-gates m_37144: on 2026-10-21 the Mac hibernated on an empty battery
+# at 01:30 and launchd ran the night at its 10:20 wake): a SKIP with its reason, never a slot taken
+# for nothing nor a bare none; the second night in a row with nothing run is red
+if late; then
+  w="$(last_wake)"
+  why="started at $(date -r "$(now)" +%H:%M), past the night's end $(date -r "$NIGHTLY_END" +%H:%M): ${w:+the Mac was asleep at the start time (pmset: $w)}${w:-why unknown (no wake in the pmset log)}"
+  echo "SKIP $why" >"$log"
+  prev="$(cut -d' ' -f3 "$out/last" 2>/dev/null)"
+  echo "$day ? skip 0 $why" >"$out/last"
+  case "$prev" in none|skip|nostart)
+    { echo "nightly full gate: nothing ran two nights in a row ($day: $why)"; echo "log: $log"; } >"$out/red.tmp" && mv "$out/red.tmp" "$out/red"
+    exit 1 ;;
+  esac
+  exit 3
+fi
 echo "QUEUED $(date): waiting for a heavy slot${NIGHTLY_END:+, nothing new starts after $(date -r "$NIGHTLY_END" '+%F %H:%M')}" >"$log"
 # --alone: both heavy slots, never beside an agent's heavy job (2026-10-14:
 # beside one, at load 8-9, 5 long tests timed out that pass alone; issue 26)
@@ -326,7 +379,7 @@ if [ -z "$sha" ] && [ -n "$late_why" ]; then
   # the second in a row is red (the rule of desktop-runs.tsv: the gate must not silently never run)
   prev="$(cut -d' ' -f3 "$out/last" 2>/dev/null)"
   echo "$day ? none $((SECONDS - s)) $late_why" >"$out/last"
-  if [ "$prev" = none ]; then
+  if [ "$prev" = none ] || [ "$prev" = skip ] || [ "$prev" = nostart ]; then
     { echo "nightly full gate: nothing ran two nights in a row ($day: $late_why)"
       echo "log: $log"; } >"$out/red.tmp" && mv "$out/red.tmp" "$out/red"
     exit 1

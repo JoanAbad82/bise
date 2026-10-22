@@ -40,6 +40,7 @@ echo "lockf: $HOME/.bise/run/heavy.lock: already locked"
 [ -n "${FAKE_SLOT_AT:-}" ] && echo "$FAKE_SLOT_AT" >"$NIGHTLY_NOW"
 [ "${1:-}" = --alone ] && { echo "heavy-run: both slots"; shift; }
 [ "${1:-}" = --land ] && { echo "heavy-run: rank 1, a land check"; shift; }
+[ -n "${HEAVY_MAX_MIN:-}" ] && echo "heavy-run: max ${HEAVY_MAX_MIN} min"
 exec "$@"
 """
 
@@ -274,6 +275,10 @@ def main():
               "cut: last names what the end cut: %r" % last)
         hist = os.path.join(out, "checks-runs.tsv")
         check(open(hist).read().splitlines()[-1].split("\t")[2:] == ["cut", "2"], "cut: checks-runs.tsv %r" % open(hist).read())
+        # the checks' verdict per full sha, for a release's desktop_tag.py (review-gates m_37177): cut is none
+        cv = open(os.path.join(out, "checks-verdicts.tsv")).read().splitlines()
+        check(len(cv[-1].split("\t")[1]) == 40 and cv[-1].split("\t")[2] == "none"
+              and any(l.split("\t")[2] == "green" for l in cv), "checks-verdicts.tsv: a green night, then a cut one none: %r" % cv)
         # a second cut night in a row: red, desktop-checks-cut
         rc, log, last, red = night(FAKE_COV_CHECKS="cut")
         check(rc != 0 and last.split()[2] == "red" and red is not None and "desktop-checks-cut" in red,
@@ -291,9 +296,16 @@ def main():
               and "past the night's end 06:00" in last and red is None,
               "slots past the end: nothing runs, none: rc %s, last %r, red %r, log %r" % (rc, last, red, log))
         # a Mac asleep at 01:30 runs the job at its wake (07:00): that night's end is past
-        rc, log, last, red = night(NOW=at(7, 0))
+        # (its SKIP says why, from pmset's log: review-gates m_37144)
+        pm = os.path.join(t, "pmset.log")
+        with open(pm, "w") as f:
+            f.write("2026-10-21 10:20:06 +0200 Wake                \tWake from Hibernate [CDNVA] : due to trackpadkeyboard Using BATT (Charge: 1%)\n")
+        rc, log, last, red = night(NOW=at(7, 0), NIGHTLY_PMSET_LOG=pm)
         check(rc == 1 and "fake gate" not in log and red is not None and "two nights in a row" in red,
               "a wake at 07:00, the second none night: red: rc %s, red %r, log %r" % (rc, red, log))
+        check(log.startswith("SKIP started at 07:00, past the night's end 06:00: the Mac was asleep") and "QUEUED" not in log
+              and "Wake from Hibernate" in log and last.split()[1:3] == ["?", "skip"] and "Charge: 1%" in last,
+              "a late start: a SKIP with its reason, no slot taken: log %r, last %r" % (log, last))
         # queued at 23:00: the end is tomorrow's 06:00
         rc, log, last, red = night(NOW=at(23, 0))
         check(rc == 0 and "covmap checks --gate-dir %s --until %s" % (os.path.join(home, "gate"), at(6, 0, 1)) in calls(),
@@ -370,6 +382,27 @@ def main():
         check(not os.path.exists(os.path.join(out, "tip-red")), "tip green: no tip-red")
         check("desktop-full" not in log or ("STEP desktop-full: none (a tip run" in log and "desktop-full start" not in log),
               "tip: no desktop-full end-to-end (the nightly and a release run it): %r" % log)
+        check("STEP desktop-checks: none (a tip run" in log and "STEP core-record: none (a tip run" in log and "covmap checks" not in log,
+              "tip: no desktop checks nor core-record (the nightly runs them): %r" % log)
+        check("heavy-run: max 120 min" in log, "tip: a wall cap of 120 min (TIP_MAX_MIN): %r" % log)
+        # a night that never started (review-gates m_37144: the job disabled at 01:00): from 07:00 the
+        # tip gate finds no log for the day and says why, once, in last and red
+        today = os.path.join(out, datetime.date.today().isoformat() + ".log")
+        if os.path.exists(today):
+            os.remove(today)
+        for f in ("red", "nostart-" + datetime.date.today().isoformat()):
+            if os.path.exists(os.path.join(out, f)):
+                os.remove(os.path.join(out, f))
+        with open(clock, "w") as f:
+            f.write(at(8, 0))
+        tip_run(NIGHTLY_JOB_LOADED="0")
+        lastn = open(os.path.join(out, "last")).read()
+        redn = open(os.path.join(out, "red")).read() if os.path.exists(os.path.join(out, "red")) else ""
+        check(lastn.split()[1:3] == ["?", "nostart"] and "is not loaded" in lastn and "did not start" in redn,
+              "no nightly log at 08:00, the job not loaded: last %r, red %r" % (lastn, redn))
+        os.remove(os.path.join(out, "red"))
+        tip_run(NIGHTLY_JOB_LOADED="0")
+        check(not os.path.exists(os.path.join(out, "red")), "the no-start is said once a day")
         # 11. the same sha again (tried): nothing runs; a red one is not retried either
         rc, log, last = tip_run()
         check(rc == 0 and log == "", "tip tried: no second run (rc %s, log %r)" % (rc, log))
@@ -397,7 +430,7 @@ def main():
     if FAILS:
         print("nightly_gate_test: FAIL\n  " + "\n  ".join(FAILS))
         return 1
-    print("nightly_gate_test: ok (6 nights, the desktop steps, the night's end, 5 tip runs)")
+    print("nightly_gate_test: ok (6 nights, the desktop steps, the night's end, a late start, a night not started, 5 tip runs)")
     return 0
 
 

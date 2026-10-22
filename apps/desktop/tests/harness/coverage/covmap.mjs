@@ -392,6 +392,8 @@ async function runChecks(argv) {
   const cutList = [...cut].sort();
   writeFileSync(path.join(covDir, 'cut.txt'), cutList.map((s) => s + '\n').join(''));
   for (const s of v.red) console.log(`FAIL ${s}`);
+  // the red names, for a release's verdict on this sha (scripts/desktop_tag.py, review-gates m_37177)
+  writeFileSync(path.join(covDir, 'reds.txt'), v.red.map((s) => s + '\n').join(''));
   if (v.red.length) spawnSync('python3', [path.join(REPO, 'tests', 'known_reds.py'), 'split', ...v.red], { stdio: 'inherit' });
   console.log(`covmap checks: ${v.said}${cutList.length ? `; ${cutSay(cutList)}` : ''}`);
   return v.red.length ? 1 : cutList.length ? 3 : 0;

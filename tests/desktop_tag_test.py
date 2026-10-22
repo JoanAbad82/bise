@@ -36,6 +36,14 @@ if [ -n "${FAKE_REDS:-}" ]; then v=red; echo "$FAKE_REDS" | tr '|' '\\n' > "$out
 printf '%s\\t%s\\t%s\\t%s\\n' "2026-10-18T05:00:00" "$sha" "$v" "$out" >> "$BISE_HOME/run/nightly/desktop-runs.tsv"
 [ "$v" = green ] && exit 0 || exit 1
 """
+# a fake covmap.mjs checks (DESKTOP_TAG_CHECKS): FAKE_CHECK_REDS (names, '|'-separated), FAKE_CHECK_RC
+FAKE_CHECKS = """#!/usr/bin/env bash
+echo "checks $*" >> "$FAKE_LOG"
+d="$3/desktop-cov-run"; mkdir -p "$d"
+echo "${FAKE_CHECK_REDS:-}" | tr '|' '\\n' | grep . > "$d/reds.txt"
+[ -n "${FAKE_CHECK_REDS:-}" ] && exit 1
+exit "${FAKE_CHECK_RC:-0}"
+"""
 # no signing prompt in a throwaway repo (his global config signs)
 GIT_ENV = {"GIT_CONFIG_COUNT": "3", "GIT_CONFIG_KEY_0": "commit.gpgsign", "GIT_CONFIG_VALUE_0": "false",
            "GIT_CONFIG_KEY_1": "tag.gpgsign", "GIT_CONFIG_VALUE_1": "false",
@@ -100,16 +108,22 @@ def repo_flow():
         fake = os.path.join(t, "nightly")
         with open(fake, "w") as f:
             f.write(FAKE_NIGHTLY)
-        env = dict(os.environ, BISE_HOME=bh, DESKTOP_TAG_NIGHTLY=fake, FAKE_LOG=log)
+        fake_checks = os.path.join(t, "checks")
+        with open(fake_checks, "w") as f:
+            f.write(FAKE_CHECKS)
+        env = dict(os.environ, BISE_HOME=bh, DESKTOP_TAG_NIGHTLY=fake, DESKTOP_TAG_CHECKS=fake_checks, FAKE_LOG=log)
         # no heavy slot in the test: the argv as it is
         prios = []  # a release's run asks heavy-run's release lane (--prio)
         T.heavy_argv = lambda cmd, lock, prio=False: (prios.append(prio), [c for c in cmd if c not in ("/usr/bin/caffeinate", "-is")])[1]
         runs = os.path.join(bh, "run", "nightly", "desktop-runs.tsv")
+        cruns = os.path.join(bh, "run", "nightly", "checks-verdicts.tsv")
         calls = lambda: open(log).read().splitlines() if os.path.exists(log) else []  # noqa: E731
+        nightlies = lambda: [c for c in calls() if c.startswith("nightly ")]  # noqa: E731
 
         def cut(tag, **extra):
-            if os.path.exists(runs):
-                os.remove(runs)
+            for f in (runs, cruns):
+                if os.path.exists(f):
+                    os.remove(f)
             try:
                 return T.cut(tag, None, "- the notes\n", repo=repo, env=dict(env, **extra))
             except T.TagError as e:
@@ -157,7 +171,7 @@ def repo_flow():
         open(log, "w").close()
         r = cut("desktop-v2026.10.1", FAKE_REDS="as-he-does/quick: row one|history-perf")
         check(r == "nightly-desktop: owned-reds 2 %s 2026-10-18T05:00:00 (owners: land-reds, night-reds)" % sha, "owned: %s" % r)
-        check(len(calls()) == 1, "owned: the nightly ran once %s" % calls())
+        check(len(nightlies()) == 1, "owned: the nightly ran once %s" % calls())
         msg = g("tag", "-l", "--format=%(contents)", "desktop-v2026.10.1")
         check(msg.startswith("- the notes") and msg.endswith(r), "owned: the message %r" % msg)
         # a run already there for the sha: taken as it is, no new run; a green one tags 'green'
@@ -170,11 +184,39 @@ def repo_flow():
         try:
             with open(runs, "w") as f:
                 f.write("2026-10-18T05:00:00\t%s\tgreen\t%s\n" % (sha, os.path.join(t, "o-green")))
+            with open(cruns, "w") as f:
+                f.write("2026-10-18T04:00:00\t%s\tgreen\t%s\n" % (sha, os.path.join(t, "o-green")))
             r = T.cut("desktop-v2026.10.2", None, "", repo=repo, env=env)
         except T.TagError as e:
             r = "ERR " + str(e)
         check(r == "nightly-desktop: green %s 2026-10-18T05:00:00" % sha and calls() == [], "green run taken: %s %s" % (r, calls()))
         check("exists" in cut("desktop-v2026.10.2"), "an existing tag")
+        # the desktop checks on that exact sha (review-gates m_37177): a night's run there is taken;
+        # none there, they run now (release lane) and their line is kept; a red outside known_reds,
+        # a cut run (rc 3) and a red with no name refuse; an owned red goes in the owned count
+        r = cut("desktop-v2026.10.6", FAKE_CHECK_REDS="app-start")
+        check(r.startswith("ERR the desktop checks") and "outside tests/known_reds.txt at that sha: app-start" in r and not g("tag", "-l", "desktop-v2026.10.6"), "checks: a red outside refuses: %s" % r)
+        check(any(c.startswith("checks checks --gate-dir ") for c in calls()), "checks: run when the sha has none: %s" % calls())
+        check(open(cruns).read().split("\t")[1:3] == [sha, "red"], "checks: its line kept: %r" % open(cruns).read())
+        r = cut("desktop-v2026.10.6", FAKE_CHECK_RC="3")
+        check(r.startswith("ERR the desktop checks") and "didn't run every step" in r, "checks: a cut run refuses: %s" % r)
+        r = cut("desktop-v2026.10.6", FAKE_CHECK_RC="1")
+        check(r.startswith("ERR the desktop checks") and "no red named" in r, "checks: red with no name refuses: %s" % r)
+        r = cut("desktop-v2026.10.6", FAKE_CHECK_REDS="history-perf")
+        check(r == "nightly-desktop: owned-reds 1 %s 2026-10-18T05:00:00 (owners: land-reds)" % sha, "checks: an owned red: %s" % r)
+        os.makedirs(os.path.join(t, "o-checks-red"))
+        with open(os.path.join(t, "o-checks-red", "reds.txt"), "w") as f:
+            f.write("app-start\n")
+        open(log, "w").close()
+        try:
+            with open(runs, "w") as f:
+                f.write("2026-10-18T05:00:00\t%s\tgreen\t%s\n" % (sha, os.path.join(t, "o-green")))
+            with open(cruns, "w") as f:
+                f.write("2026-10-18T04:00:00\t%s\tred\t%s\n" % (sha, os.path.join(t, "o-checks-red")))
+            r = T.cut("desktop-v2026.10.7", None, "", repo=repo, env=env)
+        except T.TagError as e:
+            r = "ERR " + str(e)
+        check(r.startswith("ERR the desktop checks (2026-10-18T04:00:00)") and "app-start" in r and calls() == [], "checks: a night's red run is taken, not rerun: %s %s" % (r, calls()))
         # check: both cut tags pass and print their line; lightweight, no mark, another sha fail
         for tag in ("desktop-v2026.10.1", "desktop-v2026.10.2"):
             try:
