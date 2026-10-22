@@ -239,8 +239,45 @@ def repo_flow():
         shutil.rmtree(t, ignore_errors=True)
 
 
+def tree_bise_env():
+    """checks_run's world runs the tagged tree's own bise (tree_bise.sh), as the nightly: its env
+    carries QA_BISE and AMBIENT_QA_APP_ROOT; a preset QA_BISE or a fake checks run is left alone."""
+    t = os.path.realpath(tempfile.mkdtemp(prefix="desktop-tag-bise-", dir=os.environ.get("TMPDIR")))
+    saved = T.heavy_argv
+    try:
+        T.heavy_argv = lambda cmd, lock, **kw: cmd
+        repo, bh = os.path.join(t, "repo"), os.path.join(t, "home", ".bise")
+        os.makedirs(os.path.join(repo, "scripts"))
+        with open(os.path.join(repo, "scripts", "tree_bise.sh"), "w") as f:
+            f.write('echo building >&2; mkdir -p "$CARGO_TARGET_DIR/debug"; touch "$CARGO_TARGET_DIR/debug/bise"; echo "$CARGO_TARGET_DIR/debug/bise"\n')
+        env = {"PATH": os.environ["PATH"]}
+        T.tree_bise(bh, repo, env)
+        want = os.path.join(t, "target", "debug", "bise")
+        check(env.get("QA_BISE") == want, "QA_BISE is the tree's bise, built beside the tree: %r" % env.get("QA_BISE"))
+        check(env.get("AMBIENT_QA_APP_ROOT") == repo, "AMBIENT_QA_APP_ROOT is the tagged tree")
+        env = {"PATH": os.environ["PATH"], "QA_BISE": "/given/bise"}
+        T.tree_bise(bh, repo, env)
+        check(env["QA_BISE"] == "/given/bise" and "AMBIENT_QA_APP_ROOT" not in env, "a preset QA_BISE is kept")
+        env = {"PATH": os.environ["PATH"], "DESKTOP_TAG_CHECKS": "fake"}
+        T.tree_bise(bh, repo, env)
+        check("QA_BISE" not in env, "a fake checks run builds no bise")
+        # a build that fails: no QA_BISE, the why said; checks_run runs no checks, its line is 'none'
+        with open(os.path.join(repo, "scripts", "tree_bise.sh"), "w") as f:
+            f.write('echo "cargo failed" >&2; exit 1\n')
+        env = {"PATH": os.environ["PATH"]}
+        why = T.tree_bise(bh, repo, env)
+        check(why == "tree_bise.sh exit 1" and "QA_BISE" not in env, "a failed build sets no QA_BISE and says why: %r" % why)
+        raises(lambda: T.checks_run(bh, "a" * 40, repo, {"PATH": os.environ["PATH"]}), "tree_bise.sh exit 1")
+        tsv = open(os.path.join(bh, "run", "nightly", "checks-verdicts.tsv")).read()
+        check("\t%s\tnone\t" % ("a" * 40) in tsv, "the failed build's run is 'none' in checks-verdicts.tsv: %r" % tsv)
+    finally:
+        T.heavy_argv = saved
+        shutil.rmtree(t, ignore_errors=True)
+
+
 def main():
     pure()
+    tree_bise_env()
     repo_flow()
     for f in FAILS:
         print("FAIL", f)

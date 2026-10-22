@@ -140,6 +140,30 @@ def judge_checks(run, known):
         raise TagError("the desktop checks (%s): %s" % (run["when"], e))
 
 
+def tree_bise(bh, repo, env):
+    """The real-core checks' world runs this tree's own bise, as in the nightly (nightly_gate.sh's
+    desktop-checks step): scripts/tree_bise.sh builds it in a heavy slot (target beside the tree,
+    or $CARGO_TARGET_DIR) and `env` gets QA_BISE and AMBIENT_QA_APP_ROOT. Without it qa.py found
+    no bise and every real-core check failed 'no world up' in seconds (10.10 on 6a79da476: 13
+    reds in 11 s). QA_BISE already set, a fake checks run or no tree_bise.sh: nothing. Returns None,
+    or why the build failed ('tree_bise.sh exit N'): the caller then runs no checks."""
+    script = os.path.join(repo, "scripts", "tree_bise.sh")
+    if env.get("QA_BISE") or env.get("DESKTOP_TAG_CHECKS") or not os.path.isfile(script):
+        return None
+    target = env.get("CARGO_TARGET_DIR") or os.path.join(os.path.dirname(repo), "target")
+    os.makedirs(target, exist_ok=True)
+    say("the real-core world's bise: building this tree's (scripts/tree_bise.sh, target %s)" % target)
+    r = subprocess.run(heavy_argv(["bash", script], os.path.join(bh, "run", "heavy.lock"), prio=True),
+                       cwd=repo, env=dict(env, CARGO_TARGET_DIR=target), stdout=subprocess.PIPE, text=True)
+    lines = (r.stdout or "").strip().splitlines()
+    if r.returncode == 0 and lines and os.path.isfile(lines[-1]):
+        env["QA_BISE"], env["AMBIENT_QA_APP_ROOT"] = lines[-1], repo
+        return None
+    why = "tree_bise.sh exit %d" % r.returncode
+    say("%s: this tree's bise didn't build, no desktop checks run" % why)
+    return why
+
+
 def checks_run(bh, sha, repo, env):
     """The last run of the desktop checks on exactly `sha` (<bh>/run/nightly/checks-verdicts.tsv,
     the nightly's or a tag's own); none there or one with no result: covmap.mjs checks runs now,
@@ -150,6 +174,14 @@ def checks_run(bh, sha, repo, env):
         return run
     out = os.path.join(bh, "run", "nightly", "desktop-tag-checks-%s-%s" % (sha[:8], datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     os.makedirs(out, exist_ok=True)
+    why = tree_bise(bh, repo, env)
+    if why:
+        # no bise for the world: no checks run, the run is 'none' and says the build (review-gates m_37732)
+        run = {"when": datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"), "verdict": "none", "out": os.path.join(out, "desktop-cov-run"), "why": why}
+        os.makedirs(os.path.dirname(tsv), exist_ok=True)
+        with open(tsv, "a") as f:
+            f.write("%s\t%s\tnone\t%s\n" % (run["when"], sha, run["out"]))
+        raise TagError("the desktop checks of %s: %s (this tree's bise didn't build): no checks run, no tag" % (sha[:12], why))
     fake = env.get("DESKTOP_TAG_CHECKS")
     cmd = (["bash", fake] if fake else ["node", os.path.join(repo, "apps", "desktop", "tests", "harness", "coverage", "covmap.mjs")]) + ["checks", "--gate-dir", out]
     say("no desktop checks run of %s yet: running them now, in a heavy slot; its out: %s" % (sha[:12], out))
