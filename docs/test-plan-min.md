@@ -12,9 +12,9 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 
 | | KEEP | TRANSFORM | DELETE | total |
 |---|---|---|---|---|
-| Desktop Playwright specs (apps/desktop/tests/checks) | 29 | 262 | 52 | 343 |
+| Desktop Playwright specs (apps/desktop/tests/checks) | 29 | 257 | 57 | 343 |
 | TUI tmux tests (tests/*_tmux.py) | 12 | 68 | 3 | 83 |
-| Python e2e (tests/*_e2e.py) | 29 | 45 | 2 | 76 |
+| Python e2e (tests/*_e2e.py) | 31 | 43 | 2 | 76 |
 | as-he-does rows (dev/plugins/ambient-qa/as-he-does) | 6 | 0 | 62 | 68 |
 
 ## Classification
@@ -47,7 +47,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `app/bar-more` | TRANSFORM | renderer on a scripted core: no process seam |
 | `app/bar-overflow` | DELETE | visual only: a sign-off shot or one pixel fix, no logic (showme and the post-land shots see it) |
 | `app/bar-scope` | TRANSFORM | renderer on a scripted core: no process seam |
-| `app/bar-slide` | TRANSFORM | renderer on a scripted core: no process seam |
+| `app/bar-slide` | DELETE | visual only: a pixel look, no logic (LOST, min-tests, main m_37200) |
 | `app/bottom-block` | TRANSFORM | renderer on a scripted core: no process seam |
 | `app/clicks` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `app/cmd-hints` | TRANSFORM | renderer on a scripted core: no process seam |
@@ -153,7 +153,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `composer/drafts` | TRANSFORM | renderer on a scripted core: no process seam |
 | `composer/edit-keys` | TRANSFORM | renderer on a scripted core: no process seam |
 | `composer/emoji` | TRANSFORM | renderer on a scripted core: no process seam |
-| `composer/empty-line` | TRANSFORM | renderer on a scripted core: no process seam |
+| `composer/empty-line` | DELETE | visual only: a pixel look, no logic (LOST, min-tests, main m_37200) |
 | `composer/frame-click` | TRANSFORM | renderer on a scripted core: no process seam |
 | `composer/images` | TRANSFORM | renderer on a scripted core: no process seam |
 | `composer/keybar` | TRANSFORM | renderer on a scripted core: no process seam |
@@ -174,7 +174,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `composer/quote` | TRANSFORM | renderer on a scripted core: no process seam |
 | `composer/slash` | TRANSFORM | renderer on a scripted core: no process seam |
 | `composer/stop-dark` | DELETE | visual only: a sign-off shot or one pixel fix, no logic (showme and the post-land shots see it) |
-| `composer/strip` | TRANSFORM | renderer on a scripted core: no process seam |
+| `composer/strip` | DELETE | visual only: a pixel look, no logic (LOST, min-tests, main m_37200) |
 | `composer/subword` | TRANSFORM | renderer on a scripted core: no process seam |
 | `composer/type-anywhere` | TRANSFORM | renderer on a scripted core: no process seam |
 | `composer/typing` | KEEP | real key events into the composer: caret, no flicker (no cheaper place sees real Chromium input) |
@@ -278,7 +278,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `thread/answered-link` | TRANSFORM | renderer on a scripted core: no process seam |
 | `thread/answers` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `thread/approval-raw` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
-| `thread/art-chips` | TRANSFORM | renderer on a scripted core: no process seam |
+| `thread/art-chips` | DELETE | visual only: a pixel look, no logic (LOST, min-tests, main m_37200) |
 | `thread/at-artifacts` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `thread/at-memory` | TRANSFORM | renderer on a scripted core: no process seam |
 | `thread/at-recent-real` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
@@ -318,7 +318,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `thread/interrupt` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `thread/keys-real` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `thread/log-screen` | TRANSFORM | renderer on a scripted core: no process seam |
-| `thread/messages-right` | TRANSFORM | renderer on a scripted core: no process seam |
+| `thread/messages-right` | DELETE | visual only: a pixel look, no logic (LOST, min-tests, main m_37200) |
 | `thread/news-links` | TRANSFORM | renderer on a scripted core: no process seam |
 | `thread/news-real` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
 | `thread/news-rows` | TRANSFORM | renderer on a scripted core: no process seam |
@@ -494,7 +494,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `hub_stall_e2e` | KEEP | a peer that reads nothing never holds the hub (real unix socket buffer) |
 | `idle_exit_e2e` | KEEP | a hub with no UI stops by itself, nothing lost (process lifecycle) |
 | `image_tag_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
-| `images_mem_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
+| `images_mem_e2e` | KEEP | repl-live's real heap with 20 images (the file parts' streaming): no cheap unit (KEEP, min-tests, main m_37200; run_all, ~10 s) |
 | `images_prune_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
 | `interrupt_e2e` | KEEP | a stop ends the turn in under 1 s mid-stream (hub → REPL flag, real stream) |
 | `land_every_e2e` | KEEP | nothing moves main without the land check (real git + gate) |
@@ -523,7 +523,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `secrets_keychain_e2e` | KEEP | secrets in a throwaway macOS keychain (real security CLI) |
 | `send_latency_e2e` | KEEP | send/steer/queue echo and REPL delivery fast on a loaded hub (send-fast's guard) |
 | `send_parts_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
-| `skills_hang_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
+| `skills_hang_e2e` | KEEP | a FIFO SKILL.md and a hanging reader never stall the REPL's startup scan (a shell script, real processes): no cheap unit (KEEP, min-tests, main m_37200; run_all, ~11 s) |
 | `skills_reload_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
 | `socket_auth_e2e` | KEEP | an agent's process cannot act as the user on its hub (socket auth) |
 | `spawn_model_e2e` | TRANSFORM | one process's decision or format: no seam needs the real hub |
@@ -613,7 +613,7 @@ The driver's `cut` and `rows2` modes (cand.sh's passes after `first`: 9 and 40 s
 
 ## LOST (visual)
 
-review-gates (m_37051): these 44 go with no check left. showme and the post-land shots are people looking, not a check. If one of these looks matters again, it comes back as a check of its own.
+review-gates (m_37051): these 49 go with no check left (the last 5, from app/bar-slide on, moved from TRANSFORM by min-tests, main m_37200). showme and the post-land shots are people looking, not a check. If one of these looks matters again, it comes back as a check of its own.
 
 - `app/bar-heads`: at 1400, 1100 and 800, light and dark, for every head of the right bar (AGENTS, ARCHIVED, ARTIFACTS, SCHEDULED & WATCHING): - its parts (the label, a folded summary, '+…
 - `app/bar-overflow`: at 1400, 1100 and 800 (slid over), light and dark, at rest, a row focused from the keyboard, a long row hovered (its now line slides), ⌥ held (every ring shows): - the…
@@ -659,10 +659,15 @@ review-gates (m_37051): these 44 go with no check left. showme and the post-land
 - `rowsDC47: bar heads`
 - `rowsDC47: sidebar more`
 - `rowsDC47: ring quiet`
+- `app/bar-slide`: on FakeCore: - slid over at 800, then 1400: one right bar (the docked one), no slide-over, no scrim, and a click reaches the window (a row of the docked bar opens its…
+- `composer/empty-line`: designer's try gate D18 on 723648da: the empty composer read 'write to bise, then ⏎' on the bottom line of a tall box with empty space above. Empty, the box is one line…
+- `composer/strip`: in storefront on the scripted core (FakeCore, fake data): (1) no band and no shadow over the composer: the list's bottom is an opacity mask (12 px), its ::after draws…
+- `thread/art-chips`: - the thread's artifact row is the ds chip: '↗ <title>' in --c-accent on a 10 % accent tint, 24 px high, r 6, 8 px sides, kind and version the same pink at 70 %; hover…
+- `thread/messages-right`: designer's messages-right v1. On the REAL thread screen (FakeCore): what he said sits on the right of the 720 px column in a soft bubble (at most 75% of the column, 85%…
 
 ## Deleted, not yet replaced
 
-**deleted, not yet replaced: 25** (min-tests lowers it by one per transform line it ticks; each replacement goes to review-gates with a mutation that turns it red).
+**deleted, not yet replaced: 18** (min-tests lowers it by one per transform line it ticks; each replacement goes to review-gates with a mutation that turns it red).
 
 ## Transform lines
 
@@ -690,7 +695,6 @@ One line per TRANSFORM test: what it guarded → where to check it (kind); the f
 - `app/bar-main`: (a) AGENTS' first row is main's, named 'bise', its doing line and its sign like the others; 'AGENTS · N' counts the tasks only; (b) a click on it opens main's thread… → `apps/desktop/tests/feature/app.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). Also as-he-does row(s) 'bar main row' checked it on the packed app on the real-shaped world: the rewrite covers what they read too. — covered by apps/desktop src/app/barrows.test.ts (AGENTS: main first as bise…; main stays first past the ⌥ numbers)
 - `app/bar-more`: - ARTIFACTS shows its cap (5) and 'show 50 more · 365 left'; a click adds 50 rows, then the last row holds 'show 50 more · 315 left' and 'show less'; again: 105 rows, '·… → `apps/desktop/tests/feature/app.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). — covered by apps/desktop src/app/barrows.test.ts (m_26894)
 - `app/bar-scope`: - bise's thread: every project's rows, no scope words; - storefront's main: storefront's rows only, no scope words; - perf's thread (a click on its row, the bar… → `apps/desktop/tests/feature/app.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). Also as-he-does row(s) 'alarm only in the right bar' checked it on the packed app on the real-shaped world: the rewrite covers what they read too. — covered by apps/desktop src/app/barscope.test.ts (m_25024, m_25031)
-- `app/bar-slide`: on FakeCore: - slid over at 800, then 1400: one right bar (the docked one), no slide-over, no scrim, and a click reaches the window (a row of the docked bar opens its… → `apps/desktop/tests/feature/app.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world).
 - `app/bottom-block`: b1: one inbox and one composer at the bottom of every view, like the terminal. On the REAL shell (FakeCore): on an agent's review, a project's agents, changes and… → `apps/desktop/tests/feature/app.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world).
 - `app/clicks`: - one click acts (no second click): a project in the sidebar opens its thread, the head's agent counts open the agents list, an agent there opens its thread, 'bise'… → `apps/desktop/tests/feature/app.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). — covered by apps/desktop src/composer/hover.test.ts (O.6) + app/route.test.ts
 - `app/cmd-hints`: - ⌘1 opens the first project's main, ⌘2 the second, ⌘0 bise (keys.ts's order, the sidebar's); - ⌘ held alone 150 ms (the TUI's ctrl hint delay, ctrlhint.rs:43): bise's… → `apps/desktop/tests/feature/app.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). — covered by apps/desktop src/app/keys.test.ts (⌘1 ⌘2 ⌘0) + app/held.test.tsx (⌘ held)
@@ -764,7 +768,6 @@ One line per TRANSFORM test: what it guarded → where to check it (kind); the f
 - `composer/drafts`: esc empties the field and ↑ in the empty field brings the put-away draft back whole (accents, two lines), and after a send ↑ brings the sent message back. The bar's… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/composer/pm/engine.test.tsx (a saved draft, history and queue come back; ↑ brings the history) + pure.test.ts (history newest first)
 - `composer/edit-keys`: bar ⛔2, the field's part (docs/desktop-bar.md); the app keys (⌘Q ⌘W ⌘, ⌘H, the menu bar) are qa-native's native/mac-keys. Real keys in the field, as TextEdit does them:… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/composer/grab.test.ts + pure.test.ts (subword moves) + KEEP composer/typing (real keys)
 - `composer/emoji`: bar T E22 + W13 (docs/desktop-bar.md; the terminal's emoji.rs): ':tada:' becomes 🎉 as it is typed; ':cl' opens a popup of matching emoji that filters as he types, ↓… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/composer/pure.test.ts (emojiToken, typedEmoji, filterEmoji against the TUI's emoji.tsv)
-- `composer/empty-line`: designer's try gate D18 on 723648da: the empty composer read 'write to bise, then ⏎' on the bottom line of a tall box with empty space above. Empty, the box is one line… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events.
 - `composer/frame-click`: his try round 2, point 2: the whole box is the input. A click anywhere in the composer's box (its 4 corners, its middle, beside the text) focuses the editor with the… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/ds/ds.test.tsx (the whole box is the input: a press on its padding calls onBoxDown)
 - `composer/images`: the drop makes an image chip whose thumbnail is drawn, no file path shows as text, and one Backspace removes the chip. → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/composer/pm/attach.test.tsx (an image: its file name, never the tag) + pure.test.ts (image parts)
 - `composer/keybar`: bar T W9 (docs/desktop-bar.md; the terminal's keybar.rs): the key bar shows the keys of the current mode (at rest, with text selected, in voice mode) and each key it… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/composer/pure.test.ts (W9)
@@ -783,7 +786,6 @@ One line per TRANSFORM test: what it guarded → where to check it (kind); the f
 - `composer/queue-steer`: tab during the turn shows the message as queued and sends nothing; ⏎ during the turn sends at once; ↑ brings the queued one back into the field; and ending the turn… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/store/machine/sends.law.test.ts + thread/entry.test.ts
 - `composer/quote`: a quote chip (composer.chip.<n>, data-kind=quote) goes in the field at the caret, before the words typed after it, its strip row names where it comes from ('❝ 1 “…” bise… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/composer/Composer.test.tsx (quote(text, from)…) + pure.test.ts + anchor.test.ts
 - `composer/slash`: "/" opens a picker, typing filters it, tab completes the command, and each of the terminal's commands is in the picker when its name is typed. → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/composer/pure.test.ts (/ only at the start; filters by prefix; tab only completes)
-- `composer/strip`: in storefront on the scripted core (FakeCore, fake data): (1) no band and no shadow over the composer: the list's bottom is an opacity mask (12 px), its ::after draws… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. Also as-he-does row(s) 'composer A' checked it on the packed app on the real-shaped world: the rewrite covers what they read too.
 - `composer/subword`: bar T E3 + E9 (docs/desktop-bar.md; the terminal's editor.rs subword_left / subword_right): ctrl+⌥→/← move by subword (camelCase, snake_case, kebab-case, digits) and… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/composer/pure.test.ts (subword moves)
 - `composer/type-anywhere`: the user: « quand je tape sur mon keyboard ou quand je paste quelque chose, ça sélectionne l'input tout seul » (Slack, Vibe Desktop; rules from le-chat-web's… → `apps/desktop/src/composer/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/composer/grab.test.ts (m_16044)
 - `ds/contrast`: on the built app with the scripted core (FakeCore, fake data) and prefers-contrast: more emulated: - storefront's thread: the sidebar's working dot and the inbox block's… → `apps/desktop/src/ds/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. — covered by apps/desktop src/thread/ThreadScreen.test.tsx + thread/entry.test.ts (N2) + inbox/Block.test.tsx (H10)
@@ -858,7 +860,6 @@ One line per TRANSFORM test: what it guarded → where to check it (kind); the f
 - `thread/answered-link`: his ask: in main's thread, a click on '✓ answered: <question>' (docs' card #7, answered) opens docs' thread and brings his answer there (the approval with card 7, far up… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). Also as-he-does row(s) 'answered link' checked it on the packed app on the real-shaped world: the rewrite covers what they read too. — covered by apps/desktop src/thread/answerlink.test.ts
 - `thread/answers`: in bise's thread: - the whole answer is drawn: its first and last lines are there, and scrolling the thread brings the last line into the viewport; - markdown is drawn… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). — covered by apps/desktop src/thread/ThreadScreen.test.tsx (⛔4 markdown) + thread/thread.test.tsx
 - `thread/approval-raw`: the entry the row is drawn from is an approval whose ok is a boolean. → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world).
-- `thread/art-chips`: - the thread's artifact row is the ds chip: '↗ <title>' in --c-accent on a 10 % accent tint, 24 px high, r 6, 8 px sides, kind and version the same pink at 70 %; hover… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). Also as-he-does row(s) 'art chips' checked it on the packed app on the real-shaped world: the rewrite covers what they read too.
 - `thread/at-artifacts`: - the @ list shows '↗ pricing' (an artifact row) while he types; - picking it puts the artifact's chip in the composer, the '@pricing' word goes; - the sent message… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). — covered by apps/desktop src/composer/pure.test.ts (artifacts in the @ list, W11)
 - `thread/at-memory`: in the real thread's composer, picking a FILE sends {cmd:'file_picked', project, path} with the path as the files event gave it, and browsing a folder sends nothing.… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). — covered by apps/desktop src/composer/useSources.test.tsx (R14)
 - `thread/at-recent-real`: Gabriel: browsing a folder in the @ list shows the last modified first, folders and files mixed (Finder's Date Modified), the same order as the terminal (both come from… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). Also as-he-does row(s) 'at newest first' checked it on the packed app on the real-shaped world: the rewrite covers what they read too. — covered by rust/tui files_tests.rs (the order is files.rs's, the window shows the core's list) + composer/pure.test.ts
@@ -894,7 +895,6 @@ One line per TRANSFORM test: what it guarded → where to check it (kind); the f
 - `thread/interrupt`: - the stop shows in the thread within 1 s of ctrl+c (an esc before it stops nothing); - bise's main really stops (its hub says it is no longer working: read on the hub's… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). Parity with the TUI stays checked: the same fixture into both renderers (this view and rust/tui's TestBackend), the two outputs compared in one test. — covered by apps/desktop src/thread/ThreadScreen.test.tsx + composer/Composer.test.tsx (m_22205)
 - `thread/keys-real`: TP-R6 + TP-K7b. Owner: qa-flows. The NEW app on the REAL core over the throwaway world (../world.ts), bise's own TUI on the same home hub as the reference. Real keys… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). Parity with the TUI stays checked: the same fixture into both renderers (this view and rust/tui's TestBackend), the two outputs compared in one test. — covered by apps/desktop src/composer/Composer.test.tsx (R6, and min-tests' ⇧⇥ test)
 - `thread/log-screen`: /debug: '/debug' in an agent's composer opens its raw session, read-only, in the window. The window asks the hub `log {project, agent}`, draws the newest page at the end… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). — covered by apps/desktop src/log/model.test.ts (folds past 6 lines with the TUI's words) + thread/commands.test.ts (/debug)
-- `thread/messages-right`: designer's messages-right v1. On the REAL thread screen (FakeCore): what he said sits on the right of the 720 px column in a soft bubble (at most 75% of the column, 85%… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world).
 - `thread/news-links`: in perf's thread on the scripted core's fixtures (hub_ev pos 28, PR #412), a click on 'PR #412' prints that line with the PR's url. Owner: amb-win. → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world).
 - `thread/news-real`: bar T, amb-win's batch 3a rows on amb-feed's typed news, on the REAL core over the throwaway world (../world.ts), next to the TUI on the same hub. Owner: qa-flows.… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). Parity with the TUI stays checked: the same fixture into both renderers (this view and rust/tui's TestBackend), the two outputs compared in one test. — covered by apps/desktop src/thread/entry.test.ts + rust/tui entry_reads_tests.rs (the same typed news)
 - `thread/news-rows`: on the scripted core's fixtures (hub_ev pos 27-32), main's thread shows perf's landing with its sha (a click opens that commit), the logo artifact as a card, main's… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world). — covered by apps/desktop src/thread/entry.test.ts (landed rows)
@@ -1028,7 +1028,6 @@ One line per TRANSFORM test: what it guarded → where to check it (kind); the f
 - `foundry_url_e2e`: The foundry proxy's base URL reaches a running hub (Ben's report, 2026-10-01: ANTHROPIC_FOUNDRY_BASE_URL was ignored, and the hub's cache/models.toml kept base_url = ""… → `rust config → cache/models.toml` (unit); fixture: env with and without the URL. — covered by rust/catalog tests.rs foundry_base_url_comes_from_its_env_variable_in_claude_codes_form
 - `home_workspace_e2e`: bise ambient's home workspace without a repo (docs/ambient-pages.md §5.1). A real hub (bise sbd, scripted model) on a throwaway folder WITHOUT git: main works there, its… → `rust/switchboard role prompt + land refusals` (unit); fixture: a non-git temp folder. — covered by rust/switchboard prompts.rs the_home_hubs_main_is_bise... + paths.rs only_the_home_workspace_is_home
 - `image_tag_e2e`: An image tag in a tool's output never breaks a request (2026-10-02). Three agents were stuck: every turn got Anthropic's 400 "messages.N.content.0.… → `bend/runtime tool output sanitizer` (unit); fixture: a tool output holding an image marker. — covered by bend/laws/models.bend img_scope laws + [image unavailable] law (line 514-531)
-- `images_mem_e2e`: Images reach the provider from their files, never through the REPL's heap. 2026-10-01: repl-live grew to 1.8 GB on an agent with many screenshots. Each model call loaded… → `bend/runtime request builder` (unit (images streamed from files, never in a Bend String)); fixture: 20 image files.
 - `images_prune_e2e`: The image store's retention (D14, docs/images.md "Retention"). A real hub (bise sbd, scripted model) on a throwaway home whose image store holds old and new images: 0.… → `rust/switchboard image store retention` (unit (fake clock)); fixture: old and new images. — covered by rust/switchboard image_care.rs a_tick_touches_hourly_and_prunes_daily, the_first_prune_waits_keep_days_after_the_update
 - `line_mode_e2e`: Line mode on a real hub (client-protocol step 4, P4d-feed f-c): `bise switchboard` without a terminal prints every agent's thread as `[agent] …` lines from the hub's… → `rust/switchboard line printer` (unit); fixture: thread/entry events. — covered by rust/tui entry_reads_tests.rs line_mode_prints_the_same_from_entries, line_mode_drops_no_entry
 - `name_free_e2e`: name-free: an archived agent's name and an old name are free to take, on a real hub (fake provider, throwaway HOME and state, never the user's hub). 1. /new x, /archive… → `bend/laws/agents.bend` (law); fixture: /new x, /archive x, /new x; renames. — covered by bend/laws/hub.bend names_apart (no name or old name of an agent is another's) + agents.bend
@@ -1045,7 +1044,6 @@ One line per TRANSFORM test: what it guarded → where to check it (kind); the f
 - `request_size_e2e`: A request over the provider's size limit recovers by itself (big-request, 2026-10-04). ambient's session failed every turn with Anthropic's 400 "Request content length… → `bend/runtime request builder` (unit); fixture: images over 32 MB. — covered by bend/laws/session.bend big-request laws + models.bend images fit + streams.bend refusal_for_size
 - `route_e2e`: bise desktop S2 step 3: bise's home hub routes his words, on real hubs (bise sbd, fake provider) and a throwaway BISE_HOME (never ~/.bise, never ~/bise): home + 3… → `bend/laws/route.bend` (law); fixture: home + 3 projects, words that name one. Also as-he-does row(s) 'a path naming a project stays home' checked it on the packed app on the real-shaped world: the rewrite covers what they read too. — covered by bend/laws/route.bend (11)
 - `send_parts_e2e`: Agents send images and files to each other, on a throwaway hub with the fake provider and the TUI in tmux. Fake data only: a temp HOME, a tiny PNG and a CSV made here.… → `bend/runtime parts + bend/laws/parts.bend` (unit + law); fixture: sb spawn/send --attach png, csv. — covered by bend/laws/parts.bend (4) + rust/switchboard attach_tests.rs a_file_in_the_senders_tmp_goes_to_the_receivers
-- `skills_hang_e2e`: A SKILL.md that never answers does not stop main's first model call (release-1007: ~/.vibe/skills/grill-me/SKILL.md linked into ~/Documents, macOS's privacy check made… → `the skills scan` (unit (a FIFO SKILL.md that never answers, a timeout)); fixture: a temp skills dir.
 - `skills_reload_e2e`: A skill added, edited or removed in the workspace's .agents/skills while bise runs reaches the agents without a restart (the user: "les skills dans .agents/skills/ ...… → `the skill folders stat check` (unit); fixture: a temp .agents/skills. — covered by rust/switchboard daemon/skills.rs the_skills_fingerprint_moves_when_a_skill_comes_goes_or_changes + rust/tui skills.rs the_scan_follows_the_workspace_skills
 - `spawn_model_e2e`: Issue 4: main chooses the model of each task at its spawn. A real hub, real REPLs, the scripted provider (e2e.Env: every model answers there through BEND_PROVIDER_URL),… → `bend/laws/models.bend` (law); fixture: profiles in config.toml. — covered by rust/switchboard core_tests.rs a_spawn_with_a_model_is_answered_by_the_daemons_pick, a_refused_spawn_model_moves_the_task_instead_of_failing
 - `unknown_tool_e2e`: Issue 21: a call to a tool bise does not have gets an answer that names it and says how to do it here, never an empty result. A real repl-live on the fake provider, on… → `bend/runtime tool dispatch` (unit); fixture: read_file, view_image calls per family. — covered by bend/laws/tools.bend (unknown tool: <name> — the tools here are…, line 541)
