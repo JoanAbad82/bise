@@ -57,8 +57,11 @@ export function pace(n: number, secs: number): Pace {
 }
 
 describe('pacing: long stays, few walks', () => {
-  it(`an idle hour: under ${String(WALK_MAX * 100)}% of the time walking, a few walks an hour, ${String(SNACK_MIN)} s at least at the island`, () => {
-    for (const n of [4, 12]) {
+  // an hour simulated second by second (no real time): ~1.3 ms of timeline.update per second for 12
+  // bims, ~5 s alone and twice that on a loaded machine (fast-loop, main m_37096): each office its own
+  // case, with room for a busy Mac
+  for (const n of [4, 12]) {
+    it(`an idle hour, ${String(n)} bims: under ${String(WALK_MAX * 100)}% of the time walking, a few walks an hour, ${String(SNACK_MIN)} s at least at the island`, { timeout: 30_000 }, () => {
       const p = pace(n, 3600);
       expect(p.walking, `${String(n)} bims: the share walking`).toBeLessThan(WALK_MAX);
       expect(p.walksPerHour, `${String(n)} bims: walks per bim per hour`).toBeLessThanOrEqual(2 * (3600 / 240) + 1);
@@ -67,6 +70,6 @@ describe('pacing: long stays, few walks', () => {
         expect(d).toBeGreaterThanOrEqual(SNACK_MIN - 6);
         expect(d).toBeLessThanOrEqual(SNACK_MIN + SNACK_SPREAD);
       }
-    }
-  });
+    });
+  }
 });
