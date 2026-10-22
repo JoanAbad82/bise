@@ -52,6 +52,12 @@ const theme = {
   gray: { 0: "#ffffff", 50: "#faf7f0", 100: "#f2ede2", 200: "#e6e0d4", 300: "#b5ad9f", 400: "#8a8174", 500: "#5a5349", 600: "#3a352f", 700: "#2a2622", 800: "#1f1c19", 900: "#171513", 1000: "#000000" },
 } as typeof defaultTheme;
 
+// the app's sans (kit/tokens.css --font-ui) on the canvas: cells with no font of their own,
+// the column letters and row numbers; the formula bar is DOM (viewer.css)
+const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif';
+// the DS overlay scrollbar's look: a 4 px thumb in text-3, no track
+const scrollConfig = { barSize: 4, thumbMargin: 2, barBorder: 0, trackBackgroundColor: "rgba(0,0,0,0)", trackBorderColor: "rgba(0,0,0,0)", thumbBackgroundColor: "rgba(138,129,116,0.6)", thumbHoverBackgroundColor: "rgba(138,129,116,0.8)", thumbActiveBackgroundColor: "rgba(138,129,116,0.9)", hideTrackWhenUnscrollable: true };
+
 let styled = false;
 
 /** Univer's stylesheet in the page, once. */
@@ -80,6 +86,7 @@ export function mountGrid(el: HTMLElement, data: UWorkbook, opts: { dark: boolea
     toolbar: false,
     contextMenu: false,
     formulaBar: true,
+    sheets: { scrollConfig },
     footer: { sheetBar: true, statisticBar: false, menus: false, zoomSlider: false } as never,
   } as never);
   for (const p of preset.plugins) {
@@ -87,7 +94,13 @@ export function mountGrid(el: HTMLElement, data: UWorkbook, opts: { dark: boolea
     else univer.registerPlugin(p);
   }
   const api = FUniver.newAPI(univer);
-  const book = api.createWorkbook({ ...(data as unknown as Partial<IWorkbookData>), locale: LocaleType.EN_US });
+  const sheets = Object.fromEntries(Object.entries(data.sheets).map(([id, sh]) => [id, { ...sh, defaultStyle: { ff: FONT } }]));
+  const book = api.createWorkbook({ ...(data as unknown as Partial<IWorkbookData>), sheets: sheets as never, locale: LocaleType.EN_US });
+  const header = { headerStyle: { fontFamily: FONT, fontSize: 11 } } as never;
+  for (const ws of book.getSheets()) {
+    ws.customizeColumnHeader(header);
+    ws.customizeRowHeader(header);
+  }
 
   const listeners: (() => void)[] = [];
   const movers: (() => void)[] = [];
