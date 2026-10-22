@@ -19,7 +19,9 @@ each from this repo. It is short. The architect agent keeps it current.
 - the TUI: `rust/tui/src/lib.rs`, `sb.rs`, and the module you change;
 - paths, sockets, state files: `rust/home/src/lib.rs`;
 - the agent runtime: `bend/runtime/repl-core.bend`, `repl-live.bend`;
-- tests and gates: `tests/gate.sh`'s header, `docs/loop-speed.md`;
+- tests and gates: `tests/gate.sh`'s header, `docs/loop-speed.md`; before
+  you write or change a test, the `bise-testing` skill
+  (`.agents/skills/bise-testing/SKILL.md`): the cheapest test that fails;
 - builds and releases: `scripts/versions.sh`, `docs/packaging.md`;
 - the area's design doc in `docs/` when there is one (`artifacts.md`,
   `subscriptions-design.md`, `idle-exit.md`, ...).
