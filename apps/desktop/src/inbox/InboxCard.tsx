@@ -80,19 +80,32 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
   const about = aboutOf(card);
   const [picked, setPicked] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // his pick on its way (shown picked for PICKED_MS): sent once, by the timer or at the unmount
+  const pending = useRef<(() => void) | null>(null);
   useEffect(
     () => () => {
       if (timer.current !== null) clearTimeout(timer.current);
+      timer.current = null;
+      // the card redrawn from scratch while his pick showed (the inbox's rows change under it, as
+      // when a stopped hub comes back): his pick goes now, never dropped with the timer
+      const go = pending.current;
+      pending.current = null;
+      go?.();
     },
     [],
   );
   const pick = (n: number) => {
     if (picked !== null || closed) return;
     setPicked(n);
+    pending.current = () => {
+      acts.pick(n);
+    };
     timer.current = setTimeout(() => {
       timer.current = null;
       setPicked(null);
-      acts.pick(n);
+      const go = pending.current;
+      pending.current = null;
+      go?.();
     }, PICKED_MS);
   };
   // while the keys drive (an option on), a resting mouse paints no hover;
