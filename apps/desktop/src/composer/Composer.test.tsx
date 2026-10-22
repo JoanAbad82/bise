@@ -2,7 +2,7 @@
 // The composer mounted: its field is one node for its whole life (bug 1: never re-created by a
 // prop change or a send), its words reach onSend, a command line runs, the draft survives a
 // remount. Typing through the real key path is qa-type's (tests/checks/composer, Playwright).
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Composer } from './Composer';
 import type { ComposerActions } from './actions';
@@ -10,6 +10,7 @@ import type { Store } from './drafts';
 import { NO_SOURCES } from './sources';
 import { entryOf, entrySegments } from './entry';
 import { buildMessage, type Segment } from './message';
+import { composer as words } from '../proto/words_composer.gen';
 
 afterEach(cleanup);
 
@@ -211,5 +212,29 @@ describe('the composer', () => {
       await Promise.resolve();
     });
     expect(onSend).toHaveBeenLastCalledWith(buildMessage(segs));
+  });
+
+  // min-tests: composer/approvals-toggle (TP-R6) and composer/no-undo (bar T K23)
+  it('⇧⇥ in the field is the approvals switch (onShiftTab), never an outdent; ⌘Z with nothing to undo says so', async () => {
+    const onShiftTab = vi.fn();
+    const { getByTestId, container, act: a } = await mount({ onShiftTab });
+    const field = getByTestId('composer.field');
+    await act(async () => {
+      a.insertText('- an item');
+      await Promise.resolve();
+    });
+    fireEvent.keyDown(field, { key: 'Tab', code: 'Tab', shiftKey: true });
+    expect(onShiftTab).toHaveBeenCalledTimes(1);
+    expect(field.textContent).toBe('- an item');
+    expect(container.textContent).not.toContain(words.no_undo);
+    await act(async () => {
+      a.submit();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.keyDown(field, { key: 'z', code: 'KeyZ', metaKey: true });
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain(words.no_undo);
   });
 });
