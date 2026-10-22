@@ -81,6 +81,9 @@ Rules: the position separates look-alikes (✓ at the start of a row = done, at 
 - templates: error `✗ X. /cmd fixes it.` · tip `fact. key does what.` · mode `auto · safe calls run, risky ones ask you` · answered `✓ you allowed t3: …` · hard rule `it rewrites main. this one always asks.`
 - no LLM tells: seamless, "X, not Y", "never deleted", let's, exclamation marks.
 
+## the bims (desktop)
+The animated office of agents (one bim = one agent, `?` accent / `✗` error the only UI colors on it, light from his hour, never a grey void): book §6b for the tone, `docs/brand/bims.md` for the spec, the laws and where the code lives.
+
 ## ship checklist
 blocks typing? · the one key? · which level? · every new mark has its tip words? · rest vs held? · color only for needs-you/failure? · glyph unique + 1 cell + ASCII? · every shown key works here + fallback? · the trace after acting? · drop order at 80? · dark/light/NO_COLOR/ASCII? · words (lowercase, 4 nouns)? · failure = one line + fix + nothing lost?
 

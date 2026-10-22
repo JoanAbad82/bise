@@ -283,6 +283,58 @@ every `G_*` glyph constant declared in the sources and fails when one has
 no row. Zen is a behavior, not a glyph: it has a key row (`typing`), not
 a symbol row (designer).
 
+## 6b. The bims
+
+**His team, made visible.** In the desktop app, each agent is a bim: a small
+round figure in a hoodie, at its desk in an office seen from above. One bim
+is one agent, always. Its name label is the agent's name, and its outfit
+comes from that name, so it looks the same everywhere. Main wears the ink
+hoodie, a gold chain and its `:*`, in the mono shape of §5, never a
+hand-drawn kiss.
+
+**The tone.** Joyful, colorful, a bit hip-hop. Never dull, grey or scary
+(his words). Cozy from day one: plants, a coffee corner, a
+rug, beds. The office gets better as the project grows, and it never loses
+a piece.
+
+**What tells them apart.** Bims are told apart by what they do, not by
+color:
+- a bim that waits on him stands beside its desk under a `?` pill (accent);
+- a bim that failed sits under a `✗` pill (error);
+- every other bim types, thinks, eats a fruit at the island, naps or
+  carries a crate to main.
+
+Nothing else on the office is pink or red, and no pink light falls on it.
+
+**The world.** The office is a cube floating on the app's own background:
+- no grey void around it, no veil;
+- the light follows his hour and the weather (direction A): a warm sun,
+  long shadows at golden hour, a deep blue night with warm windows and
+  lamps;
+- the theme only changes the page under the cube.
+
+He picks his office's map (13 of them, from a loft to a riad, a nordic
+cabin or a skatepark) with the chip at its bottom left, or /bims. On
+bise's thread, every project's office stands together in one town.
+
+**The jokes.** His messages fly as paper planes from his send button to
+the bim, which catches it, reads it and pockets it. Now and then a bim
+does something small and funny (an egg): a salto, a cake on a birthday,
+a ghost at midnight. Two bims waiting on each other both get a `!`.
+
+**Do.** Keep it light and alive. Keep every bim, label and pill readable
+at 320. Draw nothing when nothing changes. Under reduced motion, show the
+current hour, standing still.
+
+**Don't.**
+- never mock his work, never show private content, never anything sad or
+  violent;
+- never a plane that isn't his message;
+- never a bim inside a chair, a bed, a wall or another bim;
+- never a copied monument or brand: maps differ by layout and mood.
+
+The full spec: docs/brand/bims.md.
+
 ---
 
 # Part II — Product spec (the terminal UI)
