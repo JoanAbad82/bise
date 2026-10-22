@@ -1,8 +1,9 @@
 """Nothing moves main without the land check (issue 28 part 2), end to end.
 
 A real hub (bise sbd, scripted model) on a clone of this checkout (its HEAD
-plus its uncommitted changes, on main, no remote), whose bise.toml runs
-`tests/gate.sh land`. Reds are planted and landed; each is refused with its
+plus its uncommitted changes, on main, no remote), whose bise.toml the test
+sets to run `tests/gate.sh land` (the repo itself has no [land] check since
+d3616e24f; the check's code still serves repos that set one). Reds are planted and landed; each is refused with its
 step and its log, and main's sha does not move:
 
   reds:  clippy (a warning), proto_ts (a generated TS file stale), desktop
@@ -142,8 +143,9 @@ def main():
         print("SKIP the desktop red: no %s (or no pnpm): its typecheck cannot run here" % nm)
     ws = E.ws
     main_sha = lambda: out(ws, "git rev-parse main")  # noqa: E731
-    toml = open(os.path.join(ws, "bise.toml")).read()
-    check("[land]" in toml and "tests/gate.sh land" in toml, "this checkout's bise.toml has the land check: %r" % toml)
+    # the repo dropped its own [land] check (d3616e24f); the test plants the
+    # check it measures, so the land check's code stays proven for repos with one
+    toml = '[land]' + NL + 'check = "tests/gate.sh land"' + NL
     # before: main's tip without [land] (lands as before issue 28 part 2)
     with open(os.path.join(ws, "bise.toml"), "w") as f:
         f.write("# no land check" + NL)
