@@ -119,7 +119,8 @@ impl Shell {
         let ph = &self.photos;
         let why = if ph.wait.due { "after a full replay" } else { "idle" };
         let idle = ph.mark.events != ph.last_events && photo::idle_due(now_ms(), ph.last_event, ph.last_photo);
-        let lands = !self.lands.ranks().is_empty();
+        // sb-core's land line (land_ranks, issue 37 #3): a land in it
+        let lands = !self.hub.landing.is_empty();
         let quiet = ph.quiet;
         match self.photos.wait.tick(idle, quiet, lands, crate::load::factor()) {
             Some(photo::Act::Take) => take(&mut self.hub, &mut self.photos, &self.opts.paths, self.journal.ok(), why),
