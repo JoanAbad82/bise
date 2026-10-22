@@ -86,7 +86,7 @@ mkdir -p "$D" "$Q" && touch "$S1" "$S2" "$S3" "$S4" "$S5"
 # the disk (disk-guard, 2026-10-20: agents' builds filled it, macOS hit
 # 'critical low disk' and killed the app and every Chrome tab at 17:48). A
 # job waits for a slot while the data volume has under HEAVY_DISK_WAIT_GB
-# (15) free, saying why; a running job is stopped (its process tree,
+# (10; 15 before 2026-10-22) free, saying why; a running job is stopped (its process tree,
 # TERM then KILL after 5 s) when it drops under HEAVY_DISK_STOP_GB (5), with
 # rc=28 (ENOSPC) and a "heavy-run: stopped" line. Both also go to the
 # agent's status (sb status, when SB_AGENT is set), so the hub shows why.
@@ -169,7 +169,7 @@ disk_watch() {
     if disk_under "${HEAVY_DISK_STOP_GB:-5}"; then why="disk $(free_gb)"
     elif [ "${3:-0}" -gt 0 ] && [ "$ran" -ge "${HEAVY_MAX_SEC:-$(( $3 * 60 ))}" ]; then why="time $3"
     elif [ "${4:-0}" -gt 0 ] && [ $(( ran - busy_ran )) -ge "${HEAVY_IDLE_SEC:-$(( $4 * 60 ))}" ]; then why="idle $4"
-    elif disk_under "${HEAVY_DISK_WAIT_GB:-15}"; then reclaim $(( ${HEAVY_DISK_WAIT_GB:-15} + 10 ))
+    elif disk_under "${HEAVY_DISK_WAIT_GB:-10}"; then reclaim $(( ${HEAVY_DISK_WAIT_GB:-10} + 10 ))
     fi
     if [ -n "$why" ]; then
       echo "$why" >"$2"
@@ -208,14 +208,32 @@ job_kind() {
 reserve_gb() {
   [ -n "${HEAVY_RESERVE_GB:-}" ] && { echo "$HEAVY_RESERVE_GB"; return; }
   local flat; case "$1" in full|cargo-cold) flat=10 ;; cargo-warm) flat=3 ;; *) flat=2 ;; esac
-  awk -F'\t' -v k="$1" -v flat="$flat" '
+  p90_gb "$1" 20 "$flat" 1 "$flat"
+}
+# p90_gb <kind> <min runs> <under that: this> <at least> <at most>: the p90 GB
+# (rounded up) of the last 20 measured runs of that kind in disk.tsv
+p90_gb() {
+  awk -F'\t' -v k="$1" -v min="$2" -v dflt="$3" -v lo="$4" -v hi="$5" '
     $2 == k && $3 ~ /^[0-9]+$/ { w[n++ % 20] = $3 }
     END { m = n < 20 ? n : 20
-          if (m < 20) { print flat; exit }
+          if (m < min || m == 0) { print dflt; exit }
           for (i = 0; i < m; i++) v[i] = w[i]
           for (i = 1; i < m; i++) { x = v[i]; for (j = i - 1; j >= 0 && v[j] > x; j--) v[j + 1] = v[j]; v[j + 1] = x }
           i = int(0.9 * m + 0.999) - 1; g = int((v[i] + 1048575) / 1048576)
-          if (g < 1) g = 1; if (g > flat) g = flat; print g }' "$HOME/.bise/run/disk.tsv" 2>/dev/null || echo "$flat"
+          if (g < lo) g = lo; if (hi != "" && g > hi) g = hi; print g }' "$HOME/.bise/run/disk.tsv" 2>/dev/null || echo "$3"
+}
+# what a RUNNING job of kind $1 may still write, for the jobs that wait
+# (main m_37463, Gabriel: « on ship beaucoup trop lentement »: agents sat
+# for hours at 25 GB free behind the running jobs' flat 10 GB guesses): the
+# measured p90 of its kind in disk.tsv, from 3 measured runs on (review-gates
+# m_37481); under 3, the flat guess. The bias: a job a reclaim overlaps logs
+# '-', and the long ones nearly always do (a gate quick, a release build), so
+# today the measure sees the short jobs and leans LOW (cargo-cold's 1 GB is
+# small cargo tests; a running gate quick writes 3-4). The 5 GB stop guards
+# a guess that comes out low: one job killed with rc 28, never the disk.
+measured_gb() {
+  local flat; case "$1" in full|cargo-cold) flat=10 ;; cargo-warm) flat=3 ;; *) flat=2 ;; esac
+  p90_gb "$1" 3 "$flat" 0 ""
 }
 # the running jobs, for the queue's waiting line (main m_36953: 7 waiters
 # waited 3-5 h behind a hung --alone job no line named): "<slot> <agent or
@@ -232,7 +250,7 @@ holders() {
   echo "$out"
 }
 # what the running jobs may still write, in GB. Each running job has
-# ~/.bise/run/reserve/<slot>.<pid>: "<GB>\t<cwd>\t<free KB at its start>\t<command>"
+# ~/.bise/run/reserve/<slot>.<pid>: "<GB>\t<cwd>\t<free KB at its start>\t<command>\t<kind or ->"
 # (gone at its end; a dead job's file is removed). The space the disk lost
 # since the oldest of them started counts as written by them: their sum
 # minus that drop, never under 0 (main m_36317: the whole sum, held to
@@ -244,13 +262,17 @@ reserved_gb() {
     [ -e "$f" ] || continue
     p=${f##*.}
     kill -0 "$p" 2>/dev/null || { rm -f "$f"; continue; }
-    n=$(( n + $(cut -f1 "$f" 2>/dev/null || echo 0) ))
+    # its kind's measured share (field 5); a job that named its own
+    # (HEAVY_RESERVE_GB: '-') or an older heavy-run's file: its reserve
+    k=$(cut -f5 "$f" 2>/dev/null)
+    case "$k" in full|cargo-warm|cargo-cold|other) n=$(( n + $(measured_gb "$k") )) ;;
+      *) n=$(( n + $(cut -f1 "$f" 2>/dev/null || echo 0) )) ;; esac
     k=$(cut -f3 "$f" 2>/dev/null); [ -n "$k" ] && [ "$k" -gt "$top" ] 2>/dev/null && top=$k
   done
   [ "$top" -gt "$kb" ] && n=$(( n - (top - kb) / 1048576 ))
   [ "$n" -lt 0 ] && n=0
   # capped (main m_37136): the reserves guess what each job may still write,
-  # and their whole sum kept every waiter out at 42 GB free; the 15 GB floor
+  # and their whole sum kept every waiter out at 42 GB free; the 10 GB floor
   # and the stop under HEAVY_DISK_STOP_GB (5) still guard the disk. The
   # trade, main's: when several running jobs really write their whole
   # reserves at once, the disk can reach that stop and one job ends with
@@ -425,7 +447,7 @@ printf "%s\t%s\t-\t%s\t%s\t%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" >>
 touch "$HOME/.bise/run/last-start"
 rv="$HOME/.bise/run/reserve/${2##*/}.$$"; mkdir -p "${rv%/*}"; k0=$(free_kb)
 others=$(ls "${rv%/*}" 2>/dev/null | grep -vc "^${rv##*/}\$")
-printf "%s\t%s\t%s\t%s\n" "$HEAVY_RESERVE" "$PWD" "$k0" "$c" >"$rv"
+printf "%s\t%s\t%s\t%s\t%s\n" "$HEAVY_RESERVE" "$PWD" "$k0" "$c" "$([ -n "${HEAVY_RESERVE_GB:-}" ] && echo - || echo "$HEAVY_KIND")" >"$rv"
 mnf="$HOME/.bise/run/disk-min.$$"; echo "$k0" >"$mnf"
 r=$(git rev-parse --show-toplevel 2>/dev/null) || r=$PWD
 for f in "$r"/target/RECLAIMED.txt "$r"/*/target/RECLAIMED.txt "$r"/*/*/target/RECLAIMED.txt; do
@@ -524,13 +546,13 @@ ahead() {
 # lockf -t 0 exits 75 (EX_TEMPFAIL) when the slot is taken.
 while :; do
   held=""
-  # the disk: the floor (HEAVY_DISK_WAIT_GB, 15) + what the running jobs may
+  # the disk: the floor (HEAVY_DISK_WAIT_GB, 10; 15 before 2026-10-22, main m_37463) + what the running jobs may
   # still write + this job's own reserve must be free; else reclaim, and wait
-  need=$(( ${HEAVY_DISK_WAIT_GB:-15} + HEAVY_RESERVE + $(reserved_gb) ))
+  need=$(( ${HEAVY_DISK_WAIT_GB:-10} + HEAVY_RESERVE + $(reserved_gb) ))
   if disk_under "$need"; then
     reclaim "$need"
     if [ -z "${diskwait:-}" ]; then
-      m="heavy-run: waiting for disk room: $(free_gb) GB free, this job starts at $need GB (${HEAVY_DISK_WAIT_GB:-15} kept free + $HEAVY_RESERVE it may write + $(( need - ${HEAVY_DISK_WAIT_GB:-15} - HEAVY_RESERVE )) the running jobs may still write); reclaiming idle cargo targets: $(printf '%s ' "$@" | cut -c1-80)"
+      m="heavy-run: waiting for disk room: $(free_gb) GB free, this job starts at $need GB (${HEAVY_DISK_WAIT_GB:-10} kept free + $HEAVY_RESERVE it may write + $(( need - ${HEAVY_DISK_WAIT_GB:-10} - HEAVY_RESERVE )) the running jobs may still write); reclaiming idle cargo targets: $(printf '%s ' "$@" | cut -c1-80)"
       echo "$m" >&2; tell_hub "$m"; diskwait=1
     fi
     sleep "${HEAVY_DISK_POLL:-10}"; continue

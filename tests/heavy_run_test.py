@@ -231,19 +231,19 @@ with tempfile.TemporaryDirectory() as home:
     os.chmod(os.path.join(fbin, "sb"), 0o755)
     envd = dict(env, HEAVY_FREE_KB_FILE=freef, HEAVY_DISK_POLL="0.2", SB_AGENT="fake",
                 PATH=fbin + os.pathsep + env["PATH"])
-    open(freef, "w").write(str(12 * GB))
+    open(freef, "w").write(str(11 * GB))
     ran = os.path.join(home, "disk_ran")
     errf = open(os.path.join(home, "disk_err"), "w+")
     waiter = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran], env=envd, stderr=errf)
-    check(stays(lambda: not os.path.exists(ran), 2, "the job waits"), "12 GB free: the job waits for disk")
+    check(stays(lambda: not os.path.exists(ran), 2, "the job waits"), "11 GB free: the job waits for disk (10 kept free + 2)")
     sb_lines = lambda: open(said).read() if os.path.exists(said) else ""
-    check("waiting for disk room: 12 GB free" in sb_lines() and sb_lines().startswith("status working --note"),
+    check("waiting for disk room: 11 GB free" in sb_lines() and sb_lines().startswith("status working --note"),
           "the waiting agent's status says why: %r" % sb_lines())
     open(freef, "w").write(str(20 * GB))
     check(waiter.wait(timeout=30) == 0 and os.path.exists(ran), "20 GB free: the job runs")
     errf.seek(0)
     err = errf.read()
-    check("heavy-run: waiting for disk room: 12 GB free" in err and "disk room again (20 GB free)" in err,
+    check("heavy-run: waiting for disk room: 11 GB free" in err and "disk room again (20 GB free)" in err,
           "stderr names the wait and its end: %r" % err)
     r = subprocess.Popen([HEAVY, "sh", "-c", 'sleep 60 & wait', "x"], env=envd, stderr=subprocess.PIPE, text=True)
     wait_for(lambda: len([l for l in lines() if l.split("\t")[2] == "-"]) > len(
@@ -268,7 +268,7 @@ with tempfile.TemporaryDirectory() as home:
         fh.write('#!/bin/sh\necho "$*" >> "%s"\n' % reclaimed)
     os.chmod(fake_reclaim, 0o755)
     envr = dict(envd, HEAVY_SLOTS="2", HEAVY_RECLAIM=fake_reclaim)
-    open(freef, "w").write(str(25 * GB))
+    open(freef, "w").write(str(21 * GB))
     go_r = os.path.join(home, "go_reserve")
     big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_r],
                            env=dict(envr, HEAVY_RESERVE_GB="10"), stderr=subprocess.DEVNULL)
@@ -279,13 +279,13 @@ with tempfile.TemporaryDirectory() as home:
     e2 = open(os.path.join(home, "err2"), "w+")
     second = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran2], env=envr, stderr=e2)
     check(stays(lambda: not os.path.exists(ran2), 2, "the second job waits"),
-          "25 GB free, 10 reserved by a running job: a 2 GB job waits (needs 27) %r" % lines()[-3:])
-    check(wait_for(lambda: os.path.exists(reclaimed) and "--want 27" in open(reclaimed).read(), 10),
-          "the waiting job asks the reclaim for 27 GB")
+          "21 GB free, 10 reserved by a running job that named it: a 2 GB job waits (needs 22) %r" % lines()[-3:])
+    check(wait_for(lambda: os.path.exists(reclaimed) and "--want 22" in open(reclaimed).read(), 10),
+          "the waiting job asks the reclaim for 22 GB")
     e2.seek(0)
-    check("starts at 27 GB (15 kept free + 2 it may write + 10 the running jobs may still write)" in e2.read(), "the wait says the sum")
-    open(freef, "w").write(str(27 * GB))
-    check(job_ends(second, 30) == 0 and os.path.exists(ran2), "27 GB free: it runs")
+    check("starts at 22 GB (10 kept free + 2 it may write + 10 the running jobs may still write)" in e2.read(), "the wait says the sum")
+    open(freef, "w").write(str(22 * GB))
+    check(job_ends(second, 30) == 0 and os.path.exists(ran2), "22 GB free: it runs")
     # what the disk lost since the running job started counts as written by
     # it: started at 30 GB free, now 22 (8 written): 2 left, a 2 GB job
     # needs 19 and runs (the whole sum would want 27: main m_36317)
@@ -297,10 +297,10 @@ with tempfile.TemporaryDirectory() as home:
                            env=dict(envr, HEAVY_RESERVE_GB="10"), stderr=subprocess.DEVNULL)
     check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]),
           "the 10 GB job runs")
-    open(freef, "w").write(str(22 * GB))
+    open(freef, "w").write(str(20 * GB))
     ran5 = os.path.join(home, "ran5")
     r = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', ran5], env=envr, capture_output=True, text=True, timeout=30)
-    check(r.returncode == 0 and os.path.exists(ran5), "8 GB written since it started: a 2 GB job runs at 22 GB free: %r" % r.stderr[-300:])
+    check(r.returncode == 0 and os.path.exists(ran5), "10 GB written since it started: a 2 GB job runs at 20 GB free (the whole sum would want 22): %r" % r.stderr[-300:])
     open(go_w, "w").close()
     job_ends(big, 30)
     check(not [f for f in os.listdir(os.path.join(run, "reserve"))], "the reserves are gone with their jobs")
@@ -341,7 +341,7 @@ with tempfile.TemporaryDirectory() as home:
     def reserve(kind, rows):
         with open(dtsv, "w") as fh:
             fh.writelines("1\t%s\t%s\t0\t0\t0\tx\n" % (kind, kb) for kb in rows)
-        fn = 'eval "$(sed -n "/^reserve_gb()/,/^}/p" "$0")"; reserve_gb "$1"'
+        fn = 'eval "$(sed -n -e "/^reserve_gb()/,/^}/p" -e "/^p90_gb()/,/^}/p" "$0")"; reserve_gb "$1"'
         return subprocess.run(["bash", "-c", fn, HEAVY, kind], env=dict(env, HOME=home), capture_output=True, text=True).stdout.strip()
     check(reserve("cargo-cold", [1 * GB] * 19) == "10" and reserve("cargo-cold", []) == "10",
           "19 jobs of a kind, or none: the flat guess, 10")
@@ -376,19 +376,59 @@ with tempfile.TemporaryDirectory() as home:
     big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_c],
                            env=dict(envc, HEAVY_RESERVE_GB="10"), stderr=subprocess.DEVNULL)
     check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]), "the 10 GB job runs (cap)")
-    # 22 GB free now, and its start mark set to 22 too: no drop counts as
-    # written by it, its whole 10 GB stays reserved (uncapped: 27 needed)
+    # 18 GB free now, and its start mark set to 18 too: no drop counts as
+    # written by it, its whole 10 GB stays reserved (uncapped: 22 needed)
     ran6 = os.path.join(home, "ran6")
-    open(freef, "w").write(str(22 * GB))
+    open(freef, "w").write(str(18 * GB))
     for f in os.listdir(os.path.join(run, "reserve")):
         p = os.path.join(run, "reserve", f)
         parts = open(p).read().split("\t")
-        parts[2] = str(22 * GB)
+        parts[2] = str(18 * GB)
         open(p, "w").write("\t".join(parts))
     r = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', ran6], env=envc, capture_output=True, text=True, timeout=30)
-    check(r.returncode == 0 and os.path.exists(ran6), "the reserves capped at 4: a 2 GB job runs at 22 GB free: %r" % r.stderr[-300:])
+    check(r.returncode == 0 and os.path.exists(ran6), "the reserves capped at 4: a 2 GB job runs at 18 GB free (needs 16): %r" % r.stderr[-300:])
     open(go_c, "w").close()
     job_ends(big, 30)
+    # the running jobs count what their kind measured (main m_37463), from 3
+    # measured runs on (review-gates m_37481), else their flat guess: an
+    # 'other' job (flat 2) beside a 2 GB job at 13 GB free (10 floor + 2):
+    # 3 runs at 0 count 0 (it runs); none, or 2 runs at 0, count the flat 2
+    # (it waits, 14); 3 runs at 3 GB count 3 (it waits, 15)
+    for measured, runs_now, what in (([0] * 3, True, "3 runs at 0: 0"), ([], False, "nothing measured: flat 2"),
+                                     ([0] * 2, False, "2 runs at 0: under 3, flat 2"), ([3 * GB] * 3, False, "3 runs at 3 GB: 3")):
+        if os.path.exists(dtsv):
+            os.remove(dtsv)
+        if measured:
+            with open(dtsv, "w") as fh:
+                fh.writelines("1\tother\t%d\t0\t0\t0\tx\n" % m for m in measured)
+        open(freef, "w").write(str(30 * GB))
+        go_k = os.path.join(home, "go_kind")
+        if os.path.exists(go_k):
+            os.remove(go_k)
+        big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_k], env=envr, stderr=subprocess.DEVNULL)
+        check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]), "the 'other' job runs")
+        rf = [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")][0]
+        parts = open(os.path.join(run, "reserve", rf)).read().rstrip("\n").split("\t")
+        check(parts[0] == "2" and parts[4] == "other", "its reserve file: 2 GB, kind other: %r" % parts)
+        parts[2] = str(13 * GB)
+        open(os.path.join(run, "reserve", rf), "w").write("\t".join(parts) + "\n")
+        open(freef, "w").write(str(13 * GB))
+        ran7 = os.path.join(home, "ran7")
+        if os.path.exists(ran7):
+            os.remove(ran7)
+        small = subprocess.Popen([HEAVY, "sh", "-c", 'touch "$0"', ran7], env=envr, stderr=subprocess.DEVNULL)
+        if runs_now:
+            check(job_ends(small, 30) == 0 and os.path.exists(ran7), "a running 'other' job, %s: a 2 GB job runs at 13 GB free" % what)
+        else:
+            check(stays(lambda: not os.path.exists(ran7), 2, "it waits"), "a running 'other' job, %s: a 2 GB job waits at 13 GB free" % what)
+            small.terminate()
+            small.wait()
+        open(go_k, "w").close()
+        job_ends(big, 30)
+    if os.path.exists(dtsv):
+        os.remove(dtsv)
+    # plenty again for the cases below (their waits are the load's, not the disk's)
+    open(freef, "w").write(str(40 * GB))
     # the load (mac-budget): with a heavy job running, a new one waits while
     # the load is over HEAVY_LOAD_MAX; a lone job never waits for it
     loadf = os.path.join(home, "load")
