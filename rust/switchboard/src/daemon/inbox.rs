@@ -92,6 +92,12 @@ impl<T> Inbox<T> {
         self.pick().map_or(Next::Idle, Next::Msg)
     }
 
+    /// Nothing waits in either lane (the photo's moment, daemon/photo_take.rs).
+    pub(super) fn is_empty(&mut self) -> bool {
+        self.drain();
+        self.urgent.is_empty() && self.rest.is_empty()
+    }
+
     fn sort(&mut self, m: T) {
         if (self.urgent_of)(&m) {
             self.urgent.push_back(m);

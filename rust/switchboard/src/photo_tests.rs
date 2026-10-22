@@ -106,3 +106,22 @@ fn the_key_is_the_binarys_bytes() {
     assert_eq!(key_of(&d.join("none")), None);
     assert_eq!(format!("{:016x}", fnv(b"")), "cbf29ce484222325", "FNV-1a's offset basis");
 }
+
+/// architect m_37035: a due photo waits for a good moment (sb-core's
+/// encode holds the loop): under load or behind waiting messages it stays
+/// due, one hub.log line; at a quiet, unloaded tick it is taken, once.
+#[test]
+fn a_due_photo_waits_for_a_quiet_unloaded_tick() {
+    let mut w = Wait { due: true, ..Default::default() };
+    assert_eq!(w.tick(false, true, false, 4.0), Some(Act::Say("photo deferred: load x4.0".into())), "loaded: deferred, said once");
+    assert_eq!(w.tick(false, true, false, 4.0), None, "said once only");
+    assert!(w.due, "still due");
+    let mut w = Wait { due: true, ..Default::default() };
+    assert_eq!(w.tick(false, false, false, 1.0), Some(Act::Say("photo deferred: messages waiting".into())), "a client line waiting");
+    assert_eq!(w.tick(false, true, true, 1.0), None, "a land in line: still deferred, no second line");
+    assert!(w.due);
+    assert_eq!(w.tick(false, true, false, 1.0), Some(Act::Take), "quiet and unloaded: taken");
+    assert_eq!(w.tick(false, true, false, 1.0), None, "taken once");
+    assert_eq!(w.tick(true, true, false, 1.0), Some(Act::Take), "an idle photo, the same rule");
+    assert_eq!(moment(true, false, 1.9), Ok(()), "x1.9 is not loaded");
+}

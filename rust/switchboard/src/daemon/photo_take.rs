@@ -3,7 +3,8 @@
 //! restored and only the events after it replayed, else the full replay
 //! and one hub.log line saying why. Then a photo is taken, always between
 //! two steps and only while every journal line of the session reached the
-//! file (`journal_ok`): after a boot that did a full replay, at a clean
+//! file (`journal_ok`): at the first tick after a boot that did a full
+//! replay (outside the boot watch), at a clean
 //! stop (skipped when the last one took longer than STOP_BUDGET_MS), and
 //! at most once a day after IDLE_AFTER_MS with no journal event.
 
@@ -29,6 +30,15 @@ pub(super) struct Photos {
     last_events: usize,
     /// how long the last photo took (ms)
     last_took: u64,
+    /// a full replay's photo (`due`) or the idle one, waiting for a good
+    /// moment (photo::moment): never inside the boot, where a loaded
+    /// machine's slow encode read as a stuck boot and the boot watch
+    /// stopped the hub (his -47 switch, keep-current m_37023: ~350 s of
+    /// encode after a 703 s replay at load ~58), nor at a busy tick
+    wait: photo::Wait,
+    /// nothing waited in the loop's inbox behind the message being run
+    /// (set by the serve loop before each one)
+    pub(super) quiet: bool,
 }
 
 impl Photos {
@@ -55,7 +65,7 @@ pub(super) fn boot(hub: &mut Hub, paths: &Paths, core_bin: &Path, events: &[Valu
     let dir = paths.state.join("photo");
     photo::clean(&dir);
     let key = photo::key_of(core_bin);
-    let mut ph = Photos { dir, key, mark: Mark::of(events), last_event: now_ms(), last_photo: 0, last_events: 0, last_took: 0 };
+    let mut ph = Photos { dir, key, mark: Mark::of(events), last_event: now_ms(), last_photo: 0, last_events: 0, last_took: 0, wait: photo::Wait::default(), quiet: false };
     let t0 = now_ms();
     let (from, why) = pick(&ph.dir, ph.key.as_deref(), events, migrated);
     let rebuilt = hub.rebuild(events, from, &mut |done, total| watch.replayed(done, total));
@@ -70,7 +80,7 @@ pub(super) fn boot(hub: &mut Hub, paths: &Paths, core_bin: &Path, events: &[Valu
         Err(e) => {
             let why = why.unwrap_or(e);
             log_line(paths, &format!("boot: full replay of {} events ({} ms): {why}", events.len(), now_ms() - t0));
-            take(hub, &mut ph, paths, true, "after a full replay");
+            ph.wait.due = true;
         }
     }
     ph
@@ -103,16 +113,24 @@ fn take(hub: &mut Hub, ph: &mut Photos, paths: &Paths, journal_ok: bool, why: &s
 }
 
 impl Shell {
-    /// At each tick: the idle photo when due.
+    /// At each tick: a full replay's photo or the idle one, when the tick
+    /// is a good moment (photo::Wait); else it stays due, one hub.log line.
     pub(super) fn photo_idle(&mut self) {
         let ph = &self.photos;
-        if ph.mark.events != ph.last_events && photo::idle_due(now_ms(), ph.last_event, ph.last_photo) {
-            take(&mut self.hub, &mut self.photos, &self.opts.paths, self.journal.ok(), "idle");
+        let why = if ph.wait.due { "after a full replay" } else { "idle" };
+        let idle = ph.mark.events != ph.last_events && photo::idle_due(now_ms(), ph.last_event, ph.last_photo);
+        let lands = !self.lands.ranks().is_empty();
+        let quiet = ph.quiet;
+        match self.photos.wait.tick(idle, quiet, lands, crate::load::factor()) {
+            Some(photo::Act::Take) => take(&mut self.hub, &mut self.photos, &self.opts.paths, self.journal.ok(), why),
+            Some(photo::Act::Say(s)) => log_line(&self.opts.paths, &s),
+            None => {}
         }
     }
 
-    /// At a clean stop: the photo, unless the last one was slow (the
-    /// switcher does not wait long for a hub that goes).
+    /// At a clean stop: the photo, unless the last one was slow or the
+    /// machine is loaded (the switcher does not wait long for a hub that
+    /// goes, and a stop under load must not stretch).
     pub(super) fn photo_stop(&mut self) {
         let ph = &self.photos;
         if ph.mark.events == ph.last_events {
@@ -120,6 +138,10 @@ impl Shell {
         }
         if ph.last_took > photo::STOP_BUDGET_MS {
             return log_line(&self.opts.paths, &format!("photo at stop skipped: the last took {} ms", ph.last_took));
+        }
+        let f = crate::load::factor();
+        if crate::load::is_loaded(f) {
+            return log_line(&self.opts.paths, &format!("photo at stop skipped: load x{f:.1}"));
         }
         take(&mut self.hub, &mut self.photos, &self.opts.paths, self.journal.ok(), "stop");
     }

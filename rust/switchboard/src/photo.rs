@@ -131,6 +131,62 @@ pub fn usable(head: Option<&Head>, key: &str, events: &[Value], migrated: bool) 
     Use::Photo { k }
 }
 
+/// Whether a tick is a good moment for a photo (architect m_37035): sb-core
+/// is one thread, so the encode holds the hub's loop (~350 s at load x5
+/// on his -47 boot). Only with nothing waiting in the loop's inbox, no
+/// land in line and the machine not loaded (crate::load's one rule);
+/// else why not, for the one hub.log line.
+pub fn moment(quiet: bool, lands: bool, factor: f64) -> Result<(), String> {
+    if !quiet {
+        return Err("messages waiting".into());
+    }
+    if lands {
+        return Err("a land in line".into());
+    }
+    if crate::load::is_loaded(factor) {
+        return Err(format!("load x{factor:.1}"));
+    }
+    Ok(())
+}
+
+/// What a tick does about the photo.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Act {
+    Take,
+    /// the deferral's one hub.log line
+    Say(String),
+}
+
+/// A photo waiting for its moment: `due` after a full replay (never taken
+/// inside the boot), or the idle one. Not taken, it stays due; never
+/// taken, the next boot replays in full again (the honest fallback).
+#[derive(Debug, Default)]
+pub struct Wait {
+    pub due: bool,
+    said: bool,
+}
+
+impl Wait {
+    /// One tick: `idle` an idle photo is due ([`idle_due`]), the moment's
+    /// facts as [`moment`] reads them.
+    pub fn tick(&mut self, idle: bool, quiet: bool, lands: bool, factor: f64) -> Option<Act> {
+        if !(self.due || idle) {
+            return None;
+        }
+        match moment(quiet, lands, factor) {
+            Ok(()) => {
+                (self.due, self.said) = (false, false);
+                Some(Act::Take)
+            }
+            Err(why) if !self.said => {
+                self.said = true;
+                Some(Act::Say(format!("photo deferred: {why}")))
+            }
+            Err(_) => None,
+        }
+    }
+}
+
 /// Is an idle photo due: nothing came in for [`IDLE_AFTER_MS`] and the last
 /// photo is older than [`IDLE_EVERY_MS`] (0: never taken this session).
 pub fn idle_due(now: u64, last_input: u64, last_photo: u64) -> bool {

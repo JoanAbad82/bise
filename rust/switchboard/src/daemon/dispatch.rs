@@ -69,6 +69,8 @@ impl Shell {
                 Next::Closed => break false,
             };
             self.loop_watch.on(m.label());
+            // the photo's moment: nothing else waiting behind this message
+            self.photos.quiet = inbox.is_empty();
             let flow = self.dispatch(m, tick_queued);
             if let Some(l) = self.loop_watch.idle() {
                 log_line(&self.opts.paths, &l);
