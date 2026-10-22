@@ -127,7 +127,14 @@ reclaim() {
   local r="${HEAVY_RECLAIM:-/usr/bin/python3 $HOME/.bise/run/disk_reclaim.py}"
   # fds 3-9 closed: a job's slot lock (lockf's fd, 3; 3-6 for --alone) must
   # not outlive the job in a reclaim that runs on
-  ( $r --want "$1" >>"$HOME/.bise/run/reclaim.out" 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & ) </dev/null >/dev/null 2>&1
+  # reclaim.mark (touched at its start and end) and reclaim.running (while it
+  # runs): a job it overlaps logs no measure in disk.tsv (review-gates
+  # m_37215: space freed under a job would make it look like it wrote ~0)
+  local d="$HOME/.bise/run"
+  # (a double fork, as before: never a child of the job, so a stop of the
+  # job's tree or an --alone job's CPU count never includes it)
+  ( ( touch "$d/reclaim.mark"; : >"$d/reclaim.running"; $r --want "$1" >>"$d/reclaim.out" 2>&1
+      rm -f "$d/reclaim.running"; touch "$d/reclaim.mark" ) 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & ) </dev/null >/dev/null 2>&1
 }
 # runs in the background of a job's shell ($1): marks $2 ("disk <GB>" or
 # "time <min>") and stops the job when the disk gets too low or the job runs
@@ -143,9 +150,14 @@ cpu_cs() { # the CPU centiseconds of the pids $@, summed (ps's [[h:]m]m:ss.cc)
     awk '{ n = split($1, a, ":"); s = 0; for (i = 1; i <= n; i++) s = s * 60 + a[i]; t += s } END { printf "%d\n", t * 100 }'
 }
 disk_watch() {
-  local me=$BASHPID last now ran=0 why="" step busy_ran=0 cpu=0 c seen=0
+  local me=$BASHPID last now ran=0 why="" step busy_ran=0 cpu=0 c seen=0 k mn=""
   last=$(date +%s)
   while kill -0 "$1" 2>/dev/null; do
+    # $5: the lowest free KB seen while it runs (its disk.tsv line)
+    if [ -n "${5:-}" ]; then
+      k=$(free_kb); [ -n "$mn" ] || mn=$(cat "$5" 2>/dev/null)
+      [ -n "$k" ] && { [ -z "$mn" ] || [ "$k" -lt "$mn" ] 2>/dev/null; } && { mn=$k; echo "$k" >"$5"; }
+    fi
     # the time it ran awake: a gap between two checks counts 30 s at most,
     # so a night the Mac slept (2026-10-20, 21:43 to 10:20, an empty
     # battery) is not a stuck job
@@ -169,25 +181,41 @@ disk_watch() {
     sleep "${HEAVY_DISK_POLL:-10}"
   done
 }
-# the GB a job may still write (its reserve): a cargo build or test, a gate,
-# a bins/versions build: 3 on a warm target (cargo's CACHEDIR.TAG in the
-# repo's target or rust/target), 10 cold or for a full gate, the nightly or
-# --alone (a cold target grew 8-11 GB on 2026-10-20); anything else 2.
+# a job's kind, for its disk reserve: full (a full gate, the nightly,
+# --alone), cargo-warm or cargo-cold (a cargo build or test, a gate, a
+# bins/versions build, run_all: warm when a target cargo will use exists,
+# cargo's CACHEDIR.TAG in the repo's target, rust/'s, the task dir's that
+# gate.sh clones from its seed, or CARGO_TARGET_DIR), other
+job_kind() {
+  case " $* " in
+    *"gate.sh full"*|*nightly_gate.sh*|*" --alone "*) echo full; return ;;
+    *cargo*|*gate.sh*|*bins.sh*|*"versions.sh build"*|*run_all.sh*) ;;
+    *) echo other; return ;;
+  esac
+  local r t; r=$(git rev-parse --show-toplevel 2>/dev/null) || r=$PWD
+  for t in "${CARGO_TARGET_DIR:-/nonexistent}" "$r/rust/target" "$r/target" "$r/../target"; do
+    [ -e "$t/CACHEDIR.TAG" ] && { echo cargo-warm; return; }
+  done
+  echo cargo-cold
+}
+# the GB a job of kind $1 may still write (its reserve), from what jobs of
+# that kind really wrote (fast-loop, main m_37136: 5 agents waited at 42 GB
+# free while 3 jobs reserved a flat 10 GB each): the p90 of the last 20 of
+# that kind in ~/.bise/run/disk.tsv, rounded up, at least 1, never over the
+# flat guess. Under 20 of them (review-gates m_37204), the flat guess: full and cargo-cold 10 (a
+# cold target grew 8-11 GB on 2026-10-20), cargo-warm 3, other 2.
 # HEAVY_RESERVE_GB wins.
 reserve_gb() {
   [ -n "${HEAVY_RESERVE_GB:-}" ] && { echo "$HEAVY_RESERVE_GB"; return; }
-  case " $* " in
-    *"gate.sh full"*|*nightly_gate.sh*|*" --alone "*) echo 10; return ;;
-    *cargo*|*gate.sh*|*bins.sh*|*"versions.sh build"*|*run_all.sh*) ;;
-    *) echo 2; return ;;
-  esac
-  # warm: a target cargo will use exists (the repo's, rust/'s, the task
-  # dir's that gate.sh clones from its seed, or CARGO_TARGET_DIR)
-  local r t; r=$(git rev-parse --show-toplevel 2>/dev/null) || r=$PWD
-  for t in "${CARGO_TARGET_DIR:-/nonexistent}" "$r/rust/target" "$r/target" "$r/../target"; do
-    [ -e "$t/CACHEDIR.TAG" ] && { echo 3; return; }
-  done
-  echo 10
+  local flat; case "$1" in full|cargo-cold) flat=10 ;; cargo-warm) flat=3 ;; *) flat=2 ;; esac
+  awk -F'\t' -v k="$1" -v flat="$flat" '
+    $2 == k && $3 ~ /^[0-9]+$/ { w[n++ % 20] = $3 }
+    END { m = n < 20 ? n : 20
+          if (m < 20) { print flat; exit }
+          for (i = 0; i < m; i++) v[i] = w[i]
+          for (i = 1; i < m; i++) { x = v[i]; for (j = i - 1; j >= 0 && v[j] > x; j--) v[j + 1] = v[j]; v[j + 1] = x }
+          i = int(0.9 * m + 0.999) - 1; g = int((v[i] + 1048575) / 1048576)
+          if (g < 1) g = 1; if (g > flat) g = flat; print g }' "$HOME/.bise/run/disk.tsv" 2>/dev/null || echo "$flat"
 }
 # the running jobs, for the queue's waiting line (main m_36953: 7 waiters
 # waited 3-5 h behind a hung --alone job no line named): "<slot> <agent or
@@ -221,6 +249,14 @@ reserved_gb() {
   done
   [ "$top" -gt "$kb" ] && n=$(( n - (top - kb) / 1048576 ))
   [ "$n" -lt 0 ] && n=0
+  # capped (main m_37136): the reserves guess what each job may still write,
+  # and their whole sum kept every waiter out at 42 GB free; the 15 GB floor
+  # and the stop under HEAVY_DISK_STOP_GB (5) still guard the disk. The
+  # trade, main's: when several running jobs really write their whole
+  # reserves at once, the disk can reach that stop and one job ends with
+  # rc 28, where before a waiter waited. An rc 28 is that, not a bug of
+  # the job: rerun it.
+  [ "$n" -gt "${HEAVY_RESERVE_TOTAL_MAX:-20}" ] && n=${HEAVY_RESERVE_TOTAL_MAX:-20}
   echo "$n"
 }
 # the job's time limit in minutes, by kind (review-gates m_36096): about
@@ -371,7 +407,10 @@ if [ "$ALONE" = 0 ]; then
   export SB_TEST_JOBS="${SB_TEST_JOBS:-$(( (${HEAVY_THREADS:-4} + 1) / 2 ))}"
 fi
 # the job's disk reserve (reserve_gb) and its time limit in minutes (max_min)
-export HEAVY_RESERVE; HEAVY_RESERVE=$(reserve_gb "$([ "$ALONE" = 1 ] && echo --alone)" "$@")
+# HEAVY_KIND: decided once, here; the job's disk.tsv line carries this same
+# key, so what it wrote feeds the reserve of the jobs of its kind
+export HEAVY_KIND; HEAVY_KIND=$(job_kind "$([ "$ALONE" = 1 ] && echo --alone)" "$@")
+export HEAVY_RESERVE; HEAVY_RESERVE=$(reserve_gb "$HEAVY_KIND")
 export HEAVY_MAX; HEAVY_MAX=$(max_min "$([ "$ALONE" = 1 ] && echo --alone)" "$@")
 
 # The watcher runs with fds 3-9 closed: its sleep outlives a kill of the
@@ -384,7 +423,10 @@ JOB='export HEAVY_SLOT="${2##*/} $$"; rm -f "$1"; L="$HOME/.bise/run/heavy.log"
 c=$(printf "%s " "${@:4}" | cut -c1-160); t0=$(date +%s)
 printf "%s\t%s\t-\t%s\t%s\t%s\n" "$HEAVY_SUBMIT" "$t0" "${2##*/}" "$PWD" "$c" >>"$L" 2>/dev/null
 touch "$HOME/.bise/run/last-start"
-rv="$HOME/.bise/run/reserve/${2##*/}.$$"; mkdir -p "${rv%/*}"; printf "%s\t%s\t%s\t%s\n" "$HEAVY_RESERVE" "$PWD" "$(free_kb)" "$c" >"$rv"
+rv="$HOME/.bise/run/reserve/${2##*/}.$$"; mkdir -p "${rv%/*}"; k0=$(free_kb)
+others=$(ls "${rv%/*}" 2>/dev/null | grep -vc "^${rv##*/}\$")
+printf "%s\t%s\t%s\t%s\n" "$HEAVY_RESERVE" "$PWD" "$k0" "$c" >"$rv"
+mnf="$HOME/.bise/run/disk-min.$$"; echo "$k0" >"$mnf"
 r=$(git rev-parse --show-toplevel 2>/dev/null) || r=$PWD
 for f in "$r"/target/RECLAIMED.txt "$r"/*/target/RECLAIMED.txt "$r"/*/*/target/RECLAIMED.txt; do
   [ -e "$f" ] && { echo "$(cat "$f") (${f%/RECLAIMED.txt})" >&2; rm -f "$f"; }
@@ -392,10 +434,25 @@ done
 reclaim 0
 stop="$HOME/.bise/run/disk-stop.$$"; rm -f "$stop"
 idle=0; [ "$2" = all ] && idle="${HEAVY_IDLE_MIN:-30}"
-disk_watch $$ "$stop" "$HEAVY_MAX" "$idle" </dev/null >/dev/null 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & w=$!
+disk_watch $$ "$stop" "$HEAVY_MAX" "$idle" "$mnf" </dev/null >/dev/null 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & w=$!
 /usr/bin/caffeinate -is nice -n "$3" "${@:4}"; rc=$?
 kill $w 2>/dev/null; wait $w 2>/dev/null
 rm -f "$rv"
+# what it wrote, for the next reserve of its kind (reserve_gb): the free KB
+# at its start minus the lowest the watcher saw (or at its end), never under
+# 0; the jobs running beside it write meanwhile too: an upper bound. A
+# reclaim during its run (reclaim.mark newer than its start, or one running
+# now) frees space under it, so its measure would be low: written is "-",
+# which reserve_gb skips.
+# ~/.bise/run/disk.tsv: <end> <kind> <written KB> <free KB at start> <lowest> <others> <command>
+k1=$(free_kb); mn=$(cat "$mnf" 2>/dev/null); rm -f "$mnf"
+[ -n "$k1" ] && { [ -z "$mn" ] || [ "$k1" -lt "$mn" ]; } && mn=$k1
+if [ -n "$k0" ] && [ -n "$mn" ]; then
+  wr=$(( k0 - mn )); [ "$wr" -lt 0 ] && wr=0
+  rmk="$HOME/.bise/run/reclaim.mark"
+  { [ -e "$HOME/.bise/run/reclaim.running" ] || { [ -e "$rmk" ] && [ "$(stat -f %m "$rmk")" -ge "$t0" ]; }; } && wr=-
+  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$(date +%s)" "$HEAVY_KIND" "$wr" "$k0" "$mn" "$others" "$c" >>"$HOME/.bise/run/disk.tsv" 2>/dev/null
+fi
 if [ -e "$stop" ]; then
   why=$(cat "$stop")
   case "$why" in

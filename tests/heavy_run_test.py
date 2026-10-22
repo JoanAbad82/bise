@@ -304,6 +304,91 @@ with tempfile.TemporaryDirectory() as home:
     open(go_w, "w").close()
     job_ends(big, 30)
     check(not [f for f in os.listdir(os.path.join(run, "reserve"))], "the reserves are gone with their jobs")
+    # the reserve per kind (main m_37136): each job's disk.tsv line says what
+    # it wrote (free KB at its start minus the lowest the watcher saw)
+    dtsv = os.path.join(run, "disk.tsv")
+    if os.path.exists(dtsv):
+        os.remove(dtsv)
+    open(freef, "w").write(str(40 * GB))
+    go_d = os.path.join(home, "go_disk")
+    big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_d], env=envr, stderr=subprocess.DEVNULL)
+    check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]), "the disk job runs")
+    open(freef, "w").write(str(37 * GB))
+    # the watcher has seen 37 GB: its disk-min file says so (no sleep: the event)
+    check(wait_for(lambda: [f for f in os.listdir(run) if f.startswith("disk-min.")
+                            and open(os.path.join(run, f)).read().strip() == str(37 * GB)]), "the watcher saw 37 GB")
+    open(freef, "w").write(str(39 * GB))
+    open(go_d, "w").close()
+    job_ends(big, 30)
+    d = open(dtsv).read().splitlines()[-1].split("\t") if os.path.exists(dtsv) else []
+    check(len(d) == 7 and d[1] == "other" and d[2] == str(3 * GB) and d[3] == str(40 * GB) and d[4] == str(37 * GB),
+          "disk.tsv: kind other, wrote 3 GB (40 at start, 37 at the lowest, 39 at the end): %r" % d)
+    check(not [f for f in os.listdir(run) if f.startswith("disk-min.")], "no disk-min file left")
+    # a reclaim during the job (its mark touched mid-job): space freed under
+    # it, its measure is not one: written '-', and its kind stays flat
+    go_m = os.path.join(home, "go_mark")
+    big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_m], env=envr, stderr=subprocess.DEVNULL)
+    check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]), "the reclaimed job runs")
+    mark = os.path.join(run, "reclaim.mark")
+    open(mark, "w").close()
+    # its mtime past the job's start whatever the second (no sleep)
+    os.utime(mark, (time.time() + 5, time.time() + 5))
+    open(go_m, "w").close()
+    job_ends(big, 30)
+    d = open(dtsv).read().splitlines()[-1].split("\t")
+    check(d[1] == "other" and d[2] == "-", "a reclaim mid-job: written '-': %r" % d[:3])
+
+    def reserve(kind, rows):
+        with open(dtsv, "w") as fh:
+            fh.writelines("1\t%s\t%s\t0\t0\t0\tx\n" % (kind, kb) for kb in rows)
+        fn = 'eval "$(sed -n "/^reserve_gb()/,/^}/p" "$0")"; reserve_gb "$1"'
+        return subprocess.run(["bash", "-c", fn, HEAVY, kind], env=dict(env, HOME=home), capture_output=True, text=True).stdout.strip()
+    check(reserve("cargo-cold", [1 * GB] * 19) == "10" and reserve("cargo-cold", []) == "10",
+          "19 jobs of a kind, or none: the flat guess, 10")
+    check(reserve("cargo-cold", [GB // 2] * 17 + [int(2.5 * GB)] * 3) == "3", "20 jobs: the p90, 2.5 GB rounded up to 3")
+    check(reserve("cargo-warm", [9 * GB] * 20) == "3", "never over the flat guess (cargo-warm 3)")
+    check(reserve("full", [0] * 20) == "1", "at least 1 GB")
+    check(reserve("full", [9 * GB] * 20 + [0] * 20) == "1", "the last 20 of that kind only")
+    check(reserve("other", [9 * GB] * 20) == "2" and reserve("cargo-cold", [GB] * 19 + ["bad"] * 3) == "10",
+          "other 2; a bad line is skipped (19 left: flat)")
+    check(reserve("cargo-cold", [GB] * 19 + ["-"]) == "10", "a reclaimed job's '-' line: skipped, 19 left: flat")
+    # a job that outgrows its learned reserve (1 GB here) is still stopped by
+    # the floor: under HEAVY_DISK_STOP_GB (5) free, rc=28
+    reserve("other", [0] * 20)
+    open(freef, "w").write(str(40 * GB))
+    r = subprocess.Popen([HEAVY, "sh", "-c", 'sleep 60 & wait', "x"], env=envr, stderr=subprocess.PIPE, text=True)
+    check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]), "the 1 GB job runs")
+    check(open(os.path.join(run, "reserve", [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")][0])).read().split("\t")[0] == "1",
+          "its reserve is the learned 1 GB")
+    open(freef, "w").write(str(3 * GB))
+    try:
+        _, err = r.communicate(timeout=20)
+    except subprocess.TimeoutExpired:
+        r.kill()
+        _, err = r.communicate()
+    check(r.returncode == 28 and "3 GB free" in err, "it wrote past its reserve: stopped at 3 GB free, rc=28: %r %r" % (r.returncode, err[-200:]))
+    os.remove(dtsv)
+    # the total reserved is capped (HEAVY_RESERVE_TOTAL_MAX, 20): with 4 here,
+    # a 10 GB job running, a 2 GB job needs 15 + 2 + 4 = 21 and runs at 22
+    open(freef, "w").write(str(30 * GB))
+    go_c = os.path.join(home, "go_cap")
+    envc = dict(envr, HEAVY_RESERVE_TOTAL_MAX="4")
+    big = subprocess.Popen([HEAVY, "sh", "-c", 'while [ ! -e "$0" ]; do sleep 0.1; done', go_c],
+                           env=dict(envc, HEAVY_RESERVE_GB="10"), stderr=subprocess.DEVNULL)
+    check(wait_for(lambda: [f for f in os.listdir(os.path.join(run, "reserve")) if f.startswith("heavy")]), "the 10 GB job runs (cap)")
+    # 22 GB free now, and its start mark set to 22 too: no drop counts as
+    # written by it, its whole 10 GB stays reserved (uncapped: 27 needed)
+    ran6 = os.path.join(home, "ran6")
+    open(freef, "w").write(str(22 * GB))
+    for f in os.listdir(os.path.join(run, "reserve")):
+        p = os.path.join(run, "reserve", f)
+        parts = open(p).read().split("\t")
+        parts[2] = str(22 * GB)
+        open(p, "w").write("\t".join(parts))
+    r = subprocess.run([HEAVY, "sh", "-c", 'touch "$0"', ran6], env=envc, capture_output=True, text=True, timeout=30)
+    check(r.returncode == 0 and os.path.exists(ran6), "the reserves capped at 4: a 2 GB job runs at 22 GB free: %r" % r.stderr[-300:])
+    open(go_c, "w").close()
+    job_ends(big, 30)
     # the load (mac-budget): with a heavy job running, a new one waits while
     # the load is over HEAVY_LOAD_MAX; a lone job never waits for it
     loadf = os.path.join(home, "load")
