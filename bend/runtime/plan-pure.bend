@@ -14,6 +14,7 @@
 # "OpenAI refused the key" on a sign-in that expired.
 import Base
 import ../core/config.bend as Cf
+import ../core/gen/obs.bend as OG
 
 # subscription_sharing_usage_limit_exceeded: OpenAI says not to infer a
 # reset time from it, so the line points at the usage page
@@ -110,4 +111,4 @@ def swap_marked(+marker: String, +from: String, +to: String) -> String:
 
 # the obs line (rust/proto Obs::ModelSwapped): ids hold no space
 def swap_note(+from: String, +to: String) -> String:
-  String.concat(["  obs: model_swapped: ", from, " ", to])
+  OG.model_swapped(from, to)

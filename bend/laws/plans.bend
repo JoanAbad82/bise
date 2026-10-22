@@ -65,10 +65,10 @@ law swap_said_once_per_pair:
         Bool.not(Plan.say_swap("", "chatgpt/gpt-6-luna", "chatgpt/gpt-6-luna")))))
     == True{} : Bool}
 
-# LAW: the note is the obs line Rust parses (Obs::ModelSwapped).
+# LAW: the note is the obs record Rust reads (ObsRec::ModelSwapped).
 law swap_note_is_an_obs_line:
   {Plan.swap_note("chatgpt/gpt-6.1-sol", "chatgpt/gpt-6-luna")
-    == "  obs: model_swapped: chatgpt/gpt-6.1-sol chatgpt/gpt-6-luna" : String}
+    == "obs model_swapped :: {\"from\":\"chatgpt/gpt-6.1-sol\",\"to\":\"chatgpt/gpt-6-luna\"}" : String}
 
 # LAW: the note's <from> is the id asked before the swap.
 law swap_asked_is_before_the_swap:

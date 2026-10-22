@@ -1,13 +1,14 @@
 # core/obs.bend — observation rendering, pure.
 #
-# Every obs renders as ONE line with the "  obs: " prefix: the wire
-# contract every client (TUI, nc) parses. bend/laws/ pins the format.
+# Every obs renders as ONE record line, `obs <kind> :: <json>` (issue 38):
+# the wire contract, written by the encoders generated from
+# bise_proto::thread::obs::ObsRec (gen/obs.bend, keys sorted, each proven
+# equal to its fixture line in proofs/obs.bend) and read by the clients
+# through bise_proto's lines::read. The older text form (`  obs: …`) is
+# only read, in rust/proto/src/thread/legacy.rs, for older transcripts.
 import Base
 import ./types.bend as T
 import ./wire.bend as W
-# issue 38 sha 2a: the typed obs lines' encoders (generated from
-# bise_proto::thread::obs::ObsRec), compiled but not called yet: the writers
-# below switch to them in 2b, the release after the reader ships
 import ./gen/obs.bend as OG
 
 # a preview must stay on ONE wire line: newlines become spaces (a raw
@@ -31,40 +32,32 @@ def one_line(s: String) -> String:
 def show_obs(o: T.Obs) -> String:
   match o:
     case T.TurnStarted{}:
-      "  obs: turn_started"
+      OG.turn_started()
     case T.SteerReceived{text}:
-      String.append("  obs: steering_received: ", text)
+      OG.steering_received(text)
     case T.Steered{text}:
-      String.append("  obs: steered: ", text)
+      OG.steered(text)
     case T.NotifReceived{text}:
-      String.append("  obs: notification_received: ", text)
+      OG.notification_received(text)
     case T.NotifDelivered{text}:
-      String.append("  obs: notification_delivered: ", text)
+      OG.notification_delivered(text)
     case T.CandidateDiscarded{cause}:
-      String.append("  obs: candidate_discarded: ", cause)
+      OG.candidate_discarded(cause)
     case T.Assistant{text}:
-      String.append("  obs: assistant: ", text)
+      OG.assistant(text)
     case T.ToolStarted{call}:
-      String.append("  obs: tool_started #", U32.show(call))
+      OG.tool_started(U32.to_nat(call))
     case T.ToolFinished{call, ok}:
-      match ok:
-        case True{}:
-          String.append("  obs: tool_finished #", String.append(U32.show(call), " ok"))
-        case False{}:
-          String.append("  obs: tool_finished #", String.append(U32.show(call), " failed"))
+      OG.tool_finished(U32.to_nat(call), ok)
     case T.ToolCommitted{call}:
-      String.append("  obs: tool_result_committed #", U32.show(call))
+      OG.tool_result_committed(U32.to_nat(call))
     case T.CompactionStarted{compaction, auto}:
-      match auto:
-        case True{}:
-          String.append("  obs: compaction_started #", String.append(U32.show(compaction), " (auto)"))
-        case False{}:
-          String.append("  obs: compaction_started #", String.append(U32.show(compaction), " (manual)"))
+      OG.compaction_started(U32.to_nat(compaction), auto)
     case T.CompactionFailed{code}:
-      String.append("  obs: context_compaction_failed: ", code)
+      OG.context_compaction_failed(code)
     case T.CompactionDone{summary}:
-      String.append("  obs: compaction_done: ", String.append(String.take(one_line(String.trim(W.unescape_nl(summary))), 40n), "..."))
+      OG.compaction_done(String.append(String.take(one_line(String.trim(W.unescape_nl(summary))), 40n), "..."))
     case T.NullIteration{}:
-      "  obs: null_iteration"
-    case T.TurnDone{outcome}:
-      String.append("  obs: turn_done: ", outcome)
+      OG.null_iteration()
+    case T.TurnDone{end, why}:
+      OG.turn_done(end, why)

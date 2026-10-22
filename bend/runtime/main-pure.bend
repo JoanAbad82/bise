@@ -15,6 +15,7 @@ import ../core/text.bend as Tx
 import ./tools-pure.bend as Xp
 import ../core/edit.bend as Ed
 import ./selftools-pure.bend as Sfp
+import ../core/gen/obs.bend as OG
 
 # ---- runtime state and loop vocabulary ----
 
@@ -659,8 +660,7 @@ def fin_label(ok: Bool) -> String:
       " failed"
 
 def replay.fin(+id: U32, ok: Bool) -> String:
-  hist(String.append("  obs: tool_finished #",
-    String.append(U32.show(id), fin_label(ok))))
+  hist(OG.tool_finished(U32.to_nat(id), ok))
 
 def replay.code(is_code: Bool, +c: T.Call) -> List<&2, String>:
   match is_code:
@@ -677,7 +677,7 @@ def replay.intent(ls: List<&2, String>) -> List<&2, String>:
       Con{hist(l), replay.intent(t)}
 
 def replay.call(+c: T.Call) -> List<&2, String>:
-  Con{hist(String.append("  obs: tool_started #", U32.show(call_id(c)))),
+  Con{hist(OG.tool_started(U32.to_nat(call_id(c)))),
     Con{hist(call_ann(c)),
       List.append(&2, String, replay.code(is_code_call(call_name(c)), c),
         replay.intent(intent_anns(c)))}}
@@ -855,7 +855,7 @@ def info_line(+model: String, +threshold: String, +steer: String,
 def drain_steer.emit_of(res: T.Res) -> List<&2, String>:
   match res:
     case T.Rejected{+reason}:
-      Con{String.append("  obs: steering_rejected: ", reason), Nil{}}
+      Con{OG.steering_rejected(reason), Nil{}}
     case T.Accepted{+obs, _, _}:
       obs_lines(obs)
 

@@ -330,7 +330,7 @@ def start_compaction.too_large(auto: Bool, turn: Maybe<&2, T.Turn>,
       # in-turn: the active turn fails; what it was still holding is
       # committed (finish_turn), not dropped with the turn
       DR{Con{T.CompactionFailed{"compaction_request_too_large"},
-          Con{T.TurnDone{"failed: compaction_request_too_large"},
+          Con{T.TurnDone{"failed", "compaction_request_too_large"},
             List.append(&2, T.Obs, steer_obs(steer), notif_obs(notifs))}},
         Nil{}, None{}, None{}, Nil{}, finish_history(turn, history)}
     case False{}:
@@ -434,7 +434,7 @@ def apply.completion.too_large(auto: Bool, +code: String, +s: T.Session) -> T.Re
     case True{}:
       # the turn dies: commit what it was still holding
       T.Accepted{Con{T.CompactionFailed{code},
-          Con{T.TurnDone{String.append("failed: ", code)}, Nil{}}},
+          Con{T.TurnDone{"failed", code}, Nil{}}},
         Nil{}, bump_inputs(finish_turn(s))}
     case False{}:
       T.Accepted{Con{T.CompactionFailed{code}, Nil{}}, Nil{},
@@ -541,7 +541,7 @@ def apply.completion.null2(over: Bool, +nulls: Nat, +s: T.Session) -> T.Res:
     case True{}:
       # the iteration cap kills the turn: commit what it still held
       T.Accepted{Con{T.NullIteration{},
-          Con{T.TurnDone{"failed: null iteration limit"}, Nil{}}},
+          Con{T.TurnDone{"failed", "null iteration limit"}, Nil{}}},
         Nil{}, bump_inputs(finish_turn(s))}
     case False{}:
       # retry within the limit: the active turn survives with its
@@ -569,7 +569,7 @@ def apply.completion.plain2.finish(+s2: T.Session, +text: String) -> T.Res:
   match s2:
     case T.Sess{+cfg, +hist2, +inputs, +actions, _, _, +queued, +notifs}:
       T.Accepted{Con{T.Assistant{text},
-          Con{T.TurnDone{"completed"}, Nil{}}},
+          Con{T.TurnDone{"completed", ""}, Nil{}}},
         Nil{},
         T.Sess{cfg, List.append(&2, T.Msg, hist2,
           Con{T.asst(text, Nil{}), Nil{}}),
@@ -666,7 +666,7 @@ def apply.completion_fail.big(big: Bool, +error: String, +s: T.Session)
             Con{T.CandidateDiscarded{error}, Nil{}}, bump_inputs(s))
     case False{}:
       T.Accepted{Con{T.CandidateDiscarded{error},
-          Con{T.TurnDone{String.append("failed: ", error)}, Nil{}}},
+          Con{T.turn_failed(error), Nil{}}},
         Nil{}, bump_inputs(finish_turn(s))}
 
 def apply.completion_fail.agent(matched: Bool, +error: String,
@@ -916,7 +916,7 @@ def apply.interrupt(+s: T.Session) -> T.Res:
     case T.Sess{_, _, _, _, Some{_}, +pending, _, _}:
       # the turn dies: what it was still holding is committed
       T.Accepted{Con{T.CandidateDiscarded{"interrupt"},
-          Con{T.TurnDone{"interrupted"}, Nil{}}},
+          Con{T.TurnDone{"interrupted", ""}, Nil{}}},
         Nil{},
         bump_inputs(finish_turn(with_msgs(s, interrupt_closes(pending))))}
     case T.Sess{_, _, _, _, None{}, _, _, _}:
@@ -930,7 +930,7 @@ def apply.fail(+error: String, +s: T.Session) -> T.Res:
         case Some{t}:
           # the turn dies: what it was still holding is committed, and
           # the calls it waited for are answered first (BR-001, BISE-242)
-          T.Accepted{Con{T.TurnDone{String.append("failed: ", error)}, Nil{}},
+          T.Accepted{Con{T.turn_failed(error), Nil{}},
             Nil{}, bump_inputs(finish_turn(with_msgs(s, interrupt_closes(pending))))}
         case None{}:
           T.Rejected{"no active turn"}

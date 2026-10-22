@@ -47,6 +47,7 @@ import ../runtime/selftools-pure.bend as Sfp
 import ./repl-core-pure.bend as Rcp
 import ../core/ev.bend as Ev
 import ../core/utf8.bend as U8
+import ../core/gen/obs.bend as OG
 
 # what the loops return: keep serving, or stop. The reload path
 # unwinds to main so the process exits 0 — the parent then recompiles
@@ -97,7 +98,7 @@ def repl_reload.busy(out: Pv.Out, +sess: T.Session,
     next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
   do IO<Flow>:
     out2 : Pv.Out <- Dr.emit(out,
-      Con{"  obs: reload refused: not between turns — finish or interrupt the pending turn first",
+      Con{OG.reload(True{}, "not between turns — finish or interrupt the pending turn first"),
         Con{"--- idle", Nil{}}})
     repl_out(out2, sess, next)
 
@@ -124,8 +125,8 @@ def repl_reload(out: Pv.Out, ok: Bool, +sess: T.Session,
     case True{}:
       do IO<Flow>:
         out2 : Pv.Out <- Dr.emit(out,
-          Con{"  obs: reload: restarting the harness with the latest code",
-            Con{"  obs: reload: the session is preserved — background commands keep running",
+          Con{OG.reload(False{}, "restarting the harness with the latest code"),
+            Con{OG.reload(False{}, "the session is preserved — background commands keep running"),
               Con{"--- idle", Nil{}}}})
         repl_reload.halt(out2, sess)
     case False{}:
@@ -244,7 +245,7 @@ def repl_end_stalled.stalled(+live: Bool, active: Bool, e: R.RtEnd,
         case R.REnd{+sess2, out2}:
           do IO<Flow>:
             out3 : Pv.Out <- Dr.emit(out2,
-              Con{"  obs: turn_stalled: execution budget exhausted",
+              Con{OG.turn_stalled("execution budget exhausted"),
                 Con{"--- idle", Nil{}}})
             P.save(sess2)
             repl_out(out3, sess2, next)
@@ -388,8 +389,7 @@ def greet_lines(+n: Nat, +history: List<&2, T.Msg>) -> List<&2, String>:
   # no idle marker: the greeting is unsolicited, not a turn's end — an
   # idle here would make clients give up waiting for the first turn
   List.append(&2, String, Rp.replay(history),
-    Con{String.append("  obs: session_restored: ",
-      String.append(Nat.show(n), " messages")), Nil{}})
+    Con{OG.session_restored(n), Nil{}})
 
 # the parent respawned this process after a crash (BEND_CRASH_NOTE =
 # what the dead process said): the user must see it, right after the
@@ -400,7 +400,7 @@ def crash_lines(empty: Bool, +note: String) -> List<&2, String>:
     case True{}:
       Nil{}
     case False{}:
-      Con{String.append("  obs: harness_restarted: ", note), Nil{}}
+      Con{OG.harness_restarted(note), Nil{}}
 
 # `pre`: the session-log configuration facts (core/ev.bend), first on
 # every connection (the writer skips a fact equal to its state)

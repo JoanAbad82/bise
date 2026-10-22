@@ -2,7 +2,7 @@
 #
 # After each model call the REPL prints one feed line the clients read
 # (the TUI shows the context fill of the agent from it):
-#   "  obs: usage: model=M in=I out=O cache_read=R cache_write=W"
+#   `obs usage :: {"cache_read":R,"cache_write":W,"input":I,"model":M,"output":O}`
 # in: every input token of the call (cached ones included) - the size
 # of the context the model saw; out: the tokens it wrote. No usage in
 # the reply (or an error status): no line (""). Pure: no IO.
@@ -11,12 +11,11 @@ import ../core/api.bend as Api
 import ../core/wire.bend as W
 import ../vendor/json.bend as J
 import ../core/ev.bend as Ev
+import ../core/gen/obs.bend as OG
 
 def usage_line.fields(+inp: Nat, +out: Nat, +cr: Nat, +cw: Nat,
     +model: String) -> String:
-  String.concat(["  obs: usage: model=", model, " in=", Nat.show(inp),
-    " out=", Nat.show(out), " cache_read=", Nat.show(cr),
-    " cache_write=", Nat.show(cw)])
+  OG.usage(model, inp, out, cr, cw)
 
 # the family reads its own usage object (core/api.bend, Api.usage_of)
 def usage_line.of(u: Api.Usage, +model: String) -> String:

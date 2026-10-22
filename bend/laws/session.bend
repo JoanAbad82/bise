@@ -453,10 +453,30 @@ law summary_message_summary_is_the_block:
 
 # ---- the observation wire format (every client parses this) ----
 
-# LAW: an observation renders as exactly one line with the obs prefix.
+# LAW: an observation renders as exactly one record line (issue 38).
 law obs_wire_format:
-  {O.show_obs(T.Assistant{"bonjour"}) == "  obs: assistant: bonjour"
+  {O.show_obs(T.Assistant{"bonjour"}) == "obs assistant :: {\"text\":\"bonjour\"}"
     : String}
+
+# LAW: a turn's end is its record: how it ended and why.
+law obs_turn_done_record:
+  {O.show_obs(T.TurnDone{"failed", "provider 500"})
+    == "obs turn_done :: {\"end\":\"failed\",\"why\":\"provider 500\"}" : String}
+
+# LAW: the session log's turn_ended keeps the words a turn's end had
+# before issue 38 (bise_session reads them on resume).
+law turn_words_keep_the_old_outcomes:
+  {Con{T.turn_words("completed", ""), Con{T.turn_words("interrupted", ""),
+      Con{T.turn_words("interrupted", "main"), Con{T.turn_words("failed", "provider 500"), Nil{}}}}}
+    == Con{"completed", Con{"interrupted", Con{"failed: interrupted by main",
+      Con{"failed: provider 500", Nil{}}}}} : List<&2, String>}
+
+# LAW: a failed call's turn: an interrupt's error ends it as interrupted
+# by that one, any other as failed with its error.
+law turn_failed_reads_an_interrupt:
+  {Con{T.turn_failed("interrupted by main"), Con{T.turn_failed("boom"), Nil{}}}
+    == Con{T.TurnDone{"interrupted", "main"}, Con{T.TurnDone{"failed", "boom"}, Nil{}}}
+    : List<&2, T.Obs>}
 
 # LAW: the compaction preview stays on one wire line: a summary that
 # starts with (or contains) newlines is trimmed and flattened.
@@ -464,13 +484,13 @@ law compaction_preview_one_line:
   {O.show_obs(T.CompactionDone{"
 Le user
 veut ça"})
-    == "  obs: compaction_done: Le user veut ça..." : String}
+    == "obs compaction_done :: {\"summary\":\"Le user veut ça...\"}" : String}
 
 # LAW: the same holds for the in-session form, where a newline travels
 # escaped as backslash-n (chars 92, 110).
 law compaction_preview_unescapes:
   {O.show_obs(T.CompactionDone{SCon{Chr{92}, SCon{Chr{110}, "Le user"}}})
-    == "  obs: compaction_done: Le user..." : String}
+    == "obs compaction_done :: {\"summary\":\"Le user...\"}" : String}
 
 # ---- the command language (core/commands.bend, server-side) ----
 
@@ -577,7 +597,7 @@ def big_flow.verdict(obs: List<&2, T.Obs>) -> String:
       match o:
         case T.CompactionStarted{_, _}:
           "compact"
-        case T.TurnDone{_}:
+        case T.TurnDone{_, _}:
           "fail"
         case _:
           big_flow.verdict(rest)
@@ -647,7 +667,7 @@ law steer_channel_skips_blank_lines:
 law drain_emits_steering_received:
   {Rt.drain_steer.emit_of(
       S.apply(steer_flow.started(law_cfg()), T.UserMsg{T.Steer{}, "penguins"}))
-    == Con{"  obs: steering_received: penguins", Nil{}} : List<&2, String>}
+    == Con{"obs steering_received :: {\"text\":\"penguins\"}", Nil{}} : List<&2, String>}
 
 def drain_flow.acts(res: T.Res) -> List<&2, T.Act>:
   match res:

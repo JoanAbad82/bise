@@ -60,7 +60,9 @@ type Obs is Data:
   CompactionFailed{code: String}
   CompactionDone{summary: String}
   NullIteration{}
-  TurnDone{outcome: String}
+  # how the turn ended: end completed|interrupted|failed; why: the
+  # failure, or who interrupted ("" none) (issue 38: typed at its builders)
+  TurnDone{end: String, why: String}
 
 # ---- configuration (resolved before session creation) ----
 type ToolDef is Data:
@@ -109,6 +111,53 @@ def sys(text: String) -> Msg:
 
 def injected_user(text: String) -> Msg:
   Msg{RUser{}, text, Nil{}, True{}}
+
+# a turn a failed call ends: an interrupt's error (the provider's
+# "interrupted by <who>", provider-pure interrupted_by) ends it as
+# interrupted by that one, any other as failed with its error
+def turn_failed.go(is_int: Bool, +error: String) -> Obs:
+  match is_int:
+    case True{}:
+      TurnDone{"interrupted", String.drop(error, 15n)}
+    case False{}:
+      TurnDone{"failed", error}
+
+def turn_failed(+error: String) -> Obs:
+  turn_failed.go(String.starts_with(error, "interrupted by "), error)
+
+# the words a turn's end had before issue 38 ("completed", "interrupted",
+# "failed: <why>", "failed: interrupted by <who>"): the session log's
+# turn_ended keeps them (bise_session reads them on resume)
+def turn_words.failed(is_failed: Bool, +end: String, +why: String) -> String:
+  match is_failed:
+    case True{}:
+      String.append("failed: ", why)
+    case False{}:
+      end
+
+def turn_words.by(nobody: Bool, +why: String) -> String:
+  match nobody:
+    case True{}:
+      "interrupted"
+    case False{}:
+      String.append("failed: interrupted by ", why)
+
+def turn_words.int(is_int: Bool, +end: String, +why: String) -> String:
+  match is_int:
+    case True{}:
+      turn_words.by(String.eq(why, ""), why)
+    case False{}:
+      turn_words.failed(String.eq(end, "failed"), end, why)
+
+def turn_words.done(is_done: Bool, +end: String, +why: String) -> String:
+  match is_done:
+    case True{}:
+      "completed"
+    case False{}:
+      turn_words.int(String.eq(end, "interrupted"), end, why)
+
+def turn_words(+end: String, +why: String) -> String:
+  turn_words.done(String.eq(end, "completed"), end, why)
 
 def new_session(cfg: Cfg) -> Session:
   Sess{cfg, Nil{}, 0n, 0, None{}, None{}, Nil{}, Nil{}}

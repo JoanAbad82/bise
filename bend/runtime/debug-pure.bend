@@ -56,11 +56,13 @@ def reply_max() -> Nat:
 
 # ---- breadcrumbs: what the REPL sent the client ----
 
-def obs_prefix() -> String:
-  "  obs: "
+# an obs line, either form: the record (`obs <kind> :: <json>`, issue 38)
+# or the text (`  obs: …`: older history lines replay as text)
+def is_obs_line(+l: String) -> Bool:
+  String.starts_with(l, "obs ") || String.starts_with(l, "  obs: ")
 
 def is_crumb(+l: String) -> Bool:
-  String.starts_with(l, obs_prefix())
+  is_obs_line(l)
     || String.starts_with(l, "tool #")
     || String.starts_with(l, "tool_result #")
 

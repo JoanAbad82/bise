@@ -188,19 +188,19 @@ law resume_replays_history:
 fini", Nil{}),
       Con{T.asst("", Con{T.Call{9, "bash", "pwd"}, Nil{}}),
       Nil{}}}}}}}})
-    == Con{"history   obs: compaction_done: court...",
+    == Con{"history obs compaction_done :: {\"summary\":\"court...\"}",
       Con{"history you : salut",
-      Con{"history   obs: tool_started #7",
+      Con{"history obs tool_started :: {\"call\":7}",
       Con{"history tool #7 bash : ls -la",
       Con{"history tool_code #7 : ls -la",
       Con{"history tool_result #7 fail : boom",
-      Con{"history   obs: tool_finished #7 failed",
-      Con{String.append("history   obs: assistant: <think>hmm</think>",
-        SCon{Chr{92}, SCon{Chr{110}, "fini"}}),
-      Con{"history   obs: tool_started #9",
+      Con{"history obs tool_finished :: {\"call\":7,\"ok\":false}",
+      Con{String.append("history obs assistant :: {\"text\":\"<think>hmm</think>",
+        SCon{Chr{92}, SCon{Chr{92}, SCon{Chr{110}, "fini\"}"}}}),
+      Con{"history obs tool_started :: {\"call\":9}",
       Con{"history tool #9 bash : pwd",
       Con{"history tool_code #9 : pwd",
-      Con{"history   obs: tool_finished #9 failed",
+      Con{"history obs tool_finished :: {\"call\":9,\"ok\":false}",
       Nil{}}}}}}}}}}}}}
     : List<&2, String>}
 
@@ -239,7 +239,7 @@ event: message_delta
 data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":72}}
 
 ")
-    == "  obs: usage: model=m in=42 out=72 cache_read=30 cache_write=2" : String}
+    == "obs usage :: {\"cache_read\":30,\"cache_write\":2,\"input\":42,\"model\":\"m\",\"output\":72}" : String}
 
 # LAW: a stream with no message_start (an error event) prints no usage.
 law anth_sse_no_usage:
@@ -359,7 +359,7 @@ data: {\"object\":\"chat.completion.chunk\",\"choices\":[],\"usage\":{\"prompt_t
 data: [DONE]
 
 ")
-    == "  obs: usage: model=m in=10 out=5 cache_read=2 cache_write=0" : String}
+    == "obs usage :: {\"cache_read\":2,\"cache_write\":0,\"input\":10,\"model\":\"m\",\"output\":5}" : String}
 
 # LAW: Mistral sends a whole tool call in one delta, in the chunk that
 # also carries finish_reason and the usage.
@@ -384,7 +384,7 @@ data: {\"object\":\"chat.completion.chunk\",\"p\":\"abc\",\"choices\":[{\"index\
 data: [DONE]
 
 ")
-    == "  obs: usage: model=m in=115 out=18 cache_read=0 cache_write=0" : String}
+    == "obs usage :: {\"cache_read\":0,\"cache_write\":0,\"input\":115,\"model\":\"m\",\"output\":18}" : String}
 
 # LAW: Mistral's reasoning models stream content as blocks (thinking,
 # text): rebuilt as the whole reply's blocks, pieces joined.
@@ -522,6 +522,12 @@ law debug_event_line:
 law debug_crumbs_filter:
   {Dg.crumbs(Con{"  obs: turn_started", Con{"hello", Con{"tool #3 bash : ls", Nil{}}}}, 5n)
     == "{\"ts\":5,\"src\":\"repl\",\"kind\":\"sent\",\"line\":\"obs: turn_started\"}\n{\"ts\":5,\"src\":\"repl\",\"kind\":\"sent\",\"line\":\"tool #3 bash : ls\"}\n" : String}
+
+# LAW: a record obs line (issue 38) is a breadcrumb too.
+law debug_crumbs_record:
+  {Dg.crumbs(Con{"obs turn_started :: {}", Nil{}}, 5n)
+    == "{\"ts\":5,\"src\":\"repl\",\"kind\":\"sent\",\"line\":\"obs turn_started :: {}\"}
+" : String}
 
 # LAW: a first attempt that works is not logged; a later one that works
 # is a recovery; a failure, a retry or a 200 carrying an ERROR reply is

@@ -116,6 +116,15 @@ def Laws.summary_message_summary_is_the_block():
 def Laws.obs_wire_format():
   {==}
 
+def Laws.obs_turn_done_record():
+  {==}
+
+def Laws.turn_words_keep_the_old_outcomes():
+  {==}
+
+def Laws.turn_failed_reads_an_interrupt():
+  {==}
+
 def Laws.compaction_preview_one_line():
   {==}
 

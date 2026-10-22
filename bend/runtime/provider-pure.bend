@@ -12,6 +12,7 @@ import ../core/config.bend as Cf
 import ../core/image.bend as Im
 import ../vendor/json.bend as J
 import ./plan-pure.bend as Plan
+import ../core/gen/obs.bend as OG
 
 # ---- the provider registry ----
 # A model id is "provider/model" (the model may hold '/' itself:
@@ -1201,14 +1202,7 @@ def attempt_err_in(+host: String, +w: ProvWait, +e: NetErr) -> Attempt:
 # the line the client shows while the call waits (the TUI renders it
 # as a warning): "provider_retry: 2/10 · <why> · retry in 4s"
 def retry_line(+n: Nat, +why: String, +delay_ms: U32) -> String:
-  String.append("  obs: provider_retry: ",
-    String.append(Nat.show(Nat.add(n, 1n)),
-      String.append("/",
-        String.append(Nat.show(max_attempts()),
-          String.append(" · ",
-            String.append(String.take(why, 200n),
-              String.append(" · retry in ",
-                String.append(U32.show(U32.div(delay_ms, 1000)), "s"))))))))
+  OG.provider_retry(Nat.add(n, 1n), max_attempts(), String.take(why, 200n), U32.to_nat(delay_ms))
 
 # the final error once every attempt failed: the count and the last cause
 def exhausted_text(+tries: Nat, +why: String) -> String:

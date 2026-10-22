@@ -154,6 +154,9 @@ def Laws.debug_event_line():
 def Laws.debug_crumbs_filter():
   {==}
 
+def Laws.debug_crumbs_record():
+  {==}
+
 def Laws.debug_plan_ok_first():
   {==}
 

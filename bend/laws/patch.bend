@@ -265,7 +265,7 @@ law retry_wait_slices:
 # LAW: every retry shows the user where the call stands.
 law provider_retry_line:
   {Pv.retry_line(0n, "provider 529 (transient)", 1000)
-    == "  obs: provider_retry: 1/10 · provider 529 (transient) · retry in 1s"
+    == "obs provider_retry :: {\"delay_ms\":1000,\"n\":1,\"of\":10,\"why\":\"provider 529 (transient)\"}"
     : String}
 
 # LAW: the final error says how many attempts ran and why the last failed.

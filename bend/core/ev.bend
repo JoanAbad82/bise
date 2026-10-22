@@ -782,8 +782,8 @@ def post_ev(+c: Ctx, +inputs: Nat, +actions: U32, o: T.Obs) -> List<&2, String>:
         J.obj(Con{J.kv("id", u32(comp_id(c))),
           Con{J.kv("attempt", J.num(1n)),
             Con{J.kv("error", err("other", code)), Nil{}}}})), Nil{}}
-    case T.TurnDone{+out}:
-      Con{turn_ended(out, inputs, actions), Nil{}}
+    case T.TurnDone{+end, +why}:
+      Con{turn_ended(T.turn_words(end, why), inputs, actions), Nil{}}
     case _:
       Nil{}
 

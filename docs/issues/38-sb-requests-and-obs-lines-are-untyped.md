@@ -1,7 +1,20 @@
 # 38 · the sb requests and the runtime's obs lines are untyped
 
-Status: in progress (task debt-t5, tech-debt D10). Plan signed by architect
-(m_23413). Label: proto, cli, hub, runtime.
+Status: done (task debt-t5, tech-debt D10): sha 1 bef343639 (sb requests
+typed), sha 2a 276a2bdbd (obs records, reader first; shipped in
+v2026.10.2-47), sha 2b (the runtime writes the records; signed m_37652).
+Plan signed by architect (m_23413, m_35725, m_37394). Label: proto, cli,
+hub, runtime.
+
+Before → after: sb request variants 33 (file ops outside) → 45, all
+commands; `AgentReq::from_json` 122 lines of string keys → gone; cli.rs
+1,000 → 520 lines; core.rs 2,468 → 2,078. Obs: 23 kinds written as text
+by 6 Bend files (show_obs + 9 hand writers) and read by prefix in 11 Rust
+places → one generated encoder per kind (each proven equal to its fixture
+line), one Rust reader (`lines::read`, the text only in legacy.rs, pinned
+by tests/obs_readers.rs), 17 Python tests through tests/obs_lines.py; a
+turn's end typed (end, why) at its 7 builders instead of parsed words.
+A new obs kind: one ObsRec row + its writer's call + its view arm.
 
 ## The problem
 
