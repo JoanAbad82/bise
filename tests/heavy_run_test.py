@@ -148,7 +148,7 @@ with tempfile.TemporaryDirectory() as home:
     if on_ac:
         os.remove(order)
         go2 = os.path.join(home, "go2")
-        env2 = dict(env, HEAVY_SLOTS="2")
+        env2 = dict(env, HEAVY_SLOTS="2", HEAVY_ALONE_DRAIN_MIN="0")  # past its drain time at once
         hold = subprocess.Popen(["/usr/bin/lockf", "-k", os.path.join(run, "heavy.lock"), "sh", "-c",
                                  'while [ ! -e "$0" ]; do sleep 0.1; done', go2])
         wait_for(lambda: held(os.path.join(run, "heavy.lock")), what="the plain lockf holds slot 1")
@@ -164,6 +164,25 @@ with tempfile.TemporaryDirectory() as home:
         hold.wait(timeout=10)
         got = open(order).read().split() if os.path.exists(order) else []
         check(got == ["alone", "rest"], "the --alone job first, then the rest: %r" % got)
+        # a young --alone waiter (main m_37006) holds no slot and nobody back: a job after it
+        # runs in the free slot 2 while slot 1 is busy; the --alone job runs once all are free
+        os.remove(order)
+        go7 = os.path.join(home, "go7")
+        envy = dict(env, HEAVY_SLOTS="2", HEAVY_ALONE_DRAIN_MIN="10")
+        hold = subprocess.Popen(["/usr/bin/lockf", "-k", os.path.join(run, "heavy.lock"), "sh", "-c",
+                                 'while [ ! -e "$0" ]; do sleep 0.1; done', go7])
+        wait_for(lambda: held(os.path.join(run, "heavy.lock")), what="the plain lockf holds slot 1")
+        alone = subprocess.Popen([HEAVY, "--alone", "sh", "-c", 'echo alone >> "$0"', order], env=envy)
+        check(wait_for(lambda: any(open(os.path.join(q, f)).read().split()[-1:] == ["alone"] for f in os.listdir(q))),
+              "the young --alone waiter has its ticket")
+        rest = subprocess.Popen([HEAVY, "sh", "-c", 'echo rest >> "$0"', order], env=envy, stderr=subprocess.DEVNULL)
+        check(job_ends(rest, 30) == 0 and open(order).read().split() == ["rest"],
+              "a job after a young --alone waiter runs in the free slot: %r" % (open(order).read() if os.path.exists(order) else None))
+        check(alone.poll() is None and not held(os.path.join(run, "heavy2.lock")),
+              "the --alone waiter holds no slot while one is busy")
+        open(go7, "w").close()
+        job_ends(hold, 10)
+        check(job_ends(alone, 30) == 0 and open(order).read().split() == ["rest", "alone"], "the --alone job runs once all 4 are free")
         # an --alone measure keeps its class: after a land check submitted before it
         os.remove(order)
         go4 = os.path.join(home, "go4")

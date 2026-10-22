@@ -391,8 +391,12 @@ case " $* " in *"gate.sh full"*|*"gate.sh rerun"*|*"test:land"*|*"nightly_gate.s
 [ "$ALONE" = 1 ] && while on_battery; do sleep 60; done
 T="$Q/$rank-$HEAVY_SUBMIT-$$"
 # the ticket holds its own time (a reused pid started after it is no
-# waiter) and "alone" for an --alone job: one ahead holds back every job
-# behind it until it runs, so it gets all the slots and is never starved
+# waiter) and "alone" for an --alone job. A waiting --alone job holds no
+# slot: it starts when the 4 are free at once. For its first
+# HEAVY_ALONE_DRAIN_MIN (10) min the jobs behind it still start in free
+# slots; past that, they wait behind it, so the slots drain and it gets them
+# all (main m_37006: holding each slot as it freed, an --alone job kept the
+# queue idle 3.5 h on 2026-10-21)
 echo "$(date +%s)$([ "$ALONE" = 1 ] && echo ' alone')" >"$T"
 trap 'rm -f "$T"' EXIT
 # the live tickets ahead of this one, 99 behind a waiting --alone; a dead
@@ -406,10 +410,12 @@ ahead() {
   pids=$(printf '%s\n' $list | sed 's/.*-//' | awk '$1 ~ /^[0-9]+$/ && $1 > 0 && $1 < 100000' | paste -sd, -)
   { [ -n "$pids" ] && ps -o pid=,etime= -p "$pids" 2>/dev/null | sed 's/^ */P /'
     for f in $list; do echo "T $f $(head -c 40 "$Q/$f" 2>/dev/null)"; done; } |
-  awk -v now="$(date +%s)" -v me="${T##*/}" '
+  awk -v now="$(date +%s)" -v me="${T##*/}" -v drain="$(( ${HEAVY_ALONE_DRAIN_MIN:-10} * 60 ))" '
     $1 == "P" { k = split($3, a, /[-:]/)
                 age[$2] = k == 4 ? a[1]*86400 + a[2]*3600 + a[3]*60 + a[4] : (k == 3 ? a[1]*3600 + a[2]*60 + a[3] : a[1]*60 + a[2]); next }
     $1 == "T" { pid = $2; sub(/.*-/, "", pid); made = $3 + 0
+                # a young --alone waiter holds nobody back yet (draining after drain s)
+                if ($4 == "alone" && $2 != me && now - made < drain && (pid in age) && !(made > 0 && age[pid] < now - made - 2)) next
                 if (!(pid in age) || (made > 0 && age[pid] < now - made - 2)) { print "rm", $2; next }
                 if ($2 == me) { mine = 1; next }
                 if (!mine) { n++; if ($4 == "alone") held = 1 } }
@@ -448,10 +454,19 @@ while :; do
   # the release lane: --prio alone, first (HEAVY_NO_LANE=1: none, tests)
   [ "$PRIO" = 1 ] && [ -z "${HEAVY_NO_LANE:-}" ] && slots="$S5 $slots"
   if [ "$ALONE" = 1 ]; then
-    # its turn (nobody ahead): take each slot as it frees, holding the queue
-    # (its ticket stays until the job runs); exec keeps this pid
-    [ "$(ahead)" = 0 ] && exec /usr/bin/lockf -k "$S1" /usr/bin/lockf -k "$S2" /usr/bin/lockf -k "$S3" /usr/bin/lockf -k "$S4" \
-      /bin/bash -c "$JOB" _ "$T" "all" 10 "$@"
+    # its turn (nobody ahead): the 4 slots at once when all are free, never
+    # one by one (a slot it took waited idle for the others); lockf -t 0 each:
+    # one taken meanwhile exits 75 before the job, its ticket still here: retry
+    if [ "$(ahead)" = 0 ]; then
+      free=0
+      for s in "$S1" "$S2" "$S3" "$S4"; do /usr/bin/lockf -k -t 0 "$s" /usr/bin/true 2>/dev/null && free=$((free + 1)); done
+      if [ "$free" = 4 ]; then
+        /usr/bin/lockf -k -t 0 "$S1" /usr/bin/lockf -k -t 0 "$S2" /usr/bin/lockf -k -t 0 "$S3" /usr/bin/lockf -k -t 0 "$S4" \
+          /bin/bash -c "$JOB" _ "$T" "all" 10 "$@"
+        rc=$?
+        { [ "$rc" != 75 ] || [ ! -e "$T" ]; } && exit "$rc"
+      fi
+    fi
   else
     # probe the slots quietly first: a taken slot makes lockf print
     # 'already locked' on every try, which buried a job's real last lines.
