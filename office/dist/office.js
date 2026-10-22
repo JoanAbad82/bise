@@ -24201,10 +24201,10 @@ function recalc(book) {
   const busy = /* @__PURE__ */ new Set();
   const failed = /* @__PURE__ */ new Map();
   let computed = 0;
-  const sheetOf = /* @__PURE__ */ new Map();
-  book.eachSheet((ws) => sheetOf.set(ws.name.toLowerCase(), ws));
+  const sheetOf2 = /* @__PURE__ */ new Map();
+  book.eachSheet((ws) => sheetOf2.set(ws.name.toLowerCase(), ws));
   const valueAt = (sheet, row, col2) => {
-    const ws = sheetOf.get(sheet.toLowerCase());
+    const ws = sheetOf2.get(sheet.toLowerCase());
     if (!ws) return { error: "#REF!" };
     const cell = ws.findCell(row, col2);
     if (!cell || cell.type !== VT.Formula) return scalarOf(cell, date1904);
@@ -24839,8 +24839,8 @@ function scopes(root, origRoot) {
     if (local === void 0) continue;
     const index = nowIds.indexOf(origIds[Number(local)]);
     if (index < 0) continue;
-    const same2 = nowNames.find((n2) => attr(n2, "name") === attr(d, "name") && attr(n2, "localSheetId") === void 0 && n2.textContent === d.textContent);
-    same2?.setAttribute("localSheetId", String(index));
+    const same3 = nowNames.find((n2) => attr(n2, "name") === attr(d, "name") && attr(n2, "localSheetId") === void 0 && n2.textContent === d.textContent);
+    same3?.setAttribute("localSheetId", String(index));
   }
 }
 function ownedParts(origin) {
@@ -25066,6 +25066,233 @@ function chartTitle(origin, part2) {
   }
 }
 
+// src/sheets/univer.ts
+var ROOM_ROWS = 100;
+var ROOM_COLS = 10;
+var MIN_ROWS = 200;
+var MIN_COLS = 26;
+var HT = { left: 1, center: 2, right: 3, justify: 4, distributed: 6 };
+var VA = { top: 1, middle: 2, bottom: 3 };
+var BD = {
+  thin: 1,
+  hair: 2,
+  dotted: 3,
+  dashed: 4,
+  dashDot: 5,
+  dashDotDot: 6,
+  double: 7,
+  medium: 8,
+  mediumDashed: 9,
+  mediumDashDot: 10,
+  mediumDashDotDot: 11,
+  slantDashDot: 12,
+  thick: 13
+};
+var widthChars = (px) => Math.max(0, Math.round((px - 5) / 7 * 100) / 100);
+var heightPt = (px) => Math.max(0, Math.round(px * 72 / 96 * 100) / 100);
+function toUniver(book, id = "book") {
+  const date1904 = !!book.properties?.date1904;
+  const styles = /* @__PURE__ */ new Map();
+  const styleOf = (s) => {
+    const key = JSON.stringify(s);
+    if (key === "{}") return void 0;
+    let sid = styles.get(key);
+    if (!sid) styles.set(key, sid = `s${styles.size + 1}`);
+    return sid;
+  };
+  const sheets2 = {};
+  const order = [];
+  book.eachSheet((ws) => {
+    const sid = `sheet${order.length + 1}`;
+    order.push(sid);
+    sheets2[sid] = sheetOf(ws, sid, date1904, styleOf);
+  });
+  const styleRecord = {};
+  for (const [key, sid] of styles) styleRecord[sid] = JSON.parse(key);
+  return { id, name: "", appVersion: "1", sheetOrder: order, styles: styleRecord, sheets: sheets2 };
+}
+function sheetOf(ws, id, date1904, styleOf) {
+  const cellData = {};
+  let rows = 0;
+  let cols = 0;
+  ws.eachRow({ includeEmpty: false }, (row, r) => {
+    row.eachCell({ includeEmpty: false }, (cell, c) => {
+      if (cell.type === VT.Merge) return;
+      const u = cellOf(cell, date1904);
+      const s = styleOf(styleData(cell));
+      if (s) u.s = s;
+      if (Object.keys(u).length === 0) return;
+      (cellData[r - 1] ??= {})[c - 1] = u;
+      rows = Math.max(rows, r);
+      cols = Math.max(cols, c);
+    });
+  });
+  const defaultColumnWidth = widthPx(ws.properties.defaultColWidth ?? 8.43);
+  const defaultRowHeight = heightPx(ws.properties.defaultRowHeight ?? 15);
+  const columnData = {};
+  const lastCol = Math.max(ws.columnCount, ws._columns?.length ?? 0);
+  for (let c = 1; c <= lastCol; c++) {
+    const col2 = ws.getColumn(c);
+    const d = {};
+    if (col2.width !== void 0) d.w = widthPx(col2.width);
+    if (col2.hidden) d.hd = 1;
+    if (d.w !== void 0 || d.hd) columnData[c - 1] = d;
+  }
+  const rowData = {};
+  ws.eachRow({ includeEmpty: true }, (row, r) => {
+    const d = {};
+    if (row.height) d.h = heightPx(row.height);
+    if (row.hidden) d.hd = 1;
+    if (d.h !== void 0 || d.hd) rowData[r - 1] = d;
+  });
+  const mergeData = [];
+  for (const m of Object.values(ws._merges ?? {})) {
+    const { top, left, bottom, right } = m.model;
+    mergeData.push({ startRow: top - 1, endRow: bottom - 1, startColumn: left - 1, endColumn: right - 1 });
+    rows = Math.max(rows, bottom);
+    cols = Math.max(cols, right);
+  }
+  const sheet = {
+    id,
+    name: ws.name,
+    rowCount: Math.max(MIN_ROWS, rows + ROOM_ROWS),
+    columnCount: Math.max(MIN_COLS, cols + ROOM_COLS, lastCol),
+    defaultColumnWidth,
+    defaultRowHeight,
+    cellData,
+    columnData,
+    rowData,
+    mergeData
+  };
+  if (ws.state && ws.state !== "visible") sheet.hidden = 1;
+  const view = ws.views?.[0];
+  if (view?.state === "frozen" && (view.xSplit || view.ySplit)) {
+    const x2 = view.xSplit ?? 0;
+    const y = view.ySplit ?? 0;
+    sheet.freeze = { xSplit: x2, ySplit: y, startRow: y, startColumn: x2 };
+  }
+  return sheet;
+}
+function plain(v) {
+  if (v === null) return {};
+  if (typeof v === "number") return { v, t: 2 };
+  if (typeof v === "boolean") return { v: v ? 1 : 0, t: 3 };
+  if (isError(v)) return { v: v.error, t: 1 };
+  return { v, t: 1 };
+}
+function cellOf(cell, date1904) {
+  const value = plain(scalarOf(cell, date1904));
+  const f = formulaOf(cell);
+  return f ? { f: `=${f}`, ...value } : value;
+}
+function styleData(cell) {
+  const s = {};
+  const font = cell.font ?? {};
+  if (font.bold) s.bl = 1;
+  if (font.italic) s.it = 1;
+  if (font.underline) s.ul = { s: 1 };
+  if (font.strike) s.st = { s: 1 };
+  if (font.size && font.size !== 11) s.fs = font.size;
+  if (font.name && font.name !== "Calibri") s.ff = font.name;
+  const color2 = hex(font.color?.argb);
+  if (color2) s.cl = { rgb: color2 };
+  const fill2 = cell.fill;
+  const bg = fill2?.type === "pattern" && fill2.pattern === "solid" ? hex(fill2.fgColor?.argb) : void 0;
+  if (bg) s.bg = { rgb: bg };
+  const a = cell.alignment ?? {};
+  if (a.horizontal && HT[a.horizontal]) s.ht = HT[a.horizontal];
+  if (a.vertical && VA[a.vertical]) s.vt = VA[a.vertical];
+  if (a.wrapText) s.tb = 3;
+  const fmt = numFmtOf(cell);
+  if (fmt && fmt !== "General") s.n = { pattern: fmt };
+  const b = cell.border ?? {};
+  const bd = {};
+  for (const [side, k] of [["top", "t"], ["bottom", "b"], ["left", "l"], ["right", "r"]]) {
+    const x2 = b[side];
+    if (!x2?.style || !BD[x2.style]) continue;
+    const rgb = hex(x2.color?.argb);
+    bd[k] = rgb ? { s: BD[x2.style], cl: { rgb } } : { s: BD[x2.style] };
+  }
+  if (Object.keys(bd).length) s.bd = bd;
+  return s;
+}
+function scalarOfCell(u) {
+  if (!u || u.v === void 0 || u.v === null || u.v === "") return null;
+  if (u.t === 2) {
+    const n2 = typeof u.v === "number" ? u.v : Number(u.v);
+    return Number.isFinite(n2) ? n2 : String(u.v);
+  }
+  if (u.t === 3) return u.v === true || u.v === 1 || u.v === "1" || String(u.v).toUpperCase() === "TRUE";
+  if (typeof u.v === "string" && /^#(NULL!|DIV\/0!|VALUE!|REF!|NAME\?|NUM!|N\/A|SPILL!|CALC!|GETTING_DATA)$/.test(u.v)) return { error: u.v };
+  if (typeof u.v === "number" && u.t !== 1 && u.t !== 4) return u.v;
+  return typeof u.v === "boolean" ? u.v : String(u.v);
+}
+var same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+var formulaText = (u) => u?.f ? String(u.f).replace(/^=/, "") : void 0;
+function editsBetween(before, after) {
+  const out = [];
+  for (const sid of before.sheetOrder) {
+    const a = before.sheets[sid];
+    const b = after.sheets[sid];
+    if (!a || !b) continue;
+    const sheet = a.name;
+    const rows = new Set([...Object.keys(a.cellData ?? {}), ...Object.keys(b.cellData ?? {})].map(Number));
+    for (const r of [...rows].sort((x2, y) => x2 - y)) {
+      const ra = a.cellData?.[r] ?? {};
+      const rb = b.cellData?.[r] ?? {};
+      const cols = new Set([...Object.keys(ra), ...Object.keys(rb)].map(Number));
+      for (const c of [...cols].sort((x2, y) => x2 - y)) {
+        const fa = formulaText(ra[c]);
+        const fb = formulaText(rb[c]);
+        const va = scalarOfCell(ra[c]);
+        const vb = scalarOfCell(rb[c]);
+        const at2 = { sheet, row: r + 1, col: c + 1 };
+        if (fa !== fb) out.push({ kind: "cell", ...at2, value: fb ? { formula: fb, result: vb } : vb });
+        else if (!same2(va, vb)) out.push(fb ? { kind: "result", ...at2, result: vb } : { kind: "cell", ...at2, value: vb });
+      }
+    }
+    const colKeys = new Set([...Object.keys(a.columnData ?? {}), ...Object.keys(b.columnData ?? {})].map(Number));
+    for (const c of [...colKeys].sort((x2, y) => x2 - y)) {
+      const wa = a.columnData?.[c]?.w ?? a.defaultColumnWidth;
+      const wb = b.columnData?.[c]?.w ?? b.defaultColumnWidth;
+      if (Math.round(wa) !== Math.round(wb)) out.push({ kind: "width", sheet, col: c + 1, px: Math.round(wb) });
+    }
+    const rowKeys = new Set([...Object.keys(a.rowData ?? {}), ...Object.keys(b.rowData ?? {})].map(Number));
+    for (const r of [...rowKeys].sort((x2, y) => x2 - y)) {
+      const ha = a.rowData?.[r]?.h ?? a.defaultRowHeight;
+      const hb = b.rowData?.[r]?.h ?? b.defaultRowHeight;
+      if (Math.round(ha) !== Math.round(hb)) out.push({ kind: "height", sheet, row: r + 1, px: Math.round(hb) });
+    }
+  }
+  return out;
+}
+function xValue(v) {
+  return v;
+}
+function applyEdits(book, edits) {
+  const sheet = (name) => {
+    const ws = book.worksheets.find((w) => w.name === name);
+    if (!ws) throw new OfficeError("not_found", `no sheet "${name}" in this workbook`);
+    return ws;
+  };
+  for (const e of edits) {
+    const ws = sheet(e.sheet);
+    if (e.kind === "width") ws.getColumn(e.col).width = widthChars(e.px);
+    else if (e.kind === "height") ws.getRow(e.row).height = heightPt(e.px);
+    else if (e.kind === "result") {
+      const cell = ws.getCell(e.row, e.col);
+      const f = formulaOf(cell);
+      if (f) cell.value = { formula: f, result: xValue(e.result) };
+    } else {
+      const cell = ws.getCell(e.row, e.col);
+      const v = e.value;
+      if (v !== null && typeof v === "object" && "formula" in v) {
+        cell.value = v.result === void 0 || v.result === null ? { formula: v.formula } : { formula: v.formula, result: xValue(v.result) };
+      } else cell.value = xValue(v);
+    }
+  }
+}
+
 // src/sheets/book.ts
 var Book = class {
   constructor(x2, origin, bytes) {
@@ -25151,6 +25378,16 @@ var Book = class {
     this.edited = true;
   }
   /** Compute every formula the SDK can (save does it too); what it cannot is listed. */
+  /** The workbook as the viewer's grid opens it (Univer's snapshot, univer.ts). */
+  univer() {
+    return toUniver(this.x);
+  }
+  /** What the user did in the grid (univer.ts editsBetween), replayed on this workbook. */
+  apply(edits) {
+    if (edits.length === 0) return;
+    applyEdits(this.x, edits);
+    this.edited = true;
+  }
   recalc() {
     this.last = recalc(this.x);
     return this.last;
@@ -29223,14 +29460,17 @@ export {
   raw_exports as core,
   diff,
   docs,
+  editsBetween,
   flatten,
+  heightPt,
   kindOf,
   openPackage,
   readAnchor,
   run,
   setHost,
   sheets,
-  slides
+  slides,
+  widthChars
 };
 /*! Bundled license information:
 

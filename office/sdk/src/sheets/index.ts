@@ -20,6 +20,7 @@ export { Book };
 export type { CellInput, RangeOps, RangeSel, SaveOptions, Style } from "./book.ts";
 export type { InspectOptions } from "./inspect.ts";
 export type { Recalc } from "./calc.ts";
+export { editsBetween, widthChars, heightPt, type Edit, type UWorkbook, type USheet, type UCell, type UStyle } from "./univer.ts";
 export type { Scalar, ErrorValue } from "./formula.ts";
 
 export type CreateOptions = {

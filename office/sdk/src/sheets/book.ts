@@ -15,6 +15,7 @@ import { cellProblems, lossProblems } from "./check.ts";
 import type { Scalar } from "./formula.ts";
 import { cellNode, sheetNodes, type InspectOptions } from "./inspect.ts";
 import { render, type Origin, type XBook } from "./io.ts";
+import { applyEdits, toUniver, type Edit, type UWorkbook } from "./univer.ts";
 
 /** What `set` takes per cell: a value, a formula ("=SUM(B1:B3)" or {formula}), or null to clear. */
 export type CellInput = number | string | boolean | Date | null | { formula: string } | { error: string };
@@ -162,6 +163,18 @@ export class Book implements OfficeFile<"xlsx", RangeOps> {
   }
 
   /** Compute every formula the SDK can (save does it too); what it cannot is listed. */
+  /** The workbook as the viewer's grid opens it (Univer's snapshot, univer.ts). */
+  univer(): UWorkbook {
+    return toUniver(this.x);
+  }
+
+  /** What the user did in the grid (univer.ts editsBetween), replayed on this workbook. */
+  apply(edits: Edit[]): void {
+    if (edits.length === 0) return;
+    applyEdits(this.x, edits);
+    this.edited = true;
+  }
+
   recalc(): Recalc {
     this.last = recalc(this.x);
     return this.last;

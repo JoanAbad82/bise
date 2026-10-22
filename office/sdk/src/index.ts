@@ -2,7 +2,7 @@
 // Bytes in, bytes out, no node imports: the same bundle (office/dist/office.js)
 // runs in `bise office run`, in the side panel's viewer and in the tests.
 
-export { sheets } from "./sheets/index.ts";
+export { sheets, editsBetween, widthChars, heightPt, type Edit, type UWorkbook } from "./sheets/index.ts";
 export { slides } from "./slides/index.ts";
 export { docs } from "./docs/index.ts";
 export { run, setHost, type Host, type WriteOptions } from "./run.ts";
