@@ -156,7 +156,11 @@ def main():
                 if r.get("split_sha"):
                     return r
         rec = wait.until(split_rec, 10, "the fake's log line of the split reply")
-        got = hashlib.sha256(open(dump + ".reply", "rb").read()).hexdigest()
+        # the request ring (runtime/reqlog.bend): this call's reply is the
+        # newest <slot>.json.reply
+        replies = [os.path.join(dump, n) for n in os.listdir(dump) if n.endswith(".json.reply")]
+        newest = max(replies, key=os.path.getmtime) if replies else None
+        got = newest and hashlib.sha256(open(newest, "rb").read()).hexdigest()
         check(got == rec["split_sha"] and any("ack:" in l and "two halves" in l for l in out),
               "B' a reply paused 0.5 s inside an event arrives byte for byte")
 
