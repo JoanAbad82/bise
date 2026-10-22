@@ -59,6 +59,12 @@ test('agents/new: the window starts an agent in its own worktree, seen by the hu
     } finally {
       await page.screenshot({ path: test.info().outputPath('sent.png') });
     }
+    // the hub lists a worktree agent at once, placing (bend/hub/place.bend): no path nor branch until
+    // the shell's `placed` comes from its thread (git worktree add + setup, seconds under load); its
+    // time from the first row goes in an annotation for the nightly's trend, over 15 s it is red
+    const listed = Date.now();
+    await expect.poll(async () => (await hubAgents(w, 'telemetry')).find((x) => x.name === mine)?.branch ?? '', { timeout: 15_000, message: 'the hub places it on a branch within 15 s of its row' }).not.toBe('');
+    test.info().annotations.push({ type: 'placed', description: `placed in ${Date.now() - listed} ms` });
     const a = (await hubAgents(w, 'telemetry')).find((x) => x.name === mine);
     test.info().annotations.push({ type: 'hub', description: JSON.stringify({ name: a?.name, mode: a?.mode, branch: a?.branch, path: a?.path }) });
     expect(a?.mode, 'in its own worktree').toBe('worktree');
