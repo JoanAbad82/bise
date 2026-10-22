@@ -15,7 +15,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | Desktop Playwright specs (apps/desktop/tests/checks) | 29 | 262 | 52 | 343 |
 | TUI tmux tests (tests/*_tmux.py) | 12 | 68 | 3 | 83 |
 | Python e2e (tests/*_e2e.py) | 29 | 45 | 2 | 76 |
-| as-he-does rows (dev/plugins/ambient-qa/as-he-does) | 6 | 0 | 60 | 66 |
+| as-he-does rows (dev/plugins/ambient-qa/as-he-does) | 6 | 0 | 62 | 68 |
 
 ## Classification
 
@@ -606,6 +606,10 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `second` | KEEP | clean second launch of the promoted bundle |
 | `draft-type/draft-check` | KEEP | a draft kept across main's real restart (launchd one-shot) |
 | `quickRows (all its steps)` | DELETE | merged into `composer/question-space`'s transform line |
+| `rowsD3D8: bims office grows` | DELETE | merged into `bims/grow`'s transform line (found at the delete: its steps carry no `row(` name) |
+| `rows4E20: /bims picks a map` | DELETE | merged into `bims/mapsel`'s transform line (found at the delete: its steps carry no `row(` name) |
+
+The driver's `cut` and `rows2` modes (cand.sh's passes after `first`: 9 and 40 steps on the right bar, artifacts, history, the inbox block, dictation) are not classified here and still run: a next cull pass, the same rules.
 
 ## LOST (visual)
 
@@ -724,10 +728,10 @@ One line per TRANSFORM test: what it guarded → where to check it (kind); the f
 - `bims/budget`: (1) the list view never loads the three chunk (CDP scriptParsed against the built chunk that holds three's REVISION); the office loads it (the control); back on list,… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
 - `bims/chair`: the office draws and settles; the shots go to .harness-cache/bims-shots/chair-640-docked-<theme>.png (the shot bims signs). Owner: bims-grow. → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
 - `bims/clip`: for the patio and the tropical house, light and dark: the office draws the map, at stages 0, 3, 8 and 14, wide (640 docked), with idle bims napping in the hammocks; then… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
-- `bims/grow`: light and dark: (7) stages 0, 2, 8 and 14 draw at 320 and wide (the building fits at 320, the garden past it fades; wide shows the whole ground), stage 8 at 90 jobs done… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
+- `bims/grow`: light and dark: (7) stages 0, 2, 8 and 14 draw at 320 and wide (the building fits at 320, the garden past it fades; wide shows the whole ground), stage 8 at 90 jobs done… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows. Also as-he-does row 'bims office grows' checked it on the packed app: the corner tip says 'level N · M jobs done' and the level is at least growth.ts' stage for M, past 0.
 - `bims/hover`: (a) a fresh window shows the list alone (the office closed: an easter egg), the AGENTS head's cube not pressed; the cube opens it (the fold grows empty, then the scene… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
 - `bims/life`: (a) on each map where a napper's head went into a piece (the loft's and the greenhouse's arcade cabinet at stage 11, the haveli's jhoola at 8, the Sahel's buttress, the… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
-- `bims/mapsel`: at 320 and wide, light and dark: - the chip sits in the office's bottom-left corner with the map's name ('Loft' never picked); - a click opens the ds menu upward from… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
+- `bims/mapsel`: at 320 and wide, light and dark: - the chip sits in the office's bottom-left corner with the map's name ('Loft' never picked); - a click opens the ds menu upward from… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows. Also as-he-does row '/bims picks a map' checked it on the packed app: /bims lists the ready maps, a pick draws the office with it at once, prefs.json keeps it under bims.map.<hub id>, a reload draws it again.
 - `bims/nap`: light and dark, every map draws at stage 14, wide (640 docked), its idle bims napping on its beds; then close on a napper; and the greenhouse and kyoto at 320 too. The… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
 - `bims/office`: light and dark, at 320, 640 docked and 640 slid over: (2) at rest no label, only the '?' pills (onboarding, deploy) and the '✗' pill (search-index), no name in them; a… → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
 - `bims/sit`: every frame draws. Shots: .harness-cache/bims-shots (sit-*.png, one strip per map, theme and move). → `apps/desktop/src/bims/*.test.ts` (unit (scene model)); fixture: src/bims/fixtures.ts rows.
