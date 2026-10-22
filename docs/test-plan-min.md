@@ -12,7 +12,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 
 | | KEEP | TRANSFORM | DELETE | total |
 |---|---|---|---|---|
-| Desktop Playwright specs (apps/desktop/tests/checks) | 30 | 261 | 52 | 343 |
+| Desktop Playwright specs (apps/desktop/tests/checks) | 29 | 262 | 52 | 343 |
 | TUI tmux tests (tests/*_tmux.py) | 12 | 68 | 3 | 83 |
 | Python e2e (tests/*_e2e.py) | 29 | 45 | 2 | 76 |
 | as-he-does rows (dev/plugins/ambient-qa/as-he-does) | 6 | 0 | 60 | 66 |
@@ -183,7 +183,7 @@ A deleted file is read with `git show 6f9114127:<path>` (the tree before the cul
 | `gate/counts` | TRANSFORM | renderer on a scripted core: no process seam |
 | `gate/cut` | DELETE | a past candidate's rows, each covered by its area spec |
 | `gate/empty` | TRANSFORM | renderer on a scripted core: no process seam |
-| `gate/images` | KEEP | his pasted image reaches the model as an image (window → core → hub → REPL → provider body) |
+| `gate/images` | TRANSFORM | moved from KEEP (nightly-reds m_37064, main m_37073): no runner ever set its FAKE_BODIES, so it never ran; the image → model path stays guarded by tui_card_image_tmux |
 | `gate/more` | DELETE | a past candidate's rows, each covered by its area spec |
 | `gate/next` | DELETE | a past candidate's rows, each covered by its area spec |
 | `gate/notify-real` | TRANSFORM | view of hub data: the hub side has its py/law test, the view a fixture |
@@ -658,7 +658,7 @@ review-gates (m_37051): these 44 go with no check left. showme and the post-land
 
 ## Deleted, not yet replaced
 
-**deleted, not yet replaced: 264** (min-tests lowers it by one per transform line it ticks; each replacement goes to review-gates with a mutation that turns it red).
+**deleted, not yet replaced: 265** (min-tests lowers it by one per transform line it ticks; each replacement goes to review-gates with a mutation that turns it red).
 
 ## Transform lines
 
@@ -785,6 +785,7 @@ One line per TRANSFORM test: what it guarded → where to check it (kind); the f
 - `ds/contrast`: on the built app with the scripted core (FakeCore, fake data) and prefers-contrast: more emulated: - storefront's thread: the sidebar's working dot and the inbox block's… → `apps/desktop/src/ds/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events.
 - `ds/slash-search`: his words, designer m_22848: a list's search that '/' focuses says so, GitHub's way: the sidebar's boxed key, '/', at the field's right end (8 px from the edge,… → `apps/desktop/src/ds/*.test.tsx` (unit (happy-dom component)); fixture: the component's props + typed key/paste events. Also as-he-does row(s) 'hint on ${scr}' checked it on the packed app on the real-shaped world: the rewrite covers what they read too.
 - `gate/counts`: TOOLCOUNT's cases the rich world doesn't have: on the real thread screen (FakeCore, fake data), an edit of one file reads '± Hero.tsx' with '+18 −6' dim after it, a move… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world).
+- `gate/images`: his images reach the model (R41): an image he pastes and an image he drops on the composer each go out as an image part of the message sent, never its path or a bare `[Image N]` (main m_37073) → `apps/desktop/tests/feature/sends.feature.test.ts` (feature test: does(paste image), does(drop file) → sent() carries the image parts); fixture: a tiny PNG as the pasted / dropped file. The hub → REPL → provider half stays in tui_card_image_tmux (KEEP).
 - `gate/empty`: the try's empty thread: on a fresh home, main's empty thread shows the first-run block centred in the column, and the window never scrolls, at 800, 1024, 1100 and 1400.… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world).
 - `gate/notify-real`: - the cards that waited at start never knock; - a card arriving while no bise window has the keys knocks once: '<who> asks · shop', the question, its choices + 'open in… → `apps/desktop/tests/feature/thread.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world).
 - `inbox/answer-images`: on the scripted core (FakeCore, fake data, a fixture PNG): - the block's answer: a PNG pasted in the composer while a card is open goes with his words as answer {parts:… → `apps/desktop/tests/feature/inbox.feature.test.ts` (feature test); fixture: FakeCore's world as feature inputs (rust/proto/fixtures + tests/harness/fakes' world).

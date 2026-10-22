@@ -45,19 +45,18 @@ if [ ${#specs[@]} -eq 0 ]; then
          tests/checks/inbox/answer-everywhere.spec.ts tests/checks/agents tests/checks/review)
 fi
 cd "$desktop" || exit 1
-# checks that change the world for good (review/feature-drop drops the feature that
-# review/feature merges) run last, each on a fresh world of its own
-# (review/feature-refused moves shop's main)
+# checks that change the world for good (real.json's `fresh`) run last, each on a fresh world
+# of its own (none today: review/feature-drop and feature-refused went in the e2e cull)
+# (${a[@]+"${a[@]}"}: macOS's bash 3.2 calls an empty array unbound under set -u)
 fresh=($(rule fresh))
-is_fresh() { local f; for f in "${fresh[@]}"; do [ "$1" = "$f" ] && return 0; done; return 1; }
+is_fresh() { local f; for f in ${fresh[@]+"${fresh[@]}"}; do [ "$1" = "$f" ] && return 0; done; return 1; }
 mine=() later=()
 for s in "${specs[@]}"; do
   if is_fresh "$s"; then later+=("$s"); else mine+=("$s"); fi
 done
 # a folder holding a fresh check runs it last too, not in the shared world
-# (${a[@]+"${a[@]}"}: macOS's bash 3.2 calls an empty array unbound under set -u)
 for s in ${mine[@]+"${mine[@]}"}; do
-  for f in "${fresh[@]}"; do
+  for f in ${fresh[@]+"${fresh[@]}"}; do
     case "$f" in "$s"/*) later+=("$f") ;; esac
   done
 done
@@ -80,7 +79,7 @@ for s in ${mine[@]+"${mine[@]}"}; do
 done
 mine=(${rest[@]+"${rest[@]}"})
 if [ ${#mine[@]} -gt 0 ]; then
-  PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real.json" pnpm exec playwright test -c tests/harness/playwright.config.ts "${mine[@]}" -g "$grep" --grep-invert 'feature-drop|feature-refused' --reporter=list,json || rc=1
+  PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real.json" pnpm exec playwright test -c tests/harness/playwright.config.ts "${mine[@]}" -g "$grep" --reporter=list,json || rc=1
 fi
 n=0
 for s in ${later[@]+"${later[@]}"}; do

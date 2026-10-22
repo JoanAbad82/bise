@@ -15,24 +15,8 @@ import { fileURLToPath } from 'node:url';
 export const LAND = [
   'checks/app/keep-all.spec.ts',
   'checks/app/core-line.spec.ts',
-  'checks/spotlight/streaming.spec.ts',
   // the real pages server's CSP in the artifact view (ambient-lead m_20610, architect m_20628)
   'checks/artifacts/frame-csp.spec.ts',
-  // an html artifact its script builds shows whole, follows a new version and a reopen; '↗ browser'
-  // opens the hub's page (art-viewer, architect m_25527)
-  'checks/artifacts/script-page.spec.ts',
-  // a link in the panel's artifact (html, bise page, office viewer): his browser, another artifact
-  // in the panel, an anchor scrolls; the frame never leaves its artifact (art-links, architect m_26370)
-  'checks/artifacts/links.spec.ts',
-  // save a copy… (⤓, ⋯, ⌘S) and show in Finder: a file, an office file's older version, an archived
-  // agent's gone file through bise's copy; the panel stubbed (art-save)
-  'checks/artifacts/save-copy.spec.ts',
-  // a bise page's frame keeps every control whole from 1400 to 320 px, the words give way first
-  // (page-head, his m_26492)
-  'checks/artifacts/page-head.spec.ts',
-  // on a page updating (a pick sent, its agent still on it), his typed notes go with ⌘⏎, the send
-  // bar and the frame's send: sent, one message each (notes-send, his « le bouton send »)
-  'checks/artifacts/notes-send.spec.ts',
   // an app from the DMG or Downloads asks once to move to Applications; 'Not now' is kept for its
   // build; settings › update moves it (apple-signing ag-move; the alert and the move stubbed)
   'checks/native/move-apps.spec.ts',

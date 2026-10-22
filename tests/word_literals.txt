@@ -4,15 +4,6 @@
 # lowers it in the same commit, at 0 its line goes. Only a change that adds keys may raise a count, by
 # literals the file already had. 'lint shape': the literal has a word's shape but is not that word
 # (a description, fixture data, a hub label); the others name the area that moves it. tests/word_lint.py.
-2 apps/desktop/tests/checks/artifacts/open-cases.spec.ts  # a part of composer's '↳ to bise · about …' tab in toContainText: composer to move it whole
-1 apps/desktop/tests/checks/gate/counts.spec.ts  # lint shape: a diff count, not panel.names_more
-1 apps/desktop/tests/checks/gate/images.spec.ts  # lint shape: a regex in a note, not the row
-1 apps/desktop/tests/checks/gate/right.spec.ts  # lint shape: a step's name, not the bar's word
-1 apps/desktop/tests/checks/native/fn.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
-2 apps/desktop/tests/checks/settings/keys.spec.ts  # lint shape: an expect message or a test's label, not the word on screen
-1 apps/desktop/tests/checks/settings/sign-in-expired.spec.ts  # lint shape: a card option's label in the fixture, not settings.sign_in
-3 apps/desktop/tests/checks/spotlight/projects.spec.ts  # lint shape: spotlight's project line (no catalog area yet), not inbox/panel words
-1 apps/desktop/tests/checks/terminal/early.spec.ts  # lint shape: a test description, not inbox.waits_for
 1 apps/desktop/tests/checks/thread/computer-use.spec.ts  # lint shape: 'driving again' is a test's words
 1 tests/tui_computer_use_tmux.py  # lint shape: 'for apps' is computer use's grant text, settings to check
 1 tests/tui_file_links_tmux.py  # lint shape: the file-link note, not settings.first_opening
