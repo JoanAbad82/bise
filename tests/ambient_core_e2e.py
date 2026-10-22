@@ -195,26 +195,27 @@ def main():
         c.wait_line("main", "start an agent for: fix the login loop on Safari", 60)
         c.wait(lambda: any("[from the capsule: start an agent; answer in one short line]" in l for l in c.lines("main")), 60, "the start hint")
 
-        # bise's bookkeeping stays in the TUI (pm's C fail 36): main's
-        # archive suggestion is a drop card for the TUI, never one in the
-        # capsule, and while it is open a second drop never acts
+        # main's archive suggestion is his card (drop-card, architect
+        # m_35666: he answers it with 1 archive it / 2 keep it, so the
+        # banner and the capsule have it too), and while it is open a
+        # second drop never acts
         c.wait_idle("main", "t1")
         c.say('/new -w t2: {{bash: echo wip > wip.txt}}')
         c.wait_idle("t2")
         c.say("[[bash: sb drop t2]]")
-        # the TUI draws hub/cards' `others` too (not his: items stays his)
-        def others():
+        # hub/cards' `cards` (his), never its `others`
+        def listed(key):
             with c.lock:
-                return list((c.hub.get("hub/cards") or {}).get("others", []))
-        c.wait(lambda: any(x.get("kind") == "drop" and x.get("agent") == "t2" for x in others()), 60, "the drop card in the TUI")
-        drop = next(x for x in others() if x.get("kind") == "drop")
-        core.wait(lambda e: e.get("ev") == "state" and any(a["name"] == "t2" for a in e["agents"]), 30, "t2 in the core's list")
-        wait.holds(lambda: not any(cd["id"] == drop["id"] for cd in core.last("state")["cards"]), 1,
-                   lambda: "no drop card in the capsule: %r" % core.last("state")["cards"])
+                return list((c.hub.get("hub/cards") or {}).get(key, []))
+        c.wait(lambda: any(x.get("kind") == "drop" and x.get("agent") == "t2" for x in listed("cards")), 60, "the drop card in his cards")
+        drop = next(x for x in listed("cards") if x.get("kind") == "drop")
+        check(not any(x.get("kind") == "drop" for x in listed("others")), "a drop card in others: %r" % listed("others"))
+        check([o.get("label") for o in drop.get("options", [])] == ["archive it", "keep it"], "its 2 options: %r" % drop)
+        core.wait(lambda e: e.get("ev") == "state" and any(cd["id"] == drop["id"] for cd in e["cards"]), 30, "the drop card in the capsule")
         c.wait_idle("main")
         c.say("[[bash: sb drop t2]]")
         c.wait_line("main", "has not answered notification #%d" % drop["id"], 60)
-        check(any(x["id"] == drop["id"] for x in others()), "the card still asks him")
+        check(any(x["id"] == drop["id"] for x in listed("cards")), "the card still asks him")
 
         # round 10 (identity10 #data): t1's preview and history through the
         # hub's history op, his words to it, live in its open panel
