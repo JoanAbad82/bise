@@ -206,6 +206,18 @@ def Laws.chunk_lines_split():
 def Laws.chunk_lines_empty():
   {==}
 
+def Laws.long_line_is_one_command():
+  {==}
+
+def Laws.chunk_lines_and_a_tail():
+  {==}
+
+def Laws.chunk_without_newline_is_a_piece():
+  {==}
+
+def Laws.cut_char_in_a_long_line():
+  {==}
+
 def Laws.interrupt_path_is_per_port():
   {==}
 

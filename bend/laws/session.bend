@@ -17,6 +17,7 @@ import ../runtime/main-pure.bend as Rt
 import ../runtime/bash-pure.bend as Sh
 import ../runtime/provider-pure.bend as Pv
 import ../runtime/repl-core-pure.bend as Rp
+import ../core/utf8.bend as U8
 import ../vendor/json.bend as J
 import ../runtime/race-pure.bend as Rc
 
@@ -146,6 +147,91 @@ say b")
 # LAW: a chunk of only blank lines yields no commands.
 law chunk_lines_empty:
   {Rp.cmd_lines("\n\n") == Nil{} : List<&2, String>}
+
+# ---- a line longer than one recv (BISE-240, big-msg-perf) ----
+
+# the socket reader between two recvs: the commands so far, the carry
+# (Rp.feed) and the bytes of the char the last recv cut (core/utf8.bend)
+type Rd is Data:
+  Rd{lines: List<&2, String>, carry: List<&2, String>, pend: List<&2, U32>}
+
+def rd_fed(f: List<&2, String> & List<&2, String>, +lines: List<&2, String>,
+    +pend: List<&2, U32>) -> Rd:
+  match f:
+    case (+got, +carry):
+      Rd{List.append(&2, String, lines, got), carry, pend}
+
+def rd_dec(r: String & List<&2, U32>, +lines: List<&2, String>,
+    +carry: List<&2, String>) -> Rd:
+  match r:
+    case (+text, +pend):
+      rd_fed(Rp.feed(carry, text), lines, pend)
+
+# one recv's bytes, decoded after the cut char's bytes, then fed after
+# the unfinished line, as the REPL reads its socket
+def rd_bytes(st: Rd, +bs: List<&2, U32>) -> Rd:
+  match st:
+    case Rd{+lines, +carry, +pend}:
+      rd_dec(U8.decode(pend, bs), lines, carry)
+
+# one chunk of text, fed after the unfinished line
+def rd_text(st: Rd, +c: String) -> Rd:
+  match st:
+    case Rd{+lines, +carry, +pend}:
+      rd_fed(Rp.feed(carry, c), lines, pend)
+
+def rd_lines(st: Rd) -> List<&2, String>:
+  match st:
+    case Rd{+lines, _, _}:
+      lines
+
+def recv_go(+chunks: List<&2, List<&2, U32>>, st: Rd) -> Rd:
+  match chunks:
+    case Nil{}:
+      st
+    case Con{+bs, +rest}:
+      recv_go(rest, rd_bytes(st, bs))
+
+def text_go(+chunks: List<&2, String>, st: Rd) -> Rd:
+  match chunks:
+    case Nil{}:
+      st
+    case Con{+c, +rest}:
+      text_go(rest, rd_text(st, c))
+
+# the commands the recvs `chunks` (their bytes) carry
+def recv_lines(+chunks: List<&2, List<&2, U32>>) -> List<&2, String>:
+  rd_lines(recv_go(chunks, Rd{Nil{}, Nil{}, Nil{}}))
+
+# the commands of text chunks fed one after the other
+def text_lines(+chunks: List<&2, String>) -> List<&2, String>:
+  rd_lines(text_go(chunks, Rd{Nil{}, Nil{}, Nil{}}))
+
+# LAW: a line cut over three chunks is one command, run when its
+# newline comes.
+law long_line_is_one_command:
+  {text_lines(["say ab", "cd", "ef\n"]) == ["say abcdef"]
+    : List<&2, String>}
+
+# LAW: several lines in one chunk are separate commands, blank ones
+# dropped; the line the chunk leaves unfinished waits for its newline.
+law chunk_lines_and_a_tail:
+  {text_lines(["say a\n\nsay b\nsay c", " d\n"])
+    == ["say a", "say b", "say c d"] : List<&2, String>}
+
+# LAW: a chunk without a newline gives no command and goes on the carry
+# as it is: the line's earlier pieces are not copied or split again
+# (appending each recv to the line and splitting it whole cost ~318e9
+# instructions for a 2 MB `say`).
+law chunk_without_newline_is_a_piece:
+  {Rp.feed(["cd", "say ab"], "ef") == (Nil{}, ["ef", "cd", "say ab"])
+    : List<&2, String> & List<&2, String>}
+
+# LAW: a multibyte char (é: 0xC3 0xA9) cut by the recv boundary inside
+# a two-chunk line reaches the command whole.
+law cut_char_in_a_long_line:
+  {recv_lines([[115, 97, 121, 32, 120, 195], [169, 121, 10]])
+    == [String.append("say x", SCon{Chr{233}, "y"})] : List<&2, String>}
 
 # LAW: the interrupt flag file is per-process (the Ctrl+C path), in the
 # side dir (the agent's run/ folder, approvals-design.md §7.1).

@@ -333,37 +333,45 @@ def repl_lines.go(+live: Bool, +lines: List<&2, String>, s: Socket, +sess: T.Ses
           s2 => sess2 => repl_lines.go(live, rest, s2, sess2, next))
         IO.pure(Flow, f)
 
-# `data`: the line the last chunk left unfinished, then this chunk; the
-# lines a newline ends run, the rest waits for the next chunk (`next`
-# gets it: a message longer than one recv stays one message, BISE-240)
-def repl_data(+live: Bool, closed: Bool, s: Socket, +data: String, +sess: T.Session,
-    next: String -> Socket -> T.Session -> IO(Flow)) -> IO(Flow):
+# `lines`: the commands this chunk's newlines end (after the line the
+# last chunks left unfinished: Rcp.feed); they run, then `next` reads
+# the next chunk (a message longer than one recv stays one message,
+# BISE-240)
+def repl_data(+live: Bool, closed: Bool, s: Socket, +lines: List<&2, String>, +sess: T.Session,
+    next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
   match closed:
     case True{}:
       do IO<Flow>:
         Socket.close(s)
         IO.pure(Flow, Go{sess})
     case False{}:
-      repl_lines.go(live, Rcp.cmd_whole(data), s, sess,
-        s2 => sess2 => next(Rcp.cmd_tail(data))(s2)(sess2))
+      repl_lines.go(live, lines, s, sess, next)
 
 # one recv's bytes, after the bytes of the char the last recv cut
 # (core/utf8.bend: a char a recv boundary cuts reaches its line whole,
-# issue 36); no bytes: the hub closed the connection
+# issue 36); no bytes: the hub closed the connection. `carry`: the
+# pieces of the unfinished line, newest first (Rcp.feed)
 @unsafe
-def repl_got(+live: Bool, s: Socket, +bs: List<&2, U32>, +carry: String, +pend: List<&2, U32>, +sess: T.Session) -> IO(Flow):
+def repl_got(+live: Bool, s: Socket, +bs: List<&2, U32>, +carry: List<&2, String>, +pend: List<&2, U32>, +sess: T.Session) -> IO(Flow):
   repl_decoded(live, List.is_empty(&2, U32, bs), s, U8.decode(pend, bs), carry, sess)
 
 @unsafe
-def repl_decoded(+live: Bool, closed: Bool, s: Socket, r: String & List<&2, U32>, +carry: String, +sess: T.Session) -> IO(Flow):
+def repl_fed(+live: Bool, closed: Bool, s: Socket, f: List<&2, String> & List<&2, String>,
+    +pend2: List<&2, U32>, +sess: T.Session) -> IO(Flow):
+  match f:
+    case (+lines, +carry2):
+      repl_data(live, closed, s, lines, sess,
+        s2 => sess2 => repl_conn(live, s2, carry2, pend2, sess2))
+
+@unsafe
+def repl_decoded(+live: Bool, closed: Bool, s: Socket, r: String & List<&2, U32>, +carry: List<&2, String>, +sess: T.Session) -> IO(Flow):
   match r:
     case (+text, +pend2):
-      repl_data(live, closed, s, String.append(carry, text), sess,
-        c => s2 => sess2 => repl_conn(live, s2, c, pend2, sess2))
+      repl_fed(live, closed, s, Rcp.feed(carry, text), pend2, sess)
 
 @unsafe
 def repl_after(+live: Bool, rm: Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>>,
-    +carry: String, +pend: List<&2, U32>, +sess: T.Session) -> IO(Flow):
+    +carry: List<&2, String>, +pend: List<&2, U32>, +sess: T.Session) -> IO(Flow):
   match rm:
     case (s, Fail{_}):
       do IO<Flow>:
@@ -373,7 +381,7 @@ def repl_after(+live: Bool, rm: Socket & Result<&1, &1, U32 & String, Maybe<&1, 
       repl_got(live, s, Rcp.recv_bytes(m), carry, pend, sess)
 
 @unsafe
-def repl_conn(+live: Bool, sock: Socket, +carry: String, +pend: List<&2, U32>, sess: T.Session) -> IO(Flow):
+def repl_conn(+live: Bool, sock: Socket, +carry: List<&2, String>, +pend: List<&2, U32>, sess: T.Session) -> IO(Flow):
   do IO<Flow>:
     rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>> <- TCP.recv_bytes(sock, 4096)
     repl_after(live, rm, carry, pend, sess)
@@ -453,7 +461,7 @@ def greet_conn(+live: Bool, out: Pv.Out, +sess: T.Session) -> IO(Flow):
       IO.pure(Flow, Go{sess})
     case Pv.ONet{s2}:
       resume_queued(live, List.is_empty(&2, String, S.sess_queued(sess)), s2,
-        sess, s3 => sess3 => repl_conn(live, s3, "", Nil{}, sess3))
+        sess, s3 => sess3 => repl_conn(live, s3, Nil{}, Nil{}, sess3))
 
 
 

@@ -205,46 +205,60 @@ def cmd_lines.go(lines: List<&2, String>) -> List<&2, String>:
 def cmd_lines(+data: String) -> List<&2, String>:
   cmd_lines.go(String.split(data, Tx.newline()))
 
-# a line longer than one recv (a long paste, BISE-240: an 8 kB `say`)
-# arrives in several chunks: only the lines a newline ends are commands,
-# the tail after the last newline waits for the next chunk. `parts` is
-# the chunk split at its newlines: every part but the last is whole.
-def cmd_whole.init(+rest: List<&2, String>, +first: String) -> List<&2, String>:
+# a line longer than one recv (a long paste, BISE-240: an 8 kB `say`, a
+# 2 MB one) arrives in many chunks: only the lines a newline ends are
+# commands, the rest waits for the next chunk. The unfinished line is
+# kept as its pieces, newest first, none with a newline (the carry): a
+# chunk is split alone and the pieces are joined once, when the newline
+# comes. Appending each chunk to the line and splitting the whole line
+# again was quadratic (big-msg-perf: a 2 MB `say` cost ~318e9
+# instructions before its provider call).
+# `rest` and `first`: the chunk split at its newlines; every part but
+# the last is whole
+def feed.init(+rest: List<&2, String>, +first: String) -> List<&2, String>:
   match rest:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Con{first, cmd_whole.init(t, h)}
+      Con{first, feed.init(t, h)}
 
-def cmd_whole.of(+parts: List<&2, String>) -> List<&2, String>:
-  match parts:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      cmd_lines.go(cmd_whole.init(t, h))
-
-# the commands of `data` that a newline ends
-def cmd_whole(+data: String) -> List<&2, String>:
-  cmd_whole.of(String.split(data, Tx.newline()))
-
-def cmd_tail.last(+rest: List<&2, String>, +first: String) -> String:
+def feed.last(+rest: List<&2, String>, +first: String) -> String:
   match rest:
     case Nil{}:
       first
     case Con{+h, +t}:
-      cmd_tail.last(t, h)
+      feed.last(t, h)
 
-def cmd_tail.of(+parts: List<&2, String>) -> String:
+# the line the carry's pieces and `first` (the chunk up to its first
+# newline) make, joined once
+def feed.close(+carry: List<&2, String>, +first: String) -> String:
+  String.concat(List.reverse(&2, String, Con{first, carry}))
+
+# one part: no newline, the chunk is one more piece of the line;
+# more: the first part ends the line, the last starts the next one
+def feed.parts(+rest: List<&2, String>, +first: String, +carry: List<&2, String>)
+    -> List<&2, String> & List<&2, String>:
+  match rest:
+    case Nil{}:
+      (Nil{}, Con{first, carry})
+    case Con{+h, +t}:
+      (cmd_lines.go(Con{feed.close(carry, first), feed.init(t, h)}),
+        Con{feed.last(t, h), Nil{}})
+
+def feed.of(+parts: List<&2, String>, +carry: List<&2, String>)
+    -> List<&2, String> & List<&2, String>:
   match parts:
     case Nil{}:
-      ""
+      (Nil{}, carry)
     case Con{+h, +t}:
-      cmd_tail.last(t, h)
+      feed.parts(t, h, carry)
 
-# what `data` has after its last newline: the start of a line the next
-# chunk goes on with ("" when `data` ends with a newline)
-def cmd_tail(+data: String) -> String:
-  cmd_tail.of(String.split(data, Tx.newline()))
+# a chunk read after the carry: (the commands the newlines it holds end,
+# the carry for the next chunk). Each char of the line is split once and
+# copied once, whatever the number of chunks
+def feed(+carry: List<&2, String>, +text: String)
+    -> List<&2, String> & List<&2, String>:
+  feed.of(String.split(text, Tx.newline()), carry)
 
 # ---- BEND_EXTRA_PROMPT: a role appended to the system prompt ----
 # A switchboard hub gives each agent its role (main, or a task with its
